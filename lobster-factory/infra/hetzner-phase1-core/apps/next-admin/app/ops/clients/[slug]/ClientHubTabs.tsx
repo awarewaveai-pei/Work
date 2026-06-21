@@ -52,6 +52,25 @@ const PRICE_POSITIONS = [
   { value: "value",   label: "平價親民" },
 ];
 
+// ── Audience profile chip constants (mirrors ScriptForge.tsx) ─────────────────
+
+const CONTENT_GOALS = ["吸粉增長", "教育受眾", "銷售產品", "引流導網", "品牌曝光", "建立信任"];
+const CONTENT_TONES_CHIPS = ["專業權威", "溫柔親切", "幽默搞笑", "犀利直接", "高級質感", "情緒共鳴"];
+const CONTENT_CTAS = ["留言互動", "追蹤頻道", "購買產品", "預約服務", "下載資源", "私訊詢問"];
+const AUDIENCE_CATS = [
+  { key: "age",       label: "年齡層",          opts: ["18–24", "25–34", "35–44", "45–54", "55+"],             multi: true,  custom: false },
+  { key: "gender",    label: "性別",             opts: ["女性", "男性", "不限"],                                  multi: false, custom: false },
+  { key: "job",       label: "職業 / 身分",      opts: ["上班族", "學生", "創業/自雇", "家長", "退休族", "創作者"], multi: true,  custom: true  },
+  { key: "emotion",   label: "情緒 / 心理狀態",  opts: ["焦慮壓力", "想自我成長", "尋找療癒", "缺乏自信", "想被理解"], multi: true, custom: true },
+  { key: "awareness", label: "對主題的熟悉度",   opts: ["完全新手", "在比較方案", "進階老手"],                     multi: false, custom: false },
+  { key: "spending",  label: "消費力",           opts: ["平價親民", "中等", "高端精品"],                          multi: false, custom: false },
+] as const;
+const AUDIENCE_PRESETS = [
+  { label: "想成長的年輕上班族", sel: { age: ["25–34"],        gender: ["不限"],  job: ["上班族"],         emotion: ["想自我成長"],           awareness: ["在比較方案"], spending: ["中等"] } },
+  { label: "尋求療癒的家長",     sel: { age: ["35–44"],        gender: ["女性"],  job: ["家長"],           emotion: ["尋找療癒"],             awareness: ["完全新手"],   spending: ["中等"] } },
+  { label: "想學創作的新手",     sel: { age: ["25–34","35–44"], gender: ["不限"], job: ["創作者","上班族"], emotion: ["缺乏自信","想自我成長"], awareness: ["完全新手"],   spending: ["平價親民"] } },
+];
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface IntegrationBinding {
@@ -205,6 +224,25 @@ function MetricGrid({ items }: { items: Array<{ label: string; value: string | n
   );
 }
 
+function ChipBtn({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: "3px 10px", borderRadius: 20, fontSize: 11, border: "1px solid",
+        cursor: "pointer", whiteSpace: "nowrap",
+        background: active ? "var(--accent)" : "transparent",
+        color: active ? "#fff" : "var(--text-secondary)",
+        borderColor: active ? "var(--accent)" : "var(--card-border)",
+        fontWeight: active ? 600 : 400,
+        lineHeight: 1.6,
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
 function IntegrationTile({ name, status }: { name: string; status: "active" | "failed" | "pending" | "none" }) {
   const icons: Record<string, string> = { active: "✓", failed: "✗", pending: "…", none: "—" };
   const colors: Record<string, string> = {
@@ -238,6 +276,32 @@ function ContentTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cfg
   }
   function sm(key: keyof NonNullable<SiteContentDefaults["marketing"]>, val: string) {
     setDefaults(d => ({ ...d, marketing: { ...d.marketing, [key]: val } }));
+  }
+
+  // Audience profile chip helpers
+  type AP = NonNullable<SiteContentDefaults["audienceProfile"]>;
+  function getAP(): AP { return defaults.audienceProfile ?? {}; }
+  function setAP(updater: (prev: AP) => AP) {
+    setDefaults(d => ({ ...d, audienceProfile: updater(d.audienceProfile ?? {}) }));
+  }
+  function toggleSingle(field: keyof AP, val: string) {
+    setAP(ap => {
+      const cur = ap[field] as string | string[] | undefined;
+      const arr = Array.isArray(cur) ? cur : [];
+      return { ...ap, [field]: arr.includes(val) ? [] : [val] };
+    });
+  }
+  function toggleMulti(field: keyof AP, val: string) {
+    setAP(ap => {
+      const arr = (ap[field] as string[] | undefined) ?? [];
+      return { ...ap, [field]: arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val] };
+    });
+  }
+  function setSingle(field: keyof AP, val: string) {
+    setAP(ap => ({ ...ap, [field]: ap[field] === val ? undefined : val }));
+  }
+  function applyPreset(sel: Record<string, string[]>) {
+    setAP(ap => ({ ...ap, ...sel }));
   }
 
   async function save() {
@@ -426,6 +490,91 @@ function ContentTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cfg
               onChange={e => sf("brandVoiceInstructions", e.target.value)}
               placeholder={"例：文章開頭避免用問句；標題要情感導向而非功能性；語氣像朋友聊天，不像教授上課"}
             />
+          </div>
+
+          {/* 精準受眾畫像 */}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-primary)", marginBottom: 8, paddingBottom: 4, borderBottom: "1px solid var(--border-subtle)" }}>
+              精準受眾畫像（注入文章生成）
+            </div>
+
+            {/* 常用人設一鍵套用 */}
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, fontWeight: 500 }}>常用人設（一鍵套整組）</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {AUDIENCE_PRESETS.map(p => (
+                  <button
+                    key={p.label}
+                    onClick={() => applyPreset(p.sel)}
+                    style={{
+                      padding: "4px 12px", borderRadius: 6, fontSize: 11, border: "1px solid var(--accent)",
+                      cursor: "pointer", background: "transparent", color: "var(--accent)", fontWeight: 500,
+                    }}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 內容目的 (single) */}
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, fontWeight: 500 }}>內容目的</div>
+              <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                {CONTENT_GOALS.map(g => (
+                  <ChipBtn key={g} label={g} active={getAP().contentGoal === g} onClick={() => setSingle("contentGoal", g)} />
+                ))}
+              </div>
+            </div>
+
+            {/* 語氣風格 (single) */}
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, fontWeight: 500 }}>語氣風格</div>
+              <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                {CONTENT_TONES_CHIPS.map(t => (
+                  <ChipBtn key={t} label={t} active={getAP().contentTone === t} onClick={() => setSingle("contentTone", t)} />
+                ))}
+              </div>
+            </div>
+
+            {/* 觀眾行動 (single) */}
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, fontWeight: 500 }}>觀眾行動（期望 CTA）</div>
+              <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                {CONTENT_CTAS.map(c => (
+                  <ChipBtn key={c} label={c} active={getAP().audienceAction === c} onClick={() => setSingle("audienceAction", c)} />
+                ))}
+              </div>
+            </div>
+
+            {/* 目標受眾各維度 */}
+            {AUDIENCE_CATS.map(cat => (
+              <div key={cat.key} style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, fontWeight: 500 }}>{cat.label}</div>
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}>
+                  {cat.opts.map(opt => {
+                    const arr = (getAP()[cat.key as keyof AP] as string[] | undefined) ?? [];
+                    const active = arr.includes(opt);
+                    return (
+                      <ChipBtn
+                        key={opt}
+                        label={opt}
+                        active={active}
+                        onClick={() => cat.multi ? toggleMulti(cat.key as keyof AP, opt) : toggleSingle(cat.key as keyof AP, opt)}
+                      />
+                    );
+                  })}
+                  {cat.custom && (
+                    <input
+                      placeholder="+ 自訂"
+                      style={{ padding: "2px 8px", borderRadius: 20, fontSize: 11, border: "1px dashed var(--card-border)", background: "transparent", color: "var(--text-primary)", width: 72 }}
+                      value={(getAP()[(cat.key + "Custom") as keyof AP] as string | undefined) ?? ""}
+                      onChange={e => setAP(ap => ({ ...ap, [(cat.key + "Custom") as keyof AP]: e.target.value }))}
+                    />
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Save button (bottom) */}

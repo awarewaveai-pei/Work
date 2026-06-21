@@ -2227,15 +2227,6 @@ export default function ContentStudio() {
               <div>
                 <label className="form-label">文章標題 <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>（空白則自動生成）</span></label>
                 <input className="form-input" value={form.title} onChange={e => setF("title", e.target.value)}
-
-          {/* ══════════════════════════════════════════════════════════════════════════════════════════ */}
-          {/* ═══════════════════════════ A：文章 / 內容設定 ═══════════════════════════════════════ */}
-          <div style={{ border: "1px solid rgba(59,130,246,0.3)", borderRadius: "12px", marginBottom: "20px", overflow: "hidden" }}>
-            <div style={{ background: "linear-gradient(135deg,rgba(59,130,246,0.08),rgba(59,130,246,0.02))", borderBottom: "1px solid rgba(59,130,246,0.2)", padding: "10px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ fontSize: "15px" }}>📝</span>
-              <span style={{ fontWeight: 700, fontSize: "13px", color: "#1d4ed8" }}>文章 / 內容設定</span>
-            </div>
-            <div style={{ padding: "0 16px" }}>
                   placeholder="例：什麼是藝術療癒？" disabled={isGenerating} />
               </div>
             </div>
@@ -2309,6 +2300,15 @@ export default function ContentStudio() {
             </div>
           </div>
 
+
+          {/* ══════════════════════════════════════════════════════════════════════════════════════════ */}
+          {/* ═══════════════════════════ A：文章 / 內容設定 ═══════════════════════════════════════ */}
+          <div style={{ border: "1px solid rgba(59,130,246,0.3)", borderRadius: "12px", marginBottom: "20px", overflow: "hidden" }}>
+            <div style={{ background: "linear-gradient(135deg,rgba(59,130,246,0.08),rgba(59,130,246,0.02))", borderBottom: "1px solid rgba(59,130,246,0.2)", padding: "10px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "15px" }}>📝</span>
+              <span style={{ fontWeight: 700, fontSize: "13px", color: "#1d4ed8" }}>文章 / 內容設定</span>
+            </div>
+            <div style={{ padding: "0 16px" }}>
           {/* ── 文章結構 ── */}
           <SectionToggle label="Structure" open={showStruct} onToggle={() => setShowStruct(v => !v)}>
             {/* Introductory Hook Brief */}
@@ -2364,7 +2364,7 @@ export default function ContentStudio() {
                             if (hookBriefSugs[ht]) setF("introHookBrief", hookBriefSugs[ht]);
                           }
                           return next;
-
+                        });
                       }}
                       style={{ padding: "3px 10px", borderRadius: "20px", fontSize: "11px", cursor: "pointer",
                         border: isSelected ? "1.5px solid var(--btn-primary-bg, #5855d0)" : "1px solid var(--card-border)",
@@ -2381,78 +2381,78 @@ export default function ContentStudio() {
                   <span style={{ fontSize: "11px", color: "var(--text-muted)", alignSelf: "center" }}>
                     {hookTypesSelected.size > 1 ? `已選 ${hookTypesSelected.size} 個 → 按推薦並生成批次生成草稿` : ""}
                   </span>
-
-                  </div>
                 )}
-                <div style={{ marginTop: "8px", padding: "8px", background: "var(--bg-card)", borderRadius: "4px", borderLeft: "3px solid #5855d0", fontSize: "11px", lineHeight: 1.5 }}>
-                  {bvProfile.promptInjection}
-                </div>
               </div>
-            )}
-          </SectionToggle>
-
-          {/* ── 品牌語調（進階 raw，向後相容）── */}
-          <SectionToggle label="品牌語調 / 進階指示（原始文字，選填）" open={showAdvanced} onToggle={() => setShowAdvanced(v => !v)}>
-            <textarea className="form-textarea" style={{ minHeight: "90px" }}
-              value={form.details} onChange={e => setF("details", e.target.value)} disabled={isGenerating}
-              placeholder={`brand_name: "Soulful Expression"\nforbidden_claims: ["治癒", "治療疾病"]\naudience: 台灣成人，對表達藝術有興趣`} />
-            <div className="form-hint" style={{ marginTop: 4 }}>自由文字會接在上方「精準行銷」表單之後一起注入。已用表單者此欄可留空。</div>
-          </SectionToggle>
-
-          {/* ── Connect to Web ── */}
-          <SectionToggle label="參考 URL（Connect to Web）" open={showConnWeb} onToggle={() => setShowConnWeb(v => !v)}>
-            <label className="form-label" style={{ marginTop: 0 }}>
-              最多 3 個參考頁面 URL
-              <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— AI 讀取頁面內容作為事實參考</span>
-            </label>
-            <textarea className="form-textarea" style={{ minHeight: "80px" }}
-              value={form.referenceUrls} onChange={e => setF("referenceUrls", e.target.value)} disabled={isGenerating}
-              placeholder={"https://en.wikipedia.org/wiki/Art_therapy\nhttps://example.com/research-paper"} />
-            <div className="form-hint">伺服器端抓取頁面文字注入提示詞（每個 URL 最多 3000 字元）。</div>
-          </SectionToggle>
-
-          {/* ── #5 競業與痛點分析 ── */}
-          <SectionToggle label="🔍 競業與痛點分析（多角度市場研究）" open={showMarket} onToggle={() => setShowMarket(v => !v)}>
-            <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", marginBottom: "8px" }}>
-              <button className="btn-secondary" onClick={handleMarketAnalysis}
-                disabled={marketLoading || !form.keyword.trim()} style={{ fontSize: "12px" }}>
-                {marketLoading ? "分析中（約 10–30 秒）…" : "🔍 分析競業與痛點"}
-              </button>
-              {marketContext && <span style={{ color: "#16a34a", fontSize: "12px" }}>✓ 已納入，產生文章時自動注入</span>}
-              {marketError && <span style={{ color: "var(--color-error, #ef4444)", fontSize: "12px" }}>{marketError}</span>}
-            </div>
-            <div className="form-hint">用 Perplexity 即時搜尋，從競爭對手、讀者痛點、搜尋意圖、轉換疑慮、差異化機會五個角度分析，結果會引導文章定位。需先填關鍵字。</div>
-            {marketAnalysis && (
-              <div style={{ marginTop: "12px", display: "grid", gap: "10px", fontSize: "12px" }}>
-                {([
-                  ["讀者痛點", marketAnalysis.painPoints, "#fee2e2", "#991b1b"],
-                  ["搜尋意圖 / 角度", marketAnalysis.searchIntent, "#dbeafe", "#1e40af"],
-
-                  ["競爭對手", marketAnalysis.competitors, "#f3e8ff", "#6b21a8"],
-                  ["差異化機會", marketAnalysis.differentiators, "#dcfce7", "#166534"],
-                ] as [string, string[], string, string][]).filter(([, arr]) => arr.length > 0).map(([title, arr, bg, fg]) => (
-                  <div key={title}>
-                    <div style={{ fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>{title}</div>
-                    <div>
-                      {arr.map((x, i) => (
-                        <span key={i} style={{ display: "inline-block", padding: "2px 7px", background: bg, color: fg, borderRadius: "3px", marginRight: "4px", marginBottom: "4px" }}>{x}</span>
-                      ))}
+              {/* Generated hook brief suggestions — only for currently selected types */}
+              {Object.keys(hookBriefSugs).filter(t => hookTypesSelected.has(t)).length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "8px" }}>
+                  {Object.entries(hookBriefSugs).filter(([t]) => hookTypesSelected.has(t)).map(([t, brief]) => (
+                    <div key={t} style={{ background: "var(--bg-subtle)", borderRadius: "var(--radius-sm)", padding: "7px 10px", fontSize: "12px", border: "1px solid var(--card-border)" }}>
+                      <div style={{ fontWeight: 600, fontSize: "11px", color: "var(--text-muted)", marginBottom: "3px" }}>{HOOK_TYPE_LABELS[t as typeof HOOK_TYPES[number]] ?? t}</div>
+                      <div style={{ color: "var(--text-primary)", lineHeight: 1.5 }}>{brief}</div>
+                      <button type="button" onClick={() => { setF("introHookType", t as typeof HOOK_TYPES[number]); setF("introHookBrief", brief); }}
+                        style={{ marginTop: "5px", fontSize: "11px", padding: "2px 8px", borderRadius: "4px", border: "1px solid var(--card-border)", cursor: "pointer", background: "var(--bg-hover)" }}>
+                        使用此草稿
+                      </button>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+              <textarea className="form-textarea" style={{ minHeight: "72px" }}
+                value={form.introHookBrief} maxLength={500} disabled={isGenerating}
+                onChange={e => setF("introHookBrief", e.target.value)}
+                placeholder={`補充 Hook 的具體方向（選填）。例：\n• Question → 「你有沒有想過，為什麼大多數人學了藝術治療卻沒有改變？」\n• Statistical or Fact → 「根據 2024 APA 研究，8 成焦慮者從未嘗試表達性藝術…」\n• Anecdotal or Story → 「3 年前，一位來訪者拿著一張全黑的畫走進工作室…」`} />
+            </div>
+
+            {/* Yes/No dropdowns grid — 4 cols, 17 items = 5 rows */}
+            <div style={{ fontWeight: 600, fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: ".05em" }}>基本結構</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px 16px", marginBottom: "14px" }}>
+              {(["quickAnswer", "keyTakeaways", "comparisonTable", "faq", "conclusion", "tables", "h3", "lists", "italics", "quotes", "bold"] as const).map(key => (
+                <div key={key}>
+                  <label className="form-label" style={{ marginBottom: "4px" }}>{structLabels[key]}</label>
+                  <select className="form-select" value={form.structure[key] ? "yes" : "no"} disabled={isGenerating}
+                    onChange={e => setStruct(key, e.target.value === "yes")}>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                  </select>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontWeight: 600, fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: ".05em" }}>進階內容元素</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px 16px", marginBottom: "12px" }}>
+              {(["expertQuote", "prosCons", "stepByStep", "calloutBox", "caseStudy", "statCallout"] as const).map(key => (
+                <div key={key}>
+                  <label className="form-label" style={{ marginBottom: "4px" }}>{structLabels[key]}</label>
+                  <select className="form-select" value={form.structure[key] ? "yes" : "no"} disabled={isGenerating}
+                    onChange={e => setStruct(key, e.target.value === "yes")}>
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                  </select>
+                </div>
+              ))}
+            </div>
+
+            <label style={checkLabel}>
+              <input type="checkbox" checked={form.generateMeta} onChange={e => setF("generateMeta", e.target.checked)} disabled={isGenerating} />
+              自動生成 SEO 標題 + Meta 描述
+            </label>
           </SectionToggle>
 
-          {/* ── 外部連結 ── */}
-          <SectionToggle label="外部連結（External Links）" open={showExtLinks} onToggle={() => setShowExtLinks(v => !v)}>
-            <label className="form-label" style={{ marginTop: 0 }}>
-              指定插入的外部連結
-              <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— 每行一個，最多 5 個</span>
-            </label>
-            <textarea className="form-textarea" style={{ minHeight: "90px" }}
-              value={form.externalLinks} onChange={e => setF("externalLinks", e.target.value)} disabled={isGenerating}
-              placeholder={"https://example.com/art-therapy-research\nhttps://example.com/mental-health-resources"} />
+          {/* ── 大綱編輯器 ── */}
+          <SectionToggle label="大綱編輯器（先看大綱、可改再生成全文）" open={showOutline} onToggle={() => setShowOutline(v => !v)}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+              <label className="form-label" style={{ marginTop: 0, marginBottom: 0 }}>
+                自訂大綱
+                <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— ## H2、### H3、#### H4；每個標題含關鍵字或近義變體，生成全文時嚴格遵循</span>
+              </label>
+              <button className="btn-secondary" style={{ fontSize: "12px" }}
+                onClick={handleGenOutline} disabled={isGenerating || !form.keyword.trim() || outlineLoading}>
+                {outlineLoading ? "…" : "✨ AI 自動生成大綱"}
+              </button>
+            </div>
+            <textarea className="form-textarea" style={{ minHeight: "120px", fontFamily: "monospace", fontSize: "12px" }}
+              value={form.outline} onChange={e => setF("outline", e.target.value)} disabled={isGenerating}
+              placeholder={"## 什麼是藝術療癒？\n## 藝術療癒的好處\n### 情緒層面\n### 認知層面\n## 如何開始\n## FAQ\n## 結語"} />
           </SectionToggle>
 
           {/* ── SEO / NLP 關鍵字 ── */}
@@ -2488,7 +2488,7 @@ export default function ContentStudio() {
                           {kw}
                         </button>
                       ))}
-
+                    </div>
                     <button onClick={() => setShowKwDrop(false)}
                       style={{ fontSize: "11px", color: "var(--text-muted)", padding: "6px 4px 0", background: "none", border: "none", cursor: "pointer", display: "block" }}>
                       關閉
@@ -2500,30 +2500,7 @@ export default function ContentStudio() {
           </SectionToggle>
 
           {/* ── 分類 / 標籤 ── */}
-
-                  <div className="form-hint">已自動帶入目標客戶「{(wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0])?.name}」，可直接覆寫。</div>
-                )}
-              </div>
-              <div>
-                <label className="form-label">從 URL 擷取（選填）</label>
-                <input className="form-input" value={bvSampleUrl}
-                  onChange={e => { setBvSampleUrl(e.target.value); setBvUrlTouched(true); }}
-                  placeholder="https://example.com/about" />
-                {!bvUrlTouched && bvSampleUrl.trim() && (
-                  <div className="form-hint">已自動帶入目標客戶 About 頁，可直接覆寫。</div>
-                )}
-
-                    {bvProfile.preferWords.map((w, i) => (
-                      <span key={i} style={{ display: "inline-block", padding: "1px 6px", background: "#dcfce7", color: "#166534", borderRadius: "3px", marginRight: "4px", marginBottom: "2px", fontSize: "11px" }}>{w}</span>
-                    ))}
-                  </div>
-                )}
-                {bvProfile.avoidWords.length > 0 && (
-                  <div style={{ marginTop: "4px" }}>
-                    <span style={{ color: "var(--text-muted)" }}>避免用詞：</span>
-                    {bvProfile.avoidWords.map((w, i) => (
-                      <span key={i} style={{ display: "inline-block", padding: "1px 6px", background: "#fee2e2", color: "#991b1b", borderRadius: "3px", marginRight: "4px", marginBottom: "2px", fontSize: "11px" }}>{w}</span>
-
+          <SectionToggle label="分類 / 標籤" open={showCatTags} onToggle={() => setShowCatTags(v => !v)}>
             <div style={{ display: "flex", gap: "24px", alignItems: "flex-start", flexWrap: "wrap" }}>
               <div style={{ flex: 1, minWidth: "200px" }}>
                 <label className="form-label">分類</label>
@@ -2593,6 +2570,29 @@ export default function ContentStudio() {
               value={form.internalLinks} onChange={e => setF("internalLinks", e.target.value)} disabled={isGenerating}
               placeholder={"https://soulfulexpression.org/art-therapy-basics\n/workshop-schedule\n/about-us"} />
             <div className="form-hint">站內連結已由 Internal Link Juicer 外掛自動處理。此欄位用於強制 AI 引用特定頁面（例如相關工作坊或課程頁面）。</div>
+          </SectionToggle>
+
+          {/* ── Connect to Web ── */}
+          <SectionToggle label="參考 URL（Connect to Web）" open={showConnWeb} onToggle={() => setShowConnWeb(v => !v)}>
+            <label className="form-label" style={{ marginTop: 0 }}>
+              最多 3 個參考頁面 URL
+              <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— AI 讀取頁面內容作為事實參考</span>
+            </label>
+            <textarea className="form-textarea" style={{ minHeight: "80px" }}
+              value={form.referenceUrls} onChange={e => setF("referenceUrls", e.target.value)} disabled={isGenerating}
+              placeholder={"https://en.wikipedia.org/wiki/Art_therapy\nhttps://example.com/research-paper"} />
+            <div className="form-hint">伺服器端抓取頁面文字注入提示詞（每個 URL 最多 3000 字元）。</div>
+          </SectionToggle>
+
+          {/* ── 外部連結 ── */}
+          <SectionToggle label="外部連結（External Links）" open={showExtLinks} onToggle={() => setShowExtLinks(v => !v)}>
+            <label className="form-label" style={{ marginTop: 0 }}>
+              指定插入的外部連結
+              <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— 每行一個，最多 5 個</span>
+            </label>
+            <textarea className="form-textarea" style={{ minHeight: "90px" }}
+              value={form.externalLinks} onChange={e => setF("externalLinks", e.target.value)} disabled={isGenerating}
+              placeholder={"https://example.com/art-therapy-research\nhttps://example.com/mental-health-resources"} />
           </SectionToggle>
 
           {/* ── Media Hub ── */}
@@ -2860,7 +2860,7 @@ export default function ContentStudio() {
                 <span style={{ lineHeight: 1.4 }}>
                   <span style={{ color: "var(--btn-primary-bg, #5855d0)" }}>All media elements will be placed strictly under the headings.</span>
                   {" "}<span style={{ color: "var(--text-muted)" }}>If disabled, the AI will decide and find the best placement.</span>
-
+                </span>
               </label>
             </div>
           </SectionToggle>
@@ -2947,6 +2947,10 @@ export default function ContentStudio() {
                   ? patternsNote.includes("no auth")
                     ? "此站台尚未設定 Application Password，無法讀取 wp_block（WordPress → 使用者 → 你的帳號 → 應用程式密碼 → 新增）。"
                     : `讀取異常（${patternsNote}）— 請確認站台 Application Password 設定正確。`
+                  : "尚未讀取到 patterns（按上方按鈕讀取；站台需設定 Application Password 才可讀取 wp_block）。"}
+              </div>
+            )}
+          </SectionToggle>
             </div>
           </div>
 
@@ -2959,6 +2963,135 @@ export default function ContentStudio() {
               <span style={{ fontSize: "11px", color: "var(--text-muted)", marginLeft: 4 }}>— 自動帶入 app.aware-wave.com/ops/clients 客戶資料</span>
             </div>
             <div style={{ padding: "0 16px" }}>
+
+          {/* ── 品牌聲音 ── */}
+          <SectionToggle label="品牌聲音（Brand Voice）— 分析範例文字，自動萃取寫作風格" open={showBrandVoice} onToggle={() => setShowBrandVoice(v => !v)}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+              <div>
+                <label className="form-label">品牌 / 客戶名稱</label>
+                <input className="form-input" value={bvProfileName}
+                  onChange={e => { setBvProfileName(e.target.value); setBvNameTouched(true); }}
+                  placeholder="例：Soulful Expression" />
+                {!bvNameTouched && wpSites.length > 0 && (
+                  <div className="form-hint">已自動帶入目標客戶「{(wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0])?.name}」，可直接覆寫。</div>
+                )}
+              </div>
+              <div>
+                <label className="form-label">從 URL 擷取（選填）</label>
+                <input className="form-input" value={bvSampleUrl}
+                  onChange={e => { setBvSampleUrl(e.target.value); setBvUrlTouched(true); }}
+                  placeholder="https://example.com/about" />
+                {!bvUrlTouched && bvSampleUrl.trim() && (
+                  <div className="form-hint">已自動帶入目標客戶 About 頁，可直接覆寫。</div>
+                )}
+                {bvSampleUrl.trim() && !bvSampleText.trim() && (
+                  <div className="form-hint" style={{ color: "#f97316" }}>伺服器端抓取頁面文字；若 URL 需登入或封鎖爬蟲則會靜默失敗，建議同時貼入範例文字。</div>
+                )}
+              </div>
+            </div>
+            <label className="form-label">範例文字（貼入品牌文章或 About 頁面，至少 50 字）</label>
+            <textarea className="form-textarea" style={{ minHeight: "100px" }}
+              value={bvSampleText} onChange={e => setBvSampleText(e.target.value)}
+              placeholder="貼入品牌文章、廣告文案或 About 頁面文字…" />
+            <div style={{ display: "flex", gap: "10px", marginTop: "10px", alignItems: "center", flexWrap: "wrap" }}>
+              <button className="btn-secondary" onClick={handleAnalyzeBrandVoice}
+                disabled={bvLoading || (!bvSampleText.trim() && !bvSampleUrl.trim())}
+                style={{ fontSize: "12px" }}>
+                {bvLoading ? "分析中…" : "🔍 分析品牌聲音"}
+              </button>
+              {bvProfile && (
+                <button className="btn-primary" onClick={handleApplyBrandVoice} style={{ fontSize: "12px" }}>
+                  {bvApplied ? "✓ 已套用" : "✨ 注入文章提示詞"}
+                </button>
+              )}
+              {bvError && <span style={{ color: "var(--color-error, #ef4444)", fontSize: "12px" }}>{bvError}</span>}
+            </div>
+            {bvProfile && (
+              <div style={{ marginTop: "12px", padding: "12px", background: "var(--bg-hover, #f5f5f5)", borderRadius: "6px", fontSize: "12px" }}>
+                <div style={{ fontWeight: 600, marginBottom: "8px", color: "var(--text-primary)" }}>{bvProfile.name} — 品牌聲音摘要</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 16px" }}>
+                  <div><span style={{ color: "var(--text-muted)" }}>語調：</span>{bvProfile.tone}</div>
+                  <div><span style={{ color: "var(--text-muted)" }}>詞彙：</span>{bvProfile.vocabulary}</div>
+                  <div><span style={{ color: "var(--text-muted)" }}>句型：</span>{bvProfile.sentenceStyle}</div>
+                  <div><span style={{ color: "var(--text-muted)" }}>個性：</span>{bvProfile.personality.join("、")}</div>
+                </div>
+                {bvProfile.preferWords.length > 0 && (
+                  <div style={{ marginTop: "6px" }}>
+                    <span style={{ color: "var(--text-muted)" }}>偏好用詞：</span>
+                    {bvProfile.preferWords.map((w, i) => (
+                      <span key={i} style={{ display: "inline-block", padding: "1px 6px", background: "#dcfce7", color: "#166534", borderRadius: "3px", marginRight: "4px", marginBottom: "2px", fontSize: "11px" }}>{w}</span>
+                    ))}
+                  </div>
+                )}
+                {bvProfile.avoidWords.length > 0 && (
+                  <div style={{ marginTop: "4px" }}>
+                    <span style={{ color: "var(--text-muted)" }}>避免用詞：</span>
+                    {bvProfile.avoidWords.map((w, i) => (
+                      <span key={i} style={{ display: "inline-block", padding: "1px 6px", background: "#fee2e2", color: "#991b1b", borderRadius: "3px", marginRight: "4px", marginBottom: "2px", fontSize: "11px" }}>{w}</span>
+                    ))}
+                  </div>
+                )}
+                <div style={{ marginTop: "8px", padding: "8px", background: "var(--bg-card)", borderRadius: "4px", borderLeft: "3px solid #5855d0", fontSize: "11px", lineHeight: 1.5 }}>
+                  {bvProfile.promptInjection}
+                </div>
+              </div>
+            )}
+          </SectionToggle>
+
+          {/* ── #5 競業與痛點分析 ── */}
+          <SectionToggle label="🔍 競業與痛點分析（多角度市場研究）" open={showMarket} onToggle={() => setShowMarket(v => !v)}>
+            <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", marginBottom: "8px" }}>
+              <button className="btn-secondary" onClick={handleMarketAnalysis}
+                disabled={marketLoading || !form.keyword.trim()} style={{ fontSize: "12px" }}>
+                {marketLoading ? "分析中（約 10–30 秒）…" : "🔍 分析競業與痛點"}
+              </button>
+              {marketContext && <span style={{ color: "#16a34a", fontSize: "12px" }}>✓ 已納入，產生文章時自動注入</span>}
+              {marketError && <span style={{ color: "var(--color-error, #ef4444)", fontSize: "12px" }}>{marketError}</span>}
+            </div>
+            <div className="form-hint">用 Perplexity 即時搜尋，從競爭對手、讀者痛點、搜尋意圖、轉換疑慮、差異化機會五個角度分析，結果會引導文章定位。需先填關鍵字。</div>
+            {marketAnalysis && (
+              <div style={{ marginTop: "12px", display: "grid", gap: "10px", fontSize: "12px" }}>
+                {([
+                  ["讀者痛點", marketAnalysis.painPoints, "#fee2e2", "#991b1b"],
+                  ["搜尋意圖 / 角度", marketAnalysis.searchIntent, "#dbeafe", "#1e40af"],
+                  ["轉換疑慮", marketAnalysis.objections, "#fef3c7", "#92400e"],
+                  ["競爭對手", marketAnalysis.competitors, "#f3e8ff", "#6b21a8"],
+                  ["差異化機會", marketAnalysis.differentiators, "#dcfce7", "#166534"],
+                ] as [string, string[], string, string][]).filter(([, arr]) => arr.length > 0).map(([title, arr, bg, fg]) => (
+                  <div key={title}>
+                    <div style={{ fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>{title}</div>
+                    <div>
+                      {arr.map((x, i) => (
+                        <span key={i} style={{ display: "inline-block", padding: "2px 7px", background: bg, color: fg, borderRadius: "3px", marginRight: "4px", marginBottom: "4px" }}>{x}</span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </SectionToggle>
+
+          {/* ── #4 品牌語調 / 精準行銷（結構化表單）── */}
+          <SectionToggle label="🎯 品牌語調 / 精準行銷（填表單，打中目標）" open={showMarketing} onToggle={() => setShowMarketing(v => !v)}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+              <div>
+                <label className="form-label" style={{ marginTop: 0 }}>目標受眾</label>
+                <input className="form-input" value={form.marketing.audience} disabled={isGenerating}
+                  onChange={e => setMkt("audience", e.target.value)} placeholder="例：台灣成人，對表達藝術有興趣" />
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
+                  {MKT_PRESETS.audience.map(p => (
+                    <button key={p} type="button" disabled={isGenerating} onClick={() => setMkt("audience", p)}
+                      style={{ padding: "1px 7px", borderRadius: "10px", border: "1px solid var(--card-border)", fontSize: "11px", cursor: "pointer", background: "var(--bg-hover,#f5f5f5)", color: "var(--text-secondary)" }}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="form-label" style={{ marginTop: 0 }}>品牌定位（一句話）</label>
+                <input className="form-input" value={form.marketing.positioning} disabled={isGenerating}
+                  onChange={e => setMkt("positioning", e.target.value)} placeholder="例：陪伴而非治療的藝術自我探索空間" />
+              </div>
               <div>
                 <label className="form-label">獨特賣點 / 差異化（USP）</label>
                 <input className="form-input" value={form.marketing.usp} disabled={isGenerating}
@@ -3032,141 +3165,13 @@ export default function ContentStudio() {
             <div className="form-hint" style={{ marginTop: 4 }}>此表單會編譯成行銷簡報，連同下方「進階指示」一起注入。留空的欄位不影響。</div>
           </SectionToggle>
 
-
-                  <div className="form-hint" style={{ color: "#f97316" }}>伺服器端抓取頁面文字；若 URL 需登入或封鎖爬蟲則會靜默失敗，建議同時貼入範例文字。</div>
-                )}
-              </div>
-            </div>
-            <label className="form-label">範例文字（貼入品牌文章或 About 頁面，至少 50 字）</label>
-            <textarea className="form-textarea" style={{ minHeight: "100px" }}
-              value={bvSampleText} onChange={e => setBvSampleText(e.target.value)}
-              placeholder="貼入品牌文章、廣告文案或 About 頁面文字…" />
-            <div style={{ display: "flex", gap: "10px", marginTop: "10px", alignItems: "center", flexWrap: "wrap" }}>
-              <button className="btn-secondary" onClick={handleAnalyzeBrandVoice}
-                disabled={bvLoading || (!bvSampleText.trim() && !bvSampleUrl.trim())}
-                style={{ fontSize: "12px" }}>
-                {bvLoading ? "分析中…" : "🔍 分析品牌聲音"}
-              </button>
-              {bvProfile && (
-                <button className="btn-primary" onClick={handleApplyBrandVoice} style={{ fontSize: "12px" }}>
-                  {bvApplied ? "✓ 已套用" : "✨ 注入文章提示詞"}
-                </button>
-              )}
-              {bvError && <span style={{ color: "var(--color-error, #ef4444)", fontSize: "12px" }}>{bvError}</span>}
-            </div>
-            {bvProfile && (
-              <div style={{ marginTop: "12px", padding: "12px", background: "var(--bg-hover, #f5f5f5)", borderRadius: "6px", fontSize: "12px" }}>
-                <div style={{ fontWeight: 600, marginBottom: "8px", color: "var(--text-primary)" }}>{bvProfile.name} — 品牌聲音摘要</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 16px" }}>
-                  <div><span style={{ color: "var(--text-muted)" }}>語調：</span>{bvProfile.tone}</div>
-                  <div><span style={{ color: "var(--text-muted)" }}>詞彙：</span>{bvProfile.vocabulary}</div>
-                  <div><span style={{ color: "var(--text-muted)" }}>句型：</span>{bvProfile.sentenceStyle}</div>
-                  <div><span style={{ color: "var(--text-muted)" }}>個性：</span>{bvProfile.personality.join("、")}</div>
-                </div>
-                {bvProfile.preferWords.length > 0 && (
-                  <div style={{ marginTop: "6px" }}>
-
-              </div>
-              {/* Generated hook brief suggestions — only for currently selected types */}
-              {Object.keys(hookBriefSugs).filter(t => hookTypesSelected.has(t)).length > 0 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "8px" }}>
-                  {Object.entries(hookBriefSugs).filter(([t]) => hookTypesSelected.has(t)).map(([t, brief]) => (
-                    <div key={t} style={{ background: "var(--bg-subtle)", borderRadius: "var(--radius-sm)", padding: "7px 10px", fontSize: "12px", border: "1px solid var(--card-border)" }}>
-                      <div style={{ fontWeight: 600, fontSize: "11px", color: "var(--text-muted)", marginBottom: "3px" }}>{HOOK_TYPE_LABELS[t as typeof HOOK_TYPES[number]] ?? t}</div>
-                      <div style={{ color: "var(--text-primary)", lineHeight: 1.5 }}>{brief}</div>
-                      <button type="button" onClick={() => { setF("introHookType", t as typeof HOOK_TYPES[number]); setF("introHookBrief", brief); }}
-                        style={{ marginTop: "5px", fontSize: "11px", padding: "2px 8px", borderRadius: "4px", border: "1px solid var(--card-border)", cursor: "pointer", background: "var(--bg-hover)" }}>
-                        使用此草稿
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <textarea className="form-textarea" style={{ minHeight: "72px" }}
-                value={form.introHookBrief} maxLength={500} disabled={isGenerating}
-                onChange={e => setF("introHookBrief", e.target.value)}
-                placeholder={`補充 Hook 的具體方向（選填）。例：\n• Question → 「你有沒有想過，為什麼大多數人學了藝術治療卻沒有改變？」\n• Statistical or Fact → 「根據 2024 APA 研究，8 成焦慮者從未嘗試表達性藝術…」\n• Anecdotal or Story → 「3 年前，一位來訪者拿著一張全黑的畫走進工作室…」`} />
-            </div>
-
-            {/* Yes/No dropdowns grid — 4 cols, 17 items = 5 rows */}
-            <div style={{ fontWeight: 600, fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: ".05em" }}>基本結構</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px 16px", marginBottom: "14px" }}>
-              {(["quickAnswer", "keyTakeaways", "comparisonTable", "faq", "conclusion", "tables", "h3", "lists", "italics", "quotes", "bold"] as const).map(key => (
-                <div key={key}>
-                  <label className="form-label" style={{ marginBottom: "4px" }}>{structLabels[key]}</label>
-                  <select className="form-select" value={form.structure[key] ? "yes" : "no"} disabled={isGenerating}
-                    onChange={e => setStruct(key, e.target.value === "yes")}>
-                    <option value="yes">Yes</option>
-                    <option value="no">No</option>
-                  </select>
-                </div>
-              ))}
-            </div>
-            <div style={{ fontWeight: 600, fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: ".05em" }}>進階內容元素</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px 16px", marginBottom: "12px" }}>
-              {(["expertQuote", "prosCons", "stepByStep", "calloutBox", "caseStudy", "statCallout"] as const).map(key => (
-                <div key={key}>
-                  <label className="form-label" style={{ marginBottom: "4px" }}>{structLabels[key]}</label>
-                  <select className="form-select" value={form.structure[key] ? "yes" : "no"} disabled={isGenerating}
-                    onChange={e => setStruct(key, e.target.value === "yes")}>
-                    <option value="no">No</option>
-                    <option value="yes">Yes</option>
-                  </select>
-                </div>
-              ))}
-            </div>
-
-            <label style={checkLabel}>
-              <input type="checkbox" checked={form.generateMeta} onChange={e => setF("generateMeta", e.target.checked)} disabled={isGenerating} />
-              自動生成 SEO 標題 + Meta 描述
-            </label>
+          {/* ── 品牌語調（進階 raw，向後相容）── */}
+          <SectionToggle label="品牌語調 / 進階指示（原始文字，選填）" open={showAdvanced} onToggle={() => setShowAdvanced(v => !v)}>
+            <textarea className="form-textarea" style={{ minHeight: "90px" }}
+              value={form.details} onChange={e => setF("details", e.target.value)} disabled={isGenerating}
+              placeholder={`brand_name: "Soulful Expression"\nforbidden_claims: ["治癒", "治療疾病"]\naudience: 台灣成人，對表達藝術有興趣`} />
+            <div className="form-hint" style={{ marginTop: 4 }}>自由文字會接在上方「精準行銷」表單之後一起注入。已用表單者此欄可留空。</div>
           </SectionToggle>
-
-          {/* ── 大綱編輯器 ── */}
-          <SectionToggle label="大綱編輯器（先看大綱、可改再生成全文）" open={showOutline} onToggle={() => setShowOutline(v => !v)}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-              <label className="form-label" style={{ marginTop: 0, marginBottom: 0 }}>
-                自訂大綱
-                <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— ## H2、### H3、#### H4；每個標題含關鍵字或近義變體，生成全文時嚴格遵循</span>
-              </label>
-              <button className="btn-secondary" style={{ fontSize: "12px" }}
-                onClick={handleGenOutline} disabled={isGenerating || !form.keyword.trim() || outlineLoading}>
-                {outlineLoading ? "…" : "✨ AI 自動生成大綱"}
-              </button>
-            </div>
-            <textarea className="form-textarea" style={{ minHeight: "120px", fontFamily: "monospace", fontSize: "12px" }}
-              value={form.outline} onChange={e => setF("outline", e.target.value)} disabled={isGenerating}
-              placeholder={"## 什麼是藝術療癒？\n## 藝術療癒的好處\n### 情緒層面\n### 認知層面\n## 如何開始\n## FAQ\n## 結語"} />
-          </SectionToggle>
-
-          {/* ── #4 品牌語調 / 精準行銷（結構化表單）── */}
-          <SectionToggle label="🎯 品牌語調 / 精準行銷（填表單，打中目標）" open={showMarketing} onToggle={() => setShowMarketing(v => !v)}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-              <div>
-                <label className="form-label" style={{ marginTop: 0 }}>目標受眾</label>
-                <input className="form-input" value={form.marketing.audience} disabled={isGenerating}
-                  onChange={e => setMkt("audience", e.target.value)} placeholder="例：台灣成人，對表達藝術有興趣" />
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
-                  {MKT_PRESETS.audience.map(p => (
-                    <button key={p} type="button" disabled={isGenerating} onClick={() => setMkt("audience", p)}
-                      style={{ padding: "1px 7px", borderRadius: "10px", border: "1px solid var(--card-border)", fontSize: "11px", cursor: "pointer", background: "var(--bg-hover,#f5f5f5)", color: "var(--text-secondary)" }}>
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="form-label" style={{ marginTop: 0 }}>品牌定位（一句話）</label>
-                <input className="form-input" value={form.marketing.positioning} disabled={isGenerating}
-                  onChange={e => setMkt("positioning", e.target.value)} placeholder="例：陪伴而非治療的藝術自我探索空間" />
-
-          <SectionToggle label="品牌聲音（Brand Voice）— 分析範例文字，自動萃取寫作風格" open={showBrandVoice} onToggle={() => setShowBrandVoice(v => !v)}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
-              <div>
-                <label className="form-label">品牌 / 客戶名稱</label>
-                <input className="form-input" value={bvProfileName}
-                  onChange={e => { setBvProfileName(e.target.value); setBvNameTouched(true); }}
-                  placeholder="例：Soulful Expression" />
             </div>
           </div>
 
@@ -3314,10 +3319,6 @@ export default function ContentStudio() {
             </div>
             <div style={{ padding: "0 16px" }}>
 
-              </div>
-            )}
-          </SectionToggle>
-
           {/* ── 發布設定 ── */}
           <div className="form-block form-block--wide" style={{ marginBottom: "20px" }}>
             <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "12px", color: "var(--text-primary)" }}>發布設定</div>
@@ -3337,10 +3338,10 @@ export default function ContentStudio() {
                   <input type="datetime-local" className="form-input" style={{ width: "auto", fontSize: "12px" }}
                     value={form.scheduleDate} onChange={e => setF("scheduleDate", e.target.value)} disabled={isGenerating} />
                 )}
+              </div>
+              <div className="form-hint" style={{ marginTop: 4 }}>狀態保持「草稿」，需從 WP 後台手動發布。</div>
             </div>
           </div>
-
-              <div className="form-hint" style={{ marginTop: 4 }}>狀態保持「草稿」，需從 WP 後台手動發布。</div>
             </div>
           </div>
 
@@ -3354,11 +3355,10 @@ export default function ContentStudio() {
               <button className="btn-secondary" onClick={() => { abortRef.current?.abort(); setGenStatus("idle"); }}>停止</button>
             )}
             {genStatus === "error" && <span style={{ color: "var(--color-error, #ef4444)", fontSize: "13px" }}>{genError}</span>}
-
+            <div style={{ marginLeft: "auto" }}>
               <CostChip cost={sessionCost} />
             </div>
           </div>
-
           {/* ═══ 輸出區 ═══ */}
           {(hasContent || isGenerating) && (
             <div className="form-block form-block--wide">
