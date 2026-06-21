@@ -82,8 +82,8 @@ final class SwatchPalette {
 	}
 
 	public function enqueue( string $hook ): void {
-		if ( strpos( $hook, self::SLUG ) === false ) {
-			return;
+		if ( substr( $hook, -strlen( self::SLUG ) ) !== self::SLUG ) {
+			return; // exact suffix match (hook is e.g. "product_page_awbridge-swatch-palette").
 		}
 		wp_enqueue_style( 'wp-color-picker' );
 		wp_enqueue_script( 'wp-color-picker' );
@@ -156,13 +156,16 @@ final class SwatchPalette {
 		$n      = min( count( $labels ), count( $hexes ), 100 );
 		$map    = array();
 		for ( $i = 0; $i < $n; $i++ ) {
-			$label = sanitize_text_field( (string) $labels[ $i ] );
+			$label = mb_substr( sanitize_text_field( (string) $labels[ $i ] ), 0, 200 );
 			$h     = self::normalizeHex( (string) $hexes[ $i ] );
 			if ( $label !== '' && $h !== '' ) {
-				$map[ mb_substr( $label, 0, 200 ) ] = $h;
+				$map[ $label ] = $h;
 			}
 		}
-		update_option( self::OPTION, wp_json_encode( $map, JSON_UNESCAPED_UNICODE ) );
+		$json = wp_json_encode( $map, JSON_UNESCAPED_UNICODE );
+		if ( $json !== false ) {
+			update_option( self::OPTION, $json ); // skip write on the rare encode failure rather than store `false`.
+		}
 	}
 
 	private function printJs(): void {

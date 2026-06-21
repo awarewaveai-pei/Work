@@ -188,7 +188,7 @@ final class ColorSwatches {
     // variation form is on a page — related products / quick-view). Then fall back to id, then sibling.
     var name = group.getAttribute('data-awbridge-name');
     var form = group.closest('form.variations_form') || group.closest('form');
-    if(name && form){ var byName = form.querySelector('select[name="'+name+'"]'); if(byName){ return byName; } }
+    if(name && form){ var esc=(window.CSS&&CSS.escape)?CSS.escape(name):name; var byName = form.querySelector('select[name="'+esc+'"]'); if(byName){ return byName; } }
     var id = group.getAttribute('data-awbridge-select');
     var byId = id ? document.getElementById(id) : null;
     if(byId && byId.tagName==='SELECT'){ return byId; }
