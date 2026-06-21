@@ -69,32 +69,44 @@ final class ColorSwatches {
 			return $html;
 		}
 
-		$map = $this->colorMap( (int) $product->get_id() );
-		if ( $map === array() ) {
-			return $html; // product has no swatch map -> leave the dropdown as-is.
-		}
+		$attribute  = isset( $args['attribute'] ) ? (string) $args['attribute'] : '';
+		$isTaxonomy = $attribute !== '' && taxonomy_exists( $attribute );
 
-		// Data-driven attribute match: render swatches only if EVERY option is a known colour in the map.
-		// (A partial match means this isn't the colour attribute, or the map is stale — fall back safely.)
+		// Colour sources, in precedence: a taxonomy term's OWN swatch colour (THE STANDARD place — set on
+		// Products → Attributes → <Color> → term) > this product's per-product map (Printful one-click /
+		// per-product box) > the global palette (by colour name). Render swatches only when EVERY option
+		// resolves to a colour; a partial match means this isn't the colour attribute → leave the dropdown.
+		$perProduct = $this->productMap( (int) $product->get_id() );
+		$palette    = \AwareWave\WpBridge\Admin\SwatchPalette::palette();
+
 		$swatches = array();
 		foreach ( $options as $option ) {
-			$label = (string) $option;
-			$hex   = $this->normalizeHex( $map[ $label ] ?? '' );
-			if ( $hex === '' ) {
-				return $html; // an option without a mapped hex -> not safely a colour attribute; bail.
+			$value = (string) $option; // what WC's <select> expects: term slug (taxonomy) or label (local)
+			$hex   = '';
+			if ( $isTaxonomy ) {
+				$term = get_term_by( 'slug', $value, $attribute );
+				if ( $term && ! is_wp_error( $term ) ) {
+					$hex = $this->normalizeHex( (string) get_term_meta( $term->term_id, \AwareWave\WpBridge\Admin\AttributeSwatchTerms::TERM_META, true ) );
+					if ( $hex === '' ) {
+						$hex = $this->normalizeHex( $perProduct[ $term->name ] ?? ( $palette[ $term->name ] ?? '' ) );
+					}
+				}
+			} else {
+				$hex = $this->normalizeHex( $perProduct[ $value ] ?? ( $palette[ $value ] ?? '' ) );
 			}
-			$swatches[] = array( 'value' => $label, 'hex' => $hex );
+			if ( $hex === '' ) {
+				return $html; // an option without a colour -> not safely a colour attribute; bail.
+			}
+			$swatches[] = array( 'value' => $value, 'hex' => $hex );
 		}
 
-		// WC computes the <select> id/name from the attribute when its own id/name args are empty (the
-		// common case for local attributes — see wc_dropdown_variation_attribute_options), yet passes the
-		// ORIGINAL empty args to this filter. Mirror that derivation so the JS binds to the right <select>
-		// by id/name rather than depending on DOM adjacency (which a theme could break).
-		$attr       = isset( $args['attribute'] ) ? (string) $args['attribute'] : '';
-		$selectId   = ( isset( $args['id'] ) && (string) $args['id'] !== '' ) ? (string) $args['id'] : sanitize_title( $attr );
+		// WC computes the <select> id/name from the attribute when its own id/name args are empty, yet
+		// passes the ORIGINAL (empty) args to this filter — mirror that derivation so the JS binds the
+		// right <select> by id/name rather than DOM adjacency.
+		$selectId   = ( isset( $args['id'] ) && (string) $args['id'] !== '' ) ? (string) $args['id'] : sanitize_title( $attribute );
 		$selectName = ( isset( $args['name'] ) && (string) $args['name'] !== '' )
 			? (string) $args['name']
-			: ( $attr !== '' ? 'attribute_' . sanitize_title( $attr ) : '' );
+			: ( $attribute !== '' ? 'attribute_' . sanitize_title( $attribute ) : '' );
 		$this->printAssetsOnce();
 
 		// Swatches first (the visible control), then the original <select> kept for WC's JS — JS hides it.
