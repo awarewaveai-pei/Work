@@ -4,6 +4,33 @@
 
 ## 2026-06-22
 
+### feat(video): pexels-video 模式 + 目標時長控制（1/3/5 分鐘）
+
+[任務理解] 使用者要真實 AI 影片，現有 pipeline 是靜態圖 + Ken Burns 動畫。方案：用 Pexels Videos API 抓真實 MP4 片段，EU pipeline.py 已有 stream_loop 支援，只需加 fetchBrollVideoUrl() + 前端 UI。
+
+[現況分析] 讀 render-draft/route.ts 確認 `videos.pexels.com` 已在 SSRF allowlist；pipeline.py stream_loop 已實作；`SCHEMA_EXAMPLE` 舊常數替換為 `schemaExample(sceneCount)` 動態函式。
+
+[已修改]
+- `lib/ai/cost-model.ts`：IMAGE_RATES 加 `pexels-video`（$0）
+- `lib/content/video/pexels.ts`：加 `fetchBrollVideoUrl()`（Pexels `/videos/search` API，HD MP4，降級照片）
+- `lib/content/video/video-script-core.ts`：加 `targetMinutes` param → `scriptParams()` 計算 sceneCount/charsPerScene（1min=6×50字，3min=8×120字，5min=10×160字）
+- `lib/content/blocks/video-pipeline.ts`：`prepareScenes()` 加 `pexels-video` 分支 + `targetMinutes` 傳遞
+- `app/api/video/draft/route.ts`：DraftBody 加 `targetMinutes`，傳入 `prepareScenes()`
+- `app/tools/video/VideoStudio.tsx`：素材模式三選鈕（📹 影片/$0 / 🖼 照片/$0 / ✨ AI圖）+ 時長選鈕（1/3/5分）+ DraftEditor video preview
+
+[驗證結果]
+- REALTEST_WAIVED: SMOKE_COVERED -- tsc + npm test 通過，需 sg-deploy 後 browser 實測
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n — 讀回 6 個改動檔案，型別一致，無 stale 常數，allowlist 已涵蓋 videos.pexels.com
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=fetchBrollUrl|fetchBrollVideoUrl|pexels-video|targetMinutes|SCHEMA_EXAMPLE | hits=SCHEMA_EXAMPLE=0（完全移除）；其他所有 callers 一致
+- tsc: PASS（0 errors）
+- npm test: 431/431 PASS
+
+[剩餘風險]
+- pexels-video 草稿預覽：video autoplay 在部分瀏覽器需使用者互動才啟動（muted+autoPlay 組合通常免互動，但需 browser 實測確認）
+- 5分鐘影片 EU render 時間可能 8-12 分鐘，現有 polling deadline 12分鐘剛好，邊緣
+
+[rollback] `git revert HEAD`（純新增功能，原路徑不動）
+
 ### analysis(video): R0 video pipeline 全系統審查 — 端對端驗證通過，根因為 UX 認知落差
 
 [任務理解] 使用者在 /tools/video 看到「只有圖片」→ 懷疑 video-service 未部署或 pipeline 失敗。

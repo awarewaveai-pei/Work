@@ -517,7 +517,71 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
               {/* §2 場景設定（移入主流程：內容後、生成前 — Q3 由上到下一條順下來）*/}
               <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "12px 14px", borderRadius: 8, background: "#f8fafc", border: "1px solid var(--border-subtle)" }}>
                 <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-primary)" }}>場景設定</span>
-                {providedScenes.length === 0 ? (
+
+                {/* 素材模式 */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>素材模式</span>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {[
+                      { id: "pexels-video", label: "📹 Pexels 真實影片", badge: "$0", tip: "真實動態影片片段，最自然" },
+                      { id: "pexels-all",   label: "🖼 Pexels 照片動畫", badge: "$0", tip: "免費照片 + Ken Burns 縮放效果" },
+                      { id: "flux-schnell", label: "✨ AI 生圖",         badge: "~$0.003/張", tip: "Flux AI 插圖，視覺一致性高" },
+                    ].map(({ id, label, badge, tip }) => {
+                      const active = imageModel === id;
+                      return (
+                        <button key={id} type="button" title={tip}
+                          onClick={() => setImageModel(id)} disabled={isBusy}
+                          style={{
+                            padding: "6px 12px", borderRadius: 8, border: `2px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
+                            background: active ? "var(--accent)" : "var(--bg-canvas)",
+                            color: active ? "#fff" : "var(--text-secondary)",
+                            cursor: isBusy ? "not-allowed" : "pointer",
+                            fontSize: 12, fontWeight: active ? 700 : 500, lineHeight: 1.4,
+                            display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                          }}>
+                          <span>{label}</span>
+                          <span style={{ fontSize: 10, opacity: 0.8 }}>{badge}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {imageModel === "pexels-video" && (
+                    <div style={{ fontSize: 11, color: "#065f46", background: "#d1fae5", padding: "6px 10px", borderRadius: 6, lineHeight: 1.6 }}>
+                      ✅ 每場景自動搜尋 Pexels 影片片段（HD MP4）→ EU FFmpeg 拼接 + TTS 配音。費用 $0。
+                    </div>
+                  )}
+                </div>
+
+                {/* 目標時長（僅 pexels-video 和 pexels-all 模式顯示） */}
+                {(imageModel === "pexels-video" || imageModel === "pexels-all") && providedScenes.length === 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>目標時長</span>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {([1, 3, 5] as const).map((m) => {
+                        const sceneInfo = m >= 4 ? "10場景 × 160字" : m >= 2 ? "8場景 × 120字" : "6場景 × 50字";
+                        return (
+                          <button key={m} type="button"
+                            onClick={() => setTargetMinutes(m)} disabled={isBusy}
+                            style={{
+                              flex: 1, padding: "7px 0", borderRadius: 8,
+                              border: `2px solid ${targetMinutes === m ? "var(--accent)" : "var(--border-subtle)"}`,
+                              background: targetMinutes === m ? "var(--accent)" : "var(--bg-canvas)",
+                              color: targetMinutes === m ? "#fff" : "var(--text-secondary)",
+                              cursor: isBusy ? "not-allowed" : "pointer",
+                              fontSize: 12, fontWeight: targetMinutes === m ? 700 : 500,
+                              lineHeight: 1.4, display: "flex", flexDirection: "column", alignItems: "center",
+                            }}>
+                            <span>{m} 分鐘</span>
+                            <span style={{ fontSize: 10, opacity: 0.75 }}>{sceneInfo}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* AI 圖模式的場景滑桿（pexels-video 模式隱藏） */}
+                {imageModel !== "pexels-video" && imageModel !== "pexels-all" && providedScenes.length === 0 && (
                   <>
                     <KnobRow label="場景總數" hint={`${totalScenes} 場`} min={1} max={20} step={1} value={totalScenes} onChange={handleTotalChange} />
                     <KnobRow
@@ -527,17 +591,11 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                       value={customScenes} onChange={setCustomScenes}
                     />
                   </>
-                ) : (
+                )}
+                {providedScenes.length > 0 && (
                   <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.6 }}>場景數由前製腳本決定（{providedScenes.length} 場），每場依「畫面」生 AI 圖。</div>
                 )}
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>生圖模型</span>
-                  <select value={imageModel} onChange={(e) => setImageModel(e.target.value)} style={inputStyle}>
-                    {Object.entries(IMAGE_RATES).map(([id, r]) => (
-                      <option key={id} value={id}>{r.label} — ${r.usd}/張</option>
-                    ))}
-                  </select>
-                </div>
+
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>配音模型</span>
                   <select value={voiceModelId} onChange={(e) => setVoiceModelId(e.target.value)} style={inputStyle}>
@@ -711,9 +769,12 @@ function DraftEditor({
             display: "flex", gap: 10, padding: "10px 12px",
             border: "1px solid var(--border-subtle)", borderRadius: 8, background: "#fff",
           }}>
-            {/* Image thumbnail */}
+            {/* Thumbnail — 照片用 img；Pexels MP4 用靜音 video 預覽 */}
             <div style={{ flexShrink: 0, width: 100, height: 68, borderRadius: 6, overflow: "hidden", background: "#0f172a" }}>
-              {scene.imageUrl.startsWith("https://") ? (
+              {scene.imageUrl.endsWith(".mp4") || scene.imageUrl.includes("videos.pexels.com") ? (
+                <video src={scene.imageUrl} muted loop autoPlay playsInline
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : scene.imageUrl.startsWith("https://") ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={scene.imageUrl} alt={`場景 ${scene.id}`}
                   style={{ width: "100%", height: "100%", objectFit: "cover" }} />
