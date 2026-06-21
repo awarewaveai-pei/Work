@@ -3251,58 +3251,61 @@ export default function ContentStudio() {
                 </div>
               </div>
 
-              {/* 內容目的 */}
-              <div style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, fontWeight: 500 }}>內容目的</div>
-                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                  {CONTENT_GOALS.map(g => (
-                    <ChipBtn key={g} label={g} disabled={isGenerating} active={apState.contentGoal === g} onClick={() => setSingleAP("contentGoal", g)} />
-                  ))}
-                </div>
-              </div>
-
-              {/* 語氣風格 */}
-              <div style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, fontWeight: 500 }}>語氣風格</div>
-                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                  {CONTENT_TONES_CHIPS.map(t => (
-                    <ChipBtn key={t} label={t} disabled={isGenerating} active={apState.contentTone === t} onClick={() => setSingleAP("contentTone", t)} />
-                  ))}
-                </div>
-              </div>
-
-              {/* 觀眾行動 CTA */}
-              <div style={{ marginBottom: 10 }}>
-                <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, fontWeight: 500 }}>觀眾行動（期望 CTA）</div>
-                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                  {CONTENT_CTAS.map(c => (
-                    <ChipBtn key={c} label={c} disabled={isGenerating} active={apState.audienceAction === c} onClick={() => setSingleAP("audienceAction", c)} />
-                  ))}
-                </div>
-              </div>
-
-              {/* 目標受眾六維度 */}
-              {AUDIENCE_CATS.map(cat => (
-                <div key={cat.key} style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, fontWeight: 500 }}>{cat.label}</div>
-                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}>
-                    {cat.opts.map(opt => {
-                      const arr = (apState[cat.key as keyof AP] as string[] | undefined) ?? [];
-                      const active = arr.includes(opt);
-                      return (
-                        <ChipBtn key={opt} label={opt} disabled={isGenerating} active={active}
-                          onClick={() => cat.multi ? toggleMultiAP(cat.key as keyof AP, opt) : toggleSingleAP(cat.key as keyof AP, opt)} />
-                      );
-                    })}
-                    {cat.custom && (
-                      <input placeholder="+ 自訂" disabled={isGenerating}
-                        style={{ padding: "2px 8px", borderRadius: 20, fontSize: 11, border: "1px dashed var(--card-border)", background: "transparent", color: "var(--text-primary)", width: 72 }}
-                        value={(apState[(cat.key + "Custom") as keyof AP] as string | undefined) ?? ""}
-                        onChange={e => setApState(ap => ({ ...ap, [(cat.key + "Custom") as keyof AP]: e.target.value }))} />
-                    )}
+              {/* 2-column grid: 內容目的/語氣/CTA + 六維度 */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 20px" }}>
+                {/* 內容目的 */}
+                <div style={{ marginBottom: 6 }}>
+                  <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, fontWeight: 500 }}>內容目的</div>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                    {CONTENT_GOALS.map(g => (
+                      <ChipBtn key={g} label={g} disabled={isGenerating} active={apState.contentGoal === g} onClick={() => setSingleAP("contentGoal", g)} />
+                    ))}
                   </div>
                 </div>
-              ))}
+
+                {/* 語氣風格 */}
+                <div style={{ marginBottom: 6 }}>
+                  <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, fontWeight: 500 }}>語氣風格</div>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                    {CONTENT_TONES_CHIPS.map(t => (
+                      <ChipBtn key={t} label={t} disabled={isGenerating} active={apState.contentTone === t} onClick={() => setSingleAP("contentTone", t)} />
+                    ))}
+                  </div>
+                </div>
+
+                {/* 觀眾行動 CTA */}
+                <div style={{ marginBottom: 6 }}>
+                  <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, fontWeight: 500 }}>觀眾行動（CTA）</div>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                    {CONTENT_CTAS.map(c => (
+                      <ChipBtn key={c} label={c} disabled={isGenerating} active={apState.audienceAction === c} onClick={() => setSingleAP("audienceAction", c)} />
+                    ))}
+                  </div>
+                </div>
+
+                {/* 目標受眾六維度 */}
+                {AUDIENCE_CATS.map(cat => (
+                  <div key={cat.key} style={{ marginBottom: 6 }}>
+                    <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, fontWeight: 500 }}>{cat.label}</div>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+                      {cat.opts.map(opt => {
+                        const arr = (apState[cat.key as keyof AP] as string[] | undefined) ?? [];
+                        const active = arr.includes(opt);
+                        return (
+                          <ChipBtn key={opt} label={opt} disabled={isGenerating} active={active}
+                            onClick={() => cat.multi ? toggleMultiAP(cat.key as keyof AP, opt) : toggleSingleAP(cat.key as keyof AP, opt)} />
+                        );
+                      })}
+                      {cat.custom && (
+                        <input placeholder="+ 自訂" disabled={isGenerating}
+                          style={{ padding: "2px 8px", borderRadius: 20, fontSize: 11, border: "1px dashed var(--card-border)", background: "transparent", color: "var(--text-primary)", width: 72 }}
+                          value={(apState[(cat.key + "Custom") as keyof AP] as string | undefined) ?? ""}
+                          onChange={e => setApState(ap => ({ ...ap, [(cat.key + "Custom") as keyof AP]: e.target.value }))} />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
 
               {/* 清除 chips */}
               <button type="button" disabled={isGenerating}
@@ -4288,6 +4291,44 @@ export default function ContentStudio() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Postiz 立即發佈二次確認 modal ── */}
+      {postizShowConfirm && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999,
+        }}>
+          <div style={{
+            background: "var(--bg-canvas, #fff)", borderRadius: 10, padding: "24px 28px",
+            maxWidth: 440, width: "90%", boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+          }}>
+            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 12 }}>確認立即發佈？</div>
+            <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 14 }}>
+              以下頻道將立即推送，發佈後無法撤回：
+            </div>
+            <ul style={{ margin: "0 0 16px 0", paddingLeft: 20 }}>
+              {[...postizSelected].map(p => (
+                <li key={p} style={{ fontSize: 13, marginBottom: 4 }}>{p}</li>
+              ))}
+            </ul>
+            {postizIncludeImg && imgResult && (
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
+                附帶圖片：{imgResult.spec.label}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button className="btn-secondary" style={{ fontSize: 13 }}
+                onClick={() => setPostizShowConfirm(false)}>
+                取消
+              </button>
+              <button className="btn-primary" style={{ fontSize: 13, background: "#dc2626", borderColor: "#dc2626" }}
+                onClick={() => void handlePostizPublish(true)}>
+                確認發佈
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
