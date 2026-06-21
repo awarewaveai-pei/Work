@@ -1,21 +1,21 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { roleHeader } from "../../../lib/ops-role";
 import { openInCanvas } from "@/components/tools/canvas-handoff";
+import { STUDIO_MODEL_OPTIONS, type StudioModel } from "../../../lib/studio/model-options";
+import { STYLE_CATALOG, resolveStylePrompt } from "../../tools/tarot/tarotStyles";
 
 // ---------------------------------------------------------------------------
 // Size presets & constants
 // ---------------------------------------------------------------------------
 
 const PRESETS = {
-  // WP 網站 banners
   "hero-desktop":  { label: "Hero 桌機",     w: 1920, h: 640,  aspect: "16:9", group: "wp" as const },
   "hero-full":     { label: "Hero 全版",      w: 1920, h: 1080, aspect: "16:9", group: "wp" as const },
   "hero-mobile":   { label: "Hero 手機",      w: 1000, h: 1000, aspect: "1:1",  group: "wp" as const },
   "featured-og":   { label: "Featured / OG", w: 1200, h: 800,  aspect: "3:2",  group: "wp" as const },
   "woo-product":   { label: "WooCommerce",    w: 1000, h: 1000, aspect: "1:1",  group: "wp" as const },
-  // 社交平台 post 圖
   "ig-square":     { label: "IG 方形",        w: 1080, h: 1080, aspect: "1:1",  group: "social" as const },
   "ig-portrait":   { label: "IG 直式 ★",     w: 1080, h: 1350, aspect: "4:5",  group: "social" as const },
   "ig-story":      { label: "IG Story/Reels", w: 1080, h: 1920, aspect: "9:16", group: "social" as const },
@@ -52,6 +52,25 @@ type BgMode   = "color" | "gradient" | "upload" | "ai";
 type TextPos  = "top" | "center" | "bottom";
 type ProductPos = "center" | "left" | "right" | "bottom-right";
 
+// AI bg blocks
+const BG_SUBJECT_PRESETS = [
+  "Abstract gradient waves", "Mountain sunrise in mist", "Dark ocean waves",
+  "Neon city lights at night", "Forest morning sunlight", "Soft bokeh blur",
+  "Marble stone texture", "Starry night sky", "Tropical beach golden sunset",
+  "Snowy mountain peaks", "Golden wheat field", "Rain drops on glass",
+  "Moody cinematic fog", "Urban skyline at dusk", "Geometric abstract shapes",
+];
+
+const BG_VIBE_PRESETS = [
+  "Bold & powerful", "Dark & mysterious", "Calm & ethereal",
+  "Romantic & dreamy", "Sharp & modern", "Epic & grand",
+  "Warm & inviting", "Cool & professional", "Playful & vibrant",
+  "Raw & edgy", "Sacred & divine", "Electric & vibrant",
+];
+
+const MODEL_GROUPS = Array.from(new Set(STUDIO_MODEL_OPTIONS.map((m) => m.group)));
+const STYLE_GROUPS_ALL = Array.from(new Set(STYLE_CATALOG.map((s) => s.group)));
+
 interface CopyVariant { headline: string; subtext: string }
 
 interface State {
@@ -75,9 +94,17 @@ interface State {
   gradTo:    string;
   gradAngle: string;
   bgImage:   string | null;
-  aiPrompt:  string;
-  aiModel:   string;
   generating: boolean;
+  // AI bg blocks
+  aiBgSubject:       string;
+  aiBgVibe:          string;
+  aiBgStyle:         string;
+  aiBgModel:         StudioModel;
+  aiBgRefImage:      string | null;
+  aiBgRefMode:       "none" | "ref";
+  aiBgPromptOvr:     string;
+  aiBgPromptTouched: boolean;
+  aiBgModelGroup:    string;
   // text
   headline:  string;
   subtext:   string;
@@ -111,9 +138,16 @@ const INIT: State = {
   gradTo:    "#764ba2",
   gradAngle: "135deg",
   bgImage:   null,
-  aiPrompt:  "",
-  aiModel:   "flux-dev",
   generating: false,
+  aiBgSubject:       "",
+  aiBgVibe:          "",
+  aiBgStyle:         "",
+  aiBgModel:         "flux-dev",
+  aiBgRefImage:      null,
+  aiBgRefMode:       "none",
+  aiBgPromptOvr:     "",
+  aiBgPromptTouched: false,
+  aiBgModelGroup:    "BFL",
   headline:  "",
   subtext:   "",
   textColor: "#ffffff",
@@ -149,7 +183,6 @@ async function exportToPng(state: State): Promise<string> {
   const ctx = cv.getContext("2d");
   if (!ctx) throw new Error("canvas_unavailable");
 
-  // ── Background ──
   if (state.bgMode === "color") {
     ctx.fillStyle = state.bgColor;
     ctx.fillRect(0, 0, p.w, p.h);
@@ -178,13 +211,11 @@ async function exportToPng(state: State): Promise<string> {
     ctx.fillRect(0, 0, p.w, p.h);
   }
 
-  // ── Dim overlay ──
   if (state.dimOverlay) {
     ctx.fillStyle = "rgba(0,0,0,0.45)";
     ctx.fillRect(0, 0, p.w, p.h);
   }
 
-  // ── Product image (above dim, below text) ──
   if (state.productImage) {
     const img  = await loadImage(state.productImage);
     const isCtr = state.productPos === "center";
@@ -204,7 +235,6 @@ async function exportToPng(state: State): Promise<string> {
     ctx.drawImage(img, x, y, sw, sh);
   }
 
-  // ── Text ──
   const padding  = Math.round(p.w * 0.07);
   const maxWidth = p.w - padding * 2;
   ctx.fillStyle  = state.textColor;
@@ -240,7 +270,7 @@ async function exportToPng(state: State): Promise<string> {
 }
 
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-  const isCjk   = /[　-鿿豈-﫿]/.test(text);
+  const isCjk   = /[　-鿿豈-﫿]/.test(text);
   const tokens   = isCjk ? text.split("") : text.split(" ");
   const lines: string[] = [];
   let current = "";
@@ -254,13 +284,78 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
 }
 
 // ---------------------------------------------------------------------------
+// Shared UI sub-components (same pattern as StudioWorkbench)
+// ---------------------------------------------------------------------------
+
+function AccordionSection({
+  title, summary, children, defaultOpen = false, icon,
+}: {
+  title: string; summary?: string; children: React.ReactNode; defaultOpen?: boolean; icon?: string;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div>
+      <button
+        type="button"
+        className="btn-secondary"
+        style={{ width: "100%", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px" }}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {icon && <span>{icon}</span>}
+          <span>{title}</span>
+          {summary && !open && (
+            <span style={{ fontSize: 11, opacity: 0.45, marginLeft: 4, fontWeight: 400 }}>{summary}</span>
+          )}
+        </span>
+        <span style={{ opacity: 0.4, fontSize: 11 }}>{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div style={{ marginTop: 4, padding: 10, background: "var(--chip-surface, #f7f9fc)", borderRadius: 8, border: "1px solid var(--border, #e2e8f0)" }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PresetChips({ chips, onSelect, selected }: { chips: string[]; onSelect: (v: string) => void; selected?: string }) {
+  return (
+    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 5 }}>
+      {chips.map((c, i) => {
+        const active = selected === c;
+        return (
+          <button
+            key={`${c}-${i}`}
+            type="button"
+            onClick={() => onSelect(c)}
+            style={{
+              fontSize: 11, padding: "2px 9px", borderRadius: 20,
+              background: active ? "#6366f1" : "var(--chip-bg, #eef1f7)",
+              border: `1px solid ${active ? "#6366f1" : "var(--border, #d4d9e8)"}`,
+              cursor: "pointer", color: active ? "#fff" : "var(--text-muted, #3a4560)",
+              fontWeight: active ? 600 : 400, lineHeight: 1.6,
+              transition: "all 0.15s",
+            }}
+          >
+            {c}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 export default function BannerStudio() {
-  const [s, setS]      = useState<State>(INIT);
-  const bgFileRef      = useRef<HTMLInputElement>(null);
-  const productFileRef = useRef<HTMLInputElement>(null);
+  const [s, setS]         = useState<State>(INIT);
+  const bgFileRef         = useRef<HTMLInputElement>(null);
+  const productFileRef    = useRef<HTMLInputElement>(null);
+  const aiBgFileRef       = useRef<HTMLInputElement>(null);
+  const [aiBgStyleGroup, setAiBgStyleGroup] = useState("不指定");
 
   const set = useCallback(<K extends keyof State>(key: K, val: State[K]) =>
     setS((prev) => ({ ...prev, [key]: val, saved: key === "saved" ? (val as boolean) : false, error: null }))
@@ -269,6 +364,15 @@ export default function BannerStudio() {
   const p        = PRESETS[s.preset];
   const previewW = 520;
   const previewH = Math.round(previewW * (p.h / p.w));
+
+  // Assembled AI bg prompt from blocks
+  const assembledBgPrompt = useMemo(() => {
+    const styleStr = s.aiBgStyle ? resolveStylePrompt(s.aiBgStyle) : "";
+    const parts = [s.aiBgSubject.trim(), s.aiBgVibe.trim(), styleStr, "banner background image"].filter(Boolean);
+    return parts.join(", ");
+  }, [s.aiBgSubject, s.aiBgVibe, s.aiBgStyle]);
+
+  const effectiveBgPrompt = s.aiBgPromptTouched ? s.aiBgPromptOvr : assembledBgPrompt;
 
   // ── Preview helpers ──
   function previewBg(): React.CSSProperties {
@@ -322,6 +426,15 @@ export default function BannerStudio() {
     reader.readAsDataURL(file);
   }
 
+  async function handleAiBgRefUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload  = () => setS((prev) => ({ ...prev, aiBgRefImage: reader.result as string, error: null }));
+    reader.onerror = () => setS((prev) => ({ ...prev, error: "upload_read_failed" }));
+    reader.readAsDataURL(file);
+  }
+
   async function removeProductBg() {
     if (!s.productOrig) return;
     setS((prev) => ({ ...prev, productRemoving: true, error: null }));
@@ -340,13 +453,19 @@ export default function BannerStudio() {
   }
 
   async function generateAiBg() {
-    if (!s.aiPrompt.trim()) return;
+    if (!effectiveBgPrompt.trim()) return;
     setS((prev) => ({ ...prev, generating: true, error: null }));
     try {
-      const res  = await fetch("/api/tools/tarot/generate", {
+      const refs = s.aiBgRefMode === "ref" && s.aiBgRefImage ? [s.aiBgRefImage] : [];
+      const res  = await fetch("/api/tools/studio/generate", {
         method:  "POST",
         headers: { "Content-Type": "application/json", ...roleHeader("operator") },
-        body:    JSON.stringify({ model: s.aiModel, prompt: s.aiPrompt, aspectRatio: p.aspect }),
+        body:    JSON.stringify({
+          model:           s.aiBgModel,
+          prompt:          effectiveBgPrompt,
+          referenceImages: refs,
+          aspectRatio:     p.aspect,
+        }),
       });
       const data = await res.json() as { ok: boolean; image?: string; error?: string };
       if (!data.ok || !data.image) throw new Error(data.error ?? "generation_failed");
@@ -406,8 +525,8 @@ export default function BannerStudio() {
         body:    JSON.stringify({
           image:     png,
           source:    "banner",
-          prompt:    s.headline || s.aiPrompt || undefined,
-          modelName: s.bgMode === "ai" ? s.aiModel : undefined,
+          prompt:    s.headline || effectiveBgPrompt || undefined,
+          modelName: s.bgMode === "ai" ? s.aiBgModel : undefined,
           subject:   s.preset,
         }),
       });
@@ -487,32 +606,21 @@ export default function BannerStudio() {
                   ))}
                 </div>
               </div>
-              <button
-                className="btn btn-primary"
-                disabled={s.copyGenerating || !s.copyBrief.trim()}
-                onClick={generateCopy}
-                style={{ alignSelf: "flex-start" }}
-              >
+              <button className="btn btn-primary" disabled={s.copyGenerating || !s.copyBrief.trim()}
+                onClick={generateCopy} style={{ alignSelf: "flex-start" }}>
                 {s.copyGenerating ? "生成中…" : "生成文案"}
               </button>
-
-              {/* Streaming indicator */}
               {s.copyGenerating && s.copyStream && (
                 <div style={{ fontSize: 11, opacity: 0.5, fontFamily: "monospace", maxHeight: 40, overflow: "hidden" }}>
                   {s.copyStream.slice(-80)}
                 </div>
               )}
-
-              {/* Variants */}
               {s.copyVariants.length > 0 && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
                   {s.copyVariants.map((v, i) => (
-                    <button
-                      key={i}
-                      className="btn btn-ghost"
+                    <button key={i} className="btn btn-ghost"
                       style={{ textAlign: "left", padding: "8px 10px", fontSize: 12, lineHeight: 1.4 }}
-                      onClick={() => setS((prev) => ({ ...prev, headline: v.headline, subtext: v.subtext, saved: false, error: null }))}
-                    >
+                      onClick={() => setS((prev) => ({ ...prev, headline: v.headline, subtext: v.subtext, saved: false, error: null }))}>
                       <div style={{ fontWeight: 600 }}>{v.headline}</div>
                       <div style={{ opacity: 0.65, fontSize: 11 }}>{v.subtext}</div>
                     </button>
@@ -534,12 +642,10 @@ export default function BannerStudio() {
                   {(Object.keys(PRESETS) as PresetKey[])
                     .filter((k) => PRESETS[k].group === grp.key)
                     .map((k) => (
-                      <button
-                        key={k}
+                      <button key={k}
                         className={s.preset === k ? "btn btn-primary" : "btn btn-ghost"}
                         style={{ fontSize: 11, padding: "3px 8px" }}
-                        onClick={() => set("preset", k)}
-                      >
+                        onClick={() => set("preset", k)}>
                         {PRESETS[k].label}
                         <span style={{ opacity: 0.55, marginLeft: 4, fontSize: 9 }}>
                           {PRESETS[k].w}×{PRESETS[k].h}
@@ -561,26 +667,17 @@ export default function BannerStudio() {
                   {s.productImage ? "換圖" : "上傳產品圖"}
                 </button>
                 {s.productOrig && (
-                  <button
-                    className="btn btn-ghost"
-                    style={{ fontSize: 12 }}
-                    disabled={s.productRemoving}
-                    onClick={removeProductBg}
-                  >
+                  <button className="btn btn-ghost" style={{ fontSize: 12 }} disabled={s.productRemoving} onClick={removeProductBg}>
                     {s.productRemoving ? "去背中…" : s.productImage !== s.productOrig ? "✓ 已去背" : "一鍵去背"}
                   </button>
                 )}
                 {s.productImage && (
-                  <button
-                    className="btn btn-ghost"
-                    style={{ fontSize: 12, color: "var(--red)" }}
-                    onClick={() => setS((prev) => ({ ...prev, productOrig: null, productImage: null, saved: false }))}
-                  >
+                  <button className="btn btn-ghost" style={{ fontSize: 12, color: "var(--red)" }}
+                    onClick={() => setS((prev) => ({ ...prev, productOrig: null, productImage: null, saved: false }))}>
                     移除
                   </button>
                 )}
               </div>
-
               {s.productImage && (
                 <>
                   <div className="form-row">
@@ -590,16 +687,16 @@ export default function BannerStudio() {
                         <button key={pos}
                           className={s.productPos === pos ? "btn btn-primary" : "btn btn-ghost"}
                           style={{ fontSize: 11, padding: "3px 8px" }}
-                          onClick={() => set("productPos", pos)}
-                        >{{ center: "中央", left: "左", right: "右", "bottom-right": "右下" }[pos]}</button>
+                          onClick={() => set("productPos", pos)}>
+                          {{ center: "中央", left: "左", right: "右", "bottom-right": "右下" }[pos]}
+                        </button>
                       ))}
                     </div>
                   </div>
                   <div className="form-row">
                     <label className="form-label">大小</label>
                     <input type="range" min={0.2} max={1.0} step={0.05} value={s.productScale}
-                      onChange={(e) => set("productScale", Number(e.target.value))}
-                      style={{ flex: 1 }} />
+                      onChange={(e) => set("productScale", Number(e.target.value))} style={{ flex: 1 }} />
                     <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 32 }}>
                       {Math.round(s.productScale * 100)}%
                     </span>
@@ -619,8 +716,7 @@ export default function BannerStudio() {
                   <button key={m}
                     className={s.bgMode === m ? "btn btn-primary" : "btn btn-ghost"}
                     style={{ fontSize: 12, padding: "4px 10px" }}
-                    onClick={() => set("bgMode", m)}
-                  >
+                    onClick={() => set("bgMode", m)}>
                     {{ color: "純色", gradient: "漸層", upload: "上傳圖", ai: "AI 生成" }[m]}
                   </button>
                 ))}
@@ -654,8 +750,7 @@ export default function BannerStudio() {
                       <button key={d.value}
                         className={s.gradAngle === d.value ? "btn btn-primary" : "btn btn-ghost"}
                         style={{ fontSize: 12, padding: "3px 8px" }}
-                        onClick={() => set("gradAngle", d.value)}
-                      >{d.label}</button>
+                        onClick={() => set("gradAngle", d.value)}>{d.label}</button>
                     ))}
                   </div>
                 </div>
@@ -671,37 +766,138 @@ export default function BannerStudio() {
               </div>
             )}
 
+            {/* ── AI 生成 (生圖積木) ── */}
             {s.bgMode === "ai" && (
-              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-                <div className="form-row">
-                  <label className="form-label">模型</label>
-                  <select className="form-select" value={s.aiModel} onChange={(e) => set("aiModel", e.target.value)}>
-                    <option value="flux-schnell">FLUX schnell（快/省）</option>
-                    <option value="flux-dev">FLUX dev（推薦）</option>
-                    <option value="ideogram-v3-balanced">Ideogram v3</option>
-                    <option value="ideogram-v4-turbo">Ideogram v4 Turbo</option>
-                    <option value="imagen-4">Imagen 4</option>
-                    <option value="openai-medium">GPT-Image-1 中</option>
-                  </select>
-                </div>
-                <div className="form-row">
-                  <label className="form-label">描述</label>
+              <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+
+                {/* 圖片模型 */}
+                <AccordionSection
+                  title="圖片模型"
+                  summary={STUDIO_MODEL_OPTIONS.find((m) => m.value === s.aiBgModel)?.label ?? s.aiBgModel}
+                  icon="🤖"
+                  defaultOpen
+                >
+                  <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
+                    {MODEL_GROUPS.map((g) => (
+                      <button key={g}
+                        className={s.aiBgModelGroup === g ? "btn btn-primary" : "btn btn-ghost"}
+                        style={{ fontSize: 11, padding: "2px 8px" }}
+                        onClick={() => set("aiBgModelGroup", g)}>{g}</button>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                    {STUDIO_MODEL_OPTIONS.filter((m) => m.group === s.aiBgModelGroup).map((m) => (
+                      <button key={m.value}
+                        className={s.aiBgModel === m.value ? "btn btn-primary" : "btn btn-ghost"}
+                        style={{ fontSize: 11, padding: "3px 8px" }}
+                        onClick={() => set("aiBgModel", m.value)}>
+                        {m.label}
+                        <span style={{ opacity: 0.45, fontSize: 9, marginLeft: 3 }}>NT${m.costNt}</span>
+                      </button>
+                    ))}
+                  </div>
+                </AccordionSection>
+
+                {/* 主題 Subject */}
+                <AccordionSection title="主題 Subject" summary={s.aiBgSubject || "未填"} icon="🎯">
+                  <input className="form-input" type="text"
+                    placeholder="e.g. mountain sunrise in mist..."
+                    value={s.aiBgSubject}
+                    onChange={(e) => set("aiBgSubject", e.target.value)}
+                    style={{ marginBottom: 4, fontSize: 13, width: "100%" }} />
+                  <PresetChips chips={BG_SUBJECT_PRESETS} selected={s.aiBgSubject}
+                    onSelect={(v) => set("aiBgSubject", v === s.aiBgSubject ? "" : v)} />
+                </AccordionSection>
+
+                {/* 氣圍 Vibe */}
+                <AccordionSection title="氣圍 Vibe" summary={s.aiBgVibe || "未填"} icon="✨">
+                  <PresetChips chips={BG_VIBE_PRESETS} selected={s.aiBgVibe}
+                    onSelect={(v) => set("aiBgVibe", v === s.aiBgVibe ? "" : v)} />
+                </AccordionSection>
+
+                {/* 風格 Style */}
+                <AccordionSection title="風格 Style" summary={s.aiBgStyle || "不指定"} icon="🎨">
+                  <div style={{ display: "flex", gap: 4, marginBottom: 6, flexWrap: "wrap" }}>
+                    {["不指定", ...STYLE_GROUPS_ALL].map((g) => (
+                      <button key={g}
+                        className={aiBgStyleGroup === g ? "btn btn-primary" : "btn btn-ghost"}
+                        style={{ fontSize: 10, padding: "2px 7px" }}
+                        onClick={() => setAiBgStyleGroup(g)}>{g}</button>
+                    ))}
+                  </div>
+                  {aiBgStyleGroup !== "不指定" && (
+                    <PresetChips
+                      chips={STYLE_CATALOG.filter((x) => x.group === aiBgStyleGroup).map((x) => x.zh)}
+                      selected={s.aiBgStyle}
+                      onSelect={(v) => set("aiBgStyle", v === s.aiBgStyle ? "" : v)}
+                    />
+                  )}
+                  {s.aiBgStyle && (
+                    <button className="btn btn-ghost" style={{ fontSize: 11, marginTop: 6 }}
+                      onClick={() => set("aiBgStyle", "")}>✕ 清除風格</button>
+                  )}
+                </AccordionSection>
+
+                {/* 參考圖 */}
+                <AccordionSection title="參考圖" summary={s.aiBgRefMode === "ref" ? "風格參考" : "無"} icon="🖼">
+                  <input ref={aiBgFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleAiBgRefUpload} />
+                  <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                    {(["none", "ref"] as const).map((mode) => (
+                      <button key={mode}
+                        className={s.aiBgRefMode === mode ? "btn btn-primary" : "btn btn-ghost"}
+                        style={{ fontSize: 12, padding: "3px 10px" }}
+                        onClick={() => {
+                          set("aiBgRefMode", mode);
+                          if (mode === "none") set("aiBgRefImage", null);
+                        }}>
+                        {{ none: "無", ref: "🖼 風格參考" }[mode]}
+                      </button>
+                    ))}
+                  </div>
+                  {s.aiBgRefMode === "ref" && (
+                    <div>
+                      <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => aiBgFileRef.current?.click()}>
+                        {s.aiBgRefImage ? "✓ 已上傳，換圖" : "上傳參考圖…"}
+                      </button>
+                      {s.aiBgRefImage && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={s.aiBgRefImage} alt="" style={{ display: "block", marginTop: 6, height: 60, borderRadius: 4, objectFit: "cover" }} />
+                      )}
+                      <p className="form-hint" style={{ marginTop: 4 }}>
+                        模型仿照參考圖的風格（非內容）
+                      </p>
+                    </div>
+                  )}
+                </AccordionSection>
+
+                {/* 組合提示詞預覽 */}
+                <div style={{ marginTop: 2 }}>
+                  <div style={{ fontSize: 10, opacity: 0.45, marginBottom: 3, letterSpacing: 0.5 }}>組合提示詞預覽</div>
                   <textarea
                     className="form-input"
-                    rows={3}
-                    placeholder="e.g. serene mountain landscape at golden hour, cinematic..."
-                    value={s.aiPrompt}
-                    onChange={(e) => set("aiPrompt", e.target.value)}
-                    style={{ resize: "vertical", fontSize: 13 }}
+                    rows={2}
+                    style={{ fontSize: 12, resize: "vertical", width: "100%" }}
+                    value={s.aiBgPromptTouched ? s.aiBgPromptOvr : assembledBgPrompt}
+                    placeholder="選擇積木後自動組合，或直接輸入…"
+                    onChange={(e) => setS((prev) => ({ ...prev, aiBgPromptOvr: e.target.value, aiBgPromptTouched: true }))}
                   />
+                  {s.aiBgPromptTouched && (
+                    <button className="btn btn-ghost" style={{ fontSize: 11, marginTop: 2 }}
+                      onClick={() => setS((prev) => ({ ...prev, aiBgPromptTouched: false, aiBgPromptOvr: "" }))}>
+                      ↺ 恢復自動組合
+                    </button>
+                  )}
                 </div>
-                <button className="btn btn-primary" disabled={s.generating || !s.aiPrompt.trim()}
-                  onClick={generateAiBg} style={{ alignSelf: "flex-start" }}>
-                  {s.generating ? "生成中…" : s.bgImage ? "重新生成" : "生成背景"}
-                </button>
-                {s.bgImage && s.bgMode === "ai" && (
-                  <span className="form-hint" style={{ color: "var(--green)" }}>✓ 背景已生成</span>
-                )}
+
+                <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
+                  <button className="btn btn-primary" disabled={s.generating || !effectiveBgPrompt.trim()}
+                    onClick={generateAiBg}>
+                    {s.generating ? "生成中…" : s.bgImage && s.bgMode === "ai" ? "重新生成" : "生成背景"}
+                  </button>
+                  {s.bgImage && s.bgMode === "ai" && (
+                    <span className="form-hint" style={{ color: "var(--green)" }}>✓ 背景已生成</span>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -750,8 +946,9 @@ export default function BannerStudio() {
                     <button key={pos}
                       className={s.textPos === pos ? "btn btn-primary" : "btn btn-ghost"}
                       style={{ fontSize: 12, padding: "3px 10px" }}
-                      onClick={() => set("textPos", pos)}
-                    >{{ top: "上", center: "中", bottom: "下" }[pos]}</button>
+                      onClick={() => set("textPos", pos)}>
+                      {{ top: "上", center: "中", bottom: "下" }[pos]}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -780,18 +977,13 @@ export default function BannerStudio() {
               position: "relative", borderRadius: 6, overflow: "hidden",
               ...previewBg(),
             }}>
-              {/* Dim overlay */}
               {s.dimOverlay && (
                 <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
               )}
-
-              {/* Product image (above dim, below text) */}
               {s.productImage && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={s.productImage} alt="" style={productPreviewStyle()} />
               )}
-
-              {/* Text block */}
               {(s.headline || s.subtext) && (
                 <div style={textBlockStyle()}>
                   {s.headline && (
@@ -809,8 +1001,6 @@ export default function BannerStudio() {
                   )}
                 </div>
               )}
-
-              {/* Loading overlay */}
               {(s.generating || s.productRemoving) && (
                 <div style={{
                   position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)",

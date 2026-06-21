@@ -304,6 +304,15 @@ export default function DesignsGallery() {
   const [videoAssets, setVideoAssets] = useState<VideoAsset[]>([]);
   const [videoState, setVideoState] = useState<LoadState>("loading");
   const [videoErrorMessage, setVideoErrorMessage] = useState("");
+  const [videoSelectedIds, setVideoSelectedIds] = useState<Set<string>>(new Set());
+  const [videoSortOrder, setVideoSortOrder] = useState<SortOrder>("desc");
+  const [videoFilterTime, setVideoFilterTime] = useState<TimeRange>("all");
+  const [videoBulkDeleting, setVideoBulkDeleting] = useState(false);
+  const [videoBulkDownloading, setVideoBulkDownloading] = useState(false);
+  const [videoBulkDownloadDone, setVideoBulkDownloadDone] = useState(0);
+  const [videoBulkDownloadTotal, setVideoBulkDownloadTotal] = useState(0);
+  const [videoDeletingId, setVideoDeletingId] = useState<string | null>(null);
+  const [videoDownloadingId, setVideoDownloadingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setState("loading");
@@ -682,6 +691,119 @@ export default function DesignsGallery() {
     }
   }, [visible, selectedIds]);
 
+  /* ─── videos: filter + sort ─── */
+  const visibleVideos = useMemo(() => {
+    const now = new Date();
+    const cutoff: Date | null =
+      videoFilterTime === "today" ? startOfDay(now)
+      : videoFilterTime === "week" ? startOfWeek(now)
+      : videoFilterTime === "month" ? startOfMonth(now)
+      : null;
+    const filtered = cutoff
+      ? videoAssets.filter((v) => new Date(v.created_at) >= cutoff)
+      : videoAssets;
+    return videoSortOrder === "asc" ? [...filtered].reverse() : filtered;
+  }, [videoAssets, videoFilterTime, videoSortOrder]);
+
+  const toggleVideoSelect = useCallback((id: string) => {
+    setVideoSelectedIds((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }, []);
+
+  const deleteVideo = useCallback(async (video: VideoAsset) => {
+    if (!confirm(`刪除這部影片？此操作無法復原。`)) return;
+    setVideoDeletingId(video.id);
+    try {
+      const res = await fetch(`/api/tools/designs?id=${video.id}`, { method: "DELETE" });
+      const json = (await res.json()) as { ok: boolean; error?: string };
+      if (json.ok) {
+        setVideoAssets((prev) => prev.filter((v) => v.id !== video.id));
+        setVideoSelectedIds((prev) => { const n = new Set(prev); n.delete(video.id); return n; });
+      } else {
+        alert(`刪除失敗：${json.error ?? "unknown"}`);
+      }
+    } catch {
+      alert("刪除失敗：網路錯誤");
+    } finally {
+      setVideoDeletingId(null);
+    }
+  }, []);
+
+  const downloadVideo = useCallback(async (video: VideoAsset) => {
+    if (!video.object_url) return;
+    setVideoDownloadingId(video.id);
+    try {
+      const res = await fetch(video.object_url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const ext = video.object_key.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? "mp4";
+      const title = video.metadata?.title ? safeFilePart(video.metadata.title, "video") : "video";
+      downloadBlob(blob, `${title}.${ext}`);
+    } catch {
+      window.open(video.object_url, "_blank", "noopener");
+      alert("無法直接下載（可能被瀏覽器阻擋），已改開新分頁。");
+    } finally {
+      setVideoDownloadingId(null);
+    }
+  }, []);
+
+  const videoBulkDelete = useCallback(async () => {
+    const ids = visibleVideos.filter((v) => videoSelectedIds.has(v.id)).map((v) => v.id);
+    if (ids.length === 0) return;
+    if (!confirm(`確定刪除選取的 ${ids.length} 部影片？此操作無法復原。`)) return;
+    setVideoBulkDeleting(true);
+    let failed = 0, done = 0;
+    for (const id of ids) {
+      try {
+        const res = await fetch(`/api/tools/designs?id=${id}`, { method: "DELETE" });
+        const json = (await res.json()) as { ok: boolean };
+        if (json.ok) {
+          done++;
+          setVideoAssets((prev) => prev.filter((v) => v.id !== id));
+          setVideoSelectedIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
+        } else { failed++; }
+      } catch { failed++; }
+    }
+    setVideoBulkDeleting(false);
+    if (failed > 0) alert(`${failed} 部刪除失敗（${done} 部成功）`);
+  }, [visibleVideos, videoSelectedIds]);
+
+  const videoBulkDownload = useCallback(async () => {
+    const selected = visibleVideos.filter((v) => videoSelectedIds.has(v.id) && v.object_url);
+    if (selected.length === 0) return;
+    setVideoBulkDownloading(true);
+    setVideoBulkDownloadDone(0);
+    setVideoBulkDownloadTotal(selected.length);
+    let failed = 0, added = 0;
+    try {
+      const { default: JSZip } = await import("jszip");
+      const zip = new JSZip();
+      for (const v of selected) {
+        try {
+          const res = await fetch(v.object_url!, { cache: "no-store" });
+          if (!res.ok) { failed++; continue; }
+          const blob = await res.blob();
+          const ext = v.object_key.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? "mp4";
+          const title = v.metadata?.title ? safeFilePart(v.metadata.title, "video") : "video";
+          zip.file(`${title}.${ext}`, blob);
+          added++;
+        } catch { failed++; }
+        finally { setVideoBulkDownloadDone((p) => p + 1); }
+      }
+      if (added === 0) { alert("下載失敗：沒有可打包的檔案。"); return; }
+      const out = await zip.generateAsync({ type: "blob" });
+      downloadBlob(out, `videos-${downloadTimestamp()}.zip`);
+      if (failed > 0) alert(`已下載 ${added} 部，${failed} 部失敗。`);
+    } finally {
+      setVideoBulkDownloading(false);
+      setVideoBulkDownloadDone(0);
+      setVideoBulkDownloadTotal(0);
+    }
+  }, [visibleVideos, videoSelectedIds]);
+
   /* ─── early returns (disabled / hard-error apply to both tabs) ─── */
   if (state === "disabled") {
     return (
@@ -731,6 +853,11 @@ export default function DesignsGallery() {
       twitter_reddit_bluesky: "Twitter / Reddit / Bluesky",
     };
 
+    const videoSelectedVisible = visibleVideos.filter((v) => videoSelectedIds.has(v.id));
+    const videoVisibleSelectedCount = videoSelectedVisible.length;
+    const videoDownloadableSelected = videoSelectedVisible.filter((v) => v.object_url).length;
+    const allVisibleVideosSelected = videoVisibleSelectedCount === visibleVideos.length && visibleVideos.length > 0;
+
     const videoContent = () => {
       if (videoState === "loading") {
         return <div className="designs-state">載入中…</div>;
@@ -750,73 +877,107 @@ export default function DesignsGallery() {
           </div>
         );
       }
+      if (visibleVideos.length === 0) {
+        return <div className="designs-state">沒有符合條件的影片。</div>;
+      }
       return (
         <div className="designs-grid">
-          {videoAssets.map((v) => (
-            <div key={v.id} className="designs-card">
-              {/* ── badges ── */}
-              <div className="designs-card-header">
-                <div className="designs-badges">
-                  <span className="designs-badge designs-badge--studio">影片</span>
-                  {v.metadata?.sceneCount != null ? (
-                    <span className="designs-badge designs-badge--product">
-                      {v.metadata.sceneCount} 場景
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-
-              {/* ── primary video player ── */}
-              {v.object_url ? (
-                <div className="designs-img-frame designs-img-frame--square">
-                  <video
-                    src={v.object_url}
-                    controls
-                    preload="metadata"
-                    className="designs-img"
-                    style={{ objectFit: "contain", background: "#000" }}
+          {visibleVideos.map((v) => {
+            const isSelected = videoSelectedIds.has(v.id);
+            const isDeleting = videoDeletingId === v.id;
+            const isDownloading = videoDownloadingId === v.id;
+            return (
+              <div key={v.id} className={`designs-card${isSelected ? " designs-card--selected" : ""}`}>
+                {/* ── badges + checkbox ── */}
+                <div className="designs-card-header">
+                  <input
+                    type="checkbox"
+                    className="designs-card-checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleVideoSelect(v.id)}
                   />
-                </div>
-              ) : (
-                <div className="designs-img-placeholder designs-img-placeholder--square" />
-              )}
-
-              {/* ── title ── */}
-              {v.metadata?.title ? (
-                <div className="designs-card-name">{v.metadata.title}</div>
-              ) : null}
-
-              {/* ── metadata ── */}
-              <div className="designs-meta">
-                <div className="designs-meta-row">
-                  <span className="designs-meta-key">時間</span>
-                  <span className="designs-meta-val">
-                    {new Date(v.created_at).toLocaleString("zh-TW")}
-                  </span>
-                </div>
-              </div>
-
-              {/* ── format download links ── */}
-              {v.metadata?.formats && Object.keys(v.metadata.formats).length > 0 ? (
-                <div className="designs-prompt-section">
-                  <div className="designs-style-row" style={{ flexWrap: "wrap", gap: "6px" }}>
-                    {Object.entries(v.metadata.formats).map(([fmt, url]) => (
-                      <a
-                        key={fmt}
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="designs-action-btn"
-                        style={{ textDecoration: "none", display: "inline-block" }}
-                      >
-                        {FORMAT_LABELS[fmt] ?? fmt}
-                      </a>
-                    ))}
+                  <div className="designs-badges">
+                    <span className="designs-badge designs-badge--studio">影片</span>
+                    {v.metadata?.sceneCount != null ? (
+                      <span className="designs-badge designs-badge--product">
+                        {v.metadata.sceneCount} 場景
+                      </span>
+                    ) : null}
                   </div>
                 </div>
-              ) : null}
-            </div>
-          ))}
+
+                {/* ── primary video player ── */}
+                {v.object_url ? (
+                  <div className="designs-img-frame designs-img-frame--square">
+                    <video
+                      src={v.object_url}
+                      controls
+                      preload="metadata"
+                      className="designs-img"
+                      style={{ objectFit: "contain", background: "#000" }}
+                    />
+                  </div>
+                ) : (
+                  <div className="designs-img-placeholder designs-img-placeholder--square" />
+                )}
+
+                {/* ── title ── */}
+                {v.metadata?.title ? (
+                  <div className="designs-card-name">{v.metadata.title}</div>
+                ) : null}
+
+                {/* ── metadata ── */}
+                <div className="designs-meta">
+                  <div className="designs-meta-row">
+                    <span className="designs-meta-key">時間</span>
+                    <span className="designs-meta-val">
+                      {new Date(v.created_at).toLocaleString("zh-TW")}
+                    </span>
+                  </div>
+                </div>
+
+                {/* ── action buttons ── */}
+                <div className="designs-actions">
+                  {v.object_url && (
+                    <button
+                      className="designs-action-btn"
+                      disabled={isDownloading || isDeleting}
+                      onClick={() => void downloadVideo(v)}
+                    >
+                      {isDownloading ? "下載中…" : "下載"}
+                    </button>
+                  )}
+                  <button
+                    className="designs-action-btn designs-action-btn--danger"
+                    disabled={isDeleting || isDownloading}
+                    onClick={() => void deleteVideo(v)}
+                  >
+                    {isDeleting ? "刪除中…" : "刪除"}
+                  </button>
+                </div>
+
+                {/* ── format download links ── */}
+                {v.metadata?.formats && Object.keys(v.metadata.formats).length > 0 ? (
+                  <div className="designs-prompt-section">
+                    <div className="designs-style-row" style={{ flexWrap: "wrap", gap: "6px" }}>
+                      {Object.entries(v.metadata.formats).map(([fmt, url]) => (
+                        <a
+                          key={fmt}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="designs-action-btn"
+                          style={{ textDecoration: "none", display: "inline-block" }}
+                        >
+                          {FORMAT_LABELS[fmt] ?? fmt}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       );
     };
@@ -824,15 +985,85 @@ export default function DesignsGallery() {
     return (
       <div className="designs-page">
         {TabBar}
+
+        {/* ── Video filter panel ── */}
+        <div className="designs-filter-panel">
+          <div className="designs-filter-row">
+            <span className="designs-filter-label">時間</span>
+            {(["all", "today", "week", "month"] as TimeRange[]).map((k) => {
+              const lbl = k === "all" ? "全部" : k === "today" ? "今天" : k === "week" ? "本週" : "本月";
+              return (
+                <button
+                  key={k}
+                  className={`designs-chip${videoFilterTime === k ? " active" : ""}`}
+                  onClick={() => setVideoFilterTime(k)}
+                >
+                  {lbl}
+                </button>
+              );
+            })}
+            <span className="designs-filter-spacer" />
+            <span className="designs-filter-label">排序</span>
+            <button
+              className={`designs-chip${videoSortOrder === "desc" ? " active" : ""}`}
+              onClick={() => setVideoSortOrder("desc")}
+            >
+              新→舊
+            </button>
+            <button
+              className={`designs-chip${videoSortOrder === "asc" ? " active" : ""}`}
+              onClick={() => setVideoSortOrder("asc")}
+            >
+              舊→新
+            </button>
+            <button className="designs-refresh-btn" onClick={() => void loadVideos()}>
+              重新整理
+            </button>
+          </div>
+        </div>
+
+        {/* ── Video toolbar ── */}
         <div className="designs-toolbar">
           <span className="designs-toolbar-count">
-            {videoState === "ready" ? `${videoAssets.length} 部影片` : ""}
+            {videoState === "ready" ? `顯示 ${visibleVideos.length} / ${videoAssets.length} 部影片` : ""}
           </span>
           <span className="designs-filter-spacer" />
-          <button className="designs-refresh-btn" onClick={() => void loadVideos()}>
-            重新整理
-          </button>
+          {videoState === "ready" && visibleVideos.length > 0 && (
+            <button
+              className="designs-toolbar-btn"
+              onClick={() => {
+                if (allVisibleVideosSelected) {
+                  setVideoSelectedIds(new Set());
+                } else {
+                  setVideoSelectedIds(new Set(visibleVideos.map((v) => v.id)));
+                }
+              }}
+            >
+              {allVisibleVideosSelected ? "取消全選" : "全選"}
+            </button>
+          )}
+          {videoVisibleSelectedCount > 0 && (
+            <button
+              className="designs-toolbar-btn"
+              disabled={videoBulkDownloading || videoBulkDeleting || videoDownloadableSelected === 0}
+              onClick={() => void videoBulkDownload()}
+            >
+              {videoBulkDownloading
+                ? `打包中 ${videoBulkDownloadDone}/${videoBulkDownloadTotal}`
+                : `下載 ${videoDownloadableSelected} 部`}
+            </button>
+          )}
+          {videoVisibleSelectedCount > 0 && (
+            <button
+              className="designs-toolbar-btn designs-toolbar-btn--danger"
+              disabled={videoBulkDeleting || videoBulkDownloading}
+              onClick={() => void videoBulkDelete()}
+            >
+              {videoBulkDeleting ? "刪除中…" : `刪除 ${videoVisibleSelectedCount} 部`}
+            </button>
+          )}
         </div>
+
         {videoContent()}
       </div>
     );
