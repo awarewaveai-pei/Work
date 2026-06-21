@@ -134,7 +134,7 @@ function AccordionSection({
         <span style={{ opacity: 0.4, fontSize: 11 }}>{open ? "▲" : "▼"}</span>
       </button>
       {open && (
-        <div style={{ marginTop: 4, padding: 10, background: "var(--bg-tertiary, #1a1a1a)", borderRadius: 8, border: "1px solid var(--border, #333)" }}>
+        <div style={{ marginTop: 4, padding: 10, background: "var(--chip-surface, #f7f9fc)", borderRadius: 8, border: "1px solid var(--border, #e2e8f0)" }}>
           {children}
         </div>
       )}
@@ -152,12 +152,12 @@ function PresetChips({ chips, onSelect }: { chips: string[]; onSelect: (v: strin
           onClick={() => onSelect(c)}
           style={{
             fontSize: 11, padding: "2px 9px", borderRadius: 20,
-            background: "var(--bg-tertiary, #1e1e1e)", border: "1px solid var(--border, #333)",
-            cursor: "pointer", color: "var(--text-muted, #888)", lineHeight: 1.6,
+            background: "var(--chip-bg, #eef1f7)", border: "1px solid var(--border, #d4d9e8)",
+            cursor: "pointer", color: "var(--text-muted, #3a4560)", lineHeight: 1.6,
             transition: "border-color 0.15s",
           }}
           onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--accent, #6366f1)")}
-          onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--border, #333)")}
+          onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--border, #d4d9e8)")}
         >
           {c}
         </button>
@@ -589,7 +589,7 @@ export default function StudioWorkbench() {
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
             {TRENDING_CATEGORIES.map((cat) => (
               <button key={cat.value} type="button" onClick={() => onSelectTrendingCategory(cat.value)}
-                style={{ fontSize: 11, padding: "3px 10px", borderRadius: 20, cursor: "pointer", background: trendingCategory === cat.value ? "var(--accent, #6366f1)" : "var(--bg-secondary, #2a2a2a)", color: trendingCategory === cat.value ? "#fff" : "var(--text-muted, #888)", border: `1px solid ${trendingCategory === cat.value ? "var(--accent, #6366f1)" : "var(--border, #333)"}`, transition: "all 0.15s" }}>
+                style={{ fontSize: 11, padding: "3px 10px", borderRadius: 20, cursor: "pointer", background: trendingCategory === cat.value ? "var(--accent, #6366f1)" : "var(--chip-bg, #eef1f7)", color: trendingCategory === cat.value ? "#fff" : "var(--text-muted, #3a4560)", border: `1px solid ${trendingCategory === cat.value ? "var(--accent, #6366f1)" : "var(--border, #d4d9e8)"}`, transition: "all 0.15s" }}>
                 {cat.label}
               </button>
             ))}
@@ -600,9 +600,9 @@ export default function StudioWorkbench() {
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
               {trendingTopics.map((t, i) => (
                 <button key={`${t}-${i}`} type="button" onClick={() => setSubject(t)}
-                  style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, cursor: "pointer", background: "var(--bg-secondary, #222)", border: "1px solid var(--border, #333)", color: "var(--text, #ccc)", textAlign: "left", transition: "border-color 0.15s" }}
+                  style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, cursor: "pointer", background: "var(--chip-bg, #eef1f7)", border: "1px solid var(--border, #d4d9e8)", color: "var(--text, #1a202c)", textAlign: "left", transition: "border-color 0.15s" }}
                   onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--accent, #6366f1)")}
-                  onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--border, #333)")}>
+                  onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--border, #d4d9e8)")}>
                   {t}
                 </button>
               ))}
@@ -615,7 +615,7 @@ export default function StudioWorkbench() {
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
             {STYLE_GROUPS.map((g) => (
               <button key={g} type="button" onClick={() => setStyleGroup(g)}
-                style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${styleGroup === g ? "#6366f1" : "var(--border, #333)"}`, background: styleGroup === g ? "#6366f1" : "rgba(127,127,127,0.08)", color: styleGroup === g ? "#fff" : "var(--text-muted, #888)", transition: "all 0.15s" }}>
+                style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${styleGroup === g ? "#6366f1" : "var(--border, #d4d9e8)"}`, background: styleGroup === g ? "#6366f1" : "rgba(127,127,127,0.08)", color: styleGroup === g ? "#fff" : "var(--text-muted, #3a4560)", transition: "all 0.15s" }}>
                 {g}
               </button>
             ))}
@@ -626,7 +626,7 @@ export default function StudioWorkbench() {
               const active = style === item.zh;
               return (
                 <button key={item.zh} type="button" onClick={() => setStyle(active ? "" : item.zh)}
-                  style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${active ? "#6366f1" : "var(--border, #333)"}`, background: active ? "#6366f1" : "rgba(127,127,127,0.08)", color: active ? "#fff" : "var(--text-muted, #888)", transition: "all 0.15s" }}>
+                  style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${active ? "#6366f1" : "var(--border, #d4d9e8)"}`, background: active ? "#6366f1" : "rgba(127,127,127,0.08)", color: active ? "#fff" : "var(--text-muted, #3a4560)", transition: "all 0.15s" }}>
                   {item.zh}
                 </button>
               );
@@ -642,7 +642,7 @@ export default function StudioWorkbench() {
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
             {MODEL_GROUPS.map((g) => (
               <button key={g} type="button" onClick={() => setModelGroup(g)}
-                style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${modelGroup === g ? "#6366f1" : "var(--border, #333)"}`, background: modelGroup === g ? "#6366f1" : "rgba(127,127,127,0.08)", color: modelGroup === g ? "#fff" : "var(--text-muted, #888)", transition: "all 0.15s" }}>
+                style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${modelGroup === g ? "#6366f1" : "var(--border, #d4d9e8)"}`, background: modelGroup === g ? "#6366f1" : "rgba(127,127,127,0.08)", color: modelGroup === g ? "#fff" : "var(--text-muted, #3a4560)", transition: "all 0.15s" }}>
                 {g}
               </button>
             ))}
