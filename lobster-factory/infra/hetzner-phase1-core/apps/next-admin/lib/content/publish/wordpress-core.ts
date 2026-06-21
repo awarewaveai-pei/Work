@@ -388,8 +388,25 @@ export async function publishToWordPress(body: WordPressPublishInput): Promise<W
     if (seoTitle) seo.title = seoTitle;
     // Issue 四: a dedicated hero image generated at generation time → plugin sideloads + sets as
     // featured (best-effort). Issue 七: focus keyword (+ related terms) → ILJ ilj_linkdefinition meta.
-    const featuredImageUrl =
+    const heroRaw =
       typeof body.featuredImageUrl === "string" && body.featuredImageUrl.trim() ? body.featuredImageUrl.trim() : undefined;
+    // Operator invariant: every image the bridge sideloads into WP is WebP ≤150KB. Bake display
+    // derivatives (in-article image blocks + hero) on our sharp infra BEFORE the bridge sideloads them;
+    // the R2 designs/ masters are untouched. Per-image failure → keep the original URL (logged), never
+    // block the publish. Mirrors the POD path (app/api/tools/publish/route.ts `create`).
+    const articleImageUrls = new Set<string>();
+    for (const b of blocks) if (b.type === "image" && b.url) articleImageUrls.add(b.url);
+    if (heroRaw) articleImageUrls.add(heroRaw);
+    const articleWebMap = new Map<string, string>();
+    await Promise.all(
+      [...articleImageUrls].map(async (u) => {
+        const web = await normalizeForWp(u);
+        if (!web) console.warn(`[wordpress-core] WebP normalise failed; uploading original to WP: ${u}`);
+        articleWebMap.set(u, web ?? u);
+      }),
+    );
+    for (const b of blocks) if (b.type === "image" && b.url) b.url = articleWebMap.get(b.url) ?? b.url;
+    const featuredImageUrl = heroRaw ? articleWebMap.get(heroRaw) ?? heroRaw : undefined;
     const featuredImageAlt =
       typeof body.featuredImageAlt === "string" && body.featuredImageAlt.trim() ? body.featuredImageAlt.trim() : undefined;
     const internalLinkKeywords = (Array.isArray(body.internalLinkKeywords) ? body.internalLinkKeywords : [])
