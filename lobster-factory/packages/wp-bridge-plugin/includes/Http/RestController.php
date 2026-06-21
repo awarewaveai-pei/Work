@@ -26,6 +26,7 @@ use AwareWave\WpBridge\Content\MediaSideloader;
 use AwareWave\WpBridge\Post\PostCreator;
 use AwareWave\WpBridge\Product\ProductCreator;
 use AwareWave\WpBridge\Newsletter\NewsletterCreator;
+use AwareWave\WpBridge\Woo\ShippingProfileManager;
 use AwareWave\WpBridge\Validation\KadenceValidator;
 use AwareWave\WpBridge\Transaction\Impl\HttpRenderer;
 use AwareWave\WpBridge\Transaction\Impl\NullCachePurger;
@@ -73,6 +74,16 @@ final class RestController {
 				'methods'             => 'POST',
 				'permission_callback' => '__return_true',
 				'callback'            => array( $this, 'createProduct' ),
+			)
+		);
+
+		register_rest_route(
+			AWBRIDGE_REST_NAMESPACE,
+			'/woo/shipping-profile',
+			array(
+				'methods'             => 'POST',
+				'permission_callback' => '__return_true',
+				'callback'            => array( $this, 'applyShippingProfile' ),
 			)
 		);
 
@@ -288,6 +299,35 @@ final class RestController {
 		return new \WP_REST_Response( $result, $this->productErrorStatus( $result['reason'] ?? '' ) );
 	}
 
+	/** Apply WooCommerce shipping zones/classes from a declarative POD profile. Signed write only. */
+	public function applyShippingProfile( $request ) {
+		$auth = $this->authenticate( $request, KeyRecord::SCOPE_WRITE );
+		if ( ! $auth->authenticated() ) {
+			$this->audit( 'auth_denied', array( 'reason' => $auth->auditReason() ) );
+			return new \WP_REST_Response( array( 'ok' => false, 'error' => $auth->reason() ), $auth->httpStatus() );
+		}
+
+		$spec = json_decode( (string) $request->get_body(), true );
+		if ( ! is_array( $spec ) ) {
+			return new \WP_REST_Response( array( 'ok' => false, 'error' => 'invalid_payload' ), 400 );
+		}
+
+		$result = ( new ShippingProfileManager() )->apply( $spec );
+
+		$this->audit(
+			'woo_shipping_profile_apply',
+			array( 'key' => $auth->keyId(), 'status' => $result['status'], 'profile' => $result['profile'] ?? null, 'reason' => $result['reason'] ?? null )
+		);
+
+		if ( $result['status'] === 'committed' ) {
+			$result['ok'] = true;
+			return new \WP_REST_Response( $result, 200 );
+		}
+
+		$result['ok'] = false;
+		return new \WP_REST_Response( $result, $this->shippingProfileErrorStatus( $result['reason'] ?? '' ) );
+	}
+
 	/**
 	 * Create a FluentCRM email campaign as a DRAFT. Signed write (SCOPE_WRITE). NEVER sends — the
 	 * draft is the deliverable; the operator reviews recipients and sends manually in FluentCRM.
@@ -353,6 +393,28 @@ final class RestController {
 			case 'sku_exists':
 				return 409;
 			default: // verify_failed, save_failed, variation_save_failed
+				return 409;
+		}
+	}
+
+	/** Map a ShippingProfileManager failure reason to an HTTP status. */
+	private function shippingProfileErrorStatus( string $reason ): int {
+		switch ( $reason ) {
+			case 'woocommerce_not_active':
+				return 422;
+			case 'profile_required':
+			case 'classes_required':
+			case 'class_slug_required':
+			case 'zones_required':
+			case 'invalid_zone':
+			case 'zone_name_required':
+			case 'zone_locations_required':
+			case 'zone_methods_required':
+			case 'invalid_method':
+			case 'only_flat_rate_supported':
+			case 'unknown_shipping_class':
+				return 400;
+			default:
 				return 409;
 		}
 	}
