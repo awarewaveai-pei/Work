@@ -123,24 +123,22 @@ final class ColorSwatches {
 	 * @return array<string,string>
 	 */
 	private function colorMap( int $productId ): array {
-		$raw = get_post_meta( $productId, self::META_KEY, true );
-		if ( is_string( $raw ) && $raw !== '' ) {
-			$decoded = json_decode( $raw, true );
-		} elseif ( is_array( $raw ) ) {
-			$decoded = $raw;
-		} else {
-			return array();
-		}
-		if ( ! is_array( $decoded ) ) {
-			return array();
-		}
-		$map = array();
-		foreach ( $decoded as $label => $hex ) {
-			if ( is_string( $label ) && is_string( $hex ) ) {
-				$map[ $label ] = $hex;
+		// Per-product meta (written by the one-click Printful flow, or the per-product box) takes
+		// precedence; the provider-agnostic palette fills any remaining options. So a Printful product
+		// keeps its exact Printful-bound colours, while a hand-built product whose Colour values match
+		// palette names gets swatches with NO per-product setup.
+		$palette    = \AwareWave\WpBridge\Admin\SwatchPalette::palette();
+		$perProduct = array();
+		$raw        = get_post_meta( $productId, self::META_KEY, true );
+		$decoded    = is_string( $raw ) && $raw !== '' ? json_decode( $raw, true ) : ( is_array( $raw ) ? $raw : null );
+		if ( is_array( $decoded ) ) {
+			foreach ( $decoded as $label => $hex ) {
+				if ( is_string( $label ) && is_string( $hex ) ) {
+					$perProduct[ $label ] = $hex;
+				}
 			}
 		}
-		return $map;
+		return $perProduct + $palette; // '+' keeps left (per-product) keys on collision.
 	}
 
 	/** Validate + normalize a hex colour to lowercase #rrggbb, or '' if malformed (never trust meta blindly). */

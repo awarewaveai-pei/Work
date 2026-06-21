@@ -65,11 +65,12 @@ final class ColorSwatchAdmin {
 			return;
 		}
 
-		$map = $this->existingMap( (int) $post->ID );
+		$map     = $this->existingMap( (int) $post->ID );
+		$palette = SwatchPalette::palette(); // pre-fill hex from the master palette when this option matches one
 		wp_nonce_field( self::NONCE, self::NONCE );
-		echo '<p style="font-size:12px;color:#666;margin:0 0 8px">每個顏色填 hex；商品頁的 Color 會顯示成<b>色塊</b>，點色塊換成該色的變體圖。</p>';
+		echo '<p style="font-size:12px;color:#666;margin:0 0 8px">顏色 hex 會自動帶入<b>色票</b>（<a href="' . esc_url( admin_url( 'edit.php?post_type=product&page=awbridge-swatch-palette' ) ) . '">管理色票</a>）。可在此覆寫單一商品。商品頁 Color 顯示成<b>色塊</b>。</p>';
 		foreach ( $options as $opt ) {
-			$val = isset( $map[ $opt ] ) ? $map[ $opt ] : '';
+			$val = $map[ $opt ] ?? ( $palette[ $opt ] ?? '' );
 			printf(
 				'<p style="margin:0 0 10px"><label style="display:block;font-weight:600;margin-bottom:3px">%1$s</label>'
 				. '<input type="text" class="awbridge-hex" name="awbridge_swatch[%2$s]" value="%3$s" data-default-color="%3$s" placeholder="#rrggbb" /></p>',
