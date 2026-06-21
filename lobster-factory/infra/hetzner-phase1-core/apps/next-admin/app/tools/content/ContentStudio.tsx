@@ -111,6 +111,30 @@ const PRICE_POSITIONS = [
   { value: "value",   label: "平價親民（可近性）" },
 ];
 
+// Audience profile chip constants (mirrors ClientHubTabs — edit both places if changing)
+const CONTENT_GOALS = ["吸粉增長", "教育受眾", "銷售產品", "引流導網", "品牌曝光", "建立信任"];
+const CONTENT_TONES_CHIPS = ["專業權威", "溫柔親切", "幽默搞笑", "犀利直接", "高級質感", "情緒共鳴"];
+const CONTENT_CTAS = ["留言互動", "追蹤頻道", "購買產品", "預約服務", "下載資源", "私訊詢問"];
+const AUDIENCE_CATS = [
+  { key: "age",       label: "年齡層",          opts: ["18–24", "25–34", "35–44", "45–54", "55+"],              multi: true,  custom: false },
+  { key: "gender",    label: "性別",             opts: ["女性", "男性", "不限"],                                   multi: false, custom: false },
+  { key: "job",       label: "職業 / 身分",      opts: ["上班族", "學生", "創業/自雇", "家長", "退休族", "創作者"], multi: true,  custom: true  },
+  { key: "emotion",   label: "情緒 / 心理狀態",  opts: ["焦慮壓力", "想自我成長", "尋找療癒", "缺乏自信", "想被理解"], multi: true, custom: true },
+  { key: "awareness", label: "對主題的熟悉度",   opts: ["完全新手", "在比較方案", "進階老手"],                      multi: false, custom: false },
+  { key: "spending",  label: "消費力",           opts: ["平價親民", "中等", "高端精品"],                           multi: false, custom: false },
+] as const;
+const AUDIENCE_PRESETS = [
+  { label: "想成長的年輕上班族", sel: { age: ["25–34"],         gender: ["不限"],  job: ["上班族"],          emotion: ["想自我成長"],           awareness: ["在比較方案"], spending: ["中等"]    } },
+  { label: "尋求療癒的家長",     sel: { age: ["35–44"],         gender: ["女性"],  job: ["家長"],            emotion: ["尋找療癒"],             awareness: ["完全新手"],   spending: ["中等"]    } },
+  { label: "想學創作的新手",     sel: { age: ["25–34","35–44"], gender: ["不限"],  job: ["創作者","上班族"], emotion: ["缺乏自信","想自我成長"], awareness: ["完全新手"],   spending: ["平價親民"] } },
+];
+type AP = {
+  contentGoal?: string; contentTone?: string; audienceAction?: string;
+  age?: string[]; gender?: string[]; job?: string[]; jobCustom?: string;
+  emotion?: string[]; emotionCustom?: string; awareness?: string[]; spending?: string[];
+};
+const DEFAULT_AP: AP = {};
+
 // #4 — Marketing brief preset chips (click to fill/append each field)
 const MKT_PRESETS: Record<string, string[]> = {
   audience: ["台灣 30-45 歲女性", "有焦慮/壓力的上班族", "正在尋找自我療癒的成人", "對心理健康有興趣的父母", "藝術愛好者（非專業）", "身心科/諮商後進階探索者"],
@@ -457,6 +481,22 @@ function SectionToggle({ label, open, onToggle, children }: {
   );
 }
 
+function ChipBtn({ label, active, onClick, disabled }: { label: string; active: boolean; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button type="button" onClick={onClick} disabled={disabled}
+      style={{
+        padding: "3px 10px", borderRadius: 20, fontSize: 11, border: "1px solid",
+        cursor: disabled ? "default" : "pointer", whiteSpace: "nowrap",
+        background: active ? "var(--accent)" : "transparent",
+        color: active ? "#fff" : "var(--text-secondary)",
+        borderColor: active ? "var(--accent)" : "var(--card-border)",
+        fontWeight: active ? 600 : 400, lineHeight: 1.6,
+      }}>
+      {label}
+    </button>
+  );
+}
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function ContentStudio() {
@@ -651,6 +691,7 @@ export default function ContentStudio() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showMarketing, setShowMarketing] = useState(false); // #4 structured brand-tone form
   const [showPatterns, setShowPatterns] = useState(false);   // #6 Kadence funnel patterns
+  const [apState, setApState] = useState<AP>(DEFAULT_AP);   // audience profile chips
   const [savingDefaults, setSavingDefaults] = useState(false);
   const [saveDefaultsMsg, setSaveDefaultsMsg] = useState<string | null>(null);
 
@@ -764,6 +805,27 @@ export default function ContentStudio() {
       setForm(prev => ({ ...prev, marketing: { ...prev.marketing, [key]: value } })),
     []
   );
+
+  // Audience profile chip helpers
+  function toggleSingleAP(field: keyof AP, val: string) {
+    setApState(ap => {
+      const cur = ap[field] as string | string[] | undefined;
+      const arr = Array.isArray(cur) ? cur : [];
+      return { ...ap, [field]: arr.includes(val) ? [] : [val] };
+    });
+  }
+  function toggleMultiAP(field: keyof AP, val: string) {
+    setApState(ap => {
+      const arr = (ap[field] as string[] | undefined) ?? [];
+      return { ...ap, [field]: arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val] };
+    });
+  }
+  function setSingleAP(field: keyof AP, val: string) {
+    setApState(ap => ({ ...ap, [field]: ap[field] === val ? undefined : val }));
+  }
+  function applyAPPreset(sel: Record<string, string[]>) {
+    setApState(ap => ({ ...ap, ...sel, jobCustom: undefined, emotionCustom: undefined }));
+  }
 
   // ─── Suggest titles ────────────────────────────────────────────────────────
 
@@ -1051,29 +1113,34 @@ export default function ContentStudio() {
         if (dm.emotionalTriggers && !m.emotionalTriggers.trim()) m.emotionalTriggers = dm.emotionalTriggers;
         if (dm.objections        && !m.objections.trim())        m.objections        = dm.objections;
         if (dm.forbiddenClaims   && !m.forbiddenClaims.trim())   m.forbiddenClaims   = dm.forbiddenClaims;
-        // Inject audienceProfile chip selections → audience text (rich, structured)
-        if (d.audienceProfile && !m.audience.trim()) {
-          const ap = d.audienceProfile;
-          const parts: string[] = [];
-          if (ap.age?.length)       parts.push(`年齡層：${ap.age.join('、')}`);
-          if (ap.gender?.length)    parts.push(`性別：${ap.gender.join('、')}`);
-          const job = [...(ap.job ?? []), ...(ap.jobCustom?.trim() ? [ap.jobCustom.trim()] : [])];
-          if (job.length)           parts.push(`職業／身分：${job.join('、')}`);
-          const emo = [...(ap.emotion ?? []), ...(ap.emotionCustom?.trim() ? [ap.emotionCustom.trim()] : [])];
-          if (emo.length)           parts.push(`情緒狀態：${emo.join('、')}`);
-          if (ap.awareness?.length) parts.push(`對主題熟悉度：${ap.awareness.join('、')}`);
-          if (ap.spending?.length)  parts.push(`消費力：${ap.spending.join('、')}`);
-          if (ap.contentGoal)       parts.push(`內容目標：${ap.contentGoal}`);
-          if (ap.contentTone)       parts.push(`語氣偏向：${ap.contentTone}`);
-          if (ap.audienceAction)    parts.push(`期望觀眾行動：${ap.audienceAction}`);
-          const apText = parts.join('；');
-          if (apText) m.audience = apText;
-        }
         next.marketing = m;
       }
       return next;
     });
+    // Pre-select audience profile chips from saved site defaults
+    if (site?.contentDefaults?.audienceProfile) {
+      setApState(site.contentDefaults.audienceProfile);
+    }
   }, [selectedSiteId, wpSites]);
+
+  // Chips → compile audience text into form.marketing.audience
+  useEffect(() => {
+    const ap = apState;
+    const parts: string[] = [];
+    if (ap.age?.length)       parts.push(`年齡層：${ap.age.join('、')}`);
+    if (ap.gender?.length)    parts.push(`性別：${ap.gender.join('、')}`);
+    const job = [...(ap.job ?? []), ...(ap.jobCustom?.trim() ? [ap.jobCustom.trim()] : [])];
+    if (job.length)           parts.push(`職業／身分：${job.join('、')}`);
+    const emo = [...(ap.emotion ?? []), ...(ap.emotionCustom?.trim() ? [ap.emotionCustom.trim()] : [])];
+    if (emo.length)           parts.push(`情緒狀態：${emo.join('、')}`);
+    if (ap.awareness?.length) parts.push(`對主題熟悉度：${ap.awareness.join('、')}`);
+    if (ap.spending?.length)  parts.push(`消費力：${ap.spending.join('、')}`);
+    if (ap.contentGoal)       parts.push(`內容目標：${ap.contentGoal}`);
+    if (ap.contentTone)       parts.push(`語氣偏向：${ap.contentTone}`);
+    if (ap.audienceAction)    parts.push(`期望觀眾行動：${ap.audienceAction}`);
+    const text = parts.join('；');
+    if (text) setForm(prev => ({ ...prev, marketing: { ...prev.marketing, audience: text } }));
+  }, [apState]);
 
   // Auto-detect language from keyword: if keyword contains CJK characters and language is still
   // the default "English" (meaning the operator hasn't manually changed it), switch to 繁體中文.
@@ -3091,19 +3158,93 @@ export default function ContentStudio() {
 
           {/* ── #4 品牌語調 / 精準行銷（結構化表單）── */}
           <SectionToggle label="🎯 品牌語調 / 精準行銷（填表單，打中目標）" open={showMarketing} onToggle={() => setShowMarketing(v => !v)}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-              <div>
-                <label className="form-label" style={{ marginTop: 0 }}>目標受眾</label>
-                <input className="form-input" value={form.marketing.audience} disabled={isGenerating}
-                  onChange={e => setMkt("audience", e.target.value)} placeholder="例：台灣成人，對表達藝術有興趣" />
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
-                  {MKT_PRESETS.audience.map(p => (
-                    <button key={p} type="button" disabled={isGenerating} onClick={() => setMkt("audience", p)}
-                      style={{ padding: "1px 7px", borderRadius: "10px", border: "1px solid var(--card-border)", fontSize: "11px", cursor: "pointer", background: "var(--bg-hover,#f5f5f5)", color: "var(--text-secondary)" }}>
-                      {p}
+
+            {/* ── 精準受眾畫像 chip UI ── */}
+            <div style={{ marginBottom: 14, padding: "10px 12px", background: "var(--bg-hover,#f8f8f8)", borderRadius: 8, border: "1px solid var(--card-border)" }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-primary)", marginBottom: 10, paddingBottom: 4, borderBottom: "1px solid var(--border-subtle,var(--card-border))" }}>
+                🎯 精準受眾畫像（點選即注入文章生成）
+              </div>
+
+              {/* 常用人設 */}
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, fontWeight: 500 }}>常用人設（一鍵套整組）</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {AUDIENCE_PRESETS.map(p => (
+                    <button key={p.label} type="button" disabled={isGenerating}
+                      onClick={() => applyAPPreset(p.sel as Record<string, string[]>)}
+                      style={{ padding: "4px 12px", borderRadius: 6, fontSize: 11, border: "1px solid var(--accent)", cursor: "pointer", background: "transparent", color: "var(--accent)", fontWeight: 500 }}>
+                      {p.label}
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* 內容目的 */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, fontWeight: 500 }}>內容目的</div>
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                  {CONTENT_GOALS.map(g => (
+                    <ChipBtn key={g} label={g} disabled={isGenerating} active={apState.contentGoal === g} onClick={() => setSingleAP("contentGoal", g)} />
+                  ))}
+                </div>
+              </div>
+
+              {/* 語氣風格 */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, fontWeight: 500 }}>語氣風格</div>
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                  {CONTENT_TONES_CHIPS.map(t => (
+                    <ChipBtn key={t} label={t} disabled={isGenerating} active={apState.contentTone === t} onClick={() => setSingleAP("contentTone", t)} />
+                  ))}
+                </div>
+              </div>
+
+              {/* 觀眾行動 CTA */}
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, fontWeight: 500 }}>觀眾行動（期望 CTA）</div>
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                  {CONTENT_CTAS.map(c => (
+                    <ChipBtn key={c} label={c} disabled={isGenerating} active={apState.audienceAction === c} onClick={() => setSingleAP("audienceAction", c)} />
+                  ))}
+                </div>
+              </div>
+
+              {/* 目標受眾六維度 */}
+              {AUDIENCE_CATS.map(cat => (
+                <div key={cat.key} style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, fontWeight: 500 }}>{cat.label}</div>
+                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}>
+                    {cat.opts.map(opt => {
+                      const arr = (apState[cat.key as keyof AP] as string[] | undefined) ?? [];
+                      const active = arr.includes(opt);
+                      return (
+                        <ChipBtn key={opt} label={opt} disabled={isGenerating} active={active}
+                          onClick={() => cat.multi ? toggleMultiAP(cat.key as keyof AP, opt) : toggleSingleAP(cat.key as keyof AP, opt)} />
+                      );
+                    })}
+                    {cat.custom && (
+                      <input placeholder="+ 自訂" disabled={isGenerating}
+                        style={{ padding: "2px 8px", borderRadius: 20, fontSize: 11, border: "1px dashed var(--card-border)", background: "transparent", color: "var(--text-primary)", width: 72 }}
+                        value={(apState[(cat.key + "Custom") as keyof AP] as string | undefined) ?? ""}
+                        onChange={e => setApState(ap => ({ ...ap, [(cat.key + "Custom") as keyof AP]: e.target.value }))} />
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* 清除 chips */}
+              <button type="button" disabled={isGenerating}
+                onClick={() => { setApState(DEFAULT_AP); setMkt("audience", ""); }}
+                style={{ marginTop: 4, fontSize: 10, color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                × 清除所有選擇
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+              <div>
+                <label className="form-label" style={{ marginTop: 0 }}>目標受眾（由上方晶片自動編譯，可手動覆寫）</label>
+                <input className="form-input" value={form.marketing.audience} disabled={isGenerating}
+                  onChange={e => setMkt("audience", e.target.value)} placeholder="例：台灣成人，對表達藝術有興趣" />
               </div>
               <div>
                 <label className="form-label" style={{ marginTop: 0 }}>品牌定位（一句話）</label>
