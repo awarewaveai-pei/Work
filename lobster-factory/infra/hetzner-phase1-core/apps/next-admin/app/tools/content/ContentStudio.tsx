@@ -641,6 +641,7 @@ export default function ContentStudio() {
 
   // Section open state
   const [showNlp,      setShowNlp]      = useState(false);
+  const [showCatTags,  setShowCatTags]  = useState(false);
   const [showOutline,  setShowOutline]  = useState(false);
   const [showExtLinks, setShowExtLinks] = useState(false);
   const [showIntLinks, setShowIntLinks] = useState(false);
@@ -2668,7 +2669,7 @@ export default function ContentStudio() {
           </SectionToggle>
 
           {/* ── 分類 / 標籤 ── */}
-          <div className="form-block form-block--wide" style={{ marginBottom: "12px" }}>
+          <SectionToggle label="分類 / 標籤" open={showCatTags} onToggle={() => setShowCatTags(v => !v)}>
             <div style={{ display: "flex", gap: "24px", alignItems: "flex-start", flexWrap: "wrap" }}>
               <div style={{ flex: 1, minWidth: "200px" }}>
                 <label className="form-label">分類</label>
@@ -2726,7 +2727,7 @@ export default function ContentStudio() {
                 <div className="form-hint" style={{ marginTop: 4 }}>點選現有標籤，或直接輸入（逗號分隔）。不存在的標籤會自動建立。</div>
               </div>
             </div>
-          </div>
+          </SectionToggle>
 
           {/* ── 大綱編輯器 ── */}
           <SectionToggle label="大綱編輯器（先看大綱、可改再生成全文）" open={showOutline} onToggle={() => setShowOutline(v => !v)}>
