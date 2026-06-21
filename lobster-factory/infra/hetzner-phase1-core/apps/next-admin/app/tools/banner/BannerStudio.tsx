@@ -4,7 +4,8 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { roleHeader } from "../../../lib/ops-role";
 import { openInCanvas } from "@/components/tools/canvas-handoff";
 import { STUDIO_MODEL_OPTIONS, type StudioModel } from "../../../lib/studio/model-options";
-import { STYLE_CATALOG, resolveStylePrompt } from "../../tools/tarot/tarotStyles";
+import { STYLE_CATALOG } from "../tarot/tarotStyles";
+import { resolveStylePrompt } from "../tarot/cards";
 
 // ---------------------------------------------------------------------------
 // Size presets & constants
