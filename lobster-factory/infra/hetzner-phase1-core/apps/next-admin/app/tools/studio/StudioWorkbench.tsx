@@ -662,7 +662,7 @@ export default function StudioWorkbench() {
                     })());
                   }}
                   title={item.maxRefs > 0 ? `最多 ${item.maxRefs} 張參考圖` : "純文字生圖"}
-                  style={{ padding: "5px 10px", borderRadius: 14, fontSize: 12, cursor: "pointer", border: `1px solid ${active ? "#6366f1" : "var(--border, #333)"}`, background: active ? "#6366f1" : "rgba(127,127,127,0.08)", color: active ? "#fff" : "var(--text-muted, #888)", fontWeight: active ? 600 : 400, transition: "all 0.15s" }}>
+                  style={{ padding: "5px 10px", borderRadius: 14, fontSize: 12, cursor: "pointer", border: `1px solid ${active ? "#6366f1" : "var(--border, #d4d9e8)"}`, background: active ? "#6366f1" : "rgba(127,127,127,0.08)", color: active ? "#fff" : "var(--text-muted, #3a4560)", fontWeight: active ? 600 : 400, transition: "all 0.15s" }}>
                   {active && selectedModels.size === 1 ? "✓ " : active ? "☑ " : ""}{item.label}
                   <span style={{ fontSize: 10, opacity: 0.7, marginLeft: 4 }}>NT${item.costNt}</span>
                 </button>
@@ -683,7 +683,7 @@ export default function StudioWorkbench() {
                 key={a}
                 type="button"
                 onClick={() => setAspect(a)}
-                style={{ padding: "4px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: `1px solid ${aspect === a ? "#6366f1" : "var(--border, #333)"}`, background: aspect === a ? "#6366f1" : "rgba(127,127,127,0.08)", color: aspect === a ? "#fff" : "var(--text-muted, #888)", fontWeight: aspect === a ? 600 : 400, transition: "all 0.15s" }}
+                style={{ padding: "4px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: `1px solid ${aspect === a ? "#6366f1" : "var(--border, #d4d9e8)"}`, background: aspect === a ? "#6366f1" : "rgba(127,127,127,0.08)", color: aspect === a ? "#fff" : "var(--text-muted, #3a4560)", fontWeight: aspect === a ? 600 : 400, transition: "all 0.15s" }}
               >
                 {a}
               </button>
@@ -692,13 +692,13 @@ export default function StudioWorkbench() {
         </AccordionSection>
 
         {/* 參考圖 + 模式切換 — original bordered box style */}
-        <div style={{ border: "1px solid var(--border, #333)", borderRadius: 8, padding: 10 }}>
+        <div style={{ border: "1px solid var(--border, #e2e8f0)", borderRadius: 8, padding: 10 }}>
           <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>🖼️ 參考圖</p>
-          <div style={{ display: "flex", borderRadius: 6, overflow: "hidden", border: "1px solid var(--border, #333)", marginBottom: 8 }}>
-            <button type="button" onClick={() => onSetRefMode("ref")} style={{ flex: 1, padding: "6px 4px", fontSize: 11, cursor: "pointer", border: "none", background: refMode === "ref" ? "var(--accent, #6366f1)" : "transparent", color: refMode === "ref" ? "#fff" : "var(--text-muted, #888)", transition: "all 0.15s" }}>
+          <div style={{ display: "flex", borderRadius: 6, overflow: "hidden", border: "1px solid var(--border, #e2e8f0)", marginBottom: 8 }}>
+            <button type="button" onClick={() => onSetRefMode("ref")} style={{ flex: 1, padding: "6px 4px", fontSize: 11, cursor: "pointer", border: "none", background: refMode === "ref" ? "var(--accent, #6366f1)" : "transparent", color: refMode === "ref" ? "#fff" : "var(--text-muted, #3a4560)", transition: "all 0.15s" }}>
               🖼️ 風格參考
             </button>
-            <button type="button" onClick={() => onSetRefMode("transform")} style={{ flex: 1, padding: "6px 4px", fontSize: 11, cursor: "pointer", border: "none", background: refMode === "transform" ? "var(--accent, #6366f1)" : "transparent", color: refMode === "transform" ? "#fff" : "var(--text-muted, #888)", transition: "all 0.15s" }}>
+            <button type="button" onClick={() => onSetRefMode("transform")} style={{ flex: 1, padding: "6px 4px", fontSize: 11, cursor: "pointer", border: "none", background: refMode === "transform" ? "var(--accent, #6366f1)" : "transparent", color: refMode === "transform" ? "#fff" : "var(--text-muted, #3a4560)", transition: "all 0.15s" }}>
               🎨 改圖模式
             </button>
           </div>
@@ -782,10 +782,15 @@ export default function StudioWorkbench() {
 
           {/* Active result detail */}
           {activeResult && !activeResult.busy && activeResult.image ? (
-            <>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 290px", gap: 16, alignItems: "flex-start" }}>
+              {/* Left: canvas */}
+              <div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={activeResult.image} alt="generated design" style={{ display: "block", width: "auto", height: "auto", maxWidth: "100%", maxHeight: isMultiModel ? 420 : 560, margin: "0 auto", objectFit: "contain", borderRadius: 8, background: "#fff" }} />
+              </div>
 
+              {/* Right: operations panel */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {/* Action bar */}
               <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
                 {(() => {
@@ -931,7 +936,8 @@ export default function StudioWorkbench() {
                   <OutputTrackBar image={activeResult.image} source="pod" fileMeta={fileMeta} />
                 </div>
               </div>
-            </>
+              </div>
+            </div>
           ) : activeResult && !activeResult.busy && activeResult.error ? (
             <p style={{ color: "#e5484d" }}>{activeResult.error}</p>
           ) : activeResult?.busy ? (

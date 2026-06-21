@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import type { WpSite } from "@/lib/content/wp-sites";
 import type { ManagedSite } from "@/app/api/content/sites/route";
 import type { BrandVoiceProfile } from "@/app/api/content/brand-voice/route";
@@ -459,6 +460,7 @@ function SectionToggle({ label, open, onToggle, children }: {
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function ContentStudio() {
+  const searchParams = useSearchParams();
 
   const [activeTab, setActiveTab] = useState<Tab>("generate");
 
@@ -699,15 +701,18 @@ export default function ContentStudio() {
 
   // ─── Load WP sites ────────────────────────────────────────────────────────
   useEffect(() => {
+    const paramSiteId = searchParams.get("siteId") ?? "";
     fetch("/api/content/sites")
       .then(r => r.json())
       .then((data: { ok: boolean; sites?: ManagedSite[] }) => {
         if (data.ok && data.sites?.length) {
           setWpSites(data.sites);
-          setSelectedSiteId(data.sites[0].id);
+          const match = paramSiteId && data.sites.find(s => s.id === paramSiteId);
+          setSelectedSiteId(match ? match.id : data.sites[0].id);
         }
       })
       .catch(() => {/* silent — single-site env works without this */});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Brand Voice name follows the selected target client (📍 目標客戶) — so the operator never
