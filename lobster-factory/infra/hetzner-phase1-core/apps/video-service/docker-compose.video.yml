@@ -31,6 +31,9 @@ services:
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
       R2_VIDEO_BUCKET: ${R2_VIDEO_BUCKET:-lobster-videos}
       R2_VIDEO_PUBLIC_BASE: ${R2_VIDEO_PUBLIC_BASE}
+      # 腳本生成（Claude Haiku）+ Pexels b-roll
+      CLAUDE_API_KEY: ${CLAUDE_API_KEY}
+      PEXELS_API_KEY: ${PEXELS_API_KEY}
       # 渲染上限（防資源失控）
       RENDER_MAX_SCENES: ${RENDER_MAX_SCENES:-30}
       RENDER_MAX_ASSET_MB: ${RENDER_MAX_ASSET_MB:-200}
