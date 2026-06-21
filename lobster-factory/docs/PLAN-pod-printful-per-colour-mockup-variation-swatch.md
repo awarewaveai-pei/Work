@@ -16,7 +16,7 @@
 
 | 能力 | 現況 | 證據 |
 |---|---|---|
-| Printful 每色官方 mockup | `generateMockupBySpec(設計圖, {productId, variantId, …})` → mockups[](Flat/Lifestyle 真模特/Ghost) | `lib/studio/printful-mockup.ts:365` |
+| Printful 每色官方 mockup | `generateMockupBySpec(設計圖, {productId, variantId, …})` → mockups (Flat/Lifestyle 真模特/Ghost) | `lib/studio/printful-mockup.ts:365` |
 | mockup route variantId override | `POST /api/tools/studio/mockup` 接 `variantId`(覆寫 catalog 預設)→ 生**指定顏色**的 mockup | `app/api/tools/studio/mockup/route.ts:83` |
 | 每色 catalog variant_id | Phase 1b hex 對接已對好(`getCatalogVariants(productId, [hex])` 回每色 variant) | `print-provider.ts` getCatalogVariants |
 | **WooCommerce 變體圖** | ProductCreator `variations[].image` → `WC_Product_Variation::set_image_id` | `ProductCreator.php:459-468` |
