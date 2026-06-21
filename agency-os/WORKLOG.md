@@ -112,7 +112,9 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0
 - REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=2c/3m/3low → 修 SSRF（host 比對 + `redirect:"manual"`）、over-cap warn、bounded 並行
 - BUGHUNT_DONE: scope=next-admin（image→WP sideload 全路徑列舉）+ agency-os + scripts | grep=heroImage|imageUrl|sideload|featured_image_url|mockupUrls|isDesignsAsset|normalizeForWp | hits=0 stale（新 symbol 僅 2 預期 call site；REST 路徑記為範圍邊界）
-- 真站 e2e（建商品驗媒體庫 webp ≤150KB）：deploy 後執行
+- REALTEST_EVIDENCE: tool=SSH(SG) | cmd=`sg-deploy.sh next-admin` | exit=0 — commit 712ae991 deployed；`lobster-next-admin healthy after 6s`；smoke 全綠（/login、/api/ops/summary、wordpress、node-api 皆 200）
+- REALTEST_EVIDENCE（既有圖 backfill，soulful prod via SSH+wp-cli+Imagick，原圖保留可回滾）: tool=SSH | cmd=`wp eval-file aw-webp-convert.php 600 apply` | exit=0 — processed=449 failed=0 savedMB=100.2；attachment 層級 **oversized 非-webp = 0**（webp=473 / 剩餘 png-jpeg=137 全 ≤150KB）；product 7430 featured mime=image/webp；單張驗 id=7331 3107KB→148KB HTTP 200 image/webp
+- 剩餘（誠實，未做）：① 孤兒原 PNG 246MB 留 disk（回滾用，待確認後可刪）② 部落格內文 hard-coded .png URL 仍指原檔（需 search-replace 才換 webp）③ 全新商品的瀏覽器目視 e2e（瀏覽器 MCP 當時 unhealthy）
 
 ### feat(postiz): Task 3 完成 — lib/content/postiz.ts + social-publish route + Gates A/B/D/E.1/E.2
 
