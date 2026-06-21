@@ -40,6 +40,19 @@
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); SiteManager.tsx CSS color string replacements only, no logic change
 
+### feat(content-studio): ?siteId= query param auto-selects WP site on load
+
+[已修改]
+- `ContentStudio.tsx`: import useSearchParams + read ?siteId= on mount → prefer matched site over sites[0]
+- `page.tsx`: wrap <ContentStudio> in <Suspense fallback={null}> (Next.js 15 build-time requirement for useSearchParams on static route; critic found this — would have aborted sg-deploy build gate)
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0
+- REVIEW_DONE: critic=Quick | verdict=pass after fix | findings=1c(Suspense missing→fixed)/0M/0m
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=ContentStudio|useSearchParams | hits=0 (no stale callers; pre-existing usages in BuildConsole/LoginForm/IncidentFilterBar are unrelated)
+
+[剩餘風險] next build 未本機跑（需 SG 環境）；siteId param 未授權防護靠 API server-side（pre-existing）。
+
 [剩餘風險] SiteManager.tsx 亮色主題已完成。wp_sites 靠 hostname ILIKE 匹配，無 FK，多站同 hostname 會多回。部署後需瀏覽器測試 tab 切換與左側導覽 active 狀態。
 
 [rollback] git revert f3e4e196 bc4fcf57（兩個 checkpoint commits）。
