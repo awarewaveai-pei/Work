@@ -651,6 +651,8 @@ export default function ContentStudio() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showMarketing, setShowMarketing] = useState(false); // #4 structured brand-tone form
   const [showPatterns, setShowPatterns] = useState(false);   // #6 Kadence funnel patterns
+  const [savingDefaults, setSavingDefaults] = useState(false);
+  const [saveDefaultsMsg, setSaveDefaultsMsg] = useState<string | null>(null);
 
   // Syndication
   const [showSyn,     setShowSyn]     = useState(false);
@@ -1840,6 +1842,52 @@ export default function ContentStudio() {
     expertQuote: "專家引言", prosCons: "優缺點表", stepByStep: "步驟教學",
     calloutBox: "提示框 💡", caseStudy: "實際案例", statCallout: "數據亮點 📊",
   };
+
+  // ─── Save current form state as client content_defaults ─────────────────
+  async function saveAsClientDefault() {
+    const siteId = selectedSiteId || wpSites[0]?.id;
+    if (!siteId) return;
+    setSavingDefaults(true);
+    setSaveDefaultsMsg(null);
+    const contentDefaults = {
+      language: form.language,
+      targetCountry: form.targetCountry,
+      tone: form.tone,
+      articleType: form.articleType,
+      readability: form.readability,
+      pointOfView: form.pointOfView,
+      imageModel: form.media.aiImages,
+      brandVoiceInstructions: form.details || undefined,
+      marketing: {
+        audience: form.marketing.audience || undefined,
+        positioning: form.marketing.positioning || undefined,
+        usp: form.marketing.usp || undefined,
+        primaryCta: form.marketing.primaryCta || undefined,
+        funnelStage: form.marketing.funnelStage || undefined,
+        pricePositioning: form.marketing.pricePositioning || undefined,
+        emotionalTriggers: form.marketing.emotionalTriggers || undefined,
+        objections: form.marketing.objections || undefined,
+        forbiddenClaims: form.marketing.forbiddenClaims || undefined,
+      },
+    };
+    try {
+      const r = await fetch(`/api/content/sites/${siteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentDefaults }),
+      });
+      const data = await r.json() as { ok: boolean; error?: string };
+      setSaveDefaultsMsg(data.ok ? "✓ 已存為客戶預設" : `錯誤：${data.error ?? "unknown"}`);
+      if (data.ok) {
+        setWpSites(prev => prev.map(s => s.id === siteId ? { ...s, contentDefaults } : s));
+      }
+    } catch {
+      setSaveDefaultsMsg("網路錯誤，請重試");
+    } finally {
+      setSavingDefaults(false);
+      setTimeout(() => setSaveDefaultsMsg(null), 4000);
+    }
+  }
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
