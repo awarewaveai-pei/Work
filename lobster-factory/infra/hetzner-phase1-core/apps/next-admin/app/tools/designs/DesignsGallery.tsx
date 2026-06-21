@@ -458,8 +458,7 @@ export default function DesignsGallery() {
     try {
       // Same-origin proxy → no canvas taint for the cross-origin R2 image.
       const proxied = `/api/tools/studio/proxy-image?url=${encodeURIComponent(editAsset.object_url)}`;
-      const isAssetStyle = EDGE_MASK_STYLES.find((s) => s.id === styleId)?.kind === "asset";
-      const res = await applyEdgeMask(proxied, styleId, { amount: editAmount, seed: 7, assetStrength: isAssetStyle ? editAmount / 100 : undefined });
+      const res = await applyEdgeMask(proxied, styleId, { amount: editAmount, seed: 7 });
       if (res.ok) {
         setEditResult(res.image);
         setEditStyle(styleId);

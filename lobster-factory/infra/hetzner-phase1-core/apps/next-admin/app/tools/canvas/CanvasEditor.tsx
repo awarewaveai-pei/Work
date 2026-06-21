@@ -928,8 +928,7 @@ export default function CanvasEditor() {
     setError(null);
     try {
       const base = img.edgeOriginal ?? img.toDataURL({ format: "png", multiplier: 1, withoutTransform: true });
-      const isAssetStyle = EDGE_MASK_STYLES.find((s) => s.id === styleId)?.kind === "asset";
-      const res = await applyEdgeMask(base, styleId, { amount: edgeAmount, seed: 7, assetStrength: isAssetStyle ? edgeAmount / 100 : undefined });
+      const res = await applyEdgeMask(base, styleId, { amount: edgeAmount, seed: 7 });
       if (!res.ok) {
         setError(`套邊失敗：${(res as { ok: false; error: string }).error}`);
         return;

@@ -13076,6 +13076,21 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 - 2026-06-16 21:37:04 : gates=SKIPPED (ReportOnly) ; integrated-status: generate-integrated-status-report.ps1 OK ; supabase-memory: PASS (supabase-studio memory at 36.76% (< 85%))
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=addCostLine,COST_JSON | hits=all 12 call sites audited + kind discriminator applied
 
+### refactor(edge-mask): 積木修正 — asset 深度縮放邏輯收進積木本身
+
+[根因] 前一 commit 用 opt-in assetStrength 參數讓 caller 各自傳值，違反積木原則。
+[修正] edge-mask.ts 自行偵測 style.maskUrl → 用 amount/100*0.3 計算 scale，三個 caller 不需改動。
+
+[已修改]
+- edge-mask.ts: 刪 assetStrength 欄位，改 asset branch 為 scale = 1.1 - (amount/100)*0.3
+- StudioWorkbench / CanvasEditor / DesignsGallery: 刪 isAssetStyle + assetStrength，只傳 {amount, seed}
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=npx tsc --noEmit | exit=0
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=npm test | exit=0 | result=428/428 pass
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=assetStrength|isAssetStyle | hits=0
+
 ### fix(canvas,designs): asset brush strength slider unlock
 
 [任務] CanvasEditor + DesignsGallery 的邊緣強度 slider 對 asset 筆刷類型顯示「固定」，無法調整。

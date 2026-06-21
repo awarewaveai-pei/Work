@@ -460,9 +460,7 @@ export default function StudioWorkbench() {
     try {
       while (nextStyle) {
         const appliedStyle: EdgeMaskId = nextStyle;
-        const isAsset = EDGE_MASK_STYLES.find((s) => s.id === appliedStyle)?.kind === "asset";
-        const assetStrength = isAsset ? nextAmount / 100 : undefined;
-        const res = await applyEdgeMask(base, appliedStyle, { amount: nextAmount, seed: EDGE_APPLY_SEED, assetStrength });
+        const res = await applyEdgeMask(base, appliedStyle, { amount: nextAmount, seed: EDGE_APPLY_SEED });
         if (!res.ok) { setEdgeStates((prev) => ({ ...prev, [model]: "error" })); break; }
         setEdgeOriginals((prev) => (prev[model] ? prev : { ...prev, [model]: base }));
         setResults((prev) => prev.map((r) => r.model === model ? { ...r, image: res.image } : r));
