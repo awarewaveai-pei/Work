@@ -34,12 +34,22 @@ export async function POST(req: Request): Promise<Response> {
 
   const { clientId, mode, platforms, imageUrl, confirmPublishNow = false } = body;
 
-  if (!clientId) return new NextResponse("clientId required", { status: 400 });
+  if (!clientId || typeof clientId !== "string") {
+    return new NextResponse("clientId required", { status: 400 });
+  }
   if (!mode || (mode !== "draft" && mode !== "now")) {
     return new NextResponse("mode must be 'draft' or 'now'", { status: 400 });
   }
-  if (!platforms || platforms.length === 0) {
+  if (!Array.isArray(platforms) || platforms.length === 0) {
     return new NextResponse("platforms array required", { status: 400 });
+  }
+  const invalidPlatform = platforms.find(
+    (p) => !p || typeof p.platform !== "string" || !p.platform || typeof p.content !== "string"
+  );
+  if (invalidPlatform) {
+    return new NextResponse("each platforms entry must have non-empty platform and content strings", {
+      status: 400,
+    });
   }
 
   if (mode === "now") {
@@ -95,7 +105,10 @@ export async function POST(req: Request): Promise<Response> {
     .map((p) => ({ platform: p.platform, status: "skipped", error: "channel not connected" }));
 
   if (requestedPosts.length === 0) {
-    return NextResponse.json({ ok: false, error: "no connected channels for requested platforms", skipped });
+    return NextResponse.json(
+      { ok: false, error: "no connected channels for requested platforms", skipped },
+      { status: 422 }
+    );
   }
 
   let media: { id: string; path: string } | undefined;

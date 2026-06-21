@@ -72,6 +72,19 @@ export function buildDesignKey(mime: string, now: Date = new Date()): string | n
   return `designs/${yyyy}-${mm}/${randomUUID()}.${ext}`;
 }
 
+/**
+ * web/YYYY-MM/<uuid>.webp — keys for storefront DISPLAY derivatives (WebP ≤150KB), deliberately
+ * under a SEPARATE prefix from designs/. The designs/ masters (full-res originals for re-editing and
+ * the high-res print files sent to Printful) are NEVER overwritten — these are disposable web copies
+ * the wp-bridge sideloads into WordPress. Same bucket, distinct prefix, so "My Designs" (designs/)
+ * stays clean.
+ */
+export function buildWebImageKey(now: Date = new Date()): string {
+  const yyyy = now.getUTCFullYear();
+  const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
+  return `web/${yyyy}-${mm}/${randomUUID()}.webp`;
+}
+
 /** Parse a base64 data URL into mime + buffer. Returns null when malformed or unsupported. */
 export function parseImageDataUrl(dataUrl: string): { mime: string; buffer: Buffer } | null {
   const m = /^data:(image\/(?:png|jpeg|webp));base64,(.+)$/.exec(dataUrl);

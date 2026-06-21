@@ -4,6 +4,7 @@ import { buildDesignKey, getDesignsPublicBase, putDesignObject } from "../../../
 import { upscaleToPrintFile } from "../../../../lib/studio/upscaler";
 import { buildFaithfulPrintFile } from "../../../../lib/studio/print-file";
 import { toProductImage } from "../../../../lib/studio/to-product-image";
+import { normalizeForWp } from "../../../../lib/studio/wp-web-image";
 import { composeFlatlay, parseHexColor } from "../../../../lib/studio/flatlay";
 import { generateProductCopy } from "../../../../lib/studio/product-copy";
 import { createWooProduct, isBridgeConfigured } from "../../../../lib/studio/wp-bridge-client";
@@ -311,7 +312,32 @@ export async function POST(request: Request) {
     if (body.plusPrice !== undefined && !PRICE_RE.test(body.plusPrice)) {
       return NextResponse.json({ ok: false, error: "plusPrice must look like 26.99" }, { status: 400 });
     }
-    const mockupUrls = (body.mockupUrls ?? []).filter((u) => typeof u === "string" && u.startsWith(designsBase));
+    const rawMockupUrls = (body.mockupUrls ?? []).filter((u) => typeof u === "string" && u.startsWith(designsBase));
+    const rawColorMockups: Record<string, string> =
+      body.colorMockups && typeof body.colorMockups === "object"
+        ? Object.fromEntries(
+            Object.entries(body.colorMockups).filter(([, u]) => typeof u === "string" && u.startsWith(designsBase)),
+          )
+        : {};
+
+    // Operator invariant: every storefront image (gallery + colour-variation) is WebP ≤150KB. Bake a
+    // small DISPLAY derivative for each (on our sharp infra — host-independent) before handing URLs to
+    // the wp-bridge. The R2 designs/ MASTERS stay full-res (re-editing) and the print file → Printful
+    // path is untouched (printing needs full res). Convert each unique URL once; on a per-image failure
+    // fall back to the original URL (logged) so one bad image never aborts the whole product.
+    const wpImageMap = new Map<string, string>();
+    for (const u of new Set<string>([...rawMockupUrls, ...Object.values(rawColorMockups)])) {
+      const web = await normalizeForWp(u);
+      if (!web) console.warn(`[publish/create] WebP normalise failed; uploading original to WP: ${u}`);
+      wpImageMap.set(u, web ?? u);
+    }
+    const mockupUrls = rawMockupUrls.map((u) => wpImageMap.get(u) ?? u);
+    const colorMockups = Object.keys(rawColorMockups).length
+      ? Object.fromEntries(
+          Object.entries(rawColorMockups).map(([k, u]) => [k, wpImageMap.get(u) ?? u] as [string, string]),
+        )
+      : undefined;
+
     // Resolve the POD model (colours + display name + Printful catalog id). Absent → legacy White/Black.
     const model = Number.isInteger(body.catalogProductId) ? podModelById(body.catalogProductId as number) : undefined;
     const params = {
@@ -324,12 +350,7 @@ export async function POST(request: Request) {
       seo: body.seo && typeof body.seo === "object" ? body.seo : undefined,
       mockupUrls,
       model,
-      colorMockups:
-        body.colorMockups && typeof body.colorMockups === "object"
-          ? Object.fromEntries(
-              Object.entries(body.colorMockups).filter(([, u]) => typeof u === "string" && u.startsWith(designsBase)),
-            )
-          : undefined,
+      colorMockups,
     };
     // Always a real write (plugin has no /product dry-run) — payload is draft-status.
     const payload = buildPodProductPayload(params);

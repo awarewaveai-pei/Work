@@ -27,6 +27,7 @@ export type PostizPostResult = {
   integrationId: string;
   status: "ok" | "error";
   postizPostId?: string;
+  noId?: true;
   error?: string;
 };
 
@@ -39,6 +40,30 @@ export function getPostizConfig(): PostizConfig {
   if (!apiKey) throw new Error("POSTIZ_API_KEY env var not set");
   return { baseUrl, apiKey };
 }
+
+// SSRF guard: private / link-local / loopback ranges that must never be fetched
+const PRIVATE_HOST_RE =
+  /^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.|::1|0\.0\.0\.0)/i;
+
+function assertSafeImageUrl(url: string): void {
+  if (!url.startsWith("https://")) {
+    throw new Error(`imageUrl must use https:// scheme, got: ${url.slice(0, 30)}`);
+  }
+  let hostname: string;
+  try {
+    hostname = new URL(url).hostname;
+  } catch {
+    throw new Error("imageUrl is not a valid URL");
+  }
+  if (PRIVATE_HOST_RE.test(hostname)) {
+    throw new Error(`imageUrl hostname is private/internal: ${hostname}`);
+  }
+}
+
+// Max image bytes accepted for upload (10 MB)
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+// Fetch timeout for remote image download (20 s)
+const IMAGE_FETCH_TIMEOUT_MS = 20_000;
 
 type RawIntegration = {
   id: string;
@@ -55,7 +80,8 @@ async function fetchPostizIntegrations(cfg: PostizConfig): Promise<RawIntegratio
     cache: "no-store",
   });
   if (!res.ok) {
-    throw new Error(`Postiz /integrations returned ${res.status}: ${await res.text()}`);
+    const body = (await res.text()).slice(0, 200);
+    throw new Error(`Postiz /integrations returned ${res.status}: ${body}`);
   }
   return res.json() as Promise<RawIntegration[]>;
 }
@@ -77,14 +103,14 @@ export async function listIntegrations(clientId: string): Promise<SocialChannel[
   const liveMap = new Map(live.map((i) => [i.id, i]));
 
   return rows.map((row) => {
-    const live = liveMap.get(row.postiz_integration_id);
+    const liveEntry = liveMap.get(row.postiz_integration_id);
     const status: SocialChannel["status"] =
-      !live || live.disabled ? "disabled" : (row.status as SocialChannel["status"]);
+      !liveEntry || liveEntry.disabled ? "disabled" : (row.status as SocialChannel["status"]);
     return {
       clientId,
       postizIntegrationId: row.postiz_integration_id,
       platform: row.platform as SocialPlatform,
-      label: row.label ?? live?.name ?? row.platform,
+      label: row.label ?? liveEntry?.name ?? row.platform,
       status,
     };
   });
@@ -109,19 +135,40 @@ export async function uploadMedia(opts: {
     const b64 = imageUrl.slice(comma + 1);
     buffer = Buffer.from(b64, "base64");
     if (buffer.length === 0) throw new Error("base64 decode produced empty buffer");
-  } else if (imageUrl.startsWith("https://") || imageUrl.startsWith("http://")) {
-    const fetchRes = await fetch(imageUrl);
+    if (buffer.length > MAX_IMAGE_BYTES) {
+      throw new Error(`Image too large: ${buffer.length} bytes (max ${MAX_IMAGE_BYTES})`);
+    }
+  } else {
+    // SSRF guard: https-only + private IP block
+    assertSafeImageUrl(imageUrl);
+
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), IMAGE_FETCH_TIMEOUT_MS);
+    let fetchRes: Response;
+    try {
+      fetchRes = await fetch(imageUrl, { signal: ctrl.signal });
+    } catch (err) {
+      clearTimeout(timer);
+      throw new Error(
+        `Failed to fetch image: ${ctrl.signal.aborted ? "timeout" : err instanceof Error ? err.message : String(err)}`
+      );
+    }
+    clearTimeout(timer);
+
     if (!fetchRes.ok) {
-      throw new Error(`Failed to fetch image from ${imageUrl}: ${fetchRes.status}`);
+      throw new Error(`Failed to fetch image: HTTP ${fetchRes.status}`);
     }
     const ct = fetchRes.headers.get("content-type") ?? "";
     if (!ct.startsWith("image/")) {
       throw new Error(`Expected image/* content-type, got: ${ct}`);
     }
     mimeType = ct.split(";")[0].trim();
-    buffer = Buffer.from(new Uint8Array(await fetchRes.arrayBuffer()));
-  } else {
-    throw new Error(`Unsupported imageUrl scheme: ${imageUrl.slice(0, 30)}`);
+
+    const ab = await fetchRes.arrayBuffer();
+    if (ab.byteLength > MAX_IMAGE_BYTES) {
+      throw new Error(`Image too large: ${ab.byteLength} bytes (max ${MAX_IMAGE_BYTES})`);
+    }
+    buffer = Buffer.from(ab);
   }
 
   const form = new FormData();
@@ -136,7 +183,8 @@ export async function uploadMedia(opts: {
     body: form,
   });
   if (!uploadRes.ok) {
-    throw new Error(`Postiz upload failed: ${uploadRes.status} ${await uploadRes.text()}`);
+    const body = (await uploadRes.text()).slice(0, 200);
+    throw new Error(`Postiz upload failed: ${uploadRes.status} ${body}`);
   }
   const json = (await uploadRes.json()) as { id: string; path: string };
   if (!json.id || !json.path) throw new Error(`Unexpected upload response: ${JSON.stringify(json)}`);
@@ -146,7 +194,12 @@ export async function uploadMedia(opts: {
 export async function createSocialPost(opts: {
   clientId: string;
   mode: "draft" | "now";
-  posts: Array<{ integrationId: string; platform: string; content: string }>;
+  posts: Array<{
+    integrationId: string;
+    platform: string;
+    content: string;
+    platformSettings?: Record<string, unknown>;
+  }>;
   media?: PostizMediaRef;
 }): Promise<PostizPostResult[]> {
   const { mode, posts, media } = opts;
@@ -159,12 +212,17 @@ export async function createSocialPost(opts: {
 
     const body = {
       type: mode,
+      date: new Date().toISOString(),
       shortLink: false,
       tags: [],
       posts: [
         {
           integration: { id: post.integrationId },
           value: [value],
+          settings: {
+            __type: post.platform,
+            ...(post.platformSettings ?? {}),
+          },
         },
       ],
     };
@@ -197,6 +255,7 @@ export async function createSocialPost(opts: {
         integrationId: post.integrationId,
         status: "ok",
         postizPostId,
+        ...(postizPostId ? {} : { noId: true as const }),
       });
     } catch (err) {
       results.push({
