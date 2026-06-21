@@ -59,6 +59,7 @@ export const DEFAULT_SECTIONS: NavSection[] = [
       { type: 'link',     href: '/tools/tarot',         icon: '🔮', label: 'Tarot',           title: '塔羅牌印刷檔生成工具' },
       { type: 'link',     href: '/tools/studio',        icon: '✏', label: 'Studio',          title: 'POD 設計生成器' },
       { type: 'link',     href: '/tools/mockup',        icon: '👕', label: 'Mockup',          title: 'AI 擬真商品照' },
+      { type: 'link',     href: '/tools/banner',        icon: '🖼', label: 'Banner Studio',   title: 'Social media banner 生成工具' },
       { type: 'link',     href: '/tools/canvas',        icon: '🎨', label: 'Canvas Editor',   title: 'Fabric.js 快速編輯 Canvas' },
       { type: 'link',     href: '/tools/vector-editor', icon: '✒', label: 'Vector Editor',   title: '向量設計工具（14 積木）' },
       { type: 'link',     href: '/tools/designs',       icon: '🗂', label: 'My Designs',      title: '已儲存設計庫（R2 持久化）' },

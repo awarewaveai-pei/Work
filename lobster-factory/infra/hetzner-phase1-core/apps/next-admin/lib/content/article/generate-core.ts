@@ -547,7 +547,7 @@ export type ArticlePrepareResult = ArticlePrepareSuccess | ArticleGenerateFailur
 /**
  * Validate + coerce the request body into a ready-to-stream Anthropic config. Byte-identical to the
  * original route POST preamble (old lines 441-528): same str/bool/sarr coercion, same defaults, same
- * Perplexity real-source fetch and reference-URL fetch. Returns a discriminated result; the only
+ * Serper real-source fetch and reference-URL fetch. Returns a discriminated result; the only
  * validation failure is an empty keyword (400), matching the original route exactly.
  */
 export async function prepareArticleGeneration(body: ArticleGenerateInput): Promise<ArticlePrepareResult> {
@@ -726,8 +726,8 @@ export async function* streamArticleGeneration(
         void logAiCall({ route: "content/article-generate", response: finalMsg, jobId: config.jobId, tool: "content" });
         const costUsd = textCallCostUsd({ model: config.model, inputTokens: finalMsg.usage.input_tokens, outputTokens: finalMsg.usage.output_tokens, cacheReadTokens: finalMsg.usage.cache_read_input_tokens, cacheWriteTokens: finalMsg.usage.cache_creation_input_tokens });
         const { rate } = resolveTextRate(config.model);
-        if (config.perplexityCostUsd) {
-          yield `\n[COST_JSON]${JSON.stringify({ usd: config.perplexityCostUsd, model: "sonar", vendor: "Perplexity", route: "content/fetchRealSources" })}`;
+        if (config.sourcesCostUsd) {
+          yield `\n[COST_JSON]${JSON.stringify({ usd: config.sourcesCostUsd, model: "search", vendor: "Serper", route: "content/fetchRealSources" })}`;
         }
         yield `\n[COST_JSON]${JSON.stringify({ usd: costUsd, model: config.model, vendor: rate.vendor, route: "content/article-generate" })}`;
       }
@@ -866,8 +866,8 @@ async function* streamOpenAiGeneration(
       });
       const costUsd = textCallCostUsd({ model: config.model, inputTokens: openaiUsage.prompt_tokens ?? 0, outputTokens: openaiUsage.completion_tokens ?? 0 });
       const { rate } = resolveTextRate(config.model);
-      if (config.perplexityCostUsd) {
-        yield `\n[COST_JSON]${JSON.stringify({ usd: config.perplexityCostUsd, model: "sonar", vendor: "Perplexity", route: "content/fetchRealSources" })}`;
+      if (config.sourcesCostUsd) {
+        yield `\n[COST_JSON]${JSON.stringify({ usd: config.sourcesCostUsd, model: "search", vendor: "Serper", route: "content/fetchRealSources" })}`;
       }
       yield `\n[COST_JSON]${JSON.stringify({ usd: costUsd, model: config.model, vendor: rate.vendor, route: "content/article-generate" })}`;
     }
