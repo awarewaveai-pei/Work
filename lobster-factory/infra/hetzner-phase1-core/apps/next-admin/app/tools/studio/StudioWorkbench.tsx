@@ -826,6 +826,8 @@ export default function StudioWorkbench() {
                 const m = activeResult.model;
                 const est = edgeStates[m] ?? "idle";
                 const applied = edgeApplied[m];
+                // Asset (real brush) masks are fixed images — the strength slider has no effect on them.
+                const appliedIsAsset = applied ? EDGE_MASK_STYLES.find((s) => s.id === applied)?.kind === "asset" : false;
                 return (
                   <div style={{ marginTop: 12, padding: 10, border: "1px solid var(--border, #333)", borderRadius: 8 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
@@ -864,15 +866,16 @@ export default function StudioWorkbench() {
                         );
                       })}
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, opacity: appliedIsAsset ? 0.4 : 1 }}>
                       <span style={{ fontSize: 11, opacity: 0.6 }}>邊緣強度</span>
                       <input
                         type="range" min={10} max={90} step={1} value={edgeAmount}
+                        disabled={appliedIsAsset}
                         onChange={(e) => setEdgeAmount(Number(e.target.value))}
-                        onPointerUp={() => { if (applied) void applyEdge(m, applied); }}
+                        onPointerUp={() => { if (applied && !appliedIsAsset) void applyEdge(m, applied); }}
                         style={{ flex: 1 }}
                       />
-                      <span style={{ fontSize: 11, opacity: 0.6, width: 28, textAlign: "right" }}>{edgeAmount}</span>
+                      <span style={{ fontSize: 11, opacity: 0.6, width: 44, textAlign: "right" }}>{appliedIsAsset ? "固定" : edgeAmount}</span>
                     </div>
                   </div>
                 );

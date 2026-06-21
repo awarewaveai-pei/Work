@@ -4,6 +4,28 @@
 
 ## 2026-06-21
 
+### feat(studio): 邊緣風格改版 — 刪 13 程式 round/blob、留 8 方形、加 16 真實筆刷遮罩 + asset maskUrl 管線
+
+[任務] 使用者反映程式生成（feTurbulence）的筆刷不夠真實，給了 17 個 Illustrator 向量筆刷 SVG 包。要求：改邊緣只留方形的、刪其他、加這包進去。
+
+[已修改]
+- 刪 13 個 round/blob/噴濺程式風格（有機水滴/變形蟲/墨漬/油漆飛濺/水花/煙霧/雲朵/液體/融化/熔岩/粗筆刷/炭筆/濕筆）；留 8 個 rectangular 程式風格（乾毛筆/柔筆刷/平頭刷/排刷/書法毛筆/粉筆/點刷/刮刷）。移除對應 helper（mulberry32/blobPoints/closedSmoothPath/droplets）。
+- 新增 asset 遮罩管線：`EdgeMaskStyle` 加 `maskUrl?` + `build?` 改選用；`applyEdgeMask` 加 maskUrl 分支（asset 走同源 PNG 遮罩，procedural 走 SVG）；`buildMaskSvg` 對 asset 回 ""。
+- 17 個 SVG 預先用 sharp 光柵化成 white-on-transparent PNG（negate RGB 讓深底縮圖看得見，destination-in 只看 alpha 顏色無關）→ `public/edge-masks/mask-01..16.png`（**源包 mask-16=mask-17 位元組重複 → 實際 16 個獨特筆刷**）。prep 腳本在 D:/tmp/prep-masks.mjs（不進 repo）。
+- StudioWorkbench / DesignsGallery edgePreviews 改 `s.maskUrl ?? buildMaskSvg(...)`；asset 風格時「邊緣強度」滑桿 disable（asset 遮罩固定，amount 無效，避免拖了沒反應像壞掉）。
+- 最終 **24 風格 = 16 真實筆刷 + 8 程式方形**。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/studio/edge-mask.test.ts | exit=0 | 10/10（24 風格 / 16 asset 有 maskUrl 無 build / 8 procedural 反之 / buildMaskSvg asset 回 ""）
+- REALTEST_EVIDENCE: tool=Bash(sharp) | cmd=光柵化 17 SVG → 16 unique PNG | alpha[min=0 max=255]（透明背景+抗鋸齒柔邊保留；CSS display:none 生效驗證）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/2n（皆修：mask-16/17 重複→降 16；asset 滑桿 disable）；maskUrl 同源不 taint / destination-in 語意 / registry↔實體檔對應 / 13 刪除 id 無程式殘留 / PNG 全 RGBA 全 verified clean
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=organic-blob..wet-brush(13) + maskUrl + mask-NN | hits=1（僅 WORKLOG 歷史 grep pattern 字串，非程式引用；已存 styleTags 是自由字串、與 EdgeMaskId enum 無耦合 → 舊資料不破）
+
+[剩餘風險] 真實瀏覽器套 asset 筆刷待部署後 browser-test 親測。方形 PNG 遮罩拉伸到非方形設計會變形（同 procedural preserveAspectRatio=none 行為，設計取捨）。
+
+[rollback] git revert + 移除 public/edge-masks/。
+
 ### fix(wp-bridge v0.14.1) + ops: swatch select-binding 修正 + soulful 外掛升級 0.14.1 + 既有商品 backfill
 
 [任務] 操作者要 backfill 既有商品讓它們也顯示色塊（接續 v0.14.0）。

@@ -36,7 +36,6 @@ export type EdgeMaskId =
   | "mask-14"
   | "mask-15"
   | "mask-16"
-  | "mask-17"
   | "dry-brush"
   | "soft-brush"
   | "flat-brush"
@@ -144,8 +143,8 @@ function brushFilter(
 /* ─────────────────────────── style registry (積木) ─────────────────────────── */
 
 export const EDGE_MASK_STYLES: readonly EdgeMaskStyle[] = [
-  // 17 real brush masks (pre-rasterised vector brushes → white-on-transparent PNG alpha masks).
-  ...Array.from({ length: 17 }, (_, i) => {
+  // 16 real brush masks (pre-rasterised vector brushes → white-on-transparent PNG alpha masks).
+  ...Array.from({ length: 16 }, (_, i) => {
     const n = i + 1;
     const id = `mask-${String(n).padStart(2, "0")}` as EdgeMaskId;
     return {

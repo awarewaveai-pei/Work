@@ -7,7 +7,7 @@ import {
 } from "./edge-mask";
 
 const ASSET_IDS: EdgeMaskId[] = Array.from(
-  { length: 17 },
+  { length: 16 },
   (_, i) => `mask-${String(i + 1).padStart(2, "0")}` as EdgeMaskId,
 );
 const PROCEDURAL_IDS: EdgeMaskId[] = [
@@ -23,10 +23,10 @@ const PROCEDURAL_IDS: EdgeMaskId[] = [
 const ALL_IDS: EdgeMaskId[] = [...ASSET_IDS, ...PROCEDURAL_IDS];
 
 describe("edge-mask registry", () => {
-  it("exposes 17 asset + 8 procedural = 25 styles with unique ids + bilingual labels", () => {
-    expect(EDGE_MASK_STYLES).toHaveLength(25);
+  it("exposes 16 asset + 8 procedural = 24 styles with unique ids + bilingual labels", () => {
+    expect(EDGE_MASK_STYLES).toHaveLength(24);
     const ids = EDGE_MASK_STYLES.map((s) => s.id);
-    expect(new Set(ids).size).toBe(25);
+    expect(new Set(ids).size).toBe(24);
     expect(ids).toEqual(ALL_IDS);
     for (const s of EDGE_MASK_STYLES) {
       expect(s.label.length).toBeGreaterThan(0);

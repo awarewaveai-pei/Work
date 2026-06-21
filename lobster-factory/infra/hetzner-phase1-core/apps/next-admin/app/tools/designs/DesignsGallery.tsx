@@ -515,6 +515,9 @@ export default function DesignsGallery() {
     if (url) window.location.assign("/tools/publish");
   }, [editSavedUrl, saveEdged]);
 
+  // Asset (real brush) masks are fixed images — the strength slider has no effect on them.
+  const editIsAsset = !!editStyle && EDGE_MASK_STYLES.find((s) => s.id === editStyle)?.kind === "asset";
+
   /* ─── derive filter option lists ─── */
   const modelOptions = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -1230,7 +1233,7 @@ export default function DesignsGallery() {
               })}
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, opacity: editIsAsset ? 0.4 : 1 }}>
               <span style={{ fontSize: 11, opacity: 0.6 }}>邊緣強度</span>
               <input
                 type="range"
@@ -1238,12 +1241,12 @@ export default function DesignsGallery() {
                 max={90}
                 step={1}
                 value={editAmount}
-                disabled={editBusy}
+                disabled={editBusy || editIsAsset}
                 onChange={(e) => setEditAmount(Number(e.target.value))}
-                onPointerUp={() => { if (editStyle) void applyEdgeStyle(editStyle); }}
+                onPointerUp={() => { if (editStyle && !editIsAsset) void applyEdgeStyle(editStyle); }}
                 style={{ flex: 1 }}
               />
-              <span style={{ fontSize: 11, opacity: 0.6, width: 28, textAlign: "right" }}>{editAmount}</span>
+              <span style={{ fontSize: 11, opacity: 0.6, width: 44, textAlign: "right" }}>{editIsAsset ? "固定" : editAmount}</span>
             </div>
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
