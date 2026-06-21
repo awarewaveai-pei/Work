@@ -5,6 +5,52 @@ import Link from "next/link";
 import { WpUpdateButtons } from "./WpUpdateButtons";
 import type { ClientConfig, WpUpdateLatest } from "@/app/api/ops/clients/route";
 import type { DepartmentSummaryPayload } from "@/app/api/ops/clients/[slug]/department-summary/route";
+import type { SiteContentDefaults } from "@/app/api/content/sites/route";
+
+// ── Content-defaults dropdown options (mirror ContentStudio constants) ─────────
+
+const LANGUAGES = ["English", "繁體中文", "簡體中文", "日文", "西班牙文", "法文", "德文", "葡萄牙文"];
+const COUNTRIES = [
+  "全球（不指定）", "台灣", "香港", "新加坡", "馬來西亞",
+  "美國", "英國", "加拿大", "澳洲", "日本", "德國", "法國", "印度", "巴西",
+];
+const ARTICLE_TYPES = [
+  { value: "Pillar Article", label: "支柱文章" }, { value: "How-to Guide", label: "操作指南" },
+  { value: "Opinion Piece",  label: "觀點文章" }, { value: "Comparison",    label: "比較評測" },
+  { value: "Tutorial",       label: "教學教程" }, { value: "Q&A Page",      label: "Q&A 問答頁" },
+  { value: "Listicle",       label: "列表文章" }, { value: "Case Study",    label: "案例研究" },
+];
+const TONES = [
+  { value: "Friendly",        label: "親切友善" }, { value: "Professional",    label: "專業正式" },
+  { value: "Educational",     label: "教育啟發" }, { value: "Inspirational",   label: "鼓舞人心" },
+  { value: "Warm & Credible", label: "溫暖可信" },
+];
+const POVS = [
+  { value: "none",          label: "不指定" },        { value: "First person",  label: "第一人稱（我）" },
+  { value: "Second person", label: "第二人稱（你）" }, { value: "Third person",  label: "第三人稱（他／她）" },
+];
+const READABILITIES = [
+  { value: "6th grade (very easy)",   label: "簡單（6 年級）" },
+  { value: "8th grade (recommended)", label: "推薦（8 年級）" },
+  { value: "10th grade",              label: "一般（10 年級）" },
+  { value: "College",                 label: "大學程度" },
+  { value: "Professional",            label: "專業級" },
+];
+const FUNNEL_STAGES = [
+  { value: "",              label: "不指定" },
+  { value: "awareness",     label: "認知（剛發現問題）" },
+  { value: "interest",      label: "興趣（在比較方案）" },
+  { value: "consideration", label: "考慮（評估是否適合）" },
+  { value: "decision",      label: "決策（準備購買）" },
+  { value: "retention",     label: "留存（深化既有客戶）" },
+];
+const PRICE_POSITIONS = [
+  { value: "",        label: "不指定" },
+  { value: "premium", label: "高端精品（價值與稀缺）" },
+  { value: "midhigh", label: "中高端（品質與專業）" },
+  { value: "mid",     label: "中端（性價比）" },
+  { value: "value",   label: "平價親民" },
+];
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -178,11 +224,57 @@ function IntegrationTile({ name, status }: { name: string; status: "active" | "f
 // ── Tab content ───────────────────────────────────────────────────────────────
 
 function ContentTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cfg" | "wpSites">) {
-  const defaults = wpSites[0]?.content_defaults ?? {};
-  const siteId = wpSites[0]?.id;
+  const site = wpSites[0];
+  const siteId = site?.id;
+
+  const [defaults, setDefaults] = useState<SiteContentDefaults>(
+    () => (site?.content_defaults ?? {}) as SiteContentDefaults,
+  );
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+
+  function sf(key: keyof SiteContentDefaults, val: string) {
+    setDefaults(d => ({ ...d, [key]: val }));
+  }
+  function sm(key: keyof NonNullable<SiteContentDefaults["marketing"]>, val: string) {
+    setDefaults(d => ({ ...d, marketing: { ...d.marketing, [key]: val } }));
+  }
+
+  async function save() {
+    if (!siteId) return;
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      const r = await fetch(`/api/content/sites/${siteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentDefaults: defaults }),
+      });
+      const data = await r.json() as { ok: boolean; error?: string };
+      setSaveMsg(data.ok ? "已儲存 ✓" : `錯誤：${data.error ?? "unknown"}`);
+    } catch {
+      setSaveMsg("網路錯誤，請重試");
+    } finally {
+      setSaving(false);
+      setTimeout(() => setSaveMsg(null), 3000);
+    }
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%", padding: "5px 8px", borderRadius: 5,
+    border: "1px solid var(--card-border)", background: "var(--form-input-bg)",
+    color: "var(--text-primary)", fontSize: 12,
+  };
+  const taStyle: React.CSSProperties = {
+    ...inputStyle, resize: "vertical", minHeight: 60, lineHeight: 1.5,
+  };
+  const labelStyle: React.CSSProperties = {
+    display: "block", fontSize: 10, color: "var(--text-muted)", marginBottom: 4, fontWeight: 500,
+  };
 
   return (
     <>
+      {/* ── WP 連線 ──────────────────────────────────────────────────────── */}
       <Card title="WP 連線" action={
         <Link href="/tools/content/sites" style={{ fontSize: 11, color: "var(--accent)", textDecoration: "none" }}>
           管理連線 →
@@ -196,62 +288,179 @@ function ContentTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cfg
             </Link>
           </NoData>
         ) : (
-          wpSites.map((site) => (
-            <div key={site.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid var(--border-subtle)", fontSize: 12 }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: site.color ?? "#94a3b8", flexShrink: 0 }} />
-              <span style={{ flex: 1, fontWeight: 500 }}>{site.name}</span>
-              <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{site.url.replace(/^https?:\/\//, "")}</span>
-              <span style={{
-                fontSize: 10, padding: "2px 6px", borderRadius: 4,
-                background: site.active ? "#dcfce7" : "#fee2e2",
-                color: site.active ? "#15803d" : "#dc2626",
-              }}>
-                {site.active ? "已連線" : "停用"}
+          wpSites.map((s) => (
+            <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid var(--border-subtle)", fontSize: 12 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.color ?? "#94a3b8", flexShrink: 0 }} />
+              <span style={{ flex: 1, fontWeight: 500 }}>{s.name}</span>
+              <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{s.url.replace(/^https?:\/\//, "")}</span>
+              <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: s.active ? "#dcfce7" : "#fee2e2", color: s.active ? "#15803d" : "#dc2626" }}>
+                {s.active ? "已連線" : "停用"}
               </span>
             </div>
           ))
         )}
       </Card>
 
+      {/* ── 品牌 & 文章設定（可編輯）───────────────────────────────────── */}
       {wpSites.length > 0 && (
-        <Card title="品牌預設 (content_defaults)">
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px" }}>
-            {[
-              ["語言", (defaults as Record<string, unknown>).language as string],
-              ["語氣", (defaults as Record<string, unknown>).tone as string],
-              ["文章類型", (defaults as Record<string, unknown>).articleType as string],
-              ["目標市場", (defaults as Record<string, unknown>).targetCountry as string],
-            ].map(([k, v]) => (
-              <div key={k}>
-                <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 2 }}>{k}</div>
-                <div style={{ fontSize: 12, color: "var(--text-primary)" }}>{v || "—"}</div>
+        <Card title="品牌聲音（Brand Voice）" action={
+          saveMsg ? (
+            <span style={{ fontSize: 11, color: saveMsg.startsWith("已") ? "#16a34a" : "#dc2626" }}>{saveMsg}</span>
+          ) : (
+            <button
+              onClick={() => void save()}
+              disabled={saving}
+              style={{ fontSize: 11, padding: "3px 10px", borderRadius: 5, border: "none", cursor: saving ? "wait" : "pointer", background: "var(--accent)", color: "#fff" }}
+            >
+              {saving ? "儲存中…" : "儲存"}
+            </button>
+          )
+        }>
+          {/* 基本設定 */}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-primary)", marginBottom: 8, paddingBottom: 4, borderBottom: "1px solid var(--border-subtle)" }}>
+              基本設定
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+              <div>
+                <label style={labelStyle}>語言</label>
+                <select style={inputStyle} value={defaults.language ?? ""} onChange={e => sf("language", e.target.value)}>
+                  <option value="">不指定</option>
+                  {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
               </div>
-            ))}
+              <div>
+                <label style={labelStyle}>目標地區</label>
+                <select style={inputStyle} value={defaults.targetCountry ?? ""} onChange={e => sf("targetCountry", e.target.value)}>
+                  <option value="">不指定</option>
+                  {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>文章類型</label>
+                <select style={inputStyle} value={defaults.articleType ?? ""} onChange={e => sf("articleType", e.target.value)}>
+                  <option value="">不指定</option>
+                  {ARTICLE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>語氣風格</label>
+                <select style={inputStyle} value={defaults.tone ?? ""} onChange={e => sf("tone", e.target.value)}>
+                  <option value="">不指定</option>
+                  {TONES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>人稱視角</label>
+                <select style={inputStyle} value={defaults.pointOfView ?? ""} onChange={e => sf("pointOfView", e.target.value)}>
+                  {POVS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>閱讀難度</label>
+                <select style={inputStyle} value={defaults.readability ?? ""} onChange={e => sf("readability", e.target.value)}>
+                  <option value="">不指定</option>
+                  {READABILITIES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* 品牌語調 / 精準行銷 */}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-primary)", marginBottom: 8, paddingBottom: 4, borderBottom: "1px solid var(--border-subtle)" }}>
+              品牌語調 / 精準行銷
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+              <div>
+                <label style={labelStyle}>目標受眾</label>
+                <textarea style={taStyle} value={defaults.marketing?.audience ?? ""} onChange={e => sm("audience", e.target.value)} placeholder="例：台灣 30-45 歲尋找自我療癒的女性" />
+              </div>
+              <div>
+                <label style={labelStyle}>品牌定位</label>
+                <textarea style={taStyle} value={defaults.marketing?.positioning ?? ""} onChange={e => sm("positioning", e.target.value)} placeholder="例：透過藝術療癒，幫助成人重拾創造力與內心平靜" />
+              </div>
+              <div>
+                <label style={labelStyle}>獨特賣點（USP）</label>
+                <textarea style={taStyle} value={defaults.marketing?.usp ?? ""} onChange={e => sm("usp", e.target.value)} placeholder="例：無需繪畫天份，引導式藝術療癒體驗" />
+              </div>
+              <div>
+                <label style={labelStyle}>主要 CTA</label>
+                <input style={inputStyle} value={defaults.marketing?.primaryCta ?? ""} onChange={e => sm("primaryCta", e.target.value)} placeholder="例：預約免費體驗課" />
+              </div>
+              <div>
+                <label style={labelStyle}>漏斗階段</label>
+                <select style={inputStyle} value={defaults.marketing?.funnelStage ?? ""} onChange={e => sm("funnelStage", e.target.value)}>
+                  {FUNNEL_STAGES.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>價格定位</label>
+                <select style={inputStyle} value={defaults.marketing?.pricePositioning ?? ""} onChange={e => sm("pricePositioning", e.target.value)}>
+                  {PRICE_POSITIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>情感觸發點</label>
+                <textarea style={taStyle} value={defaults.marketing?.emotionalTriggers ?? ""} onChange={e => sm("emotionalTriggers", e.target.value)} placeholder="例：渴望被理解、想找回創造力" />
+              </div>
+              <div>
+                <label style={labelStyle}>客戶顧慮（Objections）</label>
+                <textarea style={taStyle} value={defaults.marketing?.objections ?? ""} onChange={e => sm("objections", e.target.value)} placeholder="例：我沒有繪畫天份；會不會很貴？" />
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={labelStyle}>禁用詞／不能說的事</label>
+                <textarea style={{ ...taStyle, minHeight: 44 }} value={defaults.marketing?.forbiddenClaims ?? ""} onChange={e => sm("forbiddenClaims", e.target.value)} placeholder="例：不能宣稱治療、不用「療癒」作主標" />
+              </div>
+            </div>
+          </div>
+
+          {/* 進階指示 */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-primary)", marginBottom: 8, paddingBottom: 4, borderBottom: "1px solid var(--border-subtle)" }}>
+              品牌語調 / 進階指示（選填）
+            </div>
+            <textarea
+              style={{ ...taStyle, minHeight: 80, width: "100%" }}
+              value={(defaults as Record<string, unknown>).brandVoiceInstructions as string ?? ""}
+              onChange={e => setDefaults(d => ({ ...d, brandVoiceInstructions: e.target.value }))}
+              placeholder={"例：文章開頭避免用問句；標題要情感導向而非功能性；語氣像朋友聊天，不像教授上課"}
+            />
+          </div>
+
+          {/* Save button (bottom) */}
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14, gap: 8, alignItems: "center" }}>
+            {saveMsg && <span style={{ fontSize: 11, color: saveMsg.startsWith("已") ? "#16a34a" : "#dc2626" }}>{saveMsg}</span>}
+            <button
+              onClick={() => void save()}
+              disabled={saving}
+              style={{ padding: "6px 18px", borderRadius: 6, border: "none", cursor: saving ? "wait" : "pointer", background: "var(--accent)", color: "#fff", fontSize: 12, fontWeight: 500 }}
+            >
+              {saving ? "儲存中…" : "💾 儲存品牌設定"}
+            </button>
           </div>
         </Card>
       )}
 
+      {/* ── Content Studio 快速入口 ──────────────────────────────────────── */}
       <Card title="Content Studio">
         <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 10, lineHeight: 1.7 }}>
-          在 Content Studio 中為此客戶生成 SEO 文章，網站連線與品牌設定自動套用。
+          在 Content Studio 中為此客戶生成 SEO 文章，品牌設定自動套用。
         </p>
-        <Link
-          href={siteId ? `/tools/content?siteId=${siteId}` : "/tools/content"}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            padding: "8px 14px", borderRadius: 6,
-            background: "var(--accent)", color: "#fff",
-            fontSize: 12, fontWeight: 500, textDecoration: "none",
-          }}
-        >
-          ✍ 開啟 Content Studio
-        </Link>
-        <Link
-          href="/tools/content"
-          style={{ fontSize: 11, color: "var(--text-muted)", textDecoration: "none", marginLeft: 12 }}
-        >
-          完整功能 →
-        </Link>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Link
+            href={siteId ? `/tools/content?siteId=${siteId}` : "/tools/content"}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 6, background: "var(--accent)", color: "#fff", fontSize: 12, fontWeight: 500, textDecoration: "none" }}
+          >
+            ✍ 開啟 Content Studio
+          </Link>
+          <Link
+            href={siteId ? `/tools/content?siteId=${siteId}` : "/tools/content"}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 6, border: "1px solid var(--card-border)", background: "var(--bg-card)", color: "var(--text-primary)", fontSize: 12, textDecoration: "none" }}
+          >
+            📅 內容行事曆
+          </Link>
+        </div>
       </Card>
     </>
   );
