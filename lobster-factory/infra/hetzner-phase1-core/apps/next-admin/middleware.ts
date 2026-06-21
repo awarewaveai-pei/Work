@@ -184,5 +184,5 @@ export const config = {
   // server-to-server endpoint families that carry their own auth (auth/webhooks/internal).
   // PUBLIC_API_PATHS + the x-ops-sync-key check above exempt the remaining /api/ops/*
   // server-to-server callers.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|login|api/auth|api/webhooks|api/internal|tarot-frames|edge-masks|vector-editor.html).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|login|api/auth|api/webhooks|api/internal|tarot-frames|edge-masks/|vector-editor.html).*)"],
 };

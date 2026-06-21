@@ -24,6 +24,8 @@
 
 [剩餘風險] 真實瀏覽器套 asset 筆刷待部署後 browser-test 親測。方形 PNG 遮罩拉伸到非方形設計會變形（同 procedural preserveAspectRatio=none 行為，設計取捨）。
 
+- **部署後修**：asset PNG 被 middleware 攔成 login gate（容器內 node fetch `/edge-masks/mask-01.png` 回 200 **text/html** 非 image/png）→ `middleware.ts:187` matcher 加 `edge-masks/` 排除（同 tarot-frames / vector-editor.html 靜態資源 pattern）。REVIEW_DONE: critic=security verdict=pass（無敏感暴露 / 16 PNG 唯一在 /edge-masks/ / 無保護路由受影響 / fail-closed 完好 / `edge-masks/` 加斜線防 prefix footgun）。
+
 [rollback] git revert + 移除 public/edge-masks/。
 
 ### fix(wp-bridge v0.14.1) + ops: swatch select-binding 修正 + soulful 外掛升級 0.14.1 + 既有商品 backfill
