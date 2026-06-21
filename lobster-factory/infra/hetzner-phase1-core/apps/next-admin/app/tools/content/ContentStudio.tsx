@@ -2354,6 +2354,372 @@ export default function ContentStudio() {
             </label>
           </SectionToggle>
 
+          {/* ── 大綱編輯器 ── */}
+          <SectionToggle label="大綱編輯器（先看大綱、可改再生成全文）" open={showOutline} onToggle={() => setShowOutline(v => !v)}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+              <label className="form-label" style={{ marginTop: 0, marginBottom: 0 }}>
+                自訂大綱
+                <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— ## H2、### H3、#### H4；每個標題含關鍵字或近義變體，生成全文時嚴格遵循</span>
+              </label>
+              <button className="btn-secondary" style={{ fontSize: "12px" }}
+                onClick={handleGenOutline} disabled={isGenerating || !form.keyword.trim() || outlineLoading}>
+                {outlineLoading ? "…" : "✨ AI 自動生成大綱"}
+              </button>
+            </div>
+            <textarea className="form-textarea" style={{ minHeight: "120px", fontFamily: "monospace", fontSize: "12px" }}
+              value={form.outline} onChange={e => setF("outline", e.target.value)} disabled={isGenerating}
+              placeholder={"## 什麼是藝術療癒？\n## 藝術療癒的好處\n### 情緒層面\n### 認知層面\n## 如何開始\n## FAQ\n## 結語"} />
+          </SectionToggle>
+
+          {/* ── #4 品牌語調 / 精準行銷（結構化表單）── */}
+          <SectionToggle label="🎯 品牌語調 / 精準行銷（填表單，打中目標）" open={showMarketing} onToggle={() => setShowMarketing(v => !v)}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+              <div>
+                <label className="form-label" style={{ marginTop: 0 }}>目標受眾</label>
+                <input className="form-input" value={form.marketing.audience} disabled={isGenerating}
+                  onChange={e => setMkt("audience", e.target.value)} placeholder="例：台灣成人，對表達藝術有興趣" />
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
+                  {MKT_PRESETS.audience.map(p => (
+                    <button key={p} type="button" disabled={isGenerating} onClick={() => setMkt("audience", p)}
+                      style={{ padding: "1px 7px", borderRadius: "10px", border: "1px solid var(--card-border)", fontSize: "11px", cursor: "pointer", background: "var(--bg-hover,#f5f5f5)", color: "var(--text-secondary)" }}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="form-label" style={{ marginTop: 0 }}>品牌定位（一句話）</label>
+                <input className="form-input" value={form.marketing.positioning} disabled={isGenerating}
+                  onChange={e => setMkt("positioning", e.target.value)} placeholder="例：陪伴而非治療的藝術自我探索空間" />
+              </div>
+              <div>
+                <label className="form-label">獨特賣點 / 差異化（USP）</label>
+                <input className="form-input" value={form.marketing.usp} disabled={isGenerating}
+                  onChange={e => setMkt("usp", e.target.value)} placeholder="例：跨文化、結構化模組、真人帶領" />
+              </div>
+              <div>
+                <label className="form-label">漏斗階段</label>
+                <select className="form-select" value={form.marketing.funnelStage} disabled={isGenerating}
+                  onChange={e => setMkt("funnelStage", e.target.value)}>
+                  {FUNNEL_STAGES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">主要行動呼籲（CTA）</label>
+                <input className="form-input" value={form.marketing.primaryCta} disabled={isGenerating}
+                  onChange={e => setMkt("primaryCta", e.target.value)} placeholder="例：預約免費體驗工作坊" />
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
+                  {MKT_PRESETS.primaryCta.map(p => (
+                    <button key={p} type="button" disabled={isGenerating} onClick={() => setMkt("primaryCta", p)}
+                      style={{ padding: "1px 7px", borderRadius: "10px", border: "1px solid var(--card-border)", fontSize: "11px", cursor: "pointer", background: "var(--bg-hover,#f5f5f5)", color: "var(--text-secondary)" }}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="form-label">價格定位</label>
+                <select className="form-select" value={form.marketing.pricePositioning} disabled={isGenerating}
+                  onChange={e => setMkt("pricePositioning", e.target.value)}>
+                  {PRICE_POSITIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">情緒觸發點 / 讀者渴望</label>
+                <input className="form-input" value={form.marketing.emotionalTriggers} disabled={isGenerating}
+                  onChange={e => setMkt("emotionalTriggers", e.target.value)} placeholder="例：渴望被理解、想找回創造力" />
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
+                  {MKT_PRESETS.emotionalTriggers.map(p => (
+                    <button key={p} type="button" disabled={isGenerating}
+                      onClick={() => {
+                        const cur = form.marketing.emotionalTriggers.trim();
+                        setMkt("emotionalTriggers", cur ? `${cur}、${p}` : p);
+                      }}
+                      style={{ padding: "1px 7px", borderRadius: "10px", border: "1px solid var(--card-border)", fontSize: "11px", cursor: "pointer", background: "var(--bg-hover,#f5f5f5)", color: "var(--text-secondary)" }}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="form-label">需化解的疑慮 / 抗拒點</label>
+                <input className="form-input" value={form.marketing.objections} disabled={isGenerating}
+                  onChange={e => setMkt("objections", e.target.value)} placeholder="例：我沒有繪畫天份／會不會很貴" />
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
+                  {MKT_PRESETS.objections.map(p => (
+                    <button key={p} type="button" disabled={isGenerating}
+                      onClick={() => {
+                        const cur = form.marketing.objections.trim();
+                        setMkt("objections", cur ? `${cur}、${p}` : p);
+                      }}
+                      style={{ padding: "1px 7px", borderRadius: "10px", border: "1px solid var(--card-border)", fontSize: "11px", cursor: "pointer", background: "var(--bg-hover,#f5f5f5)", color: "var(--text-secondary)" }}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <label className="form-label">避免使用 / 禁用聲明（逗號分隔）</label>
+            <input className="form-input" value={form.marketing.forbiddenClaims} disabled={isGenerating}
+              onChange={e => setMkt("forbiddenClaims", e.target.value)} placeholder="例：治癒, 治療疾病, 保證療效" />
+            <div className="form-hint" style={{ marginTop: 4 }}>此表單會編譯成行銷簡報，連同下方「進階指示」一起注入。留空的欄位不影響。</div>
+          </SectionToggle>
+
+          {/* ── 品牌聲音 ── */}
+          <SectionToggle label="品牌聲音（Brand Voice）— 分析範例文字，自動萃取寫作風格" open={showBrandVoice} onToggle={() => setShowBrandVoice(v => !v)}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+              <div>
+                <label className="form-label">品牌 / 客戶名稱</label>
+                <input className="form-input" value={bvProfileName}
+                  onChange={e => { setBvProfileName(e.target.value); setBvNameTouched(true); }}
+                  placeholder="例：Soulful Expression" />
+                {!bvNameTouched && wpSites.length > 0 && (
+                  <div className="form-hint">已自動帶入目標客戶「{(wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0])?.name}」，可直接覆寫。</div>
+                )}
+              </div>
+              <div>
+                <label className="form-label">從 URL 擷取（選填）</label>
+                <input className="form-input" value={bvSampleUrl}
+                  onChange={e => { setBvSampleUrl(e.target.value); setBvUrlTouched(true); }}
+                  placeholder="https://example.com/about" />
+                {!bvUrlTouched && bvSampleUrl.trim() && (
+                  <div className="form-hint">已自動帶入目標客戶 About 頁，可直接覆寫。</div>
+                )}
+                {bvSampleUrl.trim() && !bvSampleText.trim() && (
+                  <div className="form-hint" style={{ color: "#f97316" }}>伺服器端抓取頁面文字；若 URL 需登入或封鎖爬蟲則會靜默失敗，建議同時貼入範例文字。</div>
+                )}
+              </div>
+            </div>
+            <label className="form-label">範例文字（貼入品牌文章或 About 頁面，至少 50 字）</label>
+            <textarea className="form-textarea" style={{ minHeight: "100px" }}
+              value={bvSampleText} onChange={e => setBvSampleText(e.target.value)}
+              placeholder="貼入品牌文章、廣告文案或 About 頁面文字…" />
+            <div style={{ display: "flex", gap: "10px", marginTop: "10px", alignItems: "center", flexWrap: "wrap" }}>
+              <button className="btn-secondary" onClick={handleAnalyzeBrandVoice}
+                disabled={bvLoading || (!bvSampleText.trim() && !bvSampleUrl.trim())}
+                style={{ fontSize: "12px" }}>
+                {bvLoading ? "分析中…" : "🔍 分析品牌聲音"}
+              </button>
+              {bvProfile && (
+                <button className="btn-primary" onClick={handleApplyBrandVoice} style={{ fontSize: "12px" }}>
+                  {bvApplied ? "✓ 已套用" : "✨ 注入文章提示詞"}
+                </button>
+              )}
+              {bvError && <span style={{ color: "var(--color-error, #ef4444)", fontSize: "12px" }}>{bvError}</span>}
+            </div>
+            {bvProfile && (
+              <div style={{ marginTop: "12px", padding: "12px", background: "var(--bg-hover, #f5f5f5)", borderRadius: "6px", fontSize: "12px" }}>
+                <div style={{ fontWeight: 600, marginBottom: "8px", color: "var(--text-primary)" }}>{bvProfile.name} — 品牌聲音摘要</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 16px" }}>
+                  <div><span style={{ color: "var(--text-muted)" }}>語調：</span>{bvProfile.tone}</div>
+                  <div><span style={{ color: "var(--text-muted)" }}>詞彙：</span>{bvProfile.vocabulary}</div>
+                  <div><span style={{ color: "var(--text-muted)" }}>句型：</span>{bvProfile.sentenceStyle}</div>
+                  <div><span style={{ color: "var(--text-muted)" }}>個性：</span>{bvProfile.personality.join("、")}</div>
+                </div>
+                {bvProfile.preferWords.length > 0 && (
+                  <div style={{ marginTop: "6px" }}>
+                    <span style={{ color: "var(--text-muted)" }}>偏好用詞：</span>
+                    {bvProfile.preferWords.map((w, i) => (
+                      <span key={i} style={{ display: "inline-block", padding: "1px 6px", background: "#dcfce7", color: "#166534", borderRadius: "3px", marginRight: "4px", marginBottom: "2px", fontSize: "11px" }}>{w}</span>
+                    ))}
+                  </div>
+                )}
+                {bvProfile.avoidWords.length > 0 && (
+                  <div style={{ marginTop: "4px" }}>
+                    <span style={{ color: "var(--text-muted)" }}>避免用詞：</span>
+                    {bvProfile.avoidWords.map((w, i) => (
+                      <span key={i} style={{ display: "inline-block", padding: "1px 6px", background: "#fee2e2", color: "#991b1b", borderRadius: "3px", marginRight: "4px", marginBottom: "2px", fontSize: "11px" }}>{w}</span>
+                    ))}
+                  </div>
+                )}
+                <div style={{ marginTop: "8px", padding: "8px", background: "var(--bg-card)", borderRadius: "4px", borderLeft: "3px solid #5855d0", fontSize: "11px", lineHeight: 1.5 }}>
+                  {bvProfile.promptInjection}
+                </div>
+              </div>
+            )}
+          </SectionToggle>
+
+          {/* ── 品牌語調（進階 raw，向後相容）── */}
+          <SectionToggle label="品牌語調 / 進階指示（原始文字，選填）" open={showAdvanced} onToggle={() => setShowAdvanced(v => !v)}>
+            <textarea className="form-textarea" style={{ minHeight: "90px" }}
+              value={form.details} onChange={e => setF("details", e.target.value)} disabled={isGenerating}
+              placeholder={`brand_name: "Soulful Expression"\nforbidden_claims: ["治癒", "治療疾病"]\naudience: 台灣成人，對表達藝術有興趣`} />
+            <div className="form-hint" style={{ marginTop: 4 }}>自由文字會接在上方「精準行銷」表單之後一起注入。已用表單者此欄可留空。</div>
+          </SectionToggle>
+
+          {/* ── Connect to Web ── */}
+          <SectionToggle label="參考 URL（Connect to Web）" open={showConnWeb} onToggle={() => setShowConnWeb(v => !v)}>
+            <label className="form-label" style={{ marginTop: 0 }}>
+              最多 3 個參考頁面 URL
+              <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— AI 讀取頁面內容作為事實參考</span>
+            </label>
+            <textarea className="form-textarea" style={{ minHeight: "80px" }}
+              value={form.referenceUrls} onChange={e => setF("referenceUrls", e.target.value)} disabled={isGenerating}
+              placeholder={"https://en.wikipedia.org/wiki/Art_therapy\nhttps://example.com/research-paper"} />
+            <div className="form-hint">伺服器端抓取頁面文字注入提示詞（每個 URL 最多 3000 字元）。</div>
+          </SectionToggle>
+
+          {/* ── #5 競業與痛點分析 ── */}
+          <SectionToggle label="🔍 競業與痛點分析（多角度市場研究）" open={showMarket} onToggle={() => setShowMarket(v => !v)}>
+            <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", marginBottom: "8px" }}>
+              <button className="btn-secondary" onClick={handleMarketAnalysis}
+                disabled={marketLoading || !form.keyword.trim()} style={{ fontSize: "12px" }}>
+                {marketLoading ? "分析中（約 10–30 秒）…" : "🔍 分析競業與痛點"}
+              </button>
+              {marketContext && <span style={{ color: "#16a34a", fontSize: "12px" }}>✓ 已納入，產生文章時自動注入</span>}
+              {marketError && <span style={{ color: "var(--color-error, #ef4444)", fontSize: "12px" }}>{marketError}</span>}
+            </div>
+            <div className="form-hint">用 Perplexity 即時搜尋，從競爭對手、讀者痛點、搜尋意圖、轉換疑慮、差異化機會五個角度分析，結果會引導文章定位。需先填關鍵字。</div>
+            {marketAnalysis && (
+              <div style={{ marginTop: "12px", display: "grid", gap: "10px", fontSize: "12px" }}>
+                {([
+                  ["讀者痛點", marketAnalysis.painPoints, "#fee2e2", "#991b1b"],
+                  ["搜尋意圖 / 角度", marketAnalysis.searchIntent, "#dbeafe", "#1e40af"],
+                  ["轉換疑慮", marketAnalysis.objections, "#fef3c7", "#92400e"],
+                  ["競爭對手", marketAnalysis.competitors, "#f3e8ff", "#6b21a8"],
+                  ["差異化機會", marketAnalysis.differentiators, "#dcfce7", "#166534"],
+                ] as [string, string[], string, string][]).filter(([, arr]) => arr.length > 0).map(([title, arr, bg, fg]) => (
+                  <div key={title}>
+                    <div style={{ fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>{title}</div>
+                    <div>
+                      {arr.map((x, i) => (
+                        <span key={i} style={{ display: "inline-block", padding: "2px 7px", background: bg, color: fg, borderRadius: "3px", marginRight: "4px", marginBottom: "4px" }}>{x}</span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </SectionToggle>
+
+          {/* ── 外部連結 ── */}
+          <SectionToggle label="外部連結（External Links）" open={showExtLinks} onToggle={() => setShowExtLinks(v => !v)}>
+            <label className="form-label" style={{ marginTop: 0 }}>
+              指定插入的外部連結
+              <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— 每行一個，最多 5 個</span>
+            </label>
+            <textarea className="form-textarea" style={{ minHeight: "90px" }}
+              value={form.externalLinks} onChange={e => setF("externalLinks", e.target.value)} disabled={isGenerating}
+              placeholder={"https://example.com/art-therapy-research\nhttps://example.com/mental-health-resources"} />
+          </SectionToggle>
+
+          {/* ── SEO / NLP 關鍵字 ── */}
+          <SectionToggle label="SEO / NLP 關鍵字" open={showNlp} onToggle={() => setShowNlp(v => !v)}>
+            <div style={{ display: "flex", gap: "8px", marginBottom: "8px", alignItems: "flex-end" }}>
+              <div style={{ flex: 1 }}>
+                <label className="form-label" style={{ marginTop: 0 }}>
+                  關鍵字列表（逗號分隔）
+                  <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— AI 自然融入，不塞字</span>
+                </label>
+                <input className="form-input" value={form.nlpKeywords} onChange={e => setF("nlpKeywords", e.target.value)}
+                  placeholder="例：表達藝術, 自我探索, 藝術工作坊, 創意療癒" disabled={isGenerating} />
+              </div>
+              <div style={{ position: "relative" }}>
+                <button className="btn-secondary" style={{ fontSize: "12px", whiteSpace: "nowrap" }}
+                  onClick={handleGenKeywords} disabled={isGenerating || !form.keyword.trim() || kwLoading}>
+                  {kwLoading ? "…" : "✨ AI 自動生成關鍵字"}
+                </button>
+                {showKwDrop && kwSugs.length > 0 && (
+                  <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 50,
+                    background: "var(--bg-card, #fff)", border: "1px solid var(--card-border)",
+                    borderRadius: "6px", boxShadow: "0 4px 12px rgba(0,0,0,.12)", minWidth: "300px", padding: "8px" }}>
+                    <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px", padding: "0 4px" }}>點選新增關鍵字：</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", padding: "0 4px" }}>
+                      {kwSugs.map((kw, i) => (
+                        <button key={i}
+                          onClick={() => {
+                            const existing = form.nlpKeywords.trim();
+                            setF("nlpKeywords", existing ? `${existing}, ${kw}` : kw);
+                          }}
+                          style={{ padding: "3px 8px", borderRadius: "4px", border: "1px solid var(--card-border)",
+                            background: "var(--bg-page, #f8f9fc)", cursor: "pointer", fontSize: "12px", color: "var(--text-primary)" }}>
+                          {kw}
+                        </button>
+                      ))}
+                    </div>
+                    <button onClick={() => setShowKwDrop(false)}
+                      style={{ fontSize: "11px", color: "var(--text-muted)", padding: "6px 4px 0", background: "none", border: "none", cursor: "pointer", display: "block" }}>
+                      關閉
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </SectionToggle>
+
+          {/* ── 分類 / 標籤 ── */}
+          <SectionToggle label="分類 / 標籤" open={showCatTags} onToggle={() => setShowCatTags(v => !v)}>
+            <div style={{ display: "flex", gap: "24px", alignItems: "flex-start", flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: "200px" }}>
+                <label className="form-label">分類</label>
+                {siteCategories.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "6px" }}>
+                    {siteCategories.slice(0, 12).map(cat => {
+                      const selected = form.wpCategories.split(",").map(s => s.trim()).filter(Boolean).includes(cat);
+                      return (
+                        <button key={cat} type="button" disabled={isGenerating}
+                          onClick={() => {
+                            const cur = form.wpCategories.split(",").map(s => s.trim()).filter(Boolean);
+                            const next = selected ? cur.filter(c => c !== cat) : [...cur, cat];
+                            setF("wpCategories", next.join(", "));
+                          }}
+                          style={{ padding: "2px 8px", borderRadius: "12px", border: "1px solid", fontSize: "12px", cursor: "pointer",
+                            background: selected ? "var(--color-primary, #2563eb)" : "var(--bg-hover, #f5f5f5)",
+                            color: selected ? "#fff" : "var(--text-primary)", borderColor: selected ? "var(--color-primary, #2563eb)" : "var(--card-border)" }}>
+                          {selected ? "✓ " : ""}{cat}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <input className="form-input" style={{ width: "100%" }}
+                  value={form.wpCategories} onChange={e => setF("wpCategories", e.target.value)}
+                  placeholder="芳療, DIY 保養, 精油教學" disabled={isGenerating} />
+                <div className="form-hint" style={{ marginTop: 4 }}>點選現有分類，或直接輸入（逗號分隔）。不存在的分類會自動建立。</div>
+              </div>
+              <div style={{ flex: 1, minWidth: "200px" }}>
+                <label className="form-label">標籤</label>
+                {siteTags.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "6px" }}>
+                    {siteTags.slice(0, 20).map(tag => {
+                      const selected = form.wpTags.split(",").map(s => s.trim()).filter(Boolean).includes(tag);
+                      return (
+                        <button key={tag} type="button" disabled={isGenerating}
+                          onClick={() => {
+                            const cur = form.wpTags.split(",").map(s => s.trim()).filter(Boolean);
+                            const next = selected ? cur.filter(t => t !== tag) : [...cur, tag];
+                            setF("wpTags", next.join(", "));
+                          }}
+                          style={{ padding: "2px 8px", borderRadius: "12px", border: "1px solid", fontSize: "12px", cursor: "pointer",
+                            background: selected ? "var(--color-primary, #2563eb)" : "var(--bg-hover, #f5f5f5)",
+                            color: selected ? "#fff" : "var(--text-secondary)",
+                            borderColor: selected ? "var(--color-primary, #2563eb)" : "var(--card-border)" }}>
+                          {tag}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <input className="form-input" style={{ width: "100%" }}
+                  value={form.wpTags} onChange={e => setF("wpTags", e.target.value)}
+                  placeholder="檸檬精油, 精油配方, 天然保養" disabled={isGenerating} />
+                <div className="form-hint" style={{ marginTop: 4 }}>點選現有標籤，或直接輸入（逗號分隔）。不存在的標籤會自動建立。</div>
+              </div>
+            </div>
+          </SectionToggle>
+
+          {/* ── 內部連結 ── */}
+          <SectionToggle label="內部連結（Internal Links）" open={showIntLinks} onToggle={() => setShowIntLinks(v => !v)}>
+            <label className="form-label" style={{ marginTop: 0 }}>
+              強制引用的站內頁面
+              <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— 每行一個，最多 10 個（絕對 URL 或 /路徑）</span>
+            </label>
+            <textarea className="form-textarea" style={{ minHeight: "90px" }}
+              value={form.internalLinks} onChange={e => setF("internalLinks", e.target.value)} disabled={isGenerating}
+              placeholder={"https://soulfulexpression.org/art-therapy-basics\n/workshop-schedule\n/about-us"} />
+            <div className="form-hint">站內連結已由 Internal Link Juicer 外掛自動處理。此欄位用於強制 AI 引用特定頁面（例如相關工作坊或課程頁面）。</div>
+          </SectionToggle>
+
           {/* ── Media Hub ── */}
           <SectionToggle label="Media Hub" open={showMedia} onToggle={() => setShowMedia(v => !v)}>
             <div style={{ background: "#fffef0", border: "1px solid #fde68a", borderRadius: "6px", padding: "14px" }}>
@@ -2624,364 +2990,6 @@ export default function ContentStudio() {
             </div>
           </SectionToggle>
 
-          {/* ── SEO / NLP 關鍵字 ── */}
-          <SectionToggle label="SEO / NLP 關鍵字" open={showNlp} onToggle={() => setShowNlp(v => !v)}>
-            <div style={{ display: "flex", gap: "8px", marginBottom: "8px", alignItems: "flex-end" }}>
-              <div style={{ flex: 1 }}>
-                <label className="form-label" style={{ marginTop: 0 }}>
-                  關鍵字列表（逗號分隔）
-                  <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— AI 自然融入，不塞字</span>
-                </label>
-                <input className="form-input" value={form.nlpKeywords} onChange={e => setF("nlpKeywords", e.target.value)}
-                  placeholder="例：表達藝術, 自我探索, 藝術工作坊, 創意療癒" disabled={isGenerating} />
-              </div>
-              <div style={{ position: "relative" }}>
-                <button className="btn-secondary" style={{ fontSize: "12px", whiteSpace: "nowrap" }}
-                  onClick={handleGenKeywords} disabled={isGenerating || !form.keyword.trim() || kwLoading}>
-                  {kwLoading ? "…" : "✨ AI 自動生成關鍵字"}
-                </button>
-                {showKwDrop && kwSugs.length > 0 && (
-                  <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 50,
-                    background: "var(--bg-card, #fff)", border: "1px solid var(--card-border)",
-                    borderRadius: "6px", boxShadow: "0 4px 12px rgba(0,0,0,.12)", minWidth: "300px", padding: "8px" }}>
-                    <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px", padding: "0 4px" }}>點選新增關鍵字：</div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", padding: "0 4px" }}>
-                      {kwSugs.map((kw, i) => (
-                        <button key={i}
-                          onClick={() => {
-                            const existing = form.nlpKeywords.trim();
-                            setF("nlpKeywords", existing ? `${existing}, ${kw}` : kw);
-                          }}
-                          style={{ padding: "3px 8px", borderRadius: "4px", border: "1px solid var(--card-border)",
-                            background: "var(--bg-page, #f8f9fc)", cursor: "pointer", fontSize: "12px", color: "var(--text-primary)" }}>
-                          {kw}
-                        </button>
-                      ))}
-                    </div>
-                    <button onClick={() => setShowKwDrop(false)}
-                      style={{ fontSize: "11px", color: "var(--text-muted)", padding: "6px 4px 0", background: "none", border: "none", cursor: "pointer", display: "block" }}>
-                      關閉
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </SectionToggle>
-
-          {/* ── 分類 / 標籤 ── */}
-          <SectionToggle label="分類 / 標籤" open={showCatTags} onToggle={() => setShowCatTags(v => !v)}>
-            <div style={{ display: "flex", gap: "24px", alignItems: "flex-start", flexWrap: "wrap" }}>
-              <div style={{ flex: 1, minWidth: "200px" }}>
-                <label className="form-label">分類</label>
-                {siteCategories.length > 0 && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "6px" }}>
-                    {siteCategories.slice(0, 12).map(cat => {
-                      const selected = form.wpCategories.split(",").map(s => s.trim()).filter(Boolean).includes(cat);
-                      return (
-                        <button key={cat} type="button" disabled={isGenerating}
-                          onClick={() => {
-                            const cur = form.wpCategories.split(",").map(s => s.trim()).filter(Boolean);
-                            const next = selected ? cur.filter(c => c !== cat) : [...cur, cat];
-                            setF("wpCategories", next.join(", "));
-                          }}
-                          style={{ padding: "2px 8px", borderRadius: "12px", border: "1px solid", fontSize: "12px", cursor: "pointer",
-                            background: selected ? "var(--color-primary, #2563eb)" : "var(--bg-hover, #f5f5f5)",
-                            color: selected ? "#fff" : "var(--text-primary)", borderColor: selected ? "var(--color-primary, #2563eb)" : "var(--card-border)" }}>
-                          {selected ? "✓ " : ""}{cat}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-                <input className="form-input" style={{ width: "100%" }}
-                  value={form.wpCategories} onChange={e => setF("wpCategories", e.target.value)}
-                  placeholder="芳療, DIY 保養, 精油教學" disabled={isGenerating} />
-                <div className="form-hint" style={{ marginTop: 4 }}>點選現有分類，或直接輸入（逗號分隔）。不存在的分類會自動建立。</div>
-              </div>
-              <div style={{ flex: 1, minWidth: "200px" }}>
-                <label className="form-label">標籤</label>
-                {siteTags.length > 0 && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "6px" }}>
-                    {siteTags.slice(0, 20).map(tag => {
-                      const selected = form.wpTags.split(",").map(s => s.trim()).filter(Boolean).includes(tag);
-                      return (
-                        <button key={tag} type="button" disabled={isGenerating}
-                          onClick={() => {
-                            const cur = form.wpTags.split(",").map(s => s.trim()).filter(Boolean);
-                            const next = selected ? cur.filter(t => t !== tag) : [...cur, tag];
-                            setF("wpTags", next.join(", "));
-                          }}
-                          style={{ padding: "2px 8px", borderRadius: "12px", border: "1px solid", fontSize: "12px", cursor: "pointer",
-                            background: selected ? "var(--color-primary, #2563eb)" : "var(--bg-hover, #f5f5f5)",
-                            color: selected ? "#fff" : "var(--text-secondary)",
-                            borderColor: selected ? "var(--color-primary, #2563eb)" : "var(--card-border)" }}>
-                          {tag}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-                <input className="form-input" style={{ width: "100%" }}
-                  value={form.wpTags} onChange={e => setF("wpTags", e.target.value)}
-                  placeholder="檸檬精油, 精油配方, 天然保養" disabled={isGenerating} />
-                <div className="form-hint" style={{ marginTop: 4 }}>點選現有標籤，或直接輸入（逗號分隔）。不存在的標籤會自動建立。</div>
-              </div>
-            </div>
-          </SectionToggle>
-
-          {/* ── 大綱編輯器 ── */}
-          <SectionToggle label="大綱編輯器（先看大綱、可改再生成全文）" open={showOutline} onToggle={() => setShowOutline(v => !v)}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-              <label className="form-label" style={{ marginTop: 0, marginBottom: 0 }}>
-                自訂大綱
-                <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— ## H2、### H3、#### H4；每個標題含關鍵字或近義變體，生成全文時嚴格遵循</span>
-              </label>
-              <button className="btn-secondary" style={{ fontSize: "12px" }}
-                onClick={handleGenOutline} disabled={isGenerating || !form.keyword.trim() || outlineLoading}>
-                {outlineLoading ? "…" : "✨ AI 自動生成大綱"}
-              </button>
-            </div>
-            <textarea className="form-textarea" style={{ minHeight: "120px", fontFamily: "monospace", fontSize: "12px" }}
-              value={form.outline} onChange={e => setF("outline", e.target.value)} disabled={isGenerating}
-              placeholder={"## 什麼是藝術療癒？\n## 藝術療癒的好處\n### 情緒層面\n### 認知層面\n## 如何開始\n## FAQ\n## 結語"} />
-          </SectionToggle>
-
-          {/* ── 內部連結 ── */}
-          <SectionToggle label="內部連結（Internal Links）" open={showIntLinks} onToggle={() => setShowIntLinks(v => !v)}>
-            <label className="form-label" style={{ marginTop: 0 }}>
-              強制引用的站內頁面
-              <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— 每行一個，最多 10 個（絕對 URL 或 /路徑）</span>
-            </label>
-            <textarea className="form-textarea" style={{ minHeight: "90px" }}
-              value={form.internalLinks} onChange={e => setF("internalLinks", e.target.value)} disabled={isGenerating}
-              placeholder={"https://soulfulexpression.org/art-therapy-basics\n/workshop-schedule\n/about-us"} />
-            <div className="form-hint">站內連結已由 Internal Link Juicer 外掛自動處理。此欄位用於強制 AI 引用特定頁面（例如相關工作坊或課程頁面）。</div>
-          </SectionToggle>
-
-          {/* ── 外部連結 ── */}
-          <SectionToggle label="外部連結（External Links）" open={showExtLinks} onToggle={() => setShowExtLinks(v => !v)}>
-            <label className="form-label" style={{ marginTop: 0 }}>
-              指定插入的外部連結
-              <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— 每行一個，最多 5 個</span>
-            </label>
-            <textarea className="form-textarea" style={{ minHeight: "90px" }}
-              value={form.externalLinks} onChange={e => setF("externalLinks", e.target.value)} disabled={isGenerating}
-              placeholder={"https://example.com/art-therapy-research\nhttps://example.com/mental-health-resources"} />
-          </SectionToggle>
-
-          {/* ── Connect to Web ── */}
-          <SectionToggle label="參考 URL（Connect to Web）" open={showConnWeb} onToggle={() => setShowConnWeb(v => !v)}>
-            <label className="form-label" style={{ marginTop: 0 }}>
-              最多 3 個參考頁面 URL
-              <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— AI 讀取頁面內容作為事實參考</span>
-            </label>
-            <textarea className="form-textarea" style={{ minHeight: "80px" }}
-              value={form.referenceUrls} onChange={e => setF("referenceUrls", e.target.value)} disabled={isGenerating}
-              placeholder={"https://en.wikipedia.org/wiki/Art_therapy\nhttps://example.com/research-paper"} />
-            <div className="form-hint">伺服器端抓取頁面文字注入提示詞（每個 URL 最多 3000 字元）。</div>
-          </SectionToggle>
-
-          {/* ── 品牌聲音 ── */}
-          <SectionToggle label="品牌聲音（Brand Voice）— 分析範例文字，自動萃取寫作風格" open={showBrandVoice} onToggle={() => setShowBrandVoice(v => !v)}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
-              <div>
-                <label className="form-label">品牌 / 客戶名稱</label>
-                <input className="form-input" value={bvProfileName}
-                  onChange={e => { setBvProfileName(e.target.value); setBvNameTouched(true); }}
-                  placeholder="例：Soulful Expression" />
-                {!bvNameTouched && wpSites.length > 0 && (
-                  <div className="form-hint">已自動帶入目標客戶「{(wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0])?.name}」，可直接覆寫。</div>
-                )}
-              </div>
-              <div>
-                <label className="form-label">從 URL 擷取（選填）</label>
-                <input className="form-input" value={bvSampleUrl}
-                  onChange={e => { setBvSampleUrl(e.target.value); setBvUrlTouched(true); }}
-                  placeholder="https://example.com/about" />
-                {!bvUrlTouched && bvSampleUrl.trim() && (
-                  <div className="form-hint">已自動帶入目標客戶 About 頁，可直接覆寫。</div>
-                )}
-                {bvSampleUrl.trim() && !bvSampleText.trim() && (
-                  <div className="form-hint" style={{ color: "#f97316" }}>伺服器端抓取頁面文字；若 URL 需登入或封鎖爬蟲則會靜默失敗，建議同時貼入範例文字。</div>
-                )}
-              </div>
-            </div>
-            <label className="form-label">範例文字（貼入品牌文章或 About 頁面，至少 50 字）</label>
-            <textarea className="form-textarea" style={{ minHeight: "100px" }}
-              value={bvSampleText} onChange={e => setBvSampleText(e.target.value)}
-              placeholder="貼入品牌文章、廣告文案或 About 頁面文字…" />
-            <div style={{ display: "flex", gap: "10px", marginTop: "10px", alignItems: "center", flexWrap: "wrap" }}>
-              <button className="btn-secondary" onClick={handleAnalyzeBrandVoice}
-                disabled={bvLoading || (!bvSampleText.trim() && !bvSampleUrl.trim())}
-                style={{ fontSize: "12px" }}>
-                {bvLoading ? "分析中…" : "🔍 分析品牌聲音"}
-              </button>
-              {bvProfile && (
-                <button className="btn-primary" onClick={handleApplyBrandVoice} style={{ fontSize: "12px" }}>
-                  {bvApplied ? "✓ 已套用" : "✨ 注入文章提示詞"}
-                </button>
-              )}
-              {bvError && <span style={{ color: "var(--color-error, #ef4444)", fontSize: "12px" }}>{bvError}</span>}
-            </div>
-            {bvProfile && (
-              <div style={{ marginTop: "12px", padding: "12px", background: "var(--bg-hover, #f5f5f5)", borderRadius: "6px", fontSize: "12px" }}>
-                <div style={{ fontWeight: 600, marginBottom: "8px", color: "var(--text-primary)" }}>{bvProfile.name} — 品牌聲音摘要</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 16px" }}>
-                  <div><span style={{ color: "var(--text-muted)" }}>語調：</span>{bvProfile.tone}</div>
-                  <div><span style={{ color: "var(--text-muted)" }}>詞彙：</span>{bvProfile.vocabulary}</div>
-                  <div><span style={{ color: "var(--text-muted)" }}>句型：</span>{bvProfile.sentenceStyle}</div>
-                  <div><span style={{ color: "var(--text-muted)" }}>個性：</span>{bvProfile.personality.join("、")}</div>
-                </div>
-                {bvProfile.preferWords.length > 0 && (
-                  <div style={{ marginTop: "6px" }}>
-                    <span style={{ color: "var(--text-muted)" }}>偏好用詞：</span>
-                    {bvProfile.preferWords.map((w, i) => (
-                      <span key={i} style={{ display: "inline-block", padding: "1px 6px", background: "#dcfce7", color: "#166534", borderRadius: "3px", marginRight: "4px", marginBottom: "2px", fontSize: "11px" }}>{w}</span>
-                    ))}
-                  </div>
-                )}
-                {bvProfile.avoidWords.length > 0 && (
-                  <div style={{ marginTop: "4px" }}>
-                    <span style={{ color: "var(--text-muted)" }}>避免用詞：</span>
-                    {bvProfile.avoidWords.map((w, i) => (
-                      <span key={i} style={{ display: "inline-block", padding: "1px 6px", background: "#fee2e2", color: "#991b1b", borderRadius: "3px", marginRight: "4px", marginBottom: "2px", fontSize: "11px" }}>{w}</span>
-                    ))}
-                  </div>
-                )}
-                <div style={{ marginTop: "8px", padding: "8px", background: "var(--bg-card)", borderRadius: "4px", borderLeft: "3px solid #5855d0", fontSize: "11px", lineHeight: 1.5 }}>
-                  {bvProfile.promptInjection}
-                </div>
-              </div>
-            )}
-          </SectionToggle>
-
-          {/* ── #4 品牌語調 / 精準行銷（結構化表單）── */}
-          <SectionToggle label="🎯 品牌語調 / 精準行銷（填表單，打中目標）" open={showMarketing} onToggle={() => setShowMarketing(v => !v)}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-              <div>
-                <label className="form-label" style={{ marginTop: 0 }}>目標受眾</label>
-                <input className="form-input" value={form.marketing.audience} disabled={isGenerating}
-                  onChange={e => setMkt("audience", e.target.value)} placeholder="例：台灣成人，對表達藝術有興趣" />
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
-                  {MKT_PRESETS.audience.map(p => (
-                    <button key={p} type="button" disabled={isGenerating} onClick={() => setMkt("audience", p)}
-                      style={{ padding: "1px 7px", borderRadius: "10px", border: "1px solid var(--card-border)", fontSize: "11px", cursor: "pointer", background: "var(--bg-hover,#f5f5f5)", color: "var(--text-secondary)" }}>
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="form-label" style={{ marginTop: 0 }}>品牌定位（一句話）</label>
-                <input className="form-input" value={form.marketing.positioning} disabled={isGenerating}
-                  onChange={e => setMkt("positioning", e.target.value)} placeholder="例：陪伴而非治療的藝術自我探索空間" />
-              </div>
-              <div>
-                <label className="form-label">獨特賣點 / 差異化（USP）</label>
-                <input className="form-input" value={form.marketing.usp} disabled={isGenerating}
-                  onChange={e => setMkt("usp", e.target.value)} placeholder="例：跨文化、結構化模組、真人帶領" />
-              </div>
-              <div>
-                <label className="form-label">漏斗階段</label>
-                <select className="form-select" value={form.marketing.funnelStage} disabled={isGenerating}
-                  onChange={e => setMkt("funnelStage", e.target.value)}>
-                  {FUNNEL_STAGES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="form-label">主要行動呼籲（CTA）</label>
-                <input className="form-input" value={form.marketing.primaryCta} disabled={isGenerating}
-                  onChange={e => setMkt("primaryCta", e.target.value)} placeholder="例：預約免費體驗工作坊" />
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
-                  {MKT_PRESETS.primaryCta.map(p => (
-                    <button key={p} type="button" disabled={isGenerating} onClick={() => setMkt("primaryCta", p)}
-                      style={{ padding: "1px 7px", borderRadius: "10px", border: "1px solid var(--card-border)", fontSize: "11px", cursor: "pointer", background: "var(--bg-hover,#f5f5f5)", color: "var(--text-secondary)" }}>
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="form-label">價格定位</label>
-                <select className="form-select" value={form.marketing.pricePositioning} disabled={isGenerating}
-                  onChange={e => setMkt("pricePositioning", e.target.value)}>
-                  {PRICE_POSITIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="form-label">情緒觸發點 / 讀者渴望</label>
-                <input className="form-input" value={form.marketing.emotionalTriggers} disabled={isGenerating}
-                  onChange={e => setMkt("emotionalTriggers", e.target.value)} placeholder="例：渴望被理解、想找回創造力" />
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
-                  {MKT_PRESETS.emotionalTriggers.map(p => (
-                    <button key={p} type="button" disabled={isGenerating}
-                      onClick={() => {
-                        const cur = form.marketing.emotionalTriggers.trim();
-                        setMkt("emotionalTriggers", cur ? `${cur}、${p}` : p);
-                      }}
-                      style={{ padding: "1px 7px", borderRadius: "10px", border: "1px solid var(--card-border)", fontSize: "11px", cursor: "pointer", background: "var(--bg-hover,#f5f5f5)", color: "var(--text-secondary)" }}>
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="form-label">需化解的疑慮 / 抗拒點</label>
-                <input className="form-input" value={form.marketing.objections} disabled={isGenerating}
-                  onChange={e => setMkt("objections", e.target.value)} placeholder="例：我沒有繪畫天份／會不會很貴" />
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
-                  {MKT_PRESETS.objections.map(p => (
-                    <button key={p} type="button" disabled={isGenerating}
-                      onClick={() => {
-                        const cur = form.marketing.objections.trim();
-                        setMkt("objections", cur ? `${cur}、${p}` : p);
-                      }}
-                      style={{ padding: "1px 7px", borderRadius: "10px", border: "1px solid var(--card-border)", fontSize: "11px", cursor: "pointer", background: "var(--bg-hover,#f5f5f5)", color: "var(--text-secondary)" }}>
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <label className="form-label">避免使用 / 禁用聲明（逗號分隔）</label>
-            <input className="form-input" value={form.marketing.forbiddenClaims} disabled={isGenerating}
-              onChange={e => setMkt("forbiddenClaims", e.target.value)} placeholder="例：治癒, 治療疾病, 保證療效" />
-            <div className="form-hint" style={{ marginTop: 4 }}>此表單會編譯成行銷簡報，連同下方「進階指示」一起注入。留空的欄位不影響。</div>
-          </SectionToggle>
-
-          {/* ── #5 競業與痛點分析 ── */}
-          <SectionToggle label="🔍 競業與痛點分析（多角度市場研究）" open={showMarket} onToggle={() => setShowMarket(v => !v)}>
-            <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", marginBottom: "8px" }}>
-              <button className="btn-secondary" onClick={handleMarketAnalysis}
-                disabled={marketLoading || !form.keyword.trim()} style={{ fontSize: "12px" }}>
-                {marketLoading ? "分析中（約 10–30 秒）…" : "🔍 分析競業與痛點"}
-              </button>
-              {marketContext && <span style={{ color: "#16a34a", fontSize: "12px" }}>✓ 已納入，產生文章時自動注入</span>}
-              {marketError && <span style={{ color: "var(--color-error, #ef4444)", fontSize: "12px" }}>{marketError}</span>}
-            </div>
-            <div className="form-hint">用 Perplexity 即時搜尋，從競爭對手、讀者痛點、搜尋意圖、轉換疑慮、差異化機會五個角度分析，結果會引導文章定位。需先填關鍵字。</div>
-            {marketAnalysis && (
-              <div style={{ marginTop: "12px", display: "grid", gap: "10px", fontSize: "12px" }}>
-                {([
-                  ["讀者痛點", marketAnalysis.painPoints, "#fee2e2", "#991b1b"],
-                  ["搜尋意圖 / 角度", marketAnalysis.searchIntent, "#dbeafe", "#1e40af"],
-                  ["轉換疑慮", marketAnalysis.objections, "#fef3c7", "#92400e"],
-                  ["競爭對手", marketAnalysis.competitors, "#f3e8ff", "#6b21a8"],
-                  ["差異化機會", marketAnalysis.differentiators, "#dcfce7", "#166534"],
-                ] as [string, string[], string, string][]).filter(([, arr]) => arr.length > 0).map(([title, arr, bg, fg]) => (
-                  <div key={title}>
-                    <div style={{ fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>{title}</div>
-                    <div>
-                      {arr.map((x, i) => (
-                        <span key={i} style={{ display: "inline-block", padding: "2px 7px", background: bg, color: fg, borderRadius: "3px", marginRight: "4px", marginBottom: "4px" }}>{x}</span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </SectionToggle>
-
           {/* ── #6 Kadence 漏斗 Patterns ── */}
           <SectionToggle label="🧲 Kadence 漏斗 Patterns（在文章插入 CTA 區塊）" open={showPatterns} onToggle={() => setShowPatterns(v => !v)}>
             {/* Mode toggle + refresh */}
@@ -3067,14 +3075,6 @@ export default function ContentStudio() {
                   : "尚未讀取到 patterns（按上方按鈕讀取；站台需設定 Application Password 才可讀取 wp_block）。"}
               </div>
             )}
-          </SectionToggle>
-
-          {/* ── 品牌語調（進階 raw，向後相容）── */}
-          <SectionToggle label="品牌語調 / 進階指示（原始文字，選填）" open={showAdvanced} onToggle={() => setShowAdvanced(v => !v)}>
-            <textarea className="form-textarea" style={{ minHeight: "90px" }}
-              value={form.details} onChange={e => setF("details", e.target.value)} disabled={isGenerating}
-              placeholder={`brand_name: "Soulful Expression"\nforbidden_claims: ["治癒", "治療疾病"]\naudience: 台灣成人，對表達藝術有興趣`} />
-            <div className="form-hint" style={{ marginTop: 4 }}>自由文字會接在上方「精準行銷」表單之後一起注入。已用表單者此欄可留空。</div>
           </SectionToggle>
 
           {/* ── 發布設定 ── */}
