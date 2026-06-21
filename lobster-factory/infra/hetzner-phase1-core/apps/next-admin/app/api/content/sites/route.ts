@@ -28,6 +28,19 @@ export interface SiteContentDefaults {
     objections?: string;
     forbiddenClaims?: string;
   };
+  audienceProfile?: {
+    contentGoal?: string;
+    contentTone?: string;
+    audienceAction?: string;
+    age?: string[];
+    gender?: string[];
+    job?: string[];
+    jobCustom?: string;
+    emotion?: string[];
+    emotionCustom?: string;
+    awareness?: string[];
+    spending?: string[];
+  };
 }
 
 export interface ManagedSite {
