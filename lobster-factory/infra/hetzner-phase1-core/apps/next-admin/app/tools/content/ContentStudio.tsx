@@ -9,7 +9,38 @@ import { SeoCheckPanel } from "./SeoCheckPanel";
 import { CostChip } from "./CostChip";
 import { markdownPreview } from "@/lib/content/client-markdown";
 import { STYLE_CATALOG } from "@/app/tools/tarot/tarotStyles";
+import { resolveStylePrompt } from "@/app/tools/tarot/cards";
+import { DEFAULT_IMAGE_MODEL, IMAGE_RATES } from "@/lib/ai/cost-model";
 import { AI_TEXT_MODEL_GROUPS as AI_MODEL_GROUPS, AI_TEXT_MODELS as AI_MODELS } from "@/lib/ai/text-model-options";
+
+// ─── Video config constants (mirrors VideoStudio) ────────────────────────────
+
+const VIDEO_STYLE_PRESETS: { zh: string; group: string; prompt: string }[] = [
+  { zh: "電影感", group: "📹 影片風格", prompt: "Cinematic wide-angle 16:9, dramatic lighting, rich color grade" },
+  { zh: "紀錄片", group: "📹 影片風格", prompt: "Documentary photography, natural light, authentic moment" },
+  { zh: "商業攝影", group: "📹 影片風格", prompt: "Clean commercial photography, studio lighting, professional" },
+];
+const VIDEO_PRESET_BY_LABEL = new Map(VIDEO_STYLE_PRESETS.map((p) => [p.zh, p.prompt]));
+const VIDEO_STYLE_CATALOG = [...VIDEO_STYLE_PRESETS, ...STYLE_CATALOG];
+const VIDEO_STYLE_GROUPS = Array.from(new Set(VIDEO_STYLE_CATALOG.map((s) => s.group)));
+function resolveVideoStyle(label: string): string {
+  return VIDEO_PRESET_BY_LABEL.get(label) ?? resolveStylePrompt(label);
+}
+const VOICE_MODELS_VIDEO = [
+  { id: "edge:zh-TW-HsiaoChenNeural", label: "Edge TTS 繁中女聲", lang: "繁中", badge: "$0 免費" },
+  { id: "edge:zh-TW-YunJheNeural",    label: "Edge TTS 繁中男聲", lang: "繁中", badge: "$0 免費" },
+  { id: "edge:en-US-JennyNeural",     label: "Edge TTS English F", lang: "EN",  badge: "$0 免費" },
+  { id: "edge:en-US-GuyNeural",       label: "Edge TTS English M", lang: "EN",  badge: "$0 免費" },
+  { id: "openai:tts-1:nova",          label: "OpenAI nova",        lang: "多語", badge: "$0.015/1M" },
+  { id: "openai:tts-1:shimmer",       label: "OpenAI shimmer",     lang: "多語", badge: "$0.015/1M" },
+  { id: "openai:tts-1:alloy",         label: "OpenAI alloy",       lang: "多語", badge: "$0.015/1M" },
+  { id: "openai:tts-1:onyx",          label: "OpenAI onyx",        lang: "多語", badge: "$0.015/1M" },
+  { id: "openai:tts-1-hd:nova",       label: "OpenAI nova HD",     lang: "多語", badge: "$0.030/1M" },
+];
+function parseVoiceModel(id: string): { ttsProvider: string; ttsVoice: string } {
+  const [provider, ...rest] = id.split(":");
+  return { ttsProvider: provider, ttsVoice: rest.join(":") };
+}
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -531,6 +562,27 @@ export default function ContentStudio() {
   // Clear interval on unmount to prevent state updates on an unmounted component.
   useEffect(() => () => { if (videoPollRef.current) clearInterval(videoPollRef.current); }, []);
 
+  // Video config (mirrors tools/video config panel)
+  const [videoTotalScenes,  setVideoTotalScenes]  = useState(6);
+  const [videoCustomScenes, setVideoCustomScenes] = useState(3);
+  const [videoImageModel,   setVideoImageModel]   = useState(DEFAULT_IMAGE_MODEL);
+  const [videoVoiceId,      setVideoVoiceId]      = useState(VOICE_MODELS_VIDEO[0].id);
+  const [videoStyleZh,      setVideoStyleZh]      = useState("");
+  const [videoStyleGroup,   setVideoStyleGroup]   = useState(VIDEO_STYLE_GROUPS[0] ?? "");
+  const [videoConfigOpen,   setVideoConfigOpen]   = useState(false);
+
+  // Auto-trigger video generation when article is published.
+  // Dep array intentionally omits videoStatus: we want this to fire only on pubStatus/postId change,
+  // not when videoStatus changes (which would re-fire after the video finishes and resets to idle).
+  // The `videoStatus === "idle"` guard inside reads the closure value at fire time — sufficient to
+  // prevent double-trigger since React batches the setState calls that produce pubStatus==="done".
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (pubStatus === "done" && publishedPostId !== null && videoStatus === "idle") {
+      void handleGenerateVideo(publishedPostId);
+    }
+  }, [pubStatus, publishedPostId]);
+
   // SEO check
   const [seoReport,   setSeoReport]   = useState<RankMathReport | null>(null);
   const [seoChecking, setSeoChecking] = useState(false);
@@ -1039,7 +1091,9 @@ export default function ContentStudio() {
     setSessionCost(null);
     jobIdRef.current = crypto.randomUUID();
     setGenStatus("streaming"); setGenError(""); setGenTruncated(false);
-    setPubStatus("idle"); setPubResult(null);
+    setPubStatus("idle"); setPubResult(null); setPublishedPostId(null);
+    setVideoStatus("idle"); setVideoError("");
+    if (videoPollRef.current) { clearInterval(videoPollRef.current); videoPollRef.current = null; }
     setSeoReport(null); setSeoChecking(false);
     setSlugHint(""); setAutoImgN(0); setImgGenWarn(""); // clear here too: autoReplaceImages' clear sits
     // after its no-placeholder early-return, so an image-less re-gen would otherwise keep run A's warning
@@ -1285,8 +1339,10 @@ export default function ContentStudio() {
       setSlugHint(d.slugHint ?? "");
       setDraftId(d.id);
       setDraftSaveState("saved");
-      // Clear transient publish/SEO/image state from any previous article in the editor.
-      setPubStatus("idle"); setPubResult(null);
+      // Clear transient publish/SEO/image/video state from any previous article in the editor.
+      setPubStatus("idle"); setPubResult(null); setPublishedPostId(null);
+      setVideoStatus("idle"); setVideoError("");
+      if (videoPollRef.current) { clearInterval(videoPollRef.current); videoPollRef.current = null; }
       setSeoReport(null); setSeoChecking(false); setAutoImgN(0);
       setGenStatus("done"); setGenError(""); setGenTruncated(false);
       setActiveTab("generate");
@@ -1508,6 +1564,11 @@ export default function ContentStudio() {
           articleTitle: metaData?.seoTitle || form.keyword,
           articleContent: generated,
           language: form.language || "繁體中文",
+          visualStyle: videoStyleZh ? resolveVideoStyle(videoStyleZh) : undefined,
+          customScenes: Math.min(videoCustomScenes, videoTotalScenes),
+          brollScenes: Math.max(0, videoTotalScenes - videoCustomScenes),
+          imageModel: videoImageModel,
+          ...parseVoiceModel(videoVoiceId),
         }),
       });
       const json = await res.json() as { ok: boolean; euJobId?: string; jobId?: string; error?: string };
@@ -3038,6 +3099,96 @@ export default function ContentStudio() {
                 可直接編輯後推送。<code>{"<!-- NEEDS_BRAND_VERIFY -->"}</code> = 填入真實品牌資料。
               </div>
 
+              {/* ── 影片設定（發佈前配置，發佈後自動觸發）── */}
+              {hasContent && pubStatus === "idle" && (
+                <div style={{ marginTop: "12px", borderRadius: "8px", border: "1px solid #bae6fd", background: "#f0f9ff", overflow: "hidden" }}>
+                  <button
+                    type="button"
+                    onClick={() => setVideoConfigOpen(v => !v)}
+                    style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
+                      padding: "9px 14px", background: "none", border: "none", cursor: "pointer",
+                      fontSize: "13px", fontWeight: 600, color: "#0369a1" }}>
+                    <span>🎬 影片設定（發佈後自動生成）</span>
+                    <span style={{ fontSize: "11px", color: "#0284c7" }}>{videoConfigOpen ? "▲ 收起" : "▼ 展開"}</span>
+                  </button>
+                  {videoConfigOpen && (
+                    <div style={{ padding: "0 14px 14px", display: "flex", flexDirection: "column", gap: "12px" }}>
+                      {/* 視覺風格 */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <span style={{ fontSize: "12px", fontWeight: 600, color: "#0369a1" }}>
+                          🎨 視覺風格 <span style={{ fontWeight: 400, color: "#64748b" }}>{videoStyleZh || "不指定（電影感預設）"}</span>
+                        </span>
+                        <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                          {VIDEO_STYLE_GROUPS.map((g) => (
+                            <button key={g} type="button" onClick={() => setVideoStyleGroup(g)}
+                              style={{ padding: "2px 10px", borderRadius: 20, fontSize: "11px", cursor: "pointer",
+                                border: `1px solid ${videoStyleGroup === g ? "#0284c7" : "#bae6fd"}`,
+                                background: videoStyleGroup === g ? "#0284c7" : "rgba(255,255,255,0.6)",
+                                color: videoStyleGroup === g ? "#fff" : "#64748b" }}>
+                              {g}
+                            </button>
+                          ))}
+                        </div>
+                        <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", maxHeight: "100px", overflowY: "auto" }}>
+                          {VIDEO_STYLE_CATALOG.filter((item) => item.group === videoStyleGroup).map((item) => {
+                            const active = videoStyleZh === item.zh;
+                            return (
+                              <button key={item.zh} type="button" onClick={() => setVideoStyleZh(active ? "" : item.zh)}
+                                style={{ padding: "2px 9px", borderRadius: 20, fontSize: "11px", cursor: "pointer",
+                                  border: `1px solid ${active ? "#0284c7" : "#bae6fd"}`,
+                                  background: active ? "#0284c7" : "rgba(255,255,255,0.6)",
+                                  color: active ? "#fff" : "#64748b" }}>
+                                {item.zh}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      {/* 場景設定 */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "10px 12px", borderRadius: "6px", background: "rgba(255,255,255,0.6)", border: "1px solid #bae6fd" }}>
+                        <span style={{ fontSize: "12px", fontWeight: 700, color: "#0369a1" }}>場景設定</span>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between" }}>
+                            <span style={{ fontSize: "12px", fontWeight: 600, color: "#475569" }}>場景總數</span>
+                            <span style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a" }}>{videoTotalScenes} 場</span>
+                          </div>
+                          <input type="range" min={1} max={20} step={1} value={videoTotalScenes}
+                            onChange={(e) => { const n = Number(e.target.value); setVideoTotalScenes(n); if (videoCustomScenes > n) setVideoCustomScenes(n); }}
+                            style={{ width: "100%", accentColor: "#0284c7" }} />
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between" }}>
+                            <span style={{ fontSize: "12px", fontWeight: 600, color: "#475569" }}>自訂 AI 圖（Flux）</span>
+                            <span style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a" }}>{videoCustomScenes}/{videoTotalScenes} · B-roll：{Math.max(0, videoTotalScenes - videoCustomScenes)}</span>
+                          </div>
+                          <input type="range" min={0} max={videoTotalScenes} step={1} value={videoCustomScenes}
+                            onChange={(e) => setVideoCustomScenes(Number(e.target.value))}
+                            style={{ width: "100%", accentColor: "#0284c7" }} />
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                          <span style={{ fontSize: "12px", fontWeight: 600, color: "#475569" }}>生圖模型</span>
+                          <select value={videoImageModel} onChange={(e) => setVideoImageModel(e.target.value)}
+                            style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #bae6fd", fontSize: "12px", background: "#fff", color: "#0f172a", width: "100%" }}>
+                            {Object.entries(IMAGE_RATES).map(([id, r]) => (
+                              <option key={id} value={id}>{r.label} — ${r.usd}/張</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                          <span style={{ fontSize: "12px", fontWeight: 600, color: "#475569" }}>配音模型</span>
+                          <select value={videoVoiceId} onChange={(e) => setVideoVoiceId(e.target.value)}
+                            style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #bae6fd", fontSize: "12px", background: "#fff", color: "#0f172a", width: "100%" }}>
+                            {VOICE_MODELS_VIDEO.map((v) => (
+                              <option key={v.id} value={v.id}>{v.label} [{v.lang}] {v.badge}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* ── 輸出動作列（移到文章下方：先讀後操作，UX 較順）── */}
               <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", marginTop: "12px",
                 paddingTop: "12px", borderTop: "1px solid var(--card-border)" }}>
@@ -3081,19 +3232,21 @@ export default function ContentStudio() {
                 {pubStatus === "error" && <span style={{ fontSize: "12px", color: "var(--color-error, #ef4444)" }}>推送失敗：{pubError}</span>}
               </div>
 
-              {/* ── 影片（decoupled — 文章先推，影片後嵌）── */}
+              {/* ── 影片（自動觸發 — 文章推送後自動生成並嵌入）── */}
               {pubStatus === "done" && publishedPostId && (
                 <div style={{ marginTop: "10px", padding: "10px 14px", borderRadius: "6px",
                   background: "#f0f9ff", border: "1px solid #bae6fd", fontSize: "13px" }}>
-                  🎬 影片生成（可選）：文章已推送，影片完成後自動嵌入文章
-                  {videoStatus === "idle" && (
-                    <button className="btn-secondary" style={{ fontSize: "12px", marginLeft: "12px" }}
-                      onClick={() => handleGenerateVideo(publishedPostId)}>生成影片並嵌入</button>
-                  )}
+                  🎬 影片生成中（自動）：文章已推送，影片完成後自動嵌入文章
                   {videoStatus === "generating" && <span style={{ marginLeft: 10, color: "#0284c7" }}>⏳ 影片生成中（預計 5-15 分鐘）…</span>}
                   {videoStatus === "embedding"  && <span style={{ marginLeft: 10, color: "#0284c7" }}>⏳ 嵌入影片到 WP…</span>}
                   {videoStatus === "done"       && <span style={{ marginLeft: 10, color: "#22c55e" }}>✓ 影片已嵌入文章</span>}
-                  {videoStatus === "error"      && <span style={{ marginLeft: 10, color: "var(--color-error, #ef4444)" }}>影片失敗：{videoError}（文章不受影響）</span>}
+                  {videoStatus === "error"      && (
+                    <>
+                      <span style={{ marginLeft: 10, color: "var(--color-error, #ef4444)" }}>影片失敗：{videoError}（文章不受影響）</span>
+                      <button className="btn-secondary" style={{ fontSize: "11px", marginLeft: "8px" }}
+                        onClick={() => { setVideoError(""); void handleGenerateVideo(publishedPostId); }}>重試</button>
+                    </>
+                  )}
                 </div>
               )}
 

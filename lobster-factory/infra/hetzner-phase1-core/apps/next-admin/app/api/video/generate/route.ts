@@ -4,7 +4,7 @@
  * Parses body → builds BlockCtx → imports register-all → calls byKind("video")[0].run(ctx).
  * Server-only. No secrets or block internals leak to the client.
  *
- * Body: { topic, articleTitle?, articleContent?, language?, customScenes?, brollScenes?, imageModel? }
+ * Body: { topic, articleTitle?, articleContent?, language?, visualStyle?, customScenes?, brollScenes?, imageModel? }
  * Success: { ok: true, video: { outputs, out_dir }, scenes, title }
  * Failure: { ok: false, status, error }
  */
@@ -16,6 +16,7 @@ interface GenerateBody {
   articleTitle?: string;
   articleContent?: string;
   language?: string;
+  visualStyle?: string;
   customScenes?: number;
   brollScenes?: number;
   imageModel?: string;
@@ -56,6 +57,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     articleTitle: body.articleTitle,
     articleContent: body.articleContent,
     language: body.language ?? "繁體中文",
+    visualStyle: body.visualStyle,
     customScenes: body.customScenes,
     brollScenes: body.brollScenes,
     imageModel: body.imageModel,
