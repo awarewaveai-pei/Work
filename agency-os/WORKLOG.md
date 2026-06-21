@@ -4,6 +4,33 @@
 
 ## 2026-06-22
 
+### feat(postiz): Task 5 完成 — ContentStudio 社群發佈面板（channel selector + Draft/Now toggle + 二次確認 modal）
+
+[任務理解] ContentStudio.tsx 社群發佈區塊為「dead panel」— state、UI、handler 皆缺失。Task 5 接線：loadPostizChannels()、handlePostizPublish()、per-channel textarea（synContent 預填 / 手動）、Draft/Now toggle、confirm modal、results 含 skipped。
+
+[已修改]
+- `app/tools/content/ContentStudio.tsx`：
+  - 新 state（11 vars）：`postizChannels`/`postizChLoading`/`postizChError`/`postizSelected`(Set)/`postizCustomText`/`postizMode`/`postizIncludeImg`/`postizPushStatus`/`postizPushResults`/`postizShowConfirm`
+  - `getSynContentForPlatform(platform)` — "x" → `twitter_single ?? twitter_thread ?? ""`，其餘直接 key 查 `synContent`
+  - `loadPostizChannels()` — 加 in-flight guard（`if (postizChLoading) return`）防並行
+  - `handlePostizPublish(confirmed)` — all-blank 給具體訊息「所選頻道內容皆為空」；mode=now+!confirmed → modal；skipped 合併進 results display
+  - 面板 UI（在 `synStatus==="done"` block）：channel checkbox + per-channel textarea + 圖片 toggle + Draft/Now toggle + 發佈按鈕 + results
+  - 二次確認 modal：fixed overlay + platforms 列表 + 發佈中 disabled（防雙擊）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=<60000 (兩次 clean — 初版 + critic 修正後)
+- REVIEW_DONE: critic=Deep | verdict=Medium risk→pass after fix | findings=0c/1m/3minor/1suggest → Major（modal double-submit）+ Minor（in-flight guard/blank content msg/skipped channels）全修；Security model 確認 server-side gate 健全
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=postizChannels|postizSelected|loadPostizChannels|handlePostizPublish|postizShowConfirm | hits=1 file（ContentStudio.tsx，預期；無 stale callers）
+- BUGHUNT_WAIVED: NA — pattern hits all in the new file only, no stale cross-file references found
+
+[剩餘風險]
+- Gate C 仍未跑：Bluesky 真實 media upload test（需 live POSTIZ_API_KEY deployed）— 必須在 Task 5 上線前完成
+- `social_postiz_connections` 須先由操作者至 client hub「社群頻道」tab 連結 Postiz 帳號，否則面板顯示空清單並提示設定
+- 「now」模式非 owner/admin 的 UX（toggle 仍顯示給所有人，server 拒絕後 generic error）— 建議 Task 6 補 role 感知 UI，非阻塞
+
+[rollback]
+- git revert 本 Task 5 commit（ContentStudio.tsx 僅 client-side 狀態 + UI，無 DB/API 改動，回滾零風險）
+
 ### feat(postiz): Task 4 完成 — social-channels route + social-admin CRUD + ClientHubTabs 社群頻道 tab
 
 [任務理解] Task 3 建好了 postiz lib + social-publish route，但 social_postiz_connections 表無 rows，需要 admin UI 讓操作者把 Postiz 整合帳號 assign 給 client。
