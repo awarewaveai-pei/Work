@@ -671,7 +671,7 @@ export async function prepareArticleGeneration(body: ArticleGenerateInput): Prom
   });
 
   const jobId = typeof body._jobId === "string" ? body._jobId : null;
-  return { ok: true, config: { model, maxTokens, system: SYSTEM_PROMPT, userPrompt, perplexityCostUsd: perplexityCostUsd > 0 ? perplexityCostUsd : undefined, jobId } };
+  return { ok: true, config: { model, maxTokens, system: SYSTEM_PROMPT, userPrompt, sourcesCostUsd: sourcesCostUsd > 0 ? sourcesCostUsd : undefined, jobId } };
 }
 
 /**
