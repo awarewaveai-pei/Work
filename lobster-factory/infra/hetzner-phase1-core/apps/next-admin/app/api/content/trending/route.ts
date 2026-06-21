@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
-import { runTrending, perplexityChat, parseJsonStrings, buildDbSearchBlocks } from "@/lib/content/trending-sources";
+import { runTrending, aiChat, parseJsonStrings, buildDbSearchBlocks } from "@/lib/content/trending-sources";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // 熱門/趨勢來源已統整成「搜尋積木」：@/lib/content/trending-sources（可增刪來源 registry）。
-// 本檔只保留 keyword 探索工具（suggest / questions），並沿用積木匯出的 Perplexity 共用工具。
+// 本檔只保留 keyword 探索工具（suggest / questions），並沿用積木匯出的 AI 共用工具（Claude Haiku）。
 
 // ─── Google Autocomplete (primary for suggest/questions; may also be blocked) ─
 
@@ -26,11 +26,11 @@ async function fetchGoogleSuggest(query: string, hl: string): Promise<string[]> 
   } catch { return []; }
 }
 
-// ─── Perplexity fallbacks for suggest / questions ────────────────────────────
+// ─── AI fallbacks for suggest / questions (backed by Claude Haiku via aiChat) ─
 
-async function fetchPerplexitySuggest(query: string, hl: string): Promise<string[]> {
+async function fetchAiSuggest(query: string, hl: string): Promise<string[]> {
   const lang = hl.startsWith("zh") ? "Traditional Chinese" : "English";
-  const content = await perplexityChat(
+  const content = await aiChat(
     `Generate 10 search autocomplete suggestions for: "${query}". ` +
     `Language: ${lang}. Reply ONLY as a JSON array of strings, no markdown: ["suggestion1","suggestion2",...]`,
     8000,
@@ -38,9 +38,9 @@ async function fetchPerplexitySuggest(query: string, hl: string): Promise<string
   return parseJsonStrings(content).slice(0, 10);
 }
 
-async function fetchPerplexityQuestions(query: string, hl: string): Promise<string[]> {
+async function fetchAiQuestions(query: string, hl: string): Promise<string[]> {
   const lang = hl.startsWith("zh") ? "Traditional Chinese" : "English";
-  const content = await perplexityChat(
+  const content = await aiChat(
     `Generate 15 "People Also Ask" style questions people search about: "${query}". ` +
     `Language: ${lang}. Reply ONLY as a JSON array of question strings, no markdown: ["Question 1?","Question 2?",...]`,
     8000,
@@ -71,8 +71,8 @@ async function fetchRelatedQuestions(keyword: string, hl: string): Promise<strin
     seen.add(k); return true;
   }).slice(0, 15);
   if (deduped.length > 0) return deduped;
-  // Google returned nothing → Perplexity fallback
-  return fetchPerplexityQuestions(keyword, hl);
+  // Google returned nothing → AI fallback (Claude Haiku)
+  return fetchAiQuestions(keyword, hl);
 }
 
 // ─── Operator-managed DB sources → ephemeral search blocks ───────────────────
@@ -115,7 +115,7 @@ export async function GET(req: Request): Promise<Response> {
   if (type === "suggest") {
     if (!query) return NextResponse.json({ ok: false, error: "q required" }, { status: 400 });
     let suggestions = await fetchGoogleSuggest(query, hl);
-    if (suggestions.length === 0) suggestions = await fetchPerplexitySuggest(query, hl);
+    if (suggestions.length === 0) suggestions = await fetchAiSuggest(query, hl);
     return NextResponse.json({ ok: true, suggestions, query, hl });
   }
 

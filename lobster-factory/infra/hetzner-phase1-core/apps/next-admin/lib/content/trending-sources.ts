@@ -24,7 +24,7 @@ export interface TrendingItem {
 
 // ─── 共用工具 ────────────────────────────────────────────────────────────────
 
-export async function perplexityChat(prompt: string, _timeoutMs = 10000): Promise<string> {
+export async function aiChat(prompt: string, _timeoutMs = 10000): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return "";
   try {

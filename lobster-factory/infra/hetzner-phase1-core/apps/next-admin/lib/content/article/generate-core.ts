@@ -527,7 +527,7 @@ export interface ArticlePreparedConfig {
   maxTokens: number;
   system: string;
   userPrompt: string;
-  perplexityCostUsd?: number;
+  sourcesCostUsd?: number;
   jobId?: string | null;
 }
 
@@ -613,7 +613,7 @@ export async function prepareArticleGeneration(body: ArticleGenerateInput): Prom
 
   // Serper real sources — only when user hasn't provided their own external links
   const userExternalLinks = sarr(body.externalLinks);
-  const { sources: realSources, costUsd: perplexityCostUsd } = userExternalLinks.length === 0
+  const { sources: realSources, costUsd: sourcesCostUsd } = userExternalLinks.length === 0
     ? await fetchRealSources(keyword, str(body.language, "English"))
     : { sources: [], costUsd: 0 };
 
