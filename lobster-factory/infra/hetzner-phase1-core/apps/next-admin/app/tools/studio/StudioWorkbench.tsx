@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   STUDIO_MODEL_OPTIONS,
   type AspectRatio,
@@ -210,11 +210,9 @@ export default function StudioWorkbench() {
   const [styleGroup, setStyleGroup] = useState(STYLE_GROUPS[0] ?? "");
   const [modelGroup, setModelGroup] = useState(MODEL_GROUPS[0] ?? "");
 
-  // Trending news state
-  const [trendingCategory, setTrendingCategory] = useState("");
-  const [trendingTopics, setTrendingTopics] = useState<string[]>([]);
-  const [trendingLoading, setTrendingLoading] = useState(false);
-  const [trendingError, setTrendingError] = useState(false);
+  // Trending news state — all categories fetched in parallel, cached per day
+  const [allTopics, setAllTopics] = useState<Record<string, string[]>>({});
+  const [trendingFetching, setTrendingFetching] = useState(false);
 
   const bgInFlight = useRef<Record<string, boolean>>({});
   const mockupInFlight = useRef(false);
