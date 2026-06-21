@@ -51,7 +51,8 @@ function Write-SearchResults {
     param($Response)
     if ($Response.answerBox) {
         Write-Output "=== Answer Box ==="
-        Write-Output ($Response.answerBox.answer ?? $Response.answerBox.snippet ?? "")
+        $ans = if ($Response.answerBox.answer) { $Response.answerBox.answer } elseif ($Response.answerBox.snippet) { $Response.answerBox.snippet } else { "" }
+        Write-Output $ans
         Write-Output ""
     }
     $items = @($Response.organic ?? $Response.news ?? $Response.images ?? @())
