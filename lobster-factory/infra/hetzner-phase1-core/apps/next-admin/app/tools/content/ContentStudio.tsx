@@ -704,6 +704,19 @@ export default function ContentStudio() {
   const [synContent,  setSynContent]  = useState<Record<string, string>>({});
   const [synCopied,   setSynCopied]   = useState<Record<string, boolean>>({});
 
+  // Postiz social publish panel
+  type PostizChannel = { postizIntegrationId: string; platform: string; label: string; status: string };
+  const [postizChannels,     setPostizChannels]     = useState<PostizChannel[]>([]);
+  const [postizChLoading,    setPostizChLoading]    = useState(false);
+  const [postizChError,      setPostizChError]      = useState("");
+  const [postizSelected,     setPostizSelected]     = useState<Set<string>>(new Set());
+  const [postizCustomText,   setPostizCustomText]   = useState<Record<string, string>>({});
+  const [postizMode,         setPostizMode]         = useState<"draft" | "now">("draft");
+  const [postizIncludeImg,   setPostizIncludeImg]   = useState(false);
+  const [postizPushStatus,   setPostizPushStatus]   = useState<"idle" | "pushing" | "done" | "error">("idle");
+  const [postizPushResults,  setPostizPushResults]  = useState<Array<{ platform: string; status: "ok" | "error"; error?: string }>>([]);
+  const [postizShowConfirm,  setPostizShowConfirm]  = useState(false);
+
   // Newsletter (FluentCRM draft push — draft only, never sends; wp-bridge /newsletter)
   const [nlStatus, setNlStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [nlResult, setNlResult] = useState<{ edit_url?: string; error?: string } | null>(null);
@@ -1724,6 +1737,69 @@ export default function ContentStudio() {
       else                       { setSynStatus("error"); }
       if (json._cost) addCostLine({ route: "content/syndicate", model: json._cost.model, vendor: json._cost.vendor, usd: json._cost.usd, kind: "text" });
     } catch { setSynStatus("error"); }
+  }
+
+  // ─── Postiz social publish ────────────────────────────────────────────────
+
+  function getSynContentForPlatform(platform: string): string {
+    if (platform === "x") return synContent["twitter_single"] ?? synContent["twitter_thread"] ?? "";
+    return synContent[platform] ?? "";
+  }
+
+  async function loadPostizChannels() {
+    if (!selectedSiteId) { setPostizChError("請先選擇目標客戶"); return; }
+    setPostizChLoading(true); setPostizChError("");
+    try {
+      const res = await fetch(`/api/content/social-channels?clientId=${encodeURIComponent(selectedSiteId)}`);
+      if (!res.ok) { setPostizChError("載入社群帳號失敗"); return; }
+      const json = await res.json() as { ok: boolean; channels?: PostizChannel[] };
+      setPostizChannels(json.channels ?? []);
+      if ((json.channels ?? []).length === 0) setPostizChError("此客戶尚無連結的 Postiz 帳號，請至客戶 Hub「社群頻道」設定");
+    } catch { setPostizChError("載入失敗，請重試"); }
+    finally { setPostizChLoading(false); }
+  }
+
+  async function handlePostizPublish(confirmed: boolean) {
+    const posts = [...postizSelected].map(platform => ({
+      platform,
+      content: postizCustomText[platform] ?? getSynContentForPlatform(platform),
+    })).filter(p => p.content.trim());
+
+    if (posts.length === 0) { setPostizPushStatus("error"); return; }
+
+    if (postizMode === "now" && !confirmed) {
+      setPostizShowConfirm(true);
+      return;
+    }
+
+    setPostizPushStatus("pushing");
+    setPostizShowConfirm(false);
+    try {
+      const res = await fetch("/api/content/social-publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientId: selectedSiteId,
+          mode: postizMode,
+          platforms: posts,
+          imageUrl: postizIncludeImg && imgResult ? imgResult.imageUrl : undefined,
+          confirmPublishNow: postizMode === "now" && confirmed ? true : undefined,
+        }),
+      });
+      const json = await res.json() as {
+        ok: boolean;
+        results?: Array<{ platform: string; status: "ok" | "error"; error?: string }>;
+        skipped?: Array<{ platform: string; status: string; error: string }>;
+      };
+      if (json.ok) {
+        setPostizPushStatus("done");
+        setPostizPushResults(json.results ?? []);
+      } else {
+        setPostizPushStatus("error");
+      }
+    } catch {
+      setPostizPushStatus("error");
+    }
   }
 
   // ─── Newsletter (FluentCRM draft, never sends) ─────────────────────────────
