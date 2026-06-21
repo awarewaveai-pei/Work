@@ -30,13 +30,12 @@ export interface TextRate {
   /** Cache-write multiplier vs input (Anthropic 5-min ≈ 1.25). */
   cacheWriteMult: number;
   label: string;
-  vendor: "Anthropic" | "OpenAI" | "Google" | "Perplexity";
+  vendor: "Anthropic" | "OpenAI" | "Google" | "Perplexity" | "Serper";
 }
 
 /**
  * Keyed by the EXACT model id the code sends (so logAiCall can look it up by response model).
- * Anthropic ids per generate-core.ts ALLOWED_MODELS; OpenAI per OPENAI_MODELS; Gemini per ops-inbox;
- * Perplexity sonar per generate-core.ts fetchRealSources.
+ * Anthropic ids per generate-core.ts ALLOWED_MODELS; OpenAI per OPENAI_MODELS; Gemini per ops-inbox.
  */
 export const TEXT_RATES: Record<string, TextRate> = {
   "claude-haiku-4-5-20251001": { inputPerM: 1, outputPerM: 5, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Haiku 4.5", vendor: "Anthropic" },
@@ -48,9 +47,8 @@ export const TEXT_RATES: Record<string, TextRate> = {
   "gpt-5.4":                   { inputPerM: 2.5, outputPerM: 15, cacheReadMult: 0.5, cacheWriteMult: 1, label: "GPT-5.4", vendor: "OpenAI" },
   "gpt-5.4-mini":              { inputPerM: 0.75, outputPerM: 4.5, cacheReadMult: 0.5, cacheWriteMult: 1, label: "GPT-5.4 mini", vendor: "OpenAI" },
   "gpt-4o":                    { inputPerM: 2.5, outputPerM: 10, cacheReadMult: 0.5, cacheWriteMult: 1, label: "GPT-4o", vendor: "OpenAI" },
-  // Perplexity Sonar: token price + per-request search fee (~$5/1000 req). Token side only here;
-  // the search fee is small and folded into the estimate's per-article assumption (TEXT_FEATURES.extraUsd).
-  "sonar":                     { inputPerM: 1, outputPerM: 1, cacheReadMult: 1, cacheWriteMult: 1, label: "Perplexity Sonar", vendor: "Perplexity" },
+  // Legacy Perplexity Sonar — kept for historical cost-log lookup; no longer called (replaced by Serper).
+  "sonar":                     { inputPerM: 1, outputPerM: 1, cacheReadMult: 1, cacheWriteMult: 1, label: "Perplexity Sonar (legacy)", vendor: "Perplexity" },
   // Gemini Flash-Lite (ops-inbox diagnostics only).
   "gemini-2.0-flash-lite":     { inputPerM: 0.1, outputPerM: 0.4, cacheReadMult: 0.25, cacheWriteMult: 1, label: "Gemini 2.0 Flash-Lite", vendor: "Google" },
 };
@@ -108,7 +106,7 @@ export interface FeatureProfile {
   model: string;
   inputTok: number;
   outputTok: number;
-  /** Perplexity Sonar search fired alongside (article gen) — extra flat USD per call. */
+  /** Extra flat USD per call (e.g. paid search API alongside article gen). */
   extraUsd?: number;
 }
 

@@ -48,7 +48,7 @@ async function fetchAiQuestions(query: string, hl: string): Promise<string[]> {
   return parseJsonStrings(content).slice(0, 15);
 }
 
-// Related questions: Google prefix-expand → Perplexity fallback if empty
+// Related questions: Google prefix-expand → AI fallback if empty (Claude Haiku via aiChat)
 async function fetchRelatedQuestions(keyword: string, hl: string): Promise<string[]> {
   const PREFIXES_ZH = ["如何", "什麼是", "為什麼", "怎麼", "哪裡", "多少", "何時"];
   const PREFIXES_EN = ["how to", "what is", "why", "where", "how much", "when", "best"];

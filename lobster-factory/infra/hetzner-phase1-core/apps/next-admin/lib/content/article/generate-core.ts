@@ -379,7 +379,7 @@ function buildUserPrompt(params: {
     lines.push("=== END REFERENCE CONTENT ===");
   }
 
-  // #5 — Competitor & pain-point market context. Researched up-front (Perplexity) and injected so
+  // #5 — Competitor & pain-point market context. Researched up-front (AI market analysis) and injected so
   // the article is positioned against real competitors and speaks to real reader pains, not generic
   // filler. The model must USE this to differentiate; it must NOT name competitors disparagingly or
   // copy their copy — synthesise a stronger, reader-first angle.
@@ -391,7 +391,7 @@ function buildUserPrompt(params: {
     lines.push("=== END MARKET CONTEXT ===");
   }
 
-  // External links — user-provided first, then Perplexity-verified sources
+  // External links — user-provided first, then Serper-sourced real URLs
   const validLinks = params.externalLinks.filter(u => /^https?:\/\//.test(u.trim()));
   if (validLinks.length > 0) {
     lines.push("");
@@ -767,7 +767,7 @@ export async function generateArticleMarkdown(
 
 /**
  * Stream an article from OpenAI via the Chat Completions SSE endpoint (zero new npm dependency —
- * raw fetch, mirroring fetchRealSources' Perplexity call). Yields the same text-delta contract as
+ * raw fetch, mirroring fetchRealSources' Serper call). Yields the same text-delta contract as
  * the Anthropic path and emits the same GENERATION_TRUNCATED / GENERATION_ERROR markers under the
  * same conditions so the UI + headless block handle both providers identically.
  *

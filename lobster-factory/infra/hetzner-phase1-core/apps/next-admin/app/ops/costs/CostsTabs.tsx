@@ -318,7 +318,7 @@ const TOOL_LABEL: Record<string, string> = {
 
 const ROUTE_LABEL: Record<string, string> = {
   "content/article-generate": "文章生成",
-  "content/fetchRealSources": "Perplexity 搜尋",
+  "content/fetchRealSources": "Serper 搜尋",
   "content/image":            "內文圖片",
   "content/hero-image":       "首圖",
   "content/title":            "標題建議",
