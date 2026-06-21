@@ -242,7 +242,7 @@ create table social_postiz_connections (
 - **Task 3** `fullstack-engineer`：✅ 完成 2026-06-22 — `lib/content/postiz.ts` + `/api/content/social-publish/route.ts`（Gate E.1 已有 `lib/supabase-server.ts`；Gate A/D 已完成）。
 - **Task 4** `fullstack-engineer`：✅ 完成 2026-06-22 — `GET /api/content/social-channels?clientId=xxx`（operator+）+ `GET /api/content/social-admin/integrations`（admin+）+ `POST/DELETE /api/content/social-admin/connections`（admin+，server-side org 驗證 + platform 由 server 從 Postiz 推導，不信任 client）+ `ClientHubTabs` 新增「社群頻道」tab（connect/disconnect UI，useEffect 含 mounted guard）。
 - **Task 5** `fullstack-engineer`：✅ 完成 2026-06-22 — ContentStudio.tsx 死面板接線：postizChannels state + loadPostizChannels() + handlePostizPublish() + channel checkbox UI + per-channel textarea（synContent 預填）+ Draft/Now toggle + 二次確認 modal（不可撤回警語）+ results（含 skipped 顯示）。Critic Major fix: modal 確認鈕 disabled guard 防雙擊。
-- **Task 6** `fullstack-engineer`：ops runbook（token 過期重連、rate limit 處理、連線狀態巡查），回扣 SSOT §49。
+- **Task 6** `fullstack-engineer`：✅ 完成 2026-06-22 — `runbooks/POSTIZ-OPS-RUNBOOK.md`（token 過期重連、rate limit 處理、API key 輪替、Postiz 服務故障、草稿清理、新帳號 onboard、v2 監控計畫）。
 
 ### Task 3 實作契約
 

@@ -101,7 +101,7 @@ async function exportToPng(state: State): Promise<string> {
     ctx.fillStyle = state.bgColor;
     ctx.fillRect(0, 0, p.w, p.h);
   } else if (state.bgMode === "gradient") {
-    const angleDeg = parseFloat(state.gradAngle);
+    const angleDeg = Number.isFinite(parseFloat(state.gradAngle)) ? parseFloat(state.gradAngle) : 135;
     const rad      = (angleDeg * Math.PI) / 180;
     const cx       = p.w / 2;
     const cy       = p.h / 2;
@@ -182,17 +182,19 @@ async function exportToPng(state: State): Promise<string> {
   return canvas.toDataURL("image/png");
 }
 
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, fontSize: number): string[] {
-  const words  = text.split(" ");
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, _fontSize: number): string[] {
+  // CJK text has no spaces — split into individual chars and re-join by measure.
+  const isCjk = /[　-鿿豈-﫿]/.test(text);
+  const tokens = isCjk ? text.split("") : text.split(" ");
   const lines: string[] = [];
   let current = "";
-  for (const word of words) {
-    const test = current ? `${current} ${word}` : word;
+  for (const tok of tokens) {
+    const test = isCjk ? current + tok : (current ? `${current} ${tok}` : tok);
     if (ctx.measureText(test).width <= maxWidth) {
       current = test;
     } else {
       if (current) lines.push(current);
-      current = word;
+      current = tok;
     }
   }
   if (current) lines.push(current);
@@ -247,7 +249,8 @@ export default function BannerStudio() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => setS((prev) => ({ ...prev, bgImage: reader.result as string, bgMode: "upload", error: null }));
+    reader.onload  = () => setS((prev) => ({ ...prev, bgImage: reader.result as string, bgMode: "upload", error: null }));
+    reader.onerror = () => setS((prev) => ({ ...prev, error: "upload_read_failed" }));
     reader.readAsDataURL(file);
   }
 

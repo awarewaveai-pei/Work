@@ -4,6 +4,19 @@
 
 ## 2026-06-22
 
+### docs(postiz): Task 6 完成 — POSTIZ-OPS-RUNBOOK.md（token 過期/rate limit/key 輪替/故障/清理/onboard）
+
+[已修改]
+- `runbooks/POSTIZ-OPS-RUNBOOK.md`（新）：10 節完整 ops runbook
+- `POSTIZ_SOCIAL_PUBLISHING_PLAN.md`：Task 6 → ✅
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- runbook 文件，無 code change
+- REVIEW_WAIVED: DOC_ONLY -- runbook
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=POSTIZ-OPS-RUNBOOK | hits=0 stale（新建 runbook，無已知 callers）
+
+[rollback] git revert 本 commit（runbook-only，零風險）
+
 ### feat(postiz): Gate C 完成 — media upload pipeline 實測通過（Bluesky draft + image）
 
 [任務理解] Gate C = Postiz `/public/v1/upload`（multipart）+ `/public/v1/posts`（draft+image）端到端驗證。POSTIZ_API_KEY 從 SG `.env` 取用，測試從 SG 對 postiz.aware-wave.com 執行。
