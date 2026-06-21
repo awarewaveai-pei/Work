@@ -147,10 +147,10 @@ export const MODEL_LIGHTING = [
 
 // ── Model tab: framing options (controls full-body vs close-up, prevents head crop) ──
 export const MODEL_FRAMING = [
-  { value: "full-body", label: "全身（頭到腳）", phrase: "Full-body shot: the model's entire figure from head to feet is fully visible and centered in the frame, nothing cropped." },
-  { value: "three-quarter", label: "七分身（膝上）", phrase: "Three-quarter shot framed from roughly the knees up, with the model's full head clearly visible." },
-  { value: "upper-body", label: "半身（腰上）", phrase: "Upper-body shot framed from the waist up, with the full head and face visible." },
-  { value: "portrait", label: "特寫（肩上）", phrase: "Close-up portrait framed from the shoulders up, with the full face clearly visible." },
+  { value: "full-body", label: "全身（頭到腳）", phrase: "COMPOSITION RULE: full-body shot — the model's complete figure from top of head to bottom of feet must be fully visible with generous empty breathing room above the head and below the feet. Nothing is cropped. The camera is pulled back far enough to show the entire body." },
+  { value: "three-quarter", label: "七分身（膝上）", phrase: "Three-quarter shot framed from roughly the knees up, with the model's full head and generous empty breathing room above the head clearly visible." },
+  { value: "upper-body", label: "半身（腰上）", phrase: "Upper-body shot framed from the waist up, with the full head, face, and generous empty breathing room above the head visible." },
+  { value: "portrait", label: "特寫（肩上）", phrase: "Close-up portrait framed from the shoulders up, with the full face and generous empty breathing room above the head clearly visible." },
 ];
 
 // ── Model tab: emotion / facial expression (more options = more product appeal) ──
@@ -697,12 +697,12 @@ export function buildModelMockupPrompt(p: ModelMockupParams): string {
     : product.sentence + " " + fidelityBlock(p.color, product.surface, product.behavior) +
       product.sizeClause + product.visibilityClause;
   return (
+    `${framing.phrase} ` +
     `Photorealistic e-commerce lifestyle photo. ${who}${desc}, ${pose.phrase}, ` +
     `in ${scene.phrase}, ${lighting.phrase}. ` +
     productBlock +
     emotionClause +
     propClause +
-    ` ${framing.phrase}` +
     " The model's full head and face are clearly visible and must NOT be cropped out of frame." +
     PRO_QUALITY
   );

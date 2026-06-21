@@ -909,6 +909,11 @@ export default function MockupStudio() {
               <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={modelFraming} onChange={(e) => setModelFraming(e.target.value)}>
                 {MODEL_FRAMING.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
+              {modelFraming === "full-body" && !["4:5", "9:16"].includes(aspect) && (
+                <span style={{ fontSize: 11, color: "#f5a623", display: "block", marginTop: 4, lineHeight: 1.4 }}>
+                  ⚠ 全身框景建議搭配 <strong>4:5</strong> 或 <strong>9:16</strong> 比例（畫面更高，頭腳不易裁切）。目前比例：{aspect}
+                </span>
+              )}
               <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 2 }}>
                 全身會露出整個人；模特的頭一律不裁切。
               </span>

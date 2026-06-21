@@ -183,7 +183,9 @@ describe("buildModelMockupPrompt — framing + product category", () => {
 
   it("full-body framing asks for head to feet", () => {
     const full = buildModelMockupPrompt({ ...base, framing: "full-body" });
-    expect(full).toContain("head to feet");
+    expect(full).toContain("full-body shot");
+    expect(full).toContain("top of head to bottom of feet");
+    expect(full).toMatch(/^COMPOSITION RULE/); // framing must appear at start of prompt
     const portrait = buildModelMockupPrompt({ ...base, framing: "portrait" });
     expect(portrait).toContain("shoulders up");
   });
