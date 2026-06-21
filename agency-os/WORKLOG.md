@@ -29,7 +29,7 @@
 - REALTEST_EVIDENCE: tool=mcp__hetzner-ssh__ssh_exec | cmd=curl -si http://127.0.0.1:4007/api/public/v1/integrations | exit=0 | ms=~150 → HTTP/1.1 200 OK
 - REALTEST_EVIDENCE: tool=mcp__hetzner-ssh__ssh_exec | cmd=docker exec supabase-db psql \d social_postiz_connections | exit=0 → table + 2 indexes confirmed
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n (tsc --noEmit clean, 0 errors)
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=social-publish|postiz|SocialChannel|createSocialPost | hits=2 (只有新建的兩個檔案)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=social-publish|postiz|SocialChannel|createSocialPost|assertSafeImageUrl | hits=2 (只有新建的兩個檔案；critic 修正後再跑確認無新 stale callers)
 
 [剩餘風險]
 - Gate C media upload 實測：Task 5 前必完成（需真實 Bluesky test post with image）
