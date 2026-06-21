@@ -689,6 +689,7 @@ export default function ContentStudio() {
   const [showStruct,   setShowStruct]   = useState(true);
   const [showMedia,    setShowMedia]    = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showAudProfile, setShowAudProfile] = useState(false); // audience chip UI (above #4)
   const [showMarketing, setShowMarketing] = useState(false); // #4 structured brand-tone form
   const [showPatterns, setShowPatterns] = useState(false);   // #6 Kadence funnel patterns
   const [apState, setApState] = useState<AP>(DEFAULT_AP);   // audience profile chips
@@ -3156,14 +3157,9 @@ export default function ContentStudio() {
             )}
           </SectionToggle>
 
-          {/* ── #4 品牌語調 / 精準行銷（結構化表單）── */}
-          <SectionToggle label="🎯 品牌語調 / 精準行銷（填表單，打中目標）" open={showMarketing} onToggle={() => setShowMarketing(v => !v)}>
-
-            {/* ── 精準受眾畫像 chip UI ── */}
-            <div style={{ marginBottom: 14, padding: "10px 12px", background: "var(--bg-hover,#f8f8f8)", borderRadius: 8, border: "1px solid var(--card-border)" }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-primary)", marginBottom: 10, paddingBottom: 4, borderBottom: "1px solid var(--border-subtle,var(--card-border))" }}>
-                🎯 精準受眾畫像（點選即注入文章生成）
-              </div>
+          {/* ── 精準受眾畫像（獨立折疊，注入文章生成）── */}
+          <SectionToggle label="精準受眾畫像（點選即注入文章生成）" open={showAudProfile} onToggle={() => setShowAudProfile(v => !v)}>
+            <div>
 
               {/* 常用人設 */}
               <div style={{ marginBottom: 10 }}>
@@ -3239,6 +3235,10 @@ export default function ContentStudio() {
                 × 清除所有選擇
               </button>
             </div>
+          </SectionToggle>
+
+          {/* ── #4 品牌語調 / 精準行銷（結構化表單）── */}
+          <SectionToggle label="🎯 品牌語調 / 精準行銷（填表單，打中目標）" open={showMarketing} onToggle={() => setShowMarketing(v => !v)}>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
               <div>
