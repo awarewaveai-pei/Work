@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { textCallCostUsd } from "@/lib/ai/cost-calculator";
+import Anthropic from "@anthropic-ai/sdk";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,8 +39,8 @@ export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
 
-  const apiKey = process.env.PERPLEXITY_API_KEY;
-  if (!apiKey) return NextResponse.json({ ok: false, error: "PERPLEXITY_API_KEY not configured" }, { status: 503 });
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return NextResponse.json({ ok: false, error: "ANTHROPIC_API_KEY not configured" }, { status: 503 });
 
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return new NextResponse("invalid json", { status: 400 }); }

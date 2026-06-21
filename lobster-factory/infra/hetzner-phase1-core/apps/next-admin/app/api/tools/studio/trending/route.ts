@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
+import Anthropic from "@anthropic-ai/sdk";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -32,9 +33,9 @@ export async function POST(req: Request) {
   const cat = (body.category && CATEGORY_PROMPTS[body.category]) ? body.category : "international-news";
   const topic = CATEGORY_PROMPTS[cat]!;
 
-  const apiKey = process.env.PERPLEXITY_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ ok: false, error: "PERPLEXITY_API_KEY not configured" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
   }
 
   const systemPrompt = `You are a creative assistant helping designers find trending topics to illustrate on t-shirts, posters, and stickers.
@@ -45,31 +46,14 @@ No markdown, no explanation, no extra text — just the raw JSON array.`;
   const userPrompt = `What are 10 trending topics in ${topic} right now? Make each one visually compelling for graphic design.`;
 
   try {
-    const res = await fetch("https://api.perplexity.ai/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "sonar",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        max_tokens: 400,
-        temperature: 0.2,
-      }),
-      signal: AbortSignal.timeout(25_000),
+    const client = new Anthropic({ apiKey });
+    const msg = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 400,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
     });
-
-    if (!res.ok) {
-      const text = await res.text();
-      return NextResponse.json({ ok: false, error: `Perplexity ${res.status}: ${text.slice(0, 200)}` }, { status: 502 });
-    }
-
-    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const raw = json.choices?.[0]?.message?.content ?? "";
+    const raw = msg.content[0]?.type === "text" ? msg.content[0].text : "";
 
     // Extract JSON array robustly — model may wrap in backticks or prose
     const match = raw.match(/\[[\s\S]*\]/);
