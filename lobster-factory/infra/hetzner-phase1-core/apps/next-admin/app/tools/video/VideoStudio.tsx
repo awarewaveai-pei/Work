@@ -120,6 +120,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
   const [totalScenes, setTotalScenes] = useState(6);
   const [customScenes, setCustomScenes] = useState(3);
   const [imageModel, setImageModel] = useState(DEFAULT_IMAGE_MODEL);
+  const [targetMinutes, setTargetMinutes] = useState(1);
   const [voiceModelId, setVoiceModelId] = useState(VOICE_MODELS[0].id);
   const [introEnabled, setIntroEnabled] = useState(false);
   const [introDuration, setIntroDuration] = useState(3);
@@ -264,6 +265,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
           language,
           visualStyle: videoStyle ? resolveVideoStyle(videoStyle) : undefined,
           imageModel,
+          targetMinutes,
           scenes: providedScenes.length > 0 ? providedScenes : undefined,
         }),
       });

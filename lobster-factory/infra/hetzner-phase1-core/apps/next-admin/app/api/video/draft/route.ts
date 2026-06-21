@@ -18,8 +18,10 @@ interface DraftBody {
   language?: string;
   /** 已解析的英文風格 prompt（前端 resolveStylePrompt 後傳入）。 */
   visualStyle?: string;
-  /** "pexels-all" = 全部 Pexels 免費；其他 = Flux model id。 */
+  /** "pexels-video" = Pexels 真實影片；"pexels-all" = Pexels 免費照片；其他 = Flux model id。 */
   imageModel?: string;
+  /** 目標影片時長（分鐘）→ 控制場景數與旁白字數。1≈6場景, 3≈8場景, 5≈10場景。 */
+  targetMinutes?: number;
   /** 深層接力：前製腳本場景（台詞→旁白、畫面→生圖提示）→ 跳過 Claude 重生。 */
   scenes?: { narration: string; imagePrompt: string }[];
 }
@@ -56,6 +58,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       language: body.language ?? "繁體中文",
       visualStyle: body.visualStyle,
       imageModel: body.imageModel,
+      targetMinutes: typeof body.targetMinutes === "number" ? body.targetMinutes : undefined,
       providedScenes: providedScenes.length > 0 ? providedScenes : undefined,
     },
     anthropicKey ?? "",

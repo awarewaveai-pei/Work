@@ -157,11 +157,22 @@ export async function prepareScenes(
 
   input.onProgress?.(`素材生成中（${scenes.length} 場景並行）…`);
   const pexelsKey = process.env.PEXELS_API_KEY as string | undefined;
+  const forcePexelsVideo = input.imageModel === "pexels-video";
   const forcePexels = input.imageModel === "pexels-all";
-  const fluxModel = (!input.imageModel || input.imageModel === "pexels-all") ? "flux-schnell" : input.imageModel;
+  const fluxModel = (!input.imageModel || input.imageModel === "pexels-all" || input.imageModel === "pexels-video") ? "flux-schnell" : input.imageModel;
 
   const buildAsset = async (scene: (typeof scenes)[number]): Promise<AssetResult> => {
-    // Pexels 路徑：明確選 pexels-all（全部場景），或 Claude 判定為 broll 場景
+    // pexels-video 模式：全部場景抓 Pexels 影片片段（MP4 URL → EU stream_loop）
+    if (forcePexelsVideo && pexelsKey) {
+      const keyword = scene.broll_keyword || scene.image_prompt.split(" ").slice(0, 3).join(" ");
+      const videoUrl = await fetchBrollVideoUrl(keyword, pexelsKey);
+      if (videoUrl) return { ok: true, asset: videoUrl };
+      // 影片抓失敗 → 降級 Pexels 照片（EU zoompan 仍可出片）
+      const photoUrl = await fetchBrollUrl(keyword, pexelsKey);
+      if (photoUrl) return { ok: true, asset: photoUrl };
+      return { ok: false, status: 502, error: `場景 ${scene.id} Pexels 影片與照片均搜尋失敗（keyword: ${keyword}）` };
+    }
+    // Pexels 照片路徑：明確選 pexels-all（全部場景），或 Claude 判定為 broll 場景
     if ((forcePexels || scene.visual === "broll") && pexelsKey) {
       const keyword = scene.broll_keyword || scene.image_prompt.split(" ").slice(0, 3).join(" ");
       const brollUrl = await fetchBrollUrl(keyword, pexelsKey);
