@@ -12,14 +12,14 @@ const PRESETS = {
   // WP 網站 banners
   "hero-desktop":  { label: "Hero 桌機",     w: 1920, h: 600,  aspect: "16:9", group: "wp" as const },
   "hero-full":     { label: "Hero 全版",      w: 1920, h: 1080, aspect: "16:9", group: "wp" as const },
-  "hero-mobile":   { label: "Hero 手機",      w: 768,  h: 400,  aspect: "16:9", group: "wp" as const },
-  "featured-og":   { label: "Featured / OG", w: 1200, h: 628,  aspect: "3:2",  group: "wp" as const },
-  "woo-product":   { label: "WooCommerce",    w: 800,  h: 800,  aspect: "1:1",  group: "wp" as const },
+  "hero-mobile":   { label: "Hero 手機",      w: 768,  h: 768,  aspect: "1:1",  group: "wp" as const },
+  "featured-og":   { label: "Featured / OG", w: 1200, h: 800,  aspect: "3:2",  group: "wp" as const },
+  "woo-product":   { label: "WooCommerce",    w: 1000, h: 1000, aspect: "1:1",  group: "wp" as const },
   // 社交平台 post 圖
   "ig-square":     { label: "IG 方形",        w: 1080, h: 1080, aspect: "1:1",  group: "social" as const },
   "ig-portrait":   { label: "IG 直式 ★",     w: 1080, h: 1350, aspect: "4:5",  group: "social" as const },
   "ig-story":      { label: "IG Story/Reels", w: 1080, h: 1920, aspect: "9:16", group: "social" as const },
-  "fb-post":       { label: "FB Post",        w: 1200, h: 628,  aspect: "3:2",  group: "social" as const },
+  "fb-post":       { label: "FB Post",        w: 1080, h: 1350, aspect: "4:5",  group: "social" as const },
   "twitter-x":     { label: "X (Twitter)",    w: 1200, h: 675,  aspect: "16:9", group: "social" as const },
   "pinterest":     { label: "Pinterest Pin",  w: 1000, h: 1500, aspect: "2:3",  group: "social" as const },
   "linkedin-post": { label: "LinkedIn Post",  w: 1200, h: 627,  aspect: "3:2",  group: "social" as const },
