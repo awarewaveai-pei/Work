@@ -79,7 +79,7 @@ interface ModelResult {
   busy: boolean;
 }
 
-type RefMode = "ref" | "transform";
+type RefMode = "none" | "ref" | "transform";
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -142,26 +142,31 @@ function AccordionSection({
   );
 }
 
-function PresetChips({ chips, onSelect }: { chips: string[]; onSelect: (v: string) => void }) {
+function PresetChips({ chips, onSelect, selected }: { chips: string[]; onSelect: (v: string) => void; selected?: string }) {
   return (
     <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 5 }}>
-      {chips.map((c, i) => (
-        <button
-          key={`${c}-${i}`}
-          type="button"
-          onClick={() => onSelect(c)}
-          style={{
-            fontSize: 11, padding: "2px 9px", borderRadius: 20,
-            background: "var(--chip-bg, #eef1f7)", border: "1px solid var(--border, #d4d9e8)",
-            cursor: "pointer", color: "var(--text-muted, #3a4560)", lineHeight: 1.6,
-            transition: "border-color 0.15s",
-          }}
-          onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--accent, #6366f1)")}
-          onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--border, #d4d9e8)")}
-        >
-          {c}
-        </button>
-      ))}
+      {chips.map((c, i) => {
+        const active = selected === c;
+        return (
+          <button
+            key={`${c}-${i}`}
+            type="button"
+            onClick={() => onSelect(c)}
+            style={{
+              fontSize: 11, padding: "2px 9px", borderRadius: 20,
+              background: active ? "#6366f1" : "var(--chip-bg, #eef1f7)",
+              border: `1px solid ${active ? "#6366f1" : "var(--border, #d4d9e8)"}`,
+              cursor: "pointer", color: active ? "#fff" : "var(--text-muted, #3a4560)",
+              fontWeight: active ? 600 : 400, lineHeight: 1.6,
+              transition: "all 0.15s",
+            }}
+            onMouseOver={(e) => { if (!active) e.currentTarget.style.borderColor = "var(--accent, #6366f1)"; }}
+            onMouseOut={(e) => { if (!active) e.currentTarget.style.borderColor = "var(--border, #d4d9e8)"; }}
+          >
+            {c}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -175,9 +180,9 @@ export default function StudioWorkbench() {
   const [style, setStyle] = useState("");
   const [prompt, setPrompt] = useState("");
   const [promptTouched, setPromptTouched] = useState(false);
-  const [aspect, setAspect] = useState<AspectRatio>("4:5");
+  const [aspect, setAspect] = useState<AspectRatio>("1:1");
   const [refImages, setRefImages] = useState<string[]>([]);
-  const [refMode, setRefMode] = useState<RefMode>("ref");
+  const [refMode, setRefMode] = useState<RefMode>("none");
 
   // Multi-model results: one slot per selected model, updated incrementally
   const [results, setResults] = useState<ModelResult[]>([]);
@@ -379,7 +384,7 @@ export default function StudioWorkbench() {
       if (genIdRef.current !== genId) break; // user re-clicked generate
       const m = modelList[i];
       const mOption = STUDIO_MODEL_OPTIONS.find((o) => o.value === m);
-      const refsForModel = refImages.slice(0, mOption?.maxRefs ?? 0);
+      const refsForModel = refMode === "none" ? [] : refImages.slice(0, mOption?.maxRefs ?? 0);
 
       try {
         const res = await fetch("/api/tools/studio/generate", {
@@ -571,17 +576,17 @@ export default function StudioWorkbench() {
 
         <AccordionSection title="🎯 主題 Subject" summary={subject || "未填"} defaultOpen>
           <input className="btn-secondary" style={{ width: "100%", marginBottom: 6, opacity: isTransformMode ? 0.5 : 1 }} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={isTransformMode ? "改圖模式：主題由上傳圖決定（可選）" : "例：lotus flower mandala"} />
-          <PresetChips chips={SUBJECT_PRESETS} onSelect={setSubject} />
+          <PresetChips chips={SUBJECT_PRESETS} onSelect={setSubject} selected={subject} />
         </AccordionSection>
 
         <AccordionSection title="📚 題材 Theme" summary={theme || "未填"}>
           <input className="btn-secondary" style={{ width: "100%", marginBottom: 6, opacity: isTransformMode ? 0.4 : 1 }} value={theme} onChange={(e) => setTheme(e.target.value)} placeholder={isTransformMode ? "改圖模式下不影響 prompt" : "例：spiritual healing"} />
-          <PresetChips chips={THEME_PRESETS} onSelect={setTheme} />
+          <PresetChips chips={THEME_PRESETS} onSelect={setTheme} selected={theme} />
         </AccordionSection>
 
         <AccordionSection title="✨ 氛圍 Vibe" summary={vibe || "未填"}>
           <input className="btn-secondary" style={{ width: "100%", marginBottom: 6 }} value={vibe} onChange={(e) => setVibe(e.target.value)} placeholder="例：calm, ethereal" />
-          <PresetChips chips={VIBE_PRESETS} onSelect={setVibe} />
+          <PresetChips chips={VIBE_PRESETS} onSelect={setVibe} selected={vibe} />
         </AccordionSection>
 
         <AccordionSection title="🔥 時事靈感">
@@ -695,6 +700,9 @@ export default function StudioWorkbench() {
         <div style={{ border: "1px solid var(--border, #e2e8f0)", borderRadius: 8, padding: 10 }}>
           <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>🖼️ 參考圖</p>
           <div style={{ display: "flex", borderRadius: 6, overflow: "hidden", border: "1px solid var(--border, #e2e8f0)", marginBottom: 8 }}>
+            <button type="button" onClick={() => onSetRefMode("none")} style={{ flex: 1, padding: "6px 4px", fontSize: 11, cursor: "pointer", border: "none", background: refMode === "none" ? "var(--accent, #6366f1)" : "transparent", color: refMode === "none" ? "#fff" : "var(--text-muted, #3a4560)", transition: "all 0.15s" }}>
+              無
+            </button>
             <button type="button" onClick={() => onSetRefMode("ref")} style={{ flex: 1, padding: "6px 4px", fontSize: 11, cursor: "pointer", border: "none", background: refMode === "ref" ? "var(--accent, #6366f1)" : "transparent", color: refMode === "ref" ? "#fff" : "var(--text-muted, #3a4560)", transition: "all 0.15s" }}>
               🖼️ 風格參考
             </button>
@@ -702,24 +710,30 @@ export default function StudioWorkbench() {
               🎨 改圖模式
             </button>
           </div>
-          <p style={{ fontSize: 10, opacity: 0.5, marginBottom: 8, lineHeight: 1.5 }}>
-            {refMode === "ref" ? "上傳圖作為視覺參考，AI 依 Subject/Style 生成新圖" : "直接把你的圖套用選定風格（建議 flux-kontext）"}
-          </p>
-          {maxRefs > 0 ? (
-            <label style={{ fontSize: 12 }}>
-              {refMode === "transform" ? "上傳要改的圖" : `參考圖（${refImages.length}/${maxRefs}）`}
-              <input type="file" accept="image/png,image/jpeg,image/webp" multiple style={{ width: "100%", marginTop: 4 }} onChange={(e) => void onUploadRefs(e.target.files)} />
-              {refImages.length > 0 && (
-                <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
-                  {refImages.map((r, i) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img key={i} src={r} alt={`ref-${i}`} style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 4, cursor: "pointer" }} title="點擊移除" onClick={() => setRefImages((prev) => prev.filter((_, j) => j !== i))} />
-                  ))}
-                </div>
-              )}
-            </label>
+          {refMode === "none" ? (
+            <p style={{ fontSize: 10, opacity: 0.45, lineHeight: 1.5 }}>不使用參考圖，純文字生圖。</p>
           ) : (
-            <p style={{ fontSize: 11, opacity: 0.45 }}>目前所選模型均不支援參考圖。{refMode === "transform" && " 改圖模式將自動切換至 flux-kontext-dev。"}</p>
+            <>
+              <p style={{ fontSize: 10, opacity: 0.5, marginBottom: 8, lineHeight: 1.5 }}>
+                {refMode === "ref" ? "上傳圖作為視覺參考，AI 依 Subject/Style 生成新圖" : "直接把你的圖套用選定風格（建議 flux-kontext）"}
+              </p>
+              {maxRefs > 0 ? (
+                <label style={{ fontSize: 12 }}>
+                  {refMode === "transform" ? "上傳要改的圖" : `參考圖（${refImages.length}/${maxRefs}）`}
+                  <input type="file" accept="image/png,image/jpeg,image/webp" multiple style={{ width: "100%", marginTop: 4 }} onChange={(e) => void onUploadRefs(e.target.files)} />
+                  {refImages.length > 0 && (
+                    <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
+                      {refImages.map((r, i) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={i} src={r} alt={`ref-${i}`} style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 4, cursor: "pointer" }} title="點擊移除" onClick={() => setRefImages((prev) => prev.filter((_, j) => j !== i))} />
+                      ))}
+                    </div>
+                  )}
+                </label>
+              ) : (
+                <p style={{ fontSize: 11, opacity: 0.45 }}>目前所選模型均不支援參考圖。{refMode === "transform" && " 改圖模式將自動切換至 flux-kontext-dev。"}</p>
+              )}
+            </>
           )}
         </div>
 
@@ -871,16 +885,15 @@ export default function StudioWorkbench() {
                         );
                       })}
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, opacity: appliedIsAsset ? 0.4 : 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
                       <span style={{ fontSize: 11, opacity: 0.6 }}>邊緣強度</span>
                       <input
                         type="range" min={10} max={90} step={1} value={edgeAmount}
-                        disabled={appliedIsAsset}
                         onChange={(e) => setEdgeAmount(Number(e.target.value))}
-                        onPointerUp={() => { if (applied && !appliedIsAsset) void applyEdge(m, applied); }}
+                        onPointerUp={() => { if (applied) void applyEdge(m, applied); }}
                         style={{ flex: 1 }}
                       />
-                      <span style={{ fontSize: 11, opacity: 0.6, width: 44, textAlign: "right" }}>{appliedIsAsset ? "固定" : edgeAmount}</span>
+                      <span style={{ fontSize: 11, opacity: 0.6, width: 30, textAlign: "right" }}>{edgeAmount}</span>
                     </div>
                   </div>
                 );
@@ -912,27 +925,29 @@ export default function StudioWorkbench() {
               )}
 
               {/* AI edit panel + output track */}
-              <div style={{ display: "flex", gap: 12, marginTop: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
-                <ImageEditPromptPanel
-                  sourceImage={activeResult.image}
-                  currentPrompt={effectivePrompt}
-                  imageModel={activeResult.model}
-                  target="pod-design"
-                  aspectRatio={aspect}
-                  title="AI image prompt（修圖）"
-                  styleAnchor={{ model: activeResult.model, mode: refImages.length > 0 ? "image" : "text", stylePrompt: resolvedStylePrompt || effectivePrompt, subject: subject.trim(), refs: refImages.length, target: "pod-design" }}
-                  onEditedImage={(image, meta) => {
-                    setResults((prev) => prev.map((r, i) => i === activeIdx ? { ...r, image, seed: meta.seed } : r));
-                    setSaveStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
-                    setBgStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
-                    setOriginalImages((prev) => { const n = { ...prev }; delete n[activeResult.model]; return n; });
-                    setEdgeStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
-                    setEdgeOriginals((prev) => { const n = { ...prev }; delete n[activeResult.model]; return n; });
-                    setEdgeApplied((prev) => { const n = { ...prev }; delete n[activeResult.model]; return n; });
-                    setMockupState("idle"); setMockups([]); setSavedMockups({});
-                  }}
-                />
-                <div style={{ flex: 1, minWidth: 240 }}>
+              <div style={{ marginTop: 14 }}>
+                <AccordionSection title="✏️ AI image prompt（修圖）" defaultOpen={false}>
+                  <ImageEditPromptPanel
+                    sourceImage={activeResult.image}
+                    currentPrompt={effectivePrompt}
+                    imageModel={activeResult.model}
+                    target="pod-design"
+                    aspectRatio={aspect}
+                    title=""
+                    styleAnchor={{ model: activeResult.model, mode: refImages.length > 0 ? "image" : "text", stylePrompt: resolvedStylePrompt || effectivePrompt, subject: subject.trim(), refs: refImages.length, target: "pod-design" }}
+                    onEditedImage={(image, meta) => {
+                      setResults((prev) => prev.map((r, i) => i === activeIdx ? { ...r, image, seed: meta.seed } : r));
+                      setSaveStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
+                      setBgStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
+                      setOriginalImages((prev) => { const n = { ...prev }; delete n[activeResult.model]; return n; });
+                      setEdgeStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
+                      setEdgeOriginals((prev) => { const n = { ...prev }; delete n[activeResult.model]; return n; });
+                      setEdgeApplied((prev) => { const n = { ...prev }; delete n[activeResult.model]; return n; });
+                      setMockupState("idle"); setMockups([]); setSavedMockups({});
+                    }}
+                  />
+                </AccordionSection>
+                <div style={{ marginTop: 8 }}>
                   <OutputTrackBar image={activeResult.image} source="pod" fileMeta={fileMeta} />
                 </div>
               </div>

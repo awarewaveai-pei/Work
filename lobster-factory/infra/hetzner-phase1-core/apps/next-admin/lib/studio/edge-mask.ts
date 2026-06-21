@@ -339,8 +339,11 @@ export async function applyEdgeMask(
       : `data:image/svg+xml;charset=utf-8,${encodeURIComponent(buildMaskSvg(id, w, h, params))}`;
     const mask = await loadImage(maskSrc, false);
 
+    // Asset brushes: use edgeAmount to control mask opacity (20–100%); procedural SVGs use it for shape.
+    if (style.maskUrl) ctx.globalAlpha = 0.2 + (clamp(params.amount, 0, 100) / 100) * 0.8;
     ctx.globalCompositeOperation = "destination-in"; // keep source only where mask is opaque
     ctx.drawImage(mask, 0, 0, w, h);
+    ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = "source-over";
 
     try {
