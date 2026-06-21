@@ -1,0 +1,9 @@
+
+          {/* ══════════════════════════════════════════════════════════════════════════════════════════ */}
+          {/* ═══════════════════════════ A：文章 / 內容設定 ═══════════════════════════════════════ */}
+          <div style={{ border: "1px solid rgba(59,130,246,0.3)", borderRadius: "12px", marginBottom: "20px", overflow: "hidden" }}>
+            <div style={{ background: "linear-gradient(135deg,rgba(59,130,246,0.08),rgba(59,130,246,0.02))", borderBottom: "1px solid rgba(59,130,246,0.2)", padding: "10px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "15px" }}>📝</span>
+              <span style={{ fontWeight: 700, fontSize: "13px", color: "#1d4ed8" }}>文章 / 內容設定</span>
+            </div>
+            <div style={{ padding: "0 16px" }}>
