@@ -60,12 +60,14 @@ AUTO_TASK_DONE: feat(banner): Banner Studio P1 文案生成 + 產品圖去背
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=fetchBrollUrl|fetchBrollVideoUrl|pexels-video|targetMinutes|SCHEMA_EXAMPLE | hits=SCHEMA_EXAMPLE=0（完全移除）；其他所有 callers 一致
 - tsc: PASS（0 errors）
 - npm test: 431/431 PASS
+- REALTEST_EVIDENCE: tool=mcp__hetzner-ssh__ssh_exec | cmd=sg-deploy.sh next-admin | exit=0 | ms=~210000 → commit 6b49468c; tsc PASS; 431/431 tests PASS; docker healthy 7s; smoke /login /api/ops/summary nginx node-api 全 200 OK
 
 [剩餘風險]
 - pexels-video 草稿預覽：video autoplay 在部分瀏覽器需使用者互動才啟動（muted+autoPlay 組合通常免互動，但需 browser 實測確認）
 - 5分鐘影片 EU render 時間可能 8-12 分鐘，現有 polling deadline 12分鐘剛好，邊緣
+- render-draft ALLOWED_HOSTS 已加 player.vimeo.com（Pexels 舊影片 host），需 browser 實測 Vimeo-sourced 影片場景
 
-[rollback] `git revert HEAD`（純新增功能，原路徑不動）
+[rollback] snapshot: `lobster-phase1-next-admin:rollback-20260621-184518`（sg-deploy 自動建）
 
 ### analysis(video): R0 video pipeline 全系統審查 — 端對端驗證通過，根因為 UX 認知落差
 
