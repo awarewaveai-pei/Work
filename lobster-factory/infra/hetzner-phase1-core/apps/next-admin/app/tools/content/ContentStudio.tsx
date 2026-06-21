@@ -578,10 +578,10 @@ export default function ContentStudio() {
   // prevent double-trigger since React batches the setState calls that produce pubStatus==="done".
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (pubStatus === "done" && publishedPostId !== null && videoStatus === "idle") {
+    if (pubStatus === "done" && publishedPostId !== null && videoStatus === "idle" && form.media.youtubeSource === "ai-video") {
       void handleGenerateVideo(publishedPostId);
     }
-  }, [pubStatus, publishedPostId]);
+  }, [pubStatus, publishedPostId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // SEO check
   const [seoReport,   setSeoReport]   = useState<RankMathReport | null>(null);
@@ -2493,6 +2493,7 @@ export default function ContentStudio() {
                     onChange={e => setMedia("youtubeSource", e.target.value)}>
                     <option value="none">None</option>
                     <option value="auto">Auto（AI 建議）</option>
+                    <option value="ai-video">🎬 自製 AI 影片（$0 免費）</option>
                   </select>
                 </div>
                 <div>
@@ -2512,6 +2513,83 @@ export default function ContentStudio() {
                   </select>
                 </div>
               </div>
+
+              {/* AI 影片設定（選 ai-video 時展開）*/}
+              {form.media.youtubeSource === "ai-video" && (
+                <div style={{ marginTop: "8px", padding: "12px 14px", borderRadius: "8px", border: "1px solid #bae6fd", background: "#f0f9ff", display: "flex", flexDirection: "column", gap: "12px" }}>
+                  {/* 視覺風格 */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 600, color: "#0369a1" }}>
+                      🎨 視覺風格 <span style={{ fontWeight: 400, color: "#64748b" }}>{videoStyleZh || "不指定（電影感預設）"}</span>
+                    </span>
+                    <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                      {VIDEO_STYLE_GROUPS.map((g) => (
+                        <button key={g} type="button" onClick={() => setVideoStyleGroup(g)}
+                          style={{ padding: "2px 10px", borderRadius: 20, fontSize: "11px", cursor: "pointer",
+                            border: `1px solid ${videoStyleGroup === g ? "#0284c7" : "#bae6fd"}`,
+                            background: videoStyleGroup === g ? "#0284c7" : "rgba(255,255,255,0.6)",
+                            color: videoStyleGroup === g ? "#fff" : "#64748b" }}>
+                          {g}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", maxHeight: "100px", overflowY: "auto" }}>
+                      {VIDEO_STYLE_CATALOG.filter((item) => item.group === videoStyleGroup).map((item) => {
+                        const active = videoStyleZh === item.zh;
+                        return (
+                          <button key={item.zh} type="button" onClick={() => setVideoStyleZh(active ? "" : item.zh)}
+                            style={{ padding: "2px 9px", borderRadius: 20, fontSize: "11px", cursor: "pointer",
+                              border: `1px solid ${active ? "#0284c7" : "#bae6fd"}`,
+                              background: active ? "#0284c7" : "rgba(255,255,255,0.6)",
+                              color: active ? "#fff" : "#64748b" }}>
+                            {item.zh}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {/* 場景設定 */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "10px 12px", borderRadius: "6px", background: "rgba(255,255,255,0.6)", border: "1px solid #bae6fd" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 700, color: "#0369a1" }}>場景設定</span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: "12px", fontWeight: 600, color: "#475569" }}>場景總數</span>
+                        <span style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a" }}>{videoTotalScenes} 場</span>
+                      </div>
+                      <input type="range" min={1} max={20} step={1} value={videoTotalScenes}
+                        onChange={(e) => { const n = Number(e.target.value); setVideoTotalScenes(n); if (videoCustomScenes > n) setVideoCustomScenes(n); }}
+                        style={{ width: "100%", accentColor: "#0284c7" }} />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: "12px", fontWeight: 600, color: "#475569" }}>自訂 AI 圖（Flux）</span>
+                        <span style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a" }}>{videoCustomScenes}/{videoTotalScenes} · B-roll：{Math.max(0, videoTotalScenes - videoCustomScenes)}</span>
+                      </div>
+                      <input type="range" min={0} max={videoTotalScenes} step={1} value={videoCustomScenes}
+                        onChange={(e) => setVideoCustomScenes(Number(e.target.value))}
+                        style={{ width: "100%", accentColor: "#0284c7" }} />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <span style={{ fontSize: "12px", fontWeight: 600, color: "#475569" }}>生圖模型</span>
+                      <select value={videoImageModel} onChange={(e) => setVideoImageModel(e.target.value)}
+                        style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #bae6fd", fontSize: "12px", background: "#fff", color: "#0f172a", width: "100%" }}>
+                        {Object.entries(IMAGE_RATES).map(([id, r]) => (
+                          <option key={id} value={id}>{r.label} — ${r.usd}/張</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <span style={{ fontSize: "12px", fontWeight: 600, color: "#475569" }}>配音模型</span>
+                      <select value={videoVoiceId} onChange={(e) => setVideoVoiceId(e.target.value)}
+                        style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #bae6fd", fontSize: "12px", background: "#fff", color: "#0f172a", width: "100%" }}>
+                        {VOICE_MODELS_VIDEO.map((v) => (
+                          <option key={v.id} value={v.id}>{v.label} [{v.lang}] {v.badge}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Strict under headings */}
               <label style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "13px", cursor: "pointer", userSelect: "none" }}>
@@ -3098,96 +3176,6 @@ export default function ContentStudio() {
               <div className="form-hint" style={{ marginTop: "6px" }}>
                 可直接編輯後推送。<code>{"<!-- NEEDS_BRAND_VERIFY -->"}</code> = 填入真實品牌資料。
               </div>
-
-              {/* ── 影片設定（發佈前配置，發佈後自動觸發）── */}
-              {hasContent && pubStatus === "idle" && (
-                <div style={{ marginTop: "12px", borderRadius: "8px", border: "1px solid #bae6fd", background: "#f0f9ff", overflow: "hidden" }}>
-                  <button
-                    type="button"
-                    onClick={() => setVideoConfigOpen(v => !v)}
-                    style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
-                      padding: "9px 14px", background: "none", border: "none", cursor: "pointer",
-                      fontSize: "13px", fontWeight: 600, color: "#0369a1" }}>
-                    <span>🎬 影片設定（發佈後自動生成）</span>
-                    <span style={{ fontSize: "11px", color: "#0284c7" }}>{videoConfigOpen ? "▲ 收起" : "▼ 展開"}</span>
-                  </button>
-                  {videoConfigOpen && (
-                    <div style={{ padding: "0 14px 14px", display: "flex", flexDirection: "column", gap: "12px" }}>
-                      {/* 視覺風格 */}
-                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                        <span style={{ fontSize: "12px", fontWeight: 600, color: "#0369a1" }}>
-                          🎨 視覺風格 <span style={{ fontWeight: 400, color: "#64748b" }}>{videoStyleZh || "不指定（電影感預設）"}</span>
-                        </span>
-                        <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
-                          {VIDEO_STYLE_GROUPS.map((g) => (
-                            <button key={g} type="button" onClick={() => setVideoStyleGroup(g)}
-                              style={{ padding: "2px 10px", borderRadius: 20, fontSize: "11px", cursor: "pointer",
-                                border: `1px solid ${videoStyleGroup === g ? "#0284c7" : "#bae6fd"}`,
-                                background: videoStyleGroup === g ? "#0284c7" : "rgba(255,255,255,0.6)",
-                                color: videoStyleGroup === g ? "#fff" : "#64748b" }}>
-                              {g}
-                            </button>
-                          ))}
-                        </div>
-                        <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", maxHeight: "100px", overflowY: "auto" }}>
-                          {VIDEO_STYLE_CATALOG.filter((item) => item.group === videoStyleGroup).map((item) => {
-                            const active = videoStyleZh === item.zh;
-                            return (
-                              <button key={item.zh} type="button" onClick={() => setVideoStyleZh(active ? "" : item.zh)}
-                                style={{ padding: "2px 9px", borderRadius: 20, fontSize: "11px", cursor: "pointer",
-                                  border: `1px solid ${active ? "#0284c7" : "#bae6fd"}`,
-                                  background: active ? "#0284c7" : "rgba(255,255,255,0.6)",
-                                  color: active ? "#fff" : "#64748b" }}>
-                                {item.zh}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      {/* 場景設定 */}
-                      <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "10px 12px", borderRadius: "6px", background: "rgba(255,255,255,0.6)", border: "1px solid #bae6fd" }}>
-                        <span style={{ fontSize: "12px", fontWeight: 700, color: "#0369a1" }}>場景設定</span>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between" }}>
-                            <span style={{ fontSize: "12px", fontWeight: 600, color: "#475569" }}>場景總數</span>
-                            <span style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a" }}>{videoTotalScenes} 場</span>
-                          </div>
-                          <input type="range" min={1} max={20} step={1} value={videoTotalScenes}
-                            onChange={(e) => { const n = Number(e.target.value); setVideoTotalScenes(n); if (videoCustomScenes > n) setVideoCustomScenes(n); }}
-                            style={{ width: "100%", accentColor: "#0284c7" }} />
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between" }}>
-                            <span style={{ fontSize: "12px", fontWeight: 600, color: "#475569" }}>自訂 AI 圖（Flux）</span>
-                            <span style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a" }}>{videoCustomScenes}/{videoTotalScenes} · B-roll：{Math.max(0, videoTotalScenes - videoCustomScenes)}</span>
-                          </div>
-                          <input type="range" min={0} max={videoTotalScenes} step={1} value={videoCustomScenes}
-                            onChange={(e) => setVideoCustomScenes(Number(e.target.value))}
-                            style={{ width: "100%", accentColor: "#0284c7" }} />
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                          <span style={{ fontSize: "12px", fontWeight: 600, color: "#475569" }}>生圖模型</span>
-                          <select value={videoImageModel} onChange={(e) => setVideoImageModel(e.target.value)}
-                            style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #bae6fd", fontSize: "12px", background: "#fff", color: "#0f172a", width: "100%" }}>
-                            {Object.entries(IMAGE_RATES).map(([id, r]) => (
-                              <option key={id} value={id}>{r.label} — ${r.usd}/張</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                          <span style={{ fontSize: "12px", fontWeight: 600, color: "#475569" }}>配音模型</span>
-                          <select value={videoVoiceId} onChange={(e) => setVideoVoiceId(e.target.value)}
-                            style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #bae6fd", fontSize: "12px", background: "#fff", color: "#0f172a", width: "100%" }}>
-                            {VOICE_MODELS_VIDEO.map((v) => (
-                              <option key={v.id} value={v.id}>{v.label} [{v.lang}] {v.badge}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* ── 輸出動作列（移到文章下方：先讀後操作，UX 較順）── */}
               <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", marginTop: "12px",

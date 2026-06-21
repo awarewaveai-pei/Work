@@ -28,6 +28,15 @@ import FontLibrary from "@/components/tools/FontLibrary";
 import { posterizeDataUrl } from "@/lib/studio/posterize";
 // Pure-data import only (NOT generative-fill.ts — that uses Buffer/process.env, server-only).
 import { OUTPAINT_PRESETS, OUTPAINT_LABELS, type OutpaintPreset } from "@/lib/studio/outpaint-presets";
+import { EDGE_MASK_STYLES, applyEdgeMask, buildMaskSvg, type EdgeMaskId } from "@/lib/studio/edge-mask";
+
+// Edge-mask chip previews (asset → PNG maskUrl; procedural → tiny SVG). Computed once at import.
+const EDGE_PREVIEWS = EDGE_MASK_STYLES.map((s) => ({
+  id: s.id,
+  zh: s.label,
+  en: s.labelEn,
+  svg: s.maskUrl ?? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(buildMaskSvg(s.id, 44, 44, { amount: 62, seed: 7 }))}`,
+}));
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -107,7 +116,9 @@ export default function CanvasEditor() {
   const [brushSize, setBrushSize] = useState(34);
   // 🖼 擴圖 outpaint (flux-fill-pro) + 色調分離 posterize — both replace the selected image's pixels.
   const [outpaintDir, setOutpaintDir] = useState<OutpaintPreset>("Zoom out 1.5x");
-  const [genBusy, setGenBusy] = useState(false); // outpaint / posterize in flight
+  const [genBusy, setGenBusy] = useState(false); // outpaint / posterize / edge-mask in flight
+  const [edgeAmount, setEdgeAmount] = useState(55);
+  const [edgeStyleApplied, setEdgeStyleApplied] = useState<EdgeMaskId | null>(null);
   const [posterLevels, setPosterLevels] = useState(5);
   // 🗂 群組 — track whether the active selection can be grouped / ungrouped.
   const [multiSelected, setMultiSelected] = useState(false); // ActiveSelection (≥2 objects)
@@ -893,6 +904,54 @@ export default function CanvasEditor() {
       setGenBusy(false);
     }
   }, [fillPrompt, outpaintDir, refreshLayers]);
+
+  // ✂️ 邊緣遮罩 — mask the selected image through a brush/grunge shape → transparent PNG. Mirrors
+  // posterizeSelected (natural-res dataURL → process → swap, keep transform). Masks from a stored
+  // `edgeOriginal` so switching brushes REPLACES the edge instead of stacking masks. Client-only.
+  const applyEdgeMaskToSelected = useCallback(async (styleId: EdgeMaskId) => {
+    const canvas = fabricRef.current;
+    const img = canvas?.getActiveObject() as
+      | (FabricObject & {
+          left?: number; top?: number; scaleX?: number; scaleY?: number; angle?: number;
+          originX?: string; originY?: string; name?: string; edgeOriginal?: string;
+          toDataURL?: (o?: Record<string, unknown>) => string;
+        })
+      | null;
+    if (!canvas || !img || img.type !== "image" || !img.toDataURL) {
+      setError("請先點選一張圖片，再套邊緣");
+      return;
+    }
+    setGenBusy(true);
+    setError(null);
+    try {
+      const base = img.edgeOriginal ?? img.toDataURL({ format: "png", multiplier: 1, withoutTransform: true });
+      const res = await applyEdgeMask(base, styleId, { amount: edgeAmount, seed: 7 });
+      if (!res.ok) {
+        setError(`套邊失敗：${(res as { ok: false; error: string }).error}`);
+        return;
+      }
+      const fabric = await import("fabric");
+      // Selection may have changed during the async composite — don't replace a stale object.
+      if (fabricRef.current !== canvas || canvas.getActiveObject() !== img) return;
+      const baked = await fabric.FabricImage.fromURL(res.image, { crossOrigin: "anonymous" });
+      baked.set({
+        left: img.left, top: img.top, angle: img.angle,
+        scaleX: img.scaleX, scaleY: img.scaleY,
+        originX: img.originX, originY: img.originY, name: img.name,
+      });
+      (baked as unknown as Record<string, unknown>).edgeOriginal = base;
+      canvas.remove(img);
+      canvas.add(baked);
+      canvas.setActiveObject(baked);
+      canvas.requestRenderAll();
+      refreshLayers();
+      setEdgeStyleApplied(styleId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setGenBusy(false);
+    }
+  }, [edgeAmount, refreshLayers]);
 
   // 💾 設計檔（可再編輯）— export the full canvas JSON (custom `name` included via customProperties)
   // so a design can be reloaded and keep editing. Client-only: download a .design.json blob.

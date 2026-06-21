@@ -637,9 +637,9 @@ export default function MockupStudio() {
   });
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 16, padding: 16 }}>
-      {/* ── Controls ─────────────────────────────────────────── */}
-      <div className="build-panel" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 16, padding: 16, alignItems: "start" }}>
+      {/* ── Controls (right column) ──────────────────────────── */}
+      <div className="build-panel" style={{ gridColumn: 2, padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
 
         {/* ── Preset Library ── */}
         <div style={{ border: "1px solid #333", borderRadius: 6 }}>
@@ -1074,8 +1074,8 @@ export default function MockupStudio() {
         )}
       </div>
 
-      {/* ── Preview ─────────────────────────────────────────── */}
-      <div className="build-panel" style={{ padding: 14 }}>
+      {/* ── Preview (left column, large) ─────────────────────── */}
+      <div className="build-panel" style={{ gridColumn: 1, gridRow: 1, padding: 14 }}>
         {mode !== "printful" && (
           <div style={{ fontSize: 12, opacity: 0.6, whiteSpace: "pre-wrap", marginBottom: 10 }}>{prompt}</div>
         )}
