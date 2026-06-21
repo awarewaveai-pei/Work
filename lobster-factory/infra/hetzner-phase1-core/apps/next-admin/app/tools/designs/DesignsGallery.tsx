@@ -1147,13 +1147,13 @@ export default function DesignsGallery() {
               background: "var(--color-background-primary, #1c1c1c)",
               border: "1px solid rgba(127,127,127,0.3)",
               borderRadius: 12,
-              width: "min(680px, 94vw)",
-              maxHeight: "92vh",
-              overflow: "auto",
-              padding: 16,
+              width: "min(1200px, 96vw)",
+              height: "92vh",
+              overflow: "hidden",
+              padding: 14,
               display: "flex",
               flexDirection: "column",
-              gap: 12,
+              gap: 10,
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1164,18 +1164,20 @@ export default function DesignsGallery() {
               <button className="designs-action-btn" style={{ marginLeft: "auto" }} onClick={closeEdgeEdit}>關閉 ✕</button>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div>
-                <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4 }}>原圖</div>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={editAsset.object_url ?? ""} alt="原圖" style={{ width: "100%", borderRadius: 8, display: "block" }} />
+            <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
+                <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4, flex: "none" }}>原圖</div>
+                <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={editAsset.object_url ?? ""} alt="原圖" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 8, display: "block" }} />
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4 }}>套邊後（透明）</div>
+              <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
+                <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4, flex: "none" }}>套邊後（透明）</div>
                 <div
                   style={{
-                    width: "100%",
-                    aspectRatio: "1",
+                    flex: 1,
+                    minHeight: 0,
                     borderRadius: 8,
                     display: "flex",
                     alignItems: "center",
@@ -1183,18 +1185,18 @@ export default function DesignsGallery() {
                     backgroundColor: "#fff",
                     backgroundImage:
                       "linear-gradient(45deg,#ccc 25%,transparent 25%),linear-gradient(-45deg,#ccc 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#ccc 75%),linear-gradient(-45deg,transparent 75%,#ccc 75%)",
-                    backgroundSize: "16px 16px",
-                    backgroundPosition: "0 0,0 8px,8px -8px,-8px 0px",
+                    backgroundSize: "20px 20px",
+                    backgroundPosition: "0 0,0 10px,10px -10px,-10px 0px",
                     overflow: "hidden",
                   }}
                 >
                   {editBusy ? (
-                    <span style={{ fontSize: 12, color: "#333" }}>處理中…</span>
+                    <span style={{ fontSize: 13, color: "#333" }}>處理中…</span>
                   ) : editResult ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={editResult} alt="套邊後" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                    <img src={editResult} alt="套邊後" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
                   ) : (
-                    <span style={{ fontSize: 12, color: "#555" }}>選一個邊緣風格 →</span>
+                    <span style={{ fontSize: 13, color: "#555" }}>← 選下面一個筆刷</span>
                   )}
                 </div>
               </div>
@@ -1202,7 +1204,7 @@ export default function DesignsGallery() {
 
             {editError ? <span style={{ fontSize: 12, color: "#e5484d" }}>套用失敗：{editError}</span> : null}
 
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center", flex: "none" }}>
               {edgePreviews.map((pv) => {
                 const active = editStyle === pv.id;
                 return (
@@ -1233,7 +1235,7 @@ export default function DesignsGallery() {
               })}
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 8, opacity: editIsAsset ? 0.4 : 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "none", opacity: editIsAsset ? 0.4 : 1 }}>
               <span style={{ fontSize: 11, opacity: 0.6 }}>邊緣強度</span>
               <input
                 type="range"
@@ -1249,7 +1251,7 @@ export default function DesignsGallery() {
               <span style={{ fontSize: 11, opacity: 0.6, width: 44, textAlign: "right" }}>{editIsAsset ? "固定" : editAmount}</span>
             </div>
 
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", flex: "none" }}>
               <button
                 className="designs-action-btn"
                 disabled={!editResult || editSaving || !!editSavedUrl}
