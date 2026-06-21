@@ -189,34 +189,27 @@ interface MediaHub {
 // Allowed generation models across providers live in lib/ai/text-model-options.ts so Content Studio,
 // article generation, and image prompt tools share one Claude/OpenAI menu.
 
-/** Call Perplexity Sonar to get 3–5 real, verified external source URLs for the keyword. */
+/** Call Serper (Google Search) to get 3–5 authoritative external source URLs for the keyword. */
 async function fetchRealSources(keyword: string, language: string): Promise<{ sources: string[]; costUsd: number }> {
-  const apiKey = process.env.PERPLEXITY_API_KEY;
+  const apiKey = process.env.SERPER_API_KEY;
   if (!apiKey) return { sources: [], costUsd: 0 };
+  const isCjk = /chinese|taiwanese|japanese|korean/i.test(language);
+  const q = isCjk ? `${keyword} 權威來源` : `${keyword} authoritative source site:gov OR site:edu OR site:org`;
+  const gl = isCjk ? "tw" : "us";
   try {
-    const res = await fetch("https://api.perplexity.ai/chat/completions", {
+    const res = await fetch("https://google.serper.dev/search", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "sonar",
-        messages: [{
-          role: "user",
-          content: `Find 5 authoritative external web sources about: "${keyword}". Prefer academic journals, established health organizations, government sites, or reputable publications. Language preference: ${language}. List the 5 most relevant URLs only.`,
-        }],
-        search_recency_filter: "year",
-      }),
+      headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ q, gl, num: 5 }),
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return { sources: [], costUsd: 0 };
-    const data = await res.json() as { citations?: unknown[]; usage?: { prompt_tokens?: number; completion_tokens?: number } };
-    const sources = (data.citations ?? [])
+    const data = await res.json() as { organic?: Array<{ link?: string }> };
+    const sources = (data.organic ?? [])
+      .map(r => r.link)
       .filter((u): u is string => typeof u === "string" && /^https?:\/\//.test(u) && !/[\s\n\r]/.test(u))
       .slice(0, 5);
-    const costUsd = textCallCostUsd({ model: "sonar", inputTokens: data.usage?.prompt_tokens ?? 0, outputTokens: data.usage?.completion_tokens ?? 0 });
-    return { sources, costUsd };
+    return { sources, costUsd: 0 }; // Serper free tier: 2500 req/month
   } catch {
     return { sources: [], costUsd: 0 };
   }
@@ -618,7 +611,7 @@ export async function prepareArticleGeneration(body: ArticleGenerateInput): Prom
   // Internal links
   const internalLinks = sarr(body.internalLinks).filter(u => /^(https?:\/\/|\/)/.test(u.trim())).slice(0, 10);
 
-  // Perplexity real sources — only when user hasn't provided their own external links
+  // Serper real sources — only when user hasn't provided their own external links
   const userExternalLinks = sarr(body.externalLinks);
   const { sources: realSources, costUsd: perplexityCostUsd } = userExternalLinks.length === 0
     ? await fetchRealSources(keyword, str(body.language, "English"))

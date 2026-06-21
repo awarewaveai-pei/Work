@@ -308,25 +308,38 @@ searchBlock({
   },
 });
 
-// ④ Perplexity 即時網路熱門（key 在才啟用）
+// ④ Serper 即時 Google News（key 在才啟用；替換原 Perplexity 即時 block）
 searchBlock({
-  id: "search/perplexity",
-  title: "Perplexity 即時",
-  icon: "🔮",
+  id: "search/serper",
+  title: "Serper 即時",
+  icon: "🔍",
   geos: "*",
-  enabled: !!process.env.PERPLEXITY_API_KEY,
+  enabled: !!process.env.SERPER_API_KEY,
   run: async (geo) => {
-    const hl = geo === "TW" || geo === "HK" ? "zh-TW" : "en";
-    const lang = hl.startsWith("zh") ? "Traditional Chinese" : "English";
-    const where = GEO_NAME[geo] ?? "the world";
-    const content = await perplexityChat(
-      `List 10 trending news topics or hot search terms right now in ${where}. ` +
-      `Language: ${lang}. Reply ONLY as a JSON array of short title strings, no markdown.`,
-      8000,  // 與其他來源 8s timeout 對齊，避免拖長熱門 feed p99
-    );
-    return parseJsonStrings(content).slice(0, 10).map(title => ({
-      title, traffic: "", category: "", relatedQueries: [], source: "Perplexity",
-    }));
+    const apiKey = process.env.SERPER_API_KEY;
+    if (!apiKey) return [];
+    const p = GEO_RSS[geo] ?? GEO_RSS.TW;
+    const q = (geo === "TW" || geo === "HK") ? "今日熱門新聞 熱搜" : "trending news today";
+    try {
+      const res = await fetch("https://google.serper.dev/news", {
+        method: "POST",
+        headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ q, gl: p.gl.toLowerCase(), hl: p.hl, num: 10 }),
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) return [];
+      const data = await res.json() as { news?: Array<{ title?: string; source?: string }> };
+      return (data.news ?? [])
+        .filter(item => typeof item.title === "string" && item.title.length > 4)
+        .slice(0, 10)
+        .map(item => ({
+          title: item.title!,
+          traffic: "",
+          category: "",
+          relatedQueries: [],
+          source: item.source ?? "Serper",
+        }));
+    } catch { return []; }
   },
 });
 
