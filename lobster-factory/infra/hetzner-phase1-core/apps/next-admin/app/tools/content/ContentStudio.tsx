@@ -1027,14 +1027,16 @@ export default function ContentStudio() {
     if (!d) return;
     setForm(prev => {
       const next = { ...prev };
-      if (d.language      && !prev.language.trim())                          next.language      = d.language;
-      if (d.targetCountry && !prev.targetCountry.trim())                     next.targetCountry = d.targetCountry;
-      if (d.tone          && prev.tone          === DEFAULT_FORM.tone)       next.tone          = d.tone;
-      if (d.articleType   && prev.articleType   === DEFAULT_FORM.articleType) next.articleType  = d.articleType;
-      if (d.readability   && prev.readability   === DEFAULT_FORM.readability) next.readability  = d.readability;
-      if (d.pointOfView   && prev.pointOfView   === DEFAULT_FORM.pointOfView) next.pointOfView  = d.pointOfView;
-      if (d.imageModel   && prev.media.aiImages === DEFAULT_MEDIA.aiImages)
+      if (d.language      && prev.language      === DEFAULT_FORM.language)      next.language      = d.language;
+      if (d.targetCountry && prev.targetCountry === DEFAULT_FORM.targetCountry) next.targetCountry = d.targetCountry;
+      if (d.tone          && prev.tone          === DEFAULT_FORM.tone)          next.tone          = d.tone;
+      if (d.articleType   && prev.articleType   === DEFAULT_FORM.articleType)   next.articleType   = d.articleType;
+      if (d.readability   && prev.readability   === DEFAULT_FORM.readability)   next.readability   = d.readability;
+      if (d.pointOfView   && prev.pointOfView   === DEFAULT_FORM.pointOfView)   next.pointOfView   = d.pointOfView;
+      if (d.imageModel    && prev.media.aiImages === DEFAULT_MEDIA.aiImages)
         next.media = { ...prev.media, aiImages: d.imageModel };
+      if (d.brandVoiceInstructions && !prev.details.trim())
+        next.details = d.brandVoiceInstructions;
       if (d.marketing) {
         const m = { ...prev.marketing };
         const dm = d.marketing;

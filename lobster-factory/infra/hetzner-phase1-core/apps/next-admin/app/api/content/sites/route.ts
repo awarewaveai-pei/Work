@@ -16,6 +16,7 @@ export interface SiteContentDefaults {
   pointOfView?: string;
   featuredImageFont?: string;
   featuredImageTitlePosition?: string;
+  brandVoiceInstructions?: string;
   marketing?: {
     audience?: string;
     positioning?: string;

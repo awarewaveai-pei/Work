@@ -422,8 +422,8 @@ function ContentTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cfg
             </div>
             <textarea
               style={{ ...taStyle, minHeight: 80, width: "100%" }}
-              value={(defaults as Record<string, unknown>).brandVoiceInstructions as string ?? ""}
-              onChange={e => setDefaults(d => ({ ...d, brandVoiceInstructions: e.target.value }))}
+              value={defaults.brandVoiceInstructions ?? ""}
+              onChange={e => sf("brandVoiceInstructions", e.target.value)}
               placeholder={"例：文章開頭避免用問句；標題要情感導向而非功能性；語氣像朋友聊天，不像教授上課"}
             />
           </div>
