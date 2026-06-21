@@ -2148,15 +2148,36 @@ export default function ContentStudio() {
                   })()}
                 </span>
               )}
-              {(() => {
-                const sel = wpSites.find(x => x.id === selectedSiteId);
-                const clientHref = sel?.org_slug ? `/ops/clients/${sel.org_slug}` : "/ops/clients";
-                return (
-                  <a href={clientHref} style={{ marginLeft: "auto", fontSize: "12px", color: "var(--text-muted)", textDecoration: "none" }}>
-                    管理客戶 →
-                  </a>
-                );
-              })()}
+              <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: "10px" }}>
+                {saveDefaultsMsg && (
+                  <span style={{ fontSize: "11px", color: saveDefaultsMsg.startsWith("✓") ? "#16a34a" : "#dc2626" }}>
+                    {saveDefaultsMsg}
+                  </span>
+                )}
+                {(selectedSiteId || wpSites.length > 0) && (
+                  <button
+                    type="button"
+                    onClick={saveAsClientDefault}
+                    disabled={savingDefaults}
+                    style={{
+                      fontSize: "11px", padding: "3px 10px", borderRadius: "6px",
+                      border: "1px solid var(--accent)", background: "transparent",
+                      color: "var(--accent)", cursor: "pointer", whiteSpace: "nowrap",
+                    }}
+                  >
+                    {savingDefaults ? "儲存中…" : "💾 存為客戶預設"}
+                  </button>
+                )}
+                {(() => {
+                  const sel = wpSites.find(x => x.id === selectedSiteId);
+                  const clientHref = sel?.org_slug ? `/ops/clients/${sel.org_slug}` : "/ops/clients";
+                  return (
+                    <a href={clientHref} style={{ fontSize: "12px", color: "var(--text-muted)", textDecoration: "none" }}>
+                      管理客戶 →
+                    </a>
+                  );
+                })()}
+              </span>
             </div>
           </div>
 
