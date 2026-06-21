@@ -1,5 +1,5 @@
 {
-    "generatedAt":  "2026-06-21T02:31:27.9472666Z",
+    "generatedAt":  "2026-06-21T02:38:41.2430452Z",
     "overall":  "PASS",
     "fatal":  false,
     "fatalReason":  "",
@@ -24,9 +24,9 @@
                "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|30 2 * * * root /root/scripts/backup-eu-stack.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261|0 3 * * * root /root/scripts/verify-backup-eu.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261",
                "retention_days":  "7",
                "retention_source":  "static",
-               "backup_size":  "6.6G",
+               "backup_size":  "6.3G",
                "latest_time":  "2026-06-21 02:30:49",
-               "oldest_time":  "2026-06-13 02:30:35",
+               "oldest_time":  "2026-06-14 02:30:33",
                "backup_age_days":  "0"
            },
     "reportPath":  "agency-os/reports/status/backup-health-LATEST.md"

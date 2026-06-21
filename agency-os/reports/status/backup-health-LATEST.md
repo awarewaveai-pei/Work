@@ -1,6 +1,6 @@
 # Backup health report
 
-- Generated: 2026-06-21 10:31:27
+- Generated: 2026-06-21 10:38:41
 - Overall: **PASS**
 
 ## SG (5.223.93.113)
@@ -16,8 +16,8 @@
 - Cron file: /etc/cron.d/eu-backup => **present**
 - Cron schedule (non-comment lines): SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|30 2 * * * root /root/scripts/backup-eu-stack.sh >> /var/log/eu-backup.log 2>&1|0 3 * * * root /root/scripts/verify-backup-eu.sh >> /var/log/eu-backup.log 2>&1
 - Retention days (RETENTION_DAYS): 7 (source: static)
-- Backup dir size: 6.6G
+- Backup dir size: 6.3G
 - Latest backup file time: 2026-06-21 02:30:49
-- Oldest backup file time: 2026-06-13 02:30:35
+- Oldest backup file time: 2026-06-14 02:30:33
 - Backup age: 0d
 
