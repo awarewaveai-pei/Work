@@ -3486,6 +3486,111 @@ export default function ContentStudio() {
                         </div>
                       );
                     })}
+
+                    {/* ── 推送到 Postiz ── */}
+                    <div style={{ borderTop: "1px solid var(--card-border)", paddingTop: 14, marginTop: 4 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600 }}>📤 推送到 Postiz</span>
+                        <button className="btn-secondary" style={{ fontSize: 11, padding: "3px 10px" }}
+                          onClick={() => void loadPostizChannels()} disabled={postizChLoading}>
+                          {postizChLoading ? "載入中…" : postizChannels.length > 0 ? "重新載入" : "載入帳號"}
+                        </button>
+                      </div>
+                      {postizChError && (
+                        <div style={{ fontSize: 12, color: "#dc2626", marginBottom: 8 }}>{postizChError}</div>
+                      )}
+                      {postizChannels.filter(c => c.status === "connected").length > 0 && (
+                        <>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+                            {postizChannels.filter(c => c.status === "connected").map(ch => {
+                              const synText = getSynContentForPlatform(ch.platform);
+                              const isSelected = postizSelected.has(ch.platform);
+                              const displayContent = postizCustomText[ch.platform] ?? synText;
+                              return (
+                                <div key={ch.platform} style={{
+                                  border: `1px solid ${isSelected ? "var(--accent)" : "var(--card-border)"}`,
+                                  borderRadius: 6, padding: "8px 10px",
+                                  background: isSelected ? "#f0fdf4" : "var(--bg-canvas)",
+                                }}>
+                                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                                    <input type="checkbox" checked={isSelected}
+                                      onChange={e => setPostizSelected(prev => {
+                                        const next = new Set(prev);
+                                        if (e.target.checked) next.add(ch.platform); else next.delete(ch.platform);
+                                        return next;
+                                      })} />
+                                    <span style={{ fontSize: 12, fontWeight: 600 }}>{ch.label}</span>
+                                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>({ch.platform})</span>
+                                    {!synText && <span style={{ fontSize: 11, color: "#f59e0b" }}>需手動填入內容</span>}
+                                  </label>
+                                  {isSelected && (
+                                    <textarea
+                                      value={displayContent}
+                                      onChange={e => setPostizCustomText(prev => ({ ...prev, [ch.platform]: e.target.value }))}
+                                      style={{
+                                        width: "100%", minHeight: 64, marginTop: 6, fontSize: 11,
+                                        fontFamily: "inherit", padding: 6, borderRadius: 4,
+                                        border: "1px solid var(--card-border)", boxSizing: "border-box",
+                                        background: "var(--bg-page, #f8f9fc)", resize: "vertical",
+                                      }}
+                                      placeholder={synText ? "" : `${ch.platform} 貼文內容`}
+                                    />
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {imgResult && (
+                            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, marginBottom: 10, cursor: "pointer" }}>
+                              <input type="checkbox" checked={postizIncludeImg}
+                                onChange={e => setPostizIncludeImg(e.target.checked)} />
+                              附帶社群圖片（{imgResult.spec.label} {imgResult.spec.width}×{imgResult.spec.height}）
+                            </label>
+                          )}
+
+                          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+                            {(["draft", "now"] as const).map(m => (
+                              <button key={m} onClick={() => setPostizMode(m)}
+                                style={{
+                                  padding: "5px 14px", borderRadius: 6, fontSize: 12, fontWeight: 600,
+                                  border: "1px solid", cursor: "pointer",
+                                  background: postizMode === m ? "var(--accent)" : "transparent",
+                                  color: postizMode === m ? "#fff" : "var(--text-secondary)",
+                                  borderColor: postizMode === m ? "var(--accent)" : "var(--card-border)",
+                                }}>
+                                {m === "draft" ? "建草稿" : "立即發佈"}
+                              </button>
+                            ))}
+                            {postizMode === "now" && (
+                              <span style={{ fontSize: 11, color: "#f59e0b" }}>⚠ 立即推送，無法撤回</span>
+                            )}
+                          </div>
+
+                          <button className="btn-primary" style={{ fontSize: 12, padding: "6px 18px" }}
+                            onClick={() => void handlePostizPublish(false)}
+                            disabled={postizPushStatus === "pushing" || postizSelected.size === 0}>
+                            {postizPushStatus === "pushing"
+                              ? "推送中…"
+                              : postizMode === "draft" ? "建立 Postiz 草稿" : "立即發佈到社群"}
+                          </button>
+
+                          {postizPushStatus === "done" && postizPushResults.length > 0 && (
+                            <div style={{ marginTop: 10 }}>
+                              {postizPushResults.map(r => (
+                                <div key={r.platform} style={{ fontSize: 12, color: r.status === "ok" ? "#16a34a" : "#dc2626" }}>
+                                  {r.status === "ok" ? "✓" : "✗"} {r.platform}
+                                  {r.status === "error" && r.error && <span style={{ marginLeft: 4 }}>{r.error}</span>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {postizPushStatus === "error" && (
+                            <div style={{ fontSize: 12, color: "#dc2626", marginTop: 6 }}>推送失敗，請重試</div>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 )}
               </>
