@@ -374,7 +374,7 @@ export default function BannerStudio() {
       const langified = `【預設輸出語言：繁體中文】未另行指定時，所有文字請用繁體中文；JSON key 保持英文。\n\n${prompt}`;
       const res = await fetch("/api/tools/script-forge", {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...roleHeader("operator") },
         body:    JSON.stringify({ prompt: langified, model: "claude-sonnet-4-6" }),
       });
       if (!res.ok || !res.body) throw new Error(`文案生成失敗（${res.status}）`);
@@ -388,8 +388,9 @@ export default function BannerStudio() {
         setS((prev) => ({ ...prev, copyStream: full }));
       }
       full += dec.decode();
-      const parsed = JSON.parse(full.replace(/```json|```/g, "").trim()) as { variants: CopyVariant[] };
-      setS((prev) => ({ ...prev, copyGenerating: false, copyVariants: parsed.variants, copyStream: "" }));
+      const parsed = JSON.parse(full.replace(/```json|```/g, "").trim()) as { variants?: CopyVariant[] };
+      const variants = Array.isArray(parsed?.variants) ? parsed.variants : [];
+      setS((prev) => ({ ...prev, copyGenerating: false, copyVariants: variants, copyStream: "" }));
     } catch (err) {
       setS((prev) => ({ ...prev, copyGenerating: false, copyStream: "", error: String(err) }));
     }
@@ -401,7 +402,7 @@ export default function BannerStudio() {
       const png = await exportToPng(s);
       const res = await fetch("/api/tools/designs", {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...roleHeader("operator") },
         body:    JSON.stringify({
           image:     png,
           source:    "banner",
@@ -573,7 +574,7 @@ export default function BannerStudio() {
                   <button
                     className="btn btn-ghost"
                     style={{ fontSize: 12, color: "var(--red)" }}
-                    onClick={() => setS((prev) => ({ ...prev, productOrig: null, productImage: null }))}
+                    onClick={() => setS((prev) => ({ ...prev, productOrig: null, productImage: null, saved: false }))}
                   >
                     移除
                   </button>
