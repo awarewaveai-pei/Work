@@ -2,9 +2,26 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
-$insert
-
 ## 2026-06-21
+
+### feat(video-service): /generate-job endpoint + 自動影片生成管道
+
+**根本問題**: 2 個 WP 站每天自動生成影片。EU n8n 無法透過 Cloudflare 呼叫 SG next-admin（CF managed challenge 擋住 server-to-server curl）。
+
+**已修改**:
+- `lobster-factory/infra/hetzner-phase1-core/apps/video-service/server.py` — 新增 `POST /generate-job`：Claude Haiku 腳本 → Pexels 圖片 → `_do_render()` → R2（全在 EU 本機，繞開 CF）
+- `/root/video-svc/.env.video`（EU） — 新增 `CLAUDE_API_KEY` + `PEXELS_API_KEY`
+- EU Docker container `lobster-video-service` 重建並重啟（commit fe43bd8f）
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl POST /generate-job topic=台灣咖啡文化 scene_count=4 | exit=0 | ms=~120000 → status=done, title="台灣咖啡文化：從山林到杯中的故事", storage=r2, 3 formats uploaded
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl POST /render (smoke test) | exit=0 → status=done, 16x9/9x16/4x5 R2 URLs confirmed
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os scripts lobster-factory | grep=generate-job | hits=1 (server.py only, correct — no stale callsites)
+
+**成本**: Claude Haiku ~$0.12/月（120支）、Pexels 免費、FFmpeg 免費。
+
+**剩餘**: n8n workflow（WP webhook → /generate-job → poll → 嵌回 WP）。需用戶提供 2 個 WP 站 URL + Application Password。
 
 ### fix(pod): 每色 mockup 取到背面空白圖 → 修為取正面有設計圖 + 模特 group 名修正（task_36d83851 完成）
 
