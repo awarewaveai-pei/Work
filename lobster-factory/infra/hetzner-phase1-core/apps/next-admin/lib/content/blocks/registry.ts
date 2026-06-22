@@ -52,6 +52,15 @@ export function byKind<TOut = unknown>(kind: BlockKind): ContentBlock<TOut>[] {
   return REGISTRY.filter(b => b.kind === kind && b.enabled !== false) as ContentBlock<TOut>[];
 }
 
+/**
+ * 取特定 id 的「啟用中」積木（停用或不存在 → undefined）。
+ * 讓呼叫端精確選積木，不靠 byKind 的陣列順序（同 kind 多積木時 byKind[0] 是脆弱的順序相依）。
+ */
+export function byId<TOut = unknown>(id: string): ContentBlock<TOut> | undefined {
+  const b = REGISTRY.find((x) => x.id === id && x.enabled !== false);
+  return b as ContentBlock<TOut> | undefined;
+}
+
 /** 總清單 manifest：列出全系統已註冊積木（給管理 UI / 偵錯）。 */
 export function listAll(): Array<{
   id: string; title: string; icon?: string; kind: BlockKind; enabled: boolean; geos: string[] | "*";

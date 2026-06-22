@@ -41,12 +41,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   // Side-effect import to populate the block registry
   await import("@/lib/content/blocks/register-all");
-  const { byKind } = await import("@/lib/content/blocks/registry");
+  const { byId } = await import("@/lib/content/blocks/registry");
 
-  const blocks = byKind("video");
-  if (blocks.length === 0) {
+  // 精確選 video/pipeline（不用 byKind("video")[0]：自從 video/prepare、video/render 也註冊為 kind=video 後，
+  // [0] 會變成順序相依的脆弱選法）。
+  const pipeline = byId("video/pipeline");
+  if (!pipeline) {
     return NextResponse.json(
-      { ok: false, status: 500, error: "video 積木未註冊；請確認 register-all.ts 含 video-pipeline" },
+      { ok: false, status: 500, error: "video/pipeline 積木未註冊；請確認 register-all.ts 含 video-pipeline" },
       { status: 500 },
     );
   }
@@ -91,7 +93,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   };
   let prep: PrepareResult;
   try {
-    prep = (await blocks[0].run(ctxWithProgress)) as unknown as PrepareResult;
+    prep = (await pipeline.run(ctxWithProgress)) as unknown as PrepareResult;
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[video/generate] prepare threw:", e);
