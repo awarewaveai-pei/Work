@@ -294,14 +294,28 @@ function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: n
 
 // Decoded-image cache keyed by src — the preview re-renders the whole canvas on
 // every state change, so re-decoding the (possibly 2K) bg/product each time would lag.
+// LRU-bounded: a long "generate many AI backgrounds" session would otherwise pin every
+// decoded 2K image (keyed by a multi-MB data URL) for the page lifetime.
 const _imgCache = new Map<string, HTMLImageElement>();
+const _IMG_CACHE_MAX = 12;
 async function loadImage(src: string): Promise<HTMLImageElement> {
   const cached = _imgCache.get(src);
-  if (cached?.complete) return cached;
+  if (cached?.complete) {
+    _imgCache.delete(src); _imgCache.set(src, cached); // touch → most-recent
+    return cached;
+  }
   return new Promise((res, rej) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
-    img.onload  = () => { _imgCache.set(src, img); res(img); };
+    img.onload  = () => {
+      _imgCache.set(src, img);
+      while (_imgCache.size > _IMG_CACHE_MAX) {
+        const oldest = _imgCache.keys().next().value;
+        if (oldest === undefined) break;
+        _imgCache.delete(oldest);
+      }
+      res(img);
+    };
     img.onerror = () => rej(new Error("image_load_failed"));
     img.src = src;
   });
