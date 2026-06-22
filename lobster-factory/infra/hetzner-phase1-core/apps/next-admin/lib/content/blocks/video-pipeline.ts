@@ -100,6 +100,54 @@ export interface PreparedScenes {
   title: string;
 }
 
+/**
+ * 生成單一場景的素材（Pexels 影片/照片 或 Flux AI 圖 → R2）。
+ * 供 prepareScenes 批次呼叫，及 /api/video/regenerate-image 單張重生重用（單一 SSOT，避免邏輯重複）。
+ */
+export async function buildSceneAsset(
+  scene: Pick<import("../video/video-script-core").VideoScene, "id" | "image_prompt" | "broll_keyword" | "visual">,
+  opts: { imageModel?: string; visualStyle?: string },
+): Promise<AssetResult> {
+  const pexelsKey = process.env.PEXELS_API_KEY as string | undefined;
+  const forcePexelsVideo = opts.imageModel === "pexels-video";
+  const forcePexels = opts.imageModel === "pexels-all";
+  const fluxModel = (!opts.imageModel || opts.imageModel === "pexels-all" || opts.imageModel === "pexels-video") ? "flux-schnell" : opts.imageModel;
+
+  // pexels-video 模式：抓 Pexels 影片片段（MP4 URL → EU stream_loop）
+  if (forcePexelsVideo && pexelsKey) {
+    const keyword = scene.broll_keyword || scene.image_prompt.split(" ").slice(0, 3).join(" ");
+    const videoUrl = await fetchBrollVideoUrl(keyword, pexelsKey);
+    if (videoUrl) return { ok: true, asset: videoUrl };
+    // 影片抓失敗 → 降級 Pexels 照片（EU zoompan 仍可出片）
+    const photoUrl = await fetchBrollUrl(keyword, pexelsKey);
+    if (photoUrl) return { ok: true, asset: photoUrl };
+    return { ok: false, status: 502, error: `場景 ${scene.id} Pexels 影片與照片均搜尋失敗（keyword: ${keyword}）` };
+  }
+  // Pexels 照片路徑：明確選 pexels-all（全部場景），或 Claude 判定為 broll 場景
+  if ((forcePexels || scene.visual === "broll") && pexelsKey) {
+    const keyword = scene.broll_keyword || scene.image_prompt.split(" ").slice(0, 3).join(" ");
+    const brollUrl = await fetchBrollUrl(keyword, pexelsKey);
+    if (brollUrl) return { ok: true, asset: brollUrl };
+    // pexels-all 模式：Pexels 抓失敗 → 不 fallback Flux（避免非預期費用）
+    if (forcePexels) return { ok: false, status: 502, error: `場景 ${scene.id} Pexels 搜圖失敗（keyword: ${keyword}）` };
+  }
+  if (!isR2Configured()) return { ok: false, status: 503, error: "R2 未設定（跨機影片素材需 R2 暫存 Flux 圖）" };
+  // 風格前綴：使用者選了風格 → 用該風格（已含材質/光線/色盤），補 16:9 框景；否則用 cinematic 預設。
+  const stylePrefix = opts.visualStyle?.trim()
+    ? `${opts.visualStyle.trim()} Wide 16:9 cinematic framing.`
+    : "Cinematic wide-angle 16:9, realistic photography, dramatic natural lighting, rich color grade.";
+  const styledPrompt = `${stylePrefix} ${scene.image_prompt}`;
+  const safeModel = isTarotModel(fluxModel) ? fluxModel : "flux-schnell";
+  const img = await generateTarotImage({ model: safeModel, prompt: styledPrompt, aspectRatio: "16:9" });
+  if (img.ok === false) return { ok: false, status: 502, error: `場景 ${scene.id} 圖片生成失敗：${img.error}` };
+  const parsed = parseImageDataUrl(img.image);
+  const key = parsed ? buildDesignKey(parsed.mime) : null;
+  if (!parsed || !key) return { ok: false, status: 502, error: `場景 ${scene.id} 圖片格式無法解析` };
+  const put = await putDesignObject(key, parsed.buffer, parsed.mime);
+  if (!put.ok) return { ok: false, status: 502, error: `場景 ${scene.id} 圖片上傳 R2 失敗：${"error" in put ? put.error : "r2_put_failed"}` };
+  return { ok: true, asset: put.publicUrl, r2Key: key };
+}
+
 /** 步驟 1+2：生腳本 + 生圖；不提交 EU 渲染。可獨立呼叫供草稿預覽。 */
 export async function prepareScenes(
   input: {
@@ -161,10 +209,8 @@ export async function prepareScenes(
   }
 
   input.onProgress?.(`素材生成中（${scenes.length} 場景並行）…`);
-  const pexelsKey = process.env.PEXELS_API_KEY as string | undefined;
   const forcePexelsVideo = input.imageModel === "pexels-video";
   const forcePexels = input.imageModel === "pexels-all";
-  const fluxModel = (!input.imageModel || input.imageModel === "pexels-all" || input.imageModel === "pexels-video") ? "flux-schnell" : input.imageModel;
 
   // 「自訂 AI 圖」數量：依 customScenes 重新指派 scene.visual，使「Flux AI 圖」場景數恰為 customScenes、其餘走 Pexels B-roll。
   // 僅 AI 生圖模式套用（pexels-video/pexels-all 素材來源固定；接力 providedScenes 由前製腳本決定，全 custom，不動）。
@@ -173,44 +219,9 @@ export async function prepareScenes(
     reassignSceneVisuals(scenes, input.customScenes);
   }
 
-  const buildAsset = async (scene: (typeof scenes)[number]): Promise<AssetResult> => {
-    // pexels-video 模式：全部場景抓 Pexels 影片片段（MP4 URL → EU stream_loop）
-    if (forcePexelsVideo && pexelsKey) {
-      const keyword = scene.broll_keyword || scene.image_prompt.split(" ").slice(0, 3).join(" ");
-      const videoUrl = await fetchBrollVideoUrl(keyword, pexelsKey);
-      if (videoUrl) return { ok: true, asset: videoUrl };
-      // 影片抓失敗 → 降級 Pexels 照片（EU zoompan 仍可出片）
-      const photoUrl = await fetchBrollUrl(keyword, pexelsKey);
-      if (photoUrl) return { ok: true, asset: photoUrl };
-      return { ok: false, status: 502, error: `場景 ${scene.id} Pexels 影片與照片均搜尋失敗（keyword: ${keyword}）` };
-    }
-    // Pexels 照片路徑：明確選 pexels-all（全部場景），或 Claude 判定為 broll 場景
-    if ((forcePexels || scene.visual === "broll") && pexelsKey) {
-      const keyword = scene.broll_keyword || scene.image_prompt.split(" ").slice(0, 3).join(" ");
-      const brollUrl = await fetchBrollUrl(keyword, pexelsKey);
-      if (brollUrl) return { ok: true, asset: brollUrl };
-      // pexels-all 模式：Pexels 抓失敗 → 不 fallback Flux（避免非預期費用）
-      if (forcePexels) return { ok: false, status: 502, error: `場景 ${scene.id} Pexels 搜圖失敗（keyword: ${keyword}）` };
-    }
-    if (!isR2Configured()) return { ok: false, status: 503, error: "R2 未設定（跨機影片素材需 R2 暫存 Flux 圖）" };
-    // 風格前綴：使用者選了風格 → 用該風格（已含材質/光線/色盤），補 16:9 框景；
-    // 否則用 cinematic 預設。風格 prompt 在前、scene 主體在後（與 tarot 同慣例）。
-    const stylePrefix = input.visualStyle?.trim()
-      ? `${input.visualStyle.trim()} Wide 16:9 cinematic framing.`
-      : "Cinematic wide-angle 16:9, realistic photography, dramatic natural lighting, rich color grade.";
-    const styledPrompt = `${stylePrefix} ${scene.image_prompt}`;
-    const safeModel = isTarotModel(fluxModel) ? fluxModel : "flux-schnell";
-    const img = await generateTarotImage({ model: safeModel, prompt: styledPrompt, aspectRatio: "16:9" });
-    if (img.ok === false) return { ok: false, status: 502, error: `場景 ${scene.id} 圖片生成失敗：${img.error}` };
-    const parsed = parseImageDataUrl(img.image);
-    const key = parsed ? buildDesignKey(parsed.mime) : null;
-    if (!parsed || !key) return { ok: false, status: 502, error: `場景 ${scene.id} 圖片格式無法解析` };
-    const put = await putDesignObject(key, parsed.buffer, parsed.mime);
-    if (!put.ok) return { ok: false, status: 502, error: `場景 ${scene.id} 圖片上傳 R2 失敗：${"error" in put ? put.error : "r2_put_failed"}` };
-    return { ok: true, asset: put.publicUrl, r2Key: key };
-  };
-
-  const results = await Promise.all(scenes.map(buildAsset));
+  const results = await Promise.all(
+    scenes.map((s) => buildSceneAsset(s, { imageModel: input.imageModel, visualStyle: input.visualStyle })),
+  );
   const r2Keys = results.flatMap((r) => (r.ok && r.r2Key ? [r.r2Key] : []));
   const failed = results.find((r): r is { ok: false; status: number; error: string } => !r.ok);
   if (failed) {

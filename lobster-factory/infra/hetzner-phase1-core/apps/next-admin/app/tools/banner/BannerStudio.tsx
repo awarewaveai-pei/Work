@@ -808,6 +808,46 @@ function sanitizeDesign(raw: Record<string, unknown>): Partial<State> {
   return out;
 }
 
+// ── colour utilities (reference-image palette extraction + brand colour mapping) ──
+function hexToRgb(h: string): { r: number; g: number; b: number } {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(h);
+  return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) } : { r: 0, g: 0, b: 0 };
+}
+function rgbToHex(r: number, g: number, b: number): string {
+  return "#" + [r, g, b].map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
+}
+function luminance(h: string): number { const { r, g, b } = hexToRgb(h); return 0.299 * r + 0.587 * g + 0.114 * b; }
+function saturation(h: string): number {
+  const { r, g, b } = hexToRgb(h); const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  return mx === 0 ? 0 : (mx - mn) / mx;
+}
+// Extract a ~n-colour palette from an image (downscale → coarse-quantize → popularity → dedup).
+async function extractPalette(src: string, n = 6): Promise<string[]> {
+  const img = await loadImage(src);
+  const cw = 56, ch = 56;
+  const cv = document.createElement("canvas"); cv.width = cw; cv.height = ch;
+  const ctx = cv.getContext("2d"); if (!ctx) return [];
+  ctx.drawImage(img, 0, 0, cw, ch);
+  const data = ctx.getImageData(0, 0, cw, ch).data;
+  const buckets = new Map<string, { count: number; r: number; g: number; b: number }>();
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] < 128) continue; // skip transparent
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    const key = `${r >> 5},${g >> 5},${b >> 5}`;
+    const bk = buckets.get(key);
+    if (bk) { bk.count++; bk.r += r; bk.g += g; bk.b += b; }
+    else buckets.set(key, { count: 1, r, g, b });
+  }
+  const sorted = [...buckets.values()].sort((a, b) => b.count - a.count);
+  const out: { r: number; g: number; b: number }[] = [];
+  for (const bk of sorted) {
+    const r = bk.r / bk.count, g = bk.g / bk.count, b = bk.b / bk.count;
+    if (out.every((c) => Math.abs(c.r - r) + Math.abs(c.g - g) + Math.abs(c.b - b) > 56)) out.push({ r, g, b });
+    if (out.length >= n) break;
+  }
+  return out.map((c) => rgbToHex(c.r, c.g, c.b));
+}
+
 // ---------------------------------------------------------------------------
 // Shared UI sub-components (same pattern as StudioWorkbench)
 // ---------------------------------------------------------------------------
@@ -880,16 +920,19 @@ export default function BannerStudio() {
   const bgFileRef         = useRef<HTMLInputElement>(null);
   const productFileRef    = useRef<HTMLInputElement>(null);
   const aiBgFileRef       = useRef<HTMLInputElement>(null);
+  const colorRefFileRef   = useRef<HTMLInputElement>(null);
   const [aiBgStyleGroup, setAiBgStyleGroup] = useState("不指定");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // colour tools (not part of design State / undo history — derived/fetched data)
+  const [palette, setPalette]     = useState<string[]>([]);
+  const [selSwatch, setSelSwatch] = useState<string | null>(null);
+  const [brandClients, setBrandClients] = useState<{ slug: string; name: string; colors: string[] }[]>([]);
 
   const set = useCallback(<K extends keyof State>(key: K, val: State[K]) =>
     setS((prev) => ({ ...prev, [key]: val, saved: key === "saved" ? (val as boolean) : false, error: null }))
   , []);
 
   const p        = PRESETS[s.preset];
-  const previewW = 520;
-  const previewH = Math.round(previewW * (p.h / p.w));
 
   // Assembled AI bg prompt from blocks
   const assembledBgPrompt = useMemo(() => {
@@ -1197,8 +1240,8 @@ export default function BannerStudio() {
 
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap" }}>
 
-        {/* ── Left: controls ── */}
-        <div style={{ flex: "0 0 340px", display: "flex", flexDirection: "column", gap: 16 }}>
+        {/* ── Controls (right side) ── */}
+        <div style={{ order: 2, flex: "1 1 360px", maxWidth: 460, display: "flex", flexDirection: "column", gap: 16 }}>
 
           {/* 版型模板 — one-click conversion layouts */}
           <div className="card">
@@ -1843,8 +1886,12 @@ export default function BannerStudio() {
 
         </div>
 
-        {/* ── Right: preview + export ── */}
-        <div style={{ flex: 1, minWidth: 300 }}>
+        {/* ── Preview + export (left side, sticky so it stays visible while scrolling tools) ── */}
+        <div style={{
+          order: 1, flex: "1.7 1 520px", minWidth: 320,
+          position: "sticky", top: 12, alignSelf: "flex-start",
+          maxHeight: "calc(100vh - 24px)", overflowY: "auto",
+        }}>
 
           {/* Preview */}
           <div className="card" style={{ marginBottom: 16 }}>
@@ -1861,7 +1908,7 @@ export default function BannerStudio() {
               </div>
             </div>
             <div style={{
-              width: previewW, height: previewH, maxWidth: "100%",
+              display: "inline-block", maxWidth: "100%", minHeight: previewUrl ? undefined : 240,
               position: "relative", borderRadius: 6, overflow: "hidden",
               background: "var(--chip-surface, #f1f3f8)",
               backgroundImage:
@@ -1871,7 +1918,8 @@ export default function BannerStudio() {
             }}>
               {previewUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={previewUrl} alt="banner preview" style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }} />
+                <img src={previewUrl} alt="banner preview"
+                  style={{ display: "block", maxWidth: "100%", maxHeight: "calc(100vh - 230px)", width: "auto", height: "auto" }} />
               )}
               {(s.generating || s.productRemoving || s.designing) && (
                 <div style={{
