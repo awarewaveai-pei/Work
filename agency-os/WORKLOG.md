@@ -4,6 +4,8 @@
 
 ## 2026-06-22
 
+- AUTO_TASK_DONE: remote-weekly-agent: weekly summary generated → reports/weekly/weekly-summary-2026-06-22.md (period 2026-06-16→2026-06-22; 20+ features; committed via [claude] auto)
+
 ### incident(soulful): 過度套用「≤150KB webP」縮到操作者作品集 → 已還原 420 張全解析度
 
 [事故] 把 WP 圖一律轉 webp ≤150KB 的 backfill **不該套用到操作者手動上傳的作品集/部落格藝術圖**，但我用「檔案 >150KB」當唯一條件、未區分「pipeline 生成圖 vs 使用者上傳作品」→ 連同她的作品集一起縮成 webp ≤150KB ≤1280px。操作者震怒（正確）。
