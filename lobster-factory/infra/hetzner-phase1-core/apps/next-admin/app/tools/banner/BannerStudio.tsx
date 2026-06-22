@@ -40,6 +40,26 @@ const FONTS = [
   { value: "'Inter', 'Helvetica Neue', sans-serif",        label: "Inter" },
 ];
 
+// Curated headline × body pairings (Tier 2 — instant "designed" hierarchy)
+const FONT_PAIRS: { label: string; headline: string; body: string }[] = [
+  { label: "明體標 × 黑體文", headline: FONTS[1].value, body: FONTS[0].value },
+  { label: "黑體 × 黑體",     headline: FONTS[0].value, body: FONTS[0].value },
+  { label: "楷書標 × 黑體文", headline: FONTS[2].value, body: FONTS[0].value },
+  { label: "圓體 × 圓體",     headline: FONTS[3].value, body: FONTS[3].value },
+  { label: "Inter 標 × 黑體文", headline: FONTS[4].value, body: FONTS[0].value },
+  { label: "明體 × 明體",     headline: FONTS[1].value, body: FONTS[1].value },
+];
+
+// Marketing art-direction presets for the AI background (Tier 3 — commercial moods, not fine-art)
+const MARKETING_STYLE_PRESETS: { label: string; kw: string }[] = [
+  { label: "奢華極簡", kw: "luxury minimal, premium product photography, soft studio lighting, elegant negative space" },
+  { label: "節慶促銷", kw: "festive sale scene, vibrant celebratory, confetti and warm bokeh, energetic" },
+  { label: "溫暖生活", kw: "warm lifestyle, cozy natural window light, authentic lived-in, inviting" },
+  { label: "大膽促購", kw: "bold promotional, high contrast dramatic lighting, punchy saturated colors" },
+  { label: "清新自然", kw: "fresh natural, airy bright, botanical clean, soft daylight" },
+  { label: "科技未來", kw: "sleek futuristic, gradient glow, neon accents, modern minimal" },
+];
+
 const GRAD_DIRS: { value: string; label: string }[] = [
   { value: "135deg", label: "↘ 斜" },
   { value: "90deg",  label: "→ 橫" },
@@ -106,6 +126,7 @@ interface State {
   bgImage:   string | null;
   bgImageHasProduct: boolean;   // true 當 bgImage 已由 AI 把產品合成進去（決定是否略過事後疊加）
   generating: boolean;
+  designing: boolean;   // AI 一鍵設計整張進行中
   // AI bg blocks
   aiBgSubject:       string;
   aiBgVibe:          string;
@@ -121,7 +142,11 @@ interface State {
   headline:  string;
   subtext:   string;
   textColor: string;
-  fontFamily: string;
+  fontFamily:   string;   // body font (subtext / price / cta / trust)
+  headlineFont: string;   // 標題字體（可與內文不同 → 層級感）
+  accentColor:  string;   // 重點字（**字**）顏色
+  accentHighlight: boolean; // 重點字加螢光底色塊
+  letterSpacing: number;  // 標題字距 px
   headlineSize: number;
   subtextSize:  number;
   textPos:   TextPos;
@@ -169,6 +194,7 @@ const INIT: State = {
   bgImage:   null,
   bgImageHasProduct: false,
   generating: false,
+  designing: false,
   aiBgSubject:       "",
   aiBgVibe:          "",
   aiBgStyle:         "",
@@ -183,6 +209,10 @@ const INIT: State = {
   subtext:   "",
   textColor: "#ffffff",
   fontFamily: FONTS[0].value,
+  headlineFont: FONTS[1].value,
+  accentColor: "#fbbf24",
+  accentHighlight: false,
+  letterSpacing: 0,
   headlineSize: 64,
   subtextSize:  32,
   textPos:   "center",
@@ -398,35 +428,58 @@ async function exportToPng(state: State): Promise<string> {
   type Block = { h: number; w: number; draw: (top: number) => void };
   const blocks: Block[] = [];
 
-  // headline (outlined + shadowed for legibility on any background)
+  // headline — own font, letter-spacing, accent words (**字**), outlined for legibility
   if (state.headline) {
-    ctx.font = `bold ${state.headlineSize}px ${font}`;
-    const lines = wrapText(ctx, state.headline, maxWidth);
+    const hFont = state.headlineFont || font;
+    ctx.font = `bold ${state.headlineSize}px ${hFont}`;
+    setLetterSpacing(ctx, state.letterSpacing);
+    const lines = layoutAccentLines(ctx, parseAccentRuns(state.headline), maxWidth);
+    const lineW = (ln: AccentRun[]) => ln.reduce((s, r) => s + ctx.measureText(r.text).width, 0);
     const lineH = state.headlineSize * 1.16;
-    const w = Math.min(maxWidth, Math.max(1, ...lines.map((l) => ctx.measureText(l).width)));
+    const w = Math.min(maxWidth, Math.max(1, ...lines.map(lineW)));
+    setLetterSpacing(ctx, 0);
     blocks.push({
       h: lines.length * lineH, w,
       draw: (top) => {
-        ctx.font = `bold ${state.headlineSize}px ${font}`;
-        ctx.textAlign = align; ctx.textBaseline = "top";
+        ctx.font = `bold ${state.headlineSize}px ${hFont}`;
+        setLetterSpacing(ctx, state.letterSpacing);
+        ctx.textAlign = "left"; ctx.textBaseline = "top";
         let y = top;
-        for (const line of lines) {
-          if (state.textOutline) {
-            ctx.shadowColor = "rgba(0,0,0,0.45)";
-            ctx.shadowBlur = state.headlineSize * 0.14;
-            ctx.shadowOffsetY = state.headlineSize * 0.03;
+        for (const ln of lines) {
+          const lw = lineW(ln);
+          let x = align === "left" ? anchorX : align === "right" ? anchorX - lw : anchorX - lw / 2;
+          // accent highlight rects (behind text)
+          if (state.accentHighlight) {
+            let hx = x;
+            for (const r of ln) {
+              const rw = ctx.measureText(r.text).width;
+              if (r.accent && r.text.trim()) {
+                ctx.fillStyle = state.accentColor;
+                roundRectPath(ctx, hx - state.headlineSize * 0.04, y + state.headlineSize * 0.06,
+                  rw + state.headlineSize * 0.08, state.headlineSize * 1.0, state.headlineSize * 0.12);
+                ctx.fill();
+              }
+              hx += rw;
+            }
           }
-          ctx.fillStyle = state.textColor;
-          ctx.fillText(line, anchorX, y);
-          ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-          if (state.textOutline) {
-            ctx.lineJoin = "round";
-            ctx.lineWidth = Math.max(2, state.headlineSize * 0.045);
-            ctx.strokeStyle = "rgba(0,0,0,0.55)";
-            ctx.strokeText(line, anchorX, y);
+          for (const r of ln) {
+            const rw = ctx.measureText(r.text).width;
+            const plated = r.accent && state.accentHighlight;
+            if (state.textOutline && !plated) {
+              ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = state.headlineSize * 0.14; ctx.shadowOffsetY = state.headlineSize * 0.03;
+            }
+            ctx.fillStyle = r.accent ? (plated ? "#1a1a1a" : state.accentColor) : state.textColor;
+            ctx.fillText(r.text, x, y);
+            ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+            if (state.textOutline && !plated) {
+              ctx.lineJoin = "round"; ctx.lineWidth = Math.max(2, state.headlineSize * 0.045); ctx.strokeStyle = "rgba(0,0,0,0.55)";
+              ctx.strokeText(r.text, x, y);
+            }
+            x += rw;
           }
           y += lineH;
         }
+        setLetterSpacing(ctx, 0);
       },
     });
   }
@@ -662,6 +715,99 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
   return lines.length ? lines : [text];
 }
 
+// `**字**` → accent runs. Returns segments with an accent flag.
+type AccentRun = { text: string; accent: boolean };
+function parseAccentRuns(text: string): AccentRun[] {
+  const out: AccentRun[] = [];
+  const re = /\*\*([^*]+)\*\*/g;
+  let last = 0; let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    if (m.index > last) out.push({ text: text.slice(last, m.index), accent: false });
+    out.push({ text: m[1], accent: true });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push({ text: text.slice(last), accent: false });
+  return out.length ? out : [{ text, accent: false }];
+}
+
+// Wrap accent runs into lines (char-level — robust for CJK + mixed digits).
+// Each line is a list of merged same-accent runs. ctx.font + letterSpacing must be set first.
+function layoutAccentLines(ctx: CanvasRenderingContext2D, runs: AccentRun[], maxWidth: number): AccentRun[][] {
+  const lines: AccentRun[][] = [];
+  let line: AccentRun[] = []; let lineW = 0;
+  for (const r of runs) {
+    for (const ch of Array.from(r.text)) {
+      const w = ctx.measureText(ch).width;
+      if (lineW + w > maxWidth && line.length) { lines.push(line); line = []; lineW = 0; }
+      const last = line[line.length - 1];
+      if (last && last.accent === r.accent) last.text += ch;
+      else line.push({ text: ch, accent: r.accent });
+      lineW += w;
+    }
+  }
+  if (line.length) lines.push(line);
+  return lines.length ? lines : [[{ text: "", accent: false }]];
+}
+
+function setLetterSpacing(ctx: CanvasRenderingContext2D, px: number) {
+  try { (ctx as unknown as { letterSpacing: string }).letterSpacing = `${px}px`; } catch { /* unsupported browser — no-op */ }
+}
+
+// History signature: excludes transient flags; reduces big image data-URLs to their length
+// (so comparing snapshots never stringifies multi-MB base64).
+function designSig(st: State): string {
+  // typed → tsc catches any future transient field that's misspelled or forgotten here
+  const skip = new Set<keyof State>(["saving", "saved", "error", "generating", "designing", "productRemoving", "copyGenerating", "copyStream", "copyVariants"]);
+  const imgKeys = new Set<keyof State>(["bgImage", "productImage", "productOrig", "aiBgRefImage"]);
+  const obj: Record<string, unknown> = {};
+  for (const k of Object.keys(st) as (keyof State)[]) {
+    if (skip.has(k)) continue;
+    const v = st[k];
+    obj[k] = imgKeys.has(k) ? (typeof v === "string" ? v.length : 0) : v;
+  }
+  return JSON.stringify(obj);
+}
+
+// Validate an AI "full design" JSON into a safe State patch (drop anything malformed/out-of-range).
+function sanitizeDesign(raw: Record<string, unknown>): Partial<State> {
+  const out: Partial<State> = {};
+  const str  = (v: unknown) => (typeof v === "string" ? v : undefined);
+  const hex  = (v: unknown) => (typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v) ? v : undefined);
+  const bool = (v: unknown) => (typeof v === "boolean" ? v : undefined);
+  const enumOf = <T extends string>(v: unknown, allowed: readonly T[]) =>
+    (typeof v === "string" && (allowed as readonly string[]).includes(v) ? (v as T) : undefined);
+  const assign = <K extends keyof State>(k: K, v: State[K] | undefined) => { if (v !== undefined) out[k] = v; };
+
+  assign("headline", str(raw.headline));
+  assign("subtext", str(raw.subtext));
+  assign("ctaText", str(raw.ctaText));
+  assign("ctaBg", hex(raw.ctaBg));
+  assign("ctaTextColor", hex(raw.ctaTextColor));
+  assign("badgeText", str(raw.badgeText));
+  assign("badgeStyle", enumOf<BadgeStyle>(raw.badgeStyle, ["ribbon", "pill", "burst"]));
+  assign("badgeColor", hex(raw.badgeColor));
+  assign("badgePos", enumOf<BadgePos>(raw.badgePos, ["tl", "tr"]));
+  assign("showPrice", bool(raw.showPrice));
+  assign("priceNow", str(raw.priceNow));
+  assign("priceWas", str(raw.priceWas));
+  assign("trustType", enumOf<TrustType>(raw.trustType, ["none", "stars", "reviews", "guarantee"]));
+  if (typeof raw.trustStars === "number") assign("trustStars", Math.max(1, Math.min(5, Math.round(raw.trustStars))));
+  assign("trustText", str(raw.trustText));
+  assign("textColor", hex(raw.textColor));
+  assign("accentColor", hex(raw.accentColor));
+  assign("accentHighlight", bool(raw.accentHighlight));
+  assign("textPos", enumOf<TextPos>(raw.textPos, ["top", "center", "bottom"]));
+  assign("textAlignH", enumOf<TextAlignH>(raw.textAlignH, ["left", "center", "right"]));
+  assign("textScrim", bool(raw.textScrim));
+  assign("textOutline", bool(raw.textOutline));
+  assign("bgMode", enumOf<BgMode>(raw.bgMode, ["color", "gradient"])); // never let AI flip to upload/ai
+  assign("gradFrom", hex(raw.gradFrom));
+  assign("gradTo", hex(raw.gradTo));
+  assign("aiBgSubject", str(raw.aiBgSubject));
+  assign("aiBgVibe", str(raw.aiBgVibe));
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // Shared UI sub-components (same pattern as StudioWorkbench)
 // ---------------------------------------------------------------------------
@@ -773,6 +919,93 @@ export default function BannerStudio() {
   const applyTemplate = useCallback((patch: Partial<State>) =>
     setS((prev) => ({ ...prev, ...patch, saved: false, error: null }))
   , []);
+
+  // ── undo / redo (Banner's whole design is ONE serializable State; unchanged image
+  //    strings are shared by reference across snapshots, so history is memory-cheap) ──
+  const historyRef  = useRef<State[]>([INIT]);
+  const histIdxRef  = useRef(0);
+  const restoringRef = useRef(false);
+  const [, bumpHist] = useState(0);
+  useEffect(() => {
+    if (restoringRef.current) { restoringRef.current = false; return; }
+    const t = setTimeout(() => {
+      const hist = historyRef.current;
+      const cur = hist[histIdxRef.current];
+      if (cur && designSig(cur) === designSig(s)) return;
+      const next = hist.slice(0, histIdxRef.current + 1);
+      next.push(s);
+      while (next.length > 25) next.shift();
+      historyRef.current = next;
+      histIdxRef.current = next.length - 1;
+      bumpHist((v) => v + 1);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [s]);
+  const undo = useCallback(() => {
+    if (histIdxRef.current <= 0) return;
+    histIdxRef.current -= 1;
+    restoringRef.current = true;
+    setS(historyRef.current[histIdxRef.current]);
+    bumpHist((v) => v + 1);
+  }, []);
+  const redo = useCallback(() => {
+    if (histIdxRef.current >= historyRef.current.length - 1) return;
+    histIdxRef.current += 1;
+    restoringRef.current = true;
+    setS(historyRef.current[histIdxRef.current]);
+    bumpHist((v) => v + 1);
+  }, []);
+  const canUndo = histIdxRef.current > 0;
+  const canRedo = histIdxRef.current < historyRef.current.length - 1;
+
+  // ── AI 一鍵設計整張：LLM 回傳一個 State patch（renderer 直接吃 → 幾乎零渲染成本）──
+  async function generateFullDesign() {
+    if (!s.copyBrief.trim()) return;
+    setS((prev) => ({ ...prev, designing: true, error: null }));
+    try {
+      const prompt =
+        `【AI Banner 一鍵設計】\n` +
+        `產品/活動：${s.copyBrief}\n` +
+        `平台尺寸：${p.label} ${p.w}×${p.h}\n\n` +
+        `扮演國際級轉換廣告設計師，設計一張「會讓訪客點擊下單」的 banner。輸出純 JSON（無 markdown 包裹），欄位全部選填、能填則填：\n` +
+        `{"headline":"主標，可用 **字** 包住要強調的重點字（例：省 **50%** 起）",` +
+        `"subtext":"副標或行動說明",` +
+        `"ctaText":"按鈕文字，例 立即選購","ctaBg":"#rrggbb","ctaTextColor":"#rrggbb",` +
+        `"badgeText":"促銷徽章（不需要可空字串）","badgeStyle":"ribbon|pill|burst","badgeColor":"#rrggbb","badgePos":"tl|tr",` +
+        `"showPrice":true,"priceNow":"NT$590","priceWas":"NT$890",` +
+        `"trustType":"none|stars|reviews|guarantee","trustStars":5,"trustText":"12,000+ 則好評",` +
+        `"textColor":"#rrggbb","accentColor":"#rrggbb","accentHighlight":false,` +
+        `"textPos":"top|center|bottom","textAlignH":"left|center|right","textScrim":true,"textOutline":true,` +
+        `"bgMode":"gradient","gradFrom":"#rrggbb","gradTo":"#rrggbb",` +
+        `"aiBgSubject":"英文場景描述(供 AI 生背景)","aiBgVibe":"英文氛圍"}\n\n` +
+        `配色和諧、對比足夠、CTA 醒目；文字用繁體中文；只輸出 JSON。`;
+      const res = await fetch("/api/tools/script-forge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...roleHeader("operator") },
+        body: JSON.stringify({ prompt, model: "claude-sonnet-4-6" }),
+      });
+      if (!res.ok || !res.body) throw new Error(`設計生成失敗（${res.status}）`);
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let full = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        full += dec.decode(value, { stream: true });
+      }
+      full += dec.decode();
+      let raw: Record<string, unknown>;
+      try {
+        raw = JSON.parse(full.replace(/```json|```/g, "").trim()) as Record<string, unknown>;
+      } catch {
+        throw new Error("AI 回傳格式錯誤，請重試");
+      }
+      const patch = sanitizeDesign(raw);
+      setS((prev) => ({ ...prev, ...patch, designing: false, saved: false }));
+    } catch (err) {
+      setS((prev) => ({ ...prev, designing: false, error: String(err) }));
+    }
+  }
 
   // ── Handlers ──
 
@@ -1009,10 +1242,18 @@ export default function BannerStudio() {
                   ))}
                 </div>
               </div>
-              <button className="btn btn-primary" disabled={s.copyGenerating || !s.copyBrief.trim()}
-                onClick={generateCopy} style={{ alignSelf: "flex-start" }}>
-                {s.copyGenerating ? "生成中…" : "生成文案"}
-              </button>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button className="btn btn-primary" disabled={s.copyGenerating || s.designing || !s.copyBrief.trim()}
+                  onClick={generateCopy}>
+                  {s.copyGenerating ? "生成中…" : "生成文案"}
+                </button>
+                <button className="btn btn-primary" disabled={s.designing || s.copyGenerating || !s.copyBrief.trim()}
+                  onClick={generateFullDesign}
+                  style={{ background: "linear-gradient(135deg,#7c3aed,#ec4899)", border: "none" }}>
+                  {s.designing ? "設計中…" : "✨ AI 一鍵設計整張"}
+                </button>
+              </div>
+              <p className="form-hint">「一鍵設計」讓 AI 直接配好標題/重點字/CTA/徽章/價格/配色/版面 — 再微調即可。</p>
               {s.copyGenerating && s.copyStream && (
                 <div style={{ fontSize: 11, opacity: 0.5, fontFamily: "monospace", maxHeight: 40, overflow: "hidden" }}>
                   {s.copyStream.slice(-80)}
@@ -1214,6 +1455,14 @@ export default function BannerStudio() {
 
                 {/* 氣圍 Vibe */}
                 <AccordionSection title="氣圍 Vibe" summary={s.aiBgVibe || "未填"} icon="✨">
+                  <div style={{ fontSize: 10, opacity: 0.5, marginBottom: 3 }}>行銷風格（商業感）</div>
+                  <PresetChips chips={MARKETING_STYLE_PRESETS.map((m) => m.label)}
+                    selected={MARKETING_STYLE_PRESETS.find((m) => m.kw === s.aiBgVibe)?.label}
+                    onSelect={(label) => {
+                      const m = MARKETING_STYLE_PRESETS.find((x) => x.label === label);
+                      if (m) set("aiBgVibe", m.kw === s.aiBgVibe ? "" : m.kw);
+                    }} />
+                  <div style={{ fontSize: 10, opacity: 0.5, margin: "8px 0 3px" }}>一般氛圍</div>
                   <PresetChips chips={BG_VIBE_PRESETS} selected={s.aiBgVibe}
                     onSelect={(v) => set("aiBgVibe", v === s.aiBgVibe ? "" : v)} />
                 </AccordionSection>
@@ -1376,7 +1625,29 @@ export default function BannerStudio() {
                   value={s.subtext} onChange={(e) => set("subtext", e.target.value)} />
               </div>
               <div className="form-row">
-                <label className="form-label">字體</label>
+                <label className="form-label">字體配對</label>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {FONT_PAIRS.map((fp) => {
+                    const active = s.headlineFont === fp.headline && s.fontFamily === fp.body;
+                    return (
+                      <button key={fp.label}
+                        className={active ? "btn btn-primary" : "btn btn-ghost"}
+                        style={{ fontSize: 11, padding: "2px 7px" }}
+                        onClick={() => setS((prev) => ({ ...prev, headlineFont: fp.headline, fontFamily: fp.body, saved: false }))}>
+                        {fp.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="form-row">
+                <label className="form-label">標題字體</label>
+                <select className="form-select" value={s.headlineFont} onChange={(e) => set("headlineFont", e.target.value)}>
+                  {FONTS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+                </select>
+              </div>
+              <div className="form-row">
+                <label className="form-label">內文字體</label>
                 <select className="form-select" value={s.fontFamily} onChange={(e) => set("fontFamily", e.target.value)}>
                   {FONTS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
                 </select>
@@ -1385,6 +1656,22 @@ export default function BannerStudio() {
                 <label className="form-label">字色</label>
                 <input type="color" value={s.textColor} onChange={(e) => set("textColor", e.target.value)}
                   style={{ width: 44, height: 32, border: "none", cursor: "pointer", background: "none" }} />
+              </div>
+              <div className="form-row">
+                <label className="form-label">重點字</label>
+                <input type="color" value={s.accentColor} onChange={(e) => set("accentColor", e.target.value)}
+                  style={{ width: 44, height: 32, border: "none", cursor: "pointer", background: "none" }} />
+                <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4, marginLeft: 8 }}>
+                  <input type="checkbox" checked={s.accentHighlight} onChange={(e) => set("accentHighlight", e.target.checked)} />
+                  螢光底
+                </label>
+                <span className="form-hint" style={{ marginLeft: 6 }}>標題用 **字** 標重點，例：省 **50%**</span>
+              </div>
+              <div className="form-row">
+                <label className="form-label">字距</label>
+                <input type="range" min={-2} max={16} value={s.letterSpacing}
+                  onChange={(e) => set("letterSpacing", Number(e.target.value))} style={{ flex: 1 }} />
+                <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.letterSpacing}</span>
               </div>
               <div className="form-row">
                 <label className="form-label">標題 px</label>
@@ -1561,10 +1848,18 @@ export default function BannerStudio() {
 
           {/* Preview */}
           <div className="card" style={{ marginBottom: 16 }}>
-            <h2 style={{ fontSize: 15, margin: "0 0 12px" }}>
-              預覽 · {p.label}
-              <span style={{ fontWeight: 400, opacity: 0.6, fontSize: 12, marginLeft: 6 }}>{p.w}×{p.h}</span>
-            </h2>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <h2 style={{ fontSize: 15, margin: 0 }}>
+                預覽 · {p.label}
+                <span style={{ fontWeight: 400, opacity: 0.6, fontSize: 12, marginLeft: 6 }}>{p.w}×{p.h}</span>
+              </h2>
+              <div style={{ display: "flex", gap: 4 }}>
+                <button className="btn btn-ghost" style={{ fontSize: 13, padding: "2px 9px" }}
+                  disabled={!canUndo} onClick={undo} title="復原">↩ 復原</button>
+                <button className="btn btn-ghost" style={{ fontSize: 13, padding: "2px 9px" }}
+                  disabled={!canRedo} onClick={redo} title="重做">↪ 重做</button>
+              </div>
+            </div>
             <div style={{
               width: previewW, height: previewH, maxWidth: "100%",
               position: "relative", borderRadius: 6, overflow: "hidden",
@@ -1578,13 +1873,13 @@ export default function BannerStudio() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={previewUrl} alt="banner preview" style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }} />
               )}
-              {(s.generating || s.productRemoving) && (
+              {(s.generating || s.productRemoving || s.designing) && (
                 <div style={{
                   position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   color: "#fff", fontSize: 14,
                 }}>
-                  {s.productRemoving ? "去背中…" : "AI 生成中…"}
+                  {s.productRemoving ? "去背中…" : s.designing ? "AI 設計中…" : "AI 生成中…"}
                 </div>
               )}
             </div>
