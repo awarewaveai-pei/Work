@@ -74,6 +74,8 @@ const MIME_EXT: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
   "image/webp": "webp",
+  // video/mp4：使用者上傳影片素材（/api/video/upload-asset）。現有 image 生成路徑永不傳 video mime，故為純擴充。
+  "video/mp4": "mp4",
 };
 
 export function extensionForMime(mime: string): string | null {

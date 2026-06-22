@@ -160,7 +160,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
   const [draftScenes, setDraftScenes] = useState<DraftScene[]>([]);
   const [draftR2Keys, setDraftR2Keys] = useState<string[]>([]);
   const [draftTitle, setDraftTitle] = useState("");
-  const [regenIds, setRegenIds] = useState<Set<number>>(new Set()); // 正在單張重生中的場景 id
+  const [regenIds, setRegenIds] = useState<Set<number>>(new Set()); // 場景忙碌中的 id（單張重生 或 上傳中）
   const draftReady = draftScenes.length > 0;
 
   // ── History ──
@@ -333,6 +333,33 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
       }
     } catch (e: unknown) {
       setGenError(e instanceof Error ? e.message : "網路錯誤，重新生成失敗");
+    } finally {
+      setRegenIds((prev) => { const n = new Set(prev); n.delete(sceneId); return n; });
+    }
+  }
+
+  // ── Single-scene upload-your-own-asset handler (draft review) ──
+  async function handleUploadAsset(sceneId: number, file: File) {
+    const scene = draftScenes.find((s) => s.id === sceneId);
+    if (!scene || regenIds.has(sceneId)) return;
+    const isVideo = file.type === "video/mp4";
+    const capMb = isVideo ? 60 : 12;
+    if (file.size > capMb * 1048576) { setGenError(`檔案過大（上限 ${capMb}MB）`); return; }
+    setRegenIds((prev) => new Set(prev).add(sceneId));
+    setGenError("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("oldImageUrl", scene.imageUrl);
+      const res = await fetch("/api/video/upload-asset", { method: "POST", body: fd });
+      const j = (await res.json()) as { ok: boolean; imageUrl?: string; error?: string };
+      if (j.ok && j.imageUrl) {
+        setDraftScenes((prev) => prev.map((s) => (s.id === sceneId ? { ...s, imageUrl: j.imageUrl! } : s)));
+      } else {
+        setGenError(j.error ?? "上傳失敗");
+      }
+    } catch (e: unknown) {
+      setGenError(e instanceof Error ? e.message : "網路錯誤，上傳失敗");
     } finally {
       setRegenIds((prev) => { const n = new Set(prev); n.delete(sceneId); return n; });
     }
@@ -689,6 +716,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                   onBack={() => { setDraftScenes([]); setGenError(""); setGenStatus("idle"); }}
                   onRender={handleRenderDraft}
                   onRegenerate={handleRegenerateImage}
+                  onUpload={handleUploadAsset}
                   regenIds={regenIds}
                   disabled={isBusy}
                 />
@@ -817,7 +845,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
 // ─── DraftEditor ──────────────────────────────────────────────────────────────
 
 function DraftEditor({
-  scenes, title, onChangeScene, onBack, onRender, onRegenerate, regenIds, disabled,
+  scenes, title, onChangeScene, onBack, onRender, onRegenerate, onUpload, regenIds, disabled,
 }: {
   scenes: DraftScene[];
   title: string;
@@ -825,6 +853,7 @@ function DraftEditor({
   onBack: () => void;
   onRender: () => void;
   onRegenerate: (id: number) => void;
+  onUpload: (id: number, file: File) => void;
   regenIds: Set<number>;
   disabled: boolean;
 }) {
@@ -871,6 +900,19 @@ function DraftEditor({
                 }}>
                 {regenIds.has(scene.id) ? "⏳ 生成中" : "🔄 重新生成"}
               </button>
+              <label title="上傳自己的圖片或影片（PNG / JPEG / WebP / MP4）"
+                style={{
+                  width: "100%", padding: "4px 0", borderRadius: 6, fontSize: 11, fontWeight: 600, textAlign: "center",
+                  boxSizing: "border-box", border: "1px solid var(--border-subtle)",
+                  background: (disabled || regenIds.has(scene.id)) ? "var(--border-subtle)" : "var(--bg-canvas)",
+                  color: (disabled || regenIds.has(scene.id)) ? "var(--text-muted)" : "var(--text-secondary)",
+                  cursor: (disabled || regenIds.has(scene.id)) ? "not-allowed" : "pointer",
+                }}>
+                ⬆️ 上傳
+                <input type="file" accept="image/png,image/jpeg,image/webp,video/mp4"
+                  disabled={disabled || regenIds.has(scene.id)} style={{ display: "none" }}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(scene.id, f); e.target.value = ""; }} />
+              </label>
             </div>
             {/* Narration editor */}
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>

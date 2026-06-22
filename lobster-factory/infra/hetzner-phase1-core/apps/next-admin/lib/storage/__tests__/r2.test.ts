@@ -26,16 +26,22 @@ describe("buildDesignKey", () => {
     expect(key).toMatch(/^designs\/2026-06\/[0-9a-f-]{36}\.png$/);
   });
 
+  it("builds an mp4 key for uploaded video (designs/YYYY-MM/<uuid>.mp4)", () => {
+    const key = buildDesignKey("video/mp4", new Date(Date.UTC(2026, 5, 23)));
+    expect(key).toMatch(/^designs\/2026-06\/[0-9a-f-]{36}\.mp4$/);
+  });
+
   it("returns null for unsupported mime", () => {
     expect(buildDesignKey("image/gif")).toBeNull();
   });
 });
 
 describe("extensionForMime", () => {
-  it("maps the three supported mimes", () => {
+  it("maps the supported mimes (incl. uploaded mp4)", () => {
     expect(extensionForMime("image/png")).toBe("png");
     expect(extensionForMime("image/jpeg")).toBe("jpg");
     expect(extensionForMime("image/webp")).toBe("webp");
+    expect(extensionForMime("video/mp4")).toBe("mp4");
     expect(extensionForMime("image/svg+xml")).toBeNull();
   });
 });

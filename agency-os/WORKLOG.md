@@ -4,6 +4,28 @@
 
 ## 2026-06-23
 
+### feat(banner): 版面重構（畫布置左 sticky 放大）+ 參考圖配色擷取 + 品牌色
+
+[任務理解] 使用者抱怨：① 畫布很小、空間沒用滿；② 工具在左很長，調整時畫布在上方看不到、要一直滾上去（很麻煩）。並要求 ③ 參考圖配色擷取 + 從 /ops/clients 帶入品牌色。
+
+[現況分析] 背景調查（Explore agent）：clients 用 JSONB `metadata.client_config`（**免 migration** 可加 `brandColors`）；`GET /api/ops/clients` 已回 `clientConfig`；無現成寫 client_config 的 endpoint（tenant config route 只寫欄位）；`canWriteTenantConfig`=owner/admin；`resolveOpsRole` 正式環境讀 claims、模擬 header 僅 dev/staging fallback（送 admin header 不構成正式環境提權）。
+
+[已修改]
+- **版面**（BannerStudio）：預覽改 `order:1` 置左 + `position:sticky top:12`（滾工具時畫布常駐可見）+ 響應式放大（img maxWidth 100% / maxHeight calc(100vh-230px)，吃滿寬欄）；工具 `order:2` 移右；移除 previewW/previewH
+- **參考圖配色**（BannerStudio）：`extractPalette`（56×56 降採樣→3-bit 量化→人氣排序→去重）→ swatch；單色套用到 標題/重點/CTA/徽章/背景，或 `autoApplyPalette` 自動分配（暗→漸層、最飽和→CTA/accent）；palette/selSwatch 為 component-local（不進 undo）
+- **品牌色**：`ClientConfig.brandColors` 型別（clients/route.ts，免 migration）；新 `PATCH /api/ops/clients/[slug]/brand-colors`（canWriteTenantConfig gate、hex 正則驗證、合併進 metadata.client_config 保留 siblings、audit event）；`BrandColorsCard` 編輯器（ClientHubTabs SettingsTab）；BannerStudio mount 時 fetch clients → 「選擇品牌帶入配色」下拉（hex 再驗證）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm run build | exit=0 | /tools/banner 18kB + /api/ops/clients/[slug]/brand-colors 路由編譯通過（60 pages）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/2m（in-scope 全 Low：auth gate 不可繞、metadata merge 保留 siblings、hex 防注入、無 tainted-canvas/CSS injection；Minor：metadata read-modify-write race=既有 pattern 可接受、inline 型別建議 import）。critic 另報 VideoStudio.tsx:719 tsc 錯誤 → 為並行 session WIP（暫態），複驗 tsc exit 0 已恢復，非本任務
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=brandColors\|extractPalette\|autoApplyPalette\|BrandColorsCard\|SWATCH_TARGETS | hits=0 stale（brandColors 4 個消費者皆預期）
+- tsc --noEmit exit 0
+
+[剩餘風險] metadata 全 blob read-modify-write 與 wp-report/wp-update 並發可能互蓋（既有 pattern、手動低頻、可接受）；參考圖配色僅同源 data-URL（遠端圖不餵入，避免 tainted canvas）。
+[rollback] `git revert <hash>`；brand-colors 為新增檔可直接刪；ClientConfig.brandColors 為純新增 optional 欄位。
+
+AUTO_TASK_DONE: feat(banner): 版面 sticky 放大 + 參考圖配色擷取 + 品牌色（/ops/clients）
+
 ### feat(video): 草稿單張圖重新生成（B/4，影片工具整理）
 
 [任務理解] 影片工具整理 B：草稿審核時不喜歡的圖可單張「重新生成」。
