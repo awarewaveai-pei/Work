@@ -10,7 +10,7 @@
  *      （也在快速請求內）→ 匯出 recordVideoAsset / cleanupVideoInputKeys / resolveOrgId 供其用。
  */
 import { register, type BlockCtx } from "./registry";
-import { generateVideoScript } from "../video/video-script-core";
+import { generateVideoScript, reassignSceneVisuals } from "../video/video-script-core";
 import { fetchBrollUrl, fetchBrollVideoUrl } from "../video/pexels";
 import {
   parseImageDataUrl,
@@ -168,17 +168,9 @@ export async function prepareScenes(
 
   // 「自訂 AI 圖」數量：依 customScenes 重新指派 scene.visual，使「Flux AI 圖」場景數恰為 customScenes、其餘走 Pexels B-roll。
   // 僅 AI 生圖模式套用（pexels-video/pexels-all 素材來源固定；接力 providedScenes 由前製腳本決定，全 custom，不動）。
-  // 策略：優先保留 Claude 已標 custom 的場（尾端先降為 broll）；不足則從頭把 broll 補為 custom → 穩定、可預期。
   const isRelay = !!(input.providedScenes && input.providedScenes.length > 0);
   if (typeof input.customScenes === "number" && !forcePexels && !forcePexelsVideo && !isRelay) {
-    const target = Math.max(0, Math.min(scenes.length, Math.round(input.customScenes)));
-    let customCount = scenes.filter((s) => s.visual === "custom").length;
-    for (let k = scenes.length - 1; k >= 0 && customCount > target; k--) {
-      if (scenes[k].visual === "custom") { scenes[k].visual = "broll"; customCount--; }
-    }
-    for (let k = 0; k < scenes.length && customCount < target; k++) {
-      if (scenes[k].visual === "broll") { scenes[k].visual = "custom"; customCount++; }
-    }
+    reassignSceneVisuals(scenes, input.customScenes);
   }
 
   const buildAsset = async (scene: (typeof scenes)[number]): Promise<AssetResult> => {
@@ -251,8 +243,8 @@ register({
         language: ctx.language as string | undefined,
         visualStyle: ctx.visualStyle as string | undefined,
         imageModel: ctx.imageModel as string | undefined,
-        sceneCount: ctx.sceneCount as number | undefined,
-        customScenes: ctx.customScenes as number | undefined,
+        // 註：sceneCount / customScenes 暫不從 generate/content 路徑 forward（該路徑 sceneCount 未接，
+        // 會造成 total/custom/成本分歧）。content 滑桿待 D 積木整併時連同 sceneCount 一起接。draft 路徑已完整支援。
         onProgress,
       },
       anthropicKey,

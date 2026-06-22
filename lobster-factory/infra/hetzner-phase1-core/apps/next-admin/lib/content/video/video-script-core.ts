@@ -29,6 +29,27 @@ export interface VideoScriptSuccess {
   description: string;
 }
 
+/**
+ * 依「自訂 AI 圖」數量重新指派場景視覺：使 `visual==="custom"`（Flux AI 圖）的場景數恰為 `customScenes`，
+ * 其餘為 `broll`（Pexels 素材）。策略：優先保留既有 custom（超量時從尾端降為 broll）；不足時從頭把 broll 補為 custom。
+ * 就地 mutate 並回傳同一陣列。`customScenes` 非有限數（NaN/Infinity）= 不動（安全 no-op）。
+ * 純函式，無 I/O → 由 __tests__/reassign-scene-visuals.test.ts 守護不變量。
+ */
+export function reassignSceneVisuals(scenes: VideoScene[], customScenes: number): VideoScene[] {
+  if (!Number.isFinite(customScenes)) return scenes;
+  const target = Math.max(0, Math.min(scenes.length, Math.round(customScenes)));
+  let customCount = scenes.filter((s) => s.visual === "custom").length;
+  // 超量 → 從尾端把多餘 custom 降為 broll
+  for (let k = scenes.length - 1; k >= 0 && customCount > target; k--) {
+    if (scenes[k].visual === "custom") { scenes[k].visual = "broll"; customCount--; }
+  }
+  // 不足 → 從頭把 broll 補為 custom
+  for (let k = 0; k < scenes.length && customCount < target; k++) {
+    if (scenes[k].visual === "broll") { scenes[k].visual = "custom"; customCount++; }
+  }
+  return scenes;
+}
+
 export type VideoScriptResult =
   | VideoScriptSuccess
   | { ok: false; status: number; error: string };

@@ -4,6 +4,25 @@
 
 ## 2026-06-23
 
+### feat(video): 「自訂 AI 圖」滑桿接到生成（A/4，影片工具整理）
+
+[任務理解] 影片工具整理 A：customScenes（自訂 AI 圖）滑桿原本只影響成本估算、沒接到實際生成（同 場景總數 bug 一類）。接好它 = AI 生圖模式下 customScenes = 用 Flux AI 圖的場景數，其餘走 Pexels B-roll。
+
+[已修改]
+- `lib/content/video/video-script-core.ts`：新增**純函式** `reassignSceneVisuals(scenes, customScenes)` — 依數量重新指派 scene.visual（優先保留既有 custom，尾端先降、不足從頭補），`Number.isFinite` guard（NaN/Infinity 安全 no-op）。
+- `lib/content/blocks/video-pipeline.ts`：`prepareScenes` 加 `customScenes?`，AI 模式 + 非接力 + 非 pexels 時呼叫 reassignSceneVisuals。
+- `app/api/video/draft/route.ts`：DraftBody 加 `customScenes?`，typeof guard 傳入。
+- `app/tools/video/VideoStudio.tsx`：handleGenerateDraft 送 customScenes（僅 AI 模式非接力 = Math.min(customScenes, totalScenes)）。
+- 新增 `lib/content/video/__tests__/reassign-scene-visuals.test.ts`（10 案，受 sg-deploy npm test gate 保護）。
+
+[範圍決策] critic 抓到：原本想在 block run() forward customScenes 會悄改 /api/video/generate + ContentStudio 路徑，而該路徑 sceneCount 未接 → total/custom/成本分歧。**故縮回只動 draft 路徑**（撤 run() forwarding），content 滑桿維持原狀（零回歸），待 D 積木整併時連同 sceneCount 一起接。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run reassign-scene-visuals.test.ts` | exit=0 | ms=387 — 10/10 PASS（全custom要3、全broll要3、混合要4/要1、要0、超量clamp、2.6→3、負數clamp0、NaN/Infinity no-op）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 — 型別通過
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/1n（1🟠 run() blast radius → 已撤回縮範圍；1🟡 NaN guard → 已改 Number.isFinite；🔵 加測 → 已做）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=reassignSceneVisuals | hits=3（video-script-core 定義 / video-pipeline 呼叫 / test，全已知，無 orphan）
+
 ### feat(banner): Tier-2/3 — 字體配對 / 重點字 / 字距 / Undo-Redo / AI 一鍵設計 / 行銷風格
 
 [任務理解] 使用者「去做完」Tier 2/3，並問 canvas/vector 積木能否在 Banner Studio 用。
