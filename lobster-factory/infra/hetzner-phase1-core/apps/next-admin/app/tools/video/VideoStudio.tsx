@@ -460,30 +460,6 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                 </div>
               </div>
 
-              {/* 視覺風格（重用 tarot/studio 風格目錄）— 套用到所有 Flux 場景，影片視覺連貫 */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={labelStyle}>🎨 視覺風格 <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>{videoStyle || "不指定（電影感預設）"}</span></label>
-                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
-                  {VIDEO_STYLE_GROUPS.map((g) => (
-                    <button key={g} type="button" onClick={() => setVideoStyleGroup(g)} disabled={isBusy}
-                      style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, cursor: isBusy ? "not-allowed" : "pointer", border: `1px solid ${videoStyleGroup === g ? "var(--accent)" : "var(--border-subtle)"}`, background: videoStyleGroup === g ? "var(--accent)" : "rgba(127,127,127,0.08)", color: videoStyleGroup === g ? "#fff" : "var(--text-muted)", transition: "all 0.15s" }}>
-                      {g}
-                    </button>
-                  ))}
-                </div>
-                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", maxHeight: 120, overflowY: "auto" }}>
-                  {VIDEO_STYLE_CATALOG.filter((item) => item.group === videoStyleGroup).map((item) => {
-                    const active = videoStyle === item.zh;
-                    return (
-                      <button key={item.zh} type="button" onClick={() => setVideoStyle(active ? "" : item.zh)} disabled={isBusy}
-                        style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, cursor: isBusy ? "not-allowed" : "pointer", border: `1px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`, background: active ? "var(--accent)" : "rgba(127,127,127,0.08)", color: active ? "#fff" : "var(--text-muted)", transition: "all 0.15s" }}>
-                        {item.zh}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
               {/* Intro title card toggle */}
               <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 12px", borderRadius: 8, background: "#f8fafc", border: "1px solid var(--border-subtle)" }}>
                 <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
@@ -561,18 +537,43 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                       ✅ 每場景自動搜尋 Pexels 影片片段（HD MP4）→ EU FFmpeg 拼接 + TTS 配音。費用 $0。
                     </div>
                   )}
-                  {/* AI生圖模式：顯示完整生圖模型下拉選單 */}
+                  {/* AI生圖模式：生圖模型下拉選單 + 視覺風格（兩者只在 AI 生圖模式相關） */}
                   {imageModel !== "pexels-video" && imageModel !== "pexels-all" && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>生圖模型</span>
-                      <select value={imageModel} onChange={(e) => setImageModel(e.target.value)} style={inputStyle} disabled={isBusy}>
-                        {Object.entries(IMAGE_RATES)
-                          .filter(([id]) => id !== "pexels-video" && id !== "pexels-all")
-                          .map(([id, r]) => (
-                            <option key={id} value={id}>{r.label} — {r.vendor} (${r.usd}/張)</option>
+                    <>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>生圖模型</span>
+                        <select value={imageModel} onChange={(e) => setImageModel(e.target.value)} style={inputStyle} disabled={isBusy}>
+                          {Object.entries(IMAGE_RATES)
+                            .filter(([id]) => id !== "pexels-video" && id !== "pexels-all")
+                            .map(([id, r]) => (
+                              <option key={id} value={id}>{r.label} — {r.vendor} (${r.usd}/張)</option>
+                            ))}
+                        </select>
+                      </div>
+                      {/* 視覺風格（重用 tarot/studio 風格目錄）— 套用到所有 Flux 場景，影片視覺連貫 */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        <label style={labelStyle}>🎨 視覺風格 <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>{videoStyle || "不指定（電影感預設）"}</span></label>
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
+                          {VIDEO_STYLE_GROUPS.map((g) => (
+                            <button key={g} type="button" onClick={() => setVideoStyleGroup(g)} disabled={isBusy}
+                              style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, cursor: isBusy ? "not-allowed" : "pointer", border: `1px solid ${videoStyleGroup === g ? "var(--accent)" : "var(--border-subtle)"}`, background: videoStyleGroup === g ? "var(--accent)" : "rgba(127,127,127,0.08)", color: videoStyleGroup === g ? "#fff" : "var(--text-muted)", transition: "all 0.15s" }}>
+                              {g}
+                            </button>
                           ))}
-                      </select>
-                    </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", maxHeight: 120, overflowY: "auto" }}>
+                          {VIDEO_STYLE_CATALOG.filter((item) => item.group === videoStyleGroup).map((item) => {
+                            const active = videoStyle === item.zh;
+                            return (
+                              <button key={item.zh} type="button" onClick={() => setVideoStyle(active ? "" : item.zh)} disabled={isBusy}
+                                style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, cursor: isBusy ? "not-allowed" : "pointer", border: `1px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`, background: active ? "var(--accent)" : "rgba(127,127,127,0.08)", color: active ? "#fff" : "var(--text-muted)", transition: "all 0.15s" }}>
+                                {item.zh}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </>
                   )}
                 </div>
 
