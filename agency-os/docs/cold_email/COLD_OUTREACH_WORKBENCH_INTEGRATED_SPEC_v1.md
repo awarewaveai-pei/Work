@@ -795,13 +795,17 @@ DB migration（0048+）= **High risk**，走 db-expert 審 + 非破壞性驗證 
 wp-bridge 改動 = bump 版本 + `release-wp-bridge.sh`（正本 repo `aware-wave-wp-bridge`）。
 寄送底層（Gmail/SES）= 涉 auth/憑證 → High risk，列風險 + rollback，等明示 go-ahead。
 
-## G7. Open Decisions（待你拍板）
+## G7. 已拍板決策（2026-06-23）
 
-1. **冷信寄送身份**：代操時用「客戶 Gmail」還是「你的統一 Gmail 代寄」？影響 Gmail OAuth scope 與聲譽歸屬（建議：客戶自己的，聲譽/退訂歸客戶）。
-2. **Lead 來源**：代操時名單由客戶提供，還是你幫客戶找？影響 Apify/Hunter 額度歸屬與成本計價。
-3. **「賣」的定價模型**：訂閱制？用量制（per lead / per AI call）？影響 connector_limits 與 billing 設計時程。
-4. **SES 是否現在送審**：production access 審核要時間，要不要 Phase 1 就先掛著申請。
-5. **prefix `co_`** 是否接受（避免命名衝突），或你偏好其他 schema 命名。
+| # | 決策 | 結論 | 對設計的影響 |
+|---|---|---|---|
+| 1 | 冷信寄送身份 | **客戶自己的 Gmail** | 代操時用客戶 Gmail OAuth 寄冷信草稿；聲譽/退訂/封鎖風險歸客戶。Gmail connector = per-org OAuth（D0/E3）。自用模式才用你自己的 Gmail。 |
+| 2 | Lead 來源 | **你（agency）幫客戶找** | 找名單/驗證/enrichment 成本**全由 agency 吃**，跨所有客戶 → 免費額度爆很快 → **Free-Plan Maximization 升為第一級設計支柱**（見 PART H）。 |
+| 3 | 「賣」定價模型 | **訂閱制** | billing = 訂閱方案分層（非用量制）。方案分層與免費額度策略綁定（PART H §8）：低階方案 = BYO-key + 極省模式；高階 = agency 提供 enrichment 含上限。 |
+| 4 | SES 是否現在送審 | **不送審** | 中央 SES 完全延後，不在 Phase 1–4 路線圖佔位。暖信**只走客戶自己的 FluentSMTP**；沒有 FluentSMTP 的客戶用免費寄送替代（PART H 研究），不依賴 SES。 |
+| 5 | schema prefix `co_` | **接受（暫定）** | 所有表用 `co_` 前綴避免與 `content_*`/`ops_*`/`repair_*` 撞名；可隨時改。 |
+
+> **連動修正**：因決策 2 + 3 + 4，原 §G3 路線圖把「Free Plan 外掛」放 Phase 3 是錯的 → 已在 **PART H** 重新定位為跨階段/Phase-1 核心；SES 從 Phase 4 移除（決策 4）。
 
 ---
 
