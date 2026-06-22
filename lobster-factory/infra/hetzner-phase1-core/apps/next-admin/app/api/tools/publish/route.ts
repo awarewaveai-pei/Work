@@ -596,7 +596,14 @@ export async function POST(request: Request) {
         { status: 422 },
       );
     }
-    const thumb = (body.mockupUrls ?? []).find((u) => typeof u === "string" && u.startsWith(designsBase));
+    // Printful's sync_product.thumbnail only accepts jpg/jpeg/png/pdf. Our gallery mockups are saved as
+    // WebP (storefront display optimisation), which Printful rejects with a 400 ("content type: webp")
+    // that surfaced HERE as a generic 502 — silently blocking EVERY native publish (browser-reproduced
+    // 2026-06-23: upscale/copy/create all 200, pfcreate 502). Pick the first Printful-acceptable image;
+    // if the gallery is all-WebP, omit the thumbnail (Printful renders its own preview from the mockup).
+    const thumb = (body.mockupUrls ?? []).find(
+      (u) => typeof u === "string" && u.startsWith(designsBase) && /\.(png|jpe?g)$/i.test(u.split("?")[0]),
+    );
     const created = await createSyncProductOnNative({
       name: body.title.trim(),
       externalId: String(body.wooProductId),
