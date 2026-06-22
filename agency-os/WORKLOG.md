@@ -6,6 +6,31 @@
 
 - AUTO_TASK_DONE: remote-weekly-agent: weekly summary generated → reports/weekly/weekly-summary-2026-06-22.md (period 2026-06-16→2026-06-22; 20+ features; committed via [claude] auto)
 
+### feat(banner): Tier-1 轉換元素 — 從「海報製造機」升級為「會賣的 banner」
+
+[任務理解] 使用者批 banner 工具「跟狗屎一樣糟」，要求做出「國際設計大師級、會讓訪客點擊下單」的 banner。多視角審查（5-agent workflow wcbf22i81）結論：它是「海報製造機」非「轉換 banner 製造機」—缺 CTA 按鈕、徽章、價格、信任標記、版型，文字只是 canvas 硬刻無層級/底襯/描邊。
+
+[已修改] `app/tools/banner/BannerStudio.tsx`（大改）
+- **CTA 按鈕**（圓角+陰影，6 預設文案+底色/字色）— 最大缺口，轉換驅動核心
+- **促銷徽章**（緞帶/膠囊/爆炸星 3 style × 左上/右上，6 預設）
+- **價格**（現價大粗 + 原價刪除線）
+- **信任標記**（★評分 / 評論數 / 保固）
+- **文字底襯 scrim**（局部圓角半透明板，取代整張暗化）+ **標題描邊陰影**（修舊版 export 掉陰影）
+- **水平對齊** left/center/right（配合 text-left product-right 版面）
+- **版型模板庫**（6 個一鍵套用：促銷爆款/極簡精品/限時搶購/節慶禮物/形象主視覺/社群貼文 — 只改版面/元素不動內容）
+- **架構**：exportToPng 重寫為統一「block stack」(headline→subtext→price→CTA→trust) 量測+依 textPos/textAlignH 定位；預覽改為 render 真實 exportToPng 輸出（單一 render path，預覽=匯出完全一致）；loadImage 加 LRU(12) 圖快取
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm run build | exit=0 | /tools/banner 13.6kB 編譯通過（TS+ESLint+compile+static-gen 全過，sg-deploy 同一 gate）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1M/3m → Major（brand-hero 透明 ctaBg vs hex picker 衝突）已修為 #111827；Minor（_imgCache 無上限）已加 LRU；其餘 Minor（save 重繪/超高 stack 裁切）記錄為可接受
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=applyTemplate\|_imgCache\|CTA_PRESETS\|badgeStyle\|trustType\|aiBgCompositeProduct | hits=0（皆 component 本地，CARD_TEMPLATES 為 tarot 無關符號）
+- tsc --noEmit exit 0
+
+[剩餘風險] 超高元素堆疊在矮 preset（如 hero-desktop 640h）會被畫布邊緣裁切（graceful，非 crash）；save/download 會多觸發 1-2 次預覽重繪（perf 微，非錯誤）。Tier 2/3（字體配對、accent 重點字、AI 全幅生成、行銷風格組）未做。
+[rollback] `git revert <hash>`（單檔；無 API/DB/auth 改動）
+
+AUTO_TASK_DONE: feat(banner): Tier-1 轉換元素（CTA/徽章/價格/信任/scrim/描邊/版型模板）
+
 ### fix(next-admin): 消除 ssh2 optional-native-dep build warnings（log-only）
 
 [任務理解] sg-deploy build log 每次出現 2 條 webpack warning：`Can't resolve 'cpu-features'` + `Can't resolve './crypto/build/Release/sshcrypto.node'`（node_modules/ssh2）。根因：`ssh2`（wp-update SSH route `app/api/ops/clients/[slug]/wp-update/route.ts:17` 用）在 try/catch 內 lazy-require 兩個**可選**原生加速器，node:20-alpine 永遠缺 → 走純 JS fallback，route 正常。warning 純噪音。
