@@ -6,6 +6,23 @@
 
 - AUTO_TASK_DONE: remote-weekly-agent: weekly summary generated → reports/weekly/weekly-summary-2026-06-22.md (period 2026-06-16→2026-06-22; 20+ features; committed via [claude] auto)
 
+### fix(next-admin): 消除 ssh2 optional-native-dep build warnings（log-only）
+
+[任務理解] sg-deploy build log 每次出現 2 條 webpack warning：`Can't resolve 'cpu-features'` + `Can't resolve './crypto/build/Release/sshcrypto.node'`（node_modules/ssh2）。根因：`ssh2`（wp-update SSH route `app/api/ops/clients/[slug]/wp-update/route.ts:17` 用）在 try/catch 內 lazy-require 兩個**可選**原生加速器，node:20-alpine 永遠缺 → 走純 JS fallback，route 正常。warning 純噪音。
+
+[方案比較] A=`serverExternalPackages: ["ssh2"]`（改打包行為，須靠 standalone tracer 抓 ssh2+transitive deps，漏抓則 wp-update runtime 崩、smoke 測不到，爆炸半徑大）；B=`webpack.ignoreWarnings` 精準過濾這兩條（不動 bundling，runtime byte-for-byte 不變）。**選 B**（最小爆炸半徑）。
+
+[已修改] `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/next.config.ts`
+- 加 `webpack: (config) => { config.ignoreWarnings = [...(既有 ?? []), {module:/ssh2/,message:/cpu-features/}, {module:/ssh2/,message:/sshcrypto.node/}]; return config }`
+- ssh2 維持 webpack-bundled（不動 Dockerfile 顯式 COPY node_modules/ssh2）；僅濾 log
+- Supabase `process.version` Edge Runtime warning **刻意不修**：來自 middleware（auth gate）用 @supabase/ssr，是官方 Edge middleware pattern 固有無害 warning；唯一消除法 = 把 auth middleware 切到 experimental Node runtime（`experimental.nodeMiddleware`）→ 動 auth 紅線 Medium risk，為一條 cosmetic warning 不划算 → 留著
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx next build`（local, next-admin）| exit=0 | ms=~30000 — ssh2 `cpu-features`/`sshcrypto.node`/`Module not found` warning **全消失**（webpack phase，平台無關）；`process.version` Edge warning 仍在（如預期，未動 #2）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（1 🔵：sshcrypto.node message regex 與 ssh2 內部 require path 耦合，未來 ssh2 major bump 可能 fail-open 再現該行——無害。critic 對照 webpack bundle5.js ignoreWarnings predicate 源碼確認 module+message 為 AND-logic，不誤殺真 warning；對照 @sentry/nextjs webpack.ts 確認 user webpack fn 先跑、Sentry 用 .push() 合成，既有規則不被 clobber）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=ignoreWarnings cpu-features sshcrypto serverExternalPackages | hits=4(files)——`ignoreWarnings` 僅本檔；其餘命中為**獨立正確**的 workflows 套件 esbuild 處理（`trigger.config.ts:28` external 含 ssh2/cpu-features + `TASKS.md:447` 文件 + 2 package-lock 依賴條目），非 stale claim、非本檔 downstream consumer
+- [rollback] `git revert <hash>` 或還原 next.config.ts；純 log 改動，revert 無 runtime 風險
+
 ### feat(video-studio): 視覺風格移到生圖模型下方（/tools/video）
 
 [任務理解] 使用者：把「🎨 視覺風格」選擇器（圖一）挪到「場景設定」的「生圖模型」下拉（圖二）下面。
