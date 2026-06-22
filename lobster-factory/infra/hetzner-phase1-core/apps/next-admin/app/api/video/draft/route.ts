@@ -22,6 +22,8 @@ interface DraftBody {
   imageModel?: string;
   /** 目標影片時長（分鐘）→ 控制場景數與旁白字數。1≈6場景, 3≈8場景, 5≈10場景。 */
   targetMinutes?: number;
+  /** 明確場景數（前端「場景總數」滑桿）→ AI 生圖模式覆蓋 targetMinutes 推導的場景數。 */
+  sceneCount?: number;
   /** 深層接力：前製腳本場景（台詞→旁白、畫面→生圖提示）→ 跳過 Claude 重生。 */
   scenes?: { narration: string; imagePrompt: string }[];
 }
@@ -59,6 +61,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       visualStyle: body.visualStyle,
       imageModel: body.imageModel,
       targetMinutes: typeof body.targetMinutes === "number" ? body.targetMinutes : undefined,
+      sceneCount: typeof body.sceneCount === "number" ? body.sceneCount : undefined,
       providedScenes: providedScenes.length > 0 ? providedScenes : undefined,
     },
     anthropicKey ?? "",

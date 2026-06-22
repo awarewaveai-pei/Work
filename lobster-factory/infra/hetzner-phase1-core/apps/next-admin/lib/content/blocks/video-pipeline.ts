@@ -119,6 +119,8 @@ export async function prepareScenes(
     imageModel?: string;
     /** 目標影片時長（分鐘）→ 控制場景數與旁白字數。1=6場景, 3=8場景, 5=10場景。 */
     targetMinutes?: number;
+    /** 明確場景數（前端「場景總數」滑桿）→ 覆蓋 targetMinutes 推導的場景數。僅 Claude 生腳本路徑有效；providedScenes 路徑場景數由腳本決定。 */
+    sceneCount?: number;
     /** 深層接力：前製腳本已寫好的場景（台詞+畫面）→ 跳過 Claude 重生，直接用這些。 */
     providedScenes?: { narration: string; imagePrompt: string }[];
     onProgress?: (step: string) => void;
@@ -147,6 +149,7 @@ export async function prepareScenes(
         articleContent: input.articleContent,
         language: input.language,
         targetMinutes: input.targetMinutes,
+        sceneCount: input.sceneCount,
       },
       anthropicKey,
     );

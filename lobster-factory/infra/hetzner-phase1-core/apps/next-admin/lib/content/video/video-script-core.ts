@@ -39,10 +39,17 @@ export type VideoScriptResult =
  * 3min: 8 × 120 ≈ 960 chars ÷ 280 ≈ 3.4 min
  * 1min: 6 × 50 ≈ 300 chars ÷ 280 ≈ 1.1 min（預設，與原行為一致）
  */
-function scriptParams(targetMinutes?: number): { sceneCount: number; charsPerScene: number } {
-  if (targetMinutes && targetMinutes >= 4) return { sceneCount: 10, charsPerScene: 160 };
-  if (targetMinutes && targetMinutes >= 2) return { sceneCount: 8,  charsPerScene: 120 };
-  return { sceneCount: 6, charsPerScene: 50 };
+function scriptParams(targetMinutes?: number, sceneCountOverride?: number): { sceneCount: number; charsPerScene: number } {
+  const base =
+    targetMinutes && targetMinutes >= 4 ? { sceneCount: 10, charsPerScene: 160 } :
+    targetMinutes && targetMinutes >= 2 ? { sceneCount: 8,  charsPerScene: 120 } :
+    { sceneCount: 6, charsPerScene: 50 };
+  // 明確指定場景數（前端「場景總數」滑桿）→ 覆蓋 targetMinutes 推導的張數；charsPerScene 仍沿用梯次值。
+  // clamp 1–20 與前端滑桿上限一致（防呆：非法值落回 base）。
+  if (typeof sceneCountOverride === "number" && sceneCountOverride >= 1) {
+    return { sceneCount: Math.min(20, Math.round(sceneCountOverride)), charsPerScene: base.charsPerScene };
+  }
+  return base;
 }
 
 /** 要求 Claude 回傳的 JSON 架構（供提示使用）。 */
@@ -134,11 +141,13 @@ export async function generateVideoScript(
     language?: string;
     /** 目標影片長度（分鐘）→ 控制場景數與旁白字數。預設 1 分鐘（6 場景 × 50 字）。 */
     targetMinutes?: number;
+    /** 明確場景數（前端「場景總數」滑桿）→ 覆蓋 targetMinutes 推導的場景數。 */
+    sceneCount?: number;
   },
   apiKey: string
 ): Promise<VideoScriptResult> {
   const lang = input.language ?? "繁體中文";
-  const { sceneCount, charsPerScene } = scriptParams(input.targetMinutes);
+  const { sceneCount, charsPerScene } = scriptParams(input.targetMinutes, input.sceneCount);
 
   // 組成使用者訊息：優先使用文章，其次用主題
   let userContent: string;
@@ -166,9 +175,13 @@ export async function generateVideoScript(
   let response: Awaited<ReturnType<Anthropic["messages"]["create"]>>;
   try {
     const client = new Anthropic({ apiKey });
+    // max_tokens 隨場景數放大：6 場 ≈ 4096（沿用原值，無回歸）；場景數可達 20（場景總數滑桿上限）
+    // → ~550 tokens/場（narration+image_prompt+broll+JSON 結構，含 160 字長旁白梯次的餘裕），上限 8192。
+    // 固定 4096 在多場景時會截斷 JSON → parseScriptJson 失敗 502（2026-06-23 場景總數滑桿修復連帶處理）。
+    const maxTokens = Math.min(8192, Math.max(4096, sceneCount * 550));
     response = await client.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 4096, // 6 場景含 narration+image_prompt+broll+description，2048 易截斷致 JSON 解析失敗（對齊 Python pipeline 4000 的 headroom）
+      max_tokens: maxTokens,
       messages: [{ role: "user", content: `${systemPrompt}\n\n${userContent}` }],
     });
   } catch (e: unknown) {

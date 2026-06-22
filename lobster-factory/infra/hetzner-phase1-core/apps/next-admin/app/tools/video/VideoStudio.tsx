@@ -266,6 +266,8 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
           visualStyle: videoStyle ? resolveVideoStyle(videoStyle) : undefined,
           imageModel,
           targetMinutes,
+          // 「場景總數」滑桿只在 AI 生圖模式生效（Pexels 模式場景數由 targetMinutes 決定；接力路徑由前製腳本決定）。
+          sceneCount: (providedScenes.length === 0 && imageModel !== "pexels-video" && imageModel !== "pexels-all") ? totalScenes : undefined,
           scenes: providedScenes.length > 0 ? providedScenes : undefined,
         }),
       });

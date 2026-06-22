@@ -2,6 +2,46 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-23
+
+### fix(video): 「場景總數」滑桿失效——AI 生圖模式永遠出 6 張圖
+
+[任務理解] /tools/video AI 生圖模式，「場景總數」滑桿是死的，永遠生 6 張圖（操作者回報「像被覆蓋」）。
+
+[根因] 場景數由 `lib/content/video/video-script-core.ts` 的 `scriptParams()` 只依 `targetMinutes` 寫死（1→6/3→8/5→10）。VideoStudio「生成草稿」沒送滑桿值（`totalScenes`），且 targetMinutes 選擇器在 AI 模式隱藏卡在預設 1 → 永遠 6 場 → 永遠 6 張。滑桿改了 state 但沒人用。
+
+[已修改]（4 檔 plumbing，全部向後相容 optional 參數）
+- `lib/content/video/video-script-core.ts`：`scriptParams(targetMinutes, sceneCountOverride?)` 加 override（≥1 用 `Math.min(20, Math.round())`，否則落回 base）；`generateVideoScript` input 加 `sceneCount?` 並傳入。連帶修 `max_tokens`：原固定 4096（為 6 場設計），滑桿可達 20 場會截斷 JSON→502 → 改 `Math.min(8192, Math.max(4096, sceneCount*550))`（6 場仍 4096 無回歸）。
+- `lib/content/blocks/video-pipeline.ts`：`prepareScenes` input 加 `sceneCount?`，Claude 生腳本路徑 forward。
+- `app/api/video/draft/route.ts`：DraftBody 加 `sceneCount?`，typeof guard 後傳入。
+- `app/tools/video/VideoStudio.tsx`：handleGenerateDraft 送 `sceneCount`（僅 AI 模式、非接力時 = totalScenes）。
+
+[已知待辦] `/api/video/generate`（/tools/content 走的 block 路徑）尚未送 sceneCount → content 自動配片仍受同一限制。待積木重構（準備/渲染兩積木）時一併接上。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node -e scriptParams+maxTokens harness` | exit=0 | ms=~200 — scriptParams 7 案全 PASS（AI 12→12、25→clamp20、0→落回6、pexels 1/3/5min→6/8/10 不受影響）；maxTokens 6→4096、20→8192
+- REALTEST_WAIVED: NA -- 端到端出片需 live Claude+Flux+EU video-service；本次為純參數 plumbing，邏輯由 node harness + tsc 覆蓋，部署後再 /playwright smoke 驗實際張數
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/2n（1 🟡 max_tokens 截斷風險已於同 commit 修；1 🔵 sub-1 fallback 不可達 UI，無需處理）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=prepareScenes|generateVideoScript|scriptParams | hits=3（video-script-core.ts 定義 / video-pipeline.ts+draft route 呼叫，全已知；generate route block 路徑未送 sceneCount = 已知待辦非回歸）
+
+### ops(soulful-printful): Printful sync timeout 診斷 + 店端清理（根因=Printful 平台暫時性，店端無設定變更）
+
+[任務理解] 使用者貼 Printful Dashboard「Soulful Expression」store sync error：「Failed! The request couldn't process fast enough, please increase the maximum execution time on your server」。表面指向調高 PHP 執行時間；實際根因待查（VBC：先實測再下結論）。
+
+[現況分析] 非 repo code（client-site ops）。soulful = A 路官方外掛（platform store `18314943`，ADR 008 不遷移）；Hostinger 共享主機 `sg-nme-web624.main-hosting.eu`；SSH = `~/.ssh/hostinger_soulful`（port 65002, user `u942075013`）。
+
+[驗證結果 — R0 四動作]
+- REALTEST_EVIDENCE: tool=SSH+curl | exit=0 | 多輪實測：店 web `max_execution_time` **已=300s**（mem 1536M / input 360s / SAPI=litespeed；探針檔驗證後即刪）；首頁 0.5s / wp-json 1.9s / Store API(撈100品) <1.6s / wp-cron 0.39s 全 HTTP 200；店→Printful 連線 `status=1`、oauth 有效、store_id `18314943`、出站日誌全 `OK`；Printful API（店 token 實打）`/store`+`/sync/products` 皆 HTTP 200 / ~0.35s。**結論：根因非店端**（資源充足、三端健康），Printful 建議的「increase max execution time」早已滿足 → 逾時為 Printful 平台端暫時性，重試即可。
+- 已執行變更（client prod）：① `wp action-scheduler clean --status=failed` → **刪 4665 筆失敗排程**（全為 fluent_boards/cartbounty/cartflows 等與 Printful 無關之 DB 肥大；執行前快照 `~/as_failed_snapshot_20260622-160001.txt`；驗證後 failed=0 / complete 12951 / pending 21）② **force delete Woo product 7430「色塊測試 Swatch Demo」**（POD 測試垃圾，歷史訂單 0 筆，卻 publish 在正式店）→ 正式店剩 4 真商品（7253/7235/7149/2144）③ 站點驗證 home 200。
+- 受阻（誠實回報）：Printful `DELETE /sync/products/*` 全 **403**（store oauth token **唯讀**，無 `sync_products/write` scope；外掛用同把 key 亦無法）→ Printful 端 2 孤兒（`441184319` 色塊測試 dangling + `440074260` Art Therapy Kit 0/1；後者 Woo 2144 為 $20 實體商品、Printful catalog=None/files=0 = 誤掛之 POD 連結）**只能 Dashboard 手動刪**，已交回使用者。
+- REVIEW_DONE: critic=Quick | verdict=pass | 讀回最終狀態 published=4 / AS failed=0 / site 200，皆符預期。
+- BUGHUNT_SCOPE_NARROW: 純遠端維運（client prod），無 repo symbol/callsite/schema 改動可跨檔搜。
+
+[剩餘風險] Printful 端 2 孤兒待 Dashboard 清（benign，不影響履約/下單）；store oauth token 唯讀 = 外掛無法程式化寫 Printful（不影響其 Dashboard-driven import 流程，與 2026-06-16 WORKLOG §4209 一致）；逾時若持續＝Printful 平台問題非店端，escalate Printful support。
+[rollback] 7430 可從 WPvivid 週備份（2026-06-08 Succeeded）還原；失敗排程為已失敗 junk 無需還原（快照留存於主機）。
+
+AUTO_TASK_DONE: ops(soulful-printful): sync-timeout 診斷（店端健康、max_exec 已 300）+ 清 4665 失敗排程 + 刪測試品 7430；Printful 端 2 孤兒待 Dashboard（唯讀 token 受限）
+
 ## 2026-06-22
 
 - AUTO_TASK_DONE: remote-weekly-agent: weekly summary generated → reports/weekly/weekly-summary-2026-06-22.md (period 2026-06-16→2026-06-22; 20+ features; committed via [claude] auto)
