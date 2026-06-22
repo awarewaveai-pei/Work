@@ -259,7 +259,7 @@ const TEMPLATES: { key: string; label: string; icon: string; patch: Partial<Stat
     patch: {
       textPos: "center", textAlignH: "center", productPos: "center",
       textColor: "#ffffff", textScrim: false, textOutline: true, dimOverlay: true,
-      ctaText: "探索系列", ctaBg: "rgba(255,255,255,0.0)", ctaTextColor: "#ffffff",
+      ctaText: "探索系列", ctaBg: "#111827", ctaTextColor: "#ffffff",
       badgeText: "", showPrice: false, trustType: "none",
     },
   },
@@ -371,35 +371,264 @@ async function exportToPng(state: State): Promise<string> {
     ctx.drawImage(img, x, y, sw, sh);
   }
 
-  const padding  = Math.round(p.w * 0.07);
+  // ── unified content stack: headline → subtext → price → CTA → trust ──
+  const font     = state.fontFamily;
+  const padding  = Math.round(p.w * 0.06);
   const maxWidth = p.w - padding * 2;
-  ctx.fillStyle  = state.textColor;
-  ctx.textAlign  = "center";
-  ctx.textBaseline = "middle";
+  const align    = state.textAlignH;
+  const anchorX  = align === "left" ? padding : align === "right" ? p.w - padding : p.w / 2;
+  const gapV     = Math.round(state.subtextSize * 0.62);
+  // left edge of a w-wide block under the current alignment
+  const leftOf   = (w: number) => align === "left" ? anchorX : align === "right" ? anchorX - w : anchorX - w / 2;
 
-  const headlineH = state.headline ? state.headlineSize : 0;
-  const subtextH  = state.subtext  ? state.subtextSize  : 0;
-  const gap       = state.headline && state.subtext ? Math.round(state.headlineSize * 0.5) : 0;
-  const blockH    = headlineH + gap + subtextH;
+  type Block = { h: number; w: number; draw: (top: number) => void };
+  const blocks: Block[] = [];
 
-  let blockY: number;
-  if (state.textPos === "top")         blockY = padding + blockH / 2;
-  else if (state.textPos === "bottom") blockY = p.h - padding - blockH / 2;
-  else                                  blockY = p.h / 2;
-
+  // headline (outlined + shadowed for legibility on any background)
   if (state.headline) {
-    ctx.font = `bold ${state.headlineSize}px ${state.fontFamily}`;
-    const lines  = wrapText(ctx, state.headline, maxWidth);
-    const totalH = lines.length * state.headlineSize * 1.2;
-    let y = blockY - blockH / 2 + state.headlineSize / 2;
-    for (const line of lines) { ctx.fillText(line, p.w / 2, y); y += state.headlineSize * 1.2; }
-    blockY = blockY - blockH / 2 + totalH + gap + subtextH / 2;
+    ctx.font = `bold ${state.headlineSize}px ${font}`;
+    const lines = wrapText(ctx, state.headline, maxWidth);
+    const lineH = state.headlineSize * 1.16;
+    const w = Math.min(maxWidth, Math.max(1, ...lines.map((l) => ctx.measureText(l).width)));
+    blocks.push({
+      h: lines.length * lineH, w,
+      draw: (top) => {
+        ctx.font = `bold ${state.headlineSize}px ${font}`;
+        ctx.textAlign = align; ctx.textBaseline = "top";
+        let y = top;
+        for (const line of lines) {
+          if (state.textOutline) {
+            ctx.shadowColor = "rgba(0,0,0,0.45)";
+            ctx.shadowBlur = state.headlineSize * 0.14;
+            ctx.shadowOffsetY = state.headlineSize * 0.03;
+          }
+          ctx.fillStyle = state.textColor;
+          ctx.fillText(line, anchorX, y);
+          ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+          if (state.textOutline) {
+            ctx.lineJoin = "round";
+            ctx.lineWidth = Math.max(2, state.headlineSize * 0.045);
+            ctx.strokeStyle = "rgba(0,0,0,0.55)";
+            ctx.strokeText(line, anchorX, y);
+          }
+          y += lineH;
+        }
+      },
+    });
   }
+
+  // subtext
   if (state.subtext) {
-    ctx.font = `${state.subtextSize}px ${state.fontFamily}`;
+    ctx.font = `${state.subtextSize}px ${font}`;
     const lines = wrapText(ctx, state.subtext, maxWidth);
-    let y = state.headline ? blockY : blockY - subtextH / 2 + state.subtextSize / 2;
-    for (const line of lines) { ctx.fillText(line, p.w / 2, y); y += state.subtextSize * 1.2; }
+    const lineH = state.subtextSize * 1.32;
+    const w = Math.min(maxWidth, Math.max(1, ...lines.map((l) => ctx.measureText(l).width)));
+    blocks.push({
+      h: lines.length * lineH, w,
+      draw: (top) => {
+        ctx.font = `${state.subtextSize}px ${font}`;
+        ctx.textAlign = align; ctx.textBaseline = "top";
+        let y = top;
+        for (const line of lines) {
+          if (state.textOutline) { ctx.shadowColor = "rgba(0,0,0,0.4)"; ctx.shadowBlur = state.subtextSize * 0.18; }
+          ctx.fillStyle = state.textColor;
+          ctx.globalAlpha = 0.95;
+          ctx.fillText(line, anchorX, y);
+          ctx.globalAlpha = 1; ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
+          y += lineH;
+        }
+      },
+    });
+  }
+
+  // price row (now big bold + was struck-through)
+  if (state.showPrice && (state.priceNow || state.priceWas)) {
+    const nowSize = Math.round(state.headlineSize * 0.78);
+    const wasSize = Math.round(state.subtextSize * 0.9);
+    ctx.font = `bold ${nowSize}px ${font}`;
+    const nowW = state.priceNow ? ctx.measureText(state.priceNow).width : 0;
+    ctx.font = `${wasSize}px ${font}`;
+    const wasW = state.priceWas ? ctx.measureText(state.priceWas).width : 0;
+    const gapP = state.priceNow && state.priceWas ? Math.round(nowSize * 0.35) : 0;
+    const rowW = nowW + gapP + wasW;
+    blocks.push({
+      h: nowSize * 1.1, w: rowW,
+      draw: (top) => {
+        let x = leftOf(rowW);
+        const baseY = top + nowSize;
+        ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+        if (state.priceNow) {
+          ctx.font = `bold ${nowSize}px ${font}`;
+          ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = nowSize * 0.12;
+          ctx.fillStyle = state.textColor;
+          ctx.fillText(state.priceNow, x, baseY);
+          ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
+          x += nowW + gapP;
+        }
+        if (state.priceWas) {
+          ctx.font = `${wasSize}px ${font}`;
+          ctx.fillStyle = state.textColor; ctx.globalAlpha = 0.7;
+          const wy = baseY;
+          ctx.fillText(state.priceWas, x, wy);
+          ctx.strokeStyle = state.textColor;
+          ctx.lineWidth = Math.max(2, wasSize * 0.08);
+          ctx.beginPath();
+          ctx.moveTo(x, wy - wasSize * 0.32);
+          ctx.lineTo(x + wasW, wy - wasSize * 0.32);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+      },
+    });
+  }
+
+  // CTA button (the conversion driver)
+  if (state.ctaText) {
+    const bf   = Math.round(state.subtextSize * 1.02);
+    ctx.font = `bold ${bf}px ${font}`;
+    const tw   = ctx.measureText(state.ctaText).width;
+    const padX = Math.round(bf * 0.95);
+    const padY = Math.round(bf * 0.56);
+    const bw   = tw + padX * 2;
+    const bh   = bf + padY * 2;
+    blocks.push({
+      h: bh, w: bw,
+      draw: (top) => {
+        const left = leftOf(bw);
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.32)"; ctx.shadowBlur = bh * 0.28; ctx.shadowOffsetY = bh * 0.12;
+        roundRectPath(ctx, left, top, bw, bh, bh / 2);
+        ctx.fillStyle = state.ctaBg; ctx.fill();
+        ctx.restore();
+        ctx.fillStyle = state.ctaTextColor;
+        ctx.font = `bold ${bf}px ${font}`;
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(state.ctaText, left + bw / 2, top + bh / 2 + bf * 0.06);
+      },
+    });
+  }
+
+  // trust signals
+  if (state.trustType !== "none") {
+    const tSize = Math.round(state.subtextSize * 0.88);
+    let starsStr = "";
+    let label = "";
+    if (state.trustType === "stars" || state.trustType === "reviews") {
+      const n = Math.max(0, Math.min(5, Math.round(state.trustStars)));
+      starsStr = "★".repeat(n) + "☆".repeat(5 - n);
+      if (state.trustType === "reviews") label = state.trustText || "12,000+ 則好評";
+    } else {
+      label = "✓ " + (state.trustText || "30 天滿意保證");
+    }
+    ctx.font = `${tSize}px ${font}`;
+    const starW = starsStr ? ctx.measureText(starsStr).width : 0;
+    const labW  = label ? ctx.measureText(label).width : 0;
+    const gapT  = starsStr && label ? Math.round(tSize * 0.45) : 0;
+    const rowW  = starW + gapT + labW;
+    blocks.push({
+      h: tSize * 1.1, w: rowW,
+      draw: (top) => {
+        let x = leftOf(rowW);
+        const by = top + tSize;
+        ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+        ctx.font = `${tSize}px ${font}`;
+        if (starsStr) { ctx.fillStyle = "#fbbf24"; ctx.fillText(starsStr, x, by); x += starW + gapT; }
+        if (label) { ctx.fillStyle = state.textColor; ctx.globalAlpha = 0.92; ctx.fillText(label, x, by); ctx.globalAlpha = 1; }
+      },
+    });
+  }
+
+  // position the whole stack
+  const stackH = blocks.reduce((sum, b) => sum + b.h, 0) + gapV * Math.max(0, blocks.length - 1);
+  let stackTop = state.textPos === "top" ? padding
+    : state.textPos === "bottom" ? p.h - padding - stackH
+    : (p.h - stackH) / 2;
+  stackTop = Math.max(padding, stackTop);
+
+  // localized scrim behind the stack (cleaner than dimming the whole image)
+  if (state.textScrim && blocks.length) {
+    const maxW = Math.max(...blocks.map((b) => b.w));
+    const sPadX = Math.round(state.subtextSize * 0.95);
+    const sPadY = Math.round(state.subtextSize * 0.75);
+    const sx = Math.max(0, leftOf(maxW) - sPadX);
+    const sw = Math.min(p.w - sx, maxW + sPadX * 2);
+    const sy = Math.max(0, stackTop - sPadY);
+    const sh = Math.min(p.h - sy, stackH + sPadY * 2);
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    roundRectPath(ctx, sx, sy, sw, sh, Math.round(state.subtextSize * 0.6));
+    ctx.fill();
+  }
+
+  // draw stack top-down
+  let cy = stackTop;
+  for (const b of blocks) { b.draw(cy); cy += b.h + gapV; }
+  ctx.globalAlpha = 1; ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+  // corner offer badge (independent of the stack)
+  if (state.badgeText) {
+    const bf = Math.round(state.subtextSize * 0.95);
+    const margin = Math.round(p.w * 0.035);
+    ctx.font = `bold ${bf}px ${font}`;
+    const tw = ctx.measureText(state.badgeText).width;
+    const onLeft = state.badgePos === "tl";
+    if (state.badgeStyle === "burst") {
+      const r = Math.max(bf * 1.9, tw * 0.62 + bf * 0.4);
+      const cxb = onLeft ? margin + r : p.w - margin - r;
+      const cyb = margin + r;
+      ctx.save();
+      ctx.translate(cxb, cyb);
+      ctx.rotate((onLeft ? -1 : 1) * 0.18);
+      ctx.beginPath();
+      const spikes = 16;
+      for (let i = 0; i < spikes * 2; i++) {
+        const rr = i % 2 === 0 ? r : r * 0.84;
+        const a = (Math.PI / spikes) * i - Math.PI / 2;
+        ctx[i === 0 ? "moveTo" : "lineTo"](Math.cos(a) * rr, Math.sin(a) * rr);
+      }
+      ctx.closePath();
+      ctx.fillStyle = state.badgeColor; ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      const fit = Math.min(bf, (r * 1.5) / Math.max(1, tw / bf));
+      ctx.font = `bold ${Math.round(fit)}px ${font}`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(state.badgeText, 0, 0);
+      ctx.restore();
+    } else if (state.badgeStyle === "ribbon") {
+      const padX = bf * 0.7, bh = bf * 1.9, notch = bh * 0.45;
+      const bw = tw + padX * 2 + notch;
+      const x = onLeft ? margin : p.w - margin - bw;
+      const y = margin;
+      ctx.fillStyle = state.badgeColor;
+      ctx.beginPath();
+      if (onLeft) {
+        ctx.moveTo(x, y); ctx.lineTo(x + bw, y);
+        ctx.lineTo(x + bw - notch, y + bh / 2); ctx.lineTo(x + bw, y + bh);
+        ctx.lineTo(x, y + bh);
+      } else {
+        ctx.moveTo(x + bw, y); ctx.lineTo(x, y);
+        ctx.lineTo(x + notch, y + bh / 2); ctx.lineTo(x, y + bh);
+        ctx.lineTo(x + bw, y + bh);
+      }
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `bold ${bf}px ${font}`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(state.badgeText, onLeft ? x + (bw - notch) / 2 : x + notch + (bw - notch) / 2, y + bh / 2);
+    } else {
+      // pill
+      const padX = bf * 0.8, bh = bf * 1.9, bw = tw + padX * 2;
+      const x = onLeft ? margin : p.w - margin - bw;
+      const y = margin;
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.28)"; ctx.shadowBlur = bh * 0.25; ctx.shadowOffsetY = bh * 0.1;
+      roundRectPath(ctx, x, y, bw, bh, bh / 2);
+      ctx.fillStyle = state.badgeColor; ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `bold ${bf}px ${font}`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(state.badgeText, x + bw / 2, y + bh / 2);
+    }
   }
 
   return cv.toDataURL("image/png");
@@ -492,6 +721,7 @@ export default function BannerStudio() {
   const productFileRef    = useRef<HTMLInputElement>(null);
   const aiBgFileRef       = useRef<HTMLInputElement>(null);
   const [aiBgStyleGroup, setAiBgStyleGroup] = useState("不指定");
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const set = useCallback(<K extends keyof State>(key: K, val: State[K]) =>
     setS((prev) => ({ ...prev, [key]: val, saved: key === "saved" ? (val as boolean) : false, error: null }))
@@ -515,35 +745,20 @@ export default function BannerStudio() {
     !!(s.aiBgSubject || s.aiBgVibe || s.aiBgStyle || s.aiBgPromptTouched) ||
     (s.aiBgCompositeProduct && !!s.productImage);
 
-  // ── Preview helpers ──
-  function previewBg(): React.CSSProperties {
-    if ((s.bgMode === "upload" || s.bgMode === "ai") && s.bgImage)
-      return { backgroundImage: `url(${s.bgImage})`, backgroundSize: "cover", backgroundPosition: "center" };
-    if (s.bgMode === "gradient")
-      return { backgroundImage: `linear-gradient(${s.gradAngle}, ${s.gradFrom}, ${s.gradTo})` };
-    return { backgroundColor: s.bgColor };
-  }
+  // Live preview renders the REAL exportToPng output (single source of truth — preview
+  // always matches the downloaded PNG). Debounced so typing stays smooth; images are cached.
+  useEffect(() => {
+    let cancelled = false;
+    const t = setTimeout(() => {
+      exportToPng(s).then((url) => { if (!cancelled) setPreviewUrl(url); }).catch(() => { /* mid-edit, ignore */ });
+    }, 220);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [s]);
 
-  function productPreviewStyle(): React.CSSProperties {
-    const base: React.CSSProperties = { position: "absolute", pointerEvents: "none", objectFit: "contain", maxHeight: "85%" };
-    const wPct = `${Math.round(s.productScale * (s.productPos === "center" ? 70 : 45))}%`;
-    switch (s.productPos) {
-      case "left":         return { ...base, width: wPct, left: "5%",  top:    "50%", transform: "translateY(-50%)" };
-      case "right":        return { ...base, width: wPct, right: "5%", top:    "50%", transform: "translateY(-50%)" };
-      case "bottom-right": return { ...base, width: wPct, right: "5%", bottom: "5%" };
-      default:             return { ...base, width: wPct, left: "50%", top:    "50%", transform: "translate(-50%,-50%)" };
-    }
-  }
-
-  function textBlockStyle(): React.CSSProperties {
-    const base: React.CSSProperties = {
-      position: "absolute", left: "7%", right: "7%",
-      textAlign: "center", color: s.textColor, fontFamily: s.fontFamily, pointerEvents: "none",
-    };
-    if (s.textPos === "top")    return { ...base, top:    "8%" };
-    if (s.textPos === "bottom") return { ...base, bottom: "8%" };
-    return { ...base, top: "50%", transform: "translateY(-50%)" };
-  }
+  // ── template apply ──
+  const applyTemplate = useCallback((patch: Partial<State>) =>
+    setS((prev) => ({ ...prev, ...patch, saved: false, error: null }))
+  , []);
 
   // ── Handlers ──
 
@@ -720,9 +935,6 @@ export default function BannerStudio() {
     }
   }
 
-  const scaledHeadline = Math.round(s.headlineSize * (previewW / p.w));
-  const scaledSubtext  = Math.round(s.subtextSize  * (previewW / p.w));
-
   return (
     <div className="page">
       <h1 style={{ fontSize: 22, margin: "0 0 4px" }}>🖼 Banner Studio</h1>
@@ -740,6 +952,21 @@ export default function BannerStudio() {
 
         {/* ── Left: controls ── */}
         <div style={{ flex: "0 0 340px", display: "flex", flexDirection: "column", gap: 16 }}>
+
+          {/* 版型模板 — one-click conversion layouts */}
+          <div className="card">
+            <h2 style={{ fontSize: 15, margin: "0 0 4px" }}>✨ 版型模板 <span style={{ fontWeight: 400, opacity: 0.5, fontSize: 11 }}>一鍵套用</span></h2>
+            <p className="form-hint" style={{ marginBottom: 8 }}>套用後再填內容；只改版面/元素，不動你的文字與圖。</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              {TEMPLATES.map((t) => (
+                <button key={t.key} className="btn btn-ghost"
+                  style={{ fontSize: 12, padding: "8px 6px", textAlign: "left", lineHeight: 1.3 }}
+                  onClick={() => applyTemplate(t.patch)}>
+                  <span style={{ fontSize: 15, marginRight: 4 }}>{t.icon}</span>{t.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Step 0: 文案生成 */}
           <div className="card">
@@ -1158,7 +1385,7 @@ export default function BannerStudio() {
                 <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.subtextSize}</span>
               </div>
               <div className="form-row">
-                <label className="form-label">位置</label>
+                <label className="form-label">垂直</label>
                 <div style={{ display: "flex", gap: 6 }}>
                   {(["top", "center", "bottom"] as TextPos[]).map((pos) => (
                     <button key={pos}
@@ -1171,11 +1398,145 @@ export default function BannerStudio() {
                 </div>
               </div>
               <div className="form-row">
+                <label className="form-label">水平</label>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {(["left", "center", "right"] as TextAlignH[]).map((a) => (
+                    <button key={a}
+                      className={s.textAlignH === a ? "btn btn-primary" : "btn btn-ghost"}
+                      style={{ fontSize: 12, padding: "3px 10px" }}
+                      onClick={() => set("textAlignH", a)}>
+                      {{ left: "左", center: "中", right: "右" }[a]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="form-row">
+                <label className="form-label">描邊陰影</label>
+                <input type="checkbox" checked={s.textOutline}
+                  onChange={(e) => set("textOutline", e.target.checked)} />
+                <span className="form-hint" style={{ marginLeft: 6 }}>文字在雜亂背景上也清楚</span>
+              </div>
+              <div className="form-row">
+                <label className="form-label">文字底襯</label>
+                <input type="checkbox" checked={s.textScrim}
+                  onChange={(e) => set("textScrim", e.target.checked)} />
+                <span className="form-hint" style={{ marginLeft: 6 }}>文字後方半透明板（比整張暗化高級）</span>
+              </div>
+              <div className="form-row">
                 <label className="form-label">暗化背景</label>
                 <input type="checkbox" checked={s.dimOverlay}
                   onChange={(e) => set("dimOverlay", e.target.checked)} />
-                <span className="form-hint" style={{ marginLeft: 6 }}>讓文字更易讀</span>
+                <span className="form-hint" style={{ marginLeft: 6 }}>整張壓暗</span>
               </div>
+            </div>
+          </div>
+
+          {/* Step 4.5: 行銷元素 — conversion drivers */}
+          <div className="card">
+            <h2 style={{ fontSize: 15, margin: "0 0 4px" }}>Step 4.5 · 行銷元素 <span style={{ fontWeight: 400, opacity: 0.5, fontSize: 11 }}>讓人點擊下單</span></h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+
+              {/* CTA 按鈕 */}
+              <AccordionSection title="CTA 按鈕" summary={s.ctaText || "無"} icon="🛒" defaultOpen>
+                <input className="form-input" type="text" placeholder="例：立即選購、馬上搶購…"
+                  value={s.ctaText} onChange={(e) => set("ctaText", e.target.value)}
+                  style={{ width: "100%", fontSize: 13, marginBottom: 4 }} />
+                <PresetChips chips={CTA_PRESETS} selected={s.ctaText}
+                  onSelect={(v) => set("ctaText", v === s.ctaText ? "" : v)} />
+                {s.ctaText && (
+                  <div style={{ display: "flex", gap: 12, marginTop: 8, alignItems: "center" }}>
+                    <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
+                      底色 <input type="color" value={s.ctaBg.startsWith("#") ? s.ctaBg : "#ff5a5f"}
+                        onChange={(e) => set("ctaBg", e.target.value)}
+                        style={{ width: 32, height: 26, border: "none", background: "none", cursor: "pointer" }} />
+                    </label>
+                    <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
+                      字色 <input type="color" value={s.ctaTextColor}
+                        onChange={(e) => set("ctaTextColor", e.target.value)}
+                        style={{ width: 32, height: 26, border: "none", background: "none", cursor: "pointer" }} />
+                    </label>
+                  </div>
+                )}
+              </AccordionSection>
+
+              {/* 促銷徽章 */}
+              <AccordionSection title="促銷徽章" summary={s.badgeText || "無"} icon="🏷">
+                <input className="form-input" type="text" placeholder="例：限時優惠、母親節限定…"
+                  value={s.badgeText} onChange={(e) => set("badgeText", e.target.value)}
+                  style={{ width: "100%", fontSize: 13, marginBottom: 4 }} />
+                <PresetChips chips={BADGE_PRESETS} selected={s.badgeText}
+                  onSelect={(v) => set("badgeText", v === s.badgeText ? "" : v)} />
+                {s.badgeText && (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8, alignItems: "center" }}>
+                    {(["ribbon", "pill", "burst"] as BadgeStyle[]).map((st) => (
+                      <button key={st}
+                        className={s.badgeStyle === st ? "btn btn-primary" : "btn btn-ghost"}
+                        style={{ fontSize: 11, padding: "2px 8px" }}
+                        onClick={() => set("badgeStyle", st)}>
+                        {{ ribbon: "緞帶", pill: "膠囊", burst: "爆炸星" }[st]}
+                      </button>
+                    ))}
+                    {(["tl", "tr"] as BadgePos[]).map((pos) => (
+                      <button key={pos}
+                        className={s.badgePos === pos ? "btn btn-primary" : "btn btn-ghost"}
+                        style={{ fontSize: 11, padding: "2px 8px" }}
+                        onClick={() => set("badgePos", pos)}>
+                        {{ tl: "左上", tr: "右上" }[pos]}
+                      </button>
+                    ))}
+                    <input type="color" value={s.badgeColor}
+                      onChange={(e) => set("badgeColor", e.target.value)}
+                      style={{ width: 32, height: 26, border: "none", background: "none", cursor: "pointer" }} />
+                  </div>
+                )}
+              </AccordionSection>
+
+              {/* 價格 */}
+              <AccordionSection title="價格" summary={s.showPrice ? (s.priceNow || "已開") : "無"} icon="💰">
+                <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                  <input type="checkbox" checked={s.showPrice} onChange={(e) => set("showPrice", e.target.checked)} />
+                  顯示價格
+                </label>
+                {s.showPrice && (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input className="form-input" type="text" placeholder="現價 例：NT$590"
+                      value={s.priceNow} onChange={(e) => set("priceNow", e.target.value)}
+                      style={{ flex: 1, fontSize: 13 }} />
+                    <input className="form-input" type="text" placeholder="原價 例：NT$890"
+                      value={s.priceWas} onChange={(e) => set("priceWas", e.target.value)}
+                      style={{ flex: 1, fontSize: 13 }} />
+                  </div>
+                )}
+              </AccordionSection>
+
+              {/* 信任標記 */}
+              <AccordionSection title="信任標記" summary={s.trustType === "none" ? "無" : { stars: "評分", reviews: "評論", guarantee: "保固" }[s.trustType]} icon="⭐">
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {(["none", "stars", "reviews", "guarantee"] as TrustType[]).map((tt) => (
+                    <button key={tt}
+                      className={s.trustType === tt ? "btn btn-primary" : "btn btn-ghost"}
+                      style={{ fontSize: 11, padding: "2px 8px" }}
+                      onClick={() => set("trustType", tt)}>
+                      {{ none: "無", stars: "★ 評分", reviews: "評論數", guarantee: "保固" }[tt]}
+                    </button>
+                  ))}
+                </div>
+                {(s.trustType === "stars" || s.trustType === "reviews") && (
+                  <div className="form-row" style={{ marginTop: 8 }}>
+                    <label className="form-label">星數</label>
+                    <input type="range" min={1} max={5} value={s.trustStars}
+                      onChange={(e) => set("trustStars", Number(e.target.value))} style={{ flex: 1 }} />
+                    <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6 }}>{s.trustStars}★</span>
+                  </div>
+                )}
+                {(s.trustType === "reviews" || s.trustType === "guarantee") && (
+                  <input className="form-input" type="text"
+                    placeholder={s.trustType === "reviews" ? "例：12,000+ 則好評" : "例：30 天滿意保證"}
+                    value={s.trustText} onChange={(e) => set("trustText", e.target.value)}
+                    style={{ width: "100%", fontSize: 13, marginTop: 8 }} />
+                )}
+              </AccordionSection>
+
             </div>
           </div>
 
@@ -1193,31 +1554,15 @@ export default function BannerStudio() {
             <div style={{
               width: previewW, height: previewH, maxWidth: "100%",
               position: "relative", borderRadius: 6, overflow: "hidden",
-              ...previewBg(),
+              background: "var(--chip-surface, #f1f3f8)",
+              backgroundImage:
+                "linear-gradient(45deg,#0001 25%,transparent 25%),linear-gradient(-45deg,#0001 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#0001 75%),linear-gradient(-45deg,transparent 75%,#0001 75%)",
+              backgroundSize: "20px 20px",
+              backgroundPosition: "0 0,0 10px,10px -10px,-10px 0",
             }}>
-              {s.dimOverlay && (
-                <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
-              )}
-              {s.productImage && !(s.bgImageHasProduct && s.bgMode === "ai" && s.bgImage) && (
+              {previewUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={s.productImage} alt="" style={productPreviewStyle()} />
-              )}
-              {(s.headline || s.subtext) && (
-                <div style={textBlockStyle()}>
-                  {s.headline && (
-                    <div style={{
-                      fontSize: scaledHeadline, fontWeight: 700, lineHeight: 1.2,
-                      marginBottom: s.subtext ? Math.round(scaledHeadline * 0.3) : 0,
-                      textShadow: "0 2px 8px rgba(0,0,0,0.5)",
-                    }}>{s.headline}</div>
-                  )}
-                  {s.subtext && (
-                    <div style={{
-                      fontSize: scaledSubtext, lineHeight: 1.4, opacity: 0.9,
-                      textShadow: "0 1px 4px rgba(0,0,0,0.5)",
-                    }}>{s.subtext}</div>
-                  )}
-                </div>
+                <img src={previewUrl} alt="banner preview" style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }} />
               )}
               {(s.generating || s.productRemoving) && (
                 <div style={{
