@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { roleHeader } from "../../../lib/ops-role";
 import { openInCanvas } from "@/components/tools/canvas-handoff";
 import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, modelCompositesProduct, type StudioModel } from "../../../lib/studio/model-options";
@@ -72,6 +72,15 @@ const BG_VIBE_PRESETS = [
 const MODEL_GROUPS = Array.from(new Set(STUDIO_MODEL_OPTIONS.map((m) => m.group)));
 const STYLE_GROUPS_ALL = Array.from(new Set(STYLE_CATALOG.map((s) => s.group)));
 
+// ── Marketing / conversion element types ──
+type BadgeStyle = "ribbon" | "pill" | "burst";
+type BadgePos   = "tl" | "tr";
+type TrustType  = "none" | "stars" | "reviews" | "guarantee";
+type TextAlignH = "left" | "center" | "right";
+
+const CTA_PRESETS   = ["立即選購", "馬上搶購", "了解更多", "限時下單", "免費領取", "預約諮詢"];
+const BADGE_PRESETS = ["限時優惠", "母親節限定", "新品上市", "買一送一", "免運費", "熱賣中"];
+
 interface CopyVariant { headline: string; subtext: string }
 
 interface State {
@@ -116,7 +125,24 @@ interface State {
   headlineSize: number;
   subtextSize:  number;
   textPos:   TextPos;
+  textAlignH: TextAlignH;
   dimOverlay: boolean;
+  textScrim:  boolean;   // 局部底襯（文字後方半透明圓角板）— 比整張暗化更高級
+  textOutline: boolean;  // 標題描邊 + 陰影（匯出時保留，修舊版 export 掉陰影）
+  // marketing / conversion elements
+  ctaText:      string;  // "" = 無按鈕
+  ctaBg:        string;
+  ctaTextColor: string;
+  badgeText:    string;  // "" = 無徽章
+  badgeStyle:   BadgeStyle;
+  badgeColor:   string;
+  badgePos:     BadgePos;
+  showPrice:    boolean;
+  priceNow:     string;
+  priceWas:     string;
+  trustType:    TrustType;
+  trustStars:   number;  // 0-5
+  trustText:    string;  // 評論數 / 保固說明
   // export
   saving:    boolean;
   saved:     boolean;
@@ -160,21 +186,122 @@ const INIT: State = {
   headlineSize: 64,
   subtextSize:  32,
   textPos:   "center",
+  textAlignH: "center",
   dimOverlay: true,
+  textScrim:  false,
+  textOutline: true,
+  ctaText:      "",
+  ctaBg:        "#ff5a5f",
+  ctaTextColor: "#ffffff",
+  badgeText:    "",
+  badgeStyle:   "ribbon",
+  badgeColor:   "#e11d48",
+  badgePos:     "tr",
+  showPrice:    false,
+  priceNow:     "",
+  priceWas:     "",
+  trustType:    "none",
+  trustStars:   5,
+  trustText:    "",
   saving:    false,
   saved:     false,
   error:     null,
 };
 
 // ---------------------------------------------------------------------------
-// Canvas export  (layer order: bg → dim → product → text)
+// Layout templates — pre-composed conversion arrangements (eye-flow tested).
+// Each patch sets LAYOUT + STYLE + which elements are on; never touches the
+// user's content (headline/subtext/product/bg). Applied via merge into State.
 // ---------------------------------------------------------------------------
 
+const TEMPLATES: { key: string; label: string; icon: string; patch: Partial<State> }[] = [
+  {
+    key: "sale-blast", label: "促銷爆款", icon: "🔥",
+    patch: {
+      textPos: "center", textAlignH: "left", productPos: "right",
+      textColor: "#ffffff", textScrim: true, textOutline: true, dimOverlay: false,
+      ctaText: "立即選購", ctaBg: "#ff5a5f", ctaTextColor: "#ffffff",
+      badgeText: "限時優惠", badgeStyle: "burst", badgeColor: "#e11d48", badgePos: "tr",
+      showPrice: true, trustType: "stars", trustStars: 5,
+    },
+  },
+  {
+    key: "luxury-min", label: "極簡精品", icon: "🤍",
+    patch: {
+      textPos: "center", textAlignH: "center", productPos: "center",
+      textColor: "#ffffff", textScrim: false, textOutline: false, dimOverlay: true,
+      ctaText: "了解更多", ctaBg: "#ffffff", ctaTextColor: "#111111",
+      badgeText: "", showPrice: false, trustType: "none",
+    },
+  },
+  {
+    key: "urgency", label: "限時搶購", icon: "⏰",
+    patch: {
+      textPos: "bottom", textAlignH: "center", productPos: "center",
+      textColor: "#ffffff", textScrim: true, textOutline: true, dimOverlay: false,
+      ctaText: "馬上搶購", ctaBg: "#f59e0b", ctaTextColor: "#111111",
+      badgeText: "限時優惠", badgeStyle: "ribbon", badgeColor: "#dc2626", badgePos: "tl",
+      showPrice: true, trustType: "reviews",
+    },
+  },
+  {
+    key: "festive-gift", label: "節慶禮物", icon: "🎁",
+    patch: {
+      textPos: "center", textAlignH: "center", productPos: "left",
+      textColor: "#fff7ed", textScrim: true, textOutline: true, dimOverlay: false,
+      ctaText: "選購禮物", ctaBg: "#be123c", ctaTextColor: "#ffffff",
+      badgeText: "母親節限定", badgeStyle: "pill", badgeColor: "#be123c", badgePos: "tr",
+      showPrice: false, trustType: "none",
+    },
+  },
+  {
+    key: "brand-hero", label: "形象主視覺", icon: "✦",
+    patch: {
+      textPos: "center", textAlignH: "center", productPos: "center",
+      textColor: "#ffffff", textScrim: false, textOutline: true, dimOverlay: true,
+      ctaText: "探索系列", ctaBg: "rgba(255,255,255,0.0)", ctaTextColor: "#ffffff",
+      badgeText: "", showPrice: false, trustType: "none",
+    },
+  },
+  {
+    key: "social-promo", label: "社群貼文", icon: "📱",
+    patch: {
+      textPos: "bottom", textAlignH: "left", productPos: "right",
+      textColor: "#ffffff", textScrim: true, textOutline: true, dimOverlay: false,
+      ctaText: "點我下單", ctaBg: "#6366f1", ctaTextColor: "#ffffff",
+      badgeText: "熱賣中", badgeStyle: "pill", badgeColor: "#6366f1", badgePos: "tl",
+      showPrice: true, trustType: "stars", trustStars: 5,
+    },
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Canvas export — single source of truth (preview renders this too).
+// Layer order: bg → dim → product → scrim → text stack (headline/subtext/price/
+// CTA/trust) → corner badge.
+// ---------------------------------------------------------------------------
+
+function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  const rr = Math.max(0, Math.min(r, w / 2, h / 2));
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}
+
+// Decoded-image cache keyed by src — the preview re-renders the whole canvas on
+// every state change, so re-decoding the (possibly 2K) bg/product each time would lag.
+const _imgCache = new Map<string, HTMLImageElement>();
 async function loadImage(src: string): Promise<HTMLImageElement> {
+  const cached = _imgCache.get(src);
+  if (cached?.complete) return cached;
   return new Promise((res, rej) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
-    img.onload  = () => res(img);
+    img.onload  = () => { _imgCache.set(src, img); res(img); };
     img.onerror = () => rej(new Error("image_load_failed"));
     img.src = src;
   });
