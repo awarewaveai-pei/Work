@@ -24,6 +24,8 @@ interface DraftBody {
   targetMinutes?: number;
   /** 明確場景數（前端「場景總數」滑桿）→ AI 生圖模式覆蓋 targetMinutes 推導的場景數。 */
   sceneCount?: number;
+  /** 「自訂 AI 圖」數量（前端滑桿）→ AI 生圖模式用 Flux 圖的場景數，其餘走 Pexels B-roll。 */
+  customScenes?: number;
   /** 深層接力：前製腳本場景（台詞→旁白、畫面→生圖提示）→ 跳過 Claude 重生。 */
   scenes?: { narration: string; imagePrompt: string }[];
 }
@@ -62,6 +64,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       imageModel: body.imageModel,
       targetMinutes: typeof body.targetMinutes === "number" ? body.targetMinutes : undefined,
       sceneCount: typeof body.sceneCount === "number" ? body.sceneCount : undefined,
+      customScenes: typeof body.customScenes === "number" ? body.customScenes : undefined,
       providedScenes: providedScenes.length > 0 ? providedScenes : undefined,
     },
     anthropicKey ?? "",

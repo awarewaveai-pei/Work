@@ -121,6 +121,8 @@ export async function prepareScenes(
     targetMinutes?: number;
     /** 明確場景數（前端「場景總數」滑桿）→ 覆蓋 targetMinutes 推導的場景數。僅 Claude 生腳本路徑有效；providedScenes 路徑場景數由腳本決定。 */
     sceneCount?: number;
+    /** 「自訂 AI 圖」數量（前端滑桿）→ 用 Flux AI 圖的場景數，其餘走 Pexels B-roll。僅 AI 生圖模式 + Claude 生腳本路徑有效。 */
+    customScenes?: number;
     /** 深層接力：前製腳本已寫好的場景（台詞+畫面）→ 跳過 Claude 重生，直接用這些。 */
     providedScenes?: { narration: string; imagePrompt: string }[];
     onProgress?: (step: string) => void;
@@ -163,6 +165,21 @@ export async function prepareScenes(
   const forcePexelsVideo = input.imageModel === "pexels-video";
   const forcePexels = input.imageModel === "pexels-all";
   const fluxModel = (!input.imageModel || input.imageModel === "pexels-all" || input.imageModel === "pexels-video") ? "flux-schnell" : input.imageModel;
+
+  // 「自訂 AI 圖」數量：依 customScenes 重新指派 scene.visual，使「Flux AI 圖」場景數恰為 customScenes、其餘走 Pexels B-roll。
+  // 僅 AI 生圖模式套用（pexels-video/pexels-all 素材來源固定；接力 providedScenes 由前製腳本決定，全 custom，不動）。
+  // 策略：優先保留 Claude 已標 custom 的場（尾端先降為 broll）；不足則從頭把 broll 補為 custom → 穩定、可預期。
+  const isRelay = !!(input.providedScenes && input.providedScenes.length > 0);
+  if (typeof input.customScenes === "number" && !forcePexels && !forcePexelsVideo && !isRelay) {
+    const target = Math.max(0, Math.min(scenes.length, Math.round(input.customScenes)));
+    let customCount = scenes.filter((s) => s.visual === "custom").length;
+    for (let k = scenes.length - 1; k >= 0 && customCount > target; k--) {
+      if (scenes[k].visual === "custom") { scenes[k].visual = "broll"; customCount--; }
+    }
+    for (let k = 0; k < scenes.length && customCount < target; k++) {
+      if (scenes[k].visual === "broll") { scenes[k].visual = "custom"; customCount++; }
+    }
+  }
 
   const buildAsset = async (scene: (typeof scenes)[number]): Promise<AssetResult> => {
     // pexels-video 模式：全部場景抓 Pexels 影片片段（MP4 URL → EU stream_loop）
@@ -234,6 +251,8 @@ register({
         language: ctx.language as string | undefined,
         visualStyle: ctx.visualStyle as string | undefined,
         imageModel: ctx.imageModel as string | undefined,
+        sceneCount: ctx.sceneCount as number | undefined,
+        customScenes: ctx.customScenes as number | undefined,
         onProgress,
       },
       anthropicKey,
