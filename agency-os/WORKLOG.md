@@ -4,6 +4,31 @@
 
 ## 2026-06-22
 
+### fix(video): 還原 AI 生圖模型選擇器（pexels-video feature 誤刪）
+
+[任務理解] 使用者回報「你把我的 AI 生圖的『模型和風格』生圖工具拿掉」。根因：pexels-video feature 把「素材模式」原本的全模型 `<select>`（`Object.entries(IMAGE_RATES)`）換成 3 顆固定按鈕（pexels-video / pexels-all / flux-schnell），導致無法選 Flux dev / Ideogram / Seedream 等具體模型。
+
+[現況分析]
+- `git show 71ab7b99:VideoStudio.tsx` 確認 pexels 改動前：行 462 `🎨 視覺風格` pill picker（103 風格含畫家）+ 行 531-533 `生圖模型` 全 IMAGE_RATES `<select>`
+- 風格選擇器（`🎨 視覺風格`）pexels 改動**從未動過**，一直在 §4 上方；使用者所謂「風格未恢復」實為「模型未恢復 + 改動未部署」（commit 曾被 verify-gate 擋，未上線）
+- 截圖的可摺疊「🎨 風格 Style」AccordionSection 來自 `StudioWorkbench.tsx:639` / `BannerStudio.tsx:821`，非 video tool（video 用內嵌 pill 版）
+
+[已修改]
+- `app/tools/video/VideoStudio.tsx`：第三顆按鈕改為合成模式 sentinel `__ai__`（UI-only，永不寫入 state）；選中 AI 模式時下方顯示完整 `IMAGE_RATES` 下拉（filter 掉 pexels-video / pexels-all）；按鈕 active 判定 = `imageModel !== pexels-*`
+
+[驗證結果]
+- REALTEST_WAIVED: SMOKE_COVERED -- tsc clean；UI 純還原，需 sg-deploy 後 browser 確認下拉出現
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n（cosmetic stale count，$0 影響）— `__ai__` sentinel 前端構造安全 + 後端 `isTarotModel` clamp（video-pipeline.ts:190）雙重保護；4 個關注點全 verified clean
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=__ai__ | hits=1檔(僅 VideoStudio.tsx sentinel+判定，無外洩)
+- tsc: PASS（0 errors）
+
+[剩餘風險]
+- §3 成本表在 pexels 模式仍顯示 stale customScenes count（cosmetic，unit=$0 故 total 正確）
+
+[rollback] `git revert HEAD`（單檔 UI 還原）
+
+AUTO_TASK_DONE: fix(video): 還原 AI 生圖模型選擇器
+
 ### feat(designs): 影片 tab 加入 filter / sort / 全選 / 下載 / 刪除
 
 [任務理解] 影片 tab 無 filter、排序、全選、下載、刪除功能；圖片 tab 全有。補齊 feature parity。
