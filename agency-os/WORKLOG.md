@@ -4,6 +4,25 @@
 
 ## 2026-06-22
 
+### incident(soulful): 過度套用「≤150KB webP」縮到操作者作品集 → 已還原 420 張全解析度
+
+[事故] 把 WP 圖一律轉 webp ≤150KB 的 backfill **不該套用到操作者手動上傳的作品集/部落格藝術圖**，但我用「檔案 >150KB」當唯一條件、未區分「pipeline 生成圖 vs 使用者上傳作品」→ 連同她的作品集一起縮成 webp ≤150KB ≤1280px。操作者震怒（正確）。
+
+[我的錯誤根因] 規則語意是「自動生成圖傳 WP 要小」，我擴大解讀成「站上所有大圖都縮」。縮圖按 size 一刀切、沒按來源（author=Admin 手動 vs author=0 API）或用途（文章/作品 vs 商品）分流。**孤兒清理**又刪了 29 個原圖（規則假設 2026 原圖都 R2-backed），其中 2 張是她的部落格精選圖原圖。
+
+[已還原]（soulful prod via SSH+wp-cli，原圖大多在 backfill 時有保留 → 可逆）
+- **420 張**作品/部落格圖（非商品）`update_attached_file` 還原回原始 png/jpg + `wp_generate_attachment_metadata` 重生全解析度尺寸；attachment png_jpeg 137→557
+- **19 張商品圖維持 webp ≤150KB**（操作者選項 2：作品還原、商品保留小檔）
+- 2397 + 7275 內文嵌入的 .webp URL 反轉回原圖
+- **救不回 = 2 張部落格精選圖**（`What We Asked For` post 3291 / `Drafting the Start-2` post 6811）：原圖在孤兒清理被刪，僅剩 ~100–115KB webp（顯示仍可，無全解析度 master）；+ 1 張未使用截圖
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`wp eval-file aw-restore.php apply` | exit=0 — RESTORE=420 KEEP-product-webp=19 CANNOT=10
+- REALTEST_EVIDENCE: tool=SSH+curl | 抽樣 id=3309 還原圖 `HTTP 200 image/jpeg 306327 bytes`（1200×800 全解析度，非縮 webp）；product 7235/7430 featured mime=image/webp（商品維持小檔）
+- 救不回項已逐一點名（6515/6967）
+
+[教訓→規則] 影像最佳化（縮圖/webp/壓縮）**只能套用 pipeline 自動生成圖，永不碰使用者手動上傳的作品集/藝術圖**。判別：author=Admin 手動 vs author=0 API；用途 文章/作品（保留全解析度）vs 商品（可 webp）。破壞性 backfill 前必須先按來源分流 + dry-run 列出受影響的「使用者上傳」項給操作者確認。memory: `feedback_never_shrink_user_artwork`、`project_wp_image_webp_boundary`。
+
 ### feat(banner): AI 背景合成產品到場景（生圖積木複用）
 
 [任務理解] 使用者：「上傳產品圖，背景按 AI 生成，他應該要單獨生成背景或將產品圖合成起來」。現況 `generateAiBg` 只送 prompt，完全忽略產品圖 → 產品只在 canvas 事後疊加（貼上感、無真實光影）。需求 = 給使用者二選一：單獨背景（事後疊加）vs AI 把產品合成進場景。
