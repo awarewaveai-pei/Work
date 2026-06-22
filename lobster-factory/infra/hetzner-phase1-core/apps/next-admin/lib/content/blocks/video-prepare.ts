@@ -4,8 +4,8 @@
  * 薄包裝 prepareScenes（單一 SSOT，不重複邏輯）。與 `video/render` 兩塊串成完整 pipeline；
  * 中間「停下來給人審核」= 兩塊的接縫：draft 流程在此停（人改旁白/重生/上傳），content 自動連跑。
  *
- * 安全第一步（D/4）：已登記、可用 byId("video/prepare") 取用，但現有三個入口
- * （/api/video/draft、/api/video/generate、/tools/content）尚未改接到積木 —— 待確認可單獨裝上去後再接線。
+ * 接線狀態（D2）：/api/video/draft 已收斂到本積木（byId("video/prepare").run）。
+ * /api/video/generate（含 /tools/content）仍走 video/pipeline 複合積木（prepare+submit 一次完成）。
  */
 import { register, type BlockCtx } from "./registry";
 import { prepareScenes } from "./video-pipeline";
@@ -18,7 +18,11 @@ register({
   enabled: true,
   run: async (ctx: BlockCtx) => {
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
-    if (!anthropicKey) return { ok: false, status: 503, error: "ANTHROPIC_API_KEY not configured" };
+    const providedScenes = ctx.providedScenes as { narration: string; imagePrompt: string }[] | undefined;
+    // 接力（providedScenes）路徑跳過 Claude → 不需 key；只有要生腳本時才強制（與 /api/video/draft 同邏輯）。
+    if (!anthropicKey && !(providedScenes && providedScenes.length > 0)) {
+      return { ok: false, status: 503, error: "ANTHROPIC_API_KEY not configured" };
+    }
     return prepareScenes(
       {
         topic: (ctx.topic as string | undefined) ?? (ctx.keyword as string | undefined),
@@ -30,10 +34,10 @@ register({
         targetMinutes: ctx.targetMinutes as number | undefined,
         sceneCount: ctx.sceneCount as number | undefined,
         customScenes: ctx.customScenes as number | undefined,
-        providedScenes: ctx.providedScenes as { narration: string; imagePrompt: string }[] | undefined,
+        providedScenes,
         onProgress: (ctx as { onProgress?: (s: string) => void }).onProgress,
       },
-      anthropicKey,
+      anthropicKey ?? "",
     );
   },
 });

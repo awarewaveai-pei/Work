@@ -94,22 +94,26 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (DESIGN_KEY_RE.test(key) && !r2Keys.includes(key)) r2Keys.push(key);
   }
 
-  const { submitRender } = await import("@/lib/content/video/render-client");
   const { createJob, finishJob } = await import("@/lib/content/video/job-store");
   const { resolveOrgId } = await import("@/lib/content/blocks/video-pipeline");
 
-  const sub = await submitRender(
-    scenes.map((s) => ({ id: s.id, narration: s.narration })),
-    imageUrls,
+  // 收斂到 video/render 積木（D 接線）：本 route 仍負責素材 host 白名單 + r2Keys 重導（安全閘），
+  // 僅把「提交 EU 渲染」這步委派給積木（submitRender 的單一入口）。
+  await import("@/lib/content/blocks/register-all");
+  const { byId } = await import("@/lib/content/blocks/registry");
+  const render = byId("video/render");
+  if (!render) {
+    return NextResponse.json({ ok: false, error: "video/render 積木未註冊" }, { status: 500 });
+  }
+  const sub = (await render.run({
+    scenes: scenes.map((s) => ({ id: s.id, narration: s.narration })),
+    assets: imageUrls,
     title,
-    undefined,
-    {
-      ttsProvider: body.ttsProvider,
-      ttsVoice: body.ttsVoice,
-      introTitle: body.introTitle,
-      introDuration: body.introDuration,
-    },
-  );
+    ttsProvider: body.ttsProvider,
+    ttsVoice: body.ttsVoice,
+    introTitle: body.introTitle,
+    introDuration: body.introDuration,
+  })) as { ok: true; jobId: string } | { ok: false; status: number; error: string };
 
   if (!sub.ok) {
     const err = sub as { ok: false; status: number; error: string };

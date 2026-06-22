@@ -411,7 +411,10 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
           articleTitle: articleTitle.trim() || undefined,
           articleContent: articleContent.trim() || undefined,
           language,
-          customScenes: Math.min(customScenes, totalScenes),
+          // 「場景總數」「自訂 AI 圖」只在 AI 生圖模式生效（與 draft 路徑一致；避免 pexels 模式被滑桿覆蓋）。
+          // 必須同時送 sceneCount，否則後端 reassignSceneVisuals 會用 customScenes 但場景數仍為 targetMinutes 預設 → total/custom 分歧。
+          sceneCount: (imageModel !== "pexels-video" && imageModel !== "pexels-all") ? totalScenes : undefined,
+          customScenes: (imageModel !== "pexels-video" && imageModel !== "pexels-all") ? Math.min(customScenes, totalScenes) : undefined,
           brollScenes,
           imageModel,
           ...parseVoiceModel(voiceModelId),

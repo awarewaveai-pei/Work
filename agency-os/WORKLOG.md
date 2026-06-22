@@ -4,6 +4,24 @@
 
 ## 2026-06-23
 
+### feat(video): D2 接線——入口收斂到積木 + content 滑桿生效
+
+[任務理解] D 登記積木後的接線：① 把 content 的「場景總數/自訂AI圖」滑桿接通 ② 把 draft/render-draft 收斂到 video/prepare、video/render 積木（讓兩積木真的被用，非 shelfware）。
+
+[已修改]
+- **content 滑桿（D2b）**：`generate/route.ts` GenerateBody+ctx 加 sceneCount；`video-pipeline.ts` run() 改回 forward sceneCount+customScenes（A 當時為避分歧暫緩，現 sceneCount 已接通故安全）；`ContentStudio.tsx` 送 `sceneCount: videoTotalScenes`（原本只送 customScenes → 場景總數一直無效）。
+- **入口收斂（D2a）**：`draft/route.ts` 改 `byId("video/prepare").run()`（移除直接 import prepareScenes，結果用 optional-interface 避 union narrowing）；`render-draft/route.ts` 保留 host 白名單+r2Keys 重導安全閘，僅把提交委派給 `byId("video/render").run()`；`video-prepare.ts` 修 anthropicKey 邏輯（接力 providedScenes 不需 key，與 prepareScenes 一致）。
+- **critic M 修正**：legacy `/tools/video` 直接出片 handleGenerate 原本送 customScenes 但沒送 sceneCount，video/pipeline 改 forward 後 flux 模式會誤觸 reassign → 補送 sceneCount + 對 pexels gate customScenes（鏡像 draft 路徑），消除分歧。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run`（完整套件，含 critic 修正後重跑）| exit=0 | ms=1500 — **35 檔/448 測試全 PASS**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0（修掉 1 個 discriminated-union narrowing error，改 optional-interface pattern）
+- REALTEST_WAIVED: NA -- draft/render-draft/generate 端到端需 live Claude/Flux/EU；rewire 為 thin-wrapper 行為等價，critic 逐項追證 + 全測試套件覆蓋
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/1n（1🟠 legacy handleGenerate customScenes 分歧 → 已補 sceneCount 修正；🟡 stale headers → 已更新）。critic 證實 draft/render-draft rewire 行為等價、安全閘順序不變、content 滑桿端到端通。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=prepareScenes|submitRender|byId\("video/(prepare|render)"\) | hits=0-stale（draft/render-draft 已不直接 import 底層函式，全走積木；唯 regenerate-image 註解提及 prepareScenes=prose）
+
+[未做] generate（含 content）仍走 video/pipeline 複合積木（prepare+submit 一次），未拆成 prepare→render 兩段串接（fire-and-forget 用複合積木合理）；如未來要刪 video/pipeline 改純兩段組合再另議。
+
 ### feat(blocks): 登記「準備場景 / 渲染影片」兩積木（D/4，影片工具整理，安全第一步）
 
 [任務理解] 影片工具整理 D：把影片生成拆成兩個 content-engine 積木（準備場景=腳本+生圖、渲染影片=配音+MP4），中間留接縫（draft 流程停下給人審核、content 自動連跑）。**安全第一步：只登記、不改現有生成行為**，確認可單獨裝上去後再接線。

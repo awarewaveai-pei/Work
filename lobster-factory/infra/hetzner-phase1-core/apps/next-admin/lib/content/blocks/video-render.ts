@@ -4,7 +4,8 @@
  * 薄包裝 submitRender（單一 SSOT）。吃 `video/prepare` 輸出的場景 + 素材；渲染在 EU 背景 thread 跑、
  * 由 /api/video/status 輪詢收尾（next-admin 不做背景工作）。
  *
- * 安全第一步（D/4）：已登記、可用 byId("video/render") 取用；現有 render-draft / generate 尚未改接。
+ * 接線狀態（D2）：/api/video/render-draft 已收斂到本積木（byId("video/render").run）委派提交。
+ * /api/video/generate 仍走 video/pipeline 複合積木（內含 submitRender）。
  */
 import { register, type BlockCtx } from "./registry";
 import { submitRender } from "../video/render-client";

@@ -46,40 +46,46 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "topic 或 scenes 為必填" }, { status: 400 });
   }
 
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  // providedScenes 路徑跳過 Claude 生腳本 → 不需 anthropicKey；只有要生腳本時才強制。
-  if (!anthropicKey && providedScenes.length === 0) {
-    return NextResponse.json({ ok: false, error: "ANTHROPIC_API_KEY not configured" }, { status: 503 });
+  // 收斂到 video/prepare 積木（D 接線）：anthropicKey 缺漏 + providedScenes 邏輯由積木內處理（同 prepareScenes）。
+  await import("@/lib/content/blocks/register-all");
+  const { byId } = await import("@/lib/content/blocks/registry");
+  const prepare = byId("video/prepare");
+  if (!prepare) {
+    return NextResponse.json({ ok: false, error: "video/prepare 積木未註冊" }, { status: 500 });
   }
 
-  const { prepareScenes } = await import("@/lib/content/blocks/video-pipeline");
+  // 單一 interface + optional（避免 discriminated-union narrowing 的 TS 邊角，對齊 generate route PrepareResult pattern）。
+  interface PrepResult {
+    ok?: boolean;
+    scenes?: { id: number; narration: string; image_prompt: string; broll_keyword: string; visual: "custom" | "broll" }[];
+    assets?: string[];
+    r2Keys?: string[];
+    title?: string;
+    status?: number;
+    error?: string;
+  }
+  const result = (await prepare.run({
+    topic,
+    articleTitle: body.articleTitle,
+    articleContent: body.articleContent,
+    language: body.language ?? "繁體中文",
+    visualStyle: body.visualStyle,
+    imageModel: body.imageModel,
+    targetMinutes: typeof body.targetMinutes === "number" ? body.targetMinutes : undefined,
+    sceneCount: typeof body.sceneCount === "number" ? body.sceneCount : undefined,
+    customScenes: typeof body.customScenes === "number" ? body.customScenes : undefined,
+    providedScenes: providedScenes.length > 0 ? providedScenes : undefined,
+  })) as PrepResult;
 
-  const result = await prepareScenes(
-    {
-      topic,
-      articleTitle: body.articleTitle,
-      articleContent: body.articleContent,
-      language: body.language ?? "繁體中文",
-      visualStyle: body.visualStyle,
-      imageModel: body.imageModel,
-      targetMinutes: typeof body.targetMinutes === "number" ? body.targetMinutes : undefined,
-      sceneCount: typeof body.sceneCount === "number" ? body.sceneCount : undefined,
-      customScenes: typeof body.customScenes === "number" ? body.customScenes : undefined,
-      providedScenes: providedScenes.length > 0 ? providedScenes : undefined,
-    },
-    anthropicKey ?? "",
-  );
-
-  if (!result.ok) {
-    const err = result as { ok: false; status: number; error: string };
-    return NextResponse.json({ ok: false, error: err.error }, { status: err.status });
+  if (!result.ok || !result.scenes || !result.assets) {
+    return NextResponse.json({ ok: false, error: result.error ?? "草稿生成失敗" }, { status: result.status ?? 500 });
   }
 
   return NextResponse.json({
     ok: true,
     scenes: result.scenes.map((s) => ({ id: s.id, narration: s.narration, imagePrompt: s.image_prompt, brollKeyword: s.broll_keyword, visual: s.visual })),
     imageUrls: result.assets,
-    r2Keys: result.r2Keys,
-    title: result.title,
+    r2Keys: result.r2Keys ?? [],
+    title: result.title ?? "",
   });
 }
