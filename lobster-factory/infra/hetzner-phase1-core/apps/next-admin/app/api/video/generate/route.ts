@@ -17,6 +17,7 @@ interface GenerateBody {
   articleContent?: string;
   language?: string;
   visualStyle?: string;
+  sceneCount?: number;
   customScenes?: number;
   brollScenes?: number;
   imageModel?: string;
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     articleContent: body.articleContent,
     language: body.language ?? "繁體中文",
     visualStyle: body.visualStyle,
+    sceneCount: body.sceneCount,
     customScenes: body.customScenes,
     brollScenes: body.brollScenes,
     imageModel: body.imageModel,

@@ -254,8 +254,10 @@ register({
         language: ctx.language as string | undefined,
         visualStyle: ctx.visualStyle as string | undefined,
         imageModel: ctx.imageModel as string | undefined,
-        // 註：sceneCount / customScenes 暫不從 generate/content 路徑 forward（該路徑 sceneCount 未接，
-        // 會造成 total/custom/成本分歧）。content 滑桿待 D 積木整併時連同 sceneCount 一起接。draft 路徑已完整支援。
+        // sceneCount / customScenes 從 generate/content 路徑 forward（D 接線後 generate route + ContentStudio
+        // 已連同 sceneCount 一起傳 → total/custom/成本一致，不再分歧）。
+        sceneCount: ctx.sceneCount as number | undefined,
+        customScenes: ctx.customScenes as number | undefined,
         onProgress,
       },
       anthropicKey,

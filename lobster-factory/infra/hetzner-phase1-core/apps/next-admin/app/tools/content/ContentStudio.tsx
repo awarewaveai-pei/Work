@@ -1680,6 +1680,7 @@ export default function ContentStudio() {
           articleContent: generated,
           language: form.language || "繁體中文",
           visualStyle: videoStyleZh ? resolveVideoStyle(videoStyleZh) : undefined,
+          sceneCount: videoTotalScenes,
           customScenes: Math.min(videoCustomScenes, videoTotalScenes),
           brollScenes: Math.max(0, videoTotalScenes - videoCustomScenes),
           imageModel: videoImageModel,
