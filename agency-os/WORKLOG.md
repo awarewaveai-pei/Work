@@ -4,6 +4,23 @@
 
 ## 2026-06-23
 
+### feat(video): 草稿單張圖重新生成（B/4，影片工具整理）
+
+[任務理解] 影片工具整理 B：草稿審核時不喜歡的圖可單張「重新生成」。
+
+[已修改]
+- `lib/content/blocks/video-pipeline.ts`：從 prepareScenes inline `buildAsset` 抽出 module-level **exported `buildSceneAsset(scene, opts)`**（單一 SSOT；prepareScenes 與重生端點共用，不重複生圖邏輯）。prepareScenes 改 `scenes.map(s => buildSceneAsset(...))`。
+- `app/api/video/regenerate-image/route.ts`（新）：POST → buildSceneAsset 單場景 → 回新 imageUrl；**成功後**才 best-effort 刪舊 R2 圖（僅 `designs/` 格式，deleteDesignObject 硬鎖 designs bucket → 無 SSRF/path traversal）。
+- `app/api/video/draft/route.ts`：每場景回傳多帶 `brollKeyword`/`visual`（重生需要）。
+- `app/tools/video/VideoStudio.tsx`：DraftScene 加 imagePrompt/brollKeyword/visual；`regenIds` state；`handleRegenerateImage`（替換該場 imageUrl + 傳 oldImageUrl 清舊）；DraftEditor 每場加「🔄 重新生成」鈕；重生進行中鎖「送出渲染/返回」（flowBlocked，防送出時用到舊圖）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/content/video lib/content/blocks` | exit=0 | ms=648 — 19/19 PASS（含既有 6+3，確認 buildSceneAsset 抽出無回歸 + reassign 10）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0
+- REALTEST_WAIVED: NA -- 單張重生端到端需 live Flux/Pexels/R2；critic 已逐行確認 buildSceneAsset 與原 inline buildAsset byte-equivalent，部署後 /playwright 驗
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/1n（1🟡 重生中渲染鈕未鎖會送出舊圖 → 已修 flowBlocked；🔵 host 驗證 downstream 註解 → 已加）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=buildSceneAsset|regenerate-image|handleRegenerateImage | hits=0-stale（def+2 caller+前端 fetch+route 全已知，無 orphan、無殘留 buildAsset）
+
 ### feat(video): 「自訂 AI 圖」滑桿接到生成（A/4，影片工具整理）
 
 [任務理解] 影片工具整理 A：customScenes（自訂 AI 圖）滑桿原本只影響成本估算、沒接到實際生成（同 場景總數 bug 一類）。接好它 = AI 生圖模式下 customScenes = 用 Flux AI 圖的場景數，其餘走 Pexels B-roll。

@@ -46,6 +46,12 @@ interface DraftScene {
   id: number;
   narration: string;
   imageUrl: string;
+  /** 生圖提示（英文）— 單張重生需要。 */
+  imagePrompt: string;
+  /** B-roll 搜尋關鍵字 — Pexels 場景重生需要。 */
+  brollKeyword: string;
+  /** custom = Flux AI 圖；broll = Pexels 素材 — 決定重生走哪條路。 */
+  visual: "custom" | "broll";
 }
 
 // ─── Voice model options ──────────────────────────────────────────────────────
@@ -154,6 +160,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
   const [draftScenes, setDraftScenes] = useState<DraftScene[]>([]);
   const [draftR2Keys, setDraftR2Keys] = useState<string[]>([]);
   const [draftTitle, setDraftTitle] = useState("");
+  const [regenIds, setRegenIds] = useState<Set<number>>(new Set()); // 正在單張重生中的場景 id
   const draftReady = draftScenes.length > 0;
 
   // ── History ──
@@ -274,7 +281,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
       });
       const j = (await res.json()) as {
         ok: boolean;
-        scenes?: { id: number; narration: string }[];
+        scenes?: { id: number; narration: string; imagePrompt?: string; brollKeyword?: string; visual?: "custom" | "broll" }[];
         imageUrls?: string[];
         r2Keys?: string[];
         title?: string;
@@ -285,7 +292,10 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
         setGenStatus("error");
         return;
       }
-      setDraftScenes(j.scenes.map((s, i) => ({ id: s.id, narration: s.narration, imageUrl: j.imageUrls![i] ?? "" })));
+      setDraftScenes(j.scenes.map((s, i) => ({
+        id: s.id, narration: s.narration, imageUrl: j.imageUrls![i] ?? "",
+        imagePrompt: s.imagePrompt ?? "", brollKeyword: s.brollKeyword ?? "", visual: s.visual ?? "custom",
+      })));
       setDraftR2Keys(j.r2Keys ?? []);
       setDraftTitle(j.title ?? topic.trim());
     } catch (e: unknown) {
@@ -293,6 +303,38 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
       setGenStatus("error");
     } finally {
       setDraftLoading(false);
+    }
+  }
+
+  // ── Single-image regenerate handler (draft review) ──
+  async function handleRegenerateImage(sceneId: number) {
+    const scene = draftScenes.find((s) => s.id === sceneId);
+    if (!scene || regenIds.has(sceneId)) return;
+    setRegenIds((prev) => new Set(prev).add(sceneId));
+    setGenError("");
+    try {
+      const res = await fetch("/api/video/regenerate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imagePrompt: scene.imagePrompt,
+          imageModel,
+          visualStyle: videoStyle ? resolveVideoStyle(videoStyle) : undefined,
+          brollKeyword: scene.brollKeyword,
+          visual: scene.visual,
+          oldImageUrl: scene.imageUrl,
+        }),
+      });
+      const j = (await res.json()) as { ok: boolean; imageUrl?: string; error?: string };
+      if (j.ok && j.imageUrl) {
+        setDraftScenes((prev) => prev.map((s) => (s.id === sceneId ? { ...s, imageUrl: j.imageUrl! } : s)));
+      } else {
+        setGenError(j.error ?? "圖片重新生成失敗");
+      }
+    } catch (e: unknown) {
+      setGenError(e instanceof Error ? e.message : "網路錯誤，重新生成失敗");
+    } finally {
+      setRegenIds((prev) => { const n = new Set(prev); n.delete(sceneId); return n; });
     }
   }
 
@@ -646,6 +688,8 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                   }
                   onBack={() => { setDraftScenes([]); setGenError(""); setGenStatus("idle"); }}
                   onRender={handleRenderDraft}
+                  onRegenerate={handleRegenerateImage}
+                  regenIds={regenIds}
                   disabled={isBusy}
                 />
               ) : (
@@ -773,15 +817,19 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
 // ─── DraftEditor ──────────────────────────────────────────────────────────────
 
 function DraftEditor({
-  scenes, title, onChangeScene, onBack, onRender, disabled,
+  scenes, title, onChangeScene, onBack, onRender, onRegenerate, regenIds, disabled,
 }: {
   scenes: DraftScene[];
   title: string;
   onChangeScene: (id: number, narration: string) => void;
   onBack: () => void;
   onRender: () => void;
+  onRegenerate: (id: number) => void;
+  regenIds: Set<number>;
   disabled: boolean;
 }) {
+  // 有任何單張重生進行中 → 鎖住「返回 / 送出渲染」，避免送出時用到尚未更新的舊圖（per-scene 重生鈕仍各自獨立）。
+  const flowBlocked = disabled || regenIds.size > 0;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -797,18 +845,32 @@ function DraftEditor({
             display: "flex", gap: 10, padding: "10px 12px",
             border: "1px solid var(--border-subtle)", borderRadius: 8, background: "#fff",
           }}>
-            {/* Thumbnail — 照片用 img；Pexels MP4 用靜音 video 預覽 */}
-            <div style={{ flexShrink: 0, width: 100, height: 68, borderRadius: 6, overflow: "hidden", background: "#0f172a" }}>
-              {/\.mp4(\?|$)/.test(scene.imageUrl) || scene.imageUrl.includes("videos.pexels.com") || scene.imageUrl.includes("player.vimeo.com") ? (
-                <video src={scene.imageUrl} muted loop autoPlay playsInline
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              ) : scene.imageUrl.startsWith("https://") ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={scene.imageUrl} alt={`場景 ${scene.id}`}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              ) : (
-                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🎬</div>
-              )}
+            {/* Thumbnail + 重新生成 — 照片用 img；Pexels MP4 用靜音 video 預覽 */}
+            <div style={{ flexShrink: 0, width: 100, display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ width: 100, height: 68, borderRadius: 6, overflow: "hidden", background: "#0f172a" }}>
+                {/\.mp4(\?|$)/.test(scene.imageUrl) || scene.imageUrl.includes("videos.pexels.com") || scene.imageUrl.includes("player.vimeo.com") ? (
+                  <video src={scene.imageUrl} muted loop autoPlay playsInline
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : scene.imageUrl.startsWith("https://") ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={scene.imageUrl} alt={`場景 ${scene.id}`}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🎬</div>
+                )}
+              </div>
+              <button type="button" onClick={() => onRegenerate(scene.id)}
+                disabled={disabled || regenIds.has(scene.id)}
+                title="不喜歡這張圖？重新生成一張"
+                style={{
+                  width: "100%", padding: "4px 0", borderRadius: 6, fontSize: 11, fontWeight: 600,
+                  border: "1px solid var(--border-subtle)",
+                  background: (disabled || regenIds.has(scene.id)) ? "var(--border-subtle)" : "var(--bg-canvas)",
+                  color: (disabled || regenIds.has(scene.id)) ? "var(--text-muted)" : "var(--accent)",
+                  cursor: (disabled || regenIds.has(scene.id)) ? "not-allowed" : "pointer",
+                }}>
+                {regenIds.has(scene.id) ? "⏳ 生成中" : "🔄 重新生成"}
+              </button>
             </div>
             {/* Narration editor */}
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
@@ -831,24 +893,24 @@ function DraftEditor({
       </div>
 
       <div style={{ display: "flex", gap: 10 }}>
-        <button onClick={onBack} disabled={disabled}
+        <button onClick={onBack} disabled={flowBlocked}
           style={{
             padding: "10px 16px", borderRadius: 8, border: "1px solid var(--border-subtle)",
-            cursor: disabled ? "not-allowed" : "pointer",
+            cursor: flowBlocked ? "not-allowed" : "pointer",
             background: "var(--bg-canvas)", color: "var(--text-secondary)",
             fontSize: 13, fontWeight: 600,
           }}>
           ← 返回重生
         </button>
-        <button onClick={onRender} disabled={disabled}
+        <button onClick={onRender} disabled={flowBlocked}
           style={{
             flex: 1, padding: "10px 16px", borderRadius: 8, border: "none",
-            cursor: disabled ? "not-allowed" : "pointer",
-            background: disabled ? "var(--border-subtle)" : "#16a34a",
-            color: disabled ? "var(--text-muted)" : "#fff",
+            cursor: flowBlocked ? "not-allowed" : "pointer",
+            background: flowBlocked ? "var(--border-subtle)" : "#16a34a",
+            color: flowBlocked ? "var(--text-muted)" : "#fff",
             fontSize: 13, fontWeight: 700,
           }}>
-          {disabled ? "⏳ 處理中…" : "🎬 確認送出渲染"}
+          {regenIds.size > 0 ? "⏳ 圖片生成中…" : disabled ? "⏳ 處理中…" : "🎬 確認送出渲染"}
         </button>
       </div>
     </div>

@@ -77,7 +77,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   return NextResponse.json({
     ok: true,
-    scenes: result.scenes.map((s) => ({ id: s.id, narration: s.narration, imagePrompt: s.image_prompt })),
+    scenes: result.scenes.map((s) => ({ id: s.id, narration: s.narration, imagePrompt: s.image_prompt, brollKeyword: s.broll_keyword, visual: s.visual })),
     imageUrls: result.assets,
     r2Keys: result.r2Keys,
     title: result.title,
