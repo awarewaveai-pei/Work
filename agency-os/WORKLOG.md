@@ -4,6 +4,29 @@
 
 ## 2026-06-23
 
+### feat(video): 上傳自己的圖片/影片當素材（C/4，影片工具整理）
+
+[任務理解] 影片工具整理 C：草稿審核時可上傳自己的圖片/影片替換某場景素材。
+
+[已修改]
+- `lib/storage/r2.ts`：MIME_EXT 加 `video/mp4`→mp4（純擴充；所有 buildDesignKey 既有呼叫端都傳 image mime，零回歸）。
+- `app/api/video/upload-asset/route.ts`（新）：multipart 上傳。mime allowlist {png,jpeg,webp,mp4} + **magic-byte 驗證**（防偽造）+ 大小上限（image 12MB/video 60MB）+ **Content-Length 解析前預擋**（防 formData OOM）+ `runtime="nodejs"`/`maxDuration=120`。存 R2 designs → 回 URL（落在 render-draft ALLOWED_HOSTS）。成功後才清舊圖（僅 designs/）。
+- `app/tools/video/VideoStudio.tsx`：`handleUploadAsset`；DraftEditor 每場加「⬆️ 上傳」（隱藏 file input，忙碌共用 regenIds 集，重生/上傳中鎖送出渲染）。
+- `lib/storage/__tests__/r2.test.ts`：加 mp4 案。
+- EU 已能處理混合 image/video 素材（pexels-video 降級成照片即混合），故上傳 mp4 與 AI 圖混用可行。上傳素材比照 Flux 暫存圖於 EU 渲染完成後由 /status 清掉。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/storage/__tests__/r2.test.ts` | exit=0 | ms=342 — 7/7 PASS（含 mp4 buildDesignKey/extensionForMime）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0
+- REALTEST_WAIVED: NA -- 真實上傳端到端需 live R2 + multipart；安全核心（allowlist+magic-byte+SVG/HTML 排除+bucket-locked 刪除）由 critic 逐項追證，部署後 /playwright 驗
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/3n（2🟠 OOM 解析前預擋 + runtime 宣告 → 皆已修；🟡 nginx body-size 部署前提見下、HEIC-as-mp4 brand 混淆低風險、DESIGN_KEY_RE 三處重複可抽）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=upload-asset|handleUploadAsset|video/mp4 | hits=0-stale（新端點無 downstream，MIME_EXT 既有呼叫端全傳 image mime 不受影響）
+
+[剩餘風險]
+- **部署前提（強制）**：自架 nginx `client_max_body_size` 預設 1MB → 會擋掉 12/60MB 上傳（回 nginx 413 HTML，前端顯示誤導性「網路錯誤」）。**部署 C 前**必須在 app.aware-wave.com server block 調 `client_max_body_size 64m`（依 VPS drop-in + mtime 紀律）。未調則此功能 prod 失效。
+- 整個 /api/video/* 與既有 route 一致由 console session middleware 把關（非公開未授權）；唯此 route 是 attacker-controlled bytes 寫入 → 若未來整個 video 面加 auth gate，優先含此 route。
+- HEIC/M4A 等同為 ISO-BMFF（ftyp）可冒充 video/mp4 過 magic 檢查 → 非執行性媒體，最差 EU ffmpeg 解碼失敗（graceful），blast radius 受限。
+
 ### feat(banner): 版面重構（畫布置左 sticky 放大）+ 參考圖配色擷取 + 品牌色
 
 [任務理解] 使用者抱怨：① 畫布很小、空間沒用滿；② 工具在左很長，調整時畫布在上方看不到、要一直滾上去（很麻煩）。並要求 ③ 參考圖配色擷取 + 從 /ops/clients 帶入品牌色。
