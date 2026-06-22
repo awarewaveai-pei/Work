@@ -13,6 +13,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
+// 本 route 在 handler 內 Buffer.from(arrayBuffer) + 透過 r2.ts 用 node:crypto → 必須 nodejs runtime（與其餘 78 個 Buffer/上傳 route 一致；防 edge 預設翻轉的地雷）。
+export const runtime = "nodejs";
+export const maxDuration = 120; // 60MB 影片上傳 + R2 PUT 在慢速上行可能耗時
+
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024; // 12 MB
 const MAX_VIDEO_BYTES = 60 * 1024 * 1024; // 60 MB
 const ALLOWED = new Set(["image/png", "image/jpeg", "image/webp", "video/mp4"]);
@@ -36,6 +40,16 @@ function magicMatches(mime: string, buf: Buffer): boolean {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  // 解析前先用 Content-Length 擋超大 body（防 req.formData() 把整包讀進記憶體致 OOM）。
+  // 注意：chunked 上傳 Content-Length 可缺/可偽 → 真正後盾是 nginx client_max_body_size，此為深度防禦。
+  const declaredLen = Number(req.headers.get("content-length") ?? "0");
+  if (Number.isFinite(declaredLen) && declaredLen > MAX_VIDEO_BYTES + 1024 * 1024) {
+    return NextResponse.json(
+      { ok: false, error: `請求過大（上限 ${MAX_VIDEO_BYTES / 1048576}MB）` },
+      { status: 413 },
+    );
+  }
+
   let form: FormData;
   try {
     form = await req.formData();
