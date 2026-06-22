@@ -1,7 +1,7 @@
 /**
  * POST /api/video/generate
  *
- * Parses body → builds BlockCtx → imports register-all → calls byKind("video")[0].run(ctx).
+ * Parses body → builds BlockCtx → imports register-all → calls byId("video/pipeline").run(ctx).
  * Server-only. No secrets or block internals leak to the client.
  *
  * Body: { topic, articleTitle?, articleContent?, language?, visualStyle?, customScenes?, brollScenes?, imageModel? }

@@ -25,8 +25,8 @@ register({
     return submitRender(
       scenes.map((s) => ({ id: s.id, narration: s.narration })),
       assets,
-      title,
-      undefined,
+      title,      // submitRender 第 3 參數 = outName（輸出檔名前綴），勿與後續位置參數對調
+      undefined,  // baseUrl（用 VIDEO_SERVICE_URL 預設）
       {
         ttsProvider: ctx.ttsProvider as string | undefined,
         ttsVoice: ctx.ttsVoice as string | undefined,

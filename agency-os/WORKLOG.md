@@ -4,6 +4,26 @@
 
 ## 2026-06-23
 
+### feat(blocks): 登記「準備場景 / 渲染影片」兩積木（D/4，影片工具整理，安全第一步）
+
+[任務理解] 影片工具整理 D：把影片生成拆成兩個 content-engine 積木（準備場景=腳本+生圖、渲染影片=配音+MP4），中間留接縫（draft 流程停下給人審核、content 自動連跑）。**安全第一步：只登記、不改現有生成行為**，確認可單獨裝上去後再接線。
+
+[已修改]
+- `lib/content/blocks/registry.ts`：加 `byId(id)` 精確選取器（不靠 byKind 陣列順序）。
+- `lib/content/blocks/video-prepare.ts`（新）：`video/prepare` 積木薄包裝 prepareScenes。
+- `lib/content/blocks/video-render.ts`（新）：`video/render` 積木薄包裝 submitRender。
+- `lib/content/blocks/register-all.ts`：加兩 import（置 video-pipeline 後）。
+- `app/api/video/generate/route.ts`：加固 `byKind("video")[0]` → `byId("video/pipeline")`（kind=video 現有 3 個積木，[0] 變脆弱順序相依；byId 精確選同一個、行為等價）+ 同步 docstring。
+- `lib/content/blocks/__tests__/registry-video-blocks.test.ts`（新）：byId 機制 + 三積木註冊 + manifest。
+
+[未接線（刻意）] draft 走直接 prepareScenes、render-draft 走直接 submitRender、generate 走 byId(video/pipeline)、content 走 generate。三個入口尚未改接到 prepare/render 兩積木——下一步（接線 + content 連 sceneCount 一起接）需另開工。新積木目前「登記但無人呼叫」。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run`（完整套件）| exit=0 | ms=1520 — **35 檔 / 448 測試全 PASS**（含新 registry-video-blocks 6 + 整 session A/B/C 全綠，零回歸）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/1n（🟡 video-render 參數順序經查正確；🔵 docstring stale + outName 註解 → 皆已修）。三重證實新 kind=video 積木不被既有 byKind 誤抓（PipelineStageKind 排除 video + DEFAULT_STAGES 不含 video + 兩 video 入口直接 import 繞過 registry）。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=byId\(|video/prepare|video/render|byKind\("video"\) | hits=0-stale（byId 僅 generate+test；byKind("video") 已只剩 test；新積木無 production 呼叫端=如設計）
+
 ### feat(video): 上傳自己的圖片/影片當素材（C/4，影片工具整理）
 
 [任務理解] 影片工具整理 C：草稿審核時可上傳自己的圖片/影片替換某場景素材。
