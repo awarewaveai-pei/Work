@@ -6,6 +6,20 @@
 
 - AUTO_TASK_DONE: remote-weekly-agent: weekly summary generated → reports/weekly/weekly-summary-2026-06-22.md (period 2026-06-16→2026-06-22; 20+ features; committed via [claude] auto)
 
+### feat(video-studio): 視覺風格移到生圖模型下方（/tools/video）
+
+[任務理解] 使用者：把「🎨 視覺風格」選擇器（圖一）挪到「場景設定」的「生圖模型」下拉（圖二）下面。
+
+[已修改] `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/video/VideoStudio.tsx`
+- 視覺風格 block 從原位置（語言 select 與 標題動畫 toggle 之間）移除
+- 插入「素材模式 → 生圖模型 select」正下方，與生圖模型 div 一起包成 React fragment，置於 AI 生圖條件區塊內（`imageModel !== pexels-video && !== pexels-all`）
+- 副作用（合理）：視覺風格現只在 AI 生圖模式顯示；Pexels 真實影片/照片動畫模式不顯示（視覺風格 prompt 僅對 Flux 生效）。`videoStyle` state 保留，無資料遺失
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin project tsconfig）| exit=0 | ms=~120000 — 型別通過（.tsx 真實 build gate）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（1 🔵建議：Pexels 模式仍送 visualStyle，critic 端到端追證為 inert——video-pipeline.ts 兩條 Pexels 路徑在讀 visualStyle 前 return，非 bug，最小爆炸半徑不夾帶）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=videoStyleGroup | hits=1（僅 ContentStudio.tsx，為獨立 component 自有同名 state，非本檔引用；只移動 JSX 未 rename/remove 任何 symbol → 無 stale reference）
+
 ### incident(soulful): 過度套用「≤150KB webP」縮到操作者作品集 → 已還原 420 張全解析度
 
 [事故] 把 WP 圖一律轉 webp ≤150KB 的 backfill **不該套用到操作者手動上傳的作品集/部落格藝術圖**，但我用「檔案 >150KB」當唯一條件、未區分「pipeline 生成圖 vs 使用者上傳作品」→ 連同她的作品集一起縮成 webp ≤150KB ≤1280px。操作者震怒（正確）。
