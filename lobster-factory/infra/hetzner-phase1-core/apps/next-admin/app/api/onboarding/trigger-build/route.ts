@@ -128,6 +128,17 @@ export async function POST(request: Request) {
   // Resolve org — reuse bound org or create new
   let organizationId: string | null = (intakeRow.organization_id as string | null) ?? null;
 
+  // Carry the spec's brand colours into client_config.brandColors so the design tools
+  // (Banner Studio "選擇品牌帶入配色" + /ops/clients Settings editor) pick them up.
+  // spec.design.*_color is validated to #RRGGBB by the spec generator.
+  const hexColor = (v: unknown) => (typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : undefined);
+  const brandColors: { primary?: string; secondary?: string } = {};
+  const bcPrimary = hexColor(spec.design?.primary_color);
+  const bcSecondary = hexColor(spec.design?.secondary_color);
+  if (bcPrimary) brandColors.primary = bcPrimary;
+  if (bcSecondary) brandColors.secondary = bcSecondary;
+  const clientConfigSeed = Object.keys(brandColors).length ? { client_config: { brandColors } } : {};
+
   if (!organizationId) {
     const suffix = crypto.randomUUID().slice(0, 6);
     const { data: org, error: orgErr } = await supabase
@@ -138,7 +149,7 @@ export async function POST(request: Request) {
         slug: toOrgSlug(companyName, suffix),
         status: "active",
         default_locale: locale,
-        metadata: { intake_form_id, website_spec_id, source: "onboarding_portal" },
+        metadata: { intake_form_id, website_spec_id, source: "onboarding_portal", ...clientConfigSeed },
       })
       .select("id")
       .single();

@@ -69,6 +69,23 @@
 
 AUTO_TASK_DONE: feat(banner): 版面 sticky 放大 + 參考圖配色擷取 + 品牌色（/ops/clients）
 
+### fix(onboarding): 把 onboarding 收的品牌色接進 client_config.brandColors（原本收了沒人用）
+
+[任務理解] 使用者問：/ops/onboarding 有品牌色建立，會出現在哪裡？追查發現 onboarding 收的 `primary_color`/`secondary_color` 存進 `intake_forms.form_data` + `website_specs.spec_data.design`，但**沒任何東西消費**（連建出的網站都沒用），且跟我新加的 `client_config.brandColors`（Banner Studio 讀的）是兩個不同位置 → 收了卻不出現。
+
+[已修改] `app/api/onboarding/trigger-build/route.ts`：建 org 時把 `spec.design.{primary_color,secondary_color}`（已驗 #RRGGBB）以 `hexColor` 再驗後寫進 `metadata.client_config.brandColors`（spread 不覆蓋其他 metadata key）。→ onboarding 品牌色現在自動出現在 Banner Studio「選擇品牌帶入配色」+ /ops/clients 設定編輯器。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm run build | exit=0 | /api/onboarding/trigger-build 編譯通過
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/0m（spread 不 clobber、unknown+typeof+anchored-hex 防呆連 spec validator 沒驗 secondary_color 都擋、downstream shape 一致、reuse path gap 可接受）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=brandColors\|client_config | hits=0 stale
+- tsc --noEmit exit 0
+
+[剩餘風險] reuse path（org 已存在 re-trigger）不補 brandColors（正常流程新建 org 已覆蓋）；spec-generator 只驗 primary_color（backlog，本次 hexColor 已防呆）。
+[rollback] `git revert <hash>`（單檔、純 additive metadata seed）
+
+AUTO_TASK_DONE: fix(onboarding): onboarding 品牌色接進 client_config.brandColors
+
 ### feat(video): 草稿單張圖重新生成（B/4，影片工具整理）
 
 [任務理解] 影片工具整理 B：草稿審核時不喜歡的圖可單張「重新生成」。
