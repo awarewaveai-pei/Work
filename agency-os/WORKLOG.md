@@ -39,6 +39,32 @@
 
 [教訓→規則] 影像最佳化（縮圖/webp/壓縮）**只能套用 pipeline 自動生成圖，永不碰使用者手動上傳的作品集/藝術圖**。判別：author=Admin 手動 vs author=0 API；用途 文章/作品（保留全解析度）vs 商品（可 webp）。破壞性 backfill 前必須先按來源分流 + dry-run 列出受影響的「使用者上傳」項給操作者確認。memory: `feedback_never_shrink_user_artwork`、`project_wp_image_webp_boundary`。
 
+### fix(banner): 合成模式只准用真正會放置產品的模型（修貼上感根因）
+
+[任務理解] 使用者用合成模式仍得到「精油瓶浮在咖啡廳前面、沒放桌上」的貼上感結果，並明確指出「那不是事後疊加，那是合成」。
+
+[現況分析 — file:line 證據]
+- 預設 `aiBgModel = "flux-dev"`（maxRefs:1）。合成 gate 用 `modelSupportsRefs()`（maxRefs>0）→ flux-dev 通過、不自動切換。
+- `lib/tarot/image-gen.ts:436-443`：flux-dev provider="flux" 把參考圖當 **img2img**（`input.image = fluxRef; prompt_strength = 0.82`）→ 重繪 82% 偏離原圖，**不會把產品當物件放進場景** = 貼上感/錯誤根因。
+- `image-gen.ts:187-201`：ideogram-character 的 `character_reference_image` 是人臉/角色一致性，非產品放置。
+- 真正會「放置產品物件」：nano-banana-2/pro（`image_input` 多圖合成）、flux-kontext-dev/pro（`input_image` in-context）、gpt-image-1（`/images/edits`）。
+
+[已修改]
+- `lib/studio/model-options.ts`：新增 SSOT `PRODUCT_COMPOSITE_MODELS`（7 模型）+ `modelCompositesProduct()`，附排除 flux-dev/ideogram-character 理由註解（指向 image-gen.ts 行號）
+- `app/tools/banner/BannerStudio.tsx`：合成 toggle 自動切換 / generate disable / 警告三處由 `modelSupportsRefs` 改 `modelCompositesProduct`（預設 flux-dev → 切合成自動跳 nano-banana-2）。參考圖 style-ref 區塊維持 `modelSupportsRefs`。
+- 合成 prompt 強化：放前景桌面 + 接地陰影、不浮空不貼平、符合透視/光向（commit 73cbdbca）
+
+[驗證結果]
+- REALTEST_WAIVED: SMOKE_COVERED -- 純前端 gating + prompt；真實驗證走 sg-deploy HTTP smoke + 線上瀏覽器手測
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（4 項 verify 全 trace：7 模型對照 image-gen.ts buildInput、flux-dev/ideogram-character 正確排除、union 拼字 tsc 驗、無其他 consumer 破壞）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=modelCompositesProduct\|PRODUCT_COMPOSITE_MODELS | hits=7（本次 def+import+3 uses，無 stale、無其他 consumer）
+- tsc --noEmit exit 0
+
+[剩餘風險] 合成為 AI 重繪，標籤文字仍可能被輕微改寫（要 100% 精準用事後疊加）；nano-banana-2 放置品質依場景 prompt。
+[rollback] `git revert <hash>`（model-options.ts 純新增 export；BannerStudio predicate 還原）
+
+AUTO_TASK_DONE: fix(banner): 合成模式限定真正會放置產品的模型
+
 ### feat(banner): AI 背景合成產品到場景（生圖積木複用）
 
 [任務理解] 使用者：「上傳產品圖，背景按 AI 生成，他應該要單獨生成背景或將產品圖合成起來」。現況 `generateAiBg` 只送 prompt，完全忽略產品圖 → 產品只在 canvas 事後疊加（貼上感、無真實光影）。需求 = 給使用者二選一：單獨背景（事後疊加）vs AI 把產品合成進場景。

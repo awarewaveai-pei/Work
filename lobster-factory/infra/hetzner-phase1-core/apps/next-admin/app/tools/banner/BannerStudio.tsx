@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { roleHeader } from "../../../lib/ops-role";
 import { openInCanvas } from "@/components/tools/canvas-handoff";
-import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, type StudioModel } from "../../../lib/studio/model-options";
+import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, modelCompositesProduct, type StudioModel } from "../../../lib/studio/model-options";
 import { STYLE_CATALOG } from "../tarot/tarotStyles";
 import { resolveStylePrompt } from "../tarot/cards";
 
@@ -926,10 +926,11 @@ export default function BannerStudio() {
                         className={s.aiBgCompositeProduct ? "btn btn-primary" : "btn btn-ghost"}
                         style={{ fontSize: 12, padding: "3px 10px" }}
                         onClick={() => {
-                          // Composite needs a ref-capable model; auto-switch if the current one can't take refs.
+                          // Composite needs a model that PLACES the product as an object (not flux-dev's
+                          // img2img / ideogram-character's face ref); auto-switch to nano-banana-2 otherwise.
                           setS((prev) => {
                             const next = { ...prev, aiBgCompositeProduct: true, saved: false, error: null };
-                            if (!modelSupportsRefs(prev.aiBgModel)) {
+                            if (!modelCompositesProduct(prev.aiBgModel)) {
                               next.aiBgModel = "nano-banana-2";
                               next.aiBgModelGroup = "Google+";
                             }
@@ -941,12 +942,12 @@ export default function BannerStudio() {
                     </div>
                     <p className="form-hint" style={{ marginTop: 6 }}>
                       {s.aiBgCompositeProduct
-                        ? "AI 把產品自然融入場景（真實光影），匯出時不再事後疊加產品。"
+                        ? "AI 把產品放進場景（放在桌面、真實光影），匯出時不再事後疊加產品。"
                         : "AI 只生背景，產品圖事後疊在上層（可調位置/大小）。"}
                     </p>
-                    {s.aiBgCompositeProduct && !modelSupportsRefs(s.aiBgModel) && (
+                    {s.aiBgCompositeProduct && !modelCompositesProduct(s.aiBgModel) && (
                       <p className="form-hint" style={{ marginTop: 4, color: "var(--red)" }}>
-                        ⚠ 目前模型不吃參考圖，請在「圖片模型」選支援的模型（如 Nano Banana 2 / FLUX Kontext）
+                        ⚠ 此模型不會把產品「放進場景」（flux-dev 是 img2img、ideogram-character 是人臉參考）。請在「圖片模型」改選 Nano Banana 2/Pro、FLUX Kontext 或 GPT-Image-1。
                       </p>
                     )}
                   </div>
@@ -974,7 +975,7 @@ export default function BannerStudio() {
                 <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
                   <button
                     className="btn btn-primary"
-                    disabled={s.generating || !aiBgHasInput || (s.aiBgCompositeProduct && !!s.productImage && !modelSupportsRefs(s.aiBgModel))}
+                    disabled={s.generating || !aiBgHasInput || (s.aiBgCompositeProduct && !!s.productImage && !modelCompositesProduct(s.aiBgModel))}
                     onClick={generateAiBg}>
                     {s.generating
                       ? "生成中…"

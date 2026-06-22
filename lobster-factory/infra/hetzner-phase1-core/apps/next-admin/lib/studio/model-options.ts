@@ -60,3 +60,25 @@ export function isStudioModel(v: unknown): v is StudioModel {
 export function modelSupportsRefs(model: StudioModel): boolean {
   return (STUDIO_MODEL_OPTIONS.find((m) => m.value === model)?.maxRefs ?? 0) > 0;
 }
+
+// Models that can composite a provided product PHOTO into a newly generated scene as a discrete
+// object (real placement on a surface, matched perspective + contact shadow) — NOT mere style/img2img
+// conditioning. Deliberately stricter than modelSupportsRefs():
+//   • flux-dev  — uses the ref as img2img (input.image + prompt_strength 0.82, see lib/tarot/image-gen.ts),
+//                 which re-paints away from the photo; it does NOT place the product as an object → excluded.
+//   • ideogram-character — character_reference_image is for face/character consistency, not products → excluded.
+// nano-banana-* use image_input (multi-image compose), flux-kontext use input_image (in-context incorporation),
+// gpt-image-1 routes to /images/edits — all three genuinely place the product.
+export const PRODUCT_COMPOSITE_MODELS: readonly StudioModel[] = [
+  "nano-banana-2",
+  "nano-banana-pro",
+  "flux-kontext-dev",
+  "flux-kontext-pro",
+  "openai-low",
+  "openai-medium",
+  "openai-high",
+];
+
+export function modelCompositesProduct(model: StudioModel): boolean {
+  return PRODUCT_COMPOSITE_MODELS.includes(model);
+}
