@@ -4,6 +4,33 @@
 
 ## 2026-06-22
 
+### feat(banner): AI 背景合成產品到場景（生圖積木複用）
+
+[任務理解] 使用者：「上傳產品圖，背景按 AI 生成，他應該要單獨生成背景或將產品圖合成起來」。現況 `generateAiBg` 只送 prompt，完全忽略產品圖 → 產品只在 canvas 事後疊加（貼上感、無真實光影）。需求 = 給使用者二選一：單獨背景（事後疊加）vs AI 把產品合成進場景。
+
+[現況分析]
+- 4-reader workflow（wppp78i7k）查證：`/api/tools/studio/generate` 已支援把參考圖餵給模型合成（`image-gen.ts:215-248` nano-banana `image_input` 陣列；`115-137` flux-kontext `input_image`）。`/tools/mockup` AI 模式即用此路（`MockupStudio.tsx:437`）→ **複用，不新建 API**。
+- 合成需 maxRefs>0 模型；`model-options.ts:48` nano-banana-2 maxRefs 14 / NT$2.2（最佳預設）。`modelSupportsRefs()` 既有 helper（`:60`）。
+- 使用者指示：合成模式不另開模型選單，複用既有「圖片模型 + 風格」生圖積木。
+
+[已修改] `app/tools/banner/BannerStudio.tsx`
+- State + INIT：`aiBgCompositeProduct`（toggle）、`bgImageHasProduct`（provenance stamp）
+- `generateAiBg`：合成時 product 圖為 referenceImages[0]，maxRefs 內才補 style ref，prompt 加合成指令；成功時 stamp `bgImageHasProduct = compositing`
+- canvas `exportToPng` + preview：以 `bgImageHasProduct && bgMode==="ai"` 略過事後疊加（**非** live toggle，避免 critic 抓到的「toggle 回事後疊加→雙重產品」bug）
+- UI：「📦 產品圖處理」toggle（僅產品圖存在時出現）；切合成且當前模型 maxRefs=0 → 自動換 nano-banana-2；generate 按鈕在不支援模型時 disable
+- `handleBgUpload` 清 stamp；移除產品時 reset `aiBgCompositeProduct`
+
+[驗證結果]
+- REALTEST_WAIVED: SMOKE_COVERED -- 純前端 client component（state + prompt 組裝 + canvas），無後端契約改動；真實驗證走 sg-deploy HTTP smoke + 部署後瀏覽器手測（composite→toggle→下載確認產品只出現一次）
+- REVIEW_DONE: critic=Standard | verdict=warn→pass | findings=1c/1m（Major：toggle-back 雙重產品 → provenance-stamp 修復；Minor：移除產品 reset toggle → 已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=aiBgCompositeProduct\|bgImageHasProduct\|nano-banana-2 | hits=0（新 symbol 為 component 本地 state，無跨檔碰撞；nano-banana-2 確為合法 model value）
+- tsc --noEmit exit 0
+
+[剩餘風險] 合成後上傳新產品圖未自動重生 → 舊合成 bg 仍顯示舊產品（hint 已說明，需手動重新合成）；可接受。
+[rollback] `git revert <hash>`（僅 BannerStudio.tsx；no API/DB/auth change）
+
+AUTO_TASK_DONE: feat(banner): AI 背景合成產品到場景
+
 ### fix(video): 還原 AI 生圖模型選擇器（pexels-video feature 誤刪）
 
 [任務理解] 使用者回報「你把我的 AI 生圖的『模型和風格』生圖工具拿掉」。根因：pexels-video feature 把「素材模式」原本的全模型 `<select>`（`Object.entries(IMAGE_RATES)`）換成 3 顆固定按鈕（pexels-video / pexels-all / flux-schnell），導致無法選 Flux dev / Ideogram / Seedream 等具體模型。

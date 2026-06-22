@@ -95,6 +95,7 @@ interface State {
   gradTo:    string;
   gradAngle: string;
   bgImage:   string | null;
+  bgImageHasProduct: boolean;   // true 當 bgImage 已由 AI 把產品合成進去（決定是否略過事後疊加）
   generating: boolean;
   // AI bg blocks
   aiBgSubject:       string;
@@ -106,6 +107,7 @@ interface State {
   aiBgPromptOvr:     string;
   aiBgPromptTouched: boolean;
   aiBgModelGroup:    string;
+  aiBgCompositeProduct: boolean;   // 把產品圖合成進 AI 場景（非事後疊加）
   // text
   headline:  string;
   subtext:   string;
@@ -139,6 +141,7 @@ const INIT: State = {
   gradTo:    "#764ba2",
   gradAngle: "135deg",
   bgImage:   null,
+  bgImageHasProduct: false,
   generating: false,
   aiBgSubject:       "",
   aiBgVibe:          "",
@@ -149,6 +152,7 @@ const INIT: State = {
   aiBgPromptOvr:     "",
   aiBgPromptTouched: false,
   aiBgModelGroup:    "BFL",
+  aiBgCompositeProduct: false,
   headline:  "",
   subtext:   "",
   textColor: "#ffffff",
@@ -217,7 +221,11 @@ async function exportToPng(state: State): Promise<string> {
     ctx.fillRect(0, 0, p.w, p.h);
   }
 
-  if (state.productImage) {
+  // Skip overlaying the product when the active AI background already has it baked in.
+  // Keyed off bgImageHasProduct (set at generation time), NOT the live toggle — so flipping
+  // the toggle after a composite generate can't double-draw the product.
+  const aiComposited = state.bgImageHasProduct && state.bgMode === "ai" && !!state.bgImage;
+  if (state.productImage && !aiComposited) {
     const img  = await loadImage(state.productImage);
     const isCtr = state.productPos === "center";
     const maxW  = p.w * state.productScale * (isCtr ? 0.7 : 0.45);
@@ -374,7 +382,11 @@ export default function BannerStudio() {
   }, [s.aiBgSubject, s.aiBgVibe, s.aiBgStyle]);
 
   const effectiveBgPrompt = s.aiBgPromptTouched ? s.aiBgPromptOvr : assembledBgPrompt;
-  const aiBgHasInput = !!(s.aiBgSubject || s.aiBgVibe || s.aiBgStyle || s.aiBgPromptTouched);
+  // In composite mode the product image alone is enough input (a scene description is optional);
+  // otherwise at least one prompt block must be filled.
+  const aiBgHasInput =
+    !!(s.aiBgSubject || s.aiBgVibe || s.aiBgStyle || s.aiBgPromptTouched) ||
+    (s.aiBgCompositeProduct && !!s.productImage);
 
   // ── Preview helpers ──
   function previewBg(): React.CSSProperties {
@@ -412,7 +424,7 @@ export default function BannerStudio() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload  = () => setS((prev) => ({ ...prev, bgImage: reader.result as string, bgMode: "upload", error: null }));
+    reader.onload  = () => setS((prev) => ({ ...prev, bgImage: reader.result as string, bgMode: "upload", bgImageHasProduct: false, error: null }));
     reader.onerror = () => setS((prev) => ({ ...prev, error: "upload_read_failed" }));
     reader.readAsDataURL(file);
   }
@@ -455,23 +467,40 @@ export default function BannerStudio() {
   }
 
   async function generateAiBg() {
-    if (!effectiveBgPrompt.trim()) return;
+    const compositing = s.aiBgCompositeProduct && !!s.productImage;
+    if (!effectiveBgPrompt.trim() && !compositing) return;
     setS((prev) => ({ ...prev, generating: true, error: null }));
     try {
-      const refs = s.aiBgRefMode === "ref" && s.aiBgRefImage ? [s.aiBgRefImage] : [];
+      const maxRefs = STUDIO_MODEL_OPTIONS.find((m) => m.value === s.aiBgModel)?.maxRefs ?? 0;
+      // Product ref takes priority; a style ref is appended only if the model has spare ref slots.
+      const refs: string[] = [];
+      if (compositing && s.productImage) refs.push(s.productImage);
+      if (s.aiBgRefMode === "ref" && s.aiBgRefImage && refs.length < maxRefs) refs.push(s.aiBgRefImage);
+      const trimmedRefs = refs.slice(0, maxRefs);
+
+      let prompt = effectiveBgPrompt;
+      if (compositing) {
+        const scene = effectiveBgPrompt.trim() || "a clean professional studio background";
+        prompt =
+          `${scene}. Place the provided product image as the hero subject, ` +
+          `naturally integrated into the scene with realistic lighting, contact shadows and reflections. ` +
+          `Keep the product's exact shape, colors, text and details unchanged — do not distort, recolor, crop or redraw it. ` +
+          `Leave clean negative space for a headline.`;
+      }
+
       const res  = await fetch("/api/tools/studio/generate", {
         method:  "POST",
         headers: { "Content-Type": "application/json", ...roleHeader("operator") },
         body:    JSON.stringify({
           model:           s.aiBgModel,
-          prompt:          effectiveBgPrompt,
-          referenceImages: refs,
+          prompt,
+          referenceImages: trimmedRefs,
           aspectRatio:     p.aspect,
         }),
       });
       const data = await res.json() as { ok: boolean; image?: string; error?: string };
       if (!data.ok || !data.image) throw new Error(data.error ?? "generation_failed");
-      setS((prev) => ({ ...prev, bgImage: data.image!, bgMode: "ai", generating: false }));
+      setS((prev) => ({ ...prev, bgImage: data.image!, bgMode: "ai", bgImageHasProduct: compositing, generating: false }));
     } catch (err) {
       setS((prev) => ({ ...prev, generating: false, error: String(err) }));
     }
@@ -675,7 +704,7 @@ export default function BannerStudio() {
                 )}
                 {s.productImage && (
                   <button className="btn btn-ghost" style={{ fontSize: 12, color: "var(--red)" }}
-                    onClick={() => setS((prev) => ({ ...prev, productOrig: null, productImage: null, saved: false }))}>
+                    onClick={() => setS((prev) => ({ ...prev, productOrig: null, productImage: null, aiBgCompositeProduct: false, saved: false }))}>
                     移除
                   </button>
                 )}
@@ -878,6 +907,47 @@ export default function BannerStudio() {
                   )}
                 </AccordionSection>
 
+                {/* 產品圖處理（僅當已上傳產品圖時出現） */}
+                {s.productImage && (
+                  <div style={{ padding: 10, background: "var(--chip-surface, #f7f9fc)", borderRadius: 8, border: "1px solid var(--border, #e2e8f0)" }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>📦 產品圖處理</div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <button
+                        className={!s.aiBgCompositeProduct ? "btn btn-primary" : "btn btn-ghost"}
+                        style={{ fontSize: 12, padding: "3px 10px" }}
+                        onClick={() => set("aiBgCompositeProduct", false)}>
+                        事後疊加
+                      </button>
+                      <button
+                        className={s.aiBgCompositeProduct ? "btn btn-primary" : "btn btn-ghost"}
+                        style={{ fontSize: 12, padding: "3px 10px" }}
+                        onClick={() => {
+                          // Composite needs a ref-capable model; auto-switch if the current one can't take refs.
+                          setS((prev) => {
+                            const next = { ...prev, aiBgCompositeProduct: true, saved: false, error: null };
+                            if (!modelSupportsRefs(prev.aiBgModel)) {
+                              next.aiBgModel = "nano-banana-2";
+                              next.aiBgModelGroup = "Google+";
+                            }
+                            return next;
+                          });
+                        }}>
+                        AI 合成進場景
+                      </button>
+                    </div>
+                    <p className="form-hint" style={{ marginTop: 6 }}>
+                      {s.aiBgCompositeProduct
+                        ? "AI 把產品自然融入場景（真實光影），匯出時不再事後疊加產品。"
+                        : "AI 只生背景，產品圖事後疊在上層（可調位置/大小）。"}
+                    </p>
+                    {s.aiBgCompositeProduct && !modelSupportsRefs(s.aiBgModel) && (
+                      <p className="form-hint" style={{ marginTop: 4, color: "var(--red)" }}>
+                        ⚠ 目前模型不吃參考圖，請在「圖片模型」選支援的模型（如 Nano Banana 2 / FLUX Kontext）
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* 組合提示詞預覽 */}
                 <div style={{ marginTop: 2 }}>
                   <div style={{ fontSize: 10, opacity: 0.45, marginBottom: 3, letterSpacing: 0.5 }}>組合提示詞預覽</div>
@@ -898,12 +968,20 @@ export default function BannerStudio() {
                 </div>
 
                 <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
-                  <button className="btn btn-primary" disabled={s.generating || !aiBgHasInput}
+                  <button
+                    className="btn btn-primary"
+                    disabled={s.generating || !aiBgHasInput || (s.aiBgCompositeProduct && !!s.productImage && !modelSupportsRefs(s.aiBgModel))}
                     onClick={generateAiBg}>
-                    {s.generating ? "生成中…" : s.bgImage && s.bgMode === "ai" ? "重新生成" : "生成背景"}
+                    {s.generating
+                      ? "生成中…"
+                      : s.aiBgCompositeProduct && s.productImage
+                        ? (s.bgImage && s.bgMode === "ai" ? "重新合成" : "合成產品到場景")
+                        : (s.bgImage && s.bgMode === "ai" ? "重新生成" : "生成背景")}
                   </button>
                   {s.bgImage && s.bgMode === "ai" && (
-                    <span className="form-hint" style={{ color: "var(--green)" }}>✓ 背景已生成</span>
+                    <span className="form-hint" style={{ color: "var(--green)" }}>
+                      {s.aiBgCompositeProduct && s.productImage ? "✓ 已合成" : "✓ 背景已生成"}
+                    </span>
                   )}
                 </div>
               </div>
@@ -988,7 +1066,7 @@ export default function BannerStudio() {
               {s.dimOverlay && (
                 <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
               )}
-              {s.productImage && (
+              {s.productImage && !(s.bgImageHasProduct && s.bgMode === "ai" && s.bgImage) && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={s.productImage} alt="" style={productPreviewStyle()} />
               )}
