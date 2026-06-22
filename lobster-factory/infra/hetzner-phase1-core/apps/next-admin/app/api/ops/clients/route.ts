@@ -44,6 +44,14 @@ export interface ClientConfig {
 
   // ISO date of last department selection review (populated alongside department_selection)
   department_selection_reviewed_at?: string;
+
+  // Brand colours for design tools (Banner Studio "選擇品牌帶入配色"). Hex strings.
+  // Stored in the same JSONB blob — no schema migration.
+  brandColors?: {
+    primary?: string;
+    secondary?: string;
+    accent?: string;
+  };
 }
 
 export interface WpUpdateLatest {

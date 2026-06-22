@@ -1050,6 +1050,66 @@ export default function BannerStudio() {
     }
   }
 
+  // ── brand colours: fetch clients that have brandColors set on /ops/clients ──
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/ops/clients", { headers: { ...roleHeader("operator") } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { clients?: { slug: string; name: string; clientConfig?: { brandColors?: { primary?: string; secondary?: string; accent?: string } } }[] } | null) => {
+        if (cancelled || !d?.clients) return;
+        const list = d.clients
+          .map((c) => {
+            const bc = c.clientConfig?.brandColors;
+            const colors = [bc?.primary, bc?.secondary, bc?.accent].filter((x): x is string => !!x && /^#[0-9a-fA-F]{6}$/.test(x));
+            return { slug: c.slug, name: c.name, colors };
+          })
+          .filter((c) => c.colors.length > 0);
+        setBrandClients(list);
+      })
+      .catch(() => { /* clients endpoint unavailable — brand picker just stays empty */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  // ── colour-tool handlers ──
+  function handleColorRefUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const pal = await extractPalette(reader.result as string);
+        setPalette(pal); setSelSwatch(pal[0] ?? null);
+      } catch { setS((prev) => ({ ...prev, error: "palette_extract_failed" })); }
+    };
+    reader.onerror = () => setS((prev) => ({ ...prev, error: "upload_read_failed" }));
+    reader.readAsDataURL(file);
+  }
+
+  // Auto-distribute a palette across the design (dark→bg gradient, most-saturated→CTA/accent, light→text).
+  function autoApplyPalette(pal: string[]) {
+    if (!pal.length) return;
+    const byLum = [...pal].sort((a, b) => luminance(a) - luminance(b));
+    const dark = byLum[0];
+    const dark2 = byLum[1] ?? byLum[0];
+    const light = byLum[byLum.length - 1];
+    const accent = [...pal].sort((a, b) => saturation(b) - saturation(a))[0];
+    setS((prev) => ({
+      ...prev,
+      bgMode: "gradient", gradFrom: dark, gradTo: dark2,
+      textColor: luminance(light) > 150 ? light : "#ffffff",
+      ctaBg: accent, badgeColor: accent, accentColor: accent,
+      ctaTextColor: luminance(accent) > 150 ? "#111111" : "#ffffff",
+      saved: false, error: null,
+    }));
+  }
+
+  type ColorKey = "textColor" | "accentColor" | "ctaBg" | "badgeColor" | "gradFrom" | "gradTo" | "bgColor";
+  const SWATCH_TARGETS: { label: string; key: ColorKey }[] = [
+    { label: "標題字", key: "textColor" }, { label: "重點字", key: "accentColor" },
+    { label: "CTA 底", key: "ctaBg" }, { label: "徽章", key: "badgeColor" },
+    { label: "背景起", key: "gradFrom" }, { label: "背景迄", key: "gradTo" }, { label: "純色背景", key: "bgColor" },
+  ];
+
   // ── Handlers ──
 
   async function handleBgUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1882,6 +1942,66 @@ export default function BannerStudio() {
               </AccordionSection>
 
             </div>
+          </div>
+
+          {/* 配色 / 品牌色 */}
+          <div className="card">
+            <h2 style={{ fontSize: 15, margin: "0 0 8px" }}>🎨 配色 / 品牌色</h2>
+
+            {brandClients.length > 0 ? (
+              <div className="form-row">
+                <label className="form-label">品牌</label>
+                <select className="form-select" defaultValue=""
+                  onChange={(e) => {
+                    const c = brandClients.find((x) => x.slug === e.target.value);
+                    if (c) { setPalette(c.colors); setSelSwatch(c.colors[0] ?? null); }
+                  }}>
+                  <option value="">選擇品牌帶入配色…</option>
+                  {brandClients.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
+                </select>
+              </div>
+            ) : (
+              <p className="form-hint">尚無品牌色。到 <a href="/ops/clients">客戶設定</a> 填入品牌色後即可在此選取帶入。</p>
+            )}
+
+            <input ref={colorRefFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleColorRefUpload} />
+            <button className="btn btn-ghost" style={{ fontSize: 12, marginTop: 8 }} onClick={() => colorRefFileRef.current?.click()}>
+              📷 從參考圖擷取配色
+            </button>
+
+            {palette.length > 0 && (
+              <>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+                  {palette.map((c, i) => (
+                    <button key={`${c}-${i}`} onClick={() => setSelSwatch(c)} title={c}
+                      style={{
+                        width: 30, height: 30, borderRadius: 6, background: c, cursor: "pointer", padding: 0,
+                        border: selSwatch === c ? "3px solid #6366f1" : "1px solid var(--border, #d4d9e8)",
+                      }} />
+                  ))}
+                </div>
+                <button className="btn btn-primary" style={{ fontSize: 12, marginTop: 10 }} onClick={() => autoApplyPalette(palette)}>
+                  ✨ 自動套用整組配色
+                </button>
+                {selSwatch && (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ fontSize: 11, opacity: 0.55, marginBottom: 4, display: "flex", alignItems: "center", gap: 5 }}>
+                      把選中色
+                      <span style={{ display: "inline-block", width: 13, height: 13, background: selSwatch, borderRadius: 3, border: "1px solid #0002" }} />
+                      套到：
+                    </div>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                      {SWATCH_TARGETS.map((t) => (
+                        <button key={t.key} className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 8px" }}
+                          onClick={() => { if (selSwatch) set(t.key, selSwatch); }}>
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
         </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { roleHeader } from "@/lib/ops-role";
 import { WpUpdateButtons } from "./WpUpdateButtons";
 import type { ClientConfig, WpUpdateLatest } from "@/app/api/ops/clients/route";
 import type { DepartmentSummaryPayload } from "@/app/api/ops/clients/[slug]/department-summary/route";
@@ -836,6 +837,58 @@ function MaintenanceTab({ org, cfg, wp, runs, installRuns }: Pick<ClientHubTabsP
   );
 }
 
+function BrandColorsCard({ slug, initial }: { slug: string; initial?: { primary?: string; secondary?: string; accent?: string } }) {
+  const [primary, setPrimary] = useState(initial?.primary ?? "#6366f1");
+  const [secondary, setSecondary] = useState(initial?.secondary ?? "#111827");
+  const [accent, setAccent] = useState(initial?.accent ?? "#f59e0b");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  async function save() {
+    setSaving(true); setMsg(null);
+    try {
+      const res = await fetch(`/api/ops/clients/${slug}/brand-colors`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...roleHeader("admin") },
+        body: JSON.stringify({ primary, secondary, accent }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) throw new Error(data.error ?? `save_failed_${res.status}`);
+      setMsg("✓ 已儲存，Banner Studio 即可選此品牌帶入配色");
+    } catch (e) {
+      setMsg(`⚠ ${String(e)}`);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const row = (label: string, val: string, setter: (v: string) => void) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", fontSize: 12 }}>
+      <span style={{ color: "var(--text-muted)", width: 70, flexShrink: 0 }}>{label}</span>
+      <input type="color" value={val} onChange={(e) => setter(e.target.value)}
+        style={{ width: 40, height: 28, border: "none", background: "none", cursor: "pointer", padding: 0 }} />
+      <span style={{ fontFamily: "monospace", fontSize: 11, color: "var(--text-muted)" }}>{val}</span>
+    </div>
+  );
+
+  return (
+    <Card title="🎨 品牌色 (brandColors)">
+      <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 6px" }}>
+        設定後，Banner Studio 的「配色 / 品牌色」可直接選此客戶帶入。
+      </p>
+      {row("主色", primary, setPrimary)}
+      {row("次色", secondary, setSecondary)}
+      {row("強調色", accent, setAccent)}
+      <button onClick={save} disabled={saving}
+        style={{ marginTop: 8, fontSize: 12, padding: "5px 12px", borderRadius: 6, cursor: "pointer",
+          background: "var(--accent)", color: "#fff", border: "none", opacity: saving ? 0.6 : 1 }}>
+        {saving ? "儲存中…" : "儲存品牌色"}
+      </button>
+      {msg && <div style={{ marginTop: 6, fontSize: 11, color: msg.startsWith("✓") ? "var(--green, #16a34a)" : "var(--red, #dc2626)" }}>{msg}</div>}
+    </Card>
+  );
+}
+
 function SettingsTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cfg" | "wpSites">) {
   const configFields: Array<[string, string | undefined]> = [
     ["site_url", cfg.site_url],
@@ -860,6 +913,8 @@ function SettingsTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cf
           </Link>
         </div>
       </Card>
+
+      <BrandColorsCard slug={org.slug} initial={cfg.brandColors} />
 
       <Card
         title="WP 網站連線 (wp_sites)"

@@ -63,10 +63,10 @@ export const POD_PRODUCT_MODELS: PodProductModel[] = [
     sleeve: "long",
     sizes: [...POD_SIZES],
     colors: [
-      { hex: "#ffffff", printfulName: "White", label: "白 White" },
-      { hex: "#9b969c", printfulName: "Sport Grey", label: "運動灰 Sport Grey" },
-      { hex: "#080808", printfulName: "Black", label: "黑 Black" },
-      { hex: "#213b21", printfulName: "Forest Green", label: "森林綠 Forest Green" },
+      { hex: "#ffffff", printfulName: "White", label: "White" },
+      { hex: "#9b969c", printfulName: "Sport Grey", label: "Sport Grey" },
+      { hex: "#080808", printfulName: "Black", label: "Black" },
+      { hex: "#213b21", printfulName: "Forest Green", label: "Forest Green" },
     ],
   },
   {
@@ -76,10 +76,10 @@ export const POD_PRODUCT_MODELS: PodProductModel[] = [
     sleeve: "short",
     sizes: [...POD_SIZES],
     colors: [
-      { hex: "#ffffff", printfulName: "White", label: "白 White" },
-      { hex: "#cfcbc8", printfulName: "Heather Grey", label: "麻灰 Heather Grey" },
-      { hex: "#111111", printfulName: "Black", label: "黑 Black" },
-      { hex: "#112537", printfulName: "French Navy", label: "海軍藍 French Navy" },
+      { hex: "#ffffff", printfulName: "White", label: "White" },
+      { hex: "#cfcbc8", printfulName: "Heather Grey", label: "Heather Grey" },
+      { hex: "#111111", printfulName: "Black", label: "Black" },
+      { hex: "#112537", printfulName: "French Navy", label: "French Navy" },
     ],
   },
   {
@@ -90,10 +90,10 @@ export const POD_PRODUCT_MODELS: PodProductModel[] = [
     sizes: [...POD_SIZES],
     colors: [
       // off-white — Printful's Gildan 5000 white is #fffefa, NOT #ffffff; verified, do not "correct".
-      { hex: "#fffefa", printfulName: "White", label: "白 White" },
-      { hex: "#c4c0be", printfulName: "Sport Grey", label: "運動灰 Sport Grey" },
-      { hex: "#141313", printfulName: "Black", label: "黑 Black" },
-      { hex: "#1a2330", printfulName: "Navy", label: "海軍藍 Navy" },
+      { hex: "#fffefa", printfulName: "White", label: "White" },
+      { hex: "#c4c0be", printfulName: "Sport Grey", label: "Sport Grey" },
+      { hex: "#141313", printfulName: "Black", label: "Black" },
+      { hex: "#1a2330", printfulName: "Navy", label: "Navy" },
     ],
   },
 ];
