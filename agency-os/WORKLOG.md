@@ -4,6 +4,31 @@
 
 ## 2026-06-23
 
+### feat(banner): Tier-2/3 — 字體配對 / 重點字 / 字距 / Undo-Redo / AI 一鍵設計 / 行銷風格
+
+[任務理解] 使用者「去做完」Tier 2/3，並問 canvas/vector 積木能否在 Banner Studio 用。
+
+[現況分析] 2-reader workflow（w54h10vsf）結論：**Canvas(Fabric)** 僅適合當「進階自由編輯」出口（已接 openInCanvas PNG handoff，單向、不可還原圖層）；**vector 積木** 是 SVG 向量範式，與 Banner 點陣/照片不合 → 忽略。Tier 2/3 不轉軌，全留 canvas-2D。借 Canvas 兩個 pattern：undo/redo 快照 + CJK 字體。
+
+[已修改] `app/tools/banner/BannerStudio.tsx`
+- **字體配對**：headlineFont（標題）/ fontFamily（內文）分離 + 6 組 FONT_PAIRS 預設
+- **重點字**：`**字**` 語法（parseAccentRuns + layoutAccentLines 字元級換行）→ accentColor 上色，可選 accentHighlight 螢光底
+- **字距** letterSpacing（setLetterSpacing 安全 cast，不支援瀏覽器 no-op）
+- **Undo/Redo**：historyRef 快照（cap 25，designSig 排除 transient + 圖片只存長度；未變圖片字串 by-ref 共享 → 記憶體省）
+- **AI 一鍵設計**：generateFullDesign 串 script-forge → JSON → sanitizeDesign（hex 正則 + enum allowlist + clamp + bgMode 鎖 color|gradient）→ State patch；renderer 直接吃（零渲染改動）
+- **行銷風格** 6 預設（奢華極簡/節慶促銷/…）注入 AI 背景氛圍
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm run build | exit=0 | /tools/banner 16.4kB 編譯通過（TS+ESLint+compile+static-gen）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/3m（兩個 Major 經 trace 降為 verified-clean；Minor：AI 非 JSON 友善錯誤已修、designSig transient list 改 typed Set 已修、image-length collision 記為可接受）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=parseAccentRuns\|sanitizeDesign\|generateFullDesign\|FONT_PAIRS\|headlineFont\|setLetterSpacing\|designSig | hits=0（皆 component 本地）
+- tsc --noEmit exit 0
+
+[剩餘風險] undo 對「換成相同位元組長度的不同圖」可能漏記一步（極罕，非 crash）；AI 一鍵設計品質依 LLM。
+[rollback] `git revert <hash>`（單檔；無 API/DB/auth 改動）
+
+AUTO_TASK_DONE: feat(banner): Tier-2/3 字體配對/重點字/字距/Undo-Redo/AI一鍵設計/行銷風格
+
 ### fix(video): 「場景總數」滑桿失效——AI 生圖模式永遠出 6 張圖
 
 [任務理解] /tools/video AI 生圖模式，「場景總數」滑桿是死的，永遠生 6 張圖（操作者回報「像被覆蓋」）。
