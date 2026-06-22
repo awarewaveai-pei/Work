@@ -482,10 +482,14 @@ export default function BannerStudio() {
       if (compositing) {
         const scene = effectiveBgPrompt.trim() || "a clean professional studio background";
         prompt =
-          `${scene}. Place the provided product image as the hero subject, ` +
-          `naturally integrated into the scene with realistic lighting, contact shadows and reflections. ` +
-          `Keep the product's exact shape, colors, text and details unchanged — do not distort, recolor, crop or redraw it. ` +
-          `Leave clean negative space for a headline.`;
+          `Scene: ${scene}. Composite the provided product photo INTO this scene as the hero subject. ` +
+          `Physically PLACE the product resting on a real surface in the foreground — a table, counter or shelf that belongs to the scene — ` +
+          `standing upright with its base actually touching the surface (a grounded contact shadow beneath it), ` +
+          `NOT floating, NOT pasted flat over the background. ` +
+          `Match the scene's camera perspective, depth of field, lighting direction and color temperature; ` +
+          `add soft contact shadows and subtle surface reflection so it looks physically present in the room. ` +
+          `Keep the product's exact shape, label, colors, text and proportions unchanged — do not distort, recolor, relabel, crop or redraw it. ` +
+          `Keep clean, uncluttered negative space for a headline.`;
       }
 
       const res  = await fetch("/api/tools/studio/generate", {
