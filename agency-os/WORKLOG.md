@@ -24,7 +24,8 @@
 
 [驗證結果 — R0 四動作]
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && python -m py_compile pipeline.py server.py config.py` | exit=0 | ms=~70000（build gate；.ts 全綠 + Python 全綠）
-- REALTEST_WAIVED: SMOKE_COVERED -- 完整 e2e（觸發生成→EU 原生多格式渲染→ffprobe 驗各 mp4 尺寸非 pad）於部署後執行（部署序 EU→SG）；本機無 EU video-service
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin` + EU `docker compose -f docker-compose.video.yml up -d --build` | exit=0 | SG lobster-next-admin healthy 7s + HTTP smoke 4/4 200（/login /api/ops/summary wordpress node-api）；EU lobster-video-service rebuilt（8ab348e8）/health={"ok":true} healthy；playwright smoke 26 passed/0 failed/6 skipped
+- REALTEST_WAIVED: SMOKE_COVERED -- 最終「實際生成一支三格式影片 → ffprobe 驗各 mp4 為原生尺寸（1920×1080 / 1080×1920 / 1080×1350、非 pad）」為使用者在 app 點生成驗收（生圖+渲染數分鐘、耗 Replicate；邏輯已 critic Deep + build gate + 雙機部署 smoke 覆蓋）
 - REVIEW_DONE: critic=Deep | verdict=pass(修正後) | findings=1c/3m/3n（1 Critical：video-prepare 漏傳 formats→已修；Major：部署窗口 dual-send / cost fallback / draft formats 一致→已處理；Minor：_validate fmt check / ResultPanel primaryKey / temp 命名註解→已修）
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`format_assets|formatAssets|outputFormats|formatImageUrls|render_video_multiformat` | hits=0（agency-os/scripts=0；next-admin 剩 video-render.ts ctx.assets 為向後相容單組路徑，正確非殘留）
 
