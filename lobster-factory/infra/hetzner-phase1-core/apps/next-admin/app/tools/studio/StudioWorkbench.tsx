@@ -8,9 +8,9 @@ import {
 } from "../../../lib/studio/model-options";
 import { resolveStylePrompt } from "@/app/tools/tarot/cards";
 import { STYLE_CATALOG } from "@/app/tools/tarot/tarotStyles";
-import OutputTrackBar from "@/components/tools/OutputTrackBar";
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
-import { buildSemanticFilename, type SemanticFileMeta } from "@/lib/studio/semantic-filename";
+import { openInCanvas } from "@/components/tools/canvas-handoff";
+import { buildSemanticFilename, buildSemanticBase, type SemanticFileMeta } from "@/lib/studio/semantic-filename";
 import type { MockupView } from "@/lib/studio/printful-mockup";
 import {
   EDGE_MASK_STYLES,
