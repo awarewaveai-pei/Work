@@ -562,6 +562,26 @@ export default function StudioWorkbench() {
     } catch { setSavedMockups((prev) => ({ ...prev, [m.url]: "error" })); }
   }, [savedMockups, effectivePrompt, primaryModel, productType]);
 
+  const downloadImageWebP = useCallback((image: string, model: StudioModel) => {
+    const el = document.createElement("img");
+    el.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = el.naturalWidth;
+      c.height = el.naturalHeight;
+      const ctx = c.getContext("2d");
+      if (!ctx) return;
+      ctx.drawImage(el, 0, 0);
+      const url = c.toDataURL("image/webp", 0.9);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = buildSemanticFilename({ ...fileMeta, track: model }, "webp", `design.webp`);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    };
+    el.src = image;
+  }, [fileMeta]);
+
   const downloadImage = useCallback((image: string, model: StudioModel) => {
     const ext = image.startsWith("data:image/jpeg") ? "jpg" : image.startsWith("data:image/webp") ? "webp" : "png";
     const a = document.createElement("a");
