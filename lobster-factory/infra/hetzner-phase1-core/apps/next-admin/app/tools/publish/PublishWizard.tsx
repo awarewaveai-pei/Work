@@ -52,6 +52,10 @@ const hasUsablePfMap = (vmap?: VariantMapEntry[]): boolean =>
 const downloadHref = (url: string, filename: string): string =>
   `/api/tools/publish/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
 
+// Suggested retail = 2× wholesale cost (≈50% gross margin), rounded down to a .99 charm price.
+// A starting point the operator can override — NOT a hard rule (shipping/fees are separate).
+const suggestRetail = (cost: number): string => Math.max(0.99, Math.ceil(cost * 2) - 0.01).toFixed(2);
+
 export default function PublishWizard() {
   // Split the picker by source group so the two actions never share one flooded list:
   //   designAssets → 設計圖 (印刷檔來源, single-select)   mockupAssets → 商品照 (gallery, multi-select)
@@ -68,6 +72,16 @@ export default function PublishWizard() {
   const [plusPrice, setPlusPrice] = useState("26.99");
   const [keywordHint, setKeywordHint] = useState("");
   const [copyInstructions, setCopyInstructions] = useState("");
+  // Printful wholesale cost per tier (standard S–XL + plus 2XL) → live profit/margin before publishing.
+  const [pricing, setPricing] = useState<{
+    state: StepState;
+    currency?: string;
+    standardCost?: number;
+    plusCost?: number;
+    standardSize?: string;
+    plusSize?: string;
+    error?: string;
+  }>({ state: "idle" });
   // AI SEO/GEO/AEO/RankMath product copy (Phase 4).
   const [copy, setCopy] = useState<{
     state: StepState;
@@ -253,6 +267,23 @@ export default function PublishWizard() {
     setLink({ state: "idle" });
     setPfcreate({ state: "idle" });
   }, [catalogProductId]);
+  // Fetch the chosen model's Printful wholesale cost (standard + plus tier) so the form shows live
+  // profit. Cancellable so a fast model switch can't land a stale product's cost on the new selection.
+  useEffect(() => {
+    let cancelled = false;
+    setPricing({ state: "running" });
+    void (async () => {
+      const json = await post({ action: "pricing", catalogProductId });
+      if (cancelled) return;
+      if (!json.ok) {
+        setPricing({ state: "error", error: json.error });
+        return;
+      }
+      const p = json.pricing as { currency: string; standardCost: number; plusCost: number; standardSize: string; plusSize: string };
+      setPricing({ state: "done", currency: p.currency, standardCost: p.standardCost, plusCost: p.plusCost, standardSize: p.standardSize, plusSize: p.plusSize });
+    })();
+    return () => { cancelled = true; };
+  }, [catalogProductId, post]);
 
   const runUpscale = useCallback(async () => {
     if (!designUrl) return;
@@ -646,6 +677,21 @@ export default function PublishWizard() {
   const printFileSlug =
     title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "print-file";
 
+  // Live profit against the Printful wholesale cost. profit = retail − cost; margin = profit / retail.
+  const cur = pricing.currency ?? "USD";
+  const profitOf = (retail: string, cost?: number): { profit: number; margin: number } | null => {
+    const r = Number(retail);
+    if (cost == null || !Number.isFinite(r) || r <= 0) return null;
+    return { profit: r - cost, margin: ((r - cost) / r) * 100 };
+  };
+  const stdProfit = profitOf(retailPrice, pricing.standardCost);
+  const plusProfit = profitOf(plusPrice, pricing.plusCost);
+  const applySuggestedPricing = () => {
+    if (busy || pricing.state !== "done") return;
+    if (pricing.standardCost != null) setRetailPrice(suggestRetail(pricing.standardCost));
+    if (pricing.plusCost != null) setPlusPrice(suggestRetail(pricing.plusCost));
+  };
+
   const pill = (state: StepState) =>
     state === "done" ? "✅" : state === "running" ? "⏳" : state === "error" ? "❌" : "⬜";
 
@@ -845,6 +891,51 @@ export default function PublishWizard() {
           Plus 價（2XL+）
           <input className="btn-secondary" style={{ width: 110, marginTop: 4 }} value={plusPrice} onChange={(e) => setPlusPrice(e.target.value)} />
         </label>
+      </div>
+
+      {/* 💰 利潤試算 — Printful 履約底價 vs 售價，發佈前就知道賺多少 */}
+      <div className="build-panel" style={{ padding: 14, marginTop: 10, fontSize: 13 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <b>💰 利潤試算</b>
+          {pricing.state === "running" ? <span style={{ opacity: 0.6 }}>讀取 Printful 底價中…</span> : null}
+          {pricing.state === "error" ? (
+            <span style={{ color: "var(--yellow)" }}>無法取得 Printful 底價（{pricing.error}）— 仍可手動定價</span>
+          ) : null}
+          {pricing.state === "done" ? (
+            <button className="btn-secondary" type="button" disabled={busy} onClick={applySuggestedPricing} title="以 2× 底價（約 50% 毛利）自動帶入售價，可再改">
+              套用建議售價（2×底價）
+            </button>
+          ) : null}
+        </div>
+        {pricing.state === "done" ? (
+          <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginTop: 8 }}>
+            {/* Standard tier */}
+            <div style={{ background: "#0c0c0c", borderRadius: 6, padding: "8px 12px", minWidth: 200 }}>
+              <div style={{ opacity: 0.7, fontSize: 12 }}>標準碼 S–XL（樣本 {pricing.standardSize}）</div>
+              <div>底價 {cur} {pricing.standardCost?.toFixed(2)} · 售價 {cur} {retailPrice}</div>
+              {stdProfit ? (
+                <div style={{ color: stdProfit.profit > 0 ? "var(--green)" : "var(--red)", fontWeight: 600 }}>
+                  利潤 {cur} {stdProfit.profit.toFixed(2)} · 毛利 {stdProfit.margin.toFixed(0)}%
+                  {stdProfit.profit <= 0 ? " ⚠ 虧本" : ""}
+                </div>
+              ) : <div style={{ opacity: 0.6 }}>售價無效</div>}
+            </div>
+            {/* Plus tier */}
+            <div style={{ background: "#0c0c0c", borderRadius: 6, padding: "8px 12px", minWidth: 200 }}>
+              <div style={{ opacity: 0.7, fontSize: 12 }}>加大碼 2XL+（樣本 {pricing.plusSize}）</div>
+              <div>底價 {cur} {pricing.plusCost?.toFixed(2)} · 售價 {cur} {plusPrice}</div>
+              {plusProfit ? (
+                <div style={{ color: plusProfit.profit > 0 ? "var(--green)" : "var(--red)", fontWeight: 600 }}>
+                  利潤 {cur} {plusProfit.profit.toFixed(2)} · 毛利 {plusProfit.margin.toFixed(0)}%
+                  {plusProfit.profit <= 0 ? " ⚠ 虧本" : ""}
+                </div>
+              ) : <div style={{ opacity: 0.6 }}>售價無效</div>}
+            </div>
+          </div>
+        ) : null}
+        <div style={{ opacity: 0.55, fontSize: 11, marginTop: 6 }}>
+          底價 = Printful 單面 DTG 履約成本（不含運費 / 金流手續費）。建議售價僅起點，請依市場與成本自行調整。
+        </div>
       </div>
 
       {/* AI product copy — SEO / GEO / AEO / RankMath */}

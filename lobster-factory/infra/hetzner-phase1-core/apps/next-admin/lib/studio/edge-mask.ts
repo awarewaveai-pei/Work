@@ -341,9 +341,11 @@ export async function applyEdgeMask(
 
     ctx.globalCompositeOperation = "destination-in"; // keep source only where mask is opaque
     if (style.maskUrl) {
-      // Asset masks: use amount (10–90) to control how deep the brush cuts in spatially.
-      // amount=10 → scale 1.07 (barely touches edge); amount=90 → scale 0.83 (cuts ~8% each side)
-      const scale = 1.1 - (params.amount / 100) * 0.3;
+      // amount=10 → scale 0.97 (barely touches edge, ~1.5% each side); amount=90 → scale 0.75 (~12.5% each side)
+      // Scale is always ≤ 1.0 so the mask never overflows the canvas and brush strokes stay complete.
+      // Prior formula (1.1 - amt*0.3) gave scale=1.07 at amount=10, causing the brush PNG edges to be
+      // clipped by the canvas boundary → incomplete stroke shapes at every edge.
+      const scale = 1.0 - (params.amount / 100) * 0.28;
       const mx = (w * (1 - scale)) / 2;
       const my = (h * (1 - scale)) / 2;
       ctx.drawImage(mask, mx, my, w * scale, h * scale);

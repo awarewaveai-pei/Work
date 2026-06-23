@@ -180,6 +180,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
   const [deletingVideos, setDeletingVideos] = useState(false);
 
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isRenderingRef = useRef(false);
 
   // clear poll timer on unmount
   useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current); }, []);
@@ -249,11 +250,13 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
         return;
       }
       if (sj.status === "done" && sj.video) {
+        isRenderingRef.current = false;
         setGenResult({ outputs: sj.video.outputs, out_dir: sj.video.out_dir, title: sj.title ?? "" });
         setGenStatus("done");
         void loadHistory();
         return;
       }
+      isRenderingRef.current = false;
       setGenStatus("error");
       setGenError(sj.error ?? "生成失敗");
     };
@@ -384,6 +387,8 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
 
   // ── Render draft handler ──
   async function handleRenderDraft() {
+    if (isRenderingRef.current) return; // sync guard — prevents double-submit before React re-renders
+    isRenderingRef.current = true;
     if (pollRef.current) clearTimeout(pollRef.current);
     setGenStatus("loading");
     setGenStep("提交渲染中…");
@@ -408,9 +413,10 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
         }),
       });
       const j = (await res.json()) as { ok: boolean; jobId?: string; error?: string };
-      if (!j.ok || !j.jobId) { setGenStatus("error"); setGenError(j.error ?? "提交渲染失敗"); return; }
+      if (!j.ok || !j.jobId) { isRenderingRef.current = false; setGenStatus("error"); setGenError(j.error ?? "提交渲染失敗"); return; }
       startPolling(j.jobId);
     } catch (e: unknown) {
+      isRenderingRef.current = false;
       setGenStatus("error");
       setGenError(e instanceof Error ? e.message : "網路錯誤，請重試");
     }
@@ -708,7 +714,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                   <>
                     <KnobRow label="場景總數" hint={`${totalScenes} 場`} min={1} max={20} step={1} value={totalScenes} onChange={handleTotalChange} />
                     <KnobRow
-                      label={`自訂 AI 圖（Flux），目前 ${customScenes}/${totalScenes}`}
+                      label={`自訂 AI 圖，目前 ${customScenes}/${totalScenes}`}
                       hint={`B-roll：${brollScenes}`}
                       min={0} max={totalScenes} step={1}
                       value={customScenes} onChange={setCustomScenes}
@@ -728,6 +734,11 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                       </option>
                     ))}
                   </select>
+                  {voiceModelId.startsWith("openai:") && (
+                    <div style={{ fontSize: 11, color: "#92400e", background: "#fef3c7", padding: "4px 8px", borderRadius: 6, lineHeight: 1.5 }}>
+                      ⚠️ OpenAI TTS 需在伺服器設定 OPENAI_API_KEY，否則自動降版 Edge TTS
+                    </div>
+                  )}
                 </div>
 
                 {/* 輸出比例（每比例各自原生生成，非裁同一張、無黑邊） */}
@@ -793,6 +804,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                   onUpload={handleUploadAsset}
                   regenIds={regenIds}
                   disabled={isBusy}
+                  errorMsg={genError || undefined}
                 />
               ) : (
                 <button onClick={handleGenerateDraft} disabled={!canGenerate}
@@ -919,7 +931,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
 // ─── DraftEditor ──────────────────────────────────────────────────────────────
 
 function DraftEditor({
-  scenes, title, onChangeScene, onBack, onRender, onRegenerate, onUpload, regenIds, disabled,
+  scenes, title, onChangeScene, onBack, onRender, onRegenerate, onUpload, regenIds, disabled, errorMsg,
 }: {
   scenes: DraftScene[];
   title: string;
@@ -930,6 +942,7 @@ function DraftEditor({
   onUpload: (id: number, file: File) => void;
   regenIds: Set<number>;
   disabled: boolean;
+  errorMsg?: string;
 }) {
   // 有任何單張重生進行中 → 鎖住「返回 / 送出渲染」，避免送出時用到尚未更新的舊圖（per-scene 重生鈕仍各自獨立）。
   const flowBlocked = disabled || regenIds.size > 0;
@@ -949,8 +962,8 @@ function DraftEditor({
             border: "1px solid var(--border-subtle)", borderRadius: 8, background: "var(--card-bg)",
           }}>
             {/* Thumbnail + 重新生成 — 照片用 img；Pexels MP4 用靜音 video 預覽 */}
-            <div style={{ flexShrink: 0, width: 100, display: "flex", flexDirection: "column", gap: 4 }}>
-              <div style={{ width: 100, height: 68, borderRadius: 6, overflow: "hidden", background: "#0f172a" }}>
+            <div style={{ flexShrink: 0, width: 140, display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ width: 140, height: 96, borderRadius: 6, overflow: "hidden", background: "#0f172a" }}>
                 {/\.mp4(\?|$)/.test(scene.imageUrl) || scene.imageUrl.includes("videos.pexels.com") || scene.imageUrl.includes("player.vimeo.com") ? (
                   <video src={scene.imageUrl} muted loop autoPlay playsInline
                     style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -994,7 +1007,7 @@ function DraftEditor({
               <textarea
                 value={scene.narration}
                 onChange={(e) => onChangeScene(scene.id, e.target.value)}
-                rows={3}
+                rows={2}
                 disabled={disabled}
                 style={{
                   width: "100%", borderRadius: 6, border: "1px solid var(--border-subtle)",
@@ -1007,6 +1020,13 @@ function DraftEditor({
           </div>
         ))}
       </div>
+
+      {errorMsg && (
+        <div style={{ background: "var(--badge-red-bg)", border: "1px solid var(--red)", borderRadius: 8, padding: "10px 12px" }}>
+          <div style={{ fontSize: 12.5, color: "var(--red)", fontWeight: 700, marginBottom: 2 }}>操作失敗</div>
+          <div style={{ fontSize: 12, color: "var(--badge-red-text)" }}>{errorMsg}</div>
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 10 }}>
         <button onClick={onBack} disabled={flowBlocked}

@@ -595,7 +595,7 @@ export default function CanvasEditor() {
       requestRenderAll: () => void;
     } | null;
     if (!canvas) return;
-    const MAX_DISP = 820;
+    const MAX_DISP = 1100;
     const cm = (v: number) => (szUnit === "mm" ? v / 10 : v);
     const realW = Math.max(1, Math.round((cm(szW) * szDpi) / 2.54));
     const realH = Math.max(1, Math.round((cm(szH) * szDpi) / 2.54));
@@ -1220,6 +1220,94 @@ export default function CanvasEditor() {
     }
   }, [exportPng]);
 
+  // 🔄 Auto 色階 / 色彩 / 色調 — pixel analysis on the selected image → auto-set grade sliders.
+  const autoContrast = useCallback(() => {
+    const canvas = fabricRef.current;
+    const obj = canvas?.getActiveObject() as { type?: string; toDataURL?: (o?: Record<string, unknown>) => string } | null;
+    if (!canvas || !obj || obj.type !== "image" || !obj.toDataURL) return;
+    const dataUrl = obj.toDataURL({ format: "png", multiplier: 1, withoutTransform: true });
+    const img = new Image();
+    img.onload = () => {
+      const oc = document.createElement("canvas");
+      oc.width = img.width; oc.height = img.height;
+      const ctx = oc.getContext("2d");
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0);
+      const d = ctx.getImageData(0, 0, img.width, img.height).data;
+      let lo = 255, hi = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] < 10) continue;
+        const luma = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+        if (luma < lo) lo = luma;
+        if (luma > hi) hi = luma;
+      }
+      if (hi > lo) {
+        grade.set("black", Math.round(lo));
+        grade.set("white", Math.round(hi));
+      }
+    };
+    img.src = dataUrl;
+  }, [grade]);
+
+  const autoColor = useCallback(() => {
+    const canvas = fabricRef.current;
+    const obj = canvas?.getActiveObject() as { type?: string; toDataURL?: (o?: Record<string, unknown>) => string } | null;
+    if (!canvas || !obj || obj.type !== "image" || !obj.toDataURL) return;
+    const dataUrl = obj.toDataURL({ format: "png", multiplier: 1, withoutTransform: true });
+    const img = new Image();
+    img.onload = () => {
+      const oc = document.createElement("canvas");
+      oc.width = img.width; oc.height = img.height;
+      const ctx = oc.getContext("2d");
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0);
+      const d = ctx.getImageData(0, 0, img.width, img.height).data;
+      let r = 0, g = 0, b = 0, n = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] < 10) continue;
+        r += d[i]; g += d[i + 1]; b += d[i + 2]; n++;
+      }
+      if (n === 0) return;
+      r /= n; g /= n; b /= n;
+      const gray = (r + g + b) / 3;
+      // Gray world assumption: shift each channel to neutralise cast (SSOT: ColorGradePanel balCR/MG/YB).
+      grade.set("balCR", Math.round(Math.max(-100, Math.min(100, (gray - r) / 2.55))));
+      grade.set("balMG", Math.round(Math.max(-100, Math.min(100, (gray - g) / 2.55))));
+      grade.set("balYB", Math.round(Math.max(-100, Math.min(100, (gray - b) / 2.55))));
+    };
+    img.src = dataUrl;
+  }, [grade]);
+
+  const autoTone = useCallback(() => {
+    autoContrast();
+    autoColor();
+  }, [autoContrast, autoColor]);
+
+  // 💾 下載 WebP — export full-DPI canvas then compress to target size (≤ 200 KB).
+  const downloadWebP = useCallback(async () => {
+    const png = exportPng();
+    if (!png) return;
+    const img = new Image();
+    await new Promise<void>((res) => { img.onload = () => res(); img.src = png; });
+    const oc = document.createElement("canvas");
+    oc.width = img.width; oc.height = img.height;
+    oc.getContext("2d")!.drawImage(img, 0, 0);
+    let quality = 0.9;
+    let dataUrl = oc.toDataURL("image/webp", quality);
+    // Base64 → bytes ratio: length × 0.75; iterate down until ≤ 200 KB.
+    while (dataUrl.length * 0.75 > 200 * 1024 && quality > 0.2) {
+      quality = Math.round((quality - 0.1) * 10) / 10;
+      dataUrl = oc.toDataURL("image/webp", quality);
+    }
+    const base = nameRef.current || "canvas-design";
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = `${base}.webp`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }, [exportPng]);
+
   return (
     <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
       <h1 style={{ fontSize: 18, margin: 0 }}>✏️ 快速編輯 Canvas</h1>
@@ -1308,7 +1396,8 @@ export default function CanvasEditor() {
             }}
           />
         </label>
-        <button className="btn-primary" disabled={!ready} onClick={download}>下載 PNG</button>
+        <button className="btn-primary" disabled={!ready} onClick={download} title="下載全尺寸 PNG（最高品質）">PNG</button>
+        <button className="btn-primary" disabled={!ready} onClick={() => void downloadWebP()} title="下載 WebP，自動壓縮至 200KB 以內">WebP &lt;200k</button>
         <button
           className="btn-primary"
           disabled={!ready || saveState === "saving" || saveState === "saved"}
@@ -1376,8 +1465,8 @@ export default function CanvasEditor() {
       {error ? <span style={{ color: "var(--red)", fontSize: 12 }}>{error}</span> : null}
 
       {/* 畫布 + 右側可捲動工具欄（vector-trace-demo 風格）。面板垂直堆疊、可收合。 */}
-      <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-        <div style={{ border: "1px solid var(--card-border)", borderRadius: 8, width: 802, background: "var(--card-bg)", flexShrink: 0, display: "flex", justifyContent: "center" }}>
+      <div style={{ display: "flex", gap: 12, alignItems: "flex-start", width: "100%" }}>
+        <div style={{ border: "1px solid var(--card-border)", borderRadius: 8, flex: 1, minWidth: 300, background: "var(--card-bg)", display: "flex", justifyContent: "center", overflow: "hidden" }}>
           <canvas ref={canvasElRef} width={800} height={800} />
         </div>
 
@@ -1400,11 +1489,11 @@ export default function CanvasEditor() {
             <div style={{ display: "flex", gap: 8 }}>
               <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
                 寬
-                <input className="btn-secondary" type="number" min={0.1} step={0.1} value={szW} onChange={(e) => setSzW(Number(e.target.value))} />
+                <input className="btn-secondary" type="number" min={0.1} step={0.1} value={szW} onChange={(e) => setSzW(Number(e.target.value))} style={{ width: "100%" }} />
               </label>
               <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
                 高
-                <input className="btn-secondary" type="number" min={0.1} step={0.1} value={szH} onChange={(e) => setSzH(Number(e.target.value))} />
+                <input className="btn-secondary" type="number" min={0.1} step={0.1} value={szH} onChange={(e) => setSzH(Number(e.target.value))} style={{ width: "100%" }} />
               </label>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
@@ -1431,7 +1520,7 @@ export default function CanvasEditor() {
 
         {/* 🗂 圖層面板 — reorder / show-hide / duplicate / delete, top layer first. */}
         {layers.length > 0 ? (
-          <SidebarPanel id="layers" title={`🗂 圖層（${layers.length}）`} defaultPos={{ x: 816, y: 244 }} width={240} defaultCollapsed>
+          <SidebarPanel id="layers" title={`🗂 圖層（${layers.length}）`} defaultPos={{ x: 816, y: 244 }} width={240}>
             <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 520, overflowY: "auto" }}>
               {layers.map((o, i) => {
                 const vis = (o as unknown as { visible?: boolean }).visible !== false;
@@ -1453,7 +1542,7 @@ export default function CanvasEditor() {
 
         {/* 🎨 物件效果（PS 圖層樣式）— shown for ANY selected object (text/image/shape). */}
         {anySelected ? (
-          <SidebarPanel id="effects" title="🎨 物件效果" defaultPos={{ x: 816, y: 286 }} width={260} defaultCollapsed>
+          <SidebarPanel id="effects" title="🎨 物件效果" defaultPos={{ x: 816, y: 286 }} width={260}>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <label style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 2 }}>
               <span style={{ display: "flex", justifyContent: "space-between" }}><span>透明度</span><span style={{ opacity: 0.7 }}>{objOpacity}%</span></span>
@@ -1504,11 +1593,54 @@ export default function CanvasEditor() {
         {imageSelected ? (
           <>
           {/* 3 個獨立可拖面板：調色 / 濾鏡效果 / AI 去除 */}
-          <SidebarPanel id="grade" title="🎨 調色 / 修圖" defaultPos={{ x: 816, y: 328 }} width={272} defaultCollapsed>
+          <SidebarPanel id="grade" title="🎨 調色 / 色階 Levels" defaultPos={{ x: 816, y: 328 }} width={272}>
             <ColorGradePanel state={grade.state} onSet={grade.set} onReset={grade.reset} neutral={grade.neutral} />
           </SidebarPanel>
 
-          <SidebarPanel id="filters" title="🎨 濾鏡 / 去背 / 效果" defaultPos={{ x: 816, y: 370 }} width={272} defaultCollapsed>
+          {/* 🎛 調整 Adjustments — PS-style contrast / shadows / highlights + auto corrections */}
+          <SidebarPanel id="adjust" title="🎛 調整 Adjustments" defaultPos={{ x: 816, y: 348 }} width={272}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <button className="btn-secondary" style={{ fontSize: 12 }} onClick={autoContrast} title="分析畫素亮度範圍，自動設黑白點">自動對比</button>
+                <button className="btn-secondary" style={{ fontSize: 12 }} onClick={autoColor} title="中性灰平衡，自動矯正偏色">自動色彩</button>
+                <button className="btn-secondary" style={{ fontSize: 12 }} onClick={autoTone} title="同時套用自動對比 + 自動色彩">自動色調</button>
+              </div>
+              {([
+                { label: "對比 Contrast", v: contrast, set: setContrast, min: -100, max: 100 },
+                { label: "陰影 Shadows", v: shadows, set: setShadows, min: -100, max: 100 },
+                { label: "高光 Highlights", v: highlights, set: setHighlights, min: -100, max: 100 },
+              ] as { label: string; v: number; set: (n: number) => void; min: number; max: number }[]).map((row) => (
+                <label key={row.label} style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span>{row.label}</span>
+                    <span style={{ opacity: 0.7, fontVariantNumeric: "tabular-nums" }}>{row.v > 0 ? `+${row.v}` : `${row.v}`}</span>
+                  </span>
+                  <input type="range" min={row.min} max={row.max} value={row.v} onChange={(e) => row.set(Number(e.target.value))} style={{ width: "100%" }} />
+                </label>
+              ))}
+            </div>
+          </SidebarPanel>
+
+          {/* 🎞 Camera RAW — exposure / clarity / dehaze sliders */}
+          <SidebarPanel id="cameraraw" title="🎞 Camera RAW 效果" defaultPos={{ x: 816, y: 368 }} width={272}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {([
+                { label: "曝光 Exposure", v: exposure, set: setExposure, min: -100, max: 100 },
+                { label: "清晰度 Clarity", v: clarity, set: setClarity, min: 0, max: 100 },
+                { label: "去霧 Dehaze", v: dehaze, set: setDehaze, min: 0, max: 100 },
+              ] as { label: string; v: number; set: (n: number) => void; min: number; max: number }[]).map((row) => (
+                <label key={row.label} style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span>{row.label}</span>
+                    <span style={{ opacity: 0.7, fontVariantNumeric: "tabular-nums" }}>{row.v > 0 ? `+${row.v}` : `${row.v}`}</span>
+                  </span>
+                  <input type="range" min={row.min} max={row.max} value={row.v} onChange={(e) => row.set(Number(e.target.value))} style={{ width: "100%" }} />
+                </label>
+              ))}
+            </div>
+          </SidebarPanel>
+
+          <SidebarPanel id="filters" title="🎨 濾鏡 / 去背 / 效果" defaultPos={{ x: 816, y: 370 }} width={272}>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 <button
@@ -1548,7 +1680,7 @@ export default function CanvasEditor() {
             </div>
           </SidebarPanel>
 
-          <SidebarPanel id="inpaint" title="🪄 去除 / 生成填色（AI）" defaultPos={{ x: 816, y: 412 }} width={272} defaultCollapsed>
+          <SidebarPanel id="inpaint" title="🪄 去除 / 生成填色（AI）" defaultPos={{ x: 816, y: 412 }} width={272}>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {!inpaintMode ? (
                 <>
@@ -1597,7 +1729,7 @@ export default function CanvasEditor() {
           </SidebarPanel>
 
           {/* 🖼 擴圖（flux-fill-pro outpaint）+ 🎚 色調分離（bake）— both replace the selected image. */}
-          <SidebarPanel id="genfx" title="🖼 擴圖 / 🎚 色調分離" defaultPos={{ x: 816, y: 454 }} width={272} defaultCollapsed>
+          <SidebarPanel id="genfx" title="🖼 擴圖 / 🎚 色調分離" defaultPos={{ x: 816, y: 454 }} width={272}>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <span style={{ fontSize: 12, fontWeight: 600 }}>🖼 擴圖 Outpaint（AI 往外補畫面）</span>
@@ -1630,7 +1762,7 @@ export default function CanvasEditor() {
           </SidebarPanel>
 
           {/* ✂️ 邊緣遮罩 — brush/grunge edge on the selected image → transparent PNG */}
-          <SidebarPanel id="edge-mask" title="✂️ 邊緣遮罩（筆刷邊）" defaultPos={{ x: 816, y: 496 }} width={276} defaultCollapsed>
+          <SidebarPanel id="edge-mask" title="✂️ 邊緣遮罩（筆刷邊）" defaultPos={{ x: 816, y: 496 }} width={276}>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
               <div style={{ opacity: 0.6 }}>點筆刷 → 把選取的圖套有機邊（透明 PNG）。可換不同筆刷。</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(44px, 1fr))", gap: 5 }}>
@@ -1676,7 +1808,7 @@ export default function CanvasEditor() {
 
         {/* 🔤 字型庫 — Google Fonts (中/英) + 上傳字型 + 粗體/斜體/底線, shown when text selected. */}
         {textSelected ? (
-          <SidebarPanel id="fonts" title="🔤 字型庫" defaultPos={{ x: 816, y: 454 }} width={240} defaultCollapsed>
+          <SidebarPanel id="fonts" title="🔤 字型庫" defaultPos={{ x: 816, y: 454 }} width={240}>
             <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
               <button className="btn-secondary" style={{ fontSize: 13, fontWeight: 700 }} title="粗體（切換）" onClick={() => toggleText("fontWeight")}>B</button>
               <button className="btn-secondary" style={{ fontSize: 13, fontStyle: "italic" }} title="斜體（切換）" onClick={() => toggleText("fontStyle")}>I</button>

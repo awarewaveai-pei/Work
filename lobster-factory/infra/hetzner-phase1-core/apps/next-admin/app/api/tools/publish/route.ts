@@ -10,6 +10,7 @@ import { generateProductCopy } from "../../../../lib/studio/product-copy";
 import { createWooProduct, isBridgeConfigured } from "../../../../lib/studio/wp-bridge-client";
 import { buildPodProductPayload, buildVariantPlan, priceForSize } from "../../../../lib/studio/pod-product";
 import { podModelById } from "../../../../lib/studio/pod-catalog-config";
+import { fetchProductTierPricing } from "../../../../lib/studio/printful-catalog";
 import {
   createDraftOrderOnNative,
   createSyncProductOnNative,
@@ -47,7 +48,7 @@ function gate(request: Request): NextResponse | null {
 }
 
 interface PublishBody {
-  action?: "upscale" | "productimage" | "flatlay" | "copy" | "create" | "status" | "link" | "pfcreate" | "pforder";
+  action?: "upscale" | "productimage" | "flatlay" | "copy" | "create" | "status" | "link" | "pfcreate" | "pforder" | "pricing";
   // upscale / productimage / flatlay
   designUrl?: string;
   longEdgePx?: number;
@@ -297,6 +298,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: friendly, code });
     }
     return NextResponse.json({ ok: true, copy: r.copy, rankMath: r.rankMath });
+  }
+
+  // ── Pricing helper: Printful wholesale cost per tier so the UI shows profit BEFORE publishing ──
+  if (body.action === "pricing") {
+    if (!isPrintfulConfigured()) {
+      return NextResponse.json({ ok: false, error: "printful_not_configured" }, { status: 503 });
+    }
+    const pid = Number.isInteger(body.catalogProductId) ? (body.catalogProductId as number) : 71;
+    // Tier pricing only exists for our known POD models (legacy 71 has no pod-catalog-config entry).
+    if (!podModelById(pid)) {
+      return NextResponse.json({ ok: false, error: "unknown_catalogProductId" }, { status: 400 });
+    }
+    const pricing = await fetchProductTierPricing(pid);
+    if (!pricing) {
+      return NextResponse.json({ ok: false, error: "pricing_unavailable" }, { status: 502 });
+    }
+    return NextResponse.json({ ok: true, pricing });
   }
 
   // ── Step 2: create draft Woo product via wp-bridge ─────────────────────────
@@ -770,5 +788,5 @@ export async function POST(request: Request) {
     });
   }
 
-  return NextResponse.json({ ok: false, error: "action must be upscale|productimage|flatlay|copy|create|status|link|pfcreate|pforder" }, { status: 400 });
+  return NextResponse.json({ ok: false, error: "action must be upscale|productimage|flatlay|copy|pricing|create|status|link|pfcreate|pforder" }, { status: 400 });
 }

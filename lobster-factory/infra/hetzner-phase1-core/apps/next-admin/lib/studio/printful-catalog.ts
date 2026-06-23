@@ -35,8 +35,25 @@ export type GarmentColorChoice = "white" | "grey" | "black";
 
 interface Variant { id: number; color: string; size: string }
 
+/** Per-tier seller cost for a POD product (what Printful charges to fulfil one DTG unit). */
+export interface ProductTierPricing {
+  currency: string;
+  /** Wholesale cost of a standard (S–XL) size — single-front DTG, all-in. */
+  standardCost: number;
+  /** Wholesale cost of a plus (2XL) size — DTG plus-size garments cost more. */
+  plusCost: number;
+  /** Size whose price was sampled for standardCost (for the UI to be honest about the source). */
+  standardSize: string;
+  /** Size whose price was sampled for plusCost. */
+  plusSize: string;
+}
+
 // In-memory caches
 let catalogCache: { items: CatalogProduct[]; ts: number } | null = null;
+// Per-product tier pricing (standard + plus cost). Same 1 h success / 1 min failure TTL discipline.
+const pricingCache = new Map<number, { pricing: ProductTierPricing | null; ts: number }>();
+// Per-variant raw cost (single-front DTG, all-in), so the two tier samples reuse across products.
+const variantCostCache = new Map<number, { cost: number; currency: string; ts: number }>();
 // null means "known to fail/unsupported" — also cached to prevent retry storms.
 // Keyed by `${productId}:${color}` because each colour resolves to a different variant.
 const specCache = new Map<string, { spec: ProductSpec | null; ts: number }>();
@@ -211,5 +228,77 @@ export async function fetchProductSpec(
   } catch {
     specCache.set(key, { spec: null, ts: Date.now() });
     return null;
+  }
+}
+
+/**
+ * Seller's wholesale cost for ONE variant, single-front DTG, all-in (blank + the default front print).
+ * Source: GET /v2/catalog-variants/{id}/prices → data.variant.techniques[dtg].price (developers.
+ * printful.com/docs/v2-beta). We use the variant technique price (all-in for a single front placement)
+ * and do NOT add data.product.placements[].price — that is the cost to add EXTRA placements beyond the
+ * first, which a single-front design never incurs. ⚠ Verify against live Printful at deploy (the publish
+ * SOP smoke step) before trusting the margin for real pricing — the API key isn't available locally.
+ * Returns null on any failure (never throws — the caller degrades to "cost unavailable").
+ */
+async function fetchVariantCost(variantId: number, apiKey: string): Promise<{ cost: number; currency: string } | null> {
+  const hit = variantCostCache.get(variantId);
+  if (hit && Date.now() - hit.ts < TTL_MS) return { cost: hit.cost, currency: hit.currency };
+  try {
+    const r = await timedFetch(`${PRINTFUL_API}/v2/catalog-variants/${variantId}/prices`, apiKey);
+    if (!r.ok) return null;
+    const j = (await r.json()) as {
+      data?: { currency?: string; variant?: { techniques?: Array<{ technique_key?: string; price?: string }> } };
+    };
+    const techniques = j.data?.variant?.techniques ?? [];
+    const dtg = techniques.find((t) => /dtg/i.test(t.technique_key ?? "")) ?? techniques[0];
+    const cost = Number(dtg?.price);
+    if (!Number.isFinite(cost) || cost <= 0) return null;
+    const currency = j.data?.currency ?? "USD";
+    variantCostCache.set(variantId, { cost, currency, ts: Date.now() });
+    return { cost, currency };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Tier pricing for a POD product: the wholesale cost of a STANDARD (M) and a PLUS (2XL) variant, so the
+ * publish UI can show profit against its two price inputs (retail S–XL / plus 2XL+). Picks the first
+ * colour's M and 2XL variants (cost is colour-independent, size-dependent). Cached 1 h (success) /
+ * 1 min (failure), matching fetchProductSpec. Returns null if either tier can't be priced.
+ */
+export async function fetchProductTierPricing(catalogProductId: number): Promise<ProductTierPricing | null> {
+  const apiKey = process.env.PRINTFUL_API_KEY;
+  if (!apiKey) return null;
+
+  const hit = pricingCache.get(catalogProductId);
+  if (hit && Date.now() - hit.ts < (hit.pricing === null ? NULL_TTL_MS : TTL_MS)) return hit.pricing;
+
+  const fail = (): null => {
+    pricingCache.set(catalogProductId, { pricing: null, ts: Date.now() });
+    return null;
+  };
+  try {
+    const variants = await fetchAllVariants(catalogProductId, apiKey);
+    if (!variants.length) return fail();
+    const stdVariant = variants.find((v) => /^m$/i.test(v.size)) ?? variants.find((v) => /^(s|l|xl)$/i.test(v.size));
+    const plusVariant = variants.find((v) => /^2xl$/i.test(v.size));
+    if (!stdVariant || !plusVariant) return fail();
+    const [std, plus] = await Promise.all([
+      fetchVariantCost(stdVariant.id, apiKey),
+      fetchVariantCost(plusVariant.id, apiKey),
+    ]);
+    if (!std || !plus) return fail();
+    const pricing: ProductTierPricing = {
+      currency: std.currency,
+      standardCost: std.cost,
+      plusCost: plus.cost,
+      standardSize: stdVariant.size,
+      plusSize: plusVariant.size,
+    };
+    pricingCache.set(catalogProductId, { pricing, ts: Date.now() });
+    return pricing;
+  } catch {
+    return fail();
   }
 }

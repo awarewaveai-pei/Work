@@ -172,13 +172,13 @@ function isKnownR2Url(s: string): boolean {
 function computePosition(
   cfg: (typeof PRODUCT_CONFIG)[ProductType],
   imageDims?: { width: number; height: number },
+  designSizePct?: number,
 ): { area_width: number; area_height: number; width: number; height: number; top: number; left: number } {
   const aw = cfg.area_width;
   const ah = cfg.area_height;
-  // Fit the design into ~90% of the print area preserving its TRUE aspect ratio, then centre it.
-  // Replaces the old fixed-square fallback + fixed top margin, which squished a tall 2:3 design
-  // into a square and shrank it to ~53% of the chest when imageDims was missing (2026-06-20).
-  const FILL = 0.9;
+  // Fit the design into the print area preserving its TRUE aspect ratio, then centre it.
+  // designSizePct=1.0 → full-bleed (fills entire printable area); default 0.9 → 90% with small margin.
+  const FILL = Math.min(1, Math.max(0.3, designSizePct ?? 0.9));
   const maxW = aw * FILL;
   const maxH = ah * FILL;
   const imgW = imageDims && imageDims.width > 0 ? imageDims.width : cfg.design_width;
@@ -244,6 +244,7 @@ export async function generateMockup(
   imageInput: string,
   productType: string = "tshirt",
   imageDims?: { width: number; height: number },
+  designSizePct?: number,
 ): Promise<MockupResult> {
   const apiKey = process.env.PRINTFUL_API_KEY;
   const storeId = process.env.PRINTFUL_STORE_ID;
