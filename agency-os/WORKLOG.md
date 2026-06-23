@@ -8,9 +8,9 @@
 
 [任務理解] 操作者要尺寸表同時顯示 cm 與 inch。
 
-[已修改] printful-catalog.ts fetchProductSizeGuide：改平行抓 `?unit=inches` + `?unit=cm`（fetchSizeMeasures helper），每格合併為「<inch> / <cm>」（範圍亦然 "18–20 / 46–51"）；單邊缺退化顯示有的那邊；unit label = "inches / cm"。合併結果進同一快取（後續發佈 0 fetch）。HTML 跳脫保留。
+[已修改] printful-catalog.ts fetchProductSizeGuide：改平行抓 `?unit=inches` + `?unit=cm`（fetchSizeMeasures helper），每格合併為「<inch> / <cm>」（範圍亦然 "18–20 / 46–51"）；單邊缺退化顯示有的那邊；unit label = "inches / cm"。critic 修：(a) cache key 加 sizes 簽章（內容依 sizes，避免重發更多 size 拿到舊少列表）(b) rawMeasure 單邊 min/max 退化 (c) secondary 收斂避免 cm-only 自我合併成 "71 / 71" + 去 cm! 斷言 (d) 部分單位成功 1h TTL 鎖定註記。HTML 跳脫保留。
 
-[驗證結果] REALTEST_EVIDENCE: tool=Bash | cmd=node 雙單位合併斷言 | exit=0 -- 10/10（dual cell / range / inch-only / cm-only / partial fallback / absent-drop）；npm test 487/487；tsc clean。REVIEW_WAIVED: SMOKE_COVERED -- 單函式 delta（值來源 1→2 單位合併），escaping/sink/cache 上輪 critic 已驗，新合併邏輯 10 斷言全覆蓋。BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=fetchProductSizeGuide\|fetchSizeMeasures | hits=0 -- 無外部消費者，呼叫點僅 route create。
+[驗證結果] REALTEST_EVIDENCE: tool=Bash | cmd=node 雙單位合併斷言（含 cm-only 不自我合併 + single-bound）| exit=0 -- 7/7；npm test 487/487；tsc clean。REVIEW_DONE: critic=Deep | verdict=pass-after-fix | findings=0c/0M/2n+2s -- 0 Critical/Major；2 Minor（rawMeasure 單邊 / cache key 依 sizes）+ 2 建議（cm! 收斂 / TTL 註記）全採納；escaping XSS 邊界 + never-throws + 平行 latency Verified Clean。BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=fetchProductSizeGuide\|fetchSizeMeasures\|sizeGuideCache | hits=0 -- 無外部消費者，呼叫點僅 route create。
 
 ### ops(postiz): 刪測試 draft + 綁 Bluesky channel + Task 2 callback URL 文件化
 
