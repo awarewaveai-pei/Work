@@ -4,6 +4,30 @@
 
 ## 2026-06-23
 
+### feat(publish): AEO Quick Answer 計分修 + 真下載 proxy + 印刷檔 PDF/PNG@300DPI（/tools/publish 6 問之 #1/#4/#5）
+
+[任務理解] 操作者在 /tools/publish 列 6 個問題/需求。本波處理 3 個明確、低風險的：#1 AEO Quick Answer 文案條件、#4 下載鍵要真下載、#5 印刷檔分 PDF/PNG 皆 300DPI。（#2 每色多 mockup、#3 Printful 成本利潤定價、#6 多客戶多站 為後續波。）
+
+[現況分析] 讀全鏈：PublishWizard.tsx + api/tools/publish/route.ts + lib/studio/{product-copy,print-file,printful-mockup,pod-product,print-provider}.ts + lib/seo/rankmath-checker.ts + lib/storage/r2.ts。git log 該批檔近期僅 hex-swatch/mockup 改向，無重工。
+
+[已修改]（5 檔，committed checkpoint a64a06d9；前波被 auto-checkpoint 收）
+- lib/studio/product-copy.ts（#1）：自評 markdown 把 answer capsule（開頭 <p>）抽出掛 `## Quick Answer`，讓 aeo-quick-answer check 認得；critic 抓首版 capsule 重複計灌大 kw-density → 改每內容單元只算一次。線上 short_description 不變。
+- app/api/tools/publish/download/route.ts（#4，新檔）：同源 GET proxy，isDesignsAsset host-exact allowlist 防 SSRF + redirect:manual + size cap，串流 + Content-Disposition: attachment。critic 修：headers 收到即清 fetch timeout（不綁 body，慢速大檔/國際線不被 45s 砍）、回 upstream.body 讓 Next 傳遞 disconnect 取消。
+- app/tools/publish/PublishWizard.tsx（#4/#5）：downloadHref helper + 印刷檔 PNG/PDF 真下載鍵（取代 target=_blank 右鍵另存）+ printFileSlug + upscale.printFilePdfUrl state + 物理尺寸誠實提示。
+- lib/studio/print-file.ts（#5）：sharp .withMetadata({density:300}) 標 300DPI（像素未變）；pdf-lib（既有依賴）出 PDF 雙生檔（PNG 嵌入、頁面=圖物理尺寸@300DPI）；PNG/PDF 同 UUID 配對上傳；PrintFileResult 加 printFilePdfUrl + PRINT_DENSITY_DPI。
+- app/api/tools/publish/route.ts（#5）：upscale faithful 分支回傳 printFilePdfUrl。
+
+[驗證結果 — R0 四動作]
+- REALTEST_EVIDENCE: tool=Bash | cmd=node /d/tmp/test-printfile-density.cjs (sharp withMetadata density + pixel-fidelity + pdf-lib embedPng) | exit=0 | ms=~2000 -- density=300, space=srgb, channels=3, pixels_identical=true, pdf_header=%PDF-, page 28.80x21.60pt for 120x90px@300
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run (temp spec, real checkRankMath) + node kw-count | exit=0 | ms=~400 -- aeo-quick-answer=pass on NEW markdown; capsule kw count OLD=7 NEW=4 (double-count removed); temp test deleted
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~30000 -- twice (post-edit + post-critic-fix), clean
+- REVIEW_DONE: critic=Deep | verdict=pass-after-fix | findings=0c/1m/3n -- Major (kw-density double-count) FIXED; 2 Minor (download abort-timer mid-stream, MAX_BYTES advisory) FIXED; SSRF/safeFilename/dual-PrintFileResult/ai-enhance-no-broken-link Verified Clean
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=buildFaithfulPrintFile\|PrintFileResult\|printFileUrl\|右鍵另存 | hits=0 -- to-print-file.ts 為獨立 PrintFileResult 型別（{buffer,mime}）不衝突；DesignsGallery.tsx 已有 client blob 下載（依賴 R2 CORS、大檔 fallback 開分頁）→ 列後續統一走 proxy；無 stale 跨檔聲稱
+
+[剩餘風險] ai-enhance 路徑（upscaler.ts，非忠實 opt-in）不出 PDF——UI 條件顯示，無斷鏈。台灣印刷檔目前是 sRGB（非 CMYK）——與改前一致，CMYK 為另案。DesignsGallery 下載仍依賴 CORS（後續 task）。
+
+[rollback] git revert a64a06d9 範圍內 5 檔；新檔 download/route.ts 刪除即回原狀（其餘步驟不依賴它）。
+
 ### feat(video): 三尺寸改各比例原生生成（取代 16:9 pad 黑邊）+ 前端勾選 16:9/4:5/9:16/全選
 
 [任務理解] /tools/video（及 /tools/content）產 3 尺寸實為單一 16:9 base 經 ffmpeg pad letterbox → 直式上下黑邊、非原生構圖。操作者要：每比例「原生生成」+ 前端勾選格式。
