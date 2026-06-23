@@ -1416,8 +1416,16 @@ export default function CanvasEditor() {
             }}
           />
         </label>
-        <button className="btn-primary" disabled={!ready} onClick={download} title="下載全尺寸 PNG（最高品質）">PNG</button>
-        <button className="btn-primary" disabled={!ready} onClick={() => void downloadWebP()} title="下載 WebP，自動壓縮至 200KB 以內">WebP &lt;200k</button>
+        <input
+          type="text"
+          value={editName}
+          onChange={(e) => { setEditName(e.target.value); nameRef.current = null; /* user override clears handoff name */ }}
+          placeholder="檔名"
+          title="下載檔名（不含副檔名）"
+          style={{ fontSize: 12, padding: "2px 6px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)", width: 160 }}
+        />
+        <button className="btn-primary" disabled={!ready} onClick={download} title={`下載全尺寸 PNG${canvasMetaRef.current ? `（${canvasMetaRef.current.realW}×${canvasMetaRef.current.realH}px）` : ""}`}>PNG</button>
+        <button className="btn-primary" disabled={!ready} onClick={() => void downloadWebP()} title={`下載 WebP ≤200KB${canvasMetaRef.current ? `（${canvasMetaRef.current.realW}×${canvasMetaRef.current.realH}px 壓縮）` : ""}`}>WebP &lt;200k</button>
         <button
           className="btn-primary"
           disabled={!ready || saveState === "saving" || saveState === "saved"}
