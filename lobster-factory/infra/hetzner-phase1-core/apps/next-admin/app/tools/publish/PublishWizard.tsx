@@ -238,21 +238,17 @@ export default function PublishWizard() {
       // the clean flat front (mockup_url) when this product returns no model shots.
       const modelFronts = views.filter((v) => v.lifestyle && /front/i.test(v.view) && !/back/i.test(v.view));
       const swatchSource = (modelFronts.find((v) => /^front$/i.test(v.view)) ?? modelFronts[0])?.url ?? m.mockup_url;
-      // EXTRA gallery views (#2 — operator wants flat-lay + several model shots per colour, not one image):
-      // one clean flat-lay front + up to MAX_MODEL distinct model/lifestyle shots (different poses/people),
-      // back views excluded (blank for a front print). Printful returns ALL of these from the SAME mockup
-      // task we already ran — no extra generation, only extra saves. Dedup against the swatch + each other.
-      const MAX_MODEL = 3;
+      // EXTRA gallery view (#2, refined 2026-06-24 — operator: "每個顏色穿模特各 1 個 + 平拍"): per colour
+      // we keep exactly TWO images — the model wearing THAT colour (the swatch above, a real-model front)
+      // + ONE clean flat-lay. NO extra model angles (4 colours × many angles would flood the gallery).
+      // back views excluded. Printful returns both from the SAME mockup task we already ran (no extra gen).
+      // If this colour has no model shot, swatch falls back to the flat front and the flat extra dedups
+      // away → that colour shows a single flat image.
       const flatFront = views.find((v) => !v.lifestyle && /front/i.test(v.view) && !/back/i.test(v.view))?.url;
       const extraSources: string[] = [];
       const seen = new Set<string>([swatchSource]);
       const add = (u?: string) => { if (u && !seen.has(u)) { seen.add(u); extraSources.push(u); } };
       add(flatFront);
-      let modelCount = 0;
-      for (const v of views) {
-        if (modelCount >= MAX_MODEL) break;
-        if (v.lifestyle && !/back/i.test(v.view) && !seen.has(v.url)) { add(v.url); modelCount++; }
-      }
       // Persist swatch + each extra to My Designs (parallel). A failed save drops that ONE image only —
       // never aborts the colour (best-effort, same spirit as the all-mockups-fail fallback in runAll).
       const save = async (sourceUrl: string): Promise<string | null> => {
@@ -778,7 +774,7 @@ export default function PublishWizard() {
   return (
     <div style={{ padding: 16, maxWidth: 980 }}>
       <p style={{ opacity: 0.7, fontSize: 13 }}>
-        <b>🚀 一鍵</b>：選設計圖 + 款式 → 自動 產印刷檔 + <b>每色 Printful 商品圖</b>（平拍＋多張模特，每色一組）+ AI 文案
+        <b>🚀 一鍵</b>：選設計圖 + 款式 → 自動 產印刷檔 + <b>每色 Printful 商品圖</b>（每色：模特 1＋平拍 1）+ <b>尺寸表</b> + AI 文案
         → 建 Woo <b>草稿</b>（該款多色 × {SIZES.join("/")}）+ Printful native 綁變體＋傳設計稿（hex 對應，<b>免後台手動匯入</b>）→ 後台 review 後 publish 開賣。
       </p>
 
