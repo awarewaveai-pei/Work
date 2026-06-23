@@ -291,7 +291,7 @@ export async function generateMockup(
           {
             placement: cfg.placement,
             image_url: imageUrl,
-            position: computePosition(cfg, imageDims),
+            position: computePosition(cfg, imageDims, designSizePct),
           },
         ],
         format: "jpg",
