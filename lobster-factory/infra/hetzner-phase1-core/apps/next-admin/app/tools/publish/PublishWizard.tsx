@@ -565,11 +565,12 @@ export default function PublishWizard() {
     const galleryMockups: string[] = [];
     for (let i = 0; i < colors.length; i++) {
       const c = colors[i];
-      setAllRun({ state: "running", stage: `生成 ${c.label} Printful mockup（${i + 1}/${colors.length}）` });
-      const url = await genColorMockup(c.hex, designUrl);
-      if (url) {
-        colorMockups[c.printfulName] = url;
-        galleryMockups.push(url);
+      setAllRun({ state: "running", stage: `生成 ${c.label} Printful 商品圖（平拍＋模特，${i + 1}/${colors.length}）` });
+      const r = await genColorMockup(c.hex, designUrl);
+      if (r) {
+        // swatch = this colour's variation image; gallery = swatch + flat-lay + model shots (#2).
+        if (r.swatch) colorMockups[c.printfulName] = r.swatch;
+        galleryMockups.push(...r.gallery);
       }
     }
     // All mockups failing must NOT abort the publish — the print file is already made and the design
@@ -738,7 +739,7 @@ export default function PublishWizard() {
   return (
     <div style={{ padding: 16, maxWidth: 980 }}>
       <p style={{ opacity: 0.7, fontSize: 13 }}>
-        <b>🚀 一鍵</b>：選設計圖 + 款式 → 自動 產印刷檔 + <b>AI 批次商品圖</b>（白背平拍＋2 模特＋裝飾平拍，依款式分長短袖）+ AI 文案
+        <b>🚀 一鍵</b>：選設計圖 + 款式 → 自動 產印刷檔 + <b>每色 Printful 商品圖</b>（平拍＋多張模特，每色一組）+ AI 文案
         → 建 Woo <b>草稿</b>（該款多色 × {SIZES.join("/")}）+ Printful native 綁變體＋傳設計稿（hex 對應，<b>免後台手動匯入</b>）→ 後台 review 後 publish 開賣。
       </p>
 

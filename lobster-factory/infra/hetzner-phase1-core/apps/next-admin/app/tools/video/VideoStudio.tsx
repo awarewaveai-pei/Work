@@ -231,6 +231,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
     const deadline = Date.now() + 12 * 60 * 1000;
     const poll = async (): Promise<void> => {
       if (Date.now() > deadline) {
+        isRenderingRef.current = false;
         setGenStatus("error");
         setGenError("生成逾時（>12 分鐘）。影片可能仍在背景產出，稍後可至下方歷史紀錄查看。");
         return;
@@ -243,7 +244,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
         pollRef.current = setTimeout(() => void poll(), 5000);
         return;
       }
-      if (!sj.ok) { setGenStatus("error"); setGenError(sj.error ?? "查詢生成狀態失敗"); return; }
+      if (!sj.ok) { isRenderingRef.current = false; setGenStatus("error"); setGenError(sj.error ?? "查詢生成狀態失敗"); return; }
       if (sj.status === "running") {
         if (sj.step) setGenStep(sj.step);
         pollRef.current = setTimeout(() => void poll(), 5000);
@@ -798,7 +799,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                   onChangeScene={(id, narration) =>
                     setDraftScenes((prev) => prev.map((s) => s.id === id ? { ...s, narration } : s))
                   }
-                  onBack={() => { setDraftScenes([]); setGenError(""); setGenStatus("idle"); }}
+                  onBack={() => { isRenderingRef.current = false; setDraftScenes([]); setGenError(""); setGenStatus("idle"); }}
                   onRender={handleRenderDraft}
                   onRegenerate={handleRegenerateImage}
                   onUpload={handleUploadAsset}
