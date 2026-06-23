@@ -60,8 +60,10 @@ export interface SizeChart {
 let catalogCache: { items: CatalogProduct[]; ts: number } | null = null;
 // Per-product tier pricing (standard + plus cost). Same 1 h success / 1 min failure TTL discipline.
 const pricingCache = new Map<number, { pricing: ProductTierPricing | null; ts: number }>();
-// Per-product size chart (keyed by productId). Same TTL discipline.
-const sizeGuideCache = new Map<number, { chart: SizeChart | null; ts: number }>();
+// Size chart cache keyed by `${productId}|${sorted sizes}` — the chart CONTENT depends on the requested
+// sizes (rows), so a product re-published with a different size set must not reuse a chart built for the
+// old set (critic 2026-06-24). Same 1 h success / 1 min failure TTL.
+const sizeGuideCache = new Map<string, { chart: SizeChart | null; ts: number }>();
 // Per-variant raw cost (single-front DTG, all-in), so the two tier samples reuse across products.
 const variantCostCache = new Map<number, { cost: number; currency: string; ts: number }>();
 // null means "known to fail/unsupported" — also cached to prevent retry storms.
@@ -313,70 +315,117 @@ export async function fetchProductTierPricing(catalogProductId: number): Promise
   }
 }
 
+/** A single unit's garment measurements: ordered labels + a (label|SIZE → raw value string) lookup. */
+interface UnitMeasures {
+  labels: string[];
+  byLabelSize: Map<string, string>;
+}
+
+/** Raw (un-escaped) value string for one measurement cell: "28", a "18–20" range, or "" when absent. */
+function rawMeasure(v?: { value?: string; min_value?: string; max_value?: string }): string {
+  if (!v) return "";
+  if (v.value && v.value.trim()) return v.value.trim();
+  const min = v.min_value?.trim();
+  const max = v.max_value?.trim();
+  if (min && max) return `${min}–${max}`;
+  // Recover the single-bound case (only min OR only max present) instead of dropping the cell.
+  return min || max || "";
+}
+
+/** Fetch ONE unit's product measurements (prefers the product_measure table). null on any failure. */
+async function fetchSizeMeasures(productId: number, apiKey: string, unit: "inches" | "cm"): Promise<UnitMeasures | null> {
+  const r = await timedFetch(`${PRINTFUL_API}/products/${productId}/sizes?unit=${unit}`, apiKey);
+  if (!r.ok) return null;
+  const j = (await r.json()) as {
+    result?: {
+      size_tables?: Array<{
+        type?: string;
+        unit?: string;
+        measurements?: Array<{
+          type_label?: string;
+          values?: Array<{ size?: string; value?: string; min_value?: string; max_value?: string }>;
+        }>;
+      }>;
+    };
+  };
+  const tables = j.result?.size_tables ?? [];
+  const table = tables.find((t) => t.type === "product_measure") ?? tables[0];
+  const measurements = (table?.measurements ?? []).filter((m) => (m.type_label ?? "").trim().length > 0);
+  if (!table || measurements.length === 0) return null;
+  const labels = measurements.map((m) => (m.type_label ?? "").trim());
+  const byLabelSize = new Map<string, string>();
+  for (const m of measurements) {
+    const label = (m.type_label ?? "").trim();
+    for (const val of m.values ?? []) {
+      const sz = (val.size ?? "").toUpperCase();
+      if (sz) byLabelSize.set(`${label}|${sz}`, rawMeasure(val));
+    }
+  }
+  return { labels, byLabelSize };
+}
+
 /**
- * Fetch a product's size chart (Printful GET /products/{id}/sizes?unit=inches) reduced to a table for
- * the publish flow: header row + one row per requested size, columns = the garment measurements. Prefers
- * the `product_measure` table (actual garment dims); falls back to the first available table. Returns
- * null on any failure (never throws — the publish just omits the size-guide block). Cached 1h/1min.
+ * Fetch a product's size chart (Printful GET /products/{id}/sizes) reduced to a table for the publish
+ * flow: header row + one row per requested size, columns = garment measurements. Fetches BOTH units and
+ * renders each cell as "<inch> / <cm>" (operator request 2026-06-24); when only one unit resolves it
+ * degrades to that unit alone. Prefers the `product_measure` table (actual garment dims). Returns null
+ * on any failure (never throws — the publish just omits the size-guide block). Cached 1h/1min.
  */
 export async function fetchProductSizeGuide(catalogProductId: number, sizes: string[]): Promise<SizeChart | null> {
   const apiKey = process.env.PRINTFUL_API_KEY;
   if (!apiKey || !Array.isArray(sizes) || sizes.length === 0) return null;
 
-  const hit = sizeGuideCache.get(catalogProductId);
+  // Content depends on the requested sizes → key the cache on product + the sorted size set.
+  const cacheKey = `${catalogProductId}|${[...sizes].map((s) => s.toUpperCase()).sort().join(",")}`;
+  const hit = sizeGuideCache.get(cacheKey);
   if (hit && Date.now() - hit.ts < (hit.chart === null ? NULL_TTL_MS : TTL_MS)) return hit.chart;
 
   const fail = (): null => {
-    sizeGuideCache.set(catalogProductId, { chart: null, ts: Date.now() });
+    sizeGuideCache.set(cacheKey, { chart: null, ts: Date.now() });
     return null;
   };
   try {
-    const r = await timedFetch(`${PRINTFUL_API}/products/${catalogProductId}/sizes?unit=inches`, apiKey);
-    if (!r.ok) return fail();
-    const j = (await r.json()) as {
-      result?: {
-        size_tables?: Array<{
-          type?: string;
-          unit?: string;
-          measurements?: Array<{
-            type_label?: string;
-            values?: Array<{ size?: string; value?: string; min_value?: string; max_value?: string }>;
-          }>;
-        }>;
-      };
-    };
-    const tables = j.result?.size_tables ?? [];
-    const table = tables.find((t) => t.type === "product_measure") ?? tables[0];
-    const measurements = (table?.measurements ?? []).filter((m) => (m.type_label ?? "").trim().length > 0);
-    if (!table || measurements.length === 0) return fail();
+    // Both units in parallel; the merged result is cached, so subsequent publishes do 0 fetches.
+    // Tradeoff: a PARTIAL success (one unit fetched, the other a transient blip) caches a single-unit
+    // chart at the full 1 h TTL (NULL_TTL only applies when BOTH fail → primary null). That's acceptable
+    // — the chart is still correct, just missing the second unit for up to an hour; publish never blocks.
+    const [inch, cm] = await Promise.all([
+      fetchSizeMeasures(catalogProductId, apiKey, "inches"),
+      fetchSizeMeasures(catalogProductId, apiKey, "cm"),
+    ]);
+    const primary = inch ?? cm; // inches drives label ordering when present
+    if (!primary) return fail();
+    // The cm table to MERGE in — non-null ONLY when BOTH units fetched. In a cm-only result primary IS
+    // cm, so `secondary` stays null and cell() never merges cm with itself ("71 / 71"). Also type-
+    // narrows cleanly in cell() (no non-null assertion). Drives dual-vs-single rendering + the label.
+    const secondary: UnitMeasures | null = inch && cm ? cm : null;
+    const unitLabel = secondary ? "inches / cm" : inch ? "inches" : "cm";
 
-    // These strings (labels + measurement values) are UNTRUSTED Printful API output and flow into the
-    // wp-bridge Kadence `table` block, which emits cells into post_content WITHOUT escaping. Escape the
-    // 4 HTML-significant chars here so a future/tampered label can't inject markup (critic 2026-06-24,
-    // trust-boundary defense-in-depth). Today they're numeric strings + fixed labels — this keeps it safe.
+    // UNTRUSTED Printful strings flow into the wp-bridge Kadence `table` block, which emits cells into
+    // post_content WITHOUT escaping. Escape the 4 HTML-significant chars (critic 2026-06-24).
     const esc = (s: string): string =>
       s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-    const fmt = (v?: { value?: string; min_value?: string; max_value?: string }): string => {
-      if (!v) return "-";
-      if (v.value && v.value.trim()) return esc(v.value.trim());
-      if (v.min_value && v.max_value) return `${esc(v.min_value.trim())}–${esc(v.max_value.trim())}`;
-      return "-";
+
+    // One cell: "<inch> / <cm>" when both present, else whichever single value exists, else "-".
+    const cell = (label: string, su: string): string => {
+      const a = primary.byLabelSize.get(`${label}|${su}`) ?? "";
+      if (!secondary) return a || "-";
+      const b = secondary.byLabelSize.get(`${label}|${su}`) ?? "";
+      if (a && b) return `${a} / ${b}`;
+      return a || b || "-";
     };
-    const header = ["尺寸 / Size", ...measurements.map((m) => esc((m.type_label ?? "").trim()))];
+
+    const header = ["尺寸 / Size", ...primary.labels.map(esc)];
     const rows: string[][] = [header];
     for (const size of sizes) {
       const su = size.toUpperCase();
-      const cells = measurements.map((m) => fmt(m.values?.find((val) => (val.size ?? "").toUpperCase() === su)));
-      // Only include a size row that resolved at least one real measurement (avoid an all-"-" row for a
-      // size Printful doesn't list). `size` is operator/config-controlled (S/M/L…) but escape anyway.
+      const cells = primary.labels.map((l) => esc(cell(l, su)));
+      // Skip a size Printful doesn't list (all cells "-").
       if (cells.some((c) => c !== "-")) rows.push([esc(size), ...cells]);
     }
     if (rows.length < 2) return fail();
-    // A non-product_measure fallback table can carry unit "none" — coerce to the inches we requested so
-    // the body heading never reads "Size guide (none)" (critic 2026-06-24).
-    const unit = table.unit && table.unit !== "none" ? table.unit : "inches";
-    const chart: SizeChart = { unit, rows };
-    sizeGuideCache.set(catalogProductId, { chart, ts: Date.now() });
+    const chart: SizeChart = { unit: unitLabel, rows };
+    sizeGuideCache.set(cacheKey, { chart, ts: Date.now() });
     return chart;
   } catch {
     return fail();
