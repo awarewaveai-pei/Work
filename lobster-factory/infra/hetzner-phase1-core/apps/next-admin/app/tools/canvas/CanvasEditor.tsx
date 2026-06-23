@@ -256,7 +256,7 @@ export default function CanvasEditor() {
           // preview down to fit; exportPng() restores the full source dimensions.
           const realW = Math.max(1, img.width || 800);
           const realH = Math.max(1, img.height || 800);
-          const maxDisplay = 1100;
+          const maxDisplay = 650;
           // Allow zoom > 1 so small documents fill the workspace (like Photoshop). Export stays at realW/realH.
           const dispScale = Math.min(8, maxDisplay / Math.max(realW, realH));
           canvas.setZoom(dispScale);
@@ -1434,10 +1434,10 @@ export default function CanvasEditor() {
           style={{ fontSize: 12, padding: "2px 6px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)", width: 160 }}
         />
         <button className="btn-primary" disabled={!ready} onClick={download} title="下載全尺寸 PNG">
-          PNG{exportPxLabel ? ` ${exportPxLabel}` : ""}
+          PNG下載{exportPxLabel ? ` (${exportPxLabel})` : ""}
         </button>
         <button className="btn-primary" disabled={!ready} onClick={() => void downloadWebP()} title="下載 WebP，自動壓縮至 200KB 以內">
-          WebP &lt;200k
+          WebP下載
         </button>
         <button
           className="btn-primary"
@@ -1507,7 +1507,7 @@ export default function CanvasEditor() {
 
       {/* 畫布 + 右側可捲動工具欄（vector-trace-demo 風格）。面板垂直堆疊、可收合。 */}
       <div style={{ display: "flex", gap: 12, alignItems: "flex-start", width: "100%" }}>
-        <div style={{ border: "1px solid var(--card-border)", borderRadius: 8, flex: 1, minWidth: 300, background: "var(--card-bg)", display: "flex", justifyContent: "center", overflow: "hidden" }}>
+        <div style={{ border: "1px solid var(--card-border)", borderRadius: 8, flex: 1, minWidth: 0, background: "var(--card-bg)", display: "flex", justifyContent: "center", overflow: "hidden" }}>
           <canvas ref={canvasElRef} width={800} height={800} />
         </div>
 

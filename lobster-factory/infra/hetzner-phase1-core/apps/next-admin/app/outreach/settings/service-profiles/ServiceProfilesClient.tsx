@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from "react";
+import { useActiveOrg, withOrg } from "@/lib/outreach/use-active-org";
 
 interface Profile {
   id: string;
@@ -71,7 +72,7 @@ export default function ServiceProfilesClient() {
       const r = await fetch(API, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, organizationId: org }),
       });
       const j = await r.json();
       if (!j.ok) throw new Error(j.error || "save failed");

@@ -872,7 +872,8 @@ export default function StudioWorkbench() {
                         </button>
                       )}
                       {mockupState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>Mockup 失敗</span>}
-                      <button className="btn-secondary" onClick={() => downloadImage(img, m)}>下載</button>
+                      <button className="btn-secondary" onClick={() => downloadImage(img, m)}>PNG下載</button>
+                      <button className="btn-secondary" onClick={() => downloadImageWebP(img, m)}>WebP下載</button>
                       {activeResult.seed != null && <span style={{ fontSize: 12, opacity: 0.6 }}>seed {activeResult.seed}</span>}
                       {saveState === "saved" && <a href="/tools/designs" style={{ fontSize: 12 }}>查看 My Designs →</a>}
                       {saveState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>儲存失敗</span>}
@@ -964,8 +965,15 @@ export default function StudioWorkbench() {
                 </div>
               )}
 
-              {/* AI edit panel + output track */}
+              {/* AI edit panel + quick edit */}
               <div style={{ marginTop: 14 }}>
+                <button
+                  className="btn-secondary"
+                  style={{ width: "100%", marginBottom: 6 }}
+                  onClick={() => openInCanvas(activeResult.image, buildSemanticBase({ ...fileMeta, track: "編輯" }))}
+                >
+                  ✏️ 快速編輯
+                </button>
                 <AccordionSection title="✏️ AI image prompt（修圖）" defaultOpen={false}>
                   <ImageEditPromptPanel
                     sourceImage={activeResult.image}
@@ -987,9 +995,6 @@ export default function StudioWorkbench() {
                     }}
                   />
                 </AccordionSection>
-                <div style={{ marginTop: 8 }}>
-                  <OutputTrackBar image={activeResult.image} source="pod" fileMeta={fileMeta} />
-                </div>
               </div>
               </div>
             </div>
