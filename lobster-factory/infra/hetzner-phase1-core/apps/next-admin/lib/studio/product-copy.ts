@@ -31,6 +31,12 @@ export interface ProductCopyInput {
   brand?: string; // e.g. "Soulful Expression"
   /** Operator hint for the focus keyword; the model refines if weak. */
   focusKeywordHint?: string;
+  /**
+   * Free-text operator instructions for tone / language / brand voice / what to emphasise
+   * (e.g. "write in Traditional Chinese", "playful tone", "stress eco-friendly fabric"). These
+   * OVERRIDE the default tone/language/brand, but NEVER the mandatory safety + structure rules.
+   */
+  instructions?: string;
   /** Store domain, for the RankMath self-score (internal vs external links). */
   siteDomain?: string;
   /**
@@ -75,7 +81,7 @@ RULES (every one is mandatory):
 - BULLETS: each is one extractable unit (material, fit, print method, care, sustainability). Concrete, no fluff. AEO: phrase at least one bullet as a direct factual statement an AI could quote.
 - TONE: warm, specific, benefit-led. No unsupported superlatives ("best", "#1"). No medical/therapeutic claims.
 - ENTITIES (GEO): name concrete entities where true — e.g. "Bella+Canvas 3001", "ring-spun cotton", "DTG print", "unisex fit".
-- Output language: English (the store is English-language).
+- Output language: English by default — BUT if the operator instructions request another language, write EVERY field entirely in that language.
 - NEVER invent certifications, awards, or statistics.`;
 
 function extractJson(text: string): unknown {
