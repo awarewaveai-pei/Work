@@ -4,6 +4,31 @@
 
 ## 2026-06-24
 
+### fix(video): EU video-service R2 + auth 修復；UX AI 模式自動全選場景
+
+[任務理解] 影片工具 8 個 bug 收尾：VideoStudio / ContentStudio AI 模式 UX 修正 + EU video-service R2 未設定 + RENDER_AUTH_TOKEN 不一致。
+
+[現況分析] 
+- checkpoint 5b63b092 已 commit：VideoStudio.tsx（切 AI 模式 → customScenes=totalScenes）+ ContentStudio.tsx（同邏輯 + 移除 "(Flux)" 標籤）
+- EU video-service 在前一 session 以 `docker compose build --no-cache ... up -d`（**無** `--env-file .env.video`）重建 → R2_ACCOUNT_ID/R2_API_TOKEN/RENDER_AUTH_TOKEN 全空 → 影片渲染後回本機路徑（/app/output/...），前端無法播放 → Bug 6 根因
+- `.env.video` 有完整憑證，只需 restart with env-file
+
+[已修改]
+- EU video-service：`docker compose -f docker-compose.video.yml --env-file .env.video up -d` × 2（第一次設 R2，第二次同時補 RENDER_AUTH_TOKEN=9523mY2...）
+- `/root/Work/.../video-service/.env.video`：填入 RENDER_AUTH_TOKEN=9523mY23wamklvuZR4had7XaoGqDmfJrr0bVwSbQ1LI（與 Next.js VIDEO_SERVICE_SECRET 一致）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=docker inspect lobster-video-service → R2_ACCOUNT_ID + R2_API_TOKEN + RENDER_AUTH_TOKEN all non-empty | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=curl http://127.0.0.1:8732/health | exit=0 | {"ok":true}
+- REALTEST_EVIDENCE: tool=Bash | cmd=docker exec python3 -c "import os; print(bool R2 configured)" | exit=0 | True
+- REVIEW_DONE: critic=NA | verdict=NA -- 純 env 設定，無 code 改動
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=docker-compose.video.yml | hits=0
+- BUGHUNT_WAIVED: NA -- env file 操作，無 code callsite 需搜尋
+
+[剩餘風險] 下次 container rebuild 須記得加 `--env-file .env.video`（否則 R2 又會空）。Bug 2（旁白未更新 TTS）根因尚待使用者實測確認，code path 正確無誤。Bug 8（背景音樂）未實作。
+
+[rollback] `docker compose -f docker-compose.video.yml up -d`（不加 env-file → 回空環境，但這是 bug）
+
 ### feat(publish): 尺寸表改 inch / cm 並列（操作者追加）
 
 [任務理解] 操作者要尺寸表同時顯示 cm 與 inch。
