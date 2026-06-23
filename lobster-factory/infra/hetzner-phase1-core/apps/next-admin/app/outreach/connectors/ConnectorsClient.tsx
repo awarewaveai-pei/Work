@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { LADDERS } from "@/lib/outreach/connectors/router";
 import type { ConnectorNeed } from "@/lib/outreach/connectors/types";
+import { useActiveOrg, withOrg } from "@/lib/outreach/use-active-org";
 
 interface Connector {
   id: string;
@@ -41,11 +42,13 @@ export default function ConnectorsClient() {
   const [keyingId, setKeyingId] = useState<string | null>(null);
   const [keyValue, setKeyValue] = useState("");
 
+  const org = useActiveOrg();
+
   const load = useCallback(async () => {
     setLoading(true);
     setErr(null);
     try {
-      const r = await fetch(API);
+      const r = await fetch(withOrg(API, org));
       const j = await r.json();
       if (!j.ok) throw new Error(j.error || "load failed");
       setConnectors(j.connectors as Connector[]);
@@ -54,7 +57,7 @@ export default function ConnectorsClient() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [org]);
 
   useEffect(() => {
     void load();
@@ -70,7 +73,7 @@ export default function ConnectorsClient() {
       const r = await fetch(API, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ connectorName: k.name, connectorType: k.type, isEnabled: false }),
+        body: JSON.stringify({ connectorName: k.name, connectorType: k.type, isEnabled: false, organizationId: org }),
       });
       const j = await r.json();
       if (!j.ok) throw new Error(j.error || "save failed");

@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from "react";
+import { useActiveOrg, withOrg } from "@/lib/outreach/use-active-org";
 
 interface Lead { id: string; name: string; score: number; priority: string | null; status: string; }
 interface Evidence { used_observation: string | null; used_pain_guess: string | null; source_url: string | null; unsupported_claims: string[] }
@@ -31,15 +32,17 @@ export default function ReviewClient() {
   const [err, setErr] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const org = useActiveOrg();
+
   const loadLeads = useCallback(async () => {
     try {
-      const r = await fetch(LEADS_API);
+      const r = await fetch(withOrg(LEADS_API, org));
       const j = await r.json();
       if (j.ok) setLeads(j.leads as Lead[]);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     }
-  }, []);
+  }, [org]);
 
   const loadMessages = useCallback(async (id: string) => {
     if (!id) { setMessages([]); return; }

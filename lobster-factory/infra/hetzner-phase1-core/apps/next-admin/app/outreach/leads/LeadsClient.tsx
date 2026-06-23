@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from "react";
+import { useActiveOrg } from "@/lib/outreach/use-active-org";
 
 interface Lead {
   id: string;
@@ -29,6 +30,8 @@ export default function LeadsClient() {
   const [priority, setPriority] = useState("");
   const [status, setStatus] = useState("");
 
+  const org = useActiveOrg();
+
   const load = useCallback(async () => {
     setLoading(true);
     setErr(null);
@@ -36,6 +39,7 @@ export default function LeadsClient() {
       const qs = new URLSearchParams();
       if (priority) qs.set("priority", priority);
       if (status) qs.set("status", status);
+      if (org) qs.set("organizationId", org);
       const r = await fetch(`${API}?${qs.toString()}`);
       const j = await r.json();
       if (!j.ok) throw new Error(j.error || "load failed");
@@ -45,7 +49,7 @@ export default function LeadsClient() {
     } finally {
       setLoading(false);
     }
-  }, [priority, status]);
+  }, [priority, status, org]);
 
   useEffect(() => {
     void load();

@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from "react";
+import { useActiveOrg, withOrg } from "@/lib/outreach/use-active-org";
 
 interface InboxItem {
   id: string;
@@ -41,11 +42,13 @@ export default function InboxClient() {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [bulk, setBulk] = useState("");
 
+  const org = useActiveOrg();
+
   const load = useCallback(async () => {
     setLoading(true);
     setErr(null);
     try {
-      const r = await fetch(INBOX_API);
+      const r = await fetch(withOrg(INBOX_API, org));
       const j = await r.json();
       if (!j.ok) throw new Error(j.error || "load failed");
       setItems(j.items as InboxItem[]);
@@ -54,7 +57,7 @@ export default function InboxClient() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [org]);
 
   useEffect(() => {
     void load();
@@ -76,7 +79,7 @@ export default function InboxClient() {
       const r = await fetch(INBOX_API, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ lead: form }),
+        body: JSON.stringify({ lead: form, organizationId: org }),
       });
       const j = await r.json();
       if (!j.ok) throw new Error(j.error || "import failed");
@@ -109,7 +112,7 @@ export default function InboxClient() {
       const r = await fetch(INBOX_API, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ leads }),
+        body: JSON.stringify({ leads, organizationId: org }),
       });
       const j = await r.json();
       if (!j.ok) throw new Error(j.error || "import failed");

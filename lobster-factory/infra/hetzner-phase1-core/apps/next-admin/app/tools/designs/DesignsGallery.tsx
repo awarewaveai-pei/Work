@@ -1265,25 +1265,84 @@ export default function DesignsGallery() {
                 </div>
               </div>
 
-              {/* ── image ── */}
-              {asset.object_url ? (
-                <button
-                  className="designs-img-btn"
-                  onClick={() => setZoom(asset.object_url!)}
-                >
-                  <div className={`designs-img-frame designs-img-frame--${isTarot ? "tarot" : "square"}`}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={asset.object_url}
-                      alt={asset.metadata?.card_name ?? asset.metadata?.prompt ?? asset.object_key}
-                      loading="lazy"
-                      className="designs-img"
-                    />
-                  </div>
-                </button>
-              ) : (
-                <div className={`designs-img-placeholder designs-img-placeholder--${isTarot ? "tarot" : "square"}`} />
-              )}
+              {/* ── image + kebab overlay ── */}
+              <div className="designs-img-wrap">
+                {asset.object_url ? (
+                  <button
+                    className="designs-img-btn"
+                    onClick={() => setZoom(asset.object_url!)}
+                  >
+                    <div className={`designs-img-frame designs-img-frame--${isTarot ? "tarot" : "square"}`}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={asset.object_url}
+                        alt={asset.metadata?.card_name ?? asset.metadata?.prompt ?? asset.object_key}
+                        loading="lazy"
+                        className="designs-img"
+                      />
+                    </div>
+                  </button>
+                ) : (
+                  <div className={`designs-img-placeholder designs-img-placeholder--${isTarot ? "tarot" : "square"}`} />
+                )}
+
+                {/* ── kebab menu (top-right of image) ── */}
+                <div className="designs-kebab-wrap">
+                  {openMenuId === asset.id ? (
+                    <div
+                      className="designs-kebab-menu"
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
+                      {asset.object_url ? (
+                        <button
+                          className="designs-kebab-item"
+                          onClick={() => { setOpenMenuId(null); openInCanvas(asset.object_url!, designBaseName(asset)); }}
+                        >
+                          🎨 Canvas 編輯
+                        </button>
+                      ) : null}
+                      {asset.object_url ? (
+                        <button
+                          className="designs-kebab-item"
+                          onClick={() => { setOpenMenuId(null); openEdgeEdit(asset); }}
+                          title="套上有機／筆刷邊 → 透明 PNG，再去建商品"
+                        >
+                          ✨ 改邊緣
+                        </button>
+                      ) : null}
+                      <button
+                        className="designs-kebab-item"
+                        onClick={() => { setOpenMenuId(null); void copyUrl(asset); }}
+                      >
+                        {copiedId === asset.id ? "✓ 已複製" : "🔗 複製 URL"}
+                      </button>
+                      {asset.object_url ? (
+                        <button
+                          className="designs-kebab-item"
+                          disabled={downloadingId === asset.id}
+                          onClick={() => { setOpenMenuId(null); void downloadOne(asset); }}
+                        >
+                          {downloadingId === asset.id ? "下載中…" : "⬇ 下載"}
+                        </button>
+                      ) : null}
+                      <button
+                        className="designs-kebab-item designs-kebab-item--danger"
+                        disabled={deletingId === asset.id}
+                        onClick={() => { setOpenMenuId(null); void deleteAsset(asset); }}
+                      >
+                        {deletingId === asset.id ? "刪除中…" : "🗑 刪除"}
+                      </button>
+                    </div>
+                  ) : null}
+                  <button
+                    className="designs-kebab-btn"
+                    onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === asset.id ? null : asset.id); }}
+                    title="更多操作"
+                  >
+                    ···
+                  </button>
+                </div>
+              </div>
 
               {/* ── card name (BELOW image: keeps every image top aligned across the row,
                    regardless of whether a name exists or how long it is) ── */}
@@ -1350,62 +1409,6 @@ export default function DesignsGallery() {
                 );
               })() : null}
 
-              {/* ── action buttons (kebab) ── */}
-              <div className="designs-kebab-wrap">
-                {openMenuId === asset.id ? (
-                  <div
-                    className="designs-kebab-menu"
-                    onMouseDown={(e) => e.stopPropagation()}
-                  >
-                    {asset.object_url ? (
-                      <button
-                        className="designs-kebab-item"
-                        onClick={() => { setOpenMenuId(null); openInCanvas(asset.object_url!, designBaseName(asset)); }}
-                      >
-                        🎨 Canvas 編輯
-                      </button>
-                    ) : null}
-                    {asset.object_url ? (
-                      <button
-                        className="designs-kebab-item"
-                        onClick={() => { setOpenMenuId(null); openEdgeEdit(asset); }}
-                        title="套上有機／筆刷邊 → 透明 PNG，再去建商品"
-                      >
-                        ✨ 改邊緣
-                      </button>
-                    ) : null}
-                    <button
-                      className="designs-kebab-item"
-                      onClick={() => { setOpenMenuId(null); void copyUrl(asset); }}
-                    >
-                      {copiedId === asset.id ? "✓ 已複製" : "🔗 複製 URL"}
-                    </button>
-                    {asset.object_url ? (
-                      <button
-                        className="designs-kebab-item"
-                        disabled={downloadingId === asset.id}
-                        onClick={() => { setOpenMenuId(null); void downloadOne(asset); }}
-                      >
-                        {downloadingId === asset.id ? "下載中…" : "⬇ 下載"}
-                      </button>
-                    ) : null}
-                    <button
-                      className="designs-kebab-item designs-kebab-item--danger"
-                      disabled={deletingId === asset.id}
-                      onClick={() => { setOpenMenuId(null); void deleteAsset(asset); }}
-                    >
-                      {deletingId === asset.id ? "刪除中…" : "🗑 刪除"}
-                    </button>
-                  </div>
-                ) : null}
-                <button
-                  className="designs-kebab-btn"
-                  onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === asset.id ? null : asset.id); }}
-                  title="更多操作"
-                >
-                  ···
-                </button>
-              </div>
             </div>
           );
         })}
