@@ -4,6 +4,27 @@
 
 ## 2026-06-23
 
+### deploy(video): 部署前置——nginx body-size 實機調查 + 上傳上限對齊（VBC）
+
+[任務理解] 部署影片工具系列前，處理 C 上傳的 nginx body-size 前提。先 VBC（實機查證）再動，不照 critic 的 1MB worst-case 假設盲改 prod。
+
+[現況分析]（SSH SG 5.223.93.113 唯讀調查）
+- app.aware-wave.com live 路徑 = Cloudflare → host nginx :443 → next-admin 127.0.0.1:3002（直連；docker lobster-nginx :80 不在 HTTPS 路徑）。
+- 啟用 vhost = `/etc/nginx/sites-available/aware-wave-app-api-subdomains.conf`（`sites-enabled/app` symlink 指它；`sites-available/app` 是過時未用檔）。
+- 該 vhost `location ^~ /api/`（涵蓋 `/api/video/upload-asset`）**已設 `client_max_body_size 50M`**。critic 的「預設 1MB」假設**不成立** → **prod nginx 不需改**（避免 High-risk infra 變更）。
+
+[已修改] 唯一不一致：app 影片上限 60MB > nginx 50M → 50-60MB 影片會碰 nginx HTML 413。最小風險解＝降 app 上限：
+- `app/api/video/upload-asset/route.ts`：`MAX_VIDEO_BYTES` 60→45MB（穩在 nginx 50M 內含 Content-Length 預擋餘裕 46MB < 50M）。
+- `app/tools/video/VideoStudio.tsx`：handleUploadAsset capMb 60→45。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`cat aware-wave-app-api-subdomains.conf; ss -ltnp` | exit=0 — 確認 :443=host nginx、`^~ /api/` client_max_body_size=50M、proxy→3002
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（純常數收緊；算術確認 46MB<50M 餘裕 4MB、前後端一致、無 stale 60 literal、上傳安全核心未動）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=MAX_VIDEO_BYTES | hits=0-stale（僅 upload-asset + VideoStudio 兩改動檔，file-local 常數無 orphan）
+
+[旁見非本次] critic 提醒 `app/api/tools/publish/route.ts` 有 60MB cap，而 `^~ /api/tools/` nginx 僅 15M → 50-60MB 商品圖 publish 可能碰 nginx 413（pre-existing、product-image 域、非影片任務範圍，僅記錄）。
+
 ### feat(video): D2 接線——入口收斂到積木 + content 滑桿生效
 
 [任務理解] D 登記積木後的接線：① 把 content 的「場景總數/自訂AI圖」滑桿接通 ② 把 draft/render-draft 收斂到 video/prepare、video/render 積木（讓兩積木真的被用，非 shelfware）。
