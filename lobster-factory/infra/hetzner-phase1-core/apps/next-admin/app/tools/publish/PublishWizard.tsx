@@ -60,6 +60,7 @@ export default function PublishWizard() {
   const [retailPrice, setRetailPrice] = useState("24.99");
   const [plusPrice, setPlusPrice] = useState("26.99");
   const [keywordHint, setKeywordHint] = useState("");
+  const [copyInstructions, setCopyInstructions] = useState("");
   // AI SEO/GEO/AEO/RankMath product copy (Phase 4).
   const [copy, setCopy] = useState<{
     state: StepState;
@@ -310,6 +311,7 @@ export default function PublishWizard() {
       subject: title.trim() || undefined,
       productType: "tshirt",
       focusKeywordHint: keywordHint.trim() || undefined,
+      instructions: copyInstructions.trim() || undefined,
       ...(isFix ? { fixHints } : {}),
     });
     if (!json.ok) {
@@ -350,7 +352,7 @@ export default function PublishWizard() {
       return { ok: true, message: prevScore < 0 ? undefined : `${prevScore} → ${newScore} ↑` };
     }
     return { ok: true };
-  }, [designAssets, designUrl, title, keywordHint, post]);
+  }, [designAssets, designUrl, title, keywordHint, copyInstructions, post]);
 
   // Product AI-fix: regenerate the copy, feeding the failed checks' suggestions back as hints. Product
   // copy is structured (6 fields), so the fix is a re-generate — NOT the Markdown /api/content/seo-fix
@@ -531,6 +533,7 @@ export default function PublishWizard() {
       subject: title.trim() || undefined,
       productType: "tshirt",
       focusKeywordHint: keywordHint.trim() || undefined,
+      instructions: copyInstructions.trim() || undefined,
     });
     if (cp.ok) {
       const c = cp.copy as {
@@ -624,7 +627,7 @@ export default function PublishWizard() {
     } finally {
       runAllLatch.current = false;
     }
-  }, [designUrl, title, printMode, designAssets, keywordHint, retailPrice, plusPrice, catalogProductId, genColorMockup, post]);
+  }, [designUrl, title, printMode, designAssets, keywordHint, copyInstructions, retailPrice, plusPrice, catalogProductId, genColorMockup, post]);
 
   const busy = allRun.state === "running";
 
@@ -835,6 +838,16 @@ export default function PublishWizard() {
         <label style={{ fontSize: 12, flex: "1 1 220px" }}>
           焦點關鍵字（可留空，AI 自選）
           <input className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={keywordHint} onChange={(e) => setKeywordHint(e.target.value)} placeholder="例：spiritual lotus t-shirt" />
+        </label>
+        <label style={{ fontSize: 12, flex: "1 1 100%" }}>
+          文案指示／品牌語氣（可留空 — 覆寫預設的語氣、語言、品牌；安全規則不受影響）
+          <textarea
+            className="btn-secondary"
+            style={{ width: "100%", marginTop: 4, minHeight: 52, resize: "vertical", fontFamily: "inherit" }}
+            value={copyInstructions}
+            onChange={(e) => setCopyInstructions(e.target.value)}
+            placeholder="例：用繁體中文寫；語氣俏皮溫暖；強調環保水性墨、適合送禮；品牌叫 Soulful Expression"
+          />
         </label>
         <button className="btn-secondary" disabled={busy || copy.state === "running"} onClick={() => void runCopy()}>
           {copy.state === "running" ? "生成文案中…" : "AI 生成 SEO 文案（標題＋描述＋RankMath meta）"}

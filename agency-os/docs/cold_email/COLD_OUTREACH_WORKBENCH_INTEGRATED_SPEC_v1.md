@@ -40,7 +40,7 @@ AI Outbound Lead System
 | **賣（SaaS）** | 客戶自己登入 | 客戶（訂閱） | 每客戶一個 org，self-serve |
 
 **統一結論**：三模式在資料層**都是 org-tenant**，差別只在「登入者是誰、operator 是否 agency、是否 self-serve onboarding + billing」。
-→ 一律接現有 `organizations` + Clerk org 映射 + `user_has_org_access()`，代操跨 org 走現有 **ops-console** operator 路徑。**不採用文件的單人 `user_id` 模型。**
+→ 接現有 `organizations` 表 + **Supabase Auth + ops-role RBAC**（`lib/ops-role.ts`，已驗證 §B0.1）；`organization_id` 是「屬於哪個客戶」的篩選欄（由路由帶入），代操時 operator 看得到並切換所有客戶。**自用 / 代操在現有架構即可運作；賣（客戶自己登入只看自己）需 Phase 5 補真正 per-org 登入隔離。** **不採用文件的單人 `user_id` 模型。**
 
 ## A2. 每客戶自帶 WP + FluentCRM（本版核心現實）
 
@@ -64,12 +64,24 @@ AI Outbound Lead System
 ## B0. Schema 設計原則（對齊現有 codebase）
 
 1. **每張表加 `organization_id uuid REFERENCES public.organizations(id) ON DELETE CASCADE`**，取代文件的 `user_id references auth.users`。
-2. **RLS = service-role-only**，比照 `intake_forms` / `content_drafts`（`migrations/0034`、`0041`）：app 層（next-admin server，持 Clerk session）負責 org scoping，Supabase 只開 service_role。**不採用** `auth.uid() = user_id` per-row policy。
+2. **RLS = service-role-only**，比照 `intake_forms` / `content_drafts`（`migrations/0034`、`0041`）：next-admin server 用 service-role client（`lib/supabase-server.ts:getSupabaseWriteClient`）存取，Supabase RLS 只開 `service_role`（anon/authenticated 一律擋）。**不採用** `auth.uid() = user_id` per-row policy。
 3. PK 一律 `uuid DEFAULT gen_random_uuid()`；時間 `timestamptz NOT NULL DEFAULT now()`；狀態用 `text ... CHECK (... IN (...))`；彈性欄位用 `jsonb`。
-4. 命名 prefix 建議 `co_`（cold-outreach），避免與現有 `content_*` / `ops_*` / `repair_*` 命名空間衝突。下方 DDL 用 prefix。
-5. Migration 從 `0048_*` 起接續（最新為 `0047_video_jobs`）。
+4. 命名 prefix `co_`（cold-outreach），避免與現有 `content_*` / `ops_*` / `repair_*` 撞名。
+5. Migration **雙檔慣例**：`migrations/0048_co_outreach_core.sql` + `scripts/0048_co_outreach_core_down.sql`（比照 `0047`/`0038`）。最新為 `0047_video_jobs`。
 
-> 下列 DDL 是建議主體；實作時依現有 lint（splinter / RLS initplan）微調，並附 rollback 區塊（比照 0041）。
+> ### B0.1 已驗證的現況存取模型（reality-read 2026-06-23，**取代先前 Clerk 假設**）
+>
+> 經讀回 next-admin 實際 code，現有 admin console 是 **agency 內部 ops console**，不是 per-tenant 登入 SaaS：
+> - **身份** = Supabase Auth（email+密碼），角色 = `app_metadata.ops_role` ∈ {owner, admin, operator, viewer}（`middleware.ts`）。**runtime 不是 Clerk**（DB 有 `clerk_organization_mappings` 但 console 不靠它）。
+> - **存取控制** = ops-role RBAC（`lib/ops-role.ts`：`canWriteTenantConfig`=owner/admin、`canCreateAiImageJob`=owner/admin/operator）。
+> - **`organization_id`** = 「這筆屬於哪個客戶」的**篩選欄位**（nullable，由路由 client slug 帶入，比照 `ops/clients/[slug]/page.tsx`），**非 per-login 隔離**。operator 看得到並切換**所有**客戶。
+> - **DB 存取** = service-role client（bypass RLS）；RLS service-role-only = 縱深防禦（擋直連 anon/authenticated）。
+>
+> **co_ 表一律沿用此模型**：service-role-only RLS + `organization_id` 可空篩選欄 + 路由 ops-role 守門。
+> **三模式落點修正**：**自用 + 代操** 在現有架構**即可運作**（你操作所有客戶）；**賣**（客戶自己登入、只能看自己）= **Phase 5** 才補真正 per-org 登入隔離（per-client Supabase Auth user 或啟用 Clerk org + 加 org-scoped RLS）。
+> **存取守門**：新增 `canManageOutreach(role)`（owner/admin/operator）helper，比照既有 RBAC。
+>
+> 下列 DDL 為主體；實作依現有 lint（splinter / RLS initplan）微調，rollback 走獨立 down 檔。
 
 ## B1. co_service_profiles（服務設定檔，每 org 可多筆）
 
@@ -527,7 +539,7 @@ CREATE POLICY co_leads_service_role ON public.co_leads
 -- co_timeline_events / co_analytics_events 重複相同 policy
 ```
 
-**org 隔離由 app 層強制**：next-admin server 持 Clerk session → 解析 active org → 所有查詢自動 `WHERE organization_id = :activeOrg`。代操跨 org 走 ops-console operator 授權檢查（沿用既有授權層，不另造）。
+**存取控制（已驗證現況，見 §B0.1）**：路由用 `resolveOpsRole(req)` + `canManageOutreach(role)`（owner/admin/operator）守門；查特定客戶時用 `.eq('organization_id', orgId)`（orgId 由路由 client slug 帶入，比照 `ops/clients/[slug]`）。service-role client 存取，RLS service-role-only 為縱深防禦。**這是 agency 內部 ops console 模型**：operator 看得到所有客戶、非 per-login 隔離；賣模式的 per-tenant 隔離留 Phase 5。
 
 ---
 

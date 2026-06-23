@@ -178,9 +178,17 @@ export async function generateProductCopy(input: ProductCopyInput): Promise<Prod
   const hints = Array.isArray(input.improveHints)
     ? input.improveHints.map((h) => (typeof h === "string" ? h.trim() : "")).filter((h) => h.length > 0).slice(0, 12)
     : [];
-  const userContent = hints.length > 0
-    ? `Product design brief:\n${JSON.stringify(brief, null, 2)}\n\nThe previous copy FAILED these RankMath / SEO / AEO checks. Regenerate the FULL copy so every one passes, while still obeying all the base RULES above:\n${hints.map((h) => `- ${h}`).join("\n")}`
-    : `Product design brief:\n${JSON.stringify(brief, null, 2)}`;
+  // Operator free-text style/content instructions (publish UI「文案指示／品牌語氣」). Highest priority
+  // for STYLE — may override the default tone/language/brand — but the SYSTEM_PROMPT's mandatory RULES
+  // (valid JSON, 6 keys, structure, char limits, no medical claims, no invented facts) still bind.
+  const instructions = typeof input.instructions === "string" ? input.instructions.trim().slice(0, 600) : "";
+  const directive = instructions
+    ? `\n\nOPERATOR INSTRUCTIONS — highest priority for tone, language and brand voice; override the defaults where they conflict, but you MUST still obey every mandatory RULE above (valid JSON with the 6 keys, the answer-capsule + bullets structure, the char limits, and the safety rules — no medical/therapeutic claims, no invented certifications/stats):\n${instructions}`
+    : "";
+  const fixBlock = hints.length > 0
+    ? `\n\nThe previous copy FAILED these RankMath / SEO / AEO checks. Regenerate the FULL copy so every one passes, while still obeying all the base RULES above:\n${hints.map((h) => `- ${h}`).join("\n")}`
+    : "";
+  const userContent = `Product design brief:\n${JSON.stringify(brief, null, 2)}${directive}${fixBlock}`;
 
   const client = new Anthropic({ apiKey });
   let text: string;

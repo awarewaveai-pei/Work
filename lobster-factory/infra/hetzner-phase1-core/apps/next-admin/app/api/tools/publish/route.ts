@@ -63,6 +63,8 @@ interface PublishBody {
   theme?: string;
   brand?: string;
   focusKeywordHint?: string;
+  /** Free-text operator copy instructions (tone / language / brand voice / emphasis). Publish UI「文案指示／品牌語氣」. */
+  instructions?: string;
   // copy fix re-generation: failed-check hints fed back to regenerate compliant copy
   fixHints?: string[];
   // create
@@ -272,6 +274,7 @@ export async function POST(request: Request) {
       theme: body.theme,
       brand: body.brand,
       focusKeywordHint: body.focusKeywordHint,
+      instructions: body.instructions,
       improveHints: Array.isArray(body.fixHints)
         ? body.fixHints.filter((h) => typeof h === "string")
         : undefined,
