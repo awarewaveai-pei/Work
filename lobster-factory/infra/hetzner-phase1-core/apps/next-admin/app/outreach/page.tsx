@@ -5,8 +5,13 @@ export const metadata = { title: "Cold Outreach · Dashboard" };
 // Reads live counts from the co_* tables → must not be statically evaluated at build.
 export const dynamic = "force-dynamic";
 
-export default async function OutreachDashboardPage() {
-  const counts = await getOutreachCounts();
+export default async function OutreachDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ org?: string }>;
+}) {
+  const { org } = await searchParams;
+  const counts = await getOutreachCounts(org && org.trim() ? org.trim() : undefined);
   return (
     <>
       <div className="topbar">
