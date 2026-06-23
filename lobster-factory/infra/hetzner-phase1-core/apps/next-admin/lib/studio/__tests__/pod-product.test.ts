@@ -101,3 +101,30 @@ describe("buildPodProductPayload — multi-colour via model", () => {
     expect(p.default_attributes.find((a) => a.name === "Color")!.option).toBe(colorAttr.options[0]);
   });
 });
+
+describe("buildPodProductPayload size chart", () => {
+  const chart = { unit: "inches", rows: [["尺寸 / Size", "Length", "Width"], ["S", "28", "18"], ["M", "29", "20"]] };
+
+  it("inserts a Kadence table block + Size guide heading when sizeChart present", () => {
+    const p = buildPodProductPayload({ title: "Tee", retailPrice: "24.99", sizeChart: chart }) as {
+      blocks: Array<Record<string, unknown>>;
+    };
+    const table = p.blocks.find((b) => b.type === "table");
+    expect(table).toBeTruthy();
+    expect(table!.rows).toEqual(chart.rows);
+    const headings = p.blocks.filter((b) => b.type === "heading").map((b) => String(b.text));
+    expect(headings.some((t) => t.includes("Size guide"))).toBe(true);
+    expect(headings.some((t) => t.includes("inches"))).toBe(true);
+  });
+
+  it("omits the table block when sizeChart is absent or header-only", () => {
+    const none = buildPodProductPayload({ title: "Tee", retailPrice: "24.99" }) as { blocks: Array<Record<string, unknown>> };
+    expect(none.blocks.find((b) => b.type === "table")).toBeUndefined();
+    const headerOnly = buildPodProductPayload({
+      title: "Tee",
+      retailPrice: "24.99",
+      sizeChart: { unit: "inches", rows: [["尺寸 / Size", "Length"]] },
+    }) as { blocks: Array<Record<string, unknown>> };
+    expect(headerOnly.blocks.find((b) => b.type === "table")).toBeUndefined();
+  });
+});

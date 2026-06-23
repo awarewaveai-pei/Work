@@ -4,6 +4,27 @@
 
 ## 2026-06-23
 
+### feat(publish): #2 精修每色模特×1＋平拍 + 新增 Printful 尺寸表（操作者追加）
+
+[任務理解] 操作者看 wave-2 後追加：#2 應是「每色穿模特各 1 個 + 平拍」（非最多 3 模特）；商品應附**尺寸表**。
+
+[已修改]（4 檔）
+- PublishWizard.tsx：genColorMockup 移除 MAX_MODEL 多模特迴圈 → 每色 = swatch(模特正面) + 平拍 1（共 2 張；無模特時 fallback 平拍 dedup 成 1 張）。
+- printful-catalog.ts：fetchProductSizeGuide（GET /products/{id}/sizes?unit=inches → product_measure 表 → {unit, rows} 表格；value/min-max 格式化、size 大小寫匹配、丟全 "-" 列、HTML 跳脫 Printful 字串、unit="none" 修正；1h/1min cache）。
+- pod-product.ts：PodProductParams.sizeChart + buildPodProductPayload 插入 Kadence `table` block（wp-bridge BlockLibrary 原生支援、免改外掛、首列表頭）。
+- route.ts：create 動作 best-effort 抓 size guide（null→略過，永不阻擋發佈）+ safeSizes 驗型（防惡意 size 元素 toUpperCase 拋錯毒化快取）。
+- pod-product.test.ts：+2 永久測試（有/無 sizeChart 的 table block）。
+
+[驗證結果 — R0 四動作]
+- REALTEST_EVIDENCE: tool=Bash | cmd=node 純邏輯(尺寸表解析 + #2 flat-only) | exit=0 -- 9/9；npx vitest(真實 buildPodProductPayload table block) 2/2
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test | exit=0 -- 487/487 pass（含新增 size-chart 永久測試）；tsc --noEmit clean
+- REVIEW_DONE: critic=Deep | verdict=pass-after-fix | findings=0c/1m/4n -- Major（chartSizes 未驗型→快取毒化）已修；Minor HTML 跳脫/unit=none/缺測試 已修；#2 dedup 移迴圈後 Verified Clean
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=fetchProductSizeGuide\|sizeChart\|MAX_MODEL | hits=0 -- 新 symbol 無外部消費者；MAX_MODEL 已全移除無殘留；wp-bridge table block 既有支援
+
+[剩餘風險] 尺寸表用 product_measure 表（無則 fallback 首表）；measurement 字串已跳脫。serial 多 1 次 Printful call（20s cap，cache 命中即免）。
+
+[rollback] 4 檔 git revert；sizeChart null 時行為 = 無尺寸表（無破壞）。
+
 ### feat(publish): 每色多 mockup + Printful 利潤試算 + 多客戶多站（/tools/publish 6 問之 #2/#3/#6）
 
 [任務理解] 接續同一輪 6 問，完成剩餘 3 個：#2 每色生平拍＋多模特（非只 1 張）、#3 發佈前用 Printful 成本算利潤、#6 支援多客戶不同 WP 站。操作者明示「全部都要做直到做好+部署+commit」。

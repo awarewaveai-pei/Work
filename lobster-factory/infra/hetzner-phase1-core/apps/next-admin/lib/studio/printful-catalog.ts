@@ -350,23 +350,32 @@ export async function fetchProductSizeGuide(catalogProductId: number, sizes: str
     const measurements = (table?.measurements ?? []).filter((m) => (m.type_label ?? "").trim().length > 0);
     if (!table || measurements.length === 0) return fail();
 
+    // These strings (labels + measurement values) are UNTRUSTED Printful API output and flow into the
+    // wp-bridge Kadence `table` block, which emits cells into post_content WITHOUT escaping. Escape the
+    // 4 HTML-significant chars here so a future/tampered label can't inject markup (critic 2026-06-24,
+    // trust-boundary defense-in-depth). Today they're numeric strings + fixed labels — this keeps it safe.
+    const esc = (s: string): string =>
+      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     const fmt = (v?: { value?: string; min_value?: string; max_value?: string }): string => {
       if (!v) return "-";
-      if (v.value && v.value.trim()) return v.value.trim();
-      if (v.min_value && v.max_value) return `${v.min_value.trim()}–${v.max_value.trim()}`;
+      if (v.value && v.value.trim()) return esc(v.value.trim());
+      if (v.min_value && v.max_value) return `${esc(v.min_value.trim())}–${esc(v.max_value.trim())}`;
       return "-";
     };
-    const header = ["尺寸 / Size", ...measurements.map((m) => (m.type_label ?? "").trim())];
+    const header = ["尺寸 / Size", ...measurements.map((m) => esc((m.type_label ?? "").trim()))];
     const rows: string[][] = [header];
     for (const size of sizes) {
       const su = size.toUpperCase();
       const cells = measurements.map((m) => fmt(m.values?.find((val) => (val.size ?? "").toUpperCase() === su)));
       // Only include a size row that resolved at least one real measurement (avoid an all-"-" row for a
-      // size Printful doesn't list).
-      if (cells.some((c) => c !== "-")) rows.push([size, ...cells]);
+      // size Printful doesn't list). `size` is operator/config-controlled (S/M/L…) but escape anyway.
+      if (cells.some((c) => c !== "-")) rows.push([esc(size), ...cells]);
     }
     if (rows.length < 2) return fail();
-    const chart: SizeChart = { unit: table.unit ?? "inches", rows };
+    // A non-product_measure fallback table can carry unit "none" — coerce to the inches we requested so
+    // the body heading never reads "Size guide (none)" (critic 2026-06-24).
+    const unit = table.unit && table.unit !== "none" ? table.unit : "inches";
+    const chart: SizeChart = { unit, rows };
     sizeGuideCache.set(catalogProductId, { chart, ts: Date.now() });
     return chart;
   } catch {

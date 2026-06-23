@@ -379,18 +379,22 @@ export async function POST(request: Request) {
 
     // Resolve the POD model (colours + display name + Printful catalog id). Absent → legacy White/Black.
     const model = Number.isInteger(body.catalogProductId) ? podModelById(body.catalogProductId as number) : undefined;
-    const chartSizes = body.sizes ?? model?.sizes ?? [];
+    // Validate sizes to strings at the boundary (body is an unchecked JSON cast). A non-string element
+    // would throw in size.toUpperCase() downstream (size-guide reduce / priceForSize) — and in the
+    // size-guide path that throw 1-min-poisons the cache for EVERY publish of this product. Mirrors the
+    // bullets guard below (critic 2026-06-24).
+    const safeSizes = (body.sizes ?? model?.sizes ?? []).filter((s): s is string => typeof s === "string");
     // Best-effort size chart from Printful → a table block in the product body. A fetch failure (null)
     // simply omits the block; it must NEVER block the publish.
     const sizeChart =
-      Number.isInteger(body.catalogProductId) && chartSizes.length > 0
-        ? await fetchProductSizeGuide(body.catalogProductId as number, chartSizes)
+      Number.isInteger(body.catalogProductId) && safeSizes.length > 0
+        ? await fetchProductSizeGuide(body.catalogProductId as number, safeSizes)
         : null;
     const params = {
       title: body.title.trim(),
       retailPrice: body.retailPrice,
       plusPrice: body.plusPrice,
-      sizes: body.sizes ?? model?.sizes,
+      sizes: safeSizes.length > 0 ? safeSizes : undefined,
       shortDescription: body.shortDescription,
       bullets: Array.isArray(body.bullets) ? body.bullets.filter((b) => typeof b === "string") : undefined,
       seo: body.seo && typeof body.seo === "object" ? body.seo : undefined,
