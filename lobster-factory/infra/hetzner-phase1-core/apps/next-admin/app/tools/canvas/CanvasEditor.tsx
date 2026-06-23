@@ -249,7 +249,8 @@ export default function CanvasEditor() {
           const realW = Math.max(1, img.width || 800);
           const realH = Math.max(1, img.height || 800);
           const maxDisplay = 1100;
-          const dispScale = Math.min(1, maxDisplay / Math.max(realW, realH));
+          // Allow zoom > 1 so small documents fill the workspace (like Photoshop). Export stays at realW/realH.
+          const dispScale = Math.min(8, maxDisplay / Math.max(realW, realH));
           canvas.setZoom(dispScale);
           canvas.setDimensions({
             width: Math.round(realW * dispScale),
