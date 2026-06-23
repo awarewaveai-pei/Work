@@ -196,6 +196,27 @@
   --tab-border-active: #6366f1;
   --tab-padding: 8px 18px;
   --tab-bar-border: #e6eaf4;
+
+  /* ── Unification alias layer (2026-06-23) ──────────────────────────────────
+   * Pages historically referenced token names that were NEVER defined here
+   * (e.g. var(--color-primary, #2563eb)), so they always rendered their
+   * hardcoded fallback — a *different* blue/grey than the rest of the app.
+   * Defining them as aliases of the canonical tokens unifies every such page
+   * instantly, and routes them through the Theme Editor. DO NOT give these
+   * literal hex values — they must forward to the canonical token so one edit
+   * in /tools/theme propagates everywhere. */
+  --color-primary:            var(--accent);
+  --color-primary-hover:      var(--accent-hover);
+  --color-error:              var(--red);
+  --color-success:            var(--green);
+  --color-warning:            var(--yellow);
+  --color-background-primary: var(--card-bg);
+  --bg-page:                  var(--body-bg);
+  --bg-secondary:             var(--bg-subtle);
+  --bg-tertiary:              var(--bg-hover);
+  --surface-bg:               var(--surface);
+  --chip-bg:                  var(--build-chip-bg);
+  --chip-surface:             var(--bg-subtle);
 }
 
 body {

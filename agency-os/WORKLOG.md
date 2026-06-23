@@ -4,6 +4,34 @@
 
 ## 2026-06-23
 
+### fix(video): 前製腳本 廣告A/B/C + AI主持人稿 三缺陷（送去生產缺鈕 / 主持稿擠成團 / 標記不上色）
+
+[任務理解] 操作者回報 `/tools/video`（ScriptForge）三問題：① 廣告A/B/C 與 AI主持人稿「沒有生成腳本功能/功能缺了」② 主持人講稿擠成一團難讀 ③ 文稿標記顏色對不上「標記說明」、且文稿出現的【放慢】【降調】說明區沒有。
+
+[現況分析] 瀏覽器實測 app.aware-wave.com 三項全複現：
+- 問題① 真相：兩 module 的「生成」按鈕**其實都能正常出稿**（實測 AB 出三版本、Host 出主持稿）。真正缺的是——兩者結果頁**沒有「送去生產影片」按鈕**（其他 module 經 `ScriptResult` 都有，頂部說明第③步即按它轉影片），且 `doGen` 用空 `catch{}` 吞錯→失敗時畫面靜默。**已問操作者確認**：=「補送去生產鈕 + 順手修靜默失敗」。
+- 問題②：`ScriptForge.tsx` Host 結果用單一 `<div>{seg.marked_text}</div>`（lineHeight 1.9 + Serif），整段台詞+標記黏成一塊。
+- 問題③：文稿標記全黑字無上色；legend 只有 5 個（停/換氣/升調/加重/快說），缺【放慢】【降調】，且文稿色 ≠ 說明色（無共用 SSOT）。
+- 契約：`ProductionBridge` context（type `SendToProduction`，:40）由 root Provider 包全 module（:792）；`ScriptResult` 送去生產 payload pattern 在 :298；`video-pipeline.ts:188` 對空 imagePrompt 會 fallback 用 narration 當圖 prompt（故 Host 稿無視覺也能安全送出）。
+
+[已修改]（`apps/next-admin/app/tools/video/ScriptForge.tsx`，純前端）
+- palette 加 `teal/teallt`（:15）給第 7 個標記。
+- 新增 `HOST_MARKERS`（7 標記顏色 SSOT）+ `HOST_MARKER_MAP` + `HostMarkedText` component（:608-665）：legend 與文稿內標記**共用同一份顏色** → 永遠一致；renderer 把 marked_text 標記上色成 pill、（…）表情提示淡化、遇【停】【換氣】或句末標點斷行成段 → 解決②③。
+- Host 結果：legend 改 iterate `HOST_MARKERS`（補齊【放慢】【降調】）、marked_text 改用 `<HostMarkedText>`、加「送去生產影片」鈕（strip 標記成乾淨 TTS narration）。
+- AB 結果：加「送去生產影片」鈕（送 active 版本，`sentVer` 記最後送出版本避免跨 tab 誤標）。
+- 兩 module：空 `catch{}` → `setErr(...)` + 紅字錯誤卡；`重新生成` 重置 sent 狀態避免殘留「已送」。
+
+[驗證結果 — R0 四動作]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin）| exit=0 | ms≈40000；tool=Bash | cmd=`node D:/tmp/host-marked-test.mjs`（餵線上實際那段主持稿）| exit=0 → 1 大塊台詞拆成 5 段清楚行、6 標記全偵測且都在 SSOT（未知=0）、narration 清洗後無殘留 `【（(`。修前已用 Chrome MCP 在 app.aware-wave.com 實測複現三缺陷（截圖）。**修後視覺確認待 sg-deploy（High-risk，未做，等 go-ahead）。**
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/1minor — critic 全檔審 + 11 edge case 測 tokenizer：無 Critical/Major、無 crash 路徑、payload 與 ScriptResult:298 及 /api/video/draft 契約一致、顏色 SSOT 保證對齊；1 Minor（AB `sent` 單布林跨 tab 誤標）→ 已改 `sentVer` 修掉。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`HOST_MARKERS|HostMarkedText|HOST_MARKER_MAP|marked_text|teal|setSent|sentVer|ScriptForge` | hits: 新 symbol 全 local 未 export（僅 ScriptForge.tsx）；`marked_text` 僅剩 prompt/複製全稿(純文字 clipboard)/`<HostMarkedText>`/送生產 strip 四處，無遺漏的未上色 blob；`sent`/`sentVer` 各 scope 自洽無孤兒（ScriptResult 245/298、AB 599/604、Host 668/672）；`script_forge_video.jsx` 為 scripts 下獨立舊檔、未被 app import（live 走 ScriptForge.tsx）→ 不需動。
+- BUGHUNT_SCOPE_NARROW: 改動為單一前端檔、新 symbol 皆未 export，無 downstream consumer；已涵蓋必填 agency-os/scripts/lobster-factory 三根。
+
+[剩餘風險] ① 修後視覺（pill 上色/斷行）尚未在真機目視確認，待 sg-deploy 後操作者驗收。② 其他 module（Sales/Speech/Pitch…）仍有空 `catch{}`（本次未在 scope，未動）。③ Host 稿送生產時所有 imagePrompt 為空 → 圖用 narration 中文當 Flux prompt（品質中等但不崩，與既有路徑一致）。
+[rollback] `git revert` 單檔；無 DB/auth/金流/infra 改動。
+
+AUTO_TASK_DONE: fix(video): ScriptForge 廣告A/B/C+AI主持人稿 補「送去生產影片」鈕+修空catch靜默失敗；主持稿 HostMarkedText 標記上色(顏色SSOT)+斷行成段+補【放慢】【降調】；tsc/node/critic 三驗過，待 sg-deploy 視覺驗收
+
 ### fix(pod-publish): 「🚀 全部一鍵完成」上 Printful 永遠 502 — 根因 = WebP 縮圖被 Printful 拒收
 
 [任務理解] 操作者按「🚀 全部一鍵完成」後 Printful native 商品從未建出，誤以為流程沒跑完或看錯店。實為 pfcreate 步驟 deterministic 失敗。

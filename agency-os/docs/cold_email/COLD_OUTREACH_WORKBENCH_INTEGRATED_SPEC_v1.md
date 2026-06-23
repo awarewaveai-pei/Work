@@ -484,6 +484,20 @@ CREATE TABLE IF NOT EXISTS public.co_suppression_list (
 CREATE INDEX IF NOT EXISTS idx_co_suppression_email ON public.co_suppression_list(organization_id, email);
 ```
 
+## B11.1 co_verified_emails（email 驗證快取 — dedup，永不重驗同一 email；PART H §H6）
+
+```sql
+CREATE TABLE IF NOT EXISTS public.co_verified_emails (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id uuid REFERENCES public.organizations(id) ON DELETE CASCADE,
+  email           text NOT NULL,
+  status          text NOT NULL CHECK (status IN ('valid','invalid','risky','unknown')),
+  provider        text,
+  verified_at     timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (organization_id, email)
+);
+```
+
 ## B12. CRM 同步 / Timeline / Analytics
 
 ```sql

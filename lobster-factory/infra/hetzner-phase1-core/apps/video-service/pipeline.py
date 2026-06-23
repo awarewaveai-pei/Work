@@ -468,11 +468,16 @@ def _render_intro_scene(title: str, duration: float, out_path: str, w: int, h: i
 
 
 def compose_base_video(scenes: list, visual_files: list, audio_files: list, out_name: str,
+                       w: "int | None" = None, h: "int | None" = None, fps: "int | None" = None,
                        intro_title: str = "", intro_duration: float = 3.0) -> str:
     """純 ffmpeg 合成：每場景獨立 render 成統一參數 mp4，再 concat demuxer (-c copy) 秒級合併。
-    靜圖走 zoompan Ken Burns、實拍走 cover-fit；混合由 _render_scene_ffmpeg 依副檔名派發。"""
-    print(f"\n[4/6] 合成基礎影片（{config.BASE_WIDTH}x{config.BASE_HEIGHT}，ffmpeg per-scene + concat）...")
-    w, h, fps = config.BASE_WIDTH, config.BASE_HEIGHT, config.FPS
+    靜圖走 zoompan Ken Burns、實拍走 cover-fit；混合由 _render_scene_ffmpeg 依副檔名派發。
+    w/h/fps 省略 → config 預設（BASE_WIDTH/HEIGHT/FPS）= 舊單格式行為；多格式入口傳各格式尺寸，
+    per-scene render 直接以該尺寸 cover-fit/zoompan 填滿 → 原生比例、無 letterbox。"""
+    w = config.BASE_WIDTH if w is None else w
+    h = config.BASE_HEIGHT if h is None else h
+    fps = config.FPS if fps is None else fps
+    print(f"\n[4/6] 合成基礎影片（{w}x{h}，ffmpeg per-scene + concat）...")
     scene_paths = []
 
     # Optional intro title card
@@ -684,6 +689,50 @@ def render_video(scenes: list, visual_files: list, out_name: str,
                                     intro_title=intro_title, intro_duration=intro_duration)
     output_files = export_all_formats(base_video, out_dir)
     return output_files, base_video, out_dir
+
+
+def render_video_multiformat(scenes: list, format_assets: dict, out_name: str,
+                             tts_provider: str = "edge", tts_voice: str = "",
+                             intro_title: str = "", intro_duration: float = 3.0):
+    """多格式「原生」輸出：每個比例用『自己那組視覺素材』+『自己的目標尺寸』各跑一次 compose
+    （per-scene cover-fit/zoompan 直接填滿目標比例）→ 無 export_all_formats 的 pad letterbox、無黑邊。
+
+    format_assets：{ "16x9": [...visual_files], "9x16": [...], "4x5": [...] }；每組長度須等於 scenes
+    （與舊 render_video 的 visual_files 同規約，只是 per-format）。audio 與比例無關 → 只生一次三格式
+    共用（省 2/3 TTS）；多格式主要增量成本在 ffmpeg per-scene render（每格式一輪）。
+    回 (outputs: {fmt: path}, out_dir)。呼叫端負責 cleanup()。"""
+    import shutil
+    formats = list(format_assets.keys())
+    if not formats:
+        raise ValueError("format_assets 不可為空")
+    for fmt, files in format_assets.items():
+        if fmt not in config.FORMATS:
+            raise ValueError(f"未知格式 {fmt}（合法：{list(config.FORMATS)}）")
+        if not isinstance(files, list) or len(files) != len(scenes):
+            n = len(files) if isinstance(files, list) else "N/A"
+            raise ValueError(f"format_assets[{fmt}] 長度（{n}）須等於 scenes（{len(scenes)}）")
+    safe_name = re.sub(r"[^\w一-鿿]", "_", out_name)[:40] or "video"
+    out_dir = config.OUTPUT_DIR / safe_name
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # 配音與比例無關 → 只生一次，三格式共用。
+    audio_files = generate_audio(scenes, tts_provider=tts_provider, tts_voice=tts_voice)
+
+    outputs = {}
+    for fmt in formats:
+        w, h = config.FORMATS[fmt]
+        # 序列執行：compose 的 per-scene temp（scene_NNN.mp4 等）為固定名，序列下後格式覆蓋前格式
+        # temp 無害（前格式 base 已產出並搬出）；out_name 帶 fmt 後綴使各格式 base 檔名互不衝突。
+        base_video = compose_base_video(
+            scenes, format_assets[fmt], audio_files, f"{safe_name}_{fmt}", w, h, config.FPS,
+            intro_title=intro_title, intro_duration=intro_duration,
+        )
+        out_path = str(out_dir / f"{fmt}.mp4")
+        # base_video 已是目標尺寸 + 統一編碼（per-scene 已 crf 21 / yuv420p）→ 直接搬，免二次轉碼。
+        shutil.move(base_video, out_path)
+        outputs[fmt] = out_path
+        print(f"   {fmt} ({w}x{h}) 原生輸出 ✓")
+    return outputs, out_dir
 
 
 # ═══════════════════════════════════════════
