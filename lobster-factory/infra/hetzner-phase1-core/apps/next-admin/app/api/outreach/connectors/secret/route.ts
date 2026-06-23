@@ -54,7 +54,11 @@ export async function POST(req: Request): Promise<Response> {
     .from(TABLE)
     .update({ credentials_ref: ref, is_enabled: true, updated_at: new Date().toISOString() })
     .eq("id", connectorId);
-  if (updErr) return NextResponse.json({ ok: false, error: updErr.message }, { status: 500 });
+  if (updErr) {
+    // Compensate the orphan vault secret so a failed attach doesn't leave a dangling blob (critic minor #2).
+    try { await deleteSecret(ref); } catch { /* best-effort cleanup; ref is deterministic so a retry overwrites anyway */ }
+    return NextResponse.json({ ok: false, error: updErr.message }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true, ref });
 }

@@ -111,6 +111,7 @@ export async function POST(req: Request): Promise<Response> {
 
   // Resolve the org's enabled Gemini connector key from the vault (Free-Plan Router ai_generation step).
   let apiKey: string | null = null;
+  let vaultError: string | null = null; // capture so a vault/RLS regression is OBSERVABLE, not silent
   {
     let cq = supabase
       .from("co_connector_accounts")
@@ -125,8 +126,9 @@ export async function POST(req: Request): Promise<Response> {
     if (ref) {
       try {
         apiKey = await getSecret(ref);
-      } catch {
-        apiKey = null; // vault read failed → fall through to manual mode
+      } catch (e) {
+        apiKey = null; // vault read failed → degrade to manual, but RECORD the cause (critic minor #1)
+        vaultError = e instanceof Error ? e.message.slice(0, 80) : "vault read error";
       }
     }
   }
@@ -151,6 +153,8 @@ export async function POST(req: Request): Promise<Response> {
   } else {
     bodyText = prompt; // operator pastes this into ChatGPT/Claude (極省模式 fallback)
     mode = "manual_prompt";
+    // Distinguish "no key configured" (null) from "vault read failed" (regression to surface).
+    aiModel = vaultError ? `vault_read_failed:${vaultError}` : null;
   }
 
   const lint = lintMessage(mode === "gemini" ? bodyText : "", forbidden); // only lint real output
