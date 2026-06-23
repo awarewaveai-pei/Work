@@ -45,6 +45,15 @@ export interface RenderOpts {
   ttsVoice?: string;
   introTitle?: string;
   introDuration?: number;
+  /**
+   * 多格式原生輸出：每格式一組素材 URL（每組長度須與 scenes 等長）。
+   * 提供（且 formats 非空）時 body 送 `format_assets` + `formats`，EU 走 render_video_multiformat
+   * （每格式各自原生 compose、無 pad）；此時位置參數 `assets` 被忽略。
+   * 省略 → 舊單組 `assets` 路徑（EU base+pad export，向後相容）。
+   */
+  formatAssets?: Record<string, string[]>;
+  /** 要輸出的格式（如 ["16x9","9x16","4x5"]）；formatAssets 的鍵集。 */
+  formats?: string[];
 }
 
 export async function submitRender(
@@ -55,12 +64,15 @@ export async function submitRender(
   opts?: RenderOpts,
 ): Promise<{ ok: true; jobId: string } | { ok: false; status: number; error: string }> {
   const base = svcBase(baseUrl);
+  // 多格式：formatAssets + 非空 formats → 送 format_assets（EU 原生多格式）；否則送舊單組 assets。
+  const useMulti = !!opts?.formatAssets && Array.isArray(opts?.formats) && opts.formats.length > 0;
   try {
     const res = await fetch(`${base}/render`, {
       method: "POST",
       headers: svcHeaders(true),
       body: JSON.stringify({
-        scenes, assets, out_name: outName,
+        scenes, out_name: outName,
+        ...(useMulti ? { format_assets: opts!.formatAssets, formats: opts!.formats } : { assets }),
         ...(opts?.ttsProvider && { tts_provider: opts.ttsProvider }),
         ...(opts?.ttsVoice && { tts_voice: opts.ttsVoice }),
         ...(opts?.introTitle && { intro_title: opts.introTitle }),

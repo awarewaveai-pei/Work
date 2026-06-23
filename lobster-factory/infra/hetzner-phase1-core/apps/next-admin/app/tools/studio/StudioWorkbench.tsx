@@ -134,7 +134,7 @@ function AccordionSection({
         <span style={{ opacity: 0.4, fontSize: 11 }}>{open ? "▲" : "▼"}</span>
       </button>
       {open && (
-        <div style={{ marginTop: 4, padding: 10, background: "var(--chip-surface, #f7f9fc)", borderRadius: 8, border: "1px solid var(--border, #e2e8f0)" }}>
+        <div style={{ marginTop: 4, padding: 10, background: "var(--chip-surface)", borderRadius: 8, border: "1px solid var(--border)" }}>
           {children}
         </div>
       )}
@@ -154,14 +154,14 @@ function PresetChips({ chips, onSelect, selected }: { chips: string[]; onSelect:
             onClick={() => onSelect(c)}
             style={{
               fontSize: 11, padding: "2px 9px", borderRadius: 20,
-              background: active ? "#6366f1" : "var(--chip-bg, #eef1f7)",
-              border: `1px solid ${active ? "#6366f1" : "var(--border, #d4d9e8)"}`,
-              cursor: "pointer", color: active ? "#fff" : "var(--text-muted, #3a4560)",
+              background: active ? "var(--accent)" : "var(--chip-bg)",
+              border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+              cursor: "pointer", color: active ? "var(--btn-primary-text)" : "var(--text-muted)",
               fontWeight: active ? 600 : 400, lineHeight: 1.6,
               transition: "all 0.15s",
             }}
-            onMouseOver={(e) => { if (!active) e.currentTarget.style.borderColor = "var(--accent, #6366f1)"; }}
-            onMouseOut={(e) => { if (!active) e.currentTarget.style.borderColor = "var(--border, #d4d9e8)"; }}
+            onMouseOver={(e) => { if (!active) e.currentTarget.style.borderColor = "var(--accent)"; }}
+            onMouseOut={(e) => { if (!active) e.currentTarget.style.borderColor = "var(--border)"; }}
           >
             {c}
           </button>
@@ -607,7 +607,7 @@ export default function StudioWorkbench() {
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <p style={{ fontSize: 11, opacity: 0.55, margin: 0 }}>點擊話題填入主題欄</p>
             <button type="button" disabled={trendingFetching} onClick={() => void fetchAllTrending()}
-              style={{ fontSize: 11, padding: "3px 12px", borderRadius: 20, cursor: trendingFetching ? "default" : "pointer", background: "var(--accent, #6366f1)", color: "#fff", border: "none", opacity: trendingFetching ? 0.6 : 1, flexShrink: 0 }}>
+              style={{ fontSize: 11, padding: "3px 12px", borderRadius: 20, cursor: trendingFetching ? "default" : "pointer", background: "var(--accent)", color: "var(--btn-primary-text)", border: "none", opacity: trendingFetching ? 0.6 : 1, flexShrink: 0 }}>
               {trendingFetching ? "搜尋中…" : "抓取今日熱搜"}
             </button>
           </div>
@@ -617,15 +617,15 @@ export default function StudioWorkbench() {
             if (!topics && !trendingFetching) return null;
             return (
               <div key={cat.value} style={{ marginBottom: 6 }}>
-                <span style={{ fontSize: 10, fontWeight: 600, color: "var(--text-muted, #3a4560)", display: "inline-block", minWidth: 40, marginRight: 4 }}>{cat.label}</span>
+                <span style={{ fontSize: 10, fontWeight: 600, color: "var(--text-muted)", display: "inline-block", minWidth: 40, marginRight: 4 }}>{cat.label}</span>
                 {loading && <span style={{ fontSize: 11, opacity: 0.4 }}>…</span>}
                 {topics && (
                   <span style={{ display: "inline-flex", gap: 3, flexWrap: "wrap" }}>
                     {topics.map((t, i) => (
                       <button key={`${cat.value}-${i}`} type="button" onClick={() => setSubject(t)}
-                        style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, cursor: "pointer", background: "var(--chip-bg, #eef1f7)", border: "1px solid var(--border, #d4d9e8)", color: "var(--text, #1a202c)", transition: "border-color 0.15s" }}
-                        onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--accent, #6366f1)")}
-                        onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--border, #d4d9e8)")}>
+                        style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, cursor: "pointer", background: "var(--chip-bg)", border: "1px solid var(--border)", color: "var(--text-primary)", transition: "border-color 0.15s" }}
+                        onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--accent)")}
+                        onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--border)")}>
                         {t}
                       </button>
                     ))}
@@ -641,7 +641,7 @@ export default function StudioWorkbench() {
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
             {STYLE_GROUPS.map((g) => (
               <button key={g} type="button" onClick={() => setStyleGroup(g)}
-                style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${styleGroup === g ? "#6366f1" : "var(--border, #d4d9e8)"}`, background: styleGroup === g ? "#6366f1" : "rgba(127,127,127,0.08)", color: styleGroup === g ? "#fff" : "var(--text-muted, #3a4560)", transition: "all 0.15s" }}>
+                style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${styleGroup === g ? "var(--accent)" : "var(--border)"}`, background: styleGroup === g ? "var(--accent)" : "rgba(127,127,127,0.08)", color: styleGroup === g ? "var(--btn-primary-text)" : "var(--text-muted)", transition: "all 0.15s" }}>
                 {g}
               </button>
             ))}
@@ -652,7 +652,7 @@ export default function StudioWorkbench() {
               const active = style === item.zh;
               return (
                 <button key={item.zh} type="button" onClick={() => setStyle(active ? "" : item.zh)}
-                  style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${active ? "#6366f1" : "var(--border, #d4d9e8)"}`, background: active ? "#6366f1" : "rgba(127,127,127,0.08)", color: active ? "#fff" : "var(--text-muted, #3a4560)", transition: "all 0.15s" }}>
+                  style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`, background: active ? "var(--accent)" : "rgba(127,127,127,0.08)", color: active ? "var(--btn-primary-text)" : "var(--text-muted)", transition: "all 0.15s" }}>
                   {item.zh}
                 </button>
               );

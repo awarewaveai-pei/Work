@@ -29,11 +29,11 @@ type AnyModel = TaggedText | TaggedImage | TaggedCoding;
 // ── Color maps ────────────────────────────────────────────────────────────────
 
 const SPEED_STYLE: Record<number, { label: string; color: string; bg: string }> = {
-  1: { label: "最快", color: "#166534", bg: "#dcfce7" },
-  2: { label: "快",   color: "#1e40af", bg: "#dbeafe" },
-  3: { label: "中等", color: "#92400e", bg: "#fef3c7" },
-  4: { label: "慢",   color: "#9a3412", bg: "#ffedd5" },
-  5: { label: "最慢", color: "#7f1d1d", bg: "#fee2e2" },
+  1: { label: "最快", color: "var(--badge-green-text)",       bg: "var(--badge-green-bg)" },
+  2: { label: "快",   color: "var(--accent)",                 bg: "var(--ai-bg)" },
+  3: { label: "中等", color: "var(--build-risk-medium-text)", bg: "var(--build-risk-medium-bg)" },
+  4: { label: "慢",   color: "var(--build-risk-medium-text)", bg: "var(--build-risk-medium-bg)" },
+  5: { label: "最慢", color: "var(--badge-red-text)",         bg: "var(--badge-red-bg)" },
 };
 
 const TEXT_SOURCE_LABEL: Record<string, string> = {
@@ -57,18 +57,18 @@ const TWD = 32;
 // ── Utility functions ─────────────────────────────────────────────────────────
 
 function textCostStyle(c: number) {
-  if (c === 0)  return { label: "免費", color: "#166534", bg: "#dcfce7" };
-  if (c < 0.5)  return { label: "$",    color: "#166534", bg: "#dcfce7" };
-  if (c < 2)    return { label: "$$",   color: "#1e40af", bg: "#dbeafe" };
-  if (c < 4)    return { label: "$$$",  color: "#92400e", bg: "#fef3c7" };
-  return              { label: "$$$$", color: "#9a3412", bg: "#ffedd5" };
+  if (c === 0)  return { label: "免費", color: "var(--badge-green-text)",       bg: "var(--badge-green-bg)" };
+  if (c < 0.5)  return { label: "$",    color: "var(--badge-green-text)",       bg: "var(--badge-green-bg)" };
+  if (c < 2)    return { label: "$$",   color: "var(--accent)",                 bg: "var(--ai-bg)" };
+  if (c < 4)    return { label: "$$$",  color: "var(--build-risk-medium-text)", bg: "var(--build-risk-medium-bg)" };
+  return              { label: "$$$$", color: "var(--build-risk-medium-text)", bg: "var(--build-risk-medium-bg)" };
 }
 
 function imageCostStyle(c: number) {
-  if (c < 0.03)  return { label: "$",    color: "#166534", bg: "#dcfce7" };
-  if (c < 0.07)  return { label: "$$",   color: "#1e40af", bg: "#dbeafe" };
-  if (c < 0.12)  return { label: "$$$",  color: "#92400e", bg: "#fef3c7" };
-  return               { label: "$$$$", color: "#9a3412", bg: "#ffedd5" };
+  if (c < 0.03)  return { label: "$",    color: "var(--badge-green-text)",       bg: "var(--badge-green-bg)" };
+  if (c < 0.07)  return { label: "$$",   color: "var(--accent)",                 bg: "var(--ai-bg)" };
+  if (c < 0.12)  return { label: "$$$",  color: "var(--build-risk-medium-text)", bg: "var(--build-risk-medium-bg)" };
+  return               { label: "$$$$", color: "var(--build-risk-medium-text)", bg: "var(--build-risk-medium-bg)" };
 }
 
 // ── Cost display ──────────────────────────────────────────────────────────────
@@ -119,8 +119,8 @@ function CostBreakdown({ costInputPer1M, costOutputPer1M }: { costInputPer1M: nu
   const inTwd  = (GEN1K_IN  * costInputPer1M)  / 1_000_000 * TWD;
   const outTwd = (GEN1K_OUT * costOutputPer1M) / 1_000_000 * TWD;
   const ROW: React.CSSProperties = { display:"flex", justifyContent:"space-between", fontSize:11.5, padding:"2px 0" };
-  const LBL: React.CSSProperties = { color:"#64748b" };
-  const VAL: React.CSSProperties = { color:"#1e293b", fontWeight:600 };
+  const LBL: React.CSSProperties = { color:"var(--text-muted)" };
+  const VAL: React.CSSProperties = { color:"var(--text-secondary)", fontWeight:600 };
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:1 }}>
       <div style={ROW}><span style={LBL}>✏️ 提示詞 ~{GEN1K_IN} tokens</span><span style={VAL}>{fmtTwd(inTwd)}</span></div>
@@ -148,17 +148,17 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
   return (
     <div style={{
       display: "flex", gap: 10, padding: "5px 0",
-      borderBottom: "1px solid #f1f5f9", alignItems: "flex-start",
+      borderBottom: "1px solid var(--bg-subtle)", alignItems: "flex-start",
     }}>
       <span style={{
         width: 58, flexShrink: 0,
         fontSize: 9.5, fontWeight: 800,
         letterSpacing: ".07em", textTransform: "uppercase",
-        color: "#94a3b8", paddingTop: 2,
+        color: "var(--text-muted)", paddingTop: 2,
       }}>
         {label}
       </span>
-      <span style={{ fontSize: 12.5, color: "#1e293b", lineHeight: 1.55 }}>
+      <span style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.55 }}>
         {children}
       </span>
     </div>
@@ -169,7 +169,7 @@ function SrcLink({ href, label }: { href: string; label: string }) {
   return (
     <a href={href} target="_blank" rel="noreferrer" style={{
       color: "var(--accent)", textDecoration: "none",
-      border: "1px solid var(--card-border)", background: "#fff",
+      border: "1px solid var(--card-border)", background: "var(--card-bg)",
       borderRadius: 999, padding: "2px 8px", fontSize: 10.5, whiteSpace: "nowrap",
     }}>
       {label}
@@ -181,13 +181,13 @@ function SrcLink({ href, label }: { href: string; label: string }) {
 
 const CARD: React.CSSProperties = {
   border: "1.5px solid var(--card-border)", borderRadius: 10,
-  background: "#fff", padding: "14px 16px",
+  background: "var(--card-bg)", padding: "14px 16px",
   display: "flex", flexDirection: "column", gap: 0,
   transition: "box-shadow .15s, border-color .15s",
 };
 const CARD_SEL: React.CSSProperties = {
-  ...CARD, borderColor: "#3b82f6",
-  boxShadow: "0 0 0 3px #bfdbfe",
+  ...CARD, borderColor: "var(--accent)",
+  boxShadow: "0 0 0 3px var(--ai-bg)",
 };
 
 function CardHeader({ selected, onToggle, vendor, name, sub, badges, nameSize = 15 }: {
@@ -201,11 +201,11 @@ function CardHeader({ selected, onToggle, vendor, name, sub, badges, nameSize = 
       <input
         type="checkbox" checked={selected} onChange={onToggle}
         title="選取此模型以比較"
-        style={{ marginTop: 3, width: 16, height: 16, cursor: "pointer", accentColor: "#3b82f6", flexShrink: 0 }}
+        style={{ marginTop: 3, width: 16, height: 16, cursor: "pointer", accentColor: "var(--accent)", flexShrink: 0 }}
       />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginBottom: 3 }}>
-          <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".07em", color: "#64748b", textTransform: "uppercase" }}>
+          <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".07em", color: "var(--text-muted)", textTransform: "uppercase" }}>
             {vendor}
           </span>
           {badges}

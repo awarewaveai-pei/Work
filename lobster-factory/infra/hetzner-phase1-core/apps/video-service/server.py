@@ -135,29 +135,60 @@ def _materialize_asset(asset: str, idx: int) -> str:
 
 
 def _validate(payload: dict):
+    """回 (scenes, assets, out_name, multiformat)。
+    multiformat=True 時 assets 為 {fmt: [urls]} dict（每格式原生圖組）；
+    False 時 assets 為單一 list（舊單組，EU 內部走 base+pad export — 向後相容窗口期）。"""
     scenes = payload.get("scenes")
-    assets = payload.get("assets")
     out_name = payload.get("out_name", "video")
     if not isinstance(scenes, list) or not scenes:
         raise ValueError("scenes 必須是非空 list")
     if len(scenes) > MAX_SCENES:
         raise ValueError(f"scenes 過多（{len(scenes)} > {MAX_SCENES}）")
+    format_assets = payload.get("format_assets")
+    if format_assets is not None:
+        # 多格式原生路徑（新 next-admin）
+        if not isinstance(format_assets, dict) or not format_assets:
+            raise ValueError("format_assets 必須是非空 dict")
+        for fmt, files in format_assets.items():
+            if not isinstance(files, list) or len(files) != len(scenes):
+                raise ValueError(f"format_assets[{fmt}] 必須是與 scenes 等長的 list")
+        return scenes, format_assets, out_name, True
+    # 舊單組路徑（向後相容：舊 next-admin 或 /generate-job 內部呼叫）
+    assets = payload.get("assets")
     if not isinstance(assets, list) or len(assets) != len(scenes):
         raise ValueError("assets 必須與 scenes 等長")
-    return scenes, assets, out_name
+    return scenes, assets, out_name, False
 
 
 def _do_render(scenes, assets, out_name, tts_provider="edge", tts_voice="",
-               intro_title="", intro_duration=3.0) -> dict:
-    """重活：序列化 materialize+render+R2 上傳。回 {outputs,out_dir,storage}。"""
+               intro_title="", intro_duration=3.0, multiformat=False) -> dict:
+    """重活：序列化 materialize+render+R2 上傳。回 {outputs,out_dir,storage}。
+    multiformat=True：assets 為 {fmt:[urls]}，每格式各 materialize 後走 render_video_multiformat
+    （原生比例、無 pad）；False：assets 為單組，走舊 render_video（base+pad export）。"""
     with _render_lock:  # 序列化：materialize(下載)+render 全程獨佔 TEMP_DIR（防並行撞檔）
         try:
-            visual_files = [_materialize_asset(a, i) for i, a in enumerate(assets)]
-            outputs, _base, out_dir = pipeline.render_video(
-                scenes, visual_files, out_name,
-                tts_provider=tts_provider, tts_voice=tts_voice,
-                intro_title=intro_title, intro_duration=intro_duration,
-            )
+            if multiformat:
+                # 每格式各下載一組（idx 全域遞增 → asset_N.ext 不撞名）。
+                format_files = {}
+                _idx = 0
+                for fmt, urls in assets.items():
+                    files = []
+                    for u in urls:
+                        files.append(_materialize_asset(u, _idx))
+                        _idx += 1
+                    format_files[fmt] = files
+                outputs, out_dir = pipeline.render_video_multiformat(
+                    scenes, format_files, out_name,
+                    tts_provider=tts_provider, tts_voice=tts_voice,
+                    intro_title=intro_title, intro_duration=intro_duration,
+                )
+            else:
+                visual_files = [_materialize_asset(a, i) for i, a in enumerate(assets)]
+                outputs, _base, out_dir = pipeline.render_video(
+                    scenes, visual_files, out_name,
+                    tts_provider=tts_provider, tts_voice=tts_voice,
+                    intro_title=intro_title, intro_duration=intro_duration,
+                )
             # 跨機：產出上傳 R2 → 回 public URL。未設 R2 = 本機路徑（dev）。
             if _r2_video_configured():
                 base_key = "video/" + os.path.basename(str(out_dir))
@@ -188,11 +219,13 @@ def _prune_jobs():
 
 
 def _run_job(job_id: str, scenes, assets, out_name,
-             tts_provider="edge", tts_voice="", intro_title="", intro_duration=3.0):
+             tts_provider="edge", tts_voice="", intro_title="", intro_duration=3.0,
+             multiformat=False):
     try:
         result = _do_render(scenes, assets, out_name,
                             tts_provider=tts_provider, tts_voice=tts_voice,
-                            intro_title=intro_title, intro_duration=intro_duration)
+                            intro_title=intro_title, intro_duration=intro_duration,
+                            multiformat=multiformat)
         with _jobs_lock:
             _JOBS[job_id] = {"status": "done", **result, "ts": time.time()}
     except Exception as e:  # noqa: BLE001
@@ -202,7 +235,7 @@ def _run_job(job_id: str, scenes, assets, out_name,
 
 def submit_render(payload: dict) -> str:
     """驗證後建 job + 起背景 thread，立即回 jobId（不阻塞）。"""
-    scenes, assets, out_name = _validate(payload)
+    scenes, assets, out_name, multiformat = _validate(payload)
     tts_provider = payload.get("tts_provider", "edge")
     if tts_provider not in ("edge", "openai"):
         raise ValueError(f"unknown tts_provider: {tts_provider!r}; must be 'edge' or 'openai'")
@@ -222,7 +255,7 @@ def submit_render(payload: dict) -> str:
         _JOBS[job_id] = {"status": "running", "ts": time.time()}
     threading.Thread(
         target=_run_job,
-        args=(job_id, scenes, assets, out_name, tts_provider, tts_voice, intro_title, intro_duration),
+        args=(job_id, scenes, assets, out_name, tts_provider, tts_voice, intro_title, intro_duration, multiformat),
         daemon=True,
     ).start()
     return job_id

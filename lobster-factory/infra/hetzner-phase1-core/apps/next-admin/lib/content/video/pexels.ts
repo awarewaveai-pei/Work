@@ -48,10 +48,11 @@ interface PexelsVideoSearchResponse {
 export async function fetchBrollUrl(
   keyword: string,
   apiKey: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  orientation: "landscape" | "portrait" = "landscape",
 ): Promise<string | null> {
   try {
-    const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(keyword)}&per_page=5&orientation=landscape`;
+    const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(keyword)}&per_page=5&orientation=${orientation}`;
     const res = await fetch(url, {
       headers: { Authorization: apiKey },
       signal: signal ?? AbortSignal.timeout(8000),
@@ -85,9 +86,10 @@ export async function fetchBrollVideoUrl(
   keyword: string,
   apiKey: string,
   signal?: AbortSignal,
+  orientation: "landscape" | "portrait" = "landscape",
 ): Promise<string | null> {
   try {
-    const url = `https://api.pexels.com/videos/search?query=${encodeURIComponent(keyword)}&per_page=5&orientation=landscape`;
+    const url = `https://api.pexels.com/videos/search?query=${encodeURIComponent(keyword)}&per_page=5&orientation=${orientation}`;
     const res = await fetch(url, {
       headers: { Authorization: apiKey },
       signal: signal ?? AbortSignal.timeout(10000),
@@ -108,8 +110,11 @@ export async function fetchBrollVideoUrl(
           return (h === "videos.pexels.com" || h === "player.vimeo.com") && /\.mp4(\?|$)/.test(link);
         } catch { return false; }
       };
+      // 依目標方向選主軸 ≥1280 的片：橫式看 width，直式看 height（避免直式格式拿到橫片再被裁）。
+      const longEdge = (f: PexelsVideoFile) => (orientation === "portrait" ? f.height : f.width);
+      const matchesOrient = (f: PexelsVideoFile) => (orientation === "portrait" ? f.height > f.width : f.width > f.height);
       const preferred = files.find(
-        (f) => f.quality === "hd" && f.file_type === "video/mp4" && f.width >= 1280 && f.width > f.height && isAllowedVideoUrl(f.link),
+        (f) => f.quality === "hd" && f.file_type === "video/mp4" && longEdge(f) >= 1280 && matchesOrient(f) && isAllowedVideoUrl(f.link),
       ) ?? files.find(
         (f) => f.quality === "hd" && f.file_type === "video/mp4" && isAllowedVideoUrl(f.link),
       ) ?? files.find(

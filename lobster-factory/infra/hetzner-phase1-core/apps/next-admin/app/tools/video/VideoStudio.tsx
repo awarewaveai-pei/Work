@@ -67,15 +67,15 @@ interface VoiceModel {
 }
 
 const VOICE_MODELS: VoiceModel[] = [
-  { id: "edge:zh-TW-HsiaoChenNeural", label: "Edge TTS 繁中女聲", lang: "繁中", badge: "$0 免費", badgeColor: "#065f46", badgeBg: "#d1fae5" },
-  { id: "edge:zh-TW-YunJheNeural",    label: "Edge TTS 繁中男聲", lang: "繁中", badge: "$0 免費", badgeColor: "#065f46", badgeBg: "#d1fae5" },
-  { id: "edge:en-US-JennyNeural",     label: "Edge TTS English F", lang: "EN",  badge: "$0 免費", badgeColor: "#065f46", badgeBg: "#d1fae5" },
-  { id: "edge:en-US-GuyNeural",       label: "Edge TTS English M", lang: "EN",  badge: "$0 免費", badgeColor: "#065f46", badgeBg: "#d1fae5" },
-  { id: "openai:tts-1:nova",          label: "OpenAI nova",        lang: "多語", badge: "$0.015/1M", badgeColor: "#92400e", badgeBg: "#fef3c7", note: "自然、英文佳" },
-  { id: "openai:tts-1:shimmer",       label: "OpenAI shimmer",     lang: "多語", badge: "$0.015/1M", badgeColor: "#92400e", badgeBg: "#fef3c7", note: "柔和女聲" },
-  { id: "openai:tts-1:alloy",         label: "OpenAI alloy",       lang: "多語", badge: "$0.015/1M", badgeColor: "#92400e", badgeBg: "#fef3c7" },
-  { id: "openai:tts-1:onyx",          label: "OpenAI onyx",        lang: "多語", badge: "$0.015/1M", badgeColor: "#92400e", badgeBg: "#fef3c7", note: "低沉男聲" },
-  { id: "openai:tts-1-hd:nova",       label: "OpenAI nova HD",     lang: "多語", badge: "$0.030/1M", badgeColor: "#991b1b", badgeBg: "#fee2e2", note: "HD 品質" },
+  { id: "edge:zh-TW-HsiaoChenNeural", label: "Edge TTS 繁中女聲", lang: "繁中", badge: "$0 免費", badgeColor: "var(--badge-green-text)", badgeBg: "var(--badge-green-bg)" },
+  { id: "edge:zh-TW-YunJheNeural",    label: "Edge TTS 繁中男聲", lang: "繁中", badge: "$0 免費", badgeColor: "var(--badge-green-text)", badgeBg: "var(--badge-green-bg)" },
+  { id: "edge:en-US-JennyNeural",     label: "Edge TTS English F", lang: "EN",  badge: "$0 免費", badgeColor: "var(--badge-green-text)", badgeBg: "var(--badge-green-bg)" },
+  { id: "edge:en-US-GuyNeural",       label: "Edge TTS English M", lang: "EN",  badge: "$0 免費", badgeColor: "var(--badge-green-text)", badgeBg: "var(--badge-green-bg)" },
+  { id: "openai:tts-1:nova",          label: "OpenAI nova",        lang: "多語", badge: "$0.015/1M", badgeColor: "var(--build-risk-medium-text)", badgeBg: "var(--build-risk-medium-bg)", note: "自然、英文佳" },
+  { id: "openai:tts-1:shimmer",       label: "OpenAI shimmer",     lang: "多語", badge: "$0.015/1M", badgeColor: "var(--build-risk-medium-text)", badgeBg: "var(--build-risk-medium-bg)", note: "柔和女聲" },
+  { id: "openai:tts-1:alloy",         label: "OpenAI alloy",       lang: "多語", badge: "$0.015/1M", badgeColor: "var(--build-risk-medium-text)", badgeBg: "var(--build-risk-medium-bg)" },
+  { id: "openai:tts-1:onyx",          label: "OpenAI onyx",        lang: "多語", badge: "$0.015/1M", badgeColor: "var(--build-risk-medium-text)", badgeBg: "var(--build-risk-medium-bg)", note: "低沉男聲" },
+  { id: "openai:tts-1-hd:nova",       label: "OpenAI nova HD",     lang: "多語", badge: "$0.030/1M", badgeColor: "var(--badge-red-text)", badgeBg: "var(--badge-red-bg)", note: "HD 品質" },
 ];
 
 function parseVoiceModel(id: string): { ttsProvider: string; ttsVoice: string } {
@@ -484,7 +484,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                   <tr key={line.id} style={{ borderTop: "1px solid var(--border-subtle)" }}>
                     <td style={{ padding: "7px 0", color: "var(--text-primary)" }}>
                       <span style={{ marginRight: 6 }}>{line.icon}</span>{line.label}
-                      {line.free && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: "#065f46", background: "#d1fae5", padding: "1px 5px", borderRadius: 4 }}>免費</span>}
+                      {line.free && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: "var(--badge-green-text)", background: "var(--badge-green-bg)", padding: "1px 5px", borderRadius: 4 }}>免費</span>}
                     </td>
                     <td style={{ padding: "7px 8px", textAlign: "right", color: "var(--text-secondary)", fontFamily: "monospace", fontSize: 11.5 }}>{line.free ? "—" : USD(line.unitUsd)}</td>
                     <td style={{ padding: "7px 8px", textAlign: "right", color: "var(--text-secondary)" }}>{line.count}</td>

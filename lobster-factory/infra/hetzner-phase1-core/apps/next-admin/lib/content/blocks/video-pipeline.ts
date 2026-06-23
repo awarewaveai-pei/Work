@@ -23,6 +23,29 @@ import { submitRender, type RenderOutputs } from "../video/render-client";
 import { generateTarotImage, isTarotModel } from "../../tarot/image-gen";
 import { getSupabaseWriteClient } from "../../supabase-server";
 
+/**
+ * 輸出格式 → 生圖長寬比 + Pexels 取向 + 風格框景詞。
+ * 三格式各自「原生」生成的依據：AI 圖按 aspectRatio 生（非裁 16:9）；Pexels B-roll 按 orientation
+ * 抓對應方向素材（避免直式格式拿橫片再被裁掉重要部位）。EU 端再以各格式尺寸 cover-fit 填滿。
+ * 鍵 = R2/檔名安全字（與 config.py FORMATS + 前端 OUTPUT_LABELS 一致）。
+ */
+export const FORMAT_SPEC: Record<
+  string,
+  { aspectRatio: "16:9" | "9:16" | "4:5"; orientation: "landscape" | "portrait"; framing: string }
+> = {
+  "16x9": { aspectRatio: "16:9", orientation: "landscape", framing: "Wide 16:9 cinematic framing." },
+  "9x16": { aspectRatio: "9:16", orientation: "portrait", framing: "Vertical 9:16 full-frame composition, main subject centered." },
+  "4x5": { aspectRatio: "4:5", orientation: "portrait", framing: "Vertical 4:5 full-frame composition, main subject centered." },
+};
+/** 預設輸出全部三格式（前端「全選」對應；未指定時的後備）。 */
+export const DEFAULT_VIDEO_FORMATS = ["16x9", "9x16", "4x5"];
+
+/** 過濾出合法格式（落在 FORMAT_SPEC）；空 → 後備全三格式。單一 SSOT，避免各路徑各自硬編。 */
+export function normalizeVideoFormats(formats?: string[]): string[] {
+  const valid = (formats ?? []).filter((f) => f in FORMAT_SPEC);
+  return valid.length > 0 ? valid : [...DEFAULT_VIDEO_FORMATS];
+}
+
 /** POD_DESIGNS_DEFAULT_ORG_ID（designs route 同規約）；ctx.organizationId 優先。 */
 export function resolveOrgId(ctxOrgId?: string): string | null {
   const v = ctxOrgId ?? process.env.POD_DESIGNS_DEFAULT_ORG_ID ?? null;
