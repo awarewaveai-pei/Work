@@ -21,6 +21,7 @@
  * "300 DPI ✓" (same honesty contract as upscaler.ts, critic 2026-06-11).
  */
 import sharp from "sharp";
+import { PDFDocument } from "pdf-lib";
 import { putDesignObject, getDesignsPublicBase } from "../storage/r2";
 import { randomUUID } from "node:crypto";
 
@@ -34,9 +35,16 @@ const FETCH_TIMEOUT_MS = 25_000;
 
 export type PrintFileMode = "original" | "resample";
 
+/** DPI tagged into the PNG (pHYs) and used to size the PDF page. The print shop reads "300 DPI" and
+ *  prints at the implied physical size = longEdgePx / 300 inches (honest: a 2496px native design is
+ *  300 DPI at 8.3in, NOT a blanket "300 DPI at full 16in" — see dpiAtFullPrint for the full-area DPI). */
+export const PRINT_DENSITY_DPI = 300;
+
 export interface PrintFileResult {
   ok: true;
   printFileUrl: string;
+  /** Same artwork as a print-ready PDF (PNG embedded at 300 DPI; page = artwork's physical size). */
+  printFilePdfUrl: string;
   mode: PrintFileMode;
   byteSize: number;
   /** long edge of the produced print file, px */
@@ -53,6 +61,23 @@ export type PrintFileOutcome = PrintFileResult | { ok: false; error: string };
 /** Effective DPI when an image of `longEdgePx` is printed across `APPAREL_PRINT_LONG_EDGE_IN`. */
 export function dpiAtFullPrint(longEdgePx: number): number {
   return Math.round(longEdgePx / APPAREL_PRINT_LONG_EDGE_IN);
+}
+
+/**
+ * Embed a faithful print PNG into a single-page PDF at the given DPI. The page is sized to the
+ * artwork's PHYSICAL dimensions (px / dpi inches → ×72 PDF points), and the image fills it edge to
+ * edge — so the embedded image renders at exactly `dpi` and prints true-to-size. Pixels are the same
+ * faithful PNG (lossless FlateDecode inside the PDF); pdf-lib is already a dependency, no new infra.
+ */
+async function buildPrintPdf(pngBuffer: Buffer, widthPx: number, heightPx: number, dpi: number): Promise<Buffer> {
+  const pdf = await PDFDocument.create();
+  const png = await pdf.embedPng(pngBuffer);
+  const wPt = (widthPx / dpi) * 72;
+  const hPt = (heightPx / dpi) * 72;
+  const page = pdf.addPage([wPt, hPt]);
+  page.drawImage(png, { x: 0, y: 0, width: wPt, height: hPt });
+  const bytes = await pdf.save();
+  return Buffer.from(bytes);
 }
 
 /**
