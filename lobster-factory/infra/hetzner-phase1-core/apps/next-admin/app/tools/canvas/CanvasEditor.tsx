@@ -104,6 +104,11 @@ export default function CanvasEditor() {
   const [szUnit, setSzUnit] = useState<"cm" | "mm">("cm");
   const [szDpi, setSzDpi] = useState(300);
   const [szInfo, setSzInfo] = useState<string | null>(null);
+  // Editable download filename: auto-filled from upload filename or handoff name; user can override.
+  const [editName, setEditName] = useState(() => {
+    const now = new Date();
+    return `canvas-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+  });
   const canvasMetaRef = useRef<{ realW: number; realH: number; dispScale: number; dpi: number } | null>(null);
   const [drawMode, setDrawMode] = useState<"off" | "draw" | "erase">("off"); // 自由繪筆 / 橡皮擦
   const [drawColor, setDrawColor] = useState("#111111");
@@ -237,6 +242,7 @@ export default function CanvasEditor() {
         if (handoffName) {
           nameRef.current = handoffName; // set-only-when-found → StrictMode-safe
           sessionStorage.removeItem(CANVAS_NAME_KEY); // consume so a later direct visit can't inherit it
+          setEditName(handoffName);
         }
       }
       if (source) {

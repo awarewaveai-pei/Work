@@ -10,7 +10,7 @@ import { generateProductCopy } from "../../../../lib/studio/product-copy";
 import { createWooProduct, isBridgeConfigured, listBridgeClients } from "../../../../lib/studio/wp-bridge-client";
 import { buildPodProductPayload, buildVariantPlan, priceForSize } from "../../../../lib/studio/pod-product";
 import { podModelById } from "../../../../lib/studio/pod-catalog-config";
-import { fetchProductTierPricing } from "../../../../lib/studio/printful-catalog";
+import { fetchProductTierPricing, fetchProductSizeGuide } from "../../../../lib/studio/printful-catalog";
 import {
   createDraftOrderOnNative,
   createSyncProductOnNative,
@@ -379,6 +379,13 @@ export async function POST(request: Request) {
 
     // Resolve the POD model (colours + display name + Printful catalog id). Absent → legacy White/Black.
     const model = Number.isInteger(body.catalogProductId) ? podModelById(body.catalogProductId as number) : undefined;
+    const chartSizes = body.sizes ?? model?.sizes ?? [];
+    // Best-effort size chart from Printful → a table block in the product body. A fetch failure (null)
+    // simply omits the block; it must NEVER block the publish.
+    const sizeChart =
+      Number.isInteger(body.catalogProductId) && chartSizes.length > 0
+        ? await fetchProductSizeGuide(body.catalogProductId as number, chartSizes)
+        : null;
     const params = {
       title: body.title.trim(),
       retailPrice: body.retailPrice,
@@ -390,6 +397,7 @@ export async function POST(request: Request) {
       mockupUrls,
       model,
       colorMockups,
+      sizeChart: sizeChart ?? undefined,
     };
     // Always a real write (plugin has no /product dry-run) — payload is draft-status.
     const payload = buildPodProductPayload(params);

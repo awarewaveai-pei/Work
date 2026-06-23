@@ -39,6 +39,9 @@ export interface PodProductParams {
   /** Per-colour mockup URLs keyed by Printful colour NAME (e.g. "Sport Grey" → My Designs URL). Each
    *  becomes that colour's variation image so WooCommerce shows the right colour when a swatch is picked. */
   colorMockups?: Record<string, string>;
+  /** Printful size guide → a Kadence table block in the product body. First row = header. Absent = no
+   *  size-chart block added (best-effort; a size-guide fetch failure never blocks the publish). */
+  sizeChart?: { unit: string; rows: string[][] };
 }
 
 export interface PodVariantPlan {
@@ -155,6 +158,14 @@ export function buildPodProductPayload(params: PodProductParams): Record<string,
         text: `Soft, breathable ${productLine} printed on demand with water-based inks.`,
       },
       { type: "icon_list", items: bullets },
+      // Size guide table (Printful measurements) — a Kadence `table` block (wp-bridge BlockLibrary
+      // supports it natively; first row is the header). Omitted when no chart was fetched.
+      ...(params.sizeChart && params.sizeChart.rows.length > 1
+        ? [
+            { type: "heading", text: `Size guide (${params.sizeChart.unit})`, level: 3 },
+            { type: "table", rows: params.sizeChart.rows },
+          ]
+        : []),
       { type: "heading", text: "Care", level: 3 },
       { type: "list", items: ["Machine wash cold, inside out", "Hang dry", "Do not iron the print"] },
     ],

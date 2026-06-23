@@ -48,10 +48,20 @@ export interface ProductTierPricing {
   plusSize: string;
 }
 
+/** A product's size chart → a table (first row = header, e.g. ["尺寸","Length","Chest"]). */
+export interface SizeChart {
+  /** Measurement unit, e.g. "inches". */
+  unit: string;
+  /** rows[0] = header; rows[1..] = one row per size. */
+  rows: string[][];
+}
+
 // In-memory caches
 let catalogCache: { items: CatalogProduct[]; ts: number } | null = null;
 // Per-product tier pricing (standard + plus cost). Same 1 h success / 1 min failure TTL discipline.
 const pricingCache = new Map<number, { pricing: ProductTierPricing | null; ts: number }>();
+// Per-product size chart (keyed by productId). Same TTL discipline.
+const sizeGuideCache = new Map<number, { chart: SizeChart | null; ts: number }>();
 // Per-variant raw cost (single-front DTG, all-in), so the two tier samples reuse across products.
 const variantCostCache = new Map<number, { cost: number; currency: string; ts: number }>();
 // null means "known to fail/unsupported" — also cached to prevent retry storms.
@@ -298,6 +308,67 @@ export async function fetchProductTierPricing(catalogProductId: number): Promise
     };
     pricingCache.set(catalogProductId, { pricing, ts: Date.now() });
     return pricing;
+  } catch {
+    return fail();
+  }
+}
+
+/**
+ * Fetch a product's size chart (Printful GET /products/{id}/sizes?unit=inches) reduced to a table for
+ * the publish flow: header row + one row per requested size, columns = the garment measurements. Prefers
+ * the `product_measure` table (actual garment dims); falls back to the first available table. Returns
+ * null on any failure (never throws — the publish just omits the size-guide block). Cached 1h/1min.
+ */
+export async function fetchProductSizeGuide(catalogProductId: number, sizes: string[]): Promise<SizeChart | null> {
+  const apiKey = process.env.PRINTFUL_API_KEY;
+  if (!apiKey || !Array.isArray(sizes) || sizes.length === 0) return null;
+
+  const hit = sizeGuideCache.get(catalogProductId);
+  if (hit && Date.now() - hit.ts < (hit.chart === null ? NULL_TTL_MS : TTL_MS)) return hit.chart;
+
+  const fail = (): null => {
+    sizeGuideCache.set(catalogProductId, { chart: null, ts: Date.now() });
+    return null;
+  };
+  try {
+    const r = await timedFetch(`${PRINTFUL_API}/products/${catalogProductId}/sizes?unit=inches`, apiKey);
+    if (!r.ok) return fail();
+    const j = (await r.json()) as {
+      result?: {
+        size_tables?: Array<{
+          type?: string;
+          unit?: string;
+          measurements?: Array<{
+            type_label?: string;
+            values?: Array<{ size?: string; value?: string; min_value?: string; max_value?: string }>;
+          }>;
+        }>;
+      };
+    };
+    const tables = j.result?.size_tables ?? [];
+    const table = tables.find((t) => t.type === "product_measure") ?? tables[0];
+    const measurements = (table?.measurements ?? []).filter((m) => (m.type_label ?? "").trim().length > 0);
+    if (!table || measurements.length === 0) return fail();
+
+    const fmt = (v?: { value?: string; min_value?: string; max_value?: string }): string => {
+      if (!v) return "-";
+      if (v.value && v.value.trim()) return v.value.trim();
+      if (v.min_value && v.max_value) return `${v.min_value.trim()}–${v.max_value.trim()}`;
+      return "-";
+    };
+    const header = ["尺寸 / Size", ...measurements.map((m) => (m.type_label ?? "").trim())];
+    const rows: string[][] = [header];
+    for (const size of sizes) {
+      const su = size.toUpperCase();
+      const cells = measurements.map((m) => fmt(m.values?.find((val) => (val.size ?? "").toUpperCase() === su)));
+      // Only include a size row that resolved at least one real measurement (avoid an all-"-" row for a
+      // size Printful doesn't list).
+      if (cells.some((c) => c !== "-")) rows.push([size, ...cells]);
+    }
+    if (rows.length < 2) return fail();
+    const chart: SizeChart = { unit: table.unit ?? "inches", rows };
+    sizeGuideCache.set(catalogProductId, { chart, ts: Date.now() });
+    return chart;
   } catch {
     return fail();
   }

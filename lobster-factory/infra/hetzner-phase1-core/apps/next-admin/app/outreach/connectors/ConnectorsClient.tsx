@@ -12,13 +12,6 @@ interface Connector {
   created_at: string;
 }
 
-interface FormState {
-  connectorName: string;
-  connectorType: string;
-  credentialsRef: string;
-}
-
-// Phase-1 selectable connectors (PART H). connector_type aligns with the router ladders.
 const KNOWN: { name: string; type: string; label: string }[] = [
   { name: "gemini",     type: "ai_generation",      label: "Gemini（AI 生成 · 客戶 BYO）" },
   { name: "hunter",     type: "email_verification", label: "Hunter（Email 驗證 · 客戶 BYO）" },
@@ -29,8 +22,8 @@ const KNOWN: { name: string; type: string; label: string }[] = [
   { name: "snov",       type: "email_verification", label: "Snov（Email 查找 · Phase 3）" },
 ];
 
-const EMPTY: FormState = { connectorName: "gemini", connectorType: "ai_generation", credentialsRef: "" };
 const API = "/api/outreach/connectors";
+const SECRET_API = "/api/outreach/connectors/secret";
 const NEEDS: ConnectorNeed[] = ["ai_generation", "email_verification", "lead_scraping", "email_sending"];
 const NEED_LABEL: Record<ConnectorNeed, string> = {
   ai_generation: "AI 生成",
@@ -42,9 +35,11 @@ const NEED_LABEL: Record<ConnectorNeed, string> = {
 export default function ConnectorsClient() {
   const [connectors, setConnectors] = useState<Connector[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>(EMPTY);
+  const [pick, setPick] = useState(KNOWN[0].name);
+  const [keyingId, setKeyingId] = useState<string | null>(null);
+  const [keyValue, setKeyValue] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -65,29 +60,60 @@ export default function ConnectorsClient() {
     void load();
   }, [load]);
 
-  function onPickName(e: React.ChangeEvent<HTMLSelectElement>) {
-    const k = KNOWN.find((x) => x.name === e.target.value);
-    setForm((f) => ({ ...f, connectorName: e.target.value, connectorType: k?.type ?? f.connectorType }));
-  }
-
   async function add(e: React.FormEvent) {
     e.preventDefault();
-    setSaving(true);
+    const k = KNOWN.find((x) => x.name === pick);
+    if (!k) return;
+    setBusy(true);
     setErr(null);
     try {
       const r = await fetch(API, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...form, isEnabled: true }),
+        body: JSON.stringify({ connectorName: k.name, connectorType: k.type, isEnabled: false }),
       });
       const j = await r.json();
       if (!j.ok) throw new Error(j.error || "save failed");
-      setForm(EMPTY);
       await load();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
-      setSaving(false);
+      setBusy(false);
+    }
+  }
+
+  async function saveKey(connectorId: string) {
+    if (!keyValue.trim()) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const r = await fetch(SECRET_API, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ connectorId, value: keyValue }),
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "save key failed");
+      setKeyingId(null);
+      setKeyValue("");
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function clearKey(connectorId: string) {
+    if (!window.confirm("移除這個 connector 的金鑰（從 vault 刪除）？")) return;
+    setErr(null);
+    try {
+      const r = await fetch(`${SECRET_API}?connectorId=${encodeURIComponent(connectorId)}`, { method: "DELETE" });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "clear key failed");
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -97,13 +123,7 @@ export default function ConnectorsClient() {
       const r = await fetch(API, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          id: c.id,
-          connectorName: c.connector_name,
-          connectorType: c.connector_type,
-          credentialsRef: c.credentials_ref ?? "",
-          isEnabled: !c.is_enabled,
-        }),
+        body: JSON.stringify({ id: c.id, connectorName: c.connector_name, connectorType: c.connector_type, isEnabled: !c.is_enabled }),
       });
       const j = await r.json();
       if (!j.ok) throw new Error(j.error || "toggle failed");
@@ -130,56 +150,64 @@ export default function ConnectorsClient() {
     <div style={{ padding: 16, display: "grid", gap: 16 }}>
       {err && <div className="card-badge badge-red" role="alert">{err}</div>}
 
-      <form className="card" onSubmit={add} style={{ display: "grid", gap: 8 }}>
-        <div className="card-header">
-          <span className="card-label">新增 Connector（客戶 BYO free key）</span>
-        </div>
-        <select value={form.connectorName} onChange={onPickName}>
+      <form className="card" onSubmit={add} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <span className="card-label">新增 Connector：</span>
+        <select value={pick} onChange={(e) => setPick(e.target.value)}>
           {KNOWN.map((k) => (
             <option key={k.name} value={k.name}>{k.label}</option>
           ))}
         </select>
-        <input
-          placeholder="credentials_ref：vault 金鑰「名稱」（非密鑰值！例：gemini_acme_co）"
-          value={form.credentialsRef}
-          onChange={(e) => setForm((f) => ({ ...f, credentialsRef: e.target.value }))}
-        />
-        <p className="card-sub">
-          ⚠️ 只填 vault 金鑰「名稱」，<strong>絕不要貼真實 API key</strong>。密鑰本體存在 runtime 密鑰庫（Supabase Vault，另案）。
-        </p>
-        <button type="submit" className="btn-primary" disabled={saving}>
-          {saving ? "儲存中…" : "新增 Connector"}
-        </button>
+        <button type="submit" className="btn-primary" disabled={busy}>新增</button>
+        <span className="card-sub">（先建 connector，再為它「🔑 設定金鑰」→ 金鑰加密存 Supabase Vault，DB 只留指標）</span>
       </form>
 
       <div className="card">
-        <div className="card-header">
-          <span className="card-label">已連接（{connectors.length}）</span>
-        </div>
+        <div className="card-header"><span className="card-label">已連接（{connectors.length}）</span></div>
         {loading ? (
           <p className="card-sub">載入中…</p>
         ) : connectors.length === 0 ? (
-          <p className="card-sub">尚無 connector。先為此客戶加 Gemini / Hunter 的 BYO free key 名稱。</p>
+          <p className="card-sub">尚無 connector。先為此客戶加 Gemini / Hunter，再設定其 BYO free key。</p>
         ) : (
           <ul style={{ display: "grid", gap: 8, listStyle: "none", padding: 0 }}>
             {connectors.map((c) => (
-              <li key={c.id} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-                <span>
-                  <strong>{c.connector_name}</strong>
-                  <span className="card-sub"> · {c.connector_type}</span>
-                  <span className={`card-badge ${c.is_enabled ? "badge-green" : "badge-gray"}`} style={{ marginLeft: 8 }}>
-                    {c.is_enabled ? "enabled" : "disabled"}
+              <li key={c.id} className="card" style={{ display: "grid", gap: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                  <span>
+                    <strong>{c.connector_name}</strong>
+                    <span className="card-sub"> · {c.connector_type}</span>
+                    <span className={`card-badge ${c.is_enabled ? "badge-green" : "badge-gray"}`} style={{ marginLeft: 8 }}>
+                      {c.is_enabled ? "enabled" : "disabled"}
+                    </span>
+                    <span className={`card-badge ${c.credentials_ref ? "badge-green" : "badge-gray"}`} style={{ marginLeft: 4 }}>
+                      {c.credentials_ref ? "🔑 已設金鑰" : "未設金鑰"}
+                    </span>
                   </span>
-                  {c.credentials_ref ? <span className="card-sub"> · ref: {c.credentials_ref}</span> : <span className="card-sub"> · 無 ref</span>}
-                </span>
-                <span style={{ display: "flex", gap: 8 }}>
-                  <button type="button" className="btn-secondary" onClick={() => void toggle(c)}>
-                    {c.is_enabled ? "停用" : "啟用"}
-                  </button>
-                  <button type="button" className="btn-secondary" onClick={() => void remove(c.id)}>
-                    移除
-                  </button>
-                </span>
+                  <span style={{ display: "flex", gap: 8 }}>
+                    <button type="button" className="btn-secondary" onClick={() => { setKeyingId(keyingId === c.id ? null : c.id); setKeyValue(""); }}>
+                      🔑 設定金鑰
+                    </button>
+                    {c.credentials_ref && (
+                      <button type="button" className="btn-secondary" onClick={() => void clearKey(c.id)}>清除金鑰</button>
+                    )}
+                    <button type="button" className="btn-secondary" onClick={() => void toggle(c)}>{c.is_enabled ? "停用" : "啟用"}</button>
+                    <button type="button" className="btn-secondary" onClick={() => void remove(c.id)}>移除</button>
+                  </span>
+                </div>
+                {keyingId === c.id && (
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input
+                      type="password"
+                      autoComplete="off"
+                      placeholder="貼上該客戶的真實 API key（加密存 vault，不進 DB）"
+                      value={keyValue}
+                      onChange={(e) => setKeyValue(e.target.value)}
+                      style={{ flex: 1 }}
+                    />
+                    <button type="button" className="btn-primary" disabled={busy || !keyValue.trim()} onClick={() => void saveKey(c.id)}>
+                      存入 Vault
+                    </button>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
@@ -187,18 +215,14 @@ export default function ConnectorsClient() {
       </div>
 
       <div className="card">
-        <div className="card-header">
-          <span className="card-label">Free-Plan Router — fallback ladders</span>
-        </div>
-        <p className="card-sub">成本優先：每個需求由上往下選第一個「可用」的步驟；free / manual 永遠墊底，需求不會完全卡死。</p>
+        <div className="card-header"><span className="card-label">Free-Plan Router — fallback ladders</span></div>
+        <p className="card-sub">成本優先：每個需求由上往下選第一個「可用」步驟；free / manual 永遠墊底，需求不會完全卡死。</p>
         {NEEDS.map((need) => (
           <div key={need} style={{ marginTop: 8 }}>
             <div className="section-title">{NEED_LABEL[need]}</div>
             <ol style={{ margin: 0, paddingLeft: 20 }}>
               {LADDERS[need].map((s) => (
-                <li key={s.provider} className="card-sub">
-                  <strong>{s.provider}</strong>（{s.kind}）— {s.note}
-                </li>
+                <li key={s.provider} className="card-sub"><strong>{s.provider}</strong>（{s.kind}）— {s.note}</li>
               ))}
             </ol>
           </div>
