@@ -370,6 +370,14 @@ export default function DesignsGallery() {
 
   useEffect(() => { void loadVideos(); }, [loadVideos]);
 
+  /* close kebab menu on outside click */
+  useEffect(() => {
+    if (!openMenuId) return;
+    const handler = () => setOpenMenuId(null);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [openMenuId]);
+
   const copyUrl = useCallback(async (asset: DesignAsset) => {
     if (!asset.object_url) return;
     try {
