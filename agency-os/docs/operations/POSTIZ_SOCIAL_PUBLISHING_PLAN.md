@@ -238,7 +238,27 @@ create table social_postiz_connections (
 
 - **Task 0** `web-researcher`：✅ 完成（API 契約事實表，2026-06-16）
 - **Task 1** `devops-engineer`：✅ 完成（Postiz v2.11.3 live，Bluesky e2e 2026-06-15）；補項：smoke test 記錄、備份策略確認、`API_LIMIT` env 確認。
-- **Task 2** `web-researcher` + 操作者：各平台 dev app + 審核送件，callback 指向 Postiz。並行整條 code track；每平台審核通過時上線，不阻塞。
+- **Task 2** `web-researcher` + 操作者：各平台 dev app + 審核送件，callback 指向 Postiz。並行整條 code track；每平台審核通過時上線，不阻塞。  
+  **Callback URLs（從 Postiz source code 驗證，2026-06-24）：**  
+  - Reddit: `https://postiz.aware-wave.com/integrations/social/reddit`  
+  - LinkedIn: `https://postiz.aware-wave.com/integrations/social/linkedin`  
+  - Facebook: `https://postiz.aware-wave.com/integrations/social/facebook`  
+  - Instagram: `https://postiz.aware-wave.com/integrations/social/instagram`  
+
+  **Postiz docker-compose.yml env vars（加到 `/root/postiz/docker-compose.yml` environment 段後執行 `docker compose up -d`）：**  
+  ```yaml
+  - REDDIT_CLIENT_ID=<your-reddit-client-id>
+  - REDDIT_CLIENT_SECRET=<your-reddit-client-secret>
+  - LINKEDIN_CLIENT_ID=<your-linkedin-client-id>
+  - LINKEDIN_CLIENT_SECRET=<your-linkedin-client-secret>
+  - FACEBOOK_APP_ID=<your-meta-app-id>
+  - FACEBOOK_APP_SECRET=<your-meta-app-secret>
+  ```
+
+  **各平台人工步驟：**  
+  - **Reddit**：https://www.reddit.com/prefs/apps → Create App → type: web app → redirect URI 填上方 Reddit callback → 拿 `client_id`（app 名稱下方字串）+ `client_secret`。無需審核，立即可用。  
+  - **LinkedIn**：https://www.linkedin.com/developers/ → Create app → Products 加「Share on LinkedIn」+「Sign In with LinkedIn using OpenID Connect」→ Auth → Redirect URLs 填 LinkedIn callback → 拿 `Client ID` + `Client Secret`。需等 Product 審核（1–2 天）。  
+  - **Meta (IG+FB)**：https://developers.facebook.com → Create App (type: Business) → 加 Facebook Login + Instagram Basic Display products → Facebook Login > Settings > Valid OAuth Redirect URIs 填 Facebook + Instagram callback URLs → App Review 送審（需業務驗證，4–7 天）→ 審核通過後拿 App ID + App Secret。
 - **Task 3** `fullstack-engineer`：✅ 完成 2026-06-22 — `lib/content/postiz.ts` + `/api/content/social-publish/route.ts`（Gate E.1 已有 `lib/supabase-server.ts`；Gate A/D 已完成）。
 - **Task 4** `fullstack-engineer`：✅ 完成 2026-06-22 — `GET /api/content/social-channels?clientId=xxx`（operator+）+ `GET /api/content/social-admin/integrations`（admin+）+ `POST/DELETE /api/content/social-admin/connections`（admin+，server-side org 驗證 + platform 由 server 從 Postiz 推導，不信任 client）+ `ClientHubTabs` 新增「社群頻道」tab（connect/disconnect UI，useEffect 含 mounted guard）。
 - **Task 5** `fullstack-engineer`：✅ 完成 2026-06-22 — ContentStudio.tsx 死面板接線：postizChannels state + loadPostizChannels() + handlePostizPublish() + channel checkbox UI + per-channel textarea（synContent 預填）+ Draft/Now toggle + 二次確認 modal（不可撤回警語）+ results（含 skipped 顯示）。Critic Major fix: modal 確認鈕 disabled guard 防雙擊。

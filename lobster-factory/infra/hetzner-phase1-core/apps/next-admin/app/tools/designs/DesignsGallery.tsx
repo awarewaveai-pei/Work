@@ -1350,38 +1350,60 @@ export default function DesignsGallery() {
                 );
               })() : null}
 
-              {/* ── action buttons ── */}
-              <div className="designs-actions">
-                {asset.object_url ? (
-                  <button
-                    className="designs-action-btn"
-                    onClick={() => openEdgeEdit(asset)}
-                    title="套上有機／筆刷邊 → 透明 PNG，再去建商品"
+              {/* ── action buttons (kebab) ── */}
+              <div className="designs-kebab-wrap">
+                {openMenuId === asset.id ? (
+                  <div
+                    className="designs-kebab-menu"
+                    onMouseDown={(e) => e.stopPropagation()}
                   >
-                    ✨ 改邊緣
-                  </button>
+                    {asset.object_url ? (
+                      <button
+                        className="designs-kebab-item"
+                        onClick={() => { setOpenMenuId(null); openInCanvas(asset.object_url!, designBaseName(asset)); }}
+                      >
+                        🎨 Canvas 編輯
+                      </button>
+                    ) : null}
+                    {asset.object_url ? (
+                      <button
+                        className="designs-kebab-item"
+                        onClick={() => { setOpenMenuId(null); openEdgeEdit(asset); }}
+                        title="套上有機／筆刷邊 → 透明 PNG，再去建商品"
+                      >
+                        ✨ 改邊緣
+                      </button>
+                    ) : null}
+                    <button
+                      className="designs-kebab-item"
+                      onClick={() => { setOpenMenuId(null); void copyUrl(asset); }}
+                    >
+                      {copiedId === asset.id ? "✓ 已複製" : "🔗 複製 URL"}
+                    </button>
+                    {asset.object_url ? (
+                      <button
+                        className="designs-kebab-item"
+                        disabled={downloadingId === asset.id}
+                        onClick={() => { setOpenMenuId(null); void downloadOne(asset); }}
+                      >
+                        {downloadingId === asset.id ? "下載中…" : "⬇ 下載"}
+                      </button>
+                    ) : null}
+                    <button
+                      className="designs-kebab-item designs-kebab-item--danger"
+                      disabled={deletingId === asset.id}
+                      onClick={() => { setOpenMenuId(null); void deleteAsset(asset); }}
+                    >
+                      {deletingId === asset.id ? "刪除中…" : "🗑 刪除"}
+                    </button>
+                  </div>
                 ) : null}
                 <button
-                  className={`designs-action-btn${copiedId === asset.id ? " designs-action-btn--copied" : ""}`}
-                  onClick={() => void copyUrl(asset)}
+                  className="designs-kebab-btn"
+                  onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === asset.id ? null : asset.id); }}
+                  title="更多操作"
                 >
-                  {copiedId === asset.id ? "已複製 ✓" : "複製 URL"}
-                </button>
-                {asset.object_url ? (
-                  <button
-                    className="designs-action-btn"
-                    disabled={downloadingId === asset.id}
-                    onClick={() => void downloadOne(asset)}
-                  >
-                    {downloadingId === asset.id ? "下載中…" : "下載"}
-                  </button>
-                ) : null}
-                <button
-                  className="designs-action-btn designs-action-btn--danger"
-                  disabled={deletingId === asset.id}
-                  onClick={() => void deleteAsset(asset)}
-                >
-                  {deletingId === asset.id ? "刪除中…" : "刪除"}
+                  ···
                 </button>
               </div>
             </div>
