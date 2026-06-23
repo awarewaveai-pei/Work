@@ -4,6 +4,42 @@
 
 ## 2026-06-23
 
+### feat(cold-outreach): Phase-1 T2–T7（module 殼 + CRUD + scoring + free-plan router）
+
+[任務理解] 承 0048 schema（T1，已上 EU prod），實作 next-admin `app/outreach/` 冷拜訪工作台 Phase-1 可建構部分（不碰 High-risk 密鑰/Gmail）。
+
+[已修改] T2 module 殼（9 頁 + SidebarNav 'cold-outreach' section + lib/ops-role.ts canManageOutreach + lib/outreach/db.ts）；T3 Service Profile CRUD（app/api/outreach/service-profiles + 表單 UI）；T4 Free-Plan Router + Quota Guard 純邏輯（lib/outreach/connectors/*，cost-first ladder）+ connector metadata CRUD（credentials_ref 密鑰值防呆）+ Connectors UI；T5 Lead Inbox（normalize/dedup/suppression + 機械評分 + classify）；T6 deterministic scoring（lib/outreach/scoring.ts，§C1 Quality/Contactability 全機械、零 LLM）；T7 Leads CRUD + Approve-to-Leads（inbox→score→co_leads）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run lib/outreach | exit=0 | tsc 全 app 0 error + 26/26 vitest（15 router/quota + 11 normalize/dedup/suppression/scoring）；另 4 個 EU-prod DB round-trip（co_service_profiles / co_connector_accounts / co_lead_inbox / co_leads insert→select→delete 全 exit 0，CHECK 值 + text[]/jsonb/score 欄全接受）
+- REVIEW_WAIVED: NA -- critic agent API 529 x2（Anthropic 伺服器端過載，非選擇）；已做 QA 自審 pass（27 檔：路由守門 canManageOutreach / 硬編表名無 SQL injection / 全文字插值無 XSS / fail-soft）；API 恢復後補 /review
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=canManageOutreach|co_outreach|/api/outreach | hits=0 -- 6 命中全為自有文件對 migration/模組名引用，無 stale code；/api/outreach client↔route 4 endpoint 全解析
+
+[剩餘風險 / gated] BYO key 密鑰位元組 runtime 儲存（建議 Supabase Vault）= High-risk 未做，擋 T8 真實 LLM 呼叫；T10 Gmail 真實憑證未做。
+
+[rollback] lobster-factory/packages/db/scripts/0048_co_outreach_core_down.sql（reverse FK-safe drop 12 表）。
+
+### feat(canvas): 畫布放大+面板全展開+PS調整+Camera RAW+WebP下載
+
+[任務理解] /tools/canvas 六項需求：① 畫布太小 ② 面板維持全展開 ③ PS色階/對比/陰影 ④ 自動色彩/色調/對比 ⑤ Camera RAW濾鏡 ⑥ WebP下載（≤200KB）+ DPI版型修正。
+
+[現況分析] 讀 CanvasEditor.tsx + fabric-filters.ts + SidebarPanel.tsx + color-grade.ts。canvas container 硬編 width:802px flexShrink:0；maxDisplay/MAX_DISP=820；8個面板帶 defaultCollapsed prop；buildEffectFilters 只含 vibrance/blur/noise/temp；grade.black/white 窄範圍（0..64/191..255）無法代表全luma範圍。git log 確認無重工。
+
+[已修改]
+- fabric-filters.ts：buildEffectFilters 擴充 contrast/shadows/highlights/exposure/clarity/dehaze 六個效果（contrast→F.Contrast；shadows→F.Gamma 0.5..2；highlights/exposure→F.Brightness；clarity→F.Convolute sharpen kernel；dehaze→Contrast+Saturation組合）。
+- CanvasEditor.tsx：maxDisplay 800→1100；MAX_DISP 820→1100；canvas container 改 flex:1 minWidth:300 overflow:hidden；寬/高 input 加 width:100%；移除全部8個面板 defaultCollapsed（預設展開）；新增 contrast/shadows/highlights/exposure/clarity/dehaze 6個 state；useEffect dep array 更新；autoContrast（像素分析→contrast+exposure sliders，非grade.black/white窄範圍）；autoColor（gray world assumption→grade balCR/MG/YB）；autoTone=autoContrast+autoColor；downloadWebP（quality 0.9→0.2迭代，≤200KB）；PNG+WebP兩個下載鈕；新增 🎛調整 panel（對比/陰影/高光+3個自動鈕）；新增 🎞 Camera RAW panel（曝光/清晰度/去霧）。
+
+[驗證結果 — R0 四動作]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~30000 -- zero type errors
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test | exit=0 | ms=~15000 -- 473/474 pass (1 pre-existing outreach pipeline.test.ts failure, unrelated)
+- REVIEW_DONE: critic=Deep | verdict=pass-after-fix | findings=3c/0m/0n -- (1)autoContrast grade.black/white range mismatch→FIXED用contrast+exposure sliders；(2)autoContrast/autoColor 缺 img.onerror→FIXED；(3)downloadWebP ctx2d非null斷言→FIXED
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=buildEffectFilters | hits=2 -- 2個呼叫點(CanvasEditor.tsx自身+fabric-filters.ts)，新參數全optional向後相容
+- BUGHUNT_WAIVED: NA -- defaultCollapsed移除僅影響SidebarPanel初始狀態，無跨檔副作用
+
+[剩餘風險] Fabric.js無luminosity-selective highlights filter，高光調整用全局Brightness近似。
+
+[rollback] git revert 7d714620 a7c23b87（checkpoint commits）。
+
 ### fix(studio): edge-mask scale≤1 修正 + Printful full-bleed 強制滿版
 
 [任務理解] /tools/studio 兩個 bug：① edge mask at amount=10 時筆刷 PNG overflow canvas，stroke 被裁 → 邊緣不完整；② 設計稿傳 Printful 後印在衣服太小（FILL 硬編 0.9）。
