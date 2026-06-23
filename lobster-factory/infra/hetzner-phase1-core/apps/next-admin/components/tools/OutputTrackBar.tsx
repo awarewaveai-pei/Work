@@ -47,6 +47,8 @@ type Props = {
    * 產品-主圖名稱-風格-軌.ext instead of the server's fixed preset name. Omit → fixed name.
    */
   fileMeta?: SemanticFileMeta;
+  /** When true, the ✏️ 快速編輯 button is hidden (caller renders it separately). */
+  hideQuickEdit?: boolean;
 };
 
 function triggerDownload(dataUrl: string, filename: string) {
@@ -64,6 +66,7 @@ export default function OutputTrackBar({
   colorGrade,
   printDestinations,
   fileMeta,
+  hideQuickEdit,
 }: Props) {
   const [busy, setBusy] = useState<null | "web" | "print">(null);
   const [error, setError] = useState<string | null>(null);
@@ -112,53 +115,72 @@ export default function OutputTrackBar({
   const webPreset = source === "tarot" ? "web-tarot" : "web-original";
   const showPrint = !!printDestinations && printDestinations.length > 0;
 
+  const downloadPng = useCallback(() => {
+    const fallback = "output.png";
+    const name = fileMeta
+      ? buildSemanticFilename({ ...fileMeta, track: "PNG" }, "png", fallback)
+      : fallback;
+    triggerDownload(image, name);
+  }, [image, fileMeta]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+      {/* Download row: PNG下載 + WebP下載 together */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <button className="btn-secondary" disabled={busy !== null} onClick={downloadPng}>
+          PNG下載
+        </button>
         <button
           className="btn-primary"
           disabled={busy !== null}
           onClick={() => void run({ mode: "web", preset: webPreset }, "web")}
         >
-          {busy === "web" ? "輸出中…" : "🌐 網頁用 WebP"}
+          {busy === "web" ? "輸出中…" : "WebP下載"}
         </button>
+      </div>
 
-        {showPrint ? (
-          <>
-            <select
-              className="btn-secondary"
-              value={destId}
-              onChange={(e) => setDestId(e.target.value as PrintDestinationId)}
-              disabled={busy !== null}
-              title="印刷目的地"
-            >
-              {printDestinations!.map((id) => (
-                <option key={id} value={id}>
-                  {PRINT_DESTINATIONS[id].label}
-                </option>
-              ))}
-            </select>
+      {/* Print + quick-edit row */}
+      {(showPrint || !hideQuickEdit) && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {showPrint ? (
+            <>
+              <select
+                className="btn-secondary"
+                value={destId}
+                onChange={(e) => setDestId(e.target.value as PrintDestinationId)}
+                disabled={busy !== null}
+                title="印刷目的地"
+              >
+                {printDestinations!.map((id) => (
+                  <option key={id} value={id}>
+                    {PRINT_DESTINATIONS[id].label}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="btn-secondary"
+                disabled={busy !== null}
+                onClick={() => void run({ mode: "print", destination: destId }, "print")}
+              >
+                {busy === "print" ? "轉檔中…" : "🖨 印刷檔"}
+              </button>
+            </>
+          ) : null}
+
+          {!hideQuickEdit && (
             <button
               className="btn-secondary"
               disabled={busy !== null}
-              onClick={() => void run({ mode: "print", destination: destId }, "print")}
+              onClick={() =>
+                openInCanvas(image, fileMeta ? buildSemanticBase({ ...fileMeta, track: "編輯" }) : undefined)
+              }
+              title="上傳圖案／加文字／微調構圖"
             >
-              {busy === "print" ? "轉檔中…" : "🖨 印刷檔"}
+              ✏️ 快速編輯
             </button>
-          </>
-        ) : null}
-
-        <button
-          className="btn-secondary"
-          disabled={busy !== null}
-          onClick={() =>
-            openInCanvas(image, fileMeta ? buildSemanticBase({ ...fileMeta, track: "編輯" }) : undefined)
-          }
-          title="上傳圖案／加文字／微調構圖"
-        >
-          ✏️ 快速編輯
-        </button>
-      </div>
+          )}
+        </div>
+      )}
 
       {error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{error}</span> : null}
     </div>

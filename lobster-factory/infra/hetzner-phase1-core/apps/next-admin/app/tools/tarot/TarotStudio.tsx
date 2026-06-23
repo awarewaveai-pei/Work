@@ -6,7 +6,8 @@ import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePan
 import OutputTrackBar from "@/components/tools/OutputTrackBar";
 import GradedPreview from "@/components/tools/GradedPreview";
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
-import { buildSemanticFilename } from "@/lib/studio/semantic-filename";
+import { buildSemanticFilename, buildSemanticBase } from "@/lib/studio/semantic-filename";
+import { openInCanvas } from "@/components/tools/canvas-handoff";
 import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, STYLE_PRESETS, resolveStylePrompt, type TarotCard } from "./cards";
 
 type GroupKey = "all" | "major" | "wands" | "cups" | "swords" | "pentacles";
@@ -1182,37 +1183,53 @@ export default function TarotStudio() {
                     subject: subjectText.trim() || undefined,
                     style: stylePrompt.trim() || undefined,
                   }}
+                  hideQuickEdit
                 />
               </div>
             </div>
-            <ImageEditPromptPanel
-              sourceImage={previewImage}
-              currentPrompt={buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectText })}
-              imageModel={activeModel}
-              target="tarot-preview"
-              generateEndpoint="/api/tools/tarot/generate"
-              aspectRatio="2:3"
-              printQuality
-              styleAnchor={{
-                model: activeModel,
-                mode,
-                stylePrompt: effectiveEnglish,
-                subject: subjectText.trim(),
-                refs: referenceImages.length,
-              }}
-              onEditedImage={(image, meta) => {
-                setSelectedModels(new Set<TarotModel>([meta.model as TarotModel]));
-                setPreviewImage(image);
-                setPreviewSeed(meta.seed);
-                setPreviewSig(`${meta.model}::${meta.prompt}::edit=1`);
-                setLocked(false);
-                setBatch((prev) => {
-                  prev.forEach((it) => it.url && URL.revokeObjectURL(it.url));
-                  return [];
-                });
-                saveToGallery(image, "tarot-preview-edit", { model: meta.model, prompt: meta.prompt });
-              }}
-            />
+            {/* 快速編輯 + AI image prompt — 垂直堆疊，按鍵同寬 */}
+            <div style={{ flex: 1, minWidth: 280 }}>
+              <button
+                className="btn-secondary"
+                style={{ width: "100%", marginBottom: 8 }}
+                onClick={() =>
+                  openInCanvas(
+                    previewImage,
+                    buildSemanticBase({ product: "塔羅卡", subject: subjectText.trim() || undefined, style: stylePrompt.trim() || undefined, track: "編輯" }),
+                  )
+                }
+              >
+                ✏️ 快速編輯
+              </button>
+              <ImageEditPromptPanel
+                sourceImage={previewImage}
+                currentPrompt={buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectText })}
+                imageModel={activeModel}
+                target="tarot-preview"
+                generateEndpoint="/api/tools/tarot/generate"
+                aspectRatio="2:3"
+                printQuality
+                styleAnchor={{
+                  model: activeModel,
+                  mode,
+                  stylePrompt: effectiveEnglish,
+                  subject: subjectText.trim(),
+                  refs: referenceImages.length,
+                }}
+                onEditedImage={(image, meta) => {
+                  setSelectedModels(new Set<TarotModel>([meta.model as TarotModel]));
+                  setPreviewImage(image);
+                  setPreviewSeed(meta.seed);
+                  setPreviewSig(`${meta.model}::${meta.prompt}::edit=1`);
+                  setLocked(false);
+                  setBatch((prev) => {
+                    prev.forEach((it) => it.url && URL.revokeObjectURL(it.url));
+                    return [];
+                  });
+                  saveToGallery(image, "tarot-preview-edit", { model: meta.model, prompt: meta.prompt });
+                }}
+              />
+            </div>
             {/* 修圖積木 ([1-f])：色彩/色階/銳利度滑桿，即時 CSS 預覽。 */}
             <div style={{ width: 260 }}>
               <ColorGradePanel state={grade.state} onSet={grade.set} onReset={grade.reset} neutral={grade.neutral} />

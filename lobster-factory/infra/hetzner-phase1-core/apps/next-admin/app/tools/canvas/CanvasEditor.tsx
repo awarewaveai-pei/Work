@@ -148,6 +148,12 @@ export default function CanvasEditor() {
   const [objStrokeWidth, setObjStrokeWidth] = useState(4);
   const grade = useColorGrade(); // 修圖積木 applied to the selected image via Fabric filters
 
+  // Container width for dynamic MAX_DISP — keeps canvas within viewport without horizontal scroll.
+  const [containerWidth, setContainerWidth] = useState(650);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  // Guards against auto-reapplying 書布尺寸 when window resizes before user clicks 套用書布.
+  const sizedByCanvasApply = useRef(false);
+
   // ── init fabric canvas + load handed-off source image (client only) ──
   useEffect(() => {
     let disposed = false;
@@ -605,7 +611,8 @@ export default function CanvasEditor() {
       requestRenderAll: () => void;
     } | null;
     if (!canvas) return;
-    const MAX_DISP = 1100;
+    sizedByCanvasApply.current = true;
+    const MAX_DISP = containerWidth;
     const cm = (v: number) => (szUnit === "mm" ? v / 10 : v);
     const realW = Math.max(1, Math.round((cm(szW) * szDpi) / 2.54));
     const realH = Math.max(1, Math.round((cm(szH) * szDpi) / 2.54));
@@ -640,12 +647,32 @@ export default function CanvasEditor() {
     setSzInfo(`真實 ${realW}×${realH}px @${szDpi}DPI = ${cmW}×${cmH}cm（預覽 ${Math.round(dispScale * 100)}%）`);
     setExportPxLabel(`${realW}×${realH}px`);
     canvas.requestRenderAll();
-  }, [szW, szH, szUnit, szDpi]);
+  }, [szW, szH, szUnit, szDpi, containerWidth]);
 
   // Auto-apply when DPI dropdown changes (select = discrete complete action, no debounce needed).
   // szW/szH keep the manual button so user can finish typing before applying.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (ready && canvasMetaRef.current) applyCanvasSize(); }, [szDpi]);
+
+  // ResizeObserver: track canvas container width so MAX_DISP stays within viewport.
+  useEffect(() => {
+    const el = canvasContainerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const w = Math.max(200, Math.floor(entry.contentRect.width));
+        setContainerWidth((prev) => (Math.abs(prev - w) > 4 ? w : prev));
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Re-apply 書布尺寸 when container resizes — only if user has already clicked 套用書布.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (ready && canvasMetaRef.current && sizedByCanvasApply.current) applyCanvasSize();
+  }, [containerWidth]);
 
   // ✏️ 自由繪筆 / 🧹 橡皮擦 — change the canvas interaction mode. Eraser = a PencilBrush path
   // with globalCompositeOperation 'destination-out' (Fabric v7 has no EraserBrush), so the
@@ -1507,7 +1534,7 @@ export default function CanvasEditor() {
 
       {/* 畫布 + 右側可捲動工具欄（vector-trace-demo 風格）。面板垂直堆疊、可收合。 */}
       <div style={{ display: "flex", gap: 12, alignItems: "flex-start", width: "100%" }}>
-        <div style={{ border: "1px solid var(--card-border)", borderRadius: 8, flex: 1, minWidth: 0, background: "var(--card-bg)", display: "flex", justifyContent: "center", overflow: "hidden" }}>
+        <div ref={canvasContainerRef} style={{ border: "1px solid var(--card-border)", borderRadius: 8, flex: 1, minWidth: 0, background: "var(--card-bg)", display: "flex", justifyContent: "center", overflow: "hidden" }}>
           <canvas ref={canvasElRef} width={800} height={800} />
         </div>
 

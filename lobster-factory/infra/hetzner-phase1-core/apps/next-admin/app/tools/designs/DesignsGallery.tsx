@@ -1243,7 +1243,7 @@ export default function DesignsGallery() {
               key={asset.id}
               className={`designs-card${isSelected ? " designs-card--selected" : ""}`}
             >
-              {/* ── badges + checkbox ── */}
+              {/* ── badges + checkbox + kebab (right-aligned) ── */}
               <div className="designs-card-header">
                 <input
                   type="checkbox"
@@ -1267,30 +1267,6 @@ export default function DesignsGallery() {
                     </span>
                   ) : null}
                 </div>
-              </div>
-
-              {/* ── image + kebab overlay ── */}
-              <div className="designs-img-wrap">
-                {asset.object_url ? (
-                  <button
-                    className="designs-img-btn"
-                    onClick={() => setZoom(asset.object_url!)}
-                  >
-                    <div className={`designs-img-frame designs-img-frame--${isTarot ? "tarot" : "square"}`}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={asset.object_url}
-                        alt={asset.metadata?.card_name ?? asset.metadata?.prompt ?? asset.object_key}
-                        loading="lazy"
-                        className="designs-img"
-                      />
-                    </div>
-                  </button>
-                ) : (
-                  <div className={`designs-img-placeholder designs-img-placeholder--${isTarot ? "tarot" : "square"}`} />
-                )}
-
-                {/* ── kebab menu (top-right of image) ── */}
                 <div className="designs-kebab-wrap">
                   {openMenuId === asset.id ? (
                     <div
@@ -1347,6 +1323,26 @@ export default function DesignsGallery() {
                   </button>
                 </div>
               </div>
+
+              {/* ── image ── */}
+              {asset.object_url ? (
+                <button
+                  className="designs-img-btn"
+                  onClick={() => setZoom(asset.object_url!)}
+                >
+                  <div className={`designs-img-frame designs-img-frame--${isTarot ? "tarot" : "square"}`}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={asset.object_url}
+                      alt={asset.metadata?.card_name ?? asset.metadata?.prompt ?? asset.object_key}
+                      loading="lazy"
+                      className="designs-img"
+                    />
+                  </div>
+                </button>
+              ) : (
+                <div className={`designs-img-placeholder designs-img-placeholder--${isTarot ? "tarot" : "square"}`} />
+              )}
 
               {/* ── card name (BELOW image: keeps every image top aligned across the row,
                    regardless of whether a name exists or how long it is) ── */}

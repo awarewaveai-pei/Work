@@ -2585,19 +2585,13 @@ pre {
   border-color: rgba(239,68,68,0.35);
 }
 
-/* ── Image wrapper — needed so kebab button can be absolutely positioned ── */
-.designs-img-wrap {
-  position: relative;
-}
-
-/* ── Kebab overflow menu (overlaid on top-right of image) ── */
+/* ── Kebab overflow menu (inline in card header, right-aligned) ── */
 .designs-kebab-wrap {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  z-index: 10;
+  position: relative;
+  margin-left: auto;
+  flex-shrink: 0;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
 }
 .designs-kebab-btn {
   display: inline-flex;
@@ -2621,7 +2615,7 @@ pre {
 }
 .designs-kebab-menu {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + 2px);
   right: 0;
   min-width: 148px;
   background: var(--card-bg, #1e1e1e);
