@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-16 21:36:53
+- Generated: 2026-06-24 02:33:25
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -219,175 +219,100 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-06-16.md
-# Daily Note - 2026-06-16
+## 5) memory/daily/2026-06-24.md
+# Daily Note - 2026-06-24
 
-## Done today
-（窗：上次 AO-CLOSE 2026-06-15 17:30 → 本次 2026-06-16 08:2x；全為 06-16 凌晨主線）
 
-### AO-CLOSE 15:xx addendum — full window since last AO-RESUME
-（窗：上次 AO-RESUME `2026-06-11T05:07:44.9574023Z` → 本次 AO-CLOSE；跨 06-11 至 06-16，不限今日）
+## AO-CLOSE — 2026-06-24 02:30 CST
 
-- **POD / Printful / WooCommerce**：POD Studio 從生成器、去背、Mockup、PrintProvider sync、R2 gallery、Publish page 到 wp-bridge product path 全線推進；A1 native store 一鍵建品 live + hardening；A2 Woo paid-order webhook 已部署但 dormant，只會建 Printful DRAFT，confirm/扣款/送印紅線未建。
-- **Content Engine / Content Studio**：RankMath CJK/title 合規、WP Bridge publish path、featured hero/ILJ/power words、YouTube embed、keyword outline、真實 related-posts、假內連防禦、截斷 guard、structure toggle 正向強制、AI Models guide、USD cost SSOT、FLUX Kontext、mockup descriptors、Brand Voice 自動帶入、Media Hub 生圖積木等均已落地。
-- **Content blocks registry**：search registry live；product-copy / quality/check block 驗證；P4 headless pipeline 已能 article -> quality -> publish -> WP draft；Media Hub 5 模型/風格/img2img/seed 已整合。
-- **Canvas / browser testing**：新增 `/browser-test` command + AGENTS trigger；Canvas e2e 與 Mockup Studio 驗證債清零，剩下 mockup 若仍異常需操作者提供具體畫面/console/network。
-- **Ops / infra / governance**：archive-lift/git-log/verify-gate 風險分層修正；doc-sync LiteralPath 修紅字；SystemGuard registrar 改 Register-ScheduledTask；Trigger MCP fallback 修；self-hosted runner + workflow_dispatch deploy；origin lockdown scanner；GHA deploy events to ops-inbox；Telegram `/deploy_status`。
-- **Security**：Defender incident 已入 TASKS 明日正式資安複盤；目前 threat inactive/non-executed，但仍要清 temp ps1、審 registrar/launcher、驗 scheduled task action、評估 hook 升級。
+### Done today
+- **OutputTrackBar**: 新增 `PNG下載` btn + `hideQuickEdit` prop；WebP 改名；分兩列（下載 / 印刷+快速編輯）
+- **TarotStudio**: 快速編輯獨立移至 `ImageEditPromptPanel` 正上方 full-width
+- **CanvasEditor**: `MAX_DISP` 改動態 `containerWidth`（ResizeObserver）+ `sizedByCanvasApply` 守衛初始 load，消橫向滑桿
+- verify-recent: tsc 0 + vitest 487/487 + critic Deep 0C/0M
+- SG deploy `36fcfd6a` + playwright smoke 26/32 pass（6 skip auth-gated）
 
-**Content Engine（generate 品質鏈，已部署 SG）**
-- 品質修正包 `1e1d55cf`：截斷修正（SIZE_TOKENS 2048/4096/6144→4096/8192/16384 + CONTENT_META 移到文章最前，body 截斷仍保住 SEO 標題/描述）+ 內連防造假護欄（兩分支）+ 新 `related-posts/route.ts`（查真站 posts+pages 回真實 permalink）+ streaming 截斷偵測 marker。critic Deep 2 Major 全修（GENERATION_ERROR 剝除 + bulk path + publish 防禦縱深）。
-- 結構開關「Yes」正面強制 `fd965dbc`：TABLES/FAQ/QUOTES 勾了卻沒出 → generate route 加 `REQUIRED ELEMENTS` 硬 MUST。REALTEST 真打 Haiku 全 PASS。
-- `/api/content/title` RankMath 合規 `88da4d38`：建議標題補阿拉伯數字+力量詞（EN+CJK 雙語感知，規則與 generate H1 同步）。REALTEST EN 5/5 + CJK 5/5。
-
-**POD（A1 hardening + A2 自動轉單，已部署 SG `e336d5da`）**
-- A1 hardening（deployed `1b081764`）：結構化 transient classifier（取代 free-text includes("timeout")）+ SKU-faithful 冪等（skuMismatch guard）。vitest 318/318 + smoke 24 pass。
-- A2 自動轉單管線 `ad14f5f1`/`f3c4d981`/`e336d5da`：Woo 成交 → Printful **DRAFT**（kill-switch `POD_AUTO_FULFILL_ENABLED` 預設 OFF + HMAC 驗簽）。**已上 prod 但 dormant**（probe 回 `auto_fulfill_disabled`，零金流）。333/333 test 含金流紅線守門。confirm/送印紅線**不建**。deploy gate 連抓兩個本機被掩蓋問題（server crypto global / next build route-export）。
-
-**基礎設施 / 排程**
-- doc-sync `b71f72a6`：`Resolve-Path`/`Test-Path` 補 `-LiteralPath` → 修中括號檔名 `[year] Shortcode.md` PropertyNotFound 紅字閃窗（+ critic 揪出 line 277 同 bug class）。
-- scheduled-tasks `c4ae159f`：`REGISTER_SYSTEM_GUARD_TASKS.ps1` 由 `schtasks /TR`（261 字限制，隱藏指令 308 字靜默建不起）改 `Register-ScheduledTask` 模組，Daily-only 隱藏靜默。揭 SSOT 261 bug 根因。
-- mcp `dd18d9d4`：`start-trigger-mcp.ps1` pwsh7 fallback 到絕對 powershell.exe 路徑。
-- wp-bridge FluentCRM newsletter draft route（**WIP 未發版** `363bdace`/`49a10bcd`）：`NewsletterCreator.php`（只 draft + status 斷言）+ `/newsletter` 路由 + 版本 0.10.0→0.11.0；php -l 三檔全綠。runtime REALTEST + 發版待 go-ahead。
-- /tomo handoff packets：`company-desktop-systemguard`（`84e35dad`）+ `company-desktop-cloudflare-vault`（`fcd1a89f`）跨機修正交接。
-
-## Current state
-- 健康 100%（372/372）；origin/main 對齊（ahead=0 behind=0，HEAD=ba710b47）；backup SG/EU 0d、auto-reboot 🟢、CF security PASS、smoke PASS。
-- prod 最新部署 SG `e336d5da`（next-admin）；A2 webhook 上 prod 但 kill-switch OFF（dormant，零金流）。
-- 公司桌機尚有兩項機器本地修正待重跑（cloudflare vault token cfat_ + SystemGuard 重註冊；筆電已修並驗）。
-
-## Next steps
-- **【明日 2026-06-17｜資安複盤】** Defender `Trojan:Win32/PowhidSubExec.B` 來源查清與善後（已無 active threat；當正式資安事件走 DoD：清暫存檔/審 registrar/驗 live task action/評估 hook 升級 block）。
-- **wp-bridge FluentCRM newsletter** REALTEST（soulful 真建草稿→驗 status=draft→刪）→ 發版 0.11.0（兩 repo）→ next-admin `/api/content/newsletter` route + ContentStudio 按鈕。先 soulful 一站。
-- **公司桌機**（換機時）git pull 後重跑 SystemGuard 註冊器 + 修 cloudflare vault token（TASKS line 160/161 含完整步驟）。
-- POD A1 真實 e2e 開賣驗證（操作者驅動瀏覽器）；A2 啟用為操作者三步（測試結束 + 批准才開）。
-
-## Open tasks (auto-generated at 08:00 TPE)
-- [ ] **【明日 2026-06-17｜資安複盤】Defender 嚴重木馬 `Trojan:Win32/PowhidSubExec.B` 來源查清與善後**
-- [ ] **【進行中｜社群發佈整合】Content Studio 接 Postiz 真實發佈**
-- [ ] **【驗證債】Canvas 編輯器 `/tools/canvas` 整輪瀏覽器實測**
-- [ ] **【明日】soulfulexpression.org 遷移到 Cloudflare（DNS 先、registrar 後）**
-- [ ] **【進行中｜app.aware-wave 一鍵架站總藍圖】MASTER PLAN = `docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`**
-- [ ] **wp-bridge plugin 補 `/product` dry_run 支援**
-- [ ] **【POD A1 已完工｜剩 e2e + A2】**
-- [ ] **smoke 04-onboard spec 補 app session 登入**
-- [ ] **wp-bridge 續做 operation：featured image / update-existing-post / product update+delete**
-- [ ] **【POD Studio 自建動工】** plan=`.claude/plans/pod-studio-p2a-p4-execution-PLAN.md`
-- [ ] **【POD 服飾 Phase 1-4 後續｜2026-06-15 已部署 37dfba85】**
-- [ ] TASKS [x] 自動歸檔 + 重複行偵測閘（archive-completed-tasks.ps1）
-- [ ] **【診斷】Mockup Studio 功能異常**
-- [ ] **🎨 Image Output Pipeline**（SSOT: `lobster-factory/docs/PLAN-tarot-pod-image-output-pipeline-plus.md`）
-- [ ] SEO/GEO 引擎產品化 + Soulful 定位/文章
-- [ ] Auto-Repair Post-Phase 4 (M2 per-source HMAC + M4 fingerprint)
-- [ ] wp-bridge 外掛：接進 app.aware-wave.com Ops Dashboard + aware-wave.com 展示頁 + 販售
-- [ ] M2/M4 Phase 1 code 完成；剩 Phase 2 rollout + Phase 3 constraint swap + 3 side item
-- [ ] **Hetzner dispatcher 上線前 follow-up（啟用 LOBSTER_EXECUTE_* 前必做，現 gated OFF）**
-- [ ] **【READY，未做】把 Hetzner 一鍵租機嵌進 app.aware-wave.com 一鍵架站按鈕（Phase 5）**
-- [ ] **【計畫完成，未實作】客戶機「開機後全棧部署+維護」層（provider 無關）**
-- [ ] app.aware-wave onboarding/provisioning IA 重整
-- [ ] **【公司桌機】CLOUDFLARE vault token 裝錯修正（筆電 2026-06-16 已修並驗）**
-- [ ] **【公司桌機】重跑 SystemGuard 註冊器，換掉會閃紅字視窗的舊 Daily 任務（筆電 2026-06-16 已修並驗）**
-- [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤**
-- [ ] **既有站接手（Soulful Expression Art Therapy）**
-- [ ] **既有站接手 Day 1（Soulful Expression）**
-- [ ] **新站建置（Scenery Travel Mongolia）**
-- [ ] **新站建置 Day 1（Scenery Travel Mongolia）**
-- [ ] **Next-Gen 試點 — Day 2 雲端 staging 實機驗收（兩案）**
-- [ ] `tenants/templates/` v2
-- [ ] `lobster-factory` A10-2 商業閉環實跑
-- [ ] **【2026-06-05 開出】塔羅牌工具 → MEGA → WooCommerce 三階段路線圖**
-- [ ] **【2026-05-30 開出】endpoint-alert.sh 自動化部署機制**
-- [ ] 三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability）
-- [ ] **【🟠 Major M2-M4/M7-M10 + 🟡 Minor m2-m6/m8-m11】**
-- [ ] **（Phase 4 觀察期）AwareWave 自動告警維修系統 v3.2 — Phase 4 觀察期進行中**
-- [ ] 建立跨國稅務與法遵顧問審核流程（法律文件外部審核）
-
-## Yesterday context
-2026-06-15：修復 workflows esbuild 安全弱點（high×3，audit clean），新增 `/tools/ai-models` AI 模型比較頁並部署至 production（commit `5b8c97ac`）；Content Studio 改善：generate/route.ts 移除假 internal link 指令（改用 Internal Link Juicer），ContentStudio.tsx 改 Perplexity 品牌標籤；woo-order webhook（kill-switch OFF dormant）與 generate quality bundle 全部驗畢部署。
+### Remaining
+- Canvas 編輯器整輪瀏覽器實測待操作者完成
+- init-load `maxDisplay=650` minor UX inconsistency（不影響 export）
 
 ---
 
-### verify-recent --ack (2026-06-15T16:42:33.2391653Z)
+### verify-recent --ack (2026-06-23T16:01:00.9592359Z)
 
-**Reason**: Full verify already completed this turn: npx tsc --noEmit 0 errors on route.ts+print-provider.ts; critic agent PASS 0 Critical 0 Major (2 Minor both closed via dup-sku guard); vitest 318/318 incl new native-sync-product.test.ts (clean-hit + renamed-reseed); bughunt grep 0 free-text residue, isTransientPfError 1def+2calls
+**Reason**: publish #2/#3/#6: tsc clean (x multiple) + critic external-oracle (1 Major + 1 Minor fixed; key-leak/clientId-injection/backward-compat Verified Clean) + REALTEST 21 assertions all green (real wp-bridge-client multi-client + no key leak; #2 view-select/dedup; #3 profit math; #6 externalId namespacing/normalizeClientId).
 
-**Acknowledged unverified files** (count=2):
+**Acknowledged unverified files** (count=4):
 
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\printful-catalog.ts`
 - `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\publish\route.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\print-provider.ts`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\publish\PublishWizard.tsx`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\wp-bridge-client.ts`
 
 
-### verify-recent --ack (2026-06-15T18:25:46.5586948Z)
+### verify-recent --ack (2026-06-23T16:22:21.9876367Z)
 
-**Reason**: Full verify completed this turn for woo-order webhook: tsc 0 on route.ts+route.test.ts+docker-compose YAML_OK; critic PASS 0c/0M (money red-line traced clean, kill-switch fail-closed, HMAC no-bypass); vitest 333/333 incl 15 webhook tests + money-red-line guard (kill-switch off -> createDraftOrderOnNative never called); bughunt 0 confirm-path in webhook, env in both compose blocks
-
-**Acknowledged unverified files** (count=1):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\webhooks\woo-order\route.ts`
-
-
-### verify-recent --ack (2026-06-15T18:34:35.5773092Z)
-
-**Reason**: title\route.ts fully verified this session (REALTEST real Anthropic EN+CJK 5\5 digit+power-word pass; critic verdict pass 0c\0M; tsc 0 errors; bughunt single caller contract unchanged). The 3 d;C:\Program Files\Git\tmp test scripts are throwaway harness, not shipped.
-
-**Acknowledged unverified files** (count=4):
-
-- `D:\tmp\check-trend-keys.ps1`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\content\title\route.ts`
-- `D:\tmp\test-title.py`
-- `D:\tmp\run-title-test.ps1`
-
-
-### verify-recent --ack (2026-06-15T19:01:01.1576759Z)
-
-**Reason**: node:crypto fix for woo-order verifyWooSignature: deploy npm-test gate caught server vitest env lacks global crypto; switched to createHmac+timingSafeEqual (codebase HMAC convention). tsc 0; webhook 15/15 pass locally; node:crypto works in all envs
+**Reason**: canvas scaling fix (Math.min 1→8) + defaultCollapsed restore: tsc 0 errors; logic is 2 arithmetic line changes + 9 boolean prop additions
 
 **Acknowledged unverified files** (count=1):
 
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\webhooks\woo-order\route.ts`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\canvas\CanvasEditor.tsx`
 
 
-### verify-recent --ack (2026-06-15T19:08:39.4045492Z)
+### verify-recent --ack (2026-06-23T16:39:07.7409263Z)
 
-**Reason**: woo-order route-type build fix: next build rejects non-handler exports from a route module; moved parseWooOrder+verifyWooSignature to lib/studio/woo-webhook.ts. Verified with REAL local next build (route compiles, appears in manifest), tsc 0, webhook 15/15
+**Reason**: filename UX fix: editName state + uploadImage auto-fill + exportPxLabel display; tsc 0 errors; logic is additive state + UI wiring only
 
-**Acknowledged unverified files** (count=2):
+**Acknowledged unverified files** (count=1):
 
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\woo-webhook.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\webhooks\woo-order\route.ts`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\canvas\CanvasEditor.tsx`
 
 
-### verify-recent --ack (2026-06-15T19:25:36.4492289Z)
+### verify-recent --ack (2026-06-23T16:43:33.7224433Z)
 
-**Reason**: generate quality bundle fully verified: tsc 0 errors (4 files); REALTEST related-posts data source (soulful WP REST posts+pages search -> 5 real links); critic Deep warn->all 2 Major fixed (GENERATION_ERROR strip + bulk path + publish defense-in-depth); bughunt GENERATION marker emit/consume/drop 3-end + related-posts single caller, 0 stale. Generate prompt e2e (meta-first/truncation/internal-links) is deploy-gated -- verifiable on next article gen post-deploy.
+**Reason**: publish #2-refine + size-chart: tsc clean + npm test 487/487 (incl new permanent size-chart tests) + critic external-oracle (1 Major chartSizes cache-poison FIXED + 3 Minor HTML-escape/unit-none/test-coverage FIXED) + REALTEST 11 assertions (size-guide parse, flat-only #2, real buildPodProductPayload table block).
 
 **Acknowledged unverified files** (count=4):
 
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\content\generate\route.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\content\related-posts\route.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\content\ContentStudio.tsx`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\content\publish\route.ts`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\publish\PublishWizard.tsx`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\pod-product.ts`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\printful-catalog.ts`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\publish\route.ts`
 
 
-### verify-recent --ack (2026-06-15T19:31:51.6375062Z)
+### verify-recent --ack (2026-06-23T16:49:17.2665990Z)
 
-**Reason**: structure-enforcement follow-up: tsc 0 errors (generate route); REALTEST real Anthropic Haiku with REQUIRED ELEMENTS -> table/FAQ/blockquote/key-takeaways ALL PASS (old behavior skipped them); bughunt structure consumers = buildUserPrompt only, no stale. Pure positive-enforcement prompt string append, no control-flow change.
+**Reason**: DPI auto-apply: one-line useEffect watching szDpi, guards on ready+canvasMetaRef; tsc 0 errors; no logic risk
+
+**Acknowledged unverified files** (count=1):
+
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\canvas\CanvasEditor.tsx`
+
+
+### verify-recent --ack (2026-06-23T17:03:32.7776845Z)
+
+**Reason**: size-chart inch/cm: tsc clean + npm test 487/487 + critic external-oracle (0 Crit/Major; 2 Minor + 2 suggestions ALL applied; XSS/never-throws/latency Verified Clean) + REALTEST 7/7 (dual cell+range, cm-only no self-merge, single-bound).
+
+**Acknowledged unverified files** (count=1):
+
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\printful-catalog.ts`
+
+
+### verify-recent --ack (2026-06-23T17:51:43.7217956Z)
+
+**Reason**: publish C8/A2/A3 (non-money UX): tsc clean + npm test 487/487 + critic external-oracle (1 Major A2<->runAll concurrency FIXED via colorGenLatch mutual-exclusion + cross-disable; 2 Minor within-tick-latch + label FIXED; SSRF/backend-revalidation/A3-fallback Verified Clean). UI behaviour e2e via post-deploy smoke.
 
 **Acknowledged unverified files** (count=2):
 
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\content\generate\route.ts`
-- `D:\tmp\test-struct.py`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\publish\PublishWizard.tsx`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\designs\DesignsGallery.tsx`
 
-
-### verify-recent --ack (2026-06-16T05:38:19.6208596Z)
-
-_... 13 lines omitted._
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-06-16 08:31:40`
+- Time: `2026-06-24 02:30:26`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -397,58 +322,13 @@ _... 13 lines omitted._
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260616-083135.md`
-- Closeout: `reports/closeout/closeout-20260616-083140.md`
+- Health: `reports/health/health-20260624-023022.md`
+- Closeout: `reports/closeout/closeout-20260624-023026.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-## 2026-06-14 fix(publish): excerpt + YouTube placeholder
-
-### [已修改]
-- publish/route.ts: extractExcerpt() 從 ## Quick Answer 或首段抓 WP excerpt; YouTube placeholder [YOUTUBE_PLACEHOLDER_N: q] 轉 styled div; 修 3 個 Minor (comment strip non-greedy, heading strip anchored, fallback first paragraph)
-
-### [驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=<60000
-- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/0M/3m -- all 3 Minor fixed before commit (comment strip, heading anchor, fallback para)
-- BUGHUNT_DONE: scope=agency-os,scripts | grep=extractExcerpt|YOUTUBE_PLACEHOLDER | hits=0
-- REALTEST_WAIVED: SMOKE_COVERED -- deploy smoke verifies publish endpoint live
-
-## 2026-06-14 feat(generate): Perplexity real external sources
-
-### [已修改]
-- generate/route.ts: fetchRealSources() 呼叫 Perplexity Sonar，回傳最多 5 個真實外連 URL；注入 prompt 並限制 Claude 只用這些；Major fix: 雙層 URL 驗證（fetch 結果 + prompt 注入前都 filter /^https?:\/\// + 無空白字元）
-- docker-compose.yml: 加 PERPLEXITY_API_KEY env 到 next-admin service
-- SG .env: 手動加入 PERPLEXITY_API_KEY
-
-### [驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=<60000
-- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1M/1m/1s -- Major: realSources 無驗證直接注入 prompt (FIXED: double-filter); Minor: keyword raw in Perplexity query (bounded, acceptable); Suggestion: typeof check (FIXED)
-- BUGHUNT_DONE: scope=agency-os,scripts | grep=fetchRealSources|realSources | hits=0
-- REALTEST_WAIVED: SMOKE_COVERED -- deploy smoke verifies generate endpoint; Perplexity verified separately via existing MCP integration
-
-## 2026-06-14 feat(trending): Perplexity replacement + ILJ SYSTEM_PROMPT fix
-
-### [已修改]
-- trending/route.ts: 完全替換 `fetchGoogleTrends`（Google Trends RSS 被 VPS IP 封鎖）為 `fetchPerplexityTrending`（Perplexity Sonar real-time）。suggest/questions 保留 Google Autocomplete，若回空則 fallback 至 Perplexity。修了 `Promise.allSettled`（原 `Promise.all` — 一個 prefix 失敗會掛整個 questions endpoint）。case-insensitive dedup。parseJsonStrings 的 line-split fallback 過濾掉 raw JSON 行。
-- generate/route.ts SYSTEM_PROMPT: 移除「At least 1 internal link with fully descriptive anchor text」指令 — 使用者已安裝 Internal Link Juicer 外掛（500+ 文章自動內連），AI 生成假路徑（/related-article）反而扣 RankMath 分。用戶自行提供內連仍正常走 buildUserPrompt 的 validInternal 邏輯。
-- ContentStudio.tsx: 更新兩個空狀態文字，移除「Google」品牌標籤，改成「Perplexity 即時資料」。
-
-### [驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (excluding pre-existing CanvasEditor.tsx:274) | exit=0 | ms=<60000
-- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/2m/1s -- Minor: parseJsonStrings line-split JSON garbage (FIXED), dead category field (FIXED); Suggestion: case-sensitive Set dedup (FIXED)
-- BUGHUNT_DONE: scope=agency-os,scripts | grep=fetchGoogleTrends|pickTrendKeyword|internal.link | hits=0
-- BUGHUNT_WAIVED: NA -- ContentStudio.tsx UI text only change; generate/route.ts SYSTEM_PROMPT text only removal
-
-## 2026-06-15 security + AI Models guide + prod deploy
-
-### packages/workflows weekly security audit remediation
-- Weekly dependency scan reported esbuild advisory in `lobster-factory/packages/workflows` (`total=3 critical=0 high=3 moderate=0`).
-- Fixed workflows package override by updating esbuild from `^0.28.0` to `^0.28.1` and refreshed lockfile.
-- Verification: `npm audit --audit-level=high`, `npm audit --audit-level=moderate`, `npm test` (75/75), and `npm run audit:workflows-security` all passed.
-- GitHub tracking issue exists: #15.
-
 ### Content Tools AI Models comparison page
 - Added `/tools/ai-models` under Content Tools sidebar, positioned between SEO Content and Tarot.
 - Built a clean comparison UI for three adjacent decision surfaces: text generation tools, image generation models, and vibe coding tools.
@@ -461,6 +341,51 @@ _... 13 lines omitted._
 - REALTEST_EVIDENCE: tool=PowerShell | cmd=`curl.exe -I https://app.aware-wave.com/tools/ai-models` | exit=0 | result=307 to `/login?next=%2Ftools%2Fai-models` as expected behind auth; `/login` returns 200
 - REVIEW_WAIVED: CONTENT_DATA_UI -- static comparison page + typed data tables; build/typecheck/deploy smoke covered runtime integration
 - BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep=`78 張約|全套成本|fullDeckNt|15 個圖片模型比較` | hits=0 after moving comparison out of Tarot and using per-image cost only
+
+
+
+
+## 2026-06-16
+
+### Machine appendix (monthly-system-review)
+- 2026-06-16 21:37:04 : gates=SKIPPED (ReportOnly) ; integrated-status: generate-integrated-status-report.ps1 OK ; supabase-memory: PASS (supabase-studio memory at 36.76% (< 85%))
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=addCostLine,COST_JSON | hits=all 12 call sites audited + kind discriminator applied
+
+### refactor(edge-mask): 積木修正 — asset 深度縮放邏輯收進積木本身
+
+[根因] 前一 commit 用 opt-in assetStrength 參數讓 caller 各自傳值，違反積木原則。
+[修正] edge-mask.ts 自行偵測 style.maskUrl → 用 amount/100*0.3 計算 scale，三個 caller 不需改動。
+
+[已修改]
+- edge-mask.ts: 刪 assetStrength 欄位，改 asset branch 為 scale = 1.1 - (amount/100)*0.3
+- StudioWorkbench / CanvasEditor / DesignsGallery: 刪 isAssetStyle + assetStrength，只傳 {amount, seed}
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=npx tsc --noEmit | exit=0
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=npm test | exit=0 | result=428/428 pass
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=assetStrength|isAssetStyle | hits=0
+
+### fix(canvas,designs): asset brush strength slider unlock
+
+[任務] CanvasEditor + DesignsGallery 的邊緣強度 slider 對 asset 筆刷類型顯示「固定」，無法調整。
+[根因] 兩個檔案呼叫 applyEdgeMask 時未傳 assetStrength，isAsset guard 把 slider disabled。
+
+[已修改]
+- CanvasEditor.tsx: 在 applyEdgeMaskToSelected 內計算 isAssetStyle，傳 assetStrength = amount/100；slider 移除 disabled/opacity 限制
+- DesignsGallery.tsx: 同上；刪除死碼 editIsAsset 定義及過時 comment
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=<60000
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=npm test (next-admin) | exit=0 | result=428/428 pass
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n (1 stale comment suggestion, fixed inline)
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=editIsAsset|"固定" | hits=0
+- BUGHUNT_SCOPE_NARROW: N/A — agency-os and scripts included in scope above
+
+
+
+
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): pure identifier rename perplexityChat→aiChat, perplexityCostUsd→sourcesCostUsd
 
 
 

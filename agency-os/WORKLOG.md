@@ -13108,7 +13108,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-23 14:30:03 UTC_
+_Last synced: 2026-06-23 18:30:25 UTC_
 
 ## 2026-06-16 AO-CLOSE prep — 15:xx session close
 
@@ -14277,5 +14277,6 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): pure identifier rename perplexityChat→aiChat, perplexityCostUsd→sourcesCostUsd
+
 
 

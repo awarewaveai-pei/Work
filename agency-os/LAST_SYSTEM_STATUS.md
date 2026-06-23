@@ -1,7 +1,7 @@
 ﻿# System Guard Status
 
-- Mode: `daily`
-- Time: `2026-06-23 22:30:04`
+- Mode: `manual`
+- Time: `2026-06-24 02:30:26`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -11,8 +11,8 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260623-222748.md`
-- Closeout: `reports/closeout/closeout-20260623-223004.md`
+- Health: `reports/health/health-20260624-023022.md`
+- Closeout: `reports/closeout/closeout-20260624-023026.md`
 
 ## Action
 - No blocking issue detected.
