@@ -642,6 +642,11 @@ export default function CanvasEditor() {
     canvas.requestRenderAll();
   }, [szW, szH, szUnit, szDpi]);
 
+  // Auto-apply when DPI dropdown changes (select = discrete complete action, no debounce needed).
+  // szW/szH keep the manual button so user can finish typing before applying.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (ready && canvasMetaRef.current) applyCanvasSize(); }, [szDpi]);
+
   // ✏️ 自由繪筆 / 🧹 橡皮擦 — change the canvas interaction mode. Eraser = a PencilBrush path
   // with globalCompositeOperation 'destination-out' (Fabric v7 has no EraserBrush), so the
   // stroke punches through whatever is below it. Mutually exclusive with inpaint mode.
