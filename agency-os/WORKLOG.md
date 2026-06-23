@@ -4,6 +4,28 @@
 
 ## 2026-06-24
 
+### ops(postiz): 刪測試 draft + 綁 Bluesky channel + Task 2 callback URL 文件化
+
+[任務理解] Postiz 整合收尾三件事：① 刪 Gate C 測試 draft；② 將 Soulful Expression Bluesky 帳號連結到 social_postiz_connections；③ Task 2 OAuth 平台文件化（callback URLs + env vars）。
+
+[現況分析] git log 確認無並行 session。Postiz API key 在 SG `.env`。Bluesky integration ID `cmqe3jw960001p58nt0xohbi8` 已在 Gate B 驗證。Supabase `social_postiz_connections` 建立時 0 rows。
+
+[已修改]
+- Postiz API: DELETE /public/v1/posts/cmqo1wijz0005p58ncl1mtssr → HTTP 200（draft 已刪）
+- Supabase `social_postiz_connections`: INSERT {client_id=soulful-expression, postiz_integration_id=cmqe3jw960001p58nt0xohbi8, platform=bluesky, label=soulfulexpression.bsky.social, status=connected} → HTTP 201 (id=c80eed5d)
+- `agency-os/docs/operations/POSTIZ_SOCIAL_PUBLISHING_PLAN.md`: Task 2 補入 4 個 verified callback URLs + 6 個 env var 名稱 + 三平台人工步驟
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=curl DELETE postiz API | exit=0 | HTTP 200, id confirmed
+- REALTEST_EVIDENCE: tool=Bash | cmd=curl GET social_postiz_connections | exit=0 | platform=bluesky, status=connected verified
+- REVIEW_DONE: critic=NA | verdict=NA | findings=NA -- 純 API 呼叫 + DB 插入 + doc 更新，無 code 改動
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=cmqo1wijz0005p58ncl1mtssr | hits=0 -- Gate C 文件引用的 draft ID 已在 POSTIZ_SOCIAL_PUBLISHING_PLAN.md 保留歷史記錄（⚠ 標記），不是 stale 問題
+- BUGHUNT_WAIVED: DOC_ONLY -- Task 2 doc 更新，無 code callsite 改動
+
+[剩餘風險] Task 2 Meta 審核 4–7 天；LinkedIn Product 審核 1–2 天；Reddit 無審核可立即設定。三平台完成後需 ssh EU 更新 docker-compose.yml + docker compose up -d + Postiz UI 連帳號。
+
+[rollback] Supabase: DELETE FROM social_postiz_connections WHERE id='c80eed5d-9909-4b96-88e0-e46b0c38512b'；plan doc: git revert。Postiz draft 已永久刪除（無 rollback）。
+
 ### feat(cold-outreach): 密鑰骨幹（Supabase Vault）+ T8 冷信生成 + T9 審核
 
 [任務理解] 一勞永逸解平台 per-tenant 密鑰缺口（同時解 T8 BYO Gemini key、未來 T10 Gmail token、SSH key、tenant 整合密鑰）。
