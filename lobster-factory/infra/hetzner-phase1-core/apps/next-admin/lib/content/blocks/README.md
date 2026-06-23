@@ -244,7 +244,11 @@ AI prompt 是獨立積木，不併進 `image/style-design-workbench`。改圖流
 | `simplify` | `UI block` | `public/vector-editor.html` | 路徑簡化 |
 | `canvas/shape` | `UI block` | `app/tools/canvas/CanvasEditor.tsx` | 基本形狀（rect/circle/line） |
 | `canvas/object-lock` | `UI block` | `app/tools/canvas/CanvasEditor.tsx` | 鎖定/解鎖物件移動、縮放、旋轉 |
-| `canvas/image-effects` | `UI block` | `app/tools/canvas/CanvasEditor.tsx` | 自然飽和 / 高斯模糊 / 雜訊 |
+| `canvas/image-effects` | `UI block` | `app/tools/canvas/CanvasEditor.tsx` | 自然飽和/高斯模糊/雜訊/色溫（vibrance/blur/noise/temp）|
+| `canvas/adjustments` | `UI block` | `app/tools/canvas/CanvasEditor.tsx` | PS 調整：對比/陰影/高光 + 自動對比/色彩/色調（pixel analysis）|
+| `canvas/camera-raw` | `UI block` | `app/tools/canvas/CanvasEditor.tsx` | Camera RAW 效果：曝光/清晰度/去霧（exposure/clarity/dehaze）|
+| `canvas/color-grade` | `UI block` | `app/tools/canvas/CanvasEditor.tsx` | PS 色階/調色：hue/sat/bri/black/white/gamma/sharpen/colorBalance（共用 ColorGradePanel seam）|
+| `canvas/download` | `UI block` | `app/tools/canvas/CanvasEditor.tsx` | 下載 PNG（全尺寸）或 WebP（自動壓縮至 200KB）|
 | `ai/image-edit-prompt-panel` | `UI block` | `components/tools/ImageEditPromptPanel.tsx` | 共用 AI 修圖 prompt 面板；Tarot / Studio / Mockup 都掛這顆，不各寫一套 |
 | `tarot/output-track` | `UI block` | `app/tools/tarot/TarotStudio.tsx` | Tarot print/export outputs |
 | `studio/output-track` | `UI block` | `app/tools/studio/StudioWorkbench.tsx` | Studio web/export outputs |

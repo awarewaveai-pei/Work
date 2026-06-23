@@ -1556,7 +1556,7 @@ export default function CanvasEditor() {
 
         {/* 🎨 物件效果（PS 圖層樣式）— shown for ANY selected object (text/image/shape). */}
         {anySelected ? (
-          <SidebarPanel id="effects" title="🎨 物件效果" defaultPos={{ x: 816, y: 286 }} width={260}>
+          <SidebarPanel id="effects" title="🎨 物件效果" defaultPos={{ x: 816, y: 286 }} width={260} defaultCollapsed>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <label style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 2 }}>
               <span style={{ display: "flex", justifyContent: "space-between" }}><span>透明度</span><span style={{ opacity: 0.7 }}>{objOpacity}%</span></span>
@@ -1607,12 +1607,12 @@ export default function CanvasEditor() {
         {imageSelected ? (
           <>
           {/* 3 個獨立可拖面板：調色 / 濾鏡效果 / AI 去除 */}
-          <SidebarPanel id="grade" title="🎨 調色 / 色階 Levels" defaultPos={{ x: 816, y: 328 }} width={272}>
+          <SidebarPanel id="grade" title="🎨 調色 / 色階 Levels" defaultPos={{ x: 816, y: 328 }} width={272} defaultCollapsed>
             <ColorGradePanel state={grade.state} onSet={grade.set} onReset={grade.reset} neutral={grade.neutral} />
           </SidebarPanel>
 
           {/* 🎛 調整 Adjustments — PS-style contrast / shadows / highlights + auto corrections */}
-          <SidebarPanel id="adjust" title="🎛 調整 Adjustments" defaultPos={{ x: 816, y: 348 }} width={272}>
+          <SidebarPanel id="adjust" title="🎛 調整 Adjustments" defaultPos={{ x: 816, y: 348 }} width={272} defaultCollapsed>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 <button className="btn-secondary" style={{ fontSize: 12 }} onClick={autoContrast} title="分析畫素亮度範圍，自動設黑白點">自動對比</button>
@@ -1636,7 +1636,7 @@ export default function CanvasEditor() {
           </SidebarPanel>
 
           {/* 🎞 Camera RAW — exposure / clarity / dehaze sliders */}
-          <SidebarPanel id="cameraraw" title="🎞 Camera RAW 效果" defaultPos={{ x: 816, y: 368 }} width={272}>
+          <SidebarPanel id="cameraraw" title="🎞 Camera RAW 效果" defaultPos={{ x: 816, y: 368 }} width={272} defaultCollapsed>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {([
                 { label: "曝光 Exposure", v: exposure, set: setExposure, min: -100, max: 100 },
@@ -1654,7 +1654,7 @@ export default function CanvasEditor() {
             </div>
           </SidebarPanel>
 
-          <SidebarPanel id="filters" title="🎨 濾鏡 / 去背 / 效果" defaultPos={{ x: 816, y: 370 }} width={272}>
+          <SidebarPanel id="filters" title="🎨 濾鏡 / 去背 / 效果" defaultPos={{ x: 816, y: 370 }} width={272} defaultCollapsed>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 <button
@@ -1694,7 +1694,7 @@ export default function CanvasEditor() {
             </div>
           </SidebarPanel>
 
-          <SidebarPanel id="inpaint" title="🪄 去除 / 生成填色（AI）" defaultPos={{ x: 816, y: 412 }} width={272}>
+          <SidebarPanel id="inpaint" title="🪄 去除 / 生成填色（AI）" defaultPos={{ x: 816, y: 412 }} width={272} defaultCollapsed>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {!inpaintMode ? (
                 <>
@@ -1743,7 +1743,7 @@ export default function CanvasEditor() {
           </SidebarPanel>
 
           {/* 🖼 擴圖（flux-fill-pro outpaint）+ 🎚 色調分離（bake）— both replace the selected image. */}
-          <SidebarPanel id="genfx" title="🖼 擴圖 / 🎚 色調分離" defaultPos={{ x: 816, y: 454 }} width={272}>
+          <SidebarPanel id="genfx" title="🖼 擴圖 / 🎚 色調分離" defaultPos={{ x: 816, y: 454 }} width={272} defaultCollapsed>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <span style={{ fontSize: 12, fontWeight: 600 }}>🖼 擴圖 Outpaint（AI 往外補畫面）</span>
@@ -1776,7 +1776,7 @@ export default function CanvasEditor() {
           </SidebarPanel>
 
           {/* ✂️ 邊緣遮罩 — brush/grunge edge on the selected image → transparent PNG */}
-          <SidebarPanel id="edge-mask" title="✂️ 邊緣遮罩（筆刷邊）" defaultPos={{ x: 816, y: 496 }} width={276}>
+          <SidebarPanel id="edge-mask" title="✂️ 邊緣遮罩（筆刷邊）" defaultPos={{ x: 816, y: 496 }} width={276} defaultCollapsed>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
               <div style={{ opacity: 0.6 }}>點筆刷 → 把選取的圖套有機邊（透明 PNG）。可換不同筆刷。</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(44px, 1fr))", gap: 5 }}>
@@ -1822,7 +1822,7 @@ export default function CanvasEditor() {
 
         {/* 🔤 字型庫 — Google Fonts (中/英) + 上傳字型 + 粗體/斜體/底線, shown when text selected. */}
         {textSelected ? (
-          <SidebarPanel id="fonts" title="🔤 字型庫" defaultPos={{ x: 816, y: 454 }} width={240}>
+          <SidebarPanel id="fonts" title="🔤 字型庫" defaultPos={{ x: 816, y: 454 }} width={240} defaultCollapsed>
             <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
               <button className="btn-secondary" style={{ fontSize: 13, fontWeight: 700 }} title="粗體（切換）" onClick={() => toggleText("fontWeight")}>B</button>
               <button className="btn-secondary" style={{ fontSize: 13, fontStyle: "italic" }} title="斜體（切換）" onClick={() => toggleText("fontStyle")}>I</button>
