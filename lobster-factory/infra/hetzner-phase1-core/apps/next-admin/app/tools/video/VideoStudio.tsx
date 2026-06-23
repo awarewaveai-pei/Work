@@ -267,6 +267,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
   // ── Draft generation handler ──
   async function handleGenerateDraft() {
     if (!topic.trim() && providedScenes.length === 0) return;
+    isRenderingRef.current = false;
     if (pollRef.current) clearTimeout(pollRef.current);
     setDraftLoading(true);
     setDraftScenes([]);
