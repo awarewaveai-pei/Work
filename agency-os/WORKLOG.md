@@ -4,6 +4,29 @@
 
 ## 2026-06-23
 
+### feat(publish): 每色多 mockup + Printful 利潤試算 + 多客戶多站（/tools/publish 6 問之 #2/#3/#6）
+
+[任務理解] 接續同一輪 6 問，完成剩餘 3 個：#2 每色生平拍＋多模特（非只 1 張）、#3 發佈前用 Printful 成本算利潤、#6 支援多客戶不同 WP 站。操作者明示「全部都要做直到做好+部署+commit」。
+
+[現況分析] #2 genColorMockup 每色只存 1 張（Printful 同次 task 已回多視角卻丟棄）。#3 售價純手填、零成本資料。#6 全鏈寫死單站（WPBRIDGE_* 單組 env）。讀既有基建：next-admin 有 wp_sites（Application-Password 多站，內容流程用）+ organizations + ops/clients，但 POD publish 走**不同**的 wp-bridge Ed25519 簽章（不可混用）。WebFetch 取 Printful v2 定價 endpoint shape。
+
+[已修改]（4 檔）
+- lib/studio/printful-catalog.ts（#3）：fetchVariantCost（GET /v2/catalog-variants/{id}/prices → variant.techniques[dtg].price）+ fetchProductTierPricing（M 標準 + 2XL 加大各取一 variant），1h/1min TTL，失敗不入快取。
+- app/tools/publish/PublishWizard.tsx（#2/#3/#6）：genColorMockup → {swatch, gallery}（平拍＋最多 3 模特、back 排除、去重、逐圖存敗不中斷）；💰 利潤試算面板（即時 profit/margin + 套用建議售價 2×底價）；🏬 客戶站選單（>1 站才顯示）+ clientId 貫通 create/pfcreate（用 create 回傳的權威 clientId）；lastAutoGalleryRef 防重跑累積。
+- lib/studio/wp-bridge-client.ts（#6）：getConfig(clientId) 參數化（WPBRIDGE_SITE_<i>_* 命名空間 env）+ listBridgeClients（只回 id/name/baseUrl，零金鑰外洩）+ clientId 貫通。向後相容。
+- app/api/tools/publish/route.ts（#3/#6）：pricing + clients action + create/pfcreate 接 normalizeClientId（只允許 ""/1..10）+ Printful externalId 依 client 命名空間化（預設站格式不變）。
+
+[驗證結果 — R0 四動作]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run (temp spec, real wp-bridge-client) | exit=0 | ms=~400 -- 4/4：多站解析、越界 clientId(0/11/01/abc) 安全 fallback、listBridgeClients 零金鑰外洩；temp test 已刪
+- REALTEST_EVIDENCE: tool=Bash | cmd=node 純邏輯斷言(#2 選圖去重 + #3 利潤數學 + #6 externalId/normalizeClientId) | exit=0 | ms=~200 -- 17/17 全綠
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~30000 -- 多次（每 feature + critic 修後）clean
+- REVIEW_DONE: critic=Deep | verdict=pass-after-fix | findings=0c/1m/4n -- Major（create↔pfcreate clientId 不一致→Printful 命名空間錯站）已修；Minor gallery 累積已修；金鑰外洩/clientId 注入/向後相容/externalId 冪等 Verified Clean
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=createWooProduct\|bridgeBaseUrl\|isBridgeConfigured\|bridgePost\|genColorMockup\|fetchProductTierPricing | hits=0 -- 既有 wp-bridge caller 皆無參數→預設站，向後相容；改動 symbol 無外部消費者；無 .md stale 聲稱
+
+[剩餘風險] #3 成本採 techniques[dtg].price 未加 placements，需部署 smoke 對 live Printful 確認。#6 create↔pfcreate clientId 一致僅 UI 保障（route POST 不強制），殘留低風險（normalizeClientId 已界限）。#2 4 色×≤5 圖（≤20）可在已選列 ✕ 修剪。
+
+[rollback] 4 檔 git revert；env 未加 WPBRIDGE_SITE_* 時 #6 = 原單站（無破壞）。
+
 ### feat(cold-outreach): Phase-1 T2–T7（module 殼 + CRUD + scoring + free-plan router）
 
 [任務理解] 承 0048 schema（T1，已上 EU prod），實作 next-admin `app/outreach/` 冷拜訪工作台 Phase-1 可建構部分（不碰 High-risk 密鑰/Gmail）。

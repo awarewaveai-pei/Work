@@ -127,6 +127,10 @@ export default function PublishWizard() {
   // checkbox toggled during the multi-minute run is still reflected in the published gallery.
   const mockupUrlsRef = useRef<string[]>(mockupUrls);
   useEffect(() => { mockupUrlsRef.current = mockupUrls; }, [mockupUrls]);
+  // URLs the LAST one-click run auto-generated (per-colour swatches + flat/model shots). A repeated run
+  // drops these before folding in the operator's manual picks, so the gallery doesn't accumulate a fresh
+  // ~20-image set every retry (critic 2026-06-23). Reset when the design changes.
+  const lastAutoGalleryRef = useRef<string[]>([]);
   // Synchronous re-entrancy latch for runAll — closes the check-then-act gap that the async
   // `busy`-disabled button leaves open (a within-tick double-click would otherwise start two
   // parallel publish chains → duplicate Woo products, since `create` is not idempotent).
@@ -135,6 +139,10 @@ export default function PublishWizard() {
     state: StepState;
     productId?: number;
     editUrl?: string;
+    // The client the product was actually created on (echoed by the route). pfcreate MUST namespace its
+    // Printful externalId with THIS — not the live `clientId` state — so a mid-flow site switch can't
+    // bind a Printful product to the wrong client's Woo store (critic 2026-06-23, P4-fulfilment guard).
+    clientId?: string;
     variantMap?: VariantMapEntry[];
     // Woo returned a different variation_id count than our plan → SKU map dropped at the source.
     // The native one-click path needs the SKU map, so surface this and steer to the legacy fallback.
@@ -284,6 +292,7 @@ export default function PublishWizard() {
     if (staleFlat) setMockupUrls((prev) => prev.filter((u) => u !== staleFlat));
     lastFlatlayUrlRef.current = null;
     setFlatlay({ state: "idle" });
+    lastAutoGalleryRef.current = [];
     setCopy({ state: "idle" });
     setCreate({ state: "idle" });
     setSync({ state: "idle" });
@@ -472,6 +481,7 @@ export default function PublishWizard() {
       state: "done",
       productId: json.product_id as number,
       editUrl: json.edit_url as string | undefined,
+      clientId: json.clientId as string | undefined,
       variantMap: json.variantMap as VariantMapEntry[],
       // Surface the source-side "SKU map dropped" signal so the native path can refuse and steer to legacy.
       variantMapDropped: Boolean(json.variantMapDropped),
@@ -522,7 +532,9 @@ export default function PublishWizard() {
     setPfcreate({ state: "running" });
     const json = await post({
       action: "pfcreate",
-      clientId,
+      // Use the clientId `create` actually used (echoed), not the live selector — guards against a
+      // mid-flow site switch namespacing the Printful product against the wrong site (critic 2026-06-23).
+      clientId: create.clientId ?? clientId,
       catalogProductId,
       wooProductId: create.productId,
       title,
@@ -543,7 +555,7 @@ export default function PublishWizard() {
       alreadyExisted: Boolean(json.alreadyExisted),
       faithful: upscale.faithful,
     });
-  }, [clientId, create.productId, create.variantMap, upscale.printFileUrl, upscale.faithful, title, retailPrice, plusPrice, mockupUrls, pfcreate.state, catalogProductId, post]);
+  }, [clientId, create.clientId, create.productId, create.variantMap, upscale.printFileUrl, upscale.faithful, title, retailPrice, plusPrice, mockupUrls, pfcreate.state, catalogProductId, post]);
 
   // 🚀 ONE-CLICK: print file → product image → flat-lay → AI copy → Woo product → Printful native, in
   // sequence, aborting on the first hard failure. Each step's payload MIRRORS its run* function above;
@@ -598,9 +610,13 @@ export default function PublishWizard() {
       setAllRun({ state: "running", stage: "每色 mockup 全失敗 — 改用設計圖原稿續行" });
     }
 
-    // gallery: per-colour Printful mockups (first colour = main image) + design original + existing
-    // picks. dedup, insertion order preserved (first entry = Woo main image).
-    const gallery = Array.from(new Set([...galleryMockups, designUrl, ...mockupUrlsRef.current]));
+    // gallery: per-colour Printful mockups (first colour = main image) + design original + the operator's
+    // MANUAL picks. We DROP the previous one-click run's auto-generated mockups (tracked in
+    // lastAutoGalleryRef) before folding picks in, so a re-run on the same design replaces — not stacks —
+    // the auto set (critic 2026-06-23: a retry would otherwise pile a fresh ~20-image set on the old one).
+    const priorManual = mockupUrlsRef.current.filter((u) => !lastAutoGalleryRef.current.includes(u));
+    const gallery = Array.from(new Set([...galleryMockups, designUrl, ...priorManual]));
+    lastAutoGalleryRef.current = galleryMockups;
     setMockupUrls(gallery);
 
     // 4) AI SEO/GEO copy — BEST EFFORT (a copy failure must not abort the publish; create tolerates
@@ -668,6 +684,7 @@ export default function PublishWizard() {
       state: "done",
       productId,
       editUrl: cr.edit_url as string | undefined,
+      clientId: cr.clientId as string | undefined,
       variantMap,
       variantMapDropped: Boolean(cr.variantMapDropped),
     });
@@ -686,7 +703,9 @@ export default function PublishWizard() {
     setPfcreate({ state: "running" });
     const pf = await post({
       action: "pfcreate",
-      clientId,
+      // Namespace with the clientId `create` echoed (same value this closure used) — keep create↔pfcreate
+      // in lockstep so the Printful externalId can't point at the wrong client's Woo store.
+      clientId: cr.clientId ?? clientId,
       catalogProductId,
       wooProductId: productId,
       title,
@@ -905,6 +924,27 @@ export default function PublishWizard() {
 
       {/* form */}
       <div className="build-panel" style={{ padding: 14, marginTop: 10, display: "flex", gap: 12, flexWrap: "wrap" }}>
+        {/* Multi-client (#6): pick which client's WooCommerce site this draft goes to. Only shown when
+            more than one bridge client is configured — a single-site setup uses the default silently. */}
+        {bridgeClients.length > 1 ? (
+          <label style={{ fontSize: 13, flex: "1 1 100%" }}>
+            🏬 發佈到（客戶站）
+            <select
+              className="btn-secondary"
+              style={{ width: "100%", marginTop: 4 }}
+              value={clientId}
+              disabled={busy}
+              onChange={(e) => setClientId(e.target.value)}
+            >
+              {bridgeClients.map((c) => (
+                <option key={c.id || "default"} value={c.id}>{c.name}（{c.baseUrl.replace(/^https?:\/\//, "")}）</option>
+              ))}
+            </select>
+            <span style={{ fontSize: 11, opacity: 0.6, display: "block", marginTop: 2 }}>
+              不同客戶 = 不同 WooCommerce 站；草稿會建到所選站的後台。切換會清掉已建草稿狀態。
+            </span>
+          </label>
+        ) : null}
         <label style={{ fontSize: 13, flex: "1 1 280px" }}>
           商品名稱
           <input className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：Soulful Bloom Tee" />
