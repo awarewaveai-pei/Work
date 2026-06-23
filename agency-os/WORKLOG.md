@@ -27,6 +27,10 @@
 
 [rollback] 4 檔 git revert；env 未加 WPBRIDGE_SITE_* 時 #6 = 原單站（無破壞）。
 
+[部署] 兩波（#1-#6）已上 SG prod。`npm test` 474/474 pass + tsc clean（本機 pre-flight）→ git push origin（33afdd2e）→ `sg-deploy.sh next-admin`：image built、lobster-next-admin healthy 7s、HTTP smoke 全 200（/login、/api/ops/summary、nginx、node-api）。deployed HEAD b11d20f0（push 後 auto-checkpoint）含 33afdd2e 為祖先，/root/Work working tree 實證含 listBridgeClients/fetchProductTierPricing/printFilePdfUrl。Playwright smoke 26 pass/0 fail（evidence reports/e2e/2026-06-24/smoke）。
+- DEPLOY_EVIDENCE: tool=SSH | cmd=/root/lobster-phase1/scripts/sg-deploy.sh next-admin | exit=0 -- container healthy + smoke 4/4 200
+[後續] (a) #3 成本解讀（techniques[dtg].price 未加 placements）下次用 publish 面板時對照 Printful 後台底價眼驗。 (b) DesignsGallery 下載仍 client-fetch→blob（依賴 R2 CORS、大檔 fallback 開分頁）→ 可統一走新 download proxy。
+
 ### feat(cold-outreach): Phase-1 T2–T7（module 殼 + CRUD + scoring + free-plan router）
 
 [任務理解] 承 0048 schema（T1，已上 EU prod），實作 next-admin `app/outreach/` 冷拜訪工作台 Phase-1 可建構部分（不碰 High-risk 密鑰/Gmail）。
