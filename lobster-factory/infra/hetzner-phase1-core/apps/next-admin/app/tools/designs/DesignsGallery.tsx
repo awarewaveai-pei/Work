@@ -10,6 +10,7 @@ import {
   buildMaskSvg,
   type EdgeMaskId,
 } from "../../../lib/studio/edge-mask";
+import { openInCanvas } from "../../../components/tools/canvas-handoff";
 
 interface AssetMetadata {
   prompt?: string | null;
@@ -313,6 +314,9 @@ export default function DesignsGallery() {
   const [videoBulkDownloadTotal, setVideoBulkDownloadTotal] = useState(0);
   const [videoDeletingId, setVideoDeletingId] = useState<string | null>(null);
   const [videoDownloadingId, setVideoDownloadingId] = useState<string | null>(null);
+
+  /* kebab overflow menu */
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setState("loading");
