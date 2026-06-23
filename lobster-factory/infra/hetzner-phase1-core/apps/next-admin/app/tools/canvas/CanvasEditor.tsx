@@ -120,6 +120,13 @@ export default function CanvasEditor() {
   const [edgeAmount, setEdgeAmount] = useState(55);
   const [edgeStyleApplied, setEdgeStyleApplied] = useState<EdgeMaskId | null>(null);
   const [posterLevels, setPosterLevels] = useState(5);
+  // 🎛 調整 Adjustments (PS-style: contrast/shadows/highlights + Camera RAW)
+  const [contrast, setContrast] = useState(0);     // 對比 -100..100
+  const [shadows, setShadows] = useState(0);        // 陰影 -100..100
+  const [highlights, setHighlights] = useState(0);  // 高光 -100..100
+  const [exposure, setExposure] = useState(0);      // 曝光 -100..100
+  const [clarity, setClarity] = useState(0);        // 清晰度 0..100
+  const [dehaze, setDehaze] = useState(0);          // 去霧 0..100
   // 🗂 群組 — track whether the active selection can be grouped / ungrouped.
   const [multiSelected, setMultiSelected] = useState(false); // ActiveSelection (≥2 objects)
   const [groupSelected, setGroupSelected] = useState(false); // a single Group object
@@ -241,7 +248,7 @@ export default function CanvasEditor() {
           // preview down to fit; exportPng() restores the full source dimensions.
           const realW = Math.max(1, img.width || 800);
           const realH = Math.max(1, img.height || 800);
-          const maxDisplay = 800;
+          const maxDisplay = 1100;
           const dispScale = Math.min(1, maxDisplay / Math.max(realW, realH));
           canvas.setZoom(dispScale);
           canvas.setDimensions({
@@ -295,7 +302,7 @@ export default function CanvasEditor() {
       target.filters = [
         ...buildFabricImageFilters(ns, grade.params),
         ...buildPresetFilters(ns, presetId, removeWhite),
-        ...buildEffectFilters(ns, { vibrance, blur: blurv, noise: noisev, temp }),
+        ...buildEffectFilters(ns, { vibrance, blur: blurv, noise: noisev, temp, contrast, shadows, highlights, exposure, clarity, dehaze }),
       ];
       target.applyFilters();
       canvas.requestRenderAll();
@@ -303,7 +310,7 @@ export default function CanvasEditor() {
     return () => {
       cancelled = true;
     };
-  }, [grade.params, presetId, removeWhite, vibrance, blurv, noisev, temp]);
+  }, [grade.params, presetId, removeWhite, vibrance, blurv, noisev, temp, contrast, shadows, highlights, exposure, clarity, dehaze]);
 
   const addText = useCallback(() => {
     const canvas = fabricRef.current;

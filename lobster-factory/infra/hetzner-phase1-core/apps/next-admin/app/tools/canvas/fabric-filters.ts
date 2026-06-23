@@ -32,19 +32,55 @@ export const PRESET_FILTERS: { id: string; label: string; cls: string }[] = [
 ];
 
 /**
- * Extra image-effect filters (Photoshop-style), built separately and concat'd with grade +
- * preset filters at the apply site so all coexist on one image.
- *   - vibrance −100..100 → Fabric Vibrance (-1..1)  自然飽和
- *   - blur       0..100   → Fabric Blur (0..1)        高斯模糊
- *   - noise      0..100   → Fabric Noise (0..~600)    雜訊
+ * Extra image-effect filters (Photoshop-style + Camera RAW), built separately and concat'd
+ * with grade + preset filters at the apply site so all coexist on one image.
+ *   - vibrance  −100..100 → Fabric Vibrance (-1..1)     自然飽和
+ *   - blur        0..100  → Fabric Blur (0..1)           高斯模糊
+ *   - noise       0..100  → Fabric Noise (0..~600)       雜訊
+ *   - contrast  −100..100 → Fabric Contrast (-1..1)      對比
+ *   - shadows   −100..100 → Fabric Gamma (0.5..2)        陰影（亮暗暗部）
+ *   - highlights−100..100 → Fabric Brightness (scaled)   高光
+ *   - exposure  −100..100 → Fabric Brightness (wider)    曝光（Camera RAW）
+ *   - clarity     0..100  → Fabric Convolute (sharpen)   清晰度（Camera RAW）
+ *   - dehaze      0..100  → Contrast + Saturation        去霧（Camera RAW）
  */
 export function buildEffectFilters(
   fabricNS: { filters: Record<string, FilterCtor> },
-  eff: { vibrance?: number; blur?: number; noise?: number; temp?: number }
+  eff: {
+    vibrance?: number; blur?: number; noise?: number; temp?: number;
+    contrast?: number; shadows?: number; highlights?: number;
+    exposure?: number; clarity?: number; dehaze?: number;
+  }
 ): object[] {
   const F = fabricNS.filters;
   const out: object[] = [];
   if (eff.vibrance && F.Vibrance) out.push(new F.Vibrance({ vibrance: clampN(eff.vibrance / 100, -1, 1) }));
+  // 對比 Contrast
+  if (eff.contrast && F.Contrast) out.push(new F.Contrast({ contrast: clampN(eff.contrast / 100, -1, 1) }));
+  // 陰影 Shadows: positive = lift (brighten dark areas via gamma > 1), negative = crush
+  if (eff.shadows && F.Gamma) {
+    const g = eff.shadows > 0 ? 1 + eff.shadows / 250 : 1 / (1 + Math.abs(eff.shadows) / 250);
+    const gc = clampN(g, 0.5, 2);
+    out.push(new F.Gamma({ gamma: [gc, gc, gc] }));
+  }
+  // 高光 Highlights: subtle brightness shift (Fabric has no luminosity-selective filter)
+  if (eff.highlights && F.Brightness) {
+    out.push(new F.Brightness({ brightness: clampN(eff.highlights / 400, -0.25, 0.25) }));
+  }
+  // 曝光 Exposure: wider brightness range than standard bri slider
+  if (eff.exposure && F.Brightness) {
+    out.push(new F.Brightness({ brightness: clampN(eff.exposure / 200, -0.5, 0.5) }));
+  }
+  // 清晰度 Clarity: mid-frequency contrast via convolution sharpen kernel, softer than Sharpen
+  if (eff.clarity && F.Convolute) {
+    const s = clampN(eff.clarity / 100, 0, 1);
+    out.push(new F.Convolute({ matrix: [0, -s, 0, -s, 1 + 4 * s, -s, 0, -s, 0] }));
+  }
+  // 去霧 Dehaze: contrast + saturation boost (approximates haze removal)
+  if (eff.dehaze) {
+    if (F.Contrast) out.push(new F.Contrast({ contrast: clampN(eff.dehaze / 150, 0, 0.67) }));
+    if (F.Saturation) out.push(new F.Saturation({ saturation: clampN(eff.dehaze / 150, 0, 0.67) }));
+  }
   if (eff.blur && F.Blur) out.push(new F.Blur({ blur: clampN(eff.blur / 100, 0, 1) }));
   if (eff.noise && F.Noise) out.push(new F.Noise({ noise: clampN(eff.noise * 6, 0, 600) }));
   // 色溫 temperature: warm (+) adds red / removes blue; cool (−) the reverse. ColorMatrix offset.
