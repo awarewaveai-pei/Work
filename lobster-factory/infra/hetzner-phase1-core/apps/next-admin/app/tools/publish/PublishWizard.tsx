@@ -190,6 +190,17 @@ export default function PublishWizard() {
     return (await res.json()) as Record<string, unknown> & { ok: boolean; error?: string };
   }, []);
 
+  // Load the configured publish clients (#6). The selector only appears when >1 site is configured;
+  // with a single site the default is used silently (original behaviour).
+  useEffect(() => {
+    void (async () => {
+      const json = await post({ action: "clients" });
+      if (json.ok && Array.isArray(json.clients)) {
+        setBridgeClients(json.clients as { id: string; name: string; baseUrl: string }[]);
+      }
+    })();
+  }, [post]);
+
   // Generate the Printful OFFICIAL mockup for ONE colour (faithful — real garment + real model shown in
   // THAT colour, via Printful's mockup generator) then persist the Printful CDN image to My Designs.
   // Returns the saved url or null. This is what makes the swatch show the right colour garment.
