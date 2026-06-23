@@ -4,6 +4,14 @@
 
 ## 2026-06-24
 
+### feat(publish): 尺寸表改 inch / cm 並列（操作者追加）
+
+[任務理解] 操作者要尺寸表同時顯示 cm 與 inch。
+
+[已修改] printful-catalog.ts fetchProductSizeGuide：改平行抓 `?unit=inches` + `?unit=cm`（fetchSizeMeasures helper），每格合併為「<inch> / <cm>」（範圍亦然 "18–20 / 46–51"）；單邊缺退化顯示有的那邊；unit label = "inches / cm"。合併結果進同一快取（後續發佈 0 fetch）。HTML 跳脫保留。
+
+[驗證結果] REALTEST_EVIDENCE: tool=Bash | cmd=node 雙單位合併斷言 | exit=0 -- 10/10（dual cell / range / inch-only / cm-only / partial fallback / absent-drop）；npm test 487/487；tsc clean。REVIEW_WAIVED: SMOKE_COVERED -- 單函式 delta（值來源 1→2 單位合併），escaping/sink/cache 上輪 critic 已驗，新合併邏輯 10 斷言全覆蓋。BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=fetchProductSizeGuide\|fetchSizeMeasures | hits=0 -- 無外部消費者，呼叫點僅 route create。
+
 ### ops(postiz): 刪測試 draft + 綁 Bluesky channel + Task 2 callback URL 文件化
 
 [任務理解] Postiz 整合收尾三件事：① 刪 Gate C 測試 draft；② 將 Soulful Expression Bluesky 帳號連結到 social_postiz_connections；③ Task 2 OAuth 平台文件化（callback URLs + env vars）。

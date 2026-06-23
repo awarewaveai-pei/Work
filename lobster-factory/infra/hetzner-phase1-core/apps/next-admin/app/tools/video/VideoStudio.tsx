@@ -617,8 +617,11 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                         <button key={id} type="button" title={tip}
                           onClick={() => {
                             if (isAiMode) {
-                              if (imageModel === "pexels-video" || imageModel === "pexels-all") setImageModel(DEFAULT_IMAGE_MODEL);
-                              // else keep current AI model
+                              if (imageModel === "pexels-video" || imageModel === "pexels-all") {
+                                setImageModel(DEFAULT_IMAGE_MODEL);
+                                setCustomScenes(totalScenes); // 切到 AI 模式 → 預設全部 AI
+                              }
+                              // else keep current AI model + ratio
                             } else {
                               setImageModel(id);
                             }

@@ -2997,7 +2997,7 @@ export default function ContentStudio() {
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)" }}>自訂 AI 圖（Flux）</span>
+                        <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)" }}>自訂 AI 圖</span>
                         <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-primary)" }}>{videoCustomScenes}/{videoTotalScenes} · B-roll：{Math.max(0, videoTotalScenes - videoCustomScenes)}</span>
                       </div>
                       <input type="range" min={0} max={videoTotalScenes} step={1} value={videoCustomScenes}
@@ -3006,7 +3006,7 @@ export default function ContentStudio() {
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                       <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)" }}>生圖模型</span>
-                      <select value={videoImageModel} onChange={(e) => setVideoImageModel(e.target.value)}
+                      <select value={videoImageModel} onChange={(e) => { const m = e.target.value; setVideoImageModel(m); if (m !== "pexels-video" && m !== "pexels-all") setVideoCustomScenes(videoTotalScenes); }}
                         style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid var(--ai-bg)", fontSize: "12px", background: "var(--card-bg)", color: "var(--text-primary)", width: "100%" }}>
                         {Object.entries(IMAGE_RATES).map(([id, r]) => (
                           <option key={id} value={id}>{r.label} — ${r.usd}/張</option>
