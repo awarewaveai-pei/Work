@@ -538,7 +538,7 @@ export default function StudioWorkbench() {
       const res = await fetch("/api/tools/studio/mockup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image, productType, _jobId: jobIdRef.current, ...(dims ? { imageWidth: dims.width, imageHeight: dims.height } : {}) }),
+        body: JSON.stringify({ image, productType, designSizePct: 1, _jobId: jobIdRef.current, ...(dims ? { imageWidth: dims.width, imageHeight: dims.height } : {}) }),
       });
       const json = (await res.json()) as { ok: boolean; mockups?: MockupView[]; error?: string };
       if (!json.ok || !json.mockups?.length) { setMockupState("error"); return; }

@@ -111,7 +111,7 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  const result = await generateMockup(imageInput, productType, imageDims);
+  const result = await generateMockup(imageInput, productType, imageDims, typeof body.designSizePct === "number" ? body.designSizePct : undefined);
   return jsonResult(result, typeof body._jobId === "string" ? body._jobId : null);
 }
 
