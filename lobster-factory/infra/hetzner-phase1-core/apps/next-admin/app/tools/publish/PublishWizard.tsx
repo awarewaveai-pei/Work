@@ -299,12 +299,14 @@ export default function PublishWizard() {
   // Switching the T-shirt model invalidates every variant-bound step — a stale variantMap from the
   // previous model (its colours/SKUs) must NOT be carried into pfcreate, which would try to bind the
   // old model's colours against the newly-selected product (critic Phase 1b). Force a re-create.
+  // Switching the model OR the target client invalidates every variant-bound step — a product created
+  // on the old site/model must not be carried into pfcreate against the new selection.
   useEffect(() => {
     setCreate({ state: "idle" });
     setSync({ state: "idle" });
     setLink({ state: "idle" });
     setPfcreate({ state: "idle" });
-  }, [catalogProductId]);
+  }, [catalogProductId, clientId]);
   // Fetch the chosen model's Printful wholesale cost (standard + plus tier) so the form shows live
   // profit. Cancellable so a fast model switch can't land a stale product's cost on the new selection.
   useEffect(() => {
@@ -643,6 +645,7 @@ export default function PublishWizard() {
     setCreate({ state: "running" });
     const cr = await post({
       action: "create",
+      clientId,
       catalogProductId,
       title,
       retailPrice,
@@ -683,6 +686,7 @@ export default function PublishWizard() {
     setPfcreate({ state: "running" });
     const pf = await post({
       action: "pfcreate",
+      clientId,
       catalogProductId,
       wooProductId: productId,
       title,
@@ -709,7 +713,7 @@ export default function PublishWizard() {
     } finally {
       runAllLatch.current = false;
     }
-  }, [designUrl, title, printMode, designAssets, keywordHint, copyInstructions, retailPrice, plusPrice, catalogProductId, genColorMockup, post]);
+  }, [clientId, designUrl, title, printMode, designAssets, keywordHint, copyInstructions, retailPrice, plusPrice, catalogProductId, genColorMockup, post]);
 
   const busy = allRun.state === "running";
 
