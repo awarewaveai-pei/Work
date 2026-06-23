@@ -845,7 +845,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
 
               {/* Success result */}
               {genStatus === "done" && genResult && (
-                <ResultPanel result={genResult} onClose={() => { setGenStatus("idle"); setDraftScenes([]); }} />
+                <ResultPanel result={genResult} onClose={() => { isRenderingRef.current = false; setGenStatus("idle"); setDraftScenes([]); }} />
               )}
             </div>
           </Card>
