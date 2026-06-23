@@ -13,7 +13,8 @@ const LEADS_API = "/api/outreach/leads";
 const FU_API = "/api/outreach/followups";
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  // Match the server's Asia/Taipei business-day anchor (followups/route.ts) so buckets don't drift.
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date());
 }
 
 export default function FollowupsClient() {

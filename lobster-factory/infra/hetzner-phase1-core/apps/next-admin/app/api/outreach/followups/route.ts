@@ -10,10 +10,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
-const today = (): string => new Date().toISOString().slice(0, 10);
+// Follow-up dates are BUSINESS-day dates anchored to Asia/Taipei (the operator's home TZ), NOT the
+// UTC server clock — otherwise dates drift one day for 00:00–08:00 Taipei (critic minor #2).
+const BIZ_TZ = "Asia/Taipei";
+const today = (): string => new Intl.DateTimeFormat("en-CA", { timeZone: BIZ_TZ }).format(new Date());
 const addDays = (n: number): string => {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
+  // Pure calendar arithmetic on the local date string (UTC-anchored midnight avoids DST drift).
+  const d = new Date(`${today()}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 };
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
