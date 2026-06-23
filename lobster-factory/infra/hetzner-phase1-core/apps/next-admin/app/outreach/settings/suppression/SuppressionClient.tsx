@@ -31,12 +31,13 @@ export default function SuppressionClient() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY);
+  const org = useActiveOrg();
 
   const load = useCallback(async () => {
     setLoading(true);
     setErr(null);
     try {
-      const r = await fetch(API);
+      const r = await fetch(withOrg(API, org));
       const j = await r.json();
       if (!j.ok) throw new Error(j.error || "load failed");
       setEntries(j.entries as Entry[]);
@@ -45,7 +46,7 @@ export default function SuppressionClient() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [org]);
 
   useEffect(() => {
     void load();
@@ -63,7 +64,7 @@ export default function SuppressionClient() {
       const r = await fetch(API, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, organizationId: org }),
       });
       const j = await r.json();
       if (!j.ok) throw new Error(j.error || "add failed");
