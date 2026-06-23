@@ -23,7 +23,9 @@ export async function generateWithGemini(
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.7, maxOutputTokens: 600 },
+      // gemini-2.5/flash-latest are thinking models — reasoning consumes maxOutputTokens and truncates
+      // the actual answer. Disable thinking (cold-email copy needs none) + give the output room.
+      generationConfig: { temperature: 0.7, maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } },
     }),
   });
   if (!resp.ok) {
