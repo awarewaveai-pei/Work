@@ -190,7 +190,7 @@ export default function PublishWizard() {
   // Generate the Printful OFFICIAL mockup for ONE colour (faithful — real garment + real model shown in
   // THAT colour, via Printful's mockup generator) then persist the Printful CDN image to My Designs.
   // Returns the saved url or null. This is what makes the swatch show the right colour garment.
-  const genColorMockup = useCallback(async (colorHex: string, refDesignUrl: string): Promise<string | null> => {
+  const genColorMockup = useCallback(async (colorHex: string, refDesignUrl: string): Promise<{ swatch: string | null; gallery: string[] } | null> => {
     try {
       // Natural dims so Printful preserves aspect ratio (else square fallback squishes tall art).
       const dims = await new Promise<{ width: number; height: number } | null>((resolve) => {
@@ -210,21 +210,45 @@ export default function PublishWizard() {
         mockups?: Array<{ url: string; group: string; view: string; lifestyle?: boolean }>;
       };
       if (!m.ok || !m.mockup_url) return null;
-      // Per-colour swatch image: prefer a real-MODEL front (the customer sees the model wearing THAT
-      // colour when they click the swatch — the Printful behaviour the operator asked for). Straight
-      // "Front" beats a 3/4 model front; fall back to the clean flat front (mockup_url) when this product
-      // returns no model shots.
-      const modelFronts = (m.mockups ?? []).filter(
-        (v) => v.lifestyle && /front/i.test(v.view) && !/back/i.test(v.view),
-      );
-      const sourceUrl = (modelFronts.find((v) => /^front$/i.test(v.view)) ?? modelFronts[0])?.url ?? m.mockup_url;
-      const sRes = await fetch("/api/tools/designs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sourceUrl, source: "printful-mockup", prompt: "[auto-colour-mockup]" }),
-      });
-      const s = (await sRes.json()) as { ok: boolean; asset?: { object_url?: string } };
-      return s.ok ? (s.asset?.object_url ?? null) : null;
+      const views = m.mockups ?? [];
+      // SWATCH (the colour's variation image): prefer a real-MODEL straight front — the customer sees the
+      // model wearing THAT colour on the swatch. Straight "Front" beats a 3/4 model front; fall back to
+      // the clean flat front (mockup_url) when this product returns no model shots.
+      const modelFronts = views.filter((v) => v.lifestyle && /front/i.test(v.view) && !/back/i.test(v.view));
+      const swatchSource = (modelFronts.find((v) => /^front$/i.test(v.view)) ?? modelFronts[0])?.url ?? m.mockup_url;
+      // EXTRA gallery views (#2 — operator wants flat-lay + several model shots per colour, not one image):
+      // one clean flat-lay front + up to MAX_MODEL distinct model/lifestyle shots (different poses/people),
+      // back views excluded (blank for a front print). Printful returns ALL of these from the SAME mockup
+      // task we already ran — no extra generation, only extra saves. Dedup against the swatch + each other.
+      const MAX_MODEL = 3;
+      const flatFront = views.find((v) => !v.lifestyle && /front/i.test(v.view) && !/back/i.test(v.view))?.url;
+      const extraSources: string[] = [];
+      const seen = new Set<string>([swatchSource]);
+      const add = (u?: string) => { if (u && !seen.has(u)) { seen.add(u); extraSources.push(u); } };
+      add(flatFront);
+      let modelCount = 0;
+      for (const v of views) {
+        if (modelCount >= MAX_MODEL) break;
+        if (v.lifestyle && !/back/i.test(v.view) && !seen.has(v.url)) { add(v.url); modelCount++; }
+      }
+      // Persist swatch + each extra to My Designs (parallel). A failed save drops that ONE image only —
+      // never aborts the colour (best-effort, same spirit as the all-mockups-fail fallback in runAll).
+      const save = async (sourceUrl: string): Promise<string | null> => {
+        try {
+          const sRes = await fetch("/api/tools/designs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sourceUrl, source: "printful-mockup", prompt: "[auto-colour-mockup]" }),
+          });
+          const s = (await sRes.json()) as { ok: boolean; asset?: { object_url?: string } };
+          return s.ok ? (s.asset?.object_url ?? null) : null;
+        } catch {
+          return null;
+        }
+      };
+      const [swatch, ...extras] = await Promise.all([save(swatchSource), ...extraSources.map(save)]);
+      const gallery = [swatch, ...extras].filter((u): u is string => Boolean(u));
+      return { swatch: swatch ?? null, gallery };
     } catch {
       return null;
     }
