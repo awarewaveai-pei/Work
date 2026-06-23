@@ -4,6 +4,27 @@
 
 ## 2026-06-24
 
+### fix(ui): OutputTrackBar PNG/WebP rename+regroup；TarotStudio 快速編輯移至 prompt 上方；CanvasEditor 橫向滑桿修復
+
+[任務理解] 3 個 TarotStudio/CanvasEditor UI 改動：① OutputTrackBar 按鍵重整（WebP/PNG 下載並排；快速編輯條件隱藏）② TarotStudio 快速編輯移至 ImageEditPromptPanel 上方同寬 ③ CanvasEditor MAX_DISP 改動態 containerWidth 消橫向滑桿
+
+[現況分析] OutputTrackBar 原結構：單列 [🌐 WebP / print select / 🖨 / ✏️快速編輯]；TarotStudio 原快速編輯嵌在 OutputTrackBar 內；CanvasEditor applyCanvasSize 硬編 MAX_DISP=1100，超 viewport 寬出橫向滑桿。
+
+[已修改]
+- OutputTrackBar.tsx：新增 downloadPng callback（直接 triggerDownload data-URL）+ hideQuickEdit prop；JSX 重整為兩列（下載列：PNG下載+WebP下載；印刷+快速編輯列：條件渲染）
+- TarotStudio.tsx：加 buildSemanticBase/openInCanvas imports；OutputTrackBar 加 hideQuickEdit；在 ImageEditPromptPanel 外層 div 上方加獨立快速編輯按鈕（full-width）
+- CanvasEditor.tsx：加 containerWidth state + canvasContainerRef + sizedByCanvasApply ref；applyCanvasSize MAX_DISP 改用 containerWidth；加 ResizeObserver effect 追蹤容器寬；加 sizedByCanvasApply 守衛的 re-apply effect（避免污染初始 image load）
+
+[驗證結果 — R0 四動作]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~15000 -- 型別 clean，0 errors
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test --run (next-admin) | exit=0 | 487/487 pass | ms=1600
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/1m/2i -- Minor: init-load maxDisplay=650 vs containerWidth 不一致（純視覺，export 不受影響）；Info: ResizeObserver loop warning 防範 + 閉包文件說明；所有新 prop/ref/callback 邏輯、sizedByCanvasApply 守衛、語義檔名 track:"PNG" 均 Verified Clean
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=hideQuickEdit|downloadPng|sizedByCanvasApply|canvasContainerRef | hits=0 -- 新 symbol 僅存在於 3 個改動檔；OutputTrackBar 唯一 caller=TarotStudio（已更新）；agency-os/scripts 無 stale references
+
+[剩餘風險] init-load maxDisplay=650 硬編（critic Minor）；ResizeObserver loop console warning 可能在特定 Chromium 版本出現（requestAnimationFrame wrap 可修）；兩者均純視覺，export/功能不受影響。
+
+[rollback] git revert 3 檔；hideQuickEdit 不傳 = 快速編輯恢復原位（型別安全 optional prop）
+
 ### feat(publish): 非金流尾巴 — 裝飾平拍底圖(C8) + 手動建草稿補每色圖(A2) + 圖庫真下載(A3)
 
 [任務理解] 操作者批准做完 POD 剩餘**非金流**項（金流 B4/B5 + 成本驗 A1 緩做；C6 等台廠規格、C7 無背面產品、D9 等客戶憑證 不動）。
