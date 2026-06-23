@@ -248,6 +248,14 @@ export async function generateProductCopy(input: ProductCopyInput): Promise<Prod
   // a plain capsule <p> (no odd heading on the storefront) — answer engines extract the opening
   // sentence regardless; this only makes the SELF-SCORE honest. (aeo-subquery-coverage counts the
   // new H2 but is blog-only → marked N/A below, so no scoring side effect beyond this check.)
+  // Score each content unit EXACTLY ONCE. The short_description is structurally `<p>capsule</p>` +
+  // `<ul>` of the bullets; the bullets are already scored as the markdown list below, so when the
+  // capsule is present we represent the body as `## Quick Answer` + capsule ONLY and do NOT also strip
+  // the whole shortDescriptionHtml (which re-includes the same capsule AND the bullets) — that double
+  // count inflated kw-density and could flip a clean copy to a false "keyword stuffing" FAIL, which the
+  // AI-fix loop would then "correct" by degrading good copy (critic 2026-06-23, empirically reproduced).
+  // Fallback (no capsule matched — degenerate, the prompt mandates one): score the stripped body so no
+  // copy goes unscored.
   const capsuleMatch = /<p[^>]*>([\s\S]*?)<\/p>/i.exec(copy.shortDescriptionHtml);
   const capsule = (capsuleMatch ? capsuleMatch[1] : "")
     .replace(/<[^>]+>/g, " ")
@@ -255,8 +263,9 @@ export async function generateProductCopy(input: ProductCopyInput): Promise<Prod
     .trim();
   const markdown = [
     `# ${copy.productTitle}`,
-    ...(capsule ? [`## Quick Answer`, capsule] : []),
-    copy.shortDescriptionHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(),
+    ...(capsule
+      ? [`## Quick Answer`, capsule]
+      : [copy.shortDescriptionHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()]),
     ...copy.bullets.map((b) => `- ${b}`),
   ].join("\n\n");
   const full = checkRankMath({

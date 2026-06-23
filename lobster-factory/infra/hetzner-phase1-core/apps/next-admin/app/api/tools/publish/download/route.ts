@@ -21,7 +21,11 @@ export const maxDuration = 60;
  * download for no security gain.
  */
 
-const MAX_BYTES = 80 * 1024 * 1024; // print PNGs/PDFs can be large; cap to protect the OOM-prone host
+// Best-effort cap from the upstream's declared content-length (R2 returns an accurate one). Streaming
+// never buffers the whole file in memory, so an under-reported length can't OOM the host — it just
+// wouldn't be byte-capped; the host-exact allowlist already bounds WHAT can be proxied.
+const MAX_BYTES = 80 * 1024 * 1024;
+// Guards time-to-HEADERS only (not the body stream) — cleared the moment the response resolves.
 const FETCH_TIMEOUT_MS = 45_000;
 
 /** Sanitise a caller-supplied download name → safe ASCII filename (no path traversal, no header injection). */
@@ -61,18 +65,20 @@ export async function GET(request: Request) {
       { status: 502 },
     );
   }
+  // Headers received → the timeout has done its job (it guards time-to-headers, NOT the body). Clear it
+  // NOW so a slow client draining a large print file over an international/mobile link is never aborted
+  // mid-stream at 45s (critic 2026-06-23 — the operator travels worldwide). Total body time is then
+  // bounded by `maxDuration` + the client; passing `upstream.body` straight through lets Next propagate
+  // client-disconnect cancellation to undici so the upstream connection is released, not left draining.
+  clearTimeout(killer);
   if (!upstream.ok || !upstream.body) {
-    clearTimeout(killer);
     return NextResponse.json({ ok: false, error: `fetch_failed_${upstream.status}` }, { status: 502 });
   }
   const declared = Number(upstream.headers.get("content-length") ?? "0");
   if (declared > MAX_BYTES) {
-    clearTimeout(killer);
     return NextResponse.json({ ok: false, error: "asset_too_large" }, { status: 413 });
   }
 
-  // Stream the body straight through (no full-buffer in memory — host is OOM-prone). The upstream
-  // body's end clears the abort timer.
   const contentType = upstream.headers.get("content-type") ?? "application/octet-stream";
   const headers = new Headers({
     "Content-Type": contentType,
@@ -80,12 +86,5 @@ export async function GET(request: Request) {
     "Cache-Control": "private, max-age=0, no-store",
   });
   if (declared > 0) headers.set("Content-Length", String(declared));
-  const stream = upstream.body.pipeThrough(
-    new TransformStream({
-      flush() {
-        clearTimeout(killer);
-      },
-    }),
-  );
-  return new NextResponse(stream, { status: 200, headers });
+  return new NextResponse(upstream.body, { status: 200, headers });
 }
