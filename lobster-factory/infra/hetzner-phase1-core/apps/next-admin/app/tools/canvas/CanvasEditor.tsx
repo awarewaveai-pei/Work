@@ -711,6 +711,8 @@ export default function CanvasEditor() {
   const uploadImage = useCallback((file: File | null) => {
     const canvas = fabricRef.current;
     if (!canvas || !file) return;
+    // Use uploaded filename as the download base (strips extension, user can override in the input).
+    setEditName(file.name.replace(/\.[^.]+$/, ""));
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result as string;
