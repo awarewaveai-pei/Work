@@ -78,28 +78,30 @@ export async function POST(req: Request): Promise<Response> {
   const is_enabled = typeof body.isEnabled === "boolean" ? body.isEnabled : true;
   const settings = (body.settings ?? null) as object | null;
 
-  const fields = {
-    organization_id: str(body.organizationId),
-    connector_name,
-    connector_type,
-    is_enabled,
-    credentials_ref,
-    settings,
-  };
-
   if (id) {
-    const { data, error } = await supabase
-      .from(TABLE)
-      .update({ ...fields, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .select("*")
-      .maybeSingle();
+    // UPDATE: patch ONLY fields meant to change here. NEVER null-overwrite organization_id (the owner
+    // client, set at creation) or credentials_ref (owned by the /secret route) on a partial update such
+    // as toggle — that would silently un-assign the connector from its client. (critic: org-wipe Major)
+    const patch: Record<string, unknown> = {
+      connector_name,
+      connector_type,
+      is_enabled,
+      settings,
+      updated_at: new Date().toISOString(),
+    };
+    if (body.credentialsRef !== undefined) patch.credentials_ref = credentials_ref;
+    if (body.organizationId !== undefined) patch.organization_id = str(body.organizationId);
+    const { data, error } = await supabase.from(TABLE).update(patch).eq("id", id).select("*").maybeSingle();
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     if (!data) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
     return NextResponse.json({ ok: true, connector: data });
   }
 
-  const { data, error } = await supabase.from(TABLE).insert(fields).select("*").single();
+  const { data, error } = await supabase
+    .from(TABLE)
+    .insert({ organization_id: str(body.organizationId), connector_name, connector_type, is_enabled, credentials_ref, settings })
+    .select("*")
+    .single();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, connector: data }, { status: 201 });
 }

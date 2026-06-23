@@ -401,7 +401,9 @@ export default function PublishWizard() {
   // logic); the thin per-colour loop mirrors runAll's but is kept SEPARATE so this never destabilises the
   // one-click critical path. Stores the colour→swatch map in state + folds the shots into the gallery.
   const runColorMockups = useCallback(async () => {
-    if (!designUrl || busy || colorGen.state === "running") return;
+    // (`busy` is enforced on the button's disabled= in JSX, like the other run* steps — not referenced
+    //  here because it's declared later in the component.)
+    if (!designUrl || colorGen.state === "running") return;
     const model = podModelById(catalogProductId);
     const colors = model?.colors ?? [];
     if (colors.length === 0) return;
@@ -428,7 +430,7 @@ export default function PublishWizard() {
         ? { state: "done", count: gallery.length }
         : { state: "error", error: "每色 mockup 全失敗（Printful 暫時無回應？）" },
     );
-  }, [designUrl, busy, colorGen.state, catalogProductId, genColorMockup]);
+  }, [designUrl, colorGen.state, catalogProductId, genColorMockup]);
 
   const runCopy = useCallback(async (fixHints?: string[]): Promise<{ ok: boolean; error?: string; message?: string }> => {
     const isFix = Array.isArray(fixHints) && fixHints.length > 0;
@@ -1233,6 +1235,23 @@ export default function PublishWizard() {
           <span style={{ fontSize: 11, opacity: 0.55 }}>底圖優先於背景色；要新背景先去 Studio 生無圖案的圖</span>
           {flatlay.state === "done" ? <span style={{ fontSize: 12, color: "var(--green)" }}>已加入商品照 ✓（真實設計，非 AI 重繪）</span> : null}
           {flatlay.error ? <span style={{ color: "var(--red)", fontSize: 12 }}>{flatlay.error}</span> : null}
+        </div>
+
+        {/* A2: per-colour product images for the STEP-WISE path. One-click runAll does this automatically;
+            this button lets a manual ②-create also get colour variation images (model + flat per colour). */}
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <span>{pill(colorGen.state)}</span>
+          <button
+            className="btn-secondary"
+            disabled={busy || !designUrl || colorGen.state === "running"}
+            onClick={() => void runColorMockups()}
+            title="為所選款式每個顏色各生 1 模特 + 1 平拍，並設為該色變體圖（手動分步建草稿時用；一鍵已自動含）"
+          >
+            ⊕ 生成每色商品圖（模特＋平拍）
+          </button>
+          {colorGen.state === "running" ? <span style={{ fontSize: 12, color: "var(--accent)" }}>⏳ {colorGen.stage}…</span> : null}
+          {colorGen.state === "done" ? <span style={{ fontSize: 12, color: "var(--green)" }}>已生成 {colorGen.count} 張並設為各色變體圖 ✓</span> : null}
+          {colorGen.error ? <span style={{ color: "var(--red)", fontSize: 12 }}>{colorGen.error}</span> : null}
         </div>
 
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>

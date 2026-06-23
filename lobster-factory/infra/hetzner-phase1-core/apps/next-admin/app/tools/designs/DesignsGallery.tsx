@@ -407,19 +407,23 @@ export default function DesignsGallery() {
   }, []);
 
 
-  /* Single-image download — the <a download> attribute is ignored for cross-origin R2 URLs
-     (browser opens the image instead), so fetch the bytes and save a blob with our own filename.
-     Falls back to opening in a new tab if the fetch is blocked. Same pattern as bulkDownload. */
+  /* Single-image download — fetch through the SAME-ORIGIN download proxy
+     (/api/tools/publish/download, Content-Disposition: attachment, isDesignsAsset-allowlisted) instead
+     of the cross-origin R2 URL: a same-origin fetch can't be blocked by R2 CORS, which was the cause of
+     the "opened a tab, had to 右鍵另存" complaint. Gallery images are small, so a blob save is fine.
+     Still falls back to opening a tab if even the proxy fails. */
   const downloadOne = useCallback(async (asset: DesignAsset) => {
     if (!asset.object_url) return;
     setDownloadingId(asset.id);
+    const filename = `${designBaseName(asset)}.${assetExtension(asset)}`;
     try {
-      const res = await fetch(asset.object_url, { cache: "no-store" });
+      const href = `/api/tools/publish/download?url=${encodeURIComponent(asset.object_url)}&filename=${encodeURIComponent(filename)}`;
+      const res = await fetch(href, { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
-      downloadBlob(blob, `${designBaseName(asset)}.${assetExtension(asset)}`);
+      downloadBlob(blob, filename);
     } catch {
-      // R2 fetch blocked (CORS / network) — fall back to opening, but say so: opening ≠ saving.
+      // Proxy blocked/disabled — fall back to opening, but say so: opening ≠ saving.
       window.open(asset.object_url, "_blank", "noopener");
       alert("無法直接下載（可能被瀏覽器阻擋），已改開新分頁，請在圖片上按右鍵另存。");
     } finally {

@@ -67,6 +67,9 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const organizationId = typeof body.organizationId === "string" && body.organizationId.trim() ? body.organizationId.trim() : null;
+  if (organizationId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(organizationId)) {
+    return NextResponse.json({ ok: false, error: "organizationId must be a uuid" }, { status: 400 });
+  }
   const rawList: RawLead[] = Array.isArray(body.leads)
     ? (body.leads as RawLead[])
     : body.lead && typeof body.lead === "object"
