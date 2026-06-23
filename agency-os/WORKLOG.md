@@ -104,6 +104,25 @@ AUTO_TASK_DONE: feat(banner): 版面 sticky 放大 + 參考圖配色擷取 + 品
 
 AUTO_TASK_DONE: fix(onboarding): onboarding 品牌色接進 client_config.brandColors
 
+### feat(banner): Tier-3 收尾 — 產品場景模板 + 打光/構圖預設（roadmap 100%）
+
+[任務理解] 收尾 roadmap 最後兩項：產品擺拍場景模板 + 打光方向預設，讓合成不用懂 prompt 也能出專業產品照。
+
+[已修改] `app/tools/banner/BannerStudio.tsx`（純 additive）
+- `PRODUCT_SCENE_PRESETS`（6 個：桌面晨光/貨架氛圍/極簡平拍/戶外自然/棚拍純背/生活情境）→ 一鍵填 Subject+Vibe；UI 僅在合成模式+有產品圖時出現
+- `LIGHTING_PRESETS`（6 個：左側柔光/戲劇側光/逆光輪廓/柔頂光/暖/冷）→ 新增正交 `aiBgLighting` 欄位，併入 assembledBgPrompt（subject, vibe, **lighting**, style）+ useMemo 依賴
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm run build | exit=0 | /tools/banner 18.7kB
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0M（State/INIT/dep-array 完整無 stale closure、chip handler 不破壞 vibe single-select/AI-design/undo、無 JSX/undefined）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=aiBgLighting\|PRODUCT_SCENE_PRESETS\|LIGHTING_PRESETS | hits=0（皆 component 本地）
+- tsc --noEmit exit 0
+
+[剩餘風險] 場景模板把 aiBgVibe 設成 free-text → Vibe chip 不高亮（cosmetic，summary 仍顯示，同既有 subject 行為）。
+[rollback] `git revert <hash>`（單檔純 additive）。**Banner Studio roadmap Tier 1/2/3 + 版面 + 配色/品牌 全數完成。**
+
+AUTO_TASK_DONE: feat(banner): Tier-3 收尾 產品場景模板 + 打光預設（roadmap 100%）
+
 ### feat(video): 草稿單張圖重新生成（B/4，影片工具整理）
 
 [任務理解] 影片工具整理 B：草稿審核時不喜歡的圖可單張「重新生成」。
