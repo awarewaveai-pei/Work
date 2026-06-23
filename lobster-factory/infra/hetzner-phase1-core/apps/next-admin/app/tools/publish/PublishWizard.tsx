@@ -321,6 +321,9 @@ export default function PublishWizard() {
     setSync({ state: "idle" });
     setLink({ state: "idle" });
     setPfcreate({ state: "idle" });
+    // Switching the model changes the colour set → the per-colour images are stale; clear them.
+    setColorMockups({});
+    setColorGen({ state: "idle" });
   }, [catalogProductId, clientId]);
   // Fetch the chosen model's Printful wholesale cost (standard + plus tier) so the form shows live
   // profit. Cancellable so a fast model switch can't land a stale product's cost on the new selection.
