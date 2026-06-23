@@ -117,7 +117,15 @@ export default function PublishWizard() {
   }>({ state: "idle" });
   const [productImg, setProductImg] = useState<{ state: StepState; url?: string; error?: string }>({ state: "idle" });
   const [flatlayBg, setFlatlayBg] = useState("#f5f3ee");
+  // Optional decorative background (a My Designs image with NO artwork) composited under the design —
+  // "" = solid colour only. The backend already accepts + allowlist-validates bgUrl (route.ts flatlay).
+  const [flatlayBgUrl, setFlatlayBgUrl] = useState<string>("");
   const [flatlay, setFlatlay] = useState<{ state: StepState; url?: string; error?: string }>({ state: "idle" });
+  // Per-colour variation images (Printful colour NAME → My Designs URL) for the STEP-WISE path: the
+  // one-click runAll builds its own local map, but manual ② create had none → variants showed no colour
+  // image (A2). Populated by runColorMockups, consumed by runCreate. Reset when design/model changes.
+  const [colorMockups, setColorMockups] = useState<Record<string, string>>({});
+  const [colorGen, setColorGen] = useState<{ state: StepState; stage?: string; count?: number; error?: string }>({ state: "idle" });
   // Latest derived-image URLs, readable inside the design-change effect without making them deps.
   const lastProductUrlRef = useRef<string | null>(null);
   useEffect(() => { lastProductUrlRef.current = productImg.url ?? null; }, [productImg.url]);
@@ -289,6 +297,8 @@ export default function PublishWizard() {
     lastFlatlayUrlRef.current = null;
     setFlatlay({ state: "idle" });
     lastAutoGalleryRef.current = [];
+    setColorMockups({});
+    setColorGen({ state: "idle" });
     setCopy({ state: "idle" });
     setCreate({ state: "idle" });
     setSync({ state: "idle" });
@@ -370,7 +380,7 @@ export default function PublishWizard() {
   const runFlatlay = useCallback(async () => {
     if (!designUrl) return;
     setFlatlay({ state: "running" });
-    const json = await post({ action: "flatlay", designUrl, bgColor: flatlayBg });
+    const json = await post({ action: "flatlay", designUrl, bgColor: flatlayBg, ...(flatlayBgUrl ? { bgUrl: flatlayBgUrl } : {}) });
     if (!json.ok) {
       setFlatlay({ state: "error", error: json.error });
       return;
@@ -381,7 +391,41 @@ export default function PublishWizard() {
       return without.includes(url) ? without : [...without, url];
     });
     setFlatlay({ state: "done", url });
-  }, [designUrl, flatlayBg, flatlay.url, post]);
+  }, [designUrl, flatlayBg, flatlayBgUrl, flatlay.url, post]);
+
+  // A2: generate per-colour Printful product images (model + flat-lay) for the STEP-WISE flow, so a
+  // manually-built draft (②) also gets colour variation images. Reuses genColorMockup (the shared heavy
+  // logic); the thin per-colour loop mirrors runAll's but is kept SEPARATE so this never destabilises the
+  // one-click critical path. Stores the colour→swatch map in state + folds the shots into the gallery.
+  const runColorMockups = useCallback(async () => {
+    if (!designUrl || busy || colorGen.state === "running") return;
+    const model = podModelById(catalogProductId);
+    const colors = model?.colors ?? [];
+    if (colors.length === 0) return;
+    setColorGen({ state: "running" });
+    const map: Record<string, string> = {};
+    const gallery: string[] = [];
+    for (let i = 0; i < colors.length; i++) {
+      const c = colors[i];
+      setColorGen({ state: "running", stage: `${c.label}（${i + 1}/${colors.length}）` });
+      const r = await genColorMockup(c.hex, designUrl);
+      if (r) {
+        if (r.swatch) map[c.printfulName] = r.swatch;
+        gallery.push(...r.gallery);
+      }
+    }
+    setColorMockups(map);
+    // Drop the previous auto-generated set before folding manual picks back in (same anti-accumulation
+    // rule as runAll's lastAutoGalleryRef).
+    const priorManual = mockupUrlsRef.current.filter((u) => !lastAutoGalleryRef.current.includes(u));
+    setMockupUrls(Array.from(new Set([...gallery, ...priorManual])));
+    lastAutoGalleryRef.current = gallery;
+    setColorGen(
+      gallery.length > 0
+        ? { state: "done", count: gallery.length }
+        : { state: "error", error: "每色 mockup 全失敗（Printful 暫時無回應？）" },
+    );
+  }, [designUrl, busy, colorGen.state, catalogProductId, genColorMockup]);
 
   const runCopy = useCallback(async (fixHints?: string[]): Promise<{ ok: boolean; error?: string; message?: string }> => {
     const isFix = Array.isArray(fixHints) && fixHints.length > 0;
@@ -462,6 +506,9 @@ export default function PublishWizard() {
       plusPrice,
       sizes: SIZES,
       mockupUrls,
+      // Per-colour variation images (A2) — present only if the operator ran 「生成每色商品圖」first;
+      // empty {} otherwise (variants then fall back to the gallery main image, the old behaviour).
+      ...(Object.keys(colorMockups).length > 0 ? { colorMockups } : {}),
       // AI copy (Phase 4) — short description body + bullets + RankMath SEO meta.
       shortDescription: copy.shortDescriptionHtml,
       bullets: copy.bullets,
@@ -482,7 +529,7 @@ export default function PublishWizard() {
       // Surface the source-side "SKU map dropped" signal so the native path can refuse and steer to legacy.
       variantMapDropped: Boolean(json.variantMapDropped),
     });
-  }, [clientId, catalogProductId, title, retailPrice, plusPrice, mockupUrls, copy, post]);
+  }, [clientId, catalogProductId, title, retailPrice, plusPrice, mockupUrls, colorMockups, copy, post]);
 
   const runStatus = useCallback(async () => {
     if (!create.productId) return;
@@ -1163,7 +1210,24 @@ export default function PublishWizard() {
             背景色
             <input type="color" value={flatlayBg} onChange={(e) => setFlatlayBg(e.target.value)} style={{ width: 32, height: 24, padding: 0, border: "none", background: "none" }} />
           </label>
-          <span style={{ fontSize: 11, opacity: 0.6 }}>（要 AI 裝飾背景：先在 Studio 生成無圖案的背景圖，之後版本可選為底）</span>
+          {/* C8: optional decorative background image from My Designs (no artwork). "" = solid colour. */}
+          <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
+            裝飾底圖
+            <select
+              className="btn-secondary"
+              value={flatlayBgUrl}
+              disabled={busy}
+              onChange={(e) => setFlatlayBgUrl(e.target.value)}
+              style={{ fontSize: 12, maxWidth: 200 }}
+              title="選一張無圖案的背景圖墊在設計下（先在 Studio / Canvas 生成）"
+            >
+              <option value="">（純色背景）</option>
+              {Array.from(new Map([...mockupAssets, ...designAssets].filter((a) => a.object_url).map((a) => [a.object_url!, a])).values()).map((a) => (
+                <option key={a.id} value={a.object_url!}>{(a.metadata?.prompt ?? a.id).slice(0, 28)}</option>
+              ))}
+            </select>
+          </label>
+          <span style={{ fontSize: 11, opacity: 0.55 }}>底圖優先於背景色；要新背景先去 Studio 生無圖案的圖</span>
           {flatlay.state === "done" ? <span style={{ fontSize: 12, color: "var(--green)" }}>已加入商品照 ✓（真實設計，非 AI 重繪）</span> : null}
           {flatlay.error ? <span style={{ color: "var(--red)", fontSize: 12 }}>{flatlay.error}</span> : null}
         </div>
