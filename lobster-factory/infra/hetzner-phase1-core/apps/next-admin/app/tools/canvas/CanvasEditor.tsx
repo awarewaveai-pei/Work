@@ -600,7 +600,8 @@ export default function CanvasEditor() {
     const cm = (v: number) => (szUnit === "mm" ? v / 10 : v);
     const realW = Math.max(1, Math.round((cm(szW) * szDpi) / 2.54));
     const realH = Math.max(1, Math.round((cm(szH) * szDpi) / 2.54));
-    const dispScale = Math.min(1, MAX_DISP / Math.max(realW, realH));
+    // Allow zoom > 1 so small documents fill the workspace. Export always uses realW/realH.
+    const dispScale = Math.min(8, MAX_DISP / Math.max(realW, realH));
 
     // The OLD working width in real-coordinate space (before this resize). First time = the
     // current element width ÷ current zoom; after a prior sizing = the stored realW.
