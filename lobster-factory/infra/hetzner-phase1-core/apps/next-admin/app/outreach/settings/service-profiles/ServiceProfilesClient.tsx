@@ -40,12 +40,13 @@ export default function ServiceProfilesClient() {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const org = useActiveOrg();
 
   const load = useCallback(async () => {
     setLoading(true);
     setErr(null);
     try {
-      const r = await fetch(API);
+      const r = await fetch(withOrg(API, org));
       const j = await r.json();
       if (!j.ok) throw new Error(j.error || "load failed");
       setProfiles(j.profiles as Profile[]);
@@ -54,7 +55,7 @@ export default function ServiceProfilesClient() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [org]);
 
   useEffect(() => {
     void load();

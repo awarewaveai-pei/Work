@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from "react";
+import { useActiveOrg, withOrg } from "@/lib/outreach/use-active-org";
 
 interface Entry {
   id: string;
