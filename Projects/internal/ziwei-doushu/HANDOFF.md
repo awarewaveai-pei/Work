@@ -3,6 +3,7 @@
 > **明天接手的 AI / 開發者：先讀完這份再動工。這是本專案的單一事實來源（SSOT）。**
 > 位置：`Projects/internal/ziwei-doushu/`（AwareWave Work monorepo 內）
 > 分支：`claude/ziwei-doushu-chart-site-55fdaa`
+> **完整正式計畫見 `PLAN.md`（本檔為快速接手摘要，細節以 PLAN.md 為準）。**
 
 ---
 
@@ -35,7 +36,7 @@
 | 卜卦(易經) | 自寫 64 卦 + 六爻起卦（未做） | 簡單可控 |
 | 塔羅 | 78 張牌庫 JSON + 純亂數抽牌（未做） | 抽牌邏輯照抄競品(Fisher-Yates) |
 | 西洋占星 | **astrology-api.io**（Swiss Eph，~US$11/月，未接） | 天文精度黃金標準 |
-| 解讀引擎 | **Claude API**：Haiku=每日輕量 / Sonnet 4.6=主力深度 / Opus 4.8=頂規；模型 ID 用最新（`claude-opus-4-8` 等）；開 prompt caching 快取命理知識系統提示 | 文案=「準」的來源 |
+| 解讀引擎 | **廠商無關 AI 層，預設 GPT，可切 Claude**；`interpret()` 單一介面下接 `providers/openai.ts`(預設)/`anthropic.ts`；用真命盤 A/B 選贏家；開 prompt caching | 解讀=產品本身，哪家寫得好由 A/B+品味定 |
 | 資料庫 | Supabase(Postgres)（未接） | 帳號/存盤/訂閱/點數 + RLS |
 | 金流 | 綠界 ECPay(台) / Stripe(國際)（未接） | 訂閱+單筆 |
 
@@ -46,9 +47,9 @@
 ## 3. 部署 / 網址（待使用者最終拍板）
 
 - 程式碼：留在 `Projects/internal/ziwei-doushu/`。
-- 託管：**Vercel**（Next.js 最順、免費）或 Cloudflare Pages。
-- 網址（建議）：先用 **aware-wave.com 子網域**（如 `ziwei.aware-wave.com`，零成本，CF 加一筆 DNS）；品牌驗證後再買專屬網域。
-- ⚠️ **不要**放進 `app.aware-wave.com`（那是企業佈建 console，用途不同）。
+- 託管：**自架 SG/EU VPS（走既有 `sg-deploy.sh` 管線）為主**——你已在 VPS 跑 Next.js(next-admin)，零新廠商、零新成本、資料自主、stack 一致；需補齊新部署 6 項 SOP(test gate/healthcheck/smoke/rollback/通知/typecheck)。**Vercel 為備選**（僅在想完全免維運、肯付 Pro $20/月商用時）。
+- 網址：**`ziwei.aware-wave.com` 子網域（零成本，CF 加一筆 DNS 指向 VPS）**；品牌起來再買專屬命理網域。
+- ⚠️ **不要**做在 `aware-wave.com` 主站，也**不要**進 `app.aware-wave.com`（企業佈建 console）。
 
 ---
 
@@ -79,10 +80,11 @@
 - 部署到 Vercel + 掛子網域。
 
 **Phase 2 — AI 解讀（賺錢核心，最高槓桿）**
-- `lib/ai/interpret.ts`：Claude API 封裝，模型分流(Haiku/Sonnet/Opus) + prompt caching + streaming(萬字)。
-- `lib/ai/prompts/`：各系統解讀系統提示（**可直接改寫競品那段「組合解讀/忠於牌義/不空泛安慰」的 prompt 骨架**，品質好且省事）。
-- `app/api/interpret/route.ts`：付費牆 + 額度檢查後才呼叫 Claude。
-- 需要 `ANTHROPIC_API_KEY`（環境變數）。
+- `lib/ai/interpret.ts`：**廠商無關** `interpret()` 介面 + `providers/openai.ts`(**預設 GPT**)/`providers/anthropic.ts`(可切 Claude)；模型分級(輕量/深度/頂規) + streaming(萬字) + prompt caching。`AI_PROVIDER` 環境變數切換。
+- `lib/ai/prompts/`：各系統解讀系統提示（**可直接改寫競品那段「組合解讀/忠於牌義/不空泛安慰也不災難化」的 prompt 骨架**，品質好且省事）。
+- `app/api/interpret/route.ts`：付費牆 + 額度檢查後才呼叫 AI。
+- **真命盤 A/B**：GPT vs Claude 同盤各跑一份，使用者選贏家（可分用途）。
+- 需要 `OPENAI_API_KEY`（預設）及/或 `ANTHROPIC_API_KEY`（環境變數）。
 
 **Phase 3 — 多系統**
 - `lib/bazi.ts`(lunar-javascript) + `app/bazi/page.tsx`。
