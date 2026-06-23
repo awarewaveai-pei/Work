@@ -47,6 +47,19 @@
 
 [rollback] `scripts/0049_secret_vault_wrappers_down.sql`（drop 3 functions，不動 vault.secrets）；其餘檔案 git 還原；測試密鑰已即時刪除。
 
+### feat(cold-outreach): T11 Follow-ups + T12 Suppression（Phase-1 ungated 收尾）
+
+[已修改] T12 `app/api/outreach/suppression`（GET/POST/DELETE；reason/scope/applies_to 白名單=schema CHECK 唯一強制）+ SuppressionClient（un-suppress 二次確認）+ settings 連結；T11 `app/api/outreach/followups`（set/snooze/complete/stop，**Asia/Taipei 業務日期**錨定）+ FollowupsClient（逾期/今天/即將分桶 + 排程）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash+SSH | cmd=tsc + co_suppression_list round-trip | exit=0 | tsc 全 app 0；co_suppression_list insert（reason=complaint/scope=email/applies_to=all）→delete exit 0；followups 走 co_leads update（已驗）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/3n -- 沿用已審 leads pattern；3 Minor 已修（UUID 守門防 PG 22P02 leak + Asia/Taipei timezone 防 off-by-one + evidence type-guard）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=co_suppression_list/next_followup_date/canManageOutreach | hits=0 -- 沿用既有表/欄，無衝突
+
+[剩餘風險] leads/route.ts 同樣 uuid-into-column pattern（critic 指出，pre-existing，ops-only route）留 follow-up；T10 Gmail OAuth 仍 gated。
+
+[rollback] git 還原檔案；無 schema 變更（用既有 co_suppression_list / co_leads）。
+
 ## 2026-06-23
 
 ### feat(publish): #2 精修每色模特×1＋平拍 + 新增 Printful 尺寸表（操作者追加）
