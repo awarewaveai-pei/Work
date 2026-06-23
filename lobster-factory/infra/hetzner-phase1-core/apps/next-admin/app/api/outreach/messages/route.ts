@@ -109,20 +109,25 @@ export async function POST(req: Request): Promise<Response> {
   const forbidden = Array.isArray(sp?.forbidden_words) ? sp!.forbidden_words!.filter(Boolean) : [];
   const prompt = buildPrompt(lead, sp, forbidden);
 
-  // Resolve the org's enabled Gemini connector key from the vault (Free-Plan Router ai_generation step).
+  // Resolve a Gemini key via the Free-Plan Router ladder: (1) this client's BYO connector, then
+  // (2) the agency default connector (organization_id IS NULL). credentials_ref → Supabase Vault.
   let apiKey: string | null = null;
   let vaultError: string | null = null; // capture so a vault/RLS regression is OBSERVABLE, not silent
   {
-    let cq = supabase
-      .from("co_connector_accounts")
-      .select("credentials_ref, is_enabled, organization_id")
-      .eq("connector_name", "gemini")
-      .eq("is_enabled", true)
-      .not("credentials_ref", "is", null)
-      .limit(1);
-    if (lead.organization_id) cq = cq.eq("organization_id", lead.organization_id);
-    const { data: conn } = await cq.maybeSingle();
-    const ref = (conn as { credentials_ref?: string | null } | null)?.credentials_ref ?? null;
+    const pickRef = async (orgFilter: "client" | "agency"): Promise<string | null> => {
+      let q = supabase
+        .from("co_connector_accounts")
+        .select("credentials_ref")
+        .eq("connector_name", "gemini")
+        .eq("is_enabled", true)
+        .not("credentials_ref", "is", null)
+        .limit(1);
+      q = orgFilter === "client" && lead.organization_id ? q.eq("organization_id", lead.organization_id) : q.is("organization_id", null);
+      const { data } = await q.maybeSingle();
+      return (data as { credentials_ref?: string | null } | null)?.credentials_ref ?? null;
+    };
+    // Step 1: client-specific (only when the lead belongs to a client). Step 2: agency default (null org).
+    const ref = (lead.organization_id ? await pickRef("client") : null) ?? (await pickRef("agency"));
     if (ref) {
       try {
         apiKey = await getSecret(ref);

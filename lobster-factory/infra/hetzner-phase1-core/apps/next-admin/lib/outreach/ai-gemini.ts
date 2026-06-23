@@ -7,10 +7,15 @@ export interface GeminiResult {
   model: string;
 }
 
+// Default model is resilient to deprecation: gemini-2.0-flash was retired by some projects, which
+// silently broke generation. gemini-flash-latest auto-tracks the current flash GA model; override
+// per-deploy with GEMINI_MODEL if a pinned version is ever needed.
+export const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-flash-latest";
+
 export async function generateWithGemini(
   apiKey: string,
   prompt: string,
-  model = "gemini-2.0-flash",
+  model = DEFAULT_GEMINI_MODEL,
 ): Promise<GeminiResult> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const resp = await fetch(url, {
