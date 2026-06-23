@@ -520,6 +520,7 @@ export default function PublishWizard() {
     setPfcreate({ state: "running" });
     const json = await post({
       action: "pfcreate",
+      clientId,
       catalogProductId,
       wooProductId: create.productId,
       title,
@@ -540,7 +541,7 @@ export default function PublishWizard() {
       alreadyExisted: Boolean(json.alreadyExisted),
       faithful: upscale.faithful,
     });
-  }, [create.productId, create.variantMap, upscale.printFileUrl, upscale.faithful, title, retailPrice, plusPrice, mockupUrls, pfcreate.state, catalogProductId, post]);
+  }, [clientId, create.productId, create.variantMap, upscale.printFileUrl, upscale.faithful, title, retailPrice, plusPrice, mockupUrls, pfcreate.state, catalogProductId, post]);
 
   // 🚀 ONE-CLICK: print file → product image → flat-lay → AI copy → Woo product → Printful native, in
   // sequence, aborting on the first hard failure. Each step's payload MIRRORS its run* function above;
