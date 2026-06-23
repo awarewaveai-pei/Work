@@ -125,7 +125,7 @@ export default function PublishWizard() {
   // one-click runAll builds its own local map, but manual ② create had none → variants showed no colour
   // image (A2). Populated by runColorMockups, consumed by runCreate. Reset when design/model changes.
   const [colorMockups, setColorMockups] = useState<Record<string, string>>({});
-  const [colorGen, setColorGen] = useState<{ state: StepState; stage?: string; count?: number; error?: string }>({ state: "idle" });
+  const [colorGen, setColorGen] = useState<{ state: StepState; stage?: string; count?: number; swatches?: number; error?: string }>({ state: "idle" });
   // Latest derived-image URLs, readable inside the design-change effect without making them deps.
   const lastProductUrlRef = useRef<string | null>(null);
   useEffect(() => { lastProductUrlRef.current = productImg.url ?? null; }, [productImg.url]);
@@ -621,7 +621,7 @@ export default function PublishWizard() {
   // results are threaded through LOCAL vars (not state) so a later step never reads a stale closure.
   // Each step also updates its own state so the existing pills + success lines render as it progresses.
   const runAll = useCallback(async () => {
-    if (!designUrl || title.trim().length < 3 || runAllLatch.current) return;
+    if (!designUrl || title.trim().length < 3 || runAllLatch.current || colorGenLatch.current) return;
     runAllLatch.current = true;
     try {
     // 1) print file (faithful upscale)
@@ -1128,7 +1128,7 @@ export default function PublishWizard() {
         <button
           className="btn-primary"
           style={{ fontSize: 15, padding: "10px 18px" }}
-          disabled={!designUrl || title.trim().length < 3 || busy}
+          disabled={!designUrl || title.trim().length < 3 || busy || colorGen.state === "running"}
           onClick={() => void runAll()}
           title="一次跑完：產生印刷檔 → 商品圖 → 合成平拍圖 → AI 文案 → 建 Woo 草稿（含全部圖）→ 上 Printful native（建品＋綁變體＋印刷檔）"
         >
@@ -1261,7 +1261,7 @@ export default function PublishWizard() {
             ⊕ 生成每色商品圖（模特＋平拍）
           </button>
           {colorGen.state === "running" ? <span style={{ fontSize: 12, color: "var(--accent)" }}>⏳ {colorGen.stage}…</span> : null}
-          {colorGen.state === "done" ? <span style={{ fontSize: 12, color: "var(--green)" }}>已生成 {colorGen.count} 張並設為各色變體圖 ✓</span> : null}
+          {colorGen.state === "done" ? <span style={{ fontSize: 12, color: "var(--green)" }}>已生成 {colorGen.count} 張商品圖，其中 {colorGen.swatches} 張設為各色變體圖 ✓</span> : null}
           {colorGen.error ? <span style={{ color: "var(--red)", fontSize: 12 }}>{colorGen.error}</span> : null}
         </div>
 

@@ -4,6 +4,25 @@
 
 ## 2026-06-24
 
+### feat(publish): 非金流尾巴 — 裝飾平拍底圖(C8) + 手動建草稿補每色圖(A2) + 圖庫真下載(A3)
+
+[任務理解] 操作者批准做完 POD 剩餘**非金流**項（金流 B4/B5 + 成本驗 A1 緩做；C6 等台廠規格、C7 無背面產品、D9 等客戶憑證 不動）。
+
+[現況分析] C8：route flatlay 已支援 bgUrl、前端只有純色。A2：runAll 自動每色圖、手動 ② create 無 colorMockups → 變體無色圖。A3：DesignsGallery downloadOne 用 client fetch→blob 依賴 R2 CORS。VBC 修正：C6 的 CMYK baker（print-destinations.ts 70×120mm）是塔羅卡牌、非 apparel；apparel DTG 用 RGB/PNG 本就正確。
+
+[已修改]（2 檔，純 UI/前端）
+- PublishWizard.tsx：C8 flatlayBgUrl state + 底圖選單（My Designs 去重）+ runFlatlay 傳 bgUrl；A2 colorMockups/colorGen state + runColorMockups（重用共享 genColorMockup，獨立迴圈不動 runAll 主線）+ runCreate 帶 colorMockups + UI 按鈕 + design/model 變更 reset。
+- DesignsGallery.tsx：A3 downloadOne 改 fetch 同源 download proxy（消 CORS 失敗，保留 blob UX + fallback）。
+
+[驗證結果 — R0 四動作]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test + npx tsc --noEmit | exit=0 -- 487/487 pass、tsc clean（含修 busy-before-declaration）；UI 行為 e2e 走部署後 playwright smoke + 可選 browser-test
+- REVIEW_DONE: critic=Deep | verdict=pass-after-fix | findings=0c/1M/2n+1s -- Major（A2↔runAll 並行寫 lastAutoGalleryRef 破壞反累積）已修：加 colorGenLatch 雙 latch 互斥 + 🚀/A2 按鈕跨 disable；Minor within-tick latch + label 模糊(N張商品圖/其中M設變體圖)已修；SSRF allowlist/bgUrl 後端再驗/colorMockups 與 pfcreate 分離/A3 fallback 皆 Verified Clean
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=colorMockups\|flatlayBgUrl\|runColorMockups\|colorGenLatch | hits=0 -- 無外部消費者；runAll 主線僅加 latch 守衛未改結構；route flatlay/create 後端已存在 colorMockups/bgUrl 接口
+
+[剩餘風險] flatlayBgUrl 不隨 design reset（裝飾底圖刻意設計無關）；若底圖被刪 → 靜默退純色（critic 標可接受）。A2/A3 UI 行為建議部署後手動點一次確認。
+
+[rollback] 2 檔 git revert；C8/A2 不選/不按 = 原行為；A3 proxy 失敗自動 fallback 開分頁。
+
 ### fix(video): EU video-service R2 + auth 修復；UX AI 模式自動全選場景
 
 [任務理解] 影片工具 8 個 bug 收尾：VideoStudio / ContentStudio AI 模式 UX 修正 + EU video-service R2 未設定 + RENDER_AUTH_TOKEN 不一致。
