@@ -160,6 +160,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       printFileUrl: r.printFileUrl,
+      printFilePdfUrl: r.printFilePdfUrl,
       mode: r.mode,
       faithful: true,
       byteSize: r.byteSize,

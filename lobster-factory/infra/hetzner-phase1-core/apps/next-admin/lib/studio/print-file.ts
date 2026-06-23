@@ -120,45 +120,73 @@ export async function buildFaithfulPrintFile(
     const inputLongEdgePx = Math.max(meta.width ?? 0, meta.height ?? 0);
     if (inputLongEdgePx <= 0) return { ok: false, error: "image_dimensions_unknown" };
 
+    // Track BOTH dimensions (not just the long edge) so the PDF page can be sized to the artwork's
+    // true physical size at 300 DPI. The PNG carries a 300-DPI pHYs tag (withMetadata) — pixels are
+    // unchanged (faithful), only the density metadata is set.
     let outBuffer: Buffer;
-    let longEdgePx: number;
+    let outW: number;
+    let outH: number;
     if (opts.mode === "resample") {
       const target = opts.targetLongEdge ?? PRINT_TARGET_LONG_EDGE;
       // Never DOWNscale a print file here — that would throw away the artist's pixels.
       // If the native design already meets the target, fall through to faithful passthrough.
       if (inputLongEdgePx >= target) {
-        outBuffer = await sharp(inputBuffer, { limitInputPixels: SHARP_LIMIT_INPUT_PIXELS }).png().toBuffer();
-        longEdgePx = inputLongEdgePx;
-      } else {
-        const scale = target / inputLongEdgePx;
-        const w = Math.round((meta.width ?? inputLongEdgePx) * scale);
-        const h = Math.round((meta.height ?? inputLongEdgePx) * scale);
-        // lanczos3 = deterministic interpolation, NO synthesised detail (unlike Real-ESRGAN).
+        outW = meta.width ?? inputLongEdgePx;
+        outH = meta.height ?? inputLongEdgePx;
         outBuffer = await sharp(inputBuffer, { limitInputPixels: SHARP_LIMIT_INPUT_PIXELS })
-          .resize(w, h, { kernel: "lanczos3" })
+          .withMetadata({ density: PRINT_DENSITY_DPI })
           .png()
           .toBuffer();
-        longEdgePx = Math.max(w, h);
+      } else {
+        const scale = target / inputLongEdgePx;
+        outW = Math.round((meta.width ?? inputLongEdgePx) * scale);
+        outH = Math.round((meta.height ?? inputLongEdgePx) * scale);
+        // lanczos3 = deterministic interpolation, NO synthesised detail (unlike Real-ESRGAN).
+        outBuffer = await sharp(inputBuffer, { limitInputPixels: SHARP_LIMIT_INPUT_PIXELS })
+          .resize(outW, outH, { kernel: "lanczos3" })
+          .withMetadata({ density: PRINT_DENSITY_DPI })
+          .png()
+          .toBuffer();
       }
     } else {
       // "original" — lossless PNG re-encode; pixels unchanged from the artwork.
-      outBuffer = await sharp(inputBuffer, { limitInputPixels: SHARP_LIMIT_INPUT_PIXELS }).png().toBuffer();
-      longEdgePx = inputLongEdgePx;
+      outW = meta.width ?? inputLongEdgePx;
+      outH = meta.height ?? inputLongEdgePx;
+      outBuffer = await sharp(inputBuffer, { limitInputPixels: SHARP_LIMIT_INPUT_PIXELS })
+        .withMetadata({ density: PRINT_DENSITY_DPI })
+        .png()
+        .toBuffer();
     }
+    const longEdgePx = Math.max(outW, outH);
 
     if (outBuffer.byteLength > MAX_OUTPUT_BYTES) return { ok: false, error: "output_too_large" };
 
+    // Build the PDF twin (PNG embedded at 300 DPI). A PDF failure must not lose the PNG, but the
+    // operator asked for BOTH — so fail loud rather than silently shipping a PNG-only result.
+    let pdfBuffer: Buffer;
+    try {
+      pdfBuffer = await buildPrintPdf(outBuffer, outW, outH, PRINT_DENSITY_DPI);
+    } catch {
+      return { ok: false, error: "pdf_build_failed" };
+    }
+    if (pdfBuffer.byteLength > MAX_OUTPUT_BYTES) return { ok: false, error: "pdf_output_too_large" };
+
+    // Pair the PNG + PDF under ONE uuid so the two downloads are obviously the same print file.
     const now = new Date();
-    const key = `print/${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}/${randomUUID()}.png`;
-    const put = await putDesignObject(key, outBuffer, "image/png");
-    if (!put.ok) return { ok: false, error: (put as { ok: false; error: string }).error };
+    const dir = `print/${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+    const id = randomUUID();
+    const putPng = await putDesignObject(`${dir}/${id}.png`, outBuffer, "image/png");
+    if (!putPng.ok) return { ok: false, error: (putPng as { ok: false; error: string }).error };
+    const putPdf = await putDesignObject(`${dir}/${id}.pdf`, pdfBuffer, "application/pdf");
+    if (!putPdf.ok) return { ok: false, error: (putPdf as { ok: false; error: string }).error };
 
     const dpi = dpiAtFullPrint(longEdgePx);
     return {
       ok: true,
-      printFileUrl: put.publicUrl,
+      printFileUrl: putPng.publicUrl,
+      printFilePdfUrl: putPdf.publicUrl,
       mode: opts.mode,
-      byteSize: put.byteSize,
+      byteSize: putPng.byteSize,
       longEdgePx,
       inputLongEdgePx,
       dpiAtFullPrint: dpi,

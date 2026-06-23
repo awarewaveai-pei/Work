@@ -91,6 +91,7 @@ export default function PublishWizard() {
   const [upscale, setUpscale] = useState<{
     state: StepState;
     printFileUrl?: string;
+    printFilePdfUrl?: string;
     achievedPx?: number | null;
     dpi?: number;
     faithful?: boolean;
@@ -264,6 +265,7 @@ export default function PublishWizard() {
     setUpscale({
       state: "done",
       printFileUrl: json.printFileUrl as string,
+      printFilePdfUrl: json.printFilePdfUrl as string | undefined,
       achievedPx: json.achievedLongEdgePx as number | null,
       dpi: json.dpiAtFullPrint as number | undefined,
       faithful: Boolean(json.faithful),
@@ -492,6 +494,7 @@ export default function PublishWizard() {
     setUpscale({
       state: "done",
       printFileUrl,
+      printFilePdfUrl: up.printFilePdfUrl as string | undefined,
       achievedPx: up.achievedLongEdgePx as number | null,
       dpi: up.dpiAtFullPrint as number | undefined,
       faithful,
@@ -930,12 +933,16 @@ export default function PublishWizard() {
           </button>
           {upscale.printFileUrl ? (
             <>
-              <a href={downloadHref(upscale.printFileUrl, `${printFileSlug}-print.png`)} download style={{ fontSize: 12 }}>⬇ 下載印刷檔 PNG</a>
+              <a href={downloadHref(upscale.printFileUrl, `${printFileSlug}-print.png`)} download style={{ fontSize: 12, fontWeight: 600 }}>⬇ 下載 PNG（300DPI）</a>
+              {upscale.printFilePdfUrl ? (
+                <a href={downloadHref(upscale.printFilePdfUrl, `${printFileSlug}-print.pdf`)} download style={{ fontSize: 12, fontWeight: 600 }}>⬇ 下載 PDF（300DPI）</a>
+              ) : null}
               <span style={{ fontSize: 12, color: upscale.meetsTarget ? "var(--green)" : "var(--yellow)" }}>
                 {upscale.achievedPx ? `${upscale.achievedPx}px` : "尺寸未知"}
-                {upscale.dpi ? ` · 滿版約 ${upscale.dpi} DPI` : ""}
+                {upscale.achievedPx ? `（300DPI ≈ ${(upscale.achievedPx / 300).toFixed(1)}in 長邊）` : ""}
+                {upscale.dpi ? ` · 滿版 16in 約 ${upscale.dpi} DPI` : ""}
                 {upscale.faithful ? " · 100% 忠實" : " · AI 增強(非忠實)"}
-                {upscale.meetsTarget ? " ✓ 達標(≥225 DPI)" : " ⚠ 未達 300DPI(滿版可能略軟；小尺寸印刷仍清晰)"}
+                {upscale.meetsTarget ? " ✓ 達標(≥225 DPI)" : " ⚠ 未達滿版 300DPI(可印至上方 300DPI 尺寸；滿版會略軟)"}
               </span>
             </>
           ) : null}
@@ -951,8 +958,16 @@ export default function PublishWizard() {
               {/* Same-origin proxy adds Content-Disposition: attachment → a real one-click download
                   (the cross-origin R2 URL would otherwise just open a tab). */}
               <a href={downloadHref(upscale.printFileUrl, `${printFileSlug}-print.png`)} download style={{ fontWeight: 600 }}>
-                ⬇ 下載台灣印刷檔 PNG
+                ⬇ PNG
               </a>
+              {upscale.printFilePdfUrl ? (
+                <>
+                  {" · "}
+                  <a href={downloadHref(upscale.printFilePdfUrl, `${printFileSlug}-print.pdf`)} download style={{ fontWeight: 600 }}>
+                    ⬇ PDF
+                  </a>
+                </>
+              ) : null}
               {upscale.faithful ? "" : "（注意：目前是 AI 增強檔，非 100% 忠實）"}
             </span>
           </div>
