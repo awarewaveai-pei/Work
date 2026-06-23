@@ -36,7 +36,7 @@ import {
   type ProductCategory,
   type ReferenceKind,
 } from "../../../lib/studio/mockup-prompt";
-import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
+
 
 const MOCKUP_MODELS = STUDIO_MODEL_OPTIONS;
 
@@ -303,6 +303,7 @@ export default function MockupStudio() {
   const [bulkSaving, setBulkSaving] = useState(false);
   const [gen, setGen] = useState<GenState>({ status: "idle" });
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [promptOverride, setPromptOverride] = useState<string | null>(null);
   const inFlight = useRef(false);
   const printfulInFlight = useRef(false);
   const jobIdRef = useRef<string | null>(null);
@@ -413,6 +414,8 @@ export default function MockupStudio() {
       designSizePct, modelFraming, modelCategory, flatCategory, referenceKind,
       modelEmotion, flatCornerDecor, placement]);
 
+  const effectivePrompt = promptOverride ?? prompt;
+
   const onUploadDesign = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     try {
@@ -434,7 +437,7 @@ export default function MockupStudio() {
       const res = await fetch("/api/tools/studio/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model, prompt, referenceImages: [processedRef], aspectRatio: aspect, _jobId: jobIdRef.current }),
+        body: JSON.stringify({ model, prompt: effectivePrompt, referenceImages: [processedRef], aspectRatio: aspect, _jobId: jobIdRef.current }),
       });
       const json = (await res.json()) as { ok: boolean; image?: string; error?: string };
       if (!json.ok || !json.image) { setGen({ status: "error", error: json.error ?? `HTTP ${res.status}` }); return; }
@@ -442,7 +445,7 @@ export default function MockupStudio() {
     } catch (err) {
       setGen({ status: "error", error: err instanceof Error ? err.message : String(err) });
     } finally { inFlight.current = false; }
-  }, [designRef, model, prompt, aspect, designOpacity]);
+  }, [designRef, model, effectivePrompt, aspect, designOpacity]);
 
   const generatePrintful = useCallback(async () => {
     if (!designRef) {
@@ -553,12 +556,12 @@ export default function MockupStudio() {
       const res = await fetch("/api/tools/designs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: gen.image, prompt: `[mockup:${mode}:${color}] ${prompt}`, modelName: model, source: "mockup" }),
+        body: JSON.stringify({ image: gen.image, prompt: `[mockup:${mode}:${color}] ${effectivePrompt}`, modelName: model, source: "mockup" }),
       });
       const json = (await res.json()) as { ok: boolean };
       setSaveState(json.ok ? "saved" : "error");
     } catch { setSaveState("error"); }
-  }, [gen, mode, color, prompt, model]);
+  }, [gen, mode, color, effectivePrompt, model]);
 
   const saveModelPreset = useCallback(async () => {
     if (gen.status !== "done" || !gen.image) return;
@@ -1082,50 +1085,42 @@ export default function MockupStudio() {
       {/* ── Preview (left column, large) ─────────────────────── */}
       <div className="build-panel" style={{ gridColumn: 1, gridRow: 1, padding: 14 }}>
         {mode !== "printful" && (
-          <div style={{ fontSize: 12, opacity: 0.6, whiteSpace: "pre-wrap", marginBottom: 10 }}>{prompt}</div>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <span style={{ fontSize: 12, opacity: 0.6 }}>Prompt</span>
+              {promptOverride !== null && (
+                <button className="btn-secondary" style={{ fontSize: 11, padding: "1px 8px" }} onClick={() => setPromptOverride(null)}>↺ 還原自動</button>
+              )}
+            </div>
+            <textarea
+              value={effectivePrompt}
+              onChange={(e) => setPromptOverride(e.target.value)}
+              rows={10}
+              style={{ width: "100%", fontSize: 12, resize: "vertical", background: "var(--surface)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 6, padding: "8px", fontFamily: "inherit", lineHeight: 1.5 }}
+            />
+          </div>
         )}
 
         {mode !== "printful" && (
           <>
-            {gen.status === "idle" && <p style={{ opacity: 0.6 }}>選設計圖 → 選產品 → 填控制欄 → 合成。</p>}
+            {/* Design image — always shown when selected */}
+            {designThumb && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={designThumb} alt="selected design" style={{ maxWidth: "100%", maxHeight: 600, borderRadius: 8, background: "#111", display: "block", marginBottom: 10 }} />
+            )}
+            {!designThumb && gen.status === "idle" && <p style={{ opacity: 0.6 }}>選設計圖 → 選產品 → 填控制欄 → 合成。</p>}
             {gen.status === "generating" && <p style={{ opacity: 0.7 }}>合成中…</p>}
             {gen.status === "error" && <p style={{ color: "var(--red)" }}>{gen.error}</p>}
             {gen.status === "done" && gen.image && (
-              <>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={gen.image} alt="mockup" style={{ maxWidth: "100%", maxHeight: 600, borderRadius: 8, background: "#111" }} />
-                <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
-                  <button className="btn-primary" disabled={saveState === "saving" || saveState === "saved"} onClick={() => void saveMockup()}>
-                    {saveState === "saved" ? "已存入 My Designs ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}
-                  </button>
-                  <a className="btn-secondary" href={gen.image} download={`mockup-${mode}-${color}.png`}>下載</a>
-                  <button className="btn-secondary" onClick={() => void generate()}>再合成一張</button>
-                  {mode === "model" && <button className="btn-secondary" onClick={() => void saveModelPreset()}>儲存為模特預設</button>}
-                  {saveState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>儲存失敗</span>}
-                </div>
-                <div style={{ marginTop: 14 }}>
-                  <ImageEditPromptPanel
-                    sourceImage={gen.image}
-                    currentPrompt={prompt}
-                    imageModel={model}
-                    target="mockup"
-                    aspectRatio={aspect}
-                    styleAnchor={{
-                      model,
-                      mode: "image",
-                      stylePrompt: prompt,
-                      subject: `${mode} ${color}`,
-                      refs: designRef ? 1 : 0,
-                      target: "mockup",
-                    }}
-                    onEditedImage={(image, meta) => {
-                      setModel(meta.model);
-                      setGen({ status: "done", image });
-                      setSaveState("idle");
-                    }}
-                  />
-                </div>
-              </>
+              <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center", flexWrap: "wrap" }}>
+                <button className="btn-primary" disabled={saveState === "saving" || saveState === "saved"} onClick={() => void saveMockup()}>
+                  {saveState === "saved" ? "已存入 My Designs ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}
+                </button>
+                <a className="btn-secondary" href={gen.image} download={`mockup-${mode}-${color}.png`}>下載合成圖</a>
+                <button className="btn-secondary" onClick={() => void generate()}>再合成一張</button>
+                {mode === "model" && <button className="btn-secondary" onClick={() => void saveModelPreset()}>儲存為模特預設</button>}
+                {saveState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>儲存失敗</span>}
+              </div>
             )}
           </>
         )}
