@@ -143,6 +143,11 @@ export default function PublishWizard() {
   // `busy`-disabled button leaves open (a within-tick double-click would otherwise start two
   // parallel publish chains → duplicate Woo products, since `create` is not idempotent).
   const runAllLatch = useRef(false);
+  // Same synchronous latch for the A2 per-colour step. runColorMockups and runAll BOTH write
+  // lastAutoGalleryRef + mockupUrls, so they must be mutually exclusive — else an interleaving corrupts
+  // the anti-accumulation invariant (critic 2026-06-24). Each guards on BOTH latches; the buttons also
+  // cross-disable reactively (busy ↔ colorGen.state).
+  const colorGenLatch = useRef(false);
   const [create, setCreate] = useState<{
     state: StepState;
     productId?: number;
