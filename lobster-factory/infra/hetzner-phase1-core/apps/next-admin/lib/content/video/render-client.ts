@@ -72,7 +72,15 @@ export async function submitRender(
       headers: svcHeaders(true),
       body: JSON.stringify({
         scenes, out_name: outName,
-        ...(useMulti ? { format_assets: opts!.formatAssets, formats: opts!.formats } : { assets }),
+        ...(useMulti
+          ? {
+              format_assets: opts!.formatAssets,
+              formats: opts!.formats,
+              // 向後相容（部署窗口）：舊 EU 無 format_assets 分支 → 改用 assets（主格式單組）走 base+pad，
+              // 不 hard-fail；新 EU _validate 見 format_assets 優先走原生多格式（忽略 assets）。
+              assets: opts!.formatAssets![opts!.formats![0]] ?? assets,
+            }
+          : { assets }),
         ...(opts?.ttsProvider && { tts_provider: opts.ttsProvider }),
         ...(opts?.ttsVoice && { tts_voice: opts.ttsVoice }),
         ...(opts?.introTitle && { intro_title: opts.introTitle }),

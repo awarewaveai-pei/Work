@@ -52,6 +52,8 @@ export interface VideoCostConfig {
   brollScenes: number;
   /** 生圖模型 id（cost-model IMAGE_RATES 的鍵）；預設 flux-schnell。 */
   imageModel?: string;
+  /** 輸出格式數（每格式各生一組原生圖 → 自訂 AI 圖成本 ×此數）。預設 1。 */
+  formatCount?: number;
 }
 
 export interface VideoCostLine {
@@ -94,7 +96,8 @@ export function computeVideoCost(
       count = 1;
     } else if (step.cost.kind === "image-per-custom-scene") {
       unitUsd = imageCostUsd(imageModel);
-      count = Math.max(0, cfg.customScenes);
+      // 每格式各生一組原生 AI 圖 → 自訂場景數 × 格式數。
+      count = Math.max(0, cfg.customScenes) * Math.max(1, cfg.formatCount ?? 1);
     } else {
       // free：count 取場景數以利顯示（unit=0 → total=0）
       unitUsd = 0;

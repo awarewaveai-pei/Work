@@ -55,18 +55,18 @@ export function SystemModeControl({ currentMode }: Props) {
   return (
     <div
       style={{
-        background: "#fff",
-        border: "1px solid #e2e8f0",
+        background: "var(--card-bg)",
+        border: "1px solid var(--border)",
         borderRadius: 8,
         padding: "20px 24px",
       }}
     >
-      <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 }}>
+      <div style={{ fontSize: 12, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 }}>
         切換模式
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <label style={{ fontSize: 13, color: "#0f172a" }}>
+        <label style={{ fontSize: 13, color: "var(--text-primary)" }}>
           目標模式
           <select
             value={target}
@@ -74,10 +74,10 @@ export function SystemModeControl({ currentMode }: Props) {
             style={{
               marginLeft: 8,
               padding: "6px 10px",
-              border: "1px solid #cbd5e1",
+              border: "1px solid var(--border)",
               borderRadius: 4,
               fontSize: 14,
-              background: "#fff",
+              background: "var(--card-bg)",
             }}
           >
             {MODES.map((m) => (
@@ -89,7 +89,7 @@ export function SystemModeControl({ currentMode }: Props) {
           </select>
         </label>
 
-        <label style={{ fontSize: 13, color: "#0f172a" }}>
+        <label style={{ fontSize: 13, color: "var(--text-primary)" }}>
           切換原因（可選填，最多 500 字）
           <input
             type="text"
@@ -106,7 +106,7 @@ export function SystemModeControl({ currentMode }: Props) {
               display: "block",
               marginTop: 4,
               padding: "6px 10px",
-              border: "1px solid #cbd5e1",
+              border: "1px solid var(--border)",
               borderRadius: 4,
               fontSize: 14,
               width: "100%",
@@ -124,9 +124,9 @@ export function SystemModeControl({ currentMode }: Props) {
             style={{
               minWidth: 160,
               ...(isLock
-                ? { borderColor: "#dc2626", color: "#991b1b", background: "#fef2f2" }
+                ? { borderColor: "var(--red)", color: "var(--badge-red-text)", background: "var(--badge-red-bg)" }
                 : {}),
-              ...(isUnlock ? { background: "#059669", borderColor: "#059669" } : {}),
+              ...(isUnlock ? { background: "var(--green)", borderColor: "var(--green)" } : {}),
             }}
           >
             {busy
@@ -146,9 +146,9 @@ export function SystemModeControl({ currentMode }: Props) {
               padding: "8px 12px",
               borderRadius: 4,
               fontSize: 13,
-              background: result.ok ? "#ecfdf5" : "#fef2f2",
-              color: result.ok ? "#065f46" : "#991b1b",
-              border: `1px solid ${result.ok ? "#a7f3d0" : "#fecaca"}`,
+              background: result.ok ? "var(--badge-green-bg)" : "var(--badge-red-bg)",
+              color: result.ok ? "var(--badge-green-text)" : "var(--badge-red-text)",
+              border: `1px solid ${result.ok ? "var(--green)" : "var(--red)"}`,
             }}
           >
             {result.ok ? "✅" : "❌"} {result.msg}

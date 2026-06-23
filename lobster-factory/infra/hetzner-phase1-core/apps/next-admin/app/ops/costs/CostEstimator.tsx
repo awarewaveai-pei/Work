@@ -82,7 +82,7 @@ export function CostEstimator() {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 360px) 1fr", gap: 24, alignItems: "start" }}>
       {/* ── Controls ── */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 18, background: "#fff", border: "1px solid var(--border-subtle)", borderRadius: 12, padding: 18 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 18, background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 12, padding: 18 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-muted)", letterSpacing: 0.4 }}>① 內容量級 / 月</div>
         <Slider label="文章篇數" value={articles} min={0} max={500} step={5} onChange={setArticles} />
         <Slider label="每篇圖片數" value={imagesPerArticle} min={0} max={10} step={1} onChange={setImagesPerArticle} />
@@ -136,7 +136,7 @@ export function CostEstimator() {
 
       {/* ── Result ── */}
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ background: "linear-gradient(135deg, var(--accent) 0%, #6d28d9 100%)", color: "#fff", borderRadius: 14, padding: "22px 26px" }}>
+        <div style={{ background: "linear-gradient(135deg, var(--accent) 0%, #6d28d9 100%)", color: "var(--btn-primary-text)", borderRadius: 14, padding: "22px 26px" }}>
           <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 4 }}>估算月費總計</div>
           <div style={{ fontSize: 34, fontWeight: 800, lineHeight: 1.1 }}>{NT(est.totalUsd)}</div>
           <div style={{ fontSize: 14, opacity: 0.9, marginTop: 2 }}>{USD(est.totalUsd)} USD / 月</div>
@@ -159,7 +159,7 @@ export function CostEstimator() {
 
 function Stat({ label, usd }: { label: string; usd: number }) {
   return (
-    <div style={{ background: "#fff", border: "1px solid var(--border-subtle)", borderRadius: 10, padding: "12px 14px" }}>
+    <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 10, padding: "12px 14px" }}>
       <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>{NT(usd)}</div>
       <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>{USD(usd)}</div>
@@ -170,7 +170,7 @@ function Stat({ label, usd }: { label: string; usd: number }) {
 function BreakdownTable({ title, lines, unitIsMonthly }: { title: string; lines: { key: string; label: string; unitUsd: number; count: number; totalUsd: number }[]; unitIsMonthly?: boolean }) {
   if (lines.length === 0) return null;
   return (
-    <div style={{ background: "#fff", border: "1px solid var(--border-subtle)", borderRadius: 12, overflow: "hidden" }}>
+    <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 12, overflow: "hidden" }}>
       <div style={{ padding: "10px 16px", fontSize: 13, fontWeight: 700, color: "var(--text-primary)", borderBottom: "1px solid var(--border-subtle)" }}>{title}</div>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
         <thead>

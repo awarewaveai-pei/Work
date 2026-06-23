@@ -27,6 +27,13 @@ const VIDEO_STYLE_GROUPS = Array.from(new Set(VIDEO_STYLE_CATALOG.map((s) => s.g
 function resolveVideoStyle(label: string): string {
   return VIDEO_PRESET_BY_LABEL.get(label) ?? resolveStylePrompt(label);
 }
+// 輸出比例（mirror VideoStudio）。每比例各自原生生成，非裁同一張。
+const VIDEO_FORMAT_CHOICES = ["16x9", "9x16", "4x5"] as const;
+const VIDEO_FORMAT_LABELS: Record<string, { ratio: string; icon: string }> = {
+  "16x9": { ratio: "16:9", icon: "▶" },
+  "9x16": { ratio: "9:16", icon: "📱" },
+  "4x5": { ratio: "4:5", icon: "📷" },
+};
 const VOICE_MODELS_VIDEO = [
   { id: "edge:zh-TW-HsiaoChenNeural", label: "Edge TTS 繁中女聲", lang: "繁中", badge: "$0 免費" },
   { id: "edge:zh-TW-YunJheNeural",    label: "Edge TTS 繁中男聲", lang: "繁中", badge: "$0 免費" },
@@ -612,6 +619,8 @@ export default function ContentStudio() {
   const [videoStyleZh,      setVideoStyleZh]      = useState("");
   const [videoStyleGroup,   setVideoStyleGroup]   = useState(VIDEO_STYLE_GROUPS[0] ?? "");
   const [videoConfigOpen,   setVideoConfigOpen]   = useState(false);
+  // 輸出比例（勾選；預設全選；至少留一個）。
+  const [videoFormats,      setVideoFormats]      = useState<Set<string>>(new Set(VIDEO_FORMAT_CHOICES));
 
   // Auto-trigger video generation when article is published.
   // Dep array intentionally omits videoStatus: we want this to fire only on pubStatus/postId change,
@@ -1684,6 +1693,7 @@ export default function ContentStudio() {
           customScenes: Math.min(videoCustomScenes, videoTotalScenes),
           brollScenes: Math.max(0, videoTotalScenes - videoCustomScenes),
           imageModel: videoImageModel,
+          outputFormats: VIDEO_FORMAT_CHOICES.filter((f) => videoFormats.has(f)),
           ...parseVoiceModel(videoVoiceId),
         }),
       });
@@ -3012,6 +3022,51 @@ export default function ContentStudio() {
                         ))}
                       </select>
                     </div>
+                    {/* 輸出比例（每比例各自原生生成、無黑邊） */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)" }}>輸出比例（各比例獨立原生）</span>
+                      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                        {VIDEO_FORMAT_CHOICES.map((fmt) => {
+                          const active = videoFormats.has(fmt);
+                          const meta = VIDEO_FORMAT_LABELS[fmt];
+                          return (
+                            <button key={fmt} type="button"
+                              onClick={() => setVideoFormats((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(fmt)) { if (next.size > 1) next.delete(fmt); } // 至少留一個
+                                else next.add(fmt);
+                                return next;
+                              })}
+                              style={{
+                                padding: "5px 11px", borderRadius: 8,
+                                border: `2px solid ${active ? "var(--severity-low)" : "var(--ai-bg)"}`,
+                                background: active ? "var(--severity-low)" : "rgba(255,255,255,0.6)",
+                                color: active ? "var(--btn-primary-text)" : "var(--text-muted)",
+                                cursor: "pointer", fontSize: "12px", fontWeight: active ? 700 : 500,
+                                display: "flex", alignItems: "center", gap: "4px",
+                              }}>
+                              <span>{meta.icon}</span><span>{meta.ratio}</span>
+                            </button>
+                          );
+                        })}
+                        <button type="button"
+                          onClick={() => setVideoFormats(new Set(VIDEO_FORMAT_CHOICES))}
+                          style={{
+                            padding: "5px 11px", borderRadius: 8,
+                            border: `2px solid ${videoFormats.size === VIDEO_FORMAT_CHOICES.length ? "var(--severity-low)" : "var(--ai-bg)"}`,
+                            background: videoFormats.size === VIDEO_FORMAT_CHOICES.length ? "var(--severity-low)" : "rgba(255,255,255,0.6)",
+                            color: videoFormats.size === VIDEO_FORMAT_CHOICES.length ? "var(--btn-primary-text)" : "var(--text-muted)",
+                            cursor: "pointer", fontSize: "12px", fontWeight: 600,
+                          }}>
+                          全選
+                        </button>
+                      </div>
+                      {videoFormats.size > 1 && (
+                        <span style={{ fontSize: "11px", color: "#92400e", background: "#fef3c7", padding: "4px 8px", borderRadius: 6, lineHeight: 1.5 }}>
+                          ⚠️ {videoFormats.size} 個比例 = 自訂 AI 圖成本/時間約 ×{videoFormats.size}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -3733,15 +3788,15 @@ export default function ContentStudio() {
                 <button
                   onClick={() => setShowPreview(false)}
                   style={{ fontSize: "12px", padding: "3px 10px", borderRadius: 4, border: "1px solid var(--card-border)",
-                    background: !showPreview ? "var(--btn-primary-bg, #6366f1)" : "transparent",
-                    color: !showPreview ? "#fff" : "var(--text-muted)", cursor: "pointer" }}>
+                    background: !showPreview ? "var(--btn-primary-bg)" : "transparent",
+                    color: !showPreview ? "var(--btn-primary-text)" : "var(--text-muted)", cursor: "pointer" }}>
                   ✏️ 編輯 MD
                 </button>
                 <button
                   onClick={() => setShowPreview(true)}
                   style={{ fontSize: "12px", padding: "3px 10px", borderRadius: 4, border: "1px solid var(--card-border)",
-                    background: showPreview ? "var(--btn-primary-bg, #6366f1)" : "transparent",
-                    color: showPreview ? "#fff" : "var(--text-muted)", cursor: "pointer" }}>
+                    background: showPreview ? "var(--btn-primary-bg)" : "transparent",
+                    color: showPreview ? "var(--btn-primary-text)" : "var(--text-muted)", cursor: "pointer" }}>
                   👁 預覽排版
                 </button>
               </div>
@@ -3749,7 +3804,7 @@ export default function ContentStudio() {
               {showPreview ? (
                 <div
                   style={{ width: "100%", minHeight: "480px", padding: "20px 24px", border: "1px solid var(--card-border)",
-                    borderRadius: "6px", background: "#fff", color: "#111", boxSizing: "border-box",
+                    borderRadius: "6px", background: "var(--card-bg)", color: "var(--text-primary)", boxSizing: "border-box",
                     fontFamily: "'Noto Sans TC',sans-serif", fontSize: "15px", lineHeight: 1.8, overflowY: "auto" }}
                   dangerouslySetInnerHTML={{ __html: markdownPreview(generated) }}
                 />
@@ -3757,7 +3812,7 @@ export default function ContentStudio() {
                 <textarea
                   style={{ width: "100%", minHeight: "480px", fontFamily: "monospace", fontSize: "13px", lineHeight: 1.6,
                     padding: "12px", border: "1px solid var(--card-border)", borderRadius: "6px",
-                    background: "var(--bg-page, #f8f9fc)", color: "var(--text-primary)", resize: "vertical", boxSizing: "border-box" }}
+                    background: "var(--bg-page)", color: "var(--text-primary)", resize: "vertical", boxSizing: "border-box" }}
                   value={generated} onChange={e => setGenerated(e.target.value)} spellCheck={false}
                   placeholder="文章將在此串流顯示…" />
               )}
@@ -3772,14 +3827,14 @@ export default function ContentStudio() {
                   <div>
                     <label className="form-label">
                       Meta 描述{" "}
-                      <span style={{ fontWeight: 400, color: metaData.metaDesc.length > 160 ? "var(--red, #dc2626)" : "var(--text-muted)" }}>
+                      <span style={{ fontWeight: 400, color: metaData.metaDesc.length > 160 ? "var(--red)" : "var(--text-muted)" }}>
                         （{metaData.metaDesc.length} / 160 字元{metaData.metaDesc.length > 160 ? " ⚠ 超過上限" : ""}）
                       </span>
                     </label>
                     <input className="form-input" value={metaData.metaDesc}
                       onChange={e => setMetaData(prev => prev ? { ...prev, metaDesc: e.target.value } : prev)} />
                     {metaData.metaDesc.length > 160 && (
-                      <div className="form-hint" style={{ color: "var(--red, #dc2626)", marginTop: 2 }}>
+                      <div className="form-hint" style={{ color: "var(--red)", marginTop: 2 }}>
                         RankMath 上限 160 字元；超出部分在搜尋結果會被截斷。請縮短後再發布。
                       </div>
                     )}
@@ -3822,7 +3877,7 @@ export default function ContentStudio() {
                 )}
                 {pubStatus === "publishing" && <button className="btn-primary" disabled style={{ fontSize: "13px" }}>推送中…</button>}
                 {pubStatus === "done" && pubResult?.edit_url && (
-                  <span style={{ fontSize: "13px", color: "#22c55e" }}>
+                  <span style={{ fontSize: "13px", color: "var(--green)" }}>
                     ✓ {pubMode === "publish" ? "已發佈" : pubMode === "future" ? "已排程" : "草稿已建立"} —{" "}
                     <a href={pubResult.edit_url} target="_blank" rel="noreferrer" style={{ color: "var(--btn-primary-bg)" }}>WP 後台編輯 ↗</a>
                     {pubResult.view_url && pubMode === "publish" && (
@@ -3830,20 +3885,20 @@ export default function ContentStudio() {
                     )}
                   </span>
                 )}
-                {pubStatus === "error" && <span style={{ fontSize: "12px", color: "var(--color-error, #ef4444)" }}>推送失敗：{pubError}</span>}
+                {pubStatus === "error" && <span style={{ fontSize: "12px", color: "var(--color-error)" }}>推送失敗：{pubError}</span>}
               </div>
 
               {/* ── 影片（自動觸發 — 文章推送後自動生成並嵌入）── */}
               {pubStatus === "done" && publishedPostId && (
                 <div style={{ marginTop: "10px", padding: "10px 14px", borderRadius: "6px",
-                  background: "#f0f9ff", border: "1px solid #bae6fd", fontSize: "13px" }}>
+                  background: "var(--ai-bg)", border: "1px solid var(--ai-bg)", fontSize: "13px" }}>
                   🎬 影片生成中（自動）：文章已推送，影片完成後自動嵌入文章
-                  {videoStatus === "generating" && <span style={{ marginLeft: 10, color: "#0284c7" }}>⏳ 影片生成中（預計 5-15 分鐘）…</span>}
-                  {videoStatus === "embedding"  && <span style={{ marginLeft: 10, color: "#0284c7" }}>⏳ 嵌入影片到 WP…</span>}
-                  {videoStatus === "done"       && <span style={{ marginLeft: 10, color: "#22c55e" }}>✓ 影片已嵌入文章</span>}
+                  {videoStatus === "generating" && <span style={{ marginLeft: 10, color: "var(--severity-low)" }}>⏳ 影片生成中（預計 5-15 分鐘）…</span>}
+                  {videoStatus === "embedding"  && <span style={{ marginLeft: 10, color: "var(--severity-low)" }}>⏳ 嵌入影片到 WP…</span>}
+                  {videoStatus === "done"       && <span style={{ marginLeft: 10, color: "var(--green)" }}>✓ 影片已嵌入文章</span>}
                   {videoStatus === "error"      && (
                     <>
-                      <span style={{ marginLeft: 10, color: "var(--color-error, #ef4444)" }}>影片失敗：{videoError}（文章不受影響）</span>
+                      <span style={{ marginLeft: 10, color: "var(--color-error)" }}>影片失敗：{videoError}（文章不受影響）</span>
                       <button className="btn-secondary" style={{ fontSize: "11px", marginLeft: "8px" }}
                         onClick={() => { setVideoError(""); void handleGenerateVideo(publishedPostId); }}>重試</button>
                     </>
@@ -3868,8 +3923,8 @@ export default function ContentStudio() {
               {autoImgN > 0 && (
                 <div style={{
                   marginTop: "10px", padding: "8px 12px", borderRadius: "6px",
-                  background: "#f0f9ff", border: "1px solid #bae6fd",
-                  fontSize: "12px", color: "#0284c7",
+                  background: "var(--ai-bg)", border: "1px solid var(--ai-bg)",
+                  fontSize: "12px", color: "var(--severity-low)",
                 }}>
                   🎨 正在生成 {autoImgN} 張圖片…
                 </div>

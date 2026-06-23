@@ -19,6 +19,8 @@ interface RegenBody {
   brollKeyword?: string;
   visual?: "custom" | "broll";
   oldImageUrl?: string;
+  /** draft 主格式（"16x9"|"9x16"|"4x5"）→ 重生圖的比例/取向與預覽一致。省略 = 16:9。 */
+  format?: string;
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -34,7 +36,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "imagePrompt 為必填" }, { status: 400 });
   }
 
-  const { buildSceneAsset } = await import("@/lib/content/blocks/video-pipeline");
+  const { buildSceneAsset, FORMAT_SPEC } = await import("@/lib/content/blocks/video-pipeline");
+  // 依 draft 主格式決定重生圖的比例/取向（與預覽一致）；未知/省略 → 16:9。
+  const spec = (body.format && FORMAT_SPEC[body.format]) || FORMAT_SPEC["16x9"];
   const result = await buildSceneAsset(
     {
       id: 0,
@@ -42,7 +46,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       broll_keyword: typeof body.brollKeyword === "string" ? body.brollKeyword : "",
       visual: body.visual === "broll" ? "broll" : "custom",
     },
-    { imageModel: body.imageModel, visualStyle: body.visualStyle },
+    {
+      imageModel: body.imageModel,
+      visualStyle: body.visualStyle,
+      aspectRatio: spec.aspectRatio,
+      orientation: spec.orientation,
+      framing: spec.framing,
+    },
   );
 
   if (!result.ok) {

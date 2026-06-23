@@ -150,6 +150,8 @@ def _validate(payload: dict):
         if not isinstance(format_assets, dict) or not format_assets:
             raise ValueError("format_assets 必須是非空 dict")
         for fmt, files in format_assets.items():
+            if fmt not in config.FORMATS:  # fail-fast on HTTP boundary（免白跑 TTS 才在 pipeline 才擋）
+                raise ValueError(f"未知格式 {fmt}（合法：{list(config.FORMATS)}）")
             if not isinstance(files, list) or len(files) != len(scenes):
                 raise ValueError(f"format_assets[{fmt}] 必須是與 scenes 等長的 list")
         return scenes, format_assets, out_name, True

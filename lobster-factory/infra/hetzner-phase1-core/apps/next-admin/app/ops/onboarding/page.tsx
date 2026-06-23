@@ -217,7 +217,7 @@ export default function OnboardingPage() {
 
           <details style={{ marginTop: "0.75rem" }}>
             <summary style={{ cursor: "pointer", fontWeight: 600, padding: "0.5rem 0", fontSize: "0.9rem", color: "var(--text-muted)" }}>完整 JSON 規格</summary>
-            <pre style={{ background: "#1a1a2e", color: "#e8e8e8", padding: "1rem", borderRadius: 8, overflow: "auto", fontSize: "0.75rem", marginTop: "0.5rem" }}>
+            <pre style={{ background: "var(--code-bg)", color: "var(--pre-text)", padding: "1rem", borderRadius: 8, overflow: "auto", fontSize: "0.75rem", marginTop: "0.5rem" }}>
               {JSON.stringify(spec, null, 2)}
             </pre>
           </details>

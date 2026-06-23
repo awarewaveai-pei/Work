@@ -34,6 +34,9 @@ register({
         targetMinutes: ctx.targetMinutes as number | undefined,
         sceneCount: ctx.sceneCount as number | undefined,
         customScenes: ctx.customScenes as number | undefined,
+        // 勾選的輸出格式（draft route 傳 `formats`；generate 路徑用 `outputFormats`）→ 兩者皆收，
+        // 否則 normalizeVideoFormats(undefined) 會無視勾選永遠生全三格式（critic 2026-06-23 Critical）。
+        formats: (ctx.formats as string[] | undefined) ?? (ctx.outputFormats as string[] | undefined),
         providedScenes,
         onProgress: (ctx as { onProgress?: (s: string) => void }).onProgress,
       },

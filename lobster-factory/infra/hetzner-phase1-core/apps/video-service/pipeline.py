@@ -721,8 +721,9 @@ def render_video_multiformat(scenes: list, format_assets: dict, out_name: str,
     outputs = {}
     for fmt in formats:
         w, h = config.FORMATS[fmt]
-        # 序列執行：compose 的 per-scene temp（scene_NNN.mp4 等）為固定名，序列下後格式覆蓋前格式
-        # temp 無害（前格式 base 已產出並搬出）；out_name 帶 fmt 後綴使各格式 base 檔名互不衝突。
+        # ⚠️ 必須序列執行，禁止並行此迴圈：compose 的 per-scene temp（scene_NNN.mp4 / concat.txt /
+        # sub_*.txt / scene_intro.mp4）為固定名，序列下後格式覆蓋前格式 temp 無害（前格式 base 已
+        # 產出並搬出）；out_name 帶 fmt 後綴使各格式 base 檔名互不衝突。並行化會 silently 損毀輸出。
         base_video = compose_base_video(
             scenes, format_assets[fmt], audio_files, f"{safe_name}_{fmt}", w, h, config.FPS,
             intro_title=intro_title, intro_duration=intro_duration,

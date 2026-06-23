@@ -1515,7 +1515,7 @@ export default function DesignsGallery() {
                   className="designs-action-btn"
                   disabled={!editResult || editSaving}
                   onClick={() => void goToProductFromEdit()}
-                  style={{ borderColor: "#6366f1" }}
+                  style={{ borderColor: "var(--accent)" }}
                 >
                   → 去建商品
                 </button>

@@ -127,7 +127,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
   const sub = (await render.run({
     scenes: scenes.map((s) => ({ id: s.id, narration: s.narration })),
-    assets: imageUrls,
+    // 多格式 → 傳 formatAssets+formats（EU 原生多格式）；否則舊單組 assets。
+    ...(useMulti ? { formatAssets: urlGroups, formats: bodyFormats } : { assets: imageUrls }),
     title,
     ttsProvider: body.ttsProvider,
     ttsVoice: body.ttsVoice,

@@ -54,8 +54,8 @@ function StatCard({
 }: { label: string; usd: number; sub: string; accent?: boolean }) {
   return (
     <div style={{
-      background: accent ? "var(--accent)" : "#fff",
-      color: accent ? "#fff" : "var(--text-primary)",
+      background: accent ? "var(--accent)" : "var(--card-bg)",
+      color: accent ? "var(--btn-primary-text)" : "var(--text-primary)",
       border: accent ? "none" : "1px solid var(--border-subtle)",
       borderRadius: 12, padding: "18px 20px",
       display: "flex", flexDirection: "column", gap: 4,
@@ -80,7 +80,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
     <div style={{
-      background: "#fff", border: "1px solid var(--border-subtle)",
+      background: "var(--card-bg)", border: "1px solid var(--border-subtle)",
       borderRadius: 12, overflow: "hidden", ...style,
     }}>
       {children}
@@ -115,7 +115,7 @@ function Table({ head, rows, alignRight }: {
             <th key={h} style={{
               padding: "7px 14px", fontWeight: 600, fontSize: 11,
               color: "var(--text-muted)", textAlign: ar.includes(i) ? "right" : "left",
-              background: "#fafafa", borderBottom: "1px solid var(--border-subtle)",
+              background: "var(--bg-subtle)", borderBottom: "1px solid var(--border-subtle)",
             }}>{h}</th>
           ))}
         </tr>
@@ -153,8 +153,8 @@ function SpendTab({ real }: { real: RealSpend }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       {real.note && (
         <div style={{
-          background: "#fffbeb", border: "1px solid #fde68a",
-          color: "#92400e", padding: "10px 14px", borderRadius: 8, fontSize: 12.5,
+          background: "var(--build-risk-medium-bg)", border: "1px solid var(--yellow)",
+          color: "var(--build-risk-medium-text)", padding: "10px 14px", borderRadius: 8, fontSize: 12.5,
         }}>
           ⚠️ {real.note}
         </div>
@@ -250,7 +250,7 @@ function RatesTab({ monthlyInfraUsd }: { monthlyInfraUsd: number }) {
             rows={INFRA_MONTHLY.map((i) => [
               <span key={i.key}>
                 {i.label}
-                {i.estimate && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: "#92400e", background: "#fef3c7", padding: "1px 5px", borderRadius: 4 }}>估算</span>}
+                {i.estimate && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: "var(--build-risk-medium-text)", background: "var(--build-risk-medium-bg)", padding: "1px 5px", borderRadius: 4 }}>估算</span>}
                 {i.note && <div style={{ fontSize: 10.5, color: "var(--text-muted)", marginTop: 1 }}>{i.note}</div>}
               </span>,
               NT(i.usdPerMonth),
@@ -273,7 +273,7 @@ function QuickPick({ label, value, detail }: { label: string; value: string; det
   return (
     <div style={{
       border: "1px solid var(--border-subtle)", borderRadius: 10,
-      background: "#fff", padding: "12px 14px",
+      background: "var(--card-bg)", padding: "12px 14px",
     }}>
       <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: 5 }}>{label}</div>
       <div style={{ fontSize: 14, fontWeight: 800, color: "var(--text-primary)", marginBottom: 4 }}>{value}</div>
@@ -367,7 +367,7 @@ function LedgerTab({ rows }: { rows: LedgerRow[] }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0, border: "1px solid var(--border-subtle)", borderRadius: 10, overflow: "hidden" }}>
       {/* Header */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 90px 90px 28px", gap: 0, padding: "7px 14px", background: "#fafafa", borderBottom: "1px solid var(--border-subtle)", fontSize: 11, fontWeight: 600, color: "var(--text-muted)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 90px 90px 28px", gap: 0, padding: "7px 14px", background: "var(--bg-subtle)", borderBottom: "1px solid var(--border-subtle)", fontSize: 11, fontWeight: 600, color: "var(--text-muted)" }}>
         <span>工具 / 時間</span>
         <span style={{ textAlign: "right" }}>NT$</span>
         <span style={{ textAlign: "right" }}>USD</span>
@@ -384,10 +384,10 @@ function LedgerTab({ rows }: { rows: LedgerRow[] }) {
             {/* Job row */}
             <div
               onClick={() => toggle(jobId)}
-              style={{ display: "grid", gridTemplateColumns: "1fr 120px 90px 90px 28px", gap: 0, padding: "10px 14px", cursor: "pointer", background: open ? "var(--bg-subtle)" : "#fff", alignItems: "center" }}
+              style={{ display: "grid", gridTemplateColumns: "1fr 120px 90px 90px 28px", gap: 0, padding: "10px 14px", cursor: "pointer", background: open ? "var(--bg-subtle)" : "var(--card-bg)", alignItems: "center" }}
             >
               <div>
-                <span style={{ display: "inline-block", fontSize: 11, fontWeight: 700, padding: "1px 7px", borderRadius: 4, background: "var(--accent)", color: "#fff", marginRight: 8 }}>
+                <span style={{ display: "inline-block", fontSize: 11, fontWeight: 700, padding: "1px 7px", borderRadius: 4, background: "var(--accent)", color: "var(--btn-primary-text)", marginRight: 8 }}>
                   {TOOL_LABEL[tool] ?? tool}
                 </span>
                 <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{date}</span>
@@ -402,7 +402,7 @@ function LedgerTab({ rows }: { rows: LedgerRow[] }) {
             {open && job.rows.map((r) => {
               const rowUsd = Number(r.cost_usd) || 0;
               return (
-              <div key={r.id} style={{ display: "grid", gridTemplateColumns: "1fr 120px 90px 90px 28px", gap: 0, padding: "6px 14px 6px 28px", background: "#fafafa", borderTop: "1px solid var(--border-subtle)", alignItems: "center" }}>
+              <div key={r.id} style={{ display: "grid", gridTemplateColumns: "1fr 120px 90px 90px 28px", gap: 0, padding: "6px 14px 6px 28px", background: "var(--bg-subtle)", borderTop: "1px solid var(--border-subtle)", alignItems: "center" }}>
                 <div>
                   <span style={{ fontSize: 12, color: "var(--text-primary)" }}>{routeLabel(r.route)}</span>
                   <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 8 }}>{r.model} · {r.kind ?? "text"}</span>

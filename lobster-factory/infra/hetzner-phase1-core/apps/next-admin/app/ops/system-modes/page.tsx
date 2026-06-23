@@ -121,10 +121,10 @@ export default async function SystemModesPage() {
         style={{
           marginTop: 32,
           padding: "16px 20px",
-          background: "#f1f5f9",
-          borderLeft: "4px solid #64748b",
+          background: "var(--badge-gray-bg)",
+          borderLeft: "4px solid var(--text-muted)",
           fontSize: 13,
-          color: "#475569",
+          color: "var(--badge-gray-text)",
           lineHeight: 1.7,
         }}
       >

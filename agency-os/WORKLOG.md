@@ -4,6 +4,35 @@
 
 ## 2026-06-23
 
+### feat(video): 三尺寸改各比例原生生成（取代 16:9 pad 黑邊）+ 前端勾選 16:9/4:5/9:16/全選
+
+[任務理解] /tools/video（及 /tools/content）產 3 尺寸實為單一 16:9 base 經 ffmpeg pad letterbox → 直式上下黑邊、非原生構圖。操作者要：每比例「原生生成」+ 前端勾選格式。
+
+[現況分析] 圖寫死 16:9（video-pipeline.ts buildSceneAsset `aspectRatio:"16:9"`）；EU compose 單 1920×1080 base 後 `export_all_formats` pad 三格式（pipeline.py:512）；submitRender 無 format 欄；前端無格式 UI。EU video-service 無自動部署。git log：近期 video commit 皆積木接線/上傳上限，無人動格式/export 邏輯，無重工。
+
+[已修改]（14 檔，雙機）
+- EU pipeline.py：compose_base_video 參數化 w/h/fps；新增 render_video_multiformat（每格式各自 compose cover-fit/zoompan 填滿、無 pad；audio 生一次共用、格式序列）
+- EU server.py：/render 收 format_assets（兼容舊 assets→base+pad）；_validate fail-fast 擋未知格式
+- video-pipeline.ts：FORMAT_SPEC(AR+orientation+framing)+normalizeVideoFormats；buildSceneAsset 按格式生圖；prepareScenes 每格式各生一組（格式序列/場景並行）→ formatAssets
+- video-prepare.ts：forward formats（critic 抓到的 Critical：draft 路徑曾無視勾選、永生三格式）
+- video-render.ts：支援 formatAssets+formats（兼容單組）
+- render-client.ts：submitRender formatAssets/formats + dual-send assets fallback（部署窗口安全）
+- pexels.ts：fetchBrollUrl/VideoUrl 加 orientation（直式抓直版，不裁掉重要部位）
+- routes generate/draft/render-draft/regenerate-image：outputFormats / formatImageUrls 貫通；render-draft host 白名單驗每格式每 URL
+- video-cost.ts：自訂 AI 圖成本 ×格式數
+- 前端 VideoStudio + ContentStudio：輸出比例勾選（預設全選、至少留一、全選鈕）+ 成本/draft/render 接線
+
+[驗證結果 — R0 四動作]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && python -m py_compile pipeline.py server.py config.py` | exit=0 | ms=~70000（build gate；.ts 全綠 + Python 全綠）
+- REALTEST_WAIVED: SMOKE_COVERED -- 完整 e2e（觸發生成→EU 原生多格式渲染→ffprobe 驗各 mp4 尺寸非 pad）於部署後執行（部署序 EU→SG）；本機無 EU video-service
+- REVIEW_DONE: critic=Deep | verdict=pass(修正後) | findings=1c/3m/3n（1 Critical：video-prepare 漏傳 formats→已修；Major：部署窗口 dual-send / cost fallback / draft formats 一致→已處理；Minor：_validate fmt check / ResultPanel primaryKey / temp 命名註解→已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`format_assets|formatAssets|outputFormats|formatImageUrls|render_video_multiformat` | hits=0（agency-os/scripts=0；next-admin 剩 video-render.ts ctx.assets 為向後相容單組路徑，正確非殘留）
+
+[剩餘風險] draft 重生/上傳僅作用主格式版（formats[0]），其餘格式用初版原生圖（設計取捨：各格式本為獨立版本）；多格式=圖片量×格式數（UI 已警告 + 格式序列控並行防 Replicate 429）；EU 部署需手動 SSH docker rebuild（無自動 script）。
+[rollback] git revert（向後相容設計：舊 assets 路徑保留；EU 同時兼容新舊 payload）。
+
+AUTO_TASK_DONE: feat(video): 三尺寸各比例原生生成 + 勾選 UI；tsc/py_compile/critic 通過（修 critic Critical: video-prepare 漏傳 formats）；待部署 EU→SG + e2e smoke
+
 ### feat(pod-publish): AI 文案加「文案指示／品牌語氣」自由輸入框 — 操作者控制語氣/語言/品牌
 
 [任務理解] 操作者問「文案這塊能去哪設定、填什麼條件內容」。現況：AI 文案只吃 商品名稱(subject)+焦點關鍵字(focusKeywordHint)，語氣/語言/品牌全寫死（English / brand=Soulful Expression / system prompt）。需求（甲）加自由輸入欄位讓她控制；（丙）基本用法保留。

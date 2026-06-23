@@ -96,6 +96,9 @@ const OUTPUT_LABELS: Record<string, { label: string; ratio: string; icon: string
   twitter_reddit_bluesky: { label: "Twitter / Reddit / Bluesky", ratio: "16:9 短版", icon: "🐦" },
 };
 
+// 可選輸出比例（順序固定 → 勾選排序穩定；[0] = draft 預覽的主版）。每個比例各自原生生成。
+const VIDEO_FORMAT_CHOICES = ["16x9", "9x16", "4x5"] as const;
+
 // ─── Pipeline step descriptions (for progress tracker) ────────────────────────
 
 const PROGRESS_STEPS = [
@@ -130,6 +133,9 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
   const [voiceModelId, setVoiceModelId] = useState(VOICE_MODELS[0].id);
   const [introEnabled, setIntroEnabled] = useState(false);
   const [introDuration, setIntroDuration] = useState(3);
+  // 輸出比例（勾選；預設全選；至少留一個）。每比例各自原生生成 → 圖片成本/時間 ×已選數。
+  const [selectedFormats, setSelectedFormats] = useState<Set<string>>(new Set(VIDEO_FORMAT_CHOICES));
+  const orderedFormats = VIDEO_FORMAT_CHOICES.filter((f) => selectedFormats.has(f));
 
   const brollScenes = Math.max(0, totalScenes - customScenes);
   // 深層接力：前製腳本場景（若有）→ 生成草稿時直接用，跳過 Claude 重生。
@@ -138,9 +144,9 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
   // 成本：providedScenes 路徑每場都 Flux 自訂圖、無 B-roll → 以腳本場景數估算；否則用滑桿值。
   const costBreakdown = useMemo(
     () => providedScenes.length > 0
-      ? computeVideoCost({ totalScenes: providedScenes.length, customScenes: providedScenes.length, brollScenes: 0, imageModel })
-      : computeVideoCost({ totalScenes, customScenes: Math.min(customScenes, totalScenes), brollScenes, imageModel }),
-    [providedScenes, totalScenes, customScenes, brollScenes, imageModel],
+      ? computeVideoCost({ totalScenes: providedScenes.length, customScenes: providedScenes.length, brollScenes: 0, imageModel, formatCount: orderedFormats.length })
+      : computeVideoCost({ totalScenes, customScenes: Math.min(customScenes, totalScenes), brollScenes, imageModel, formatCount: orderedFormats.length }),
+    [providedScenes, totalScenes, customScenes, brollScenes, imageModel, orderedFormats.length],
   );
 
   // ── Generate form ── (initial = 從 ScriptForge「送去生產」帶入的腳本預填)
@@ -158,6 +164,9 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
   // ── Draft state ──
   const [draftLoading, setDraftLoading] = useState(false);
   const [draftScenes, setDraftScenes] = useState<DraftScene[]>([]);
+  // draft 各格式原生圖組（render 時送回；主格式那組以 draftScenes.imageUrl 覆蓋以反映編輯/重生/上傳）。
+  const [draftFormatUrls, setDraftFormatUrls] = useState<Record<string, string[]>>({});
+  const [draftFormats, setDraftFormats] = useState<string[]>([]);
   const [draftR2Keys, setDraftR2Keys] = useState<string[]>([]);
   const [draftTitle, setDraftTitle] = useState("");
   const [regenIds, setRegenIds] = useState<Set<number>>(new Set()); // 場景忙碌中的 id（單張重生 或 上傳中）
@@ -276,26 +285,33 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
           // 「場景總數」「自訂 AI 圖」滑桿只在 AI 生圖模式生效（Pexels 模式場景數由 targetMinutes 決定；接力路徑由前製腳本決定）。
           sceneCount: (providedScenes.length === 0 && imageModel !== "pexels-video" && imageModel !== "pexels-all") ? totalScenes : undefined,
           customScenes: (providedScenes.length === 0 && imageModel !== "pexels-video" && imageModel !== "pexels-all") ? Math.min(customScenes, totalScenes) : undefined,
+          outputFormats: orderedFormats,
           scenes: providedScenes.length > 0 ? providedScenes : undefined,
         }),
       });
       const j = (await res.json()) as {
         ok: boolean;
         scenes?: { id: number; narration: string; imagePrompt?: string; brollKeyword?: string; visual?: "custom" | "broll" }[];
-        imageUrls?: string[];
+        formatImageUrls?: Record<string, string[]>;
+        formats?: string[];
         r2Keys?: string[];
         title?: string;
         error?: string;
       };
-      if (!j.ok || !j.scenes || !j.imageUrls) {
+      if (!j.ok || !j.scenes || !j.formatImageUrls || !j.formats || j.formats.length === 0) {
         setGenError(j.error ?? "草稿生成失敗");
         setGenStatus("error");
         return;
       }
+      // 主格式（formats[0]）那組作預覽編輯；全部格式原生圖組存起，render 時送回。
+      const primaryFmt = j.formats[0];
+      const primaryUrls = j.formatImageUrls[primaryFmt] ?? [];
       setDraftScenes(j.scenes.map((s, i) => ({
-        id: s.id, narration: s.narration, imageUrl: j.imageUrls![i] ?? "",
+        id: s.id, narration: s.narration, imageUrl: primaryUrls[i] ?? "",
         imagePrompt: s.imagePrompt ?? "", brollKeyword: s.brollKeyword ?? "", visual: s.visual ?? "custom",
       })));
+      setDraftFormatUrls(j.formatImageUrls);
+      setDraftFormats(j.formats);
       setDraftR2Keys(j.r2Keys ?? []);
       setDraftTitle(j.title ?? topic.trim());
     } catch (e: unknown) {
@@ -323,6 +339,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
           brollKeyword: scene.brollKeyword,
           visual: scene.visual,
           oldImageUrl: scene.imageUrl,
+          format: draftFormats[0], // 重生圖比例對齊 draft 預覽的主格式
         }),
       });
       const j = (await res.json()) as { ok: boolean; imageUrl?: string; error?: string };
@@ -372,12 +389,17 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
     setGenStep("提交渲染中…");
     setGenError("");
     try {
+      // 主格式那組以當前 draftScenes.imageUrl 覆蓋（反映編輯/重生/上傳）；其餘格式用初版原生圖。
+      const primaryFmt = draftFormats[0];
+      const formatImageUrls: Record<string, string[]> = { ...draftFormatUrls };
+      if (primaryFmt) formatImageUrls[primaryFmt] = draftScenes.map((s) => s.imageUrl);
       const res = await fetch("/api/video/render-draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           scenes: draftScenes.map((s) => ({ id: s.id, narration: s.narration })),
-          imageUrls: draftScenes.map((s) => s.imageUrl),
+          formatImageUrls,
+          formats: draftFormats,
           r2Keys: draftR2Keys,
           title: draftTitle,
           ...parseVoiceModel(voiceModelId),
@@ -417,6 +439,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
           customScenes: (imageModel !== "pexels-video" && imageModel !== "pexels-all") ? Math.min(customScenes, totalScenes) : undefined,
           brollScenes,
           imageModel,
+          outputFormats: orderedFormats,
           ...parseVoiceModel(voiceModelId),
           introTitle: introEnabled ? (topic.trim() || undefined) : undefined,
           introDuration: introEnabled ? introDuration : undefined,
@@ -705,6 +728,54 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                       </option>
                     ))}
                   </select>
+                </div>
+
+                {/* 輸出比例（每比例各自原生生成，非裁同一張、無黑邊） */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>輸出比例 <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>（各比例獨立原生生成）</span></span>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {VIDEO_FORMAT_CHOICES.map((fmt) => {
+                      const active = selectedFormats.has(fmt);
+                      const meta = OUTPUT_LABELS[fmt];
+                      return (
+                        <button key={fmt} type="button" disabled={isBusy}
+                          onClick={() => setSelectedFormats((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(fmt)) { if (next.size > 1) next.delete(fmt); } // 至少留一個
+                            else next.add(fmt);
+                            return next;
+                          })}
+                          style={{
+                            padding: "6px 12px", borderRadius: 8,
+                            border: `2px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
+                            background: active ? "var(--accent)" : "var(--bg-canvas)",
+                            color: active ? "#fff" : "var(--text-secondary)",
+                            cursor: isBusy ? "not-allowed" : "pointer",
+                            fontSize: 12, fontWeight: active ? 700 : 500,
+                            display: "flex", alignItems: "center", gap: 4,
+                          }}>
+                          <span>{meta.icon}</span><span>{meta.ratio}</span>
+                        </button>
+                      );
+                    })}
+                    <button type="button" disabled={isBusy}
+                      onClick={() => setSelectedFormats(new Set(VIDEO_FORMAT_CHOICES))}
+                      style={{
+                        padding: "6px 12px", borderRadius: 8,
+                        border: `2px solid ${selectedFormats.size === VIDEO_FORMAT_CHOICES.length ? "var(--accent)" : "var(--border-subtle)"}`,
+                        background: selectedFormats.size === VIDEO_FORMAT_CHOICES.length ? "var(--accent)" : "var(--bg-canvas)",
+                        color: selectedFormats.size === VIDEO_FORMAT_CHOICES.length ? "#fff" : "var(--text-secondary)",
+                        cursor: isBusy ? "not-allowed" : "pointer",
+                        fontSize: 12, fontWeight: 600,
+                      }}>
+                      全選
+                    </button>
+                  </div>
+                  {orderedFormats.length > 1 && (
+                    <span style={{ fontSize: 11, color: "#92400e", background: "#fef3c7", padding: "4px 8px", borderRadius: 6, lineHeight: 1.5 }}>
+                      ⚠️ {orderedFormats.length} 個比例 = 自訂 AI 圖成本與生成時間約 ×{orderedFormats.length}（每比例各自原生生成）
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -1009,7 +1080,8 @@ function ProgressTracker({ step }: { step: string }) {
 // ─── ResultPanel ──────────────────────────────────────────────────────────────
 
 function ResultPanel({ result, onClose }: { result: VideoOutputs; onClose: () => void }) {
-  const primaryKey = result.outputs["16x9"] ? "16x9" : "youtube_linkedin";
+  // 主版優先 16x9；若未勾 16x9 則取第一個實際輸出格式（避免落到已不存在的 legacy key）。
+  const primaryKey = result.outputs["16x9"] ? "16x9" : (Object.keys(result.outputs)[0] ?? "");
   const primaryUrl = result.outputs[primaryKey] ?? Object.values(result.outputs)[0] ?? "";
 
   return (
