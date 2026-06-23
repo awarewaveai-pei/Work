@@ -25,11 +25,13 @@ export default function FollowupsClient() {
   const [schedLead, setSchedLead] = useState("");
   const [schedDate, setSchedDate] = useState(todayStr());
 
+  const org = useActiveOrg();
+
   const load = useCallback(async () => {
     setLoading(true);
     setErr(null);
     try {
-      const r = await fetch(LEADS_API);
+      const r = await fetch(withOrg(LEADS_API, org));
       const j = await r.json();
       if (!j.ok) throw new Error(j.error || "load failed");
       setLeads(j.leads as Lead[]);
@@ -38,7 +40,7 @@ export default function FollowupsClient() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [org]);
 
   useEffect(() => {
     void load();

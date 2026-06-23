@@ -564,13 +564,16 @@ export default function StudioWorkbench() {
 
   const downloadImageWebP = useCallback((image: string, model: StudioModel) => {
     const el = document.createElement("img");
+    el.onerror = () => { console.warn("WebP下載：圖片解碼失敗"); };
     el.onload = () => {
+      const MAX = 4096;
+      const scale = Math.min(1, MAX / Math.max(el.naturalWidth, el.naturalHeight, 1));
       const c = document.createElement("canvas");
-      c.width = el.naturalWidth;
-      c.height = el.naturalHeight;
+      c.width = Math.round(el.naturalWidth * scale);
+      c.height = Math.round(el.naturalHeight * scale);
       const ctx = c.getContext("2d");
       if (!ctx) return;
-      ctx.drawImage(el, 0, 0);
+      ctx.drawImage(el, 0, 0, c.width, c.height);
       const url = c.toDataURL("image/webp", 0.9);
       const a = document.createElement("a");
       a.href = url;
