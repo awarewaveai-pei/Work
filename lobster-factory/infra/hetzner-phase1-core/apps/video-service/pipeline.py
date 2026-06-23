@@ -233,6 +233,10 @@ def _tts_openai(text: str, path: str, model: str = "tts-1", voice: str = "alloy"
 
 def generate_audio(scenes: list, tts_provider: str = "edge", tts_voice: str = "") -> list:
     print(f"\n[3/6] {tts_provider.upper()} TTS 生成配音...")
+    # OpenAI TTS requested but OPENAI_API_KEY not set → graceful fallback to Edge TTS.
+    if tts_provider == "openai" and not config.OPENAI_API_KEY:
+        print("   [WARN] OPENAI_API_KEY not set — falling back to Edge TTS")
+        tts_provider, tts_voice = "edge", ""
     audio_files = []
     for scene in scenes:
         path = str(config.TEMP_DIR / f"audio_{scene['id']}.mp3")
