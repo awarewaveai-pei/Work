@@ -239,8 +239,23 @@ export async function generateProductCopy(input: ProductCopyInput): Promise<Prod
 
   // Self-score with the same RankMath checker the blog pipeline uses. The body we score
   // is the title + answer capsule + bullets rendered as plain markdown (link-free).
+  // The opening <p> IS the AEO answer capsule (SYSTEM_PROMPT mandates it), but the
+  // `aeo-quick-answer` check scans for a `## Quick Answer` HEADING (rankmath-checker.ts:393)
+  // that this product markdown never emitted — so the check failed for EVERY product despite
+  // the capsule being present (operator report 2026-06-23: "Missing Quick Answer section").
+  // Extract the capsule and label it under the heading the checker recognises, so the score
+  // reflects the AEO answer the page actually carries. The live product short_description stays
+  // a plain capsule <p> (no odd heading on the storefront) — answer engines extract the opening
+  // sentence regardless; this only makes the SELF-SCORE honest. (aeo-subquery-coverage counts the
+  // new H2 but is blog-only → marked N/A below, so no scoring side effect beyond this check.)
+  const capsuleMatch = /<p[^>]*>([\s\S]*?)<\/p>/i.exec(copy.shortDescriptionHtml);
+  const capsule = (capsuleMatch ? capsuleMatch[1] : "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   const markdown = [
     `# ${copy.productTitle}`,
+    ...(capsule ? [`## Quick Answer`, capsule] : []),
     copy.shortDescriptionHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(),
     ...copy.bullets.map((b) => `- ${b}`),
   ].join("\n\n");

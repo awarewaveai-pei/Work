@@ -45,6 +45,13 @@ const hasUsablePfMap = (vmap?: VariantMapEntry[]): boolean =>
   vmap.length > 0 &&
   vmap.every((m) => typeof m?.sku === "string" && m.sku.length > 0 && typeof m?.price === "string" && PF_PRICE_RE.test(m.price));
 
+// Build a SAME-ORIGIN download URL for a My Designs asset. The R2 bucket is cross-origin, so an
+// <a download> straight to the R2 URL is ignored by browsers (opens a tab instead of downloading).
+// Routing through /api/tools/publish/download re-streams the same public bytes with a
+// `Content-Disposition: attachment` header → a real one-click download (see that route's comment).
+const downloadHref = (url: string, filename: string): string =>
+  `/api/tools/publish/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
+
 export default function PublishWizard() {
   // Split the picker by source group so the two actions never share one flooded list:
   //   designAssets → 設計圖 (印刷檔來源, single-select)   mockupAssets → 商品照 (gallery, multi-select)
@@ -631,6 +638,11 @@ export default function PublishWizard() {
 
   const busy = allRun.state === "running";
 
+  // Filename stem for downloaded print files — slugify the product name (ASCII only; the proxy
+  // re-sanitises server-side). Falls back to a generic stem when the name is blank/non-ASCII.
+  const printFileSlug =
+    title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "print-file";
+
   const pill = (state: StepState) =>
     state === "done" ? "✅" : state === "running" ? "⏳" : state === "error" ? "❌" : "⬜";
 
@@ -918,7 +930,7 @@ export default function PublishWizard() {
           </button>
           {upscale.printFileUrl ? (
             <>
-              <a href={upscale.printFileUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>印刷檔 ↗</a>
+              <a href={downloadHref(upscale.printFileUrl, `${printFileSlug}-print.png`)} download style={{ fontSize: 12 }}>⬇ 下載印刷檔 PNG</a>
               <span style={{ fontSize: 12, color: upscale.meetsTarget ? "var(--green)" : "var(--yellow)" }}>
                 {upscale.achievedPx ? `${upscale.achievedPx}px` : "尺寸未知"}
                 {upscale.dpi ? ` · 滿版約 ${upscale.dpi} DPI` : ""}
@@ -936,9 +948,10 @@ export default function PublishWizard() {
             <span>🌎 {APPAREL_PRINT_DESTINATIONS.printful.note}</span>
             <span>
               🇹🇼 {APPAREL_PRINT_DESTINATIONS["tw-local"].note}{" "}
-              {/* R2 is cross-origin → the download attr is ignored by browsers; open in a tab and 另存 instead. */}
-              <a href={upscale.printFileUrl} target="_blank" rel="noreferrer" style={{ fontWeight: 600 }}>
-                開啟台灣印刷檔（右鍵另存）↗
+              {/* Same-origin proxy adds Content-Disposition: attachment → a real one-click download
+                  (the cross-origin R2 URL would otherwise just open a tab). */}
+              <a href={downloadHref(upscale.printFileUrl, `${printFileSlug}-print.png`)} download style={{ fontWeight: 600 }}>
+                ⬇ 下載台灣印刷檔 PNG
               </a>
               {upscale.faithful ? "" : "（注意：目前是 AI 增強檔，非 100% 忠實）"}
             </span>
