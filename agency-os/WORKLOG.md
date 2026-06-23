@@ -4,6 +4,28 @@
 
 ## 2026-06-23
 
+### feat(pod-publish): AI 文案加「文案指示／品牌語氣」自由輸入框 — 操作者控制語氣/語言/品牌
+
+[任務理解] 操作者問「文案這塊能去哪設定、填什麼條件內容」。現況：AI 文案只吃 商品名稱(subject)+焦點關鍵字(focusKeywordHint)，語氣/語言/品牌全寫死（English / brand=Soulful Expression / system prompt）。需求（甲）加自由輸入欄位讓她控制；（丙）基本用法保留。
+
+[現況分析] 讀全部觸點：copy 走 `lib/studio/product-copy.ts generateProductCopy`（SYSTEM_PROMPT 定 6-field 結構 + SEO/GEO/AEO/RankMath + 安全規則）；`route.ts` copy action 從 body 組 ProductCopyInput；`PublishWizard.tsx` 兩處呼叫 copy（runCopy 手動鈕 + runAll 一鍵）。
+
+[已修改]
+- `lib/studio/product-copy.ts`：`ProductCopyInput.instructions?`；SYSTEM_PROMPT 語言規則放寬（operator 指定語言則用之）；generateProductCopy 把 instructions（slice 600）組成 `directive` 串進 userContent，明示 override tone/language/brand 但**不可**破壞 mandatory RULES + safety（no medical claims / no invented facts / valid JSON / char limits）。
+- `app/api/tools/publish/route.ts`：`PublishBody.instructions?` + copy action 傳 `instructions: body.instructions`。
+- `app/tools/publish/PublishWizard.tsx`：`copyInstructions` state + textarea UI（焦點關鍵字下方）；runCopy 與 runAll 兩路徑帶入 + 兩 useCallback deps 加 copyInstructions（防 stale closure）。
+
+[驗證結果 — R0 四動作]
+- REALTEST_EVIDENCE: tool=Browser | exit=0 | sg-deploy(commit `a80e97c7`, healthy 7s, smoke 全 200) 後瀏覽器實跑：新「文案指示」textarea 渲染出現；填「用繁體中文寫整篇文案，語氣俏皮溫暖，強調適合送禮、日常百搭」+ title=Lion Spirit Tee → 按「AI 生成 SEO 文案」→ RankMath 面板顯示「SEO title 14–30 characters (CJK) — 36 characters」+「CJK meta 過短(51字)」= 文案整篇變繁中（指示生效，UI→route→lib→LLM 全鏈通）。
+- REVIEW_DONE: critic=Deep | verdict=pass(warn) | findings=0c/0M/4n（4 Minor 全 cosmetic/defensive：CJK slug 計分偏低、600-char slice、語言切換不 crash）；無 Critical/High；既有防線（sanitizeProductHtml/clampLen/JSON gate/WP kses）全未動。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`generateProductCopy|action "copy"|focusKeywordHint|copyInstructions|instructions` | hits: generateProductCopy 兩 caller（publish route 已傳；`lib/content/blocks/product-copy.ts` 走 `ctx as ProductCopyInput` 透傳，新欄位 optional 向後相容無破壞）；三處 copy 呼叫一致；無 stale。
+- tsc --noEmit exit 0。
+
+[剩餘風險] no-medical-claims 仍 prompt-soft（未加 deny-list — 刻意：soulful 品牌即「healing art / 療癒藝術」，硬擋 heal 會誤殺正當文案；草稿有人審）；中文文案 RankMath 自評分天生偏低（英文關鍵字調校；cosmetic）。
+[rollback] git revert（additive optional field，無 DB/auth/金流改動）。
+
+AUTO_TASK_DONE: feat(pod-publish): 文案指示／品牌語氣 free-text field — operator 可覆寫語氣/語言/品牌；deploy a80e97c7 + 瀏覽器實測繁中輸出生效
+
 ### fix(video): 前製腳本 廣告A/B/C + AI主持人稿 三缺陷（送去生產缺鈕 / 主持稿擠成團 / 標記不上色）
 
 [任務理解] 操作者回報 `/tools/video`（ScriptForge）三問題：① 廣告A/B/C 與 AI主持人稿「沒有生成腳本功能/功能缺了」② 主持人講稿擠成一團難讀 ③ 文稿標記顏色對不上「標記說明」、且文稿出現的【放慢】【降調】說明區沒有。

@@ -114,11 +114,14 @@ type AssetResult =
   | { ok: true; asset: string; r2Key?: string }
   | { ok: false; status: number; error: string };
 
-/** 草稿生成結果：腳本 + 圖片 URL，不含渲染（供 /api/video/draft 使用）。 */
+/** 草稿生成結果：腳本 + 每格式圖片 URL，不含渲染（供 /api/video/draft 使用）。 */
 export interface PreparedScenes {
   ok: true;
   scenes: import("../video/video-script-core").VideoScene[];
-  assets: string[];
+  /** 每格式一組素材 URL（與 scenes 等長）；key ∈ formats。每格式原生比例，非裁同一張。 */
+  formatAssets: Record<string, string[]>;
+  /** 實際輸出的格式（已 normalize；前端勾選的子集或全三格式）。 */
+  formats: string[];
   r2Keys: string[];
   title: string;
 }
@@ -129,9 +132,19 @@ export interface PreparedScenes {
  */
 export async function buildSceneAsset(
   scene: Pick<import("../video/video-script-core").VideoScene, "id" | "image_prompt" | "broll_keyword" | "visual">,
-  opts: { imageModel?: string; visualStyle?: string },
+  opts: {
+    imageModel?: string;
+    visualStyle?: string;
+    /** 目標長寬比（AI 生圖用）；省略 = 16:9（向後相容）。 */
+    aspectRatio?: "16:9" | "9:16" | "4:5";
+    /** Pexels 取向（B-roll 用）；省略 = landscape。 */
+    orientation?: "landscape" | "portrait";
+    /** 風格框景詞（接在 visualStyle 後）；省略 = 16:9 寬框。 */
+    framing?: string;
+  },
 ): Promise<AssetResult> {
   const pexelsKey = process.env.PEXELS_API_KEY as string | undefined;
+  const orientation = opts.orientation ?? "landscape";
   const forcePexelsVideo = opts.imageModel === "pexels-video";
   const forcePexels = opts.imageModel === "pexels-all";
   const fluxModel = (!opts.imageModel || opts.imageModel === "pexels-all" || opts.imageModel === "pexels-video") ? "flux-schnell" : opts.imageModel;
@@ -139,29 +152,32 @@ export async function buildSceneAsset(
   // pexels-video 模式：抓 Pexels 影片片段（MP4 URL → EU stream_loop）
   if (forcePexelsVideo && pexelsKey) {
     const keyword = scene.broll_keyword || scene.image_prompt.split(" ").slice(0, 3).join(" ");
-    const videoUrl = await fetchBrollVideoUrl(keyword, pexelsKey);
+    const videoUrl = await fetchBrollVideoUrl(keyword, pexelsKey, undefined, orientation);
     if (videoUrl) return { ok: true, asset: videoUrl };
     // 影片抓失敗 → 降級 Pexels 照片（EU zoompan 仍可出片）
-    const photoUrl = await fetchBrollUrl(keyword, pexelsKey);
+    const photoUrl = await fetchBrollUrl(keyword, pexelsKey, undefined, orientation);
     if (photoUrl) return { ok: true, asset: photoUrl };
     return { ok: false, status: 502, error: `場景 ${scene.id} Pexels 影片與照片均搜尋失敗（keyword: ${keyword}）` };
   }
   // Pexels 照片路徑：明確選 pexels-all（全部場景），或 Claude 判定為 broll 場景
   if ((forcePexels || scene.visual === "broll") && pexelsKey) {
     const keyword = scene.broll_keyword || scene.image_prompt.split(" ").slice(0, 3).join(" ");
-    const brollUrl = await fetchBrollUrl(keyword, pexelsKey);
+    const brollUrl = await fetchBrollUrl(keyword, pexelsKey, undefined, orientation);
     if (brollUrl) return { ok: true, asset: brollUrl };
     // pexels-all 模式：Pexels 抓失敗 → 不 fallback Flux（避免非預期費用）
     if (forcePexels) return { ok: false, status: 502, error: `場景 ${scene.id} Pexels 搜圖失敗（keyword: ${keyword}）` };
   }
   if (!isR2Configured()) return { ok: false, status: 503, error: "R2 未設定（跨機影片素材需 R2 暫存 Flux 圖）" };
-  // 風格前綴：使用者選了風格 → 用該風格（已含材質/光線/色盤），補 16:9 框景；否則用 cinematic 預設。
+  // 風格前綴：使用者選了風格 → 用該風格（已含材質/光線/色盤）+ 該格式框景；否則用 cinematic 預設。
+  // framing/aspectRatio 依目標格式（16:9 寬框 / 9:16・4:5 直式置中）→ 每格式原生構圖，非裁 16:9。
+  const aspectRatio = opts.aspectRatio ?? "16:9";
+  const framing = opts.framing ?? "Wide 16:9 cinematic framing.";
   const stylePrefix = opts.visualStyle?.trim()
-    ? `${opts.visualStyle.trim()} Wide 16:9 cinematic framing.`
-    : "Cinematic wide-angle 16:9, realistic photography, dramatic natural lighting, rich color grade.";
+    ? `${opts.visualStyle.trim()} ${framing}`
+    : `Cinematic realistic photography, dramatic natural lighting, rich color grade. ${framing}`;
   const styledPrompt = `${stylePrefix} ${scene.image_prompt}`;
   const safeModel = isTarotModel(fluxModel) ? fluxModel : "flux-schnell";
-  const img = await generateTarotImage({ model: safeModel, prompt: styledPrompt, aspectRatio: "16:9" });
+  const img = await generateTarotImage({ model: safeModel, prompt: styledPrompt, aspectRatio });
   if (img.ok === false) return { ok: false, status: 502, error: `場景 ${scene.id} 圖片生成失敗：${img.error}` };
   const parsed = parseImageDataUrl(img.image);
   const key = parsed ? buildDesignKey(parsed.mime) : null;
@@ -194,6 +210,8 @@ export async function prepareScenes(
     sceneCount?: number;
     /** 「自訂 AI 圖」數量（前端滑桿）→ 用 Flux AI 圖的場景數，其餘走 Pexels B-roll。僅 AI 生圖模式 + Claude 生腳本路徑有效。 */
     customScenes?: number;
+    /** 要輸出的格式（["16x9","9x16","4x5"] 子集）→ 每格式各生一組原生圖。省略 = 全三格式。 */
+    formats?: string[];
     /** 深層接力：前製腳本已寫好的場景（台詞+畫面）→ 跳過 Claude 重生，直接用這些。 */
     providedScenes?: { narration: string; imagePrompt: string }[];
     onProgress?: (step: string) => void;
@@ -231,7 +249,6 @@ export async function prepareScenes(
     title = scriptResult.title;
   }
 
-  input.onProgress?.(`素材生成中（${scenes.length} 場景並行）…`);
   const forcePexelsVideo = input.imageModel === "pexels-video";
   const forcePexels = input.imageModel === "pexels-all";
 
@@ -242,17 +259,35 @@ export async function prepareScenes(
     reassignSceneVisuals(scenes, input.customScenes);
   }
 
-  const results = await Promise.all(
-    scenes.map((s) => buildSceneAsset(s, { imageModel: input.imageModel, visualStyle: input.visualStyle })),
-  );
-  const r2Keys = results.flatMap((r) => (r.ok && r.r2Key ? [r.r2Key] : []));
-  const failed = results.find((r): r is { ok: false; status: number; error: string } => !r.ok);
-  if (failed) {
-    await cleanupVideoInputKeys(r2Keys);
-    return failed;
+  const formats = normalizeVideoFormats(input.formats);
+  input.onProgress?.(`素材生成中（${scenes.length} 場景 × ${formats.length} 比例）…`);
+
+  // 每格式各生一組原生素材。格式維度序列、場景維度並行 → 控並行數（避免一次 N×格式 張同時打 Replicate
+  // 撞 429）；AI 圖按 aspectRatio 原生生、B-roll 按 orientation 抓對應方向，皆非裁同一張。
+  const formatAssets: Record<string, string[]> = {};
+  const r2Keys: string[] = [];
+  for (const fmt of formats) {
+    const spec = FORMAT_SPEC[fmt];
+    const results = await Promise.all(
+      scenes.map((s) =>
+        buildSceneAsset(s, {
+          imageModel: input.imageModel,
+          visualStyle: input.visualStyle,
+          aspectRatio: spec.aspectRatio,
+          orientation: spec.orientation,
+          framing: spec.framing,
+        }),
+      ),
+    );
+    r2Keys.push(...results.flatMap((r) => (r.ok && r.r2Key ? [r.r2Key] : [])));
+    const failed = results.find((r): r is { ok: false; status: number; error: string } => !r.ok);
+    if (failed) {
+      await cleanupVideoInputKeys(r2Keys); // 任一格式任一場景失敗 → 清掉本輪所有格式已上傳的暫存圖
+      return failed;
+    }
+    formatAssets[fmt] = results.map((r) => (r as { ok: true; asset: string }).asset);
   }
-  const assets = results.map((r) => (r as { ok: true; asset: string }).asset);
-  return { ok: true, scenes, assets, r2Keys, title };
+  return { ok: true, scenes, formatAssets, formats, r2Keys, title };
 }
 
 register({
@@ -281,18 +316,19 @@ register({
         // 已連同 sceneCount 一起傳 → total/custom/成本一致，不再分歧）。
         sceneCount: ctx.sceneCount as number | undefined,
         customScenes: ctx.customScenes as number | undefined,
+        formats: ctx.outputFormats as string[] | undefined,
         onProgress,
       },
       anthropicKey,
     );
     if (!prep.ok) return prep as { ok: false; status: number; error: string };
-    const { scenes, assets, r2Keys, title } = prep;
+    const { scenes, formatAssets, formats, r2Keys, title } = prep;
 
     // 3) 提交 EU（短請求，不等渲染）→ 回 euJobId。渲染在 EU thread 跑，由 /status 輪詢收尾。
     onProgress?.("提交合成任務（EU 伺服器）…");
     const sub = await submitRender(
       scenes.map((s) => ({ id: s.id, narration: s.narration })),
-      assets,
+      [], // 多格式走 formatAssets（下方 opts）；位置參數 assets 忽略
       title,
       undefined,
       {
@@ -300,6 +336,8 @@ register({
         ttsVoice: ctx.ttsVoice as string | undefined,
         introTitle: ctx.introTitle as string | undefined,
         introDuration: ctx.introDuration as number | undefined,
+        formats,
+        formatAssets,
       },
     );
     if (!sub.ok) {

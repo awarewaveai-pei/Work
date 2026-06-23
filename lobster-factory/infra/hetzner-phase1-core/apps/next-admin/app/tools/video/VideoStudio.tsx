@@ -515,13 +515,13 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                   ✅ 已從前製腳本帶入 <b>{providedScenes.length}</b> 個場景（台詞＝旁白、畫面＝生圖）。下方調整場景設定後，按「📋 生成草稿」即用此腳本出片，不重寫。
                 </div>
               ) : (
-                <div style={{ background: "#f8fafc", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: "9px 12px", fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                <div style={{ background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: "9px 12px", fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.6 }}>
                   💡 想用寫好的腳本？到「📝 前製腳本」寫完按「送去生產影片」帶過來；或在此直接打主題快速生成。
                 </div>
               )}
 
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={labelStyle}>主題 / 關鍵字 <span style={{ color: "#dc2626" }}>*</span></label>
+                <label style={labelStyle}>主題 / 關鍵字 <span style={{ color: "var(--red)" }}>*</span></label>
                 <input type="text" value={topic} onChange={(e) => setTopic(e.target.value)}
                   placeholder="例：如何用 AI 提升 SEO 排名" style={inputStyle} disabled={isLoading} />
               </div>
@@ -536,7 +536,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
               </div>
 
               {/* Intro title card toggle */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 12px", borderRadius: 8, background: "#f8fafc", border: "1px solid var(--border-subtle)" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 12px", borderRadius: 8, background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)" }}>
                 <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                   <input type="checkbox" checked={introEnabled} onChange={e => setIntroEnabled(e.target.checked)} disabled={isLoading} />
                   <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>標題動畫（片頭黑底 + fade-in 標題）</span>
@@ -566,7 +566,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
               </div>
 
               {/* §2 場景設定（移入主流程：內容後、生成前 — Q3 由上到下一條順下來）*/}
-              <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "12px 14px", borderRadius: 8, background: "#f8fafc", border: "1px solid var(--border-subtle)" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "12px 14px", borderRadius: 8, background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)" }}>
                 <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-primary)" }}>場景設定</span>
 
                 {/* 素材模式 */}
@@ -596,7 +596,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                           style={{
                             padding: "6px 12px", borderRadius: 8, border: `2px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
                             background: active ? "var(--accent)" : "var(--bg-canvas)",
-                            color: active ? "#fff" : "var(--text-secondary)",
+                            color: active ? "var(--btn-primary-text)" : "var(--text-secondary)",
                             cursor: isBusy ? "not-allowed" : "pointer",
                             fontSize: 12, fontWeight: active ? 700 : 500, lineHeight: 1.4,
                             display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
@@ -608,7 +608,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                     })}
                   </div>
                   {imageModel === "pexels-video" && (
-                    <div style={{ fontSize: 11, color: "#065f46", background: "#d1fae5", padding: "6px 10px", borderRadius: 6, lineHeight: 1.6 }}>
+                    <div style={{ fontSize: 11, color: "var(--badge-green-text)", background: "var(--badge-green-bg)", padding: "6px 10px", borderRadius: 6, lineHeight: 1.6 }}>
                       ✅ 每場景自動搜尋 Pexels 影片片段（HD MP4）→ EU FFmpeg 拼接 + TTS 配音。費用 $0。
                     </div>
                   )}
@@ -631,7 +631,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
                           {VIDEO_STYLE_GROUPS.map((g) => (
                             <button key={g} type="button" onClick={() => setVideoStyleGroup(g)} disabled={isBusy}
-                              style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, cursor: isBusy ? "not-allowed" : "pointer", border: `1px solid ${videoStyleGroup === g ? "var(--accent)" : "var(--border-subtle)"}`, background: videoStyleGroup === g ? "var(--accent)" : "rgba(127,127,127,0.08)", color: videoStyleGroup === g ? "#fff" : "var(--text-muted)", transition: "all 0.15s" }}>
+                              style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, cursor: isBusy ? "not-allowed" : "pointer", border: `1px solid ${videoStyleGroup === g ? "var(--accent)" : "var(--border-subtle)"}`, background: videoStyleGroup === g ? "var(--accent)" : "rgba(127,127,127,0.08)", color: videoStyleGroup === g ? "var(--btn-primary-text)" : "var(--text-muted)", transition: "all 0.15s" }}>
                               {g}
                             </button>
                           ))}
@@ -641,7 +641,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                             const active = videoStyle === item.zh;
                             return (
                               <button key={item.zh} type="button" onClick={() => setVideoStyle(active ? "" : item.zh)} disabled={isBusy}
-                                style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, cursor: isBusy ? "not-allowed" : "pointer", border: `1px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`, background: active ? "var(--accent)" : "rgba(127,127,127,0.08)", color: active ? "#fff" : "var(--text-muted)", transition: "all 0.15s" }}>
+                                style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, cursor: isBusy ? "not-allowed" : "pointer", border: `1px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`, background: active ? "var(--accent)" : "rgba(127,127,127,0.08)", color: active ? "var(--btn-primary-text)" : "var(--text-muted)", transition: "all 0.15s" }}>
                                 {item.zh}
                               </button>
                             );
@@ -666,7 +666,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                               flex: 1, padding: "7px 0", borderRadius: 8,
                               border: `2px solid ${targetMinutes === m ? "var(--accent)" : "var(--border-subtle)"}`,
                               background: targetMinutes === m ? "var(--accent)" : "var(--bg-canvas)",
-                              color: targetMinutes === m ? "#fff" : "var(--text-secondary)",
+                              color: targetMinutes === m ? "var(--btn-primary-text)" : "var(--text-secondary)",
                               cursor: isBusy ? "not-allowed" : "pointer",
                               fontSize: 12, fontWeight: targetMinutes === m ? 700 : 500,
                               lineHeight: 1.4, display: "flex", flexDirection: "column", alignItems: "center",
@@ -729,7 +729,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                     padding: "11px 20px", borderRadius: 8, border: "none",
                     cursor: canGenerate ? "pointer" : "not-allowed",
                     background: canGenerate ? "var(--accent)" : "var(--border-subtle)",
-                    color: canGenerate ? "#fff" : "var(--text-muted)",
+                    color: canGenerate ? "var(--btn-primary-text)" : "var(--text-muted)",
                     fontSize: 14, fontWeight: 700, transition: "background 0.15s",
                   }}>
                   {draftLoading ? "⏳ 生成草稿中…" : "📋 生成草稿"}
@@ -738,9 +738,9 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
 
               {/* Draft loading spinner */}
               {draftLoading && (
-                <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "14px 16px" }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1d4ed8", marginBottom: 6 }}>🔄 生成草稿中…</div>
-                  <div style={{ fontSize: 12, color: "#3b82f6" }}>Claude 生成腳本 + Flux 生成圖片（約 30–60 秒）</div>
+                <div style={{ background: "var(--ai-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 16px" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", marginBottom: 6 }}>🔄 生成草稿中…</div>
+                  <div style={{ fontSize: 12, color: "var(--accent)" }}>Claude 生成腳本 + Flux 生成圖片（約 30–60 秒）</div>
                 </div>
               )}
 
@@ -749,11 +749,11 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
 
               {/* Error */}
               {genStatus === "error" && (
-                <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "12px 14px" }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#dc2626", marginBottom: 4 }}>失敗</div>
-                  <div style={{ fontSize: 12.5, color: "#7f1d1d" }}>{genError}</div>
+                <div style={{ background: "var(--badge-red-bg)", border: "1px solid var(--red)", borderRadius: 8, padding: "12px 14px" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--red)", marginBottom: 4 }}>失敗</div>
+                  <div style={{ fontSize: 12.5, color: "var(--badge-red-text)" }}>{genError}</div>
                   {genError.toLowerCase().includes("video-service") && (
-                    <div style={{ marginTop: 6, fontSize: 11.5, color: "#991b1b" }}>提示：EU video-service 需正常運行（健康狀態請查 Repair Center）。</div>
+                    <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--badge-red-text)" }}>提示：EU video-service 需正常運行（健康狀態請查 Repair Center）。</div>
                   )}
                 </div>
               )}
@@ -875,7 +875,7 @@ function DraftEditor({
         {scenes.map((scene, idx) => (
           <div key={scene.id} style={{
             display: "flex", gap: 10, padding: "10px 12px",
-            border: "1px solid var(--border-subtle)", borderRadius: 8, background: "#fff",
+            border: "1px solid var(--border-subtle)", borderRadius: 8, background: "var(--card-bg)",
           }}>
             {/* Thumbnail + 重新生成 — 照片用 img；Pexels MP4 用靜音 video 預覽 */}
             <div style={{ flexShrink: 0, width: 100, display: "flex", flexDirection: "column", gap: 4 }}>
@@ -951,8 +951,8 @@ function DraftEditor({
           style={{
             flex: 1, padding: "10px 16px", borderRadius: 8, border: "none",
             cursor: flowBlocked ? "not-allowed" : "pointer",
-            background: flowBlocked ? "var(--border-subtle)" : "#16a34a",
-            color: flowBlocked ? "var(--text-muted)" : "#fff",
+            background: flowBlocked ? "var(--border-subtle)" : "var(--green)",
+            color: flowBlocked ? "var(--text-muted)" : "var(--btn-primary-text)",
             fontSize: 13, fontWeight: 700,
           }}>
           {regenIds.size > 0 ? "⏳ 圖片生成中…" : disabled ? "⏳ 處理中…" : "🎬 確認送出渲染"}
@@ -967,8 +967,8 @@ function DraftEditor({
 function ProgressTracker({ step }: { step: string }) {
   const currentIdx = getCurrentStepIndex(step);
   return (
-    <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "14px 16px" }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: "#1d4ed8", marginBottom: 12 }}>🔄 正在生成…</div>
+    <div style={{ background: "var(--ai-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 16px" }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", marginBottom: 12 }}>🔄 正在生成…</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {PROGRESS_STEPS.slice(0, -1).map((s, idx) => {
           const done = idx < currentIdx;
@@ -979,27 +979,27 @@ function ProgressTracker({ step }: { step: string }) {
                 width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: 11, fontWeight: 800,
-                background: done ? "#16a34a" : active ? "#2563eb" : "#e5e7eb",
-                color: done || active ? "#fff" : "#9ca3af",
+                background: done ? "var(--green)" : active ? "var(--accent)" : "var(--border)",
+                color: done || active ? "var(--btn-primary-text)" : "var(--text-muted)",
               }}>
                 {done ? "✓" : idx + 1}
               </div>
               <div style={{ flex: 1 }}>
                 <span style={{
                   fontSize: 12.5, fontWeight: active ? 700 : 500,
-                  color: done ? "#16a34a" : active ? "#1d4ed8" : "var(--text-muted)",
+                  color: done ? "var(--green)" : active ? "var(--accent)" : "var(--text-muted)",
                 }}>
                   {s.label}
                 </span>
                 {active && (
-                  <span style={{ marginLeft: 8, fontSize: 11, color: "#3b82f6" }}>{step}</span>
+                  <span style={{ marginLeft: 8, fontSize: 11, color: "var(--accent)" }}>{step}</span>
                 )}
               </div>
             </div>
           );
         })}
       </div>
-      <div style={{ marginTop: 10, fontSize: 11, color: "#3b82f6" }}>
+      <div style={{ marginTop: 10, fontSize: 11, color: "var(--accent)" }}>
         可以關閉頁面，完成後影片會出現在下方「最近生成記錄」。
       </div>
     </div>
@@ -1013,10 +1013,10 @@ function ResultPanel({ result, onClose }: { result: VideoOutputs; onClose: () =>
   const primaryUrl = result.outputs[primaryKey] ?? Object.values(result.outputs)[0] ?? "";
 
   return (
-    <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: "16px" }}>
+    <div style={{ background: "var(--intake-success-bg)", border: "1px solid var(--green)", borderRadius: 10, padding: "16px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#166534" }}>✅ 生成完成：{result.title}</div>
-        <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#166534", fontSize: 18, lineHeight: 1 }}>×</button>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--badge-green-text)" }}>✅ 生成完成：{result.title}</div>
+        <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--badge-green-text)", fontSize: 18, lineHeight: 1 }}>×</button>
       </div>
 
       {/* Primary video player */}
@@ -1071,27 +1071,27 @@ function VideoViewer({ title, outputs, primaryUrl, onClose }: {
           const meta = OUTPUT_LABELS[key];
           const isHttps = url.startsWith("https://");
           return (
-            <div key={key} style={{ background: "#f8fafc", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: "10px 12px" }}>
+            <div key={key} style={{ background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: "10px 12px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)" }}>
                   {meta ? `${meta.icon} ${meta.label}` : key}
                 </span>
-                {meta && <span style={{ fontSize: 10, color: "var(--text-muted)", background: "#e5e7eb", padding: "1px 6px", borderRadius: 4 }}>{meta.ratio}</span>}
+                {meta && <span style={{ fontSize: 10, color: "var(--text-muted)", background: "var(--border)", padding: "1px 6px", borderRadius: 4 }}>{meta.ratio}</span>}
               </div>
               <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
                 {isHttps ? (
                   <>
                     <a href={url} download target="_blank" rel="noreferrer"
-                      style={{ flex: 1, padding: "5px 8px", background: "var(--accent)", color: "#fff", borderRadius: 6, textAlign: "center", fontSize: 11.5, fontWeight: 700, textDecoration: "none" }}>
+                      style={{ flex: 1, padding: "5px 8px", background: "var(--accent)", color: "var(--btn-primary-text)", borderRadius: 6, textAlign: "center", fontSize: 11.5, fontWeight: 700, textDecoration: "none" }}>
                       ⬇ 下載
                     </a>
                     <button onClick={() => copyUrl(url, key)}
-                      style={{ padding: "5px 8px", background: "#f1f5f9", border: "1px solid var(--border-subtle)", borderRadius: 6, fontSize: 11.5, cursor: "pointer", color: "var(--text-secondary)", fontWeight: 600 }}>
+                      style={{ padding: "5px 8px", background: "var(--badge-gray-bg)", border: "1px solid var(--border-subtle)", borderRadius: 6, fontSize: 11.5, cursor: "pointer", color: "var(--text-secondary)", fontWeight: 600 }}>
                       {copied === key ? "✓" : "複製"}
                     </button>
                   </>
                 ) : (
-                  <code style={{ fontSize: 10, wordBreak: "break-all", color: "var(--text-muted)", background: "#f1f5f9", padding: "4px 6px", borderRadius: 4 }}>{url}</code>
+                  <code style={{ fontSize: 10, wordBreak: "break-all", color: "var(--text-muted)", background: "var(--badge-gray-bg)", padding: "4px 6px", borderRadius: 4 }}>{url}</code>
                 )}
               </div>
             </div>
@@ -1122,7 +1122,7 @@ function HistoryRow({ item, active, onSelect, checked, onCheck }: {
         display: "flex", alignItems: "center", gap: 12,
         padding: "10px 12px", borderRadius: 8, cursor: "pointer",
         border: `1px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
-        background: active ? "#eff6ff" : "#fff",
+        background: active ? "var(--ai-bg)" : "var(--card-bg)",
         transition: "border-color 0.1s, background 0.1s",
       }}
     >
@@ -1172,15 +1172,15 @@ function FlowCard({
     <div style={{
       display: "flex", alignItems: "flex-start", gap: 12,
       padding: "10px 12px", borderRadius: 8,
-      border: `1px solid ${isActive ? "var(--accent)" : muted ? "#e5e7eb" : "var(--border-subtle)"}`,
-      background: isActive ? "#eff6ff" : muted ? "#f9fafb" : "#fff",
+      border: `1px solid ${isActive ? "var(--accent)" : muted ? "var(--border)" : "var(--border-subtle)"}`,
+      background: isActive ? "var(--ai-bg)" : muted ? "var(--bg-subtle)" : "var(--card-bg)",
       opacity: muted ? 0.55 : 1,
       transition: "border-color 0.15s, background 0.15s",
     }}>
       <div style={{
         width: 24, height: 24, borderRadius: "50%", flexShrink: 0, marginTop: 1,
-        background: isActive ? "var(--accent)" : muted ? "#e5e7eb" : "var(--accent)",
-        color: muted && !isActive ? "#9ca3af" : "#fff",
+        background: isActive ? "var(--accent)" : muted ? "var(--border)" : "var(--accent)",
+        color: muted && !isActive ? "var(--text-muted)" : "var(--btn-primary-text)",
         fontSize: 11, fontWeight: 800,
         display: "flex", alignItems: "center", justifyContent: "center",
       }}>
@@ -1192,8 +1192,8 @@ function FlowCard({
           <span style={{ fontSize: 13, fontWeight: 700, color: muted ? "var(--text-muted)" : "var(--text-primary)", textDecoration: muted ? "line-through" : "none" }}>
             {step.label}
           </span>
-          {muted && <span style={{ fontSize: 10, fontWeight: 700, color: "#6b7280", background: "#f3f4f6", padding: "1px 6px", borderRadius: 4 }}>已停用</span>}
-          {isActive && <span style={{ fontSize: 10, fontWeight: 700, color: "#2563eb", background: "#dbeafe", padding: "1px 6px", borderRadius: 4, animation: "pulse 1s infinite" }}>進行中</span>}
+          {muted && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", background: "var(--badge-gray-bg)", padding: "1px 6px", borderRadius: 4 }}>已停用</span>}
+          {isActive && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--accent)", background: "var(--ai-bg)", padding: "1px 6px", borderRadius: 4, animation: "pulse 1s infinite" }}>進行中</span>}
         </div>
         <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginTop: 3 }}>
           {step.tool} · <span style={{ color: "var(--text-muted)" }}>{step.vendor}</span>
@@ -1203,8 +1203,8 @@ function FlowCard({
       {costLine !== undefined && (
         <div style={{ flexShrink: 0 }}>
           {costLine.free
-            ? <span style={{ background: "#d1fae5", color: "#065f46", padding: "2px 7px", borderRadius: 4, fontSize: 10.5, fontWeight: 700 }}>$0 免費</span>
-            : <span style={{ background: "#fef3c7", color: "#92400e", padding: "2px 7px", borderRadius: 4, fontSize: 10.5, fontWeight: 700 }}>${costLine.totalUsd.toLocaleString("en-US", { maximumFractionDigits: 4 })}</span>
+            ? <span style={{ background: "var(--badge-green-bg)", color: "var(--badge-green-text)", padding: "2px 7px", borderRadius: 4, fontSize: 10.5, fontWeight: 700 }}>$0 免費</span>
+            : <span style={{ background: "var(--build-risk-medium-bg)", color: "var(--build-risk-medium-text)", padding: "2px 7px", borderRadius: 4, fontSize: 10.5, fontWeight: 700 }}>${costLine.totalUsd.toLocaleString("en-US", { maximumFractionDigits: 4 })}</span>
           }
         </div>
       )}
@@ -1218,8 +1218,8 @@ function Card({ title, subtitle, action, children }: {
   title: string; subtitle?: string; action?: React.ReactNode; children: React.ReactNode;
 }) {
   return (
-    <div style={{ background: "#fff", border: "1px solid var(--border-subtle)", borderRadius: 12, overflow: "hidden" }}>
-      <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--border-subtle)", background: "#fafafa", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+    <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-subtle)", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>{title}</div>
           {subtitle && <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 3, lineHeight: 1.5 }}>{subtitle}</div>}
@@ -1254,6 +1254,6 @@ const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: 
 const inputStyle: React.CSSProperties = {
   padding: "8px 10px", borderRadius: 8,
   border: "1px solid var(--border-subtle)",
-  fontSize: 13, background: "#fff", color: "var(--text-primary)",
+  fontSize: 13, background: "var(--card-bg)", color: "var(--text-primary)",
   width: "100%", boxSizing: "border-box",
 };

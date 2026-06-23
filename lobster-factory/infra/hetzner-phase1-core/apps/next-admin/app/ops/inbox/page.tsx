@@ -67,10 +67,10 @@ export default async function OpsInboxListPage({ searchParams }: { searchParams:
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {critical > 0 && (
-            <StatPill count={critical} label="critical" color="#dc2626" bg="#fef2f2" />
+            <StatPill count={critical} label="critical" color="var(--severity-critical)" bg="var(--badge-red-bg)" />
           )}
           {high > 0 && (
-            <StatPill count={high} label="high" color="#ea580c" bg="#fff7ed" />
+            <StatPill count={high} label="high" color="var(--severity-high)" bg="var(--build-risk-medium-bg)" />
           )}
           <StatPill
             count={total}
@@ -85,8 +85,8 @@ export default async function OpsInboxListPage({ searchParams }: { searchParams:
                       ? "已忽略"
                       : "total"
             }
-            color="#475569"
-            bg="#f1f5f9"
+            color="var(--text-muted)"
+            bg="var(--badge-gray-bg)"
           />
           <Link
             href="/ops/tools"
@@ -95,12 +95,12 @@ export default async function OpsInboxListPage({ searchParams }: { searchParams:
               alignItems: "center",
               gap: 4,
               padding: "5px 12px",
-              background: "#f8fafc",
-              border: "1px solid #e2e8f0",
+              background: "var(--bg-subtle)",
+              border: "1px solid var(--border)",
               borderRadius: 8,
               fontSize: 12,
               fontWeight: 500,
-              color: "#475569",
+              color: "var(--text-muted)",
               textDecoration: "none",
             }}
           >
@@ -113,13 +113,13 @@ export default async function OpsInboxListPage({ searchParams }: { searchParams:
       {sp.client_slug && (
         <div style={{
           display: "flex", alignItems: "center", gap: 8,
-          background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8,
-          padding: "8px 14px", marginBottom: 16, fontSize: 13, color: "#1d4ed8",
+          background: "var(--ai-bg)", border: "1px solid var(--severity-low)", borderRadius: 8,
+          padding: "8px 14px", marginBottom: 16, fontSize: 13, color: "var(--accent)",
         }}>
           <span>篩選客戶：<strong>{sp.client_slug}</strong></span>
           <Link
             href="/ops/inbox"
-            style={{ marginLeft: "auto", fontSize: 11, color: "#64748b", textDecoration: "none" }}
+            style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)", textDecoration: "none" }}
           >
             ✕ 清除篩選
           </Link>
@@ -179,7 +179,7 @@ function EmptyState({ rawStatus }: { rawStatus?: string }) {
   return (
     <div
       style={{
-        background: "#fff",
+        background: "var(--card-bg)",
         border: "1px solid var(--border-subtle)",
         borderRadius: 12,
         padding: "56px 40px",
@@ -204,9 +204,9 @@ function ConnectionError({ message }: { message?: string }) {
   return (
     <div
       style={{
-        background: "#fef2f2",
-        border: "1px solid #fecaca",
-        color: "#991b1b",
+        background: "var(--badge-red-bg)",
+        border: "1px solid var(--approval-result-err-border)",
+        color: "var(--badge-red-text)",
         padding: "20px 24px",
         borderRadius: 10,
         margin: 32,
@@ -214,7 +214,7 @@ function ConnectionError({ message }: { message?: string }) {
     >
       <strong style={{ fontSize: 14 }}>無法連線到 Supabase</strong>
       {message && (
-        <pre style={{ marginTop: 8, fontSize: 11, background: "transparent", color: "#b91c1c", padding: 0 }}>
+        <pre style={{ marginTop: 8, fontSize: 11, background: "transparent", color: "var(--approval-role-deny)", padding: 0 }}>
           {message}
         </pre>
       )}

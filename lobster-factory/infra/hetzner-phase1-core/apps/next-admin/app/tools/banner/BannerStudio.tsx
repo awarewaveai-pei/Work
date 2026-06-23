@@ -898,7 +898,7 @@ function AccordionSection({
         <span style={{ opacity: 0.4, fontSize: 11 }}>{open ? "▲" : "▼"}</span>
       </button>
       {open && (
-        <div style={{ marginTop: 4, padding: 10, background: "var(--chip-surface, #f7f9fc)", borderRadius: 8, border: "1px solid var(--border, #e2e8f0)" }}>
+        <div style={{ marginTop: 4, padding: 10, background: "var(--chip-surface)", borderRadius: 8, border: "1px solid var(--border)" }}>
           {children}
         </div>
       )}
@@ -918,9 +918,9 @@ function PresetChips({ chips, onSelect, selected }: { chips: string[]; onSelect:
             onClick={() => onSelect(c)}
             style={{
               fontSize: 11, padding: "2px 9px", borderRadius: 20,
-              background: active ? "#6366f1" : "var(--chip-bg, #eef1f7)",
-              border: `1px solid ${active ? "#6366f1" : "var(--border, #d4d9e8)"}`,
-              cursor: "pointer", color: active ? "#fff" : "var(--text-muted, #3a4560)",
+              background: active ? "var(--accent)" : "var(--chip-bg)",
+              border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+              cursor: "pointer", color: active ? "var(--btn-primary-text)" : "var(--text-muted)",
               fontWeight: active ? 600 : 400, lineHeight: 1.6,
               transition: "all 0.15s",
             }}
@@ -1678,7 +1678,7 @@ export default function BannerStudio() {
 
                 {/* 產品圖處理（僅當已上傳產品圖時出現） */}
                 {s.productImage && (
-                  <div style={{ padding: 10, background: "var(--chip-surface, #f7f9fc)", borderRadius: 8, border: "1px solid var(--border, #e2e8f0)" }}>
+                  <div style={{ padding: 10, background: "var(--chip-surface)", borderRadius: 8, border: "1px solid var(--border)" }}>
                     <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>📦 產品圖處理</div>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                       <button
@@ -2021,7 +2021,7 @@ export default function BannerStudio() {
                     <button key={`${c}-${i}`} onClick={() => setSelSwatch(c)} title={c}
                       style={{
                         width: 30, height: 30, borderRadius: 6, background: c, cursor: "pointer", padding: 0,
-                        border: selSwatch === c ? "3px solid #6366f1" : "1px solid var(--border, #d4d9e8)",
+                        border: selSwatch === c ? "3px solid var(--accent)" : "1px solid var(--border)",
                       }} />
                   ))}
                 </div>
@@ -2075,7 +2075,7 @@ export default function BannerStudio() {
             <div style={{
               display: "inline-block", maxWidth: "100%", minHeight: previewUrl ? undefined : 240,
               position: "relative", borderRadius: 6, overflow: "hidden",
-              background: "var(--chip-surface, #f1f3f8)",
+              background: "var(--chip-surface)",
               backgroundImage:
                 "linear-gradient(45deg,#0001 25%,transparent 25%),linear-gradient(-45deg,#0001 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#0001 75%),linear-gradient(-45deg,transparent 75%,#0001 75%)",
               backgroundSize: "20px 20px",
@@ -2090,7 +2090,7 @@ export default function BannerStudio() {
                 <div style={{
                   position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  color: "#fff", fontSize: 14,
+                  color: "var(--btn-primary-text)", fontSize: 14,
                 }}>
                   {s.productRemoving ? "去背中…" : s.designing ? "AI 設計中…" : "AI 生成中…"}
                 </div>

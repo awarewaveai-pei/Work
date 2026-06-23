@@ -84,7 +84,7 @@ export function LoginForm() {
       </div>
 
       {error && (
-        <div style={{ fontSize: 12.5, color: "#991b1b", margin: "4px 0 12px" }}>{error}</div>
+        <div style={{ fontSize: 12.5, color: "var(--badge-red-text)", margin: "4px 0 12px" }}>{error}</div>
       )}
 
       <button type="submit" className="btn-primary" style={{ width: "100%" }} disabled={busy}>

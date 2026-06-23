@@ -501,7 +501,7 @@ export default function BuildConsole() {
 
           {/* ── WP Plugin Stack Summary ──────────────────────────────────── */}
           {form.pluginSlugs && form.pluginSlugs.length > 0 && (
-            <div className="build-plugin-stack-summary" style={{ margin: "12px 0", padding: "12px 16px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8 }}>
+            <div className="build-plugin-stack-summary" style={{ margin: "12px 0", padding: "12px 16px", background: "var(--badge-green-bg)", border: "1px solid var(--badge-green-bg)", borderRadius: 8 }}>
               <div className="section-title" style={{ marginBottom: 8 }}>📦 WordPress 外掛堆疊（OnboardWizard Step 2 帶入）</div>
               <div className="build-kv-grid">
                 <div>
@@ -514,17 +514,17 @@ export default function BuildConsole() {
                 </div>
                 <div>
                   <span>🟢 自動安裝（WP.org）</span>
-                  <strong style={{ color: "#166534" }}>{form.pluginSlugs.length} 個</strong>
+                  <strong style={{ color: "var(--badge-green-text)" }}>{form.pluginSlugs.length} 個</strong>
                 </div>
                 {form.paidPluginCount ? (
                   <div>
                     <span>🟡 需手動上傳（付費）</span>
-                    <strong style={{ color: "#92400e" }}>{form.paidPluginCount} 個</strong>
+                    <strong style={{ color: "var(--build-risk-medium-text)" }}>{form.paidPluginCount} 個</strong>
                   </div>
                 ) : null}
                 <div>
                   <span>SSH host（一鍵安裝必要）</span>
-                  <strong style={{ color: form.sshHost ? "#166534" : "#92400e", fontFamily: form.sshHost ? "monospace" : undefined, fontSize: 11 }}>
+                  <strong style={{ color: form.sshHost ? "var(--badge-green-text)" : "var(--build-risk-medium-text)", fontFamily: form.sshHost ? "monospace" : undefined, fontSize: 11 }}>
                     {form.sshHost ?? "未提供 — 安裝會跳過（Wizard Step 1 可補）"}
                   </strong>
                 </div>

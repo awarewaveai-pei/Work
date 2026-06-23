@@ -45,35 +45,35 @@ export default async function SystemModesPage() {
   return (
     <div style={{ padding: "32px 40px", maxWidth: 800 }}>
       <h1 style={{ marginBottom: 6 }}>系統模式（Kill Switch）</h1>
-      <p style={{ color: "#64748b", fontSize: 14, marginBottom: 24 }}>
+      <p style={{ color: "var(--text-muted)", fontSize: 14, marginBottom: 24 }}>
         全域系統開關。影響 Always-On Command Plane（指令面板）允許哪些指令執行。
       </p>
 
       <div
         style={{
-          background: "#f8fafc",
-          border: "1px solid #e2e8f0",
+          background: "var(--bg-subtle)",
+          border: "1px solid var(--border)",
           borderRadius: 8,
           padding: "12px 16px",
           marginBottom: 20,
           fontSize: 13,
-          color: "#475569",
+          color: "var(--badge-gray-text)",
         }}
       >
         你的角色：<strong>{role}</strong>{" "}
         {canAct ? (
-          <span style={{ color: "#059669" }}>（可切換模式）</span>
+          <span style={{ color: "var(--green)" }}>（可切換模式）</span>
         ) : (
-          <span style={{ color: "#b91c1c" }}>（唯讀 — 需 owner / admin 才能切換）</span>
+          <span style={{ color: "var(--red)" }}>（唯讀 — 需 owner / admin 才能切換）</span>
         )}
       </div>
 
       {dbError && (
         <div
           style={{
-            background: "#fef2f2",
-            border: "1px solid #fecaca",
-            color: "#991b1b",
+            background: "var(--badge-red-bg)",
+            border: "1px solid var(--red)",
+            color: "var(--badge-red-text)",
             borderRadius: 8,
             padding: "12px 16px",
             marginBottom: 24,
@@ -85,17 +85,17 @@ export default async function SystemModesPage() {
 
       <div
         style={{
-          background: isLocked ? "#fef2f2" : "#ecfdf5",
-          border: `1px solid ${isLocked ? "#fecaca" : "#a7f3d0"}`,
+          background: isLocked ? "var(--badge-red-bg)" : "var(--badge-green-bg)",
+          border: `1px solid ${isLocked ? "var(--red)" : "var(--green)"}`,
           borderRadius: 8,
           padding: "20px 24px",
           marginBottom: 24,
         }}
       >
-        <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
           目前模式
         </div>
-        <div style={{ fontSize: 28, fontWeight: 700, color: isLocked ? "#991b1b" : "#065f46", marginBottom: 8 }}>
+        <div style={{ fontSize: 28, fontWeight: 700, color: isLocked ? "var(--badge-red-text)" : "var(--badge-green-text)", marginBottom: 8 }}>
           {effectiveMode === "emergency_stop" && "🛑 "}
           {effectiveMode === "maintenance" && "🔧 "}
           {effectiveMode === "read_only" && "🔒 "}
@@ -103,13 +103,13 @@ export default async function SystemModesPage() {
           {effectiveMode}
         </div>
         {current?.reason && (
-          <div style={{ fontSize: 13, color: "#475569", marginTop: 8 }}>
+          <div style={{ fontSize: 13, color: "var(--badge-gray-text)", marginTop: 8 }}>
             <strong>切換原因：</strong>
             {current.reason}
           </div>
         )}
         {current?.set_at && (
-          <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
             最後切換時間：{new Date(current.set_at).toLocaleString("zh-TW")}
           </div>
         )}

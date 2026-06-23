@@ -20,17 +20,17 @@ const SOURCE_COLOR: Record<string, { bg: string; text: string }> = {
 };
 
 const SEV_COLOR: Record<string, string> = {
-  critical: "#dc2626",
-  high: "#ea580c",
-  medium: "#ca8a04",
-  low: "#0284c7",
+  critical: "var(--severity-critical)",
+  high: "var(--severity-high)",
+  medium: "var(--severity-medium)",
+  low: "var(--severity-low)",
 };
 
 const SEV_BG: Record<string, string> = {
-  critical: "#fef2f2",
-  high: "#fff7ed",
-  medium: "#fefce8",
-  low: "#f0f9ff",
+  critical: "var(--badge-red-bg)",
+  high: "var(--build-risk-medium-bg)",
+  medium: "var(--build-risk-medium-bg)",
+  low: "var(--ai-bg)",
 };
 
 function getSourceUrl(incident: Incident): string | null {
@@ -61,19 +61,19 @@ const SIGNAL_LABEL: Record<string, string> = {
 };
 
 const SIGNAL_COLOR: Record<string, { bg: string; text: string }> = {
-  error: { bg: "#fef2f2", text: "#991b1b" },
-  uptime: { bg: "#ecfdf5", text: "#065f46" },
-  latency: { bg: "#eff6ff", text: "#1e40af" },
-  resource: { bg: "#fefce8", text: "#713f12" },
-  business: { bg: "#f0fdf4", text: "#166534" },
-  deployment: { bg: "#f0f9ff", text: "#0c4a6e" },
+  error: { bg: "var(--badge-red-bg)", text: "var(--badge-red-text)" },
+  uptime: { bg: "var(--badge-green-bg)", text: "var(--badge-green-text)" },
+  latency: { bg: "var(--ai-bg)", text: "var(--accent)" },
+  resource: { bg: "var(--build-risk-medium-bg)", text: "var(--build-risk-medium-text)" },
+  business: { bg: "var(--badge-green-bg)", text: "var(--badge-green-text)" },
+  deployment: { bg: "var(--ai-bg)", text: "var(--severity-low)" },
 };
 
 export function IncidentCard({ incident, canAct }: { incident: Incident; canAct: boolean }) {
-  const sevColor = SEV_COLOR[incident.severity] ?? "#64748b";
-  const sevBg = SEV_BG[incident.severity] ?? "#f8fafc";
-  const src = SOURCE_COLOR[incident.source] ?? { bg: "#f1f5f9", text: "#475569" };
-  const sig = SIGNAL_COLOR[incident.signal_type] ?? { bg: "#f1f5f9", text: "#475569" };
+  const sevColor = SEV_COLOR[incident.severity] ?? "var(--text-muted)";
+  const sevBg = SEV_BG[incident.severity] ?? "var(--bg-subtle)";
+  const src = SOURCE_COLOR[incident.source] ?? { bg: "var(--badge-gray-bg)", text: "var(--badge-gray-text)" };
+  const sig = SIGNAL_COLOR[incident.signal_type] ?? { bg: "var(--badge-gray-bg)", text: "var(--badge-gray-text)" };
   const aiSummary = incident.ai_diagnoses?.find((d) => d.role === "auto-classify")?.summary;
   const isResolved = incident.status === "resolved";
   const isIgnored = incident.status === "ignored";
@@ -83,8 +83,8 @@ export function IncidentCard({ incident, canAct }: { incident: Incident; canAct:
   return (
     <article
       style={{
-        background: "#fff",
-        border: "1px solid #e5e7eb",
+        background: "var(--card-bg)",
+        border: "1px solid var(--border)",
         borderLeft: `3px solid ${sevColor}`,
         borderRadius: 10,
         padding: "14px 18px",
@@ -182,14 +182,14 @@ export function IncidentCard({ incident, canAct }: { incident: Incident; canAct:
 
           {/* Service or host context */}
           {incident.service ? (
-            <span style={{ fontSize: 12, color: "#64748b" }}>{incident.service}</span>
+            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{incident.service}</span>
           ) : incident.source === "netdata" && (incident.tags as any)?.host ? (
             <span
               style={{
                 fontSize: 11,
                 fontWeight: 600,
-                color: "#b45309",
-                background: "#fef3c7",
+                color: "var(--build-risk-medium-text)",
+                background: "var(--build-risk-medium-bg)",
                 padding: "1px 6px",
                 borderRadius: 4,
               }}
@@ -197,7 +197,7 @@ export function IncidentCard({ incident, canAct }: { incident: Incident; canAct:
               {(incident.tags as any).host === "sg" ? "SG Server" : "EU Server"}
             </span>
           ) : incident.source === "uptime_kuma" && (incident.tags as any)?.hostname ? (
-            <span style={{ fontSize: 11, color: "#64748b", fontFamily: "ui-monospace, monospace" }}>
+            <span style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "ui-monospace, monospace" }}>
               {String((incident.tags as any).hostname).replace(/^https?:\/\//, "").split("/")[0]}
             </span>
           ) : null}
@@ -207,8 +207,8 @@ export function IncidentCard({ incident, canAct }: { incident: Incident; canAct:
             <span
               style={{
                 fontSize: 11,
-                color: "#6366f1",
-                background: "#eef2ff",
+                color: "var(--accent)",
+                background: "var(--ai-bg)",
                 padding: "1px 6px",
                 borderRadius: 4,
               }}
@@ -219,18 +219,18 @@ export function IncidentCard({ incident, canAct }: { incident: Incident; canAct:
 
           {/* Status (non-open) */}
           {isResolved && (
-            <span style={{ fontSize: 11, color: "#16a34a", background: "#dcfce7", padding: "1px 6px", borderRadius: 4 }}>
+            <span style={{ fontSize: 11, color: "var(--status-resolved)", background: "var(--badge-green-bg)", padding: "1px 6px", borderRadius: 4 }}>
               已解決
             </span>
           )}
           {isIgnored && (
-            <span style={{ fontSize: 11, color: "#6b7280", background: "#f3f4f6", padding: "1px 6px", borderRadius: 4 }}>
+            <span style={{ fontSize: 11, color: "var(--status-ignored)", background: "var(--badge-gray-bg)", padding: "1px 6px", borderRadius: 4 }}>
               已忽略
             </span>
           )}
 
           {/* Time */}
-          <span style={{ marginLeft: "auto", fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap" }}>
+          <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
             {timeAgo(incident.last_seen_at)}
           </span>
         </div>
@@ -238,7 +238,7 @@ export function IncidentCard({ incident, canAct }: { incident: Incident; canAct:
         {/* Title */}
         <Link
           href={`/ops/inbox/${incident.id}`}
-          style={{ color: "#0f172a", textDecoration: "none", display: "block", marginBottom: aiSummary ? 8 : 6 }}
+          style={{ color: "var(--text-primary)", textDecoration: "none", display: "block", marginBottom: aiSummary ? 8 : 6 }}
         >
           <h3
             style={{
@@ -260,7 +260,7 @@ export function IncidentCard({ incident, canAct }: { incident: Incident; canAct:
           <div
             style={{
               fontSize: 12,
-              color: "#64748b",
+              color: "var(--text-muted)",
               lineHeight: 1.5,
               marginBottom: 8,
               overflow: "hidden",
@@ -277,9 +277,9 @@ export function IncidentCard({ incident, canAct }: { incident: Incident; canAct:
         {aiSummary && (
           <div
             style={{
-              background: "#f0f9ff",
-              border: "1px solid #bae6fd",
-              color: "#0369a1",
+              background: "var(--ai-bg)",
+              border: "1px solid var(--severity-low)",
+              color: "var(--ai-text)",
               padding: "6px 10px",
               borderRadius: 6,
               fontSize: 12,
@@ -293,18 +293,18 @@ export function IncidentCard({ incident, canAct }: { incident: Incident; canAct:
 
         {/* Footer meta */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 11, color: "#94a3b8" }}>
+          <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
             {incident.occurrence_count} occurrence{incident.occurrence_count !== 1 ? "s" : ""}
           </span>
           <OpenInCursorButton incident={incident} primary={false} />
           <Link
             href={`/ops/inbox/${incident.id}`}
-            style={{ fontSize: 12, color: "#6366f1", textDecoration: "none", fontWeight: 500 }}
+            style={{ fontSize: 12, color: "var(--accent)", textDecoration: "none", fontWeight: 500 }}
           >
             詳情 →
           </Link>
         </div>
-        <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #f1f5f9", width: "100%" }}>
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--bg-subtle)", width: "100%" }}>
           <StatusActions incidentId={incident.id} status={incident.status} canAct={canAct} />
         </div>
       </div>

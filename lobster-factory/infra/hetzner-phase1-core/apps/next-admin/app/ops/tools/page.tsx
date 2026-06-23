@@ -125,8 +125,8 @@ export default function OpsToolsPage() {
 
   return (
     <div style={{ background: "var(--bg-canvas)", minHeight: "100vh", padding: "28px 32px", maxWidth: 900, margin: "0 auto" }}>
-      <nav style={{ marginBottom: 16, fontSize: 13, color: "#64748b" }}>
-        <Link href="/ops/inbox" style={{ color: "#6366f1", textDecoration: "none" }}>← Ops Inbox</Link>
+      <nav style={{ marginBottom: 16, fontSize: 13, color: "var(--text-muted)" }}>
+        <Link href="/ops/inbox" style={{ color: "var(--accent)", textDecoration: "none" }}>← Ops Inbox</Link>
         {" / "}
         <span>Tools</span>
       </nav>
@@ -146,13 +146,13 @@ export default function OpsToolsPage() {
 
         <div
           style={{
-            background: "#f8fafc",
-            border: "1px dashed #cbd5e1",
+            background: "var(--bg-subtle)",
+            border: "1px dashed var(--border)",
             borderRadius: 10,
             padding: 16,
           }}
         >
-          <h4 style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 12 }}>新增 AI 工具</h4>
+          <h4 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 12 }}>新增 AI 工具</h4>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
             <Field label="工具名稱 *">
               <input
@@ -206,8 +206,8 @@ export default function OpsToolsPage() {
               disabled={!newTool.name.trim()}
               style={{
                 padding: "7px 18px",
-                background: newTool.name.trim() ? "#6366f1" : "#e2e8f0",
-                color: newTool.name.trim() ? "#fff" : "#94a3b8",
+                background: newTool.name.trim() ? "var(--accent)" : "var(--border)",
+                color: newTool.name.trim() ? "var(--btn-primary-text)" : "var(--text-muted)",
                 border: "none",
                 borderRadius: 7,
                 fontSize: 13,
@@ -217,7 +217,7 @@ export default function OpsToolsPage() {
             >
               新增工具
             </button>
-            {toolMsg && <span style={{ fontSize: 12, color: "#16a34a" }}>{toolMsg}</span>}
+            {toolMsg && <span style={{ fontSize: 12, color: "var(--green)" }}>{toolMsg}</span>}
           </div>
         </div>
       </Section>
@@ -232,13 +232,13 @@ export default function OpsToolsPage() {
 
         <div
           style={{
-            background: "#f8fafc",
-            border: "1px dashed #cbd5e1",
+            background: "var(--bg-subtle)",
+            border: "1px dashed var(--border)",
             borderRadius: 10,
             padding: 16,
           }}
         >
-          <h4 style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 12 }}>新增通知頻道</h4>
+          <h4 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 12 }}>新增通知頻道</h4>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
             <Field label="頻道名稱 *">
               <input
@@ -274,8 +274,8 @@ export default function OpsToolsPage() {
               disabled={!newChannel.name.trim() || !newChannel.target.trim()}
               style={{
                 padding: "7px 18px",
-                background: newChannel.name.trim() && newChannel.target.trim() ? "#0f172a" : "#e2e8f0",
-                color: newChannel.name.trim() && newChannel.target.trim() ? "#fff" : "#94a3b8",
+                background: newChannel.name.trim() && newChannel.target.trim() ? "var(--text-primary)" : "var(--border)",
+                color: newChannel.name.trim() && newChannel.target.trim() ? "var(--btn-primary-text)" : "var(--text-muted)",
                 border: "none",
                 borderRadius: 7,
                 fontSize: 13,
@@ -285,19 +285,19 @@ export default function OpsToolsPage() {
             >
               新增頻道
             </button>
-            {channelMsg && <span style={{ fontSize: 12, color: "#16a34a" }}>{channelMsg}</span>}
+            {channelMsg && <span style={{ fontSize: 12, color: "var(--green)" }}>{channelMsg}</span>}
           </div>
         </div>
       </Section>
 
       <div
         style={{
-          background: "#fffbeb",
-          border: "1px solid #fde68a",
+          background: "var(--build-risk-medium-bg)",
+          border: "1px solid var(--yellow)",
           borderRadius: 10,
           padding: "12px 16px",
           fontSize: 12,
-          color: "#92400e",
+          color: "var(--build-risk-medium-text)",
           lineHeight: 1.6,
         }}
       >
@@ -316,8 +316,8 @@ function Section({ title, subtitle, children }: { title: string; subtitle: strin
   return (
     <section style={{ marginBottom: 36 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 14 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", margin: 0 }}>{title}</h2>
-        <span style={{ fontSize: 12, color: "#94a3b8" }}>{subtitle}</span>
+        <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>{title}</h2>
+        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{subtitle}</span>
       </div>
       {children}
     </section>
@@ -328,8 +328,8 @@ function ToolRow({ tool, onRemove }: { tool: AiTool; onRemove?: () => void }) {
   return (
     <div
       style={{
-        background: "#fff",
-        border: "1px solid #e5e7eb",
+        background: "var(--card-bg)",
+        border: "1px solid var(--border)",
         borderRadius: 9,
         padding: "12px 16px",
         display: "flex",
@@ -340,15 +340,15 @@ function ToolRow({ tool, onRemove }: { tool: AiTool; onRemove?: () => void }) {
       <span style={{ fontSize: 18, width: 24, textAlign: "center" }}>{TYPE_ICON[tool.type]}</span>
       <div style={{ flex: 1 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-          <span style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{tool.name}</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{tool.name}</span>
           <span
             style={{
               fontSize: 10,
               fontWeight: 600,
               padding: "1px 6px",
               borderRadius: 4,
-              background: "#f1f5f9",
-              color: "#64748b",
+              background: "var(--badge-gray-bg)",
+              color: "var(--text-muted)",
               textTransform: "uppercase",
               letterSpacing: "0.04em",
             }}
@@ -356,17 +356,17 @@ function ToolRow({ tool, onRemove }: { tool: AiTool; onRemove?: () => void }) {
             {TOOL_TYPE_LABEL[tool.type]}
           </span>
           {tool.builtin && (
-            <span style={{ fontSize: 10, color: "#6366f1", background: "#eef2ff", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>
+            <span style={{ fontSize: 10, color: "var(--accent)", background: "var(--ai-bg)", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>
               內建
             </span>
           )}
         </div>
-        <div style={{ fontSize: 12, color: "#64748b" }}>{tool.description}</div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{tool.description}</div>
         {tool.url && (
-          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2, fontFamily: "ui-monospace, monospace" }}>{tool.url}</div>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, fontFamily: "ui-monospace, monospace" }}>{tool.url}</div>
         )}
         {tool.command && (
-          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2, fontFamily: "ui-monospace, monospace" }}>{tool.command}</div>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, fontFamily: "ui-monospace, monospace" }}>{tool.command}</div>
         )}
       </div>
       {onRemove && (
@@ -374,9 +374,9 @@ function ToolRow({ tool, onRemove }: { tool: AiTool; onRemove?: () => void }) {
           onClick={onRemove}
           style={{
             padding: "4px 10px",
-            background: "#fef2f2",
-            color: "#dc2626",
-            border: "1px solid #fecaca",
+            background: "var(--badge-red-bg)",
+            color: "var(--red)",
+            border: "1px solid var(--red)",
             borderRadius: 6,
             fontSize: 11,
             fontWeight: 600,
@@ -394,8 +394,8 @@ function ChannelRow({ channel, onRemove }: { channel: NotifyChannel; onRemove?: 
   return (
     <div
       style={{
-        background: "#fff",
-        border: "1px solid #e5e7eb",
+        background: "var(--card-bg)",
+        border: "1px solid var(--border)",
         borderRadius: 9,
         padding: "12px 16px",
         display: "flex",
@@ -406,9 +406,9 @@ function ChannelRow({ channel, onRemove }: { channel: NotifyChannel; onRemove?: 
       <span style={{ fontSize: 18, width: 24, textAlign: "center" }}>{CHANNEL_ICON[channel.type]}</span>
       <div style={{ flex: 1 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-          <span style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{channel.name}</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{channel.name}</span>
           {channel.builtin && (
-            <span style={{ fontSize: 10, color: "#6366f1", background: "#eef2ff", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>
+            <span style={{ fontSize: 10, color: "var(--accent)", background: "var(--ai-bg)", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>
               內建
             </span>
           )}
@@ -416,7 +416,7 @@ function ChannelRow({ channel, onRemove }: { channel: NotifyChannel; onRemove?: 
         <div
           style={{
             fontSize: 11,
-            color: "#94a3b8",
+            color: "var(--text-muted)",
             fontFamily: "ui-monospace, monospace",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -432,9 +432,9 @@ function ChannelRow({ channel, onRemove }: { channel: NotifyChannel; onRemove?: 
           onClick={onRemove}
           style={{
             padding: "4px 10px",
-            background: "#fef2f2",
-            color: "#dc2626",
-            border: "1px solid #fecaca",
+            background: "var(--badge-red-bg)",
+            color: "var(--red)",
+            border: "1px solid var(--red)",
             borderRadius: 6,
             fontSize: 11,
             fontWeight: 600,
@@ -451,7 +451,7 @@ function ChannelRow({ channel, onRemove }: { channel: NotifyChannel; onRemove?: 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b", display: "block", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+      <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.04em" }}>
         {label}
       </label>
       {children}
@@ -463,10 +463,10 @@ const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "7px 10px",
   borderRadius: 6,
-  border: "1px solid #d1d5db",
+  border: "1px solid var(--border)",
   fontSize: 12,
-  color: "#0f172a",
-  background: "#fff",
+  color: "var(--text-primary)",
+  background: "var(--card-bg)",
   outline: "none",
   boxSizing: "border-box",
 };

@@ -26,6 +26,8 @@ interface DraftBody {
   sceneCount?: number;
   /** 「自訂 AI 圖」數量（前端滑桿）→ AI 生圖模式用 Flux 圖的場景數，其餘走 Pexels B-roll。 */
   customScenes?: number;
+  /** 要輸出的格式（["16x9","9x16","4x5"] 子集）→ 每格式各生一組原生圖。省略 = 全三格式。 */
+  outputFormats?: string[];
   /** 深層接力：前製腳本場景（台詞→旁白、畫面→生圖提示）→ 跳過 Claude 重生。 */
   scenes?: { narration: string; imagePrompt: string }[];
 }
@@ -58,7 +60,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   interface PrepResult {
     ok?: boolean;
     scenes?: { id: number; narration: string; image_prompt: string; broll_keyword: string; visual: "custom" | "broll" }[];
-    assets?: string[];
+    formatAssets?: Record<string, string[]>;
+    formats?: string[];
     r2Keys?: string[];
     title?: string;
     status?: number;
@@ -74,17 +77,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     targetMinutes: typeof body.targetMinutes === "number" ? body.targetMinutes : undefined,
     sceneCount: typeof body.sceneCount === "number" ? body.sceneCount : undefined,
     customScenes: typeof body.customScenes === "number" ? body.customScenes : undefined,
+    formats: Array.isArray(body.outputFormats) ? body.outputFormats : undefined,
     providedScenes: providedScenes.length > 0 ? providedScenes : undefined,
   })) as PrepResult;
 
-  if (!result.ok || !result.scenes || !result.assets) {
+  if (!result.ok || !result.scenes || !result.formatAssets || !result.formats) {
     return NextResponse.json({ ok: false, error: result.error ?? "草稿生成失敗" }, { status: result.status ?? 500 });
   }
 
   return NextResponse.json({
     ok: true,
     scenes: result.scenes.map((s) => ({ id: s.id, narration: s.narration, imagePrompt: s.image_prompt, brollKeyword: s.broll_keyword, visual: s.visual })),
-    imageUrls: result.assets,
+    // 每格式一組原生圖；前端以主格式（formats[0]）預覽編輯，render-draft 時送回全部格式。
+    formatImageUrls: result.formatAssets,
+    formats: result.formats,
     r2Keys: result.r2Keys ?? [],
     title: result.title ?? "",
   });

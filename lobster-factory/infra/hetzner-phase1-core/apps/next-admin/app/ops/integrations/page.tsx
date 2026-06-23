@@ -97,11 +97,11 @@ export default async function IntegrationsPage() {
       )}
 
       {actionItems.length > 0 && (
-        <section style={{ ...panelStyle, borderColor: "#fecaca", background: "#fff7ed", marginBottom: 16 }}>
+        <section style={{ ...panelStyle, borderColor: "var(--red)", background: "var(--build-risk-medium-bg)", marginBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", marginBottom: 10 }}>
             <div>
-              <h2 style={{ fontSize: 14, fontWeight: 750, color: "#7c2d12", margin: 0 }}>Action required</h2>
-              <p style={{ fontSize: 12, color: "#9a3412", lineHeight: 1.6, margin: "4px 0 0" }}>
+              <h2 style={{ fontSize: 14, fontWeight: 750, color: "var(--build-risk-medium-text)", margin: 0 }}>Action required</h2>
+              <p style={{ fontSize: 12, color: "var(--severity-high)", lineHeight: 1.6, margin: "4px 0 0" }}>
                 These connections are visible to Repair Center but are not production-clean yet.
               </p>
             </div>
@@ -109,12 +109,12 @@ export default async function IntegrationsPage() {
           </div>
           <div style={{ display: "grid", gap: 8 }}>
             {actionItems.map((item) => (
-              <div key={item.key} style={{ ...smallRowStyle, background: "#fff" }}>
+              <div key={item.key} style={{ ...smallRowStyle, background: "var(--card-bg)" }}>
                 <div style={{ minWidth: 0 }}>
-                  <strong style={{ display: "block", fontSize: 12, color: "#7c2d12" }}>
+                  <strong style={{ display: "block", fontSize: 12, color: "var(--build-risk-medium-text)" }}>
                     {item.clientName} · {providerLabel(item.provider)}
                   </strong>
-                  <div style={{ fontSize: 11, color: "#9a3412", lineHeight: 1.6 }}>{item.message}</div>
+                  <div style={{ fontSize: 11, color: "var(--severity-high)", lineHeight: 1.6 }}>{item.message}</div>
                   <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 3 }}>{item.nextStep}</div>
                 </div>
                 <Pill text={item.status} tone={item.status === "pending" ? "warn" : "danger"} />
@@ -198,13 +198,13 @@ export default async function IntegrationsPage() {
                                 {integration.external_hint ? ` · ${integration.external_hint}` : ""}
                               </span>
                               {integration.last_error ? (
-                                <div style={{ fontSize: 11, color: "#991b1b", marginTop: 3 }}>{integration.last_error}</div>
+                                <div style={{ fontSize: 11, color: "var(--badge-red-text)", marginTop: 3 }}>{integration.last_error}</div>
                               ) : null}
                               <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 3 }}>
                                 tested {formatTime(integration.last_tested_at)} · seen {formatTime(integration.last_seen_at)}
                               </div>
                               {health ? (
-                                <div style={{ fontSize: 11, color: health.ok ? "#166534" : "#991b1b", marginTop: 3 }}>
+                                <div style={{ fontSize: 11, color: health.ok ? "var(--badge-green-text)" : "var(--badge-red-text)", marginTop: 3 }}>
                                   {health.scope}: {health.summary}
                                 </div>
                               ) : null}
@@ -309,7 +309,7 @@ function ReadinessBanner({
   integrationsError: string | null;
 }) {
   return (
-    <div style={{ background: "#fffbeb", border: "1px solid #fde68a", color: "#92400e", borderRadius: 8, padding: "12px 14px", fontSize: 13, lineHeight: 1.6 }}>
+    <div style={{ background: "var(--build-risk-medium-bg)", border: "1px solid var(--yellow)", color: "var(--build-risk-medium-text)", borderRadius: 8, padding: "12px 14px", fontSize: 13, lineHeight: 1.6 }}>
       <strong>Data foundation migration required.</strong>
       <div>
         assets: {assetsReady ? "ready" : assetsError ?? "not ready"} · integrations: {integrationsReady ? "ready" : integrationsError ?? "not ready"}
@@ -321,7 +321,7 @@ function ReadinessBanner({
 
 function ErrorPanel({ message }: { message: string }) {
   return (
-    <div style={{ margin: 32, background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", borderRadius: 8, padding: 18 }}>
+    <div style={{ margin: 32, background: "var(--badge-red-bg)", border: "1px solid var(--red)", color: "var(--badge-red-text)", borderRadius: 8, padding: 18 }}>
       <strong>Integrations unavailable</strong>
       <div style={{ marginTop: 6, fontSize: 13 }}>{message}</div>
     </div>
@@ -329,14 +329,14 @@ function ErrorPanel({ message }: { message: string }) {
 }
 
 function toneStyle(tone: "ok" | "warn" | "danger" | "muted"): CSSProperties {
-  if (tone === "ok") return { background: "#f0fdf4", color: "#166534", borderColor: "#bbf7d0" };
-  if (tone === "warn") return { background: "#fffbeb", color: "#92400e", borderColor: "#fde68a" };
-  if (tone === "danger") return { background: "#fef2f2", color: "#991b1b", borderColor: "#fecaca" };
-  return { background: "#f8fafc", color: "#475569", borderColor: "#e2e8f0" };
+  if (tone === "ok") return { background: "var(--badge-green-bg)", color: "var(--badge-green-text)", borderColor: "var(--green)" };
+  if (tone === "warn") return { background: "var(--build-risk-medium-bg)", color: "var(--build-risk-medium-text)", borderColor: "var(--yellow)" };
+  if (tone === "danger") return { background: "var(--badge-red-bg)", color: "var(--badge-red-text)", borderColor: "var(--red)" };
+  return { background: "var(--bg-subtle)", color: "var(--badge-gray-text)", borderColor: "var(--border)" };
 }
 
 const panelStyle: CSSProperties = {
-  background: "#fff",
+  background: "var(--card-bg)",
   border: "1px solid var(--border-subtle)",
   borderRadius: 8,
   padding: 16,

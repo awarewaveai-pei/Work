@@ -59,8 +59,8 @@ export function ClientCard({ org, health }: { org: OrgRow; health: HealthResult 
   // M3: department coverage count
   const deptCount = Array.isArray(cfg.department_selection) ? cfg.department_selection.length : null;
 
-  const healthColor = health.ok ? "#16a34a" : "#dc2626";
-  const healthBg = health.ok ? "#f0fdf4" : "#fef2f2";
+  const healthColor = health.ok ? "var(--green)" : "var(--red)";
+  const healthBg = health.ok ? "var(--badge-green-bg)" : "var(--badge-red-bg)";
   const healthLabel = health.ok
     ? `HTTP ${health.statusCode ?? "200"}`
     : health.error === "no_url"
@@ -138,8 +138,8 @@ export function ClientCard({ org, health }: { org: OrgRow; health: HealthResult 
               style={{
                 display: "inline-flex", alignItems: "center", gap: 4,
                 padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 500,
-                background: "#f1f5f9", color: "#475569",
-                border: "1px solid #e2e8f0", textDecoration: "none",
+                background: "var(--badge-gray-bg)", color: "var(--badge-gray-text)",
+                border: "1px solid var(--border)", textDecoration: "none",
               }}
             >
               ⚑ 查看警報
@@ -150,22 +150,22 @@ export function ClientCard({ org, health }: { org: OrgRow; health: HealthResult 
         {/* Row 4: WP plugin update summary */}
         {cfg.platform === "wordpress" && (
           <div style={{
-            background: "#f8fafc",
+            background: "var(--bg-subtle)",
             borderRadius: 8,
             padding: "10px 12px",
-            border: "1px solid #e2e8f0",
+            border: "1px solid var(--border)",
           }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>
               外掛更新
             </div>
             {wp ? (
               <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-                <Metric label="已更新" value={updatedCount} color="#16a34a" />
+                <Metric label="已更新" value={updatedCount} color="var(--green)" />
                 {pendingLicenseCount > 0 && (
-                  <Metric label="需授權" value={pendingLicenseCount} color="#ca8a04" />
+                  <Metric label="需授權" value={pendingLicenseCount} color="var(--severity-medium)" />
                 )}
                 {failedCount > 0 && (
-                  <Metric label="失敗" value={failedCount} color="#dc2626" />
+                  <Metric label="失敗" value={failedCount} color="var(--red)" />
                 )}
                 <div style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: "auto", alignSelf: "flex-end" }}>
                   {daysSinceRun === 0 ? "今日" : daysSinceRun === 1 ? "昨日" : `${daysSinceRun}天前`}
@@ -183,15 +183,15 @@ export function ClientCard({ org, health }: { org: OrgRow; health: HealthResult 
         {/* Row 5: AwareWave SaaS — no WP metrics */}
         {cfg.platform === "saas" && (
           <div style={{
-            background: "#f0f9ff",
+            background: "var(--ai-bg)",
             borderRadius: 8,
             padding: "8px 12px",
-            border: "1px solid #bae6fd",
+            border: "1px solid var(--severity-low)",
             fontSize: 11,
-            color: "#0369a1",
+            color: "var(--ai-text)",
           }}>
-            ◈ 平台自身 — 查看 <Link href="/ops/repairs" style={{ color: "#0369a1" }}>Repair Center</Link>、
-            <Link href="/ops/system-modes" style={{ color: "#0369a1" }}> 系統模式</Link>
+            ◈ 平台自身 — 查看 <Link href="/ops/repairs" style={{ color: "var(--ai-text)" }}>Repair Center</Link>、
+            <Link href="/ops/system-modes" style={{ color: "var(--ai-text)" }}> 系統模式</Link>
           </div>
         )}
       </div>
@@ -202,10 +202,10 @@ export function ClientCard({ org, health }: { org: OrgRow; health: HealthResult 
 // ── Small helpers (client-side fine too) ─────────────────────────────────────
 
 function Tag({ label, muted, dept, active }: { label: string; muted?: boolean; dept?: boolean; active?: boolean }) {
-  let bg = "#e0e7ff", color = "#4338ca", border = "#c7d2fe";
-  if (muted)  { bg = "#f1f5f9"; color = "#64748b"; border = "#cbd5e1"; }
-  if (dept && active)  { bg = "#f0fdf4"; color = "#166534"; border = "#bbf7d0"; }
-  if (dept && !active) { bg = "#fef9c3"; color = "#854d0e"; border = "#fde047"; }
+  let bg = "var(--designs-badge-tarot-bg)", color = "var(--accent)", border = "var(--accent-hover)";
+  if (muted)  { bg = "var(--badge-gray-bg)"; color = "var(--text-muted)"; border = "var(--border)"; }
+  if (dept && active)  { bg = "var(--badge-green-bg)"; color = "var(--badge-green-text)"; border = "var(--green)"; }
+  if (dept && !active) { bg = "var(--dept-by-industry-bg)"; color = "var(--dept-by-industry-text)"; border = "var(--yellow)"; }
   return (
     <span style={{
       display: "inline-block",

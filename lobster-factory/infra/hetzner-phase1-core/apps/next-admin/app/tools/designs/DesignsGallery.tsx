@@ -1474,7 +1474,7 @@ export default function DesignsGallery() {
                         borderRadius: 8,
                         cursor: "pointer",
                         background: active ? "rgba(99,102,241,0.18)" : "rgba(127,127,127,0.06)",
-                        border: `1px solid ${active ? "#6366f1" : "rgba(127,127,127,0.25)"}`,
+                        border: `1px solid ${active ? "var(--accent)" : "rgba(127,127,127,0.25)"}`,
                       }}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1485,7 +1485,7 @@ export default function DesignsGallery() {
                 })}
               </div>
 
-              {editError ? <span style={{ fontSize: 12, color: "#e5484d", flex: "none" }}>套用失敗：{editError}</span> : null}
+              {editError ? <span style={{ fontSize: 12, color: "var(--red)", flex: "none" }}>套用失敗：{editError}</span> : null}
 
               <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "none" }}>
                 <span style={{ fontSize: 11, opacity: 0.6 }}>強度</span>

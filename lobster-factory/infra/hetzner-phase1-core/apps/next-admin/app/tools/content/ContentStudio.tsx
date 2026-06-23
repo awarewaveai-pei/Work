@@ -1993,8 +1993,8 @@ export default function ContentStudio() {
   const tabStyle = (active: boolean): React.CSSProperties => ({
     padding: "8px 18px", border: "none", cursor: "pointer", background: "none", fontSize: "13px",
     fontWeight: active ? 600 : 400,
-    color: active ? "var(--btn-primary-bg, #5855d0)" : "var(--text-muted)",
-    borderBottom: active ? "2px solid var(--btn-primary-bg, #5855d0)" : "2px solid transparent",
+    color: active ? "var(--btn-primary-bg)" : "var(--text-muted)",
+    borderBottom: active ? "2px solid var(--btn-primary-bg)" : "2px solid transparent",
     marginBottom: "-1px",
   });
   const checkRow: React.CSSProperties   = { display: "flex", gap: "20px", flexWrap: "wrap", marginBottom: "6px" };
@@ -2106,8 +2106,8 @@ export default function ContentStudio() {
                 {(["trending", "suggest", "questions", "sources"] as const).map(t => (
                   <button key={t} onClick={() => setTrendTab(t)}
                     style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "4px", border: "1px solid var(--card-border)", cursor: "pointer",
-                      background: trendTab === t ? "var(--btn-primary-bg, #5855d0)" : "var(--bg-card)",
-                      color: trendTab === t ? "#fff" : "var(--text-muted)" }}>
+                      background: trendTab === t ? "var(--btn-primary-bg)" : "var(--bg-card)",
+                      color: trendTab === t ? "var(--btn-primary-text)" : "var(--text-muted)" }}>
                     {t === "trending" ? "今日熱搜" : t === "suggest" ? "搜尋建議" : t === "questions" ? "相關問題" : "⚙️ 管理來源"}
                   </button>
                 ))}
@@ -2151,7 +2151,7 @@ export default function ContentStudio() {
                     Reddit: { bg: "#ff4500", text: "#fff" },
                     PTT:    { bg: "#006e2e", text: "#fff" },
                   };
-                  const sc = item.source ? (srcColor[item.source] ?? { bg: "#e0e7ff", text: "#3730a3" }) : null;
+                  const sc = item.source ? (srcColor[item.source] ?? { bg: "var(--ai-bg)", text: "var(--accent)" }) : null;
                   return (
                     <div key={i} style={{ display: "flex", alignItems: "center", gap: "0", borderRadius: "6px", overflow: "hidden",
                       border: "1px solid var(--card-border)", background: "var(--bg-card)" }}>
@@ -2168,7 +2168,7 @@ export default function ContentStudio() {
                         {item.title}
                       </button>
                       {item.traffic && (
-                        <span style={{ padding: "3px 6px", fontSize: "10px", background: "#fef3c7", color: "#92400e", borderLeft: "1px solid var(--card-border)" }}>
+                        <span style={{ padding: "3px 6px", fontSize: "10px", background: "var(--build-risk-medium-bg)", color: "var(--build-risk-medium-text)", borderLeft: "1px solid var(--card-border)" }}>
                           {item.traffic}
                         </span>
                       )}
@@ -2209,7 +2209,7 @@ export default function ContentStudio() {
                     style={{ padding: "6px 12px", background: "var(--bg-card)", border: "1px solid var(--card-border)",
                       borderRadius: "6px", cursor: "pointer", fontSize: "12px", color: "var(--text-primary)",
                       textAlign: "left", width: "100%", display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span style={{ color: "#5855d0", fontWeight: 600 }}>?</span>{q}
+                    <span style={{ color: "var(--btn-primary-bg)", fontWeight: 600 }}>?</span>{q}
                   </button>
                 ))}
               </div>
@@ -2240,7 +2240,7 @@ export default function ContentStudio() {
                     {addingSource ? "新增中…" : "+ 新增"}
                   </button>
                 </div>
-                {sourcesError && <div style={{ fontSize: "12px", color: "var(--color-error, #ef4444)", marginBottom: "8px" }}>{sourcesError}</div>}
+                {sourcesError && <div style={{ fontSize: "12px", color: "var(--color-error)", marginBottom: "8px" }}>{sourcesError}</div>}
 
                 {/* DB sources list */}
                 {sourcesLoading && <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>讀取中…</div>}
@@ -2262,7 +2262,7 @@ export default function ContentStudio() {
                             {s.url}{Array.isArray(s.geos) ? ` · ${s.geos.join("/")}` : ""}
                           </div>
                         </div>
-                        <button className="btn-secondary" style={{ fontSize: "11px", padding: "3px 9px", color: "var(--color-error, #ef4444)", flexShrink: 0 }}
+                        <button className="btn-secondary" style={{ fontSize: "11px", padding: "3px 9px", color: "var(--color-error)", flexShrink: 0 }}
                           onClick={() => { if (window.confirm(`刪除來源「${s.label}」？`)) void deleteSource(s.id); }}>
                           刪除
                         </button>
@@ -2293,7 +2293,7 @@ export default function ContentStudio() {
             <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
               <span style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)", whiteSpace: "nowrap" }}>📍 目標客戶</span>
               {wpSites.length === 0 && (
-                <span style={{ fontSize: "12px", color: "#f59e0b" }}>
+                <span style={{ fontSize: "12px", color: "var(--yellow)" }}>
                   尚未連接任何網站 — 文章仍可生成，但無法推送。{" "}
                   <a href="/tools/content/sites" style={{ color: "var(--btn-primary-bg)" }}>前往連接 ↗</a>
                 </span>
@@ -2319,7 +2319,7 @@ export default function ContentStudio() {
               )}
               <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: "10px" }}>
                 {saveDefaultsMsg && (
-                  <span style={{ fontSize: "11px", color: saveDefaultsMsg.startsWith("✓") ? "#16a34a" : "#dc2626" }}>
+                  <span style={{ fontSize: "11px", color: saveDefaultsMsg.startsWith("✓") ? "var(--green)" : "var(--red)" }}>
                     {saveDefaultsMsg}
                   </span>
                 )}
@@ -2471,7 +2471,7 @@ export default function ContentStudio() {
           <div style={{ border: "1px solid rgba(59,130,246,0.3)", borderRadius: "12px", marginBottom: "20px", overflow: "hidden" }}>
             <div style={{ background: "linear-gradient(135deg,rgba(59,130,246,0.08),rgba(59,130,246,0.02))", borderBottom: "1px solid rgba(59,130,246,0.2)", padding: "10px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ fontSize: "15px" }}>📝</span>
-              <span style={{ fontWeight: 700, fontSize: "13px", color: "#1d4ed8" }}>文章 / 內容設定</span>
+              <span style={{ fontWeight: 700, fontSize: "13px", color: "var(--accent)" }}>文章 / 內容設定</span>
             </div>
             <div style={{ padding: "0 16px" }}>
           {/* ── 文章結構 ── */}
@@ -2482,7 +2482,7 @@ export default function ContentStudio() {
                 <label className="form-label" style={{ margin: 0 }}>Introductory Hook Brief</label>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                   <button type="button" disabled={isGenerating || hookBriefLoading || !form.keyword.trim()}
-                    style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "4px", border: "1px solid var(--card-border)", cursor: "pointer", background: "var(--bg-hover, #f5f5f5)" }}
+                    style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "4px", border: "1px solid var(--card-border)", cursor: "pointer", background: "var(--bg-hover)" }}
                     title={hookTypesSelected.size > 1 ? `為 ${hookTypesSelected.size} 個類型各生成一個 Hook 範例` : "AI 幫你寫一個 Hook 草稿"}
                     onClick={() => {
                       // If nothing selected, auto-select the recommended type first then generate
@@ -2532,9 +2532,9 @@ export default function ContentStudio() {
                         });
                       }}
                       style={{ padding: "3px 10px", borderRadius: "20px", fontSize: "11px", cursor: "pointer",
-                        border: isSelected ? "1.5px solid var(--btn-primary-bg, #5855d0)" : "1px solid var(--card-border)",
-                        background: isActive ? "var(--btn-primary-bg, #5855d0)" : isSelected ? "color-mix(in srgb, var(--btn-primary-bg, #5855d0) 12%, transparent)" : "transparent",
-                        color: isActive ? "#fff" : isSelected ? "var(--btn-primary-bg, #5855d0)" : "var(--text-muted)",
+                        border: isSelected ? "1.5px solid var(--btn-primary-bg)" : "1px solid var(--card-border)",
+                        background: isActive ? "var(--btn-primary-bg)" : isSelected ? "color-mix(in srgb, var(--btn-primary-bg) 12%, transparent)" : "transparent",
+                        color: isActive ? "var(--btn-primary-text)" : isSelected ? "var(--btn-primary-bg)" : "var(--text-muted)",
                         fontWeight: isSelected ? 600 : 400,
                       }}>
                       {HOOK_TYPE_LABELS[ht]}
@@ -2638,7 +2638,7 @@ export default function ContentStudio() {
                 </button>
                 {showKwDrop && kwSugs.length > 0 && (
                   <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 50,
-                    background: "var(--bg-card, #fff)", border: "1px solid var(--card-border)",
+                    background: "var(--bg-card)", border: "1px solid var(--card-border)",
                     borderRadius: "6px", boxShadow: "0 4px 12px rgba(0,0,0,.12)", minWidth: "300px", padding: "8px" }}>
                     <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px", padding: "0 4px" }}>點選新增關鍵字：</div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", padding: "0 4px" }}>
@@ -2649,7 +2649,7 @@ export default function ContentStudio() {
                             setF("nlpKeywords", existing ? `${existing}, ${kw}` : kw);
                           }}
                           style={{ padding: "3px 8px", borderRadius: "4px", border: "1px solid var(--card-border)",
-                            background: "var(--bg-page, #f8f9fc)", cursor: "pointer", fontSize: "12px", color: "var(--text-primary)" }}>
+                            background: "var(--bg-page)", cursor: "pointer", fontSize: "12px", color: "var(--text-primary)" }}>
                           {kw}
                         </button>
                       ))}
@@ -2681,8 +2681,8 @@ export default function ContentStudio() {
                             setF("wpCategories", next.join(", "));
                           }}
                           style={{ padding: "2px 8px", borderRadius: "12px", border: "1px solid", fontSize: "12px", cursor: "pointer",
-                            background: selected ? "var(--color-primary, #2563eb)" : "var(--bg-hover, #f5f5f5)",
-                            color: selected ? "#fff" : "var(--text-primary)", borderColor: selected ? "var(--color-primary, #2563eb)" : "var(--card-border)" }}>
+                            background: selected ? "var(--color-primary)" : "var(--bg-hover)",
+                            color: selected ? "var(--btn-primary-text)" : "var(--text-primary)", borderColor: selected ? "var(--color-primary)" : "var(--card-border)" }}>
                           {selected ? "✓ " : ""}{cat}
                         </button>
                       );
@@ -2708,9 +2708,9 @@ export default function ContentStudio() {
                             setF("wpTags", next.join(", "));
                           }}
                           style={{ padding: "2px 8px", borderRadius: "12px", border: "1px solid", fontSize: "12px", cursor: "pointer",
-                            background: selected ? "var(--color-primary, #2563eb)" : "var(--bg-hover, #f5f5f5)",
-                            color: selected ? "#fff" : "var(--text-secondary)",
-                            borderColor: selected ? "var(--color-primary, #2563eb)" : "var(--card-border)" }}>
+                            background: selected ? "var(--color-primary)" : "var(--bg-hover)",
+                            color: selected ? "var(--btn-primary-text)" : "var(--text-secondary)",
+                            borderColor: selected ? "var(--color-primary)" : "var(--card-border)" }}>
                           {tag}
                         </button>
                       );
@@ -2762,7 +2762,7 @@ export default function ContentStudio() {
 
           {/* ── Media Hub ── */}
           <SectionToggle label="Media Hub" open={showMedia} onToggle={() => setShowMedia(v => !v)}>
-            <div style={{ background: "#fffef0", border: "1px solid #fde68a", borderRadius: "6px", padding: "14px" }}>
+            <div style={{ background: "var(--build-risk-medium-bg)", border: "1px solid var(--yellow)", borderRadius: "6px", padding: "14px" }}>
               {/* Row 1: AI Images + count + size + style */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto 1fr", gap: "12px", marginBottom: "12px", alignItems: "end" }}>
                 <div>
@@ -2897,7 +2897,7 @@ export default function ContentStudio() {
                     onChange={e => setMedia("includeKeywordAlt", e.target.checked)} />
                   <span style={{ lineHeight: 1.4 }}>
                     Include the main keyword in the first image as Alt-text.{" "}
-                    <span style={{ color: "var(--btn-primary-bg, #5855d0)" }}>Relevant keywords will be picked up and added to the rest of the images.</span>
+                    <span style={{ color: "var(--btn-primary-bg)" }}>Relevant keywords will be picked up and added to the rest of the images.</span>
                   </span>
                 </label>
                 <label style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "13px", cursor: "pointer", userSelect: "none" }}>
@@ -2905,7 +2905,7 @@ export default function ContentStudio() {
                     checked={form.media.autoAltText}
                     disabled={isGenerating || form.media.aiImages === "none"}
                     onChange={e => setMedia("autoAltText", e.target.checked)} />
-                  <span style={{ lineHeight: 1.4, color: "var(--btn-primary-bg, #5855d0)" }}>
+                  <span style={{ lineHeight: 1.4, color: "var(--btn-primary-bg)" }}>
                     Adds informative Alt-text to images based on their content, providing a clear description of what is depicted to improve SEO.
                   </span>
                 </label>
@@ -2941,19 +2941,19 @@ export default function ContentStudio() {
 
               {/* AI 影片設定（選 ai-video 時展開）*/}
               {form.media.youtubeSource === "ai-video" && (
-                <div style={{ marginTop: "8px", padding: "12px 14px", borderRadius: "8px", border: "1px solid #bae6fd", background: "#f0f9ff", display: "flex", flexDirection: "column", gap: "12px" }}>
+                <div style={{ marginTop: "8px", padding: "12px 14px", borderRadius: "8px", border: "1px solid var(--ai-bg)", background: "var(--ai-bg)", display: "flex", flexDirection: "column", gap: "12px" }}>
                   {/* 視覺風格 */}
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 600, color: "#0369a1" }}>
-                      🎨 視覺風格 <span style={{ fontWeight: 400, color: "#64748b" }}>{videoStyleZh || "不指定（電影感預設）"}</span>
+                    <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--ai-text)" }}>
+                      🎨 視覺風格 <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>{videoStyleZh || "不指定（電影感預設）"}</span>
                     </span>
                     <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
                       {VIDEO_STYLE_GROUPS.map((g) => (
                         <button key={g} type="button" onClick={() => setVideoStyleGroup(g)}
                           style={{ padding: "2px 10px", borderRadius: 20, fontSize: "11px", cursor: "pointer",
-                            border: `1px solid ${videoStyleGroup === g ? "#0284c7" : "#bae6fd"}`,
-                            background: videoStyleGroup === g ? "#0284c7" : "rgba(255,255,255,0.6)",
-                            color: videoStyleGroup === g ? "#fff" : "#64748b" }}>
+                            border: `1px solid ${videoStyleGroup === g ? "var(--severity-low)" : "var(--ai-bg)"}`,
+                            background: videoStyleGroup === g ? "var(--severity-low)" : "rgba(255,255,255,0.6)",
+                            color: videoStyleGroup === g ? "var(--btn-primary-text)" : "var(--text-muted)" }}>
                           {g}
                         </button>
                       ))}
@@ -2964,9 +2964,9 @@ export default function ContentStudio() {
                         return (
                           <button key={item.zh} type="button" onClick={() => setVideoStyleZh(active ? "" : item.zh)}
                             style={{ padding: "2px 9px", borderRadius: 20, fontSize: "11px", cursor: "pointer",
-                              border: `1px solid ${active ? "#0284c7" : "#bae6fd"}`,
-                              background: active ? "#0284c7" : "rgba(255,255,255,0.6)",
-                              color: active ? "#fff" : "#64748b" }}>
+                              border: `1px solid ${active ? "var(--severity-low)" : "var(--ai-bg)"}`,
+                              background: active ? "var(--severity-low)" : "rgba(255,255,255,0.6)",
+                              color: active ? "var(--btn-primary-text)" : "var(--text-muted)" }}>
                             {item.zh}
                           </button>
                         );
@@ -2974,39 +2974,39 @@ export default function ContentStudio() {
                     </div>
                   </div>
                   {/* 場景設定 */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "10px 12px", borderRadius: "6px", background: "rgba(255,255,255,0.6)", border: "1px solid #bae6fd" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 700, color: "#0369a1" }}>場景設定</span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "10px 12px", borderRadius: "6px", background: "rgba(255,255,255,0.6)", border: "1px solid var(--ai-bg)" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--ai-text)" }}>場景設定</span>
                     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span style={{ fontSize: "12px", fontWeight: 600, color: "#475569" }}>場景總數</span>
-                        <span style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a" }}>{videoTotalScenes} 場</span>
+                        <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)" }}>場景總數</span>
+                        <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-primary)" }}>{videoTotalScenes} 場</span>
                       </div>
                       <input type="range" min={1} max={20} step={1} value={videoTotalScenes}
                         onChange={(e) => { const n = Number(e.target.value); setVideoTotalScenes(n); if (videoCustomScenes > n) setVideoCustomScenes(n); }}
-                        style={{ width: "100%", accentColor: "#0284c7" }} />
+                        style={{ width: "100%", accentColor: "var(--severity-low)" }} />
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span style={{ fontSize: "12px", fontWeight: 600, color: "#475569" }}>自訂 AI 圖（Flux）</span>
-                        <span style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a" }}>{videoCustomScenes}/{videoTotalScenes} · B-roll：{Math.max(0, videoTotalScenes - videoCustomScenes)}</span>
+                        <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)" }}>自訂 AI 圖（Flux）</span>
+                        <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-primary)" }}>{videoCustomScenes}/{videoTotalScenes} · B-roll：{Math.max(0, videoTotalScenes - videoCustomScenes)}</span>
                       </div>
                       <input type="range" min={0} max={videoTotalScenes} step={1} value={videoCustomScenes}
                         onChange={(e) => setVideoCustomScenes(Number(e.target.value))}
-                        style={{ width: "100%", accentColor: "#0284c7" }} />
+                        style={{ width: "100%", accentColor: "var(--severity-low)" }} />
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                      <span style={{ fontSize: "12px", fontWeight: 600, color: "#475569" }}>生圖模型</span>
+                      <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)" }}>生圖模型</span>
                       <select value={videoImageModel} onChange={(e) => setVideoImageModel(e.target.value)}
-                        style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #bae6fd", fontSize: "12px", background: "#fff", color: "#0f172a", width: "100%" }}>
+                        style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid var(--ai-bg)", fontSize: "12px", background: "var(--card-bg)", color: "var(--text-primary)", width: "100%" }}>
                         {Object.entries(IMAGE_RATES).map(([id, r]) => (
                           <option key={id} value={id}>{r.label} — ${r.usd}/張</option>
                         ))}
                       </select>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                      <span style={{ fontSize: "12px", fontWeight: 600, color: "#475569" }}>配音模型</span>
+                      <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)" }}>配音模型</span>
                       <select value={videoVoiceId} onChange={(e) => setVideoVoiceId(e.target.value)}
-                        style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #bae6fd", fontSize: "12px", background: "#fff", color: "#0f172a", width: "100%" }}>
+                        style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid var(--ai-bg)", fontSize: "12px", background: "var(--card-bg)", color: "var(--text-primary)", width: "100%" }}>
                         {VOICE_MODELS_VIDEO.map((v) => (
                           <option key={v.id} value={v.id}>{v.label} [{v.lang}] {v.badge}</option>
                         ))}
@@ -3023,7 +3023,7 @@ export default function ContentStudio() {
                   disabled={isGenerating || (form.media.aiImages === "none" && form.media.youtubeSource === "none")}
                   onChange={e => setMedia("strictUnderHeadings", e.target.checked)} />
                 <span style={{ lineHeight: 1.4 }}>
-                  <span style={{ color: "var(--btn-primary-bg, #5855d0)" }}>All media elements will be placed strictly under the headings.</span>
+                  <span style={{ color: "var(--btn-primary-bg)" }}>All media elements will be placed strictly under the headings.</span>
                   {" "}<span style={{ color: "var(--text-muted)" }}>If disabled, the AI will decide and find the best placement.</span>
                 </span>
               </label>
@@ -3037,17 +3037,17 @@ export default function ContentStudio() {
               <button type="button" disabled={isGenerating}
                 onClick={() => setPatternMode("auto")}
                 style={{ padding: "3px 12px", fontSize: "12px", borderRadius: "4px", border: "1px solid", cursor: "pointer",
-                  background: patternMode === "auto" ? "var(--color-primary, #2563eb)" : "var(--bg-hover, #f5f5f5)",
-                  color: patternMode === "auto" ? "#fff" : "var(--text-secondary)",
-                  borderColor: patternMode === "auto" ? "var(--color-primary, #2563eb)" : "var(--card-border)" }}>
+                  background: patternMode === "auto" ? "var(--color-primary)" : "var(--bg-hover)",
+                  color: patternMode === "auto" ? "var(--btn-primary-text)" : "var(--text-secondary)",
+                  borderColor: patternMode === "auto" ? "var(--color-primary)" : "var(--card-border)" }}>
                 AI 自動挑選
               </button>
               <button type="button" disabled={isGenerating}
                 onClick={() => setPatternMode("manual")}
                 style={{ padding: "3px 12px", fontSize: "12px", borderRadius: "4px", border: "1px solid", cursor: "pointer",
-                  background: patternMode === "manual" ? "var(--color-primary, #2563eb)" : "var(--bg-hover, #f5f5f5)",
-                  color: patternMode === "manual" ? "#fff" : "var(--text-secondary)",
-                  borderColor: patternMode === "manual" ? "var(--color-primary, #2563eb)" : "var(--card-border)" }}>
+                  background: patternMode === "manual" ? "var(--color-primary)" : "var(--bg-hover)",
+                  color: patternMode === "manual" ? "var(--btn-primary-text)" : "var(--text-secondary)",
+                  borderColor: patternMode === "manual" ? "var(--color-primary)" : "var(--card-border)" }}>
                 手動選擇
               </button>
               <button className="btn-secondary" onClick={() => void loadPatterns()} disabled={patternsLoading}
@@ -3097,9 +3097,9 @@ export default function ContentStudio() {
                         padding: "3px 10px", borderRadius: "4px", border: "1px solid",
                         fontSize: "12px",
                         cursor: patternMode === "manual" ? "pointer" : "default",
-                        background: isSelected ? "var(--color-primary, #2563eb)" : "var(--bg-hover, #f5f5f5)",
-                        color: isSelected ? "#fff" : "var(--text-primary)",
-                        borderColor: isSelected ? "var(--color-primary, #2563eb)" : "var(--card-border)",
+                        background: isSelected ? "var(--color-primary)" : "var(--bg-hover)",
+                        color: isSelected ? "var(--btn-primary-text)" : "var(--text-primary)",
+                        borderColor: isSelected ? "var(--color-primary)" : "var(--card-border)",
                       }}>
                       {p.title}
                     </button>
@@ -3107,7 +3107,7 @@ export default function ContentStudio() {
                 })}
               </div>
             ) : (
-              <div className="form-hint" style={{ marginTop: 8, color: patternsNote && !patternsNote.includes("no auth") ? "var(--red, #dc2626)" : "var(--text-muted)" }}>
+              <div className="form-hint" style={{ marginTop: 8, color: patternsNote && !patternsNote.includes("no auth") ? "var(--red)" : "var(--text-muted)" }}>
                 {patternsLoading ? "" : patternsNote
                   ? patternsNote.includes("no auth")
                     ? "此站台尚未設定 Application Password，無法讀取 wp_block（WordPress → 使用者 → 你的帳號 → 應用程式密碼 → 新增）。"
@@ -3124,7 +3124,7 @@ export default function ContentStudio() {
           <div style={{ border: "1px solid rgba(139,92,246,0.3)", borderRadius: "12px", marginBottom: "20px", overflow: "hidden" }}>
             <div style={{ background: "linear-gradient(135deg,rgba(139,92,246,0.08),rgba(139,92,246,0.02))", borderBottom: "1px solid rgba(139,92,246,0.2)", padding: "10px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ fontSize: "15px" }}>🎯</span>
-              <span style={{ fontWeight: 700, fontSize: "13px", color: "#6d28d9" }}>品牌資料</span>
+              <span style={{ fontWeight: 700, fontSize: "13px", color: "var(--accent)" }}>品牌資料</span>
               <span style={{ fontSize: "11px", color: "var(--text-muted)", marginLeft: 4 }}>— 自動帶入 app.aware-wave.com/ops/clients 客戶資料</span>
             </div>
             <div style={{ padding: "0 16px" }}>
@@ -3150,7 +3150,7 @@ export default function ContentStudio() {
                   <div className="form-hint">已自動帶入目標客戶 About 頁，可直接覆寫。</div>
                 )}
                 {bvSampleUrl.trim() && !bvSampleText.trim() && (
-                  <div className="form-hint" style={{ color: "#f97316" }}>伺服器端抓取頁面文字；若 URL 需登入或封鎖爬蟲則會靜默失敗，建議同時貼入範例文字。</div>
+                  <div className="form-hint" style={{ color: "var(--severity-high)" }}>伺服器端抓取頁面文字；若 URL 需登入或封鎖爬蟲則會靜默失敗，建議同時貼入範例文字。</div>
                 )}
               </div>
             </div>
@@ -3169,10 +3169,10 @@ export default function ContentStudio() {
                   {bvApplied ? "✓ 已套用" : "✨ 注入文章提示詞"}
                 </button>
               )}
-              {bvError && <span style={{ color: "var(--color-error, #ef4444)", fontSize: "12px" }}>{bvError}</span>}
+              {bvError && <span style={{ color: "var(--color-error)", fontSize: "12px" }}>{bvError}</span>}
             </div>
             {bvProfile && (
-              <div style={{ marginTop: "12px", padding: "12px", background: "var(--bg-hover, #f5f5f5)", borderRadius: "6px", fontSize: "12px" }}>
+              <div style={{ marginTop: "12px", padding: "12px", background: "var(--bg-hover)", borderRadius: "6px", fontSize: "12px" }}>
                 <div style={{ fontWeight: 600, marginBottom: "8px", color: "var(--text-primary)" }}>{bvProfile.name} — 品牌聲音摘要</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 16px" }}>
                   <div><span style={{ color: "var(--text-muted)" }}>語調：</span>{bvProfile.tone}</div>
@@ -3184,7 +3184,7 @@ export default function ContentStudio() {
                   <div style={{ marginTop: "6px" }}>
                     <span style={{ color: "var(--text-muted)" }}>偏好用詞：</span>
                     {bvProfile.preferWords.map((w, i) => (
-                      <span key={i} style={{ display: "inline-block", padding: "1px 6px", background: "#dcfce7", color: "#166534", borderRadius: "3px", marginRight: "4px", marginBottom: "2px", fontSize: "11px" }}>{w}</span>
+                      <span key={i} style={{ display: "inline-block", padding: "1px 6px", background: "var(--badge-green-bg)", color: "var(--badge-green-text)", borderRadius: "3px", marginRight: "4px", marginBottom: "2px", fontSize: "11px" }}>{w}</span>
                     ))}
                   </div>
                 )}
@@ -3192,11 +3192,11 @@ export default function ContentStudio() {
                   <div style={{ marginTop: "4px" }}>
                     <span style={{ color: "var(--text-muted)" }}>避免用詞：</span>
                     {bvProfile.avoidWords.map((w, i) => (
-                      <span key={i} style={{ display: "inline-block", padding: "1px 6px", background: "#fee2e2", color: "#991b1b", borderRadius: "3px", marginRight: "4px", marginBottom: "2px", fontSize: "11px" }}>{w}</span>
+                      <span key={i} style={{ display: "inline-block", padding: "1px 6px", background: "var(--badge-red-bg)", color: "var(--badge-red-text)", borderRadius: "3px", marginRight: "4px", marginBottom: "2px", fontSize: "11px" }}>{w}</span>
                     ))}
                   </div>
                 )}
-                <div style={{ marginTop: "8px", padding: "8px", background: "var(--bg-card)", borderRadius: "4px", borderLeft: "3px solid #5855d0", fontSize: "11px", lineHeight: 1.5 }}>
+                <div style={{ marginTop: "8px", padding: "8px", background: "var(--bg-card)", borderRadius: "4px", borderLeft: "3px solid var(--btn-primary-bg)", fontSize: "11px", lineHeight: 1.5 }}>
                   {bvProfile.promptInjection}
                 </div>
               </div>
@@ -3210,18 +3210,18 @@ export default function ContentStudio() {
                 disabled={marketLoading || !form.keyword.trim()} style={{ fontSize: "12px" }}>
                 {marketLoading ? "分析中（約 10–30 秒）…" : "🔍 分析競業與痛點"}
               </button>
-              {marketContext && <span style={{ color: "#16a34a", fontSize: "12px" }}>✓ 已納入，產生文章時自動注入</span>}
-              {marketError && <span style={{ color: "var(--color-error, #ef4444)", fontSize: "12px" }}>{marketError}</span>}
+              {marketContext && <span style={{ color: "var(--green)", fontSize: "12px" }}>✓ 已納入，產生文章時自動注入</span>}
+              {marketError && <span style={{ color: "var(--color-error)", fontSize: "12px" }}>{marketError}</span>}
             </div>
             <div className="form-hint">用 AI 多角度分析，從競爭對手、讀者痛點、搜尋意圖、轉換疑慮、差異化機會五個角度，結果會引導文章定位。需先填關鍵字。</div>
             {marketAnalysis && (
               <div style={{ marginTop: "12px", display: "grid", gap: "10px", fontSize: "12px" }}>
                 {([
-                  ["讀者痛點", marketAnalysis.painPoints, "#fee2e2", "#991b1b"],
-                  ["搜尋意圖 / 角度", marketAnalysis.searchIntent, "#dbeafe", "#1e40af"],
-                  ["轉換疑慮", marketAnalysis.objections, "#fef3c7", "#92400e"],
+                  ["讀者痛點", marketAnalysis.painPoints, "var(--badge-red-bg)", "var(--badge-red-text)"],
+                  ["搜尋意圖 / 角度", marketAnalysis.searchIntent, "var(--ai-bg)", "var(--accent)"],
+                  ["轉換疑慮", marketAnalysis.objections, "var(--build-risk-medium-bg)", "var(--build-risk-medium-text)"],
                   ["競爭對手", marketAnalysis.competitors, "#f3e8ff", "#6b21a8"],
-                  ["差異化機會", marketAnalysis.differentiators, "#dcfce7", "#166534"],
+                  ["差異化機會", marketAnalysis.differentiators, "var(--badge-green-bg)", "var(--badge-green-text)"],
                 ] as [string, string[], string, string][]).filter(([, arr]) => arr.length > 0).map(([title, arr, bg, fg]) => (
                   <div key={title}>
                     <div style={{ fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>{title}</div>
@@ -3421,7 +3421,7 @@ export default function ContentStudio() {
           <div style={{ border: "1px solid rgba(34,197,94,0.3)", borderRadius: "12px", marginBottom: "20px", overflow: "hidden" }}>
             <div style={{ background: "linear-gradient(135deg,rgba(34,197,94,0.08),rgba(34,197,94,0.02))", borderBottom: "1px solid rgba(34,197,94,0.2)", padding: "10px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ fontSize: "15px" }}>📢</span>
-              <span style={{ fontWeight: 700, fontSize: "13px", color: "#15803d" }}>分發設定</span>
+              <span style={{ fontWeight: 700, fontSize: "13px", color: "var(--green)" }}>分發設定</span>
               <span style={{ fontSize: "11px", color: "var(--text-muted)", marginLeft: 4 }}>— 生成文章後才能使用</span>
             </div>
             <div style={{ padding: "0 16px" }}>
@@ -3460,7 +3460,7 @@ export default function ContentStudio() {
                   </button>
                 </div>
                 {synStatus === "error" && (
-                  <div style={{ fontSize: "12px", color: "var(--color-error, #ef4444)", marginTop: "6px" }}>社群貼文生成失敗，請重試</div>
+                  <div style={{ fontSize: "12px", color: "var(--color-error)", marginTop: "6px" }}>社群貼文生成失敗，請重試</div>
                 )}
                 {synStatus === "done" && Object.keys(synContent).length > 0 && (
                   <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -3503,7 +3503,7 @@ export default function ContentStudio() {
                         </button>
                       </div>
                       {postizChError && (
-                        <div style={{ fontSize: 12, color: "#dc2626", marginBottom: 8 }}>{postizChError}</div>
+                        <div style={{ fontSize: 12, color: "var(--red)", marginBottom: 8 }}>{postizChError}</div>
                       )}
                       {postizChannels.filter(c => c.status === "connected").length > 0 && (
                         <>
@@ -3527,7 +3527,7 @@ export default function ContentStudio() {
                                       })} />
                                     <span style={{ fontSize: 12, fontWeight: 600 }}>{ch.label}</span>
                                     <span style={{ fontSize: 11, color: "var(--text-muted)" }}>({ch.platform})</span>
-                                    {!synText && <span style={{ fontSize: 11, color: "#f59e0b" }}>需手動填入內容</span>}
+                                    {!synText && <span style={{ fontSize: 11, color: "var(--yellow)" }}>需手動填入內容</span>}
                                   </label>
                                   {isSelected && (
                                     <textarea
@@ -3537,7 +3537,7 @@ export default function ContentStudio() {
                                         width: "100%", minHeight: 64, marginTop: 6, fontSize: 11,
                                         fontFamily: "inherit", padding: 6, borderRadius: 4,
                                         border: "1px solid var(--card-border)", boxSizing: "border-box",
-                                        background: "var(--bg-page, #f8f9fc)", resize: "vertical",
+                                        background: "var(--bg-page)", resize: "vertical",
                                       }}
                                       placeholder={synText ? "" : `${ch.platform} 貼文內容`}
                                     />
@@ -3584,15 +3584,15 @@ export default function ContentStudio() {
                           {postizPushStatus === "done" && postizPushResults.length > 0 && (
                             <div style={{ marginTop: 10 }}>
                               {postizPushResults.map(r => (
-                                <div key={r.platform} style={{ fontSize: 12, color: r.status === "ok" ? "#16a34a" : "#dc2626" }}>
+                                <div key={r.platform} style={{ fontSize: 12, color: r.status === "ok" ? "var(--green)" : "var(--red)" }}>
                                   {r.status === "ok" ? "✓" : "✗"} {r.platform}
-                                  {r.status === "error" && r.error && <span style={{ marginLeft: 4 }}>{r.error}</span>}
+                                  {r.status === "error" && r.error && <span style={{ marginLeft: 4, color: "var(--red)" }}>{r.error}</span>}
                                 </div>
                               ))}
                             </div>
                           )}
                           {postizPushStatus === "error" && (
-                            <div style={{ fontSize: 12, color: "#dc2626", marginTop: 6 }}>推送失敗，請重試</div>
+                            <div style={{ fontSize: 12, color: "var(--red)", marginTop: 6 }}>推送失敗，請重試</div>
                           )}
                         </>
                       )}
@@ -3637,19 +3637,19 @@ export default function ContentStudio() {
                     {nlStatus === "sending" ? "推送中…" : "📧 建立 FluentCRM 導讀草稿"}
                   </button>
                   {!nlArticleUrl.trim() && (
-                    <span style={{ fontSize: "11px", color: "#f59e0b" }}>未填文章連結 — 導讀將不含按鈕</span>
+                    <span style={{ fontSize: "11px", color: "var(--yellow)" }}>未填文章連結 — 導讀將不含按鈕</span>
                   )}
                 </div>
                 {nlStatus === "done" && (
                   <div style={{ marginTop: "10px", fontSize: "12px", color: "var(--text-primary)" }}>
                     ✓ 已建立 FluentCRM 草稿
                     {nlResult?.edit_url && (
-                      <> — <a href={nlResult.edit_url} target="_blank" rel="noopener noreferrer" style={{ color: "#5855d0" }}>在 FluentCRM 開啟並寄送 ↗</a></>
+                      <> — <a href={nlResult.edit_url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--btn-primary-bg)" }}>在 FluentCRM 開啟並寄送 ↗</a></>
                     )}
                   </div>
                 )}
                 {nlStatus === "error" && (
-                  <div style={{ marginTop: "10px", fontSize: "12px", color: "#c0392b" }}>
+                  <div style={{ marginTop: "10px", fontSize: "12px", color: "var(--red)" }}>
                     {nlResult?.error ?? "推送失敗"}
                   </div>
                 )}
@@ -3664,7 +3664,7 @@ export default function ContentStudio() {
           <div style={{ border: "1px solid rgba(249,115,22,0.3)", borderRadius: "12px", marginBottom: "20px", overflow: "hidden" }}>
             <div style={{ background: "linear-gradient(135deg,rgba(249,115,22,0.08),rgba(249,115,22,0.02))", borderBottom: "1px solid rgba(249,115,22,0.2)", padding: "10px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ fontSize: "15px" }}>🚀</span>
-              <span style={{ fontWeight: 700, fontSize: "13px", color: "#c2410c" }}>發布</span>
+              <span style={{ fontWeight: 700, fontSize: "13px", color: "var(--severity-high)" }}>發布</span>
             </div>
             <div style={{ padding: "0 16px" }}>
 
@@ -3703,7 +3703,7 @@ export default function ContentStudio() {
             {isGenerating && (
               <button className="btn-secondary" onClick={() => { abortRef.current?.abort(); setGenStatus("idle"); }}>停止</button>
             )}
-            {genStatus === "error" && <span style={{ color: "var(--color-error, #ef4444)", fontSize: "13px" }}>{genError}</span>}
+            {genStatus === "error" && <span style={{ color: "var(--color-error)", fontSize: "13px" }}>{genError}</span>}
             <div style={{ marginLeft: "auto" }}>
               <CostChip cost={sessionCost} />
             </div>
@@ -3715,12 +3715,12 @@ export default function ContentStudio() {
                 <div style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)" }}>
                   產出文章
                   {isGenerating && <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 8 }}>串流中…</span>}
-                  {genStatus === "done" && <span style={{ fontWeight: 400, color: "#22c55e", marginLeft: 8 }}>✓ 完成</span>}
+                  {genStatus === "done" && <span style={{ fontWeight: 400, color: "var(--green)", marginLeft: 8 }}>✓ 完成</span>}
                   {genStatus === "done" && draftSaveState === "saving" && <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 8, fontSize: "12px" }}>💾 儲存中…</span>}
                   {genStatus === "done" && draftSaveState === "saved"  && <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 8, fontSize: "12px" }}>💾 已存草稿</span>}
-                  {genStatus === "done" && draftSaveState === "error"  && <span style={{ fontWeight: 400, color: "#f59e0b", marginLeft: 8, fontSize: "12px" }}>⚠ 草稿未存（文章不受影響）</span>}
+                  {genStatus === "done" && draftSaveState === "error"  && <span style={{ fontWeight: 400, color: "var(--yellow)", marginLeft: 8, fontSize: "12px" }}>⚠ 草稿未存（文章不受影響）</span>}
                   {genStatus === "done" && genTruncated && (
-                    <span style={{ fontWeight: 500, color: "#f59e0b", marginLeft: 8, fontSize: "12px" }}>
+                    <span style={{ fontWeight: 500, color: "var(--yellow)", marginLeft: 8, fontSize: "12px" }}>
                       ⚠ 可能被截斷（超過長度上限）— 建議選短篇或拆主題重新生成
                     </span>
                   )}

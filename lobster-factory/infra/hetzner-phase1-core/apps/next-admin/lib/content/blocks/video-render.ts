@@ -19,8 +19,22 @@ register({
   run: async (ctx: BlockCtx) => {
     const scenes = (ctx.scenes as { id: number; narration: string }[] | undefined) ?? [];
     const assets = (ctx.assets as string[] | undefined) ?? [];
+    const formatAssets = ctx.formatAssets as Record<string, string[]> | undefined;
+    const formats = ctx.formats as string[] | undefined;
     const title = (ctx.title as string | undefined) ?? "影片";
-    if (scenes.length === 0 || assets.length !== scenes.length) {
+    if (scenes.length === 0) {
+      return { ok: false, status: 400, error: "video/render 需非空 scenes" };
+    }
+    // 多格式：每格式素材組須與 scenes 等長；否則退回舊單組 assets 等長檢查。
+    const useMulti = !!formatAssets && Array.isArray(formats) && formats.length > 0;
+    if (useMulti) {
+      for (const f of formats!) {
+        const arr = formatAssets![f];
+        if (!Array.isArray(arr) || arr.length !== scenes.length) {
+          return { ok: false, status: 400, error: `video/render formatAssets[${f}] 需與 scenes 等長` };
+        }
+      }
+    } else if (assets.length !== scenes.length) {
       return { ok: false, status: 400, error: "video/render 需 scenes 與等長 assets" };
     }
     return submitRender(
@@ -33,6 +47,7 @@ register({
         ttsVoice: ctx.ttsVoice as string | undefined,
         introTitle: ctx.introTitle as string | undefined,
         introDuration: ctx.introDuration as number | undefined,
+        ...(useMulti ? { formats, formatAssets } : {}),
       },
     );
   },

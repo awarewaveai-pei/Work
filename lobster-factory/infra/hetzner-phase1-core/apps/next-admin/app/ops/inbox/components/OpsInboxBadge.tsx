@@ -25,9 +25,9 @@ export function OpsInboxBadge() {
 
   if (!counts || counts.total === 0) return null;
 
-  const bg = counts.critical > 0 ? "var(--severity-critical)" : "#64748b";
+  const bg = counts.critical > 0 ? "var(--severity-critical)" : "var(--status-ignored)";
   return (
-    <span style={{ marginLeft: 8, padding: "2px 6px", background: bg, color: "#fff", borderRadius: 999, fontSize: 11 }}>
+    <span style={{ marginLeft: 8, padding: "2px 6px", background: bg, color: "var(--btn-primary-text)", borderRadius: 999, fontSize: 11 }}>
       {counts.total}
     </span>
   );

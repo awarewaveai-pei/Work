@@ -1366,11 +1366,11 @@ export default function CanvasEditor() {
         </label>
       </div>
 
-      {error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{error}</span> : null}
+      {error ? <span style={{ color: "var(--red)", fontSize: 12 }}>{error}</span> : null}
 
       {/* 畫布 + 右側可捲動工具欄（vector-trace-demo 風格）。面板垂直堆疊、可收合。 */}
       <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-        <div style={{ border: "1px solid var(--card-border)", borderRadius: 8, width: 802, background: "#fff", flexShrink: 0, display: "flex", justifyContent: "center" }}>
+        <div style={{ border: "1px solid var(--card-border)", borderRadius: 8, width: 802, background: "var(--card-bg)", flexShrink: 0, display: "flex", justifyContent: "center" }}>
           <canvas ref={canvasElRef} width={800} height={800} />
         </div>
 
@@ -1436,7 +1436,7 @@ export default function CanvasEditor() {
                     <button title="上移" onClick={() => moveLayer(o, "up")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>↑</button>
                     <button title="下移" onClick={() => moveLayer(o, "down")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>↓</button>
                     <button title="複製" onClick={() => duplicateLayer(o)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>⧉</button>
-                    <button title="刪除" onClick={() => deleteLayer(o)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#e5484d" }}>🗑</button>
+                    <button title="刪除" onClick={() => deleteLayer(o)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "var(--red)" }}>🗑</button>
                   </div>
                 );
               })}
@@ -1640,7 +1640,7 @@ export default function CanvasEditor() {
                         display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: 2,
                         borderRadius: 6, cursor: "pointer",
                         background: active ? "rgba(99,102,241,0.18)" : "rgba(127,127,127,0.06)",
-                        border: `1px solid ${active ? "#6366f1" : "rgba(127,127,127,0.25)"}`,
+                        border: `1px solid ${active ? "var(--accent)" : "rgba(127,127,127,0.25)"}`,
                       }}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}

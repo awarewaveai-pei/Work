@@ -220,16 +220,16 @@ function CardHeader({ selected, onToggle, vendor, name, sub, badges, nameSize = 
 function ProCon({ strengths, tradeoffs }: { strengths: string; tradeoffs: string }) {
   return (
     <div style={{
-      background: "#f8fafc", borderRadius: 7, padding: "10px 12px",
+      background: "var(--bg-subtle)", borderRadius: 7, padding: "10px 12px",
       marginBottom: 10, display: "flex", flexDirection: "column", gap: 6,
     }}>
       <div style={{ display: "flex", gap: 7, alignItems: "flex-start" }}>
         <span style={{ fontSize: 14, lineHeight: "18px", flexShrink: 0 }}>✅</span>
-        <span style={{ fontSize: 12, color: "#374151", lineHeight: 1.5 }}>{strengths}</span>
+        <span style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5 }}>{strengths}</span>
       </div>
       <div style={{ display: "flex", gap: 7, alignItems: "flex-start" }}>
         <span style={{ fontSize: 14, lineHeight: "18px", flexShrink: 0 }}>⚠️</span>
-        <span style={{ fontSize: 12, color: "#374151", lineHeight: 1.5 }}>{tradeoffs}</span>
+        <span style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5 }}>{tradeoffs}</span>
       </div>
     </div>
   );
@@ -395,10 +395,10 @@ function CompareModal({ models, onClose }: { models: AnyModel[]; onClose: () => 
       style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.45)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000, padding:20 }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{ background:"#fff", borderRadius:12, width:"100%", maxWidth: Math.min(models.length * 300 + 160, 1200), maxHeight:"88vh", overflow:"auto", padding:24, boxShadow:"0 20px 60px rgba(0,0,0,.25)" }}>
+      <div style={{ background:"var(--card-bg)", borderRadius:12, width:"100%", maxWidth: Math.min(models.length * 300 + 160, 1200), maxHeight:"88vh", overflow:"auto", padding:24, boxShadow:"0 20px 60px rgba(0,0,0,.25)" }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
           <h2 style={{ margin:0, fontSize:17, fontWeight:800 }}>模型比較 · {names.join(" vs ")}</h2>
-          <button onClick={onClose} style={{ border:"none", background:"#f1f5f9", borderRadius:6, padding:"5px 12px", cursor:"pointer", fontSize:13, fontWeight:600 }}>關閉 ✕</button>
+          <button onClick={onClose} style={{ border:"none", background:"var(--bg-subtle)", borderRadius:6, padding:"5px 12px", cursor:"pointer", fontSize:13, fontWeight:600 }}>關閉 ✕</button>
         </div>
         <div style={{ overflowX:"auto" }}>
           <table style={{ width:"100%", borderCollapse:"separate", borderSpacing:0 }}>
@@ -410,8 +410,8 @@ function CompareModal({ models, onClose }: { models: AnyModel[]; onClose: () => 
             </thead>
             <tbody>
               {rows.map((row, i) => (
-                <tr key={row.label} style={{ background: i % 2 === 0 ? "#fff" : "#f8fafc" }}>
-                  <td style={{ ...TD, fontWeight:700, color:"#64748b", fontSize:10.5, textTransform:"uppercase", letterSpacing:".06em" }}>{row.label}</td>
+                <tr key={row.label} style={{ background: i % 2 === 0 ? "var(--card-bg)" : "var(--bg-subtle)" }}>
+                  <td style={{ ...TD, fontWeight:700, color:"var(--text-muted)", fontSize:10.5, textTransform:"uppercase", letterSpacing:".06em" }}>{row.label}</td>
                   {models.map((m, j) => <td key={j} style={TD}>{row.get(m)}</td>)}
                 </tr>
               ))}
@@ -425,13 +425,13 @@ function CompareModal({ models, onClose }: { models: AnyModel[]; onClose: () => 
 
 const TH: React.CSSProperties = {
   padding:"10px 14px", textAlign:"left",
-  background:"#f8fafc", borderBottom:"2px solid #e2e8f0",
-  fontSize:12, fontWeight:700, color:"#374151",
+  background:"var(--bg-subtle)", borderBottom:"2px solid var(--border)",
+  fontSize:12, fontWeight:700, color:"var(--text-secondary)",
   position:"sticky", top:0,
 };
 const TD: React.CSSProperties = {
-  padding:"10px 14px", borderBottom:"1px solid #f1f5f9",
-  fontSize:12.5, color:"#1e293b", lineHeight:1.55, verticalAlign:"top",
+  padding:"10px 14px", borderBottom:"1px solid var(--bg-subtle)",
+  fontSize:12.5, color:"var(--text-secondary)", lineHeight:1.55, verticalAlign:"top",
 };
 
 // ── Controls bar ──────────────────────────────────────────────────────────────
@@ -441,21 +441,21 @@ function Controls({ sortKey, sortDir, onSort, selCount, onCompare, onClear }: {
   selCount: number; onCompare: () => void; onClear: () => void;
 }) {
   const base: React.CSSProperties = { padding:"5px 13px", borderRadius:6, fontSize:12, fontWeight:600, border:"1px solid var(--card-border)", cursor:"pointer" };
-  const on: React.CSSProperties = { ...base, background:"var(--accent)", color:"#fff", borderColor:"var(--accent)" };
-  const off: React.CSSProperties = { ...base, background:"#fff", color:"#475569" };
+  const on: React.CSSProperties = { ...base, background:"var(--accent)", color:"var(--btn-primary-text)", borderColor:"var(--accent)" };
+  const off: React.CSSProperties = { ...base, background:"var(--card-bg)", color:"var(--text-muted)" };
   const arrow = (k: SortKey) => sortKey === k ? (sortDir === "asc" ? " ↑" : " ↓") : "";
   return (
     <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12, flexWrap:"wrap" }}>
-      <span style={{ fontSize:10.5, fontWeight:800, letterSpacing:".07em", textTransform:"uppercase", color:"#94a3b8" }}>排序</span>
+      <span style={{ fontSize:10.5, fontWeight:800, letterSpacing:".07em", textTransform:"uppercase", color:"var(--text-muted)" }}>排序</span>
       <button style={sortKey==="default" ? on : off} onClick={() => onSort("default")}>預設</button>
       <button style={sortKey==="cost"    ? on : off} onClick={() => onSort("cost")}>成本{arrow("cost")}</button>
       <button style={sortKey==="speed"   ? on : off} onClick={() => onSort("speed")}>速度{arrow("speed")}</button>
       {selCount > 0 && (
         <div style={{ display:"flex", alignItems:"center", gap:6, marginLeft:"auto" }}>
-          <span style={{ fontSize:12, color:"#64748b" }}>已選 {selCount} 個（最多 4）</span>
+          <span style={{ fontSize:12, color:"var(--text-muted)" }}>已選 {selCount} 個（最多 4）</span>
           <button
             onClick={onCompare} disabled={selCount < 2}
-            style={{ ...base, background: selCount>=2 ? "#2563eb" : "#e2e8f0", color: selCount>=2 ? "#fff" : "#94a3b8", borderColor: selCount>=2 ? "#2563eb" : "#e2e8f0", cursor: selCount>=2 ? "pointer" : "not-allowed" }}
+            style={{ ...base, background: selCount>=2 ? "var(--accent)" : "var(--border)", color: selCount>=2 ? "var(--btn-primary-text)" : "var(--text-muted)", borderColor: selCount>=2 ? "var(--accent)" : "var(--border)", cursor: selCount>=2 ? "pointer" : "not-allowed" }}
           >比較 ⇄</button>
           <button style={off} onClick={onClear}>清除</button>
         </div>
@@ -525,8 +525,8 @@ export default function AiModelsClient() {
   const tabBtn = (active: boolean): React.CSSProperties => ({
     padding:"7px 18px", borderRadius:7, fontSize:13, fontWeight:700,
     border:"none", cursor:"pointer",
-    background: active ? "var(--accent)" : "#f1f5f9",
-    color: active ? "#fff" : "#475569",
+    background: active ? "var(--accent)" : "var(--bg-subtle)",
+    color: active ? "var(--btn-primary-text)" : "var(--text-muted)",
   });
 
   function changeTab(t: Tab) { setTab(t); setSortKey("default"); setSortDir("asc"); setCmpOpen(false); }
@@ -550,7 +550,7 @@ export default function AiModelsClient() {
 
       {/* Hint */}
       {curSel.size === 0 && (
-        <p style={{ fontSize:12, color:"#94a3b8", margin:"0 0 12px" }}>
+        <p style={{ fontSize:12, color:"var(--text-muted)", margin:"0 0 12px" }}>
           ☑ 勾選最多 4 個模型後可點「比較 ⇄」並排對照
         </p>
       )}

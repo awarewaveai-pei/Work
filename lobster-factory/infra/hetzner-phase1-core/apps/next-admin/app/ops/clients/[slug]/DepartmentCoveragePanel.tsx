@@ -9,10 +9,10 @@ import type { DepartmentSummaryPayload, GroupCoverage, ClusterSummary, Enterpris
 // ── Tier display helpers ──────────────────────────────────────────────────────
 
 const TIER_META: Record<EnterpriseTier, { label: string; color: string; bg: string; border: string }> = {
-  not_configured: { label: "未設定", color: "#6b7280", bg: "#f9fafb", border: "#e5e7eb" },
-  smb:            { label: "SMB",    color: "#0369a1", bg: "#f0f9ff", border: "#bae6fd" },
+  not_configured: { label: "未設定", color: "var(--text-muted)", bg: "var(--bg-subtle)", border: "var(--border)" },
+  smb:            { label: "SMB",    color: "var(--ai-text)", bg: "var(--ai-bg)", border: "var(--severity-low)" },
   growth:         { label: "Growth", color: "#7c3aed", bg: "#faf5ff", border: "#ddd6fe" },
-  enterprise:     { label: "Enterprise", color: "#b45309", bg: "#fffbeb", border: "#fde68a" },
+  enterprise:     { label: "Enterprise", color: "var(--build-risk-medium-text)", bg: "var(--build-risk-medium-bg)", border: "var(--yellow)" },
 };
 
 const GROUP_ORDER: GroupCoverage["groupKey"][] = [
@@ -35,9 +35,9 @@ function TierBadge({ tier }: { tier: EnterpriseTier }) {
 }
 
 function CoverageBar({ percent }: { percent: number }) {
-  const color = percent >= 70 ? "#16a34a" : percent >= 40 ? "#7c3aed" : percent > 0 ? "#0369a1" : "#d1d5db";
+  const color = percent >= 70 ? "var(--green)" : percent >= 40 ? "#7c3aed" : percent > 0 ? "var(--severity-low)" : "var(--border)";
   return (
-    <div style={{ background: "#f1f5f9", borderRadius: 99, height: 6, width: "100%", overflow: "hidden" }}>
+    <div style={{ background: "var(--bg-subtle)", borderRadius: 99, height: 6, width: "100%", overflow: "hidden" }}>
       <div style={{
         width: `${percent}%`, height: "100%",
         background: color, borderRadius: 99,
@@ -56,9 +56,9 @@ function ClusterChip({ cs }: { cs: ClusterSummary }) {
       style={{
         display: "inline-flex", alignItems: "center", gap: 5,
         padding: "3px 9px", borderRadius: 6, fontSize: 11, fontWeight: 500,
-        background: cs.active ? "#f0fdf4" : "#f8fafc",
-        color: cs.active ? "#166534" : "#94a3b8",
-        border: `1px solid ${cs.active ? "#bbf7d0" : "#e2e8f0"}`,
+        background: cs.active ? "var(--badge-green-bg)" : "var(--bg-subtle)",
+        color: cs.active ? "var(--badge-green-text)" : "var(--text-muted)",
+        border: `1px solid ${cs.active ? "var(--green)" : "var(--border)"}`,
       }}
     >
       <span style={{ fontSize: 9, lineHeight: 1 }}>{cs.active ? "●" : "○"}</span>
@@ -95,17 +95,17 @@ function GroupSection({ g }: { g: GroupCoverage }) {
 function UnconfiguredNotice({ smbDefaults }: { smbDefaults: string[] }) {
   return (
     <div style={{
-      background: "#fffbeb", border: "1px solid #fde68a",
-      borderRadius: 8, padding: "12px 14px", fontSize: 12, color: "#92400e", lineHeight: 1.7,
+      background: "var(--build-risk-medium-bg)", border: "1px solid var(--yellow)",
+      borderRadius: 8, padding: "12px 14px", fontSize: 12, color: "var(--build-risk-medium-text)", lineHeight: 1.7,
     }}>
       <strong>⚠ 尚未設定部門選型</strong>
       <div style={{ marginTop: 6 }}>
-        請在 Supabase 的 <code style={{ fontSize: 10, background: "#fef3c7", padding: "1px 4px", borderRadius: 3 }}>
+        請在 Supabase 的 <code style={{ fontSize: 10, background: "var(--build-alert-warning-bg)", padding: "1px 4px", borderRadius: 3 }}>
           organizations.metadata.client_config.department_selection
         </code> 填入{" "}
-        <code style={{ fontSize: 10, background: "#fef3c7", padding: "1px 4px", borderRadius: 3 }}>ClusterId[]</code>。
+        <code style={{ fontSize: 10, background: "var(--build-alert-warning-bg)", padding: "1px 4px", borderRadius: 3 }}>ClusterId[]</code>。
       </div>
-      <div style={{ marginTop: 6, fontSize: 11, color: "#b45309" }}>
+      <div style={{ marginTop: 6, fontSize: 11, color: "var(--severity-high)" }}>
         SMB 建議預設值：{smbDefaults.join(", ")}
       </div>
     </div>
@@ -146,8 +146,8 @@ export function DepartmentCoveragePanel({ summary }: { summary: DepartmentSummar
             )}
             {summary.isDefaultSelection && !notConfigured && (
               <span style={{
-                fontSize: 9, fontWeight: 600, color: "#64748b",
-                background: "#f1f5f9", border: "1px solid #e2e8f0",
+                fontSize: 9, fontWeight: 600, color: "var(--text-muted)",
+                background: "var(--badge-gray-bg)", border: "1px solid var(--border)",
                 padding: "1px 6px", borderRadius: 99,
               }}>
                 SMB 預設
@@ -189,8 +189,8 @@ export function DepartmentCoveragePanel({ summary }: { summary: DepartmentSummar
           {summary.matrixRowsCovered.length > 0 && (
             <div style={{
               marginTop: 12,
-              background: "#f8fafc", borderRadius: 8,
-              padding: "10px 12px", border: "1px solid #e2e8f0",
+              background: "var(--bg-subtle)", borderRadius: 8,
+              padding: "10px 12px", border: "1px solid var(--border)",
             }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>
                 矩陣列覆蓋（{summary.matrixRowsCovered.length}/15）
@@ -201,8 +201,8 @@ export function DepartmentCoveragePanel({ summary }: { summary: DepartmentSummar
                     key={row}
                     style={{
                       fontSize: 10, padding: "2px 6px", borderRadius: 4,
-                      background: "#e0f2fe", color: "#0369a1",
-                      border: "1px solid #bae6fd",
+                      background: "var(--ai-bg)", color: "var(--ai-text)",
+                      border: "1px solid var(--severity-low)",
                     }}
                   >
                     {row}
@@ -224,7 +224,7 @@ export function DepartmentCoveragePanel({ summary }: { summary: DepartmentSummar
           <div style={{ marginTop: 10, fontSize: 10, color: "var(--text-muted)" }}>
             最後審閱：{summary.lastReviewedAt ?? "未記錄"}{" "}
             · 更新方法：修改 Supabase{" "}
-            <code style={{ fontSize: 9, background: "#f1f5f9", padding: "1px 4px", borderRadius: 3 }}>
+            <code style={{ fontSize: 9, background: "var(--bg-subtle)", padding: "1px 4px", borderRadius: 3 }}>
               metadata.client_config.department_selection
             </code>
           </div>

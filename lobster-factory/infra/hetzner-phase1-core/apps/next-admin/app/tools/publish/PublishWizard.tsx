@@ -698,7 +698,7 @@ export default function PublishWizard() {
                 {/* When a design原稿 is also checked into the gallery it shows in BOTH sections;
                     this badge makes that duplication read as intentional (critic Minor). */}
                 {isMockup ? (
-                  <span style={{ position: "absolute", bottom: 2, left: 2, fontSize: 9, background: "#46a758", color: "#fff", padding: "0 3px", borderRadius: 3 }}>已加入商品照</span>
+                  <span style={{ position: "absolute", bottom: 2, left: 2, fontSize: 9, background: "var(--green)", color: "var(--btn-primary-text)", padding: "0 3px", borderRadius: 3 }}>已加入商品照</span>
                 ) : null}
               </div>
             );
@@ -720,7 +720,7 @@ export default function PublishWizard() {
           <div style={{ marginBottom: 8, padding: 8, background: "#0c0c0c", borderRadius: 6 }}>
             <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>
               已選 {mockupUrls.length} 張 ·{" "}
-              <b style={{ color: "#f5a623" }}>★ 第一張 = 主圖（上架封面）</b>，其餘進 product gallery
+              <b style={{ color: "var(--yellow)" }}>★ 第一張 = 主圖（上架封面）</b>，其餘進 product gallery
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {mockupUrls.map((url, i) => {
@@ -733,18 +733,18 @@ export default function PublishWizard() {
                       alt={`商品照 ${i + 1}`}
                       style={{
                         width: 60, height: 60, objectFit: "contain", background: "#111", borderRadius: 6,
-                        border: isMain ? "2px solid #f5a623" : "2px solid #333",
+                        border: isMain ? "2px solid var(--yellow)" : "2px solid var(--border)",
                       }}
                     />
                     {isMain ? (
-                      <span style={{ position: "absolute", top: 0, left: 0, fontSize: 9, background: "#f5a623", color: "#000", padding: "0 3px", borderTopLeftRadius: 6, borderBottomRightRadius: 6 }}>主圖</span>
+                      <span style={{ position: "absolute", top: 0, left: 0, fontSize: 9, background: "var(--yellow)", color: "var(--text-primary)", padding: "0 3px", borderTopLeftRadius: 6, borderBottomRightRadius: 6 }}>主圖</span>
                     ) : (
                       <button
                         type="button"
                         disabled={busy}
                         onClick={() => setAsMain(url)}
                         title="設為主圖（移到第一張）"
-                        style={{ position: "absolute", top: 0, left: 0, fontSize: 9, lineHeight: 1.5, padding: "0 3px", cursor: busy ? "not-allowed" : "pointer", background: "#222", color: "#f5a623", border: "none", borderTopLeftRadius: 6, borderBottomRightRadius: 6 }}
+                        style={{ position: "absolute", top: 0, left: 0, fontSize: 9, lineHeight: 1.5, padding: "0 3px", cursor: busy ? "not-allowed" : "pointer", background: "var(--code-bg)", color: "var(--yellow)", border: "none", borderTopLeftRadius: 6, borderBottomRightRadius: 6 }}
                       >★主圖</button>
                     )}
                     <button
@@ -752,7 +752,7 @@ export default function PublishWizard() {
                       disabled={busy}
                       onClick={() => removeFromGallery(url)}
                       title="從商品照移除"
-                      style={{ position: "absolute", top: 0, right: 0, fontSize: 10, lineHeight: 1.3, width: 16, height: 16, cursor: busy ? "not-allowed" : "pointer", background: "rgba(0,0,0,0.65)", color: "#e5484d", border: "none", borderRadius: 3 }}
+                      style={{ position: "absolute", top: 0, right: 0, fontSize: 10, lineHeight: 1.3, width: 16, height: 16, cursor: busy ? "not-allowed" : "pointer", background: "rgba(0,0,0,0.65)", color: "var(--red)", border: "none", borderRadius: 3 }}
                     >✕</button>
                   </div>
                 );
@@ -779,7 +779,7 @@ export default function PublishWizard() {
                     background: "#111",
                     borderRadius: 6,
                     opacity: busy ? 0.55 : 1,
-                    border: isMockup ? "2px solid #46a758" : "2px solid transparent",
+                    border: isMockup ? "2px solid var(--green)" : "2px solid transparent",
                   }}
                 />
                 <input
@@ -852,7 +852,7 @@ export default function PublishWizard() {
         <button className="btn-secondary" disabled={busy || copy.state === "running"} onClick={() => void runCopy()}>
           {copy.state === "running" ? "生成文案中…" : "AI 生成 SEO 文案（標題＋描述＋RankMath meta）"}
         </button>
-        {copy.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{copy.error}</span> : null}
+        {copy.error ? <span style={{ color: "var(--red)", fontSize: 12 }}>{copy.error}</span> : null}
         {copy.state === "done" && copy.rankMath ? (
           <div style={{ flexBasis: "100%" }}>
             <span style={{ fontSize: 11, opacity: 0.7 }}>
@@ -884,12 +884,12 @@ export default function PublishWizard() {
         >
           🚀 全部一鍵完成（印刷檔＋AI 批次商品圖＋文案＋Woo＋Printful native）
         </button>
-        {busy ? <span style={{ fontSize: 13, color: "#4f8cff" }}>⏳ {allRun.stage}…</span> : null}
+        {busy ? <span style={{ fontSize: 13, color: "var(--accent)" }}>⏳ {allRun.stage}…</span> : null}
         {allRun.state === "done" ? (
-          <span style={{ fontSize: 13, color: "#46a758" }}>✅ 全部完成：Woo 草稿 + Printful native 都建好了（含全部商品圖）— 後台 review 後 publish 即可開賣</span>
+          <span style={{ fontSize: 13, color: "var(--green)" }}>✅ 全部完成：Woo 草稿 + Printful native 都建好了（含全部商品圖）— 後台 review 後 publish 即可開賣</span>
         ) : null}
         {allRun.state === "error" ? (
-          <span style={{ fontSize: 13, color: "#e5484d" }}>❌ 卡在「{allRun.stage}」：{allRun.error}（下方可從該步分步續做）</span>
+          <span style={{ fontSize: 13, color: "var(--red)" }}>❌ 卡在「{allRun.stage}」：{allRun.error}（下方可從該步分步續做）</span>
         ) : null}
         {!designUrl || title.trim().length < 3 ? (
           <span style={{ fontSize: 11, opacity: 0.6 }}>需先選一張設計圖 + 填商品名稱（≥3 字）</span>
@@ -919,7 +919,7 @@ export default function PublishWizard() {
           {upscale.printFileUrl ? (
             <>
               <a href={upscale.printFileUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>印刷檔 ↗</a>
-              <span style={{ fontSize: 12, color: upscale.meetsTarget ? "#46a758" : "#f5a623" }}>
+              <span style={{ fontSize: 12, color: upscale.meetsTarget ? "var(--green)" : "var(--yellow)" }}>
                 {upscale.achievedPx ? `${upscale.achievedPx}px` : "尺寸未知"}
                 {upscale.dpi ? ` · 滿版約 ${upscale.dpi} DPI` : ""}
                 {upscale.faithful ? " · 100% 忠實" : " · AI 增強(非忠實)"}
@@ -927,7 +927,7 @@ export default function PublishWizard() {
               </span>
             </>
           ) : null}
-          {upscale.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{upscale.error}</span> : null}
+          {upscale.error ? <span style={{ color: "var(--red)", fontSize: 12 }}>{upscale.error}</span> : null}
         </div>
 
         {/* Phase 3: two fulfilment routes for the same faithful print file */}
@@ -950,8 +950,8 @@ export default function PublishWizard() {
           <button className="btn-secondary" disabled={busy || !designUrl || productImg.state === "running"} onClick={() => void runProductImage()}>
             ⊕ 把這張設計做成產品圖（加入商品照）
           </button>
-          {productImg.state === "done" ? <span style={{ fontSize: 12, color: "#46a758" }}>已加入商品照 ✓（純圖案，忠實）</span> : null}
-          {productImg.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{productImg.error}</span> : null}
+          {productImg.state === "done" ? <span style={{ fontSize: 12, color: "var(--green)" }}>已加入商品照 ✓（純圖案，忠實）</span> : null}
+          {productImg.error ? <span style={{ color: "var(--red)", fontSize: 12 }}>{productImg.error}</span> : null}
         </div>
 
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -964,8 +964,8 @@ export default function PublishWizard() {
             <input type="color" value={flatlayBg} onChange={(e) => setFlatlayBg(e.target.value)} style={{ width: 32, height: 24, padding: 0, border: "none", background: "none" }} />
           </label>
           <span style={{ fontSize: 11, opacity: 0.6 }}>（要 AI 裝飾背景：先在 Studio 生成無圖案的背景圖，之後版本可選為底）</span>
-          {flatlay.state === "done" ? <span style={{ fontSize: 12, color: "#46a758" }}>已加入商品照 ✓（真實設計，非 AI 重繪）</span> : null}
-          {flatlay.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{flatlay.error}</span> : null}
+          {flatlay.state === "done" ? <span style={{ fontSize: 12, color: "var(--green)" }}>已加入商品照 ✓（真實設計，非 AI 重繪）</span> : null}
+          {flatlay.error ? <span style={{ color: "var(--red)", fontSize: 12 }}>{flatlay.error}</span> : null}
         </div>
 
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -981,7 +981,7 @@ export default function PublishWizard() {
             <a href={create.editUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>後台編輯 ↗</a>
           ) : null}
           {create.productId ? <span style={{ fontSize: 12, opacity: 0.7 }}>product #{create.productId}</span> : null}
-          {create.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{create.error}</span> : null}
+          {create.error ? <span style={{ color: "var(--red)", fontSize: 12 }}>{create.error}</span> : null}
         </div>
 
         {/* ③ Native store ONE-CLICK full automation — the primary path. One API call creates the
@@ -997,12 +997,12 @@ export default function PublishWizard() {
             🚀 ③ 一鍵上 Printful（native 全自動：建品＋綁變體＋印刷檔）
           </button>
           {pfcreate.state === "done" ? (
-            <span style={{ fontSize: 12, color: "#46a758" }}>
+            <span style={{ fontSize: 12, color: "var(--green)" }}>
               {pfcreate.alreadyExisted ? "已存在（冪等命中）" : "已建立"} ✓ Printful #{pfcreate.syncProductId} · {pfcreate.variantCount} 變體已綁印刷檔（{pfcreate.faithful ? "100% 忠實" : "AI 增強，非忠實"}）— 免手動匯入
             </span>
           ) : null}
           {pfcreate.error ? (
-            <span style={{ color: "#e5484d", fontSize: 12 }}>
+            <span style={{ color: "var(--red)", fontSize: 12 }}>
               {pfcreate.error}{pfcreate.retryable ? "（可重試）" : ""}
             </span>
           ) : null}
@@ -1013,7 +1013,7 @@ export default function PublishWizard() {
           </div>
         ) : create.variantMapDropped || !hasUsablePfMap(create.variantMap) ? (
           // create 成功但 Woo 回傳的 variation_id 數與計畫不符 → SKU 對照表在源頭被丟棄，native 路徑無 SKU 可綁。
-          <div style={{ fontSize: 11, color: "#f5a623", paddingLeft: 26 }}>
+          <div style={{ fontSize: 11, color: "var(--yellow)", paddingLeft: 26 }}>
             ⚠ 建立草稿時 Woo 回傳的變體數與計畫不符，SKU 對照表未產生，無法走一鍵 native 路徑。
             請改用下方「進階：舊 Woo store 手動同步路徑」，或重新建立草稿商品（②）。
           </div>
@@ -1036,7 +1036,7 @@ export default function PublishWizard() {
                   {sync.synced ? "已同步 ✓ 可綁定" : "尚未同步 — 確認商品已在後台 publish（draft 不會同步），再稍候重按"}
                 </span>
               ) : null}
-              {sync.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{sync.error}</span> : null}
+              {sync.error ? <span style={{ color: "var(--red)", fontSize: 12 }}>{sync.error}</span> : null}
             </div>
 
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -1053,7 +1053,7 @@ export default function PublishWizard() {
                   綁定 {link.linkedCount}/{link.total} ✓（印刷檔：{link.faithful ? "100% 忠實" : "AI 增強，非忠實"}）— 後台 review 後 publish 即可開賣
                 </span>
               ) : null}
-              {link.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{link.error}</span> : null}
+              {link.error ? <span style={{ color: "var(--red)", fontSize: 12 }}>{link.error}</span> : null}
             </div>
           </div>
         </details>

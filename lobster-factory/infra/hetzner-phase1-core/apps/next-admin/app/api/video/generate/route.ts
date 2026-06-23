@@ -25,6 +25,8 @@ interface GenerateBody {
   ttsVoice?: string;
   introTitle?: string;
   introDuration?: number;
+  /** 要輸出的格式（["16x9","9x16","4x5"] 子集）；每格式原生生成。省略 = 全三格式。 */
+  outputFormats?: string[];
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -69,6 +71,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     ttsVoice: body.ttsVoice,
     introTitle: body.introTitle,
     introDuration: body.introDuration,
+    outputFormats: body.outputFormats,
   };
 
   // prepare 回傳（pending handle）— 單一 interface + optional（避免 union narrowing TS 邊角）

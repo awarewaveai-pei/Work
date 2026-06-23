@@ -709,7 +709,7 @@ export default function StudioWorkbench() {
                 key={a}
                 type="button"
                 onClick={() => setAspect(a)}
-                style={{ padding: "4px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: `1px solid ${aspect === a ? "#6366f1" : "var(--border, #d4d9e8)"}`, background: aspect === a ? "#6366f1" : "rgba(127,127,127,0.08)", color: aspect === a ? "#fff" : "var(--text-muted, #3a4560)", fontWeight: aspect === a ? 600 : 400, transition: "all 0.15s" }}
+                style={{ padding: "4px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: `1px solid ${aspect === a ? "var(--accent)" : "var(--border)"}`, background: aspect === a ? "var(--accent)" : "rgba(127,127,127,0.08)", color: aspect === a ? "var(--btn-primary-text)" : "var(--text-muted)", fontWeight: aspect === a ? 600 : 400, transition: "all 0.15s" }}
               >
                 {a}
               </button>
@@ -718,16 +718,16 @@ export default function StudioWorkbench() {
         </AccordionSection>
 
         {/* 參考圖 + 模式切換 — original bordered box style */}
-        <div style={{ border: "1px solid var(--border, #e2e8f0)", borderRadius: 8, padding: 10 }}>
+        <div style={{ border: "1px solid var(--border)", borderRadius: 8, padding: 10 }}>
           <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>🖼️ 參考圖</p>
-          <div style={{ display: "flex", borderRadius: 6, overflow: "hidden", border: "1px solid var(--border, #e2e8f0)", marginBottom: 8 }}>
-            <button type="button" onClick={() => onSetRefMode("none")} style={{ flex: 1, padding: "6px 4px", fontSize: 11, cursor: "pointer", border: "none", background: refMode === "none" ? "var(--accent, #6366f1)" : "transparent", color: refMode === "none" ? "#fff" : "var(--text-muted, #3a4560)", transition: "all 0.15s" }}>
+          <div style={{ display: "flex", borderRadius: 6, overflow: "hidden", border: "1px solid var(--border)", marginBottom: 8 }}>
+            <button type="button" onClick={() => onSetRefMode("none")} style={{ flex: 1, padding: "6px 4px", fontSize: 11, cursor: "pointer", border: "none", background: refMode === "none" ? "var(--accent)" : "transparent", color: refMode === "none" ? "var(--btn-primary-text)" : "var(--text-muted)", transition: "all 0.15s" }}>
               無
             </button>
-            <button type="button" onClick={() => onSetRefMode("ref")} style={{ flex: 1, padding: "6px 4px", fontSize: 11, cursor: "pointer", border: "none", background: refMode === "ref" ? "var(--accent, #6366f1)" : "transparent", color: refMode === "ref" ? "#fff" : "var(--text-muted, #3a4560)", transition: "all 0.15s" }}>
+            <button type="button" onClick={() => onSetRefMode("ref")} style={{ flex: 1, padding: "6px 4px", fontSize: 11, cursor: "pointer", border: "none", background: refMode === "ref" ? "var(--accent)" : "transparent", color: refMode === "ref" ? "var(--btn-primary-text)" : "var(--text-muted)", transition: "all 0.15s" }}>
               🖼️ 風格參考
             </button>
-            <button type="button" onClick={() => onSetRefMode("transform")} style={{ flex: 1, padding: "6px 4px", fontSize: 11, cursor: "pointer", border: "none", background: refMode === "transform" ? "var(--accent, #6366f1)" : "transparent", color: refMode === "transform" ? "#fff" : "var(--text-muted, #3a4560)", transition: "all 0.15s" }}>
+            <button type="button" onClick={() => onSetRefMode("transform")} style={{ flex: 1, padding: "6px 4px", fontSize: 11, cursor: "pointer", border: "none", background: refMode === "transform" ? "var(--accent)" : "transparent", color: refMode === "transform" ? "var(--btn-primary-text)" : "var(--text-muted)", transition: "all 0.15s" }}>
               🎨 改圖模式
             </button>
           </div>
@@ -792,20 +792,20 @@ export default function StudioWorkbench() {
                     onClick={() => !r.busy && setActiveIdx(i)}
                     style={{
                       width: 140, cursor: r.busy ? "default" : "pointer",
-                      border: `2px solid ${isActive ? "var(--accent, #6366f1)" : "var(--border, #333)"}`,
+                      border: `2px solid ${isActive ? "var(--accent)" : "var(--border)"}`,
                       borderRadius: 8, overflow: "hidden", transition: "border-color 0.15s",
                       opacity: r.busy ? 0.6 : 1,
                     }}
                   >
                     {r.busy ? (
-                      <div style={{ height: 140, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg-tertiary, #1a1a1a)", fontSize: 11, opacity: 0.5 }}>生成中…</div>
+                      <div style={{ height: 140, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg-tertiary)", fontSize: 11, opacity: 0.5 }}>生成中…</div>
                     ) : r.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={r.image} alt={r.model} style={{ width: "100%", height: 140, objectFit: "cover", display: "block", background: "#fff" }} />
                     ) : (
-                      <div style={{ height: 140, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg-tertiary, #1a1a1a)", fontSize: 10, color: "#e5484d", padding: 4, textAlign: "center" }}>{r.error ?? "失敗"}</div>
+                      <div style={{ height: 140, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg-tertiary)", fontSize: 10, color: "var(--red)", padding: 4, textAlign: "center" }}>{r.error ?? "失敗"}</div>
                     )}
-                    <div style={{ padding: "4px 6px", fontSize: 10, background: "var(--bg-secondary, #111)" }}>
+                    <div style={{ padding: "4px 6px", fontSize: 10, background: "var(--bg-secondary)" }}>
                       <span style={{ opacity: 0.8 }}>{opt?.label ?? r.model}</span>
                       <span style={{ opacity: 0.5, marginLeft: 4 }}>NT${opt?.costNt}</span>
                     </div>
@@ -845,17 +845,17 @@ export default function StudioWorkbench() {
                       {bgState === "done" && origImg && (
                         <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => restoreOriginal(m)}>還原原圖</button>
                       )}
-                      {bgState === "error" && <span style={{ color: "#e5484d", fontSize: 12 }}>去背失敗</span>}
+                      {bgState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>去背失敗</span>}
                       {bgState === "done" && productType === "tshirt" && (
                         <button className="btn-secondary" disabled={mockupState === "generating" || mockupState === "done"} onClick={() => void generateMockupFromDesign(img)}>
                           {mockupState === "done" ? "產品預覽 ✓" : mockupState === "generating" ? "生成 Mockup…" : "產品 Mockup"}
                         </button>
                       )}
-                      {mockupState === "error" && <span style={{ color: "#e5484d", fontSize: 12 }}>Mockup 失敗</span>}
+                      {mockupState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>Mockup 失敗</span>}
                       <button className="btn-secondary" onClick={() => downloadImage(img, m)}>下載</button>
                       {activeResult.seed != null && <span style={{ fontSize: 12, opacity: 0.6 }}>seed {activeResult.seed}</span>}
                       {saveState === "saved" && <a href="/tools/designs" style={{ fontSize: 12 }}>查看 My Designs →</a>}
-                      {saveState === "error" && <span style={{ color: "#e5484d", fontSize: 12 }}>儲存失敗</span>}
+                      {saveState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>儲存失敗</span>}
                     </>
                   );
                 })()}
@@ -868,12 +868,12 @@ export default function StudioWorkbench() {
                 const applied = edgeApplied[m];
                 // Asset (real brush) masks are fixed images — the strength slider has no effect on them.
                 return (
-                  <div style={{ marginTop: 12, padding: 10, border: "1px solid var(--border, #333)", borderRadius: 8 }}>
+                  <div style={{ marginTop: 12, padding: 10, border: "1px solid var(--border)", borderRadius: 8 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                       <span style={{ fontSize: 13, fontWeight: 600 }}>✨ 邊緣風格</span>
                       <span style={{ fontSize: 11, opacity: 0.55 }}>有機邊 → 透明 PNG（深色衣服也印得出來）</span>
                       {est === "applying" && <span style={{ fontSize: 11, opacity: 0.6 }}>套用中…</span>}
-                      {est === "error" && <span style={{ fontSize: 11, color: "#e5484d" }}>套用失敗</span>}
+                      {est === "error" && <span style={{ fontSize: 11, color: "var(--red)" }}>套用失敗</span>}
                       {applied && (
                         <button className="btn-secondary" style={{ fontSize: 11, marginLeft: "auto" }} onClick={() => restoreEdge(m)}>
                           還原原圖
@@ -894,7 +894,7 @@ export default function StudioWorkbench() {
                               display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
                               width: 60, padding: 4, borderRadius: 8, cursor: "pointer",
                               background: active ? "rgba(99,102,241,0.15)" : "rgba(127,127,127,0.06)",
-                              border: `1px solid ${active ? "#6366f1" : "var(--border, #333)"}`,
+                              border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
                               transition: "all 0.15s",
                             }}
                           >
@@ -974,14 +974,14 @@ export default function StudioWorkbench() {
               </div>
             </div>
           ) : activeResult && !activeResult.busy && activeResult.error ? (
-            <p style={{ color: "#e5484d" }}>{activeResult.error}</p>
+            <p style={{ color: "var(--red)" }}>{activeResult.error}</p>
           ) : activeResult?.busy ? (
             <p style={{ opacity: 0.7 }}>生成中（依模型 5–60 秒）…</p>
           ) : null}
 
           {/* Single-model error (no results yet) */}
           {!isMultiModel && results.length === 1 && results[0].error && !results[0].busy && !anyResults && (
-            <p style={{ color: "#e5484d" }}>{results[0].error}</p>
+            <p style={{ color: "var(--red)" }}>{results[0].error}</p>
           )}
         </div>
       </div>

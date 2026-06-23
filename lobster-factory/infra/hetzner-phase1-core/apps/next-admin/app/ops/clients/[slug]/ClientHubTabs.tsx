@@ -233,7 +233,7 @@ function ChipBtn({ label, active, onClick }: { label: string; active: boolean; o
         padding: "3px 10px", borderRadius: 20, fontSize: 11, border: "1px solid",
         cursor: "pointer", whiteSpace: "nowrap",
         background: active ? "var(--accent)" : "transparent",
-        color: active ? "#fff" : "var(--text-secondary)",
+        color: active ? "var(--btn-primary-text)" : "var(--text-secondary)",
         borderColor: active ? "var(--accent)" : "var(--card-border)",
         fontWeight: active ? 600 : 400,
         lineHeight: 1.6,
@@ -355,10 +355,10 @@ function ContentTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cfg
         ) : (
           wpSites.map((s) => (
             <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid var(--border-subtle)", fontSize: 12 }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.color ?? "#94a3b8", flexShrink: 0 }} />
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.color ?? "var(--text-muted)", flexShrink: 0 }} />
               <span style={{ flex: 1, fontWeight: 500 }}>{s.name}</span>
               <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{s.url.replace(/^https?:\/\//, "")}</span>
-              <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: s.active ? "#dcfce7" : "#fee2e2", color: s.active ? "#15803d" : "#dc2626" }}>
+              <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: s.active ? "var(--badge-green-bg)" : "var(--badge-red-bg)", color: s.active ? "var(--badge-green-text)" : "var(--badge-red-text)" }}>
                 {s.active ? "已連線" : "停用"}
               </span>
             </div>
@@ -370,12 +370,12 @@ function ContentTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cfg
       {wpSites.length > 0 && (
         <Card title="品牌聲音（Brand Voice）" action={
           saveMsg ? (
-            <span style={{ fontSize: 11, color: saveMsg.startsWith("已") ? "#16a34a" : "#dc2626" }}>{saveMsg}</span>
+            <span style={{ fontSize: 11, color: saveMsg.startsWith("已") ? "var(--green)" : "var(--red)" }}>{saveMsg}</span>
           ) : (
             <button
               onClick={() => void save()}
               disabled={saving}
-              style={{ fontSize: 11, padding: "3px 10px", borderRadius: 5, border: "none", cursor: saving ? "wait" : "pointer", background: "var(--accent)", color: "#fff" }}
+              style={{ fontSize: 11, padding: "3px 10px", borderRadius: 5, border: "none", cursor: saving ? "wait" : "pointer", background: "var(--accent)", color: "var(--btn-primary-text)" }}
             >
               {saving ? "儲存中…" : "儲存"}
             </button>
@@ -580,11 +580,11 @@ function ContentTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cfg
 
           {/* Save button (bottom) */}
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14, gap: 8, alignItems: "center" }}>
-            {saveMsg && <span style={{ fontSize: 11, color: saveMsg.startsWith("已") ? "#16a34a" : "#dc2626" }}>{saveMsg}</span>}
+            {saveMsg && <span style={{ fontSize: 11, color: saveMsg.startsWith("已") ? "var(--green)" : "var(--red)" }}>{saveMsg}</span>}
             <button
               onClick={() => void save()}
               disabled={saving}
-              style={{ padding: "6px 18px", borderRadius: 6, border: "none", cursor: saving ? "wait" : "pointer", background: "var(--accent)", color: "#fff", fontSize: 12, fontWeight: 500 }}
+              style={{ padding: "6px 18px", borderRadius: 6, border: "none", cursor: saving ? "wait" : "pointer", background: "var(--accent)", color: "var(--btn-primary-text)", fontSize: 12, fontWeight: 500 }}
             >
               {saving ? "儲存中…" : "💾 儲存品牌設定"}
             </button>
@@ -600,7 +600,7 @@ function ContentTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cfg
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <Link
             href={siteId ? `/tools/content?siteId=${siteId}` : "/tools/content"}
-            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 6, background: "var(--accent)", color: "#fff", fontSize: 12, fontWeight: 500, textDecoration: "none" }}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 6, background: "var(--accent)", color: "var(--btn-primary-text)", fontSize: 12, fontWeight: 500, textDecoration: "none" }}
           >
             ✍ 開啟 Content Studio
           </Link>
@@ -633,8 +633,8 @@ function IntegrationsTab({ integrations }: Pick<ClientHubTabsProps, "integration
   return (
     <>
       <MetricGrid items={[
-        { label: "已連線", value: activeCount, color: "#16a34a" },
-        { label: "失敗", value: failedCount, color: failedCount > 0 ? "#dc2626" : "var(--text-muted)" },
+        { label: "已連線", value: activeCount, color: "var(--green)" },
+        { label: "失敗", value: failedCount, color: failedCount > 0 ? "var(--red)" : "var(--text-muted)" },
         { label: "未設定", value: TOTAL_PROVIDERS - integrations.length, color: "var(--text-muted)" },
       ]} />
 
@@ -670,7 +670,7 @@ function ProvisioningTab({ deptSummary, runs, cfg }: Pick<ClientHubTabsProps, "d
             <span style={{ fontSize: 10, color: "var(--text-muted)", width: 80, flexShrink: 0 }}>{group.groupLabel}</span>
             <div style={{ flex: 1, height: 5, background: "var(--bg-canvas)", borderRadius: 3, overflow: "hidden" }}>
               <div style={{
-                height: "100%", borderRadius: 3, background: "#a78bfa",
+                height: "100%", borderRadius: 3, background: "var(--accent-hover)",
                 width: group.total > 0 ? `${Math.round((group.active / group.total) * 100)}%` : "0%",
                 transition: "width 0.3s",
               }} />
@@ -697,7 +697,7 @@ function ProvisioningTab({ deptSummary, runs, cfg }: Pick<ClientHubTabsProps, "d
             <span style={{
               width: 20, height: 20, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 10, flexShrink: 0, fontWeight: 600,
-              background: "#dcfce7", color: "#15803d",
+              background: "var(--badge-green-bg)", color: "var(--badge-green-text)",
             }}>✓</span>
             {step}
           </div>
@@ -718,7 +718,7 @@ function ProvisioningTab({ deptSummary, runs, cfg }: Pick<ClientHubTabsProps, "d
           {buildRuns.slice(0, 5).map((run) => (
             <div key={run.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid var(--bg-canvas)", fontSize: 11 }}>
               <span style={{ fontFamily: "monospace", flex: 1, color: "var(--text-secondary)" }}>{run.action_id ?? "—"}</span>
-              <span style={{ color: run.status === "completed" || run.status === "success" ? "#16a34a" : "#dc2626", fontWeight: 600 }}>{run.status}</span>
+              <span style={{ color: run.status === "completed" || run.status === "success" ? "var(--green)" : "var(--red)", fontWeight: 600 }}>{run.status}</span>
               <span style={{ color: "var(--text-muted)" }}>{relativeTime(run.started_at)}</span>
             </div>
           ))}
@@ -754,27 +754,27 @@ function MaintenanceTab({ org, cfg, wp, runs, installRuns }: Pick<ClientHubTabsP
           ) : (
             <>
               <MetricGrid items={[
-                { label: "已更新", value: wp.updated_count ?? 0, color: "#16a34a" },
-                { label: "需授權", value: skipped.length, color: skipped.length > 0 ? "#ca8a04" : "var(--text-muted)" },
-                { label: "失敗", value: failed.length, color: failed.length > 0 ? "#dc2626" : "var(--text-muted)" },
-                { label: "健康狀態", value: wp.health_final ?? "—", color: wp.ok ? "#16a34a" : "#dc2626" },
+                { label: "已更新", value: wp.updated_count ?? 0, color: "var(--green)" },
+                { label: "需授權", value: skipped.length, color: skipped.length > 0 ? "var(--severity-medium)" : "var(--text-muted)" },
+                { label: "失敗", value: failed.length, color: failed.length > 0 ? "var(--red)" : "var(--text-muted)" },
+                { label: "健康狀態", value: wp.health_final ?? "—", color: wp.ok ? "var(--green)" : "var(--red)" },
               ]} />
               {skipped.length > 0 && (
                 <>
                   <SubLabel>🔑 需授權（WP 管理後台）</SubLabel>
-                  {skipped.map((r) => <PluginRow key={r.plugin} name={r.plugin} from={r.from} to={r.to} statusColor="#ca8a04" />)}
+                  {skipped.map((r) => <PluginRow key={r.plugin} name={r.plugin} from={r.from} to={r.to} statusColor="var(--severity-medium)" />)}
                 </>
               )}
               {failed.length > 0 && (
                 <>
                   <SubLabel>⚠️ 失敗</SubLabel>
-                  {failed.map((r) => <PluginRow key={r.plugin} name={r.plugin} from={r.from} to={r.to} statusColor="#dc2626" />)}
+                  {failed.map((r) => <PluginRow key={r.plugin} name={r.plugin} from={r.from} to={r.to} statusColor="var(--red)" />)}
                 </>
               )}
               {updated.length > 0 && (
                 <>
                   <SubLabel>✅ 已更新</SubLabel>
-                  {updated.map((r) => <PluginRow key={r.plugin} name={r.plugin} from={r.from} to={r.to} statusColor="#16a34a" />)}
+                  {updated.map((r) => <PluginRow key={r.plugin} name={r.plugin} from={r.from} to={r.to} statusColor="var(--green)" />)}
                 </>
               )}
             </>
@@ -791,13 +791,13 @@ function MaintenanceTab({ org, cfg, wp, runs, installRuns }: Pick<ClientHubTabsP
         ) : (
           <>
             <MetricGrid items={[
-              { label: "已安裝", value: pluginInstalled.length, color: "#16a34a" },
-              { label: "需手動授權", value: pluginSkipped.length, color: "#ca8a04" },
-              { label: "失敗", value: pluginFailed.length, color: "#dc2626" },
+              { label: "已安裝", value: pluginInstalled.length, color: "var(--green)" },
+              { label: "需手動授權", value: pluginSkipped.length, color: "var(--severity-medium)" },
+              { label: "失敗", value: pluginFailed.length, color: "var(--red)" },
             ]} />
             {pluginInstalled.slice(0, 5).map((r) => {
               const s = r.result_summary as InstallSummary;
-              return <PluginRow key={r.id} name={s.plugin_slug ?? "—"} to={s.version ?? undefined} statusColor="#16a34a" />;
+              return <PluginRow key={r.id} name={s.plugin_slug ?? "—"} to={s.version ?? undefined} statusColor="var(--green)" />;
             })}
           </>
         )}
@@ -810,10 +810,10 @@ function MaintenanceTab({ org, cfg, wp, runs, installRuns }: Pick<ClientHubTabsP
           runs.slice(0, 8).map((run) => {
             const color =
               run.status === "completed" || run.status === "success"
-                ? "#16a34a"
+                ? "var(--green)"
                 : run.status === "failed" || run.status === "error"
-                  ? "#dc2626"
-                  : "#64748b";
+                  ? "var(--red)"
+                  : "var(--text-muted)";
             return (
               <div key={run.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid var(--bg-canvas)", fontSize: 11 }}>
                 <span style={{ fontFamily: "monospace", flex: 1, color: "var(--text-secondary)", fontSize: 10 }}>{run.action_id ?? "—"}</span>
@@ -881,10 +881,10 @@ function BrandColorsCard({ slug, initial }: { slug: string; initial?: { primary?
       {row("強調色", accent, setAccent)}
       <button onClick={save} disabled={saving}
         style={{ marginTop: 8, fontSize: 12, padding: "5px 12px", borderRadius: 6, cursor: "pointer",
-          background: "var(--accent)", color: "#fff", border: "none", opacity: saving ? 0.6 : 1 }}>
+          background: "var(--accent)", color: "var(--btn-primary-text)", border: "none", opacity: saving ? 0.6 : 1 }}>
         {saving ? "儲存中…" : "儲存品牌色"}
       </button>
-      {msg && <div style={{ marginTop: 6, fontSize: 11, color: msg.startsWith("✓") ? "var(--green, #16a34a)" : "var(--red, #dc2626)" }}>{msg}</div>}
+      {msg && <div style={{ marginTop: 6, fontSize: 11, color: msg.startsWith("✓") ? "var(--green)" : "var(--red)" }}>{msg}</div>}
     </Card>
   );
 }
@@ -934,7 +934,7 @@ function SettingsTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cf
         ) : (
           wpSites.map((site) => (
             <div key={site.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid var(--border-subtle)", fontSize: 12 }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: site.color ?? "#94a3b8", flexShrink: 0 }} />
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: site.color ?? "var(--text-muted)", flexShrink: 0 }} />
               <span style={{ flex: 1, fontWeight: 500 }}>{site.name}</span>
               <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{site.url.replace(/^https?:\/\//, "")}</span>
             </div>
@@ -1097,13 +1097,13 @@ function SocialChannelsTab({ org }: Pick<ClientHubTabsProps, "org">) {
       {error && (
         <div style={{
           margin: "0 0 12px", padding: "10px 14px", borderRadius: 8, fontSize: 12,
-          background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca",
+          background: "var(--badge-red-bg)", color: "var(--red)", border: "1px solid var(--red)",
         }}>
           {error}
         </div>
       )}
       <MetricGrid items={[
-        { label: "已連結", value: connected.filter((c) => c.status === "connected").length, color: "#16a34a" },
+        { label: "已連結", value: connected.filter((c) => c.status === "connected").length, color: "var(--green)" },
         { label: "可用帳號", value: integrations.length, color: "var(--text-muted)" },
       ]} />
       <Card title="Postiz 帳號">
@@ -1122,7 +1122,7 @@ function SocialChannelsTab({ org }: Pick<ClientHubTabsProps, "org">) {
                     display: "flex", alignItems: "center", gap: 10,
                     padding: "10px 12px", borderRadius: 8,
                     border: `1px solid ${isConnected ? "var(--accent)" : "var(--card-border)"}`,
-                    background: isConnected ? "#f0fdf4" : "var(--bg-canvas)",
+                    background: isConnected ? "var(--badge-green-bg)" : "var(--bg-canvas)",
                     opacity: !isSupported && !isConnected ? 0.5 : 1,
                   }}
                 >
@@ -1133,7 +1133,7 @@ function SocialChannelsTab({ org }: Pick<ClientHubTabsProps, "org">) {
                     <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
                       {integration.identifier}
                       {integration.profile && integration.profile !== integration.name && ` · ${integration.profile}`}
-                      {integration.disabled && <span style={{ color: "#f59e0b", marginLeft: 6 }}>已停用</span>}
+                      {integration.disabled && <span style={{ color: "var(--yellow)", marginLeft: 6 }}>已停用</span>}
                     </div>
                   </div>
                   {!isSupported ? (
@@ -1146,8 +1146,8 @@ function SocialChannelsTab({ org }: Pick<ClientHubTabsProps, "org">) {
                         padding: "5px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600,
                         cursor: isSaving ? "default" : "pointer",
                         border: "none", flexShrink: 0,
-                        background: isConnected ? "#fee2e2" : "var(--accent)",
-                        color: isConnected ? "#dc2626" : "#fff",
+                        background: isConnected ? "var(--badge-red-bg)" : "var(--accent)",
+                        color: isConnected ? "var(--red)" : "var(--btn-primary-text)",
                         opacity: isSaving ? 0.6 : 1,
                       }}
                     >
@@ -1206,9 +1206,9 @@ export function ClientHubTabs(props: ClientHubTabsProps) {
             <div style={{
               marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5,
               padding: "5px 12px", borderRadius: 20, fontSize: 11, fontWeight: 600,
-              background: health.ok ? "#f0fdf4" : "#fef2f2",
-              color: health.ok ? "#15803d" : "#dc2626",
-              border: `1px solid ${health.ok ? "#bbf7d0" : "#fecaca"}`,
+              background: health.ok ? "var(--badge-green-bg)" : "var(--badge-red-bg)",
+              color: health.ok ? "var(--badge-green-text)" : "var(--red)",
+              border: `1px solid ${health.ok ? "var(--green)" : "var(--red)"}`,
             }}>
               <span style={{ fontSize: 9 }}>●</span>
               {health.ok ? "上線中" : "離線"}

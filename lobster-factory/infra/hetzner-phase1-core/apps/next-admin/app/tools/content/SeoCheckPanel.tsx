@@ -130,7 +130,7 @@ function CheckRow({ check }: { check: RankMathCheck }) {
         border: isNa ? "1px solid var(--card-border)" : "none",
         display: "flex", alignItems: "center", justifyContent: "center",
         marginTop: "1px",
-        fontSize: "11px", color: isNa ? "var(--text-muted)" : "#fff", fontWeight: 700,
+        fontSize: "11px", color: isNa ? "var(--text-muted)" : "var(--btn-primary-text)", fontWeight: 700,
       }}>
         {isNa ? "–" : check.pass ? "✓" : "✕"}
       </span>
@@ -196,7 +196,7 @@ function CategoryBlock({
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           {errors > 0 && (
             <span style={{
-              fontSize: "11px", fontWeight: 600, color: "#fff",
+              fontSize: "11px", fontWeight: 600, color: "var(--btn-primary-text)",
               background: "var(--red)", borderRadius: "12px", padding: "1px 8px",
             }}>
               × {errors} 項

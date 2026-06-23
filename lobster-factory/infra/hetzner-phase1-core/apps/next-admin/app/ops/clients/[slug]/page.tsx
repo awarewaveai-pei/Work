@@ -39,7 +39,7 @@ export default async function ClientDetailPage({
   const supabase = getSupabaseServerClient();
   if (!supabase) {
     return (
-      <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", padding: "20px 24px", borderRadius: 10, margin: 32, fontSize: 13 }}>
+      <div style={{ background: "var(--badge-red-bg)", border: "1px solid var(--red)", color: "var(--badge-red-text)", padding: "20px 24px", borderRadius: 10, margin: 32, fontSize: 13 }}>
         <strong>錯誤：</strong> Supabase not configured.
       </div>
     );

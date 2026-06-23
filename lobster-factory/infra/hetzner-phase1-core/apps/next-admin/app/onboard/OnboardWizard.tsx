@@ -303,7 +303,7 @@ function Step1({
         </p>
         <div className="build-form-grid">
           <div className="form-row">
-            <label className="form-label">SSH host {info.profile === "profile_c" ? <span style={{ color: "#dc2626" }}>*</span> : null}</label>
+            <label className="form-label">SSH host {info.profile === "profile_c" ? <span style={{ color: "var(--red)" }}>*</span> : null}</label>
             <input className="form-input" value={info.sshHost}
               onChange={(e) => onChange({ sshHost: e.target.value.trim() })}
               placeholder="soulful.aware-wave.com 或 1.2.3.4" />
@@ -430,9 +430,9 @@ function Step2WpType({
       </div>
 
       {/* ── Base pack (always-on, locked) ─────────────────────────────────── */}
-      <div className="dept-summary" style={{ marginBottom: 16, background: "#f0fdf4", borderColor: "#bbf7d0" }}>
+      <div className="dept-summary" style={{ marginBottom: 16, background: "var(--badge-green-bg)", borderColor: "var(--badge-green-bg)" }}>
         <div className="section-title" style={{ marginBottom: 6 }}>
-          📦 基礎包 — 必裝 <strong style={{ color: "#166534" }}>{BASE_PACK_SIZE} 個</strong>
+          📦 基礎包 — 必裝 <strong style={{ color: "var(--badge-green-text)" }}>{BASE_PACK_SIZE} 個</strong>
           <span className="form-hint" style={{ marginLeft: 8 }}>（所有客戶站通用，不可取消）</span>
         </div>
         <p className="form-hint" style={{ margin: 0, fontSize: 11 }}>
@@ -460,7 +460,7 @@ function Step2WpType({
               />
               <span className="dept-cluster-name">{emoji} {label}</span>
               <span className="dept-cluster-rows">{desc}</span>
-              <span className="dept-cluster-rows" style={{ color: active ? "#166534" : "#64748b", fontWeight: 600 }}>
+              <span className="dept-cluster-rows" style={{ color: active ? "var(--badge-green-text)" : "var(--text-muted)", fontWeight: 600 }}>
                 +{count} 個
               </span>
             </label>
@@ -476,13 +476,13 @@ function Step2WpType({
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginBottom: 12 }}>
           <tbody>
             {stackRows.map((row, i) => (
-              <tr key={row.name} style={{ borderBottom: i === stackRows.length - 1 ? "2px solid var(--border-subtle)" : "1px solid #f1f5f9" }}>
+              <tr key={row.name} style={{ borderBottom: i === stackRows.length - 1 ? "2px solid var(--border-subtle)" : "1px solid var(--border)" }}>
                 <td style={{ padding: "6px 8px", width: 36 }}>{row.emoji}</td>
                 <td style={{ padding: "6px 8px" }}>
                   {row.name}
                   {row.locked && <span className="form-hint" style={{ marginLeft: 6 }}>（必裝）</span>}
                 </td>
-                <td style={{ padding: "6px 8px", textAlign: "right", fontFamily: "monospace", color: "#64748b" }}>
+                <td style={{ padding: "6px 8px", textAlign: "right", fontFamily: "monospace", color: "var(--text-muted)" }}>
                   {i === 0 ? "  " : "+ "}{row.count}
                 </td>
               </tr>
@@ -496,18 +496,18 @@ function Step2WpType({
         </table>
 
         <div className="build-kv-grid">
-          <div><span>🟢 自動安裝（WP.org）</span><strong style={{ color: "#166534" }}>{autoCount} 個</strong></div>
+          <div><span>🟢 自動安裝（WP.org）</span><strong style={{ color: "var(--badge-green-text)" }}>{autoCount} 個</strong></div>
           <div>
             <span>🔵 條件安裝（LiteSpeed 主機才裝）</span>
-            <strong style={{ color: "#1d4ed8" }}>{conditionalCount} 個</strong>
+            <strong style={{ color: "var(--accent)" }}>{conditionalCount} 個</strong>
           </div>
           <div>
             <span>🟡 需手動上傳（付費 zip）</span>
-            <strong style={{ color: paidCount > 0 ? "#92400e" : "#166534" }}>{paidCount} 個</strong>
+            <strong style={{ color: paidCount > 0 ? "var(--build-risk-medium-text)" : "var(--badge-green-text)" }}>{paidCount} 個</strong>
           </div>
         </div>
         {conditionalCount > 0 && (
-          <p className="form-hint" style={{ marginTop: 6, fontSize: 11, color: "#1d4ed8" }}>
+          <p className="form-hint" style={{ marginTop: 6, fontSize: 11, color: "var(--accent)" }}>
             條件外掛：{info.resolvedConditionalPlugins.map((p) => p.slug).join(", ")}
             &nbsp;— 只在 LiteSpeed 主機上安裝（Hostinger VPS 預設是 LiteSpeed；Cloudways/Nginx 不裝）
           </p>
@@ -547,7 +547,7 @@ function Step2WpType({
                   {list.map((p) => (
                     <div key={`${mod}-${p.slug}`} className="dept-file-row">
                       <code className="dept-file-path">{p.slug}</code>
-                      <span className="dept-file-fields" style={{ color: !p.free && !p.alternativeSlug ? "#92400e" : undefined }}>
+                      <span className="dept-file-fields" style={{ color: !p.free && !p.alternativeSlug ? "var(--build-risk-medium-text)" : undefined }}>
                         {p.label}
                         {!p.free && p.alternativeSlug && (
                           <span className="dept-file-recommended"> ↩ {p.alternativeSlug}</span>
@@ -745,11 +745,11 @@ function Step4Svc({
             <div
               key={p.id}
               style={{
-                border: `1px solid ${active ? "#3b82f6" : "var(--border-subtle, #e2e8f0)"}`,
-                borderLeft: `4px solid ${active ? "#3b82f6" : "#cbd5e1"}`,
+                border: `1px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
+                borderLeft: `4px solid ${active ? "var(--accent)" : "var(--border)"}`,
                 borderRadius: 8,
                 padding: "14px 16px",
-                background: active ? "#f0f9ff" : "var(--surface-bg, #fff)",
+                background: active ? "var(--ai-bg)" : "var(--surface-bg)",
                 opacity: active ? 1 : 0.65,
                 transition: "all 0.15s",
               }}
@@ -770,7 +770,7 @@ function Step4Svc({
                     onChange={() => toggle(p.id)}
                     style={{ width: 16, height: 16 }}
                   />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: active ? "#1d4ed8" : "#94a3b8" }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: active ? "var(--accent)" : "var(--text-muted)" }}>
                     {active ? "✓ 開通" : "略過"}
                   </span>
                 </label>
@@ -803,7 +803,7 @@ function Step4Svc({
               )}
 
               {p.hintDefs.length === 0 && active && (
-                <p className="form-hint" style={{ margin: "10px 0 0", fontSize: 11, color: "#64748b" }}>
+                <p className="form-hint" style={{ margin: "10px 0 0", fontSize: 11, color: "var(--text-muted)" }}>
                   自動建立 — 不需要額外設定
                 </p>
               )}
@@ -912,7 +912,7 @@ function Step5Launch({
         </div>
         <div>
           <span>SSH host</span>
-          <strong style={{ color: info.sshHost ? "#166534" : "#92400e", fontFamily: info.sshHost ? "monospace" : undefined, fontSize: 11 }}>
+          <strong style={{ color: info.sshHost ? "var(--badge-green-text)" : "var(--build-risk-medium-text)", fontFamily: info.sshHost ? "monospace" : undefined, fontSize: 11 }}>
             {info.sshHost || "未填 — 一鍵安裝外掛將跳過（hosting adapter 之後可補）"}
           </strong>
         </div>

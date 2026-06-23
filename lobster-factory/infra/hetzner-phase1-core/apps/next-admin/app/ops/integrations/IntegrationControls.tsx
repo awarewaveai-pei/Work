@@ -147,7 +147,7 @@ export function IntegrationCreatePanel({
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginTop: 12 }}>
-        <div style={{ fontSize: 11, color: message?.includes("failed") ? "#991b1b" : "var(--text-muted)" }}>
+        <div style={{ fontSize: 11, color: message?.includes("failed") ? "var(--badge-red-text)" : "var(--text-muted)" }}>
           {message ?? "Secrets are referenced by name only. Raw tokens do not belong in Repair OS records."}
         </div>
         <button type="submit" disabled={busy || !organizationId || !provider} style={primaryButtonStyle}>
@@ -200,7 +200,7 @@ export function IntegrationRowActions({ integration }: { integration: Integratio
           </button>
         )}
       </div>
-      {message ? <div style={{ fontSize: 11, color: message.includes("failed") ? "#991b1b" : "var(--text-muted)" }}>{message}</div> : null}
+      {message ? <div style={{ fontSize: 11, color: message.includes("failed") ? "var(--badge-red-text)" : "var(--text-muted)" }}>{message}</div> : null}
     </div>
   );
 }
@@ -234,7 +234,7 @@ function providerLabel(provider: string): string {
 }
 
 const panelStyle: CSSProperties = {
-  background: "#fff",
+  background: "var(--card-bg)",
   border: "1px solid var(--border-subtle)",
   borderRadius: 8,
   padding: 14,
@@ -244,18 +244,18 @@ const panelStyle: CSSProperties = {
 const inputStyle: CSSProperties = {
   width: "100%",
   minHeight: 34,
-  border: "1px solid #cbd5e1",
+  border: "1px solid var(--border)",
   borderRadius: 6,
   padding: "6px 8px",
   fontSize: 12,
   color: "var(--text-primary)",
-  background: "#fff",
+  background: "var(--card-bg)",
 };
 
 const primaryButtonStyle: CSSProperties = {
-  border: "1px solid #2563eb",
-  background: "#2563eb",
-  color: "#fff",
+  border: "1px solid var(--accent)",
+  background: "var(--accent)",
+  color: "var(--btn-primary-text)",
   borderRadius: 6,
   padding: "7px 11px",
   fontSize: 12,
@@ -264,8 +264,8 @@ const primaryButtonStyle: CSSProperties = {
 };
 
 const smallButtonStyle: CSSProperties = {
-  border: "1px solid #cbd5e1",
-  background: "#fff",
+  border: "1px solid var(--border)",
+  background: "var(--card-bg)",
   color: "var(--text-primary)",
   borderRadius: 6,
   padding: "5px 8px",
@@ -276,7 +276,7 @@ const smallButtonStyle: CSSProperties = {
 
 const dangerButtonStyle: CSSProperties = {
   ...smallButtonStyle,
-  borderColor: "#fecaca",
-  color: "#991b1b",
-  background: "#fef2f2",
+  borderColor: "var(--red)",
+  color: "var(--badge-red-text)",
+  background: "var(--badge-red-bg)",
 };

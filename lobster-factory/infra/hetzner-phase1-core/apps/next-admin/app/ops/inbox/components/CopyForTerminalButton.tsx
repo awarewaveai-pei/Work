@@ -39,9 +39,9 @@ export function CopyForTerminalButton({ incident, tool }: Props) {
       style={{
         padding: "7px 13px",
         borderRadius: 6,
-        border: "1px solid #e5e7eb",
-        background: copied ? "#dcfce7" : "#f8fafc",
-        color: copied ? "#15803d" : "#374151",
+        border: "1px solid var(--border)",
+        background: copied ? "var(--badge-green-bg)" : "var(--bg-subtle)",
+        color: copied ? "var(--badge-green-text)" : "var(--text-secondary)",
         cursor: "pointer",
         fontSize: 13,
         fontWeight: 500,

@@ -191,7 +191,7 @@ export function RepairActions({ canAct, mode, incidentId, runId, runState, canEs
     }
   }
 
-  if (!canAct) return <span style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap" }}>唯讀</span>;
+  if (!canAct) return <span style={{ fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>唯讀</span>;
 
   const btns = mode === "run" ? visibleRunButtons(runState, canEscalate ?? false, archivedAt) : null;
 
@@ -235,7 +235,7 @@ export function RepairActions({ canAct, mode, incidentId, runId, runState, canEs
           )}
           {btns!.archive && (
             <button type="button" className="btn-secondary" disabled={busy} onClick={archive}
-              style={{ color: "#92400e", borderColor: "#fcd34d" }}>
+              style={{ color: "var(--build-risk-medium-text)", borderColor: "var(--yellow)" }}>
               封存
             </button>
           )}
@@ -247,7 +247,7 @@ export function RepairActions({ canAct, mode, incidentId, runId, runState, canEs
             maxWidth: 220,
             fontSize: 11,
             lineHeight: 1.45,
-            color: ok ? "#166534" : "#991b1b",
+            color: ok ? "var(--badge-green-text)" : "var(--badge-red-text)",
             textAlign: "right",
           }}
         >

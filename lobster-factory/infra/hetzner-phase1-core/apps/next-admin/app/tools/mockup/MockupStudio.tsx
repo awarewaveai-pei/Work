@@ -150,12 +150,12 @@ function CatalogGrid({
       <div style={{ fontSize: 13, marginBottom: 4 }}>
         選擇產品（多選）
         {selectedIds.size > 0 && (
-          <span style={{ marginLeft: 8, color: "#4f8cff", fontSize: 12 }}>已選 {selectedIds.size} 個</span>
+          <span style={{ marginLeft: 8, color: "var(--accent)", fontSize: 12 }}>已選 {selectedIds.size} 個</span>
         )}
       </div>
       {catalogLoading && <p style={{ fontSize: 12, opacity: 0.6 }}>載入產品目錄中…</p>}
       {!catalogLoading && catalog.length === 0 && (
-        <p style={{ fontSize: 12, color: "#e5484d" }}>無法載入 Printful 產品目錄</p>
+        <p style={{ fontSize: 12, color: "var(--red)" }}>無法載入 Printful 產品目錄</p>
       )}
       {/* 3-col grid of SQUARE cards, image fills each card. Two CSS facts are load-bearing
           (both verified live on production DOM, do NOT change without re-testing):
@@ -176,7 +176,7 @@ function CatalogGrid({
                 title={name}
                 style={{
                   cursor: "pointer",
-                  border: selected ? "2px solid #4f8cff" : "2px solid #333",
+                  border: selected ? "2px solid var(--accent)" : "2px solid var(--border)",
                   borderRadius: 6,
                   overflow: "hidden",
                   background: "#1a1a1a",
@@ -187,7 +187,7 @@ function CatalogGrid({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={p.image} alt={name} loading="lazy" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                 {selected && (
-                  <div style={{ position: "absolute", top: 4, right: 4, background: "#4f8cff", borderRadius: "50%", width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#fff", fontWeight: 700, zIndex: 2 }}>✓</div>
+                  <div style={{ position: "absolute", top: 4, right: 4, background: "var(--accent)", borderRadius: "50%", width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "var(--btn-primary-text)", fontWeight: 700, zIndex: 2 }}>✓</div>
                 )}
                 <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "14px 6px 4px", background: "linear-gradient(transparent, rgba(0,0,0,0.85))", zIndex: 1 }}>
                   <div style={{ fontSize: 10, fontWeight: 600, color: "#fff", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
@@ -234,9 +234,9 @@ function PropChips({
               fontSize: 11,
               padding: "2px 8px",
               borderRadius: 12,
-              border: on ? "1.5px solid #4f8cff" : "1.5px solid #444",
-              background: on ? "rgba(79,140,255,0.15)" : "transparent",
-              color: on ? "#4f8cff" : "#aaa",
+              border: on ? "1.5px solid var(--accent)" : "1.5px solid var(--border)",
+              background: on ? "var(--ai-bg)" : "transparent",
+              color: on ? "var(--accent)" : "var(--text-muted)",
               cursor: "pointer",
             }}
           >
@@ -631,7 +631,7 @@ export default function MockupStudio() {
   }, []);
 
   const selectStyle = (selected: boolean) => ({
-    border: selected ? "2px solid #4f8cff" : "2px solid transparent",
+    border: selected ? "2px solid var(--accent)" : "2px solid transparent",
     borderRadius: 6,
     cursor: "pointer",
   });
@@ -664,7 +664,7 @@ export default function MockupStudio() {
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={p.object_url!} alt={p.metadata?.preset_name ?? p.id} style={{ width: 64, height: 80, objectFit: "cover", borderRadius: 4, background: "#111" }} />
                       <div style={{ fontSize: 10, textAlign: "center", maxWidth: 64, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.metadata?.preset_name ?? "預設"}</div>
-                      <button style={{ position: "absolute", top: 0, right: 0, fontSize: 9, background: "#e5484d", color: "#fff", border: "none", borderRadius: 2, cursor: "pointer", padding: "1px 3px" }} onClick={(e) => { e.stopPropagation(); void deletePreset(p.id, p.asset_domain); }}>✕</button>
+                      <button style={{ position: "absolute", top: 0, right: 0, fontSize: 9, background: "var(--red)", color: "var(--btn-primary-text)", border: "none", borderRadius: 2, cursor: "pointer", padding: "1px 3px" }} onClick={(e) => { e.stopPropagation(); void deletePreset(p.id, p.asset_domain); }}>✕</button>
                     </div>
                   ))}
                 </div>
@@ -678,7 +678,7 @@ export default function MockupStudio() {
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={p.object_url!} alt={p.metadata?.preset_name ?? p.id} style={{ width: 64, height: 80, objectFit: "cover", borderRadius: 4, background: "#111" }} />
                         <div style={{ fontSize: 10, textAlign: "center", maxWidth: 64, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.metadata?.preset_name ?? "預設"}</div>
-                        <button style={{ position: "absolute", top: 0, right: 0, fontSize: 9, background: "#e5484d", color: "#fff", border: "none", borderRadius: 2, cursor: "pointer", padding: "1px 3px" }} onClick={(e) => { e.stopPropagation(); void deletePreset(p.id, p.asset_domain); }}>✕</button>
+                        <button style={{ position: "absolute", top: 0, right: 0, fontSize: 9, background: "var(--red)", color: "var(--btn-primary-text)", border: "none", borderRadius: 2, cursor: "pointer", padding: "1px 3px" }} onClick={(e) => { e.stopPropagation(); void deletePreset(p.id, p.asset_domain); }}>✕</button>
                       </div>
                     ))}
                   </div>
@@ -887,7 +887,7 @@ export default function MockupStudio() {
               <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={pose} onChange={(e) => setPose(e.target.value)}>
                 {MODEL_POSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
-              {isChestOccludingPose(pose) && <span style={{ color: "#f5a623", fontSize: 12 }}>⚠ 此姿勢會遮住胸前設計</span>}
+              {isChestOccludingPose(pose) && <span style={{ color: "var(--yellow)", fontSize: 12 }}>⚠ 此姿勢會遮住胸前設計</span>}
             </label>
 
             <label style={{ fontSize: 13 }}>
@@ -910,7 +910,7 @@ export default function MockupStudio() {
                 {MODEL_FRAMING.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
               {modelFraming === "full-body" && !["4:5", "9:16"].includes(aspect) && (
-                <span style={{ fontSize: 11, color: "#f5a623", display: "block", marginTop: 4, lineHeight: 1.4 }}>
+                <span style={{ fontSize: 11, color: "var(--yellow)", display: "block", marginTop: 4, lineHeight: 1.4 }}>
                   ⚠ 全身框景建議搭配 <strong>4:5</strong> 或 <strong>9:16</strong> 比例（畫面更高，頭腳不易裁切）。目前比例：{aspect}
                 </span>
               )}
@@ -930,7 +930,7 @@ export default function MockupStudio() {
             </label>
 
             {modelCategory !== "apparel" && (
-              <div style={{ fontSize: 12, padding: "6px 10px", borderRadius: 6, background: "rgba(79,140,255,0.12)", color: "#4f8cff" }}>
+              <div style={{ fontSize: 12, padding: "6px 10px", borderRadius: 6, background: "var(--ai-bg)", color: "var(--ai-text)" }}>
                 偵測到非服飾產品（{modelCategory}）→ 模特會以「{modelCategory === "drinkware" ? "手持杯子" : modelCategory === "jewelry" ? "配戴飾品特寫" : modelCategory === "wall-art" ? "手持展示" : modelCategory === "bag" ? "揹／拿著包" : modelCategory === "phone" ? "手持手機" : modelCategory === "pillow" ? "抱著抱枕" : "展示"}」方式入鏡，而非穿在身上。
               </div>
             )}
@@ -970,7 +970,7 @@ export default function MockupStudio() {
             </label>
 
             {flatCategory !== "apparel" && (
-              <div style={{ fontSize: 12, padding: "6px 10px", borderRadius: 6, background: "rgba(79,140,255,0.12)", color: "#4f8cff" }}>
+              <div style={{ fontSize: 12, padding: "6px 10px", borderRadius: 6, background: "var(--ai-bg)", color: "var(--ai-text)" }}>
                 偵測到非服飾產品（{flatCategory}）→ {flatCategory === "jewelry" ? "以俯拍平擺呈現" : "改用「立拍」：產品站立、斜前角度，而非平躺俯拍。"}
               </div>
             )}
@@ -1059,7 +1059,7 @@ export default function MockupStudio() {
                 ))}
               </select>
               {MOCKUP_MODELS.find((m) => m.value === model)?.maxRefs === 0 && (
-                <span style={{ color: "#f5a623", fontSize: 12 }}>⚠ 此模型不吃參考圖，設計不會印上衣服</span>
+                <span style={{ color: "var(--yellow)", fontSize: 12 }}>⚠ 此模型不吃參考圖，設計不會印上衣服</span>
               )}
             </label>
 
@@ -1089,7 +1089,7 @@ export default function MockupStudio() {
           <>
             {gen.status === "idle" && <p style={{ opacity: 0.6 }}>選設計圖 → 選產品 → 填控制欄 → 合成。</p>}
             {gen.status === "generating" && <p style={{ opacity: 0.7 }}>合成中…</p>}
-            {gen.status === "error" && <p style={{ color: "#e5484d" }}>{gen.error}</p>}
+            {gen.status === "error" && <p style={{ color: "var(--red)" }}>{gen.error}</p>}
             {gen.status === "done" && gen.image && (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1101,7 +1101,7 @@ export default function MockupStudio() {
                   <a className="btn-secondary" href={gen.image} download={`mockup-${mode}-${color}.png`}>下載</a>
                   <button className="btn-secondary" onClick={() => void generate()}>再合成一張</button>
                   {mode === "model" && <button className="btn-secondary" onClick={() => void saveModelPreset()}>儲存為模特預設</button>}
-                  {saveState === "error" && <span style={{ color: "#e5484d", fontSize: 12 }}>儲存失敗</span>}
+                  {saveState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>儲存失敗</span>}
                 </div>
                 <div style={{ marginTop: 14 }}>
                   <ImageEditPromptPanel
@@ -1157,7 +1157,7 @@ export default function MockupStudio() {
                   <span style={{ fontSize: 13, fontWeight: 600 }}>{pr.productTitle.replace(/\s*\|.*$/, "")}</span>
                   {pr.status === "generating" && <span style={{ fontSize: 12, opacity: 0.6 }}>合成中…</span>}
                   {pr.status === "done" && pr.mockups && <span style={{ fontSize: 11, opacity: 0.5 }}>{pr.mockups.length} 張</span>}
-                  {pr.status === "error" && <span style={{ fontSize: 12, color: "#e5484d" }}>✗ {pr.error}</span>}
+                  {pr.status === "error" && <span style={{ fontSize: 12, color: "var(--red)" }}>✗ {pr.error}</span>}
                 </div>
                 {pr.status === "done" && pr.mockups && (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
@@ -1167,13 +1167,13 @@ export default function MockupStudio() {
                       return (
                         <div key={mv.url} style={{ display: "flex", flexDirection: "column", gap: 3, cursor: "pointer", position: "relative" }} onClick={() => toggleMockup(mv.url)}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={mv.url} alt={mv.label} style={{ width: "100%", borderRadius: 6, background: "#111", outline: checked ? "2px solid #4f8cff" : "none" }} />
+                          <img src={mv.url} alt={mv.label} style={{ width: "100%", borderRadius: 6, background: "#111", outline: checked ? "2px solid var(--accent)" : "none" }} />
                           <input type="checkbox" checked={checked} onChange={() => toggleMockup(mv.url)}
                             style={{ position: "absolute", top: 4, left: 4, width: 16, height: 16, cursor: "pointer" }}
                             onClick={(e) => e.stopPropagation()} />
-                          {st === "saved" && <div style={{ position: "absolute", top: 4, right: 4, background: "#1a9e5c", color: "#fff", fontSize: 10, borderRadius: 3, padding: "1px 4px" }}>✓</div>}
+                          {st === "saved" && <div style={{ position: "absolute", top: 4, right: 4, background: "var(--green)", color: "var(--btn-primary-text)", fontSize: 10, borderRadius: 3, padding: "1px 4px" }}>✓</div>}
                           <div style={{ fontSize: 10, opacity: 0.65, textAlign: "center" }}>{mv.label}</div>
-                          {st === "error" && <span style={{ color: "#e5484d", fontSize: 10, textAlign: "center" }}>儲存失敗</span>}
+                          {st === "error" && <span style={{ color: "var(--red)", fontSize: 10, textAlign: "center" }}>儲存失敗</span>}
                         </div>
                       );
                     })}

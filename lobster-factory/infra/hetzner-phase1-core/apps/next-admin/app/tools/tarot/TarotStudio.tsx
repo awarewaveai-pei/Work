@@ -760,9 +760,9 @@ export default function TarotStudio() {
                           borderRadius: 14,
                           fontSize: 12,
                           cursor: locked ? "default" : "pointer",
-                          border: `1px solid ${active ? "#6366f1" : "var(--card-border)"}`,
-                          background: active ? "#6366f1" : "rgba(127,127,127,0.08)",
-                          color: active ? "#fff" : "var(--text-muted)",
+                          border: `1px solid ${active ? "var(--accent)" : "var(--card-border)"}`,
+                          background: active ? "var(--accent)" : "rgba(127,127,127,0.08)",
+                          color: active ? "var(--btn-primary-text)" : "var(--text-muted)",
                           fontWeight: active ? 600 : 400,
                           opacity: locked ? 0.5 : 1,
                         }}
@@ -837,8 +837,8 @@ export default function TarotStudio() {
                           height: 20,
                           borderRadius: "50%",
                           border: "none",
-                          background: "#ef4444",
-                          color: "#fff",
+                          background: "var(--red)",
+                          color: "var(--btn-primary-text)",
                           cursor: "pointer",
                           fontSize: 12,
                           lineHeight: "20px",
@@ -902,9 +902,9 @@ export default function TarotStudio() {
                         borderRadius: 14,
                         fontSize: 12,
                         cursor: locked ? "default" : "pointer",
-                        border: `1px solid ${selected ? "#6366f1" : "var(--card-border)"}`,
-                        background: selected ? "#6366f1" : "rgba(127,127,127,0.08)",
-                        color: selected ? "#fff" : "var(--text-muted)",
+                        border: `1px solid ${selected ? "var(--accent)" : "var(--card-border)"}`,
+                        background: selected ? "var(--accent)" : "rgba(127,127,127,0.08)",
+                        color: selected ? "var(--btn-primary-text)" : "var(--text-muted)",
                         fontWeight: selected ? 600 : 400,
                         opacity: locked ? 0.5 : 1,
                       }}
@@ -943,9 +943,9 @@ export default function TarotStudio() {
                   fontSize: 11,
                   padding: "3px 10px",
                   borderRadius: 10,
-                  border: "1px solid #6366f1",
-                  background: locked || suggestBusy ? "rgba(127,127,127,0.08)" : "#eef2ff",
-                  color: locked || suggestBusy ? "var(--text-muted)" : "#4338ca",
+                  border: "1px solid var(--accent)",
+                  background: locked || suggestBusy ? "rgba(127,127,127,0.08)" : "var(--ai-bg)",
+                  color: locked || suggestBusy ? "var(--text-muted)" : "var(--accent)",
                   cursor: locked || suggestBusy ? "default" : "pointer",
                   fontWeight: 500,
                   whiteSpace: "nowrap",
@@ -1015,7 +1015,7 @@ export default function TarotStudio() {
                         height: 213,
                         borderRadius: 6,
                         objectFit: "cover",
-                        border: active ? "3px solid #6366f1" : "1px solid var(--card-border)",
+                        border: active ? "3px solid var(--accent)" : "1px solid var(--card-border)",
                       }}
                     />
                   ) : (
@@ -1035,7 +1035,7 @@ export default function TarotStudio() {
                       …
                     </div>
                   )}
-                  <div style={{ fontSize: 14, marginTop: 6, lineHeight: 1.3, color: active ? "#4338ca" : "var(--text-muted)" }}>
+                  <div style={{ fontSize: 14, marginTop: 6, lineHeight: 1.3, color: active ? "var(--accent)" : "var(--text-muted)" }}>
                     {t.label}
                   </div>
                 </div>
@@ -1051,9 +1051,9 @@ export default function TarotStudio() {
               marginBottom: 10,
               padding: "8px 12px",
               borderRadius: 8,
-              border: "1px solid #f59e0b",
-              background: "#fffbeb",
-              color: "#92400e",
+              border: "1px solid var(--yellow)",
+              background: "var(--build-risk-medium-bg)",
+              color: "var(--build-risk-medium-text)",
               fontSize: 13,
             }}
           >
@@ -1075,7 +1075,7 @@ export default function TarotStudio() {
               className="btn-primary"
               onClick={generatePreview}
               disabled={previewBusy || locked}
-              style={previewStale ? { boxShadow: "0 0 0 3px #fde68a" } : undefined}
+              style={previewStale ? { boxShadow: "0 0 0 3px var(--yellow)" } : undefined}
             >
               {previewBusy ? "生成中…" : previewImage ? "重新生成預覽（套用新風格）" : "生成風格預覽"}
             </button>
@@ -1129,7 +1129,7 @@ export default function TarotStudio() {
                       </button>
                     </>
                   ) : (
-                    <div style={{ fontSize: 12, color: "#ef4444", width: 180 }}>
+                    <div style={{ fontSize: 12, color: "var(--red)", width: 180 }}>
                       {modelOption(r.model).label}
                       <br />
                       ⚠ {r.error ?? "失敗"}
@@ -1236,9 +1236,9 @@ export default function TarotStudio() {
                         borderRadius: 6,
                         fontSize: 12,
                         cursor: batchBusy ? "default" : "pointer",
-                        border: `1px solid ${active ? "#6366f1" : "var(--card-border)"}`,
-                        background: active ? "#eef2ff" : "transparent",
-                        color: active ? "#4338ca" : "var(--text-muted)",
+                        border: `1px solid ${active ? "var(--accent)" : "var(--card-border)"}`,
+                        background: active ? "var(--ai-bg)" : "transparent",
+                        color: active ? "var(--accent)" : "var(--text-muted)",
                       }}
                     >
                       {g.label}
@@ -1280,14 +1280,14 @@ export default function TarotStudio() {
                   </button>
                 )}
                 {(bgStatus === "pending" || bgStatus === "running") && (
-                  <span style={{ fontSize: 12, color: "#6366f1" }}>
+                  <span style={{ fontSize: 12, color: "var(--accent)" }}>
                     進行中 {bgProgress.done}/{bgProgress.total} 張…
                     {bgJobId && <span style={{ color: "var(--text-muted)", marginLeft: 6 }}>job: {bgJobId.slice(0, 8)}</span>}
                   </span>
                 )}
                 {bgStatus === "done" && (
                   <>
-                    <span style={{ fontSize: 12, color: "#10b981" }}>✅ 完成 {bgProgress.done}/{bgProgress.total} 張</span>
+                    <span style={{ fontSize: 12, color: "var(--green)" }}>✅ 完成 {bgProgress.done}/{bgProgress.total} 張</span>
                     <button
                       className="btn-primary"
                       disabled={bgLoadBusy}
@@ -1300,7 +1300,7 @@ export default function TarotStudio() {
                 )}
                 {bgStatus === "error" && (
                   <>
-                    <span style={{ fontSize: 12, color: "#ef4444" }}>❌ 部分失敗 {bgProgress.done}/{bgProgress.total}</span>
+                    <span style={{ fontSize: 12, color: "var(--red)" }}>❌ 部分失敗 {bgProgress.done}/{bgProgress.total}</span>
                     <button
                       className="btn-secondary"
                       disabled={bgLoadBusy}
@@ -1410,7 +1410,7 @@ export default function TarotStudio() {
               )}
             </div>
             {batch[viewIndex].status === "error" && (
-              <div style={{ color: "#f87171", fontSize: 13 }}>
+              <div style={{ color: "var(--red)", fontSize: 13 }}>
                 ❌ {batch[viewIndex].error ?? "生成失敗"}
               </div>
             )}

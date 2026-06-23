@@ -41,8 +41,8 @@ export function IncidentFilterBar({
         alignItems: "center",
         gap: 8,
         marginBottom: 14,
-        background: "#fff",
-        border: "1px solid #e5e7eb",
+        background: "var(--card-bg)",
+        border: "1px solid var(--border)",
         borderRadius: 10,
         padding: "8px 12px",
         flexWrap: "wrap",
@@ -62,7 +62,7 @@ export function IncidentFilterBar({
                 padding: "5px 12px",
                 borderRadius: 6,
                 background: active ? "#0f172a" : "transparent",
-                color: active ? "#fff" : "#64748b",
+                color: active ? "var(--btn-primary-text)" : "var(--text-muted)",
                 border: "none",
                 cursor: "pointer",
                 fontSize: 12,
@@ -77,7 +77,7 @@ export function IncidentFilterBar({
       </div>
 
       {/* Divider */}
-      <div style={{ width: 1, height: 20, background: "#e5e7eb", margin: "0 4px" }} />
+      <div style={{ width: 1, height: 20, background: "var(--border)", margin: "0 4px" }} />
 
       {/* Search */}
       <div style={{ flex: 1, position: "relative", minWidth: 180 }}>
@@ -87,7 +87,7 @@ export function IncidentFilterBar({
             left: 10,
             top: "50%",
             transform: "translateY(-50%)",
-            color: "#94a3b8",
+            color: "var(--text-muted)",
             fontSize: 13,
             pointerEvents: "none",
           }}
@@ -102,17 +102,17 @@ export function IncidentFilterBar({
             width: "100%",
             padding: "5px 10px 5px 30px",
             borderRadius: 6,
-            border: "1px solid #e5e7eb",
+            border: "1px solid var(--border)",
             fontSize: 12,
-            color: "#0f172a",
-            background: "#f8fafc",
+            color: "var(--text-primary)",
+            background: "var(--bg-subtle)",
             outline: "none",
           }}
         />
       </div>
 
       {isPending && (
-        <span style={{ fontSize: 11, color: "#94a3b8" }}>Loading…</span>
+        <span style={{ fontSize: 11, color: "var(--text-muted)" }}>Loading…</span>
       )}
     </div>
   );

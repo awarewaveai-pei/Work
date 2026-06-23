@@ -156,18 +156,18 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
         )}
 
         {integrationBlockers.length > 0 && (
-          <Panel title="維修能力補件" subtitle="這些外部串接會影響 Repair Center 的偵測、通知、驗證或客戶交付能力。" style={{ marginBottom: 16, background: "#fff7ed", borderColor: "#fed7aa" }}>
+          <Panel title="維修能力補件" subtitle="這些外部串接會影響 Repair Center 的偵測、通知、驗證或客戶交付能力。" style={{ marginBottom: 16, background: "var(--build-risk-medium-bg)", borderColor: "var(--yellow)" }}>
             <div style={{ display: "grid", gap: 10 }}>
               {integrationBlockers.map((item) => (
-                <div key={item.key} style={{ ...rowStyle, background: "#fff" }}>
+                <div key={item.key} style={{ ...rowStyle, background: "var(--card-bg)" }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 5, flexWrap: "wrap" }}>
                       <span style={warnPillStyle}>{item.clientSlug}</span>
                       <span style={pillStyle}>{providerLabel(item.provider)}</span>
                       <span style={item.status === "pending" ? warnPillStyle : dangerPillStyle}>{item.status}</span>
                     </div>
-                    <div style={{ fontSize: 13, color: "#7c2d12", fontWeight: 700 }}>{item.message}</div>
-                    <div style={{ fontSize: 12, color: "#9a3412", marginTop: 4 }}>{item.nextStep}</div>
+                    <div style={{ fontSize: 13, color: "var(--build-risk-medium-text)", fontWeight: 700 }}>{item.message}</div>
+                    <div style={{ fontSize: 12, color: "var(--severity-high)", marginTop: 4 }}>{item.nextStep}</div>
                   </div>
                   <Link href="/ops/integrations" style={linkButtonStyle}>前往串接</Link>
                 </div>
@@ -241,7 +241,7 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
                       {run.github_pr_url ? <a href={run.github_pr_url} style={linkStyle} target="_blank" rel="noreferrer">PR #{run.github_pr_number ?? ""}</a> : <span>尚無 PR</span>}
                       {run.backup_ref ? <code>{run.backup_ref}</code> : null}
                     </div>
-                    {run.backup_error ? <div style={{ color: "#991b1b", fontSize: 12, marginTop: 5 }}>{run.backup_error}</div> : null}
+                    {run.backup_error ? <div style={{ color: "var(--badge-red-text)", fontSize: 12, marginTop: 5 }}>{run.backup_error}</div> : null}
                   </div>
                   <RepairActions
                     runId={run.id}
@@ -274,7 +274,7 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
 
 function Panel({ title, subtitle, children, style }: { title: string; subtitle?: string; children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <section style={{ background: "#fff", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: 18, ...style }}>
+    <section style={{ background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: 18, ...style }}>
       <div style={{ marginBottom: 14 }}>
         <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>{title}</h2>
         {subtitle ? <p style={{ fontSize: 12, color: "var(--text-secondary)" }}>{subtitle}</p> : null}
@@ -286,7 +286,7 @@ function Panel({ title, subtitle, children, style }: { title: string; subtitle?:
 
 function QuickLink({ href, label, tone }: { href: string; label: string; tone?: "ok" | "danger" }) {
   return (
-    <Link href={href} style={{ ...quickLinkStyle, ...(tone === "danger" ? { borderColor: "#fecaca", color: "#991b1b", background: "#fef2f2" } : tone === "ok" ? { borderColor: "#bbf7d0", color: "#166534", background: "#f0fdf4" } : {}) }}>
+    <Link href={href} style={{ ...quickLinkStyle, ...(tone === "danger" ? { borderColor: "var(--red)", color: "var(--badge-red-text)", background: "var(--badge-red-bg)" } : tone === "ok" ? { borderColor: "var(--green)", color: "var(--badge-green-text)", background: "var(--badge-green-bg)" } : {}) }}>
       {label}
     </Link>
   );
@@ -294,9 +294,9 @@ function QuickLink({ href, label, tone }: { href: string; label: string; tone?: 
 
 function Metric({ label, value, hint, tone }: { label: string; value: string | number; hint: string; tone?: "ok" | "warn" }) {
   return (
-    <div style={{ background: "#fff", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: "14px 16px" }}>
+    <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: "14px 16px" }}>
       <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 750, color: tone === "warn" ? "#b45309" : tone === "ok" ? "#166534" : "var(--text-primary)" }}>{value}</div>
+      <div style={{ fontSize: 22, fontWeight: 750, color: tone === "warn" ? "var(--build-risk-medium-text)" : tone === "ok" ? "var(--badge-green-text)" : "var(--text-primary)" }}>{value}</div>
       <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>{hint}</div>
     </div>
   );
@@ -304,7 +304,7 @@ function Metric({ label, value, hint, tone }: { label: string; value: string | n
 
 function Alert({ title, body, tone }: { title: string; body: string; tone: "danger" }) {
   return (
-    <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", borderRadius: 8, padding: "12px 16px", marginBottom: 16 }}>
+    <div style={{ background: "var(--badge-red-bg)", border: "1px solid var(--red)", color: "var(--badge-red-text)", borderRadius: 8, padding: "12px 16px", marginBottom: 16 }}>
       <strong>{title}</strong>
       <div style={{ marginTop: 4, fontSize: 13 }}>{body}</div>
     </div>
@@ -313,9 +313,9 @@ function Alert({ title, body, tone }: { title: string; body: string; tone: "dang
 
 function SafetyRow({ name, ok, value, link }: { name: string; ok: boolean; value: string; link?: string }) {
   const content = (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 0", borderBottom: "1px solid #f1f5f9" }}>
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 0", borderBottom: "1px solid var(--border)" }}>
       <span style={{ fontSize: 13, fontWeight: 650, color: "var(--text-primary)" }}>{name}</span>
-      <span style={{ fontSize: 12, color: ok ? "#166534" : "#b45309", textAlign: "right" }}>{ok ? "正常" : "已阻擋"} · {value}</span>
+      <span style={{ fontSize: 12, color: ok ? "var(--badge-green-text)" : "var(--build-risk-medium-text)", textAlign: "right" }}>{ok ? "正常" : "已阻擋"} · {value}</span>
     </div>
   );
   return link ? <Link href={link} style={{ textDecoration: "none" }}>{content}</Link> : content;
@@ -323,7 +323,7 @@ function SafetyRow({ name, ok, value, link }: { name: string; ok: boolean; value
 
 function PolicyCard({ title, label, body }: { title: string; label: string; body: string }) {
   return (
-    <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 14 }}>
+    <div style={{ border: "1px solid var(--border)", borderRadius: 8, padding: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
         <strong style={{ color: "var(--text-primary)" }}>{title}</strong>
         <span style={okPillStyle}>{label}</span>
@@ -334,7 +334,7 @@ function PolicyCard({ title, label, body }: { title: string; label: string; body
 }
 
 function Empty({ text }: { text: string }) {
-  return <div style={{ border: "1px dashed #cbd5e1", borderRadius: 8, padding: 18, color: "var(--text-secondary)", fontSize: 13 }}>{text}</div>;
+  return <div style={{ border: "1px dashed var(--border)", borderRadius: 8, padding: 18, color: "var(--text-secondary)", fontSize: 13 }}>{text}</div>;
 }
 
 function Severity({ value }: { value: string }) {
@@ -424,13 +424,13 @@ function providerLabel(provider: string): string {
 }
 
 const linkStyle: React.CSSProperties = { color: "var(--accent)", textDecoration: "none" };
-const linkButtonStyle: React.CSSProperties = { ...linkStyle, border: "1px solid #fed7aa", borderRadius: 8, padding: "7px 10px", fontSize: 12, fontWeight: 700, alignSelf: "center", whiteSpace: "nowrap" };
-const quickLinkStyle: React.CSSProperties = { display: "block", border: "1px solid #e2e8f0", borderRadius: 8, background: "#fff", color: "var(--text-secondary)", padding: "8px 10px", fontSize: 12, textDecoration: "none" };
-const rowStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start", border: "1px solid #e2e8f0", borderRadius: 8, padding: 14 };
-const pillStyle: React.CSSProperties = { fontSize: 11, padding: "2px 8px", borderRadius: 999, background: "#f1f5f9", color: "#475569", whiteSpace: "nowrap" };
-const okPillStyle: React.CSSProperties = { ...pillStyle, background: "#dcfce7", color: "#166534" };
-const warnPillStyle: React.CSSProperties = { ...pillStyle, background: "#fef3c7", color: "#92400e" };
-const dangerPillStyle: React.CSSProperties = { ...pillStyle, background: "#fee2e2", color: "#991b1b" };
+const linkButtonStyle: React.CSSProperties = { ...linkStyle, border: "1px solid var(--yellow)", borderRadius: 8, padding: "7px 10px", fontSize: 12, fontWeight: 700, alignSelf: "center", whiteSpace: "nowrap" };
+const quickLinkStyle: React.CSSProperties = { display: "block", border: "1px solid var(--border)", borderRadius: 8, background: "var(--card-bg)", color: "var(--text-secondary)", padding: "8px 10px", fontSize: 12, textDecoration: "none" };
+const rowStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start", border: "1px solid var(--border)", borderRadius: 8, padding: 14 };
+const pillStyle: React.CSSProperties = { fontSize: 11, padding: "2px 8px", borderRadius: 999, background: "var(--badge-gray-bg)", color: "var(--badge-gray-text)", whiteSpace: "nowrap" };
+const okPillStyle: React.CSSProperties = { ...pillStyle, background: "var(--badge-green-bg)", color: "var(--badge-green-text)" };
+const warnPillStyle: React.CSSProperties = { ...pillStyle, background: "var(--build-risk-medium-bg)", color: "var(--build-risk-medium-text)" };
+const dangerPillStyle: React.CSSProperties = { ...pillStyle, background: "var(--badge-red-bg)", color: "var(--badge-red-text)" };
 
 function readBackupGate(): { ok: boolean; mode: string; value: string } {
   if (process.env.AUTO_REPAIR_BACKUP_WEBHOOK_URL) {

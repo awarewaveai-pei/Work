@@ -277,7 +277,7 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
             <button className="btn btn-primary" style={{ fontSize: 13 }} onClick={handleSave} disabled={saving}>
               {saving ? "儲存中…" : "儲存預設"}
             </button>
-            {saved && <span style={{ color: "#10b981", fontSize: 12 }}>✓ 已儲存，下次選此站台會自動帶入</span>}
+            {saved && <span style={{ color: "var(--green)", fontSize: 12 }}>✓ 已儲存，下次選此站台會自動帶入</span>}
           </div>
         </div>
       )}
@@ -313,7 +313,7 @@ function ColorPicker({
             height: 24,
             borderRadius: 6,
             background: c,
-            border: value === c ? "2px solid #fff" : "2px solid transparent",
+            border: value === c ? "2px solid var(--card-bg)" : "2px solid transparent",
             outline: value === c ? `2px solid ${c}` : "none",
             cursor: "pointer",
             padding: 0,
@@ -381,7 +381,7 @@ function SiteCard({
             </span>
           )}
           {!site.active && (
-            <span style={{ fontSize: 11, color: "#f59e0b", background: "rgba(245,158,11,0.12)", padding: "2px 6px", borderRadius: 4 }}>
+            <span style={{ fontSize: 11, color: "var(--yellow)", background: "rgba(245,158,11,0.12)", padding: "2px 6px", borderRadius: 4 }}>
               停用
             </span>
           )}
@@ -390,14 +390,14 @@ function SiteCard({
         {site.note && (
           <div style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 2, paddingLeft: 18 }}>{site.note}</div>
         )}
-        <div style={{ paddingLeft: 18, marginTop: 4, fontSize: 12, color: site.usernameSet ? "#10b981" : "#f59e0b" }}>
+        <div style={{ paddingLeft: 18, marginTop: 4, fontSize: 12, color: site.usernameSet ? "var(--green)" : "var(--yellow)" }}>
           用戶：{site.usernameSet ? "已設定 ✓" : "未設定"} ／ 密碼：{site.tokenSet ? "已設定 ✓" : "未設定 ✗"}
         </div>
         {testResult && (
           <div
             style={{
               paddingLeft: 18, marginTop: 4, fontSize: 12,
-              color: testResult.ok ? "#10b981" : "#ef4444",
+              color: testResult.ok ? "var(--green)" : "var(--red)",
             }}
           >
             {testResult.ok ? "✓" : "✗"} {testResult.message}
@@ -435,7 +435,7 @@ function SiteCard({
               <>
                 <button
                   className="btn btn-sm"
-                  style={{ fontSize: 12, background: "#ef4444", color: "#fff" }}
+                  style={{ fontSize: 12, background: "var(--red)", color: "var(--btn-primary-text)" }}
                   onClick={() => onDelete(site.id)}
                 >
                   確認刪除
@@ -451,7 +451,7 @@ function SiteCard({
             ) : (
               <button
                 className="btn btn-sm"
-                style={{ fontSize: 12, color: "#ef4444" }}
+                style={{ fontSize: 12, color: "var(--red)" }}
                 onClick={() => setConfirmDel(true)}
               >
                 移除
@@ -582,7 +582,7 @@ function SiteForm({
       </label>
 
       {error && (
-        <div style={{ color: "#ef4444", fontSize: 13, background: "rgba(239,68,68,0.10)", padding: "8px 12px", borderRadius: 6 }}>
+        <div style={{ color: "var(--red)", fontSize: 13, background: "var(--badge-red-bg)", padding: "8px 12px", borderRadius: 6 }}>
           {error}
         </div>
       )}
