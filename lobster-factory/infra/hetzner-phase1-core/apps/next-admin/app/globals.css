@@ -2585,6 +2585,77 @@ pre {
   border-color: rgba(239,68,68,0.35);
 }
 
+/* ── Kebab overflow menu (replaces individual action buttons) ── */
+.designs-kebab-wrap {
+  position: relative;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--card-border);
+  display: flex;
+  justify-content: flex-end;
+}
+.designs-kebab-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--btn-secondary-border);
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-text);
+  font-size: 18px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  line-height: 1;
+}
+.designs-kebab-btn:hover {
+  background: var(--body-bg);
+  border-color: var(--designs-chip-hover-border);
+}
+.designs-kebab-menu {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  right: 0;
+  min-width: 148px;
+  background: var(--card-bg, #1e1e1e);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  overflow: hidden;
+  z-index: 50;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+}
+.designs-kebab-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 9px 13px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--btn-secondary-text);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  transition: background 0.1s;
+}
+.designs-kebab-item:hover:not(:disabled) {
+  background: var(--btn-secondary-bg);
+}
+.designs-kebab-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.designs-kebab-item--danger {
+  color: var(--red);
+}
+.designs-kebab-item--danger:hover:not(:disabled) {
+  background: rgba(239,68,68,0.08);
+}
+
 /* ── Lightbox ── */
 .designs-lightbox {
   position: fixed;

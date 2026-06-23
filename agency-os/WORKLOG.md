@@ -2,6 +2,29 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-24
+
+### feat(cold-outreach): 密鑰骨幹（Supabase Vault）+ T8 冷信生成 + T9 審核
+
+[任務理解] 一勞永逸解平台 per-tenant 密鑰缺口（同時解 T8 BYO Gemini key、未來 T10 Gmail token、SSH key、tenant 整合密鑰）。
+
+[現況分析] EU `supabase_vault` 0.3.1 已裝但無任何讀寫接線（secretStore.ts Phase-4 gap）；平台慣例已定 = `secret_ref`→vault pointer（0024 等 + 部署 checklist「不可明文存 DB」）。→ 實作平台早選定卻沒接的那一個後端，非新架構。
+
+[已修改]
+- migration `0049_secret_vault_wrappers`（public `secret_put/get/delete`，SECURITY DEFINER + `SET search_path=vault,public` + REVOKE public/anon/authenticated + GRANT service_role）+ down 檔 → **已 apply EU prod**
+- `lib/secret-vault.ts`（put/get/delete via service-role rpc；永不 log 值）
+- Phase B：`app/api/outreach/connectors/secret`（raw key→vault→DB 只存 ref；updErr 補償 orphan）+ ConnectorsClient 加「🔑 設定金鑰」
+- Phase C：`lib/outreach/cold-gate.ts`（Cold Gate + evidence + lint）+ `ai-gemini.ts`（Gemini REST）+ `app/api/outreach/messages`（生成：Cold Gate→vault key→Gemini→lint→draft；無/失敗 key 降級 manual_prompt 並記因）+ ReviewClient（生成/evidence/safety/approve）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash+SSH | cmd=tsc + vitest + vault round-trip + Gemini live | exit=0 | tsc 全 app 0；vitest 37/37（含 cold-gate 11）；vault round-trip `secret_put`→`secret_get`回 'hunter-xyz-123'→`delete`→null（EU prod）；`set role anon; secret_get` → permission denied（提權鎖死）；co_messages/co_connector_accounts/co_leads/co_lead_inbox/co_service_profiles DB round-trip exit 0；Gemini REST 真打到 API（HTTP 400 "API key expired" → client + 解析正確，agency `GEMINI_API_KEY` 過期需續期，非缺陷，BYO client key 即可生成）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/3n -- 密鑰骨幹 textbook-correct（DEFINER+search_path+REVOKE/GRANT 正確、密鑰不入 DB/log、RBAC+fail-closed 完整、草稿不自動寄）；3 Minor 已修 2（vault-fail 可觀測 + orphan 補償），#3（未來 send path 不可繞 lint）已記
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=secret_put/secret_get/credentials_ref/getSecret | hits=0 -- 新 helper 無與既有衝突；wp_sites/wp-bridge 未動
+
+[剩餘風險] agency `GEMINI_API_KEY` 過期（ops 續期或靠 BYO client key）；vault 根金鑰 restart 持久性未在 prod 重啟驗（supabase_vault 設計即持久，維護窗口可確認）；T10 Gmail OAuth flow 另案（會重用此 vault）。
+
+[rollback] `scripts/0049_secret_vault_wrappers_down.sql`（drop 3 functions，不動 vault.secrets）；其餘檔案 git 還原；測試密鑰已即時刪除。
+
 ## 2026-06-23
 
 ### feat(publish): #2 精修每色模特×1＋平拍 + 新增 Printful 尺寸表（操作者追加）
