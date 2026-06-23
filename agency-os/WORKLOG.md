@@ -4,6 +4,29 @@
 
 ## 2026-06-23
 
+### fix(studio): edge-mask scale≤1 修正 + Printful full-bleed 強制滿版
+
+[任務理解] /tools/studio 兩個 bug：① edge mask at amount=10 時筆刷 PNG overflow canvas，stroke 被裁 → 邊緣不完整；② 設計稿傳 Printful 後印在衣服太小（FILL 硬編 0.9）。
+
+[現況分析] 讀 edge-mask.ts：asset mask 用 `scale = 1.1 - (amount/100)*0.3`，amount=10 → scale=1.07 > 1.0 → mask 比 canvas 大 → 筆刷筆觸超界被 clip = BUG。讀 printful-mockup.ts：`computePosition` 硬編 `FILL=0.9`；legacy `generateMockup` 無 designSizePct 參數。StudioWorkbench.tsx 未傳 designSizePct。route.ts body type 已含 `designSizePct?:number` 但未接通 legacy 路徑。git log: 近期 commit 皆 video/publish 議題，無重工。
+
+[已修改]
+- lib/studio/edge-mask.ts：scale 公式 `1.0 - (amt/100)*0.28`（含 clamp(0,100)）→ amount=10: scale=0.972，amount=90: scale=0.748；scale 永遠 ≤ 1.0，筆刷不再 overflow。
+- lib/studio/printful-mockup.ts：`computePosition` 加 `designSizePct?:number` 參數；`FILL = Math.min(1, Math.max(0.3, designSizePct ?? 0.9))`；`generateMockup` 加第 4 參數 `designSizePct?:number`。
+- app/api/tools/studio/mockup/route.ts：legacy 路徑傳 `designSizePct` body 欄位到 `generateMockup`。
+- app/tools/studio/StudioWorkbench.tsx：`generateMockupFromDesign` 加 `designSizePct: 1`（full-bleed）。
+
+[驗證結果 — R0 四動作]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (twice) | exit=0 | ms=~30000 -- zero type errors both runs
+- REALTEST_EVIDENCE: tool=Bash | cmd=node -e "edge-mask scale formula verification" | exit=0 | ms=<100 -- amount=10→scale=0.972, amount=50→scale=0.860, amount=90→scale=0.748; all ≤ 1.0
+- REALTEST_EVIDENCE: tool=Bash | cmd=node -e "computePosition full-bleed verification" | exit=0 | ms=<100 -- designSizePct=1.0: width=1800, FILL=1.0; designSizePct=0.9: width=1620 (legacy); full-bleed 100% printable area confirmed
+- REVIEW_DONE: critic=Deep | verdict=pass-after-fix | findings=0c/0m/1n -- Minor: clamp(0,100) on amt APPLIED; suggestions: comment clarifying scale<1 invariant APPLIED; no critical/major
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=applyEdgeMask|generateMockup|computePosition|designSizePct | hits=10 -- all expected callers: CanvasEditor.tsx/DesignsGallery.tsx call applyEdgeMask (benefit from clamp); generateMockupBySpec separate path (no FILL); no stale references
+
+[剩餘風險] CanvasEditor.tsx / DesignsGallery.tsx 的 edgeAmount slider min=10 仍有效（clamp 兜底）。computeDynamicPosition（catalog path）獨立邏輯，無 FILL=0.9 問題。
+
+[rollback] git revert <commit>；edge-mask.ts scale 還原 `1.1 - (amount/100)*0.3`；printful-mockup.ts 移除 designSizePct 參數；route.ts/StudioWorkbench.tsx 還原。
+
 ### feat(publish): AEO Quick Answer 計分修 + 真下載 proxy + 印刷檔 PDF/PNG@300DPI（/tools/publish 6 問之 #1/#4/#5）
 
 [任務理解] 操作者在 /tools/publish 列 6 個問題/需求。本波處理 3 個明確、低風險的：#1 AEO Quick Answer 文案條件、#4 下載鍵要真下載、#5 印刷檔分 PDF/PNG 皆 300DPI。（#2 每色多 mockup、#3 Printful 成本利潤定價、#6 多客戶多站 為後續波。）

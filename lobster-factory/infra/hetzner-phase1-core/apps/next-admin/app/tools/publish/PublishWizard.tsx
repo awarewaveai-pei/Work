@@ -448,6 +448,7 @@ export default function PublishWizard() {
     setCreate({ state: "running" });
     const json = await post({
       action: "create",
+      clientId,
       catalogProductId,
       title,
       retailPrice,
@@ -473,7 +474,7 @@ export default function PublishWizard() {
       // Surface the source-side "SKU map dropped" signal so the native path can refuse and steer to legacy.
       variantMapDropped: Boolean(json.variantMapDropped),
     });
-  }, [catalogProductId, title, retailPrice, plusPrice, mockupUrls, copy, post]);
+  }, [clientId, catalogProductId, title, retailPrice, plusPrice, mockupUrls, copy, post]);
 
   const runStatus = useCallback(async () => {
     if (!create.productId) return;
