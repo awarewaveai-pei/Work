@@ -56,19 +56,28 @@ export async function POST(req: Request): Promise<Response> {
   const applies_to = str(body.appliesTo) ?? "all";
   if (!APPLIES.has(applies_to)) return NextResponse.json({ ok: false, error: "invalid appliesTo" }, { status: 400 });
 
+  // Validate uuid-typed columns up front so a bad id returns a clean 400, not a raw PG 22P02 leak (critic #1).
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const organizationId = str(body.organizationId);
+  if (organizationId && !UUID_RE.test(organizationId)) return NextResponse.json({ ok: false, error: "organizationId must be a uuid" }, { status: 400 });
+  const leadId = str(body.leadId);
+  if (leadId && !UUID_RE.test(leadId)) return NextResponse.json({ ok: false, error: "leadId must be a uuid" }, { status: 400 });
+  // jsonb evidence must be an object, not a scalar/array (critic #3).
+  const evidence = body.evidence && typeof body.evidence === "object" && !Array.isArray(body.evidence) ? (body.evidence as object) : null;
+
   const { data, error } = await supabase
     .from(TABLE)
     .insert({
-      organization_id: str(body.organizationId),
+      organization_id: organizationId,
       email,
       domain,
       company_name,
-      lead_id: str(body.leadId),
+      lead_id: leadId,
       reason,
       source: str(body.source) ?? "manual",
       applies_to,
       scope,
-      evidence: (body.evidence ?? null) as object | null,
+      evidence,
     })
     .select("*")
     .single();
