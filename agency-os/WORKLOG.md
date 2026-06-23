@@ -48,6 +48,13 @@ AUTO_TASK_DONE: fix(pod-publish): 一鍵 502 根因=WebP thumbnail 被 Printful 
 
 [旁見非本次] critic 提醒 `app/api/tools/publish/route.ts` 有 60MB cap，而 `^~ /api/tools/` nginx 僅 15M → 50-60MB 商品圖 publish 可能碰 nginx 413（pre-existing、product-image 域、非影片任務範圍，僅記錄）。
 
+[部署結果] AUTO_TASK_DONE: sg-deploy next-admin → prod（操作者授權「去部署」）
+- 並行衝突處理：另一 session deploy（banner Tier-3, PID 4076592）進行中 → **不 --force**，等其完成（部署到 eda51928）後才跑我的（VPS 並行衝突紀律）。
+- deployed_commit=`10227453`（含 855feb0d cap fix + D2 + A/B/C/D + 場景數fix；previous eda51928）；tsc+npm test gate 通過 → build → container healthy after 7s。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin` | exit=0 — smoke 全綠：next-admin /login 200、/api/ops/summary 200、nginx/wordpress 200、node-api 200
+- REALTEST_EVIDENCE: tool=SSH+curl | 127.0.0.1:3002 直打新端點 — /api/video/upload-asset(C)、/api/video/regenerate-image(B)、/api/video/draft(D2 rewire) 皆回 **401**（route 已部署且 session auth 把關，非 404；順證上傳端點非未授權可寫）；/tools/video → 307 導 login。
+- 影片工具整理全系列（場景數fix + A/B/C/D + D2 + cap對齊）**已全部上線**。
+
 ### feat(video): D2 接線——入口收斂到積木 + content 滑桿生效
 
 [任務理解] D 登記積木後的接線：① 把 content 的「場景總數/自訂AI圖」滑桿接通 ② 把 draft/render-draft 收斂到 video/prepare、video/render 積木（讓兩積木真的被用，非 shelfware）。
