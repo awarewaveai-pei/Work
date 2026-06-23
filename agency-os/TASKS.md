@@ -50,6 +50,10 @@
 
 ### 未完成
 
+#### 🆕 Cold Outreach Workbench（AI 冷拜訪 + FluentCRM 暖名單工作台）
+
+- [ ] **【未開始｜Phase 1 MVP】Cold Outreach Workbench — 冷開發完整鏈** — SSOT：[`agency-os/docs/cold_email/COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md`](docs/cold_email/COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md)（三份草稿已整合並 superseded）；實作排程：[`COLD_OUTREACH_PHASE1_BUILD_PLAN.md`](docs/cold_email/COLD_OUTREACH_PHASE1_BUILD_PLAN.md)（T1–T12 依賴排序）。**已拍板決策**：代操冷信用客戶 Gmail / 名單你幫找 / 訂閱制 / 不用 SES / schema prefix `co_`。**架構對齊**：org-tenant（Clerk）+ service-role RLS（比照 0034/0041）；暖層走既有 wp-bridge（+小擴充 FluentCRM contact/tag endpoint，非新建 connector）；暖信走客戶 FluentSMTP 或 Brevo free；self-host Supabase/Trigger.dev/n8n = $0；**Free-Plan Router + 客戶 BYO-key 乘數**為第一級設計（PART H）。**關鍵路徑**：T1 schema → T2 module 殼 → T4 Connector/Router/BYO-key → T5 Inbox → T6 AI scoring → T8 Message gen(Cold Gate) → T9 Review → T10 Gmail draft(⚠High，等 go-ahead)。**DoD**：操作者跑完「Service Profile→Inbox(dedup+suppression)→AI 評分→生冷信→審核→客戶 Gmail 草稿→follow-up」，全程 org-scoped、人工寄、不碰金流。**⚠️ 待補**：免費額度數字（PART H）需上線前以官方頁確認；驗證 workflow 撞 session limit 未跑完，可重置後補跑。
+
 #### 待釐清 / 明日提醒
 > `/tomo` 自動寫入此分類
 

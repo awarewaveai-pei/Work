@@ -1,3 +1,5 @@
+> ⛔ **SUPERSEDED（2026-06-23）**：本文件為草稿，已整合進單一 SSOT → [`COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md`](./COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md)（PART F 控制台 UX，掛進 next-admin `app/outreach/`）。請以該檔為準；本檔僅留歷史參考，不再更新。
+
 * # **AI 冷拜訪行銷工作台 UX v2.3 Final：FluentCRM Warm Nurture Experience**
 
 * 文件類型：UI/UX 最終規劃  

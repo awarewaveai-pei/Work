@@ -4,6 +4,29 @@
 
 ## 2026-06-23
 
+### fix(pod-publish): 「🚀 全部一鍵完成」上 Printful 永遠 502 — 根因 = WebP 縮圖被 Printful 拒收
+
+[任務理解] 操作者按「🚀 全部一鍵完成」後 Printful native 商品從未建出，誤以為流程沒跑完或看錯店。實為 pfcreate 步驟 deterministic 失敗。
+
+[現況分析] 瀏覽器實跑 + Printful native API 雙重複現。runAll（`PublishWizard.tsx`）序列：upscale→per-color mockup×4→copy→create(Woo)→pfcreate(native)。瀏覽器 network：前 3 步 200、create 200、**pfcreate 502**。`route.ts:599` 把第一張 mockup 當 `sync_product.thumbnail` 送 Printful；mockup 經 `designs` route `toWebpOptimized` 存成 `.webp`（`r2.ts:76`）。
+
+[根因] Printful `sync_product.thumbnail` 只接受 jpg/jpeg/png/pdf，webp 回 **400「Invalid... content type: webp」(FL-1)** → app 包成 502。印刷檔（`sync_variants.files`）本身是 PNG（`print-file.ts` `sharp().png()`）不受影響，唯獨 thumbnail 是 webp → 每次一鍵必死在此。
+
+[已修改]
+- `app/api/tools/publish/route.ts:599` — thumbnail 只挑 designs asset 中 png/jpg（`/\.(png|jpe?g)$/i`，strip query），全 webp 則不帶（Printful 自生預覽）。
+- `lib/studio/pod-catalog-config.ts` — 顏色 label 中文→純英文（一鍵每次用 config label 重建 Woo Color，WP 手改會被覆蓋；config 才是 SSOT，hex 為綁定 key 不受影響）。
+
+[驗證結果 — R0 四動作]
+- REALTEST_EVIDENCE: tool=Browser+Bash+curl | exit=0 | 部署前 SG native API 直打複現：同一 PNG 印刷檔成功(200)、僅多帶 webp thumbnail→400「content type: webp」。修後 `sg-deploy next-admin`（commit `e67f66f0`，healthy 7s、smoke 全 200、容器 bundle `route.js` 含 `png|jpe?g`+`split("?")`）。瀏覽器實跑 🚀 → network pfcreate **200** → native store `18324409` 出現 `441538401 ZZ DIAG 一鍵驗證`(Woo 7509) **synced 20/20**。
+- REVIEW_DONE: critic=Quick | verdict=pass | thumbnail filter 讀回正確；印刷檔 PNG 路徑未動；`tsc --noEmit` exit 0。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`thumbnailUrl|sync_product.thumbnail|createSyncProductOnNative|files: [{ type` | hits: thumbnail→Printful 僅 `createSyncProductOnNative`(print-provider.ts:385) 一處消費（已過濾）；`files` 全 = `printFileUrl`(PNG，:299/:391)；其餘 thumbnailUrl 皆為 READ-back，無其他 webp 漏口。
+- 清理：Woo 草稿 7475/7509 已 force delete；native store 4 個 ZZ 測試品 DELETE API 回 200 但未實刪（Printful native store 怪癖，GET detail 仍 200），待 Dashboard 手動。
+
+[剩餘風險] ① 次要 bug：`genColorMockup` 失敗的色靜默丟（`PublishWizard.tsx:503` `if(url)`）→ 4 色僅 2 色有圖（=操作者回報「只生 2 色」），未修。② 印刷檔僅 1024px≈64DPI（<300DPI）→ 真印偏軟、圖案偏小（=「設計圖太小」根源之一）。③ native store `18324409` ≠ soulful 外掛 platform store `18314943`；soulful POD 走哪條未定（ADR 008 兩店衝突），需操作者決策。
+[rollback] `git revert`（route.ts 單行邏輯改 + config label 文字改）；無 DB/auth/金流改動。
+
+AUTO_TASK_DONE: fix(pod-publish): 一鍵 502 根因=WebP thumbnail 被 Printful 拒收；route.ts 過濾 thumbnail 為 png/jpg；sg-deploy + 瀏覽器實跑驗證 native store synced 20/20；顏色 label 英文化
+
 ### deploy(video): 部署前置——nginx body-size 實機調查 + 上傳上限對齊（VBC）
 
 [任務理解] 部署影片工具系列前，處理 C 上傳的 nginx body-size 前提。先 VBC（實機查證）再動，不照 critic 的 1MB worst-case 假設盲改 prod。

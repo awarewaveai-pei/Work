@@ -1,3 +1,5 @@
+> ⛔ **SUPERSEDED（2026-06-23）**：本文件為草稿，已整合進單一 SSOT → [`COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md`](./COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md)（PART D 寄送治理 + PART H 免費寄送策略；SES 已依決策移除，暖信走客戶 FluentSMTP 或 Brevo free）。請以該檔為準；本檔僅留歷史參考，不再更新。
+
 # Email Deliverability & Compliance v3 Final：退信、投訴、退訂風險治理版
 
 > 適用產品：AI 冷拜訪行銷工作台  

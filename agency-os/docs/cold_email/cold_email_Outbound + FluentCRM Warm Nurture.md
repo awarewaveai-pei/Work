@@ -1,3 +1,5 @@
+> ⛔ **SUPERSEDED（2026-06-23）**：本文件為草稿，已整合進單一 SSOT → [`COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md`](./COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md)（含對齊現有系統的修正、三營運模式、Free-Plan 成本骨幹）。請以該檔為準；本檔僅留歷史參考，不再更新。
+
 # **Email 冷拜訪行銷工作台 v3.0：Outbound \+ FluentCRM Warm Nurture 完整最終架構**
 
 文件類型：產品 / 技術總規劃  
