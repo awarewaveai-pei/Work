@@ -683,7 +683,7 @@ export default function PublishWizard() {
                     borderRadius: 6,
                     cursor: busy ? "not-allowed" : "pointer",
                     opacity: busy ? 0.55 : 1,
-                    border: isDesign ? "2px solid #4f8cff" : "2px solid transparent",
+                    border: isDesign ? "2px solid var(--accent)" : "2px solid transparent",
                   }}
                   onClick={() => { if (!busy) setDesignUrl(d.object_url); }}
                 />

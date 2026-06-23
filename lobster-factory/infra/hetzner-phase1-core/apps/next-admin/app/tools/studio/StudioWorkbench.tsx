@@ -668,7 +668,7 @@ export default function StudioWorkbench() {
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
             {MODEL_GROUPS.map((g) => (
               <button key={g} type="button" onClick={() => setModelGroup(g)}
-                style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${modelGroup === g ? "#6366f1" : "var(--border, #d4d9e8)"}`, background: modelGroup === g ? "#6366f1" : "rgba(127,127,127,0.08)", color: modelGroup === g ? "#fff" : "var(--text-muted, #3a4560)", transition: "all 0.15s" }}>
+                style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${modelGroup === g ? "var(--accent)" : "var(--border)"}`, background: modelGroup === g ? "var(--accent)" : "rgba(127,127,127,0.08)", color: modelGroup === g ? "var(--btn-primary-text)" : "var(--text-muted)", transition: "all 0.15s" }}>
                 {g}
               </button>
             ))}
@@ -688,7 +688,7 @@ export default function StudioWorkbench() {
                     })());
                   }}
                   title={item.maxRefs > 0 ? `最多 ${item.maxRefs} 張參考圖` : "純文字生圖"}
-                  style={{ padding: "5px 10px", borderRadius: 14, fontSize: 12, cursor: "pointer", border: `1px solid ${active ? "#6366f1" : "var(--border, #d4d9e8)"}`, background: active ? "#6366f1" : "rgba(127,127,127,0.08)", color: active ? "#fff" : "var(--text-muted, #3a4560)", fontWeight: active ? 600 : 400, transition: "all 0.15s" }}>
+                  style={{ padding: "5px 10px", borderRadius: 14, fontSize: 12, cursor: "pointer", border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`, background: active ? "var(--accent)" : "rgba(127,127,127,0.08)", color: active ? "var(--btn-primary-text)" : "var(--text-muted)", fontWeight: active ? 600 : 400, transition: "all 0.15s" }}>
                   {active && selectedModels.size === 1 ? "✓ " : active ? "☑ " : ""}{item.label}
                   <span style={{ fontSize: 10, opacity: 0.7, marginLeft: 4 }}>NT${item.costNt}</span>
                 </button>

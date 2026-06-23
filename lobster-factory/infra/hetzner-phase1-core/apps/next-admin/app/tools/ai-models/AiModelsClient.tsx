@@ -210,8 +210,8 @@ function CardHeader({ selected, onToggle, vendor, name, sub, badges, nameSize = 
           </span>
           {badges}
         </div>
-        <div style={{ fontSize: nameSize, fontWeight: 800, color: "#0f172a" }}>{name}</div>
-        {sub && <div style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 2 }}>{sub}</div>}
+        <div style={{ fontSize: nameSize, fontWeight: 800, color: "var(--text-primary)" }}>{name}</div>
+        {sub && <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 2 }}>{sub}</div>}
       </div>
     </div>
   );

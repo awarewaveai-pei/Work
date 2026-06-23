@@ -511,7 +511,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
               {providedScenes.length > 0 ? (
-                <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, padding: "10px 12px", fontSize: 12.5, color: "#166534", lineHeight: 1.6 }}>
+                <div style={{ background: "var(--intake-success-bg)", border: "1px solid var(--green)", borderRadius: 8, padding: "10px 12px", fontSize: 12.5, color: "var(--badge-green-text)", lineHeight: 1.6 }}>
                   ✅ 已從前製腳本帶入 <b>{providedScenes.length}</b> 個場景（台詞＝旁白、畫面＝生圖）。下方調整場景設定後，按「📋 生成草稿」即用此腳本出片，不重寫。
                 </div>
               ) : (

@@ -247,7 +247,7 @@ function ChipBtn({ label, active, onClick }: { label: string; active: boolean; o
 function IntegrationTile({ name, status }: { name: string; status: "active" | "failed" | "pending" | "none" }) {
   const icons: Record<string, string> = { active: "✓", failed: "✗", pending: "…", none: "—" };
   const colors: Record<string, string> = {
-    active: "#16a34a", failed: "#dc2626", pending: "#ca8a04", none: "#d1d5db",
+    active: "var(--green)", failed: "var(--red)", pending: "var(--severity-medium)", none: "var(--border)",
   };
   return (
     <div style={{
