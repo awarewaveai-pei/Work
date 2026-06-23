@@ -48,6 +48,22 @@
 
 [rollback] `docker compose -f docker-compose.video.yml up -d`（不加 env-file → 回空環境，但這是 bug）
 
+### fix(content-studio): 素材模式改 button chip UI；修 div 嵌套 regression
+
+[任務理解] ContentStudio 素材模式選單由 `<select>` 改成與 VideoStudio 一致的 button chip（真實影片/照片動畫/AI 生圖）；AI 模式才顯示 自訂 AI 圖 滑桿。
+
+[現況分析] checkpoint 5b63b092 已含 chip UI 骨架。critic Deep review 發現 MAJOR：line 3061 `</div>`（18sp）提前關閉「場景設定」card，導致 配音模型 + 輸出比例 被 eject 到 card 外（視覺 regression，功能不受影響）。MINOR：cost warning 在 pexels 模式（$0 成本）仍顯示「自訂 AI 圖成本」，語意錯誤。
+
+[已修改]
+- ContentStudio.tsx：①移除 line 3061 早關 `</div>`；②在 輸出比例 後補 18sp `</div>` 正確關閉 card；③cost warning 加 AI mode 門控（`videoImageModel !== "pexels-video" && !== "pexels-all"`）+ 文字改「渲染成本/時間」
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~40000 -- clean，div balance 正確
+- REVIEW_DONE: critic=Deep | verdict=pass-after-fix | findings=0c/1M/1n -- MAJOR（div nesting）+ MINOR（cost warning）均已修；邏輯 + payload + state flow Verified Clean
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=videoImageModel\|videoCustomScenes\|videoFormats | hits=1 -- WORKLOG 文件引用，非 stale callsite；無外部消費者
+
+[rollback] git revert ContentStudio.tsx（chip UI → 舊 select + 無嵌套 bug 修）
+
 ### feat(publish): 尺寸表改 inch / cm 並列（操作者追加）
 
 [任務理解] 操作者要尺寸表同時顯示 cm 與 inch。

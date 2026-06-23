@@ -2983,6 +2983,57 @@ export default function ContentStudio() {
                       })}
                     </div>
                   </div>
+                  {/* 素材模式 */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--ai-text)" }}>素材模式</span>
+                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                      {([
+                        { id: "pexels-video", label: "📹 真實影片", badge: "$0" },
+                        { id: "pexels-all",   label: "🖼 照片動畫", badge: "$0" },
+                        { id: "__ai__",       label: "✨ AI 生圖",  badge: "按模型" },
+                      ] as { id: string; label: string; badge: string }[]).map(({ id, label, badge }) => {
+                        const isAiBtn = id === "__ai__";
+                        const active = isAiBtn
+                          ? (videoImageModel !== "pexels-video" && videoImageModel !== "pexels-all")
+                          : videoImageModel === id;
+                        return (
+                          <button key={id} type="button"
+                            onClick={() => {
+                              if (isAiBtn) {
+                                if (videoImageModel === "pexels-video" || videoImageModel === "pexels-all") {
+                                  setVideoImageModel(DEFAULT_IMAGE_MODEL);
+                                  setVideoCustomScenes(videoTotalScenes);
+                                }
+                              } else {
+                                setVideoImageModel(id);
+                              }
+                            }}
+                            style={{
+                              padding: "6px 12px", borderRadius: 8,
+                              border: `2px solid ${active ? "var(--accent)" : "rgba(0,0,0,0.12)"}`,
+                              background: active ? "var(--accent)" : "rgba(255,255,255,0.8)",
+                              color: active ? "var(--btn-primary-text)" : "var(--text-secondary)",
+                              cursor: "pointer", fontSize: 12, fontWeight: active ? 700 : 500, lineHeight: 1.4,
+                              display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                            }}>
+                            <span>{label}</span>
+                            <span style={{ fontSize: 10, opacity: 0.8 }}>{badge}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {/* AI 模式：生圖模型下拉 */}
+                    {videoImageModel !== "pexels-video" && videoImageModel !== "pexels-all" && (
+                      <select value={videoImageModel} onChange={(e) => setVideoImageModel(e.target.value)}
+                        style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid var(--ai-bg)", fontSize: "12px", background: "var(--card-bg)", color: "var(--text-primary)", width: "100%" }}>
+                        {Object.entries(IMAGE_RATES)
+                          .filter(([id]) => id !== "pexels-video" && id !== "pexels-all")
+                          .map(([id, r]) => (
+                            <option key={id} value={id}>{r.label} — ${r.usd}/張</option>
+                          ))}
+                      </select>
+                    )}
+                  </div>
                   {/* 場景設定 */}
                   <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "10px 12px", borderRadius: "6px", background: "rgba(255,255,255,0.6)", border: "1px solid var(--ai-bg)" }}>
                     <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--ai-text)" }}>場景設定</span>
@@ -2995,6 +3046,8 @@ export default function ContentStudio() {
                         onChange={(e) => { const n = Number(e.target.value); setVideoTotalScenes(n); if (videoCustomScenes > n) setVideoCustomScenes(n); }}
                         style={{ width: "100%", accentColor: "var(--severity-low)" }} />
                     </div>
+                    {/* 自訂 AI 圖滑桿：只在 AI 生圖模式顯示 */}
+                    {videoImageModel !== "pexels-video" && videoImageModel !== "pexels-all" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between" }}>
                         <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)" }}>自訂 AI 圖</span>
@@ -3004,15 +3057,7 @@ export default function ContentStudio() {
                         onChange={(e) => setVideoCustomScenes(Number(e.target.value))}
                         style={{ width: "100%", accentColor: "var(--severity-low)" }} />
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                      <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)" }}>生圖模型</span>
-                      <select value={videoImageModel} onChange={(e) => { const m = e.target.value; setVideoImageModel(m); if (m !== "pexels-video" && m !== "pexels-all") setVideoCustomScenes(videoTotalScenes); }}
-                        style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid var(--ai-bg)", fontSize: "12px", background: "var(--card-bg)", color: "var(--text-primary)", width: "100%" }}>
-                        {Object.entries(IMAGE_RATES).map(([id, r]) => (
-                          <option key={id} value={id}>{r.label} — ${r.usd}/張</option>
-                        ))}
-                      </select>
-                    </div>
+                    )}
                     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                       <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)" }}>配音模型</span>
                       <select value={videoVoiceId} onChange={(e) => setVideoVoiceId(e.target.value)}
@@ -3061,9 +3106,9 @@ export default function ContentStudio() {
                           全選
                         </button>
                       </div>
-                      {videoFormats.size > 1 && (
+                      {videoFormats.size > 1 && videoImageModel !== "pexels-video" && videoImageModel !== "pexels-all" && (
                         <span style={{ fontSize: "11px", color: "#92400e", background: "#fef3c7", padding: "4px 8px", borderRadius: 6, lineHeight: 1.5 }}>
-                          ⚠️ {videoFormats.size} 個比例 = 自訂 AI 圖成本/時間約 ×{videoFormats.size}
+                          ⚠️ {videoFormats.size} 個比例 = 渲染成本/時間約 ×{videoFormats.size}
                         </span>
                       )}
                     </div>
