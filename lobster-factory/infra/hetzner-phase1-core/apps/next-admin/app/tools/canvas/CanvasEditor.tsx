@@ -110,7 +110,6 @@ export default function CanvasEditor() {
     return `canvas-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
   });
   // Shown inline near download buttons so user knows what resolution they'll get.
-  const [exportPxLabel, setExportPxLabel] = useState<string | null>(null);
   const canvasMetaRef = useRef<{ realW: number; realH: number; dispScale: number; dpi: number } | null>(null);
   const [drawMode, setDrawMode] = useState<"off" | "draw" | "erase">("off"); // 自由繪筆 / 橡皮擦
   const [drawColor, setDrawColor] = useState("#111111");
@@ -272,7 +271,6 @@ export default function CanvasEditor() {
           });
           canvasMetaRef.current = { realW, realH, dispScale, dpi: szDpi };
           setSzInfo(`來源 ${realW}×${realH}px（預覽 ${Math.round(dispScale * 100)}%）`);
-          setExportPxLabel(`${realW}×${realH}px`);
           img.set({
             left: realW / 2,
             top: realH / 2,
@@ -1452,27 +1450,6 @@ export default function CanvasEditor() {
             }}
           />
         </label>
-        <input
-          type="text"
-          value={editName}
-          onChange={(e) => { setEditName(e.target.value); nameRef.current = null; /* user override clears handoff name */ }}
-          placeholder="檔名"
-          title="下載檔名（不含副檔名）"
-          style={{ fontSize: 12, padding: "2px 6px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)", width: 160 }}
-        />
-        <button className="btn-primary" disabled={!ready} onClick={download} title="下載全尺寸 PNG">
-          PNG下載{exportPxLabel ? ` (${exportPxLabel})` : ""}
-        </button>
-        <button className="btn-primary" disabled={!ready} onClick={() => void downloadWebP()} title="下載 WebP，自動壓縮至 200KB 以內">
-          WebP下載
-        </button>
-        <button
-          className="btn-primary"
-          disabled={!ready || saveState === "saving" || saveState === "saved"}
-          onClick={() => void saveToDesigns()}
-        >
-          {saveState === "saved" ? "已存入 ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}
-        </button>
       </div>
 
       {/* Text style controls — apply to the selected text, or set defaults for the next ＋文字. */}
@@ -1551,6 +1528,26 @@ export default function CanvasEditor() {
             paddingRight: 4,
           }}
         >
+        {/* 💾 匯出 / 下載 */}
+        <SidebarPanel id="export" title="💾 匯出 / 下載" defaultPos={{ x: 816, y: 0 }} width={280}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <input
+              type="text"
+              value={editName}
+              onChange={(e) => { setEditName(e.target.value); nameRef.current = null; }}
+              placeholder="檔名"
+              title="下載檔名（不含副檔名）"
+              style={{ fontSize: 12, padding: "2px 6px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)", width: "100%" }}
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready} onClick={download} title="下載全尺寸 PNG">PNG下載</button>
+              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready} onClick={() => void downloadWebP()} title="下載 WebP，自動壓縮至 150KB 以內">WebP下載</button>
+            </div>
+            <button className="btn-primary" style={{ width: "100%" }} disabled={!ready || saveState === "saving" || saveState === "saved"} onClick={() => void saveToDesigns()}>
+              {saveState === "saved" ? "已存入 ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}
+            </button>
+          </div>
+        </SidebarPanel>
         {/* 📐 畫布尺寸 / DPI — 公分/公釐 + DPI 自設（參考 vector-trace-demo）。 */}
         <SidebarPanel id="canvas-size" title="📐 畫布尺寸 / DPI" defaultPos={{ x: 816, y: 0 }} width={236}>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
