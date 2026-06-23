@@ -60,6 +60,26 @@ const MARKETING_STYLE_PRESETS: { label: string; kw: string }[] = [
   { label: "科技未來", kw: "sleek futuristic, gradient glow, neon accents, modern minimal" },
 ];
 
+// Product-as-hero scene scaffolds — one click fills Subject + Vibe for pro product photography (Tier 3)
+const PRODUCT_SCENE_PRESETS: { label: string; subject: string; vibe: string }[] = [
+  { label: "桌面晨光", subject: "product resting on a wooden table by a window", vibe: "soft morning daylight, warm and inviting, shallow depth of field" },
+  { label: "貨架氛圍", subject: "product styled on a minimalist shelf", vibe: "moody warm ambient light, premium boutique feel" },
+  { label: "極簡平拍", subject: "flat-lay of the product on a marble surface with props", vibe: "luxury minimal, soft even overhead light, elegant negative space" },
+  { label: "戶外自然", subject: "product in an outdoor natural setting with greenery", vibe: "golden hour sunlight, fresh and organic, gentle bokeh" },
+  { label: "棚拍純背", subject: "product on a seamless studio backdrop", vibe: "clean soft key light, professional studio, subtle gradient" },
+  { label: "生活情境", subject: "product in a cozy lifestyle context being used", vibe: "warm natural light, authentic candid, inviting atmosphere" },
+];
+
+// Lighting / composition direction — orthogonal keyword chips appended to the scene (Tier 3)
+const LIGHTING_PRESETS: { label: string; kw: string }[] = [
+  { label: "左側柔光", kw: "soft key light from the left" },
+  { label: "戲劇側光", kw: "dramatic side lighting, deep shadows" },
+  { label: "逆光輪廓", kw: "backlight rim glow, luminous edges" },
+  { label: "柔頂光", kw: "soft overhead diffused light" },
+  { label: "暖色調", kw: "warm golden color temperature" },
+  { label: "冷色調", kw: "cool crisp color temperature" },
+];
+
 const GRAD_DIRS: { value: string; label: string }[] = [
   { value: "135deg", label: "↘ 斜" },
   { value: "90deg",  label: "→ 橫" },
@@ -130,6 +150,7 @@ interface State {
   // AI bg blocks
   aiBgSubject:       string;
   aiBgVibe:          string;
+  aiBgLighting:      string;   // 打光/構圖方向（與 subject/vibe 正交）
   aiBgStyle:         string;
   aiBgModel:         StudioModel;
   aiBgRefImage:      string | null;
@@ -197,6 +218,7 @@ const INIT: State = {
   designing: false,
   aiBgSubject:       "",
   aiBgVibe:          "",
+  aiBgLighting:      "",
   aiBgStyle:         "",
   aiBgModel:         "flux-dev",
   aiBgRefImage:      null,
@@ -937,9 +959,9 @@ export default function BannerStudio() {
   // Assembled AI bg prompt from blocks
   const assembledBgPrompt = useMemo(() => {
     const styleStr = s.aiBgStyle ? resolveStylePrompt(s.aiBgStyle) : "";
-    const parts = [s.aiBgSubject.trim(), s.aiBgVibe.trim(), styleStr].filter(Boolean);
+    const parts = [s.aiBgSubject.trim(), s.aiBgVibe.trim(), s.aiBgLighting.trim(), styleStr].filter(Boolean);
     return parts.length ? parts.join(", ") + ", banner background image" : "";
-  }, [s.aiBgSubject, s.aiBgVibe, s.aiBgStyle]);
+  }, [s.aiBgSubject, s.aiBgVibe, s.aiBgLighting, s.aiBgStyle]);
 
   const effectiveBgPrompt = s.aiBgPromptTouched ? s.aiBgPromptOvr : assembledBgPrompt;
   // In composite mode the product image alone is enough input (a scene description is optional);
@@ -1545,6 +1567,19 @@ export default function BannerStudio() {
                   </div>
                 </AccordionSection>
 
+                {/* 產品場景模板（合成用）— 一鍵填好 Subject + Vibe */}
+                {s.aiBgCompositeProduct && s.productImage && (
+                  <AccordionSection title="產品場景模板" summary="一鍵專業擺拍" icon="📸" defaultOpen>
+                    <p className="form-hint" style={{ marginBottom: 6 }}>選一個場景，自動填好主題＋氛圍（產品會放進此場景）。</p>
+                    <PresetChips chips={PRODUCT_SCENE_PRESETS.map((sc) => sc.label)}
+                      selected={PRODUCT_SCENE_PRESETS.find((sc) => sc.subject === s.aiBgSubject)?.label}
+                      onSelect={(label) => {
+                        const sc = PRODUCT_SCENE_PRESETS.find((x) => x.label === label);
+                        if (sc) setS((prev) => ({ ...prev, aiBgSubject: sc.subject, aiBgVibe: sc.vibe, saved: false }));
+                      }} />
+                  </AccordionSection>
+                )}
+
                 {/* 主題 Subject */}
                 <AccordionSection title="主題 Subject" summary={s.aiBgSubject || "未填"} icon="🎯">
                   <input className="form-input" type="text"
@@ -1568,6 +1603,16 @@ export default function BannerStudio() {
                   <div style={{ fontSize: 10, opacity: 0.5, margin: "8px 0 3px" }}>一般氛圍</div>
                   <PresetChips chips={BG_VIBE_PRESETS} selected={s.aiBgVibe}
                     onSelect={(v) => set("aiBgVibe", v === s.aiBgVibe ? "" : v)} />
+                </AccordionSection>
+
+                {/* 打光 / 構圖 */}
+                <AccordionSection title="打光 / 構圖" summary={LIGHTING_PRESETS.find((l) => l.kw === s.aiBgLighting)?.label || "未指定"} icon="💡">
+                  <PresetChips chips={LIGHTING_PRESETS.map((l) => l.label)}
+                    selected={LIGHTING_PRESETS.find((l) => l.kw === s.aiBgLighting)?.label}
+                    onSelect={(label) => {
+                      const l = LIGHTING_PRESETS.find((x) => x.label === label);
+                      if (l) set("aiBgLighting", l.kw === s.aiBgLighting ? "" : l.kw);
+                    }} />
                 </AccordionSection>
 
                 {/* 風格 Style */}

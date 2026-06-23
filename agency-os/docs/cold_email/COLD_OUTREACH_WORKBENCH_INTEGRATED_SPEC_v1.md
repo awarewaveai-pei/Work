@@ -773,10 +773,10 @@ AI 成本一律記 `ai_call_logs`（含 job_id，`migrations/0046`）。
 
 ## G3. 路線圖（對齊現有 phased + SES/Gmail 時程）
 
-- **Phase 1 核心**：schema+RLS / Service Profile / Lead Inbox / Leads CRUD / AI scoring / Message generation+Review / **Gmail per-org OAuth + draft only** / Follow-up date / Cold Gate / Suppression / sender daily limit。
-- **Phase 2 品質與暖層**：Quality Gate / Safety Linter / Evidence Snapshot / Draft Queue / Prompt Versioning / Reply Classifier / **wp-bridge contact endpoint + Warm sync** / WordPress Form inbox / Consent model / Unsubscribe webhook / Email Risk Dashboard(basic)。
-- **Phase 3 Free Plan 外掛 + 寄送治理**：Connector Accounts/Usage/Limits / Quota Router / Apify·Hunter·Sheets import / Cost-saving Mode / **Resend transactional** / Daily deliverability scan / Emergency stop / Incident Center / Domain auth dashboard。
-- **Phase 4 進階寄送/法規**：**SES optional fallback（production access 現在可先送審掛著）** / Google Postmaster / DMARC reports / provider fallback / Region legal rules。
+- **Phase 1 核心（含 Free-Plan Router）**：schema+RLS / Service Profile / Lead Inbox / Leads CRUD / AI scoring / Message generation+Review / **Gmail per-org OAuth + draft only** / Follow-up date / Cold Gate / Suppression / sender daily limit / **Free-Plan Router + 客戶 BYO-key onboarding（前移，PART H）+ Quota Guard 基礎**。
+- **Phase 2 品質與暖層**：Quality Gate / Safety Linter / Evidence Snapshot / Draft Queue / Prompt Versioning / Reply Classifier / **wp-bridge contact endpoint + Warm sync** / WordPress Form inbox / Consent model / Unsubscribe webhook / Email Risk Dashboard(basic) / **Brevo free 暖信 fallback（無 FluentSMTP 客戶）** / verified-email cache。
+- **Phase 3 外部 connector + 寄送治理**：Apify·Hunter·Snov·Sheets import / Google Places lead sourcing / Cost-saving Mode UI / **Resend transactional** / Daily deliverability scan / Emergency stop / Incident Center / Domain auth dashboard。
+- **Phase 4 進階寄送/法規**：Google Postmaster / DMARC reports / provider fallback / Region legal rules。（**SES 已移除** — 決策 4；暖信走客戶 FluentSMTP 或 Brevo free。）
 - **Phase 5 成效與「賣」**：Analytics Dashboard / A/B Engine / Playbook Builder / Proposal Builder / Deal Path / Nurture conversion / **billing + self-serve onboarding + per-org 成本隔離**（sell 模式）。
 
 ## G4. MVP 範圍（Phase 1 + 部分 Phase 2）
@@ -806,6 +806,126 @@ wp-bridge 改動 = bump 版本 + `release-wp-bridge.sh`（正本 repo `aware-wav
 | 5 | schema prefix `co_` | **接受（暫定）** | 所有表用 `co_` 前綴避免與 `content_*`/`ops_*`/`repair_*` 撞名；可隨時改。 |
 
 > **連動修正**：因決策 2 + 3 + 4，原 §G3 路線圖把「Free Plan 外掛」放 Phase 3 是錯的 → 已在 **PART H** 重新定位為跨階段/Phase-1 核心；SES 從 Phase 4 移除（決策 4）。
+
+---
+
+# PART H — Free-Plan Maximization & Cost Architecture（成本骨幹，第一級）
+
+> **狀態註記**：下列免費額度數字依 **2026-01 知識**整理；免費方案常縮水，**上線前必以各官方 pricing 頁確認**，標 ⚠️ 者特別易變。背景驗證 workflow 因 session limit（台北 3:30am 重置）未跑完，重置後可補跑對帳。
+
+## H0. 核心洞察：self-host = $0 骨幹
+
+你已在 EU VPS self-host **Supabase + Trigger.dev + n8n** → 資料層 / 背景任務 / 自動化**全部 $0**（只付 VPS）。
+→ 免費額度的真正瓶頸**只有 5 類外部 SaaS**：Gemini（AI 生成）、Hunter/Snov/Apollo（Email 查找/驗證）、Apify（抓資料）、Clerk（Auth，賣模式）、Gmail（寄送）。其餘不必煩惱。
+
+## H1. 免費額度總表（⚠️ = 易變，需上線前確認）
+
+| 工具 | 類別 | 免費上限（約） | 重置 | 觸發付費 | self-host | BYO-key | 免費替代 |
+|---|---|---|---|---|---|---|---|
+| Gemini API | AI 生成 | ~15 RPM / ~1500 RPD（flash 類）⚠️ | 每日 | 超量 / 要更高 RPM | ✗ | ✓ | OpenRouter free / 本機 Ollama / 手動貼 ChatGPT |
+| Hunter.io | Email 驗證 | ~25 搜尋 + 50 驗證/月 ⚠️ | 每月 | 超量 / 完整 API | ✗ | ✓ | 手動 MX/syntax / Snov |
+| Snov.io | Email 查找 | ~50 credits/月 ⚠️ | 每月 | 超量 / API | ✗ | ✓ | Hunter / 手動 |
+| Apollo.io | B2B 名單 | email credits 有限，**API 鎖付費** ⚠️ | 每月 | API / export 量 | ✗ | ✓ | 手動 export |
+| Apify | 抓資料 | ~$5 平台 credit/月 ⚠️ | 每月 | credit 用完 | 部分 | ✓ | 手動 / Google Places |
+| Resend | 交易信 | 3,000/月、100/日、1 域 | 月/日 | 超量 / 多域 | ✗ | （agency 一把即可） | Brevo |
+| Clerk | Auth（賣） | ~10,000 MAU；**Org 數/B2B 功能可能設限** ⚠️ | 月 | MAU / Org 超量 / Pro 功能 | ✗ | ✗ | 自架 auth（成本高，不建議） |
+| Gmail API | 冷信草稿 | 草稿建立 quota 充足；寄送 Workspace 2,000/日、消費版 500/日 | 日 | — | ✗ | ✓（per-org OAuth） | — |
+| Supabase | DB | **self-host 無限**（只付 VPS） | — | — | ✓ | — | — |
+| Trigger.dev | 背景任務 | **self-host 免費** | — | — | ✓ | — | — |
+| n8n | 自動化 | **self-host 社群版免費**（SSO/queue 等企業功能鎖付費） | — | — | ✓ | — | — |
+| Brevo | 暖信 fallback | 300/日（~9,000/月） | 日 | 超量 | ✗ | ✓ | MailerSend ~3,000/月 |
+
+## H2. BYO-key 乘數策略（最大槓桿）⭐
+
+**問題**：決策 2 = 你幫客戶找名單 → 若全用 agency 一組 key，Hunter 25–50/月、Apify $5/月 跨所有客戶**秒爆**。
+
+**解法（化解張力）**：**勞動由你做，API 額度由各客戶自己的免費帳號出。**
+- onboarding 收集每客戶**自己的免費 key**（Gemini / Hunter / Snov / Apify），存進 `co_connector_accounts`（per-org `credentials_ref` → secrets-vault，**不硬編**）。
+- 你在 workbench 幫客戶找名單時，該 org 的呼叫**跑在該客戶的免費額度上** → 免費額度 = **× 客戶數**，你不吃 API 成本。
+- **自用** org 用你自己一組 key。
+
+| Connector | 走法 | 原因 |
+|---|---|---|
+| Gemini / Hunter / Snov / Apify | **客戶 BYO（per-org）** | 免費額度乘客戶數；成本歸客戶 |
+| Gmail | **客戶 BYO OAuth（per-org）** | 決策 1：用客戶身份寄 |
+| FluentCRM / FluentSMTP | **客戶自有**（已存在） | 每客戶自帶 WP |
+| Resend（交易信） | **agency 共用一把** | 寄給 operator，量低，3,000/月夠 |
+| Clerk（Auth） | **agency 共用**（平台層） | 平台級，非 per-client key |
+
+## H3.「你幫找名單」的免費優先 lead-sourcing stack
+
+排序（免費先，付費 credit 留給高分）：
+1. **手動 / Google Maps 目視 / 公開目錄**（$0，最先用）
+2. **Google Places API**（$200/月 free credit ⚠️，覆蓋數千查詢）+ **Custom Search API**（100 查詢/日免費）
+3. **Apify free credit**（$5/月，只抓高價值清單 / 補資料）
+4. **Hunter/Snov 驗證**：只對 **score ≥ 80** 的 lead 花 credit
+5. 用完 → 標 `email_unverified`，手動補或下月再處理（**不買付費**）
+
+## H4. Free-Plan Router（決策邏輯）
+
+```
+需要 AI 生成:
+  1. 客戶 BYO Gemini key (free RPD)
+  2. agency Gemini key (自用/fallback, 有 quota guard)
+  3. 產 prompt 讓 operator 手動貼 ChatGPT/Claude
+  ⚠️ 隱私: Gemini free tier 會拿資料訓練 → 客戶 PII 不送 free tier,
+     只送公開 observation; 敏感資料走 BYO 付費 key 或本機模型
+
+需要 Email 驗證:
+  1. 客戶 BYO Hunter (~50/月) → 2. 客戶 BYO Snov (~50/月)
+  3. 免費 MX/syntax 檢查 → 4. 標 unverified (不付費)
+  規則: 只驗 score >= 80; 已驗過的 email 進 cache 不重驗
+
+需要 抓名單:
+  1. 手動/Google Maps → 2. Places API (free credit)
+  3. 客戶 BYO Apify ($5) 只抓高價值 → 4. 標 needs_manual
+
+需要 CRM (暖層):
+  1. 客戶自有 FluentCRM (wp-bridge) — 唯一路徑
+
+需要 寄送:
+  冷: 客戶 Gmail draft (per-org OAuth)
+  暖: 客戶 FluentSMTP → 沒有則 Brevo free (300/日)
+  交易: Resend (agency 共用)
+  不用 SES (決策 4)
+
+需要 DB/自動化/任務:
+  self-hosted Supabase / n8n / Trigger.dev — 全免費
+```
+
+## H5. Cost-Saving Modes（具體 connector 對應）
+
+| 模式 | AI | Email 驗證 | 抓資料 | 適用 |
+|---|---|---|---|---|
+| 極省 | 只產 prompt 手動貼 | 手動/不驗 | 純手動 | 訂閱 Starter / 客戶沒給 key |
+| 平衡 | Gemini free（BYO） | Hunter 只驗 ≥80 | Apify 只抓必要 | 多數客戶 |
+| 品質優先 | Gemini 多版本 + safety lint | 完整驗證 + enrichment | 完整抓 | 高價值客戶 / Pro 方案 |
+
+## H6. Quota Guard（防爆額度）
+
+- `co_connector_limits`：每 org 每 connector 設 `monthly_limit` + `alert_threshold`（預設 0.8）→ 達 80% 警示、100% 自動降級下一階 fallback。
+- `co_connector_usage`：記每次外部呼叫（Hunter/Apify）；AI 走 `ai_call_logs`。
+- **Reserve rule**：Hunter/Apify/付費 AI 只給 `score >= 80` lead。
+- **Dedup/cache**：驗證過的 email 入 cache（新增 `co_verified_emails` 或併入 inbox）→ **永不重驗同一 email**，省 credit。
+
+## H7. 訂閱方案 × 免費額度（避免 agency 虧本）
+
+| 方案 | AI/Enrichment | 條件 | agency 變動成本 |
+|---|---|---|---|
+| Starter（最便宜） | **BYO-key 必填** + 極省模式 | 客戶自備所有 free key | ≈ $0 |
+| Growth | agency 提供 enrichment，含月上限（如 50 驗證 / N 篇 AI） | 用 agency key，capped | 受控可預測 |
+| Pro | 高上限 + 多版本 + 優先 | agency key | 較高，訂閱費覆蓋 |
+
+→ 訂閱費**至少 cover** 該方案 agency key 封頂成本 + VPS 攤提。BYO-key 方案近乎零變動成本。
+
+## H8. Spec 變更清單（本 PART 對前文的修正）
+
+1. **Free-Plan Router 從 Phase 3 → Phase 1 跨切面核心**（router + BYO-key onboarding 一開始就在）。
+2. `co_connector_accounts`：onboarding 加「收集客戶 BYO free key」步驟（per-org `credentials_ref`）。
+3. 暖信 fallback：**Brevo free（300/日）取代 SES**（決策 4 移除 SES）。
+4. Gemini 隱私註記：free tier 訓練資料 → 客戶 PII 不送 free tier。
+5. 路線圖 §G3：Phase 4 移除 SES；Phase 3「Free Plan 外掛」前移 Phase 1。
+6. 新增 verified-email cache（dedup 省 credit）。
 
 ---
 

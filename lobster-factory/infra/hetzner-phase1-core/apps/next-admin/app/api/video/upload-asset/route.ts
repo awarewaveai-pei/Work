@@ -15,10 +15,12 @@ import { NextRequest, NextResponse } from "next/server";
 
 // 本 route 在 handler 內 Buffer.from(arrayBuffer) + 透過 r2.ts 用 node:crypto → 必須 nodejs runtime（與其餘 78 個 Buffer/上傳 route 一致；防 edge 預設翻轉的地雷）。
 export const runtime = "nodejs";
-export const maxDuration = 120; // 60MB 影片上傳 + R2 PUT 在慢速上行可能耗時
+export const maxDuration = 120; // 影片上傳（≤45MB）+ R2 PUT 在慢速上行可能耗時
 
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024; // 12 MB
-const MAX_VIDEO_BYTES = 60 * 1024 * 1024; // 60 MB
+// 45MB：穩在 SG host nginx `location ^~ /api/` 的 client_max_body_size 50M 之內（含 Content-Length 預擋餘裕），
+// 確保 app 回乾淨 JSON 413 而非 nginx HTML 413。scene 短片足夠。調高需同步調 nginx /api/ 上限。
+const MAX_VIDEO_BYTES = 45 * 1024 * 1024; // 45 MB
 const ALLOWED = new Set(["image/png", "image/jpeg", "image/webp", "video/mp4"]);
 
 /** 以 magic bytes 驗證 buffer 實際型別與宣告 mime 相符（client mime 可偽造 → 防混入非媒體內容）。 */

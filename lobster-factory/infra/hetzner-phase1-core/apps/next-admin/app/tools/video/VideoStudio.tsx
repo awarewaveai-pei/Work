@@ -343,7 +343,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
     const scene = draftScenes.find((s) => s.id === sceneId);
     if (!scene || regenIds.has(sceneId)) return;
     const isVideo = file.type === "video/mp4";
-    const capMb = isVideo ? 60 : 12;
+    const capMb = isVideo ? 45 : 12; // 與後端 + nginx /api/ 50M 對齊
     if (file.size > capMb * 1048576) { setGenError(`檔案過大（上限 ${capMb}MB）`); return; }
     setRegenIds((prev) => new Set(prev).add(sceneId));
     setGenError("");
