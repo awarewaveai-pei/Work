@@ -109,6 +109,8 @@ export default function CanvasEditor() {
     const now = new Date();
     return `canvas-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
   });
+  // Shown inline near download buttons so user knows what resolution they'll get.
+  const [exportPxLabel, setExportPxLabel] = useState<string | null>(null);
   const canvasMetaRef = useRef<{ realW: number; realH: number; dispScale: number; dpi: number } | null>(null);
   const [drawMode, setDrawMode] = useState<"off" | "draw" | "erase">("off"); // 自由繪筆 / 橡皮擦
   const [drawColor, setDrawColor] = useState("#111111");
@@ -264,6 +266,7 @@ export default function CanvasEditor() {
           });
           canvasMetaRef.current = { realW, realH, dispScale, dpi: szDpi };
           setSzInfo(`來源 ${realW}×${realH}px（預覽 ${Math.round(dispScale * 100)}%）`);
+          setExportPxLabel(`${realW}×${realH}px`);
           img.set({
             left: realW / 2,
             top: realH / 2,
@@ -635,6 +638,7 @@ export default function CanvasEditor() {
     const cmW = +((realW / szDpi) * 2.54).toFixed(2);
     const cmH = +((realH / szDpi) * 2.54).toFixed(2);
     setSzInfo(`真實 ${realW}×${realH}px @${szDpi}DPI = ${cmW}×${cmH}cm（預覽 ${Math.round(dispScale * 100)}%）`);
+    setExportPxLabel(`${realW}×${realH}px`);
     canvas.requestRenderAll();
   }, [szW, szH, szUnit, szDpi]);
 
@@ -984,12 +988,12 @@ export default function CanvasEditor() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${nameRef.current || "canvas-design"}.design.json`;
+    a.download = `${nameRef.current || editName}.design.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-  }, []);
+  }, [editName]);
 
   const importDesign = useCallback(
     (file: File | null) => {
@@ -1206,7 +1210,7 @@ export default function CanvasEditor() {
     document.body.appendChild(a);
     a.click();
     a.remove();
-  }, [exportPng]);
+  }, [exportPng, editName]);
 
   const saveToDesigns = useCallback(async () => {
     const png = exportPng();
@@ -1326,7 +1330,7 @@ export default function CanvasEditor() {
     document.body.appendChild(a);
     a.click();
     a.remove();
-  }, [exportPng]);
+  }, [exportPng, editName]);
 
   return (
     <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
@@ -1424,8 +1428,12 @@ export default function CanvasEditor() {
           title="下載檔名（不含副檔名）"
           style={{ fontSize: 12, padding: "2px 6px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)", width: 160 }}
         />
-        <button className="btn-primary" disabled={!ready} onClick={download} title={`下載全尺寸 PNG${canvasMetaRef.current ? `（${canvasMetaRef.current.realW}×${canvasMetaRef.current.realH}px）` : ""}`}>PNG</button>
-        <button className="btn-primary" disabled={!ready} onClick={() => void downloadWebP()} title={`下載 WebP ≤200KB${canvasMetaRef.current ? `（${canvasMetaRef.current.realW}×${canvasMetaRef.current.realH}px 壓縮）` : ""}`}>WebP &lt;200k</button>
+        <button className="btn-primary" disabled={!ready} onClick={download} title="下載全尺寸 PNG">
+          PNG{exportPxLabel ? ` ${exportPxLabel}` : ""}
+        </button>
+        <button className="btn-primary" disabled={!ready} onClick={() => void downloadWebP()} title="下載 WebP，自動壓縮至 200KB 以內">
+          WebP &lt;200k
+        </button>
         <button
           className="btn-primary"
           disabled={!ready || saveState === "saving" || saveState === "saved"}
