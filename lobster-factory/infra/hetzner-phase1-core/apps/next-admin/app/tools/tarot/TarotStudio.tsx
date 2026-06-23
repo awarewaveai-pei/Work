@@ -508,14 +508,23 @@ export default function TarotStudio() {
         patchItem(index, { status: "error", error: resp.error ?? "unknown" });
         return;
       }
-      saveToGallery(resp.image, "tarot", {
-        cardName: card.name,
-        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectText }),
-      });
       // Apply the deck's colour-grade to every card (洞1 fix): the adjustment made on the
       // preview now propagates to all 78 cards' print render — not just the preview download.
       const blob = await renderPrintCard(card, resp.image, template, grade.neutral ? undefined : grade.cssFilter);
       const url = URL.createObjectURL(blob);
+      // Save the colour-graded card to gallery (洞2 fix): previously saved raw resp.image BEFORE
+      // renderPrintCard, so the gallery always got the ungraded original. Now we convert the graded
+      // blob to a data URL and save that — gallery and download are always in sync.
+      void new Promise<string>((res) => {
+        const reader = new FileReader();
+        reader.onload = () => res(reader.result as string);
+        reader.readAsDataURL(blob);
+      }).then((dataUrl) =>
+        saveToGallery(dataUrl, "tarot", {
+          cardName: card.name,
+          prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectText }),
+        }),
+      );
       // revoke any prior url for this slot (retry case) before replacing
       setBatch((prev) =>
         prev.map((it, i) => {
