@@ -406,35 +406,41 @@ export default function PublishWizard() {
   // logic); the thin per-colour loop mirrors runAll's but is kept SEPARATE so this never destabilises the
   // one-click critical path. Stores the colour→swatch map in state + folds the shots into the gallery.
   const runColorMockups = useCallback(async () => {
-    // (`busy` is enforced on the button's disabled= in JSX, like the other run* steps — not referenced
-    //  here because it's declared later in the component.)
-    if (!designUrl || colorGen.state === "running") return;
+    // Mutually exclusive with runAll — both write lastAutoGalleryRef/mockupUrls. `busy` (runAll running)
+    // also disables this button reactively; the two latches close the within-tick check-then-act gap
+    // (the same hardening runAll has via runAllLatch — critic 2026-06-24).
+    if (!designUrl || colorGen.state === "running" || colorGenLatch.current || runAllLatch.current) return;
     const model = podModelById(catalogProductId);
     const colors = model?.colors ?? [];
     if (colors.length === 0) return;
-    setColorGen({ state: "running" });
-    const map: Record<string, string> = {};
-    const gallery: string[] = [];
-    for (let i = 0; i < colors.length; i++) {
-      const c = colors[i];
-      setColorGen({ state: "running", stage: `${c.label}（${i + 1}/${colors.length}）` });
-      const r = await genColorMockup(c.hex, designUrl);
-      if (r) {
-        if (r.swatch) map[c.printfulName] = r.swatch;
-        gallery.push(...r.gallery);
+    colorGenLatch.current = true;
+    try {
+      setColorGen({ state: "running" });
+      const map: Record<string, string> = {};
+      const gallery: string[] = [];
+      for (let i = 0; i < colors.length; i++) {
+        const c = colors[i];
+        setColorGen({ state: "running", stage: `${c.label}（${i + 1}/${colors.length}）` });
+        const r = await genColorMockup(c.hex, designUrl);
+        if (r) {
+          if (r.swatch) map[c.printfulName] = r.swatch;
+          gallery.push(...r.gallery);
+        }
       }
+      setColorMockups(map);
+      // Drop the previous auto-generated set before folding manual picks back in (same anti-accumulation
+      // rule as runAll's lastAutoGalleryRef).
+      const priorManual = mockupUrlsRef.current.filter((u) => !lastAutoGalleryRef.current.includes(u));
+      setMockupUrls(Array.from(new Set([...gallery, ...priorManual])));
+      lastAutoGalleryRef.current = gallery;
+      setColorGen(
+        gallery.length > 0
+          ? { state: "done", count: gallery.length, swatches: Object.keys(map).length }
+          : { state: "error", error: "每色 mockup 全失敗（Printful 暫時無回應？）" },
+      );
+    } finally {
+      colorGenLatch.current = false;
     }
-    setColorMockups(map);
-    // Drop the previous auto-generated set before folding manual picks back in (same anti-accumulation
-    // rule as runAll's lastAutoGalleryRef).
-    const priorManual = mockupUrlsRef.current.filter((u) => !lastAutoGalleryRef.current.includes(u));
-    setMockupUrls(Array.from(new Set([...gallery, ...priorManual])));
-    lastAutoGalleryRef.current = gallery;
-    setColorGen(
-      gallery.length > 0
-        ? { state: "done", count: gallery.length }
-        : { state: "error", error: "每色 mockup 全失敗（Printful 暫時無回應？）" },
-    );
   }, [designUrl, colorGen.state, catalogProductId, genColorMockup]);
 
   const runCopy = useCallback(async (fixHints?: string[]): Promise<{ ok: boolean; error?: string; message?: string }> => {
