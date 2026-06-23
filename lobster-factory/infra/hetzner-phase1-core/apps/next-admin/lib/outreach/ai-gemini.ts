@@ -1,0 +1,33 @@
+// Gemini REST client (free-tier compatible) — the ai_generation step of the Free-Plan Router.
+// SECURITY: the API key goes in the query string per Google's API; NEVER log the url or the key.
+// Errors surface the HTTP status + response body (which does not contain the key).
+
+export interface GeminiResult {
+  text: string;
+  model: string;
+}
+
+export async function generateWithGemini(
+  apiKey: string,
+  prompt: string,
+  model = "gemini-2.0-flash",
+): Promise<GeminiResult> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.7, maxOutputTokens: 600 },
+    }),
+  });
+  if (!resp.ok) {
+    const detail = await resp.text().catch(() => "");
+    throw new Error(`gemini ${resp.status}: ${detail.slice(0, 200)}`);
+  }
+  const j: unknown = await resp.json();
+  const parts = (j as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> })?.candidates?.[0]?.content?.parts;
+  const text = (parts ?? []).map((p) => p.text ?? "").join("").trim();
+  if (!text) throw new Error("gemini: empty response");
+  return { text, model };
+}

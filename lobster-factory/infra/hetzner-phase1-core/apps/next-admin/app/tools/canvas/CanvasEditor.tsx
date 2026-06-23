@@ -1199,9 +1199,7 @@ export default function CanvasEditor() {
   const download = useCallback(() => {
     const png = exportPng();
     if (!png) return;
-    // Use the semantic base name captured from the handoff on mount (nameRef); fall back
-    // to the old fixed name when the editor was opened without metadata (e.g. sidebar link).
-    const base = nameRef.current || "canvas-design";
+    const base = nameRef.current || editName;
     const a = document.createElement("a");
     a.href = png;
     a.download = `${base}.png`;
@@ -1321,7 +1319,7 @@ export default function CanvasEditor() {
       quality = Math.round((quality - 0.1) * 10) / 10;
       dataUrl = oc.toDataURL("image/webp", quality);
     }
-    const base = nameRef.current || "canvas-design";
+    const base = nameRef.current || editName;
     const a = document.createElement("a");
     a.href = dataUrl;
     a.download = `${base}.webp`;
