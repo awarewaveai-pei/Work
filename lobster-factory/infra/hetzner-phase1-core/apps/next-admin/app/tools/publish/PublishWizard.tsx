@@ -68,6 +68,9 @@ export default function PublishWizard() {
   const [title, setTitle] = useState("");
   // Which T-shirt model to publish (pod-catalog-config). Drives colours (Woo variants) + Printful binding.
   const [catalogProductId, setCatalogProductId] = useState<number>(POD_PRODUCT_MODELS[0].catalogProductId);
+  // Multi-client (#6): which configured WooCommerce site to publish to. "" = default site.
+  const [bridgeClients, setBridgeClients] = useState<{ id: string; name: string; baseUrl: string }[]>([]);
+  const [clientId, setClientId] = useState<string>("");
   const [retailPrice, setRetailPrice] = useState("24.99");
   const [plusPrice, setPlusPrice] = useState("26.99");
   const [keywordHint, setKeywordHint] = useState("");

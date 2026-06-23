@@ -9,9 +9,18 @@
  * the request travels as ?rest_route=<path>.
  *
  * Env (server-only, never NEXT_PUBLIC):
- *   WPBRIDGE_BASE_URL    e.g. https://soulfulexpression.org
+ *   WPBRIDGE_BASE_URL    e.g. https://soulfulexpression.org   (the DEFAULT client, id="")
  *   WPBRIDGE_KEY_ID      e.g. SE-01
  *   WPBRIDGE_PRIVATE_KEY base64 Ed25519 secret (64-byte libsodium or 32-byte seed)
+ *   WPBRIDGE_NAME        optional display label for the default client
+ *
+ * MULTI-CLIENT (one POD operator, several clients' WooCommerce sites): mirror the numbered
+ * convention used by the content pipeline (lib/content/wp-sites.ts `WP_SITE_<i>_*`). Each extra
+ * client i (1..10) is its OWN bridge install with its OWN Ed25519 key:
+ *   WPBRIDGE_SITE_<i>_BASE_URL / _KEY_ID / _PRIVATE_KEY / _NAME
+ * Private keys live ONLY in env (never the DB) — they are signing secrets. A publish call carries an
+ * optional `clientId` ("" = default, "1".."10" = that site); absent → default → fully backward
+ * compatible with the original single-site behaviour.
  */
 import { createHash, createPrivateKey, randomUUID, sign as edSign, type KeyObject } from "node:crypto";
 
@@ -21,10 +30,42 @@ const PKCS8_ED25519_PREFIX = Buffer.from("302e020100300506032b657004220420", "he
 
 export type BridgeResult<T> = { ok: true; value: T } | { ok: false; error: string };
 
-function getConfig(): { baseUrl: string; keyId: string; key: KeyObject } | null {
-  const baseUrl = process.env.WPBRIDGE_BASE_URL;
-  const keyId = process.env.WPBRIDGE_KEY_ID;
-  const secretB64 = process.env.WPBRIDGE_PRIVATE_KEY;
+/** A configured bridge client the publish UI can target. `id` = "" for default, "1".."10" for extras. */
+export interface BridgeClient {
+  id: string;
+  name: string;
+  baseUrl: string;
+}
+
+/** Resolve the raw env triplet + label for a client id. "1".."10" → namespaced; else → default. */
+function rawBridgeEnv(clientId?: string): { baseUrl?: string; keyId?: string; secretB64?: string; name?: string } {
+  const n = typeof clientId === "string" && /^([1-9]|10)$/.test(clientId) ? clientId : null;
+  if (n) {
+    return {
+      baseUrl: process.env[`WPBRIDGE_SITE_${n}_BASE_URL`],
+      keyId: process.env[`WPBRIDGE_SITE_${n}_KEY_ID`],
+      secretB64: process.env[`WPBRIDGE_SITE_${n}_PRIVATE_KEY`],
+      name: process.env[`WPBRIDGE_SITE_${n}_NAME`],
+    };
+  }
+  return {
+    baseUrl: process.env.WPBRIDGE_BASE_URL,
+    keyId: process.env.WPBRIDGE_KEY_ID,
+    secretB64: process.env.WPBRIDGE_PRIVATE_KEY,
+    name: process.env.WPBRIDGE_NAME,
+  };
+}
+
+function hostLabel(baseUrl: string): string {
+  try {
+    return new URL(baseUrl).hostname;
+  } catch {
+    return baseUrl;
+  }
+}
+
+function getConfig(clientId?: string): { baseUrl: string; keyId: string; key: KeyObject } | null {
+  const { baseUrl, keyId, secretB64 } = rawBridgeEnv(clientId);
   if (!baseUrl || !keyId || !secretB64) return null;
   try {
     const raw = Buffer.from(secretB64.trim(), "base64");
@@ -43,8 +84,8 @@ function getConfig(): { baseUrl: string; keyId: string; key: KeyObject } | null 
   }
 }
 
-export function isBridgeConfigured(): boolean {
-  return getConfig() !== null;
+export function isBridgeConfigured(clientId?: string): boolean {
+  return getConfig(clientId) !== null;
 }
 
 /**
@@ -52,8 +93,26 @@ export function isBridgeConfigured(): boolean {
  * configured / the key is corrupt. Used by the publish route to gate Bridge routing on a hostname
  * match — so an article destined for a non-bridge site is NOT mis-published to the bridge site.
  */
-export function bridgeBaseUrl(): string | null {
-  return getConfig()?.baseUrl ?? null;
+export function bridgeBaseUrl(clientId?: string): string | null {
+  return getConfig(clientId)?.baseUrl ?? null;
+}
+
+/**
+ * List every configured bridge client (default + WPBRIDGE_SITE_1..10) for the publish UI selector.
+ * Returns ONLY non-secret fields (id / display name / base URL — the site is public). A client appears
+ * iff its full Ed25519 triplet is present AND the key parses, so the dropdown reflects what can actually
+ * be published to. Empty when nothing is configured.
+ */
+export function listBridgeClients(): BridgeClient[] {
+  const out: BridgeClient[] = [];
+  const def = getConfig();
+  if (def) out.push({ id: "", name: rawBridgeEnv().name?.trim() || hostLabel(def.baseUrl), baseUrl: def.baseUrl });
+  for (let i = 1; i <= 10; i++) {
+    const id = String(i);
+    const c = getConfig(id);
+    if (c) out.push({ id, name: rawBridgeEnv(id).name?.trim() || hostLabel(c.baseUrl), baseUrl: c.baseUrl });
+  }
+  return out;
 }
 
 /**
@@ -65,9 +124,9 @@ export function bridgeBaseUrl(): string | null {
 export async function bridgePost<T>(
   path: string,
   payload: unknown,
-  options?: { dryRun?: boolean; timeoutMs?: number },
+  options?: { dryRun?: boolean; timeoutMs?: number; clientId?: string },
 ): Promise<BridgeResult<T>> {
-  const config = getConfig();
+  const config = getConfig(options?.clientId);
   if (!config) return { ok: false, error: "bridge_not_configured" };
 
   const fullPath = `${REST_NAMESPACE}${path}`;
@@ -137,8 +196,9 @@ export interface BridgeProductResponse {
  */
 export function createWooProduct(
   payload: Record<string, unknown>,
+  clientId?: string,
 ): Promise<BridgeResult<BridgeProductResponse>> {
-  return bridgePost<BridgeProductResponse>("/product", payload, { timeoutMs: 90_000 });
+  return bridgePost<BridgeProductResponse>("/product", payload, { timeoutMs: 90_000, clientId });
 }
 
 export interface BridgePostResponse {

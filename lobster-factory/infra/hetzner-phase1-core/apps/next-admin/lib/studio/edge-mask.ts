@@ -343,9 +343,9 @@ export async function applyEdgeMask(
     if (style.maskUrl) {
       // amount=10 → scale 0.97 (barely touches edge, ~1.5% each side); amount=90 → scale 0.75 (~12.5% each side)
       // Scale is always ≤ 1.0 so the mask never overflows the canvas and brush strokes stay complete.
-      // Prior formula (1.1 - amt*0.3) gave scale=1.07 at amount=10, causing the brush PNG edges to be
-      // clipped by the canvas boundary → incomplete stroke shapes at every edge.
-      const scale = 1.0 - (params.amount / 100) * 0.28;
+      // Clamp amount so the invariant is enforced here, not solely by the caller's slider bounds.
+      const amt = clamp(params.amount, 0, 100);
+      const scale = 1.0 - (amt / 100) * 0.28;
       const mx = (w * (1 - scale)) / 2;
       const my = (h * (1 - scale)) / 2;
       ctx.drawImage(mask, mx, my, w * scale, h * scale);

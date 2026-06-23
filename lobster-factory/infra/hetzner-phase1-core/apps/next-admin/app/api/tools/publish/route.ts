@@ -7,7 +7,7 @@ import { toProductImage } from "../../../../lib/studio/to-product-image";
 import { normalizeManyForWp } from "../../../../lib/studio/wp-web-image";
 import { composeFlatlay, parseHexColor } from "../../../../lib/studio/flatlay";
 import { generateProductCopy } from "../../../../lib/studio/product-copy";
-import { createWooProduct, isBridgeConfigured } from "../../../../lib/studio/wp-bridge-client";
+import { createWooProduct, isBridgeConfigured, listBridgeClients } from "../../../../lib/studio/wp-bridge-client";
 import { buildPodProductPayload, buildVariantPlan, priceForSize } from "../../../../lib/studio/pod-product";
 import { podModelById } from "../../../../lib/studio/pod-catalog-config";
 import { fetchProductTierPricing } from "../../../../lib/studio/printful-catalog";
@@ -48,7 +48,10 @@ function gate(request: Request): NextResponse | null {
 }
 
 interface PublishBody {
-  action?: "upscale" | "productimage" | "flatlay" | "copy" | "create" | "status" | "link" | "pfcreate" | "pforder" | "pricing";
+  action?: "upscale" | "productimage" | "flatlay" | "copy" | "create" | "status" | "link" | "pfcreate" | "pforder" | "pricing" | "clients";
+  /** Which configured bridge client to publish to: "" = default site, "1".."10" = an extra client
+   *  (wp-bridge-client.ts WPBRIDGE_SITE_<i>_*). Absent → default → original single-site behaviour. */
+  clientId?: string;
   // upscale / productimage / flatlay
   designUrl?: string;
   longEdgePx?: number;
@@ -104,6 +107,13 @@ interface PublishBody {
 }
 
 const PRICE_RE = /^\d+(\.\d{1,2})?$/;
+
+// Sanitize the caller's bridge-client selector → "" (default) or "1".."10". Anything else (incl. a
+// stray slug or injection attempt) collapses to "" so a bad value can never select a wrong/no site
+// silently — it just uses the default, which isBridgeConfigured then validates.
+function normalizeClientId(raw: unknown): string {
+  return typeof raw === "string" && /^([1-9]|10)$/.test(raw) ? raw : "";
+}
 
 // Transient = safe to retry (the read-before-write idempotency guard means a retry never duplicates).
 // STRUCTURED tokens only: pf() (print-provider.ts:103) emits `printful_timeout` / `printful_network_error`
@@ -317,11 +327,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, pricing });
   }
 
+  // ── Multi-client: list the configured bridge clients (default + WPBRIDGE_SITE_1..10) for the UI ──
+  if (body.action === "clients") {
+    // Non-secret fields only (id / display name / public base URL). Empty list = bridge not configured.
+    return NextResponse.json({ ok: true, clients: listBridgeClients() });
+  }
+
   // ── Step 2: create draft Woo product via wp-bridge ─────────────────────────
   if (body.action === "create") {
-    if (!isBridgeConfigured()) {
+    const clientId = normalizeClientId(body.clientId);
+    if (!isBridgeConfigured(clientId)) {
       return NextResponse.json(
-        { ok: false, error: "bridge_not_configured", hint: "Set WPBRIDGE_BASE_URL / WPBRIDGE_KEY_ID / WPBRIDGE_PRIVATE_KEY." },
+        {
+          ok: false,
+          error: "bridge_not_configured",
+          clientId,
+          hint: clientId
+            ? `Set WPBRIDGE_SITE_${clientId}_BASE_URL / _KEY_ID / _PRIVATE_KEY for this client.`
+            : "Set WPBRIDGE_BASE_URL / WPBRIDGE_KEY_ID / WPBRIDGE_PRIVATE_KEY.",
+        },
         { status: 503 },
       );
     }
@@ -369,7 +393,7 @@ export async function POST(request: Request) {
     };
     // Always a real write (plugin has no /product dry-run) — payload is draft-status.
     const payload = buildPodProductPayload(params);
-    const r = await createWooProduct(payload);
+    const r = await createWooProduct(payload, clientId);
     if (!r.ok) {
       return NextResponse.json({ ok: false, error: (r as { ok: false; error: string }).error }, { status: 502 });
     }
@@ -393,6 +417,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       ...value,
+      clientId,
       variantMap,
       ...(variantMapComplete
         ? {}
@@ -626,9 +651,13 @@ export async function POST(request: Request) {
     const thumb = (body.mockupUrls ?? []).find(
       (u) => typeof u === "string" && u.startsWith(designsBase) && /\.(png|jpe?g)$/i.test(u.split("?")[0]),
     );
+    // Namespace the Printful externalId by client so two different client sites can each have a Woo
+    // product with the same numeric id without colliding in the ONE shared native store. Default site
+    // (clientId="") keeps the bare numeric id → existing sync products are untouched (idempotent).
+    const pfClientId = normalizeClientId(body.clientId);
     const created = await createSyncProductOnNative({
       name: body.title.trim(),
-      externalId: String(body.wooProductId),
+      externalId: pfClientId ? `${pfClientId}-${body.wooProductId}` : String(body.wooProductId),
       thumbnailUrl: thumb,
       variants,
     });

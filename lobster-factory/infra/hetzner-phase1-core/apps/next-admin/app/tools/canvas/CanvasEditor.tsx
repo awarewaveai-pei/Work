@@ -1220,13 +1220,14 @@ export default function CanvasEditor() {
     }
   }, [exportPng]);
 
-  // 🔄 Auto 色階 / 色彩 / 色調 — pixel analysis on the selected image → auto-set grade sliders.
+  // 🔄 Auto 色階 / 色彩 / 色調 — pixel analysis on the selected image → auto-set sliders.
   const autoContrast = useCallback(() => {
     const canvas = fabricRef.current;
     const obj = canvas?.getActiveObject() as { type?: string; toDataURL?: (o?: Record<string, unknown>) => string } | null;
     if (!canvas || !obj || obj.type !== "image" || !obj.toDataURL) return;
     const dataUrl = obj.toDataURL({ format: "png", multiplier: 1, withoutTransform: true });
     const img = new Image();
+    img.onerror = () => setError("自動對比失敗：無法解碼圖片");
     img.onload = () => {
       const oc = document.createElement("canvas");
       oc.width = img.width; oc.height = img.height;
@@ -1241,13 +1242,21 @@ export default function CanvasEditor() {
         if (luma < lo) lo = luma;
         if (luma > hi) hi = luma;
       }
-      if (hi > lo) {
-        grade.set("black", Math.round(lo));
-        grade.set("white", Math.round(hi));
-      }
+      if (hi <= lo) return;
+      const range = hi - lo;
+      // Map the compressed tonal range → contrast/exposure sliders (full -100..100 range).
+      // grade.black/white sliders have narrow bounds (0..64 / 191..255) so we use the
+      // dedicated contrast + exposure sliders that cover the full range correctly.
+      const contrastBoost = Math.round(Math.min(100, (255 / range - 1) * 50));
+      const midpoint = (lo + hi) / 2;
+      const exposureAdj = Math.round(Math.max(-50, Math.min(50, (127.5 - midpoint) / 2.55)));
+      setContrast(contrastBoost);
+      setExposure(exposureAdj);
     };
     img.src = dataUrl;
-  }, [grade]);
+    // setContrast/setExposure are stable useState dispatchers — no dep needed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const autoColor = useCallback(() => {
     const canvas = fabricRef.current;
@@ -1255,6 +1264,7 @@ export default function CanvasEditor() {
     if (!canvas || !obj || obj.type !== "image" || !obj.toDataURL) return;
     const dataUrl = obj.toDataURL({ format: "png", multiplier: 1, withoutTransform: true });
     const img = new Image();
+    img.onerror = () => setError("自動色彩失敗：無法解碼圖片");
     img.onload = () => {
       const oc = document.createElement("canvas");
       oc.width = img.width; oc.height = img.height;
@@ -1291,7 +1301,9 @@ export default function CanvasEditor() {
     await new Promise<void>((res) => { img.onload = () => res(); img.src = png; });
     const oc = document.createElement("canvas");
     oc.width = img.width; oc.height = img.height;
-    oc.getContext("2d")!.drawImage(img, 0, 0);
+    const ctx2d = oc.getContext("2d");
+    if (!ctx2d) { setError("WebP 下載失敗：無法建立畫布"); return; }
+    ctx2d.drawImage(img, 0, 0);
     let quality = 0.9;
     let dataUrl = oc.toDataURL("image/webp", quality);
     // Base64 → bytes ratio: length × 0.75; iterate down until ≤ 200 KB.
