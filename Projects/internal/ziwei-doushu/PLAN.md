@@ -3,7 +3,7 @@
 > **本檔 = 專案唯一正式計畫(SSOT)。** 快速接手讀 `HANDOFF.md`;完整規格、決策、路線圖看本檔。
 > 位置:`Projects/internal/ziwei-doushu/`(AwareWave Work monorepo)
 > 分支:`claude/ziwei-doushu-chart-site-55fdaa`
-> 最後更新:2026-06-23
+> 最後更新:2026-06-24(本次 session 大幅擴充:電商/內容引擎/三品牌漏斗/EU 機/資料源策略 → 見 §18)
 
 ---
 
@@ -16,6 +16,9 @@
 - **託管**:**自架 SG/EU VPS(走既有 `sg-deploy.sh` 管線)為主**,Vercel 為備選。
 - **網址**:**`ziwei.aware-wave.com` 子網域(零成本)**;品牌起來再買專屬網域。
 - **AI**:**廠商無關 AI 層,預設 GPT,可切 Claude,用真命盤 A/B 選贏家**。
+- **產品已擴為生態系(2026-06-24,見 §18)**:算命引擎 + 每日運勢工廠 + SEO 文章/影片(**重用既有 next-admin 內容引擎**)+ 8 平台社群發佈 + **三品牌漏斗(導 soulful 身心靈 / wear the world 服飾)** + **自己的 shop(headless WooCommerce + POD/Printful,金流走 Next.js 一層共用、天生無縫)**。
+- **資料源策略**:中式系統(紫微/八字/卜卦/塔羅)**一律自算(免費、零邊際成本)**;只有「算起來難」的**西洋占星**接 API(MVP 用 astrology-api.io,**注意非通包、按配額計費**;流量起來切自架 **XALEN Apache-2.0** 引擎,零月費可閉源)。
+- **部署目標更新**:使用者近期將 **SG→EU 遷移並新購一台 EU 機**;ziwei 直接落地新 EU 機(見 §18)。
 - **現況**:Phase 0(紫微排盤引擎 + 真太陽時校正 + 12宮渲染)已完成、tsc/build 綠燈、已 push。
 
 ---
@@ -245,6 +248,7 @@ npm run build        # production build gate
 - AI 預設家(目前定 GPT)+ 提供 `OPENAI_API_KEY`(及/或 `ANTHROPIC_API_KEY`)。
 - astrology-api.io key、Supabase 專案、金流商(綠界 vs Stripe)。
 - 何時買專屬命理網域(先用 `ziwei.aware-wave.com`)。
+- **本次 session 新增的開放決策見 §18.8**(soulful 定位 / Woo 店位置 / 新 EU 機 IP / 金流商 / API keys)。
 
 ---
 
@@ -255,3 +259,79 @@ npm run build        # production build gate
 - 機密一律環境變數,禁硬編。
 - 排盤邏輯改動 → 已知生辰回歸驗證。
 - 部署走 sg-deploy 管線,補齊新部署 6 項 SOP。
+
+---
+
+## 18. 2026-06-24 擴充決策(本次 session 鎖定,優先級高於前文衝突處)
+
+> 本節是與 operator 多輪討論後鎖定的方向。與 §0–§17 衝突處**以本節為準**。產品從「單一算命網站」擴為「以算命引流的多品牌變現生態系」。
+
+### 18.1 資料源策略(自算 vs API)
+- **判準:API 的價值 = 計算難度。** 確定性算法(中式)誰算都一樣準,付費 API 不會更準。
+- **中式系統一律自算、零邊際成本**:紫微(iztro)、八字(lunar-javascript)、卜卦(自寫)、**塔羅(自寫 78 牌 JSON + Fisher-Yates,絕不接 API)**。
+- **塔羅特別註記**:它就是「Math.random + 靜態 JSON」,且是免費病毒漏斗;接 API = 為三行 code 按次付錢還被配額綁,**最虧,禁接**。
+- **西洋占星才接**(行星位置要 Swiss Ephemeris,自算易錯):
+  - MVP:`astrology-api.io`。**重要:不是月付 $11 通包**;$11 Starter 僅含約 1,000–5,000 次/月(≈每日 33–160 次),超量要升 $37(55k)/$99(220k)。**故西洋占星鎖在付費牆後,讓付錢的人才觸發按次呼叫,成本被收入覆蓋。**
+  - 流量起來:切自架 **XALEN(`@xalen/wasm`,Apache-2.0)** → 零月費、可閉源、精度同級。⚠️ 別自架原生 Swiss Ephemeris:它是 **AGPLv3**,網路服務會傳染逼你全站開源(對付費牆 SaaS 是毒藥)。切換前用 3–5 張已知正確本命盤回歸驗證精度。
+
+### 18.2 每日運勢工廠(免費病毒漏斗,成本趨近零)
+今日運勢 / 幸運色 / 幸運數字 / 幸運方位 / 宜忌 —— **全是內容不是計算**,做法:
+- **共用地基:一張五行↔屬性對應表**(靜態 JSON):`木{綠青,3/8,東} 火{紅紫,2/7,南} 土{黃棕,5/0,中} 金{白金,4/9,西} 水{黑藍,1/6,北}`。
+- **幸運色/數/方位 = 純演算法**:取使用者喜用神五行(lunar-javascript 取日主→推喜用神;簡版先用日主或當日日柱五行)→ 查表。確定性、零 AI、零成本、同盤同日固定可重現。
+- **宜忌 = lunar-javascript 內建黃曆**(`getDayYi()`/`getDayJi()`),免寫免 AI,全站同日共用快取。
+- **今日運勢評分 = 規則算分**(iztro 流日盤落宮 + 四化吉凶 → 愛情/事業/財運/健康星等)。
+- **運勢文案 = 便宜 AI(Haiku)**,唯一花錢處,但**快取鍵 = `chart_id + 日期`**:同盤同日只生一次 → 海量免費流量仍零增量成本。太陽星座今日運勢更只需 12 份/日全站共用。
+- **差異化**:從**真命盤(流日/過運)**算 → 千人千面,贏競品「12 星座輪播罐頭文」。
+
+### 18.3 內容引擎 —— 重用既有 `next-admin`,不要重造
+公司已有完整「**Content Pipeline Blocks**」引擎(`lobster-factory/.../next-admin`,SSOT:`agency-os/docs/operations/CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md` §0.5 進度總帳):
+- ✅ production:AI 文章生成(7 route,`lib/content/article/generate-core.ts`)、SEO 檢查(RankMath 16 點,`quality/seo-check-core.ts`)、熱點搜尋(`trending-sources.ts`)、brand-voice、發 WordPress(wp-bridge draft-first,`wordpress-core.ts`)、ContentStudio UI。
+- 🟡 收尾中:影片生成(`apps/video-service/` 圖→Edge TTS→ffmpeg,Ken Burns/中文字幕/Flux 圖/Pexels B-roll,≈$0.02/支,骨架+真機驗證過,差積木接線)、社群發佈(Postiz 已部署 `postiz.aware-wave.com`,8 平台,差整合碼)。
+- **算命站重用此引擎**產 SEO 文章+開運影片→自動發各社群帶流量回站。**禁止重造一套。**
+- 文章後台:operator 大量寫文 → **Notion-as-CMS**(已有 Notion)或 MDX,前台仍 Next.js。
+
+### 18.4 自己的 shop —— headless WooCommerce + POD,金流共用一層(天生無縫)
+- **店核心 = WooCommerce**(operator 已熟、已有 POD→Printful+Woo 管線:`lib/studio/pod-product.ts`、`docs/PLAN-pod-one-click-auto-publish-design-to-woo-printful.md`)。**WooCommerce 不差,差的是把算命互動 app 塞進 WP** → 故分層。
+- **架構(一次蓋對,不重工)**:
+  - 前台(逛商品/購物車/**結帳/付款**)= **Next.js 算命站**,使用者全程不跳走、看不到 WordPress。
+  - 金流 = **Next.js 一層 ECPay/Stripe**,同時收「訂閱 + 數位報告 + 實體商品」三種 → **只接一次,服務三者**。
+  - **不使用 Woo 的結帳/金流**(那才是會被丟掉重做的東西)。Woo 退居純後端:商品/庫存/訂單記錄/觸發 POD(Printful)。
+  - 付款成功後經 API 在 Woo 建訂單 → Woo 發 POD 出貨。
+  - **這是「天生無縫 headless」,非「先有縫再無縫」** → 滿足 operator「不重工、直接做好」原則。
+- **數位商品**(運勢報告/命書/解讀)= Next.js + 同一金流層直收,零庫存 ~100% 毛利,即買即 AI 生成 → 高客單主力。
+- **WP/Woo 更新維護**:把自家 Woo 店納入既有 **MainWP + WPvivid 備份 + `/wp-maintenance safe-update` + Playwright 驗站** 流程(operator 本業強項,邊際負擔小)。headless 下 Woo 不需頁面建構器/佈景/前台外掛 → 攻擊面更小、要更新的更少。
+
+### 18.5 三品牌共生漏斗(算命引流 → 變現三路)
+```
+免費算命/今日運勢(Next.js)
+  ├─ 幸運色/開運穿搭 ──當場買實體(Next.js 結帳, Woo+POD 後端)──→ wear the world(服飾)
+  ├─ 身心靈/療癒解讀 ───────────────────────────────────────→ soulful(身心靈)
+  └─ 深度報告付費牆 ──數位商品(Next.js 金流直收)──→ 自家營收
+全程 UTM + 站內事件歸因(lib/attribution.ts)→ 看哪條金流最強 → 加碼
+```
+- 殺手橋樑:「今日幸運色 → 開運穿搭推薦」是命理與服飾的天然接點,不突兀、轉換高。
+- 「悄悄導流」靠內容原生橋樑(文末 CTA / 推薦)+ UTM,不靠生硬廣告。
+- ⚠️ 待確認:soulful 確切定位(身心靈/課程/商品?)以校準橋樑文案。
+
+### 18.6 部署目標更新(SG→EU 遷移 + 新 EU 機)
+- operator 近期將 **SG → EU 遷移,並新購一台 EU 機** 託管。
+- **ziwei 直接落地新 EU 機**(免日後從 SG 再搬一次)。新機是**第三台**,容器/網路/secrets 獨立登記(ENVIRONMENT_REGISTRY);SG/EU **不可混用**。
+- 部署管線:複製 `sg-deploy.sh` 為 `eu-deploy.sh`(或參數化目標主機),**保留六項 SOP**(test gate / healthcheck / smoke / rollback / 通知 / typecheck),**禁止**在新機直接 git pull 繞 gate。
+- DNS:`ziwei.aware-wave.com` A record 指新 EU 機 IP(機器/IP 確定後)。SG→EU 遷移本身是另一個 High-risk 大任務,需另開規劃。
+
+### 18.7 範圍與順序提醒(operator 原則:地基一次蓋對、不重工;但功能仍按序蓋)
+- **不重工 = 地基(金流層 / headless 架構 / 廠商無關 AI 層 / 每日運勢工廠 / 內容引擎重用)一次設計對,永不打掉重做。**
+- **「一塊一塊蓋到好、不回頭拆」≠「先做小再做好」**:前者是必要的施工順序(先紫微→八字→…→合盤),不是重工;後者(同一塊做兩遍)才是浪費 → 避免。
+- 建議施工順序(先賺錢的最小閉環,但每塊一次蓋到好):
+  1. 紫微 MVP + 每日運勢工廠 → 上 `ziwei.aware-wave.com`(新 EU 機)
+  2. Next.js 金流層(ECPay/Stripe)+ 數位商品付費牆(運勢報告)→ 第一條現金流
+  3. 重用 next-admin 內容引擎產文章/影片導流 + Postiz 社群
+  4. headless 接 Woo 店(無縫結帳,共用金流)+ 三品牌漏斗 + 歸因
+  5. 訂閱、合盤、其餘系統(八字/卜卦/塔羅/西洋占星)
+
+### 18.8 本次新增的開放決策(待 operator 提供才能動工)
+- soulful 定位(校準身心靈漏斗文案)。
+- wear the world / 自家 shop 的 Woo 站位置與網址(`shop.aware-wave.com`?)、Printful 帳號。
+- 新 EU 機規格 / IP(部署目標)。
+- 金流商(綠界台灣 vs Stripe 國際 vs 並用)—— 金流層要先定才能一次接對。
+- 各 API key:`OPENAI_API_KEY`(AI 預設)、astrology-api.io key(MVP 西洋占星)。
