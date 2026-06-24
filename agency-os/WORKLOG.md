@@ -2,6 +2,42 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-25
+
+### refactor(video): VideoStudio UI 一致性 + 時間長度功能 + 全面去 emoji
+
+[任務理解] 生圖模型/視覺風格/配音模型 UI 不一致、無主體色；外層分類按鈕與內層項目視覺相同無區隔；真實影片/照片動畫 缺少 場景總數/自訂AI圖/時間長度 控制項；全頁 emoji 過多。
+
+[已修改]
+- `app/tools/video/VideoStudio.tsx` (commit 6c7bbc16)
+  - 新增 `IMAGE_VENDOR_GROUPS` + `vendorForModel()` → 生圖模型改為 vendor tabs（外層）+ model chips（內層），兩層視覺差異明確
+  - 新增 `imageVendor` state（與 imageModel 聯動，切換到 pexels 模式時 vendor 區塊 hidden）
+  - 新增 `isPexels` computed constant：`imageModel === "pexels-video" || imageModel === "pexels-all"`
+  - 新增 `targetMinutes` state（slider 1–5 min, step 0.5）
+  - 場景總數 + 自訂AI圖 + 時間長度 組合成「場景與時間」card，移至素材模式正下方，三種素材模式（真實影片/照片動畫/AI生圖）**全部共用**
+  - `handleDraft()` sceneCount 從 `!isPexels` 條件改為全模式傳送（`video-script-core.ts scriptParams()` 的 sceneCountOverride 對所有模式有效，已確認）
+  - 配音模型 UI：provider outer tabs + voice chips，color 統一改用 `var(--accent)`（移除 `var(--severity-low)` 綠）
+  - 視覺風格 category outer tabs + item inner chips 同 accent color
+  - VIDEO_STYLE_PRESETS 三條全部修正 group 去掉 emoji（原 lines 14-15 仍有 `📹 影片風格` 造成兩個 tab 的 critic 找到的 bug）
+  - Settings summary key 文字去 emoji（素材/場景/配音/比例/風格/片頭）
+  - inner studioTab labels 去 emoji（生成影片/生成記錄/說明 & 成本）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin | exit=0 | ms=217000
+  - tsc typecheck: pass | vitest: 487/487 pass | healthcheck: healthy 7s | smoke: 4/4 OK
+  - deployed commit: 6c7bbc16cf98dd8f822e5ec1fbcf7caa8b0f9298
+- REALTEST_EVIDENCE: tool=Bash | cmd=playwright-runner.ps1 -Mode smoke -SkipInstall | exit=0 | ms=18900
+  - 26 passed / 6 skipped / 0 failed
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=1c(fixed)/0m/0n — VIDEO_STYLE_PRESETS group emoji bug 在 commit 前已修
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=isPexels|imageVendor|vendorForModel|targetMinutes | hits=0
+
+[剩餘風險] 無
+[rollback] `git revert 6c7bbc16`
+
+AUTO_TASK_DONE: VideoStudio UI 一致性 + 時間長度 + 去 emoji 重構部署完成
+
+---
+
 ## 2026-06-24
 
 ### refactor(video): VideoStudio 影片生產頁 UX 重設計 — 3 Tab + 2 欄佈局
