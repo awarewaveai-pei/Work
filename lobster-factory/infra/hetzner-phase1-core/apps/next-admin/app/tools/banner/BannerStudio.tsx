@@ -945,13 +945,13 @@ function PresetChips({ chips, onSelect, selected }: { chips: string[]; onSelect:
 }
 
 function StepCard({
-  title, step, icon, hint, children, defaultOpen = false,
+  title, step, icon, hint, children, defaultOpen = false, order,
 }: {
-  title: string; step?: string; icon?: string; hint?: string; children: React.ReactNode; defaultOpen?: boolean;
+  title: string; step?: string; icon?: string; hint?: string; children: React.ReactNode; defaultOpen?: boolean; order?: number;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+    <div className="card" style={{ padding: 0, overflow: "hidden", ...(order !== undefined ? { order } : {}) }}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -1369,11 +1369,10 @@ export default function BannerStudio() {
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap" }}>
 
         {/* ── Controls (right side) ── */}
-        <div style={{ order: 2, flex: "0 0 460px", width: 460,
+        <div style={{ order: 2, flex: "0 0 380px", width: 380,
           display: "flex", flexDirection: "column", gap: 12 }}>
 
-          {/* 配色 / 品牌色 — 挪到最前面 */}
-          <StepCard title="配色 / 品牌色" icon="🎨">
+          <StepCard title="配色 / 品牌色" icon="🎨" order={1}>
             {brandClients.length > 0 ? (
               <div className="form-row" style={{ marginTop: 12 }}>
                 <label className="form-label">品牌</label>
@@ -1430,8 +1429,7 @@ export default function BannerStudio() {
             )}
           </StepCard>
 
-          {/* 版型模板 — one-click conversion layouts */}
-          <StepCard title="版型模板" icon="✨" hint="一鍵套用">
+          <StepCard title="版型模板" icon="✨" hint="一鍵套用" order={5}>
             <p className="form-hint" style={{ marginBottom: 8, marginTop: 4 }}>套用後再填內容；只改版面/元素，不動你的文字與圖。</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
               {TEMPLATES.map((t) => (
@@ -1445,7 +1443,7 @@ export default function BannerStudio() {
           </StepCard>
 
           {/* Step 0: 文案生成 */}
-          <StepCard title="文案生成" step="Step 0" icon="✍️" hint="選填">
+          <StepCard title="文案生成" step="Step 0" icon="✍️" hint="選填" order={6}>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
               <div className="form-row">
                 <label className="form-label">描述</label>
@@ -1503,7 +1501,7 @@ export default function BannerStudio() {
           </StepCard>
 
           {/* Step 1: 尺寸 */}
-          <StepCard title="尺寸" step="Step 1" icon="📐">
+          <StepCard title="尺寸" step="Step 1" icon="📐" order={2}>
             {PRESET_GROUPS.map((grp) => (
               <div key={grp.key} style={{ marginBottom: 10 }}>
                 <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, opacity: 0.5, marginBottom: 6 }}>
@@ -1529,7 +1527,7 @@ export default function BannerStudio() {
           </StepCard>
 
           {/* Step 2: 產品圖 */}
-          <StepCard title="產品圖" step="Step 2" icon="🖼" hint="選填">
+          <StepCard title="產品圖" step="Step 2" icon="🖼" hint="選填" order={3}>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
               <input ref={productFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleProductUpload} />
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -1577,7 +1575,7 @@ export default function BannerStudio() {
           </StepCard>
 
           {/* Step 3: 背景 */}
-          <StepCard title="背景" step="Step 3" icon="🎆">
+          <StepCard title="背景" step="Step 3" icon="🎆" order={4}>
             <div className="form-row" style={{ marginTop: 4 }}>
               <label className="form-label">類型</label>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -1859,7 +1857,7 @@ export default function BannerStudio() {
           </StepCard>
 
           {/* Step 4: 文字 */}
-          <StepCard title="文字" step="Step 4" icon="✍">
+          <StepCard title="文字" step="Step 4" icon="✍" order={7}>
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
               <div className="form-row">
                 <label className="form-label">標題</label>
@@ -1994,7 +1992,7 @@ export default function BannerStudio() {
           </StepCard>
 
           {/* Step 4.5: 行銷元素 — conversion drivers */}
-          <StepCard title="行銷元素" step="Step 4.5" icon="🛒" hint="讓人點擊下單">
+          <StepCard title="行銷元素" step="Step 4.5" icon="🛒" hint="讓人點擊下單" order={8}>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
 
               {/* CTA 按鈕 */}
@@ -2110,7 +2108,7 @@ export default function BannerStudio() {
           </StepCard>
 
           {/* Export */}
-          <div className="card">
+          <div className="card" style={{ order: 9 }}>
             <h2 style={{ fontSize: 15, margin: "0 0 12px" }}>Step 5 · 匯出</h2>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button className="btn btn-primary" onClick={handleSave}
