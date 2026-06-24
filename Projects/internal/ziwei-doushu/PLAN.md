@@ -343,7 +343,12 @@ operator 要求:**國內外都賣,需英文版 + 各國語言。**
   | 商品 | headless → 多語在 Next.js 資料層管(不依賴 WPML) | 小 |
 - **三件 day-1 必做(否則重工)**:
   1. **語言路由**:Next.js 原生 i18n,subpath `/[locale]/...`(`/zh` `/en` `/ja` `/zh-cn`)+ `hreflang` 標籤 → 各語言分別被 Google 收錄。
-  2. **金流多幣別/多區(升級 §7、§5 的金流決策)**:**台灣/中文圈→綠界 ECPay**(本地卡/超商/ATM);**國際→Stripe**(多幣別/各國卡/Apple/Google Pay)。Next.js 金流層**抽象兩者**、依地區自動路由 → **一次接對服務全球**。（故 §18.8 的「金流商」決策答案 = **雙軌並用,不是二選一**。）
+  2. **金流多幣別/多區/多 provider(升級 §7、§5 的金流決策)**:Next.js **金流抽象層** `pay(order, region/method)` 後掛多家 provider,**加一家 = 加一個 adapter,前台/結帳/商品零改動(operator 不重工原則的回報)**:
+     - **台灣/中文圈 → 綠界 ECPay**(本地卡/超商/ATM)
+     - **國際 → Stripe**(各國卡/Apple/Google Pay/多幣別)
+     - **國際 → PayPal**(PayPal 帳號/餘額、品牌信任、買家保護;部分地區/年齡層只用 PayPal,缺了會漏單)
+     - **未來可插(同層零重工)**:LINE Pay / 街口(台)、Alipay / 微信支付(中國+海外華人)
+     - 依使用者地區自動路由預設方式,並列出其可用方式。
   3. **禁止硬編任何 UI 文字字串** → 第一行 code 就抽到翻譯檔 / AI 參數。
 - **語言上線順序**(架構支援無限語言,AI 加參數即擴):① 繁中(台/港,主場)② 英文(國際+西洋占星/塔羅英語圈大)③ 簡中 ④ 日文(占い付費意願高)→ 之後韓/西/泰…。
 - **語言 ≠ 市場定位**:西方語版主打西洋占星/塔羅(他們熟),紫微/八字當「異國神秘」特色;同站不同語言首頁可主推不同系統。
@@ -353,6 +358,6 @@ operator 要求:**國內外都賣,需英文版 + 各國語言。**
 - soulful 定位(校準身心靈漏斗文案)。
 - wear the world / 自家 shop 的 Woo 站位置與網址(`shop.aware-wave.com`?)、Printful 帳號。
 - 新 EU 機規格 / IP(部署目標)。
-- ~~金流商(綠界 vs Stripe)~~ → **已定:ECPay+Stripe 雙軌多幣別**(見 §18.9);仍待 operator 提供兩家帳號/key。
+- ~~金流商(綠界 vs Stripe)~~ → **已定:ECPay + Stripe + PayPal 多 provider 抽象層**(見 §18.9);仍待 operator 提供各家帳號/key。
 - 各 API key:`OPENAI_API_KEY`(AI 預設)、astrology-api.io key(MVP 西洋占星)。
 - **語言上線清單最終確認**(預設 繁中→英→簡中→日,可調)。
