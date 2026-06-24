@@ -442,8 +442,6 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
           articleTitle: articleTitle.trim() || undefined,
           articleContent: articleContent.trim() || undefined,
           language,
-          // 「場景總數」「自訂 AI 圖」只在 AI 生圖模式生效（與 draft 路徑一致；避免 pexels 模式被滑桿覆蓋）。
-          // 必須同時送 sceneCount，否則後端 reassignSceneVisuals 會用 customScenes 但場景數仍為 targetMinutes 預設 → total/custom 分歧。
           sceneCount: (imageModel !== "pexels-video" && imageModel !== "pexels-all") ? totalScenes : undefined,
           customScenes: (imageModel !== "pexels-video" && imageModel !== "pexels-all") ? Math.min(customScenes, totalScenes) : undefined,
           brollScenes,
@@ -476,130 +474,105 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
   const isBusy = isLoading || draftLoading;
   const canGenerate = (topic.trim().length > 0 || providedScenes.length > 0) && !isBusy;
 
+  // suppress unused warning for handleGenerate (kept for backward compat)
+  void handleGenerate;
+
   return (
-    <div style={{ padding: "24px 28px", background: "var(--bg-canvas)", minHeight: "100vh" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(340px, 480px) 1fr", gap: 24, alignItems: "start" }}>
+    <div style={{ background: "var(--bg-canvas)", minHeight: "100vh" }}>
 
-        {/* ─── LEFT PANEL ─────────────────────────────────────────────── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* ── Inner tab bar ── */}
+      <div style={{
+        display: "flex", gap: 4, padding: "10px 28px 0",
+        background: "var(--bg-canvas)", borderBottom: "1px solid var(--border-subtle)",
+      }}>
+        {([
+          { id: "generate" as const, label: "🎬 生成影片" },
+          { id: "history"  as const, label: "📋 生成記錄" },
+          { id: "info"     as const, label: "ℹ️ 說明 & 成本" },
+        ]).map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setStudioTab(t.id)}
+            style={{
+              padding: "10px 18px", border: "none",
+              borderBottom: `3px solid ${studioTab === t.id ? "var(--accent)" : "transparent"}`,
+              background: "transparent", cursor: "pointer", fontSize: 14,
+              fontWeight: studioTab === t.id ? 700 : 500,
+              color: studioTab === t.id ? "var(--accent)" : "var(--text-secondary)",
+              transition: "color 0.15s, border-color 0.15s",
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-          {/* §1 — Pipeline flow */}
-          <Card title="① 生成流程" subtitle="lib/content/video/video-cost.ts VIDEO_PIPELINE_STEPS 驅動">
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {VIDEO_PIPELINE_STEPS.map((step, idx) => (
-                <FlowCard
-                  key={step.id}
-                  step={step}
-                  index={idx}
-                  costLine={costBreakdown.lines.find((l) => l.id === step.id)}
-                  activeStep={isLoading ? genStep : undefined}
-                />
-              ))}
-            </div>
-          </Card>
+      {/* ── Generate tab ── */}
+      {studioTab === "generate" && (
+        <div style={{ padding: "24px 28px" }}>
+          <div style={{ maxWidth: 680, display: "flex", flexDirection: "column", gap: 16 }}>
 
-          {/* §2 場景設定 → 已移入右欄 §4（內容後、生成前），讓主流程由上到下一條順下來 */}
-
-          {/* §3 — Cost breakdown */}
-          <Card title="③ 成本明細">
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-              <thead>
-                <tr style={{ color: "var(--text-muted)", textAlign: "left" }}>
-                  <th style={{ padding: "6px 0", fontWeight: 600 }}>步驟</th>
-                  <th style={{ padding: "6px 8px", fontWeight: 600, textAlign: "right" }}>USD</th>
-                  <th style={{ padding: "6px 8px", fontWeight: 600, textAlign: "right" }}>×</th>
-                  <th style={{ padding: "6px 0", fontWeight: 600, textAlign: "right" }}>NT$</th>
-                </tr>
-              </thead>
-              <tbody>
-                {costBreakdown.lines.map((line) => (
-                  <tr key={line.id} style={{ borderTop: "1px solid var(--border-subtle)" }}>
-                    <td style={{ padding: "7px 0", color: "var(--text-primary)" }}>
-                      <span style={{ marginRight: 6 }}>{line.icon}</span>{line.label}
-                      {line.free && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: "var(--badge-green-text)", background: "var(--badge-green-bg)", padding: "1px 5px", borderRadius: 4 }}>免費</span>}
-                    </td>
-                    <td style={{ padding: "7px 8px", textAlign: "right", color: "var(--text-secondary)", fontFamily: "monospace", fontSize: 11.5 }}>{line.free ? "—" : USD(line.unitUsd)}</td>
-                    <td style={{ padding: "7px 8px", textAlign: "right", color: "var(--text-secondary)" }}>{line.count}</td>
-                    <td style={{ padding: "7px 0", textAlign: "right", fontWeight: 600, color: line.free ? "var(--text-muted)" : "var(--text-primary)" }}>{line.free ? "—" : NT(line.totalUsd)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div style={{ marginTop: 12, borderTop: "2px solid var(--border-subtle)", paddingTop: 12, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-              <div>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>每支合計</span>
-                <span style={{ fontSize: 11.5, color: "var(--text-secondary)", marginLeft: 8 }}>({USD(costBreakdown.totalUsd)})</span>
+            {/* Hint banner */}
+            {providedScenes.length > 0 ? (
+              <div style={{ background: "var(--intake-success-bg)", border: "1px solid var(--green)", borderRadius: 8, padding: "10px 12px", fontSize: 12.5, color: "var(--badge-green-text)", lineHeight: 1.6 }}>
+                ✅ 已從前製腳本帶入 <b>{providedScenes.length}</b> 個場景。調整下方設定後，按「📋 生成草稿」出片。
               </div>
-              <span style={{ fontSize: 22, fontWeight: 800, color: "var(--accent)" }}>{NT(costBreakdown.totalUsd)}</span>
-            </div>
-          </Card>
-        </div>
-
-        {/* ─── RIGHT PANEL ────────────────────────────────────────────── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
-          {/* §4 — Generate */}
-          <Card title="④ 生成影片">
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-
-              {providedScenes.length > 0 ? (
-                <div style={{ background: "var(--intake-success-bg)", border: "1px solid var(--green)", borderRadius: 8, padding: "10px 12px", fontSize: 12.5, color: "var(--badge-green-text)", lineHeight: 1.6 }}>
-                  ✅ 已從前製腳本帶入 <b>{providedScenes.length}</b> 個場景（台詞＝旁白、畫面＝生圖）。下方調整場景設定後，按「📋 生成草稿」即用此腳本出片，不重寫。
-                </div>
-              ) : (
-                <div style={{ background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: "9px 12px", fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.6 }}>
-                  💡 想用寫好的腳本？到「📝 前製腳本」寫完按「送去生產影片」帶過來；或在此直接打主題快速生成。
-                </div>
-              )}
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={labelStyle}>主題 / 關鍵字 <span style={{ color: "var(--red)" }}>*</span></label>
-                <input type="text" value={topic} onChange={(e) => setTopic(e.target.value)}
-                  placeholder="例：如何用 AI 提升 SEO 排名" style={inputStyle} disabled={isLoading} />
+            ) : (
+              <div style={{ background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: "9px 12px", fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                💡 可到「📝 前製腳本」寫完再帶入，或直接填主題快速生成。
               </div>
+            )}
 
-              <div style={{ display: "flex", gap: 12 }}>
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-                  <label style={labelStyle}>語言</label>
-                  <select value={language} onChange={(e) => setLanguage(e.target.value)} style={{ ...inputStyle, cursor: "pointer" }} disabled={isLoading}>
-                    {["繁體中文", "English", "簡體中文", "日文", "西班牙文"].map((l) => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                </div>
+            {/* ① 輸入內容 */}
+            <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 12, overflow: "hidden" }}>
+              <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-subtle)" }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>① 輸入內容</span>
               </div>
+              <div style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
 
-              {/* Intro title card toggle */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 12px", borderRadius: 8, background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                  <input type="checkbox" checked={introEnabled} onChange={e => setIntroEnabled(e.target.checked)} disabled={isLoading} />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>標題動畫（片頭黑底 + fade-in 標題）</span>
-                </label>
-                {introEnabled && (
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <span style={{ fontSize: 11.5, color: "var(--text-muted)", whiteSpace: "nowrap" }}>時長 (秒)</span>
-                    <input type="range" min={2} max={6} step={0.5} value={introDuration}
-                      onChange={e => setIntroDuration(Number(e.target.value))}
-                      style={{ flex: 1, accentColor: "var(--accent)" }} disabled={isLoading} />
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)", minWidth: 28 }}>{introDuration}s</span>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <label style={labelStyle}>主題 / 關鍵字 <span style={{ color: "var(--red)" }}>*</span></label>
+                  <input type="text" value={topic} onChange={(e) => setTopic(e.target.value)}
+                    placeholder="例：如何用 AI 提升 SEO 排名" style={inputStyle} disabled={isLoading} />
+                </div>
+
+                <div style={{ display: "flex", gap: 12 }}>
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label style={labelStyle}>語言</label>
+                    <select value={language} onChange={(e) => setLanguage(e.target.value)} style={{ ...inputStyle, cursor: "pointer" }} disabled={isLoading}>
+                      {["繁體中文", "English", "簡體中文", "日文", "西班牙文"].map((l) => <option key={l} value={l}>{l}</option>)}
+                    </select>
                   </div>
-                )}
-              </div>
+                </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={labelStyle}>文章標題（選用）</label>
-                <input type="text" value={articleTitle} onChange={(e) => setArticleTitle(e.target.value)}
-                  placeholder="留白 = 純主題生成" style={inputStyle} disabled={isLoading} />
-              </div>
+                <details style={{ borderRadius: 8, border: "1px solid var(--border-subtle)", overflow: "hidden" }}>
+                  <summary style={{ padding: "8px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", background: "var(--bg-subtle)", listStyle: "none", display: "flex", alignItems: "center", gap: 6 }}>
+                    ▸ 文章內容（選用 — 填入可讓腳本更貼近你的文章）
+                  </summary>
+                  <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <label style={labelStyle}>文章標題</label>
+                      <input type="text" value={articleTitle} onChange={(e) => setArticleTitle(e.target.value)}
+                        placeholder="留白 = 純主題生成" style={inputStyle} disabled={isLoading} />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <label style={labelStyle}>文章內文（Markdown 或純文字）</label>
+                      <textarea value={articleContent} onChange={(e) => setArticleContent(e.target.value)}
+                        placeholder="留白 = 以主題/標題生成腳本" rows={4}
+                        style={{ ...inputStyle, resize: "vertical", fontFamily: "monospace", fontSize: 12 }} disabled={isLoading} />
+                    </div>
+                  </div>
+                </details>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={labelStyle}>文章內文（選用 — 貼入 Markdown 或純文字）</label>
-                <textarea value={articleContent} onChange={(e) => setArticleContent(e.target.value)}
-                  placeholder="留白 = 以主題/標題生成腳本" rows={4}
-                  style={{ ...inputStyle, resize: "vertical", fontFamily: "monospace", fontSize: 12 }} disabled={isLoading} />
               </div>
+            </div>
 
-              {/* §2 場景設定（移入主流程：內容後、生成前 — Q3 由上到下一條順下來）*/}
-              <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "12px 14px", borderRadius: 8, background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)" }}>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-primary)" }}>場景設定</span>
+            {/* ② 影片設定 */}
+            <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 12, overflow: "hidden" }}>
+              <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-subtle)" }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>② 影片設定</span>
+              </div>
+              <div style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
 
                 {/* 素材模式 */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -620,16 +593,16 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                             if (isAiMode) {
                               if (imageModel === "pexels-video" || imageModel === "pexels-all") {
                                 setImageModel(DEFAULT_IMAGE_MODEL);
-                                setCustomScenes(totalScenes); // 切到 AI 模式 → 預設全部 AI
+                                setCustomScenes(totalScenes);
                               }
-                              // else keep current AI model + ratio
                             } else {
                               setImageModel(id);
                             }
                           }}
                           disabled={isBusy}
                           style={{
-                            padding: "6px 12px", borderRadius: 8, border: `2px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
+                            padding: "6px 12px", borderRadius: 8,
+                            border: `2px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
                             background: active ? "var(--accent)" : "var(--bg-canvas)",
                             color: active ? "var(--btn-primary-text)" : "var(--text-secondary)",
                             cursor: isBusy ? "not-allowed" : "pointer",
@@ -647,47 +620,55 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                       ✅ 每場景自動搜尋 Pexels 影片片段（HD MP4）→ EU FFmpeg 拼接 + TTS 配音。費用 $0。
                     </div>
                   )}
-                  {/* AI生圖模式：生圖模型下拉選單 + 視覺風格（兩者只在 AI 生圖模式相關） */}
-                  {imageModel !== "pexels-video" && imageModel !== "pexels-all" && (
-                    <>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>生圖模型</span>
-                        <select value={imageModel} onChange={(e) => setImageModel(e.target.value)} style={inputStyle} disabled={isBusy}>
-                          {Object.entries(IMAGE_RATES)
-                            .filter(([id]) => id !== "pexels-video" && id !== "pexels-all")
-                            .map(([id, r]) => (
-                              <option key={id} value={id}>{r.label} — {r.vendor} (${r.usd}/張)</option>
-                            ))}
-                        </select>
-                      </div>
-                      {/* 視覺風格（重用 tarot/studio 風格目錄）— 套用到所有 Flux 場景，影片視覺連貫 */}
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                        <label style={labelStyle}>🎨 視覺風格 <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>{videoStyle || "不指定（電影感預設）"}</span></label>
-                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
-                          {VIDEO_STYLE_GROUPS.map((g) => (
-                            <button key={g} type="button" onClick={() => setVideoStyleGroup(g)} disabled={isBusy}
-                              style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, cursor: isBusy ? "not-allowed" : "pointer", border: `1px solid ${videoStyleGroup === g ? "var(--accent)" : "var(--border-subtle)"}`, background: videoStyleGroup === g ? "var(--accent)" : "rgba(127,127,127,0.08)", color: videoStyleGroup === g ? "var(--btn-primary-text)" : "var(--text-muted)", transition: "all 0.15s" }}>
-                              {g}
-                            </button>
-                          ))}
-                        </div>
-                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", maxHeight: 120, overflowY: "auto" }}>
-                          {VIDEO_STYLE_CATALOG.filter((item) => item.group === videoStyleGroup).map((item) => {
-                            const active = videoStyle === item.zh;
-                            return (
-                              <button key={item.zh} type="button" onClick={() => setVideoStyle(active ? "" : item.zh)} disabled={isBusy}
-                                style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, cursor: isBusy ? "not-allowed" : "pointer", border: `1px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`, background: active ? "var(--accent)" : "rgba(127,127,127,0.08)", color: active ? "var(--btn-primary-text)" : "var(--text-muted)", transition: "all 0.15s" }}>
-                                {item.zh}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </>
-                  )}
                 </div>
 
-                {/* 目標時長（僅 pexels-video 和 pexels-all 模式顯示） */}
+                {/* AI mode: model picker */}
+                {imageModel !== "pexels-video" && imageModel !== "pexels-all" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>生圖模型</span>
+                    <select value={imageModel} onChange={(e) => setImageModel(e.target.value)} style={inputStyle} disabled={isBusy}>
+                      {Object.entries(IMAGE_RATES)
+                        .filter(([id]) => id !== "pexels-video" && id !== "pexels-all")
+                        .map(([id, r]) => (
+                          <option key={id} value={id}>{r.label} — {r.vendor} (${r.usd}/張)</option>
+                        ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* AI mode: visual style (collapsed by default) */}
+                {imageModel !== "pexels-video" && imageModel !== "pexels-all" && (
+                  <details style={{ borderRadius: 8, border: "1px solid var(--border-subtle)", overflow: "hidden" }}>
+                    <summary style={{ padding: "8px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", background: "var(--bg-subtle)", listStyle: "none", display: "flex", alignItems: "center", gap: 6 }}>
+                      🎨 視覺風格{videoStyle
+                        ? <span style={{ color: "var(--accent)", fontWeight: 400 }}>&nbsp;— {videoStyle}</span>
+                        : <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>&nbsp;（不指定 = 電影感預設）</span>}
+                    </summary>
+                    <div style={{ padding: "12px 14px" }}>
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
+                        {VIDEO_STYLE_GROUPS.map((g) => (
+                          <button key={g} type="button" onClick={() => setVideoStyleGroup(g)} disabled={isBusy}
+                            style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, cursor: isBusy ? "not-allowed" : "pointer", border: `1px solid ${videoStyleGroup === g ? "var(--accent)" : "var(--border-subtle)"}`, background: videoStyleGroup === g ? "var(--accent)" : "rgba(127,127,127,0.08)", color: videoStyleGroup === g ? "var(--btn-primary-text)" : "var(--text-muted)", transition: "all 0.15s" }}>
+                            {g}
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", maxHeight: 120, overflowY: "auto" }}>
+                        {VIDEO_STYLE_CATALOG.filter((item) => item.group === videoStyleGroup).map((item) => {
+                          const active = videoStyle === item.zh;
+                          return (
+                            <button key={item.zh} type="button" onClick={() => setVideoStyle(active ? "" : item.zh)} disabled={isBusy}
+                              style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, cursor: isBusy ? "not-allowed" : "pointer", border: `1px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`, background: active ? "var(--accent)" : "rgba(127,127,127,0.08)", color: active ? "var(--btn-primary-text)" : "var(--text-muted)", transition: "all 0.15s" }}>
+                              {item.zh}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </details>
+                )}
+
+                {/* Pexels: target duration */}
                 {(imageModel === "pexels-video" || imageModel === "pexels-all") && providedScenes.length === 0 && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>目標時長</span>
@@ -695,8 +676,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                       {([1, 3, 5] as const).map((m) => {
                         const sceneInfo = m >= 4 ? "10場景 × 160字" : m >= 2 ? "8場景 × 120字" : "6場景 × 50字";
                         return (
-                          <button key={m} type="button"
-                            onClick={() => setTargetMinutes(m)} disabled={isBusy}
+                          <button key={m} type="button" onClick={() => setTargetMinutes(m)} disabled={isBusy}
                             style={{
                               flex: 1, padding: "7px 0", borderRadius: 8,
                               border: `2px solid ${targetMinutes === m ? "var(--accent)" : "var(--border-subtle)"}`,
@@ -715,7 +695,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                   </div>
                 )}
 
-                {/* AI 圖模式的場景滑桿（pexels-video 模式隱藏） */}
+                {/* AI: scene sliders */}
                 {imageModel !== "pexels-video" && imageModel !== "pexels-all" && providedScenes.length === 0 && (
                   <>
                     <KnobRow label="場景總數" hint={`${totalScenes} 場`} min={1} max={20} step={1} value={totalScenes} onChange={handleTotalChange} />
@@ -731,7 +711,8 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                   <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.6 }}>場景數由前製腳本決定（{providedScenes.length} 場），每場依「畫面」生 AI 圖。</div>
                 )}
 
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {/* Voice */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>配音模型</span>
                   <div style={{ display: "flex", gap: 4 }}>
                     {(["edge", "openai"] as const).map((prov) => {
@@ -769,7 +750,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                   )}
                 </div>
 
-                {/* 輸出比例（每比例各自原生生成，非裁同一張、無黑邊） */}
+                {/* Output ratios */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>輸出比例 <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>（各比例獨立原生生成）</span></span>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -780,7 +761,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                         <button key={fmt} type="button" disabled={isBusy}
                           onClick={() => setSelectedFormats((prev) => {
                             const next = new Set(prev);
-                            if (next.has(fmt)) { if (next.size > 1) next.delete(fmt); } // 至少留一個
+                            if (next.has(fmt)) { if (next.size > 1) next.delete(fmt); }
                             else next.add(fmt);
                             return next;
                           })}
@@ -812,146 +793,236 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                   </div>
                   {orderedFormats.length > 1 && (
                     <span style={{ fontSize: 11, color: "#92400e", background: "#fef3c7", padding: "4px 8px", borderRadius: 6, lineHeight: 1.5 }}>
-                      ⚠️ {orderedFormats.length} 個比例 = 自訂 AI 圖成本與生成時間約 ×{orderedFormats.length}（每比例各自原生生成）
+                      ⚠️ {orderedFormats.length} 個比例 = 成本與時間約 ×{orderedFormats.length}（每比例各自原生生成）
                     </span>
                   )}
                 </div>
-              </div>
 
-              {/* Draft editor (replaces buttons when draft is ready) */}
-              {draftReady ? (
-                <DraftEditor
-                  scenes={draftScenes}
-                  title={draftTitle}
-                  onChangeScene={(id, narration) =>
-                    setDraftScenes((prev) => prev.map((s) => s.id === id ? { ...s, narration } : s))
-                  }
-                  onBack={() => { isRenderingRef.current = false; setDraftScenes([]); setGenError(""); setGenStatus("idle"); }}
-                  onRender={handleRenderDraft}
-                  onRegenerate={handleRegenerateImage}
-                  onUpload={handleUploadAsset}
-                  regenIds={regenIds}
-                  disabled={isBusy}
-                  errorMsg={genError || undefined}
-                />
-              ) : (
-                <button onClick={handleGenerateDraft} disabled={!canGenerate}
-                  style={{
-                    padding: "11px 20px", borderRadius: 8, border: "none",
-                    cursor: canGenerate ? "pointer" : "not-allowed",
-                    background: canGenerate ? "var(--accent)" : "var(--border-subtle)",
-                    color: canGenerate ? "var(--btn-primary-text)" : "var(--text-muted)",
-                    fontSize: 14, fontWeight: 700, transition: "background 0.15s",
-                  }}>
-                  {draftLoading ? "⏳ 生成草稿中…" : "📋 生成草稿"}
-                </button>
-              )}
-
-              {/* Draft loading spinner */}
-              {draftLoading && (
-                <div style={{ background: "var(--ai-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 16px" }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", marginBottom: 6 }}>🔄 生成草稿中…</div>
-                  <div style={{ fontSize: 12, color: "var(--accent)" }}>Claude 生成腳本 + Flux 生成圖片（約 30–60 秒）</div>
-                </div>
-              )}
-
-              {/* Progress tracker (render phase) */}
-              {isLoading && <ProgressTracker step={genStep} />}
-
-              {/* Error */}
-              {genStatus === "error" && (
-                <div style={{ background: "var(--badge-red-bg)", border: "1px solid var(--red)", borderRadius: 8, padding: "12px 14px" }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--red)", marginBottom: 4 }}>失敗</div>
-                  <div style={{ fontSize: 12.5, color: "var(--badge-red-text)" }}>{genError}</div>
-                  {genError.toLowerCase().includes("video-service") && (
-                    <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--badge-red-text)" }}>提示：EU video-service 需正常運行（健康狀態請查 Repair Center）。</div>
+                {/* Intro toggle */}
+                <div style={{ padding: "10px 12px", borderRadius: 8, background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                    <input type="checkbox" checked={introEnabled} onChange={e => setIntroEnabled(e.target.checked)} disabled={isLoading} />
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>標題動畫（片頭黑底 + fade-in 標題）</span>
+                  </label>
+                  {introEnabled && (
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+                      <span style={{ fontSize: 11.5, color: "var(--text-muted)", whiteSpace: "nowrap" }}>時長 (秒)</span>
+                      <input type="range" min={2} max={6} step={0.5} value={introDuration}
+                        onChange={e => setIntroDuration(Number(e.target.value))}
+                        style={{ flex: 1, accentColor: "var(--accent)" }} disabled={isLoading} />
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)", minWidth: 28 }}>{introDuration}s</span>
+                    </div>
                   )}
                 </div>
-              )}
 
-              {/* Success result */}
-              {genStatus === "done" && genResult && (
-                <ResultPanel result={genResult} onClose={() => { isRenderingRef.current = false; setGenStatus("idle"); setDraftScenes([]); }} />
-              )}
+              </div>
             </div>
-          </Card>
 
-          {/* §5 — History */}
-          <Card
-            title="⑤ 最近生成記錄"
-            action={<button onClick={loadHistory} disabled={historyLoading}
+            {/* ③ 費用預覽 + CTA (hidden when draft editor is active) */}
+            {!draftReady && (
+              <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-subtle)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>③ 費用預覽</span>
+                  <button type="button" onClick={() => setStudioTab("info")}
+                    style={{ fontSize: 11, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
+                    查完整明細 →
+                  </button>
+                </div>
+                <div style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "var(--bg-subtle)", borderRadius: 8 }}>
+                    <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>每支影片成本</span>
+                    <span style={{ fontSize: 22, fontWeight: 800, color: "var(--accent)" }}>{NT(costBreakdown.totalUsd)}</span>
+                  </div>
+                  <button onClick={handleGenerateDraft} disabled={!canGenerate}
+                    style={{
+                      padding: "13px 20px", borderRadius: 8, border: "none",
+                      cursor: canGenerate ? "pointer" : "not-allowed",
+                      background: canGenerate ? "var(--accent)" : "var(--border-subtle)",
+                      color: canGenerate ? "var(--btn-primary-text)" : "var(--text-muted)",
+                      fontSize: 15, fontWeight: 700, transition: "background 0.15s",
+                    }}>
+                    {draftLoading ? "⏳ 生成草稿中…" : "📋 生成草稿"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Draft editor */}
+            {draftReady && (
+              <DraftEditor
+                scenes={draftScenes}
+                title={draftTitle}
+                onChangeScene={(id, narration) =>
+                  setDraftScenes((prev) => prev.map((s) => s.id === id ? { ...s, narration } : s))
+                }
+                onBack={() => { isRenderingRef.current = false; setDraftScenes([]); setGenError(""); setGenStatus("idle"); }}
+                onRender={handleRenderDraft}
+                onRegenerate={handleRegenerateImage}
+                onUpload={handleUploadAsset}
+                regenIds={regenIds}
+                disabled={isBusy}
+                errorMsg={genError || undefined}
+              />
+            )}
+
+            {/* Draft loading */}
+            {draftLoading && (
+              <div style={{ background: "var(--ai-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 16px" }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", marginBottom: 6 }}>🔄 生成草稿中…</div>
+                <div style={{ fontSize: 12, color: "var(--accent)" }}>Claude 生成腳本 + Flux 生成圖片（約 30–60 秒）</div>
+              </div>
+            )}
+
+            {/* Progress tracker (render phase) */}
+            {isLoading && <ProgressTracker step={genStep} />}
+
+            {/* Error */}
+            {genStatus === "error" && (
+              <div style={{ background: "var(--badge-red-bg)", border: "1px solid var(--red)", borderRadius: 8, padding: "12px 14px" }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--red)", marginBottom: 4 }}>失敗</div>
+                <div style={{ fontSize: 12.5, color: "var(--badge-red-text)" }}>{genError}</div>
+                {genError.toLowerCase().includes("video-service") && (
+                  <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--badge-red-text)" }}>提示：EU video-service 需正常運行（健康狀態請查 Repair Center）。</div>
+                )}
+              </div>
+            )}
+
+            {/* Success result */}
+            {genStatus === "done" && genResult && (
+              <ResultPanel result={genResult} onClose={() => { isRenderingRef.current = false; setGenStatus("idle"); setDraftScenes([]); }} />
+            )}
+
+          </div>
+        </div>
+      )}
+
+      {/* ── History tab ── */}
+      {studioTab === "history" && (
+        <div style={{ padding: "24px 28px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>生成記錄</span>
+            <button onClick={loadHistory} disabled={historyLoading}
               style={{ fontSize: 11.5, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
               {historyLoading ? "載入中…" : "↻ 重新整理"}
-            </button>}
-          >
-            {history.length === 0 ? (
-              <div style={{ fontSize: 12.5, color: "var(--text-muted)", padding: "8px 0" }}>
-                {historyLoading ? "載入中…" : "尚無影片記錄。生成第一支影片後會出現在這裡。"}
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {history.length > 0 && (
-                  <div className="flex items-center gap-3 mb-3">
-                    <label className="flex items-center gap-2 text-sm text-neutral-400 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedVideos.size === history.length && history.length > 0}
-                        onChange={e => {
-                          if (e.target.checked) {
-                            setSelectedVideos(new Set(history.map((v) => v.id)));
-                          } else {
-                            setSelectedVideos(new Set());
-                          }
-                        }}
-                      />
-                      全選
-                    </label>
-                    {selectedVideos.size > 0 && (
-                      <button
-                        onClick={deleteSelected}
-                        disabled={deletingVideos}
-                        className="px-3 py-1 rounded text-sm bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
-                      >
-                        {deletingVideos ? "刪除中..." : `刪除 ${selectedVideos.size} 個`}
-                      </button>
-                    )}
-                    <span className="text-xs text-neutral-500 ml-auto">
-                      {selectedVideos.size > 0 ? `已選 ${selectedVideos.size}` : `共 ${history.length} 個`}
-                    </span>
-                  </div>
-                )}
-                {history.map((item) => (
-                  <HistoryRow
-                    key={item.id}
-                    item={item}
-                    active={selectedVideo?.id === item.id}
-                    onSelect={() => setSelectedVideo(selectedVideo?.id === item.id ? null : item)}
-                    checked={selectedVideos.has(item.id)}
-                    onCheck={e => {
-                      const next = new Set(selectedVideos);
-                      if (e.target.checked) next.add(item.id);
-                      else next.delete(item.id);
-                      setSelectedVideos(next);
+            </button>
+          </div>
+          {history.length === 0 ? (
+            <div style={{ fontSize: 12.5, color: "var(--text-muted)", padding: "8px 0" }}>
+              {historyLoading ? "載入中…" : "尚無影片記錄。生成第一支影片後會出現在這裡。"}
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div className="flex items-center gap-3 mb-3">
+                <label className="flex items-center gap-2 text-sm text-neutral-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedVideos.size === history.length && history.length > 0}
+                    onChange={e => {
+                      if (e.target.checked) {
+                        setSelectedVideos(new Set(history.map((v) => v.id)));
+                      } else {
+                        setSelectedVideos(new Set());
+                      }
                     }}
+                  />
+                  全選共 {history.length} 個
+                </label>
+                {selectedVideos.size > 0 && (
+                  <button
+                    onClick={deleteSelected}
+                    disabled={deletingVideos}
+                    className="px-3 py-1 rounded text-sm bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+                  >
+                    {deletingVideos ? "刪除中..." : `刪除 ${selectedVideos.size} 個`}
+                  </button>
+                )}
+                {selectedVideos.size > 0 && (
+                  <span className="text-xs text-neutral-500 ml-auto">已選 {selectedVideos.size}</span>
+                )}
+              </div>
+              {history.map((item) => (
+                <HistoryRow
+                  key={item.id}
+                  item={item}
+                  active={selectedVideo?.id === item.id}
+                  onSelect={() => setSelectedVideo(selectedVideo?.id === item.id ? null : item)}
+                  checked={selectedVideos.has(item.id)}
+                  onCheck={e => {
+                    const next = new Set(selectedVideos);
+                    if (e.target.checked) next.add(item.id);
+                    else next.delete(item.id);
+                    setSelectedVideos(next);
+                  }}
+                />
+              ))}
+            </div>
+          )}
+          {selectedVideo && (
+            <div style={{ marginTop: 12, borderTop: "1px solid var(--border-subtle)", paddingTop: 12 }}>
+              <VideoViewer
+                title={selectedVideo.title}
+                outputs={selectedVideo.formats}
+                primaryUrl={selectedVideo.object_url}
+                onClose={() => setSelectedVideo(null)}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Info tab ── */}
+      {studioTab === "info" && (
+        <div style={{ padding: "24px 28px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(340px, 480px) 1fr", gap: 24, alignItems: "start" }}>
+            <Card title="生成流程" subtitle="lib/content/video/video-cost.ts VIDEO_PIPELINE_STEPS 驅動">
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {VIDEO_PIPELINE_STEPS.map((step, idx) => (
+                  <FlowCard
+                    key={step.id}
+                    step={step}
+                    index={idx}
+                    costLine={costBreakdown.lines.find((l) => l.id === step.id)}
+                    activeStep={isLoading ? genStep : undefined}
                   />
                 ))}
               </div>
-            )}
-
-            {/* Expanded video viewer */}
-            {selectedVideo && (
-              <div style={{ marginTop: 12, borderTop: "1px solid var(--border-subtle)", paddingTop: 12 }}>
-                <VideoViewer
-                  title={selectedVideo.title}
-                  outputs={selectedVideo.formats}
-                  primaryUrl={selectedVideo.object_url}
-                  onClose={() => setSelectedVideo(null)}
-                />
+            </Card>
+            <Card title="成本明細">
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+                <thead>
+                  <tr style={{ color: "var(--text-muted)", textAlign: "left" }}>
+                    <th style={{ padding: "6px 0", fontWeight: 600 }}>步驟</th>
+                    <th style={{ padding: "6px 8px", fontWeight: 600, textAlign: "right" }}>USD</th>
+                    <th style={{ padding: "6px 8px", fontWeight: 600, textAlign: "right" }}>×</th>
+                    <th style={{ padding: "6px 0", fontWeight: 600, textAlign: "right" }}>NT$</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {costBreakdown.lines.map((line) => (
+                    <tr key={line.id} style={{ borderTop: "1px solid var(--border-subtle)" }}>
+                      <td style={{ padding: "7px 0", color: "var(--text-primary)" }}>
+                        <span style={{ marginRight: 6 }}>{line.icon}</span>{line.label}
+                        {line.free && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: "var(--badge-green-text)", background: "var(--badge-green-bg)", padding: "1px 5px", borderRadius: 4 }}>免費</span>}
+                      </td>
+                      <td style={{ padding: "7px 8px", textAlign: "right", color: "var(--text-secondary)", fontFamily: "monospace", fontSize: 11.5 }}>{line.free ? "—" : USD(line.unitUsd)}</td>
+                      <td style={{ padding: "7px 8px", textAlign: "right", color: "var(--text-secondary)" }}>{line.count}</td>
+                      <td style={{ padding: "7px 0", textAlign: "right", fontWeight: 600, color: line.free ? "var(--text-muted)" : "var(--text-primary)" }}>{line.free ? "—" : NT(line.totalUsd)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{ marginTop: 12, borderTop: "2px solid var(--border-subtle)", paddingTop: 12, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>每支合計</span>
+                  <span style={{ fontSize: 11.5, color: "var(--text-secondary)", marginLeft: 8 }}>({USD(costBreakdown.totalUsd)})</span>
+                </div>
+                <span style={{ fontSize: 22, fontWeight: 800, color: "var(--accent)" }}>{NT(costBreakdown.totalUsd)}</span>
               </div>
-            )}
-          </Card>
+            </Card>
+          </div>
         </div>
-      </div>
+      )}
+
     </div>
   );
 }
@@ -1119,7 +1190,7 @@ function ProgressTracker({ step }: { step: string }) {
         })}
       </div>
       <div style={{ marginTop: 10, fontSize: 11, color: "var(--accent)" }}>
-        可以關閉頁面，完成後影片會出現在下方「最近生成記錄」。
+        可以關閉頁面，完成後影片會出現在「📋 生成記錄」。
       </div>
     </div>
   );
