@@ -732,13 +732,35 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>配音模型</span>
-                  <select value={voiceModelId} onChange={(e) => setVoiceModelId(e.target.value)} style={inputStyle}>
-                    {VOICE_MODELS.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.label}{v.note ? ` — ${v.note}` : ""} [{v.lang}] {v.badge}
-                      </option>
-                    ))}
-                  </select>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {(["edge", "openai"] as const).map((prov) => {
+                      const active = voiceModelId.startsWith(prov + ":");
+                      const firstVoice = VOICE_MODELS.find((v) => v.id.startsWith(prov + ":"))?.id ?? voiceModelId;
+                      return (
+                        <button key={prov} type="button" onClick={() => setVoiceModelId(firstVoice)}
+                          style={{ padding: "2px 10px", borderRadius: 20, fontSize: 11, cursor: "pointer",
+                            border: `1px solid ${active ? "var(--severity-low)" : "var(--ai-bg)"}`,
+                            background: active ? "var(--severity-low)" : "rgba(255,255,255,0.6)",
+                            color: active ? "var(--btn-primary-text)" : "var(--text-muted)" }}>
+                          {prov === "edge" ? "Edge 免費" : "OpenAI"}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                    {VOICE_MODELS.filter((v) => v.id.startsWith(voiceModelId.startsWith("openai:") ? "openai:" : "edge:")).map((v) => {
+                      const active = voiceModelId === v.id;
+                      return (
+                        <button key={v.id} type="button" onClick={() => setVoiceModelId(v.id)}
+                          style={{ padding: "2px 9px", borderRadius: 20, fontSize: 11, cursor: "pointer",
+                            border: `1px solid ${active ? "var(--severity-low)" : "var(--ai-bg)"}`,
+                            background: active ? "var(--severity-low)" : "rgba(255,255,255,0.6)",
+                            color: active ? "var(--btn-primary-text)" : "var(--text-muted)" }}>
+                          {v.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                   {voiceModelId.startsWith("openai:") && (
                     <div style={{ fontSize: 11, color: "#92400e", background: "#fef3c7", padding: "4px 8px", borderRadius: 6, lineHeight: 1.5 }}>
                       ⚠️ OpenAI TTS 需在伺服器設定 OPENAI_API_KEY，否則自動降版 Edge TTS

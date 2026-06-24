@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { STYLE_PRESETS } from "../tarot/cards";
 // SSOT for source→group classification — shared with the publish picker + /api/tools/designs filter.
 import { assetToolGroup as toolGroup } from "../../../lib/studio/asset-group";
@@ -377,6 +377,20 @@ export default function DesignsGallery() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [openMenuId]);
+
+  /* hide filter panel when scrolling down, reveal on scroll up */
+  const [filterHidden, setFilterHidden] = useState(false);
+  const lastScrollY = useRef(0);
+  useEffect(() => {
+    const handle = () => {
+      const y = window.scrollY;
+      if (y > lastScrollY.current && y > 120) setFilterHidden(true);
+      else if (y < lastScrollY.current) setFilterHidden(false);
+      lastScrollY.current = y;
+    };
+    window.addEventListener("scroll", handle, { passive: true });
+    return () => window.removeEventListener("scroll", handle);
+  }, []);
 
   const copyUrl = useCallback(async (asset: DesignAsset) => {
     if (!asset.object_url) return;
@@ -1011,7 +1025,7 @@ export default function DesignsGallery() {
         {TabBar}
 
         {/* ── Video filter panel ── */}
-        <div className="designs-filter-panel">
+        <div className={`designs-filter-panel${filterHidden ? " designs-filter-panel--hidden" : ""}`}>
           <div className="designs-filter-row">
             <span className="designs-filter-label">時間</span>
             {(["all", "today", "week", "month"] as TimeRange[]).map((k) => {
@@ -1129,7 +1143,7 @@ export default function DesignsGallery() {
     <div className="designs-page">
       {TabBar}
       {/* ── Filter panel ─────────────────────────────────────────── */}
-      <div className="designs-filter-panel">
+      <div className={`designs-filter-panel${filterHidden ? " designs-filter-panel--hidden" : ""}`}>
         <Chips label="模型" options={modelOptions} value={filterModel} onChange={setFilterModel} showEmpty />
         {hasProducts && (
           <Chips label="產品" options={productOptions} value={filterProduct} onChange={setFilterProduct} />

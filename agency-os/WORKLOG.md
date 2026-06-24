@@ -4,6 +4,27 @@
 
 ## 2026-06-24
 
+### feat(ui): ContentStudio 素材模式↑視覺風格 順序修正 + 配音模型 chip UI（兩個工具統一）
+
+[任務理解] ① ContentStudio 的「素材模式」應在「視覺風格」上方（與 VideoStudio 積木順序一致）② 配音模型從 `<select>` 改 2-level chip UI（點 Edge→4 個聲音；點 OpenAI→5 個聲音），兩個工具同步套用
+
+[現況分析] ContentStudio ai-video block: 視覺風格 > 素材模式（錯）；VideoStudio: 素材模式 > 視覺風格（正確）。兩個工具的配音模型均為 `<select>` dropdown，與視覺風格積木 UI 風格不一致。VOICE_MODELS/VOICE_MODELS_VIDEO 均為 4 Edge + 5 OpenAI 共 9 voices，prefix 恆為 `edge:` / `openai:`。
+
+[已修改]
+- ContentStudio.tsx: 移除 視覺風格 block 原位置（素材模式前）；插入至素材模式後、場景設定前
+- ContentStudio.tsx: 配音模型 `<select>` → 2-level chip（videoVoiceId 狀態；OpenAI 警告 banner 新增，原本缺少）
+- VideoStudio.tsx: 配音模型 `<select>` → 2-level chip（voiceModelId 狀態；OpenAI 警告 banner 保留）
+
+[驗證結果 — R0 四動作]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~15000 -- 0 errors
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n -- empty-filter edge case Verified Clean（filter 永遠命中 ≥4 chip）；JSX balance clean；OpenAI warning banner ContentStudio 新增（VideoStudio 已有）；backend contract parseVoiceModel 不受影響
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=videoVoiceId\|voiceModelId\|VOICE_MODELS_VIDEO | hits=0 -- 兩個 symbol 僅在各自工具檔案內使用，無其他消費者
+- WORKLOG: 本條目
+
+[剩餘風險] 無
+
+[rollback] git revert ContentStudio.tsx VideoStudio.tsx
+
 ### fix(ui): CanvasEditor 匯出按鍵移至右側工具欄 + 清除 exportPxLabel 死狀態
 
 [任務理解] 使用者要求：① PNG下載/WebP下載/存入 My Designs 全部移到右側工具欄；② PNG 按鍵不顯示尺寸標籤（只有 WebP 有 150→200KB 限制）

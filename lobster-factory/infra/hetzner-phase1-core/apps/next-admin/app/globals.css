@@ -2,6 +2,7 @@
 
 :root {
   --sidebar-w: 248px;
+  --topbar-h: 53px;
   /* Light sidebar (2026-06-05): light surface + dark text, indigo color-block on hover/active. */
   --sidebar-bg: #f7f9fc;
   --sidebar-border: #e6eaf4;
@@ -2091,6 +2092,15 @@ pre {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  position: sticky;
+  top: var(--topbar-h, 53px);
+  z-index: 9;
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease;
+}
+.designs-filter-panel--hidden {
+  transform: translateY(calc(-100% - 24px));
+  opacity: 0;
+  pointer-events: none;
 }
 
 .designs-filter-row {

@@ -2952,37 +2952,6 @@ export default function ContentStudio() {
               {/* AI 影片設定（選 ai-video 時展開）*/}
               {form.media.youtubeSource === "ai-video" && (
                 <div style={{ marginTop: "8px", padding: "12px 14px", borderRadius: "8px", border: "1px solid var(--ai-bg)", background: "var(--ai-bg)", display: "flex", flexDirection: "column", gap: "12px" }}>
-                  {/* 視覺風格 */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--ai-text)" }}>
-                      🎨 視覺風格 <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>{videoStyleZh || "不指定（電影感預設）"}</span>
-                    </span>
-                    <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
-                      {VIDEO_STYLE_GROUPS.map((g) => (
-                        <button key={g} type="button" onClick={() => setVideoStyleGroup(g)}
-                          style={{ padding: "2px 10px", borderRadius: 20, fontSize: "11px", cursor: "pointer",
-                            border: `1px solid ${videoStyleGroup === g ? "var(--severity-low)" : "var(--ai-bg)"}`,
-                            background: videoStyleGroup === g ? "var(--severity-low)" : "rgba(255,255,255,0.6)",
-                            color: videoStyleGroup === g ? "var(--btn-primary-text)" : "var(--text-muted)" }}>
-                          {g}
-                        </button>
-                      ))}
-                    </div>
-                    <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", maxHeight: "100px", overflowY: "auto" }}>
-                      {VIDEO_STYLE_CATALOG.filter((item) => item.group === videoStyleGroup).map((item) => {
-                        const active = videoStyleZh === item.zh;
-                        return (
-                          <button key={item.zh} type="button" onClick={() => setVideoStyleZh(active ? "" : item.zh)}
-                            style={{ padding: "2px 9px", borderRadius: 20, fontSize: "11px", cursor: "pointer",
-                              border: `1px solid ${active ? "var(--severity-low)" : "var(--ai-bg)"}`,
-                              background: active ? "var(--severity-low)" : "rgba(255,255,255,0.6)",
-                              color: active ? "var(--btn-primary-text)" : "var(--text-muted)" }}>
-                            {item.zh}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
                   {/* 素材模式 */}
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                     <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--ai-text)" }}>素材模式</span>
@@ -3034,6 +3003,37 @@ export default function ContentStudio() {
                       </select>
                     )}
                   </div>
+                  {/* 視覺風格 */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--ai-text)" }}>
+                      🎨 視覺風格 <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>{videoStyleZh || "不指定（電影感預設）"}</span>
+                    </span>
+                    <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                      {VIDEO_STYLE_GROUPS.map((g) => (
+                        <button key={g} type="button" onClick={() => setVideoStyleGroup(g)}
+                          style={{ padding: "2px 10px", borderRadius: 20, fontSize: "11px", cursor: "pointer",
+                            border: `1px solid ${videoStyleGroup === g ? "var(--severity-low)" : "var(--ai-bg)"}`,
+                            background: videoStyleGroup === g ? "var(--severity-low)" : "rgba(255,255,255,0.6)",
+                            color: videoStyleGroup === g ? "var(--btn-primary-text)" : "var(--text-muted)" }}>
+                          {g}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", maxHeight: "100px", overflowY: "auto" }}>
+                      {VIDEO_STYLE_CATALOG.filter((item) => item.group === videoStyleGroup).map((item) => {
+                        const active = videoStyleZh === item.zh;
+                        return (
+                          <button key={item.zh} type="button" onClick={() => setVideoStyleZh(active ? "" : item.zh)}
+                            style={{ padding: "2px 9px", borderRadius: 20, fontSize: "11px", cursor: "pointer",
+                              border: `1px solid ${active ? "var(--severity-low)" : "var(--ai-bg)"}`,
+                              background: active ? "var(--severity-low)" : "rgba(255,255,255,0.6)",
+                              color: active ? "var(--btn-primary-text)" : "var(--text-muted)" }}>
+                            {item.zh}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                   {/* 場景設定 */}
                   <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "10px 12px", borderRadius: "6px", background: "rgba(255,255,255,0.6)", border: "1px solid var(--ai-bg)" }}>
                     <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--ai-text)" }}>場景設定</span>
@@ -3060,12 +3060,40 @@ export default function ContentStudio() {
                     )}
                     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                       <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)" }}>配音模型</span>
-                      <select value={videoVoiceId} onChange={(e) => setVideoVoiceId(e.target.value)}
-                        style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid var(--ai-bg)", fontSize: "12px", background: "var(--card-bg)", color: "var(--text-primary)", width: "100%" }}>
-                        {VOICE_MODELS_VIDEO.map((v) => (
-                          <option key={v.id} value={v.id}>{v.label} [{v.lang}] {v.badge}</option>
-                        ))}
-                      </select>
+                      <div style={{ display: "flex", gap: "4px" }}>
+                        {(["edge", "openai"] as const).map((prov) => {
+                          const active = videoVoiceId.startsWith(prov + ":");
+                          const firstVoice = VOICE_MODELS_VIDEO.find((v) => v.id.startsWith(prov + ":"))?.id ?? videoVoiceId;
+                          return (
+                            <button key={prov} type="button" onClick={() => setVideoVoiceId(firstVoice)}
+                              style={{ padding: "2px 10px", borderRadius: 20, fontSize: "11px", cursor: "pointer",
+                                border: `1px solid ${active ? "var(--severity-low)" : "var(--ai-bg)"}`,
+                                background: active ? "var(--severity-low)" : "rgba(255,255,255,0.6)",
+                                color: active ? "var(--btn-primary-text)" : "var(--text-muted)" }}>
+                              {prov === "edge" ? "Edge 免費" : "OpenAI"}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                        {VOICE_MODELS_VIDEO.filter((v) => v.id.startsWith(videoVoiceId.startsWith("openai:") ? "openai:" : "edge:")).map((v) => {
+                          const active = videoVoiceId === v.id;
+                          return (
+                            <button key={v.id} type="button" onClick={() => setVideoVoiceId(v.id)}
+                              style={{ padding: "2px 9px", borderRadius: 20, fontSize: "11px", cursor: "pointer",
+                                border: `1px solid ${active ? "var(--severity-low)" : "var(--ai-bg)"}`,
+                                background: active ? "var(--severity-low)" : "rgba(255,255,255,0.6)",
+                                color: active ? "var(--btn-primary-text)" : "var(--text-muted)" }}>
+                              {v.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {videoVoiceId.startsWith("openai:") && (
+                        <div style={{ fontSize: "11px", color: "#92400e", background: "#fef3c7", padding: "4px 8px", borderRadius: 6, lineHeight: 1.5 }}>
+                          ⚠️ OpenAI TTS 需在伺服器設定 OPENAI_API_KEY，否則自動降版 Edge TTS
+                        </div>
+                      )}
                     </div>
                     {/* 輸出比例（每比例各自原生生成、無黑邊） */}
                     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
