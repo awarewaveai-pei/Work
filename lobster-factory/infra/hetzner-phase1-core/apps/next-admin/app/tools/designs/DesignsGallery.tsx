@@ -1058,10 +1058,9 @@ export default function DesignsGallery() {
               重新整理
             </button>
           </div>
-        </div>
 
-        {/* ── Video toolbar ── */}
-        <div className={`designs-toolbar${filterHidden ? " designs-toolbar--hidden" : ""}`}>
+          {/* ── Video toolbar ── */}
+          <div className="designs-toolbar">
           <span className="designs-toolbar-count">
             {videoState === "ready" ? `顯示 ${visibleVideos.length} / ${videoAssets.length} 部影片` : ""}
           </span>
@@ -1100,6 +1099,7 @@ export default function DesignsGallery() {
               {videoBulkDeleting ? "刪除中…" : `刪除 ${videoVisibleSelectedCount} 部`}
             </button>
           )}
+          </div>
         </div>
 
         {videoContent()}
@@ -1188,7 +1188,6 @@ export default function DesignsGallery() {
             重新整理
           </button>
         </div>
-      </div>
 
       {/* ── Bulk action toolbar ───────────────────────────────────── */}
       {(() => {
@@ -1197,7 +1196,7 @@ export default function DesignsGallery() {
         const downloadableSelected = selectedVisible.filter((a) => a.object_url).length;
         const allVisibleSelected = visibleSelected === visible.length && visible.length > 0;
         return (
-          <div className={`designs-toolbar${filterHidden ? " designs-toolbar--hidden" : ""}`}>
+          <div className="designs-toolbar">
             <span className="designs-toolbar-count">顯示 {visible.length} / {assets.length} 張</span>
             <span className="designs-filter-spacer" />
             <button
@@ -1233,6 +1232,7 @@ export default function DesignsGallery() {
           </div>
         );
       })()}
+      </div>
 
       {/* ── Per-tab empty hint ───────────────────────────────────── */}
       {visible.length === 0 && (
