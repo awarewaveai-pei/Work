@@ -157,15 +157,20 @@ export async function deleteDesignObject(
  */
 export async function deleteVideoObjects(
   objectKey: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; deleted: number } | { ok: false; error: string }> {
   const apiToken = process.env.R2_API_TOKEN;
   const accountId = process.env.R2_ACCOUNT_ID;
   if (!apiToken || !accountId) return { ok: false, error: "r2_not_configured" };
 
-  // object_key for videos is `video/<dir>/<format>.mp4` — extract the dir segment.
+  // object_key for videos is `video/<dir>/<format>.mp4`.
+  // videoObjectKey() derives the key via URL.pathname which percent-encodes CJK chars
+  // (e.g. 龍蝦 → %E9%BE%8D%8D). Decode before building the LIST prefix so that
+  // URLSearchParams.set() encodes the raw UTF-8 once — matching Cloudflare's raw key.
+  // Double-encoding (%25E9…) would cause LIST to return 0 results and silently succeed
+  // while leaving the files in the bucket (orphan → reconcile re-inserts every ~15 min).
   const m = /^video\/(.+)\/[^/]+\.mp4$/.exec(objectKey);
   if (!m) return { ok: false, error: "invalid_video_object_key" };
-  const dir = m[1];
+  const dir = decodeURIComponent(m[1]);
 
   const bucket = process.env.R2_VIDEO_BUCKET ?? "lobster-videos";
   const base = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucket}`;
@@ -192,6 +197,7 @@ export async function deleteVideoObjects(
   } while (cursor);
 
   // 2) Delete each object found (idempotent — 404 treated as success).
+  let deleted = 0;
   for (const key of keys) {
     try {
       const res = await fetch(
@@ -201,11 +207,12 @@ export async function deleteVideoObjects(
       if (!res.ok && res.status !== 404) {
         return { ok: false, error: `r2_video_delete_failed_${res.status}` };
       }
+      deleted++;
     } catch {
       return { ok: false, error: "r2_video_network_error" };
     }
   }
-  return { ok: true };
+  return { ok: true, deleted };
 }
 
 /**

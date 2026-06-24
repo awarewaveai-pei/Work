@@ -34,12 +34,21 @@ export async function DELETE(
     return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
   }
 
+  if (!asset.object_url) {
+    return NextResponse.json({ ok: false, error: "asset_has_no_url" }, { status: 422 });
+  }
+
   // Delete all format variants from the video bucket using prefix LIST (immune to format drift).
   // Videos are in R2_VIDEO_BUCKET ("lobster-videos"), not the designs bucket.
+  // On R2 failure: abort — don't delete the DB row, let the caller retry (mirrors designs/route.ts).
   const r2Result = await deleteVideoObjects(videoObjectKey(asset.object_url));
-  const r2Errors = r2Result.ok ? 0 : 1;
+  if (!r2Result.ok) {
+    const err = (r2Result as { ok: false; error: string }).error;
+    console.error("[video/id] R2 delete failed:", err);
+    return NextResponse.json({ ok: false, error: err }, { status: 502 });
+  }
 
-  // Delete DB record
+  // Delete DB record only after R2 succeeds (prevents orphan → reconcile re-insert loop).
   const { error: dbErr } = await supabase.from("media_assets").delete().eq("id", id);
   if (dbErr) {
     return NextResponse.json({ ok: false, error: dbErr.message }, { status: 500 });
@@ -48,7 +57,6 @@ export async function DELETE(
   return NextResponse.json({
     ok: true,
     id,
-    r2_deleted: r2Result.ok ? 1 : 0,
-    r2_errors: r2Errors,
+    r2_deleted: r2Result.deleted,
   });
 }
