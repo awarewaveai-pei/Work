@@ -185,6 +185,7 @@ export default function TarotStudio() {
 
   const [styleGroupTab, setStyleGroupTab] = useState<string>("西方畫家");
   const [modelProviderTab, setModelProviderTab] = useState<string>("BFL");
+  const [hoveredStyleDesc, setHoveredStyleDesc] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState<Record<string, boolean>>({
     model: false, style: false, subject: false, mode: false, template: false, grade: false, edit: false,
   });
@@ -1434,7 +1435,8 @@ export default function TarotStudio() {
                           return toks.join(", ");
                         })
                       }
-                      title={p.zh.includes("｜") ? p.zh.replace("｜", " — ") : undefined}
+                      onMouseEnter={() => setHoveredStyleDesc(p.zh.includes("｜") ? p.zh.split("｜")[1] : null)}
+                      onMouseLeave={() => setHoveredStyleDesc(null)}
                       style={{
                         padding: "3px 9px", borderRadius: 12, fontSize: 11,
                         cursor: locked ? "default" : "pointer",
