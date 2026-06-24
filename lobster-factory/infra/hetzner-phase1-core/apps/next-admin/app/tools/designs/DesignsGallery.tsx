@@ -1061,7 +1061,7 @@ export default function DesignsGallery() {
         </div>
 
         {/* ── Video toolbar ── */}
-        <div className="designs-toolbar">
+        <div className={`designs-toolbar${filterHidden ? " designs-toolbar--hidden" : ""}`}>
           <span className="designs-toolbar-count">
             {videoState === "ready" ? `顯示 ${visibleVideos.length} / ${videoAssets.length} 部影片` : ""}
           </span>
@@ -1197,7 +1197,7 @@ export default function DesignsGallery() {
         const downloadableSelected = selectedVisible.filter((a) => a.object_url).length;
         const allVisibleSelected = visibleSelected === visible.length && visible.length > 0;
         return (
-          <div className="designs-toolbar">
+          <div className={`designs-toolbar${filterHidden ? " designs-toolbar--hidden" : ""}`}>
             <span className="designs-toolbar-count">顯示 {visible.length} / {assets.length} 張</span>
             <span className="designs-filter-spacer" />
             <button
