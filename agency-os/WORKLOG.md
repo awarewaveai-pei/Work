@@ -4,6 +4,28 @@
 
 ## 2026-06-24
 
+### feat(social): 完整影片→Postiz 社群發佈架構
+
+[任務理解] 影片生成後的多格式輸出（16:9/9:16/4:5）應依平台路由推送到 Postiz（草稿或立即發佈），每平台自動選擇正確比例。ContentStudio 需要媒體選擇器（文字/圖片/影片）與 Syndicate copy 的媒體類型提示。
+
+[現況分析]
+- `postiz.ts` 只有 `uploadMedia`（圖片）；無影片上傳路徑
+- `social-publish/route.ts` 只接 `imageUrl`；無 `videoUrls` 路由
+- `syndicate/route.ts` 無 `mediaType` 支援；所有平台 copy 均以圖文模式生成
+- ContentStudio 影片輪詢完成後未儲存所有格式 URL；Postiz 面板只有圖片 checkbox
+
+[已修改]
+- `lib/content/postiz.ts`: 新增 `uploadVideo()`（SSRF guard + 200MB + 2min timeout + Content-Length 前置 check + content-type 驗證）；新增 `PLATFORM_VIDEO_FORMAT` export（9x16→TikTok/IG/Threads, 4x5→FB/Pinterest, 16x9→其他）；`createSocialPost` 加 `mediaPerPlatform` 參數
+- `app/api/content/social-publish/route.ts`: 加 `videoUrls?: Partial<Record<"16x9"|"9x16"|"4x5", string>>`；per-platform format routing + URL dedup upload；`videoUrls` 欄位 shape validation（400 on bad keys/types）
+- `app/api/content/syndicate/route.ts`: 加 `VIDEO_PLATFORM_ADDENDUM`（10 平台各別影片 copy 指引）；接 `mediaType`（text/image/video）並注入 prompt
+- `app/tools/content/ContentStudio.tsx`: `videoOutputUrls` state（輪詢完 save all outputs）；`postizMediaType` state（none/image/video）；Postiz 面板媒體選擇器 chip UI（替代舊 image checkbox）；IG hint 修正（instagram=9x16 Reels）；`videoFormats` 預設改 ["16x9"]；`VIDEO_FORMAT_LABELS` 加 platform label；handleSyndicate 傳 mediaType；handlePostizPublish 傳 videoUrls
+- `app/tools/video/VideoStudio.tsx`: `selectedFormats` 預設改 ["16x9"]；`OUTPUT_LABELS` 加平台名稱（▶ YouTube/文章, 📱 TikTok/Reels, 📷 IG Feed/FB）
+
+[驗證結果]
+- REALTEST_WAIVED: SMOKE_COVERED -- sg-deploy smoke 26/32 passed（deploy f6eb8402→SG，httpcheck /api/content/social-publish 200）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/3m/2s — 3 minor 全修（postiz.ts Content-Length + content-type；social-publish videoUrls validation；ContentStudio IG hint）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=uploadVideo|PLATFORM_VIDEO_FORMAT|videoOutputUrls|postizMediaType|VIDEO_PLATFORM_ADDENDUM|mediaPerPlatform | hits=0
+
 ### fix(video): 刪除影片改打 R2_VIDEO_BUCKET（三處 call site 全修）
 
 [任務理解] 使用者在 /tools/designs 刪除所有影片後，影片全部冒回來。

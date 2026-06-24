@@ -805,6 +805,38 @@ pre {
   box-shadow: none;
 }
 
+/* ── Banner Studio button base + ghost variant ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .12s, border-color .12s, color .12s;
+  text-decoration: none;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+}
+.btn-ghost {
+  background: transparent;
+  border: 1.5px solid var(--border);
+  color: var(--text-primary);
+}
+.btn-ghost:hover {
+  background: var(--chip-bg, #f1f3f5);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.btn-ghost:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
 .form-message {
   margin-top: 12px;
   font-size: 12px;

@@ -189,6 +189,10 @@ interface State {
   trustType:    TrustType;
   trustStars:   number;  // 0-5
   trustText:    string;  // 評論數 / 保固說明
+  // export controls
+  badgeScale:          number;
+  textScrimOpacity:    number;
+  dimOverlayOpacity:   number;
   // export
   saving:    boolean;
   saved:     boolean;
@@ -255,6 +259,9 @@ const INIT: State = {
   trustType:    "none",
   trustStars:   5,
   trustText:    "",
+  badgeScale:          1.0,
+  textScrimOpacity:    0.5,
+  dimOverlayOpacity:   0.45,
   saving:    false,
   saved:     false,
   error:     null,
@@ -410,7 +417,7 @@ async function exportToPng(state: State): Promise<string> {
   }
 
   if (state.dimOverlay) {
-    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.fillStyle = `rgba(0,0,0,${state.dimOverlayOpacity})`;
     ctx.fillRect(0, 0, p.w, p.h);
   }
 
@@ -477,8 +484,8 @@ async function exportToPng(state: State): Promise<string> {
               const rw = ctx.measureText(r.text).width;
               if (r.accent && r.text.trim()) {
                 ctx.fillStyle = state.accentColor;
-                roundRectPath(ctx, hx - state.headlineSize * 0.04, y + state.headlineSize * 0.06,
-                  rw + state.headlineSize * 0.08, state.headlineSize * 1.0, state.headlineSize * 0.12);
+                roundRectPath(ctx, hx - state.headlineSize * 0.06, y - state.headlineSize * 0.08,
+                  rw + state.headlineSize * 0.12, state.headlineSize * 1.22, state.headlineSize * 0.12);
                 ctx.fill();
               }
               hx += rw;
@@ -487,16 +494,17 @@ async function exportToPng(state: State): Promise<string> {
           for (const r of ln) {
             const rw = ctx.measureText(r.text).width;
             const plated = r.accent && state.accentHighlight;
-            if (state.textOutline && !plated) {
-              ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = state.headlineSize * 0.14; ctx.shadowOffsetY = state.headlineSize * 0.03;
-            }
             ctx.fillStyle = r.accent ? (plated ? "#1a1a1a" : state.accentColor) : state.textColor;
-            ctx.fillText(r.text, x, y);
-            ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
             if (state.textOutline && !plated) {
-              ctx.lineJoin = "round"; ctx.lineWidth = Math.max(2, state.headlineSize * 0.045); ctx.strokeStyle = "rgba(0,0,0,0.55)";
-              ctx.strokeText(r.text, x, y);
+              // Two-pass shadow halo: no strokeText (avoid per-stroke outline on CJK)
+              ctx.shadowColor = "rgba(0,0,0,0.85)";
+              ctx.shadowBlur = state.headlineSize * 0.22;
+              ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+              ctx.fillText(r.text, x, y);
+              ctx.shadowBlur = state.headlineSize * 0.08;
             }
+            ctx.fillText(r.text, x, y);
+            ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
             x += rw;
           }
           y += lineH;
@@ -643,7 +651,7 @@ async function exportToPng(state: State): Promise<string> {
     const sw = Math.min(p.w - sx, maxW + sPadX * 2);
     const sy = Math.max(0, stackTop - sPadY);
     const sh = Math.min(p.h - sy, stackH + sPadY * 2);
-    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillStyle = `rgba(0,0,0,${state.textScrimOpacity})`;
     roundRectPath(ctx, sx, sy, sw, sh, Math.round(state.subtextSize * 0.6));
     ctx.fill();
   }
