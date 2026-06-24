@@ -89,7 +89,20 @@
 - **F5 端到端驗收**:`npm start` 真實 server smoke — `/api/health`={ok:true}、`/`→307→`/zh-TW`(proxy)、`/zh-TW` 繁中標題、`/en` 英文標題 + `<html lang="en">`。
 - 驗證:`npm test` 26/26 ✅、typecheck ✅、build ✅(standalone server.js 產出)、HTTP smoke ✅。
 
-> ✅ **地基(F1–F5)全部完成**。現產品定位 = 全球命理生態系(見 `PLAN.md` v2)。下方 Phase 1–5 為舊版單站路線,**已被 `PLAN.md` §18「MVP 第一刀 + Phase 2–5」取代**,以 PLAN 為準。**下一步 = 功能期**:四中式系統實作 DivinationSystem 介面、每日運勢工廠、金流接真 provider + 數位報告付費牆、AI 解讀接 SDK。
+### ✅ 已完成(功能期 — 免憑證範圍全做完,本次)
+- **四命理系統**(皆實作 DivinationSystem 介面 + 回歸測試):紫微(iztro+真太陽時)、八字(lunar-javascript)、卜卦(自寫 64 卦六爻)、塔羅(78 牌雙語+Fisher-Yates)。
+- **每日運勢工廠**:五行表+喜用神演算法(幸運色/數/方位)+ lunar 黃曆宜忌 + 運勢星等,確定性零成本,中英在地化。
+- **UI 層**:首頁 hub + 5 系統頁面(各自 SEO metadata,zh-TW/en 全 SSG)+ SystemNav(語言切換)。
+- **SEO 地基**:多語 sitemap/robots/metadataBase/hreflang/OG。
+- 驗證:`npm test` 49/49 ✅、typecheck ✅、build ✅(17 靜態頁雙語預渲染)、HTTP smoke(hub+各系統頁雙語)✅。
+
+> ✅ **地基(F1–F5)+ 功能期免憑證範圍全部完成**(共 10 commit:102e1c1…5d29c5d)。
+> **下一步全部 BLOCKED 在 operator 憑證/決策**(見 `PLAN.md` §22),非技術缺漏:
+> - AI 解讀接真 SDK → `OPENAI_API_KEY`(+選配 `ANTHROPIC_API_KEY`)
+> - 金流真結帳 → ECPay/Stripe/PayPal 帳號;DB/帳號 → Supabase 專案
+> - 西洋占星(第 5 系統)→ astrology-api.io key
+> - Blog → §22 內容引擎整合方式(A/B/C)拍板 + Notion/憑證
+> - 實體 shop → Woo + Printful;部署 → 新 EU 機 IP;訂閱價/soulful 定位 → operator
 
 ### ⬜ 待做（依優先序）
 
