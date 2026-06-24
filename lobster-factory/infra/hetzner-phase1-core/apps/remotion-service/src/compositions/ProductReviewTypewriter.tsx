@@ -6,6 +6,7 @@ import {
   interpolate,
   spring,
   useCurrentFrame,
+  useVideoConfig,
 } from "remotion";
 
 export interface ProductReviewTypewriterProps {
