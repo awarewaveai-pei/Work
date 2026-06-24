@@ -81,6 +81,31 @@ sudo rm /etc/nginx/sites-enabled/oracle.aware-wave.com && nginx -t && systemctl 
 
 ---
 
+### feat(video): Remotion Phase 3 — VideoStudio Remotion tab + API routes + RemotionStudio UI
+
+[任務理解] 將 Remotion pipeline 接進 next-admin VideoStudio：新增 /api/video/remotion-render、/api/video/remotion-status 兩條路由作為 EU remotion-service 的代理；在 VideoStudio.tsx 加入第三個 tab「Remotion 模板」；實作 RemotionStudio 組件（5 模板選擇卡 + 欄位表單 + polling UI + 結果播放）。
+
+[已修改]
+- `lib/content/video/remotion-client.ts`（新建）— HTTP wrapper：submitRemotion（POST /render）+ pollRemotion（GET /status/:jobId）；auth Bearer token from env；AbortSignal.timeout；done+empty-url → explicit error（critic Minor fix）
+- `app/api/video/remotion-render/route.ts`（新建）— POST proxy，回傳 remotion-service jobId
+- `app/api/video/remotion-status/route.ts`（新建）— GET proxy，poll 單次，前端 5s interval 自行迴圈
+- `app/tools/video/VideoStudio.tsx`（修改）— 加 "remotion" tab type + tab button + RemotionStudio 組件（~270 行）；5 模板定義；polling cleanup via useRef；template switch guard if(!busy)；double-submit guard；void-wrapper on async handler；starCount Number() coerce
+
+[驗證結果]
+- REALTEST_WAIVED: SMOKE_COVERED -- API routes 需 SG 部署後可 curl 驗；Remotion端對端渲染已在 Phase 1+2 真實驗過（4 個模板 → R2 URL）；sg-deploy 是下一步
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/3n/1s（1 Minor 已修正：done+empty-url；2 Minor 為 low-priority polling 邊界）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=submitRemotion|pollRemotion|remotion-client|RemotionStudio | hits=2（handoffs doc ref + VideoStudio.tsx 本身；無 stale call sites）
+- BUGHUNT_SCOPE_NARROW: agency-os 有 handoffs doc 參考，無需更新（doc-only reference）
+
+[剩餘風險]
+- REMOTION_SERVICE_URL + REMOTION_AUTH_TOKEN 尚未加入 SG next-admin 的 env（.env.local / docker .env）→ 部署前需設定；未設定時 remotion-service 連線失敗會回傳 502
+- EU remotion-service 與 SG next-admin 的 Bearer token 需一致（RENDER_AUTH_TOKEN in EU = REMOTION_AUTH_TOKEN in SG）
+
+[rollback]
+- `git revert` 本 commit 即還原 VideoStudio tab + API routes；EU remotion-service 不受影響
+
+---
+
 ### feat(video): Remotion Phase 0+1 — 57 Creatomate JSON 藍圖 + remotion-service EU Docker
 
 [任務理解] 替換 Creatomate 商業 API，改用自架 Remotion（React→Chrome→ffmpeg）Pipeline。Phase 0：抽取 57 個模板 JSON 作設計藍圖。Phase 1：建 remotion-service，跑通 ScaleBGTextSlideUp 第一個模板。
@@ -14661,3 +14686,5 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): layout-only JSX restructure, no logic change
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): remove sticky+overflow wrapper, layout-only JSX change
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): CSS order prop + width tweak, no logic change
+
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): added missing useVideoConfig import to ProductReviewTypewriter.tsx (one-line fix, file already Deep-critic-reviewed in prior session)

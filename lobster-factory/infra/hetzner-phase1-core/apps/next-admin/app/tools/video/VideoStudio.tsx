@@ -195,7 +195,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
   const [selectedVideo, setSelectedVideo] = useState<VideoHistoryItem | null>(null);
   const [selectedVideos, setSelectedVideos] = useState<Set<string>>(new Set());
   const [deletingVideos, setDeletingVideos] = useState(false);
-  const [studioTab, setStudioTab] = useState<"generate" | "history" | "info">("generate");
+  const [studioTab, setStudioTab] = useState<"generate" | "history" | "info" | "remotion">("generate");
 
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isRenderingRef = useRef(false);
@@ -505,6 +505,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
       }}>
         {([
           { id: "generate" as const, label: "生成影片" },
+          { id: "remotion" as const, label: "Remotion 模板" },
           { id: "history"  as const, label: "生成記錄" },
           { id: "info"     as const, label: "說明 & 成本" },
         ]).map((t) => (
@@ -681,8 +682,8 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                     <KnobRow label="場景總數" hint={`${totalScenes} 場`} min={1} max={20} step={1} value={totalScenes} onChange={handleTotalChange} />
                     {!isPexels && (
                       <KnobRow
-                        label="自訂 AI 圖"
-                        hint={`${customScenes}/${totalScenes} 場（B-roll ${brollScenes}）`}
+                        label="AI 生圖"
+                        hint={`AI 生圖 ${customScenes} 場｜圖庫補 ${brollScenes} 場`}
                         min={0} max={totalScenes} step={1}
                         value={customScenes} onChange={setCustomScenes}
                       />
@@ -1126,6 +1127,9 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
         </div>
       )}
 
+      {/* ── Remotion 模板 tab ── */}
+      {studioTab === "remotion" && <RemotionStudio />}
+
     </div>
   );
 }
@@ -1551,3 +1555,271 @@ const inputStyle: React.CSSProperties = {
   fontSize: 13, background: "var(--card-bg)", color: "var(--text-primary)",
   width: "100%", boxSizing: "border-box",
 };
+
+// ─── RemotionStudio ───────────────────────────────────────────────────────────
+
+interface RemotionTemplateField {
+  key: string;
+  label: string;
+  hint?: string;
+  multiline?: boolean;
+}
+
+interface RemotionTemplate {
+  id: string;
+  name: string;
+  aspect: string;
+  duration: string;
+  desc: string;
+  fields: RemotionTemplateField[];
+}
+
+const REMOTION_TEMPLATES: RemotionTemplate[] = [
+  {
+    id: "scale-bg-text-slideup",
+    name: "背景縮放 + 文字滑入",
+    aspect: "16:9",
+    duration: "6s",
+    desc: "全幅背景圖緩慢縮放，主標語從底部滑入（廣告橫幅、促銷貼文）",
+    fields: [
+      { key: "imageUrl",  label: "背景圖片 URL",          hint: "https://... .jpg / R2 URL" },
+      { key: "text",      label: "主標語",                hint: "例：限時優惠 75折" },
+      { key: "logoUrl",   label: "Logo URL（選用）",      hint: "" },
+      { key: "audioUrl",  label: "背景音樂 URL（選用）",  hint: "" },
+    ],
+  },
+  {
+    id: "pan-slide-text-left-3scenes",
+    name: "三場景平移 + 文字",
+    aspect: "9:16",
+    duration: "20s",
+    desc: "直式短影音；三場景 Ken Burns 平移，文字從側邊滑入（TikTok / Reels / Stories）",
+    fields: [
+      { key: "imageUrl1", label: "場景 1 圖片 URL",        hint: "" },
+      { key: "text1",     label: "場景 1 文字",            hint: "" },
+      { key: "imageUrl2", label: "場景 2 圖片 URL",        hint: "" },
+      { key: "text2",     label: "場景 2 文字",            hint: "" },
+      { key: "imageUrl3", label: "場景 3 圖片 URL",        hint: "" },
+      { key: "text3",     label: "場景 3 文字",            hint: "" },
+      { key: "logoUrl",   label: "Logo URL（選用）",       hint: "" },
+      { key: "audioUrl",  label: "背景音樂 URL（選用）",   hint: "" },
+    ],
+  },
+  {
+    id: "circle-mask-text-slideup-reveal",
+    name: "圓形遮罩 + 文字滑入",
+    aspect: "16:9",
+    duration: "20s",
+    desc: "圖片以圓形揭幕方式展開，右側品牌文字逐行滑入（品牌形象、產品上市）",
+    fields: [
+      { key: "imageUrl",  label: "主圖片 URL",            hint: "" },
+      { key: "headline",  label: "主標題",                hint: "例：重新定義品質" },
+      { key: "brand",     label: "品牌名（選用）",         hint: "" },
+      { key: "tagline",   label: "副標語（選用）",         hint: "" },
+      { key: "logoUrl",   label: "Logo URL（選用）",      hint: "" },
+      { key: "audioUrl",  label: "背景音樂 URL（選用）",  hint: "" },
+    ],
+  },
+  {
+    id: "product-review-typewriter",
+    name: "產品評論打字機",
+    aspect: "16:9",
+    duration: "10s",
+    desc: "評論框從中展開，星星逐個跳入，評論文字以打字效果呈現（電商信任感、UGC）",
+    fields: [
+      { key: "backgroundImageUrl", label: "背景圖片 URL",             hint: "" },
+      { key: "productImageUrl",    label: "產品圖片 URL",             hint: "" },
+      { key: "profileImageUrl",    label: "評論人大頭照 URL（選用）", hint: "" },
+      { key: "reviewerName",       label: "評論人姓名",               hint: "例：Wang Mei" },
+      { key: "reviewDate",         label: "日期",                    hint: "例：June 2026" },
+      { key: "reviewText",         label: "評論內容",                 hint: "這產品太棒了！強烈推薦！", multiline: true },
+      { key: "starCount",          label: "星星數（1–5）",            hint: "5" },
+      { key: "logoUrl",            label: "Logo URL（選用）",         hint: "" },
+      { key: "audioUrl",           label: "背景音樂 URL（選用）",     hint: "" },
+    ],
+  },
+  {
+    id: "photo-highlights-slides-zoom",
+    name: "相片精選幻燈片",
+    aspect: "16:9",
+    duration: "22s",
+    desc: "三張相片縮放平移 + 旋轉滑動切換，適合旅遊 / 活動回顧 / 作品集（60fps）",
+    fields: [
+      { key: "imageUrl1",       label: "相片 1 URL",                hint: "" },
+      { key: "text1",           label: "相片 1 說明文字",           hint: "" },
+      { key: "imageUrl2",       label: "相片 2 URL",                hint: "" },
+      { key: "text2",           label: "相片 2 說明文字",           hint: "" },
+      { key: "imageUrl3",       label: "相片 3 URL",                hint: "" },
+      { key: "text3",           label: "相片 3 說明文字",           hint: "" },
+      { key: "logoUrl",         label: "Logo URL（選用）",          hint: "" },
+      { key: "backgroundColor", label: "主題色（選用）",            hint: "#0ebba2" },
+      { key: "audioUrl",        label: "背景音樂 URL（選用）",      hint: "" },
+    ],
+  },
+];
+
+type RemotionStatus = "idle" | "submitting" | "rendering" | "done" | "error";
+
+function RemotionStudio() {
+  const [selectedId, setSelectedId] = useState(REMOTION_TEMPLATES[0].id);
+  const [fields, setFields] = useState<Record<string, string>>({});
+  const [status, setStatus] = useState<RemotionStatus>("idle");
+  const [resultUrl, setResultUrl] = useState("");
+  const [error, setError] = useState("");
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current); }, []);
+
+  const tmpl = REMOTION_TEMPLATES.find(t => t.id === selectedId)!;
+  const busy = status === "submitting" || status === "rendering";
+
+  const setField = (key: string, value: string) =>
+    setFields(prev => ({ ...prev, [key]: value }));
+
+  function startPolling(jobId: string) {
+    const deadline = Date.now() + 15 * 60 * 1000;
+    const poll = async (): Promise<void> => {
+      if (Date.now() > deadline) { setStatus("error"); setError("渲染逾時（>15 分鐘）"); return; }
+      try {
+        const r = await fetch(`/api/video/remotion-status?jobId=${encodeURIComponent(jobId)}`);
+        const j = (await r.json()) as { ok: boolean; status?: string; url?: string; error?: string };
+        if (!j.ok || j.status === "error") { setStatus("error"); setError(j.error ?? "渲染失敗"); return; }
+        if (j.status === "done" && j.url) { setStatus("done"); setResultUrl(j.url); return; }
+        pollRef.current = setTimeout(() => void poll(), 5000);
+      } catch {
+        pollRef.current = setTimeout(() => void poll(), 5000);
+      }
+    };
+    pollRef.current = setTimeout(() => void poll(), 5000);
+  }
+
+  async function handleSubmit() {
+    if (busy) return;
+    setStatus("submitting");
+    setError("");
+    setResultUrl("");
+    // Convert numeric fields before sending
+    const props: Record<string, unknown> = { ...fields };
+    if (selectedId === "product-review-typewriter" && fields.starCount) {
+      props.starCount = Number(fields.starCount) || 5;
+    }
+    try {
+      const r = await fetch("/api/video/remotion-render", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateId: selectedId, props }),
+      });
+      const j = (await r.json()) as { ok: boolean; jobId?: string; error?: string };
+      if (!j.ok || !j.jobId) { setStatus("error"); setError(j.error ?? "提交失敗"); return; }
+      setStatus("rendering");
+      startPolling(j.jobId);
+    } catch (e: unknown) {
+      setStatus("error");
+      setError(e instanceof Error ? e.message : "網路錯誤");
+    }
+  }
+
+  return (
+    <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 16 }}>
+
+      {/* 模板選擇器 */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
+        {REMOTION_TEMPLATES.map(t => {
+          const active = t.id === selectedId;
+          return (
+            <button key={t.id} type="button" onClick={() => { if (!busy) { setSelectedId(t.id); setFields({}); setStatus("idle"); setError(""); setResultUrl(""); } }}
+              style={{
+                padding: "12px 14px", borderRadius: 10, textAlign: "left", cursor: busy ? "not-allowed" : "pointer",
+                border: `2px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
+                background: active ? "var(--ai-bg)" : "var(--card-bg)",
+                transition: "border-color 0.15s, background 0.15s",
+              }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: active ? "var(--accent)" : "var(--text-primary)", marginBottom: 4 }}>{t.name}</div>
+              <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: "var(--build-risk-medium-bg)", color: "var(--build-risk-medium-text)" }}>{t.aspect}</span>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: "var(--badge-gray-bg)", color: "var(--text-muted)" }}>{t.duration}</span>
+              </div>
+              <div style={{ fontSize: 11, color: "var(--text-secondary)", lineHeight: 1.5 }}>{t.desc}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 欄位表單 */}
+      <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-subtle)" }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>{tmpl.name} — 填入素材</span>
+        </div>
+        <div style={{ padding: "16px 18px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          {tmpl.fields.map(f => (
+            <div key={f.key} style={{ display: "flex", flexDirection: "column", gap: 4, gridColumn: f.multiline ? "1 / -1" : undefined }}>
+              <label style={labelStyle}>{f.label}</label>
+              {f.multiline ? (
+                <textarea value={fields[f.key] ?? ""} onChange={e => setField(f.key, e.target.value)}
+                  placeholder={f.hint} rows={2} disabled={busy}
+                  style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit", fontSize: 12 }} />
+              ) : (
+                <input type="text" value={fields[f.key] ?? ""} onChange={e => setField(f.key, e.target.value)}
+                  placeholder={f.hint} disabled={busy} style={inputStyle} />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Status + error + result */}
+      {status === "submitting" && (
+        <div style={{ background: "var(--ai-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 16px", fontSize: 12.5, color: "var(--accent)", fontWeight: 700 }}>
+          提交到 remotion-service 中…
+        </div>
+      )}
+      {status === "rendering" && (
+        <div style={{ background: "var(--ai-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 16px" }}>
+          <div style={{ fontSize: 12.5, color: "var(--accent)", fontWeight: 700, marginBottom: 4 }}>🎬 渲染中（Chrome + ffmpeg）…</div>
+          <div style={{ fontSize: 11.5, color: "var(--accent)" }}>預計 2–5 分鐘（依模板長度）。可保持頁面開啟等待。</div>
+        </div>
+      )}
+      {status === "error" && (
+        <div style={{ background: "var(--badge-red-bg)", border: "1px solid var(--red)", borderRadius: 8, padding: "12px 14px" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--red)", marginBottom: 4 }}>失敗</div>
+          <div style={{ fontSize: 12.5, color: "var(--badge-red-text)" }}>{error}</div>
+        </div>
+      )}
+      {status === "done" && resultUrl && (
+        <div style={{ background: "var(--intake-success-bg)", border: "1px solid var(--green)", borderRadius: 10, padding: "16px" }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--badge-green-text)", marginBottom: 12 }}>✅ 渲染完成</div>
+          <video controls src={resultUrl} style={{ width: "100%", borderRadius: 8, background: "#000", maxHeight: 320, marginBottom: 12 }} />
+          <div style={{ display: "flex", gap: 8 }}>
+            <a href={resultUrl} download target="_blank" rel="noreferrer"
+              style={{ flex: 1, padding: "8px 0", background: "var(--accent)", color: "var(--btn-primary-text)", borderRadius: 8, textAlign: "center", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>
+              ⬇ 下載 MP4
+            </a>
+            <button onClick={() => navigator.clipboard.writeText(resultUrl).catch(() => {})}
+              style={{ padding: "8px 16px", background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: 8, fontSize: 13, cursor: "pointer", color: "var(--text-secondary)", fontWeight: 600 }}>
+              複製 URL
+            </button>
+            <button onClick={() => { setStatus("idle"); setResultUrl(""); setError(""); }}
+              style={{ padding: "8px 16px", background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: 8, fontSize: 13, cursor: "pointer", color: "var(--text-secondary)", fontWeight: 600 }}>
+              再做一個
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* CTA */}
+      {status !== "done" && (
+        <button onClick={() => void handleSubmit()} disabled={busy}
+          style={{
+            padding: "13px 0", borderRadius: 8, border: "none", width: "100%",
+            cursor: busy ? "not-allowed" : "pointer",
+            background: busy ? "var(--border-subtle)" : "var(--accent)",
+            color: busy ? "var(--text-muted)" : "var(--btn-primary-text)",
+            fontSize: 15, fontWeight: 700, transition: "background 0.15s",
+          }}>
+          {status === "submitting" ? "提交中…" : status === "rendering" ? "渲染中…" : "🎬 送出渲染"}
+        </button>
+      )}
+
+    </div>
+  );
+}
