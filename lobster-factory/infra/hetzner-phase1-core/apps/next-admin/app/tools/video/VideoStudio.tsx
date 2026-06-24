@@ -10,14 +10,30 @@ import { resolveStylePrompt } from "@/app/tools/tarot/cards";
 
 // 影片專屬攝影風格 preset（放最前 = 預設組）。值為英文 prompt，直接送 Flux。
 const VIDEO_STYLE_PRESETS: { zh: string; group: string; prompt: string }[] = [
-  { zh: "電影感", group: "📹 影片風格", prompt: "Cinematic wide-angle 16:9, dramatic lighting, rich color grade" },
-  { zh: "紀錄片", group: "📹 影片風格", prompt: "Documentary photography, natural light, authentic moment" },
-  { zh: "商業攝影", group: "📹 影片風格", prompt: "Clean commercial photography, studio lighting, professional" },
+  { zh: "電影感", group: "影片風格", prompt: "Cinematic wide-angle 16:9, dramatic lighting, rich color grade" },
+  { zh: "紀錄片", group: "影片風格", prompt: "Documentary photography, natural light, authentic moment" },
+  { zh: "商業攝影", group: "影片風格", prompt: "Clean commercial photography, studio lighting, professional" },
 ];
 const VIDEO_PRESET_BY_LABEL = new Map(VIDEO_STYLE_PRESETS.map((p) => [p.zh, p.prompt]));
 // 影片 preset + tarot/studio 103 風格合併（preset 在前 → 預設組）。
 const VIDEO_STYLE_CATALOG = [...VIDEO_STYLE_PRESETS, ...STYLE_CATALOG];
 const VIDEO_STYLE_GROUPS = Array.from(new Set(VIDEO_STYLE_CATALOG.map((s) => s.group)));
+
+// 生圖模型廠商分組（外層 tab → 內層 chip 兩層選擇器）。
+const IMAGE_VENDOR_GROUPS: Record<string, string[]> = {
+  "FLUX":      ["flux-schnell", "flux-dev", "flux-kontext-dev", "flux-kontext-pro", "flux-2-max"],
+  "Ideogram":  ["ideogram-v2a-turbo", "ideogram-v3-balanced", "ideogram-v4-turbo", "ideogram-v4-quality", "ideogram-character"],
+  "Google":    ["nano-banana-2", "nano-banana-pro", "imagen-4"],
+  "ByteDance": ["seedream-4.5"],
+  "OpenAI":    ["openai-low", "openai-medium", "openai-high"],
+};
+function vendorForModel(model: string): string {
+  for (const [v, ids] of Object.entries(IMAGE_VENDOR_GROUPS)) {
+    if (ids.includes(model)) return v;
+  }
+  return "FLUX";
+}
+
 // preset 直接回英文 prompt；其餘走 tarot resolveStylePrompt（zh label → 英文）。
 function resolveVideoStyle(label: string): string {
   return VIDEO_PRESET_BY_LABEL.get(label) ?? resolveStylePrompt(label);
@@ -129,6 +145,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
   const [totalScenes, setTotalScenes] = useState(6);
   const [customScenes, setCustomScenes] = useState(3);
   const [imageModel, setImageModel] = useState(DEFAULT_IMAGE_MODEL);
+  const [imageVendor, setImageVendor] = useState(() => vendorForModel(DEFAULT_IMAGE_MODEL));
   const [targetMinutes, setTargetMinutes] = useState(1);
   const [voiceModelId, setVoiceModelId] = useState(VOICE_MODELS[0].id);
   const [introEnabled, setIntroEnabled] = useState(false);
@@ -288,8 +305,8 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
           visualStyle: videoStyle ? resolveVideoStyle(videoStyle) : undefined,
           imageModel,
           targetMinutes,
-          // 「場景總數」「自訂 AI 圖」滑桿只在 AI 生圖模式生效（Pexels 模式場景數由 targetMinutes 決定；接力路徑由前製腳本決定）。
-          sceneCount: (providedScenes.length === 0 && imageModel !== "pexels-video" && imageModel !== "pexels-all") ? totalScenes : undefined,
+          // 三模式共用：sceneCount 覆蓋 targetMinutes 推導值；customScenes 僅 AI 生圖模式有意義。
+          sceneCount: providedScenes.length === 0 ? totalScenes : undefined,
           customScenes: (providedScenes.length === 0 && imageModel !== "pexels-video" && imageModel !== "pexels-all") ? Math.min(customScenes, totalScenes) : undefined,
           outputFormats: orderedFormats,
           scenes: providedScenes.length > 0 ? providedScenes : undefined,
@@ -472,6 +489,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
 
   const isLoading = genStatus === "loading";
   const isBusy = isLoading || draftLoading;
+  const isPexels = imageModel === "pexels-video" || imageModel === "pexels-all";
   const canGenerate = (topic.trim().length > 0 || providedScenes.length > 0) && !isBusy;
 
   // suppress unused warning for handleGenerate (kept for backward compat)
@@ -486,9 +504,9 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
         background: "var(--bg-canvas)", borderBottom: "1px solid var(--border-subtle)",
       }}>
         {([
-          { id: "generate" as const, label: "🎬 生成影片" },
-          { id: "history"  as const, label: "📋 生成記錄" },
-          { id: "info"     as const, label: "ℹ️ 說明 & 成本" },
+          { id: "generate" as const, label: "生成影片" },
+          { id: "history"  as const, label: "生成記錄" },
+          { id: "info"     as const, label: "說明 & 成本" },
         ]).map((t) => (
           <button
             key={t.id}
@@ -514,11 +532,11 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
           {/* Hint banner — full width */}
           {providedScenes.length > 0 ? (
             <div style={{ background: "var(--intake-success-bg)", border: "1px solid var(--green)", borderRadius: 8, padding: "10px 12px", fontSize: 12.5, color: "var(--badge-green-text)", lineHeight: 1.6 }}>
-              ✅ 已從前製腳本帶入 <b>{providedScenes.length}</b> 個場景。調整下方設定後，按「📋 生成草稿」出片。
+              已從前製腳本帶入 <b>{providedScenes.length}</b> 個場景。調整下方設定後，按「生成草稿」出片。
             </div>
           ) : (
             <div style={{ background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: "9px 12px", fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.6 }}>
-              💡 可到「📝 前製腳本」寫完再帶入，或直接填主題快速生成。
+              可到「前製腳本」寫完再帶入，或直接填主題快速生成。
             </div>
           )}
 
@@ -612,93 +630,164 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
               <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-subtle)" }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>② 影片設定</span>
               </div>
-              <div style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 16 }}>
 
                 {/* 素材模式 */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>素材模式</span>
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", gap: 6 }}>
                     {[
-                      { id: "pexels-video", label: "📹 真實影片", badge: "$0", tip: "真實動態影片片段，最自然" },
-                      { id: "pexels-all",   label: "🖼 照片動畫", badge: "$0", tip: "免費照片 + Ken Burns 縮放效果" },
-                      { id: "__ai__",       label: "✨ AI 生圖",  badge: "按模型", tip: "Flux / Ideogram 等 AI 插圖" },
+                      { id: "pexels-video", label: "真實影片", badge: "免費",    tip: "真實動態影片片段，最自然" },
+                      { id: "pexels-all",   label: "照片動畫", badge: "免費",    tip: "免費照片 + Ken Burns 縮放效果" },
+                      { id: "__ai__",       label: "AI 生圖",  badge: "按模型", tip: "Flux / Ideogram 等 AI 插圖" },
                     ].map(({ id, label, badge, tip }) => {
                       const isAiMode = id === "__ai__";
-                      const active = isAiMode
-                        ? (imageModel !== "pexels-video" && imageModel !== "pexels-all")
-                        : imageModel === id;
+                      const active = isAiMode ? !isPexels : imageModel === id;
                       return (
                         <button key={id} type="button" title={tip}
                           onClick={() => {
                             if (isAiMode) {
-                              if (imageModel === "pexels-video" || imageModel === "pexels-all") {
-                                setImageModel(DEFAULT_IMAGE_MODEL);
-                                setCustomScenes(totalScenes);
-                              }
+                              if (isPexels) { setImageModel(DEFAULT_IMAGE_MODEL); setImageVendor(vendorForModel(DEFAULT_IMAGE_MODEL)); setCustomScenes(totalScenes); }
                             } else {
                               setImageModel(id);
                             }
                           }}
                           disabled={isBusy}
                           style={{
-                            padding: "6px 12px", borderRadius: 8,
+                            flex: 1, padding: "8px 0", borderRadius: 8,
                             border: `2px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
                             background: active ? "var(--accent)" : "var(--bg-canvas)",
                             color: active ? "var(--btn-primary-text)" : "var(--text-secondary)",
                             cursor: isBusy ? "not-allowed" : "pointer",
-                            fontSize: 12, fontWeight: active ? 700 : 500, lineHeight: 1.4,
+                            fontSize: 12, fontWeight: active ? 700 : 500,
                             display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
                           }}>
                           <span>{label}</span>
-                          <span style={{ fontSize: 10, opacity: 0.8 }}>{badge}</span>
+                          <span style={{ fontSize: 10, opacity: 0.75 }}>{badge}</span>
                         </button>
                       );
                     })}
                   </div>
                   {imageModel === "pexels-video" && (
                     <div style={{ fontSize: 11, color: "var(--badge-green-text)", background: "var(--badge-green-bg)", padding: "6px 10px", borderRadius: 6, lineHeight: 1.6 }}>
-                      ✅ 每場景自動搜尋 Pexels 影片片段（HD MP4）→ EU FFmpeg 拼接 + TTS 配音。費用 $0。
+                      每場景自動搜尋 Pexels 影片片段（HD MP4）→ EU FFmpeg 拼接 + TTS 配音。費用 $0。
                     </div>
                   )}
                 </div>
 
-                {/* AI mode: model picker */}
-                {imageModel !== "pexels-video" && imageModel !== "pexels-all" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {/* 場景與時間 combo — 三模式共用 */}
+                {providedScenes.length === 0 ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 14px", background: "var(--bg-subtle)", borderRadius: 8, border: "1px solid var(--border-subtle)" }}>
+                    <KnobRow label="場景總數" hint={`${totalScenes} 場`} min={1} max={20} step={1} value={totalScenes} onChange={handleTotalChange} />
+                    {!isPexels && (
+                      <KnobRow
+                        label="自訂 AI 圖"
+                        hint={`${customScenes}/${totalScenes} 場（B-roll ${brollScenes}）`}
+                        min={0} max={totalScenes} step={1}
+                        value={customScenes} onChange={setCustomScenes}
+                      />
+                    )}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>時間長度</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>{targetMinutes} 分鐘</span>
+                      </div>
+                      <input type="range" min={1} max={5} step={0.5} value={targetMinutes}
+                        onChange={e => setTargetMinutes(Number(e.target.value))}
+                        style={{ width: "100%", accentColor: "var(--accent)" }} disabled={isBusy} />
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--text-muted)" }}>
+                        <span>1 分</span><span>2.5 分</span><span>5 分</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.6 }}>場景數由前製腳本決定（{providedScenes.length} 場），每場依「畫面」生 AI 圖。</div>
+                )}
+
+                {/* 生圖模型 — AI 模式，廠商 tab + 模型 chip */}
+                {!isPexels && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>生圖模型</span>
-                    <select value={imageModel} onChange={(e) => setImageModel(e.target.value)} style={inputStyle} disabled={isBusy}>
-                      {Object.entries(IMAGE_RATES)
-                        .filter(([id]) => id !== "pexels-video" && id !== "pexels-all")
-                        .map(([id, r]) => (
-                          <option key={id} value={id}>{r.label} — {r.vendor} (${r.usd}/張)</option>
-                        ))}
-                    </select>
+                    <div style={{ display: "flex", borderBottom: "1px solid var(--border-subtle)" }}>
+                      {Object.keys(IMAGE_VENDOR_GROUPS).map(v => (
+                        <button key={v} type="button" disabled={isBusy}
+                          onClick={() => {
+                            setImageVendor(v);
+                            const first = IMAGE_VENDOR_GROUPS[v]?.[0];
+                            if (first) setImageModel(first);
+                          }}
+                          style={{
+                            padding: "5px 12px", border: "none", background: "transparent",
+                            borderBottom: `3px solid ${imageVendor === v ? "var(--accent)" : "transparent"}`,
+                            marginBottom: -1, cursor: isBusy ? "not-allowed" : "pointer",
+                            fontSize: 12, fontWeight: imageVendor === v ? 700 : 500,
+                            color: imageVendor === v ? "var(--accent)" : "var(--text-muted)",
+                            transition: "all 0.15s", whiteSpace: "nowrap",
+                          }}>
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                      {(IMAGE_VENDOR_GROUPS[imageVendor] ?? []).map(id => {
+                        const r = IMAGE_RATES[id];
+                        const active = imageModel === id;
+                        return (
+                          <button key={id} type="button" onClick={() => setImageModel(id)} disabled={isBusy}
+                            style={{
+                              padding: "4px 12px", borderRadius: 20, fontSize: 11,
+                              cursor: isBusy ? "not-allowed" : "pointer",
+                              border: `1px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
+                              background: active ? "var(--accent)" : "rgba(127,127,127,0.06)",
+                              color: active ? "var(--btn-primary-text)" : "var(--text-secondary)",
+                              transition: "all 0.15s",
+                            }}>
+                            {r?.label ?? id}
+                            {r && <span style={{ fontSize: 10, opacity: 0.7, marginLeft: 4 }}>${r.usd}/張</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
-                {/* AI mode: visual style (collapsed by default) */}
-                {imageModel !== "pexels-video" && imageModel !== "pexels-all" && (
+                {/* 視覺風格 — AI 模式，類別 tab + 風格 chip */}
+                {!isPexels && (
                   <details style={{ borderRadius: 8, border: "1px solid var(--border-subtle)", overflow: "hidden" }}>
                     <summary style={{ padding: "8px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", background: "var(--bg-subtle)", listStyle: "none", display: "flex", alignItems: "center", gap: 6 }}>
-                      🎨 視覺風格{videoStyle
+                      ▸ 視覺風格{videoStyle
                         ? <span style={{ color: "var(--accent)", fontWeight: 400 }}>&nbsp;— {videoStyle}</span>
                         : <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>&nbsp;（不指定 = 電影感預設）</span>}
                     </summary>
-                    <div style={{ padding: "12px 14px" }}>
-                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
-                        {VIDEO_STYLE_GROUPS.map((g) => (
+                    <div style={{ padding: "10px 14px" }}>
+                      <div style={{ display: "flex", borderBottom: "1px solid var(--border-subtle)", marginBottom: 8 }}>
+                        {VIDEO_STYLE_GROUPS.map(g => (
                           <button key={g} type="button" onClick={() => setVideoStyleGroup(g)} disabled={isBusy}
-                            style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, cursor: isBusy ? "not-allowed" : "pointer", border: `1px solid ${videoStyleGroup === g ? "var(--accent)" : "var(--border-subtle)"}`, background: videoStyleGroup === g ? "var(--accent)" : "rgba(127,127,127,0.08)", color: videoStyleGroup === g ? "var(--btn-primary-text)" : "var(--text-muted)", transition: "all 0.15s" }}>
+                            style={{
+                              padding: "4px 10px", border: "none", background: "transparent",
+                              borderBottom: `3px solid ${videoStyleGroup === g ? "var(--accent)" : "transparent"}`,
+                              marginBottom: -1, cursor: isBusy ? "not-allowed" : "pointer",
+                              fontSize: 11, fontWeight: videoStyleGroup === g ? 700 : 500,
+                              color: videoStyleGroup === g ? "var(--accent)" : "var(--text-muted)",
+                              transition: "all 0.15s", whiteSpace: "nowrap",
+                            }}>
                             {g}
                           </button>
                         ))}
                       </div>
                       <div style={{ display: "flex", gap: 4, flexWrap: "wrap", maxHeight: 120, overflowY: "auto" }}>
-                        {VIDEO_STYLE_CATALOG.filter((item) => item.group === videoStyleGroup).map((item) => {
+                        {VIDEO_STYLE_CATALOG.filter(item => item.group === videoStyleGroup).map(item => {
                           const active = videoStyle === item.zh;
                           return (
                             <button key={item.zh} type="button" onClick={() => setVideoStyle(active ? "" : item.zh)} disabled={isBusy}
-                              style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, cursor: isBusy ? "not-allowed" : "pointer", border: `1px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`, background: active ? "var(--accent)" : "rgba(127,127,127,0.08)", color: active ? "var(--btn-primary-text)" : "var(--text-muted)", transition: "all 0.15s" }}>
+                              style={{
+                                padding: "3px 10px", borderRadius: 20, fontSize: 11,
+                                cursor: isBusy ? "not-allowed" : "pointer",
+                                border: `1px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
+                                background: active ? "var(--accent)" : "rgba(127,127,127,0.06)",
+                                color: active ? "var(--btn-primary-text)" : "var(--text-muted)",
+                                transition: "all 0.15s",
+                              }}>
                               {item.zh}
                             </button>
                           );
@@ -708,76 +797,40 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                   </details>
                 )}
 
-                {/* Pexels: target duration */}
-                {(imageModel === "pexels-video" || imageModel === "pexels-all") && providedScenes.length === 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>目標時長</span>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      {([1, 3, 5] as const).map((m) => {
-                        const sceneInfo = m >= 4 ? "10場景 × 160字" : m >= 2 ? "8場景 × 120字" : "6場景 × 50字";
-                        return (
-                          <button key={m} type="button" onClick={() => setTargetMinutes(m)} disabled={isBusy}
-                            style={{
-                              flex: 1, padding: "7px 0", borderRadius: 8,
-                              border: `2px solid ${targetMinutes === m ? "var(--accent)" : "var(--border-subtle)"}`,
-                              background: targetMinutes === m ? "var(--accent)" : "var(--bg-canvas)",
-                              color: targetMinutes === m ? "var(--btn-primary-text)" : "var(--text-secondary)",
-                              cursor: isBusy ? "not-allowed" : "pointer",
-                              fontSize: 12, fontWeight: targetMinutes === m ? 700 : 500,
-                              lineHeight: 1.4, display: "flex", flexDirection: "column", alignItems: "center",
-                            }}>
-                            <span>{m} 分鐘</span>
-                            <span style={{ fontSize: 10, opacity: 0.75 }}>{sceneInfo}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* AI: scene sliders */}
-                {imageModel !== "pexels-video" && imageModel !== "pexels-all" && providedScenes.length === 0 && (
-                  <>
-                    <KnobRow label="場景總數" hint={`${totalScenes} 場`} min={1} max={20} step={1} value={totalScenes} onChange={handleTotalChange} />
-                    <KnobRow
-                      label={`自訂 AI 圖，目前 ${customScenes}/${totalScenes}`}
-                      hint={`B-roll：${brollScenes}`}
-                      min={0} max={totalScenes} step={1}
-                      value={customScenes} onChange={setCustomScenes}
-                    />
-                  </>
-                )}
-                {providedScenes.length > 0 && (
-                  <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.6 }}>場景數由前製腳本決定（{providedScenes.length} 場），每場依「畫面」生 AI 圖。</div>
-                )}
-
-                {/* Voice */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {/* 配音模型 — 廠商 tab + 聲音 chip，統一 accent 色 */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>配音模型</span>
-                  <div style={{ display: "flex", gap: 4 }}>
-                    {(["edge", "openai"] as const).map((prov) => {
+                  <div style={{ display: "flex", borderBottom: "1px solid var(--border-subtle)" }}>
+                    {(["edge", "openai"] as const).map(prov => {
                       const active = voiceModelId.startsWith(prov + ":");
-                      const firstVoice = VOICE_MODELS.find((v) => v.id.startsWith(prov + ":"))?.id ?? voiceModelId;
+                      const firstVoice = VOICE_MODELS.find(v => v.id.startsWith(prov + ":"))?.id ?? voiceModelId;
                       return (
                         <button key={prov} type="button" onClick={() => setVoiceModelId(firstVoice)}
-                          style={{ padding: "2px 10px", borderRadius: 20, fontSize: 11, cursor: "pointer",
-                            border: `1px solid ${active ? "var(--severity-low)" : "var(--ai-bg)"}`,
-                            background: active ? "var(--severity-low)" : "rgba(255,255,255,0.6)",
-                            color: active ? "var(--btn-primary-text)" : "var(--text-muted)" }}>
+                          style={{
+                            padding: "5px 14px", border: "none", background: "transparent",
+                            borderBottom: `3px solid ${active ? "var(--accent)" : "transparent"}`,
+                            marginBottom: -1, cursor: "pointer",
+                            fontSize: 12, fontWeight: active ? 700 : 500,
+                            color: active ? "var(--accent)" : "var(--text-muted)",
+                            transition: "all 0.15s",
+                          }}>
                           {prov === "edge" ? "Edge 免費" : "OpenAI"}
                         </button>
                       );
                     })}
                   </div>
                   <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                    {VOICE_MODELS.filter((v) => v.id.startsWith(voiceModelId.startsWith("openai:") ? "openai:" : "edge:")).map((v) => {
+                    {VOICE_MODELS.filter(v => v.id.startsWith(voiceModelId.startsWith("openai:") ? "openai:" : "edge:")).map(v => {
                       const active = voiceModelId === v.id;
                       return (
                         <button key={v.id} type="button" onClick={() => setVoiceModelId(v.id)}
-                          style={{ padding: "2px 9px", borderRadius: 20, fontSize: 11, cursor: "pointer",
-                            border: `1px solid ${active ? "var(--severity-low)" : "var(--ai-bg)"}`,
-                            background: active ? "var(--severity-low)" : "rgba(255,255,255,0.6)",
-                            color: active ? "var(--btn-primary-text)" : "var(--text-muted)" }}>
+                          style={{
+                            padding: "3px 10px", borderRadius: 20, fontSize: 11, cursor: "pointer",
+                            border: `1px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
+                            background: active ? "var(--accent)" : "rgba(127,127,127,0.06)",
+                            color: active ? "var(--btn-primary-text)" : "var(--text-secondary)",
+                            transition: "all 0.15s",
+                          }}>
                           {v.label}
                         </button>
                       );
@@ -785,21 +838,21 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                   </div>
                   {voiceModelId.startsWith("openai:") && (
                     <div style={{ fontSize: 11, color: "#92400e", background: "#fef3c7", padding: "4px 8px", borderRadius: 6, lineHeight: 1.5 }}>
-                      ⚠️ OpenAI TTS 需在伺服器設定 OPENAI_API_KEY，否則自動降版 Edge TTS
+                      OpenAI TTS 需在伺服器設定 OPENAI_API_KEY，否則自動降版 Edge TTS
                     </div>
                   )}
                 </div>
 
-                {/* Output ratios */}
+                {/* 輸出比例 */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>輸出比例 <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>（各比例獨立原生生成）</span></span>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {VIDEO_FORMAT_CHOICES.map((fmt) => {
+                    {VIDEO_FORMAT_CHOICES.map(fmt => {
                       const active = selectedFormats.has(fmt);
                       const meta = OUTPUT_LABELS[fmt];
                       return (
                         <button key={fmt} type="button" disabled={isBusy}
-                          onClick={() => setSelectedFormats((prev) => {
+                          onClick={() => setSelectedFormats(prev => {
                             const next = new Set(prev);
                             if (next.has(fmt)) { if (next.size > 1) next.delete(fmt); }
                             else next.add(fmt);
@@ -812,9 +865,8 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                             color: active ? "#fff" : "var(--text-secondary)",
                             cursor: isBusy ? "not-allowed" : "pointer",
                             fontSize: 12, fontWeight: active ? 700 : 500,
-                            display: "flex", alignItems: "center", gap: 4,
                           }}>
-                          <span>{meta.icon}</span><span>{meta.ratio}</span>
+                          {meta.ratio}
                         </button>
                       );
                     })}
@@ -833,12 +885,12 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                   </div>
                   {orderedFormats.length > 1 && (
                     <span style={{ fontSize: 11, color: "#92400e", background: "#fef3c7", padding: "4px 8px", borderRadius: 6, lineHeight: 1.5 }}>
-                      ⚠️ {orderedFormats.length} 個比例 = 成本與時間約 ×{orderedFormats.length}（每比例各自原生生成）
+                      {orderedFormats.length} 個比例 = 成本與時間約 x{orderedFormats.length}（每比例各自原生生成）
                     </span>
                   )}
                 </div>
 
-                {/* Intro toggle */}
+                {/* 標題動畫 */}
                 <div style={{ padding: "10px 12px", borderRadius: 8, background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)" }}>
                   <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                     <input type="checkbox" checked={introEnabled} onChange={e => setIntroEnabled(e.target.checked)} disabled={isLoading} />
@@ -861,7 +913,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
               {/* Draft loading inline */}
               {draftLoading && (
                 <div style={{ background: "var(--ai-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 16px" }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", marginBottom: 6 }}>🔄 生成草稿中…</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", marginBottom: 6 }}>生成草稿中…</div>
                   <div style={{ fontSize: 12, color: "var(--accent)" }}>Claude 生成腳本 + Flux 生成圖片（約 30–60 秒）</div>
                 </div>
               )}
@@ -917,7 +969,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                       color: canGenerate ? "var(--btn-primary-text)" : "var(--text-muted)",
                       fontSize: 15, fontWeight: 700, transition: "background 0.15s",
                     }}>
-                    {draftLoading ? "⏳ 草稿生成中…" : "📋 生成草稿"}
+                    {draftLoading ? "草稿生成中…" : "生成草稿"}
                   </button>
                 </div>
               </div>
@@ -926,15 +978,15 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
               <div style={{ background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: 10, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 6 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", marginBottom: 2, textTransform: "uppercase", letterSpacing: "0.05em" }}>目前設定</div>
                 {[
-                  { icon: "🖼", label: imageModel === "pexels-video" ? "真實影片 (Pexels)" : imageModel === "pexels-all" ? "照片動畫 (Pexels)" : (IMAGE_RATES[imageModel]?.label ?? imageModel) },
-                  { icon: "📽", label: providedScenes.length > 0 ? `${providedScenes.length} 場（前製腳本）` : imageModel === "pexels-video" || imageModel === "pexels-all" ? `${targetMinutes} 分鐘` : `${totalScenes} 場（AI ${customScenes} / B-roll ${brollScenes}）` },
-                  { icon: "🎙", label: VOICE_MODELS.find(v => v.id === voiceModelId)?.label ?? voiceModelId },
-                  { icon: "📐", label: orderedFormats.map(f => OUTPUT_LABELS[f]?.ratio ?? f).join(" + ") },
-                  ...(videoStyle ? [{ icon: "🎨", label: videoStyle }] : []),
-                  ...(introEnabled ? [{ icon: "🎬", label: `片頭動畫 ${introDuration}s` }] : []),
-                ].map(({ icon, label }) => (
-                  <div key={label} style={{ fontSize: 12, color: "var(--text-secondary)", display: "flex", gap: 6 }}>
-                    <span style={{ width: 18, flexShrink: 0 }}>{icon}</span>
+                  { key: "素材", label: isPexels ? (imageModel === "pexels-video" ? "真實影片" : "照片動畫") : (IMAGE_RATES[imageModel]?.label ?? imageModel) },
+                  { key: "場景", label: providedScenes.length > 0 ? `${providedScenes.length} 場（前製腳本）` : `${totalScenes} 場 / ${targetMinutes} 分鐘${!isPexels ? ` / AI ${customScenes}` : ""}` },
+                  { key: "配音", label: VOICE_MODELS.find(v => v.id === voiceModelId)?.label ?? voiceModelId },
+                  { key: "比例", label: orderedFormats.map(f => OUTPUT_LABELS[f]?.ratio ?? f).join(" + ") },
+                  ...(videoStyle ? [{ key: "風格", label: videoStyle }] : []),
+                  ...(introEnabled ? [{ key: "片頭", label: `${introDuration}s` }] : []),
+                ].map(({ key, label }) => (
+                  <div key={key} style={{ fontSize: 12, color: "var(--text-secondary)", display: "flex", gap: 8 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", minWidth: 26, paddingTop: 1, flexShrink: 0 }}>{key}</span>
                     <span>{label}</span>
                   </div>
                 ))}
