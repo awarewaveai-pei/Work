@@ -4,6 +4,37 @@
 
 ## 2026-06-24
 
+### refactor(video): VideoStudio 影片生產頁 UX 重設計 — 3 Tab + 2 欄佈局
+
+[任務理解] `/tools/video` 🎬影片生產 tab 原本 5 個區塊擠在單欄，整體雜亂。目標：清晰的 tab 分區 + checkout 風格雙欄（左表單、右 sticky 費用+CTA）。
+
+[已修改]
+- `app/tools/video/VideoStudio.tsx`：完整重寫
+  - 新增 `studioTab` state（`"generate" | "history" | "info"`）
+  - 🎬生成影片 tab：狀態機 4 相（done / loading / draftReady / idle-config）互斥渲染；idle 相用 `gridTemplateColumns: "1fr 320px"` 雙欄（左：①輸入+②設定；右：sticky ③費用+生成按鈕）
+  - 📋生成記錄 tab：歷史列表 + checkbox 批次刪除
+  - ℹ️說明&成本 tab：2欄格（pipeline 步驟卡 + 成本表）
+  - 修正 `errorMsg` prop gate（`genStatus === "error"` 嚴格判斷，防舊錯誤洩漏）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin | exit=0 | ms=<360000
+  - tsc typecheck: pass | vitest: 487/487 pass | healthcheck: healthy 7s | smoke: 4/4 OK
+  - deployed commit: fb11470bfb136393b7015d5977141ee9a75aa4be
+- REALTEST_EVIDENCE: tool=Bash | cmd=playwright smoke | exit=0 | ms=19400
+  - 26 passed / 6 skipped / 0 failed
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=VideoStudio|studioTab | hits=0 (no stale cross-file refs)
+- BUGHUNT_WAIVED: NA -- UI-only JSX layout refactor, no shared symbols changed
+
+[剩餘風險] 無
+
+[rollback]
+- `git revert fb11470b` → 還原到 f837a7c0（原始單欄版本）
+
+AUTO_TASK_DONE: VideoStudio UX 重設計部署完成
+
+---
+
 ### fix(social): ContentStudio 媒體類型架構修正（postizMediaType rename + confirm modal bug fix）
 
 [任務理解] 發現並修正 3 個 bug：(A) UX 順序悖論（媒體選擇器在生成按鈕下游，handleSyndicate 讀不到設定）；(B) `postizIncludeImg` dead state 永遠 false 破壞 confirm modal；(C) confirm modal 無影片媒體資訊。根本問題：一個 concern（分發媒體類型）橫跨錯誤的抽象邊界。
