@@ -20,6 +20,9 @@
 --   anon / authenticated roles have no access whatsoever.
 --   App code reaches this table only via the service-role Supabase client (lib/supabase-server.ts).
 --
+-- APPLY WITH: docker exec supabase-db psql -U supabase_admin -d postgres -f /tmp/0050_client_credentials.sql
+-- (postgres user lacks auth schema access for TO service_role policies; supabase_admin is required)
+--
 -- Down migration (rollback): packages/db/scripts/0050_client_credentials_down.sql
 --   DROP TABLE IF EXISTS client_credentials;
 --
