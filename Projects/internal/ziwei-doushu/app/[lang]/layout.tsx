@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import "../globals.css";
 import { locales, isLocale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
+import SystemNav from "@/components/SystemNav";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -43,13 +44,17 @@ export default async function LocaleLayout({
 }) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
+  const dict = await getDictionary(lang);
 
   return (
     <html
       lang={lang}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <SystemNav dict={dict} locale={lang} />
+        {children}
+      </body>
     </html>
   );
 }
