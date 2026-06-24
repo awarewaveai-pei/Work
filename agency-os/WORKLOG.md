@@ -139,6 +139,24 @@ git revert e0221df4 b1c9e59f 2e727fd8 && git push
 docker exec supabase-db psql -U supabase_admin -d postgres -c "DROP TABLE IF EXISTS public.client_credentials;"
 ```
 
+### feat(credentials): 批量匯入 AWARE_WAVE_CREDENTIALS.md → Vault
+
+[任務理解] 把 `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md` 所有憑證透過 DO $script$ 直接寫入 vault（secret_put）+ client_credentials（secret_ref），無繞過應用層。
+
+[已修改]
+- `/tmp/cred_import.sql`（EU VPS 暫檔，執行後已刪除）
+  - AwareWave Ops (39ad4149): hosting×6 + api×37 + analytics×3 + email×1 + cms×2 + other×2 = 51筆
+  - Soulful Expression (2bf60452): hosting×1 + cms×1 + api×5 + social×1 = 8筆
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec supabase-db psql -U supabase_admin -d postgres -f /tmp/cred_import.sql` | exit=0 | stdout=BEGIN/DO/COMMIT (no errors)
+- REALTEST_EVIDENCE: tool=SSH | cmd=`SELECT category, COUNT(*) FROM client_credentials GROUP BY category` | result=analytics:3 api:42 cms:3 email:1 hosting:7 other:2 social:1 → total=59 | exit=0
+- REVIEW_WAIVED: NA -- SQL 為純資料 INSERT+secret_put，無業務邏輯改動；secret_ref 全部更新（UPDATE WHERE id=cred_id 後有 secret_ref）
+- BUGHUNT_WAIVED: NA -- 純資料 bulk load，無 code call sites 新增；temp file 已從容器 + VPS 雙刪
+
+[剩餘風險]
+- WP Bridge Key SE-01 已 EXPOSED（note 有標記）→ 操作者需登入 WP admin revoke 重產
+
 AUTO_TASK_DONE: 憑證庫 (migration 0050 + 3 API routes + CredentialsTab UI) 全棧部署完成，26/32 smoke PASS
 
 ---
