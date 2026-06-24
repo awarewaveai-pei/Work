@@ -1166,7 +1166,7 @@ function SocialChannelsTab({ org }: Pick<ClientHubTabsProps, "org">) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-const TABS = ["內容工具", "整合", "佈建", "維護", "設定", "社群頻道"] as const;
+const TABS = ["內容工具", "整合", "佈建", "維護", "設定", "社群頻道", "憑證庫"] as const;
 type Tab = typeof TABS[number];
 
 export function ClientHubTabs(props: ClientHubTabsProps) {
@@ -1246,6 +1246,7 @@ export function ClientHubTabs(props: ClientHubTabsProps) {
         {activeTab === "維護" && <MaintenanceTab org={org} cfg={cfg} wp={wp} runs={runs} installRuns={installRuns} />}
         {activeTab === "設定" && <SettingsTab org={org} cfg={cfg} wpSites={wpSites} />}
         {activeTab === "社群頻道" && <SocialChannelsTab org={org} />}
+        {activeTab === "憑證庫" && <CredentialsTab org={org} />}
       </div>
     </div>
   );

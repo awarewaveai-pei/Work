@@ -48,3 +48,8 @@ export async function deleteSecret(name: string): Promise<boolean> {
 export function connectorSecretRef(connectorAccountId: string): string {
   return `co_connector:${connectorAccountId}`;
 }
+
+/** Deterministic vault ref for a client credential secret (migration 0050). */
+export function clientCredSecretRef(credentialId: string): string {
+  return `client_cred:${credentialId}`;
+}
