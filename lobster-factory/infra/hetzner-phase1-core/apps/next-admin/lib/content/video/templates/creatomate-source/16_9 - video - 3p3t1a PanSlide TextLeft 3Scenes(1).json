@@ -1,0 +1,258 @@
+{
+  "name": "Triple Slide Landscape",
+  "output_format": "mp4",
+  "width": 1920,
+  "height": 1080,
+  "duration": 20,
+  "snapshot_time": 1.6,
+  "fill_color": "rgba(255,255,255,1)",
+  "elements": [
+    {
+      "id": "9225386d-222b-42af-8345-62c90e23b3f2",
+      "name": "C1",
+      "type": "composition",
+      "track": 1,
+      "time": 0,
+      "duration": 6.774,
+      "elements": [
+        {
+          "id": "ebbcf2b9-496c-4a3c-986f-960892de91fd",
+          "name": "Image-1",
+          "type": "image",
+          "track": 1,
+          "time": 0,
+          "source": "219bfa78-e407-46b5-9cee-d3f85337905e",
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 0,
+              "duration": 4.011,
+              "easing": "linear",
+              "type": "pan",
+              "end_x": "50%",
+              "end_y": "0%",
+              "scope": "element",
+              "start_x": "50%",
+              "end_scale": "100%",
+              "start_scale": "113%"
+            }
+          ]
+        },
+        {
+          "id": "1f70e255-00d2-4412-9def-dafb30e95b69",
+          "name": "Text-1",
+          "type": "text",
+          "track": 2,
+          "time": 1,
+          "duration": 4.999,
+          "width": "81.9291%",
+          "height": "29.9565%",
+          "y_alignment": "50%",
+          "text": "Your first title or news headline here Your first title or news headline here",
+          "font_family": "Alata",
+          "font_size_maximum": "10 vmin",
+          "background_color": "rgba(255,255,255,0.75)",
+          "background_x_padding": "23%",
+          "background_y_padding": "8%",
+          "background_border_radius": "30%",
+          "background_align_threshold": "10%",
+          "fill_color": "#333333",
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 0,
+              "duration": 1,
+              "easing": "linear",
+              "type": "text-appear",
+              "fade": false,
+              "overlap": "0%",
+              "background_effect": "animated"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "9286eede-ea9d-4b4e-a071-c291a465de8f",
+      "name": "C2",
+      "type": "composition",
+      "track": 2,
+      "time": 5.8806,
+      "duration": 6.999,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1,
+          "easing": "quadratic-out",
+          "type": "slide",
+          "direction": "180°"
+        }
+      ],
+      "elements": [
+        {
+          "id": "1797bfd1-e035-45c2-9472-1b685ba5d3a5",
+          "name": "Image-2",
+          "type": "image",
+          "track": 1,
+          "time": 0,
+          "duration": 6.998,
+          "source": "45b68a10-c74a-4510-8ad5-1871242972ed",
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 0,
+              "duration": 4.07,
+              "easing": "linear",
+              "type": "pan",
+              "end_x": "50%",
+              "end_y": "0%",
+              "scope": "element",
+              "start_x": "50%",
+              "property": "animations",
+              "end_scale": "100%",
+              "start_scale": "113%"
+            }
+          ]
+        },
+        {
+          "id": "b8787b86-1bb3-4a28-b3bd-b8305c9f9e3d",
+          "name": "Text-2",
+          "type": "text",
+          "track": 2,
+          "time": 1.003,
+          "duration": 5.996,
+          "width": "81.9291%",
+          "height": "29.9565%",
+          "y_alignment": "50%",
+          "text": "Your first title or news headline here",
+          "font_family": "Alata",
+          "font_size_maximum": "10 vmin",
+          "background_color": "rgba(255,255,255,0.75)",
+          "background_x_padding": "23%",
+          "background_y_padding": "8%",
+          "background_border_radius": "30%",
+          "background_align_threshold": "10%",
+          "fill_color": "#333333",
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 0,
+              "duration": 1,
+              "easing": "linear",
+              "type": "text-appear",
+              "fade": false,
+              "overlap": "0%",
+              "background_effect": "animated"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "e31beb5f-14f3-44ee-8928-70c52a36b424",
+      "name": "C3",
+      "type": "composition",
+      "track": 3,
+      "time": 11.88,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1,
+          "easing": "quadratic-out",
+          "type": "slide",
+          "direction": "180°"
+        }
+      ],
+      "elements": [
+        {
+          "id": "529ccaf3-9368-4d13-808b-f28cd716f735",
+          "name": "Image-3",
+          "type": "image",
+          "track": 1,
+          "time": 0,
+          "source": "9a3f2ad3-c5f5-478d-8c1b-b148ccd62535",
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 0,
+              "duration": 5,
+              "easing": "linear",
+              "type": "pan",
+              "end_x": "50%",
+              "end_y": "0%",
+              "scope": "element",
+              "start_x": "50%",
+              "property": "animations",
+              "end_scale": "100%",
+              "start_scale": "113%"
+            }
+          ]
+        },
+        {
+          "id": "5de3e353-b6da-401f-b78c-79fa807ace7c",
+          "name": "Text-3",
+          "type": "text",
+          "track": 2,
+          "time": 1.949,
+          "duration": 6.999,
+          "width": "91.1771%",
+          "height": "83.6226%",
+          "y_alignment": "50%",
+          "text": "text text text text text text text text text text text text text text text text text text text text text text text text text text text text text text text text",
+          "font_family": "Alata",
+          "font_size_maximum": "8 vmin",
+          "background_color": "rgba(255,255,255,0.75)",
+          "background_x_padding": "23%",
+          "background_y_padding": "8%",
+          "background_border_radius": "30%",
+          "background_align_threshold": "10%",
+          "fill_color": "#333333",
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 0,
+              "duration": 1,
+              "easing": "linear",
+              "type": "text-appear",
+              "fade": false,
+              "overlap": "0%",
+              "background_effect": "animated"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "50656aca-d9d7-4e09-9235-889264640ee0",
+      "name": "logo",
+      "type": "image",
+      "track": 4,
+      "time": 0,
+      "x": "93.6091%",
+      "y": "10.2473%",
+      "width": "9.4354%",
+      "height": "15.636%",
+      "aspect_ratio": 1,
+      "source": "ec9eddf4-243b-4760-b197-c0442bb29d05",
+      "border_radius": "100 vmin",
+      "animations": [
+        {
+          "time": 0,
+          "duration": 0.99,
+          "easing": "quadratic-out",
+          "type": "fade",
+          "track": 0
+        }
+      ]
+    },
+    {
+      "id": "2ffcd39d-b333-49d1-9bd2-67957f4c7710",
+      "name": "music",
+      "type": "audio",
+      "track": 5,
+      "time": 0,
+      "duration": null,
+      "dynamic": true
+    }
+  ]
+}

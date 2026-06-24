@@ -1,0 +1,160 @@
+{
+  "output_format": "mp4",
+  "width": 1920,
+  "height": 1080,
+  "duration": 9.98,
+  "snapshot_time": 5.94,
+  "snapshot_location": "start",
+  "elements": [
+    {
+      "id": "e37d6a82-45b8-4f46-9b5d-bcede5ab35fb",
+      "type": "image",
+      "track": 1,
+      "time": 0,
+      "source": "7aed2f69-1749-413c-9637-4d462177a554",
+      "dynamic": true
+    },
+    {
+      "id": "37d63c37-5441-4b20-a140-b777704da01c",
+      "type": "composition",
+      "track": 2,
+      "time": 0,
+      "x": "8.6692%",
+      "y": "9.9096%",
+      "width": "82.6616%",
+      "height": null,
+      "x_anchor": "0%",
+      "y_anchor": "0%",
+      "animations": [
+        {
+          "time": "end",
+          "duration": 1,
+          "easing": "cubic-in",
+          "reversed": true,
+          "type": "fade"
+        }
+      ],
+      "elements": [
+        {
+          "id": "ed34fdea-94fa-4d53-80bb-94888d09a79b",
+          "name": "Shape-2Z5",
+          "type": "shape",
+          "track": 1,
+          "time": 0,
+          "x": "49.5386%",
+          "y": "53.9843%",
+          "width": "103.6911%",
+          "height": "118.714%",
+          "x_anchor": "50%",
+          "y_anchor": "50%",
+          "path": "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+          "fill_color": "rgba(87,87,87,0.41)",
+          "border_radius": "5 vmin"
+        },
+        {
+          "id": "af56ac82-5927-4880-a4cc-884ef61221ab",
+          "type": "composition",
+          "track": 2,
+          "time": 0,
+          "y": null,
+          "height": "11.6969 vmin",
+          "aspect_ratio": 7.067,
+          "x_alignment": "0%",
+          "animations": [
+            {
+              "time": 0,
+              "duration": 1.749,
+              "easing": "cubic-out",
+              "type": "fade",
+              "track": 0,
+              "property": "animations"
+            }
+          ],
+          "elements": [
+            {
+              "id": "82b5f647-8777-40b1-9721-ee930e71c995",
+              "name": "Handle",
+              "type": "text",
+              "track": 1,
+              "time": 0,
+              "x": "58.5547%",
+              "y": "77.9585%",
+              "width": "82.8905%",
+              "height": "44.0819%",
+              "y_alignment": "50%",
+              "text": "@OrganicAromas",
+              "font_weight": "600",
+              "fill_color": "rgba(255,255,255,1)"
+            },
+            {
+              "id": "ba8acd4e-d1b7-49cc-a550-75291d3b62d2",
+              "name": "Name",
+              "type": "text",
+              "track": 2,
+              "time": 0,
+              "x": "58.5547%",
+              "y": "28.4596%",
+              "width": "82.8903%",
+              "height": "56.9192%",
+              "y_alignment": "50%",
+              "text": "Organic Aromas®",
+              "font_weight": "700",
+              "fill_color": "rgba(255,255,255,1)"
+            },
+            {
+              "id": "f0ae69b5-8a9b-4fb5-861b-2d002afd6c68",
+              "name": "logo",
+              "type": "image",
+              "track": 3,
+              "time": 0,
+              "x": "6.7882%",
+              "width": "13.5763%",
+              "aspect_ratio": 1,
+              "source": "ec9eddf4-243b-4760-b197-c0442bb29d05",
+              "border_radius": "100 vmin"
+            }
+          ]
+        },
+        {
+          "id": "7cd2fa53-787f-4bbb-936b-8df1c306e403",
+          "name": "Message",
+          "type": "text",
+          "track": 3,
+          "time": 0,
+          "x": "0%",
+          "y": null,
+          "width": "99.8164%",
+          "height": "23.6745 vh",
+          "y_padding": "3.1 vh",
+          "x_anchor": "0%",
+          "y_anchor": "0%",
+          "text": "Cultivate an optimistic mind, use your imagination, always consider alternatives, and dare to believe that you can make possible what others think is impossible.",
+          "font_weight": "600",
+          "font_size_minimum": "5 vmin",
+          "line_height": "127%",
+          "fill_color": "rgba(255,255,255,1)",
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 0.782,
+              "duration": 5.178,
+              "easing": "quadratic-out",
+              "type": "text-appear",
+              "split": "letter",
+              "overlap": "3%"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bf62b13a-0e29-4217-864c-d939eaa67c24",
+      "name": "Music",
+      "type": "audio",
+      "track": 3,
+      "time": 0,
+      "duration": null,
+      "dynamic": true
+    }
+  ]
+}

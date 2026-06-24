@@ -1,0 +1,294 @@
+{
+  "output_format": "mp4",
+  "width": 1536,
+  "height": 1920,
+  "frame_rate": "60 fps",
+  "snapshot_time": 3.5,
+  "elements": [
+    {
+      "id": "82f45c55-41fa-4941-9e6c-b231e74d3cbe",
+      "name": "Composition-1",
+      "type": "composition",
+      "track": 1,
+      "duration": 5,
+      "elements": [
+        {
+          "id": "2c92ffd7-b5bc-4cc9-ad27-8f86cfe1a09d",
+          "name": "Image-1",
+          "type": "image",
+          "track": 1,
+          "time": 0,
+          "source": "4a7903f0-37bc-48df-9d83-5eb52afd5d07",
+          "dynamic": true,
+          "animations": [
+            {
+              "easing": "linear",
+              "type": "scale",
+              "fade": false,
+              "end_scale": "100%",
+              "start_scale": "150%"
+            }
+          ]
+        },
+        {
+          "id": "0cf1a646-4a53-4483-bea9-9ce8eff9101c",
+          "name": "Text-1",
+          "type": "text",
+          "track": 2,
+          "time": 0,
+          "y": "33%",
+          "width": "88%",
+          "height": "40%",
+          "x_alignment": "50%",
+          "y_alignment": "50%",
+          "text": "Did you know you can automate TikTok, Instagram, and YouTube videos? 🔥",
+          "font_family": "Montserrat",
+          "font_weight": "600",
+          "font_size_minimum": "7 vmin",
+          "line_height": "100%",
+          "fill_color": "#ffffff",
+          "stroke_color": "#000000",
+          "stroke_width": "1.05 vmin",
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 0,
+              "duration": 1.5,
+              "easing": "quadratic-out",
+              "type": "text-slide",
+              "scope": "split-clip",
+              "split": "line",
+              "distance": "100%",
+              "direction": "up",
+              "background_effect": "disabled"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "26bc2a23-52a2-4b4c-ab16-4847b84a87be",
+      "name": "Composition-2",
+      "type": "composition",
+      "track": 1,
+      "duration": 6,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 0.818,
+          "easing": "quadratic-out",
+          "transition": true,
+          "type": "wipe",
+          "x_anchor": "0%"
+        }
+      ],
+      "elements": [
+        {
+          "id": "859e205a-8a69-41ac-b2ff-bacce9de1c2f",
+          "name": "Image-2",
+          "type": "image",
+          "track": 1,
+          "time": 0,
+          "source": "4a6f6b28-bb42-4987-8eca-7ee36b347ee7",
+          "dynamic": true,
+          "animations": [
+            {
+              "easing": "linear",
+              "type": "scale",
+              "fade": false,
+              "end_scale": "150%",
+              "start_scale": "100%"
+            }
+          ]
+        },
+        {
+          "id": "83da183b-7929-4131-8d64-34e67228bf79",
+          "name": "Text-2",
+          "type": "text",
+          "track": 2,
+          "time": 0,
+          "width": "88%",
+          "height": "40%",
+          "x_alignment": "50%",
+          "y_alignment": "50%",
+          "text": "Use any video automation tool to replace these text and background assets with your own! 😊",
+          "font_family": "Montserrat",
+          "font_weight": "600",
+          "font_size_minimum": "7 vmin",
+          "line_height": "100%",
+          "fill_color": "#ffffff",
+          "stroke_color": "#000000",
+          "stroke_width": "1.05 vmin",
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 1,
+              "duration": 5,
+              "easing": "quadratic-out",
+              "type": "text-typewriter",
+              "typing_start": 0,
+              "typing_duration": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "59073a38-f091-4b1b-8550-b5bb831cb839",
+      "name": "Composition-3",
+      "type": "composition",
+      "track": 1,
+      "duration": 6,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1.114,
+          "transition": true,
+          "type": "circular-wipe",
+          "fade": false
+        }
+      ],
+      "elements": [
+        {
+          "id": "a138cb79-7002-4f18-9145-b3d87461cbea",
+          "name": "Image-3",
+          "type": "video",
+          "track": 1,
+          "time": 0,
+          "duration": null,
+          "source": "4f6963a5-7286-450b-bc64-f87a3a1d8964",
+          "dynamic": true
+        },
+        {
+          "id": "659ba5fc-658b-4166-ac18-d3a552d9fdae",
+          "name": "Text-3",
+          "type": "text",
+          "track": 2,
+          "time": 0,
+          "y": "66%",
+          "width": "88%",
+          "height": "40%",
+          "x_alignment": "50%",
+          "y_alignment": "50%",
+          "text": "Learn how to get started on the Guides & Tutorials page on Creatomate's home page.",
+          "font_family": "Montserrat",
+          "font_weight": "600",
+          "font_size_minimum": "7 vmin",
+          "line_height": "100%",
+          "fill_color": "#ffffff",
+          "stroke_color": "#000000",
+          "stroke_width": "1.05 vmin",
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 1,
+              "duration": 1.5,
+              "easing": "quadratic-out",
+              "type": "text-slide",
+              "fade": false,
+              "scope": "element",
+              "split": "line",
+              "distance": "200%",
+              "direction": "right",
+              "background_effect": "sliding"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bf5d3064-e22c-4a04-abab-c8dd595534d4",
+      "name": "Composition-4",
+      "type": "composition",
+      "track": 1,
+      "duration": 6,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1,
+          "transition": true,
+          "type": "fade"
+        }
+      ],
+      "elements": [
+        {
+          "id": "beaab5d7-7e2c-4fb0-b3e9-210f68611a8d",
+          "name": "Image-4",
+          "type": "video",
+          "track": 1,
+          "time": 0,
+          "duration": null,
+          "source": "36899eae-a128-43e6-9e97-f2076f54ea18",
+          "dynamic": true
+        },
+        {
+          "id": "730ec258-79ac-4e12-beaf-6ce68f1bd5b1",
+          "name": "Text-4",
+          "type": "text",
+          "track": 2,
+          "time": 0,
+          "y": "33%",
+          "width": "88%",
+          "height": "40%",
+          "x_alignment": "50%",
+          "y_alignment": "50%",
+          "text": "Use the template editor to completely customize this video to meet your own needs. 🚀",
+          "font_family": "Montserrat",
+          "font_weight": "600",
+          "font_size_minimum": "7 vmin",
+          "line_height": "100%",
+          "fill_color": "#ffffff",
+          "stroke_color": "#000000",
+          "stroke_width": "1.05 vmin",
+          "dynamic": true,
+          "animations": [
+            {
+              "easing": "linear",
+              "type": "wiggle",
+              "frequency": "0.5 Hz",
+              "z_rotation": "4°",
+              "ramp_duration": "0%"
+            },
+            {
+              "time": 1,
+              "duration": 1.5,
+              "easing": "quadratic-out",
+              "type": "text-fly",
+              "split": "line"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cd6f78f9-2cb4-4868-9caf-cead9df8f2c7",
+      "name": "logo",
+      "type": "image",
+      "track": 2,
+      "time": 0,
+      "x": "87.8331%",
+      "y": "89.5335%",
+      "width": "17.3395%",
+      "height": "13.7278%",
+      "source": "e36edca6-0be9-4e90-8605-4392bce13493",
+      "animations": [
+        {
+          "time": 0,
+          "duration": 0.99,
+          "easing": "quadratic-out",
+          "type": "fade",
+          "track": 0
+        }
+      ]
+    },
+    {
+      "id": "fbfdcf2c-f914-4820-94d1-4d737a28a91d",
+      "name": "Music",
+      "type": "audio",
+      "track": 3,
+      "time": 0,
+      "duration": null,
+      "dynamic": true
+    }
+  ]
+}

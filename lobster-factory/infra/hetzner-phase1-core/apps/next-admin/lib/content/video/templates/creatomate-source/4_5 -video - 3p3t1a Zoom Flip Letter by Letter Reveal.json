@@ -1,0 +1,406 @@
+{
+  "output_format": "mp4",
+  "width": 1536,
+  "height": 1920,
+  "duration": 25,
+  "snapshot_time": 2.36,
+  "elements": [
+    {
+      "id": "8d1365e6-427d-429e-b607-8ccdfc9c0421",
+      "name": "Image 1",
+      "type": "image",
+      "track": 1,
+      "time": 0,
+      "source": "a85070c0-3ffa-4178-8267-ba239c85ee61",
+      "clip": true,
+      "dynamic": true,
+      "animations": [
+        {
+          "easing": "quadratic-out",
+          "type": "scale",
+          "fade": false,
+          "end_scale": "140%",
+          "start_scale": "100%"
+        }
+      ]
+    },
+    {
+      "id": "d6945da3-c586-4f2a-977f-bbe28e4f579d",
+      "name": "C1",
+      "type": "composition",
+      "track": 2,
+      "time": 2,
+      "duration": 6,
+      "y": [
+        {
+          "time": 0,
+          "easing": "cubic-out",
+          "value": "54.732%"
+        },
+        {
+          "time": 1.39,
+          "easing": "cubic-out",
+          "value": "50%"
+        }
+      ],
+      "width": "75%",
+      "height": [
+        {
+          "time": 0,
+          "easing": "cubic-out",
+          "value": "9.464%"
+        },
+        {
+          "time": 1.39,
+          "easing": "cubic-out",
+          "value": "77.3032%"
+        }
+      ],
+      "elements": [
+        {
+          "id": "6b80adc6-6afc-4fe8-8f90-dd72db325619",
+          "type": "shape",
+          "track": 1,
+          "time": 0,
+          "width": "100%",
+          "height": "100%",
+          "path": "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+          "stroke_color": "rgba(255,255,255,1)",
+          "stroke_width": "2.8 vmin"
+        },
+        {
+          "id": "495890a8-4632-488b-951f-f21716a516af",
+          "name": "Image 1",
+          "type": "image",
+          "track": 2,
+          "time": 0,
+          "source": "a85070c0-3ffa-4178-8267-ba239c85ee61",
+          "clip": true,
+          "dynamic": true
+        },
+        {
+          "id": "dd9d0252-b981-41fd-83b7-83d010756de1",
+          "type": "shape",
+          "track": 3,
+          "time": 0,
+          "x": "0%",
+          "y": "100%",
+          "width": "100%",
+          "height": "10.32 vh",
+          "x_anchor": "0%",
+          "y_anchor": "100%",
+          "path": "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+          "fill_color": "rgba(255,255,255,1)"
+        },
+        {
+          "id": "bb63f9ea-e223-4f73-a633-e0b529de7b61",
+          "name": "logo",
+          "type": "image",
+          "track": 4,
+          "time": 0.94,
+          "x": "88.3103%",
+          "y": "93.5465%",
+          "width": "18.7397%",
+          "height": "12.9071%",
+          "source": "e36edca6-0be9-4e90-8605-4392bce13493"
+        },
+        {
+          "id": "acabe053-7559-4efc-a553-3853958d1aa6",
+          "name": "Text 1",
+          "type": "text",
+          "track": 5,
+          "time": 1.05,
+          "x": "6.3815%",
+          "y": "98.417%",
+          "width": "87.2371%",
+          "height": "7.1032 vh",
+          "x_anchor": "0%",
+          "y_anchor": "100%",
+          "x_alignment": "50%",
+          "y_alignment": "50%",
+          "text": "This week's winner",
+          "font_family": "Just Another Hand",
+          "font_size_minimum": "6 vmin",
+          "fill_color": "rgba(0,0,0,1)",
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 0,
+              "duration": 1.33,
+              "easing": "cubic-out",
+              "type": "text-appear",
+              "split": "letter",
+              "random": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1757a40f-e35b-4dc4-aa63-a8177a9ae25a",
+      "name": "C2",
+      "type": "composition",
+      "track": 2,
+      "duration": 8.083,
+      "width": "75%",
+      "height": "77.3032%",
+      "fill_color": "rgba(255,255,255,1)",
+      "border_radius": "1.3 vmin",
+      "clip": true,
+      "warp_matrix": [
+        [
+          {
+            "x": "0%",
+            "y": "0%"
+          },
+          {
+            "x": "100%",
+            "y": "0%"
+          }
+        ],
+        [
+          {
+            "x": "0%",
+            "y": "100%"
+          },
+          {
+            "x": "100%",
+            "y": "100%"
+          }
+        ]
+      ],
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1.993,
+          "transition": true,
+          "type": "flip",
+          "fade": false,
+          "y_rotation": "-180°"
+        }
+      ],
+      "elements": [
+        {
+          "id": "904b9e6f-91d6-441c-89cf-481ca084c30b",
+          "name": "Image 2",
+          "type": "image",
+          "track": 1,
+          "time": 0,
+          "width": "99.9961%",
+          "height": "99.996%",
+          "source": "4b29e591-32af-436a-b36d-cd56e1424cd8",
+          "clip": true,
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 0,
+              "duration": 4.092,
+              "easing": "quadratic-out",
+              "type": "scale",
+              "start_scale": "150%"
+            }
+          ]
+        },
+        {
+          "id": "8d24da83-d269-41ae-b70d-9b01f2f1f6a5",
+          "name": "Text 2",
+          "type": "text",
+          "track": 2,
+          "time": 2.348,
+          "x": "5.6522%",
+          "y": "93.2059%",
+          "width": "88.6956%",
+          "height": "33.3995 vh",
+          "x_anchor": "0%",
+          "y_anchor": "100%",
+          "x_alignment": "50%",
+          "text": "Elisabeth Parker b alabala balabalab alabala balabalabalElisabeth Parker b alabala balabalab alabala balabalabalElisabeth Parker b alabala balabalab alabala balabalabalElisabeth Parker b alabala balabalab alabala balabalabal",
+          "font_family": "Just Another Hand",
+          "font_size_maximum": "8 vmin",
+          "fill_color": "#ffffff",
+          "stroke_color": "#000000",
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 0,
+              "duration": 3.12,
+              "easing": "cubic-out",
+              "type": "text-appear",
+              "split": "letter",
+              "random": true
+            }
+          ]
+        },
+        {
+          "id": "d7ee53fb-1c94-43ca-88a4-9f55eb02dca0",
+          "name": "Text 1",
+          "type": "text",
+          "track": 3,
+          "time": 1.339,
+          "x": "5.6522%",
+          "y": "44.4277%",
+          "width": "88.6956%",
+          "height": "16.6501 vh",
+          "x_anchor": "0%",
+          "y_anchor": "100%",
+          "x_alignment": "50%",
+          "text": "This week's winner This week's winner This week's winner This week's winner",
+          "font_family": "Just Another Hand",
+          "font_size_maximum": "10 vmin",
+          "line_height": "80%",
+          "fill_color": "#ffffff",
+          "stroke_color": "#000000",
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 0.059,
+              "duration": 1.33,
+              "easing": "cubic-out",
+              "type": "text-appear",
+              "split": "letter",
+              "random": true
+            }
+          ]
+        },
+        {
+          "id": "9e35de82-beff-4486-b0c9-fdfdd34bee05",
+          "name": "logo",
+          "type": "image",
+          "track": 4,
+          "time": 0,
+          "x": "84.5427%",
+          "y": "12.3397%",
+          "width": "21.8453%",
+          "height": "16.6967%",
+          "source": "e36edca6-0be9-4e90-8605-4392bce13493"
+        }
+      ]
+    },
+    {
+      "id": "dd95cbf3-8377-447e-9c80-ed3d4d92138a",
+      "name": "music",
+      "type": "audio",
+      "track": 3,
+      "time": 0,
+      "duration": null,
+      "dynamic": true
+    },
+    {
+      "id": "c34dc274-d54f-430d-9d52-5c6beacf4c02",
+      "name": "C3",
+      "type": "composition",
+      "track": 4,
+      "time": 10.445,
+      "x": "50.2217%",
+      "y": "49.9768%",
+      "width": "100.4433%",
+      "height": "99.9536%",
+      "fill_color": "rgba(255,255,255,1)",
+      "border_radius": "1.3 vmin",
+      "clip": true,
+      "warp_matrix": [
+        [
+          {
+            "x": "0%",
+            "y": "0%"
+          },
+          {
+            "x": "100%",
+            "y": "0%"
+          }
+        ],
+        [
+          {
+            "x": "0%",
+            "y": "100%"
+          },
+          {
+            "x": "100%",
+            "y": "100%"
+          }
+        ]
+      ],
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1.979,
+          "easing": "cubic-bezier(0.46, 0.47, 0.61, 0.62)",
+          "transition": true,
+          "type": "flip",
+          "fade": false,
+          "x_anchor": "0%",
+          "y_anchor": "25%"
+        }
+      ],
+      "elements": [
+        {
+          "id": "d3157a75-a920-4641-8b27-f27c87ca6d3d",
+          "name": "Image 3",
+          "type": "image",
+          "track": 1,
+          "time": 0,
+          "source": "b5f432c4-485f-4c05-9f7f-dcc6928336a9",
+          "clip": true,
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 0,
+              "duration": 1,
+              "transition": true,
+              "type": "flip",
+              "fade": false
+            }
+          ]
+        },
+        {
+          "id": "3d04240d-a5c0-49b3-a02e-e7515d872919",
+          "name": "Text 3",
+          "type": "text",
+          "track": 2,
+          "time": 1.963,
+          "width": "75%",
+          "height": "75%",
+          "y_alignment": "50%",
+          "text": "Your text here Your text here Your text here Your text here Your text here Your text here Your text here Your text here.... \n\n",
+          "font_family": "Just Another Hand",
+          "font_size_minimum": "5 vmin",
+          "background_color": "rgba(0,0,0,0.5)",
+          "background_border_radius": "30%",
+          "fill_color": "#ffffff",
+          "stroke_color": "#333333",
+          "stroke_width": "0.5 vmin",
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 0,
+              "duration": 3.2,
+              "easing": "quadratic-out",
+              "type": "text-appear",
+              "split": "word"
+            }
+          ]
+        },
+        {
+          "id": "abc4e7ca-161e-48d1-92bc-23cda566bd10",
+          "name": "logo",
+          "type": "image",
+          "track": 3,
+          "time": 4.731,
+          "x": "89.9752%",
+          "y": "92.3769%",
+          "width": "13.8798%",
+          "height": "10.9425%",
+          "source": "e36edca6-0be9-4e90-8605-4392bce13493",
+          "animations": [
+            {
+              "time": 0,
+              "duration": 1,
+              "easing": "quadratic-out",
+              "type": "fade"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

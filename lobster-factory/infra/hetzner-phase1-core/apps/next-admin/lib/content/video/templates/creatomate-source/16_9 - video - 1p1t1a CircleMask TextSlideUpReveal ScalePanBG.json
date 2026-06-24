@@ -1,0 +1,204 @@
+{
+  "output_format": "mp4",
+  "width": 1920,
+  "height": 1080,
+  "duration": 20,
+  "snapshot_time": 3.11,
+  "fill_color": "rgba(255,150,162,1)",
+  "elements": [
+    {
+      "id": "25ba529f-0a9c-40ae-8831-d806221ab2b5",
+      "type": "composition",
+      "track": 1,
+      "time": 0,
+      "x": "25.9592%",
+      "width": "92.2996 vh",
+      "height": "100 vh",
+      "clip": true,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1,
+          "easing": "quadratic-out",
+          "type": "fade"
+        }
+      ],
+      "elements": [
+        {
+          "id": "ecd95fa2-4df9-4ce2-823e-299b90110c34",
+          "name": "Image1",
+          "type": "image",
+          "track": 1,
+          "time": 0,
+          "source": "0649c6b8-34d4-4360-8dff-8888418f5dc7",
+          "dynamic": true,
+          "animations": [
+            {
+              "easing": "sinusoid-out",
+              "type": "scale",
+              "fade": false,
+              "x_anchor": "0%",
+              "end_scale": "120%",
+              "start_scale": "100%"
+            }
+          ]
+        },
+        {
+          "id": "9378299b-f905-4245-bf9a-9d6b724c4fc3",
+          "name": "Circle-Mask",
+          "type": "shape",
+          "track": 2,
+          "time": 0,
+          "x": "27.1523%",
+          "width": "145.6955%",
+          "height": "134.4762%",
+          "x_anchor": "50%",
+          "y_anchor": "50%",
+          "path": "M 50 0 C 77.61 0 100 22.39 100 50 C 100 77.61 77.61 100 50 100 C 22.39 100 0 77.61 0 50 C 0 22.39 22.39 0 50 0 Z",
+          "fill_color": "#333333",
+          "mask_mode": "alpha",
+          "animations": [
+            {
+              "time": 0,
+              "duration": 1,
+              "easing": "quadratic-out",
+              "type": "scale",
+              "x_anchor": "50%",
+              "y_anchor": "50%",
+              "start_scale": "0"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4d44bf96-b2e9-47cf-a0e8-7697fdf4aff8",
+      "name": "Text1",
+      "type": "text",
+      "track": 2,
+      "time": 1,
+      "x": "77.5969%",
+      "y": "51.3252%",
+      "width": "40.3829%",
+      "height": "36.5361%",
+      "y_alignment": "50%",
+      "text": "10 Tips for Working Remotely While Traveling",
+      "font_family": "Inter",
+      "font_weight": "700",
+      "font_size_minimum": "7 vmin",
+      "fill_color": "#ffffff",
+      "stroke_color": "#333333",
+      "stroke_cap": "butt",
+      "stroke_join": "miter",
+      "dynamic": true,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1,
+          "easing": "quadratic-out",
+          "type": "text-slide",
+          "scope": "split-clip",
+          "split": "line",
+          "direction": "up"
+        }
+      ]
+    },
+    {
+      "id": "200b52ec-5227-4635-bb92-f074229766f8",
+      "name": "Brand name",
+      "type": "text",
+      "track": 3,
+      "time": 0.5,
+      "x": "57.4055%",
+      "y": "11.4927%",
+      "width": "27.2599%",
+      "x_anchor": "0%",
+      "y_anchor": "0%",
+      "x_alignment": "50%",
+      "y_alignment": "50%",
+      "text": "Organic Aromas®",
+      "font_family": "Inter",
+      "font_weight": "900",
+      "text_wrap": false,
+      "text_transform": "uppercase",
+      "background_color": "#2eb0a4",
+      "background_x_padding": "108%",
+      "background_y_padding": "58%",
+      "fill_color": "#ffffff",
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1,
+          "easing": "quadratic-out",
+          "type": "text-slide",
+          "scope": "split-clip",
+          "split": "word",
+          "direction": "up"
+        }
+      ]
+    },
+    {
+      "id": "ae27914b-d159-448a-9218-df15e3b7a4d0",
+      "name": "pure and simple",
+      "type": "text",
+      "track": 4,
+      "time": 1.5,
+      "x": "58%",
+      "y": "74.0101%",
+      "x_anchor": "0%",
+      "y_anchor": "0%",
+      "x_alignment": "50%",
+      "y_alignment": "50%",
+      "text": "Pure and Simple",
+      "font_family": "Inter",
+      "font_weight": "600",
+      "font_size": "4.41 vmin",
+      "text_wrap": false,
+      "fill_color": "#ff96a0",
+      "stroke_color": "#ffffff",
+      "stroke_width": "0.9 vmin",
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1,
+          "easing": "quadratic-out",
+          "type": "text-slide",
+          "scope": "split-clip",
+          "split": "word",
+          "direction": "up"
+        }
+      ]
+    },
+    {
+      "id": "9d626321-2104-49d4-bd4b-72345e29f3a3",
+      "name": "logo-OA",
+      "type": "image",
+      "track": 5,
+      "time": 0,
+      "x": "5.8396%",
+      "y": "9.3349%",
+      "width": "6.6196%",
+      "height": "15.1683%",
+      "aspect_ratio": 1,
+      "source": "ec9eddf4-243b-4760-b197-c0442bb29d05",
+      "border_radius": "100 vmin",
+      "animations": [
+        {
+          "time": 1.51,
+          "duration": 0.99,
+          "easing": "quadratic-out",
+          "type": "fade"
+        }
+      ]
+    },
+    {
+      "id": "f08ebf96-8ecd-4326-b502-7c61e1f4c57e",
+      "name": "music",
+      "type": "audio",
+      "track": 6,
+      "time": 0,
+      "duration": null,
+      "dynamic": true
+    }
+  ]
+}

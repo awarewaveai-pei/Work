@@ -1,0 +1,237 @@
+{
+  "output_format": "mp4",
+  "width": 1080,
+  "height": 720,
+  "duration": 20,
+  "snapshot_time": 1.28,
+  "elements": [
+    {
+      "id": "7d4ab9e2-e4b0-4f8f-b666-e7d34ed964a7",
+      "name": "Shape-KWK",
+      "type": "shape",
+      "track": 1,
+      "time": 0,
+      "width": "100%",
+      "height": "100%",
+      "x_anchor": "50%",
+      "y_anchor": "50%",
+      "path": "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+      "fill_color": "rgba(46,176,164,1)"
+    },
+    {
+      "id": "9ad80b3a-cc96-4a84-a0ec-e19464456820",
+      "name": "logo",
+      "type": "image",
+      "track": 4,
+      "time": 0,
+      "width": "65.9722%",
+      "height": "36.8055%",
+      "source": "dcb37c53-379b-4d31-8196-48a010739ce5"
+    },
+    {
+      "id": "399592ab-7edd-4062-88ca-dc3980e400d7",
+      "name": "C1",
+      "type": "composition",
+      "track": 7,
+      "time": 0.763,
+      "animations": [
+        {
+          "time": 0.054,
+          "duration": 1,
+          "easing": "cubic-bezier(0, 0.01, 1, 0.99)",
+          "transition": true,
+          "type": "color-wipe",
+          "color": "#2EB0A4",
+          "direction": "left"
+        }
+      ],
+      "elements": [
+        {
+          "id": "bc613b3c-f256-4fe5-ae3b-ba1e20a9dc11",
+          "name": "Image1",
+          "type": "image",
+          "track": 1,
+          "time": 0,
+          "source": "99bac41d-843f-46fb-ab15-246aee6d68bd",
+          "color_overlay": "rgba(0,0,0,0)",
+          "dynamic": true
+        },
+        {
+          "id": "ca0ff506-403f-43f7-8862-db1a9e8b0f12",
+          "name": "logo",
+          "type": "image",
+          "track": 2,
+          "time": 0,
+          "x": "93.33%",
+          "y": "10.217%",
+          "width": "9.4744%",
+          "height": "13.8529%",
+          "source": "e36edca6-0be9-4e90-8605-4392bce13493"
+        }
+      ]
+    },
+    {
+      "id": "0133b8a0-8f7b-4c9e-95af-a6ec62007e4c",
+      "name": "C2",
+      "type": "composition",
+      "track": 8,
+      "time": 0,
+      "elements": [
+        {
+          "id": "d5e1ba06-6401-477a-8cc4-8d5e523da258",
+          "name": "Shape-PSF",
+          "type": "shape",
+          "track": 1,
+          "time": 3,
+          "width": "85.8603%",
+          "height": "37.2578%",
+          "x_anchor": "50%",
+          "y_anchor": "50%",
+          "path": "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+          "fill_color": "#ff96a0",
+          "border_radius": "1 vmin"
+        },
+        {
+          "id": "0cf1a646-4a53-4483-bea9-9ce8eff9101c",
+          "name": "Text1",
+          "type": "text",
+          "track": 2,
+          "time": 1.99,
+          "x": "50.1168%",
+          "width": "82.6918%",
+          "height": "37.71%",
+          "x_alignment": "50%",
+          "text": "this is the title with animation this is the title with animation",
+          "font_family": "Montserrat",
+          "font_weight": "700",
+          "background_color": "rgba(255,150,162,0)",
+          "background_x_padding": "26%",
+          "background_y_padding": "7%",
+          "fill_color": "#ffffff",
+          "stroke_color": "#2a2a2a",
+          "stroke_width": "1.05 vmin",
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 0,
+              "duration": 2.006,
+              "easing": "cubic-bezier(0.44, 0.1, 0.58, 0.91)",
+              "transition": true,
+              "type": "color-wipe",
+              "color": "#2EB0A4",
+              "direction": "left"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "7fbc25a1-6f54-44b9-bc78-ca6b7a8fe4bd",
+      "name": "music",
+      "type": "audio",
+      "track": 9,
+      "time": 0,
+      "duration": null,
+      "dynamic": true
+    },
+    {
+      "id": "67eaf8b3-754a-407e-92ce-abae45b73c5c",
+      "name": "Image2",
+      "type": "image",
+      "track": 10,
+      "time": 5.621,
+      "source": "36242fe9-2224-4180-9554-26223d8a1bfa",
+      "dynamic": true,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1,
+          "transition": true,
+          "type": "wipe",
+          "fade": false,
+          "end_angle": "45°",
+          "start_angle": "45°"
+        }
+      ]
+    },
+    {
+      "id": "fdd17bb5-45a1-435c-b7d2-781e868503ae",
+      "name": "Text2",
+      "type": "text",
+      "track": 11,
+      "time": 7.276,
+      "x": "50.1168%",
+      "width": "82.6918%",
+      "height": "37.71%",
+      "x_alignment": "50%",
+      "text": "this is the title with animation",
+      "font_family": "Montserrat",
+      "font_weight": "700",
+      "background_color": "rgba(255,150,162,0)",
+      "background_x_padding": "26%",
+      "background_y_padding": "7%",
+      "fill_color": "#ffffff",
+      "stroke_color": "#2a2a2a",
+      "stroke_width": "1.05 vmin",
+      "dynamic": true,
+      "animations": [
+        {
+          "time": -0.15,
+          "duration": 1.026,
+          "transition": true,
+          "type": "wipe",
+          "fade": false,
+          "end_angle": "45°",
+          "start_angle": "45°"
+        }
+      ]
+    },
+    {
+      "id": "2ad8bd53-4af1-4c6c-b10d-a0b36e8f199e",
+      "name": "Image3",
+      "type": "image",
+      "track": 12,
+      "time": 11.263,
+      "source": "dd8672e1-7cdc-4d69-a073-879437ab9811",
+      "dynamic": true,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1,
+          "transition": true,
+          "type": "circular-wipe",
+          "y_anchor": "100%"
+        }
+      ]
+    },
+    {
+      "id": "f826f8fa-8b1e-4a29-a098-795565f148ad",
+      "name": "Text3",
+      "type": "text",
+      "track": 13,
+      "time": 13,
+      "x": "50.1168%",
+      "width": "82.6918%",
+      "height": "37.71%",
+      "x_alignment": "50%",
+      "text": "this is the title with animation",
+      "font_family": "Montserrat",
+      "font_weight": "700",
+      "background_color": "rgba(255,150,162,0)",
+      "background_x_padding": "26%",
+      "background_y_padding": "7%",
+      "fill_color": "#ffffff",
+      "stroke_color": "#2a2a2a",
+      "stroke_width": "1.05 vmin",
+      "dynamic": true,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1,
+          "transition": true,
+          "type": "circular-wipe"
+        }
+      ]
+    }
+  ]
+}
