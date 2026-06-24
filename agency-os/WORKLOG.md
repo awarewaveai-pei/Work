@@ -14323,3 +14323,4 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 
 
 
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): structural DOM move, toolbar inside filter-panel, no logic change
