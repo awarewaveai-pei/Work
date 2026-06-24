@@ -1421,42 +1421,62 @@ export default function TarotStudio() {
               <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 10 }}>
                 {STYLE_PRESETS.filter((p) => p.group === styleGroupTab).map((p) => {
                   const selected = styleTokens.includes(p.zh);
+                  const hasDesc = p.zh.includes("｜");
+                  const desc = hasDesc ? p.zh.split("｜")[1] : null;
                   return (
-                    <button
-                      key={p.zh}
-                      type="button"
-                      disabled={locked}
-                      onClick={() =>
-                        setStylePrompt((prev) => {
-                          const toks = prev.split(",").map((s) => s.trim()).filter(Boolean);
-                          const i = toks.indexOf(p.zh);
-                          if (i >= 0) toks.splice(i, 1);
-                          else toks.push(p.zh);
-                          return toks.join(", ");
-                        })
-                      }
-                      onMouseEnter={() => setHoveredStyleDesc(p.zh.includes("｜") ? p.zh.split("｜")[1] : null)}
-                      onMouseLeave={() => setHoveredStyleDesc(null)}
-                      style={{
-                        padding: "3px 9px", borderRadius: 12, fontSize: 11,
-                        cursor: locked ? "default" : "pointer",
-                        border: `1px solid ${selected ? "var(--accent)" : "var(--card-border)"}`,
-                        background: selected ? "rgba(99,102,241,0.12)" : "rgba(127,127,127,0.04)",
-                        color: selected ? "var(--accent)" : "var(--text-muted)",
-                        fontWeight: selected ? 600 : 400,
-                        opacity: locked ? 0.5 : 1,
-                      }}
-                    >
-                      {selected ? "✓ " : ""}{p.zh.split("｜")[0]}
-                    </button>
+                    <span key={p.zh} style={{ position: "relative", display: "inline-block" }}>
+                      <button
+                        type="button"
+                        disabled={locked}
+                        onClick={() =>
+                          setStylePrompt((prev) => {
+                            const toks = prev.split(",").map((s) => s.trim()).filter(Boolean);
+                            const i = toks.indexOf(p.zh);
+                            if (i >= 0) toks.splice(i, 1);
+                            else toks.push(p.zh);
+                            return toks.join(", ");
+                          })
+                        }
+                        onMouseEnter={() => setHoveredStyleDesc(hasDesc ? p.zh : null)}
+                        onMouseLeave={() => setHoveredStyleDesc(null)}
+                        style={{
+                          padding: "3px 9px", borderRadius: 12, fontSize: 11,
+                          cursor: locked ? "default" : "pointer",
+                          border: `1px solid ${selected ? "var(--accent)" : "var(--card-border)"}`,
+                          background: selected ? "rgba(99,102,241,0.12)" : "rgba(127,127,127,0.04)",
+                          color: selected ? "var(--accent)" : "var(--text-muted)",
+                          fontWeight: selected ? 600 : 400,
+                          opacity: locked ? 0.5 : 1,
+                        }}
+                      >
+                        {selected ? "✓ " : ""}{p.zh.split("｜")[0]}
+                      </button>
+                      {hoveredStyleDesc === p.zh && desc && (
+                        <div style={{
+                          position: "absolute",
+                          bottom: "calc(100% + 6px)",
+                          left: "50%",
+                          transform: "translateX(-50%)",
+                          background: "var(--card-bg, #1e1e2e)",
+                          border: "1px solid var(--accent)",
+                          borderRadius: 8,
+                          padding: "6px 12px",
+                          fontSize: 12,
+                          fontWeight: 500,
+                          color: "var(--text)",
+                          whiteSpace: "nowrap",
+                          zIndex: 999,
+                          boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+                          pointerEvents: "none",
+                          lineHeight: 1.4,
+                        }}>
+                          {desc}
+                        </div>
+                      )}
+                    </span>
                   );
                 })}
               </div>
-              {hoveredStyleDesc && (
-                <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 6, lineHeight: 1.4, minHeight: 28 }}>
-                  {hoveredStyleDesc}
-                </div>
-              )}
               <textarea
                 className="form-textarea"
                 style={{ minHeight: 52, fontSize: 12 }}
