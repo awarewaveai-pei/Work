@@ -186,7 +186,7 @@ export default function TarotStudio() {
   const [styleGroupTab, setStyleGroupTab] = useState<string>("西方畫家");
   const [modelProviderTab, setModelProviderTab] = useState<string>("BFL");
   const [panelOpen, setPanelOpen] = useState<Record<string, boolean>>({
-    model: false, style: false, subject: false, mode: false, template: false, grade: false,
+    model: false, style: false, subject: false, mode: false, template: false, grade: false, edit: false,
   });
   function togglePanel(key: string) {
     setPanelOpen((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -877,53 +877,6 @@ export default function TarotStudio() {
                     hideQuickEdit
                   />
                 </div>
-                <div style={{ marginTop: 12 }}>
-                  <button
-                    className="btn-secondary"
-                    style={{ width: "100%", marginBottom: 8 }}
-                    onClick={() =>
-                      openInCanvas(
-                        previewImage,
-                        buildSemanticBase({
-                          product: "塔羅卡",
-                          subject: subjectText.trim() || undefined,
-                          style: stylePrompt.trim() || undefined,
-                          track: "編輯",
-                        }),
-                      )
-                    }
-                  >
-                    ✏️ 快速編輯
-                  </button>
-                  <ImageEditPromptPanel
-                    sourceImage={previewImage}
-                    currentPrompt={buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectText })}
-                    imageModel={activeModel}
-                    target="tarot-preview"
-                    generateEndpoint="/api/tools/tarot/generate"
-                    aspectRatio="2:3"
-                    printQuality
-                    styleAnchor={{
-                      model: activeModel,
-                      mode,
-                      stylePrompt: effectiveEnglish,
-                      subject: subjectText.trim(),
-                      refs: referenceImages.length,
-                    }}
-                    onEditedImage={(image, meta) => {
-                      setSelectedModels(new Set<TarotModel>([meta.model as TarotModel]));
-                      setPreviewImage(image);
-                      setPreviewSeed(meta.seed);
-                      setPreviewSig(`${meta.model}::${meta.prompt}::edit=1`);
-                      setLocked(false);
-                      setBatch((prev) => {
-                        prev.forEach((it) => it.url && URL.revokeObjectURL(it.url));
-                        return [];
-                      });
-                      saveToGallery(image, "tarot-preview-edit", { model: meta.model, prompt: meta.prompt });
-                    }}
-                  />
-                </div>
               </div>
             </div>
           </div>
@@ -1085,7 +1038,7 @@ export default function TarotStudio() {
       {/* ── RIGHT: sticky settings accordion ── */}
       <div
         style={{
-          width: 300, flexShrink: 0,
+          width: 360, flexShrink: 0,
           position: "sticky", top: 0, alignSelf: "flex-start",
           maxHeight: "100vh", overflowY: "auto",
           borderLeft: "1px solid var(--card-border)",
@@ -1491,7 +1444,7 @@ export default function TarotStudio() {
                         opacity: locked ? 0.5 : 1,
                       }}
                     >
-                      {selected ? "✓ " : ""}{p.zh}
+                      {selected ? "✓ " : ""}{p.zh.split("｜")[0]}
                     </button>
                   );
                 })}
@@ -1571,6 +1524,83 @@ export default function TarotStudio() {
           {panelOpen.grade && (
             <div style={{ paddingBottom: 12 }}>
               <ColorGradePanel state={grade.state} onSet={grade.set} onReset={grade.reset} neutral={grade.neutral} />
+            </div>
+          )}
+        </div>
+
+        {/* ── Accordion: 快速編輯 ── */}
+        <div style={{ borderTop: "1px solid var(--card-border)" }}>
+          <button
+            type="button"
+            onClick={() => togglePanel("edit")}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "9px 0", background: "none", border: "none", cursor: "pointer",
+              fontSize: 13, fontWeight: 600, color: "var(--text)",
+            }}
+          >
+            <span>快速編輯</span>
+            <span style={{ fontSize: 11, color: previewImage ? "var(--accent)" : "var(--text-muted)", marginLeft: "auto", marginRight: 6 }}>
+              {previewImage ? "AI 修圖" : "需先生成預覽"}
+            </span>
+            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{panelOpen.edit ? "▲" : "▼"}</span>
+          </button>
+          {panelOpen.edit && (
+            <div style={{ paddingBottom: 12 }}>
+              {!previewImage ? (
+                <div className="form-hint" style={{ color: "var(--text-muted)" }}>
+                  請先在左側生成預覽圖，再使用快速編輯。
+                </div>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ width: "100%", marginBottom: 10 }}
+                    onClick={() =>
+                      openInCanvas(
+                        previewImage,
+                        buildSemanticBase({
+                          product: "塔羅卡",
+                          subject: subjectText.trim() || undefined,
+                          style: stylePrompt.trim() || undefined,
+                          track: "編輯",
+                        }),
+                      )
+                    }
+                  >
+                    ✏️ 在 Canvas 編輯
+                  </button>
+                  <ImageEditPromptPanel
+                    sourceImage={previewImage}
+                    currentPrompt={buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectText })}
+                    imageModel={activeModel}
+                    target="tarot-preview"
+                    generateEndpoint="/api/tools/tarot/generate"
+                    aspectRatio="2:3"
+                    printQuality
+                    styleAnchor={{
+                      model: activeModel,
+                      mode,
+                      stylePrompt: effectiveEnglish,
+                      subject: subjectText.trim(),
+                      refs: referenceImages.length,
+                    }}
+                    onEditedImage={(image, meta) => {
+                      setSelectedModels(new Set<TarotModel>([meta.model as TarotModel]));
+                      setPreviewImage(image);
+                      setPreviewSeed(meta.seed);
+                      setPreviewSig(`${meta.model}::${meta.prompt}::edit=1`);
+                      setLocked(false);
+                      setBatch((prev) => {
+                        prev.forEach((it) => it.url && URL.revokeObjectURL(it.url));
+                        return [];
+                      });
+                      saveToGallery(image, "tarot-preview-edit", { model: meta.model, prompt: meta.prompt });
+                    }}
+                  />
+                </>
+              )}
             </div>
           )}
         </div>
