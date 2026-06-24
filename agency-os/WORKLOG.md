@@ -4,6 +4,27 @@
 
 ## 2026-06-24
 
+### fix(ui): CanvasEditor 匯出按鍵移至右側工具欄 + 清除 exportPxLabel 死狀態
+
+[任務理解] 使用者要求：① PNG下載/WebP下載/存入 My Designs 全部移到右側工具欄；② PNG 按鍵不顯示尺寸標籤（只有 WebP 有 150→200KB 限制）
+
+[現況分析] 原本 3 顆按鍵在頂部工具列尾端（span flex:1 spacer 後方）；exportPxLabel 狀態僅用於 PNG 按鍵標籤顯示，無其他用途。
+
+[已修改]
+- CanvasEditor.tsx：移除頂部工具列的 editName input + PNG下載 + WebP下載 + 存入 My Designs（Lines ~1455–1475 舊位置）
+- CanvasEditor.tsx：右側工具欄新增 SidebarPanel id="export" title="💾 匯出 / 下載" 作為第一個 Panel，含 editName input + PNG/WebP 並排 + 存入 My Designs 全寬
+- CanvasEditor.tsx：移除死狀態 exportPxLabel + setExportPxLabel（state 宣告 + 兩個 call sites）；移除 stale 注釋；修 WebP tooltip 150KB→200KB 對齊實際壓縮目標
+
+[驗證結果 — R0 四動作]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~15000 -- 型別 clean，0 errors
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test (next-admin) | exit=0 | 487/487 pass | ms=1680
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/2minor_fixed -- Minor 1: stale comment line 112 (已刪)；Minor 2: WebP tooltip 150KB→200KB mismatch (已修)；tag-balance 12:12 SidebarPanel；editName wiring Verified Clean；button disabled-state logic Verified Clean
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=exportPxLabel|setExportPxLabel | hits=4 -- 所有 4 個命中均為 agency-os/memory/daily + status reports 的歷史 ack reason 字串（前一 session 留存的記錄），非程式碼 callsite；lobster-factory 程式碼 0 命中
+
+[剩餘風險] saveState 在存入後永久 disabled（既有行為，非本次引入）
+
+[rollback] git revert CanvasEditor.tsx；按鍵恢復頂部工具列
+
 ### fix(ui): OutputTrackBar PNG/WebP rename+regroup；TarotStudio 快速編輯移至 prompt 上方；CanvasEditor 橫向滑桿修復
 
 [任務理解] 3 個 TarotStudio/CanvasEditor UI 改動：① OutputTrackBar 按鍵重整（WebP/PNG 下載並排；快速編輯條件隱藏）② TarotStudio 快速編輯移至 ImageEditPromptPanel 上方同寬 ③ CanvasEditor MAX_DISP 改動態 containerWidth 消橫向滑桿
