@@ -4,6 +4,55 @@
 
 ## 2026-06-25
 
+### deploy(ziwei): oracle.aware-wave.com 上線 — SG 部署 + CF DNS + host nginx
+
+[任務理解] 把 ziwei-doushu 命理站部署到 SG，以 oracle.aware-wave.com 對外服務。
+
+[已修改]
+- `Projects/internal/ziwei-doushu/docker-compose.yml` (ziwei branch 677948d1)
+  - 加 `networks: lobster-net: external: true` + oracle-web 加入 lobster-net
+  - 保留 host port 3010 供本機 health-check
+- SG `/opt/oracle/` — sparse-checkout ziwei branch（只拉 ziwei-doushu 子目錄）
+- SG `oracle-web` Docker container — built + up（mem_limit 512m，lobster-net）
+- SG `/etc/nginx/sites-available/oracle.aware-wave.com` — host nginx vhost（443 SSL）
+- CF DNS — A record oracle → 5.223.93.113 proxied:true (id: f4518b53c1424df8a42ad49115cb81c4)
+- `Projects/internal/ziwei-doushu/deploy/DEPLOY-SG.md` (main d59eb0d7)
+  - 修正架構說明：host nginx(443) vs Docker nginx(80)；wildcard cert 不需 certbot
+
+[架構修正]（根因：DEPLOY-SG.md 未說清楚 SG 雙層 nginx）
+- SG 有兩層 nginx：host nginx(1.24.0, Ubuntu, port 443) + Docker lobster-nginx(port 80)
+- CF SSL mode = "Full" → CF 連 origin:443 → 必須改 host nginx
+- Wildcard cert `*.aware-wave.com` 已涵蓋 oracle → 不需 certbot
+- docker-compose.yml 的 oracle-web 需加入 lobster-net 才能被 Docker nginx 反代（備用路徑）
+- 錯誤路徑：改 Docker default.conf → 改正確，但 CF 走 443 → host nginx，看不到 Docker nginx 的 oracle block
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=curl -s https://oracle.aware-wave.com/api/health | exit=0 | ms=800
+  - response: {"ok":true,"service":"ziwei"}
+- REALTEST_EVIDENCE: tool=Bash | cmd=curl -sI https://oracle.aware-wave.com/ | exit=0 | ms=600
+  - 307 → Location: /zh-TW (i18n redirect 正確)
+- REALTEST_EVIDENCE: tool=Bash | cmd=curl -s https://oracle.aware-wave.com/zh-TW | grep 東西方命理 | exit=0
+  - 3 hits ✓
+- 主站 aware-wave.com health: ok=true ✓ | app.aware-wave.com: 307 ✓ | 全部既有 container: healthy ✓
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=oracle | hits=1 (WORKLOG 本行) | no stale claims
+- BUGHUNT_WAIVED: NA -- nginx 架構修正只影響 SG infra，無 lobster-factory code call sites
+
+[剩餘風險]
+- oracle-web 目前無 .env.production（無 OPENAI_API_KEY 等）→ 命理頁可用，AI 功能待憑證
+- SG 磁碟已從 96% → 86%（prune 後）；Docker image + node_modules 約 800MB；監控繼續
+- Wildcard cert 到期 2026-08-23 → 自動 renew（certbot cron 已在），無需手動
+
+[rollback]
+```bash
+# SG: docker compose down
+cd /opt/oracle/Projects/internal/ziwei-doushu && docker compose down
+sudo rm /etc/nginx/sites-enabled/oracle.aware-wave.com && nginx -t && systemctl reload nginx
+# CF DNS 可留著（不影響主站）
+```
+
+---
+
 ### refactor(video): VideoStudio UI 一致性 + 時間長度功能 + 全面去 emoji
 
 [任務理解] 生圖模型/視覺風格/配音模型 UI 不一致、無主體色；外層分類按鈕與內層項目視覺相同無區隔；真實影片/照片動畫 缺少 場景總數/自訂AI圖/時間長度 控制項；全頁 emoji 過多。
