@@ -178,6 +178,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
   const [selectedVideo, setSelectedVideo] = useState<VideoHistoryItem | null>(null);
   const [selectedVideos, setSelectedVideos] = useState<Set<string>>(new Set());
   const [deletingVideos, setDeletingVideos] = useState(false);
+  const [studioTab, setStudioTab] = useState<"generate" | "history" | "info">("generate");
 
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isRenderingRef = useRef(false);
