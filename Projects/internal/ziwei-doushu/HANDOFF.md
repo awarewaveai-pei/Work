@@ -83,7 +83,13 @@
 - 移除舊 `app/layout.tsx` / `app/page.tsx`（移入 `app/[lang]/`）。
 - 驗證:`npm test` 13/13 ✅、typecheck ✅、build ✅（`/zh-TW`+`/en` 皆 SSG 預渲染、Proxy 啟用）。
 
-> ⚠️ **接手注意**:現產品定位 = 全球命理生態系（見 `PLAN.md` v2）。下方 Phase 1–5 為舊版單站路線,**已被 `PLAN.md` §18「MVP 第一刀 + Phase 2–5」取代**,以 PLAN 為準。剩餘地基:F3 接縫合約（AI/金流/DB/DivinationSystem）、F4 Docker/CI、F5 垂直切片驗收。
+### ✅ 已完成（F3 接縫合約 + F4 Docker/CI + F5 端到端驗收,本次）
+- **F3 接縫合約**(stub 可運行,有 key 即通):`lib/divination/`(DivinationSystem 統一介面 + registry + 系統無關 InterpretationContext + 紫微 adapter)、`lib/ai/`(廠商無關 interpret,預設 GPT 可切 Claude)、`lib/payments/`(ECPay/Stripe/PayPal adapter + 地區路由)、`lib/db/`(schema 型別 + env seam)。
+- **F4 部署地基**:`next.config.ts` output standalone + outputFileTracingRoot;`Dockerfile`(三階段 + HEALTHCHECK)、`.dockerignore`、`app/api/health`、`.github/workflows/ziwei-ci.yml`(typecheck·test·build 三閘)。
+- **F5 端到端驗收**:`npm start` 真實 server smoke — `/api/health`={ok:true}、`/`→307→`/zh-TW`(proxy)、`/zh-TW` 繁中標題、`/en` 英文標題 + `<html lang="en">`。
+- 驗證:`npm test` 26/26 ✅、typecheck ✅、build ✅(standalone server.js 產出)、HTTP smoke ✅。
+
+> ✅ **地基(F1–F5)全部完成**。現產品定位 = 全球命理生態系(見 `PLAN.md` v2)。下方 Phase 1–5 為舊版單站路線,**已被 `PLAN.md` §18「MVP 第一刀 + Phase 2–5」取代**,以 PLAN 為準。**下一步 = 功能期**:四中式系統實作 DivinationSystem 介面、每日運勢工廠、金流接真 provider + 數位報告付費牆、AI 解讀接 SDK。
 
 ### ⬜ 待做（依優先序）
 

@@ -1,0 +1,57 @@
+name: ziwei — typecheck · test · build
+
+# 紫微生態系 CI 三閘(部署 SOP 第 6 項)。
+# 每次 push 到 main 或開發分支、PR 到 main(且觸及本專案)即跑 tsc + vitest + build。
+# 與 eu-deploy 的 build gate 形成兩道獨立防線(CI 早期攔截;deploy gate 是硬停)。
+
+on:
+  push:
+    branches:
+      - main
+      - claude/ziwei-doushu-chart-site-55fdaa
+    paths:
+      - 'Projects/internal/ziwei-doushu/**'
+      - '.github/workflows/ziwei-ci.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'Projects/internal/ziwei-doushu/**'
+      - '.github/workflows/ziwei-ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ziwei-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    name: typecheck · test · build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Projects/internal/ziwei-doushu
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22.x"
+          cache: "npm"
+          cache-dependency-path: Projects/internal/ziwei-doushu/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
