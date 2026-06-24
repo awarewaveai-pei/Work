@@ -6,11 +6,12 @@
 import { registerSystem } from './registry';
 import { ziweiSystem } from './systems/ziwei';
 import { baziSystem } from './systems/bazi';
+import { ichingSystem } from './systems/iching';
 
 registerSystem(ziweiSystem);
 registerSystem(baziSystem);
+registerSystem(ichingSystem);
 // 後續系統(按 PLAN §18 路線圖):
-// registerSystem(ichingSystem);
 // registerSystem(tarotSystem);
 // registerSystem(astrologySystem);
 
