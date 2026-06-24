@@ -1370,10 +1370,7 @@ export default function BannerStudio() {
 
         {/* ── Controls (right side) ── */}
         <div style={{ order: 2, flex: "0 0 460px", width: 460,
-          position: "sticky", top: 12, alignSelf: "flex-start",
-          height: "calc(100vh - 24px)" }}>
-          <div style={{ height: "100%", overflowY: "auto", overflowX: "hidden",
-            display: "flex", flexDirection: "column", gap: 12, paddingBottom: 12 }}>
+          display: "flex", flexDirection: "column", gap: 12 }}>
 
           {/* 配色 / 品牌色 — 挪到最前面 */}
           <StepCard title="配色 / 品牌色" icon="🎨">
@@ -2136,7 +2133,6 @@ export default function BannerStudio() {
             )}
           </div>
 
-          </div>
         </div>
 
         {/* ── Preview (left side, sticky) ── */}
