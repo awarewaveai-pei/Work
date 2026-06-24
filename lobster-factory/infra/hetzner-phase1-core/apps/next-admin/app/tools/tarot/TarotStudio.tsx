@@ -185,13 +185,20 @@ export default function TarotStudio() {
 
   const [styleGroupTab, setStyleGroupTab] = useState<string>("西方畫家");
   const [modelProviderTab, setModelProviderTab] = useState<string>("BFL");
-  const [hoveredStyleDesc, setHoveredStyleDesc] = useState<string | null>(null);
+  // Style-chip hover tooltip: viewport coords captured on hover so the tip can be
+  // rendered position:fixed at the component root (escapes the sidebar's overflow
+  // clipping + sticky stacking context). null = hidden.
+  const [styleTip, setStyleTip] = useState<{ text: string; x: number; y: number } | null>(null);
   const [panelOpen, setPanelOpen] = useState<Record<string, boolean>>({
     model: false, style: false, subject: false, mode: false, template: false, grade: false, edit: false,
   });
   function togglePanel(key: string) {
     setPanelOpen((prev) => ({ ...prev, [key]: !prev[key] }));
   }
+  // Defensive clear: if the chip list is restructured (tab switch / style accordion
+  // collapse / lock) while a chip is hovered, the chip can unmount without a
+  // mouseleave — dismiss any live tooltip so it can't strand at stale coords.
+  useEffect(() => { setStyleTip(null); }, [styleGroupTab, panelOpen.style, locked]);
 
   const doneCount = batch.filter((b) => b.status === "done").length;
   // For Step 1 UI (ref upload limit), use first selected model.
@@ -1423,8 +1430,20 @@ export default function TarotStudio() {
                   const selected = styleTokens.includes(p.zh);
                   const hasDesc = p.zh.includes("｜");
                   const desc = hasDesc ? p.zh.split("｜")[1] : null;
+                  // Hover handlers live on the SPAN (not the button): a disabled button
+                  // does not fire mouse events, so the tooltip would die while locked.
+                  const showTip = (e: React.MouseEvent<HTMLElement>) => {
+                    if (!desc) return;
+                    const r = e.currentTarget.getBoundingClientRect();
+                    setStyleTip({ text: desc, x: r.left + r.width / 2, y: r.top });
+                  };
                   return (
-                    <span key={p.zh} style={{ position: "relative", display: "inline-block" }}>
+                    <span
+                      key={p.zh}
+                      style={{ display: "inline-block" }}
+                      onMouseEnter={showTip}
+                      onMouseLeave={() => setStyleTip(null)}
+                    >
                       <button
                         type="button"
                         disabled={locked}
@@ -1437,11 +1456,11 @@ export default function TarotStudio() {
                             return toks.join(", ");
                           })
                         }
-                        onMouseEnter={() => setHoveredStyleDesc(hasDesc ? p.zh : null)}
-                        onMouseLeave={() => setHoveredStyleDesc(null)}
                         style={{
                           padding: "3px 9px", borderRadius: 12, fontSize: 11,
                           cursor: locked ? "default" : "pointer",
+                          // pointerEvents:none while locked lets the hover reach the span
+                          pointerEvents: locked ? "none" : "auto",
                           border: `1px solid ${selected ? "var(--accent)" : "var(--card-border)"}`,
                           background: selected ? "rgba(99,102,241,0.12)" : "rgba(127,127,127,0.04)",
                           color: selected ? "var(--accent)" : "var(--text-muted)",
@@ -1451,28 +1470,6 @@ export default function TarotStudio() {
                       >
                         {selected ? "✓ " : ""}{p.zh.split("｜")[0]}
                       </button>
-                      {hoveredStyleDesc === p.zh && desc && (
-                        <div style={{
-                          position: "absolute",
-                          bottom: "calc(100% + 6px)",
-                          left: "50%",
-                          transform: "translateX(-50%)",
-                          background: "var(--card-bg, #1e1e2e)",
-                          border: "1px solid var(--accent)",
-                          borderRadius: 8,
-                          padding: "6px 12px",
-                          fontSize: 12,
-                          fontWeight: 500,
-                          color: "var(--text)",
-                          whiteSpace: "nowrap",
-                          zIndex: 999,
-                          boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
-                          pointerEvents: "none",
-                          lineHeight: 1.4,
-                        }}>
-                          {desc}
-                        </div>
-                      )}
                     </span>
                   );
                 })}
@@ -1733,6 +1730,39 @@ export default function TarotStudio() {
             onClick={(e) => e.stopPropagation()}
             style={{ maxHeight: "90vh", maxWidth: "92vw", borderRadius: 10, boxShadow: "0 8px 40px rgba(0,0,0,0.5)" }}
           />
+        </div>
+      )}
+
+      {/* Style-chip hover tooltip — position:FIXED at the viewport coords captured on
+          chip hover. Rendered here at the component root (a sibling of the sticky
+          sidebar) so it escapes the sidebar's overflowY:auto clipping AND its
+          position:sticky stacking context. Hard-coded colors (no CSS var) keep it
+          readable in any theme; x is clamped so edge chips don't push it off-screen. */}
+      {styleTip && (
+        <div
+          style={{
+            position: "fixed",
+            left: Math.min(Math.max(styleTip.x, 8), (typeof window !== "undefined" ? window.innerWidth : 1920) - 8),
+            top: styleTip.y - 6,
+            transform: "translate(-50%, -100%)",
+            maxWidth: "min(320px, 92vw)",
+            background: "#0d1526",
+            color: "#ffffff",
+            border: "1px solid #6366f1",
+            borderRadius: 8,
+            padding: "6px 12px",
+            fontSize: 12,
+            fontWeight: 500,
+            lineHeight: 1.4,
+            whiteSpace: "normal",
+            wordBreak: "break-word",
+            textAlign: "center",
+            boxShadow: "0 6px 24px rgba(0,0,0,0.45)",
+            pointerEvents: "none",
+            zIndex: 2147483647,
+          }}
+        >
+          {styleTip.text}
         </div>
       )}
     </div>
