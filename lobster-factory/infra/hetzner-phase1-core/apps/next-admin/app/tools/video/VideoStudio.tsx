@@ -509,19 +509,59 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
 
       {/* ── Generate tab ── */}
       {studioTab === "generate" && (
-        <div style={{ padding: "24px 28px" }}>
-          <div style={{ maxWidth: 680, display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 16 }}>
 
-            {/* Hint banner */}
-            {providedScenes.length > 0 ? (
-              <div style={{ background: "var(--intake-success-bg)", border: "1px solid var(--green)", borderRadius: 8, padding: "10px 12px", fontSize: 12.5, color: "var(--badge-green-text)", lineHeight: 1.6 }}>
-                ✅ 已從前製腳本帶入 <b>{providedScenes.length}</b> 個場景。調整下方設定後，按「📋 生成草稿」出片。
-              </div>
-            ) : (
-              <div style={{ background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: "9px 12px", fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.6 }}>
-                💡 可到「📝 前製腳本」寫完再帶入，或直接填主題快速生成。
-              </div>
-            )}
+          {/* Hint banner — full width */}
+          {providedScenes.length > 0 ? (
+            <div style={{ background: "var(--intake-success-bg)", border: "1px solid var(--green)", borderRadius: 8, padding: "10px 12px", fontSize: 12.5, color: "var(--badge-green-text)", lineHeight: 1.6 }}>
+              ✅ 已從前製腳本帶入 <b>{providedScenes.length}</b> 個場景。調整下方設定後，按「📋 生成草稿」出片。
+            </div>
+          ) : (
+            <div style={{ background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: "9px 12px", fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+              💡 可到「📝 前製腳本」寫完再帶入，或直接填主題快速生成。
+            </div>
+          )}
+
+          {/* ── Phase: done ── */}
+          {genStatus === "done" && genResult && (
+            <ResultPanel result={genResult} onClose={() => { isRenderingRef.current = false; setGenStatus("idle"); setDraftScenes([]); }} />
+          )}
+
+          {/* ── Phase: rendering (progress) ── */}
+          {isLoading && <ProgressTracker step={genStep} />}
+
+          {/* ── Phase: draft review ── */}
+          {draftReady && !isLoading && genStatus !== "done" && (
+            <>
+              {genStatus === "error" && (
+                <div style={{ background: "var(--badge-red-bg)", border: "1px solid var(--red)", borderRadius: 8, padding: "12px 14px" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--red)", marginBottom: 4 }}>失敗</div>
+                  <div style={{ fontSize: 12.5, color: "var(--badge-red-text)" }}>{genError}</div>
+                </div>
+              )}
+              <DraftEditor
+                scenes={draftScenes}
+                title={draftTitle}
+                onChangeScene={(id, narration) =>
+                  setDraftScenes((prev) => prev.map((s) => s.id === id ? { ...s, narration } : s))
+                }
+                onBack={() => { isRenderingRef.current = false; setDraftScenes([]); setGenError(""); setGenStatus("idle"); }}
+                onRender={handleRenderDraft}
+                onRegenerate={handleRegenerateImage}
+                onUpload={handleUploadAsset}
+                regenIds={regenIds}
+                disabled={isBusy}
+                errorMsg={genStatus === "error" ? genError : undefined}
+              />
+            </>
+          )}
+
+          {/* ── Phase: idle / config — 2-col layout ── */}
+          {!draftReady && !isLoading && genStatus !== "done" && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 24, alignItems: "start" }}>
+
+            {/* LEFT ── form cards */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
             {/* ① 輸入內容 */}
             <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 12, overflow: "hidden" }}>
@@ -818,81 +858,92 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
               </div>
             </div>
 
-            {/* ③ 費用預覽 + CTA (hidden when draft editor is active) */}
-            {!draftReady && (
+              {/* Draft loading inline */}
+              {draftLoading && (
+                <div style={{ background: "var(--ai-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 16px" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", marginBottom: 6 }}>🔄 生成草稿中…</div>
+                  <div style={{ fontSize: 12, color: "var(--accent)" }}>Claude 生成腳本 + Flux 生成圖片（約 30–60 秒）</div>
+                </div>
+              )}
+
+              {/* Error (non-draft phase) */}
+              {genStatus === "error" && !draftReady && (
+                <div style={{ background: "var(--badge-red-bg)", border: "1px solid var(--red)", borderRadius: 8, padding: "12px 14px" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--red)", marginBottom: 4 }}>失敗</div>
+                  <div style={{ fontSize: 12.5, color: "var(--badge-red-text)" }}>{genError}</div>
+                  {genError.toLowerCase().includes("video-service") && (
+                    <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--badge-red-text)" }}>提示：EU video-service 需正常運行（健康狀態請查 Repair Center）。</div>
+                  )}
+                </div>
+              )}
+            </div>{/* end LEFT column */}
+
+            {/* RIGHT ── sticky cost + CTA */}
+            <div style={{ position: "sticky", top: 24, display: "flex", flexDirection: "column", gap: 12 }}>
+
+              {/* ③ 費用預覽 card */}
               <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 12, overflow: "hidden" }}>
                 <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-subtle)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>③ 費用預覽</span>
                   <button type="button" onClick={() => setStudioTab("info")}
                     style={{ fontSize: 11, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
-                    查完整明細 →
+                    完整明細 →
                   </button>
                 </div>
-                <div style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "var(--bg-subtle)", borderRadius: 8 }}>
-                    <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>每支影片成本</span>
-                    <span style={{ fontSize: 22, fontWeight: 800, color: "var(--accent)" }}>{NT(costBreakdown.totalUsd)}</span>
+                <div style={{ padding: "14px 18px", display: "flex", flexDirection: "column", gap: 8 }}>
+                  {/* Mini cost breakdown */}
+                  {costBreakdown.lines.filter(l => !l.free).map(l => (
+                    <div key={l.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12 }}>
+                      <span style={{ color: "var(--text-secondary)" }}>{l.icon} {l.label}</span>
+                      <span style={{ fontWeight: 600, color: "var(--text-primary)", fontFamily: "monospace" }}>{NT(l.totalUsd)}</span>
+                    </div>
+                  ))}
+                  {costBreakdown.lines.some(l => l.free) && (
+                    <div style={{ fontSize: 11, color: "var(--badge-green-text)" }}>
+                      + {costBreakdown.lines.filter(l => l.free).map(l => l.label).join("、")} 免費
+                    </div>
+                  )}
+                  {/* Total */}
+                  <div style={{ borderTop: "2px solid var(--border-subtle)", paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                    <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>每支合計</span>
+                    <span style={{ fontSize: 26, fontWeight: 800, color: "var(--accent)" }}>{NT(costBreakdown.totalUsd)}</span>
                   </div>
+                  {/* CTA */}
                   <button onClick={handleGenerateDraft} disabled={!canGenerate}
                     style={{
-                      padding: "13px 20px", borderRadius: 8, border: "none",
+                      padding: "13px 0", borderRadius: 8, border: "none", width: "100%",
                       cursor: canGenerate ? "pointer" : "not-allowed",
                       background: canGenerate ? "var(--accent)" : "var(--border-subtle)",
                       color: canGenerate ? "var(--btn-primary-text)" : "var(--text-muted)",
                       fontSize: 15, fontWeight: 700, transition: "background 0.15s",
                     }}>
-                    {draftLoading ? "⏳ 生成草稿中…" : "📋 生成草稿"}
+                    {draftLoading ? "⏳ 草稿生成中…" : "📋 生成草稿"}
                   </button>
                 </div>
               </div>
-            )}
 
-            {/* Draft editor */}
-            {draftReady && (
-              <DraftEditor
-                scenes={draftScenes}
-                title={draftTitle}
-                onChangeScene={(id, narration) =>
-                  setDraftScenes((prev) => prev.map((s) => s.id === id ? { ...s, narration } : s))
-                }
-                onBack={() => { isRenderingRef.current = false; setDraftScenes([]); setGenError(""); setGenStatus("idle"); }}
-                onRender={handleRenderDraft}
-                onRegenerate={handleRegenerateImage}
-                onUpload={handleUploadAsset}
-                regenIds={regenIds}
-                disabled={isBusy}
-                errorMsg={genError || undefined}
-              />
-            )}
-
-            {/* Draft loading */}
-            {draftLoading && (
-              <div style={{ background: "var(--ai-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 16px" }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", marginBottom: 6 }}>🔄 生成草稿中…</div>
-                <div style={{ fontSize: 12, color: "var(--accent)" }}>Claude 生成腳本 + Flux 生成圖片（約 30–60 秒）</div>
+              {/* Settings summary */}
+              <div style={{ background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: 10, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", marginBottom: 2, textTransform: "uppercase", letterSpacing: "0.05em" }}>目前設定</div>
+                {[
+                  { icon: "🖼", label: imageModel === "pexels-video" ? "真實影片 (Pexels)" : imageModel === "pexels-all" ? "照片動畫 (Pexels)" : (IMAGE_RATES[imageModel]?.label ?? imageModel) },
+                  { icon: "📽", label: providedScenes.length > 0 ? `${providedScenes.length} 場（前製腳本）` : imageModel === "pexels-video" || imageModel === "pexels-all" ? `${targetMinutes} 分鐘` : `${totalScenes} 場（AI ${customScenes} / B-roll ${brollScenes}）` },
+                  { icon: "🎙", label: VOICE_MODELS.find(v => v.id === voiceModelId)?.label ?? voiceModelId },
+                  { icon: "📐", label: orderedFormats.map(f => OUTPUT_LABELS[f]?.ratio ?? f).join(" + ") },
+                  ...(videoStyle ? [{ icon: "🎨", label: videoStyle }] : []),
+                  ...(introEnabled ? [{ icon: "🎬", label: `片頭動畫 ${introDuration}s` }] : []),
+                ].map(({ icon, label }) => (
+                  <div key={label} style={{ fontSize: 12, color: "var(--text-secondary)", display: "flex", gap: 6 }}>
+                    <span style={{ width: 18, flexShrink: 0 }}>{icon}</span>
+                    <span>{label}</span>
+                  </div>
+                ))}
               </div>
-            )}
 
-            {/* Progress tracker (render phase) */}
-            {isLoading && <ProgressTracker step={genStep} />}
+            </div>{/* end RIGHT column */}
 
-            {/* Error */}
-            {genStatus === "error" && (
-              <div style={{ background: "var(--badge-red-bg)", border: "1px solid var(--red)", borderRadius: 8, padding: "12px 14px" }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--red)", marginBottom: 4 }}>失敗</div>
-                <div style={{ fontSize: 12.5, color: "var(--badge-red-text)" }}>{genError}</div>
-                {genError.toLowerCase().includes("video-service") && (
-                  <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--badge-red-text)" }}>提示：EU video-service 需正常運行（健康狀態請查 Repair Center）。</div>
-                )}
-              </div>
-            )}
+          </div>)}{/* end 2-col grid + idle condition */}
 
-            {/* Success result */}
-            {genStatus === "done" && genResult && (
-              <ResultPanel result={genResult} onClose={() => { isRenderingRef.current = false; setGenStatus("idle"); setDraftScenes([]); }} />
-            )}
-
-          </div>
         </div>
       )}
 
