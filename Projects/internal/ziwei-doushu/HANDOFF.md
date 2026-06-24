@@ -4,7 +4,7 @@
 > 位置：`Projects/internal/ziwei-doushu/`（AwareWave Work monorepo 內）
 > 分支：`claude/ziwei-doushu-chart-site-55fdaa`
 > **完整正式計畫見 `PLAN.md`（本檔為快速接手摘要，細節以 PLAN.md 為準）。**
-> **⚠️ 2026-06-24 重大擴充**：產品已從「單一算命站」擴為「以算命引流的多品牌變現生態系」（電商 headless Woo+POD、重用 next-admin 內容/影片/社群引擎、三品牌漏斗導 soulful/wear the world、每日運勢工廠、SG→EU 遷移+新 EU 機、資料源自算為主只西洋接 API、**國際化 i18n 多語言+ECPay/Stripe 雙軌多幣別金流為地基級需求**）。**細節全在 `PLAN.md` §18，接手前必讀該節（i18n 見 §18.9，必須 day-1 設計否則全站重工）。**
+> **⚠️ 2026-06-24 PLAN 已重整為 v2**:產品升級為「**多語言全球命理 × 內容 × 電商生態系**」(算命引擎+每日運勢工廠+重用 next-admin 內容/影片/社群引擎+headless WooCommerce/POD 電商+三品牌漏斗 soulful/wear the world+i18n 多語+ECPay/Stripe/PayPal 全球金流+Stripe Tax/GDPR+SG→EU 遷移新機)。**PLAN.md 已折回所有決策、消除矛盾、補 GDPR/MVP/內容引擎整合/快取四缺口。接手前必讀 PLAN 全文,尤其 §18 路線圖「MVP 第一刀」與 §22 待拍板清單。**
 
 ---
 
