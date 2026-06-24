@@ -1452,6 +1452,11 @@ export default function TarotStudio() {
                   );
                 })}
               </div>
+              {hoveredStyleDesc && (
+                <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 6, lineHeight: 1.4, minHeight: 28 }}>
+                  {hoveredStyleDesc}
+                </div>
+              )}
               <textarea
                 className="form-textarea"
                 style={{ minHeight: 52, fontSize: 12 }}
