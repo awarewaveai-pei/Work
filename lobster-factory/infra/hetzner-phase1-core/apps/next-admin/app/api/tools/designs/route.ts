@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import sharp from "sharp";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../lib/ops-role";
 import { getSupabaseReadClient, getSupabaseWriteClient } from "../../../../lib/supabase-server";
-import { buildDesignKey, deleteDesignObject, isR2Configured, parseImageDataUrl, putDesignObject } from "../../../../lib/storage/r2";
+import { buildDesignKey, deleteDesignObject, deleteVideoObjects, isR2Configured, parseImageDataUrl, putDesignObject } from "../../../../lib/storage/r2";
 import { MOCKUP_SOURCES } from "../../../../lib/studio/asset-group";
 
 export const runtime = "nodejs";
@@ -284,10 +284,10 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ ok: false, error: "supabase_write_not_configured" }, { status: 503 });
   }
 
-  // Fetch the asset to get object_key before deleting.
+  // Fetch the asset to get object_key + mime_type before deleting.
   const { data: asset, error: fetchErr } = await supabase
     .from("media_assets")
-    .select("id,object_key,organization_id,metadata")
+    .select("id,object_key,mime_type,organization_id,metadata")
     .eq("id", assetId)
     .eq("storage_backend", "r2")
     .eq("asset_domain", "ai_generated")
@@ -297,8 +297,13 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
   }
 
-  // Delete from R2 first (idempotent — 404 treated as success).
-  const r2Result = await deleteDesignObject(asset.object_key);
+  // Delete from the correct R2 bucket — videos live in R2_VIDEO_BUCKET ("lobster-videos"),
+  // images in R2_DESIGNS_BUCKET ("lobster-designs"). Using deleteDesignObject for videos
+  // was a no-op (video not in designs bucket → 404 treated as success), leaving the file
+  // in the video bucket so the reconcile cron would re-insert the media_assets row.
+  const r2Result = asset.mime_type?.startsWith("video/")
+    ? await deleteVideoObjects(asset.object_key)
+    : await deleteDesignObject(asset.object_key);
   if (!r2Result.ok) {
     console.error("[designs] R2 delete failed:", (r2Result as { ok: false; error: string }).error);
     return NextResponse.json({ ok: false, error: (r2Result as { ok: false; error: string }).error }, { status: 502 });

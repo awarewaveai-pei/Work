@@ -65,6 +65,30 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 // Fetch timeout for remote image download (20 s)
 const IMAGE_FETCH_TIMEOUT_MS = 20_000;
 
+// Max video bytes accepted for upload (200 MB)
+const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
+// Fetch timeout for remote video download (2 min)
+const VIDEO_FETCH_TIMEOUT_MS = 120_000;
+
+/**
+ * Preferred video format per platform.
+ * 9x16 = vertical short-form (TikTok/IG Reels/Threads)
+ * 4x5  = portrait feed (IG Feed/FB/Pinterest)
+ * 16x9 = landscape standard (LinkedIn/Reddit/X/Bluesky)
+ */
+export const PLATFORM_VIDEO_FORMAT: Record<string, "16x9" | "9x16" | "4x5"> = {
+  tiktok:    "9x16",
+  instagram: "9x16",
+  threads:   "9x16",
+  facebook:  "4x5",
+  pinterest: "4x5",
+  linkedin:  "16x9",
+  reddit:    "16x9",
+  x:         "16x9",
+  bluesky:   "16x9",
+  youtube:   "16x9",
+};
+
 export type RawIntegration = {
   id: string;
   name: string;
@@ -196,6 +220,56 @@ export async function uploadMedia(opts: {
   return { id: json.id, path: json.path };
 }
 
+/**
+ * Upload a video to Postiz media storage via HTTPS URL.
+ * Larger limits than uploadMedia (200 MB / 2 min timeout).
+ */
+export async function uploadVideo(opts: {
+  videoUrl: string;
+  filename?: string;
+}): Promise<PostizMediaRef> {
+  const { videoUrl, filename = "video.mp4" } = opts;
+  assertSafeImageUrl(videoUrl); // reuse SSRF guard
+  const cfg = getPostizConfig();
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), VIDEO_FETCH_TIMEOUT_MS);
+  let buffer: Buffer;
+  try {
+    const r = await fetch(videoUrl, { signal: controller.signal });
+    if (!r.ok) throw new Error(`video fetch failed: HTTP ${r.status}`);
+    const arr = await r.arrayBuffer();
+    buffer = Buffer.from(arr);
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (buffer.length > MAX_VIDEO_BYTES) {
+    throw new Error(`video too large: ${(buffer.length / 1024 / 1024).toFixed(1)} MB > ${MAX_VIDEO_BYTES / 1024 / 1024} MB limit`);
+  }
+
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "mp4";
+  const mimeType = ext === "webm" ? "video/webm" : ext === "mov" ? "video/quicktime" : "video/mp4";
+
+  const ab = new ArrayBuffer(buffer.length);
+  new Uint8Array(ab).set(buffer);
+  const form = new FormData();
+  form.append("file", new Blob([ab], { type: mimeType }), filename);
+
+  const up = await fetch(`${cfg.baseUrl}/public/v1/upload`, {
+    method: "POST",
+    headers: { Authorization: cfg.apiKey },
+    body: form,
+  });
+  if (!up.ok) {
+    const errText = await up.text().catch(() => "");
+    throw new Error(`Postiz video upload ${up.status}: ${errText.slice(0, 200)}`);
+  }
+  const json = (await up.json()) as { id?: string; path?: string };
+  if (!json.id || !json.path) throw new Error(`Unexpected video upload response: ${JSON.stringify(json)}`);
+  return { id: json.id, path: json.path };
+}
+
 export async function createSocialPost(opts: {
   clientId: string;
   mode: "draft" | "now";
@@ -206,14 +280,17 @@ export async function createSocialPost(opts: {
     platformSettings?: Record<string, unknown>;
   }>;
   media?: PostizMediaRef;
+  /** Per-platform media (e.g. different video formats per platform). Takes precedence over `media`. */
+  mediaPerPlatform?: Record<string, PostizMediaRef>;
 }): Promise<PostizPostResult[]> {
-  const { mode, posts, media } = opts;
+  const { mode, posts, media, mediaPerPlatform } = opts;
   const cfg = getPostizConfig();
   const results: PostizPostResult[] = [];
 
   for (const post of posts) {
     const value: Record<string, unknown> = { content: post.content };
-    if (media) value.image = [{ id: media.id, path: media.path }];
+    const platformMedia = mediaPerPlatform?.[post.platform] ?? media;
+    if (platformMedia) value.image = [{ id: platformMedia.id, path: platformMedia.path }];
 
     const body = {
       type: mode,

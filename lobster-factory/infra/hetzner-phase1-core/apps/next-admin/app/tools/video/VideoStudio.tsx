@@ -86,9 +86,9 @@ function parseVoiceModel(id: string): { ttsProvider: string; ttsVoice: string } 
 // ─── Output format label map ──────────────────────────────────────────────────
 
 const OUTPUT_LABELS: Record<string, { label: string; ratio: string; icon: string }> = {
-  "16x9": { label: "16:9 橫式", ratio: "16:9", icon: "▶" },
-  "9x16": { label: "9:16 直式", ratio: "9:16", icon: "📱" },
-  "4x5":  { label: "4:5 直式",  ratio: "4:5",  icon: "📷" },
+  "16x9": { label: "16:9 YouTube/文章",   ratio: "16:9", icon: "▶" },
+  "9x16": { label: "9:16 TikTok/Reels",  ratio: "9:16", icon: "📱" },
+  "4x5":  { label: "4:5 IG Feed/FB",     ratio: "4:5",  icon: "📷" },
   // 舊格式鍵（相容歷史影片顯示）
   youtube_linkedin: { label: "YouTube / LinkedIn", ratio: "16:9", icon: "▶" },
   tiktok_reels:    { label: "TikTok / Reels",     ratio: "9:16",  icon: "📱" },
@@ -133,8 +133,8 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
   const [voiceModelId, setVoiceModelId] = useState(VOICE_MODELS[0].id);
   const [introEnabled, setIntroEnabled] = useState(false);
   const [introDuration, setIntroDuration] = useState(3);
-  // 輸出比例（勾選；預設全選；至少留一個）。每比例各自原生生成 → 圖片成本/時間 ×已選數。
-  const [selectedFormats, setSelectedFormats] = useState<Set<string>>(new Set(VIDEO_FORMAT_CHOICES));
+  // 輸出比例（預設只 16:9，WP/YouTube 用；需社群格式時手動勾選）。每比例各自原生生成 → 圖片成本/時間 ×已選數。
+  const [selectedFormats, setSelectedFormats] = useState<Set<string>>(new Set(["16x9"]));
   const orderedFormats = VIDEO_FORMAT_CHOICES.filter((f) => selectedFormats.has(f));
 
   const brollScenes = Math.max(0, totalScenes - customScenes);

@@ -4,8 +4,11 @@ import {
   getPostizConfig,
   listIntegrations,
   uploadMedia,
+  uploadVideo,
   createSocialPost,
   assertCanPublishNow,
+  PLATFORM_VIDEO_FORMAT,
+  type PostizMediaRef,
 } from "@/lib/content/postiz";
 
 export const runtime = "nodejs";
@@ -16,6 +19,10 @@ type RequestBody = {
   mode: "draft" | "now";
   platforms: Array<{ platform: string; content: string }>;
   imageUrl?: string;
+  /** Per-format video URLs from the video generation step.
+   *  Keys: "16x9" | "9x16" | "4x5". When present, each platform receives
+   *  its preferred format via PLATFORM_VIDEO_FORMAT routing. */
+  videoUrls?: Partial<Record<"16x9" | "9x16" | "4x5", string>>;
   confirmPublishNow?: boolean;
 };
 
@@ -32,7 +39,7 @@ export async function POST(req: Request): Promise<Response> {
     return new NextResponse("invalid json", { status: 400 });
   }
 
-  const { clientId, mode, platforms, imageUrl, confirmPublishNow = false } = body;
+  const { clientId, mode, platforms, imageUrl, videoUrls, confirmPublishNow = false } = body;
 
   if (!clientId || typeof clientId !== "string") {
     return new NextResponse("clientId required", { status: 400 });
@@ -111,7 +118,7 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  let media: { id: string; path: string } | undefined;
+  let media: PostizMediaRef | undefined;
   if (imageUrl) {
     try {
       media = await uploadMedia({ imageUrl });
@@ -123,7 +130,49 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
 
-  const results = await createSocialPost({ clientId, mode, posts: requestedPosts, media });
+  // Per-platform video routing: upload each unique video URL once (dedup), then map platforms.
+  let mediaPerPlatform: Record<string, PostizMediaRef> | undefined;
+  if (videoUrls && Object.keys(videoUrls).length > 0) {
+    // Collect unique URLs needed by the requested platforms
+    const urlToRef = new Map<string, PostizMediaRef>();
+    const uploadErrors: string[] = [];
+
+    for (const post of requestedPosts) {
+      const preferredFormat = PLATFORM_VIDEO_FORMAT[post.platform] ?? "16x9";
+      // Fall back through format priority if the preferred format wasn't generated
+      const candidateFormats: Array<"9x16" | "4x5" | "16x9"> =
+        preferredFormat === "9x16" ? ["9x16", "4x5", "16x9"]
+        : preferredFormat === "4x5" ? ["4x5", "9x16", "16x9"]
+        : ["16x9", "4x5", "9x16"];
+
+      const videoUrl = candidateFormats.map(f => videoUrls[f]).find(Boolean);
+      if (!videoUrl) continue;
+
+      if (!urlToRef.has(videoUrl)) {
+        try {
+          const ref = await uploadVideo({ videoUrl });
+          urlToRef.set(videoUrl, ref);
+        } catch (err) {
+          uploadErrors.push(`${post.platform}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+
+      const ref = urlToRef.get(videoUrl);
+      if (ref) {
+        mediaPerPlatform ??= {};
+        mediaPerPlatform[post.platform] = ref;
+      }
+    }
+
+    if (uploadErrors.length > 0) {
+      return NextResponse.json(
+        { ok: false, error: `video upload failed: ${uploadErrors.join("; ")}` },
+        { status: 500 }
+      );
+    }
+  }
+
+  const results = await createSocialPost({ clientId, mode, posts: requestedPosts, media, mediaPerPlatform });
 
   return NextResponse.json({ ok: true, results, skipped });
 }

@@ -5,7 +5,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseWriteClient } from "../../../../lib/supabase-server";
-import { deleteDesignObject } from "../../../../lib/storage/r2";
+import { deleteVideoObjects } from "../../../../lib/storage/r2";
 import { videoObjectKey } from "../../../../lib/content/blocks/video-pipeline";
 
 function timingSafeEqual(a: string, b: string): boolean {
@@ -41,11 +41,8 @@ export async function POST(req: NextRequest) {
 
   let deleted = 0;
   for (const asset of old) {
-    const formats: Record<string, string> = asset.metadata?.formats ?? {};
-    const urls = [asset.object_url, ...Object.values(formats)].filter(Boolean);
-    for (const url of urls) {
-      try { await deleteDesignObject(videoObjectKey(url)); } catch { /* best-effort */ }
-    }
+    // Delete all format variants from the video bucket (prefix LIST → immune to format drift).
+    try { await deleteVideoObjects(videoObjectKey(asset.object_url)); } catch { /* best-effort */ }
     await supabase.from("media_assets").delete().eq("id", asset.id);
     deleted++;
   }

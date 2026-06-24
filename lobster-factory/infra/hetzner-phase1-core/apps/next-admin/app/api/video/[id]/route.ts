@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { deleteDesignObject } from "@/lib/storage/r2";
+import { deleteVideoObjects } from "@/lib/storage/r2";
 import { videoObjectKey, resolveOrgId } from "@/lib/content/blocks/video-pipeline";
 import { readOpsRole } from "@/lib/ops-role";
 
@@ -34,19 +34,10 @@ export async function DELETE(
     return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
   }
 
-  // Delete all R2 objects (primary + all format variants)
-  const formats: Record<string, string> = asset.metadata?.formats ?? {};
-  const urlsToDelete = [asset.object_url, ...Object.values(formats)].filter(Boolean);
-  const deleteErrors: string[] = [];
-
-  for (const url of urlsToDelete) {
-    try {
-      const key = videoObjectKey(url);
-      await deleteDesignObject(key);
-    } catch (e) {
-      deleteErrors.push(String(e));
-    }
-  }
+  // Delete all format variants from the video bucket using prefix LIST (immune to format drift).
+  // Videos are in R2_VIDEO_BUCKET ("lobster-videos"), not the designs bucket.
+  const r2Result = await deleteVideoObjects(videoObjectKey(asset.object_url));
+  const r2Errors = r2Result.ok ? 0 : 1;
 
   // Delete DB record
   const { error: dbErr } = await supabase.from("media_assets").delete().eq("id", id);
@@ -57,7 +48,7 @@ export async function DELETE(
   return NextResponse.json({
     ok: true,
     id,
-    r2_deleted: urlsToDelete.length - deleteErrors.length,
-    r2_errors: deleteErrors.length,
+    r2_deleted: r2Result.ok ? 1 : 0,
+    r2_errors: r2Errors,
   });
 }

@@ -145,6 +145,70 @@ export async function deleteDesignObject(
 }
 
 /**
+ * Delete all objects under the video/<dir>/ prefix in R2_VIDEO_BUCKET ("lobster-videos").
+ * Uses LIST-then-delete rather than a hardcoded format list so it is immune to format drift
+ * between r2.ts, reconcile.ts, and the EU video-service FORMATS SSOT.
+ *
+ * Videos are NOT in the designs bucket — using deleteDesignObject on a video was a no-op
+ * (the object isn't there → 404 treated as success), leaving the file in lobster-videos so
+ * the reconcile cron re-inserted the media_assets row every ~15 min.
+ *
+ * Idempotent — 404s and an empty list both return ok:true.
+ */
+export async function deleteVideoObjects(
+  objectKey: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const apiToken = process.env.R2_API_TOKEN;
+  const accountId = process.env.R2_ACCOUNT_ID;
+  if (!apiToken || !accountId) return { ok: false, error: "r2_not_configured" };
+
+  // object_key for videos is `video/<dir>/<format>.mp4` — extract the dir segment.
+  const m = /^video\/(.+)\/[^/]+\.mp4$/.exec(objectKey);
+  if (!m) return { ok: false, error: "invalid_video_object_key" };
+  const dir = m[1];
+
+  const bucket = process.env.R2_VIDEO_BUCKET ?? "lobster-videos";
+  const base = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucket}`;
+  const headers = { Authorization: `Bearer ${apiToken}` };
+
+  // 1) List all objects under video/<dir>/ (authoritative, immune to format-name drift).
+  const keys: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const u = new URL(`${base}/objects`);
+    u.searchParams.set("per_page", "100");
+    u.searchParams.set("prefix", `video/${dir}/`);
+    if (cursor) u.searchParams.set("cursor", cursor);
+    let listRes: Response;
+    try {
+      listRes = await fetch(u.toString(), { headers, signal: AbortSignal.timeout(15_000) });
+    } catch {
+      return { ok: false, error: "r2_video_list_network_error" };
+    }
+    if (!listRes.ok) return { ok: false, error: `r2_video_list_failed_${listRes.status}` };
+    const j = (await listRes.json()) as { result?: { key: string }[]; result_info?: { cursor?: string; is_truncated?: boolean } };
+    for (const o of j.result ?? []) keys.push(o.key);
+    cursor = j.result_info?.is_truncated ? j.result_info.cursor : undefined;
+  } while (cursor);
+
+  // 2) Delete each object found (idempotent — 404 treated as success).
+  for (const key of keys) {
+    try {
+      const res = await fetch(
+        `${base}/objects/${encodeURIComponent(key).replace(/%2F/g, "/")}`,
+        { method: "DELETE", headers },
+      );
+      if (!res.ok && res.status !== 404) {
+        return { ok: false, error: `r2_video_delete_failed_${res.status}` };
+      }
+    } catch {
+      return { ok: false, error: "r2_video_network_error" };
+    }
+  }
+  return { ok: true };
+}
+
+/**
  * Upload one object to the designs bucket. Returns the public URL on success.
  * Caller is responsible for size limits; this function only transports bytes.
  */

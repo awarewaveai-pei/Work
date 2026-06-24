@@ -327,6 +327,10 @@ export default function TarotStudio() {
 
   function previewInputsValid(): boolean {
     setMessage(null);
+    if (!hasSelectedModel) {
+      setMessage("請先在右側面板選擇一個圖片模型");
+      return false;
+    }
     if (mode === "image" && referenceImages.length === 0) {
       setMessage("以圖生圖模式請先上傳至少一張參考圖（或切到文字模式並填描述）");
       return false;
@@ -732,382 +736,51 @@ export default function TarotStudio() {
   }
 
   return (
-    <div className="page">
-      <h1 style={{ fontSize: 22, margin: "0 0 4px" }}>🔮 塔羅牌印刷檔生成工具</h1>
-      <p className="form-hint" style={{ marginBottom: 20 }}>
-        先設計一張風格樣本 → 鎖定風格 → 整套 78 張同風格生成 → 下載印刷檔 PNG（70×120mm @300DPI 含出血）。
-      </p>
+    <div style={{ display: "flex", minHeight: "calc(100vh - 52px)", alignItems: "flex-start" }}>
 
-      {message && (
-        <div className="form-message" style={{ marginBottom: 16 }}>
-          {message}
-        </div>
-      )}
+      {/* ── LEFT: main content ── */}
+      <div style={{ flex: 1, minWidth: 0, padding: "16px 16px 32px" }}>
 
-      {/* ── Step 1: style design ─────────────────────────────── */}
-      <div className="card" style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: 15, margin: "0 0 14px" }}>Step 1 · 風格設計</h2>
-
-        <div className="form-row">
-          <label className="form-label">
-            圖片模型{isMultiModel ? "（多選 → 生成比較）" : "（點選 → 生成預覽）"}
-          </label>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {MODEL_GROUPS.map((group) => (
-              <div key={group}>
-                <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>{group}</div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {MODEL_OPTIONS.filter((o) => o.group === group).map((o) => {
-                    const active = selectedModels.has(o.value);
-                    return (
-                      <button
-                        key={o.value}
-                        type="button"
-                        disabled={locked}
-                        onClick={() => {
-                          setSelectedModels((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(o.value)) {
-                              if (next.size > 1) next.delete(o.value); // keep at least 1 selected
-                            } else {
-                              next.add(o.value);
-                            }
-                            return next;
-                          });
-                        }}
-                        title={`~NT$${o.costNt}/張${o.maxRefs > 0 ? `，最多 ${o.maxRefs} 張參考圖` : "，純文字"}`}
-                        style={{
-                          padding: "5px 12px",
-                          borderRadius: 14,
-                          fontSize: 12,
-                          cursor: locked ? "default" : "pointer",
-                          border: `1px solid ${active ? "var(--accent)" : "var(--card-border)"}`,
-                          background: active ? "var(--accent)" : "rgba(127,127,127,0.08)",
-                          color: active ? "var(--btn-primary-text)" : "var(--text-muted)",
-                          fontWeight: active ? 600 : 400,
-                          opacity: locked ? 0.5 : 1,
-                        }}
-                      >
-                        {active && selectedModels.size === 1 ? "✓ " : active ? "☑ " : ""}{o.label}
-                        <span style={{ fontSize: 10, opacity: 0.7, marginLeft: 4 }}>NT${o.costNt}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="form-hint" style={{ marginTop: 6 }}>
-            {isMultiModel
-              ? `已選 ${selectedModels.size} 個模型 → 點「生成比較」同時生成對比。`
-              : maxRefs === 0
-                ? "此模型不吃參考圖（純文字生圖）"
-                : `此模型最多吃 ${maxRefs} 張參考圖`}
-          </div>
-        </div>
-
-        <div className="form-row">
-          <label className="form-label">生成模式</label>
-          <select className="form-select" value={mode} onChange={(e) => setMode(e.target.value as Mode)} disabled={locked}>
-            <option value="text">文字生圖（純描述）</option>
-            <option value="image">以圖生圖 / 上傳風格參考圖</option>
-          </select>
-        </div>
-
-        {mode === "image" && (
-          <div className="form-row">
-            <label className="form-label">參考圖（風格參考，可多張）</label>
-            {maxRefs === 0 ? (
-              <div className="form-hint" style={{ color: "var(--yellow)" }}>
-                ⚠ 目前模型不吃參考圖。改選 FLUX dev（1 張）或 gpt-image-1（最多 5 張）才會用到上傳圖。
-              </div>
-            ) : (
-              <>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="form-input"
-                  disabled={locked || referenceImages.length >= maxRefs}
-                  onChange={(e) => {
-                    void onAddReferences(e.target.files);
-                    e.currentTarget.value = "";
-                  }}
-                />
-                <div className="form-hint">
-                  已上傳 {referenceImages.length} / {maxRefs} 張
-                  {referenceImages.length >= maxRefs ? "（已達此模型上限）" : ""}
-                </div>
-              </>
-            )}
-            {referenceImages.length > 0 && (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-                {referenceImages.map((src, i) => (
-                  <div key={i} style={{ position: "relative" }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={src} alt={`ref ${i + 1}`} style={{ height: 90, borderRadius: 6, border: "1px solid var(--card-border)" }} />
-                    {!locked && (
-                      <button
-                        onClick={() => removeReference(i)}
-                        title="移除"
-                        style={{
-                          position: "absolute",
-                          top: -6,
-                          right: -6,
-                          width: 20,
-                          height: 20,
-                          borderRadius: "50%",
-                          border: "none",
-                          background: "var(--red)",
-                          color: "var(--btn-primary-text)",
-                          cursor: "pointer",
-                          fontSize: 12,
-                          lineHeight: "20px",
-                          padding: 0,
-                        }}
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+        {message && (
+          <div className="form-message" style={{ marginBottom: 12 }}>
+            {message}
           </div>
         )}
 
-        <div className="form-row">
-          <label className="form-label">主角／角色替換（選填）</label>
-          <input
-            className="form-input"
-            placeholder="留空＝用標準塔羅人物。例：a fluffy orange cat / a cartoon robot / 一隻柴犬"
-            value={subjectText}
-            onChange={(e) => setSubjectText(e.target.value)}
-            disabled={locked}
-          />
-          <div className="form-hint">
-            換掉每張牌的主角，情境（姿勢、道具、符號）不變，整副 78 張同一角色。中文會自動轉英；用英文最準。
-            <b>上傳真人／角色照片</b>時這裡留空即可，模型會直接照圖換臉（走上方「以圖生圖」）。
-          </div>
-        </div>
-
-        <div className="form-row">
-          <label className="form-label">風格描述{mode === "image" && referenceImages.length > 0 ? "（選填，已上傳參考圖可留空）" : ""}</label>
-          <div style={{ marginBottom: 8 }}>
-            {Array.from(new Set(STYLE_PRESETS.map((p) => p.group))).map((g) => (
-              <div key={g} style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4, opacity: 0.8 }}>{g}</div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {STYLE_PRESETS.filter((p) => p.group === g).map((p) => {
-                    const selected = styleTokens.includes(p.zh);
-                    return (
-                    <button
-                      key={p.zh}
-                      type="button"
-                      disabled={locked}
-                      onClick={() =>
-                        // Toggle the zh label in/out of the box. The textarea shows Chinese; the
-                        // English catalog prompt is resolved + sent at generation time. zh labels
-                        // have no commas, so comma-split round-trips cleanly.
-                        setStylePrompt((prev) => {
-                          const toks = prev.split(",").map((s) => s.trim()).filter(Boolean);
-                          const i = toks.indexOf(p.zh);
-                          if (i >= 0) toks.splice(i, 1);
-                          else toks.push(p.zh);
-                          return toks.join(", ");
-                        })
-                      }
-                      title={selected ? `移除 ${p.zh}` : `加入 ${p.zh}`}
-                      style={{
-                        padding: "4px 10px",
-                        borderRadius: 14,
-                        fontSize: 12,
-                        cursor: locked ? "default" : "pointer",
-                        border: `1px solid ${selected ? "var(--accent)" : "var(--card-border)"}`,
-                        background: selected ? "var(--accent)" : "rgba(127,127,127,0.08)",
-                        color: selected ? "var(--btn-primary-text)" : "var(--text-muted)",
-                        fontWeight: selected ? 600 : 400,
-                        opacity: locked ? 0.5 : 1,
-                      }}
-                    >
-                      {selected ? "✓ " : ""}
-                      {p.zh}
-                    </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-          <textarea
-            className="form-textarea"
-            placeholder="點上方按鈕選風格（顯示中文）。也可自行輸入。例：水彩｜透明淡彩暈染風格"
-            value={stylePrompt}
-            onChange={(e) => setStylePrompt(e.target.value)}
-            disabled={locked}
-          />
-          <div className="form-hint">
-            點按鈕選風格 → 框裡顯示<b>中文</b>（看得懂選了什麼），再點一次取消（打勾＝已選）。對應的<b>完整英文</b>會帶到下方，<b>你可以直接編輯</b>，生成時送的就是下面那段。整段套用到 78 張牌；風格不夠強時改用 FLUX dev 模型。
-          </div>
-
-          <div style={{ marginTop: 8 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                🎨 <b>實際送給圖片模型的英文</b>（可直接改，改了就送這段）
-              </span>
-              <button
-                type="button"
-                disabled={locked || suggestBusy}
-                onClick={() => void suggestPrompt()}
-                title="用 AI 根據你的風格提示自動生成英文 art-direction prompt"
-                style={{
-                  fontSize: 11,
-                  padding: "3px 10px",
-                  borderRadius: 10,
-                  border: "1px solid var(--accent)",
-                  background: locked || suggestBusy ? "rgba(127,127,127,0.08)" : "var(--ai-bg)",
-                  color: locked || suggestBusy ? "var(--text-muted)" : "var(--accent)",
-                  cursor: locked || suggestBusy ? "default" : "pointer",
-                  fontWeight: 500,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {suggestBusy ? "✨ AI 生成中…" : "✨ 幫我想 prompt"}
-              </button>
-              {styleEnglishEdited && (
-                <button
-                  type="button"
-                  disabled={locked}
-                  onClick={() => {
-                    setStyleEnglish("");
-                    setStyleEnglishEdited(false);
-                  }}
-                  style={{
-                    fontSize: 11,
-                    padding: "1px 8px",
-                    borderRadius: 10,
-                    border: "1px solid var(--card-border)",
-                    background: "transparent",
-                    color: "var(--text-muted)",
-                    cursor: locked ? "default" : "pointer",
-                  }}
-                >
-                  ↻ 重設為中文對應
-                </button>
-              )}
-            </div>
-            <textarea
-              className="form-textarea"
-              style={{ minHeight: 90, fontSize: 12, lineHeight: 1.5, background: "rgba(99,102,241,0.06)" }}
-              placeholder="（選了上方風格這裡會自動帶出英文；也可自行修改或直接輸入英文）"
-              value={effectiveEnglish}
-              onChange={(e) => {
-                setStyleEnglish(e.target.value);
-                setStyleEnglishEdited(true);
-              }}
-              disabled={locked}
-            />
-            {styleEnglishEdited && (
-              <div className="form-hint" style={{ color: "var(--yellow)" }}>
-                ✏ 你已手動編輯英文 → 生成時送這段（已覆蓋中文按鈕的自動對應）。按「重設」恢復自動。
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="form-row">
-          <label className="form-label">外框顏色（正式塔羅版式 · 上羅馬數字／中圖像／下牌名 · 三色直線外框）</label>
-          <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-            {CARD_TEMPLATES.map((t) => {
-              const active = template === t.key;
-              return (
-                <div
-                  key={t.key}
-                  onClick={() => setTemplate(t.key)}
-                  style={{ cursor: "pointer", textAlign: "center", width: 129 }}
-                >
-                  {templateThumbs[t.key] ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={templateThumbs[t.key]}
-                      alt={t.label}
-                      style={{
-                        width: 129,
-                        height: 213,
-                        borderRadius: 6,
-                        objectFit: "cover",
-                        border: active ? "3px solid var(--accent)" : "1px solid var(--card-border)",
-                      }}
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        width: 129,
-                        height: 213,
-                        borderRadius: 6,
-                        border: "1px solid var(--card-border)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 22,
-                        opacity: 0.5,
-                      }}
-                    >
-                      …
-                    </div>
-                  )}
-                  <div style={{ fontSize: 14, marginTop: 6, lineHeight: 1.3, color: active ? "var(--accent)" : "var(--text-muted)" }}>
-                    {t.label}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="form-hint">每張下載的牌都會套這個框 + 自動加牌名。生成預覽後，這裡會用你的圖顯示各模板樣式。</div>
-        </div>
-
-        {previewStale && (
+        {/* Empty state */}
+        {!previewImage && !locked && compareResults.length === 0 && (
           <div
             style={{
-              marginBottom: 10,
-              padding: "8px 12px",
-              borderRadius: 8,
-              border: "1px solid var(--yellow)",
-              background: "var(--build-risk-medium-bg)",
-              color: "var(--build-risk-medium-text)",
-              fontSize: 13,
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              minHeight: 420, gap: 16, textAlign: "center",
+              border: "1px dashed var(--card-border)", borderRadius: 16,
+              padding: 40, background: "rgba(99,102,241,0.03)",
             }}
           >
-            ⚠ 你已更改風格或模型，但上方預覽與外框縮圖仍是<strong>舊圖</strong>。請按「重新生成預覽」套用新風格（縮圖不會自己更新）。
+            <div style={{ fontSize: 64, lineHeight: 1 }}>🔮</div>
+            <h1 style={{ fontSize: 20, margin: 0 }}>塔羅牌印刷檔生成工具</h1>
+            <p className="form-hint" style={{ maxWidth: 360 }}>
+              在右側選擇圖片模型 → 選風格 → 點「生成預覽」查看效果 → 滿意後鎖定，整套 78 張同風格生成
+            </p>
+            {!hasSelectedModel && (
+              <div
+                style={{
+                  padding: "8px 16px", borderRadius: 8,
+                  background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.3)",
+                  color: "var(--yellow)", fontSize: 13,
+                }}
+              >
+                ← 請先在右側選擇一個圖片模型
+              </div>
+            )}
           </div>
         )}
 
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          {isMultiModel ? (
-            <button
-              className="btn-primary"
-              onClick={generateCompare}
-              disabled={compareBusy || locked}
-            >
-              {compareBusy ? `生成中… (${selectedModels.size} 個模型)` : `生成比較（${selectedModels.size} 個）`}
-            </button>
-          ) : (
-            <button
-              className="btn-primary"
-              onClick={generatePreview}
-              disabled={previewBusy || locked}
-              style={previewStale ? { boxShadow: "0 0 0 3px var(--yellow)" } : undefined}
-            >
-              {previewBusy ? "生成中…" : previewImage ? "重新生成預覽（套用新風格）" : "生成風格預覽"}
-            </button>
-          )}
-        </div>
-
-        {/* Multi-model comparison results */}
+        {/* Compare results */}
         {compareResults.length > 0 && (
-          <div style={{ marginTop: 16 }}>
+          <div className="card" style={{ marginBottom: 16 }}>
             <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13 }}>
-              比較結果（點圖放大，按「選這個」進入整套生成）
+              比較結果（點圖放大 · 點「選這個」進入整套生成）
             </div>
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
               {compareResults.map((r) => (
@@ -1115,15 +788,9 @@ export default function TarotStudio() {
                   {r.busy ? (
                     <div
                       style={{
-                        width: 180,
-                        height: 270,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        border: "1px solid var(--card-border)",
-                        borderRadius: 8,
-                        fontSize: 13,
-                        color: "var(--text-muted)",
+                        width: 180, height: 270, display: "flex", alignItems: "center",
+                        justifyContent: "center", border: "1px solid var(--card-border)",
+                        borderRadius: 8, fontSize: 13, color: "var(--text-muted)",
                       }}
                     >
                       ⏳ 生成中…
@@ -1152,8 +819,7 @@ export default function TarotStudio() {
                   ) : (
                     <div style={{ fontSize: 12, color: "var(--red)", width: 180 }}>
                       {modelOption(r.model).label}
-                      <br />
-                      ⚠ {r.error ?? "失敗"}
+                      <br />⚠ {r.error ?? "失敗"}
                     </div>
                   )}
                 </div>
@@ -1162,267 +828,753 @@ export default function TarotStudio() {
           </div>
         )}
 
+        {/* Preview */}
         {previewImage && (
-          <div style={{ marginTop: 16, display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
-            {/* True WYSIWYG preview — gamma/sharpen/levels show their real effect (not CSS). */}
-            <div onClick={() => setPreviewZoom(true)} title="點擊放大" style={{ cursor: "zoom-in", border: "1px solid var(--card-border)", borderRadius: 10, lineHeight: 0 }}>
-              <GradedPreview image={previewImage} params={grade.params} maxWidth={300} maxHeight={450} />
-            </div>
-            <div>
-              <div className="form-hint" style={{ marginBottom: 8 }}>
-                預覽牌：{PREVIEW_CARD.name}
-                {previewSeed != null ? ` · seed ${previewSeed}` : ""}
-              </div>
-              {!locked ? (
-                <button className="btn-primary" onClick={lockStyle}>
-                  ✓ 鎖定這個風格，進入整套生成
-                </button>
-              ) : (
-                <button className="btn-secondary" onClick={() => setLocked(false)}>
-                  解除鎖定，重新設計
-                </button>
-              )}
-              {/* 輸出軌 ([1-g])：塔羅卡 4 目的地，尺寸正確（70×120/121mm）。色階/銳利度由 server bake。 */}
-              <div style={{ marginTop: 12 }}>
-                <OutputTrackBar
-                  image={previewImage}
-                  source="tarot"
-                  colorGrade={grade.params}
-                  printDestinations={["tw-local", "mpc", "tgc", "printninja"]}
-                  fileMeta={{
-                    product: "塔羅卡",
-                    subject: subjectText.trim() || undefined,
-                    style: stylePrompt.trim() || undefined,
-                  }}
-                  hideQuickEdit
-                />
-              </div>
-            </div>
-            {/* 快速編輯 + AI image prompt — 垂直堆疊，按鍵同寬 */}
-            <div style={{ flex: 1, minWidth: 280 }}>
-              <button
-                className="btn-secondary"
-                style={{ width: "100%", marginBottom: 8 }}
-                onClick={() =>
-                  openInCanvas(
-                    previewImage,
-                    buildSemanticBase({ product: "塔羅卡", subject: subjectText.trim() || undefined, style: stylePrompt.trim() || undefined, track: "編輯" }),
-                  )
-                }
+          <div className="card" style={{ marginBottom: 16 }}>
+            {previewStale && (
+              <div
+                style={{
+                  marginBottom: 10, padding: "8px 12px", borderRadius: 8,
+                  border: "1px solid var(--yellow)", background: "var(--build-risk-medium-bg)",
+                  color: "var(--build-risk-medium-text)", fontSize: 13,
+                }}
               >
-                ✏️ 快速編輯
-              </button>
-              <ImageEditPromptPanel
-                sourceImage={previewImage}
-                currentPrompt={buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectText })}
-                imageModel={activeModel}
-                target="tarot-preview"
-                generateEndpoint="/api/tools/tarot/generate"
-                aspectRatio="2:3"
-                printQuality
-                styleAnchor={{
-                  model: activeModel,
-                  mode,
-                  stylePrompt: effectiveEnglish,
-                  subject: subjectText.trim(),
-                  refs: referenceImages.length,
-                }}
-                onEditedImage={(image, meta) => {
-                  setSelectedModels(new Set<TarotModel>([meta.model as TarotModel]));
-                  setPreviewImage(image);
-                  setPreviewSeed(meta.seed);
-                  setPreviewSig(`${meta.model}::${meta.prompt}::edit=1`);
-                  setLocked(false);
-                  setBatch((prev) => {
-                    prev.forEach((it) => it.url && URL.revokeObjectURL(it.url));
-                    return [];
-                  });
-                  saveToGallery(image, "tarot-preview-edit", { model: meta.model, prompt: meta.prompt });
-                }}
-              />
-            </div>
-            {/* 修圖積木 ([1-f])：色彩/色階/銳利度滑桿，即時 CSS 預覽。 */}
-            <div style={{ width: 260 }}>
-              <ColorGradePanel state={grade.state} onSet={grade.set} onReset={grade.reset} neutral={grade.neutral} />
+                ⚠ 風格或模型已變更，預覽仍是<strong>舊圖</strong>。在右側點「重新生成預覽」套用。
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+              <div
+                onClick={() => setPreviewZoom(true)}
+                title="點擊放大"
+                style={{ cursor: "zoom-in", border: "1px solid var(--card-border)", borderRadius: 10, lineHeight: 0 }}
+              >
+                <GradedPreview image={previewImage} params={grade.params} maxWidth={260} maxHeight={390} />
+              </div>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <div className="form-hint" style={{ marginBottom: 8 }}>
+                  預覽牌：{PREVIEW_CARD.name}{previewSeed != null ? ` · seed ${previewSeed}` : ""}
+                </div>
+                {!locked ? (
+                  <button className="btn-primary" onClick={lockStyle}>
+                    ✓ 鎖定這個風格，進入整套生成
+                  </button>
+                ) : (
+                  <button className="btn-secondary" onClick={() => setLocked(false)}>
+                    解除鎖定，重新設計
+                  </button>
+                )}
+                <div style={{ marginTop: 12 }}>
+                  <OutputTrackBar
+                    image={previewImage}
+                    source="tarot"
+                    colorGrade={grade.params}
+                    printDestinations={["tw-local", "mpc", "tgc", "printninja"]}
+                    fileMeta={{
+                      product: "塔羅卡",
+                      subject: subjectText.trim() || undefined,
+                      style: stylePrompt.trim() || undefined,
+                    }}
+                    hideQuickEdit
+                  />
+                </div>
+                <div style={{ marginTop: 12 }}>
+                  <button
+                    className="btn-secondary"
+                    style={{ width: "100%", marginBottom: 8 }}
+                    onClick={() =>
+                      openInCanvas(
+                        previewImage,
+                        buildSemanticBase({
+                          product: "塔羅卡",
+                          subject: subjectText.trim() || undefined,
+                          style: stylePrompt.trim() || undefined,
+                          track: "編輯",
+                        }),
+                      )
+                    }
+                  >
+                    ✏️ 快速編輯
+                  </button>
+                  <ImageEditPromptPanel
+                    sourceImage={previewImage}
+                    currentPrompt={buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectText })}
+                    imageModel={activeModel}
+                    target="tarot-preview"
+                    generateEndpoint="/api/tools/tarot/generate"
+                    aspectRatio="2:3"
+                    printQuality
+                    styleAnchor={{
+                      model: activeModel,
+                      mode,
+                      stylePrompt: effectiveEnglish,
+                      subject: subjectText.trim(),
+                      refs: referenceImages.length,
+                    }}
+                    onEditedImage={(image, meta) => {
+                      setSelectedModels(new Set<TarotModel>([meta.model as TarotModel]));
+                      setPreviewImage(image);
+                      setPreviewSeed(meta.seed);
+                      setPreviewSig(`${meta.model}::${meta.prompt}::edit=1`);
+                      setLocked(false);
+                      setBatch((prev) => {
+                        prev.forEach((it) => it.url && URL.revokeObjectURL(it.url));
+                        return [];
+                      });
+                      saveToGallery(image, "tarot-preview-edit", { model: meta.model, prompt: meta.prompt });
+                    }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         )}
-      </div>
 
-      {/* ── Step 2 + 3: per-group / per-card generation + download ──── */}
-      {locked &&
-        (() => {
-          const groupItems = batch.map((it, i) => ({ it, i })).filter(({ it }) => inGroup(it.card, group));
-          const groupDone = groupItems.filter(({ it }) => it.status === "done").length;
-          const groupPending = groupItems.filter(({ it }) => it.status !== "done").length;
-          return (
-            <div className="card">
-              <h2 style={{ fontSize: 15, margin: "0 0 10px" }}>Step 2 · 分組 / 單張生成與下載</h2>
-
-              {/* group filter chips */}
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
-                {GROUPS.map((g) => {
-                  const active = group === g.key;
-                  return (
+        {/* Step 2: batch grid */}
+        {locked &&
+          (() => {
+            const groupItems = batch.map((it, i) => ({ it, i })).filter(({ it }) => inGroup(it.card, group));
+            const groupDone = groupItems.filter(({ it }) => it.status === "done").length;
+            const groupPending = groupItems.filter(({ it }) => it.status !== "done").length;
+            return (
+              <div className="card">
+                <h2 style={{ fontSize: 15, margin: "0 0 10px" }}>整套生成 · Step 2</h2>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+                  {GROUPS.map((g) => {
+                    const active = group === g.key;
+                    return (
+                      <button
+                        key={g.key}
+                        onClick={() => setGroup(g.key)}
+                        disabled={batchBusy}
+                        style={{
+                          padding: "5px 12px", borderRadius: 6, fontSize: 12,
+                          cursor: batchBusy ? "default" : "pointer",
+                          border: `1px solid ${active ? "var(--accent)" : "var(--card-border)"}`,
+                          background: active ? "var(--ai-bg)" : "transparent",
+                          color: active ? "var(--accent)" : "var(--text-muted)",
+                        }}
+                      >
+                        {g.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 6 }}>
+                  <button className="btn-primary" onClick={() => void generateGroup(true)} disabled={batchBusy || groupPending === 0}>
+                    {batchBusy ? `生成中… ${groupDone}/${groupItems.length}` : `生成未完成 ${groupPending} 張`}
+                  </button>
+                  {groupDone > 0 && (
                     <button
-                      key={g.key}
-                      onClick={() => setGroup(g.key)}
+                      className="btn-secondary"
+                      onClick={() => void generateGroup(false)}
                       disabled={batchBusy}
+                      title="重新生成這組所有牌"
+                    >
+                      重新生成全組
+                    </button>
+                  )}
+                  <button className="btn-secondary" onClick={downloadZip} disabled={zipBusy || doneCount === 0}>
+                    {zipBusy ? "打包中…" : `下載 ZIP（${doneCount} 張）`}
+                  </button>
+                  <span className="form-hint">
+                    這組 {groupDone}/{groupItems.length} · 全部 {doneCount}/{TAROT_CARDS.length}
+                  </span>
+                </div>
+                {/* Background batch */}
+                <div
+                  style={{
+                    display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap",
+                    marginBottom: 8, padding: "10px 12px", borderRadius: 8,
+                    border: "1px solid var(--card-border)", background: "rgba(99,102,241,0.04)",
+                  }}
+                >
+                  <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>⚡ 背景批次（78 張）</span>
+                  {bgStatus === "idle" && (
+                    <button
+                      className="btn-secondary"
+                      disabled={batchBusy}
+                      onClick={() => void startBackgroundBatch()}
+                      style={{ fontSize: 12 }}
+                    >
+                      🚀 背景生成全 78 張
+                    </button>
+                  )}
+                  {(bgStatus === "pending" || bgStatus === "running") && (
+                    <span style={{ fontSize: 12, color: "var(--accent)" }}>
+                      進行中 {bgProgress.done}/{bgProgress.total} 張…
+                      {bgJobId && <span style={{ color: "var(--text-muted)", marginLeft: 6 }}>job: {bgJobId.slice(0, 8)}</span>}
+                    </span>
+                  )}
+                  {bgStatus === "done" && (
+                    <>
+                      <span style={{ fontSize: 12, color: "var(--green)" }}>✅ 完成 {bgProgress.done}/{bgProgress.total} 張</span>
+                      <button
+                        className="btn-primary"
+                        disabled={bgLoadBusy}
+                        onClick={() => void loadBatchResults()}
+                        style={{ fontSize: 12 }}
+                      >
+                        {bgLoadBusy ? "載入中…" : "載入批次結果"}
+                      </button>
+                    </>
+                  )}
+                  {bgStatus === "error" && (
+                    <>
+                      <span style={{ fontSize: 12, color: "var(--red)" }}>❌ 部分失敗 {bgProgress.done}/{bgProgress.total}</span>
+                      <button
+                        className="btn-secondary"
+                        disabled={bgLoadBusy}
+                        onClick={() => void loadBatchResults()}
+                        style={{ fontSize: 12 }}
+                      >
+                        {bgLoadBusy ? "載入中…" : "載入已完成的"}
+                      </button>
+                    </>
+                  )}
+                </div>
+                <div className="form-hint" style={{ marginBottom: 12 }}>
+                  💡 點<b>已完成</b>的卡查看大圖（可重新生成）。點<b>空白卡</b>生成那一張。
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                  {groupItems.map(({ it, i }) => (
+                    <div
+                      key={it.card.id}
+                      title={`${it.card.name}${it.error ? ` — ${it.error}` : ""}`}
+                      onClick={() => {
+                        if (batchBusy) return;
+                        if (it.status === "done") setViewIndex(i);
+                        else generateSingle(i);
+                      }}
                       style={{
-                        padding: "5px 12px",
-                        borderRadius: 6,
-                        fontSize: 12,
+                        width: 132, height: 219, borderRadius: 8,
+                        border: `1px solid ${it.card.colors[0]}55`,
+                        background: it.card.colors[1],
+                        position: "relative", overflow: "hidden",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 11, color: it.card.colors[0], textAlign: "center",
                         cursor: batchBusy ? "default" : "pointer",
-                        border: `1px solid ${active ? "var(--accent)" : "var(--card-border)"}`,
-                        background: active ? "var(--ai-bg)" : "transparent",
-                        color: active ? "var(--accent)" : "var(--text-muted)",
+                        opacity: batchBusy && it.status !== "pending" ? 0.6 : 1,
                       }}
                     >
-                      {g.label}
+                      {it.url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={it.url} alt={it.card.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ) : it.status === "pending" ? (
+                        <span>⏳ 生成中…</span>
+                      ) : it.status === "error" ? (
+                        <span>
+                          ⚠️ 失敗
+                          <br />
+                          點擊重試
+                        </span>
+                      ) : (
+                        <span style={{ padding: 6 }}>
+                          {it.card.name}
+                          <br />
+                          <span style={{ opacity: 0.6 }}>（點擊生成）</span>
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+      </div>
+
+      {/* ── RIGHT: sticky settings accordion ── */}
+      <div
+        style={{
+          width: 300, flexShrink: 0,
+          position: "sticky", top: 0, alignSelf: "flex-start",
+          maxHeight: "100vh", overflowY: "auto",
+          borderLeft: "1px solid var(--card-border)",
+          padding: "12px 12px 32px",
+        }}
+      >
+        {/* Generate button */}
+        <div style={{ marginBottom: 12 }}>
+          {isMultiModel ? (
+            <button
+              className="btn-primary"
+              style={{ width: "100%" }}
+              onClick={generateCompare}
+              disabled={compareBusy || locked}
+            >
+              {compareBusy ? `生成中… (${selectedModels.size} 模型)` : `生成比較（${selectedModels.size}）`}
+            </button>
+          ) : (
+            <button
+              className="btn-primary"
+              style={{
+                width: "100%",
+                boxShadow: previewStale ? "0 0 0 3px var(--yellow)" : undefined,
+                opacity: !hasSelectedModel ? 0.6 : 1,
+              }}
+              onClick={generatePreview}
+              disabled={previewBusy || locked}
+            >
+              {previewBusy ? "生成中…" : !hasSelectedModel ? "請先選擇圖片模型" : previewImage ? "重新生成預覽" : "生成風格預覽"}
+            </button>
+          )}
+          {!hasSelectedModel && (
+            <div style={{ fontSize: 11, color: "var(--yellow)", marginTop: 4, textAlign: "center" }}>
+              ↓ 在圖片模型區選一個
+            </div>
+          )}
+        </div>
+
+        {/* ── Accordion: 圖片模型 ── */}
+        <div style={{ borderTop: "1px solid var(--card-border)" }}>
+          <button
+            type="button"
+            onClick={() => togglePanel("model")}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "9px 0", background: "none", border: "none", cursor: "pointer",
+              fontSize: 13, fontWeight: 600, color: "var(--text)",
+            }}
+          >
+            <span>圖片模型</span>
+            <span
+              style={{
+                fontSize: 11, color: hasSelectedModel ? "var(--accent)" : "var(--text-muted)",
+                marginLeft: "auto", marginRight: 6,
+                maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}
+            >
+              {hasSelectedModel
+                ? [...selectedModels].map((m) => modelOption(m).label).join(" + ")
+                : "未選擇"}
+            </span>
+            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{panelOpen.model ? "▲" : "▼"}</span>
+          </button>
+          {panelOpen.model && (
+            <div style={{ paddingBottom: 12 }}>
+              {/* Provider tabs */}
+              <div style={{ display: "flex", gap: 4, marginBottom: 10, flexWrap: "wrap" }}>
+                {MODEL_GROUPS.map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => setModelProviderTab(g)}
+                    style={{
+                      padding: "3px 10px", borderRadius: 12, fontSize: 11, cursor: "pointer",
+                      border: `1px solid ${modelProviderTab === g ? "var(--accent)" : "var(--card-border)"}`,
+                      background: modelProviderTab === g ? "var(--accent)" : "transparent",
+                      color: modelProviderTab === g ? "var(--btn-primary-text)" : "var(--text-muted)",
+                      fontWeight: modelProviderTab === g ? 600 : 400,
+                    }}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
+              {/* Model rows */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {MODEL_OPTIONS.filter((o) => o.group === modelProviderTab).map((o) => {
+                  const active = selectedModels.has(o.value);
+                  return (
+                    <button
+                      key={o.value}
+                      type="button"
+                      disabled={locked}
+                      onClick={() => {
+                        setSelectedModels((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(o.value)) {
+                            next.delete(o.value);
+                          } else {
+                            next.add(o.value);
+                          }
+                          return next;
+                        });
+                      }}
+                      title={`~NT$${o.costNt}/張${o.maxRefs > 0 ? `，最多 ${o.maxRefs} 張參考圖` : "，純文字"}`}
+                      style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "6px 10px", borderRadius: 8, fontSize: 12,
+                        cursor: locked ? "default" : "pointer",
+                        border: `1px solid ${active ? "var(--accent)" : "var(--card-border)"}`,
+                        background: active ? "rgba(99,102,241,0.12)" : "rgba(127,127,127,0.04)",
+                        color: active ? "var(--accent)" : "var(--text)",
+                        fontWeight: active ? 600 : 400,
+                        opacity: locked ? 0.5 : 1,
+                      }}
+                    >
+                      <span>{active ? "✓ " : ""}{o.label}</span>
+                      <span style={{ fontSize: 10, color: "var(--text-muted)" }}>
+                        NT${o.costNt}{o.maxRefs > 0 ? ` · ${o.maxRefs}ref` : " · text"}
+                      </span>
                     </button>
                   );
                 })}
               </div>
+              {isMultiModel && (
+                <div className="form-hint" style={{ marginTop: 6 }}>
+                  已選 {selectedModels.size} 個模型 → 用「生成比較」同時比較
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
-              <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 6 }}>
-                <button className="btn-primary" onClick={() => void generateGroup(true)} disabled={batchBusy || groupPending === 0}>
-                  {batchBusy ? `生成中… ${groupDone}/${groupItems.length}` : `生成未完成 ${groupPending} 張`}
-                </button>
-                {groupDone > 0 && (
-                  <button className="btn-secondary" onClick={() => void generateGroup(false)} disabled={batchBusy}
-                    title="重新生成這組所有牌（包含已完成的），會覆蓋現有結果">
-                    重新生成全組
-                  </button>
-                )}
-                <button className="btn-secondary" onClick={downloadZip} disabled={zipBusy || doneCount === 0}>
-                  {zipBusy ? "打包中…" : `下載 ZIP（全部 ${doneCount} 張）`}
-                </button>
-                <span className="form-hint">
-                  這組 {groupDone}/{groupItems.length}　·　全部 {doneCount}/{TAROT_CARDS.length}
-                </span>
-              </div>
-
-              {/* Background batch (Trigger.dev) */}
-              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 8, padding: "10px 12px", borderRadius: 8, border: "1px solid var(--card-border)", background: "rgba(99,102,241,0.04)" }}>
-                <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>⚡ 背景批次（78 張）</span>
-                {bgStatus === "idle" && (
+        {/* ── Accordion: 風格 ── */}
+        <div style={{ borderTop: "1px solid var(--card-border)" }}>
+          <button
+            type="button"
+            onClick={() => togglePanel("style")}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "9px 0", background: "none", border: "none", cursor: "pointer",
+              fontSize: 13, fontWeight: 600, color: "var(--text)",
+            }}
+          >
+            <span>風格</span>
+            <span
+              style={{
+                fontSize: 11, color: "var(--text-muted)", marginLeft: "auto", marginRight: 6,
+                maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}
+            >
+              {styleTokens.length > 0
+                ? styleTokens.slice(0, 2).join("、") + (styleTokens.length > 2 ? `…+${styleTokens.length - 2}` : "")
+                : "未選擇"}
+            </span>
+            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{panelOpen.style ? "▲" : "▼"}</span>
+          </button>
+          {panelOpen.style && (
+            <div style={{ paddingBottom: 12 }}>
+              {/* Group tabs */}
+              <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
+                {STYLE_GROUPS.map((g) => (
                   <button
-                    className="btn-secondary"
-                    disabled={batchBusy}
-                    onClick={() => void startBackgroundBatch()}
-                    title="在伺服器背景生成全 78 張，可關閉瀏覽器"
-                    style={{ fontSize: 12 }}
-                  >
-                    🚀 背景生成全 78 張
-                  </button>
-                )}
-                {(bgStatus === "pending" || bgStatus === "running") && (
-                  <span style={{ fontSize: 12, color: "var(--accent)" }}>
-                    進行中 {bgProgress.done}/{bgProgress.total} 張…
-                    {bgJobId && <span style={{ color: "var(--text-muted)", marginLeft: 6 }}>job: {bgJobId.slice(0, 8)}</span>}
-                  </span>
-                )}
-                {bgStatus === "done" && (
-                  <>
-                    <span style={{ fontSize: 12, color: "var(--green)" }}>✅ 完成 {bgProgress.done}/{bgProgress.total} 張</span>
-                    <button
-                      className="btn-primary"
-                      disabled={bgLoadBusy}
-                      onClick={() => void loadBatchResults()}
-                      style={{ fontSize: 12 }}
-                    >
-                      {bgLoadBusy ? "載入中…" : "載入批次結果"}
-                    </button>
-                  </>
-                )}
-                {bgStatus === "error" && (
-                  <>
-                    <span style={{ fontSize: 12, color: "var(--red)" }}>❌ 部分失敗 {bgProgress.done}/{bgProgress.total}</span>
-                    <button
-                      className="btn-secondary"
-                      disabled={bgLoadBusy}
-                      onClick={() => void loadBatchResults()}
-                      style={{ fontSize: 12 }}
-                    >
-                      {bgLoadBusy ? "載入中…" : "載入已完成的"}
-                    </button>
-                  </>
-                )}
-              </div>
-              <div className="form-hint" style={{ marginBottom: 12 }}>
-                💡 點<b>已完成</b>的卡 = 看大圖（裡面可重新生成）。點<b>空白卡</b> = 生成那一張。建議先生一張看滿不滿意再「生成這組」。
-              </div>
-
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                {groupItems.map(({ it, i }) => (
-                  <div
-                    key={it.card.id}
-                    title={`${it.card.name}${it.error ? ` — ${it.error}` : ""}`}
-                    onClick={() => {
-                      if (batchBusy) return;
-                      if (it.status === "done") setViewIndex(i);
-                      else generateSingle(i);
-                    }}
+                    key={g}
+                    type="button"
+                    onClick={() => setStyleGroupTab(g)}
                     style={{
-                      width: 132,
-                      height: 219,
-                      borderRadius: 8,
-                      border: `1px solid ${it.card.colors[0]}55`,
-                      background: it.card.colors[1],
-                      position: "relative",
-                      overflow: "hidden",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 11,
-                      color: it.card.colors[0],
-                      textAlign: "center",
-                      cursor: batchBusy ? "default" : "pointer",
-                      opacity: batchBusy && it.status !== "pending" ? 0.6 : 1,
+                      padding: "3px 8px", borderRadius: 12, fontSize: 11, cursor: "pointer",
+                      border: `1px solid ${styleGroupTab === g ? "var(--accent)" : "var(--card-border)"}`,
+                      background: styleGroupTab === g ? "var(--accent)" : "transparent",
+                      color: styleGroupTab === g ? "var(--btn-primary-text)" : "var(--text-muted)",
+                      fontWeight: styleGroupTab === g ? 600 : 400,
                     }}
                   >
-                    {it.url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={it.url} alt={it.card.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    ) : it.status === "pending" ? (
-                      <span>⏳ 生成中…</span>
-                    ) : it.status === "error" ? (
-                      <span>
-                        ⚠️ 失敗
-                        <br />
-                        點擊重試
-                      </span>
-                    ) : (
-                      <span style={{ padding: 6 }}>
-                        {it.card.name}
-                        <br />
-                        <span style={{ opacity: 0.6 }}>（點擊生成）</span>
-                      </span>
-                    )}
-                  </div>
+                    {g}
+                  </button>
                 ))}
               </div>
+              {/* Chips */}
+              <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 10 }}>
+                {STYLE_PRESETS.filter((p) => p.group === styleGroupTab).map((p) => {
+                  const selected = styleTokens.includes(p.zh);
+                  return (
+                    <button
+                      key={p.zh}
+                      type="button"
+                      disabled={locked}
+                      onClick={() =>
+                        setStylePrompt((prev) => {
+                          const toks = prev.split(",").map((s) => s.trim()).filter(Boolean);
+                          const i = toks.indexOf(p.zh);
+                          if (i >= 0) toks.splice(i, 1);
+                          else toks.push(p.zh);
+                          return toks.join(", ");
+                        })
+                      }
+                      style={{
+                        padding: "3px 9px", borderRadius: 12, fontSize: 11,
+                        cursor: locked ? "default" : "pointer",
+                        border: `1px solid ${selected ? "var(--accent)" : "var(--card-border)"}`,
+                        background: selected ? "rgba(99,102,241,0.12)" : "rgba(127,127,127,0.04)",
+                        color: selected ? "var(--accent)" : "var(--text-muted)",
+                        fontWeight: selected ? 600 : 400,
+                        opacity: locked ? 0.5 : 1,
+                      }}
+                    >
+                      {selected ? "✓ " : ""}{p.zh}
+                    </button>
+                  );
+                })}
+              </div>
+              <textarea
+                className="form-textarea"
+                style={{ minHeight: 52, fontSize: 12 }}
+                placeholder="點上方選風格，或自行輸入中文"
+                value={stylePrompt}
+                onChange={(e) => setStylePrompt(e.target.value)}
+                disabled={locked}
+              />
+              <div style={{ marginTop: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 10, color: "var(--text-muted)" }}>🎨 送給模型的英文</span>
+                  <button
+                    type="button"
+                    disabled={locked || suggestBusy}
+                    onClick={() => void suggestPrompt()}
+                    style={{
+                      fontSize: 10, padding: "2px 8px", borderRadius: 10,
+                      border: "1px solid var(--accent)",
+                      background: locked || suggestBusy ? "rgba(127,127,127,0.08)" : "var(--ai-bg)",
+                      color: locked || suggestBusy ? "var(--text-muted)" : "var(--accent)",
+                      cursor: locked || suggestBusy ? "default" : "pointer",
+                    }}
+                  >
+                    {suggestBusy ? "✨ AI 生成中…" : "✨ 幫我想 prompt"}
+                  </button>
+                  {styleEnglishEdited && (
+                    <button
+                      type="button"
+                      disabled={locked}
+                      onClick={() => { setStyleEnglish(""); setStyleEnglishEdited(false); }}
+                      style={{
+                        fontSize: 10, padding: "2px 6px", borderRadius: 10,
+                        border: "1px solid var(--card-border)", background: "transparent",
+                        color: "var(--text-muted)", cursor: locked ? "default" : "pointer",
+                      }}
+                    >
+                      ↻ 重設
+                    </button>
+                  )}
+                </div>
+                <textarea
+                  className="form-textarea"
+                  style={{ minHeight: 72, fontSize: 11, background: "rgba(99,102,241,0.06)" }}
+                  placeholder="（選風格後自動帶出；可直接修改）"
+                  value={effectiveEnglish}
+                  onChange={(e) => { setStyleEnglish(e.target.value); setStyleEnglishEdited(true); }}
+                  disabled={locked}
+                />
+                {styleEnglishEdited && (
+                  <div className="form-hint" style={{ color: "var(--yellow)", marginTop: 2 }}>
+                    ✏ 已手動編輯英文，生成時送這段。
+                  </div>
+                )}
+              </div>
             </div>
-          );
-        })()}
+          )}
+        </div>
 
-      {/* large-view modal */}
+        {/* ── Accordion: 主角替換 ── */}
+        <div style={{ borderTop: "1px solid var(--card-border)" }}>
+          <button
+            type="button"
+            onClick={() => togglePanel("subject")}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "9px 0", background: "none", border: "none", cursor: "pointer",
+              fontSize: 13, fontWeight: 600, color: "var(--text)",
+            }}
+          >
+            <span>主角替換</span>
+            <span
+              style={{
+                fontSize: 11, color: "var(--text-muted)", marginLeft: "auto", marginRight: 6,
+                maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}
+            >
+              {subjectText.trim() || "標準塔羅人物"}
+            </span>
+            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{panelOpen.subject ? "▲" : "▼"}</span>
+          </button>
+          {panelOpen.subject && (
+            <div style={{ paddingBottom: 12 }}>
+              <input
+                className="form-input"
+                placeholder="留空＝標準塔羅人物。例：a fluffy orange cat / 一隻柴犬"
+                value={subjectText}
+                onChange={(e) => setSubjectText(e.target.value)}
+                disabled={locked}
+              />
+              <div className="form-hint" style={{ marginTop: 4 }}>
+                換掉每張牌的主角，整副 78 張同一角色。中文自動轉英。
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Accordion: 生成模式 ── */}
+        <div style={{ borderTop: "1px solid var(--card-border)" }}>
+          <button
+            type="button"
+            onClick={() => togglePanel("mode")}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "9px 0", background: "none", border: "none", cursor: "pointer",
+              fontSize: 13, fontWeight: 600, color: "var(--text)",
+            }}
+          >
+            <span>生成模式</span>
+            <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: "auto", marginRight: 6 }}>
+              {mode === "text" ? "文字生圖" : `以圖生圖 (${referenceImages.length}張)`}
+            </span>
+            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{panelOpen.mode ? "▲" : "▼"}</span>
+          </button>
+          {panelOpen.mode && (
+            <div style={{ paddingBottom: 12 }}>
+              <select
+                className="form-select"
+                value={mode}
+                onChange={(e) => setMode(e.target.value as Mode)}
+                disabled={locked}
+                style={{ marginBottom: 10 }}
+              >
+                <option value="text">文字生圖（純描述）</option>
+                <option value="image">以圖生圖 / 上傳風格參考圖</option>
+              </select>
+              {mode === "image" && (
+                <>
+                  {maxRefs === 0 ? (
+                    <div className="form-hint" style={{ color: "var(--yellow)" }}>
+                      ⚠ 目前模型不吃參考圖。改選 FLUX dev 或 GPT-Image-1。
+                    </div>
+                  ) : (
+                    <>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="form-input"
+                        disabled={locked || referenceImages.length >= maxRefs}
+                        onChange={(e) => { void onAddReferences(e.target.files); e.currentTarget.value = ""; }}
+                      />
+                      <div className="form-hint">
+                        已上傳 {referenceImages.length}/{maxRefs} 張
+                        {referenceImages.length >= maxRefs ? "（已達上限）" : ""}
+                      </div>
+                    </>
+                  )}
+                  {referenceImages.length > 0 && (
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                      {referenceImages.map((src, i) => (
+                        <div key={i} style={{ position: "relative" }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={src}
+                            alt={`ref ${i + 1}`}
+                            style={{ height: 70, borderRadius: 6, border: "1px solid var(--card-border)" }}
+                          />
+                          {!locked && (
+                            <button
+                              onClick={() => removeReference(i)}
+                              style={{
+                                position: "absolute", top: -6, right: -6,
+                                width: 18, height: 18, borderRadius: "50%",
+                                border: "none", background: "var(--red)",
+                                color: "var(--btn-primary-text)", cursor: "pointer",
+                                fontSize: 11, lineHeight: "18px", padding: 0,
+                              }}
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── Accordion: 外框模板 ── */}
+        <div style={{ borderTop: "1px solid var(--card-border)" }}>
+          <button
+            type="button"
+            onClick={() => togglePanel("template")}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "9px 0", background: "none", border: "none", cursor: "pointer",
+              fontSize: 13, fontWeight: 600, color: "var(--text)",
+            }}
+          >
+            <span>外框模板</span>
+            <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: "auto", marginRight: 6 }}>
+              {CARD_TEMPLATES.find((t) => t.key === template)?.label ?? template}
+            </span>
+            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{panelOpen.template ? "▲" : "▼"}</span>
+          </button>
+          {panelOpen.template && (
+            <div style={{ paddingBottom: 12 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {CARD_TEMPLATES.map((t) => {
+                  const active = template === t.key;
+                  return (
+                    <div key={t.key} onClick={() => setTemplate(t.key)} style={{ cursor: "pointer", textAlign: "center" }}>
+                      {templateThumbs[t.key] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={templateThumbs[t.key]}
+                          alt={t.label}
+                          style={{
+                            width: 78, height: 129, borderRadius: 5, objectFit: "cover",
+                            border: active ? "2px solid var(--accent)" : "1px solid var(--card-border)",
+                          }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: 78, height: 129, borderRadius: 5,
+                            border: `${active ? 2 : 1}px solid ${active ? "var(--accent)" : "var(--card-border)"}`,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 18, opacity: 0.5,
+                          }}
+                        >
+                          …
+                        </div>
+                      )}
+                      <div style={{ fontSize: 11, marginTop: 4, color: active ? "var(--accent)" : "var(--text-muted)" }}>
+                        {t.label}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="form-hint" style={{ marginTop: 6 }}>
+                每張牌都會套這個框 + 自動加牌名。
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Accordion: 調色/修圖 ── */}
+        <div style={{ borderTop: "1px solid var(--card-border)" }}>
+          <button
+            type="button"
+            onClick={() => togglePanel("grade")}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "9px 0", background: "none", border: "none", cursor: "pointer",
+              fontSize: 13, fontWeight: 600, color: "var(--text)",
+            }}
+          >
+            <span>調色 / 修圖</span>
+            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{panelOpen.grade ? "▲" : "▼"}</span>
+          </button>
+          {panelOpen.grade && (
+            <div style={{ paddingBottom: 12 }}>
+              <ColorGradePanel state={grade.state} onSet={grade.set} onReset={grade.reset} neutral={grade.neutral} />
+            </div>
+          )}
+        </div>
+
+      </div>
+
+      {/* ── Modals ── */}
       {viewIndex != null && batch[viewIndex]?.url && (
         <div
           onClick={() => setViewIndex(null)}
           style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.75)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-            padding: 24,
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 1000, padding: 24,
           }}
         >
-          <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-            {/* image + loading overlay */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}
+          >
             <div style={{ position: "relative" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -1436,11 +1588,13 @@ export default function TarotStudio() {
                 }}
               />
               {batch[viewIndex].status === "pending" && (
-                <div style={{
-                  position: "absolute", inset: 0,
-                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                  color: "#fff", fontSize: 16, fontWeight: 600, gap: 10,
-                }}>
+                <div
+                  style={{
+                    position: "absolute", inset: 0,
+                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                    color: "#fff", fontSize: 16, fontWeight: 600, gap: 10,
+                  }}
+                >
                   <div style={{ fontSize: 32, animation: "spin 1s linear infinite" }}>⏳</div>
                   生成中，請稍候…
                 </div>
@@ -1470,20 +1624,13 @@ export default function TarotStudio() {
         </div>
       )}
 
-      {/* large-view modal — compare grid image */}
       {compareZoom && (
         <div
           onClick={() => setCompareZoom(null)}
           style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.75)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-            padding: 24,
-            cursor: "zoom-out",
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 1000, padding: 24, cursor: "zoom-out",
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1496,20 +1643,13 @@ export default function TarotStudio() {
         </div>
       )}
 
-      {/* large-view modal — step-1 style preview */}
       {previewZoom && previewImage && (
         <div
           onClick={() => setPreviewZoom(false)}
           style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.75)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-            padding: 24,
-            cursor: "zoom-out",
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 1000, padding: 24, cursor: "zoom-out",
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}

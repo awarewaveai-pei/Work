@@ -7,6 +7,23 @@ import { textCallCostUsd, resolveTextRate } from "@/lib/ai/cost-calculator";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * When generating copy for a VIDEO post, prepend this addendum per platform.
+ * The main PLATFORM_SPECS still provide format/length guidance; this adds video-specific framing.
+ */
+const VIDEO_PLATFORM_ADDENDUM: Record<string, string> = {
+  tiktok:    "This is copy for a SHORT-FORM VERTICAL VIDEO (9:16). Open with a hook word ('Watch:', 'POV:', '⚡'). Caption complements the video — do not describe it. Max 80 words total.",
+  instagram: "This is copy for an INSTAGRAM REEL (9:16 vertical video). First line = hook emoji + punchy statement. Let the video tell the story; caption adds emotional pull. Max 125 words.",
+  threads:   "This is copy for a THREADS VIDEO post. Conversational, adds context the video doesn't say out loud. Max 100 words.",
+  facebook:  "This is copy for a FACEBOOK VIDEO post. Engaging opening question or surprising fact. The video is the main content. Max 100 words.",
+  linkedin:  "This is copy for a LINKEDIN VIDEO post. Professional opener ('New video:', 'Just released:'). One key takeaway. 80-150 words.",
+  reddit:    "This is copy for a REDDIT VIDEO post. Title = what the video shows (no hype). Body = brief context + why it matters.",
+  x:         "This is copy for an X/TWITTER VIDEO post. Max 240 chars. Hook first. Let the video explain.",
+  bluesky:   "This is copy for a BLUESKY VIDEO post. Brief, direct, max 200 chars.",
+  pinterest: "This is copy for a PINTEREST VIDEO post (4:5). Inspirational tone. Include 3-5 keywords. End with save CTA.",
+  youtube:   "This is copy for a YOUTUBE video description. Hook in first 2 lines (shows above fold). Include article link as [LINK]. 150-300 words.",
+};
+
 const PLATFORM_SPECS: Record<string, string> = {
   twitter_single:  "Twitter/X (single tweet): max 280 chars total including hashtags. Punchy, hook-first. 2-3 relevant hashtags at end.",
   twitter_thread:  "Twitter/X Thread: 5-7 tweets. Tweet 1 = hook + main insight. Tweets 2-6 = one key point each (max 250 chars per tweet, numbered '2/7', '3/7' etc). Last tweet = CTA with article link placeholder [LINK]. Format: each tweet on its own line, start with tweet number.",
@@ -34,6 +51,9 @@ export async function POST(req: Request): Promise<Response> {
   const article = (typeof body.article === "string" ? body.article : "").trim();
   if (!article) return new NextResponse("article required", { status: 400 });
 
+  // "text" | "image" | "video" — informs copy tone and length
+  const mediaType = typeof body.mediaType === "string" ? body.mediaType : "text";
+
   // Accept both platform keys and twitter_mode
   const rawPlatforms = Array.isArray(body.platforms)
     ? body.platforms.filter((p): p is string => typeof p === "string")
@@ -53,7 +73,19 @@ export async function POST(req: Request): Promise<Response> {
   const articleUrl = typeof body.articleUrl === "string" ? body.articleUrl.trim() : "";
   const urlLine = articleUrl ? `\nArticle URL (use as [LINK] where indicated): ${articleUrl}` : "";
 
-  const specs = platforms.map(p => `- ${PLATFORM_SPECS[p]}`).join("\n");
+  // For video posts, prepend a platform-specific framing addendum before the format spec.
+  // Strip the "twitter_single"/"twitter_thread" prefix back to "twitter" for the addendum lookup.
+  const specs = platforms.map(p => {
+    const lookupKey = p.replace(/^twitter.*/, "twitter");
+    const addendum = mediaType === "video" ? (VIDEO_PLATFORM_ADDENDUM[lookupKey] ?? "") : "";
+    return addendum ? `- ${addendum} ${PLATFORM_SPECS[p]}` : `- ${PLATFORM_SPECS[p]}`;
+  }).join("\n");
+
+  const mediaLine = mediaType === "video"
+    ? "\nIMPORTANT: This content will accompany a VIDEO. Write captions/copy that complement the video — do NOT describe the video or repeat its script."
+    : mediaType === "image"
+    ? "\nThis content will accompany an IMAGE. Reference the visual without describing it literally."
+    : "";
 
   const client = new Anthropic({ apiKey });
   const msg = await client.messages.create({
@@ -62,7 +94,7 @@ export async function POST(req: Request): Promise<Response> {
     messages: [{
       role: "user",
       content: `Create social media posts from this article for these platforms:
-${specs}${urlLine}
+${specs}${urlLine}${mediaLine}
 
 Article (first 3000 chars):
 ${article.slice(0, 3000)}

@@ -29,10 +29,10 @@ function resolveVideoStyle(label: string): string {
 }
 // 輸出比例（mirror VideoStudio）。每比例各自原生生成，非裁同一張。
 const VIDEO_FORMAT_CHOICES = ["16x9", "9x16", "4x5"] as const;
-const VIDEO_FORMAT_LABELS: Record<string, { ratio: string; icon: string }> = {
-  "16x9": { ratio: "16:9", icon: "▶" },
-  "9x16": { ratio: "9:16", icon: "📱" },
-  "4x5": { ratio: "4:5", icon: "📷" },
+const VIDEO_FORMAT_LABELS: Record<string, { ratio: string; label: string; icon: string }> = {
+  "16x9": { ratio: "16:9", label: "YouTube/文章",  icon: "▶" },
+  "9x16": { ratio: "9:16", label: "TikTok/Reels",  icon: "📱" },
+  "4x5":  { ratio: "4:5",  label: "IG Feed/FB",    icon: "📷" },
 };
 const VOICE_MODELS_VIDEO = [
   { id: "edge:zh-TW-HsiaoChenNeural", label: "Edge TTS 繁中女聲", lang: "繁中", badge: "$0 免費" },
@@ -619,8 +619,10 @@ export default function ContentStudio() {
   const [videoStyleZh,      setVideoStyleZh]      = useState("");
   const [videoStyleGroup,   setVideoStyleGroup]   = useState(VIDEO_STYLE_GROUPS[0] ?? "");
   const [videoConfigOpen,   setVideoConfigOpen]   = useState(false);
-  // 輸出比例（勾選；預設全選；至少留一個）。
-  const [videoFormats,      setVideoFormats]      = useState<Set<string>>(new Set(VIDEO_FORMAT_CHOICES));
+  // 輸出比例（勾選；預設只 16:9，WP 嵌入用；其他格式走社群發佈）。
+  const [videoFormats,      setVideoFormats]      = useState<Set<string>>(new Set(["16x9"]));
+  // Output URLs keyed by format ("16x9"|"9x16"|"4x5") — populated after video generation polling completes.
+  const [videoOutputUrls,   setVideoOutputUrls]   = useState<Record<string, string>>({});
 
   // Auto-trigger video generation when article is published.
   // Dep array intentionally omits videoStatus: we want this to fire only on pubStatus/postId change,
@@ -722,6 +724,8 @@ export default function ContentStudio() {
   const [postizCustomText,   setPostizCustomText]   = useState<Record<string, string>>({});
   const [postizMode,         setPostizMode]         = useState<"draft" | "now">("draft");
   const [postizIncludeImg,   setPostizIncludeImg]   = useState(false);
+  // "none" = text-only | "image" = attach hero/social image | "video" = attach generated video (per-platform format routing)
+  const [postizMediaType,    setPostizMediaType]    = useState<"none" | "image" | "video">("none");
   const [postizPushStatus,   setPostizPushStatus]   = useState<"idle" | "pushing" | "done" | "error">("idle");
   const [postizPushResults,  setPostizPushResults]  = useState<Array<{ platform: string; status: "ok" | "error"; error?: string }>>([]);
   const [postizShowConfirm,  setPostizShowConfirm]  = useState(false);
@@ -1717,6 +1721,8 @@ export default function ContentStudio() {
               clearInterval(videoPollRef.current!); videoPollRef.current = null;
               setVideoStatus("error"); setVideoError("影片輸出 URL 不存在"); return;
             }
+            // Save all output URLs so the Postiz social-publish flow can send per-platform formats.
+            setVideoOutputUrls(sj.video.outputs as Record<string, string>);
             clearInterval(videoPollRef.current!); videoPollRef.current = null;
             setVideoStatus("embedding");
             const embedRes = await fetch("/api/video/embed-to-wp", {
@@ -1741,7 +1747,10 @@ export default function ContentStudio() {
     try {
       const res  = await fetch("/api/content/syndicate", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ article: generated, platforms, twitterMode, articleUrl: pubResult?.view_url }),
+        body: JSON.stringify({
+          article: generated, platforms, twitterMode, articleUrl: pubResult?.view_url,
+          mediaType: postizMediaType === "video" ? "video" : postizMediaType === "image" ? "image" : "text",
+        }),
       });
       const json = await res.json() as { ok: boolean; posts?: Record<string, string>; _cost?: { usd: number; model: string; vendor: string } };
       if (json.ok && json.posts) { setSynContent(json.posts); setSynStatus("done"); }
@@ -1794,7 +1803,10 @@ export default function ContentStudio() {
           clientId: selectedSiteId,
           mode: postizMode,
           platforms: posts,
-          imageUrl: postizIncludeImg && imgResult ? imgResult.imageUrl : undefined,
+          imageUrl: postizMediaType === "image" && imgResult ? imgResult.imageUrl : undefined,
+          videoUrls: postizMediaType === "video" && Object.keys(videoOutputUrls).length > 0
+            ? videoOutputUrls as Partial<Record<"16x9" | "9x16" | "4x5", string>>
+            : undefined,
           confirmPublishNow: postizMode === "now" && confirmed ? true : undefined,
         }),
       });
@@ -3118,7 +3130,7 @@ export default function ContentStudio() {
                                 cursor: "pointer", fontSize: "12px", fontWeight: active ? 700 : 500,
                                 display: "flex", alignItems: "center", gap: "4px",
                               }}>
-                              <span>{meta.icon}</span><span>{meta.ratio}</span>
+                              <span>{meta.icon}</span><span>{meta.ratio}</span><span style={{ fontSize: "10px", opacity: 0.75 }}>{meta.label}</span>
                             </button>
                           );
                         })}
@@ -3675,13 +3687,38 @@ export default function ContentStudio() {
                             })}
                           </div>
 
-                          {imgResult && (
-                            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, marginBottom: 10, cursor: "pointer" }}>
-                              <input type="checkbox" checked={postizIncludeImg}
-                                onChange={e => setPostizIncludeImg(e.target.checked)} />
-                              附帶社群圖片（{imgResult.spec.label} {imgResult.spec.width}×{imgResult.spec.height}）
-                            </label>
-                          )}
+                          {/* Media attachment selector — text / image / video */}
+                          <div style={{ marginBottom: 10 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: "var(--text-secondary)" }}>
+                              附加媒體
+                            </div>
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                              {(["none", "image", "video"] as const).map(mt => {
+                                const disabled = mt === "image" ? !imgResult : mt === "video" ? Object.keys(videoOutputUrls).length === 0 : false;
+                                const label = mt === "none" ? "僅文字" : mt === "image" ? `圖片${imgResult ? ` (${imgResult.spec.label})` : " (未生成)"}` : `影片${Object.keys(videoOutputUrls).length > 0 ? " (依平台比例)" : " (未生成)"}`;
+                                const active = postizMediaType === mt && !disabled;
+                                return (
+                                  <button key={mt} type="button"
+                                    onClick={() => !disabled && setPostizMediaType(mt)}
+                                    disabled={disabled}
+                                    style={{
+                                      padding: "4px 12px", borderRadius: 20, fontSize: 11, cursor: disabled ? "not-allowed" : "pointer",
+                                      border: `1px solid ${active ? "var(--accent)" : "var(--card-border)"}`,
+                                      background: active ? "var(--accent)" : disabled ? "var(--bg-canvas)" : "rgba(255,255,255,0.6)",
+                                      color: active ? "#fff" : disabled ? "var(--text-muted)" : "var(--text-secondary)",
+                                      opacity: disabled ? 0.5 : 1,
+                                    }}>
+                                    {label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            {postizMediaType === "video" && Object.keys(videoOutputUrls).length > 0 && (
+                              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 5 }}>
+                                ▶ 16:9 → YouTube/文章 | 📱 9:16 → TikTok/Reels/Threads | 📷 4:5 → IG Feed/FB/Pinterest
+                              </div>
+                            )}
+                          </div>
 
                           <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
                             {(["draft", "now"] as const).map(m => (
