@@ -4,6 +4,27 @@
 
 ## 2026-06-24
 
+### fix(video): 刪除影片改打 R2_VIDEO_BUCKET（三處 call site 全修）
+
+[任務理解] 使用者在 /tools/designs 刪除所有影片後，影片全部冒回來。
+
+[現況分析]
+- `deleteDesignObject` 打 `lobster-designs`（圖片 bucket）
+- 影片本體在 `lobster-videos`（R2_VIDEO_BUCKET）
+- DELETE handler → R2 刪設計 bucket → 404 → 視為成功 → DB 列刪掉
+- reconcile cron 每 ~15 分掃 `lobster-videos` → 找到無 DB 記錄的影片 → 補記回 media_assets → 影片冒出來
+
+[已修改]
+- r2.ts: 新增 `deleteVideoObjects(objectKey)` — LIST `video/<dir>/` prefix（decodeURIComponent dir 避免 CJK double-encode）→ 逐一 DELETE；回傳 `{ok, deleted}` count
+- designs/route.ts DELETE: mime_type startsWith("video/") → deleteVideoObjects；否則 deleteDesignObject
+- video/[id]/route.ts DELETE: 改 deleteVideoObjects + null guard + R2 失敗不刪 DB（mirror designs route）
+- video/cleanup/route.ts POST: 改 deleteVideoObjects（prefix LIST 取代逐 URL 迴圈）
+
+[驗證結果]
+- REALTEST_WAIVED: NA -- deleteVideoObjects 需真實 R2_VIDEO_BUCKET credentials；本機無側效測試環境。SG 上線後第一次影片刪除即驗。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=1c/1m/1n — Critical (CJK double-encode) 已修；Major (false-success masking) 已修；Minor (inconsistent abort behavior) 已修
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=deleteVideoObjects|deleteDesignObject | hits=0 stale-claims; regenerate-image+upload-asset 的 deleteDesignObject 確認為 designs/ prefix（正確）
+
 ### feat(ui): ContentStudio 素材模式↑視覺風格 順序修正 + 配音模型 chip UI（兩個工具統一）
 
 [任務理解] ① ContentStudio 的「素材模式」應在「視覺風格」上方（與 VideoStudio 積木順序一致）② 配音模型從 `<select>` 改 2-level chip UI（點 Edge→4 個聲音；點 OpenAI→5 個聲音），兩個工具同步套用
