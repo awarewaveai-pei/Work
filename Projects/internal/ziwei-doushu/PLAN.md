@@ -347,8 +347,19 @@ operator 要求:**國內外都賣,需英文版 + 各國語言。**
      - **台灣/中文圈 → 綠界 ECPay**(本地卡/超商/ATM)
      - **國際 → Stripe**(各國卡/Apple/Google Pay/多幣別)
      - **國際 → PayPal**(PayPal 帳號/餘額、品牌信任、買家保護;部分地區/年齡層只用 PayPal,缺了會漏單)
-     - **未來可插(同層零重工)**:LINE Pay / 街口(台)、Alipay / 微信支付(中國+海外華人)
+     - **未來可插(同層零重工)**:LINE Pay / 街口(台)、印度 Razorpay(UPI)、中國境內 PSP…
      - 依使用者地區自動路由預設方式,並列出其可用方式。
+     - **做全球 ≠ 接很多金流(關鍵認知)**:**Stripe 本身是全球本地支付聚合器** —— 一個 adapter 即解鎖各國本地方式,各區在 Stripe 後台開關、**不寫 code**:
+       | 區域 | Stripe 一接即有 |
+       |---|---|
+       | 美國 | 卡、Apple/Google Pay、ACH、Cash App Pay、BNPL(Klarna/Afterpay/Affirm) |
+       | 歐洲 | 卡、SEPA 直扣、iDEAL(荷)、Bancontact(比)、Sofort/Giropay(德)、Przelewy24/BLIK(波)、Multibanco(葡)、Klarna |
+       | 英國 | 卡、Apple/Google Pay、Klarna、PayPal |
+       | 拉美 | Pix/Boleto(巴西)、OXXO(墨) |
+       | 亞洲 | Alipay/微信(中國+海外華人)、GrabPay 等 |
+       | 全球 | ~135 幣別,以當地幣別顯示價 |
+  2b. **BNPL 先買後付(Klarna/Afterpay/Affirm)**:歐美澳普及,**對高客單(全年運勢報告/服飾)顯著提升轉換**;走 Stripe/PayPal 開通,免額外整合。
+  2c. **⚠️ 全球稅務合規(global 最易漏的雷,day-1 開)**:跨國賣**數位商品**觸發各地稅務 —— 歐盟 **VAT**(按買家國課+VAT OSS 申報)、英國 VAT、美國各州 **sales tax**、澳/日 GST… → **開 Stripe Tax** 自動依買家所在地算稅率+產合規發票。事後補稅算=重工,故一開始就開。
   3. **禁止硬編任何 UI 文字字串** → 第一行 code 就抽到翻譯檔 / AI 參數。
 - **語言上線順序**(架構支援無限語言,AI 加參數即擴):① 繁中(台/港,主場)② 英文(國際+西洋占星/塔羅英語圈大)③ 簡中 ④ 日文(占い付費意願高)→ 之後韓/西/泰…。
 - **語言 ≠ 市場定位**:西方語版主打西洋占星/塔羅(他們熟),紫微/八字當「異國神秘」特色;同站不同語言首頁可主推不同系統。
