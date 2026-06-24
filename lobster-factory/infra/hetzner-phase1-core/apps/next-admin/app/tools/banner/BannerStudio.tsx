@@ -663,7 +663,7 @@ async function exportToPng(state: State): Promise<string> {
 
   // corner offer badge (independent of the stack)
   if (state.badgeText) {
-    const bf = Math.round(state.subtextSize * 0.95);
+    const bf = Math.round(state.subtextSize * 0.95 * state.badgeScale);
     const margin = Math.round(p.w * 0.035);
     ctx.font = `bold ${bf}px ${font}`;
     const tw = ctx.measureText(state.badgeText).width;
@@ -892,8 +892,11 @@ function AccordionSection({
     <div>
       <button
         type="button"
-        className="btn-secondary"
-        style={{ width: "100%", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px" }}
+        style={{
+          width: "100%", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "9px 14px", background: "var(--chip-surface, #f8f9fa)", border: "none", borderRadius: 6,
+          cursor: "pointer", color: "var(--text-primary)", fontWeight: 600,
+        }}
         onClick={() => setOpen((v) => !v)}
       >
         <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -937,6 +940,41 @@ function PresetChips({ chips, onSelect, selected }: { chips: string[]; onSelect:
           </button>
         );
       })}
+    </div>
+  );
+}
+
+function StepCard({
+  title, step, icon, hint, children, defaultOpen = false,
+}: {
+  title: string; step?: string; icon?: string; hint?: string; children: React.ReactNode; defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          width: "100%", background: "none", border: "none",
+          padding: "13px 16px", cursor: "pointer", display: "flex",
+          alignItems: "center", justifyContent: "space-between",
+          color: "var(--text-primary)", textAlign: "left",
+        }}
+      >
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {icon && <span style={{ fontSize: 16 }}>{icon}</span>}
+          {step && <span style={{ fontSize: 10, opacity: 0.35, fontWeight: 400, letterSpacing: 0.5 }}>{step}</span>}
+          <span style={{ fontSize: 15, fontWeight: 700 }}>{title}</span>
+          {hint && <span style={{ fontSize: 11, opacity: 0.45, fontWeight: 400, marginLeft: 2 }}>{hint}</span>}
+        </span>
+        <span style={{ opacity: 0.35, fontSize: 11, flexShrink: 0, marginLeft: 8 }}>{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div style={{ padding: "4px 16px 16px", borderTop: "1px solid var(--border)" }}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }
@@ -1331,12 +1369,71 @@ export default function BannerStudio() {
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap" }}>
 
         {/* ── Controls (right side) ── */}
-        <div style={{ order: 2, flex: "1 1 360px", maxWidth: 460, display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ order: 2, flex: "1 1 360px", maxWidth: 460, display: "flex", flexDirection: "column", gap: 12,
+          position: "sticky", top: 12, alignSelf: "flex-start",
+          maxHeight: "calc(100vh - 24px)", overflowY: "auto" }}>
+
+          {/* 配色 / 品牌色 — 挪到最前面 */}
+          <StepCard title="配色 / 品牌色" icon="🎨">
+            {brandClients.length > 0 ? (
+              <div className="form-row" style={{ marginTop: 12 }}>
+                <label className="form-label">品牌</label>
+                <select className="form-select" defaultValue=""
+                  onChange={(e) => {
+                    const c = brandClients.find((x) => x.slug === e.target.value);
+                    if (c) { setPalette(c.colors); setSelSwatch(c.colors[0] ?? null); }
+                  }}>
+                  <option value="">選擇品牌帶入配色…</option>
+                  {brandClients.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
+                </select>
+              </div>
+            ) : (
+              <p className="form-hint" style={{ marginTop: 12 }}>尚無品牌色。到 <a href="/ops/clients">客戶設定</a> 填入品牌色後即可在此選取帶入。</p>
+            )}
+
+            <input ref={colorRefFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleColorRefUpload} />
+            <button className="btn btn-ghost" style={{ fontSize: 12, marginTop: 8 }} onClick={() => colorRefFileRef.current?.click()}>
+              📷 從參考圖擷取配色
+            </button>
+
+            {palette.length > 0 && (
+              <>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+                  {palette.map((c, i) => (
+                    <button key={`${c}-${i}`} onClick={() => setSelSwatch(c)} title={c}
+                      style={{
+                        width: 30, height: 30, borderRadius: 6, background: c, cursor: "pointer", padding: 0,
+                        border: selSwatch === c ? "3px solid var(--accent)" : "1px solid var(--border)",
+                      }} />
+                  ))}
+                </div>
+                <button className="btn btn-primary" style={{ fontSize: 12, marginTop: 10 }} onClick={() => autoApplyPalette(palette)}>
+                  ✨ 自動套用整組配色
+                </button>
+                {selSwatch && (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ fontSize: 11, opacity: 0.55, marginBottom: 4, display: "flex", alignItems: "center", gap: 5 }}>
+                      把選中色
+                      <span style={{ display: "inline-block", width: 13, height: 13, background: selSwatch, borderRadius: 3, border: "1px solid #0002" }} />
+                      套到：
+                    </div>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                      {SWATCH_TARGETS.map((t) => (
+                        <button key={t.key} className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 8px" }}
+                          onClick={() => { if (selSwatch) set(t.key, selSwatch); }}>
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </StepCard>
 
           {/* 版型模板 — one-click conversion layouts */}
-          <div className="card">
-            <h2 style={{ fontSize: 15, margin: "0 0 4px" }}>✨ 版型模板 <span style={{ fontWeight: 400, opacity: 0.5, fontSize: 11 }}>一鍵套用</span></h2>
-            <p className="form-hint" style={{ marginBottom: 8 }}>套用後再填內容；只改版面/元素，不動你的文字與圖。</p>
+          <StepCard title="版型模板" icon="✨" hint="一鍵套用">
+            <p className="form-hint" style={{ marginBottom: 8, marginTop: 4 }}>套用後再填內容；只改版面/元素，不動你的文字與圖。</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
               {TEMPLATES.map((t) => (
                 <button key={t.key} className="btn btn-ghost"
@@ -1346,12 +1443,11 @@ export default function BannerStudio() {
                 </button>
               ))}
             </div>
-          </div>
+          </StepCard>
 
           {/* Step 0: 文案生成 */}
-          <div className="card">
-            <h2 style={{ fontSize: 15, margin: "0 0 12px" }}>Step 0 · 文案生成 <span style={{ fontWeight: 400, opacity: 0.5, fontSize: 11 }}>選填</span></h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <StepCard title="文案生成" step="Step 0" icon="✍️" hint="選填">
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
               <div className="form-row">
                 <label className="form-label">描述</label>
                 <textarea
@@ -1405,11 +1501,10 @@ export default function BannerStudio() {
                 </div>
               )}
             </div>
-          </div>
+          </StepCard>
 
           {/* Step 1: 尺寸 */}
-          <div className="card">
-            <h2 style={{ fontSize: 15, margin: "0 0 12px" }}>Step 1 · 尺寸</h2>
+          <StepCard title="尺寸" step="Step 1" icon="📐">
             {PRESET_GROUPS.map((grp) => (
               <div key={grp.key} style={{ marginBottom: 10 }}>
                 <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, opacity: 0.5, marginBottom: 6 }}>
@@ -1432,12 +1527,11 @@ export default function BannerStudio() {
                 </div>
               </div>
             ))}
-          </div>
+          </StepCard>
 
           {/* Step 2: 產品圖 */}
-          <div className="card">
-            <h2 style={{ fontSize: 15, margin: "0 0 12px" }}>Step 2 · 產品圖 <span style={{ fontWeight: 400, opacity: 0.5, fontSize: 11 }}>選填</span></h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <StepCard title="產品圖" step="Step 2" icon="🖼" hint="選填">
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
               <input ref={productFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleProductUpload} />
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => productFileRef.current?.click()}>
@@ -1481,12 +1575,11 @@ export default function BannerStudio() {
                 </>
               )}
             </div>
-          </div>
+          </StepCard>
 
           {/* Step 3: 背景 */}
-          <div className="card">
-            <h2 style={{ fontSize: 15, margin: "0 0 12px" }}>Step 3 · 背景</h2>
-            <div className="form-row">
+          <StepCard title="背景" step="Step 3" icon="🎆">
+            <div className="form-row" style={{ marginTop: 4 }}>
               <label className="form-label">類型</label>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {(["color", "gradient", "upload", "ai"] as BgMode[]).map((m) => (
@@ -1764,12 +1857,11 @@ export default function BannerStudio() {
                 </div>
               </div>
             )}
-          </div>
+          </StepCard>
 
           {/* Step 4: 文字 */}
-          <div className="card">
-            <h2 style={{ fontSize: 15, margin: "0 0 12px" }}>Step 4 · 文字</h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <StepCard title="文字" step="Step 4" icon="✍">
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
               <div className="form-row">
                 <label className="form-label">標題</label>
                 <input className="form-input" type="text" placeholder="主標題…"
@@ -1878,20 +1970,33 @@ export default function BannerStudio() {
                 <input type="checkbox" checked={s.textScrim}
                   onChange={(e) => set("textScrim", e.target.checked)} />
                 <span className="form-hint" style={{ marginLeft: 6 }}>文字後方半透明板（比整張暗化高級）</span>
+                {s.textScrim && (
+                  <>
+                    <input type="range" min={0.05} max={0.9} step={0.05} value={s.textScrimOpacity}
+                      onChange={(e) => set("textScrimOpacity", Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />
+                    <span style={{ fontSize: 12, opacity: 0.7, minWidth: 32 }}>{Math.round(s.textScrimOpacity * 100)}%</span>
+                  </>
+                )}
               </div>
               <div className="form-row">
                 <label className="form-label">暗化背景</label>
                 <input type="checkbox" checked={s.dimOverlay}
                   onChange={(e) => set("dimOverlay", e.target.checked)} />
                 <span className="form-hint" style={{ marginLeft: 6 }}>整張壓暗</span>
+                {s.dimOverlay && (
+                  <>
+                    <input type="range" min={0.05} max={0.85} step={0.05} value={s.dimOverlayOpacity}
+                      onChange={(e) => set("dimOverlayOpacity", Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />
+                    <span style={{ fontSize: 12, opacity: 0.7, minWidth: 32 }}>{Math.round(s.dimOverlayOpacity * 100)}%</span>
+                  </>
+                )}
               </div>
             </div>
-          </div>
+          </StepCard>
 
           {/* Step 4.5: 行銷元素 — conversion drivers */}
-          <div className="card">
-            <h2 style={{ fontSize: 15, margin: "0 0 4px" }}>Step 4.5 · 行銷元素 <span style={{ fontWeight: 400, opacity: 0.5, fontSize: 11 }}>讓人點擊下單</span></h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+          <StepCard title="行銷元素" step="Step 4.5" icon="🛒" hint="讓人點擊下單">
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
 
               {/* CTA 按鈕 */}
               <AccordionSection title="CTA 按鈕" summary={s.ctaText || "無"} icon="🛒" defaultOpen>
@@ -1924,27 +2029,35 @@ export default function BannerStudio() {
                 <PresetChips chips={BADGE_PRESETS} selected={s.badgeText}
                   onSelect={(v) => set("badgeText", v === s.badgeText ? "" : v)} />
                 {s.badgeText && (
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8, alignItems: "center" }}>
-                    {(["ribbon", "pill", "burst"] as BadgeStyle[]).map((st) => (
-                      <button key={st}
-                        className={s.badgeStyle === st ? "btn btn-primary" : "btn btn-ghost"}
-                        style={{ fontSize: 11, padding: "2px 8px" }}
-                        onClick={() => set("badgeStyle", st)}>
-                        {{ ribbon: "緞帶", pill: "膠囊", burst: "爆炸星" }[st]}
-                      </button>
-                    ))}
-                    {(["tl", "tr"] as BadgePos[]).map((pos) => (
-                      <button key={pos}
-                        className={s.badgePos === pos ? "btn btn-primary" : "btn btn-ghost"}
-                        style={{ fontSize: 11, padding: "2px 8px" }}
-                        onClick={() => set("badgePos", pos)}>
-                        {{ tl: "左上", tr: "右上" }[pos]}
-                      </button>
-                    ))}
-                    <input type="color" value={s.badgeColor}
-                      onChange={(e) => set("badgeColor", e.target.value)}
-                      style={{ width: 32, height: 26, border: "none", background: "none", cursor: "pointer" }} />
-                  </div>
+                  <>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8, alignItems: "center" }}>
+                      {(["ribbon", "pill", "burst"] as BadgeStyle[]).map((st) => (
+                        <button key={st}
+                          className={s.badgeStyle === st ? "btn btn-primary" : "btn btn-ghost"}
+                          style={{ fontSize: 11, padding: "2px 8px" }}
+                          onClick={() => set("badgeStyle", st)}>
+                          {{ ribbon: "緞帶", pill: "膠囊", burst: "爆炸星" }[st]}
+                        </button>
+                      ))}
+                      {(["tl", "tr"] as BadgePos[]).map((pos) => (
+                        <button key={pos}
+                          className={s.badgePos === pos ? "btn btn-primary" : "btn btn-ghost"}
+                          style={{ fontSize: 11, padding: "2px 8px" }}
+                          onClick={() => set("badgePos", pos)}>
+                          {{ tl: "左上", tr: "右上" }[pos]}
+                        </button>
+                      ))}
+                      <input type="color" value={s.badgeColor}
+                        onChange={(e) => set("badgeColor", e.target.value)}
+                        style={{ width: 32, height: 26, border: "none", background: "none", cursor: "pointer" }} />
+                    </div>
+                    <div className="form-row" style={{ marginTop: 8 }}>
+                      <label className="form-label">徽章大小</label>
+                      <input type="range" min={0.5} max={2.5} step={0.1} value={s.badgeScale}
+                        onChange={(e) => set("badgeScale", Number(e.target.value))} style={{ flex: 1 }} />
+                      <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 32 }}>{s.badgeScale.toFixed(1)}×</span>
+                    </div>
+                  </>
                 )}
               </AccordionSection>
 
@@ -1995,67 +2108,7 @@ export default function BannerStudio() {
               </AccordionSection>
 
             </div>
-          </div>
-
-          {/* 配色 / 品牌色 */}
-          <div className="card">
-            <h2 style={{ fontSize: 15, margin: "0 0 8px" }}>🎨 配色 / 品牌色</h2>
-
-            {brandClients.length > 0 ? (
-              <div className="form-row">
-                <label className="form-label">品牌</label>
-                <select className="form-select" defaultValue=""
-                  onChange={(e) => {
-                    const c = brandClients.find((x) => x.slug === e.target.value);
-                    if (c) { setPalette(c.colors); setSelSwatch(c.colors[0] ?? null); }
-                  }}>
-                  <option value="">選擇品牌帶入配色…</option>
-                  {brandClients.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
-                </select>
-              </div>
-            ) : (
-              <p className="form-hint">尚無品牌色。到 <a href="/ops/clients">客戶設定</a> 填入品牌色後即可在此選取帶入。</p>
-            )}
-
-            <input ref={colorRefFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleColorRefUpload} />
-            <button className="btn btn-ghost" style={{ fontSize: 12, marginTop: 8 }} onClick={() => colorRefFileRef.current?.click()}>
-              📷 從參考圖擷取配色
-            </button>
-
-            {palette.length > 0 && (
-              <>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
-                  {palette.map((c, i) => (
-                    <button key={`${c}-${i}`} onClick={() => setSelSwatch(c)} title={c}
-                      style={{
-                        width: 30, height: 30, borderRadius: 6, background: c, cursor: "pointer", padding: 0,
-                        border: selSwatch === c ? "3px solid var(--accent)" : "1px solid var(--border)",
-                      }} />
-                  ))}
-                </div>
-                <button className="btn btn-primary" style={{ fontSize: 12, marginTop: 10 }} onClick={() => autoApplyPalette(palette)}>
-                  ✨ 自動套用整組配色
-                </button>
-                {selSwatch && (
-                  <div style={{ marginTop: 10 }}>
-                    <div style={{ fontSize: 11, opacity: 0.55, marginBottom: 4, display: "flex", alignItems: "center", gap: 5 }}>
-                      把選中色
-                      <span style={{ display: "inline-block", width: 13, height: 13, background: selSwatch, borderRadius: 3, border: "1px solid #0002" }} />
-                      套到：
-                    </div>
-                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                      {SWATCH_TARGETS.map((t) => (
-                        <button key={t.key} className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 8px" }}
-                          onClick={() => { if (selSwatch) set(t.key, selSwatch); }}>
-                          {t.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+          </StepCard>
 
         </div>
 
