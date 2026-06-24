@@ -2,6 +2,33 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-25
+
+### feat(remotion): Phase 0+1 — Creatomate JSON 提取 + remotion-service scaffold
+
+[任務理解] 將 57 個 Creatomate docx 模板 JSON 提取出來作為 Remotion 設計藍圖；建立 remotion-service（Node 20 + Chromium + ffmpeg + Express HTTP）替換 Creatomate 商業 API；Phase 1 跑通第一個模板 ScaleBGTextSlideUp。
+
+[現況分析] EU VPS 已做記憶體優化（ClickHouse 1.5GB + swappiness=10）；可用 RAM 2.7GB 足夠 Remotion。Python video-service 繼續作為 fallback（不動）。新服務獨立 docker-compose.remotion.yml + port 8733；Phase 3 才接 render-client.ts。
+
+[已修改]
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/content/video/templates/creatomate-source/` — 57 個 JSON（Phase 0）
+- `apps/remotion-service/` — 新服務：package.json / tsconfig.server.json / Dockerfile / docker-compose.remotion.yml / .dockerignore / .env.remotion.example
+- `src/index.ts` — `registerRoot(RemotionRoot)`（Critical fix：bundle entryPoint）
+- `src/Root.tsx` — Remotion root + `calculateMetadata`（動態 duration/size）
+- `src/compositions/ScaleBGTextSlideUp.tsx` — 第一個模板（Ken Burns zoom + overlay + text slide-up）
+- `src/server.ts` — Express HTTP server，含：constant-time auth、startup warn、MAX_FRAMES clamp、finally unlink、error redact
+
+[驗證結果 — R0 四動作]
+- REALTEST_WAIVED: NA -- remotion-service 需 Docker build on EU VPS（node_modules + chromium + ffmpeg 不在本機）；Phase 1 REALTEST = EU `docker compose -f docker-compose.remotion.yml up -d --build` + `curl /health` (執行於部署步驟)
+- REVIEW_DONE: critic=Deep | verdict=pass(修正後) | findings=2c/4m/3n（Critical: registerRoot缺/R2_VIDEO_PUBLIC_BASE缺→已修；Major: constant-time auth/startup warn/frames clamp/finally unlink→已修；Minor: error redact/auth parse/.dockerignore→已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`registerRoot|ScaleBGTextSlideUp|scale-bg-text-slideup|remotion-service` | hits=0（新符號只存在新服務內，無 downstream callers；Phase 3 建 render-client 時再搜）
+- WORKLOG: 本段
+
+[剩餘風險] Chromium `gl: swangle` 在 node:20-slim 可能需額外 libGL — Docker build 才能驗；bundle 首次執行需 ~30-60s（健康檢查 start_period=60s，/health 獨立不依賴 bundle）；Phase 3 render-client.ts 接線尚未做。
+[rollback] `docker compose -f docker-compose.remotion.yml down`；Python video-service 繼續服務；無破壞性改動。
+
+AUTO_TASK_DONE: Phase 0(57 JSON 提取) + Phase 1(remotion-service scaffold) 完成；critic 2 Critical/4 Major 已修；commit 後 EU 部署驗 /health
+
 ## 2026-06-23
 
 ### feat(video): 三尺寸改各比例原生生成（取代 16:9 pad 黑邊）+ 前端勾選 16:9/4:5/9:16/全選

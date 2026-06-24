@@ -9,8 +9,6 @@ import type { Dictionary } from '@/lib/i18n/dictionaries';
 
 /**
  * 互動排盤工具 (Client Island)。
- * 排盤在瀏覽器端用 iztro 計算 (computeChart),不需後端;命盤資料的語言
- * 由 locale 決定 (傳入 computeChart → iztro lang)。UI 文字走 dict。
  */
 export default function ZiweiTool({
   dict,
@@ -37,13 +35,12 @@ export default function ZiweiTool({
       <BirthForm dict={dict} onSubmit={handleSubmit} />
 
       {error ? (
-        <p className="mt-6 rounded-md bg-rose-50 p-3 text-center text-sm text-rose-600">
-          {error}
-        </p>
+        <div className="error-banner mt-6">{error}</div>
       ) : null}
 
       {result ? (
         <section className="mt-8">
+          <hr className="star-divider" />
           <ZiweiChart result={result} dict={dict} />
         </section>
       ) : null}

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Noto_Serif_TC } from "next/font/google";
 import { notFound } from "next/navigation";
 import "../globals.css";
 import { locales, isLocale } from "@/lib/i18n/config";
@@ -17,7 +17,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-/** 預生成所有語言路由 (SSG)，各語言頁靜態化 → SEO + 速度。 */
+const notoSerifTC = Noto_Serif_TC({
+  variable: "--font-noto-serif-tc",
+  subsets: ["latin"],
+  weight: ["400", "600", "700"],
+  display: "swap",
+});
+
+/** 預生成所有語言路由 (SSG) */
 export function generateStaticParams() {
   return locales.map((lang) => ({ lang }));
 }
@@ -37,7 +44,7 @@ export async function generateMetadata({
     openGraph: {
       title: dict.meta.title,
       description: dict.meta.description,
-      type: 'website',
+      type: "website",
       locale: lang,
     },
   };
@@ -57,9 +64,9 @@ export default async function LocaleLayout({
   return (
     <html
       lang={lang}
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${notoSerifTC.variable} h-full`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col antialiased">
         <SystemNav dict={dict} locale={lang} />
         {children}
       </body>

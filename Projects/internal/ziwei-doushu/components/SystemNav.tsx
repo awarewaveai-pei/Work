@@ -20,25 +20,31 @@ export default function SystemNav({
   const switchHref = pathname.replace(/^\/[^/]+/, `/${other}`);
 
   return (
-    <nav className="border-b border-slate-200 bg-white">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-sm">
-        <Link href={base} className="font-bold text-indigo-700">
+    <nav className="nav-bar">
+      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3">
+        <Link href={base} className="nav-brand">
           {dict.hub.title}
         </Link>
-        {SYSTEMS.map((s) => {
-          const href = `${base}/${s}`;
-          const active = pathname === href;
-          return (
-            <Link
-              key={s}
-              href={href}
-              className={active ? 'font-semibold text-indigo-600' : 'text-slate-500 hover:text-slate-800'}
-            >
-              {dict.nav[s]}
-            </Link>
-          );
-        })}
-        <Link href={switchHref} className="ml-auto rounded border border-slate-300 px-2 py-0.5 text-xs text-slate-500 hover:bg-slate-50">
+
+        <span className="mx-2 text-[var(--text-dim)] hidden sm:inline select-none">·</span>
+
+        <div className="flex flex-wrap gap-x-1 gap-y-1">
+          {SYSTEMS.map((s) => {
+            const href = `${base}/${s}`;
+            const active = pathname === href;
+            return (
+              <Link
+                key={s}
+                href={href}
+                className={`nav-link${active ? ' active' : ''}`}
+              >
+                {dict.nav[s]}
+              </Link>
+            );
+          })}
+        </div>
+
+        <Link href={switchHref} className="nav-lang ml-auto">
           {locale === 'en' ? '中文' : 'EN'}
         </Link>
       </div>

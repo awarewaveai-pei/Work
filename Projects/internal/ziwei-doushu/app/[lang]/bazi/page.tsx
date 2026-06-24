@@ -24,11 +24,26 @@ export default async function BaziPage({
   if (!isLocale(lang)) notFound();
   const dict = await getDictionary(lang);
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-10">
+    <main className="relative flex-1 px-4 py-12">
       <div className="mx-auto max-w-4xl">
         <header className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-slate-900">{dict.bazi.title}</h1>
-          <p className="mt-2 text-sm text-slate-500">{dict.bazi.subtitle}</p>
+          <span className="page-header-glyph">⊕</span>
+          <h1
+            style={{
+              fontFamily: "var(--font-noto-serif-tc), 'PingFang TC', serif",
+              fontSize: "clamp(1.5rem, 4vw, 2.25rem)",
+              fontWeight: 700,
+              color: "var(--text-heading)",
+              letterSpacing: "0.04em",
+              marginBottom: "0.5rem",
+            }}
+          >
+            {dict.bazi.title}
+          </h1>
+          <p style={{ color: "var(--text-caption)", fontSize: "0.875rem", letterSpacing: "0.03em" }}>
+            {dict.bazi.subtitle}
+          </p>
+          <div className="star-divider mx-auto mt-4" style={{ maxWidth: "200px" }} />
         </header>
         <BaziTool dict={dict} locale={lang} />
       </div>

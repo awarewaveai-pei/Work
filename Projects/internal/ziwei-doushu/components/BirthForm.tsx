@@ -37,77 +37,116 @@ export default function BirthForm({
     });
   }
 
-  const field = 'rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none';
-
   return (
-    <form onSubmit={submit} className="grid grid-cols-2 gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-3">
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-slate-500">{t.birthDate}</span>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={field} required />
-      </label>
-
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-slate-500">{t.birthTime}</span>
-        <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={field} required />
-      </label>
-
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-slate-500">{t.gender}</span>
-        <select value={gender} onChange={(e) => setGender(e.target.value as Gender)} className={field}>
-          <option value="男">{t.male}</option>
-          <option value="女">{t.female}</option>
-        </select>
-      </label>
-
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-slate-500">{t.calendar}</span>
-        <select value={calendar} onChange={(e) => setCalendar(e.target.value as CalendarType)} className={field}>
-          <option value="solar">{t.solar}</option>
-          <option value="lunar">{t.lunar}</option>
-        </select>
-      </label>
-
-      {calendar === 'lunar' ? (
-        <label className="flex items-center gap-2 text-sm md:mt-6">
-          <input type="checkbox" checked={isLeapMonth} onChange={(e) => setIsLeapMonth(e.target.checked)} />
-          <span className="text-slate-600">{t.leapMonth}</span>
+    <form
+      onSubmit={submit}
+      className="glass-card p-6"
+      style={{ borderRadius: "var(--radius-xl)" }}
+    >
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+        <label className="flex flex-col gap-1.5">
+          <span className="label-dark">{t.birthDate}</span>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="field-dark"
+            required
+          />
         </label>
-      ) : null}
 
-      <label className="col-span-2 flex items-center gap-2 text-sm md:col-span-3 md:mt-2">
-        <input type="checkbox" checked={useTrueSolar} onChange={(e) => setUseTrueSolar(e.target.checked)} />
-        <span className="text-slate-600">{t.trueSolarToggle}</span>
-      </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="label-dark">{t.birthTime}</span>
+          <input
+            type="time"
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
+            className="field-dark"
+            required
+          />
+        </label>
 
-      {useTrueSolar ? (
-        <>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-slate-500">{t.city}</span>
-            <select
-              value={city}
-              onChange={(e) => { setCity(e.target.value); setLongitude(CITY_LON[e.target.value]); }}
-              className={field}
-            >
-              {Object.keys(CITY_LON).map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-slate-500">{t.longitude}</span>
+        <label className="flex flex-col gap-1.5">
+          <span className="label-dark">{t.gender}</span>
+          <select
+            value={gender}
+            onChange={(e) => setGender(e.target.value as Gender)}
+            className="field-dark"
+          >
+            <option value="男">{t.male}</option>
+            <option value="女">{t.female}</option>
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="label-dark">{t.calendar}</span>
+          <select
+            value={calendar}
+            onChange={(e) => setCalendar(e.target.value as CalendarType)}
+            className="field-dark"
+          >
+            <option value="solar">{t.solar}</option>
+            <option value="lunar">{t.lunar}</option>
+          </select>
+        </label>
+
+        {calendar === 'lunar' ? (
+          <label className="flex items-center gap-2 md:mt-6">
             <input
-              type="number" step="0.1" value={longitude}
-              onChange={(e) => setLongitude(Number(e.target.value))} className={field}
+              type="checkbox"
+              checked={isLeapMonth}
+              onChange={(e) => setIsLeapMonth(e.target.checked)}
+              className="field-check"
             />
+            <span className="label-dark">{t.leapMonth}</span>
           </label>
-        </>
-      ) : null}
+        ) : null}
 
-      <div className="col-span-2 md:col-span-3">
-        <button
-          type="submit"
-          className="w-full rounded-md bg-indigo-600 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
-        >
-          {t.submit}
-        </button>
+        <label className="col-span-2 flex items-center gap-2 md:col-span-3 md:mt-1">
+          <input
+            type="checkbox"
+            checked={useTrueSolar}
+            onChange={(e) => setUseTrueSolar(e.target.checked)}
+            className="field-check"
+          />
+          <span className="label-dark">{t.trueSolarToggle}</span>
+        </label>
+
+        {useTrueSolar ? (
+          <>
+            <label className="flex flex-col gap-1.5">
+              <span className="label-dark">{t.city}</span>
+              <select
+                value={city}
+                onChange={(e) => {
+                  setCity(e.target.value);
+                  setLongitude(CITY_LON[e.target.value]);
+                }}
+                className="field-dark"
+              >
+                {Object.keys(CITY_LON).map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="label-dark">{t.longitude}</span>
+              <input
+                type="number"
+                step="0.1"
+                value={longitude}
+                onChange={(e) => setLongitude(Number(e.target.value))}
+                className="field-dark"
+              />
+            </label>
+          </>
+        ) : null}
+
+        <div className="col-span-2 md:col-span-3 mt-2">
+          <button type="submit" className="btn-gold">
+            {t.submit}
+          </button>
+        </div>
       </div>
     </form>
   );

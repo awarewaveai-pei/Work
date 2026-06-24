@@ -34,29 +34,79 @@ export default function BaziTool({ dict, locale }: { dict: Dictionary; locale: L
   return (
     <>
       <BirthForm dict={dict} onSubmit={handleSubmit} />
+
       {error ? (
-        <p className="mt-6 rounded-md bg-rose-50 p-3 text-center text-sm text-rose-600">{error}</p>
+        <div className="error-banner mt-6">{error}</div>
       ) : null}
+
       {result ? (
         <section className="mt-8">
-          <div className="mb-4 flex justify-center gap-6 text-sm">
-            <span><b className="text-slate-500">{t.dayMaster}</b> <span className="font-bold text-indigo-700">{result.dayMaster}</span></span>
-            <span><b className="text-slate-500">{t.zodiac}</b> {result.zodiac}</span>
+          <hr className="star-divider" />
+
+          {/* Day master summary */}
+          <div
+            className="glass-card p-4 mb-5 flex justify-center gap-8 text-sm"
+          >
+            <span>
+              <span style={{ color: 'var(--text-caption)' }}>{t.dayMaster}　</span>
+              <span
+                style={{
+                  fontWeight: 700,
+                  color: 'var(--gold-400)',
+                  textShadow: '0 0 10px var(--gold-glow)',
+                  fontSize: '1.125rem',
+                  fontFamily: "var(--font-noto-serif-tc), 'PingFang TC', serif",
+                }}
+              >
+                {result.dayMaster}
+              </span>
+            </span>
+            <span>
+              <span style={{ color: 'var(--text-caption)' }}>{t.zodiac}　</span>
+              <span style={{ color: 'var(--text-heading)' }}>{result.zodiac}</span>
+            </span>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+
+          {/* Four pillars */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {pillars.map(([label, p]) => (
-              <div key={label} className="rounded-lg border border-slate-200 bg-white p-3 text-center">
-                <div className="text-xs text-slate-400">{label}</div>
-                <div className="my-1 text-2xl font-bold text-indigo-700">{p.ganZhi}</div>
-                <div className="text-xs text-slate-500">{t.shiShen}：{p.shiShen}</div>
-                <div className="text-xs text-slate-500">{t.hiddenStems}：{p.hiddenStems.join(' ')}</div>
-                <div className="text-xs text-slate-400">{t.naYin}：{p.naYin}</div>
+              <div key={label} className="glass-card p-4 text-center">
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-caption)', marginBottom: '0.5rem' }}>
+                  {label}
+                </div>
+                <div
+                  style={{
+                    fontSize: '1.75rem',
+                    fontWeight: 700,
+                    color: 'var(--gold-400)',
+                    textShadow: '0 0 12px var(--gold-glow)',
+                    fontFamily: "var(--font-noto-serif-tc), 'PingFang TC', serif",
+                    lineHeight: 1.2,
+                    marginBottom: '0.5rem',
+                  }}
+                >
+                  {p.ganZhi}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-body)' }}>
+                  {t.shiShen}：{p.shiShen}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-body)' }}>
+                  {t.hiddenStems}：{p.hiddenStems.join(' ')}
+                </div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-caption)', marginTop: '0.25rem' }}>
+                  {t.naYin}：{p.naYin}
+                </div>
               </div>
             ))}
           </div>
+
           {result.correction ? (
-            <p className="mt-3 text-center text-xs text-emerald-600">
-              {dict.chart.trueSolarCorrection} {result.correction.correctionMinutes >= 0 ? '+' : ''}
+            <p
+              className="mt-4 text-center"
+              style={{ fontSize: '0.75rem', color: 'var(--jade-400)' }}
+            >
+              {dict.chart.trueSolarCorrection}{' '}
+              {result.correction.correctionMinutes >= 0 ? '+' : ''}
               {result.correction.correctionMinutes} {dict.chart.minutesUnit}
             </p>
           ) : null}
