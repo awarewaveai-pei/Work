@@ -1,405 +1,405 @@
-﻿{
-    "output_format":  "mp4",
-    "width":  1920,
-    "height":  1080,
-    "frame_rate":  "60 fps",
-    "duration":  20.0186,
-    "snapshot_time":  12.15,
-    "fill_color":  "rgba(255,255,255,1)",
-    "elements":  [
-                     {
-                         "id":  "5f3b3e71-52e3-443c-bb4c-e03297014d4c",
-                         "name":  "Intro",
-                         "type":  "composition",
-                         "track":  1,
-                         "time":  0,
-                         "duration":  4.0811,
-                         "width":  "92.0384 vmin",
-                         "height":  "23.6132 vmin",
-                         "animations":  [
-                                            {
-                                                "easing":  "quadratic-out",
-                                                "type":  "scale",
-                                                "start_scale":  "80%"
-                                            }
-                                        ],
-                         "elements":  [
-                                          {
-                                              "id":  "fae15c1d-d564-4b1e-b338-0cdf99488397",
-                                              "name":  "Shape-B5N",
-                                              "type":  "shape",
-                                              "track":  1,
-                                              "time":  0,
-                                              "width":  "144.8671%",
-                                              "height":  "423.4919%",
-                                              "x_anchor":  "50%",
-                                              "y_anchor":  "50%",
-                                              "path":  "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
-                                              "fill_color":  "#00b59b"
-                                          },
-                                          {
-                                              "id":  "8e32fa66-279b-4645-9e8f-64fdf938ee71",
-                                              "name":  "Title 1",
-                                              "type":  "text",
-                                              "track":  2,
-                                              "time":  0,
-                                              "y":  "33.9728%",
-                                              "width":  "99.9999%",
-                                              "height":  "67.9456%",
-                                              "x_alignment":  "50%",
-                                              "y_alignment":  "50%",
-                                              "text":  "Photo Competition",
-                                              "font_family":  "Archivo",
-                                              "font_weight":  "600",
-                                              "fill_color":  "#ffffff",
-                                              "dynamic":  true
-                                          },
-                                          {
-                                              "id":  "e9d5b7d8-1f91-4ab7-99c2-954e7d8aa3d5",
-                                              "name":  "Subtext 1",
-                                              "type":  "text",
-                                              "track":  3,
-                                              "time":  0,
-                                              "y":  "82.9449%",
-                                              "width":  "100%",
-                                              "height":  "34.1101%",
-                                              "x_alignment":  "50%",
-                                              "y_alignment":  "50%",
-                                              "text":  "Top Photo\u0027s This Week",
-                                              "font_family":  "Archivo",
-                                              "font_weight":  "600",
-                                              "font_size_minimum":  "7.5 vmin",
-                                              "fill_color":  "#ffffff",
-                                              "dynamic":  true
-                                          },
-                                          {
-                                              "id":  "3bd23911-41e8-4b3e-87eb-64264eee1bfe",
-                                              "name":  "logo",
-                                              "type":  "image",
-                                              "track":  4,
-                                              "time":  0,
-                                              "x":  "100%",
-                                              "y":  "-111.541%",
-                                              "width":  "16.0498%",
-                                              "height":  "62.2919%",
-                                              "source":  "e36edca6-0be9-4e90-8605-4392bce13493"
-                                          }
-                                      ]
-                     },
-                     {
-                         "id":  "be252ad4-c4fd-4570-a30d-15ebc0c1b7a0",
-                         "name":  "Slide-1",
-                         "type":  "composition",
-                         "track":  1,
-                         "duration":  7.8,
-                         "fill_color":  "rgba(255,255,255,1)",
-                         "animations":  [
-                                            {
-                                                "time":  0,
-                                                "duration":  1.991,
-                                                "transition":  true,
-                                                "type":  "slide",
-                                                "direction":  "180°"
-                                            }
-                                        ],
-                         "elements":  [
-                                          {
-                                              "id":  "ceb44a64-0370-48a7-9de0-cbfcc9726050",
-                                              "name":  "Photo-1",
-                                              "type":  "image",
-                                              "track":  1,
-                                              "time":  0,
-                                              "x":  "42.4827%",
-                                              "y":  "49.8642%",
-                                              "width":  "82.8262%",
-                                              "height":  "95.925%",
-                                              "source":  "974e8516-c044-438f-a3c6-2cf0ed27fbe8",
-                                              "border_radius":  "4.5 vmin",
-                                              "clip":  true,
-                                              "dynamic":  true,
-                                              "animations":  [
-                                                                 {
-                                                                     "easing":  "sinusoid-in-out",
-                                                                     "type":  "scale",
-                                                                     "fade":  false,
-                                                                     "scope":  "element",
-                                                                     "start_scale":  "115%"
-                                                                 }
-                                                             ]
-                                          },
-                                          {
-                                              "id":  "96fd6b33-f33f-499b-91a8-7875c9b50829",
-                                              "type":  "composition",
-                                              "track":  2,
-                                              "time":  2.1598,
-                                              "x":  "91.9479%",
-                                              "width":  "94.5318 vh",
-                                              "height":  "16.1042 vw",
-                                              "z_rotation":  "-90°",
-                                              "elements":  [
-                                                               {
-                                                                   "id":  "8cbf5a9e-61ea-43b5-9f9d-f6baa7a8c1a9",
-                                                                   "name":  "Text 1-2",
-                                                                   "type":  "text",
-                                                                   "track":  1,
-                                                                   "time":  0.4559,
-                                                                   "y":  "79.5354%",
-                                                                   "width":  "100%",
-                                                                   "height":  "40.9293%",
-                                                                   "y_padding":  0,
-                                                                   "text":  "Jack Blucker",
-                                                                   "font_family":  "Archivo",
-                                                                   "font_weight":  "200",
-                                                                   "font_size":  "4.6115 vmin",
-                                                                   "text_wrap":  false,
-                                                                   "text_clip":  true,
-                                                                   "fill_color":  "rgba(0,0,0,1)",
-                                                                   "dynamic":  true,
-                                                                   "animations":  [
-                                                                                      {
-                                                                                          "time":  0,
-                                                                                          "duration":  1,
-                                                                                          "easing":  "cubic-out",
-                                                                                          "type":  "text-slide",
-                                                                                          "scope":  "split-clip",
-                                                                                          "split":  "line",
-                                                                                          "direction":  "up"
-                                                                                      }
-                                                                                  ]
-                                                               },
-                                                               {
-                                                                   "id":  "275a18ef-9f46-4b0e-b075-d6ccdb3f50e1",
-                                                                   "name":  "Text 1-1",
-                                                                   "type":  "text",
-                                                                   "track":  2,
-                                                                   "time":  0,
-                                                                   "x":  "49.3739%",
-                                                                   "y":  "25%",
-                                                                   "width":  "100.0945%",
-                                                                   "height":  "30.4015%",
-                                                                   "y_alignment":  "100%",
-                                                                   "text":  "Valley of Fire State Park, ",
-                                                                   "font_family":  "Archivo",
-                                                                   "font_weight":  "500",
-                                                                   "font_size_minimum":  "6 vmin",
-                                                                   "text_wrap":  false,
-                                                                   "text_clip":  true,
-                                                                   "fill_color":  "rgba(0,0,0,1)",
-                                                                   "dynamic":  true,
-                                                                   "animations":  [
-                                                                                      {
-                                                                                          "time":  0,
-                                                                                          "duration":  1,
-                                                                                          "easing":  "cubic-out",
-                                                                                          "type":  "text-slide",
-                                                                                          "scope":  "split-clip",
-                                                                                          "split":  "line",
-                                                                                          "direction":  "up"
-                                                                                      }
-                                                                                  ]
-                                                               }
-                                                           ]
-                                          },
-                                          {
-                                              "id":  "26192313-86cd-4d32-9c6e-ee77d012f2aa",
-                                              "name":  "logo",
-                                              "type":  "image",
-                                              "track":  3,
-                                              "time":  0,
-                                              "x":  "9.1599%",
-                                              "y":  "13.0794%",
-                                              "width":  "11.079%",
-                                              "height":  "14.7091%",
-                                              "source":  "e36edca6-0be9-4e90-8605-4392bce13493"
-                                          }
-                                      ]
-                     },
-                     {
-                         "id":  "722216cf-0701-4f4c-9afc-851cb47b70b4",
-                         "name":  "Slide-2",
-                         "type":  "composition",
-                         "track":  1,
-                         "fill_color":  "rgba(255,255,255,1)",
-                         "animations":  [
-                                            {
-                                                "time":  0,
-                                                "duration":  1.64,
-                                                "transition":  true,
-                                                "type":  "slide",
-                                                "direction":  "180°"
-                                            }
-                                        ],
-                         "elements":  [
-                                          {
-                                              "id":  "b4dfc40b-285d-4c62-9dbf-953187c07bc1",
-                                              "name":  "Shape-9P5",
-                                              "type":  "shape",
-                                              "track":  1,
-                                              "time":  0,
-                                              "x":  "57.3792%",
-                                              "width":  "83.771%",
-                                              "height":  "100%",
-                                              "x_anchor":  "50%",
-                                              "y_anchor":  "50%",
-                                              "path":  "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
-                                              "fill_color":  "#2eb0a4"
-                                          },
-                                          {
-                                              "id":  "8788bcfd-bded-4fc8-8f70-ab8492c41897",
-                                              "name":  "Subtext 2",
-                                              "type":  "text",
-                                              "track":  2,
-                                              "time":  3.771,
-                                              "x":  "21.4645%",
-                                              "width":  861.953,
-                                              "height":  359.6643,
-                                              "x_anchor":  "0%",
-                                              "y_anchor":  "0%",
-                                              "y_alignment":  "50%",
-                                              "text":  "Your text here Your text here Your text here Your text here",
-                                              "font_family":  "Noto Sans",
-                                              "font_size_minimum":  "7 vmin",
-                                              "font_size_maximum":  "7 vmin",
-                                              "fill_color":  "#ffffff",
-                                              "dynamic":  true,
-                                              "animations":  [
-                                                                 {
-                                                                     "time":  0,
-                                                                     "duration":  2.048,
-                                                                     "easing":  "quadratic-out",
-                                                                     "type":  "text-reveal",
-                                                                     "axis":  "y",
-                                                                     "split":  "line",
-                                                                     "y_anchor":  "0%"
-                                                                 }
-                                                             ]
-                                          },
-                                          {
-                                              "id":  "f09cfe27-0145-4bc3-b8a1-3a018e79c9a2",
-                                              "name":  "Title 2",
-                                              "type":  "text",
-                                              "track":  3,
-                                              "time":  2.002,
-                                              "x":  "22.6367%",
-                                              "y":  "18.6106%",
-                                              "width":  "68.5331%",
-                                              "height":  "27.7399%",
-                                              "x_anchor":  "0%",
-                                              "y_anchor":  "0%",
-                                              "text":  "Your text here Your text here Your text",
-                                              "font_family":  "Noto Sans",
-                                              "font_weight":  "700",
-                                              "font_size_minimum":  "8 vmin",
-                                              "fill_color":  "#ffffff",
-                                              "dynamic":  true,
-                                              "animations":  [
-                                                                 {
-                                                                     "time":  0,
-                                                                     "duration":  1.5,
-                                                                     "easing":  "quadratic-out",
-                                                                     "type":  "text-slide",
-                                                                     "scope":  "element",
-                                                                     "split":  "word",
-                                                                     "distance":  "200%",
-                                                                     "direction":  "down",
-                                                                     "background_effect":  "disabled"
-                                                                 }
-                                                             ]
-                                          },
-                                          {
-                                              "id":  "dbb710e4-d0f3-4b46-a28a-12e60f709360",
-                                              "type":  "composition",
-                                              "track":  4,
-                                              "time":  1,
-                                              "x":  "7.8423%",
-                                              "width":  "94.53 vh",
-                                              "height":  "12.8635 vw",
-                                              "z_rotation":  "-90°",
-                                              "elements":  [
-                                                               {
-                                                                   "id":  "2fc744c5-3912-4708-a8ab-5240129b9ae4",
-                                                                   "name":  "Text 2-2",
-                                                                   "type":  "text",
-                                                                   "track":  1,
-                                                                   "time":  0.4559,
-                                                                   "y":  "79.54%",
-                                                                   "width":  "100%",
-                                                                   "height":  "40.93%",
-                                                                   "y_padding":  0,
-                                                                   "text":  "Tomasz Filipek",
-                                                                   "font_family":  "Archivo",
-                                                                   "font_weight":  "200",
-                                                                   "font_size":  "4.6115 vmin",
-                                                                   "text_wrap":  false,
-                                                                   "text_clip":  true,
-                                                                   "fill_color":  "rgba(0,0,0,1)",
-                                                                   "dynamic":  true,
-                                                                   "animations":  [
-                                                                                      {
-                                                                                          "time":  0,
-                                                                                          "duration":  1,
-                                                                                          "easing":  "cubic-out",
-                                                                                          "type":  "text-slide",
-                                                                                          "scope":  "split-clip",
-                                                                                          "split":  "line",
-                                                                                          "direction":  "up"
-                                                                                      }
-                                                                                  ]
-                                                               },
-                                                               {
-                                                                   "id":  "435fd44b-68d8-4eae-b736-57c9d1ed8767",
-                                                                   "name":  "Text 2-1",
-                                                                   "type":  "text",
-                                                                   "track":  2,
-                                                                   "time":  0,
-                                                                   "y":  "25%",
-                                                                   "width":  "100%",
-                                                                   "height":  "50%",
-                                                                   "y_alignment":  "100%",
-                                                                   "text":  "Trzebiatów, Polska",
-                                                                   "font_family":  "Archivo",
-                                                                   "font_weight":  "500",
-                                                                   "font_size":  "6 vmin",
-                                                                   "text_wrap":  false,
-                                                                   "text_clip":  true,
-                                                                   "fill_color":  "rgba(0,0,0,1)",
-                                                                   "dynamic":  true,
-                                                                   "animations":  [
-                                                                                      {
-                                                                                          "time":  0,
-                                                                                          "duration":  1,
-                                                                                          "easing":  "cubic-out",
-                                                                                          "type":  "text-slide",
-                                                                                          "scope":  "split-clip",
-                                                                                          "split":  "line",
-                                                                                          "direction":  "up"
-                                                                                      }
-                                                                                  ]
-                                                               }
-                                                           ]
-                                          },
-                                          {
-                                              "id":  "5ea2a78e-0724-4523-bd1f-060d383d9107",
-                                              "name":  "logo",
-                                              "type":  "image",
-                                              "track":  5,
-                                              "time":  0,
-                                              "x":  "91.8123%",
-                                              "y":  "11.5335%",
-                                              "width":  "11.079%",
-                                              "height":  "14.7091%",
-                                              "source":  "e36edca6-0be9-4e90-8605-4392bce13493"
-                                          }
-                                      ]
-                     },
-                     {
-                         "id":  "08f3b7b7-06bb-4978-af54-3b4ab969c695",
-                         "name":  "music",
-                         "type":  "audio",
-                         "track":  2,
-                         "time":  0,
-                         "duration":  null,
-                         "dynamic":  true
-                     }
-                 ]
+{
+  "output_format": "mp4",
+  "width": 1920,
+  "height": 1080,
+  "frame_rate": "60 fps",
+  "duration": 20.0186,
+  "snapshot_time": 12.15,
+  "fill_color": "rgba(255,255,255,1)",
+  "elements": [
+    {
+      "id": "5f3b3e71-52e3-443c-bb4c-e03297014d4c",
+      "name": "Intro",
+      "type": "composition",
+      "track": 1,
+      "time": 0,
+      "duration": 4.0811,
+      "width": "92.0384 vmin",
+      "height": "23.6132 vmin",
+      "animations": [
+        {
+          "easing": "quadratic-out",
+          "type": "scale",
+          "start_scale": "80%"
+        }
+      ],
+      "elements": [
+        {
+          "id": "fae15c1d-d564-4b1e-b338-0cdf99488397",
+          "name": "Shape-B5N",
+          "type": "shape",
+          "track": 1,
+          "time": 0,
+          "width": "144.8671%",
+          "height": "423.4919%",
+          "x_anchor": "50%",
+          "y_anchor": "50%",
+          "path": "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+          "fill_color": "#00b59b"
+        },
+        {
+          "id": "8e32fa66-279b-4645-9e8f-64fdf938ee71",
+          "name": "Title 1",
+          "type": "text",
+          "track": 2,
+          "time": 0,
+          "y": "33.9728%",
+          "width": "99.9999%",
+          "height": "67.9456%",
+          "x_alignment": "50%",
+          "y_alignment": "50%",
+          "text": "Photo Competition",
+          "font_family": "Archivo",
+          "font_weight": "600",
+          "fill_color": "#ffffff",
+          "dynamic": true
+        },
+        {
+          "id": "e9d5b7d8-1f91-4ab7-99c2-954e7d8aa3d5",
+          "name": "Subtext 1",
+          "type": "text",
+          "track": 3,
+          "time": 0,
+          "y": "82.9449%",
+          "width": "100%",
+          "height": "34.1101%",
+          "x_alignment": "50%",
+          "y_alignment": "50%",
+          "text": "Top Photo's This Week",
+          "font_family": "Archivo",
+          "font_weight": "600",
+          "font_size_minimum": "7.5 vmin",
+          "fill_color": "#ffffff",
+          "dynamic": true
+        },
+        {
+          "id": "3bd23911-41e8-4b3e-87eb-64264eee1bfe",
+          "name": "logo",
+          "type": "image",
+          "track": 4,
+          "time": 0,
+          "x": "100%",
+          "y": "-111.541%",
+          "width": "16.0498%",
+          "height": "62.2919%",
+          "source": "e36edca6-0be9-4e90-8605-4392bce13493"
+        }
+      ]
+    },
+    {
+      "id": "be252ad4-c4fd-4570-a30d-15ebc0c1b7a0",
+      "name": "Slide-1",
+      "type": "composition",
+      "track": 1,
+      "duration": 7.8,
+      "fill_color": "rgba(255,255,255,1)",
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1.991,
+          "transition": true,
+          "type": "slide",
+          "direction": "180°"
+        }
+      ],
+      "elements": [
+        {
+          "id": "ceb44a64-0370-48a7-9de0-cbfcc9726050",
+          "name": "Photo-1",
+          "type": "image",
+          "track": 1,
+          "time": 0,
+          "x": "42.4827%",
+          "y": "49.8642%",
+          "width": "82.8262%",
+          "height": "95.925%",
+          "source": "974e8516-c044-438f-a3c6-2cf0ed27fbe8",
+          "border_radius": "4.5 vmin",
+          "clip": true,
+          "dynamic": true,
+          "animations": [
+            {
+              "easing": "sinusoid-in-out",
+              "type": "scale",
+              "fade": false,
+              "scope": "element",
+              "start_scale": "115%"
+            }
+          ]
+        },
+        {
+          "id": "96fd6b33-f33f-499b-91a8-7875c9b50829",
+          "type": "composition",
+          "track": 2,
+          "time": 2.1598,
+          "x": "91.9479%",
+          "width": "94.5318 vh",
+          "height": "16.1042 vw",
+          "z_rotation": "-90°",
+          "elements": [
+            {
+              "id": "8cbf5a9e-61ea-43b5-9f9d-f6baa7a8c1a9",
+              "name": "Text 1-2",
+              "type": "text",
+              "track": 1,
+              "time": 0.4559,
+              "y": "79.5354%",
+              "width": "100%",
+              "height": "40.9293%",
+              "y_padding": 0,
+              "text": "Jack Blucker",
+              "font_family": "Archivo",
+              "font_weight": "200",
+              "font_size": "4.6115 vmin",
+              "text_wrap": false,
+              "text_clip": true,
+              "fill_color": "rgba(0,0,0,1)",
+              "dynamic": true,
+              "animations": [
+                {
+                  "time": 0,
+                  "duration": 1,
+                  "easing": "cubic-out",
+                  "type": "text-slide",
+                  "scope": "split-clip",
+                  "split": "line",
+                  "direction": "up"
+                }
+              ]
+            },
+            {
+              "id": "275a18ef-9f46-4b0e-b075-d6ccdb3f50e1",
+              "name": "Text 1-1",
+              "type": "text",
+              "track": 2,
+              "time": 0,
+              "x": "49.3739%",
+              "y": "25%",
+              "width": "100.0945%",
+              "height": "30.4015%",
+              "y_alignment": "100%",
+              "text": "Valley of Fire State Park, ",
+              "font_family": "Archivo",
+              "font_weight": "500",
+              "font_size_minimum": "6 vmin",
+              "text_wrap": false,
+              "text_clip": true,
+              "fill_color": "rgba(0,0,0,1)",
+              "dynamic": true,
+              "animations": [
+                {
+                  "time": 0,
+                  "duration": 1,
+                  "easing": "cubic-out",
+                  "type": "text-slide",
+                  "scope": "split-clip",
+                  "split": "line",
+                  "direction": "up"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "26192313-86cd-4d32-9c6e-ee77d012f2aa",
+          "name": "logo",
+          "type": "image",
+          "track": 3,
+          "time": 0,
+          "x": "9.1599%",
+          "y": "13.0794%",
+          "width": "11.079%",
+          "height": "14.7091%",
+          "source": "e36edca6-0be9-4e90-8605-4392bce13493"
+        }
+      ]
+    },
+    {
+      "id": "722216cf-0701-4f4c-9afc-851cb47b70b4",
+      "name": "Slide-2",
+      "type": "composition",
+      "track": 1,
+      "fill_color": "rgba(255,255,255,1)",
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1.64,
+          "transition": true,
+          "type": "slide",
+          "direction": "180°"
+        }
+      ],
+      "elements": [
+        {
+          "id": "b4dfc40b-285d-4c62-9dbf-953187c07bc1",
+          "name": "Shape-9P5",
+          "type": "shape",
+          "track": 1,
+          "time": 0,
+          "x": "57.3792%",
+          "width": "83.771%",
+          "height": "100%",
+          "x_anchor": "50%",
+          "y_anchor": "50%",
+          "path": "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+          "fill_color": "#2eb0a4"
+        },
+        {
+          "id": "8788bcfd-bded-4fc8-8f70-ab8492c41897",
+          "name": "Subtext 2",
+          "type": "text",
+          "track": 2,
+          "time": 3.771,
+          "x": "21.4645%",
+          "width": 861.953,
+          "height": 359.6643,
+          "x_anchor": "0%",
+          "y_anchor": "0%",
+          "y_alignment": "50%",
+          "text": "Your text here Your text here Your text here Your text here",
+          "font_family": "Noto Sans",
+          "font_size_minimum": "7 vmin",
+          "font_size_maximum": "7 vmin",
+          "fill_color": "#ffffff",
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 0,
+              "duration": 2.048,
+              "easing": "quadratic-out",
+              "type": "text-reveal",
+              "axis": "y",
+              "split": "line",
+              "y_anchor": "0%"
+            }
+          ]
+        },
+        {
+          "id": "f09cfe27-0145-4bc3-b8a1-3a018e79c9a2",
+          "name": "Title 2",
+          "type": "text",
+          "track": 3,
+          "time": 2.002,
+          "x": "22.6367%",
+          "y": "18.6106%",
+          "width": "68.5331%",
+          "height": "27.7399%",
+          "x_anchor": "0%",
+          "y_anchor": "0%",
+          "text": "Your text here Your text here Your text",
+          "font_family": "Noto Sans",
+          "font_weight": "700",
+          "font_size_minimum": "8 vmin",
+          "fill_color": "#ffffff",
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 0,
+              "duration": 1.5,
+              "easing": "quadratic-out",
+              "type": "text-slide",
+              "scope": "element",
+              "split": "word",
+              "distance": "200%",
+              "direction": "down",
+              "background_effect": "disabled"
+            }
+          ]
+        },
+        {
+          "id": "dbb710e4-d0f3-4b46-a28a-12e60f709360",
+          "type": "composition",
+          "track": 4,
+          "time": 1,
+          "x": "7.8423%",
+          "width": "94.53 vh",
+          "height": "12.8635 vw",
+          "z_rotation": "-90°",
+          "elements": [
+            {
+              "id": "2fc744c5-3912-4708-a8ab-5240129b9ae4",
+              "name": "Text 2-2",
+              "type": "text",
+              "track": 1,
+              "time": 0.4559,
+              "y": "79.54%",
+              "width": "100%",
+              "height": "40.93%",
+              "y_padding": 0,
+              "text": "Tomasz Filipek",
+              "font_family": "Archivo",
+              "font_weight": "200",
+              "font_size": "4.6115 vmin",
+              "text_wrap": false,
+              "text_clip": true,
+              "fill_color": "rgba(0,0,0,1)",
+              "dynamic": true,
+              "animations": [
+                {
+                  "time": 0,
+                  "duration": 1,
+                  "easing": "cubic-out",
+                  "type": "text-slide",
+                  "scope": "split-clip",
+                  "split": "line",
+                  "direction": "up"
+                }
+              ]
+            },
+            {
+              "id": "435fd44b-68d8-4eae-b736-57c9d1ed8767",
+              "name": "Text 2-1",
+              "type": "text",
+              "track": 2,
+              "time": 0,
+              "y": "25%",
+              "width": "100%",
+              "height": "50%",
+              "y_alignment": "100%",
+              "text": "Trzebiatów, Polska",
+              "font_family": "Archivo",
+              "font_weight": "500",
+              "font_size": "6 vmin",
+              "text_wrap": false,
+              "text_clip": true,
+              "fill_color": "rgba(0,0,0,1)",
+              "dynamic": true,
+              "animations": [
+                {
+                  "time": 0,
+                  "duration": 1,
+                  "easing": "cubic-out",
+                  "type": "text-slide",
+                  "scope": "split-clip",
+                  "split": "line",
+                  "direction": "up"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "5ea2a78e-0724-4523-bd1f-060d383d9107",
+          "name": "logo",
+          "type": "image",
+          "track": 5,
+          "time": 0,
+          "x": "91.8123%",
+          "y": "11.5335%",
+          "width": "11.079%",
+          "height": "14.7091%",
+          "source": "e36edca6-0be9-4e90-8605-4392bce13493"
+        }
+      ]
+    },
+    {
+      "id": "08f3b7b7-06bb-4978-af54-3b4ab969c695",
+      "name": "music",
+      "type": "audio",
+      "track": 2,
+      "time": 0,
+      "duration": null,
+      "dynamic": true
+    }
+  ]
 }

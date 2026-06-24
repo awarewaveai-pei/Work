@@ -1,376 +1,376 @@
-﻿{
-    "output_format":  "mp4",
-    "width":  1536,
-    "height":  1920,
-    "frame_rate":  "60 fps",
-    "duration":  22,
-    "snapshot_time":  12.15,
-    "fill_color":  "rgba(255,255,255,1)",
-    "elements":  [
-                     {
-                         "id":  "72dba84a-83cd-456d-8e59-e45b3752a069",
-                         "name":  "Shape-SWB",
-                         "type":  "shape",
-                         "track":  1,
-                         "time":  0,
-                         "width":  "100%",
-                         "height":  "100%",
-                         "x_anchor":  "50%",
-                         "y_anchor":  "50%",
-                         "path":  "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
-                         "fill_color":  "#0ebba2"
-                     },
-                     {
-                         "id":  "be252ad4-c4fd-4570-a30d-15ebc0c1b7a0",
-                         "name":  "Photo-Slide-1",
-                         "type":  "composition",
-                         "track":  2,
-                         "duration":  7.8,
-                         "fill_color":  "rgba(255,255,255,1)",
-                         "elements":  [
-                                          {
-                                              "id":  "ceb44a64-0370-48a7-9de0-cbfcc9726050",
-                                              "name":  "Photo-1",
-                                              "type":  "image",
-                                              "track":  1,
-                                              "time":  0,
-                                              "x":  "44.4564%",
-                                              "y":  "49.8642%",
-                                              "width":  "86.4206%",
-                                              "height":  "95.925%",
-                                              "source":  "53d2a40d-0213-4416-89f6-afb3ae3297c1",
-                                              "border_radius":  "4.5 vmin",
-                                              "clip":  true,
-                                              "dynamic":  true,
-                                              "animations":  [
-                                                                 {
-                                                                     "easing":  "sinusoid-in-out",
-                                                                     "type":  "scale",
-                                                                     "fade":  false,
-                                                                     "scope":  "element",
-                                                                     "start_scale":  "115%"
-                                                                 }
-                                                             ]
-                                          },
-                                          {
-                                              "id":  "96fd6b33-f33f-499b-91a8-7875c9b50829",
-                                              "type":  "composition",
-                                              "track":  2,
-                                              "time":  2.1598,
-                                              "x":  "42.553%",
-                                              "width":  "43.7992 vh",
-                                              "height":  "50 vw",
-                                              "z_rotation":  "-359.9122°",
-                                              "animations":  [
-                                                                 {
-                                                                     "time":  0,
-                                                                     "duration":  1,
-                                                                     "transition":  true,
-                                                                     "type":  "rotate-slide",
-                                                                     "fade":  false,
-                                                                     "clockwise":  false,
-                                                                     "direction":  "left"
-                                                                 }
-                                                             ],
-                                              "elements":  [
-                                                               {
-                                                                   "id":  "b046a150-ae40-4909-b8d5-2a582368c958",
-                                                                   "name":  "Text1",
-                                                                   "type":  "text",
-                                                                   "track":  1,
-                                                                   "time":  0,
-                                                                   "x":  "1.8937%",
-                                                                   "width":  "96.2125%",
-                                                                   "height":  "50%",
-                                                                   "x_anchor":  "0%",
-                                                                   "y_anchor":  "0%",
-                                                                   "x_alignment":  "50%",
-                                                                   "y_alignment":  "50%",
-                                                                   "text":  "Your text here Your text here",
-                                                                   "font_family":  "Noto Sans",
-                                                                   "font_weight":  "700",
-                                                                   "font_size_maximum":  "10 vmin",
-                                                                   "background_color":  "rgba(0,0,0,0.3)",
-                                                                   "background_border_radius":  "15%",
-                                                                   "fill_color":  "#ffffff",
-                                                                   "stroke_color":  "#333333",
-                                                                   "shadow_color":  "rgba(0,0,0,0.25)",
-                                                                   "dynamic":  true
-                                                               }
-                                                           ]
-                                          },
-                                          {
-                                              "id":  "26192313-86cd-4d32-9c6e-ee77d012f2aa",
-                                              "name":  "logo",
-                                              "type":  "image",
-                                              "track":  3,
-                                              "time":  0,
-                                              "x":  "12.6167%",
-                                              "y":  "13.0426%",
-                                              "width":  "17.9928%",
-                                              "height":  "14.6354%",
-                                              "source":  "e36edca6-0be9-4e90-8605-4392bce13493"
-                                          },
-                                          {
-                                              "id":  "db5b2605-6328-4789-a4ec-511fc8442dbb",
-                                              "name":  "Text-RH2",
-                                              "type":  "text",
-                                              "track":  4,
-                                              "time":  0,
-                                              "x":  "96.6489%",
-                                              "width":  "115.8407%",
-                                              "height":  "14.6183%",
-                                              "z_rotation":  "-90.0862°",
-                                              "text":  "Breathe in calm. Breathe out stress",
-                                              "font_family":  "Noto Sans"
-                                          }
-                                      ]
-                     },
-                     {
-                         "id":  "722216cf-0701-4f4c-9afc-851cb47b70b4",
-                         "name":  "Photo-Slide-2",
-                         "type":  "composition",
-                         "track":  2,
-                         "time":  6.4639,
-                         "duration":  7.4961,
-                         "fill_color":  "rgba(255,255,255,1)",
-                         "animations":  [
-                                            {
-                                                "time":  0,
-                                                "duration":  1.293,
-                                                "transition":  true,
-                                                "type":  "slide",
-                                                "direction":  "180°"
-                                            }
-                                        ],
-                         "elements":  [
-                                          {
-                                              "id":  "af85903d-0f59-465d-b8c3-9799bc78ea20",
-                                              "name":  "Photo-2",
-                                              "type":  "image",
-                                              "track":  1,
-                                              "time":  0,
-                                              "x":  "56.3649%",
-                                              "width":  "85.0833%",
-                                              "height":  "95.925%",
-                                              "source":  "1c94ca75-800b-4bf7-b19f-1f51178a702f",
-                                              "border_radius":  "4.5 vmin",
-                                              "clip":  true,
-                                              "dynamic":  true,
-                                              "animations":  [
-                                                                 {
-                                                                     "easing":  "sinusoid-in-out",
-                                                                     "type":  "scale",
-                                                                     "fade":  false,
-                                                                     "scope":  "element",
-                                                                     "end_scale":  "115%",
-                                                                     "start_scale":  "100%"
-                                                                 }
-                                                             ]
-                                          },
-                                          {
-                                              "id":  "dbb710e4-d0f3-4b46-a28a-12e60f709360",
-                                              "type":  "composition",
-                                              "track":  2,
-                                              "time":  1.8963,
-                                              "x":  "57.0115%",
-                                              "y":  "84.9926%",
-                                              "width":  "99.894 vh",
-                                              "height":  "12.8635 vw",
-                                              "z_rotation":  "-360.1577°",
-                                              "animations":  [
-                                                                 {
-                                                                     "time":  0,
-                                                                     "duration":  1,
-                                                                     "transition":  true,
-                                                                     "type":  "rotate-slide",
-                                                                     "clockwise":  true,
-                                                                     "direction":  "right"
-                                                                 }
-                                                             ],
-                                              "elements":  [
-                                                               {
-                                                                   "id":  "435fd44b-68d8-4eae-b736-57c9d1ed8767",
-                                                                   "name":  "Text2",
-                                                                   "type":  "text",
-                                                                   "track":  1,
-                                                                   "time":  0,
-                                                                   "x":  "47.891%",
-                                                                   "y":  "-5.8071%",
-                                                                   "width":  "95.782%",
-                                                                   "height":  "211.6142%",
-                                                                   "x_alignment":  "50%",
-                                                                   "y_alignment":  "100%",
-                                                                   "text":  "YOUR TEXT HERE YOUR TEXT HEREYOUR TEXT HERE",
-                                                                   "font_family":  "Archivo",
-                                                                   "font_weight":  "700",
-                                                                   "font_size_minimum":  "5 vmin",
-                                                                   "font_size_maximum":  "8 vmin",
-                                                                   "background_color":  "rgba(0,0,0,0.3)",
-                                                                   "background_border_radius":  "15%",
-                                                                   "fill_color":  "#ffffff",
-                                                                   "stroke_color":  "#333333",
-                                                                   "stroke_width":  "0.2 vmin",
-                                                                   "shadow_color":  "rgba(0,0,0,0.25)",
-                                                                   "dynamic":  true,
-                                                                   "animations":  [
-                                                                                      {
-                                                                                          "time":  0,
-                                                                                          "duration":  1,
-                                                                                          "easing":  "cubic-out",
-                                                                                          "type":  "text-slide",
-                                                                                          "scope":  "split-clip",
-                                                                                          "split":  "line",
-                                                                                          "direction":  "up"
-                                                                                      }
-                                                                                  ]
-                                                               }
-                                                           ]
-                                          },
-                                          {
-                                              "id":  "5ea2a78e-0724-4523-bd1f-060d383d9107",
-                                              "name":  "logo",
-                                              "type":  "image",
-                                              "track":  3,
-                                              "time":  0,
-                                              "x":  "91.8123%",
-                                              "y":  "11.5335%",
-                                              "width":  "11.079%",
-                                              "height":  "14.7091%",
-                                              "source":  "e36edca6-0be9-4e90-8605-4392bce13493"
-                                          },
-                                          {
-                                              "id":  "66bde195-81e2-4189-86ac-212988cc057d",
-                                              "name":  "Text-XFD",
-                                              "type":  "text",
-                                              "track":  4,
-                                              "time":  0,
-                                              "x":  "5.1945%",
-                                              "y":  "96.4809%",
-                                              "width":  "69.7192%",
-                                              "height":  "9.5327%",
-                                              "x_anchor":  "0%",
-                                              "y_anchor":  "0%",
-                                              "z_rotation":  "-90.018°",
-                                              "text":  "Pure botanicals, pure moments.",
-                                              "font_family":  "Noto Sans"
-                                          }
-                                      ]
-                     },
-                     {
-                         "id":  "deb2c777-f00f-4138-b2a0-b0858cd4b9a3",
-                         "name":  "Photo-Slide-3",
-                         "type":  "composition",
-                         "track":  2,
-                         "fill_color":  "rgba(255,255,255,1)",
-                         "animations":  [
-                                            {
-                                                "time":  0,
-                                                "duration":  1.611,
-                                                "transition":  true,
-                                                "type":  "slide",
-                                                "direction":  "90°"
-                                            }
-                                        ],
-                         "elements":  [
-                                          {
-                                              "id":  "79fbfce9-8783-45ac-a7cf-4796fb6b5401",
-                                              "name":  "Photo-3",
-                                              "type":  "image",
-                                              "track":  1,
-                                              "time":  0.0968,
-                                              "x":  "49.5619%",
-                                              "width":  "95.7039%",
-                                              "height":  "95.92%",
-                                              "source":  "a6988cb1-6c80-433c-8565-d8d3d0e35a79",
-                                              "border_radius":  "4.5 vmin",
-                                              "clip":  true,
-                                              "dynamic":  true,
-                                              "animations":  [
-                                                                 {
-                                                                     "time":  0,
-                                                                     "duration":  7.8,
-                                                                     "easing":  "sinusoid-in-out",
-                                                                     "type":  "pan",
-                                                                     "end_x":  "100%",
-                                                                     "end_y":  "50%",
-                                                                     "scope":  "element",
-                                                                     "track":  0,
-                                                                     "start_x":  "0%",
-                                                                     "start_y":  "50%",
-                                                                     "end_zoom":  "120%",
-                                                                     "property":  "animations",
-                                                                     "start_zoom":  "120"
-                                                                 }
-                                                             ]
-                                          },
-                                          {
-                                              "id":  "2f2750cd-f87b-4be6-8aeb-830dc22208d4",
-                                              "type":  "composition",
-                                              "track":  2,
-                                              "time":  1.8963,
-                                              "width":  "122.0875 vh",
-                                              "height":  "71.0798 vw",
-                                              "z_rotation":  "-360.4415°",
-                                              "elements":  [
-                                                               {
-                                                                   "id":  "880bbc76-feea-4d5b-a40b-42e0d6513cca",
-                                                                   "name":  "Text3",
-                                                                   "type":  "text",
-                                                                   "track":  1,
-                                                                   "time":  0,
-                                                                   "width":  "70%",
-                                                                   "height":  "70%",
-                                                                   "x_alignment":  "50%",
-                                                                   "y_alignment":  "50%",
-                                                                   "text":  "Andenes, Norway",
-                                                                   "font_family":  "Archivo",
-                                                                   "font_weight":  "900",
-                                                                   "font_size_maximum":  "8 vmin",
-                                                                   "text_clip":  true,
-                                                                   "background_color":  "rgba(0,0,0,0.3)",
-                                                                   "background_border_radius":  "15%",
-                                                                   "fill_color":  "#ffffff",
-                                                                   "stroke_color":  "#333333",
-                                                                   "stroke_width":  "0.3 vmin",
-                                                                   "shadow_color":  "rgba(0,0,0,0.25)",
-                                                                   "dynamic":  true,
-                                                                   "animations":  [
-                                                                                      {
-                                                                                          "time":  0,
-                                                                                          "duration":  2.006,
-                                                                                          "easing":  "quadratic-out",
-                                                                                          "type":  "text-slide",
-                                                                                          "scope":  "split-clip",
-                                                                                          "split":  "letter",
-                                                                                          "direction":  "up"
-                                                                                      }
-                                                                                  ]
-                                                               }
-                                                           ]
-                                          },
-                                          {
-                                              "id":  "edb319c9-0410-4c4b-9e18-9c4df97ff617",
-                                              "name":  "logo",
-                                              "type":  "image",
-                                              "track":  3,
-                                              "time":  0,
-                                              "x":  "8.4973%",
-                                              "y":  "12.196%",
-                                              "width":  "11.079%",
-                                              "height":  "14.7091%",
-                                              "source":  "e36edca6-0be9-4e90-8605-4392bce13493"
-                                          }
-                                      ]
-                     },
-                     {
-                         "id":  "e9567b93-47db-4349-bdad-4bf1a2ba5e2e",
-                         "name":  "music",
-                         "type":  "audio",
-                         "track":  3,
-                         "time":  0,
-                         "duration":  null,
-                         "dynamic":  true
-                     }
-                 ]
+{
+  "output_format": "mp4",
+  "width": 1536,
+  "height": 1920,
+  "frame_rate": "60 fps",
+  "duration": 22,
+  "snapshot_time": 12.15,
+  "fill_color": "rgba(255,255,255,1)",
+  "elements": [
+    {
+      "id": "72dba84a-83cd-456d-8e59-e45b3752a069",
+      "name": "Shape-SWB",
+      "type": "shape",
+      "track": 1,
+      "time": 0,
+      "width": "100%",
+      "height": "100%",
+      "x_anchor": "50%",
+      "y_anchor": "50%",
+      "path": "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+      "fill_color": "#0ebba2"
+    },
+    {
+      "id": "be252ad4-c4fd-4570-a30d-15ebc0c1b7a0",
+      "name": "Photo-Slide-1",
+      "type": "composition",
+      "track": 2,
+      "duration": 7.8,
+      "fill_color": "rgba(255,255,255,1)",
+      "elements": [
+        {
+          "id": "ceb44a64-0370-48a7-9de0-cbfcc9726050",
+          "name": "Photo-1",
+          "type": "image",
+          "track": 1,
+          "time": 0,
+          "x": "44.4564%",
+          "y": "49.8642%",
+          "width": "86.4206%",
+          "height": "95.925%",
+          "source": "53d2a40d-0213-4416-89f6-afb3ae3297c1",
+          "border_radius": "4.5 vmin",
+          "clip": true,
+          "dynamic": true,
+          "animations": [
+            {
+              "easing": "sinusoid-in-out",
+              "type": "scale",
+              "fade": false,
+              "scope": "element",
+              "start_scale": "115%"
+            }
+          ]
+        },
+        {
+          "id": "96fd6b33-f33f-499b-91a8-7875c9b50829",
+          "type": "composition",
+          "track": 2,
+          "time": 2.1598,
+          "x": "42.553%",
+          "width": "43.7992 vh",
+          "height": "50 vw",
+          "z_rotation": "-359.9122°",
+          "animations": [
+            {
+              "time": 0,
+              "duration": 1,
+              "transition": true,
+              "type": "rotate-slide",
+              "fade": false,
+              "clockwise": false,
+              "direction": "left"
+            }
+          ],
+          "elements": [
+            {
+              "id": "b046a150-ae40-4909-b8d5-2a582368c958",
+              "name": "Text1",
+              "type": "text",
+              "track": 1,
+              "time": 0,
+              "x": "1.8937%",
+              "width": "96.2125%",
+              "height": "50%",
+              "x_anchor": "0%",
+              "y_anchor": "0%",
+              "x_alignment": "50%",
+              "y_alignment": "50%",
+              "text": "Your text here Your text here",
+              "font_family": "Noto Sans",
+              "font_weight": "700",
+              "font_size_maximum": "10 vmin",
+              "background_color": "rgba(0,0,0,0.3)",
+              "background_border_radius": "15%",
+              "fill_color": "#ffffff",
+              "stroke_color": "#333333",
+              "shadow_color": "rgba(0,0,0,0.25)",
+              "dynamic": true
+            }
+          ]
+        },
+        {
+          "id": "26192313-86cd-4d32-9c6e-ee77d012f2aa",
+          "name": "logo",
+          "type": "image",
+          "track": 3,
+          "time": 0,
+          "x": "12.6167%",
+          "y": "13.0426%",
+          "width": "17.9928%",
+          "height": "14.6354%",
+          "source": "e36edca6-0be9-4e90-8605-4392bce13493"
+        },
+        {
+          "id": "db5b2605-6328-4789-a4ec-511fc8442dbb",
+          "name": "Text-RH2",
+          "type": "text",
+          "track": 4,
+          "time": 0,
+          "x": "96.6489%",
+          "width": "115.8407%",
+          "height": "14.6183%",
+          "z_rotation": "-90.0862°",
+          "text": "Breathe in calm. Breathe out stress",
+          "font_family": "Noto Sans"
+        }
+      ]
+    },
+    {
+      "id": "722216cf-0701-4f4c-9afc-851cb47b70b4",
+      "name": "Photo-Slide-2",
+      "type": "composition",
+      "track": 2,
+      "time": 6.4639,
+      "duration": 7.4961,
+      "fill_color": "rgba(255,255,255,1)",
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1.293,
+          "transition": true,
+          "type": "slide",
+          "direction": "180°"
+        }
+      ],
+      "elements": [
+        {
+          "id": "af85903d-0f59-465d-b8c3-9799bc78ea20",
+          "name": "Photo-2",
+          "type": "image",
+          "track": 1,
+          "time": 0,
+          "x": "56.3649%",
+          "width": "85.0833%",
+          "height": "95.925%",
+          "source": "1c94ca75-800b-4bf7-b19f-1f51178a702f",
+          "border_radius": "4.5 vmin",
+          "clip": true,
+          "dynamic": true,
+          "animations": [
+            {
+              "easing": "sinusoid-in-out",
+              "type": "scale",
+              "fade": false,
+              "scope": "element",
+              "end_scale": "115%",
+              "start_scale": "100%"
+            }
+          ]
+        },
+        {
+          "id": "dbb710e4-d0f3-4b46-a28a-12e60f709360",
+          "type": "composition",
+          "track": 2,
+          "time": 1.8963,
+          "x": "57.0115%",
+          "y": "84.9926%",
+          "width": "99.894 vh",
+          "height": "12.8635 vw",
+          "z_rotation": "-360.1577°",
+          "animations": [
+            {
+              "time": 0,
+              "duration": 1,
+              "transition": true,
+              "type": "rotate-slide",
+              "clockwise": true,
+              "direction": "right"
+            }
+          ],
+          "elements": [
+            {
+              "id": "435fd44b-68d8-4eae-b736-57c9d1ed8767",
+              "name": "Text2",
+              "type": "text",
+              "track": 1,
+              "time": 0,
+              "x": "47.891%",
+              "y": "-5.8071%",
+              "width": "95.782%",
+              "height": "211.6142%",
+              "x_alignment": "50%",
+              "y_alignment": "100%",
+              "text": "YOUR TEXT HERE YOUR TEXT HEREYOUR TEXT HERE",
+              "font_family": "Archivo",
+              "font_weight": "700",
+              "font_size_minimum": "5 vmin",
+              "font_size_maximum": "8 vmin",
+              "background_color": "rgba(0,0,0,0.3)",
+              "background_border_radius": "15%",
+              "fill_color": "#ffffff",
+              "stroke_color": "#333333",
+              "stroke_width": "0.2 vmin",
+              "shadow_color": "rgba(0,0,0,0.25)",
+              "dynamic": true,
+              "animations": [
+                {
+                  "time": 0,
+                  "duration": 1,
+                  "easing": "cubic-out",
+                  "type": "text-slide",
+                  "scope": "split-clip",
+                  "split": "line",
+                  "direction": "up"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "5ea2a78e-0724-4523-bd1f-060d383d9107",
+          "name": "logo",
+          "type": "image",
+          "track": 3,
+          "time": 0,
+          "x": "91.8123%",
+          "y": "11.5335%",
+          "width": "11.079%",
+          "height": "14.7091%",
+          "source": "e36edca6-0be9-4e90-8605-4392bce13493"
+        },
+        {
+          "id": "66bde195-81e2-4189-86ac-212988cc057d",
+          "name": "Text-XFD",
+          "type": "text",
+          "track": 4,
+          "time": 0,
+          "x": "5.1945%",
+          "y": "96.4809%",
+          "width": "69.7192%",
+          "height": "9.5327%",
+          "x_anchor": "0%",
+          "y_anchor": "0%",
+          "z_rotation": "-90.018°",
+          "text": "Pure botanicals, pure moments.",
+          "font_family": "Noto Sans"
+        }
+      ]
+    },
+    {
+      "id": "deb2c777-f00f-4138-b2a0-b0858cd4b9a3",
+      "name": "Photo-Slide-3",
+      "type": "composition",
+      "track": 2,
+      "fill_color": "rgba(255,255,255,1)",
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1.611,
+          "transition": true,
+          "type": "slide",
+          "direction": "90°"
+        }
+      ],
+      "elements": [
+        {
+          "id": "79fbfce9-8783-45ac-a7cf-4796fb6b5401",
+          "name": "Photo-3",
+          "type": "image",
+          "track": 1,
+          "time": 0.0968,
+          "x": "49.5619%",
+          "width": "95.7039%",
+          "height": "95.92%",
+          "source": "a6988cb1-6c80-433c-8565-d8d3d0e35a79",
+          "border_radius": "4.5 vmin",
+          "clip": true,
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 0,
+              "duration": 7.8,
+              "easing": "sinusoid-in-out",
+              "type": "pan",
+              "end_x": "100%",
+              "end_y": "50%",
+              "scope": "element",
+              "track": 0,
+              "start_x": "0%",
+              "start_y": "50%",
+              "end_zoom": "120%",
+              "property": "animations",
+              "start_zoom": "120"
+            }
+          ]
+        },
+        {
+          "id": "2f2750cd-f87b-4be6-8aeb-830dc22208d4",
+          "type": "composition",
+          "track": 2,
+          "time": 1.8963,
+          "width": "122.0875 vh",
+          "height": "71.0798 vw",
+          "z_rotation": "-360.4415°",
+          "elements": [
+            {
+              "id": "880bbc76-feea-4d5b-a40b-42e0d6513cca",
+              "name": "Text3",
+              "type": "text",
+              "track": 1,
+              "time": 0,
+              "width": "70%",
+              "height": "70%",
+              "x_alignment": "50%",
+              "y_alignment": "50%",
+              "text": "Andenes, Norway",
+              "font_family": "Archivo",
+              "font_weight": "900",
+              "font_size_maximum": "8 vmin",
+              "text_clip": true,
+              "background_color": "rgba(0,0,0,0.3)",
+              "background_border_radius": "15%",
+              "fill_color": "#ffffff",
+              "stroke_color": "#333333",
+              "stroke_width": "0.3 vmin",
+              "shadow_color": "rgba(0,0,0,0.25)",
+              "dynamic": true,
+              "animations": [
+                {
+                  "time": 0,
+                  "duration": 2.006,
+                  "easing": "quadratic-out",
+                  "type": "text-slide",
+                  "scope": "split-clip",
+                  "split": "letter",
+                  "direction": "up"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "edb319c9-0410-4c4b-9e18-9c4df97ff617",
+          "name": "logo",
+          "type": "image",
+          "track": 3,
+          "time": 0,
+          "x": "8.4973%",
+          "y": "12.196%",
+          "width": "11.079%",
+          "height": "14.7091%",
+          "source": "e36edca6-0be9-4e90-8605-4392bce13493"
+        }
+      ]
+    },
+    {
+      "id": "e9567b93-47db-4349-bdad-4bf1a2ba5e2e",
+      "name": "music",
+      "type": "audio",
+      "track": 3,
+      "time": 0,
+      "duration": null,
+      "dynamic": true
+    }
+  ]
 }

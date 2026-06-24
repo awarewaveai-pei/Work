@@ -1,182 +1,182 @@
-﻿{
-    "output_format":  "mp4",
-    "width":  1920,
-    "height":  1080,
-    "elements":  [
-                     {
-                         "id":  "background-image",
-                         "type":  "image",
-                         "track":  1,
-                         "time":  0,
-                         "source":  "a61888a8-637f-4384-982d-5d99d84bd98a",
-                         "dynamic":  true
-                     },
-                     {
-                         "id":  "text-1",
-                         "name":  "Text-1",
-                         "type":  "text",
-                         "track":  2,
-                         "time":  0,
-                         "x":  "39%",
-                         "y":  "13.64%",
-                         "width":  "20.6277%",
-                         "height":  "15.8563%",
-                         "z_rotation":  "20.3792°",
-                         "text":  "Hi {{name}}",
-                         "font_family":  "Mansalva",
-                         "font_size_minimum":  "5 vmin",
-                         "text_clip":  true,
-                         "fill_color":  "rgba(0,0,0,1)",
-                         "dynamic":  true,
-                         "animations":  [
-                                            {
-                                                "time":  0,
-                                                "duration":  1,
-                                                "easing":  "cubic-out",
-                                                "type":  "fade"
-                                            },
-                                            {
-                                                "time":  4.999,
-                                                "duration":  1,
-                                                "easing":  "linear",
-                                                "type":  "wiggle",
-                                                "x_angle":  "20°",
-                                                "y_angle":  "20°",
-                                                "z_angle":  "10°"
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "text-2",
-                         "name":  "Text-2",
-                         "type":  "text",
-                         "track":  3,
-                         "time":  0,
-                         "x":  "21.3384%",
-                         "y":  "51.9327%",
-                         "width":  "18.4657%",
-                         "height":  "19.459%",
-                         "z_rotation":  "15.7623°",
-                         "y_alignment":  "50%",
-                         "text":  "thanks for signing up!",
-                         "font_family":  "Sedgwick Ave Display",
-                         "font_size_minimum":  "5 vmin",
-                         "text_clip":  true,
-                         "fill_color":  "rgba(0,0,0,1)",
-                         "dynamic":  true,
-                         "animations":  [
-                                            {
-                                                "time":  1.2,
-                                                "duration":  1,
-                                                "easing":  "cubic-out",
-                                                "type":  "fade"
-                                            },
-                                            {
-                                                "time":  5.088,
-                                                "duration":  1,
-                                                "easing":  "linear",
-                                                "type":  "wiggle",
-                                                "x_angle":  "20°",
-                                                "y_angle":  "20°",
-                                                "z_angle":  "10°"
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "text-3",
-                         "name":  "Text-3",
-                         "type":  "text",
-                         "track":  4,
-                         "time":  0,
-                         "x":  "57.2226%",
-                         "y":  "72.1068%",
-                         "width":  "14.8169%",
-                         "height":  "15.7589%",
-                         "z_rotation":  "-40.0555°",
-                         "y_alignment":  "50%",
-                         "text":  "if you need any help...",
-                         "font_family":  "Long Cang",
-                         "font_size_minimum":  "5 vmin",
-                         "line_height":  "82%",
-                         "text_clip":  true,
-                         "fill_color":  "rgba(0,0,0,1)",
-                         "dynamic":  true,
-                         "animations":  [
-                                            {
-                                                "time":  2.4,
-                                                "duration":  1,
-                                                "easing":  "cubic-out",
-                                                "type":  "fade"
-                                            },
-                                            {
-                                                "time":  5.208,
-                                                "duration":  1,
-                                                "easing":  "linear",
-                                                "type":  "wiggle",
-                                                "x_angle":  "20°",
-                                                "y_angle":  "20°",
-                                                "z_angle":  "10°"
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "text-4",
-                         "name":  "Text-4",
-                         "type":  "text",
-                         "track":  5,
-                         "time":  0,
-                         "duration":  10,
-                         "x":  "73.96%",
-                         "y":  "57.6%",
-                         "width":  "15.6163%",
-                         "height":  "17.2589%",
-                         "z_rotation":  "-21.9727°",
-                         "y_alignment":  "50%",
-                         "text":  "...we are here for you",
-                         "font_family":  "Patrick Hand",
-                         "font_size_minimum":  "5 vmin",
-                         "text_clip":  true,
-                         "fill_color":  "rgba(0,0,0,1)",
-                         "dynamic":  true,
-                         "animations":  [
-                                            {
-                                                "time":  3.6,
-                                                "duration":  1,
-                                                "easing":  "cubic-out",
-                                                "type":  "fade"
-                                            },
-                                            {
-                                                "time":  5.3,
-                                                "duration":  1,
-                                                "easing":  "linear",
-                                                "type":  "wiggle",
-                                                "x_angle":  "20°",
-                                                "y_angle":  "20°",
-                                                "z_angle":  "10°"
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "109ef7ab-7bd6-4e14-8236-91739ebd4c2e",
-                         "name":  "logo",
-                         "type":  "image",
-                         "track":  6,
-                         "time":  0,
-                         "x":  "92.1309%",
-                         "y":  "12.2626%",
-                         "width":  "9.6379%",
-                         "height":  "17.9281%",
-                         "source":  "e36edca6-0be9-4e90-8605-4392bce13493"
-                     },
-                     {
-                         "id":  "d408b8f7-533f-4273-95e6-aa13d5ca01af",
-                         "name":  "music",
-                         "type":  "audio",
-                         "track":  7,
-                         "time":  0,
-                         "source":  "This text is read aloud. Replace it with your own speech text.",
-                         "provider":  "elevenlabs model_id=eleven_multilingual_v2 voice_id=XrExE9yKIg1WjnnlVkGX",
-                         "dynamic":  true
-                     }
-                 ]
+{
+  "output_format": "mp4",
+  "width": 1920,
+  "height": 1080,
+  "elements": [
+    {
+      "id": "background-image",
+      "type": "image",
+      "track": 1,
+      "time": 0,
+      "source": "a61888a8-637f-4384-982d-5d99d84bd98a",
+      "dynamic": true
+    },
+    {
+      "id": "text-1",
+      "name": "Text-1",
+      "type": "text",
+      "track": 2,
+      "time": 0,
+      "x": "39%",
+      "y": "13.64%",
+      "width": "20.6277%",
+      "height": "15.8563%",
+      "z_rotation": "20.3792°",
+      "text": "Hi {{name}}",
+      "font_family": "Mansalva",
+      "font_size_minimum": "5 vmin",
+      "text_clip": true,
+      "fill_color": "rgba(0,0,0,1)",
+      "dynamic": true,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1,
+          "easing": "cubic-out",
+          "type": "fade"
+        },
+        {
+          "time": 4.999,
+          "duration": 1,
+          "easing": "linear",
+          "type": "wiggle",
+          "x_angle": "20°",
+          "y_angle": "20°",
+          "z_angle": "10°"
+        }
+      ]
+    },
+    {
+      "id": "text-2",
+      "name": "Text-2",
+      "type": "text",
+      "track": 3,
+      "time": 0,
+      "x": "21.3384%",
+      "y": "51.9327%",
+      "width": "18.4657%",
+      "height": "19.459%",
+      "z_rotation": "15.7623°",
+      "y_alignment": "50%",
+      "text": "thanks for signing up!",
+      "font_family": "Sedgwick Ave Display",
+      "font_size_minimum": "5 vmin",
+      "text_clip": true,
+      "fill_color": "rgba(0,0,0,1)",
+      "dynamic": true,
+      "animations": [
+        {
+          "time": 1.2,
+          "duration": 1,
+          "easing": "cubic-out",
+          "type": "fade"
+        },
+        {
+          "time": 5.088,
+          "duration": 1,
+          "easing": "linear",
+          "type": "wiggle",
+          "x_angle": "20°",
+          "y_angle": "20°",
+          "z_angle": "10°"
+        }
+      ]
+    },
+    {
+      "id": "text-3",
+      "name": "Text-3",
+      "type": "text",
+      "track": 4,
+      "time": 0,
+      "x": "57.2226%",
+      "y": "72.1068%",
+      "width": "14.8169%",
+      "height": "15.7589%",
+      "z_rotation": "-40.0555°",
+      "y_alignment": "50%",
+      "text": "if you need any help...",
+      "font_family": "Long Cang",
+      "font_size_minimum": "5 vmin",
+      "line_height": "82%",
+      "text_clip": true,
+      "fill_color": "rgba(0,0,0,1)",
+      "dynamic": true,
+      "animations": [
+        {
+          "time": 2.4,
+          "duration": 1,
+          "easing": "cubic-out",
+          "type": "fade"
+        },
+        {
+          "time": 5.208,
+          "duration": 1,
+          "easing": "linear",
+          "type": "wiggle",
+          "x_angle": "20°",
+          "y_angle": "20°",
+          "z_angle": "10°"
+        }
+      ]
+    },
+    {
+      "id": "text-4",
+      "name": "Text-4",
+      "type": "text",
+      "track": 5,
+      "time": 0,
+      "duration": 10,
+      "x": "73.96%",
+      "y": "57.6%",
+      "width": "15.6163%",
+      "height": "17.2589%",
+      "z_rotation": "-21.9727°",
+      "y_alignment": "50%",
+      "text": "...we are here for you",
+      "font_family": "Patrick Hand",
+      "font_size_minimum": "5 vmin",
+      "text_clip": true,
+      "fill_color": "rgba(0,0,0,1)",
+      "dynamic": true,
+      "animations": [
+        {
+          "time": 3.6,
+          "duration": 1,
+          "easing": "cubic-out",
+          "type": "fade"
+        },
+        {
+          "time": 5.3,
+          "duration": 1,
+          "easing": "linear",
+          "type": "wiggle",
+          "x_angle": "20°",
+          "y_angle": "20°",
+          "z_angle": "10°"
+        }
+      ]
+    },
+    {
+      "id": "109ef7ab-7bd6-4e14-8236-91739ebd4c2e",
+      "name": "logo",
+      "type": "image",
+      "track": 6,
+      "time": 0,
+      "x": "92.1309%",
+      "y": "12.2626%",
+      "width": "9.6379%",
+      "height": "17.9281%",
+      "source": "e36edca6-0be9-4e90-8605-4392bce13493"
+    },
+    {
+      "id": "d408b8f7-533f-4273-95e6-aa13d5ca01af",
+      "name": "music",
+      "type": "audio",
+      "track": 7,
+      "time": 0,
+      "source": "This text is read aloud. Replace it with your own speech text.",
+      "provider": "elevenlabs model_id=eleven_multilingual_v2 voice_id=XrExE9yKIg1WjnnlVkGX",
+      "dynamic": true
+    }
+  ]
 }

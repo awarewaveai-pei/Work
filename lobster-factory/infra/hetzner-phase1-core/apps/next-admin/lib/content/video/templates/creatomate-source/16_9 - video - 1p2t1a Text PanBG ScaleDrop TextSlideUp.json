@@ -1,252 +1,252 @@
-﻿{
-    "output_format":  "mp4",
-    "width":  1920,
-    "height":  1080,
-    "duration":  12.0094,
-    "snapshot_time":  6.57,
-    "fill_color":  "rgba(255,255,255,1)",
-    "elements":  [
-                     {
-                         "id":  "5b82e4b6-0d0c-4c84-b9ef-a12c278120fb",
-                         "type":  "image",
-                         "track":  1,
-                         "time":  0,
-                         "width":  "100.0001%",
-                         "source":  "aadb2610-9d86-45a6-9c8e-8d449ab3bc7c",
-                         "clip":  true,
-                         "color_overlay":  "rgba(0,0,0,0.2)",
-                         "dynamic":  true,
-                         "animations":  [
-                                            {
-                                                "time":  0,
-                                                "duration":  1.995,
-                                                "easing":  "quadratic-out",
-                                                "type":  "scale",
-                                                "y_anchor":  "100%",
-                                                "end_scale":  "180%",
-                                                "start_scale":  "100%"
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "88a59cb2-0483-48d1-857a-f0a19ac15dc9",
-                         "name":  "Text-1",
-                         "type":  "text",
-                         "track":  2,
-                         "time":  2.995,
-                         "x":  "6.0767%",
-                         "y":  [
-                                   {
-                                       "time":  1.98,
-                                       "value":  "46.0249%"
-                                   },
-                                   {
-                                       "time":  2.609,
-                                       "value":  "40.4957%"
-                                   },
-                                   {
-                                       "time":  4.082,
-                                       "value":  "40.4957%"
-                                   },
-                                   {
-                                       "time":  5.013,
-                                       "value":  "33.2462%"
-                                   }
-                               ],
-                         "width":  "87.8222%",
-                         "height":  "19.5951%",
-                         "x_anchor":  "0%",
-                         "y_anchor":  "100%",
-                         "x_scale":  [
-                                         {
-                                             "time":  0,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  0.172,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  0.23,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  0.96,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  1.09,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  1.98,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  2.609,
-                                             "value":  "75%"
-                                         },
-                                         {
-                                             "time":  6.613,
-                                             "value":  "75%"
-                                         }
-                                     ],
-                         "y_scale":  [
-                                         {
-                                             "time":  0,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  0.172,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  0.23,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  0.96,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  1.09,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  1.98,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  2.609,
-                                             "value":  "75%"
-                                         },
-                                         {
-                                             "time":  6.613,
-                                             "value":  "75%"
-                                         }
-                                     ],
-                         "text":  "Welcome {{ name }}",
-                         "font_family":  "Oswald",
-                         "font_weight":  "700",
-                         "text_wrap":  false,
-                         "text_transform":  "uppercase",
-                         "background_color":  "#ff96a1",
-                         "background_border_radius":  "100%",
-                         "fill_color":  "#ffffff",
-                         "dynamic":  true,
-                         "animations":  [
-                                            {
-                                                "time":  0,
-                                                "duration":  0.761,
-                                                "easing":  "quadratic-out",
-                                                "type":  "text-slide",
-                                                "scope":  "split-clip",
-                                                "split":  "line",
-                                                "direction":  "up"
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "3b2750c1-42f4-4f4c-ad82-4ebc2569f690",
-                         "name":  "Text-2",
-                         "type":  "text",
-                         "track":  4,
-                         "time":  5.181,
-                         "x":  "9.1631%",
-                         "y":  [
-                                   {
-                                       "time":  0.527,
-                                       "value":  "90.1868%"
-                                   },
-                                   {
-                                       "time":  2.841,
-                                       "value":  "90.1868%"
-                                   },
-                                   {
-                                       "time":  4.901,
-                                       "value":  "70%"
-                                   }
-                               ],
-                         "width":  "84.7602%",
-                         "height":  "48.1271%",
-                         "x_anchor":  "0%",
-                         "y_anchor":  "100%",
-                         "x_scale":  [
-                                         {
-                                             "time":  0.527,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  2.841,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  4.901,
-                                             "value":  "75%"
-                                         }
-                                     ],
-                         "y_scale":  [
-                                         {
-                                             "time":  0.527,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  2.849,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  4.901,
-                                             "value":  "75%"
-                                         }
-                                     ],
-                         "y_alignment":  "50%",
-                         "text":  "This is just an example template. This is just an example template",
-                         "font_family":  "Oswald",
-                         "font_weight":  "700",
-                         "text_transform":  "uppercase",
-                         "fill_color":  "#FFFFFF",
-                         "dynamic":  true,
-                         "animations":  [
-                                            {
-                                                "time":  0,
-                                                "duration":  2.847,
-                                                "easing":  "quadratic-out",
-                                                "type":  "text-appear",
-                                                "overlap":  "0%"
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "f8569a97-4ff2-4efa-a23e-06a34b0261d5",
-                         "name":  "logo",
-                         "type":  "image",
-                         "track":  5,
-                         "time":  0,
-                         "x":  "89.9926%",
-                         "y":  "15.1077%",
-                         "width":  "13.0207%",
-                         "height":  "22.5617%",
-                         "source":  "e36edca6-0be9-4e90-8605-4392bce13493",
-                         "animations":  [
-                                            {
-                                                "time":  0,
-                                                "duration":  0.99,
-                                                "easing":  "quadratic-out",
-                                                "type":  "fade",
-                                                "track":  0
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "260eabf9-7e10-4a05-babd-e34623e49216",
-                         "name":  "music",
-                         "type":  "audio",
-                         "track":  6,
-                         "time":  0,
-                         "duration":  null,
-                         "source":  "This text is read aloud. Replace it with your own speech text.",
-                         "provider":  "elevenlabs model_id=eleven_multilingual_v2 voice_id=XrExE9yKIg1WjnnlVkGX",
-                         "dynamic":  true
-                     }
-                 ]
+{
+  "output_format": "mp4",
+  "width": 1920,
+  "height": 1080,
+  "duration": 12.0094,
+  "snapshot_time": 6.57,
+  "fill_color": "rgba(255,255,255,1)",
+  "elements": [
+    {
+      "id": "5b82e4b6-0d0c-4c84-b9ef-a12c278120fb",
+      "type": "image",
+      "track": 1,
+      "time": 0,
+      "width": "100.0001%",
+      "source": "aadb2610-9d86-45a6-9c8e-8d449ab3bc7c",
+      "clip": true,
+      "color_overlay": "rgba(0,0,0,0.2)",
+      "dynamic": true,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1.995,
+          "easing": "quadratic-out",
+          "type": "scale",
+          "y_anchor": "100%",
+          "end_scale": "180%",
+          "start_scale": "100%"
+        }
+      ]
+    },
+    {
+      "id": "88a59cb2-0483-48d1-857a-f0a19ac15dc9",
+      "name": "Text-1",
+      "type": "text",
+      "track": 2,
+      "time": 2.995,
+      "x": "6.0767%",
+      "y": [
+        {
+          "time": 1.98,
+          "value": "46.0249%"
+        },
+        {
+          "time": 2.609,
+          "value": "40.4957%"
+        },
+        {
+          "time": 4.082,
+          "value": "40.4957%"
+        },
+        {
+          "time": 5.013,
+          "value": "33.2462%"
+        }
+      ],
+      "width": "87.8222%",
+      "height": "19.5951%",
+      "x_anchor": "0%",
+      "y_anchor": "100%",
+      "x_scale": [
+        {
+          "time": 0,
+          "value": "100%"
+        },
+        {
+          "time": 0.172,
+          "value": "100%"
+        },
+        {
+          "time": 0.23,
+          "value": "100%"
+        },
+        {
+          "time": 0.96,
+          "value": "100%"
+        },
+        {
+          "time": 1.09,
+          "value": "100%"
+        },
+        {
+          "time": 1.98,
+          "value": "100%"
+        },
+        {
+          "time": 2.609,
+          "value": "75%"
+        },
+        {
+          "time": 6.613,
+          "value": "75%"
+        }
+      ],
+      "y_scale": [
+        {
+          "time": 0,
+          "value": "100%"
+        },
+        {
+          "time": 0.172,
+          "value": "100%"
+        },
+        {
+          "time": 0.23,
+          "value": "100%"
+        },
+        {
+          "time": 0.96,
+          "value": "100%"
+        },
+        {
+          "time": 1.09,
+          "value": "100%"
+        },
+        {
+          "time": 1.98,
+          "value": "100%"
+        },
+        {
+          "time": 2.609,
+          "value": "75%"
+        },
+        {
+          "time": 6.613,
+          "value": "75%"
+        }
+      ],
+      "text": "Welcome {{ name }}",
+      "font_family": "Oswald",
+      "font_weight": "700",
+      "text_wrap": false,
+      "text_transform": "uppercase",
+      "background_color": "#ff96a1",
+      "background_border_radius": "100%",
+      "fill_color": "#ffffff",
+      "dynamic": true,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 0.761,
+          "easing": "quadratic-out",
+          "type": "text-slide",
+          "scope": "split-clip",
+          "split": "line",
+          "direction": "up"
+        }
+      ]
+    },
+    {
+      "id": "3b2750c1-42f4-4f4c-ad82-4ebc2569f690",
+      "name": "Text-2",
+      "type": "text",
+      "track": 4,
+      "time": 5.181,
+      "x": "9.1631%",
+      "y": [
+        {
+          "time": 0.527,
+          "value": "90.1868%"
+        },
+        {
+          "time": 2.841,
+          "value": "90.1868%"
+        },
+        {
+          "time": 4.901,
+          "value": "70%"
+        }
+      ],
+      "width": "84.7602%",
+      "height": "48.1271%",
+      "x_anchor": "0%",
+      "y_anchor": "100%",
+      "x_scale": [
+        {
+          "time": 0.527,
+          "value": "100%"
+        },
+        {
+          "time": 2.841,
+          "value": "100%"
+        },
+        {
+          "time": 4.901,
+          "value": "75%"
+        }
+      ],
+      "y_scale": [
+        {
+          "time": 0.527,
+          "value": "100%"
+        },
+        {
+          "time": 2.849,
+          "value": "100%"
+        },
+        {
+          "time": 4.901,
+          "value": "75%"
+        }
+      ],
+      "y_alignment": "50%",
+      "text": "This is just an example template. This is just an example template",
+      "font_family": "Oswald",
+      "font_weight": "700",
+      "text_transform": "uppercase",
+      "fill_color": "#FFFFFF",
+      "dynamic": true,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 2.847,
+          "easing": "quadratic-out",
+          "type": "text-appear",
+          "overlap": "0%"
+        }
+      ]
+    },
+    {
+      "id": "f8569a97-4ff2-4efa-a23e-06a34b0261d5",
+      "name": "logo",
+      "type": "image",
+      "track": 5,
+      "time": 0,
+      "x": "89.9926%",
+      "y": "15.1077%",
+      "width": "13.0207%",
+      "height": "22.5617%",
+      "source": "e36edca6-0be9-4e90-8605-4392bce13493",
+      "animations": [
+        {
+          "time": 0,
+          "duration": 0.99,
+          "easing": "quadratic-out",
+          "type": "fade",
+          "track": 0
+        }
+      ]
+    },
+    {
+      "id": "260eabf9-7e10-4a05-babd-e34623e49216",
+      "name": "music",
+      "type": "audio",
+      "track": 6,
+      "time": 0,
+      "duration": null,
+      "source": "This text is read aloud. Replace it with your own speech text.",
+      "provider": "elevenlabs model_id=eleven_multilingual_v2 voice_id=XrExE9yKIg1WjnnlVkGX",
+      "dynamic": true
+    }
+  ]
 }

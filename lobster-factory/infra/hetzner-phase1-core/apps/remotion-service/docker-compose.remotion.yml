@@ -1,0 +1,65 @@
+# remotion-service — EU 部署單元
+# 依賴同 video-service 的 .env.video（共用 R2/RENDER_AUTH_TOKEN）
+#
+# 部署（EU）：
+#   docker compose -f docker-compose.remotion.yml --env-file .env.video up -d --build
+#
+# 記憶體：Chromium headless ~500MB + Node ~200MB = ~700MB；上限設 1024MB。
+
+x-logging: &remotion-logging
+  driver: json-file
+  options:
+    max-size: "25m"
+    max-file: "5"
+
+services:
+  remotion-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: lobster-remotion-service:local
+    container_name: lobster-remotion-service
+    restart: unless-stopped
+    environment:
+      REMOTION_PORT: "8733"
+      RENDER_AUTH_TOKEN: ${RENDER_AUTH_TOKEN}
+      R2_API_TOKEN: ${R2_API_TOKEN}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
+      R2_VIDEO_BUCKET: ${R2_VIDEO_BUCKET:-lobster-videos}
+      R2_VIDEO_PUBLIC_BASE: ${R2_VIDEO_PUBLIC_BASE}
+      # Allow Chromium to run as root in Docker
+      CHROMIUM_FLAGS: "--no-sandbox --disable-dev-shm-usage"
+    ports:
+      - "127.0.0.1:8733:8733"
+    # tmpfs for Chrome's /dev/shm (prevents OOM during headless rendering)
+    tmpfs:
+      - /dev/shm:size=512m
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://127.0.0.1:8733/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - video-net
+      - lobster-net
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+          cpus: "2.00"
+    logging: *remotion-logging
+
+networks:
+  video-net:
+    name: lobster-video-net
+    external: true
+  lobster-net:
+    external: true
+    name: lobster-net

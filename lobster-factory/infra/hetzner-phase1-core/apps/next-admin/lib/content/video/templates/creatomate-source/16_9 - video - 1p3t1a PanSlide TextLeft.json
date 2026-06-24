@@ -1,188 +1,188 @@
-﻿{
-    "name":  "Triple Slide Landscape",
-    "output_format":  "mp4",
-    "width":  1920,
-    "height":  1080,
-    "duration":  9,
-    "snapshot_time":  1.6,
-    "fill_color":  "rgba(255,255,255,1)",
-    "elements":  [
-                     {
-                         "id":  "ebbcf2b9-496c-4a3c-986f-960892de91fd",
-                         "type":  "image",
-                         "track":  1,
-                         "time":  0,
-                         "source":  "219bfa78-e407-46b5-9cee-d3f85337905e",
-                         "dynamic":  true,
-                         "animations":  [
-                                            {
-                                                "easing":  "linear",
-                                                "type":  "pan",
-                                                "end_x":  "50%",
-                                                "end_y":  "0%",
-                                                "scope":  "element",
-                                                "start_x":  "50%",
-                                                "end_scale":  "100%",
-                                                "start_scale":  "113%"
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "2270374a-a542-429b-b3b1-60d7a1ba66cc",
-                         "name":  "Vignette",
-                         "type":  "shape",
-                         "track":  2,
-                         "width":  "100%",
-                         "height":  "100%",
-                         "x_anchor":  "50%",
-                         "y_anchor":  "50%",
-                         "path":  "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
-                         "fill_color":  [
-                                            {
-                                                "offset":  "0%",
-                                                "color":  "rgba(0,0,0,0)"
-                                            },
-                                            {
-                                                "offset":  "100%",
-                                                "color":  "rgba(0,0,0,0.67)"
-                                            }
-                                        ],
-                         "fill_mode":  "radial",
-                         "fill_y0":  "50%"
-                     },
-                     {
-                         "id":  "1f70e255-00d2-4412-9def-dafb30e95b69",
-                         "name":  "Text-1",
-                         "type":  "text",
-                         "track":  3,
-                         "duration":  4.3321,
-                         "x":  "21.494%",
-                         "width":  "36.7933%",
-                         "height":  "83.6226%",
-                         "y_alignment":  "50%",
-                         "text":  "Your first title or news headline here",
-                         "font_family":  "Alata",
-                         "font_size_minimum":  "7 vmin",
-                         "font_size_maximum":  "10.4 vmin",
-                         "background_color":  "#ffffff",
-                         "background_x_padding":  "23%",
-                         "background_y_padding":  "8%",
-                         "background_border_radius":  "15%",
-                         "background_align_threshold":  "10%",
-                         "fill_color":  "#333333",
-                         "dynamic":  true,
-                         "animations":  [
-                                            {
-                                                "time":  0,
-                                                "duration":  1,
-                                                "easing":  "linear",
-                                                "type":  "text-appear",
-                                                "fade":  false,
-                                                "overlap":  "0%",
-                                                "background_effect":  "animated"
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "7b883b3a-0a0f-4cf6-9736-f2594e562aaa",
-                         "name":  "Text-2",
-                         "type":  "text",
-                         "track":  3,
-                         "time":  3,
-                         "duration":  4.3321,
-                         "x":  "21.494%",
-                         "width":  "36.7933%",
-                         "height":  "83.6226%",
-                         "y_alignment":  "50%",
-                         "text":  "Another title accompanying this picture goes here",
-                         "font_family":  "Alata",
-                         "font_size_minimum":  "7 vmin",
-                         "font_size_maximum":  "10.4 vmin",
-                         "background_color":  "rgba(255,255,255,1)",
-                         "background_x_padding":  "23%",
-                         "background_y_padding":  "8%",
-                         "background_border_radius":  "25%",
-                         "background_align_threshold":  "10%",
-                         "fill_color":  "#333333",
-                         "dynamic":  true,
-                         "animations":  [
-                                            {
-                                                "time":  0,
-                                                "duration":  1,
-                                                "easing":  "linear",
-                                                "type":  "text-appear",
-                                                "fade":  false,
-                                                "track":  0,
-                                                "overlap":  "0%",
-                                                "property":  "animations",
-                                                "background_effect":  "animated"
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "5de3e353-b6da-401f-b78c-79fa807ace7c",
-                         "name":  "Text-3",
-                         "type":  "text",
-                         "track":  3,
-                         "time":  6,
-                         "x":  "21.494%",
-                         "width":  "36.7933%",
-                         "height":  "83.6226%",
-                         "y_alignment":  "50%",
-                         "text":  "This is the text for the third and last picture",
-                         "font_family":  "Alata",
-                         "font_size_minimum":  "7 vmin",
-                         "font_size_maximum":  "10.4 vmin",
-                         "background_color":  "rgba(255,255,255,1)",
-                         "background_x_padding":  "23%",
-                         "background_y_padding":  "8%",
-                         "background_border_radius":  "25%",
-                         "background_align_threshold":  "10%",
-                         "fill_color":  "#333333",
-                         "dynamic":  true,
-                         "animations":  [
-                                            {
-                                                "time":  0,
-                                                "duration":  1,
-                                                "easing":  "linear",
-                                                "type":  "text-appear",
-                                                "fade":  false,
-                                                "overlap":  "0%",
-                                                "background_effect":  "animated"
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "50656aca-d9d7-4e09-9235-889264640ee0",
-                         "name":  "logo",
-                         "type":  "image",
-                         "track":  5,
-                         "time":  0,
-                         "x":  "93.6091%",
-                         "y":  "10.2473%",
-                         "width":  "9.4354%",
-                         "height":  "15.636%",
-                         "aspect_ratio":  1,
-                         "source":  "ec9eddf4-243b-4760-b197-c0442bb29d05",
-                         "border_radius":  "100 vmin",
-                         "animations":  [
-                                            {
-                                                "time":  0,
-                                                "duration":  0.99,
-                                                "easing":  "quadratic-out",
-                                                "type":  "fade",
-                                                "track":  0
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "f0b15319-0537-4092-87ed-ccc6aafd8fcb",
-                         "name":  "music",
-                         "type":  "audio",
-                         "track":  6,
-                         "time":  0,
-                         "duration":  null,
-                         "dynamic":  true
-                     }
-                 ]
+{
+  "name": "Triple Slide Landscape",
+  "output_format": "mp4",
+  "width": 1920,
+  "height": 1080,
+  "duration": 9,
+  "snapshot_time": 1.6,
+  "fill_color": "rgba(255,255,255,1)",
+  "elements": [
+    {
+      "id": "ebbcf2b9-496c-4a3c-986f-960892de91fd",
+      "type": "image",
+      "track": 1,
+      "time": 0,
+      "source": "219bfa78-e407-46b5-9cee-d3f85337905e",
+      "dynamic": true,
+      "animations": [
+        {
+          "easing": "linear",
+          "type": "pan",
+          "end_x": "50%",
+          "end_y": "0%",
+          "scope": "element",
+          "start_x": "50%",
+          "end_scale": "100%",
+          "start_scale": "113%"
+        }
+      ]
+    },
+    {
+      "id": "2270374a-a542-429b-b3b1-60d7a1ba66cc",
+      "name": "Vignette",
+      "type": "shape",
+      "track": 2,
+      "width": "100%",
+      "height": "100%",
+      "x_anchor": "50%",
+      "y_anchor": "50%",
+      "path": "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+      "fill_color": [
+        {
+          "offset": "0%",
+          "color": "rgba(0,0,0,0)"
+        },
+        {
+          "offset": "100%",
+          "color": "rgba(0,0,0,0.67)"
+        }
+      ],
+      "fill_mode": "radial",
+      "fill_y0": "50%"
+    },
+    {
+      "id": "1f70e255-00d2-4412-9def-dafb30e95b69",
+      "name": "Text-1",
+      "type": "text",
+      "track": 3,
+      "duration": 4.3321,
+      "x": "21.494%",
+      "width": "36.7933%",
+      "height": "83.6226%",
+      "y_alignment": "50%",
+      "text": "Your first title or news headline here",
+      "font_family": "Alata",
+      "font_size_minimum": "7 vmin",
+      "font_size_maximum": "10.4 vmin",
+      "background_color": "#ffffff",
+      "background_x_padding": "23%",
+      "background_y_padding": "8%",
+      "background_border_radius": "15%",
+      "background_align_threshold": "10%",
+      "fill_color": "#333333",
+      "dynamic": true,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1,
+          "easing": "linear",
+          "type": "text-appear",
+          "fade": false,
+          "overlap": "0%",
+          "background_effect": "animated"
+        }
+      ]
+    },
+    {
+      "id": "7b883b3a-0a0f-4cf6-9736-f2594e562aaa",
+      "name": "Text-2",
+      "type": "text",
+      "track": 3,
+      "time": 3,
+      "duration": 4.3321,
+      "x": "21.494%",
+      "width": "36.7933%",
+      "height": "83.6226%",
+      "y_alignment": "50%",
+      "text": "Another title accompanying this picture goes here",
+      "font_family": "Alata",
+      "font_size_minimum": "7 vmin",
+      "font_size_maximum": "10.4 vmin",
+      "background_color": "rgba(255,255,255,1)",
+      "background_x_padding": "23%",
+      "background_y_padding": "8%",
+      "background_border_radius": "25%",
+      "background_align_threshold": "10%",
+      "fill_color": "#333333",
+      "dynamic": true,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1,
+          "easing": "linear",
+          "type": "text-appear",
+          "fade": false,
+          "track": 0,
+          "overlap": "0%",
+          "property": "animations",
+          "background_effect": "animated"
+        }
+      ]
+    },
+    {
+      "id": "5de3e353-b6da-401f-b78c-79fa807ace7c",
+      "name": "Text-3",
+      "type": "text",
+      "track": 3,
+      "time": 6,
+      "x": "21.494%",
+      "width": "36.7933%",
+      "height": "83.6226%",
+      "y_alignment": "50%",
+      "text": "This is the text for the third and last picture",
+      "font_family": "Alata",
+      "font_size_minimum": "7 vmin",
+      "font_size_maximum": "10.4 vmin",
+      "background_color": "rgba(255,255,255,1)",
+      "background_x_padding": "23%",
+      "background_y_padding": "8%",
+      "background_border_radius": "25%",
+      "background_align_threshold": "10%",
+      "fill_color": "#333333",
+      "dynamic": true,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1,
+          "easing": "linear",
+          "type": "text-appear",
+          "fade": false,
+          "overlap": "0%",
+          "background_effect": "animated"
+        }
+      ]
+    },
+    {
+      "id": "50656aca-d9d7-4e09-9235-889264640ee0",
+      "name": "logo",
+      "type": "image",
+      "track": 5,
+      "time": 0,
+      "x": "93.6091%",
+      "y": "10.2473%",
+      "width": "9.4354%",
+      "height": "15.636%",
+      "aspect_ratio": 1,
+      "source": "ec9eddf4-243b-4760-b197-c0442bb29d05",
+      "border_radius": "100 vmin",
+      "animations": [
+        {
+          "time": 0,
+          "duration": 0.99,
+          "easing": "quadratic-out",
+          "type": "fade",
+          "track": 0
+        }
+      ]
+    },
+    {
+      "id": "f0b15319-0537-4092-87ed-ccc6aafd8fcb",
+      "name": "music",
+      "type": "audio",
+      "track": 6,
+      "time": 0,
+      "duration": null,
+      "dynamic": true
+    }
+  ]
 }

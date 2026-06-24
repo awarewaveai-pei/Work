@@ -1,321 +1,321 @@
-﻿{
-    "output_format":  "mp4",
-    "width":  1920,
-    "height":  1080,
-    "duration":  9,
-    "snapshot_time":  3.67,
-    "elements":  [
-                     {
-                         "id":  "0dac167e-ca39-414b-8d88-1b08c8489bd6",
-                         "type":  "image",
-                         "track":  1,
-                         "time":  0,
-                         "source":  "8badec34-15c3-4da1-9fa4-bdb00a2edba3",
-                         "color_overlay":  [
-                                               {
-                                                   "time":  0,
-                                                   "easing":  "quadratic-out",
-                                                   "value":  "rgba(0,0,0,0)"
-                                               },
-                                               {
-                                                   "time":  1.03,
-                                                   "easing":  "quadratic-out",
-                                                   "value":  "rgba(0,0,0,0.33)"
-                                               }
-                                           ],
-                         "dynamic":  true,
-                         "animations":  [
-                                            {
-                                                "easing":  "quadratic-out",
-                                                "type":  "scale",
-                                                "fade":  false,
-                                                "end_scale":  "120%",
-                                                "start_scale":  "100%"
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "de2f5dfd-51f9-4aec-ab1b-4fdf91e5b628",
-                         "name":  "Brand",
-                         "type":  "composition",
-                         "track":  3,
-                         "time":  0.49,
-                         "x":  "44.799%",
-                         "y":  [
-                                   {
-                                       "time":  0.74,
-                                       "value":  "91.4965%"
-                                   },
-                                   {
-                                       "time":  4.78,
-                                       "value":  "84.2086%"
-                                   },
-                                   {
-                                       "time":  5.85,
-                                       "value":  "50%"
-                                   },
-                                   {
-                                       "time":  7.767,
-                                       "value":  "50%"
-                                   }
-                               ],
-                         "width":  [
-                                       {
-                                           "time":  0.74,
-                                           "value":  "48.7866 vmin"
-                                       },
-                                       {
-                                           "time":  4.78,
-                                           "value":  "40.5714 vmin"
-                                       },
-                                       {
-                                           "time":  5.845,
-                                           "value":  "50 vmin"
-                                       },
-                                       {
-                                           "time":  5.85,
-                                           "value":  "71.571 vmin"
-                                       },
-                                       {
-                                           "time":  5.855,
-                                           "value":  "50 vmin"
-                                       },
-                                       {
-                                           "time":  7.767,
-                                           "value":  "47.3278 vmin"
-                                       }
-                                   ],
-                         "height":  [
-                                        {
-                                            "time":  0.74,
-                                            "value":  "8.1569 vmin"
-                                        },
-                                        {
-                                            "time":  4.78,
-                                            "value":  "11.2488 vmin"
-                                        },
-                                        {
-                                            "time":  5.85,
-                                            "value":  "19.8437 vmin"
-                                        }
-                                    ],
-                         "aspect_ratio":  3.5956,
-                         "elements":  [
-                                          {
-                                              "id":  "c7f28526-aedf-4a2b-820d-ad70797c8a68",
-                                              "name":  "logo",
-                                              "type":  "image",
-                                              "track":  1,
-                                              "time":  0,
-                                              "x":  "8.8885%",
-                                              "y":  "55.5095%",
-                                              "width":  "29.2859%",
-                                              "height":  "111.019%",
-                                              "source":  "e36edca6-0be9-4e90-8605-4392bce13493"
-                                          },
-                                          {
-                                              "id":  "04b054f0-a506-4f8d-89ab-b7e25594cc39",
-                                              "name":  "Name",
-                                              "type":  "text",
-                                              "track":  2,
-                                              "time":  0,
-                                              "x":  "82.7453%",
-                                              "y":  "58.0537%",
-                                              "width":  "106.4365%",
-                                              "height":  "83.8925%",
-                                              "y_alignment":  "50%",
-                                              "text":  "Organic Aromas®",
-                                              "font_weight":  "700",
-                                              "fill_color":  "rgba(255,255,255,1)"
-                                          }
-                                      ]
-                     },
-                     {
-                         "id":  "98f55018-59f8-4a96-9b36-ec6c54a31d78",
-                         "name":  "Discount",
-                         "type":  "text",
-                         "track":  4,
-                         "time":  1.548,
-                         "duration":  4.792,
-                         "x":  "69.371%",
-                         "y":  "62.852%",
-                         "width":  "45.4552%",
-                         "height":  "21.6893%",
-                         "z_rotation":  "-13.7034°",
-                         "x_alignment":  "50%",
-                         "text":  "-30% ",
-                         "font_family":  "Work Sans",
-                         "font_weight":  "700",
-                         "font_size_minimum":  "7 vmin",
-                         "letter_spacing":  "-58%",
-                         "background_color":  "rgba(253,94,94,1)",
-                         "background_x_padding":  "13%",
-                         "background_y_padding":  "6%",
-                         "fill_color":  "rgba(0,0,0,1)",
-                         "dynamic":  true,
-                         "animations":  [
-                                            {
-                                                "time":  0,
-                                                "duration":  4.03,
-                                                "easing":  "sinusoid-out",
-                                                "type":  "text-counter",
-                                                "scope":  "split",
-                                                "split":  "line",
-                                                "direction":  "up"
-                                            },
-                                            {
-                                                "time":  0,
-                                                "duration":  0.3,
-                                                "easing":  "sinusoid-out",
-                                                "type":  "scale",
-                                                "start_scale":  "500%"
-                                            },
-                                            {
-                                                "time":  "end",
-                                                "duration":  1.07,
-                                                "easing":  "quadratic-out",
-                                                "reversed":  true,
-                                                "type":  "slide",
-                                                "track":  0,
-                                                "property":  "animations",
-                                                "direction":  "270°"
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "9db23433-c1cd-4bd9-a79b-7e072a72cd2c",
-                         "name":  "Title",
-                         "type":  "text",
-                         "track":  5,
-                         "time":  0.49,
-                         "duration":  5.85,
-                         "x":  "8.9109%",
-                         "y":  "7.4762%",
-                         "width":  "82.1782%",
-                         "height":  "14.9825%",
-                         "x_anchor":  "0%",
-                         "y_anchor":  "0%",
-                         "x_alignment":  "50%",
-                         "y_alignment":  "100%",
-                         "text":  "Spring Sale",
-                         "font_family":  "Work Sans",
-                         "font_weight":  "700",
-                         "fill_color":  "rgba(255,255,255,1)",
-                         "dynamic":  true,
-                         "animations":  [
-                                            {
-                                                "time":  0,
-                                                "duration":  0.67,
-                                                "easing":  "cubic-out",
-                                                "type":  "fade",
-                                                "track":  0,
-                                                "property":  "animations"
-                                            },
-                                            {
-                                                "time":  "end",
-                                                "duration":  1.07,
-                                                "easing":  "quadratic-out",
-                                                "reversed":  true,
-                                                "type":  "slide",
-                                                "track":  0,
-                                                "property":  "animations",
-                                                "direction":  "270°"
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "7a931cfc-b1ab-435d-af62-db88eb3dd7dc",
-                         "name":  "Caption",
-                         "type":  "text",
-                         "track":  6,
-                         "time":  0.49,
-                         "duration":  5.85,
-                         "x":  "8.9109%",
-                         "y":  "22.4587%",
-                         "width":  "82.1782%",
-                         "height":  "8.0526%",
-                         "x_anchor":  "0%",
-                         "y_anchor":  "0%",
-                         "x_alignment":  "50%",
-                         "text":  "3 days left ",
-                         "font_family":  "Work Sans",
-                         "font_weight":  "500",
-                         "font_size_minimum":  "6 vmin",
-                         "fill_color":  "rgba(255,255,255,1)",
-                         "dynamic":  true,
-                         "animations":  [
-                                            {
-                                                "time":  0,
-                                                "duration":  0.67,
-                                                "easing":  "cubic-out",
-                                                "type":  "text-slide",
-                                                "scope":  "split-clip",
-                                                "split":  "line",
-                                                "direction":  "down"
-                                            },
-                                            {
-                                                "time":  "end",
-                                                "duration":  1.07,
-                                                "easing":  "quadratic-out",
-                                                "reversed":  true,
-                                                "type":  "slide",
-                                                "track":  0,
-                                                "property":  "animations",
-                                                "direction":  "270°"
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "b7f282fe-e8d3-4167-b680-9306feab6a38",
-                         "name":  "music",
-                         "type":  "audio",
-                         "track":  7,
-                         "time":  0,
-                         "duration":  null,
-                         "source":  "This text is read aloud. Replace it with your own speech text.",
-                         "provider":  "elevenlabs model_id=eleven_multilingual_v2 voice_id=XrExE9yKIg1WjnnlVkGX",
-                         "dynamic":  true
-                     },
-                     {
-                         "id":  "26a6283e-7375-461f-a304-ba4da659d824",
-                         "name":  "Title",
-                         "type":  "text",
-                         "track":  8,
-                         "time":  0.49,
-                         "duration":  5.85,
-                         "x":  "8.9109%",
-                         "y":  "40.3826%",
-                         "width":  "82.1782%",
-                         "height":  "14.9825%",
-                         "x_anchor":  "0%",
-                         "y_anchor":  "0%",
-                         "x_alignment":  "50%",
-                         "y_alignment":  "100%",
-                         "text":  "Happy Holiday!",
-                         "font_family":  "Work Sans",
-                         "font_weight":  "700",
-                         "fill_color":  "rgba(255,255,255,1)",
-                         "dynamic":  true,
-                         "animations":  [
-                                            {
-                                                "time":  0,
-                                                "duration":  0.67,
-                                                "easing":  "cubic-out",
-                                                "type":  "fade",
-                                                "track":  0,
-                                                "property":  "animations"
-                                            },
-                                            {
-                                                "time":  "end",
-                                                "duration":  1.07,
-                                                "easing":  "quadratic-out",
-                                                "reversed":  true,
-                                                "type":  "slide",
-                                                "track":  0,
-                                                "property":  "animations",
-                                                "direction":  "270°"
-                                            }
-                                        ]
-                     }
-                 ]
+{
+  "output_format": "mp4",
+  "width": 1920,
+  "height": 1080,
+  "duration": 9,
+  "snapshot_time": 3.67,
+  "elements": [
+    {
+      "id": "0dac167e-ca39-414b-8d88-1b08c8489bd6",
+      "type": "image",
+      "track": 1,
+      "time": 0,
+      "source": "8badec34-15c3-4da1-9fa4-bdb00a2edba3",
+      "color_overlay": [
+        {
+          "time": 0,
+          "easing": "quadratic-out",
+          "value": "rgba(0,0,0,0)"
+        },
+        {
+          "time": 1.03,
+          "easing": "quadratic-out",
+          "value": "rgba(0,0,0,0.33)"
+        }
+      ],
+      "dynamic": true,
+      "animations": [
+        {
+          "easing": "quadratic-out",
+          "type": "scale",
+          "fade": false,
+          "end_scale": "120%",
+          "start_scale": "100%"
+        }
+      ]
+    },
+    {
+      "id": "de2f5dfd-51f9-4aec-ab1b-4fdf91e5b628",
+      "name": "Brand",
+      "type": "composition",
+      "track": 3,
+      "time": 0.49,
+      "x": "44.799%",
+      "y": [
+        {
+          "time": 0.74,
+          "value": "91.4965%"
+        },
+        {
+          "time": 4.78,
+          "value": "84.2086%"
+        },
+        {
+          "time": 5.85,
+          "value": "50%"
+        },
+        {
+          "time": 7.767,
+          "value": "50%"
+        }
+      ],
+      "width": [
+        {
+          "time": 0.74,
+          "value": "48.7866 vmin"
+        },
+        {
+          "time": 4.78,
+          "value": "40.5714 vmin"
+        },
+        {
+          "time": 5.845,
+          "value": "50 vmin"
+        },
+        {
+          "time": 5.85,
+          "value": "71.571 vmin"
+        },
+        {
+          "time": 5.855,
+          "value": "50 vmin"
+        },
+        {
+          "time": 7.767,
+          "value": "47.3278 vmin"
+        }
+      ],
+      "height": [
+        {
+          "time": 0.74,
+          "value": "8.1569 vmin"
+        },
+        {
+          "time": 4.78,
+          "value": "11.2488 vmin"
+        },
+        {
+          "time": 5.85,
+          "value": "19.8437 vmin"
+        }
+      ],
+      "aspect_ratio": 3.5956,
+      "elements": [
+        {
+          "id": "c7f28526-aedf-4a2b-820d-ad70797c8a68",
+          "name": "logo",
+          "type": "image",
+          "track": 1,
+          "time": 0,
+          "x": "8.8885%",
+          "y": "55.5095%",
+          "width": "29.2859%",
+          "height": "111.019%",
+          "source": "e36edca6-0be9-4e90-8605-4392bce13493"
+        },
+        {
+          "id": "04b054f0-a506-4f8d-89ab-b7e25594cc39",
+          "name": "Name",
+          "type": "text",
+          "track": 2,
+          "time": 0,
+          "x": "82.7453%",
+          "y": "58.0537%",
+          "width": "106.4365%",
+          "height": "83.8925%",
+          "y_alignment": "50%",
+          "text": "Organic Aromas®",
+          "font_weight": "700",
+          "fill_color": "rgba(255,255,255,1)"
+        }
+      ]
+    },
+    {
+      "id": "98f55018-59f8-4a96-9b36-ec6c54a31d78",
+      "name": "Discount",
+      "type": "text",
+      "track": 4,
+      "time": 1.548,
+      "duration": 4.792,
+      "x": "69.371%",
+      "y": "62.852%",
+      "width": "45.4552%",
+      "height": "21.6893%",
+      "z_rotation": "-13.7034°",
+      "x_alignment": "50%",
+      "text": "-30% ",
+      "font_family": "Work Sans",
+      "font_weight": "700",
+      "font_size_minimum": "7 vmin",
+      "letter_spacing": "-58%",
+      "background_color": "rgba(253,94,94,1)",
+      "background_x_padding": "13%",
+      "background_y_padding": "6%",
+      "fill_color": "rgba(0,0,0,1)",
+      "dynamic": true,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 4.03,
+          "easing": "sinusoid-out",
+          "type": "text-counter",
+          "scope": "split",
+          "split": "line",
+          "direction": "up"
+        },
+        {
+          "time": 0,
+          "duration": 0.3,
+          "easing": "sinusoid-out",
+          "type": "scale",
+          "start_scale": "500%"
+        },
+        {
+          "time": "end",
+          "duration": 1.07,
+          "easing": "quadratic-out",
+          "reversed": true,
+          "type": "slide",
+          "track": 0,
+          "property": "animations",
+          "direction": "270°"
+        }
+      ]
+    },
+    {
+      "id": "9db23433-c1cd-4bd9-a79b-7e072a72cd2c",
+      "name": "Title",
+      "type": "text",
+      "track": 5,
+      "time": 0.49,
+      "duration": 5.85,
+      "x": "8.9109%",
+      "y": "7.4762%",
+      "width": "82.1782%",
+      "height": "14.9825%",
+      "x_anchor": "0%",
+      "y_anchor": "0%",
+      "x_alignment": "50%",
+      "y_alignment": "100%",
+      "text": "Spring Sale",
+      "font_family": "Work Sans",
+      "font_weight": "700",
+      "fill_color": "rgba(255,255,255,1)",
+      "dynamic": true,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 0.67,
+          "easing": "cubic-out",
+          "type": "fade",
+          "track": 0,
+          "property": "animations"
+        },
+        {
+          "time": "end",
+          "duration": 1.07,
+          "easing": "quadratic-out",
+          "reversed": true,
+          "type": "slide",
+          "track": 0,
+          "property": "animations",
+          "direction": "270°"
+        }
+      ]
+    },
+    {
+      "id": "7a931cfc-b1ab-435d-af62-db88eb3dd7dc",
+      "name": "Caption",
+      "type": "text",
+      "track": 6,
+      "time": 0.49,
+      "duration": 5.85,
+      "x": "8.9109%",
+      "y": "22.4587%",
+      "width": "82.1782%",
+      "height": "8.0526%",
+      "x_anchor": "0%",
+      "y_anchor": "0%",
+      "x_alignment": "50%",
+      "text": "3 days left ",
+      "font_family": "Work Sans",
+      "font_weight": "500",
+      "font_size_minimum": "6 vmin",
+      "fill_color": "rgba(255,255,255,1)",
+      "dynamic": true,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 0.67,
+          "easing": "cubic-out",
+          "type": "text-slide",
+          "scope": "split-clip",
+          "split": "line",
+          "direction": "down"
+        },
+        {
+          "time": "end",
+          "duration": 1.07,
+          "easing": "quadratic-out",
+          "reversed": true,
+          "type": "slide",
+          "track": 0,
+          "property": "animations",
+          "direction": "270°"
+        }
+      ]
+    },
+    {
+      "id": "b7f282fe-e8d3-4167-b680-9306feab6a38",
+      "name": "music",
+      "type": "audio",
+      "track": 7,
+      "time": 0,
+      "duration": null,
+      "source": "This text is read aloud. Replace it with your own speech text.",
+      "provider": "elevenlabs model_id=eleven_multilingual_v2 voice_id=XrExE9yKIg1WjnnlVkGX",
+      "dynamic": true
+    },
+    {
+      "id": "26a6283e-7375-461f-a304-ba4da659d824",
+      "name": "Title",
+      "type": "text",
+      "track": 8,
+      "time": 0.49,
+      "duration": 5.85,
+      "x": "8.9109%",
+      "y": "40.3826%",
+      "width": "82.1782%",
+      "height": "14.9825%",
+      "x_anchor": "0%",
+      "y_anchor": "0%",
+      "x_alignment": "50%",
+      "y_alignment": "100%",
+      "text": "Happy Holiday!",
+      "font_family": "Work Sans",
+      "font_weight": "700",
+      "fill_color": "rgba(255,255,255,1)",
+      "dynamic": true,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 0.67,
+          "easing": "cubic-out",
+          "type": "fade",
+          "track": 0,
+          "property": "animations"
+        },
+        {
+          "time": "end",
+          "duration": 1.07,
+          "easing": "quadratic-out",
+          "reversed": true,
+          "type": "slide",
+          "track": 0,
+          "property": "animations",
+          "direction": "270°"
+        }
+      ]
+    }
+  ]
 }

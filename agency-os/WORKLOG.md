@@ -53,6 +53,48 @@ sudo rm /etc/nginx/sites-enabled/oracle.aware-wave.com && nginx -t && systemctl 
 
 ---
 
+### feat(video): Remotion Phase 0+1 — 57 Creatomate JSON 藍圖 + remotion-service EU Docker
+
+[任務理解] 替換 Creatomate 商業 API，改用自架 Remotion（React→Chrome→ffmpeg）Pipeline。Phase 0：抽取 57 個模板 JSON 作設計藍圖。Phase 1：建 remotion-service，跑通 ScaleBGTextSlideUp 第一個模板。
+
+[已修改]
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/content/video/templates/creatomate-source/` — 新增 57 個 Creatomate JSON（PowerShell 從 .docx 解包）
+- `lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/src/index.ts` — bundle entryPoint，`registerRoot(RemotionRoot)` 必填
+- `lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/src/Root.tsx` — 登錄 ScaleBGTextSlideUp composition + `calculateMetadata`
+- `lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/src/compositions/ScaleBGTextSlideUp.tsx` — Ken Burns zoom + dark overlay fade-in + text spring slide-up
+- `lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/src/server.ts` — Express HTTP server：POST /render, GET /status/:jobId, GET /health；constant-time auth；DoS clamp MAX_FRAMES=3600
+- `lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/Dockerfile` — node:20-slim + chromium + ffmpeg + CJK fonts；Chrome wrapper `/usr/local/bin/chromium-docker`
+- `lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/docker-compose.remotion.yml` — port 127.0.0.1:8733；tmpfs /dev/shm 512m；lobster-video-net + lobster-net
+- `lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/package.json` — remotion@4.0.290, @remotion/bundler, @remotion/renderer, react@18.3.1
+- `lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/tsconfig.server.json` — 只編譯 server.ts（compositions 由 webpack/bundler 處理）
+
+[關鍵修正]（critic Deep review 發現）
+- `registerRoot()` 必須在 bundle entryPoint 呼叫，否則 `selectComposition()` 找不到 composition
+- `R2_VIDEO_PUBLIC_BASE` 漏加到 docker-compose.remotion.yml env block → URL 會缺 host prefix
+- auth 改用 `crypto.timingSafeEqual` + equal-length buffer padding（防 timing attack）
+- temp MP4 移到 `finally` block 清除（原本 error path 不清）
+- 加 startup console.warn 如果 AUTH_TOKEN/R2_API_TOKEN 空白
+
+[驗證結果]
+- REALTEST_WAIVED: NA -- remotion-service needs Docker build on EU VPS（Phase 1 deploy 待做）
+- REVIEW_DONE: critic=Deep | verdict=pass(修正後) | findings=2c/4m/3n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=registerRoot|ScaleBGTextSlideUp|scale-bg-text-slideup|remotion-service | hits=0
+- BUGHUNT_WAIVED: NA -- new service, no downstream callers yet
+
+[剩餘風險]
+- EU VPS Docker build 未跑；Phase 1 deploy 是下一步
+- `npx tsc --noEmit` on server.ts 未跑（compositions 靠 bundler 不靠 tsc）
+- Phase 2: 翻譯剩餘 4 個模板（PanSlideTextLeft3Scenes / CircleMaskTextSlideUpReveal / TextTypewriter / PhotoHighlightsSlidesZoom）
+- Phase 3: render-client.ts 路由 templateId 到 remotion-service
+
+[rollback]
+```bash
+# EU VPS：
+cd /root/Work && docker compose -f lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/docker-compose.remotion.yml down
+```
+
+---
+
 ### refactor(video): VideoStudio UI 一致性 + 時間長度功能 + 全面去 emoji
 
 [任務理解] 生圖模型/視覺風格/配音模型 UI 不一致、無主體色；外層分類按鈕與內層項目視覺相同無區隔；真實影片/照片動畫 缺少 場景總數/自訂AI圖/時間長度 控制項；全頁 emoji 過多。

@@ -1,293 +1,293 @@
-﻿{
-    "output_format":  "mp4",
-    "width":  1920,
-    "height":  1080,
-    "duration":  10.0074,
-    "snapshot_time":  4.78,
-    "elements":  [
-                     {
-                         "id":  "0bf7ce7c-6c26-40ee-b1d6-33ea8d8bbd75",
-                         "name":  "Background",
-                         "type":  "shape",
-                         "track":  1,
-                         "time":  0,
-                         "width":  "100%",
-                         "height":  "100%",
-                         "path":  "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
-                         "fill_color":  "#2eb0a4"
-                     },
-                     {
-                         "id":  "6c6e773c-3eb5-42da-acea-64637dd9729f",
-                         "type":  "composition",
-                         "track":  3,
-                         "time":  0,
-                         "duration":  6.27,
-                         "x":  "81.4854%",
-                         "y":  "75.3125%",
-                         "width":  "122.7741 vmax",
-                         "height":  "122.7741 vmax",
-                         "fill_color":  "#2eb0a4",
-                         "animations":  [
-                                            {
-                                                "time":  "end",
-                                                "duration":  0.78,
-                                                "easing":  "quadratic-out",
-                                                "reversed":  true,
-                                                "type":  "scale",
-                                                "axis":  "both",
-                                                "x_anchor":  "100%",
-                                                "y_anchor":  "100%"
-                                            }
-                                        ],
-                         "elements":  [
-                                          {
-                                              "id":  "b1838067-3723-4f32-a1a1-35b66c5eb4d9",
-                                              "type":  "shape",
-                                              "track":  1,
-                                              "time":  0,
-                                              "width":  "85.938%",
-                                              "height":  "85.938%",
-                                              "path":  "M 50 0 C 77.61 0 100 22.39 100 50 C 100 77.61 77.61 100 50 100 C 22.39 100 0 77.61 0 50 C 0 22.39 22.39 0 50 0 Z",
-                                              "fill_color":  "rgba(0,0,0,0.14)",
-                                              "animations":  [
-                                                                 {
-                                                                     "easing":  "linear",
-                                                                     "type":  "bounce",
-                                                                     "frequency":  "0.25 Hz"
-                                                                 }
-                                                             ]
-                                          },
-                                          {
-                                              "id":  "dec346dd-948d-4400-bfbc-d1c5fdf49c96",
-                                              "type":  "image",
-                                              "track":  2,
-                                              "time":  0,
-                                              "x":  "42.2021%",
-                                              "y":  "44.344%",
-                                              "width":  "47.2443%",
-                                              "height":  "51.5282%",
-                                              "source":  "b5615fec-6e77-4247-b753-ed0f870ec329",
-                                              "dynamic":  true
-                                          },
-                                          {
-                                              "id":  "2e34fcbe-dc84-4a15-91a4-0178b7f33639",
-                                              "type":  "shape",
-                                              "track":  3,
-                                              "time":  0,
-                                              "x":  "50.7846%",
-                                              "y":  "50.7846%",
-                                              "width":  "61.3455%",
-                                              "height":  "61.3455%",
-                                              "path":  "M 50 0 C 77.61 0 100 22.39 100 50 C 100 77.61 77.61 100 50 100 C 22.39 100 0 77.61 0 50 C 0 22.39 22.39 0 50 0 Z",
-                                              "fill_color":  "#333333",
-                                              "mask_mode":  "alpha",
-                                              "animations":  [
-                                                                 {
-                                                                     "time":  0,
-                                                                     "duration":  1.13,
-                                                                     "easing":  "cubic-out",
-                                                                     "type":  "scale",
-                                                                     "x_anchor":  "50%",
-                                                                     "y_anchor":  "50%"
-                                                                 },
-                                                                 {
-                                                                     "easing":  "linear",
-                                                                     "type":  "bounce",
-                                                                     "scale":  "5",
-                                                                     "track":  0,
-                                                                     "property":  "animations",
-                                                                     "frequency":  "0.25 Hz"
-                                                                 }
-                                                             ]
-                                          }
-                                      ]
-                     },
-                     {
-                         "id":  "3c93d45f-113a-43e4-9c5f-74188f177e89",
-                         "type":  "image",
-                         "track":  4,
-                         "time":  0,
-                         "y":  "50.0731%",
-                         "height":  "99.0977%",
-                         "source":  "b5615fec-6e77-4247-b753-ed0f870ec329",
-                         "color_overlay":  "rgba(0,0,0,0.1)",
-                         "dynamic":  true,
-                         "animations":  [
-                                            {
-                                                "time":  6.077,
-                                                "duration":  1,
-                                                "transition":  true,
-                                                "type":  "fade"
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "84bbc0e9-0290-4bf8-804e-2f7f872135c1",
-                         "type":  "composition",
-                         "track":  5,
-                         "time":  0,
-                         "x":  "6.194%",
-                         "y":  "6.58%",
-                         "width":  "70%",
-                         "height":  "80%",
-                         "x_anchor":  "0%",
-                         "y_anchor":  "0%",
-                         "x_scale":  [
-                                         {
-                                             "time":  5.49,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  6.27,
-                                             "value":  "75%"
-                                         }
-                                     ],
-                         "y_scale":  [
-                                         {
-                                             "time":  5.49,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  6.27,
-                                             "value":  "75%"
-                                         }
-                                     ],
-                         "elements":  [
-                                          {
-                                              "id":  "21b09b54-da91-4de6-9b09-c7c138e530f6",
-                                              "name":  "Brand name",
-                                              "type":  "text",
-                                              "track":  1,
-                                              "time":  0,
-                                              "x":  "0%",
-                                              "y":  "4.7744%",
-                                              "width":  "55.0223%",
-                                              "height":  "8.2464%",
-                                              "x_anchor":  "0%",
-                                              "y_anchor":  "0%",
-                                              "text":  "ORGANIC AROMAS®",
-                                              "font_family":  "Archivo Black",
-                                              "font_size_minimum":  "5.5 vmin",
-                                              "font_size_maximum":  "5.5 vmin",
-                                              "fill_color":  "#ffffff"
-                                          },
-                                          {
-                                              "id":  "d74fe992-2ad5-49d0-a911-fc3211959c07",
-                                              "name":  "Shape-64S",
-                                              "type":  "shape",
-                                              "track":  2,
-                                              "time":  5.243,
-                                              "x":  "48.6049%",
-                                              "y":  "32.5521%",
-                                              "width":  "97.2098%",
-                                              "height":  "33.8542%",
-                                              "x_anchor":  "50%",
-                                              "y_anchor":  "50%",
-                                              "path":  "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
-                                              "fill_color":  "#2eb0a4",
-                                              "animations":  [
-                                                                 {
-                                                                     "time":  0,
-                                                                     "duration":  1,
-                                                                     "easing":  "quadratic-out",
-                                                                     "type":  "fade"
-                                                                 }
-                                                             ]
-                                          },
-                                          {
-                                              "id":  "2b00c456-3aa5-435b-a07e-f8864a1d1bdc",
-                                              "type":  "text",
-                                              "track":  3,
-                                              "time":  0,
-                                              "x":  "1.4373%",
-                                              "y":  "17.9894%",
-                                              "width":  "92.9706%",
-                                              "height":  "28.8451%",
-                                              "x_anchor":  "0%",
-                                              "y_anchor":  "0%",
-                                              "text":  "Getting Started with SEO and Marketing Analytics ",
-                                              "font_family":  "Lato",
-                                              "font_weight":  "700",
-                                              "fill_color":  "rgba(255,255,255,1)",
-                                              "dynamic":  true,
-                                              "animations":  [
-                                                                 {
-                                                                     "time":  0,
-                                                                     "duration":  1,
-                                                                     "easing":  "quadratic-out",
-                                                                     "type":  "text-slide",
-                                                                     "scope":  "split-clip",
-                                                                     "split":  "line",
-                                                                     "direction":  "right"
-                                                                 }
-                                                             ]
-                                          },
-                                          {
-                                              "id":  "596857a3-acb4-4cb1-b7bd-588bb7719cc3",
-                                              "name":  "Text-below",
-                                              "type":  "text",
-                                              "track":  4,
-                                              "time":  0.68,
-                                              "x":  "0%",
-                                              "y":  "54.1204%",
-                                              "width":  "31.4507%",
-                                              "height":  "13.1372%",
-                                              "x_anchor":  "0%",
-                                              "y_anchor":  "0%",
-                                              "y_alignment":  "50%",
-                                              "text":  "PURE AND SIMPLE",
-                                              "font_family":  "Lato",
-                                              "font_weight":  "700",
-                                              "background_color":  "#ff96a0",
-                                              "fill_color":  "#ffffff",
-                                              "animations":  [
-                                                                 {
-                                                                     "time":  0,
-                                                                     "duration":  1,
-                                                                     "easing":  "quadratic-out",
-                                                                     "type":  "text-slide",
-                                                                     "scope":  "split-clip",
-                                                                     "split":  "line",
-                                                                     "direction":  "right"
-                                                                 }
-                                                             ]
-                                          }
-                                      ]
-                     },
-                     {
-                         "id":  "93334314-3f97-4e33-95ce-5000d187533a",
-                         "type":  "shape",
-                         "track":  6,
-                         "time":  6.059,
-                         "duration":  1.14,
-                         "y":  "58.1751%",
-                         "width":  "157.7649%",
-                         "height":  "157.7649%",
-                         "aspect_ratio":  1,
-                         "path":  "M 50 0 C 77.61 0 100 22.39 100 50 C 100 77.61 77.61 100 50 100 C 22.39 100 0 77.61 0 50 C 0 22.39 22.39 0 50 0 Z",
-                         "fill_color":  "rgba(0,0,0,0.4)",
-                         "animations":  [
-                                            {
-                                                "time":  "end",
-                                                "duration":  1,
-                                                "easing":  "cubic-in",
-                                                "reversed":  true,
-                                                "type":  "scale",
-                                                "x_anchor":  "50%",
-                                                "y_anchor":  "50%",
-                                                "end_scale":  "0",
-                                                "start_scale":  "100%"
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "01d466b6-a93e-4f34-ae33-c134c07f15b7",
-                         "name":  "music",
-                         "type":  "audio",
-                         "track":  7,
-                         "time":  0,
-                         "duration":  null,
-                         "dynamic":  true
-                     }
-                 ]
+{
+  "output_format": "mp4",
+  "width": 1920,
+  "height": 1080,
+  "duration": 10.0074,
+  "snapshot_time": 4.78,
+  "elements": [
+    {
+      "id": "0bf7ce7c-6c26-40ee-b1d6-33ea8d8bbd75",
+      "name": "Background",
+      "type": "shape",
+      "track": 1,
+      "time": 0,
+      "width": "100%",
+      "height": "100%",
+      "path": "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+      "fill_color": "#2eb0a4"
+    },
+    {
+      "id": "6c6e773c-3eb5-42da-acea-64637dd9729f",
+      "type": "composition",
+      "track": 3,
+      "time": 0,
+      "duration": 6.27,
+      "x": "81.4854%",
+      "y": "75.3125%",
+      "width": "122.7741 vmax",
+      "height": "122.7741 vmax",
+      "fill_color": "#2eb0a4",
+      "animations": [
+        {
+          "time": "end",
+          "duration": 0.78,
+          "easing": "quadratic-out",
+          "reversed": true,
+          "type": "scale",
+          "axis": "both",
+          "x_anchor": "100%",
+          "y_anchor": "100%"
+        }
+      ],
+      "elements": [
+        {
+          "id": "b1838067-3723-4f32-a1a1-35b66c5eb4d9",
+          "type": "shape",
+          "track": 1,
+          "time": 0,
+          "width": "85.938%",
+          "height": "85.938%",
+          "path": "M 50 0 C 77.61 0 100 22.39 100 50 C 100 77.61 77.61 100 50 100 C 22.39 100 0 77.61 0 50 C 0 22.39 22.39 0 50 0 Z",
+          "fill_color": "rgba(0,0,0,0.14)",
+          "animations": [
+            {
+              "easing": "linear",
+              "type": "bounce",
+              "frequency": "0.25 Hz"
+            }
+          ]
+        },
+        {
+          "id": "dec346dd-948d-4400-bfbc-d1c5fdf49c96",
+          "type": "image",
+          "track": 2,
+          "time": 0,
+          "x": "42.2021%",
+          "y": "44.344%",
+          "width": "47.2443%",
+          "height": "51.5282%",
+          "source": "b5615fec-6e77-4247-b753-ed0f870ec329",
+          "dynamic": true
+        },
+        {
+          "id": "2e34fcbe-dc84-4a15-91a4-0178b7f33639",
+          "type": "shape",
+          "track": 3,
+          "time": 0,
+          "x": "50.7846%",
+          "y": "50.7846%",
+          "width": "61.3455%",
+          "height": "61.3455%",
+          "path": "M 50 0 C 77.61 0 100 22.39 100 50 C 100 77.61 77.61 100 50 100 C 22.39 100 0 77.61 0 50 C 0 22.39 22.39 0 50 0 Z",
+          "fill_color": "#333333",
+          "mask_mode": "alpha",
+          "animations": [
+            {
+              "time": 0,
+              "duration": 1.13,
+              "easing": "cubic-out",
+              "type": "scale",
+              "x_anchor": "50%",
+              "y_anchor": "50%"
+            },
+            {
+              "easing": "linear",
+              "type": "bounce",
+              "scale": "5",
+              "track": 0,
+              "property": "animations",
+              "frequency": "0.25 Hz"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3c93d45f-113a-43e4-9c5f-74188f177e89",
+      "type": "image",
+      "track": 4,
+      "time": 0,
+      "y": "50.0731%",
+      "height": "99.0977%",
+      "source": "b5615fec-6e77-4247-b753-ed0f870ec329",
+      "color_overlay": "rgba(0,0,0,0.1)",
+      "dynamic": true,
+      "animations": [
+        {
+          "time": 6.077,
+          "duration": 1,
+          "transition": true,
+          "type": "fade"
+        }
+      ]
+    },
+    {
+      "id": "84bbc0e9-0290-4bf8-804e-2f7f872135c1",
+      "type": "composition",
+      "track": 5,
+      "time": 0,
+      "x": "6.194%",
+      "y": "6.58%",
+      "width": "70%",
+      "height": "80%",
+      "x_anchor": "0%",
+      "y_anchor": "0%",
+      "x_scale": [
+        {
+          "time": 5.49,
+          "value": "100%"
+        },
+        {
+          "time": 6.27,
+          "value": "75%"
+        }
+      ],
+      "y_scale": [
+        {
+          "time": 5.49,
+          "value": "100%"
+        },
+        {
+          "time": 6.27,
+          "value": "75%"
+        }
+      ],
+      "elements": [
+        {
+          "id": "21b09b54-da91-4de6-9b09-c7c138e530f6",
+          "name": "Brand name",
+          "type": "text",
+          "track": 1,
+          "time": 0,
+          "x": "0%",
+          "y": "4.7744%",
+          "width": "55.0223%",
+          "height": "8.2464%",
+          "x_anchor": "0%",
+          "y_anchor": "0%",
+          "text": "ORGANIC AROMAS®",
+          "font_family": "Archivo Black",
+          "font_size_minimum": "5.5 vmin",
+          "font_size_maximum": "5.5 vmin",
+          "fill_color": "#ffffff"
+        },
+        {
+          "id": "d74fe992-2ad5-49d0-a911-fc3211959c07",
+          "name": "Shape-64S",
+          "type": "shape",
+          "track": 2,
+          "time": 5.243,
+          "x": "48.6049%",
+          "y": "32.5521%",
+          "width": "97.2098%",
+          "height": "33.8542%",
+          "x_anchor": "50%",
+          "y_anchor": "50%",
+          "path": "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+          "fill_color": "#2eb0a4",
+          "animations": [
+            {
+              "time": 0,
+              "duration": 1,
+              "easing": "quadratic-out",
+              "type": "fade"
+            }
+          ]
+        },
+        {
+          "id": "2b00c456-3aa5-435b-a07e-f8864a1d1bdc",
+          "type": "text",
+          "track": 3,
+          "time": 0,
+          "x": "1.4373%",
+          "y": "17.9894%",
+          "width": "92.9706%",
+          "height": "28.8451%",
+          "x_anchor": "0%",
+          "y_anchor": "0%",
+          "text": "Getting Started with SEO and Marketing Analytics ",
+          "font_family": "Lato",
+          "font_weight": "700",
+          "fill_color": "rgba(255,255,255,1)",
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 0,
+              "duration": 1,
+              "easing": "quadratic-out",
+              "type": "text-slide",
+              "scope": "split-clip",
+              "split": "line",
+              "direction": "right"
+            }
+          ]
+        },
+        {
+          "id": "596857a3-acb4-4cb1-b7bd-588bb7719cc3",
+          "name": "Text-below",
+          "type": "text",
+          "track": 4,
+          "time": 0.68,
+          "x": "0%",
+          "y": "54.1204%",
+          "width": "31.4507%",
+          "height": "13.1372%",
+          "x_anchor": "0%",
+          "y_anchor": "0%",
+          "y_alignment": "50%",
+          "text": "PURE AND SIMPLE",
+          "font_family": "Lato",
+          "font_weight": "700",
+          "background_color": "#ff96a0",
+          "fill_color": "#ffffff",
+          "animations": [
+            {
+              "time": 0,
+              "duration": 1,
+              "easing": "quadratic-out",
+              "type": "text-slide",
+              "scope": "split-clip",
+              "split": "line",
+              "direction": "right"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "93334314-3f97-4e33-95ce-5000d187533a",
+      "type": "shape",
+      "track": 6,
+      "time": 6.059,
+      "duration": 1.14,
+      "y": "58.1751%",
+      "width": "157.7649%",
+      "height": "157.7649%",
+      "aspect_ratio": 1,
+      "path": "M 50 0 C 77.61 0 100 22.39 100 50 C 100 77.61 77.61 100 50 100 C 22.39 100 0 77.61 0 50 C 0 22.39 22.39 0 50 0 Z",
+      "fill_color": "rgba(0,0,0,0.4)",
+      "animations": [
+        {
+          "time": "end",
+          "duration": 1,
+          "easing": "cubic-in",
+          "reversed": true,
+          "type": "scale",
+          "x_anchor": "50%",
+          "y_anchor": "50%",
+          "end_scale": "0",
+          "start_scale": "100%"
+        }
+      ]
+    },
+    {
+      "id": "01d466b6-a93e-4f34-ae33-c134c07f15b7",
+      "name": "music",
+      "type": "audio",
+      "track": 7,
+      "time": 0,
+      "duration": null,
+      "dynamic": true
+    }
+  ]
 }

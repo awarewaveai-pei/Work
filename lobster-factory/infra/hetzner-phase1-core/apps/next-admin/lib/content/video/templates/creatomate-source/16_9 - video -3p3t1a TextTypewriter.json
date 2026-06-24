@@ -1,324 +1,324 @@
-﻿{
-    "output_format":  "mp4",
-    "width":  1920,
-    "height":  1080,
-    "duration":  20.012,
-    "snapshot_time":  6.22,
-    "elements":  [
-                     {
-                         "id":  "3a994049-9d90-435a-bb43-51d7264c0eeb",
-                         "name":  "Image1",
-                         "type":  "image",
-                         "track":  1,
-                         "time":  0,
-                         "source":  "92231325-553c-4f9b-886c-6e98f3f27534",
-                         "clip":  true,
-                         "color_overlay":  "rgba(0,0,0,0)",
-                         "dynamic":  true,
-                         "animations":  [
-                                            {
-                                                "time":  0,
-                                                "duration":  7.165,
-                                                "easing":  "linear",
-                                                "type":  "scale",
-                                                "fade":  false,
-                                                "end_scale":  "160%",
-                                                "start_scale":  "100%"
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "cdcb424e-9cc5-43cb-af56-06fda1ec2c07",
-                         "name":  "Composition3",
-                         "type":  "composition",
-                         "track":  2,
-                         "time":  12.337,
-                         "duration":  7.675,
-                         "width":  "79.2988%",
-                         "height":  [
-                                        {
-                                            "time":  0,
-                                            "value":  "0%"
-                                        },
-                                        {
-                                            "time":  1,
-                                            "value":  "79.2988%"
-                                        }
-                                    ],
-                         "elements":  [
-                                          {
-                                              "id":  "54ae220e-34bf-4cd3-b84e-f32f7c850360",
-                                              "name":  "Image3",
-                                              "type":  "image",
-                                              "track":  1,
-                                              "time":  0,
-                                              "source":  "5ab75993-f75b-4c51-8d3d-8fc2380474c0",
-                                              "clip":  true,
-                                              "dynamic":  true,
-                                              "animations":  [
-                                                                 {
-                                                                     "time":  0,
-                                                                     "duration":  3.854,
-                                                                     "easing":  "linear",
-                                                                     "type":  "scale",
-                                                                     "fade":  false,
-                                                                     "scope":  "element",
-                                                                     "start_scale":  "130%"
-                                                                 }
-                                                             ]
-                                          },
-                                          {
-                                              "id":  "1b146585-d8c8-4e00-8649-4600609fb653",
-                                              "name":  "White-Fill",
-                                              "type":  "shape",
-                                              "track":  2,
-                                              "time":  0,
-                                              "width":  "100%",
-                                              "height":  "100%",
-                                              "x_anchor":  "50%",
-                                              "y_anchor":  "50%",
-                                              "path":  "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
-                                              "fill_color":  "rgba(0,0,0,0.32)",
-                                              "animations":  [
-                                                                 {
-                                                                     "time":  1.509,
-                                                                     "duration":  1,
-                                                                     "easing":  "quadratic-out",
-                                                                     "type":  "fade"
-                                                                 }
-                                                             ]
-                                          },
-                                          {
-                                              "id":  "525f3d97-a99a-484e-8998-3278a79ce614",
-                                              "name":  "Text3",
-                                              "type":  "text",
-                                              "track":  4,
-                                              "time":  1.5,
-                                              "width":  "89.974%",
-                                              "height":  "93.5951%",
-                                              "x_alignment":  "50%",
-                                              "y_alignment":  "50%",
-                                              "text":  "YOUR TEXT HERE YOUR TEXT HERE YOUR TEXT YOUR TEXT HERE YOUR TEXT HERE YOUR TEXT YOUR TEXT HERE YOUR TEXT HERE YOUR TEXT YOUR TEXT HERE YOUR TEXT HERE YOUR TEXT YOUR TEXT HERE YOUR TEXT HERE YOUR TEXT ",
-                                              "font_family":  "DejaVu Sans",
-                                              "font_weight":  "700",
-                                              "font_size_minimum":  "4 vmin",
-                                              "font_size_maximum":  "8 vmin",
-                                              "text_clip":  true,
-                                              "fill_color":  "#ffffff",
-                                              "stroke_color":  "#333333",
-                                              "dynamic":  true,
-                                              "animations":  [
-                                                                 {
-                                                                     "easing":  "quadratic-out",
-                                                                     "type":  "text-typewriter",
-                                                                     "typing_start":  "0 s",
-                                                                     "typing_duration":  "4 s"
-                                                                 }
-                                                             ]
-                                          }
-                                      ]
-                     },
-                     {
-                         "id":  "5aae1fc1-099b-4b4f-be6e-8bd911a74668",
-                         "name":  "Composition2",
-                         "type":  "composition",
-                         "track":  3,
-                         "time":  5.447,
-                         "duration":  7.174,
-                         "width":  "79.2988%",
-                         "height":  [
-                                        {
-                                            "time":  0,
-                                            "value":  "0%"
-                                        },
-                                        {
-                                            "time":  1,
-                                            "value":  "79.2988%"
-                                        }
-                                    ],
-                         "animations":  [
-                                            {
-                                                "time":  "end",
-                                                "duration":  1,
-                                                "easing":  "quadratic-out",
-                                                "reversed":  true,
-                                                "type":  "fade"
-                                            }
-                                        ],
-                         "elements":  [
-                                          {
-                                              "id":  "6e5d843f-7328-4f30-9eeb-de0a328651f6",
-                                              "name":  "White-Fill",
-                                              "type":  "shape",
-                                              "track":  1,
-                                              "time":  0,
-                                              "y":  "82.6503%",
-                                              "width":  "100%",
-                                              "height":  "34.6994%",
-                                              "x_anchor":  "50%",
-                                              "y_anchor":  "50%",
-                                              "path":  "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
-                                              "fill_color":  "rgba(255,255,255,0.75)"
-                                          },
-                                          {
-                                              "id":  "17279a2c-1059-4afb-826d-58a5c01c8499",
-                                              "name":  "Image2",
-                                              "type":  "image",
-                                              "track":  3,
-                                              "time":  0,
-                                              "y":  "32.1166%",
-                                              "height":  "66.3342%",
-                                              "source":  "4e0c0553-df03-49c5-ba53-3c40b93de0e3",
-                                              "clip":  true,
-                                              "dynamic":  true,
-                                              "animations":  [
-                                                                 {
-                                                                     "easing":  "linear",
-                                                                     "type":  "scale",
-                                                                     "fade":  false,
-                                                                     "scope":  "element",
-                                                                     "start_scale":  "130%"
-                                                                 }
-                                                             ]
-                                          },
-                                          {
-                                              "id":  "97a3fba5-18a2-4c5a-ad06-35e3b1079f1c",
-                                              "name":  "Text2",
-                                              "type":  "text",
-                                              "track":  5,
-                                              "time":  1.5,
-                                              "y":  "82.1488%",
-                                              "width":  "89.974%",
-                                              "height":  "29.7687%",
-                                              "x_alignment":  "50%",
-                                              "y_alignment":  "50%",
-                                              "text":  "If you\u0027re looIf you\u0027re looking for a woods is If you\u0027re looking for a woods is If If you\u0027re looIf you\u0027re looking for a woods is If you\u0027re looking for a woods is If ",
-                                              "font_family":  "Alata",
-                                              "font_size_maximum":  "8 vmin",
-                                              "fill_color":  "#333333",
-                                              "dynamic":  true,
-                                              "animations":  [
-                                                                 {
-                                                                     "easing":  "quadratic-out",
-                                                                     "type":  "text-typewriter",
-                                                                     "typing_start":  "0 s",
-                                                                     "typing_duration":  "4 s"
-                                                                 }
-                                                             ]
-                                          }
-                                      ]
-                     },
-                     {
-                         "id":  "841c014f-c25d-44e8-8e70-3e25d9d854e3",
-                         "name":  "Composition1",
-                         "type":  "composition",
-                         "track":  4,
-                         "time":  0,
-                         "duration":  5.642,
-                         "width":  "79.2988%",
-                         "height":  [
-                                        {
-                                            "time":  0,
-                                            "value":  "0%"
-                                        },
-                                        {
-                                            "time":  1,
-                                            "value":  "79.2988%"
-                                        }
-                                    ],
-                         "animations":  [
-                                            {
-                                                "time":  "end",
-                                                "duration":  1,
-                                                "easing":  "quadratic-out",
-                                                "reversed":  true,
-                                                "type":  "fade"
-                                            }
-                                        ],
-                         "elements":  [
-                                          {
-                                              "id":  "2a4f8625-5692-430c-bc2b-231090241784",
-                                              "name":  "White-Fill",
-                                              "type":  "shape",
-                                              "track":  1,
-                                              "time":  0,
-                                              "y":  "82.6503%",
-                                              "width":  "100%",
-                                              "height":  "34.6994%",
-                                              "x_anchor":  "50%",
-                                              "y_anchor":  "50%",
-                                              "path":  "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
-                                              "fill_color":  "rgba(255,255,255,0.75)"
-                                          },
-                                          {
-                                              "id":  "c545f972-5cb6-4d65-9498-d87e3871ec26",
-                                              "name":  "Image1",
-                                              "type":  "image",
-                                              "track":  3,
-                                              "time":  0,
-                                              "y":  "31.7884%",
-                                              "height":  "66.7194%",
-                                              "source":  "99123d78-f899-4aee-942f-a0750da9a05c",
-                                              "clip":  true,
-                                              "dynamic":  true,
-                                              "animations":  [
-                                                                 {
-                                                                     "easing":  "linear",
-                                                                     "type":  "scale",
-                                                                     "fade":  false,
-                                                                     "scope":  "element",
-                                                                     "start_scale":  "130%"
-                                                                 }
-                                                             ]
-                                          },
-                                          {
-                                              "id":  "31daa89f-c204-475e-9977-93fde99b2e3d",
-                                              "name":  "Text1",
-                                              "type":  "text",
-                                              "track":  5,
-                                              "time":  1.5,
-                                              "y":  "83.3625%",
-                                              "width":  "95%",
-                                              "height":  "30.0723%",
-                                              "y_alignment":  "50%",
-                                              "text":  "If you\u0027re looIf you\u0027re looking for a woods is If you\u0027re looking for a woods is If If you\u0027re looIf you\u0027re looking for a woods is If you\u0027re looking for a woods is If ",
-                                              "font_family":  "Alata",
-                                              "font_size_maximum":  "8 vmin",
-                                              "fill_color":  "#333333",
-                                              "dynamic":  true,
-                                              "animations":  [
-                                                                 {
-                                                                     "easing":  "quadratic-out",
-                                                                     "type":  "text-typewriter",
-                                                                     "typing_start":  "0 s",
-                                                                     "typing_duration":  "4 s"
-                                                                 }
-                                                             ]
-                                          }
-                                      ]
-                     },
-                     {
-                         "id":  "dffbfd1c-c51c-4ac6-a114-201f24252e9e",
-                         "name":  "music",
-                         "type":  "audio",
-                         "track":  5,
-                         "time":  0,
-                         "duration":  null,
-                         "width":  "79.2988%",
-                         "height":  "79.2988%",
-                         "dynamic":  true
-                     },
-                     {
-                         "id":  "9af2112a-6d0e-45bc-b792-1548f8b137f5",
-                         "name":  "logo",
-                         "type":  "image",
-                         "track":  6,
-                         "time":  0,
-                         "x":  "89.9926%",
-                         "y":  "14.7764%",
-                         "width":  "13.0207%",
-                         "height":  "21.8992%",
-                         "source":  "e36edca6-0be9-4e90-8605-4392bce13493"
-                     }
-                 ]
+{
+  "output_format": "mp4",
+  "width": 1920,
+  "height": 1080,
+  "duration": 20.012,
+  "snapshot_time": 6.22,
+  "elements": [
+    {
+      "id": "3a994049-9d90-435a-bb43-51d7264c0eeb",
+      "name": "Image1",
+      "type": "image",
+      "track": 1,
+      "time": 0,
+      "source": "92231325-553c-4f9b-886c-6e98f3f27534",
+      "clip": true,
+      "color_overlay": "rgba(0,0,0,0)",
+      "dynamic": true,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 7.165,
+          "easing": "linear",
+          "type": "scale",
+          "fade": false,
+          "end_scale": "160%",
+          "start_scale": "100%"
+        }
+      ]
+    },
+    {
+      "id": "cdcb424e-9cc5-43cb-af56-06fda1ec2c07",
+      "name": "Composition3",
+      "type": "composition",
+      "track": 2,
+      "time": 12.337,
+      "duration": 7.675,
+      "width": "79.2988%",
+      "height": [
+        {
+          "time": 0,
+          "value": "0%"
+        },
+        {
+          "time": 1,
+          "value": "79.2988%"
+        }
+      ],
+      "elements": [
+        {
+          "id": "54ae220e-34bf-4cd3-b84e-f32f7c850360",
+          "name": "Image3",
+          "type": "image",
+          "track": 1,
+          "time": 0,
+          "source": "5ab75993-f75b-4c51-8d3d-8fc2380474c0",
+          "clip": true,
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 0,
+              "duration": 3.854,
+              "easing": "linear",
+              "type": "scale",
+              "fade": false,
+              "scope": "element",
+              "start_scale": "130%"
+            }
+          ]
+        },
+        {
+          "id": "1b146585-d8c8-4e00-8649-4600609fb653",
+          "name": "White-Fill",
+          "type": "shape",
+          "track": 2,
+          "time": 0,
+          "width": "100%",
+          "height": "100%",
+          "x_anchor": "50%",
+          "y_anchor": "50%",
+          "path": "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+          "fill_color": "rgba(0,0,0,0.32)",
+          "animations": [
+            {
+              "time": 1.509,
+              "duration": 1,
+              "easing": "quadratic-out",
+              "type": "fade"
+            }
+          ]
+        },
+        {
+          "id": "525f3d97-a99a-484e-8998-3278a79ce614",
+          "name": "Text3",
+          "type": "text",
+          "track": 4,
+          "time": 1.5,
+          "width": "89.974%",
+          "height": "93.5951%",
+          "x_alignment": "50%",
+          "y_alignment": "50%",
+          "text": "YOUR TEXT HERE YOUR TEXT HERE YOUR TEXT YOUR TEXT HERE YOUR TEXT HERE YOUR TEXT YOUR TEXT HERE YOUR TEXT HERE YOUR TEXT YOUR TEXT HERE YOUR TEXT HERE YOUR TEXT YOUR TEXT HERE YOUR TEXT HERE YOUR TEXT ",
+          "font_family": "DejaVu Sans",
+          "font_weight": "700",
+          "font_size_minimum": "4 vmin",
+          "font_size_maximum": "8 vmin",
+          "text_clip": true,
+          "fill_color": "#ffffff",
+          "stroke_color": "#333333",
+          "dynamic": true,
+          "animations": [
+            {
+              "easing": "quadratic-out",
+              "type": "text-typewriter",
+              "typing_start": "0 s",
+              "typing_duration": "4 s"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5aae1fc1-099b-4b4f-be6e-8bd911a74668",
+      "name": "Composition2",
+      "type": "composition",
+      "track": 3,
+      "time": 5.447,
+      "duration": 7.174,
+      "width": "79.2988%",
+      "height": [
+        {
+          "time": 0,
+          "value": "0%"
+        },
+        {
+          "time": 1,
+          "value": "79.2988%"
+        }
+      ],
+      "animations": [
+        {
+          "time": "end",
+          "duration": 1,
+          "easing": "quadratic-out",
+          "reversed": true,
+          "type": "fade"
+        }
+      ],
+      "elements": [
+        {
+          "id": "6e5d843f-7328-4f30-9eeb-de0a328651f6",
+          "name": "White-Fill",
+          "type": "shape",
+          "track": 1,
+          "time": 0,
+          "y": "82.6503%",
+          "width": "100%",
+          "height": "34.6994%",
+          "x_anchor": "50%",
+          "y_anchor": "50%",
+          "path": "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+          "fill_color": "rgba(255,255,255,0.75)"
+        },
+        {
+          "id": "17279a2c-1059-4afb-826d-58a5c01c8499",
+          "name": "Image2",
+          "type": "image",
+          "track": 3,
+          "time": 0,
+          "y": "32.1166%",
+          "height": "66.3342%",
+          "source": "4e0c0553-df03-49c5-ba53-3c40b93de0e3",
+          "clip": true,
+          "dynamic": true,
+          "animations": [
+            {
+              "easing": "linear",
+              "type": "scale",
+              "fade": false,
+              "scope": "element",
+              "start_scale": "130%"
+            }
+          ]
+        },
+        {
+          "id": "97a3fba5-18a2-4c5a-ad06-35e3b1079f1c",
+          "name": "Text2",
+          "type": "text",
+          "track": 5,
+          "time": 1.5,
+          "y": "82.1488%",
+          "width": "89.974%",
+          "height": "29.7687%",
+          "x_alignment": "50%",
+          "y_alignment": "50%",
+          "text": "If you're looIf you're looking for a woods is If you're looking for a woods is If If you're looIf you're looking for a woods is If you're looking for a woods is If ",
+          "font_family": "Alata",
+          "font_size_maximum": "8 vmin",
+          "fill_color": "#333333",
+          "dynamic": true,
+          "animations": [
+            {
+              "easing": "quadratic-out",
+              "type": "text-typewriter",
+              "typing_start": "0 s",
+              "typing_duration": "4 s"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "841c014f-c25d-44e8-8e70-3e25d9d854e3",
+      "name": "Composition1",
+      "type": "composition",
+      "track": 4,
+      "time": 0,
+      "duration": 5.642,
+      "width": "79.2988%",
+      "height": [
+        {
+          "time": 0,
+          "value": "0%"
+        },
+        {
+          "time": 1,
+          "value": "79.2988%"
+        }
+      ],
+      "animations": [
+        {
+          "time": "end",
+          "duration": 1,
+          "easing": "quadratic-out",
+          "reversed": true,
+          "type": "fade"
+        }
+      ],
+      "elements": [
+        {
+          "id": "2a4f8625-5692-430c-bc2b-231090241784",
+          "name": "White-Fill",
+          "type": "shape",
+          "track": 1,
+          "time": 0,
+          "y": "82.6503%",
+          "width": "100%",
+          "height": "34.6994%",
+          "x_anchor": "50%",
+          "y_anchor": "50%",
+          "path": "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+          "fill_color": "rgba(255,255,255,0.75)"
+        },
+        {
+          "id": "c545f972-5cb6-4d65-9498-d87e3871ec26",
+          "name": "Image1",
+          "type": "image",
+          "track": 3,
+          "time": 0,
+          "y": "31.7884%",
+          "height": "66.7194%",
+          "source": "99123d78-f899-4aee-942f-a0750da9a05c",
+          "clip": true,
+          "dynamic": true,
+          "animations": [
+            {
+              "easing": "linear",
+              "type": "scale",
+              "fade": false,
+              "scope": "element",
+              "start_scale": "130%"
+            }
+          ]
+        },
+        {
+          "id": "31daa89f-c204-475e-9977-93fde99b2e3d",
+          "name": "Text1",
+          "type": "text",
+          "track": 5,
+          "time": 1.5,
+          "y": "83.3625%",
+          "width": "95%",
+          "height": "30.0723%",
+          "y_alignment": "50%",
+          "text": "If you're looIf you're looking for a woods is If you're looking for a woods is If If you're looIf you're looking for a woods is If you're looking for a woods is If ",
+          "font_family": "Alata",
+          "font_size_maximum": "8 vmin",
+          "fill_color": "#333333",
+          "dynamic": true,
+          "animations": [
+            {
+              "easing": "quadratic-out",
+              "type": "text-typewriter",
+              "typing_start": "0 s",
+              "typing_duration": "4 s"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dffbfd1c-c51c-4ac6-a114-201f24252e9e",
+      "name": "music",
+      "type": "audio",
+      "track": 5,
+      "time": 0,
+      "duration": null,
+      "width": "79.2988%",
+      "height": "79.2988%",
+      "dynamic": true
+    },
+    {
+      "id": "9af2112a-6d0e-45bc-b792-1548f8b137f5",
+      "name": "logo",
+      "type": "image",
+      "track": 6,
+      "time": 0,
+      "x": "89.9926%",
+      "y": "14.7764%",
+      "width": "13.0207%",
+      "height": "21.8992%",
+      "source": "e36edca6-0be9-4e90-8605-4392bce13493"
+    }
+  ]
 }

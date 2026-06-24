@@ -1,426 +1,426 @@
-﻿{
-    "output_format":  "mp4",
-    "width":  1080,
-    "height":  1920,
-    "duration":  25,
-    "snapshot_time":  6.22,
-    "elements":  [
-                     {
-                         "id":  "3a994049-9d90-435a-bb43-51d7264c0eeb",
-                         "name":  "Photo-main background",
-                         "type":  "image",
-                         "track":  1,
-                         "time":  0,
-                         "width":  "97%",
-                         "source":  "1b704a73-8d4b-49f8-ba5d-b28c1eb9c795",
-                         "clip":  true,
-                         "color_overlay":  "rgba(0,0,0,0.15)",
-                         "blur_radius":  36,
-                         "dynamic":  true,
-                         "animations":  [
-                                            {
-                                                "time":  0,
-                                                "duration":  0.491,
-                                                "easing":  "linear",
-                                                "type":  "scale",
-                                                "fade":  false,
-                                                "end_scale":  "160%",
-                                                "start_scale":  "100%"
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "1e39174d-339f-4693-a25a-26839585105b",
-                         "name":  "C1-question",
-                         "type":  "composition",
-                         "track":  3,
-                         "time":  0.5,
-                         "animations":  [
-                                            {
-                                                "time":  0,
-                                                "duration":  1,
-                                                "easing":  "quadratic-out",
-                                                "type":  "slide",
-                                                "direction":  "270°"
-                                            }
-                                        ],
-                         "elements":  [
-                                          {
-                                              "id":  "6e5d843f-7328-4f30-9eeb-de0a328651f6",
-                                              "name":  "C1- Buttom Photo",
-                                              "type":  "shape",
-                                              "track":  1,
-                                              "time":  0,
-                                              "y":  "75%",
-                                              "width":  "100%",
-                                              "height":  "50%",
-                                              "x_anchor":  "50%",
-                                              "y_anchor":  "50%",
-                                              "path":  "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
-                                              "fill_color":  "#ffffff"
-                                          },
-                                          {
-                                              "id":  "97a3fba5-18a2-4c5a-ad06-35e3b1079f1c",
-                                              "name":  "C1 - Question-Text",
-                                              "type":  "text",
-                                              "track":  2,
-                                              "time":  2.968,
-                                              "y":  "82%",
-                                              "width":  "90%",
-                                              "height":  "30%",
-                                              "text":  "Which essential oil helps with sleep the most? 🌲❤️",
-                                              "font_family":  "Alata",
-                                              "font_size_maximum":  "5 vmin",
-                                              "fill_color":  "#333333",
-                                              "dynamic":  true,
-                                              "animations":  [
-                                                                 {
-                                                                     "easing":  "quadratic-out",
-                                                                     "type":  "text-typewriter",
-                                                                     "typing_start":  "0 s",
-                                                                     "typing_duration":  "4 s"
-                                                                 }
-                                                             ]
-                                          },
-                                          {
-                                              "id":  "ea85b523-fefd-4246-827a-00b236d0b9d7",
-                                              "name":  "C1-customer profile",
-                                              "type":  "composition",
-                                              "track":  3,
-                                              "time":  1.8583,
-                                              "x":  "5%",
-                                              "y":  "55%",
-                                              "width":  "61.3563 vmin",
-                                              "height":  "9.2718 vmin",
-                                              "x_anchor":  "0%",
-                                              "y_anchor":  "0%",
-                                              "elements":  [
-                                                               {
-                                                                   "id":  "e52b92c5-e96b-49f3-bdd0-cd3909b15dcb",
-                                                                   "name":  "C1-ProfilePicture-customer",
-                                                                   "type":  "image",
-                                                                   "track":  1,
-                                                                   "time":  0,
-                                                                   "x":  "0%",
-                                                                   "y":  "0%",
-                                                                   "width":  "9.5835 vmin",
-                                                                   "height":  "9.2718 vmin",
-                                                                   "aspect_ratio":  1,
-                                                                   "x_anchor":  "0%",
-                                                                   "y_anchor":  "0%",
-                                                                   "source":  "d6628425-8e35-4fee-9de8-a18d21309546",
-                                                                   "border_radius":  "100 vmin",
-                                                                   "dynamic":  true,
-                                                                   "animations":  [
-                                                                                      {
-                                                                                          "time":  0,
-                                                                                          "duration":  0.5,
-                                                                                          "easing":  "quadratic-out",
-                                                                                          "type":  "fade"
-                                                                                      }
-                                                                                  ]
-                                                               },
-                                                               {
-                                                                   "id":  "f4a3604b-91e4-4422-87c0-6c3cd9f27edb",
-                                                                   "name":  "C1-Name-customer",
-                                                                   "type":  "text",
-                                                                   "track":  2,
-                                                                   "time":  0,
-                                                                   "x":  "21.2012%",
-                                                                   "y":  "13.3764%",
-                                                                   "width":  "78.7988%",
-                                                                   "height":  "33.8567%",
-                                                                   "x_anchor":  "0%",
-                                                                   "y_anchor":  "0%",
-                                                                   "y_alignment":  "50%",
-                                                                   "text":  "LISA SMITH",
-                                                                   "font_family":  "Roboto",
-                                                                   "font_weight":  "500",
-                                                                   "fill_color":  "rgba(0,0,0,1)",
-                                                                   "clip":  true,
-                                                                   "dynamic":  true,
-                                                                   "animations":  [
-                                                                                      {
-                                                                                          "time":  0,
-                                                                                          "duration":  1,
-                                                                                          "easing":  "quadratic-out",
-                                                                                          "type":  "text-slide",
-                                                                                          "scope":  "element",
-                                                                                          "split":  "line"
-                                                                                      }
-                                                                                  ]
-                                                               },
-                                                               {
-                                                                   "id":  "0723b627-a41f-40f6-beab-f6cd0d68c529",
-                                                                   "name":  "C1-Date",
-                                                                   "type":  "text",
-                                                                   "track":  3,
-                                                                   "time":  0,
-                                                                   "x":  "21.2012%",
-                                                                   "y":  "52.7667%",
-                                                                   "width":  "78.7988%",
-                                                                   "height":  "33.8567%",
-                                                                   "x_anchor":  "0%",
-                                                                   "y_anchor":  "0%",
-                                                                   "y_alignment":  "50%",
-                                                                   "text":  "Asked on {{Date}}",
-                                                                   "font_family":  "Roboto",
-                                                                   "fill_color":  "#696969",
-                                                                   "clip":  true,
-                                                                   "dynamic":  true,
-                                                                   "animations":  [
-                                                                                      {
-                                                                                          "time":  0,
-                                                                                          "duration":  1,
-                                                                                          "easing":  "quadratic-out",
-                                                                                          "type":  "text-slide",
-                                                                                          "scope":  "element",
-                                                                                          "split":  "line"
-                                                                                      }
-                                                                                  ]
-                                                               }
-                                                           ]
-                                          },
-                                          {
-                                              "id":  "17279a2c-1059-4afb-826d-58a5c01c8499",
-                                              "name":  "C1-Up Photo",
-                                              "type":  "image",
-                                              "track":  4,
-                                              "time":  0,
-                                              "y":  "25%",
-                                              "height":  "50%",
-                                              "source":  "1b704a73-8d4b-49f8-ba5d-b28c1eb9c795",
-                                              "clip":  true,
-                                              "dynamic":  true,
-                                              "animations":  [
-                                                                 {
-                                                                     "time":  1.004,
-                                                                     "duration":  0.803,
-                                                                     "easing":  "linear",
-                                                                     "type":  "scale",
-                                                                     "fade":  false,
-                                                                     "scope":  "element",
-                                                                     "start_scale":  "130%"
-                                                                 }
-                                                             ]
-                                          }
-                                      ]
-                     },
-                     {
-                         "id":  "5aae1fc1-099b-4b4f-be6e-8bd911a74668",
-                         "name":  "C3-answer",
-                         "type":  "composition",
-                         "track":  4,
-                         "time":  9,
-                         "height":  [
-                                        {
-                                            "time":  0,
-                                            "value":  "0%"
-                                        },
-                                        {
-                                            "time":  0.751,
-                                            "value":  "100%"
-                                        }
-                                    ],
-                         "fill_color":  "#2eb0a4",
-                         "elements":  [
-                                          {
-                                              "id":  "02e1659b-9f23-4bee-a150-e7abf0a130a8",
-                                              "name":  "C5-expert answer",
-                                              "type":  "composition",
-                                              "track":  1,
-                                              "time":  0,
-                                              "width":  "95%",
-                                              "height":  [
-                                                             {
-                                                                 "time":  0,
-                                                                 "value":  "0%"
-                                                             },
-                                                             {
-                                                                 "time":  1.44,
-                                                                 "value":  "100%"
-                                                             }
-                                                         ],
-                                              "fill_color":  "#2eb0a4",
-                                              "elements":  [
-                                                               {
-                                                                   "id":  "50350cc8-13f2-4da5-a3ca-52655ee60f60",
-                                                                   "name":  "C5-background",
-                                                                   "type":  "shape",
-                                                                   "track":  1,
-                                                                   "time":  0,
-                                                                   "width":  "95%",
-                                                                   "height":  "85%",
-                                                                   "x_anchor":  "50%",
-                                                                   "y_anchor":  "50%",
-                                                                   "path":  "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
-                                                                   "fill_color":  "#ffffff",
-                                                                   "shadow_color":  "rgba(0,0,0,0.25)",
-                                                                   "shadow_blur":  "13 vmin"
-                                                               },
-                                                               {
-                                                                   "id":  "6584c15c-82aa-4c81-bf13-460eef611ad1",
-                                                                   "name":  "C5-Text-Answer",
-                                                                   "type":  "text",
-                                                                   "track":  2,
-                                                                   "time":  4.012,
-                                                                   "y":  "60%",
-                                                                   "width":  "89.974%",
-                                                                   "height":  "63%",
-                                                                   "text":  "Lavender is the most popular oil for sleep.It relaxes your mind and body so you can fall asleep easier. \n\nOther great options include Roman chamomile, cedarwood, and bergamot — all of them help calm the mind and support better rest. ❤️",
-                                                                   "font_family":  "Alata",
-                                                                   "fill_color":  "#4e4e4e",
-                                                                   "dynamic":  true,
-                                                                   "animations":  [
-                                                                                      {
-                                                                                          "easing":  "quadratic-out",
-                                                                                          "type":  "text-typewriter",
-                                                                                          "typing_start":  "0 s",
-                                                                                          "typing_duration":  "7 s"
-                                                                                      }
-                                                                                  ]
-                                                               }
-                                                           ]
-                                          },
-                                          {
-                                              "id":  "691cbf42-9b87-4681-92f1-e35f0d6138a4",
-                                              "name":  "C4-expert profile",
-                                              "type":  "composition",
-                                              "track":  2,
-                                              "time":  1.44,
-                                              "x":  "6.6261%",
-                                              "y":  "13.0701%",
-                                              "width":  "75.8171 vmin",
-                                              "height":  "14.4189 vmin",
-                                              "x_anchor":  "0%",
-                                              "y_anchor":  "0%",
-                                              "elements":  [
-                                                               {
-                                                                   "id":  "4be47044-1e10-43d4-a07b-65c5d244cbae",
-                                                                   "name":  "C4-background",
-                                                                   "type":  "shape",
-                                                                   "track":  1,
-                                                                   "time":  0,
-                                                                   "y":  "38.1194%",
-                                                                   "width":  "100%",
-                                                                   "height":  "123.7612%",
-                                                                   "x_anchor":  "50%",
-                                                                   "y_anchor":  "50%",
-                                                                   "path":  "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
-                                                                   "fill_color":  "#ffffff"
-                                                               },
-                                                               {
-                                                                   "id":  "017a8ed3-3c1f-4ff5-8373-3a1824f178f2",
-                                                                   "name":  "C4-ProfilePicture-expert",
-                                                                   "type":  "image",
-                                                                   "track":  2,
-                                                                   "time":  0,
-                                                                   "x":  "0%",
-                                                                   "y":  "0%",
-                                                                   "width":  "15.711 vmin",
-                                                                   "height":  "13.1934 vmin",
-                                                                   "aspect_ratio":  1,
-                                                                   "x_anchor":  "0%",
-                                                                   "y_anchor":  "0%",
-                                                                   "source":  "d6628425-8e35-4fee-9de8-a18d21309546",
-                                                                   "border_radius":  "100 vmin",
-                                                                   "dynamic":  true,
-                                                                   "animations":  [
-                                                                                      {
-                                                                                          "time":  0,
-                                                                                          "duration":  0.531,
-                                                                                          "easing":  "quadratic-out",
-                                                                                          "type":  "fade"
-                                                                                      }
-                                                                                  ]
-                                                               },
-                                                               {
-                                                                   "id":  "f8cb5ff7-57b7-4698-8a25-27378169b366",
-                                                                   "name":  "C4-Name- expert",
-                                                                   "type":  "text",
-                                                                   "track":  3,
-                                                                   "time":  0.531,
-                                                                   "x":  "21.2012%",
-                                                                   "y":  "13.3764%",
-                                                                   "width":  "78.7988%",
-                                                                   "height":  "33.8567%",
-                                                                   "x_anchor":  "0%",
-                                                                   "y_anchor":  "0%",
-                                                                   "y_alignment":  "50%",
-                                                                   "text":  "Elisabeth Parker",
-                                                                   "font_family":  "Roboto",
-                                                                   "font_weight":  "500",
-                                                                   "fill_color":  "rgba(0,0,0,1)",
-                                                                   "clip":  true,
-                                                                   "dynamic":  true,
-                                                                   "animations":  [
-                                                                                      {
-                                                                                          "time":  0,
-                                                                                          "duration":  0.468,
-                                                                                          "easing":  "quadratic-out",
-                                                                                          "type":  "text-slide",
-                                                                                          "scope":  "element",
-                                                                                          "split":  "line"
-                                                                                      }
-                                                                                  ]
-                                                               },
-                                                               {
-                                                                   "id":  "fbaf45ab-5960-406e-a50b-91f314c5084d",
-                                                                   "name":  "C4-Date",
-                                                                   "type":  "text",
-                                                                   "track":  4,
-                                                                   "time":  0.531,
-                                                                   "x":  "21.2012%",
-                                                                   "y":  "52.7667%",
-                                                                   "width":  "78.7988%",
-                                                                   "height":  "33.8567%",
-                                                                   "x_anchor":  "0%",
-                                                                   "y_anchor":  "0%",
-                                                                   "y_alignment":  "50%",
-                                                                   "text":  "Replied on {{Date}}",
-                                                                   "font_family":  "Roboto",
-                                                                   "fill_color":  "#696969",
-                                                                   "clip":  true,
-                                                                   "dynamic":  true,
-                                                                   "animations":  [
-                                                                                      {
-                                                                                          "time":  0,
-                                                                                          "duration":  0.468,
-                                                                                          "easing":  "quadratic-out",
-                                                                                          "type":  "text-slide",
-                                                                                          "scope":  "element",
-                                                                                          "split":  "line"
-                                                                                      }
-                                                                                  ]
-                                                               }
-                                                           ]
-                                          }
-                                      ]
-                     },
-                     {
-                         "id":  "9af2112a-6d0e-45bc-b792-1548f8b137f5",
-                         "name":  "logo",
-                         "type":  "image",
-                         "track":  5,
-                         "time":  0,
-                         "x":  "81.159%",
-                         "y":  "9.3128%",
-                         "width":  "20.409%",
-                         "height":  "11.9117%",
-                         "source":  "e36edca6-0be9-4e90-8605-4392bce13493",
-                         "shadow_color":  "rgba(0,0,0,0.25)",
-                         "shadow_blur":  "2.3 vmin"
-                     },
-                     {
-                         "id":  "a61e9719-9176-41c9-a3d9-1c3a9aeebb81",
-                         "name":  "music",
-                         "type":  "audio",
-                         "track":  6,
-                         "time":  0,
-                         "duration":  null,
-                         "source":  "This text is read aloud. Replace it with your own speech text.",
-                         "provider":  "elevenlabs model_id=eleven_multilingual_v2 voice_id=XrExE9yKIg1WjnnlVkGX",
-                         "dynamic":  true
-                     }
-                 ]
+{
+  "output_format": "mp4",
+  "width": 1080,
+  "height": 1920,
+  "duration": 25,
+  "snapshot_time": 6.22,
+  "elements": [
+    {
+      "id": "3a994049-9d90-435a-bb43-51d7264c0eeb",
+      "name": "Photo-main background",
+      "type": "image",
+      "track": 1,
+      "time": 0,
+      "width": "97%",
+      "source": "1b704a73-8d4b-49f8-ba5d-b28c1eb9c795",
+      "clip": true,
+      "color_overlay": "rgba(0,0,0,0.15)",
+      "blur_radius": 36,
+      "dynamic": true,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 0.491,
+          "easing": "linear",
+          "type": "scale",
+          "fade": false,
+          "end_scale": "160%",
+          "start_scale": "100%"
+        }
+      ]
+    },
+    {
+      "id": "1e39174d-339f-4693-a25a-26839585105b",
+      "name": "C1-question",
+      "type": "composition",
+      "track": 3,
+      "time": 0.5,
+      "animations": [
+        {
+          "time": 0,
+          "duration": 1,
+          "easing": "quadratic-out",
+          "type": "slide",
+          "direction": "270°"
+        }
+      ],
+      "elements": [
+        {
+          "id": "6e5d843f-7328-4f30-9eeb-de0a328651f6",
+          "name": "C1- Buttom Photo",
+          "type": "shape",
+          "track": 1,
+          "time": 0,
+          "y": "75%",
+          "width": "100%",
+          "height": "50%",
+          "x_anchor": "50%",
+          "y_anchor": "50%",
+          "path": "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+          "fill_color": "#ffffff"
+        },
+        {
+          "id": "97a3fba5-18a2-4c5a-ad06-35e3b1079f1c",
+          "name": "C1 - Question-Text",
+          "type": "text",
+          "track": 2,
+          "time": 2.968,
+          "y": "82%",
+          "width": "90%",
+          "height": "30%",
+          "text": "Which essential oil helps with sleep the most? 🌲❤️",
+          "font_family": "Alata",
+          "font_size_maximum": "5 vmin",
+          "fill_color": "#333333",
+          "dynamic": true,
+          "animations": [
+            {
+              "easing": "quadratic-out",
+              "type": "text-typewriter",
+              "typing_start": "0 s",
+              "typing_duration": "4 s"
+            }
+          ]
+        },
+        {
+          "id": "ea85b523-fefd-4246-827a-00b236d0b9d7",
+          "name": "C1-customer profile",
+          "type": "composition",
+          "track": 3,
+          "time": 1.8583,
+          "x": "5%",
+          "y": "55%",
+          "width": "61.3563 vmin",
+          "height": "9.2718 vmin",
+          "x_anchor": "0%",
+          "y_anchor": "0%",
+          "elements": [
+            {
+              "id": "e52b92c5-e96b-49f3-bdd0-cd3909b15dcb",
+              "name": "C1-ProfilePicture-customer",
+              "type": "image",
+              "track": 1,
+              "time": 0,
+              "x": "0%",
+              "y": "0%",
+              "width": "9.5835 vmin",
+              "height": "9.2718 vmin",
+              "aspect_ratio": 1,
+              "x_anchor": "0%",
+              "y_anchor": "0%",
+              "source": "d6628425-8e35-4fee-9de8-a18d21309546",
+              "border_radius": "100 vmin",
+              "dynamic": true,
+              "animations": [
+                {
+                  "time": 0,
+                  "duration": 0.5,
+                  "easing": "quadratic-out",
+                  "type": "fade"
+                }
+              ]
+            },
+            {
+              "id": "f4a3604b-91e4-4422-87c0-6c3cd9f27edb",
+              "name": "C1-Name-customer",
+              "type": "text",
+              "track": 2,
+              "time": 0,
+              "x": "21.2012%",
+              "y": "13.3764%",
+              "width": "78.7988%",
+              "height": "33.8567%",
+              "x_anchor": "0%",
+              "y_anchor": "0%",
+              "y_alignment": "50%",
+              "text": "LISA SMITH",
+              "font_family": "Roboto",
+              "font_weight": "500",
+              "fill_color": "rgba(0,0,0,1)",
+              "clip": true,
+              "dynamic": true,
+              "animations": [
+                {
+                  "time": 0,
+                  "duration": 1,
+                  "easing": "quadratic-out",
+                  "type": "text-slide",
+                  "scope": "element",
+                  "split": "line"
+                }
+              ]
+            },
+            {
+              "id": "0723b627-a41f-40f6-beab-f6cd0d68c529",
+              "name": "C1-Date",
+              "type": "text",
+              "track": 3,
+              "time": 0,
+              "x": "21.2012%",
+              "y": "52.7667%",
+              "width": "78.7988%",
+              "height": "33.8567%",
+              "x_anchor": "0%",
+              "y_anchor": "0%",
+              "y_alignment": "50%",
+              "text": "Asked on {{Date}}",
+              "font_family": "Roboto",
+              "fill_color": "#696969",
+              "clip": true,
+              "dynamic": true,
+              "animations": [
+                {
+                  "time": 0,
+                  "duration": 1,
+                  "easing": "quadratic-out",
+                  "type": "text-slide",
+                  "scope": "element",
+                  "split": "line"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "17279a2c-1059-4afb-826d-58a5c01c8499",
+          "name": "C1-Up Photo",
+          "type": "image",
+          "track": 4,
+          "time": 0,
+          "y": "25%",
+          "height": "50%",
+          "source": "1b704a73-8d4b-49f8-ba5d-b28c1eb9c795",
+          "clip": true,
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 1.004,
+              "duration": 0.803,
+              "easing": "linear",
+              "type": "scale",
+              "fade": false,
+              "scope": "element",
+              "start_scale": "130%"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5aae1fc1-099b-4b4f-be6e-8bd911a74668",
+      "name": "C3-answer",
+      "type": "composition",
+      "track": 4,
+      "time": 9,
+      "height": [
+        {
+          "time": 0,
+          "value": "0%"
+        },
+        {
+          "time": 0.751,
+          "value": "100%"
+        }
+      ],
+      "fill_color": "#2eb0a4",
+      "elements": [
+        {
+          "id": "02e1659b-9f23-4bee-a150-e7abf0a130a8",
+          "name": "C5-expert answer",
+          "type": "composition",
+          "track": 1,
+          "time": 0,
+          "width": "95%",
+          "height": [
+            {
+              "time": 0,
+              "value": "0%"
+            },
+            {
+              "time": 1.44,
+              "value": "100%"
+            }
+          ],
+          "fill_color": "#2eb0a4",
+          "elements": [
+            {
+              "id": "50350cc8-13f2-4da5-a3ca-52655ee60f60",
+              "name": "C5-background",
+              "type": "shape",
+              "track": 1,
+              "time": 0,
+              "width": "95%",
+              "height": "85%",
+              "x_anchor": "50%",
+              "y_anchor": "50%",
+              "path": "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+              "fill_color": "#ffffff",
+              "shadow_color": "rgba(0,0,0,0.25)",
+              "shadow_blur": "13 vmin"
+            },
+            {
+              "id": "6584c15c-82aa-4c81-bf13-460eef611ad1",
+              "name": "C5-Text-Answer",
+              "type": "text",
+              "track": 2,
+              "time": 4.012,
+              "y": "60%",
+              "width": "89.974%",
+              "height": "63%",
+              "text": "Lavender is the most popular oil for sleep.It relaxes your mind and body so you can fall asleep easier. \n\nOther great options include Roman chamomile, cedarwood, and bergamot — all of them help calm the mind and support better rest. ❤️",
+              "font_family": "Alata",
+              "fill_color": "#4e4e4e",
+              "dynamic": true,
+              "animations": [
+                {
+                  "easing": "quadratic-out",
+                  "type": "text-typewriter",
+                  "typing_start": "0 s",
+                  "typing_duration": "7 s"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "691cbf42-9b87-4681-92f1-e35f0d6138a4",
+          "name": "C4-expert profile",
+          "type": "composition",
+          "track": 2,
+          "time": 1.44,
+          "x": "6.6261%",
+          "y": "13.0701%",
+          "width": "75.8171 vmin",
+          "height": "14.4189 vmin",
+          "x_anchor": "0%",
+          "y_anchor": "0%",
+          "elements": [
+            {
+              "id": "4be47044-1e10-43d4-a07b-65c5d244cbae",
+              "name": "C4-background",
+              "type": "shape",
+              "track": 1,
+              "time": 0,
+              "y": "38.1194%",
+              "width": "100%",
+              "height": "123.7612%",
+              "x_anchor": "50%",
+              "y_anchor": "50%",
+              "path": "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+              "fill_color": "#ffffff"
+            },
+            {
+              "id": "017a8ed3-3c1f-4ff5-8373-3a1824f178f2",
+              "name": "C4-ProfilePicture-expert",
+              "type": "image",
+              "track": 2,
+              "time": 0,
+              "x": "0%",
+              "y": "0%",
+              "width": "15.711 vmin",
+              "height": "13.1934 vmin",
+              "aspect_ratio": 1,
+              "x_anchor": "0%",
+              "y_anchor": "0%",
+              "source": "d6628425-8e35-4fee-9de8-a18d21309546",
+              "border_radius": "100 vmin",
+              "dynamic": true,
+              "animations": [
+                {
+                  "time": 0,
+                  "duration": 0.531,
+                  "easing": "quadratic-out",
+                  "type": "fade"
+                }
+              ]
+            },
+            {
+              "id": "f8cb5ff7-57b7-4698-8a25-27378169b366",
+              "name": "C4-Name- expert",
+              "type": "text",
+              "track": 3,
+              "time": 0.531,
+              "x": "21.2012%",
+              "y": "13.3764%",
+              "width": "78.7988%",
+              "height": "33.8567%",
+              "x_anchor": "0%",
+              "y_anchor": "0%",
+              "y_alignment": "50%",
+              "text": "Elisabeth Parker",
+              "font_family": "Roboto",
+              "font_weight": "500",
+              "fill_color": "rgba(0,0,0,1)",
+              "clip": true,
+              "dynamic": true,
+              "animations": [
+                {
+                  "time": 0,
+                  "duration": 0.468,
+                  "easing": "quadratic-out",
+                  "type": "text-slide",
+                  "scope": "element",
+                  "split": "line"
+                }
+              ]
+            },
+            {
+              "id": "fbaf45ab-5960-406e-a50b-91f314c5084d",
+              "name": "C4-Date",
+              "type": "text",
+              "track": 4,
+              "time": 0.531,
+              "x": "21.2012%",
+              "y": "52.7667%",
+              "width": "78.7988%",
+              "height": "33.8567%",
+              "x_anchor": "0%",
+              "y_anchor": "0%",
+              "y_alignment": "50%",
+              "text": "Replied on {{Date}}",
+              "font_family": "Roboto",
+              "fill_color": "#696969",
+              "clip": true,
+              "dynamic": true,
+              "animations": [
+                {
+                  "time": 0,
+                  "duration": 0.468,
+                  "easing": "quadratic-out",
+                  "type": "text-slide",
+                  "scope": "element",
+                  "split": "line"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "9af2112a-6d0e-45bc-b792-1548f8b137f5",
+      "name": "logo",
+      "type": "image",
+      "track": 5,
+      "time": 0,
+      "x": "81.159%",
+      "y": "9.3128%",
+      "width": "20.409%",
+      "height": "11.9117%",
+      "source": "e36edca6-0be9-4e90-8605-4392bce13493",
+      "shadow_color": "rgba(0,0,0,0.25)",
+      "shadow_blur": "2.3 vmin"
+    },
+    {
+      "id": "a61e9719-9176-41c9-a3d9-1c3a9aeebb81",
+      "name": "music",
+      "type": "audio",
+      "track": 6,
+      "time": 0,
+      "duration": null,
+      "source": "This text is read aloud. Replace it with your own speech text.",
+      "provider": "elevenlabs model_id=eleven_multilingual_v2 voice_id=XrExE9yKIg1WjnnlVkGX",
+      "dynamic": true
+    }
+  ]
 }

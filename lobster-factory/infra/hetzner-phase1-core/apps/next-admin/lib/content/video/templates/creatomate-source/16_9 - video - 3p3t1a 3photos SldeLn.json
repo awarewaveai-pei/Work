@@ -1,582 +1,582 @@
-﻿{
-    "output_format":  "mp4",
-    "width":  1920,
-    "height":  1080,
-    "snapshot_time":  5,
-    "fill_color":  "rgba(255,255,255,1)",
-    "elements":  [
-                     {
-                         "id":  "53cc9a92-8537-40cb-a282-1e9137217eb6",
-                         "name":  "background",
-                         "type":  "shape",
-                         "track":  1,
-                         "time":  0,
-                         "width":  "100%",
-                         "height":  "100%",
-                         "x_anchor":  "50%",
-                         "y_anchor":  "50%",
-                         "path":  "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
-                         "fill_color":  "#2eb0a4"
-                     },
-                     {
-                         "id":  "92500629-e52d-44fb-a1ea-b46a4aabc9ad",
-                         "name":  "Brand",
-                         "type":  "composition",
-                         "track":  2,
-                         "time":  12.612,
-                         "y":  "49.7549%",
-                         "width":  [
-                                       {
-                                           "time":  0,
-                                           "value":  "34.4352 vmin"
-                                       },
-                                       {
-                                           "time":  2.077,
-                                           "easing":  "quartic-out",
-                                           "value":  "102.2331 vmin"
-                                       }
-                                   ],
-                         "height":  [
-                                        {
-                                            "time":  0,
-                                            "value":  "10.7474 vmin"
-                                        },
-                                        {
-                                            "time":  0.386,
-                                            "value":  "23.2188 vmin"
-                                        },
-                                        {
-                                            "time":  2.077,
-                                            "easing":  "quartic-out",
-                                            "value":  "31.9074 vmin"
-                                        },
-                                        {
-                                            "time":  2.092,
-                                            "value":  "31.9074 vmin"
-                                        }
-                                    ],
-                         "x_alignment":  "0%",
-                         "elements":  [
-                                          {
-                                              "id":  "967da833-2b74-443a-b59c-470ab6edd61e",
-                                              "name":  "logo",
-                                              "type":  "image",
-                                              "track":  1,
-                                              "time":  0,
-                                              "y":  "50.7682%",
-                                              "width":  "79.2902%",
-                                              "source":  "4b6c682f-2aaa-4816-8bca-4dae82dd7955"
-                                          }
-                                      ]
-                     },
-                     {
-                         "id":  "6580f435-e542-4fe5-9354-48404a735d42",
-                         "name":  "C1",
-                         "type":  "composition",
-                         "track":  3,
-                         "time":  2.013,
-                         "x":  [
-                                   {
-                                       "time":  0,
-                                       "value":  "50%"
-                                   },
-                                   {
-                                       "time":  0.794,
-                                       "easing":  "cubic-out",
-                                       "value":  "50.8324%"
-                                   },
-                                   {
-                                       "time":  6.187,
-                                       "value":  "50.8324%"
-                                   },
-                                   {
-                                       "time":  7.999,
-                                       "value":  "50%"
-                                   },
-                                   {
-                                       "time":  9.983,
-                                       "value":  "50%"
-                                   },
-                                   {
-                                       "time":  11.057,
-                                       "value":  "52.331%"
-                                   }
-                               ],
-                         "y":  [
-                                   {
-                                       "time":  0,
-                                       "value":  "128.4688%"
-                                   },
-                                   {
-                                       "time":  0.794,
-                                       "easing":  "cubic-out",
-                                       "value":  "51.3762%"
-                                   },
-                                   {
-                                       "time":  6.187,
-                                       "value":  "51.3762%"
-                                   },
-                                   {
-                                       "time":  7.999,
-                                       "value":  "50%"
-                                   },
-                                   {
-                                       "time":  9.983,
-                                       "value":  "50%"
-                                   },
-                                   {
-                                       "time":  11.057,
-                                       "value":  "-56.5805%"
-                                   }
-                               ],
-                         "width":  "66.7586 vmin",
-                         "height":  "77.8444 vmin",
-                         "x_scale":  [
-                                         {
-                                             "time":  6.187,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  7.999,
-                                             "value":  "85%"
-                                         }
-                                     ],
-                         "y_scale":  [
-                                         {
-                                             "time":  6.187,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  7.999,
-                                             "value":  "85%"
-                                         }
-                                     ],
-                         "z_rotation":  [
-                                            {
-                                                "time":  0,
-                                                "value":  "26.6°"
-                                            },
-                                            {
-                                                "time":  0.794,
-                                                "easing":  "cubic-out",
-                                                "value":  "4.6048°"
-                                            },
-                                            {
-                                                "time":  6.187,
-                                                "value":  "4.6048°"
-                                            },
-                                            {
-                                                "time":  7.999,
-                                                "value":  "0°"
-                                            }
-                                        ],
-                         "shadow_color":  "rgba(0,0,0,0.25)",
-                         "animations":  [
-                                            {
-                                                "time":  "end",
-                                                "duration":  1,
-                                                "easing":  "quadratic-out",
-                                                "reversed":  true,
-                                                "type":  "flip",
-                                                "fade":  false,
-                                                "x_anchor":  "0%",
-                                                "x_rotation":  "0°",
-                                                "y_rotation":  "90°"
-                                            }
-                                        ],
-                         "elements":  [
-                                          {
-                                              "id":  "de88948a-6d65-4e33-94c3-70894faf5455",
-                                              "type":  "shape",
-                                              "track":  1,
-                                              "time":  0,
-                                              "width":  "100%",
-                                              "height":  "99.9999%",
-                                              "x_anchor":  "50%",
-                                              "y_anchor":  "50%",
-                                              "path":  "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
-                                              "fill_color":  "rgba(255,255,255,1)"
-                                          },
-                                          {
-                                              "id":  "a3b7bf2c-c7d2-4743-a5da-1c1c12110ab2",
-                                              "name":  "Image-1",
-                                              "type":  "image",
-                                              "track":  2,
-                                              "time":  0,
-                                              "y":  "44.8996%",
-                                              "width":  "89.2057%",
-                                              "height":  "80.4823%",
-                                              "source":  "c0346505-8571-4880-af8d-3c069c15d52b",
-                                              "dynamic":  true
-                                          },
-                                          {
-                                              "id":  "0ab756ce-1f10-4846-a3fb-e5967b322669",
-                                              "name":  "Text-1",
-                                              "type":  "text",
-                                              "track":  3,
-                                              "time":  0,
-                                              "y":  "92.5703%",
-                                              "width":  "89.2057%",
-                                              "height":  "14.8592%",
-                                              "x_alignment":  "50%",
-                                              "y_alignment":  "50%",
-                                              "text":  "Our home for the next two days 😴⛺",
-                                              "font_family":  "Caveat",
-                                              "font_weight":  "500",
-                                              "font_size_minimum":  "3.2 vmin",
-                                              "font_size_maximum":  "4.5 vmin",
-                                              "fill_color":  "#333333",
-                                              "dynamic":  true
-                                          }
-                                      ]
-                     },
-                     {
-                         "id":  "4bb7015a-99f2-4e29-9844-0e2af0ec367e",
-                         "name":  "C2",
-                         "type":  "composition",
-                         "track":  4,
-                         "time":  2.013,
-                         "x":  [
-                                   {
-                                       "time":  1.595,
-                                       "easing":  "quadratic-out",
-                                       "value":  "133.9057%"
-                                   },
-                                   {
-                                       "time":  2.518,
-                                       "easing":  "cubic-out",
-                                       "value":  "76.6658%"
-                                   },
-                                   {
-                                       "time":  6.187,
-                                       "value":  "76.6658%"
-                                   },
-                                   {
-                                       "time":  7.999,
-                                       "value":  "83.4515%"
-                                   },
-                                   {
-                                       "time":  9.983,
-                                       "value":  "83.4515%"
-                                   },
-                                   {
-                                       "time":  11.057,
-                                       "value":  "135.22%"
-                                   }
-                               ],
-                         "y":  [
-                                   {
-                                       "time":  1.595,
-                                       "easing":  "quadratic-out",
-                                       "value":  "169.9451%"
-                                   },
-                                   {
-                                       "time":  2.518,
-                                       "easing":  "cubic-out",
-                                       "value":  "41.5935%"
-                                   },
-                                   {
-                                       "time":  6.187,
-                                       "value":  "41.5935%"
-                                   },
-                                   {
-                                       "time":  7.999,
-                                       "value":  "50%"
-                                   },
-                                   {
-                                       "time":  9.983,
-                                       "value":  "50%"
-                                   },
-                                   {
-                                       "time":  11.057,
-                                       "value":  "51.199%"
-                                   }
-                               ],
-                         "width":  "66.7586 vmin",
-                         "height":  "77.8444 vmin",
-                         "x_scale":  [
-                                         {
-                                             "time":  6.187,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  7.999,
-                                             "value":  "85%"
-                                         }
-                                     ],
-                         "y_scale":  [
-                                         {
-                                             "time":  6.187,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  7.999,
-                                             "value":  "85%"
-                                         }
-                                     ],
-                         "z_rotation":  [
-                                            {
-                                                "time":  1.595,
-                                                "value":  "-17.58°"
-                                            },
-                                            {
-                                                "time":  2.518,
-                                                "easing":  "cubic-out",
-                                                "value":  "8.4192°"
-                                            },
-                                            {
-                                                "time":  6.187,
-                                                "value":  "8.4192°"
-                                            },
-                                            {
-                                                "time":  7.999,
-                                                "value":  "0°"
-                                            }
-                                        ],
-                         "fill_color":  "#2eb0a4",
-                         "shadow_color":  "rgba(0,0,0,0.25)",
-                         "elements":  [
-                                          {
-                                              "id":  "e30e3bca-1271-4129-ab4a-e5e90f1c11b0",
-                                              "type":  "shape",
-                                              "track":  1,
-                                              "time":  0,
-                                              "width":  "100%",
-                                              "height":  "99.9999%",
-                                              "x_anchor":  "50%",
-                                              "y_anchor":  "50%",
-                                              "path":  "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
-                                              "fill_color":  "rgba(255,255,255,1)"
-                                          },
-                                          {
-                                              "id":  "22a271f9-b828-42a6-b156-dfc945b16856",
-                                              "name":  "Image-2",
-                                              "type":  "image",
-                                              "track":  2,
-                                              "time":  0,
-                                              "y":  "44.8996%",
-                                              "width":  "89.2057%",
-                                              "height":  "80.4823%",
-                                              "source":  "8c281b0c-ab00-492b-bc81-28173dcef41f",
-                                              "dynamic":  true
-                                          },
-                                          {
-                                              "id":  "5d28082f-1620-4525-a2a0-38a10e86109a",
-                                              "name":  "Text-2",
-                                              "type":  "text",
-                                              "track":  3,
-                                              "time":  0,
-                                              "y":  "92.5703%",
-                                              "width":  "89.2057%",
-                                              "height":  "14.8592%",
-                                              "x_alignment":  "50%",
-                                              "y_alignment":  "50%",
-                                              "text":  "Our view after hours of climbing, it was well worth it! 💯",
-                                              "font_family":  "Caveat",
-                                              "font_weight":  "500",
-                                              "font_size_minimum":  "3.2 vmin",
-                                              "font_size_maximum":  "4.5 vmin",
-                                              "fill_color":  "#333333",
-                                              "dynamic":  true
-                                          }
-                                      ]
-                     },
-                     {
-                         "id":  "6396bf07-49c7-47ca-af0c-0986ab2c4c59",
-                         "name":  "C3",
-                         "type":  "composition",
-                         "track":  5,
-                         "time":  2.013,
-                         "x":  [
-                                   {
-                                       "time":  3.252,
-                                       "value":  "-19.5077%"
-                                   },
-                                   {
-                                       "time":  4.322,
-                                       "easing":  "cubic-out",
-                                       "value":  "22.4328%"
-                                   },
-                                   {
-                                       "time":  6.187,
-                                       "value":  "22.4328%"
-                                   },
-                                   {
-                                       "time":  7.999,
-                                       "value":  "16.5485%"
-                                   },
-                                   {
-                                       "time":  9.983,
-                                       "value":  "16.5485%"
-                                   },
-                                   {
-                                       "time":  11.057,
-                                       "value":  "-35.22%"
-                                   }
-                               ],
-                         "y":  [
-                                   {
-                                       "time":  3.252,
-                                       "value":  "158.2713%"
-                                   },
-                                   {
-                                       "time":  4.322,
-                                       "easing":  "cubic-out",
-                                       "value":  "42.9959%"
-                                   },
-                                   {
-                                       "time":  6.187,
-                                       "value":  "42.9959%"
-                                   },
-                                   {
-                                       "time":  7.999,
-                                       "value":  "50%"
-                                   },
-                                   {
-                                       "time":  9.983,
-                                       "value":  "50%"
-                                   },
-                                   {
-                                       "time":  11.057,
-                                       "value":  "51.199%"
-                                   }
-                               ],
-                         "width":  "66.7586 vmin",
-                         "height":  "77.8444 vmin",
-                         "x_scale":  [
-                                         {
-                                             "time":  6.187,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  7.999,
-                                             "value":  "85%"
-                                         }
-                                     ],
-                         "y_scale":  [
-                                         {
-                                             "time":  6.187,
-                                             "value":  "100%"
-                                         },
-                                         {
-                                             "time":  7.999,
-                                             "value":  "85%"
-                                         }
-                                     ],
-                         "z_rotation":  [
-                                            {
-                                                "time":  3.252,
-                                                "value":  "31.41°"
-                                            },
-                                            {
-                                                "time":  4.322,
-                                                "easing":  "cubic-out",
-                                                "value":  "-5.588°"
-                                            },
-                                            {
-                                                "time":  6.187,
-                                                "value":  "-5.588°"
-                                            },
-                                            {
-                                                "time":  7.999,
-                                                "value":  "0°"
-                                            }
-                                        ],
-                         "shadow_color":  "rgba(0,0,0,0.25)",
-                         "elements":  [
-                                          {
-                                              "id":  "3d6ec843-0bc9-4543-a4d9-69b473dc9716",
-                                              "name":  "Shape-3",
-                                              "type":  "shape",
-                                              "track":  1,
-                                              "time":  0,
-                                              "width":  "100%",
-                                              "height":  "99.9999%",
-                                              "x_anchor":  "50%",
-                                              "y_anchor":  "50%",
-                                              "path":  "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
-                                              "fill_color":  "rgba(255,255,255,1)"
-                                          },
-                                          {
-                                              "id":  "5c828402-7bfa-4d1b-a3b9-f20f9655ae40",
-                                              "name":  "Image-3",
-                                              "type":  "image",
-                                              "track":  2,
-                                              "time":  0,
-                                              "y":  "44.8996%",
-                                              "width":  "89.2057%",
-                                              "height":  "80.4823%",
-                                              "source":  "93bb8d2b-8a5e-42c2-8dd7-f2e26c0accfb",
-                                              "dynamic":  true
-                                          },
-                                          {
-                                              "id":  "695ac5b4-d69e-49ba-ae46-514f746a31a2",
-                                              "name":  "Text-3",
-                                              "type":  "text",
-                                              "track":  3,
-                                              "time":  0,
-                                              "y":  "92.5703%",
-                                              "width":  "89.2057%",
-                                              "height":  "14.8592%",
-                                              "x_alignment":  "50%",
-                                              "y_alignment":  "50%",
-                                              "text":  "Lazy sunday 😊",
-                                              "font_family":  "Caveat",
-                                              "font_weight":  "500",
-                                              "font_size_maximum":  "4.5 vmin",
-                                              "fill_color":  "#333333",
-                                              "dynamic":  true
-                                          }
-                                      ]
-                     },
-                     {
-                         "id":  "14120e43-91e1-46dc-af6f-e4b3a7e89f15",
-                         "name":  "Title",
-                         "type":  "text",
-                         "track":  6,
-                         "time":  0,
-                         "duration":  2.178,
-                         "x":  "11.8986%",
-                         "y":  "30.8834%",
-                         "width":  "76.2029%",
-                         "height":  "38.2332%",
-                         "x_anchor":  "0%",
-                         "y_anchor":  "0%",
-                         "x_alignment":  "50%",
-                         "text":  "Let\u0027s Learn About Essential oils!",
-                         "font_family":  "Noto Sans",
-                         "font_weight":  "700",
-                         "letter_spacing":  "50%",
-                         "line_height":  "150%",
-                         "fill_color":  "#ffffff",
-                         "animations":  [
-                                            {
-                                                "time":  0,
-                                                "duration":  0.872,
-                                                "easing":  "quadratic-out",
-                                                "type":  "text-spin",
-                                                "split":  "letter",
-                                                "direction":  "down"
-                                            },
-                                            {
-                                                "time":  "end",
-                                                "duration":  0.368,
-                                                "easing":  "quadratic-out",
-                                                "reversed":  true,
-                                                "type":  "text-appear",
-                                                "order":  "random",
-                                                "split":  "letter"
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "96e98388-2687-4465-9ccb-b355ee7f113d",
-                         "name":  "music",
-                         "type":  "audio",
-                         "track":  7,
-                         "time":  0,
-                         "duration":  null,
-                         "dynamic":  true
-                     }
-                 ]
+{
+  "output_format": "mp4",
+  "width": 1920,
+  "height": 1080,
+  "snapshot_time": 5,
+  "fill_color": "rgba(255,255,255,1)",
+  "elements": [
+    {
+      "id": "53cc9a92-8537-40cb-a282-1e9137217eb6",
+      "name": "background",
+      "type": "shape",
+      "track": 1,
+      "time": 0,
+      "width": "100%",
+      "height": "100%",
+      "x_anchor": "50%",
+      "y_anchor": "50%",
+      "path": "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+      "fill_color": "#2eb0a4"
+    },
+    {
+      "id": "92500629-e52d-44fb-a1ea-b46a4aabc9ad",
+      "name": "Brand",
+      "type": "composition",
+      "track": 2,
+      "time": 12.612,
+      "y": "49.7549%",
+      "width": [
+        {
+          "time": 0,
+          "value": "34.4352 vmin"
+        },
+        {
+          "time": 2.077,
+          "easing": "quartic-out",
+          "value": "102.2331 vmin"
+        }
+      ],
+      "height": [
+        {
+          "time": 0,
+          "value": "10.7474 vmin"
+        },
+        {
+          "time": 0.386,
+          "value": "23.2188 vmin"
+        },
+        {
+          "time": 2.077,
+          "easing": "quartic-out",
+          "value": "31.9074 vmin"
+        },
+        {
+          "time": 2.092,
+          "value": "31.9074 vmin"
+        }
+      ],
+      "x_alignment": "0%",
+      "elements": [
+        {
+          "id": "967da833-2b74-443a-b59c-470ab6edd61e",
+          "name": "logo",
+          "type": "image",
+          "track": 1,
+          "time": 0,
+          "y": "50.7682%",
+          "width": "79.2902%",
+          "source": "4b6c682f-2aaa-4816-8bca-4dae82dd7955"
+        }
+      ]
+    },
+    {
+      "id": "6580f435-e542-4fe5-9354-48404a735d42",
+      "name": "C1",
+      "type": "composition",
+      "track": 3,
+      "time": 2.013,
+      "x": [
+        {
+          "time": 0,
+          "value": "50%"
+        },
+        {
+          "time": 0.794,
+          "easing": "cubic-out",
+          "value": "50.8324%"
+        },
+        {
+          "time": 6.187,
+          "value": "50.8324%"
+        },
+        {
+          "time": 7.999,
+          "value": "50%"
+        },
+        {
+          "time": 9.983,
+          "value": "50%"
+        },
+        {
+          "time": 11.057,
+          "value": "52.331%"
+        }
+      ],
+      "y": [
+        {
+          "time": 0,
+          "value": "128.4688%"
+        },
+        {
+          "time": 0.794,
+          "easing": "cubic-out",
+          "value": "51.3762%"
+        },
+        {
+          "time": 6.187,
+          "value": "51.3762%"
+        },
+        {
+          "time": 7.999,
+          "value": "50%"
+        },
+        {
+          "time": 9.983,
+          "value": "50%"
+        },
+        {
+          "time": 11.057,
+          "value": "-56.5805%"
+        }
+      ],
+      "width": "66.7586 vmin",
+      "height": "77.8444 vmin",
+      "x_scale": [
+        {
+          "time": 6.187,
+          "value": "100%"
+        },
+        {
+          "time": 7.999,
+          "value": "85%"
+        }
+      ],
+      "y_scale": [
+        {
+          "time": 6.187,
+          "value": "100%"
+        },
+        {
+          "time": 7.999,
+          "value": "85%"
+        }
+      ],
+      "z_rotation": [
+        {
+          "time": 0,
+          "value": "26.6°"
+        },
+        {
+          "time": 0.794,
+          "easing": "cubic-out",
+          "value": "4.6048°"
+        },
+        {
+          "time": 6.187,
+          "value": "4.6048°"
+        },
+        {
+          "time": 7.999,
+          "value": "0°"
+        }
+      ],
+      "shadow_color": "rgba(0,0,0,0.25)",
+      "animations": [
+        {
+          "time": "end",
+          "duration": 1,
+          "easing": "quadratic-out",
+          "reversed": true,
+          "type": "flip",
+          "fade": false,
+          "x_anchor": "0%",
+          "x_rotation": "0°",
+          "y_rotation": "90°"
+        }
+      ],
+      "elements": [
+        {
+          "id": "de88948a-6d65-4e33-94c3-70894faf5455",
+          "type": "shape",
+          "track": 1,
+          "time": 0,
+          "width": "100%",
+          "height": "99.9999%",
+          "x_anchor": "50%",
+          "y_anchor": "50%",
+          "path": "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+          "fill_color": "rgba(255,255,255,1)"
+        },
+        {
+          "id": "a3b7bf2c-c7d2-4743-a5da-1c1c12110ab2",
+          "name": "Image-1",
+          "type": "image",
+          "track": 2,
+          "time": 0,
+          "y": "44.8996%",
+          "width": "89.2057%",
+          "height": "80.4823%",
+          "source": "c0346505-8571-4880-af8d-3c069c15d52b",
+          "dynamic": true
+        },
+        {
+          "id": "0ab756ce-1f10-4846-a3fb-e5967b322669",
+          "name": "Text-1",
+          "type": "text",
+          "track": 3,
+          "time": 0,
+          "y": "92.5703%",
+          "width": "89.2057%",
+          "height": "14.8592%",
+          "x_alignment": "50%",
+          "y_alignment": "50%",
+          "text": "Our home for the next two days 😴⛺",
+          "font_family": "Caveat",
+          "font_weight": "500",
+          "font_size_minimum": "3.2 vmin",
+          "font_size_maximum": "4.5 vmin",
+          "fill_color": "#333333",
+          "dynamic": true
+        }
+      ]
+    },
+    {
+      "id": "4bb7015a-99f2-4e29-9844-0e2af0ec367e",
+      "name": "C2",
+      "type": "composition",
+      "track": 4,
+      "time": 2.013,
+      "x": [
+        {
+          "time": 1.595,
+          "easing": "quadratic-out",
+          "value": "133.9057%"
+        },
+        {
+          "time": 2.518,
+          "easing": "cubic-out",
+          "value": "76.6658%"
+        },
+        {
+          "time": 6.187,
+          "value": "76.6658%"
+        },
+        {
+          "time": 7.999,
+          "value": "83.4515%"
+        },
+        {
+          "time": 9.983,
+          "value": "83.4515%"
+        },
+        {
+          "time": 11.057,
+          "value": "135.22%"
+        }
+      ],
+      "y": [
+        {
+          "time": 1.595,
+          "easing": "quadratic-out",
+          "value": "169.9451%"
+        },
+        {
+          "time": 2.518,
+          "easing": "cubic-out",
+          "value": "41.5935%"
+        },
+        {
+          "time": 6.187,
+          "value": "41.5935%"
+        },
+        {
+          "time": 7.999,
+          "value": "50%"
+        },
+        {
+          "time": 9.983,
+          "value": "50%"
+        },
+        {
+          "time": 11.057,
+          "value": "51.199%"
+        }
+      ],
+      "width": "66.7586 vmin",
+      "height": "77.8444 vmin",
+      "x_scale": [
+        {
+          "time": 6.187,
+          "value": "100%"
+        },
+        {
+          "time": 7.999,
+          "value": "85%"
+        }
+      ],
+      "y_scale": [
+        {
+          "time": 6.187,
+          "value": "100%"
+        },
+        {
+          "time": 7.999,
+          "value": "85%"
+        }
+      ],
+      "z_rotation": [
+        {
+          "time": 1.595,
+          "value": "-17.58°"
+        },
+        {
+          "time": 2.518,
+          "easing": "cubic-out",
+          "value": "8.4192°"
+        },
+        {
+          "time": 6.187,
+          "value": "8.4192°"
+        },
+        {
+          "time": 7.999,
+          "value": "0°"
+        }
+      ],
+      "fill_color": "#2eb0a4",
+      "shadow_color": "rgba(0,0,0,0.25)",
+      "elements": [
+        {
+          "id": "e30e3bca-1271-4129-ab4a-e5e90f1c11b0",
+          "type": "shape",
+          "track": 1,
+          "time": 0,
+          "width": "100%",
+          "height": "99.9999%",
+          "x_anchor": "50%",
+          "y_anchor": "50%",
+          "path": "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+          "fill_color": "rgba(255,255,255,1)"
+        },
+        {
+          "id": "22a271f9-b828-42a6-b156-dfc945b16856",
+          "name": "Image-2",
+          "type": "image",
+          "track": 2,
+          "time": 0,
+          "y": "44.8996%",
+          "width": "89.2057%",
+          "height": "80.4823%",
+          "source": "8c281b0c-ab00-492b-bc81-28173dcef41f",
+          "dynamic": true
+        },
+        {
+          "id": "5d28082f-1620-4525-a2a0-38a10e86109a",
+          "name": "Text-2",
+          "type": "text",
+          "track": 3,
+          "time": 0,
+          "y": "92.5703%",
+          "width": "89.2057%",
+          "height": "14.8592%",
+          "x_alignment": "50%",
+          "y_alignment": "50%",
+          "text": "Our view after hours of climbing, it was well worth it! 💯",
+          "font_family": "Caveat",
+          "font_weight": "500",
+          "font_size_minimum": "3.2 vmin",
+          "font_size_maximum": "4.5 vmin",
+          "fill_color": "#333333",
+          "dynamic": true
+        }
+      ]
+    },
+    {
+      "id": "6396bf07-49c7-47ca-af0c-0986ab2c4c59",
+      "name": "C3",
+      "type": "composition",
+      "track": 5,
+      "time": 2.013,
+      "x": [
+        {
+          "time": 3.252,
+          "value": "-19.5077%"
+        },
+        {
+          "time": 4.322,
+          "easing": "cubic-out",
+          "value": "22.4328%"
+        },
+        {
+          "time": 6.187,
+          "value": "22.4328%"
+        },
+        {
+          "time": 7.999,
+          "value": "16.5485%"
+        },
+        {
+          "time": 9.983,
+          "value": "16.5485%"
+        },
+        {
+          "time": 11.057,
+          "value": "-35.22%"
+        }
+      ],
+      "y": [
+        {
+          "time": 3.252,
+          "value": "158.2713%"
+        },
+        {
+          "time": 4.322,
+          "easing": "cubic-out",
+          "value": "42.9959%"
+        },
+        {
+          "time": 6.187,
+          "value": "42.9959%"
+        },
+        {
+          "time": 7.999,
+          "value": "50%"
+        },
+        {
+          "time": 9.983,
+          "value": "50%"
+        },
+        {
+          "time": 11.057,
+          "value": "51.199%"
+        }
+      ],
+      "width": "66.7586 vmin",
+      "height": "77.8444 vmin",
+      "x_scale": [
+        {
+          "time": 6.187,
+          "value": "100%"
+        },
+        {
+          "time": 7.999,
+          "value": "85%"
+        }
+      ],
+      "y_scale": [
+        {
+          "time": 6.187,
+          "value": "100%"
+        },
+        {
+          "time": 7.999,
+          "value": "85%"
+        }
+      ],
+      "z_rotation": [
+        {
+          "time": 3.252,
+          "value": "31.41°"
+        },
+        {
+          "time": 4.322,
+          "easing": "cubic-out",
+          "value": "-5.588°"
+        },
+        {
+          "time": 6.187,
+          "value": "-5.588°"
+        },
+        {
+          "time": 7.999,
+          "value": "0°"
+        }
+      ],
+      "shadow_color": "rgba(0,0,0,0.25)",
+      "elements": [
+        {
+          "id": "3d6ec843-0bc9-4543-a4d9-69b473dc9716",
+          "name": "Shape-3",
+          "type": "shape",
+          "track": 1,
+          "time": 0,
+          "width": "100%",
+          "height": "99.9999%",
+          "x_anchor": "50%",
+          "y_anchor": "50%",
+          "path": "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+          "fill_color": "rgba(255,255,255,1)"
+        },
+        {
+          "id": "5c828402-7bfa-4d1b-a3b9-f20f9655ae40",
+          "name": "Image-3",
+          "type": "image",
+          "track": 2,
+          "time": 0,
+          "y": "44.8996%",
+          "width": "89.2057%",
+          "height": "80.4823%",
+          "source": "93bb8d2b-8a5e-42c2-8dd7-f2e26c0accfb",
+          "dynamic": true
+        },
+        {
+          "id": "695ac5b4-d69e-49ba-ae46-514f746a31a2",
+          "name": "Text-3",
+          "type": "text",
+          "track": 3,
+          "time": 0,
+          "y": "92.5703%",
+          "width": "89.2057%",
+          "height": "14.8592%",
+          "x_alignment": "50%",
+          "y_alignment": "50%",
+          "text": "Lazy sunday 😊",
+          "font_family": "Caveat",
+          "font_weight": "500",
+          "font_size_maximum": "4.5 vmin",
+          "fill_color": "#333333",
+          "dynamic": true
+        }
+      ]
+    },
+    {
+      "id": "14120e43-91e1-46dc-af6f-e4b3a7e89f15",
+      "name": "Title",
+      "type": "text",
+      "track": 6,
+      "time": 0,
+      "duration": 2.178,
+      "x": "11.8986%",
+      "y": "30.8834%",
+      "width": "76.2029%",
+      "height": "38.2332%",
+      "x_anchor": "0%",
+      "y_anchor": "0%",
+      "x_alignment": "50%",
+      "text": "Let's Learn About Essential oils!",
+      "font_family": "Noto Sans",
+      "font_weight": "700",
+      "letter_spacing": "50%",
+      "line_height": "150%",
+      "fill_color": "#ffffff",
+      "animations": [
+        {
+          "time": 0,
+          "duration": 0.872,
+          "easing": "quadratic-out",
+          "type": "text-spin",
+          "split": "letter",
+          "direction": "down"
+        },
+        {
+          "time": "end",
+          "duration": 0.368,
+          "easing": "quadratic-out",
+          "reversed": true,
+          "type": "text-appear",
+          "order": "random",
+          "split": "letter"
+        }
+      ]
+    },
+    {
+      "id": "96e98388-2687-4465-9ccb-b355ee7f113d",
+      "name": "music",
+      "type": "audio",
+      "track": 7,
+      "time": 0,
+      "duration": null,
+      "dynamic": true
+    }
+  ]
 }

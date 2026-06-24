@@ -1,138 +1,138 @@
-﻿{
-    "output_format":  "mp4",
-    "width":  1920,
-    "height":  1080,
-    "duration":  12.0094,
-    "snapshot_time":  6.57,
-    "fill_color":  "rgba(255,255,255,1)",
-    "elements":  [
-                     {
-                         "id":  "5b82e4b6-0d0c-4c84-b9ef-a12c278120fb",
-                         "type":  "image",
-                         "track":  1,
-                         "time":  0,
-                         "width":  "100.0001%",
-                         "source":  "d7cfb333-7a01-4717-b137-f7a9c94ede2d",
-                         "clip":  true,
-                         "dynamic":  true,
-                         "animations":  [
-                                            {
-                                                "time":  0.078,
-                                                "duration":  1.896,
-                                                "type":  "scale",
-                                                "fade":  false,
-                                                "scope":  "element",
-                                                "start_scale":  "150%"
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "984bb499-35e0-4a92-833d-102e63c5b812",
-                         "name":  "Composition-KM2",
-                         "type":  "composition",
-                         "track":  2,
-                         "time":  3.002,
-                         "x":  "50.01%",
-                         "animations":  [
-                                            {
-                                                "time":  3.535,
-                                                "duration":  1.212,
-                                                "transition":  true,
-                                                "type":  "scale",
-                                                "fade":  false,
-                                                "x_anchor":  "0%",
-                                                "y_anchor":  "5%",
-                                                "end_scale":  "70%",
-                                                "start_scale":  "100%"
-                                            }
-                                        ],
-                         "elements":  [
-                                          {
-                                              "id":  "8a10702f-ba3e-46b5-aad9-fa4aabf5c517",
-                                              "name":  "Shape-SR9",
-                                              "type":  "shape",
-                                              "track":  1,
-                                              "time":  0,
-                                              "x":  "49.7328%",
-                                              "y":  "51.5142%",
-                                              "width":  "94.7149%",
-                                              "height":  "51.3658%",
-                                              "x_anchor":  "50%",
-                                              "y_anchor":  "50%",
-                                              "path":  "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
-                                              "fill_color":  "rgba(87,87,87,0.7)",
-                                              "animations":  [
-                                                                 {
-                                                                     "time":  0,
-                                                                     "duration":  1,
-                                                                     "transition":  true,
-                                                                     "type":  "fade"
-                                                                 }
-                                                             ]
-                                          },
-                                          {
-                                              "id":  "3b2750c1-42f4-4f4c-ad82-4ebc2569f690",
-                                              "type":  "text",
-                                              "track":  2,
-                                              "time":  0.798,
-                                              "x":  "6.0767%",
-                                              "y":  "75%",
-                                              "width":  "87.8466%",
-                                              "height":  "48.1271%",
-                                              "x_anchor":  "0%",
-                                              "y_anchor":  "100%",
-                                              "y_alignment":  "50%",
-                                              "text":  "This is just an example template. This is just an example template",
-                                              "font_family":  "Oswald",
-                                              "font_weight":  "700",
-                                              "text_transform":  "uppercase",
-                                              "fill_color":  "#FFFFFF",
-                                              "stroke_color":  "#333333",
-                                              "stroke_width":  "0.3 vmin",
-                                              "dynamic":  true,
-                                              "animations":  [
-                                                                 {
-                                                                     "time":  0,
-                                                                     "duration":  2.847,
-                                                                     "easing":  "quadratic-out",
-                                                                     "type":  "text-appear",
-                                                                     "overlap":  "0%"
-                                                                 }
-                                                             ]
-                                          }
-                                      ]
-                     },
-                     {
-                         "id":  "f8569a97-4ff2-4efa-a23e-06a34b0261d5",
-                         "name":  "logo",
-                         "type":  "image",
-                         "track":  4,
-                         "time":  0,
-                         "x":  "91.4212%",
-                         "y":  "12.7888%",
-                         "width":  "10.1635%",
-                         "height":  "17.9239%",
-                         "source":  "e36edca6-0be9-4e90-8605-4392bce13493",
-                         "animations":  [
-                                            {
-                                                "time":  0,
-                                                "duration":  0.99,
-                                                "easing":  "quadratic-out",
-                                                "type":  "fade",
-                                                "track":  0
-                                            }
-                                        ]
-                     },
-                     {
-                         "id":  "a540c67b-390d-4e02-8f43-c35e8d7f861d",
-                         "name":  "music",
-                         "type":  "audio",
-                         "track":  5,
-                         "time":  0,
-                         "duration":  null,
-                         "source":  "This text is read aloud. Replace it with your own speech text.",
-                         "provider":  "elevenlabs model_id=eleven_multilingual_v2 voice_id=XrExE9yKIg1WjnnlVkGX",
-                         "dynamic":  true
-                     }
-                 ]
+{
+  "output_format": "mp4",
+  "width": 1920,
+  "height": 1080,
+  "duration": 12.0094,
+  "snapshot_time": 6.57,
+  "fill_color": "rgba(255,255,255,1)",
+  "elements": [
+    {
+      "id": "5b82e4b6-0d0c-4c84-b9ef-a12c278120fb",
+      "type": "image",
+      "track": 1,
+      "time": 0,
+      "width": "100.0001%",
+      "source": "d7cfb333-7a01-4717-b137-f7a9c94ede2d",
+      "clip": true,
+      "dynamic": true,
+      "animations": [
+        {
+          "time": 0.078,
+          "duration": 1.896,
+          "type": "scale",
+          "fade": false,
+          "scope": "element",
+          "start_scale": "150%"
+        }
+      ]
+    },
+    {
+      "id": "984bb499-35e0-4a92-833d-102e63c5b812",
+      "name": "Composition-KM2",
+      "type": "composition",
+      "track": 2,
+      "time": 3.002,
+      "x": "50.01%",
+      "animations": [
+        {
+          "time": 3.535,
+          "duration": 1.212,
+          "transition": true,
+          "type": "scale",
+          "fade": false,
+          "x_anchor": "0%",
+          "y_anchor": "5%",
+          "end_scale": "70%",
+          "start_scale": "100%"
+        }
+      ],
+      "elements": [
+        {
+          "id": "8a10702f-ba3e-46b5-aad9-fa4aabf5c517",
+          "name": "Shape-SR9",
+          "type": "shape",
+          "track": 1,
+          "time": 0,
+          "x": "49.7328%",
+          "y": "51.5142%",
+          "width": "94.7149%",
+          "height": "51.3658%",
+          "x_anchor": "50%",
+          "y_anchor": "50%",
+          "path": "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+          "fill_color": "rgba(87,87,87,0.7)",
+          "animations": [
+            {
+              "time": 0,
+              "duration": 1,
+              "transition": true,
+              "type": "fade"
+            }
+          ]
+        },
+        {
+          "id": "3b2750c1-42f4-4f4c-ad82-4ebc2569f690",
+          "type": "text",
+          "track": 2,
+          "time": 0.798,
+          "x": "6.0767%",
+          "y": "75%",
+          "width": "87.8466%",
+          "height": "48.1271%",
+          "x_anchor": "0%",
+          "y_anchor": "100%",
+          "y_alignment": "50%",
+          "text": "This is just an example template. This is just an example template",
+          "font_family": "Oswald",
+          "font_weight": "700",
+          "text_transform": "uppercase",
+          "fill_color": "#FFFFFF",
+          "stroke_color": "#333333",
+          "stroke_width": "0.3 vmin",
+          "dynamic": true,
+          "animations": [
+            {
+              "time": 0,
+              "duration": 2.847,
+              "easing": "quadratic-out",
+              "type": "text-appear",
+              "overlap": "0%"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "f8569a97-4ff2-4efa-a23e-06a34b0261d5",
+      "name": "logo",
+      "type": "image",
+      "track": 4,
+      "time": 0,
+      "x": "91.4212%",
+      "y": "12.7888%",
+      "width": "10.1635%",
+      "height": "17.9239%",
+      "source": "e36edca6-0be9-4e90-8605-4392bce13493",
+      "animations": [
+        {
+          "time": 0,
+          "duration": 0.99,
+          "easing": "quadratic-out",
+          "type": "fade",
+          "track": 0
+        }
+      ]
+    },
+    {
+      "id": "a540c67b-390d-4e02-8f43-c35e8d7f861d",
+      "name": "music",
+      "type": "audio",
+      "track": 5,
+      "time": 0,
+      "duration": null,
+      "source": "This text is read aloud. Replace it with your own speech text.",
+      "provider": "elevenlabs model_id=eleven_multilingual_v2 voice_id=XrExE9yKIg1WjnnlVkGX",
+      "dynamic": true
+    }
+  ]
 }
