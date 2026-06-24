@@ -1,0 +1,44 @@
+{
+  "meta": {
+    "title": "紫微斗數命盤 · 真太陽時校正",
+    "description": "專業級紫微斗數線上排盤,內建真太陽時校正(經度差 + 均時差),三方四正一目了然。免費排盤,AI 深度解讀。"
+  },
+  "home": {
+    "title": "紫微斗數命盤",
+    "subtitle": "專業級排盤 · 真太陽時校正 · 三方四正一目了然"
+  },
+  "form": {
+    "birthDate": "出生日期",
+    "birthTime": "出生時間",
+    "gender": "性別",
+    "male": "男",
+    "female": "女",
+    "calendar": "曆法",
+    "solar": "國曆 (陽曆)",
+    "lunar": "農曆 (陰曆)",
+    "leapMonth": "閏月",
+    "trueSolarToggle": "啟用真太陽時校正(專業級準度,建議開啟)",
+    "city": "出生城市",
+    "longitude": "經度 (東經)",
+    "submit": "排盤"
+  },
+  "chart": {
+    "soulInfo": "命主資訊",
+    "solarDate": "陽曆",
+    "lunarDate": "農曆",
+    "fourPillars": "四柱",
+    "hour": "時辰",
+    "zodiac": "生肖",
+    "sign": "星座",
+    "soul": "命主",
+    "body": "身主",
+    "fiveElements": "五行局",
+    "bodyBadge": "身",
+    "trueSolarCorrection": "真太陽時校正",
+    "trueSolarOff": "未啟用真太陽時校正",
+    "minutesUnit": "分"
+  },
+  "errors": {
+    "computeFailed": "排盤失敗,請檢查輸入"
+  }
+}

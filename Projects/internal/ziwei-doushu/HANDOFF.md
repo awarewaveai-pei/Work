@@ -64,14 +64,26 @@
 
 ## 5. 目前進度
 
-### ✅ 已完成（Phase 0，commit `e02796c`，已 push）
+### ✅ 已完成（Phase 0，commit `e02796c`）
 - Next.js 16 + Tailwind scaffold。
 - `lib/trueSolarTime.ts`：真太陽時校正（經度差 + 均時差 → 修正時辰；可跨日；含 `hourToTimeIndex`）。
-- `lib/ziwei.ts`：iztro 封裝；`computeChart(req)` → 真太陽時校正 → 安星。
-- `components/BirthForm.tsx`：生辰輸入（國/農曆、性別、城市經度、真太陽時開關）。
-- `components/ZiweiChart.tsx`：12 宮固定方位渲染（主星廟旺+四化、大限、身宮、中宮命主資訊）。
-- `app/page.tsx`：表單 + 命盤組合（client component）。
-- **驗證**：`npx tsc --noEmit` ✅、`npm run build` ✅；排盤對照 iztro 範例 2000-08-16 女 → 命主破軍/身主文昌/木三局 ✅。
+- `lib/ziwei.ts`：iztro 封裝；`computeChart(req)` → 真太陽時校正 → 安星（**F2 後支援 locale → iztro 語言**）。
+- `components/BirthForm.tsx` / `ZiweiChart.tsx`：生辰輸入 + 12 宮渲染（**F2 後皆接 dict 多語**）。
+
+### ✅ 已完成（F1 驗證 gate，commit `102e1c1`）
+- `package.json` 加 `typecheck`/`test`/`lint` 腳本 + vitest。
+- `lib/trueSolarTime.test.ts`（9 測）+ `lib/ziwei.test.ts`（排盤回歸錨點:iztro 官方 2000-08-16 **寅時** → 破軍/文昌/木三局）。
+- 驗證:`npm test` 13/13 ✅、`npm run typecheck` ✅、`npm run build` ✅。
+
+### ✅ 已完成（F2 i18n + SSR 地基，本次）
+- i18n:原生 dictionary 模式（**零依賴**,非 next-intl）。`lib/i18n/config.ts`（locales=zh-TW/en、locale→iztro 語言碼）+ `lib/i18n/dictionaries.ts`（server-only 載入器）+ `messages/{zh-TW,en}.json`。
+- 路由:`app/[lang]/`（async params、`generateStaticParams` 雙語 SSG、`generateMetadata` 多語 SEO）。**首頁去 client 化**:server shell（SEO h1/描述）+ `components/ZiweiTool.tsx`（client island）。
+- `proxy.ts`（Next 16 middleware 改名）依 Accept-Language 導向 `/[locale]`。
+- 字型:globals.css 加 CJK fallback。
+- 移除舊 `app/layout.tsx` / `app/page.tsx`（移入 `app/[lang]/`）。
+- 驗證:`npm test` 13/13 ✅、typecheck ✅、build ✅（`/zh-TW`+`/en` 皆 SSG 預渲染、Proxy 啟用）。
+
+> ⚠️ **接手注意**:現產品定位 = 全球命理生態系（見 `PLAN.md` v2）。下方 Phase 1–5 為舊版單站路線,**已被 `PLAN.md` §18「MVP 第一刀 + Phase 2–5」取代**,以 PLAN 為準。剩餘地基:F3 接縫合約（AI/金流/DB/DivinationSystem）、F4 Docker/CI、F5 垂直切片驗收。
 
 ### ⬜ 待做（依優先序）
 

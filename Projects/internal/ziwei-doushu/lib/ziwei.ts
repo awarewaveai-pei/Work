@@ -5,6 +5,7 @@ import {
   hourToTimeIndex,
   type TrueSolarResult,
 } from './trueSolarTime';
+import { localeToIztroLang, defaultLocale, type Locale } from './i18n/config';
 
 export type Gender = '男' | '女';
 export type CalendarType = 'solar' | 'lunar';
@@ -25,6 +26,8 @@ export interface ChartRequest {
     longitude: number;
     tzOffsetHours: number;
   };
+  /** 命盤資料語言（對應 iztro 語言碼）；不給預設繁中 */
+  locale?: Locale;
 }
 
 export interface ChartResult {
@@ -65,11 +68,25 @@ export function computeChart(req: ChartRequest): ChartResult {
 
   const timeIndex = hourToTimeIndex(hour);
   const dateStr = `${year}-${month}-${day}`;
+  const iztroLang = localeToIztroLang(req.locale ?? defaultLocale);
 
   const astrolabe =
     req.calendar === 'lunar'
-      ? astro.byLunar(dateStr, timeIndex, req.gender, req.isLeapMonth ?? false, true, 'zh-TW')
-      : astro.bySolar(dateStr, timeIndex, req.gender, true, 'zh-TW');
+      ? astro.byLunar(
+          dateStr,
+          timeIndex,
+          req.gender,
+          req.isLeapMonth ?? false,
+          true,
+          iztroLang as Parameters<typeof astro.byLunar>[5],
+        )
+      : astro.bySolar(
+          dateStr,
+          timeIndex,
+          req.gender,
+          true,
+          iztroLang as Parameters<typeof astro.bySolar>[4],
+        );
 
   return { astrolabe, timeIndex, correction };
 }
