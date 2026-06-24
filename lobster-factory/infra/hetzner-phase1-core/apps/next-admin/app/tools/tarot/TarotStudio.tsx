@@ -143,7 +143,7 @@ async function downscaleImageFile(file: File, maxDim = 1024, quality = 0.85): Pr
 
 export default function TarotStudio() {
   // Multi-select for comparison; batch generation always uses lockedModel (set at lock time).
-  const [selectedModels, setSelectedModels] = useState<Set<TarotModel>>(new Set<TarotModel>(["flux-schnell"]));
+  const [selectedModels, setSelectedModels] = useState<Set<TarotModel>>(new Set<TarotModel>());
   const [lockedModel, setLockedModel] = useState<TarotModel>("flux-schnell");
   // Tarot is print-fixed at 2:3 portrait — no ratio UI here. Other apps pass aspectRatio
   // to the same API/toolkit (see lobster-factory/docs/IMAGE_GEN_TOOLKIT.md).
@@ -183,11 +183,22 @@ export default function TarotStudio() {
   const [templateThumbs, setTemplateThumbs] = useState<Record<string, string>>({});
   const grade = useColorGrade(); // 修圖積木：色彩/色階/銳利度 (live CSS preview + server bake)
 
+  const [styleGroupTab, setStyleGroupTab] = useState<string>("西方畫家");
+  const [modelProviderTab, setModelProviderTab] = useState<string>("BFL");
+  const [panelOpen, setPanelOpen] = useState<Record<string, boolean>>({
+    model: true, style: true, subject: false, mode: false, template: false, grade: false,
+  });
+  function togglePanel(key: string) {
+    setPanelOpen((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
   const doneCount = batch.filter((b) => b.status === "done").length;
   // For Step 1 UI (ref upload limit), use first selected model.
   const activeModel: TarotModel = Array.from(selectedModels)[0] ?? "flux-schnell";
   const maxRefs = modelOption(activeModel).maxRefs;
   const isMultiModel = selectedModels.size > 1;
+  const hasSelectedModel = selectedModels.size > 0;
+  const STYLE_GROUPS = Array.from(new Set(STYLE_PRESETS.map((p) => p.group)));
 
   // Style box = comma-separated zh labels. zh labels never contain commas, so this cleanly
   // recovers the selected chips (drives chip highlight + toggle).
