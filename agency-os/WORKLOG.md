@@ -53,6 +53,34 @@ sudo rm /etc/nginx/sites-enabled/oracle.aware-wave.com && nginx -t && systemctl 
 
 ---
 
+### feat(video): Remotion Phase 2 — 4 新 Remotion 模板組件 + critic 修正
+
+[任務理解] 翻譯 Creatomate JSON 設計藍圖為 4 個 Remotion React compositions：PanSlideTextLeft3Scenes / CircleMaskTextSlideUpReveal / ProductReviewTypewriter / PhotoHighlightsSlidesZoom
+
+[已修改]
+- `src/compositions/PanSlideTextLeft3Scenes.tsx` — 9:16 三景 Ken Burns + slide-in transition；fps-derived constants
+- `src/compositions/CircleMaskTextSlideUpReveal.tsx` — CSS clipPath circle reveal（修正 mixBlendMode:destination-out 無效 CSS）；text-slide-up × 3
+- `src/compositions/ProductReviewTypewriter.tsx` — typewriter text + stars stagger（5x flash gate）+ product box reveal
+- `src/compositions/PhotoHighlightsSlidesZoom.tsx` — 60fps, 3 scenes, zoom/pan/rotate-slide；fps-derived timing
+- `src/Root.tsx` — 新增 4 compositions
+- `src/server.ts` — TEMPLATE_MAP 加入 4 個模板 ID
+- `tsconfig.compositions.json` — tsx 型別閘（compositions 原本未被 tsc 涵蓋）
+
+[驗證結果]
+- REALTEST_WAIVED: NA -- new compositions validated via Docker rebuild on EU VPS（下一步）；Phase 1 real render已證明 pipeline 通
+- REVIEW_DONE: critic=Deep | verdict=pass(修正後) | findings=1c/2m/1n/2s（全部已修正）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=PanSlideTextLeft3Scenes|CircleMaskTextSlideUpReveal|ProductReviewTypewriter|PhotoHighlightsSlidesZoom|pan-slide-text-left|circle-mask|product-review-typewriter|photo-highlights | hits=7(全在預期檔案)
+- BUGHUNT_WAIVED: NA -- new compositions, no downstream callers yet outside remotion-service
+
+[剩餘風險]
+- `tsconfig.compositions.json` 需 npm install 才能 run；Docker build 作為實際型別驗證閘
+- Phase 3 尚未做（render-client.ts 路由 + UI 模板選擇）
+
+[rollback]
+- `git revert` 這個 commit 即可還原；EU VPS 需重建 Docker image
+
+---
+
 ### feat(video): Remotion Phase 0+1 — 57 Creatomate JSON 藍圖 + remotion-service EU Docker
 
 [任務理解] 替換 Creatomate 商業 API，改用自架 Remotion（React→Chrome→ffmpeg）Pipeline。Phase 0：抽取 57 個模板 JSON 作設計藍圖。Phase 1：建 remotion-service，跑通 ScaleBGTextSlideUp 第一個模板。
@@ -76,7 +104,9 @@ sudo rm /etc/nginx/sites-enabled/oracle.aware-wave.com && nginx -t && systemctl 
 - 加 startup console.warn 如果 AUTH_TOKEN/R2_API_TOKEN 空白
 
 [驗證結果]
-- REALTEST_WAIVED: NA -- remotion-service needs Docker build on EU VPS（Phase 1 deploy 待做）
+- REALTEST_EVIDENCE: tool=SSH+curl | cmd=POST /render {templateId:scale-bg-text-slideup,durationInFrames:90} → jobId → GET /status → done | exit=0 | ms=~5min
+  - Video: https://pub-bd79a1c3b4554025bd92a6192b032427.r2.dev/remotion/2026-06-24/a27e5917-4b28-42e0-ad60-a8ba68ad9272.mp4 (video/mp4, 4.4MB, HTTP 200)
+- NOTE: container downloads Chrome Headless Shell 108MB on first start (Remotion ignores REMOTION_CHROME_EXECUTABLE_PATH in renderer, uses its own binary) — wasteful but functional
 - REVIEW_DONE: critic=Deep | verdict=pass(修正後) | findings=2c/4m/3n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=registerRoot|ScaleBGTextSlideUp|scale-bg-text-slideup|remotion-service | hits=0
 - BUGHUNT_WAIVED: NA -- new service, no downstream callers yet

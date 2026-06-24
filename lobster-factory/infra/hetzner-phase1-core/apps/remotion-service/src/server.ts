@@ -39,6 +39,10 @@ const VALID_FPS = new Set([24, 25, 30, 60]);
 // ── Composition ID map ────────────────────────────────────────────────────────
 const TEMPLATE_MAP: Record<string, string> = {
   "scale-bg-text-slideup": "ScaleBGTextSlideUp",
+  "pan-slide-text-left-3scenes": "PanSlideTextLeft3Scenes",
+  "circle-mask-text-slideup-reveal": "CircleMaskTextSlideUpReveal",
+  "product-review-typewriter": "ProductReviewTypewriter",
+  "photo-highlights-slides-zoom": "PhotoHighlightsSlidesZoom",
 };
 
 // ── Job store (in-memory) ─────────────────────────────────────────────────────
