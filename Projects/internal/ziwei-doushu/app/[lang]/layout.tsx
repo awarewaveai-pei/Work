@@ -5,6 +5,7 @@ import "../globals.css";
 import { locales, isLocale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import SystemNav from "@/components/SystemNav";
+import { SITE_URL } from "@/lib/site";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,8 +31,15 @@ export async function generateMetadata({
   if (!isLocale(lang)) return {};
   const dict = await getDictionary(lang);
   return {
-    title: dict.meta.title,
+    metadataBase: new URL(SITE_URL),
+    title: { default: dict.meta.title, template: `%s · ${dict.hub.title}` },
     description: dict.meta.description,
+    openGraph: {
+      title: dict.meta.title,
+      description: dict.meta.description,
+      type: 'website',
+      locale: lang,
+    },
   };
 }
 
