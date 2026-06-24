@@ -4,6 +4,30 @@
 
 ## 2026-06-25
 
+### feat(ziwei): oracle UI 全面重刻 — 深色星空神祕風
+
+[任務理解] 使用者反映 oracle.aware-wave.com UI「很爛」(純 Tailwind 預設骨架,零視覺識別)。重刻成 premium dark celestial。
+
+[已修改]（branch claude/ziwei-doushu-chart-site-55fdaa）
+- `Projects/internal/ziwei-doushu/app/globals.css` — 35 CSS 變數 design token + 星點 field + 星雲 body gradient + .glass-card/.btn-gold/.field-dark/.ziwei-grid/.tarot-card 等元件 class;critic 後修 --text-dim 對比(#5c5478→#8077a0,WCAG AA)+ 加 prefers-reduced-motion 守衛
+- `app/[lang]/layout.tsx` — 載 Noto Serif TC(思源宋體)標題字
+- `app/[lang]/page.tsx` + 5 系統頁 + `components/`(SystemNav/BirthForm/ZiweiTool/ZiweiChart/BaziTool/IChingTool/TarotTool/DailyTool)全部深色化
+- violet(紫微星)+ 金(帝星)雙主軸;宜玉綠/忌玫瑰;命盤翻成深色星圖
+
+[事故修復] frontend-designer agent 跑 17 分鐘期間 AO-RESUME hook 把工作樹切回 main,agent 後半段在錯亂樹上跑、誤 WAIVE 三閘。處置:備份 redesign 到 D:/tmp → 切回 branch → 還原 → 自己補做真實驗證。教訓:長 agent 任務跨 hook 觸發有工作樹被切換風險。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test (vitest) | exit=0 | ms=2330 -- 49/49 pass(lib 邏輯完整)
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm run build | exit=0 | ms=12000 -- 17 頁雙語 SSG
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/2n -- 2 minor a11y(text-dim 對比/reduced-motion)已修
+- BUGHUNT_DONE: scope=Projects/internal/ziwei-doushu/app,Projects/internal/ziwei-doushu/components | grep=bg-white\|bg-slate\|text-slate\|text-indigo (殘留淺色 class) | hits=0
+- BUGHUNT_SCOPE_NARROW: UI-only redesign 限 ziwei-doushu app/components;無 symbol/string 被 agency-os 或 scripts 消費(無外部 call site)
+
+[剩餘風險] 待部署到 SG 後做 live 視覺驗證(截圖)。
+
+[rollback] docker compose down + 還原前一版 image;或 git revert UI commit 後重 deploy。
+
 ### feat(remotion): Phase 0+1 — Creatomate JSON 提取 + remotion-service scaffold
 
 [任務理解] 將 57 個 Creatomate docx 模板 JSON 提取出來作為 Remotion 設計藍圖；建立 remotion-service（Node 20 + Chromium + ffmpeg + Express HTTP）替換 Creatomate 商業 API；Phase 1 跑通第一個模板 ScaleBGTextSlideUp。
