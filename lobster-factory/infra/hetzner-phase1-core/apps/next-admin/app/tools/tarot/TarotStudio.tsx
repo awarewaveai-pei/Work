@@ -1434,6 +1434,7 @@ export default function TarotStudio() {
                           return toks.join(", ");
                         })
                       }
+                      title={p.zh.includes("｜") ? p.zh.replace("｜", " — ") : undefined}
                       style={{
                         padding: "3px 9px", borderRadius: 12, fontSize: 11,
                         cursor: locked ? "default" : "pointer",
