@@ -1,0 +1,637 @@
+@import "tailwindcss";
+
+/* ─── Design Tokens ─────────────────────────────────────────────────────────── */
+:root {
+  /* Background layers */
+  --bg-void:    #0a0a14;
+  --bg-deep:    #0f0d1f;
+  --bg-nebula:  #1a1035;
+  --bg-surface: #12102a;
+
+  /* Glass surface */
+  --glass-bg:      rgba(255, 255, 255, 0.04);
+  --glass-bg-hover: rgba(255, 255, 255, 0.07);
+  --glass-border:  rgba(168, 85, 247, 0.25);
+  --glass-border-hover: rgba(245, 215, 110, 0.5);
+  --glass-blur:    12px;
+
+  /* Primary — Violet (紫微星) */
+  --violet-400: #c084fc;
+  --violet-500: #a855f7;
+  --violet-600: #9333ea;
+  --violet-glow: rgba(168, 85, 247, 0.35);
+
+  /* Accent — Imperial Gold (帝星金) */
+  --gold-300: #fde68a;
+  --gold-400: #f5d76e;
+  --gold-500: #e8c468;
+  --gold-glow: rgba(245, 215, 110, 0.4);
+  --gold-glow-strong: rgba(245, 215, 110, 0.6);
+
+  /* Text */
+  --text-heading: #f5f3ff;
+  --text-body:    #b8b0d0;
+  --text-caption: #8980a8;
+  --text-dim:     #5c5478;
+
+  /* Auspicious — Jade Green (宜) */
+  --jade-400: #6ee7b7;
+  --jade-bg:  rgba(110, 231, 183, 0.08);
+  --jade-border: rgba(110, 231, 183, 0.25);
+
+  /* Inauspicious — Deep Rose (忌) */
+  --rose-400: #fb7185;
+  --rose-bg:  rgba(251, 113, 133, 0.08);
+  --rose-border: rgba(251, 113, 133, 0.25);
+
+  /* Sky Blue (科) */
+  --sky-400: #7dd3fc;
+
+  /* Amber (權) */
+  --amber-400: #fbbf24;
+
+  /* Spacing / Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  /* Motion */
+  --dur-fast:   150ms;
+  --dur-normal: 250ms;
+  --dur-slow:   400ms;
+  --ease-out:   cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ─── Tailwind v4 @theme extension ──────────────────────────────────────────── */
+@theme inline {
+  --color-background: var(--bg-void);
+  --color-foreground: var(--text-heading);
+  --font-sans:  var(--font-geist-sans);
+  --font-mono:  var(--font-geist-mono);
+  --font-serif: var(--font-noto-serif-tc);
+}
+
+/* ─── Base ───────────────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--bg-void);
+  color: var(--text-body);
+  font-family: var(--font-geist-sans), "PingFang TC", "Microsoft JhengHei",
+    "Noto Sans TC", "Noto Sans SC", "Hiragino Sans", sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Cosmic background gradient */
+  background-image:
+    radial-gradient(ellipse 80% 60% at 50% 0%,   rgba(88, 28, 135, 0.35) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 30%,  rgba(168, 85, 247, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 50% at 20% 70%,  rgba(139, 92, 246, 0.10) 0%, transparent 55%),
+    radial-gradient(ellipse 100% 80% at 50% 100%,rgba(45, 27, 78, 0.5) 0%, transparent 70%);
+  background-attachment: fixed;
+  background-size: cover;
+  overflow-x: hidden;
+}
+
+/* ─── Star Field ─────────────────────────────────────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(1px 1px at 15%  8%,  rgba(255,255,255,0.8) 0%, transparent 100%),
+    radial-gradient(1px 1px at 87%  4%,  rgba(255,255,255,0.6) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 32% 15%, rgba(255,255,255,0.7) 0%, transparent 100%),
+    radial-gradient(1px 1px at 62%  11%, rgba(255,255,255,0.5) 0%, transparent 100%),
+    radial-gradient(1px 1px at 5%  28%,  rgba(255,255,255,0.6) 0%, transparent 100%),
+    radial-gradient(1px 1px at 94% 22%,  rgba(255,255,255,0.5) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 48% 6%, rgba(255,255,255,0.9) 0%, transparent 100%),
+    radial-gradient(1px 1px at 72% 31%,  rgba(255,255,255,0.4) 0%, transparent 100%),
+    radial-gradient(1px 1px at 25% 42%,  rgba(255,255,255,0.5) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 78% 18%, rgba(255,255,255,0.7) 0%, transparent 100%),
+    radial-gradient(1px 1px at 40% 55%,  rgba(255,255,255,0.3) 0%, transparent 100%),
+    radial-gradient(1px 1px at 10% 65%,  rgba(255,255,255,0.4) 0%, transparent 100%),
+    radial-gradient(1px 1px at 90% 50%,  rgba(255,255,255,0.5) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 55% 38%, rgba(255,255,255,0.6) 0%, transparent 100%),
+    radial-gradient(1px 1px at 20% 75%,  rgba(255,255,255,0.3) 0%, transparent 100%),
+    radial-gradient(1px 1px at 65% 70%,  rgba(255,255,255,0.4) 0%, transparent 100%),
+    radial-gradient(1px 1px at 35% 85%,  rgba(255,255,255,0.35) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 82% 88%, rgba(255,255,255,0.5) 0%, transparent 100%),
+    radial-gradient(1px 1px at 50% 92%,  rgba(255,255,255,0.3) 0%, transparent 100%),
+    radial-gradient(1px 1px at 8%  90%,  rgba(255,255,255,0.4) 0%, transparent 100%),
+    /* violet-tinted stars */
+    radial-gradient(1.5px 1.5px at 70% 45%, rgba(196, 132, 252, 0.8) 0%, transparent 100%),
+    radial-gradient(1px 1px at 30% 22%,  rgba(196, 132, 252, 0.6) 0%, transparent 100%),
+    radial-gradient(2px 2px at 58% 78%,  rgba(196, 132, 252, 0.4) 0%, transparent 100%),
+    /* gold-tinted stars */
+    radial-gradient(1.5px 1.5px at 45% 20%, rgba(253, 230, 138, 0.7) 0%, transparent 100%),
+    radial-gradient(1px 1px at 85% 60%,  rgba(253, 230, 138, 0.5) 0%, transparent 100%);
+  animation: starTwinkle 6s ease-in-out infinite alternate;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(1px 1px at 22% 35%,  rgba(255,255,255,0.6) 0%, transparent 100%),
+    radial-gradient(1px 1px at 75% 12%,  rgba(255,255,255,0.5) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 12% 50%, rgba(255,255,255,0.4) 0%, transparent 100%),
+    radial-gradient(1px 1px at 92% 75%,  rgba(255,255,255,0.5) 0%, transparent 100%),
+    radial-gradient(1px 1px at 38% 68%,  rgba(255,255,255,0.3) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 60% 95%, rgba(255,255,255,0.4) 0%, transparent 100%),
+    radial-gradient(1px 1px at 18% 88%,  rgba(255,255,255,0.35) 0%, transparent 100%);
+  animation: starTwinkle2 8s ease-in-out 2s infinite alternate;
+}
+
+@keyframes starTwinkle {
+  0%   { opacity: 0.6; }
+  30%  { opacity: 0.9; }
+  60%  { opacity: 0.7; }
+  100% { opacity: 1.0; }
+}
+
+@keyframes starTwinkle2 {
+  0%   { opacity: 0.8; }
+  50%  { opacity: 0.5; }
+  100% { opacity: 0.9; }
+}
+
+/* ─── Page wrapper (above star field) ──────────────────────────────────────── */
+nav, main, footer {
+  position: relative;
+  z-index: 1;
+}
+
+/* ─── Headings ───────────────────────────────────────────────────────────────── */
+h1, h2, h3 {
+  color: var(--text-heading);
+  font-family: var(--font-noto-serif-tc), "PingFang TC", "Microsoft JhengHei", serif;
+  line-height: 1.3;
+}
+
+/* ─── Glass Card ─────────────────────────────────────────────────────────────── */
+.glass-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  transition:
+    border-color var(--dur-normal) var(--ease-out),
+    box-shadow var(--dur-normal) var(--ease-out),
+    transform var(--dur-normal) var(--ease-out),
+    background var(--dur-normal) var(--ease-out);
+}
+
+.glass-card:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
+  box-shadow: 0 0 24px rgba(245, 215, 110, 0.15), 0 8px 32px rgba(0,0,0,0.4);
+  transform: translateY(-2px);
+}
+
+/* ─── Gold CTA Button ────────────────────────────────────────────────────────── */
+.btn-gold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.7rem 1.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(245, 215, 110, 0.4);
+  background: linear-gradient(135deg, rgba(245, 215, 110, 0.18) 0%, rgba(232, 196, 104, 0.12) 100%);
+  color: var(--gold-400);
+  font-weight: 600;
+  font-size: 0.875rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+  text-shadow: 0 0 12px var(--gold-glow);
+}
+
+.btn-gold:hover {
+  background: linear-gradient(135deg, rgba(245, 215, 110, 0.28) 0%, rgba(232, 196, 104, 0.22) 100%);
+  border-color: rgba(245, 215, 110, 0.7);
+  box-shadow: 0 0 20px var(--gold-glow), 0 4px 16px rgba(0,0,0,0.3);
+}
+
+.btn-gold:focus-visible {
+  outline: 2px solid var(--gold-400);
+  outline-offset: 2px;
+}
+
+.btn-gold:active {
+  transform: scale(0.98);
+}
+
+/* ─── Violet CTA (secondary) ─────────────────────────────────────────────────── */
+.btn-violet {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.7rem 1.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.18) 0%, rgba(139, 92, 246, 0.12) 100%);
+  color: var(--violet-400);
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.btn-violet:hover {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.28) 0%, rgba(139, 92, 246, 0.22) 100%);
+  box-shadow: 0 0 20px var(--violet-glow), 0 4px 16px rgba(0,0,0,0.3);
+  border-color: rgba(168, 85, 247, 0.7);
+}
+
+.btn-violet:focus-visible {
+  outline: 2px solid var(--violet-400);
+  outline-offset: 2px;
+}
+
+.btn-violet:active {
+  transform: scale(0.98);
+}
+
+/* ─── Dark Form Fields ───────────────────────────────────────────────────────── */
+.field-dark {
+  width: 100%;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(137, 128, 168, 0.3);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-heading);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.field-dark::placeholder {
+  color: var(--text-dim);
+}
+
+.field-dark:focus {
+  outline: none;
+  border-color: var(--violet-500);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2), 0 0 12px rgba(168, 85, 247, 0.15);
+}
+
+/* Date/time inputs: force light text on dark bg in Webkit */
+.field-dark::-webkit-calendar-picker-indicator {
+  filter: invert(0.7) sepia(1) saturate(5) hue-rotate(220deg);
+  cursor: pointer;
+}
+
+/* Select arrow */
+select.field-dark {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24'%3E%3Cpath fill='%238980a8' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  padding-right: 2rem;
+}
+
+/* Checkbox */
+input[type="checkbox"].field-check {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 3px;
+  border: 1px solid rgba(137, 128, 168, 0.5);
+  background: rgba(255,255,255,0.04);
+  accent-color: var(--violet-500);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ─── Label ─────────────────────────────────────────────────────────────────── */
+.label-dark {
+  color: var(--text-body);
+  font-size: 0.8125rem;
+}
+
+/* ─── Error Banner ───────────────────────────────────────────────────────────── */
+.error-banner {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--rose-border);
+  background: var(--rose-bg);
+  padding: 0.75rem 1rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--rose-400);
+}
+
+/* ─── Section divider ────────────────────────────────────────────────────────── */
+.star-divider {
+  border: none;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(168, 85, 247, 0.4), rgba(245, 215, 110, 0.4), transparent);
+  margin: 1.5rem 0;
+}
+
+/* ─── Gold glow text ─────────────────────────────────────────────────────────── */
+.text-gold {
+  color: var(--gold-400);
+  text-shadow: 0 0 16px var(--gold-glow);
+}
+
+.text-gold-dim {
+  color: var(--gold-500);
+}
+
+.text-violet {
+  color: var(--violet-400);
+  text-shadow: 0 0 12px var(--violet-glow);
+}
+
+/* ─── Mutagen colors (deep-sky compatible) ──────────────────────────────────── */
+.mutagen-lu  { color: var(--jade-400); }
+.mutagen-quan { color: var(--amber-400); }
+.mutagen-ke  { color: var(--sky-400); }
+.mutagen-ji  { color: var(--rose-400); }
+
+/* ─── Ziwei Chart Grid ───────────────────────────────────────────────────────── */
+.ziwei-grid {
+  display: grid;
+  aspect-ratio: 1;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  gap: 2px;
+  background: rgba(168, 85, 247, 0.15);
+  border-radius: var(--radius-md);
+  padding: 2px;
+  overflow: hidden;
+}
+
+.ziwei-palace {
+  background: rgba(10, 10, 30, 0.85);
+  backdrop-filter: blur(4px);
+  padding: 0.375rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 0;
+  transition: background var(--dur-fast);
+}
+
+.ziwei-palace:hover {
+  background: rgba(30, 20, 60, 0.95);
+}
+
+.ziwei-center {
+  background: rgba(20, 12, 50, 0.9);
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  text-align: center;
+}
+
+.star-major {
+  font-weight: 600;
+  color: var(--text-heading);
+  font-size: 0.7rem;
+}
+
+.star-minor {
+  color: var(--text-body);
+  font-size: 0.65rem;
+}
+
+.star-adj {
+  color: var(--text-caption);
+  font-size: 0.6rem;
+}
+
+.palace-name {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--gold-400);
+  text-shadow: 0 0 8px var(--gold-glow);
+}
+
+.palace-stem {
+  font-size: 0.625rem;
+  color: var(--text-caption);
+}
+
+.palace-decade {
+  font-size: 0.6rem;
+  color: var(--violet-400);
+}
+
+.body-badge {
+  font-size: 0.55rem;
+  border-radius: 3px;
+  padding: 0.05rem 0.25rem;
+  background: rgba(251, 113, 133, 0.15);
+  border: 1px solid var(--rose-border);
+  color: var(--rose-400);
+}
+
+.correction-text {
+  font-size: 0.65rem;
+  color: var(--jade-400);
+}
+
+.no-correction-text {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+}
+
+/* ─── Hexagram lines (IChing) ────────────────────────────────────────────────── */
+.hex-line-yang {
+  height: 6px;
+  width: 5rem;
+  border-radius: 3px;
+  background: linear-gradient(to right, var(--violet-600), var(--violet-400));
+  box-shadow: 0 0 6px var(--violet-glow);
+}
+
+.hex-line-yin-l,
+.hex-line-yin-r {
+  height: 6px;
+  width: 2.2rem;
+  border-radius: 3px;
+  background: linear-gradient(to right, var(--violet-600), var(--violet-400));
+  box-shadow: 0 0 4px var(--violet-glow);
+}
+
+/* ─── Tarot card ─────────────────────────────────────────────────────────────── */
+.tarot-card {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(8px);
+  padding: 0.75rem;
+  text-align: center;
+  transition:
+    border-color var(--dur-normal) var(--ease-out),
+    box-shadow var(--dur-normal) var(--ease-out),
+    transform var(--dur-normal) var(--ease-out);
+}
+
+.tarot-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 0 16px var(--violet-glow);
+}
+
+.tarot-card.reversed {
+  border-color: var(--rose-border);
+  box-shadow: 0 0 10px rgba(251, 113, 133, 0.15);
+}
+
+.tarot-card.upright {
+  border-color: var(--jade-border);
+  box-shadow: 0 0 10px rgba(110, 231, 183, 0.1);
+}
+
+/* ─── Daily Fortune ──────────────────────────────────────────────────────────── */
+.fortune-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.375rem 0;
+  border-bottom: 1px solid rgba(137, 128, 168, 0.1);
+}
+
+.fortune-row:last-child {
+  border-bottom: none;
+}
+
+.yi-card {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--jade-border);
+  background: var(--jade-bg);
+  padding: 0.75rem;
+}
+
+.ji-card {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--rose-border);
+  background: var(--rose-bg);
+  padding: 0.75rem;
+}
+
+/* ─── Page header accent ─────────────────────────────────────────────────────── */
+.page-header-glyph {
+  display: block;
+  font-size: 2.5rem;
+  line-height: 1;
+  margin-bottom: 0.5rem;
+  filter: drop-shadow(0 0 12px var(--violet-glow));
+}
+
+/* ─── Hub system card glyph ─────────────────────────────────────────────────── */
+.system-glyph {
+  font-size: 2rem;
+  line-height: 1;
+  display: block;
+  margin-bottom: 0.75rem;
+  filter: drop-shadow(0 0 10px var(--violet-glow));
+  transition: filter var(--dur-normal) var(--ease-out), transform var(--dur-normal) var(--ease-out);
+}
+
+.glass-card:hover .system-glyph {
+  filter: drop-shadow(0 0 16px var(--gold-glow-strong));
+  transform: scale(1.08);
+}
+
+/* ─── Nav ─────────────────────────────────────────────────────────────────────── */
+.nav-bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(10, 10, 20, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(168, 85, 247, 0.2);
+}
+
+.nav-brand {
+  font-family: var(--font-noto-serif-tc), "PingFang TC", serif;
+  font-weight: 700;
+  color: var(--text-heading);
+  font-size: 0.9375rem;
+  letter-spacing: 0.03em;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: color var(--dur-fast);
+}
+
+.nav-brand::before {
+  content: '✦';
+  color: var(--gold-400);
+  font-size: 0.75rem;
+  text-shadow: 0 0 8px var(--gold-glow);
+}
+
+.nav-brand:hover {
+  color: var(--gold-400);
+  text-shadow: 0 0 12px var(--gold-glow);
+}
+
+.nav-link {
+  color: var(--text-caption);
+  font-size: 0.8125rem;
+  text-decoration: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  transition: color var(--dur-fast), background var(--dur-fast);
+}
+
+.nav-link:hover {
+  color: var(--text-body);
+  background: rgba(168, 85, 247, 0.1);
+}
+
+.nav-link.active {
+  color: var(--gold-400);
+  font-weight: 600;
+  background: rgba(245, 215, 110, 0.08);
+  box-shadow: inset 0 -2px 0 rgba(245, 215, 110, 0.5);
+  text-shadow: 0 0 10px var(--gold-glow);
+}
+
+.nav-lang {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--text-caption);
+  border: 1px solid rgba(137, 128, 168, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 0.2rem 0.6rem;
+  text-decoration: none;
+  transition: border-color var(--dur-fast), color var(--dur-fast);
+}
+
+.nav-lang:hover {
+  border-color: rgba(168, 85, 247, 0.5);
+  color: var(--violet-400);
+}
