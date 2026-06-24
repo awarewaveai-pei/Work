@@ -1369,9 +1369,11 @@ export default function BannerStudio() {
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap" }}>
 
         {/* ── Controls (right side) ── */}
-        <div style={{ order: 2, flex: "1 1 360px", maxWidth: 460, display: "flex", flexDirection: "column", gap: 12,
+        <div style={{ order: 2, flex: "0 0 460px", width: 460,
           position: "sticky", top: 12, alignSelf: "flex-start",
-          maxHeight: "calc(100vh - 24px)", overflowY: "auto" }}>
+          height: "calc(100vh - 24px)" }}>
+          <div style={{ height: "100%", overflowY: "auto", overflowX: "hidden",
+            display: "flex", flexDirection: "column", gap: 12, paddingBottom: 12 }}>
 
           {/* 配色 / 品牌色 — 挪到最前面 */}
           <StepCard title="配色 / 品牌色" icon="🎨">
@@ -2110,13 +2112,37 @@ export default function BannerStudio() {
             </div>
           </StepCard>
 
+          {/* Export */}
+          <div className="card">
+            <h2 style={{ fontSize: 15, margin: "0 0 12px" }}>Step 5 · 匯出</h2>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button className="btn btn-primary" onClick={handleSave}
+                disabled={s.saving || s.generating || s.productRemoving}>
+                {s.saving ? "儲存中…" : s.saved ? "✓ 已存到圖庫" : "存到圖庫"}
+              </button>
+              <button className="btn btn-ghost" onClick={handleDownload}
+                disabled={s.generating || s.productRemoving}>
+                下載 PNG
+              </button>
+              <button className="btn btn-ghost" onClick={handleOpenInCanvas}
+                disabled={s.generating || s.productRemoving}>
+                在 Canvas Editor 開啟
+              </button>
+            </div>
+            {s.saved && (
+              <p className="form-hint" style={{ marginTop: 8, color: "var(--green)" }}>
+                ✓ 已儲存至 <a href="/tools/designs" style={{ color: "var(--green)" }}>My Designs</a>
+              </p>
+            )}
+          </div>
+
+          </div>
         </div>
 
-        {/* ── Preview + export (left side, sticky so it stays visible while scrolling tools) ── */}
+        {/* ── Preview (left side, sticky) ── */}
         <div style={{
           order: 1, flex: "1.7 1 520px", minWidth: 320,
           position: "sticky", top: 12, alignSelf: "flex-start",
-          maxHeight: "calc(100vh - 24px)", overflowY: "auto",
         }}>
 
           {/* Preview */}
@@ -2157,30 +2183,6 @@ export default function BannerStudio() {
                 </div>
               )}
             </div>
-          </div>
-
-          {/* Export */}
-          <div className="card">
-            <h2 style={{ fontSize: 15, margin: "0 0 12px" }}>Step 5 · 匯出</h2>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button className="btn btn-primary" onClick={handleSave}
-                disabled={s.saving || s.generating || s.productRemoving}>
-                {s.saving ? "儲存中…" : s.saved ? "✓ 已存到圖庫" : "存到圖庫"}
-              </button>
-              <button className="btn btn-ghost" onClick={handleDownload}
-                disabled={s.generating || s.productRemoving}>
-                下載 PNG
-              </button>
-              <button className="btn btn-ghost" onClick={handleOpenInCanvas}
-                disabled={s.generating || s.productRemoving}>
-                在 Canvas Editor 開啟
-              </button>
-            </div>
-            {s.saved && (
-              <p className="form-hint" style={{ marginTop: 8, color: "var(--green)" }}>
-                ✓ 已儲存至 <a href="/tools/designs" style={{ color: "var(--green)" }}>My Designs</a>
-              </p>
-            )}
           </div>
 
         </div>
