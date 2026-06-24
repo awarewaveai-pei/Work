@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-24 02:33:25
+- Generated: 2026-06-24 08:22:20
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -308,6 +308,40 @@
 - `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\designs\DesignsGallery.tsx`
 
 
+### verify-recent --ack (2026-06-24T00:07:39.4601223Z)
+
+**Reason**: comment-only delete (stale exportPxLabel description) + tooltip text fix (150KB->200KB); already covered by tsc/critic/npm-test in same session
+
+**Acknowledged unverified files** (count=1):
+
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\canvas\CanvasEditor.tsx`
+
+
+### verify-recent --ack (2026-06-24T00:15:37.1508739Z)
+
+**Reason**: critic Deep review passed 0c/0m/0n on ContentStudio.tsx + VideoStudio.tsx chip UI changes; tsc clean; bughunt hits=0
+
+**Acknowledged unverified files** (count=2):
+
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\content\ContentStudio.tsx`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\video\VideoStudio.tsx`
+
+---
+
+## AO-CLOSE — 2026-06-24 (session #2)
+
+### Done this session
+- **CanvasEditor 匯出面板移至右側工具欄**：PNG下載 / WebP下載 / 存入 My Designs / 檔名 input 從頂部工具列移至右側 SidebarPanel id="export"（第一個 panel）
+- **exportPxLabel 死狀態清除**：state 宣告 + 2 個 setExportPxLabel call sites + stale comment 全部移除
+- **PNG 按鍵**：不再顯示尺寸標籤
+- **WebP tooltip 修正**：150KB → 200KB（對齊實際壓縮目標）
+- verify-recent: tsc 0 + vitest 487/487 + critic Deep 0C/0M（2 minor 已修）+ bughunt hits=4（doc-only）
+- SG deploy `c8d9d34f` + playwright smoke 26/32（6 skip auth-gated）
+
+### Remaining
+- Canvas 編輯器整輪瀏覽器實測待操作者完成
+
+
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
@@ -329,7 +363,6 @@
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-### Content Tools AI Models comparison page
 - Added `/tools/ai-models` under Content Tools sidebar, positioned between SEO Content and Tarot.
 - Built a clean comparison UI for three adjacent decision surfaces: text generation tools, image generation models, and vibe coding tools.
 - Image model table uses per-image cost only, not 78-card deck cost, and covers the 15 app image models requested by the operator.
@@ -386,6 +419,7 @@
 
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): pure identifier rename perplexityChat→aiChat, perplexityCostUsd→sourcesCostUsd
+
 
 
 

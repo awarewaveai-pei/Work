@@ -3,6 +3,8 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-06-24 (AO-CLOSE #2, CanvasEditor 匯出移右側工具欄)** — 窗：本 Claude Code session（2026-06-24 上午）。使用者要求：① PNG下載/WebP下載/存入 My Designs 全部移到右側工具欄；② PNG 不再顯示尺寸標籤。**已完成**：CanvasEditor.tsx — 頂部工具列移除 editName input + 3 顆按鈕；右側工具欄新增 SidebarPanel id="export" title="💾 匯出 / 下載" 作為第一個 Panel；移除死狀態 exportPxLabel + setExportPxLabel（state 宣告 + 2 call sites）；修 stale comment；修 WebP tooltip 150KB→200KB 對齊實際壓縮目標。**驗證**：tsc 0 + vitest 487/487 + critic Deep 0C/0M（2 minor 已修）+ BUGHUNT hits=4（全 doc 歷史紀錄，無程式碼 callsite）。**部署**：SG commit `c8d9d34f`，healthy 6s，smoke 4/4，playwright 26/32（6 skip = auth-gated 正常）。Canvas 整輪瀏覽器實測仍待操作者。
+
 - **2026-06-24 (AO-CLOSE, UI bug fixes + SG deploy)** — 窗：本 Claude Code session（2026-06-24 凌晨）。三個 TarotStudio/CanvasEditor 介面問題修復並部署 SG。(1) **OutputTrackBar 按鍵重整**：新增 `PNG下載`（直接 triggerDownload）+ 將「🌐 網頁用 WebP」改名 `WebP下載`；JSX 重組為兩列（下載列 / 印刷+快速編輯列）；加 `hideQuickEdit?: boolean` prop（`OutputTrackBar.tsx`）。(2) **TarotStudio 快速編輯上移**：加 `buildSemanticBase`/`openInCanvas` imports；OutputTrackBar 傳 `hideQuickEdit`；在 `ImageEditPromptPanel` 正上方加獨立全寬快速編輯按鈕（`TarotStudio.tsx`）。(3) **CanvasEditor 橫向滑桿修復**：`applyCanvasSize` `MAX_DISP` 從硬編 1100 改為動態 `containerWidth`；加 `ResizeObserver` effect 追蹤容器寬；加 `sizedByCanvasApply` ref 守衛初始 image load，防 resize re-apply 破壞初始構圖（`CanvasEditor.tsx`）。**驗證**：tsc 0 errors + vitest 487/487 pass + critic Deep 0C/0M + BUGHUNT hits=0；SG deploy `36fcfd6a` healthy + smoke 26/32 pass（6 skip = auth-gated 正常）。**commit**: `fd8e088b`（code）+ `45d3b650`（WORKLOG）。**剩餘**：init-load `maxDisplay=650` 硬編 minor（純 UX 不影響 export），可後補。Canvas 編輯器整輪瀏覽器實測仍待操作者完成。
 
 - **2026-06-16 (AO-CLOSE, Content Engine 品質鏈 + POD A2 自動轉單 dormant)** — 窗：06-15 17:30 → 06-16 08:2x（凌晨主線）。三條主線全已部署 SG（最新 `e336d5da`）。(1) **Content Engine generate 品質鏈**：品質修正包 `1e1d55cf`（截斷修正 = SIZE_TOKENS 倍增 + CONTENT_META 移文首使 body 截斷仍保 SEO 標題/描述；內連防造假護欄；新 `related-posts/route.ts` 查真站 posts+pages 回真實 permalink；streaming 截斷 marker + publish 防禦縱深）+ 結構開關「Yes」正面強制 `fd965dbc`（REQUIRED ELEMENTS 硬 MUST）+ `/api/content/title` RankMath 合規 `88da4d38`（建議標題補數字+力量詞，EN/CJK 雙語感知，與 generate H1 規則同步）。全 REALTEST 真打 Haiku 驗證。**剩**：生成草稿零持久化（重整即失，待選 Supabase 表 vs localStorage）、trending 來源擴充、清理已發佈假連結舊文 `expressive-arts-emotional-wellness`（404）。(2) **POD A2 自動轉單管線**（`ad14f5f1`/`f3c4d981`/`e336d5da`）：Woo 成交 webhook → Printful **DRAFT**（kill-switch `POD_AUTO_FULFILL_ENABLED` 預設 OFF + HMAC 驗簽）。**已上 prod 但完全 dormant**（probe 實證回 `auto_fulfill_disabled`，零金流）；333/333 test 含金流紅線守門（kill-switch off → createDraftOrderOnNative 絕不呼叫）。**confirm/送印紅線完全沒建**（測試結束 + 操作者明示批准才議）。啟用 = 操作者三步（SG .env 設 flag+secret 重啟容器 → WP 加 Woo webhook → 仍 draft-only）。另 A1 hardening（`1b081764`，transient classifier + SKU-faithful 冪等）。deploy gate 連抓兩個本機被掩蓋問題（server 無 global crypto → node:crypto；next build 拒 route 非 handler export → 純函式移 lib/studio/woo-webhook.ts）= gate 價值實證。(3) **基礎設施修**：doc-sync `Resolve-Path`/`Test-Path` 補 `-LiteralPath`（`b71f72a6`，修中括號檔名紅字閃窗）；`REGISTER_SYSTEM_GUARD_TASKS.ps1` 由 schtasks（/TR 261 字限制致隱藏任務靜默建不起）改 `Register-ScheduledTask` 模組（`c4ae159f`，Daily-only 隱藏靜默）；start-trigger-mcp pwsh7 fallback 絕對 powershell.exe（`dd18d9d4`）；wp-bridge FluentCRM newsletter draft route **WIP 未發版**（`NewsletterCreator.php` 只 draft + status 斷言、`/newsletter` 路由、版本 0.11.0，php -l 全綠；runtime REALTEST + 發版待 go-ahead，紅線=只草稿永不寄）。**明日優先**：① Defender 木馬 `Trojan:Win32/PowhidSubExec.B` 資安複盤（2026-06-17，已無 active threat，當正式事件善後）② newsletter REALTEST + 發版 ③ 公司桌機換機時重跑 SystemGuard 註冊器 + cloudflare vault token 修（cfat_ 非 cfut_）。健康 100%（372/372）。
@@ -502,7 +504,7 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-06-23 18:30:25 UTC_
+_Last synced: 2026-06-24 00:21:11 UTC_
 
 ## 2026-06-16 AO-CLOSE memory — session window 2026-06-11T05:07Z → 2026-06-16 afternoon
 
@@ -537,6 +539,7 @@ _Last synced: 2026-06-23 18:30:25 UTC_
 - **AI Models 指南上線**：原本使用者想放 Tarot，後更正要放 Content Tools，因生圖工具會被多處共用。新 route `/tools/ai-models` 已加入 sidebar（SEO Content 下、Tarot 上），正式站 deploy commit `5b8c97ac59e5da7d194db7256c1db27f8a503552`。
 - **頁面內容**：三個相鄰比較區：文字生成工具（OpenAI/Claude/Gemini/Perplexity/Grok）、圖片生成模型（15 個 app 現有模型，成本改成每張，不是 78 張）、Vibe Coding 工具（Codex/Claude Code/Gemini/Perplexity/Grok）。表格呈現優劣、風格、速度、成本、prompt/image input、比例與來源連結。
 - **部署證據**：local `npm run typecheck` + `npm run build` PASS；SG `sg-deploy.sh next-admin` PASS；prod gates `tsc` PASS、vitest 24 files / 316 tests PASS、container healthy after 7s、smoke `/login` + `/api/ops/summary` + nginx/wordpress + node-api OK。`/tools/ai-models` 未登入時 307 到 login（符合 auth middleware）。
+
 
 
 
