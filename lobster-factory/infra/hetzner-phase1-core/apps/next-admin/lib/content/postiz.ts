@@ -235,9 +235,33 @@ export async function uploadVideo(opts: {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), VIDEO_FETCH_TIMEOUT_MS);
   let buffer: Buffer;
+  let mimeType: string;
   try {
     const r = await fetch(videoUrl, { signal: controller.signal });
     if (!r.ok) throw new Error(`video fetch failed: HTTP ${r.status}`);
+
+    // Pre-flight size check via Content-Length to avoid buffering oversized payloads.
+    const clHeader = r.headers.get("content-length");
+    if (clHeader) {
+      const cl = parseInt(clHeader, 10);
+      if (!isNaN(cl) && cl > MAX_VIDEO_BYTES) {
+        throw new Error(`video too large: server reports ${(cl / 1024 / 1024).toFixed(1)} MB > ${MAX_VIDEO_BYTES / 1024 / 1024} MB limit`);
+      }
+    }
+
+    // Validate content-type is actually a video (parity with uploadMedia image check).
+    const ct = r.headers.get("content-type") ?? "";
+    if (!ct.startsWith("video/")) {
+      const ext2 = filename.split(".").pop()?.toLowerCase() ?? "mp4";
+      // Accept streams with no content-type (R2 presigned URLs sometimes omit it); use filename extension.
+      if (ct && ct !== "application/octet-stream" && ct !== "binary/octet-stream") {
+        throw new Error(`Expected video/* content-type, got: ${ct}`);
+      }
+      mimeType = ext2 === "webm" ? "video/webm" : ext2 === "mov" ? "video/quicktime" : "video/mp4";
+    } else {
+      mimeType = ct.split(";")[0].trim();
+    }
+
     const arr = await r.arrayBuffer();
     buffer = Buffer.from(arr);
   } finally {
@@ -247,9 +271,6 @@ export async function uploadVideo(opts: {
   if (buffer.length > MAX_VIDEO_BYTES) {
     throw new Error(`video too large: ${(buffer.length / 1024 / 1024).toFixed(1)} MB > ${MAX_VIDEO_BYTES / 1024 / 1024} MB limit`);
   }
-
-  const ext = filename.split(".").pop()?.toLowerCase() ?? "mp4";
-  const mimeType = ext === "webm" ? "video/webm" : ext === "mov" ? "video/quicktime" : "video/mp4";
 
   const ab = new ArrayBuffer(buffer.length);
   new Uint8Array(ab).set(buffer);
