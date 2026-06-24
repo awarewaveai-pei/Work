@@ -109,7 +109,6 @@ export default function CanvasEditor() {
     const now = new Date();
     return `canvas-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
   });
-  // Shown inline near download buttons so user knows what resolution they'll get.
   const canvasMetaRef = useRef<{ realW: number; realH: number; dispScale: number; dpi: number } | null>(null);
   const [drawMode, setDrawMode] = useState<"off" | "draw" | "erase">("off"); // 自由繪筆 / 橡皮擦
   const [drawColor, setDrawColor] = useState("#111111");
@@ -643,7 +642,6 @@ export default function CanvasEditor() {
     const cmW = +((realW / szDpi) * 2.54).toFixed(2);
     const cmH = +((realH / szDpi) * 2.54).toFixed(2);
     setSzInfo(`真實 ${realW}×${realH}px @${szDpi}DPI = ${cmW}×${cmH}cm（預覽 ${Math.round(dispScale * 100)}%）`);
-    setExportPxLabel(`${realW}×${realH}px`);
     canvas.requestRenderAll();
   }, [szW, szH, szUnit, szDpi, containerWidth]);
 
@@ -1541,7 +1539,7 @@ export default function CanvasEditor() {
             />
             <div style={{ display: "flex", gap: 8 }}>
               <button className="btn-primary" style={{ flex: 1 }} disabled={!ready} onClick={download} title="下載全尺寸 PNG">PNG下載</button>
-              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready} onClick={() => void downloadWebP()} title="下載 WebP，自動壓縮至 150KB 以內">WebP下載</button>
+              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready} onClick={() => void downloadWebP()} title="下載 WebP，自動壓縮至 200KB 以內">WebP下載</button>
             </div>
             <button className="btn-primary" style={{ width: "100%" }} disabled={!ready || saveState === "saving" || saveState === "saved"} onClick={() => void saveToDesigns()}>
               {saveState === "saved" ? "已存入 ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}
