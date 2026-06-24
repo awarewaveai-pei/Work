@@ -32,6 +32,9 @@ declare module 'lunar-javascript' {
   export class Lunar {
     getEightChar(): EightChar;
     getYearShengXiao(): string;
+    getDayGan(): string;
+    getDayZhi(): string;
+    getDayInGanZhi(): string;
     getDayYi(): string[];
     getDayJi(): string[];
   }
