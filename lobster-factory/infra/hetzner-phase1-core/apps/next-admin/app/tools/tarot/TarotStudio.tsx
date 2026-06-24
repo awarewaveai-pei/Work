@@ -186,7 +186,7 @@ export default function TarotStudio() {
   const [styleGroupTab, setStyleGroupTab] = useState<string>("西方畫家");
   const [modelProviderTab, setModelProviderTab] = useState<string>("BFL");
   const [panelOpen, setPanelOpen] = useState<Record<string, boolean>>({
-    model: true, style: true, subject: false, mode: false, template: false, grade: false,
+    model: false, style: false, subject: false, mode: false, template: false, grade: false,
   });
   function togglePanel(key: string) {
     setPanelOpen((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -1124,6 +1124,205 @@ export default function TarotStudio() {
           )}
         </div>
 
+        {/* ── Accordion: 生成模式 ── */}
+        <div style={{ borderTop: "1px solid var(--card-border)" }}>
+          <button
+            type="button"
+            onClick={() => togglePanel("mode")}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "9px 0", background: "none", border: "none", cursor: "pointer",
+              fontSize: 13, fontWeight: 600, color: "var(--text)",
+            }}
+          >
+            <span>生成模式</span>
+            <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: "auto", marginRight: 6 }}>
+              {mode === "text" ? "文字生圖" : `以圖生圖 (${referenceImages.length}張)`}
+            </span>
+            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{panelOpen.mode ? "▲" : "▼"}</span>
+          </button>
+          {panelOpen.mode && (
+            <div style={{ paddingBottom: 12 }}>
+              {/* Mode toggle buttons */}
+              <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+                {(["text", "image"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    disabled={locked}
+                    onClick={() => setMode(m)}
+                    style={{
+                      flex: 1, padding: "7px 0", borderRadius: 8, fontSize: 12,
+                      cursor: locked ? "default" : "pointer",
+                      border: `1px solid ${mode === m ? "var(--accent)" : "var(--card-border)"}`,
+                      background: mode === m ? "rgba(99,102,241,0.12)" : "rgba(127,127,127,0.04)",
+                      color: mode === m ? "var(--accent)" : "var(--text-muted)",
+                      fontWeight: mode === m ? 600 : 400,
+                      opacity: locked ? 0.5 : 1,
+                    }}
+                  >
+                    {m === "text" ? "文字生圖" : "以圖生圖"}
+                  </button>
+                ))}
+              </div>
+              {mode === "image" && (
+                <>
+                  {!hasSelectedModel ? (
+                    <div className="form-hint" style={{ color: "var(--yellow)" }}>
+                      請先在「圖片模型」選擇支援參考圖的模型（如 FLUX dev、GPT-Image-1）
+                    </div>
+                  ) : maxRefs === 0 ? (
+                    <div className="form-hint" style={{ color: "var(--yellow)" }}>
+                      ⚠ 目前選的模型不吃參考圖。改選 FLUX dev 或 GPT-Image-1。
+                    </div>
+                  ) : (
+                    <>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="form-input"
+                        disabled={locked || referenceImages.length >= maxRefs}
+                        onChange={(e) => { void onAddReferences(e.target.files); e.currentTarget.value = ""; }}
+                      />
+                      <div className="form-hint">
+                        已上傳 {referenceImages.length}/{maxRefs} 張
+                        {referenceImages.length >= maxRefs ? "（已達上限）" : ""}
+                      </div>
+                    </>
+                  )}
+                  {referenceImages.length > 0 && (
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                      {referenceImages.map((src, i) => (
+                        <div key={i} style={{ position: "relative" }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={src}
+                            alt={`ref ${i + 1}`}
+                            style={{ height: 70, borderRadius: 6, border: "1px solid var(--card-border)" }}
+                          />
+                          {!locked && (
+                            <button
+                              onClick={() => removeReference(i)}
+                              style={{
+                                position: "absolute", top: -6, right: -6,
+                                width: 18, height: 18, borderRadius: "50%",
+                                border: "none", background: "var(--red)",
+                                color: "var(--btn-primary-text)", cursor: "pointer",
+                                fontSize: 11, lineHeight: "18px", padding: 0,
+                              }}
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── Accordion: 主角替換 ── */}
+        <div style={{ borderTop: "1px solid var(--card-border)" }}>
+          <button
+            type="button"
+            onClick={() => togglePanel("subject")}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "9px 0", background: "none", border: "none", cursor: "pointer",
+              fontSize: 13, fontWeight: 600, color: "var(--text)",
+            }}
+          >
+            <span>主角替換</span>
+            <span
+              style={{
+                fontSize: 11, color: "var(--text-muted)", marginLeft: "auto", marginRight: 6,
+                maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}
+            >
+              {subjectText.trim() || "標準塔羅人物"}
+            </span>
+            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{panelOpen.subject ? "▲" : "▼"}</span>
+          </button>
+          {panelOpen.subject && (
+            <div style={{ paddingBottom: 12 }}>
+              <input
+                className="form-input"
+                placeholder="留空＝標準塔羅人物。例：a fluffy orange cat / 一隻柴犬"
+                value={subjectText}
+                onChange={(e) => setSubjectText(e.target.value)}
+                disabled={locked}
+              />
+              <div className="form-hint" style={{ marginTop: 4 }}>
+                換掉每張牌的主角，整副 78 張同一角色。中文自動轉英。
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Accordion: 外框模板 ── */}
+        <div style={{ borderTop: "1px solid var(--card-border)" }}>
+          <button
+            type="button"
+            onClick={() => togglePanel("template")}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "9px 0", background: "none", border: "none", cursor: "pointer",
+              fontSize: 13, fontWeight: 600, color: "var(--text)",
+            }}
+          >
+            <span>外框模板</span>
+            <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: "auto", marginRight: 6 }}>
+              {CARD_TEMPLATES.find((t) => t.key === template)?.label ?? template}
+            </span>
+            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{panelOpen.template ? "▲" : "▼"}</span>
+          </button>
+          {panelOpen.template && (
+            <div style={{ paddingBottom: 12 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {CARD_TEMPLATES.map((t) => {
+                  const active = template === t.key;
+                  return (
+                    <div key={t.key} onClick={() => setTemplate(t.key)} style={{ cursor: "pointer", textAlign: "center" }}>
+                      {templateThumbs[t.key] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={templateThumbs[t.key]}
+                          alt={t.label}
+                          style={{
+                            width: 78, height: 129, borderRadius: 5, objectFit: "cover",
+                            border: active ? "2px solid var(--accent)" : "1px solid var(--card-border)",
+                          }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: 78, height: 129, borderRadius: 5,
+                            border: `${active ? 2 : 1}px solid ${active ? "var(--accent)" : "var(--card-border)"}`,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 18, opacity: 0.5,
+                          }}
+                        >
+                          …
+                        </div>
+                      )}
+                      <div style={{ fontSize: 11, marginTop: 4, color: active ? "var(--accent)" : "var(--text-muted)" }}>
+                        {t.label}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="form-hint" style={{ marginTop: 6 }}>
+                每張牌都會套這個框 + 自動加牌名。
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* ── Accordion: 圖片模型 ── */}
         <div style={{ borderTop: "1px solid var(--card-border)" }}>
           <button
@@ -1350,189 +1549,6 @@ export default function TarotStudio() {
                     ✏ 已手動編輯英文，生成時送這段。
                   </div>
                 )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ── Accordion: 主角替換 ── */}
-        <div style={{ borderTop: "1px solid var(--card-border)" }}>
-          <button
-            type="button"
-            onClick={() => togglePanel("subject")}
-            style={{
-              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "9px 0", background: "none", border: "none", cursor: "pointer",
-              fontSize: 13, fontWeight: 600, color: "var(--text)",
-            }}
-          >
-            <span>主角替換</span>
-            <span
-              style={{
-                fontSize: 11, color: "var(--text-muted)", marginLeft: "auto", marginRight: 6,
-                maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-              }}
-            >
-              {subjectText.trim() || "標準塔羅人物"}
-            </span>
-            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{panelOpen.subject ? "▲" : "▼"}</span>
-          </button>
-          {panelOpen.subject && (
-            <div style={{ paddingBottom: 12 }}>
-              <input
-                className="form-input"
-                placeholder="留空＝標準塔羅人物。例：a fluffy orange cat / 一隻柴犬"
-                value={subjectText}
-                onChange={(e) => setSubjectText(e.target.value)}
-                disabled={locked}
-              />
-              <div className="form-hint" style={{ marginTop: 4 }}>
-                換掉每張牌的主角，整副 78 張同一角色。中文自動轉英。
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ── Accordion: 生成模式 ── */}
-        <div style={{ borderTop: "1px solid var(--card-border)" }}>
-          <button
-            type="button"
-            onClick={() => togglePanel("mode")}
-            style={{
-              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "9px 0", background: "none", border: "none", cursor: "pointer",
-              fontSize: 13, fontWeight: 600, color: "var(--text)",
-            }}
-          >
-            <span>生成模式</span>
-            <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: "auto", marginRight: 6 }}>
-              {mode === "text" ? "文字生圖" : `以圖生圖 (${referenceImages.length}張)`}
-            </span>
-            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{panelOpen.mode ? "▲" : "▼"}</span>
-          </button>
-          {panelOpen.mode && (
-            <div style={{ paddingBottom: 12 }}>
-              <select
-                className="form-select"
-                value={mode}
-                onChange={(e) => setMode(e.target.value as Mode)}
-                disabled={locked}
-                style={{ marginBottom: 10 }}
-              >
-                <option value="text">文字生圖（純描述）</option>
-                <option value="image">以圖生圖 / 上傳風格參考圖</option>
-              </select>
-              {mode === "image" && (
-                <>
-                  {maxRefs === 0 ? (
-                    <div className="form-hint" style={{ color: "var(--yellow)" }}>
-                      ⚠ 目前模型不吃參考圖。改選 FLUX dev 或 GPT-Image-1。
-                    </div>
-                  ) : (
-                    <>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="form-input"
-                        disabled={locked || referenceImages.length >= maxRefs}
-                        onChange={(e) => { void onAddReferences(e.target.files); e.currentTarget.value = ""; }}
-                      />
-                      <div className="form-hint">
-                        已上傳 {referenceImages.length}/{maxRefs} 張
-                        {referenceImages.length >= maxRefs ? "（已達上限）" : ""}
-                      </div>
-                    </>
-                  )}
-                  {referenceImages.length > 0 && (
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
-                      {referenceImages.map((src, i) => (
-                        <div key={i} style={{ position: "relative" }}>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={src}
-                            alt={`ref ${i + 1}`}
-                            style={{ height: 70, borderRadius: 6, border: "1px solid var(--card-border)" }}
-                          />
-                          {!locked && (
-                            <button
-                              onClick={() => removeReference(i)}
-                              style={{
-                                position: "absolute", top: -6, right: -6,
-                                width: 18, height: 18, borderRadius: "50%",
-                                border: "none", background: "var(--red)",
-                                color: "var(--btn-primary-text)", cursor: "pointer",
-                                fontSize: 11, lineHeight: "18px", padding: 0,
-                              }}
-                            >
-                              ×
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* ── Accordion: 外框模板 ── */}
-        <div style={{ borderTop: "1px solid var(--card-border)" }}>
-          <button
-            type="button"
-            onClick={() => togglePanel("template")}
-            style={{
-              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "9px 0", background: "none", border: "none", cursor: "pointer",
-              fontSize: 13, fontWeight: 600, color: "var(--text)",
-            }}
-          >
-            <span>外框模板</span>
-            <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: "auto", marginRight: 6 }}>
-              {CARD_TEMPLATES.find((t) => t.key === template)?.label ?? template}
-            </span>
-            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{panelOpen.template ? "▲" : "▼"}</span>
-          </button>
-          {panelOpen.template && (
-            <div style={{ paddingBottom: 12 }}>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {CARD_TEMPLATES.map((t) => {
-                  const active = template === t.key;
-                  return (
-                    <div key={t.key} onClick={() => setTemplate(t.key)} style={{ cursor: "pointer", textAlign: "center" }}>
-                      {templateThumbs[t.key] ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={templateThumbs[t.key]}
-                          alt={t.label}
-                          style={{
-                            width: 78, height: 129, borderRadius: 5, objectFit: "cover",
-                            border: active ? "2px solid var(--accent)" : "1px solid var(--card-border)",
-                          }}
-                        />
-                      ) : (
-                        <div
-                          style={{
-                            width: 78, height: 129, borderRadius: 5,
-                            border: `${active ? 2 : 1}px solid ${active ? "var(--accent)" : "var(--card-border)"}`,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: 18, opacity: 0.5,
-                          }}
-                        >
-                          …
-                        </div>
-                      )}
-                      <div style={{ fontSize: 11, marginTop: 4, color: active ? "var(--accent)" : "var(--text-muted)" }}>
-                        {t.label}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="form-hint" style={{ marginTop: 6 }}>
-                每張牌都會套這個框 + 自動加牌名。
               </div>
             </div>
           )}
