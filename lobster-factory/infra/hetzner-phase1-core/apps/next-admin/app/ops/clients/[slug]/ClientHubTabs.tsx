@@ -1164,6 +1164,369 @@ function SocialChannelsTab({ org }: Pick<ClientHubTabsProps, "org">) {
   );
 }
 
+// ── Credentials Vault Tab (migration 0050) ────────────────────────────────────
+
+type CredentialItem = {
+  id: string;
+  client_id: string;
+  category: string;
+  label: string;
+  identifier: string | null;
+  note: string | null;
+  secretSet: boolean;
+  sort_order: number;
+  created_at: string;
+};
+
+const CRED_CATEGORIES: Array<{ value: string; label: string; color: string }> = [
+  { value: "social",    label: "社群",    color: "#8b5cf6" },
+  { value: "cms",       label: "CMS",     color: "#0ea5e9" },
+  { value: "analytics", label: "分析",    color: "#f59e0b" },
+  { value: "email",     label: "Email",   color: "#10b981" },
+  { value: "ads",       label: "廣告",    color: "#f43f5e" },
+  { value: "crm",       label: "CRM",     color: "#6366f1" },
+  { value: "hosting",   label: "主機",    color: "#64748b" },
+  { value: "api",       label: "API",     color: "#0284c7" },
+  { value: "other",     label: "其他",    color: "var(--text-muted)" },
+];
+
+const CRED_CATEGORY_MAP = new Map(CRED_CATEGORIES.map((c) => [c.value, c]));
+
+const EMPTY_FORM = { category: "other", label: "", identifier: "", note: "" };
+
+function CredentialsTab({ org }: Pick<ClientHubTabsProps, "org">) {
+  const [credentials, setCredentials] = useState<CredentialItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState<string | null>(null); // credentialId being saved
+
+  // Add-form state
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [formSaving, setFormSaving] = useState(false);
+
+  // Inline secret input per row: credentialId → input value
+  const [secretInputs, setSecretInputs] = useState<Record<string, string>>({});
+  const [secretVisible, setSecretVisible] = useState<Record<string, boolean>>({});
+
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/ops/clients/credentials?clientId=${encodeURIComponent(org.id)}`);
+      if (!res.ok) throw new Error(`載入失敗 (${res.status})`);
+      const json = await res.json();
+      setCredentials(json.credentials ?? []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "載入失敗");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    setError(null);
+    fetch(`/api/ops/clients/credentials?clientId=${encodeURIComponent(org.id)}`)
+      .then((r) => r.ok ? r.json() : Promise.reject(new Error(`載入失敗 (${r.status})`)))
+      .then((json) => { if (mounted) setCredentials(json.credentials ?? []); })
+      .catch((e: unknown) => { if (mounted) setError(e instanceof Error ? e.message : "載入失敗"); })
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, [org.id]);
+
+  async function handleCreate() {
+    if (!form.label.trim()) { setError("label 必填"); return; }
+    setFormSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/ops/clients/credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientId: org.id,
+          category: form.category,
+          label: form.label.trim(),
+          identifier: form.identifier.trim() || null,
+          note: form.note.trim() || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? `新增失敗 (${res.status})`);
+      setShowForm(false);
+      setForm(EMPTY_FORM);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "新增失敗");
+    } finally {
+      setFormSaving(false);
+    }
+  }
+
+  async function handleSetSecret(credentialId: string) {
+    const value = secretInputs[credentialId];
+    if (!value?.trim()) { setError("密碼不能為空"); return; }
+    setSaving(credentialId);
+    setError(null);
+    try {
+      const res = await fetch("/api/ops/clients/credentials/secret", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credentialId, value }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? `設定失敗 (${res.status})`);
+      setSecretInputs((prev) => { const n = { ...prev }; delete n[credentialId]; return n; });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "設定失敗");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function handleClearSecret(credentialId: string) {
+    setSaving(credentialId);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/ops/clients/credentials/secret?credentialId=${encodeURIComponent(credentialId)}`,
+        { method: "DELETE" }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? `清除失敗 (${res.status})`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "清除失敗");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function handleDelete(credentialId: string, label: string) {
+    if (!confirm(`確認刪除「${label}」？此操作無法恢復。`)) return;
+    setSaving(credentialId);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/ops/clients/credentials?id=${encodeURIComponent(credentialId)}`,
+        { method: "DELETE" }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? `刪除失敗 (${res.status})`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "刪除失敗");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  // Group by category
+  const grouped = new Map<string, CredentialItem[]>();
+  for (const cred of credentials) {
+    const existing = grouped.get(cred.category) ?? [];
+    existing.push(cred);
+    grouped.set(cred.category, existing);
+  }
+
+  const secretCount = credentials.filter((c) => c.secretSet).length;
+
+  if (loading) return <div style={{ padding: 24, color: "var(--text-muted)", fontSize: 13 }}>載入中⋯</div>;
+
+  return (
+    <>
+      {error && (
+        <div style={{
+          margin: "0 0 12px", padding: "10px 14px", borderRadius: 8, fontSize: 12,
+          background: "var(--badge-red-bg)", color: "var(--red)", border: "1px solid var(--red)",
+        }}>
+          {error}
+        </div>
+      )}
+
+      <MetricGrid items={[
+        { label: "憑證項目", value: credentials.length, color: "var(--text-muted)" },
+        { label: "已設密碼", value: secretCount, color: "var(--green)" },
+        { label: "未設密碼", value: credentials.length - secretCount, color: secretCount < credentials.length ? "var(--yellow)" : "var(--text-muted)" },
+      ]} />
+
+      {/* Add credential form */}
+      {showForm ? (
+        <Card title="新增憑證">
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {CRED_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.value}
+                  onClick={() => setForm((f) => ({ ...f, category: cat.value }))}
+                  style={{
+                    padding: "4px 10px", borderRadius: 12, fontSize: 11, fontWeight: 600,
+                    cursor: "pointer", border: `1px solid ${cat.color}`,
+                    background: form.category === cat.value ? cat.color : "transparent",
+                    color: form.category === cat.value ? "#fff" : cat.color,
+                  }}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+            <input
+              placeholder="名稱 * (e.g. Instagram @soulful)"
+              value={form.label}
+              onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
+              style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid var(--card-border)", fontSize: 12, background: "var(--bg-canvas)", color: "var(--text-primary)" }}
+            />
+            <input
+              placeholder="帳號 / Email / ID（可選，非密碼）"
+              value={form.identifier}
+              onChange={(e) => setForm((f) => ({ ...f, identifier: e.target.value }))}
+              style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid var(--card-border)", fontSize: 12, background: "var(--bg-canvas)", color: "var(--text-primary)" }}
+            />
+            <textarea
+              placeholder="備注（可選）"
+              value={form.note}
+              rows={2}
+              onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+              style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid var(--card-border)", fontSize: 12, background: "var(--bg-canvas)", color: "var(--text-primary)", resize: "vertical" }}
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={handleCreate}
+                disabled={formSaving}
+                style={{ padding: "7px 14px", borderRadius: 6, fontSize: 12, fontWeight: 600, border: "none", background: "var(--accent)", color: "var(--btn-primary-text)", cursor: formSaving ? "default" : "pointer", opacity: formSaving ? 0.6 : 1 }}
+              >
+                {formSaving ? "新增中⋯" : "確認新增"}
+              </button>
+              <button
+                onClick={() => { setShowForm(false); setForm(EMPTY_FORM); setError(null); }}
+                style={{ padding: "7px 14px", borderRadius: 6, fontSize: 12, fontWeight: 500, border: "1px solid var(--card-border)", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </Card>
+      ) : (
+        <div style={{ marginBottom: 12 }}>
+          <button
+            onClick={() => { setShowForm(true); setError(null); }}
+            style={{ padding: "7px 16px", borderRadius: 6, fontSize: 12, fontWeight: 600, border: "none", background: "var(--accent)", color: "var(--btn-primary-text)", cursor: "pointer" }}
+          >
+            ＋ 新增憑證
+          </button>
+        </div>
+      )}
+
+      {/* Credential groups */}
+      {credentials.length === 0 ? (
+        <Card title="憑證庫">
+          <div style={{ fontSize: 13, color: "var(--text-muted)" }}>尚無憑證。點「新增憑證」開始建立。</div>
+        </Card>
+      ) : (
+        CRED_CATEGORIES
+          .filter((cat) => grouped.has(cat.value))
+          .map((cat) => (
+            <Card key={cat.value} title={`${cat.label}`}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {(grouped.get(cat.value) ?? []).map((cred) => {
+                  const isSaving = saving === cred.id;
+                  const secretInput = secretInputs[cred.id] ?? "";
+                  const isVisible = secretVisible[cred.id] ?? false;
+                  return (
+                    <div
+                      key={cred.id}
+                      style={{
+                        padding: "12px 14px", borderRadius: 8,
+                        border: `1px solid ${cred.secretSet ? "var(--card-border)" : "var(--yellow)"}`,
+                        background: "var(--bg-canvas)",
+                        opacity: isSaving ? 0.7 : 1,
+                      }}
+                    >
+                      {/* Row header */}
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
+                            {cred.label}
+                          </div>
+                          {cred.identifier && (
+                            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                              {cred.identifier}
+                            </div>
+                          )}
+                          {cred.note && (
+                            <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4, fontStyle: "italic" }}>
+                              {cred.note}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                          <span style={{
+                            fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 10,
+                            background: cred.secretSet ? "var(--badge-green-bg)" : "var(--badge-yellow-bg, #fef3c7)",
+                            color: cred.secretSet ? "var(--green)" : "#92400e",
+                            border: `1px solid ${cred.secretSet ? "var(--green)" : "#d97706"}`,
+                          }}>
+                            {cred.secretSet ? "已設密碼" : "未設密碼"}
+                          </span>
+                          <button
+                            disabled={isSaving}
+                            onClick={() => handleDelete(cred.id, cred.label)}
+                            style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px solid var(--red)", background: "transparent", color: "var(--red)", cursor: isSaving ? "default" : "pointer" }}
+                          >
+                            刪除
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Secret controls */}
+                      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                        <div style={{ position: "relative", flex: "1 1 200px" }}>
+                          <input
+                            type={isVisible ? "text" : "password"}
+                            placeholder={cred.secretSet ? "輸入新密碼以覆蓋" : "輸入密碼 / API Key"}
+                            value={secretInput}
+                            onChange={(e) => setSecretInputs((prev) => ({ ...prev, [cred.id]: e.target.value }))}
+                            autoComplete="new-password"
+                            style={{ width: "100%", padding: "6px 32px 6px 8px", borderRadius: 6, border: "1px solid var(--card-border)", fontSize: 11, background: "var(--bg-canvas)", color: "var(--text-primary)", boxSizing: "border-box" }}
+                          />
+                          <button
+                            onClick={() => setSecretVisible((prev) => ({ ...prev, [cred.id]: !isVisible }))}
+                            style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", cursor: "pointer", fontSize: 13, color: "var(--text-muted)", padding: 0 }}
+                            title={isVisible ? "隱藏" : "顯示"}
+                          >
+                            {isVisible ? "🙈" : "👁"}
+                          </button>
+                        </div>
+                        <button
+                          disabled={isSaving || !secretInput.trim()}
+                          onClick={() => handleSetSecret(cred.id)}
+                          style={{ padding: "6px 12px", borderRadius: 6, fontSize: 11, fontWeight: 600, border: "none", background: "var(--accent)", color: "var(--btn-primary-text)", cursor: (isSaving || !secretInput.trim()) ? "default" : "pointer", opacity: (isSaving || !secretInput.trim()) ? 0.5 : 1, whiteSpace: "nowrap" }}
+                        >
+                          {isSaving ? "⋯" : "儲存密碼"}
+                        </button>
+                        {cred.secretSet && (
+                          <button
+                            disabled={isSaving}
+                            onClick={() => handleClearSecret(cred.id)}
+                            style={{ padding: "6px 10px", borderRadius: 6, fontSize: 11, fontWeight: 500, border: "1px solid var(--red)", background: "transparent", color: "var(--red)", cursor: isSaving ? "default" : "pointer", whiteSpace: "nowrap" }}
+                          >
+                            清除密碼
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          ))
+      )}
+    </>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 const TABS = ["內容工具", "整合", "佈建", "維護", "設定", "社群頻道", "憑證庫"] as const;
