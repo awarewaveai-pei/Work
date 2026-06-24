@@ -723,12 +723,19 @@ export default function ContentStudio() {
   const [postizSelected,     setPostizSelected]     = useState<Set<string>>(new Set());
   const [postizCustomText,   setPostizCustomText]   = useState<Record<string, string>>({});
   const [postizMode,         setPostizMode]         = useState<"draft" | "now">("draft");
-  const [postizIncludeImg,   setPostizIncludeImg]   = useState(false);
   // "none" = text-only | "image" = attach hero/social image | "video" = attach generated video (per-platform format routing)
-  const [postizMediaType,    setPostizMediaType]    = useState<"none" | "image" | "video">("none");
+  // Document-level property — controls both copy generation style AND Postiz attachment. Positioned before generate button.
+  const [distMediaType,      setDistMediaType]      = useState<"none" | "image" | "video">("none");
+  // true when distMediaType changed after copy was generated → prompt user to re-generate
+  const [synStale,           setSynStale]           = useState(false);
   const [postizPushStatus,   setPostizPushStatus]   = useState<"idle" | "pushing" | "done" | "error">("idle");
   const [postizPushResults,  setPostizPushResults]  = useState<Array<{ platform: string; status: "ok" | "error"; error?: string }>>([]);
   const [postizShowConfirm,  setPostizShowConfirm]  = useState(false);
+
+  // Mark copy stale when distribution media type changes after copy already generated
+  useEffect(() => {
+    if (synStatus === "done") setSynStale(true);
+  }, [distMediaType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Newsletter (FluentCRM draft push — draft only, never sends; wp-bridge /newsletter)
   const [nlStatus, setNlStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
@@ -1749,11 +1756,11 @@ export default function ContentStudio() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           article: generated, platforms, twitterMode, articleUrl: pubResult?.view_url,
-          mediaType: postizMediaType === "video" ? "video" : postizMediaType === "image" ? "image" : "text",
+          mediaType: distMediaType === "video" ? "video" : distMediaType === "image" ? "image" : "text",
         }),
       });
       const json = await res.json() as { ok: boolean; posts?: Record<string, string>; _cost?: { usd: number; model: string; vendor: string } };
-      if (json.ok && json.posts) { setSynContent(json.posts); setSynStatus("done"); }
+      if (json.ok && json.posts) { setSynContent(json.posts); setSynStatus("done"); setSynStale(false); }
       else                       { setSynStatus("error"); }
       if (json._cost) addCostLine({ route: "content/syndicate", model: json._cost.model, vendor: json._cost.vendor, usd: json._cost.usd, kind: "text" });
     } catch { setSynStatus("error"); }
@@ -1803,8 +1810,8 @@ export default function ContentStudio() {
           clientId: selectedSiteId,
           mode: postizMode,
           platforms: posts,
-          imageUrl: postizMediaType === "image" && imgResult ? imgResult.imageUrl : undefined,
-          videoUrls: postizMediaType === "video" && Object.keys(videoOutputUrls).length > 0
+          imageUrl: distMediaType === "image" && imgResult ? imgResult.imageUrl : undefined,
+          videoUrls: distMediaType === "video" && Object.keys(videoOutputUrls).length > 0
             ? videoOutputUrls as Partial<Record<"16x9" | "9x16" | "4x5", string>>
             : undefined,
           confirmPublishNow: postizMode === "now" && confirmed ? true : undefined,
@@ -3572,6 +3579,38 @@ export default function ContentStudio() {
               <div style={{ fontSize: "12px", color: "var(--text-muted)", padding: "8px 0", textAlign: "center" }}>⏳ 請先生成文章後才能使用</div>
             ) : (
               <>
+                {/* Distribution media type — must be set BEFORE generating copy (affects copy style + Postiz attachment) */}
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: "var(--text-secondary)" }}>
+                    附加媒體（影響文案風格與發佈附件）
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {(["none", "image", "video"] as const).map(mt => {
+                      const disabled = mt === "image" ? !imgResult : mt === "video" ? Object.keys(videoOutputUrls).length === 0 : false;
+                      const label = mt === "none" ? "僅文字" : mt === "image" ? `圖片${imgResult ? ` (${imgResult.spec.label})` : " (未生成)"}` : `影片${Object.keys(videoOutputUrls).length > 0 ? " (依平台比例)" : " (未生成)"}`;
+                      const active = distMediaType === mt && !disabled;
+                      return (
+                        <button key={mt} type="button"
+                          onClick={() => !disabled && setDistMediaType(mt)}
+                          disabled={disabled}
+                          style={{
+                            padding: "4px 12px", borderRadius: 20, fontSize: 11, cursor: disabled ? "not-allowed" : "pointer",
+                            border: `1px solid ${active ? "var(--accent)" : "var(--card-border)"}`,
+                            background: active ? "var(--accent)" : disabled ? "var(--bg-canvas)" : "rgba(255,255,255,0.6)",
+                            color: active ? "#fff" : disabled ? "var(--text-muted)" : "var(--text-secondary)",
+                            opacity: disabled ? 0.5 : 1,
+                          }}>
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {distMediaType === "video" && Object.keys(videoOutputUrls).length > 0 && (
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 5 }}>
+                      ▶ 16:9 → YouTube/文章/LinkedIn | 📱 9:16 → TikTok/Reels/IG/Threads | 📷 4:5 → FB/Pinterest
+                    </div>
+                  )}
+                </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "flex-start", marginBottom: "10px" }}>
                   {SYN_PLATFORMS.map(p => (
                     <div key={p.key} style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -3598,6 +3637,11 @@ export default function ContentStudio() {
                     disabled={synStatus === "generating" || !Object.values(synEnabled).some(Boolean)}>
                     {synStatus === "generating" ? "生成中…" : "生成社群貼文"}
                   </button>
+                  {synStale && synStatus === "done" && (
+                    <span style={{ fontSize: 11, color: "#f59e0b", alignSelf: "center" }}>
+                      ⚠ 媒體類型已變更，建議重新生成
+                    </span>
+                  )}
                 </div>
                 {synStatus === "error" && (
                   <div style={{ fontSize: "12px", color: "var(--color-error)", marginTop: "6px" }}>社群貼文生成失敗，請重試</div>
@@ -3685,39 +3729,6 @@ export default function ContentStudio() {
                                 </div>
                               );
                             })}
-                          </div>
-
-                          {/* Media attachment selector — text / image / video */}
-                          <div style={{ marginBottom: 10 }}>
-                            <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: "var(--text-secondary)" }}>
-                              附加媒體
-                            </div>
-                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                              {(["none", "image", "video"] as const).map(mt => {
-                                const disabled = mt === "image" ? !imgResult : mt === "video" ? Object.keys(videoOutputUrls).length === 0 : false;
-                                const label = mt === "none" ? "僅文字" : mt === "image" ? `圖片${imgResult ? ` (${imgResult.spec.label})` : " (未生成)"}` : `影片${Object.keys(videoOutputUrls).length > 0 ? " (依平台比例)" : " (未生成)"}`;
-                                const active = postizMediaType === mt && !disabled;
-                                return (
-                                  <button key={mt} type="button"
-                                    onClick={() => !disabled && setPostizMediaType(mt)}
-                                    disabled={disabled}
-                                    style={{
-                                      padding: "4px 12px", borderRadius: 20, fontSize: 11, cursor: disabled ? "not-allowed" : "pointer",
-                                      border: `1px solid ${active ? "var(--accent)" : "var(--card-border)"}`,
-                                      background: active ? "var(--accent)" : disabled ? "var(--bg-canvas)" : "rgba(255,255,255,0.6)",
-                                      color: active ? "#fff" : disabled ? "var(--text-muted)" : "var(--text-secondary)",
-                                      opacity: disabled ? 0.5 : 1,
-                                    }}>
-                                    {label}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                            {postizMediaType === "video" && Object.keys(videoOutputUrls).length > 0 && (
-                              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 5 }}>
-                                ▶ 16:9 → YouTube/文章/LinkedIn | 📱 9:16 → TikTok/Reels/IG/Threads | 📷 4:5 → FB/Pinterest
-                              </div>
-                            )}
                           </div>
 
                           <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
@@ -4481,9 +4492,14 @@ export default function ContentStudio() {
                 <li key={p} style={{ fontSize: 13, marginBottom: 4 }}>{p}</li>
               ))}
             </ul>
-            {postizIncludeImg && imgResult && (
+            {distMediaType === "image" && imgResult && (
               <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
                 附帶圖片：{imgResult.spec.label}
+              </div>
+            )}
+            {distMediaType === "video" && Object.keys(videoOutputUrls).length > 0 && (
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
+                附帶影片（{Object.keys(videoOutputUrls).join("、")} 比例，依各平台自動路由）
               </div>
             )}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>

@@ -4,6 +4,34 @@
 
 ## 2026-06-24
 
+### fix(social): ContentStudio 媒體類型架構修正（postizMediaType rename + confirm modal bug fix）
+
+[任務理解] 發現並修正 3 個 bug：(A) UX 順序悖論（媒體選擇器在生成按鈕下游，handleSyndicate 讀不到設定）；(B) `postizIncludeImg` dead state 永遠 false 破壞 confirm modal；(C) confirm modal 無影片媒體資訊。根本問題：一個 concern（分發媒體類型）橫跨錯誤的抽象邊界。
+
+[已修改]
+- `app/tools/content/ContentStudio.tsx`:
+  - `postizMediaType` → rename `distMediaType`（distribution media type，語意更清楚）
+  - `postizIncludeImg` dead state 完全移除（checkbox 被 chip UI 取代後此 state 從未被 SET）
+  - 新增 `synStale: boolean` state + `useEffect([distMediaType])` — 媒體類型改變且 copy 已存在時顯示「建議重新生成」警示
+  - 媒體選擇器 chip UI 從 Postiz 子區塊**移至**平台 checkbox 上方（生成按鈕前），操作順序符合邏輯
+  - confirm modal（立即發佈二次確認）：修正 `postizIncludeImg`（always false）→ `distMediaType === "image"`；補充影片媒體資訊區塊
+  - `synStale` 警示加 `synStatus === "done"` guard（防止跨文章殘留）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=<60000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/1n（minor: synStale guard → 已修）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=postizMediaType|postizIncludeImg (code files only: .ts,.tsx,.js,.ps1,.sh) | hits=0
+  - Note: WORKLOG.md hits=5 are historical documentation entries from prior session (state was introduced then) — not stale code references
+- BUGHUNT_WAIVED: DOC_ONLY -- WORKLOG hits are prior session historical records; no live code consumers
+
+[剩餘風險]
+- `distMediaType`/`imgResult`/`videoOutputUrls` 不在新文章 reset 區塊內（pre-existing；前一 session 同樣行為；使用者繼承前一篇文章的媒體選擇是有意識決策）
+
+[rollback]
+- `git revert HEAD`（single commit） → 還原到 postizMediaType/postizIncludeImg 版本
+
+
+
 ### feat(social): 完整影片→Postiz 社群發佈架構
 
 [任務理解] 影片生成後的多格式輸出（16:9/9:16/4:5）應依平台路由推送到 Postiz（草稿或立即發佈），每平台自動選擇正確比例。ContentStudio 需要媒體選擇器（文字/圖片/影片）與 Syndicate copy 的媒體類型提示。
@@ -13193,7 +13221,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-24 00:21:11 UTC_
+_Last synced: 2026-06-24 14:30:03 UTC_
 
 ## 2026-06-16 AO-CLOSE prep — 15:xx session close
 
@@ -14367,3 +14395,5 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): structural DOM move, toolbar inside filter-panel, no logic change
+
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): layout-only JSX restructure, no logic change
