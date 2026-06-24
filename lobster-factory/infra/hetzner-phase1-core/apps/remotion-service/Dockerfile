@@ -2,13 +2,23 @@
 # Node 20 + Chromium + ffmpeg + CJK fonts
 # Memory budget: ~800MB (Chrome headless rendering)
 
+# ── Stage 1: build (includes devDeps for tsc) ─────────────────────────────────
+FROM node:20-slim AS builder
+
+WORKDIR /app
+COPY package.json ./
+RUN npm install
+COPY . .
+RUN npx tsc -p tsconfig.server.json
+
+# ── Stage 2: prod deps only ────────────────────────────────────────────────────
 FROM node:20-slim AS deps
 
 WORKDIR /app
 COPY package.json ./
 RUN npm install --omit=dev
 
-# ── Runtime image ──────────────────────────────────────────────────────────────
+# ── Stage 3: runtime image ─────────────────────────────────────────────────────
 FROM node:20-slim
 
 # System packages: Chromium + ffmpeg + CJK fonts + shared libs Chrome needs
@@ -48,10 +58,8 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV REMOTION_CHROME_EXECUTABLE_PATH=/usr/local/bin/chromium-docker
 
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
 COPY . .
-
-# Compile Express server (TypeScript → CommonJS)
-RUN npx tsc -p tsconfig.server.json
 
 EXPOSE 8733
 
