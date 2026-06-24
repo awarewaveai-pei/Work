@@ -3715,7 +3715,7 @@ export default function ContentStudio() {
                             </div>
                             {postizMediaType === "video" && Object.keys(videoOutputUrls).length > 0 && (
                               <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 5 }}>
-                                ▶ 16:9 → YouTube/文章 | 📱 9:16 → TikTok/Reels/Threads | 📷 4:5 → IG Feed/FB/Pinterest
+                                ▶ 16:9 → YouTube/文章/LinkedIn | 📱 9:16 → TikTok/Reels/IG/Threads | 📷 4:5 → FB/Pinterest
                               </div>
                             )}
                           </div>

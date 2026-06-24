@@ -58,6 +58,20 @@ export async function POST(req: Request): Promise<Response> {
       status: 400,
     });
   }
+  const VALID_VIDEO_FORMAT_KEYS = new Set(["16x9", "9x16", "4x5"]);
+  if (videoUrls !== undefined) {
+    if (typeof videoUrls !== "object" || videoUrls === null || Array.isArray(videoUrls)) {
+      return new NextResponse("videoUrls must be an object", { status: 400 });
+    }
+    for (const [k, v] of Object.entries(videoUrls)) {
+      if (!VALID_VIDEO_FORMAT_KEYS.has(k)) {
+        return new NextResponse(`videoUrls key must be one of: 16x9, 9x16, 4x5 (got: ${k})`, { status: 400 });
+      }
+      if (typeof v !== "string" || !v.trim()) {
+        return new NextResponse(`videoUrls["${k}"] must be a non-empty string`, { status: 400 });
+      }
+    }
+  }
 
   if (mode === "now") {
     try {
