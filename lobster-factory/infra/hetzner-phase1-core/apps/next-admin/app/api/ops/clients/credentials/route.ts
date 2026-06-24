@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canWriteTenantConfig } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { deleteSecret, clientCredSecretRef } from "@/lib/secret-vault";
+import { deleteSecret } from "@/lib/secret-vault";
 
 // Per-client credential vault — metadata CRUD (migration 0050).
 //
@@ -126,7 +126,11 @@ export async function PATCH(req: Request): Promise<Response> {
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (body.label      !== undefined) patch.label      = str(body.label);
+  if (body.label !== undefined) {
+    const labelVal = str(body.label);
+    if (!labelVal) return NextResponse.json({ ok: false, error: "label cannot be empty" }, { status: 400 });
+    patch.label = labelVal;
+  }
   if (body.category   !== undefined) {
     const cat = str(body.category) ?? "other";
     if (!VALID_CATEGORIES.has(cat)) {

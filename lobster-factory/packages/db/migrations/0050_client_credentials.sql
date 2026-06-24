@@ -22,7 +22,16 @@
 --
 -- Down migration (rollback): packages/db/scripts/0050_client_credentials_down.sql
 --   DROP TABLE IF EXISTS client_credentials;
---   (safe — no other table references this table; vault entries are namespaced `client_cred:{id}`)
+--
+-- VAULT ORPHAN NOTE: ON DELETE CASCADE removes client_credentials rows at the SQL layer when an
+-- organization is deleted, bypassing app code and leaving vault entries (`client_cred:{uuid}`)
+-- without a referencing row. These are inert orphaned ciphertext blobs (not a security leak), but
+-- accumulate indefinitely. Mitigate via periodic reconciliation:
+--   SELECT secret_delete(secret_ref) FROM client_credentials
+--     WHERE secret_ref IS NOT NULL AND NOT EXISTS (
+--       SELECT 1 FROM vault.secrets WHERE name = secret_ref
+--     );
+-- Run before org deletion in the client-offboarding flow (future ops-action step).
 
 BEGIN;
 
@@ -46,9 +55,13 @@ CREATE INDEX IF NOT EXISTS idx_client_credentials_client_id
 
 ALTER TABLE public.client_credentials ENABLE ROW LEVEL SECURITY;
 
+-- Align with house pattern (see 0041, 0042, 0048): TO service_role + explicit WITH CHECK.
+-- App reaches this table exclusively via the service-role Supabase client (lib/supabase-server.ts).
 CREATE POLICY "service_role only"
   ON public.client_credentials
-  USING (auth.role() = 'service_role');
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
 
 NOTIFY pgrst, 'reload schema';
 
