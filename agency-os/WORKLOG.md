@@ -87,6 +87,62 @@ AUTO_TASK_DONE: VideoStudio UI 一致性 + 時間長度 + 去 emoji 重構部署
 
 ---
 
+### feat(credentials): 憑證庫 — 完整 per-client 加密憑證中心上線
+
+[任務理解] 客戶憑證（社群帳號、API Key、CRM Token、WP 密碼、Analytics ID…）散落各處，無統一加密存放。建立 canonical encrypted-at-rest per-client credential store，一勞永逸。
+
+[已修改]
+- `lobster-factory/packages/db/migrations/0050_client_credentials.sql` (NEW)
+  - `client_credentials` table：id/client_id/category/label/identifier/note/secret_ref/metadata/sort_order
+  - 9 categories CHECK constraint、RLS TO service_role（house pattern 同 0041/0042/0048）
+  - Applied EU Supabase: CREATE TABLE + INDEX + RLS + POLICY + NOTIFY — 全部成功
+  - APPLY 指令需 `supabase_admin` user（postgres 缺 auth schema 權限，會 permission denied）
+- `lobster-factory/packages/db/scripts/0050_client_credentials_down.sql` (NEW)
+  - Down migration: `DROP TABLE IF EXISTS public.client_credentials;`
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/secret-vault.ts` (MODIFIED)
+  - 新增 `clientCredSecretRef(credentialId)` → `client_cred:{uuid}` vault ref 命名函式
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/clients/credentials/route.ts` (NEW)
+  - Metadata CRUD（GET/POST/PATCH/DELETE）；GET 只回 `secretSet: boolean`，從不回傳秘密值
+  - `looksLikeSecret()` guard 防誤貼 API key 到 label/identifier/note
+  - PATCH 明確拒絕 secretRef/secret_ref 欄位（400）；label 空字串 guard（400）
+  - Gate: `canWriteTenantConfig(role)`
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/clients/credentials/secret/route.ts` (NEW)
+  - 唯一接受原始秘密 bytes 的路徑；`putSecret(clientCredSecretRef(id), value)` → 只存 ref
+  - DB update 失敗時 `deleteSecret(ref)` compensate 避免 vault orphan
+  - DELETE 清除 vault entry + 清空 secret_ref 欄位
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/clients/[slug]/ClientHubTabs.tsx` (MODIFIED)
+  - TABS 新增「憑證庫」tab
+  - 新增 `CredentialsTab` component (~280 lines)：9 category chips + inline add form + secretSet badge + 👁 password toggle + 儲存/清除/刪除操作
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec supabase-db psql -U supabase_admin -d postgres -f /tmp/0050_v2.sql | exit=0 | ms=~3000
+  - BEGIN + CREATE TABLE + CREATE INDEX + ALTER TABLE + CREATE POLICY + NOTIFY + COMMIT ✅
+  - table schema confirmed: 11 columns + policy `{service_role}` ✅
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin | exit=0 | ms=41000
+  - tsc typecheck: pass | vitest: 487/487 pass | healthcheck: healthy 7s | smoke: 4/4 OK
+  - deployed commit: febf7cb45d8780928fb7c62da6fdc274f7378e74
+- REALTEST_EVIDENCE: tool=Bash | cmd=playwright-runner.ps1 -Mode smoke -SkipInstall | exit=0 | ms=15800
+  - 26 passed / 6 skipped / 0 failed
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/3n(fixed) — unused import 移除 + label empty guard + migration user comment
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=client_cred:|client_credentials | hits=0 (no prior usage, no stale claims)
+- BUGHUNT_WAIVED: NA -- migration 0050 是新命名空間，無下游 call sites
+
+[剩餘風險]
+- Vault orphan on org DELETE CASCADE（app code 繞過，vault entries 留下）— 已記錄於 migration comment；mitigate: 日後 client-offboarding flow 加 reconciliation step
+- WP sites plaintext token 仍在 wp_sites table（legacy）— migration 0051 候選，非本任務範圍
+
+[rollback]
+```bash
+# App: git revert <commits> + redeploy
+git revert e0221df4 b1c9e59f 2e727fd8 && git push
+# Migration: 0050_client_credentials_down.sql
+docker exec supabase-db psql -U supabase_admin -d postgres -c "DROP TABLE IF EXISTS public.client_credentials;"
+```
+
+AUTO_TASK_DONE: 憑證庫 (migration 0050 + 3 API routes + CredentialsTab UI) 全棧部署完成，26/32 smoke PASS
+
+---
+
 ## 2026-06-24
 
 ### refactor(video): VideoStudio 影片生產頁 UX 重設計 — 3 Tab + 2 欄佈局
