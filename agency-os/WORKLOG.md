@@ -14429,3 +14429,4 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): layout-only JSX restructure, no logic change
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): remove sticky+overflow wrapper, layout-only JSX change
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): CSS order prop + width tweak, no logic change
