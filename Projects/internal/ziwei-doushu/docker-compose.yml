@@ -4,6 +4,9 @@
 #   oracle.aware-wave.com。容器只綁 127.0.0.1,不對外開埠;對外一律走 nginx + TLS。
 # ⚠️ SG 是共用 4GB 機(跑 WordPress 等),故設 mem_limit 防 OOM(見 OOM runbook)。
 # 之後遷 EU 機:同一份 compose 換主機即可(host-agnostic)。
+#
+# 網路說明:加入 lobster-net(external)讓 lobster-nginx 可用 oracle-web:3000 反代。
+#   host port 3010 保留供本機 health-check 使用。
 
 services:
   oracle-web:
@@ -23,12 +26,19 @@ services:
     # env_file:
     #   - .env.production
     ports:
-      - "127.0.0.1:3010:3000" # 只綁 localhost,由 nginx 反代
+      - "127.0.0.1:3010:3000" # 保留供本機 health-check
     mem_limit: 512m
     mem_reservation: 256m
+    networks:
+      - lobster-net
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 20s
+
+networks:
+  lobster-net:
+    external: true
+    name: lobster-net
