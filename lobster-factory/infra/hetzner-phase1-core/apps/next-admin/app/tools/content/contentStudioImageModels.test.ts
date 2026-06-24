@@ -80,7 +80,8 @@ describe("Content Studio image-style picker ↔ STYLE_CATALOG", () => {
   });
 
   it("resolves a known zh key to its English prompt (mediaImageParams() path)", () => {
-    const vg = STYLE_CATALOG.find(s => s.zh === "梵谷 Van Gogh");
+    // zh labels carry an optional "｜<描述>" tooltip suffix; the lookup key is the name before it.
+    const vg = STYLE_CATALOG.find(s => s.zh.split("｜")[0] === "梵谷 Van Gogh");
     expect(vg).toBeDefined();
     expect(vg!.prompt.toLowerCase()).toContain("impasto");
   });
