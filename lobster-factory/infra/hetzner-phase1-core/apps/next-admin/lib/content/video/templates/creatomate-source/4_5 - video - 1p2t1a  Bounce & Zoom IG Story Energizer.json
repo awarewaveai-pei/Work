@@ -1,0 +1,139 @@
+﻿{
+    "output_format":  "mp4",
+    "width":  1536,
+    "height":  1920,
+    "duration":  10.01,
+    "elements":  [
+                     {
+                         "id":  "3939202c-9b2f-4325-9d69-6bf8b54026e7",
+                         "type":  "image",
+                         "track":  1,
+                         "time":  0,
+                         "source":  "22ac7085-d6fc-488d-bb1b-b200abf1a9c5",
+                         "clip":  true,
+                         "dynamic":  true,
+                         "animations":  [
+                                            {
+                                                "time":  0.105,
+                                                "duration":  0.528,
+                                                "easing":  "quadratic-out",
+                                                "type":  "fade"
+                                            },
+                                            {
+                                                "time":  1.132,
+                                                "duration":  6.326,
+                                                "type":  "scale",
+                                                "fade":  false,
+                                                "scope":  "element",
+                                                "end_scale":  "130%",
+                                                "start_scale":  "100%"
+                                            }
+                                        ]
+                     },
+                     {
+                         "id":  "dd9df45a-0ab3-43fc-8ad0-0c944609381d",
+                         "type":  "text",
+                         "track":  3,
+                         "time":  1.5,
+                         "x":  "50.6106%",
+                         "y":  "73.1116%",
+                         "width":  "86.7162%",
+                         "height":  "40.0638%",
+                         "x_alignment":  "50%",
+                         "y_alignment":  "100%",
+                         "text":  "Feel the Energy!",
+                         "font_family":  "Montserrat",
+                         "font_weight":  "600",
+                         "font_size_minimum":  "7 vmin",
+                         "font_size_maximum":  "7 vmin",
+                         "background_color":  "#2eb0a4",
+                         "fill_color":  "#ffffff",
+                         "shadow_color":  "rgba(0,0,0,0.4)",
+                         "dynamic":  true,
+                         "animations":  [
+                                            {
+                                                "time":  0,
+                                                "duration":  1.2,
+                                                "easing":  "bounce-out",
+                                                "type":  "bounce",
+                                                "direction":  "bottom"
+                                            },
+                                            {
+                                                "time":  0,
+                                                "duration":  5,
+                                                "easing":  "linear",
+                                                "type":  "wiggle",
+                                                "rotation":  "4°",
+                                                "frequency":  "2 Hz"
+                                            }
+                                        ]
+                     },
+                     {
+                         "id":  "e82fd2ea-a85b-4e6a-85fe-8a605f85f19d",
+                         "name":  "Title",
+                         "type":  "text",
+                         "track":  4,
+                         "time":  0.5,
+                         "y":  "28.9445%",
+                         "width":  "100%",
+                         "height":  "25.6246%",
+                         "x_alignment":  "50%",
+                         "text":  "Your Awesome Headline!",
+                         "font_family":  "Montserrat",
+                         "font_weight":  "700",
+                         "font_size_minimum":  "7 vmin",
+                         "font_size_maximum":  "10 vmin",
+                         "background_color":  "#ff597b",
+                         "fill_color":  "#ffffff",
+                         "shadow_color":  "rgba(0,0,0,0.4)",
+                         "dynamic":  true,
+                         "animations":  [
+                                            {
+                                                "time":  0,
+                                                "duration":  1.2,
+                                                "easing":  "bounce-out",
+                                                "type":  "bounce",
+                                                "direction":  "top"
+                                            },
+                                            {
+                                                "time":  0,
+                                                "duration":  6,
+                                                "easing":  "linear",
+                                                "type":  "wiggle",
+                                                "rotation":  "3°",
+                                                "frequency":  "1.5 Hz"
+                                            }
+                                        ]
+                     },
+                     {
+                         "id":  "cb76cdd8-4b44-486a-a3e7-9c8b5bc28a78",
+                         "name":  "Logo",
+                         "type":  "image",
+                         "track":  6,
+                         "time":  0,
+                         "x":  "88.2441%",
+                         "y":  "8.4114%",
+                         "width":  "17.68%",
+                         "height":  "14.3993%",
+                         "source":  "e36edca6-0be9-4e90-8605-4392bce13493",
+                         "animations":  [
+                                            {
+                                                "time":  0,
+                                                "duration":  0.99,
+                                                "easing":  "quadratic-out",
+                                                "type":  "fade",
+                                                "track":  0
+                                            }
+                                        ]
+                     },
+                     {
+                         "id":  "b4684537-4b4e-45f5-ab0a-2f2a046bf868",
+                         "name":  "Music",
+                         "type":  "audio",
+                         "track":  7,
+                         "time":  0,
+                         "duration":  null,
+                         "dynamic":  true
+                     }
+                 ]
+}

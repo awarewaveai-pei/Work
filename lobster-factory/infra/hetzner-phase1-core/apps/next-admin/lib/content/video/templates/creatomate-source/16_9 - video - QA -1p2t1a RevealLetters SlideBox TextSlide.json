@@ -1,0 +1,278 @@
+﻿{
+    "output_format":  "mp4",
+    "width":  1920,
+    "height":  1080,
+    "duration":  11.81,
+    "snapshot_time":  7.74,
+    "fill_color":  "#2eb0a4",
+    "elements":  [
+                     {
+                         "id":  "66586164-d3a2-44ab-bfff-f62f626aea11",
+                         "name":  "Music",
+                         "type":  "image",
+                         "track":  1,
+                         "time":  0,
+                         "source":  "A rocky seaside cliff with waves crashing against the shore during a cloudy sunset.",
+                         "provider":  "openai model=dall-e-3",
+                         "dynamic":  true
+                     },
+                     {
+                         "id":  "1ff3776f-1848-4734-a484-4804de65d8d1",
+                         "name":  "background",
+                         "type":  "image",
+                         "track":  2,
+                         "time":  0,
+                         "source":  "e5a688ff-d287-4a5d-8a08-097920469fd4",
+                         "clip":  true,
+                         "dynamic":  true,
+                         "animations":  [
+                                            {
+                                                "time":  0,
+                                                "duration":  1,
+                                                "easing":  "quadratic-out",
+                                                "type":  "scale",
+                                                "scope":  "element",
+                                                "start_scale":  "150%"
+                                            }
+                                        ]
+                     },
+                     {
+                         "id":  "2bd393d9-3113-4d31-a3fe-db82080c4c7c",
+                         "name":  "C2",
+                         "type":  "composition",
+                         "track":  4,
+                         "time":  2.255,
+                         "y":  "57.1476%",
+                         "width":  "82.6384%",
+                         "height":  589.7137,
+                         "fill_color":  "#ff96a0",
+                         "stroke_color":  "#ff96a1",
+                         "stroke_width":  "0.5 vmin",
+                         "border_radius":  "3 vmin",
+                         "animations":  [
+                                            {
+                                                "time":  0,
+                                                "duration":  1.689,
+                                                "easing":  "cubic-bezier(0.59, 0.56, 0.52, 0.64)",
+                                                "type":  "slide",
+                                                "direction":  "90°"
+                                            }
+                                        ],
+                         "elements":  [
+                                          {
+                                              "id":  "799b8574-b9ef-44f6-bf18-1ff0ebd08da1",
+                                              "type":  "shape",
+                                              "track":  1,
+                                              "time":  0,
+                                              "width":  "100%",
+                                              "height":  "100%",
+                                              "path":  "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+                                              "fill_color":  "rgba(255,255,255,1)",
+                                              "border_radius":  "1.8 vmin"
+                                          },
+                                          {
+                                              "id":  "6bf97d31-2186-415a-b122-3d3316f18172",
+                                              "name":  "Quote",
+                                              "type":  "text",
+                                              "track":  2,
+                                              "time":  1.23,
+                                              "y":  "42.3146%",
+                                              "width":  "100%",
+                                              "height":  "84.6291%",
+                                              "x_padding":  "4.2 vw",
+                                              "y_padding":  "2.2 vh",
+                                              "y_alignment":  "50%",
+                                              "text":  "There is a widely shared rumor that you can train your body to need fewer than 7–9 hours’ sleep. Although some people might claim to feel fine with limited sleep, scientists think it is more likely that they are used to the negative effects of reduced sleep.",
+                                              "font_family":  "Mulish",
+                                              "font_size_maximum":  "10 vmin",
+                                              "line_height":  "150%",
+                                              "fill_color":  "rgba(0,0,0,1)",
+                                              "dynamic":  true,
+                                              "animations":  [
+                                                                 {
+                                                                     "time":  0,
+                                                                     "duration":  7,
+                                                                     "easing":  "quadratic-out",
+                                                                     "type":  "text-appear",
+                                                                     "fade":  false,
+                                                                     "split":  "letter",
+                                                                     "random":  true
+                                                                 }
+                                                             ]
+                                          },
+                                          {
+                                              "id":  "90fb8a70-6e17-45e2-9329-00847121b5e7",
+                                              "name":  "Quote-Icon",
+                                              "type":  "shape",
+                                              "track":  3,
+                                              "time":  0,
+                                              "x":  "51.1282%",
+                                              "y":  "83.9138%",
+                                              "width":  "12%",
+                                              "height":  "10.1236%",
+                                              "aspect_ratio":  1.1516,
+                                              "x_anchor":  "59.4014%",
+                                              "y_anchor":  "50.0039%",
+                                              "path":  "M 19.1843 0 C 8.5922 0 0 10.175 0 22.7291 C 0 35.2754 8.5922 45.458 19.1843 45.458 C 38.362 45.458 25.579 89.3932 0 89.3932 L 0 100 C 45.6515 100.0077 63.5396 0 19.1843 0 Z M 74.4475 0 C 63.862 0 55.2698 10.175 55.2698 22.7291 C 55.2698 35.2754 63.862 45.458 74.4475 45.458 C 93.6317 45.458 80.8488 89.3932 55.2698 89.3932 L 55.2698 100 C 100.9147 100.0077 118.8029 0 74.4475 0 Z",
+                                              "fill_color":  "#ff96a1"
+                                          }
+                                      ]
+                     },
+                     {
+                         "id":  "9d639a80-442a-4a7b-84dc-7d4d286db2b6",
+                         "name":  "C1",
+                         "type":  "composition",
+                         "track":  5,
+                         "time":  0.998,
+                         "elements":  [
+                                          {
+                                              "id":  "fb813b5f-91b4-4508-b508-2c7723c9ea64",
+                                              "name":  "Shape-B6V",
+                                              "type":  "shape",
+                                              "track":  1,
+                                              "time":  0,
+                                              "y":  [
+                                                        {
+                                                            "time":  0,
+                                                            "value":  "48.5994%"
+                                                        },
+                                                        {
+                                                            "time":  1.056,
+                                                            "easing":  "cubic-in-out",
+                                                            "value":  "50%"
+                                                        },
+                                                        {
+                                                            "time":  3.032,
+                                                            "easing":  "cubic-in-out",
+                                                            "value":  "19.4097%"
+                                                        },
+                                                        {
+                                                            "time":  6.352,
+                                                            "value":  "15.8426%"
+                                                        },
+                                                        {
+                                                            "time":  9.585,
+                                                            "value":  "21.261%"
+                                                        }
+                                                    ],
+                                              "width":  "100%",
+                                              "height":  "18.0973%",
+                                              "x_anchor":  "50%",
+                                              "y_anchor":  "50%",
+                                              "path":  "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+                                              "fill_color":  "#2eb0a4",
+                                              "border_radius":  "1.8 vmin",
+                                              "animations":  [
+                                                                 {
+                                                                     "time":  0,
+                                                                     "duration":  0.23,
+                                                                     "easing":  "quadratic-out",
+                                                                     "type":  "fade"
+                                                                 }
+                                                             ]
+                                          },
+                                          {
+                                              "id":  "81604c9d-1417-4d52-b5e8-ff45de30a6ab",
+                                              "name":  "Question",
+                                              "type":  "text",
+                                              "track":  2,
+                                              "time":  0,
+                                              "y":  [
+                                                        {
+                                                            "time":  0,
+                                                            "value":  "48.5994%"
+                                                        },
+                                                        {
+                                                            "time":  1.056,
+                                                            "easing":  "cubic-in-out",
+                                                            "value":  "50%"
+                                                        },
+                                                        {
+                                                            "time":  3.03,
+                                                            "easing":  "cubic-in-out",
+                                                            "value":  "19.4097%"
+                                                        },
+                                                        {
+                                                            "time":  3.057,
+                                                            "value":  "19.4097%"
+                                                        },
+                                                        {
+                                                            "time":  6.352,
+                                                            "value":  "15.8426%"
+                                                        },
+                                                        {
+                                                            "time":  9.59,
+                                                            "value":  "21.261%"
+                                                        }
+                                                    ],
+                                              "text":  "Do we really need 8 hours of sleep?",
+                                              "font_family":  "Mulish",
+                                              "font_weight":  "700",
+                                              "font_size":  "9.9999 vmin",
+                                              "line_height":  "100%",
+                                              "fill_color":  "rgba(255,255,255,1)",
+                                              "dynamic":  true,
+                                              "animations":  [
+                                                                 {
+                                                                     "time":  0,
+                                                                     "duration":  1.54,
+                                                                     "easing":  "quadratic-out",
+                                                                     "type":  "text-slide",
+                                                                     "scope":  "split-clip",
+                                                                     "split":  "line",
+                                                                     "direction":  "up"
+                                                                 }
+                                                             ]
+                                          }
+                                      ]
+                     },
+                     {
+                         "id":  "dac09ce7-6921-464c-b5e2-36264684e78d",
+                         "name":  "Handle",
+                         "type":  "text",
+                         "track":  6,
+                         "time":  6.14,
+                         "duration":  5.67,
+                         "x":  "58.3226%",
+                         "y":  "91%",
+                         "width":  "47.7523%",
+                         "height":  "11.2056%",
+                         "y_alignment":  "50%",
+                         "text":  "Orgaic Aromas",
+                         "font_family":  "Mulish",
+                         "font_weight":  "700",
+                         "line_height":  "127%",
+                         "fill_color":  "#2eb0a4",
+                         "animations":  [
+                                            {
+                                                "time":  0,
+                                                "duration":  1,
+                                                "easing":  "quadratic-out",
+                                                "type":  "fade"
+                                            }
+                                        ]
+                     },
+                     {
+                         "id":  "d423e2df-61c3-4f9f-b0a5-4d71af0dd3d2",
+                         "name":  "logo",
+                         "type":  "image",
+                         "track":  7,
+                         "time":  6.14,
+                         "duration":  5.67,
+                         "x":  "29.4329%",
+                         "y":  "91.5208%",
+                         "width":  "6.6406%",
+                         "height":  "12.2471%",
+                         "source":  "e36edca6-0be9-4e90-8605-4392bce13493",
+                         "animations":  [
+                                            {
+                                                "time":  -0.007,
+                                                "duration":  1,
+                                                "easing":  "quadratic-out",
+                                                "type":  "fade",
+                                                "track":  0
+                                            }
+                                        ]
+                     }
+                 ]
+}

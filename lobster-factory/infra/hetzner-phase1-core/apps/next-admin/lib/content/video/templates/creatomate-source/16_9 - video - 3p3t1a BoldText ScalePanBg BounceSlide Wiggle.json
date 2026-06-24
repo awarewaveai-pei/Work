@@ -1,0 +1,230 @@
+﻿{
+    "output_format":  "mp4",
+    "width":  1920,
+    "height":  1080,
+    "duration":  25,
+    "fill_color":  "rgba(0,0,0,1)",
+    "elements":  [
+                     {
+                         "id":  "d7b08d51-7dbe-4c22-80d3-7b4dd766af79",
+                         "name":  "Image1",
+                         "type":  "image",
+                         "track":  1,
+                         "time":  0,
+                         "source":  "345d013c-fef2-46a1-8863-172a8b86e745",
+                         "clip":  true,
+                         "dynamic":  true,
+                         "animations":  [
+                                            {
+                                                "time":  0,
+                                                "duration":  8,
+                                                "easing":  "cubic-out",
+                                                "type":  "scale",
+                                                "fade":  false,
+                                                "scope":  "element",
+                                                "start_scale":  "115%"
+                                            }
+                                        ]
+                     },
+                     {
+                         "id":  "ad5edc0d-ff6c-4c8c-bc27-8b266e8f3271",
+                         "name":  "Text1-title",
+                         "type":  "text",
+                         "track":  4,
+                         "time":  1.5,
+                         "x":  "6.7066%",
+                         "y":  "12%",
+                         "width":  "82.988%",
+                         "height":  "32.69%",
+                         "x_padding":  "3 vmin",
+                         "y_padding":  "2 vmin",
+                         "x_anchor":  "0%",
+                         "y_anchor":  "0%",
+                         "text":  "Attention-Grabbing\nHeader Text Attention-Grabbing\nHeader Text ",
+                         "font_family":  "Montserrat",
+                         "font_weight":  "800",
+                         "background_color":  "rgba(0,0,0,0.7)",
+                         "fill_color":  "#FFFFFF",
+                         "dynamic":  true,
+                         "animations":  [
+                                            {
+                                                "time":  0,
+                                                "duration":  1,
+                                                "easing":  "bounce-out",
+                                                "type":  "slide",
+                                                "direction":  "top"
+                                            },
+                                            {
+                                                "time":  1.3,
+                                                "duration":  7,
+                                                "type":  "wiggle",
+                                                "rotation":  "2.5°",
+                                                "frequency":  "1.5 Hz"
+                                            }
+                                        ]
+                     },
+                     {
+                         "id":  "93fd11a9-ff1e-46db-b1e4-1d75884c7205",
+                         "type":  "audio",
+                         "track":  5,
+                         "time":  0,
+                         "duration":  null,
+                         "audio_fade_in":  1,
+                         "audio_fade_out":  1,
+                         "dynamic":  true
+                     },
+                     {
+                         "id":  "36ea64f8-0799-4044-bed5-cf161b013532",
+                         "name":  "logo",
+                         "type":  "image",
+                         "track":  6,
+                         "time":  0,
+                         "x":  "93.3469%",
+                         "y":  "10.9115%",
+                         "width":  "8.5485%",
+                         "height":  "15.9363%",
+                         "source":  "e36edca6-0be9-4e90-8605-4392bce13493",
+                         "animations":  [
+                                            {
+                                                "time":  0,
+                                                "duration":  0.99,
+                                                "easing":  "quadratic-out",
+                                                "type":  "fade",
+                                                "track":  0
+                                            }
+                                        ]
+                     },
+                     {
+                         "id":  "bd0d1448-b8bc-4812-b47f-67230a57fadb",
+                         "name":  "Image2",
+                         "type":  "image",
+                         "track":  8,
+                         "time":  6,
+                         "source":  "683ea09f-13a9-42b0-8687-8f5cdba8a036",
+                         "clip":  true,
+                         "dynamic":  true,
+                         "animations":  [
+                                            {
+                                                "time":  0,
+                                                "duration":  5.979,
+                                                "easing":  "cubic-out",
+                                                "type":  "scale",
+                                                "fade":  false,
+                                                "scope":  "element",
+                                                "start_scale":  "115%"
+                                            },
+                                            {
+                                                "time":  0,
+                                                "duration":  1,
+                                                "transition":  true,
+                                                "type":  "circular-wipe",
+                                                "fade":  false,
+                                                "x_anchor":  "100%"
+                                            }
+                                        ]
+                     },
+                     {
+                         "id":  "d8dcc3f8-2baf-4c58-81a0-908342bfb09f",
+                         "name":  "Text2",
+                         "type":  "text",
+                         "track":  9,
+                         "time":  8,
+                         "x":  "96.4154%",
+                         "y":  "100%",
+                         "width":  "90.6765%",
+                         "height":  "97.0567%",
+                         "x_padding":  "2.5 vmin",
+                         "y_padding":  "1.5 vmin",
+                         "x_anchor":  "100%",
+                         "y_anchor":  "100%",
+                         "x_alignment":  "100%",
+                         "y_alignment":  "50%",
+                         "text":  "Eye-Popping Text Eye-Popping Text Eye-Popping Text Eye-Popping Text Eye-Popping Text",
+                         "font_family":  "Montserrat",
+                         "font_weight":  "600",
+                         "font_size_maximum":  "8 vmin",
+                         "background_color":  "rgba(0,0,0,0.7)",
+                         "fill_color":  "#FFFFFF",
+                         "dynamic":  true,
+                         "animations":  [
+                                            {
+                                                "time":  0,
+                                                "duration":  1.2,
+                                                "easing":  "back-out",
+                                                "type":  "slide",
+                                                "fade":  true,
+                                                "rotation":  "45°",
+                                                "direction":  "top-right",
+                                                "start_scale":  "50%"
+                                            }
+                                        ]
+                     },
+                     {
+                         "id":  "316175ff-9d51-4430-b420-bd413971816c",
+                         "name":  "Image3",
+                         "type":  "image",
+                         "track":  10,
+                         "time":  12,
+                         "source":  "826f6a5e-2e69-401d-a0c0-e71ce17e9921",
+                         "clip":  true,
+                         "dynamic":  true,
+                         "animations":  [
+                                            {
+                                                "time":  0,
+                                                "duration":  5.473,
+                                                "easing":  "cubic-out",
+                                                "type":  "scale",
+                                                "fade":  false,
+                                                "scope":  "element",
+                                                "start_scale":  "115%"
+                                            },
+                                            {
+                                                "time":  0,
+                                                "duration":  1,
+                                                "transition":  true,
+                                                "type":  "circular-wipe",
+                                                "fade":  false,
+                                                "x_anchor":  "0%"
+                                            }
+                                        ]
+                     },
+                     {
+                         "id":  "87208455-e228-4693-886a-33d0063f25f2",
+                         "name":  "Text３",
+                         "type":  "text",
+                         "track":  11,
+                         "time":  13.5,
+                         "x":  "85.3313%",
+                         "y":  "93.8905%",
+                         "width":  "70.6626%",
+                         "height":  "87.7811%",
+                         "x_padding":  "1 vmin",
+                         "y_padding":  "1 vmin",
+                         "x_anchor":  "100%",
+                         "y_anchor":  "100%",
+                         "x_alignment":  "50%",
+                         "y_alignment":  "50%",
+                         "text":  "Eye-Popping Text Eye-Popping Text Eye-Popping Text Eye-Popping Text Eye-Popping TextEye-Popping Text Eye-Popping Text Eye-Popping Text Eye-Popping Text Eye-Popping TextEye-Popping Text Eye-Popping Text Eye-Popping Text Eye-Popping Text Eye-Popping Text",
+                         "font_family":  "Montserrat",
+                         "font_weight":  "600",
+                         "font_size_maximum":  "8 vmin",
+                         "background_color":  "rgba(0,0,0,0.5)",
+                         "background_x_padding":  "30%",
+                         "background_y_padding":  "30%",
+                         "background_border_radius":  "45%",
+                         "fill_color":  "#FFFFFF",
+                         "stroke_color":  "#333333",
+                         "stroke_width":  "0.5 vmin",
+                         "dynamic":  true,
+                         "animations":  [
+                                            {
+                                                "time":  0,
+                                                "duration":  2.36,
+                                                "easing":  "quadratic-out",
+                                                "type":  "text-appear",
+                                                "split":  "word"
+                                            }
+                                        ]
+                     }
+                 ]
+}

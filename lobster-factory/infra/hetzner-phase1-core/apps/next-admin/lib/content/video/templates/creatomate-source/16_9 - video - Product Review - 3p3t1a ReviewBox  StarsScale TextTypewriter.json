@@ -1,0 +1,373 @@
+﻿{
+    "output_format":  "mp4",
+    "width":  1920,
+    "height":  1080,
+    "duration":  10,
+    "snapshot_time":  6.22,
+    "elements":  [
+                     {
+                         "id":  "3a994049-9d90-435a-bb43-51d7264c0eeb",
+                         "type":  "image",
+                         "track":  1,
+                         "source":  "1b704a73-8d4b-49f8-ba5d-b28c1eb9c795",
+                         "clip":  true,
+                         "color_overlay":  "rgba(0,0,0,0.15)",
+                         "blur_radius":  36,
+                         "dynamic":  true,
+                         "animations":  [
+                                            {
+                                                "easing":  "linear",
+                                                "type":  "scale",
+                                                "fade":  false,
+                                                "end_scale":  "160%",
+                                                "start_scale":  "100%"
+                                            }
+                                        ]
+                     },
+                     {
+                         "id":  "5aae1fc1-099b-4b4f-be6e-8bd911a74668",
+                         "type":  "composition",
+                         "track":  2,
+                         "time":  0,
+                         "width":  "79.2988%",
+                         "height":  [
+                                        {
+                                            "time":  0,
+                                            "value":  "0%"
+                                        },
+                                        {
+                                            "time":  1,
+                                            "value":  "79.2988%"
+                                        }
+                                    ],
+                         "elements":  [
+                                          {
+                                              "id":  "6e5d843f-7328-4f30-9eeb-de0a328651f6",
+                                              "name":  "White-Fill",
+                                              "type":  "shape",
+                                              "track":  1,
+                                              "time":  0,
+                                              "y":  "75%",
+                                              "width":  "100%",
+                                              "height":  "50%",
+                                              "x_anchor":  "50%",
+                                              "y_anchor":  "50%",
+                                              "path":  "M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z",
+                                              "fill_color":  "#ffffff"
+                                          },
+                                          {
+                                              "id":  "9f3308af-9c35-4fdd-af38-21b5c88a6b80",
+                                              "name":  "Stars",
+                                              "type":  "composition",
+                                              "track":  2,
+                                              "time":  3.5,
+                                              "x":  "5.1659%",
+                                              "y":  "89.205%",
+                                              "width":  "20.8383 vmin",
+                                              "height":  "5.7862 vmin",
+                                              "x_anchor":  "0%",
+                                              "y_anchor":  "0%",
+                                              "animations":  [
+                                                                 {
+                                                                     "time":  0,
+                                                                     "duration":  1,
+                                                                     "easing":  "cubic-in-out",
+                                                                     "type":  "scale",
+                                                                     "start_scale":  "300"
+                                                                 }
+                                                             ],
+                                              "elements":  [
+                                                               {
+                                                                   "id":  "291bacf5-92f7-46e6-b11c-bd5079ee61cf",
+                                                                   "name":  "Shape-5",
+                                                                   "type":  "shape",
+                                                                   "track":  1,
+                                                                   "time":  0.8337,
+                                                                   "x":  "90.6365%",
+                                                                   "y":  "49.9993%",
+                                                                   "width":  "18.727%",
+                                                                   "height":  "99.9987%",
+                                                                   "aspect_ratio":  1,
+                                                                   "path":  "M 50 80.3684 L 80.9 100 L 72.7 63 L 100 38.1053 L 64.05 34.8421 L 50 0 L 35.95 34.8421 L 0 38.1053 L 27.25 63 L 19.1 100 L 50 80.3684 Z",
+                                                                   "fill_color":  "rgba(251,188,4,1)",
+                                                                   "animations":  [
+                                                                                      {
+                                                                                          "time":  0,
+                                                                                          "duration":  1,
+                                                                                          "easing":  "cubic-in-out",
+                                                                                          "type":  "scale",
+                                                                                          "start_x":  "50%",
+                                                                                          "start_scale":  "500%"
+                                                                                      }
+                                                                                  ]
+                                                               },
+                                                               {
+                                                                   "id":  "e6220972-20de-4905-ba29-88048be465f0",
+                                                                   "name":  "Shape-4",
+                                                                   "type":  "shape",
+                                                                   "track":  2,
+                                                                   "time":  0.6253,
+                                                                   "x":  "70.3183%",
+                                                                   "y":  "49.9993%",
+                                                                   "width":  "18.727%",
+                                                                   "height":  "99.9987%",
+                                                                   "aspect_ratio":  1,
+                                                                   "path":  "M 50 80.3684 L 80.9 100 L 72.7 63 L 100 38.1053 L 64.05 34.8421 L 50 0 L 35.95 34.8421 L 0 38.1053 L 27.25 63 L 19.1 100 L 50 80.3684 Z",
+                                                                   "fill_color":  "rgba(251,188,4,1)",
+                                                                   "animations":  [
+                                                                                      {
+                                                                                          "time":  0,
+                                                                                          "duration":  1,
+                                                                                          "easing":  "cubic-in-out",
+                                                                                          "type":  "scale",
+                                                                                          "start_x":  "40%",
+                                                                                          "start_scale":  "500%"
+                                                                                      }
+                                                                                  ]
+                                                               },
+                                                               {
+                                                                   "id":  "bb4c5e6a-fecc-428f-99e5-42dabfe5cc7d",
+                                                                   "name":  "Shape-3",
+                                                                   "type":  "shape",
+                                                                   "track":  3,
+                                                                   "time":  0.4169,
+                                                                   "x":  "50.0001%",
+                                                                   "y":  "49.9993%",
+                                                                   "width":  "18.727%",
+                                                                   "height":  "99.9987%",
+                                                                   "aspect_ratio":  1,
+                                                                   "path":  "M 50 80.3684 L 80.9 100 L 72.7 63 L 100 38.1053 L 64.05 34.8421 L 50 0 L 35.95 34.8421 L 0 38.1053 L 27.25 63 L 19.1 100 L 50 80.3684 Z",
+                                                                   "fill_color":  "rgba(251,188,4,1)",
+                                                                   "animations":  [
+                                                                                      {
+                                                                                          "time":  0,
+                                                                                          "duration":  1,
+                                                                                          "easing":  "cubic-in-out",
+                                                                                          "type":  "scale",
+                                                                                          "start_x":  "30",
+                                                                                          "start_y":  "50%",
+                                                                                          "start_scale":  "500%"
+                                                                                      }
+                                                                                  ]
+                                                               },
+                                                               {
+                                                                   "id":  "85ec0e98-5b78-462f-890f-b267d1e920c6",
+                                                                   "name":  "Shape-2",
+                                                                   "type":  "shape",
+                                                                   "track":  4,
+                                                                   "time":  0.2084,
+                                                                   "x":  "29.6818%",
+                                                                   "width":  "18.727%",
+                                                                   "height":  "99.9987%",
+                                                                   "aspect_ratio":  1,
+                                                                   "path":  "M 50 80.3684 L 80.9 100 L 72.7 63 L 100 38.1053 L 64.05 34.8421 L 50 0 L 35.95 34.8421 L 0 38.1053 L 27.25 63 L 19.1 100 L 50 80.3684 Z",
+                                                                   "fill_color":  "rgba(251,188,4,1)",
+                                                                   "animations":  [
+                                                                                      {
+                                                                                          "time":  0,
+                                                                                          "duration":  1,
+                                                                                          "easing":  "cubic-in-out",
+                                                                                          "type":  "scale",
+                                                                                          "start_x":  "20",
+                                                                                          "start_y":  "50%",
+                                                                                          "start_scale":  "500%"
+                                                                                      }
+                                                                                  ]
+                                                               },
+                                                               {
+                                                                   "id":  "40343198-94a9-48bb-91e4-2c2aa71c1b96",
+                                                                   "name":  "Shape-1",
+                                                                   "type":  "shape",
+                                                                   "track":  5,
+                                                                   "time":  0,
+                                                                   "x":  "9.3636%",
+                                                                   "y":  "50.0003%",
+                                                                   "width":  "18.7272%",
+                                                                   "height":  "99.9993%",
+                                                                   "aspect_ratio":  1,
+                                                                   "path":  "M 50 80.3684 L 80.9 100 L 72.7 63 L 100 38.1053 L 64.05 34.8421 L 50 0 L 35.95 34.8421 L 0 38.1053 L 27.25 63 L 19.1 100 L 50 80.3684 Z",
+                                                                   "fill_color":  "rgba(251,188,4,1)",
+                                                                   "animations":  [
+                                                                                      {
+                                                                                          "time":  0,
+                                                                                          "duration":  1,
+                                                                                          "easing":  "cubic-in-out",
+                                                                                          "type":  "scale",
+                                                                                          "start_x":  "10%",
+                                                                                          "start_scale":  "500%"
+                                                                                      }
+                                                                                  ]
+                                                               }
+                                                           ]
+                                          },
+                                          {
+                                              "id":  "17279a2c-1059-4afb-826d-58a5c01c8499",
+                                              "type":  "image",
+                                              "track":  3,
+                                              "time":  0,
+                                              "y":  "25%",
+                                              "height":  "50%",
+                                              "source":  "1b704a73-8d4b-49f8-ba5d-b28c1eb9c795",
+                                              "clip":  true,
+                                              "dynamic":  true,
+                                              "animations":  [
+                                                                 {
+                                                                     "easing":  "linear",
+                                                                     "type":  "scale",
+                                                                     "fade":  false,
+                                                                     "scope":  "element",
+                                                                     "start_scale":  "130%"
+                                                                 }
+                                                             ]
+                                          },
+                                          {
+                                              "id":  "ea85b523-fefd-4246-827a-00b236d0b9d7",
+                                              "type":  "composition",
+                                              "track":  4,
+                                              "time":  1,
+                                              "x":  "5.0131%",
+                                              "y":  "54.149%",
+                                              "width":  "61.3563 vmin",
+                                              "height":  "9.2718 vmin",
+                                              "x_anchor":  "0%",
+                                              "y_anchor":  "0%",
+                                              "elements":  [
+                                                               {
+                                                                   "id":  "e52b92c5-e96b-49f3-bdd0-cd3909b15dcb",
+                                                                   "name":  "Profile-Picture",
+                                                                   "type":  "image",
+                                                                   "track":  1,
+                                                                   "time":  0,
+                                                                   "x":  "0%",
+                                                                   "y":  "0%",
+                                                                   "width":  "9.5835 vmin",
+                                                                   "height":  "9.2718 vmin",
+                                                                   "aspect_ratio":  1,
+                                                                   "x_anchor":  "0%",
+                                                                   "y_anchor":  "0%",
+                                                                   "source":  "d6628425-8e35-4fee-9de8-a18d21309546",
+                                                                   "border_radius":  "100 vmin",
+                                                                   "dynamic":  true,
+                                                                   "animations":  [
+                                                                                      {
+                                                                                          "time":  0,
+                                                                                          "duration":  0.5,
+                                                                                          "easing":  "quadratic-out",
+                                                                                          "type":  "fade"
+                                                                                      }
+                                                                                  ]
+                                                               },
+                                                               {
+                                                                   "id":  "f4a3604b-91e4-4422-87c0-6c3cd9f27edb",
+                                                                   "name":  "Name",
+                                                                   "type":  "text",
+                                                                   "track":  2,
+                                                                   "time":  0,
+                                                                   "x":  "21.2012%",
+                                                                   "y":  "13.3764%",
+                                                                   "width":  "78.7988%",
+                                                                   "height":  "33.8567%",
+                                                                   "x_anchor":  "0%",
+                                                                   "y_anchor":  "0%",
+                                                                   "y_alignment":  "50%",
+                                                                   "text":  "Elisabeth Parker",
+                                                                   "font_family":  "Roboto",
+                                                                   "font_weight":  "500",
+                                                                   "fill_color":  "rgba(0,0,0,1)",
+                                                                   "clip":  true,
+                                                                   "dynamic":  true,
+                                                                   "animations":  [
+                                                                                      {
+                                                                                          "time":  0,
+                                                                                          "duration":  1,
+                                                                                          "easing":  "quadratic-out",
+                                                                                          "type":  "text-slide",
+                                                                                          "scope":  "element",
+                                                                                          "split":  "line"
+                                                                                      }
+                                                                                  ]
+                                                               },
+                                                               {
+                                                                   "id":  "0723b627-a41f-40f6-beab-f6cd0d68c529",
+                                                                   "name":  "Date",
+                                                                   "type":  "text",
+                                                                   "track":  3,
+                                                                   "time":  0,
+                                                                   "x":  "21.2012%",
+                                                                   "y":  "52.7667%",
+                                                                   "width":  "78.7988%",
+                                                                   "height":  "33.8567%",
+                                                                   "x_anchor":  "0%",
+                                                                   "y_anchor":  "0%",
+                                                                   "y_alignment":  "50%",
+                                                                   "text":  "Reviewed on {{Date}}",
+                                                                   "font_family":  "Roboto",
+                                                                   "fill_color":  "#696969",
+                                                                   "clip":  true,
+                                                                   "dynamic":  true,
+                                                                   "animations":  [
+                                                                                      {
+                                                                                          "time":  0,
+                                                                                          "duration":  1,
+                                                                                          "easing":  "quadratic-out",
+                                                                                          "type":  "text-slide",
+                                                                                          "scope":  "element",
+                                                                                          "split":  "line"
+                                                                                      }
+                                                                                  ]
+                                                               }
+                                                           ]
+                                          },
+                                          {
+                                              "id":  "97a3fba5-18a2-4c5a-ad06-35e3b1079f1c",
+                                              "name":  "Review-Text",
+                                              "type":  "text",
+                                              "track":  5,
+                                              "time":  1.5,
+                                              "y":  "77.5231%",
+                                              "width":  "89.974%",
+                                              "height":  "23.3638%",
+                                              "y_alignment":  "50%",
+                                              "text":  "If you\u0027re looking for a secluded and peaceful retreat, this cabin in the woods is the perfect choice! 🌲❤️",
+                                              "font_family":  "Alata",
+                                              "font_size_maximum":  "3.75 vmin",
+                                              "fill_color":  "#333333",
+                                              "dynamic":  true,
+                                              "animations":  [
+                                                                 {
+                                                                     "easing":  "quadratic-out",
+                                                                     "type":  "text-typewriter",
+                                                                     "typing_start":  "0 s",
+                                                                     "typing_duration":  "4 s"
+                                                                 }
+                                                             ]
+                                          }
+                                      ]
+                     },
+                     {
+                         "id":  "dffbfd1c-c51c-4ac6-a114-201f24252e9e",
+                         "name":  "music",
+                         "type":  "audio",
+                         "track":  3,
+                         "time":  0,
+                         "duration":  null,
+                         "width":  "79.2988%",
+                         "height":  "79.2988%",
+                         "source":  "This text is read aloud. Replace it with your own speech text.",
+                         "provider":  "elevenlabs model_id=eleven_multilingual_v2 voice_id=XrExE9yKIg1WjnnlVkGX",
+                         "dynamic":  true
+                     },
+                     {
+                         "id":  "9af2112a-6d0e-45bc-b792-1548f8b137f5",
+                         "name":  "logo",
+                         "type":  "image",
+                         "track":  4,
+                         "time":  0,
+                         "x":  "94.1721%",
+                         "y":  "10.3506%",
+                         "width":  "9.0454%",
+                         "height":  "16.5988%",
+                         "source":  "e36edca6-0be9-4e90-8605-4392bce13493"
+                     }
+                 ]
+}

@@ -1,0 +1,55 @@
+﻿{
+    "width":  1920,
+    "height":  1080,
+    "elements":  [
+                     {
+                         "id":  "43f3d8e9-e31c-4b28-824f-01f646e78f50",
+                         "name":  "Automation Image - Fill Here",
+                         "type":  "image",
+                         "track":  1,
+                         "time":  0,
+                         "y":  "44.1589%",
+                         "height":  "88.3177%",
+                         "source":  "2ba8ec01-725c-4896-81e6-aef03a6f87a3",
+                         "dynamic":  true
+                     },
+                     {
+                         "id":  "c072e3ab-4471-41d9-b607-4bbe89e8da36",
+                         "name":  "Image-1",
+                         "type":  "image",
+                         "track":  2,
+                         "time":  0,
+                         "y":  "56.811%",
+                         "height":  "93.6306%",
+                         "source":  "b5736c89-7c3d-4c77-9934-aac37a897155"
+                     },
+                     {
+                         "id":  "1c406407-ffe8-4335-9b28-324fc3b5a2fb",
+                         "type":  "text",
+                         "track":  4,
+                         "time":  0,
+                         "x":  "49.68%",
+                         "y":  "83.8992%",
+                         "width":  "87.1313%",
+                         "height":  "24.3976%",
+                         "x_alignment":  "50%",
+                         "y_alignment":  "50%",
+                         "text":  "Your text here we need to write a bunch of words here to figure out what works best to figure out how it lays out.",
+                         "font_family":  "Noto Sans",
+                         "fill_color":  "#787878",
+                         "dynamic":  true
+                     },
+                     {
+                         "id":  "498d241f-829a-4167-9672-190a94d750cb",
+                         "name":  "logo",
+                         "type":  "image",
+                         "track":  5,
+                         "time":  0,
+                         "x":  "92.0154%",
+                         "y":  "12.3449%",
+                         "width":  "8.9751%",
+                         "height":  "17.0362%",
+                         "source":  "e36edca6-0be9-4e90-8605-4392bce13493"
+                     }
+                 ]
+}

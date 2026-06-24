@@ -1209,6 +1209,9 @@ function CredentialsTab({ org }: Pick<ClientHubTabsProps, "org">) {
   const [secretInputs, setSecretInputs] = useState<Record<string, string>>({});
   const [secretVisible, setSecretVisible] = useState<Record<string, boolean>>({});
 
+  // Active category tab ("all" = show all grouped)
+  const [activeCat, setActiveCat] = useState<string>("all");
+
   async function load() {
     setLoading(true);
     setError(null);
@@ -1411,7 +1414,11 @@ function CredentialsTab({ org }: Pick<ClientHubTabsProps, "org">) {
       ) : (
         <div style={{ marginBottom: 12 }}>
           <button
-            onClick={() => { setShowForm(true); setError(null); }}
+            onClick={() => {
+              setShowForm(true);
+              setError(null);
+              if (activeCat !== "all") setForm((f) => ({ ...f, category: activeCat }));
+            }}
             style={{ padding: "7px 16px", borderRadius: 6, fontSize: 12, fontWeight: 600, border: "none", background: "var(--accent)", color: "var(--btn-primary-text)", cursor: "pointer" }}
           >
             ＋ 新增憑證
@@ -1419,110 +1426,146 @@ function CredentialsTab({ org }: Pick<ClientHubTabsProps, "org">) {
         </div>
       )}
 
-      {/* Credential groups */}
+      {/* Category tab strip */}
+      {credentials.length > 0 && (
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 12 }}>
+          <button
+            onClick={() => setActiveCat("all")}
+            style={{
+              padding: "5px 12px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer",
+              border: `1px solid ${activeCat === "all" ? "var(--accent)" : "var(--card-border)"}`,
+              background: activeCat === "all" ? "var(--accent)" : "transparent",
+              color: activeCat === "all" ? "var(--btn-primary-text)" : "var(--text-secondary)",
+            }}
+          >
+            全部 <span style={{ fontWeight: 700 }}>{credentials.length}</span>
+          </button>
+          {CRED_CATEGORIES.filter((cat) => grouped.has(cat.value)).map((cat) => {
+            const count = grouped.get(cat.value)?.length ?? 0;
+            const isActive = activeCat === cat.value;
+            return (
+              <button
+                key={cat.value}
+                onClick={() => setActiveCat(cat.value)}
+                style={{
+                  padding: "5px 12px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                  border: `1px solid ${isActive ? cat.color : "var(--card-border)"}`,
+                  background: isActive ? cat.color : "transparent",
+                  color: isActive ? "#fff" : "var(--text-secondary)",
+                }}
+              >
+                {cat.label} <span style={{ fontWeight: 700 }}>{count}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Credential list */}
       {credentials.length === 0 ? (
         <Card title="憑證庫">
           <div style={{ fontSize: 13, color: "var(--text-muted)" }}>尚無憑證。點「新增憑證」開始建立。</div>
         </Card>
-      ) : (
-        CRED_CATEGORIES
-          .filter((cat) => grouped.has(cat.value))
-          .map((cat) => (
-            <Card key={cat.value} title={`${cat.label}`}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {(grouped.get(cat.value) ?? []).map((cred) => {
-                  const isSaving = saving === cred.id;
-                  const secretInput = secretInputs[cred.id] ?? "";
-                  const isVisible = secretVisible[cred.id] ?? false;
-                  return (
-                    <div
-                      key={cred.id}
-                      style={{
-                        padding: "12px 14px", borderRadius: 8,
-                        border: `1px solid ${cred.secretSet ? "var(--card-border)" : "var(--yellow)"}`,
-                        background: "var(--bg-canvas)",
-                        opacity: isSaving ? 0.7 : 1,
-                      }}
-                    >
-                      {/* Row header */}
-                      <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
-                            {cred.label}
+      ) : (() => {
+        const displayCats = activeCat === "all"
+          ? CRED_CATEGORIES.filter((cat) => grouped.has(cat.value))
+          : CRED_CATEGORIES.filter((cat) => cat.value === activeCat && grouped.has(cat.value));
+        return displayCats.map((cat) => (
+          <Card key={cat.value} title={activeCat === "all" ? cat.label : ""}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {(grouped.get(cat.value) ?? []).map((cred) => {
+                const isSaving = saving === cred.id;
+                const secretInput = secretInputs[cred.id] ?? "";
+                const isVisible = secretVisible[cred.id] ?? false;
+                return (
+                  <div
+                    key={cred.id}
+                    style={{
+                      padding: "12px 14px", borderRadius: 8,
+                      border: `1px solid ${cred.secretSet ? "var(--card-border)" : "var(--yellow)"}`,
+                      background: "var(--bg-canvas)",
+                      opacity: isSaving ? 0.7 : 1,
+                    }}
+                  >
+                    {/* Row header */}
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
+                          {cred.label}
+                        </div>
+                        {cred.identifier && (
+                          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                            {cred.identifier}
                           </div>
-                          {cred.identifier && (
-                            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
-                              {cred.identifier}
-                            </div>
-                          )}
-                          {cred.note && (
-                            <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4, fontStyle: "italic" }}>
-                              {cred.note}
-                            </div>
-                          )}
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                          <span style={{
-                            fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 10,
-                            background: cred.secretSet ? "var(--badge-green-bg)" : "var(--badge-yellow-bg, #fef3c7)",
-                            color: cred.secretSet ? "var(--green)" : "#92400e",
-                            border: `1px solid ${cred.secretSet ? "var(--green)" : "#d97706"}`,
-                          }}>
-                            {cred.secretSet ? "已設密碼" : "未設密碼"}
-                          </span>
-                          <button
-                            disabled={isSaving}
-                            onClick={() => handleDelete(cred.id, cred.label)}
-                            style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px solid var(--red)", background: "transparent", color: "var(--red)", cursor: isSaving ? "default" : "pointer" }}
-                          >
-                            刪除
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Secret controls */}
-                      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                        <div style={{ position: "relative", flex: "1 1 200px" }}>
-                          <input
-                            type={isVisible ? "text" : "password"}
-                            placeholder={cred.secretSet ? "輸入新密碼以覆蓋" : "輸入密碼 / API Key"}
-                            value={secretInput}
-                            onChange={(e) => setSecretInputs((prev) => ({ ...prev, [cred.id]: e.target.value }))}
-                            autoComplete="new-password"
-                            style={{ width: "100%", padding: "6px 32px 6px 8px", borderRadius: 6, border: "1px solid var(--card-border)", fontSize: 11, background: "var(--bg-canvas)", color: "var(--text-primary)", boxSizing: "border-box" }}
-                          />
-                          <button
-                            onClick={() => setSecretVisible((prev) => ({ ...prev, [cred.id]: !isVisible }))}
-                            style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", cursor: "pointer", fontSize: 13, color: "var(--text-muted)", padding: 0 }}
-                            title={isVisible ? "隱藏" : "顯示"}
-                          >
-                            {isVisible ? "🙈" : "👁"}
-                          </button>
-                        </div>
-                        <button
-                          disabled={isSaving || !secretInput.trim()}
-                          onClick={() => handleSetSecret(cred.id)}
-                          style={{ padding: "6px 12px", borderRadius: 6, fontSize: 11, fontWeight: 600, border: "none", background: "var(--accent)", color: "var(--btn-primary-text)", cursor: (isSaving || !secretInput.trim()) ? "default" : "pointer", opacity: (isSaving || !secretInput.trim()) ? 0.5 : 1, whiteSpace: "nowrap" }}
-                        >
-                          {isSaving ? "⋯" : "儲存密碼"}
-                        </button>
-                        {cred.secretSet && (
-                          <button
-                            disabled={isSaving}
-                            onClick={() => handleClearSecret(cred.id)}
-                            style={{ padding: "6px 10px", borderRadius: 6, fontSize: 11, fontWeight: 500, border: "1px solid var(--red)", background: "transparent", color: "var(--red)", cursor: isSaving ? "default" : "pointer", whiteSpace: "nowrap" }}
-                          >
-                            清除密碼
-                          </button>
+                        )}
+                        {cred.note && (
+                          <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4, fontStyle: "italic" }}>
+                            {cred.note}
+                          </div>
                         )}
                       </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                        <span style={{
+                          fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 10,
+                          background: cred.secretSet ? "var(--badge-green-bg)" : "var(--badge-yellow-bg, #fef3c7)",
+                          color: cred.secretSet ? "var(--green)" : "#92400e",
+                          border: `1px solid ${cred.secretSet ? "var(--green)" : "#d97706"}`,
+                        }}>
+                          {cred.secretSet ? "已設密碼" : "未設密碼"}
+                        </span>
+                        <button
+                          disabled={isSaving}
+                          onClick={() => handleDelete(cred.id, cred.label)}
+                          style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px solid var(--red)", background: "transparent", color: "var(--red)", cursor: isSaving ? "default" : "pointer" }}
+                        >
+                          刪除
+                        </button>
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
-            </Card>
-          ))
-      )}
+
+                    {/* Secret controls */}
+                    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                      <div style={{ position: "relative", flex: "1 1 200px" }}>
+                        <input
+                          type={isVisible ? "text" : "password"}
+                          placeholder={cred.secretSet ? "輸入新密碼以覆蓋" : "輸入密碼 / API Key"}
+                          value={secretInput}
+                          onChange={(e) => setSecretInputs((prev) => ({ ...prev, [cred.id]: e.target.value }))}
+                          autoComplete="new-password"
+                          style={{ width: "100%", padding: "6px 32px 6px 8px", borderRadius: 6, border: "1px solid var(--card-border)", fontSize: 11, background: "var(--bg-canvas)", color: "var(--text-primary)", boxSizing: "border-box" }}
+                        />
+                        <button
+                          onClick={() => setSecretVisible((prev) => ({ ...prev, [cred.id]: !isVisible }))}
+                          style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", cursor: "pointer", fontSize: 13, color: "var(--text-muted)", padding: 0 }}
+                          title={isVisible ? "隱藏" : "顯示"}
+                        >
+                          {isVisible ? "🙈" : "👁"}
+                        </button>
+                      </div>
+                      <button
+                        disabled={isSaving || !secretInput.trim()}
+                        onClick={() => handleSetSecret(cred.id)}
+                        style={{ padding: "6px 12px", borderRadius: 6, fontSize: 11, fontWeight: 600, border: "none", background: "var(--accent)", color: "var(--btn-primary-text)", cursor: (isSaving || !secretInput.trim()) ? "default" : "pointer", opacity: (isSaving || !secretInput.trim()) ? 0.5 : 1, whiteSpace: "nowrap" }}
+                      >
+                        {isSaving ? "⋯" : "儲存密碼"}
+                      </button>
+                      {cred.secretSet && (
+                        <button
+                          disabled={isSaving}
+                          onClick={() => handleClearSecret(cred.id)}
+                          style={{ padding: "6px 10px", borderRadius: 6, fontSize: 11, fontWeight: 500, border: "1px solid var(--red)", background: "transparent", color: "var(--red)", cursor: isSaving ? "default" : "pointer", whiteSpace: "nowrap" }}
+                        >
+                          清除密碼
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        ));
+      })()}
     </>
   );
 }

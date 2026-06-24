@@ -1,0 +1,261 @@
+﻿{
+    "output_format":  "mp4",
+    "width":  1080,
+    "height":  1920,
+    "duration":  8.1507,
+    "snapshot_time":  6.57,
+    "fill_color":  "rgba(255,255,255,1)",
+    "elements":  [
+                     {
+                         "id":  "5b82e4b6-0d0c-4c84-b9ef-a12c278120fb",
+                         "type":  "image",
+                         "track":  1,
+                         "time":  0,
+                         "width":  "100.0001%",
+                         "source":  "aadb2610-9d86-45a6-9c8e-8d449ab3bc7c",
+                         "color_overlay":  "rgba(0,0,0,0.25)",
+                         "dynamic":  true,
+                         "locked":  true,
+                         "animations":  [
+                                            {
+                                                "easing":  "sinusoid-out",
+                                                "type":  "pan",
+                                                "end_x":  "50%",
+                                                "end_y":  "0%",
+                                                "scope":  "element",
+                                                "start_x":  "50%",
+                                                "start_y":  "100%",
+                                                "end_scale":  "100%",
+                                                "start_scale":  "130%"
+                                            }
+                                        ]
+                     },
+                     {
+                         "id":  "88a59cb2-0483-48d1-857a-f0a19ac15dc9",
+                         "name":  "Text-1",
+                         "type":  "text",
+                         "track":  2,
+                         "time":  0,
+                         "x":  "6.0767%",
+                         "y":  [
+                                   {
+                                       "time":  1.98,
+                                       "value":  "46.0249%"
+                                   },
+                                   {
+                                       "time":  2.239,
+                                       "value":  "40.4957%"
+                                   },
+                                   {
+                                       "time":  4.082,
+                                       "value":  "40.4957%"
+                                   },
+                                   {
+                                       "time":  4.342,
+                                       "value":  "33.2462%"
+                                   }
+                               ],
+                         "width":  "41.7204%",
+                         "height":  "10.1286%",
+                         "x_anchor":  "0%",
+                         "y_anchor":  "100%",
+                         "x_scale":  [
+                                         {
+                                             "time":  0,
+                                             "value":  "100%"
+                                         },
+                                         {
+                                             "time":  0.23,
+                                             "value":  "100%"
+                                         },
+                                         {
+                                             "time":  1.09,
+                                             "value":  "100%"
+                                         },
+                                         {
+                                             "time":  1.98,
+                                             "value":  "100%"
+                                         },
+                                         {
+                                             "time":  2.239,
+                                             "value":  "75%"
+                                         }
+                                     ],
+                         "y_scale":  [
+                                         {
+                                             "time":  0,
+                                             "value":  "100%"
+                                         },
+                                         {
+                                             "time":  0.23,
+                                             "value":  "100%"
+                                         },
+                                         {
+                                             "time":  1.09,
+                                             "value":  "100%"
+                                         },
+                                         {
+                                             "time":  1.98,
+                                             "value":  "100%"
+                                         },
+                                         {
+                                             "time":  2.239,
+                                             "value":  "75%"
+                                         }
+                                     ],
+                         "y_alignment":  "50%",
+                         "text":  "Welcome {{ name }}",
+                         "font_family":  "Oswald",
+                         "text_wrap":  false,
+                         "text_transform":  "uppercase",
+                         "background_color":  "#ff96a1",
+                         "background_border_radius":  "100%",
+                         "fill_color":  "#ffffff",
+                         "dynamic":  true,
+                         "animations":  [
+                                            {
+                                                "time":  0,
+                                                "duration":  0.761,
+                                                "easing":  "quadratic-out",
+                                                "type":  "text-slide",
+                                                "scope":  "split-clip",
+                                                "split":  "line",
+                                                "direction":  "up"
+                                            }
+                                        ]
+                     },
+                     {
+                         "id":  "3b2750c1-42f4-4f4c-ad82-4ebc2569f690",
+                         "name":  "Text-2",
+                         "type":  "text",
+                         "track":  3,
+                         "time":  2.1105,
+                         "x":  "6.0767%",
+                         "y":  [
+                                   {
+                                       "time":  1.971,
+                                       "value":  "62.1756%"
+                                   },
+                                   {
+                                       "time":  1.972,
+                                       "value":  "62.1756%"
+                                   },
+                                   {
+                                       "time":  2.231,
+                                       "value":  "50.9413%"
+                                   }
+                               ],
+                         "width":  "87.8466%",
+                         "height":  "20.1159%",
+                         "x_anchor":  "0%",
+                         "y_anchor":  "100%",
+                         "x_scale":  [
+                                         {
+                                             "time":  1.971,
+                                             "value":  "100%"
+                                         },
+                                         {
+                                             "time":  1.972,
+                                             "value":  "100%"
+                                         },
+                                         {
+                                             "time":  2.231,
+                                             "value":  "75%"
+                                         }
+                                     ],
+                         "y_scale":  [
+                                         {
+                                             "time":  1.971,
+                                             "value":  "100%"
+                                         },
+                                         {
+                                             "time":  1.972,
+                                             "value":  "100%"
+                                         },
+                                         {
+                                             "time":  2.231,
+                                             "value":  "75%"
+                                         }
+                                     ],
+                         "y_alignment":  "50%",
+                         "text":  "This is just an example template",
+                         "font_family":  "Oswald",
+                         "font_weight":  "700",
+                         "text_transform":  "uppercase",
+                         "fill_color":  "#FFFFFF",
+                         "dynamic":  true,
+                         "animations":  [
+                                            {
+                                                "time":  0,
+                                                "duration":  1.971,
+                                                "easing":  "quadratic-out",
+                                                "type":  "text-appear",
+                                                "overlap":  "0%"
+                                            }
+                                        ]
+                     },
+                     {
+                         "id":  "39a64912-885a-4251-a7ba-c642d1d2aa6a",
+                         "name":  "Text-3",
+                         "type":  "text",
+                         "track":  4,
+                         "time":  4.0815,
+                         "y":  "63.2519%",
+                         "width":  "87.8444%",
+                         "height":  "11.892%",
+                         "y_alignment":  "50%",
+                         "text":  "Tapr something here, long subtitle or something else",
+                         "font_family":  "Oswald",
+                         "font_size_minimum":  "6 vmin",
+                         "font_size_maximum":  "6 vmin",
+                         "text_transform":  "uppercase",
+                         "background_color":  "#2eb0a4",
+                         "fill_color":  "#FFFFFF",
+                         "dynamic":  true,
+                         "animations":  [
+                                            {
+                                                "time":  0,
+                                                "duration":  0.802,
+                                                "easing":  "quadratic-out",
+                                                "type":  "text-slide",
+                                                "scope":  "split-clip",
+                                                "split":  "line",
+                                                "direction":  "up",
+                                                "background_effect":  "scaling-clip"
+                                            }
+                                        ]
+                     },
+                     {
+                         "id":  "f8569a97-4ff2-4efa-a23e-06a34b0261d5",
+                         "name":  "logo",
+                         "type":  "image",
+                         "track":  5,
+                         "time":  0,
+                         "x":  "89.9926%",
+                         "y":  "10.6907%",
+                         "width":  "13.0207%",
+                         "height":  "13.7278%",
+                         "source":  "e36edca6-0be9-4e90-8605-4392bce13493",
+                         "animations":  [
+                                            {
+                                                "time":  0,
+                                                "duration":  0.99,
+                                                "easing":  "quadratic-out",
+                                                "type":  "fade",
+                                                "track":  0
+                                            }
+                                        ]
+                     },
+                     {
+                         "id":  "309236bf-85ee-48c1-994a-276b17e0a323",
+                         "name":  "music",
+                         "type":  "audio",
+                         "track":  6,
+                         "time":  0,
+                         "duration":  null,
+                         "source":  "This text is read aloud. Replace it with your own speech text.",
+                         "provider":  "elevenlabs model_id=eleven_multilingual_v2 voice_id=XrExE9yKIg1WjnnlVkGX",
+                         "dynamic":  true
+                     }
+                 ]
+}
