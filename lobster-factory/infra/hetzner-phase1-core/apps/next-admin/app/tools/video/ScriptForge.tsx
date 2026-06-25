@@ -301,8 +301,8 @@ function ScriptResult({script,score,onReset,extraTop,autoSaveTag}: any){
 
       <Card><SL ch="🔄 多平台轉換"/><div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:repLoading||repurposed?12:0}}>{PLATFORMS.map(p=><button key={p.id} onClick={()=>doRep(p.id)} style={{padding:"6px 12px",borderRadius:999,border:`1.5px solid ${repPlatform===p.id?C.violet:C.border}`,background:repPlatform===p.id?C.violetl:C.white,color:repPlatform===p.id?C.violet:C.ink,fontSize:11.5,fontWeight:repPlatform===p.id?700:400,cursor:"pointer",transition:"all .15s",fontFamily:"inherit"}}>{p.icon} {p.label}</button>)}</div>{repLoading&&<div style={{textAlign:"center",padding:"12px 0",color:C.mid,fontSize:12.5}}>轉換中...</div>}{repurposed&&<div style={{background:C.violetl,borderRadius:9,padding:12}}><div style={{fontSize:13.5,fontWeight:800,color:C.violet,marginBottom:3}}>{repurposed.title}</div><div style={{fontSize:12.5,color:C.violet,fontStyle:"italic",marginBottom:7}}>「{repurposed.hook}」</div>{repurposed.scenes?.map((s,i)=><div key={i} style={{fontSize:11.5,color:C.ink,padding:"4px 0",borderBottom:`1px solid rgba(124,92,252,.1)`}}><b style={{color:C.violet}}>【{s.time}】</b> {s.dialogue}</div>)}{repurposed.key_changes&&<div style={{marginTop:7,fontSize:11.5,color:C.mid,background:C.white,borderRadius:6,padding:"6px 9px"}}><b>與原版差異：</b>{repurposed.key_changes}</div>}</div>}</Card>
 
-      {sendToProduction&&script?.scenes?.length>0&&<PBtn ch={sent?"✅ 已送進影片生產線 — 切到上方「🎬 影片生產」分頁":"🎬 送去生產影片（用此腳本直接生影片）"} onClick={()=>{const dlg=(script.scenes||[]).map(s=>s.dialogue).filter(Boolean).join("\n");const sc=(script.scenes||[]).map(s=>({narration:(s.dialogue||"").trim(),imagePrompt:(s.visual||"").trim()})).filter(s=>s.narration);sendToProduction({topic:script.title||"",articleTitle:script.title||"",articleContent:`${script.hook?`開場鉤子：${script.hook}\n\n`:""}${dlg}${script.cta?`\n\n結尾 CTA：${script.cta}`:""}`,scenes:sc.length>0?sc:undefined,mediaMode,duration});setSent(true);}} full/>}
-      {sendToRemotion&&script&&<PBtn ch={remotionSent?"✅ 已送去 Remotion 模板 — 切換到「Remotion 模板」分頁":"✨ 送去 Remotion 模板（精緻動效影片）"} onClick={()=>{sendToRemotion({topic:script.title||"",headline:script.title||"",tagline:script.hook||"",cta:script.cta||"",imageHint:script.scenes?.[0]?.visual||"",scenes:(script.scenes||[]).map(s=>({visual:s.visual||"",dialogue:s.dialogue||""})),mediaMode,duration});setRemotionSent(true);}} full/>}
+      {sendToProduction&&script?.scenes?.length>0&&<PBtn ch={sent?"✅ 已送進影片生產線 — 切到上方「🎬 影片生產」分頁":"🎬 送去生產影片（用此腳本直接生影片）"} onClick={()=>{const dlg=(script.scenes||[]).map(s=>s.dialogue).filter(Boolean).join("\n");const sc=(script.scenes||[]).map(s=>({narration:(s.dialogue||"").trim(),imagePrompt:(s.visual||"").trim()})).filter(s=>s.narration);sendToProduction({topic:script.title||"",articleTitle:script.title||"",articleContent:`${script.hook?`開場鉤子：${script.hook}\n\n`:""}${dlg}${script.cta?`\n\n結尾 CTA：${script.cta}`:""}`,scenes:sc.length>0?sc:undefined,mediaMode,duration,customScenes});setSent(true);}} full/>}
+      {sendToRemotion&&script&&<PBtn ch={remotionSent?"✅ 已送去 Remotion 模板 — 切換到「Remotion 模板」分頁":"✨ 送去 Remotion 模板（精緻動效影片）"} onClick={()=>{sendToRemotion({topic:script.title||"",headline:script.title||"",tagline:script.hook||"",cta:script.cta||"",imageHint:script.scenes?.[0]?.visual||"",scenes:(script.scenes||[]).map(s=>({visual:s.visual||"",dialogue:s.dialogue||""})),mediaMode,duration,customScenes});setRemotionSent(true);}} full/>}
       <div style={{display:"flex",gap:9}}><GBtn ch={copied?"✅ 已複製":"📋 複製腳本"} onClick={copyScript} style={{flex:1,padding:"11px"}}/><PBtn ch="重新開始 →" onClick={onReset} full style={{flex:1}}/></div>
     </div>
   );
@@ -848,27 +848,6 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { 
             <b style={{color:C.ink}}>怎麼用：</b>① 上方選功能（預設「手動生成」）→ ② 填主題、按生成 → ③ 結果頁按「<b style={{color:C.coral}}>🎬 送去生產影片</b>」轉成影片
           </span>
           <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-            <label style={{fontSize:11,color:C.mid,fontWeight:700,whiteSpace:"nowrap"}}>🎬 素材</label>
-            <div style={{display:"flex",gap:3}}>
-              {([["pexels-video","真實影片"],["pexels-all","照片動畫"],["__ai__","AI生圖"]] as [string,string][]).map(([id,label])=><button key={id} onClick={()=>setMediaMode(id)}
-                style={{padding:"3px 8px",borderRadius:6,border:`1.5px solid ${mediaMode===id?C.coral:C.border}`,background:mediaMode===id?C.corallt:C.white,color:mediaMode===id?C.coral:C.ink,fontSize:11,fontWeight:mediaMode===id?700:400,cursor:"pointer",fontFamily:"inherit"}}>
-                {label}
-              </button>)}
-            </div>
-            <label style={{fontSize:11,color:C.mid,fontWeight:700,whiteSpace:"nowrap"}}>⏱ 時長</label>
-            <div style={{display:"flex",gap:3}}>
-              {[1,2,3,5].map(n=><button key={n} onClick={()=>setDuration(n)}
-                style={{padding:"3px 8px",borderRadius:6,border:`1.5px solid ${duration===n?C.coral:C.border}`,background:duration===n?C.corallt:C.white,color:duration===n?C.coral:C.ink,fontSize:11,fontWeight:duration===n?700:400,cursor:"pointer",fontFamily:"inherit"}}>
-                {n}分
-              </button>)}
-            </div>
-            <label style={{fontSize:11,color:C.mid,fontWeight:700,whiteSpace:"nowrap"}}>📽 場景數</label>
-            <div style={{display:"flex",gap:3}}>
-              {[3,5,7,10].map(n=><button key={n} onClick={()=>setSceneCount(n)}
-                style={{padding:"3px 8px",borderRadius:6,border:`1.5px solid ${sceneCount===n?C.coral:C.border}`,background:sceneCount===n?C.corallt:C.white,color:sceneCount===n?C.coral:C.ink,fontSize:11,fontWeight:sceneCount===n?700:400,cursor:"pointer",fontFamily:"inherit"}}>
-                {n}
-              </button>)}
-            </div>
             <label style={{fontSize:11,color:C.mid,fontWeight:700,whiteSpace:"nowrap"}}>🌐 語言</label>
             <select value={lang} onChange={e=>{setLang(e.target.value);SF_LANG=e.target.value;}} title="腳本輸出語言（與你打的主題語言無關）" style={{padding:"5px 9px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:11.5,fontFamily:"inherit",cursor:"pointer"}}>
               {SF_LANGS.map((l)=><option key={l} value={l}>{l}</option>)}
@@ -882,6 +861,72 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { 
               {clients.map((c:any)=><option key={c.id} value={c.id}>{c.name}</option>)}
             </select>}
             {brand?.name&&<div style={{padding:"3px 9px",background:C.jadelt,borderRadius:999,fontSize:10.5,color:C.jade,fontWeight:700,whiteSpace:"nowrap"}}>✅ {brand.name}</div>}
+          </div>
+        </div>
+      </div>
+      {/* ② 影片設定 — 與 VideoStudio 一模一樣 UI，設定由此帶入，VideoStudio 接力時隱藏 */}
+      <div style={{background:C.white,borderBottom:`1.5px solid ${C.border}`}}>
+        <div style={{maxWidth:960,margin:"0 auto",padding:"14px 14px",display:"flex",flexDirection:"column",gap:14}}>
+          {/* 素材模式 */}
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <span style={{fontSize:12,fontWeight:600,color:C.mid}}>素材模式</span>
+            <div style={{display:"flex",gap:6}}>
+              {([
+                {id:"pexels-video",label:"真實影片",badge:"免費",tip:"真實動態影片片段，最自然"},
+                {id:"pexels-all",label:"照片動畫",badge:"免費",tip:"免費照片 + Ken Burns 縮放效果"},
+                {id:"__ai__",label:"AI 生圖",badge:"按模型",tip:"Flux / Ideogram 等 AI 插圖"},
+              ] as {id:string;label:string;badge:string;tip:string}[]).map(({id,label,badge,tip})=>{
+                const isAiMode=id==="__ai__";
+                const sfIsPexels=mediaMode!=="__ai__";
+                const active=isAiMode?!sfIsPexels:mediaMode===id;
+                return(
+                  <button key={id} type="button" title={tip}
+                    onClick={()=>{if(isAiMode){if(sfIsPexels)setMediaMode("__ai__");}else{setMediaMode(id);}}}
+                    style={{flex:1,padding:"8px 0",borderRadius:8,border:`2px solid ${active?"var(--accent)":"var(--border-subtle)"}`,background:active?"var(--accent)":"var(--bg-canvas)",color:active?"var(--btn-primary-text)":"var(--text-secondary)",cursor:"pointer",fontSize:12,fontWeight:active?700:500,display:"flex",flexDirection:"column",alignItems:"center",gap:2,fontFamily:"inherit"}}>
+                    <span>{label}</span>
+                    <span style={{fontSize:10,opacity:0.75}}>{badge}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {/* 場景 + 時間 sliders */}
+          <div style={{display:"flex",flexDirection:"column",gap:10,padding:"12px 14px",background:"var(--bg-subtle)",borderRadius:8,border:"1px solid var(--border-subtle)"}}>
+            {/* 場景總數 */}
+            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+              <div style={{display:"flex",justifyContent:"space-between"}}>
+                <span style={{fontSize:12,fontWeight:600,color:"var(--text-secondary)"}}>場景總數</span>
+                <span style={{fontSize:13,fontWeight:700,color:"var(--text-primary)"}}>{sceneCount} 場</span>
+              </div>
+              <input type="range" min={1} max={20} step={1} value={sceneCount}
+                onChange={e=>{const v=Number(e.target.value);setSceneCount(v);setCustomScenes(prev=>Math.min(prev,v));}}
+                style={{width:"100%",accentColor:"var(--accent)"}}/>
+            </div>
+            {/* AI生圖 — 只在 AI 模式顯示 */}
+            {mediaMode==="__ai__"&&(
+              <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                <div style={{display:"flex",justifyContent:"space-between"}}>
+                  <span style={{fontSize:12,fontWeight:600,color:"var(--text-secondary)"}}>AI 生圖</span>
+                  <span style={{fontSize:13,fontWeight:700,color:"var(--text-primary)"}}>AI 生圖 {customScenes} 場｜圖庫補 {Math.max(0,sceneCount-customScenes)} 場</span>
+                </div>
+                <input type="range" min={0} max={sceneCount} step={1} value={customScenes}
+                  onChange={e=>setCustomScenes(Number(e.target.value))}
+                  style={{width:"100%",accentColor:"var(--accent)"}}/>
+              </div>
+            )}
+            {/* 時間長度 */}
+            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+              <div style={{display:"flex",justifyContent:"space-between"}}>
+                <span style={{fontSize:12,fontWeight:600,color:"var(--text-secondary)"}}>時間長度</span>
+                <span style={{fontSize:13,fontWeight:700,color:"var(--text-primary)"}}>{duration} 分鐘</span>
+              </div>
+              <input type="range" min={1} max={10} step={0.5} value={duration}
+                onChange={e=>setDuration(Number(e.target.value))}
+                style={{width:"100%",accentColor:"var(--accent)"}}/>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"var(--text-muted)"}}>
+                <span>1 分</span><span>5 分</span><span>10 分</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
