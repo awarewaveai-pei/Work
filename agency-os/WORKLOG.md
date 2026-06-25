@@ -4,6 +4,37 @@
 
 ## 2026-06-25
 
+### feat(studio): /tools/studio 控制面板重排 — 工具列移右 + 風格/模型改 tarot 款 + 主圖/題材/氛圍分類化
+
+[任務理解] 操作者要 `/tools/studio` 控制面板：① 工具列從左移到右側 ② `🤖 圖片模型`、`🎨 風格` 改成 tarot（`/tools/tarot`）同款呈現（子分類 tab + chips + hover 描述 tooltip），且順序模型在風格之前 ③ 主圖/題材/氛圍要很多選項 + 分類 + 圖二排版（圖二即 tarot 風格區截圖）。純前端呈現需求。
+
+[現況分析]
+- 版面 `StudioWorkbench.tsx:626` grid `340px 1fr`（控制在左）；主圖/題材/氛圍用扁平 `PresetChips` 各 15 個英文字串、無分類無 tooltip；風格 chip 直印整串 `item.zh`（含 `｜描述`）無 tooltip；模型用橫向 chip。
+- tarot 呈現：子分類 tab + chips，tooltip = `zh.split("｜")[1]`，position:fixed 在 root 渲染（`TarotStudio.tsx:1428,1741`）；模型用 provider tab + 直向 row。
+- 關鍵相容點：studio style 值存整串 `item.zh`，`resolveStylePrompt` 用整串當 key（`cards.ts:185,217`）→ `｜` 拆分只能用於顯示。已確認 STYLE_CATALOG 全 103 筆都有 `｜`。
+- git log（git-log-injector 閘）：上一 session 為 CanvasEditor/AO-CLOSE，無人動 studio，無重工。
+- 依賴：`SUBJECT/THEME/VIBE_PRESETS`、`PresetChips` 皆 StudioWorkbench 本地；BannerStudio 有獨立同名拷貝 → 改 studio 不影響 banner。
+
+[已修改]
+- 新增 `lib/studio/prompt-presets.ts`：分類化 presets — 主圖 5 類 64 項 / 題材 4 類 36 項 / 氛圍 4 類 32 項，每項 `{zh,en,desc}`（chip 顯示 zh、tooltip 顯示 desc、click 把 en 填欄位 → prompt 仍英文）。
+- 改 `app/tools/studio/StudioWorkbench.tsx`：
+  - root grid → `1fr 340px`；控制面板 `gridColumn:2 gridRow:1` + `position:sticky`（移右並 sticky）；預覽 `gridColumn:1 gridRow:1`。
+  - 移除扁平 `PresetChips` + 三個舊 preset 常數；新增 `CategoryPicker`（子分類 tab + chips + hover tooltip）+ 共用 `tip`/`setTip` state（root 處 position:fixed 渲染，逃離 sticky panel overflow 裁切）。
+  - 主圖/題材/氛圍改用 `CategoryPicker`（主題→改名「主圖 Subject」）。
+  - `🤖 圖片模型` 重排到 `🎨 風格` 之前；模型改 tarot 直向 row（label 左、cost/ref 右，保留 `onModelsChange` 清 ref 邏輯）；風格 chip 顯示拆 `｜`（label + tooltip），state 仍存整串。
+
+[驗證結果]（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin） | exit=0 | ms=6420。.tsx 改動的真實 build gate 通過。視覺 e2e 待 sg-deploy 後 `/playwright smoke`（本機改動未上 production，無法在 live 站驗）。
+- REVIEW_DONE: critic=Standard | verdict=pass（Low risk）| findings=0c/0M/2m/2n。Minor 皆 cosmetic（summary trim、tooltip x-clamp 與 tarot 同款）+ promptTouched pre-existing out-of-scope。確認 103 風格全有 `｜`、`if(!desc)return` guard、單選 toggle、key 唯一性、sticky+tooltip 裁切逃離 全數 verified clean。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`SUBJECT_CATEGORIES|THEME_CATEGORIES|VIBE_CATEGORIES|CategoryPicker|prompt-presets|PresetCategory|PresetChips|*_PRESETS` | hits=12（全為新檔定義 + StudioWorkbench 消費，0 殘留舊引用 0 collision）。
+- BUGHUNT_SCOPE_NARROW: N/A（含 agency-os + scripts + lobster-factory；新 symbol 無 downstream consumer）。
+
+[剩餘風險]
+- 純前端、無 API/DB/auth；視覺版面尚未在 live 站確認（待 deploy + playwright，或本機 dev 視覺檢查）。
+- cosmetic minors（critic 🟡🔵）未改：tooltip 長描述近邊緣可能溢出半框寬（沿用 tarot 行為，desc 短）；summary 未 trim（chip 寫入值乾淨，無實害）。
+
+[rollback] `git checkout lobster-factory/.../app/tools/studio/StudioWorkbench.tsx` + `rm lib/studio/prompt-presets.ts`；無資料/外部副作用。
+
 ### incident(SG): 磁碟 97.5% CRITICAL — 25 封 Telegram 告警；docker image 累積根因 + weekly cleanup 修法
 
 [任務理解] 操作者收到 25 封 Telegram 警告。根因（非表面症狀）= SG VPS `wordpress-ubuntu-4gb-sin-1` (5.223.93.113) 根分割區滿到 98%（最新 06:52 UTC Netdata CRITICAL `disk_space./ = 97.5%`）。25 封 ≈ 此 disk 告警 + 半夜 00:21–00:41 的 web_log scanner spike（已自動 recovered，非持續事件）。磁碟滿會引爆 502/OOM。

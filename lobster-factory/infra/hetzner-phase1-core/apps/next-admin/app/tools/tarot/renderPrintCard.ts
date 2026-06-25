@@ -91,8 +91,9 @@ function toBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 
 /**
  * Apply a CSS filter to artwork and return a new PNG data URL.
- * Used to bake the preview colour grade before saving to gallery or sending as AI reference,
- * so gallery thumbnails and AI style references match what the user sees on-screen.
+ * Bakes hue/saturation/brightness/contrast (CSS filter primitives) into the image pixel data.
+ * Note: gamma, sharpen, and colour-balance have no canvas-filter analog and are NOT baked —
+ * same limitation as renderPrintCard's colorFilter param (see comment at line 115).
  */
 export async function applyGradeToDataUrl(dataUrl: string, cssFilter: string): Promise<string> {
   const img = await loadImage(dataUrl);
