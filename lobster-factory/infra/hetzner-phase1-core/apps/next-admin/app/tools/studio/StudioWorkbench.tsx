@@ -784,7 +784,7 @@ export default function StudioWorkbench() {
                   onMouseLeave={() => setTip(null)}
                 >
                   <button type="button" onClick={() => setStyle(active ? "" : item.zh)}
-                    style={{ padding: "3px 10px", borderRadius: 12, fontSize: 11, cursor: "pointer", border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`, background: active ? "var(--accent)" : "rgba(127,127,127,0.08)", color: active ? "var(--btn-primary-text)" : "var(--text-muted)", fontWeight: active ? 600 : 400, transition: "all 0.15s" }}>
+                    style={chipStyle(active)}>
                     {active ? "✓ " : ""}{label}
                   </button>
                 </span>
