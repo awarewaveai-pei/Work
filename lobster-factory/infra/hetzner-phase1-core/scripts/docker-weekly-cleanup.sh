@@ -47,7 +47,9 @@ rotate_log
   docker system df 2>/dev/null || true
 
   echo "--- docker system prune -af --filter until=168h ---"
-  docker system prune -af --filter "until=168h"
+  # `|| echo WARN` keeps set -e from aborting mid-block on a prune hiccup, so the
+  # `df (after)` + END marker always get logged (failed run = visible, not truncated).
+  docker system prune -af --filter "until=168h" || echo "WARN: prune exited $? — see output above; cleanup continued"
 
   echo "--- docker system df (after) ---"
   docker system df 2>/dev/null || true
