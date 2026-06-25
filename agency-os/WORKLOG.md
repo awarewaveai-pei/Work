@@ -127,6 +127,25 @@
 
 [rollback] script 還原：`git checkout lobster-factory/.../docker-weekly-cleanup.sh` 後重 scp；或 server 上改回 `prune -f`。磁碟清理不可逆（image 已刪）但無傷——下次 sg-deploy 自動 rebuild。
 
+### fix(tarot): 批次牌卡 Fabric 全 bake + 「生成風格預覽」移入調色面板
+
+[任務理解] 兩個問題：①「鎖定風格整套生成」後 78 張牌卡仍是原色（`renderPrintCard` 用 CSS filter 只有 hue/sat/bri，漏掉 gamma/sharpen/balance）②「生成風格預覽」在頂部 UX 不對，應在調色面板底部。
+
+[已修改] `TarotStudio.tsx`（commit b3611a16）：
+- `generateOne:555` — 改為先 `applyGradeToDataUrl(resp.image, grade.params)` 再 `renderPrintCard(artForPrint)`，全 10 維度進印刷牌
+- `downloadZip:722` — `deckFilter=grade.cssFilter` → `deckParams=grade.params`；pre-bake 後再 `renderPrintCard`
+- `panelOpen:196` — `grade: false` → `grade: true`（調色面板預設展開）
+- 頂部 generate 區塊：只保留 isMultiModel 的 compare 按鈕
+- ColorGradePanel 底部加入「生成風格預覽」按鈕（完整 disabled/busy/stale/warn 邏輯）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | ms=N/A
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0M/0m
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`deckFilter|artForPrint|deckParams` | hits=0（舊 deckFilter 已完全替換）
+- BUGHUNT_WAIVED: N/A — 已跑
+
+[rollback] `git revert b3611a16`；無資料/外部副作用。
+
 ### deploy(ziwei): oracle.aware-wave.com 上線 — SG 部署 + CF DNS + host nginx
 
 [任務理解] 把 ziwei-doushu 命理站部署到 SG，以 oracle.aware-wave.com 對外服務。
