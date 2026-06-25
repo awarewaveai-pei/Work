@@ -18,8 +18,7 @@
 [驗證結果]（R0 四動作）
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=3017
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0major/3minor（#1 fetching flag race→已改 per-key；#3 whitespace normalize→已加；#2 rate-limit=trending 同源既存類非回歸，flag）
-- BUGHUNT_DONE: scope=app,lib(next-admin) | grep=culture-presets|tools/studio/culture|chipStyle|tabStyle|region-collision | hits=0
-- BUGHUNT_SCOPE_NARROW: 改動全在 next-admin app/lib，純前端 feature + 新 route，無 agency-os/scripts call sites 或 downstream consumer
+- BUGHUNT_DONE: scope=agency-os,scripts,app,lib(next-admin) | grep=culture-presets|tools/studio/culture|chipStyle|tabStyle|cultureChips | hits=0 (agency-os 命中僅自身 worklog-excerpt 蒸餾鏡像，非 stale ref；symbols 全新無 downstream consumer)
 
 [剩餘風險] ①地圖（Phase 2）未做，待操作者定互動方式 ②未 deploy ③LLM 文化項準確度依模型（system prompt 已防 stereotype / sacred-commercialize）
 

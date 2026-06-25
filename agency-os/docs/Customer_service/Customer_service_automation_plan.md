@@ -1,9 +1,9 @@
 # 全自動客服系統 — 進化版總計畫（Automation Master Plan）
 
 > **SSOT 宣告**：本檔是「全自動客服」的**主計畫（SSOT）**。
-> 附錄：`Customer_service_competitive_research.md`（頂規競品研究證據基底，v2.0 升級的依據）、`Customer_service_platform_research.md`（通道可行性）、`Customer_service_plan.md`（最初決策摘要）。
+> 附錄：`Customer_service_competitive_research.md`（頂規競品研究證據）、**`Customer_service_uiux_design.md`（客戶體驗 UI/UX 設計規範，§18 摘要）**、`Customer_service_platform_research.md`（通道可行性）、`Customer_service_plan.md`（最初決策摘要）。
 > **本次範圍：只出計畫，不寫 code。** 每個 Phase 的實作另起 R0 流程。
-> **狀態**：草案 **v2.0**（2026-06-25）｜v2.0 = 研究全球頂規系統（Intercom Fin / Sierra / Decagon / Ada / Zendesk / Agentforce）後全面升級：雙軸自主分級、agentic 行動安全架構、supervisor 模型、Contextual Retrieval、prompt-injection 防禦、開源 eval/護欄棧、AgentBot 整合、多供應商容錯。**已鎖定決策**見 §0。
+> **狀態**：草案 **v2.1**（2026-06-25）｜v2.0 = 研究全球頂規系統（Fin/Sierra/Decagon/Ada/Zendesk/Agentforce）全面升級（雙軸自主、agentic 安全、supervisor、Contextual Retrieval、prompt-injection 防禦、開源 eval 棧、多供應商容錯）。**v2.1 = 加客戶體驗層**（清新自然設計語言 + headless 自建 widget，§18）。**已鎖定決策**見 §0。
 
 ---
 

@@ -653,7 +653,8 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
               </div>
               <div style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 16 }}>
 
-                {/* 素材模式 */}
+                {/* 素材模式 — 前製腳本接力時隱藏（設定已在前製腳本選好）*/}
+                {providedScenes.length === 0 && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>素材模式</span>
                   <div style={{ display: "flex", gap: 6 }}>
@@ -695,6 +696,19 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
                     </div>
                   )}
                 </div>
+                )}
+
+                {/* 前製腳本接力：素材模式摘要（只讀）*/}
+                {providedScenes.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 10, padding: "10px 14px", background: "var(--bg-subtle)", borderRadius: 8, border: "1px solid var(--border-subtle)", fontSize: 12, color: "var(--text-secondary)" }}>
+                    <span>🎬 {imageModel === "pexels-video" ? "真實影片" : imageModel === "pexels-all" ? "照片動畫" : "AI 生圖"}</span>
+                    <span>·</span>
+                    <span>📽 {providedScenes.length} 場</span>
+                    <span>·</span>
+                    <span>⏱ {targetMinutes} 分鐘</span>
+                    <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)" }}>由前製腳本設定</span>
+                  </div>
+                )}
 
                 {/* 場景與時間 combo — 三模式共用 */}
                 {providedScenes.length === 0 ? (
