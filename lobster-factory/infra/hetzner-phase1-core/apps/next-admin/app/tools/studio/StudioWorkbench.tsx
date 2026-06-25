@@ -230,7 +230,7 @@ export default function StudioWorkbench() {
   const [cultureLens, setCultureLens] = useState(CULTURE_LENSES[0]?.key ?? "");
   const [cultureChips, setCultureChips] = useState<string[]>([]); // en tokens in prompt
   const [cultureDyn, setCultureDyn] = useState<Record<string, CultureItem[]>>({}); // `${regionEn}|${lensKey}` → items
-  const [cultureFetching, setCultureFetching] = useState(false);
+  const [cultureFetching, setCultureFetching] = useState<Record<string, boolean>>({}); // per-key in-flight flag
 
   // 🔥 時事靈感 — active category tab (圖一 layout: tabs + items below)
   const [trendingTab, setTrendingTab] = useState(TRENDING_CATEGORIES[0]?.value ?? "");
@@ -375,7 +375,7 @@ export default function StudioWorkbench() {
   const fetchCulture = useCallback(async (regionEn: string, lensKey: string) => {
     const key = `${regionEn}|${lensKey}`;
     if (cultureDyn[key]) return;
-    setCultureFetching(true);
+    setCultureFetching((p) => ({ ...p, [key]: true }));
     try {
       const res = await fetch("/api/tools/studio/culture", {
         method: "POST",
@@ -387,7 +387,7 @@ export default function StudioWorkbench() {
         setCultureDyn((prev) => ({ ...prev, [key]: json.items! }));
       }
     } catch { /* keep fallback chips */ }
-    setCultureFetching(false);
+    setCultureFetching((p) => { const n = { ...p }; delete n[key]; return n; });
   }, [cultureDyn]);
 
   const fetchAllTrending = useCallback(async () => {
@@ -790,6 +790,7 @@ export default function StudioWorkbench() {
             const lens = CULTURE_LENSES.find((l) => l.key === cultureLens) ?? CULTURE_LENSES[0];
             const dynKey = region ? `${region.en}|${cultureLens}` : "";
             const dyn = dynKey ? cultureDyn[dynKey] : undefined;
+            const fetching = dynKey ? !!cultureFetching[dynKey] : false;
             const seen = new Set<string>();
             const chips: CultureItem[] = [];
             for (const it of [...(dyn ?? []), ...lens.fallback]) {
@@ -799,10 +800,10 @@ export default function StudioWorkbench() {
             return (
               <>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <button type="button" disabled={!region || cultureFetching}
+                  <button type="button" disabled={!region || fetching}
                     onClick={() => { if (region) void fetchCulture(region.en, cultureLens); }}
-                    style={{ fontSize: 11, padding: "3px 12px", borderRadius: 20, cursor: !region || cultureFetching ? "default" : "pointer", background: "var(--accent)", color: "var(--btn-primary-text)", border: "none", opacity: !region || cultureFetching ? 0.5 : 1, flexShrink: 0 }}>
-                    {cultureFetching ? "AI 思考中…" : `✨ AI 靈感（${region ? region.zh : "先選地域"}・${lens.zh}）`}
+                    style={{ fontSize: 11, padding: "3px 12px", borderRadius: 20, cursor: !region || fetching ? "default" : "pointer", background: "var(--accent)", color: "var(--btn-primary-text)", border: "none", opacity: !region || fetching ? 0.5 : 1, flexShrink: 0 }}>
+                    {fetching ? "AI 思考中…" : `✨ AI 靈感（${region ? region.zh : "先選地域"}・${lens.zh}）`}
                   </button>
                   {dyn && <span style={{ fontSize: 10, opacity: 0.45 }}>AI 已填 {dyn.length} 項</span>}
                 </div>

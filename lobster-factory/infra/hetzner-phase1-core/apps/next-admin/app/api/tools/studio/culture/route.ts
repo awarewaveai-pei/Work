@@ -96,9 +96,9 @@ No markdown, no explanation, no extra text — just the raw JSON array.`;
     const items: CultureItem[] = parsed
       .filter((it): it is Record<string, unknown> => typeof it === "object" && it !== null)
       .map((it) => ({
-        zh: typeof it.zh === "string" ? it.zh.slice(0, 24) : "",
-        en: typeof it.en === "string" ? it.en.slice(0, 80) : "",
-        desc: typeof it.desc === "string" ? it.desc.slice(0, 40) : "",
+        zh: typeof it.zh === "string" ? it.zh.replace(/\s+/g, " ").trim().slice(0, 24) : "",
+        en: typeof it.en === "string" ? it.en.replace(/\s+/g, " ").trim().slice(0, 80) : "",
+        desc: typeof it.desc === "string" ? it.desc.replace(/\s+/g, " ").trim().slice(0, 40) : "",
       }))
       .filter((it) => it.zh && it.en)
       .slice(0, 12);
