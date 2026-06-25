@@ -891,12 +891,12 @@ export default function StudioWorkbench() {
                 {shown.map((it, i) => {
                   const ang = i * GOLDEN;
                   const rad = Math.sqrt((i + 0.5) / n);
-                  const cx = 50 + Math.cos(ang) * rad * 36;
-                  const cy = 56 + Math.sin(ang) * rad * 28;
+                  const cx = 50 + Math.cos(ang) * rad * 32;
+                  const cy = 56 + Math.sin(ang) * rad * 24;
                   const active = cultureChips.includes(it.en);
                   return (
                     <button key={it.en} type="button" onClick={() => toggleCultureChip(it.en)} title={it.desc}
-                      style={{ position: "absolute", left: `${cx}%`, top: `${cy}%`, transform: "translate(-50%,-50%)", fontSize: 11, padding: "2px 8px", borderRadius: 12, cursor: "pointer", whiteSpace: "nowrap", border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`, background: active ? "rgba(99,102,241,0.92)" : "var(--chip-surface)", color: active ? "#fff" : "var(--text-primary)", boxShadow: "0 1px 4px rgba(0,0,0,0.18)", transition: "all 0.15s" }}>
+                      style={{ position: "absolute", left: `${cx}%`, top: `${cy}%`, transform: "translate(-50%,-50%)", fontSize: 11, padding: "2px 8px", borderRadius: 12, cursor: "pointer", whiteSpace: "nowrap", maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`, background: active ? "rgba(99,102,241,0.92)" : "var(--chip-surface)", color: active ? "#fff" : "var(--text-primary)", boxShadow: "0 1px 4px rgba(0,0,0,0.18)", transition: "all 0.15s" }}>
                       📍{it.zh}
                     </button>
                   );

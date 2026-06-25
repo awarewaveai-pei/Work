@@ -24,6 +24,24 @@
 
 [rollback] 3 檔皆新增或局部 edit；`git revert <commit>` 即可；無 DB/schema/auth 改動
 
+### feat(studio): 🎲 文化混搭骰 + 🗺️ 靈感地圖（Phase 2，操作者選 3+4）
+
+[任務理解] 操作者選「靈感地圖」+「文化混搭骰」兩者都要。混搭骰=一鍵隨機 2 國×1 鏡頭逼意外靈感；靈感地圖=AI 項目以圖釘散佈在地域板上，點選填 prompt。
+
+[已修改] StudioWorkbench.tsx（同檔續加）：
+- state：fusionRegion（混搭第 2 文化）/ showMap（地圖開關）
+- rollDice useCallback：CULTURE_REGIONS flatMap → Math.random 抽 2 distinct 國 + 1 lens → setRegion/fusionRegion/lens + auto fetchCulture 兩國（"use client" 端碼，Math.random 合法；置於 fetchCulture 之後避 TDZ）
+- assembledPrompt 加 `fused with {B} heritage`（deps 補 fusionRegion）；手動選國 onClick 清 fusionRegion 避殘留
+- UI：🎲 漸層按鈕 + 🗺️ 切換 + 混搭 banner(A×B)；地圖板 golden-angle(137.5°) 散佈 ≤12 圖釘，點釘 toggle 進 cultureChips
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=2916
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0major/0minor（1 cosmetic：邊緣 pin 長標籤截切→已加 maxWidth+ellipsis+縮半徑 32/24）
+- BUGHUNT_DONE: scope=agency-os,scripts,app(next-admin) | grep=rollDice|fusionRegion|showMap | hits=0（symbols 全新；TDZ/越界/除零/key 碰撞/state-leak critic 全清）
+
+[剩餘風險] 地圖板為無依賴 stylized 散佈（非 GIS 精確地理；圖釘位置裝飾性）；fusion 地圖目前只顯主 region 項目
+[rollback] 同檔 `git revert`
+
 ## 2026-06-25
 
 ### perf(trigger): dispatch-action-run schedule */1 → */10 — 一勞永逸消除 dispatcher 空轉容器
