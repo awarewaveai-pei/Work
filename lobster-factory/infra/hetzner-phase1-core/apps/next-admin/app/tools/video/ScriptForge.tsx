@@ -37,11 +37,11 @@ async function claude(prompt: string, onChunk?: (full: string) => void){
 }
 
 /* ── 送去生產影片 bridge：ScriptResult 經 context 取得回呼，免穿過 24 個 module（傳 null = 非整合模式）── */
-type SendToProduction = (p: { topic: string; articleTitle: string; articleContent: string; scenes?: { narration: string; imagePrompt: string }[]; mediaMode?: string; duration?: number }) => void;
+type SendToProduction = (p: { topic: string; articleTitle: string; articleContent: string; scenes?: { narration: string; imagePrompt: string }[]; mediaMode?: string; duration?: number; customScenes?: number }) => void;
 const ProductionBridge = createContext<SendToProduction | null>(null);
-type SendToRemotion = (p: { topic: string; headline?: string; tagline?: string; cta?: string; imageHint?: string; scenes?: { visual: string; dialogue: string }[]; mediaMode?: string; duration?: number }) => void;
+type SendToRemotion = (p: { topic: string; headline?: string; tagline?: string; cta?: string; imageHint?: string; scenes?: { visual: string; dialogue: string }[]; mediaMode?: string; duration?: number; customScenes?: number }) => void;
 const RemotionBridge = createContext<SendToRemotion | null>(null);
-const ScriptSettingsCtx = createContext<{ sceneCount: number; mediaMode: string; duration: number }>({ sceneCount: 7, mediaMode: "__ai__", duration: 1 });
+const ScriptSettingsCtx = createContext<{ sceneCount: number; customScenes: number; mediaMode: string; duration: number }>({ sceneCount: 6, customScenes: 3, mediaMode: "__ai__", duration: 1 });
 function pj(raw){return JSON.parse(raw.replace(/```json|```/g,"").trim());}
 
 /* ── INDUSTRY DATA ── */
@@ -248,7 +248,7 @@ function ScriptResult({script,score,onReset,extraTop,autoSaveTag}: any){
   const[sent,setSent]=useState(false);
   const sendToRemotion=useContext(RemotionBridge);
   const[remotionSent,setRemotionSent]=useState(false);
-  const{mediaMode,duration}=useContext(ScriptSettingsCtx);
+  const{mediaMode,duration,customScenes}=useContext(ScriptSettingsCtx);
 
   useEffect(()=>{if(script&&autoSaveTag)saveHistory({tag:autoSaveTag,title:script.title,hook:script.hook,script});},[script]);
 
@@ -783,7 +783,8 @@ function HistoryModule({setNav}){
 /* ═══ ROOT ═══ */
 export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { onSendToProduction?: SendToProduction; onSendToRemotion?: SendToRemotion } = {}){
   const[nav,setNav]=useState("manual");
-  const[sceneCount,setSceneCount]=useState(7);
+  const[sceneCount,setSceneCount]=useState(6);
+  const[customScenes,setCustomScenes]=useState(3);
   const[mediaMode,setMediaMode]=useState("__ai__");
   const[duration,setDuration]=useState(1);
   const[brand,setBrand]=useState(()=>{try{const s=localStorage.getItem("sf_brand");return s?JSON.parse(s):null;}catch{return null;}});
@@ -804,7 +805,7 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { 
   }
   function clearBrand(){setBrand(null);try{localStorage.removeItem("sf_brand");}catch{}}
   return(
-    <ScriptSettingsCtx.Provider value={{ sceneCount, mediaMode, duration }}>
+    <ScriptSettingsCtx.Provider value={{ sceneCount, customScenes, mediaMode, duration }}>
     <ProductionBridge.Provider value={onSendToProduction ?? null}>
     <RemotionBridge.Provider value={onSendToRemotion ?? null}>
     <div style={{minHeight:"100vh",background:C.paper,fontFamily:"DM Sans,sans-serif"}}>
