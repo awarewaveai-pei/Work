@@ -223,6 +223,18 @@ export default function StudioWorkbench() {
   const [vibe, setVibe] = useState("");
   const [subject, setSubject] = useState("");
   const [style, setStyle] = useState("");
+
+  // 🌍 世界文化 — region (single-select) + lens tab + picked culture chips (multi)
+  const [region, setRegion] = useState<CultureItem | null>(null);
+  const [regionTab, setRegionTab] = useState(CULTURE_REGIONS[0]?.group ?? "");
+  const [cultureLens, setCultureLens] = useState(CULTURE_LENSES[0]?.key ?? "");
+  const [cultureChips, setCultureChips] = useState<string[]>([]); // en tokens in prompt
+  const [cultureDyn, setCultureDyn] = useState<Record<string, CultureItem[]>>({}); // `${regionEn}|${lensKey}` → items
+  const [cultureFetching, setCultureFetching] = useState(false);
+
+  // 🔥 時事靈感 — active category tab (圖一 layout: tabs + items below)
+  const [trendingTab, setTrendingTab] = useState(TRENDING_CATEGORIES[0]?.value ?? "");
+
   const [prompt, setPrompt] = useState("");
   const [promptTouched, setPromptTouched] = useState(false);
   const [aspect, setAspect] = useState<AspectRatio>("1:1");
@@ -306,19 +318,22 @@ export default function StudioWorkbench() {
   }, [productType, subject, theme, style]);
 
   const assembledPrompt = useMemo(() => {
+    // 🌍 culture tokens: region adjective + any picked culture chips
+    const cultureTokens = [region ? `${region.en} cultural heritage` : "", ...cultureChips].filter(Boolean);
     if (refMode === "transform" && refImages.length > 0) {
       const parts = [
         "Transform this image.",
         resolvedStylePrompt ? `Apply style: ${resolvedStylePrompt}.` : "",
+        cultureTokens.length ? `Cultural influence: ${cultureTokens.join(", ")}.` : "",
         vibe.trim() ? `Mood: ${vibe.trim()}.` : "",
         subject.trim() ? `Keep subject: ${subject.trim()}.` : "",
         product.suffix,
       ].filter(Boolean);
       return parts.join(" ");
     }
-    const parts = [subject.trim(), theme.trim(), vibe.trim(), resolvedStylePrompt, product.suffix].filter(Boolean);
+    const parts = [subject.trim(), ...cultureTokens, theme.trim(), vibe.trim(), resolvedStylePrompt, product.suffix].filter(Boolean);
     return parts.join(", ");
-  }, [subject, theme, vibe, resolvedStylePrompt, product, refMode, refImages.length]);
+  }, [subject, theme, vibe, resolvedStylePrompt, product, refMode, refImages.length, region, cultureChips]);
 
   const effectivePrompt = promptTouched ? prompt : assembledPrompt;
 
@@ -350,6 +365,30 @@ export default function StudioWorkbench() {
       }
     }
   }, [selectedModels]);
+
+  const toggleCultureChip = useCallback((en: string) => {
+    setCultureChips((prev) => (prev.includes(en) ? prev.filter((x) => x !== en) : [...prev, en]));
+  }, []);
+
+  // Fetch 12 specific authentic items for the current region×lens via the LLM.
+  // Cached per (regionEn|lensKey) for the session — re-clicking is a no-op.
+  const fetchCulture = useCallback(async (regionEn: string, lensKey: string) => {
+    const key = `${regionEn}|${lensKey}`;
+    if (cultureDyn[key]) return;
+    setCultureFetching(true);
+    try {
+      const res = await fetch("/api/tools/studio/culture", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ region: regionEn, lens: lensKey }),
+      });
+      const json = (await res.json()) as { ok: boolean; items?: CultureItem[] };
+      if (json.ok && json.items?.length) {
+        setCultureDyn((prev) => ({ ...prev, [key]: json.items! }));
+      }
+    } catch { /* keep fallback chips */ }
+    setCultureFetching(false);
+  }, [cultureDyn]);
 
   const fetchAllTrending = useCallback(async () => {
     const today = new Date().toISOString().slice(0, 10);
@@ -678,35 +717,131 @@ export default function StudioWorkbench() {
 
         <AccordionSection title="🔥 時事靈感">
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <p style={{ fontSize: 11, opacity: 0.55, margin: 0 }}>點擊話題填入主題欄</p>
+            <p style={{ fontSize: 11, opacity: 0.55, margin: 0 }}>點擊話題填入主圖欄</p>
             <button type="button" disabled={trendingFetching} onClick={() => void fetchAllTrending()}
               style={{ fontSize: 11, padding: "3px 12px", borderRadius: 20, cursor: trendingFetching ? "default" : "pointer", background: "var(--accent)", color: "var(--btn-primary-text)", border: "none", opacity: trendingFetching ? 0.6 : 1, flexShrink: 0 }}>
               {trendingFetching ? "搜尋中…" : "抓取今日熱搜"}
             </button>
           </div>
-          {TRENDING_CATEGORIES.map((cat) => {
-            const topics = allTopics[cat.value];
-            const loading = trendingFetching && !topics;
-            if (!topics && !trendingFetching) return null;
+          {/* Row 1: category tabs (圖一 layout) */}
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+            {TRENDING_CATEGORIES.map((cat) => (
+              <button key={cat.value} type="button" onClick={() => setTrendingTab(cat.value)} style={tabStyle(trendingTab === cat.value)}>
+                {cat.label}
+              </button>
+            ))}
+          </div>
+          {/* Row 2: topics of the active category */}
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+            {(() => {
+              const topics = allTopics[trendingTab];
+              if (!topics) {
+                return <span style={{ fontSize: 11, opacity: 0.45 }}>{trendingFetching ? "搜尋中…" : "點「抓取今日熱搜」載入話題"}</span>;
+              }
+              return topics.map((t, i) => (
+                <button key={`${trendingTab}-${i}`} type="button" onClick={() => setSubject(t)} style={chipStyle(false)}>
+                  {t}
+                </button>
+              ));
+            })()}
+          </div>
+        </AccordionSection>
+
+        {/* 🌍 世界文化 — region × lens, with AI-filled specific items (混搭靈感工具) */}
+        <AccordionSection title="🌍 世界文化" summary={region ? region.zh : (cultureChips.length ? `${cultureChips.length} 元素` : "未選")}>
+          <p style={{ fontSize: 11, opacity: 0.55, margin: "0 0 8px" }}>
+            1️⃣ 選地域 → 2️⃣ 選鏡頭 → ✨ AI 噴出該文化專屬靈感（可多選，填入 prompt）
+          </p>
+
+          {/* 地域：洲 tabs + 國家 chips（單選） */}
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
+            {CULTURE_REGIONS.map((g) => (
+              <button key={g.group} type="button" onClick={() => setRegionTab(g.group)} style={tabStyle(regionTab === g.group)}>
+                {g.group}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 10 }}>
+            {(CULTURE_REGIONS.find((g) => g.group === regionTab)?.items ?? []).map((it) => {
+              const active = region?.en === it.en;
+              return (
+                <span key={it.en} style={{ display: "inline-block" }}
+                  onMouseEnter={(e) => { const r = e.currentTarget.getBoundingClientRect(); setTip({ text: it.desc, x: r.left + r.width / 2, y: r.top }); }}
+                  onMouseLeave={() => setTip(null)}>
+                  <button type="button" onClick={() => setRegion(active ? null : it)} style={chipStyle(active)}>
+                    {active ? "✓ " : ""}{it.zh}
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+
+          {/* 鏡頭 lens tabs */}
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+            {CULTURE_LENSES.map((l) => (
+              <button key={l.key} type="button" onClick={() => setCultureLens(l.key)} style={tabStyle(cultureLens === l.key)}>
+                {l.emoji} {l.zh}
+              </button>
+            ))}
+          </div>
+
+          {/* AI 動態填充 + chips（動態具體項在前，靜態 fallback 在後，多選） */}
+          {(() => {
+            const lens = CULTURE_LENSES.find((l) => l.key === cultureLens) ?? CULTURE_LENSES[0];
+            const dynKey = region ? `${region.en}|${cultureLens}` : "";
+            const dyn = dynKey ? cultureDyn[dynKey] : undefined;
+            const seen = new Set<string>();
+            const chips: CultureItem[] = [];
+            for (const it of [...(dyn ?? []), ...lens.fallback]) {
+              if (seen.has(it.en)) continue;
+              seen.add(it.en); chips.push(it);
+            }
             return (
-              <div key={cat.value} style={{ marginBottom: 6 }}>
-                <span style={{ fontSize: 10, fontWeight: 600, color: "var(--text-muted)", display: "inline-block", minWidth: 40, marginRight: 4 }}>{cat.label}</span>
-                {loading && <span style={{ fontSize: 11, opacity: 0.4 }}>…</span>}
-                {topics && (
-                  <span style={{ display: "inline-flex", gap: 3, flexWrap: "wrap" }}>
-                    {topics.map((t, i) => (
-                      <button key={`${cat.value}-${i}`} type="button" onClick={() => setSubject(t)}
-                        style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, cursor: "pointer", background: "var(--chip-bg)", border: "1px solid var(--border)", color: "var(--text-primary)", transition: "border-color 0.15s" }}
-                        onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--accent)")}
-                        onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--border)")}>
-                        {t}
-                      </button>
-                    ))}
-                  </span>
-                )}
-              </div>
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <button type="button" disabled={!region || cultureFetching}
+                    onClick={() => { if (region) void fetchCulture(region.en, cultureLens); }}
+                    style={{ fontSize: 11, padding: "3px 12px", borderRadius: 20, cursor: !region || cultureFetching ? "default" : "pointer", background: "var(--accent)", color: "var(--btn-primary-text)", border: "none", opacity: !region || cultureFetching ? 0.5 : 1, flexShrink: 0 }}>
+                    {cultureFetching ? "AI 思考中…" : `✨ AI 靈感（${region ? region.zh : "先選地域"}・${lens.zh}）`}
+                  </button>
+                  {dyn && <span style={{ fontSize: 10, opacity: 0.45 }}>AI 已填 {dyn.length} 項</span>}
+                </div>
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                  {chips.map((it) => {
+                    const active = cultureChips.includes(it.en);
+                    return (
+                      <span key={it.en} style={{ display: "inline-block" }}
+                        onMouseEnter={(e) => { const r = e.currentTarget.getBoundingClientRect(); setTip({ text: it.desc, x: r.left + r.width / 2, y: r.top }); }}
+                        onMouseLeave={() => setTip(null)}>
+                        <button type="button" onClick={() => toggleCultureChip(it.en)} style={chipStyle(active)}>
+                          {active ? "✓ " : ""}{it.zh}
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              </>
             );
-          })}
+          })()}
+
+          {/* 已選文化元素 summary + 清除 */}
+          {cultureChips.length > 0 && (
+            <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)" }}>已選文化元素 ({cultureChips.length})</span>
+                <button type="button" onClick={() => setCultureChips([])}
+                  style={{ fontSize: 10, padding: "1px 8px", borderRadius: 10, cursor: "pointer", background: "transparent", border: "1px solid var(--border)", color: "var(--text-muted)" }}>清除</button>
+              </div>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {cultureChips.map((en) => (
+                  <button key={en} type="button" onClick={() => toggleCultureChip(en)} title="點擊移除"
+                    style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, cursor: "pointer", background: "rgba(99,102,241,0.15)", border: "1px solid var(--accent)", color: "var(--accent)" }}>
+                    {en} ✕
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </AccordionSection>
 
         {/* 🤖 圖片模型 — placed BEFORE 風格 (per spec). Tarot-style: provider tabs + vertical rows. */}
