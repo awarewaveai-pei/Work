@@ -1,5 +1,5 @@
 {
-    "generatedAt":  "2026-06-24T18:33:23.1059435Z",
+    "generatedAt":  "2026-06-25T14:13:07.9030078Z",
     "overall":  "PASS",
     "fatal":  false,
     "fatalReason":  "",
@@ -12,8 +12,8 @@
                "retention_days":  "7",
                "retention_source":  "static",
                "backup_size":  "12G",
-               "latest_time":  "2026-06-24 02:31:16",
-               "oldest_time":  "2026-06-17 02:00:01",
+               "latest_time":  "2026-06-25 02:31:14",
+               "oldest_time":  "2026-06-18 02:00:02",
                "backup_age_days":  "0"
            },
     "eu":  {
@@ -24,9 +24,9 @@
                "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|30 2 * * * root /root/scripts/backup-eu-stack.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261|0 3 * * * root /root/scripts/verify-backup-eu.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261",
                "retention_days":  "7",
                "retention_source":  "static",
-               "backup_size":  "7.0G",
-               "latest_time":  "2026-06-24 02:30:51",
-               "oldest_time":  "2026-06-17 02:30:40",
+               "backup_size":  "7.2G",
+               "latest_time":  "2026-06-25 02:30:49",
+               "oldest_time":  "2026-06-18 02:30:42",
                "backup_age_days":  "0"
            },
     "reportPath":  "agency-os/reports/status/backup-health-LATEST.md"
