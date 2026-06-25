@@ -14,6 +14,8 @@ interface ProductionPrefill {
   articleTitle: string;
   articleContent: string;
   scenes?: { narration: string; imagePrompt: string }[];
+  mediaMode?: string;
+  duration?: number;
 }
 
 interface RemotionPrefill {
@@ -23,6 +25,8 @@ interface RemotionPrefill {
   cta?: string;
   imageHint?: string;
   scenes?: { visual: string; dialogue: string }[];
+  mediaMode?: string;
+  duration?: number;
 }
 
 const TABS = [

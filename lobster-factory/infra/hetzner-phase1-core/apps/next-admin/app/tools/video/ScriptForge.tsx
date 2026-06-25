@@ -784,6 +784,8 @@ function HistoryModule({setNav}){
 export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { onSendToProduction?: SendToProduction; onSendToRemotion?: SendToRemotion } = {}){
   const[nav,setNav]=useState("manual");
   const[sceneCount,setSceneCount]=useState(7);
+  const[mediaMode,setMediaMode]=useState("__ai__");
+  const[duration,setDuration]=useState(1);
   const[brand,setBrand]=useState(()=>{try{const s=localStorage.getItem("sf_brand");return s?JSON.parse(s):null;}catch{return null;}});
   const groups=["生成","工具","分析","設定","規劃","紀錄"];
   const gNavs=groups.map(g=>({group:g,items:NAVS.filter(n=>n.group===g)}));
@@ -802,7 +804,7 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { 
   }
   function clearBrand(){setBrand(null);try{localStorage.removeItem("sf_brand");}catch{}}
   return(
-    <ScriptSettingsCtx.Provider value={{ sceneCount }}>
+    <ScriptSettingsCtx.Provider value={{ sceneCount, mediaMode, duration }}>
     <ProductionBridge.Provider value={onSendToProduction ?? null}>
     <RemotionBridge.Provider value={onSendToRemotion ?? null}>
     <div style={{minHeight:"100vh",background:C.paper,fontFamily:"DM Sans,sans-serif"}}>
@@ -845,6 +847,20 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { 
             <b style={{color:C.ink}}>怎麼用：</b>① 上方選功能（預設「手動生成」）→ ② 填主題、按生成 → ③ 結果頁按「<b style={{color:C.coral}}>🎬 送去生產影片</b>」轉成影片
           </span>
           <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            <label style={{fontSize:11,color:C.mid,fontWeight:700,whiteSpace:"nowrap"}}>🎬 素材</label>
+            <div style={{display:"flex",gap:3}}>
+              {([["pexels-video","真實影片"],["pexels-all","照片動畫"],["__ai__","AI生圖"]] as [string,string][]).map(([id,label])=><button key={id} onClick={()=>setMediaMode(id)}
+                style={{padding:"3px 8px",borderRadius:6,border:`1.5px solid ${mediaMode===id?C.coral:C.border}`,background:mediaMode===id?C.corallt:C.white,color:mediaMode===id?C.coral:C.ink,fontSize:11,fontWeight:mediaMode===id?700:400,cursor:"pointer",fontFamily:"inherit"}}>
+                {label}
+              </button>)}
+            </div>
+            <label style={{fontSize:11,color:C.mid,fontWeight:700,whiteSpace:"nowrap"}}>⏱ 時長</label>
+            <div style={{display:"flex",gap:3}}>
+              {[1,2,3,5].map(n=><button key={n} onClick={()=>setDuration(n)}
+                style={{padding:"3px 8px",borderRadius:6,border:`1.5px solid ${duration===n?C.coral:C.border}`,background:duration===n?C.corallt:C.white,color:duration===n?C.coral:C.ink,fontSize:11,fontWeight:duration===n?700:400,cursor:"pointer",fontFamily:"inherit"}}>
+                {n}分
+              </button>)}
+            </div>
             <label style={{fontSize:11,color:C.mid,fontWeight:700,whiteSpace:"nowrap"}}>📽 場景數</label>
             <div style={{display:"flex",gap:3}}>
               {[3,5,7,10].map(n=><button key={n} onClick={()=>setSceneCount(n)}

@@ -138,6 +138,10 @@ interface VideoStudioInitial {
   articleContent?: string;
   /** 深層接力：前製腳本場景（台詞→旁白、畫面→生圖提示）→ 直接出片，不重生。 */
   scenes?: { narration: string; imagePrompt: string }[];
+  /** 前製腳本帶入的素材模式（pexels-video / pexels-all / __ai__） */
+  mediaMode?: string;
+  /** 前製腳本帶入的目標時長（分鐘） */
+  duration?: number;
 }
 
 interface ScriptRemotionPrefill {
@@ -147,15 +151,25 @@ interface ScriptRemotionPrefill {
   cta?: string;
   imageHint?: string;
   scenes?: { visual: string; dialogue: string }[];
+  mediaMode?: string;
+  duration?: number;
 }
 
 export default function VideoStudio({ initial, remotionInitial }: { initial?: VideoStudioInitial; remotionInitial?: ScriptRemotionPrefill } = {}) {
   // ── Config knobs ──
   const [totalScenes, setTotalScenes] = useState(6);
   const [customScenes, setCustomScenes] = useState(3);
-  const [imageModel, setImageModel] = useState(DEFAULT_IMAGE_MODEL);
-  const [imageVendor, setImageVendor] = useState(() => vendorForModel(DEFAULT_IMAGE_MODEL));
-  const [targetMinutes, setTargetMinutes] = useState(1);
+  const [imageModel, setImageModel] = useState(() => {
+    const m = initial?.mediaMode;
+    if (!m || m === "__ai__") return DEFAULT_IMAGE_MODEL;
+    return m; // "pexels-video" or "pexels-all"
+  });
+  const [imageVendor, setImageVendor] = useState(() => {
+    const m = initial?.mediaMode;
+    if (!m || m === "__ai__") return vendorForModel(DEFAULT_IMAGE_MODEL);
+    return vendorForModel(DEFAULT_IMAGE_MODEL); // pexels: vendor unused
+  });
+  const [targetMinutes, setTargetMinutes] = useState(initial?.duration ?? 1);
   const [voiceModelId, setVoiceModelId] = useState(VOICE_MODELS[0].id);
   // 輸出比例（預設只 16:9，WP/YouTube 用；需社群格式時手動勾選）。每比例各自原生生成 → 圖片成本/時間 ×已選數。
   const [selectedFormats, setSelectedFormats] = useState<Set<string>>(new Set(["16x9"]));
