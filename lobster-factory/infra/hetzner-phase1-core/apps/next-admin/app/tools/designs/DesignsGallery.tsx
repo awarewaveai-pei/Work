@@ -370,12 +370,13 @@ export default function DesignsGallery() {
 
   useEffect(() => { void loadVideos(); }, [loadVideos]);
 
-  /* close kebab menu on outside click */
+  /* close kebab menu on outside click (use click, not mousedown — mousedown fires before
+   * React 18's synthetic stopPropagation can cancel it, so items were unreachable) */
   useEffect(() => {
     if (!openMenuId) return;
     const handler = () => setOpenMenuId(null);
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
   }, [openMenuId]);
 
   /* hide filter panel when scrolling down, reveal on scroll up */
@@ -1285,7 +1286,7 @@ export default function DesignsGallery() {
                   {openMenuId === asset.id ? (
                     <div
                       className="designs-kebab-menu"
-                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
                     >
                       {asset.object_url ? (
                         <button

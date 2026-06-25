@@ -705,6 +705,7 @@ export default function TarotStudio() {
     setMessage(null);
     try {
       await generateOne(batch[index].card, index);
+      setMessage("✓ 已重新生成");
     } finally {
       setBatchBusy(false);
     }
@@ -1543,28 +1544,29 @@ export default function TarotStudio() {
         {/* ── 生成風格預覽 button + Accordion: 調色/修圖 ── */}
         <div style={{ borderTop: "1px solid var(--card-border)" }}>
           {!isMultiModel && (
-            <div style={{ padding: "10px 0 6px" }}>
-              {hasSelectedModel ? (
-                <button
-                  className="btn-primary"
-                  style={{
-                    width: "100%",
-                    boxShadow: previewStale ? "0 0 0 3px var(--yellow)" : undefined,
-                  }}
-                  onClick={generatePreview}
-                  disabled={previewBusy || locked}
-                >
-                  {previewBusy ? "生成中…" : previewImage ? "重新生成預覽" : "生成風格預覽"}
-                </button>
-              ) : (
+            <div style={{ padding: "10px 0 6px", display: "flex", flexDirection: "column", gap: 6 }}>
+              {!hasSelectedModel && (
                 <div style={{
-                  fontSize: 12, color: "var(--text-muted)", textAlign: "center",
-                  padding: "7px 0", borderRadius: 6,
-                  border: "1px dashed var(--card-border)",
+                  fontSize: 12, color: "var(--yellow)", textAlign: "center",
+                  padding: "6px 10px", borderRadius: 6,
+                  border: "1px dashed var(--yellow)",
+                  background: "rgba(234,179,8,0.07)",
                 }}>
-                  ↓ 請先在圖片模型區選一個模型
+                  ⚠️ 請先在下方圖片模型區選一個模型
                 </div>
               )}
+              <button
+                className="btn-primary"
+                style={{
+                  width: "100%",
+                  boxShadow: previewStale ? "0 0 0 3px var(--yellow)" : undefined,
+                  opacity: !hasSelectedModel ? 0.45 : 1,
+                }}
+                onClick={generatePreview}
+                disabled={previewBusy || locked || !hasSelectedModel}
+              >
+                {previewBusy ? "生成中…" : previewImage ? "重新生成預覽" : "生成風格預覽"}
+              </button>
             </div>
           )}
           <button
