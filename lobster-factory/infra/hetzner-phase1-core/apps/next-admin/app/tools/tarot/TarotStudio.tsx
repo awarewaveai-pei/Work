@@ -1540,8 +1540,29 @@ export default function TarotStudio() {
           )}
         </div>
 
-        {/* ── Accordion: 調色/修圖 ── */}
+        {/* ── 生成風格預覽 button + Accordion: 調色/修圖 ── */}
         <div style={{ borderTop: "1px solid var(--card-border)" }}>
+          {!isMultiModel && (
+            <div style={{ padding: "10px 0 6px" }}>
+              <button
+                className="btn-primary"
+                style={{
+                  width: "100%",
+                  boxShadow: previewStale ? "0 0 0 3px var(--yellow)" : undefined,
+                  opacity: !hasSelectedModel ? 0.6 : 1,
+                }}
+                onClick={generatePreview}
+                disabled={previewBusy || locked}
+              >
+                {previewBusy ? "生成中…" : !hasSelectedModel ? "請先選擇圖片模型" : previewImage ? "重新生成預覽" : "生成風格預覽"}
+              </button>
+              {!hasSelectedModel && (
+                <div style={{ fontSize: 11, color: "var(--yellow)", marginTop: 4, textAlign: "center" }}>
+                  ↓ 在圖片模型區選一個
+                </div>
+              )}
+            </div>
+          )}
           <button
             type="button"
             onClick={() => togglePanel("grade")}
@@ -1557,27 +1578,6 @@ export default function TarotStudio() {
           {panelOpen.grade && (
             <div style={{ paddingBottom: 12 }}>
               <ColorGradePanel state={grade.state} onSet={grade.set} onReset={grade.reset} neutral={grade.neutral} />
-              {!isMultiModel && (
-                <div style={{ marginTop: 10 }}>
-                  <button
-                    className="btn-primary"
-                    style={{
-                      width: "100%",
-                      boxShadow: previewStale ? "0 0 0 3px var(--yellow)" : undefined,
-                      opacity: !hasSelectedModel ? 0.6 : 1,
-                    }}
-                    onClick={generatePreview}
-                    disabled={previewBusy || locked}
-                  >
-                    {previewBusy ? "生成中…" : !hasSelectedModel ? "請先選擇圖片模型" : previewImage ? "重新生成預覽" : "生成風格預覽"}
-                  </button>
-                  {!hasSelectedModel && (
-                    <div style={{ fontSize: 11, color: "var(--yellow)", marginTop: 4, textAlign: "center" }}>
-                      ↓ 在圖片模型區選一個
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           )}
         </div>
