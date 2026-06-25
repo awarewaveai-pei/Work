@@ -4,6 +4,34 @@
 
 ## 2026-06-25
 
+### incident(EU): 12,853 Trigger runner 屍體堆積根因 — autoremove "0"→"1" 治本 + cleanup script 一致化
+
+[任務理解] 收 SG 磁碟告警後檢查 EU（`204.168.175.41`）是否同病。發現兩獨立問題（皆非緊急）：(A) cleanup script 同樣舊版 `prune -f` 不清無用 tagged image；(B) 12,853 個 Exited 容器堆積（根因待查）。操作者要求 R0 propose-first，逐項批准後才動。
+
+[現況分析]（唯讀蒐證）
+- EU 磁碟 71%（102G/150G），健康，無 SG 緊迫性。containerd-snapshotter（namespace moby）。
+- (A) `/usr/local/bin/docker-weekly-cleanup.sh:43` = `prune -f`（無 -a）；images 88 個 46.65GB / 11.66GB 可回收。
+- (B) 12,826 Exited / 29 Up。`docker ps -a` 證實 12,828 個來自 image `registry:5000/trigger/proj_6c4f...production`，名稱 `runner-*`，~2/min 持續產生（樣本 20s/22s 前剛退）。weekly cron 有跑（06-21 清完剩 262），4 天堆回 1.2 萬。僅 613MB = metadata 堆積非磁碟。
+- (B) 根因鐵證：`/root/trigger/docker-compose.yml` `supervisor:` service L333（repo SSOT `lobster-factory/infra/trigger/docker-compose.yml:336`）`DOCKER_AUTOREMOVE_EXITED_CONTAINERS: "0"` → 明確關閉自動移除。
+
+[已修改]
+- (A) scp 已修的 `docker-weekly-cleanup.sh`（`-af --filter until=168h`，repo 早於 SG 修法 commit）到 EU `/usr/local/bin/`，bash -n + grep 驗證 OK。repo 無需新 commit（檔已是 -af）。
+- (B1 一次性) EU `docker container prune -f`（清 1.2 萬 exited）+ `docker image prune -af --filter until=168h`（回收 11.66GB）— 背景執行，安全進展中（11k→9.4k 遞減，29 服務全 intact，prune PID 活著）。
+- (B2 治本) `lobster-factory/infra/trigger/docker-compose.yml` autoremove `"0"`→`"1"`（+ 2 行註解說明根因與 debug 代價）。EU live `/root/trigger/docker-compose.yml` 備份（`.bak-20260625-autoremove`）後 sed 同步 + `docker compose config` YAML 驗證 OK + `docker compose up -d supervisor` 重建。
+
+[驗證結果]（R0 四動作）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker compose up -d supervisor` + `docker inspect -f '{{.HostConfig.AutoRemove}}'` | exit=0 | supervisor 10s healthy（v4.4.4），29 服務全 healthy；新建 runner `runner-cmqtmd3180rp0...` **AutoRemove=true**，supervisor env `DOCKER_AUTOREMOVE_EXITED_CONTAINERS=1` → 治本生效於源頭。(A) bash -n + grep `-af` OK。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — 單行 env 切換 + 註解；YAML 經 `docker compose config` 驗證；備份在位可秒級 rollback；複用 SG 已 critic-pass 的 cleanup script。
+- BUGHUNT_DONE: scope=lobster-factory,scripts,agency-os | grep=`DOCKER_AUTOREMOVE_EXITED_CONTAINERS`,`docker-weekly-cleanup` | hits: repo SSOT 唯一 autoremove 定義已改（`lobster-factory/infra/trigger/docker-compose.yml`）；cleanup script repo 早已 -af；無其他 stale 引用。
+- BUGHUNT_SCOPE_NARROW: N/A（含三根路徑）。
+
+[剩餘風險]
+- B1 backlog 大清理背景跑（containerd 逐容器極慢，~12k 個）；未完成不影響治本（autoremove 已防新增），最差由下次 weekly cron 收尾。
+- autoremove="1" 後失敗 run 容器也自動移除 → 無法事後 `docker logs`；run logs 仍在 webapp DB + OTEL，可接受。
+- EU live compose 為 surgical sed（僅值），repo SSOT 有完整註解；下次正式 deploy 同步註解。
+
+[rollback] (B2) `docker-compose.yml.bak-20260625-autoremove` 還原 + `docker compose up -d supervisor`（秒級）；或值改回 "0"。(A) scp 舊版回 EU。一次性 prune 不可逆但無傷（屍體本就該清）。
+
 ### feat(studio): /tools/studio 控制面板重排 — 工具列移右 + 風格/模型改 tarot 款 + 主圖/題材/氛圍分類化
 
 [任務理解] 操作者要 `/tools/studio` 控制面板：① 工具列從左移到右側 ② `🤖 圖片模型`、`🎨 風格` 改成 tarot（`/tools/tarot`）同款呈現（子分類 tab + chips + hover 描述 tooltip），且順序模型在風格之前 ③ 主圖/題材/氛圍要很多選項 + 分類 + 圖二排版（圖二即 tarot 風格區截圖）。純前端呈現需求。
@@ -14777,3 +14805,5 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): added missing useVideoConfig import to ProductReviewTypewriter.tsx (one-line fix, file already Deep-critic-reviewed in prior session)
 
+
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial)

@@ -333,7 +333,9 @@ services:
       DOCKER_REGISTRY_URL: ${DOCKER_REGISTRY_URL}
       DOCKER_REGISTRY_USERNAME: ${DEPLOY_REGISTRY_USERNAME}
       DOCKER_REGISTRY_PASSWORD: ${DEPLOY_REGISTRY_PASSWORD}
-      DOCKER_AUTOREMOVE_EXITED_CONTAINERS: "0"
+      # "1" = runner 容器跑完即自動移除，防止 exited 屍體堆積（2026-06-25: EU 4 天堆 1.2 萬個 → containerd metadata 膨脹）。
+      # 代價：失敗 run 的容器也會被移除，無法事後 docker logs；但 run logs 已存於 webapp DB + OTEL。
+      DOCKER_AUTOREMOVE_EXITED_CONTAINERS: "1"
     healthcheck:
       test:
         [
