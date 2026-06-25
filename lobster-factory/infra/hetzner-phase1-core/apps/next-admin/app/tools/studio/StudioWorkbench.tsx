@@ -8,6 +8,12 @@ import {
 } from "../../../lib/studio/model-options";
 import { resolveStylePrompt } from "@/app/tools/tarot/cards";
 import { STYLE_CATALOG } from "@/app/tools/tarot/tarotStyles";
+import {
+  SUBJECT_CATEGORIES,
+  THEME_CATEGORIES,
+  VIBE_CATEGORIES,
+  type PresetCategory,
+} from "@/lib/studio/prompt-presets";
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 import { openInCanvas } from "@/components/tools/canvas-handoff";
 import { buildSemanticFilename, buildSemanticBase, type SemanticFileMeta } from "@/lib/studio/semantic-filename";
@@ -29,30 +35,6 @@ const PRODUCT_TYPES = [
 ];
 
 const ASPECTS: AspectRatio[] = ["1:1", "3:2", "2:3", "4:3", "3:4", "4:5", "16:9", "9:16"];
-
-const SUBJECT_PRESETS = [
-  "Dragon warrior", "Celestial goddess", "Skull with flowers",
-  "Koi fish spirit", "Mountain with moon", "Tiger spirit",
-  "Astronaut drifting", "Wolf howling at moon", "Phoenix rising",
-  "Samurai warrior", "Sacred geometry", "Mermaid deep sea",
-  "Lion with crown", "Butterfly mandala", "Cyberpunk cityscape",
-];
-
-const THEME_PRESETS = [
-  "Sports & competition", "Music culture", "Street fashion",
-  "Ancient mythology", "Future technology", "Nature ecology",
-  "Spiritual journey", "Social satire", "Art therapy",
-  "Gaming culture", "Psychology & mind", "Historical heritage",
-  "Animal liberation", "Space exploration", "Luxury lifestyle",
-];
-
-const VIBE_PRESETS = [
-  "Bold & powerful", "Dark & mysterious", "Calm & ethereal",
-  "Playful & whimsical", "Romantic & dreamy", "Raw & edgy",
-  "Sacred & divine", "Nostalgic & warm", "Sharp & modern",
-  "Electric & vibrant", "Zen & peaceful", "Epic & grand",
-  "Melancholic & deep", "Rebellious & wild", "Tender & intimate",
-];
 
 const TRENDING_CATEGORIES = [
   { value: "international-news", label: "國際" },
@@ -142,31 +124,67 @@ function AccordionSection({
   );
 }
 
-function PresetChips({ chips, onSelect, selected }: { chips: string[]; onSelect: (v: string) => void; selected?: string }) {
+type TipState = { text: string; x: number; y: number } | null;
+
+// Tarot-style categorized chip picker (圖二 layout): a row of sub-category tabs +
+// a chip grid, each chip carrying a hover tooltip (中文描述). The chip's `en` is what
+// lands in the field so the assembled prompt stays English; the zh label is display-only.
+// Single-select: clicking the active chip clears the field.
+function CategoryPicker({
+  categories, value, onPick, onTip,
+}: {
+  categories: PresetCategory[];
+  value: string;
+  onPick: (v: string) => void;
+  onTip: (tip: TipState) => void;
+}) {
+  const [tab, setTab] = useState(categories[0]?.group ?? "");
+  const items = categories.find((c) => c.group === tab)?.items ?? [];
+  const current = value.trim();
   return (
-    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 5 }}>
-      {chips.map((c, i) => {
-        const active = selected === c;
-        return (
-          <button
-            key={`${c}-${i}`}
-            type="button"
-            onClick={() => onSelect(c)}
-            style={{
-              fontSize: 11, padding: "2px 9px", borderRadius: 20,
-              background: active ? "var(--accent)" : "var(--chip-bg)",
-              border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
-              cursor: "pointer", color: active ? "var(--btn-primary-text)" : "var(--text-muted)",
-              fontWeight: active ? 600 : 400, lineHeight: 1.6,
-              transition: "all 0.15s",
-            }}
-            onMouseOver={(e) => { if (!active) e.currentTarget.style.borderColor = "var(--accent)"; }}
-            onMouseOut={(e) => { if (!active) e.currentTarget.style.borderColor = "var(--border)"; }}
-          >
-            {c}
-          </button>
-        );
-      })}
+    <div>
+      {/* Row 1: sub-category tabs */}
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+        {categories.map((c) => {
+          const active = tab === c.group;
+          return (
+            <button
+              key={c.group}
+              type="button"
+              onClick={() => { setTab(c.group); onTip(null); }}
+              style={{ padding: "3px 10px", borderRadius: 12, fontSize: 11, cursor: "pointer", border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`, background: active ? "var(--accent)" : "rgba(127,127,127,0.08)", color: active ? "var(--btn-primary-text)" : "var(--text-muted)", fontWeight: active ? 600 : 400, transition: "all 0.15s" }}
+            >
+              {c.group}
+            </button>
+          );
+        })}
+      </div>
+      {/* Row 2: chips for selected sub-category — hover handlers on the SPAN so the
+          tooltip survives even if the button is ever disabled (mirrors tarot). */}
+      <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+        {items.map((it) => {
+          const active = current === it.en;
+          return (
+            <span
+              key={it.zh}
+              style={{ display: "inline-block" }}
+              onMouseEnter={(e) => {
+                const r = e.currentTarget.getBoundingClientRect();
+                onTip({ text: it.desc, x: r.left + r.width / 2, y: r.top });
+              }}
+              onMouseLeave={() => onTip(null)}
+            >
+              <button
+                type="button"
+                onClick={() => onPick(active ? "" : it.en)}
+                style={{ padding: "3px 10px", borderRadius: 12, fontSize: 11, cursor: "pointer", border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`, background: active ? "var(--accent)" : "rgba(127,127,127,0.08)", color: active ? "var(--btn-primary-text)" : "var(--text-muted)", fontWeight: active ? 600 : 400, transition: "all 0.15s" }}
+              >
+                {active ? "✓ " : ""}{it.zh}
+              </button>
+            </span>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -209,6 +227,11 @@ export default function StudioWorkbench() {
   const MODEL_GROUPS = Array.from(new Set(STUDIO_MODEL_OPTIONS.map((item) => item.group)));
   const [styleGroup, setStyleGroup] = useState(STYLE_GROUPS[0] ?? "");
   const [modelGroup, setModelGroup] = useState(MODEL_GROUPS[0] ?? "");
+
+  // Shared hover-tooltip for all categorized chips (主圖/題材/氛圍/風格). Captured at
+  // viewport coords on hover, rendered position:fixed at the component root so it escapes
+  // the sticky control panel's overflow clipping (same pattern as TarotStudio).
+  const [tip, setTip] = useState<TipState>(null);
 
   // Trending news state — all categories fetched in parallel, cached per day
   const [allTopics, setAllTopics] = useState<Record<string, string[]>>({});
@@ -600,9 +623,9 @@ export default function StudioWorkbench() {
   const anyResults = results.some((r) => !r.busy && r.image);
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 16, padding: 16 }}>
-      {/* ── Controls ───────────────────────────────────────────── */}
-      <div className="build-panel" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 16, padding: 16, alignItems: "start" }}>
+      {/* ── Controls (RIGHT column, sticky — moved from left per spec) ───────── */}
+      <div className="build-panel" style={{ gridColumn: 2, gridRow: 1, position: "sticky", top: 16, alignSelf: "start", maxHeight: "calc(100vh - 32px)", overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 8 }}>
 
         <label style={{ fontSize: 13 }}>
           商品類型
@@ -611,19 +634,19 @@ export default function StudioWorkbench() {
           </select>
         </label>
 
-        <AccordionSection title="🎯 主題 Subject" summary={subject || "未填"} defaultOpen>
-          <input className="btn-secondary" style={{ width: "100%", marginBottom: 6, opacity: isTransformMode ? 0.5 : 1 }} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={isTransformMode ? "改圖模式：主題由上傳圖決定（可選）" : "例：lotus flower mandala"} />
-          <PresetChips chips={SUBJECT_PRESETS} onSelect={setSubject} selected={subject} />
+        <AccordionSection title="🎯 主圖 Subject" summary={subject || "未填"} defaultOpen>
+          <input className="btn-secondary" style={{ width: "100%", marginBottom: 8, opacity: isTransformMode ? 0.5 : 1 }} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={isTransformMode ? "改圖模式：主圖由上傳圖決定（可選）" : "例：lotus flower mandala"} />
+          <CategoryPicker categories={SUBJECT_CATEGORIES} value={subject} onPick={setSubject} onTip={setTip} />
         </AccordionSection>
 
         <AccordionSection title="📚 題材 Theme" summary={theme || "未填"}>
-          <input className="btn-secondary" style={{ width: "100%", marginBottom: 6, opacity: isTransformMode ? 0.4 : 1 }} value={theme} onChange={(e) => setTheme(e.target.value)} placeholder={isTransformMode ? "改圖模式下不影響 prompt" : "例：spiritual healing"} />
-          <PresetChips chips={THEME_PRESETS} onSelect={setTheme} selected={theme} />
+          <input className="btn-secondary" style={{ width: "100%", marginBottom: 8, opacity: isTransformMode ? 0.4 : 1 }} value={theme} onChange={(e) => setTheme(e.target.value)} placeholder={isTransformMode ? "改圖模式下不影響 prompt" : "例：spiritual healing"} />
+          <CategoryPicker categories={THEME_CATEGORIES} value={theme} onPick={setTheme} onTip={setTip} />
         </AccordionSection>
 
         <AccordionSection title="✨ 氛圍 Vibe" summary={vibe || "未填"}>
-          <input className="btn-secondary" style={{ width: "100%", marginBottom: 6 }} value={vibe} onChange={(e) => setVibe(e.target.value)} placeholder="例：calm, ethereal" />
-          <PresetChips chips={VIBE_PRESETS} onSelect={setVibe} selected={vibe} />
+          <input className="btn-secondary" style={{ width: "100%", marginBottom: 8 }} value={vibe} onChange={(e) => setVibe(e.target.value)} placeholder="例：calm, ethereal" />
+          <CategoryPicker categories={VIBE_CATEGORIES} value={vibe} onPick={setVibe} onTip={setTip} />
         </AccordionSection>
 
         <AccordionSection title="🔥 時事靈感">
@@ -659,45 +682,22 @@ export default function StudioWorkbench() {
           })}
         </AccordionSection>
 
-        <AccordionSection title="🎨 風格 Style" summary={style || "不指定"}>
-          {/* Row 1: group chips */}
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
-            {STYLE_GROUPS.map((g) => (
-              <button key={g} type="button" onClick={() => setStyleGroup(g)}
-                style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${styleGroup === g ? "var(--accent)" : "var(--border)"}`, background: styleGroup === g ? "var(--accent)" : "rgba(127,127,127,0.08)", color: styleGroup === g ? "var(--btn-primary-text)" : "var(--text-muted)", transition: "all 0.15s" }}>
-                {g}
-              </button>
-            ))}
-          </div>
-          {/* Row 2: style chips for selected group */}
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-            {STYLE_CATALOG.filter((item) => item.group === styleGroup).map((item) => {
-              const active = style === item.zh;
-              return (
-                <button key={item.zh} type="button" onClick={() => setStyle(active ? "" : item.zh)}
-                  style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`, background: active ? "var(--accent)" : "rgba(127,127,127,0.08)", color: active ? "var(--btn-primary-text)" : "var(--text-muted)", transition: "all 0.15s" }}>
-                  {item.zh}
-                </button>
-              );
-            })}
-          </div>
-        </AccordionSection>
-
+        {/* 🤖 圖片模型 — placed BEFORE 風格 (per spec). Tarot-style: provider tabs + vertical rows. */}
         <AccordionSection
           title="🤖 圖片模型"
           summary={selectedModels.size > 1 ? `已選 ${selectedModels.size} 個` : (STUDIO_MODEL_OPTIONS.find((o) => selectedModels.has(o.value))?.label ?? "")}
         >
-          {/* Row 1: group chips */}
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+          {/* Row 1: provider tabs */}
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 10 }}>
             {MODEL_GROUPS.map((g) => (
               <button key={g} type="button" onClick={() => setModelGroup(g)}
-                style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${modelGroup === g ? "var(--accent)" : "var(--border)"}`, background: modelGroup === g ? "var(--accent)" : "rgba(127,127,127,0.08)", color: modelGroup === g ? "var(--btn-primary-text)" : "var(--text-muted)", transition: "all 0.15s" }}>
+                style={{ padding: "3px 10px", borderRadius: 12, fontSize: 11, cursor: "pointer", border: `1px solid ${modelGroup === g ? "var(--accent)" : "var(--border)"}`, background: modelGroup === g ? "var(--accent)" : "rgba(127,127,127,0.08)", color: modelGroup === g ? "var(--btn-primary-text)" : "var(--text-muted)", fontWeight: modelGroup === g ? 600 : 400, transition: "all 0.15s" }}>
                 {g}
               </button>
             ))}
           </div>
-          {/* Row 2: model chips for selected group */}
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {/* Row 2: model rows (label left, cost/ref right) */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {STUDIO_MODEL_OPTIONS.filter((item) => item.group === modelGroup).map((item) => {
               const active = selectedModels.has(item.value);
               return (
@@ -711,9 +711,11 @@ export default function StudioWorkbench() {
                     })());
                   }}
                   title={item.maxRefs > 0 ? `最多 ${item.maxRefs} 張參考圖` : "純文字生圖"}
-                  style={{ padding: "5px 10px", borderRadius: 14, fontSize: 12, cursor: "pointer", border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`, background: active ? "var(--accent)" : "rgba(127,127,127,0.08)", color: active ? "var(--btn-primary-text)" : "var(--text-muted)", fontWeight: active ? 600 : 400, transition: "all 0.15s" }}>
-                  {active && selectedModels.size === 1 ? "✓ " : active ? "☑ " : ""}{item.label}
-                  <span style={{ fontSize: 10, opacity: 0.7, marginLeft: 4 }}>NT${item.costNt}</span>
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 10px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`, background: active ? "rgba(99,102,241,0.12)" : "rgba(127,127,127,0.04)", color: active ? "var(--accent)" : "var(--text-primary)", fontWeight: active ? 600 : 400, transition: "all 0.15s" }}>
+                  <span>{active && selectedModels.size === 1 ? "✓ " : active ? "☑ " : ""}{item.label}</span>
+                  <span style={{ fontSize: 10, color: "var(--text-muted)" }}>
+                    NT${item.costNt}{item.maxRefs > 0 ? ` · ${item.maxRefs}ref` : " · text"}
+                  </span>
                 </button>
               );
             })}
@@ -723,6 +725,45 @@ export default function StudioWorkbench() {
               ? `已選 ${selectedModels.size} 個模型 → 依序生成 ${selectedModels.size} 張比較圖`
               : (() => { const m = STUDIO_MODEL_OPTIONS.find((o) => selectedModels.has(o.value)); return m?.maxRefs ? `此模型最多吃 ${m.maxRefs} 張參考圖` : "此模型不吃參考圖（純文字生圖）"; })()}
           </p>
+        </AccordionSection>
+
+        {/* 🎨 風格 Style — tarot-style: group tabs + chips with hover tooltip (圖二). The
+            chip stores the FULL item.zh (needed by resolveStylePrompt); only the display
+            is split on "｜" — label before, tooltip description after. */}
+        <AccordionSection title="🎨 風格 Style" summary={style ? style.split("｜")[0] : "不指定"}>
+          {/* Row 1: group tabs */}
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+            {STYLE_GROUPS.map((g) => (
+              <button key={g} type="button" onClick={() => { setStyleGroup(g); setTip(null); }}
+                style={{ padding: "3px 10px", borderRadius: 12, fontSize: 11, cursor: "pointer", border: `1px solid ${styleGroup === g ? "var(--accent)" : "var(--border)"}`, background: styleGroup === g ? "var(--accent)" : "rgba(127,127,127,0.08)", color: styleGroup === g ? "var(--btn-primary-text)" : "var(--text-muted)", fontWeight: styleGroup === g ? 600 : 400, transition: "all 0.15s" }}>
+                {g}
+              </button>
+            ))}
+          </div>
+          {/* Row 2: style chips for selected group, with hover tooltip */}
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+            {STYLE_CATALOG.filter((item) => item.group === styleGroup).map((item) => {
+              const active = style === item.zh;
+              const [label, desc] = item.zh.split("｜");
+              return (
+                <span
+                  key={item.zh}
+                  style={{ display: "inline-block" }}
+                  onMouseEnter={(e) => {
+                    if (!desc) return;
+                    const r = e.currentTarget.getBoundingClientRect();
+                    setTip({ text: desc, x: r.left + r.width / 2, y: r.top });
+                  }}
+                  onMouseLeave={() => setTip(null)}
+                >
+                  <button type="button" onClick={() => setStyle(active ? "" : item.zh)}
+                    style={{ padding: "3px 10px", borderRadius: 12, fontSize: 11, cursor: "pointer", border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`, background: active ? "var(--accent)" : "rgba(127,127,127,0.08)", color: active ? "var(--btn-primary-text)" : "var(--text-muted)", fontWeight: active ? 600 : 400, transition: "all 0.15s" }}>
+                    {active ? "✓ " : ""}{label}
+                  </button>
+                </span>
+              );
+            })}
+          </div>
         </AccordionSection>
 
         <AccordionSection title="📐 比例" summary={aspect}>
