@@ -2,6 +2,29 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-26
+
+### feat(studio): 🌍 世界文化靈感工具（region×lens + AI 動態填充）+ chip 淺紫修正 + 時事靈感 tab 化
+
+[任務理解] 操作者做「世界各地特徵的衣服」，要 /tools/studio 加「讓靈感噴發」小工具：國家 + 多軸（食物/文化紋樣·配色·織法·符號/音樂/藝術/政治/運動/景點/節慶/代表人物含原住民…）+ 地圖 + 選項要非常多很豐富。並修 2 個 UI：勾選項目背景改淺紫（與實心 tab 區分）、時事靈感改 tab 版面。
+
+[現況分析] StudioWorkbench.tsx = AI 生圖工作台，三軸 chip picker（主圖/題材/氛圍 via prompt-presets.ts）+ 多模型 + mockup + 去背 + inpaint + 時事靈感（LLM /api/tools/studio/trending）。三軸**無地理/文化維度**（最多到泛分類「民俗信仰」）→ 正是缺口。chip 與 tab 都用 var(--accent) 實心 → 同色難分。
+
+[已修改]
+- NEW lib/studio/culture-presets.ts：CULTURE_REGIONS（10 洲 60 地域，含台灣原住民/薩米/馬賽/安地斯/毛利…原住民一級項）+ CULTURE_LENSES（16 鏡頭，各帶 hint + fallback）
+- NEW app/api/tools/studio/culture/route.ts：POST{region,lens}→Haiku 回 12 個該文化真實具體項（雙語 {zh,en,desc}）；複用 trending 的 resolveOpsRole/canCreateAiImageJob gate；region slice(60) + lens 白名單 + 防禦式 JSON 解析 + 欄位 coerce/normalize
+- EDIT StudioWorkbench.tsx：①tabStyle/chipStyle helper（chipStyle=淺紫 rgba(99,102,241,0.15) 選中填色）套 CategoryPicker+Style chip ②新 state（region/regionTab/cultureLens/cultureChips/cultureDyn/cultureFetching per-key/trendingTab）③fetchCulture（per-key 快取）+ toggleCultureChip ④assembledPrompt 折入 cultureTokens（deps 補 region,cultureChips）⑤時事靈感→tab 版面 ⑥新 🌍 世界文化 section（地域 tabs+國家 chips 單選 / lens tabs / AI 按鈕+動態+fallback chips 多選 / 已選 summary 清除）
+
+[驗證結果]（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=3017
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0major/3minor（#1 fetching flag race→已改 per-key；#3 whitespace normalize→已加；#2 rate-limit=trending 同源既存類非回歸，flag）
+- BUGHUNT_DONE: scope=app,lib(next-admin) | grep=culture-presets|tools/studio/culture|chipStyle|tabStyle|region-collision | hits=0
+- BUGHUNT_SCOPE_NARROW: 改動全在 next-admin app/lib，純前端 feature + 新 route，無 agency-os/scripts call sites 或 downstream consumer
+
+[剩餘風險] ①地圖（Phase 2）未做，待操作者定互動方式 ②未 deploy ③LLM 文化項準確度依模型（system prompt 已防 stereotype / sacred-commercialize）
+
+[rollback] 3 檔皆新增或局部 edit；`git revert <commit>` 即可；無 DB/schema/auth 改動
+
 ## 2026-06-25
 
 ### perf(trigger): dispatch-action-run schedule */1 → */10 — 一勞永逸消除 dispatcher 空轉容器
