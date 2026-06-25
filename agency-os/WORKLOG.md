@@ -35,6 +35,32 @@
 
 [rollback] `git checkout lobster-factory/.../app/tools/studio/StudioWorkbench.tsx` + `rm lib/studio/prompt-presets.ts`；無資料/外部副作用。
 
+### fix(tarot): gallery/AI-reference 吃到完整色彩調整 — Fabric pipeline 全 bake
+
+[任務理解] 根本問題：用戶在預覽面板做色彩調整後，①存入 gallery 的縮圖是原始 AI 圖（未套調色），②用「調整後風格」生成其他羅牌時，AI 只吃到部分調色（hue/sat/bri）而非用戶看到的完整效果（gamma/sharpen/colour-balance 完全沒進去）。
+
+[現況分析]
+- 原 `applyGradeToDataUrl(dataUrl, cssFilter)` 用 `ctx.filter = cssFilter`（CSS filter）。`toCssFilter()` 只輸出 hue-rotate/saturate/brightness/contrast — 沒有 gamma/sharpen/colour-balance 對應的 CSS primitive。
+- GradedPreview（on-screen WYSIWYG）用 Fabric pipeline（`buildFabricImageFilters`），完整支援全 10 維度。
+- 結果：用戶調 gamma/sharpen/balance 時，bake 產出與原圖相同（identity），gallery + AI reference 都是原圖。
+- 5 個 call sites 全在 TarotStudio.tsx；`lockedGradedPreview` 存 lock 時快照供 AI reference。
+
+[已修改]
+- `renderPrintCard.ts`: `applyGradeToDataUrl` 改用 Fabric pipeline：`fabric.FabricImage.fromURL` + `buildFabricImageFilters(fabric, params)` + `fc.toDataURL`。簽名從 `(dataUrl, cssFilter: string)` → `(dataUrl, params: ColorGradeParams)`。新增 import `ColorGradeParams` + `buildFabricImageFilters`；新增 `FabricNS`/`FilterableImage` local type aliases（匹配 GradedPreview 慣例）。
+- `TarotStudio.tsx`：5 個 call sites 全改 `grade.cssFilter` → `grade.params`。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin） | exit=0 | ms=N/A。型別正確：新簽名、FabricImage/StaticCanvas 型別、`fImg.width/height`、`fc.setDimensions/toDataURL` 全通過。視覺 e2e 待 sg-deploy 後 `/playwright smoke`。
+- REVIEW_DONE: critic=Deep | verdict=addressed | findings=0c/1M→fixed/3m/1s。Major（CSS vs Fabric engine mismatch）= 根因 → 本 commit 修法。Minors（grade race / lock staleness / PNG size）pre-existing，本次不動（不在用戶回報範圍）。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`applyGradeToDataUrl|lockedGradedPreview` | hits=7（全為本次改動的定義+call sites；剩餘 `grade.cssFilter` 2 hits 是 `renderPrintCard` 的印刷層 CSS filter — 另一機制，intentional）。
+- BUGHUNT_WAIVED: N/A — 已執行完整 bughunt。
+
+[剩餘風險]
+- `renderPrintCard` 的印刷層（78 張牌 print card 本身）仍用 CSS filter — gamma/sharpen/balance 在印刷卡面也不完整。但這是另一條路徑，使用者原始回報的兩個 bug（gallery + AI reference）均已修。
+- Fabric async import 在首次 bake 有 ~100ms 動態載入延遲（Fabric 約 300KB bundle），後續請求走 module cache 快。
+
+[rollback] `git checkout lobster-factory/.../app/tools/tarot/renderPrintCard.ts lobster-factory/.../app/tools/tarot/TarotStudio.tsx`；無資料/外部副作用。
+
 ### incident(SG): 磁碟 97.5% CRITICAL — 25 封 Telegram 告警；docker image 累積根因 + weekly cleanup 修法
 
 [任務理解] 操作者收到 25 封 Telegram 警告。根因（非表面症狀）= SG VPS `wordpress-ubuntu-4gb-sin-1` (5.223.93.113) 根分割區滿到 98%（最新 06:52 UTC Netdata CRITICAL `disk_space./ = 97.5%`）。25 封 ≈ 此 disk 告警 + 半夜 00:21–00:41 的 web_log scanner spike（已自動 recovered，非持續事件）。磁碟滿會引爆 502/OOM。
