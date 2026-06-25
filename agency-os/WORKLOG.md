@@ -26,7 +26,7 @@
 - BUGHUNT_SCOPE_NARROW: N/A（含三根路徑）。
 
 [剩餘風險]
-- B1 backlog 大清理背景跑（containerd 逐容器極慢，~12k 個）；未完成不影響治本（autoremove 已防新增），最差由下次 weekly cron 收尾。
+- B1 backlog 大清理已完成（12,873→68，磁碟釋出 ~9G）；autoremove 已防新增，EU 容器數長期維持 ~29。
 - autoremove="1" 後失敗 run 容器也自動移除 → 無法事後 `docker logs`；run logs 仍在 webapp DB + OTEL，可接受。
 - EU live compose 為 surgical sed（僅值），repo SSOT 有完整註解；下次正式 deploy 同步註解。
 
