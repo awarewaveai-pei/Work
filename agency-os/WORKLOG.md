@@ -18,7 +18,7 @@
 - `lobster-factory/infra/trigger/TASK_REFERENCE.md:99` 同步描述為 `*/10` safety-net（BUGHUNT 命中之現行文件；歷史 memory/reports 的「每分鐘」為過往事實不改寫）。
 
 [驗證結果]（R0 四動作）
-- REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/lobster-trigger-deploy.ps1` (trigger v4 deploy) + `psql TaskSchedule` | exit=0 | 部署 `Version 20260625.1 deployed with 11 detected tasks`；DB `TaskSchedule.generatorExpression='*/10 * * * *'` active=t updatedAt=22:35:12（deploy 即時更新）；kick 仍 HTTP 200；29 服務 healthy。（觀測確認 */10 cadence 背景跑中）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/lobster-trigger-deploy.ps1` (trigger v4 deploy) + `psql TaskSchedule` | exit=0 | 部署 `Version 20260625.1 deployed with 11 detected tasks`；DB `TaskSchedule.generatorExpression='*/10 * * * *'` active=t updatedAt=22:35:12（deploy 即時更新）；kick 仍 HTTP 200；29 服務 healthy。觀測確認：22:36-22:41 視窗 schedule 僅 22:40 觸發一次（舊 */1 會有 5 次）→ */10 實機生效。
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — critic subagent 撞 session limit 不可用 → 自審 + `verify-recent --ack`（logged daily 2026-06-26）；改動為 cron 值 + 註解，無邏輯；`*/10` 標準合法 cron；真實 build gate = trigger deploy（已過）。
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`*/1 * * * *`,`dispatch-action-run-schedule`,`polls every minute` | hits=1 現行文件（TASK_REFERENCE.md，已同 commit 修）；其餘命中皆 2026-06-14 歷史記錄（不改寫）。
 - BUGHUNT_SCOPE_NARROW: N/A（含三根路徑）。
