@@ -193,7 +193,7 @@ export default function TarotStudio() {
   // clipping + sticky stacking context). null = hidden.
   const [styleTip, setStyleTip] = useState<{ text: string; x: number; y: number } | null>(null);
   const [panelOpen, setPanelOpen] = useState<Record<string, boolean>>({
-    model: false, style: false, subject: false, mode: false, template: false, grade: false, edit: false,
+    model: false, style: false, subject: false, mode: false, template: false, grade: true, edit: false,
   });
   function togglePanel(key: string) {
     setPanelOpen((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -552,9 +552,12 @@ export default function TarotStudio() {
         patchItem(index, { status: "error", error: resp.error ?? "unknown" });
         return;
       }
-      // Apply the deck's colour-grade to every card (洞1 fix): the adjustment made on the
-      // preview now propagates to all 78 cards' print render — not just the preview download.
-      const blob = await renderPrintCard(card, resp.image, template, grade.neutral ? undefined : grade.cssFilter);
+      // Bake the full colour grade (Fabric: gamma/sharpen/balance included) into the artwork
+      // first; then composite into the print card frame — all 10 sliders applied, not just CSS dims.
+      const artForPrint = !grade.neutral
+        ? await applyGradeToDataUrl(resp.image, grade.params).catch(() => resp.image)
+        : resp.image;
+      const blob = await renderPrintCard(card, artForPrint, template);
       const url = URL.createObjectURL(blob);
       // Save the colour-graded card to gallery (洞2 fix): previously saved raw resp.image BEFORE
       // renderPrintCard, so the gallery always got the ungraded original. Now we convert the graded
@@ -720,7 +723,7 @@ export default function TarotStudio() {
       // Snapshot the deck colour-grade once (洞1: background-batch cards have only an R2 url,
       // not a pre-graded blob, so they must be (re)graded here too — foreground cards' blobs
       // were already graded in generateOne). One snapshot = uniform deck, no mid-zip drift.
-      const deckFilter = grade.neutral ? undefined : grade.cssFilter;
+      const deckParams = grade.neutral ? null : grade.params;
       for (const it of batch) {
         if (it.status !== "done") continue;
         // Cards from background batch have url (R2) but no blob — render the print card on demand.
@@ -734,7 +737,10 @@ export default function TarotStudio() {
               reader.onerror = () => reject(new Error("read_error"));
               reader.readAsDataURL(imgBlob);
             });
-            const printBlob = await renderPrintCard(it.card, artDataUrl, template, deckFilter);
+            const gradedArt = deckParams
+              ? await applyGradeToDataUrl(artDataUrl, deckParams).catch(() => artDataUrl)
+              : artDataUrl;
+            const printBlob = await renderPrintCard(it.card, gradedArt, template);
             const safe = it.card.name.replace(/[^a-z0-9]+/gi, "_").toLowerCase();
             zip.file(`${String(it.card.id).padStart(2, "0")}_${safe}.png`, printBlob);
           } catch { /* skip unrenderable cards */ }
@@ -1073,9 +1079,9 @@ export default function TarotStudio() {
           padding: "12px 12px 32px",
         }}
       >
-        {/* Generate button */}
-        <div style={{ marginBottom: 12 }}>
-          {isMultiModel ? (
+        {/* Compare-mode generate button — single-model preview button lives in 調色/修圖 panel */}
+        {isMultiModel && (
+          <div style={{ marginBottom: 12 }}>
             <button
               className="btn-primary"
               style={{ width: "100%" }}
@@ -1084,26 +1090,8 @@ export default function TarotStudio() {
             >
               {compareBusy ? `生成中… (${selectedModels.size} 模型)` : `生成比較（${selectedModels.size}）`}
             </button>
-          ) : (
-            <button
-              className="btn-primary"
-              style={{
-                width: "100%",
-                boxShadow: previewStale ? "0 0 0 3px var(--yellow)" : undefined,
-                opacity: !hasSelectedModel ? 0.6 : 1,
-              }}
-              onClick={generatePreview}
-              disabled={previewBusy || locked}
-            >
-              {previewBusy ? "生成中…" : !hasSelectedModel ? "請先選擇圖片模型" : previewImage ? "重新生成預覽" : "生成風格預覽"}
-            </button>
-          )}
-          {!hasSelectedModel && (
-            <div style={{ fontSize: 11, color: "var(--yellow)", marginTop: 4, textAlign: "center" }}>
-              ↓ 在圖片模型區選一個
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* ── Accordion: 生成模式 ── */}
         <div style={{ borderTop: "1px solid var(--card-border)" }}>
@@ -1569,6 +1557,27 @@ export default function TarotStudio() {
           {panelOpen.grade && (
             <div style={{ paddingBottom: 12 }}>
               <ColorGradePanel state={grade.state} onSet={grade.set} onReset={grade.reset} neutral={grade.neutral} />
+              {!isMultiModel && (
+                <div style={{ marginTop: 10 }}>
+                  <button
+                    className="btn-primary"
+                    style={{
+                      width: "100%",
+                      boxShadow: previewStale ? "0 0 0 3px var(--yellow)" : undefined,
+                      opacity: !hasSelectedModel ? 0.6 : 1,
+                    }}
+                    onClick={generatePreview}
+                    disabled={previewBusy || locked}
+                  >
+                    {previewBusy ? "生成中…" : !hasSelectedModel ? "請先選擇圖片模型" : previewImage ? "重新生成預覽" : "生成風格預覽"}
+                  </button>
+                  {!hasSelectedModel && (
+                    <div style={{ fontSize: 11, color: "var(--yellow)", marginTop: 4, textAlign: "center" }}>
+                      ↓ 在圖片模型區選一個
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
