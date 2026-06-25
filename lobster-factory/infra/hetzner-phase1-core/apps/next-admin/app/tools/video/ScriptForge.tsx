@@ -39,6 +39,8 @@ async function claude(prompt: string, onChunk?: (full: string) => void){
 /* ── 送去生產影片 bridge：ScriptResult 經 context 取得回呼，免穿過 24 個 module（傳 null = 非整合模式）── */
 type SendToProduction = (p: { topic: string; articleTitle: string; articleContent: string; scenes?: { narration: string; imagePrompt: string }[] }) => void;
 const ProductionBridge = createContext<SendToProduction | null>(null);
+type SendToRemotion = (p: { topic: string; headline?: string; tagline?: string; cta?: string; imageHint?: string; scenes?: { visual: string; dialogue: string }[] }) => void;
+const RemotionBridge = createContext<SendToRemotion | null>(null);
 function pj(raw){return JSON.parse(raw.replace(/```json|```/g,"").trim());}
 
 /* ── INDUSTRY DATA ── */
@@ -243,6 +245,8 @@ function ScriptResult({script,score,onReset,extraTop,autoSaveTag}: any){
   const[showPreview,setShowPreview]=useState(false);
   const sendToProduction=useContext(ProductionBridge);
   const[sent,setSent]=useState(false);
+  const sendToRemotion=useContext(RemotionBridge);
+  const[remotionSent,setRemotionSent]=useState(false);
 
   useEffect(()=>{if(script&&autoSaveTag)saveHistory({tag:autoSaveTag,title:script.title,hook:script.hook,script});},[script]);
 
@@ -296,6 +300,7 @@ function ScriptResult({script,score,onReset,extraTop,autoSaveTag}: any){
       <Card><SL ch="🔄 多平台轉換"/><div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:repLoading||repurposed?12:0}}>{PLATFORMS.map(p=><button key={p.id} onClick={()=>doRep(p.id)} style={{padding:"6px 12px",borderRadius:999,border:`1.5px solid ${repPlatform===p.id?C.violet:C.border}`,background:repPlatform===p.id?C.violetl:C.white,color:repPlatform===p.id?C.violet:C.ink,fontSize:11.5,fontWeight:repPlatform===p.id?700:400,cursor:"pointer",transition:"all .15s",fontFamily:"inherit"}}>{p.icon} {p.label}</button>)}</div>{repLoading&&<div style={{textAlign:"center",padding:"12px 0",color:C.mid,fontSize:12.5}}>轉換中...</div>}{repurposed&&<div style={{background:C.violetl,borderRadius:9,padding:12}}><div style={{fontSize:13.5,fontWeight:800,color:C.violet,marginBottom:3}}>{repurposed.title}</div><div style={{fontSize:12.5,color:C.violet,fontStyle:"italic",marginBottom:7}}>「{repurposed.hook}」</div>{repurposed.scenes?.map((s,i)=><div key={i} style={{fontSize:11.5,color:C.ink,padding:"4px 0",borderBottom:`1px solid rgba(124,92,252,.1)`}}><b style={{color:C.violet}}>【{s.time}】</b> {s.dialogue}</div>)}{repurposed.key_changes&&<div style={{marginTop:7,fontSize:11.5,color:C.mid,background:C.white,borderRadius:6,padding:"6px 9px"}}><b>與原版差異：</b>{repurposed.key_changes}</div>}</div>}</Card>
 
       {sendToProduction&&script?.scenes?.length>0&&<PBtn ch={sent?"✅ 已送進影片生產線 — 切到上方「🎬 影片生產」分頁":"🎬 送去生產影片（用此腳本直接生影片）"} onClick={()=>{const dlg=(script.scenes||[]).map(s=>s.dialogue).filter(Boolean).join("\n");const sc=(script.scenes||[]).map(s=>({narration:(s.dialogue||"").trim(),imagePrompt:(s.visual||"").trim()})).filter(s=>s.narration);sendToProduction({topic:script.title||"",articleTitle:script.title||"",articleContent:`${script.hook?`開場鉤子：${script.hook}\n\n`:""}${dlg}${script.cta?`\n\n結尾 CTA：${script.cta}`:""}`,scenes:sc.length>0?sc:undefined});setSent(true);}} full/>}
+      {sendToRemotion&&script&&<PBtn ch={remotionSent?"✅ 已送去 Remotion 模板 — 切換到「Remotion 模板」分頁":"✨ 送去 Remotion 模板（精緻動效影片）"} onClick={()=>{sendToRemotion({topic:script.title||"",headline:script.title||"",tagline:script.hook||"",cta:script.cta||"",imageHint:script.scenes?.[0]?.visual||"",scenes:(script.scenes||[]).map(s=>({visual:s.visual||"",dialogue:s.dialogue||""}))});setRemotionSent(true);}} full/>}
       <div style={{display:"flex",gap:9}}><GBtn ch={copied?"✅ 已複製":"📋 複製腳本"} onClick={copyScript} style={{flex:1,padding:"11px"}}/><PBtn ch="重新開始 →" onClick={onReset} full style={{flex:1}}/></div>
     </div>
   );
@@ -769,7 +774,7 @@ function HistoryModule({setNav}){
 }
 
 /* ═══ ROOT ═══ */
-export default function ScriptForge({ onSendToProduction }: { onSendToProduction?: SendToProduction } = {}){
+export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { onSendToProduction?: SendToProduction; onSendToRemotion?: SendToRemotion } = {}){
   const[nav,setNav]=useState("manual");
   const[brand,setBrand]=useState(()=>{try{const s=localStorage.getItem("sf_brand");return s?JSON.parse(s):null;}catch{return null;}});
   const groups=["生成","工具","分析","設定","規劃","紀錄"];
@@ -790,6 +795,7 @@ export default function ScriptForge({ onSendToProduction }: { onSendToProduction
   function clearBrand(){setBrand(null);try{localStorage.removeItem("sf_brand");}catch{}}
   return(
     <ProductionBridge.Provider value={onSendToProduction ?? null}>
+    <RemotionBridge.Provider value={onSendToRemotion ?? null}>
     <div style={{minHeight:"100vh",background:C.paper,fontFamily:"DM Sans,sans-serif"}}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&family=DM+Serif+Display:ital@0;1&display=swap');
@@ -872,6 +878,7 @@ export default function ScriptForge({ onSendToProduction }: { onSendToProduction
         {nav==="history"&&<HistoryModule setNav={setNav}/>}
       </div>
     </div>
+    </RemotionBridge.Provider>
     </ProductionBridge.Provider>
   );
 }

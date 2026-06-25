@@ -16,6 +16,15 @@ interface ProductionPrefill {
   scenes?: { narration: string; imagePrompt: string }[];
 }
 
+interface RemotionPrefill {
+  topic: string;
+  headline?: string;
+  tagline?: string;
+  cta?: string;
+  imageHint?: string;
+  scenes?: { visual: string; dialogue: string }[];
+}
+
 const TABS = [
   { id: "script" as const, label: "📝 前製腳本", desc: "用 AI 寫台詞、分鏡、字幕、標題" },
   { id: "produce" as const, label: "🎬 影片生產", desc: "腳本 → AI 生圖 → 配音 → MP4" },
@@ -24,6 +33,7 @@ const TABS = [
 export default function VideoTabs() {
   const [tab, setTab] = useState<"script" | "produce">("script");
   const [prefill, setPrefill] = useState<ProductionPrefill | undefined>(undefined);
+  const [remotionPrefill, setRemotionPrefill] = useState<RemotionPrefill | undefined>(undefined);
 
   return (
     <div>

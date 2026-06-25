@@ -24,7 +24,9 @@
   - `🤖 圖片模型` 重排到 `🎨 風格` 之前；模型改 tarot 直向 row（label 左、cost/ref 右，保留 `onModelsChange` 清 ref 邏輯）；風格 chip 顯示拆 `｜`（label + tooltip），state 仍存整串。
 
 [驗證結果]（R0 四動作）
-- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin） | exit=0 | ms=6420。.tsx 改動的真實 build gate 通過。視覺 e2e 待 sg-deploy 後 `/playwright smoke`（本機改動未上 production，無法在 live 站驗）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin） | exit=0 | ms=6420。.tsx 真實 build gate 通過。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin`（SG prod，操作者 go-ahead A） | exit=0 | next-admin build OK → `.deployed-commit` c85bb780→3977de0e → healthy 7s → HTTP smoke 4/4 200。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`playwright-runner.ps1 -Mode smoke` | exit=0 | 26 passed / 0 failed / 6 skipped（auth-token skips）。evidence: `agency-os/reports/e2e/2026-06-25/smoke`。**已上線 app.aware-wave.com/tools/studio**。
 - REVIEW_DONE: critic=Standard | verdict=pass（Low risk）| findings=0c/0M/2m/2n。Minor 皆 cosmetic（summary trim、tooltip x-clamp 與 tarot 同款）+ promptTouched pre-existing out-of-scope。確認 103 風格全有 `｜`、`if(!desc)return` guard、單選 toggle、key 唯一性、sticky+tooltip 裁切逃離 全數 verified clean。
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`SUBJECT_CATEGORIES|THEME_CATEGORIES|VIBE_CATEGORIES|CategoryPicker|prompt-presets|PresetCategory|PresetChips|*_PRESETS` | hits=12（全為新檔定義 + StudioWorkbench 消費，0 殘留舊引用 0 collision）。
 - BUGHUNT_SCOPE_NARROW: N/A（含 agency-os + scripts + lobster-factory；新 symbol 無 downstream consumer）。
