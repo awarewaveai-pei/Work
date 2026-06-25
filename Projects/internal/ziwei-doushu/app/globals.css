@@ -32,7 +32,9 @@
   --text-heading: #f5f3ff;
   --text-body:    #b8b0d0;
   --text-caption: #8980a8;
-  --text-dim:     #5c5478;
+  /* WCAG AA: lightened from #5c5478 (2.6:1) → ~4.6:1 on dark glass; used by
+     真太陽時狀態字 (.no-correction-text) 與塔羅牌序號等真實內容,須可讀。 */
+  --text-dim:     #8077a0;
 
   /* Auspicious — Jade Green (宜) */
   --jade-400: #6ee7b7;
@@ -166,6 +168,14 @@ body::after {
   0%   { opacity: 0.8; }
   50%  { opacity: 0.5; }
   100% { opacity: 0.9; }
+}
+
+/* WCAG 2.3.3 — 尊重使用者的減少動態偏好,關閉星點閃爍 */
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  body::after {
+    animation: none;
+  }
 }
 
 /* ─── Page wrapper (above star field) ──────────────────────────────────────── */
