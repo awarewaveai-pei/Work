@@ -142,6 +142,8 @@ interface VideoStudioInitial {
   mediaMode?: string;
   /** 前製腳本帶入的目標時長（分鐘） */
   duration?: number;
+  /** 前製腳本帶入的 AI 生圖場景數 */
+  customScenes?: number;
 }
 
 interface ScriptRemotionPrefill {
@@ -153,12 +155,13 @@ interface ScriptRemotionPrefill {
   scenes?: { visual: string; dialogue: string }[];
   mediaMode?: string;
   duration?: number;
+  customScenes?: number;
 }
 
 export default function VideoStudio({ initial, remotionInitial }: { initial?: VideoStudioInitial; remotionInitial?: ScriptRemotionPrefill } = {}) {
   // ── Config knobs ──
   const [totalScenes, setTotalScenes] = useState(6);
-  const [customScenes, setCustomScenes] = useState(3);
+  const [customScenes, setCustomScenes] = useState(initial?.customScenes ?? 3);
   const [imageModel, setImageModel] = useState(() => {
     const m = initial?.mediaMode;
     if (!m || m === "__ai__") return DEFAULT_IMAGE_MODEL;
