@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
-# Weekly Docker garbage collection — safe prune only.
-# Removes: dangling images, stopped containers, unused networks, build cache.
-# Does NOT remove: tagged images, running containers, named volumes.
+# Weekly Docker garbage collection — age-gated prune.
+# Removes: UNUSED images/containers/networks/build-cache older than 7 days (168h).
+# Does NOT remove: running containers, images in use by them, named volumes,
+#                  or anything created in the last 7 days (rollback window).
 #
 # Deployed by: install-maintenance-crons.sh (idempotent)
 # Log: /var/log/docker-weekly-cleanup.log (rotated at 5 MB, kept 4 files)
 # Schedule: Sunday 03:00–03:30 UTC (see install-maintenance-crons.sh for exact time per host)
 #
-# Long-run safety: docker system prune -f is non-destructive for running workloads.
+# Why -af --filter until=168h (changed 2026-06-25 after disk hit 97.5% on SG):
+#   Plain `prune -f` only reaps DANGLING images. sg-deploy rebuilds tagged
+#   `:local` images every deploy; over weeks ~182 unused-but-tagged image
+#   generations accumulated → 42 GB in containerd overlayfs → disk 98%.
+#   `-a` reaps unused TAGGED images too; `--filter until=168h` keeps the last
+#   7 days of images so recent deploys stay available for rollback.
+# Long-run safety: in-use images are NEVER pruned regardless of the filter.
 # If your stack uses anonymous volumes you never want to lose, add --volumes ONLY
 # after verifying all state is in named volumes or external (Supabase / object storage).
 set -euo pipefail
@@ -39,8 +46,8 @@ rotate_log
   echo "--- docker system df (before) ---"
   docker system df 2>/dev/null || true
 
-  echo "--- docker system prune -f ---"
-  docker system prune -f
+  echo "--- docker system prune -af --filter until=168h ---"
+  docker system prune -af --filter "until=168h"
 
   echo "--- docker system df (after) ---"
   docker system df 2>/dev/null || true
