@@ -504,7 +504,7 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-06-24 00:21:11 UTC_
+_Last synced: 2026-06-25 14:30:06 UTC_
 
 ## 2026-06-16 AO-CLOSE memory — session window 2026-06-11T05:07Z → 2026-06-16 afternoon
 
@@ -539,6 +539,7 @@ _Last synced: 2026-06-24 00:21:11 UTC_
 - **AI Models 指南上線**：原本使用者想放 Tarot，後更正要放 Content Tools，因生圖工具會被多處共用。新 route `/tools/ai-models` 已加入 sidebar（SEO Content 下、Tarot 上），正式站 deploy commit `5b8c97ac59e5da7d194db7256c1db27f8a503552`。
 - **頁面內容**：三個相鄰比較區：文字生成工具（OpenAI/Claude/Gemini/Perplexity/Grok）、圖片生成模型（15 個 app 現有模型，成本改成每張，不是 78 張）、Vibe Coding 工具（Codex/Claude Code/Gemini/Perplexity/Grok）。表格呈現優劣、風格、速度、成本、prompt/image input、比例與來源連結。
 - **部署證據**：local `npm run typecheck` + `npm run build` PASS；SG `sg-deploy.sh next-admin` PASS；prod gates `tsc` PASS、vitest 24 files / 316 tests PASS、container healthy after 7s、smoke `/login` + `/api/ops/summary` + nginx/wordpress + node-api OK。`/tools/ai-models` 未登入時 307 到 login（符合 auth middleware）。
+
 
 
 
