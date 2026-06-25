@@ -90,6 +90,24 @@ function toBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 }
 
 /**
+ * Apply a CSS filter to artwork and return a new PNG data URL.
+ * Used to bake the preview colour grade before saving to gallery or sending as AI reference,
+ * so gallery thumbnails and AI style references match what the user sees on-screen.
+ */
+export async function applyGradeToDataUrl(dataUrl: string, cssFilter: string): Promise<string> {
+  const img = await loadImage(dataUrl);
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return dataUrl;
+  ctx.filter = cssFilter;
+  ctx.drawImage(img, 0, 0);
+  ctx.filter = "none";
+  return canvas.toDataURL("image/png");
+}
+
+/**
  * Render one print-ready card: parchment background, double straight-ruled colour border,
  * Roman numeral on top, artwork embedded in the centre, card name on the bottom.
  */
