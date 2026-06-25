@@ -14,6 +14,11 @@ import {
   VIBE_CATEGORIES,
   type PresetCategory,
 } from "@/lib/studio/prompt-presets";
+import {
+  CULTURE_REGIONS,
+  CULTURE_LENSES,
+  type CultureItem,
+} from "@/lib/studio/culture-presets";
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 import { openInCanvas } from "@/components/tools/canvas-handoff";
 import { buildSemanticFilename, buildSemanticBase, type SemanticFileMeta } from "@/lib/studio/semantic-filename";
@@ -90,6 +95,28 @@ async function downscaleImageFile(file: File, maxDim = 1024, quality = 0.85): Pr
     img.onerror = () => reject(new Error("image_decode_failed"));
     img.src = dataUrl;
   });
+}
+
+// Shared pill looks. A selected TAB is a solid-accent fill; a selected CHIP is a
+// light-purple fill — so a checked item is visually distinct from the active tab
+// (previously both used var(--accent) and were indistinguishable).
+function tabStyle(active: boolean): React.CSSProperties {
+  return {
+    padding: "3px 10px", borderRadius: 12, fontSize: 11, cursor: "pointer",
+    border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+    background: active ? "var(--accent)" : "rgba(127,127,127,0.08)",
+    color: active ? "var(--btn-primary-text)" : "var(--text-muted)",
+    fontWeight: active ? 600 : 400, transition: "all 0.15s",
+  };
+}
+function chipStyle(active: boolean): React.CSSProperties {
+  return {
+    padding: "3px 10px", borderRadius: 12, fontSize: 11, cursor: "pointer",
+    border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+    background: active ? "rgba(99,102,241,0.15)" : "rgba(127,127,127,0.08)",
+    color: active ? "var(--accent)" : "var(--text-muted)",
+    fontWeight: active ? 600 : 400, transition: "all 0.15s",
+  };
 }
 
 function AccordionSection({
@@ -177,7 +204,7 @@ function CategoryPicker({
               <button
                 type="button"
                 onClick={() => onPick(active ? "" : it.en)}
-                style={{ padding: "3px 10px", borderRadius: 12, fontSize: 11, cursor: "pointer", border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`, background: active ? "var(--accent)" : "rgba(127,127,127,0.08)", color: active ? "var(--btn-primary-text)" : "var(--text-muted)", fontWeight: active ? 600 : 400, transition: "all 0.15s" }}
+                style={chipStyle(active)}
               >
                 {active ? "✓ " : ""}{it.zh}
               </button>
