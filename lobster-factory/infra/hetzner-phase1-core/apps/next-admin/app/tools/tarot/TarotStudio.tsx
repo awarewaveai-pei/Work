@@ -1559,17 +1559,7 @@ export default function TarotStudio() {
         {/* ── 生成風格預覽 button + Accordion: 調色/修圖 ── */}
         <div style={{ borderTop: "1px solid var(--card-border)" }}>
           {!isMultiModel && (
-            <div style={{ padding: "10px 0 6px", display: "flex", flexDirection: "column", gap: 6 }}>
-              {!hasSelectedModel && (
-                <div style={{
-                  fontSize: 12, color: "var(--yellow)", textAlign: "center",
-                  padding: "6px 10px", borderRadius: 6,
-                  border: "1px dashed var(--yellow)",
-                  background: "rgba(234,179,8,0.07)",
-                }}>
-                  ⚠️ 請先在下方圖片模型區選一個模型
-                </div>
-              )}
+            <div style={{ padding: "10px 0 6px" }}>
               <button
                 className="btn-primary"
                 style={{
