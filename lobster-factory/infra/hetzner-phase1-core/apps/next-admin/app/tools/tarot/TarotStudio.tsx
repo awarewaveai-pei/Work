@@ -411,7 +411,7 @@ export default function TarotStudio() {
       setPreviewSig(`${activeModel}::${effectiveEnglish.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}`);
       // Save colour-graded preview to gallery (Bug 1 fix: raw resp.image ≠ what user sees).
       const gradedPreview = !grade.neutral
-        ? await applyGradeToDataUrl(resp.image, grade.cssFilter).catch(() => resp.image)
+        ? await applyGradeToDataUrl(resp.image, grade.params).catch(() => resp.image)
         : resp.image;
       saveToGallery(gradedPreview, "tarot-preview", { model: activeModel, prompt: effectiveEnglish });
     } catch (e) {
@@ -458,7 +458,7 @@ export default function TarotStudio() {
       slots[i] = result;
       if (result.image) {
         const gradedCompare = !grade.neutral
-          ? await applyGradeToDataUrl(result.image, grade.cssFilter).catch(() => result.image!)
+          ? await applyGradeToDataUrl(result.image, grade.params).catch(() => result.image!)
           : result.image;
         saveToGallery(gradedCompare, "tarot-compare", { model: m, prompt });
       }
@@ -476,7 +476,7 @@ export default function TarotStudio() {
     compareGenIdRef.current++; // invalidate any in-flight compare so it won't repopulate after lock
     const { english, subject } = compareStyleRef.current; // use prompt that produced these images
     const gradedSelected = !grade.neutral
-      ? await applyGradeToDataUrl(r.image, grade.cssFilter).catch(() => r.image!)
+      ? await applyGradeToDataUrl(r.image, grade.params).catch(() => r.image!)
       : r.image;
     saveToGallery(gradedSelected, "tarot-preview", { model: newModel, prompt: english });
     setLockedGradedPreview(!grade.neutral ? gradedSelected : null);
@@ -499,7 +499,7 @@ export default function TarotStudio() {
   async function lockStyle() {
     if (!previewImage) return;
     const gradedLock = !grade.neutral
-      ? await applyGradeToDataUrl(previewImage, grade.cssFilter).catch(() => previewImage!)
+      ? await applyGradeToDataUrl(previewImage, grade.params).catch(() => previewImage!)
       : previewImage;
     saveToGallery(gradedLock, "tarot-preview", { model: activeModel, prompt: effectiveEnglish });
     setLockedGradedPreview(!grade.neutral ? gradedLock : null);
@@ -1643,7 +1643,7 @@ export default function TarotStudio() {
                         return [];
                       });
                       const gradedEdit = !grade.neutral
-                        ? await applyGradeToDataUrl(image, grade.cssFilter).catch(() => image)
+                        ? await applyGradeToDataUrl(image, grade.params).catch(() => image)
                         : image;
                       saveToGallery(gradedEdit, "tarot-preview-edit", { model: meta.model, prompt: meta.prompt });
                     }}

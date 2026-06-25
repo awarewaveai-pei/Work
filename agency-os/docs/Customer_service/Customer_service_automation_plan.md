@@ -3,7 +3,7 @@
 > **SSOT 宣告**：本檔是「全自動客服」的**主計畫（SSOT）**，取代 `Customer_service_plan.md` 的 roadmap 與 AI 層設計。
 > `Customer_service_plan.md`（決策摘要）與 `Customer_service_platform_research.md`（通道可行性研究）降為**附錄**，事實仍有效，但排序/AI 架構以本檔為準。
 > **本次範圍：只出計畫，不寫 code。** 每個 Phase 的實作另起 R0 流程。
-> **狀態**：草案 v1（2026-06-25）｜**已鎖定決策**見 §0。
+> **狀態**：草案 v1.1（2026-06-25）｜**已鎖定決策**見 §0。（v1.1 補：失效降級 §8.4、成本單位經濟 §8.5、24h 時窗 §3、起手意圖表 §5.0、AI 引擎決策 D7）
 
 ---
 
@@ -17,6 +17,7 @@
 | D4 | 個人帳號軌 | **商業軌=主幹**（全平台官方 API）；**個人軌=隔離高風險選配**，僅自用實驗、獨立 IP、明確封號旗標，不進產品 | Roadmap Phase 6 隔離 |
 | D5 | Chatwoot VPS | **獨立 VPS**（已驗證 EU cpx32 8GB 近滿，塞不下） | 基礎設施 |
 | D6 | 對話儲存歸屬 | **Chatwoot 擁有對話/訊息**；我方層經 webhook+API 讀，自己只擁有「知識庫+eval+AI 稽核+租戶設定」（無雙真相源） | 資料模型邊界 |
+| D7 | AI 引擎 build vs buy | **自建 Claude+RAG**（非 Chatwoot 付費 Captain）：重用既有 SDK/Supabase、模型/護欄/品牌語氣自控、省 per-agent + per-credit 費 | AI 層全自研 |
 
 **一句話架構**：Chatwoot 當全通道載體（獨立 VPS）+ 自建 `lib/cs/` 深模組（重用 Claude SDK / Supabase pgvector / vault / ops-inbox 派送器）做 AI 核心；自動化 L1→L2 逐意圖漸進、money/身分永不自動、全程 eval 護欄 + 一鍵 kill-switch。
 
@@ -100,6 +101,8 @@
 ```
 
 **冪等與可靠性**：webhook 用 `idempotency-key`（Chatwoot message id）去重；失敗走 Trigger.dev（既有）做 durable retry（持久重試），避免重複回覆客戶。
+
+**平台時窗限制（WhatsApp/Meta 24h window，自動化必懂）**：客戶來訊後 **24 小時內**可自由回覆（AI 自動或人工皆可）；**逾 24h 僅能送平台核准的範本訊息（template）**，AI 不可自由發訊。故 AI 自動回覆**只在時窗內**運作；逾時的對話走「核准範本 + 轉真人」。Email / Telegram / Website widget **無此限制**（這也是 Phase 1 先打這三條最快見效的原因）。
 
 ---
 

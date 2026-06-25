@@ -7,6 +7,8 @@
 // Three templates differ only by border/ink colour.
 
 import type { TarotCard } from "./cards";
+import type { ColorGradeParams } from "@/lib/studio/color-grade";
+import { buildFabricImageFilters } from "../canvas/fabric-filters";
 
 export const PRINT_W = 898;
 export const PRINT_H = 1488;
@@ -89,23 +91,37 @@ function toBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   });
 }
 
+type FabricNS = { filters: Record<string, new (o?: Record<string, unknown>) => object> };
+type FilterableImage = { filters: object[]; applyFilters: () => void };
+
 /**
- * Apply a CSS filter to artwork and return a new PNG data URL.
- * Bakes hue/saturation/brightness/contrast (CSS filter primitives) into the image pixel data.
- * Note: gamma, sharpen, and colour-balance have no canvas-filter analog and are NOT baked —
- * same limitation as renderPrintCard's colorFilter param (see comment at line 115).
+ * Apply the full colour grade to artwork via Fabric's filter pipeline and return a new PNG data URL.
+ * Covers ALL sliders — hue/sat/bri/contrast + gamma + sharpen + colour-balance — using the same
+ * engine as GradedPreview, so the baked gallery thumbnail and AI reference faithfully match
+ * what the user sees on-screen.
  */
-export async function applyGradeToDataUrl(dataUrl: string, cssFilter: string): Promise<string> {
-  const img = await loadImage(dataUrl);
-  const canvas = document.createElement("canvas");
-  canvas.width = img.naturalWidth;
-  canvas.height = img.naturalHeight;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return dataUrl;
-  ctx.filter = cssFilter;
-  ctx.drawImage(img, 0, 0);
-  ctx.filter = "none";
-  return canvas.toDataURL("image/png");
+export async function applyGradeToDataUrl(dataUrl: string, params: ColorGradeParams): Promise<string> {
+  const fabric = await import("fabric");
+  const fImg = await fabric.FabricImage.fromURL(dataUrl, { crossOrigin: "anonymous" });
+  const natW = fImg.width || 1;
+  const natH = fImg.height || 1;
+  const canvasEl = document.createElement("canvas");
+  const fc = new fabric.StaticCanvas(canvasEl, { enableRetinaScaling: false });
+  fc.setDimensions({ width: natW, height: natH });
+  fImg.set({ left: 0, top: 0, originX: "left", originY: "top", scaleX: 1, scaleY: 1, selectable: false });
+  const target = fImg as unknown as FilterableImage;
+  target.filters = buildFabricImageFilters(fabric as unknown as FabricNS, params);
+  target.applyFilters();
+  fc.add(fImg);
+  fc.renderAll();
+  try {
+    const result = fc.toDataURL({ format: "png", multiplier: 1 });
+    void fc.dispose();
+    return result;
+  } catch {
+    void fc.dispose();
+    return dataUrl;
+  }
 }
 
 /**
