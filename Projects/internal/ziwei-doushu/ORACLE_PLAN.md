@@ -1,6 +1,6 @@
 # 正式專案計畫 — 東西方命理 × 內容 × 電商生態系
 
-> **本檔 = 專案唯一正式計畫(SSOT)。** 快速接手讀 `HANDOFF.md`;完整規格、決策、路線圖看本檔。
+> **本檔 = 專案唯一正式計畫(SSOT)。** 快速接手讀 `ORACLE_HANDOFF.md`;完整規格、決策、路線圖看本檔。
 > 位置:`Projects/internal/ziwei-doushu/`(AwareWave Work monorepo)
 > 分支:`claude/ziwei-doushu-chart-site-55fdaa`
 > 最後更新:2026-06-24(v2 — 全面重整:折回散落決策、消除矛盾、補 GDPR/MVP/內容引擎整合/快取四缺口)

@@ -1,7 +1,7 @@
 # EVOLUTION PLAN — oracle 進化成全球最頂規東西方命理平台
 
 > **本檔 = 競品天花板對標 + Gap 分析 + 分階段進化路線圖。**
-> 與 `PLAN.md`（生態系/商業/架構 SSOT）互補：PLAN.md 答「做什麼生意」，本檔答「功能/精度/體驗如何做到全球第一」。
+> 與 `ORACLE_PLAN.md`（生態系/商業/架構 SSOT）互補：ORACLE_PLAN.md 答「做什麼生意」，本檔答「功能/精度/體驗如何做到全球第一」。
 > 研究基礎：2026-06-25 跨 7 領域、38+ 競品的競品情報（每節附來源）。
 > 位置：`Projects/internal/ziwei-doushu/`｜分支：`claude/ziwei-doushu-chart-site-55fdaa`
 > 現況：5 系統 + 真太陽時 + 深色星空 UI 已上線（oracle.aware-wave.com）；AI 解讀 / 帳號 / 金流仍是 stub。

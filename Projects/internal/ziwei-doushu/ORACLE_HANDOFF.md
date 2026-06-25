@@ -3,7 +3,7 @@
 > **明天接手的 AI / 開發者：先讀完這份再動工。這是本專案的單一事實來源（SSOT）。**
 > 位置：`Projects/internal/ziwei-doushu/`（AwareWave Work monorepo 內）
 > 分支：`claude/ziwei-doushu-chart-site-55fdaa`
-> **完整正式計畫見 `PLAN.md`（本檔為快速接手摘要，細節以 PLAN.md 為準）。**
+> **完整正式計畫見 `ORACLE_PLAN.md`（本檔為快速接手摘要，細節以 ORACLE_PLAN.md 為準）。**
 > **⚠️ 2026-06-24 PLAN 已重整為 v2**:產品升級為「**多語言全球命理 × 內容 × 電商生態系**」(算命引擎+每日運勢工廠+重用 next-admin 內容/影片/社群引擎+headless WooCommerce/POD 電商+三品牌漏斗 soulful/wear the world+i18n 多語+ECPay/Stripe/PayPal 全球金流+Stripe Tax/GDPR+SG→EU 遷移新機)。**PLAN.md 已折回所有決策、消除矛盾、補 GDPR/MVP/內容引擎整合/快取四缺口。接手前必讀 PLAN 全文,尤其 §18 路線圖「MVP 第一刀」與 §22 待拍板清單。**
 
 ---
@@ -97,7 +97,7 @@
 - 驗證:`npm test` 49/49 ✅、typecheck ✅、build ✅(17 靜態頁雙語預渲染)、HTTP smoke(hub+各系統頁雙語)✅。
 
 > ✅ **地基(F1–F5)+ 功能期免憑證範圍全部完成**(共 10 commit:102e1c1…5d29c5d)。
-> **下一步全部 BLOCKED 在 operator 憑證/決策**(見 `PLAN.md` §22),非技術缺漏:
+> **下一步全部 BLOCKED 在 operator 憑證/決策**(見 `ORACLE_PLAN.md` §22),非技術缺漏:
 > - AI 解讀接真 SDK → `OPENAI_API_KEY`(+選配 `ANTHROPIC_API_KEY`)
 > - 金流真結帳 → ECPay/Stripe/PayPal 帳號;DB/帳號 → Supabase 專案
 > - 西洋占星(第 5 系統)→ astrology-api.io key
