@@ -242,11 +242,20 @@ export const dispatchActionRun = task({
 });
 
 // ─────────────────────────────────────────────
-// Scheduled dispatcher — polls every minute
+// Safety-net dispatcher — backstop only, NOT the primary path.
+// Primary dispatch is on-demand: every ops_action_runs enqueue calls
+// kickActionRunDispatcher() (lib/kick-dispatcher.ts) → immediate dispatch
+// (verified HTTP 200 in prod, WORKLOG 2026-06-25). This schedule only catches
+// the rare case a kick fails (Trigger restart / network blip / token issue),
+// so an enqueued action is never silently stuck. Cadence cut */1 → */10 on
+// 2026-06-25: the every-minute poll spawned ~1,440 no-op runner containers/day
+// (queue usually empty); */10 keeps the no-stuck-action guarantee at 1/10th the
+// idle container churn. Do NOT remove entirely — that reintroduces a single
+// point of failure on the kick.
 // ─────────────────────────────────────────────
 export const dispatchActionRunSchedule = schedules.task({
   id: "dispatch-action-run-schedule",
-  cron: "*/1 * * * *",
+  cron: "*/10 * * * *",
   run: async () => {
     return tasks.trigger("dispatch-action-run", {});
   },
