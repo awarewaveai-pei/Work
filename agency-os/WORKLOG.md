@@ -4,6 +4,35 @@
 
 ## 2026-06-25
 
+### incident(SG): 磁碟 97.5% CRITICAL — 25 封 Telegram 告警；docker image 累積根因 + weekly cleanup 修法
+
+[任務理解] 操作者收到 25 封 Telegram 警告。根因（非表面症狀）= SG VPS `wordpress-ubuntu-4gb-sin-1` (5.223.93.113) 根分割區滿到 98%（最新 06:52 UTC Netdata CRITICAL `disk_space./ = 97.5%`）。25 封 ≈ 此 disk 告警 + 半夜 00:21–00:41 的 web_log scanner spike（已自動 recovered，非持續事件）。磁碟滿會引爆 502/OOM。
+
+[現況分析]
+- `df -h /` = 70G/75G used, 1.9G avail, 98%。`du`：`/var/lib/containerd` 42G 為大頭（`/var/lib/docker` 僅 1.5G）。
+- `ctr namespace ls` = `moby` → Docker 用 **containerd-snapshotter** 後端，42G = Docker 的 image/layer 存於 containerd overlayfs（34G snapshots + 7.5G content blobs）。
+- `docker system df`：Images 192 個 / 44GB，**僅 10 個 ACTIVE**（運行中容器使用）→ ~182 個無用 image = 元凶。Build cache 7.77GB（5GB 可回收）。dangling 僅 1。
+- 既有 weekly cleanup cron（週日 03:00 UTC `/usr/local/bin/docker-weekly-cleanup.sh`）上週日 06-21 有跑，但腳本是 `docker system prune -f`（**無 `-a`**）→ 只清 dangling，無用 tagged image 全逃過 → 數週累積。
+- git log -12：無相關 disk/docker-cleanup commit，無重工。
+
+[已修改]
+- SG 即時清理（操作者 go-ahead）：`apt-get clean`（+1.2G）→ `docker system prune -af`（不含 --volumes）→ 磁碟 98%→**44%**（70G→32G used，釋出 ~38GB）。Images 192→10（全在用），build cache 歸零。所有 10 容器維持 healthy，volume（WP DB/redis/grafana）未動。
+- 持久修法（repo SSOT）`lobster-factory/infra/hetzner-phase1-core/scripts/docker-weekly-cleanup.sh`：`prune -f` → `prune -af --filter "until=168h"`（清無用 tagged image、保留近 7 天 rollback 視窗）+ `|| echo WARN`（critic 抓的 set -e 截斷 log 觀測缺口）+ header 註解。scp 部署到 server live copy。
+- `lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md:29`：威脅表更新（R4 stale claim — 原寫「只清 dangling」）。
+
+[驗證結果]（R0 四動作）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker system prune -af` then `df -h /` | exit=0 | 磁碟 98%→44%，10 容器 healthy，`curl app.aware-wave.com`=307/173ms。腳本部署後實跑一次 reclaim=0B（證明不誤刪在用/<168h image）。`bash -n` 雙端 OK。
+- REVIEW_DONE: critic=Standard | verdict=pass（Low risk，無 Critical/Major）| findings=0c/2m/2n。Minor: set -e 失敗截斷 log（已折回 `|| echo WARN`）+ LONG_TERM_OPS stale（已修）。Suggestion: install-maintenance-crons.sh:105 雙寫 logfile（pre-existing，out of scope，known issue）。
+- BUGHUNT_DONE: scope=lobster-factory,scripts,agency-os | grep=`docker-weekly-cleanup`,`prune -f`,`system prune` | hits 已全數修（script + LONG_TERM_OPS:29；WORKLOG.md:12318 為歷史記錄保留，critic 同意）。
+- BUGHUNT_SCOPE_NARROW: N/A（含 agency-os + scripts + lobster-factory）。
+
+[剩餘風險]
+- web_log scanner spike（00:21）已 recovered，但 scanner 持續掃 SG → 若再現 bad-request%>50 依 AGENTS 規則走 CF WAF block。本次未觸發。
+- install-maintenance-crons.sh:105 雙寫 logfile latent trap（critic 🔵，pre-existing），未處理。
+- 修法只在 SG live copy + repo SSOT；EU server 若也有此 cron 需同步（本次未檢查 EU，因告警只來自 SG）。
+
+[rollback] script 還原：`git checkout lobster-factory/.../docker-weekly-cleanup.sh` 後重 scp；或 server 上改回 `prune -f`。磁碟清理不可逆（image 已刪）但無傷——下次 sg-deploy 自動 rebuild。
+
 ### deploy(ziwei): oracle.aware-wave.com 上線 — SG 部署 + CF DNS + host nginx
 
 [任務理解] 把 ziwei-doushu 命理站部署到 SG，以 oracle.aware-wave.com 對外服務。
