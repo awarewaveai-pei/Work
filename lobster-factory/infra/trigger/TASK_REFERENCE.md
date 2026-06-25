@@ -96,8 +96,12 @@ No payload needed — uses `LOBSTER_AO_ORG_ID` env var automatically.
 
 ### `dispatch-action-run-schedule`
 
-**What it does**: Cron `*/1 * * * *` — triggers `dispatch-action-run` every minute automatically.  
-Appears in Trigger.dev Schedules tab. No action needed unless you want to pause it.
+**What it does**: Cron `*/10 * * * *` — **safety-net** backstop that triggers `dispatch-action-run` every 10 min.  
+The PRIMARY dispatch path is on-demand: every `ops_action_runs` enqueue calls `kickActionRunDispatcher()`
+(`next-admin/lib/kick-dispatcher.ts`) → immediate dispatch. This schedule only catches the rare case a kick
+fails so an enqueued action is never silently stuck. Cadence was cut `*/1`→`*/10` on 2026-06-25 (the
+every-minute poll spawned ~1,440 no-op runner containers/day; queue is usually empty). Do NOT remove entirely
+— that reintroduces a single point of failure on the kick. Appears in Trigger.dev Schedules tab.
 
 ---
 

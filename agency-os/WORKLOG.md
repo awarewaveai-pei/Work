@@ -4,6 +4,28 @@
 
 ## 2026-06-25
 
+### perf(trigger): dispatch-action-run schedule */1 → */10 — 一勞永逸消除 dispatcher 空轉容器
+
+[任務理解] 操作者要 dispatcher 容器堆積「一勞永逸」。承上條 autoremove 修法後，深查「為何每天產 ~2,880 容器」：根因是 `dispatch-action-run-schedule` cron `*/1`（每分鐘）輪詢 `ops_action_runs`，佇列通常為空 → ~99% 是空轉容器。
+
+[現況分析]（全實證）
+- 事件驅動 `kickActionRunDispatcher()`（`next-admin/lib/kick-dispatcher.ts`）**早已寫好**、wired 進唯二 inserter（`build/runs:203`、`trigger-build:359`），prod 實測 **HTTP 200**（建立 `run_cmqto6odx0...`）。next-admin 是唯一 inserter（其餘 select / RLS policy）。
+- → 每分鐘 schedule 已是冗餘 backstop。DB 證實近期 dispatch-action-run 全落每分鐘 `:03` = 全 schedule 來。
+- 架構決策：保留 backstop（移除 = kick 單點失效、佈建漏單），僅降頻。否決純事件驅動（C 案）與搬出 Trigger（過度工程）。
+
+[已修改]
+- `lobster-factory/packages/workflows/src/trigger/dispatch-action-run.ts:258` cron `*/1 * * * *` → `*/10 * * * *` + 註解（含「不可移除」架構警告）。
+- `lobster-factory/infra/trigger/TASK_REFERENCE.md:99` 同步描述為 `*/10` safety-net（BUGHUNT 命中之現行文件；歷史 memory/reports 的「每分鐘」為過往事實不改寫）。
+
+[驗證結果]（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/lobster-trigger-deploy.ps1` (trigger v4 deploy) + `psql TaskSchedule` | exit=0 | 部署 `Version 20260625.1 deployed with 11 detected tasks`；DB `TaskSchedule.generatorExpression='*/10 * * * *'` active=t updatedAt=22:35:12（deploy 即時更新）；kick 仍 HTTP 200；29 服務 healthy。（觀測確認 */10 cadence 背景跑中）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — critic subagent 撞 session limit 不可用 → 自審 + `verify-recent --ack`（logged daily 2026-06-26）；改動為 cron 值 + 註解，無邏輯；`*/10` 標準合法 cron；真實 build gate = trigger deploy（已過）。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`*/1 * * * *`,`dispatch-action-run-schedule`,`polls every minute` | hits=1 現行文件（TASK_REFERENCE.md，已同 commit 修）；其餘命中皆 2026-06-14 歷史記錄（不改寫）。
+- BUGHUNT_SCOPE_NARROW: N/A（含三根路徑）。
+
+[剩餘風險] kick 失敗的 action 最多等 10 分鐘被 backstop 撿（builds 本就跑數分鐘、可見）。EU live `/root/trigger/docker-compose.yml` autoremove 為 surgical sed（值），repo SSOT 有完整註解，下次正式 deploy 同步。
+[rollback] cron 改回 `*/1` + 重跑 `lobster-trigger-deploy.ps1`（前版仍在 Trigger）。
+
 ### incident(EU): 12,853 Trigger runner 屍體堆積根因 — autoremove "0"→"1" 治本 + cleanup script 一致化
 
 [任務理解] 收 SG 磁碟告警後檢查 EU（`204.168.175.41`）是否同病。發現兩獨立問題（皆非緊急）：(A) cleanup script 同樣舊版 `prune -f` 不清無用 tagged image；(B) 12,853 個 Exited 容器堆積（根因待查）。操作者要求 R0 propose-first，逐項批准後才動。
