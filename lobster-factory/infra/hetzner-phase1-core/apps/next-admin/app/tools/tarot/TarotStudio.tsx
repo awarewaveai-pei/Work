@@ -1544,21 +1544,25 @@ export default function TarotStudio() {
         <div style={{ borderTop: "1px solid var(--card-border)" }}>
           {!isMultiModel && (
             <div style={{ padding: "10px 0 6px" }}>
-              <button
-                className="btn-primary"
-                style={{
-                  width: "100%",
-                  boxShadow: previewStale ? "0 0 0 3px var(--yellow)" : undefined,
-                  opacity: !hasSelectedModel ? 0.6 : 1,
-                }}
-                onClick={generatePreview}
-                disabled={previewBusy || locked}
-              >
-                {previewBusy ? "生成中…" : !hasSelectedModel ? "請先選擇圖片模型" : previewImage ? "重新生成預覽" : "生成風格預覽"}
-              </button>
-              {!hasSelectedModel && (
-                <div style={{ fontSize: 11, color: "var(--yellow)", marginTop: 4, textAlign: "center" }}>
-                  ↓ 在圖片模型區選一個
+              {hasSelectedModel ? (
+                <button
+                  className="btn-primary"
+                  style={{
+                    width: "100%",
+                    boxShadow: previewStale ? "0 0 0 3px var(--yellow)" : undefined,
+                  }}
+                  onClick={generatePreview}
+                  disabled={previewBusy || locked}
+                >
+                  {previewBusy ? "生成中…" : previewImage ? "重新生成預覽" : "生成風格預覽"}
+                </button>
+              ) : (
+                <div style={{
+                  fontSize: 12, color: "var(--text-muted)", textAlign: "center",
+                  padding: "7px 0", borderRadius: 6,
+                  border: "1px dashed var(--card-border)",
+                }}>
+                  ↓ 請先在圖片模型區選一個模型
                 </div>
               )}
             </div>
