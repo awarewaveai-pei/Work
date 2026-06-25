@@ -827,8 +827,8 @@ export default function StudioWorkbench() {
         </button>
       </div>
 
-      {/* ── Preview ───────────────────────────────────────────── */}
-      <div className="build-panel" style={{ padding: 14 }}>
+      {/* ── Preview (LEFT column) ──────────────────────────────── */}
+      <div className="build-panel" style={{ gridColumn: 1, gridRow: 1, padding: 14 }}>
         <label style={{ fontSize: 13 }}>
           Prompt（自動組裝，可直接改）
           <textarea className="btn-secondary" style={{ width: "100%", marginTop: 4, minHeight: 72, fontFamily: "inherit" }} value={effectivePrompt}
@@ -1054,6 +1054,36 @@ export default function StudioWorkbench() {
           )}
         </div>
       </div>
+
+      {/* Chip hover tooltip — position:FIXED at the viewport coords captured on hover,
+          rendered at the grid root so it escapes the sticky control panel's overflow
+          clipping. Hard-coded colors keep it readable in any theme; x is clamped so
+          edge chips don't push it off-screen (same pattern as TarotStudio). */}
+      {tip && (
+        <div
+          style={{
+            position: "fixed",
+            left: Math.min(Math.max(tip.x, 8), (typeof window !== "undefined" ? window.innerWidth : 1920) - 8),
+            top: tip.y - 6,
+            transform: "translate(-50%, -100%)",
+            background: "#0d1526",
+            color: "#ffffff",
+            border: "1px solid #6366f1",
+            borderRadius: 8,
+            padding: "6px 12px",
+            fontSize: 12,
+            fontWeight: 500,
+            lineHeight: 1.4,
+            whiteSpace: "nowrap",
+            textAlign: "center",
+            boxShadow: "0 6px 24px rgba(0,0,0,0.45)",
+            pointerEvents: "none",
+            zIndex: 2147483647,
+          }}
+        >
+          {tip.text}
+        </div>
+      )}
     </div>
   );
 }
