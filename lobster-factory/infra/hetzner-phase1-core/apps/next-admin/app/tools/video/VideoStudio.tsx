@@ -148,8 +148,6 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
   const [imageVendor, setImageVendor] = useState(() => vendorForModel(DEFAULT_IMAGE_MODEL));
   const [targetMinutes, setTargetMinutes] = useState(1);
   const [voiceModelId, setVoiceModelId] = useState(VOICE_MODELS[0].id);
-  const [introEnabled, setIntroEnabled] = useState(false);
-  const [introDuration, setIntroDuration] = useState(3);
   // 輸出比例（預設只 16:9，WP/YouTube 用；需社群格式時手動勾選）。每比例各自原生生成 → 圖片成本/時間 ×已選數。
   const [selectedFormats, setSelectedFormats] = useState<Set<string>>(new Set(["16x9"]));
   const orderedFormats = VIDEO_FORMAT_CHOICES.filter((f) => selectedFormats.has(f));
