@@ -699,11 +699,11 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
                         <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>時間長度</span>
                         <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>{targetMinutes} 分鐘</span>
                       </div>
-                      <input type="range" min={1} max={5} step={0.5} value={targetMinutes}
+                      <input type="range" min={1} max={10} step={0.5} value={targetMinutes}
                         onChange={e => setTargetMinutes(Number(e.target.value))}
                         style={{ width: "100%", accentColor: "var(--accent)" }} disabled={isBusy} />
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--text-muted)" }}>
-                        <span>1 分</span><span>2.5 分</span><span>5 分</span>
+                        <span>1 分</span><span>5 分</span><span>10 分</span>
                       </div>
                     </div>
                   </div>
