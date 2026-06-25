@@ -65,6 +65,13 @@
 
 [rollback] `git checkout lobster-factory/.../app/tools/studio/StudioWorkbench.tsx` + `rm lib/studio/prompt-presets.ts`；無資料/外部副作用。
 
+[後續微調 + 部署] 操作者回饋：子分類 tab 在 340px 換行（截圖）不喜歡 → 控制面板 grid `1fr 340px`→`1fr 400px`（主圖 5-tab 最寬列一行容下）。`StudioWorkbench.tsx:626`。
+- 平行衝突處理（VBC）：tsc 一度紅燈 = **Cursor session 並行改 `VideoStudio.tsx`（半成品 + scriptPrefill 型別錯）+ trigger/docker-compose**，非本次改動（error 在 VideoStudio 非 studio；working-tree 髒 120 行）。判定不可硬部署（會推他人 WIP + typecheck gate 擋）→ **HOLD 並回報操作者選 A/B**。等 Cursor 收工（main `61ecb668` working-tree clean + 全專案 tsc green ms=2699）才部署。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin`（操作者「可以部署了嗎」=go，main 已驗 green） | exit=0 | `.deployed-commit`→`61ecb668` → healthy 6s → HTTP smoke 4/4 200。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`playwright-runner.ps1 -Mode smoke` | exit=0 | 26 passed / 0 failed / 6 skipped。寬度修正**已上線**。
+- REVIEW_WAIVED: NA -- 單一 CSS px 值（340→400），無邏輯改動；主邏輯已於本 entry critic pass。
+- BUGHUNT_WAIVED: NA -- 同上，無 symbol/schema/string 改動。
+
 ### fix(tarot): gallery/AI-reference 吃到完整色彩調整 — Fabric pipeline 全 bake
 
 [任務理解] 根本問題：用戶在預覽面板做色彩調整後，①存入 gallery 的縮圖是原始 AI 圖（未套調色），②用「調整後風格」生成其他羅牌時，AI 只吃到部分調色（hue/sat/bri）而非用戶看到的完整效果（gamma/sharpen/colour-balance 完全沒進去）。
