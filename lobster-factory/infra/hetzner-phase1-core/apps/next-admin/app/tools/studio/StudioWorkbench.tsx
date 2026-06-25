@@ -623,7 +623,7 @@ export default function StudioWorkbench() {
   const anyResults = results.some((r) => !r.busy && r.image);
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 16, padding: 16, alignItems: "start" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 400px", gap: 16, padding: 16, alignItems: "start" }}>
       {/* ── Controls (RIGHT column, sticky — moved from left per spec) ───────── */}
       <div className="build-panel" style={{ gridColumn: 2, gridRow: 1, position: "sticky", top: 16, alignSelf: "start", maxHeight: "calc(100vh - 32px)", overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 8 }}>
 

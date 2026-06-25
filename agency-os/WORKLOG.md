@@ -14807,3 +14807,6 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial)
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~15000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/2n (all fixed before commit)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=prefillAppliedRef|ScriptRemotionPrefill|RemotionBridge|introEnabled | hits=0 (intro fields remain optional in API routes — no stale callers)

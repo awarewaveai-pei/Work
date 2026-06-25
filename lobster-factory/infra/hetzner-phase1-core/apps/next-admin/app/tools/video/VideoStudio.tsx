@@ -140,7 +140,16 @@ interface VideoStudioInitial {
   scenes?: { narration: string; imagePrompt: string }[];
 }
 
-export default function VideoStudio({ initial }: { initial?: VideoStudioInitial } = {}) {
+interface ScriptRemotionPrefill {
+  topic: string;
+  headline?: string;
+  tagline?: string;
+  cta?: string;
+  imageHint?: string;
+  scenes?: { visual: string; dialogue: string }[];
+}
+
+export default function VideoStudio({ initial, remotionInitial }: { initial?: VideoStudioInitial; remotionInitial?: ScriptRemotionPrefill } = {}) {
   // ── Config knobs ──
   const [totalScenes, setTotalScenes] = useState(6);
   const [customScenes, setCustomScenes] = useState(3);
@@ -193,7 +202,10 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
   const [selectedVideo, setSelectedVideo] = useState<VideoHistoryItem | null>(null);
   const [selectedVideos, setSelectedVideos] = useState<Set<string>>(new Set());
   const [deletingVideos, setDeletingVideos] = useState(false);
-  const [studioTab, setStudioTab] = useState<"generate" | "history" | "info" | "remotion">("generate");
+  const [studioTab, setStudioTab] = useState<"generate" | "history" | "info" | "remotion">(remotionInitial ? "remotion" : "generate");
+
+  // Auto-switch to Remotion tab when a script prefill arrives from ScriptForge
+  useEffect(() => { if (remotionInitial) setStudioTab("remotion"); }, [remotionInitial]);
 
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isRenderingRef = useRef(false);
@@ -426,8 +438,6 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
           r2Keys: draftR2Keys,
           title: draftTitle,
           ...parseVoiceModel(voiceModelId),
-          introTitle: introEnabled ? (topic.trim() || undefined) : undefined,
-          introDuration: introEnabled ? introDuration : undefined,
         }),
       });
       const j = (await res.json()) as { ok: boolean; jobId?: string; error?: string };
@@ -463,8 +473,6 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
           imageModel,
           outputFormats: orderedFormats,
           ...parseVoiceModel(voiceModelId),
-          introTitle: introEnabled ? (topic.trim() || undefined) : undefined,
-          introDuration: introEnabled ? introDuration : undefined,
         }),
       });
       const start = (await res.json()) as { ok: boolean; jobId?: string; error?: string };
@@ -889,23 +897,6 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                   )}
                 </div>
 
-                {/* 標題動畫 */}
-                <div style={{ padding: "10px 12px", borderRadius: 8, background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)" }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                    <input type="checkbox" checked={introEnabled} onChange={e => setIntroEnabled(e.target.checked)} disabled={isLoading} />
-                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>標題動畫（片頭黑底 + fade-in 標題）</span>
-                  </label>
-                  {introEnabled && (
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
-                      <span style={{ fontSize: 11.5, color: "var(--text-muted)", whiteSpace: "nowrap" }}>時長 (秒)</span>
-                      <input type="range" min={2} max={6} step={0.5} value={introDuration}
-                        onChange={e => setIntroDuration(Number(e.target.value))}
-                        style={{ flex: 1, accentColor: "var(--accent)" }} disabled={isLoading} />
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)", minWidth: 28 }}>{introDuration}s</span>
-                    </div>
-                  )}
-                </div>
-
               </div>
             </div>
 
@@ -982,7 +973,6 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                   { key: "配音", label: VOICE_MODELS.find(v => v.id === voiceModelId)?.label ?? voiceModelId },
                   { key: "比例", label: orderedFormats.map(f => OUTPUT_LABELS[f]?.ratio ?? f).join(" + ") },
                   ...(videoStyle ? [{ key: "風格", label: videoStyle }] : []),
-                  ...(introEnabled ? [{ key: "片頭", label: `${introDuration}s` }] : []),
                 ].map(({ key, label }) => (
                   <div key={key} style={{ fontSize: 12, color: "var(--text-secondary)", display: "flex", gap: 8 }}>
                     <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", minWidth: 26, paddingTop: 1, flexShrink: 0 }}>{key}</span>
@@ -1126,7 +1116,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
       )}
 
       {/* ── Remotion 模板 tab ── */}
-      {studioTab === "remotion" && <RemotionStudio />}
+      {studioTab === "remotion" && <RemotionStudio scriptPrefill={remotionInitial} />}
 
     </div>
   );
@@ -1561,6 +1551,10 @@ interface RemotionTemplateField {
   label: string;
   hint?: string;
   multiline?: boolean;
+  optional?: boolean;
+  type?: "image" | "audio" | "logo" | "color" | "number" | "text";
+  prefillFrom?: "headline" | "tagline" | "cta" | "topic";
+  maxLen?: number;
 }
 
 interface RemotionTemplate {
@@ -1580,10 +1574,10 @@ const REMOTION_TEMPLATES: RemotionTemplate[] = [
     duration: "6s",
     desc: "全幅背景圖緩慢縮放，主標語從底部滑入（廣告橫幅、促銷貼文）",
     fields: [
-      { key: "imageUrl",  label: "背景圖片 URL",          hint: "https://... .jpg / R2 URL" },
-      { key: "text",      label: "主標語",                hint: "例：限時優惠 75折" },
-      { key: "logoUrl",   label: "Logo URL（選用）",      hint: "" },
-      { key: "audioUrl",  label: "背景音樂 URL（選用）",  hint: "" },
+      { key: "imageUrl",  label: "背景圖片", type: "image", hint: "https://..." },
+      { key: "text",      label: "主標語", type: "text", prefillFrom: "headline", maxLen: 20, hint: "限時優惠 75折" },
+      { key: "logoUrl",   label: "Logo", type: "logo", hint: "", optional: true },
+      { key: "audioUrl",  label: "背景音樂", type: "audio", hint: "", optional: true },
     ],
   },
   {
@@ -1593,29 +1587,29 @@ const REMOTION_TEMPLATES: RemotionTemplate[] = [
     duration: "20s",
     desc: "直式短影音；三場景 Ken Burns 平移，文字從側邊滑入（TikTok / Reels / Stories）",
     fields: [
-      { key: "imageUrl1", label: "場景 1 圖片 URL",        hint: "" },
-      { key: "text1",     label: "場景 1 文字",            hint: "" },
-      { key: "imageUrl2", label: "場景 2 圖片 URL",        hint: "" },
-      { key: "text2",     label: "場景 2 文字",            hint: "" },
-      { key: "imageUrl3", label: "場景 3 圖片 URL",        hint: "" },
-      { key: "text3",     label: "場景 3 文字",            hint: "" },
-      { key: "logoUrl",   label: "Logo URL（選用）",       hint: "" },
-      { key: "audioUrl",  label: "背景音樂 URL（選用）",   hint: "" },
+      { key: "imageUrl1", label: "場景 1 圖片", type: "image", hint: "" },
+      { key: "text1",     label: "場景 1 文字", type: "text", prefillFrom: "headline", maxLen: 20, hint: "" },
+      { key: "imageUrl2", label: "場景 2 圖片", type: "image", hint: "" },
+      { key: "text2",     label: "場景 2 文字", type: "text", prefillFrom: "tagline", maxLen: 20, hint: "" },
+      { key: "imageUrl3", label: "場景 3 圖片", type: "image", hint: "" },
+      { key: "text3",     label: "場景 3 文字", type: "text", prefillFrom: "cta", maxLen: 20, hint: "" },
+      { key: "logoUrl",   label: "Logo", type: "logo", hint: "", optional: true },
+      { key: "audioUrl",  label: "背景音樂", type: "audio", hint: "", optional: true },
     ],
   },
   {
     id: "circle-mask-text-slideup-reveal",
-    name: "圓形遮罩 + 文字滑入",
+    name: "圓形遮罩 + 品牌文字",
     aspect: "16:9",
     duration: "20s",
     desc: "圖片以圓形揭幕方式展開，右側品牌文字逐行滑入（品牌形象、產品上市）",
     fields: [
-      { key: "imageUrl",  label: "主圖片 URL",            hint: "" },
-      { key: "headline",  label: "主標題",                hint: "例：重新定義品質" },
-      { key: "brand",     label: "品牌名（選用）",         hint: "" },
-      { key: "tagline",   label: "副標語（選用）",         hint: "" },
-      { key: "logoUrl",   label: "Logo URL（選用）",      hint: "" },
-      { key: "audioUrl",  label: "背景音樂 URL（選用）",  hint: "" },
+      { key: "imageUrl",  label: "主圖片", type: "image", hint: "" },
+      { key: "headline",  label: "主標題", type: "text", prefillFrom: "headline", maxLen: 20, hint: "重新定義品質" },
+      { key: "brand",     label: "品牌名", type: "text", prefillFrom: "topic", maxLen: 16, hint: "", optional: true },
+      { key: "tagline",   label: "副標語", type: "text", prefillFrom: "tagline", maxLen: 30, hint: "", optional: true },
+      { key: "logoUrl",   label: "Logo", type: "logo", hint: "", optional: true },
+      { key: "audioUrl",  label: "背景音樂", type: "audio", hint: "", optional: true },
     ],
   },
   {
@@ -1625,15 +1619,15 @@ const REMOTION_TEMPLATES: RemotionTemplate[] = [
     duration: "10s",
     desc: "評論框從中展開，星星逐個跳入，評論文字以打字效果呈現（電商信任感、UGC）",
     fields: [
-      { key: "backgroundImageUrl", label: "背景圖片 URL",             hint: "" },
-      { key: "productImageUrl",    label: "產品圖片 URL",             hint: "" },
-      { key: "profileImageUrl",    label: "評論人大頭照 URL（選用）", hint: "" },
-      { key: "reviewerName",       label: "評論人姓名",               hint: "例：Wang Mei" },
-      { key: "reviewDate",         label: "日期",                    hint: "例：June 2026" },
-      { key: "reviewText",         label: "評論內容",                 hint: "這產品太棒了！強烈推薦！", multiline: true },
-      { key: "starCount",          label: "星星數（1–5）",            hint: "5" },
-      { key: "logoUrl",            label: "Logo URL（選用）",         hint: "" },
-      { key: "audioUrl",           label: "背景音樂 URL（選用）",     hint: "" },
+      { key: "backgroundImageUrl", label: "背景圖片", type: "image", hint: "" },
+      { key: "productImageUrl",    label: "產品圖片", type: "image", hint: "" },
+      { key: "profileImageUrl",    label: "評論人大頭照", type: "image", hint: "", optional: true },
+      { key: "reviewerName",       label: "評論人姓名", type: "text", maxLen: 20, hint: "Wang Mei" },
+      { key: "reviewDate",         label: "日期", type: "text", maxLen: 20, hint: "June 2026" },
+      { key: "reviewText",         label: "評論內容", multiline: true, prefillFrom: "headline", maxLen: 80, hint: "這產品太棒了！強烈推薦！" },
+      { key: "starCount",          label: "星星數（1–5）", type: "number", hint: "5" },
+      { key: "logoUrl",            label: "Logo", type: "logo", hint: "", optional: true },
+      { key: "audioUrl",           label: "背景音樂", type: "audio", hint: "", optional: true },
     ],
   },
   {
@@ -1641,38 +1635,116 @@ const REMOTION_TEMPLATES: RemotionTemplate[] = [
     name: "相片精選幻燈片",
     aspect: "16:9",
     duration: "22s",
-    desc: "三張相片縮放平移 + 旋轉滑動切換，適合旅遊 / 活動回顧 / 作品集（60fps）",
+    desc: "三張相片縮放平移 + 旋轉滑動切換，旅遊 / 活動回顧 / 作品集（60fps）",
     fields: [
-      { key: "imageUrl1",       label: "相片 1 URL",                hint: "" },
-      { key: "text1",           label: "相片 1 說明文字",           hint: "" },
-      { key: "imageUrl2",       label: "相片 2 URL",                hint: "" },
-      { key: "text2",           label: "相片 2 說明文字",           hint: "" },
-      { key: "imageUrl3",       label: "相片 3 URL",                hint: "" },
-      { key: "text3",           label: "相片 3 說明文字",           hint: "" },
-      { key: "logoUrl",         label: "Logo URL（選用）",          hint: "" },
-      { key: "backgroundColor", label: "主題色（選用）",            hint: "#0ebba2" },
-      { key: "audioUrl",        label: "背景音樂 URL（選用）",      hint: "" },
+      { key: "imageUrl1",       label: "相片 1", type: "image", hint: "" },
+      { key: "text1",           label: "相片 1 說明", type: "text", prefillFrom: "headline", maxLen: 20, hint: "" },
+      { key: "imageUrl2",       label: "相片 2", type: "image", hint: "" },
+      { key: "text2",           label: "相片 2 說明", type: "text", prefillFrom: "tagline", maxLen: 20, hint: "" },
+      { key: "imageUrl3",       label: "相片 3", type: "image", hint: "" },
+      { key: "text3",           label: "相片 3 說明", type: "text", prefillFrom: "cta", maxLen: 20, hint: "" },
+      { key: "logoUrl",         label: "Logo", type: "logo", hint: "", optional: true },
+      { key: "backgroundColor", label: "主題色", type: "color", hint: "#0ebba2", optional: true },
+      { key: "audioUrl",        label: "背景音樂", type: "audio", hint: "", optional: true },
     ],
   },
 ];
 
 type RemotionStatus = "idle" | "submitting" | "rendering" | "done" | "error";
 
-function RemotionStudio() {
+// ── Helpers for AI image generation prompt resolution ──
+function getSceneIndexForImageField(key: string): number | null {
+  const match = key.match(/Url(\d)$/);
+  if (match) return parseInt(match[1]) - 1;
+  return null;
+}
+
+function getImagePromptForField(fieldKey: string, prefill: ScriptRemotionPrefill | undefined): string {
+  if (!prefill) return "";
+  const idx = getSceneIndexForImageField(fieldKey);
+  if (idx !== null && prefill.scenes?.[idx]?.visual) return prefill.scenes[idx].visual;
+  return prefill.imageHint || prefill.topic || "";
+}
+
+function aspectToFormat(aspect: string): string {
+  if (aspect === "9:16") return "9x16";
+  if (aspect === "4:5") return "4x5";
+  return "16x9";
+}
+
+function RemotionStudio({ scriptPrefill }: { scriptPrefill?: ScriptRemotionPrefill }) {
   const [selectedId, setSelectedId] = useState(REMOTION_TEMPLATES[0].id);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<RemotionStatus>("idle");
   const [resultUrl, setResultUrl] = useState("");
   const [error, setError] = useState("");
+  const [aiGenFields, setAiGenFields] = useState<Record<string, boolean>>({});
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks which (selectedId × scriptPrefill identity) combo has already been applied,
+  // so clearing a prefilled field doesn't get re-clobbered on the next render.
+  const prefillAppliedRef = useRef<string>("");
 
   useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current); }, []);
 
   const tmpl = REMOTION_TEMPLATES.find(t => t.id === selectedId)!;
   const busy = status === "submitting" || status === "rendering";
 
+  // Auto-populate text fields from scriptPrefill — runs exactly once per (selectedId × scriptPrefill identity)
+  useEffect(() => {
+    if (!scriptPrefill) return;
+    const applyKey = `${selectedId}::${scriptPrefill.topic}::${scriptPrefill.headline ?? ""}::${scriptPrefill.tagline ?? ""}`;
+    if (prefillAppliedRef.current === applyKey) return;
+    prefillAppliedRef.current = applyKey;
+    setFields(prev => {
+      const next = { ...prev };
+      tmpl.fields.forEach(f => {
+        if (f.prefillFrom && !next[f.key]) {
+          const v = scriptPrefill[f.prefillFrom as keyof ScriptRemotionPrefill];
+          if (typeof v === "string" && v) {
+            next[f.key] = f.maxLen ? v.slice(0, f.maxLen) : v;
+          }
+        }
+      });
+      return next;
+    });
+  }, [scriptPrefill, selectedId, tmpl.fields]);
+
   const setField = (key: string, value: string) =>
-    setFields(prev => ({ ...prev, [key]: value }));
+    setFields(prev => {
+      const maxLen = tmpl.fields.find(f => f.key === key)?.maxLen;
+      return { ...prev, [key]: maxLen ? value.slice(0, maxLen) : value };
+    });
+
+  function selectTemplate(id: string) {
+    if (busy) return;
+    setSelectedId(id);
+    setFields({});
+    setStatus("idle");
+    setError("");
+    setResultUrl("");
+  }
+
+  // AI image generation for a single field
+  async function generateImageForField(fieldKey: string) {
+    const prompt = getImagePromptForField(fieldKey, scriptPrefill);
+    if (!prompt) return;
+    setAiGenFields(prev => ({ ...prev, [fieldKey]: true }));
+    try {
+      const r = await fetch("/api/video/regenerate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imagePrompt: prompt,
+          imageModel: "flux-schnell",
+          format: aspectToFormat(tmpl.aspect),
+          visual: "custom",
+        }),
+      });
+      const j = (await r.json()) as { ok: boolean; imageUrl?: string };
+      if (j.ok && j.imageUrl) setField(fieldKey, j.imageUrl);
+    } catch { /* best-effort */ }
+    setAiGenFields(prev => ({ ...prev, [fieldKey]: false }));
+  }
 
   function startPolling(jobId: string) {
     const deadline = Date.now() + 15 * 60 * 1000;
@@ -1696,10 +1768,9 @@ function RemotionStudio() {
     setStatus("submitting");
     setError("");
     setResultUrl("");
-    // Convert numeric fields before sending
     const props: Record<string, unknown> = { ...fields };
-    if (selectedId === "product-review-typewriter" && fields.starCount) {
-      props.starCount = Number(fields.starCount) || 5;
+    if (selectedId === "product-review-typewriter") {
+      props.starCount = Math.min(5, Math.max(1, Number(fields.starCount) || 5));
     }
     try {
       const r = await fetch("/api/video/remotion-render", {
@@ -1717,87 +1788,195 @@ function RemotionStudio() {
     }
   }
 
-  return (
-    <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 16 }}>
+  const isPortrait = (aspect: string) => aspect === "9:16";
 
-      {/* 模板選擇器 */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
+  return (
+    <div style={{ padding: "20px 28px", display: "flex", flexDirection: "column", gap: 14 }}>
+
+      {/* Script prefill banner */}
+      {scriptPrefill && (
+        <div style={{
+          background: "var(--ai-bg)", border: "1px solid var(--border)", borderRadius: 8,
+          padding: "9px 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 8,
+        }}>
+          <span style={{ fontWeight: 700, color: "var(--accent)" }}>✨ 腳本已帶入</span>
+          <span style={{ color: "var(--text-secondary)" }}>{scriptPrefill.headline || scriptPrefill.topic} — 文字欄位已預填；圖片點「AI 生圖」自動生成</span>
+        </div>
+      )}
+
+      {/* Template selector — horizontal scroll */}
+      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2 }}>
         {REMOTION_TEMPLATES.map(t => {
           const active = t.id === selectedId;
+          const portrait = isPortrait(t.aspect);
           return (
-            <button key={t.id} type="button" onClick={() => { if (!busy) { setSelectedId(t.id); setFields({}); setStatus("idle"); setError(""); setResultUrl(""); } }}
+            <button key={t.id} type="button" onClick={() => selectTemplate(t.id)}
               style={{
-                padding: "12px 14px", borderRadius: 10, textAlign: "left", cursor: busy ? "not-allowed" : "pointer",
+                flexShrink: 0, width: 164, padding: "12px", borderRadius: 10, textAlign: "left",
+                cursor: busy ? "not-allowed" : "pointer",
                 border: `2px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
                 background: active ? "var(--ai-bg)" : "var(--card-bg)",
-                transition: "border-color 0.15s, background 0.15s",
+                boxShadow: active ? "0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)" : "none",
+                transition: "all 0.15s",
               }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: active ? "var(--accent)" : "var(--text-primary)", marginBottom: 4 }}>{t.name}</div>
-              <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: "var(--build-risk-medium-bg)", color: "var(--build-risk-medium-text)" }}>{t.aspect}</span>
-                <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: "var(--badge-gray-bg)", color: "var(--text-muted)" }}>{t.duration}</span>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                {/* Aspect ratio thumbnail */}
+                <div style={{
+                  width: portrait ? 16 : 30, height: portrait ? 30 : 16,
+                  borderRadius: 3, flexShrink: 0,
+                  background: active ? "var(--accent)" : "var(--border-subtle)",
+                  transition: "background 0.15s",
+                }} />
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: active ? "var(--accent)" : "var(--text-muted)", fontFamily: "monospace", lineHeight: 1.2 }}>{t.aspect}</div>
+                  <div style={{ fontSize: 9, color: "var(--text-muted)", lineHeight: 1.2 }}>{t.duration}</div>
+                </div>
               </div>
-              <div style={{ fontSize: 11, color: "var(--text-secondary)", lineHeight: 1.5 }}>{t.desc}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: active ? "var(--accent)" : "var(--text-primary)", lineHeight: 1.3, marginBottom: 4 }}>{t.name}</div>
+              <div style={{ fontSize: 10.5, color: "var(--text-secondary)", lineHeight: 1.4 }}>{t.desc}</div>
             </button>
           );
         })}
       </div>
 
-      {/* 欄位表單 */}
+      {/* Field form */}
       <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 12, overflow: "hidden" }}>
-        <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-subtle)" }}>
+        <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-subtle)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>{tmpl.name} — 填入素材</span>
+          <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{tmpl.aspect} · {tmpl.duration}</span>
         </div>
-        <div style={{ padding: "16px 18px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          {tmpl.fields.map(f => (
-            <div key={f.key} style={{ display: "flex", flexDirection: "column", gap: 4, gridColumn: f.multiline ? "1 / -1" : undefined }}>
-              <label style={labelStyle}>{f.label}</label>
-              {f.multiline ? (
-                <textarea value={fields[f.key] ?? ""} onChange={e => setField(f.key, e.target.value)}
-                  placeholder={f.hint} rows={2} disabled={busy}
-                  style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit", fontSize: 12 }} />
-              ) : (
-                <input type="text" value={fields[f.key] ?? ""} onChange={e => setField(f.key, e.target.value)}
-                  placeholder={f.hint} disabled={busy} style={inputStyle} />
-              )}
-            </div>
-          ))}
+        <div style={{ padding: "14px 16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          {tmpl.fields.map(f => {
+            const val = fields[f.key] ?? "";
+            const isImgField = f.type === "image";
+            const isLogoField = f.type === "logo";
+            const isAudioField = f.type === "audio";
+            const isColorField = f.type === "color";
+            const isNumberField = f.type === "number";
+            const aiLoading = aiGenFields[f.key] === true;
+            const aiPrompt = getImagePromptForField(f.key, scriptPrefill);
+            const hasAIGen = isImgField;
+            const showImgPreview = (isImgField || isLogoField) && val.startsWith("https://");
+            const fullWidth = f.multiline || isAudioField;
+
+            return (
+              <div key={f.key} style={{ display: "flex", flexDirection: "column", gap: 4, gridColumn: fullWidth ? "1 / -1" : undefined }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                  <label style={{ ...labelStyle, display: "flex", alignItems: "center", gap: 4 }}>
+                    {f.label}
+                    {f.optional && <span style={{ color: "var(--text-muted)", fontWeight: 400, fontSize: 10 }}>選用</span>}
+                  </label>
+                  {f.maxLen && val && (
+                    <span style={{ fontSize: 10, fontFamily: "monospace", color: val.length > f.maxLen ? "var(--red)" : "var(--text-muted)" }}>
+                      {val.length}/{f.maxLen}
+                    </span>
+                  )}
+                </div>
+
+                {f.multiline ? (
+                  <textarea value={val} onChange={e => setField(f.key, e.target.value)}
+                    placeholder={f.hint} rows={2} disabled={busy}
+                    style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit", fontSize: 12 }} />
+                ) : isImgField ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <input type="text" value={val} onChange={e => setField(f.key, e.target.value)}
+                        placeholder="https://..." disabled={busy || aiLoading}
+                        style={{ ...inputStyle, flex: 1, fontSize: 11 }} />
+                      {hasAIGen && (
+                        <button type="button"
+                          onClick={() => void generateImageForField(f.key)}
+                          disabled={busy || aiLoading || !aiPrompt}
+                          title={aiPrompt ? `AI 生圖：${aiPrompt.slice(0, 40)}…` : "需先從前製腳本帶入（✨ 送去 Remotion 模板）才能 AI 生圖"}
+                          style={{
+                            padding: "0 10px", height: 36, borderRadius: 7, flexShrink: 0,
+                            border: "1px solid var(--border-subtle)", fontSize: 11, fontWeight: 700,
+                            cursor: (busy || aiLoading || !aiPrompt) ? "not-allowed" : "pointer",
+                            background: aiLoading ? "var(--border-subtle)" : (aiPrompt ? "var(--ai-bg)" : "var(--bg-subtle)"),
+                            color: aiLoading ? "var(--text-muted)" : (aiPrompt ? "var(--accent)" : "var(--text-muted)"),
+                            whiteSpace: "nowrap", transition: "all 0.15s",
+                          }}>
+                          {aiLoading ? "⏳" : "✨ AI"}
+                        </button>
+                      )}
+                    </div>
+                    {showImgPreview && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={val} alt="" style={{ width: "100%", height: 56, objectFit: "cover", borderRadius: 6 }} />
+                    )}
+                  </div>
+                ) : isColorField ? (
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <input type="color" value={val || "#0ebba2"} onChange={e => setField(f.key, e.target.value)}
+                      style={{ width: 36, height: 34, padding: 2, border: "1px solid var(--border-subtle)", borderRadius: 6, cursor: "pointer", background: "var(--card-bg)" }} />
+                    <input type="text" value={val} onChange={e => setField(f.key, e.target.value)}
+                      placeholder={f.hint || "#0ebba2"} disabled={busy}
+                      style={{ ...inputStyle, flex: 1, fontFamily: "monospace" }} />
+                  </div>
+                ) : isNumberField ? (
+                  <input type="number" value={val} onChange={e => setField(f.key, e.target.value)}
+                    placeholder={f.hint} min={1} max={5} disabled={busy}
+                    style={{ ...inputStyle, width: 80 }} />
+                ) : (
+                  <input type="text" value={val} onChange={e => setField(f.key, e.target.value)}
+                    placeholder={f.hint} disabled={busy} style={inputStyle} />
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Status + error + result */}
+      {/* Status */}
       {status === "submitting" && (
         <div style={{ background: "var(--ai-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 16px", fontSize: 12.5, color: "var(--accent)", fontWeight: 700 }}>
-          提交到 remotion-service 中…
+          ⏳ 提交到 remotion-service 中…
         </div>
       )}
       {status === "rendering" && (
-        <div style={{ background: "var(--ai-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 16px" }}>
-          <div style={{ fontSize: 12.5, color: "var(--accent)", fontWeight: 700, marginBottom: 4 }}>🎬 渲染中（Chrome + ffmpeg）…</div>
-          <div style={{ fontSize: 11.5, color: "var(--accent)" }}>預計 2–5 分鐘（依模板長度）。可保持頁面開啟等待。</div>
+        <div style={{ background: "var(--ai-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 16px" }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+            <span style={{ fontSize: 16 }}>🎬</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--accent)" }}>渲染中 — Chrome + ffmpeg</div>
+              <div style={{ fontSize: 11.5, color: "var(--accent)", opacity: 0.8 }}>預計 2–5 分鐘。可保持頁面開啟等待。</div>
+            </div>
+          </div>
+          <div style={{ height: 3, background: "var(--border-subtle)", borderRadius: 2, overflow: "hidden" }}>
+            <div style={{ height: "100%", background: "var(--accent)", borderRadius: 2, width: "60%",
+              animation: "indeterminate 2s ease-in-out infinite" }} />
+          </div>
+          <style>{`@keyframes indeterminate{0%{margin-left:-30%;width:30%}100%{margin-left:100%;width:30%}}`}</style>
         </div>
       )}
       {status === "error" && (
         <div style={{ background: "var(--badge-red-bg)", border: "1px solid var(--red)", borderRadius: 8, padding: "12px 14px" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--red)", marginBottom: 4 }}>失敗</div>
-          <div style={{ fontSize: 12.5, color: "var(--badge-red-text)" }}>{error}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--red)", marginBottom: 4 }}>渲染失敗</div>
+          <div style={{ fontSize: 12.5, color: "var(--badge-red-text)", marginBottom: 8 }}>{error}</div>
+          <button onClick={() => setStatus("idle")}
+            style={{ fontSize: 12, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", fontWeight: 600, padding: 0 }}>
+            ← 修改後重試
+          </button>
         </div>
       )}
       {status === "done" && resultUrl && (
-        <div style={{ background: "var(--intake-success-bg)", border: "1px solid var(--green)", borderRadius: 10, padding: "16px" }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--badge-green-text)", marginBottom: 12 }}>✅ 渲染完成</div>
+        <div style={{ background: "var(--intake-success-bg)", border: "1px solid var(--green)", borderRadius: 12, padding: "16px" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--badge-green-text)", marginBottom: 12, display: "flex", alignItems: "center" }}>
+            ✅ 渲染完成
+            <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 400, color: "var(--text-muted)" }}>{tmpl.name} · {tmpl.aspect}</span>
+          </div>
           <video controls src={resultUrl} style={{ width: "100%", borderRadius: 8, background: "#000", maxHeight: 320, marginBottom: 12 }} />
           <div style={{ display: "flex", gap: 8 }}>
             <a href={resultUrl} download target="_blank" rel="noreferrer"
-              style={{ flex: 1, padding: "8px 0", background: "var(--accent)", color: "var(--btn-primary-text)", borderRadius: 8, textAlign: "center", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>
+              style={{ flex: 1, padding: "9px 0", background: "var(--accent)", color: "var(--btn-primary-text)", borderRadius: 8, textAlign: "center", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>
               ⬇ 下載 MP4
             </a>
             <button onClick={() => navigator.clipboard.writeText(resultUrl).catch(() => {})}
-              style={{ padding: "8px 16px", background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: 8, fontSize: 13, cursor: "pointer", color: "var(--text-secondary)", fontWeight: 600 }}>
+              style={{ padding: "9px 16px", background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: 8, fontSize: 13, cursor: "pointer", color: "var(--text-secondary)", fontWeight: 600 }}>
               複製 URL
             </button>
             <button onClick={() => { setStatus("idle"); setResultUrl(""); setError(""); }}
-              style={{ padding: "8px 16px", background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: 8, fontSize: 13, cursor: "pointer", color: "var(--text-secondary)", fontWeight: 600 }}>
+              style={{ padding: "9px 16px", background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: 8, fontSize: 13, cursor: "pointer", color: "var(--text-secondary)", fontWeight: 600 }}>
               再做一個
             </button>
           </div>
