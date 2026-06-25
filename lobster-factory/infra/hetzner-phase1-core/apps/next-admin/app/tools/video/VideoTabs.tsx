@@ -79,11 +79,17 @@ export default function VideoTabs() {
         <ScriptForge
           onSendToProduction={(p) => {
             setPrefill(p);
+            setRemotionPrefill(undefined);
+            setTab("produce");
+          }}
+          onSendToRemotion={(p) => {
+            setRemotionPrefill(p);
+            setPrefill(undefined);
             setTab("produce");
           }}
         />
       ) : (
-        <VideoStudio initial={prefill} />
+        <VideoStudio initial={prefill} remotionInitial={remotionPrefill} />
       )}
     </div>
   );
