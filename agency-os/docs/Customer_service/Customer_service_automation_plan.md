@@ -89,7 +89,7 @@
 4. 分類  意圖分類(haiku 快模型)→intent+信心。命中敏感表(退款/個資/法律/醫療/投訴)→直接(8)轉真人
 5. 檢索  hybrid: vector+BM25→RRF 融合→rerank→top-4。WHERE organization_id 強制過濾(租戶隔離)
          檢索 top score 過低(知識庫沒答案)→(8)轉真人,不硬答
-6. 生成  Claude sonnet + 注入 top-4 檢索塊 + 客戶記憶(Memories) → 草擬回覆
+6. 生成  Claude sonnet + 注入 top-4 檢索塊 + 客戶記憶 + CIS 品牌語氣(BrandVoiceProfile,同內容引擎) → 草擬回覆
          · 需行動時(查訂單等)→tool-calling loop(見 §3.4),只能呼叫 allowlist 內 tool
 7. 護欄  supervisor 把關(獨立評估,defense-in-depth):
          · grounding: 回覆主張須對應檢索塊,否則 hallucination→轉真人
@@ -436,6 +436,8 @@ create table if not exists cs_action_log (           -- 每個 tool 呼叫稽核
 | 整合綁定 | `…/0024_tenant_integration_registry.sql`/`0050_client_credentials.sql` | 通道憑證 |
 | Supabase client | `…/next-admin/lib/supabase-server.ts` | service-role 存取 |
 | OpenAI 模型慣例 | `…/next-admin/lib/ai/text-model-options.ts:6`（GPT 系列）| 註：`openai` npm 套件尚非直接依賴，embeddings 需補裝 |
+| **CIS 品牌色（VI）** | `…/next-admin/app/api/ops/clients/[slug]/brand-colors/route.ts:33`（`metadata.client_config.brandColors{primary,secondary,accent}`）| widget 標準色錨點，**重用不重造** |
+| **CIS 品牌語氣（BI/MI）** | `…/next-admin/app/api/content/brand-voice/route.ts:9`（`BrandVoiceProfile` + `promptInjection`）| 客服 AI persona，與內容引擎同源 |
 | 下個 migration | `…/migrations/`（最新 0050）→ **0051** | 新表 DDL |
 
 **pgvector 確認不存在**（grep 空）→ §4/§9 新建。**無既有 messaging/helpdesk 入口**（無 FluentSupport）→ 不衝突。
@@ -525,7 +527,7 @@ create table if not exists cs_action_log (           -- 每個 tool 呼叫稽核
 - **字**：General Sans（UI）+ Fraunces（標題襯線帶溫度）+ **Noto Sans TC**（CJK 必顯式載）。
 - **形/動**：不對稱對話泡泡、圓角、暖調柔陰影、grain 微紋；spring 柔性動效（緩慢呼吸非快速手勢）。
 - **反 AI-slop**：禁紫藍漸層 / Inter 零客製 / 純白底 / 通用 fade / 無 easing snap / 玻璃擬態濫用。
-- **品牌色自動配色（多租戶核心）**：每租戶一個品牌 seed → OKLCH 演算法推導整套清新自然色階（中性低彩度、主色亮度鎖定保證文字 AA）；主題登錄表支援預設庫/自訂 hex/明暗 auto/一鍵回預設；每租戶存 `cs_theme(seed+mode)`（`_uiux_design.md §2.6`）。
+- **企業識別系統（CIS）配置 — 重用既有，不重造（多租戶核心）**：CIS=MI/BI/VI 三層。**VI 標準色**重用既有 `organizations.metadata.client_config.brandColors{primary,secondary,accent}`（`brand-colors/route.ts`，Banner Studio 已用）當錨點，演算法只填周邊色階/中性/狀態色+保 AA（單色 OKLCH 推導降為無品牌時的 fallback）；補 logo/標準字/輔助圖形（擴 `brandKit`）。**BI/MI 語氣**重用既有 `BrandVoiceProfile{tone,personality,preferWords,avoidWords,promptInjection}`（`brand-voice/route.ts`）注入**客服 AI system prompt → 客服語氣 = 內容引擎同源**，跨觸點一致。詳 `_uiux_design.md §2.6`。
 
 **非常棒的互動**（Chatwoot 原生互動類型 headless 自渲染）：快速回覆 chips（`input_select`）、即時訂單/物流卡（`cards`+A1 tool）、inline 表單（`form`）、inline 知識搜尋（`article`+RAG）、AI 打字 spring 指示、AI 已回透明標記、一鍵轉真人狀態、滿意度即時星評、檔案上傳；後期語音輸入/多語句級切換/主動訊息。
 
