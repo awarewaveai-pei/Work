@@ -1080,6 +1080,21 @@ export default function TarotStudio() {
           padding: "12px 12px 32px",
         }}
       >
+        {/* ── 未選模型全域警示（頂部） ── */}
+        {!isMultiModel && !hasSelectedModel && (
+          <div style={{
+            marginBottom: 10,
+            padding: "8px 12px",
+            borderRadius: 7,
+            border: "1.5px solid var(--yellow)",
+            background: "rgba(234,179,8,0.09)",
+            fontSize: 12, color: "var(--yellow)",
+            fontWeight: 600, textAlign: "center",
+          }}>
+            ⚠️ 請先在下方「圖片模型」選一個模型
+          </div>
+        )}
+
         {/* Compare-mode generate button — single-model preview button lives in 調色/修圖 panel */}
         {isMultiModel && (
           <div style={{ marginBottom: 12 }}>
