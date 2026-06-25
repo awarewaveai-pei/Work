@@ -22,8 +22,9 @@
 | D9 | 行動架構 | **agentic 行動分階**：A1 唯讀 → A2 確認後受閘寫入 → **金錢/身分用 deterministic code gate（程式硬閘，非 LLM 判斷）**；分階見 §3.4 |
 | D10 | 品質/護欄棧 | **開源自架**：Arize Phoenix（tracing）+ RAGAS + DeepEval（eval）+ NeMo Guardrails + LlamaFirewall/PromptGuard 2（jailbreak）+ Anthropic Contextual Retrieval + hybrid search |
 | D11 | 編排 | **先純 tool-calling**（Anthropic 官方：線性流跳過框架）；複雜分支/durable 才加 LangGraph；型別安全+成本上限用 PydanticAI；durable retry 用既有 Trigger.dev |
+| D12 | 顧客 widget | **headless 自建 widget**（Client API + WebSocket/pubsub_token），**不用 Chatwoot 預設 iframe widget**（樣式鎖死，達不到頂規 UI）。設計語言=清新自然（§18 + `_uiux_design.md`）|
 
-**一句話架構**：Chatwoot Community（獨立 VPS）當全通道載體 → AgentBot webhook 進 `lib/cs/` 深模組（自建 Claude agentic 引擎）→ 雙軸漸進自主、金錢/身分 code 硬閘永不自動、supervisor 模型把關、Contextual-Retrieval RAG、開源 eval/護欄棧、多供應商容錯、一鍵 kill-switch。
+**一句話架構**：Chatwoot Community（獨立 VPS）當全通道載體 → AgentBot webhook 進 `lib/cs/` 深模組（自建 Claude agentic 引擎）→ 雙軸漸進自主、金錢/身分 code 硬閘永不自動、supervisor 模型把關、Contextual-Retrieval RAG、開源 eval/護欄棧、多供應商容錯、一鍵 kill-switch；**顧客端=清新自然 headless 自建 widget**。
 
 ---
 
@@ -404,6 +405,7 @@ create table if not exists cs_action_log (           -- 每個 tool 呼叫稽核
 
 **每 Phase 強制**：healthcheck 綠 + 真實訊息端到端（REALTEST_EVIDENCE）+ rollback runbook + kill-switch 測試 + WORKLOG。新可部署服務（Chatwoot、cs-engine）走 AGENTS.md「新部署 6 項」（unit test/healthcheck/smoke/rollback/notify/typecheck gate）。
 **三維一起建（D2）**：資料模型/隔離/RAG namespace 從 Phase 1 按多租戶設計；第一個真實流量租戶=自家 Account#0 當金絲雀養肥 eval 集，客戶/產品租戶結構同時就緒隨時可開。
+**顧客 widget（D12，與上表並行）**：headless 自建 widget 分 4 階（MVP→互動類型渲染→inline 知識+a11y→語音/多語/主動，詳 `_uiux_design.md` §10）。Widget P1 對齊主 Phase 1（先 Email/Telegram 內部測，Website widget 同期上自建版）。
 
 ---
 
@@ -499,6 +501,8 @@ create table if not exists cs_action_log (           -- 每個 tool 呼叫稽核
 | 護欄 | **NeMo Guardrails + LlamaFirewall/PromptGuard 2 + Guardrails AI(Presidio PII)** | jailbreak/hallucination/PII |
 | 記憶 | **Letta**（量大時）| per-customer 跨 session |
 | embeddings | **OpenAI text-embedding-3-small（可插拔）→ bge-m3 自架** | D3 |
+| 顧客 widget | **headless 自建**（Chatwoot Client API + WebSocket）+ Next embed script | 預設 iframe widget 樣式鎖死 |
+| 設計系統 | 清新自然 token（CSS vars）+ General Sans/Fraunces/Noto Sans TC + Framer Motion spring | `_uiux_design.md` |
 
 ---
 
@@ -509,6 +513,24 @@ create table if not exists cs_action_log (           -- 每個 tool 呼叫稽核
 **RAG**：□ hybrid(vector+BM25+RRF) □ Contextual Retrieval □ rerank □ metadata 含 tenant/version □ 租戶 filter 強制 □ stale chunk delete 傳播驗證
 **行動**：□ tool allowlist □ A2 確認 checkpoint □ 金錢/身分 code gate（閾值常數）□ action_log 稽核 □ 紅線動作擋下實測
 **運維**：□ 多供應商 failover □ 三層 kill-switch □ 降級退人工 □ 每租戶成本上限 □ rollback runbook □ WORKLOG 四動作
+
+---
+
+## §18 客戶體驗層（清新自然 UI/UX，摘要 — 完整見 `Customer_service_uiux_design.md`）
+
+**核心判定**：Chatwoot 預設 widget 是 **iframe 鎖死**（外部 CSS 進不去）→ 要頂規 UI **必走 headless 自建**：用 Chatwoot **Client API + WebSocket（pubsub_token）**當後端，前端 100% 自刻（官方 `client-api-demo` 證實即時訊息可收）。坐席端用 Chatwoot 原生坐席台（不重造），管理面 `/ops/cs` 自建同設計語言。
+
+**設計語言「晨間工作室」清新自然**（研究全球最佳網站 Linear/Airbnb/Headspace/Aesop + 反 AI-slop）：
+- **色**：暖米白 `#F7F4F0` + 尤加利鼠尾草 `#547C65` + 暖土 `#D5B295`；中性全拉暖（非冷灰）；純白/純黑禁用。
+- **字**：General Sans（UI）+ Fraunces（標題襯線帶溫度）+ **Noto Sans TC**（CJK 必顯式載）。
+- **形/動**：不對稱對話泡泡、圓角、暖調柔陰影、grain 微紋；spring 柔性動效（緩慢呼吸非快速手勢）。
+- **反 AI-slop**：禁紫藍漸層 / Inter 零客製 / 純白底 / 通用 fade / 無 easing snap / 玻璃擬態濫用。
+
+**非常棒的互動**（Chatwoot 原生互動類型 headless 自渲染）：快速回覆 chips（`input_select`）、即時訂單/物流卡（`cards`+A1 tool）、inline 表單（`form`）、inline 知識搜尋（`article`+RAG）、AI 打字 spring 指示、AI 已回透明標記、一鍵轉真人狀態、滿意度即時星評、檔案上傳；後期語音輸入/多語句級切換/主動訊息。
+
+**Widget 分 4 階**（`_uiux_design.md` §10）：P1 headless MVP（Client API+WS+基本對話）→ P2 互動類型渲染器+打字+滿意度 → P3 inline 知識+交接 UI+a11y 全過（WCAG AA、鍵盤、reduced-motion、ARIA live）→ P4 語音/多語/主動/行動原生。
+
+**已附互動原型**：本對話已渲染清新自然 widget 互動示意（快速回覆/AI 打字/訂單卡/轉真人/星評可點）。
 
 ---
 
