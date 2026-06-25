@@ -231,6 +231,8 @@ export default function StudioWorkbench() {
   const [cultureChips, setCultureChips] = useState<string[]>([]); // en tokens in prompt
   const [cultureDyn, setCultureDyn] = useState<Record<string, CultureItem[]>>({}); // `${regionEn}|${lensKey}` → items
   const [cultureFetching, setCultureFetching] = useState<Record<string, boolean>>({}); // per-key in-flight flag
+  const [fusionRegion, setFusionRegion] = useState<CultureItem | null>(null); // 🎲 混搭骰 second culture
+  const [showMap, setShowMap] = useState(false); // 🗺️ 靈感地圖 toggle
 
   // 🔥 時事靈感 — active category tab (圖一 layout: tabs + items below)
   const [trendingTab, setTrendingTab] = useState(TRENDING_CATEGORIES[0]?.value ?? "");
@@ -318,8 +320,12 @@ export default function StudioWorkbench() {
   }, [productType, subject, theme, style]);
 
   const assembledPrompt = useMemo(() => {
-    // 🌍 culture tokens: region adjective + any picked culture chips
-    const cultureTokens = [region ? `${region.en} cultural heritage` : "", ...cultureChips].filter(Boolean);
+    // 🌍 culture tokens: region adjective (+ 🎲 fusion culture) + any picked culture chips
+    const cultureTokens = [
+      region ? `${region.en} cultural heritage` : "",
+      fusionRegion ? `fused with ${fusionRegion.en} heritage` : "",
+      ...cultureChips,
+    ].filter(Boolean);
     if (refMode === "transform" && refImages.length > 0) {
       const parts = [
         "Transform this image.",
@@ -333,7 +339,7 @@ export default function StudioWorkbench() {
     }
     const parts = [subject.trim(), ...cultureTokens, theme.trim(), vibe.trim(), resolvedStylePrompt, product.suffix].filter(Boolean);
     return parts.join(", ");
-  }, [subject, theme, vibe, resolvedStylePrompt, product, refMode, refImages.length, region, cultureChips]);
+  }, [subject, theme, vibe, resolvedStylePrompt, product, refMode, refImages.length, region, fusionRegion, cultureChips]);
 
   const effectivePrompt = promptTouched ? prompt : assembledPrompt;
 
@@ -389,6 +395,25 @@ export default function StudioWorkbench() {
     } catch { /* keep fallback chips */ }
     setCultureFetching((p) => { const n = { ...p }; delete n[key]; return n; });
   }, [cultureDyn]);
+
+  // 🎲 文化混搭骰 — random 2 cultures × 1 lens, auto-fetch both → forced serendipity.
+  // Math.random is fine here (browser/client code; the no-random rule is for workflow scripts).
+  const rollDice = useCallback(() => {
+    const flat = CULTURE_REGIONS.flatMap((g) => g.items.map((it) => ({ it, group: g.group })));
+    if (flat.length < 2) return;
+    const ai = Math.floor(Math.random() * flat.length);
+    let bi = Math.floor(Math.random() * flat.length);
+    if (bi === ai) bi = (bi + 1) % flat.length;
+    const a = flat[ai]!, b = flat[bi]!;
+    const lens = CULTURE_LENSES[Math.floor(Math.random() * CULTURE_LENSES.length)] ?? CULTURE_LENSES[0]!;
+    setRegion(a.it);
+    setRegionTab(a.group);
+    setFusionRegion(b.it);
+    setCultureLens(lens.key);
+    setShowMap(true);
+    void fetchCulture(a.it.en, lens.key);
+    void fetchCulture(b.it.en, lens.key);
+  }, [fetchCulture]);
 
   const fetchAllTrending = useCallback(async () => {
     const today = new Date().toISOString().slice(0, 10);
@@ -748,10 +773,30 @@ export default function StudioWorkbench() {
         </AccordionSection>
 
         {/* 🌍 世界文化 — region × lens, with AI-filled specific items (混搭靈感工具) */}
-        <AccordionSection title="🌍 世界文化" summary={region ? region.zh : (cultureChips.length ? `${cultureChips.length} 元素` : "未選")}>
+        <AccordionSection title="🌍 世界文化" summary={region ? (fusionRegion ? `${region.zh}×${fusionRegion.zh}` : region.zh) : (cultureChips.length ? `${cultureChips.length} 元素` : "未選")}>
           <p style={{ fontSize: 11, opacity: 0.55, margin: "0 0 8px" }}>
             1️⃣ 選地域 → 2️⃣ 選鏡頭 → ✨ AI 噴出該文化專屬靈感（可多選，填入 prompt）
           </p>
+
+          {/* 🎲 混搭骰 + 🗺️ 地圖切換 */}
+          <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+            <button type="button" onClick={rollDice} title="隨機 2 國 × 1 鏡頭混搭，逼出意外靈感"
+              style={{ fontSize: 12, fontWeight: 600, padding: "4px 14px", borderRadius: 20, cursor: "pointer", background: "linear-gradient(135deg,#6366f1,#a855f7)", color: "#fff", border: "none", boxShadow: "0 1px 6px rgba(99,102,241,0.4)" }}>
+              🎲 文化混搭骰
+            </button>
+            <button type="button" onClick={() => setShowMap((v) => !v)}
+              style={{ ...tabStyle(showMap), padding: "4px 12px" }}>
+              🗺️ 靈感地圖 {showMap ? "▲" : "▼"}
+            </button>
+          </div>
+          {fusionRegion && region && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, padding: "5px 10px", borderRadius: 8, background: "rgba(168,85,247,0.12)", border: "1px solid rgba(168,85,247,0.4)", fontSize: 12 }}>
+              <span style={{ fontWeight: 600 }}>🎲 {region.zh} × {fusionRegion.zh}</span>
+              <span style={{ opacity: 0.6 }}>· {CULTURE_LENSES.find((l) => l.key === cultureLens)?.zh ?? ""} 混搭中</span>
+              <button type="button" onClick={() => setFusionRegion(null)} title="取消混搭"
+                style={{ marginLeft: "auto", fontSize: 11, padding: "0 6px", borderRadius: 8, cursor: "pointer", background: "transparent", border: "1px solid rgba(168,85,247,0.5)", color: "var(--text-primary)" }}>✕</button>
+            </div>
+          )}
 
           {/* 地域：洲 tabs + 國家 chips（單選） */}
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
@@ -768,7 +813,7 @@ export default function StudioWorkbench() {
                 <span key={it.en} style={{ display: "inline-block" }}
                   onMouseEnter={(e) => { const r = e.currentTarget.getBoundingClientRect(); setTip({ text: it.desc, x: r.left + r.width / 2, y: r.top }); }}
                   onMouseLeave={() => setTip(null)}>
-                  <button type="button" onClick={() => setRegion(active ? null : it)} style={chipStyle(active)}>
+                  <button type="button" onClick={() => { setRegion(active ? null : it); setFusionRegion(null); }} style={chipStyle(active)}>
                     {active ? "✓ " : ""}{it.zh}
                   </button>
                 </span>
@@ -822,6 +867,42 @@ export default function StudioWorkbench() {
                   })}
                 </div>
               </>
+            );
+          })()}
+
+          {/* 🗺️ 靈感地圖 — AI 項目以圖釘散佈在地域板上，點釘填入 prompt（golden-angle 散佈，無依賴） */}
+          {showMap && region && (() => {
+            const lens = CULTURE_LENSES.find((l) => l.key === cultureLens) ?? CULTURE_LENSES[0]!;
+            const dyn = cultureDyn[`${region.en}|${cultureLens}`];
+            const seen = new Set<string>();
+            const items: CultureItem[] = [];
+            for (const it of [...(dyn ?? []), ...lens.fallback]) {
+              if (seen.has(it.en)) continue;
+              seen.add(it.en); items.push(it);
+            }
+            const shown = items.slice(0, 12);
+            const n = Math.max(shown.length, 1);
+            const GOLDEN = 2.399963229728653; // ~137.5° in radians — even, non-overlapping scatter
+            return (
+              <div style={{ marginTop: 10, position: "relative", height: 220, borderRadius: 12, border: "1px solid var(--border)", background: "radial-gradient(circle at 32% 30%, rgba(99,102,241,0.12), rgba(127,127,127,0.04) 70%)", overflow: "hidden" }}>
+                <div style={{ position: "absolute", top: 8, left: 10, fontSize: 12, fontWeight: 700, color: "var(--accent)", letterSpacing: 0.5 }}>
+                  🗺️ {region.zh}{fusionRegion ? ` × ${fusionRegion.zh}` : ""} · {lens.emoji}{lens.zh}
+                </div>
+                {shown.map((it, i) => {
+                  const ang = i * GOLDEN;
+                  const rad = Math.sqrt((i + 0.5) / n);
+                  const cx = 50 + Math.cos(ang) * rad * 36;
+                  const cy = 56 + Math.sin(ang) * rad * 28;
+                  const active = cultureChips.includes(it.en);
+                  return (
+                    <button key={it.en} type="button" onClick={() => toggleCultureChip(it.en)} title={it.desc}
+                      style={{ position: "absolute", left: `${cx}%`, top: `${cy}%`, transform: "translate(-50%,-50%)", fontSize: 11, padding: "2px 8px", borderRadius: 12, cursor: "pointer", whiteSpace: "nowrap", border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`, background: active ? "rgba(99,102,241,0.92)" : "var(--chip-surface)", color: active ? "#fff" : "var(--text-primary)", boxShadow: "0 1px 4px rgba(0,0,0,0.18)", transition: "all 0.15s" }}>
+                      📍{it.zh}
+                    </button>
+                  );
+                })}
+                <div style={{ position: "absolute", bottom: 6, right: 10, fontSize: 10, opacity: 0.4 }}>點圖釘填入 prompt</div>
+              </div>
             );
           })()}
 

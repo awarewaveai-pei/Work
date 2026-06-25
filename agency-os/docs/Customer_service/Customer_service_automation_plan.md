@@ -525,6 +525,7 @@ create table if not exists cs_action_log (           -- 每個 tool 呼叫稽核
 - **字**：General Sans（UI）+ Fraunces（標題襯線帶溫度）+ **Noto Sans TC**（CJK 必顯式載）。
 - **形/動**：不對稱對話泡泡、圓角、暖調柔陰影、grain 微紋；spring 柔性動效（緩慢呼吸非快速手勢）。
 - **反 AI-slop**：禁紫藍漸層 / Inter 零客製 / 純白底 / 通用 fade / 無 easing snap / 玻璃擬態濫用。
+- **品牌色自動配色（多租戶核心）**：每租戶一個品牌 seed → OKLCH 演算法推導整套清新自然色階（中性低彩度、主色亮度鎖定保證文字 AA）；主題登錄表支援預設庫/自訂 hex/明暗 auto/一鍵回預設；每租戶存 `cs_theme(seed+mode)`（`_uiux_design.md §2.6`）。
 
 **非常棒的互動**（Chatwoot 原生互動類型 headless 自渲染）：快速回覆 chips（`input_select`）、即時訂單/物流卡（`cards`+A1 tool）、inline 表單（`form`）、inline 知識搜尋（`article`+RAG）、AI 打字 spring 指示、AI 已回透明標記、一鍵轉真人狀態、滿意度即時星評、檔案上傳；後期語音輸入/多語句級切換/主動訊息。
 

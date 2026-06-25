@@ -84,6 +84,36 @@
 - 圖示 stroke 1.5px@24 / 1.25px@16，圓端圓角接（Lucide / Phosphor / Heroicons）。**避免**填滿厚圖示、純幾何冷圖示。
 - 插畫：柔手繪線、sage/earth 2–3 色、略不完美。Reference Headspace/Mailchimp Freddie，**非** Midjourney 光滑 3D。藝術/塔羅脈絡可用植物意象（葉/莖）做空狀態裝飾。
 
+### 2.6 品牌色自動配色引擎 + 主題系統（多租戶核心）
+
+**Token 三層架構**（換主題只動最上層一個值，其餘全自動）：
+```
+品牌種子色 seed(每租戶一個) → 演算法推導色階(OKLCH) → 語意 token → 元件
+ #547C65                      50/200/400/prim/800      --bg/--prim/--ink   按鈕/泡泡/邊框
+```
+
+**推導演算法（清新自然濾鏡）**：從 seed 取色相 H + 飽和 S，套**固定明度梯 + 壓低彩度**長出整套色階。中性背景帶一點品牌色相的暖灰（`C≈.012*S`），主色才拉高彩度（`C≈.115*S`）→ 任何品牌色都自動變「清新自然版」，不把刺眼原色直接砸上。灰色系 seed（S≈0）→ 自然退化為中性灰階。
+```
+淺色: bg L.965 / surface .982 / overlay .935 / s50 .93 / s200 .83 / s400 .69 / 主色 .54 / s800 .40
+深色: bg L.16 / surface .20 / overlay .26 / s400 .62 / 主色 .70（提亮利暗底可讀）
+文字: 淺=暖黑 #2C2926 固定 / 深=暖白 #F0EDE8；on-primary=暖白/暖黑
+```
+
+**自動無障礙**：主色**亮度鎖定**（淺 L≈.54、深 L≈.70）→ 主色上文字對比**恆過 WCAG AA**，客戶給任何顏色都不出現看不清按鈕。低彩度中性恆過對比。
+
+**品牌色來源（多租戶）**：① 讀 Chatwoot inbox widget color；② 我方 `cs_theme`（每 `organization_id` 一筆，優先）。widget 載入帶自己租戶 seed → 自動成該品牌清新自然版。A 客橙、B 客藍，同引擎各自協調。
+
+**主題系統（theme registry，回到所有主題）**：runtime 切換 = 重設 CSS 變數（headless 完全可控）。
+| 來源 | 說明 |
+|---|---|
+| 預設「晨間鼠尾草」 | 系統 default，`回到預設` 一鍵還原 |
+| 預設主題庫（8 款）| 海潮藍/赤陶土/李紫/森綠/墨炭/蜜橙/玫瑰…一鍵切 |
+| 租戶品牌色 | 從該客戶 seed 自動推導 |
+| 自訂 hex | 色票自由選 |
+| 明暗模式 | light / dark / **auto**（跟系統 `prefers-color-scheme`）|
+
+**持久化**：每租戶存 `seed + mode`（建議欄位：`cs_theme(organization_id, seed_hex, mode, preset_key, updated_at)`，或塞 `organizations.metadata.brand`）；下次載入自動套用。**已附互動原型**：本對話已渲染「品牌色自動配色引擎」demo（拉色票即時重配色 + 預設主題切換 + 回到預設）。
+
 ---
 
 ## §3 自建 Widget 架構（headless on Chatwoot Client API）
