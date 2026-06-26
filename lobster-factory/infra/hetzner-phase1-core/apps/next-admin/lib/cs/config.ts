@@ -47,9 +47,10 @@ export const CS_THRESHOLDS = {
 } as const;
 
 /**
- * A3 red-line: actions / intents that may NEVER be executed autonomously, regardless of model
- * confidence or per-intent config. Matched case-insensitively against intent keys, tool risk, and
- * (as a backstop) the customer message. Hitting any ⇒ forced human handoff.
+ * A3 red-line: money / identity / legal / medical that may NEVER be handled autonomously. Matched
+ * case-insensitively (substring) in TWO places: the customer message — autonomy.ts hitsRedLine,
+ * which forces handoff in decideAnswerAction — AND the tool NAME — tools.ts resolveToolDecision,
+ * which forces pending_human even if the DB risk column was mis-tagged. Hitting either ⇒ human.
  */
 export const CS_RED_LINE_KEYWORDS = [
   "refund", "退款", "退費", "chargeback", "扣款", "退訂",

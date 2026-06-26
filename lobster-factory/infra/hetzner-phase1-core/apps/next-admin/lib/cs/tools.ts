@@ -5,6 +5,7 @@
 // and there are no read handlers to call.
 
 import { MAX_REFUND_CENTS } from "@/lib/cs/config";
+import { hitsRedLine, hitsSensitive } from "@/lib/cs/autonomy";
 import type { ToolSpec } from "@/lib/cs/types";
 
 export type ToolHandler = (params: Record<string, unknown>) => Promise<unknown>;
@@ -44,8 +45,16 @@ export function extractAmountCents(params: Record<string, unknown>): number | nu
 export function resolveToolDecision(spec: ToolSpec, params: Record<string, unknown>): ToolDecision {
   if (!spec.isEnabled) return { allow: false, status: "denied", reason: "tool_disabled" };
 
+  // Name backstop: a tool whose NAME implies money/identity can NEVER run autonomously, even if the
+  // DB `risk` column was mis-tagged (e.g. issue_refund flagged A1_read). Code beats DB config here.
+  if (hitsRedLine(spec.name) || hitsSensitive(spec.name)) {
+    return { allow: false, status: "pending_human", reason: "red_line_tool_name" };
+  }
+
+  // Any non-zero amount (positive OR negative) over the code ceiling ⇒ human. MAX_REFUND_CENTS=0 in
+  // U1 means no autonomous money movement at all; abs() closes a negative-amount bypass.
   const amount = extractAmountCents(params);
-  if (amount !== null && amount > MAX_REFUND_CENTS) {
+  if (amount !== null && Math.abs(amount) > MAX_REFUND_CENTS) {
     return { allow: false, status: "pending_human", reason: "amount_over_ceiling" };
   }
 

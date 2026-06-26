@@ -53,19 +53,22 @@ export function inputGuards(text: string): GuardrailResult {
 
 // ── Output guards ────────────────────────────────────────────────────────────
 
-// Credit-card-ish (13-19 digit run, optional spaces/dashes) and Taiwan national id (A123456789).
+// Credit-card-ish (13-19 digit run, optional spaces/dashes) and Taiwan national id (A123456789,
+// case-insensitive). Run AFTER NFKC normalization so fullwidth digits / Unicode dashes can't evade.
 const CARD_RE = /(?:\d[ -]?){13,19}/;
-const TW_ID_RE = /\b[A-Z][12]\d{8}\b/;
+const TW_ID_RE = /\b[A-Za-z][12]\d{8}\b/;
 
 /** Output guard: refuse to send a reply that leaks card numbers / national ids. */
 export function checkPiiLeak(reply: string): GuardrailResult {
+  // NFKC folds fullwidth digits → ASCII; then unify Unicode hyphen/minus variants to ASCII '-'.
+  const norm = reply.normalize("NFKC").replace(/[‐-―−﹣－]/g, "-");
   // Card-like = a 13-19 digit run (with optional spaces/dashes) AND ≥13 raw digits overall,
   // so short order numbers like "#AW-20847" don't trip it.
-  const digitCount = reply.replace(/[^\d]/g, "").length;
-  if (digitCount >= 13 && CARD_RE.test(reply)) {
+  const digitCount = norm.replace(/[^\d]/g, "").length;
+  if (digitCount >= 13 && CARD_RE.test(norm)) {
     return { pass: false, reason: "pii_card_like", handoffReason: "guardrail_block" };
   }
-  if (TW_ID_RE.test(reply)) {
+  if (TW_ID_RE.test(norm)) {
     return { pass: false, reason: "pii_national_id", handoffReason: "guardrail_block" };
   }
   return PASS;

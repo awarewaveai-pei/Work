@@ -37,6 +37,12 @@ export async function generateReply(opts: {
   return { text, provider };
 }
 
+/** Map a parsed supervisor JSON to a verdict. PURE + fail-closed: any missing/false field ⇒ block. */
+export function parseVerdict(v: { grounded?: boolean; safe?: boolean; reason?: string } | null): SupervisorVerdict {
+  if (!v) return { grounded: false, safe: false, reason: "supervisor_parse_failed" };
+  return { grounded: v.grounded === true, safe: v.safe === true, reason: v.reason ?? "" };
+}
+
 /** Independent supervisor: is the draft grounded in the knowledge and safe to send? */
 export async function superviseReply(opts: {
   reply: string;
@@ -69,9 +75,7 @@ export async function superviseReply(opts: {
       timeoutMs: CS_TIMEOUTS.supervisorMs,
     });
     const v = parseJsonObject<{ grounded?: boolean; safe?: boolean; reason?: string }>(text);
-    if (!v) return { grounded: false, safe: false, reason: "supervisor_parse_failed" };
-    // Fail closed: missing field ⇒ not grounded / not safe.
-    return { grounded: v.grounded === true, safe: v.safe !== false, reason: v.reason ?? "" };
+    return parseVerdict(v);
   } catch {
     return { grounded: false, safe: false, reason: "supervisor_error" };
   }
@@ -145,7 +149,7 @@ export async function runAgenticTurn(opts: {
       if (!decision.allow) {
         toolCalls.push({ toolName: spec.name, risk: spec.risk, status: decision.status, params, reason: decision.reason });
         if (decision.status === "pending_human" || decision.status === "pending_confirm") needsHandoff = true;
-        results.push({ type: "tool_result", tool_use_id: use.id, content: "這個動作需要真人專員協助處理。" });
+        results.push({ type: "tool_result", tool_use_id: use.id, content: "這個動作需要真人專員協助處理（尚未執行）。", is_error: true });
         continue;
       }
 
