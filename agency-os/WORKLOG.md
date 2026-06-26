@@ -4,6 +4,24 @@
 
 ## 2026-06-26
 
+### feat(video): /tools/video 雙分頁合併為單頁雙 section（上 前製腳本 / 下 影片生產）
+
+[任務理解] 操作者要把 /tools/video 原本 2 個分頁（📝前製腳本=ScriptForge ↔ 🎬影片生產=VideoStudio，二選一切換）整合成同頁：上 section1=前製腳本，下 section2=影片生產。
+
+[現況分析] VideoTabs.tsx 用 `tab` state + 條件渲染二選一；切分頁靠 unmount/remount 讓 VideoStudio 以最新 prefill 重新 seed。VideoStudio prefill 全走 useState 初始化（只在 mount 讀一次，VideoStudio.tsx:164/175/183/194-196/222）→ 常駐不會自動 re-seed，是合併的關鍵約束。consumer 僅 page.tsx（無 props）。
+
+[已修改]
+- EDIT app/tools/video/VideoTabs.tsx：移除 tab bar + 條件渲染，改常駐兩 `<section>`（各帶標題列）；接力保留 — 新增 `productionKey` 當 VideoStudio 的 React key，`goProduce()` 送去生產時 bump→強制 remount 重新 seed（VideoStudio 內部零改動）+ requestAnimationFrame scrollIntoView 捲到生產區（produceRef 掛常駐外層 section 永不為 null）。
+
+[驗證結果]（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~一次性 build gate（next-admin 全專案 0 error）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0major/2minor（皆非阻塞：①VideoStudio.tsx:225 remotionInitial useEffect 在 remount 設計下變冗餘但無害，非本次改動不碰；②productionKey 無條件 bump 是正確設計，勿改條件式）。critic 逐一 trace 四焦點：key-remount 正確 re-seed / React19 自動批次無 stale-prop race / scrollIntoView 目標常駐 / Remotion 接力經 line-222 initializer 仍正常
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`VideoTabs|setTab|TABS|onSendToProduction|onSendToRemotion|productionKey` | hits=0 stale（setTab/TABS 命中全為無關元件各自 local state：CostsTabs/ClientHubTabs/theme/AiModels/Studio；VideoTabs 唯一 consumer=page.tsx 無 props；ScriptForge 回呼簽章不變經 context 接；agency-os 命中皆歷史 WORKLOG 記錄非 live claim；scripts=0）
+
+[剩餘風險] ①未 deploy（live 站仍顯示舊分頁，需 sg-deploy 才生效）②兩工具 root 各自 minHeight:100vh + 背景處理不同（ScriptForge 硬編淺色 / VideoStudio CSS var）→ 上下堆疊視覺略有落差，屬既有非本次引入 ③送新腳本會 remount 生產區（清掉進行中產製）= 與原切分頁行為一致，預期內
+
+[rollback] 單檔 `git revert <commit>` 即可；無 DB/schema/auth/deploy 改動
+
 ### feat(studio): 🌍 世界文化靈感工具（region×lens + AI 動態填充）+ chip 淺紫修正 + 時事靈感 tab 化
 
 [任務理解] 操作者做「世界各地特徵的衣服」，要 /tools/studio 加「讓靈感噴發」小工具：國家 + 多軸（食物/文化紋樣·配色·織法·符號/音樂/藝術/政治/運動/景點/節慶/代表人物含原住民…）+ 地圖 + 選項要非常多很豐富。並修 2 個 UI：勾選項目背景改淺紫（與實心 tab 區分）、時事靈感改 tab 版面。
