@@ -555,11 +555,11 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
         <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Hint banner — full width */}
           {providedScenes.length > 0 ? (
-            <div style={{ background: "var(--intake-success-bg)", border: "1px solid var(--green)", borderRadius: 8, padding: "10px 12px", fontSize: 12.5, color: "var(--badge-green-text)", lineHeight: 1.6 }}>
+            <div style={{ ...videoConfigWidthStyle, background: "var(--intake-success-bg)", border: "1px solid var(--green)", borderRadius: 8, padding: "10px 12px", fontSize: 12.5, color: "var(--badge-green-text)", lineHeight: 1.6 }}>
               已從前製腳本帶入 <b>{providedScenes.length}</b> 個場景。調整下方設定後，按「生成草稿」出片。
             </div>
           ) : (
-            <div style={{ background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: "9px 12px", fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+            <div style={{ ...videoConfigWidthStyle, background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: "9px 12px", fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.6 }}>
               可到「前製腳本」寫完再帶入，或直接填主題快速生成。
             </div>
           )}
@@ -1491,13 +1491,18 @@ function KnobRow({ label, hint, min, max, step, value, onChange }: {
 
 const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" };
 
-const videoConfigStackStyle: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 16,
+const videoConfigWidthStyle: React.CSSProperties = {
   width: "100%",
   maxWidth: 960,
   margin: "0 auto",
+  boxSizing: "border-box",
+};
+
+const videoConfigStackStyle: React.CSSProperties = {
+  ...videoConfigWidthStyle,
+  display: "flex",
+  flexDirection: "column",
+  gap: 16,
 };
 
 const videoConfigFieldsStyle: React.CSSProperties = {
