@@ -13,7 +13,7 @@
 - `components/DailyTool.tsx`(改):接 `<AiReading tier="light">`(每日=便宜病毒層)產生個人化文案。
 - `lib/daily.test.ts`:luckyElement 綁 favorable[0]、命局摘要欄、dailyContext 形狀。
 
-[驗證結果](R0 四動作)
+[驗證結果]（R0 四動作）
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/daily.test` | exit=0 | 8 pass — 丙日身弱真喜用神首位=木(與舊簡版巧合一致,但身強盤現已正確)、偏財格帶入、dailyContext systemId=bazi+含評分/宜忌。另 tsc=0、`npm test` 88 pass、build=0。
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n+1suggestion — critic 確認 favorable 必非空、WUXING 表全 5 鍵、determinism 保持、dailyContext 17 facts<60 且皆過 sanitizeFact 含空陣列 guard、generatorOf 移除無殘留、tier=light 合法、ChartRequest→BaziRequest 結構相容。採納:移除靜默 `?? meEl` fallback(避免日後 favorable 變空靜默回命理錯值)。
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/ziwei-doushu | grep=`generatorOf`,`dailyContext`,`DailyFortune`,`computeDailyFortune` | hits=0 stale — generatorOf 0 殘留;`DailyFortuneCache`(db/schema)為另一 DB 型別非衝突。

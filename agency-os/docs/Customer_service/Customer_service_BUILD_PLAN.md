@@ -117,6 +117,13 @@ per-client hub  /ops/clients/[slug]   （既有 7 tab：內容工具/整合/佈�
 - **REVIEW**：critic → **0 Critical / 0 Major**（auth 閘、slug→org 多租戶、prototype-pollution、merge 保留全乾淨）+ 2 Minor → **修**（csVoice 改保留外部 key 不清 brandVoice/apologyStyle/slogan；free-text 加長度上限防 prompt 膨脹）。`- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/2minor修`
 - **BUGHUNT**：grep「品牌識別」wired / BrandColorsCard 單一 render / cis route 被呼叫 / brandKit·csVoice 跨 6 檔一致。`- BUGHUNT_DONE: scope=lobster-factory | grep=brandKit|csVoice|品牌識別 | hits=一致`
 
+**2026-06-26 — U3 客服 tab + 頂層「客服」section ✅**
+- 建：`cs-config/route.ts`（GET 讀 intents/knowledge/csEnabled + PATCH 每租戶 kill-switch，service-role 讀 cs_ 表）+ `ClientHubTabs.tsx` 加 `CustomerServiceTab`（client-side fetch，kill-switch toggle + 雙軸 autonomy 徽章 + 知識源數）+ wire「客服」tab + `SidebarNav.tsx` 加頂層「Customer Service」section + `app/ops/cs/page.tsx`（跨客戶營運中心，聚合 cs_ counts）。
+- **REALTEST**：`tsc --noEmit` = **0**；vitest 35/35；**live prod 驗證**（org 解析=1 / cs_intents 7 欄 SELECT 對得上 schema / knowledge·replies 查詢不爆）。`- REALTEST_EVIDENCE: tool=SSH | cmd=tsc 0 + psql validate cs-config SELECT cols vs EU prod | exit=0`
+- **REVIEW**：critic → **1 Critical**（kill-switch inert：UI/API 寫 csEnabled 但 engine 沒讀 → 切了沒用）+ 1 Major（型別未綁）+ 2 Minor → **全修**：kill-switch 接進 `orchestrator.handleInbound`（step 2 後、LLM spend 前 `cis.csEnabled===false → makeHandoff("tenant_killswitch")`）+ `loadCis` 回傳 csEnabled + `CisProfile`/`ClientConfig` 加型別 + `HandoffReason` 加 `tenant_killswitch` + loadCounts 查詢失敗回 null + setCsEnabled 用 server echo。`- REVIEW_DONE: critic=Deep | verdict=pass(修後) | findings=1c/1m/2minor 全修`
+- **BUGHUNT**：`csEnabled` 從 0 consumer → 6 檔（types/cis/orchestrator/route/cs-config/ClientHubTabs）；客服 tab wired；/ops/cs 連結 + sidebar section 無 404（critic 驗）。`- BUGHUNT_DONE: scope=lobster-factory | grep=csEnabled | hits=6檔一致`
+- 待 hardening：`handleInbound` 整合測試（mock loadCis 驗 kill-switch 觸發）。
+
 ---
 
 ## §6 每單元驗證標準（R0 四動作，逐單元）
