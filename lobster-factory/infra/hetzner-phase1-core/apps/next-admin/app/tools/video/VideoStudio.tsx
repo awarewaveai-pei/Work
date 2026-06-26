@@ -553,8 +553,8 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
       {/* ── Generate tab ── */}
       {studioTab === "generate" && (
         <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* 窄螢幕：config 2 欄 → 單欄堆疊（表單在上、費用+生成按鈕在下，按鈕永遠看得到）。2026-06-26 修：右欄按鈕在窄視窗被擠出畫面。 */}
-          <style>{`@media (max-width: 980px){.vs-config-grid{grid-template-columns:1fr !important}.vs-config-cta{position:static !important}}`}</style>
+          {/* 費用+生成按鈕固定排在設定表單後方，避免桌機版側欄 sticky 卡在頁面中段。 */}
+          <style>{`.vs-config-cta{position:static !important}`}</style>
 
           {/* Hint banner — full width */}
           {providedScenes.length > 0 ? (
@@ -601,9 +601,9 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
             </>
           )}
 
-          {/* ── Phase: idle / config — 2-col layout ── */}
+          {/* ── Phase: idle / config — single-column layout ── */}
           {!draftReady && !isLoading && genStatus !== "done" && (
-          <div className="vs-config-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 320px", gap: 24, alignItems: "start" }}>
+          <div className="vs-config-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 24, alignItems: "start" }}>
 
             {/* LEFT ── form cards */}
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -877,8 +877,8 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
               )}
             </div>{/* end LEFT column */}
 
-            {/* RIGHT ── sticky cost + CTA（窄螢幕由 .vs-config-cta media query 取消 sticky，堆疊到表單下方）*/}
-            <div className="vs-config-cta" style={{ position: "sticky", top: 24, display: "flex", flexDirection: "column", gap: 12 }}>
+            {/* BOTTOM ── cost + CTA */}
+            <div className="vs-config-cta" style={{ display: "flex", flexDirection: "column", gap: 12, width: "min(100%, 420px)", justifySelf: "center" }}>
 
               {/* ③ 費用預覽 card */}
               <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 12, overflow: "hidden" }}>
@@ -938,9 +938,9 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
                 ))}
               </div>
 
-            </div>{/* end RIGHT column */}
+            </div>{/* end BOTTOM cost + CTA */}
 
-          </div>)}{/* end 2-col grid + idle condition */}
+          </div>)}{/* end config grid + idle condition */}
 
         </div>
       )}
