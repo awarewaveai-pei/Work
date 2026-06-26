@@ -4,7 +4,20 @@
 
 ## 2026-06-26
 
-### fix(tarot): 單卡「重新生成」產生位元相同的圖（第 3 次回報，前 2 修為假性）
+### docs(runbook): EU DNS repoint 清單 live 查證寫進 §5（搬機前置）
+
+[任務理解] §7 未打勾項「列出指向 EU 的 Cloudflare DNS record」—搬機要 repoint 哪些必須有確切清單。
+
+[已修改] CF API live 查證（zone `f21b...`）→ runbook §5 step 5 加 9 個指向 EU(204.168.175.41) 的 A record repoint 表 + 查詢指令；§4 step9 / §7 checklist 標完成。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl .../zones/<zone>/dns_records` | exit=0 | live 9 EU records：supabase/studio/n8n/trigger/uptime/**mainwp/postiz**(proxied) + **remotion-svc/video-svc**(DNS-only)。SG 4 個(apex/api/app/oracle)+www CNAME。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — 純文件；表格 markdown 正確。
+- BUGHUNT_DONE: scope=agency-os,runbooks,scripts | grep=`204.168.175.41`,`dns_records` | hits: **live≠doc 發現** — `CLOUDFLARE_HETZNER_PHASE1.md` 只舉例 supabase/studio/n8n/trigger/uptime，漏列 mainwp/postiz/remotion-svc/video-svc（該 doc 是概念分工示例，完整列舉以 runbook §5 為準，不重複）。
+- BUGHUNT_SCOPE_NARROW: N/A。
+
+[剩餘風險] DNS 會變動；runbook 附 live 查詢指令供搬機當下重查（不依賴此快照）。
+[rollback] git revert（純文件）。
 
 [任務理解] /tools/tarot 整套生成 Step 2 → 不滿意的卡點「重新生成這張」→ 有跑但圖案完全沒變；/tools/designs 也無新圖。非快取問題 — 結構性：重新生成沿用固定 seed，決定性 model 必產同圖。
 
