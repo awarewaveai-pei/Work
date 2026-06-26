@@ -135,6 +135,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 
 | 觸發情境 | 立即執行 |
 |---------|---------|
+| 使用者提到「改外觀 / 改顏色 / 改主題 / theme / 字體 / 側欄樣式 / 換配色 / 外觀不對 / appearance」 | **先讀** [`app/tools/theme/如何修改外觀-APPEARANCE-GUIDE.md`](../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/theme/如何修改外觀-APPEARANCE-GUIDE.md)（外觀系統 SSOT：哪個檔改什麼 + 改完怎麼上線）。**禁止**臆測哪個檔；90% 調整只碰 `lib/theme/tokens.ts` 或 `app/tools/theme/page.tsx` |
 | 使用者問某段時間的 Slack / Telegram / 告警 / incident | `scripts/fetch-external-signals.ps1 -From ... -To ...`（無時區預設 CST/UTC+8）|
 | AO-RESUME digest `since_utc` 比需要範圍早 > 2 小時 | 補跑 `/signals -From <需要起點>` |
 | AO-RESUME | 讀 `reports/status/cf-security-LATEST.md`，列入外部信號段（mtime >24h 才重跑腳本）|
