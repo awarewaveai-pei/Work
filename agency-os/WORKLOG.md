@@ -4,7 +4,28 @@
 
 ## 2026-06-26
 
-### feat(oracle): Phase A — AI 問答入口(route + UI 解讀按鈕,4 系統共用)
+### fix(backup-health): 備份「跑了但壞了」原本靜默 — check-backup-health 改讀 verify 判定 surface 到 AO-RESUME
+
+[任務理解] 備份失敗（verify 失敗/缺檔）原本沒人知道（跟 R2 同款靜默）。讓它在 AO-RESUME 自動 surface（系統既有「零記憶負擔」模式，非新建 Telegram）。
+
+[現況分析]（讀 `check-backup-health.ps1` 全檔 + 兩台 verify log + cron）
+- `check-backup-health.ps1` `$overall` 只由 fatal/`-not ok`/**staleness(age>3d)** 決定 → 只看「新不新」不看「壞沒壞」。
+- EU `verify-backup-eu.sh` 每日 03:00 cron 跑，log `=== verify-backup-eu PASSED/FAILED ===` 到沒人讀的 `/var/log/eu-backup.log`；該腳本 L2 註解「alert on failure」**無對應程式碼**（騙人）。SG verify-backup.sh 反而本來就有 Slack 告警（L142）。
+- 唯一 consumer = `ao-resume.ps1:554`（只讀 exit code，不 parse JSON）→ 加欄位不破壞。
+
+[已修改]
+- `scripts/check-backup-health.ps1`：`Get-HostBackupHealth` 加 `$VerifyLog` 參數；base64 bash payload 加抽取最後一筆 `=== verify-backup[a-zA-Z0-9_-]* (PASSED|FAILED)` → `VERIFY_RESULT`(PASSED/FAILED/UNKNOWN)+`VERIFY_TIME`；兩 hashtable + 兩呼叫點(SG/EU log 路徑)；`$overall` 把 verify FAILED 納入 WARN（UNKNOWN 不誤報）；MD/console/JSON 加 verify 欄。順手補 L168 `$sg.ok/$eu.ok` null guard（critic 指出的 pre-existing latent StrictMode trap）。
+- `lobster-factory/infra/eu-backup/verify-backup-eu.sh`（+ EU `/root/scripts/`）：L2 假註解改為據實（log verdict + surfaced via check-backup-health.ps1）。
+- runbook §2「接 Telegram」措辭 + §7 checkbox 改為據實（AO-RESUME surface，非 Telegram）。
+
+[驗證結果]（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`check-backup-health.ps1` + induced-failure 單元測試 | exit=0 | 實跑兩台 verify=PASSED、overall PASS；抽取邏輯測 EU/SG FAILED→FAILED、PASSED-last→PASSED、missing→UNKNOWN（不誤報）；PS verdict verify FAILED→**WARN**；放寬 regex 後 verify-backup/-eu/-phase1/-v2 全匹配。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/2n（皆已修：regex `[a-z-]*`→`[a-zA-Z0-9_-]*` 防未來改名靜默；L168 null guard）。critic 實跑 9 fixtures + StrictMode + quote balance + downstream 全驗。CP950 audit clean。
+- BUGHUNT_DONE: scope=scripts,agency-os,runbooks | grep=`VERIFY_RESULT`,`check-backup-health`,`verify_result` | hits: 唯一 consumer ao-resume 只讀 exit code；其餘引用腳本內自洽；無 stale。
+- BUGHUNT_SCOPE_NARROW: N/A（含 scripts+agency-os）。
+
+[剩餘風險] 機制是每日開工 surface（非即時 push）—備份半夜失敗會在你下次 AO-RESUME 才看到（每日備份用每日檢查足夠；即時類走 Netdata/Uptime-Kuma）。
+[rollback] `git revert`（check-backup-health.ps1 一檔邏輯 + 兩處文字 + verify 註解）。warn-only 不碰 prod。
 
 [任務理解] 把上一刀的 Centaur 解讀層接成「可用」:HTTP route + UI 按鈕,讓 4 系統(紫微/八字/卜卦/塔羅)算完盤即可一鍵 AI 解讀。
 
