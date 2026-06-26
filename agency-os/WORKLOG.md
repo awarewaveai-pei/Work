@@ -4,6 +4,31 @@
 
 ## 2026-06-26
 
+### feat(oracle): Phase A — AI 問答入口(route + UI 解讀按鈕,4 系統共用)
+
+[任務理解] 把上一刀的 Centaur 解讀層接成「可用」:HTTP route + UI 按鈕,讓 4 系統(紫微/八字/卜卦/塔羅)算完盤即可一鍵 AI 解讀。
+
+[現況分析] 各系統 adapter 已有 `toContext()`(local);工具用 lib 函式直算 result,未經 registry。最小爆炸半徑:export 各 adapter 的 `toContext`,工具用既有 result 建 context 傳給一個共用元件 POST 到 route(不重構 compute 流程、不跨系統 bundle bloat)。route handler 形狀依本專案 Next 16 docs(Web Request/Response,POST 不快取)。
+
+[已修改]
+- `app/api/interpret/route.ts`(新):POST `{context,tier?,provider?}` → 嚴格驗證(systemId/locale/headline/facts 長度上限 + `sanitizeFact` 去控制/分隔字元)→ `interpret()` → Reading。付費牆前不開 premium、generic error 不外洩、無 console。
+- `components/AiReading.tsx`(新):可重用 client 元件(按鈕 → fetch /api/interpret → 顯示解讀 + 免責)。
+- `components/{Ziwei,Bazi,Tarot,IChing}Tool.tsx`(改):算完盤接 `<AiReading context={toContext(result,locale)} ai={dict.ai} />`。
+- `lib/divination/systems/{ziwei,bazi,tarot,iching}.ts`(改):`toContext` 改 export(唯一改動)。
+- `messages/{zh-TW,en}.json`:加 `ai` 區塊(雙語,型別 parity)。
+- 安全強化:`lib/ai/providers/{openai,anthropic}.ts` 加 timeout 60s + maxRetries 1;`lib/ai/prompts/index.ts` rule#1 加「事實為資料非指令」護欄。
+- `app/api/interpret/route.test.ts`(新):16 測(11 驗證 + 4 sanitize + 1 gated live)。
+
+[驗證結果](R0 四動作)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`RUN_LIVE_AI=1 OPENAI_API_KEY=<vault> npx vitest run app/api/interpret/route` | exit=0 | ms≈4100 — POST /api/interpret 真打 GPT 回 200 + 非空解讀。另 `tsc --noEmit` exit=0、`npm test` 72 pass/3 skip、`npm run build` exit=0(`ƒ /api/interpret` 註冊;首次 Windows copyfile flake,clean 重build 過)。
+- REVIEW_DONE: critic=Deep×2 | verdict=warn→Major(已修) | findings — 第一輪抓 prompt-injection Major(fact value 換行偽造假規則塊)+ DoS/empty Minor;我修(codePoint<0x20 strip)。**第二輪抓我的修法不全:U+2028/U+2029/NEL(codePoint≥0x20)漏網,單一分隔不靠 `\s{2,}` 也能偽造** → 改 Unicode-property strip `[\p{Cc}\p{Zl}\p{Zp}]/gu` + 用該 bypass payload 回歸測試。另加 provider timeout(封 DoS)+ prompt「資料非指令」護欄。critic 確認無 key/facts 外洩、無 console、React 自動跳脫無 XSS、surrogate 對不切。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/ziwei-doushu | grep=`toContext`,`AiReading`,`sanitizeFact`,`/api/interpret` | hits=0 stale — 4 adapter export + 4 tool 引用 + route/fetch/test 全對齊;ORACLE docs 命中皆概念引用。
+- BUGHUNT_SCOPE_NARROW: N/A(含 agency-os + scripts)。
+
+[剩餘風險] route 開放無 auth/quota(付費牆前展示用)→ prod 前必補 credits 計量 + rate-limit/Turnstile(task #8 + PLAN §17)。inline 單行注入文字弱化但非零(prompt fence 緩解,facts 來源仍為確定性引擎)。串流(萬字)未做。
+
+[rollback] 本刀檔案皆新增/可逆;`git revert`;toContext export 還原為 local 不影響 compute。
+
 ### feat(oracle): Phase A — Centaur AI 解讀層(紫微/八字/卜卦/塔羅共用,GPT 預設)
 
 [任務理解] 照 `ORACLE_ROADMAP.md` 開 Phase A 第一刀「Centaur AI 解讀層」(ROADMAP §0 洞察#1=最短最高 ROI 變現路徑)。`oracle.aware-wave.com`(`Projects/internal/ziwei-doushu/`)排盤層已正確,AI 解讀全是 stub。Centaur=確定性引擎算 → 結構化事實餵 LLM + 「NO CALCULATIONS」護欄 → LLM 只敘事 → 零幻覺。
