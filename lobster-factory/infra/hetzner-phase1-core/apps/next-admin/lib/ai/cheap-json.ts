@@ -1,12 +1,15 @@
 import { logAiCall } from "./log-ai-call";
+import Anthropic from "@anthropic-ai/sdk";
+import { isOpenAiTextModel, normalizeAiTextModel, type AiTextModel } from "./text-model-options";
 
-export const CHEAP_JSON_MODEL = "gpt-5.4-nano";
+export const CHEAP_JSON_MODEL: AiTextModel = "gpt-5.4-nano";
 
 interface CheapJsonTextArgs {
   route: string;
   system: string;
   user: string;
   maxTokens: number;
+  model?: string;
   metadata?: Record<string, unknown>;
   tool?: string | null;
 }
@@ -18,7 +21,7 @@ interface OpenAiChatCompletion {
 }
 
 export type CheapJsonTextResult =
-  | { ok: true; raw: string }
+  | { ok: true; raw: string; model: AiTextModel }
   | { ok: false; status: number; error: string };
 
 export function extractJsonArray(raw: string): string | null {
@@ -26,6 +29,12 @@ export function extractJsonArray(raw: string): string | null {
 }
 
 export async function generateCheapJsonText(args: CheapJsonTextArgs): Promise<CheapJsonTextResult> {
+  const model = normalizeAiTextModel(args.model ?? CHEAP_JSON_MODEL);
+  if (!isOpenAiTextModel(model)) return generateAnthropicJsonText({ ...args, model });
+  return generateOpenAiJsonText({ ...args, model });
+}
+
+async function generateOpenAiJsonText(args: CheapJsonTextArgs & { model: AiTextModel }): Promise<CheapJsonTextResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { ok: false, status: 503, error: "OPENAI_API_KEY not configured" };
 
@@ -37,7 +46,7 @@ export async function generateCheapJsonText(args: CheapJsonTextArgs): Promise<Ch
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: CHEAP_JSON_MODEL,
+        model: args.model,
         max_completion_tokens: args.maxTokens,
         messages: [
           { role: "system", content: args.system },
@@ -53,14 +62,45 @@ export async function generateCheapJsonText(args: CheapJsonTextArgs): Promise<Ch
 
     void logAiCall({
       route: args.route,
-      model: json.model ?? CHEAP_JSON_MODEL,
+      model: json.model ?? args.model,
       inputTokens: json.usage?.prompt_tokens ?? 0,
       outputTokens: json.usage?.completion_tokens ?? 0,
       metadata: args.metadata,
       tool: args.tool,
     });
 
-    return { ok: true, raw };
+    return { ok: true, raw, model: args.model };
+  } catch (err) {
+    return { ok: false, status: 502, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+async function generateAnthropicJsonText(args: CheapJsonTextArgs & { model: AiTextModel }): Promise<CheapJsonTextResult> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { ok: false, status: 503, error: "ANTHROPIC_API_KEY not configured" };
+
+  try {
+    const client = new Anthropic({ apiKey });
+    const msg = await client.messages.create({
+      model: args.model,
+      max_tokens: args.maxTokens,
+      system: args.system,
+      messages: [{ role: "user", content: args.user }],
+    });
+    const raw = msg.content
+      .filter((block) => block.type === "text")
+      .map((block) => block.text)
+      .join("");
+
+    void logAiCall({
+      route: args.route,
+      response: msg,
+      fallbackModel: args.model,
+      metadata: args.metadata,
+      tool: args.tool,
+    });
+
+    return { ok: true, raw, model: args.model };
   } catch (err) {
     return { ok: false, status: 502, error: err instanceof Error ? err.message : String(err) };
   }

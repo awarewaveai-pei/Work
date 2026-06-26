@@ -30,6 +30,8 @@ import {
   buildMaskSvg,
   type EdgeMaskId,
 } from "@/lib/studio/edge-mask";
+import { AI_TEXT_MODEL_GROUPS, AI_TEXT_MODELS, type AiTextModel } from "@/lib/ai/text-model-options";
+import { textModelCostLabel, textModelCostSummary } from "@/lib/ai/text-model-pricing";
 
 const PRODUCT_TYPES = [
   { value: "tshirt", label: "T-shirt", aspect: "4:5" as AspectRatio, suffix: "t-shirt graphic design, centered composition, plain background" },
@@ -55,6 +57,7 @@ const TRENDING_CATEGORIES = [
 ];
 
 const TRANSFORM_MODEL: StudioModel = "flux-kontext-dev";
+const DEFAULT_SEARCH_DATA_MODEL: AiTextModel = "gpt-5.4-nano";
 const CULTURE_STORAGE_PREFIX = "studio_culture_v2";
 const TRENDING_STORAGE_KEY = "studio_trending_v2";
 
@@ -336,6 +339,10 @@ export default function StudioWorkbench() {
   const MODEL_GROUPS = Array.from(new Set(STUDIO_MODEL_OPTIONS.map((item) => item.group)));
   const [styleGroup, setStyleGroup] = useState(STYLE_GROUPS[0] ?? "");
   const [modelGroup, setModelGroup] = useState(MODEL_GROUPS[0] ?? "");
+  const [searchDataModel, setSearchDataModel] = useState<AiTextModel>(DEFAULT_SEARCH_DATA_MODEL);
+  const [searchDataModelGroup, setSearchDataModelGroup] = useState(
+    AI_TEXT_MODEL_GROUPS.find((group) => group === "OpenAI") ?? AI_TEXT_MODEL_GROUPS[0],
+  );
 
   // Shared hover-tooltip for all categorized chips (主圖/題材/氛圍/風格). Captured at
   // viewport coords on hover, rendered position:fixed at the component root so it escapes
@@ -412,6 +419,7 @@ export default function StudioWorkbench() {
   const effectivePrompt = promptTouched ? prompt : assembledPrompt;
 
   const activeResult = results[activeIdx] ?? null;
+  const selectedSearchDataModel = AI_TEXT_MODELS.find((model) => model.value === searchDataModel) ?? AI_TEXT_MODELS[0];
 
   const onPickProduct = useCallback((value: string) => {
     setProductType(value);
@@ -453,7 +461,7 @@ export default function StudioWorkbench() {
       const res = await fetch("/api/tools/studio/culture", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ region: regionEn, lens: lensKey }),
+        body: JSON.stringify({ region: regionEn, lens: lensKey, model: searchDataModel }),
       });
       const json = (await res.json()) as { ok: boolean; items?: CultureItem[] };
       const items = coerceCultureItems(json.items);
@@ -463,7 +471,7 @@ export default function StudioWorkbench() {
       }
     } catch { /* keep fallback chips */ }
     setCultureFetching((p) => { const n = { ...p }; delete n[key]; return n; });
-  }, []);
+  }, [searchDataModel]);
 
   // 🎲 文化混搭骰 — random 2 cultures × 1 lens, auto-fetch both → forced serendipity.
   // Math.random is fine here (browser/client code; the no-random rule is for workflow scripts).
@@ -492,7 +500,7 @@ export default function StudioWorkbench() {
         const res = await fetch("/api/tools/studio/trending", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ category: cat.value }),
+          body: JSON.stringify({ category: cat.value, model: searchDataModel }),
         });
         const json = (await res.json()) as { ok: boolean; topics?: string[] };
         const topics = coerceTopics(json.topics);
@@ -504,7 +512,7 @@ export default function StudioWorkbench() {
       storeTrending(nextTopics);
     }
     setTrendingFetching(false);
-  }, []);
+  }, [searchDataModel]);
 
   // On mount: restore the last clicked trend set without any API call.
   useEffect(() => {
@@ -784,6 +792,62 @@ export default function StudioWorkbench() {
             {PRODUCT_TYPES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
         </label>
+
+        <AccordionSection
+          title="🔎 搜尋資料AI模型"
+          summary={selectedSearchDataModel.label}
+        >
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 10 }}>
+            {AI_TEXT_MODEL_GROUPS.map((group) => (
+              <button
+                key={group}
+                type="button"
+                onClick={() => setSearchDataModelGroup(group)}
+                style={tabStyle(searchDataModelGroup === group)}
+              >
+                {group}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {AI_TEXT_MODELS.filter((item) => item.group === searchDataModelGroup).map((item) => {
+              const active = searchDataModel === item.value;
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() => setSearchDataModel(item.value)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    padding: "6px 10px",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    cursor: "pointer",
+                    border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+                    background: active ? "rgba(99,102,241,0.12)" : "rgba(127,127,127,0.04)",
+                    color: active ? "var(--accent)" : "var(--text-primary)",
+                    fontWeight: active ? 600 : 400,
+                    transition: "all 0.15s",
+                  }}
+                >
+                  <span>{active ? "✓ " : ""}{item.label}</span>
+                  <span style={{ fontSize: 10, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                    {textModelCostLabel(item.value)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p style={{ fontSize: 11, opacity: 0.55, marginTop: 6, marginBottom: 0 }}>
+            世界文化與時事靈感共用此模型；只有點擊 AI 靈感或抓取熱搜時才會花文字 token。
+          </p>
+          <p style={{ fontSize: 10, opacity: 0.45, marginTop: 4, marginBottom: 0 }}>
+            {textModelCostSummary(searchDataModel)}
+          </p>
+        </AccordionSection>
 
         {/* 🌍 世界文化 — region × lens, with AI-filled specific items (混搭靈感工具). Moved to FIRST per spec. */}
         <AccordionSection title="🌍 世界文化" summary={region ? (fusionRegion ? `${region.zh}×${fusionRegion.zh}` : region.zh) : (cultureChips.length ? `${cultureChips.length} 元素` : "未選")}>

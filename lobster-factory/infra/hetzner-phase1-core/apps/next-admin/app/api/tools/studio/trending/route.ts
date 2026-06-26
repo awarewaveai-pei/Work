@@ -23,9 +23,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });
   }
 
-  let body: { category?: string };
+  let body: { category?: string; model?: string };
   try {
-    body = (await req.json()) as { category?: string };
+    body = (await req.json()) as { category?: string; model?: string };
   } catch {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
@@ -46,6 +46,7 @@ No markdown, no explanation, no extra text - just the raw JSON array.`;
       system: systemPrompt,
       user: userPrompt,
       maxTokens: 400,
+      model: body.model,
       metadata: { category: cat },
       tool: "studio",
     });
@@ -74,7 +75,7 @@ No markdown, no explanation, no extra text - just the raw JSON array.`;
     }
 
     const safe = topics.filter((t): t is string => typeof t === "string").slice(0, 10);
-    return NextResponse.json({ ok: true, topics: safe });
+    return NextResponse.json({ ok: true, topics: safe, model: result.model });
   } catch (err) {
     return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
