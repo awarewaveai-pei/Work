@@ -54,7 +54,12 @@
     "bodyBadge": "身",
     "trueSolarCorrection": "真太陽時校正",
     "trueSolarOff": "未啟用真太陽時校正",
-    "minutesUnit": "分"
+    "minutesUnit": "分",
+    "transit": "今日運限",
+    "decadal": "大限",
+    "yearly": "流年",
+    "monthly": "流月",
+    "daily": "流日"
   },
   "bazi": {
     "title": "八字四柱排盤",

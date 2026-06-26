@@ -83,6 +83,16 @@ export const DEFAULT_SECTIONS: NavSection[] = [
     ],
   },
   {
+    id: 'customer-service',
+    label: 'Customer Service',
+    items: [
+      { type: 'link',     href: '/ops/cs', icon: '💬', label: '客服總覽', title: 'AI 客服營運中心：知識庫 / 意圖 / 成效 / kill-switch' },
+      { type: 'disabled', icon: '📚', label: '知識庫（soon）' },
+      { type: 'disabled', icon: '🎚', label: '意圖與分級（soon）' },
+      { type: 'disabled', icon: '🧪', label: 'Eval / 模擬（soon）' },
+    ],
+  },
+  {
     id: 'system',
     label: 'System',
     items: [

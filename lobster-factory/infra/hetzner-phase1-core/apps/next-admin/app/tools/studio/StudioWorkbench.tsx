@@ -953,24 +953,33 @@ export default function StudioWorkbench() {
             })}
           </div>
 
-          {/* 鏡頭 lens tabs */}
+          {/* 鏡頭 lens tabs（一般文化模式）/ 地圖主題 tabs（地圖模式）*/}
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
-            {CULTURE_LENSES.map((l) => (
-              <button key={l.key} type="button" onClick={() => setCultureLens(l.key)} style={tabStyle(cultureLens === l.key)}>
-                {l.emoji} {l.zh}
-              </button>
-            ))}
+            {mapMode
+              ? MAP_THEMES.map((t) => (
+                  <button key={t.key} type="button" onClick={() => setMapTheme(t.key)} style={tabStyle(mapTheme === t.key)}>
+                    {t.emoji} {t.zh}
+                  </button>
+                ))
+              : CULTURE_LENSES.map((l) => (
+                  <button key={l.key} type="button" onClick={() => setCultureLens(l.key)} style={tabStyle(cultureLens === l.key)}>
+                    {l.emoji} {l.zh}
+                  </button>
+                ))}
           </div>
 
-          {/* AI 動態填充 + chips（動態具體項在前，靜態 fallback 在後，多選） */}
+          {/* AI 動態填充 + chips（動態具體項在前，靜態 fallback 在後，多選）。
+              facet = 地圖模式用 map theme，否則用文化鏡頭；兩者共用 region.en|key 快取。 */}
           {(() => {
-            const lens = CULTURE_LENSES.find((l) => l.key === cultureLens) ?? CULTURE_LENSES[0];
-            const dynKey = region ? `${region.en}|${cultureLens}` : "";
+            const facet = mapMode
+              ? (MAP_THEMES.find((t) => t.key === mapTheme) ?? MAP_THEMES[0]!)
+              : (CULTURE_LENSES.find((l) => l.key === cultureLens) ?? CULTURE_LENSES[0]!);
+            const dynKey = region ? `${region.en}|${facet.key}` : "";
             const dyn = dynKey ? cultureDyn[dynKey] : undefined;
             const fetching = dynKey ? !!cultureFetching[dynKey] : false;
             const seen = new Set<string>();
             const chips: CultureItem[] = [];
-            for (const it of [...(dyn ?? []), ...lens.fallback]) {
+            for (const it of [...(dyn ?? []), ...facet.fallback]) {
               if (seen.has(it.en)) continue;
               seen.add(it.en); chips.push(it);
             }
@@ -978,9 +987,9 @@ export default function StudioWorkbench() {
               <>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                   <button type="button" disabled={!region || fetching}
-                    onClick={() => { if (region) void fetchCulture(region.en, cultureLens); }}
+                    onClick={() => { if (region) void fetchCulture(region.en, facet.key); }}
                     style={actionPill(!region || fetching)}>
-                    {fetching ? "AI 思考中…" : `✨ AI 靈感（${region ? region.zh : "先選地域"}・${lens.zh}）`}
+                    {fetching ? "AI 思考中…" : `✨ AI 靈感（${region ? region.zh : "先選地域"}・${facet.zh}）`}
                   </button>
                   {dyn && <span style={{ fontSize: 10, opacity: 0.45 }}>AI 已填 {dyn.length} 項</span>}
                 </div>
@@ -1002,13 +1011,13 @@ export default function StudioWorkbench() {
             );
           })()}
 
-          {/* 🗺️ 靈感地圖 — AI 項目以圖釘散佈在地域板上，點釘填入 prompt（golden-angle 散佈，無依賴） */}
-          {showMap && region && (() => {
-            const lens = CULTURE_LENSES.find((l) => l.key === cultureLens) ?? CULTURE_LENSES[0]!;
-            const dyn = cultureDyn[`${region.en}|${cultureLens}`];
+          {/* 🗺️ 地圖預覽 — AI 項目以圖釘散佈，點釘＝放上地圖（同時填入 prompt）；golden-angle 散佈，無依賴 */}
+          {mapMode && region && (() => {
+            const mt = MAP_THEMES.find((t) => t.key === mapTheme) ?? MAP_THEMES[0]!;
+            const dyn = cultureDyn[`${region.en}|${mapTheme}`];
             const seen = new Set<string>();
             const items: CultureItem[] = [];
-            for (const it of [...(dyn ?? []), ...lens.fallback]) {
+            for (const it of [...(dyn ?? []), ...mt.fallback]) {
               if (seen.has(it.en)) continue;
               seen.add(it.en); items.push(it);
             }
@@ -1018,7 +1027,7 @@ export default function StudioWorkbench() {
             return (
               <div style={{ marginTop: 10, position: "relative", height: 220, borderRadius: 12, border: "1px solid var(--border)", background: "radial-gradient(circle at 32% 30%, rgba(99,102,241,0.12), rgba(127,127,127,0.04) 70%)", overflow: "hidden" }}>
                 <div style={{ position: "absolute", top: 8, left: 10, fontSize: 12, fontWeight: 700, color: "var(--accent)", letterSpacing: 0.5 }}>
-                  🗺️ {region.zh}{fusionRegion ? ` × ${fusionRegion.zh}` : ""} · {lens.emoji}{lens.zh}
+                  🗺️ {region.zh}{fusionRegion ? ` × ${fusionRegion.zh}` : ""} · {mt.emoji}{mt.zh}
                 </div>
                 {shown.map((it, i) => {
                   const ang = i * GOLDEN;
@@ -1033,7 +1042,7 @@ export default function StudioWorkbench() {
                     </button>
                   );
                 })}
-                <div style={{ position: "absolute", bottom: 6, right: 10, fontSize: 10, opacity: 0.4 }}>點圖釘填入 prompt</div>
+                <div style={{ position: "absolute", bottom: 6, right: 10, fontSize: 10, opacity: 0.4 }}>點圖釘＝放上地圖</div>
               </div>
             );
           })()}

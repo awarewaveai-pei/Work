@@ -54,7 +54,12 @@
     "bodyBadge": "B",
     "trueSolarCorrection": "True solar time correction",
     "trueSolarOff": "True solar time correction off",
-    "minutesUnit": "min"
+    "minutesUnit": "min",
+    "transit": "Transits (today)",
+    "decadal": "Decade",
+    "yearly": "Year",
+    "monthly": "Month",
+    "daily": "Day"
   },
   "bazi": {
     "title": "BaZi Four Pillars",

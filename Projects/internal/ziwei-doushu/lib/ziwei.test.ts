@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { computeChart } from './ziwei';
+import { computeChart, computeHoroscope, formatMutagen } from './ziwei';
+import { toContext } from './divination/systems/ziwei';
 
 /**
  * 排盤正確性回歸錨點 (PLAN §20)。
@@ -34,5 +35,60 @@ describe('computeChart — 紫微排盤回歸', () => {
 
   it('寅時 04:00 → timeIndex 2', () => {
     expect(result.timeIndex).toBe(2);
+  });
+});
+
+describe('computeHoroscope — 過運四化', () => {
+  const result = computeChart({
+    year: 2000, month: 8, day: 16, hour: 4, minute: 0,
+    gender: '女', calendar: 'solar',
+  });
+
+  it('流年四化只取決於流年天干:2026 = 丙年 → 同機昌廉', () => {
+    const h = computeHoroscope(result.astrolabe, '2026-06-26');
+    expect(h.yearly.heavenlyStem).toBe('丙');
+    // 丙干四化:天同(祿)天機(權)文昌(科)廉貞(忌)
+    expect(h.yearly.mutagenStars).toEqual(['天同', '天機', '文昌', '廉貞']);
+    expect(h.date).toBe('2026-06-26');
+  });
+
+  it('五個運限層皆有四化飛星', () => {
+    const h = computeHoroscope(result.astrolabe, '2026-06-26');
+    for (const scope of [h.decadal, h.yearly, h.monthly, h.daily, h.hourly]) {
+      expect(scope.mutagenStars.length).toBe(4);
+    }
+  });
+});
+
+describe('formatMutagen', () => {
+  it('依序組成「X化祿、X化權…」', () => {
+    expect(formatMutagen(['天同', '天機', '文昌', '廉貞'])).toBe(
+      '天同化祿、天機化權、文昌化科、廉貞化忌',
+    );
+  });
+});
+
+describe('紫微 toContext 強化(廟旺 + 四化 + 過運)', () => {
+  const result = computeChart({
+    year: 2000, month: 8, day: 16, hour: 4, minute: 0,
+    gender: '女', calendar: 'solar',
+  });
+
+  it('各宮主星 fact 帶廟旺括號', () => {
+    const ctx = toContext(result, 'zh-TW');
+    const ming = ctx.facts.find((f) => f.label === 'palace:命宮');
+    expect(ming?.value).toMatch(/[（(].+[)）]/); // 含廟旺括號
+  });
+
+  it('傳入 horoscope 時加入大限 / 流年 facts', () => {
+    const h = computeHoroscope(result.astrolabe, '2026-06-26');
+    const ctx = toContext(result, 'zh-TW', h);
+    expect(ctx.facts.find((f) => f.label === 'yearly')?.value).toContain('丙年');
+    expect(ctx.facts.some((f) => f.label === 'decadal')).toBe(true);
+  });
+
+  it('不傳 horoscope 時不含過運 facts(compute 預設不帶,維持確定性)', () => {
+    const ctx = toContext(result, 'zh-TW');
+    expect(ctx.facts.some((f) => f.label === 'yearly')).toBe(false);
   });
 });
