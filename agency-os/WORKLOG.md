@@ -4,7 +4,22 @@
 
 ## 2026-06-26
 
-### feat(oracle): Phase A — 付費牆 / credits 邏輯層(DB seam, ready-to-apply)
+### fix(doc-integrity): validator 治本 — 不再把 prose-in-parens 當 broken link
+
+[任務理解] `[驗證結果](R0 四動作)` 類 ASCII-括號 prose 反覆被 `validate-doc-integrity.mjs` 當相對路徑連結 → broken_link → health critical gate fail。治標(改全形)每 session 被平行 checkpoint 還原，recurring。治本改 validator。
+
+[現況分析] `resolveLink()` 對任何 `[x](y)` 的 y 都當路徑解析，沒判斷「像不像路徑」。`R0 四動作`(含空格/中文、無 `/` 無副檔名)被 join 成相對路徑 → 不存在 → 誤報。注意 repo 有 CJK 檔名（`runbooks/自動排程...維護手冊.md`），不能粗暴跳過非 ASCII。
+
+[已修改] `lobster-factory/scripts/validate-doc-integrity.mjs` `resolveLink()` 加：`looksLikePath = href 含 "/" 或符合 /\.[a-zA-Z0-9]{1,8}$/(副檔名)`；不像路徑就跳過。CJK 檔名走副檔名判斷仍會驗。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --check` + 隔離邏輯測 + 端到端回歸 | exit=0 | 隔離 8/8（`R0 四動作`/`根因案例`/`README` 跳過；`./foo.md`/`dir/sub`/CJK 檔名 `自動排程...維護手冊.md` 仍驗）；端到端（測試檔放掃描根 lobster-factory）：`[prose](R0 四動作)` 不報、`[real broken](./不存在.md)` **照抓 exit 1**、刪檔後 exit 0。→ 誤判消除、真 broken link 偵測不變。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — 最小新增一個正向判斷（looksLikePath），不動既有 URI/anchor 跳過邏輯；端到端證實核心功能不退。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`resolveLink`,`looksLikePath`,`linkRe` | hits: resolveLink 單一定義；無其他複製的 link 解析；既有 RankMath/GEO/data: 跳過邏輯不受影響。
+- BUGHUNT_SCOPE_NARROW: N/A（含 scripts via lobster-factory）。
+
+[剩餘風險] 極罕見「無副檔名、無分隔」的真 broken link（如 `[x](missing-dir)`）會被跳過 — 此 repo 內部連結皆有 `.md`/路徑，可接受。
+[rollback] git revert 單檔。
 
 [任務理解] /api/interpret 原無付費牆(inline ALLOWED_TIERS 擋 premium)。建可測的政策層 + DB seam:邏輯完整、Supabase 接線為 drop-in,不需改政策即可上正式計量。
 
