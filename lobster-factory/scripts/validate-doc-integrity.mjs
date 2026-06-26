@@ -105,6 +105,13 @@ function resolveLink(fromFile, href) {
     return null;
   }
   if (noAnchor.startsWith("//")) return null;
+  // Only treat as a file reference if it LOOKS like a path: has a separator OR a
+  // file extension. Prose accidentally wrapped in ASCII parens after a bracket —
+  // e.g. "[驗證結果](R0 四動作)" — is NOT a file link and must not be resolved as
+  // a relative path (recurring false-positive broken_link, 2026-06-26).
+  // CJK-named files (e.g. "...維護手冊.md") still match via the extension test.
+  const looksLikePath = noAnchor.includes("/") || /\.[a-zA-Z0-9]{1,8}$/.test(noAnchor);
+  if (!looksLikePath) return null;
   const base = path.dirname(fromFile);
   return path.normalize(path.join(base, noAnchor));
 }
