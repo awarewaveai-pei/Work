@@ -1,13 +1,15 @@
+// Ordered cheap → expensive within each group (price = lib/ai/cost-model.ts TEXT_RATES).
+// Labels carry no parenthetical descriptor — pricing is shown separately in the picker UI.
 export const AI_TEXT_MODELS = [
-  { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6（品質平衡）", group: "Claude" },
-  { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5（快速省 token）", group: "Claude" },
-  { value: "claude-opus-4-8", label: "Claude Opus 4.8（高階推理）", group: "Claude" },
-  { value: "claude-fable-5", label: "Claude Fable 5（長任務代理）", group: "Claude" },
-  { value: "gpt-5.5", label: "GPT-5.5（OpenAI 旗艦）", group: "OpenAI" },
-  { value: "gpt-5.4", label: "GPT-5.4（OpenAI 高品質）", group: "OpenAI" },
-  { value: "gpt-5.4-mini", label: "GPT-5.4 mini（OpenAI 平衡）", group: "OpenAI" },
-  { value: "gpt-5.4-nano", label: "GPT-5.4 nano（OpenAI 最便宜）", group: "OpenAI" },
-  { value: "gpt-4o", label: "GPT-4o（OpenAI 通用）", group: "OpenAI" },
+  { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5", group: "Claude" },
+  { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", group: "Claude" },
+  { value: "claude-opus-4-8", label: "Claude Opus 4.8", group: "Claude" },
+  { value: "claude-fable-5", label: "Claude Fable 5", group: "Claude" },
+  { value: "gpt-5.4-nano", label: "GPT-5.4 nano", group: "OpenAI" },
+  { value: "gpt-5.4-mini", label: "GPT-5.4 mini", group: "OpenAI" },
+  { value: "gpt-4o", label: "GPT-4o", group: "OpenAI" },
+  { value: "gpt-5.4", label: "GPT-5.4", group: "OpenAI" },
+  { value: "gpt-5.5", label: "GPT-5.5", group: "OpenAI" },
 ] as const;
 
 export type AiTextModel = (typeof AI_TEXT_MODELS)[number]["value"];
