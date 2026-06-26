@@ -4,12 +4,16 @@
 // helpers (summarize / gradeIntent) are unit-tested; the run* functions spend LLM and need the DB.
 
 import { CS_MODELS } from "@/lib/cs/config";
+import { canaryRoll, decideAnswerAction, topScore } from "@/lib/cs/autonomy";
 import { loadCis } from "@/lib/cs/cis";
-import { loadEvalCases } from "@/lib/cs/db";
+import { loadEvalCases, loadIntents } from "@/lib/cs/db";
 import { generateReply, superviseReply } from "@/lib/cs/generate";
+import { inputGuards } from "@/lib/cs/guardrails";
+import { classifyIntent } from "@/lib/cs/intent";
 import { generateText, parseJsonObject } from "@/lib/cs/llm";
+import { resolveIntent } from "@/lib/cs/orchestrator";
 import { retrieve } from "@/lib/cs/rag";
-import type { CisProfile, EvalCase, EvalCaseResult, EvalSummary, IntentGrade } from "@/lib/cs/types";
+import type { CisProfile, EvalCase, EvalCaseResult, EvalSummary, Intent, IntentGrade } from "@/lib/cs/types";
 
 /** LLM-judge: does the answer cover the expected points (semantically, not verbatim)? */
 export async function judgeCovers(opts: {
@@ -39,35 +43,78 @@ export async function judgeCovers(opts: {
   return { covered: v?.covered === true, reason: v?.reason ?? "judge_parse_failed" };
 }
 
-/** Run one golden case through the engine answer path + judge. */
-export async function runEvalCase(cis: CisProfile, c: EvalCase): Promise<EvalCaseResult> {
+function caseError(c: EvalCase, msg: string): EvalCaseResult {
+  // Engine catches any failure and hands off (orchestrator engine_error). Mirror that here so an
+  // errored case is a handoff, never a silent abort: correct iff the case expected a handoff.
+  return {
+    question: c.question, intentKey: c.intentKey, expectHandoff: c.expectHandoff,
+    didHandoff: true, covered: false, pass: c.expectHandoff, dangerous: false,
+    answer: "", judgeReason: `case_error:${msg.slice(0, 120)}`,
+  };
+}
+
+/**
+ * Run one golden case through the engine's REAL decision path and judge it. The handoff verdict
+ * comes from the production `decideAnswerAction` (all 7 gates: sensitive/red-line, knowledge-gap by
+ * score, not-grounded, low-confidence, L0, + input guards), NOT a re-derived subset — so the eval
+ * cannot be more lenient than production (critic #1/#2).
+ */
+export async function runEvalCase(cis: CisProfile, intents: Intent[], c: EvalCase): Promise<EvalCaseResult> {
   const orgId = cis.organizationId;
-  const chunks = await retrieve(orgId, c.question);
+  try {
+    // 1. Input guards (prompt-injection / sensitive keyword) — orchestrator step 1.
+    const guard = inputGuards(c.question);
+    if (!guard.pass) {
+      return { question: c.question, intentKey: c.intentKey, expectHandoff: c.expectHandoff, didHandoff: true, covered: false, pass: c.expectHandoff, dangerous: false, answer: "", judgeReason: `input_guard:${guard.reason ?? ""}` };
+    }
 
-  let answer = "";
-  let grounded = false;
-  if (chunks.length > 0) {
-    const g = await generateReply({ cis, message: c.question, chunks, memory: [] });
-    answer = g.text;
-    const verdict = await superviseReply({ reply: answer, chunks, organizationId: orgId });
-    grounded = verdict.grounded && verdict.safe;
+    // 2. Classify + resolve intent (same as the engine).
+    const cls = await classifyIntent({ organizationId: orgId, message: c.question, intents });
+    const intent = resolveIntent(intents, cls.intentKey);
+
+    // 3. Retrieve + score.
+    const chunks = await retrieve(orgId, c.question);
+    const retrievalScore = topScore(chunks);
+
+    // 4. Generate + supervise (only when there's knowledge to ground on).
+    let answer = "";
+    let grounded = false;
+    if (chunks.length > 0) {
+      const g = await generateReply({ cis, message: c.question, chunks, memory: [] });
+      answer = g.text;
+      const verdict = await superviseReply({ reply: answer, chunks, organizationId: orgId });
+      grounded = verdict.grounded && verdict.safe;
+    }
+
+    // 5. THE REAL DECISION — same deterministic gate the engine uses.
+    const decision = decideAnswerAction({
+      intent, confidence: cls.confidence, retrievalScore, grounded,
+      messageText: c.question, roll: canaryRoll(c.question),
+    });
+    const didHandoff = decision.action === "handoff";
+
+    // 6. Judge coverage only for answered, non-handoff cases that declared expected points.
+    let covered = false;
+    let judgeReason: string | undefined;
+    if (!c.expectHandoff && !didHandoff) {
+      if (c.expectedPoints.length === 0) {
+        // An answer case with no expected points asserts no quality — never a free pass (critic #3).
+        covered = false;
+        judgeReason = "no_expected_points_for_answer_case";
+      } else {
+        const j = await judgeCovers({ question: c.question, answer, expectedPoints: c.expectedPoints, organizationId: orgId });
+        covered = j.covered;
+        judgeReason = j.reason;
+      }
+    }
+
+    const pass = c.expectHandoff ? didHandoff : !didHandoff && covered;
+    const dangerous = c.expectHandoff && !didHandoff; // answered when it should have deferred to a human
+
+    return { question: c.question, intentKey: c.intentKey, expectHandoff: c.expectHandoff, didHandoff, covered, pass, dangerous, answer, judgeReason: judgeReason ?? decision.handoffReason };
+  } catch (e) {
+    return caseError(c, String(e)); // critic #4 — per-case isolation, errored case = handoff
   }
-
-  // Replicate the engine's deterministic handoff triggers: no knowledge OR supervisor rejects.
-  const didHandoff = chunks.length === 0 || !grounded;
-
-  let covered = false;
-  let judgeReason: string | undefined;
-  if (!c.expectHandoff && !didHandoff) {
-    const j = await judgeCovers({ question: c.question, answer, expectedPoints: c.expectedPoints, organizationId: orgId });
-    covered = j.covered;
-    judgeReason = j.reason;
-  }
-
-  const pass = c.expectHandoff ? didHandoff : !didHandoff && covered;
-  const dangerous = c.expectHandoff && !didHandoff; // answered when it should have deferred to a human
-
-  return { question: c.question, intentKey: c.intentKey, expectHandoff: c.expectHandoff, didHandoff, covered, pass, dangerous, answer, judgeReason };
 }
 
 /** PURE aggregation over case results. */
@@ -88,11 +135,11 @@ export function summarize(results: EvalCaseResult[]): Omit<EvalSummary, "organiz
 
 /** Run the full golden set for a tenant (optionally one intent). Sequential = bounded LLM spend. */
 export async function runEval(organizationId: string, intentKey?: string): Promise<EvalSummary> {
-  const cis = await loadCis(organizationId);
+  const [cis, intents] = await Promise.all([loadCis(organizationId), loadIntents(organizationId)]);
   const cases = await loadEvalCases(organizationId, intentKey);
   const results: EvalCaseResult[] = [];
   for (const c of cases) {
-    results.push(await runEvalCase(cis, c));
+    results.push(await runEvalCase(cis, intents, c));
   }
   return { organizationId, intentKey, ...summarize(results) };
 }

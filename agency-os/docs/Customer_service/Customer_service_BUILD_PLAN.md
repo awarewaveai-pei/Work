@@ -67,7 +67,7 @@ per-client hub  /ops/clients/[slug]   （既有 7 tab：內容工具/整合/佈�
 | **U2** | **CIS 配置 + tab**（brandKit+csVoice JSONB + 「品牌識別」tab，重用 brandColors/BrandVoiceProfile）| 💻 next-admin UI | — | P1 | ✅ **建好+驗證**（tab+cis route；tsc 0 / critic 0C0M）|
 | **U3** | **客服 tab + 頂層「客服」section**（per-client config + 跨客戶營運中心）| 💻 next-admin UI | U0,U1 | P1–P2 | ✅ **建好+驗證**（tab+cs-config route+/ops/cs+sidebar；tsc 0 / critic 1C 修；kill-switch 接進 engine）|
 | **U4** | **headless widget**（Client API+WS+清新自然+互動類型）| 💻 next-admin embed | U1,U6 | P1 | ⏳ |
-| **U5** | **eval/護欄 harness**（RAGAS+DeepEval+Phoenix+golden set+CI gate+simulation）| 💻 自架現有機 | U1 | P2 | ⏳ |
+| **U5** | **eval/護欄 harness**（golden set runner + LLM-judge + 畢業 gate）| 💻 自架現有機 | U1 | P2 | ✅ **建好+驗證**（lib/cs/eval+route+7 測；tsc 0/vitest 42；critic 2C 修：跑真實 decideAnswerAction）|
 | **U6** | **Chatwoot 載體**（docker-compose Community + healthcheck/smoke/rollback）| 📦 EU 現可緊跑/本機測 → **搬大機** | — | P1 | ⛔（deploy gated）|
 
 **U1 cs-engine 子任務**（建時細分，仿 Cold Outreach T1–T12）：
@@ -123,6 +123,13 @@ per-client hub  /ops/clients/[slug]   （既有 7 tab：內容工具/整合/佈�
 - **REVIEW**：critic → **1 Critical**（kill-switch inert：UI/API 寫 csEnabled 但 engine 沒讀 → 切了沒用）+ 1 Major（型別未綁）+ 2 Minor → **全修**：kill-switch 接進 `orchestrator.handleInbound`（step 2 後、LLM spend 前 `cis.csEnabled===false → makeHandoff("tenant_killswitch")`）+ `loadCis` 回傳 csEnabled + `CisProfile`/`ClientConfig` 加型別 + `HandoffReason` 加 `tenant_killswitch` + loadCounts 查詢失敗回 null + setCsEnabled 用 server echo。`- REVIEW_DONE: critic=Deep | verdict=pass(修後) | findings=1c/1m/2minor 全修`
 - **BUGHUNT**：`csEnabled` 從 0 consumer → 6 檔（types/cis/orchestrator/route/cs-config/ClientHubTabs）；客服 tab wired；/ops/cs 連結 + sidebar section 無 404（critic 驗）。`- BUGHUNT_DONE: scope=lobster-factory | grep=csEnabled | hits=6檔一致`
 - 待 hardening：`handleInbound` 整合測試（mock loadCis 驗 kill-switch 觸發）。
+
+**2026-06-26 — U5 eval/護欄 harness ✅**
+- 建：`lib/cs/eval.ts`（judgeCovers LLM-judge + runEvalCase + summarize/gradeIntent 純函式 + runEval）+ `db.loadEvalCases` + `app/api/ops/cs/eval/route.ts`（POST，operator+ gated，只回 metrics 不回答案=防 PII）+ types(EvalCase/Result/Summary/IntentGrade) + `cs-eval.test.ts`（7 測）。畢業 gate：n≥30 / passRate≥0.95 / **危險誤答=0（零容忍）** / handoffRecall=1。
+- **REALTEST**：`tsc` 0；vitest **42/42**（+7 eval 純邏輯）；**live prod 驗** cs_eval_cases 5 欄 SELECT 對得上 schema。`- REALTEST_EVIDENCE: tool=SSH | cmd=tsc 0 + vitest 42 + psql validate eval cols vs EU prod | exit=0`
+- **REVIEW**：critic → **2 Critical**（eval 重寫 lossy 子集，只複製 7 個 handoff 觸發的 2 個 → 可放行 prod 不安全意圖）+ 2 Major + 3 Minor → **修**：runEvalCase 改呼叫**真實 `decideAnswerAction`**（input guards→classify→resolveIntent→retrieve→supervise→真實 7-gate 決策；export orchestrator.resolveIntent 重用）+ 空 expectedPoints 答題不免費過 + per-case try/catch（errored=handoff）+ 逐意圖才評級。#6/#7 文件記（golden set 須含 handoff 案例；大集移背景 job）。`- REVIEW_DONE: critic=Deep | verdict=pass(修後) | findings=2c/2m/3minor`
+- **BUGHUNT**：resolveIntent 1 export/1 import；decideAnswerAction 真實 gate 接上；runEval/gradeIntent 導出+route 用。`- BUGHUNT_DONE: scope=lobster-factory | grep=decideAnswerAction|resolveIntent | hits=一致`
+- 待 hardening：runEvalCase 整合測試（mock DB/LLM）；eval 移 Trigger.dev 背景 job（n≥30 sequential 恐逾 maxDuration）。
 
 ---
 

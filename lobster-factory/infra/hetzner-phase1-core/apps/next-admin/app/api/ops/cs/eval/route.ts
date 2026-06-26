@@ -36,7 +36,9 @@ export async function POST(request: Request) {
   if (error || !org) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
 
   const summary = await runEval(org.id as string, intentKey);
-  const grade = gradeIntent(summary);
+  // Graduation is per-intent (plan §5.2) — only grade when a single intent was evaluated; a
+  // whole-tenant run blends heterogeneous intents and must not yield one L1→L2 verdict.
+  const grade = intentKey ? gradeIntent(summary) : null;
 
   // Don't echo full answers/questions (may contain PII) — return metrics + verdict only.
   return NextResponse.json({
@@ -48,5 +50,6 @@ export async function POST(request: Request) {
     dangerousErrorRate: Number(summary.dangerousErrorRate.toFixed(4)),
     handoffRecall: Number(summary.handoffRecall.toFixed(4)),
     grade,
+    note: intentKey ? undefined : "whole-tenant run — pass intentKey to get an L1→L2 graduation verdict",
   });
 }

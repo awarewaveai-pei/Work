@@ -32,7 +32,7 @@ function defaultIntent(key: string): Intent {
   };
 }
 
-function resolveIntent(intents: Intent[], key: string): Intent {
+export function resolveIntent(intents: Intent[], key: string): Intent {
   return intents.find((i) => i.key === key) ?? defaultIntent(key);
 }
 
