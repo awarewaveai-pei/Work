@@ -1,0 +1,143 @@
+# EU 自架 Stack — 備份 / RAID / 災難還原 Runbook（上 Dedicated 主機的安全前提）
+
+> **這份文件是什麼**：EU VPS（`204.168.175.41`，跑 Supabase + Trigger + n8n + Postiz + MainWP + Uptime Kuma）
+> 若要從 Hetzner **Cloud** 搬到便宜很多的 **Dedicated auction（Serverbörse）** 二手實體機，會失去 Cloud 的「硬體壞自動遷移」。
+> 本 runbook = **讓 dedicated 變安全的前提層**：要備份什麼、備到哪、RAID 怎麼設、硬體壞了怎麼還原、Cloud→Dedicated 怎麼搬。
+>
+> **何時讀**：① 評估要不要上 dedicated 時（看 §0 決策 + §7 checklist）② 真的要搬時（照 §5）③ 硬體故障還原時（直接跳 §4）。
+>
+> **狀態**：框架草稿（2026-06-26 建）。確切指令在「真的要做」時於各節 `TODO:` 處補齊並實測；現階段供決策評估用。
+> **相關**：[`VPS-AUTO-REBOOT-RUNBOOK.md`](VPS-AUTO-REBOOT-RUNBOOK.md)、[`HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md`](HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md)、`agency-os/AGENTS.md §AwareWave Stack`。
+
+---
+
+## §0 決策背景：為什麼需要這一層
+
+| | Hetzner Cloud（現況） | Hetzner Dedicated auction |
+|---|---|---|
+| 硬體壞 | 自動遷移到健康硬體、幾乎無感 | **你的機器躺平，等技師換料（幾小時），無自動 failover** |
+| 磁碟 | 單碟即可（底層有冗餘） | **必須自己做 RAID 1**，否則一碟壞全毀 |
+| Snapshot | 一鍵 | **無**，要自己搭備份 |
+| RAM 單價 | 漲價後貴 | **便宜 4–8 倍** |
+
+**結論**：dedicated 用錢換不到的「自動容錯」，要用**備份 + RAID + 演練過的還原**補回來。這三件沒做好之前，**不要把客戶生產資料搬上 dedicated**。
+
+---
+
+## §1 要備份什麼（EU 實際盤點，2026-06-26）
+
+> 原則：**資料庫用邏輯 dump（pg_dump / mysqldump）**，不是直接複製 data 目錄（live copy 會不一致）。檔案類用 volume / 目錄快照。
+
+### 🔴 CRITICAL — 丟了無法重建（客戶資料 / 密鑰）
+| 項目 | 位置 | 備份方式 |
+|------|------|---------|
+| Supabase Postgres（客戶/業務主資料） | container `supabase-db`（data 在 `/root/supabase/volumes/`） | `pg_dumpall` 邏輯 dump |
+| Trigger Postgres（run 紀錄/排程/狀態） | container `trigger-postgres`，vol `trigger_trigger_pg_data` | `pg_dumpall` |
+| 全部 `.env`（密鑰 SSOT） | `/root/{supabase,trigger,mainwp,postiz}/.env` | 加密複製（含在 §2 備份集）|
+| MainWP DB（child site 連線/token） | container `mainwp-db`，vol `mainwp_mainwp_db` | `mysqldump` |
+| n8n 資料（workflow + 憑證） | vol `n8n_n8n_data`（含 SQLite/設定）| volume 快照 + n8n export |
+
+### 🟡 IMPORTANT — 丟了會痛但可重建
+| 項目 | 位置 | 備份方式 |
+|------|------|---------|
+| Supabase Storage（上傳檔） | vol `supabase_storage-data` | volume 快照 |
+| Trigger MinIO（packets/物件） | vol `trigger_trigger_minio_data` | volume 快照 |
+| Trigger ClickHouse（run analytics） | vol `trigger_trigger_clickhouse_data` | `clickhouse-backup` 或可接受重建 |
+| Postiz（排程貼文/上傳） | vol `postiz_postiz_uploads` + container `postiz`（DB 在 Supabase？待確認 `TODO`）| volume + DB dump |
+| MainWP files | vol `mainwp_mainwp_files` | volume 快照 |
+| Uptime Kuma（監控設定/歷史） | vol `uptime-kuma` | volume 快照 |
+| compose / 設定 | `/root/{各 stack}/docker-compose.yml` + 子目錄 | 目錄複製（多數已在 `Work` repo） |
+
+### 🟢 可丟棄（cache，不必備）
+`trigger_trigger_redis_data`、`postiz-redis`、`supabase_deno-cache`、`trigger_trigger_shared`（runtime 暫存）。
+
+> **既有資產（不要重造）**：EU 已有 `/root/db-backups/`、`/root/backups/`、`/root/scripts/`（backup-eu routine，產出 `agency-os/reports/status/backup-health-LATEST`）。
+> **第一步是讀懂現有 backup 腳本涵蓋了上表哪些**，缺的才補 —不是從零寫一套。`TODO:` 盤點 `/root/scripts/backup-*.sh` 實際 dump 範圍。
+
+---
+
+## §2 備份策略（3-2-1）
+
+> **3-2-1 rule（業界備份基準）**：**3** 份資料、**2** 種媒介、**1** 份異地離線。
+
+| 層 | 做法 | 頻率 | 保留 |
+|----|------|------|------|
+| 本機 dump | DB 邏輯 dump → `/root/db-backups/`（已有，擴充涵蓋全 🔴）| 每日 | 7 天 |
+| 異地 | 推到 **Hetzner Storage Box**（`BX` 系列，便宜、SFTP/borg）| 每日 | 30 天 |
+| 離線/跨供應商 | 每週一份打到第二地點（如 Backblaze B2 / 另一機）| 每週 | 8 週 |
+
+- **工具建議**：`restic` 或 `borgbackup`（去重 + 加密 + 增量；業界 backup CLI 標準）→ repo 放 Storage Box。`.env` 必須**加密後**才離機（含密鑰）。
+- **自動化**：cron + 失敗告警接現有 Telegram alert 管線（見 `runbooks/ADD-PERIODIC-HEALTH-CHECK.md` 的 codified pattern；零記憶負擔 = 失敗自己會叫）。
+- `TODO:` 確認 Storage Box 已開 / 帳號；寫 `backup-eu-offsite.sh` + cron + 告警。
+
+---
+
+## §3 RAID 設定（dedicated 開機時，**搬之前先做**）
+
+> Cloud 現況是**單碟無 RAID**（`sda` 152.6G 一顆）。dedicated 必須改用雙碟 **RAID 1（mirror，一碟壞另一碟頂著）**。
+
+1. 挑 auction listing：**雙碟 + NVMe/SSD**（避免 SATA HDD，Postgres/ClickHouse I/O 會慘）。
+2. Hetzner **rescue 系統** → `installimage` 安裝 OS 時選 **RAID 1**（`mdadm`，軟體 RAID）。
+3. 開機後 `cat /proc/mdstat` 確認 `[UU]`（兩碟都在）。
+4. **二手碟先驗健康**：`smartctl -a /dev/nvme0` / `/dev/sda`，看 `Power_On_Hours`、`Reallocated_Sector`、`Wear_Leveling`。數據差的 listing 直接換一台。
+5. 設 `mdadm` 故障 email/告警 → 接 Telegram。
+- `TODO:` RAID 重建（換碟後 resync）步驟細節在實機時補。
+
+---
+
+## §4 災難還原 Runbook（硬體壞 → 復原）
+
+> 觸發：dedicated 整機掛 / 一碟壞 / 資料毀損。**目標 RTO（復原時間目標）、RPO（可接受資料遺失窗口）先定**：建議 RPO ≤ 24h（每日備份）、RTO ≤ 數小時。
+
+**單碟壞（RAID 1 救援）**：機器還活著 → Hetzner 換碟 → `mdadm --add` 重建 mirror → 不需動資料。（這就是 RAID 的價值。）
+
+**整機壞 / 需重建**：
+1. Hetzner 開新 dedicated（或修好原機）→ §3 裝 OS + RAID。
+2. `git clone` `Work` repo → 拿回所有 compose / scripts。
+3. 從 Storage Box 拉最新備份集（restic restore）。
+4. 還原密鑰：解密 `.env` 放回 `/root/{stack}/`。
+5. 還原 DB：`psql < supabase_dump.sql`、`trigger` 同理、`mysql < mainwp_dump.sql`。
+6. 還原 volumes：storage / minio / n8n / uptime-kuma。
+7. `docker compose up -d`（各 stack）→ 等 healthy。
+8. **驗證**：Supabase 登入 + 客戶資料在、Trigger 排程在（`TaskSchedule`）、MainWP 連得到 child、app.aware-wave 能佈建。
+9. DNS：若換 IP → 更新 Cloudflare A record（`TODO:` 列出所有指向 EU 的 record）。
+- `TODO:` 每步補確切指令 + 預期輸出（實機演練時定稿）。
+
+---
+
+## §5 Cloud → Dedicated 遷移 Runbook（一次性，有停機）
+
+> **這是個專案不是點一下。** 風險 High（客戶資料搬移）。排低流量時段 + 全程可回滾（原 Cloud 機保留到驗證完才退）。
+
+1. **前置**：§2 備份全綠 + §3 dedicated（RAID + SMART 過）就緒 + §4 還原已**演練過一次**。
+2. 凍結寫入（短維護窗）：停對外入口，避免遷移中產生新資料。
+3. 取最終一致 dump（所有 🔴🟡）。
+4. 在 dedicated 還原（照 §4 step 2–7）。
+5. 切 DNS → dedicated IP，TTL 先調短。
+6. **平行驗證**：兩機都在，逐項對比（資料筆數、登入、佈建、監控）。
+7. 觀察 24–48h 無誤 → 退掉 Cloud 機。
+- **回滾**：任何驗證失敗 → DNS 切回 Cloud（原機未退），零資料遺失。
+
+---
+
+## §6 演練（沒演練過的備份 = 沒有備份）
+
+- **每季**一次：拿最新備份在**臨時機**跑一次 §4 還原，計時 RTO，確認資料完整。演練結果寫 WORKLOG。
+- 演練才會抓出「dump 漏了某張表 / .env 沒進備份集 / volume 沒涵蓋」這類致命缺口。
+
+---
+
+## §7 上 Dedicated 前 Checklist（全綠才搬）
+
+- [ ] 讀懂現有 `/root/scripts/backup-*.sh` 涵蓋範圍，補齊 §1 全部 🔴
+- [ ] Storage Box 開好，每日異地備份自動跑 + 失敗告警
+- [ ] 備份集含**加密後**的 `.env`
+- [ ] 至少**演練還原成功一次**（§6），RTO/RPO 達標
+- [ ] auction 機：雙碟 NVMe + RAID 1 + SMART 健康 + mdadm 告警
+- [ ] §4 / §5 的 `TODO:` 指令全部補齊並實測
+- [ ] 所有指向 EU 的 Cloudflare DNS record 清單列出
+- [ ] 原 Cloud 機保留至遷移驗證完成
+
+---
+
+_建立 2026-06-26。維護者：AwareWave。新增/修訂後若納入 runbook 路由，更新 `agency-os/AGENTS.md §問題症狀→Runbook 路由表`。_
