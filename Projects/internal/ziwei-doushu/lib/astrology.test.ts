@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   julianDay,
   signIndexOf,
+  houseOf,
   computeWesternChart,
 } from './astrology';
 import { astrologyContext, signName } from './astrologyView';
@@ -42,6 +43,19 @@ describe('computeWesternChart — XALEN(對 J2000 已知值驗證)', () => {
     expect(chart.ascendant.signIndex).toBeLessThan(12);
   });
 
+  it('MC 在摩羯(弧度→度 單位修正回歸;mc≈279.6°)', () => {
+    // 回歸 critic 2026-06-26:housesJson 回弧度、行星回度;未轉換時 MC 誤判為牡羊(0)。
+    expect(chart.mc.longitude).toBeCloseTo(279.6, 0);
+    expect(chart.mc.signIndex).toBe(9); // 摩羯
+  });
+
+  it('行星不塌成同一宮(宮頭單位正確)+ 太陽合 MC 落第 10 宮', () => {
+    const distinctHouses = new Set(chart.planets.map((p) => p.house)).size;
+    expect(distinctHouses).toBeGreaterThan(1); // bug 時全塌成單一宮
+    const sun = chart.planets.find((p) => p.body === 'sun')!;
+    expect(sun.house).toBe(10); // 太陽 280.37° 緊接 MC(第 10 宮頭)
+  });
+
   it('每顆星落入 1–12 宮、星座 0–11', () => {
     for (const p of chart.planets) {
       expect(p.house).toBeGreaterThanOrEqual(1);
@@ -49,6 +63,15 @@ describe('computeWesternChart — XALEN(對 J2000 已知值驗證)', () => {
       expect(p.signIndex).toBeGreaterThanOrEqual(0);
       expect(p.signIndex).toBeLessThan(12);
     }
+  });
+
+  it('houseOf 處理跨 0° 環繞的宮(度)', () => {
+    // 第 12 宮頭 350°,第 1 宮頭 20°(跨 0°);5° 應落第 12 宮
+    const cusps = [20, 50, 80, 110, 140, 170, 200, 230, 260, 290, 320, 350];
+    expect(houseOf(5, cusps)).toBe(12); // 跨 0° 的第 12 宮(350°→20°)
+    expect(houseOf(355, cusps)).toBe(12);
+    expect(houseOf(25, cusps)).toBe(1);
+    expect(houseOf(295, cusps)).toBe(10);
   });
 
   it('astrologyContext → systemId=astrology + 三巨頭 headline + 行星 facts', () => {

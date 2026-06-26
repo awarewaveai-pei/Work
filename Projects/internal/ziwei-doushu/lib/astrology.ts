@@ -53,6 +53,8 @@ export interface WesternChart {
   /** 12 宮頭黃道度 */
   houseCusps: number[];
   planets: WesternPlanet[];
+  /** 高緯(|lat|≳66.5°)Placidus 退化,XALEN 改用替代宮位制 */
+  fallbackHouses: boolean;
 }
 
 export interface WesternRequest {
@@ -97,8 +99,8 @@ export function signIndexOf(longitude: number): number {
   return Math.floor((((longitude % 360) + 360) % 360) / 30);
 }
 
-/** 行星黃道經度落在哪一宮(Placidus 宮頭不等分,需逐宮判斷含跨 0° 環繞)。 */
-function houseOf(longitude: number, cusps: number[]): number {
+/** 行星黃道經度落在哪一宮(Placidus 宮頭不等分,需逐宮判斷含跨 0° 環繞)。cusps 須為「度」。 */
+export function houseOf(longitude: number, cusps: number[]): number {
   const L = (((longitude % 360) + 360) % 360);
   for (let i = 0; i < 12; i++) {
     const start = cusps[i];
@@ -127,6 +129,9 @@ function getXalen(): XalenWasm {
   return handle;
 }
 
+const RAD2DEG = 180 / Math.PI;
+const norm360 = (x: number): number => (((x % 360) + 360) % 360);
+
 export function computeWesternChart(req: WesternRequest): WesternChart {
   const w = getXalen();
   const hourUT = req.hour + req.minute / 60 - req.tzOffsetHours;
@@ -136,8 +141,14 @@ export function computeWesternChart(req: WesternRequest): WesternChart {
     cusps: number[];
     ascendant: number;
     mc: number;
+    fallback_used?: boolean;
   };
-  const cusps = houses.cusps;
+  // ⚠️ XALEN housesJson 的 cusps/ascendant/mc 是「弧度」,planetPositionJson 的
+  //   longitude 是「度」(實測 2026-06-26,critic 抓到)。在邊界統一轉成度,否則
+  //   宮位/上升/天頂全錯(行星經度<->弧度宮頭比較會塌成單一宮)。
+  const cusps = houses.cusps.map((c) => norm360(c * RAD2DEG));
+  const ascDeg = norm360(houses.ascendant * RAD2DEG);
+  const mcDeg = norm360(houses.mc * RAD2DEG);
 
   const planets: WesternPlanet[] = WESTERN_BODIES.map((b) => {
     const p = JSON.parse(
@@ -154,12 +165,10 @@ export function computeWesternChart(req: WesternRequest): WesternChart {
 
   return {
     jd,
-    ascendant: {
-      longitude: houses.ascendant,
-      signIndex: signIndexOf(houses.ascendant),
-    },
-    mc: { longitude: houses.mc, signIndex: signIndexOf(houses.mc) },
+    ascendant: { longitude: ascDeg, signIndex: signIndexOf(ascDeg) },
+    mc: { longitude: mcDeg, signIndex: signIndexOf(mcDeg) },
     houseCusps: cusps,
     planets,
+    fallbackHouses: Boolean(houses.fallback_used),
   };
 }
