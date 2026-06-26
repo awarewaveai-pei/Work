@@ -4,6 +4,25 @@
 
 ## 2026-06-26
 
+### feat(oracle): Phase A — 付費牆 / credits 邏輯層(DB seam, ready-to-apply)
+
+[任務理解] /api/interpret 原無付費牆(inline ALLOWED_TIERS 擋 premium)。建可測的政策層 + DB seam:邏輯完整、Supabase 接線為 drop-in,不需改政策即可上正式計量。
+
+[已修改]
+- `lib/entitlements.ts`(新):`evaluateEntitlement`(純政策:訂閱者全放行;免費 premium 需訂閱;免費 light/deep 每日上限 FREE_DAILY_AI_LIMIT=3;fail-closed 防壞 query)+ `EntitlementStore` 介面(含 status→Plan 映射契約)+ `createInMemoryStore`(stub,可注入時鐘)+ `checkAndConsume`(允許才扣量,標 TOCTOU 契約)。
+- `app/api/interpret/route.ts`(改):移除 inline ALLOWED_TIERS,改 `evaluateEntitlement` 集中政策 → premium 免費用戶 402 payment_required;VALID_TIERS 加 premium(合法性≠政策);每日計量待 auth+store 接上(匿名 aiUsedToday=0,已註)。
+- 測試:`entitlements.test.ts`(6)+ `route.test.ts` 修正(premium 400→402+body、deep 非 402、非法 tier 400)。
+
+[驗證結果](R0 四動作)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npm test` + `npm start`+curl POST `/api/interpret` | exit=0 | live:premium(免費)→**402 payment_required/premium_requires_subscription**、deep→**200 真 GPT 解讀(gpt-4o-2024-11-20,Centaur 端到端)**、非法 tier→400。tsc=0、`npm test` **111 pass**/3 skip、build=0。
+- REVIEW_DONE: critic=Deep | verdict=pass(修後) | findings=1c/1m/2n→已修 — critic **抓到 Critical:既有 `route.test.ts` premium 斷言 400 未隨改 402 → npm test RED**(我先前跑 targeted test 漏跑 route.test.ts)。已修測試 + 補 402 body/deep-not-gated 正向覆蓋 + evaluateEntitlement fail-closed(NaN/負數)+ TOCTOU/status→Plan 契約註記。政策核心 critic 逐組合驗證無 off-by-one、無 free→premium 逃逸、402 在 AI 呼叫前回(無成本洩漏)。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/ziwei-doushu | grep=`evaluateEntitlement`,`checkAndConsume`,`ALLOWED_TIERS`,`EntitlementStore`,`FREE_DAILY_AI_LIMIT` | hits=0 stale — ALLOWED_TIERS 已全移除無殘留;route 唯一消費端對齊;schema.ts Subscription/CreditLedger 為 drop-in 目標(已註映射)。
+- BUGHUNT_SCOPE_NARROW: N/A(含 agency-os + scripts)。
+
+[剩餘風險] 每日次數計量 + 真實 Plan 判定需 auth + Supabase store(drop-in,契約已定);rate-limit/Turnstile 待 PLAN §17;金流 webhook→subscription 狀態待金流階段。匿名期間 light/deep 未計量(同改動前,premium 已擋=成本保護)。
+
+[rollback] 新增可逆;`git revert`;route 還原 inline ALLOWED_TIERS 即可。
+
 ### feat(tarot): 大圖「存無框圖」按鈕 → 無框原圖進 My Designs + seed-fix 上線
 
 [任務理解] 兩件延續：(A) 把同 session 的「重新生成沿用固定 seed」修復(seedOverride,本檔下方 entry)實際部署上線；(B) 新需求：整套生成只把「含框 print card」自動存 My Designs，使用者要能把漂亮的「無框原圖」也存進 gallery，且要**按鈕觸發**（挑喜歡的存，不每張自動灌爆 gallery）。
