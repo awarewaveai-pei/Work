@@ -76,6 +76,14 @@ const LABELS: Record<Locale, { headline: string; facts: string; ask: string }> =
  */
 export function buildPrompt(req: InterpretRequest): BuiltPrompt {
   const { context, tier, locale } = req;
+  // facts 已在排盤時依 context.locale 在地化;若與 req.locale 不一致會產生
+  //   「英文框架包中文事實」的半語言解讀。寧可在開發期大聲拋錯,也不靜默輸出
+  //   混語(critic 2026-06-26)。
+  if (locale !== context.locale) {
+    throw new Error(
+      `buildPrompt: locale 不一致(req=${locale} vs context=${context.locale})——facts 已依 context.locale 在地化,不可混用`,
+    );
+  }
   const label = LABELS[locale];
 
   const system = [

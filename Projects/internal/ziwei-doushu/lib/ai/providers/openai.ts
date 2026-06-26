@@ -27,7 +27,10 @@ export const openaiAdapter: AiProviderAdapter = {
     try {
       const res = await getClient().chat.completions.create({
         model,
-        max_tokens: MAX_TOKENS[req.tier],
+        // 用 max_completion_tokens(非已棄用的 max_tokens):o-series 推理模型不收
+        //   max_tokens。因模型 ID 可由 env 覆寫(OPENAI_MODEL_*),operator 換成
+        //   o4-mini 之類也不會悄悄壞掉(critic 2026-06-26)。
+        max_completion_tokens: MAX_TOKENS[req.tier],
         messages: [
           // 穩定的 system prompt 放最前;OpenAI 對 >1024 token 的前綴自動快取。
           { role: 'system', content: system },

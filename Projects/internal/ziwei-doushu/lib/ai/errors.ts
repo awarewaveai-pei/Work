@@ -15,13 +15,29 @@ export class AiNotImplementedError extends Error {
   }
 }
 
+/**
+ * 移除字串中可能夾帶的密鑰片段(sk-... / Bearer ...)。
+ * 已驗 OpenAI/Anthropic SDK 錯誤訊息目前不含金鑰,但本層 secrets-adjacent,
+ *   自行遮蔽 = 由我們保證不外洩,不依賴 vendor 行為不變(critic 2026-06-26)。
+ */
+export function redactSecrets(s: string): string {
+  // 先遮 Bearer(連同其後的 token 整段),再遮獨立的 sk-... — 順序相反會在
+  //   "Bearer sk-..." 留下 "Bearer sk-" 殘片。
+  return s
+    .replace(/Bearer\s+[A-Za-z0-9._-]{8,}/gi, 'Bearer ***REDACTED***')
+    .replace(/sk-[A-Za-z0-9_-]{8,}/g, 'sk-***REDACTED***');
+}
+
 /** provider 已設定 key 但實際呼叫 LLM 失敗(網路/額度/API 錯誤/空回應)。 */
 export class AiCallError extends Error {
+  public readonly detail: string;
   constructor(
     public readonly providerId: string,
-    public readonly detail: string,
+    detail: string,
   ) {
-    super(`AI provider 呼叫失敗 (${providerId}): ${detail}`);
+    const safe = redactSecrets(detail);
+    super(`AI provider 呼叫失敗 (${providerId}): ${safe}`);
+    this.detail = safe;
     this.name = 'AiCallError';
   }
 }

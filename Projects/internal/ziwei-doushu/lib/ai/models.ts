@@ -41,12 +41,18 @@ export function modelFor(provider: AiProviderId, tier: AiTier): string {
 }
 
 /**
- * 各 tier 的輸出長度上限(token)。深度/頂規較長;三者皆 < 16K,故走非串流即可
- *   (避免 SDK HTTP timeout 的門檻是 ~16K;萬字級串流輸出是後續增量,屆時加
- *    interpretStream 而不動本接縫)。
+ * 各 tier 的輸出長度上限(token)。
+ *
+ * 抓 prompts/index.ts 各 tier 的字數指引 × CJK 最壞約 2.5 token/字,確保不會把
+ *   報告腰斬(chat.completions.create 截斷不會丟錯,會悄悄回半句 — critic 2026-06-26):
+ *     light  ≤250 字 → ~625 tok   < 1500
+ *     deep   ≤1500字 → ~3750 tok  < 5000
+ *     premium≤3500字 → ~8750 tok  < 12000
+ *   三者皆 < 16K,故走非串流即可(避免 SDK HTTP timeout 的門檻 ~16K;萬字級串流
+ *   輸出是後續增量,屆時加 interpretStream 而不動本接縫)。
  */
 export const MAX_TOKENS: Record<AiTier, number> = {
-  light: 1200,
-  deep: 4000,
-  premium: 8000,
+  light: 1500,
+  deep: 5000,
+  premium: 12000,
 };
