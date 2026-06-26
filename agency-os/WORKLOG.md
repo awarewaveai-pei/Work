@@ -14,14 +14,14 @@
 - `lib/ai/prompts/index.ts`(新):`buildPrompt(req)→{system,user}` Centaur 組裝——NO-CALC 護欄、綁具體事實(防巴納姆)、zh-TW/en 各自模板(不直譯)、tier 篇幅、娛樂免責、locale 一致性 assert。
 - `lib/ai/prompts/systems.ts`(新):5 系統角色框架(雙語)。
 - `lib/ai/models.ts`(新):provider×tier→model map(env 可覆寫 OPENAI_MODEL_* / ANTHROPIC_MODEL_*)+ MAX_TOKENS(依字數×CJK 2.5tok/字反推,不腰斬)。
-- `lib/ai/providers/openai.ts`/`anthropic.ts`(改):真 SDK 呼叫(預設 GPT,Claude A/B 備選);OpenAI 用 `max_completion_tokens`(o-series 安全);Anthropic system 標 cache_control。
-- `lib/ai/errors.ts`(改):加 `AiCallError` + `redactSecrets()`(遮 sk-/Bearer,secrets-adjacent 自保不依賴 vendor)。
+- `lib/ai/providers/openai.ts`/`anthropic.ts`(改):真 SDK 呼叫(預設 GPT,Claude A/B 備選);OpenAI 用 `max_completion_tokens`(o-series 安全)+ deep/premium 預設釘 `gpt-4o-2024-11-20`(16384 輸出,避免裸 gpt-4o 4096 上限把 deep/premium 400 拒絕);Anthropic system 標 cache_control。
+- `lib/ai/errors.ts`(改):加 `AiCallError` + `redactSecrets()`(遮 Bearer/sk-,含 String() 強制轉型 + 範圍註解,secrets-adjacent 自保不依賴 vendor)。
 - 測試:`prompts/index.test.ts`(5)、`errors.test.ts`(3,密鑰遮蔽 pin)、`interpret.live.test.ts`(gated,RUN_LIVE_AI=1 才打真 API)。
 - 依賴:`openai` + `@anthropic-ai/sdk`。
 
 [驗證結果](R0 四動作)
-- REALTEST_EVIDENCE: tool=Bash | cmd=`RUN_LIVE_AI=1 OPENAI_API_KEY=<vault> npx vitest run lib/ai/interpret.live` | exit=0 | ms=4806 — 真打 GPT 回非空解讀 + 標明 model(gpt-4o-mini);改 max_completion_tokens 後重驗仍 0。另 `npx tsc --noEmit` exit=0、`npm test` 57 pass/1 skip。
-- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/2n+suggestions — critic 確認無 key 外洩路徑(SDK 錯誤訊息不含 auth)、Centaur 護欄雙 provider×雙語皆在、無注入。已修 Major(max_tokens→max_completion_tokens,防 env 換 o-series 悄壞)+ 2 Minor(locale assert 防混語、premium token 上限防腰斬)+ secrets 遮蔽 pin。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`RUN_LIVE_AI=1 OPENAI_API_KEY=<vault> npx vitest run lib/ai/interpret.live` | exit=0 | ms=12599 — 真打 GPT:light(4007ms)+ **deep max_completion_tokens=5000(8591ms)皆回非空解讀**(deep 正是先前會 400 的路徑,釘快照後驗證通過)。另 `npx tsc --noEmit` exit=0、`npm test` 57 pass/2 skip。
+- REVIEW_DONE: critic=Deep×2 | verdict=warn→warn | findings=0c/2m(皆已修)/3n — 第一輪修 Major(max_tokens→max_completion_tokens)+ 2 Minor(locale assert 防混語、token 上限防腰斬)+ secrets pin。**第二輪(verify-recent)抓到我第一輪的 token 上限修法自身引入新 Major:deep=5000/premium=12000 超出裸 gpt-4o 4096 輸出 → API 400 拒絕(非截斷),綠測因 light=1500 未覆蓋而漏掉** → 釘 16384 輸出快照 + 加 deep-tier live test 證明。再修 2 Minor(redactSecrets String() 轉型 + 範圍註解)。critic 確認無 key 外洩路徑、Centaur 護欄雙 provider×雙語皆在、無注入、redactSecrets 無 ReDoS。
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/ziwei-doushu | grep=`AiNotImplementedError`,`buildPrompt`,`AiCallError`,`interpret(`,`modelFor` | hits=0 stale — `AiNotImplementedError` 已無 caller(保留供未來 stub provider);其餘 call sites 全對齊;agency-os 命中皆 ORACLE docs 概念引用(非過期)。
 - BUGHUNT_SCOPE_NARROW: N/A(含 agency-os + scripts)。
 
