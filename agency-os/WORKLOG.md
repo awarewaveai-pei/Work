@@ -4,6 +4,23 @@
 
 ## 2026-06-26
 
+### fix(eu-backup): R2 異地自 2026-05 從沒上傳成功 — 變數未 export 給子腳本
+
+[任務理解] 方案A 後 R2 upload 仍 WARN。R2 是 SG 退役後唯一存活的異地，必修。
+
+[現況分析] `upload-to-r2.sh` 為子行程，需 `R2_API_TOKEN` 在 environment。`/etc/default/eu-backup` 用普通賦值（無 `export`），`backup-eu-stack.sh` 的 `source` 只設成 shell 變數 → 子腳本讀不到 → `R2_API_TOKEN not set` exit 1 → WARN。**意涵：自 2026-05 起 R2 從沒真的上傳成功，先前「3-2-1 已成立」是假的（實際只有本機+SG）。** 與本日 `.env`/openssl 同一類 export bug。
+
+[已修改] `lobster-factory/infra/eu-backup/backup-eu-stack.sh`（+ EU `/root/scripts/`）：`source /etc/default/eu-backup` 改為 `set -a; source …; set +a`（export 全部 sourced 變數，一併根治 R2 + openssl）。runbook §1/§7 + README 標 R2 已修。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`bash /root/scripts/backup-eu-stack.sh`（完整跑）| exit=0 | 端到端 **`R2 upload OK`**（不再 WARN）；隔離測試 `upload-to-r2.sh` 10/10 檔 HTTP 200（含 205M trigger.sql、148M uptime）。→ 真 3-2-1（本機+SG+R2）成立。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — `set -a/+a` 標準 export 慣用法；bash -n 本機+server 雙驗；不碰 prod 服務。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,runbooks | grep=`R2_API_TOKEN`,`set -a`,`upload-to-r2` | hits: 同類 export bug 僅此 source 點（openssl 那條本日已加 export，set -a 後雙保險）；無其他 stale。
+- BUGHUNT_SCOPE_NARROW: N/A（含 agency-os）。
+
+[剩餘風險] SG 退役時異地 L1（→SG）需改 R2 二 bucket / Storage Box（R2 主線已可靠）。
+[rollback] `cp backup-eu-stack.sh.bak-20260626-055600`（含修前狀態）。
+
 ### ops(eu-backup): 方案A 補齊全部備份漏項 + 還原演練 + 腳本納入 repo 版控
 
 [任務理解] 關閉 EU 最大曝險（密鑰/客戶連線/自動化未備份）。操作者選方案A（七項一次全補）。

@@ -23,8 +23,9 @@ ssh -i ~/.ssh/hetzner_trigger root@204.168.175.41 'chmod +x /root/scripts/{backu
 `BACKUP_ENC_KEY` 在 EU `/etc/default/eu-backup`（**不進備份**）+ 鏡像於本機 vault（`secrets-vault.ps1 -Action get -Name BACKUP_ENC_KEY`）。
 還原 `env.tar.gz.enc`：`openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -in env.tar.gz.enc | tar xzf - -C /`。
 
-## ⚠️ 已知待修
+## 異地狀態
 
-- **R2 upload 近期 WARN 失敗**（SG 異地仍正常）→ **SG 退役前必修**，否則退 SG 後零異地。
+**真 3-2-1 成立**（2026-06-26）：本機 `/root/backups/` + SG rsync + **Cloudflare R2**（已修 — 原 `R2_API_TOKEN` 未 export 給子腳本，`set -a` 包住 source 修復，實測 10/10 檔 HTTP 200）。
+- 待辦：SG 退役時把異地 L1（rsync→SG）改為 R2 二 bucket / Storage Box（R2 主線已可靠）。
 
 _SG/Phase1 的備份正本在 [`hetzner-phase1-core/LONG_TERM_OPS.md`](../hetzner-phase1-core/LONG_TERM_OPS.md)（兩台互為異地）。_

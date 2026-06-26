@@ -72,7 +72,9 @@
 >
 > **🔑 `.env` 解密金鑰**：`BACKUP_ENC_KEY` 在 `/etc/default/eu-backup`（不進備份）+ **鏡像於本機 vault `secrets-vault.ps1 get BACKUP_ENC_KEY`**。機器死 → 從 vault 取金鑰解 `env.tar.gz.enc`。
 >
-> **🔴 仍待處理**：① 異地 L2 **R2 upload 近期 WARN 失敗**（非本次改動；SG L1 正常）→ **SG 退役前必修**（否則退 SG 後零異地）。② 異地 L1 指向 SG，SG 退役即斷 → 補第二異地。③ 備份腳本仍為**機器專屬無 repo 版控**（建議納入 repo）。
+> **✅ R2 異地已修（2026-06-26）**：根因 = `/etc/default/eu-backup` 變數沒 export，子腳本 `upload-to-r2.sh` 讀不到 `R2_API_TOKEN`（自 2026-05 起 R2 從沒真的上傳成功，「3-2-1」其實只有本機+SG）。修 = `set -a` 包住 source。實測 10/10 檔 HTTP 200、`R2 upload OK`。**現在才是真 3-2-1**（本機 + SG + R2），R2 跨供應商那條 SG 退役後仍在。
+>
+> **🔴 仍待處理**：① 異地 L1 指向 SG，SG 退役即斷 → 退 SG 時把第二異地改成 R2 二 bucket / Storage Box（R2 主線已可靠）。② 備份腳本部署仍為手動 scp（repo 已有正本，無 auto-deploy）。
 
 ---
 
@@ -213,7 +215,7 @@ openssl enc -d -aes-256-cbc -pbkdf2 -in "$OUT/env.tar.gz.enc" | tar tzf - 2>&1 |
 - [ ] 補第二異地取代 SG-offsite（SG 退役前）：R2 二 region 或 Hetzner Storage Box
 - [x] 備份集含**加密後**的 `.env`，金鑰 `BACKUP_ENC_KEY` 存本機 vault（不同地）— 2026-06-26
 - [x] **演練還原成功一次**（§6 A/C + MainWP/n8n 內容驗證）— 2026-06-26
-- [ ] **修 R2 upload WARN**（SG 退役前必修，否則退 SG 後零異地）
+- [x] **修 R2 upload WARN**（2026-06-26：`set -a` export 修；實測 10/10 HTTP 200）→ 真 3-2-1 成立
 - [ ] 確認 `verify-backup-eu.sh` 失敗有真的觸發 Telegram 告警
 - [ ] auction 機：雙碟 NVMe + RAID 1 + SMART 健康 + mdadm 告警
 - [ ] §4 / §5 的 `TODO:` 指令全部補齊並實測
