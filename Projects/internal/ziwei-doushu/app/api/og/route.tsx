@@ -62,21 +62,19 @@ function clamp(s: string | null, n: number): string {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const title = clamp(searchParams.get('title'), 40) || '東西方命理';
-  const subtitle = clamp(searchParams.get('subtitle'), 60);
+  const title = cjkSafe(clamp(searchParams.get('title'), 40)) || '東西方命理';
+  const subtitle = cjkSafe(clamp(searchParams.get('subtitle'), 60));
   const lines = clamp(searchParams.get('lines'), 400)
     .split('|')
-    .map((s) => `· ${s.slice(0, 40)}`)
-    .filter((s) => s.length > 2)
+    .map((s) => `${MIDDOT}${cjkSafe(s.slice(0, 40))}`)
+    .filter((s) => s.length > 1)
     .slice(0, 6);
   const type = searchParams.get('type') ?? 'ziwei';
   const accent = ACCENTS[type] ?? '#d4b15f';
 
-  // 字型子集只需「實際會渲染的字」;不含裝飾符號以免 Google Fonts 子集 400。
+  // 字型子集只需「實際會渲染的字」;以正規化後文字請求,確保涵蓋(無 U+00B7)。
   const allText = BRAND + title + subtitle + lines.join('') + DOMAIN;
   const font = await loadCjkFont(allText);
-  // eslint-disable-next-line no-console
-  console.log('[og] font bytes =', font ? font.byteLength : 'NULL');
 
   return new ImageResponse(
     (
