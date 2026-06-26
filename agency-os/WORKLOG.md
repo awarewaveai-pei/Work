@@ -4,6 +4,28 @@
 
 ## 2026-06-26
 
+### ops(eu-backup): 方案A 補齊全部備份漏項 + 還原演練 + 腳本納入 repo 版控
+
+[任務理解] 關閉 EU 最大曝險（密鑰/客戶連線/自動化未備份）。操作者選方案A（七項一次全補）。
+
+[現況分析] `backup-eu-stack.sh`（機器專屬無 repo 版控）原只備 Supabase PG + Trigger PG + Uptime Kuma。漏：MainWP DB、`.env`×4、n8n、Postiz、Supabase Storage、MinIO、MainWP files。先量體積（🟡 volume 全 < 150M，supabase_storage 僅 4K）→ 方案A 每日全備僅 +~150M，盤餘 51G → 可行。
+
+[已修改]
+- EU `/root/scripts/backup-eu-stack.sh`（先 `.bak-20260626-055600` 備份）新增 7 dump 段：MainWP `mysqldump`（root pw 讀容器 env 不硬編，ERRORS++）、`.env` AES-256 加密（ERRORS++）、n8n + 4 volume（`_archive_vol` helper，n8n ERRORS++ 其餘 WARN）。
+- `verify-backup-eu.sh` 檢查清單加 `mainwp.sql.gz n8n.tgz` + `env.tar.gz.enc` 存在檢查。
+- `BACKUP_ENC_KEY`（`openssl rand -base64 32`）寫 EU `/etc/default/eu-backup`（idempotent，不進備份）+ 鏡像本機 vault。
+- 腳本納入 repo 版控：`lobster-factory/infra/eu-backup/{backup-eu-stack.sh,verify-backup-eu.sh,README.md}`（含部署/解密/待修指引）。
+- runbook §1/§6/§7 更新為「已補齊 + 演練通過」+ 記錄 n8n/postiz workflow 在 supabase dump 的關鍵還原事實。
+
+[驗證結果]（R0 四動作）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`bash /root/scripts/backup-eu-stack.sh` + 還原演練 | exit=0 | **首跑抓到 `.env` 加密 bug**（`source` 未 export、`openssl -pass env:` 讀不到）→ 加 `export BACKUP_ENC_KEY` 修 → 重跑 `env.tar.gz.enc OK` + Offsite rsync OK + Backup complete 402M。**還原演練**：`.env` openssl 解密列出 4 檔；MainWP dump 44 表（含 `mwp_mainwp_api_keys`）；n8n.tgz 解開 OK；`supabase-all.sql.gz` 含 `CREATE DATABASE n8n` + `workflow_entity`×32（→ n8n/postiz workflow 在 supabase dump，volume 只補 binary）。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — 沿用既有 integrity+ERRORS++ 樣式；`bash -n` 本機+server 雙驗；root pw/金鑰皆不硬編；備份不碰 prod 服務。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,runbooks | grep=`backup-eu-stack`,`BACKUP_ENC_KEY`,`env.tar.gz.enc`,`_archive_vol` | hits: repo 新增正本唯一；runbook/README 同步；無 stale。
+- BUGHUNT_SCOPE_NARROW: N/A（含 agency-os）。scripts 根：EU 腳本不在 `scripts/`（Windows/PS 用），repo 正本入 `lobster-factory/infra/eu-backup/`。
+
+[剩餘風險] ① **R2 upload 近期 WARN 失敗**（非本次改動；SG L1 異地正常）→ SG 退役前必修否則零異地。② 異地 L1 SG 退役即斷需補第二異地。③ EU `/root/scripts/` 仍無 git；repo 正本需手動 scp 同步（README 已載指令）。
+[rollback] `cp /root/scripts/backup-eu-stack.sh.bak-20260626-055600 /root/scripts/backup-eu-stack.sh`。備份器不碰 prod 服務，秒級可逆。
+
 ### fix(ao-close): report retention fully aligned to 90 days — Codex 2026-06-26 09:39
 
 [任務理解] 使用者指出 AO-CLOSE 刪除 `>30 days` 舊 report 與既有 90 天保留期不一致，並要求「全部處理好，該改的地方都要改到」。
