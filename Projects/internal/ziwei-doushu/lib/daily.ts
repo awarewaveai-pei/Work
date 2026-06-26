@@ -39,11 +39,6 @@ const GENERATES: Record<WuXing, WuXing> = { 木: '火', 火: '土', 土: '金', 
 /** 我剋(相剋):木→土→水→火→金→木 */
 const CONTROLS: Record<WuXing, WuXing> = { 木: '土', 土: '水', 水: '火', 火: '金', 金: '木' };
 
-/** 生我者(印,扶助日主)= 簡版喜用神 */
-function generatorOf(x: WuXing): WuXing {
-  return (Object.keys(GENERATES) as WuXing[]).find((k) => GENERATES[k] === x)!;
-}
-
 type Relation = '比和' | '生我' | '我生' | '剋我' | '我剋';
 function relation(today: WuXing, me: WuXing): Relation {
   if (today === me) return '比和';
@@ -63,7 +58,7 @@ const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n
 
 export interface DailyFortune {
   date: string;
-  /** 簡版喜用神五行 */
+  /** 主喜用神五行(扶抑法 favorable 之首,決定幸運色/數/方位) */
   luckyElement: WuXing;
   luckyColors: string[];
   luckyNumbers: number[];
@@ -71,6 +66,11 @@ export interface DailyFortune {
   scores: { overall: number; love: number; career: number; wealth: number; health: number };
   yi: string[];
   ji: string[];
+  /** 命局摘要(供 AI 文案綁具體) */
+  dayMaster: string;
+  strength: string;
+  pattern: string;
+  favorable: string[];
 }
 
 export function computeDailyFortune(
@@ -80,7 +80,8 @@ export function computeDailyFortune(
 ): DailyFortune {
   const bazi = computeBazi({ ...birth, locale });
   const meEl = GAN_WUXING[bazi.dayMaster];
-  const luckyEl = generatorOf(meEl);
+  // 真喜用神(扶抑法):身強者忌印、身弱者喜印;取 favorable 之首為主喜神。
+  const luckyEl = (bazi.analysis.favorable[0] ?? meEl) as WuXing;
   const attr = WUXING[luckyEl];
 
   const lunar = Solar.fromYmd(target.year, target.month, target.day).getLunar();
