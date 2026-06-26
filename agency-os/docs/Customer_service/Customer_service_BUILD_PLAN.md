@@ -103,6 +103,14 @@ per-client hub  /ops/clients/[slug]   （既有 7 tab：內容工具/整合/佈�
 - 驗證：✅ 0051 未被佔 / cs_ 表名無衝突 / vector+hnsw 首用（佐證 pgvector 不存在）/ down 就位。REALTEST waived（apply=gated High）
 - 待：apply 到 EU Supabase（⛔ 等 go-ahead）
 
+**2026-06-26 — U1 cs-engine 核心 ✅**
+- 建 13 檔 `lib/cs/`：`config`(models/閾值/紅線常數 MAX_REFUND_CENTS=0) · `types` · `autonomy`(雙軸決策/RRF/紅線,純) · `guardrails`(injection/PII,純) · `llm`(Claude+Gemini failover+logAiCall) · `cis`(載入+system prompt 三段隔離) · `db`(cs_* 存取+向量/關鍵字檢索) · `rag`(OpenAI embeddings 可插拔+hybrid+切塊) · `intent`(haiku 分類) · `tools`(行動閘 A1放/A2A3人類+money code 硬閘) · `generate`(生成+supervisor+agentic tool-loop) · `orchestrator`(handleInbound 管線,任何失敗退安全態) · `index`(公開介面)。+ `__tests__/cs-core.test.ts`。
+- **REALTEST**：`npx tsc --noEmit` = **0 錯**（全專案）；`vitest run lib/cs` = **35/35 過**。`- REALTEST_EVIDENCE: tool=Bash | cmd=tsc --noEmit && vitest run lib/cs | exit=0 | ms=~40000`
+- **REVIEW**：critic（外部 oracle）審 → 0 Critical、2 High（supervisor `safe` fail-open；tool 名稱 backstop 缺）+ minors → **全修 + 重驗**（safe 改 fail-closed `parseVerdict`；tools.ts 加 `hitsRedLine(name)` backstop + 負數金額 abs；PII NFKC 正規化抓全形/小寫/Unicode dash；denied tool `is_error`；down migration 補 DROP FUNCTION）。`- REVIEW_DONE: critic=Deep | verdict=pass(修後) | findings=0c/2h/5m`
+- **BUGHUNT**：`grep cs_match_chunks/cs_knowledge_chunks/handleInbound` 跨 `lobster-factory agency-os scripts` → 單一存取點（db.ts+migration）、無重複模組、無外部 stale caller。`- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=cs_match_chunks|handleInbound | hits=單一存取點確認`
+- **待 / 已知 seam**（非 bug，後續單元）：① agentic auto-send 的 grounding 目前看 chunks 非 tool 輸出 → 工具型答案會退 handoff（fail-safe；Phase 3 接業務系統時補）② `parseJsonObject` greedy（退 fail-safe，可靠性 nit）③ `withinBusinessHours` 欄位留給交接/通知層（AI 24h 回，非決策）。
+- 待：apply U0 + 接 Chatwoot AgentBot webhook route（U3/U6）才能 live 端到端。
+
 ---
 
 ## §6 每單元驗證標準（R0 四動作，逐單元）
