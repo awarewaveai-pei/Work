@@ -535,6 +535,7 @@ export default function TarotStudio() {
       prev.forEach((it) => it.url && URL.revokeObjectURL(it.url));
       return TAROT_CARDS.map((card) => ({ card, status: "idle" }));
     });
+    setSavedArt(new Set()); // new deck — drop stale "已存無框圖" marks
     setMessage(null);
   }
 
@@ -552,6 +553,7 @@ export default function TarotStudio() {
       prev.forEach((it) => it.url && URL.revokeObjectURL(it.url));
       return TAROT_CARDS.map((card) => ({ card, status: "idle" }));
     });
+    setSavedArt(new Set()); // new deck — drop stale "已存無框圖" marks
     setMessage(null);
   }
 
