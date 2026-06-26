@@ -145,6 +145,42 @@ async function downscaleImageFile(file: File, maxDim = 1024, quality = 0.85): Pr
   });
 }
 
+// Re-encode a (possibly multi-MB PNG) artwork data URL into a gallery-sized WebP data URL:
+// caps the longest side and recompresses. A raw 2K-model PNG can exceed the gallery API's
+// ~9MB limit (→ HTTP 413 → "save failed"); this keeps it safely under while staying visually
+// faithful (quality 0.9) for collecting / reuse. Full-resolution printing still uses the
+// original art via renderPrintCard — only the gallery copy is capped. Best-effort: any decode /
+// canvas / encode failure falls back to the original data URL (let the API decide).
+async function toGalleryArt(dataUrl: string, maxDim = 2048, quality = 0.9): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, w, h);
+      try {
+        const webp = canvas.toDataURL("image/webp", quality);
+        // Some browsers silently return a PNG data URL when webp is unsupported — accept either,
+        // but if it somehow produced nothing usable, fall back to JPEG then the original.
+        resolve(webp.startsWith("data:image/") ? webp : canvas.toDataURL("image/jpeg", quality));
+      } catch {
+        resolve(dataUrl);
+      }
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
 export default function TarotStudio() {
   // Multi-select for comparison; batch generation always uses lockedModel (set at lock time).
   const [selectedModels, setSelectedModels] = useState<Set<TarotModel>>(new Set<TarotModel>());
@@ -579,6 +615,11 @@ export default function TarotStudio() {
         : resp.image;
       const blob = await renderPrintCard(card, artForPrint, template);
       const url = URL.createObjectURL(blob);
+      // Gallery-sized copy of the frameless art (capped WebP) for the on-demand "存無框圖" save —
+      // keeps a raw 2K PNG (which can exceed the gallery API's ~9MB limit → 413) safely under it,
+      // and shrinks what we retain in React state. The full-res artForPrint is still used for the
+      // printable card above; only this collected copy is capped.
+      const galleryArt = await toGalleryArt(artForPrint);
       // Save the colour-graded card to gallery (洞2 fix): previously saved raw resp.image BEFORE
       // renderPrintCard, so the gallery always got the ungraded original. Now we convert the graded
       // blob to a data URL and save that — gallery and download are always in sync.
@@ -592,15 +633,14 @@ export default function TarotStudio() {
           prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectText }),
         }),
       );
-      // Retain the frameless artwork (artForPrint = the full graded picture BEFORE renderPrintCard
-      // composites it into the frame) so the large-view modal can save the raw art to My Designs
+      // Retain the gallery-sized frameless artwork so the large-view modal can save it to My Designs
       // on demand — the user collects only the pictures she likes, no auto-flooding the gallery.
       // revoke any prior url for this slot (retry case) before replacing
       setBatch((prev) =>
         prev.map((it, i) => {
           if (i !== index) return it;
           if (it.url) URL.revokeObjectURL(it.url);
-          return { ...it, status: "done", blob, url, art: artForPrint, error: undefined };
+          return { ...it, status: "done", blob, url, art: galleryArt, error: undefined };
         }),
       );
       // Fresh art for this slot — clear any prior "已存無框圖" mark so the new art can be saved.

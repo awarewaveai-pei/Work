@@ -4,6 +4,30 @@
 
 ## 2026-06-26
 
+### feat(oracle): Phase B — 西洋占星本命盤引擎(自架 XALEN,Apache,無 API key)
+
+[任務理解] 補全球最大占星市場(回歸黃道行星/星座/宮位/上升)。PLAN §5 路線:MVP astrology-api.io(需 key,被擋)→ 自架 XALEN。先驗 XALEN 真實存在+可用+準確,再建(R0:不可建無法驗證的「最準」引擎)。
+
+[現況分析] `@xalen/wasm` v0.6.0 真實存在(Apache-2.0,vedika-io,2026-06-02),純 Rust→WASM,VSOP87A+IAU2000B+ELP2000,對 DE440/Swiss 交叉驗證(太陽 0.21″、次角秒;對 Swiss 1850–2150 五百萬盤無一超 0.1°)→ 真 Swiss 級,非 Moshier 捷徑。暴露 `tropicalLongitude`/`planetPositionJson(sidereal=false)`/`housesJson` → 西洋制可直接做。
+
+[已修改]
+- `lib/astrology.ts`(新,server-only):XALEN wasm 載入(initSync+fs)+ julianDay + `computeWesternChart`(12 星體 tropical + Placidus 宮 + 上升/MC)。
+- `lib/astrologyView.ts`(新,純):星座/行星名雙語 + astrologyContext(headline=三巨頭)。
+- `app/api/astrology/route.ts`(新):POST 生辰+經緯度→盤,intIn 範圍驗證 + 曆日驗證(拒 2/31)。
+- `components/AstrologyTool.tsx` + `app/[lang]/astrology/page.tsx`(新):表單→盤格+AiReading。
+- SystemNav/hub/sitemap/i18n(zh+en)加 astrology;next.config `outputFileTracingIncludes` 納 wasm(standalone 部署)。
+- `lib/astrology.test.ts`(新,9 測,含單位回歸)。
+
+[驗證結果](R0 四動作)
+- REALTEST_EVIDENCE: tool=Bash | cmd=node 探針(XALEN)+`npm test`+`npm start`+curl POST `/api/astrology` | exit=0 | **真 XALEN:太陽 @J2000=280.37°(摩羯,對 DE440 次角秒)**;單位修正後 live 回 **MC=摩羯(9)、太陽第 10 宮(合 MC)、8 個不同宮(未塌)、Feb31→400**。tsc=0、`npm test` 103 pass、`npm run build` exit=0(astrology SSG + `ƒ /api/astrology` + **wasm 1754301 bytes 追蹤進 standalone**)。
+- REVIEW_DONE: critic=Deep | verdict=pass(修後) | findings=1c/1m/0n→已修 — critic **抓到 Critical 單位 bug:housesJson 回弧度、行星回度,未轉換致宮位全塌+MC/上升星座全錯**(我原 range-only 測試掩蓋)。已修:邊界 rad→deg(RAD2DEG/norm360)+ 補 value-level 回歸測試(MC=9/太陽第10宮/houseOf 跨0°)。Major(測試只驗範圍)+ Minor(曆日驗證)一併修。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/ziwei-doushu | grep=`computeWesternChart`,`astrologyContext`,`houseOf`,`/api/astrology`,`@xalen/wasm` | hits=0 stale — astrology.ts 僅 route+test value-import(client 只 type-import,wasm 不入 client bundle);SystemNav/hub/sitemap/interpret SYSTEM_IDS 對齊。
+- BUGHUNT_SCOPE_NARROW: N/A(含 agency-os + scripts)。
+
+[剩餘風險] 無 geocoding(使用者手填經緯度;PLAN 列 geocoding 為後續)。相位(aspects)未做(本刀聚焦行星/星座/宮位)。route 無 quota(付費牆前,同 task#1)。高緯 Placidus 退化已用 fallbackHouses 旗標標示。
+
+[rollback] 新增可逆;`git revert`;移依賴 `npm rm @xalen/wasm` + 還原 next.config tracing。
+
 ### feat(oracle): Phase C — 塔羅牌陣擴充(6 陣 + 牌位含義)+ 情境化卡義
 
 [任務理解] 塔羅原只 3 陣且 AI 只收牌名(不知牌位/主題)。補:更多牌陣 + 每牌位含義 + 情境主題,讓 AI 依「牌位×主題」給情境化解讀(同張牌在感情 vs 事業語意不同),非空泛列牌。
