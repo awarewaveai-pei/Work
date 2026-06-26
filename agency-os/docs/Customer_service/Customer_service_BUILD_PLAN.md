@@ -62,7 +62,7 @@ per-client hub  /ops/clients/[slug]   （既有 7 tab：內容工具/整合/佈�
 
 | U | 單元 | 跑哪 | 依賴 | 對應 Phase | 狀態 |
 |---|---|---|---|---|---|
-| **U0** | **資料地基** migration 0051（8 表 + pgvector + RLS）| 💻 現有 Supabase | — | 全 Phase 地基 | ✅ **建好+驗證**（apply ⛔ gated）|
+| **U0** | **資料地基** migration 0051（8 表 + pgvector + RLS + RPC）| 💻 EU prod Supabase | — | 全 Phase 地基 | ✅ **建好+apply+live 驗證**（8表/8RLS/8policy/RPC/pgvector）|
 | **U1** | **cs-engine 核心** `lib/cs/`（webhook→護欄→分類→RAG→生成→supervisor→送/動作/轉）| 💻 next-admin | U0 | P1–P4 | ✅ **建好+驗證**（13 檔+測試；tsc 0 / vitest 35 / critic 修訖）|
 | **U2** | **CIS 配置 + tab**（brandKit+csVoice JSONB + 「品牌識別」tab，重用 brandColors/BrandVoiceProfile）| 💻 next-admin UI | — | P1 | ⏭ 下一個（可見）|
 | **U3** | **客服 tab + 頂層「客服」section**（per-client config + 跨客戶營運中心）| 💻 next-admin UI | U0,U1 | P1–P2 | ⏳ |
@@ -100,8 +100,8 @@ per-client hub  /ops/clients/[slug]   （既有 7 tab：內容工具/整合/佈�
 **2026-06-26 — U0 資料地基 ✅**
 - 建：[`packages/db/migrations/0051_cs_core.sql`](../../../lobster-factory/packages/db/migrations/0051_cs_core.sql)（8 表：cs_knowledge_sources / cs_knowledge_chunks[pgvector+BM25] / cs_intents[雙軸] / cs_tools[allowlist] / cs_eval_cases / cs_customer_memory / cs_ai_replies[稽核] / cs_action_log）+ [`scripts/0051_cs_core_down.sql`](../../../lobster-factory/packages/db/scripts/0051_cs_core_down.sql)
 - 慣例：照 0050（BEGIN/COMMIT + service-role RLS + NOTIFY pgrst + WHY/SCHEMA/SECURITY 註解）
-- 驗證：✅ 0051 未被佔 / cs_ 表名無衝突 / vector+hnsw 首用（佐證 pgvector 不存在）/ down 就位。REALTEST waived（apply=gated High）
-- 待：apply 到 EU Supabase（⛔ 等 go-ahead）
+- 驗證：✅ 0051 未被佔 / cs_ 表名無衝突 / vector+hnsw 首用 / down 就位
+- **apply（2026-06-26，operator go-ahead）**：pre-flight（supabase-db 在 / pgvector available=1 / cs_ 表=0）→ `cat 0051 | ssh EU "docker exec -i supabase-db psql -U supabase_admin -v ON_ERROR_STOP=1"` → **PSQL_EXIT=0 原子 COMMIT** → live 驗證 **cs_tables=8 / rls_on=8 / policies=8 / rpc=1 / vector_ext=1 / RPC smoke 回 0 列**。`- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec supabase-db psql apply 0051 + verify | exit=0`
 
 **2026-06-26 — U1 cs-engine 核心 ✅**
 - 建 13 檔 `lib/cs/`：`config`(models/閾值/紅線常數 MAX_REFUND_CENTS=0) · `types` · `autonomy`(雙軸決策/RRF/紅線,純) · `guardrails`(injection/PII,純) · `llm`(Claude+Gemini failover+logAiCall) · `cis`(載入+system prompt 三段隔離) · `db`(cs_* 存取+向量/關鍵字檢索) · `rag`(OpenAI embeddings 可插拔+hybrid+切塊) · `intent`(haiku 分類) · `tools`(行動閘 A1放/A2A3人類+money code 硬閘) · `generate`(生成+supervisor+agentic tool-loop) · `orchestrator`(handleInbound 管線,任何失敗退安全態) · `index`(公開介面)。+ `__tests__/cs-core.test.ts`。

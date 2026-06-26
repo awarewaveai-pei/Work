@@ -14,7 +14,14 @@ import { AiCallError } from '../errors';
 let client: OpenAI | null = null;
 function getClient(): OpenAI {
   // 延遲建構:模組載入時不需要 key(isConfigured 只讀 env),真正呼叫時才需。
-  if (!client) client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  // timeout/maxRetries 明設:解讀端點付費牆前開放,封住 upstream 卡住的連線佔用
+  //   DoS(SDK 預設 10 分鐘 + retry 2 次太寬 — critic 2026-06-26)。
+  if (!client)
+    client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      timeout: 60_000,
+      maxRetries: 1,
+    });
   return client;
 }
 

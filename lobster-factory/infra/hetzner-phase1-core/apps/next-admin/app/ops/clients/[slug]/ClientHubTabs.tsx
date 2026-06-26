@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type CSSProperties } from "react";
 import Link from "next/link";
 import { roleHeader } from "@/lib/ops-role";
 import { WpUpdateButtons } from "./WpUpdateButtons";
@@ -914,7 +914,9 @@ function SettingsTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cf
         </div>
       </Card>
 
-      <BrandColorsCard slug={org.slug} initial={cfg.brandColors} />
+      <div style={{ fontSize: 11, color: "var(--text-muted)", margin: "2px 0 4px" }}>
+        品牌色 / Logo / 客服語氣已移至「品牌識別」分頁。
+      </div>
 
       <Card
         title="WP 網站連線 (wp_sites)"
@@ -963,6 +965,166 @@ function SettingsTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cf
           ))}
         </Card>
       )}
+    </>
+  );
+}
+
+// ── Brand identity (CIS) tab ──────────────────────────────────────────────────
+
+const cisBtnStyle: CSSProperties = {
+  marginTop: 8, fontSize: 12, padding: "5px 12px", borderRadius: 6, cursor: "pointer",
+  background: "var(--accent)", color: "var(--btn-primary-text)", border: "none",
+};
+
+function CisText({ label, value, onChange, placeholder, mono }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; mono?: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 12 }}>
+      <span style={{ color: "var(--text-muted)", width: 88, flexShrink: 0 }}>{label}</span>
+      <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
+        style={{ flex: 1, fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid var(--card-border)",
+          background: "var(--bg-canvas)", color: "var(--text-primary)", fontFamily: mono ? "monospace" : "inherit" }} />
+    </div>
+  );
+}
+
+function CisSelect<T extends string>({ label, value, onChange, options }: {
+  label: string; value: T; onChange: (v: T) => void; options: Array<[T, string]>;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 12 }}>
+      <span style={{ color: "var(--text-muted)", width: 88, flexShrink: 0 }}>{label}</span>
+      <select value={value} onChange={(e) => onChange(e.target.value as T)}
+        style={{ flex: 1, fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid var(--card-border)",
+          background: "var(--bg-canvas)", color: "var(--text-primary)" }}>
+        {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </select>
+    </div>
+  );
+}
+
+async function patchCis(slug: string, payload: Record<string, unknown>): Promise<void> {
+  const res = await fetch(`/api/ops/clients/${slug}/cis`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...roleHeader("admin") },
+    body: JSON.stringify(payload),
+  });
+  const data = (await res.json()) as { ok?: boolean; error?: string };
+  if (!res.ok || !data.ok) throw new Error(data.error ?? `save_failed_${res.status}`);
+}
+
+function BrandKitCard({ slug, initial }: { slug: string; initial?: ClientConfig["brandKit"] }) {
+  const [logoPrimary, setLogoPrimary] = useState(initial?.logo?.primary ?? "");
+  const [logoInverse, setLogoInverse] = useState(initial?.logo?.inverse ?? "");
+  const [logoIcon, setLogoIcon] = useState(initial?.logo?.icon ?? "");
+  const [headingFont, setHeadingFont] = useState(initial?.typography?.headingFont ?? "");
+  const [bodyFont, setBodyFont] = useState(initial?.typography?.bodyFont ?? "");
+  const [cjkFont, setCjkFont] = useState(initial?.typography?.cjkFont ?? "");
+  const [iconStyle, setIconStyle] = useState(initial?.graphics?.iconStyle ?? "");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  async function save() {
+    setSaving(true); setMsg(null);
+    try {
+      await patchCis(slug, { brandKit: {
+        logo: { primary: logoPrimary, inverse: logoInverse, icon: logoIcon },
+        typography: { headingFont, bodyFont, cjkFont },
+        graphics: { iconStyle },
+      } });
+      setMsg("✓ 已儲存品牌資產");
+    } catch (e) { setMsg(`⚠ ${String(e)}`); } finally { setSaving(false); }
+  }
+
+  return (
+    <Card title="🖼️ 品牌資產 (brandKit · VI)">
+      <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 6px" }}>
+        Logo 存 URL（走資產庫）；標準字與輔助圖形給客服 widget 與生圖工具參考。標準色在上方「品牌色」卡。
+      </p>
+      <CisText label="Logo 主標" value={logoPrimary} onChange={setLogoPrimary} placeholder="https://…" mono />
+      <CisText label="Logo 反白" value={logoInverse} onChange={setLogoInverse} placeholder="https://…" mono />
+      <CisText label="Logo 圖示" value={logoIcon} onChange={setLogoIcon} placeholder="https://…" mono />
+      <CisText label="標題字" value={headingFont} onChange={setHeadingFont} placeholder="Fraunces" />
+      <CisText label="內文字" value={bodyFont} onChange={setBodyFont} placeholder="General Sans" />
+      <CisText label="中文字" value={cjkFont} onChange={setCjkFont} placeholder="Noto Sans TC" />
+      <CisText label="圖示風格" value={iconStyle} onChange={setIconStyle} placeholder="lucide / phosphor" />
+      <button onClick={save} disabled={saving} style={{ ...cisBtnStyle, opacity: saving ? 0.6 : 1 }}>
+        {saving ? "儲存中…" : "儲存品牌資產"}
+      </button>
+      {msg && <div style={{ marginTop: 6, fontSize: 11, color: msg.startsWith("✓") ? "var(--green)" : "var(--red)" }}>{msg}</div>}
+    </Card>
+  );
+}
+
+function CsVoiceCard({ slug, initial }: { slug: string; initial?: ClientConfig["csVoice"] }) {
+  const [personaName, setPersonaName] = useState(initial?.personaName ?? "");
+  const [languages, setLanguages] = useState((initial?.languages ?? ["zh-Hant"]).join(", "));
+  const [formality, setFormality] = useState<"casual" | "polite" | "formal">(initial?.formality ?? "polite");
+  const [honorifics, setHonorifics] = useState(initial?.honorifics ?? "你");
+  const [emojiPolicy, setEmojiPolicy] = useState<"none" | "sparing" | "friendly">(initial?.emojiPolicy ?? "sparing");
+  const [greeting, setGreeting] = useState(initial?.greeting ?? "");
+  const [signoff, setSignoff] = useState(initial?.signoff ?? "");
+  const [refusalStyle, setRefusalStyle] = useState(initial?.refusalStyle ?? "");
+  const [escalationTone, setEscalationTone] = useState(initial?.escalationTone ?? "");
+  const [servicePrinciples, setServicePrinciples] = useState((initial?.servicePrinciples ?? []).join("\n"));
+  const [mission, setMission] = useState(initial?.mission ?? "");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  async function save() {
+    setSaving(true); setMsg(null);
+    try {
+      await patchCis(slug, { csVoice: {
+        personaName, formality, honorifics, emojiPolicy, greeting, signoff, refusalStyle, escalationTone, mission,
+        languages: languages.split(",").map((s) => s.trim()).filter(Boolean),
+        servicePrinciples: servicePrinciples.split("\n").map((s) => s.trim()).filter(Boolean),
+      } });
+      setMsg("✓ 已儲存客服語氣，將套用到 widget 與 AI");
+    } catch (e) { setMsg(`⚠ ${String(e)}`); } finally { setSaving(false); }
+  }
+
+  return (
+    <Card title="💬 客服語氣 (csVoice · BI/MI)">
+      <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 6px" }}>
+        驅動客服 AI 的人格與口吻；語氣本體可連動內容引擎品牌聲音（同源）。
+      </p>
+      <CisText label="化身名" value={personaName} onChange={setPersonaName} placeholder="小柔" />
+      <CisText label="語言" value={languages} onChange={setLanguages} placeholder="zh-Hant, en" />
+      <CisSelect<"casual" | "polite" | "formal"> label="正式度" value={formality} onChange={setFormality}
+        options={[["casual", "輕鬆"], ["polite", "禮貌"], ["formal", "正式"]]} />
+      <CisSelect label="敬語" value={honorifics} onChange={setHonorifics} options={[["你", "你"], ["您", "您"]]} />
+      <CisSelect<"none" | "sparing" | "friendly"> label="Emoji" value={emojiPolicy} onChange={setEmojiPolicy}
+        options={[["none", "不用"], ["sparing", "節制"], ["friendly", "友善"]]} />
+      <CisText label="招呼語" value={greeting} onChange={setGreeting} placeholder="嗨，我是小柔…" />
+      <CisText label="結尾語" value={signoff} onChange={setSignoff} placeholder="還有需要再找我喔" />
+      <CisText label="拒絕用語" value={refusalStyle} onChange={setRefusalStyle} placeholder="做不到時的說法" />
+      <CisText label="轉真人語氣" value={escalationTone} onChange={setEscalationTone} placeholder="轉接時的說法" />
+      <CisText label="品牌使命" value={mission} onChange={setMission} placeholder="MI（選填）" />
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "4px 0", fontSize: 12 }}>
+        <span style={{ color: "var(--text-muted)", width: 88, flexShrink: 0, paddingTop: 5 }}>服務準則</span>
+        <textarea value={servicePrinciples} onChange={(e) => setServicePrinciples(e.target.value)}
+          placeholder="一行一條（能否開玩笑 / 同理優先…）" rows={3}
+          style={{ flex: 1, fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid var(--card-border)",
+            background: "var(--bg-canvas)", color: "var(--text-primary)", resize: "vertical", fontFamily: "inherit" }} />
+      </div>
+      <button onClick={save} disabled={saving} style={{ ...cisBtnStyle, opacity: saving ? 0.6 : 1 }}>
+        {saving ? "儲存中…" : "儲存客服語氣"}
+      </button>
+      {msg && <div style={{ marginTop: 6, fontSize: 11, color: msg.startsWith("✓") ? "var(--green)" : "var(--red)" }}>{msg}</div>}
+    </Card>
+  );
+}
+
+function BrandIdentityTab({ org, cfg }: Pick<ClientHubTabsProps, "org" | "cfg">) {
+  return (
+    <>
+      <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: "0 0 10px", lineHeight: 1.6 }}>
+        CIS 企業識別 — <strong>VI 視覺</strong>（標準色 / Logo / 標準字）+ <strong>BI·MI 客服語氣</strong>，同一份設定同時驅動客服 widget 視覺與 AI 口吻，跨觸點一致。
+      </p>
+      <BrandColorsCard slug={org.slug} initial={cfg.brandColors} />
+      <BrandKitCard slug={org.slug} initial={cfg.brandKit} />
+      <CsVoiceCard slug={org.slug} initial={cfg.csVoice} />
     </>
   );
 }
@@ -1572,7 +1734,7 @@ function CredentialsTab({ org }: Pick<ClientHubTabsProps, "org">) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-const TABS = ["內容工具", "整合", "佈建", "維護", "設定", "社群頻道", "憑證庫"] as const;
+const TABS = ["內容工具", "整合", "佈建", "維護", "設定", "品牌識別", "社群頻道", "憑證庫"] as const;
 type Tab = typeof TABS[number];
 
 export function ClientHubTabs(props: ClientHubTabsProps) {
@@ -1651,6 +1813,7 @@ export function ClientHubTabs(props: ClientHubTabsProps) {
         {activeTab === "佈建" && <ProvisioningTab deptSummary={deptSummary} runs={runs} cfg={cfg} />}
         {activeTab === "維護" && <MaintenanceTab org={org} cfg={cfg} wp={wp} runs={runs} installRuns={installRuns} />}
         {activeTab === "設定" && <SettingsTab org={org} cfg={cfg} wpSites={wpSites} />}
+        {activeTab === "品牌識別" && <BrandIdentityTab org={org} cfg={cfg} />}
         {activeTab === "社群頻道" && <SocialChannelsTab org={org} />}
         {activeTab === "憑證庫" && <CredentialsTab org={org} />}
       </div>

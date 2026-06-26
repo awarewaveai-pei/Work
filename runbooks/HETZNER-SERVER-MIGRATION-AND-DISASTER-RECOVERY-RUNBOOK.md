@@ -98,7 +98,7 @@
    - (c) 新的大 dedicated 本身當第二落地（遷移後）
 
 - **`.env` 密鑰**：`openssl enc -aes-256-cbc -pbkdf2` 加密後才進備份；**金鑰存本機 vault（`secrets-vault.ps1`），絕不跟備份同地**。
-- **失敗告警**：`verify-backup-eu.sh` 已有；接現有 Telegram alert 管線（見 `runbooks/ADD-PERIODIC-HEALTH-CHECK.md`；零記憶負擔 = 失敗自己會叫）。**`TODO:` 確認 verify 失敗有真的觸發 Telegram。**
+- **失敗告警（✅ 2026-06-26 接好）**：機制是 **AO-RESUME surface**（非 Telegram push）—`verify-backup-eu.sh` 把判定 log 到 `/var/log/eu-backup.log`，`scripts/check-backup-health.ps1` 每次開工讀最新 verify 判定，FAILED → `backup-health-LATEST` 報告轉 WARN → Claude 在 §1 報給你（零記憶負擔）。涵蓋「備份壞了」+「備份停了(stale)」兩種。SG verify 另有 Slack 告警（既有）。（即時 push 類用 Netdata/Uptime-Kuma，不在此層。）
 
 ---
 
@@ -218,7 +218,7 @@ openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -in "$OUT/env.tar.g
 - [x] 備份集含**加密後**的 `.env`，金鑰 `BACKUP_ENC_KEY` 存本機 vault（不同地）— 2026-06-26
 - [x] **演練還原成功一次**（§6 A/C + MainWP/n8n 內容驗證）— 2026-06-26
 - [x] **修 R2 upload WARN**（2026-06-26：`set -a` export 修；實測 10/10 HTTP 200）→ 真 3-2-1 成立
-- [ ] 確認 `verify-backup-eu.sh` 失敗有真的觸發 Telegram 告警
+- [x] 備份失敗會 surface（2026-06-26：`check-backup-health.ps1` 讀 verify 判定，FAILED→AO-RESUME WARN；非 Telegram 而是開工自動報，涵蓋「壞了」+「停了」）
 - [ ] auction 機：雙碟 NVMe + RAID 1 + SMART 健康 + mdadm 告警
 - [ ] §4 / §5 的 `TODO:` 指令全部補齊並實測
 - [ ] 所有指向 EU 的 Cloudflare DNS record 清單列出

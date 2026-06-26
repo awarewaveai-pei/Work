@@ -52,6 +52,27 @@ export interface ClientConfig {
     secondary?: string;
     accent?: string;
   };
+  // CIS VI layer — logo / fonts / aux graphics (brand colours stay in brandColors above, not
+  // duplicated here). Same JSONB blob, no migration. See _uiux_design.md §2.7.
+  brandKit?: {
+    logo?: { primary?: string; inverse?: string; icon?: string; clearSpace?: string; minWidthPx?: number };
+    typography?: { headingFont?: string; bodyFont?: string; cjkFont?: string };
+    graphics?: { iconStyle?: string; illustrationStyle?: string; imageryTreatment?: string };
+  };
+  // CIS BI·MI layer — the customer-service AI persona/voice. Consumed by lib/cs (cis.ts).
+  csVoice?: {
+    personaName?: string;
+    languages?: string[];
+    formality?: "casual" | "polite" | "formal";
+    honorifics?: string;
+    emojiPolicy?: "none" | "sparing" | "friendly";
+    greeting?: string;
+    signoff?: string;
+    refusalStyle?: string;
+    escalationTone?: string;
+    servicePrinciples?: string[];
+    mission?: string;
+  };
 }
 
 export interface WpUpdateLatest {

@@ -1,6 +1,6 @@
 # Backup health report
 
-- Generated: 2026-06-26 15:19:45
+- Generated: 2026-06-26 15:27:05
 - Overall: **PASS**
 
 ## SG (5.223.93.113)
@@ -11,6 +11,7 @@
 - Latest backup file time: 2026-06-26 02:31:14
 - Oldest backup file time: 2026-06-19 02:00:02
 - Backup age: 0d
+- Verify result: PASSED (2026-06-26T02:30:12Z)
 
 ## EU (204.168.175.41)
 - Cron file: /etc/cron.d/eu-backup => **present**
@@ -20,4 +21,5 @@
 - Latest backup file time: 2026-06-26 06:16:53
 - Oldest backup file time: 2026-06-19 02:30:45
 - Backup age: 0d
+- Verify result: PASSED (2026-06-26T03:00:16Z)
 

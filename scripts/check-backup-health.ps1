@@ -65,7 +65,8 @@ function Get-HostBackupHealth {
         [Parameter(Mandatory = $true)][string]$ServerHost,
         [Parameter(Mandatory = $true)][string]$CronPath,
         [Parameter(Mandatory = $true)][string]$BackupScriptPath,
-        [Parameter(Mandatory = $true)][string]$BackupDir
+        [Parameter(Mandatory = $true)][string]$BackupDir,
+        [Parameter(Mandatory = $true)][string]$VerifyLog
     )
 
     $parts = @(
@@ -73,6 +74,7 @@ function Get-HostBackupHealth {
         ("CRON_PATH='" + $CronPath + "'"),
         ("BACKUP_SCRIPT='" + $BackupScriptPath + "'"),
         ("BACKUP_DIR='" + $BackupDir + "'"),
+        ("VERIFY_LOG='" + $VerifyLog + "'"),
         'if [ -f "$CRON_PATH" ]; then cron_status="present"; cron_lines=$(grep -v ''^[[:space:]]*#'' "$CRON_PATH" | grep -v ''^[[:space:]]*$'' || true); if [ -z "$cron_lines" ]; then cron_lines="(empty)"; fi; else cron_status="missing"; cron_lines="(missing)"; fi',
         'retention_days="(unknown)"',
         'retention_source="unknown"',
@@ -82,6 +84,7 @@ function Get-HostBackupHealth {
         'if [ -z "$retention_days" ]; then retention_days="(unknown)"; fi',
         'if [ -d "$BACKUP_DIR" ]; then backup_size=$(du -sh "$BACKUP_DIR" 2>/dev/null | awk ''{print $1}''); latest_file=$(ls -1t "$BACKUP_DIR" 2>/dev/null | head -n 1 || true); oldest_file=$(ls -1tr "$BACKUP_DIR" 2>/dev/null | head -n 1 || true); if [ -n "$latest_file" ]; then latest_time=$(stat -c ''%y'' "$BACKUP_DIR/$latest_file" | cut -d''.'' -f1); else latest_time="(none)"; fi; if [ -n "$oldest_file" ]; then oldest_time=$(stat -c ''%y'' "$BACKUP_DIR/$oldest_file" | cut -d''.'' -f1); else oldest_time="(none)"; fi; else backup_size="(missing)"; latest_time="(missing)"; oldest_time="(missing)"; fi',
         'backup_age_days="999"; if [ -d "$BACKUP_DIR" ]; then _latest=$(ls -1t "$BACKUP_DIR" 2>/dev/null | head -n 1 || true); if [ -n "$_latest" ]; then _mtime=$(stat -c ''%Y'' "$BACKUP_DIR/$_latest" 2>/dev/null || echo "0"); _now=$(date +%s); backup_age_days=$(( (_now - _mtime) / 86400 )); fi; fi',
+        'verify_result="UNKNOWN"; verify_time="(none)"; if [ -f "$VERIFY_LOG" ]; then vline=$(grep -E ''=== verify-backup[a-z-]* (PASSED|FAILED)'' "$VERIFY_LOG" 2>/dev/null | tail -n 1 || true); if [ -n "$vline" ]; then if printf ''%s'' "$vline" | grep -q PASSED; then verify_result="PASSED"; else verify_result="FAILED"; fi; verify_time=$(printf ''%s'' "$vline" | grep -oE ''^\[[^]]+\]'' | tr -d ''[]'' || true); if [ -z "$verify_time" ]; then verify_time="(?)"; fi; fi; fi',
         'echo CRON_STATUS=$cron_status',
         'echo "CRON_LINES=$(printf ''%s'' "$cron_lines" | tr ''\n'' ''|'')"',
         'echo RETENTION_DAYS=$retention_days',
@@ -89,7 +92,9 @@ function Get-HostBackupHealth {
         'echo BACKUP_SIZE=$backup_size',
         'echo LATEST_TIME=$latest_time',
         'echo OLDEST_TIME=$oldest_time',
-        'echo BACKUP_AGE_DAYS=$backup_age_days'
+        'echo BACKUP_AGE_DAYS=$backup_age_days',
+        'echo VERIFY_RESULT=$verify_result',
+        'echo VERIFY_TIME=$verify_time'
     )
     $raw = ($parts -join "; ")
     $b64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($raw))
@@ -108,6 +113,8 @@ function Get-HostBackupHealth {
             latest_time      = "(error)"
             oldest_time      = "(error)"
             backup_age_days  = "999"
+            verify_result    = "(error)"
+            verify_time      = "(error)"
         }
     }
 
@@ -123,6 +130,8 @@ function Get-HostBackupHealth {
         latest_time      = Parse-ResultLine -Output $res.Output -Key "LATEST_TIME"
         oldest_time      = Parse-ResultLine -Output $res.Output -Key "OLDEST_TIME"
         backup_age_days  = Parse-ResultLine -Output $res.Output -Key "BACKUP_AGE_DAYS"
+        verify_result    = Parse-ResultLine -Output $res.Output -Key "VERIFY_RESULT"
+        verify_time      = Parse-ResultLine -Output $res.Output -Key "VERIFY_TIME"
     }
 }
 
@@ -146,13 +155,17 @@ if (-not $sshOk) {
     $fatal = $true
     $fatalReason = "SSH private key not found: $PrivateKey"
 } else {
-    $sg = Get-HostBackupHealth -ServerHost $SgHost -CronPath "/etc/cron.d/lobster-backup" -BackupScriptPath "/root/lobster-phase1/scripts/backup-phase1.sh" -BackupDir "/root/lobster-phase1/backups"
-    $eu = Get-HostBackupHealth -ServerHost $EuHost -CronPath "/etc/cron.d/eu-backup" -BackupScriptPath "/root/scripts/backup-eu-stack.sh" -BackupDir "/root/backups"
+    $sg = Get-HostBackupHealth -ServerHost $SgHost -CronPath "/etc/cron.d/lobster-backup" -BackupScriptPath "/root/lobster-phase1/scripts/backup-phase1.sh" -BackupDir "/root/lobster-phase1/backups" -VerifyLog "/var/log/lobster-backup.log"
+    $eu = Get-HostBackupHealth -ServerHost $EuHost -CronPath "/etc/cron.d/eu-backup" -BackupScriptPath "/root/scripts/backup-eu-stack.sh" -BackupDir "/root/backups" -VerifyLog "/var/log/eu-backup.log"
 }
 
 $sgStale = ($sg -ne $null) -and $sg.ok -and ($sg.backup_age_days -match '^\d+$') -and ([int]$sg.backup_age_days -gt 3)
 $euStale = ($eu -ne $null) -and $eu.ok -and ($eu.backup_age_days -match '^\d+$') -and ([int]$eu.backup_age_days -gt 3)
-$overall = if ($fatal) { "ERROR" } elseif ((-not $sg.ok) -or (-not $eu.ok)) { "WARN" } elseif ($sgStale -or $euStale) { "WARN" } else { "PASS" }
+# Verify RESULT (integrity), not just freshness: a backup can be fresh-but-broken.
+# Only FAILED escalates to WARN; UNKNOWN (e.g. log rotated / marker not yet present) does NOT false-alarm.
+$sgVerifyFail = ($sg -ne $null) -and $sg.ok -and ($sg.verify_result -eq "FAILED")
+$euVerifyFail = ($eu -ne $null) -and $eu.ok -and ($eu.verify_result -eq "FAILED")
+$overall = if ($fatal) { "ERROR" } elseif ((-not $sg.ok) -or (-not $eu.ok)) { "WARN" } elseif ($sgStale -or $euStale -or $sgVerifyFail -or $euVerifyFail) { "WARN" } else { "PASS" }
 
 $markdown = New-Object System.Text.StringBuilder
 [void]$markdown.AppendLine("# Backup health report")
@@ -186,6 +199,8 @@ if ($fatal) {
         [void]$markdown.AppendLine("- Oldest backup file time: " + $node.data.oldest_time)
         $ageTag = if ($node.data.backup_age_days -match '^\d+$' -and [int]$node.data.backup_age_days -gt 3) { " STALE" } else { "" }
         [void]$markdown.AppendLine("- Backup age: " + $node.data.backup_age_days + "d" + $ageTag)
+        $verifyTag = if ($node.data.verify_result -eq "FAILED") { " **FAILED**" } elseif ($node.data.verify_result -eq "UNKNOWN") { " (unknown)" } else { "" }
+        [void]$markdown.AppendLine("- Verify result: " + $node.data.verify_result + " (" + $node.data.verify_time + ")" + $verifyTag)
         [void]$markdown.AppendLine("")
     }
 }
@@ -225,9 +240,10 @@ if ($Json) {
             if ($x.data.ok) {
                 $ageD = $x.data.backup_age_days
                 $stale = ($ageD -match '^\d+$') -and ([int]$ageD -gt 3)
-                $line = "- " + $x.name + ": cron=" + $x.data.cron_status + ", retention=" + $x.data.retention_days + "d(" + $x.data.retention_source + "), size=" + $x.data.backup_size + ", latest=" + $x.data.latest_time + ", oldest=" + $x.data.oldest_time + ", age=" + $ageD + "d"
-                if ($stale) {
-                    Write-Host ($line + " STALE") -ForegroundColor Yellow
+                $vfail = ($x.data.verify_result -eq "FAILED")
+                $line = "- " + $x.name + ": cron=" + $x.data.cron_status + ", retention=" + $x.data.retention_days + "d(" + $x.data.retention_source + "), size=" + $x.data.backup_size + ", latest=" + $x.data.latest_time + ", oldest=" + $x.data.oldest_time + ", age=" + $ageD + "d, verify=" + $x.data.verify_result
+                if ($stale -or $vfail) {
+                    Write-Host ($line + $(if ($stale) { " STALE" } else { "" }) + $(if ($vfail) { " VERIFY-FAILED" } else { "" })) -ForegroundColor Yellow
                 } else {
                     Write-Host $line
                 }

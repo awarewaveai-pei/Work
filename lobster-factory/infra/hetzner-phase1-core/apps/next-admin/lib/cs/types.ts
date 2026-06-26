@@ -131,8 +131,8 @@ export interface CsVoice {
   formality?: "casual" | "polite" | "formal";
   honorifics?: string; // '您' | '你'
   emojiPolicy?: "none" | "sparing" | "friendly";
-  greeting?: Record<string, string>;
-  signoff?: Record<string, string>;
+  greeting?: string;
+  signoff?: string;
   apologyStyle?: string;
   refusalStyle?: string;
   escalationTone?: string;

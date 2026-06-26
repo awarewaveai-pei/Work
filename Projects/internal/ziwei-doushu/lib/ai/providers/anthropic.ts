@@ -12,7 +12,13 @@ import { AiCallError } from '../errors';
  */
 let client: Anthropic | null = null;
 function getClient(): Anthropic {
-  if (!client) client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  // timeout/maxRetries 明設:同 openai,封住 upstream 卡住的連線佔用(critic 2026-06-26)。
+  if (!client)
+    client = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      timeout: 60_000,
+      maxRetries: 1,
+    });
   return client;
 }
 

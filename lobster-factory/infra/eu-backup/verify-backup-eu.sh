@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Verify today's EU backup integrity and alert on failure.
+# Verify today's EU backup integrity. Logs verdict "=== verify-backup-eu PASSED/FAILED ==="
+# to /var/log/eu-backup.log + exits non-zero on failure. This script does NOT push alerts
+# itself; failures surface to the operator at AO-RESUME via scripts/check-backup-health.ps1
+# (reads the verdict line; FAILED -> backup-health report WARN).
 set -euo pipefail
 
 [[ -f /etc/default/eu-backup ]] && source /etc/default/eu-backup
