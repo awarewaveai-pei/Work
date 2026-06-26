@@ -4,6 +4,25 @@
 
 ## 2026-06-26
 
+### feat(oracle): Phase A — 每日運勢個人化(真喜用神 + AI 文案)
+
+[任務理解] 每日運勢工廠原已個人化(八字日主→喜用神→幸運色/數/方位),但 ① 喜用神是**簡版恆取印**(身強者其實忌印,錯)② 無 AI 文案。補這兩塊。
+
+[已修改]
+- `lib/daily.ts`(改):luckyElement 改用真扶抑喜用神 `bazi.analysis.favorable[0]`(取代恆取印的 generatorOf,已移除);DailyFortune 加 dayMaster/strength/pattern/favorable;新 `dailyContext(f,locale)` → InterpretationContext(systemId=bazi,標今日+評分+宜忌)餵 AI。
+- `components/DailyTool.tsx`(改):接 `<AiReading tier="light">`(每日=便宜病毒層)產生個人化文案。
+- `lib/daily.test.ts`:luckyElement 綁 favorable[0]、命局摘要欄、dailyContext 形狀。
+
+[驗證結果](R0 四動作)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/daily.test` | exit=0 | 8 pass — 丙日身弱真喜用神首位=木(與舊簡版巧合一致,但身強盤現已正確)、偏財格帶入、dailyContext systemId=bazi+含評分/宜忌。另 tsc=0、`npm test` 88 pass、build=0。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n+1suggestion — critic 確認 favorable 必非空、WUXING 表全 5 鍵、determinism 保持、dailyContext 17 facts<60 且皆過 sanitizeFact 含空陣列 guard、generatorOf 移除無殘留、tier=light 合法、ChartRequest→BaziRequest 結構相容。採納:移除靜默 `?? meEl` fallback(避免日後 favorable 變空靜默回命理錯值)。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/ziwei-doushu | grep=`generatorOf`,`dailyContext`,`DailyFortune`,`computeDailyFortune` | hits=0 stale — generatorOf 0 殘留;`DailyFortuneCache`(db/schema)為另一 DB 型別非衝突。
+- BUGHUNT_SCOPE_NARROW: N/A(含 agency-os + scripts)。
+
+[剩餘風險] 每日 AI 文案端點開放(付費牆前,同 task#1);quota/rate-limit 待 #8。流日四化(computeHoroscope)尚未併入 daily scoring(本刀聚焦真喜用神 + AI 文案)。
+
+[rollback] 新增可逆;`git revert`;DailyFortune 新欄移除需同步 dailyContext + DailyTool。
+
 ### feat(oracle): Phase C — 紫微 過運(流年/流月/流日/流時)+ 四化 + 廟旺餵 AI
 
 [任務理解] 紫微深化:廟旺/四化已在視覺盤(ZiweiChart 早有),但 **AI 解讀的 facts 只有星名、沒有廟旺/四化**,且**完全沒有過運(流年/流月/流日/流時)**。補這兩塊讓旗艦系統解讀真正「綁具體 + 千人千面」。

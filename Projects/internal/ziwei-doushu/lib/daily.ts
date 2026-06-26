@@ -81,7 +81,9 @@ export function computeDailyFortune(
   const bazi = computeBazi({ ...birth, locale });
   const meEl = GAN_WUXING[bazi.dayMaster];
   // 真喜用神(扶抑法):身強者忌印、身弱者喜印;取 favorable 之首為主喜神。
-  const luckyEl = (bazi.analysis.favorable[0] ?? meEl) as WuXing;
+  //   analyzeBazi 保證 favorable 非空(各 strength 分支皆 uniq ≥1);不設靜默 fallback,
+  //   以免日後若 favorable 變空而靜默回日主五行(身強者得比劫=命理錯,critic 2026-06-26)。
+  const luckyEl = bazi.analysis.favorable[0] as WuXing;
   const attr = WUXING[luckyEl];
 
   const lunar = Solar.fromYmd(target.year, target.month, target.day).getLunar();
