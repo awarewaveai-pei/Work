@@ -193,7 +193,7 @@ export default function TarotStudio() {
   // clipping + sticky stacking context). null = hidden.
   const [styleTip, setStyleTip] = useState<{ text: string; x: number; y: number } | null>(null);
   const [panelOpen, setPanelOpen] = useState<Record<string, boolean>>({
-    model: false, style: false, subject: false, mode: false, template: false, grade: true, edit: false,
+    model: false, style: false, subject: false, mode: false, template: false, grade: false, edit: false,
   });
   function togglePanel(key: string) {
     setPanelOpen((prev) => ({ ...prev, [key]: !prev[key] }));
