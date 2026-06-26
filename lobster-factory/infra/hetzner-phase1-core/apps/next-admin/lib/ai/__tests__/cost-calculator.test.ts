@@ -19,6 +19,10 @@ describe("textCallCostUsd", () => {
     expect(textCallCostUsd({ model: "claude-haiku-4-5-20251001", inputTokens: 1_000_000, outputTokens: 1_000_000 })).toBeCloseTo(6, 6);
   });
 
+  it("computes gpt-5.4-nano exactly ($0.20/$1.25 per 1M)", () => {
+    expect(textCallCostUsd({ model: "gpt-5.4-nano", inputTokens: 1_000_000, outputTokens: 1_000_000 })).toBeCloseTo(1.45, 6);
+  });
+
   it("applies cache-read multiplier (0.1x input)", () => {
     // 1M cache-read on sonnet = 1M * ($3/1M) * 0.1 = $0.30
     expect(textCallCostUsd({ model: "claude-sonnet-4-6", inputTokens: 0, outputTokens: 0, cacheReadTokens: 1_000_000 })).toBeCloseTo(0.3, 6);

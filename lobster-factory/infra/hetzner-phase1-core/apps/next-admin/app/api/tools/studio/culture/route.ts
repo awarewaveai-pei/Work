@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
+import { extractJsonArray, generateCheapJsonText } from "../../../../../lib/ai/cheap-json";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
-import Anthropic from "@anthropic-ai/sdk";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-// Lens key → English fragment describing what specifics to surface. Kept in sync
-// with CULTURE_LENSES[].hint in lib/studio/culture-presets.ts (the UI never sends
-// a key that isn't in that list, but we validate against this map anyway).
+// Lens key to English fragment describing what specifics to surface. Kept in sync
+// with CULTURE_LENSES[].hint in lib/studio/culture-presets.ts.
 const LENS_HINTS: Record<string, string> = {
   garment: "traditional garments, dress, costume and clothing silhouettes",
   pattern: "traditional decorative patterns, motifs and ornamental designs",
@@ -51,48 +50,48 @@ export async function POST(req: Request) {
   if (!region || !lensKey) {
     return NextResponse.json({ ok: false, error: "missing_region_or_lens" }, { status: 400 });
   }
-  const lensHint = LENS_HINTS[lensKey]!;
-
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ ok: false, error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
-  }
 
   const systemPrompt = `You are a cultural design researcher helping a designer create clothing graphics inspired by world cultures.
 Given a culture and a facet, return ONLY a valid JSON array of 12 specific, authentic, visually distinctive items of that facet from that culture.
 Each item is an object: {"zh": "<short Traditional Chinese label, 2-6 chars>", "en": "<English phrase, 2-6 words, vivid and visual for an image prompt>", "desc": "<short Traditional Chinese description, under 12 chars>"}.
-Be culturally accurate and respectful — use real names of dishes, patterns, garments, landmarks, instruments, figures, etc. Avoid stereotypes and avoid sacred items that should not be commercialized.
-No markdown, no explanation, no extra text — just the raw JSON array.`;
+Be culturally accurate and respectful - use real names of dishes, patterns, garments, landmarks, instruments, figures, etc. Avoid stereotypes and avoid sacred items that should not be commercialized.
+No markdown, no explanation, no extra text - just the raw JSON array.`;
 
-  const userPrompt = `Culture: ${region}. Facet: ${lensHint}. List 12 specific, authentic, visually compelling items suitable as graphic motifs for clothing design.`;
+  const userPrompt = `Culture: ${region}. Facet: ${LENS_HINTS[lensKey]}. List 12 specific, authentic, visually compelling items suitable as graphic motifs for clothing design.`;
 
   try {
-    const client = new Anthropic({ apiKey });
-    const msg = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 900,
+    const result = await generateCheapJsonText({
+      route: "/api/tools/studio/culture",
       system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
+      user: userPrompt,
+      maxTokens: 900,
+      metadata: { region, lens: lensKey },
+      tool: "studio",
     });
-    const raw = msg.content[0]?.type === "text" ? msg.content[0].text : "";
 
-    const match = raw.match(/\[[\s\S]*\]/);
-    if (!match) {
-      return NextResponse.json({ ok: false, error: "Unexpected response format", raw: raw.slice(0, 300) }, { status: 502 });
+    if (result.ok === false) {
+      return NextResponse.json({ ok: false, error: result.error }, { status: result.status });
+    }
+
+    const jsonArray = extractJsonArray(result.raw);
+    if (!jsonArray) {
+      return NextResponse.json(
+        { ok: false, error: "Unexpected response format", raw: result.raw.slice(0, 300) },
+        { status: 502 },
+      );
     }
 
     let parsed: unknown[];
     try {
-      parsed = JSON.parse(match[0]) as unknown[];
+      parsed = JSON.parse(jsonArray) as unknown[];
     } catch {
-      return NextResponse.json({ ok: false, error: "JSON parse failed", raw: match[0].slice(0, 300) }, { status: 502 });
+      return NextResponse.json({ ok: false, error: "JSON parse failed", raw: jsonArray.slice(0, 300) }, { status: 502 });
     }
 
     if (!Array.isArray(parsed)) {
       return NextResponse.json({ ok: false, error: "Parsed value is not an array" }, { status: 502 });
     }
 
-    // Keep only well-formed bilingual items; coerce to plain strings defensively.
     const items: CultureItem[] = parsed
       .filter((it): it is Record<string, unknown> => typeof it === "object" && it !== null)
       .map((it) => ({
