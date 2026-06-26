@@ -504,7 +504,7 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-06-25 14:30:06 UTC_
+_Last synced: 2026-06-26 01:28:23 UTC_
 
 ## 2026-06-16 AO-CLOSE memory — session window 2026-06-11T05:07Z → 2026-06-16 afternoon
 
@@ -539,6 +539,14 @@ _Last synced: 2026-06-25 14:30:06 UTC_
 - **AI Models 指南上線**：原本使用者想放 Tarot，後更正要放 Content Tools，因生圖工具會被多處共用。新 route `/tools/ai-models` 已加入 sidebar（SEO Content 下、Tarot 上），正式站 deploy commit `5b8c97ac59e5da7d194db7256c1db27f8a503552`。
 - **頁面內容**：三個相鄰比較區：文字生成工具（OpenAI/Claude/Gemini/Perplexity/Grok）、圖片生成模型（15 個 app 現有模型，成本改成每張，不是 78 張）、Vibe Coding 工具（Codex/Claude Code/Gemini/Perplexity/Grok）。表格呈現優劣、風格、速度、成本、prompt/image input、比例與來源連結。
 - **部署證據**：local `npm run typecheck` + `npm run build` PASS；SG `sg-deploy.sh next-admin` PASS；prod gates `tsc` PASS、vitest 24 files / 316 tests PASS、container healthy after 7s、smoke `/login` + `/api/ops/summary` + nginx/wordpress + node-api OK。`/tools/ai-models` 未登入時 307 到 login（符合 auth middleware）。
+
+## 2026-06-26 AO-CLOSE memory — Codex closeout
+
+- User asked to handle uncommitted work, push, then run AO-CLOSE. The initial dirty tree was generated AO status output only: latest auto-reboot, backup-health, cf-security, routine-freshness, smoke JSON, plus `backup-health-20260626-091634.md`. It was committed and pushed as `7a2c506c chore(status): refresh AO routine reports`.
+- AO-CLOSE needed a repo-local `XDG_CONFIG_HOME` to avoid the unreadable Windows global git ignore warning from turning into a PowerShell NativeCommandError. The fetch step also needed the approved outside-sandbox run because `.git/FETCH_HEAD` was permission-denied in the sandbox.
+- AO-CLOSE verify chain reached strict completeness with build gates PASS, health `100% (372/372)`, system guard PASS, integrated status refreshed, and stale `ALERT_REQUIRED.txt` removed. The remaining action is the generated AO-CLOSE sync commit/push plus final archive report overwrite.
+
+
 
 
 

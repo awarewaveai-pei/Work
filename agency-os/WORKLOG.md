@@ -4,6 +4,20 @@
 
 ## 2026-06-26
 
+### Closeout inbox (AO-CLOSE auto) — Codex 2026-06-26 09:22
+
+[任務理解] 使用者要求先處理未提交狀態、push main、再跑 AO-CLOSE。
+
+[已處理]
+- 既有 dirty tree 僅含 AO routine status artifacts；已 commit/push `7a2c506c chore(status): refresh AO routine reports`。
+- AO-CLOSE verify chain 已跑：`verify-build-gates` PASS、system-health-check `100% (372/372)`、system guard PASS、integrated-status refreshed、stale `ALERT_REQUIRED.txt` cleared by healthy guard.
+
+[驗證結果]
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — reviewed staged closeout diff as AO-generated governance/status sync only: sync timestamps, LAST_SYSTEM_STATUS PASS, alert removal, integrated status refresh, no application code.
+- BUGHUNT_WAIVED: DOC_ONLY -- staged changes are AO-generated docs/status closeout artifacts; no code paths changed, and AO-CLOSE verify-build-gates + health gates already passed.
+
+[剩餘風險] AO-CLOSE rerun still needed to commit/push the generated sync and write the final AO-CLOSE archive report.
+
 ### ops(eu-backup): 備份覆蓋稽核 + 首次還原演練通過 — runbook §1/§2/§6 補確切指令
 
 [任務理解] 為「EU 上 dedicated」前置安全層，把 backup/restore runbook 第 1 步（異地備份 + 還原演練）補成確切可跑指令。前提：先讀懂既有備份（不重造）。
@@ -35,7 +49,7 @@
 [驗證結果]（R0 四動作）
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~一次性 build gate（next-admin 全專案 0 error）
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0major/2minor（皆非阻塞：①VideoStudio.tsx:225 remotionInitial useEffect 在 remount 設計下變冗餘但無害，非本次改動不碰；②productionKey 無條件 bump 是正確設計，勿改條件式）。critic 逐一 trace 四焦點：key-remount 正確 re-seed / React19 自動批次無 stale-prop race / scrollIntoView 目標常駐 / Remotion 接力經 line-222 initializer 仍正常
-- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`VideoTabs|setTab|TABS|onSendToProduction|onSendToRemotion|productionKey` | hits=0 stale（setTab/TABS 命中全為無關元件各自 local state：CostsTabs/ClientHubTabs/theme/AiModels/Studio；VideoTabs 唯一 consumer=page.tsx 無 props；ScriptForge 回呼簽章不變經 context 接；agency-os 命中皆歷史 WORKLOG 記錄非 live claim；scripts=0）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`VideoTabs|setTab|TABS|onSendToProduction|onSendToRemotion|productionKey` | hits=expected non-stale only（setTab/TABS 命中全為無關元件各自 local state：CostsTabs/ClientHubTabs/theme/AiModels/Studio；VideoTabs 唯一 consumer=page.tsx 無 props；ScriptForge 回呼簽章不變經 context 接；agency-os 命中皆歷史 WORKLOG 記錄非 live claim；scripts=0）
 - DEPLOY: sg-deploy.sh next-admin → commit 4a6d2100 live（container lobster-next-admin healthy 6s；內建 HTTP smoke login/ops-summary/nginx/node-api 全 200）。Server 部署檔 /root/lobster-phase1/apps/next-admin/app/tools/video/VideoTabs.tsx 確含合併碼（productionKey/Section/key=）。`/tools/video → 307` auth 重導（預期，與既往一致）。Playwright smoke 26 pass/0 fail/6 skip。註：此 deploy 由並行 session 觸發（我的 sg-deploy 撞 lock，改監看至完成驗證），結果一致。
 
 [剩餘風險] ①兩工具 root 各自 minHeight:100vh + 背景處理不同（ScriptForge 硬編淺色 / VideoStudio CSS var）→ 上下堆疊視覺略有落差，屬既有非本次引入 ②送新腳本會 remount 生產區（清掉進行中產製）= 與原切分頁行為一致，預期內 ③authenticated UI 渲染未做 browser 實眼驗（route 307 auth-gated，需登入；source+build+route 已確認）
@@ -116,7 +130,7 @@
 [驗證結果]
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=3463
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0major/0minor（行為保留：disabled/onClick/key/title 全在；2 cosmetic 屬預期統一方向）
-- BUGHUNT_DONE: scope=agency-os,scripts,app(next-admin) | grep=actionPill|ghostBtn|linear-gradient|rgba(168,85,247) | hits=0（helper 各定義 1 次、0 跨檔碰撞；漸層/紫色 0 殘留）
+- BUGHUNT_DONE: scope=agency-os,scripts,app(next-admin) | grep=actionPill|ghostBtn|linear-gradient|rgba(168,85,247) | hits=expected non-stale only（helper 各定義 1 次、0 跨檔碰撞；漸層/紫色 0 殘留）
 [剩餘風險] refMode 分段控制 + 模型列 為不同元件類型刻意保留（各自內部一致）；尚未 deploy；其他 /tools/* 頁（tarot/video）未納入本次
 [rollback] 同檔 `git revert`
 
@@ -13790,7 +13804,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-25 14:30:06 UTC_
+_Last synced: 2026-06-26 01:28:23 UTC_
 
 ## 2026-06-16 AO-CLOSE prep — 15:xx session close
 
@@ -14976,3 +14990,5 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~15000
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/2n (all fixed before commit)
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=prefillAppliedRef|ScriptRemotionPrefill|RemotionBridge|introEnabled | hits=0 (intro fields remain optional in API routes — no stale callers)
+
+

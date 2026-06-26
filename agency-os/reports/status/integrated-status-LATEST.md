@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-24 08:22:20
+- Generated: 2026-06-26 09:28:29
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -219,134 +219,81 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-06-24.md
-# Daily Note - 2026-06-24
+## 5) memory/daily/2026-06-26.md
+# Daily Note - 2026-06-26
 
+## Done today
+- Committed and pushed the pre-existing AO routine status artifacts as `7a2c506c chore(status): refresh AO routine reports`.
+- Ran AO-CLOSE through fetch safety, build gates, health, system guard, and integrated-status generation. Gate evidence: `verify-build-gates` PASS; health `100% (372/372)`; system guard PASS.
 
-## AO-CLOSE — 2026-06-24 02:30 CST
+## Current state
+- `main` was pushed to `origin/main` before AO-CLOSE. AO-CLOSE generated governance/status sync changes are staged for the final closeout commit.
+- Current reports: `reports/health/health-20260626-092156.md`, `reports/guard/guard-20260626-092201.md`, `reports/status/integrated-status-20260626-092210.md`.
+- Stale `ALERT_REQUIRED.txt` was cleared because System Guard is now PASS.
 
-### Done today
-- **OutputTrackBar**: 新增 `PNG下載` btn + `hideQuickEdit` prop；WebP 改名；分兩列（下載 / 印刷+快速編輯）
-- **TarotStudio**: 快速編輯獨立移至 `ImageEditPromptPanel` 正上方 full-width
-- **CanvasEditor**: `MAX_DISP` 改動態 `containerWidth`（ResizeObserver）+ `sizedByCanvasApply` 守衛初始 load，消橫向滑桿
-- verify-recent: tsc 0 + vitest 487/487 + critic Deep 0C/0M
-- SG deploy `36fcfd6a` + playwright smoke 26/32 pass（6 skip auth-gated）
+## Next steps
+- Rerun AO-CLOSE strict after this evidence update so it can commit and push the generated sync.
+- After a successful AO-CLOSE sync commit, overwrite the generated archive skeleton with the final four-section AO-CLOSE report and prune old AO-CLOSE reports if required.
 
-### Remaining
-- Canvas 編輯器整輪瀏覽器實測待操作者完成
-- init-load `maxDisplay=650` minor UX inconsistency（不影響 export）
+## Open tasks (auto-generated at 08:00 TPE)
+- [ ] **【未開始｜Phase 1 MVP】Cold Outreach Workbench — 冷開發完整鏈**（T1–T12 ungated 全完成；唯一剩 T10 Gmail per-org OAuth = gated High-risk）
+- [ ] **【資安複盤】Defender 嚴重木馬 `Trojan:Win32/PowhidSubExec.B` 來源查清與善後**（暫存檔清掉 + scheduled task action 驗證 + hook 補阻擋規則）
+- [ ] **【進行中｜POD 一鍵自動上架】設計圖 → Woo + Printful 多款多色全自動**
+- [ ] **【人工｜Postiz Task 2 OAuth app 審核】各平台 dev app 提交**（Meta IG+FB / Reddit / LinkedIn；X 跳過）
+- [ ] **【人工｜Postiz 測試草稿清理】**（登入 postiz.aware-wave.com → 刪 draft `cmqo1wijz0005p58ncl1mtssr`）
+- [ ] **【操作者｜Postiz 帳號 → 客戶 Hub 連結】**（app.aware-wave.com/ops/clients/[slug] → 社群頻道 tab → 連結 Bluesky）
+- [ ] **【進行中｜內容引擎積木化】搜尋積木 registry 已 live，剩來源/UI/第二批**
+- [ ] **【驗證債】Canvas 編輯器 `/tools/canvas` 整輪瀏覽器實測**（Undo/Redo / 排版橡皮擦 / 生成填色 / 群組/Posterize / .design.json 存載）
+- [ ] **【明日】soulfulexpression.org 遷移到 Cloudflare（DNS 先、registrar 後）**
+- [ ] **【進行中｜app.aware-wave 一鍵架站總藍圖】Stage 1 完成；下一步 Stage 2 Fluent Form→intake 橋接+FluentCRM**
+- [ ] **wp-bridge plugin 補 `/product` dry_run 支援**
+- [ ] **【POD A1 已完工｜剩 e2e + A2】真實 e2e 開賣驗證**
+- [ ] **【POD A2 confirm phase — 🔴 金流紅線】**（draft-only dormant；需操作者明示批准）
+- [ ] **smoke 04-onboard spec 補 app session 登入**
+- [ ] **wp-bridge 續做 operation：featured image / update-existing-post / product update+delete**
+- [ ] **【POD Studio 自建動工】**（下一步 = link 寫路徑首驗 → P3 上架定案）
+- [ ] **【POD 服飾 Phase 1-4 後續｜2026-06-15 已部署】剩餘項目**
+- [ ] **TASKS [x] 自動歸檔 + 重複行偵測閘**（archive-completed-tasks.ps1；R0 已批方案A）
+- [ ] **【診斷】Mockup Studio 功能異常 — 卡操作者症狀**（需操作者提供錯誤細節）
+- [ ] **🎨 Image Output Pipeline**（SSOT: `lobster-factory/docs/PLAN-tarot-pod-image-output-pipeline-plus.md`）
+- [ ] **SEO/GEO 引擎產品化 + Soulful 定位/文章**
+- [ ] **Auto-Repair Post-Phase 4 (M2 per-source HMAC + M4 fingerprint)**
+- [ ] **wp-bridge 外掛：接進 app.aware-wave.com Ops Dashboard + 展示頁 + 販售**
+- [ ] **M2/M4 Phase 1 code 完成；剩 Phase 2 rollout + Phase 3 constraint swap + 3 side item**
+- [ ] **Hetzner dispatcher 上線前 follow-up**（M10 orphan reaper + partial index；啟用 LOBSTER_EXECUTE_* 前必做）
+- [ ] **【READY，未做】把 Hetzner 一鍵租機嵌進 app.aware-wave.com（Phase 5）**
+- [ ] **【計畫完成，未實作】客戶機「開機後全棧部署+維護」層**
+- [ ] **app.aware-wave onboarding/provisioning IA 重整**（Phase 1 退役 ops-console）
+- [ ] **【公司桌機】CLOUDFLARE vault token 裝錯修正**（`cfut_` → `cfat_`；補 `CLOUDFLARE_ACCOUNT_ID`）
+- [ ] **【公司桌機】重跑 SystemGuard 註冊器，換掉會閃紅字視窗的舊 Daily 任務**
+- [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤**
+- [ ] **既有站接手（Soulful Expression Art Therapy）**（Day 2 書面完成；下一步 Day 1 §1.1 操作者登入）
+- [ ] **既有站接手 Day 1（Soulful Expression）**（§1.2✅ §1.3✅；仍開放：§1.1 帳號層級權限確認）
+- [ ] **新站建置（Scenery Travel Mongolia）**（下一步：選定主機商後 Runbook §2）
+- [ ] **新站建置 Day 1（Scenery Travel Mongolia）**（下一步：與客戶確認素材與頂級網域）
+- [ ] **Next-Gen 試點 — Day 2 雲端 staging 實機驗收（兩案）**（阻塞：須 Hostinger/主機商操作）
+- [ ] **`tenants/templates/` v2**（未開始；依試點回填後再開）
+- [ ] **`lobster-factory` A10-2 商業閉環實跑**（未開始）
+- [ ] **【2026-06-05 開出】塔羅牌工具 → MEGA → WooCommerce 三階段路線圖**
+- [ ] **【2026-05-30 開出】endpoint-alert.sh 自動化部署機制**
+- [ ] **三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability）**（每月 drift 記錄）
+- [ ] **【🟠 Major M2-M4/M7-M10 + 🟡 Minor m2-m6/m8-m11】**（排 Phase 4 觀察期後）
+- [ ] **（Phase 4 觀察期）AwareWave 自動告警維修系統 v3.2**（Phase 1+2+3 全完成；Phase 4 每週巡檢啟動）
+- [ ] **建立跨國稅務與法遵顧問審核流程**
 
----
-
-### verify-recent --ack (2026-06-23T16:01:00.9592359Z)
-
-**Reason**: publish #2/#3/#6: tsc clean (x multiple) + critic external-oracle (1 Major + 1 Minor fixed; key-leak/clientId-injection/backward-compat Verified Clean) + REALTEST 21 assertions all green (real wp-bridge-client multi-client + no key leak; #2 view-select/dedup; #3 profit math; #6 externalId namespacing/normalizeClientId).
-
-**Acknowledged unverified files** (count=4):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\printful-catalog.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\publish\route.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\publish\PublishWizard.tsx`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\wp-bridge-client.ts`
-
-
-### verify-recent --ack (2026-06-23T16:22:21.9876367Z)
-
-**Reason**: canvas scaling fix (Math.min 1→8) + defaultCollapsed restore: tsc 0 errors; logic is 2 arithmetic line changes + 9 boolean prop additions
-
-**Acknowledged unverified files** (count=1):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\canvas\CanvasEditor.tsx`
-
-
-### verify-recent --ack (2026-06-23T16:39:07.7409263Z)
-
-**Reason**: filename UX fix: editName state + uploadImage auto-fill + exportPxLabel display; tsc 0 errors; logic is additive state + UI wiring only
-
-**Acknowledged unverified files** (count=1):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\canvas\CanvasEditor.tsx`
-
-
-### verify-recent --ack (2026-06-23T16:43:33.7224433Z)
-
-**Reason**: publish #2-refine + size-chart: tsc clean + npm test 487/487 (incl new permanent size-chart tests) + critic external-oracle (1 Major chartSizes cache-poison FIXED + 3 Minor HTML-escape/unit-none/test-coverage FIXED) + REALTEST 11 assertions (size-guide parse, flat-only #2, real buildPodProductPayload table block).
-
-**Acknowledged unverified files** (count=4):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\publish\PublishWizard.tsx`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\pod-product.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\printful-catalog.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\publish\route.ts`
-
-
-### verify-recent --ack (2026-06-23T16:49:17.2665990Z)
-
-**Reason**: DPI auto-apply: one-line useEffect watching szDpi, guards on ready+canvasMetaRef; tsc 0 errors; no logic risk
-
-**Acknowledged unverified files** (count=1):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\canvas\CanvasEditor.tsx`
-
-
-### verify-recent --ack (2026-06-23T17:03:32.7776845Z)
-
-**Reason**: size-chart inch/cm: tsc clean + npm test 487/487 + critic external-oracle (0 Crit/Major; 2 Minor + 2 suggestions ALL applied; XSS/never-throws/latency Verified Clean) + REALTEST 7/7 (dual cell+range, cm-only no self-merge, single-bound).
-
-**Acknowledged unverified files** (count=1):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\printful-catalog.ts`
-
-
-### verify-recent --ack (2026-06-23T17:51:43.7217956Z)
-
-**Reason**: publish C8/A2/A3 (non-money UX): tsc clean + npm test 487/487 + critic external-oracle (1 Major A2<->runAll concurrency FIXED via colorGenLatch mutual-exclusion + cross-disable; 2 Minor within-tick-latch + label FIXED; SSRF/backend-revalidation/A3-fallback Verified Clean). UI behaviour e2e via post-deploy smoke.
-
-**Acknowledged unverified files** (count=2):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\publish\PublishWizard.tsx`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\designs\DesignsGallery.tsx`
-
-
-### verify-recent --ack (2026-06-24T00:07:39.4601223Z)
-
-**Reason**: comment-only delete (stale exportPxLabel description) + tooltip text fix (150KB->200KB); already covered by tsc/critic/npm-test in same session
-
-**Acknowledged unverified files** (count=1):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\canvas\CanvasEditor.tsx`
-
-
-### verify-recent --ack (2026-06-24T00:15:37.1508739Z)
-
-**Reason**: critic Deep review passed 0c/0m/0n on ContentStudio.tsx + VideoStudio.tsx chip UI changes; tsc clean; bughunt hits=0
-
-**Acknowledged unverified files** (count=2):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\content\ContentStudio.tsx`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\video\VideoStudio.tsx`
+## Yesterday context
+最後 session 2026-06-16：重構 POD edge-mask 積木（縮放邏輯從 caller 移入積木本身，三個 caller 不需改動）、Canvas/Designs asset brush strength slider 解鎖；428/428 tests pass，Deep critic 0 findings。Cold Outreach Phase 1 T1–T12 全完成，唯一剩 T10 Gmail per-org OAuth（High-risk gated，另案）。
 
 ---
-
-## AO-CLOSE — 2026-06-24 (session #2)
-
-### Done this session
-- **CanvasEditor 匯出面板移至右側工具欄**：PNG下載 / WebP下載 / 存入 My Designs / 檔名 input 從頂部工具列移至右側 SidebarPanel id="export"（第一個 panel）
-- **exportPxLabel 死狀態清除**：state 宣告 + 2 個 setExportPxLabel call sites + stale comment 全部移除
-- **PNG 按鍵**：不再顯示尺寸標籤
-- **WebP tooltip 修正**：150KB → 200KB（對齊實際壓縮目標）
-- verify-recent: tsc 0 + vitest 487/487 + critic Deep 0C/0M（2 minor 已修）+ bughunt hits=4（doc-only）
-- SG deploy `c8d9d34f` + playwright smoke 26/32（6 skip auth-gated）
-
-### Remaining
-- Canvas 編輯器整輪瀏覽器實測待操作者完成
-
+<!-- prior session note preserved -->
+### verify-recent --ack (2026-06-25T22:33:38Z)
+cron value + comment only, no logic change. `*/10` standard valid cron. Acknowledged unverified: `lobster-factory/packages/workflows/src/trigger/dispatch-action-run.ts`
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-06-24 02:30:26`
+- Time: `2026-06-26 09:22:01`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -356,28 +303,13 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260624-023022.md`
-- Closeout: `reports/closeout/closeout-20260624-023026.md`
+- Health: `reports/health/health-20260626-092156.md`
+- Closeout: `reports/closeout/closeout-20260626-092200.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-- Added `/tools/ai-models` under Content Tools sidebar, positioned between SEO Content and Tarot.
-- Built a clean comparison UI for three adjacent decision surfaces: text generation tools, image generation models, and vibe coding tools.
-- Image model table uses per-image cost only, not 78-card deck cost, and covers the 15 app image models requested by the operator.
-- Data includes model strengths, tradeoffs, style tendencies, cost notes, prompt/image input constraints where available, speed class, ratios, and source links.
-- REALTEST_EVIDENCE: tool=PowerShell | cmd=`npm run typecheck` (next-admin) | exit=0 | result=tsc clean
-- REALTEST_EVIDENCE: tool=PowerShell | cmd=`npm run build` (next-admin) | exit=0 | result=Next production build passed; route table includes `/tools/ai-models`
-- REALTEST_EVIDENCE: tool=SSH | cmd=`/root/lobster-phase1/scripts/sg-deploy.sh next-admin` | exit=0 | result=deployed commit `5b8c97ac59e5da7d194db7256c1db27f8a503552`
-- REALTEST_EVIDENCE: tool=SSH | cmd=deploy gates | exit=0 | result=tsc passed; vitest 24 files / 316 tests passed; container healthy after 7s; smoke OK for `/login`, `/api/ops/summary`, nginx/wordpress, node-api
-- REALTEST_EVIDENCE: tool=PowerShell | cmd=`curl.exe -I https://app.aware-wave.com/tools/ai-models` | exit=0 | result=307 to `/login?next=%2Ftools%2Fai-models` as expected behind auth; `/login` returns 200
-- REVIEW_WAIVED: CONTENT_DATA_UI -- static comparison page + typed data tables; build/typecheck/deploy smoke covered runtime integration
-- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep=`78 張約|全套成本|fullDeckNt|15 個圖片模型比較` | hits=0 after moving comparison out of Tarot and using per-image cost only
-
-
-
-
 ## 2026-06-16
 
 ### Machine appendix (monthly-system-review)
@@ -421,5 +353,20 @@
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): pure identifier rename perplexityChat→aiChat, perplexityCostUsd→sourcesCostUsd
 
 
+
+
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): structural DOM move, toolbar inside filter-panel, no logic change
+
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): layout-only JSX restructure, no logic change
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): remove sticky+overflow wrapper, layout-only JSX change
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): CSS order prop + width tweak, no logic change
+
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): added missing useVideoConfig import to ProductReviewTypewriter.tsx (one-line fix, file already Deep-critic-reviewed in prior session)
+
+
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial)
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~15000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/2n (all fixed before commit)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=prefillAppliedRef|ScriptRemotionPrefill|RemotionBridge|introEnabled | hits=0 (intro fields remain optional in API routes — no stale callers)
 
 
