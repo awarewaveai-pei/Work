@@ -44,20 +44,25 @@ export function evaluateEntitlement(input: EntitlementInput): EntitlementResult 
   if (input.tier === 'premium') {
     return { allowed: false, reason: 'premium_requires_subscription' };
   }
+  // 防呆:真實 Supabase store 若因壞 query 回負數/NaN,fail-closed(視為已達上限),
+  //   不可 fail-open 放免費無限用(critic 2026-06-26)。
+  const used = Number.isFinite(input.aiUsedToday)
+    ? Math.max(0, Math.floor(input.aiUsedToday))
+    : FREE_DAILY_AI_LIMIT;
   // 免費:輕量/深度受每日上限
-  if (input.aiUsedToday >= FREE_DAILY_AI_LIMIT) {
+  if (used >= FREE_DAILY_AI_LIMIT) {
     return { allowed: false, reason: 'free_daily_limit_reached' };
   }
-  return {
-    allowed: true,
-    remaining: FREE_DAILY_AI_LIMIT - input.aiUsedToday - 1,
-  };
+  return { allowed: true, remaining: FREE_DAILY_AI_LIMIT - used - 1 };
 }
 
 /**
  * 用量/訂閱狀態儲存 seam。
- * 真實實作(drop-in):讀 subscriptions(plan/status)+ 計當日 readings 數(或
- *   credit_ledger)→ 回 { plan, aiUsedToday };recordUse 寫一筆扣量。
+ * 真實實作(drop-in)契約:
+ *   - getStatus:讀 subscriptions → `plan='subscriber'` 當且僅當 `status ∈
+ *     {active, trialing}`(schema.ts Subscription.status),其餘為 'free';
+ *     `aiUsedToday` 計當日 readings 數(或 credit_ledger 當日扣量筆數)。
+ *   - recordUse:寫一筆扣量(Reading 列 / credit_ledger delta)。
  */
 export interface EntitlementStore {
   getStatus(subjectId: string): Promise<{ plan: Plan; aiUsedToday: number }>;
@@ -101,6 +106,9 @@ export async function checkAndConsume(
 ): Promise<EntitlementResult> {
   const { plan, aiUsedToday } = await store.getStatus(subjectId);
   const result = evaluateEntitlement({ plan, aiUsedToday, tier });
+  // ⚠️ TOCTOU:getStatus→recordUse 非原子,並發同 subjectId 可能各讀到同值而雙寫
+  //   (超發少數)。stub 可接受;真實 store 須原子化(INSERT ... ON CONFLICT DO
+  //   UPDATE ... RETURNING count,或寫後檢查回傳值超標則退量)。
   if (result.allowed) await store.recordUse(subjectId, tier);
   return result;
 }
