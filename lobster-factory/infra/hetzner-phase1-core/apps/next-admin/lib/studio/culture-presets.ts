@@ -351,8 +351,8 @@ export const MAP_THEMES: MapTheme[] = [
     ],
   },
   {
-    key: "architecture", zh: "古蹟", emoji: "🏛️", enLabel: "historic heritage sites", kind: "map",
-    hint: "iconic architecture, historic sites and heritage buildings",
+    key: "heritage", zh: "古蹟", emoji: "🏛️", enLabel: "historic heritage sites", kind: "map",
+    hint: "historic heritage sites, monuments, ancient ruins, old temples and landmark heritage buildings",
     fallback: [
       { zh: "古蹟", en: "historic site", desc: "歷史古蹟" },
       { zh: "古廟", en: "old temple", desc: "古老廟宇" },

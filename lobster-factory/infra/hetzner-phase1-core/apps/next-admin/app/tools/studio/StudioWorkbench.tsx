@@ -139,7 +139,8 @@ function buildMapPrompt(opts: {
   if (theme.kind === "chart") {
     return `An illustrated reference chart poster of ${place} ${theme.enLabel}, neat grid of individual labeled icons${icons ? ` such as ${icons}` : ""}, flat vector illustration, bold clean outlines, plain background, infographic style, not a realistic photograph`;
   }
-  return `A colorful flat-vector illustrated tourist map of ${place}, top-down stylized map in the shape of the country, travel-poster infographic highlighting ${theme.enLabel},${icons ? ` with labeled cute illustrated icons of ${icons},` : ""} decorative compass rose, small clouds, trees and a welcome title banner, soft vibrant colors, thick clean outlines, cartographic illustration, not a realistic photograph`;
+  const shapeClause = fusionEn ? "blending both regions" : "top-down stylized map in the shape of the country/region";
+  return `A colorful flat-vector illustrated tourist map of ${place}, ${shapeClause}, travel-poster infographic highlighting ${theme.enLabel},${icons ? ` with labeled cute illustrated icons of ${icons},` : ""} decorative compass rose, small clouds, trees and a welcome title banner, soft vibrant colors, thick clean outlines, cartographic illustration, not a realistic photograph`;
 }
 
 function coerceTopics(value: unknown): string[] {

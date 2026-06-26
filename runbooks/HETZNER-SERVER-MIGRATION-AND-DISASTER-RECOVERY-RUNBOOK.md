@@ -159,7 +159,7 @@
 6. 還原 volumes：storage / minio / n8n / uptime-kuma。
 7. `docker compose up -d`（各 stack）→ 等 healthy。
 8. **驗證**：Supabase 登入 + 客戶資料在、Trigger 排程在（`TaskSchedule`）、MainWP 連得到 child、app.aware-wave 能佈建。
-9. DNS：若換 IP → 更新 Cloudflare A record（`TODO:` 列出所有指向 EU 的 record）。
+9. DNS：若換 IP → 更新 Cloudflare A record。**指向 EU 的 9 個 record 清單見 §5 step 5**（2026-06-26 live 查證）。
 - `TODO:` 每步補確切指令 + 預期輸出（實機演練時定稿）。
 
 ---
@@ -172,7 +172,16 @@
 2. 凍結寫入（短維護窗）：停對外入口，避免遷移中產生新資料。
 3. 取最終一致 dump（所有 🔴🟡）。
 4. 在 dedicated 還原（照 §4 step 2–7）。
-5. 切 DNS → dedicated IP，TTL 先調短。
+5. 切 DNS → dedicated IP，TTL 先調短。**要改的就是下面這 9 個指向 EU 的 A 記錄**（2026-06-26 live 查證，非文件舉例）：
+
+   | 子網域 | CF 代理 | 備註 |
+   |--------|--------|------|
+   | `supabase` / `studio` / `n8n` / `trigger` / `uptime` / `mainwp` / `postiz` | 🟠 proxied | 平台/自動化/監控入口；改 A record content 即可（CF 邊緣不變）|
+   | `remotion-svc` / `video-svc` | ⚪ **DNS-only（沒走 CF）** | **直接暴露 origin IP、無 CDN**；改 IP 後訪客直連新機，注意這兩個沒有 CF 邊緣保護 |
+
+   - SG 那 4 個（`apex` / `api` / `app` / `oracle`）+ `www`(CNAME→apex) **不要動**（除非也搬 SG）。
+   - 查當前 live 清單：`curl -H "Authorization: Bearer <CLOUDFLARE_API_TOKEN>" "https://api.cloudflare.com/client/v4/zones/f21b1919632fee2221647908a94fdcac/dns_records?per_page=200"`。
+   - 概念分工（哪些該指哪台）正本：[`CLOUDFLARE_HETZNER_PHASE1.md`](../agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md)。
 6. **平行驗證**：兩機都在，逐項對比（資料筆數、登入、佈建、監控）。
 7. 觀察 24–48h 無誤 → 退掉 Cloud 機。
 - **回滾**：任何驗證失敗 → DNS 切回 Cloud（原機未退），零資料遺失。
@@ -250,7 +259,7 @@ openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -in "$OUT/env.tar.g
 - [x] 備份失敗會 surface（2026-06-26：`check-backup-health.ps1` 讀 verify 判定，FAILED→AO-RESUME WARN；非 Telegram 而是開工自動報，涵蓋「壞了」+「停了」）
 - [ ] auction 機：雙碟 NVMe + RAID 1 + SMART 健康 + mdadm 告警
 - [ ] §4 / §5 的 `TODO:` 指令全部補齊並實測
-- [ ] 所有指向 EU 的 Cloudflare DNS record 清單列出
+- [x] 所有指向 EU 的 Cloudflare DNS record 清單列出（2026-06-26 live 查證：9 個，見 §5 step 5；含 2 個 DNS-only `remotion-svc`/`video-svc`）
 - [ ] 原 Cloud 機保留至遷移驗證完成
 
 ---

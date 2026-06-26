@@ -25,6 +25,7 @@ const LENS_HINTS: Record<string, string> = {
   animal: "culturally iconic and symbolic animals",
   script: "traditional scripts, calligraphy styles and lettering",
   // 🗺️ map-only themes — keep in sync with MAP_THEMES in lib/studio/culture-presets.ts
+  heritage: "historic heritage sites, monuments, ancient ruins, old temples and landmark heritage buildings",
   themepark: "famous amusement parks, theme parks, observation decks, zoos, aquariums and major tourist attractions",
   metro: "metro and subway lines with their colors, major interchange stations and rail transit hubs",
   roadsign: "distinctive road signs, traffic signals, pedestrian markers and transportation symbols characteristic of the country",
