@@ -89,12 +89,115 @@ function buildDeck(): TarotCard[] {
 
 export const TAROT_DECK: ReadonlyArray<TarotCard> = buildDeck();
 
-export type SpreadId = 'single' | 'three' | 'celtic';
-export const SPREAD_SIZE: Record<SpreadId, number> = {
-  single: 1,
-  three: 3,
-  celtic: 10,
+export type SpreadId =
+  | 'single'
+  | 'three'
+  | 'relationship'
+  | 'decision'
+  | 'yesno'
+  | 'celtic';
+
+export interface TarotSpread {
+  id: SpreadId;
+  size: number;
+  name: Record<Locale, string>;
+  /** 各牌位含義(順序對應抽出的牌);長度 = size */
+  positions: Record<Locale, string[]>;
+}
+
+export const SPREADS: Record<SpreadId, TarotSpread> = {
+  single: {
+    id: 'single',
+    size: 1,
+    name: { 'zh-TW': '單張指引', en: 'Single card' },
+    positions: { 'zh-TW': ['指引'], en: ['Guidance'] },
+  },
+  three: {
+    id: 'three',
+    size: 3,
+    name: { 'zh-TW': '三張(過去/現在/未來)', en: 'Three cards (Past/Present/Future)' },
+    positions: {
+      'zh-TW': ['過去', '現在', '未來'],
+      en: ['Past', 'Present', 'Future'],
+    },
+  },
+  relationship: {
+    id: 'relationship',
+    size: 3,
+    name: { 'zh-TW': '關係(你/對方/關係)', en: 'Relationship (You/Them/Bond)' },
+    positions: {
+      'zh-TW': ['你', '對方', '兩人關係'],
+      en: ['You', 'Them', 'The relationship'],
+    },
+  },
+  decision: {
+    id: 'decision',
+    size: 3,
+    name: { 'zh-TW': '抉擇(現況/選A/選B)', en: 'Decision (Now/Option A/Option B)' },
+    positions: {
+      'zh-TW': ['現況', '選擇 A 的走向', '選擇 B 的走向'],
+      en: ['Current situation', 'If you choose A', 'If you choose B'],
+    },
+  },
+  yesno: {
+    id: 'yesno',
+    size: 1,
+    name: { 'zh-TW': '是非題', en: 'Yes / No' },
+    positions: { 'zh-TW': ['是非傾向與提醒'], en: ['Yes/No leaning & caution'] },
+  },
+  celtic: {
+    id: 'celtic',
+    size: 10,
+    name: { 'zh-TW': '凱爾特十字', en: 'Celtic Cross' },
+    positions: {
+      'zh-TW': [
+        '現況',
+        '阻礙/助力',
+        '潛意識根源',
+        '過去',
+        '可能的未來',
+        '近期發展',
+        '自我態度',
+        '環境與他人',
+        '希望與恐懼',
+        '最終結果',
+      ],
+      en: [
+        'Present',
+        'Challenge',
+        'Subconscious',
+        'Past',
+        'Possible future',
+        'Near future',
+        'Your attitude',
+        'External influences',
+        'Hopes & fears',
+        'Outcome',
+      ],
+    },
+  },
 };
+
+/** 抽牌情境(情境化卡義:同一張牌在不同主題語意不同)。 */
+export type TarotTopic =
+  | 'general'
+  | 'love'
+  | 'career'
+  | 'wealth'
+  | 'spiritual';
+
+export const TOPICS: Record<TarotTopic, Record<Locale, string>> = {
+  general: { 'zh-TW': '綜合', en: 'General' },
+  love: { 'zh-TW': '感情', en: 'Love' },
+  career: { 'zh-TW': '事業', en: 'Career' },
+  wealth: { 'zh-TW': '財運', en: 'Wealth' },
+  spiritual: { 'zh-TW': '靈性成長', en: 'Spiritual' },
+};
+
+/** @deprecated 改用 SPREADS[id].size;保留以免外部引用即斷。 */
+export const SPREAD_SIZE: Record<SpreadId, number> = Object.fromEntries(
+  (Object.keys(SPREADS) as SpreadId[]).map((id) => [id, SPREADS[id].size]),
+) as Record<SpreadId, number>;
 
 export interface DrawnCard {
   card: TarotCard;
@@ -130,5 +233,5 @@ export function drawSpread(
   spread: SpreadId,
   rng: () => number = Math.random,
 ): TarotResult {
-  return { spread, cards: drawCards(SPREAD_SIZE[spread], rng) };
+  return { spread, cards: drawCards(SPREADS[spread].size, rng) };
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { TAROT_DECK, drawCards, drawSpread } from './tarot';
-import { tarotSystem } from './divination/systems/tarot';
+import { TAROT_DECK, drawCards, drawSpread, SPREADS } from './tarot';
+import type { SpreadId } from './tarot';
+import { tarotSystem, toContext } from './divination/systems/tarot';
 
 describe('塔羅牌庫', () => {
   it('恰 78 張(22 大 + 56 小)且 id 唯一、雙語齊備', () => {
@@ -45,14 +46,45 @@ describe('抽牌 — 不放回 + 正逆位', () => {
   });
 });
 
-describe('塔羅系統 adapter', () => {
-  it('compute → systemId=tarot + 每張帶正逆位', async () => {
+describe('牌陣定義 SPREADS', () => {
+  it('每個牌陣的 positions 長度(雙語)= size', () => {
+    for (const id of Object.keys(SPREADS) as SpreadId[]) {
+      const s = SPREADS[id];
+      expect(s.positions['zh-TW']).toHaveLength(s.size);
+      expect(s.positions.en).toHaveLength(s.size);
+      expect(drawSpread(id).cards).toHaveLength(s.size);
+    }
+  });
+
+  it('新增牌陣存在(關係/抉擇/是非)', () => {
+    expect(SPREADS.relationship.size).toBe(3);
+    expect(SPREADS.decision.size).toBe(3);
+    expect(SPREADS.yesno.size).toBe(1);
+  });
+});
+
+describe('塔羅系統 adapter — 牌位 + 情境', () => {
+  it('compute → systemId=tarot + facts 帶牌位 + 正逆位', async () => {
     const { context, data } = await tarotSystem.compute(
-      { spread: 'three', rng: () => 0 },
+      { spread: 'three', topic: 'love', rng: () => 0 },
       'zh-TW',
     );
     expect(context.systemId).toBe('tarot');
     expect(data.cards).toHaveLength(3);
-    expect(context.facts[0].value).toContain('逆位');
+    // 牌位標籤(過去/現在/未來)入 fact label
+    expect(context.facts.some((f) => f.label === 'position:過去')).toBe(true);
+    // 情境主題入 fact + headline
+    expect(context.facts.find((f) => f.label === 'topic')?.value).toBe('感情');
+    expect(context.headline).toContain('感情');
+    // 牌面帶正逆位
+    expect(
+      context.facts.find((f) => f.label.startsWith('position:'))?.value,
+    ).toContain('逆位');
+  });
+
+  it('toContext 不傳 topic 時無 topic fact', () => {
+    const r = drawSpread('single', () => 0.9);
+    const ctx = toContext(r, 'zh-TW');
+    expect(ctx.facts.some((f) => f.label === 'topic')).toBe(false);
   });
 });

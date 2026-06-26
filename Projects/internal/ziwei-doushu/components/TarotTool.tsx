@@ -2,20 +2,32 @@
 
 import { useState } from 'react';
 import AiReading from '@/components/AiReading';
-import { drawSpread, type TarotResult, type SpreadId } from '@/lib/tarot';
+import {
+  drawSpread,
+  SPREADS,
+  TOPICS,
+  type TarotResult,
+  type SpreadId,
+  type TarotTopic,
+} from '@/lib/tarot';
 import { toContext } from '@/lib/divination/systems/tarot';
 import type { Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
+const SPREAD_IDS = Object.keys(SPREADS) as SpreadId[];
+const TOPIC_IDS = Object.keys(TOPICS) as TarotTopic[];
+
 export default function TarotTool({ dict, locale }: { dict: Dictionary; locale: Locale }) {
   const [spread, setSpread] = useState<SpreadId>('three');
+  const [topic, setTopic] = useState<TarotTopic>('general');
   const [result, setResult] = useState<TarotResult | null>(null);
   const t = dict.tarot;
+  const positions = result ? SPREADS[result.spread].positions[locale] : [];
 
   return (
     <>
-      <div className="glass-card p-6">
-        <label style={{ display: 'block', marginBottom: '0.75rem' }}>
+      <div className="glass-card p-6" style={{ display: 'grid', gap: '1rem' }}>
+        <label style={{ display: 'block' }}>
           <span className="label-dark" style={{ display: 'block', marginBottom: '0.5rem' }}>
             {t.spread}
           </span>
@@ -23,17 +35,35 @@ export default function TarotTool({ dict, locale }: { dict: Dictionary; locale: 
             value={spread}
             onChange={(e) => setSpread(e.target.value as SpreadId)}
             className="field-dark"
-            style={{ maxWidth: '280px' }}
+            style={{ maxWidth: '320px' }}
           >
-            <option value="single">{t.single}</option>
-            <option value="three">{t.three}</option>
-            <option value="celtic">{t.celtic}</option>
+            {SPREAD_IDS.map((id) => (
+              <option key={id} value={id}>
+                {SPREADS[id].name[locale]}
+              </option>
+            ))}
           </select>
         </label>
-        <button
-          onClick={() => setResult(drawSpread(spread))}
-          className="btn-gold"
-        >
+
+        <label style={{ display: 'block' }}>
+          <span className="label-dark" style={{ display: 'block', marginBottom: '0.5rem' }}>
+            {t.topic}
+          </span>
+          <select
+            value={topic}
+            onChange={(e) => setTopic(e.target.value as TarotTopic)}
+            className="field-dark"
+            style={{ maxWidth: '320px' }}
+          >
+            {TOPIC_IDS.map((id) => (
+              <option key={id} value={id}>
+                {TOPICS[id][locale]}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <button onClick={() => setResult(drawSpread(spread))} className="btn-gold" style={{ justifySelf: 'start' }}>
           {t.draw}
         </button>
       </div>
@@ -44,17 +74,14 @@ export default function TarotTool({ dict, locale }: { dict: Dictionary; locale: 
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
               gap: '0.75rem',
             }}
           >
             {result.cards.map((d, i) => (
-              <div
-                key={i}
-                className={`tarot-card ${d.reversed ? 'reversed' : 'upright'}`}
-              >
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginBottom: '0.5rem' }}>
-                  {i + 1}
+              <div key={i} className={`tarot-card ${d.reversed ? 'reversed' : 'upright'}`}>
+                <div style={{ fontSize: '0.65rem', color: 'var(--gold-400)', marginBottom: '0.4rem', minHeight: '1.6em' }}>
+                  {positions[i] ?? `#${i + 1}`}
                 </div>
                 <div
                   style={{
@@ -79,7 +106,8 @@ export default function TarotTool({ dict, locale }: { dict: Dictionary; locale: 
               </div>
             ))}
           </div>
-          <AiReading context={toContext(result, locale)} ai={dict.ai} />
+
+          <AiReading context={toContext(result, locale, topic)} ai={dict.ai} />
         </section>
       ) : null}
     </>

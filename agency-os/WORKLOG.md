@@ -4,6 +4,27 @@
 
 ## 2026-06-26
 
+### feat(oracle): Phase C — 塔羅牌陣擴充(6 陣 + 牌位含義)+ 情境化卡義
+
+[任務理解] 塔羅原只 3 陣且 AI 只收牌名(不知牌位/主題)。補:更多牌陣 + 每牌位含義 + 情境主題,讓 AI 依「牌位×主題」給情境化解讀(同張牌在感情 vs 事業語意不同),非空泛列牌。
+
+[已修改]
+- `lib/tarot.ts`(改):`SPREADS` 取代 SPREAD_SIZE — 6 陣(單張/三張/關係/抉擇/是非/凱爾特十字),每陣帶雙語牌位含義(positions,長度=size);`TarotTopic`/`TOPICS`(綜合/感情/事業/財運/靈性);drawSpread 用 SPREADS[id].size。SPREAD_SIZE 留 deprecated 衍生別名。
+- `lib/divination/systems/tarot.ts`(改):TarotInput 加 topic;toContext 出 spread fact + 可選 topic fact + 每牌 `position:<牌位>` label,headline 帶陣名+主題。
+- `components/TarotTool.tsx`(改):牌陣 + 主題雙選單(迭代 SPREADS/TOPICS);每張牌顯示牌位含義;topic 餵 AI。
+- `messages/{zh-TW,en}.json`:tarot.topic。
+- `lib/tarot.test.ts`:positions===size(全陣雙語)+ 新陣 + 牌位/主題 facts。
+
+[驗證結果](R0 四動作)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/tarot.test` | exit=0 | 10 pass — 78 牌庫完好、6 陣 positions 長度=size(雙語)、drawSpread 張數正確、adapter facts 帶 `position:過去`+topic=感情+headline 含感情+正逆位。另 tsc=0、`npm run build` exit=0。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n+2note — critic 逐陣驗 positions===size、SPREAD_SIZE 0 消費端、最長 label/headline/fact 數皆遠低於 route 上限且 `/` 過 sanitizeFact、切陣時 positions 綁 result.spread(非 live 選單)故不會錯位、i18n 完美 parity。2 note 皆刻意設計(牌位非唯一鍵 / 同抽牌可換主題重解)。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/ziwei-doushu | grep=`SPREAD_SIZE`,`drawSpread`,`SPREADS`,`TOPICS`,`TarotInput` | hits=0 stale — 消費端(TarotTool/systems-tarot)全對齊;SPREAD_SIZE 無外部引用。
+- BUGHUNT_SCOPE_NARROW: N/A(含 agency-os + scripts)。
+
+[剩餘風險] journaling(情緒 tag/模式分析)需 DB,本刀未做(待 Supabase)。自訂牌陣 wizard 未做。
+
+[rollback] 新增可逆;`git revert`;SPREAD_SIZE 別名可隨時刪。
+
 ### feat(oracle): Phase A — 分享圖卡 OG 生成(Satori/ImageResponse,CJK 子集字型)
 
 [任務理解] 病毒漏斗:解讀/命盤一鍵產出可分享的精美圖卡(IG/TikTok/LINE)。純渲染、無憑證。
