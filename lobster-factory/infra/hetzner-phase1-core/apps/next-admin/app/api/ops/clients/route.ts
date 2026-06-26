@@ -73,6 +73,8 @@ export interface ClientConfig {
     servicePrinciples?: string[];
     mission?: string;
   };
+  // Per-tenant CS kill-switch (default ON). false = AI must not auto-reply; enforced in lib/cs/orchestrator.ts.
+  csEnabled?: boolean;
 }
 
 export interface WpUpdateLatest {

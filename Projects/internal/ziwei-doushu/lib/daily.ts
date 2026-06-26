@@ -1,15 +1,16 @@
 import { Solar } from 'lunar-javascript';
 import { computeBazi, type BaziRequest } from './bazi';
 import { defaultLocale, type Locale } from './i18n/config';
+import type { InterpretationContext } from './divination/types';
 
 /**
  * 每日運勢工廠(PLAN §9)— 免費病毒漏斗,確定性、零邊際成本。
  *
- * 幸運色/數/方位:由「喜用神(簡版=生我之五行,即印星,扶助日主)」查五行屬性表
- *   得出 → 純演算法、零 AI、同人同日固定。
+ * 幸運色/數/方位:由「真喜用神(扶抑法,身強弱決定;見 baziAnalysis)」查五行屬性表
+ *   得出 → 純演算法、零 AI、同人同日固定。(舊版恆取「生我之印」,身強者其實忌印 → 已修)
  * 今日運勢評分:由「當日日柱五行 vs 日主五行」之生剋關係 + 確定性微擾 → 4 領域星等。
  * 宜忌:lunar-javascript 黃曆(getDayYi/getDayJi)。
- * 運勢「文案」由 AI 層另行產生(本模組只給結構化結果,供快取 chart+date+locale)。
+ * 運勢「文案」由 AI 層另行產生(本模組給結構化結果 + dailyContext 餵 AI,供快取 chart+date+locale)。
  */
 
 export type WuXing = '木' | '火' | '土' | '金' | '水';

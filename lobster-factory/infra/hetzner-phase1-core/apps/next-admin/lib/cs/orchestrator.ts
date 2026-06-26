@@ -78,6 +78,13 @@ export async function handleInbound(message: InboundMessage): Promise<CsDecision
       loadMemory(message.organizationId, message.contactRef),
     ]);
 
+    // 2b. Per-tenant kill-switch — if disabled, route to a human before any LLM spend.
+    if (cis.csEnabled === false) {
+      const d = makeHandoff("tenant_killswitch", { killSwitch: true });
+      await persist(message, d);
+      return d;
+    }
+
     // 3. Classify intent.
     const cls = await classifyIntent({ organizationId: message.organizationId, message: message.text, intents });
     const intent = resolveIntent(intents, cls.intentKey);

@@ -21,7 +21,8 @@ export async function loadCis(organizationId: string): Promise<CisProfile> {
   const cc = (meta.client_config && typeof meta.client_config === "object" ? meta.client_config : {}) as Record<string, unknown>;
   const brandColors = (cc.brandColors ?? undefined) as CisProfile["brandColors"];
   const csVoice = (cc.csVoice ?? undefined) as CsVoice | undefined;
-  return { organizationId, brandColors, csVoice };
+  const csEnabled = cc.csEnabled !== false; // default ON; only an explicit false disables
+  return { organizationId, brandColors, csVoice, csEnabled };
 }
 
 const SAFETY_PREAMBLE = [

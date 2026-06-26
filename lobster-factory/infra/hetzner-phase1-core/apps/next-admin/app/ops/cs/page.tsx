@@ -17,6 +17,7 @@ async function loadCounts(): Promise<{ intents: number; knowledge: number; repli
     sb.from("cs_knowledge_sources").select("id", { count: "exact", head: true }),
     sb.from("cs_ai_replies").select("id", { count: "exact", head: true }),
   ]);
+  if (intents.error || knowledge.error || replies.error) return null;
   return { intents: intents.count ?? 0, knowledge: knowledge.count ?? 0, replies: replies.count ?? 0 };
 }
 

@@ -1170,9 +1170,9 @@ function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
         headers: { "Content-Type": "application/json", ...roleHeader("admin") },
         body: JSON.stringify({ csEnabled: next }),
       });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
+      const data = (await res.json()) as { ok?: boolean; error?: string; csEnabled?: boolean };
       if (!res.ok || !data.ok) throw new Error(data.error ?? `save_failed_${res.status}`);
-      setCsEnabled(next);
+      setCsEnabled(data.csEnabled ?? next);
       setMsg(next ? "✓ 已啟用此客戶 AI 客服" : "✓ 已停用（kill-switch）— AI 不再自動回覆此客戶");
     } catch (e) { setMsg(`⚠ ${String(e)}`); } finally { setSaving(false); }
   }

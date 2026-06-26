@@ -147,6 +147,8 @@ export interface CisProfile {
   organizationId: string;
   brandColors?: { primary?: string; secondary?: string; accent?: string };
   csVoice?: CsVoice;
+  /** Per-tenant kill-switch (client_config.csEnabled). Default ON; false = AI must not auto-reply. */
+  csEnabled?: boolean;
 }
 
 /** A knowledge document to ingest into the RAG store. */
