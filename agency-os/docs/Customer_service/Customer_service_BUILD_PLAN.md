@@ -66,7 +66,7 @@ per-client hub  /ops/clients/[slug]   （既有 7 tab：內容工具/整合/佈�
 | **U1** | **cs-engine 核心** `lib/cs/`（webhook→護欄→分類→RAG→生成→supervisor→送/動作/轉）| 💻 next-admin | U0 | P1–P4 | ✅ **建好+驗證**（13 檔+測試；tsc 0 / vitest 35 / critic 修訖）|
 | **U2** | **CIS 配置 + tab**（brandKit+csVoice JSONB + 「品牌識別」tab，重用 brandColors/BrandVoiceProfile）| 💻 next-admin UI | — | P1 | ✅ **建好+驗證**（tab+cis route；tsc 0 / critic 0C0M）|
 | **U3** | **客服 tab + 頂層「客服」section**（per-client config + 跨客戶營運中心）| 💻 next-admin UI | U0,U1 | P1–P2 | ✅ **建好+驗證**（tab+cs-config route+/ops/cs+sidebar；tsc 0 / critic 1C 修；kill-switch 接進 engine）|
-| **U4** | **headless widget**（Client API+WS+清新自然+互動類型）| 💻 next-admin embed | U1,U6 | P1 | ⏳ |
+| **U4** | **headless widget**（Client API+WS+清新自然+互動類型）| 💻 next-admin embed | U1,U6 | P1 | 🟡 **程式碼完成+驗證**（6 檔；tsc 0/vitest 49/critic XSS-clean+4 Major 修）— **等 U6 接 live** |
 | **U5** | **eval/護欄 harness**（golden set runner + LLM-judge + 畢業 gate）| 💻 自架現有機 | U1 | P2 | ✅ **建好+驗證**（lib/cs/eval+route+7 測；tsc 0/vitest 42；critic 2C 修：跑真實 decideAnswerAction）|
 | **U6** | **Chatwoot 載體**（docker-compose Community + healthcheck/smoke/rollback）| 📦 EU 現可緊跑/本機測 → **搬大機** | — | P1 | ⛔（deploy gated）|
 
@@ -130,6 +130,13 @@ per-client hub  /ops/clients/[slug]   （既有 7 tab：內容工具/整合/佈�
 - **REVIEW**：critic → **2 Critical**（eval 重寫 lossy 子集，只複製 7 個 handoff 觸發的 2 個 → 可放行 prod 不安全意圖）+ 2 Major + 3 Minor → **修**：runEvalCase 改呼叫**真實 `decideAnswerAction`**（input guards→classify→resolveIntent→retrieve→supervise→真實 7-gate 決策；export orchestrator.resolveIntent 重用）+ 空 expectedPoints 答題不免費過 + per-case try/catch（errored=handoff）+ 逐意圖才評級。#6/#7 文件記（golden set 須含 handoff 案例；大集移背景 job）。`- REVIEW_DONE: critic=Deep | verdict=pass(修後) | findings=2c/2m/3minor`
 - **BUGHUNT**：resolveIntent 1 export/1 import；decideAnswerAction 真實 gate 接上；runEval/gradeIntent 導出+route 用。`- BUGHUNT_DONE: scope=lobster-factory | grep=decideAnswerAction|resolveIntent | hits=一致`
 - 待 hardening：runEvalCase 整合測試（mock DB/LLM）；eval 移 Trigger.dev 背景 job（n≥30 sequential 恐逾 maxDuration）。
+
+**2026-06-26 — U4 headless 清新自然 widget（程式碼完成，等 U6 接 live）🟡**
+- 建 6 檔：`lib/cs-widget/{types,theme,chatwoot-transport,mock-transport}.ts` + `app/cs-widget/{CsWidget.tsx,page.tsx}` + `__tests__/theme.test.ts`。transport 抽象（真 Chatwoot Client API+ActionCable WS / Mock）；CIS seed→OKLCH 清新自然色盤（主色亮度鎖保 AA）；泡泡/快速回覆/卡片/打字/轉真人/launcher；demo 頁 MockTransport 可渲染。
+- **REALTEST**：`tsc` 0；vitest **49/49**（+7 theme 純邏輯：hexToHueSat NaN-safe / 主色亮度鎖 / 灰種低彩度）。`- REALTEST_EVIDENCE: tool=Bash | cmd=tsc 0 + vitest 49 (theme pure) | exit=0` ｜ live UI/Chatwoot 端到端待 U6（無後端）。
+- **REVIEW**：critic → **XSS 面乾淨**（React escaping，無 dangerouslySetInnerHTML）+ 4 Major → **修**：window.open URL scheme 驗證 http/https+noreferrer（唯一真資安）/ content_attributes.items 解包（否則互動內容 prod 全失效）/ reject_subscription 清 stale token / Number(cached) NaN guard；+ IME isComposing（繁中 audience）+ close/launcher/card-action 改 `<button>` a11y。`- REVIEW_DONE: critic=Deep | verdict=pass(修後) | findings=0c/4m/5minor`
+- **BUGHUNT**：safeOpen wired / content items 解包 / reject_subscription。`- BUGHUNT_DONE: scope=lobster-factory | grep=safeOpen|content_attributes|reject_subscription | hits=一致`
+- 待 U6 接 live：MockTransport→ChatwootTransport(config)；WS onclose 自動重連（critic Minor）；inbox_identifier/baseUrl 從 CIS 設定帶入。
 
 ---
 
