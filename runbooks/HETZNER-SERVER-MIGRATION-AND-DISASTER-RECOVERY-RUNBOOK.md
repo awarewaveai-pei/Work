@@ -262,7 +262,7 @@ docker rm -f drill-pg
 # MainWP DB（補漏後）：灌進拋棄式 mariadb 驗 wp_options/連線表筆數
 # n8n volume：docker run --rm -v drill-n8n:/d -v $OUT:/b alpine tar xzf /b/n8n.tgz -C /d
 #   → 起拋棄式 n8n 掛 drill-n8n 確認 workflow 清單回得來
-# TODO: 補漏項實際上線後，於下一次演練補上對應指令並定稿
+# 註：補漏項已上線並內容驗過（2026-06-26：mainwp dump 44 表、n8n 解開 OK）；上面 live-restore 指令待下次正式演練跑通定稿（拋棄式 mariadb root pw env 待調）。
 ```
 
 ### 演練 C — `.env` 解密驗證
