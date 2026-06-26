@@ -13,7 +13,7 @@
  */
 import { NextResponse } from "next/server";
 import { resolveOpsRole } from "../../../../../lib/ops-role";
-import { getDesignsPublicBase } from "../../../../../lib/storage/r2";
+import { isDesignsAsset } from "../../../../../lib/storage/r2";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -34,8 +34,9 @@ export async function GET(request: Request) {
   if (!target) {
     return NextResponse.json({ ok: false, error: "url query param required" }, { status: 400 });
   }
-  const base = getDesignsPublicBase();
-  if (!base || !target.startsWith(base + "/")) {
+  // Host-exact allowlist (https + exact bucket host + "/" boundary) — same hardened guard the
+  // publish/print-file routes use, NOT a bypassable bare startsWith. Mirrors lib/storage/r2.ts.
+  if (!isDesignsAsset(target)) {
     return NextResponse.json({ ok: false, error: "url must be a My Designs asset URL" }, { status: 400 });
   }
 
