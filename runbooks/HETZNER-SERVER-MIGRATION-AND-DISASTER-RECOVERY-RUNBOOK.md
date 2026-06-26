@@ -32,10 +32,10 @@
 | 項目 | 位置 | 備份方式 |
 |------|------|---------|
 | Supabase Postgres（客戶/業務主資料） | container `supabase-db`（data 在 `/root/supabase/volumes/`） | `pg_dumpall` 邏輯 dump |
-| Trigger Postgres（run 紀錄/排程/狀態） | container `trigger-postgres`，vol `trigger_trigger_pg_data` | `pg_dumpall` |
+| Trigger Postgres（run 紀錄/排程/狀態） | container `trigger-postgres` | `pg_dump -U trigger trigger`（**單庫**；還原需先 `CREATE DATABASE trigger`）|
 | 全部 `.env`（密鑰 SSOT） | `/root/{supabase,trigger,mainwp,postiz}/.env` | 加密複製（含在 §2 備份集）|
-| MainWP DB（child site 連線/token） | container `mainwp-db`，vol `mainwp_mainwp_db` | `mysqldump` |
-| n8n 資料（workflow + 憑證） | vol `n8n_n8n_data`（含 SQLite/設定）| volume 快照 + n8n export |
+| MainWP DB（child site 連線/token） | container `mainwp-db` | `mysqldump --single-transaction mainwp` |
+| n8n（workflow + 憑證） | **workflow/憑證在 supabase-db 的 `n8n` DB**（隨 Supabase `pg_dumpall`）；加密金鑰在 n8n `.env`；vol `n8n_n8n_data` 僅 binary/config（**無 SQLite**）| workflow 隨 supabase dump + `.env` 加密 + volume 快照 |
 
 ### 🟡 IMPORTANT — 丟了會痛但可重建
 | 項目 | 位置 | 備份方式 |
@@ -43,7 +43,7 @@
 | Supabase Storage（上傳檔） | vol `supabase_storage-data` | volume 快照 |
 | Trigger MinIO（packets/物件） | vol `trigger_trigger_minio_data` | volume 快照 |
 | Trigger ClickHouse（run analytics） | vol `trigger_trigger_clickhouse_data` | `clickhouse-backup` 或可接受重建 |
-| Postiz（排程貼文/上傳） | vol `postiz_postiz_uploads` + container `postiz`（DB 在 Supabase？待確認 `TODO`）| volume + DB dump |
+| Postiz（排程貼文/上傳） | **DB 在 supabase-db 的 `postiz` DB**（隨 Supabase dump，已確認 2026-06-26）+ vol `postiz_postiz_uploads`（上傳檔）| DB 隨 supabase dump + volume 快照 |
 | MainWP files | vol `mainwp_mainwp_files` | volume 快照 |
 | Uptime Kuma（監控設定/歷史） | vol `uptime-kuma` | volume 快照 |
 | compose / 設定 | `/root/{各 stack}/docker-compose.yml` + 子目錄 | 目錄複製（多數已在 `Work` repo） |
@@ -57,7 +57,7 @@
 > - Supabase PG（`pg_dumpall -U supabase_admin` → `supabase-all.sql.gz`）
 > - Trigger PG（`pg_dump -U trigger trigger` → `trigger.sql.gz`）
 > - Uptime Kuma volume（`uptime-kuma.tgz`）
-> - 異地 L1：rsync → SG VPS（key `/root/.ssh/backup_to_sg`）｜異地 L2：**Cloudflare R2**（bucket `lobster-backup`，prefix `eu`，`upload-to-r2.sh`）→ **3-2-1 已成立**（本機 + SG + R2）
+> - 異地 L1：rsync → SG VPS（key `/root/.ssh/backup_to_sg`）｜異地 L2：**Cloudflare R2**（bucket `lobster-backup`，prefix `eu`，`upload-to-r2.sh`）→ 設計為 3-2-1，但 **R2 自 2026-05 因 export bug 從沒真上傳成功（2026-06-26 修，見下）**，修前實際只有本機 + SG
 > - integrity 驗證：`verify-backup-eu.sh`（gzip/tar -t + 檔案存在 + SG 異地存在）
 >
 > **✅ 漏洞已補齊（方案A，2026-06-26，實機跑 + 還原演練通過）** — `backup-eu-stack.sh` 已新增以下 7 項：
@@ -199,9 +199,11 @@ docker rm -f drill-pg
 
 ### 演練 C — `.env` 解密驗證
 ```bash
-# 確認加密的 .env 備份解得開（金鑰在本機 vault）
-openssl enc -d -aes-256-cbc -pbkdf2 -in "$OUT/env.tar.gz.enc" | tar tzf - 2>&1 | head
-# 期望列出 4 個 .env 路徑 = ✅ 密鑰救得回
+# 確認加密的 .env 備份解得開。金鑰來源二選一：
+#   EU 機上：source /etc/default/eu-backup; export BACKUP_ENC_KEY
+#   本機/異機：BACKUP_ENC_KEY=$(secrets-vault.ps1 -Action get ... 取實值) export
+openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -in "$OUT/env.tar.gz.enc" | tar tzf - 2>&1 | head
+# 期望列出 4 個 .env 路徑（root/supabase/.env 等）= ✅ 密鑰救得回
 ```
 
 **每次演練**：計時 RTO、記錄哪些 count 對得上、抓到什麼漏洞 → 寫 `agency-os/WORKLOG.md`（演練本身就是抓「dump 漏表 / .env 沒進集 / volume 沒涵蓋」的手段）。
