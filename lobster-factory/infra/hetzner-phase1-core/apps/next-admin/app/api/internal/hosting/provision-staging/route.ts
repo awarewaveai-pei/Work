@@ -160,6 +160,94 @@ async function seedContentFromSpec(conn: SshClient, wpPath: string, websiteSpecI
   return `content seeded: ${res.stdout.trim().split("\n").pop()}`;
 }
 
+// ── Content seeding (Stage C) ────────────────────────────────────────────────
+// Turns the provisioned WP shell into a content-filled site using the AI website spec.
+// Mechanism verified on the SG container 2026-06-27: the whole bash script is base64-encoded
+// in Node, single-quoted on the host, and only decoded (`base64 -d`) inside the container's
+// bash stdin — so CJK bytes never pass through the host login shell / SSH / locale layer and
+// cannot mojibake. Every interpolated spec value is shq()-escaped (POSIX single-quote), which
+// was confirmed injection-proof (a `'; echo PWNED;'` probe echoed as a literal, not executed).
+const MAX_SEED_PAGES = 12; // bound wall time under the Cloudflare ~100s request ceiling
+
+function shq(s: unknown): string {
+  return `'${String(s ?? "").replace(/'/g, `'\\''`)}'`;
+}
+
+function htmlEscape(s: string): string {
+  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function buildHomepageHtml(spec: WebsiteSpec): string {
+  const hero = spec.homepage?.hero;
+  const sections = spec.homepage?.sections ?? [];
+  const parts: string[] = [];
+  if (hero?.headline) parts.push(`<!-- wp:heading {"level":1} --><h1>${htmlEscape(hero.headline)}</h1><!-- /wp:heading -->`);
+  if (hero?.subheadline) parts.push(`<!-- wp:paragraph --><p>${htmlEscape(hero.subheadline)}</p><!-- /wp:paragraph -->`);
+  if (hero?.cta_text) {
+    const href = htmlEscape(hero.cta_url || "#");
+    parts.push(`<!-- wp:buttons --><div class="wp-block-buttons"><!-- wp:button --><div class="wp-block-button"><a class="wp-block-button__link wp-element-button" href="${href}">${htmlEscape(hero.cta_text)}</a></div><!-- /wp:button --></div><!-- /wp:buttons -->`);
+  }
+  for (const sec of sections) {
+    if (sec?.headline) parts.push(`<!-- wp:heading --><h2>${htmlEscape(sec.headline)}</h2><!-- /wp:heading -->`);
+    if (sec?.body) parts.push(`<!-- wp:paragraph --><p>${htmlEscape(sec.body)}</p><!-- /wp:paragraph -->`);
+  }
+  return parts.join("\n");
+}
+
+// One idempotent bash script. Completion-gated: the `aw_seed_done` option is set LAST, so a
+// half-seed never short-circuits a retry; every create is guarded by slug so a re-run repairs
+// rather than duplicates.
+function buildSeedScript(spec: WebsiteSpec, wpPath: string): string {
+  const L: string[] = [];
+  L.push(`set -e`);
+  L.push(`wpcli() { php -d memory_limit=256M /usr/local/bin/wp --path=${shq(wpPath + "/")} "$@"; }`);
+  L.push(`if [ "$(wpcli option get aw_seed_done 2>/dev/null)" = "1" ]; then echo "AW_SEED_SKIP already seeded"; exit 0; fi`);
+  if (spec.site_name) L.push(`wpcli option update blogname ${shq(spec.site_name)}`);
+  if (spec.tagline) L.push(`wpcli option update blogdescription ${shq(spec.tagline)}`);
+  const pages = (spec.sitemap ?? []).filter((p) => p && !p.is_homepage && p.slug !== "home").slice(0, MAX_SEED_PAGES);
+  for (const p of pages) {
+    const slug = (p.slug || "").trim();
+    if (!slug) continue;
+    L.push(`if ! wpcli post list --post_type=page --name=${shq(slug)} --field=ID 2>/dev/null | grep -q .; then wpcli post create --post_type=page --post_status=publish --post_name=${shq(slug)} --post_title=${shq(p.title || slug)} >/dev/null; fi`);
+  }
+  const homeTitle = (spec.sitemap ?? []).find((p) => p?.is_homepage)?.title || "首頁";
+  const homeHtml = buildHomepageHtml(spec);
+  L.push(`HOME_ID=$(wpcli post list --post_type=page --name=aw-home --field=ID 2>/dev/null | head -n1)`);
+  L.push(`if [ -z "$HOME_ID" ]; then HOME_ID=$(wpcli post create --post_type=page --post_status=publish --post_name=aw-home --post_title=${shq(homeTitle)} --post_content=${shq(homeHtml)} --porcelain); fi`);
+  L.push(`wpcli option update show_on_front page`);
+  L.push(`wpcli option update page_on_front "$HOME_ID"`);
+  const rm = spec.plugin_config?.rankmath;
+  const seoTitle = rm?.site_title || spec.seo?.meta_title;
+  const seoDesc = rm?.meta_description || spec.seo?.meta_description;
+  if (seoTitle) L.push(`wpcli post meta update "$HOME_ID" rank_math_title ${shq(seoTitle)} >/dev/null 2>&1 || true`);
+  if (seoDesc) L.push(`wpcli post meta update "$HOME_ID" rank_math_description ${shq(seoDesc)} >/dev/null 2>&1 || true`);
+  L.push(`wpcli option update aw_seed_done 1 >/dev/null`);
+  L.push(`echo "AW_SEED_OK home=$HOME_ID pages=${pages.length}"`);
+  return L.join("\n");
+}
+
+async function seedContentFromSpec(conn: SshClient, wpPath: string, websiteSpecId: string): Promise<string> {
+  const supabase = getSupabaseWriteClient();
+  if (!supabase) return "content seed skipped: no DB client";
+  const { data, error } = await supabase
+    .from("website_specs")
+    .select("spec_data")
+    .eq("id", websiteSpecId)
+    .single();
+  if (error || !data?.spec_data) {
+    return `content seed skipped: spec not found (${error?.message ?? "no row"})`;
+  }
+  const spec = data.spec_data as WebsiteSpec;
+  const script = buildSeedScript(spec, wpPath);
+  const b64 = Buffer.from(script, "utf8").toString("base64");
+  const res = await sshExec(conn, `echo '${b64}' | base64 -d | docker exec -i -u www-data lobster-wordpress bash`);
+  const out = `${res.stdout}${res.stderr}`;
+  if (res.code !== 0 || !(out.includes("AW_SEED_OK") || out.includes("AW_SEED_SKIP"))) {
+    return `content seed WARN (code ${res.code}): ${out.replace(/\s+/g, " ").slice(0, 300)}`;
+  }
+  return `content seeded: ${out.match(/AW_SEED_(OK|SKIP)[^\n]*/)?.[0] ?? "ok"}`;
+}
+
 export async function POST(request: Request) {
   // Auth
   const apiToken = process.env.LOBSTER_HOSTING_API_TOKEN?.trim();

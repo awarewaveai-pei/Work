@@ -20,7 +20,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Canvas as FabricCanvas, FabricObject } from "fabric";
 import { roleHeader } from "@/lib/ops-role";
-import { CANVAS_SOURCE_KEY, CANVAS_NAME_KEY, toCanvasSrc } from "@/components/tools/canvas-handoff";
+import { CANVAS_NAME_KEY, toCanvasSrc, readCanvasSource } from "@/components/tools/canvas-handoff";
 import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
 import { buildFabricImageFilters, buildPresetFilters, buildEffectFilters, PRESET_FILTERS } from "./fabric-filters";
 import SidebarPanel from "@/components/tools/SidebarPanel";
@@ -242,7 +242,7 @@ export default function CanvasEditor() {
       setLayers([...canvas.getObjects()].reverse());
       snapshot(); // initial baseline so the first edit is undoable
 
-      const source = typeof window !== "undefined" ? sessionStorage.getItem(CANVAS_SOURCE_KEY) : null;
+      const source = typeof window !== "undefined" ? await readCanvasSource() : null;
       if (typeof window !== "undefined") {
         const handoffName = sessionStorage.getItem(CANVAS_NAME_KEY);
         if (handoffName) {

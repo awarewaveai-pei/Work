@@ -906,6 +906,12 @@ export default function StudioWorkbench() {
               style={actionPill()}>
               🎲 文化混搭骰
             </button>
+            <button type="button" disabled={!region}
+              onClick={() => setFusionPickMode((v) => !v)}
+              title="先選一個主國，再開此鈕，點第二個國家自己決定混搭組合"
+              style={tabStyle(fusionPickMode)}>
+              ✋ 手選混搭 {fusionPickMode ? "ON" : ""}
+            </button>
             <button type="button"
               onClick={() => {
                 setMapMode((v) => {
@@ -945,15 +951,32 @@ export default function StudioWorkbench() {
               </button>
             ))}
           </div>
+          {fusionPickMode && region && (
+            <p style={{ fontSize: 11, color: "var(--accent)", margin: "0 0 6px" }}>✋ 手選混搭中：點一個國家設為「混搭第二國」（再點取消）</p>
+          )}
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 10 }}>
             {(CULTURE_REGIONS.find((g) => g.group === regionTab)?.items ?? []).map((it) => {
-              const active = region?.en === it.en;
+              const isPrimary = region?.en === it.en;
+              const isFusion = fusionRegion?.en === it.en;
+              const active = isPrimary || isFusion;
               return (
                 <span key={it.en} style={{ display: "inline-block" }}
                   onMouseEnter={(e) => { const r = e.currentTarget.getBoundingClientRect(); setTip({ text: it.desc, x: r.left + r.width / 2, y: r.top }); }}
                   onMouseLeave={() => setTip(null)}>
-                  <button type="button" onClick={() => { setRegion(active ? null : it); setFusionRegion(null); }} style={chipStyle(active)}>
-                    {active ? "✓ " : ""}{it.zh}
+                  <button type="button"
+                    onClick={() => {
+                      // ✋ 手選混搭: when a primary is already chosen, a click on a DIFFERENT
+                      // country sets/clears it as the fusion (2nd) country. Otherwise normal single-select.
+                      if (fusionPickMode && region && !isPrimary) {
+                        setFusionRegion(isFusion ? null : it);
+                      } else {
+                        setRegion(isPrimary ? null : it);
+                        setFusionRegion(null);
+                        setFusionPickMode(false);
+                      }
+                    }}
+                    style={chipStyle(active)}>
+                    {isPrimary ? "✓ " : isFusion ? "＋ " : ""}{it.zh}
                   </button>
                 </span>
               );
@@ -1327,7 +1350,10 @@ export default function StudioWorkbench() {
               {/* Left: canvas */}
               <div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={activeResult.image} alt="generated design" style={{ display: "block", width: "auto", height: "auto", maxWidth: "100%", maxHeight: isMultiModel ? 420 : 560, margin: "0 auto", objectFit: "contain", borderRadius: 8, background: "#fff" }} />
+              <img src={activeResult.image} alt="generated design" title="點擊放大"
+                onClick={() => setZoomImage(activeResult.image)}
+                style={{ display: "block", width: "auto", height: "auto", maxWidth: "100%", maxHeight: isMultiModel ? 420 : 560, margin: "0 auto", objectFit: "contain", borderRadius: 8, background: "#fff", cursor: "zoom-in" }} />
+              <div style={{ textAlign: "center", fontSize: 11, opacity: 0.5, marginTop: 4 }}>🔍 點圖可放大檢視</div>
               </div>
 
               {/* Right: operations panel */}
@@ -1524,6 +1550,24 @@ export default function StudioWorkbench() {
           }}
         >
           {tip.text}
+        </div>
+      )}
+
+      {/* 🔍 Lightbox — click the generated image to view it full-screen. Click anywhere to close. */}
+      {zoomImage && (
+        <div
+          onClick={() => setZoomImage(null)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 2147483646,
+            background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center",
+            justifyContent: "center", padding: 24, cursor: "zoom-out",
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={zoomImage} alt="放大檢視"
+            style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 8, boxShadow: "0 8px 40px rgba(0,0,0,0.6)" }} />
+          <button type="button" onClick={() => setZoomImage(null)}
+            style={{ position: "fixed", top: 16, right: 20, fontSize: 22, lineHeight: 1, color: "#fff", background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.4)", borderRadius: 8, width: 40, height: 40, cursor: "pointer" }}>✕</button>
         </div>
       )}
     </div>
