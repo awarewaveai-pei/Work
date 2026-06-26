@@ -319,6 +319,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | Cloudflare WAF 規則 / scanner 攻擊 / DDoS | `runbooks/CLOUDFLARE-WAF-SETUP.md` |
 | VPS reboot 訊號 + 16h 未處理 | `runbooks/VPS-AUTO-REBOOT-RUNBOOK.md` |
 | 雲端排程報告沒更新 / Telegram 排程警報 / routine source 漂移 / 週報月報 stale | `runbooks/自動排程監控與手機Telegram警報-維護手冊.md` |
+| EU/SG 搬機 / 上 dedicated 主機 / 備份策略 / RAID / 災難還原 / Cloud→Dedicated 遷移 | `runbooks/EU-STACK-BACKUP-RAID-RESTORE-FOR-DEDICATED-RUNBOOK.md` |
 
 MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 
