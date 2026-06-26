@@ -47,6 +47,16 @@ export async function POST(request: Request) {
     return bad('bad birth/location fields');
   }
 
+  // 拒絕不存在的日期(2/31、4/31 等)。native date picker 已擋,但 API 可直打。
+  const dt = new Date(Date.UTC(year, month - 1, day));
+  if (
+    dt.getUTCFullYear() !== year ||
+    dt.getUTCMonth() !== month - 1 ||
+    dt.getUTCDate() !== day
+  ) {
+    return bad('impossible calendar date');
+  }
+
   const req: WesternRequest = {
     year, month, day, hour, minute, tzOffsetHours, lat, lon,
   };
