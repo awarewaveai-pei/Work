@@ -47,6 +47,15 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 }
 
 
+// Validate ../../app/[lang]/astrology/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/[lang]/astrology">> = Specific
+  const handler = {} as typeof import("../../app/[lang]/astrology/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
 // Validate ../../app/[lang]/bazi/page.tsx
 {
   type __IsExpected<Specific extends AppPageConfig<"/[lang]/bazi">> = Specific
@@ -96,6 +105,15 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   type __IsExpected<Specific extends AppPageConfig<"/[lang]/ziwei">> = Specific
   const handler = {} as typeof import("../../app/[lang]/ziwei/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../app/api/astrology/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/astrology">> = Specific
+  const handler = {} as typeof import("../../app/api/astrology/route.js")
   type __Check = __IsExpected<typeof handler>
   // @ts-ignore
   type __Unused = __Check
