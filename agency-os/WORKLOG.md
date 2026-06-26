@@ -2,6 +2,27 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-27
+
+### feat(onboarding): 公開接客門（preview-only）+ sidebar 建站流重組 — app.aware-wave 全自動接客 Stage A/B
+
+[任務理解] 操作者要「真正接客、看全自動生成網站」。先查證引擎是否真活（同事聲稱已完成、不告知做法 → VBC）。再補「全自動接客」缺口。
+
+[現況分析] 三個建站入口非重複：`/ops/onboarding`→trigger-build（客戶自動建站，收斂 ops_action_runs→create-wp-site）、`/build`→build/runs（同 pipeline，手動 profile）、`/onboard`→provision-services（服務棧 orchestrate-tenant-provisioning，**不同 pipeline**）+ Step5 deep-link 交棒 /build。submit/generate-spec/trigger-build 全要 ops role → **無公開接客門**。`create-wp-site.ts`(503行) 只佈建主題+外掛 manifest，**不讀 spec.homepage/sitemap/sections** → AI 內容未注入（C 缺口）。
+
+[已修改]
+- `app/SidebarNav.tsx` + `app/page.tsx`：重組 Build & Onboard(intake→精靈→Console 三步相鄰照序)/Clients & Ops/Repair & Control；兩導覽面對齊（首頁原本連 intake 都沒列）。
+- `app/api/onboarding/intake-public/route.ts`(新)：server-to-server 公開門，專屬 token `ONBOARDING_PUBLIC_INTAKE_TOKEN`(blast-radius 隔離)；鏈 store intake + AI 生規格(預覽)；**刻意不建站**(建站維持 trigger-build 閘控=「自動到預覽+1鍵建站」決策)。spend cap 用 insert-先-再依 submitted_at ordinal 把關(billable Claude 呼叫移到閘後)；org_id 公開路徑強制 null(防跨租戶注入)；必填用真 schema(company_name/industry/pages_needed，移除廢棄 primary_goal)。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec supabase-db psql -c "select metadata->>'source',status,count(*) from ops_action_runs group by..."` 及 intake_forms 分布 | exit=0 | 實證引擎已通：run `b344f86e` dispatched→completed(2分鐘)；`onboarding_portal`=3 run(1 completed/2 dispatched)、`build-console`=**0 run**(prod 未用)；2 筆 dispatched 是 06-03 pre-fix 殘骸非 bug。**(新端點 intake-public e2e 待 deploy + token 配置後補測)**
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=1c/2m/2n(round1) → 全 resolved(round2 復驗 5/5 PASS,風險降 Low)。Round1 抓到 Critical：rate-limit TOCTOU 併發爆量可繞過=花費上限假；Major：org_id 公開注入、廢棄 primary_goal 致 422 拒真流量。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=ONBOARDING_PUBLIC_INTAKE_TOKEN | hits=0(新檔外無引用、無 downstream consumer；section id 改名亦無 stale ref，theme/api 皆泛型讀 id)
+
+[剩餘風險] ① intake-public 未部署、未配 token、未接 n8n bridge → 公開門尚未活。② spend cap 邊界仍有 microsecond-tie 微量 overshoot(fails-safe，瀏覽器直連需升 Postgres RPC+captcha)。③ C(AI 內容注入站)、D(機層+服務棧)未做。
+[rollback] git revert 本 commit（純新增端點+nav 資料，零破壞性；端點未部署無 runtime 影響）。
+[下一步] C：create-wp-site 加內容注入步驟（讀 spec.homepage/sitemap/plugin_config → WP-CLI 經既有 SSH bridge 建頁/設 Kadence 色盤/RankMath SEO）。
+
 ## 2026-06-26
 
 ### fix(doc-integrity): validator 治本 — 不再把 prose-in-parens 當 broken link

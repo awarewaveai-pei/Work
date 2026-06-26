@@ -95,7 +95,11 @@ export async function POST(request: Request) {
     .lte("submitted_at", intakeRow.submitted_at as string);
   if (countErr || (count ?? 0) > PUBLIC_INTAKE_MAX_PER_WINDOW) {
     // Over cap (or can't verify) — roll back our own row so it doesn't count against future windows.
-    await supabase.from("intake_forms").delete().eq("id", intakeId);
+    const { error: rollbackErr } = await supabase.from("intake_forms").delete().eq("id", intakeId);
+    if (rollbackErr) {
+      // Lingering row only makes the NEXT window stricter (fails safe), but log for reconciliation.
+      console.error("[intake-public] failed to roll back over-cap intake row:", rollbackErr.message);
+    }
     if (countErr) return NextResponse.json({ ok: false, error: "rate_check_failed" }, { status: 503 });
     return NextResponse.json(
       { ok: false, error: "rate_limited", retry_after_seconds: PUBLIC_INTAKE_WINDOW_MIN * 60 },
