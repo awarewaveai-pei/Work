@@ -58,6 +58,13 @@ describe('computeHoroscope — 過運四化', () => {
       expect(scope.mutagenStars.length).toBe(4);
     }
   });
+
+  it('傳入 timeIndex 時 hourly 為確定(同輸入必同輸出)', () => {
+    const a = computeHoroscope(result.astrolabe, '2026-06-26', 2);
+    const b = computeHoroscope(result.astrolabe, '2026-06-26', 2);
+    expect(a.hourly.mutagenStars).toEqual(b.hourly.mutagenStars);
+    expect(a.hourly.heavenlyStem).toBe(b.hourly.heavenlyStem);
+  });
 });
 
 describe('formatMutagen', () => {

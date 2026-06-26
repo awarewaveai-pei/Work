@@ -57,7 +57,9 @@ export interface ZiweiHoroscope {
   yearly: ZiweiScope; // 流年
   monthly: ZiweiScope; // 流月
   daily: ZiweiScope; // 流日
-  hourly: ZiweiScope; // 流時
+  /** 流時。⚠️ 需 timeIndex 才確定;computeHoroscope 未傳 timeIndex 時 iztro 取
+   *  「呼叫當下時辰」→ 同 date 跨次呼叫可能不同。批次/持久化請務必傳入 timeIndex。 */
+  hourly: ZiweiScope;
 }
 
 /** 把四化星陣列格式化為「天同化祿、天機化權…」。 */
@@ -71,15 +73,18 @@ export function formatMutagen(stars: string[]): string {
 /**
  * 運限(過運)計算 — 大限/流年/流月/流日/流時 + 各自四化飛星。
  *
- * 由排好的本命盤 + 目標日期推算(iztro horoscope)。本函式對「同一 astrolabe +
- *   同一 date」為確定性;呼叫端決定 date(UI 傳今日 / 每日運勢工廠傳當日),
- *   故本函式不碰 Date,保持可測。
+ * 由排好的本命盤 + 目標日期推算(iztro horoscope)。本函式不碰 Date,呼叫端決定
+ *   date(UI 傳今日 / 每日運勢工廠傳當日),保持可測。
+ * 決定論:大限/流年/流月/流日 只取決於 date → 同 (astrolabe,date) 必同。流時另需
+ *   timeIndex;不傳則 iztro 取「呼叫當下時辰」→ hourly 非確定(見 ZiweiHoroscope.hourly)。
+ *   要 hourly 確定/可重現,務必傳入 timeIndex(0–11,子時起)。
  */
 export function computeHoroscope(
   astrolabe: IFunctionalAstrolabe,
   date: string,
+  timeIndex?: number,
 ): ZiweiHoroscope {
-  const h = astrolabe.horoscope(date);
+  const h = astrolabe.horoscope(date, timeIndex);
   const toScope = (s: {
     name: string;
     heavenlyStem: string;

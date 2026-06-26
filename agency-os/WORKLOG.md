@@ -4,6 +4,29 @@
 
 ## 2026-06-26
 
+### feat(oracle): Phase C — 紫微 過運(流年/流月/流日/流時)+ 四化 + 廟旺餵 AI
+
+[任務理解] 紫微深化:廟旺/四化已在視覺盤(ZiweiChart 早有),但 **AI 解讀的 facts 只有星名、沒有廟旺/四化**,且**完全沒有過運(流年/流月/流日/流時)**。補這兩塊讓旗艦系統解讀真正「綁具體 + 千人千面」。
+
+[現況分析] iztro 已提供 star.brightness(廟旺)+ star.mutagen(生年四化)+ astrolabe.horoscope(date,timeIndex)(五運限 + 各自四化飛星)。先 node 探針驗真實輸出(命宮紫微=廟、生年四化財帛武曲化權…、2026=丙年流年四化同機昌廉)再寫,不臆測 API。
+
+[已修改]
+- `lib/ziwei.ts`(改):新 `computeHoroscope(astrolabe,date,timeIndex?)` → 大限/流年/流月/流日/流時 + 四化飛星;`formatMutagen`/`MUTAGEN_LABELS`/`ZiweiScope`/`ZiweiHoroscope`。timeIndex 可選(流時確定性,已註記不傳則取呼叫當下時辰)。
+- `lib/divination/systems/ziwei.ts`(改):toContext 各宮主星帶廟旺+四化、加生年四化摘要 fact、可選第 3 參數 horoscope 加大限/流年 facts(compute() 不傳 → 維持確定性)。
+- `components/ZiweiTool.tsx`(改):useMemo 以今日算 horoscope → 餵 AI context + 顯示「今日運限」卡(大限/流年/流月/流日四化)。
+- `messages/{zh-TW,en}.json`:chart 加 transit/decadal/yearly/monthly/daily。
+- 測試:`ziwei.test.ts` 加 computeHoroscope(流年四化錨點)+ formatMutagen + 強化 toContext + hourly 確定性。
+
+[驗證結果](R0 四動作)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/ziwei.test` + `node -e`(iztro 探針)| exit=0 | **真 iztro 驗:2026-06-26 流年=丙 → 四化 天同/天機/文昌/廉貞(丙干同機昌廉,正確);命宮主星 fact 帶廟旺括號;傳 horoscope 才有大限/流年 facts**。另 tsc=0、`npm test` 85 pass、`npm run build` exit=0。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n+2suggestion — critic 對照 iztro .d.ts 確認 toScope 結構寬子型安全、5 運限欄皆在、3rd 參數向後相容、facts ≤23<60 且皆過 sanitizeFact、無 SSR/hydration 問題(過運卡僅互動後渲染)。採納:流時加 timeIndex 參數(決定論)+ hourly 非確定性註記。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/ziwei-doushu | grep=`computeHoroscope`,`formatMutagen`,`ZiweiHoroscope`,`toContext(` | hits=0 stale — toContext 3rd 參數 optional,compute/4 工具/測試 call sites 全相容(tsc 過)。
+- BUGHUNT_SCOPE_NARROW: N/A(含 agency-os + scripts)。
+
+[剩餘風險] 流時(hourly)不傳 timeIndex 時取呼叫當下時辰(已型別註記);未來批次/持久化消費 hourly 須傳 timeIndex。UI 今日運限用 UTC 日期(toISOString),UTC+8 晚間可能顯示隔日 流日(已顯示 date 讓使用者知道是哪天)。
+
+[rollback] 新增可逆;`git revert`;toContext 第 3 參數與 computeHoroscope 移除需同步 ZiweiTool。
+
 ### docs(runbook): EU DNS repoint 清單 live 查證寫進 §5（搬機前置）
 
 [任務理解] §7 未打勾項「列出指向 EU 的 Cloudflare DNS record」—搬機要 repoint 哪些必須有確切清單。
