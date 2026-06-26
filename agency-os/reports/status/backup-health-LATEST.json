@@ -1,5 +1,5 @@
 {
-    "generatedAt":  "2026-06-26T06:15:08.1035885Z",
+    "generatedAt":  "2026-06-26T06:20:51.9801486Z",
     "overall":  "PASS",
     "fatal":  false,
     "fatalReason":  "",
@@ -24,8 +24,8 @@
                "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|30 2 * * * root /root/scripts/backup-eu-stack.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261|0 3 * * * root /root/scripts/verify-backup-eu.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261",
                "retention_days":  "7",
                "retention_source":  "static",
-               "backup_size":  "7.9G",
-               "latest_time":  "2026-06-26 06:01:01",
+               "backup_size":  "8.3G",
+               "latest_time":  "2026-06-26 06:16:53",
                "oldest_time":  "2026-06-19 02:30:45",
                "backup_age_days":  "0"
            },
