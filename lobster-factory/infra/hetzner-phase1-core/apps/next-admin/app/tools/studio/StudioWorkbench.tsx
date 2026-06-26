@@ -19,6 +19,7 @@ import {
   CULTURE_LENSES,
   type CultureItem,
 } from "@/lib/studio/culture-presets";
+import { tabStyle, chipStyle, actionPill, ghostBtn } from "@/components/tools/panel-primitives";
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 import { openInCanvas } from "@/components/tools/canvas-handoff";
 import { buildSemanticFilename, buildSemanticBase, type SemanticFileMeta } from "@/lib/studio/semantic-filename";
@@ -95,50 +96,6 @@ async function downscaleImageFile(file: File, maxDim = 1024, quality = 0.85): Pr
     img.onerror = () => reject(new Error("image_decode_failed"));
     img.src = dataUrl;
   });
-}
-
-// ── Studio panel design system (4 primitives — keep ALL same-type elements identical) ──
-//   tabStyle(active)      sub-category TABS  — solid-accent fill when active
-//   chipStyle(active)     option CHIPS       — light-purple fill when active (distinct from tabs)
-//   actionPill(disabled)  primary ACTION     — solid-accent pill (fetch / dice / roll)
-//   ghostBtn()            secondary ACTION   — transparent + bordered (clear / cancel / remove)
-// Boundary: the result-stage buttons (生成 / 存入 / 去背 / 下載) use the GLOBAL
-// btn-primary / btn-secondary CSS classes — a separate, self-consistent primitive.
-// Do NOT unify across that boundary; only same-type elements share a helper.
-function tabStyle(active: boolean): React.CSSProperties {
-  return {
-    padding: "3px 10px", borderRadius: 12, fontSize: 11, cursor: "pointer",
-    border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
-    background: active ? "var(--accent)" : "rgba(127,127,127,0.08)",
-    color: active ? "var(--btn-primary-text)" : "var(--text-muted)",
-    fontWeight: active ? 600 : 400, transition: "all 0.15s",
-  };
-}
-function chipStyle(active: boolean): React.CSSProperties {
-  return {
-    padding: "3px 10px", borderRadius: 12, fontSize: 11, cursor: "pointer",
-    border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
-    background: active ? "rgba(99,102,241,0.15)" : "rgba(127,127,127,0.08)",
-    color: active ? "var(--accent)" : "var(--text-muted)",
-    fontWeight: active ? 600 : 400, transition: "all 0.15s",
-  };
-}
-// Primary ACTION button — solid-accent pill (radius 20). Every trigger: fetch / dice / roll.
-function actionPill(disabled = false): React.CSSProperties {
-  return {
-    fontSize: 11, fontWeight: 600, padding: "4px 14px", borderRadius: 20,
-    cursor: disabled ? "default" : "pointer",
-    background: "var(--accent)", color: "var(--btn-primary-text)", border: "none",
-    opacity: disabled ? 0.5 : 1, flexShrink: 0, transition: "all 0.15s",
-  };
-}
-// Secondary ACTION button — transparent + bordered, muted (radius 20). clear / cancel / remove.
-function ghostBtn(): React.CSSProperties {
-  return {
-    fontSize: 11, padding: "2px 10px", borderRadius: 20, cursor: "pointer",
-    background: "transparent", border: "1px solid var(--border)",
-    color: "var(--text-muted)", transition: "all 0.15s",
-  };
 }
 
 function AccordionSection({
