@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { ImageResponse } from 'next/og';
 
 /**
@@ -48,7 +50,12 @@ async function loadCjkFont(text: string): Promise<ArrayBuffer | null> {
     const css = await res.text();
     const m = css.match(/src:\s*url\(([^)]+)\)/);
     if (!m) return null;
-    const fontRes = await fetch(m[1], { signal: AbortSignal.timeout(6000) });
+    // 明確白名單字型主機:Google CSS 不會把 text 反射進 src url(已驗無 SSRF),
+    //   但把「信任 Google 格式」固化成顯式不變量,防未來格式變動/MITM(critic 2026-06-26)。
+    const fontUrl = new URL(m[1]);
+    if (fontUrl.protocol !== 'https:' || fontUrl.hostname !== 'fonts.gstatic.com')
+      return null;
+    const fontRes = await fetch(fontUrl, { signal: AbortSignal.timeout(6000) });
     if (!fontRes.ok) return null;
     return await fontRes.arrayBuffer();
   } catch {
@@ -58,6 +65,24 @@ async function loadCjkFont(text: string): Promise<ArrayBuffer | null> {
 
 function clamp(s: string | null, n: number): string {
   return (s ?? '').slice(0, n);
+}
+
+/**
+ * 載入內建拉丁字型(Geist)當 Latin fallback。
+ * Noto Sans TC 的 text= 子集不含拉丁,故 ORACLE / 網域等拉丁字無字型 → @vercel/og
+ *   會逐字 fetch fallback 並 400(雖仍出圖但拉丁變方塊)。提供 Geist 後全字解析。
+ */
+function loadLatinFont(): ArrayBuffer | null {
+  try {
+    const p = join(
+      process.cwd(),
+      'node_modules/next/dist/compiled/@vercel/og/Geist-Regular.ttf',
+    );
+    const buf = readFileSync(p);
+    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+  } catch {
+    return null;
+  }
 }
 
 export async function GET(request: Request) {
@@ -74,7 +99,12 @@ export async function GET(request: Request) {
 
   // 字型子集只需「實際會渲染的字」;以正規化後文字請求,確保涵蓋(無 U+00B7)。
   const allText = BRAND + title + subtitle + lines.join('') + DOMAIN;
-  const font = await loadCjkFont(allText);
+  const cjk = await loadCjkFont(allText);
+  const latin = loadLatinFont();
+  const fonts: { name: string; data: ArrayBuffer; weight: 400 | 700; style: 'normal' }[] =
+    [];
+  if (cjk) fonts.push({ name: 'Noto Sans TC', data: cjk, weight: 700, style: 'normal' });
+  if (latin) fonts.push({ name: 'Geist', data: latin, weight: 400, style: 'normal' });
 
   return new ImageResponse(
     (
@@ -90,7 +120,7 @@ export async function GET(request: Request) {
             'linear-gradient(135deg, #0b1020 0%, #1a1535 60%, #241a40 100%)',
           color: '#e8e6f0',
           padding: '90px',
-          fontFamily: '"Noto Sans TC", sans-serif',
+          fontFamily: '"Noto Sans TC", "Geist", sans-serif',
         }}
       >
         <div style={{ display: 'flex', fontSize: 34, color: accent, letterSpacing: 4 }}>
@@ -144,9 +174,7 @@ export async function GET(request: Request) {
     {
       width: 1080,
       height: 1080,
-      fonts: font
-        ? [{ name: 'Noto Sans TC', data: font, weight: 700, style: 'normal' }]
-        : undefined,
+      fonts: fonts.length ? fonts : undefined,
     },
   );
 }

@@ -4,6 +4,29 @@
 
 ## 2026-06-26
 
+### feat(oracle): Phase A — 分享圖卡 OG 生成(Satori/ImageResponse,CJK 子集字型)
+
+[任務理解] 病毒漏斗:解讀/命盤一鍵產出可分享的精美圖卡(IG/TikTok/LINE)。純渲染、無憑證。
+
+[現況分析] next/og 內建 ImageResponse(Satori)但只附拉丁字型(Geist),CJK 會變方塊。標準解 = 依卡片文字向 Google Fonts 取最小子集 + Geist 補拉丁。
+
+[已修改]
+- `app/api/og/route.tsx`(新):動態 OG 卡(1080²,深色星空 + 金色品牌 + 標題/摘要/重點)。CJK 走 Noto Sans TC text-subset(IE-UA → woff,Satori 可解;現代 UA 回 woff2 解不了)+ Geist 補拉丁;cjkSafe 把 U+00B7「·」換 U+30FB「・」(前者不在 Noto Sans TC 子集);字型主機白名單 gstatic.com(防 SSRF,顯式不變量);取字型逾時/失敗 graceful degrade。
+- `lib/og.ts`(新):`ogCardUrl`/`ogParamsFromContext` 純 URL 建構。
+- `components/AiReading.tsx`(改):加「分享圖卡」鍵 window.open(noopener)。
+- `messages/{zh-TW,en}.json`:`ai.share`。
+- `lib/og.test.ts`(新):URL 建構單元測試。
+
+[驗證結果](R0 四動作)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npm start` + python(UTF-8)curl `/api/og` + Read PNG 目視 | exit=0 | **真實渲染 HTTP 200 image/png 1080×1080 77522 bytes,目視確認 CJK 完美**(破軍・木三局/紫微斗數命盤/命宮：破軍(陷)…全對)、0 個 dynamic-font 錯誤。關鍵診斷:首輪 curl CJK 變亂碼 = **Git Bash CP950 把命令列 CJK 編錯**(專案文件警告的 trap),非 route bug;改 python UTF-8 即完美。另 tsc=0、`npm run build` exit=0(`ƒ /api/og`)、og.test 3 pass。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n+2suggestion — critic **實打 SSRF payload(含 169.254.169.254 metadata)無法利用**(Google 不把 text 反射進 src url);確認 standalone 有 trace Geist 字型(部署可解析)、輸入有界無 ReDoS、URLSearchParams 編碼安全。採納:font url 加 gstatic.com 白名單。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/ziwei-doushu | grep=`ogCardUrl`,`ogParamsFromContext`,`/api/og`,`loadCjkFont` | hits=0 stale — AiReading 引用 + route 對齊;ACCENTS.daily 為開放 type(非 SystemId)無衝突。
+- BUGHUNT_SCOPE_NARROW: N/A(含 agency-os + scripts)。
+
+[剩餘風險] OG 渲染時 fetch Google Fonts(EU 機可對外;無網則降級拉丁)。route 開放無 quota(付費牆前,同 task#1)。Web Share API(navigator.share)未用(現為 window.open 開圖讓使用者存),行動端可後續加。
+
+[rollback] 新增可逆;`git revert`。
+
 ### fix(dr): 修 DR gap(R2 token 只在會死的機器上) + §4 災難還原補確切指令 + 端到端驗證
 
 [任務理解] 推進 §7 災難還原可執行性。寫 §4 確切還原指令前，先確認「從 R2 拉備份」的方法（DR 時 EU 已死）。
