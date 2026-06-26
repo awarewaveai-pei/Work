@@ -152,6 +152,44 @@ export interface CisProfile {
   csEnabled?: boolean;
 }
 
+// ── Offline eval (golden set → graduation gate, plan §5.2) ────────────────────
+/** One golden-set case (cs_eval_cases). */
+export interface EvalCase {
+  question: string;
+  intentKey: string;
+  expectedPoints: string[];
+  expectHandoff: boolean;
+  isAdversarial: boolean;
+}
+
+export interface EvalCaseResult {
+  question: string;
+  intentKey: string;
+  expectHandoff: boolean;
+  didHandoff: boolean;
+  covered: boolean;     // judge: answer covers expected points (meaningful only when !expectHandoff)
+  pass: boolean;        // overall correct
+  dangerous: boolean;   // answered confidently when it should have handed off (worst error)
+  answer: string;
+  judgeReason?: string;
+}
+
+export interface EvalSummary {
+  organizationId: string;
+  intentKey?: string;
+  n: number;
+  passRate: number;
+  dangerousErrorRate: number; // dangerous / n
+  handoffRecall: number;      // correctly-handed-off / expected-handoff (1 when none expected)
+  results: EvalCaseResult[];
+}
+
+/** Graduation verdict: may this intent move L1 → L2? */
+export interface IntentGrade {
+  canGraduate: boolean;
+  reasons: string[];
+}
+
 /** A knowledge document to ingest into the RAG store. */
 export interface KnowledgeInput {
   organizationId: string;

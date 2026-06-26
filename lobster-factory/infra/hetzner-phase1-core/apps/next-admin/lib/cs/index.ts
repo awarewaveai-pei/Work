@@ -6,6 +6,7 @@ export { handleInbound } from "@/lib/cs/orchestrator";
 export { ingestKnowledge, retrieve, getEmbeddingProvider, setEmbeddingProvider } from "@/lib/cs/rag";
 export { registerTool } from "@/lib/cs/tools";
 export { loadCis } from "@/lib/cs/cis";
+export { runEval, gradeIntent } from "@/lib/cs/eval";
 
 export type {
   InboundMessage,
@@ -15,4 +16,6 @@ export type {
   KnowledgeInput,
   EmbeddingProvider,
   CisProfile,
+  EvalSummary,
+  IntentGrade,
 } from "@/lib/cs/types";

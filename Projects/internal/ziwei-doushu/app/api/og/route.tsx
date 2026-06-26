@@ -21,16 +21,27 @@ const ACCENTS: Record<string, string> = {
   astrology: '#60a5fa',
 };
 
-const BRAND = 'ORACLE · 東西方命理';
+const BRAND = 'ORACLE 東西方命理';
 const DOMAIN = 'oracle.aware-wave.com';
+const MIDDOT = '・'; // ・ 片假名中點(CJK 字型涵蓋);U+00B7「·」不在 Noto Sans TC
+
+/** 把 U+00B7 中點換成 CJK 字型有涵蓋的中點,避免 Satori 逐字 fallback 取字型失敗。 */
+function cjkSafe(s: string): string {
+  return s.replace(/·/g, MIDDOT);
+}
 
 async function loadCjkFont(text: string): Promise<ArrayBuffer | null> {
   try {
     const api = `https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700&text=${encodeURIComponent(
       text,
     )}`;
+    // 用舊版 IE UA:Google Fonts 對其回 woff(Satori 可解),對現代 UA 回 woff2
+    //   (此 @vercel/og 解不了 → 中文變方塊)。實測 2026-06-26。
     const res = await fetch(api, {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)',
+      },
       signal: AbortSignal.timeout(6000),
     });
     if (!res.ok) return null;
@@ -64,6 +75,8 @@ export async function GET(request: Request) {
   // 字型子集只需「實際會渲染的字」;不含裝飾符號以免 Google Fonts 子集 400。
   const allText = BRAND + title + subtitle + lines.join('') + DOMAIN;
   const font = await loadCjkFont(allText);
+  // eslint-disable-next-line no-console
+  console.log('[og] font bytes =', font ? font.byteLength : 'NULL');
 
   return new ImageResponse(
     (

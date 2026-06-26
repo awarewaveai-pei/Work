@@ -5,10 +5,31 @@
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import type {
   CsActionKind,
+  EvalCase,
   Intent,
   ToolRisk,
   ToolSpec,
 } from "@/lib/cs/types";
+
+/** Load the golden-set eval cases for a tenant (optionally one intent). Degrades to []. */
+export async function loadEvalCases(organizationId: string, intentKey?: string): Promise<EvalCase[]> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return [];
+  let q = sb
+    .from("cs_eval_cases")
+    .select("question,intent_key,expected_points,expect_handoff,is_adversarial")
+    .eq("organization_id", organizationId);
+  if (intentKey) q = q.eq("intent_key", intentKey);
+  const { data, error } = await q;
+  if (error || !data) return [];
+  return data.map((r) => ({
+    question: typeof r.question === "string" ? r.question : "",
+    intentKey: typeof r.intent_key === "string" ? r.intent_key : "",
+    expectedPoints: Array.isArray(r.expected_points) ? (r.expected_points as unknown[]).filter((x): x is string => typeof x === "string") : [],
+    expectHandoff: r.expect_handoff === true,
+    isAdversarial: r.is_adversarial === true,
+  }));
+}
 
 interface IntentRow {
   key: string;
