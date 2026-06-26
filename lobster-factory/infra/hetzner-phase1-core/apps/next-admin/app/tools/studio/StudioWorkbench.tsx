@@ -725,55 +725,8 @@ export default function StudioWorkbench() {
           </select>
         </label>
 
-        <AccordionSection title="🎯 主圖 Subject" summary={subject || "未填"} defaultOpen>
-          <input className="btn-secondary" style={{ width: "100%", marginBottom: 8, opacity: isTransformMode ? 0.5 : 1 }} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={isTransformMode ? "改圖模式：主圖由上傳圖決定（可選）" : "例：lotus flower mandala"} />
-          <CategoryPicker categories={SUBJECT_CATEGORIES} value={subject} onPick={setSubject} onTip={setTip} />
-        </AccordionSection>
-
-        <AccordionSection title="📚 題材 Theme" summary={theme || "未填"}>
-          <input className="btn-secondary" style={{ width: "100%", marginBottom: 8, opacity: isTransformMode ? 0.4 : 1 }} value={theme} onChange={(e) => setTheme(e.target.value)} placeholder={isTransformMode ? "改圖模式下不影響 prompt" : "例：spiritual healing"} />
-          <CategoryPicker categories={THEME_CATEGORIES} value={theme} onPick={setTheme} onTip={setTip} />
-        </AccordionSection>
-
-        <AccordionSection title="✨ 氛圍 Vibe" summary={vibe || "未填"}>
-          <input className="btn-secondary" style={{ width: "100%", marginBottom: 8 }} value={vibe} onChange={(e) => setVibe(e.target.value)} placeholder="例：calm, ethereal" />
-          <CategoryPicker categories={VIBE_CATEGORIES} value={vibe} onPick={setVibe} onTip={setTip} />
-        </AccordionSection>
-
-        <AccordionSection title="🔥 時事靈感">
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <p style={{ fontSize: 11, opacity: 0.55, margin: 0 }}>點擊話題填入主圖欄</p>
-            <button type="button" disabled={trendingFetching} onClick={() => void fetchAllTrending()}
-              style={{ fontSize: 11, padding: "3px 12px", borderRadius: 20, cursor: trendingFetching ? "default" : "pointer", background: "var(--accent)", color: "var(--btn-primary-text)", border: "none", opacity: trendingFetching ? 0.6 : 1, flexShrink: 0 }}>
-              {trendingFetching ? "搜尋中…" : "抓取今日熱搜"}
-            </button>
-          </div>
-          {/* Row 1: category tabs (圖一 layout) */}
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
-            {TRENDING_CATEGORIES.map((cat) => (
-              <button key={cat.value} type="button" onClick={() => setTrendingTab(cat.value)} style={tabStyle(trendingTab === cat.value)}>
-                {cat.label}
-              </button>
-            ))}
-          </div>
-          {/* Row 2: topics of the active category */}
-          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-            {(() => {
-              const topics = allTopics[trendingTab];
-              if (!topics) {
-                return <span style={{ fontSize: 11, opacity: 0.45 }}>{trendingFetching ? "搜尋中…" : "點「抓取今日熱搜」載入話題"}</span>;
-              }
-              return topics.map((t, i) => (
-                <button key={`${trendingTab}-${i}`} type="button" onClick={() => setSubject(t)} style={chipStyle(false)}>
-                  {t}
-                </button>
-              ));
-            })()}
-          </div>
-        </AccordionSection>
-
-        {/* 🌍 世界文化 — region × lens, with AI-filled specific items (混搭靈感工具) */}
-        <AccordionSection title="🌍 世界文化" summary={region ? (fusionRegion ? `${region.zh}×${fusionRegion.zh}` : region.zh) : (cultureChips.length ? `${cultureChips.length} 元素` : "未選")}>
+        {/* 🌍 世界文化 — region × lens, with AI-filled specific items (混搭靈感工具). Moved to FIRST per spec. */}
+        <AccordionSection title="🌍 世界文化" summary={region ? (fusionRegion ? `${region.zh}×${fusionRegion.zh}` : region.zh) : (cultureChips.length ? `${cultureChips.length} 元素` : "未選")} defaultOpen>
           <p style={{ fontSize: 11, opacity: 0.55, margin: "0 0 8px" }}>
             1️⃣ 選地域 → 2️⃣ 選鏡頭 → ✨ AI 噴出該文化專屬靈感（可多選，填入 prompt）
           </p>
@@ -924,6 +877,56 @@ export default function StudioWorkbench() {
               </div>
             </div>
           )}
+        </AccordionSection>
+
+        <AccordionSection title="🎯 主圖 Subject" summary={subject || "未填"}>
+          <input className="btn-secondary" style={{ width: "100%", marginBottom: 8, opacity: isTransformMode ? 0.5 : 1 }} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={isTransformMode ? "改圖模式：主圖由上傳圖決定（可選）" : "例：lotus flower mandala"} />
+          <CategoryPicker categories={SUBJECT_CATEGORIES} value={subject} onPick={setSubject} onTip={setTip} />
+        </AccordionSection>
+
+        <AccordionSection title="📚 題材 Theme" summary={theme || "未填"}>
+          <input className="btn-secondary" style={{ width: "100%", marginBottom: 8, opacity: isTransformMode ? 0.4 : 1 }} value={theme} onChange={(e) => setTheme(e.target.value)} placeholder={isTransformMode ? "改圖模式下不影響 prompt" : "例：spiritual healing"} />
+          <CategoryPicker categories={THEME_CATEGORIES} value={theme} onPick={setTheme} onTip={setTip} />
+        </AccordionSection>
+
+        <AccordionSection title="✨ 氛圍 Vibe" summary={vibe || "未填"}>
+          <input className="btn-secondary" style={{ width: "100%", marginBottom: 8 }} value={vibe} onChange={(e) => setVibe(e.target.value)} placeholder="例：calm, ethereal" />
+          <CategoryPicker categories={VIBE_CATEGORIES} value={vibe} onPick={setVibe} onTip={setTip} />
+        </AccordionSection>
+
+        <AccordionSection title="🔥 時事靈感">
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <p style={{ fontSize: 11, opacity: 0.55, margin: 0 }}>點擊話題填入主圖欄（再點一次取消）</p>
+            <button type="button" disabled={trendingFetching} onClick={() => void fetchAllTrending()}
+              style={{ fontSize: 11, padding: "3px 12px", borderRadius: 20, cursor: trendingFetching ? "default" : "pointer", background: "var(--accent)", color: "var(--btn-primary-text)", border: "none", opacity: trendingFetching ? 0.6 : 1, flexShrink: 0 }}>
+              {trendingFetching ? "搜尋中…" : "抓取今日熱搜"}
+            </button>
+          </div>
+          {/* Row 1: category tabs (圖一 layout) */}
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+            {TRENDING_CATEGORIES.map((cat) => (
+              <button key={cat.value} type="button" onClick={() => setTrendingTab(cat.value)} style={tabStyle(trendingTab === cat.value)}>
+                {cat.label}
+              </button>
+            ))}
+          </div>
+          {/* Row 2: topics of the active category — active chip shows 淺紫 bg + ✓ (selected = current subject) */}
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+            {(() => {
+              const topics = allTopics[trendingTab];
+              if (!topics) {
+                return <span style={{ fontSize: 11, opacity: 0.45 }}>{trendingFetching ? "搜尋中…" : "點「抓取今日熱搜」載入話題"}</span>;
+              }
+              return topics.map((t, i) => {
+                const active = subject === t;
+                return (
+                  <button key={`${trendingTab}-${i}`} type="button" onClick={() => setSubject(active ? "" : t)} style={chipStyle(active)}>
+                    {active ? "✓ " : ""}{t}
+                  </button>
+                );
+              });
+            })()}
+          </div>
         </AccordionSection>
 
         {/* 🤖 圖片模型 — placed BEFORE 風格 (per spec). Tarot-style: provider tabs + vertical rows. */}
