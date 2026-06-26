@@ -70,7 +70,7 @@
 >
 > **🔑 還原關鍵事實（restore 時必知）**：`supabase-db` 這個 Postgres cluster 含 **4 個 DB** — `postgres`(Supabase) + **`n8n`**(workflow) + **`postiz`** + `_supabase`。`pg_dumpall` 全抓 → **n8n workflow、postiz 排程資料都在 `supabase-all.sql.gz` 裡**（已驗 `CREATE DATABASE n8n` + `workflow_entity`），n8n.tgz/postiz-uploads.tgz 只補 binary/上傳檔。**還原 n8n/postiz = 先 restore supabase dump（含其 DB）+ 再還原對應 volume。**
 >
-> **🔑 `.env` 解密金鑰**：`BACKUP_ENC_KEY` 在 `/etc/default/eu-backup`（不進備份）+ **鏡像於本機 vault `secrets-vault.ps1 get BACKUP_ENC_KEY`**。機器死 → 從 vault 取金鑰解 `env.tar.gz.enc`。
+> **🔑 兩把救援鑰匙都在本機 vault（機器死也拿得到，2026-06-26 補齊）**：① `BACKUP_ENC_KEY`（解 `env.tar.gz.enc`）② `R2_API_TOKEN`（下載 R2 備份 —**原本只在 EU `/etc/default/eu-backup`，是 DR gap：EU 死 + SG 退役後 R2 是唯一異地卻拿不到 token；已鏡像到 vault**）。兩者在 EU `/etc/default/eu-backup`（不進備份）+ vault。完整救援指令見 §4 step 0；端到端已驗（vault→R2 下載→解密列 4 個 .env，全程不需 EU）。
 >
 > **✅ R2 異地已修（2026-06-26）**：根因 = `/etc/default/eu-backup` 變數沒 export，子腳本 `upload-to-r2.sh` 讀不到 `R2_API_TOKEN`（自 2026-05 起 R2 從沒真的上傳成功，「3-2-1」其實只有本機+SG）。修 = `set -a` 包住 source。實測 10/10 檔 HTTP 200、`R2 upload OK`。**現在才是真 3-2-1**（本機 + SG + R2），R2 跨供應商那條 SG 退役後仍在。
 >
@@ -150,17 +150,47 @@
 
 **單碟壞（RAID 1 救援）**：機器還活著 → Hetzner 換碟 → `mdadm --add` 重建 mirror → 不需動資料。（這就是 RAID 的價值。）
 
-**整機壞 / 需重建**：
-1. Hetzner 開新 dedicated（或修好原機）→ §3 裝 OS + RAID。
-2. `git clone` `Work` repo → 拿回所有 compose / scripts。
-3. 從 Storage Box 拉最新備份集（restic restore）。
-4. 還原密鑰：解密 `.env` 放回 `/root/{stack}/`。
-5. 還原 DB：`psql < supabase_dump.sql`、`trigger` 同理、`mysql < mainwp_dump.sql`。
-6. 還原 volumes：storage / minio / n8n / uptime-kuma。
-7. `docker compose up -d`（各 stack）→ 等 healthy。
-8. **驗證**：Supabase 登入 + 客戶資料在、Trigger 排程在（`TaskSchedule`）、MainWP 連得到 child、app.aware-wave 能佈建。
-9. DNS：若換 IP → 更新 Cloudflare A record。**指向 EU 的 9 個 record 清單見 §5 step 5**（2026-06-26 live 查證）。
-- `TODO:` 每步補確切指令 + 預期輸出（實機演練時定稿）。
+**整機壞 / 需重建**（指令 2026-06-26 實機驗證；`$NEW` = 新機 IP）：
+
+**0. 取備份集 —兩個來源（SG 還在用 SG，較快；SG 退役後用 R2）**
+
+兩把救援鑰匙都在**本機 vault**（已驗，機器死也拿得到）：`R2_API_TOKEN`（下載 R2）+ `BACKUP_ENC_KEY`（解 .env）。
+```powershell
+# 從本機（筆電/桌機）救援。secrets-vault.ps1 run 把兩把鑰匙注入 env，不落地。
+& scripts\secrets-vault.ps1 -Action run -Names @("R2_API_TOKEN","BACKUP_ENC_KEY") -Command @'
+  $acct="aea1a836e6f8b8d7f18206dc8e848bd6"; $date="<YYYY-MM-DD>"
+  $files="supabase-all.sql.gz","trigger.sql.gz","mainwp.sql.gz","env.tar.gz.enc","n8n.tgz","supabase-storage.tgz","trigger-minio.tgz","postiz-uploads.tgz","mainwp-files.tgz","uptime-kuma.tgz"
+  foreach($f in $files){ curl.exe -s -H "Authorization: Bearer $env:R2_API_TOKEN" -o "D:\tmp\restore\$f" "https://api.cloudflare.com/client/v4/accounts/$acct/r2/buckets/lobster-backup/objects/eu/$date/$f" }
+'@
+# 或 SG 還在：scp -i ~/.ssh/backup_to_sg -r root@5.223.93.113:/root/lobster-phase1/backups/from-eu/<YYYY-MM-DD>/ ./restore/
+```
+（已驗：R2 GET → HTTP 200；vault 注入 + openssl 解密 → 列出 4 個 .env，全程不需 EU。）
+
+**1.** Hetzner 開新 dedicated（或修原機）→ §3 裝 OS + RAID 1 + SMART。
+**2.** `git clone https://github.com/awarewaveai-pei/Work /root/Work`（compose/scripts 正本；EU 備份腳本在 `lobster-factory/infra/eu-backup/`）。把備份集 scp 到新機 `/root/restore/`。
+
+**3. 還原密鑰**（`BACKUP_ENC_KEY` 從 vault；新機 `/etc/default/eu-backup` 也要重建此值 + R2/OFFSITE 設定）：
+```bash
+openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -in /root/restore/env.tar.gz.enc | tar xzf - -C /   # 還原 /root/{supabase,trigger,mainwp,postiz}/.env
+```
+**4. 還原 DB**（先 `docker compose up -d` 起 DB 容器，再灌）：
+```bash
+gunzip -c /root/restore/supabase-all.sql.gz | docker exec -i supabase-db psql -U supabase_admin   # 含 postgres + n8n + postiz DB（pg_dumpall 全抓）
+gunzip -c /root/restore/trigger.sql.gz      | docker exec -i trigger-postgres psql -U trigger -d trigger
+docker exec mainwp-db sh -c 'mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS mainwp"'
+gunzip -c /root/restore/mainwp.sql.gz       | docker exec -i mainwp-db sh -c 'mysql -u root -p"$MYSQL_ROOT_PASSWORD" mainwp'
+```
+**5. 還原 volumes**（每個 tgz 灌回對應 volume）：
+```bash
+for pair in "n8n.tgz:n8n_n8n_data" "supabase-storage.tgz:supabase_storage-data" "trigger-minio.tgz:trigger_trigger_minio_data" "postiz-uploads.tgz:postiz_postiz_uploads" "mainwp-files.tgz:mainwp_mainwp_files" "uptime-kuma.tgz:uptime-kuma"; do
+  f="${pair%%:*}"; v="${pair##*:}"; docker volume create "$v" >/dev/null
+  docker run --rm -v "$v":/d -v /root/restore:/b alpine sh -c "tar xzf /b/$f -C /d"
+done
+```
+**6.** `docker compose up -d`（各 stack：supabase / trigger / 各服務）→ 等 healthy。
+**7. 驗證**：`docker exec supabase-db psql -U supabase_admin -d postgres -c "SELECT count(*) FROM organizations"`（客戶資料）；Trigger `SELECT * FROM "TaskSchedule"`（排程在）；MainWP 連得到 child；app.aware-wave 能建站。
+**8. DNS**：换 IP → 更新指向 EU 的 **9 個 record**（清單 + 指令見 §5 step 5）。
+**9.** 新機重建備份：`scp lobster-factory/infra/eu-backup/*.sh root@$NEW:/root/scripts/` + 重設 `/etc/default/eu-backup`（`BACKUP_ENC_KEY` 從 vault、R2_* 設定）+ 裝 cron。
 
 ---
 
@@ -258,7 +288,8 @@ openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -in "$OUT/env.tar.g
 - [x] **修 R2 upload WARN**（2026-06-26：`set -a` export 修；實測 10/10 HTTP 200）→ 真 3-2-1 成立
 - [x] 備份失敗會 surface（2026-06-26：`check-backup-health.ps1` 讀 verify 判定，FAILED→AO-RESUME WARN；非 Telegram 而是開工自動報，涵蓋「壞了」+「停了」）
 - [ ] auction 機：雙碟 NVMe + RAID 1 + SMART 健康 + mdadm 告警
-- [ ] §4 / §5 的 `TODO:` 指令全部補齊並實測
+- [x] §4 災難還原指令補齊並驗證（2026-06-26：取備份/解密/還原 DB/volume 確切指令；端到端 R2→解密實測）；§5 DNS step 補齊（§4/§5 剩 step 隨真機演練定稿）
+- [x] **救援鑰匙 off-machine**（2026-06-26 修 DR gap：`R2_API_TOKEN` 原本只在 EU，已鏡像本機 vault；EU 死也下載得到 R2 備份）
 - [x] 所有指向 EU 的 Cloudflare DNS record 清單列出（2026-06-26 live 查證：9 個，見 §5 step 5；含 2 個 DNS-only `remotion-svc`/`video-svc`）
 - [ ] 原 Cloud 機保留至遷移驗證完成
 

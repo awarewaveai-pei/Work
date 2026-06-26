@@ -4,7 +4,26 @@
 
 ## 2026-06-26
 
-### feat(oracle): Phase A — 每日運勢個人化(真喜用神 + AI 文案)
+### fix(dr): 修 DR gap(R2 token 只在會死的機器上) + §4 災難還原補確切指令 + 端到端驗證
+
+[任務理解] 推進 §7 災難還原可執行性。寫 §4 確切還原指令前，先確認「從 R2 拉備份」的方法（DR 時 EU 已死）。
+
+[現況分析]（實測）
+- CF zone token（`CLOUDFLARE_API_TOKEN`）不能存取 R2（10000 auth error）；R2 用獨立 `R2_API_TOKEN`。
+- **DR gap**：`R2_API_TOKEN` **只在 EU `/etc/default/eu-backup`**，不在本機 vault（`BACKUP_ENC_KEY` 在）。→ EU 死 + SG 退役後，R2 是唯一異地卻**拿不到 token = 完全無法還原**。
+
+[已修改]
+- `R2_API_TOKEN` 從 EU 取出鏡像到本機 vault（`secrets-vault.ps1 set`）—同 `BACKUP_ENC_KEY` 模式，兩把救援鑰匙都 off-machine。
+- runbook §4「整機壞」從高層步驟改為**確切已驗指令**：step0 取備份（vault run 注入 token → R2 GET / 或 SG scp）、step3 openssl 解密 .env、step4 psql/mysql 還原 DB、step5 docker volume 還原迴圈、step7 驗證查詢。§1 鑰匙註記 + §7 checklist（§4 補齊 + 救援鑰匙 off-machine）更新。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash/PowerShell | cmd=`secrets-vault.ps1 -Action run -Names R2_API_TOKEN,BACKUP_ENC_KEY` + R2 GET + openssl | exit=0 | **完整 DR 鏈端到端**（模擬 EU 死、人在筆電）：vault 注入兩鑰匙 → R2 下載 `env.tar.gz.enc` **HTTP 200** → vault `BACKUP_ENC_KEY` 解密 → 列出 4 個 .env（root/{supabase,trigger,mainwp,postiz}/.env）。全程不需 EU。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — 還原指令複用今天 drill 驗過的 dump 格式/帳號；vault run 為既有 secret 注入機制；純文件 + 一個 vault set（非 prod 服務）。
+- BUGHUNT_DONE: scope=agency-os,runbooks,scripts,mcp | grep=`R2_API_TOKEN`,`BACKUP_ENC_KEY`,`secrets-vault` | hits: token 原僅 EU `/etc/default/eu-backup`（已鏡像 vault）；runbook §1/§4/§7 一致；無 stale。
+- BUGHUNT_SCOPE_NARROW: N/A（含 scripts+agency-os）。
+
+[剩餘風險] §4/§5 仍有少數 step 隨真機演練定稿（新機 IP/路徑替換）。第二異地（SG 退役前）+ RAID（買機）仍待。
+[rollback] 純文件 git revert；vault set 可 `secrets-vault.ps1 remove R2_API_TOKEN`（但留著才是對的）。
 
 [任務理解] 每日運勢工廠原已個人化(八字日主→喜用神→幸運色/數/方位),但 ① 喜用神是**簡版恆取印**(身強者其實忌印,錯)② 無 AI 文案。補這兩塊。
 
