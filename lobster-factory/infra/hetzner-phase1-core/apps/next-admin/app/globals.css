@@ -66,6 +66,8 @@
   --badge-red-text: #991b1b;
   --badge-gray-bg: #f1f5f9;
   --badge-gray-text: #475569;
+  --badge-yellow-bg: #fef3c7;
+  --badge-yellow-text: #92400e;
   --icon-ops-bg: #eff6ff;
   --icon-prov-bg: #f0fdf4;
   --icon-infra-bg: #f5f3ff;
@@ -515,9 +517,10 @@ body {
   border-radius: 20px;
 }
 
-.badge-green { background: var(--badge-green-bg); color: var(--badge-green-text); }
-.badge-red   { background: var(--badge-red-bg); color: var(--badge-red-text); }
-.badge-gray  { background: var(--badge-gray-bg); color: var(--badge-gray-text); }
+.badge-green  { background: var(--badge-green-bg); color: var(--badge-green-text); }
+.badge-red    { background: var(--badge-red-bg); color: var(--badge-red-text); }
+.badge-gray   { background: var(--badge-gray-bg); color: var(--badge-gray-text); }
+.badge-yellow { background: var(--badge-yellow-bg); color: var(--badge-yellow-text); }
 
 .card-value {
   font-size: 24px;

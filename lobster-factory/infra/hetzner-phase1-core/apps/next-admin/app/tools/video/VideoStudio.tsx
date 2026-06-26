@@ -699,34 +699,34 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
                   )}
                 </div>
 
-                {/* 場景與時間 combo — 三模式共用 */}
-                {providedScenes.length === 0 ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 14px", background: "var(--bg-subtle)", borderRadius: 8, border: "1px solid var(--border-subtle)" }}>
+                {/* 場景與時間 combo — 場景數：接力時由腳本決定（唯讀），否則滑桿；時長一律可調 */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 14px", background: "var(--bg-subtle)", borderRadius: 8, border: "1px solid var(--border-subtle)" }}>
+                  {providedScenes.length === 0 ? (
                     <KnobRow label="場景總數" hint={`${totalScenes} 場`} min={1} max={20} step={1} value={totalScenes} onChange={handleTotalChange} />
-                    {!isPexels && (
-                      <KnobRow
-                        label="AI 生圖"
-                        hint={`AI 生圖 ${customScenes} 場｜圖庫補 ${brollScenes} 場`}
-                        min={0} max={totalScenes} step={1}
-                        value={customScenes} onChange={setCustomScenes}
-                      />
-                    )}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>時間長度</span>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>{targetMinutes} 分鐘</span>
-                      </div>
-                      <input type="range" min={1} max={10} step={0.5} value={targetMinutes}
-                        onChange={e => setTargetMinutes(Number(e.target.value))}
-                        style={{ width: "100%", accentColor: "var(--accent)" }} disabled={isBusy} />
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--text-muted)" }}>
-                        <span>1 分</span><span>5 分</span><span>10 分</span>
-                      </div>
+                  ) : (
+                    <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.6 }}>場景數由前製腳本決定（{providedScenes.length} 場）。</div>
+                  )}
+                  {!isPexels && providedScenes.length === 0 && (
+                    <KnobRow
+                      label="AI 生圖"
+                      hint={`AI 生圖 ${customScenes} 場｜圖庫補 ${brollScenes} 場`}
+                      min={0} max={totalScenes} step={1}
+                      value={customScenes} onChange={setCustomScenes}
+                    />
+                  )}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>時間長度</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>{targetMinutes} 分鐘</span>
+                    </div>
+                    <input type="range" min={1} max={10} step={0.5} value={targetMinutes}
+                      onChange={e => setTargetMinutes(Number(e.target.value))}
+                      style={{ width: "100%", accentColor: "var(--accent)" }} disabled={isBusy} />
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--text-muted)" }}>
+                      <span>1 分</span><span>5 分</span><span>10 分</span>
                     </div>
                   </div>
-                ) : (
-                  <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.6 }}>場景數由前製腳本決定（{providedScenes.length} 場），每場依「畫面」生 AI 圖。</div>
-                )}
+                </div>
 
                 {/* 生圖模型 — AI 模式，廠商 tab + 模型 chip */}
                 {!isPexels && (

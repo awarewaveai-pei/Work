@@ -1507,8 +1507,8 @@ function CredentialsTab({ org }: Pick<ClientHubTabsProps, "org">) {
                       <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                         <span style={{
                           fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 10,
-                          background: cred.secretSet ? "var(--badge-green-bg)" : "var(--badge-yellow-bg, #fef3c7)",
-                          color: cred.secretSet ? "var(--green)" : "#92400e",
+                          background: cred.secretSet ? "var(--badge-green-bg)" : "var(--badge-yellow-bg)",
+                          color: cred.secretSet ? "var(--badge-green-text)" : "var(--badge-yellow-text)",
                           border: `1px solid ${cred.secretSet ? "var(--green)" : "#d97706"}`,
                         }}>
                           {cred.secretSet ? "已設密碼" : "未設密碼"}
