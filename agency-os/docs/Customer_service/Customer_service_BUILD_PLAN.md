@@ -63,8 +63,8 @@ per-client hub  /ops/clients/[slug]   （既有 7 tab：內容工具/整合/佈�
 | U | 單元 | 跑哪 | 依賴 | 對應 Phase | 狀態 |
 |---|---|---|---|---|---|
 | **U0** | **資料地基** migration 0051（8 表 + pgvector + RLS）| 💻 現有 Supabase | — | 全 Phase 地基 | ✅ **建好+驗證**（apply ⛔ gated）|
-| **U1** | **cs-engine 核心** `lib/cs/`（webhook→護欄→分類→RAG→生成→supervisor→送/動作/轉）| 💻 next-admin | U0 | P1–P4 | ⏭ 下一個 |
-| **U2** | **CIS 配置 + tab**（brandKit+csVoice JSONB + 「品牌識別」tab，重用 brandColors/BrandVoiceProfile）| 💻 next-admin UI | — | P1 | ⏳（可插隊：可見）|
+| **U1** | **cs-engine 核心** `lib/cs/`（webhook→護欄→分類→RAG→生成→supervisor→送/動作/轉）| 💻 next-admin | U0 | P1–P4 | ✅ **建好+驗證**（13 檔+測試；tsc 0 / vitest 35 / critic 修訖）|
+| **U2** | **CIS 配置 + tab**（brandKit+csVoice JSONB + 「品牌識別」tab，重用 brandColors/BrandVoiceProfile）| 💻 next-admin UI | — | P1 | ⏭ 下一個（可見）|
 | **U3** | **客服 tab + 頂層「客服」section**（per-client config + 跨客戶營運中心）| 💻 next-admin UI | U0,U1 | P1–P2 | ⏳ |
 | **U4** | **headless widget**（Client API+WS+清新自然+互動類型）| 💻 next-admin embed | U1,U6 | P1 | ⏳ |
 | **U5** | **eval/護欄 harness**（RAGAS+DeepEval+Phoenix+golden set+CI gate+simulation）| 💻 自架現有機 | U1 | P2 | ⏳ |
