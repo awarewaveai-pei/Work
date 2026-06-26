@@ -41,7 +41,9 @@ type SendToProduction = (p: { topic: string; articleTitle: string; articleConten
 const ProductionBridge = createContext<SendToProduction | null>(null);
 type SendToRemotion = (p: { topic: string; headline?: string; tagline?: string; cta?: string; imageHint?: string; scenes?: { visual: string; dialogue: string }[]; mediaMode?: string; duration?: number; customScenes?: number }) => void;
 const RemotionBridge = createContext<SendToRemotion | null>(null);
-const ScriptSettingsCtx = createContext<{ sceneCount: number; customScenes: number; mediaMode: string; duration: number }>({ sceneCount: 6, customScenes: 3, mediaMode: "__ai__", duration: 1 });
+// 合併後（2026-06-26）：素材模式 / AI生圖分配 / 時長 設定移至下方 VideoStudio（生產區）擁有，避免雙區重複。
+// 此 context 只保留 sceneCount — 它餵腳本生成（決定 AI 寫幾場），是腳本層參數，非生產設定。
+const ScriptSettingsCtx = createContext<{ sceneCount: number }>({ sceneCount: 6 });
 function pj(raw){return JSON.parse(raw.replace(/```json|```/g,"").trim());}
 
 /* ── INDUSTRY DATA ── */
@@ -248,7 +250,6 @@ function ScriptResult({script,score,onReset,extraTop,autoSaveTag}: any){
   const[sent,setSent]=useState(false);
   const sendToRemotion=useContext(RemotionBridge);
   const[remotionSent,setRemotionSent]=useState(false);
-  const{mediaMode,duration,customScenes}=useContext(ScriptSettingsCtx);
 
   useEffect(()=>{if(script&&autoSaveTag)saveHistory({tag:autoSaveTag,title:script.title,hook:script.hook,script});},[script]);
 
@@ -301,8 +302,8 @@ function ScriptResult({script,score,onReset,extraTop,autoSaveTag}: any){
 
       <Card><SL ch="🔄 多平台轉換"/><div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:repLoading||repurposed?12:0}}>{PLATFORMS.map(p=><button key={p.id} onClick={()=>doRep(p.id)} style={{padding:"6px 12px",borderRadius:999,border:`1.5px solid ${repPlatform===p.id?C.violet:C.border}`,background:repPlatform===p.id?C.violetl:C.white,color:repPlatform===p.id?C.violet:C.ink,fontSize:11.5,fontWeight:repPlatform===p.id?700:400,cursor:"pointer",transition:"all .15s",fontFamily:"inherit"}}>{p.icon} {p.label}</button>)}</div>{repLoading&&<div style={{textAlign:"center",padding:"12px 0",color:C.mid,fontSize:12.5}}>轉換中...</div>}{repurposed&&<div style={{background:C.violetl,borderRadius:9,padding:12}}><div style={{fontSize:13.5,fontWeight:800,color:C.violet,marginBottom:3}}>{repurposed.title}</div><div style={{fontSize:12.5,color:C.violet,fontStyle:"italic",marginBottom:7}}>「{repurposed.hook}」</div>{repurposed.scenes?.map((s,i)=><div key={i} style={{fontSize:11.5,color:C.ink,padding:"4px 0",borderBottom:`1px solid rgba(124,92,252,.1)`}}><b style={{color:C.violet}}>【{s.time}】</b> {s.dialogue}</div>)}{repurposed.key_changes&&<div style={{marginTop:7,fontSize:11.5,color:C.mid,background:C.white,borderRadius:6,padding:"6px 9px"}}><b>與原版差異：</b>{repurposed.key_changes}</div>}</div>}</Card>
 
-      {sendToProduction&&script?.scenes?.length>0&&<PBtn ch={sent?"✅ 已送進影片生產線 — 切到上方「🎬 影片生產」分頁":"🎬 送去生產影片（用此腳本直接生影片）"} onClick={()=>{const dlg=(script.scenes||[]).map(s=>s.dialogue).filter(Boolean).join("\n");const sc=(script.scenes||[]).map(s=>({narration:(s.dialogue||"").trim(),imagePrompt:(s.visual||"").trim()})).filter(s=>s.narration);sendToProduction({topic:script.title||"",articleTitle:script.title||"",articleContent:`${script.hook?`開場鉤子：${script.hook}\n\n`:""}${dlg}${script.cta?`\n\n結尾 CTA：${script.cta}`:""}`,scenes:sc.length>0?sc:undefined,mediaMode,duration,customScenes});setSent(true);}} full/>}
-      {sendToRemotion&&script&&<PBtn ch={remotionSent?"✅ 已送去 Remotion 模板 — 切換到「Remotion 模板」分頁":"✨ 送去 Remotion 模板（精緻動效影片）"} onClick={()=>{sendToRemotion({topic:script.title||"",headline:script.title||"",tagline:script.hook||"",cta:script.cta||"",imageHint:script.scenes?.[0]?.visual||"",scenes:(script.scenes||[]).map(s=>({visual:s.visual||"",dialogue:s.dialogue||""})),mediaMode,duration,customScenes});setRemotionSent(true);}} full/>}
+      {sendToProduction&&script?.scenes?.length>0&&<PBtn ch={sent?"✅ 已送到下方 🎬 影片生產區（已自動捲動過去）":"🎬 送去生產影片（用此腳本直接生影片）"} onClick={()=>{const dlg=(script.scenes||[]).map(s=>s.dialogue).filter(Boolean).join("\n");const sc=(script.scenes||[]).map(s=>({narration:(s.dialogue||"").trim(),imagePrompt:(s.visual||"").trim()})).filter(s=>s.narration);sendToProduction({topic:script.title||"",articleTitle:script.title||"",articleContent:`${script.hook?`開場鉤子：${script.hook}\n\n`:""}${dlg}${script.cta?`\n\n結尾 CTA：${script.cta}`:""}`,scenes:sc.length>0?sc:undefined});setSent(true);}} full/>}
+      {sendToRemotion&&script&&<PBtn ch={remotionSent?"✅ 已送到下方 🎬 影片生產（Remotion 模板，已自動捲動過去）":"✨ 送去 Remotion 模板（精緻動效影片）"} onClick={()=>{sendToRemotion({topic:script.title||"",headline:script.title||"",tagline:script.hook||"",cta:script.cta||"",imageHint:script.scenes?.[0]?.visual||"",scenes:(script.scenes||[]).map(s=>({visual:s.visual||"",dialogue:s.dialogue||""}))});setRemotionSent(true);}} full/>}
       <div style={{display:"flex",gap:9}}><GBtn ch={copied?"✅ 已複製":"📋 複製腳本"} onClick={copyScript} style={{flex:1,padding:"11px"}}/><PBtn ch="重新開始 →" onClick={onReset} full style={{flex:1}}/></div>
     </div>
   );
@@ -613,7 +614,7 @@ function ABModule({brand}){
   const vC=[C.coral,C.violet,C.jade];const vL=[C.corallt,C.violetl,C.jadelt];
   async function doGen(){if(!product||!platform)return;setLoading(true);setAds(null);setErr("");const plat=PLATFORMS.find(p=>p.id===platform)?.label||"";try{const raw=await claude(`為產品生成3個不同角度的${plat}廣告腳本（各${duration}）。${bv}\n產品：${product}\n版本A-痛點型、版本B-故事型、版本C-社會證明型\n純JSON：{"versions":[{"version":"A","type":"痛點型","title":"","hook":"","strength":"","scenes":[{"time":"","visual":"","dialogue":"","subtitle":"","shoot_tip":""}],"cta":""},{"version":"B","type":"故事型","title":"","hook":"","strength":"","scenes":[...],"cta":""},{"version":"C","type":"社會證明型","title":"","hook":"","strength":"","scenes":[...],"cta":""}],"recommendation":""}`);setAds(pj(raw));}catch{setErr("生成失敗，請再試一次（可能是 AI 回應逾時或格式問題）");}setLoading(false);}
   if(!ads)return(<div style={{display:"grid",gap:18}}><div><h2 style={{fontSize:19,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",marginBottom:3}}>廣告腳本 A/B/C 版本</h2><p style={{fontSize:12.5,color:C.mid}}>同一產品，三個不同角度廣告腳本</p></div><div><SL ch="產品/服務 *"/><TA value={product} onChange={e=>setProduct(e.target.value)} placeholder="詳細描述產品或服務..." rows={4}/></div><div><SL ch="廣告平台 *"/><PlatGrid value={platform} onChange={setPlatform}/></div><div><SL ch="廣告長度"/><div style={{display:"flex",gap:5}}>{["15秒","30秒","60秒"].map(d=><Pill key={d} label={d} active={duration===d} onClick={()=>setDuration(d)}/>)}</div></div>{err&&<div style={{padding:"7px 11px",background:C.roselt,border:`1.5px solid ${C.rose}`,borderRadius:7,fontSize:12.5,color:C.rose,fontWeight:600}}>{err}</div>}{loading&&<Spin label="AI 正在生成三個版本..."/>}{!loading&&<PBtn ch="🎯 生成A/B/C三版本 →" onClick={doGen} disabled={!product||!platform} full/>}</div>);
-  return(<div style={{display:"grid",gap:14}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><h2 style={{fontSize:17,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",margin:0}}>三版本廣告腳本</h2><GBtn ch="重新生成" onClick={()=>{setAds(null);setSentVer("");}}/></div>{ads.recommendation&&<Card style={{background:C.goldlt,borderColor:C.gold}}><SL ch="💡 AI建議先測試"/><div style={{fontSize:12.5,color:C.ink,lineHeight:1.6}}>{ads.recommendation}</div></Card>}<div style={{display:"flex",gap:6,borderBottom:`1.5px solid ${C.border}`}}>{ads.versions?.map((v,i)=><button key={i} onClick={()=>setActiveTab(i)} style={{padding:"9px 16px",border:"none",borderBottom:`3px solid ${activeTab===i?vC[i]:"transparent"}`,background:"transparent",color:activeTab===i?vC[i]:C.mid,fontWeight:activeTab===i?800:400,fontSize:12.5,cursor:"pointer",fontFamily:"inherit"}}>版本{v.version}：{v.type}</button>)}</div>{ads.versions?.map((v,i)=>activeTab===i&&<div key={i} style={{display:"grid",gap:10}}><Card style={{background:vL[i],borderColor:vC[i]}}><div style={{fontSize:15,fontWeight:800,color:vC[i],marginBottom:3,fontFamily:"DM Serif Display,serif"}}>{v.title}</div><div style={{fontSize:12.5,color:vC[i],fontStyle:"italic",marginBottom:7}}>「{v.hook}」</div><div style={{fontSize:11.5,color:C.ink,background:C.white,borderRadius:7,padding:"7px 10px"}}><b>適合：</b>{v.strength}</div></Card><div style={{display:"grid",gap:7}}>{v.scenes?.map((s,j)=><div key={j} style={{border:`1.5px solid ${C.border}`,borderRadius:10,overflow:"hidden"}}><div style={{background:C.black,padding:"5px 11px",display:"flex",alignItems:"center",gap:7}}><div style={{background:vC[i],color:C.white,width:19,height:19,borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:800}}>{String(j+1).padStart(2,"0")}</div><span style={{fontSize:10.5,color:"#ccc"}}>{s.time}</span>{s.subtitle&&<span style={{marginLeft:"auto",fontSize:9.5,color:"rgba(255,255,255,.7)"}}>「{s.subtitle}」</span>}</div><div style={{padding:"9px 13px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}><div><div style={{fontSize:8.5,color:C.mid,fontWeight:700,letterSpacing:1,marginBottom:1}}>畫面</div><div style={{fontSize:11.5,color:C.ink}}>{s.visual}</div></div><div><div style={{fontSize:8.5,color:C.mid,fontWeight:700,letterSpacing:1,marginBottom:1}}>台詞</div><div style={{fontSize:11.5,color:vC[i],fontStyle:"italic"}}>{s.dialogue}</div></div></div></div>)}</div><Card style={{borderColor:vC[i],background:vL[i]}}><SL ch="CTA"/><div style={{fontSize:13.5,color:vC[i],fontStyle:"italic",fontFamily:"DM Serif Display,serif"}}>「{v.cta}」</div></Card>{sendToProduction&&v.scenes?.length>0&&<PBtn ch={sentVer===v.version?"✅ 已送進影片生產線 — 切到上方「🎬 影片生產」分頁":`🎬 送去生產影片（用版本${v.version}生影片）`} onClick={()=>{const sc=(v.scenes||[]).map(s=>({narration:(s.dialogue||"").trim(),imagePrompt:(s.visual||"").trim()})).filter(s=>s.narration);sendToProduction({topic:v.title||product||"",articleTitle:v.title||"",articleContent:`${v.hook?`開場鉤子：${v.hook}\n\n`:""}${sc.map(s=>s.narration).join("\n")}${v.cta?`\n\n結尾 CTA：${v.cta}`:""}`,scenes:sc.length>0?sc:undefined});setSentVer(v.version);}} full/>}</div>)}</div>);
+  return(<div style={{display:"grid",gap:14}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><h2 style={{fontSize:17,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",margin:0}}>三版本廣告腳本</h2><GBtn ch="重新生成" onClick={()=>{setAds(null);setSentVer("");}}/></div>{ads.recommendation&&<Card style={{background:C.goldlt,borderColor:C.gold}}><SL ch="💡 AI建議先測試"/><div style={{fontSize:12.5,color:C.ink,lineHeight:1.6}}>{ads.recommendation}</div></Card>}<div style={{display:"flex",gap:6,borderBottom:`1.5px solid ${C.border}`}}>{ads.versions?.map((v,i)=><button key={i} onClick={()=>setActiveTab(i)} style={{padding:"9px 16px",border:"none",borderBottom:`3px solid ${activeTab===i?vC[i]:"transparent"}`,background:"transparent",color:activeTab===i?vC[i]:C.mid,fontWeight:activeTab===i?800:400,fontSize:12.5,cursor:"pointer",fontFamily:"inherit"}}>版本{v.version}：{v.type}</button>)}</div>{ads.versions?.map((v,i)=>activeTab===i&&<div key={i} style={{display:"grid",gap:10}}><Card style={{background:vL[i],borderColor:vC[i]}}><div style={{fontSize:15,fontWeight:800,color:vC[i],marginBottom:3,fontFamily:"DM Serif Display,serif"}}>{v.title}</div><div style={{fontSize:12.5,color:vC[i],fontStyle:"italic",marginBottom:7}}>「{v.hook}」</div><div style={{fontSize:11.5,color:C.ink,background:C.white,borderRadius:7,padding:"7px 10px"}}><b>適合：</b>{v.strength}</div></Card><div style={{display:"grid",gap:7}}>{v.scenes?.map((s,j)=><div key={j} style={{border:`1.5px solid ${C.border}`,borderRadius:10,overflow:"hidden"}}><div style={{background:C.black,padding:"5px 11px",display:"flex",alignItems:"center",gap:7}}><div style={{background:vC[i],color:C.white,width:19,height:19,borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:800}}>{String(j+1).padStart(2,"0")}</div><span style={{fontSize:10.5,color:"#ccc"}}>{s.time}</span>{s.subtitle&&<span style={{marginLeft:"auto",fontSize:9.5,color:"rgba(255,255,255,.7)"}}>「{s.subtitle}」</span>}</div><div style={{padding:"9px 13px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}><div><div style={{fontSize:8.5,color:C.mid,fontWeight:700,letterSpacing:1,marginBottom:1}}>畫面</div><div style={{fontSize:11.5,color:C.ink}}>{s.visual}</div></div><div><div style={{fontSize:8.5,color:C.mid,fontWeight:700,letterSpacing:1,marginBottom:1}}>台詞</div><div style={{fontSize:11.5,color:vC[i],fontStyle:"italic"}}>{s.dialogue}</div></div></div></div>)}</div><Card style={{borderColor:vC[i],background:vL[i]}}><SL ch="CTA"/><div style={{fontSize:13.5,color:vC[i],fontStyle:"italic",fontFamily:"DM Serif Display,serif"}}>「{v.cta}」</div></Card>{sendToProduction&&v.scenes?.length>0&&<PBtn ch={sentVer===v.version?"✅ 已送到下方 🎬 影片生產區（已自動捲動過去）":`🎬 送去生產影片（用版本${v.version}生影片）`} onClick={()=>{const sc=(v.scenes||[]).map(s=>({narration:(s.dialogue||"").trim(),imagePrompt:(s.visual||"").trim()})).filter(s=>s.narration);sendToProduction({topic:v.title||product||"",articleTitle:v.title||"",articleContent:`${v.hook?`開場鉤子：${v.hook}\n\n`:""}${sc.map(s=>s.narration).join("\n")}${v.cta?`\n\n結尾 CTA：${v.cta}`:""}`,scenes:sc.length>0?sc:undefined});setSentVer(v.version);}} full/>}</div>)}</div>);
 }
 
 /* ── 主持人稿標記 SSOT：標記說明 legend 與 文稿內標記上色 共用同一份 → 顏色永遠一致；新增標記只需改這裡（修「文稿沒上色／顏色對不上說明／缺【放慢】【降調】」）。 ── */
@@ -681,7 +682,7 @@ function HostModule(){
   const hostStyles=["親切朋友型","專業老師型","熱情分享型","冷靜分析型","幽默主持型"];
   async function doGen(){if(!topic)return;setLoading(true);setResult(null);setErr("");try{const raw=await claude(`生成適合真人說話的AI主持人稿，主題：${topic}，風格：${style||"親切朋友型"}，長度：${duration}。\n要求：完全口語化；含【停】【換氣】標記；含【升調】【降調】【加重】【放慢】【快說】語氣標記；含（微笑）（眼神直視鏡頭）（手勢）表情提示；分段清楚每段15-20秒。\n純JSON：{"title":"","segments":[{"id":1,"duration":"0-15秒","marked_text":"含所有標記的台詞","action_notes":"表情肢體提示","breathing_notes":"換氣節奏說明"}],"delivery_tips":["","",""],"common_mistakes":["",""]}`);setResult(pj(raw));}catch{setErr("生成失敗，請再試一次（可能是 AI 回應逾時或格式問題）");}setLoading(false);}
   if(!result)return(<div style={{display:"grid",gap:18}}><div><h2 style={{fontSize:19,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",marginBottom:3}}>AI 主持人稿</h2><p style={{fontSize:12.5,color:C.mid}}>生成適合真人說話的腳本，含停頓、語氣、換氣、肢體動作標記</p></div><div><SL ch="影片主題 *"/><IN value={topic} onChange={e=>setTopic(e.target.value)} placeholder="例如：新手學畫畫的三個誤區"/></div><div><SL ch="主持風格"/><div style={{display:"flex",flexWrap:"wrap",gap:5}}>{hostStyles.map(s=><Pill key={s} label={s} active={style===s} onClick={()=>setStyle(s)}/>)}</div></div><div><SL ch="長度"/><div style={{display:"flex",gap:5}}>{DURATIONS.map(d=><Pill key={d} label={d} active={duration===d} onClick={()=>setDuration(d)}/>)}</div></div>{err&&<div style={{padding:"7px 11px",background:C.roselt,border:`1.5px solid ${C.rose}`,borderRadius:7,fontSize:12.5,color:C.rose,fontWeight:600}}>{err}</div>}{loading&&<Spin label="AI 正在撰寫主持人稿..."/>}{!loading&&<PBtn ch="🤖 生成主持人稿 →" onClick={doGen} disabled={!topic} full/>}</div>);
-  return(<div style={{display:"grid",gap:12}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><h2 style={{fontSize:17,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",margin:0}}>{result.title}</h2><div style={{display:"flex",gap:7}}><GBtn ch={copied?"✅ 已複製":"📋 複製全稿"} onClick={()=>{const t=result.segments?.map(s=>`【${s.duration}】\n${s.marked_text}\n（${s.action_notes}）`).join("\n\n");navigator.clipboard.writeText(t);setCopied(true);setTimeout(()=>setCopied(false),2000);}}/><GBtn ch="重新生成" onClick={()=>{setResult(null);setSent(false);}}/></div></div><Card style={{background:C.corallt,borderColor:C.coral}}><SL ch="標記說明"/><div style={{display:"flex",flexWrap:"wrap",gap:5}}>{HOST_MARKERS.map((mk)=><div key={mk.k} style={{padding:"3px 9px",background:C.white,borderRadius:6,border:`1px solid ${C.border}`}}><span style={{fontSize:10.5,fontWeight:700,color:mk.c}}>【{mk.k}】</span><span style={{fontSize:9.5,color:C.mid,marginLeft:3}}>{mk.d}</span></div>)}</div></Card>{result.segments?.map((seg,i)=><Card key={i}><div style={{display:"flex",alignItems:"center",gap:7,marginBottom:9}}><div style={{background:C.coral,color:C.white,width:21,height:21,borderRadius:5,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800}}>{i+1}</div><span style={{fontSize:11.5,fontWeight:700,color:C.ink}}>{seg.duration}</span></div><div style={{background:"#FEFEF9",border:`1.5px solid ${C.border}`,borderRadius:9,padding:"12px 14px",marginBottom:9}}><HostMarkedText text={seg.marked_text}/></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>{seg.action_notes&&<div style={{background:C.roselt,borderRadius:7,padding:"7px 9px"}}><div style={{fontSize:9.5,color:C.rose,fontWeight:700,marginBottom:2}}>肢體</div><div style={{fontSize:11.5,color:C.ink}}>{seg.action_notes}</div></div>}{seg.breathing_notes&&<div style={{background:C.skylt,borderRadius:7,padding:"7px 9px"}}><div style={{fontSize:9.5,color:C.sky,fontWeight:700,marginBottom:2}}>換氣</div><div style={{fontSize:11.5,color:C.ink}}>{seg.breathing_notes}</div></div>}</div></Card>)}{result.delivery_tips&&<Card style={{borderColor:C.jade,background:C.jadelt}}><SL ch="🎭 表演建議"/>{result.delivery_tips.map((t,i)=><div key={i} style={{fontSize:12.5,color:C.ink,padding:"4px 0",borderBottom:i<result.delivery_tips.length-1?`1px solid rgba(0,168,120,.15)`:"none"}}>{t}</div>)}</Card>}{sendToProduction&&result.segments?.length>0&&<PBtn ch={sent?"✅ 已送進影片生產線 — 切到上方「🎬 影片生產」分頁":"🎬 送去生產影片（用此主持人稿生影片）"} onClick={()=>{const sc=(result.segments||[]).map(s=>({narration:(s.marked_text||"").replace(/【[^】]*】/g,"").replace(/（[^）]*）/g,"").replace(/\([^)]*\)/g,"").replace(/\s+/g," ").trim(),imagePrompt:""})).filter(s=>s.narration);sendToProduction({topic:result.title||topic||"",articleTitle:result.title||"",articleContent:sc.map(s=>s.narration).join("\n\n"),scenes:sc.length>0?sc:undefined});setSent(true);}} full/>}</div>);
+  return(<div style={{display:"grid",gap:12}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><h2 style={{fontSize:17,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",margin:0}}>{result.title}</h2><div style={{display:"flex",gap:7}}><GBtn ch={copied?"✅ 已複製":"📋 複製全稿"} onClick={()=>{const t=result.segments?.map(s=>`【${s.duration}】\n${s.marked_text}\n（${s.action_notes}）`).join("\n\n");navigator.clipboard.writeText(t);setCopied(true);setTimeout(()=>setCopied(false),2000);}}/><GBtn ch="重新生成" onClick={()=>{setResult(null);setSent(false);}}/></div></div><Card style={{background:C.corallt,borderColor:C.coral}}><SL ch="標記說明"/><div style={{display:"flex",flexWrap:"wrap",gap:5}}>{HOST_MARKERS.map((mk)=><div key={mk.k} style={{padding:"3px 9px",background:C.white,borderRadius:6,border:`1px solid ${C.border}`}}><span style={{fontSize:10.5,fontWeight:700,color:mk.c}}>【{mk.k}】</span><span style={{fontSize:9.5,color:C.mid,marginLeft:3}}>{mk.d}</span></div>)}</div></Card>{result.segments?.map((seg,i)=><Card key={i}><div style={{display:"flex",alignItems:"center",gap:7,marginBottom:9}}><div style={{background:C.coral,color:C.white,width:21,height:21,borderRadius:5,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800}}>{i+1}</div><span style={{fontSize:11.5,fontWeight:700,color:C.ink}}>{seg.duration}</span></div><div style={{background:"#FEFEF9",border:`1.5px solid ${C.border}`,borderRadius:9,padding:"12px 14px",marginBottom:9}}><HostMarkedText text={seg.marked_text}/></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>{seg.action_notes&&<div style={{background:C.roselt,borderRadius:7,padding:"7px 9px"}}><div style={{fontSize:9.5,color:C.rose,fontWeight:700,marginBottom:2}}>肢體</div><div style={{fontSize:11.5,color:C.ink}}>{seg.action_notes}</div></div>}{seg.breathing_notes&&<div style={{background:C.skylt,borderRadius:7,padding:"7px 9px"}}><div style={{fontSize:9.5,color:C.sky,fontWeight:700,marginBottom:2}}>換氣</div><div style={{fontSize:11.5,color:C.ink}}>{seg.breathing_notes}</div></div>}</div></Card>)}{result.delivery_tips&&<Card style={{borderColor:C.jade,background:C.jadelt}}><SL ch="🎭 表演建議"/>{result.delivery_tips.map((t,i)=><div key={i} style={{fontSize:12.5,color:C.ink,padding:"4px 0",borderBottom:i<result.delivery_tips.length-1?`1px solid rgba(0,168,120,.15)`:"none"}}>{t}</div>)}</Card>}{sendToProduction&&result.segments?.length>0&&<PBtn ch={sent?"✅ 已送到下方 🎬 影片生產區（已自動捲動過去）":"🎬 送去生產影片（用此主持人稿生影片）"} onClick={()=>{const sc=(result.segments||[]).map(s=>({narration:(s.marked_text||"").replace(/【[^】]*】/g,"").replace(/（[^）]*）/g,"").replace(/\([^)]*\)/g,"").replace(/\s+/g," ").trim(),imagePrompt:""})).filter(s=>s.narration);sendToProduction({topic:result.title||topic||"",articleTitle:result.title||"",articleContent:sc.map(s=>s.narration).join("\n\n"),scenes:sc.length>0?sc:undefined});setSent(true);}} full/>}</div>);
 }
 
 function HookModule(){
@@ -784,9 +785,6 @@ function HistoryModule({setNav}){
 export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { onSendToProduction?: SendToProduction; onSendToRemotion?: SendToRemotion } = {}){
   const[nav,setNav]=useState("manual");
   const[sceneCount,setSceneCount]=useState(6);
-  const[customScenes,setCustomScenes]=useState(3);
-  const[mediaMode,setMediaMode]=useState("__ai__");
-  const[duration,setDuration]=useState(1);
   const[brand,setBrand]=useState(()=>{try{const s=localStorage.getItem("sf_brand");return s?JSON.parse(s):null;}catch{return null;}});
   const groups=["生成","工具","分析","設定","規劃","紀錄"];
   const gNavs=groups.map(g=>({group:g,items:NAVS.filter(n=>n.group===g)}));
@@ -805,7 +803,7 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { 
   }
   function clearBrand(){setBrand(null);try{localStorage.removeItem("sf_brand");}catch{}}
   return(
-    <ScriptSettingsCtx.Provider value={{ sceneCount, customScenes, mediaMode, duration }}>
+    <ScriptSettingsCtx.Provider value={{ sceneCount }}>
     <ProductionBridge.Provider value={onSendToProduction ?? null}>
     <RemotionBridge.Provider value={onSendToRemotion ?? null}>
     <div style={{minHeight:"100vh",background:C.paper,fontFamily:"DM Sans,sans-serif"}}>
@@ -864,68 +862,20 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { 
           </div>
         </div>
       </div>
-      {/* ② 影片設定 — 與 VideoStudio 一模一樣 UI，設定由此帶入，VideoStudio 接力時隱藏 */}
+      {/* ② 腳本場景數 — 只控制 AI 寫幾場（腳本層參數）。素材模式 / AI生圖分配 / 時長 等生產設定已移至下方「🎬 影片生產」區，避免雙區重複（2026-06-26 合併）。 */}
       <div style={{background:C.white,borderBottom:`1.5px solid ${C.border}`}}>
-        <div style={{maxWidth:960,margin:"0 auto",padding:"14px 14px",display:"flex",flexDirection:"column",gap:14}}>
-          {/* 素材模式 */}
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            <span style={{fontSize:12,fontWeight:600,color:C.mid}}>素材模式</span>
-            <div style={{display:"flex",gap:6}}>
-              {([
-                {id:"pexels-video",label:"真實影片",badge:"免費",tip:"真實動態影片片段，最自然"},
-                {id:"pexels-all",label:"照片動畫",badge:"免費",tip:"免費照片 + Ken Burns 縮放效果"},
-                {id:"__ai__",label:"AI 生圖",badge:"按模型",tip:"Flux / Ideogram 等 AI 插圖"},
-              ] as {id:string;label:string;badge:string;tip:string}[]).map(({id,label,badge,tip})=>{
-                const isAiMode=id==="__ai__";
-                const sfIsPexels=mediaMode!=="__ai__";
-                const active=isAiMode?!sfIsPexels:mediaMode===id;
-                return(
-                  <button key={id} type="button" title={tip}
-                    onClick={()=>{if(isAiMode){if(sfIsPexels)setMediaMode("__ai__");}else{setMediaMode(id);}}}
-                    style={{flex:1,padding:"8px 0",borderRadius:8,border:`2px solid ${active?"var(--accent)":"var(--border-subtle)"}`,background:active?"var(--accent)":"var(--bg-canvas)",color:active?"var(--btn-primary-text)":"var(--text-secondary)",cursor:"pointer",fontSize:12,fontWeight:active?700:500,display:"flex",flexDirection:"column",alignItems:"center",gap:2,fontFamily:"inherit"}}>
-                    <span>{label}</span>
-                    <span style={{fontSize:10,opacity:0.75}}>{badge}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          {/* 場景 + 時間 sliders */}
+        <div style={{maxWidth:960,margin:"0 auto",padding:"14px 14px",display:"flex",flexDirection:"column",gap:8}}>
+          {/* 場景總數 */}
           <div style={{display:"flex",flexDirection:"column",gap:10,padding:"12px 14px",background:"var(--bg-subtle)",borderRadius:8,border:"1px solid var(--border-subtle)"}}>
-            {/* 場景總數 */}
             <div style={{display:"flex",flexDirection:"column",gap:4}}>
               <div style={{display:"flex",justifyContent:"space-between"}}>
                 <span style={{fontSize:12,fontWeight:600,color:"var(--text-secondary)"}}>場景總數</span>
                 <span style={{fontSize:13,fontWeight:700,color:"var(--text-primary)"}}>{sceneCount} 場</span>
               </div>
               <input type="range" min={1} max={20} step={1} value={sceneCount}
-                onChange={e=>{const v=Number(e.target.value);setSceneCount(v);setCustomScenes(prev=>Math.min(prev,v));}}
+                onChange={e=>setSceneCount(Number(e.target.value))}
                 style={{width:"100%",accentColor:"var(--accent)"}}/>
-            </div>
-            {/* AI生圖 — 只在 AI 模式顯示 */}
-            {mediaMode==="__ai__"&&(
-              <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                <div style={{display:"flex",justifyContent:"space-between"}}>
-                  <span style={{fontSize:12,fontWeight:600,color:"var(--text-secondary)"}}>AI 生圖</span>
-                  <span style={{fontSize:13,fontWeight:700,color:"var(--text-primary)"}}>AI 生圖 {customScenes} 場｜圖庫補 {Math.max(0,sceneCount-customScenes)} 場</span>
-                </div>
-                <input type="range" min={0} max={sceneCount} step={1} value={customScenes}
-                  onChange={e=>setCustomScenes(Number(e.target.value))}
-                  style={{width:"100%",accentColor:"var(--accent)"}}/>
-              </div>
-            )}
-            {/* 時間長度 */}
-            <div style={{display:"flex",flexDirection:"column",gap:4}}>
-              <div style={{display:"flex",justifyContent:"space-between"}}>
-                <span style={{fontSize:12,fontWeight:600,color:"var(--text-secondary)"}}>時間長度</span>
-                <span style={{fontSize:13,fontWeight:700,color:"var(--text-primary)"}}>{duration} 分鐘</span>
-              </div>
-              <input type="range" min={1} max={10} step={0.5} value={duration}
-                onChange={e=>setDuration(Number(e.target.value))}
-                style={{width:"100%",accentColor:"var(--accent)"}}/>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"var(--text-muted)"}}>
-                <span>1 分</span><span>5 分</span><span>10 分</span>
-              </div>
+              <span style={{fontSize:10.5,color:"var(--text-muted)",lineHeight:1.5}}>腳本會寫成這麼多場；素材模式、生圖模型、時長等出片設定在下方「🎬 影片生產」區設定。</span>
             </div>
           </div>
         </div>
