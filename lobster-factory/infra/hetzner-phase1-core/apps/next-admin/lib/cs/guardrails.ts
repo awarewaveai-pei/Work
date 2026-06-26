@@ -60,7 +60,8 @@ const TW_ID_RE = /\b[A-Za-z][12]\d{8}\b/;
 
 /** Output guard: refuse to send a reply that leaks card numbers / national ids. */
 export function checkPiiLeak(reply: string): GuardrailResult {
-  // NFKC folds fullwidth digits → ASCII; then unify Unicode hyphen/minus variants to ASCII '-'.
+  // NFKC folds fullwidth digits → ASCII; then unify Unicode hyphen/minus variants to ASCII '-'
+  // (U+2010..U+2015 dashes, U+2212 minus, U+FE63 small hyphen, U+FF0D fullwidth hyphen).
   const norm = reply.normalize("NFKC").replace(/[‐-―−﹣－]/g, "-");
   // Card-like = a 13-19 digit run (with optional spaces/dashes) AND ≥13 raw digits overall,
   // so short order numbers like "#AW-20847" don't trip it.
