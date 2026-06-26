@@ -83,7 +83,8 @@ export type HandoffReason =
   | "prompt_injection"
   | "engine_error"
   | "customer_requested"
-  | "out_of_window";
+  | "out_of_window"
+  | "tenant_killswitch";
 
 /** The engine's decision for one inbound message. */
 export interface CsDecision {
