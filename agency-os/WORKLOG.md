@@ -4,6 +4,24 @@
 
 ## 2026-06-27
 
+### fix(tarot): 鎖定風格不再重複存預覽（My Designs 出現兩張相同 tarot-preview）
+
+[任務理解] 使用者發現 My Designs 同一張預覽圖出現兩筆 `Tarot · 預覽`，相隔約 6 秒。判斷按「✓ 鎖定這個風格，進入整套生成」會多存一張重複圖。
+
+[現況分析] 確認屬實：`generatePreview()`(TarotStudio.tsx:458) 生預覽時已存一次 `tarot-preview`；`lockStyle()`(:547) 按鎖定時又存一次相同 `gradedLock`。grade neutral 時 `gradedLock===previewImage===gradedPreview` → 位元完全相同 → 重複。3:17:09(生預覽)+3:17:15(鎖定) 正是兩次。
+
+[已修改] `app/tools/tarot/TarotStudio.tsx` `lockStyle()`：移除 `saveToGallery(gradedLock, "tarot-preview", ...)` 那行（鎖定是 UI 狀態轉換，非新生成）。保留 `gradedLock` 計算（仍餵 `setLockedGradedPreview` 作 deck reference）。
+
+[驗證結果](R0 四動作)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`(全專案) | exit=0 | gradedLock 仍被 setLockedGradedPreview 使用，無未用變數。瀏覽器行為(生預覽→鎖定→only 1 筆)待部署後 live 確認。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n+1s — critic 追全部 3 個 previewImage 來源(generatePreview:458 存 tarot-preview / selectCompareResult:523 存 tarot-preview 且自身 setLocked 不經 lockStyle / AI edit:1706 存 tarot-preview-edit)皆**先**存過 → lockStyle 的 save 從非唯一一次 → 無 regression。採納 suggestion 補註解第三來源。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`lockStyle`,`saveToGallery.*tarot-preview` | hits=0 stale — lockStyle 1 caller(按鈕)；tarot-preview 存檔現只剩 generatePreview+selectCompareResult 兩處(重複源已除)；WORKLOG 提 lockStyle 處為清 savedArt，仍正確。
+- BUGHUNT_SCOPE_NARROW: N/A(含 agency-os + scripts)。
+
+[剩餘風險] 若使用者先生預覽(grade A 已存)再調色才鎖定，gallery 只有 grade-A 預覽、deck 用 grade-B(lockedGradedPreview)；但 deck 卡片各自存最終 grade，預覽僅風格參考縮圖，可接受。
+
+[rollback] 還原該行 `saveToGallery`；純前景單行改動。
+
 ### feat(onboarding): 公開接客門（preview-only）+ sidebar 建站流重組 — app.aware-wave 全自動接客 Stage A/B
 
 [任務理解] 操作者要「真正接客、看全自動生成網站」。先查證引擎是否真活（同事聲稱已完成、不告知做法 → VBC）。再補「全自動接客」缺口。
