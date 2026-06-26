@@ -1,5 +1,7 @@
 # Trigger.dev 自託管（v4，Docker Compose）
 
+> 📍 機器拓樸（誰跑哪台）唯一正本：[`AWAREWAVE_STACK_QUICKREF.md`](../../../agency-os/docs/operations/AWAREWAVE_STACK_QUICKREF.md)。本檔 = Trigger（EU）部署/設定正本；改容器時兩邊一起改。
+
 **官方文件（版本變動快）**：<https://trigger.dev/docs/self-hosting/docker>  
 **上游 compose 正本**：<https://github.com/triggerdotdev/trigger.dev/tree/main/hosting/docker>  
 

@@ -1,5 +1,7 @@
 # Supabase Self-Hosted Runbook
 
+> 📍 機器拓樸（誰跑哪台）唯一正本：[`AWAREWAVE_STACK_QUICKREF.md`](AWAREWAVE_STACK_QUICKREF.md)。本檔 = Supabase（EU）部署/設定正本；改容器時兩邊一起改。
+
 > Owner: `awarewaveai`  
 > **Supabase stack (EU)**: `204.168.175.41` (Hetzner Helsinki; SG host `5.223.93.113` no longer carries `/root/supabase` compose — lobster-phase1 only).  
 > Secrets policy: live tokens and passwords stay in vault or machine-local env only; do not commit them into repo-tracked files.

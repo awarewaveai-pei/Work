@@ -4,6 +4,8 @@
 > **誠實邊界**：沒有任何一組 `docker-compose.yml` 能在 **30 年內完全不改版**；本檔追求的是 **可替換零件、可審計流程、可演練還原**，而不是鎖死某一個供應商版本號。  
 > **上層紀律**：`agency-os/docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`（全 monorepo）；**資料主權（SoR）**仍在 **Supabase／Postgres** — 見 `agency-os/docs/architecture/decisions/005-supabase-sor-vs-wordpress-runtime-db.md`。  
 > **可複製核對表**：[`MAINTENANCE_CALENDAR.md`](./MAINTENANCE_CALENDAR.md)（週／月／季／年）。
+>
+> **🗂️ 備份範圍邊界（避免兩份文件各說各話）**：本檔負責 **SG / Phase 1 core**（`backup-phase1.sh`）。**EU stack**（Supabase / Trigger / n8n / MainWP / Postiz）的備份/還原/災難復原**正本在** [`runbooks/EU-STACK-BACKUP-RAID-RESTORE-FOR-DEDICATED-RUNBOOK.md`](../../../runbooks/EU-STACK-BACKUP-RAID-RESTORE-FOR-DEDICATED-RUNBOOK.md)（EU `backup-eu-stack.sh`）。兩台互為異地落點，改備份策略時兩檔一起看。
 
 ---
 

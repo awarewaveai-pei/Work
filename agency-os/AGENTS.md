@@ -96,7 +96,8 @@ Auto-repair Issue 必含中文摘要（問題/原因/修法/風險/建議）。�
 
 ## AwareWave Stack 伺服器邊界（**不可混用**）
 
-SG `5.223.93.113` / EU `204.168.175.41` — 容器細節見 [`docs/operations/AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md)。  
+SG `5.223.93.113` / EU `204.168.175.41` — 容器細節見 [`docs/operations/AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md)（拓樸唯一正本）。  
+**搬機 / 上 dedicated / EU→大機·SG→EU 遷移唯一正本**：[`runbooks/EU-STACK-BACKUP-RAID-RESTORE-FOR-DEDICATED-RUNBOOK.md`](../runbooks/EU-STACK-BACKUP-RAID-RESTORE-FOR-DEDICATED-RUNBOOK.md)（備份/RAID/還原/遷移；動機器前必讀 §7 checklist）。  
 ClickHouse 版本鎖定：`25.7.x`，**禁升 latest / 24.x**。  
 Secrets: `scripts/secrets-vault.ps1 -Action get -Name <KEY_NAME>`（輸出 `NAME=遮罩值`，僅供確認存在；實值消費走 `mcp/user-env.ps1` / env）；key names 在 `mcp/user-env.ps1`；**禁止硬編**。
 
