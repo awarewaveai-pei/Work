@@ -541,10 +541,11 @@ export default function TarotStudio() {
 
   async function lockStyle() {
     if (!previewImage) return;
-    // NOTE: do NOT saveToGallery here — generatePreview (and selectCompareResult) already saved this
-    // exact preview as "tarot-preview" when it was produced. Locking is a UI state transition, not a
-    // new generation; re-saving created a duplicate gallery entry (identical bits when grade is
-    // neutral). We still bake gradedLock for lockedGradedPreview (the in-memory deck reference).
+    // NOTE: do NOT saveToGallery here — whichever path produced previewImage already saved it:
+    // generatePreview + selectCompareResult save "tarot-preview", the AI quick-edit saves
+    // "tarot-preview-edit". Locking is a UI state transition, not a new generation; re-saving
+    // created a duplicate gallery entry (identical bits when grade is neutral). We still bake
+    // gradedLock for lockedGradedPreview (the in-memory deck reference).
     const gradedLock = !grade.neutral
       ? await applyGradeToDataUrl(previewImage, grade.params).catch(() => previewImage!)
       : previewImage;

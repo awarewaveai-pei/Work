@@ -64,6 +64,75 @@ export async function loadIntents(organizationId: string): Promise<Intent[]> {
   return (data as IntentRow[]).map(mapIntent);
 }
 
+/** Create or update an intent (config — ops UI). Upsert on (organization_id, key). */
+export async function upsertIntent(
+  organizationId: string,
+  i: { key: string; label: string; answerLevel: string; actionLevel: string; isSensitive: boolean; confidenceThreshold?: number; canaryPct?: number },
+): Promise<boolean> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return false;
+  const { error } = await sb.from("cs_intents").upsert(
+    {
+      organization_id: organizationId,
+      key: i.key,
+      label: i.label,
+      answer_level: i.answerLevel,
+      action_level: i.actionLevel,
+      is_sensitive: i.isSensitive,
+      confidence_threshold: i.confidenceThreshold ?? 0.8,
+      canary_pct: i.canaryPct ?? 0,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "organization_id,key" },
+  );
+  return !error;
+}
+
+export async function deleteIntent(organizationId: string, key: string): Promise<boolean> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return false;
+  const { error } = await sb.from("cs_intents").delete().eq("organization_id", organizationId).eq("key", key);
+  return !error;
+}
+
+/** List knowledge sources for the ops UI, with per-source chunk counts. */
+export async function listKnowledgeSources(
+  organizationId: string,
+): Promise<Array<{ id: string; title: string; kind: string; isSensitive: boolean; chunks: number }>> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from("cs_knowledge_sources")
+    .select("id,title,kind,is_sensitive")
+    .eq("organization_id", organizationId)
+    .order("created_at", { ascending: false });
+  if (error || !data) return [];
+  const ids = data.map((s) => s.id as string);
+  const counts = new Map<string, number>();
+  if (ids.length) {
+    const { data: chunkRows } = await sb.from("cs_knowledge_chunks").select("source_id").in("source_id", ids);
+    (chunkRows ?? []).forEach((c) => {
+      const sid = c.source_id as string;
+      counts.set(sid, (counts.get(sid) ?? 0) + 1);
+    });
+  }
+  return data.map((s) => ({
+    id: s.id as string,
+    title: s.title as string,
+    kind: s.kind as string,
+    isSensitive: s.is_sensitive === true,
+    chunks: counts.get(s.id as string) ?? 0,
+  }));
+}
+
+/** Delete a knowledge source; its chunks cascade-delete via FK (migration 0051). */
+export async function deleteKnowledgeSource(organizationId: string, sourceId: string): Promise<boolean> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return false;
+  const { error } = await sb.from("cs_knowledge_sources").delete().eq("organization_id", organizationId).eq("id", sourceId);
+  return !error;
+}
+
 export async function loadEnabledTools(organizationId: string): Promise<ToolSpec[]> {
   const sb = getSupabaseWriteClient();
   if (!sb) return [];
