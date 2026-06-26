@@ -50,8 +50,23 @@ describe('/api/interpret 輸入驗證(信任邊界)', () => {
     expect(r.status).toBe(400);
   });
 
-  it('premium tier 被拒(付費牆前不開放)→ 400', async () => {
+  it('premium tier 免費用戶被付費牆擋 → 402 payment_required', async () => {
     const r = await POST(post({ context: goodCtx, tier: 'premium' }));
+    expect(r.status).toBe(402);
+    const data = (await r.json()) as { error: string; reason: string };
+    expect(data.error).toBe('payment_required');
+    expect(data.reason).toBe('premium_requires_subscription');
+  });
+
+  it('deep tier 通過付費牆(非 402;無 key 時 503)', async () => {
+    if (process.env.OPENAI_API_KEY) return; // 有 key 時(live)會回 200,跳過
+    const r = await POST(post({ context: goodCtx, tier: 'deep' }));
+    expect(r.status).not.toBe(402); // 未被付費牆擋
+    expect(r.status).toBe(503); // 走到 AI 層、無 key
+  });
+
+  it('非法 tier(ultra)→ 400', async () => {
+    const r = await POST(post({ context: goodCtx, tier: 'ultra' }));
     expect(r.status).toBe(400);
   });
 
