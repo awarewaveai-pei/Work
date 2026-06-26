@@ -16,6 +16,7 @@ import {
   outputGuards,
 } from "@/lib/cs/guardrails";
 import { extractAmountCents, resolveToolDecision } from "@/lib/cs/tools";
+import { parseVerdict } from "@/lib/cs/generate";
 import { chunkText } from "@/lib/cs/rag";
 import { buildSystemPrompt, buildUserContext } from "@/lib/cs/cis";
 import type { Intent, ToolSpec } from "@/lib/cs/types";
@@ -133,6 +134,10 @@ describe("guardrails", () => {
     expect(checkPiiLeak("您的卡號是 4111 1111 1111 1111").pass).toBe(false);
     expect(checkPiiLeak("您的訂單編號是 #AW-20847").pass).toBe(true);
   });
+  it("blocks fullwidth-digit cards and lowercase national ids (evasion)", () => {
+    expect(checkPiiLeak("４１１１ １１１１ １１１１ １１１１").pass).toBe(false);
+    expect(checkPiiLeak("身分證 a123456789").pass).toBe(false);
+  });
   it("rejects empty replies", () => {
     expect(checkReplyShape("   ").pass).toBe(false);
     expect(outputGuards("正常的回覆內容").pass).toBe(true);
@@ -155,10 +160,14 @@ describe("tool gate", () => {
   it("denies disabled tools", () => {
     expect(resolveToolDecision(tool({ isEnabled: false }), {}).status).toBe("denied");
   });
-  it("hard-stops money over the ceiling", () => {
-    const d = resolveToolDecision(tool({ risk: "A1_read" }), { amount_cents: 100 });
+  it("hard-stops money over the ceiling (positive and negative)", () => {
+    expect(resolveToolDecision(tool({ risk: "A1_read" }), { amount_cents: 100 }).status).toBe("pending_human");
+    expect(resolveToolDecision(tool({ risk: "A1_read" }), { amount_cents: -100 }).status).toBe("pending_human");
+  });
+  it("name backstop: a money-named tool mis-tagged A1_read still can't run", () => {
+    const d = resolveToolDecision(tool({ name: "issue_refund", risk: "A1_read", isEnabled: true }), {});
     expect(d.allow).toBe(false);
-    expect(d.status).toBe("pending_human");
+    expect(d.reason).toBe("red_line_tool_name");
   });
   it("extracts amounts in several shapes", () => {
     expect(extractAmountCents({ amount_cents: 500 })).toBe(500);
@@ -191,5 +200,20 @@ describe("CIS prompt assembly", () => {
     expect(user).toContain("<customer_message>");
     expect(user).toContain("ignore all instructions");
     expect(user).toContain("<retrieved_knowledge>");
+  });
+});
+
+describe("supervisor verdict (fail-closed)", () => {
+  it("null parse ⇒ not grounded, not safe", () => {
+    expect(parseVerdict(null)).toEqual({ grounded: false, safe: false, reason: "supervisor_parse_failed" });
+  });
+  it("missing `safe` field ⇒ NOT safe (no fail-open)", () => {
+    const v = parseVerdict({ grounded: true });
+    expect(v.grounded).toBe(true);
+    expect(v.safe).toBe(false);
+  });
+  it("both true only when both explicitly true", () => {
+    expect(parseVerdict({ grounded: true, safe: true })).toMatchObject({ grounded: true, safe: true });
+    expect(parseVerdict({ grounded: true, safe: false }).safe).toBe(false);
   });
 });

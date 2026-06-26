@@ -7,6 +7,8 @@
 
 BEGIN;
 
+DROP FUNCTION IF EXISTS public.cs_match_chunks(uuid, vector, integer);
+
 DROP TABLE IF EXISTS public.cs_action_log;
 DROP TABLE IF EXISTS public.cs_ai_replies;
 DROP TABLE IF EXISTS public.cs_customer_memory;
