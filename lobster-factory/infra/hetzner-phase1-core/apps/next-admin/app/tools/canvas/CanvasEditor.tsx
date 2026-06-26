@@ -20,7 +20,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Canvas as FabricCanvas, FabricObject } from "fabric";
 import { roleHeader } from "@/lib/ops-role";
-import { CANVAS_SOURCE_KEY, CANVAS_NAME_KEY } from "@/components/tools/canvas-handoff";
+import { CANVAS_SOURCE_KEY, CANVAS_NAME_KEY, toCanvasSrc } from "@/components/tools/canvas-handoff";
 import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
 import { buildFabricImageFilters, buildPresetFilters, buildEffectFilters, PRESET_FILTERS } from "./fabric-filters";
 import SidebarPanel from "@/components/tools/SidebarPanel";
@@ -253,7 +253,10 @@ export default function CanvasEditor() {
       }
       if (source) {
         try {
-          const img = await fabric.FabricImage.fromURL(source, { crossOrigin: "anonymous" });
+          // Remote R2 public URLs (gallery handoff) are cross-origin → taint the canvas under
+          // crossOrigin:"anonymous". toCanvasSrc routes them through the same-origin image proxy
+          // (data URLs from Banner/Studio/Tarot pass through unchanged). Was the "底圖載入失敗" cause.
+          const img = await fabric.FabricImage.fromURL(toCanvasSrc(source), { crossOrigin: "anonymous" });
           if (disposed || !canvas) return;
           // Match the canvas to the imported image instead of forcing every handoff into
           // the default 800×800 square. Work in source-pixel coordinates and zoom the
@@ -279,7 +282,9 @@ export default function CanvasEditor() {
           });
           canvas.add(img);
           canvas.requestRenderAll();
-        } catch {
+        } catch (err) {
+          // Surface the real reason in the console — the on-screen message stays user-friendly.
+          console.warn("[canvas] 底圖載入失敗", err);
           setError("底圖載入失敗（可能是跨來源限制）。仍可加文字／上傳圖片。");
         }
       }
