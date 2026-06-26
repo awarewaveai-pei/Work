@@ -9,6 +9,7 @@ import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 import { buildSemanticFilename, buildSemanticBase } from "@/lib/studio/semantic-filename";
 import { openInCanvas } from "@/components/tools/canvas-handoff";
 import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, STYLE_PRESETS, resolveStylePrompt, type TarotCard } from "./cards";
+import { tabStyle, chipStyle, ghostBtn } from "@/components/tools/panel-primitives";
 
 type GroupKey = "all" | "major" | "wands" | "cups" | "swords" | "pentacles";
 const GROUPS: { key: GroupKey; label: string }[] = [
@@ -934,13 +935,7 @@ export default function TarotStudio() {
                         key={g.key}
                         onClick={() => setGroup(g.key)}
                         disabled={batchBusy}
-                        style={{
-                          padding: "5px 12px", borderRadius: 6, fontSize: 12,
-                          cursor: batchBusy ? "default" : "pointer",
-                          border: `1px solid ${active ? "var(--accent)" : "var(--card-border)"}`,
-                          background: active ? "var(--ai-bg)" : "transparent",
-                          color: active ? "var(--accent)" : "var(--text-muted)",
-                        }}
+                        style={{ ...chipStyle(active), cursor: batchBusy ? "default" : "pointer" }}
                       >
                         {g.label}
                       </button>
@@ -1136,15 +1131,7 @@ export default function TarotStudio() {
                     type="button"
                     disabled={locked}
                     onClick={() => setMode(m)}
-                    style={{
-                      flex: 1, padding: "7px 0", borderRadius: 8, fontSize: 12,
-                      cursor: locked ? "default" : "pointer",
-                      border: `1px solid ${mode === m ? "var(--accent)" : "var(--card-border)"}`,
-                      background: mode === m ? "rgba(99,102,241,0.12)" : "rgba(127,127,127,0.04)",
-                      color: mode === m ? "var(--accent)" : "var(--text-muted)",
-                      fontWeight: mode === m ? 600 : 400,
-                      opacity: locked ? 0.5 : 1,
-                    }}
+                    style={{ ...chipStyle(mode === m), flex: 1, padding: "7px 0", opacity: locked ? 0.5 : 1, cursor: locked ? "default" : "pointer" }}
                   >
                     {m === "text" ? "文字生圖" : "以圖生圖"}
                   </button>
@@ -1342,13 +1329,7 @@ export default function TarotStudio() {
                     key={g}
                     type="button"
                     onClick={() => setModelProviderTab(g)}
-                    style={{
-                      padding: "3px 10px", borderRadius: 12, fontSize: 11, cursor: "pointer",
-                      border: `1px solid ${modelProviderTab === g ? "var(--accent)" : "var(--card-border)"}`,
-                      background: modelProviderTab === g ? "var(--accent)" : "transparent",
-                      color: modelProviderTab === g ? "var(--btn-primary-text)" : "var(--text-muted)",
-                      fontWeight: modelProviderTab === g ? 600 : 400,
-                    }}
+                    style={tabStyle(modelProviderTab === g)}
                   >
                     {g}
                   </button>

@@ -784,7 +784,6 @@ function HistoryModule({setNav}){
 /* ═══ ROOT ═══ */
 export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { onSendToProduction?: SendToProduction; onSendToRemotion?: SendToRemotion } = {}){
   const[nav,setNav]=useState("manual");
-  const[sceneCount,setSceneCount]=useState(6);
   const[brand,setBrand]=useState(()=>{try{const s=localStorage.getItem("sf_brand");return s?JSON.parse(s):null;}catch{return null;}});
   const groups=["生成","工具","分析","設定","規劃","紀錄"];
   const gNavs=groups.map(g=>({group:g,items:NAVS.filter(n=>n.group===g)}));
@@ -803,7 +802,7 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { 
   }
   function clearBrand(){setBrand(null);try{localStorage.removeItem("sf_brand");}catch{}}
   return(
-    <ScriptSettingsCtx.Provider value={{ sceneCount }}>
+    <ScriptSettingsCtx.Provider value={{ sceneCount: 6 }}>
     <ProductionBridge.Provider value={onSendToProduction ?? null}>
     <RemotionBridge.Provider value={onSendToRemotion ?? null}>
     <div style={{minHeight:"100vh",background:C.paper,fontFamily:"DM Sans,sans-serif"}}>
@@ -862,24 +861,7 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { 
           </div>
         </div>
       </div>
-      {/* ② 腳本場景數 — 只控制 AI 寫幾場（腳本層參數）。素材模式 / AI生圖分配 / 時長 等生產設定已移至下方「🎬 影片生產」區，避免雙區重複（2026-06-26 合併）。 */}
-      <div style={{background:C.white,borderBottom:`1.5px solid ${C.border}`}}>
-        <div style={{maxWidth:960,margin:"0 auto",padding:"14px 14px",display:"flex",flexDirection:"column",gap:8}}>
-          {/* 場景總數 */}
-          <div style={{display:"flex",flexDirection:"column",gap:10,padding:"12px 14px",background:"var(--bg-subtle)",borderRadius:8,border:"1px solid var(--border-subtle)"}}>
-            <div style={{display:"flex",flexDirection:"column",gap:4}}>
-              <div style={{display:"flex",justifyContent:"space-between"}}>
-                <span style={{fontSize:12,fontWeight:600,color:"var(--text-secondary)"}}>場景總數</span>
-                <span style={{fontSize:13,fontWeight:700,color:"var(--text-primary)"}}>{sceneCount} 場</span>
-              </div>
-              <input type="range" min={1} max={20} step={1} value={sceneCount}
-                onChange={e=>setSceneCount(Number(e.target.value))}
-                style={{width:"100%",accentColor:"var(--accent)"}}/>
-              <span style={{fontSize:10.5,color:"var(--text-muted)",lineHeight:1.5}}>腳本會寫成這麼多場；素材模式、生圖模型、時長等出片設定在下方「🎬 影片生產」區設定。</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* 影片設定（素材模式/場景數/生圖模型/時長）全部移至下方「🎬 影片生產」區，前製腳本只負責寫腳本（2026-06-26 合併去重）。腳本場景數固定預設 6 場，需要時於下方生產區調整。 */}
       <div style={{maxWidth:960,margin:"0 auto",padding:"22px 14px 80px",animation:"fadeUp .3s ease"}}>
         {nav==="manual"&&<ManualModule brand={brand}/>}
         {nav==="article"&&<ArticleModule brand={brand}/>}
