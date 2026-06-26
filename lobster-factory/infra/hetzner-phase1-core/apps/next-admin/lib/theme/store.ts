@@ -1,7 +1,9 @@
 // Server-side persistence for the global app theme (single shared row in Supabase).
 // Read by app/layout.tsx (to render the saved look on every device, server-side,
 // before paint) and app/api/theme route. Service-role client → bypasses RLS; the
-// app_theme table is RLS-locked so only this server path can touch it.
+// app_theme table is RLS-locked so only this server path can touch it. Requires
+// SUPABASE_SERVICE_ROLE_KEY: without it the client degrades to anon (RLS-denied) → reads
+// fail-open to globals.css defaults, writes fail-closed (500). The key is set in this stack.
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import type { SavedLayout } from "@/lib/theme/tokens";
 

@@ -228,6 +228,25 @@
 [剩餘風險] ScriptForge 用自有 coral/violet/jade palette（前製腳本創作頁，刻意不同）未納入；video 頂層 page-nav tab（studioTab）為 primary nav 保留 underline；待操作者定是否也要統一
 [rollback] 各檔 git revert；共用 module 移除即回退
 
+### feat(theme): /tools/theme 全域跨裝置外觀（DB 單一真相，移除 localStorage hack；乾淨重寫）
+
+[任務理解] 操作者要 /tools/theme「真正能管理外觀」且全域跨裝置（她旅行+雙機），並明確要求「不要一堆補丁/強制，要踏踏實實乾乾淨淨」。
+[現況分析] 舊機制 = localStorage-only（單瀏覽器）+ layout FOUC inline `<script>` + route POST 只 validate 不存 + 文案謊稱「globals.css 永久 for all users」+ token 定義在 page.tsx/route.ts 重複。三套重疊機制 = 補丁味。
+[已修改] 單一真相來源 = DB；移除所有 hack：
+- NEW `lib/theme/tokens.ts`：token 定義 SSOT（COLOR/TYPO groups + DEFAULT_TOKENS + VALID_TOKEN_NAMES + SAFE_VALUE_RE + SavedLayout）→ route/store/SidebarNav import（消重複）
+- NEW `lib/theme/store.ts`：getThemeConfig（service-role 讀，**fail-open + 1.5s timeout** → DB 掛也不弄壞渲染）/ saveThemeConfig（upsert 單列）
+- NEW migration `0052_app_theme.sql`（純新增單列表 + RLS enable + 顯式 deny_anon/authenticated policy）+ `scripts/0052_app_theme_down.sql`（drop，符合慣例）
+- `app/layout.tsx`：改 async → server 讀 DB → `<html style={tokens}>` 開機注入（跨裝置、無 FOUC）；**移除 localStorage inline script**；傳 initialLayout 給 SidebarNav
+- `app/SidebarNav.tsx`：改吃 server 傳的 initialLayout prop（純函式渲染）；**移除 localStorage + storage listener**
+- `app/api/theme/route.ts`：GET 回 defaults+overrides；POST 補 **ops-role 權限閘**（canWriteTenantConfig=owner/admin）+ 白名單 + SAFE_VALUE_RE + 只存 diff
+- `app/tools/theme/page.tsx`：載入走 GET（移除 localStorage）；Save/Reset 走 POST + router.refresh；no-op guard；文案改老實（存伺服器、所有裝置）
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=tsc --noEmit（本機 partial install）| exit=0(my files) | 23 殘留全為 pre-existing missing @anthropic-ai/@google SDK（Docker build 才裝），filter 後 0；權威全量 typecheck = sg-deploy 內 `npm run typecheck`（待 deploy）；e2e curl POST + 換 incognito = 待 migration apply 後執行
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0major/3minor（全修：NavItem 未用 import/migration 註解自相矛盾/store service-role 註解）；db-expert=safe-to-apply（修 2 項：補 down script + 顯式 deny policy）
+- BUGHUNT_DONE: scope=agency-os,scripts,app(next-admin) | grep=localStorage|aw-theme-overrides|aw-sidebar-order|StorageEvent（theme 6 檔）| hits=0（hack 全清；其餘 localStorage 命中為無關工具 ScriptForge/StudioWorkbench）
+[剩餘風險] **migration 尚未套 prod Supabase（High-risk，等操作者 go）**；未 deploy；page.tsx 仍保留自有 token 定義鏡像（與 tokens.ts 同步，純 DRY smell 非錯誤，刻意不冒 145 行 match 風險）；getThemeConfig 未快取（單列 PK 查 sub-ms，單操作者可接受；db-expert 認可）
+[rollback] code: 各檔 git revert；DB: `scripts/0052_app_theme_down.sql`（drop table，無 FK 依賴，無損）
+
 ## 2026-06-25
 
 ### perf(trigger): dispatch-action-run schedule */1 → */10 — 一勞永逸消除 dispatcher 空轉容器

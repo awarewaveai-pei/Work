@@ -14,8 +14,9 @@
 --   tokens jsonb   — only the OVERRIDDEN tokens (diffs vs globals.css :root defaults), e.g.
 --                    {"--accent":"#ff0066"}. Defaults stay in globals.css; we never overwrite it.
 --   layout jsonb   — sidebar order: { sectionOrder: string[], itemOrders: {sectionId: string[]} }.
---   RLS enabled with NO policies → only the service_role key (server-side app/layout + /api/theme)
---   can read/write. Non-sensitive data, but locking it keeps the write path single + auditable.
+--   RLS enabled + an explicit deny policy for anon/authenticated → only the service_role key
+--   (server-side app/layout + /api/theme) can read/write. Non-sensitive data, but locking it
+--   keeps the write path single + auditable.
 
 create table if not exists public.app_theme (
   id          text primary key default 'default',
