@@ -4,7 +4,26 @@
 
 ## 2026-06-26
 
-### feat(video): /tools/video 雙分頁合併為單頁雙 section（上 前製腳本 / 下 影片生產）
+### ops(eu-backup): 備份覆蓋稽核 + 首次還原演練通過 — runbook §1/§2/§6 補確切指令
+
+[任務理解] 為「EU 上 dedicated」前置安全層，把 backup/restore runbook 第 1 步（異地備份 + 還原演練）補成確切可跑指令。前提：先讀懂既有備份（不重造）。
+
+[現況分析]（唯讀實測 EU `/root/scripts/`）
+- 既有 `backup-eu-stack.sh`（每日 02:30 cron `eu-backup`）已備：Supabase PG（`pg_dumpall -U supabase_admin`）+ Trigger PG（`pg_dump -U trigger`）+ Uptime Kuma vol；異地 **SG rsync + Cloudflare R2**（bucket `lobster-backup`/prefix `eu`，token SET）→ 3-2-1 對已備項已成立；`verify-backup-eu.sh` 驗 integrity。
+- **🔴 漏洞**：未備 MainWP DB（user=mainwp，root_set=yes）、`.env` 密鑰 ×4、n8n、Postiz、Supabase Storage、MinIO、MainWP files。
+- **🔴 結構問題**：verify 只驗 integrity 從未真還原；異地 L1 指向 SG → SG 退役即斷（R2 仍在）。
+
+[已修改]
+- `runbooks/EU-STACK-BACKUP-RAID-RESTORE-FOR-DEDICATED-RUNBOOK.md`：§1 改為精確現況（✅ 已備 vs 🔴 漏項 + 補漏 dump 指令含已驗帳號）、§2 改為真實 3-2-1 + SG 退役異地接替方案、§6 擴為**確切還原演練指令**（演練 A PG / B volume / C .env 解密）、§7 checklist 對齊。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`gunzip supabase-all.sql.gz | docker exec drill-pg psql` (拋棄式 postgres:15 還原演練) | exit=0 | **首次還原演練通過**：`public_tables=73`、`organizations=5`、`ops_action_runs=6` → 客戶資料證實可還原；容器 teardown 確認、EU RAM 復原無殘留。同時驗證 runbook §6 指令可用。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — 自審 runbook 結構；既有腳本讀回確認涵蓋範圍；漏項 dump 帳號（mainwp/supabase_admin/trigger）皆實機確認存在。
+- BUGHUNT_DONE: scope=runbooks,agency-os,scripts | grep=`backup-eu-stack`,`backup_to_sg`,`OFFSITE` | hits: 既有腳本唯一定義；SG-offsite 依賴已在 runbook §1/§2/§7 標記退役風險；無其他 stale 引用。
+- BUGHUNT_SCOPE_NARROW: N/A（含 agency-os+scripts）。
+
+[剩餘風險] 補漏覆蓋（MainWP/n8n/.env/storage/minio 進 backup-eu-stack.sh）尚未做 = **目前機器死仍會失去這些**（Medium，改 prod 備份腳本需 propose）。Trigger/MainWP/n8n/.env 還原演練待補漏後補。
+[rollback] runbook 純文件，git revert 即可。演練全程拋棄式容器、未碰 prod。
 
 [任務理解] 操作者要把 /tools/video 原本 2 個分頁（📝前製腳本=ScriptForge ↔ 🎬影片生產=VideoStudio，二選一切換）整合成同頁：上 section1=前製腳本，下 section2=影片生產。
 
@@ -17,8 +36,9 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~一次性 build gate（next-admin 全專案 0 error）
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0major/2minor（皆非阻塞：①VideoStudio.tsx:225 remotionInitial useEffect 在 remount 設計下變冗餘但無害，非本次改動不碰；②productionKey 無條件 bump 是正確設計，勿改條件式）。critic 逐一 trace 四焦點：key-remount 正確 re-seed / React19 自動批次無 stale-prop race / scrollIntoView 目標常駐 / Remotion 接力經 line-222 initializer 仍正常
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`VideoTabs|setTab|TABS|onSendToProduction|onSendToRemotion|productionKey` | hits=0 stale（setTab/TABS 命中全為無關元件各自 local state：CostsTabs/ClientHubTabs/theme/AiModels/Studio；VideoTabs 唯一 consumer=page.tsx 無 props；ScriptForge 回呼簽章不變經 context 接；agency-os 命中皆歷史 WORKLOG 記錄非 live claim；scripts=0）
+- DEPLOY: sg-deploy.sh next-admin → commit 4a6d2100 live（container lobster-next-admin healthy 6s；內建 HTTP smoke login/ops-summary/nginx/node-api 全 200）。Server 部署檔 /root/lobster-phase1/apps/next-admin/app/tools/video/VideoTabs.tsx 確含合併碼（productionKey/Section/key=）。`/tools/video → 307` auth 重導（預期，與既往一致）。Playwright smoke 26 pass/0 fail/6 skip。註：此 deploy 由並行 session 觸發（我的 sg-deploy 撞 lock，改監看至完成驗證），結果一致。
 
-[剩餘風險] ①未 deploy（live 站仍顯示舊分頁，需 sg-deploy 才生效）②兩工具 root 各自 minHeight:100vh + 背景處理不同（ScriptForge 硬編淺色 / VideoStudio CSS var）→ 上下堆疊視覺略有落差，屬既有非本次引入 ③送新腳本會 remount 生產區（清掉進行中產製）= 與原切分頁行為一致，預期內
+[剩餘風險] ①兩工具 root 各自 minHeight:100vh + 背景處理不同（ScriptForge 硬編淺色 / VideoStudio CSS var）→ 上下堆疊視覺略有落差，屬既有非本次引入 ②送新腳本會 remount 生產區（清掉進行中產製）= 與原切分頁行為一致，預期內 ③authenticated UI 渲染未做 browser 實眼驗（route 307 auth-gated，需登入；source+build+route 已確認）
 
 [rollback] 單檔 `git revert <commit>` 即可；無 DB/schema/auth/deploy 改動
 

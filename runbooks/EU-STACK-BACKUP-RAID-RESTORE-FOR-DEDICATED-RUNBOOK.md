@@ -149,19 +149,68 @@
 
 ---
 
-## §6 演練（沒演練過的備份 = 沒有備份）
+## §6 還原演練（沒演練過的備份 = 沒有備份）— **確切指令**
 
-- **每季**一次：拿最新備份在**臨時機**跑一次 §4 還原，計時 RTO，確認資料完整。演練結果寫 WORKLOG。
-- 演練才會抓出「dump 漏了某張表 / .env 沒進備份集 / volume 沒涵蓋」這類致命缺口。
+> 現有 `verify-backup-eu.sh` 只驗 gzip/tar 完整性 = **「檔案沒爛」≠「還原得回來」**。真演練必須把 dump **灌進臨時 DB** 確認資料活著。
+> **頻率**：每季一次（+ 每次補漏覆蓋後一次）。**目標**：RTO ≤ 數小時、RPO ≤ 24h。**全程在臨時容器，不碰 prod。**
+>
+> **✅ 首次演練 2026-06-26（演練 A Supabase）通過**：把 `20260625-023001/supabase-all.sql.gz` 灌進拋棄式 postgres:15 → `public_tables=73`、**`organizations=5`**、`ops_action_runs=6` → 客戶資料證實還原得回來（不只 integrity）。註：pg_dumpall 還原進新 PG 會有 ~315 個 role/extension-already-exists 類非致命雜訊，以 data count>0 為判定。Trigger/MainWP/n8n/.env 演練待補漏項上線後補。
+
+### 演練 A — Supabase / Trigger PG dump 真的還原得回來
+
+```bash
+# 在 EU（或任何有 docker 的機）跑，全程拋棄式，不碰 prod
+OUT=$(ls -dt /root/backups/*/ | head -1)          # 取最新備份
+echo "drill from: $OUT"
+
+# 1) 起一個拋棄式 postgres
+docker run -d --name drill-pg -e POSTGRES_PASSWORD=drill postgres:15
+sleep 8
+
+# 2) 灌 Supabase dump（pg_dumpall 含 CREATE ROLE/DB）
+gunzip -c "$OUT/supabase-all.sql.gz" | docker exec -i drill-pg psql -U postgres 2>&1 | tail -5
+
+# 3) 驗資料真的在（改成你的關鍵表，如 organizations / ops_action_runs）
+docker exec drill-pg psql -U postgres -d postgres -c \
+  "SELECT count(*) FROM organizations;" 2>&1     # 期望 > 0 = 客戶資料還活著
+
+# 4) Trigger dump 同法（trigger.sql.gz 是單庫 pg_dump）
+docker exec drill-pg psql -U postgres -c "CREATE DATABASE trigger;" 
+gunzip -c "$OUT/trigger.sql.gz" | docker exec -i drill-pg psql -U postgres -d trigger 2>&1 | tail -3
+docker exec drill-pg psql -U postgres -d trigger -c "SELECT count(*) FROM \"TaskSchedule\";"
+
+# 5) 拆台
+docker rm -f drill-pg
+```
+**判定**：步驟 3/4 的 count > 0 = ✅ 還原可行。count=0 或報錯 = 🔴 備份有問題，當天修。
+
+### 演練 B — MainWP / n8n / volume 還原（補漏項上線後加驗）
+```bash
+# MainWP DB（補漏後）：灌進拋棄式 mariadb 驗 wp_options/連線表筆數
+# n8n volume：docker run --rm -v drill-n8n:/d -v $OUT:/b alpine tar xzf /b/n8n.tgz -C /d
+#   → 起拋棄式 n8n 掛 drill-n8n 確認 workflow 清單回得來
+# TODO: 補漏項實際上線後，於下一次演練補上對應指令並定稿
+```
+
+### 演練 C — `.env` 解密驗證
+```bash
+# 確認加密的 .env 備份解得開（金鑰在本機 vault）
+openssl enc -d -aes-256-cbc -pbkdf2 -in "$OUT/env.tar.gz.enc" | tar tzf - 2>&1 | head
+# 期望列出 4 個 .env 路徑 = ✅ 密鑰救得回
+```
+
+**每次演練**：計時 RTO、記錄哪些 count 對得上、抓到什麼漏洞 → 寫 `agency-os/WORKLOG.md`（演練本身就是抓「dump 漏表 / .env 沒進集 / volume 沒涵蓋」的手段）。
 
 ---
 
 ## §7 上 Dedicated 前 Checklist（全綠才搬）
 
-- [ ] 讀懂現有 `/root/scripts/backup-*.sh` 涵蓋範圍，補齊 §1 全部 🔴
-- [ ] Storage Box 開好，每日異地備份自動跑 + 失敗告警
-- [ ] 備份集含**加密後**的 `.env`
-- [ ] 至少**演練還原成功一次**（§6），RTO/RPO 達標
+- [x] 讀懂現有 `backup-eu-stack.sh` 涵蓋範圍（2026-06-26：Supabase+Trigger PG+Uptime Kuma，異地 SG+R2）
+- [ ] 補齊 §1 漏項進 `backup-eu-stack.sh`：**MainWP DB / n8n / `.env`(加密) / Supabase Storage / MinIO / MainWP files**（Medium，需 propose）
+- [ ] 補第二異地取代 SG-offsite（SG 退役前）：R2 二 region 或 Hetzner Storage Box
+- [ ] 備份集含**加密後**的 `.env`，金鑰存本機 vault（不同地）
+- [ ] **演練還原成功一次**（§6 演練 A count>0），RTO/RPO 達標 + 寫 WORKLOG
+- [ ] 確認 `verify-backup-eu.sh` 失敗有真的觸發 Telegram 告警
 - [ ] auction 機：雙碟 NVMe + RAID 1 + SMART 健康 + mdadm 告警
 - [ ] §4 / §5 的 `TODO:` 指令全部補齊並實測
 - [ ] 所有指向 EU 的 Cloudflare DNS record 清單列出
