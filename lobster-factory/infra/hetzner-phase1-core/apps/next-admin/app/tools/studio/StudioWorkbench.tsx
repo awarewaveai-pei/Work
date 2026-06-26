@@ -139,8 +139,10 @@ function buildMapPrompt(opts: {
   if (theme.kind === "chart") {
     return `An illustrated reference chart poster of ${place} ${theme.enLabel}, neat grid of individual labeled icons${icons ? ` such as ${icons}` : ""}, flat vector illustration, bold clean outlines, plain background, infographic style, not a realistic photograph`;
   }
-  const shapeClause = fusionEn ? "blending both regions" : "top-down stylized map in the shape of the country/region";
-  return `A colorful flat-vector illustrated tourist map of ${place}, ${shapeClause}, travel-poster infographic highlighting ${theme.enLabel},${icons ? ` with labeled cute illustrated icons of ${icons},` : ""} decorative compass rose, small clouds, trees and a welcome title banner, soft vibrant colors, thick clean outlines, cartographic illustration, not a realistic photograph`;
+  // `regionEn` is a culture adjective ("Taiwanese") — use it attributively ("a Taiwanese
+  // tourist map") so the title banner reads naturally rather than "map of Taiwanese".
+  const fusionClause = fusionEn ? ` blended with ${fusionEn} culture` : "";
+  return `A colorful flat-vector illustrated ${regionEn} tourist map${fusionClause}, top-down stylized map in the shape of the region, travel-poster infographic highlighting ${theme.enLabel},${icons ? ` with labeled cute illustrated icons of ${icons},` : ""} decorative compass rose, small clouds, trees and a welcome title banner, soft vibrant colors, thick clean outlines, cartographic illustration, not a realistic photograph`;
 }
 
 function coerceTopics(value: unknown): string[] {

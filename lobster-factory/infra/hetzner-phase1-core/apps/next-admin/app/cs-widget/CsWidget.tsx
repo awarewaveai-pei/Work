@@ -12,6 +12,16 @@ import type {
 let localSeq = 0;
 const localId = () => `local-${++localSeq}`;
 
+/** Open a bot-supplied URL safely: http/https only (blocks javascript:/data:), scheme-less → https,
+ *  with noopener,noreferrer (no window.opener, no Referer leak to the attacker-influenced target). */
+function safeOpen(uri: string) {
+  try {
+    const raw = /^[a-z][a-z0-9+.-]*:/i.test(uri) ? uri : `https://${uri}`;
+    const u = new URL(raw);
+    if (u.protocol === "http:" || u.protocol === "https:") window.open(u.href, "_blank", "noopener,noreferrer");
+  } catch { /* reject non-http(s) / unparseable */ }
+}
+
 export function CsWidget({ transport, config }: { transport: WidgetTransport; config: WidgetConfig }) {
   const [open, setOpen] = useState(true);
   const [messages, setMessages] = useState<WidgetMessage[]>([]);
@@ -76,7 +86,7 @@ export function CsWidget({ transport, config }: { transport: WidgetTransport; co
                 {humanOwns ? "真人專員服務中" : "線上 · 通常幾秒內回覆"}
               </div>
             </div>
-            <span onClick={() => setOpen(false)} style={{ cursor: "pointer", color: "var(--muted)", fontSize: 20, lineHeight: 1 }}>×</span>
+            <button onClick={() => setOpen(false)} aria-label="關閉" style={{ cursor: "pointer", color: "var(--muted)", fontSize: 20, lineHeight: 1, border: "none", background: "none", padding: 0 }}>×</button>
           </div>
 
           {/* body */}
@@ -94,7 +104,7 @@ export function CsWidget({ transport, config }: { transport: WidgetTransport; co
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") send(); }}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) send(); }}
               placeholder="輸入訊息…"
               style={{ flex: 1, height: 40, border: "1px solid var(--border)", borderRadius: 9999, padding: "0 16px", fontSize: 14, color: "var(--ink)", background: "var(--bg)", outline: "none", fontFamily: "inherit" }}
             />
@@ -104,9 +114,9 @@ export function CsWidget({ transport, config }: { transport: WidgetTransport; co
       )}
 
       {/* launcher */}
-      <div onClick={() => setOpen((o) => !o)} style={{ width: 58, height: 58, borderRadius: "50%", background: "var(--primary)", color: "var(--on-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, cursor: "pointer", boxShadow: "0 12px 32px rgba(84,124,101,.30)" }}>
+      <button onClick={() => setOpen((o) => !o)} aria-label={open ? "關閉客服" : "開啟客服"} style={{ width: 58, height: 58, borderRadius: "50%", background: "var(--primary)", color: "var(--on-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, cursor: "pointer", border: "none", boxShadow: "0 12px 32px rgba(84,124,101,.30)" }}>
         {open ? "×" : "💬"}
-      </div>
+      </button>
     </div>
   );
 }
@@ -152,10 +162,10 @@ function MessageView({ m, onPostback }: { m: WidgetMessage; onPostback: (v: stri
               <div style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>{c.title}</div>
               {c.description && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{c.description}</div>}
               {c.actions.map((a, j) => (
-                <div key={j} onClick={() => { if (a.type === "postback" && a.payload) onPostback(a.payload, a.text); else if (a.uri) window.open(a.uri, "_blank", "noopener"); }}
-                  style={{ marginTop: 9, background: "var(--primary)", color: "var(--on-primary)", textAlign: "center", padding: 7, borderRadius: 9, fontSize: 13, cursor: "pointer" }}>
+                <button key={j} onClick={() => { if (a.type === "postback" && a.payload) onPostback(a.payload, a.text); else if (a.uri) safeOpen(a.uri); }}
+                  style={{ display: "block", width: "100%", marginTop: 9, background: "var(--primary)", color: "var(--on-primary)", textAlign: "center", padding: 7, borderRadius: 9, fontSize: 13, cursor: "pointer", border: "none", fontFamily: "inherit" }}>
                   {a.text}
-                </div>
+                </button>
               ))}
             </div>
           </div>
