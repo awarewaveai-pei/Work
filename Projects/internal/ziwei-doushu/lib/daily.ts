@@ -111,6 +111,41 @@ export function computeDailyFortune(
     },
     yi: lunar.getDayYi().slice(0, 5),
     ji: lunar.getDayJi().slice(0, 5),
+    dayMaster: bazi.dayMaster,
+    strength: bazi.analysis.strength,
+    pattern: bazi.analysis.pattern,
+    favorable: bazi.analysis.favorable,
+  };
+}
+
+/**
+ * 每日運勢 → AI 解讀 context(供 AiReading 產生個人化文案)。
+ * systemId 用 'bazi'(本運勢由八字推),facts 明確標今日 + 評分 + 宜忌 → AI 寫每日運勢。
+ */
+export function dailyContext(f: DailyFortune, locale: Locale): InterpretationContext {
+  return {
+    systemId: 'bazi',
+    locale,
+    headline: `今日運勢 ${f.date}`,
+    facts: [
+      { label: 'readingType', value: '每日運勢(今日)' },
+      { label: 'date', value: f.date },
+      { label: 'dayMaster', value: f.dayMaster },
+      { label: 'strength', value: f.strength },
+      { label: 'pattern', value: f.pattern },
+      { label: 'favorable', value: f.favorable.join('、') || '—' },
+      { label: 'luckyElement', value: f.luckyElement },
+      { label: 'luckyColors', value: f.luckyColors.join('、') },
+      { label: 'luckyNumbers', value: f.luckyNumbers.join('、') },
+      { label: 'luckyDirection', value: f.luckyDirection },
+      { label: 'scoreOverall', value: `${f.scores.overall}/5` },
+      { label: 'scoreLove', value: `${f.scores.love}/5` },
+      { label: 'scoreCareer', value: `${f.scores.career}/5` },
+      { label: 'scoreWealth', value: `${f.scores.wealth}/5` },
+      { label: 'scoreHealth', value: `${f.scores.health}/5` },
+      { label: 'yi', value: f.yi.join('、') || '—' },
+      { label: 'ji', value: f.ji.join('、') || '—' },
+    ],
   };
 }
 

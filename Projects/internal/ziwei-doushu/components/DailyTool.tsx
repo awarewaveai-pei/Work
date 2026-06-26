@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import BirthForm from '@/components/BirthForm';
-import { computeDailyFortune, type DailyFortune } from '@/lib/daily';
+import AiReading from '@/components/AiReading';
+import { computeDailyFortune, dailyContext, type DailyFortune } from '@/lib/daily';
 import type { ChartRequest } from '@/lib/ziwei';
 import type { Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
@@ -159,6 +160,8 @@ export default function DailyTool({ dict, locale }: { dict: Dictionary; locale: 
               </div>
             </div>
           </div>
+
+          <AiReading context={dailyContext(result, locale)} ai={dict.ai} tier="light" />
         </section>
       ) : null}
     </>
