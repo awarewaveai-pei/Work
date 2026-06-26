@@ -19,11 +19,14 @@ export class AiNotImplementedError extends Error {
  * 移除字串中可能夾帶的密鑰片段(sk-... / Bearer ...)。
  * 已驗 OpenAI/Anthropic SDK 錯誤訊息目前不含金鑰,但本層 secrets-adjacent,
  *   自行遮蔽 = 由我們保證不外洩,不依賴 vendor 行為不變(critic 2026-06-26)。
+ * ⚠️ 範圍:僅涵蓋 `sk-*` 與 `Bearer *`(= 目前 OpenAI/Anthropic 兩家的格式)。
+ *   日後加非 sk- 廠商(如 Gemini `AIza...`)須在此補對應 pattern。
  */
 export function redactSecrets(s: string): string {
+  const str = String(s); // exported util:防呼叫端傳非字串時 .replace 爆掉
   // 先遮 Bearer(連同其後的 token 整段),再遮獨立的 sk-... — 順序相反會在
   //   "Bearer sk-..." 留下 "Bearer sk-" 殘片。
-  return s
+  return str
     .replace(/Bearer\s+[A-Za-z0-9._-]{8,}/gi, 'Bearer ***REDACTED***')
     .replace(/sk-[A-Za-z0-9_-]{8,}/g, 'sk-***REDACTED***');
 }

@@ -105,24 +105,7 @@ export const DEFAULT_SECTIONS: NavSection[] = [
   },
 ];
 
-const LS_ORDER_KEY = 'aw-sidebar-order';
-
-// Saved shape: { sectionOrder: string[], itemOrders: Record<sectionId, string[]> }
-interface SavedLayout {
-  sectionOrder?: string[];
-  itemOrders?: Record<string, string[]>;
-}
-
-function loadLayout(): SavedLayout | null {
-  try {
-    const raw = localStorage.getItem(LS_ORDER_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    // Migrate legacy shape: was string[] (section IDs only)
-    if (Array.isArray(parsed)) return { sectionOrder: parsed };
-    return parsed as SavedLayout;
-  } catch { return null; }
-}
+// Saved shape: { sectionOrder: string[], itemOrders: Record<sectionId, string[]> } — see SavedLayout in lib/theme/tokens.
 
 function applyLayout(sections: NavSection[], layout: SavedLayout): NavSection[] {
   const map = new Map(sections.map(s => [s.id, s]));
