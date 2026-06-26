@@ -60,20 +60,19 @@
 > - 異地 L1：rsync → SG VPS（key `/root/.ssh/backup_to_sg`）｜異地 L2：**Cloudflare R2**（bucket `lobster-backup`，prefix `eu`，`upload-to-r2.sh`）→ **3-2-1 已成立**（本機 + SG + R2）
 > - integrity 驗證：`verify-backup-eu.sh`（gzip/tar -t + 檔案存在 + SG 異地存在）
 >
-> **🔴 確認的漏洞（backup-eu-stack.sh 沒涵蓋，機器死即永久遺失）**：
-> | 漏項 | dump 指令（已驗帳號）| 優先 |
-> |------|------|------|
-> | **MainWP DB** | `docker exec mainwp-db mysqldump -u root -p"$MYSQL_ROOT_PASSWORD" mainwp \| gzip` （user=mainwp/db=mainwp，root_set=yes）| 🔴 |
-> | **`.env` 密鑰 ×4** | `tar czf - /root/{supabase,trigger,mainwp,postiz}/.env \| openssl enc -aes-256-cbc -pbkdf2 -out env.tar.gz.enc`（**加密後**才離機）| 🔴 |
-> | **n8n** | `docker run --rm -v n8n_n8n_data:/d:ro -v $OUT:/b alpine tar czf /b/n8n.tgz -C /d .` | 🔴 |
-> | Postiz uploads | 同上 vol `postiz_postiz_uploads` | 🟡 |
-> | Supabase Storage | 同上 vol `supabase_storage-data` | 🟡 |
-> | Trigger MinIO | 同上 vol `trigger_trigger_minio_data` | 🟡 |
-> | MainWP files | 同上 vol `mainwp_mainwp_files` | 🟡 |
+> **✅ 漏洞已補齊（方案A，2026-06-26，實機跑 + 還原演練通過）** — `backup-eu-stack.sh` 已新增以下 7 項：
+> | 項目 | 備份產物 | 還原演練 |
+> |------|---------|---------|
+> | **MainWP DB** | `mainwp.sql.gz`（`mysqldump --single-transaction`，root pw 讀容器 env 不硬編）| ✅ 內容 44 張表（含 `mwp_mainwp_api_keys` 客戶連線）|
+> | **`.env` 密鑰 ×4** | `env.tar.gz.enc`（AES-256，`-pass env:BACKUP_ENC_KEY`）| ✅ 解密列出 4 個 .env |
+> | **n8n** | `n8n.tgz`（binary/config volume）| ✅ 解開 config/nodes/storage |
+> | Postiz uploads / Supabase Storage / Trigger MinIO / MainWP files | `*.tgz`（volume archive）| ✅ 產出 OK |
 >
-> **🔴 兩個結構性問題**：① `verify-backup-eu.sh` **只驗 integrity、從沒真的還原過**（= 等於沒演練，見 §6）② 異地 L1 指向 **SG**，**SG 退役後這條斷**，只剩 R2 單一異地 → 退 SG 前需補第二異地（R2 第二 region 或 Hetzner Storage Box）。
+> **🔑 還原關鍵事實（restore 時必知）**：`supabase-db` 這個 Postgres cluster 含 **4 個 DB** — `postgres`(Supabase) + **`n8n`**(workflow) + **`postiz`** + `_supabase`。`pg_dumpall` 全抓 → **n8n workflow、postiz 排程資料都在 `supabase-all.sql.gz` 裡**（已驗 `CREATE DATABASE n8n` + `workflow_entity`），n8n.tgz/postiz-uploads.tgz 只補 binary/上傳檔。**還原 n8n/postiz = 先 restore supabase dump（含其 DB）+ 再還原對應 volume。**
 >
-> **補漏動作（Medium，改 prod 備份腳本，需另行 propose）**：把上表 🔴🟡 加進 `backup-eu-stack.sh`（同樣 integrity 驗證 + 納入 R2/異地）。`.env` 加密金鑰存本機 vault，**不可**跟備份放一起。
+> **🔑 `.env` 解密金鑰**：`BACKUP_ENC_KEY` 在 `/etc/default/eu-backup`（不進備份）+ **鏡像於本機 vault `secrets-vault.ps1 get BACKUP_ENC_KEY`**。機器死 → 從 vault 取金鑰解 `env.tar.gz.enc`。
+>
+> **🔴 仍待處理**：① 異地 L2 **R2 upload 近期 WARN 失敗**（非本次改動；SG L1 正常）→ **SG 退役前必修**（否則退 SG 後零異地）。② 異地 L1 指向 SG，SG 退役即斷 → 補第二異地。③ 備份腳本仍為**機器專屬無 repo 版控**（建議納入 repo）。
 
 ---
 
@@ -154,7 +153,11 @@
 > 現有 `verify-backup-eu.sh` 只驗 gzip/tar 完整性 = **「檔案沒爛」≠「還原得回來」**。真演練必須把 dump **灌進臨時 DB** 確認資料活著。
 > **頻率**：每季一次（+ 每次補漏覆蓋後一次）。**目標**：RTO ≤ 數小時、RPO ≤ 24h。**全程在臨時容器，不碰 prod。**
 >
-> **✅ 首次演練 2026-06-26（演練 A Supabase）通過**：把 `20260625-023001/supabase-all.sql.gz` 灌進拋棄式 postgres:15 → `public_tables=73`、**`organizations=5`**、`ops_action_runs=6` → 客戶資料證實還原得回來（不只 integrity）。註：pg_dumpall 還原進新 PG 會有 ~315 個 role/extension-already-exists 類非致命雜訊，以 data count>0 為判定。Trigger/MainWP/n8n/.env 演練待補漏項上線後補。
+> **✅ 演練 2026-06-26 通過**：
+> - **A Supabase**：`supabase-all.sql.gz` → 拋棄式 postgres:15 → `organizations=5`、`ops_action_runs=6`、73 表（pg_dumpall 還原有 ~315 role/extension-exists 雜訊，以 count>0 判定）。
+> - **C `.env` 解密**：`openssl enc -d -pass env:BACKUP_ENC_KEY` → 列出 4 個 .env（密鑰救得回）。
+> - **MainWP**：`mainwp.sql.gz` 內容 44 表（含客戶連線）；**n8n**：`n8n.tgz` 解開 OK，workflow 本體在 supabase dump 的 `n8n` DB（`workflow_entity` 已驗）。
+> - （拋棄式 mariadb live-load 因 root pw env 不合 1045，改以 dump 內容驗證；非備份問題。）
 
 ### 演練 A — Supabase / Trigger PG dump 真的還原得回來
 
@@ -206,10 +209,11 @@ openssl enc -d -aes-256-cbc -pbkdf2 -in "$OUT/env.tar.gz.enc" | tar tzf - 2>&1 |
 ## §7 上 Dedicated 前 Checklist（全綠才搬）
 
 - [x] 讀懂現有 `backup-eu-stack.sh` 涵蓋範圍（2026-06-26：Supabase+Trigger PG+Uptime Kuma，異地 SG+R2）
-- [ ] 補齊 §1 漏項進 `backup-eu-stack.sh`：**MainWP DB / n8n / `.env`(加密) / Supabase Storage / MinIO / MainWP files**（Medium，需 propose）
+- [x] 補齊 §1 漏項進 `backup-eu-stack.sh`（方案A 2026-06-26：MainWP DB / n8n / `.env`加密 / Storage / MinIO / MainWP files 全補 + 實機跑 + 還原演練）
 - [ ] 補第二異地取代 SG-offsite（SG 退役前）：R2 二 region 或 Hetzner Storage Box
-- [ ] 備份集含**加密後**的 `.env`，金鑰存本機 vault（不同地）
-- [ ] **演練還原成功一次**（§6 演練 A count>0），RTO/RPO 達標 + 寫 WORKLOG
+- [x] 備份集含**加密後**的 `.env`，金鑰 `BACKUP_ENC_KEY` 存本機 vault（不同地）— 2026-06-26
+- [x] **演練還原成功一次**（§6 A/C + MainWP/n8n 內容驗證）— 2026-06-26
+- [ ] **修 R2 upload WARN**（SG 退役前必修，否則退 SG 後零異地）
 - [ ] 確認 `verify-backup-eu.sh` 失敗有真的觸發 Telegram 告警
 - [ ] auction 機：雙碟 NVMe + RAID 1 + SMART 健康 + mdadm 告警
 - [ ] §4 / §5 的 `TODO:` 指令全部補齊並實測
