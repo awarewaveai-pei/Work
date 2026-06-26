@@ -17,7 +17,7 @@
 - `messages/{zh-TW,en}.json`:chart 加 transit/decadal/yearly/monthly/daily。
 - 測試:`ziwei.test.ts` 加 computeHoroscope(流年四化錨點)+ formatMutagen + 強化 toContext + hourly 確定性。
 
-[驗證結果](R0 四動作)
+[驗證結果]（R0 四動作）
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/ziwei.test` + `node -e`(iztro 探針)| exit=0 | **真 iztro 驗:2026-06-26 流年=丙 → 四化 天同/天機/文昌/廉貞(丙干同機昌廉,正確);命宮主星 fact 帶廟旺括號;傳 horoscope 才有大限/流年 facts**。另 tsc=0、`npm test` 85 pass、`npm run build` exit=0。
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n+2suggestion — critic 對照 iztro .d.ts 確認 toScope 結構寬子型安全、5 運限欄皆在、3rd 參數向後相容、facts ≤23<60 且皆過 sanitizeFact、無 SSR/hydration 問題(過運卡僅互動後渲染)。採納:流時加 timeIndex 參數(決定論)+ hourly 非確定性註記。
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/ziwei-doushu | grep=`computeHoroscope`,`formatMutagen`,`ZiweiHoroscope`,`toContext(` | hits=0 stale — toContext 3rd 參數 optional,compute/4 工具/測試 call sites 全相容(tsc 過)。
@@ -52,7 +52,7 @@
 - `generateGroup(skipDone)`：`!skipDone`（重新生成全組）每張傳新 seed；`skipDone`（填補未完成）維持 previewSeed。
 - seed-忽略型 model（openai/seedream/nano-banana/imagen/ideogram-v4）本就隨機，傳新 seed 無害；修正精準命中決定性 class（flux-*, ideogram-v2a/v3, ideogram-character, flux-2-max）。
 
-[驗證結果](R0 四動作)
+[驗證結果]（R0 四動作）
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit (next-admin)` | exit=2 | ms=~32000 -- TarotStudio.tsx **0 errors**；exit=2 全數來自無關檔 `StudioWorkbench.tsx`（另一 Cursor session 未提交 WIP，showMap→mapMode 半成品 rename + lens）。
 - REALTEST_WAIVED: SMOKE_COVERED -- E2E 真生成需 deploy + Replicate 付費，且 sg-deploy typecheck gate 目前被 StudioWorkbench WIP 擋；root cause 經 tsc + critic 全鏈追證確定，e2e 待 deploy 後由 /playwright 或 browser-test 補。
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n — 確認 (a)3 處簽名/型別正確、(b)`!== undefined` 是唯一正確判斷（truthiness/`!=null` 會誤判 seed=0）、(c)client seed 0..1e9 與 route 驗證(`generate/route.ts:85`)+server `?? random` 範圍相容、(d)`previewSeed=null` 時 server 端仍生隨機（無回歸）、(e)純值傳參無 race/staleness。
@@ -74,7 +74,7 @@
 - `app/tools/canvas/CanvasEditor.tsx`(改)：載入處過 `toCanvasSrc`（choke point，全 caller 自動覆蓋）；catch 加 `console.warn` 真錯。
 - `app/api/tools/studio/proxy-image/route.ts`(改)：SSRF allowlist bare `startsWith(base+"/")` → 硬化 `isDesignsAsset()`（host-exact，與 publish/print-file 同 posture；critic 確認舊版不可 exploit 但移除整個 bypass class）。
 
-[驗證結果](R0 四動作)
+[驗證結果]（R0 四動作）
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsx -e import(canvas-handoff).toCanvasSrc(6 cases)` | exit=0（6/6）；另 `node` 邏輯重跑 5/5 PASS（R2 URL 空格+`+` → `%20`/`%2B` 正確 encode、data/blob/相對/空字串原樣）；`npx tsc --noEmit` exit=0（3 檔）。
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/2n — Nn 皆 pre-existing（其一即 proxy SSRF 硬化，已順手收斂）。確認 (a)encodeURIComponent 對 `?&+`/CJK 正確、(b)同源 proxy 配 crossOrigin:"anonymous" 無害、(c)無漏其他 remote handoff、(d)allowlist 不可繞。
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`toCanvasSrc`,`startsWith\(base \+ "/"\)`,`底圖載入失敗` | hits=0 stale — `toCanvasSrc` 僅 CanvasEditor:259 使用；剩餘 bare-startsWith 兩處(`r2.ts:59`/`image-gen.ts:331`)皆在已硬化 guard 內(後接 host 檢查)，非 proxy 破口。
@@ -98,7 +98,7 @@
 - `messages/{zh-TW,en}.json`:bazi 加 pattern/strength/favorable/avoid 標籤。
 - 測試:`baziAnalysis.test.ts`(6,含身強/弱/簡體)+ `bazi.test.ts` 端到端錨點。
 
-[驗證結果](R0 四動作)
+[驗證結果]（R0 四動作）
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/baziAnalysis lib/bazi.test` | exit=0 | **真 lunar 資料端到端驗:2000-08-16 14:30 女(丙午日 申月失令)→ 身弱、喜木火、偏財格**,與手算扶抑 + 教科書一致。另 `tsc --noEmit` exit=0、`npm test` 79 pass、`npm run build` exit=0。
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n — critic 對照 lunar-javascript@1.7.7 原始碼確認:inverse() 為 total(SHENG/KE 皆 5 元 bijection)、十神查表 100 entry 永不 undefined、各地支≥1 藏干故 [0] 永遠安全、strength 門檻無 off-by-one、FU/YI 含 lunar 預設簡體 10 形、BaziResult 新必填欄無漏改消費端。採納 2 防禦建議:analyzeBazi 加未知日干 fail-loud guard + lunar locale 依賴註解。
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/ziwei-doushu | grep=`analyzeBazi`,`BaziAnalysis`,`BaziResult`,`.analysis`,`computeBazi` | hits=0 stale — BaziResult 消費端(BaziTool/systems-bazi/test)全更新,tsc 過=無型別破壞。
@@ -144,7 +144,7 @@
 - 安全強化:`lib/ai/providers/{openai,anthropic}.ts` 加 timeout 60s + maxRetries 1;`lib/ai/prompts/index.ts` rule#1 加「事實為資料非指令」護欄。
 - `app/api/interpret/route.test.ts`(新):16 測(11 驗證 + 4 sanitize + 1 gated live)。
 
-[驗證結果](R0 四動作)
+[驗證結果]（R0 四動作）
 - REALTEST_EVIDENCE: tool=Bash | cmd=`RUN_LIVE_AI=1 OPENAI_API_KEY=<vault> npx vitest run app/api/interpret/route` | exit=0 | ms≈4100 — POST /api/interpret 真打 GPT 回 200 + 非空解讀。另 `tsc --noEmit` exit=0、`npm test` 72 pass/3 skip、`npm run build` exit=0(`ƒ /api/interpret` 註冊;首次 Windows copyfile flake,clean 重build 過)。
 - REVIEW_DONE: critic=Deep×2 | verdict=warn→Major(已修) | findings — 第一輪抓 prompt-injection Major(fact value 換行偽造假規則塊)+ DoS/empty Minor;我修(codePoint<0x20 strip)。**第二輪抓我的修法不全:U+2028/U+2029/NEL(codePoint≥0x20)漏網,單一分隔不靠 `\s{2,}` 也能偽造** → 改 Unicode-property strip `[\p{Cc}\p{Zl}\p{Zp}]/gu` + 用該 bypass payload 回歸測試。另加 provider timeout(封 DoS)+ prompt「資料非指令」護欄。critic 確認無 key/facts 外洩、無 console、React 自動跳脫無 XSS、surrogate 對不切。
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/ziwei-doushu | grep=`toContext`,`AiReading`,`sanitizeFact`,`/api/interpret` | hits=0 stale — 4 adapter export + 4 tool 引用 + route/fetch/test 全對齊;ORACLE docs 命中皆概念引用。
@@ -169,7 +169,7 @@
 - 測試:`prompts/index.test.ts`(5)、`errors.test.ts`(3,密鑰遮蔽 pin)、`interpret.live.test.ts`(gated,RUN_LIVE_AI=1 才打真 API)。
 - 依賴:`openai` + `@anthropic-ai/sdk`。
 
-[驗證結果](R0 四動作)
+[驗證結果]（R0 四動作）
 - REALTEST_EVIDENCE: tool=Bash | cmd=`RUN_LIVE_AI=1 OPENAI_API_KEY=<vault> npx vitest run lib/ai/interpret.live` | exit=0 | ms=12599 — 真打 GPT:light(4007ms)+ **deep max_completion_tokens=5000(8591ms)皆回非空解讀**(deep 正是先前會 400 的路徑,釘快照後驗證通過)。另 `npx tsc --noEmit` exit=0、`npm test` 57 pass/2 skip。
 - REVIEW_DONE: critic=Deep×2 | verdict=warn→warn | findings=0c/2m(皆已修)/3n — 第一輪修 Major(max_tokens→max_completion_tokens)+ 2 Minor(locale assert 防混語、token 上限防腰斬)+ secrets pin。**第二輪(verify-recent)抓到我第一輪的 token 上限修法自身引入新 Major:deep=5000/premium=12000 超出裸 gpt-4o 4096 輸出 → API 400 拒絕(非截斷),綠測因 light=1500 未覆蓋而漏掉** → 釘 16384 輸出快照 + 加 deep-tier live test 證明。再修 2 Minor(redactSecrets String() 轉型 + 範圍註解)。critic 確認無 key 外洩路徑、Centaur 護欄雙 provider×雙語皆在、無注入、redactSecrets 無 ReDoS。
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/ziwei-doushu | grep=`AiNotImplementedError`,`buildPrompt`,`AiCallError`,`interpret(`,`modelFor` | hits=0 stale — `AiNotImplementedError` 已無 caller(保留供未來 stub provider);其餘 call sites 全對齊;agency-os 命中皆 ORACLE docs 概念引用(非過期)。
