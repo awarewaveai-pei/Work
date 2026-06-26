@@ -13,7 +13,7 @@ const LENS_HINTS: Record<string, string> = {
   palette: "signature traditional color palettes and named color combinations",
   weave: "traditional textile techniques, weaving, dyeing and craft methods",
   symbol: "iconic cultural symbols, emblems and sacred signs",
-  food: "iconic dishes, street food, desserts and drinks",
+  food: "iconic dishes, street food, desserts, drinks, local fruits and regional snacks",
   music: "traditional musical instruments, genres and dances",
   art: "representative art forms, painting styles and visual mediums",
   architecture: "iconic architecture, building styles and structural motifs",
@@ -29,6 +29,7 @@ const LENS_HINTS: Record<string, string> = {
   themepark: "famous amusement parks, theme parks, observation decks, zoos, aquariums and major tourist attractions",
   metro: "metro and subway lines with their colors, major interchange stations and rail transit hubs",
   roadsign: "distinctive road signs, traffic signals, pedestrian markers and transportation symbols characteristic of the country",
+  craft: "traditional handicrafts, artisan products, local specialty goods and famous souvenirs",
 };
 
 interface CultureItem {

@@ -332,6 +332,8 @@ export default function StudioWorkbench() {
   const [fusionRegion, setFusionRegion] = useState<CultureItem | null>(null); // 🎲 混搭骰 second culture
   const [mapMode, setMapMode] = useState(false); // 🗺️ 地圖模式 — generate a whole illustrated tourist map
   const [mapTheme, setMapTheme] = useState(MAP_THEMES[0]?.key ?? ""); // active map theme (地標/美食/捷運…)
+  const [fusionPickMode, setFusionPickMode] = useState(false); // ✋ 手選混搭 — next country click sets fusionRegion
+  const [zoomImage, setZoomImage] = useState<string | null>(null); // 🔍 click-to-enlarge lightbox
 
   // 🔥 時事靈感 — active category tab (圖一 layout: tabs + items below)
   const [trendingTab, setTrendingTab] = useState(TRENDING_CATEGORIES[0]?.value ?? "");
@@ -908,9 +910,11 @@ export default function StudioWorkbench() {
               onClick={() => {
                 setMapMode((v) => {
                   const next = !v;
-                  // Entering map mode: reset to portrait (like a travel poster) and drop any
-                  // manual prompt edit so the freshly-assembled map prompt shows immediately.
-                  if (next) { setAspect("3:4"); setPromptTouched(false); setPrompt(""); }
+                  // Entering map mode: reset to a verified portrait ratio (travel-poster shape)
+                  // and drop any manual prompt edit so the map prompt shows immediately.
+                  // NOTE: use "2:3" not "3:4" — Ideogram v4's 3:4 resolution is unverified and
+                  // 422s (image-gen.ts IDEOGRAM_V4_RES); 2:3 is the universal verified default.
+                  if (next) { setAspect("2:3"); setPromptTouched(false); setPrompt(""); }
                   return next;
                 });
               }}

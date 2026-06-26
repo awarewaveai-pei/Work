@@ -207,11 +207,13 @@ export const CULTURE_LENSES: CultureLens[] = [
   },
   {
     key: "food", zh: "食物", emoji: "🍜",
-    hint: "iconic dishes, street food, desserts and drinks",
+    hint: "iconic dishes, street food, desserts, drinks, local fruits and regional snacks",
     fallback: [
       { zh: "招牌料理", en: "signature dish", desc: "招牌料理" },
       { zh: "街頭小吃", en: "street food", desc: "街頭小吃" },
       { zh: "傳統甜點", en: "traditional dessert", desc: "傳統甜點" },
+      { zh: "當地水果", en: "local fruit", desc: "在地水果" },
+      { zh: "特色零食", en: "regional snack", desc: "特色零食" },
     ],
   },
   {
@@ -414,6 +416,15 @@ export const MAP_THEMES: MapTheme[] = [
       { zh: "山岳", en: "famous mountain", desc: "代表山岳" },
       { zh: "湖泊", en: "scenic lake", desc: "知名湖泊" },
       { zh: "海岸", en: "scenic coast", desc: "海岸風景" },
+    ],
+  },
+  {
+    key: "craft", zh: "特產工藝", emoji: "🧶", enLabel: "local crafts and specialty souvenirs", kind: "map",
+    hint: "traditional handicrafts, artisan products, local specialty goods and famous souvenirs",
+    fallback: [
+      { zh: "手工藝", en: "traditional handicraft", desc: "傳統手工藝" },
+      { zh: "特產", en: "local specialty product", desc: "在地特產" },
+      { zh: "伴手禮", en: "famous souvenir", desc: "知名伴手禮" },
     ],
   },
 ];

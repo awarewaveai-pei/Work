@@ -7,6 +7,8 @@ export { ingestKnowledge, retrieve, getEmbeddingProvider, setEmbeddingProvider }
 export { registerTool } from "@/lib/cs/tools";
 export { loadCis } from "@/lib/cs/cis";
 export { runEval, gradeIntent } from "@/lib/cs/eval";
+// Ops-console CRUD (data-entry surfaces — knowledge + intents).
+export { loadIntents, upsertIntent, deleteIntent, listKnowledgeSources, deleteKnowledgeSource } from "@/lib/cs/db";
 
 export type {
   InboundMessage,
