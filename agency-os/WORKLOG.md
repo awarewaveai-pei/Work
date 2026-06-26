@@ -171,6 +171,21 @@
 [剩餘風險] refMode 分段控制 + 模型列 為不同元件類型刻意保留（各自內部一致）；尚未 deploy；其他 /tools/* 頁（tarot/video）未納入本次
 [rollback] 同檔 `git revert`
 
+### refactor(tools): 4-primitive 系統抽成共用 module + 推到 tarot/video 全站一致
+
+[任務理解] 操作者要全站視覺語言一致（她 ADHD/OCD/ASD/HSP/CPTSD，不一致很痛）。把 studio 的 4-primitive 推到 /tools/tarot、/tools/video。
+[已修改]
+- NEW components/tools/panel-primitives.ts：tabStyle/chipStyle/actionPill/ghostBtn 抽成 SSOT module（型別 CSSProperties，palette 全走 CSS vars）
+- StudioWorkbench.tsx：移除 local defs → import 共用 module（19 usages 不變）
+- TarotStudio.tsx（refactor agent）：9 處 inline → helper（model/style tab、各 chip、batch-group var(--ai-bg)、mode toggle、✨/↻→ghostBtn）
+- VideoStudio.tsx（refactor agent）：12 處 → helper；**underline tabs（borderBottom）→ 實心 pill tabStyle**（最大差異）、chips radius 20→12、format 2px→chipStyle、素材 mode toggle→tabStyle
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit（whole project, both refactors）| exit=0 | ms=2643
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0major/1minor（minor=VideoStudio 含平行 session 已 commit 的 632c6d01 設定擁有權 logic 變更，非本次 styling，且已部署=無新風險）；~21 conversions 全 style-only、active-bool 正確、0 dropped handler
+- BUGHUNT_DONE: scope=agency-os,scripts,app(next-admin) | grep=panel-primitives import|borderBottom 3px|gradient|violet | hits=0（3 工具皆 import SSOT；漸層/紫 0；唯一 borderBottom:3px=video 頂層頁籤 page-nav 不同層級刻意保留）
+[剩餘風險] ScriptForge 用自有 coral/violet/jade palette（前製腳本創作頁，刻意不同）未納入；video 頂層 page-nav tab（studioTab）為 primary nav 保留 underline；待操作者定是否也要統一
+[rollback] 各檔 git revert；共用 module 移除即回退
+
 ## 2026-06-25
 
 ### perf(trigger): dispatch-action-run schedule */1 → */10 — 一勞永逸消除 dispatcher 空轉容器
