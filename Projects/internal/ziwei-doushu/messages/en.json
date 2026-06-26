@@ -123,6 +123,7 @@
     "interpret": "AI Reading",
     "interpreting": "Interpreting…",
     "error": "Reading failed, please try again",
-    "disclaimer": "Note: AI reading is for reference and entertainment only."
+    "disclaimer": "Note: AI reading is for reference and entertainment only.",
+    "share": "Share card"
   }
 }

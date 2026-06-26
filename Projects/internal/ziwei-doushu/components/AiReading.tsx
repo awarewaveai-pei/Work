@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { InterpretationContext } from '@/lib/divination/types';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
+import { ogCardUrl, ogParamsFromContext } from '@/lib/og';
 
 /**
  * 可重用的 AI 解讀區塊 (Phase A — AI 問答入口)。
@@ -43,11 +44,31 @@ export default function AiReading({
     }
   }
 
+  function share() {
+    window.open(ogCardUrl(ogParamsFromContext(context)), '_blank', 'noopener');
+  }
+
   return (
     <div className="mt-6">
-      <button onClick={run} disabled={loading} className="btn-gold">
-        {loading ? ai.interpreting : ai.interpret}
-      </button>
+      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <button onClick={run} disabled={loading} className="btn-gold">
+          {loading ? ai.interpreting : ai.interpret}
+        </button>
+        <button
+          onClick={share}
+          style={{
+            padding: '0.5rem 1.25rem',
+            borderRadius: '0.5rem',
+            border: '1px solid var(--gold-400)',
+            background: 'transparent',
+            color: 'var(--gold-400)',
+            fontSize: '0.875rem',
+            cursor: 'pointer',
+          }}
+        >
+          {ai.share}
+        </button>
+      </div>
 
       {error ? <div className="error-banner mt-4">{ai.error}</div> : null}
 
