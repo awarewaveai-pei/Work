@@ -118,6 +118,23 @@ function chipStyle(active: boolean): React.CSSProperties {
     fontWeight: active ? 600 : 400, transition: "all 0.15s",
   };
 }
+// Primary ACTION button — solid-accent pill (radius 20). Every trigger: fetch / dice / roll.
+function actionPill(disabled = false): React.CSSProperties {
+  return {
+    fontSize: 11, fontWeight: 600, padding: "4px 14px", borderRadius: 20,
+    cursor: disabled ? "default" : "pointer",
+    background: "var(--accent)", color: "var(--btn-primary-text)", border: "none",
+    opacity: disabled ? 0.5 : 1, flexShrink: 0, transition: "all 0.15s",
+  };
+}
+// Secondary ACTION button — transparent + bordered, muted (radius 20). clear / cancel / remove.
+function ghostBtn(): React.CSSProperties {
+  return {
+    fontSize: 11, padding: "2px 10px", borderRadius: 20, cursor: "pointer",
+    background: "transparent", border: "1px solid var(--border)",
+    color: "var(--text-muted)", transition: "all 0.15s",
+  };
+}
 
 function AccordionSection({
   title, summary, children, defaultOpen = false, icon,
@@ -179,7 +196,7 @@ function CategoryPicker({
               key={c.group}
               type="button"
               onClick={() => { setTab(c.group); onTip(null); }}
-              style={{ padding: "3px 10px", borderRadius: 12, fontSize: 11, cursor: "pointer", border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`, background: active ? "var(--accent)" : "rgba(127,127,127,0.08)", color: active ? "var(--btn-primary-text)" : "var(--text-muted)", fontWeight: active ? 600 : 400, transition: "all 0.15s" }}
+              style={tabStyle(active)}
             >
               {c.group}
             </button>
@@ -734,20 +751,20 @@ export default function StudioWorkbench() {
           {/* 🎲 混搭骰 + 🗺️ 地圖切換 */}
           <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
             <button type="button" onClick={rollDice} title="隨機 2 國 × 1 鏡頭混搭，逼出意外靈感"
-              style={{ fontSize: 12, fontWeight: 600, padding: "4px 14px", borderRadius: 20, cursor: "pointer", background: "linear-gradient(135deg,#6366f1,#a855f7)", color: "#fff", border: "none", boxShadow: "0 1px 6px rgba(99,102,241,0.4)" }}>
+              style={actionPill()}>
               🎲 文化混搭骰
             </button>
             <button type="button" onClick={() => setShowMap((v) => !v)}
-              style={{ ...tabStyle(showMap), padding: "4px 12px" }}>
+              style={tabStyle(showMap)}>
               🗺️ 靈感地圖 {showMap ? "▲" : "▼"}
             </button>
           </div>
           {fusionRegion && region && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, padding: "5px 10px", borderRadius: 8, background: "rgba(168,85,247,0.12)", border: "1px solid rgba(168,85,247,0.4)", fontSize: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, padding: "5px 10px", borderRadius: 8, background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.4)", fontSize: 12 }}>
               <span style={{ fontWeight: 600 }}>🎲 {region.zh} × {fusionRegion.zh}</span>
               <span style={{ opacity: 0.6 }}>· {CULTURE_LENSES.find((l) => l.key === cultureLens)?.zh ?? ""} 混搭中</span>
               <button type="button" onClick={() => setFusionRegion(null)} title="取消混搭"
-                style={{ marginLeft: "auto", fontSize: 11, padding: "0 6px", borderRadius: 8, cursor: "pointer", background: "transparent", border: "1px solid rgba(168,85,247,0.5)", color: "var(--text-primary)" }}>✕</button>
+                style={{ ...ghostBtn(), marginLeft: "auto" }}>✕</button>
             </div>
           )}
 
@@ -800,7 +817,7 @@ export default function StudioWorkbench() {
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                   <button type="button" disabled={!region || fetching}
                     onClick={() => { if (region) void fetchCulture(region.en, cultureLens); }}
-                    style={{ fontSize: 11, padding: "3px 12px", borderRadius: 20, cursor: !region || fetching ? "default" : "pointer", background: "var(--accent)", color: "var(--btn-primary-text)", border: "none", opacity: !region || fetching ? 0.5 : 1, flexShrink: 0 }}>
+                    style={actionPill(!region || fetching)}>
                     {fetching ? "AI 思考中…" : `✨ AI 靈感（${region ? region.zh : "先選地域"}・${lens.zh}）`}
                   </button>
                   {dyn && <span style={{ fontSize: 10, opacity: 0.45 }}>AI 已填 {dyn.length} 項</span>}
@@ -865,12 +882,12 @@ export default function StudioWorkbench() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
                 <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)" }}>已選文化元素 ({cultureChips.length})</span>
                 <button type="button" onClick={() => setCultureChips([])}
-                  style={{ fontSize: 10, padding: "1px 8px", borderRadius: 10, cursor: "pointer", background: "transparent", border: "1px solid var(--border)", color: "var(--text-muted)" }}>清除</button>
+                  style={ghostBtn()}>清除</button>
               </div>
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                 {cultureChips.map((en) => (
                   <button key={en} type="button" onClick={() => toggleCultureChip(en)} title="點擊移除"
-                    style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, cursor: "pointer", background: "rgba(99,102,241,0.15)", border: "1px solid var(--accent)", color: "var(--accent)" }}>
+                    style={chipStyle(true)}>
                     {en} ✕
                   </button>
                 ))}
@@ -898,7 +915,7 @@ export default function StudioWorkbench() {
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <p style={{ fontSize: 11, opacity: 0.55, margin: 0 }}>點擊話題填入主圖欄（再點一次取消）</p>
             <button type="button" disabled={trendingFetching} onClick={() => void fetchAllTrending()}
-              style={{ fontSize: 11, padding: "3px 12px", borderRadius: 20, cursor: trendingFetching ? "default" : "pointer", background: "var(--accent)", color: "var(--btn-primary-text)", border: "none", opacity: trendingFetching ? 0.6 : 1, flexShrink: 0 }}>
+              style={actionPill(trendingFetching)}>
               {trendingFetching ? "搜尋中…" : "抓取今日熱搜"}
             </button>
           </div>
@@ -938,7 +955,7 @@ export default function StudioWorkbench() {
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 10 }}>
             {MODEL_GROUPS.map((g) => (
               <button key={g} type="button" onClick={() => setModelGroup(g)}
-                style={{ padding: "3px 10px", borderRadius: 12, fontSize: 11, cursor: "pointer", border: `1px solid ${modelGroup === g ? "var(--accent)" : "var(--border)"}`, background: modelGroup === g ? "var(--accent)" : "rgba(127,127,127,0.08)", color: modelGroup === g ? "var(--btn-primary-text)" : "var(--text-muted)", fontWeight: modelGroup === g ? 600 : 400, transition: "all 0.15s" }}>
+                style={tabStyle(modelGroup === g)}>
                 {g}
               </button>
             ))}
@@ -982,7 +999,7 @@ export default function StudioWorkbench() {
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
             {STYLE_GROUPS.map((g) => (
               <button key={g} type="button" onClick={() => { setStyleGroup(g); setTip(null); }}
-                style={{ padding: "3px 10px", borderRadius: 12, fontSize: 11, cursor: "pointer", border: `1px solid ${styleGroup === g ? "var(--accent)" : "var(--border)"}`, background: styleGroup === g ? "var(--accent)" : "rgba(127,127,127,0.08)", color: styleGroup === g ? "var(--btn-primary-text)" : "var(--text-muted)", fontWeight: styleGroup === g ? 600 : 400, transition: "all 0.15s" }}>
+                style={tabStyle(styleGroup === g)}>
                 {g}
               </button>
             ))}
@@ -1020,7 +1037,7 @@ export default function StudioWorkbench() {
                 key={a}
                 type="button"
                 onClick={() => setAspect(a)}
-                style={{ padding: "4px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: `1px solid ${aspect === a ? "var(--accent)" : "var(--border)"}`, background: aspect === a ? "var(--accent)" : "rgba(127,127,127,0.08)", color: aspect === a ? "var(--btn-primary-text)" : "var(--text-muted)", fontWeight: aspect === a ? 600 : 400, transition: "all 0.15s" }}
+                style={chipStyle(aspect === a)}
               >
                 {a}
               </button>
