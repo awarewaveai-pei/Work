@@ -12,7 +12,7 @@
 > - Phase 1 core（SG）→ [`lobster-factory/infra/hetzner-phase1-core/README.md`](../../../lobster-factory/infra/hetzner-phase1-core/README.md)
 > - SG 雙目錄陷阱 → [`SG_PHASE1_DOCKER_LAYOUT.md`](SG_PHASE1_DOCKER_LAYOUT.md)｜DNS → [`CLOUDFLARE_HETZNER_PHASE1.md`](CLOUDFLARE_HETZNER_PHASE1.md)｜部署 → [`DEPLOY_ROLLBACK_RUNBOOK.md`](DEPLOY_ROLLBACK_RUNBOOK.md)
 >
-> **🚚 要「搬機 / 上 dedicated / EU→大機、SG→EU」？唯一遷移正本** → [`runbooks/EU-STACK-BACKUP-RAID-RESTORE-FOR-DEDICATED-RUNBOOK.md`](../../../runbooks/EU-STACK-BACKUP-RAID-RESTORE-FOR-DEDICATED-RUNBOOK.md)（含備份/RAID/還原/遷移 §0–§7）。
+> **🚚 要「搬機 / 上 dedicated / EU→大機、SG→EU」？唯一遷移正本** → [`runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`](../../../runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md)（含備份/RAID/還原/遷移 §0–§7）。
 
 ---
 

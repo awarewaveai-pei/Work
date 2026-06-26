@@ -97,7 +97,7 @@ Auto-repair Issue 必含中文摘要（問題/原因/修法/風險/建議）。�
 ## AwareWave Stack 伺服器邊界（**不可混用**）
 
 SG `5.223.93.113` / EU `204.168.175.41` — 容器細節見 [`docs/operations/AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md)（拓樸唯一正本）。  
-**搬機 / 上 dedicated / EU→大機·SG→EU 遷移唯一正本**：[`runbooks/EU-STACK-BACKUP-RAID-RESTORE-FOR-DEDICATED-RUNBOOK.md`](../runbooks/EU-STACK-BACKUP-RAID-RESTORE-FOR-DEDICATED-RUNBOOK.md)（備份/RAID/還原/遷移；動機器前必讀 §7 checklist）。  
+**搬機 / 上 dedicated / EU→大機·SG→EU 遷移唯一正本**：[`runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`](../runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md)（備份/RAID/還原/遷移；動機器前必讀 §7 checklist）。  
 ClickHouse 版本鎖定：`25.7.x`，**禁升 latest / 24.x**。  
 Secrets: `scripts/secrets-vault.ps1 -Action get -Name <KEY_NAME>`（輸出 `NAME=遮罩值`，僅供確認存在；實值消費走 `mcp/user-env.ps1` / env）；key names 在 `mcp/user-env.ps1`；**禁止硬編**。
 
@@ -320,7 +320,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | Cloudflare WAF 規則 / scanner 攻擊 / DDoS | `runbooks/CLOUDFLARE-WAF-SETUP.md` |
 | VPS reboot 訊號 + 16h 未處理 | `runbooks/VPS-AUTO-REBOOT-RUNBOOK.md` |
 | 雲端排程報告沒更新 / Telegram 排程警報 / routine source 漂移 / 週報月報 stale | `runbooks/自動排程監控與手機Telegram警報-維護手冊.md` |
-| EU/SG 搬機 / 上 dedicated 主機 / 備份策略 / RAID / 災難還原 / Cloud→Dedicated 遷移 | `runbooks/EU-STACK-BACKUP-RAID-RESTORE-FOR-DEDICATED-RUNBOOK.md` |
+| EU/SG 搬機 / 上 dedicated 主機 / 備份策略 / RAID / 災難還原 / Cloud→Dedicated 遷移 | `runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md` |
 
 MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 

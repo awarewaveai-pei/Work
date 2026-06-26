@@ -1,7 +1,7 @@
 # EU Stack 備份腳本（repo 版控正本）
 
 > 📍 機器拓樸正本見 [`AWAREWAVE_STACK_QUICKREF.md`](../../../agency-os/docs/operations/AWAREWAVE_STACK_QUICKREF.md)。
-> 完整備份/RAID/還原/遷移策略見 [`runbooks/EU-STACK-BACKUP-RAID-RESTORE-FOR-DEDICATED-RUNBOOK.md`](../../../runbooks/EU-STACK-BACKUP-RAID-RESTORE-FOR-DEDICATED-RUNBOOK.md)。
+> 完整備份/RAID/還原/遷移策略見 [`runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`](../../../runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md)。
 
 EU VPS（`204.168.175.41`）每日備份的兩個腳本。本目錄為 **repo 版控正本**；實機部署在 EU `/root/scripts/`。
 

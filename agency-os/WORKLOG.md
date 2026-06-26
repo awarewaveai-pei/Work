@@ -107,7 +107,7 @@
 - **🔴 結構問題**：verify 只驗 integrity 從未真還原；異地 L1 指向 SG → SG 退役即斷（R2 仍在）。
 
 [已修改]
-- `runbooks/EU-STACK-BACKUP-RAID-RESTORE-FOR-DEDICATED-RUNBOOK.md`：§1 改為精確現況（✅ 已備 vs 🔴 漏項 + 補漏 dump 指令含已驗帳號）、§2 改為真實 3-2-1 + SG 退役異地接替方案、§6 擴為**確切還原演練指令**（演練 A PG / B volume / C .env 解密）、§7 checklist 對齊。
+- `runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`：§1 改為精確現況（✅ 已備 vs 🔴 漏項 + 補漏 dump 指令含已驗帳號）、§2 改為真實 3-2-1 + SG 退役異地接替方案、§6 擴為**確切還原演練指令**（演練 A PG / B volume / C .env 解密）、§7 checklist 對齊。
 
 [驗證結果]
 - REALTEST_EVIDENCE: tool=SSH | cmd=`gunzip supabase-all.sql.gz | docker exec drill-pg psql` (拋棄式 postgres:15 還原演練) | exit=0 | **首次還原演練通過**：`public_tables=73`、`organizations=5`、`ops_action_runs=6` → 客戶資料證實可還原；容器 teardown 確認、EU RAM 復原無殘留。同時驗證 runbook §6 指令可用。

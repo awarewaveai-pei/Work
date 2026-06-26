@@ -1,6 +1,6 @@
 # Hetzner 自架堆疊：安裝順序 × 平面 × 連動索引（工程 SSOT）
 
-> ⚠️ **現況真相以 [`AWAREWAVE_STACK_QUICKREF.md`](AWAREWAVE_STACK_QUICKREF.md)（拓樸正本）+ `WORKLOG.md` 為準。** 本檔「專案狀態」表停在 **2026-04-20**，**晚於此的變動未反映**（例：Trigger.dev 已自架於 EU、Supabase EU-only）。本檔現定位 = **安裝順序/連動索引的歷史與設計**，不是現況狀態源。要搬機/上 dedicated → [`runbooks/EU-STACK-BACKUP-RAID-RESTORE-FOR-DEDICATED-RUNBOOK.md`](../../../runbooks/EU-STACK-BACKUP-RAID-RESTORE-FOR-DEDICATED-RUNBOOK.md)。
+> ⚠️ **現況真相以 [`AWAREWAVE_STACK_QUICKREF.md`](AWAREWAVE_STACK_QUICKREF.md)（拓樸正本）+ `WORKLOG.md` 為準。** 本檔「專案狀態」表停在 **2026-04-20**，**晚於此的變動未反映**（例：Trigger.dev 已自架於 EU、Supabase EU-only）。本檔現定位 = **安裝順序/連動索引的歷史與設計**，不是現況狀態源。要搬機/上 dedicated → [`runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`](../../../runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md)。
 >
 > **記性不好？** 你只要書籤 **`hetzner-self-host-start-here.md`**（一張表跳轉全文）；本檔給「改堆疊定義／連動驗收」用。  
 > **Owner（本檔）**：把「第一階段 10 項核心 + 第二階段觀測／儲存 4 項」與 **Data / Execution / Delivery / Control / Infra** 平面的對照、**實裝落點（compose）、與 repo 內 SSOT** 收斂在一處。  
