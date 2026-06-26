@@ -10,7 +10,7 @@ import type { DivinationSystem, InterpretationContext } from '../types';
  * 紫微斗數系統 adapter — 把既有 computeChart 接上統一 DivinationSystem 合約。
  * 這是 F3 的「垂直證明」:現有引擎不重寫,只用 adapter 接縫。
  */
-function toContext(result: ChartResult, locale: Locale): InterpretationContext {
+export function toContext(result: ChartResult, locale: Locale): InterpretationContext {
   const a = result.astrolabe;
   const facts: { label: string; value: string }[] = [
     { label: 'soul', value: String(a.soul) },

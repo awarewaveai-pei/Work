@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import BirthForm from '@/components/BirthForm';
 import ZiweiChart from '@/components/ZiweiChart';
+import AiReading from '@/components/AiReading';
 import { computeChart, type ChartRequest, type ChartResult } from '@/lib/ziwei';
+import { toContext } from '@/lib/divination/systems/ziwei';
 import type { Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
@@ -42,6 +44,7 @@ export default function ZiweiTool({
         <section className="mt-8">
           <hr className="star-divider" />
           <ZiweiChart result={result} dict={dict} />
+          <AiReading context={toContext(result, locale)} ai={dict.ai} />
         </section>
       ) : null}
     </>

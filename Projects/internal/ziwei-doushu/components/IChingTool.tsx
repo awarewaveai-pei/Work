@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import AiReading from '@/components/AiReading';
 import { castHexagram, type IChingResult, type Hexagram } from '@/lib/iching';
+import { toContext } from '@/lib/divination/systems/iching';
 import type { Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
@@ -45,7 +47,6 @@ function HexView({ h, label, hexagramNo }: { h: Hexagram; label: string; hexagra
 }
 
 export default function IChingTool({ dict, locale }: { dict: Dictionary; locale: Locale }) {
-  void locale;
   const [question, setQuestion] = useState('');
   const [result, setResult] = useState<IChingResult | null>(null);
   const t = dict.iching;
@@ -102,6 +103,7 @@ export default function IChingTool({ dict, locale }: { dict: Dictionary; locale:
               ? result.movingLines.map((i) => i + 1).join('、')
               : t.noMoving}
           </p>
+          <AiReading context={toContext(result, locale)} ai={dict.ai} />
         </section>
       ) : null}
     </>

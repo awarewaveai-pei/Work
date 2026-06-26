@@ -1,1 +1,0 @@
-self.__SSG_MANIFEST=new Set(["\u002F[lang]","\u002F[lang]\u002Fbazi","\u002F[lang]\u002Fdaily","\u002F[lang]\u002Fiching","\u002F[lang]\u002Ftarot","\u002F[lang]\u002Fziwei"]);self.__SSG_MANIFEST_CB&&self.__SSG_MANIFEST_CB()

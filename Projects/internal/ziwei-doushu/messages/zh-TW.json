@@ -109,5 +109,11 @@
   },
   "errors": {
     "computeFailed": "排盤失敗,請檢查輸入"
+  },
+  "ai": {
+    "interpret": "AI 解讀",
+    "interpreting": "解讀中…",
+    "error": "解讀失敗,請稍後再試",
+    "disclaimer": "※ AI 解讀僅供參考與娛樂。"
   }
 }

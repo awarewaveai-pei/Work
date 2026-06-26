@@ -553,9 +553,6 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
       {/* ── Generate tab ── */}
       {studioTab === "generate" && (
         <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* 費用+生成按鈕固定排在設定表單後方，避免桌機版側欄 sticky 卡在頁面中段。 */}
-          <style>{`.vs-config-cta{position:static !important}`}</style>
-
           {/* Hint banner — full width */}
           {providedScenes.length > 0 ? (
             <div style={{ background: "var(--intake-success-bg)", border: "1px solid var(--green)", borderRadius: 8, padding: "10px 12px", fontSize: 12.5, color: "var(--badge-green-text)", lineHeight: 1.6 }}>
@@ -603,10 +600,10 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
 
           {/* ── Phase: idle / config — single-column layout ── */}
           {!draftReady && !isLoading && genStatus !== "done" && (
-          <div className="vs-config-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 24, alignItems: "start" }}>
+          <div style={videoConfigStackStyle}>
 
-            {/* LEFT ── form cards */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Form cards */}
+            <div style={videoConfigFieldsStyle}>
 
             {/* ① 輸入內容 */}
             <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 12, overflow: "hidden" }}>
@@ -875,10 +872,10 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
                   )}
                 </div>
               )}
-            </div>{/* end LEFT column */}
+            </div>{/* end form cards */}
 
-            {/* BOTTOM ── cost + CTA */}
-            <div className="vs-config-cta" style={{ display: "flex", flexDirection: "column", gap: 12, width: "min(100%, 420px)", justifySelf: "center" }}>
+            {/* Cost + CTA */}
+            <div style={videoConfigCtaStyle}>
 
               {/* ③ 費用預覽 card */}
               <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 12, overflow: "hidden" }}>
@@ -938,7 +935,7 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
                 ))}
               </div>
 
-            </div>{/* end BOTTOM cost + CTA */}
+            </div>{/* end cost + CTA */}
 
           </div>)}{/* end config grid + idle condition */}
 
@@ -1493,6 +1490,29 @@ function KnobRow({ label, hint, min, max, step, value, onChange }: {
 // ─── Shared styles ─────────────────────────────────────────────────────────────
 
 const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" };
+
+const videoConfigStackStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 16,
+  width: "100%",
+  maxWidth: 960,
+  margin: "0 auto",
+};
+
+const videoConfigFieldsStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 16,
+  width: "100%",
+};
+
+const videoConfigCtaStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 12,
+  width: "100%",
+};
 
 const inputStyle: React.CSSProperties = {
   padding: "8px 10px", borderRadius: 8,

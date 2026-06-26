@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import AiReading from '@/components/AiReading';
 import { drawSpread, type TarotResult, type SpreadId } from '@/lib/tarot';
+import { toContext } from '@/lib/divination/systems/tarot';
 import type { Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
@@ -77,6 +79,7 @@ export default function TarotTool({ dict, locale }: { dict: Dictionary; locale: 
               </div>
             ))}
           </div>
+          <AiReading context={toContext(result, locale)} ai={dict.ai} />
         </section>
       ) : null}
     </>

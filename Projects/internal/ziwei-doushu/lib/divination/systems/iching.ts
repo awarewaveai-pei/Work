@@ -8,7 +8,7 @@ export interface IChingInput {
   rng?: () => number;
 }
 
-function toContext(r: IChingResult, locale: Locale): InterpretationContext {
+export function toContext(r: IChingResult, locale: Locale): InterpretationContext {
   const facts: { label: string; value: string }[] = [
     { label: 'question', value: r.question },
     { label: 'primary', value: `${r.primary.name}(第${r.primary.number}卦)` },

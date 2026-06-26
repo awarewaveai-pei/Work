@@ -13,7 +13,7 @@ function orient(reversed: boolean, locale: Locale): string {
   return reversed ? '逆位' : '正位';
 }
 
-function toContext(r: TarotResult, locale: Locale): InterpretationContext {
+export function toContext(r: TarotResult, locale: Locale): InterpretationContext {
   const facts = r.cards.map((d, i) => ({
     label: `card${i + 1}`,
     value: `${d.card.name[locale]}(${orient(d.reversed, locale)})`,

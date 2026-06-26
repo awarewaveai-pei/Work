@@ -2,7 +2,7 @@ import { computeBazi, type BaziRequest, type BaziResult } from '@/lib/bazi';
 import type { Locale } from '@/lib/i18n/config';
 import type { DivinationSystem, InterpretationContext } from '../types';
 
-function toContext(r: BaziResult, locale: Locale): InterpretationContext {
+export function toContext(r: BaziResult, locale: Locale): InterpretationContext {
   const p = r.pillars;
   const facts: { label: string; value: string }[] = [
     { label: 'dayMaster', value: r.dayMaster },

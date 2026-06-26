@@ -91,6 +91,12 @@
       "namedRegex": "^/api/health(?:/)?$"
     },
     {
+      "page": "/api/interpret",
+      "regex": "^/api/interpret(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/interpret(?:/)?$"
+    },
+    {
       "page": "/favicon.ico",
       "regex": "^/favicon\\.ico(?:/)?$",
       "routeKeys": {},

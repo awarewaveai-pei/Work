@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import BirthForm from '@/components/BirthForm';
+import AiReading from '@/components/AiReading';
 import { computeBazi, type BaziResult } from '@/lib/bazi';
+import { toContext } from '@/lib/divination/systems/bazi';
 import type { ChartRequest } from '@/lib/ziwei';
 import type { Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
@@ -110,6 +112,8 @@ export default function BaziTool({ dict, locale }: { dict: Dictionary; locale: L
               {result.correction.correctionMinutes} {dict.chart.minutesUnit}
             </p>
           ) : null}
+
+          <AiReading context={toContext(result, locale)} ai={dict.ai} />
         </section>
       ) : null}
     </>
