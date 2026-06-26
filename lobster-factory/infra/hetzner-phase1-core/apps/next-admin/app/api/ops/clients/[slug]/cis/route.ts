@@ -9,12 +9,17 @@ import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import type { ClientConfig } from "@/app/api/ops/clients/route";
 
+// Length caps: these free-text fields get injected verbatim into the AI system prompt (lib/cs/cis.ts),
+// so bound them to avoid an admin bloating the prompt / JSONB row.
 function str(v: unknown): string | undefined {
-  return typeof v === "string" && v.trim() ? v.trim() : undefined;
+  return typeof v === "string" && v.trim() ? v.trim().slice(0, 2000) : undefined;
 }
 function strArray(v: unknown): string[] | undefined {
   if (!Array.isArray(v)) return undefined;
-  const out = v.filter((x): x is string => typeof x === "string" && x.trim().length > 0).map((x) => x.trim());
+  const out = v
+    .filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+    .map((x) => x.trim().slice(0, 500))
+    .slice(0, 20);
   return out.length ? out : undefined;
 }
 function pick<T extends Record<string, unknown>>(obj: T, keys: string[]): Record<string, unknown> | undefined {
@@ -98,8 +103,17 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
     if (brandKit) clientConfig.brandKit = brandKit;
     else delete clientConfig.brandKit;
   }
+  // csVoice: the form owns a SUBSET of keys; preserve keys it doesn't own (e.g. brandVoice synced
+  // from the content engine, apologyStyle/slogan) so an admin save can't silently clobber them.
   if ("csVoice" in body) {
-    if (csVoice) clientConfig.csVoice = csVoice;
+    const CS_FORM_KEYS = ["personaName", "languages", "formality", "honorifics", "emojiPolicy",
+      "greeting", "signoff", "refusalStyle", "escalationTone", "servicePrinciples", "mission"];
+    const existing = (clientConfig.csVoice && typeof clientConfig.csVoice === "object"
+      ? { ...(clientConfig.csVoice as Record<string, unknown>) }
+      : {}) as Record<string, unknown>;
+    for (const k of CS_FORM_KEYS) delete existing[k]; // form is authoritative for its own keys (incl. clearing)
+    const merged = { ...existing, ...(csVoice ?? {}) };
+    if (Object.keys(merged).length) clientConfig.csVoice = merged;
     else delete clientConfig.csVoice;
   }
 

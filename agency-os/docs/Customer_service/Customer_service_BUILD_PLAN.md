@@ -64,8 +64,8 @@ per-client hub  /ops/clients/[slug]   （既有 7 tab：內容工具/整合/佈�
 |---|---|---|---|---|---|
 | **U0** | **資料地基** migration 0051（8 表 + pgvector + RLS + RPC）| 💻 EU prod Supabase | — | 全 Phase 地基 | ✅ **建好+apply+live 驗證**（8表/8RLS/8policy/RPC/pgvector）|
 | **U1** | **cs-engine 核心** `lib/cs/`（webhook→護欄→分類→RAG→生成→supervisor→送/動作/轉）| 💻 next-admin | U0 | P1–P4 | ✅ **建好+驗證**（13 檔+測試；tsc 0 / vitest 35 / critic 修訖）|
-| **U2** | **CIS 配置 + tab**（brandKit+csVoice JSONB + 「品牌識別」tab，重用 brandColors/BrandVoiceProfile）| 💻 next-admin UI | — | P1 | ⏭ 下一個（可見）|
-| **U3** | **客服 tab + 頂層「客服」section**（per-client config + 跨客戶營運中心）| 💻 next-admin UI | U0,U1 | P1–P2 | ⏳ |
+| **U2** | **CIS 配置 + tab**（brandKit+csVoice JSONB + 「品牌識別」tab，重用 brandColors/BrandVoiceProfile）| 💻 next-admin UI | — | P1 | ✅ **建好+驗證**（tab+cis route；tsc 0 / critic 0C0M）|
+| **U3** | **客服 tab + 頂層「客服」section**（per-client config + 跨客戶營運中心）| 💻 next-admin UI | U0,U1 | P1–P2 | ⏭ 下一個 |
 | **U4** | **headless widget**（Client API+WS+清新自然+互動類型）| 💻 next-admin embed | U1,U6 | P1 | ⏳ |
 | **U5** | **eval/護欄 harness**（RAGAS+DeepEval+Phoenix+golden set+CI gate+simulation）| 💻 自架現有機 | U1 | P2 | ⏳ |
 | **U6** | **Chatwoot 載體**（docker-compose Community + healthcheck/smoke/rollback）| 📦 EU 現可緊跑/本機測 → **搬大機** | — | P1 | ⛔（deploy gated）|
@@ -110,6 +110,12 @@ per-client hub  /ops/clients/[slug]   （既有 7 tab：內容工具/整合/佈�
 - **BUGHUNT**：`grep cs_match_chunks/cs_knowledge_chunks/handleInbound` 跨 `lobster-factory agency-os scripts` → 單一存取點（db.ts+migration）、無重複模組、無外部 stale caller。`- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=cs_match_chunks|handleInbound | hits=單一存取點確認`
 - **待 / 已知 seam**（非 bug，後續單元）：① agentic auto-send 的 grounding 目前看 chunks 非 tool 輸出 → 工具型答案會退 handoff（fail-safe；Phase 3 接業務系統時補）② `parseJsonObject` greedy（退 fail-safe，可靠性 nit）③ `withinBusinessHours` 欄位留給交接/通知層（AI 24h 回，非決策）。
 - 待：apply U0 + 接 Chatwoot AgentBot webhook route（U3/U6）才能 live 端到端。
+
+**2026-06-26 — U2 CIS「品牌識別」tab ✅**
+- 建：`app/api/ops/clients/[slug]/cis/route.ts`（PATCH，brandKit+csVoice 進 client_config JSONB，鏡像 brand-colors：canWriteTenantConfig + ops_audit_events）+ `ClientHubTabs.tsx` 加 `BrandIdentityTab`（BrandColorsCard 重用 + BrandKitCard logo/字/圖形 + CsVoiceCard 人格/語氣/emoji/敬語）+ `CisText/CisSelect` helper + wire TABS「品牌識別」+ render；`ClientConfig` 加 brandKit/csVoice 型別；品牌色從「設定」tab 移出（consolidation）。
+- **REALTEST**：`tsc --noEmit` = **0 錯**；vitest 35/35（型別改動無破壞）。`- REALTEST_EVIDENCE: tool=Bash | cmd=tsc --noEmit && vitest run lib/cs | exit=0` ｜ live UI/route smoke 待 app 跑起（dev server / deploy）。
+- **REVIEW**：critic → **0 Critical / 0 Major**（auth 閘、slug→org 多租戶、prototype-pollution、merge 保留全乾淨）+ 2 Minor → **修**（csVoice 改保留外部 key 不清 brandVoice/apologyStyle/slogan；free-text 加長度上限防 prompt 膨脹）。`- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/2minor修`
+- **BUGHUNT**：grep「品牌識別」wired / BrandColorsCard 單一 render / cis route 被呼叫 / brandKit·csVoice 跨 6 檔一致。`- BUGHUNT_DONE: scope=lobster-factory | grep=brandKit|csVoice|品牌識別 | hits=一致`
 
 ---
 

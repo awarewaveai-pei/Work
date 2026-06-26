@@ -55,6 +55,8 @@ const TRENDING_CATEGORIES = [
 ];
 
 const TRANSFORM_MODEL: StudioModel = "flux-kontext-dev";
+const CULTURE_STORAGE_PREFIX = "studio_culture_v2";
+const TRENDING_STORAGE_KEY = "studio_trending_v2";
 
 // Fixed seed so the edge-style preview thumbnails match what `applyEdge` actually composites.
 const EDGE_APPLY_SEED = 7;
@@ -68,6 +70,93 @@ interface ModelResult {
 }
 
 type RefMode = "none" | "ref" | "transform";
+
+function cultureRuntimeKey(regionEn: string, lensKey: string): string {
+  return `${regionEn}|${lensKey}`;
+}
+
+function cultureStorageKey(regionEn: string, lensKey: string): string {
+  return `${CULTURE_STORAGE_PREFIX}_${encodeURIComponent(regionEn)}_${encodeURIComponent(lensKey)}`;
+}
+
+function coerceCultureItems(value: unknown): CultureItem[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((it): it is Record<string, unknown> => typeof it === "object" && it !== null)
+    .map((it) => ({
+      zh: typeof it.zh === "string" ? it.zh.trim() : "",
+      en: typeof it.en === "string" ? it.en.trim() : "",
+      desc: typeof it.desc === "string" ? it.desc.trim() : "",
+    }))
+    .filter((it) => it.zh && it.en)
+    .slice(0, 12);
+}
+
+function readStoredCulture(regionEn: string, lensKey: string): CultureItem[] | null {
+  try {
+    const raw = localStorage.getItem(cultureStorageKey(regionEn, lensKey));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { items?: unknown };
+    const items = coerceCultureItems(parsed.items);
+    return items.length ? items : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeCulture(regionEn: string, lensKey: string, items: CultureItem[]): void {
+  try {
+    localStorage.setItem(
+      cultureStorageKey(regionEn, lensKey),
+      JSON.stringify({ savedAt: new Date().toISOString(), items }),
+    );
+  } catch {
+    // Ignore quota/private-mode failures; the in-memory result still renders.
+  }
+}
+
+function coerceTopics(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((topic): topic is string => typeof topic === "string")
+    .map((topic) => topic.trim())
+    .filter(Boolean)
+    .slice(0, 10);
+}
+
+function coerceTopicsByCategory(value: unknown): Record<string, string[]> {
+  if (!value || typeof value !== "object") return {};
+  const source = value as Record<string, unknown>;
+  const topicsByCategory: Record<string, string[]> = {};
+  for (const cat of TRENDING_CATEGORIES) {
+    const topics = coerceTopics(source[cat.value]);
+    if (topics.length > 0) topicsByCategory[cat.value] = topics;
+  }
+  return topicsByCategory;
+}
+
+function readStoredTrending(): Record<string, string[]> | null {
+  try {
+    const raw = localStorage.getItem(TRENDING_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { topics?: unknown };
+    const topics = coerceTopicsByCategory(parsed.topics);
+    return Object.keys(topics).length ? topics : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeTrending(topics: Record<string, string[]>): void {
+  try {
+    localStorage.setItem(
+      TRENDING_STORAGE_KEY,
+      JSON.stringify({ savedAt: new Date().toISOString(), topics }),
+    );
+  } catch {
+    // Ignore quota/private-mode failures; the in-memory result still renders.
+  }
+}
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -356,10 +445,9 @@ export default function StudioWorkbench() {
   }, []);
 
   // Fetch 12 specific authentic items for the current region×lens via the LLM.
-  // Cached per (regionEn|lensKey) for the session — re-clicking is a no-op.
+  // The result persists locally and is replaced only when the operator clicks again.
   const fetchCulture = useCallback(async (regionEn: string, lensKey: string) => {
-    const key = `${regionEn}|${lensKey}`;
-    if (cultureDyn[key]) return;
+    const key = cultureRuntimeKey(regionEn, lensKey);
     setCultureFetching((p) => ({ ...p, [key]: true }));
     try {
       const res = await fetch("/api/tools/studio/culture", {
@@ -368,12 +456,14 @@ export default function StudioWorkbench() {
         body: JSON.stringify({ region: regionEn, lens: lensKey }),
       });
       const json = (await res.json()) as { ok: boolean; items?: CultureItem[] };
-      if (json.ok && json.items?.length) {
-        setCultureDyn((prev) => ({ ...prev, [key]: json.items! }));
+      const items = coerceCultureItems(json.items);
+      if (json.ok && items.length) {
+        setCultureDyn((prev) => ({ ...prev, [key]: items }));
+        storeCulture(regionEn, lensKey, items);
       }
     } catch { /* keep fallback chips */ }
     setCultureFetching((p) => { const n = { ...p }; delete n[key]; return n; });
-  }, [cultureDyn]);
+  }, []);
 
   // 🎲 文化混搭骰 — random 2 cultures × 1 lens, auto-fetch both → forced serendipity.
   // Math.random is fine here (browser/client code; the no-random rule is for workflow scripts).
@@ -395,21 +485,9 @@ export default function StudioWorkbench() {
   }, [fetchCulture]);
 
   const fetchAllTrending = useCallback(async () => {
-    const today = new Date().toISOString().slice(0, 10);
-    // Load whatever is already cached today
-    const fromCache: Record<string, string[]> = {};
-    const missing: typeof TRENDING_CATEGORIES = [];
-    for (const cat of TRENDING_CATEGORIES) {
-      try {
-        const val = localStorage.getItem(`studio_trending_v1_${cat.value}_${today}`);
-        if (val) { fromCache[cat.value] = JSON.parse(val) as string[]; }
-        else { missing.push(cat); }
-      } catch { missing.push(cat); }
-    }
-    setAllTopics((prev) => ({ ...prev, ...fromCache }));
-    if (missing.length === 0) return;
     setTrendingFetching(true);
-    await Promise.allSettled(missing.map(async (cat) => {
+    const nextTopics: Record<string, string[]> = {};
+    await Promise.allSettled(TRENDING_CATEGORIES.map(async (cat) => {
       try {
         const res = await fetch("/api/tools/studio/trending", {
           method: "POST",
@@ -417,27 +495,30 @@ export default function StudioWorkbench() {
           body: JSON.stringify({ category: cat.value }),
         });
         const json = (await res.json()) as { ok: boolean; topics?: string[] };
-        if (json.ok && json.topics?.length) {
-          try { localStorage.setItem(`studio_trending_v1_${cat.value}_${today}`, JSON.stringify(json.topics)); } catch { /* quota */ }
-          setAllTopics((prev) => ({ ...prev, [cat.value]: json.topics! }));
-        }
+        const topics = coerceTopics(json.topics);
+        if (json.ok && topics.length) nextTopics[cat.value] = topics;
       } catch { /* skip this category */ }
     }));
+    if (Object.keys(nextTopics).length > 0) {
+      setAllTopics(nextTopics);
+      storeTrending(nextTopics);
+    }
     setTrendingFetching(false);
   }, []);
 
-  // On mount: restore today's cache without any API call
+  // On mount: restore the last clicked trend set without any API call.
   useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const fromCache: Record<string, string[]> = {};
-    for (const cat of TRENDING_CATEGORIES) {
-      try {
-        const val = localStorage.getItem(`studio_trending_v1_${cat.value}_${today}`);
-        if (val) fromCache[cat.value] = JSON.parse(val) as string[];
-      } catch { /* ignore */ }
-    }
-    if (Object.keys(fromCache).length > 0) setAllTopics(fromCache);
+    const stored = readStoredTrending();
+    if (stored) setAllTopics(stored);
   }, []);
+
+  // When a saved culture×lens pair is selected again, show it without spending tokens.
+  useEffect(() => {
+    if (!region) return;
+    const key = cultureRuntimeKey(region.en, cultureLens);
+    const stored = readStoredCulture(region.en, cultureLens);
+    if (stored) setCultureDyn((prev) => (prev[key] ? prev : { ...prev, [key]: stored }));
+  }, [region, cultureLens]);
 
   const onUploadRefs = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
