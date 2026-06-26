@@ -13,7 +13,15 @@
 # Log:  /var/log/eu-backup.log
 set -euo pipefail
 
+# set -a exports every sourced var so CHILD processes can read them:
+#   - upload-to-r2.sh (child script) needs R2_API_TOKEN/R2_* in its environment
+#   - openssl -pass env:BACKUP_ENC_KEY reads the process environment
+# Root cause of silent R2 WARN since 2026-05: /etc/default/eu-backup uses plain
+# assignments (no `export`), so `source` set them as shell vars only — children
+# couldn't see them. Fixed 2026-06-26 (verified R2 upload 10/10 files HTTP 200).
+set -a
 [[ -f /etc/default/eu-backup ]] && source /etc/default/eu-backup
+set +a
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
 DATE="$(date +%Y-%m-%d)"
