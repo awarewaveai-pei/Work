@@ -4,6 +4,27 @@
 
 ## 2026-06-26
 
+### fix(canvas): Canvas 編輯底圖跨來源載入失敗（My Designs handoff）
+
+[任務理解] app.aware-wave.com/tools/designs 點「Canvas 編輯」→「底圖載入失敗（可能是跨來源限制）」。非偶發 CORS — 結構性：gallery 把跨來源 R2 public URL 交給只支援 data URL 假設的 CanvasEditor。
+
+[現況分析] `DesignsGallery.tsx:1294` `openInCanvas(asset.object_url!)` 傳 `pub-*.r2.dev` 跨來源 URL → sessionStorage → `CanvasEditor.tsx:256` `fromURL(source,{crossOrigin:"anonymous"})`；R2 public bucket 無 CORS header → 瀏覽器擋 → reject → catch line 283。**解法已存在**：同檔 edge-mask 編輯器(`DesignsGallery.tsx:500`)走同源 proxy `/api/tools/studio/proxy-image`。5 個 openInCanvas caller 僅 gallery 傳遠端 URL，餘皆 data URL。
+
+[已修改]
+- `components/tools/canvas-handoff.ts`(改)：加 `toCanvasSrc(raw)` — http(s) 遠端 URL → proxy；data:/blob:/相對原樣。
+- `app/tools/canvas/CanvasEditor.tsx`(改)：載入處過 `toCanvasSrc`（choke point，全 caller 自動覆蓋）；catch 加 `console.warn` 真錯。
+- `app/api/tools/studio/proxy-image/route.ts`(改)：SSRF allowlist bare `startsWith(base+"/")` → 硬化 `isDesignsAsset()`（host-exact，與 publish/print-file 同 posture；critic 確認舊版不可 exploit 但移除整個 bypass class）。
+
+[驗證結果](R0 四動作)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsx -e import(canvas-handoff).toCanvasSrc(6 cases)` | exit=0（6/6）；另 `node` 邏輯重跑 5/5 PASS（R2 URL 空格+`+` → `%20`/`%2B` 正確 encode、data/blob/相對/空字串原樣）；`npx tsc --noEmit` exit=0（3 檔）。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/2n — Nn 皆 pre-existing（其一即 proxy SSRF 硬化，已順手收斂）。確認 (a)encodeURIComponent 對 `?&+`/CJK 正確、(b)同源 proxy 配 crossOrigin:"anonymous" 無害、(c)無漏其他 remote handoff、(d)allowlist 不可繞。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`toCanvasSrc`,`startsWith\(base \+ "/"\)`,`底圖載入失敗` | hits=0 stale — `toCanvasSrc` 僅 CanvasEditor:259 使用；剩餘 bare-startsWith 兩處(`r2.ts:59`/`image-gen.ts:331`)皆在已硬化 guard 內(後接 host 檢查)，非 proxy 破口。
+- BUGHUNT_SCOPE_NARROW: N/A（含 agency-os + scripts + lobster-factory）。
+
+[剩餘風險] 修正僅本機 commit，**尚未部署**；app.aware-wave.com 需 sg-deploy 才生效。proxy 需 `POD_DESIGNS_ENABLED=true`（gallery 同條件，一致）。
+
+[rollback] `git revert`；三檔改動皆可逆、無 schema/DB/migration。
+
 ### feat(oracle): Phase C — 八字喜用神 + 格局(扶抑取用法)
 
 [任務理解] ROADMAP「最核心商業化功能」=八字喜用神。純演算法、無憑證,且直接讓八字 AI 解讀大幅變值錢(facts 多了喜用神/格局/身強弱)。
