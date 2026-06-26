@@ -4,6 +4,21 @@
 
 ## 2026-06-26
 
+### fix(ao-close): report retention fully aligned to 90 days — Codex 2026-06-26 09:39
+
+[任務理解] 使用者指出 AO-CLOSE 刪除 `>30 days` 舊 report 與既有 90 天保留期不一致，並要求「全部處理好，該改的地方都要改到」。
+
+[已修改]
+- `cba741aa fix(ao-close): use 90-day report retention`：恢復被 30 天規則誤刪的 `agency-os/reports/ao-close/2026-05-25-1837.md`；把 `.claude/commands/ao-close.md` prune rule 與 `scripts/ao-close.ps1` prior-close guard 改為 90 天。
+- `625e6442 fix(ao): align report retention docs to 90 days`：補齊仍寫 30 天的現行入口：`agency-os/reports/ao-close/README.md`、`agency-os/reports/ao-resume/README.md`、`agency-os/README.md` 的 archive 範例，以及 `scripts/archive-old-reports.ps1` 預設 `KeepDays`。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`Parser::ParseFile` on `scripts/archive-old-reports.ps1` + `scripts/ao-close.ps1` | exit=0 | both parse OK.
+- BUGHUNT_DONE: scope=current AO retention authorities | grep=`Retention**: 30 days|Prune old reports (>30 days)|KeepDays 30|KeepDays = 30|AddDays(-29)|past 30d prune` | result=0 matches in `.claude/commands/ao-close.md`, `.claude/commands/ao-resume.md`, `scripts/ao-close.ps1`, `scripts/archive-old-reports.ps1`, `agency-os/README.md`, AO-CLOSE/AO-RESUME report README, and current 2026-06-26 AO-CLOSE report.
+
+[剩餘風險] `WORKLOG`、舊 AO-CLOSE reports、`.claude/file-history`、`.claude/bash-commands.log`、cache 內仍可能出現「30 days」字樣；這些是歷史快照或工具記錄，未改寫過去紀錄。
+[rollback] 若要回復政策，依序 `git revert 625e6442 cba741aa`；目前不建議，因 90 天為現行保留期。
+
 ### Closeout inbox (AO-CLOSE auto) — Codex 2026-06-26 09:22
 
 [任務理解] 使用者要求先處理未提交狀態、push main、再跑 AO-CLOSE。
@@ -13804,7 +13819,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-26 01:28:23 UTC_
+_Last synced: 2026-06-26 01:40:18 UTC_
 
 ## 2026-06-16 AO-CLOSE prep — 15:xx session close
 
@@ -14990,5 +15005,6 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~15000
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/2n (all fixed before commit)
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=prefillAppliedRef|ScriptRemotionPrefill|RemotionBridge|introEnabled | hits=0 (intro fields remain optional in API routes — no stale callers)
+
 
 

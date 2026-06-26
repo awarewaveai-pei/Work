@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-26 09:28:29
+- Generated: 2026-06-26 09:42:45
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -225,15 +225,17 @@
 ## Done today
 - Committed and pushed the pre-existing AO routine status artifacts as `7a2c506c chore(status): refresh AO routine reports`.
 - Ran AO-CLOSE through fetch safety, build gates, health, system guard, and integrated-status generation. Gate evidence: `verify-build-gates` PASS; health `100% (372/372)`; system guard PASS.
+- Corrected AO report retention back to 90 days after the stale `>30 days` prune surfaced: `cba741aa` restored the 2026-05-25 AO-CLOSE report and updated AO-CLOSE prune/guard logic; `625e6442` aligned the AO-CLOSE/AO-RESUME README files, general archive examples, and `archive-old-reports.ps1` default.
 
 ## Current state
-- `main` was pushed to `origin/main` before AO-CLOSE. AO-CLOSE generated governance/status sync changes are staged for the final closeout commit.
+- `main` is pushed and aligned with `origin/main` through `625e6442`.
+- Active AO retention authorities now use 90 days. Authoritative grep found no remaining stale 30-day retention matches in the AO-CLOSE/AO-RESUME command files, guard script, generic archive script, report README files, agency README examples, or the current AO-CLOSE report.
 - Current reports: `reports/health/health-20260626-092156.md`, `reports/guard/guard-20260626-092201.md`, `reports/status/integrated-status-20260626-092210.md`.
 - Stale `ALERT_REQUIRED.txt` was cleared because System Guard is now PASS.
 
 ## Next steps
-- Rerun AO-CLOSE strict after this evidence update so it can commit and push the generated sync.
-- After a successful AO-CLOSE sync commit, overwrite the generated archive skeleton with the final four-section AO-CLOSE report and prune old AO-CLOSE reports if required.
+- Rerun AO-CLOSE strict after this evidence update so it can commit and push the final governance sync.
+- After a successful AO-CLOSE sync commit, overwrite the generated archive skeleton with the final four-section AO-CLOSE report and prune only AO-CLOSE reports older than 90 days if required.
 
 ## Open tasks (auto-generated at 08:00 TPE)
 - [ ] **【未開始｜Phase 1 MVP】Cold Outreach Workbench — 冷開發完整鏈**（T1–T12 ungated 全完成；唯一剩 T10 Gmail per-org OAuth = gated High-risk）
@@ -293,7 +295,7 @@ cron value + comment only, no logic change. `*/10` standard valid cron. Acknowle
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-06-26 09:22:01`
+- Time: `2026-06-26 09:42:37`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -303,14 +305,13 @@ cron value + comment only, no logic change. `*/10` standard valid cron. Acknowle
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260626-092156.md`
-- Closeout: `reports/closeout/closeout-20260626-092200.md`
+- Health: `reports/health/health-20260626-094233.md`
+- Closeout: `reports/closeout/closeout-20260626-094237.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-## 2026-06-16
 
 ### Machine appendix (monthly-system-review)
 - 2026-06-16 21:37:04 : gates=SKIPPED (ReportOnly) ; integrated-status: generate-integrated-status-report.ps1 OK ; supabase-memory: PASS (supabase-studio memory at 36.76% (< 85%))
@@ -368,5 +369,6 @@ cron value + comment only, no logic change. `*/10` standard valid cron. Acknowle
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~15000
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/2n (all fixed before commit)
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=prefillAppliedRef|ScriptRemotionPrefill|RemotionBridge|introEnabled | hits=0 (intro fields remain optional in API routes — no stale callers)
+
 
 

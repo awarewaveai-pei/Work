@@ -3,6 +3,8 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-06-26 (AO-CLOSE retention correction)** — 使用者抓到 AO-CLOSE 仍有 `>30 days` report prune 與既有 90 天保留期不一致。已完成兩段修正並 push：`cba741aa` 把 AO-CLOSE command/prior-close guard 改回 90 天並恢復 `reports/ao-close/2026-05-25-1837.md`；`625e6442` 補齊 AO-CLOSE/AO-RESUME report README、`agency-os/README.md` archive 範例與 `scripts/archive-old-reports.ps1` 預設 `KeepDays=90`。驗證：相關 PowerShell 腳本 parse OK，current AO retention authoritative grep 對 stale 30-day tokens 為 0 matches；歷史 WORKLOG/report/log/cache 不回寫。
+
 - **2026-06-24 (AO-CLOSE #2, CanvasEditor 匯出移右側工具欄)** — 窗：本 Claude Code session（2026-06-24 上午）。使用者要求：① PNG下載/WebP下載/存入 My Designs 全部移到右側工具欄；② PNG 不再顯示尺寸標籤。**已完成**：CanvasEditor.tsx — 頂部工具列移除 editName input + 3 顆按鈕；右側工具欄新增 SidebarPanel id="export" title="💾 匯出 / 下載" 作為第一個 Panel；移除死狀態 exportPxLabel + setExportPxLabel（state 宣告 + 2 call sites）；修 stale comment；修 WebP tooltip 150KB→200KB 對齊實際壓縮目標。**驗證**：tsc 0 + vitest 487/487 + critic Deep 0C/0M（2 minor 已修）+ BUGHUNT hits=4（全 doc 歷史紀錄，無程式碼 callsite）。**部署**：SG commit `c8d9d34f`，healthy 6s，smoke 4/4，playwright 26/32（6 skip = auth-gated 正常）。Canvas 整輪瀏覽器實測仍待操作者。
 
 - **2026-06-24 (AO-CLOSE, UI bug fixes + SG deploy)** — 窗：本 Claude Code session（2026-06-24 凌晨）。三個 TarotStudio/CanvasEditor 介面問題修復並部署 SG。(1) **OutputTrackBar 按鍵重整**：新增 `PNG下載`（直接 triggerDownload）+ 將「🌐 網頁用 WebP」改名 `WebP下載`；JSX 重組為兩列（下載列 / 印刷+快速編輯列）；加 `hideQuickEdit?: boolean` prop（`OutputTrackBar.tsx`）。(2) **TarotStudio 快速編輯上移**：加 `buildSemanticBase`/`openInCanvas` imports；OutputTrackBar 傳 `hideQuickEdit`；在 `ImageEditPromptPanel` 正上方加獨立全寬快速編輯按鈕（`TarotStudio.tsx`）。(3) **CanvasEditor 橫向滑桿修復**：`applyCanvasSize` `MAX_DISP` 從硬編 1100 改為動態 `containerWidth`；加 `ResizeObserver` effect 追蹤容器寬；加 `sizedByCanvasApply` ref 守衛初始 image load，防 resize re-apply 破壞初始構圖（`CanvasEditor.tsx`）。**驗證**：tsc 0 errors + vitest 487/487 pass + critic Deep 0C/0M + BUGHUNT hits=0；SG deploy `36fcfd6a` healthy + smoke 26/32 pass（6 skip = auth-gated 正常）。**commit**: `fd8e088b`（code）+ `45d3b650`（WORKLOG）。**剩餘**：init-load `maxDisplay=650` 硬編 minor（純 UX 不影響 export），可後補。Canvas 編輯器整輪瀏覽器實測仍待操作者完成。
@@ -504,7 +506,7 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-06-26 01:28:23 UTC_
+_Last synced: 2026-06-26 01:40:18 UTC_
 
 ## 2026-06-16 AO-CLOSE memory — session window 2026-06-11T05:07Z → 2026-06-16 afternoon
 
@@ -545,6 +547,7 @@ _Last synced: 2026-06-26 01:28:23 UTC_
 - User asked to handle uncommitted work, push, then run AO-CLOSE. The initial dirty tree was generated AO status output only: latest auto-reboot, backup-health, cf-security, routine-freshness, smoke JSON, plus `backup-health-20260626-091634.md`. It was committed and pushed as `7a2c506c chore(status): refresh AO routine reports`.
 - AO-CLOSE needed a repo-local `XDG_CONFIG_HOME` to avoid the unreadable Windows global git ignore warning from turning into a PowerShell NativeCommandError. The fetch step also needed the approved outside-sandbox run because `.git/FETCH_HEAD` was permission-denied in the sandbox.
 - AO-CLOSE verify chain reached strict completeness with build gates PASS, health `100% (372/372)`, system guard PASS, integrated status refreshed, and stale `ALERT_REQUIRED.txt` removed. The remaining action is the generated AO-CLOSE sync commit/push plus final archive report overwrite.
+
 
 
 
