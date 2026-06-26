@@ -4,6 +4,31 @@
 
 ## 2026-06-26
 
+### feat(oracle): Phase A — Centaur AI 解讀層(紫微/八字/卜卦/塔羅共用,GPT 預設)
+
+[任務理解] 照 `ORACLE_ROADMAP.md` 開 Phase A 第一刀「Centaur AI 解讀層」(ROADMAP §0 洞察#1=最短最高 ROI 變現路徑)。`oracle.aware-wave.com`(`Projects/internal/ziwei-doushu/`)排盤層已正確,AI 解讀全是 stub。Centaur=確定性引擎算 → 結構化事實餵 LLM + 「NO CALCULATIONS」護欄 → LLM 只敘事 → 零幻覺。
+
+[現況分析] `lib/ai/interpret.ts` 路由正確(無需改);`providers/{openai,anthropic}.ts` throw `AiNotImplementedError`;`lib/divination/types.ts` 的 `InterpretationContext{systemId,locale,headline,facts[]}`=系統無關事實(ziwei adapter 已轉好)。**關鍵發現:`OPENAI_API_KEY` 已在 vault(=預設 provider)→ Phase A 並非 BLOCKED**(HANDOFF/PLAN §22 寫的「blocked on credentials」過時);`ANTHROPIC_API_KEY` 未設→Claude 路徑實作但 live-test 跳過(A/B 備選)。`git log`:上一 session commit 皆 AO 收尾,無人動 `lib/ai`。
+
+[已修改]
+- `lib/ai/prompts/index.ts`(新):`buildPrompt(req)→{system,user}` Centaur 組裝——NO-CALC 護欄、綁具體事實(防巴納姆)、zh-TW/en 各自模板(不直譯)、tier 篇幅、娛樂免責、locale 一致性 assert。
+- `lib/ai/prompts/systems.ts`(新):5 系統角色框架(雙語)。
+- `lib/ai/models.ts`(新):provider×tier→model map(env 可覆寫 OPENAI_MODEL_* / ANTHROPIC_MODEL_*)+ MAX_TOKENS(依字數×CJK 2.5tok/字反推,不腰斬)。
+- `lib/ai/providers/openai.ts`/`anthropic.ts`(改):真 SDK 呼叫(預設 GPT,Claude A/B 備選);OpenAI 用 `max_completion_tokens`(o-series 安全);Anthropic system 標 cache_control。
+- `lib/ai/errors.ts`(改):加 `AiCallError` + `redactSecrets()`(遮 sk-/Bearer,secrets-adjacent 自保不依賴 vendor)。
+- 測試:`prompts/index.test.ts`(5)、`errors.test.ts`(3,密鑰遮蔽 pin)、`interpret.live.test.ts`(gated,RUN_LIVE_AI=1 才打真 API)。
+- 依賴:`openai` + `@anthropic-ai/sdk`。
+
+[驗證結果](R0 四動作)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`RUN_LIVE_AI=1 OPENAI_API_KEY=<vault> npx vitest run lib/ai/interpret.live` | exit=0 | ms=4806 — 真打 GPT 回非空解讀 + 標明 model(gpt-4o-mini);改 max_completion_tokens 後重驗仍 0。另 `npx tsc --noEmit` exit=0、`npm test` 57 pass/1 skip。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/2n+suggestions — critic 確認無 key 外洩路徑(SDK 錯誤訊息不含 auth)、Centaur 護欄雙 provider×雙語皆在、無注入。已修 Major(max_tokens→max_completion_tokens,防 env 換 o-series 悄壞)+ 2 Minor(locale assert 防混語、premium token 上限防腰斬)+ secrets 遮蔽 pin。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/ziwei-doushu | grep=`AiNotImplementedError`,`buildPrompt`,`AiCallError`,`interpret(`,`modelFor` | hits=0 stale — `AiNotImplementedError` 已無 caller(保留供未來 stub provider);其餘 call sites 全對齊;agency-os 命中皆 ORACLE docs 概念引用(非過期)。
+- BUGHUNT_SCOPE_NARROW: N/A(含 agency-os + scripts)。
+
+[剩餘風險] route+UI(AI 問答入口/付費牆)未接=本刀只做解讀管線核心(Phase A 下一刀);route 落地時須:不把 `AiCallError.message` 原樣回前端、不 `console.error` 整個 req(user prompt 含生辰衍生 facts)。premium 萬字級需求未來改串流(加 interpretStream 不動接縫)。Claude 路徑無 key 未 live 驗。
+
+[rollback] 本刀檔案皆新增/可逆;`git revert` 對應 commit;移依賴 `npm rm openai @anthropic-ai/sdk`。
+
 ### fix(eu-backup): R2 異地自 2026-05 從沒上傳成功 — 變數未 export 給子腳本
 
 [任務理解] 方案A 後 R2 upload 仍 WARN。R2 是 SG 退役後唯一存活的異地，必修。
