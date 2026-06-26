@@ -26,6 +26,13 @@ create table if not exists public.app_theme (
 
 alter table public.app_theme enable row level security;
 
+-- Explicit deny for anon + authenticated (service_role bypasses RLS and is the ONLY writer/reader,
+-- via the server-side app). Mirrors the convention in 0033_repair_runs_rls_deny_anon.sql: an
+-- explicit deny is auditable, vs. "RLS-on, no policy" which silently returns 0 rows.
+drop policy if exists app_theme_deny_non_service on public.app_theme;
+create policy app_theme_deny_non_service on public.app_theme
+  for all to anon, authenticated using (false) with check (false);
+
 -- Seed the single global row so the first GET/upsert has a target (idempotent).
 insert into public.app_theme (id, tokens, layout)
 values ('default', '{}'::jsonb, null)

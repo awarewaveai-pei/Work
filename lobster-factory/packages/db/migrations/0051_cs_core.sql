@@ -195,6 +195,25 @@ CREATE TABLE IF NOT EXISTS public.cs_action_log (
 CREATE INDEX IF NOT EXISTS idx_cs_action_log_conv
   ON public.cs_action_log(organization_id, chatwoot_conversation_id);
 
+-- ── Vector retrieval RPC (tenant-scoped cosine match; called via service-role .rpc) ──
+-- Returns the top-N most similar chunks for ONE organization. organization_id filter is applied
+-- INSIDE the function so a caller can never cross tenants. Hybrid keyword half (bm25_tsv) is fused
+-- in the cs-engine layer (lib/cs/rag.ts) via RRF; this RPC is the vector half.
+CREATE OR REPLACE FUNCTION public.cs_match_chunks(
+  p_org       uuid,
+  p_embedding vector(1536),
+  p_limit     int DEFAULT 8
+)
+RETURNS TABLE (id uuid, source_id uuid, content text, similarity double precision)
+LANGUAGE sql STABLE AS $$
+  SELECT c.id, c.source_id, c.content, 1 - (c.embedding <=> p_embedding) AS similarity
+  FROM public.cs_knowledge_chunks c
+  WHERE c.organization_id = p_org
+    AND c.embedding IS NOT NULL
+  ORDER BY c.embedding <=> p_embedding
+  LIMIT GREATEST(p_limit, 1);
+$$;
+
 -- ── RLS: service_role only (house pattern; user_has_org_access added in Phase 5) ──
 ALTER TABLE public.cs_knowledge_sources ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cs_knowledge_chunks  ENABLE ROW LEVEL SECURITY;

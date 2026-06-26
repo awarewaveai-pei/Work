@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { DEFAULT_SECTIONS, itemKey, type NavSection, type NavItem } from '../../SidebarNav';
 
 // ── Token definitions ───────────────────────────────────────────────────────
@@ -150,9 +151,6 @@ const ALL_GROUPS = [...COLOR_GROUPS, ...TYPOGRAPHY_GROUPS];
 const STATIC_DEFAULTS: Record<string, string> = {};
 ALL_GROUPS.forEach(g => g.tokens.forEach(t => { STATIC_DEFAULTS[t.name] = t.default; }));
 
-const LS_TOKENS_KEY = 'aw-theme-overrides';
-const LS_ORDER_KEY  = 'aw-sidebar-order';
-
 type Tab = 'colors' | 'typography' | 'sidebar';
 
 interface SavedLayout {
@@ -184,6 +182,7 @@ function applyLayoutToSections(sections: NavSection[], layout: SavedLayout): Nav
 
 // ── Main page ───────────────────────────────────────────────────────────────
 export default function ThemePage() {
+  const router = useRouter();
   const [activeTab, setActiveTab]     = useState<Tab>('colors');
   const [serverDefaults, setServerDefaults] = useState<Record<string, string>>({ ...STATIC_DEFAULTS });
   const [values, setValues]           = useState<Record<string, string>>({ ...STATIC_DEFAULTS });
@@ -194,53 +193,28 @@ export default function ThemePage() {
   const [secDragIdx, setSecDragIdx]   = useState<number | null>(null);
   const [itemDragIdx, setItemDragIdx] = useState<number | null>(null);
 
-  // Load token defaults from API, then apply any localStorage overrides on top.
-  // localStorage always wins — this prevents the async API response from overwriting saved values.
+  // Load the saved global theme (tokens + sidebar layout) from the server. The layout already
+  // applied these on <html> before paint; this just syncs the editor's fields to the saved state.
+  // Single source of truth = the server (DB). No localStorage.
   useEffect(() => {
-    let lsOverrides: Record<string, string> = {};
-    try {
-      const stored = localStorage.getItem(LS_TOKENS_KEY);
-      if (stored) lsOverrides = JSON.parse(stored) as Record<string, string>;
-    } catch {}
-
     fetch('/api/theme')
       .then(r => r.ok ? r.json() : null)
-      .then((data: { tokens?: Record<string, string> } | null) => {
-        const apiDefaults: Record<string, string> = {};
+      .then((data: { tokens?: Record<string, string>; layout?: SavedLayout | null } | null) => {
         if (data?.tokens) {
-          ALL_GROUPS.forEach(g =>
-            g.tokens.forEach(t => {
-              if (t.name in data.tokens!) apiDefaults[t.name] = data.tokens![t.name];
-            })
-          );
+          const merged: Record<string, string> = {};
+          ALL_GROUPS.forEach(g => g.tokens.forEach(t => {
+            if (t.name in data.tokens!) merged[t.name] = data.tokens![t.name];
+          }));
+          setServerDefaults(prev => ({ ...prev, ...merged }));
+          setValues(prev => ({ ...prev, ...merged }));
+          Object.entries(merged).forEach(([k, v]) =>
+            document.documentElement.style.setProperty(k, v));
         }
-        // localStorage overrides win over API defaults
-        const merged = { ...apiDefaults, ...lsOverrides };
-        setServerDefaults(prev => ({ ...prev, ...apiDefaults }));
-        setValues(prev => ({ ...prev, ...merged }));
-        Object.entries(merged).forEach(([k, v]) =>
-          document.documentElement.style.setProperty(k, v)
-        );
+        if (data?.layout) {
+          setSections(applyLayoutToSections(DEFAULT_SECTIONS, data.layout));
+        }
       })
-      .catch(() => {
-        if (Object.keys(lsOverrides).length > 0) {
-          setValues(prev => ({ ...prev, ...lsOverrides }));
-          Object.entries(lsOverrides).forEach(([k, v]) =>
-            document.documentElement.style.setProperty(k, v)
-          );
-        }
-      });
-  }, []);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(LS_ORDER_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        const layout: SavedLayout = Array.isArray(parsed) ? { sectionOrder: parsed } : parsed;
-        setSections(applyLayoutToSections(DEFAULT_SECTIONS, layout));
-      }
-    } catch {}
+      .catch(() => { /* fail-open: editor shows static defaults */ });
   }, []);
 
   // ── Token handlers ──────────────────────────────────────────────────────
@@ -250,36 +224,58 @@ export default function ThemePage() {
     setSavedMsg('');
   }, []);
 
-  const handleSave = () => {
-    // Persist all changed tokens to localStorage.
-    // layout.tsx injects these before first paint via an inline <script>,
-    // so the theme survives page reload without any server round-trip.
+  const handleSave = async () => {
+    if (changedCount === 0 && !orderChanged) {
+      setSavedMsg('沒有變更'); setTimeout(() => setSavedMsg(''), 2000); return;
+    }
+    // Store only true overrides (diffs vs globals.css defaults) → minimal, correct DB row.
     const overrides: Record<string, string> = {};
-    Object.entries(values).forEach(([k, v]) => { if (v !== serverDefaults[k]) overrides[k] = v; });
-    localStorage.setItem(LS_TOKENS_KEY, JSON.stringify(overrides));
+    Object.entries(values).forEach(([k, v]) => { if (v !== STATIC_DEFAULTS[k]) overrides[k] = v; });
 
     const layout: SavedLayout = {
       sectionOrder: sections.map(s => s.id),
       itemOrders: Object.fromEntries(
-        sections.map(sec => [sec.id, sec.items.map((item, i) => itemKey(item, i))])
+        sections.map(sec => [sec.id, sec.items.map((item, i) => itemKey(item, i))]),
       ),
     };
-    const layoutJson = JSON.stringify(layout);
-    localStorage.setItem(LS_ORDER_KEY, layoutJson);
-    window.dispatchEvent(new StorageEvent('storage', { key: LS_ORDER_KEY, newValue: layoutJson }));
 
-    setServerDefaults(prev => ({ ...prev, ...values }));
-    setSavedMsg('✓ Saved');
-    setTimeout(() => setSavedMsg(''), 2000);
+    setSavedMsg('儲存中…');
+    try {
+      const res = await fetch('/api/theme', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tokens: overrides, layout }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) throw new Error(json.error || 'save_failed');
+      setServerDefaults(prev => ({ ...prev, ...values }));
+      setSavedMsg('✓ 已儲存（所有裝置）');
+      router.refresh(); // re-render layout so the new theme + sidebar order apply from the DB
+    } catch {
+      setSavedMsg('✗ 儲存失敗');
+    }
+    setTimeout(() => setSavedMsg(''), 2500);
   };
 
-  const handleReset = () => {
-    localStorage.removeItem(LS_TOKENS_KEY);
-    localStorage.removeItem(LS_ORDER_KEY);
+  const handleReset = async () => {
     ALL_GROUPS.forEach(g => g.tokens.forEach(t => document.documentElement.style.removeProperty(t.name)));
-    setValues({ ...serverDefaults });
+    setValues({ ...STATIC_DEFAULTS });
+    setServerDefaults({ ...STATIC_DEFAULTS });
     setSections(DEFAULT_SECTIONS);
-    setSavedMsg('');
+    setSavedMsg('重設中…');
+    try {
+      const res = await fetch('/api/theme', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tokens: {}, layout: null }),
+      });
+      if (!res.ok) throw new Error();
+      setSavedMsg('✓ 已重設');
+      router.refresh();
+    } catch {
+      setSavedMsg('✗ 重設失敗');
+    }
+    setTimeout(() => setSavedMsg(''), 2500);
   };
 
   const handleCopy = () => {
@@ -559,11 +555,11 @@ export default function ThemePage() {
 
       {/* ── Instructions ────────────────────────────────────────────── */}
       <div className="card" style={{ padding: 20, background: 'var(--ai-bg)', border: '1px solid var(--border)' }}>
-        <div style={{ fontWeight: 600, color: 'var(--ai-text)', marginBottom: 8, fontSize: 13 }}>Make changes permanent</div>
+        <div style={{ fontWeight: 600, color: 'var(--ai-text)', marginBottom: 8, fontSize: 13 }}>儲存方式</div>
         <ol style={{ color: 'var(--ai-text)', fontSize: 13, lineHeight: 1.9, paddingLeft: 20 }}>
-          <li>Adjust tokens above → live across the whole app instantly.</li>
-          <li><strong>Save</strong> writes to <code>app/globals.css</code> (permanent for all users) <em>and</em> localStorage.</li>
-          <li><strong>Copy CSS</strong> → manual backup of the <code>:root &#123;…&#125;</code> block.</li>
+          <li>調整上方 token → 立即在整個 app 預覽（此時尚未儲存）。</li>
+          <li><strong>Save</strong> 存到伺服器 → 你登入的<strong>所有裝置</strong>（筆電 / 桌機 / 旅行）開機都會套用同一套外觀。</li>
+          <li><strong>Copy CSS</strong> → 手動備份 <code>:root &#123;…&#125;</code> 區塊。</li>
         </ol>
       </div>
     </div>
