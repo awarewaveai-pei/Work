@@ -247,6 +247,18 @@
 [剩餘風險] **migration 尚未套 prod Supabase（High-risk，等操作者 go）**；未 deploy；page.tsx 仍保留自有 token 定義鏡像（與 tokens.ts 同步，純 DRY smell 非錯誤，刻意不冒 145 行 match 風險）；getThemeConfig 未快取（單列 PK 查 sub-ms，單操作者可接受；db-expert 認可）
 [rollback] code: 各檔 git revert；DB: `scripts/0052_app_theme_down.sql`（drop table，無 FK 依賴，無損）
 
+### deploy(theme): migration 套 prod Supabase + sg-deploy → 全域外觀 LIVE 驗證
+
+[已部署] ① migration `0052` 套 prod Supabase(EU supabase-db)：base64 byte-exact 傳輸 → `psql -v ON_ERROR_STOP=1` → CREATE TABLE/ALTER/CREATE POLICY/INSERT 全 OK，table+policy+seed row(count=1) 驗證存在；② `/sg-deploy next-admin` → commit ba24abff，healthy 7s；③ 外觀指南改名 `THEME_ARCHITECTURE_APPEARANCE.md` + AGENTS.md 路由更新
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=EU psql update app_theme tokens + SG curl localhost:3002/login | exit=0 | 端到端證明：baseline `<html lang="zh-TW">`(無 style) → DB 設 `{"--accent":"#ff0066"}` → SG `<html lang="zh-TW" style="--accent:#ff0066">`(server 注入成功) → reset `{}` → `<html lang="zh-TW">`(復原)。完整 DB→store→layout→`<html style>` 跨裝置路徑驗證通過；測試色已 reset，prod 主題維持預設
+- REALTEST_EVIDENCE: tool=SSH | cmd=grep deployed layout | exit=0 | getThemeConfig present, THEME_INJECT_SCRIPT=0(舊 hack 已不在 prod), store/route 已部署
+- REALTEST_EVIDENCE: tool=Bash | cmd=playwright smoke | exit=0 | 26 pass/0 fail/6 skip
+- REVIEW_WAIVED: NA -- 部署+migration apply 動作，code review 已在 feat commit 完成(critic+db-expert)
+- BUGHUNT_WAIVED: NA -- 部署動作無 code 改動
+[剩餘風險] 無；migration idempotent(IF NOT EXISTS+ON CONFLICT)，可安全重跑；rollback=down script
+[rollback] DB: 0052_app_theme_down.sql；code: sg-deploy 自帶 auto-rollback / git revert + redeploy
+
 ## 2026-06-25
 
 ### perf(trigger): dispatch-action-run schedule */1 → */10 — 一勞永逸消除 dispatcher 空轉容器
