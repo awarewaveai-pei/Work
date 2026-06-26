@@ -144,26 +144,10 @@ export function itemKey(item: NavItem, fallbackIndex?: number): string {
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
-export function SidebarNav() {
-  const [sections, setSections] = useState(DEFAULT_SECTIONS);
-
-  useEffect(() => {
-    const layout = loadLayout();
-    if (layout) setSections(applyLayout(DEFAULT_SECTIONS, layout));
-  }, []);
-
-  useEffect(() => {
-    function onStorage(e: StorageEvent) {
-      if (e.key === LS_ORDER_KEY && e.newValue) {
-        try {
-          const layout = JSON.parse(e.newValue) as SavedLayout;
-          setSections(applyLayout(DEFAULT_SECTIONS, layout));
-        } catch {}
-      }
-    }
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, []);
+// `initialLayout` is fetched server-side (app/layout.tsx) from the DB, so the saved sidebar
+// order renders identically on every device. Pure function of the prop — no client storage.
+export function SidebarNav({ initialLayout }: { initialLayout?: SavedLayout | null }) {
+  const sections = initialLayout ? applyLayout(DEFAULT_SECTIONS, initialLayout) : DEFAULT_SECTIONS;
 
   return (
     <>

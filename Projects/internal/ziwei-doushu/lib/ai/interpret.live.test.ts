@@ -29,13 +29,25 @@ const req: InterpretRequest = {
 
 suite('AI 解讀真實呼叫 (RUN_LIVE_AI)', () => {
   it(
-    'openai 回傳非空解讀並標明 model',
+    'openai light 回傳非空解讀並標明 model',
     { timeout: 60_000 },
     async () => {
       const reading = await interpret(req, 'openai');
       expect(reading.text.length).toBeGreaterThan(20);
       expect(reading.provider).toBe('openai');
       expect(reading.model).toBeTruthy();
+    },
+  );
+
+  it(
+    'openai deep(max_completion_tokens=5000)不被 400 拒絕',
+    { timeout: 90_000 },
+    async () => {
+      // 回歸:deep/premium 的 token 預算曾超出裸 gpt-4o 的 4096 輸出上限導致
+      //   400(critic 2026-06-26)。釘 16384 輸出快照後須能成功回讀。
+      const reading = await interpret({ ...req, tier: 'deep' }, 'openai');
+      expect(reading.text.length).toBeGreaterThan(20);
+      expect(reading.provider).toBe('openai');
     },
   );
 });
