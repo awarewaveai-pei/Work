@@ -4,6 +4,11 @@ import {
   type TrueSolarResult,
 } from './trueSolarTime';
 import { defaultLocale, type Locale } from './i18n/config';
+import {
+  analyzeBazi,
+  type Strength,
+  type WuXing,
+} from './baziAnalysis';
 import type { Gender, CalendarType } from './ziwei';
 
 /**
@@ -38,10 +43,23 @@ export interface BaziPillar {
   naYin: string;
 }
 
+/** 喜用神 / 格局分析結果(扶抑法,見 baziAnalysis.ts;pattern 已在地化)。 */
+export interface BaziAnalysisDisplay {
+  strength: Strength;
+  dayElement: WuXing;
+  /** 喜用神(五行) */
+  favorable: WuXing[];
+  /** 忌神(五行) */
+  avoid: WuXing[];
+  /** 格局名,如「偏財格」 */
+  pattern: string;
+}
+
 export interface BaziResult {
   pillars: { year: BaziPillar; month: BaziPillar; day: BaziPillar; hour: BaziPillar };
   dayMaster: string;
   zodiac: string;
+  analysis: BaziAnalysisDisplay;
   correction?: TrueSolarResult;
 }
 
@@ -68,6 +86,14 @@ function localizeShiShen(value: string, locale: Locale): string {
 }
 function localizeZodiac(value: string, locale: Locale): string {
   return isSimplified(locale) ? value : toTW(value, ZODIAC_TW);
+}
+
+/** 月令本氣十神 → 格局名(比肩/劫財 為特殊格)。 */
+function patternName(rawShiShen: string, locale: Locale): string {
+  const tw = localizeShiShen(rawShiShen, locale);
+  if (tw === '比肩') return '建祿格';
+  if (tw === '劫財') return '陽刃格';
+  return `${tw}格`;
 }
 
 export function computeBazi(req: BaziRequest): BaziResult {
@@ -105,6 +131,24 @@ export function computeBazi(req: BaziRequest): BaziResult {
     naYin,
   });
 
+  // 喜用神 / 格局:用 lunar 算好的「原始(簡體)十神」分析,與排盤同源。
+  //   地支取「本氣」(藏干十神陣列首位)。月令權重在 analyzeBazi 內加倍。
+  const analysisRaw = analyzeBazi({
+    dayGan: ec.getDayGan(),
+    stemShiShen: [
+      ec.getYearShiShenGan(),
+      ec.getMonthShiShenGan(),
+      ec.getTimeShiShenGan(),
+    ],
+    branchPrimaryShiShen: [
+      { shiShen: ec.getYearShiShenZhi()[0], isMonth: false },
+      { shiShen: ec.getMonthShiShenZhi()[0], isMonth: true },
+      { shiShen: ec.getDayShiShenZhi()[0], isMonth: false },
+      { shiShen: ec.getTimeShiShenZhi()[0], isMonth: false },
+    ],
+    monthPrimaryShiShen: ec.getMonthShiShenZhi()[0],
+  });
+
   return {
     pillars: {
       year: pillar(ec.getYear(), ec.getYearGan(), ec.getYearZhi(), ec.getYearShiShenGan(), ec.getYearShiShenZhi(), ec.getYearNaYin()),
@@ -114,6 +158,13 @@ export function computeBazi(req: BaziRequest): BaziResult {
     },
     dayMaster: ec.getDayGan(),
     zodiac: localizeZodiac(lunar.getYearShengXiao(), locale),
+    analysis: {
+      strength: analysisRaw.strength,
+      dayElement: analysisRaw.dayElement,
+      favorable: analysisRaw.favorable,
+      avoid: analysisRaw.avoid,
+      pattern: patternName(analysisRaw.patternShiShen, locale),
+    },
     correction,
   };
 }

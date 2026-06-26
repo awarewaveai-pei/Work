@@ -67,7 +67,11 @@
     "hiddenStems": "藏干",
     "naYin": "納音",
     "dayMaster": "日主",
-    "zodiac": "生肖"
+    "zodiac": "生肖",
+    "pattern": "格局",
+    "strength": "身強弱",
+    "favorable": "喜用神",
+    "avoid": "忌神"
   },
   "iching": {
     "title": "易經卜卦",

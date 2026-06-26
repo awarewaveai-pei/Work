@@ -67,7 +67,11 @@
     "hiddenStems": "Hidden",
     "naYin": "NaYin",
     "dayMaster": "Day Master",
-    "zodiac": "Zodiac"
+    "zodiac": "Zodiac",
+    "pattern": "Pattern",
+    "strength": "Strength",
+    "favorable": "Favorable",
+    "avoid": "Unfavorable"
   },
   "iching": {
     "title": "I Ching",

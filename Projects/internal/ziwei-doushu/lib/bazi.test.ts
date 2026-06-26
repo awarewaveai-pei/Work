@@ -36,6 +36,13 @@ describe('computeBazi — 八字回歸', () => {
     });
     expect(c.correction).toBeDefined();
   });
+
+  it('喜用神/格局(扶抑法):丙日申月失令 → 身弱、喜木火、偏財格', () => {
+    expect(r.analysis.dayElement).toBe('火');
+    expect(r.analysis.strength).toBe('身弱');
+    expect(r.analysis.favorable.sort()).toEqual(['木', '火'].sort());
+    expect(r.analysis.pattern).toBe('偏財格');
+  });
 });
 
 describe('八字系統 adapter', () => {

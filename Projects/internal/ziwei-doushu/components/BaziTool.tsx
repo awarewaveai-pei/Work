@@ -69,6 +69,30 @@ export default function BaziTool({ dict, locale }: { dict: Dictionary; locale: L
             </span>
           </div>
 
+          {/* 喜用神 / 格局(扶抑法) */}
+          <div className="glass-card p-4 mb-5 flex flex-wrap justify-center gap-x-8 gap-y-2 text-sm">
+            <span>
+              <span style={{ color: 'var(--text-caption)' }}>{t.pattern}　</span>
+              <span style={{ color: 'var(--gold-400)' }}>{result.analysis.pattern}</span>
+            </span>
+            <span>
+              <span style={{ color: 'var(--text-caption)' }}>{t.strength}　</span>
+              <span style={{ color: 'var(--text-heading)' }}>{result.analysis.strength}</span>
+            </span>
+            <span>
+              <span style={{ color: 'var(--text-caption)' }}>{t.favorable}　</span>
+              <span style={{ color: 'var(--jade-400)', fontWeight: 600 }}>
+                {result.analysis.favorable.join('、')}
+              </span>
+            </span>
+            <span>
+              <span style={{ color: 'var(--text-caption)' }}>{t.avoid}　</span>
+              <span style={{ color: 'var(--rose-400)' }}>
+                {result.analysis.avoid.join('、')}
+              </span>
+            </span>
+          </div>
+
           {/* Four pillars */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {pillars.map(([label, p]) => (

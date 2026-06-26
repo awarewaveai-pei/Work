@@ -2,17 +2,21 @@
 
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { AI_TEXT_MODELS, DEFAULT_AI_TEXT_MODEL } from "@/lib/ai/text-model-options";
+import { chipStyle } from "@/components/tools/panel-primitives";
 
+// Palette mapped onto the GLOBAL theme CSS vars so ScriptForge matches the rest of the
+// app (was a bespoke coral/violet/jade palette) AND follows /tools/theme automatically.
+// Light tints use color-mix so they track the accent/status colors when the theme changes.
 const C = {
-  white:"#FFFFFF",paper:"#F7F5F2",fog:"#EDEBE7",border:"#E2DDD8",
-  mid:"#9B9590",ink:"#3A3530",black:"#1A1512",
-  coral:"#FF5C3A",corallt:"#FFF0ED",
-  violet:"#7C5CFC",violetl:"#F0ECFF",
-  gold:"#F0A500",goldlt:"#FFF8E6",
-  jade:"#00A878",jadelt:"#E6F7F2",
-  rose:"#E8366F",roselt:"#FDEDF3",
-  sky:"#0EA5E9",skylt:"#E0F2FE",
-  teal:"#0D9488",teallt:"#E0F2F1",
+  white:"var(--card-bg)",paper:"var(--body-bg)",fog:"var(--bg-hover)",border:"var(--border)",
+  mid:"var(--text-muted)",ink:"var(--text-primary)",black:"var(--text-primary)",
+  coral:"var(--accent)",corallt:"color-mix(in srgb, var(--accent) 12%, transparent)",
+  violet:"var(--accent)",violetl:"color-mix(in srgb, var(--accent) 12%, transparent)",
+  gold:"var(--yellow)",goldlt:"color-mix(in srgb, var(--yellow) 14%, transparent)",
+  jade:"var(--green)",jadelt:"color-mix(in srgb, var(--green) 14%, transparent)",
+  rose:"var(--red)",roselt:"color-mix(in srgb, var(--red) 12%, transparent)",
+  sky:"var(--severity-low)",skylt:"color-mix(in srgb, var(--severity-low) 14%, transparent)",
+  teal:"var(--green)",teallt:"color-mix(in srgb, var(--green) 12%, transparent)",
 };
 
 /* ── HISTORY ── */
