@@ -15,7 +15,7 @@
 - `messages/{zh-TW,en}.json`:tarot.topic。
 - `lib/tarot.test.ts`:positions===size(全陣雙語)+ 新陣 + 牌位/主題 facts。
 
-[驗證結果](R0 四動作)
+[驗證結果]（R0 四動作）
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/tarot.test` | exit=0 | 10 pass — 78 牌庫完好、6 陣 positions 長度=size(雙語)、drawSpread 張數正確、adapter facts 帶 `position:過去`+topic=感情+headline 含感情+正逆位。另 tsc=0、`npm run build` exit=0。
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n+2note — critic 逐陣驗 positions===size、SPREAD_SIZE 0 消費端、最長 label/headline/fact 數皆遠低於 route 上限且 `/` 過 sanitizeFact、切陣時 positions 綁 result.spread(非 live 選單)故不會錯位、i18n 完美 parity。2 note 皆刻意設計(牌位非唯一鍵 / 同抽牌可換主題重解)。
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/ziwei-doushu | grep=`SPREAD_SIZE`,`drawSpread`,`SPREADS`,`TOPICS`,`TarotInput` | hits=0 stale — 消費端(TarotTool/systems-tarot)全對齊;SPREAD_SIZE 無外部引用。
@@ -38,7 +38,7 @@
 - `messages/{zh-TW,en}.json`:`ai.share`。
 - `lib/og.test.ts`(新):URL 建構單元測試。
 
-[驗證結果](R0 四動作)
+[驗證結果]（R0 四動作）
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npm start` + python(UTF-8)curl `/api/og` + Read PNG 目視 | exit=0 | **真實渲染 HTTP 200 image/png 1080×1080 77522 bytes,目視確認 CJK 完美**(破軍・木三局/紫微斗數命盤/命宮：破軍(陷)…全對)、0 個 dynamic-font 錯誤。關鍵診斷:首輪 curl CJK 變亂碼 = **Git Bash CP950 把命令列 CJK 編錯**(專案文件警告的 trap),非 route bug;改 python UTF-8 即完美。另 tsc=0、`npm run build` exit=0(`ƒ /api/og`)、og.test 3 pass。
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n+2suggestion — critic **實打 SSRF payload(含 169.254.169.254 metadata)無法利用**(Google 不把 text 反射進 src url);確認 standalone 有 trace Geist 字型(部署可解析)、輸入有界無 ReDoS、URLSearchParams 編碼安全。採納:font url 加 gstatic.com 白名單。
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/ziwei-doushu | grep=`ogCardUrl`,`ogParamsFromContext`,`/api/og`,`loadCjkFont` | hits=0 stale — AiReading 引用 + route 對齊;ACCENTS.daily 為開放 type(非 SystemId)無衝突。
