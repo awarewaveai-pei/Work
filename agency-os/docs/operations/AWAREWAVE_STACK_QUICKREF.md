@@ -3,7 +3,16 @@
 > 所有伺服器、容器、路徑、端口的事實參考。
 > 從 AGENTS.md 移出，避免讓 system prompt 過重。
 > 規則（禁止事項、SOP）仍在 AGENTS.md。
-> Last updated: 2026-06-03
+> Last updated: 2026-06-26
+>
+> **📍 本檔 = 機器拓樸唯一正本（topology SSOT）。** 「誰跑在哪台、什麼容器、什麼 port」以此為準。
+> 各 stack 的**部署/設定細節**另有正本（改容器時這幾處要一起改）：
+> - Trigger.dev（EU）→ [`lobster-factory/infra/trigger/README.md`](../../../lobster-factory/infra/trigger/README.md)
+> - Supabase（EU）→ [`SUPABASE_SELF_HOSTED_RUNBOOK.md`](SUPABASE_SELF_HOSTED_RUNBOOK.md)
+> - Phase 1 core（SG）→ [`lobster-factory/infra/hetzner-phase1-core/README.md`](../../../lobster-factory/infra/hetzner-phase1-core/README.md)
+> - SG 雙目錄陷阱 → [`SG_PHASE1_DOCKER_LAYOUT.md`](SG_PHASE1_DOCKER_LAYOUT.md)｜DNS → [`CLOUDFLARE_HETZNER_PHASE1.md`](CLOUDFLARE_HETZNER_PHASE1.md)｜部署 → [`DEPLOY_ROLLBACK_RUNBOOK.md`](DEPLOY_ROLLBACK_RUNBOOK.md)
+>
+> **🚚 要「搬機 / 上 dedicated / EU→大機、SG→EU」？唯一遷移正本** → [`runbooks/EU-STACK-BACKUP-RAID-RESTORE-FOR-DEDICATED-RUNBOOK.md`](../../../runbooks/EU-STACK-BACKUP-RAID-RESTORE-FOR-DEDICATED-RUNBOOK.md)（含備份/RAID/還原/遷移 §0–§7）。
 
 ---
 
