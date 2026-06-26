@@ -70,8 +70,12 @@ export class ChatwootTransport implements WidgetTransport {
     if (this.conversationId != null) return this.conversationId;
     const cached = localStorage.getItem(lsKey(this.cfg.inboxIdentifier, "conversation"));
     if (cached) {
-      this.conversationId = Number(cached);
-      return this.conversationId;
+      const n = Number(cached);
+      if (Number.isFinite(n)) {
+        this.conversationId = n;
+        return n;
+      }
+      localStorage.removeItem(lsKey(this.cfg.inboxIdentifier, "conversation")); // corrupted → recreate
     }
     const contact = await this.ensureContact();
     const conv = await this.postJson<{ id: number }>(`/contacts/${contact.source_id}/conversations`);
@@ -107,6 +111,14 @@ export class ChatwootTransport implements WidgetTransport {
     }
     if (frame.type === "welcome") return this.onEvent?.({ type: "connected" });
     if (frame.type === "ping" || frame.type === "confirm_subscription") return;
+    if (frame.type === "reject_subscription") {
+      // Stale/rotated pubsub_token — drop the cached contact so the next load force-creates a fresh
+      // one + re-subscribes; surface an error so the widget isn't "connected but silent".
+      localStorage.removeItem(lsKey(this.cfg.inboxIdentifier, "contact"));
+      localStorage.removeItem(lsKey(this.cfg.inboxIdentifier, "pubsub"));
+      this.contact = null;
+      return this.onEvent?.({ type: "error", reason: "subscription_rejected" });
+    }
     const inner = frame.message;
     if (!inner?.event) return;
     const data = inner.data ?? {};
@@ -119,7 +131,9 @@ export class ChatwootTransport implements WidgetTransport {
           sender,
           text: typeof data.content === "string" ? data.content : "",
           contentType: ((data.content_type as ContentType) ?? "text"),
-          content: data.content_attributes,
+          // Chatwoot wraps interactive payloads as content_attributes.items (object, not bare array);
+          // unwrap so CsWidget's Array.isArray(content) render path fires for input_select / cards.
+          content: (data.content_attributes as { items?: unknown } | undefined)?.items ?? data.content_attributes,
           createdAt: Date.now(),
           isAiReply: sender === "bot",
         };
