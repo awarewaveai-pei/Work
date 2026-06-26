@@ -4,7 +4,26 @@
 
 ## 2026-06-26
 
-### feat(oracle): Phase B — 西洋占星本命盤引擎(自架 XALEN,Apache,無 API key)
+### feat(tarot): 大圖「存無框圖」按鈕 → 無框原圖進 My Designs + seed-fix 上線
+
+[任務理解] 兩件延續：(A) 把同 session 的「重新生成沿用固定 seed」修復(seedOverride,本檔下方 entry)實際部署上線；(B) 新需求：整套生成只把「含框 print card」自動存 My Designs，使用者要能把漂亮的「無框原圖」也存進 gallery，且要**按鈕觸發**（挑喜歡的存，不每張自動灌爆 gallery）。
+
+[現況分析] `generateOne` 在 `renderPrintCard` 前已有完整已調色無框圖(`artForPrint`)，但只把含框 blob 留 state、含框版自動 `saveToGallery(...,"tarot")`；無框圖未留存。designs POST API 接受任意 source（`route.ts:221` 無白名單）。gallery 分類 SSOT：`lib/studio/asset-group.ts` + `DesignsGallery.tsx`(SOURCE_SUBTYPE/assetProduct/isTarotSrc)。
+
+[已修改]
+- (A) 部署 seed-fix：`sg-deploy.sh next-admin` → commit `0e671ee1`，container healthy 8s，HTTP smoke 全 200，Playwright smoke 26 pass/0 fail。git source + rsync build source 兩邊確認含全 3 處 seedOverride。
+- (B) `app/tools/tarot/TarotStudio.tsx`：BatchItem 加 `art?`；`generateOne` 以新 helper `toGalleryArt()` 把無框圖轉**上限 2048px WebP(q0.9)**存 state(同時解 413 + 記憶體)；大圖 modal 加「🖼 存無框圖」按鈕(僅 done+有 art 顯示，狀態：儲存中…/✓已存無框圖)，按下以 source `tarot-art` POST；`saveToGallery` 抽出 `postDesign()`(回 Promise<boolean>)供按鈕做成功/失敗回饋，既有 5 處 fire-and-forget 呼叫不變；`savedArt`/`savingArt` 狀態，deck 重建(lockStyle/selectCompareResult)清 savedArt。
+- (B) gallery 註冊 `tarot-art`：assetToolGroup→tarot、SOURCE_SUBTYPE=原圖、assetProduct→tarot-card、isTarotSrc→true（顯示 Tarot·原圖 + portrait frame）。含框自動存維持不變(兩者並存)。
+
+[驗證結果](R0 四動作)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`(全專案,改後重跑) + `sg-deploy.sh`(seed-fix 部署) + `playwright-runner.ps1 -Mode smoke` | exit=0 | tsc 兩次皆 0；deploy smoke 26 pass/0 fail/6 skip。(無框 canvas 編碼+按鈕流為瀏覽器行為，真實 E2E 待本功能部署後 browser-test。)
+- REVIEW_DONE: critic=Deep | verdict=warn→已修 | findings=0c/1M/2m+1s — critic 抓 **Major：2K model 無框 PNG 可能 >9MB→413→「請稍後再試」誤導(重試永遠失敗)**；已修(toGalleryArt 上限 2048 WebP，2K 也 <9MB)。Minor1(savedArt deck-reset 殘留,self-healing)已修；Minor2(state 記憶體)由改存 capped WebP 一併解；Suggestion(floating promise,無 lint 強制)保留。其餘逐項 verified clean(fire-and-forget 無回歸/race guard/分類完整/CSS class 存在)。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`tarot-art`,`postDesign`,`toGalleryArt`,`savedArt`,`savingArt` | hits=0 stale — `tarot-art` 僅 producer(TarotStudio)+4 分類點(DesignsGallery×3/asset-group)；新 symbol 皆 TarotStudio.tsx 內部無外洩消費端。
+- BUGHUNT_SCOPE_NARROW: N/A(含 agency-os + scripts)。
+
+[剩餘風險] 背景批次載入的卡(R2 url，本就無框)不設 `art`→按鈕隱藏，無法經此按鈕存 My Designs(她的流程是前景整套生成，覆蓋)。toGalleryArt 把 gallery 副本上限 2048(非全解析度)；全解析度列印仍走含框卡/ZIP，不受影響。
+
+[rollback] 純前景加法；`git revert <hash>`；無 schema/migration/外部呼叫變更。
 
 [任務理解] 補全球最大占星市場(回歸黃道行星/星座/宮位/上升)。PLAN §5 路線:MVP astrology-api.io(需 key,被擋)→ 自架 XALEN。先驗 XALEN 真實存在+可用+準確,再建(R0:不可建無法驗證的「最準」引擎)。
 
