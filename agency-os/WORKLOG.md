@@ -4,6 +4,29 @@
 
 ## 2026-06-26
 
+### fix(tarot): 單卡「重新生成」產生位元相同的圖（第 3 次回報，前 2 修為假性）
+
+[任務理解] /tools/tarot 整套生成 Step 2 → 不滿意的卡點「重新生成這張」→ 有跑但圖案完全沒變；/tools/designs 也無新圖。非快取問題 — 結構性：重新生成沿用固定 seed，決定性 model 必產同圖。
+
+[現況分析] 預設 model `flux-schnell`，server `generateFlux` 強制 `go_fast:false`（`image-gen.ts:431-434` 註解「Force bf16 for reproducible deck generation」）= 同 seed 決定性輸出。預覽以 `seed:null` 取得隨機 seed 存入 `previewSeed`（`TarotStudio.tsx:411`）；`generateSingle`→`generateOne` 重生時傳 `seed:previewSeed`（固定，舊 `:548`）→ 同 model+同 prompt+同固定 seed = 同一張 PNG。`saveToGallery` 存入相同位元 → designs 看似沒變。**前 2 次假性修復**：commit `16be2467` 只加「✓ 已重新生成」提示訊息，從未碰 seed。
+
+[已修改] `app/tools/tarot/TarotStudio.tsx`（單檔 3 處）
+- `generateOne` 加第 3 參 `seedOverride?: number | null`；seed line → `seed: seedOverride !== undefined ? seedOverride : previewSeed`（省略=用 previewSeed 首生一致；明確傳=覆蓋）。
+- `generateSingle`（單卡重生，含空白卡首生與 modal「重新生成這張」）傳 `Math.floor(Math.random()*1e9)` 新 seed。
+- `generateGroup(skipDone)`：`!skipDone`（重新生成全組）每張傳新 seed；`skipDone`（填補未完成）維持 previewSeed。
+- seed-忽略型 model（openai/seedream/nano-banana/imagen/ideogram-v4）本就隨機，傳新 seed 無害；修正精準命中決定性 class（flux-*, ideogram-v2a/v3, ideogram-character, flux-2-max）。
+
+[驗證結果](R0 四動作)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit (next-admin)` | exit=2 | ms=~32000 -- TarotStudio.tsx **0 errors**；exit=2 全數來自無關檔 `StudioWorkbench.tsx`（另一 Cursor session 未提交 WIP，showMap→mapMode 半成品 rename + lens）。
+- REALTEST_WAIVED: SMOKE_COVERED -- E2E 真生成需 deploy + Replicate 付費，且 sg-deploy typecheck gate 目前被 StudioWorkbench WIP 擋；root cause 經 tsc + critic 全鏈追證確定，e2e 待 deploy 後由 /playwright 或 browser-test 補。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n — 確認 (a)3 處簽名/型別正確、(b)`!== undefined` 是唯一正確判斷（truthiness/`!=null` 會誤判 seed=0）、(c)client seed 0..1e9 與 route 驗證(`generate/route.ts:85`)+server `?? random` 範圍相容、(d)`previewSeed=null` 時 server 端仍生隨機（無回歸）、(e)純值傳參無 race/staleness。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`generateOne\(`,`previewSeed`,`seed: previewSeed` | hits=0 stale — `generateOne` 全部 3 call site 已更新（TarotStudio.tsx:545/619/717）；無 downstream consumer（component-local 函式）；舊 `seed: previewSeed` 字串已不存在。
+- BUGHUNT_SCOPE_NARROW: N/A（含 agency-os + scripts + lobster-factory）。
+
+[剩餘風險] (1) 修正僅本機 commit，**尚未部署**；app.aware-wave.com 需 sg-deploy 生效。(2) sg-deploy typecheck gate 被無關的 `StudioWorkbench.tsx` 並行 WIP（5+ tsc error）擋住 — 需該 session 補完 showMap→mapMode rename 才能 deploy 本修正。
+
+[rollback] `git revert` 本 commit 即還原 3 處 seed 邏輯（純加性改動，無 schema/DB/API 變更）。
+
 ### fix(canvas): Canvas 編輯底圖跨來源載入失敗（My Designs handoff）
 
 [任務理解] app.aware-wave.com/tools/designs 點「Canvas 編輯」→「底圖載入失敗（可能是跨來源限制）」。非偶發 CORS — 結構性：gallery 把跨來源 R2 public URL 交給只支援 data URL 假設的 CanvasEditor。
