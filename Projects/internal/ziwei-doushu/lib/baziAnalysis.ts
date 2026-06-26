@@ -32,7 +32,9 @@ function inverse(map: Record<WuXing, WuXing>, target: WuXing): WuXing {
   return (Object.keys(map) as WuXing[]).find((k) => map[k] === target) as WuXing;
 }
 
-// 十神 → 勢力歸類。含簡繁兩形(lunar 原始輸出為簡體,排盤後可能已正規化為繁中)。
+// 十神 → 勢力歸類。含簡繁兩形(lunar 預設輸出簡體,排盤後可能已正規化為繁中)。
+// ⚠️ 依賴 lunar-javascript 維持預設 'chs' locale;若他處呼叫 I18n.setLanguage 改語系,
+//    十神字串會不在本集合內 → 全部歸為「中和」(critic 2026-06-26)。本專案全程不改 locale。
 const FU = new Set(['比肩', '劫財', '劫财', '正印', '偏印']); // 印 + 比劫:生扶日主
 const YI = new Set([
   '食神', '傷官', '伤官', '正財', '正财', '偏財', '偏财', '正官', '七殺', '七杀',
@@ -72,6 +74,8 @@ function uniq(a: WuXing[]): WuXing[] {
 
 export function analyzeBazi(input: BaziAnalysisInput): BaziAnalysis {
   const dayElement = GAN_WUXING[input.dayGan];
+  // export + 單元測試直呼:未知日干即大聲拋錯,不靜默回 undefined 欄位(critic 2026-06-26)。
+  if (!dayElement) throw new Error(`analyzeBazi: 未知日干 ${input.dayGan}`);
 
   let support = 0;
   let drain = 0;

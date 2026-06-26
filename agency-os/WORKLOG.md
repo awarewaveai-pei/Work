@@ -4,6 +4,30 @@
 
 ## 2026-06-26
 
+### feat(oracle): Phase C — 八字喜用神 + 格局(扶抑取用法)
+
+[任務理解] ROADMAP「最核心商業化功能」=八字喜用神。純演算法、無憑證,且直接讓八字 AI 解讀大幅變值錢(facts 多了喜用神/格局/身強弱)。
+
+[現況分析] `lib/bazi.ts` 已用 lunar-javascript 排盤;**lunar 已算好每柱十神(天干 + 地支藏干,本氣首位)**,故不需自推十神,只需把十神分扶/抑 + 取喜用神 + 月令取格。
+
+[已修改]
+- `lib/baziAnalysis.ts`(新):扶抑取用法。天干→五行表 + 五行生剋(bijection)+ 十神分類(扶=印比/抑=食傷財官,含簡繁兩形)。月令權重×2。身強→喜抑神、身弱→喜扶神、中和→輕洩。明確宣告只採扶抑法(不含調候/通關)。
+- `lib/bazi.ts`(改):computeBazi 取 lunar 原始(簡體)十神 → analyzeBazi → 在地化 pattern(比肩→建祿格、劫財→陽刃格)→ BaziResult 加 `analysis{strength,dayElement,favorable,avoid,pattern}`。
+- `lib/divination/systems/bazi.ts`(改):toContext 加 pattern/strength/favorable/avoid facts + headline 帶格局喜神。
+- `components/BaziTool.tsx`(改):顯示格局/身強弱/喜用神/忌神卡。
+- `messages/{zh-TW,en}.json`:bazi 加 pattern/strength/favorable/avoid 標籤。
+- 測試:`baziAnalysis.test.ts`(6,含身強/弱/簡體)+ `bazi.test.ts` 端到端錨點。
+
+[驗證結果](R0 四動作)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/baziAnalysis lib/bazi.test` | exit=0 | **真 lunar 資料端到端驗:2000-08-16 14:30 女(丙午日 申月失令)→ 身弱、喜木火、偏財格**,與手算扶抑 + 教科書一致。另 `tsc --noEmit` exit=0、`npm test` 79 pass、`npm run build` exit=0。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n — critic 對照 lunar-javascript@1.7.7 原始碼確認:inverse() 為 total(SHENG/KE 皆 5 元 bijection)、十神查表 100 entry 永不 undefined、各地支≥1 藏干故 [0] 永遠安全、strength 門檻無 off-by-one、FU/YI 含 lunar 預設簡體 10 形、BaziResult 新必填欄無漏改消費端。採納 2 防禦建議:analyzeBazi 加未知日干 fail-loud guard + lunar locale 依賴註解。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/ziwei-doushu | grep=`analyzeBazi`,`BaziAnalysis`,`BaziResult`,`.analysis`,`computeBazi` | hits=0 stale — BaziResult 消費端(BaziTool/systems-bazi/test)全更新,tsc 過=無型別破壞。
+- BUGHUNT_SCOPE_NARROW: N/A(含 agency-os + scripts)。
+
+[剩餘風險] 喜用神僅扶抑法,邊界命局(需調候/通關)可能與他派不同→已在 baziAnalysis.ts 頂註明,AI 解讀層應呈現為「初步判定」。建祿/陽刃格簡化(未嚴格判月支臨官/帝旺)。
+
+[rollback] 新增可逆;`git revert`;BaziResult.analysis 移除需同步 4 消費端。
+
 ### fix(backup-health): 備份「跑了但壞了」原本靜默 — check-backup-health 改讀 verify 判定 surface 到 AO-RESUME
 
 [任務理解] 備份失敗（verify 失敗/缺檔）原本沒人知道（跟 R2 同款靜默）。讓它在 AO-RESUME 自動 surface（系統既有「零記憶負擔」模式，非新建 Telegram）。
