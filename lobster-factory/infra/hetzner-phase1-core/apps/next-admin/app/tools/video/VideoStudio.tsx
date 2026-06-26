@@ -7,6 +7,7 @@ import { usdToNtd } from "@/lib/ai/cost-calculator";
 import type { VideoHistoryItem } from "@/app/api/video/history/route";
 import { STYLE_CATALOG } from "@/app/tools/tarot/tarotStyles";
 import { resolveStylePrompt } from "@/app/tools/tarot/cards";
+import { tabStyle, chipStyle } from "@/components/tools/panel-primitives";
 
 // 影片專屬攝影風格 preset（放最前 = 預設組）。值為英文 prompt，直接送 Flux。
 const VIDEO_STYLE_PRESETS: { zh: string; group: string; prompt: string }[] = [
@@ -677,15 +678,7 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
                             }
                           }}
                           disabled={isBusy}
-                          style={{
-                            flex: 1, padding: "8px 0", borderRadius: 8,
-                            border: `2px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
-                            background: active ? "var(--accent)" : "var(--bg-canvas)",
-                            color: active ? "var(--btn-primary-text)" : "var(--text-secondary)",
-                            cursor: isBusy ? "not-allowed" : "pointer",
-                            fontSize: 12, fontWeight: active ? 700 : 500,
-                            display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-                          }}>
+                          style={{ ...tabStyle(active), flex: 1, padding: "8px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
                           <span>{label}</span>
                           <span style={{ fontSize: 10, opacity: 0.75 }}>{badge}</span>
                         </button>
@@ -732,7 +725,7 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
                 {!isPexels && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>生圖模型</span>
-                    <div style={{ display: "flex", borderBottom: "1px solid var(--border-subtle)" }}>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                       {Object.keys(IMAGE_VENDOR_GROUPS).map(v => (
                         <button key={v} type="button" disabled={isBusy}
                           onClick={() => {
@@ -740,14 +733,7 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
                             const first = IMAGE_VENDOR_GROUPS[v]?.[0];
                             if (first) setImageModel(first);
                           }}
-                          style={{
-                            padding: "5px 12px", border: "none", background: "transparent",
-                            borderBottom: `3px solid ${imageVendor === v ? "var(--accent)" : "transparent"}`,
-                            marginBottom: -1, cursor: isBusy ? "not-allowed" : "pointer",
-                            fontSize: 12, fontWeight: imageVendor === v ? 700 : 500,
-                            color: imageVendor === v ? "var(--accent)" : "var(--text-muted)",
-                            transition: "all 0.15s", whiteSpace: "nowrap",
-                          }}>
+                          style={tabStyle(imageVendor === v)}>
                           {v}
                         </button>
                       ))}
@@ -758,14 +744,7 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
                         const active = imageModel === id;
                         return (
                           <button key={id} type="button" onClick={() => setImageModel(id)} disabled={isBusy}
-                            style={{
-                              padding: "4px 12px", borderRadius: 20, fontSize: 11,
-                              cursor: isBusy ? "not-allowed" : "pointer",
-                              border: `1px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
-                              background: active ? "var(--accent)" : "rgba(127,127,127,0.06)",
-                              color: active ? "var(--btn-primary-text)" : "var(--text-secondary)",
-                              transition: "all 0.15s",
-                            }}>
+                            style={chipStyle(active)}>
                             {r?.label ?? id}
                             {r && <span style={{ fontSize: 10, opacity: 0.7, marginLeft: 4 }}>${r.usd}/張</span>}
                           </button>
@@ -784,17 +763,10 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
                         : <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>&nbsp;（不指定 = 電影感預設）</span>}
                     </summary>
                     <div style={{ padding: "10px 14px" }}>
-                      <div style={{ display: "flex", borderBottom: "1px solid var(--border-subtle)", marginBottom: 8 }}>
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
                         {VIDEO_STYLE_GROUPS.map(g => (
                           <button key={g} type="button" onClick={() => setVideoStyleGroup(g)} disabled={isBusy}
-                            style={{
-                              padding: "4px 10px", border: "none", background: "transparent",
-                              borderBottom: `3px solid ${videoStyleGroup === g ? "var(--accent)" : "transparent"}`,
-                              marginBottom: -1, cursor: isBusy ? "not-allowed" : "pointer",
-                              fontSize: 11, fontWeight: videoStyleGroup === g ? 700 : 500,
-                              color: videoStyleGroup === g ? "var(--accent)" : "var(--text-muted)",
-                              transition: "all 0.15s", whiteSpace: "nowrap",
-                            }}>
+                            style={tabStyle(videoStyleGroup === g)}>
                             {g}
                           </button>
                         ))}
@@ -804,14 +776,7 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
                           const active = videoStyle === item.zh;
                           return (
                             <button key={item.zh} type="button" onClick={() => setVideoStyle(active ? "" : item.zh)} disabled={isBusy}
-                              style={{
-                                padding: "3px 10px", borderRadius: 20, fontSize: 11,
-                                cursor: isBusy ? "not-allowed" : "pointer",
-                                border: `1px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
-                                background: active ? "var(--accent)" : "rgba(127,127,127,0.06)",
-                                color: active ? "var(--btn-primary-text)" : "var(--text-muted)",
-                                transition: "all 0.15s",
-                              }}>
+                              style={chipStyle(active)}>
                               {item.zh}
                             </button>
                           );
@@ -824,20 +789,13 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
                 {/* 配音模型 — 廠商 tab + 聲音 chip，統一 accent 色 */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>配音模型</span>
-                  <div style={{ display: "flex", borderBottom: "1px solid var(--border-subtle)" }}>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                     {(["edge", "openai"] as const).map(prov => {
                       const active = voiceModelId.startsWith(prov + ":");
                       const firstVoice = VOICE_MODELS.find(v => v.id.startsWith(prov + ":"))?.id ?? voiceModelId;
                       return (
                         <button key={prov} type="button" onClick={() => setVoiceModelId(firstVoice)}
-                          style={{
-                            padding: "5px 14px", border: "none", background: "transparent",
-                            borderBottom: `3px solid ${active ? "var(--accent)" : "transparent"}`,
-                            marginBottom: -1, cursor: "pointer",
-                            fontSize: 12, fontWeight: active ? 700 : 500,
-                            color: active ? "var(--accent)" : "var(--text-muted)",
-                            transition: "all 0.15s",
-                          }}>
+                          style={tabStyle(active)}>
                           {prov === "edge" ? "Edge 免費" : "OpenAI"}
                         </button>
                       );
@@ -848,13 +806,7 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
                       const active = voiceModelId === v.id;
                       return (
                         <button key={v.id} type="button" onClick={() => setVoiceModelId(v.id)}
-                          style={{
-                            padding: "3px 10px", borderRadius: 20, fontSize: 11, cursor: "pointer",
-                            border: `1px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
-                            background: active ? "var(--accent)" : "rgba(127,127,127,0.06)",
-                            color: active ? "var(--btn-primary-text)" : "var(--text-secondary)",
-                            transition: "all 0.15s",
-                          }}>
+                          style={chipStyle(active)}>
                           {v.label}
                         </button>
                       );
@@ -882,28 +834,14 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
                             else next.add(fmt);
                             return next;
                           })}
-                          style={{
-                            padding: "6px 12px", borderRadius: 8,
-                            border: `2px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
-                            background: active ? "var(--accent)" : "var(--bg-canvas)",
-                            color: active ? "#fff" : "var(--text-secondary)",
-                            cursor: isBusy ? "not-allowed" : "pointer",
-                            fontSize: 12, fontWeight: active ? 700 : 500,
-                          }}>
+                          style={chipStyle(active)}>
                           {meta.ratio}
                         </button>
                       );
                     })}
                     <button type="button" disabled={isBusy}
                       onClick={() => setSelectedFormats(new Set(VIDEO_FORMAT_CHOICES))}
-                      style={{
-                        padding: "6px 12px", borderRadius: 8,
-                        border: `2px solid ${selectedFormats.size === VIDEO_FORMAT_CHOICES.length ? "var(--accent)" : "var(--border-subtle)"}`,
-                        background: selectedFormats.size === VIDEO_FORMAT_CHOICES.length ? "var(--accent)" : "var(--bg-canvas)",
-                        color: selectedFormats.size === VIDEO_FORMAT_CHOICES.length ? "#fff" : "var(--text-secondary)",
-                        cursor: isBusy ? "not-allowed" : "pointer",
-                        fontSize: 12, fontWeight: 600,
-                      }}>
+                      style={chipStyle(selectedFormats.size === VIDEO_FORMAT_CHOICES.length)}>
                       全選
                     </button>
                   </div>

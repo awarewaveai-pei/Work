@@ -1357,14 +1357,12 @@ export default function TarotStudio() {
                       }}
                       title={`~NT$${o.costNt}/張${o.maxRefs > 0 ? `，最多 ${o.maxRefs} 張參考圖` : "，純文字"}`}
                       style={{
+                        ...chipStyle(active),
                         display: "flex", alignItems: "center", justifyContent: "space-between",
-                        padding: "6px 10px", borderRadius: 8, fontSize: 12,
-                        cursor: locked ? "default" : "pointer",
-                        border: `1px solid ${active ? "var(--accent)" : "var(--card-border)"}`,
-                        background: active ? "rgba(99,102,241,0.12)" : "rgba(127,127,127,0.04)",
+                        padding: "6px 10px",
                         color: active ? "var(--accent)" : "var(--text)",
-                        fontWeight: active ? 600 : 400,
                         opacity: locked ? 0.5 : 1,
+                        cursor: locked ? "default" : "pointer",
                       }}
                     >
                       <span>{active ? "✓ " : ""}{o.label}</span>
@@ -1417,13 +1415,7 @@ export default function TarotStudio() {
                     key={g}
                     type="button"
                     onClick={() => setStyleGroupTab(g)}
-                    style={{
-                      padding: "3px 8px", borderRadius: 12, fontSize: 11, cursor: "pointer",
-                      border: `1px solid ${styleGroupTab === g ? "var(--accent)" : "var(--card-border)"}`,
-                      background: styleGroupTab === g ? "var(--accent)" : "transparent",
-                      color: styleGroupTab === g ? "var(--btn-primary-text)" : "var(--text-muted)",
-                      fontWeight: styleGroupTab === g ? 600 : 400,
-                    }}
+                    style={tabStyle(styleGroupTab === g)}
                   >
                     {g}
                   </button>
@@ -1462,14 +1454,10 @@ export default function TarotStudio() {
                           })
                         }
                         style={{
-                          padding: "3px 9px", borderRadius: 12, fontSize: 11,
+                          ...chipStyle(selected),
                           cursor: locked ? "default" : "pointer",
                           // pointerEvents:none while locked lets the hover reach the span
                           pointerEvents: locked ? "none" : "auto",
-                          border: `1px solid ${selected ? "var(--accent)" : "var(--card-border)"}`,
-                          background: selected ? "rgba(99,102,241,0.12)" : "rgba(127,127,127,0.04)",
-                          color: selected ? "var(--accent)" : "var(--text-muted)",
-                          fontWeight: selected ? 600 : 400,
                           opacity: locked ? 0.5 : 1,
                         }}
                       >
@@ -1494,13 +1482,7 @@ export default function TarotStudio() {
                     type="button"
                     disabled={locked || suggestBusy}
                     onClick={() => void suggestPrompt()}
-                    style={{
-                      fontSize: 10, padding: "2px 8px", borderRadius: 10,
-                      border: "1px solid var(--accent)",
-                      background: locked || suggestBusy ? "rgba(127,127,127,0.08)" : "var(--ai-bg)",
-                      color: locked || suggestBusy ? "var(--text-muted)" : "var(--accent)",
-                      cursor: locked || suggestBusy ? "default" : "pointer",
-                    }}
+                    style={{ ...ghostBtn(), cursor: locked || suggestBusy ? "default" : "pointer", opacity: locked || suggestBusy ? 0.5 : 1 }}
                   >
                     {suggestBusy ? "✨ AI 生成中…" : "✨ 幫我想 prompt"}
                   </button>
@@ -1509,11 +1491,7 @@ export default function TarotStudio() {
                       type="button"
                       disabled={locked}
                       onClick={() => { setStyleEnglish(""); setStyleEnglishEdited(false); }}
-                      style={{
-                        fontSize: 10, padding: "2px 6px", borderRadius: 10,
-                        border: "1px solid var(--card-border)", background: "transparent",
-                        color: "var(--text-muted)", cursor: locked ? "default" : "pointer",
-                      }}
+                      style={{ ...ghostBtn(), cursor: locked ? "default" : "pointer", opacity: locked ? 0.5 : 1 }}
                     >
                       ↻ 重設
                     </button>
