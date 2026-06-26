@@ -1,6 +1,6 @@
 param(
     [string]$WorkspaceRoot = "",
-    [int]$KeepDays = 30,
+    [int]$KeepDays = 90,
     [switch]$Apply
 )
 

@@ -11,7 +11,7 @@ so you can browse past closeouts without scrolling up in the live chat.
   - 未完成
   - 連動檢查（doc-sync, health gate result）
   - 明日優先
-- **Retention**: 30 days — older files are auto-pruned by the slash command on the next run
+- **Retention**: 90 days — older files are auto-pruned by the slash command on the next run
 - **Sync**: git tracked → cross-machine via `git pull`
 
 ## Authoring rule

@@ -7,7 +7,7 @@ so you can browse history without scrolling up in the live chat.
 
 - **Filename**: `YYYY-MM-DD-HHmm.md` (local time of the AO-RESUME run)
 - **Content**: the full 七段式 markdown Claude printed in chat
-- **Retention**: 30 days — older files are auto-pruned by the slash command on the next run
+- **Retention**: 90 days — older files are auto-pruned by the slash command on the next run
 - **Sync**: git tracked → cross-machine via `git pull`
 
 ## Authoring rule
