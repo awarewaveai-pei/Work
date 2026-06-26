@@ -97,8 +97,9 @@
 - 驗證:`npm test` 49/49 ✅、typecheck ✅、build ✅(17 靜態頁雙語預渲染)、HTTP smoke(hub+各系統頁雙語)✅。
 
 > ✅ **地基(F1–F5)+ 功能期免憑證範圍全部完成**(共 10 commit:102e1c1…5d29c5d)。
-> **下一步全部 BLOCKED 在 operator 憑證/決策**(見 `ORACLE_PLAN.md` §22),非技術缺漏:
-> - AI 解讀接真 SDK → `OPENAI_API_KEY`(+選配 `ANTHROPIC_API_KEY`)
+> ✅ **2026-06-26 Phase A「Centaur AI 解讀層」已接真 SDK 並上線驗過**(WORKLOG 2026-06-26 / commit 36f3069d):`lib/ai/{prompts,models,errors,providers}` 真打 GPT(預設,`OPENAI_API_KEY` **已在 vault — 非 blocked**)+ Claude 備選;NO-CALC 護欄、雙語模板、tier 分級、密鑰遮蔽。`npm test` 57 pass + 真 GPT light/deep live 驗過。**下一刀 = AI 問答入口 `app/api/interpret/route.ts` + UI + Freemium 付費牆**(此才需 Supabase/金流憑證)。
+> **下列仍 BLOCKED 在 operator 憑證/決策**(見 `ORACLE_PLAN.md` §22),非技術缺漏:
+> - Claude A/B → 選配 `ANTHROPIC_API_KEY`(未設,GPT 路徑已可獨立運作)
 > - 金流真結帳 → ECPay/Stripe/PayPal 帳號;DB/帳號 → Supabase 專案
 > - 西洋占星(第 5 系統)→ astrology-api.io key
 > - Blog → §22 內容引擎整合方式(A/B/C)拍板 + Notion/憑證
@@ -112,11 +113,10 @@
 - 部署到 Vercel + 掛子網域。
 
 **Phase 2 — AI 解讀（賺錢核心，最高槓桿）**
-- `lib/ai/interpret.ts`：**廠商無關** `interpret()` 介面 + `providers/openai.ts`(**預設 GPT**)/`providers/anthropic.ts`(可切 Claude)；模型分級(輕量/深度/頂規) + streaming(萬字) + prompt caching。`AI_PROVIDER` 環境變數切換。
-- `lib/ai/prompts/`：各系統解讀系統提示（**可直接改寫競品那段「組合解讀/忠於牌義/不空泛安慰也不災難化」的 prompt 骨架**，品質好且省事）。
-- `app/api/interpret/route.ts`：付費牆 + 額度檢查後才呼叫 AI。
-- **真命盤 A/B**：GPT vs Claude 同盤各跑一份，使用者選贏家（可分用途）。
-- 需要 `OPENAI_API_KEY`（預設）及/或 `ANTHROPIC_API_KEY`（環境變數）。
+- ✅ `lib/ai/interpret.ts` 廠商無關 `interpret()` + `providers/{openai,anthropic}.ts` 真 SDK(預設 GPT,`AI_PROVIDER` 切換)+ `lib/ai/models.ts`(tier 分級,env 可覆寫)+ `lib/ai/prompts/`(Centaur NO-CALC 護欄、雙語)。已驗(2026-06-26)。
+- ⬜ streaming(萬字報告)— 接縫已留,加 `interpretStream` 不動現有 `interpret()`。
+- ⬜ `app/api/interpret/route.ts`：付費牆 + 額度檢查後才呼叫 AI(**route 落地時:勿把 `AiCallError.message` 原樣回前端、勿 `console.error` 整個 req — user prompt 含生辰衍生 facts**)。
+- ⬜ **真命盤 A/B**：GPT vs Claude 同盤各跑(需 `ANTHROPIC_API_KEY`,目前未設)。
 
 **Phase 3 — 多系統**
 - `lib/bazi.ts`(lunar-javascript) + `app/bazi/page.tsx`。
