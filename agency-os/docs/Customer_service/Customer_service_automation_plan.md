@@ -1,6 +1,7 @@
 # 全自動客服系統 — 進化版總計畫（Automation Master Plan）
 
-> **SSOT 宣告**：本檔是「全自動客服」的**主計畫（SSOT）**。
+> **SSOT 宣告**：本檔是「全自動客服」的**設計主計畫（SSOT）**。
+> **執行進度/單元/順序/gate 看** → [`Customer_service_BUILD_PLAN.md`](Customer_service_BUILD_PLAN.md)（執行 SSOT）。
 > 附錄：`Customer_service_competitive_research.md`（頂規競品研究證據）、**`Customer_service_uiux_design.md`（客戶體驗 UI/UX 設計規範，§18 摘要）**、`Customer_service_platform_research.md`（通道可行性）、`Customer_service_plan.md`（最初決策摘要）。
 > **本次範圍：只出計畫，不寫 code。** 每個 Phase 的實作另起 R0 流程。
 > **狀態**：草案 **v2.1**（2026-06-25）｜v2.0 = 研究全球頂規系統（Fin/Sierra/Decagon/Ada/Zendesk/Agentforce）全面升級（雙軸自主、agentic 安全、supervisor、Contextual Retrieval、prompt-injection 防禦、開源 eval 棧、多供應商容錯）。**v2.1 = 加客戶體驗層**（清新自然設計語言 + headless 自建 widget，§18）。**已鎖定決策**見 §0。

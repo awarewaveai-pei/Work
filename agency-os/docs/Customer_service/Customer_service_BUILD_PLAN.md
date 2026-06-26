@@ -1,0 +1,116 @@
+# 全自動客服 — 建置執行總計畫（BUILD PLAN / 執行 SSOT）
+
+> **這份是「執行 SSOT」** —— 要知道「做到哪、下一步、誰依賴誰、哪些 gate、跑哪台機」，看這份。
+> **設計 SSOT** 是 [`Customer_service_automation_plan.md`](Customer_service_automation_plan.md)（架構/分級/RAG/eval/agentic）。兩份分工同 Cold Outreach 的 SPEC + BUILD_PLAN 範式。
+> **建置原則**（操作者拍板 2026-06-26）：**軟體先行、硬體後搬** —— U0–U5 全部現在零花費在現有機器建好驗證；只有 U6（Chatwoot 載體）之後搬大記憶體機器。
+
+---
+
+## §0 文件地圖（這專案的所有文件）
+
+| 檔 | 角色 |
+|---|---|
+| **`Customer_service_BUILD_PLAN.md`（本檔）** | **執行 SSOT** — 單元/順序/進度/gate/IA 落點 |
+| [`Customer_service_automation_plan.md`](Customer_service_automation_plan.md) | **設計 SSOT** — v2.1 主計畫（§0 決策 / §1 雙軸分級 / §3 控制流 / §4 RAG / §5 eval / §8 容錯 / §9 資料模型 / §11 roadmap / §15-17 / §18 客戶體驗）|
+| [`Customer_service_competitive_research.md`](Customer_service_competitive_research.md) | 頂規競品研究證據（Fin/Sierra/Decagon… + 開源棧，含出處）|
+| [`Customer_service_uiux_design.md`](Customer_service_uiux_design.md) | 客戶體驗 UX + 清新自然設計語言 + **CIS（§2.6 品牌色引擎 / §2.7 brandKit+csVoice schema）**+ headless widget |
+| [`Customer_service_plan.md`](Customer_service_plan.md) | 最初決策摘要（原檔，附錄）|
+| [`Customer_service_platform_research.md`](Customer_service_platform_research.md) | 通道可行性研究（原檔，附錄）|
+| 互動原型 | `D:\tmp\cs-widget-demo.html`（清新自然 widget，瀏覽器可開）+ 對話內 2 個 show_widget（配色引擎 / CIS 設定 tab）|
+
+---
+
+## §1 鎖定決策速查（D1–D12，詳設計 SSOT §0）
+
+| D | 決策 |
+|---|---|
+| D1 | 雙軸漸進：答覆 L1→L2 × 行動 A1→A2；money/身分/法律/醫療**永不自動**（code 硬閘）|
+| D2 | 三維一起建（自用+客戶自用+代操）；自家 Account#0 先金絲雀 |
+| D3 | OpenAI embeddings 可插拔（資料主權客戶切 bge-m3）|
+| D4 | 商業軌（官方 API）主幹；個人軌隔離不進產品 |
+| D5 | 獨立 Chatwoot 機器（**軟體先行、之後搬大機**）|
+| D6 | Chatwoot 擁有對話；我方只存知識/eval/稽核/記憶/CIS |
+| D7 | 自建 Claude+RAG+agentic（非付費 Captain）|
+| D8 | Chatwoot Pattern A（AgentBot+webhook）+ Community 版 |
+| D9 | agentic 行動分階 A1 唯讀→A2 受閘寫→A3 金錢/身分人類閘 |
+| D10 | 開源護欄棧：Phoenix+RAGAS+DeepEval+NeMo+PromptGuard2+Contextual Retrieval+hybrid |
+| D11 | 先純 tool-calling；複雜才 LangGraph；durable 用 Trigger.dev |
+| D12 | headless 自建 widget（清新自然）；CIS 重用既有 brandColors+BrandVoiceProfile |
+
+---
+
+## §2 IA 落點（已驗證 `next-admin/app/SidebarNav.tsx` + `ClientHubTabs.tsx`）
+
+```
+per-client hub  /ops/clients/[slug]   （既有 7 tab：內容工具/整合/佈建/維護/設定/社群頻道/憑證庫）
+  ├─ ➕ tab「品牌識別(CIS)」   ← VI 標準色(錨點 brandColors)+Logo+標準字 / BI·MI 客服語氣(BrandVoiceProfile)
+  └─ ➕ tab「客服」            ← 該客戶 知識庫/通道/intent autonomy
+
+頂層 sidebar ➕ section「客服」（仿 Cold Outreach 作戰中心）
+  ← 跨客戶營運：Chatwoot 收件匣 / eval·模擬 / 意圖開關 / resolution·成本 / kill-switch 三層
+
+客戶自用（賣，Phase 5）  ← 不另寫；同一批 per-client 元件在自助 portal 限定該 org 重用
+```
+**原則**：設計一次，自用+代操今天可用（agency ops 視角）；客戶自助 Phase 5 重用同元件。**不新增孤立入口。**
+
+---
+
+## §3 建置單元與依賴順序（U0–U6）
+
+> 狀態：✅ 完成 ｜ 🔨 進行中 ｜ ⏭ 下一個 ｜ ⏳ 排隊 ｜ ⛔ gated（等 go-ahead）
+> 跑哪：💻 現有機器($0) ｜ 📦 之後搬大機
+
+| U | 單元 | 跑哪 | 依賴 | 對應 Phase | 狀態 |
+|---|---|---|---|---|---|
+| **U0** | **資料地基** migration 0051（8 表 + pgvector + RLS）| 💻 現有 Supabase | — | 全 Phase 地基 | ✅ **建好+驗證**（apply ⛔ gated）|
+| **U1** | **cs-engine 核心** `lib/cs/`（webhook→護欄→分類→RAG→生成→supervisor→送/動作/轉）| 💻 next-admin | U0 | P1–P4 | ⏭ 下一個 |
+| **U2** | **CIS 配置 + tab**（brandKit+csVoice JSONB + 「品牌識別」tab，重用 brandColors/BrandVoiceProfile）| 💻 next-admin UI | — | P1 | ⏳（可插隊：可見）|
+| **U3** | **客服 tab + 頂層「客服」section**（per-client config + 跨客戶營運中心）| 💻 next-admin UI | U0,U1 | P1–P2 | ⏳ |
+| **U4** | **headless widget**（Client API+WS+清新自然+互動類型）| 💻 next-admin embed | U1,U6 | P1 | ⏳ |
+| **U5** | **eval/護欄 harness**（RAGAS+DeepEval+Phoenix+golden set+CI gate+simulation）| 💻 自架現有機 | U1 | P2 | ⏳ |
+| **U6** | **Chatwoot 載體**（docker-compose Community + healthcheck/smoke/rollback）| 📦 EU 現可緊跑/本機測 → **搬大機** | — | P1 | ⛔（deploy gated）|
+
+**U1 cs-engine 子任務**（建時細分，仿 Cold Outreach T1–T12）：
+- U1a RAG 管線：切塊 + Contextual Retrieval + embeddings(可插拔) + pgvector 寫入/檢索 + hybrid(vector+BM25+RRF+rerank)
+- U1b 控制流：webhook 接收(HMAC+冪等) + 前置(租戶/營業時間/loop/rate) + 意圖分類(haiku)
+- U1c 護欄：PromptGuard2 + 三段隔離 + grounding supervisor + 信心門檻 + PII + 敏感意圖轉真人
+- U1d 生成：Claude sonnet + CIS 品牌語氣注入(BrandVoiceProfile) + 多供應商 failover(Gemini)
+- U1e agentic 行動：tool-loop + allowlist(cs_tools) + A2 確認 checkpoint + A3 code 硬閘
+- U1f 送出/交接：Chatwoot Client/AgentBot API 回覆 + pending→open + cs_ai_replies/cs_action_log 稽核 + ops-inbox 漏回告警
+- U1g 成本/可觀測：ai_call_logs(kind=cs) + Phoenix/Langfuse trace
+
+**Phase 對照**（設計 SSOT §11）：U0+U1b/c/d+U2+U6+U4 = Phase 1（載體+L1 副駕）；U1a+U5 = Phase 2（RAG+eval 升 L2）；U1e(A1) = Phase 3；U1e(A2) = Phase 4。
+
+---
+
+## §4 High-Risk Gates（不經 go-ahead 不做）
+
+| Gate | 觸發 | 規則 |
+|---|---|---|
+| **apply migration 0051** | U0 寫入 prod Supabase | High：等明示 go-ahead；apply 前確認實例有 pgvector + hnsw |
+| **Chatwoot deploy** | U6 docker-compose 上機 | High：走新部署 6 項（healthcheck/smoke/rollback/notify/typecheck）+ go-ahead |
+| **租/搬 VPS** | U6 搬大記憶體機器 | High：規格/區域/成本由操作者拍板（D5，目前暫緩）|
+| **money/身分自動化** | A3 動作 | 紅線：**永不自動**，code 硬閘 + 人類閘 |
+| **DPA** | 送客戶 PII 到 LLM（Phase 2 前）| 帳號層：Anthropic+OpenAI 零保留設定 |
+
+---
+
+## §5 建置進度 Log
+
+**2026-06-26 — U0 資料地基 ✅**
+- 建：[`packages/db/migrations/0051_cs_core.sql`](../../../lobster-factory/packages/db/migrations/0051_cs_core.sql)（8 表：cs_knowledge_sources / cs_knowledge_chunks[pgvector+BM25] / cs_intents[雙軸] / cs_tools[allowlist] / cs_eval_cases / cs_customer_memory / cs_ai_replies[稽核] / cs_action_log）+ [`scripts/0051_cs_core_down.sql`](../../../lobster-factory/packages/db/scripts/0051_cs_core_down.sql)
+- 慣例：照 0050（BEGIN/COMMIT + service-role RLS + NOTIFY pgrst + WHY/SCHEMA/SECURITY 註解）
+- 驗證：✅ 0051 未被佔 / cs_ 表名無衝突 / vector+hnsw 首用（佐證 pgvector 不存在）/ down 就位。REALTEST waived（apply=gated High）
+- 待：apply 到 EU Supabase（⛔ 等 go-ahead）
+
+---
+
+## §6 每單元驗證標準（R0 四動作，逐單元）
+- **REALTEST**：U1+ code → `npx tsc --noEmit` + 真實 invoke（webhook/curl/DB round-trip）；U0 migration → apply 後查表/RLS；REALTEST_EVIDENCE 入 WORKLOG
+- **REVIEW**：critic subagent 外部 oracle，結論入 [驗證結果]
+- **BUGHUNT**：跨檔 grep call sites（scope 含 agency-os/scripts/lobster-factory）
+- **WORKLOG**：每單元根因/步驟/驗證 + 本檔 §5 進度 log 更新
+
+---
+
+_本檔為執行 SSOT；設計細節一律回指 `Customer_service_automation_plan.md`。新單元完成 → 更新 §3 狀態 + §5 log。_

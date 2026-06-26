@@ -1,123 +1,84 @@
 /**
- * GET  /api/theme  → { tokens: Record<string, string> }
- *   Returns the default token values baked into globals.css at build time.
- *   Theme overrides are stored client-side in localStorage ('aw-theme-overrides')
- *   and applied before paint via an inline <script> in layout.tsx.
+ * GET  /api/theme  → { tokens: Record<string,string>, layout: SavedLayout | null }
+ *   tokens = globals.css defaults merged with the saved global overrides (server-side).
  *
- * POST /api/theme  { tokens: Record<string, string> } → { ok: true }
- *   Validates token names/values and returns ok.
- *   Actual persistence is handled by the theme editor writing to localStorage.
- *   (Next.js standalone mode does not have the source globals.css at runtime,
- *    so server-side CSS file writes are not possible without a volume mount.)
+ * POST /api/theme  { tokens, layout } → { ok: true, updated }
+ *   owner/admin only. Validates token names+values, stores ONLY overrides (diffs vs default)
+ *   + the sidebar layout in the single global app_theme row. layout.tsx reads it back so the
+ *   look applies on every device before paint. (Single source of truth — no localStorage.)
  */
-
 import { NextResponse } from "next/server";
+import { resolveOpsRole, canWriteTenantConfig } from "../../../lib/ops-role";
+import { DEFAULT_TOKENS, VALID_TOKEN_NAMES, SAFE_VALUE_RE, type SavedLayout } from "../../../lib/theme/tokens";
+import { getThemeConfig, saveThemeConfig } from "../../../lib/theme/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Default token values — mirrors the :root block in globals.css.
-// These are what GET returns so the theme editor starts from the right baseline.
-const DEFAULT_TOKENS: Record<string, string> = {
-  "--accent":            "#6366f1",
-  "--accent-hover":      "#818cf8",
-  "--btn-primary-bg":    "#6366f1",
-  "--btn-primary-hover": "#4f52e0",
-  "--btn-primary-text":  "#ffffff",
-  "--body-bg":           "#f2f5fb",
-  "--card-bg":           "#ffffff",
-  "--bg-subtle":         "#f5f7fd",
-  "--bg-hover":          "#eef1f9",
-  "--surface-2":         "#f5f7fd",
-  "--sidebar-bg":        "#f7f9fc",
-  "--sidebar-border":    "#e6eaf4",
-  "--sidebar-text":      "#475569",
-  "--sidebar-text-hover":  "#0d1526",
-  "--sidebar-text-active": "#0d1526",
-  "--sidebar-active-bar":  "#6366f1",
-  "--text-primary":      "#0d1526",
-  "--text-muted":        "#64748b",
-  "--text-secondary":    "#64748b",
-  "--green":             "#10b981",
-  "--red":               "#ef4444",
-  "--yellow":            "#f59e0b",
-  "--severity-critical": "#dc2626",
-  "--severity-high":     "#ea580c",
-  "--severity-medium":   "#ca8a04",
-  "--severity-low":      "#0284c7",
-  "--status-resolved":   "#16a34a",
-  "--status-ignored":    "#6b7280",
-  "--card-border":       "#e6eaf4",
-  "--border":            "#e6eaf4",
-  "--border-subtle":     "#e6eaf4",
-  "--radius":            "12px",
-  "--radius-sm":         "8px",
-  "--code-bg":           "#07101f",
-  "--ai-bg":             "#e0f2fe",
-  "--ai-text":           "#0369a1",
-  "--btn-secondary-bg":     "#ffffff",
-  "--btn-secondary-border": "#d4d9e8",
-  "--btn-secondary-text":   "#0d1526",
-  // Typography
-  "--font-size-xs":   "11px",
-  "--font-size-sm":   "13px",
-  "--font-size-base": "14px",
-  "--font-size-md":   "15px",
-  "--font-size-lg":   "17px",
-  "--font-size-xl":   "22px",
-  "--font-weight-normal":   "400",
-  "--font-weight-medium":   "500",
-  "--font-weight-semibold": "600",
-  "--font-weight-bold":     "700",
-  "--font-weight-heavy":    "800",
-  "--line-height-base":     "1.6",
-  "--line-height-tight":    "1.3",
-  "--letter-spacing-label": "0.07em",
-  // Tab component
-  "--tab-font-size":     "14px",
-  "--tab-font-weight":   "600",
-  "--tab-color":         "#64748b",
-  "--tab-color-hover":   "#0d1526",
-  "--tab-color-active":  "#6366f1",
-  "--tab-bg":            "transparent",
-  "--tab-bg-hover":      "rgba(99,102,241,0.05)",
-  "--tab-bg-active":     "transparent",
-  "--tab-border-active": "#6366f1",
-  "--tab-bar-border":    "#e6eaf4",
-};
-
-// Only accept safe CSS values (no injection vectors).
-const SAFE_VALUE_RE =
-  /^(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)|hsla?\([^)]+\)|[0-9]+(\.[0-9]+)?(px|em|rem|%|vh|vw|dvh|dvw|s|ms)?|0|inherit|transparent|[a-z][\w-]*)$/;
-
 export async function GET() {
-  return NextResponse.json({ tokens: DEFAULT_TOKENS });
+  const saved = await getThemeConfig();
+  return NextResponse.json({
+    tokens: { ...DEFAULT_TOKENS, ...saved.tokens },
+    layout: saved.layout,
+  });
+}
+
+function validateLayout(input: unknown): SavedLayout | null {
+  if (input == null || typeof input !== "object" || Array.isArray(input)) return null;
+  const obj = input as Record<string, unknown>;
+  const out: SavedLayout = {};
+  if (Array.isArray(obj.sectionOrder) && obj.sectionOrder.every((s) => typeof s === "string")) {
+    out.sectionOrder = obj.sectionOrder as string[];
+  }
+  if (obj.itemOrders && typeof obj.itemOrders === "object" && !Array.isArray(obj.itemOrders)) {
+    const io: Record<string, string[]> = {};
+    for (const [k, v] of Object.entries(obj.itemOrders as Record<string, unknown>)) {
+      if (Array.isArray(v) && v.every((x) => typeof x === "string")) io[k] = v as string[];
+    }
+    out.itemOrders = io;
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 export async function POST(req: Request) {
-  let body: { tokens?: Record<string, unknown> };
+  const { role } = resolveOpsRole(req);
+  if (!canWriteTenantConfig(role)) {
+    return NextResponse.json({ ok: false, error: "forbidden_role", role }, { status: 403 });
+  }
+
+  let body: { tokens?: Record<string, unknown>; layout?: unknown };
   try {
-    body = await req.json();
+    body = (await req.json()) as typeof body;
   } catch {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
 
-  const incoming = body?.tokens;
-  if (!incoming || typeof incoming !== "object" || Array.isArray(incoming)) {
+  const incoming = body?.tokens ?? {};
+  if (typeof incoming !== "object" || Array.isArray(incoming)) {
     return NextResponse.json({ ok: false, error: "tokens_required" }, { status: 400 });
   }
 
-  // Validate names and values.
+  // Defence-in-depth: only known token names, only safe values, store only true overrides.
+  const tokens: Record<string, string> = {};
   for (const [name, value] of Object.entries(incoming)) {
-    if (!/^--[\w-]+$/.test(name)) {
-      return NextResponse.json({ ok: false, error: `invalid_token_name: ${name}` }, { status: 400 });
+    if (!VALID_TOKEN_NAMES.has(name)) {
+      return NextResponse.json({ ok: false, error: `unknown_token: ${name}` }, { status: 400 });
     }
     if (typeof value !== "string" || !SAFE_VALUE_RE.test(value.trim())) {
-      return NextResponse.json({ ok: false, error: `unsafe_value for ${name}: ${value}` }, { status: 400 });
+      return NextResponse.json({ ok: false, error: `unsafe_value for ${name}` }, { status: 400 });
     }
+    if (value.trim() !== DEFAULT_TOKENS[name]) tokens[name] = value.trim();
   }
 
-  // Persistence is handled by the theme editor writing to localStorage.
-  // The inline script in layout.tsx applies those values before first paint.
-  return NextResponse.json({ ok: true, updated: Object.keys(incoming).length });
+  const layout = validateLayout(body?.layout);
+
+  try {
+    await saveThemeConfig(tokens, layout);
+  } catch (err) {
+    return NextResponse.json(
+      { ok: false, error: err instanceof Error ? err.message : "save_failed" },
+      { status: 500 },
+    );
+  }
+  return NextResponse.json({ ok: true, updated: Object.keys(tokens).length });
 }

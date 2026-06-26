@@ -1,23 +1,22 @@
-import type { ReactNode } from "react";
+import type { ReactNode, CSSProperties } from "react";
 import "./globals.css";
 import { PHProvider } from "./providers";
 import { PostHogAnalytics } from "./posthog-analytics";
 import { LogoutButton } from "./LogoutButton";
 import { SidebarNav } from "./SidebarNav";
+import { getThemeConfig } from "../lib/theme/store";
 
 export const metadata = { title: "Lobster Factory Admin" };
 
-// Inline script that runs synchronously before first paint — reads aw-theme-overrides
-// from localStorage and applies CSS custom properties so theme changes survive page reload.
-const THEME_INJECT_SCRIPT = `(function(){try{var o=JSON.parse(localStorage.getItem('aw-theme-overrides')||'{}');var s=document.documentElement.style;for(var k in o){if(k.indexOf('--')===0)s.setProperty(k,o[k]);}}catch(e){}})();`;
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // Saved global theme, server-side. Rendered as inline custom properties on <html> so the
+  // operator's look applies on EVERY device before first paint (no FOUC, no localStorage).
+  // Fail-open: getThemeConfig returns {} on any DB error/timeout → globals.css defaults.
+  const { tokens, layout: navLayout } = await getThemeConfig();
+  const themeStyle = tokens as CSSProperties;
 
-export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="zh-TW">
-      <head>
-        {/* Must be first in <head> — applies before CSS bundle loads to eliminate FOUC */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_INJECT_SCRIPT }} />
-      </head>
+    <html lang="zh-TW" style={themeStyle}>
       <body>
         <PHProvider>
           <PostHogAnalytics />
@@ -31,7 +30,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 </div>
               </div>
 
-              <SidebarNav />
+              <SidebarNav initialLayout={navLayout} />
 
               <div className="sidebar-footer">
                 aware-wave.com

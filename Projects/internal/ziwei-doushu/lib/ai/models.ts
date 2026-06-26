@@ -11,9 +11,15 @@ import type { AiProviderId, AiTier } from './types';
  */
 const DEFAULTS: Record<AiProviderId, Record<AiTier, string>> = {
   openai: {
-    light: 'gpt-4o-mini',
-    deep: 'gpt-4o',
-    premium: 'gpt-4o',
+    // ⚠️ 模型的「輸出上限」必須 ≥ 下方 MAX_TOKENS[tier],否則 OpenAI 直接 400
+    //   拒絕(不是截斷)。裸 `gpt-4o` alias 部分快照僅 4096 輸出 → deep/premium
+    //   會爆;故 deep/premium 釘在 16384 輸出的快照(critic 2026-06-26)。
+    //   env 覆寫(OPENAI_MODEL_*)時同樣須選輸出上限足夠的模型。
+    //   deep 與 premium 共用同一模型為刻意:目前差異在 token 預算與篇幅指引,
+    //   非模型能力;未來頂規可改 env 指向更強模型。
+    light: 'gpt-4o-mini', // 16384 輸出
+    deep: 'gpt-4o-2024-11-20', // 16384 輸出
+    premium: 'gpt-4o-2024-11-20', // 16384 輸出
   },
   anthropic: {
     light: 'claude-haiku-4-5',

@@ -1,7 +1,7 @@
 'use client';
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { OpsInboxBadge } from './ops/inbox/components/OpsInboxBadge';
+import type { SavedLayout } from '../lib/theme/tokens';
 
 // ── Nav data ────────────────────────────────────────────────────────────────
 export type NavItem =
