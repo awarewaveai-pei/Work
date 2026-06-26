@@ -107,6 +107,78 @@
 
 **唯一真相源 + 持久化**：一份 client CIS 同時驅動 內容引擎(已用)+Banner Studio(已用)+客服 widget 視覺+客服 AI 語氣。存既有 `organizations.metadata.client_config`（`brandColors` 已在；擴 `brandKit` + `csVoice`），不另開孤立表。**已附互動原型**：先前「配色引擎」demo = VI 周邊色階推導器（fallback/quickstart），非 CIS 本身。
 
+### 2.7 brandKit + csVoice schema 草案（沿用 client_config JSONB，免 migration）
+
+> 位置：`organizations.metadata.client_config.{brandKit, csVoice}`，與既有 `brandColors` **同層 sibling**（`brand-colors/route.ts` 同模式）。**標準色唯一真相源仍是 `brandColors`**，brandKit 不重存色值（避免雙真相源）。
+
+**VI — `brandKit`（補 logo/標準字/輔助圖形，目前 repo 無）**
+```ts
+interface BrandKit {
+  logo: {
+    primary?:    string;   // 主標 URL
+    inverse?:    string;   // 反白/深底版 URL
+    icon?:       string;   // 純圖示/favicon URL（widget launcher/標頭用）
+    clearSpace?: string;   // 安全空間，如 "0.5× logo 高"
+    minWidthPx?: number;   // 最小顯示寬
+    preferOn?:   'light' | 'dark' | 'any';
+  };
+  typography?: {
+    headingFont?: { name: string; src?: string };  // 標準字（標題）
+    bodyFont?:    { name: string; src?: string };   // 內文
+    cjkFont?:     { name: string; src?: string };   // CJK 標準字（如 Noto Sans TC）
+  };
+  graphics?: {
+    pattern?:           string;                      // 輔助圖形/底紋 URL
+    illustrationStyle?: string;                      // 插畫風格描述（餵生圖/選素材）
+    iconStyle?:         'lucide' | 'phosphor' | 'custom';
+    imageryTreatment?:  string;                      // 影像調性（暖光/低飽和…）
+  };
+  motionPersonality?: 'calm' | 'balanced' | 'energetic';
+  doDont?: string[];     // 使用規範（logo 不可變形/不可換色…）
+  // 標準色 → 讀 client_config.brandColors，不在此重存
+}
+```
+
+**BI/MI — `csVoice`（客服專屬，補 `BrandVoiceProfile` 增量，不重存語氣本體）**
+```ts
+interface CsVoice {
+  personaName?: string;        // 客服化身名，如「小幫手」
+  avatarUrl?:   string;
+  brandVoiceRef: 'content';    // 語氣本體重用內容引擎 BrandVoiceProfile（同源，不複製）
+  languages:    string[];      // ['zh-Hant','en']
+  formality?:   'casual' | 'polite' | 'formal';
+  honorifics?:  '您' | '你';    // 稱謂
+  emojiPolicy?: 'none' | 'sparing' | 'friendly';
+  greeting?:    Record<string,string>;  // 各語言招呼語 { 'zh-Hant': '嗨，我是…' }
+  signoff?:     Record<string,string>;  // 結尾/簽名
+  apologyStyle?:   string;     // 道歉用語基調
+  refusalStyle?:   string;     // 做不到/拒絕時的用語
+  escalationTone?: string;     // 轉真人時語氣
+  servicePrinciples?: string[];// 服務準則（能否開玩笑/同理優先/不過度承諾…）
+  // MI 脈絡（選填，給 persona + 罐頭回覆基調）
+  mission?: string; slogan?: string; values?: string[];
+}
+```
+
+**System prompt 組裝（BI/MI 怎麼進 AI，§3 step6）**
+```
+system = [ 客服護欄與安全(§5)
+         + BrandVoiceProfile.promptInjection (內容引擎同源)
+         + preferWords / avoidWords
+         + csVoice: personaName / formality / honorifics / emojiPolicy
+                    / greeting / signoff / refusalStyle / escalationTone
+         + MI: mission / values (脈絡)
+         + RAG 檢索塊 + 客戶記憶 ]
+```
+
+**治理（沿用既有慣例）**：
+- RBAC：brandKit / csVoice 與 brandColors **同 client-config tier** → `canWriteTenantConfig`（owner/admin）。
+- logo / avatar 檔走既有資產儲存（Supabase storage / 既有圖庫），欄位**只存 URL**；hex 沿用既有 `HEX` 驗證。
+- 寫入記 `ops_audit_events`（`event_type: brand_kit_updated` / `cs_voice_updated`），同 brand-colors:78 模式。
+- 管理面：next-admin `/ops/cs` 或既有 `ClientHubTabs` 加「品牌識別」分頁（同清新自然設計語言）。
+
+**Fallback 階梯**：brandKit 缺 → 清新自然 default + brandColors 單色推導（§2.6）；csVoice 缺 brandVoice → 用內容引擎 profile；全無 → 中性禮貌預設。**有 CIS 就鎖定品牌，不給隨意換色/換語氣。**
+
 ---
 
 ## §3 自建 Widget 架構（headless on Chatwoot Client API）

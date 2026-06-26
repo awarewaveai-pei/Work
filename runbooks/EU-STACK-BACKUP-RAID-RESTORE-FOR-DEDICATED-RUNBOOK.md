@@ -51,24 +51,53 @@
 ### 🟢 可丟棄（cache，不必備）
 `trigger_trigger_redis_data`、`postiz-redis`、`supabase_deno-cache`、`trigger_trigger_shared`（runtime 暫存）。
 
-> **既有資產（不要重造）**：EU 已有 `/root/db-backups/`、`/root/backups/`、`/root/scripts/`（backup-eu routine，產出 `agency-os/reports/status/backup-health-LATEST`）。
-> **第一步是讀懂現有 backup 腳本涵蓋了上表哪些**，缺的才補 —不是從零寫一套。`TODO:` 盤點 `/root/scripts/backup-*.sh` 實際 dump 範圍。
+> **既有備份現況（2026-06-26 實測 `/root/scripts/backup-eu-stack.sh`）— 不重造，只補漏**：
+>
+> **✅ 已每日備份（02:30 UTC，cron `/etc/cron.d/eu-backup`）**：
+> - Supabase PG（`pg_dumpall -U supabase_admin` → `supabase-all.sql.gz`）
+> - Trigger PG（`pg_dump -U trigger trigger` → `trigger.sql.gz`）
+> - Uptime Kuma volume（`uptime-kuma.tgz`）
+> - 異地 L1：rsync → SG VPS（key `/root/.ssh/backup_to_sg`）｜異地 L2：**Cloudflare R2**（bucket `lobster-backup`，prefix `eu`，`upload-to-r2.sh`）→ **3-2-1 已成立**（本機 + SG + R2）
+> - integrity 驗證：`verify-backup-eu.sh`（gzip/tar -t + 檔案存在 + SG 異地存在）
+>
+> **🔴 確認的漏洞（backup-eu-stack.sh 沒涵蓋，機器死即永久遺失）**：
+> | 漏項 | dump 指令（已驗帳號）| 優先 |
+> |------|------|------|
+> | **MainWP DB** | `docker exec mainwp-db mysqldump -u root -p"$MYSQL_ROOT_PASSWORD" mainwp \| gzip` （user=mainwp/db=mainwp，root_set=yes）| 🔴 |
+> | **`.env` 密鑰 ×4** | `tar czf - /root/{supabase,trigger,mainwp,postiz}/.env \| openssl enc -aes-256-cbc -pbkdf2 -out env.tar.gz.enc`（**加密後**才離機）| 🔴 |
+> | **n8n** | `docker run --rm -v n8n_n8n_data:/d:ro -v $OUT:/b alpine tar czf /b/n8n.tgz -C /d .` | 🔴 |
+> | Postiz uploads | 同上 vol `postiz_postiz_uploads` | 🟡 |
+> | Supabase Storage | 同上 vol `supabase_storage-data` | 🟡 |
+> | Trigger MinIO | 同上 vol `trigger_trigger_minio_data` | 🟡 |
+> | MainWP files | 同上 vol `mainwp_mainwp_files` | 🟡 |
+>
+> **🔴 兩個結構性問題**：① `verify-backup-eu.sh` **只驗 integrity、從沒真的還原過**（= 等於沒演練，見 §6）② 異地 L1 指向 **SG**，**SG 退役後這條斷**，只剩 R2 單一異地 → 退 SG 前需補第二異地（R2 第二 region 或 Hetzner Storage Box）。
+>
+> **補漏動作（Medium，改 prod 備份腳本，需另行 propose）**：把上表 🔴🟡 加進 `backup-eu-stack.sh`（同樣 integrity 驗證 + 納入 R2/異地）。`.env` 加密金鑰存本機 vault，**不可**跟備份放一起。
 
 ---
 
-## §2 備份策略（3-2-1）
+## §2 備份策略（3-2-1）— 現況已達標，重點在「補漏 + SG 退役後的異地接替」
 
 > **3-2-1 rule（業界備份基準）**：**3** 份資料、**2** 種媒介、**1** 份異地離線。
 
-| 層 | 做法 | 頻率 | 保留 |
-|----|------|------|------|
-| 本機 dump | DB 邏輯 dump → `/root/db-backups/`（已有，擴充涵蓋全 🔴）| 每日 | 7 天 |
-| 異地 | 推到 **Hetzner Storage Box**（`BX` 系列，便宜、SFTP/borg）| 每日 | 30 天 |
-| 離線/跨供應商 | 每週一份打到第二地點（如 Backblaze B2 / 另一機）| 每週 | 8 週 |
+**現有實作（`backup-eu-stack.sh`，已符合 3-2-1）**：
 
-- **工具建議**：`restic` 或 `borgbackup`（去重 + 加密 + 增量；業界 backup CLI 標準）→ repo 放 Storage Box。`.env` 必須**加密後**才離機（含密鑰）。
-- **自動化**：cron + 失敗告警接現有 Telegram alert 管線（見 `runbooks/ADD-PERIODIC-HEALTH-CHECK.md` 的 codified pattern；零記憶負擔 = 失敗自己會叫）。
-- `TODO:` 確認 Storage Box 已開 / 帳號；寫 `backup-eu-offsite.sh` + cron + 告警。
+| 層 | 現況 | 頻率 | 保留 | SG 退役影響 |
+|----|------|------|------|------------|
+| 本機 | `/root/backups/<stamp>/` | 每日 02:30 | 7 天 | 無 |
+| 異地 L1 | rsync → **SG VPS** | 每日 | — | **❌ 斷**（SG 退役）|
+| 異地 L2 | **Cloudflare R2**（bucket `lobster-backup`/prefix `eu`）| 每日 | — | ✅ 不受影響 |
+
+**所以策略不是「重建」，是兩件補強**：
+1. **補漏覆蓋**（§1 表的 🔴🟡）— 加進 `backup-eu-stack.sh`，含 integrity 驗證 + 一起進 R2。
+2. **SG 退役前補第二異地**取代 L1：選一 →
+   - (a) **R2 第二 bucket/region**（最省力，已有 R2 帳號）
+   - (b) **Hetzner Storage Box**（`BX` 系列，SFTP/borg；新機房 = 真正獨立故障域）
+   - (c) 新的大 dedicated 本身當第二落地（遷移後）
+
+- **`.env` 密鑰**：`openssl enc -aes-256-cbc -pbkdf2` 加密後才進備份；**金鑰存本機 vault（`secrets-vault.ps1`），絕不跟備份同地**。
+- **失敗告警**：`verify-backup-eu.sh` 已有；接現有 Telegram alert 管線（見 `runbooks/ADD-PERIODIC-HEALTH-CHECK.md`；零記憶負擔 = 失敗自己會叫）。**`TODO:` 確認 verify 失敗有真的觸發 Telegram。**
 
 ---
 
