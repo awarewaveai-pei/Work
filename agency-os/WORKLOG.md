@@ -104,6 +104,22 @@
 [剩餘風險] 無（mirror 既有 pattern）；尚未 deploy
 [rollback] 同檔 `git revert`
 
+### fix(studio): UI 一致性重構 — 4-primitive 設計系統（同類型元件統一，神經多樣性友善）
+
+[任務理解] 操作者有 ADHD/OCD/ASD/HSP/CPTSD，UI 不一致造成痛苦。要求所有小工具 tabs/select/按鈕等同類元件樣式（含顏色）完全一致。
+[現況分析] 稽核 StudioWorkbench：同類元件多套 inline 變體 — CategoryPicker/模型/風格 tab 各寫 inline（外觀同但未共用 helper）；比例按鈕圓角 20+字 12 ≠ 其他 chip 圓角 12+字 11；🎲骰子紫漸層 ≠ 其他平面 accent 動作鈕；✕/清除/移除 各圓角 8/10。
+[已修改] StudioWorkbench.tsx：建立 4-primitive 設計系統
+- 既有 tabStyle/chipStyle + 新增 actionPill(主要動作,平面 accent pill)/ghostBtn(次要,透明描邊)
+- tab 全收斂 tabStyle ×7（+CategoryPicker/模型/風格/地圖切換）；chip 全收斂 chipStyle ×7（+比例 +已選文化 token）
+- 動作鈕 actionPill ×3（骰子去漸層 / AI 靈感 / 抓熱搜）；次要 ghostBtn ×2（✕/清除）
+- 混搭 banner 紫(168,85,247)→accent(99,102,241) 統一色盤；註解標記 design-system 邊界（結果區 btn-* class 為另一 primitive，勿跨界統一）
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=3463
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0major/0minor（行為保留：disabled/onClick/key/title 全在；2 cosmetic 屬預期統一方向）
+- BUGHUNT_DONE: scope=agency-os,scripts,app(next-admin) | grep=actionPill|ghostBtn|linear-gradient|rgba(168,85,247) | hits=0（helper 各定義 1 次、0 跨檔碰撞；漸層/紫色 0 殘留）
+[剩餘風險] refMode 分段控制 + 模型列 為不同元件類型刻意保留（各自內部一致）；尚未 deploy；其他 /tools/* 頁（tarot/video）未納入本次
+[rollback] 同檔 `git revert`
+
 ## 2026-06-25
 
 ### perf(trigger): dispatch-action-run schedule */1 → */10 — 一勞永逸消除 dispatcher 空轉容器

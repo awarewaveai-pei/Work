@@ -97,9 +97,14 @@ async function downscaleImageFile(file: File, maxDim = 1024, quality = 0.85): Pr
   });
 }
 
-// Shared pill looks. A selected TAB is a solid-accent fill; a selected CHIP is a
-// light-purple fill — so a checked item is visually distinct from the active tab
-// (previously both used var(--accent) and were indistinguishable).
+// ── Studio panel design system (4 primitives — keep ALL same-type elements identical) ──
+//   tabStyle(active)      sub-category TABS  — solid-accent fill when active
+//   chipStyle(active)     option CHIPS       — light-purple fill when active (distinct from tabs)
+//   actionPill(disabled)  primary ACTION     — solid-accent pill (fetch / dice / roll)
+//   ghostBtn()            secondary ACTION   — transparent + bordered (clear / cancel / remove)
+// Boundary: the result-stage buttons (生成 / 存入 / 去背 / 下載) use the GLOBAL
+// btn-primary / btn-secondary CSS classes — a separate, self-consistent primitive.
+// Do NOT unify across that boundary; only same-type elements share a helper.
 function tabStyle(active: boolean): React.CSSProperties {
   return {
     padding: "3px 10px", borderRadius: 12, fontSize: 11, cursor: "pointer",
