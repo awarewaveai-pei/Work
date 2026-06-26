@@ -786,7 +786,7 @@ export default function StudioWorkbench() {
         </label>
 
         {/* 🌍 世界文化 — region × lens, with AI-filled specific items (混搭靈感工具). Moved to FIRST per spec. */}
-        <AccordionSection title="🌍 世界文化" summary={region ? (fusionRegion ? `${region.zh}×${fusionRegion.zh}` : region.zh) : (cultureChips.length ? `${cultureChips.length} 元素` : "未選")} defaultOpen>
+        <AccordionSection title="🌍 世界文化" summary={region ? (fusionRegion ? `${region.zh}×${fusionRegion.zh}` : region.zh) : (cultureChips.length ? `${cultureChips.length} 元素` : "未選")}>
           <p style={{ fontSize: 11, opacity: 0.55, margin: "0 0 8px" }}>
             1️⃣ 選地域 → 2️⃣ 選鏡頭 → ✨ AI 噴出該文化專屬靈感（可多選，填入 prompt）
           </p>
