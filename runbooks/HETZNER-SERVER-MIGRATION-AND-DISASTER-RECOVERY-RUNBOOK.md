@@ -6,7 +6,7 @@
 >
 > **何時讀**：① 評估要不要上 dedicated 時（看 §0 決策 + §7 checklist）② 真的要搬時（照 §5）③ 硬體故障還原時（直接跳 §4）。
 >
-> **狀態**：框架草稿（2026-06-26 建）。確切指令在「真的要做」時於各節 `TODO:` 處補齊並實測；現階段供決策評估用。
+> **狀態**：**備份 / 災難還原層已實機驗證可用**（§1–§2.5 + §4 + §6 全綠 — 見 §7 已勾項；§4 還原指令端到端驗過）。**非純草稿** — 現可同時用於①決策評估 ②真實災難還原。**仍待真機定稿的只有**：§3 RAID（要先買 dedicated）+ §5 少數遷移 step（搬機當下）。完整待辦以 **§7 checklist 為唯一正本**。
 > **相關**：拓樸正本 [`AWAREWAVE_STACK_QUICKREF.md`](../agency-os/docs/operations/AWAREWAVE_STACK_QUICKREF.md)｜**SG/Phase1 備份正本** [`hetzner-phase1-core/LONG_TERM_OPS.md`](../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md)（本檔負責 EU stack，兩台互為異地）｜[`VPS-AUTO-REBOOT-RUNBOOK.md`](VPS-AUTO-REBOOT-RUNBOOK.md)、[`HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md`](HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md)、`agency-os/AGENTS.md §AwareWave Stack`。
 
 ---
@@ -74,7 +74,7 @@
 >
 > **✅ R2 異地已修（2026-06-26）**：根因 = `/etc/default/eu-backup` 變數沒 export，子腳本 `upload-to-r2.sh` 讀不到 `R2_API_TOKEN`（自 2026-05 起 R2 從沒真的上傳成功，「3-2-1」其實只有本機+SG）。修 = `set -a` 包住 source。實測 10/10 檔 HTTP 200、`R2 upload OK`。**現在才是真 3-2-1**（本機 + SG + R2），R2 跨供應商那條 SG 退役後仍在。
 >
-> **🔴 仍待處理**：① 異地 L1 指向 SG，SG 退役即斷 → 退 SG 時把第二異地改成 R2 二 bucket / Storage Box（R2 主線已可靠）。② 備份腳本部署仍為手動 scp（repo 已有正本，無 auto-deploy）。
+> **⚠️ 備份層兩個已知限制**（**完整搬機待辦以 §7 checklist 為唯一正本**，本處只列與備份直接相關的）：① 異地 L1 指向 SG，SG 退役即斷 → 退 SG 時把第二異地改成 R2 二 bucket / Storage Box（R2 主線已可靠；§7 有對應項）。② 備份腳本部署仍為手動 scp（repo 已有正本，無 auto-deploy；非搬機阻擋項，故不在 §7 gate）。
 
 ---
 

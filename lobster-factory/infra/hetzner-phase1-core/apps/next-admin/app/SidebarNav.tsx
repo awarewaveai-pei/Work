@@ -23,31 +23,39 @@ export const DEFAULT_SECTIONS: NavSection[] = [
       { type: 'link', href: '/', icon: '◈', label: 'Dashboard' },
     ],
   },
+  // ── Build & Onboard ──────────────────────────────────────────────────────
+  // 建站三步序列（intake → 技術精靈 → 部署）刻意相鄰且照順序，對映 MASTER PLAN §1
+  // 資料流：submit → generate-spec → trigger-build → create-wp-site。
+  // 招新客（生新站）與下方營運/維修（顧舊客）刻意分區。
   {
-    id: 'repair-os',
-    label: 'Repair OS',
+    id: 'build-onboard',
+    label: 'Build & Onboard',
     items: [
-      { type: 'link', href: '/ops/repairs',      icon: '🛠', label: 'Repair Center',           badge: 'ops-inbox', title: 'AI 維修主控台' },
-      { type: 'link', href: '/ops/clients',      icon: '👥', label: 'Clients',                  title: '全客戶健康狀態 + WP 外掛更新' },
-      { type: 'link', href: '/ops/onboarding',   icon: '✨', label: 'Onboarding（客戶 Intake）', title: '建站第 1 步：客戶探索式問卷' },
-      { type: 'link', href: '/ops/integrations', icon: '⇄', label: 'Integrations',              title: '客戶工具串接狀態' },
-      { type: 'link', href: '/api-check',        icon: '⬡', label: 'API Health',                title: 'Node API 健康（server-side）' },
+      { type: 'link', href: '/ops/onboarding', icon: '✨', label: 'Onboarding（客戶 Intake）', title: '建站第 1 步：客戶探索式問卷' },
+      { type: 'link', href: '/onboard',        icon: '✦', label: '建站精靈（技術）',          title: '建站第 2 步：技術建站精靈' },
+      { type: 'link', href: '/build',          icon: '⚡', label: 'Build Console',            title: '建站第 3 步：部署執行（plan_only 或 enqueue）' },
     ],
   },
+  // ── Clients & Ops ────────────────────────────────────────────────────────
+  // 既有客戶的監看 / 串接 / 健康（營運面，非新建站）
   {
-    id: 'actions',
-    label: 'Actions',
+    id: 'clients-ops',
+    label: 'Clients & Ops',
     items: [
-      { type: 'link', href: '/ops/approvals',    icon: '✓', label: 'Approvals',    title: '高風險指令簽核佇列' },
-      { type: 'link', href: '/ops/system-modes', icon: '◐', label: 'System Modes', title: '全域 Kill Switch / 維護模式' },
+      { type: 'link', href: '/ops/clients',      icon: '👥', label: 'Clients',      title: '全客戶健康狀態 + WP 外掛更新' },
+      { type: 'link', href: '/ops/integrations', icon: '⇄', label: 'Integrations', title: '客戶工具串接狀態' },
+      { type: 'link', href: '/api-check',        icon: '⬡', label: 'API Health',    title: 'Node API 健康（server-side）' },
     ],
   },
+  // ── Repair & Control ─────────────────────────────────────────────────────
+  // AI 維修主控台 + 全域控制閘（簽核 / kill-switch）— 與首頁 dashboard「Actions」區一致
   {
-    id: 'provisioning',
-    label: 'Provisioning',
+    id: 'repair-control',
+    label: 'Repair & Control',
     items: [
-      { type: 'link', href: '/onboard', icon: '✦', label: '建站精靈（技術）', title: '建站第 2 步：技術建站精靈' },
-      { type: 'link', href: '/build',   icon: '⚡', label: 'Build Console',   title: '部署執行：plan_only 或 enqueue' },
+      { type: 'link', href: '/ops/repairs',      icon: '🛠', label: 'Repair Center', badge: 'ops-inbox', title: 'AI 維修主控台' },
+      { type: 'link', href: '/ops/approvals',    icon: '✓', label: 'Approvals',     title: '高風險指令簽核佇列' },
+      { type: 'link', href: '/ops/system-modes', icon: '◐', label: 'System Modes',  title: '全域 Kill Switch / 維護模式' },
     ],
   },
   {

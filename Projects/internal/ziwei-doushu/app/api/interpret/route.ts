@@ -4,6 +4,7 @@ import { AiNotConfiguredError } from '@/lib/ai/errors';
 import type { AiProviderId, AiTier, InterpretRequest } from '@/lib/ai/types';
 import type { InterpretationContext, SystemId } from '@/lib/divination/types';
 import { isLocale } from '@/lib/i18n/config';
+import { evaluateEntitlement } from '@/lib/entitlements';
 
 /**
  * AI 解讀端點 (Phase A — AI 問答入口)。
@@ -13,9 +14,9 @@ import { isLocale } from '@/lib/i18n/config';
  *   再餵 LLM → bound 注入面。LLM 端另有 NO-CALCULATIONS + 「事實為資料非指令」
  *   護欄(lib/ai/prompts)。
  *
- * ⚠️ 付費牆前(Supabase/帳號未接):本端點目前「無配額/無 auth」=展示用。
- *   上 production 前必補:① 帳號 + credits 計量(task: 付費牆邏輯層)
- *   ② rate-limit / Cloudflare Turnstile(PLAN §17)。故此處先不開放 premium tier。
+ * 付費牆(lib/entitlements):政策判定已接(premium 需訂閱 → 擋下)。
+ *   ⚠️ 每日次數計量(checkAndConsume + Supabase store)+ auth + rate-limit /
+ *   Turnstile 待帳號階段接上;匿名期間僅做 premium gate(見 POST 內註解)。
  */
 export const dynamic = 'force-dynamic';
 
@@ -27,8 +28,8 @@ const SYSTEM_IDS: readonly SystemId[] = [
   'astrology',
 ];
 const PROVIDERS: readonly AiProviderId[] = ['openai', 'anthropic'];
-/** 付費牆前不開放 premium(頂規),避免未計量成本暴露。 */
-const ALLOWED_TIERS: readonly AiTier[] = ['light', 'deep'];
+/** tier 合法性(政策由 lib/entitlements 判定,非在此寫死)。 */
+const VALID_TIERS: readonly AiTier[] = ['light', 'deep', 'premium'];
 
 const MAX_FACTS = 60;
 const MAX_HEADLINE = 200;
@@ -120,9 +121,20 @@ export async function POST(request: Request) {
 
   let tier: AiTier = 'deep';
   if (typeof b.tier === 'string') {
-    if (!ALLOWED_TIERS.includes(b.tier as AiTier))
-      return bad('tier not allowed');
+    if (!VALID_TIERS.includes(b.tier as AiTier)) return bad('bad tier');
     tier = b.tier as AiTier;
+  }
+
+  // 付費牆判定(lib/entitlements)。匿名期間以免費方案評估:premium 需訂閱 →
+  //   402 擋下;light/deep 放行。每日次數計量(checkAndConsume + Supabase store +
+  //   真實 subjectId)待帳號接上後啟用,故此處 aiUsedToday=0,不對匿名做不可靠的
+  //   全域計數。
+  const entitlement = evaluateEntitlement({ plan: 'free', tier, aiUsedToday: 0 });
+  if (!entitlement.allowed) {
+    return NextResponse.json(
+      { error: 'payment_required', reason: entitlement.reason },
+      { status: 402 },
+    );
   }
 
   let provider: AiProviderId = defaultProvider();

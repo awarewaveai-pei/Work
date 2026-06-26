@@ -172,8 +172,9 @@ export default async function DashboardPage() {
           />
         </div>
 
-        {/* ── Actions ─────────────────────────────────── */}
-        <div className="section-title">Actions</div>
+        {/* ── Repair & Control ────────────────────────── */}
+        {/* 與 SidebarNav 的 repair-control 區一致（維修主控 + 簽核 + kill-switch） */}
+        <div className="section-title">Repair &amp; Control</div>
         <div className="link-list" style={{ marginBottom: 28 }}>
           <NavCard
             href="/ops/repairs"
@@ -198,22 +199,30 @@ export default async function DashboardPage() {
           />
         </div>
 
-        {/* ── Provisioning ────────────────────────────── */}
-        <div className="section-title">Provisioning</div>
+        {/* ── Build & Onboard ─────────────────────────── */}
+        {/* 建站三步序列，與 SidebarNav 的 build-onboard 區一致（intake → 精靈 → 部署） */}
+        <div className="section-title">Build &amp; Onboard</div>
         <div className="link-list" style={{ marginBottom: 28 }}>
+          <NavCard
+            href="/ops/onboarding"
+            icon="✨"
+            iconClass="icon-prov"
+            title="Onboarding（客戶 Intake）"
+            desc="建站第 1 步：客戶探索式問卷"
+          />
           <NavCard
             href="/onboard"
             icon="✦"
             iconClass="icon-prov"
-            title="New Client Onboarding"
-            desc="逐步精靈：資訊 → 部門選型 → 服務開通 → Build"
+            title="建站精靈（技術）"
+            desc="建站第 2 步：資訊 → 部門選型 → 服務開通 → Build"
           />
           <NavCard
             href="/build"
             icon="⚡"
             iconClass="icon-prov"
             title="Build Console"
-            desc="部署執行：plan_only 預覽或 enqueue 送 Trigger.dev"
+            desc="建站第 3 步：部署執行（plan_only 預覽或 enqueue 送 Trigger.dev）"
           />
         </div>
 
