@@ -70,6 +70,20 @@
 [剩餘風險] deployed commit 331fa610 為部署當下 origin HEAD；origin 之後又進 checkpoint 至 d158c8b1（無 next-admin app code 差異）
 [rollback] sg-deploy 自帶 auto-rollback；手動見 DEPLOY_ROLLBACK_RUNBOOK.md §2.1
 
+### fix(studio): 🌍 世界文化 移至首位 + 🔥 時事靈感 chip active 狀態（淺紫+✓）
+
+[任務理解] 操作者 2 點：①🌍世界文化 搬到面板第一個 ②時事靈感點選話題後無 active 背景/打勾，無法判斷是否已選（其他 chip 有）。
+[已修改] StudioWorkbench.tsx：
+- reorder：主圖/題材/氛圍/時事靈感 4 區塊移到 🌍世界文化 之後（= 世界文化 first）；世界文化 加 defaultOpen，主圖 移除 defaultOpen（只首區自動展開）
+- 時事靈感 topic chip：active=(subject===t)，點擊 toggle setSubject(active?"":t)，chipStyle(active)+✓ 前綴 — 與既有 CategoryPicker chip pattern 一致
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=3309
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0major/0minor（1 cosmetic：subject 由他途相符時 chip 會亮，屬預期行為）
+- BUGHUNT_DONE: scope=app(next-admin) | grep=AccordionSection 各區塊計數+open/close 平衡 | hits=0（5 區塊各 exactly 1；9 open/9 close 平衡；無重複/孤兒）
+- BUGHUNT_SCOPE_NARROW: 純前端 reorder + chip styling，無新 symbol、無 agency-os/scripts call sites
+[剩餘風險] 無（mirror 既有 pattern）；尚未 deploy
+[rollback] 同檔 `git revert`
+
 ## 2026-06-25
 
 ### perf(trigger): dispatch-action-run schedule */1 → */10 — 一勞永逸消除 dispatcher 空轉容器
