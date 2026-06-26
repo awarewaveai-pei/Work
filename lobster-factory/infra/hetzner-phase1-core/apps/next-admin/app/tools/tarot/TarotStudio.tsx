@@ -42,6 +42,9 @@ interface BatchItem {
   status: "idle" | "pending" | "done" | "error";
   url?: string;
   blob?: Blob;
+  /** Frameless graded artwork (the AI picture WITHOUT the card frame) as a PNG data URL.
+   *  Retained so the large-view modal can save the raw art to My Designs on demand. */
+  art?: string;
   error?: string;
 }
 
@@ -181,6 +184,8 @@ export default function TarotStudio() {
   const [bgProgress, setBgProgress] = useState({ done: 0, total: 0 });
   const [bgLoadBusy, setBgLoadBusy] = useState(false);
   const [viewIndex, setViewIndex] = useState<number | null>(null); // large-view modal (batch cards)
+  const [savingArt, setSavingArt] = useState(false); // modal "存無框圖" in-flight
+  const [savedArt, setSavedArt] = useState<Set<number>>(() => new Set()); // batch indices whose frameless art is saved
   const [previewZoom, setPreviewZoom] = useState(false); // large-view modal (step-1 preview)
   const [compareZoom, setCompareZoom] = useState<string | null>(null); // large-view modal (compare grid)
   const [previewSig, setPreviewSig] = useState<string | null>(null); // model+style that made the current preview
@@ -522,8 +527,11 @@ export default function TarotStudio() {
   // styleTags (the picked zh chips) + subject ride along so the gallery can show what was
   // selected and build a meaningful filename. Read from current state — for compare's async
   // loop the chips rarely change mid-run, same posture as lockedModel below.
-  function saveToGallery(image: string, source: string, extra?: { cardName?: string; prompt?: string; model?: string }) {
-    void fetch("/api/tools/designs", {
+  // POST one image to the gallery; resolves true on a 2xx, false on any failure (never throws).
+  // Shared by the fire-and-forget saveToGallery and the modal "存無框圖" button (which awaits
+  // the boolean to show saving / saved / failed feedback).
+  function postDesign(image: string, source: string, extra?: { cardName?: string; prompt?: string; model?: string }): Promise<boolean> {
+    return fetch("/api/tools/designs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -535,7 +543,14 @@ export default function TarotStudio() {
         styleTags: styleTokens,
         subject: subjectText.trim() || undefined,
       }),
-    }).catch(() => {/* gallery save never blocks generation */});
+    })
+      .then((r) => r.ok)
+      .catch(() => false);
+  }
+
+  // Fire-and-forget save — never blocks generation or UI.
+  function saveToGallery(image: string, source: string, extra?: { cardName?: string; prompt?: string; model?: string }) {
+    void postDesign(image, source, extra);
   }
 
   // seedOverride: omit → use the locked deck seed (previewSeed) for first-fill consistency.
@@ -577,22 +592,24 @@ export default function TarotStudio() {
           prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectText }),
         }),
       );
-      // Also save the frameless artwork (the AI picture WITHOUT the card border / Roman numeral /
-      // name) so the user can collect the raw art in My Designs. artForPrint is the full graded
-      // image — renderPrintCard only object-fit-covers it into the frame, so this is the complete,
-      // uncropped picture. Source "tarot-art" → classified as frameless tarot art in the gallery.
-      saveToGallery(artForPrint, "tarot-art", {
-        cardName: card.name,
-        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectText }),
-      });
+      // Retain the frameless artwork (artForPrint = the full graded picture BEFORE renderPrintCard
+      // composites it into the frame) so the large-view modal can save the raw art to My Designs
+      // on demand — the user collects only the pictures she likes, no auto-flooding the gallery.
       // revoke any prior url for this slot (retry case) before replacing
       setBatch((prev) =>
         prev.map((it, i) => {
           if (i !== index) return it;
           if (it.url) URL.revokeObjectURL(it.url);
-          return { ...it, status: "done", blob, url, error: undefined };
+          return { ...it, status: "done", blob, url, art: artForPrint, error: undefined };
         }),
       );
+      // Fresh art for this slot — clear any prior "已存無框圖" mark so the new art can be saved.
+      setSavedArt((prev) => {
+        if (!prev.has(index)) return prev;
+        const next = new Set(prev);
+        next.delete(index);
+        return next;
+      });
     } catch (e) {
       patchItem(index, { status: "error", error: e instanceof Error ? e.message : String(e) });
     }
@@ -1707,6 +1724,29 @@ export default function TarotStudio() {
               >
                 {batchBusy ? "生成中…" : "🔄 重新生成這張"}
               </button>
+              {batch[viewIndex].status === "done" && batch[viewIndex].art && (
+                <button
+                  className="btn-secondary"
+                  disabled={savingArt || savedArt.has(viewIndex)}
+                  title="把這張圖（不含牌框 / 標題 / 羅馬數字）存進 My Designs"
+                  onClick={async () => {
+                    const idx = viewIndex;
+                    if (idx == null) return;
+                    const item = batch[idx];
+                    if (!item?.art || savingArt || savedArt.has(idx)) return;
+                    setSavingArt(true);
+                    const ok = await postDesign(item.art, "tarot-art", {
+                      cardName: item.card.name,
+                      prompt: buildCardPrompt(item.card, { styleResolved: effectiveEnglish, subject: subjectText }),
+                    });
+                    setSavingArt(false);
+                    if (ok) setSavedArt((prev) => new Set(prev).add(idx));
+                    else setMessage("無框圖儲存失敗，請稍後再試。");
+                  }}
+                >
+                  {savingArt ? "儲存中…" : savedArt.has(viewIndex) ? "✓ 已存無框圖" : "🖼 存無框圖"}
+                </button>
+              )}
               <button className="btn-secondary" onClick={() => setViewIndex(null)}>
                 關閉
               </button>
