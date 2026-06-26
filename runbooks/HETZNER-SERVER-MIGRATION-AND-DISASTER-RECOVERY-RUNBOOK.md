@@ -98,7 +98,36 @@
    - (c) 新的大 dedicated 本身當第二落地（遷移後）
 
 - **`.env` 密鑰**：`openssl enc -aes-256-cbc -pbkdf2` 加密後才進備份；**金鑰存本機 vault（`secrets-vault.ps1`），絕不跟備份同地**。
-- **失敗告警（✅ 2026-06-26 接好）**：機制是 **AO-RESUME surface**（非 Telegram push）—`verify-backup-eu.sh` 把判定 log 到 `/var/log/eu-backup.log`，`scripts/check-backup-health.ps1` 每次開工讀最新 verify 判定，FAILED → `backup-health-LATEST` 報告轉 WARN → Claude 在 §1 報給你（零記憶負擔）。涵蓋「備份壞了」+「備份停了(stale)」兩種。SG verify 另有 Slack 告警（既有）。（即時 push 類用 Netdata/Uptime-Kuma，不在此層。）
+- **失敗怎麼知道** → 見 **§2.5**（獨立小節）。
+
+---
+
+## §2.5 監看：備份壞了 / 停了怎麼知道（✅ 2026-06-26 接好）
+
+> **核心問題**：備份半夜自己跑，**壞了或停了沒人知道 = 等於沒備份**。本節 = 「會不會被通知」的單一說明。
+
+**機制 = AO-RESUME surface（開工自動報，非即時 push）**：
+
+```
+每日 cron：backup → verify(檢查 integrity) → 判定寫 log
+            /var/log/eu-backup.log（EU）｜/var/log/lobster-backup.log（SG）
+                              │
+你開工(AO-RESUME) → check-backup-health.ps1 SSH 兩台，讀「最新 verify 判定 + 備份年齡」
+                              │
+   verify=FAILED 或 age>3天(stale) → backup-health-LATEST 報告轉 WARN → Claude 在 §1 主動報你
+```
+
+| 偵測什麼 | 判斷依據 | 行為 |
+|---------|---------|------|
+| 備份**壞了**（檔毀/缺/dump 失敗）| verify 判定 = FAILED | → AO-RESUME **WARN** |
+| 備份**停了**（cron 沒跑）| 最新備份 age > 3 天 | → AO-RESUME **WARN** |
+| log 不在 / 格式不符 | UNKNOWN | **不誤報**（不會假性 WARN）|
+
+- **零記憶負擔**：你不用記得去查，**開工自動報**（系統既有 pattern，非新建告警）。
+- **兩台都涵蓋**：SG + EU。SG verify 另有即時 **Slack** 告警（既有）；EU 靠本機制。
+- **不在此層**：服務當機 / CPU / 網路等**即時**告警走 **Netdata + Uptime Kuma**（那是服務健康，不是備份健康）。
+- **SSOT**：`scripts/check-backup-health.ps1`（warn-only、read-only，由 `ao-resume.ps1` 每次開工呼叫）；判定來源 `verify-backup-eu.sh` / `verify-backup.sh`。
+- **怎麼自己手動查**：本機跑 `pwsh scripts/check-backup-health.ps1`，或讀 `agency-os/reports/status/backup-health-LATEST.md`。
 
 ---
 
