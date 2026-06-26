@@ -15,7 +15,7 @@
 - (B) `app/tools/tarot/TarotStudio.tsx`：BatchItem 加 `art?`；`generateOne` 以新 helper `toGalleryArt()` 把無框圖轉**上限 2048px WebP(q0.9)**存 state(同時解 413 + 記憶體)；大圖 modal 加「🖼 存無框圖」按鈕(僅 done+有 art 顯示，狀態：儲存中…/✓已存無框圖)，按下以 source `tarot-art` POST；`saveToGallery` 抽出 `postDesign()`(回 Promise<boolean>)供按鈕做成功/失敗回饋，既有 5 處 fire-and-forget 呼叫不變；`savedArt`/`savingArt` 狀態，deck 重建(lockStyle/selectCompareResult)清 savedArt。
 - (B) gallery 註冊 `tarot-art`：assetToolGroup→tarot、SOURCE_SUBTYPE=原圖、assetProduct→tarot-card、isTarotSrc→true（顯示 Tarot·原圖 + portrait frame）。含框自動存維持不變(兩者並存)。
 
-[驗證結果](R0 四動作)
+[驗證結果]（R0 四動作）
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`(全專案,改後重跑) + `sg-deploy.sh`(seed-fix 部署) + `playwright-runner.ps1 -Mode smoke` | exit=0 | tsc 兩次皆 0；deploy smoke 26 pass/0 fail/6 skip。(無框 canvas 編碼+按鈕流為瀏覽器行為，真實 E2E 待本功能部署後 browser-test。)
 - REVIEW_DONE: critic=Deep | verdict=warn→已修 | findings=0c/1M/2m+1s — critic 抓 **Major：2K model 無框 PNG 可能 >9MB→413→「請稍後再試」誤導(重試永遠失敗)**；已修(toGalleryArt 上限 2048 WebP，2K 也 <9MB)。Minor1(savedArt deck-reset 殘留,self-healing)已修；Minor2(state 記憶體)由改存 capped WebP 一併解；Suggestion(floating promise,無 lint 強制)保留。其餘逐項 verified clean(fire-and-forget 無回歸/race guard/分類完整/CSS class 存在)。
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`tarot-art`,`postDesign`,`toGalleryArt`,`savedArt`,`savingArt` | hits=0 stale — `tarot-art` 僅 producer(TarotStudio)+4 分類點(DesignsGallery×3/asset-group)；新 symbol 皆 TarotStudio.tsx 內部無外洩消費端。
@@ -37,7 +37,7 @@
 - SystemNav/hub/sitemap/i18n(zh+en)加 astrology;next.config `outputFileTracingIncludes` 納 wasm(standalone 部署)。
 - `lib/astrology.test.ts`(新,9 測,含單位回歸)。
 
-[驗證結果](R0 四動作)
+[驗證結果]（R0 四動作）
 - REALTEST_EVIDENCE: tool=Bash | cmd=node 探針(XALEN)+`npm test`+`npm start`+curl POST `/api/astrology` | exit=0 | **真 XALEN:太陽 @J2000=280.37°(摩羯,對 DE440 次角秒)**;單位修正後 live 回 **MC=摩羯(9)、太陽第 10 宮(合 MC)、8 個不同宮(未塌)、Feb31→400**。tsc=0、`npm test` 103 pass、`npm run build` exit=0(astrology SSG + `ƒ /api/astrology` + **wasm 1754301 bytes 追蹤進 standalone**)。
 - REVIEW_DONE: critic=Deep | verdict=pass(修後) | findings=1c/1m/0n→已修 — critic **抓到 Critical 單位 bug:housesJson 回弧度、行星回度,未轉換致宮位全塌+MC/上升星座全錯**(我原 range-only 測試掩蓋)。已修:邊界 rad→deg(RAD2DEG/norm360)+ 補 value-level 回歸測試(MC=9/太陽第10宮/houseOf 跨0°)。Major(測試只驗範圍)+ Minor(曆日驗證)一併修。
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/ziwei-doushu | grep=`computeWesternChart`,`astrologyContext`,`houseOf`,`/api/astrology`,`@xalen/wasm` | hits=0 stale — astrology.ts 僅 route+test value-import(client 只 type-import,wasm 不入 client bundle);SystemNav/hub/sitemap/interpret SYSTEM_IDS 對齊。
