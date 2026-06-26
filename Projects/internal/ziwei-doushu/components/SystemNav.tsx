@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { locales, type Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
-const SYSTEMS = ['ziwei', 'bazi', 'iching', 'tarot', 'daily'] as const;
+const SYSTEMS = ['ziwei', 'bazi', 'iching', 'tarot', 'astrology', 'daily'] as const;
 
 export default function SystemNav({
   dict,

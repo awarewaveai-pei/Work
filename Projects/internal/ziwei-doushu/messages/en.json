@@ -9,7 +9,8 @@
     "bazi": "BaZi",
     "iching": "I Ching",
     "tarot": "Tarot",
-    "daily": "Daily Fortune"
+    "daily": "Daily Fortune",
+    "astrology": "Astrology"
   },
   "hub": {
     "title": "East & West Divination",
@@ -19,7 +20,8 @@
     "baziDesc": "BaZi Four Pillars, Ten Gods, hidden stems, NaYin",
     "ichingDesc": "I Ching coin casting, primary & changed hexagrams",
     "tarotDesc": "78-card deck, single / three-card / Celtic Cross",
-    "dailyDesc": "Daily fortune, lucky color, lucky number, almanac"
+    "dailyDesc": "Daily fortune, lucky color, lucky number, almanac",
+    "astrologyDesc": "Planets · Signs · Houses · Ascendant (Swiss-grade, self-hosted)"
   },
   "home": {
     "title": "Zi Wei Dou Shu Chart",
@@ -116,6 +118,20 @@
     "yi": "Auspicious",
     "ji": "Inauspicious",
     "view": "View today's fortune"
+  },
+  "astrology": {
+    "title": "Western Natal Chart",
+    "subtitle": "Tropical zodiac · Planets/Signs/Houses/Ascendant · Swiss-grade (self-hosted XALEN)",
+    "birthDate": "Birth date",
+    "birthTime": "Birth time (local)",
+    "timezone": "Timezone (East +, e.g. +8)",
+    "latitude": "Latitude (North +)",
+    "longitude": "Longitude (East +)",
+    "submit": "Cast chart",
+    "computing": "Casting…",
+    "ascendant": "Ascendant",
+    "mc": "Midheaven (MC)",
+    "house": "House"
   },
   "errors": {
     "computeFailed": "Charting failed, please check your input"

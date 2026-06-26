@@ -9,7 +9,8 @@
     "bazi": "八字四柱",
     "iching": "易經卜卦",
     "tarot": "塔羅",
-    "daily": "每日運勢"
+    "daily": "每日運勢",
+    "astrology": "西洋占星"
   },
   "hub": {
     "title": "東西方命理",
@@ -19,7 +20,8 @@
     "baziDesc": "八字四柱、十神、藏干、納音",
     "ichingDesc": "六爻銅錢起卦,本卦變卦動爻",
     "tarotDesc": "78 張牌庫,單張/三張/凱爾特十字",
-    "dailyDesc": "今日運勢、幸運色、幸運數字、宜忌"
+    "dailyDesc": "今日運勢、幸運色、幸運數字、宜忌",
+    "astrologyDesc": "行星·星座·宮位·上升(Swiss 級精度,自架)"
   },
   "home": {
     "title": "紫微斗數命盤",
@@ -116,6 +118,20 @@
     "yi": "宜",
     "ji": "忌",
     "view": "查看今日運勢"
+  },
+  "astrology": {
+    "title": "西洋占星本命盤",
+    "subtitle": "回歸黃道 · 行星/星座/宮位/上升 · Swiss 級精度(自架 XALEN)",
+    "birthDate": "出生日期",
+    "birthTime": "出生時間(當地)",
+    "timezone": "時區(東為正,如台灣 +8)",
+    "latitude": "緯度(北為正)",
+    "longitude": "經度(東為正)",
+    "submit": "排盤",
+    "computing": "排盤中…",
+    "ascendant": "上升",
+    "mc": "天頂 MC",
+    "house": "宮"
   },
   "errors": {
     "computeFailed": "排盤失敗,請檢查輸入"

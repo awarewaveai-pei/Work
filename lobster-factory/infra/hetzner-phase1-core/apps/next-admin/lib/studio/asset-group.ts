@@ -11,7 +11,8 @@
  * The raw classifier is `metadata.source`, written by /api/tools/designs on save:
  *   "mockup"                                    → product mockup 商品照
  *   "pod-studio"                                → studio design art
- *   "tarot" | "tarot-preview" | "tarot-compare" → tarot card art
+ *   "tarot" | "tarot-preview" | "tarot-compare" | "tarot-art" → tarot card art
+ *     ("tarot" = framed print card; "tarot-art" = frameless raw artwork)
  *   "canvas" | anything else                    → passed through verbatim
  */
 
@@ -25,7 +26,7 @@ export const MOCKUP_SOURCES = ["mockup", "printful-mockup"] as const;
 /** Collapse a raw `metadata.source` into a coarse tool group (tarot / studio / mockup / …). */
 export function assetToolGroup(source: string | null | undefined): string {
   if (!source) return "unknown";
-  if (source === "tarot" || source === "tarot-preview" || source === "tarot-compare") return "tarot";
+  if (source === "tarot" || source === "tarot-preview" || source === "tarot-compare" || source === "tarot-art") return "tarot";
   if (source === "pod-studio") return "studio";
   if ((MOCKUP_SOURCES as readonly string[]).includes(source)) return "mockup";
   return source;

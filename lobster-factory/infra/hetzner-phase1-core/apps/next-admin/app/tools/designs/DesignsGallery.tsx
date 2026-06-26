@@ -85,6 +85,7 @@ const TOOL_GROUP_LABELS: Record<string, string> = {
 const SOURCE_SUBTYPE: Record<string, string> = {
   "tarot-preview": "預覽",
   "tarot-compare": "比較",
+  "tarot-art": "原圖",
   tarot: "牌卡",
 };
 
@@ -100,14 +101,14 @@ const PRODUCT_LABELS: Record<string, string> = {
 
 function assetProduct(asset: DesignAsset): string | null {
   const src = asset.metadata?.source;
-  if (src === "tarot" || src === "tarot-preview" || src === "tarot-compare") return "tarot-card";
+  if (src === "tarot" || src === "tarot-preview" || src === "tarot-compare" || src === "tarot-art") return "tarot-card";
   if (src === "pod-studio") return asset.metadata?.product_type ?? null;
   if (src === "mockup") return "mockup-composite";
   return null;
 }
 
 function isTarotSrc(source: string | null | undefined): boolean {
-  return source === "tarot" || source === "tarot-preview" || source === "tarot-compare";
+  return source === "tarot" || source === "tarot-preview" || source === "tarot-compare" || source === "tarot-art";
 }
 
 function formatBytes(bytes: number | null): string {

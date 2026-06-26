@@ -577,6 +577,14 @@ export default function TarotStudio() {
           prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectText }),
         }),
       );
+      // Also save the frameless artwork (the AI picture WITHOUT the card border / Roman numeral /
+      // name) so the user can collect the raw art in My Designs. artForPrint is the full graded
+      // image — renderPrintCard only object-fit-covers it into the frame, so this is the complete,
+      // uncropped picture. Source "tarot-art" → classified as frameless tarot art in the gallery.
+      saveToGallery(artForPrint, "tarot-art", {
+        cardName: card.name,
+        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectText }),
+      });
       // revoke any prior url for this slot (retry case) before replacing
       setBatch((prev) =>
         prev.map((it, i) => {

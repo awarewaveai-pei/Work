@@ -13,6 +13,7 @@ const SYSTEMS = [
   { id: "bazi",   descKey: "baziDesc",  glyph: "⊕" },
   { id: "iching", descKey: "ichingDesc",glyph: "☲" },
   { id: "tarot",  descKey: "tarotDesc", glyph: "✦" },
+  { id: "astrology", descKey: "astrologyDesc", glyph: "♆" },
   { id: "daily",  descKey: "dailyDesc", glyph: "☀" },
 ] as const;
 
