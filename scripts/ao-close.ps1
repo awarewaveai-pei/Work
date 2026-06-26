@@ -308,16 +308,16 @@ try {
         if ($m.Success) {
             $rptName = "{0}-{1}.md" -f $m.Groups[1].Value, $m.Groups[2].Value
             $rptPath = Join-Path $WorkRoot ("agency-os\reports\ao-close\" + $rptName)
-            # Prune-horizon skip (critic m1): the ao-close skill prunes reports older than 30 days.
+            # Prune-horizon skip (critic m1): the ao-close skill prunes reports older than 90 days.
             # If a session gap exceeds that, the prior report was legitimately deleted — checking for it
             # would false-block forever (you cannot un-prune). Skip when the parsed date is past the horizon.
-            # Use -29 (not -30) so this skip window STRICTLY CONTAINS the pruner's >30d delete window — a
+            # Use -89 (not -90) so this skip window STRICTLY CONTAINS the pruner's >90d delete window — a
             # 1-day safety margin against an off-by-one in the pruner's comparison (critic 2nd-pass Minor#2),
             # since the pruner lives in the skill (out of this file). Worst case we skip one extra day's check.
             $rptDate = [datetime]::MinValue
             $parsedOk = [datetime]::TryParseExact($m.Groups[1].Value, 'yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::None, [ref]$rptDate)
-            if ($parsedOk -and $rptDate -lt (Get-Date).Date.AddDays(-29)) {
-                Write-Host "  prior-close report past 30d prune horizon ($rptName); skip (legitimately pruned)." -ForegroundColor DarkGray
+            if ($parsedOk -and $rptDate -lt (Get-Date).Date.AddDays(-89)) {
+                Write-Host "  prior-close report past 90d prune horizon ($rptName); skip (legitimately pruned)." -ForegroundColor DarkGray
             } elseif (-not (Test-Path -LiteralPath $rptPath)) {
                 Add-CloseoutGateResult -Gate $gate -Name "prior AO-CLOSE archive report" -Failed $true `
                     -Detail "last AO-CLOSE sync commit ($($m.Groups[1].Value) $($m.Groups[2].Value)) has no archive report at agency-os/reports/ao-close/$rptName" `

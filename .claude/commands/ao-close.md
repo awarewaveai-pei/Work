@@ -124,12 +124,12 @@ is no longer discretionary.
 > If the script printed `report already present -> ...` instead, the file existed (e.g. you
 > pre-wrote it) — still overwrite it with the final four-section content.
 
-### Prune old reports (>30 days)
+### Prune old reports (>90 days)
 
 After writing today's file, list `agency-os/reports/ao-close/*.md` (Glob),
 parse the date prefix of each filename, and delete any whose date is more than
-30 days before today. **Never delete the most-recent report** (the one the gate keys off,
-i.e. the latest AO-CLOSE sync commit's file), even if a >30-day session gap would otherwise
+90 days before today. **Never delete the most-recent report** (the one the gate keys off,
+i.e. the latest AO-CLOSE sync commit's file), even if a >90-day session gap would otherwise
 make it prunable. Skip `README.md`. Use the `Bash` tool with `rm` — git
 will track the deletions on the next commit.
 
