@@ -42,6 +42,16 @@
 [剩餘風險] 地圖板為無依賴 stylized 散佈（非 GIS 精確地理；圖釘位置裝飾性）；fusion 地圖目前只顯主 region 項目
 [rollback] 同檔 `git revert`
 
+### deploy(sg): next-admin 上線世界文化工具 → 已驗證 live
+
+[已部署] `/sg-deploy next-admin` exit=0 → deployed commit `331fa610`（含 culture batch1+2）；container lobster-next-admin healthy 6s；image 重建 23:54。
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl POST 127.0.0.1:3002/api/tools/studio/culture | exit=0 | http=401（route LIVE，與 sibling trending 同；404=未部署已排除）；/tools/studio 公網 307 auth-gate；staging build StudioWorkbench 含 rollDice/靈感地圖/chipStyle/CULTURE_REGIONS
+- REALTEST_EVIDENCE: tool=Bash | cmd=playwright smoke (retry) | exit=0 | 26 pass/0 fail/6 skip（首跑 5 fail 全在 onboard/ops/api-health 非本次改動，container 重啟暖機 transient，retry 全綠）
+- BUGHUNT_WAIVED: NA -- 部署動作，無 code 改動
+[剩餘風險] deployed commit 331fa610 為部署當下 origin HEAD；origin 之後又進 checkpoint 至 d158c8b1（無 next-admin app code 差異）
+[rollback] sg-deploy 自帶 auto-rollback；手動見 DEPLOY_ROLLBACK_RUNBOOK.md §2.1
+
 ## 2026-06-25
 
 ### perf(trigger): dispatch-action-run schedule */1 → */10 — 一勞永逸消除 dispatcher 空轉容器
