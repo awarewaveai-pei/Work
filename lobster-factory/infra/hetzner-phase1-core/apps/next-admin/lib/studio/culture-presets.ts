@@ -342,12 +342,15 @@ export const MAP_THEMES: MapTheme[] = [
     ],
   },
   {
-    key: "food", zh: "美食", emoji: "🍜", enLabel: "iconic foods and dishes", kind: "map",
-    hint: "iconic dishes, street food, desserts and drinks",
+    key: "food", zh: "美食", emoji: "🍜", enLabel: "iconic foods, fruits and snacks", kind: "map",
+    hint: "iconic dishes, street food, desserts, drinks, local fruits and regional snacks",
     fallback: [
       { zh: "招牌菜", en: "signature dish", desc: "招牌料理" },
       { zh: "小吃", en: "street food", desc: "街頭小吃" },
       { zh: "甜點", en: "traditional dessert", desc: "傳統甜點" },
+      { zh: "當地水果", en: "local fruit", desc: "在地水果" },
+      { zh: "特色零食", en: "regional snack", desc: "特色零食" },
+      { zh: "飲品", en: "traditional drink", desc: "傳統飲品" },
     ],
   },
   {

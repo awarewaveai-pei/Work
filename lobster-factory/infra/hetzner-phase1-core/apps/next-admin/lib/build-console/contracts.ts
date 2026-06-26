@@ -105,6 +105,13 @@ export interface BuildRunRequest {
   notes?: string;
   /** Service integrations to wire up during the workflow run */
   integrations?: BuildIntegrations;
+  /**
+   * AI website spec id (website_specs.id). Threaded to the hosting bridge so it can fetch
+   * spec_data and seed real page content (homepage hero/sections, sitemap, SEO) into the new
+   * WP install — turning the provisioned shell into a content-filled site. Optional: when absent
+   * the bridge provisions the shell only (back-compat with manual Build Console runs).
+   */
+  websiteSpecId?: string;
 }
 
 export interface BuildPlanStage {

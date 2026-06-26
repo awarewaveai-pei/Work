@@ -17,6 +17,9 @@ export async function provisionHttpJsonStaging(input: {
   organizationId: string;
   siteId: string;
   siteName: string;
+  manifestSlug?: string;
+  pluginSlugs?: string[];
+  websiteSpecId?: string;
 }): Promise<StagingHostingProvisionResult> {
   const baseUrl = process.env.LOBSTER_HOSTING_PROVIDER_BASE_URL?.trim();
   const token = process.env.LOBSTER_HOSTING_API_TOKEN?.trim();
@@ -68,8 +71,9 @@ export async function provisionHttpJsonStaging(input: {
         organizationId: input.organizationId,
         siteId: input.siteId,
         siteName: input.siteName,
-        manifestSlug: (input as Record<string, unknown>).manifestSlug ?? "wp-basic",
-        pluginSlugs: (input as Record<string, unknown>).pluginSlugs ?? [],
+        manifestSlug: input.manifestSlug ?? "wp-basic",
+        pluginSlugs: input.pluginSlugs ?? [],
+        websiteSpecId: input.websiteSpecId, // bridge fetches spec_data + seeds content when present
       }),
     });
 

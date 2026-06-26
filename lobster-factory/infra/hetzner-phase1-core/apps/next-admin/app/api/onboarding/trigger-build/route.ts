@@ -275,6 +275,7 @@ export async function POST(request: Request) {
     workspaceId,
     projectId,
     siteId,
+    websiteSpecId: website_spec_id, // threaded to hosting bridge for content seeding
     environment: "staging",
     provider: "hostinger",
     locale: locale === "zh-TW" ? "zh_TW" : "en_US",

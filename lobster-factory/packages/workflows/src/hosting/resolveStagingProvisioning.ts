@@ -16,6 +16,10 @@ export async function resolveStagingProvisioning(input: {
   siteId: string;
   siteName: string;
   organizationId: string;
+  // Optional pass-through to the http_json bridge (stack selection + content seeding).
+  manifestSlug?: string;
+  pluginSlugs?: string[];
+  websiteSpecId?: string;
 }): Promise<StagingHostingProvisionResult> {
   const raw = process.env.LOBSTER_HOSTING_ADAPTER?.trim();
   const mode = (raw || "none").toLowerCase();

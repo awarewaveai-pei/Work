@@ -138,6 +138,8 @@ const InputSchema = z.preprocess(
     integrations: IntegrationsSchema,
     // WP Plugin Stack — from OnboardWizard Step 2 (Phase 1)
     pluginSlugs: z.array(z.string()).optional(),
+    // AI website spec id — forwarded to the hosting bridge so it can seed real page content.
+    websiteSpecId: z.string().uuid().optional(),
     sshHost: z.string().optional(),
     sshCredentialsRef: z.string().optional(),
     wpPath: z.string().optional(),
@@ -174,6 +176,11 @@ export const createWpSite = task({
         siteId: input.siteId,
         siteName: input.siteName,
         organizationId: input.organizationId,
+        // Thread the selected stack + spec so the bridge installs the right plugins and seeds
+        // real content (previously these never reached the bridge — sites came out as bare shells).
+        manifestSlug: input.manifestSlug,
+        pluginSlugs: input.pluginSlugs,
+        websiteSpecId: input.websiteSpecId,
       });
 
     if (hosting.outcome === "blocked") {

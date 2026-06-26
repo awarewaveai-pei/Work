@@ -12,6 +12,8 @@
 import { NextResponse } from "next/server";
 import { Client as SshClient } from "ssh2";
 import { timingSafeEqual } from "../../../../../lib/ops-inbox/verifyIngestToken";
+import { getSupabaseWriteClient } from "../../../../../lib/supabase-server";
+import type { WebsiteSpec } from "../../../../../lib/onboarding/intake-form";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -60,6 +62,104 @@ function sshExec(conn: SshClient, cmd: string): Promise<{ code: number; stdout: 
   });
 }
 
+// ── Content seeding (Stage C) ────────────────────────────────────────────────
+// Turn the provisioned WP shell into a content-filled site using the AI WebsiteSpec.
+//
+// CJK-safety: page titles/bodies are Chinese. We NEVER inline them in the SSH command
+// (Big5/locale mojibake trap — see reference_cjk_bash_cron_encoding). Instead the whole
+// seeding script is built in Node (UTF-8), base64-encoded, and delivered as:
+//   echo '<b64>' | base64 -d | docker exec -i -u www-data lobster-wordpress bash
+// The command on the wire is pure ASCII; the UTF-8 bytes only materialise inside the
+// container's bash stdin, so neither the host shell nor SSH transport can corrupt them.
+
+function htmlEscape(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Single-quote a value for safe use inside the in-container bash script.
+function shq(s: string): string {
+  return `'${String(s ?? "").replace(/'/g, `'\\''`)}'`;
+}
+
+function buildHomepageHtml(spec: WebsiteSpec): string {
+  const hero = spec.homepage?.hero;
+  const sections = spec.homepage?.sections ?? [];
+  const parts: string[] = [];
+  if (hero) {
+    parts.push(`<!-- wp:heading {"level":1} --><h1>${htmlEscape(hero.headline ?? "")}</h1><!-- /wp:heading -->`);
+    if (hero.subheadline)
+      parts.push(`<!-- wp:paragraph --><p>${htmlEscape(hero.subheadline)}</p><!-- /wp:paragraph -->`);
+    if (hero.cta_text)
+      parts.push(
+        `<!-- wp:buttons --><div class="wp-block-buttons"><!-- wp:button --><div class="wp-block-button">` +
+          `<a class="wp-block-button__link" href="${htmlEscape(hero.cta_url || "/")}">${htmlEscape(hero.cta_text)}</a>` +
+          `</div><!-- /wp:button --></div><!-- /wp:buttons -->`,
+      );
+  }
+  for (const sec of sections) {
+    if (sec.headline) parts.push(`<!-- wp:heading --><h2>${htmlEscape(sec.headline)}</h2><!-- /wp:heading -->`);
+    if (sec.body) parts.push(`<!-- wp:paragraph --><p>${htmlEscape(sec.body)}</p><!-- /wp:paragraph -->`);
+  }
+  return parts.join("\n");
+}
+
+function buildSeedScript(spec: WebsiteSpec, wpPath: string): string {
+  const lines: string[] = [];
+  lines.push(`set -e`);
+  lines.push(`wpcli() { php -d memory_limit=256M /usr/local/bin/wp --path=${shq(wpPath + "/")} "$@"; }`);
+  // Idempotency: if the homepage marker page already exists, do nothing (re-run safe).
+  lines.push(
+    `if wpcli post list --post_type=page --name=aw-home --field=ID 2>/dev/null | grep -q .; then echo "AW_SEED_SKIP"; exit 0; fi`,
+  );
+  lines.push(`wpcli option update blogname ${shq(spec.site_name ?? "")}`);
+  if (spec.tagline) lines.push(`wpcli option update blogdescription ${shq(spec.tagline)}`);
+  // Non-home pages from the sitemap (best-effort each).
+  for (const page of spec.sitemap ?? []) {
+    if (page.is_homepage || page.slug === "home") continue;
+    lines.push(
+      `wpcli post create --post_type=page --post_status=publish --post_title=${shq(page.title ?? page.slug)} --post_name=${shq(page.slug)} >/dev/null 2>&1 || true`,
+    );
+  }
+  // Homepage with hero + sections, set as the static front page.
+  const homeTitle = (spec.sitemap ?? []).find((p) => p.is_homepage)?.title ?? "首頁";
+  const homeHtml = buildHomepageHtml(spec);
+  lines.push(
+    `HOME_ID=$(wpcli post create --post_type=page --post_status=publish --post_name=aw-home --post_title=${shq(homeTitle)} --post_content=${shq(homeHtml)} --porcelain)`,
+  );
+  lines.push(`wpcli option update show_on_front page`);
+  lines.push(`wpcli option update page_on_front "$HOME_ID"`);
+  // RankMath SEO on the homepage (best-effort — harmless if the plugin isn't active).
+  const seoTitle = spec.plugin_config?.rankmath?.site_title ?? spec.seo?.meta_title;
+  const seoDesc = spec.plugin_config?.rankmath?.meta_description ?? spec.seo?.meta_description;
+  if (seoTitle) lines.push(`wpcli post meta update "$HOME_ID" rank_math_title ${shq(seoTitle)} >/dev/null 2>&1 || true`);
+  if (seoDesc) lines.push(`wpcli post meta update "$HOME_ID" rank_math_description ${shq(seoDesc)} >/dev/null 2>&1 || true`);
+  lines.push(`echo "AW_SEED_OK home=$HOME_ID"`);
+  return lines.join("\n");
+}
+
+async function seedContentFromSpec(conn: SshClient, wpPath: string, websiteSpecId: string): Promise<string> {
+  const supabase = getSupabaseWriteClient();
+  if (!supabase) return "content seed skipped: DB client unavailable";
+  const { data, error } = await supabase
+    .from("website_specs")
+    .select("spec_data")
+    .eq("id", websiteSpecId)
+    .single();
+  if (error || !data?.spec_data) {
+    return `content seed skipped: spec not found (${error?.message ?? "no row"})`;
+  }
+  const spec = data.spec_data as WebsiteSpec;
+  const script = buildSeedScript(spec, wpPath);
+  const b64 = Buffer.from(script, "utf8").toString("base64");
+  // base64 chars are [A-Za-z0-9+/=] — safe inside single quotes on the host shell.
+  const res = await sshExec(conn, `echo '${b64}' | base64 -d | docker exec -i -u www-data lobster-wordpress bash`);
+  const ok = res.stdout.includes("AW_SEED_OK") || res.stdout.includes("AW_SEED_SKIP");
+  if (res.code !== 0 || !ok) {
+    return `content seed WARN (code ${res.code}): ${(res.stdout + res.stderr).slice(0, 300)}`;
+  }
+  return `content seeded: ${res.stdout.trim().split("\n").pop()}`;
+}
+
 export async function POST(request: Request) {
   // Auth
   const apiToken = process.env.LOBSTER_HOSTING_API_TOKEN?.trim();
@@ -72,14 +172,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { organizationId?: string; siteId?: string; siteName?: string; manifestSlug?: string; pluginSlugs?: string[] };
+  let body: { organizationId?: string; siteId?: string; siteName?: string; manifestSlug?: string; pluginSlugs?: string[]; websiteSpecId?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
 
-  const { organizationId, siteId, siteName, manifestSlug = "wp-basic", pluginSlugs = [] } = body;
+  const { organizationId, siteId, siteName, manifestSlug = "wp-basic", pluginSlugs = [], websiteSpecId } = body;
   if (!siteId || !siteName) {
     return NextResponse.json({ error: "siteId and siteName required" }, { status: 422 });
   }
@@ -182,6 +282,17 @@ export async function POST(request: Request) {
     );
     const pluginsOk = pluginResult.code === 0;
 
+    // 8. Seed real content from the AI WebsiteSpec (Stage C). Best-effort: a seeding failure
+    // never fails the provision — the shell site already exists. CJK-safe (base64 via stdin).
+    let contentNote = "content seed skipped: no websiteSpecId";
+    if (websiteSpecId) {
+      try {
+        contentNote = await seedContentFromSpec(conn, wpPath, websiteSpecId);
+      } catch (e) {
+        contentNote = `content seed error: ${e instanceof Error ? e.message : String(e)}`;
+      }
+    }
+
     return NextResponse.json({
       environmentId,
       wpRootPath: wpPath,
@@ -190,6 +301,7 @@ export async function POST(request: Request) {
       provisioningNotes: [
         ...(!themeOk ? ["WARN: Kadence theme install had issues"] : []),
         ...(!pluginsOk ? ["WARN: some plugins may not have installed"] : [`Plugins installed: ${allPlugins.join(", ")}`]),
+        contentNote,
         `staging/${slug}/ — subdirectory install on aware-wave.com`,
         `DB: ${dbName} on lobster-wordpress-db`,
         `Admin: admin / ${adminPass}`,
