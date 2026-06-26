@@ -177,7 +177,7 @@
    | 子網域 | CF 代理 | 備註 |
    |--------|--------|------|
    | `supabase` / `studio` / `n8n` / `trigger` / `uptime` / `mainwp` / `postiz` | 🟠 proxied | 平台/自動化/監控入口；改 A record content 即可（CF 邊緣不變）|
-   | `remotion-svc` / `video-svc` | ⚪ **DNS-only（沒走 CF）** | **直接暴露 origin IP、無 CDN**；改 IP 後訪客直連新機，注意這兩個沒有 CF 邊緣保護 |
+   | `remotion-svc` / `video-svc` | ⚪ **DNS-only（刻意，勿開 proxy）** | **影片 render 超過 CF 100s proxy 超時 → 開 proxy 會 524 弄壞它**（nginx read_timeout 600s）。保護靠 **X-Render-Token（無 token→401）+ TLS**（2026-06-26 實測確認）。搬機改 A record IP 後仍維持 grey/DNS-only。代價：origin IP 公開（可接受，已 token+TLS）；想隱藏 IP 又保長請求 → 未來可考慮 Cloudflare Tunnel(cloudflared)，非必要 |
 
    - SG 那 4 個（`apex` / `api` / `app` / `oracle`）+ `www`(CNAME→apex) **不要動**（除非也搬 SG）。
    - 查當前 live 清單：`curl -H "Authorization: Bearer <CLOUDFLARE_API_TOKEN>" "https://api.cloudflare.com/client/v4/zones/f21b1919632fee2221647908a94fdcac/dns_records?per_page=200"`。
