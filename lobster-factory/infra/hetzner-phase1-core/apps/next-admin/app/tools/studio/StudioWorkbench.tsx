@@ -17,7 +17,9 @@ import {
 import {
   CULTURE_REGIONS,
   CULTURE_LENSES,
+  MAP_THEMES,
   type CultureItem,
+  type MapTheme,
 } from "@/lib/studio/culture-presets";
 import { tabStyle, chipStyle, actionPill, ghostBtn } from "@/components/tools/panel-primitives";
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
@@ -116,6 +118,28 @@ function storeCulture(regionEn: string, lensKey: string, items: CultureItem[]): 
   } catch {
     // Ignore quota/private-mode failures; the in-memory result still renders.
   }
+}
+
+// 🗺️ Build a full illustrated-map prompt from country + the picked specific items.
+// `items` are English phrases (real names like "Taipei 101", or the theme fallback).
+// The country and every item are written into the prompt explicitly so the output
+// is an actual themed map, not a generic scene.
+function buildMapPrompt(opts: {
+  regionEn: string;
+  fusionEn?: string;
+  theme: MapTheme;
+  items: string[];
+}): string {
+  const { regionEn, fusionEn, theme, items } = opts;
+  const place = fusionEn ? `${regionEn} and ${fusionEn}` : regionEn;
+  const icons = items.slice(0, 12).filter(Boolean).join(", ");
+  if (theme.kind === "transit") {
+    return `A clean stylized ${place} ${theme.enLabel} diagram, colorful subway map design with several distinct colored lines and labeled stations${icons ? ` including ${icons}` : ""}, interchange dots, flat minimal vector infographic, plain light background, not a realistic photograph`;
+  }
+  if (theme.kind === "chart") {
+    return `An illustrated reference chart poster of ${place} ${theme.enLabel}, neat grid of individual labeled icons${icons ? ` such as ${icons}` : ""}, flat vector illustration, bold clean outlines, plain background, infographic style, not a realistic photograph`;
+  }
+  return `A colorful flat-vector illustrated tourist map of ${place}, top-down stylized map in the shape of the country, travel-poster infographic highlighting ${theme.enLabel},${icons ? ` with labeled cute illustrated icons of ${icons},` : ""} decorative compass rose, small clouds, trees and a welcome title banner, soft vibrant colors, thick clean outlines, cartographic illustration, not a realistic photograph`;
 }
 
 function coerceTopics(value: unknown): string[] {
@@ -303,7 +327,8 @@ export default function StudioWorkbench() {
   const [cultureDyn, setCultureDyn] = useState<Record<string, CultureItem[]>>({}); // `${regionEn}|${lensKey}` → items
   const [cultureFetching, setCultureFetching] = useState<Record<string, boolean>>({}); // per-key in-flight flag
   const [fusionRegion, setFusionRegion] = useState<CultureItem | null>(null); // 🎲 混搭骰 second culture
-  const [showMap, setShowMap] = useState(false); // 🗺️ 靈感地圖 toggle
+  const [mapMode, setMapMode] = useState(false); // 🗺️ 地圖模式 — generate a whole illustrated tourist map
+  const [mapTheme, setMapTheme] = useState(MAP_THEMES[0]?.key ?? ""); // active map theme (地標/美食/捷運…)
 
   // 🔥 時事靈感 — active category tab (圖一 layout: tabs + items below)
   const [trendingTab, setTrendingTab] = useState(TRENDING_CATEGORIES[0]?.value ?? "");
@@ -395,6 +420,20 @@ export default function StudioWorkbench() {
   }, [productType, subject, theme, style]);
 
   const assembledPrompt = useMemo(() => {
+    // 🗺️ 地圖模式 — assemble a whole illustrated-map prompt from country + picked items.
+    // Items priority: explicitly picked chips → AI-fetched set for this theme → theme fallback.
+    if (mapMode && region) {
+      const mt = MAP_THEMES.find((t) => t.key === mapTheme) ?? MAP_THEMES[0]!;
+      const dyn = cultureDyn[`${region.en}|${mapTheme}`] ?? [];
+      const items = cultureChips.length
+        ? cultureChips
+        : dyn.length
+          ? dyn.map((d) => d.en)
+          : mt.fallback.map((d) => d.en);
+      const base = buildMapPrompt({ regionEn: region.en, fusionEn: fusionRegion?.en, theme: mt, items });
+      const extras = [resolvedStylePrompt, vibe.trim()].filter(Boolean).join(", ");
+      return extras ? `${base}, ${extras}` : base;
+    }
     // 🌍 culture tokens: region adjective (+ 🎲 fusion culture) + any picked culture chips
     const cultureTokens = [
       region ? `${region.en} cultural heritage` : "",
@@ -414,7 +453,7 @@ export default function StudioWorkbench() {
     }
     const parts = [subject.trim(), ...cultureTokens, theme.trim(), vibe.trim(), resolvedStylePrompt, product.suffix].filter(Boolean);
     return parts.join(", ");
-  }, [subject, theme, vibe, resolvedStylePrompt, product, refMode, refImages.length, region, fusionRegion, cultureChips]);
+  }, [subject, theme, vibe, resolvedStylePrompt, product, refMode, refImages.length, region, fusionRegion, cultureChips, mapMode, mapTheme, cultureDyn]);
 
   const effectivePrompt = promptTouched ? prompt : assembledPrompt;
 
@@ -487,7 +526,6 @@ export default function StudioWorkbench() {
     setRegionTab(a.group);
     setFusionRegion(b.it);
     setCultureLens(lens.key);
-    setShowMap(true);
     void fetchCulture(a.it.en, lens.key);
     void fetchCulture(b.it.en, lens.key);
   }, [fetchCulture]);
@@ -520,13 +558,15 @@ export default function StudioWorkbench() {
     if (stored) setAllTopics(stored);
   }, []);
 
-  // When a saved culture×lens pair is selected again, show it without spending tokens.
+  // When a saved culture×facet pair is selected again, show it without spending tokens.
+  // The active facet is the map theme in 地圖模式, otherwise the culture lens.
   useEffect(() => {
     if (!region) return;
-    const key = cultureRuntimeKey(region.en, cultureLens);
-    const stored = readStoredCulture(region.en, cultureLens);
+    const facetKey = mapMode ? mapTheme : cultureLens;
+    const key = cultureRuntimeKey(region.en, facetKey);
+    const stored = readStoredCulture(region.en, facetKey);
     if (stored) setCultureDyn((prev) => (prev[key] ? prev : { ...prev, [key]: stored }));
-  }, [region, cultureLens]);
+  }, [region, cultureLens, mapMode, mapTheme]);
 
   const onUploadRefs = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -855,17 +895,32 @@ export default function StudioWorkbench() {
             1️⃣ 選地域 → 2️⃣ 選鏡頭 → ✨ AI 噴出該文化專屬靈感（可多選，填入 prompt）
           </p>
 
-          {/* 🎲 混搭骰 + 🗺️ 地圖切換 */}
+          {/* 🎲 混搭骰 + 🗺️ 地圖模式切換 */}
           <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
             <button type="button" onClick={rollDice} title="隨機 2 國 × 1 鏡頭混搭，逼出意外靈感"
               style={actionPill()}>
               🎲 文化混搭骰
             </button>
-            <button type="button" onClick={() => setShowMap((v) => !v)}
-              style={tabStyle(showMap)}>
-              🗺️ 靈感地圖 {showMap ? "▲" : "▼"}
+            <button type="button"
+              onClick={() => {
+                setMapMode((v) => {
+                  const next = !v;
+                  // Entering map mode: reset to portrait (like a travel poster) and drop any
+                  // manual prompt edit so the freshly-assembled map prompt shows immediately.
+                  if (next) { setAspect("3:4"); setPromptTouched(false); setPrompt(""); }
+                  return next;
+                });
+              }}
+              title="把選取的國家＋項目組成一整張插畫旅遊地圖（像觀光地圖）"
+              style={tabStyle(mapMode)}>
+              🗺️ 地圖模式 {mapMode ? "ON" : "OFF"}
             </button>
           </div>
+          {mapMode && (
+            <div style={{ marginBottom: 10, padding: "6px 10px", borderRadius: 8, background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.4)", fontSize: 11.5, lineHeight: 1.5 }}>
+              🗺️ <b>地圖模式已開</b>：選國家 → 選地圖主題 → ✨AI 噴出具體項目 → 點選（不選則自動用 AI 全部項目）。生成的是一整張地圖，國名與每個項目都會寫進 prompt。
+            </div>
+          )}
           {fusionRegion && region && (
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, padding: "5px 10px", borderRadius: 8, background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.4)", fontSize: 12 }}>
               <span style={{ fontWeight: 600 }}>🎲 {region.zh} × {fusionRegion.zh}</span>

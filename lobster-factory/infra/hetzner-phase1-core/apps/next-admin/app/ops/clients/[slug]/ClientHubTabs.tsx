@@ -1129,6 +1129,110 @@ function BrandIdentityTab({ org, cfg }: Pick<ClientHubTabsProps, "org" | "cfg">)
   );
 }
 
+// ── Customer service tab ──────────────────────────────────────────────────────
+
+type CsIntentRow = {
+  key: string; label: string; answer_level: string; action_level: string;
+  is_sensitive: boolean; confidence_threshold: number; canary_pct: number;
+};
+
+function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
+  const [loading, setLoading] = useState(true);
+  const [csEnabled, setCsEnabled] = useState(true);
+  const [knowledgeCount, setKnowledgeCount] = useState(0);
+  const [intents, setIntents] = useState<CsIntentRow[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/ops/clients/${org.slug}/cs-config`, { headers: { ...roleHeader("admin") } });
+        const data = (await res.json()) as { ok?: boolean; csEnabled?: boolean; knowledgeCount?: number; intents?: CsIntentRow[] };
+        if (!alive) return;
+        if (data.ok) {
+          setCsEnabled(data.csEnabled ?? true);
+          setKnowledgeCount(data.knowledgeCount ?? 0);
+          setIntents(data.intents ?? []);
+        }
+      } catch { /* ignore — show empty */ } finally { if (alive) setLoading(false); }
+    })();
+    return () => { alive = false; };
+  }, [org.slug]);
+
+  async function toggleKill() {
+    setSaving(true); setMsg(null);
+    const next = !csEnabled;
+    try {
+      const res = await fetch(`/api/ops/clients/${org.slug}/cs-config`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...roleHeader("admin") },
+        body: JSON.stringify({ csEnabled: next }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) throw new Error(data.error ?? `save_failed_${res.status}`);
+      setCsEnabled(next);
+      setMsg(next ? "✓ 已啟用此客戶 AI 客服" : "✓ 已停用（kill-switch）— AI 不再自動回覆此客戶");
+    } catch (e) { setMsg(`⚠ ${String(e)}`); } finally { setSaving(false); }
+  }
+
+  const badge = (bg: string, fg: string, text: string) => (
+    <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 5, background: bg, color: fg, whiteSpace: "nowrap" }}>{text}</span>
+  );
+  const ansBadge = (l: string) =>
+    l === "L2" ? badge("var(--badge-green-bg)", "var(--green)", "L2 自動")
+      : l === "L1" ? badge("var(--bg-canvas)", "var(--text-secondary)", "L1 草稿")
+        : badge("var(--bg-canvas)", "var(--text-muted)", "L0 關閉");
+  const actBadge = (l: string) =>
+    l === "A2" ? badge("var(--bg-canvas)", "var(--text-secondary)", "A2 受閘寫")
+      : l === "A1" ? badge("var(--bg-canvas)", "var(--text-secondary)", "A1 唯讀")
+        : badge("var(--bg-canvas)", "var(--text-muted)", "A0 無動作");
+
+  return (
+    <>
+      <Card title={csEnabled ? "🟢 AI 客服：啟用中" : "🔴 AI 客服：已停用 (kill-switch)"}>
+        <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
+          每租戶 kill-switch（停用後此客戶的對話一律轉真人，不自動回覆）。意圖層級與全域開關另在「客服營運中心」。
+        </p>
+        <button onClick={toggleKill} disabled={saving}
+          style={{ ...cisBtnStyle, background: csEnabled ? "var(--red)" : "var(--accent)", opacity: saving ? 0.6 : 1 }}>
+          {saving ? "處理中…" : csEnabled ? "停用 AI 客服" : "啟用 AI 客服"}
+        </button>
+        {msg && <div style={{ marginTop: 6, fontSize: 11, color: msg.startsWith("✓") ? "var(--green)" : "var(--red)" }}>{msg}</div>}
+      </Card>
+
+      <Card title="知識庫">
+        <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+          已建知識來源：<strong style={{ color: "var(--text-primary)" }}>{loading ? "…" : knowledgeCount}</strong> 筆
+          {!loading && knowledgeCount === 0 && <span style={{ color: "var(--text-muted)" }}>（尚未餵資料；RAG 需先建知識源）</span>}
+        </div>
+      </Card>
+
+      <Card title={`意圖與自動化分級 (${loading ? "…" : intents.length})`}>
+        <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
+          雙軸：答覆 L0/L1/L2 × 行動 A0/A1/A2；敏感意圖永遠轉真人（money/身分/法律）。
+        </p>
+        {loading ? (
+          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>載入中…</div>
+        ) : intents.length === 0 ? (
+          <NoData>尚未設定意圖（cs_intents 空）。可在「客服營運中心」或 seed 後逐意圖畢業升級。</NoData>
+        ) : (
+          intents.map((it) => (
+            <div key={it.key} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid var(--border-subtle)", fontSize: 12 }}>
+              <span style={{ flex: 1, fontWeight: 500 }}>{it.label}<span style={{ color: "var(--text-muted)", fontWeight: 400, marginLeft: 6, fontFamily: "monospace", fontSize: 10 }}>{it.key}</span></span>
+              {it.is_sensitive && badge("var(--badge-red-bg)", "var(--red)", "敏感·轉真人")}
+              {ansBadge(it.answer_level)}
+              {actBadge(it.action_level)}
+              {it.canary_pct > 0 && it.canary_pct < 100 && badge("var(--bg-canvas)", "var(--text-secondary)", `canary ${it.canary_pct}%`)}
+            </div>
+          ))
+        )}
+      </Card>
+    </>
+  );
+}
+
 // ── Social channels tab ───────────────────────────────────────────────────────
 
 type PostizIntegrationItem = {

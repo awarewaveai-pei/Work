@@ -538,14 +538,18 @@ export default function TarotStudio() {
     }).catch(() => {/* gallery save never blocks generation */});
   }
 
-  async function generateOne(card: TarotCard, index: number): Promise<void> {
+  // seedOverride: omit → use the locked deck seed (previewSeed) for first-fill consistency.
+  // Pass an explicit fresh seed for *regeneration* — deterministic models (FLUX go_fast:false,
+  // ideogram v2a/v3) reproduce the identical image from the same seed, so reusing previewSeed
+  // made "重新生成" silently no-op. A new seed forces a genuinely different result.
+  async function generateOne(card: TarotCard, index: number, seedOverride?: number | null): Promise<void> {
     patchItem(index, { status: "pending", error: undefined });
     try {
       const resp = await callGenerate({
         model: lockedModel,
         prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectText }),
         referenceImages: lockedRefs,
-        seed: previewSeed,
+        seed: seedOverride !== undefined ? seedOverride : previewSeed,
         printQuality: true,
         _jobId: jobIdRef.current,
       });
@@ -609,7 +613,10 @@ export default function TarotStudio() {
     setMessage(null);
     try {
       for (const t of targets) {
-        await generateOne(t.it.card, t.i);
+        // "重新生成全組" (skipDone=false) redoes already-done cards → needs a fresh seed each,
+        // else deterministic models reproduce the same images. "填補未完成" (skipDone=true) is
+        // first-fill → keep the deck seed (previewSeed) for cross-card consistency.
+        await generateOne(t.it.card, t.i, skipDone ? undefined : Math.floor(Math.random() * 1_000_000_000));
       }
     } finally {
       setBatchBusy(false);
@@ -705,7 +712,9 @@ export default function TarotStudio() {
     setBatchBusy(true);
     setMessage(null);
     try {
-      await generateOne(batch[index].card, index);
+      // Always a fresh seed: this button is "regenerate this card", whether the slot was blank
+      // or already done. Without a new seed, deterministic models redraw the identical image.
+      await generateOne(batch[index].card, index, Math.floor(Math.random() * 1_000_000_000));
       setMessage("✓ 已重新生成");
     } finally {
       setBatchBusy(false);
