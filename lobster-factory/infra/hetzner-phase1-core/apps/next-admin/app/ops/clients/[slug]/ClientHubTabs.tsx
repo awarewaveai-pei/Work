@@ -1282,25 +1282,33 @@ function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
         </div>
       </Card>
 
-      <Card title={`意圖與自動化分級 (${loading ? "…" : intents.length})`}>
+      <Card title={`意圖與自動化分級（${loading ? "…" : intents.length}）`}>
         <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
-          雙軸：答覆 L0/L1/L2 × 行動 A0/A1/A2；敏感意圖永遠轉真人（money/身分/法律）。
+          雙軸：答覆 L0 關閉 / L1 草稿 / L2 自動 × 行動 A0 無 / A1 唯讀 / A2 受閘寫；勾「敏感」= money/身分/法律，永遠轉真人。
         </p>
-        {loading ? (
-          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>載入中…</div>
-        ) : intents.length === 0 ? (
-          <NoData>尚未設定意圖（cs_intents 空）。可在「客服營運中心」或 seed 後逐意圖畢業升級。</NoData>
-        ) : (
-          intents.map((it) => (
-            <div key={it.key} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid var(--border-subtle)", fontSize: 12 }}>
-              <span style={{ flex: 1, fontWeight: 500 }}>{it.label}<span style={{ color: "var(--text-muted)", fontWeight: 400, marginLeft: 6, fontFamily: "monospace", fontSize: 10 }}>{it.key}</span></span>
-              {it.is_sensitive && badge("var(--badge-red-bg)", "var(--red)", "敏感·轉真人")}
-              {ansBadge(it.answer_level)}
-              {actBadge(it.action_level)}
-              {it.canary_pct > 0 && it.canary_pct < 100 && badge("var(--bg-canvas)", "var(--text-secondary)", `canary ${it.canary_pct}%`)}
-            </div>
-          ))
-        )}
+        {!loading && intents.map((it) => (
+          <div key={it.key} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid var(--border-subtle)", fontSize: 12 }}>
+            <span style={{ flex: 1, fontWeight: 500 }}>{it.label}<span style={{ color: "var(--text-muted)", fontWeight: 400, marginLeft: 6, fontFamily: "monospace", fontSize: 10 }}>{it.key}</span></span>
+            {it.is_sensitive && badge("var(--badge-red-bg)", "var(--red)", "敏感·轉真人")}
+            {ansBadge(it.answer_level)}
+            {actBadge(it.action_level)}
+            {it.canary_pct > 0 && it.canary_pct < 100 && badge("var(--bg-canvas)", "var(--text-secondary)", `canary ${it.canary_pct}%`)}
+            <button onClick={() => delIntent(it.key)} aria-label="刪除" style={{ border: "none", background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }}>×</button>
+          </div>
+        ))}
+        <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 10, marginTop: 4 }}>
+          <CisText label="代碼 key" value={iKey} onChange={setIKey} placeholder="order_status" mono />
+          <CisText label="名稱" value={iLabel} onChange={setILabel} placeholder="訂單狀態查詢" />
+          <CisSelect label="答覆" value={iAns} onChange={setIAns} options={[["L0", "L0 關閉"], ["L1", "L1 草稿"], ["L2", "L2 自動"]]} />
+          <CisSelect label="行動" value={iAct} onChange={setIAct} options={[["A0", "A0 無"], ["A1", "A1 唯讀"], ["A2", "A2 受閘寫"]]} />
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-secondary)", padding: "4px 0 0 96px" }}>
+            <input type="checkbox" checked={iSensitive} onChange={(e) => setISensitive(e.target.checked)} /> 敏感（永遠轉真人）
+          </label>
+          <button onClick={addIntent} disabled={iSaving || !iKey || !iLabel} style={{ ...cisBtnStyle, opacity: iSaving || !iKey || !iLabel ? 0.5 : 1 }}>
+            {iSaving ? "新增中…" : "新增意圖"}
+          </button>
+          {iMsg && <div style={{ marginTop: 6, fontSize: 11, color: iMsg.startsWith("✓") ? "var(--green)" : "var(--red)" }}>{iMsg}</div>}
+        </div>
       </Card>
     </>
   );
