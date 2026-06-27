@@ -4,6 +4,36 @@
 
 ## 2026-06-27
 
+### feat(canvas): /tools/canvas 兩批改善 — 裁切/面板永顯/畫布貼合/存檔修復(Batch1) + 每圖記調色/滑桿undo(Batch2)
+
+[任務理解] 使用者要 /tools/canvas 更完善。先做唯讀邏輯審查列出問題,再依其指示分兩批實作+部署+真機驗證。
+
+[現況分析] CanvasEditor.tsx(1900→2000+ 行,Fabric v7 client component)。讀全檔 + SidebarPanel/ColorGradePanel。確認問題附 file:line:① 存檔按一次永久卡死(saveState=saved 後無 reset);② 擴圖/生成填色共用 fillPrompt 互相污染;③ 調色滑桿全域 → 點圖A調好換圖B帶過去(跨圖污染);④ 調色滑桿無法 undo;⑧ 刪除鈕無選取也亮;⑪ 工具面板要先點圖層才出現。另缺裁切工具;畫布尺寸與進來的圖各自為政(上傳縮放用顯示px算→高DPI下圖超小)。
+
+[已修改]
+- Batch1(commit d9ac17e4): app/tools/canvas/CanvasEditor.tsx
+  - #11(使用者指定版): effects/影像工具群/字型庫 改 always-render(拿掉 imageSelected/textSelected/anySelected 閘)+全 defaultCollapsed(匯出維持展開)。圖層含文字+圖片時圖片工具不再需先點選。
+  - 裁切工具(新): enterCrop/applyCrop/cancelCrop + cropMode,Fabric 原生 cropX/cropY/width/height(非破壞可undo);座標全在 object/real space → zoom 無關;支援 origin center(handoff)與 left/top(上傳);require angle 0 + 非翻轉(否則裁鏡像/斜框)。
+  - 畫布/圖邏輯: 修上傳縮放(改真實畫布尺寸+置中)+ 加「符合畫布/填滿畫布」(contain/cover)+模型說明。
+  - #1 存檔: onStack/filter effect setSaveState idle(restore 時 restoringRef 跳過);#2 拆 outpaintPrompt;#8 刪除鈕加 !anySelected;crop 期間禁 undo/redo/筆/擦/匯出/存檔(防 __cropRect 烤進存檔)。
+- Batch2(commit 587d0a24): CanvasEditor.tsx + components/tools/ColorGradePanel.tsx
+  - #3 per-image: 新 AdjState(grade+preset+removeWhite+10滑桿)存每張圖 .adj;customProperties 加 "adj"(隨 toJSON/save/load);syncFromSelection→loadAdj 選圖載入該圖 adj(無則中性);filter effect 寫回 active 圖 .adj。useColorGrade 加 setAll(NEUTRAL_STATE merge 防舊存檔殘缺鍵)。
+  - #4 undo: filter effect 真實使用者編輯時排 debounced(450ms) snapshot。**userEditRef 從 bool 改存「正在編輯的物件」**,effect 僅 active===userEditRef 才記 → 選圖載入/restore 不誤記(critic 物件識別消除 async 競態整類)。markEdit() 接所有真實滑桿/preset/checkbox/auto。
+  - bake(posterize/outpaint/edge/inpaint)換圖後 resetAdjToNeutral()(新像素已含效果,防舊設定再污染);unmount 清 snapTimerRef;undo/redo restore 後 resetAdjToNeutral 同步滑桿。
+
+[驗證結果](R0 四動作 ×2 批)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 (兩批各跑)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npm test` | exit=0 (537 passed/41 files,兩批各跑無 regression)
+- REALTEST_EVIDENCE: tool=mcp__Claude_in_Chrome | cmd=真機 e2e 部署版 | exit=0 | **Batch1**: 上傳→裁切右(藍)半→cropX=200/width=200/落框位,**取樣像素=純藍(0,0,255)** 抓對區域;符合畫布 scaleX=4;存檔鈕編輯後 enabled。**Batch2**: A 設 contrast50→切B 滑桿=0(無污染)→切回A=50;A.adj=50/B.adj=0;第2次 undo 還原 contrast(filters:0)→redo 回來(filters:1/adjC50)。
+- REVIEW_DONE: critic=Deep ×2 | verdict=pass | Batch1 findings=0c/3m/4n(M1/M2/N3/N4 修,M3 verified-clean);Batch2 findings=2c/2m/3n **全修**(物件識別 flag 為 root-fix)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=fillPrompt|outpaintPrompt|enterCrop|cropMode|setAll|markEdit|resetAdjToNeutral|userEditRef|customProperties | hits=0(prompt 雙向無 bleed;setAll 加法相容其他 useColorGrade 消費者;新符號限 CanvasEditor)
+
+[部署] SG sg-deploy.sh next-admin。**並行衝突插曲**:另一 session 的 deploy 在我 push Batch2 前搶先跑,先上 4fa2e58c(含 Batch1 不含 Batch2)。VBC 比對線上 source 缺 Batch2 符號(grep=0)→ 等鎖釋放重跑 → 確認 587d0a24 真進 image(23 符號命中,customProperties=["name","adj"])。兩批均 healthy 7s + HTTP smoke 全 200 + playwright smoke 26/0(Batch1 後跑)。
+
+[剩餘風險] 點 auto 鈕後 ms 級內切換到別張圖,auto 值可能套到他圖(pre-existing;object-id flag 已防誤記 undo)。edgeStyle/edgeOriginal 仍不在 customProperties(pre-existing,本批未碰)。
+
+[rollback] git revert 587d0a24(Batch2,2檔)/ d9ac17e4(Batch1,1檔);線上 sg-deploy 舊 commit。
+
 ### deploy(oracle): oracle.aware-wave.com 上線全部 8 功能(SG，使用者授權 High-risk)
 
 [任務理解] 使用者授權部署。先驗發現:oracle.aware-wave.com 為 **live 但舊版**(Phase 0,/api/interpret、/api/astrology 全 404),這輪 8 功能(Centaur AI/紫微過運/每日個人化/OG/塔羅/西洋占星/付費牆)未上線。
