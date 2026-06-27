@@ -38,8 +38,12 @@
 讓 Chatwoot 進站訊息 → 觸發已建好的 `handleInbound` → 回覆：
 
 1. **Chatwoot 端**：建一個 **API inbox** + 註冊 **AgentBot**（Super Admin），webhook URL 指向 next-admin。
-2. **next-admin 端（新建 1 個 route）**：`app/api/cs/chatwoot-webhook/route.ts` —— 驗 `X-Chatwoot-Signature`(HMAC) → 解析 `message_created` → 組 `InboundMessage` → **呼叫 `handleInbound`（已存在 `@/lib/cs`）** → 依回傳 decision 經 Chatwoot API 回覆 + `pending→open` 交接 + 記 `cs_ai_replies`/`cs_action_log`（這些表已存在）。
-   - 注意：`handleInbound` 已含 kill-switch、雙軸自主、護欄、RAG、supervisor —— **不要重寫，只要接上**。
+2. **next-admin 端（新建 1 個 route）**：`app/api/cs/chatwoot-webhook/route.ts` —— 驗 `X-Chatwoot-Signature`(HMAC) → 解析 `message_created` → 組 `InboundMessage`（8 欄，Chatwoot payload 直接對映：organizationId 由 inbox→tenant 查表、conversationId/messageId/contactRef/channel/conversationStatus/text 來自 payload）→ **呼叫 `handleInbound`（已存在 `@/lib/cs`，回傳 `CsDecision`）** → 讀 `decision.replyText` + `decision.action`：**自動回覆**就把 `replyText` 經 Chatwoot API POST 回 + 設對話狀態；**handoff/suppressed** 留給真人（`pending` 不動 / assign）。
+   - ⚠️ **不要在 route 再寫 `cs_ai_replies`** —— `handleInbound` 內部已寫（`orchestrator.ts` persist() → recordReply → `lib/cs/db.ts:187` `cs_ai_replies.upsert`）。route 重寫 = 重複。
+   - `cs_action_log`（migration 0051:183）表存在但**目前零 writer**，Telegram/Email 自動回 MVP 用不到；要記 tool 行動再接，不是 route 的必做。
+   - **冪等鍵 = Chatwoot message id**：webhook 會重送 → 必須把它放進 `InboundMessage.messageId`（type 註解明寫 idempotency key），否則同一則回兩次。
+   - **靜音規則已在 brain**（`isFromAgent` / `conversationStatus==="open"` → `suppressed`）→ route 不用自己過濾。
+   - `handleInbound` 已含 kill-switch、雙軸自主、護欄、RAG、supervisor —— **不要重寫，只要接上**。
 3. **widget 端（改 1 行）**：`app/cs-widget/page.tsx` 把 `new MockTransport()` 換成 `new ChatwootTransport(config)`（`ChatwootTransport` 已寫好在 `lib/cs-widget/chatwoot-transport.ts`），`config` 帶真實 `baseUrl`(Chatwoot host) + `inboxIdentifier`。
 4. **設定**：Chatwoot baseUrl + 每租戶 inbox identifier 存哪（建議 `client_config` JSONB，沿用 CIS 慣例）。
 5. **驗證**：從 Telegram/Email 發一則真實訊息 → 進 Chatwoot → 觸發 webhook → AI 回 → 確認對方收到（REALTEST_EVIDENCE）。
