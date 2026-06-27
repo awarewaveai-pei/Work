@@ -34,6 +34,8 @@ services:
       # 腳本生成（Claude Haiku）+ Pexels b-roll
       CLAUDE_API_KEY: ${CLAUDE_API_KEY}
       PEXELS_API_KEY: ${PEXELS_API_KEY}
+      # OpenAI TTS（tts-1 / tts-1-hd）；缺則 pipeline 會自動 fallback Edge TTS。
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       # 渲染上限（防資源失控）
       RENDER_MAX_SCENES: ${RENDER_MAX_SCENES:-30}
       RENDER_MAX_ASSET_MB: ${RENDER_MAX_ASSET_MB:-200}
