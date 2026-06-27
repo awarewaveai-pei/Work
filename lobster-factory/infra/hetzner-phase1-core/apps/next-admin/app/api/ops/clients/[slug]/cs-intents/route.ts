@@ -21,6 +21,14 @@ async function orgIdOf(slug: string): Promise<string | null> {
   return error || !data ? null : (data.id as string);
 }
 
+function audit(orgId: string, role: string, source: string, event: string, payload: Record<string, unknown>) {
+  void getSupabaseWriteClient()?.from("ops_audit_events").insert({
+    organization_id: orgId, actor_role: role, event_type: event,
+    target_type: "organizations", target_id: orgId, trace_id: crypto.randomUUID(),
+    payload: { ...payload, role_source: source },
+  });
+}
+
 export async function POST(request: Request, context: { params: Promise<{ slug: string }> }) {
   const resolved = resolveOpsRole(request);
   if (!canWriteTenantConfig(resolved.role)) {

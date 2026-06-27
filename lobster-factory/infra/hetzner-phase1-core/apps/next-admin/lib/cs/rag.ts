@@ -130,17 +130,31 @@ export async function ingestKnowledge(input: KnowledgeInput): Promise<{ sourceId
   if (!sourceId) return { sourceId: null, chunks: 0 };
 
   const pieces = chunkText(input.body);
-  if (!pieces.length) return { sourceId, chunks: 0 };
+  if (!pieces.length) {
+    await deleteKnowledgeSource(input.organizationId, sourceId).catch(() => {});
+    return { sourceId: null, chunks: 0 };
+  }
 
-  const embeddings = await getEmbeddingProvider().embed(pieces);
-  const model = getEmbeddingProvider().id;
-  const rows = pieces.map((content, i) => ({
-    organizationId: input.organizationId,
-    sourceId,
-    content,
-    embedding: embeddings[i] ?? [],
-    embedModel: model,
-  }));
-  const chunks = await insertChunks(rows.filter((r) => r.embedding.length > 0));
-  return { sourceId, chunks };
+  // The source row is already committed; if embedding/chunk-insert fails, roll it back so a failed
+  // ingest never leaves a permanent zero-chunk ghost source (critic finding).
+  try {
+    const embeddings = await getEmbeddingProvider().embed(pieces);
+    const model = getEmbeddingProvider().id;
+    const rows = pieces.map((content, i) => ({
+      organizationId: input.organizationId,
+      sourceId,
+      content,
+      embedding: embeddings[i] ?? [],
+      embedModel: model,
+    }));
+    const chunks = await insertChunks(rows.filter((r) => r.embedding.length > 0));
+    if (chunks === 0) {
+      await deleteKnowledgeSource(input.organizationId, sourceId).catch(() => {});
+      return { sourceId: null, chunks: 0 };
+    }
+    return { sourceId, chunks };
+  } catch (e) {
+    await deleteKnowledgeSource(input.organizationId, sourceId).catch(() => {});
+    throw e;
+  }
 }
