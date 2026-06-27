@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   STUDIO_MODEL_OPTIONS,
   type AspectRatio,
@@ -525,6 +525,15 @@ export default function StudioWorkbench() {
     setPlayMods((prev) => (prev.includes(en) ? prev.filter((x) => x !== en) : [...prev, en]));
   }, []);
 
+  // 🗺️ 整體地圖 — picking a broad category (小吃/甜點…) builds a whole map "packed with a wide
+  // variety of that category". Enters map mode + toggles a variety token in cultureChips.
+  const onPickCategory = useCallback((catEn: string) => {
+    const token = `many different kinds of ${catEn}`;
+    // Only reset aspect/prompt on the OFF→ON transition (don't clobber a manual edit on every click).
+    if (!mapMode) { setMapMode(true); setAspect("2:3"); setPromptTouched(false); setPrompt(""); }
+    setCultureChips((prev) => (prev.includes(token) ? prev.filter((x) => x !== token) : [...prev, token]));
+  }, [mapMode]);
+
   // Fetch 12 specific authentic items for the current region×lens.
   // Default path returns pre-baked curated items (free + instant); only the long tail hits
   // the LLM. opts.curatedOnly (auto-load) never spends; opts.force re-rolls via the AI.
@@ -628,13 +637,16 @@ export default function StudioWorkbench() {
     setRefImages((prev) => [...prev, ...urls].slice(0, maxRefs));
   }, [maxRefs, refImages.length]);
 
-  // Sequential multi-model generation (avoids API 429, results appear incrementally)
-  const generate = useCallback(async () => {
-    if (!effectivePrompt || effectivePrompt.trim().length < 3) {
+  // Sequential multi-model generation (avoids API 429, results appear incrementally).
+  // promptOverride lets 🎨 單獨生圖 generate one specific item; noRef forces text-to-image.
+  const runGenerate = useCallback(async (opts?: { promptOverride?: string; noRef?: boolean }) => {
+    const usePrompt = opts?.promptOverride ?? effectivePrompt;
+    const effRefMode: RefMode = opts?.noRef ? "none" : refMode;
+    if (!usePrompt || usePrompt.trim().length < 3) {
       setResults([{ model: primaryModel, image: null, seed: null, error: "請先填主題/描述（prompt 至少 3 字）", busy: false }]);
       return;
     }
-    if (refMode === "transform" && refImages.length === 0) {
+    if (effRefMode === "transform" && refImages.length === 0) {
       setResults([{ model: primaryModel, image: null, seed: null, error: "改圖模式需要先上傳一張圖", busy: false }]);
       return;
     }
@@ -642,7 +654,7 @@ export default function StudioWorkbench() {
     const modelList = Array.from(selectedModels);
 
     // Validate ideogram-character requires ref (refMode="none" sends [] regardless of stale refImages)
-    if (modelList.includes("ideogram-character") && (refMode === "none" || refImages.length === 0)) {
+    if (modelList.includes("ideogram-character") && (effRefMode === "none" || refImages.length === 0)) {
       setResults([{ model: "ideogram-character", image: null, seed: null, error: "Ideogram Character 需要至少 1 張角色參考圖", busy: false }]);
       return;
     }
@@ -669,13 +681,13 @@ export default function StudioWorkbench() {
       if (genIdRef.current !== genId) break; // user re-clicked generate
       const m = modelList[i];
       const mOption = STUDIO_MODEL_OPTIONS.find((o) => o.value === m);
-      const refsForModel = refMode === "none" ? [] : refImages.slice(0, mOption?.maxRefs ?? 0);
+      const refsForModel = effRefMode === "none" ? [] : refImages.slice(0, mOption?.maxRefs ?? 0);
 
       try {
         const res = await fetch("/api/tools/studio/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model: m, prompt: effectivePrompt, referenceImages: refsForModel, aspectRatio: aspect, _jobId: jobIdRef.current }),
+          body: JSON.stringify({ model: m, prompt: usePrompt, referenceImages: refsForModel, aspectRatio: aspect, _jobId: jobIdRef.current }),
         });
         const json = (await res.json()) as { ok: boolean; image?: string; seed?: number | null; error?: string };
         slots[i] = json.ok && json.image
@@ -690,6 +702,15 @@ export default function StudioWorkbench() {
 
     if (genIdRef.current === genId) setBusy(false);
   }, [selectedModels, effectivePrompt, refImages, aspect, refMode, primaryModel]);
+
+  const generate = useCallback(() => { void runGenerate(); }, [runGenerate]);
+
+  // 🎨 單獨生圖 — generate one specific item on its own (sticker), with current 玩法 + 風格 applied.
+  const generateSingle = useCallback((en: string) => {
+    const p = [en, playMods.join(", "), resolvedStylePrompt, "die-cut sticker design, bold clean outline, plain background"]
+      .filter(Boolean).join(", ");
+    void runGenerate({ promptOverride: p, noRef: true });
+  }, [runGenerate, playMods, resolvedStylePrompt]);
 
   const removeBg = useCallback(async (model: StudioModel, image: string) => {
     if (bgInFlight.current[model]) return;
@@ -1042,7 +1063,7 @@ export default function StudioWorkbench() {
                 ))}
           </div>
 
-          {/* AI 動態填充 + chips（動態具體項在前，靜態 fallback 在後，多選）。
+          {/* 具體項目（dyn，可放地圖/🎨單獨生圖）與 分類（fallback，整體地圖）分開列。
               facet = 地圖模式用 map theme，否則用文化鏡頭；兩者共用 region.en|key 快取。 */}
           {(() => {
             const facet = mapMode
@@ -1051,12 +1072,10 @@ export default function StudioWorkbench() {
             const dynKey = region ? `${region.en}|${facet.key}` : "";
             const dyn = dynKey ? cultureDyn[dynKey] : undefined;
             const fetching = dynKey ? !!cultureFetching[dynKey] : false;
-            const seen = new Set<string>();
-            const chips: CultureItem[] = [];
-            for (const it of [...(dyn ?? []), ...facet.fallback]) {
-              if (seen.has(it.en)) continue;
-              seen.add(it.en); chips.push(it);
-            }
+            const specSeen = new Set<string>();          // dedupe by en (guard vs AI re-roll dupes)
+            const specifics = (dyn ?? []).filter((it) => !specSeen.has(it.en) && specSeen.add(it.en));
+            const categories = facet.fallback;           // 概略大類
+            const miniBtn: CSSProperties = { fontSize: 11, padding: "2px 6px", borderRadius: 10, cursor: "pointer", border: "1px solid var(--border)", background: "var(--chip-surface)", color: "var(--text-primary)" };
             return (
               <>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
@@ -1066,17 +1085,40 @@ export default function StudioWorkbench() {
                     style={actionPill(!region || fetching)}>
                     {fetching ? "AI 思考中…" : `🔄 AI 換一批（${region ? region.zh : "先選地域"}・${facet.zh}）`}
                   </button>
-                  {dyn && <span style={{ fontSize: 10, opacity: 0.45 }}>已載入 {dyn.length} 項</span>}
+                  {specifics.length > 0 && <span style={{ fontSize: 10, opacity: 0.45 }}>已載入 {specifics.length} 項</span>}
                 </div>
-                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                  {chips.map((it) => {
+
+                {/* 具體項目：勾選＝放地圖/加 prompt；🎨＝單獨生這一張 */}
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", margin: "2px 0 4px" }}>具體項目 <span style={{ fontWeight: 400, opacity: 0.6 }}>· 勾選放地圖／🎨單獨生圖</span></div>
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 8 }}>
+                  {specifics.length === 0 && <span style={{ fontSize: 11, opacity: 0.45 }}>{region ? "按「AI 換一批」取得具體項目" : "先選地域"}</span>}
+                  {specifics.map((it) => {
                     const active = cultureChips.includes(it.en);
                     return (
-                      <span key={it.en} style={{ display: "inline-block" }}
+                      <span key={it.en} style={{ display: "inline-flex", alignItems: "center", gap: 2 }}
                         onMouseEnter={(e) => { const r = e.currentTarget.getBoundingClientRect(); setTip({ text: it.desc, x: r.left + r.width / 2, y: r.top }); }}
                         onMouseLeave={() => setTip(null)}>
                         <button type="button" onClick={() => toggleCultureChip(it.en)} style={chipStyle(active)}>
                           {active ? "✓ " : ""}{it.zh}
+                        </button>
+                        <button type="button" disabled={busy} onClick={() => generateSingle(it.en)} title="單獨生這一張圖" style={miniBtn}>🎨</button>
+                      </span>
+                    );
+                  })}
+                </div>
+
+                {/* 分類：點＝整體地圖（鋪滿該類多樣） */}
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", margin: "2px 0 4px" }}>分類 <span style={{ fontWeight: 400, opacity: 0.6 }}>· 點＝整體地圖（鋪滿該類多樣）</span></div>
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                  {categories.map((it) => {
+                    const token = `many different kinds of ${it.en}`;
+                    const active = cultureChips.includes(token);
+                    return (
+                      <span key={it.en} style={{ display: "inline-block" }}
+                        onMouseEnter={(e) => { const r = e.currentTarget.getBoundingClientRect(); setTip({ text: `整體地圖：鋪滿各種${it.zh}`, x: r.left + r.width / 2, y: r.top }); }}
+                        onMouseLeave={() => setTip(null)}>
+                        <button type="button" onClick={() => onPickCategory(it.en)} style={chipStyle(active)}>
+                          🗺️ {active ? "✓ " : ""}{it.zh}
                         </button>
                       </span>
                     );
