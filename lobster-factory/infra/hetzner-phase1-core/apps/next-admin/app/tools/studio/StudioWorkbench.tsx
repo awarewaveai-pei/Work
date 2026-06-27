@@ -356,6 +356,7 @@ export default function StudioWorkbench() {
   const [fusionPickMode, setFusionPickMode] = useState(false); // ✋ 手選混搭 — next country click sets fusionRegion
   const [zoomImage, setZoomImage] = useState<string | null>(null); // 🔍 click-to-enlarge lightbox
   const [playMods, setPlayMods] = useState<string[]>([]); // 🎭 玩法 — selected treatment fragments (multi)
+  const [showAdvanced, setShowAdvanced] = useState(false); // ▸ 進階：文化混搭 (collapsed by default to declutter)
 
   // 🔥 時事靈感 — active category tab (圖一 layout: tabs + items below)
   const [trendingTab, setTrendingTab] = useState(TRENDING_CATEGORIES[0]?.value ?? "");
@@ -962,47 +963,47 @@ export default function StudioWorkbench() {
         {/* 🌍 世界文化 — region × lens, with AI-filled specific items (混搭靈感工具). Moved to FIRST per spec. */}
         <AccordionSection title="🌍 世界文化" summary={region ? (fusionRegion ? `${region.zh}×${fusionRegion.zh}` : region.zh) : (cultureChips.length ? `${cultureChips.length} 元素` : "未選")}>
           <p style={{ fontSize: 11, opacity: 0.55, margin: "0 0 8px" }}>
-            1️⃣ 選地域 → 2️⃣ 選鏡頭 → ✨ AI 噴出該文化專屬靈感（可多選，填入 prompt）
+            1️⃣ 選用途 → 2️⃣ 選國家 → 3️⃣ 選主題 → 項目自動跳出（免費），按「生成」
           </p>
 
-          {/* 🎲 混搭骰 + 🗺️ 地圖模式切換 */}
-          <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
-            <button type="button" onClick={rollDice} title="隨機 2 國 × 1 鏡頭混搭，逼出意外靈感"
-              style={actionPill()}>
-              🎲 文化混搭骰
-            </button>
-            <button type="button" disabled={!region}
-              onClick={() => setFusionPickMode((v) => !v)}
-              title="先選一個主國，再開此鈕，點第二個國家自己決定混搭組合"
-              style={tabStyle(fusionPickMode)}>
-              ✋ 手選混搭 {fusionPickMode ? "ON" : ""}
+          {/* 1️⃣ 用途：做圖案（衣服/貼紙的文化元素）vs 做地圖（整張觀光地圖）— 明確二選一，取代隱藏的開關 */}
+          <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+            <button type="button" onClick={() => setMapMode(false)}
+              title="做衣服/貼紙上的單張文化圖案" style={{ ...tabStyle(!mapMode), flex: 1 }}>
+              🎨 做圖案
             </button>
             <button type="button"
-              onClick={() => {
-                setMapMode((v) => {
-                  const next = !v;
-                  // Entering map mode: reset to a verified portrait ratio (travel-poster shape)
-                  // and drop any manual prompt edit so the map prompt shows immediately.
-                  // NOTE: use "2:3" not "3:4" — Ideogram v4's 3:4 resolution is unverified and
-                  // 422s (image-gen.ts IDEOGRAM_V4_RES); 2:3 is the universal verified default.
-                  if (next) { setAspect("2:3"); setPromptTouched(false); setPrompt(""); }
-                  return next;
-                });
-              }}
-              title="把選取的國家＋項目組成一整張插畫旅遊地圖（像觀光地圖）"
-              style={tabStyle(mapMode)}>
-              🗺️ 地圖模式 {mapMode ? "ON" : "OFF"}
+              onClick={() => { setMapMode(true); setAspect("2:3"); setPromptTouched(false); setPrompt(""); }}
+              title="把國家＋項目組成一整張插畫觀光地圖" style={{ ...tabStyle(mapMode), flex: 1 }}>
+              🗺️ 做地圖
             </button>
           </div>
-          {mapMode && (
-            <div style={{ marginBottom: 10, padding: "6px 10px", borderRadius: 8, background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.4)", fontSize: 11.5, lineHeight: 1.5 }}>
-              🗺️ <b>地圖模式已開</b>：選國家 → 選地圖主題 → ✨AI 噴出具體項目 → 點選（不選則自動用 AI 全部項目）。生成的是一整張地圖，國名與每個項目都會寫進 prompt。
+          <div style={{ marginBottom: 10, padding: "6px 10px", borderRadius: 8, background: "rgba(99,102,241,0.10)", border: "1px solid var(--border)", fontSize: 11.5, lineHeight: 1.5 }}>
+            {mapMode
+              ? <>🗺️ <b>做地圖</b>：選國家＋地圖主題（地標/美食/必去/驚奇…）→ 生成一整張觀光插畫地圖。</>
+              : <>🎨 <b>做圖案</b>：選國家＋文化面向（服飾/紋樣/符號…）→ 做衣服或貼紙上的單張文化圖案。</>}
+          </div>
+
+          {/* 進階：文化混搭（兩國融合）— 收合，避免一般使用者眼花 */}
+          <button type="button" onClick={() => setShowAdvanced((v) => !v)}
+            style={{ ...ghostBtn(), marginBottom: showAdvanced ? 6 : 10 }}>
+            {showAdvanced ? "▾" : "▸"} 進階：文化混搭（兩國融合）
+          </button>
+          {showAdvanced && (
+            <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap", alignItems: "center" }}>
+              <button type="button" onClick={rollDice} title="隨機 2 國混搭，逼出意外靈感" style={actionPill()}>
+                🎲 隨機混搭
+              </button>
+              <button type="button" disabled={!region} onClick={() => setFusionPickMode((v) => !v)}
+                title="先選一個主國，再開此鈕，點第二個國家自己決定組合" style={tabStyle(fusionPickMode)}>
+                ✋ 手選第二國 {fusionPickMode ? "ON" : ""}
+              </button>
+              <span style={{ fontSize: 10, opacity: 0.5 }}>＝把兩個國家的文化融合</span>
             </div>
           )}
           {fusionRegion && region && (
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, padding: "5px 10px", borderRadius: 8, background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.4)", fontSize: 12 }}>
-              <span style={{ fontWeight: 600 }}>🎲 {region.zh} × {fusionRegion.zh}</span>
-              <span style={{ opacity: 0.6 }}>· {CULTURE_LENSES.find((l) => l.key === cultureLens)?.zh ?? ""} 混搭中</span>
+              <span style={{ fontWeight: 600 }}>🎲 {region.zh} × {fusionRegion.zh} 混搭中</span>
               <button type="button" onClick={() => setFusionRegion(null)} title="取消混搭"
                 style={{ ...ghostBtn(), marginLeft: "auto" }}>✕</button>
             </div>
