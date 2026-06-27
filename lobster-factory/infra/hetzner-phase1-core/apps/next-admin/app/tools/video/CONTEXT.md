@@ -56,3 +56,20 @@ _Avoid_: collage, gallery
 The self-hosted `remotion-service` on the EU VPS that turns a Timeline into an MP4 on R2.
 The Director and the Render Service never share state beyond the Timeline.
 _Avoid_: renderer, backend, encoder
+
+**Production Mode**:
+The user's per-video choice of which engine produces the video. Chosen at script
+handoff. Two values: Quick Engine and Director Engine. The two engines coexist
+permanently; the choice is never global.
+_Avoid_: render mode, quality tier, pipeline choice
+
+**Quick Engine**:
+The existing Python ffmpeg path (Ken Burns + drawtext subtitles + fade + concat).
+Fast, cheap, simple look. Stays the default and the fallback — never removed.
+_Avoid_: legacy path, basic mode, ffmpeg mode
+
+**Director Engine**:
+The new path: AI Director → Timeline → one short Remotion clip per Scene → ffmpeg
+concat with xfade transitions. Rich, layered, cinematic look. Per-Scene clips render
+in parallel, so a 1–10 min video stays feasible and never hits the 2-min clip cap.
+_Avoid_: remotion mode, premium mode, cinematic engine

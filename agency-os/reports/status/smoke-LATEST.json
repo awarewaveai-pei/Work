@@ -1,9 +1,14 @@
 ﻿{
     "checks":  {
                    "n8n_failures":  "skip:exception",
-                   "client_sites":  "skip:unreachable",
-                   "n8n_mcp":  "fail:exit1",
-                   "repair_center":  "skip:unreachable"
+                   "repair_detail":  {
+                                         "ok":  true,
+                                         "system_mode":  "normal",
+                                         "table_ok":  true
+                                     },
+                   "client_sites":  "skip:http401",
+                   "n8n_mcp":  "ok",
+                   "repair_center":  "ok"
                },
-    "generated":  "2026-06-27 09:15:57"
+    "generated":  "2026-06-27 09:26:10"
 }
