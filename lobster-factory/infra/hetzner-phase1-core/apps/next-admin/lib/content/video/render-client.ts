@@ -24,6 +24,7 @@ export interface VideoServiceCapability {
   native_multiformat: boolean;
   format_assets: boolean;
   output_dimensions: boolean;
+  openai_tts?: boolean;
   formats: string[];
 }
 
@@ -57,7 +58,7 @@ async function assertNativeMultiformat(base: string, formats: string[]): Promise
     });
     const body = (await r.json().catch(() => ({}))) as {
       ok?: boolean;
-      capabilities?: { native_multiformat?: boolean; format_assets?: boolean; output_dimensions?: boolean };
+      capabilities?: { native_multiformat?: boolean; format_assets?: boolean; output_dimensions?: boolean; openai_tts?: boolean };
       formats?: string[];
     };
     const serviceFormats = new Set(body.formats ?? []);

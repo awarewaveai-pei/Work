@@ -18,6 +18,7 @@ import { featureUnitCostUsd, imageCostUsd, usdToNtd } from "../../ai/cost-calcul
 export type StepCostKind =
   | { kind: "text-feature"; featureKey: string }   // 一次性文字呼叫，用 cost-model 的 token profile
   | { kind: "image-per-custom-scene" }             // × 自訂(Flux)場景數，用選定 image model 單價
+  | { kind: "tts" }                                // Edge = free；OpenAI = per-character
   | { kind: "free" };                              // Pexels / Edge TTS / ffmpeg / wp-bridge = $0
 
 export interface VideoPipelineStep {
@@ -39,10 +40,20 @@ export const VIDEO_PIPELINE_STEPS: VideoPipelineStep[] = [
   { id: "script",  label: "腳本生成",     tool: "Claude Sonnet 4.6", vendor: "Anthropic",      icon: "📝", cost: { kind: "text-feature", featureKey: "video-script" }, enabled: true, note: "主題/文章 → 6 場景旁白 + 視覺提示" },
   { id: "image",   label: "自訂場景圖",   tool: "FLUX schnell",      vendor: "BFL/Replicate",  icon: "🎨", cost: { kind: "image-per-custom-scene" },                  enabled: true, note: "每個 custom 場景一張 AI 插圖" },
   { id: "broll",   label: "實拍 B-roll",  tool: "Pexels 影片庫",     vendor: "Pexels",         icon: "🎞️", cost: { kind: "free" },                                    enabled: true, note: "免費實拍素材（broll 場景）" },
-  { id: "tts",     label: "旁白配音",     tool: "Edge TTS 神經語音", vendor: "Microsoft",      icon: "🔊", cost: { kind: "free" },                                    enabled: true, note: "免費中文神經語音" },
+  { id: "tts",     label: "旁白配音",     tool: "Edge TTS 神經語音", vendor: "Microsoft",      icon: "🔊", cost: { kind: "tts" },                                     enabled: true, note: "Edge 免費；OpenAI 依旁白字元數計費" },
   { id: "render",  label: "合成 + 多尺寸", tool: "ffmpeg（自架）",    vendor: "Hetzner",        icon: "🎬", cost: { kind: "free" },                                    enabled: true, note: "Ken Burns/字幕/4 平台尺寸；算力含在月固定基礎" },
   { id: "publish", label: "發佈（選用）", tool: "wp-bridge / YouTube", vendor: "自架/Google",  icon: "🚀", cost: { kind: "free" },                                    enabled: false, note: "預設關；WordPress 走 wp-bridge 簽章" },
 ];
+
+export const OPENAI_TTS_RATES_USD_PER_1M_CHARS: Record<string, number> = {
+  "tts-1": 15,
+  "tts-1-hd": 30,
+};
+
+export function openAiTtsModelFromVoice(ttsVoice?: string): string {
+  const model = (ttsVoice ?? "").split(":")[0];
+  return model in OPENAI_TTS_RATES_USD_PER_1M_CHARS ? model : "tts-1";
+}
 
 export interface VideoCostConfig {
   totalScenes: number;
@@ -56,6 +67,12 @@ export interface VideoCostConfig {
   formatCount?: number;
   /** 前製腳本接力時文字腳本已產生，影片生產區不應重複計腳本生成成本。 */
   includeScriptCost?: boolean;
+  /** 配音 provider；Edge 免費，OpenAI 依字元數計費。 */
+  ttsProvider?: string;
+  /** OpenAI voice 格式為 "tts-1:nova" 或 "tts-1-hd:nova"。 */
+  ttsVoice?: string;
+  /** 估算旁白字元數；前製接力可用實際 narration 長度，快速生成用場景/時長估算。 */
+  ttsChars?: number;
 }
 
 export interface VideoCostLine {
@@ -92,6 +109,9 @@ export function computeVideoCost(
     if (step.id === "script" && cfg.includeScriptCost === false) continue;
     let unitUsd = 0;
     let count = 1;
+    let tool = step.tool;
+    let vendor = step.vendor;
+    let note = step.note;
 
     if (step.cost.kind === "text-feature") {
       const f = featureByKey.get(step.cost.featureKey);
@@ -101,6 +121,18 @@ export function computeVideoCost(
       unitUsd = imageCostUsd(imageModel);
       // 每格式各生一組原生 AI 圖 → 自訂場景數 × 格式數。
       count = Math.max(0, cfg.customScenes) * Math.max(1, cfg.formatCount ?? 1);
+    } else if (step.cost.kind === "tts") {
+      if (cfg.ttsProvider === "openai") {
+        const ttsModel = openAiTtsModelFromVoice(cfg.ttsVoice);
+        unitUsd = OPENAI_TTS_RATES_USD_PER_1M_CHARS[ttsModel] / 1_000_000;
+        count = Math.max(0, Math.round(cfg.ttsChars ?? 0));
+        tool = `OpenAI ${ttsModel}`;
+        vendor = "OpenAI";
+        note = "依旁白字元數估算；實際以 OpenAI 用量帳單為準";
+      } else {
+        unitUsd = 0;
+        count = cfg.totalScenes;
+      }
     } else {
       // free：count 取場景數以利顯示（unit=0 → total=0）
       unitUsd = 0;
@@ -108,8 +140,8 @@ export function computeVideoCost(
     }
 
     lines.push({
-      id: step.id, label: step.label, tool: step.tool, vendor: step.vendor, icon: step.icon,
-      unitUsd, count, totalUsd: unitUsd * count, free: unitUsd === 0, note: step.note,
+      id: step.id, label: step.label, tool, vendor, icon: step.icon,
+      unitUsd, count, totalUsd: unitUsd * count, free: unitUsd === 0, note,
     });
   }
 

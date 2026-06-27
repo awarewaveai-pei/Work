@@ -434,6 +434,7 @@ class _Handler(BaseHTTPRequestHandler):
                     "format_assets": True,
                     "native_multiformat": True,
                     "output_dimensions": True,
+                    "openai_tts": bool(config.OPENAI_API_KEY),
                 },
                 "formats": list(config.FORMATS.keys()),
             })  # healthcheck 免認證

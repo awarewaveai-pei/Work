@@ -59,4 +59,22 @@ describe("computeVideoCost", () => {
     const r = computeVideoCost(base);
     expect(r.lines.find((l) => l.id === "publish")).toBeUndefined();
   });
+
+  it("OpenAI TTS adds per-character voice cost", () => {
+    const r = computeVideoCost({ ...base, ttsProvider: "openai", ttsVoice: "tts-1:nova", ttsChars: 300 });
+    const tts = r.lines.find((l) => l.id === "tts")!;
+    expect(tts.vendor).toBe("OpenAI");
+    expect(tts.tool).toBe("OpenAI tts-1");
+    expect(tts.count).toBe(300);
+    expect(tts.unitUsd).toBeCloseTo(15 / 1_000_000, 10);
+    expect(tts.totalUsd).toBeCloseTo(0.0045, 6);
+    expect(r.totalUsd).toBeCloseTo(0.0531, 6);
+  });
+
+  it("OpenAI TTS HD uses the higher rate", () => {
+    const r = computeVideoCost({ ...base, ttsProvider: "openai", ttsVoice: "tts-1-hd:nova", ttsChars: 300 });
+    const tts = r.lines.find((l) => l.id === "tts")!;
+    expect(tts.tool).toBe("OpenAI tts-1-hd");
+    expect(tts.totalUsd).toBeCloseTo(0.009, 6);
+  });
 });

@@ -71,6 +71,10 @@ interface DraftScene {
   visual: "custom" | "broll";
 }
 
+interface VideoCapabilities {
+  openaiTts: boolean;
+}
+
 // ─── Voice model options ──────────────────────────────────────────────────────
 
 interface VoiceModel {
@@ -88,16 +92,24 @@ const VOICE_MODELS: VoiceModel[] = [
   { id: "edge:zh-TW-YunJheNeural",    label: "Edge TTS 繁中男聲", lang: "繁中", badge: "$0 免費", badgeColor: "var(--badge-green-text)", badgeBg: "var(--badge-green-bg)" },
   { id: "edge:en-US-JennyNeural",     label: "Edge TTS English F", lang: "EN",  badge: "$0 免費", badgeColor: "var(--badge-green-text)", badgeBg: "var(--badge-green-bg)" },
   { id: "edge:en-US-GuyNeural",       label: "Edge TTS English M", lang: "EN",  badge: "$0 免費", badgeColor: "var(--badge-green-text)", badgeBg: "var(--badge-green-bg)" },
-  { id: "openai:tts-1:nova",          label: "OpenAI nova",        lang: "多語", badge: "$0.015/1M", badgeColor: "var(--build-risk-medium-text)", badgeBg: "var(--build-risk-medium-bg)", note: "自然、英文佳" },
-  { id: "openai:tts-1:shimmer",       label: "OpenAI shimmer",     lang: "多語", badge: "$0.015/1M", badgeColor: "var(--build-risk-medium-text)", badgeBg: "var(--build-risk-medium-bg)", note: "柔和女聲" },
-  { id: "openai:tts-1:alloy",         label: "OpenAI alloy",       lang: "多語", badge: "$0.015/1M", badgeColor: "var(--build-risk-medium-text)", badgeBg: "var(--build-risk-medium-bg)" },
-  { id: "openai:tts-1:onyx",          label: "OpenAI onyx",        lang: "多語", badge: "$0.015/1M", badgeColor: "var(--build-risk-medium-text)", badgeBg: "var(--build-risk-medium-bg)", note: "低沉男聲" },
-  { id: "openai:tts-1-hd:nova",       label: "OpenAI nova HD",     lang: "多語", badge: "$0.030/1M", badgeColor: "var(--badge-red-text)", badgeBg: "var(--badge-red-bg)", note: "HD 品質" },
+  { id: "openai:tts-1:nova",          label: "OpenAI nova",        lang: "多語", badge: "$15/1M字", badgeColor: "var(--build-risk-medium-text)", badgeBg: "var(--build-risk-medium-bg)", note: "自然、英文佳" },
+  { id: "openai:tts-1:shimmer",       label: "OpenAI shimmer",     lang: "多語", badge: "$15/1M字", badgeColor: "var(--build-risk-medium-text)", badgeBg: "var(--build-risk-medium-bg)", note: "柔和女聲" },
+  { id: "openai:tts-1:alloy",         label: "OpenAI alloy",       lang: "多語", badge: "$15/1M字", badgeColor: "var(--build-risk-medium-text)", badgeBg: "var(--build-risk-medium-bg)" },
+  { id: "openai:tts-1:onyx",          label: "OpenAI onyx",        lang: "多語", badge: "$15/1M字", badgeColor: "var(--build-risk-medium-text)", badgeBg: "var(--build-risk-medium-bg)", note: "低沉男聲" },
+  { id: "openai:tts-1-hd:nova",       label: "OpenAI nova HD",     lang: "多語", badge: "$30/1M字", badgeColor: "var(--badge-red-text)", badgeBg: "var(--badge-red-bg)", note: "HD 品質" },
 ];
 
 function parseVoiceModel(id: string): { ttsProvider: string; ttsVoice: string } {
   const [provider, ...rest] = id.split(":");
   return { ttsProvider: provider, ttsVoice: rest.join(":") };
+}
+
+function estimateCharsPerScene(targetMinutes: number) {
+  return targetMinutes >= 4 ? 160 : targetMinutes >= 2 ? 120 : 50;
+}
+
+function countNarrationChars(scenes: { narration: string }[]) {
+  return scenes.reduce((sum, scene) => sum + scene.narration.trim().length, 0);
 }
 
 // ─── Output format label map ──────────────────────────────────────────────────
@@ -175,6 +187,13 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
   });
   const [targetMinutes, setTargetMinutes] = useState(initial?.duration ?? 1);
   const [voiceModelId, setVoiceModelId] = useState(VOICE_MODELS[0].id);
+  const [videoCaps, setVideoCaps] = useState<VideoCapabilities | null>(null);
+  const voiceSelection = useMemo(() => parseVoiceModel(voiceModelId), [voiceModelId]);
+  const activeVoice = VOICE_MODELS.find((v) => v.id === voiceModelId) ?? VOICE_MODELS[0];
+  const openAiVoiceSelected = voiceSelection.ttsProvider === "openai";
+  const costVoiceSelection = openAiVoiceSelected && videoCaps?.openaiTts === false
+    ? { ttsProvider: "edge", ttsVoice: "" }
+    : voiceSelection;
   const isPexels = imageModel === "pexels-video" || imageModel === "pexels-all";
   // 輸出比例（預設只 16:9，WP/YouTube 用；需社群格式時手動勾選）。每比例各自原生生成 → 圖片成本/時間 ×已選數。
   const [selectedFormats, setSelectedFormats] = useState<Set<string>>(new Set(["16x9"]));
@@ -186,12 +205,15 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
 
   const providedCustomScenes = providedScenes.filter((s) => s.visual !== "broll").length;
   const providedBrollScenes = Math.max(0, providedScenes.length - providedCustomScenes);
+  const ttsCharEstimate = providedScenes.length > 0
+    ? countNarrationChars(providedScenes)
+    : Math.max(1, totalScenes) * estimateCharsPerScene(targetMinutes);
   // 成本：前製腳本接力已經完成文字生成，影片區只估素材/配音/渲染；Pexels 模式不計 AI 圖。
   const costBreakdown = useMemo(
     () => providedScenes.length > 0
-      ? computeVideoCost({ totalScenes: providedScenes.length, customScenes: isPexels ? 0 : providedCustomScenes, brollScenes: isPexels ? providedScenes.length : providedBrollScenes, imageModel, formatCount: orderedFormats.length, includeScriptCost: false })
-      : computeVideoCost({ totalScenes, customScenes: Math.min(customScenes, totalScenes), brollScenes, imageModel, formatCount: orderedFormats.length }),
-    [providedScenes, providedCustomScenes, providedBrollScenes, isPexels, totalScenes, customScenes, brollScenes, imageModel, orderedFormats.length],
+      ? computeVideoCost({ totalScenes: providedScenes.length, customScenes: isPexels ? 0 : providedCustomScenes, brollScenes: isPexels ? providedScenes.length : providedBrollScenes, imageModel, formatCount: orderedFormats.length, includeScriptCost: false, ...costVoiceSelection, ttsChars: ttsCharEstimate })
+      : computeVideoCost({ totalScenes, customScenes: Math.min(customScenes, totalScenes), brollScenes, imageModel, formatCount: orderedFormats.length, ...costVoiceSelection, ttsChars: ttsCharEstimate }),
+    [providedScenes, providedCustomScenes, providedBrollScenes, isPexels, totalScenes, customScenes, brollScenes, imageModel, orderedFormats.length, costVoiceSelection, ttsCharEstimate],
   );
 
   // ── Generate form ── (initial = 從 ScriptForge「送去生產」帶入的腳本預填)
@@ -247,6 +269,20 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
   }, []);
 
   useEffect(() => { void loadHistory(); }, [loadHistory]);
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const r = await fetch("/api/video/capabilities", { cache: "no-store" });
+        const j = (await r.json()) as { capabilities?: { openaiTts?: boolean } };
+        if (alive) setVideoCaps({ openaiTts: j.capabilities?.openaiTts === true });
+      } catch {
+        if (alive) setVideoCaps({ openaiTts: false });
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
 
   // ── Delete selected videos ──
   const deleteSelected = async () => {
@@ -830,16 +866,30 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
                     {VOICE_MODELS.filter(v => v.id.startsWith(voiceModelId.startsWith("openai:") ? "openai:" : "edge:")).map(v => {
                       const active = voiceModelId === v.id;
                       return (
-                        <button key={v.id} type="button" onClick={() => setVoiceModelId(v.id)}
-                          style={chipStyle(active)}>
-                          {v.label}
+                        <button key={v.id} type="button" onClick={() => setVoiceModelId(v.id)} title={v.note ?? v.badge}
+                          style={{ ...chipStyle(active), display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <span>{v.label}</span>
+                          <span style={{ fontSize: 10, color: v.badgeColor, background: v.badgeBg, padding: "1px 6px", borderRadius: 999, fontWeight: 700 }}>
+                            {v.badge}
+                          </span>
                         </button>
                       );
                     })}
                   </div>
-                  {voiceModelId.startsWith("openai:") && (
-                    <div style={{ fontSize: 11, color: "#92400e", background: "#fef3c7", padding: "4px 8px", borderRadius: 6, lineHeight: 1.5 }}>
-                      OpenAI TTS 需在伺服器設定 OPENAI_API_KEY，否則自動降版 Edge TTS
+                  {openAiVoiceSelected && (
+                    <div style={{
+                      fontSize: 11,
+                      color: videoCaps?.openaiTts ? "var(--badge-green-text)" : "#92400e",
+                      background: videoCaps?.openaiTts ? "var(--badge-green-bg)" : "#fef3c7",
+                      padding: "4px 8px",
+                      borderRadius: 6,
+                      lineHeight: 1.5,
+                    }}>
+                      {videoCaps === null
+                        ? "正在檢查 EU video-service 的 OpenAI TTS 設定..."
+                        : videoCaps.openaiTts
+                          ? "OpenAI TTS 已在 EU video-service 啟用；成本會依旁白字元數估算。"
+                          : "EU video-service 尚未設定 OPENAI_API_KEY；目前會自動降版 Edge TTS。"}
                     </div>
                   )}
                 </div>
@@ -950,7 +1000,7 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
                 {[
                   { key: "素材", label: isPexels ? (imageModel === "pexels-video" ? "真實影片" : "照片動畫") : (IMAGE_RATES[imageModel]?.label ?? imageModel) },
                   { key: "場景", label: providedScenes.length > 0 ? `${providedScenes.length} 場（前製腳本；長度由旁白決定）` : `${totalScenes} 場 / ${targetMinutes} 分鐘${!isPexels ? ` / AI ${customScenes}` : ""}` },
-                  { key: "配音", label: VOICE_MODELS.find(v => v.id === voiceModelId)?.label ?? voiceModelId },
+                  { key: "配音", label: `${activeVoice.label} · ${activeVoice.badge}` },
                   { key: "比例", label: orderedFormats.map(f => OUTPUT_LABELS[f]?.ratio ?? f).join(" + ") },
                   ...(videoStyle ? [{ key: "風格", label: videoStyle }] : []),
                 ].map(({ key, label }) => (
