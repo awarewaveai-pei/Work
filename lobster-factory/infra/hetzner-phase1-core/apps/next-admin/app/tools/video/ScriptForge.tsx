@@ -30,8 +30,11 @@ let SF_MODEL: string = DEFAULT_AI_TEXT_MODEL;
 // （與你打的主題/文章語言無關；多語言模組的明確目標仍可覆蓋此預設）。
 const SF_LANGS = ["繁體中文", "English", "簡體中文", "日本語", "한국어", "Español", "Bahasa Melayu"];
 let SF_LANG: string = SF_LANGS[0];
+let SF_SCENE_COUNT = 6;
+let SF_CUSTOM_SCENES = 3;
 async function claude(prompt: string, onChunk?: (full: string) => void){
-  const langified=`【預設輸出語言：${SF_LANG}】未另行指定語言時，所有文字內容（標題/台詞/字幕/說明等）請用此語言撰寫；JSON 的英文 key 與結構保持不變。若輸出 scenes，請在每個 scene 額外提供 visual_type（"custom" 或 "broll"）與 broll_keyword（英文 1-3 個字；custom 可留空），供後續影片生產保留素材策略。\n\n${prompt}`;
+  const brollScenes = Math.max(0, SF_SCENE_COUNT - SF_CUSTOM_SCENES);
+  const langified=`【預設輸出語言：${SF_LANG}】未另行指定語言時，所有文字內容（標題/台詞/字幕/說明等）請用此語言撰寫；JSON 的英文 key 與結構保持不變。若輸出 scenes，請輸出剛好 ${SF_SCENE_COUNT} 個 scene，其中剛好 ${SF_CUSTOM_SCENES} 個 visual_type="custom"（AI 原生生圖）、剛好 ${brollScenes} 個 visual_type="broll"（圖庫/實拍素材），並在每個 scene 額外提供 visual_type（"custom" 或 "broll"）與 broll_keyword（英文 1-3 個字；custom 可留空），供後續影片生產保留素材策略。\n\n${prompt}`;
   const res=await fetch("/api/tools/script-forge",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:langified,model:SF_MODEL})});
   if(!res.ok||!res.body){throw new Error(`腳本生成失敗（${res.status}）`);}
   const reader=res.body.getReader();const dec=new TextDecoder();let full="";
@@ -46,10 +49,15 @@ type SendToProduction = (p: { topic: string; articleTitle: string; articleConten
 const ProductionBridge = createContext<SendToProduction | null>(null);
 type SendToRemotion = (p: { topic: string; headline?: string; tagline?: string; cta?: string; imageHint?: string; scenes?: { visual: string; dialogue: string }[]; mediaMode?: string; duration?: number; customScenes?: number }) => void;
 const RemotionBridge = createContext<SendToRemotion | null>(null);
-// 合併後（2026-06-26）：素材模式 / AI生圖分配 / 時長 設定移至下方 VideoStudio（生產區）擁有，避免雙區重複。
-// 此 context 只保留 sceneCount — 它餵腳本生成（決定 AI 寫幾場），是腳本層參數，非生產設定。
-const ScriptSettingsCtx = createContext<{ sceneCount: number }>({ sceneCount: 6 });
+// 場景總數與 AI 生圖分配屬於前製腳本：它們會改變腳本內容量與每場 visual_type。
+// VideoStudio 只負責素材模式、模型、配音、輸出比例與渲染。
+const ScriptSettingsCtx = createContext<{ sceneCount: number; customScenes: number }>({ sceneCount: 6, customScenes: 3 });
 function pj(raw){return JSON.parse(raw.replace(/```json|```/g,"").trim());}
+
+function clampCustomScenes(n: number, sceneCount: number) {
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(sceneCount, Math.round(n)));
+}
 
 function productionSceneFromScriptScene(s: any): ProductionScene | null {
   const narration = String(s?.dialogue ?? s?.narration ?? s?.marked_text ?? "").trim();
@@ -59,6 +67,25 @@ function productionSceneFromScriptScene(s: any): ProductionScene | null {
   const rawVisual = String(s?.visual_type ?? s?.asset_type ?? s?.visualMode ?? "").toLowerCase();
   const visual: "custom" | "broll" = rawVisual === "broll" || brollKeyword ? "broll" : "custom";
   return { narration, imagePrompt, visual, brollKeyword };
+}
+
+function enforceProductionVisualSplit(scenes: ProductionScene[], customScenes: number): ProductionScene[] {
+  const target = clampCustomScenes(customScenes, scenes.length);
+  let customCount = scenes.filter((s) => s.visual !== "broll").length;
+  const next = scenes.map((s) => ({ ...s, visual: s.visual ?? "custom" }));
+  for (let i = next.length - 1; i >= 0 && customCount > target; i--) {
+    if (next[i].visual !== "broll") {
+      next[i].visual = "broll";
+      customCount--;
+    }
+  }
+  for (let i = 0; i < next.length && customCount < target; i++) {
+    if (next[i].visual === "broll") {
+      next[i].visual = "custom";
+      customCount++;
+    }
+  }
+  return next;
 }
 
 /* ── INDUSTRY DATA ── */
@@ -262,6 +289,7 @@ function ScriptResult({script,score,onReset,extraTop,autoSaveTag}: any){
   const[repurposed,setRepurposed]=useState(null);
   const[showPreview,setShowPreview]=useState(false);
   const sendToProduction=useContext(ProductionBridge);
+  const { customScenes }=useContext(ScriptSettingsCtx);
   const[sent,setSent]=useState(false);
   const sendToRemotion=useContext(RemotionBridge);
   const[remotionSent,setRemotionSent]=useState(false);
@@ -317,8 +345,8 @@ function ScriptResult({script,score,onReset,extraTop,autoSaveTag}: any){
 
       <Card><SL ch="🔄 多平台轉換"/><div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:repLoading||repurposed?12:0}}>{PLATFORMS.map(p=><button key={p.id} onClick={()=>doRep(p.id)} style={{padding:"6px 12px",borderRadius:999,border:`1.5px solid ${repPlatform===p.id?C.violet:C.border}`,background:repPlatform===p.id?C.violetl:C.white,color:repPlatform===p.id?C.violet:C.ink,fontSize:11.5,fontWeight:repPlatform===p.id?700:400,cursor:"pointer",transition:"all .15s",fontFamily:"inherit"}}>{p.icon} {p.label}</button>)}</div>{repLoading&&<div style={{textAlign:"center",padding:"12px 0",color:C.mid,fontSize:12.5}}>轉換中...</div>}{repurposed&&<div style={{background:C.violetl,borderRadius:9,padding:12}}><div style={{fontSize:13.5,fontWeight:800,color:C.violet,marginBottom:3}}>{repurposed.title}</div><div style={{fontSize:12.5,color:C.violet,fontStyle:"italic",marginBottom:7}}>「{repurposed.hook}」</div>{repurposed.scenes?.map((s,i)=><div key={i} style={{fontSize:11.5,color:C.ink,padding:"4px 0",borderBottom:`1px solid rgba(124,92,252,.1)`}}><b style={{color:C.violet}}>【{s.time}】</b> {s.dialogue}</div>)}{repurposed.key_changes&&<div style={{marginTop:7,fontSize:11.5,color:C.mid,background:C.white,borderRadius:6,padding:"6px 9px"}}><b>與原版差異：</b>{repurposed.key_changes}</div>}</div>}</Card>
 
-      {sendToProduction&&script?.scenes?.length>0&&<PBtn ch={sent?"✅ 已送到下方 🎬 影片生產區（已自動捲動過去）":"🎬 送去生產影片（用此腳本直接生影片）"} onClick={()=>{const dlg=(script.scenes||[]).map(s=>s.dialogue).filter(Boolean).join("\n");const sc=(script.scenes||[]).map(productionSceneFromScriptScene).filter(Boolean) as ProductionScene[];sendToProduction({topic:script.title||"",articleTitle:script.title||"",articleContent:`${script.hook?`開場鉤子：${script.hook}\n\n`:""}${dlg}${script.cta?`\n\n結尾 CTA：${script.cta}`:""}`,scenes:sc.length>0?sc:undefined});setSent(true);}} full/>}
-      {sendToRemotion&&script&&<PBtn ch={remotionSent?"✅ 已送到下方 🎬 影片生產（Remotion 模板，已自動捲動過去）":"✨ 送去 Remotion 模板（精緻動效影片）"} onClick={()=>{sendToRemotion({topic:script.title||"",headline:script.title||"",tagline:script.hook||"",cta:script.cta||"",imageHint:script.scenes?.[0]?.visual||"",scenes:(script.scenes||[]).map(s=>({visual:s.visual||"",dialogue:s.dialogue||""}))});setRemotionSent(true);}} full/>}
+      {sendToProduction&&script?.scenes?.length>0&&<PBtn ch={sent?"✅ 已送到下方 🎬 影片生產區（已自動捲動過去）":"🎬 送去生產影片（用此腳本直接生影片）"} onClick={()=>{const dlg=(script.scenes||[]).map(s=>s.dialogue).filter(Boolean).join("\n");const rawScenes=(script.scenes||[]).map(productionSceneFromScriptScene).filter(Boolean) as ProductionScene[];const sc=enforceProductionVisualSplit(rawScenes,customScenes);sendToProduction({topic:script.title||"",articleTitle:script.title||"",articleContent:`${script.hook?`開場鉤子：${script.hook}\n\n`:""}${dlg}${script.cta?`\n\n結尾 CTA：${script.cta}`:""}`,scenes:sc.length>0?sc:undefined,customScenes:sc.length>0?clampCustomScenes(customScenes,sc.length):undefined});setSent(true);}} full/>}
+      {sendToRemotion&&script&&<PBtn ch={remotionSent?"✅ 已送到下方 🎬 影片生產（Remotion 模板，已自動捲動過去）":"✨ 送去 Remotion 模板（精緻動效影片）"} onClick={()=>{sendToRemotion({topic:script.title||"",headline:script.title||"",tagline:script.hook||"",cta:script.cta||"",imageHint:script.scenes?.[0]?.visual||"",scenes:(script.scenes||[]).map(s=>({visual:s.visual||"",dialogue:s.dialogue||""})),customScenes:clampCustomScenes(customScenes,script.scenes?.length||0)});setRemotionSent(true);}} full/>}
       <div style={{display:"flex",gap:9}}><GBtn ch={copied?"✅ 已複製":"📋 複製腳本"} onClick={copyScript} style={{flex:1,padding:"11px"}}/><PBtn ch="重新開始 →" onClick={onReset} full style={{flex:1}}/></div>
     </div>
   );
@@ -807,6 +835,22 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { 
   const[model,setModel]=useState<string>(SF_MODEL);
   const[lang,setLang]=useState<string>(SF_LANG);
   const[sceneCount,setSceneCount]=useState(6);
+  const[customScenes,setCustomScenes]=useState(3);
+  function updateSceneCount(n: number) {
+    const next = Math.max(1, Math.min(20, Math.round(n)));
+    setSceneCount(next);
+    SF_SCENE_COUNT = next;
+    setCustomScenes((prev) => {
+      const clamped = clampCustomScenes(prev, next);
+      SF_CUSTOM_SCENES = clamped;
+      return clamped;
+    });
+  }
+  function updateCustomScenes(n: number) {
+    const next = clampCustomScenes(n, sceneCount);
+    setCustomScenes(next);
+    SF_CUSTOM_SCENES = next;
+  }
   useEffect(()=>{(async()=>{try{const r=await fetch("/api/content/sites");const j=await r.json();if(j?.ok&&Array.isArray(j.sites))setClients(j.sites.filter((s:any)=>s.active!==false));}catch{/* best-effort：未登入/無客戶 → 下拉為空 */}})();},[]);
   function loadClient(id:string){
     const s=clients.find((c:any)=>c.id===id);if(!s)return;
@@ -818,7 +862,7 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { 
   }
   function clearBrand(){setBrand(null);try{localStorage.removeItem("sf_brand");}catch{}}
   return(
-    <ScriptSettingsCtx.Provider value={{ sceneCount }}>
+    <ScriptSettingsCtx.Provider value={{ sceneCount, customScenes }}>
     <ProductionBridge.Provider value={onSendToProduction ?? null}>
     <RemotionBridge.Provider value={onSendToRemotion ?? null}>
     <div style={{minHeight:"100vh",background:C.paper,fontFamily:"DM Sans,sans-serif"}}>
@@ -866,9 +910,14 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { 
               {SF_LANGS.map((l)=><option key={l} value={l}>{l}</option>)}
             </select>
             <label style={{fontSize:11,color:C.mid,fontWeight:700,whiteSpace:"nowrap"}}>🎞 場景</label>
-            <select value={sceneCount} onChange={e=>setSceneCount(Number(e.target.value))} title="腳本場景總數：AI 會依此決定內容量；影片區只負責生產" style={{padding:"5px 9px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:11.5,fontFamily:"inherit",cursor:"pointer"}}>
+            <select value={sceneCount} onChange={e=>updateSceneCount(Number(e.target.value))} title="腳本場景總數：AI 會依此決定內容量；影片區只負責生產" style={{padding:"5px 9px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:11.5,fontFamily:"inherit",cursor:"pointer"}}>
               {[4,6,8,10,12,16,20].map((n)=><option key={n} value={n}>{n} 場</option>)}
             </select>
+            <label style={{fontSize:11,color:C.mid,fontWeight:700,whiteSpace:"nowrap"}}>🎨 AI 生圖</label>
+            <select value={customScenes} onChange={e=>updateCustomScenes(Number(e.target.value))} title="前製素材分配：腳本會依此標記 custom / broll，送去影片生產時照此執行" style={{padding:"5px 9px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:11.5,fontFamily:"inherit",cursor:"pointer"}}>
+              {Array.from({length:sceneCount+1},(_,n)=><option key={n} value={n}>{n} 場</option>)}
+            </select>
+            <span style={{fontSize:10.5,color:C.mid,whiteSpace:"nowrap"}}>圖庫補 {sceneCount-customScenes} 場</span>
             <label style={{fontSize:11,color:C.mid,fontWeight:700,whiteSpace:"nowrap"}}>🤖 AI 模型</label>
             <select value={model} onChange={e=>{setModel(e.target.value);SF_MODEL=e.target.value;}} title="文字 AI 模型（與內容工具共用同一份選單）" style={{padding:"5px 9px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:11.5,fontFamily:"inherit",cursor:"pointer"}}>
               {["Claude","OpenAI"].map((g)=><optgroup key={g} label={g}>{AI_TEXT_MODELS.filter((m)=>m.group===g).map((m)=><option key={m.value} value={m.value}>{m.label}</option>)}</optgroup>)}
@@ -881,7 +930,7 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { 
           </div>
         </div>
       </div>
-      {/* 影片設定（素材模式/場景數/生圖模型/時長）全部移至下方「🎬 影片生產」區，前製腳本只負責寫腳本（2026-06-26 合併去重）。腳本場景數固定預設 6 場，需要時於下方生產區調整。 */}
+      {/* 場景總數與 AI/圖庫分配已回到前製腳本；影片生產只負責素材模式、模型、配音、輸出比例與渲染。 */}
       <div style={{maxWidth:960,margin:"0 auto",padding:"22px 14px 80px",animation:"fadeUp .3s ease"}}>
         {nav==="manual"&&<ManualModule brand={brand}/>}
         {nav==="article"&&<ArticleModule brand={brand}/>}

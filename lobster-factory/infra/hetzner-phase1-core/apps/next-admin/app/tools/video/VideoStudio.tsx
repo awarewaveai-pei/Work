@@ -161,8 +161,8 @@ interface ScriptRemotionPrefill {
 
 export default function VideoStudio({ initial, remotionInitial }: { initial?: VideoStudioInitial; remotionInitial?: ScriptRemotionPrefill } = {}) {
   // ── Config knobs ──
-  const [totalScenes, setTotalScenes] = useState(initial?.scenes?.length ?? 6);
-  const [customScenes, setCustomScenes] = useState(initial?.customScenes ?? 3);
+  const [totalScenes] = useState(initial?.scenes?.length ?? 6);
+  const [customScenes] = useState(initial?.customScenes ?? 3);
   const [imageModel, setImageModel] = useState(() => {
     const m = initial?.mediaMode;
     if (!m || m === "__ai__") return DEFAULT_IMAGE_MODEL;
@@ -537,11 +537,6 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
     }
   }
 
-  function handleTotalChange(n: number) {
-    setTotalScenes(n);
-    if (customScenes > n) setCustomScenes(n);
-  }
-
   const isLoading = genStatus === "loading";
   const isBusy = isLoading || draftLoading;
   const canGenerate = (topic.trim().length > 0 || providedScenes.length > 0) && !isBusy;
@@ -704,7 +699,7 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
                         <button key={id} type="button" title={tip}
                           onClick={() => {
                             if (isAiMode) {
-                              if (isPexels) { setImageModel(DEFAULT_IMAGE_MODEL); setImageVendor(vendorForModel(DEFAULT_IMAGE_MODEL)); setCustomScenes(totalScenes); }
+                              if (isPexels) { setImageModel(DEFAULT_IMAGE_MODEL); setImageVendor(vendorForModel(DEFAULT_IMAGE_MODEL)); }
                             } else {
                               setImageModel(id);
                             }
@@ -724,21 +719,13 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
                   )}
                 </div>
 
-                {/* 場景與時間 combo — 場景數：接力時由腳本決定（唯讀），否則滑桿；時長一律可調 */}
+                {/* 前製擁有場景總數與 AI/圖庫分配；生產區只顯示 handoff 結果或快速生成預設。 */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 14px", background: "var(--bg-subtle)", borderRadius: 8, border: "1px solid var(--border-subtle)" }}>
-                  {providedScenes.length === 0 ? (
-                    <KnobRow label="場景總數" hint={`${totalScenes} 場`} min={1} max={20} step={1} value={totalScenes} onChange={handleTotalChange} />
-                  ) : (
-                    <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.6 }}>場景數由前製腳本決定（{providedScenes.length} 場）。</div>
-                  )}
-                  {!isPexels && providedScenes.length === 0 && (
-                    <KnobRow
-                      label="AI 生圖"
-                      hint={`AI 生圖 ${customScenes} 場｜圖庫補 ${brollScenes} 場`}
-                      min={0} max={totalScenes} step={1}
-                      value={customScenes} onChange={setCustomScenes}
-                    />
-                  )}
+                  <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.6 }}>
+                    {providedScenes.length > 0
+                      ? `場景與素材分配由前製腳本決定（${providedScenes.length} 場；AI 生圖 ${providedCustomScenes} 場｜圖庫補 ${providedBrollScenes} 場）。`
+                      : `場景與 AI/圖庫分配請在上方「前製腳本」設定；直接快速生成使用 ${totalScenes} 場、AI 生圖 ${customScenes} 場、圖庫補 ${brollScenes} 場預設。`}
+                  </div>
                   {providedScenes.length > 0 ? (
                     <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.6 }}>
                       影片長度由前製腳本旁白與 TTS 決定；要改成更長/更短，請回腳本區調整場景數或重寫腳本。
@@ -1524,22 +1511,6 @@ function Card({ title, subtitle, action, children }: {
         {action}
       </div>
       <div style={{ padding: "16px 18px" }}>{children}</div>
-    </div>
-  );
-}
-
-function KnobRow({ label, hint, min, max, step, value, onChange }: {
-  label: string; hint: string; min: number; max: number; step: number; value: number; onChange: (n: number) => void;
-}) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>{label}</span>
-        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>{hint}</span>
-      </div>
-      <input type="range" min={min} max={max} step={step} value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        style={{ width: "100%", accentColor: "var(--accent)" }} />
     </div>
   );
 }
