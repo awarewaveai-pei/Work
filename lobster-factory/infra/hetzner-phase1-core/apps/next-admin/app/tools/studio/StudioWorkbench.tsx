@@ -1128,42 +1128,6 @@ export default function StudioWorkbench() {
             );
           })()}
 
-          {/* 🗺️ 地圖預覽 — AI 項目以圖釘散佈，點釘＝放上地圖（同時填入 prompt）；golden-angle 散佈，無依賴 */}
-          {mapMode && region && (() => {
-            const mt = MAP_THEMES.find((t) => t.key === mapTheme) ?? MAP_THEMES[0]!;
-            const dyn = cultureDyn[`${region.en}|${mapTheme}`];
-            const seen = new Set<string>();
-            const items: CultureItem[] = [];
-            for (const it of [...(dyn ?? []), ...mt.fallback]) {
-              if (seen.has(it.en)) continue;
-              seen.add(it.en); items.push(it);
-            }
-            const shown = items.slice(0, 12);
-            const n = Math.max(shown.length, 1);
-            const GOLDEN = 2.399963229728653; // ~137.5° in radians — even, non-overlapping scatter
-            return (
-              <div style={{ marginTop: 10, position: "relative", height: 220, borderRadius: 12, border: "1px solid var(--border)", background: "radial-gradient(circle at 32% 30%, rgba(99,102,241,0.12), rgba(127,127,127,0.04) 70%)", overflow: "hidden" }}>
-                <div style={{ position: "absolute", top: 8, left: 10, fontSize: 12, fontWeight: 700, color: "var(--accent)", letterSpacing: 0.5 }}>
-                  🗺️ {region.zh}{fusionRegion ? ` × ${fusionRegion.zh}` : ""} · {mt.emoji}{mt.zh}
-                </div>
-                {shown.map((it, i) => {
-                  const ang = i * GOLDEN;
-                  const rad = Math.sqrt((i + 0.5) / n);
-                  const cx = 50 + Math.cos(ang) * rad * 32;
-                  const cy = 56 + Math.sin(ang) * rad * 24;
-                  const active = cultureChips.includes(it.en);
-                  return (
-                    <button key={it.en} type="button" onClick={() => toggleCultureChip(it.en)} title={it.desc}
-                      style={{ position: "absolute", left: `${cx}%`, top: `${cy}%`, transform: "translate(-50%,-50%)", fontSize: 11, padding: "2px 8px", borderRadius: 12, cursor: "pointer", whiteSpace: "nowrap", maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`, background: active ? "rgba(99,102,241,0.92)" : "var(--chip-surface)", color: active ? "#fff" : "var(--text-primary)", boxShadow: "0 1px 4px rgba(0,0,0,0.18)", transition: "all 0.15s" }}>
-                      📍{it.zh}
-                    </button>
-                  );
-                })}
-                <div style={{ position: "absolute", bottom: 6, right: 10, fontSize: 10, opacity: 0.4 }}>點圖釘＝放上地圖</div>
-              </div>
-            );
-          })()}
-
           {/* 已選文化元素 summary + 清除 */}
           {cultureChips.length > 0 && (
             <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
