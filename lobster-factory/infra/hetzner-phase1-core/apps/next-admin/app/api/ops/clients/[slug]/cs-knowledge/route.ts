@@ -41,11 +41,13 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
   let body: Record<string, unknown>;
   try { body = (await request.json()) as Record<string, unknown>; } catch { return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 }); }
 
-  const title = typeof body.title === "string" ? body.title.trim() : "";
+  const title = (typeof body.title === "string" ? body.title.trim() : "").slice(0, 300);
   const docBody = typeof body.body === "string" ? body.body.trim() : "";
   const kind = KINDS.includes(body.kind as string) ? (body.kind as "doc" | "faq" | "sop" | "conversation" | "url") : "doc";
   const isSensitive = body.isSensitive === true;
   if (!title || docBody.length < 10) return NextResponse.json({ ok: false, error: "title_and_body_required" }, { status: 400 });
+  // Cap body to bound embedding cost + stay under OpenAI's per-request token/input ceiling.
+  if (docBody.length > 100000) return NextResponse.json({ ok: false, error: "body_too_long", hint: "內容過長（上限 10 萬字），請拆成多筆" }, { status: 400 });
 
   const orgId = await orgIdOf(slug);
   if (!orgId) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });

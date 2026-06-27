@@ -4,6 +4,7 @@
 import { CS_EMBEDDING, CS_THRESHOLDS, CS_TIMEOUTS } from "@/lib/cs/config";
 import { rrfFuse } from "@/lib/cs/autonomy";
 import {
+  deleteKnowledgeSource,
   insertChunks,
   insertSource,
   matchChunksKeyword,
