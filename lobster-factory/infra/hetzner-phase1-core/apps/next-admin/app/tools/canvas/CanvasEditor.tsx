@@ -239,7 +239,8 @@ export default function CanvasEditor() {
       // 🗂 keep the layer panel in sync with the object stack.
       const onStack = () => {
         setLayers([...canvas.getObjects()].reverse());
-        setSaveState("idle"); // any edit re-enables 存入 My Designs (was: stuck disabled after first save)
+        // any *user* edit re-enables 存入 My Designs; skip during undo/redo/load restore (critic N4).
+        if (!restoringRef.current) setSaveState("idle");
         snapshot(); // record an undo step on add/remove/modify
       };
       canvas.on("object:added", onStack);
@@ -694,6 +695,11 @@ export default function CanvasEditor() {
       | null;
     if (!canvas || !img || img.type !== "image") { setError("請先點選一張圖片再裁切"); return; }
     if (((img.angle ?? 0) % 360) !== 0) { setError("請先把圖轉正（角度歸零）再裁切"); return; }
+    // Flip mirrors the displayed pixels but cropX/cropY index the UNFLIPPED source → boxing the
+    // flipped view would grab the mirror-image region. Block it (critic N3).
+    if ((img as { flipX?: boolean; flipY?: boolean }).flipX || (img as { flipX?: boolean; flipY?: boolean }).flipY) {
+      setError("請先取消翻轉再裁切"); return;
+    }
     applyDrawMode("off");
     cropImgRef.current = img;
     const w = (img.width ?? 0) * (img.scaleX ?? 1);
@@ -759,9 +765,11 @@ export default function CanvasEditor() {
     let ncy = curCropY + (rTop - iTLy) / sy;
     let nw = rW / sx;
     let nh = rH / sy;
-    // clamp the crop window to the source element bounds
-    const elW = img._element?.naturalWidth ?? (curCropX + (img.width ?? 0));
-    const elH = img._element?.naturalHeight ?? (curCropY + (img.height ?? 0));
+    // clamp the crop window to the source element bounds. If natural dims are unavailable, use
+    // Infinity (no upper clamp) rather than a fabricated bound — for an already-cropped image
+    // (curCropX≠0) `curCropX + width` is NOT the natural width and would silently shrink the crop.
+    const elW = img._element?.naturalWidth || Infinity;
+    const elH = img._element?.naturalHeight || Infinity;
     ncx = Math.max(0, Math.min(ncx, elW - 1));
     ncy = Math.max(0, Math.min(ncy, elH - 1));
     nw = Math.max(1, Math.min(nw, elW - ncx));
@@ -1584,7 +1592,7 @@ export default function CanvasEditor() {
         ) : null}
         <span style={{ flex: 1 }} />
         {/* 💾 設計檔（可再編輯）— export/import the full canvas JSON */}
-        <button className="btn-secondary" disabled={!ready} onClick={exportDesign} title="匯出可再編輯的設計檔（.design.json）">💾 設計檔</button>
+        <button className="btn-secondary" disabled={!ready || cropMode} onClick={exportDesign} title="匯出可再編輯的設計檔（.design.json）">💾 設計檔</button>
         <label className="btn-secondary" style={{ cursor: ready ? "pointer" : "default" }} title="載入先前匯出的設計檔">
           📂 載入
           <input
@@ -1688,10 +1696,10 @@ export default function CanvasEditor() {
               style={{ fontSize: 12, padding: "2px 6px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)", width: "100%" }}
             />
             <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready} onClick={download} title="下載全尺寸 PNG">PNG下載</button>
-              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready} onClick={() => void downloadWebP()} title="下載 WebP，自動壓縮至 200KB 以內">WebP下載</button>
+              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready || cropMode} onClick={download} title="下載全尺寸 PNG">PNG下載</button>
+              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready || cropMode} onClick={() => void downloadWebP()} title="下載 WebP，自動壓縮至 200KB 以內">WebP下載</button>
             </div>
-            <button className="btn-primary" style={{ width: "100%" }} disabled={!ready || saveState === "saving" || saveState === "saved"} onClick={() => void saveToDesigns()}>
+            <button className="btn-primary" style={{ width: "100%" }} disabled={!ready || cropMode || saveState === "saving" || saveState === "saved"} onClick={() => void saveToDesigns()}>
               {saveState === "saved" ? "已存入 ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}
             </button>
           </div>
