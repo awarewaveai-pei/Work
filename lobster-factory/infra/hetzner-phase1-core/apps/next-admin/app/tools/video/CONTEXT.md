@@ -69,7 +69,15 @@ Fast, cheap, simple look. Stays the default and the fallback — never removed.
 _Avoid_: legacy path, basic mode, ffmpeg mode
 
 **Director Engine**:
-The new path: AI Director → Timeline → one short Remotion clip per Scene → ffmpeg
-concat with xfade transitions. Rich, layered, cinematic look. Per-Scene clips render
-in parallel, so a 1–10 min video stays feasible and never hits the 2-min clip cap.
-_Avoid_: remotion mode, premium mode, cinematic engine
+The new path: AI Director → Timeline → ONE Remotion composition for the whole video,
+keeping native `<TransitionSeries>` transitions, native `<Audio>` music with ducking,
+and cross-scene continuity. Long videos are produced by Frame-Range Sharding. Rich,
+layered, cinematic look.
+_Avoid_: remotion mode, premium mode, cinematic engine, per-scene clips
+
+**Frame-Range Sharding**:
+The render technique for the Director Engine: the single composition is split into
+time/frame ranges rendered in parallel processes, then losslessly concatenated. Splits
+by frame range (mechanical, seamless), never by Scene. Enables 1–10 min videos at
+feasible speed with per-shard fault recovery.
+_Avoid_: scene splitting, clip rendering, chunking
