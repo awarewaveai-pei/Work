@@ -68,7 +68,9 @@
     "luckyStars": "吉星",
     "unluckyStars": "煞星",
     "patternsTitle": "格局分析",
-    "flyingTitle": "飛宮四化"
+    "flyingTitle": "飛宮四化",
+    "palaceReadingTitle": "十二宮逐星詳解",
+    "palaceBorrowed": "無主星（借對宮論）"
   },
   "bazi": {
     "title": "八字四柱排盤",

@@ -4,6 +4,29 @@
 
 ## 2026-06-27
 
+### feat(oracle): 紫微十二宮逐星知識庫 — 14主星×12宮正統解讀引擎
+
+[任務理解] 操作者指出格局/飛化解說太通用、且缺競品的「十二宮逐星」深度,要我**去讀真正的紫微網站**而非用自己半吊子知識硬湊。
+
+[現況分析] 派 3 研究代理從正統四化飛星派(金辰瀚 88kch.com,page id 連續成對 5972~6002)抓回全部 14 主星 × 12 宮逐宮斷語 + 化氣/五行/原型/優缺點,單一一致體系、自洽完整。
+
+[已修改]
+- `lib/ziwei/stars.ts`(新):14 主星知識庫(qi/element/archetype/pros/cons + palaces 12 宮斷語),宮名 key 對齊 iztro zh-TW palace.js。
+- `lib/ziwei/palaceReading.ts`(新):analyzePalaceReadings 逐宮取主星查庫,廟旺(廟旺得地/落陷失輝…)+生年四化修飾;無主星宮借 surroundedPalaces().opposite 主星(借星安宮)。
+- `lib/ziwei/analyze.ts`:ZiweiAnalysis 加 palaceReadings。
+- `lib/divination/systems/ziwei.ts`:toContext 有 analysis 時以逐宮 facts(`宮:命宮`)取代裸星名,餵 AI 命主簡批;fact 數/長度經實測 < MAX_FACTS=60 / MAX_VALUE=300。
+- `components/ZiweiTool.tsx`:渲染「十二宮逐星詳解」區塊;`messages/{zh-TW,en}.json` 加 palaceReadingTitle/palaceBorrowed。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && npx vitest run && npm run build && tsx probe` | exit=0 | ms=~9000 — tsc=0、vitest 118 pass(+逐宮 7 測試)、build=0、node probe 確認 12 宮輸出正確、無主星宮正確借對宮(借紫微：…)。部署後待真機 DOM 驗。
+- REVIEW_DONE: critic=Deep | verdict=warn→修 | findings=0c/1M/2m — Major(借星 head 誤帶對宮廟旺,自相矛盾)已修(借星 head 省廟旺、保留化象);Minor birthMutagen 補 .slice(0,300);逐宮 fact 數/長度/key 對齊/crash 安全/借星邏輯經 critic 驗 clean。
+- BUGHUNT_DONE: scope=Projects/internal/ziwei-doushu | grep=`palaceReadings|analyzePalaceReadings|STAR_PROFILES|PALACE_ORDER|palace:` | hits=23(全為預期 callsites;`palace:` 消費者 registry.test/ziwei.test 走無-analysis fallback,118 測試綠已證實無破壞)
+- BUGHUNT_SCOPE_NARROW: 改動全在 ziwei-doushu app 內,無 agency-os/scripts downstream consumer(該 app 獨立 deploy,不被 repo 其他腳本引用)。
+
+[剩餘風險] 逐宮斷語為單一流派(金辰瀚)體系,他派用詞略異(已於 commit message 標注來源)。
+
+[rollback] git revert 本 commit;或 SG `docker tag oracle-web:rollback oracle-web:latest && docker compose up -d`。
+
 ### feat(canvas): 畫布自動適應一頁 + Adobe 快捷鍵 + 工具列整合進右側欄（3 commit，皆部署+真機驗）
 
 [任務理解] 使用者要 /tools/canvas：① 上方工具列整合進右側欄讓圖案畫面更大 ② Adobe 快捷鍵(Ctrl+Z/Delete) ③ 畫布高度不超過一頁、自動適應、實際尺寸不變(如 Banner Studio)。

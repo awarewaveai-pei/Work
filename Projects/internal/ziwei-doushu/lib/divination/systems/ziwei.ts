@@ -41,20 +41,24 @@ export function toContext(
       .map((s) => `${s.name}化${s.mutagen}(${p.name})`),
   );
   if (birthMutagen.length) {
-    facts.push({ label: 'birthMutagen', value: birthMutagen.join('、') });
+    facts.push({ label: 'birthMutagen', value: birthMutagen.join('、').slice(0, 300) });
   }
 
-  // 各宮主星帶廟旺 + 四化 → 讓 AI 綁具體廟陷與四化(非空泛巴納姆)
-  for (const p of a.palaces) {
-    const stars = p.majorStars
-      .map(
-        (s) =>
-          `${s.name}${s.brightness ? `(${s.brightness})` : ''}${
-            s.mutagen ? `化${s.mutagen}` : ''
-          }`,
-      )
-      .join('/');
-    facts.push({ label: `palace:${p.name}`, value: stars || '—' });
+  // 各宮主星帶廟旺 + 四化 → 讓 AI 綁具體廟陷與四化(非空泛巴納姆)。
+  //   有頂規 analysis 時改用知識庫「逐宮逐星」解讀(更豐富,見下方 analysis 區),
+  //   此處只在無 analysis 時提供裸星名清單作 fallback。
+  if (!analysis) {
+    for (const p of a.palaces) {
+      const stars = p.majorStars
+        .map(
+          (s) =>
+            `${s.name}${s.brightness ? `(${s.brightness})` : ''}${
+              s.mutagen ? `化${s.mutagen}` : ''
+            }`,
+        )
+        .join('/');
+      facts.push({ label: `palace:${p.name}`, value: stars || '—' });
+    }
   }
 
   // 過運(若呼叫端提供目標日期):大限 + 流年四化飛星
@@ -99,6 +103,15 @@ export function toContext(
     }
     for (const [domain, flows] of byDomain) {
       facts.push({ label: `飛化:${domain}`, value: flows.join('、').slice(0, 280) });
+    }
+    // 十二宮逐星逐宮解讀(知識庫驅動)→ AI 命主簡批的逐宮依據
+    for (const pr of analysis.palaceReadings) {
+      if (!pr.readings.length) continue;
+      const prefix = pr.borrowed ? '(無主星，借對宮論) ' : '';
+      facts.push({
+        label: `宮:${pr.palace}`,
+        value: (prefix + pr.readings.join('；')).slice(0, 300),
+      });
     }
   }
 

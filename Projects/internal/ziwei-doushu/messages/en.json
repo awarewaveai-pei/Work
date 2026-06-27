@@ -68,7 +68,9 @@
     "luckyStars": "Lucky",
     "unluckyStars": "Malefic",
     "patternsTitle": "Chart patterns",
-    "flyingTitle": "Flying transformations"
+    "flyingTitle": "Flying transformations",
+    "palaceReadingTitle": "Twelve palaces, star by star",
+    "palaceBorrowed": "No major star (read via opposite palace)"
   },
   "bazi": {
     "title": "BaZi Four Pillars",

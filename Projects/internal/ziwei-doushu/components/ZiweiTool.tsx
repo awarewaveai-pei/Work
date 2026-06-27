@@ -201,6 +201,59 @@ export default function ZiweiTool({
                   </div>
                 </div>
               ) : null}
+
+              {/* 十二宮逐星詳解(知識庫驅動) */}
+              {analysis.palaceReadings.some((p) => p.readings.length) ? (
+                <div className="glass-card p-4">
+                  <div className="label-dark" style={{ marginBottom: '0.6rem' }}>
+                    {t.palaceReadingTitle}
+                  </div>
+                  <div style={{ display: 'grid', gap: '0.7rem' }}>
+                    {analysis.palaceReadings.map((pr) =>
+                      pr.readings.length ? (
+                        <div
+                          key={pr.palace}
+                          style={{
+                            borderLeft: `3px solid var(--violet-400)`,
+                            paddingLeft: '0.6rem',
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontWeight: 700,
+                              color: 'var(--text-heading)',
+                              fontSize: '0.84rem',
+                              marginBottom: '0.2rem',
+                            }}
+                          >
+                            {pr.palace}
+                            <span style={{ color: 'var(--text-caption)', fontWeight: 400, marginLeft: '0.35rem' }}>
+                              {pr.branch}
+                            </span>
+                            {pr.borrowed ? (
+                              <span style={{ color: 'var(--gold-400)', fontSize: '0.66rem', marginLeft: '0.4rem' }}>
+                                {t.palaceBorrowed}
+                              </span>
+                            ) : null}
+                          </div>
+                          {pr.readings.map((r, i) => (
+                            <div
+                              key={i}
+                              style={{
+                                color: 'var(--text-body)',
+                                fontSize: '0.78rem',
+                                lineHeight: 1.6,
+                              }}
+                            >
+                              {r}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null,
+                    )}
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : null}
 

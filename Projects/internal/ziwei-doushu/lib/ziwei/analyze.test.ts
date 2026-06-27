@@ -44,12 +44,35 @@ describe('紫微頂規分析引擎', () => {
     expect(detectPatterns(r2.astrolabe).map((p) => p.name)).toContain('丹墀桂墀格');
   });
 
-  it('toContext 帶 analysis 時注入格局/亮度/飛化 facts + headline 含格局', () => {
+  it('十二宮逐星:每宮有星處皆有知識庫斷語、含主星名與宮職象意', () => {
+    const pr = a.palaceReadings;
+    expect(pr.length).toBe(12);
+    // 命宮必有解讀(命宮幾乎必有主星或借星)
+    const ming = pr.find((p) => p.palace === '命宮');
+    expect(ming).toBeDefined();
+    expect(ming!.readings.length).toBeGreaterThan(0);
+    // 每條斷語非空、夠長(非空泛一詞)
+    for (const p of pr) {
+      for (const line of p.readings) {
+        expect(line.length).toBeGreaterThan(8);
+        expect(line).toMatch(/：/); // 「星名：斷語」結構
+      }
+    }
+    // 借對宮的宮位:borrowed=true 且斷語以「借」起
+    const borrowed = pr.filter((p) => p.borrowed && p.readings.length);
+    for (const p of borrowed) {
+      expect(p.readings[0].startsWith('借')).toBe(true);
+    }
+  });
+
+  it('toContext 帶 analysis 時注入格局/亮度/飛化/逐宮 facts + headline 含格局', () => {
     const h = undefined;
     const ctx = toContext(r, 'zh-TW', h, a);
     expect(ctx.facts.some((f) => f.label.startsWith('格局:'))).toBe(true);
     expect(ctx.facts.some((f) => f.label === '主星亮度指數')).toBe(true);
     expect(ctx.facts.some((f) => f.label.startsWith('飛化:'))).toBe(true);
+    expect(ctx.facts.some((f) => f.label.startsWith('宮:'))).toBe(true); // 逐宮逐星
+    expect(ctx.facts.length).toBeLessThanOrEqual(60); // route MAX_FACTS
     expect(ctx.facts.every((f) => f.value.length <= 300)).toBe(true); // route 上限
     expect(ctx.headline).toContain('府相朝垣格');
   });
