@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 import { extractJsonArray, generateCheapJsonText } from "../../../../../lib/ai/cheap-json";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
+// Pre-baked curated items for ~all region×theme combos (generated once by
+// scripts/generate-culture-curated.mjs). Served first → free + instant, no LLM call.
+// The live LLM below is only the long-tail fallback for combos not in this file.
+import CURATED_ITEMS from "../../../../../lib/studio/culture-curated.json";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
+
+const CURATED = CURATED_ITEMS as Record<string, CultureItem[]>;
 
 // Lens key to English fragment describing what specifics to surface. Kept in sync
 // with CULTURE_LENSES[].hint in lib/studio/culture-presets.ts.
@@ -44,9 +50,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });
   }
 
-  let body: { region?: string; lens?: string; model?: string };
+  let body: { region?: string; lens?: string; model?: string; force?: boolean; curatedOnly?: boolean };
   try {
-    body = (await req.json()) as { region?: string; lens?: string; model?: string };
+    body = (await req.json()) as { region?: string; lens?: string; model?: string; force?: boolean; curatedOnly?: boolean };
   } catch {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
@@ -55,6 +61,18 @@ export async function POST(req: Request) {
   const lensKey = body.lens && LENS_HINTS[body.lens] ? body.lens : "";
   if (!region || !lensKey) {
     return NextResponse.json({ ok: false, error: "missing_region_or_lens" }, { status: 400 });
+  }
+
+  // 🪙 Curated fast-path: serve pre-baked items for free + instantly. Only combos missing
+  // from the dataset (the long tail) fall through to the live LLM below. `force` re-rolls a
+  // curated combo via the AI; `curatedOnly` (used by the client's auto-load) NEVER calls the
+  // LLM — it returns curated-or-empty so selecting a region can't silently spend tokens.
+  const baked = CURATED[`${region}|${lensKey}`];
+  if (baked && baked.length && !body.force) {
+    return NextResponse.json({ ok: true, items: baked.slice(0, 12), model: "curated" });
+  }
+  if (body.curatedOnly) {
+    return NextResponse.json({ ok: true, items: [], model: "none" });
   }
 
   const systemPrompt = `You are a cultural design researcher helping a designer create clothing graphics inspired by world cultures.

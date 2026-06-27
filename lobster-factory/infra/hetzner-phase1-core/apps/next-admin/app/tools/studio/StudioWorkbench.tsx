@@ -496,16 +496,18 @@ export default function StudioWorkbench() {
     setCultureChips((prev) => (prev.includes(en) ? prev.filter((x) => x !== en) : [...prev, en]));
   }, []);
 
-  // Fetch 12 specific authentic items for the current region×lens via the LLM.
-  // The result persists locally and is replaced only when the operator clicks again.
-  const fetchCulture = useCallback(async (regionEn: string, lensKey: string) => {
+  // Fetch 12 specific authentic items for the current region×lens.
+  // Default path returns pre-baked curated items (free + instant); only the long tail hits
+  // the LLM. opts.curatedOnly (auto-load) never spends; opts.force re-rolls via the AI.
+  const fetchCulture = useCallback(async (regionEn: string, lensKey: string, opts?: { curatedOnly?: boolean; force?: boolean }) => {
     const key = cultureRuntimeKey(regionEn, lensKey);
-    setCultureFetching((p) => ({ ...p, [key]: true }));
+    // Silent for auto-load (curated is instant); show the spinner only for explicit fetches.
+    if (!opts?.curatedOnly) setCultureFetching((p) => ({ ...p, [key]: true }));
     try {
       const res = await fetch("/api/tools/studio/culture", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ region: regionEn, lens: lensKey, model: searchDataModel }),
+        body: JSON.stringify({ region: regionEn, lens: lensKey, model: searchDataModel, curatedOnly: opts?.curatedOnly, force: opts?.force }),
       });
       const json = (await res.json()) as { ok: boolean; items?: CultureItem[] };
       const items = coerceCultureItems(json.items);
@@ -514,7 +516,7 @@ export default function StudioWorkbench() {
         storeCulture(regionEn, lensKey, items);
       }
     } catch { /* keep fallback chips */ }
-    setCultureFetching((p) => { const n = { ...p }; delete n[key]; return n; });
+    if (!opts?.curatedOnly) setCultureFetching((p) => { const n = { ...p }; delete n[key]; return n; });
   }, [searchDataModel]);
 
   // 🎲 文化混搭骰 — random 2 cultures × 1 lens, auto-fetch both → forced serendipity.
@@ -563,15 +565,20 @@ export default function StudioWorkbench() {
     if (stored) setAllTopics(stored);
   }, []);
 
-  // When a saved culture×facet pair is selected again, show it without spending tokens.
-  // The active facet is the map theme in 地圖模式, otherwise the culture lens.
+  // Auto-load items for the selected region×facet WITHOUT a click and WITHOUT spending:
+  // localStorage first, else a curated-only fetch (pre-baked = free + instant; never the LLM).
+  // The ref guards against an effect loop when a long-tail combo has no curated entry (empty).
+  const autoLoadedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!region) return;
     const facetKey = mapMode ? mapTheme : cultureLens;
     const key = cultureRuntimeKey(region.en, facetKey);
     const stored = readStoredCulture(region.en, facetKey);
-    if (stored) setCultureDyn((prev) => (prev[key] ? prev : { ...prev, [key]: stored }));
-  }, [region, cultureLens, mapMode, mapTheme]);
+    if (stored) { setCultureDyn((prev) => (prev[key] ? prev : { ...prev, [key]: stored })); return; }
+    if (autoLoadedRef.current.has(key)) return;
+    autoLoadedRef.current.add(key);
+    void fetchCulture(region.en, facetKey, { curatedOnly: true });
+  }, [region, cultureLens, mapMode, mapTheme, fetchCulture]);
 
   // 🔍 Lightbox: close on Escape while an image is zoomed.
   useEffect(() => {
@@ -1023,13 +1030,14 @@ export default function StudioWorkbench() {
             }
             return (
               <>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
                   <button type="button" disabled={!region || fetching}
-                    onClick={() => { if (region) void fetchCulture(region.en, facet.key); }}
+                    onClick={() => { if (region) void fetchCulture(region.en, facet.key, { force: true }); }}
+                    title="精選清單已自動載入（免費）。想要不一樣的，按這個用 AI 換一批（花一點點錢）"
                     style={actionPill(!region || fetching)}>
-                    {fetching ? "AI 思考中…" : `✨ AI 靈感（${region ? region.zh : "先選地域"}・${facet.zh}）`}
+                    {fetching ? "AI 思考中…" : `🔄 AI 換一批（${region ? region.zh : "先選地域"}・${facet.zh}）`}
                   </button>
-                  {dyn && <span style={{ fontSize: 10, opacity: 0.45 }}>AI 已填 {dyn.length} 項</span>}
+                  {dyn && <span style={{ fontSize: 10, opacity: 0.45 }}>已載入 {dyn.length} 項</span>}
                 </div>
                 <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                   {chips.map((it) => {
