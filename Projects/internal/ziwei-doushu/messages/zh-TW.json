@@ -61,7 +61,14 @@
     "decadal": "大限",
     "yearly": "流年",
     "monthly": "流月",
-    "daily": "流日"
+    "daily": "流日",
+    "brightnessTitle": "主星亮度與吉凶分析",
+    "brightnessIndex": "主星亮度指數",
+    "fortuneIndex": "三方四正吉凶指數",
+    "luckyStars": "吉星",
+    "unluckyStars": "煞星",
+    "patternsTitle": "格局分析",
+    "flyingTitle": "飛宮四化"
   },
   "bazi": {
     "title": "八字四柱排盤",

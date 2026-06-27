@@ -61,7 +61,14 @@
     "decadal": "Decade",
     "yearly": "Year",
     "monthly": "Month",
-    "daily": "Day"
+    "daily": "Day",
+    "brightnessTitle": "Star brightness & fortune",
+    "brightnessIndex": "Brightness index",
+    "fortuneIndex": "Three-harmony fortune index",
+    "luckyStars": "Lucky",
+    "unluckyStars": "Malefic",
+    "patternsTitle": "Chart patterns",
+    "flyingTitle": "Flying transformations"
   },
   "bazi": {
     "title": "BaZi Four Pillars",
