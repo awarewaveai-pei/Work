@@ -1,5 +1,5 @@
 {
-    "generatedAt":  "2026-06-27T01:58:09.7829916Z",
+    "generatedAt":  "2026-06-27T02:12:30.1981162Z",
     "overall":  "PASS",
     "fatal":  false,
     "fatalReason":  "",
@@ -12,8 +12,8 @@
                "retention_days":  "7",
                "retention_source":  "static",
                "backup_size":  "13G",
-               "latest_time":  "2026-06-26 02:31:14",
-               "oldest_time":  "2026-06-19 02:00:02",
+               "latest_time":  "2026-06-27 02:00:02",
+               "oldest_time":  "2026-06-20 02:00:02",
                "backup_age_days":  "0",
                "verify_result":  "PASSED",
                "verify_time":  "2026-06-26T02:30:12Z"
@@ -26,8 +26,8 @@
                "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|30 2 * * * root /root/scripts/backup-eu-stack.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261|0 3 * * * root /root/scripts/verify-backup-eu.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261",
                "retention_days":  "7",
                "retention_source":  "static",
-               "backup_size":  "8.3G",
-               "latest_time":  "2026-06-26 06:16:53",
+               "backup_size":  "8.4G",
+               "latest_time":  "2026-06-27 02:00:53",
                "oldest_time":  "2026-06-19 02:30:45",
                "backup_age_days":  "0",
                "verify_result":  "PASSED",
