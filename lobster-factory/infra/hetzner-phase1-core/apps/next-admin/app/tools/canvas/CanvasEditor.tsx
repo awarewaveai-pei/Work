@@ -1673,152 +1673,6 @@ export default function CanvasEditor() {
         上傳圖案、加文字，拖曳 / 縮放 / 旋轉，即時預覽。完成後可下載 PNG 或存入 My Designs。
       </p>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <button className="btn-secondary" disabled={!ready || !canUndo || drawMode !== "off" || inpaintMode || cropMode} onClick={undo} title="復原 (Undo)">↩️</button>
-        <button className="btn-secondary" disabled={!ready || !canRedo || drawMode !== "off" || inpaintMode || cropMode} onClick={redo} title="重做 (Redo)">↪️</button>
-        <button className="btn-secondary" disabled={!ready} onClick={addText}>＋ 文字</button>
-        <label className="btn-secondary" style={{ cursor: ready ? "pointer" : "default" }}>
-          ＋ 上傳圖案
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            style={{ display: "none" }}
-            disabled={!ready}
-            onChange={(e) => {
-              uploadImage(e.target.files?.[0] ?? null);
-              e.target.value = ""; // allow re-uploading the same file
-            }}
-          />
-        </label>
-        <button className="btn-secondary" disabled={!ready || !anySelected} onClick={deleteSelected}>刪除選取</button>
-        {/* ✂️ 裁切 — crop the selected image (native cropX/cropY). Apply/cancel appear while cropping. */}
-        <button className="btn-secondary" disabled={!ready || inpaintMode || cropMode || !imageSelected} onClick={enterCrop} title="裁切選取的圖片">✂️ 裁切</button>
-        {cropMode ? (
-          <>
-            <button className="btn-primary" onClick={applyCrop} title="套用裁切">✅ 套用裁切</button>
-            <button className="btn-secondary" onClick={cancelCrop} title="取消裁切">✖ 取消</button>
-          </>
-        ) : null}
-        {/* 🔷 形狀積木 */}
-        <button className="btn-secondary" disabled={!ready} onClick={() => addShape("rect")} title="加方框">▭</button>
-        <button className="btn-secondary" disabled={!ready} onClick={() => addShape("circle")} title="加圓形">◯</button>
-        <button className="btn-secondary" disabled={!ready} onClick={() => addShape("line")} title="加線條">／</button>
-        {/* 🔒 物件鎖定積木 */}
-        <button
-          className="btn-secondary"
-          disabled={!ready || !anySelected}
-          onClick={toggleLock}
-          title="鎖定／解鎖選取物件（防誤移）"
-        >
-          {lockSelected ? "🔒 已鎖定" : "🔓 鎖定"}
-        </button>
-        {/* 🗂 群組 / 解散群組 — group an active multi-selection, ungroup a selected group */}
-        {multiSelected ? (
-          <button className="btn-secondary" disabled={!ready} onClick={groupSelection} title="把選取的多個物件組成群組">🗂 群組</button>
-        ) : null}
-        {groupSelected ? (
-          <button className="btn-secondary" disabled={!ready} onClick={ungroupSelection} title="把群組拆回個別物件">🗂 解散</button>
-        ) : null}
-        {/* ✏️ 自由繪筆 / 🧹 橡皮擦 — toggle drawing mode (exits inpaint first) */}
-        <button
-          className="btn-secondary"
-          disabled={!ready || inpaintMode || cropMode}
-          style={{ fontWeight: drawMode === "draw" ? 700 : 400 }}
-          onClick={() => applyDrawMode(drawMode === "draw" ? "off" : "draw")}
-          title="自由繪筆"
-        >
-          ✏️ 畫筆
-        </button>
-        <button
-          className="btn-secondary"
-          disabled={!ready || inpaintMode || cropMode}
-          style={{ fontWeight: drawMode === "erase" ? 700 : 400 }}
-          onClick={() => applyDrawMode(drawMode === "erase" ? "off" : "erase")}
-          title="橡皮擦（擦掉畫到的地方）"
-        >
-          🧹 橡皮擦
-        </button>
-        {drawMode !== "off" ? (
-          <>
-            {drawMode === "draw" ? (
-              <input type="color" value={drawColor} title="畫筆顏色" onChange={(e) => { setDrawColor(e.target.value); const c = fabricRef.current; if (c?.freeDrawingBrush) c.freeDrawingBrush.color = e.target.value; }} style={{ width: 30, height: 24, padding: 0 }} />
-            ) : null}
-            <input type="range" min={1} max={80} value={drawWidth} title="筆刷大小" onChange={(e) => { const w = Number(e.target.value); setDrawWidth(w); const c = fabricRef.current; if (c?.freeDrawingBrush) c.freeDrawingBrush.width = w; }} />
-          </>
-        ) : null}
-        <span style={{ flex: 1 }} />
-        {/* 💾 設計檔（可再編輯）— export/import the full canvas JSON */}
-        <button className="btn-secondary" disabled={!ready || cropMode} onClick={exportDesign} title="匯出可再編輯的設計檔（.design.json）">💾 設計檔</button>
-        <label className="btn-secondary" style={{ cursor: ready ? "pointer" : "default" }} title="載入先前匯出的設計檔">
-          📂 載入
-          <input
-            type="file"
-            accept="application/json,.json"
-            style={{ display: "none" }}
-            disabled={!ready}
-            onChange={(e) => {
-              importDesign(e.target.files?.[0] ?? null);
-              e.target.value = "";
-            }}
-          />
-        </label>
-      </div>
-
-      {/* Text style controls — apply to the selected text, or set defaults for the next ＋文字. */}
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", fontSize: 12 }}>
-        <span style={{ opacity: 0.6 }}>
-          文字{textSelected ? "（套用到選取）" : "（新文字預設）"}：
-        </span>
-        <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          字型
-          <select
-            className="btn-secondary"
-            value={textFont}
-            disabled={!ready}
-            onChange={(e) => {
-              setTextFont(e.target.value);
-              applyTextStyle({ fontFamily: e.target.value });
-            }}
-          >
-            {FONT_OPTIONS.map((f) => (
-              <option key={f.label} value={f.value} style={{ fontFamily: f.value }}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          顏色
-          <input
-            type="color"
-            value={textColor}
-            disabled={!ready}
-            onChange={(e) => {
-              setTextColor(e.target.value);
-              applyTextStyle({ fill: e.target.value });
-            }}
-            style={{ width: 32, height: 24, padding: 0, border: "1px solid var(--card-border)", borderRadius: 4, cursor: "pointer" }}
-          />
-        </label>
-        <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          字級
-          <input
-            type="range"
-            min={8}
-            max={200}
-            step={1}
-            value={textSize}
-            disabled={!ready}
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              setTextSize(v);
-              applyTextStyle({ fontSize: v });
-            }}
-          />
-          <span style={{ width: 28, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{textSize}</span>
-        </label>
-      </div>
-
       {error ? <span style={{ color: "var(--red)", fontSize: 12 }}>{error}</span> : null}
 
       {/* 畫布 + 右側可捲動工具欄（vector-trace-demo 風格）。面板垂直堆疊、可收合。 */}
@@ -1844,6 +1698,80 @@ export default function CanvasEditor() {
             paddingRight: 4,
           }}
         >
+        {/* 🧰 常用快捷列（常駐，不收合）— 高頻動作一鍵到 */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          <button className="btn-secondary" disabled={!ready || !canUndo || drawMode !== "off" || inpaintMode || cropMode} onClick={undo} title="復原 (Ctrl+Z)">↩️</button>
+          <button className="btn-secondary" disabled={!ready || !canRedo || drawMode !== "off" || inpaintMode || cropMode} onClick={redo} title="重做 (Ctrl+Shift+Z)">↪️</button>
+          <button className="btn-secondary" disabled={!ready} onClick={addText} title="加文字">＋文字</button>
+          <label className="btn-secondary" style={{ cursor: ready ? "pointer" : "default" }} title="上傳圖案">
+            ＋圖
+            <input type="file" accept="image/png,image/jpeg,image/webp" style={{ display: "none" }} disabled={!ready} onChange={(e) => { uploadImage(e.target.files?.[0] ?? null); e.target.value = ""; }} />
+          </label>
+          <button className="btn-secondary" disabled={!ready || !anySelected} onClick={deleteSelected} title="刪除選取 (Delete)">🗑</button>
+          <button className="btn-secondary" disabled={!ready || inpaintMode || cropMode || !imageSelected} onClick={enterCrop} title="裁切選取的圖片">✂️ 裁切</button>
+          {cropMode ? (
+            <>
+              <button className="btn-primary" onClick={applyCrop} title="套用裁切">✅ 套用</button>
+              <button className="btn-secondary" onClick={cancelCrop} title="取消裁切 (Esc)">✖ 取消</button>
+            </>
+          ) : null}
+        </div>
+
+        {/* 🧰 更多工具 — 形狀 / 鎖定 / 群組 / 畫筆 / 橡皮擦 / 設計檔（低頻，收合省空間）*/}
+        <SidebarPanel id="more-tools" title="🧰 更多工具" defaultPos={{ x: 816, y: 0 }} width={280} defaultCollapsed>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+              <span style={{ fontSize: 11, opacity: 0.6 }}>形狀</span>
+              <button className="btn-secondary" disabled={!ready} onClick={() => addShape("rect")} title="加方框">▭</button>
+              <button className="btn-secondary" disabled={!ready} onClick={() => addShape("circle")} title="加圓形">◯</button>
+              <button className="btn-secondary" disabled={!ready} onClick={() => addShape("line")} title="加線條">／</button>
+              <button className="btn-secondary" disabled={!ready || !anySelected} onClick={toggleLock} title="鎖定／解鎖選取物件（防誤移）">{lockSelected ? "🔒 已鎖定" : "🔓 鎖定"}</button>
+              {multiSelected ? (<button className="btn-secondary" disabled={!ready} onClick={groupSelection} title="把選取的多個物件組成群組">🗂 群組</button>) : null}
+              {groupSelected ? (<button className="btn-secondary" disabled={!ready} onClick={ungroupSelection} title="把群組拆回個別物件">🗂 解散</button>) : null}
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+              <button className="btn-secondary" disabled={!ready || inpaintMode || cropMode} style={{ fontWeight: drawMode === "draw" ? 700 : 400 }} onClick={() => applyDrawMode(drawMode === "draw" ? "off" : "draw")} title="自由繪筆">✏️ 畫筆</button>
+              <button className="btn-secondary" disabled={!ready || inpaintMode || cropMode} style={{ fontWeight: drawMode === "erase" ? 700 : 400 }} onClick={() => applyDrawMode(drawMode === "erase" ? "off" : "erase")} title="橡皮擦（擦掉畫到的地方）">🧹 橡皮擦</button>
+              {drawMode !== "off" ? (
+                <>
+                  {drawMode === "draw" ? (<input type="color" value={drawColor} title="畫筆顏色" onChange={(e) => { setDrawColor(e.target.value); const c = fabricRef.current; if (c?.freeDrawingBrush) c.freeDrawingBrush.color = e.target.value; }} style={{ width: 30, height: 24, padding: 0 }} />) : null}
+                  <input type="range" min={1} max={80} value={drawWidth} title="筆刷大小" onChange={(e) => { const w = Number(e.target.value); setDrawWidth(w); const c = fabricRef.current; if (c?.freeDrawingBrush) c.freeDrawingBrush.width = w; }} />
+                </>
+              ) : null}
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+              <span style={{ fontSize: 11, opacity: 0.6 }}>設計檔</span>
+              <button className="btn-secondary" disabled={!ready || cropMode} onClick={exportDesign} title="匯出可再編輯的設計檔（.design.json）">💾 匯出</button>
+              <label className="btn-secondary" style={{ cursor: ready ? "pointer" : "default" }} title="載入先前匯出的設計檔">
+                📂 載入
+                <input type="file" accept="application/json,.json" style={{ display: "none" }} disabled={!ready} onChange={(e) => { importDesign(e.target.files?.[0] ?? null); e.target.value = ""; }} />
+              </label>
+            </div>
+          </div>
+        </SidebarPanel>
+
+        {/* 🔤 文字 — 字型 / 顏色 / 字級（套用到選取文字，或設定新文字預設）*/}
+        <SidebarPanel id="text-style" title="✏️ 文字樣式" defaultPos={{ x: 816, y: 0 }} width={280} defaultCollapsed>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
+            <span style={{ opacity: 0.6 }}>{textSelected ? "套用到選取文字" : "新文字預設"}</span>
+            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 30 }}>字型</span>
+              <select className="btn-secondary" value={textFont} disabled={!ready} onChange={(e) => { setTextFont(e.target.value); applyTextStyle({ fontFamily: e.target.value }); }} style={{ flex: 1 }}>
+                {FONT_OPTIONS.map((f) => (<option key={f.label} value={f.value} style={{ fontFamily: f.value }}>{f.label}</option>))}
+              </select>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 30 }}>顏色</span>
+              <input type="color" value={textColor} disabled={!ready} onChange={(e) => { setTextColor(e.target.value); applyTextStyle({ fill: e.target.value }); }} style={{ width: 36, height: 24, padding: 0, border: "1px solid var(--card-border)", borderRadius: 4, cursor: "pointer" }} />
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 30 }}>字級</span>
+              <input type="range" min={8} max={200} step={1} value={textSize} disabled={!ready} onChange={(e) => { const v = Number(e.target.value); setTextSize(v); applyTextStyle({ fontSize: v }); }} style={{ flex: 1 }} />
+              <span style={{ width: 28, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{textSize}</span>
+            </label>
+          </div>
+        </SidebarPanel>
+
         {/* 💾 匯出 / 下載 */}
         <SidebarPanel id="export" title="💾 匯出 / 下載" defaultPos={{ x: 816, y: 0 }} width={280}>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
