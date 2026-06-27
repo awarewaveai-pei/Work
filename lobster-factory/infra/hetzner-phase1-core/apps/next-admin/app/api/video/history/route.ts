@@ -17,6 +17,11 @@ export interface VideoHistoryItem {
   object_url: string;
   formats: Record<string, string>;
   sceneCount: number;
+  selectedFormats?: string[];
+  formatCount?: number;
+  outputMeta?: Record<string, unknown>;
+  source?: string;
+  imageModel?: string;
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
@@ -56,7 +61,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   const items: VideoHistoryItem[] = (data ?? []).map((row) => {
-    const meta = (row.metadata ?? {}) as { title?: string; formats?: Record<string, string>; sceneCount?: number };
+    const meta = (row.metadata ?? {}) as {
+      title?: string;
+      formats?: Record<string, string>;
+      sceneCount?: number;
+      selectedFormats?: string[];
+      formatCount?: number;
+      outputMeta?: Record<string, unknown>;
+      source?: string;
+      imageModel?: string;
+    };
     return {
       id: row.id as string,
       title: meta.title ?? "未命名影片",
@@ -64,6 +78,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       object_url: row.object_url as string,
       formats: meta.formats ?? {},
       sceneCount: meta.sceneCount ?? 0,
+      selectedFormats: meta.selectedFormats,
+      formatCount: meta.formatCount,
+      outputMeta: meta.outputMeta,
+      source: meta.source,
+      imageModel: meta.imageModel,
     };
   });
 

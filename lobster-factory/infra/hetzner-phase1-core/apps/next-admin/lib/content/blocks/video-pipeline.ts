@@ -19,7 +19,7 @@ import {
   deleteDesignObject,
   isR2Configured,
 } from "../../storage/r2";
-import { submitRender, type RenderOutputs } from "../video/render-client";
+import { submitRender, type RenderOutputMeta, type RenderOutputs, type VideoServiceCapability } from "../video/render-client";
 import { generateTarotImage, isTarotModel } from "../../tarot/image-gen";
 import { getSupabaseWriteClient } from "../../supabase-server";
 
@@ -70,6 +70,12 @@ export async function recordVideoAsset(params: {
   outputs: RenderOutputs;
   title: string;
   sceneCount: number;
+  formats?: string[];
+  visualBreakdown?: { custom: number; broll: number };
+  imageModel?: string;
+  source?: "generate" | "draft";
+  serviceCapability?: VideoServiceCapability;
+  outputMeta?: RenderOutputMeta;
 }): Promise<void> {
   const supabase = getSupabaseWriteClient();
   if (!supabase) return;
@@ -83,7 +89,19 @@ export async function recordVideoAsset(params: {
     mime_type: "video/mp4",
     byte_size: 0,
     is_current: true,
-    metadata: { title: params.title, formats: params.outputs, sceneCount: params.sceneCount },
+    metadata: {
+      title: params.title,
+      formats: params.outputs,
+      selectedFormats: params.formats ?? Object.keys(params.outputs),
+      formatCount: Object.keys(params.outputs).length,
+      sceneCount: params.sceneCount,
+      visualBreakdown: params.visualBreakdown,
+      imageModel: params.imageModel,
+      source: params.source,
+      serviceCapability: params.serviceCapability,
+      outputMeta: params.outputMeta,
+      renderedAt: new Date().toISOString(),
+    },
   });
   if (error) console.warn("[video-pipeline] media_assets insert failed (best-effort):", error.message);
 }
@@ -107,6 +125,10 @@ export interface VideoPipelinePending {
   r2Keys: string[];
   title: string;
   sceneCount: number;
+  formats: string[];
+  visualBreakdown: { custom: number; broll: number };
+  imageModel?: string;
+  serviceCapability?: VideoServiceCapability;
 }
 type VideoPipelineResult = VideoPipelinePending | { ok: false; status: number; error: string };
 
@@ -353,6 +375,25 @@ register({
         error: "error" in sub ? sub.error : "提交渲染失敗",
       };
     }
-    return { ok: true, pending: true, euJobId: sub.jobId, r2Keys, title, sceneCount: scenes.length };
+    const visualBreakdown = scenes.reduce(
+      (acc, scene) => {
+        if (scene.visual === "broll") acc.broll += 1;
+        else acc.custom += 1;
+        return acc;
+      },
+      { custom: 0, broll: 0 },
+    );
+    return {
+      ok: true,
+      pending: true,
+      euJobId: sub.jobId,
+      r2Keys,
+      title,
+      sceneCount: scenes.length,
+      formats,
+      visualBreakdown,
+      imageModel: ctx.imageModel as string | undefined,
+      serviceCapability: sub.serviceCapability,
+    };
   },
 });

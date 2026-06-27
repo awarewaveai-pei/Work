@@ -8,6 +8,33 @@
  * 收尾全在這個快速請求內完成 → 不依賴任何背景工作（繞開 Next.js 背景限制）。
  */
 import { NextRequest, NextResponse } from "next/server";
+import type { RenderOutputMeta, RenderOutputs } from "@/lib/content/video/render-client";
+
+const EXPECTED_VIDEO_DIMENSIONS: Record<string, { width: number; height: number }> = {
+  "16x9": { width: 1920, height: 1080 },
+  "9x16": { width: 1080, height: 1920 },
+  "4x5": { width: 1080, height: 1350 },
+};
+
+function validateRenderOutputs(
+  outputs: RenderOutputs,
+  outputMeta: RenderOutputMeta | undefined,
+  expectedFormats?: string[],
+): string | null {
+  const formats = (expectedFormats ?? []).filter((fmt) => fmt in EXPECTED_VIDEO_DIMENSIONS);
+  if (formats.length === 0) return null;
+
+  for (const fmt of formats) {
+    if (!outputs[fmt]) return `render 缺少輸出格式：${fmt}`;
+    const meta = outputMeta?.[fmt];
+    if (!meta) return `render 缺少 ${fmt} 尺寸驗證資料`;
+    const expected = EXPECTED_VIDEO_DIMENSIONS[fmt];
+    if (meta.width !== expected.width || meta.height !== expected.height) {
+      return `${fmt} 輸出尺寸錯誤：${meta.width}x${meta.height}，預期 ${expected.width}x${expected.height}`;
+    }
+  }
+  return null;
+}
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const jobId = new URL(req.url).searchParams.get("jobId");
@@ -45,6 +72,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (poll.status === "done") {
     // 收尾：記 media_assets（best-effort，只記一次）+ 清 R2 暫存
     const { recordVideoAsset, cleanupVideoInputKeys } = await import("@/lib/content/blocks/video-pipeline");
+    const validationError = validateRenderOutputs(poll.outputs, poll.outputMeta, job.recordParams?.formats);
+    if (validationError) {
+      if (job.r2Keys?.length) await cleanupVideoInputKeys(job.r2Keys);
+      await finishJob(jobId, { status: "error", error: validationError, statusCode: 502 });
+      return NextResponse.json({ ok: true, status: "error", error: validationError, statusCode: 502 });
+    }
     if (!job.recorded && job.recordParams) {
       const primaryUrl = poll.outputs["16x9"] ?? poll.outputs["youtube_linkedin"] ?? Object.values(poll.outputs)[0];
       if (primaryUrl && primaryUrl.startsWith("https://")) {
@@ -55,6 +88,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             outputs: poll.outputs,
             title: job.recordParams.title,
             sceneCount: job.recordParams.sceneCount,
+            formats: job.recordParams.formats,
+            visualBreakdown: job.recordParams.visualBreakdown,
+            imageModel: job.recordParams.imageModel,
+            source: job.recordParams.source,
+            serviceCapability: job.recordParams.serviceCapability,
+            outputMeta: poll.outputMeta,
           });
         } catch (e) {
           console.warn("[video/status] recordVideoAsset threw (best-effort):", e);
@@ -62,8 +101,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       }
     }
     if (job.r2Keys?.length) await cleanupVideoInputKeys(job.r2Keys);
-    await finishJob(jobId, { status: "done", recorded: true, video: { outputs: poll.outputs, out_dir: poll.out_dir }, title: job.recordParams?.title });
-    return NextResponse.json({ ok: true, status: "done", video: { outputs: poll.outputs, out_dir: poll.out_dir }, title: job.recordParams?.title });
+    await finishJob(jobId, { status: "done", recorded: true, video: { outputs: poll.outputs, out_dir: poll.out_dir, outputMeta: poll.outputMeta }, title: job.recordParams?.title });
+    return NextResponse.json({ ok: true, status: "done", video: { outputs: poll.outputs, out_dir: poll.out_dir, outputMeta: poll.outputMeta }, title: job.recordParams?.title });
   }
 
   // EU error → 只標記錯誤；**不**清暫存圖：保留 Flux 輸入圖讓使用者能重試 render（先前在失敗時就刪掉

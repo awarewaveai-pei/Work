@@ -13,6 +13,7 @@
  */
 import { randomUUID } from "crypto";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import type { RenderOutputMeta, VideoServiceCapability } from "./render-client";
 
 export type VideoJobStatus = "running" | "done" | "error";
 
@@ -20,7 +21,7 @@ export interface VideoJob {
   id: string;
   status: VideoJobStatus;
   step?: string;                 // 目前執行到哪個步驟（給 UI 顯示進度）
-  video?: { outputs: Record<string, string>; out_dir: string };
+  video?: { outputs: Record<string, string>; out_dir: string; outputMeta?: RenderOutputMeta };
   title?: string;
   error?: string;
   statusCode?: number;
@@ -28,7 +29,16 @@ export interface VideoJob {
   // ── async 收尾用（prepare 後填；/status 輪詢 EU + 完成記錄）──
   euJobId?: string;              // EU video-service 的 render job id
   r2Keys?: string[];            // 本輪 Flux 暫存物件 key（render 完成後清）
-  recordParams?: { title: string; sceneCount: number; organizationId: string };
+  recordParams?: {
+    title: string;
+    sceneCount: number;
+    organizationId: string;
+    formats?: string[];
+    visualBreakdown?: { custom: number; broll: number };
+    imageModel?: string;
+    source?: "generate" | "draft";
+    serviceCapability?: VideoServiceCapability;
+  };
   recorded?: boolean;           // media_assets 已記錄（只記一次）
 }
 

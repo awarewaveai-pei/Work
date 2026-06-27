@@ -33,6 +33,7 @@ import uuid
 import socket
 import ipaddress
 import threading
+import subprocess
 from urllib.parse import urlparse, quote, parse_qs
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -162,6 +163,50 @@ def _validate(payload: dict):
     return scenes, assets, out_name, False
 
 
+def _probe_video_size(path: str) -> dict:
+    """Return actual mp4 width/height using ffprobe from the ffmpeg package."""
+    res = subprocess.run(
+        [
+            "ffprobe", "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=width,height",
+            "-of", "json",
+            path,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    if res.returncode != 0:
+        raise RuntimeError(f"ffprobe failed for {path}: {res.stderr[-300:]}")
+    streams = json.loads(res.stdout or "{}").get("streams", [])
+    if not streams:
+        raise RuntimeError(f"ffprobe found no video stream: {path}")
+    width = int(streams[0].get("width") or 0)
+    height = int(streams[0].get("height") or 0)
+    if width <= 0 or height <= 0:
+        raise RuntimeError(f"ffprobe invalid dimensions for {path}: {width}x{height}")
+    return {"width": width, "height": height}
+
+
+def _build_output_meta(outputs: dict) -> dict:
+    meta = {}
+    for fmt, path in outputs.items():
+        size = _probe_video_size(str(path))
+        expected = config.FORMATS.get(fmt)
+        item = dict(size)
+        if expected:
+            item["expected_width"] = expected[0]
+            item["expected_height"] = expected[1]
+            if (size["width"], size["height"]) != expected:
+                raise RuntimeError(
+                    f"output {fmt} dimensions {size['width']}x{size['height']} "
+                    f"!= expected {expected[0]}x{expected[1]}"
+                )
+        meta[fmt] = item
+    return meta
+
+
 def _do_render(scenes, assets, out_name, tts_provider="edge", tts_voice="",
                intro_title="", intro_duration=3.0, multiformat=False) -> dict:
     """重活：序列化 materialize+render+R2 上傳。回 {outputs,out_dir,storage}。
@@ -191,6 +236,7 @@ def _do_render(scenes, assets, out_name, tts_provider="edge", tts_voice="",
                     tts_provider=tts_provider, tts_voice=tts_voice,
                     intro_title=intro_title, intro_duration=intro_duration,
                 )
+            output_meta = _build_output_meta(outputs)
             # 跨機：產出上傳 R2 → 回 public URL。未設 R2 = 本機路徑（dev）。
             if _r2_video_configured():
                 base_key = "video/" + os.path.basename(str(out_dir))
@@ -201,8 +247,13 @@ def _do_render(scenes, assets, out_name, tts_provider="edge", tts_voice="",
                             f"{base_key}/{fmt}.mp4", fh.read(), "video/mp4",
                             R2_VIDEO_BUCKET, R2_VIDEO_PUBLIC_BASE,
                         )
-                return {"outputs": urls, "out_dir": str(out_dir), "storage": "r2"}
-            return {"outputs": {k: str(v) for k, v in outputs.items()}, "out_dir": str(out_dir), "storage": "local"}
+                return {"outputs": urls, "out_dir": str(out_dir), "storage": "r2", "output_meta": output_meta}
+            return {
+                "outputs": {k: str(v) for k, v in outputs.items()},
+                "out_dir": str(out_dir),
+                "storage": "local",
+                "output_meta": output_meta,
+            }
         finally:
             pipeline.cleanup()
 
@@ -382,6 +433,7 @@ class _Handler(BaseHTTPRequestHandler):
                 "capabilities": {
                     "format_assets": True,
                     "native_multiformat": True,
+                    "output_dimensions": True,
                 },
                 "formats": list(config.FORMATS.keys()),
             })  # healthcheck 免認證

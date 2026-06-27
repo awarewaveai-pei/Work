@@ -13,6 +13,19 @@ interface RenderScene {
 
 /** /render 成功回應的 outputs 結構（各平台輸出路徑）。 */
 export type RenderOutputs = Record<string, string>;
+export type RenderOutputMeta = Record<string, {
+  width: number;
+  height: number;
+  expected_width?: number;
+  expected_height?: number;
+}>;
+
+export interface VideoServiceCapability {
+  native_multiformat: boolean;
+  format_assets: boolean;
+  output_dimensions: boolean;
+  formats: string[];
+}
 
 export type RenderResult =
   | { ok: true; outputs: RenderOutputs; out_dir: string }
@@ -36,7 +49,7 @@ function svcHeaders(json: boolean): Record<string, string> {
 
 const svcBase = (baseUrl?: string) => baseUrl ?? process.env.VIDEO_SERVICE_URL ?? "http://127.0.0.1:8732";
 
-async function assertNativeMultiformat(base: string, formats: string[]): Promise<{ ok: true } | { ok: false; error: string }> {
+async function assertNativeMultiformat(base: string, formats: string[]): Promise<{ ok: true; capability: VideoServiceCapability } | { ok: false; error: string }> {
   try {
     const r = await fetch(`${base}/health`, {
       headers: svcHeaders(false),
@@ -44,20 +57,35 @@ async function assertNativeMultiformat(base: string, formats: string[]): Promise
     });
     const body = (await r.json().catch(() => ({}))) as {
       ok?: boolean;
-      capabilities?: { native_multiformat?: boolean; format_assets?: boolean };
+      capabilities?: { native_multiformat?: boolean; format_assets?: boolean; output_dimensions?: boolean };
       formats?: string[];
     };
     const serviceFormats = new Set(body.formats ?? []);
     const supportsFormats = formats.every((fmt) => serviceFormats.has(fmt));
-    if (r.ok && body.ok && body.capabilities?.native_multiformat && body.capabilities?.format_assets && supportsFormats) {
-      return { ok: true };
+    if (
+      r.ok &&
+      body.ok &&
+      body.capabilities?.native_multiformat &&
+      body.capabilities?.format_assets &&
+      body.capabilities?.output_dimensions &&
+      supportsFormats
+    ) {
+      return {
+        ok: true,
+        capability: {
+          native_multiformat: true,
+          format_assets: true,
+          output_dimensions: true,
+          formats: body.formats ?? [],
+        },
+      };
     }
   } catch {
     // Return the same actionable error below; render would fail or silently fall back on old services.
   }
   return {
     ok: false,
-    error: "video-service 尚未部署原生多比例版本（需 /health 回報 native_multiformat + format_assets）。請先更新 EU video-service 後再輸出多比例。",
+    error: "video-service 尚未部署原生多比例版本（需 /health 回報 native_multiformat + format_assets + output_dimensions）。請先更新 EU video-service 後再輸出多比例。",
   };
 }
 
@@ -87,13 +115,15 @@ export async function submitRender(
   outName: string,
   baseUrl?: string,
   opts?: RenderOpts,
-): Promise<{ ok: true; jobId: string } | { ok: false; status: number; error: string }> {
+): Promise<{ ok: true; jobId: string; serviceCapability?: VideoServiceCapability } | { ok: false; status: number; error: string }> {
   const base = svcBase(baseUrl);
   // 多格式：formatAssets + 非空 formats → 送 format_assets（EU 原生多格式）；否則送舊單組 assets。
   const useMulti = !!opts?.formatAssets && Array.isArray(opts?.formats) && opts.formats.length > 0;
+  let serviceCapability: VideoServiceCapability | undefined;
   if (useMulti) {
     const capability = await assertNativeMultiformat(base, opts!.formats!);
     if (capability.ok === false) return { ok: false, status: 503, error: capability.error };
+    serviceCapability = capability.capability;
   }
   try {
     const res = await fetch(`${base}/render`, {
@@ -119,7 +149,7 @@ export async function submitRender(
     if (!res.ok || !body.jobId) {
       return { ok: false, status: res.status || 502, error: body.error ?? `提交渲染失敗（HTTP ${res.status}）` };
     }
-    return { ok: true, jobId: body.jobId };
+    return { ok: true, jobId: body.jobId, serviceCapability };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, status: 503, error: `無法連線到 video-service（${base}）：${msg}` };
@@ -128,7 +158,7 @@ export async function submitRender(
 
 export type RenderPoll =
   | { status: "running" }
-  | { status: "done"; outputs: RenderOutputs; out_dir: string }
+  | { status: "done"; outputs: RenderOutputs; out_dir: string; outputMeta?: RenderOutputMeta; storage?: string }
   | { status: "error"; error: string };
 
 /** 查一次 EU /job 狀態（單一短請求，給 /status 每輪呼叫；不阻塞、不輪詢）。 */
@@ -140,10 +170,17 @@ export async function pollRenderJob(jobId: string, baseUrl?: string): Promise<Re
       signal: AbortSignal.timeout(30_000),
     });
     if (r.status === 404) return { status: "error", error: "render job 不存在（服務可能重啟）" };
-    const job = (await r.json().catch(() => ({}))) as { status?: string; outputs?: RenderOutputs; out_dir?: string; error?: string };
+    const job = (await r.json().catch(() => ({}))) as {
+      status?: string;
+      outputs?: RenderOutputs;
+      out_dir?: string;
+      output_meta?: RenderOutputMeta;
+      storage?: string;
+      error?: string;
+    };
     if (job.status === "done") {
       if (!job.outputs || typeof job.out_dir !== "string") return { status: "error", error: "render done 但缺 outputs/out_dir" };
-      return { status: "done", outputs: job.outputs, out_dir: job.out_dir };
+      return { status: "done", outputs: job.outputs, out_dir: job.out_dir, outputMeta: job.output_meta, storage: job.storage };
     }
     if (job.status === "error") return { status: "error", error: job.error ?? "render 失敗" };
     return { status: "running" };

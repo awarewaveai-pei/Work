@@ -10,6 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import type { VideoServiceCapability } from "@/lib/content/video/render-client";
 
 interface GenerateBody {
   topic?: string;
@@ -82,6 +83,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     r2Keys?: string[];
     title?: string;
     sceneCount?: number;
+    formats?: string[];
+    visualBreakdown?: { custom: number; broll: number };
+    serviceCapability?: VideoServiceCapability;
     error?: string;
     status?: number;
   }
@@ -113,7 +117,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       euJobId: prep.euJobId,
       r2Keys: prep.r2Keys ?? [],
       recordParams: orgId
-        ? { title: prep.title ?? "", sceneCount: prep.sceneCount ?? 0, organizationId: orgId }
+        ? {
+            title: prep.title ?? "",
+            sceneCount: prep.sceneCount ?? 0,
+            organizationId: orgId,
+            formats: prep.formats,
+            visualBreakdown: prep.visualBreakdown,
+            imageModel: body.imageModel,
+            source: "generate",
+            serviceCapability: prep.serviceCapability,
+          }
         : undefined,
     });
   } else {

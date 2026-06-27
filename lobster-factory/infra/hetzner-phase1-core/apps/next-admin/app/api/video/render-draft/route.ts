@@ -17,6 +17,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import type { VideoServiceCapability } from "@/lib/content/video/render-client";
 
 interface RenderDraftBody {
   scenes?: { id: number; narration: string }[];
@@ -134,7 +135,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     ttsVoice: body.ttsVoice,
     introTitle: body.introTitle,
     introDuration: body.introDuration,
-  })) as { ok: true; jobId: string } | { ok: false; status: number; error: string };
+  })) as
+    | { ok: true; jobId: string; serviceCapability?: VideoServiceCapability }
+    | { ok: false; status: number; error: string };
 
   if (!sub.ok) {
     const err = sub as { ok: false; status: number; error: string };
@@ -148,7 +151,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     euJobId: sub.jobId,
     r2Keys,
     recordParams: orgId
-      ? { title, sceneCount: scenes.length, organizationId: orgId }
+      ? {
+          title,
+          sceneCount: scenes.length,
+          organizationId: orgId,
+          formats: useMulti ? bodyFormats : undefined,
+          source: "draft",
+          serviceCapability: sub.serviceCapability,
+        }
       : undefined,
   });
 
