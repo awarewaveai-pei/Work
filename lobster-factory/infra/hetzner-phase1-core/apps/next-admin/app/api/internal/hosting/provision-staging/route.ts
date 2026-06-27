@@ -9,7 +9,7 @@
  * Output: { environmentId, wpRootPath, stagingSiteUrl, wpAdminUrl }
  */
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { Client as SshClient } from "ssh2";
 import { timingSafeEqual } from "../../../../../lib/ops-inbox/verifyIngestToken";
 import { getSupabaseWriteClient } from "../../../../../lib/supabase-server";
@@ -274,15 +274,31 @@ export async function POST(request: Request) {
     );
     const pluginsOk = pluginResult.code === 0;
 
-    // 8. Seed real content from the AI WebsiteSpec (Stage C). Best-effort: a seeding failure
-    // never fails the provision — the shell site already exists. CJK-safe (base64 via stdin).
-    let contentNote = "content seed skipped: no websiteSpecId";
+    // 8. Schedule content seeding to run AFTER this response (Next.js `after`). Seeding adds
+    // ~15-25s of WP-CLI work; running it inline pushed the synchronous provision past the
+    // hosting-adapter / Cloudflare ~95-100s ceiling, so create-wp-site marked the run "blocked"
+    // even though the site built + seeded fine (verified live 2026-06-27: aw_seed_done=1 but
+    // run blocked). `after()` runs seeding post-response with its OWN SSH connection, so the
+    // provision returns fast (run completes) while seeding finishes async. Idempotent +
+    // best-effort (aw_seed_done gate) — a failure only leaves a shell to re-seed on retry.
+    const willSeed = !!websiteSpecId;
     if (websiteSpecId) {
-      try {
-        contentNote = await seedContentFromSpec(conn, wpPath, websiteSpecId);
-      } catch (e) {
-        contentNote = `content seed error: ${e instanceof Error ? e.message : String(e)}`;
-      }
+      const seedOpts = { host: sshHost, port: 22, username: "root", privateKey };
+      const seedSpecId = websiteSpecId;
+      const seedPath = wpPath;
+      const seedSite = siteId;
+      after(async () => {
+        let seedConn: SshClient | null = null;
+        try {
+          seedConn = await connectSsh(seedOpts);
+          const note = await seedContentFromSpec(seedConn, seedPath, seedSpecId);
+          console.log(`[provision-staging] async seed (${seedSite}): ${note}`);
+        } catch (e) {
+          console.error(`[provision-staging] async seed failed (${seedSite}):`, e instanceof Error ? e.message : String(e));
+        } finally {
+          seedConn?.end();
+        }
+      });
     }
 
     return NextResponse.json({
@@ -293,7 +309,7 @@ export async function POST(request: Request) {
       provisioningNotes: [
         ...(!themeOk ? ["WARN: Kadence theme install had issues"] : []),
         ...(!pluginsOk ? ["WARN: some plugins may not have installed"] : [`Plugins installed: ${allPlugins.join(", ")}`]),
-        contentNote,
+        willSeed ? "content seeding scheduled (async, post-response)" : "content seed skipped: no websiteSpecId",
         `staging/${slug}/ — subdirectory install on aware-wave.com`,
         `DB: ${dbName} on lobster-wordpress-db`,
         `Admin: admin / ${adminPass}`,
