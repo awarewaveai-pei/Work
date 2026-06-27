@@ -18,9 +18,12 @@ export async function POST(request: Request) {
   }
 
   const { form, organization_id } = body;
-  if (!form?.company_name || !form?.industry || !form?.primary_goal?.length) {
+  // primary_goal was DEPRECATED 2026-06-05 (removed from the intake form) — requiring it here
+  // hard-failed every real UI submission with missing_required_fields. Validate the fields the
+  // form actually collects (see intake-form.ts required set): company_name, industry, pages_needed.
+  if (!form?.company_name || !form?.industry || !form?.pages_needed?.length) {
     return NextResponse.json(
-      { ok: false, error: "missing_required_fields", required: ["company_name", "industry", "primary_goal"] },
+      { ok: false, error: "missing_required_fields", required: ["company_name", "industry", "pages_needed"] },
       { status: 422 }
     );
   }
