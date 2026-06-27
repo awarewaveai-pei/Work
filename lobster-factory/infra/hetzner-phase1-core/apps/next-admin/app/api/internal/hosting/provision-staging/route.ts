@@ -106,7 +106,9 @@ function buildSeedScript(spec: WebsiteSpec, wpPath: string): string {
   L.push(`if [ "$(wpcli option get aw_seed_done 2>/dev/null)" = "1" ]; then echo "AW_SEED_SKIP already seeded"; exit 0; fi`);
   if (spec.site_name) L.push(`wpcli option update blogname ${shq(spec.site_name)}`);
   if (spec.tagline) L.push(`wpcli option update blogdescription ${shq(spec.tagline)}`);
-  const pages = (spec.sitemap ?? []).filter((p) => p && !p.is_homepage && p.slug !== "home").slice(0, MAX_SEED_PAGES);
+  // Exclude the homepage slugs (incl. our reserved aw-home) so a colliding spec slug can't
+  // blank the front page by matching the aw-home lookup below.
+  const pages = (spec.sitemap ?? []).filter((p) => p && !p.is_homepage && p.slug !== "home" && p.slug !== "aw-home").slice(0, MAX_SEED_PAGES);
   for (const p of pages) {
     const slug = (p.slug || "").trim();
     if (!slug) continue;

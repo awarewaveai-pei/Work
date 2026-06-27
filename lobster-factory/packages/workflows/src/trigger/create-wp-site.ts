@@ -139,7 +139,9 @@ const InputSchema = z.preprocess(
     // WP Plugin Stack — from OnboardWizard Step 2 (Phase 1)
     pluginSlugs: z.array(z.string()).optional(),
     // AI website spec id — forwarded to the hosting bridge so it can seed real page content.
-    websiteSpecId: z.string().uuid().optional(),
+    // .catch(undefined): a malformed value from any future caller degrades to "skip seeding"
+    // rather than failing the entire provisioning workflow.
+    websiteSpecId: z.string().uuid().optional().catch(undefined),
     sshHost: z.string().optional(),
     sshCredentialsRef: z.string().optional(),
     wpPath: z.string().optional(),

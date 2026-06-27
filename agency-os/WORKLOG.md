@@ -41,6 +41,27 @@
 [rollback] git revert 本 commit（純新增端點+nav 資料，零破壞性；端點未部署無 runtime 影響）。
 [下一步] C：create-wp-site 加內容注入步驟（讀 spec.homepage/sitemap/plugin_config → WP-CLI 經既有 SSH bridge 建頁/設 Kadence 色盤/RankMath SEO）。
 
+### feat(provisioning): Stage C — AI spec 內容注入站（空殼站 → 有內容的站）
+
+[任務理解] 建站引擎只佈建空殼（主題+外掛），AI 生的 homepage/sitemap/SEO 存在 website_specs 卻沒推進站。要讓「全自動生成網站」真的長出內容。
+
+[現況分析] `create-wp-site.ts` 呼叫 `resolveStagingProvisioning` 只傳 siteId/siteName/orgId，連選的 manifest/plugins 都沒下傳（bridge 永遠裝 wp-basic）。bridge `provision-staging/route.ts` 第 7 步裝外掛就停，無內容注入。spec 內容是**中文** → WP-CLI 經 SSH 內聯會 CJK mojibake（系統真踩過）。
+
+[已修改]（6 檔，只串一個 `websiteSpecId` 下去，bridge 端撈 spec_data 注入，最小爆炸半徑）
+- `lib/build-console/contracts.ts`：BuildRunRequest 加 `websiteSpecId?`（normalizeBuildRequest spread 自動帶）
+- `api/onboarding/trigger-build/route.ts`：buildPayload 帶 `websiteSpecId: website_spec_id`
+- `packages/workflows/src/trigger/create-wp-site.ts`：InputSchema 加 `websiteSpecId`（`.catch(undefined)` 壞值降級不炸 workflow）；呼叫 hosting 層補傳 manifestSlug/pluginSlugs/websiteSpecId（修既有沒傳的 gap）
+- `packages/workflows/src/hosting/resolveStagingProvisioning.ts` + `providers/httpJsonStagingAdapter.ts`：型別放寬 + websiteSpecId 進 POST body
+- `api/internal/hosting/provision-staging/route.ts`：加 Step 8 內容注入 — `seedContentFromSpec` 撈 spec_data → `buildSeedScript` 產 idempotent bash（建 sitemap 頁/建首頁 hero+sections/設 static front page/RankMath SEO meta/CJK 站名標語）→ **base64 經 stdin 灌進容器 bash**（避 CJK trap + host-shell 變數展開）；每個 spec 值 shq() 單引號跳脫防注入；完成閘 `aw_seed_done` 最後設、每頁 slug 守衛 → 可重跑修復不重複；MAX_SEED_PAGES=12 限縮 CF ~100s ceiling；best-effort（seed 失敗不擋建站）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=完整 buildSeedScript 對 SG `test-pilot` 容器 e2e（base64→stdin→bash→wp-cli）| exit=0 | 結果：`blogname=晨光咖啡烘焙坊`(CJK 零亂碼)、建 aw-home(首頁)/about(關於我們)/menu(菜單)/contact(聯絡我們)、`show_on_front=page page_on_front=9`、第2次跑=`AW_SEED_SKIP`(idempotency)、注入探針 `'; echo PWNED;'` 被當字面值(防注入)、cleanup 還原。非破壞。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/3n（全新 critic，行號對得上實檔；**前一份 critic 是對不存在程式的幻覺審查，已棄用**）。修 2 項：sitemap 過濾排除 aw-home（防撞名洗首頁）、websiteSpecId `.catch(undefined)`。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=websiteSpecId | hits=0 stale（page.tsx:49 同名是 onboarding UI 既有 client state，無關；欄位全程 additive/optional 無壞 consumer）
+
+[剩餘風險] ① 未部署：next-admin(bridge)+Trigger.dev(create-wp-site) 重新部署才生效。② content seed WARN note = 需重跑 provision 補完 seeding（operational，未自動重試）。③ section body 無長度上限（極大 spec 理論上撞 ARG_MAX，實務 KB 級安全）。④ Kadence 色盤未注入（避免 theme mod 格式弄錯，brand colors 另經 client_config 走）。
+[rollback] git revert 本 commit（threading 全 optional、bridge seeding best-effort，未部署無 runtime 影響）。
+
 ## 2026-06-26
 
 ### fix(doc-integrity): validator 治本 — 不再把 prose-in-parens 當 broken link
