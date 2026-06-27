@@ -46,6 +46,27 @@ const PRODUCT_TYPES = [
 
 const ASPECTS: AspectRatio[] = ["1:1", "3:2", "2:3", "4:3", "3:4", "4:5", "16:9", "9:16"];
 
+// 🎭 玩法 — "treatment / concept" modifiers (a separate axis from 風格 art-medium and 氛圍).
+// Multi-select; each appends an English fragment to the prompt. Works in both normal and
+// map mode (e.g. 擬人化 map = cute food characters scattered on the map). zh = chip label,
+// en = prompt fragment, desc = hover tip.
+const PLAY_MODIFIERS: { zh: string; emoji: string; en: string; desc: string }[] = [
+  { zh: "擬人化", emoji: "🧸", en: "as cute cartoon mascot characters with happy faces, little arms and legs, chibi style", desc: "變成有臉有手腳的角色（貼紙最好賣）" },
+  { zh: "可愛Q版", emoji: "🌸", en: "kawaii chibi style, soft pastel colors, adorable rounded shapes, healing cute aesthetic", desc: "柔和粉嫩、圓潤可愛、療癒系" },
+  { zh: "搞笑趣味", emoji: "😆", en: "funny exaggerated comical cartoon, silly playful expressions, humorous", desc: "誇張好笑、俏皮" },
+  { zh: "在地風情", emoji: "🏮", en: "set in an authentic local street scene with regional atmosphere, signage and surroundings", desc: "放進在地真實場景（夜市/招牌/氛圍）" },
+  { zh: "美味誘人", emoji: "🍙", en: "deliciously appetizing styling, mouth-watering, glossy fresh look", desc: "食物拍得超誘人（適合美食）" },
+  { zh: "童趣繪本", emoji: "📖", en: "children's storybook illustration style, warm friendly, picture-book look", desc: "溫暖繪本插畫風" },
+  { zh: "手繪塗鴉", emoji: "🖍️", en: "hand-drawn doodle sketch style, playful crayon and marker lines", desc: "蠟筆/麥克筆手繪塗鴉" },
+  { zh: "貼紙風", emoji: "🏷️", en: "die-cut sticker design with bold clean outline and subtle drop shadow", desc: "粗邊去背貼紙" },
+  { zh: "繽紛波普", emoji: "🌈", en: "colorful pop-art style, bold flat color blocks, playful graphic", desc: "普普藝術、大膽撞色" },
+  { zh: "復古懷舊", emoji: "📻", en: "retro vintage nostalgic style, muted aged colors, old-school poster look", desc: "復古海報、懷舊色調" },
+  { zh: "夢幻奇幻", emoji: "✨", en: "dreamy whimsical fantasy style, soft glow, magical sparkles", desc: "夢幻奇幻、微光閃爍" },
+  { zh: "節慶喜氣", emoji: "🎉", en: "festive celebratory mood, vibrant joyful colors, party atmosphere", desc: "節慶歡樂、喜氣繽紛" },
+  { zh: "霓虹賽博", emoji: "🌃", en: "neon cyberpunk style, glowing lights, futuristic night vibe", desc: "霓虹賽博、未來夜景" },
+  { zh: "高級質感", emoji: "💎", en: "premium elegant refined aesthetic, sophisticated tasteful composition", desc: "高級精緻、有質感" },
+];
+
 const TRENDING_CATEGORIES = [
   { value: "international-news", label: "國際" },
   { value: "politics", label: "政治" },
@@ -334,6 +355,7 @@ export default function StudioWorkbench() {
   const [mapTheme, setMapTheme] = useState(MAP_THEMES[0]?.key ?? ""); // active map theme (地標/美食/捷運…)
   const [fusionPickMode, setFusionPickMode] = useState(false); // ✋ 手選混搭 — next country click sets fusionRegion
   const [zoomImage, setZoomImage] = useState<string | null>(null); // 🔍 click-to-enlarge lightbox
+  const [playMods, setPlayMods] = useState<string[]>([]); // 🎭 玩法 — selected treatment fragments (multi)
 
   // 🔥 時事靈感 — active category tab (圖一 layout: tabs + items below)
   const [trendingTab, setTrendingTab] = useState(TRENDING_CATEGORIES[0]?.value ?? "");
@@ -425,6 +447,8 @@ export default function StudioWorkbench() {
   }, [productType, subject, theme, style]);
 
   const assembledPrompt = useMemo(() => {
+    // 🎭 玩法 — treatment fragments appended to every mode (multi-select).
+    const playClause = playMods.join(", ");
     // 🗺️ 地圖模式 — assemble a whole illustrated-map prompt from country + picked items.
     // Items priority: explicitly picked chips → AI-fetched set for this theme → theme fallback.
     if (mapMode && region) {
@@ -436,7 +460,7 @@ export default function StudioWorkbench() {
           ? dyn.map((d) => d.en)
           : mt.fallback.map((d) => d.en);
       const base = buildMapPrompt({ regionEn: region.en, fusionEn: fusionRegion?.en, theme: mt, items });
-      const extras = [resolvedStylePrompt, vibe.trim()].filter(Boolean).join(", ");
+      const extras = [playClause, resolvedStylePrompt, vibe.trim()].filter(Boolean).join(", ");
       return extras ? `${base}, ${extras}` : base;
     }
     // 🌍 culture tokens: region adjective (+ 🎲 fusion culture) + any picked culture chips
@@ -450,15 +474,16 @@ export default function StudioWorkbench() {
         "Transform this image.",
         resolvedStylePrompt ? `Apply style: ${resolvedStylePrompt}.` : "",
         cultureTokens.length ? `Cultural influence: ${cultureTokens.join(", ")}.` : "",
+        playClause ? `Style treatment: ${playClause}.` : "",
         vibe.trim() ? `Mood: ${vibe.trim()}.` : "",
         subject.trim() ? `Keep subject: ${subject.trim()}.` : "",
         product.suffix,
       ].filter(Boolean);
       return parts.join(" ");
     }
-    const parts = [subject.trim(), ...cultureTokens, theme.trim(), vibe.trim(), resolvedStylePrompt, product.suffix].filter(Boolean);
+    const parts = [subject.trim(), ...cultureTokens, playClause, theme.trim(), vibe.trim(), resolvedStylePrompt, product.suffix].filter(Boolean);
     return parts.join(", ");
-  }, [subject, theme, vibe, resolvedStylePrompt, product, refMode, refImages.length, region, fusionRegion, cultureChips, mapMode, mapTheme, cultureDyn]);
+  }, [subject, theme, vibe, resolvedStylePrompt, product, refMode, refImages.length, region, fusionRegion, cultureChips, mapMode, mapTheme, cultureDyn, playMods]);
 
   const effectivePrompt = promptTouched ? prompt : assembledPrompt;
 
@@ -494,6 +519,10 @@ export default function StudioWorkbench() {
 
   const toggleCultureChip = useCallback((en: string) => {
     setCultureChips((prev) => (prev.includes(en) ? prev.filter((x) => x !== en) : [...prev, en]));
+  }, []);
+
+  const togglePlayMod = useCallback((en: string) => {
+    setPlayMods((prev) => (prev.includes(en) ? prev.filter((x) => x !== en) : [...prev, en]));
   }, []);
 
   // Fetch 12 specific authentic items for the current region×lens.
@@ -1110,6 +1139,30 @@ export default function StudioWorkbench() {
                 ))}
               </div>
             </div>
+          )}
+        </AccordionSection>
+
+        {/* 🎭 玩法 — treatment modifiers (multi-select), applied to whichever items/subject are chosen. */}
+        <AccordionSection title="🎭 玩法" summary={playMods.length ? `${playMods.length} 種` : "未選"}>
+          <p style={{ fontSize: 11, opacity: 0.55, margin: "0 0 8px" }}>
+            套在你選的項目上（可多選）。例：雞排+珍奶 ＋ 擬人化 ＝ 有臉有手腳的可愛角色。
+          </p>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+            {PLAY_MODIFIERS.map((m) => {
+              const active = playMods.includes(m.en);
+              return (
+                <span key={m.en} style={{ display: "inline-block" }}
+                  onMouseEnter={(e) => { const r = e.currentTarget.getBoundingClientRect(); setTip({ text: m.desc, x: r.left + r.width / 2, y: r.top }); }}
+                  onMouseLeave={() => setTip(null)}>
+                  <button type="button" onClick={() => togglePlayMod(m.en)} style={chipStyle(active)}>
+                    {active ? "✓ " : ""}{m.emoji} {m.zh}
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+          {playMods.length > 0 && (
+            <button type="button" onClick={() => setPlayMods([])} style={{ ...ghostBtn(), marginTop: 8 }}>清除玩法</button>
           )}
         </AccordionSection>
 
