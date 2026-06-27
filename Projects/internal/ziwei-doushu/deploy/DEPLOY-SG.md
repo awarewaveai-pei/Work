@@ -53,17 +53,31 @@ sudo nginx -t && sudo systemctl reload nginx   # 還原 nginx
 # DNS 可留著(指向沒服務的埠不影響主站)
 ```
 
-## 7. 更新(之後每次改版)
+## 7. 更新(之後每次改版)— 2026-06-26 實測流程
+> ⚠️ `/opt/oracle` 是 **partial clone(blob:none)**,且現已切到 **main** 分支(原為
+> `claude/ziwei-doushu-chart-site-55fdaa`,已 consolidate 上 main)。`git pull` 在此會
+> 因無 `origin/main` 本地 ref 而失敗 → 用 fetch + reset。
 ```bash
-cd /opt/oracle && git pull
+cd /opt/oracle
+docker tag oracle-web:latest oracle-web:rollback   # 先留回滾鏡像
+git fetch origin main && git reset --hard FETCH_HEAD   # 取最新 main(非 git pull)
+git log -1 --oneline                                   # 確認 HEAD = 預期 commit
 cd Projects/internal/ziwei-doushu
-docker compose build && docker compose up -d   # 滾動更新
-curl -s http://127.0.0.1:3010/api/health
+docker compose build && docker compose up -d           # 滾動更新(override + .env.production 自動帶入)
+docker inspect -f '{{.State.Health.Status}}' oracle-web # 等 healthy
+curl -s http://127.0.0.1:3010/api/health               # {"ok":true,"service":"ziwei"}
+docker image prune -f                                   # 清 dangling(勿動 :rollback)
 ```
+**回滾**:`docker tag oracle-web:rollback oracle-web:latest && docker compose up -d`(或 `git reset --hard <舊commit>` 後重 build)。
 
 ## 備註
-- 憑證(OPENAI_API_KEY / 金流 / Supabase / astrology-api.io)到位後:在此目錄建 `.env.production`
-  (**勿進 git**),並在 `docker-compose.yml` 取消 `env_file` 註解 → `docker compose up -d` 重啟。
+- **憑證注入(2026-06-26 實際做法)**:secrets 走兩個 **untracked** 檔(勿進 git):
+  - `.env.production`(`chmod 600`):`OPENAI_API_KEY=...` + `OPENAI_MODEL_DEEP=gpt-4o-2024-11-20`
+    (⚠️ deep/premium 必須釘 16384-輸出快照如 `-2024-11-20`,裸 `gpt-4o` 輸出上限 4096 → max_completion_tokens 5000/12000 會 400)。
+  - `docker-compose.override.yml`:`services.oracle-web.env_file: [.env.production]`(避免改 tracked compose)。
+  - 寫 key 勿留命令列字面量:本機 `... | ssh root@SG 'umask 077; cat > .../.env.production'`(從 vault 管線進 stdin)。
+- **付費牆**:`/api/interpret` premium → 402(免費需訂閱);light/deep 放行;每日計量待 Supabase store。
+- 磁碟:每次 build 約 +2G;SG 已 86%,定期 `docker image prune -f`;留意空間。
 - 遷 EU 機:同一份 compose/nginx/手冊,把主機與 DNS 換成 EU 即可。
 - 與既有 `sg-deploy.sh` 整合(test gate→healthcheck→smoke→rollback→通知)為後續優化;
-  本手冊為首次手動上線的最小安全路徑。
+  本手冊為手動上線的最小安全路徑。
