@@ -445,4 +445,41 @@ export const MAP_THEMES: MapTheme[] = [
       { zh: "伴手禮", en: "famous souvenir", desc: "知名伴手禮" },
     ],
   },
+  // 觀光客二分法（必/獵奇）— 套用到 玩(必去/秘境)、買(必買)、拍(打卡)。食物的 必吃/驚奇 見上方。
+  {
+    key: "mustsee", zh: "必去", emoji: "🌟", enLabel: "must-visit famous attractions", kind: "map",
+    hint: "famous must-visit attractions, top sights and bucket-list places every tourist should see",
+    fallback: [
+      { zh: "必去景點", en: "must-visit attraction", desc: "必去景點" },
+      { zh: "熱門地標", en: "popular landmark", desc: "熱門地標" },
+      { zh: "名勝", en: "famous scenic spot", desc: "知名名勝" },
+    ],
+  },
+  {
+    key: "hidden", zh: "秘境", emoji: "🤫", enLabel: "hidden gem secret spots", kind: "map",
+    hint: "hidden gems, secret off-the-beaten-path spots and lesser-known places that locals love",
+    fallback: [
+      { zh: "私房秘境", en: "hidden gem spot", desc: "私房秘境" },
+      { zh: "在地小景", en: "local secret spot", desc: "在地小景" },
+      { zh: "隱藏巷弄", en: "hidden alley", desc: "隱藏巷弄" },
+    ],
+  },
+  {
+    key: "mustbuy", zh: "必買", emoji: "🎁", enLabel: "must-buy souvenirs and specialties", kind: "map",
+    hint: "must-buy souvenirs, signature local products, famous gifts and shopping specialties tourists take home",
+    fallback: [
+      { zh: "必買伴手禮", en: "must-buy souvenir", desc: "必買伴手禮" },
+      { zh: "在地名產", en: "local famous product", desc: "在地名產" },
+      { zh: "特色小物", en: "local trinket", desc: "特色小物" },
+    ],
+  },
+  {
+    key: "photospot", zh: "打卡", emoji: "📸", enLabel: "instagrammable photo spots", kind: "map",
+    hint: "the most photogenic instagrammable photo spots, scenic viewpoints and iconic backdrops",
+    fallback: [
+      { zh: "打卡熱點", en: "instagram photo spot", desc: "打卡熱點" },
+      { zh: "絕美視角", en: "scenic viewpoint", desc: "絕美視角" },
+      { zh: "網美景點", en: "photogenic backdrop", desc: "網美景點" },
+    ],
+  },
 ];

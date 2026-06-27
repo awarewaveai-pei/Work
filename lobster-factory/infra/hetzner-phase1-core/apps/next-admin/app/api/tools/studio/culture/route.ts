@@ -38,6 +38,10 @@ const LENS_HINTS: Record<string, string> = {
   metro: "metro and subway lines with their colors, major interchange stations and rail transit hubs",
   roadsign: "distinctive road signs, traffic signals, pedestrian markers and transportation symbols characteristic of the country",
   craft: "traditional handicrafts, artisan products, local specialty goods and famous souvenirs",
+  mustsee: "famous must-visit attractions, top sights and bucket-list places every tourist should see",
+  hidden: "hidden gems, secret off-the-beaten-path spots and lesser-known places that locals love",
+  mustbuy: "must-buy souvenirs, signature local products, famous gifts and shopping specialties tourists take home",
+  photospot: "the most photogenic instagrammable photo spots, scenic viewpoints and iconic backdrops",
 };
 
 interface CultureItem {
