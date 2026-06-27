@@ -51,6 +51,7 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
   if (!orgId) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
 
   const ok = await upsertIntent(orgId, { key, label, answerLevel, actionLevel, isSensitive, confidenceThreshold, canaryPct });
+  if (ok) audit(orgId, resolved.role, resolved.source, "cs_intent_upserted", { key, answerLevel, actionLevel, isSensitive });
   return ok ? NextResponse.json({ ok: true, key }) : NextResponse.json({ ok: false, error: "upsert_failed" }, { status: 409 });
 }
 
