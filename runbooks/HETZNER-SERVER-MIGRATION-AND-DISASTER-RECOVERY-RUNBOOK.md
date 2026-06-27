@@ -24,6 +24,43 @@
 
 ---
 
+## §0b 2026-06-27 決策：買哪台 + Chatwoot 先行 + 單台夠不夠（HA 第二台延後）
+
+> **起因**：要上 **Chatwoot 客服**（omnichannel 收件匣，需 ~8GB），實測現有兩台塞不下 —— **EU 8GB 已用 5.7G + 吃 3G swap**、**SG 僅 4GB**。決定**買一台二手 dedicated** 當主力，承載 Chatwoot + 之後整併 EU/SG 全部服務。客服系統決策正本：[`Customer_service_BUILD_PLAN.md`](../agency-os/docs/Customer_service/Customer_service_BUILD_PLAN.md)（U6）。
+>
+> ★ **重要脈絡（只讀本 runbook 會漏掉）**：AI 客服的「大腦」—— cs-engine + RAG + 操作 UI（U0–U5）+ headless widget 程式碼（U4）—— **已建好且上 prod 驗證過**（部署在 SG `lobster-next-admin`，讀 EU Supabase 的 cs_* 表；餵知識→pgvector 已 live 驗證 embed_dim=1536）。本搬家的 **Chatwoot = 該系統 U6（最後一塊）= 收件匣那層**。Chatwoot 裝好後的**接線步驟**（建 AgentBot webhook route 呼叫 `lib/cs` 的 `handleInbound`、widget 把 `MockTransport` 換 `ChatwootTransport`）+ 8 月冷啟動完整接手 → **`agency-os/handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md`**（這份是接手第一讀）。
+
+**選定機型（Serverbörse auction 條件）**：
+
+| 項目 | 選定 | 為什麼 |
+|---|---|---|
+| CPU | Intel **i7-7700**（i7-6700 可）| auction 地板價、4C8T 夠用 |
+| RAM | **64GB** | 塞 Chatwoot + EU 全服務 + 多租戶 headroom（EU 現 8GB 已爆）|
+| 碟 | **2× 512GB SSD**（**絕不 HDD**）| Postgres/ClickHouse/Chatwoot 全是 DB I/O，HDD 會慘；2 顆才能 RAID 1；512 > 256（ClickHouse/上傳會長）|
+| 價 | ~**€48.70/月**（≈NT$1600）| 64GB 地板價；單價比雲端便宜一半多 |
+| 機房 | Falkenstein（FSN）| 與 EU(Helsinki) 異 DC → 未來留一台即天然異地 |
+
+> ⚠️ **絕對金額比現在貴**（EU+SG 雲端 ~€28 → 一台 €48.70），但 RAM 12GB→64GB（5×），單價便宜一半多。省錢靠**搬完退掉雲端兩台**，結算在單台 €48.70（不是疊加）。
+
+**執行順序（關鍵：Chatwoot greenfield 先行，不被 EU 搬移綁架）**：
+```
+1. 買機 → §3 裝 OS + RAID 1 + SMART 驗碟
+2. R2 備份就緒 + §6 還原演練（已驗 2026-06-26）
+3. ★ Chatwoot 先裝（全新服務、無舊資料 → 零搬遷風險）→ 接 cs-engine AgentBot webhook + headless widget
+4. EU 服務（Supabase/Trigger/n8n/Postiz/MainWP/Uptime）照 §5 一台台搬
+5. 驗證 24–48h → 退 EU + SG 兩台雲端
+```
+> **Chatwoot 先行的理由**：它是 greenfield，先上**不碰任何現有東西**、當天可用、客服立刻有家；而搬 Supabase（核心資料層、連 cs-engine 都靠它）是 High-risk 專案（§5）。**搬移風險與 Chatwoot 上線解耦** —— 別為了湊 8GB 趕著搬核心資料。
+
+**單台夠不夠？（HA 第二台延後 — 決策）**：
+- **一台 + RAID 1 + R2 異地備份 = 開始夠用、零資料損失。** 很多公司單台跑多年。
+- 四種失效對照：① 服務當/吃爆記憶體 → Docker 容器隔離 + **per-container 記憶體上限**（裝時設）→ 只那個掛，其他沒事 ② 一碟壞 → **RAID 1 零當機** ③ 資料毀/誤刪 → R2 還原 ④ **整機死（罕見，RAID 已蓋最常見的碟壞）→ 從 R2 還原數小時**（§4，RPO≤24h / RTO≤數小時）。
+- **第二台 hot-standby 延後**：等客戶/營收上來、連「整機死那幾小時」都不能停時再加（重用一台現有雲端當異地備援即可）。**別為 HA 在 day 1 養兩台。**
+
+**Chatwoot 資料納入備份（上線後補）**：Chatwoot 自帶 Postgres（對話 = 唯一真相源）+ Redis（可丟）+ uploads volume。裝好後把 **Chatwoot PG dump + uploads volume** 加進 `backup-eu-stack.sh`（§1 表 🔴/🟡 + §6 演練同步擴充）。
+
+---
+
 ## §1 要備份什麼（EU 實際盤點，2026-06-26）
 
 > 原則：**資料庫用邏輯 dump（pg_dump / mysqldump）**，不是直接複製 data 目錄（live copy 會不一致）。檔案類用 volume / 目錄快照。
@@ -287,7 +324,11 @@ openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -in "$OUT/env.tar.g
 - [x] **演練還原成功一次**（§6 A/C + MainWP/n8n 內容驗證）— 2026-06-26
 - [x] **修 R2 upload WARN**（2026-06-26：`set -a` export 修；實測 10/10 HTTP 200）→ 真 3-2-1 成立
 - [x] 備份失敗會 surface（2026-06-26：`check-backup-health.ps1` 讀 verify 判定，FAILED→AO-RESUME WARN；非 Telegram 而是開工自動報，涵蓋「壞了」+「停了」）
-- [ ] auction 機：雙碟 NVMe + RAID 1 + SMART 健康 + mdadm 告警
+- [ ] 機型已選（§0b 2026-06-27：i7-7700 / 64GB / **2× 512GB SSD** / ~€48.70/月 / FSN）— **待操作者下單**（刷卡非 Claude）
+- [ ] auction 機：雙碟 NVMe/SSD + RAID 1 + SMART 健康 + mdadm 告警
+- [ ] **Chatwoot greenfield 先上**（EU 搬移前；§0b 順序 step 3）→ 接 cs-engine AgentBot webhook + headless widget
+- [ ] **每容器設記憶體上限**（docker-compose `mem_limit`）→ 防一個服務吃爆拖垮全部（EU 現況痛點）
+- [ ] Chatwoot PG dump + uploads volume 納入 `backup-eu-stack.sh`（Chatwoot 上線後；§0b）
 - [x] §4 災難還原指令補齊並驗證（2026-06-26：取備份/解密/還原 DB/volume 確切指令；端到端 R2→解密實測）；§5 DNS step 補齊（§4/§5 剩 step 隨真機演練定稿）
 - [x] **救援鑰匙 off-machine**（2026-06-26 修 DR gap：`R2_API_TOKEN` 原本只在 EU，已鏡像本機 vault；EU 死也下載得到 R2 備份）
 - [x] 所有指向 EU 的 Cloudflare DNS record 清單列出（2026-06-26 live 查證：9 個，見 §5 step 5；含 2 個 DNS-only `remotion-svc`/`video-svc`）
@@ -295,4 +336,4 @@ openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -in "$OUT/env.tar.g
 
 ---
 
-_建立 2026-06-26。維護者：AwareWave。新增/修訂後若納入 runbook 路由，更新 `agency-os/AGENTS.md §問題症狀→Runbook 路由表`。_
+_建立 2026-06-26。修訂 2026-06-27（+§0b：買哪台 + Chatwoot greenfield 先行 + 單台+RAID+R2 夠用、HA 第二台延後；§7 +5 項）。維護者：AwareWave。新增/修訂後若納入 runbook 路由，更新 `agency-os/AGENTS.md §問題症狀→Runbook 路由表`。_
