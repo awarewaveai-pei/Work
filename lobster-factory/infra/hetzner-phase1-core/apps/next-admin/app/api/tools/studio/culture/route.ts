@@ -5,6 +5,7 @@ import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role
 // scripts/generate-culture-curated.mjs). Served first → free + instant, no LLM call.
 // The live LLM below is only the long-tail fallback for combos not in this file.
 import CURATED_ITEMS from "../../../../../lib/studio/culture-curated.json";
+import { toTraditional } from "../../../../../lib/ai/to-traditional";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -123,12 +124,13 @@ No markdown, no explanation, no extra text - just the raw JSON array.`;
       return NextResponse.json({ ok: false, error: "Parsed value is not an array" }, { status: 502 });
     }
 
+    // Live AI often returns Simplified despite the prompt → force Traditional (zh/desc only).
     const items: CultureItem[] = parsed
       .filter((it): it is Record<string, unknown> => typeof it === "object" && it !== null)
       .map((it) => ({
-        zh: typeof it.zh === "string" ? it.zh.replace(/\s+/g, " ").trim().slice(0, 24) : "",
+        zh: typeof it.zh === "string" ? toTraditional(it.zh.replace(/\s+/g, " ").trim().slice(0, 24)) : "",
         en: typeof it.en === "string" ? it.en.replace(/\s+/g, " ").trim().slice(0, 80) : "",
-        desc: typeof it.desc === "string" ? it.desc.replace(/\s+/g, " ").trim().slice(0, 40) : "",
+        desc: typeof it.desc === "string" ? toTraditional(it.desc.replace(/\s+/g, " ").trim().slice(0, 40)) : "",
       }))
       .filter((it) => it.zh && it.en)
       .slice(0, 12);

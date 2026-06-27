@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { extractJsonArray, generateCheapJsonText } from "../../../../../lib/ai/cheap-json";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
+import { toTraditional } from "../../../../../lib/ai/to-traditional";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -74,7 +75,7 @@ No markdown, no explanation, no extra text - just the raw JSON array.`;
       return NextResponse.json({ ok: false, error: "Parsed value is not an array" }, { status: 502 });
     }
 
-    const safe = topics.filter((t): t is string => typeof t === "string").slice(0, 10);
+    const safe = topics.filter((t): t is string => typeof t === "string").map((t) => toTraditional(t)).slice(0, 10);
     return NextResponse.json({ ok: true, topics: safe, model: result.model });
   } catch (err) {
     return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
