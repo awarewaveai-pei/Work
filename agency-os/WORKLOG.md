@@ -4,6 +4,68 @@
 
 ## 2026-06-27
 
+### feat(canvas): 畫布自動適應一頁 + Adobe 快捷鍵 + 工具列整合進右側欄（3 commit，皆部署+真機驗）
+
+[任務理解] 使用者要 /tools/canvas：① 上方工具列整合進右側欄讓圖案畫面更大 ② Adobe 快捷鍵(Ctrl+Z/Delete) ③ 畫布高度不超過一頁、自動適應、實際尺寸不變(如 Banner Studio)。
+
+[已修改]
+- Commit A(05f9f62f): 自動適應 + 快捷鍵 + lib/studio/canvas-fit.ts(新,純模組)+test
+  - fitDisplayScale=min(8,availW/realW,availH/realH);relayoutCanvas() 量測容器寬+高→setZoom/
+    setDimensions 把顯示塞進視窗,realW/realH 不變(export 全解析度)。init seed 800 meta;
+    window resize/container width/ready 都重 fit;DPI 變更 gate sizedByCanvasApply。
+  - keydown: Ctrl+Z undo / Ctrl+Shift+Z·Ctrl+Y redo / Delete·Backspace 刪除 / Esc 取消模式;
+    防呆 input/textarea/select/contentEditable/isEditing 不攔截。
+  - critic 修: addText/addShape 改 real-space 置中(縮放後 getWidth()=顯示px 會偏);fresh 空白
+    畫布上傳圖→採原圖尺寸(export 全解析度)。
+- Commit B(470e10ba): 工具列整合進右側欄(純 JSX 搬移,無 handler 改)
+  - 刪畫布上方工具列+文字樣式 div;右側欄頂改:常駐快捷列(↩️↪️/＋文字/＋圖/🗑/✂️裁切+裁切套用/取消)
+    + 🧰更多工具(收合:形狀/鎖定/群組/筆刷/橡皮擦/設計檔)+ ✏️文字樣式(收合:字型/顏色/字級)。
+    上方淨空→canvas top 181→86px→畫布吃滿更多高度。
+
+[驗證結果](R0 四動作 ×2 commit)
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 (兩 commit)
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test | exit=0 (A:537+7 canvas-fit / B:546)
+- REALTEST_EVIDENCE: tool=mcp__Claude_in_Chrome | cmd=真機 e2e 部署版 470e10ba | exit=0 |
+  ① 自動適應: 1000×2000 高圖→顯示 248×495(塞進 695 視窗),real 2000 保留 scale1(全解析度)
+  ② 快捷鍵: addText 置中 (500,1000)✓、Delete 刪除✓、Ctrl+Z 復原✓
+  ③ 工具列: canvas top 181→86px(畫布變大)、快捷列+更多工具+文字樣式 panel 皆在側欄、上方無工具列
+- REVIEW_DONE: critic=Deep ×2 | A findings=0c/1m/3n(Major 置中已修;export 4 路徑 clean);
+  B findings=0c/0m/0n+2s(機械比對 17 handlers/19 disabled/全 conditional byte-identical,無漏鈕)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=fitDisplayScale|relayoutCanvas|更多工具|text-style|accept= | hits=0
+
+[部署事故+VBC] sg-deploy 第一次跑時 git pull 拉到 7155d73e(我 470e10ba push 尚未傳到 GitHub)→
+建了舊版。**VBC 發現 .deployed-commit≠我的 commit → 查 /root/Work git 確認 origin/main 已含
+470e10ba → 重跑 deploy → fast-forward 到 470e10ba 重建 → 真機確認新版。** 關鍵教訓:sg-deploy
+build context = /root/Work(git pull origin main),非 /root/lobster-phase1(stale rsync 副本);
+驗證部署務必比對 /root/Work HEAD 與 .deployed-commit,別只 grep stale 副本。
+
+[剩餘風險] 捲動(非resize)時 availH 不重算;quick-bar 無框靠 gap 分隔(目視 OK)。
+[rollback] git revert 470e10ba / 05f9f62f。
+
+
+### feat(cs): AI 全自動客服系統 — 規劃→建置 U0–U5→操作 UI→prod 上線 + live 實測 ✅（U6 Chatwoot 待買機）
+
+[範圍] 從零規劃並建置 AI 全自動客服（omnichannel 統一收件匣 + RAG 自動回 + CIS 企業識別）。**SSOT**：`docs/Customer_service/`（BUILD_PLAN=執行細節、automation_plan v2.1=設計、_competitive_research=頂規競品、_uiux_design=清新自然+CIS）。本條為主 WORKLOG 摘要+證據鏈，逐單元細節見 BUILD_PLAN §5。
+
+[已建並上 prod]
+- **U0** migration 0051（8 表 + pgvector + hnsw + RPC + service-role RLS）**已 apply EU prod**
+- **U1** cs-engine `lib/cs/`（護欄→分類→RAG hybrid→生成→supervisor→雙軸自主 L0-L2×A0-A2；money/身分 code 硬閘；Claude→Gemini failover）
+- **U2** CIS「品牌識別」tab（重用既有 `brandColors` + `BrandVoiceProfile`，不重造）
+- **U3** 客服 tab + 頂層「客服」section + 每租戶 kill-switch（critic 抓 inert→接進 engine 修）
+- **U5** eval/護欄 harness（golden set + LLM-judge + 畢業 gate；critic 抓 lossy→改跑真實 `decideAnswerAction`）
+- **操作 UI**（餵知識庫 + 建意圖 CRUD route + ClientHubTabs 表單）
+- **U4** headless 清新自然 widget 程式碼完成（等 U6 接 live）
+
+[驗證結果]
+- `- REALTEST_EVIDENCE: tool=SSH | cmd=psql apply 0051 + sg-deploy.sh next-admin | exit=0`（8表/8RLS/RPC + 容器 healthy 7s + HTTP smoke 全 200 + commit 024b52c3）
+- `- REALTEST_EVIDENCE: tool=Chrome+SSH | cmd=瀏覽器 prod 餵知識+建意圖 → EU prod psql 驗 | embed_dim=1536 / sources=1 / intents=1`（OpenAI embeddings→pgvector 全鏈在 production 跑通）
+- `- REVIEW_DONE: critic=Deep | 每單元（U1 2-High / U2 0C / U3 1C / U5 2C / 操作UI 0C2M / widget 0C4M）findings 全修`
+- `- BUGHUNT_DONE: scope=lobster-factory | grep=csEnabled|decideAnswerAction|brandKit|品牌識別 | hits=一致`
+- R2 證據錨點 commit：`9abdb0bf`(U0–U5) / `91d026c4`(U4)；部署 commit `024b52c3`
+- 附帶修：`provision-staging/route.ts` 並行 bad-merge 重複 5 函式擋全專案 tsc → 刪舊 copy → tsc 0、部署通
+
+[剩餘] **U6 Chatwoot 載體 = 唯一剩項**，等買二手 dedicated（決策：買哪台/Chatwoot greenfield 先行/單台 RAID+R2 夠用 HA 延後 → `runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md §0b`）。8 通道現實：6 可（Email/Telegram/WhatsApp/Messenger/IG/LINE）、X 不可即時收 DM、Threads 接不了。
+
 ### feat(oracle): 紫微頂規確定性分析引擎 — 對標競品「命盤簡批」深度 + 上線
 
 [任務理解] 操作者指出原紫微只「星名→一段 AI」=半成品,要求頂規。競品的簡批是**確定性規則引擎**:格局判定 + 主星亮度吉凶指數 + 飛宮四化 + 逐宮逐星。補上這套(ROADMAP「中式天花板」)。
