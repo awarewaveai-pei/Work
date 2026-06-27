@@ -24,7 +24,8 @@ const WP_CLI = "php -d memory_limit=256M /usr/local/bin/wp";
 const STAGING_ADMIN_EMAIL = "staging@aware-wave.com";
 
 function toSlug(name: string, siteId: string): string {
-  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 18);
+  // All-CJK names produce an empty base → fall back to "site" so the slug isn't "-<id>".
+  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 18) || "site";
   return `${base}-${siteId.replace(/-/g, "").slice(0, 6)}`;
 }
 
@@ -125,6 +126,22 @@ function buildSeedScript(spec: WebsiteSpec, wpPath: string): string {
   const seoDesc = rm?.meta_description || spec.seo?.meta_description;
   if (seoTitle) L.push(`wpcli post meta update "$HOME_ID" rank_math_title ${shq(seoTitle)} >/dev/null 2>&1 || true`);
   if (seoDesc) L.push(`wpcli post meta update "$HOME_ID" rank_math_description ${shq(seoDesc)} >/dev/null 2>&1 || true`);
+  // Brand colours → Additional CSS via core wp_update_custom_css_post() (theme-agnostic; verified
+  // rendering on the 曦光 site 2026-06-27). Kadence's own palette option storage is undocumented/
+  // fragile, so we tint the key elements (buttons/headings/links/header) with the AI brand palette.
+  const hex = (v: unknown) => (typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : null);
+  const primary = hex(spec.design?.primary_color) ?? hex(spec.plugin_config?.kadence?.global_color_palette?.[0]);
+  const secondary = hex(spec.design?.secondary_color) ?? hex(spec.plugin_config?.kadence?.global_color_palette?.[1]);
+  if (primary) {
+    const sec = secondary ?? primary;
+    const css =
+      `:root{--aw-primary:${primary};--aw-secondary:${sec}}` +
+      `.wp-block-button__link,.wp-element-button{background-color:${primary} !important;border-color:${primary} !important;color:#fff !important}` +
+      `h1,h2,h3,.entry-title,.site-title,.site-branding a{color:${sec} !important}` +
+      `a{color:${primary}}body{--global-palette1:${primary};--global-palette2:${sec}}` +
+      `.site-header-wrap,.site-top-header-wrap{border-top:4px solid ${primary}}`;
+    L.push(`wpcli eval ${shq(`wp_update_custom_css_post('${css}');`)}`);
+  }
   L.push(`wpcli option update aw_seed_done 1 >/dev/null`);
   L.push(`echo "AW_SEED_OK home=$HOME_ID pages=${pages.length}"`);
   return L.join("\n");
@@ -150,6 +167,65 @@ async function seedContentFromSpec(conn: SshClient, wpPath: string, websiteSpecI
     return `content seed WARN (code ${res.code}): ${out.replace(/\s+/g, " ").slice(0, 300)}`;
   }
   return `content seeded: ${out.match(/AW_SEED_(OK|SKIP)[^\n]*/)?.[0] ?? "ok"}`;
+}
+
+// Wire a newly-provisioned client into the content toolchain: create a WP Application Password,
+// register a wp_sites row (so SEO Content / Video can target it), and stamp client_config.site_url
+// on the org (the hostname the content tools match on). Without this the built client is invisible
+// to the content tools (connectivity audit 2026-06-27). Idempotent: skips if wp_sites row exists.
+// Best-effort — a wiring failure must NOT fail the provision.
+async function wireClientToContentTools(
+  conn: SshClient,
+  wpPath: string,
+  organizationId: string | undefined,
+  siteName: string,
+  siteUrl: string,
+): Promise<string> {
+  if (!organizationId) return "wiring skipped: no organizationId";
+  const supabase = getSupabaseWriteClient();
+  if (!supabase) return "wiring skipped: no DB client";
+  const cleanUrl = siteUrl.replace(/\/$/, "");
+  try {
+    // Read org metadata first (for the brand colour + to merge site_url later).
+    const { data: org } = await supabase.from("organizations").select("metadata").eq("id", organizationId).single();
+    const meta = (org?.metadata ?? {}) as Record<string, unknown>;
+    const cc = (meta.client_config ?? {}) as Record<string, unknown>;
+    const brandColor = ((cc.brandColors as { primary?: string } | undefined)?.primary) ?? "#5855d0";
+
+    // 1. RESERVE the wp_sites row FIRST (token empty, inactive). `wp_sites` has a unique index on
+    //    lower(url) (0039_wp_sites.sql:18), so a duplicate insert fails atomically (23505) → that
+    //    is our idempotency. Crucially we mint the app-password only AFTER winning this reservation,
+    //    so a concurrent/retry race can never leave an orphaned WP credential.
+    const { error: insErr } = await supabase
+      .from("wp_sites")
+      .insert({ name: siteName, url: cleanUrl, username: "admin", token: "", color: brandColor, active: false });
+    if (insErr) {
+      return (insErr as { code?: string }).code === "23505"
+        ? "wiring skipped: wp_sites row already exists"
+        : `wiring WARN: wp_sites insert failed (${insErr.message})`;
+    }
+
+    // 2. We won the reservation → mint a WP Application Password (REST API auth for content tools).
+    const apRes = await sshExec(
+      conn,
+      `docker exec -u www-data lobster-wordpress bash -c "${WP_CLI} user application-password create admin 'AwareWave Content' --path=${wpPath}/ --porcelain 2>/dev/null"`,
+    );
+    const appPw = apRes.stdout.trim().split(/\s+/).pop() ?? "";
+    if (appPw.length < 16) {
+      // Roll back the placeholder so a later re-run can complete wiring cleanly.
+      await supabase.from("wp_sites").delete().eq("url", cleanUrl).eq("token", "");
+      return `wiring WARN: app-password not created (code ${apRes.code})`;
+    }
+
+    // 3. Activate the row with the real token + stamp client_config.site_url (content tools
+    //    hostname-match on this; spread preserves brandColors and all other client_config keys).
+    await supabase.from("wp_sites").update({ token: appPw, active: true }).eq("url", cleanUrl);
+    meta.client_config = { ...cc, site_url: cleanUrl };
+    await supabase.from("organizations").update({ metadata: meta }).eq("id", organizationId);
+    return "wired: site_url + wp_sites + app-password";
+  } catch (e) {
+    return `wiring error: ${e instanceof Error ? e.message : String(e)}`;
+  }
 }
 
 // mode:"seed" — a short, synchronous seed-only call. The persistent Trigger.dev `create-wp-site`
@@ -308,6 +384,10 @@ export async function POST(request: Request) {
     );
     const pluginsOk = pluginResult.code === 0;
 
+    // Wire this client into the content toolchain (app-password + wp_sites + site_url) so SEO
+    // Content / Video can target it. Synchronous (~2s) and best-effort — never fails the provision.
+    const wiringNote = await wireClientToContentTools(conn, wpPath, organizationId, siteName, stagingSiteUrl);
+
     // Content seeding is intentionally NOT done here. Seeding adds ~15-25s of WP-CLI work which,
     // on top of the ~71-90s provision, blew past the hosting-adapter / Cloudflare ~95-100s ceiling
     // → the run was marked "blocked" (verified live 2026-06-27). And next-admin can NOT run
@@ -323,6 +403,7 @@ export async function POST(request: Request) {
       provisioningNotes: [
         ...(!themeOk ? ["WARN: Kadence theme install had issues"] : []),
         ...(!pluginsOk ? ["WARN: some plugins may not have installed"] : [`Plugins installed: ${allPlugins.join(", ")}`]),
+        wiringNote,
         `staging/${slug}/ — subdirectory install on aware-wave.com`,
         `DB: ${dbName} on lobster-wordpress-db`,
         `Admin: admin / ${adminPass}`,

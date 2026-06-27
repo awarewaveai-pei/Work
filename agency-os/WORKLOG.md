@@ -4,6 +4,25 @@
 
 ## 2026-06-27
 
+### feat(provisioning): 建站完善 — slug fallback + 品牌色注入 + 內容工具 wiring
+
+[任務理解] live UI 實測建出曦光藝術工作室站後，操作者要把瑕疵補完整：① slug 全中文名變 `-894881` ② AI 品牌色沒套進站（樸素）③ 連通性稽核發現新客戶對 SEO Content/Video「不存在」。
+
+[現況分析] ① `toSlug` 全中文→空 base。② Kadence 全域色盤 option 儲存格式不明（實機查 `kadence_global_palette`/`theme_mods_kadence` 皆空）。③ 內容工具讀 `wp_sites` + 用 `organizations.metadata.client_config.site_url` hostname 配對，但 onboarding 兩者都沒寫（只寫 brandColors）。
+
+[已修改]（全在 `app/api/internal/hosting/provision-staging/route.ts`）
+- **slug fallback**：`toSlug` 空 base → "site"（`site-<id>` 不再 `-<id>`）。
+- **品牌色**：buildSeedScript 加 Additional CSS via 核心 `wp_update_custom_css_post()`（主題無關，**實機驗證會渲染**：曦光站按鈕變 #b5822a 琥珀金、標題 #3d2e1e）；色取自 spec.design.primary/secondary_color，hex 驗證。
+- **wiring**：`wireClientToContentTools`（provision path 同步呼叫，best-effort）— **reserve-first**：先 insert wp_sites 佔位（靠 `wp_sites_url_unique` lower(url) index 原子 idempotency）→ 贏了才 mint WP app-password → activate row + 寫 `client_config.site_url`。**先佔位後建憑證 = 無孤兒 app-password**（critic Major 修正：原 check-then-insert 在 race 會留孤兒憑證）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | 品牌色 CSS 經 base64→stdin→`wp_update_custom_css_post` 套上曦光站(-894881) → playwright 截圖確認按鈕/標題/header 變品牌色（CSS_SET_BYTES=400）; app-password create 實測回 24 字元; wp_sites unique index 確認(0039:18)。**完整 e2e（部署後新建站驗品牌色+wp_sites+內容工具看得到）接著做。**
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=1m(reserve-first 修畢)/其餘 5 項 PASS（secret 存法一致、app-pw parsing、metadata merge 不 clobber、best-effort 隔離、CSS shq 跳脫淨）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=wireClientToContentTools|wp_update_custom_css_post|wp_sites | hits: wp_sites 消費端=`api/content/sites`(讀 token 不外洩); 0050 標 plaintext legacy(但內容工具仍讀 wp_sites，寫這裡才生效，待 client_credentials 遷移時同步)
+
+[剩餘風險] ① 套圖（image_requirements）未做——需獨立 async image-gen step（同步 seed 會撞 timeout）。② wp_sites.token plaintext（與既有 POST handler 一致；0050 legacy 註記，待整體遷 vault）。③ Approvals/Repair Center 仍不讀 ops_action_runs（稽核列出，本次未補）。
+[rollback] git revert；全 best-effort/optional，未部署無 runtime 影響。
+
 ### feat(canvas): /tools/canvas 兩批改善 — 裁切/面板永顯/畫布貼合/存檔修復(Batch1) + 每圖記調色/滑桿undo(Batch2)
 
 [任務理解] 使用者要 /tools/canvas 更完善。先做唯讀邏輯審查列出問題,再依其指示分兩批實作+部署+真機驗證。
