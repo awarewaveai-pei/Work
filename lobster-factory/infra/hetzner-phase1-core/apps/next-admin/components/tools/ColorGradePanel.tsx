@@ -33,11 +33,14 @@ export function useColorGrade() {
     (key: keyof ColorGradeState, value: number) => setState((s) => ({ ...s, [key]: value })),
     []
   );
+  // Replace the whole state at once — used to restore a selected image's saved grade (per-image #3).
+  // Merge over NEUTRAL_STATE so a partial/old persisted shape (missing keys) can't yield undefined.
+  const setAll = useCallback((next: Partial<ColorGradeState>) => setState({ ...NEUTRAL_STATE, ...next }), []);
   const reset = useCallback(() => setState(NEUTRAL_STATE), []);
   const params = useMemo<ColorGradeParams>(() => stateToParams(state), [state]);
   const cssFilter = useMemo(() => toCssFilter(state), [state]);
   const neutral = useMemo(() => isNeutralState(state), [state]);
-  return { state, set, reset, params, cssFilter, neutral };
+  return { state, set, setAll, reset, params, cssFilter, neutral };
 }
 
 type SliderRow = {

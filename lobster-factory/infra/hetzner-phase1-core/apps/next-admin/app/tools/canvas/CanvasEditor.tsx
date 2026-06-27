@@ -22,6 +22,7 @@ import type { Canvas as FabricCanvas, FabricObject } from "fabric";
 import { roleHeader } from "@/lib/ops-role";
 import { CANVAS_NAME_KEY, toCanvasSrc, readCanvasSource } from "@/components/tools/canvas-handoff";
 import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
+import type { ColorGradeState } from "@/lib/studio/color-grade";
 import { buildFabricImageFilters, buildPresetFilters, buildEffectFilters, PRESET_FILTERS } from "./fabric-filters";
 import SidebarPanel from "@/components/tools/SidebarPanel";
 import FontLibrary from "@/components/tools/FontLibrary";
@@ -39,6 +40,20 @@ const EDGE_PREVIEWS = EDGE_MASK_STYLES.map((s) => ({
 }));
 
 type SaveState = "idle" | "saving" | "saved" | "error";
+
+/**
+ * 🎨 Per-image adjustment bundle (#3). Stored on each Fabric image as `.adj` (registered in
+ * customProperties so it survives toJSON / design save / load). Re-selecting an image restores
+ * exactly these sliders — switching images no longer carries the previous image's settings.
+ */
+type AdjState = {
+  grade: ColorGradeState;
+  presetId: string | null;
+  removeWhite: boolean;
+  vibrance: number; temp: number; blur: number; noise: number;
+  contrast: number; shadows: number; highlights: number;
+  exposure: number; clarity: number; dehaze: number;
+};
 
 /**
  * Font choices for the text tool. Each value is a CSS font-family STACK (canvas 2D / Fabric
@@ -150,6 +165,22 @@ export default function CanvasEditor() {
   const [objStrokeColor, setObjStrokeColor] = useState("#000000");
   const [objStrokeWidth, setObjStrokeWidth] = useState(4);
   const grade = useColorGrade(); // 修圖積木 applied to the selected image via Fabric filters
+  // 🎨 per-image adjustments (#3/#4): userEditRef holds the OBJECT the user is editing (not a bool).
+  // The debounced undo snapshot fires only when the filter effect's active object === userEditRef,
+  // so a programmatic selection-sync (loadAdj) can never consume a flag meant for another object
+  // (critic: object identity eliminates the async wrong-image / stuck-flag race class).
+  const userEditRef = useRef<FabricObject | null>(null);
+  const snapTimerRef = useRef<number | null>(null);
+  // Mark the currently-active object as the target of a genuine user edit (called by slider handlers).
+  const markEdit = useCallback(() => { userEditRef.current = fabricRef.current?.getActiveObject() ?? null; }, []);
+  // Reset all adjustment sliders to neutral (programmatic — does NOT markEdit). Used after a bake
+  // replaces the image (new pixels already include the look) and after undo/redo restore.
+  const resetAdjToNeutral = useCallback(() => {
+    grade.reset();
+    setPresetId(null); setRemoveWhite(false);
+    setVibrance(0); setTemp(0); setBlurv(0); setNoisev(0);
+    setContrast(0); setShadows(0); setHighlights(0); setExposure(0); setClarity(0); setDehaze(0);
+  }, [grade]);
 
   // Container width for dynamic MAX_DISP — keeps canvas within viewport without horizontal scroll.
   const [containerWidth, setContainerWidth] = useState(650);
@@ -177,7 +208,7 @@ export default function CanvasEditor() {
       // Persist our custom `name` (圖層改名) through toJSON/loadFromJSON + design save. Must be set
       // class-level BEFORE any object is created (Fabric v7 concatenates customProperties into
       // every toObject; per-instance assignment is ignored). Confirmed: fabricjs discussion #10176.
-      (fabric.FabricObject as unknown as { customProperties: string[] }).customProperties = ["name"];
+      (fabric.FabricObject as unknown as { customProperties: string[] }).customProperties = ["name", "adj"];
 
       canvas = new fabric.Canvas(canvasElRef.current, {
         backgroundColor: "#ffffff",
@@ -186,6 +217,24 @@ export default function CanvasEditor() {
       fabricRef.current = canvas;
       canvasMetaRef.current = null; // fresh canvas → no print-size meta (critic: stale meta would corrupt export)
       setReady(true);
+
+      // 🎨 Load an image's saved adjustments into the sliders (or neutral). Sets state WITHOUT
+      // touching userEditRef, so the filter effect won't record an undo step for a mere selection.
+      const loadAdj = (adj: AdjState | null) => {
+        if (adj) {
+          adj.grade ? grade.setAll(adj.grade) : grade.reset();
+          setPresetId(adj.presetId ?? null);
+          setRemoveWhite(!!adj.removeWhite);
+          setVibrance(adj.vibrance ?? 0); setTemp(adj.temp ?? 0); setBlurv(adj.blur ?? 0); setNoisev(adj.noise ?? 0);
+          setContrast(adj.contrast ?? 0); setShadows(adj.shadows ?? 0); setHighlights(adj.highlights ?? 0);
+          setExposure(adj.exposure ?? 0); setClarity(adj.clarity ?? 0); setDehaze(adj.dehaze ?? 0);
+        } else {
+          grade.reset();
+          setPresetId(null); setRemoveWhite(false);
+          setVibrance(0); setTemp(0); setBlurv(0); setNoisev(0);
+          setContrast(0); setShadows(0); setHighlights(0); setExposure(0); setClarity(0); setDehaze(0);
+        }
+      };
 
       // Keep the toolbar in sync with the selected text object (and vice-versa).
       const syncFromSelection = () => {
@@ -201,6 +250,8 @@ export default function CanvasEditor() {
           setTextSelected(false);
         }
         setImageSelected(o?.type === "image");
+        // 🎨 per-image adjustments (#3): load THIS image's saved sliders, or neutral for non-images.
+        loadAdj(o?.type === "image" ? ((o as unknown as { adj?: AdjState }).adj ?? null) : null);
         // reflect THIS image's own applied edge style (or none) in the edge-mask panel
         setEdgeStyleApplied((o as unknown as { edgeStyle?: EdgeMaskId } | null)?.edgeStyle ?? null);
         setAnySelected(!!o);
@@ -230,6 +281,7 @@ export default function CanvasEditor() {
       canvas.on("selection:cleared", () => {
         setTextSelected(false);
         setImageSelected(false);
+        loadAdj(null); // no image selected → sliders show neutral (not the last image's settings)
         setEdgeStyleApplied(null);
         setAnySelected(false);
         setMultiSelected(false);
@@ -299,6 +351,8 @@ export default function CanvasEditor() {
 
     return () => {
       disposed = true;
+      // Cancel any pending debounced undo snapshot so it can't fire against a disposing canvas.
+      if (snapTimerRef.current) { window.clearTimeout(snapTimerRef.current); snapTimerRef.current = null; }
       // dispose() detaches DOM listeners; ref cleared so a fast remount can't double-dispose.
       // Park the (async) dispose promise so the next mount can await it before reinit.
       const c = fabricRef.current;
@@ -332,10 +386,26 @@ export default function CanvasEditor() {
       target.applyFilters();
       canvas.requestRenderAll();
       setSaveState("idle"); // filter/adjust change is an edit → re-enable save
+      // 🎨 persist these params on THIS image (#3) so re-selecting it restores the exact sliders.
+      (obj as unknown as { adj?: AdjState }).adj = {
+        grade: { ...grade.state }, presetId, removeWhite,
+        vibrance, temp, blur: blurv, noise: noisev,
+        contrast, shadows, highlights, exposure, clarity, dehaze,
+      };
+      // ↩️ #4 record ONE undo step after the user stops dragging (debounced). Only when THIS object
+      // is the genuine edit target — never for selection-sync (loadAdj) or undo/redo restore.
+      if (userEditRef.current === obj && !restoringRef.current) {
+        userEditRef.current = null;
+        if (snapTimerRef.current) window.clearTimeout(snapTimerRef.current);
+        snapTimerRef.current = window.setTimeout(() => { snapTimerRef.current = null; snapshot(); }, 450);
+      }
     });
     return () => {
       cancelled = true;
     };
+    // snapshot intentionally omitted from deps (declared later; stable useCallback). grade.state read
+    // via grade.params dep. userEditRef/snapTimerRef are refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [grade.params, presetId, removeWhite, vibrance, blurv, noisev, temp, contrast, shadows, highlights, exposure, clarity, dehaze]);
 
   const addText = useCallback(() => {
@@ -511,10 +581,11 @@ export default function CanvasEditor() {
         });
         c.requestRenderAll();
         refreshLayers();
+        resetAdjToNeutral(); // loadFromJSON clears selection → sliders back to neutral (no stale display)
         restoringRef.current = false; // only now are all object:added events done
       });
     },
-    [refreshLayers]
+    [refreshLayers, resetAdjToNeutral]
   );
   const undo = useCallback(() => {
     if (undoStack.current.length < 2) return;
@@ -1053,6 +1124,7 @@ export default function CanvasEditor() {
       canvas.remove(img);
       canvas.add(baked);
       canvas.setActiveObject(baked);
+      resetAdjToNeutral(); // baked pixels include the look → sliders/adj reset (no stale carry-over)
       canvas.requestRenderAll();
       refreshLayers();
     } catch (err) {
@@ -1060,7 +1132,7 @@ export default function CanvasEditor() {
     } finally {
       setGenBusy(false);
     }
-  }, [posterLevels, refreshLayers]);
+  }, [posterLevels, refreshLayers, resetAdjToNeutral]);
 
   // 🖼 擴圖 Outpaint — extend the selected image with flux-fill-pro's outpaint presets (no mask,
   // no coordinate math). Sends the natural-res image + prompt + preset; replaces with the larger
@@ -1098,6 +1170,7 @@ export default function CanvasEditor() {
       canvas.add(ext);
       canvas.centerObject(ext);
       canvas.setActiveObject(ext);
+      resetAdjToNeutral(); // outpainted result is fresh pixels → reset sliders/adj
       canvas.requestRenderAll();
       refreshLayers();
     } catch (err) {
@@ -1105,7 +1178,7 @@ export default function CanvasEditor() {
     } finally {
       setGenBusy(false);
     }
-  }, [outpaintPrompt, outpaintDir, refreshLayers]);
+  }, [outpaintPrompt, outpaintDir, refreshLayers, resetAdjToNeutral]);
 
   // ✂️ 邊緣遮罩 — mask the selected image through a brush/grunge shape → transparent PNG. Mirrors
   // posterizeSelected (natural-res dataURL → process → swap, keep transform). Masks from a stored
@@ -1146,6 +1219,7 @@ export default function CanvasEditor() {
       canvas.remove(img);
       canvas.add(baked);
       canvas.setActiveObject(baked);
+      resetAdjToNeutral(); // edge-masked result is fresh pixels → reset sliders/adj
       canvas.requestRenderAll();
       refreshLayers();
       setEdgeStyleApplied(styleId);
@@ -1154,7 +1228,7 @@ export default function CanvasEditor() {
     } finally {
       setGenBusy(false);
     }
-  }, [edgeAmount, refreshLayers]);
+  }, [edgeAmount, refreshLayers, resetAdjToNeutral]);
 
   // 💾 設計檔（可再編輯）— export the full canvas JSON (custom `name` included via customProperties)
   // so a design can be reloaded and keep editing. Client-only: download a .design.json blob.
@@ -1328,6 +1402,7 @@ export default function CanvasEditor() {
       canvas.remove(img);
       canvas.add(cleaned);
       canvas.setActiveObject(cleaned);
+      resetAdjToNeutral(); // inpaint result is fresh pixels → reset sliders/adj
       inpaintImgRef.current = null;
       canvas.isDrawingMode = false;
       // Detach the path:created listener (critic Major #1 — success path must not leak it).
@@ -1347,7 +1422,7 @@ export default function CanvasEditor() {
     } finally {
       setInpaintBusy(false);
     }
-  }, [maskMode, fillPrompt]);
+  }, [maskMode, fillPrompt, resetAdjToNeutral]);
 
   /** Flatten the canvas to a PNG data URL (codebase convention — see file header). */
   const exportPng = useCallback((): string | null => {
@@ -1415,6 +1490,7 @@ export default function CanvasEditor() {
     const canvas = fabricRef.current;
     const obj = canvas?.getActiveObject() as { type?: string; toDataURL?: (o?: Record<string, unknown>) => string } | null;
     if (!canvas || !obj || obj.type !== "image" || !obj.toDataURL) return;
+    markEdit(); // auto-adjust is a user edit → undoable + persisted to img.adj
     const dataUrl = obj.toDataURL({ format: "png", multiplier: 1, withoutTransform: true });
     const img = new Image();
     img.onerror = () => setError("自動對比失敗：無法解碼圖片");
@@ -1452,6 +1528,7 @@ export default function CanvasEditor() {
     const canvas = fabricRef.current;
     const obj = canvas?.getActiveObject() as { type?: string; toDataURL?: (o?: Record<string, unknown>) => string } | null;
     if (!canvas || !obj || obj.type !== "image" || !obj.toDataURL) return;
+    markEdit(); // auto-adjust is a user edit → undoable + persisted to img.adj
     const dataUrl = obj.toDataURL({ format: "png", multiplier: 1, withoutTransform: true });
     const img = new Image();
     img.onerror = () => setError("自動色彩失敗：無法解碼圖片");
@@ -1821,7 +1898,7 @@ export default function CanvasEditor() {
           <>
           {/* 3 個獨立可拖面板：調色 / 濾鏡效果 / AI 去除 */}
           <SidebarPanel id="grade" title="🎨 調色 / 色階 Levels" defaultPos={{ x: 816, y: 328 }} width={272} defaultCollapsed>
-            <ColorGradePanel state={grade.state} onSet={grade.set} onReset={grade.reset} neutral={grade.neutral} />
+            <ColorGradePanel state={grade.state} onSet={(k, v) => { markEdit(); grade.set(k, v); }} onReset={() => { markEdit(); grade.reset(); }} neutral={grade.neutral} />
           </SidebarPanel>
 
           {/* 🎛 調整 Adjustments — PS-style contrast / shadows / highlights + auto corrections */}
@@ -1842,7 +1919,7 @@ export default function CanvasEditor() {
                     <span>{row.label}</span>
                     <span style={{ opacity: 0.7, fontVariantNumeric: "tabular-nums" }}>{row.v > 0 ? `+${row.v}` : `${row.v}`}</span>
                   </span>
-                  <input type="range" min={row.min} max={row.max} value={row.v} onChange={(e) => row.set(Number(e.target.value))} style={{ width: "100%" }} />
+                  <input type="range" min={row.min} max={row.max} value={row.v} onChange={(e) => { markEdit(); row.set(Number(e.target.value)); }} style={{ width: "100%" }} />
                 </label>
               ))}
             </div>
@@ -1861,7 +1938,7 @@ export default function CanvasEditor() {
                     <span>{row.label}</span>
                     <span style={{ opacity: 0.7, fontVariantNumeric: "tabular-nums" }}>{row.v > 0 ? `+${row.v}` : `${row.v}`}</span>
                   </span>
-                  <input type="range" min={row.min} max={row.max} value={row.v} onChange={(e) => row.set(Number(e.target.value))} style={{ width: "100%" }} />
+                  <input type="range" min={row.min} max={row.max} value={row.v} onChange={(e) => { markEdit(); row.set(Number(e.target.value)); }} style={{ width: "100%" }} />
                 </label>
               ))}
             </div>
@@ -1873,7 +1950,7 @@ export default function CanvasEditor() {
                 <button
                   className="btn-secondary"
                   style={{ fontSize: 12, fontWeight: presetId === null ? 700 : 400 }}
-                  onClick={() => setPresetId(null)}
+                  onClick={() => { markEdit(); setPresetId(null); }}
                 >
                   原圖
                 </button>
@@ -1882,14 +1959,14 @@ export default function CanvasEditor() {
                     key={p.id}
                     className="btn-secondary"
                     style={{ fontSize: 12, fontWeight: presetId === p.id ? 700 : 400 }}
-                    onClick={() => setPresetId(presetId === p.id ? null : p.id)}
+                    onClick={() => { markEdit(); setPresetId(presetId === p.id ? null : p.id); }}
                   >
                     {p.label}
                   </button>
                 ))}
               </div>
               <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                <input type="checkbox" checked={removeWhite} onChange={(e) => setRemoveWhite(e.target.checked)} />
+                <input type="checkbox" checked={removeWhite} onChange={(e) => { markEdit(); setRemoveWhite(e.target.checked); }} />
                 ✂️ 去白底（免費，近白色變透明）
               </label>
               {/* 影像效果積木：自然飽和 / 高斯模糊 / 雜訊 */}
@@ -1901,7 +1978,7 @@ export default function CanvasEditor() {
               ].map((row) => (
                 <label key={row.label} style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 2 }}>
                   <span style={{ display: "flex", justifyContent: "space-between" }}><span>{row.label}</span><span style={{ opacity: 0.7 }}>{row.v}</span></span>
-                  <input type="range" min={row.min} max={row.max} value={row.v} onChange={(e) => row.set(Number(e.target.value))} />
+                  <input type="range" min={row.min} max={row.max} value={row.v} onChange={(e) => { markEdit(); row.set(Number(e.target.value)); }} />
                 </label>
               ))}
             </div>
