@@ -30,6 +30,7 @@ import { posterizeDataUrl } from "@/lib/studio/posterize";
 // Pure-data import only (NOT generative-fill.ts — that uses Buffer/process.env, server-only).
 import { OUTPAINT_PRESETS, OUTPAINT_LABELS, type OutpaintPreset } from "@/lib/studio/outpaint-presets";
 import { EDGE_MASK_STYLES, applyEdgeMask, buildMaskSvg, type EdgeMaskId } from "@/lib/studio/edge-mask";
+import { fitDisplayScale } from "@/lib/studio/canvas-fit";
 
 // Edge-mask chip previews (asset → PNG maskUrl; procedural → tiny SVG). Computed once at import.
 const EDGE_PREVIEWS = EDGE_MASK_STYLES.map((s) => ({
@@ -75,6 +76,7 @@ const FONT_OPTIONS: { label: string; value: string }[] = [
 function isTextObject(o: { type?: string } | null | undefined): boolean {
   return !!o && (o.type === "i-text" || o.type === "text" || o.type === "textbox");
 }
+
 
 export default function CanvasEditor() {
   const canvasElRef = useRef<HTMLCanvasElement | null>(null);
@@ -215,7 +217,9 @@ export default function CanvasEditor() {
         preserveObjectStacking: true,
       });
       fabricRef.current = canvas;
-      canvasMetaRef.current = null; // fresh canvas → no print-size meta (critic: stale meta would corrupt export)
+      // Default 800×800 document so the auto-fit (relayoutCanvas) has a real size to scale from even
+      // before a handoff/upload. Export uses these realW/realH. (Was null → no auto-fit on direct visit.)
+      canvasMetaRef.current = { realW: 800, realH: 800, dispScale: 1, dpi: szDpi };
       setReady(true);
 
       // 🎨 Load an image's saved adjustments into the sliders (or neutral). Sets state WITHOUT
@@ -322,9 +326,12 @@ export default function CanvasEditor() {
           // preview down to fit; exportPng() restores the full source dimensions.
           const realW = Math.max(1, img.width || 800);
           const realH = Math.max(1, img.height || 800);
-          const maxDisplay = 650;
-          // Allow zoom > 1 so small documents fill the workspace (like Photoshop). Export stays at realW/realH.
-          const dispScale = Math.min(8, maxDisplay / Math.max(realW, realH));
+          // Fit the preview into the visible workspace (width AND height) so it never exceeds one
+          // viewport. Export stays at realW/realH. Subsequent resizes go through relayoutCanvas().
+          const el = canvasContainerRef.current;
+          const availW = el ? Math.max(200, el.clientWidth - 4) : 650;
+          const availH = el && typeof window !== "undefined" ? Math.max(220, window.innerHeight - el.getBoundingClientRect().top - 20) : 650;
+          const dispScale = fitDisplayScale(realW, realH, availW, availH);
           canvas.setZoom(dispScale);
           canvas.setDimensions({
             width: Math.round(realW * dispScale),
@@ -413,9 +420,13 @@ export default function CanvasEditor() {
     if (!canvas) return;
     void import("fabric").then((fabric) => {
       if (fabricRef.current !== canvas) return; // unmounted/disposed mid-import
+      // Center in REAL/object space (objects are zoom-independent); the canvas may now be zoomed by
+      // auto-fit, so getWidth() (display px) would mis-place the text (critic Major).
+      const m = canvasMetaRef.current;
+      const z = canvas.getZoom() || 1;
       const text = new fabric.IText("雙擊編輯文字", {
-        left: canvas.getWidth() / 2,
-        top: canvas.getHeight() / 2,
+        left: m ? m.realW / 2 : canvas.getWidth() / z / 2,
+        top: m ? m.realH / 2 : canvas.getHeight() / z / 2,
         originX: "center",
         originY: "center",
         fontSize: textSize,
@@ -680,8 +691,26 @@ export default function CanvasEditor() {
     return `🔷 ${t ?? "物件"}`;
   }
 
-  // 📐 畫布尺寸 / DPI — cm/mm → px (round(cm·dpi/2.54)); resize the Fabric canvas to a scaled
-  // display (≤ MAX_DISP) and store real px + scale so export can render at full DPI.
+  // 🖥 自動把畫布「顯示」縮放到塞進可用視窗（寬+高），實際輸出尺寸(canvasMetaRef.realW/H)不變 →
+  // 畫布永遠不超過一頁高（參考 Banner Studio）。export 仍走 realW/realH 全解析度。
+  const relayoutCanvas = useCallback(() => {
+    const canvas = fabricRef.current as unknown as {
+      setZoom: (z: number) => void; setDimensions: (d: { width: number; height: number }) => void; requestRenderAll: () => void;
+    } | null;
+    const m = canvasMetaRef.current;
+    const el = canvasContainerRef.current;
+    if (!canvas || !m || !el || typeof window === "undefined") return;
+    const availW = Math.max(200, el.clientWidth - 4);
+    const availH = Math.max(220, window.innerHeight - el.getBoundingClientRect().top - 20);
+    const dispScale = fitDisplayScale(m.realW, m.realH, availW, availH);
+    canvas.setZoom(dispScale);
+    canvas.setDimensions({ width: Math.round(m.realW * dispScale), height: Math.round(m.realH * dispScale) });
+    canvasMetaRef.current = { ...m, dispScale };
+    canvas.requestRenderAll();
+  }, []);
+
+  // 📐 畫布尺寸 / DPI — cm/mm → px (round(cm·dpi/2.54)); set the real document size + rescale objects,
+  // then relayoutCanvas() fits the display to the viewport. Export renders at full DPI (realW/realH).
   const applyCanvasSize = useCallback(() => {
     const canvas = fabricRef.current as unknown as {
       getWidth: () => number;
@@ -693,12 +722,9 @@ export default function CanvasEditor() {
     } | null;
     if (!canvas) return;
     sizedByCanvasApply.current = true;
-    const MAX_DISP = containerWidth;
     const cm = (v: number) => (szUnit === "mm" ? v / 10 : v);
     const realW = Math.max(1, Math.round((cm(szW) * szDpi) / 2.54));
     const realH = Math.max(1, Math.round((cm(szH) * szDpi) / 2.54));
-    // Allow zoom > 1 so small documents fill the workspace. Export always uses realW/realH.
-    const dispScale = Math.min(8, MAX_DISP / Math.max(realW, realH));
 
     // The OLD working width in real-coordinate space (before this resize). First time = the
     // current element width ÷ current zoom; after a prior sizing = the stored realW.
@@ -719,15 +745,14 @@ export default function CanvasEditor() {
         oo.setCoords();
       });
     }
-    // Work in real-coordinate space, zoomed down to fit the display element.
-    canvas.setZoom(dispScale);
-    canvas.setDimensions({ width: Math.round(realW * dispScale), height: Math.round(realH * dispScale) });
-    canvasMetaRef.current = { realW, realH, dispScale, dpi: szDpi };
+    // Store the real document size, then fit the display to the viewport (width+height).
+    canvasMetaRef.current = { realW, realH, dispScale: canvasMetaRef.current?.dispScale ?? 1, dpi: szDpi };
+    relayoutCanvas();
+    const ds = canvasMetaRef.current?.dispScale ?? 1;
     const cmW = +((realW / szDpi) * 2.54).toFixed(2);
     const cmH = +((realH / szDpi) * 2.54).toFixed(2);
-    setSzInfo(`真實 ${realW}×${realH}px @${szDpi}DPI = ${cmW}×${cmH}cm（預覽 ${Math.round(dispScale * 100)}%）`);
-    canvas.requestRenderAll();
-  }, [szW, szH, szUnit, szDpi, containerWidth]);
+    setSzInfo(`真實 ${realW}×${realH}px @${szDpi}DPI = ${cmW}×${cmH}cm（預覽 ${Math.round(ds * 100)}%）`);
+  }, [szW, szH, szUnit, szDpi, relayoutCanvas]);
 
   // 📐 符合畫布 / 填滿畫布 — snap the selected image to the artboard (contain / cover). The artboard
   // (canvas) is the authoritative output size; images are content that conform to it. Fixes the
@@ -858,10 +883,21 @@ export default function CanvasEditor() {
     snapshot();
   }, [refreshLayers, snapshot]);
 
-  // Auto-apply when DPI dropdown changes (select = discrete complete action, no debounce needed).
-  // szW/szH keep the manual button so user can finish typing before applying.
+  // Auto-apply when DPI dropdown changes — only if the user has engaged 套用畫布尺寸 (otherwise the
+  // default/handoff canvas would be reshaped to the 9×5.4cm szW/szH on a mere DPI tweak).
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (ready && canvasMetaRef.current) applyCanvasSize(); }, [szDpi]);
+  useEffect(() => { if (ready && canvasMetaRef.current && sizedByCanvasApply.current) applyCanvasSize(); }, [szDpi]);
+
+  // 🖥 Re-fit the display whenever the canvas becomes ready or the viewport resizes (height too).
+  useEffect(() => {
+    if (ready && canvasMetaRef.current) relayoutCanvas();
+  }, [ready, relayoutCanvas]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onResize = () => { if (canvasMetaRef.current) relayoutCanvas(); };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [relayoutCanvas]);
 
   // ResizeObserver: track canvas container width so MAX_DISP stays within viewport.
   useEffect(() => {
@@ -877,10 +913,10 @@ export default function CanvasEditor() {
     return () => ro.disconnect();
   }, []);
 
-  // Re-apply 書布尺寸 when container resizes — only if user has already clicked 套用書布.
+  // Re-fit display when the canvas container width changes (sidebar/window). Real size unchanged.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (ready && canvasMetaRef.current && sizedByCanvasApply.current) applyCanvasSize();
+    if (ready && canvasMetaRef.current) relayoutCanvas();
   }, [containerWidth]);
 
   // ✏️ 自由繪筆 / 🧹 橡皮擦 — change the canvas interaction mode. Eraser = a PencilBrush path
@@ -964,9 +1000,19 @@ export default function CanvasEditor() {
       void import("fabric").then(async (fabric) => {
         const img = await fabric.FabricImage.fromURL(dataUrl, { crossOrigin: "anonymous" });
         if (fabricRef.current !== canvas) return; // unmounted/disposed mid-import/decode
-        // Scale relative to the REAL artboard, not the zoomed display width. getWidth() returns
-        // display px (e.g. 650) but objects live in real-px space, so the old calc landed uploads
-        // tiny on a high-DPI artboard. Land at ~70% of the artboard, centred in real coords.
+        // Fresh untouched canvas (no objects, no explicit 套用畫布尺寸) → adopt the image's native
+        // size as the artboard so export is FULL resolution ("new from image"), not the 800 default.
+        const fresh = canvas.getObjects().length === 0 && !sizedByCanvasApply.current;
+        if (fresh && img.width && img.height) {
+          canvasMetaRef.current = { realW: img.width, realH: img.height, dispScale: 1, dpi: szDpi };
+          img.set({ left: img.width / 2, top: img.height / 2, originX: "center", originY: "center" });
+          canvas.add(img);
+          canvas.setActiveObject(img);
+          relayoutCanvas(); // fit the now image-sized artboard into the viewport
+          setSzInfo(`來源 ${img.width}×${img.height}px（預覽 ${Math.round((canvasMetaRef.current?.dispScale ?? 1) * 100)}%）`);
+          return;
+        }
+        // Otherwise place into the EXISTING artboard at ~70%, centred in real coords (zoom-independent).
         const m = canvasMetaRef.current;
         const z = canvas.getZoom() || 1;
         const aw = m ? m.realW : canvas.getWidth() / z;
@@ -981,7 +1027,7 @@ export default function CanvasEditor() {
       });
     };
     reader.readAsDataURL(file);
-  }, []);
+  }, [relayoutCanvas, szDpi]);
 
   const deleteSelected = useCallback(() => {
     const canvas = fabricRef.current;
@@ -1022,8 +1068,11 @@ export default function CanvasEditor() {
     if (!canvas) return;
     void import("fabric").then((fabric) => {
       if (fabricRef.current !== canvas) return;
-      const cx = canvas.getWidth() / 2;
-      const cy = canvas.getHeight() / 2;
+      // Center in REAL/object space (zoom-independent) so shapes land centered on the auto-fit canvas.
+      const m = canvasMetaRef.current;
+      const z = canvas.getZoom() || 1;
+      const cx = m ? m.realW / 2 : canvas.getWidth() / z / 2;
+      const cy = m ? m.realH / 2 : canvas.getHeight() / z / 2;
       const common = { fill: "transparent", stroke: "#111111", strokeWidth: 4 };
       let shape: FabricObject;
       if (kind === "rect") {
@@ -1586,6 +1635,36 @@ export default function CanvasEditor() {
     a.click();
     a.remove();
   }, [exportPng, editName]);
+
+  // ⌨️ Adobe 風快捷鍵：Ctrl/⌘+Z 復原、Ctrl+Shift+Z / Ctrl+Y 重做、Delete/Backspace 刪除、Esc 取消
+  // 當前模式。防呆：在輸入框/下拉打字、或畫布內編輯文字(i-text editing)時不攔截，讓打字/刪字正常。
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || t?.isContentEditable) return;
+      const ao = fabricRef.current?.getActiveObject() as { isEditing?: boolean } | null;
+      if (ao?.isEditing) return; // editing canvas text → let keys reach the text
+      const mod = e.ctrlKey || e.metaKey;
+      const k = e.key.toLowerCase();
+      if (mod && k === "z" && !e.shiftKey) {
+        e.preventDefault();
+        if (ready && canUndo && drawMode === "off" && !inpaintMode && !cropMode) undo();
+      } else if (mod && (k === "y" || (k === "z" && e.shiftKey))) {
+        e.preventDefault();
+        if (ready && canRedo && drawMode === "off" && !inpaintMode && !cropMode) redo();
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        if (cropMode || inpaintMode || drawMode !== "off") return;
+        if (ready && anySelected) { e.preventDefault(); deleteSelected(); }
+      } else if (e.key === "Escape") {
+        if (cropMode) cancelCrop();
+        else if (inpaintMode) exitInpaint(false);
+        else if (drawMode !== "off") applyDrawMode("off");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [ready, canUndo, canRedo, drawMode, inpaintMode, cropMode, anySelected, undo, redo, deleteSelected, cancelCrop, exitInpaint, applyDrawMode]);
 
   return (
     <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
