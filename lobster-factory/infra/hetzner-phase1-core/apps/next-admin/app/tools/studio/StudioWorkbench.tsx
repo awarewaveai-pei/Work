@@ -573,6 +573,14 @@ export default function StudioWorkbench() {
     if (stored) setCultureDyn((prev) => (prev[key] ? prev : { ...prev, [key]: stored }));
   }, [region, cultureLens, mapMode, mapTheme]);
 
+  // 🔍 Lightbox: close on Escape while an image is zoomed.
+  useEffect(() => {
+    if (!zoomImage) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setZoomImage(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [zoomImage]);
+
   const onUploadRefs = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const room = Math.max(0, maxRefs - refImages.length);

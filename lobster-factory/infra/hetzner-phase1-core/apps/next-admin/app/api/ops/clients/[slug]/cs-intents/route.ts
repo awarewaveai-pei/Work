@@ -70,5 +70,6 @@ export async function DELETE(request: Request, context: { params: Promise<{ slug
   if (!orgId) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
 
   const ok = await deleteIntent(orgId, key);
+  if (ok) audit(orgId, resolved.role, resolved.source, "cs_intent_deleted", { key });
   return ok ? NextResponse.json({ ok: true }) : NextResponse.json({ ok: false, error: "delete_failed" }, { status: 409 });
 }

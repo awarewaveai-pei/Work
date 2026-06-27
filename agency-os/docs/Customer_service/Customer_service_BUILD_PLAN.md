@@ -138,6 +138,14 @@ per-client hub  /ops/clients/[slug]   （既有 7 tab：內容工具/整合/佈�
 - **BUGHUNT**：safeOpen wired / content items 解包 / reject_subscription。`- BUGHUNT_DONE: scope=lobster-factory | grep=safeOpen|content_attributes|reject_subscription | hits=一致`
 - 待 U6 接 live：MockTransport→ChatwootTransport(config)；WS onclose 自動重連（critic Minor）；inbox_identifier/baseUrl 從 CIS 設定帶入。
 
+**2026-06-27 — 操作介面（data-entry）✅ — 操作者反映「沒有填資料的頁面」**
+- 根因：先前 /ops/cs 與客戶「客服」分頁皆**唯讀**（只顯示數量+kill-switch），沒有建意圖/餵知識庫的入口 → 0/0/0 無從輸入。
+- 建：`db.ts` 加 upsertIntent/deleteIntent/listKnowledgeSources/deleteKnowledgeSource → index 導出；`cs-intents/route.ts`（POST upsert + DELETE）+ `cs-knowledge/route.ts`（GET list + POST ingestKnowledge + DELETE）；`CustomerServiceTab` 擴成可操作（**餵知識庫表單**：標題+內容→切塊+向量化；**建意圖表單**：key/名稱/答覆 L0-L2/行動 A0-A2/敏感；逐列刪除）。操作位置=**客戶中心 →「客服」分頁**；CIS 在「品牌識別」分頁。
+- **REALTEST**：`tsc` 0；vitest 49/49。`- REALTEST_EVIDENCE: tool=Bash | cmd=tsc 0 + vitest 49 | exit=0` ｜ live 端到端（實際餵資料→RAG 檢索）需 next-admin 部署 + `OPENAI_API_KEY`。
+- **REVIEW**：critic → **0 Critical**（auth/多租戶/RLS/onConflict/cascade/XSS 全乾淨；middleware strip 偽造 role header）+ 2 Major + 1 Minor → **修**：knowledge body 上限 10 萬字（防 OpenAI 失控成本/硬失敗）+ ingestKnowledge embed 失敗 rollback source row（不留 0-塊 ghost）+ 4 mutation 加 ops_audit_events parity。`- REVIEW_DONE: critic=Deep | verdict=pass(修後) | findings=0c/2m/1minor`
+- **BUGHUNT**：audit/rollback/cap 接線；helper 各檔一致。`- BUGHUNT_DONE: scope=lobster-factory | grep=ops_audit_events|deleteKnowledgeSource|body_too_long | hits=一致`
+- **附帶修**：`app/api/internal/hosting/provision-staging/route.ts` 並行 session bad-merge 把 5 個 content-seed helper 定義兩次（405 行）→ 全專案 tsc 10 錯擋部署。刪舊 Copy（保留 2026-06-27 SG 驗證的新版 `shq(unknown)`+MAX_SEED_PAGES）→ 307 行、tsc 0。非 CS 檔但擋 build，line-precise sed 刪除，備份 `/d/tmp/provision-staging-backup.ts`。
+
 ---
 
 ## §6 每單元驗證標準（R0 四動作，逐單元）

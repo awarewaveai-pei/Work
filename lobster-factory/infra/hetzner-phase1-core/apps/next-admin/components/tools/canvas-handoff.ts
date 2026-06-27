@@ -54,6 +54,7 @@ async function idbGet(key: string): Promise<string | null> {
       const r = tx.objectStore(IDB_STORE).get(key);
       r.onsuccess = () => resolve((r.result as string | undefined) ?? null);
       r.onerror = () => reject(r.error);
+      tx.onabort = () => reject(tx.error); // don't hang readCanvasSource() if the read tx aborts
     });
   } finally {
     db.close();

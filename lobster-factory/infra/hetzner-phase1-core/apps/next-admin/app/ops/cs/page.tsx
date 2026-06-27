@@ -55,8 +55,9 @@ export default async function CustomerServiceOverview() {
           <li>✅ 資料層 migration 0051（8 表 + pgvector + RPC）已上 EU prod</li>
           <li>✅ cs-engine <code>lib/cs/</code>（RAG / 護欄 / tool-loop / 雙軸自主）</li>
           <li>✅ per-client CIS「品牌識別」+「客服」分頁（客戶中心）</li>
+          <li>✅ <strong>操作介面：客戶中心 →「客服」分頁</strong>（餵知識庫 + 建意圖/設自動化分級 + kill-switch）；CIS 在「品牌識別」分頁</li>
           <li>⏳ Chatwoot 載體（headless widget + AgentBot webhook）— 待搬大記憶體機</li>
-          <li>⏳ 知識庫上傳 / 意圖畢業流 / eval 儀表板（子頁建置中）</li>
+          <li>⏳ eval 儀表板 / 意圖畢業流（跨客戶總覽子頁建置中）</li>
         </ul>
       </div>
 
