@@ -1748,12 +1748,16 @@ export default function CanvasEditor() {
           <canvas ref={canvasElRef} width={800} height={800} />
         </div>
 
-        {/* 右側工具欄：固定寬、超出時捲動 */}
+        {/* 右側工具欄：固定寬、sticky 黏住視窗並吃滿可視高度（畫布很高時整頁會捲，sticky 讓工具欄
+            永遠完整在畫面內、用滿垂直空間 → 一次看到更多工具，少捲動）。 */}
         <div
           style={{
             width: 300,
             flexShrink: 0,
-            maxHeight: "calc(100vh - 130px)",
+            position: "sticky",
+            top: 12,
+            alignSelf: "flex-start",
+            maxHeight: "calc(100vh - 24px)",
             overflowY: "auto",
             display: "flex",
             flexDirection: "column",
