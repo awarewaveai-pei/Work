@@ -17,7 +17,7 @@ interface ProductionPrefill {
   topic: string;
   articleTitle: string;
   articleContent: string;
-  scenes?: { narration: string; imagePrompt: string }[];
+  scenes?: { narration: string; imagePrompt: string; visual?: "custom" | "broll"; brollKeyword?: string }[];
   mediaMode?: string;
   duration?: number;
   customScenes?: number;

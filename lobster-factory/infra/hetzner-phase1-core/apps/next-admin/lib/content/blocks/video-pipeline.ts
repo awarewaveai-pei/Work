@@ -213,7 +213,12 @@ export async function prepareScenes(
     /** 要輸出的格式（["16x9","9x16","4x5"] 子集）→ 每格式各生一組原生圖。省略 = 全三格式。 */
     formats?: string[];
     /** 深層接力：前製腳本已寫好的場景（台詞+畫面）→ 跳過 Claude 重生，直接用這些。 */
-    providedScenes?: { narration: string; imagePrompt: string }[];
+    providedScenes?: {
+      narration: string;
+      imagePrompt: string;
+      visual?: "custom" | "broll";
+      brollKeyword?: string;
+    }[];
     onProgress?: (step: string) => void;
   },
   anthropicKey: string,
@@ -227,8 +232,8 @@ export async function prepareScenes(
       id: i + 1,
       narration: (s.narration || "").trim(),
       image_prompt: (s.imagePrompt || "").trim() || (s.narration || "").trim(),
-      broll_keyword: "",
-      visual: "custom" as const,
+      broll_keyword: (s.brollKeyword || "").trim(),
+      visual: s.visual === "broll" ? "broll" as const : "custom" as const,
     }));
     title = (input.articleTitle || input.topic || "影片").trim();
   } else {

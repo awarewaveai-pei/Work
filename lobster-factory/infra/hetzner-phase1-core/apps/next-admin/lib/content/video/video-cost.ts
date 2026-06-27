@@ -54,6 +54,8 @@ export interface VideoCostConfig {
   imageModel?: string;
   /** 輸出格式數（每格式各生一組原生圖 → 自訂 AI 圖成本 ×此數）。預設 1。 */
   formatCount?: number;
+  /** 前製腳本接力時文字腳本已產生，影片生產區不應重複計腳本生成成本。 */
+  includeScriptCost?: boolean;
 }
 
 export interface VideoCostLine {
@@ -87,6 +89,7 @@ export function computeVideoCost(
 
   for (const step of steps) {
     if (!step.enabled) continue;
+    if (step.id === "script" && cfg.includeScriptCost === false) continue;
     let unitUsd = 0;
     let count = 1;
 

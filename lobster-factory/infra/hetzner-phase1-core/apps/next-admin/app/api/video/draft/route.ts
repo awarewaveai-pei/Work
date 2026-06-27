@@ -29,7 +29,7 @@ interface DraftBody {
   /** 要輸出的格式（["16x9","9x16","4x5"] 子集）→ 每格式各生一組原生圖。省略 = 全三格式。 */
   outputFormats?: string[];
   /** 深層接力：前製腳本場景（台詞→旁白、畫面→生圖提示）→ 跳過 Claude 重生。 */
-  scenes?: { narration: string; imagePrompt: string }[];
+  scenes?: { narration: string; imagePrompt: string; visual?: "custom" | "broll"; brollKeyword?: string }[];
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {

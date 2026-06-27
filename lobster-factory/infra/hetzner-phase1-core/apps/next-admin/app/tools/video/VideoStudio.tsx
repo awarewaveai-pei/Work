@@ -138,7 +138,7 @@ interface VideoStudioInitial {
   articleTitle?: string;
   articleContent?: string;
   /** 深層接力：前製腳本場景（台詞→旁白、畫面→生圖提示）→ 直接出片，不重生。 */
-  scenes?: { narration: string; imagePrompt: string }[];
+  scenes?: { narration: string; imagePrompt: string; visual?: "custom" | "broll"; brollKeyword?: string }[];
   /** 前製腳本帶入的素材模式（pexels-video / pexels-all / __ai__） */
   mediaMode?: string;
   /** 前製腳本帶入的目標時長（分鐘） */
@@ -161,7 +161,7 @@ interface ScriptRemotionPrefill {
 
 export default function VideoStudio({ initial, remotionInitial }: { initial?: VideoStudioInitial; remotionInitial?: ScriptRemotionPrefill } = {}) {
   // ── Config knobs ──
-  const [totalScenes, setTotalScenes] = useState(6);
+  const [totalScenes, setTotalScenes] = useState(initial?.scenes?.length ?? 6);
   const [customScenes, setCustomScenes] = useState(initial?.customScenes ?? 3);
   const [imageModel, setImageModel] = useState(() => {
     const m = initial?.mediaMode;
@@ -175,6 +175,7 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
   });
   const [targetMinutes, setTargetMinutes] = useState(initial?.duration ?? 1);
   const [voiceModelId, setVoiceModelId] = useState(VOICE_MODELS[0].id);
+  const isPexels = imageModel === "pexels-video" || imageModel === "pexels-all";
   // 輸出比例（預設只 16:9，WP/YouTube 用；需社群格式時手動勾選）。每比例各自原生生成 → 圖片成本/時間 ×已選數。
   const [selectedFormats, setSelectedFormats] = useState<Set<string>>(new Set(["16x9"]));
   const orderedFormats = VIDEO_FORMAT_CHOICES.filter((f) => selectedFormats.has(f));
@@ -183,12 +184,14 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
   // 深層接力：前製腳本場景（若有）→ 生成草稿時直接用，跳過 Claude 重生。
   const [providedScenes] = useState(initial?.scenes ?? []);
 
-  // 成本：providedScenes 路徑每場都 Flux 自訂圖、無 B-roll → 以腳本場景數估算；否則用滑桿值。
+  const providedCustomScenes = providedScenes.filter((s) => s.visual !== "broll").length;
+  const providedBrollScenes = Math.max(0, providedScenes.length - providedCustomScenes);
+  // 成本：前製腳本接力已經完成文字生成，影片區只估素材/配音/渲染；Pexels 模式不計 AI 圖。
   const costBreakdown = useMemo(
     () => providedScenes.length > 0
-      ? computeVideoCost({ totalScenes: providedScenes.length, customScenes: providedScenes.length, brollScenes: 0, imageModel, formatCount: orderedFormats.length })
+      ? computeVideoCost({ totalScenes: providedScenes.length, customScenes: isPexels ? 0 : providedCustomScenes, brollScenes: isPexels ? providedScenes.length : providedBrollScenes, imageModel, formatCount: orderedFormats.length, includeScriptCost: false })
       : computeVideoCost({ totalScenes, customScenes: Math.min(customScenes, totalScenes), brollScenes, imageModel, formatCount: orderedFormats.length }),
-    [providedScenes, totalScenes, customScenes, brollScenes, imageModel, orderedFormats.length],
+    [providedScenes, providedCustomScenes, providedBrollScenes, isPexels, totalScenes, customScenes, brollScenes, imageModel, orderedFormats.length],
   );
 
   // ── Generate form ── (initial = 從 ScriptForge「送去生產」帶入的腳本預填)
@@ -209,6 +212,7 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
   // draft 各格式原生圖組（render 時送回；主格式那組以 draftScenes.imageUrl 覆蓋以反映編輯/重生/上傳）。
   const [draftFormatUrls, setDraftFormatUrls] = useState<Record<string, string[]>>({});
   const [draftFormats, setDraftFormats] = useState<string[]>([]);
+  const [draftPreviewFormat, setDraftPreviewFormat] = useState("");
   const [draftR2Keys, setDraftR2Keys] = useState<string[]>([]);
   const [draftTitle, setDraftTitle] = useState("");
   const [regenIds, setRegenIds] = useState<Set<number>>(new Set()); // 場景忙碌中的 id（單張重生 或 上傳中）
@@ -317,6 +321,9 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
     if (pollRef.current) clearTimeout(pollRef.current);
     setDraftLoading(true);
     setDraftScenes([]);
+    setDraftFormatUrls({});
+    setDraftFormats([]);
+    setDraftPreviewFormat("");
     setDraftR2Keys([]);
     setGenError("");
     setGenResult(null);
@@ -363,6 +370,7 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
       })));
       setDraftFormatUrls(j.formatImageUrls);
       setDraftFormats(j.formats);
+      setDraftPreviewFormat(primaryFmt);
       setDraftR2Keys(j.r2Keys ?? []);
       setDraftTitle(j.title ?? topic.trim());
     } catch (e: unknown) {
@@ -373,10 +381,19 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
     }
   }
 
+  function handleDraftPreviewFormatChange(fmt: string) {
+    const urls = draftFormatUrls[fmt];
+    if (!urls) return;
+    setDraftPreviewFormat(fmt);
+    setDraftScenes((prev) => prev.map((s, i) => ({ ...s, imageUrl: urls[i] ?? s.imageUrl })));
+  }
+
   // ── Single-image regenerate handler (draft review) ──
   async function handleRegenerateImage(sceneId: number) {
     const scene = draftScenes.find((s) => s.id === sceneId);
     if (!scene || regenIds.has(sceneId)) return;
+    const sceneIndex = draftScenes.findIndex((s) => s.id === sceneId);
+    const activeFormat = draftPreviewFormat || draftFormats[0];
     setRegenIds((prev) => new Set(prev).add(sceneId));
     setGenError("");
     try {
@@ -390,12 +407,18 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
           brollKeyword: scene.brollKeyword,
           visual: scene.visual,
           oldImageUrl: scene.imageUrl,
-          format: draftFormats[0], // 重生圖比例對齊 draft 預覽的主格式
+          format: activeFormat,
         }),
       });
       const j = (await res.json()) as { ok: boolean; imageUrl?: string; error?: string };
       if (j.ok && j.imageUrl) {
         setDraftScenes((prev) => prev.map((s) => (s.id === sceneId ? { ...s, imageUrl: j.imageUrl! } : s)));
+        if (activeFormat && sceneIndex >= 0) {
+          setDraftFormatUrls((prev) => ({
+            ...prev,
+            [activeFormat]: (prev[activeFormat] ?? []).map((url, i) => (i === sceneIndex ? j.imageUrl! : url)),
+          }));
+        }
       } else {
         setGenError(j.error ?? "圖片重新生成失敗");
       }
@@ -410,6 +433,8 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
   async function handleUploadAsset(sceneId: number, file: File) {
     const scene = draftScenes.find((s) => s.id === sceneId);
     if (!scene || regenIds.has(sceneId)) return;
+    const sceneIndex = draftScenes.findIndex((s) => s.id === sceneId);
+    const activeFormat = draftPreviewFormat || draftFormats[0];
     const isVideo = file.type === "video/mp4";
     const capMb = isVideo ? 45 : 12; // 與後端 + nginx /api/ 50M 對齊
     if (file.size > capMb * 1048576) { setGenError(`檔案過大（上限 ${capMb}MB）`); return; }
@@ -423,6 +448,12 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
       const j = (await res.json()) as { ok: boolean; imageUrl?: string; error?: string };
       if (j.ok && j.imageUrl) {
         setDraftScenes((prev) => prev.map((s) => (s.id === sceneId ? { ...s, imageUrl: j.imageUrl! } : s)));
+        if (activeFormat && sceneIndex >= 0) {
+          setDraftFormatUrls((prev) => ({
+            ...prev,
+            [activeFormat]: (prev[activeFormat] ?? []).map((url, i) => (i === sceneIndex ? j.imageUrl! : url)),
+          }));
+        }
       } else {
         setGenError(j.error ?? "上傳失敗");
       }
@@ -442,8 +473,8 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
     setGenStep("提交渲染中…");
     setGenError("");
     try {
-      // 主格式那組以當前 draftScenes.imageUrl 覆蓋（反映編輯/重生/上傳）；其餘格式用初版原生圖。
-      const primaryFmt = draftFormats[0];
+      // 目前預覽比例那組以 draftScenes.imageUrl 覆蓋（反映編輯/重生/上傳）；其他比例保留各自原生圖。
+      const primaryFmt = draftPreviewFormat || draftFormats[0];
       const formatImageUrls: Record<string, string[]> = { ...draftFormatUrls };
       if (primaryFmt) formatImageUrls[primaryFmt] = draftScenes.map((s) => s.imageUrl);
       const res = await fetch("/api/video/render-draft", {
@@ -513,7 +544,6 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
 
   const isLoading = genStatus === "loading";
   const isBusy = isLoading || draftLoading;
-  const isPexels = imageModel === "pexels-video" || imageModel === "pexels-all";
   const canGenerate = (topic.trim().length > 0 || providedScenes.length > 0) && !isBusy;
 
   // suppress unused warning for handleGenerate (kept for backward compat)
@@ -556,7 +586,7 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
           {/* Hint banner — full width */}
           {providedScenes.length > 0 ? (
             <div style={{ ...videoConfigWidthStyle, background: "var(--intake-success-bg)", border: "1px solid var(--green)", borderRadius: 8, padding: "10px 12px", fontSize: 12.5, color: "var(--badge-green-text)", lineHeight: 1.6 }}>
-              已從前製腳本帶入 <b>{providedScenes.length}</b> 個場景。調整下方設定後，按「生成草稿」出片。
+              已從前製腳本帶入 <b>{providedScenes.length}</b> 個場景。影片區只設定素材、配音與輸出比例；內容量請回腳本區調整。
             </div>
           ) : (
             <div style={{ ...videoConfigWidthStyle, background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: "9px 12px", fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.6 }}>
@@ -584,6 +614,9 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
               <DraftEditor
                 scenes={draftScenes}
                 title={draftTitle}
+                formats={draftFormats}
+                activeFormat={draftPreviewFormat || draftFormats[0] || ""}
+                onChangeFormat={handleDraftPreviewFormatChange}
                 onChangeScene={(id, narration) =>
                   setDraftScenes((prev) => prev.map((s) => s.id === id ? { ...s, narration } : s))
                 }
@@ -706,18 +739,24 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
                       value={customScenes} onChange={setCustomScenes}
                     />
                   )}
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>時間長度</span>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>{targetMinutes} 分鐘</span>
+                  {providedScenes.length > 0 ? (
+                    <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.6 }}>
+                      影片長度由前製腳本旁白與 TTS 決定；要改成更長/更短，請回腳本區調整場景數或重寫腳本。
                     </div>
-                    <input type="range" min={1} max={10} step={0.5} value={targetMinutes}
-                      onChange={e => setTargetMinutes(Number(e.target.value))}
-                      style={{ width: "100%", accentColor: "var(--accent)" }} disabled={isBusy} />
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--text-muted)" }}>
-                      <span>1 分</span><span>5 分</span><span>10 分</span>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>時間長度</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>{targetMinutes} 分鐘</span>
+                      </div>
+                      <input type="range" min={1} max={10} step={0.5} value={targetMinutes}
+                        onChange={e => setTargetMinutes(Number(e.target.value))}
+                        style={{ width: "100%", accentColor: "var(--accent)" }} disabled={isBusy} />
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--text-muted)" }}>
+                        <span>1 分</span><span>5 分</span><span>10 分</span>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* 生圖模型 — AI 模式，廠商 tab + 模型 chip */}
@@ -923,7 +962,7 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
                 <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", marginBottom: 2, textTransform: "uppercase", letterSpacing: "0.05em" }}>目前設定</div>
                 {[
                   { key: "素材", label: isPexels ? (imageModel === "pexels-video" ? "真實影片" : "照片動畫") : (IMAGE_RATES[imageModel]?.label ?? imageModel) },
-                  { key: "場景", label: providedScenes.length > 0 ? `${providedScenes.length} 場（前製腳本）` : `${totalScenes} 場 / ${targetMinutes} 分鐘${!isPexels ? ` / AI ${customScenes}` : ""}` },
+                  { key: "場景", label: providedScenes.length > 0 ? `${providedScenes.length} 場（前製腳本；長度由旁白決定）` : `${totalScenes} 場 / ${targetMinutes} 分鐘${!isPexels ? ` / AI ${customScenes}` : ""}` },
                   { key: "配音", label: VOICE_MODELS.find(v => v.id === voiceModelId)?.label ?? voiceModelId },
                   { key: "比例", label: orderedFormats.map(f => OUTPUT_LABELS[f]?.ratio ?? f).join(" + ") },
                   ...(videoStyle ? [{ key: "風格", label: videoStyle }] : []),
@@ -1079,10 +1118,13 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
 // ─── DraftEditor ──────────────────────────────────────────────────────────────
 
 function DraftEditor({
-  scenes, title, onChangeScene, onBack, onRender, onRegenerate, onUpload, regenIds, disabled, errorMsg,
+  scenes, title, formats, activeFormat, onChangeFormat, onChangeScene, onBack, onRender, onRegenerate, onUpload, regenIds, disabled, errorMsg,
 }: {
   scenes: DraftScene[];
   title: string;
+  formats: string[];
+  activeFormat: string;
+  onChangeFormat: (fmt: string) => void;
   onChangeScene: (id: number, narration: string) => void;
   onBack: () => void;
   onRender: () => void;
@@ -1102,6 +1144,21 @@ function DraftEditor({
         </div>
         <div style={{ fontSize: 11, color: "var(--text-muted)" }}>可編輯旁白後送出渲染</div>
       </div>
+
+      {formats.length > 1 && (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {formats.map((fmt) => {
+            const active = fmt === activeFormat;
+            const meta = OUTPUT_LABELS[fmt];
+            return (
+              <button key={fmt} type="button" onClick={() => onChangeFormat(fmt)} disabled={disabled}
+                style={chipStyle(active)}>
+                {meta?.ratio ?? fmt}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 520, overflowY: "auto" }}>
         {scenes.map((scene, idx) => (

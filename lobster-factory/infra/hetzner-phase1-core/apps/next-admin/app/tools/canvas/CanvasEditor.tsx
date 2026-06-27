@@ -118,6 +118,7 @@ export default function CanvasEditor() {
   const [inpaintBusy, setInpaintBusy] = useState(false);
   const [maskMode, setMaskMode] = useState<"remove" | "fill">("remove"); // what the painted mask does
   const [fillPrompt, setFillPrompt] = useState(""); // 生成填色 prompt (AI fills the masked area)
+  const [outpaintPrompt, setOutpaintPrompt] = useState(""); // 擴圖 prompt — separate state (was shared with fillPrompt → bled across tools)
   const [brushSize, setBrushSize] = useState(34);
   // 🖼 擴圖 outpaint (flux-fill-pro) + 色調分離 posterize — both replace the selected image's pixels.
   const [outpaintDir, setOutpaintDir] = useState<OutpaintPreset>("Zoom out 1.5x");
@@ -137,6 +138,10 @@ export default function CanvasEditor() {
   const [groupSelected, setGroupSelected] = useState(false); // a single Group object
   const inpaintImgRef = useRef<FabricObject | null>(null); // image being edited in inpaint mode
   const inpaintPathsRef = useRef<FabricObject[]>([]); // strokes painted as the mask
+  // ✂️ 裁切 Crop — drag a rect over the selected image, apply → native cropX/cropY window (non-destructive, undoable).
+  const [cropMode, setCropMode] = useState(false);
+  const cropImgRef = useRef<FabricObject | null>(null); // image being cropped
+  const cropRectRef = useRef<FabricObject | null>(null); // the draggable crop rectangle overlay
   // 🎨 物件效果（PS 圖層樣式）— apply to the selected object (text/image/shape).
   const [objOpacity, setObjOpacity] = useState(100);
   const [objBlend, setObjBlend] = useState("normal");
@@ -234,6 +239,7 @@ export default function CanvasEditor() {
       // 🗂 keep the layer panel in sync with the object stack.
       const onStack = () => {
         setLayers([...canvas.getObjects()].reverse());
+        setSaveState("idle"); // any edit re-enables 存入 My Designs (was: stuck disabled after first save)
         snapshot(); // record an undo step on add/remove/modify
       };
       canvas.on("object:added", onStack);
@@ -324,6 +330,7 @@ export default function CanvasEditor() {
       ];
       target.applyFilters();
       canvas.requestRenderAll();
+      setSaveState("idle"); // filter/adjust change is an edit → re-enable save
     });
     return () => {
       cancelled = true;
@@ -650,6 +657,128 @@ export default function CanvasEditor() {
     canvas.requestRenderAll();
   }, [szW, szH, szUnit, szDpi, containerWidth]);
 
+  // 📐 符合畫布 / 填滿畫布 — snap the selected image to the artboard (contain / cover). The artboard
+  // (canvas) is the authoritative output size; images are content that conform to it. Fixes the
+  // "畫布有畫布尺寸、圖有自己尺寸" disconnect the user hit.
+  const fitImageToCanvas = useCallback((mode: "fit" | "fill") => {
+    const canvas = fabricRef.current as unknown as {
+      getActiveObject: () => FabricObject | null;
+      getWidth: () => number; getHeight: () => number; getZoom: () => number;
+      setActiveObject: (o: FabricObject) => void; requestRenderAll: () => void;
+    } | null;
+    if (!canvas) return;
+    const img = canvas.getActiveObject() as
+      | (FabricObject & { type?: string; width?: number; height?: number; set: (p: Record<string, unknown>) => void })
+      | null;
+    if (!img || img.type !== "image") { setError("請先點選一張圖片"); return; }
+    const m = canvasMetaRef.current;
+    const z = canvas.getZoom() || 1;
+    const aw = m ? m.realW : canvas.getWidth() / z; // artboard real width (px)
+    const ah = m ? m.realH : canvas.getHeight() / z;
+    const iw = img.width || 1, ih = img.height || 1;
+    const s = mode === "fill" ? Math.max(aw / iw, ah / ih) : Math.min(aw / iw, ah / ih);
+    img.set({ scaleX: s, scaleY: s, angle: 0, originX: "center", originY: "center", left: aw / 2, top: ah / 2 });
+    (img as unknown as { setCoords: () => void }).setCoords();
+    canvas.setActiveObject(img);
+    canvas.requestRenderAll();
+    snapshot();
+  }, [snapshot]);
+
+  // ✂️ 裁切 Crop — overlay a draggable rect on the selected image; apply sets native cropX/cropY/
+  // width/height (a window into the source) so it's non-destructive and undoable. Requires angle 0
+  // (mirrors inpaint) so the box is axis-aligned. All math in object/real coords → zoom-independent.
+  const enterCrop = useCallback(() => {
+    const canvas = fabricRef.current;
+    const img = canvas?.getActiveObject() as
+      | (FabricObject & { type?: string; width?: number; height?: number; scaleX?: number; scaleY?: number; angle?: number; left?: number; top?: number; originX?: string; originY?: string; set: (p: Record<string, unknown>) => void })
+      | null;
+    if (!canvas || !img || img.type !== "image") { setError("請先點選一張圖片再裁切"); return; }
+    if (((img.angle ?? 0) % 360) !== 0) { setError("請先把圖轉正（角度歸零）再裁切"); return; }
+    applyDrawMode("off");
+    cropImgRef.current = img;
+    const w = (img.width ?? 0) * (img.scaleX ?? 1);
+    const h = (img.height ?? 0) * (img.scaleY ?? 1);
+    const ox = img.originX === "center" ? 0.5 : img.originX === "right" ? 1 : 0;
+    const oy = img.originY === "center" ? 0.5 : img.originY === "bottom" ? 1 : 0;
+    const tlx = (img.left ?? 0) - w * ox;
+    const tly = (img.top ?? 0) - h * oy;
+    void import("fabric").then((fabric) => {
+      if (fabricRef.current !== canvas) return;
+      const rect = new fabric.Rect({
+        left: tlx + w * 0.1, top: tly + h * 0.1, width: w * 0.8, height: h * 0.8,
+        fill: "rgba(99,102,241,0.12)", stroke: "#6366f1", strokeWidth: 2, strokeDashArray: [6, 4],
+        cornerColor: "#6366f1", transparentCorners: false, originX: "left", originY: "top", lockRotation: true,
+      });
+      (rect as unknown as { set: (p: Record<string, unknown>) => void }).set({ name: "__cropRect" });
+      cropRectRef.current = rect as unknown as FabricObject;
+      img.set({ selectable: false });
+      restoringRef.current = true; // don't record the helper rect as an undo step
+      canvas.add(rect as unknown as FabricObject);
+      restoringRef.current = false;
+      canvas.setActiveObject(rect as unknown as FabricObject);
+      setCropMode(true);
+      canvas.requestRenderAll();
+    });
+    // applyDrawMode declared below; body-only ref is fine, and "off" is stable regardless of its deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const cancelCrop = useCallback(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const rect = cropRectRef.current;
+    if (rect) { restoringRef.current = true; canvas.remove(rect); restoringRef.current = false; }
+    (cropImgRef.current as unknown as { set?: (p: Record<string, unknown>) => void } | null)?.set?.({ selectable: true });
+    cropRectRef.current = null;
+    cropImgRef.current = null;
+    setCropMode(false);
+    canvas.requestRenderAll();
+  }, []);
+
+  const applyCrop = useCallback(() => {
+    const canvas = fabricRef.current;
+    const img = cropImgRef.current as
+      | (FabricObject & { width?: number; height?: number; scaleX?: number; scaleY?: number; cropX?: number; cropY?: number; left?: number; top?: number; originX?: string; originY?: string; set: (p: Record<string, unknown>) => void; _element?: { naturalWidth?: number; naturalHeight?: number } })
+      | null;
+    const rect = cropRectRef.current as
+      | (FabricObject & { width?: number; height?: number; scaleX?: number; scaleY?: number; left?: number; top?: number })
+      | null;
+    if (!canvas || !img || !rect) return;
+    const sx = img.scaleX ?? 1, sy = img.scaleY ?? 1;
+    const rW = (rect.width ?? 0) * (rect.scaleX ?? 1);
+    const rH = (rect.height ?? 0) * (rect.scaleY ?? 1);
+    const rLeft = rect.left ?? 0, rTop = rect.top ?? 0; // crop rect has origin left/top
+    // image rendered top-left in object coords (origin-agnostic)
+    const iw = (img.width ?? 0) * sx, ih = (img.height ?? 0) * sy;
+    const iox = img.originX === "center" ? 0.5 : img.originX === "right" ? 1 : 0;
+    const ioy = img.originY === "center" ? 0.5 : img.originY === "bottom" ? 1 : 0;
+    const iTLx = (img.left ?? 0) - iw * iox;
+    const iTLy = (img.top ?? 0) - ih * ioy;
+    const curCropX = img.cropX ?? 0, curCropY = img.cropY ?? 0;
+    let ncx = curCropX + (rLeft - iTLx) / sx;
+    let ncy = curCropY + (rTop - iTLy) / sy;
+    let nw = rW / sx;
+    let nh = rH / sy;
+    // clamp the crop window to the source element bounds
+    const elW = img._element?.naturalWidth ?? (curCropX + (img.width ?? 0));
+    const elH = img._element?.naturalHeight ?? (curCropY + (img.height ?? 0));
+    ncx = Math.max(0, Math.min(ncx, elW - 1));
+    ncy = Math.max(0, Math.min(ncy, elH - 1));
+    nw = Math.max(1, Math.min(nw, elW - ncx));
+    nh = Math.max(1, Math.min(nh, elH - ncy));
+    // normalise origin to top-left so left/top == the crop rect's top-left (display matches the box)
+    img.set({ cropX: ncx, cropY: ncy, width: nw, height: nh, originX: "left", originY: "top", left: rLeft, top: rTop, selectable: true });
+    (img as unknown as { setCoords: () => void }).setCoords();
+    restoringRef.current = true; canvas.remove(rect); restoringRef.current = false;
+    cropRectRef.current = null;
+    cropImgRef.current = null;
+    canvas.setActiveObject(img);
+    setCropMode(false);
+    canvas.requestRenderAll();
+    refreshLayers();
+    snapshot();
+  }, [refreshLayers, snapshot]);
+
   // Auto-apply when DPI dropdown changes (select = discrete complete action, no debounce needed).
   // szW/szH keep the manual button so user can finish typing before applying.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -756,10 +885,18 @@ export default function CanvasEditor() {
       void import("fabric").then(async (fabric) => {
         const img = await fabric.FabricImage.fromURL(dataUrl, { crossOrigin: "anonymous" });
         if (fabricRef.current !== canvas) return; // unmounted/disposed mid-import/decode
-        const scale = Math.min((canvas.getWidth() * 0.6) / (img.width || 1), 1);
+        // Scale relative to the REAL artboard, not the zoomed display width. getWidth() returns
+        // display px (e.g. 650) but objects live in real-px space, so the old calc landed uploads
+        // tiny on a high-DPI artboard. Land at ~70% of the artboard, centred in real coords.
+        const m = canvasMetaRef.current;
+        const z = canvas.getZoom() || 1;
+        const aw = m ? m.realW : canvas.getWidth() / z;
+        const ah = m ? m.realH : canvas.getHeight() / z;
+        const scale = Math.min((aw * 0.7) / (img.width || 1), (ah * 0.7) / (img.height || 1), 1);
         img.scale(scale);
         canvas.add(img);
-        canvas.centerObject(img);
+        img.set({ left: aw / 2, top: ah / 2, originX: "center", originY: "center" });
+        (img as unknown as { setCoords: () => void }).setCoords();
         canvas.setActiveObject(img);
         canvas.requestRenderAll();
       });
@@ -926,7 +1063,7 @@ export default function CanvasEditor() {
       | (FabricObject & { scaleX?: number; scaleY?: number; name?: string; toDataURL?: (o?: Record<string, unknown>) => string })
       | null;
     if (!canvas || !img || img.type !== "image" || !img.toDataURL) return;
-    if (fillPrompt.trim().length < 2) {
+    if (outpaintPrompt.trim().length < 2) {
       setError("請先描述要生成的內容（prompt）");
       return;
     }
@@ -937,7 +1074,7 @@ export default function CanvasEditor() {
       const res = await fetch("/api/tools/studio/genfill", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...roleHeader("operator") },
-        body: JSON.stringify({ image: src, prompt: fillPrompt.trim(), outpaint: outpaintDir }),
+        body: JSON.stringify({ image: src, prompt: outpaintPrompt.trim(), outpaint: outpaintDir }),
       });
       const json = (await res.json()) as { ok: boolean; image?: string; error?: string };
       if (!json.ok || !json.image) {
@@ -960,7 +1097,7 @@ export default function CanvasEditor() {
     } finally {
       setGenBusy(false);
     }
-  }, [fillPrompt, outpaintDir, refreshLayers]);
+  }, [outpaintPrompt, outpaintDir, refreshLayers]);
 
   // ✂️ 邊緣遮罩 — mask the selected image through a brush/grunge shape → transparent PNG. Mirrors
   // posterizeSelected (natural-res dataURL → process → swap, keep transform). Masks from a stored
@@ -1373,8 +1510,8 @@ export default function CanvasEditor() {
       </p>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <button className="btn-secondary" disabled={!ready || !canUndo || drawMode !== "off" || inpaintMode} onClick={undo} title="復原 (Undo)">↩️</button>
-        <button className="btn-secondary" disabled={!ready || !canRedo || drawMode !== "off" || inpaintMode} onClick={redo} title="重做 (Redo)">↪️</button>
+        <button className="btn-secondary" disabled={!ready || !canUndo || drawMode !== "off" || inpaintMode || cropMode} onClick={undo} title="復原 (Undo)">↩️</button>
+        <button className="btn-secondary" disabled={!ready || !canRedo || drawMode !== "off" || inpaintMode || cropMode} onClick={redo} title="重做 (Redo)">↪️</button>
         <button className="btn-secondary" disabled={!ready} onClick={addText}>＋ 文字</button>
         <label className="btn-secondary" style={{ cursor: ready ? "pointer" : "default" }}>
           ＋ 上傳圖案
@@ -1389,7 +1526,15 @@ export default function CanvasEditor() {
             }}
           />
         </label>
-        <button className="btn-secondary" disabled={!ready} onClick={deleteSelected}>刪除選取</button>
+        <button className="btn-secondary" disabled={!ready || !anySelected} onClick={deleteSelected}>刪除選取</button>
+        {/* ✂️ 裁切 — crop the selected image (native cropX/cropY). Apply/cancel appear while cropping. */}
+        <button className="btn-secondary" disabled={!ready || inpaintMode || cropMode || !imageSelected} onClick={enterCrop} title="裁切選取的圖片">✂️ 裁切</button>
+        {cropMode ? (
+          <>
+            <button className="btn-primary" onClick={applyCrop} title="套用裁切">✅ 套用裁切</button>
+            <button className="btn-secondary" onClick={cancelCrop} title="取消裁切">✖ 取消</button>
+          </>
+        ) : null}
         {/* 🔷 形狀積木 */}
         <button className="btn-secondary" disabled={!ready} onClick={() => addShape("rect")} title="加方框">▭</button>
         <button className="btn-secondary" disabled={!ready} onClick={() => addShape("circle")} title="加圓形">◯</button>
@@ -1413,7 +1558,7 @@ export default function CanvasEditor() {
         {/* ✏️ 自由繪筆 / 🧹 橡皮擦 — toggle drawing mode (exits inpaint first) */}
         <button
           className="btn-secondary"
-          disabled={!ready || inpaintMode}
+          disabled={!ready || inpaintMode || cropMode}
           style={{ fontWeight: drawMode === "draw" ? 700 : 400 }}
           onClick={() => applyDrawMode(drawMode === "draw" ? "off" : "draw")}
           title="自由繪筆"
@@ -1422,7 +1567,7 @@ export default function CanvasEditor() {
         </button>
         <button
           className="btn-secondary"
-          disabled={!ready || inpaintMode}
+          disabled={!ready || inpaintMode || cropMode}
           style={{ fontWeight: drawMode === "erase" ? 700 : 400 }}
           onClick={() => applyDrawMode(drawMode === "erase" ? "off" : "erase")}
           title="橡皮擦（擦掉畫到的地方）"
@@ -1552,7 +1697,7 @@ export default function CanvasEditor() {
           </div>
         </SidebarPanel>
         {/* 📐 畫布尺寸 / DPI — 公分/公釐 + DPI 自設（參考 vector-trace-demo）。 */}
-        <SidebarPanel id="canvas-size" title="📐 畫布尺寸 / DPI" defaultPos={{ x: 816, y: 0 }} width={236}>
+        <SidebarPanel id="canvas-size" title="📐 畫布尺寸 / DPI" defaultPos={{ x: 816, y: 0 }} width={236} defaultCollapsed>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
             <div style={{ display: "flex", gap: 8 }}>
               <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
@@ -1582,13 +1727,19 @@ export default function CanvasEditor() {
               </label>
             </div>
             <button className="btn-primary" onClick={applyCanvasSize}>套用畫布尺寸</button>
+            {/* 📐 把選取的圖貼合畫布（畫布＝輸出尺寸，圖是內容） */}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn-secondary" style={{ flex: 1, fontSize: 12 }} disabled={!imageSelected} onClick={() => fitImageToCanvas("fit")} title="把選取的圖縮放到剛好放進畫布（保留全圖）">符合畫布</button>
+              <button className="btn-secondary" style={{ flex: 1, fontSize: 12 }} disabled={!imageSelected} onClick={() => fitImageToCanvas("fill")} title="把選取的圖放大到填滿畫布（超出邊界裁掉）">填滿畫布</button>
+            </div>
+            <span style={{ fontSize: 10, opacity: 0.5, lineHeight: 1.4 }}>畫布＝最終輸出尺寸；圖片是內容，選圖後用上面兩鍵貼合畫布。</span>
             {szInfo ? <span style={{ fontSize: 11, opacity: 0.7 }}>{szInfo}</span> : null}
           </div>
         </SidebarPanel>
 
         {/* 🗂 圖層面板 — reorder / show-hide / duplicate / delete, top layer first. */}
         {layers.length > 0 ? (
-          <SidebarPanel id="layers" title={`🗂 圖層（${layers.length}）`} defaultPos={{ x: 816, y: 244 }} width={240}>
+          <SidebarPanel id="layers" title={`🗂 圖層（${layers.length}）`} defaultPos={{ x: 816, y: 244 }} width={240} defaultCollapsed>
             <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 520, overflowY: "auto" }}>
               {layers.map((o, i) => {
                 const vis = (o as unknown as { visible?: boolean }).visible !== false;
@@ -1608,8 +1759,8 @@ export default function CanvasEditor() {
           </SidebarPanel>
         ) : null}
 
-        {/* 🎨 物件效果（PS 圖層樣式）— shown for ANY selected object (text/image/shape). */}
-        {anySelected ? (
+        {/* 🎨 物件效果（PS 圖層樣式）— always shown (collapsed); acts on the active object when one is selected. */}
+        {(
           <SidebarPanel id="effects" title="🎨 物件效果" defaultPos={{ x: 816, y: 286 }} width={260} defaultCollapsed>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <label style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 2 }}>
@@ -1655,10 +1806,10 @@ export default function CanvasEditor() {
             </div>
           </div>
           </SidebarPanel>
-        ) : null}
+        )}
 
-        {/* 調色工具包 — appears when an image is selected; applies via Fabric filters (WYSIWYG). */}
-        {imageSelected ? (
+        {/* 調色工具包 — always shown (collapsed); each tool acts on the active image when one is selected. */}
+        {(
           <>
           {/* 3 個獨立可拖面板：調色 / 濾鏡效果 / AI 去除 */}
           <SidebarPanel id="grade" title="🎨 調色 / 色階 Levels" defaultPos={{ x: 816, y: 328 }} width={272} defaultCollapsed>
@@ -1804,8 +1955,8 @@ export default function CanvasEditor() {
                 <input
                   className="btn-secondary"
                   placeholder="描述整體場景，例如：海邊草地"
-                  value={fillPrompt}
-                  onChange={(e) => setFillPrompt(e.target.value)}
+                  value={outpaintPrompt}
+                  onChange={(e) => setOutpaintPrompt(e.target.value)}
                   style={{ fontSize: 12 }}
                 />
                 <select className="btn-secondary" value={outpaintDir} onChange={(e) => setOutpaintDir(e.target.value as OutpaintPreset)} style={{ fontSize: 12 }}>
@@ -1872,10 +2023,10 @@ export default function CanvasEditor() {
             </div>
           </SidebarPanel>
           </>
-        ) : null}
+        )}
 
-        {/* 🔤 字型庫 — Google Fonts (中/英) + 上傳字型 + 粗體/斜體/底線, shown when text selected. */}
-        {textSelected ? (
+        {/* 🔤 字型庫 — always shown (collapsed); text styling acts on the active text object. */}
+        {(
           <SidebarPanel id="fonts" title="🔤 字型庫" defaultPos={{ x: 816, y: 454 }} width={240} defaultCollapsed>
             <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
               <button className="btn-secondary" style={{ fontSize: 13, fontWeight: 700 }} title="粗體（切換）" onClick={() => toggleText("fontWeight")}>B</button>
@@ -1892,7 +2043,7 @@ export default function CanvasEditor() {
               }}
             />
           </SidebarPanel>
-        ) : null}
+        )}
         </div>
       </div>
     </div>

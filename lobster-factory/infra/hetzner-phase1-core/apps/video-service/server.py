@@ -377,7 +377,14 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
-            self._json(200, {"ok": True})  # healthcheck 免認證
+            self._json(200, {
+                "ok": True,
+                "capabilities": {
+                    "format_assets": True,
+                    "native_multiformat": True,
+                },
+                "formats": list(config.FORMATS.keys()),
+            })  # healthcheck 免認證
             return
         if self.path.split("?")[0] == "/job":
             if not _authed(self):

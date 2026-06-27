@@ -18,7 +18,12 @@ register({
   enabled: true,
   run: async (ctx: BlockCtx) => {
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
-    const providedScenes = ctx.providedScenes as { narration: string; imagePrompt: string }[] | undefined;
+    const providedScenes = ctx.providedScenes as {
+      narration: string;
+      imagePrompt: string;
+      visual?: "custom" | "broll";
+      brollKeyword?: string;
+    }[] | undefined;
     // 接力（providedScenes）路徑跳過 Claude → 不需 key；只有要生腳本時才強制（與 /api/video/draft 同邏輯）。
     if (!anthropicKey && !(providedScenes && providedScenes.length > 0)) {
       return { ok: false, status: 503, error: "ANTHROPIC_API_KEY not configured" };

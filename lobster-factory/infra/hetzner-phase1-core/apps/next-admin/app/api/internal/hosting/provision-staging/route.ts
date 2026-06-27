@@ -9,7 +9,7 @@
  * Output: { environmentId, wpRootPath, stagingSiteUrl, wpAdminUrl }
  */
 
-import { NextResponse, after } from "next/server";
+import { NextResponse } from "next/server";
 import { Client as SshClient } from "ssh2";
 import { timingSafeEqual } from "../../../../../lib/ops-inbox/verifyIngestToken";
 import { getSupabaseWriteClient } from "../../../../../lib/supabase-server";
@@ -152,6 +152,35 @@ async function seedContentFromSpec(conn: SshClient, wpPath: string, websiteSpecI
   return `content seeded: ${out.match(/AW_SEED_(OK|SKIP)[^\n]*/)?.[0] ?? "ok"}`;
 }
 
+// mode:"seed" — a short, synchronous seed-only call. The persistent Trigger.dev `create-wp-site`
+// task makes this AFTER the provision call returns, so neither call hits the CF ~100s ceiling and
+// the work runs in a process that survives (next-admin can't run post-response background work).
+async function handleSeedMode(body: { websiteSpecId?: string; wpPath?: string; siteId?: string }): Promise<Response> {
+  const { websiteSpecId, wpPath, siteId } = body;
+  if (!websiteSpecId || !wpPath) {
+    return NextResponse.json({ error: "websiteSpecId and wpPath required for seed mode" }, { status: 422 });
+  }
+  const keyB64 = process.env.SG_SSH_PRIVATE_KEY_B64?.trim();
+  const sshHost = process.env.SG_SSH_HOST?.trim() || "5.223.93.113";
+  if (!keyB64) {
+    return NextResponse.json({ error: "SG_SSH_PRIVATE_KEY_B64 not configured" }, { status: 503 });
+  }
+  let conn: SshClient | null = null;
+  try {
+    const privateKey = Buffer.from(keyB64, "base64").toString("utf8");
+    conn = await connectSsh({ host: sshHost, port: 22, username: "root", privateKey });
+    const seeded = await seedContentFromSpec(conn, wpPath, websiteSpecId);
+    return NextResponse.json({ ok: true, siteId: siteId ?? null, seeded });
+  } catch (e) {
+    return NextResponse.json(
+      { ok: false, error: "seed_failed", detail: e instanceof Error ? e.message : String(e) },
+      { status: 500 },
+    );
+  } finally {
+    conn?.end();
+  }
+}
+
 export async function POST(request: Request) {
   // Auth
   const apiToken = process.env.LOBSTER_HOSTING_API_TOKEN?.trim();
@@ -164,14 +193,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { organizationId?: string; siteId?: string; siteName?: string; manifestSlug?: string; pluginSlugs?: string[]; websiteSpecId?: string };
+  let body: { organizationId?: string; siteId?: string; siteName?: string; manifestSlug?: string; pluginSlugs?: string[]; websiteSpecId?: string; mode?: string; wpPath?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
 
-  const { organizationId, siteId, siteName, manifestSlug = "wp-basic", pluginSlugs = [], websiteSpecId } = body;
+  // Seed-only mode (separate short call from create-wp-site after provision) — see handleSeedMode.
+  if (body.mode === "seed") {
+    return handleSeedMode(body);
+  }
+
+  const { organizationId, siteId, siteName, manifestSlug = "wp-basic", pluginSlugs = [] } = body;
   if (!siteId || !siteName) {
     return NextResponse.json({ error: "siteId and siteName required" }, { status: 422 });
   }
@@ -274,33 +308,13 @@ export async function POST(request: Request) {
     );
     const pluginsOk = pluginResult.code === 0;
 
-    // 8. Schedule content seeding to run AFTER this response (Next.js `after`). Seeding adds
-    // ~15-25s of WP-CLI work; running it inline pushed the synchronous provision past the
-    // hosting-adapter / Cloudflare ~95-100s ceiling, so create-wp-site marked the run "blocked"
-    // even though the site built + seeded fine (verified live 2026-06-27: aw_seed_done=1 but
-    // run blocked). `after()` runs seeding post-response with its OWN SSH connection, so the
-    // provision returns fast (run completes) while seeding finishes async. Idempotent +
-    // best-effort (aw_seed_done gate) — a failure only leaves a shell to re-seed on retry.
-    const willSeed = !!websiteSpecId;
-    if (websiteSpecId) {
-      const seedOpts = { host: sshHost, port: 22, username: "root", privateKey };
-      const seedSpecId = websiteSpecId;
-      const seedPath = wpPath;
-      const seedSite = siteId;
-      after(async () => {
-        let seedConn: SshClient | null = null;
-        try {
-          seedConn = await connectSsh(seedOpts);
-          const note = await seedContentFromSpec(seedConn, seedPath, seedSpecId);
-          console.log(`[provision-staging] async seed (${seedSite}): ${note}`);
-        } catch (e) {
-          console.error(`[provision-staging] async seed failed (${seedSite}):`, e instanceof Error ? e.message : String(e));
-        } finally {
-          seedConn?.end();
-        }
-      });
-    }
-
+    // Content seeding is intentionally NOT done here. Seeding adds ~15-25s of WP-CLI work which,
+    // on top of the ~71-90s provision, blew past the hosting-adapter / Cloudflare ~95-100s ceiling
+    // → the run was marked "blocked" (verified live 2026-06-27). And next-admin can NOT run
+    // post-response background work in this standalone deploy (`after()`/`void async` get cut —
+    // WORKLOG 2026-06-17). So seeding runs as a SEPARATE short call (mode:"seed", handled at the
+    // top of POST) that the persistent Trigger.dev `create-wp-site` task makes AFTER this provision
+    // call returns. Each call stays under the CF ceiling; the orchestrator surfaces seed status.
     return NextResponse.json({
       environmentId,
       wpRootPath: wpPath,
@@ -309,7 +323,6 @@ export async function POST(request: Request) {
       provisioningNotes: [
         ...(!themeOk ? ["WARN: Kadence theme install had issues"] : []),
         ...(!pluginsOk ? ["WARN: some plugins may not have installed"] : [`Plugins installed: ${allPlugins.join(", ")}`]),
-        willSeed ? "content seeding scheduled (async, post-response)" : "content seed skipped: no websiteSpecId",
         `staging/${slug}/ — subdirectory install on aware-wave.com`,
         `DB: ${dbName} on lobster-wordpress-db`,
         `Admin: admin / ${adminPass}`,

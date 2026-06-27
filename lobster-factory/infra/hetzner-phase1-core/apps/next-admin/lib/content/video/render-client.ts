@@ -36,6 +36,31 @@ function svcHeaders(json: boolean): Record<string, string> {
 
 const svcBase = (baseUrl?: string) => baseUrl ?? process.env.VIDEO_SERVICE_URL ?? "http://127.0.0.1:8732";
 
+async function assertNativeMultiformat(base: string, formats: string[]): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const r = await fetch(`${base}/health`, {
+      headers: svcHeaders(false),
+      signal: AbortSignal.timeout(5_000),
+    });
+    const body = (await r.json().catch(() => ({}))) as {
+      ok?: boolean;
+      capabilities?: { native_multiformat?: boolean; format_assets?: boolean };
+      formats?: string[];
+    };
+    const serviceFormats = new Set(body.formats ?? []);
+    const supportsFormats = formats.every((fmt) => serviceFormats.has(fmt));
+    if (r.ok && body.ok && body.capabilities?.native_multiformat && body.capabilities?.format_assets && supportsFormats) {
+      return { ok: true };
+    }
+  } catch {
+    // Return the same actionable error below; render would fail or silently fall back on old services.
+  }
+  return {
+    ok: false,
+    error: "video-service 尚未部署原生多比例版本（需 /health 回報 native_multiformat + format_assets）。請先更新 EU video-service 後再輸出多比例。",
+  };
+}
+
 /**
  * 提交渲染給 EU video-service（一次短請求，不等渲染）。回 EU 端 jobId。
  * 渲染在 EU 自己的背景 thread 跑（持久），由 /status 輪詢 — next-admin 不做任何背景工作。
@@ -66,6 +91,10 @@ export async function submitRender(
   const base = svcBase(baseUrl);
   // 多格式：formatAssets + 非空 formats → 送 format_assets（EU 原生多格式）；否則送舊單組 assets。
   const useMulti = !!opts?.formatAssets && Array.isArray(opts?.formats) && opts.formats.length > 0;
+  if (useMulti) {
+    const capability = await assertNativeMultiformat(base, opts!.formats!);
+    if (capability.ok === false) return { ok: false, status: 503, error: capability.error };
+  }
   try {
     const res = await fetch(`${base}/render`, {
       method: "POST",
@@ -76,9 +105,7 @@ export async function submitRender(
           ? {
               format_assets: opts!.formatAssets,
               formats: opts!.formats,
-              // 向後相容（部署窗口）：舊 EU 無 format_assets 分支 → 改用 assets（主格式單組）走 base+pad，
-              // 不 hard-fail；新 EU _validate 見 format_assets 優先走原生多格式（忽略 assets）。
-              assets: opts!.formatAssets![opts!.formats![0]] ?? assets,
+              require_native_multiformat: true,
             }
           : { assets }),
         ...(opts?.ttsProvider && { tts_provider: opts.ttsProvider }),

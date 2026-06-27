@@ -158,6 +158,38 @@ const InputSchema = z.preprocess(
  * Phase 1 intentionally keeps DB persistence + hosting adapter as placeholders.
  * Guardrails: all steps must be staging-only.
  */
+// Stage C: seed AI content via a SECOND short call to the hosting bridge, AFTER provision returns.
+// Seeding inline in the provision call blew past the CF/adapter ~95-100s ceiling (run wrongly
+// "blocked"), and next-admin can't run post-response background work (WORKLOG 2026-06-17). This
+// task (Trigger.dev) is the persistent orchestrator: it makes provision + seed as two separate
+// short calls, each under the ceiling. Best-effort — a seed failure does not fail the build.
+async function seedContentViaBridge(payload: {
+  websiteSpecId: string;
+  wpPath: string;
+  siteId: string;
+}): Promise<string> {
+  const baseUrl = process.env.LOBSTER_HOSTING_PROVIDER_BASE_URL?.trim();
+  const path = process.env.LOBSTER_HOSTING_PROVISION_PATH?.trim() || "/v1/lobster/staging-provision";
+  const token = process.env.LOBSTER_HOSTING_API_TOKEN?.trim();
+  if (!baseUrl || !token) throw new Error("hosting bridge not configured (base URL or token missing)");
+  const url = new URL(path, baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`).toString();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 90_000); // under the CF ~100s ceiling
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ mode: "seed", ...payload }),
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`seed bridge HTTP ${res.status}: ${text.slice(0, 200)}`);
+    return text.slice(0, 300);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export const createWpSite = task({
   id: "create-wp-site",
   run: async (payload: unknown) => {
@@ -406,6 +438,23 @@ export const createWpSite = task({
       const integrationErrors = integrationResults.filter((r) => r.status === "error");
       if (integrationErrors.length > 0) {
         logger.warn("create-wp-site: some integrations failed", { errors: integrationErrors });
+      }
+
+      // ── Stage C: seed AI content (second short bridge call; see seedContentViaBridge) ──
+      let seedResult: string | null = null;
+      if (input.websiteSpecId && stagingRef?.wpRootPath) {
+        try {
+          seedResult = await seedContentViaBridge({
+            websiteSpecId: input.websiteSpecId,
+            wpPath: stagingRef.wpRootPath,
+            siteId: input.siteId,
+          });
+          logger.info("create-wp-site: content seeded", { seedResult });
+        } catch (err) {
+          logger.warn("create-wp-site: content seed failed (non-fatal)", {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
       }
 
       // ── Stage 3.5: Trigger wp-install-plugins for user-facing plugin stack ──
