@@ -356,6 +356,24 @@ export const MAP_THEMES: MapTheme[] = [
     ],
   },
   {
+    key: "musteat", zh: "必吃", emoji: "😋", enLabel: "must-try foods foreign tourists love", kind: "map",
+    hint: "must-try crowd-pleasing iconic dishes, drinks and desserts that foreign tourists love and recommend",
+    fallback: [
+      { zh: "招牌必吃", en: "must-try signature dish", desc: "必吃招牌" },
+      { zh: "人氣小吃", en: "popular street food", desc: "人氣小吃" },
+      { zh: "招牌飲品", en: "famous local drink", desc: "招牌飲品" },
+    ],
+  },
+  {
+    key: "weirdfood", zh: "驚奇", emoji: "😲", enLabel: "surprising adventurous local foods", kind: "map",
+    hint: "surprising, adventurous, unusual or shocking local street foods that amaze or challenge foreign tourists (fermented, offal, blood, pungent or exotic dishes)",
+    fallback: [
+      { zh: "獵奇小吃", en: "adventurous street food", desc: "獵奇小吃" },
+      { zh: "重口味", en: "pungent local delicacy", desc: "重口味美食" },
+      { zh: "在地黑暗料理", en: "surprising local dish", desc: "在地驚奇料理" },
+    ],
+  },
+  {
     key: "heritage", zh: "古蹟", emoji: "🏛️", enLabel: "historic heritage sites", kind: "map",
     hint: "historic heritage sites, monuments, ancient ruins, old temples and landmark heritage buildings",
     fallback: [

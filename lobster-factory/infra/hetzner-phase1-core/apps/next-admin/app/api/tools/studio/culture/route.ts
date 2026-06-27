@@ -20,6 +20,8 @@ const LENS_HINTS: Record<string, string> = {
   weave: "traditional textile techniques, weaving, dyeing and craft methods",
   symbol: "iconic cultural symbols, emblems and sacred signs",
   food: "iconic dishes, street food, desserts, drinks, local fruits and regional snacks",
+  musteat: "must-try crowd-pleasing iconic dishes, drinks and desserts that foreign tourists love and recommend",
+  weirdfood: "surprising, adventurous, unusual or shocking local street foods that amaze or challenge foreign tourists (fermented, offal, blood, pungent or exotic dishes)",
   music: "traditional musical instruments, genres and dances",
   art: "representative art forms, painting styles and visual mediums",
   architecture: "iconic architecture, building styles and structural motifs",
