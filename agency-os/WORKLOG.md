@@ -4,6 +4,30 @@
 
 ## 2026-06-27
 
+### feat(oracle): 紫微頂規確定性分析引擎 — 對標競品「命盤簡批」深度 + 上線
+
+[任務理解] 操作者指出原紫微只「星名→一段 AI」=半成品,要求頂規。競品的簡批是**確定性規則引擎**:格局判定 + 主星亮度吉凶指數 + 飛宮四化 + 逐宮逐星。補上這套(ROADMAP「中式天花板」)。
+
+[現況分析] iztro 已提供全部計算原語:`surroundedPalaces`(三方四正 have/haveOneOf/haveMutagen)、`palace.has/hasOneOf`、`fliesTo/selfMutaged/mutagedPlaces`(飛宮四化/自化)、star.brightness(廟旺)。故只需建「規則 + 知識層」,不重造計算。
+
+[已修改]
+- `lib/ziwei/patterns.ts`(新):21+ 命格規則(紫府同宮/機月同梁/殺破狼/府相朝垣/君臣慶會/三奇加會/權祿巡逢/雙祿朝垣/文星拱命/火貪/鈴貪/石中隱玉/日麗中天/月朗天門/丹墀桂墀/命裡逢空/天梁拱月…)+ 古典解說,每條 try/catch。
+- `lib/ziwei/brightness.ts`(新):命宮主星廟旺→亮度指數;三方四正六吉+三吉化+祿存 vs 六煞+化忌→吉凶指數%。
+- `lib/ziwei/flying.ts`(新):自化 + 化入他宮(mutagedPlaces 索引 [祿權科忌] 經 critic 驗證)+ 財富/事業/婚姻/健康/人際/本命 分類;pn() 避免「命宮宮」重複。
+- `lib/ziwei/analyze.ts`(新)orchestrator;`systems/ziwei.ts` toContext 注入格局/亮度/飛化 facts(限 12 格局,≤300 字/fact);`prompts/systems.ts` 紫微 framing 改結構化簡批指令(命主特質/格局剖析/重點宮位/飛化走勢/建議)。
+- `ZiweiTool.tsx`:渲染三大分析區塊 + 餵 AI;分析固定 zh-TW 命盤 + try/catch。
+- 測試 `lib/ziwei/analyze.test.ts`(6)。
+
+[驗證結果](R0 四動作)
+- REALTEST_EVIDENCE: tool=Bash+Browser+SSH | exit=0 | tsc=0、npm test 117 pass、build=0;node 探針驗 府相朝垣/坐貴向貴/丹墀桂墀/24 飛化/吉凶33%;**部署 SG 後瀏覽器 DOM 抓取確認 live**:格局分析/主星亮度與吉凶/飛宮四化 三區塊 + 內容齊全,命宮宮 typo 修後=0。
+- REVIEW_DONE: critic=Deep | verdict=warn→修 | findings=0c/1m/2n — Major(en locale 廟旺/地支字面失效)修=分析固定 zh-TW 命盤;Minor(白屏防護)修=analyzeZiwei try/catch;君臣慶會收緊;格局 fact 限 12。mutagedPlaces 索引、.have AND 語意、crash-safety 經 critic 三方驗證為正確。
+- BUGHUNT_DONE: scope=Projects/internal/ziwei-doushu | grep=`analyzeZiwei`,`detectPatterns`,`mutagedPlaces`,`命宮宮` | 命宮宮 live=0;analyzeZiwei 僅 ZiweiTool client useMemo 引用。
+- BUGHUNT_SCOPE_NARROW: 紫微功能局部,scope 限 ziwei-doushu。
+
+[剩餘風險] 逐宮逐星完整知識庫(每星×每宮)未做(現由 AI 從富結構敘事 + 確定性格局/亮度/飛化補);格局庫可續擴(目前 21+,競品數十)。en locale 分析顯示中文命理內容(命理術語本即中文)。
+
+[rollback] `docker tag oracle-web:rollback oracle-web:latest && docker compose up -d`;或 git revert daed7544/ac7e5873。
+
 ### feat(provisioning): AI hero 圖自動生成+插入站（視覺層收尾）
 
 [任務理解] 建站完善最後一塊「套圖」——讓建出的站有 AI 生的 hero 圖（不只內容+品牌色）。
