@@ -4,6 +4,29 @@
 
 ## 2026-06-27
 
+### deploy(oracle): oracle.aware-wave.com 上線全部 8 功能(SG，使用者授權 High-risk)
+
+[任務理解] 使用者授權部署。先驗發現:oracle.aware-wave.com 為 **live 但舊版**(Phase 0,/api/interpret、/api/astrology 全 404),這輪 8 功能(Centaur AI/紫微過運/每日個人化/OG/塔羅/西洋占星/付費牆)未上線。
+
+[現況分析] SG `/opt/oracle` 容器 oracle-web(healthy,lobster-net 後 lobster-nginx 反代)。**關鍵坑**:① 部署目錄停在舊 feature 分支 `claude/ziwei-doushu-chart-site-55fdaa`(HEAD c3f7967),與 main 分歧 3911 commits(ziwei 已 consolidate 上 main)→ `git pull --ff-only` 失敗;partial clone(blob:none)無 `origin/main` 本地 ref。② 無 `.env.production` → AI 端點會 503。③ 磁碟 84%。
+
+[已修改](遠端 SG,非 repo)
+- 切分支:`git checkout -B main` + `git fetch origin main && git reset --hard FETCH_HEAD` → HEAD 2ffe80cb(含全部最新:astrology RAD2DEG×4、entitlements fail-closed、402 paywall、@xalen dep)。
+- 注入憑證(untracked):`.env.production`(600;OPENAI_API_KEY 從 vault 經 ssh stdin 管線寫入,無命令列字面量;OPENAI_MODEL_DEEP=gpt-4o-2024-11-20 釘 16384 輸出快照避 4096-cap 400)+ `docker-compose.override.yml`(env_file)。
+- 回滾鏡像:`docker tag oracle-web:latest oracle-web:rollback`(保留)。
+- `docker compose build && up -d`(背景+log 防 MCP 斷線)。
+- 文件:`deploy/DEPLOY-SG.md §7/§備註` 改為實測流程(fetch+reset 非 pull、override+.env、release 釘快照、磁碟、回滾)。
+
+[驗證結果](R0 四動作)
+- REALTEST_EVIDENCE: tool=SSH+curl | cmd=`docker compose build/up` + public smoke | exit=0 | **public https://oracle.aware-wave.com 全綠**:/api/health 200、首頁含「西洋占星」、/api/astrology 200(真盤,1990-05-20→太陽金牛 12 星體;原 404)、/api/interpret premium→**402 付費牆**(原 404)、/api/interpret deep→**200 真 GPT**(231 字,model gpt-4o-2024-11-20,**確認 prod OPENAI key 生效、無 400**)。容器 healthy。
+- REVIEW_DONE: critic=N/A(部署操作,非 code 改;DEPLOY-SG.md 為 doc)| 上線前本機 build gate 全綠(tsc=0/test 111/build=0)。
+- BUGHUNT_DONE: scope=Projects/internal/ziwei-doushu | grep=部署前驗 HEAD 含 RAD2DEG/fail-closed/payment_required/@xalen 各 1+ → 確認部署的是最新 code,非舊版。
+- BUGHUNT_SCOPE_NARROW: 部署操作,scope 限 ziwei-doushu(非 code 改動)。
+
+[剩餘風險] ① 磁碟 86%(每次 build +2G,需定期 prune)。② 每日次數計量 + 真實訂閱判定待 Supabase+auth(premium 已 402 擋,light/deep 匿名未計量同改動前)。③ rate-limit/Turnstile 待 PLAN §17。④ ANTHROPIC/金流/Supabase/astrology-api key 未設(對應功能待)。⑤ 未整合 sg-deploy.sh 安全管線(手動上線)。
+
+[rollback] `docker tag oracle-web:rollback oracle-web:latest && docker compose up -d`(舊鏡像保留);或 `git reset --hard c3f7967` 後重 build。
+
 ### fix(tarot): 鎖定風格不再重複存預覽（My Designs 出現兩張相同 tarot-preview）
 
 [任務理解] 使用者發現 My Designs 同一張預覽圖出現兩筆 `Tarot · 預覽`，相隔約 6 秒。判斷按「✓ 鎖定這個風格，進入整套生成」會多存一張重複圖。
