@@ -156,8 +156,10 @@ function buildSeedScript(spec: WebsiteSpec, wpPath: string): string {
 async function generateAndInstallHeroImage(conn: SshClient, wpPath: string, spec: WebsiteSpec): Promise<string> {
   if (!isR2Configured()) return "hero image skipped: R2 not configured";
   const style = (spec.design?.image_style || "warm natural light, soft handcrafted texture, atmospheric").slice(0, 200);
-  const prompt = `${style}. Wide hero banner photograph for ${spec.site_name || "a brand"}. Cinematic, high detail, tasteful, no text, no words, no letters, no logo.`;
-  const gen = await generateTarotImage({ model: "flux-schnell", prompt, aspectRatio: "16:9" });
+  // imagen-4 (Google) over flux-schnell: flux-schnell renders gibberish pseudo-text on hero banners
+  // even with negative prompts; Imagen honours "no text" reliably for clean photographic heroes.
+  const prompt = `${style}. A wide cinematic hero banner photograph for ${spec.site_name || "a brand"}. Photorealistic, atmospheric, tasteful, high detail. Absolutely no text, no words, no letters, no captions, no signage, no logo, no watermark anywhere in the image.`;
+  const gen = await generateTarotImage({ model: "imagen-4", prompt, aspectRatio: "16:9" });
   if (!gen.ok) return `hero image gen failed: ${"error" in gen ? gen.error : "gen_failed"}`;
   const parsed = parseImageDataUrl(gen.image);
   if (!parsed) return "hero image: unparseable output";
