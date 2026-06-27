@@ -85,6 +85,24 @@
 [剩餘風險] ① 未部署：next-admin(bridge)+Trigger.dev(create-wp-site) 重新部署才生效。② content seed WARN note = 需重跑 provision 補完 seeding（operational，未自動重試）。③ section body 無長度上限（極大 spec 理論上撞 ARG_MAX，實務 KB 級安全）。④ Kadence 色盤未注入（避免 theme mod 格式弄錯，brand colors 另經 client_config 走）。
 [rollback] git revert 本 commit（threading 全 optional、bridge seeding best-effort，未部署無 runtime 影響）。
 
+### fix(provisioning): Stage C 內容注入改 two-call split（修同步 timeout regression）
+
+[任務理解] live e2e（真實觸發建站 run e0ab0e4c）暴露 inline seeding regression：站建好+seed 成功（aw_seed_done=1）但 provision 同步呼叫(provision ~71-90s + seed ~20s)超過 95s adapter/CF ceiling → run 標 `blocked`。**這是靜態 critic + test-pilot 隔離測試抓不到、只有 live pipeline 抓得到的。**
+
+[現況分析] 第一版修法用 Next.js `after()` 被 critic 用 VBC 否決：repo 自己 2026-06-17 已實證此 standalone 部署「`void async`/`after()` 回應後都被切」（`video-pipeline.ts:4-5` / WORKLOG 2026-06-17）→ 會變 run 綠燈但靜默空殼站，更糟。正解=持久進程跑 seeding。
+
+[已修改]
+- `provision-staging/route.ts`：provision path 移除所有 seeding（純步驟 1-7，~71-90s 快速回應）；加 `handleSeedMode(body)` + POST 入口 `if (body.mode==="seed") return handleSeedMode(body)`（auth 在分支前，繼承同 bearer）；seed mode 同步開 SSH → `seedContentFromSpec` → 回 {ok,seeded}。
+- `create-wp-site.ts`：加 `seedContentViaBridge`（POST `{mode:"seed",...}` 到 bridge，90s timeout）；provision+integrations 後、markActionRunTerminal 前 await（try/catch best-effort，seed 失敗不擋建站）。Trigger.dev task=持久編排者，provision/seed 兩段各自 HTTP 呼叫、各自在 CF ceiling 內。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | seeding 機制 e2e 已證（test-pilot：CJK/建頁/首頁/idempotency exit=0）；mode-split 編排 live 重測在部署後（commit→deploy next-admin+Trigger.dev→重觸發 run 確認 completes+站有內容）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m | 三輪：inline→after()(VBC 否決 Critical)→mode-split(5/5 PASS Low Clear-to-deploy)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=handleSeedMode|seedContentViaBridge | hits: 唯一 producer=seedContentViaBridge；httpJsonStagingAdapter 不設 mode→走 provision path（provision-only 不受影響）
+
+[剩餘風險] ① seed 失敗只 logger.warn 無自動重試（aw_seed_done 閘使手動重觸發 idempotent 可修）② handleSeedMode 接 body.wpPath（trusted token 邊界內、shq 跳脫）③ **並行 session 把 CanvasEditor.tsx 改壞（本機未提交,+174 行語法錯）**——不影響 origin/main 部署，但被 checkpoint commit 會炸下次 build。
+[rollback] git revert 本 commit。
+
 ## 2026-06-26
 
 ### fix(doc-integrity): validator 治本 — 不再把 prose-in-parens 當 broken link
