@@ -1139,26 +1139,36 @@ type CsIntentRow = {
 function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
   const [loading, setLoading] = useState(true);
   const [csEnabled, setCsEnabled] = useState(true);
-  const [knowledgeCount, setKnowledgeCount] = useState(0);
   const [intents, setIntents] = useState<CsIntentRow[]>([]);
+  const [sources, setSources] = useState<Array<{ id: string; title: string; kind: string; isSensitive: boolean; chunks: number }>>([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  // new-knowledge form
+  const [kTitle, setKTitle] = useState(""); const [kBody, setKBody] = useState(""); const [kKind, setKKind] = useState("doc");
+  const [kSensitive, setKSensitive] = useState(false); const [kSaving, setKSaving] = useState(false); const [kMsg, setKMsg] = useState<string | null>(null);
+  // new-intent form
+  const [iKey, setIKey] = useState(""); const [iLabel, setILabel] = useState(""); const [iAns, setIAns] = useState("L1"); const [iAct, setIAct] = useState("A0");
+  const [iSensitive, setISensitive] = useState(false); const [iSaving, setISaving] = useState(false); const [iMsg, setIMsg] = useState<string | null>(null);
 
+  async function reloadConfig() {
+    try {
+      const res = await fetch(`/api/ops/clients/${org.slug}/cs-config`, { headers: { ...roleHeader("admin") } });
+      const data = (await res.json()) as { ok?: boolean; csEnabled?: boolean; intents?: CsIntentRow[] };
+      if (data.ok) { setCsEnabled(data.csEnabled ?? true); setIntents(data.intents ?? []); }
+    } catch { /* ignore */ }
+  }
+  async function reloadSources() {
+    try {
+      const res = await fetch(`/api/ops/clients/${org.slug}/cs-knowledge`, { headers: { ...roleHeader("admin") } });
+      const data = (await res.json()) as { ok?: boolean; sources?: Array<{ id: string; title: string; kind: string; isSensitive: boolean; chunks: number }> };
+      if (data.ok && data.sources) setSources(data.sources);
+    } catch { /* ignore */ }
+  }
   useEffect(() => {
     let alive = true;
-    (async () => {
-      try {
-        const res = await fetch(`/api/ops/clients/${org.slug}/cs-config`, { headers: { ...roleHeader("admin") } });
-        const data = (await res.json()) as { ok?: boolean; csEnabled?: boolean; knowledgeCount?: number; intents?: CsIntentRow[] };
-        if (!alive) return;
-        if (data.ok) {
-          setCsEnabled(data.csEnabled ?? true);
-          setKnowledgeCount(data.knowledgeCount ?? 0);
-          setIntents(data.intents ?? []);
-        }
-      } catch { /* ignore — show empty */ } finally { if (alive) setLoading(false); }
-    })();
+    (async () => { await Promise.all([reloadConfig(), reloadSources()]); if (alive) setLoading(false); })();
     return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [org.slug]);
 
   async function toggleKill() {
@@ -1175,6 +1185,41 @@ function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
       setCsEnabled(data.csEnabled ?? next);
       setMsg(next ? "✓ 已啟用此客戶 AI 客服" : "✓ 已停用（kill-switch）— AI 不再自動回覆此客戶");
     } catch (e) { setMsg(`⚠ ${String(e)}`); } finally { setSaving(false); }
+  }
+
+  async function addKnowledge() {
+    setKSaving(true); setKMsg(null);
+    try {
+      const res = await fetch(`/api/ops/clients/${org.slug}/cs-knowledge`, {
+        method: "POST", headers: { "Content-Type": "application/json", ...roleHeader("admin") },
+        body: JSON.stringify({ title: kTitle, body: kBody, kind: kKind, isSensitive: kSensitive }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string; chunks?: number };
+      if (!res.ok || !data.ok) throw new Error(data.error ?? `failed_${res.status}`);
+      setKMsg(`✓ 已建索引（${data.chunks ?? 0} 塊）`); setKTitle(""); setKBody(""); setKSensitive(false);
+      await reloadSources();
+    } catch (e) { setKMsg(`⚠ ${String(e)}`); } finally { setKSaving(false); }
+  }
+  async function delKnowledge(id: string) {
+    await fetch(`/api/ops/clients/${org.slug}/cs-knowledge`, { method: "DELETE", headers: { "Content-Type": "application/json", ...roleHeader("admin") }, body: JSON.stringify({ sourceId: id }) });
+    await reloadSources();
+  }
+  async function addIntent() {
+    setISaving(true); setIMsg(null);
+    try {
+      const res = await fetch(`/api/ops/clients/${org.slug}/cs-intents`, {
+        method: "POST", headers: { "Content-Type": "application/json", ...roleHeader("admin") },
+        body: JSON.stringify({ key: iKey, label: iLabel, answerLevel: iAns, actionLevel: iAct, isSensitive: iSensitive }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) throw new Error(data.error ?? `failed_${res.status}`);
+      setIMsg("✓ 已新增意圖"); setIKey(""); setILabel(""); setISensitive(false);
+      await reloadConfig();
+    } catch (e) { setIMsg(`⚠ ${String(e)}`); } finally { setISaving(false); }
+  }
+  async function delIntent(key: string) {
+    await fetch(`/api/ops/clients/${org.slug}/cs-intents`, { method: "DELETE", headers: { "Content-Type": "application/json", ...roleHeader("admin") }, body: JSON.stringify({ key }) });
+    await reloadConfig();
   }
 
   const badge = (bg: string, fg: string, text: string) => (
@@ -1202,10 +1247,38 @@ function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
         {msg && <div style={{ marginTop: 6, fontSize: 11, color: msg.startsWith("✓") ? "var(--green)" : "var(--red)" }}>{msg}</div>}
       </Card>
 
-      <Card title="知識庫">
-        <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-          已建知識來源：<strong style={{ color: "var(--text-primary)" }}>{loading ? "…" : knowledgeCount}</strong> 筆
-          {!loading && knowledgeCount === 0 && <span style={{ color: "var(--text-muted)" }}>（尚未餵資料；RAG 需先建知識源）</span>}
+      <Card title={`知識庫（${loading ? "…" : sources.length} 筆來源）`}>
+        <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
+          餵給 AI 的資料（FAQ / SOP / 產品說明…）。新增後自動切塊 + 向量化（pgvector），AI 只根據這些內容回答，答不出來轉真人。
+        </p>
+        {sources.length > 0 && (
+          <div style={{ marginBottom: 10 }}>
+            {sources.map((s) => (
+              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--border-subtle)", fontSize: 12 }}>
+                <span style={{ flex: 1, fontWeight: 500 }}>{s.title}</span>
+                {badge("var(--bg-canvas)", "var(--text-muted)", s.kind)}
+                {s.isSensitive && badge("var(--badge-red-bg)", "var(--red)", "敏感")}
+                <span style={{ color: "var(--text-muted)" }}>{s.chunks} 塊</span>
+                <button onClick={() => delKnowledge(s.id)} aria-label="刪除" style={{ border: "none", background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }}>×</button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 10 }}>
+          <CisText label="標題" value={kTitle} onChange={setKTitle} placeholder="退換貨政策" />
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "4px 0", fontSize: 12 }}>
+            <span style={{ color: "var(--text-muted)", width: 88, flexShrink: 0, paddingTop: 5 }}>內容</span>
+            <textarea value={kBody} onChange={(e) => setKBody(e.target.value)} placeholder="貼上 FAQ / 政策 / 產品說明…（≥10 字）" rows={4}
+              style={{ flex: 1, fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-primary)", resize: "vertical", fontFamily: "inherit" }} />
+          </div>
+          <CisSelect label="類型" value={kKind} onChange={setKKind} options={[["doc", "文件"], ["faq", "FAQ"], ["sop", "SOP"], ["conversation", "對話範例"], ["url", "網址"]]} />
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-secondary)", padding: "4px 0 0 96px" }}>
+            <input type="checkbox" checked={kSensitive} onChange={(e) => setKSensitive(e.target.checked)} /> 敏感內容
+          </label>
+          <button onClick={addKnowledge} disabled={kSaving || !kTitle || kBody.length < 10} style={{ ...cisBtnStyle, opacity: kSaving || !kTitle || kBody.length < 10 ? 0.5 : 1 }}>
+            {kSaving ? "建索引中…" : "新增並建索引"}
+          </button>
+          {kMsg && <div style={{ marginTop: 6, fontSize: 11, color: kMsg.startsWith("✓") ? "var(--green)" : "var(--red)" }}>{kMsg}</div>}
         </div>
       </Card>
 
