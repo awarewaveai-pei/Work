@@ -81,6 +81,12 @@ const SOURCE: Record<
   },
 };
 
+/** 宮名加「宮」字,但避免「命宮」→「命宮宮」之類重複(命宮/福德等已不需,但 iztro
+ *  宮名多為二字如「財帛」需補;此處只在未以「宮」結尾時補)。 */
+function pn(name: string): string {
+  return name.endsWith('宮') ? name : `${name}宮`;
+}
+
 export function analyzeFlying(astro: IFunctionalAstrolabe): FlyingStatement[] {
   const out: FlyingStatement[] = [];
 
@@ -95,7 +101,7 @@ export function analyzeFlying(astro: IFunctionalAstrolabe): FlyingStatement[] {
         if (src.selfMutaged(m)) {
           out.push({
             domain: cfg.domain,
-            flow: `${sourceName}宮自化${m}`,
+            flow: `${pn(sourceName)}自化${m}`,
             meaning: `${cfg.phrase[m]}(力量回歸自身,起伏更明顯)`,
           });
         }
@@ -118,7 +124,7 @@ export function analyzeFlying(astro: IFunctionalAstrolabe): FlyingStatement[] {
       if (targetName === sourceName) return; // 自化已處理
       out.push({
         domain: cfg.domain,
-        flow: `${sourceName}宮化${m}入${targetName}宮`,
+        flow: `${pn(sourceName)}化${m}入${pn(targetName)}`,
         meaning: cfg.phrase[m],
       });
     });
