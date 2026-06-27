@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fitDisplayScale } from "@/lib/studio/canvas-fit";
+import { fitDisplayScale, convertUnit } from "@/lib/studio/canvas-fit";
 
 describe("fitDisplayScale", () => {
   it("fits a wide doc by width when width is the binding constraint", () => {
@@ -38,5 +38,34 @@ describe("fitDisplayScale", () => {
     const s = fitDisplayScale(realW, realH, availW, availH);
     expect(realW * s).toBeLessThanOrEqual(availW + 1e-6);
     expect(realH * s).toBeLessThanOrEqual(availH + 1e-6);
+  });
+});
+
+describe("convertUnit", () => {
+  it("is identity for same unit", () => {
+    expect(convertUnit(1234, "px", "px", 300)).toBe(1234);
+    expect(convertUnit(9, "cm", "cm", 300)).toBe(9);
+  });
+
+  it("px ↔ cm round-trips at DPI (no catastrophic blow-up — the footgun this fixes)", () => {
+    // 1234px @300dpi → cm, then back → ~1234px (not 1234cm = 145748px)
+    const cm = convertUnit(1234, "px", "cm", 300);
+    expect(cm).toBeCloseTo((1234 / 300) * 2.54, 1); // ~10.45cm
+    const backPx = convertUnit(cm, "cm", "px", 300);
+    expect(Math.abs(backPx - 1234)).toBeLessThanOrEqual(2); // round-trip within rounding
+  });
+
+  it("cm ↔ mm is ×10 (fixes the pre-existing silent cm/mm bug)", () => {
+    expect(convertUnit(9, "cm", "mm", 300)).toBe(90);
+    expect(convertUnit(90, "mm", "cm", 300)).toBe(9);
+  });
+
+  it("cm → px uses DPI", () => {
+    // 2.54cm @300dpi = 300px
+    expect(convertUnit(2.54, "cm", "px", 300)).toBe(300);
+  });
+
+  it("guards non-finite input", () => {
+    expect(convertUnit(NaN, "px", "cm", 300)).toBeNaN();
   });
 });

@@ -30,7 +30,7 @@ import { posterizeDataUrl } from "@/lib/studio/posterize";
 // Pure-data import only (NOT generative-fill.ts — that uses Buffer/process.env, server-only).
 import { OUTPAINT_PRESETS, OUTPAINT_LABELS, type OutpaintPreset } from "@/lib/studio/outpaint-presets";
 import { EDGE_MASK_STYLES, applyEdgeMask, buildMaskSvg, type EdgeMaskId } from "@/lib/studio/edge-mask";
-import { fitDisplayScale } from "@/lib/studio/canvas-fit";
+import { fitDisplayScale, convertUnit } from "@/lib/studio/canvas-fit";
 
 // Edge-mask chip previews (asset → PNG maskUrl; procedural → tiny SVG). Computed once at import.
 const EDGE_PREVIEWS = EDGE_MASK_STYLES.map((s) => ({
@@ -118,7 +118,7 @@ export default function CanvasEditor() {
   // 畫布尺寸 / DPI（公分↔像素；參考 vector-trace-demo）
   const [szW, setSzW] = useState(9);
   const [szH, setSzH] = useState(5.4);
-  const [szUnit, setSzUnit] = useState<"cm" | "mm">("cm");
+  const [szUnit, setSzUnit] = useState<"cm" | "mm" | "px">("cm");
   const [szDpi, setSzDpi] = useState(300);
   const [szInfo, setSzInfo] = useState<string | null>(null);
   // Editable download filename: auto-filled from upload filename or handoff name; user can override.
@@ -338,6 +338,10 @@ export default function CanvasEditor() {
             height: Math.round(realH * dispScale),
           });
           canvasMetaRef.current = { realW, realH, dispScale, dpi: szDpi };
+          // 畫布尺寸 panel 反映「圖片的實際 px 尺寸」(非預設 9×5.4cm) — 一致且按套用不會縮回預設。
+          setSzUnit("px");
+          setSzW(realW);
+          setSzH(realH);
           setSzInfo(`來源 ${realW}×${realH}px（預覽 ${Math.round(dispScale * 100)}%）`);
           img.set({
             left: realW / 2,
@@ -722,9 +726,10 @@ export default function CanvasEditor() {
     } | null;
     if (!canvas) return;
     sizedByCanvasApply.current = true;
-    const cm = (v: number) => (szUnit === "mm" ? v / 10 : v);
-    const realW = Math.max(1, Math.round((cm(szW) * szDpi) / 2.54));
-    const realH = Math.max(1, Math.round((cm(szH) * szDpi) / 2.54));
+    // px unit = the value IS the real pixel size (no DPI conversion); cm/mm → px via DPI.
+    const toPx = (v: number) => (szUnit === "px" ? Math.round(v) : Math.round(((szUnit === "mm" ? v / 10 : v) * szDpi) / 2.54));
+    const realW = Math.max(1, toPx(szW));
+    const realH = Math.max(1, toPx(szH));
 
     // The OLD working width in real-coordinate space (before this resize). First time = the
     // current element width ÷ current zoom; after a prior sizing = the stored realW.
@@ -1009,6 +1014,10 @@ export default function CanvasEditor() {
           canvas.add(img);
           canvas.setActiveObject(img);
           relayoutCanvas(); // fit the now image-sized artboard into the viewport
+          // 畫布尺寸 panel 反映圖片 px 尺寸（一致 + 按套用不會縮回預設）
+          setSzUnit("px");
+          setSzW(img.width);
+          setSzH(img.height);
           setSzInfo(`來源 ${img.width}×${img.height}px（預覽 ${Math.round((canvasMetaRef.current?.dispScale ?? 1) * 100)}%）`);
           return;
         }
@@ -1798,19 +1807,26 @@ export default function CanvasEditor() {
             <div style={{ display: "flex", gap: 8 }}>
               <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
                 寬
-                <input className="btn-secondary" type="number" min={0.1} step={0.1} value={szW} onChange={(e) => setSzW(Number(e.target.value))} style={{ width: "100%" }} />
+                <input className="btn-secondary" type="number" min={szUnit === "px" ? 1 : 0.1} step={szUnit === "px" ? 1 : 0.1} value={szW} onChange={(e) => setSzW(Number(e.target.value))} style={{ width: "100%" }} />
               </label>
               <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
                 高
-                <input className="btn-secondary" type="number" min={0.1} step={0.1} value={szH} onChange={(e) => setSzH(Number(e.target.value))} style={{ width: "100%" }} />
+                <input className="btn-secondary" type="number" min={szUnit === "px" ? 1 : 0.1} step={szUnit === "px" ? 1 : 0.1} value={szH} onChange={(e) => setSzH(Number(e.target.value))} style={{ width: "100%" }} />
               </label>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
                 單位
-                <select className="btn-secondary" value={szUnit} onChange={(e) => setSzUnit(e.target.value as "cm" | "mm")}>
+                <select className="btn-secondary" value={szUnit} onChange={(e) => {
+                  const next = e.target.value as "cm" | "mm" | "px";
+                  // Convert the displayed values so the size is preserved (e.g. 1234px → 10.45cm, not 1234cm).
+                  setSzW(convertUnit(szW, szUnit, next, szDpi));
+                  setSzH(convertUnit(szH, szUnit, next, szDpi));
+                  setSzUnit(next);
+                }}>
                   <option value="cm">公分 cm</option>
                   <option value="mm">公釐 mm</option>
+                  <option value="px">像素 px</option>
                 </select>
               </label>
               <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
