@@ -4,6 +4,24 @@
 
 ## 2026-06-27
 
+### feat(provisioning): AI hero 圖自動生成+插入站（視覺層收尾）
+
+[任務理解] 建站完善最後一塊「套圖」——讓建出的站有 AI 生的 hero 圖（不只內容+品牌色）。
+
+[現況分析] image-gen toolkit `generateTarotImage`（Replicate，flux-schnell ~5-8s）已存在；R2 `putDesignObject` 取公開 URL；WP 核心 `media_sideload_image` 可從 URL 匯入。同步 seed call 90s budget 容得下 1 張 flux-schnell。
+
+[已修改]（`provision-staging/route.ts`）
+- `generateAndInstallHeroImage(conn, wpPath, spec)`：prompt 取 spec.design.image_style+site_name → `generateTarotImage(flux-schnell,16:9)` → `parseImageDataUrl` → `putDesignObject` 取 R2 `.webp` 公開 URL → base64 script `wpcli eval` 用 `media_sideload_image` 匯入+prepend wp:image block 到 aw-home+set_post_thumbnail。idempotent(`aw_hero_done`)、best-effort(失敗不擋 seed)。
+- 在 `seedContentFromSpec` seed 成功後 try/catch 呼叫，note 併入回傳。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | `media_sideload_image`+wp:image block 機制實機驗證(site-cca9e5 用測試圖 URL → AW_HERO_OK att=11 → playwright 截圖確認圖渲染在首頁頂部+品牌色); R2 buildWebImageKey 產 `.webp`(滿足 media_sideload_image 副檔名檢查; picsum 無副檔名才被拒已釐清)。**真 AI 生成 e2e 部署後驗(需 prod REPLICATE/R2 env)。**
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/2n(worst-case timing ~80s 仍在 90s/120s ceiling 內; hero 失敗不重試=cost-safe) | 注入淨(url 全 server-controlled 雙重包)、best-effort 隔離 airtight、無 retry loop
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=generateAndInstallHeroImage|media_sideload_image|aw_hero_done | hits: 自身+測試腳本; 復用既有 generateTarotImage/R2(無重建)
+
+[剩餘風險] ① 真 AI 生成部署後才驗。② worst-case timing ~80s(Replicate stall) 仍 bounded。③ hero 失敗永久(需清 aw_hero_done/aw_seed_done 重試)。④ 目前 1 張 hero(非每 section)——足夠視覺收尾。
+[rollback] git revert; best-effort 全包,未部署無 runtime 影響。
+
 ### feat(provisioning): 建站完善 — slug fallback + 品牌色注入 + 內容工具 wiring
 
 [任務理解] live UI 實測建出曦光藝術工作室站後，操作者要把瑕疵補完整：① slug 全中文名變 `-894881` ② AI 品牌色沒套進站（樸素）③ 連通性稽核發現新客戶對 SEO Content/Video「不存在」。

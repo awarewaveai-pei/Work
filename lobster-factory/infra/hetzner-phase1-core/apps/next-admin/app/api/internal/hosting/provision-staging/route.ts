@@ -14,6 +14,8 @@ import { Client as SshClient } from "ssh2";
 import { timingSafeEqual } from "../../../../../lib/ops-inbox/verifyIngestToken";
 import { getSupabaseWriteClient } from "../../../../../lib/supabase-server";
 import type { WebsiteSpec } from "../../../../../lib/onboarding/intake-form";
+import { generateTarotImage } from "../../../../../lib/tarot/image-gen";
+import { isR2Configured, buildWebImageKey, parseImageDataUrl, putDesignObject } from "../../../../../lib/storage/r2";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -147,6 +149,42 @@ function buildSeedScript(spec: WebsiteSpec, wpPath: string): string {
   return L.join("\n");
 }
 
+// Generate ONE AI hero image from the spec's visual direction and install it at the top of the
+// homepage (+ set as featured). flux-schnell is fast (~5-8s) so this fits inside the seed call's
+// budget. Best-effort + idempotent (aw_hero_done option) — a failure never fails seeding.
+// `media_sideload_image` (core) does the import+insert in one PHP eval, so no bash/php var passing.
+async function generateAndInstallHeroImage(conn: SshClient, wpPath: string, spec: WebsiteSpec): Promise<string> {
+  if (!isR2Configured()) return "hero image skipped: R2 not configured";
+  const style = (spec.design?.image_style || "warm natural light, soft handcrafted texture, atmospheric").slice(0, 200);
+  const prompt = `${style}. Wide hero banner photograph for ${spec.site_name || "a brand"}. Cinematic, high detail, tasteful, no text, no words, no letters, no logo.`;
+  const gen = await generateTarotImage({ model: "flux-schnell", prompt, aspectRatio: "16:9" });
+  if (!gen.ok) return `hero image gen failed: ${"error" in gen ? gen.error : "gen_failed"}`;
+  const parsed = parseImageDataUrl(gen.image);
+  if (!parsed) return "hero image: unparseable output";
+  const key = buildWebImageKey();
+  const put = await putDesignObject(key, parsed.buffer, parsed.mime);
+  if (!put.ok) return "hero image: R2 upload failed";
+  const url = put.publicUrl; // public https R2 URL — controlled, no user input
+  const heroPhp =
+    `$url='${url}';$h=get_page_by_path('aw-home');if(!$h){echo 'AW_HERO_NOHOME';return;}` +
+    `require_once(ABSPATH.'wp-admin/includes/media.php');require_once(ABSPATH.'wp-admin/includes/file.php');require_once(ABSPATH.'wp-admin/includes/image.php');` +
+    `$att=media_sideload_image($url,$h->ID,null,'id');if(is_wp_error($att)){echo 'AW_HERO_ERR '.$att->get_error_message();return;}` +
+    `$img=wp_get_attachment_url($att);$b='<!-- wp:image {"id":'.$att.',"sizeSlug":"large","align":"wide"} --><figure class="wp-block-image alignwide size-large"><img src="'.$img.'" alt="" class="wp-image-'.$att.'"/></figure><!-- /wp:image -->';` +
+    `wp_update_post(array('ID'=>$h->ID,'post_content'=>$b.$h->post_content));set_post_thumbnail($h->ID,$att);echo 'AW_HERO_OK att='.$att;`;
+  const script = [
+    `wpcli() { php -d memory_limit=256M /usr/local/bin/wp --path=${shq(wpPath + "/")} "$@"; }`,
+    `if [ "$(wpcli option get aw_hero_done 2>/dev/null)" = "1" ]; then echo "AW_HERO_SKIP"; exit 0; fi`,
+    `wpcli eval ${shq(heroPhp)}`,
+    `wpcli option update aw_hero_done 1 >/dev/null`,
+  ].join("\n");
+  const b64 = Buffer.from(script, "utf8").toString("base64");
+  const res = await sshExec(conn, `echo '${b64}' | base64 -d | docker exec -i -u www-data lobster-wordpress bash`);
+  const out = `${res.stdout}${res.stderr}`;
+  return out.includes("AW_HERO_OK") || out.includes("AW_HERO_SKIP")
+    ? `hero image: ${out.match(/AW_HERO_(OK|SKIP)[^\n]*/)?.[0] ?? "ok"}`
+    : `hero image WARN: ${out.replace(/\s+/g, " ").slice(0, 200)}`;
+}
+
 async function seedContentFromSpec(conn: SshClient, wpPath: string, websiteSpecId: string): Promise<string> {
   const supabase = getSupabaseWriteClient();
   if (!supabase) return "content seed skipped: no DB client";
@@ -166,7 +204,14 @@ async function seedContentFromSpec(conn: SshClient, wpPath: string, websiteSpecI
   if (res.code !== 0 || !(out.includes("AW_SEED_OK") || out.includes("AW_SEED_SKIP"))) {
     return `content seed WARN (code ${res.code}): ${out.replace(/\s+/g, " ").slice(0, 300)}`;
   }
-  return `content seeded: ${out.match(/AW_SEED_(OK|SKIP)[^\n]*/)?.[0] ?? "ok"}`;
+  // Best-effort AI hero image (never fails the seed result).
+  let heroNote = "hero image skipped";
+  try {
+    heroNote = await generateAndInstallHeroImage(conn, wpPath, spec);
+  } catch (e) {
+    heroNote = `hero image error: ${e instanceof Error ? e.message : String(e)}`;
+  }
+  return `content seeded: ${out.match(/AW_SEED_(OK|SKIP)[^\n]*/)?.[0] ?? "ok"} | ${heroNote}`;
 }
 
 // Wire a newly-provisioned client into the content toolchain: create a WP Application Password,
