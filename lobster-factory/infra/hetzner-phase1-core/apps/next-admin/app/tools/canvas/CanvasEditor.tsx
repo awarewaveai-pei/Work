@@ -1729,8 +1729,8 @@ export default function CanvasEditor() {
           <canvas ref={canvasElRef} width={800} height={800} />
         </div>
 
-        {/* 右側工具欄：固定寬、sticky 黏住視窗並吃滿可視高度（畫布很高時整頁會捲，sticky 讓工具欄
-            永遠完整在畫面內、用滿垂直空間 → 一次看到更多工具，少捲動）。 */}
+        {/* 右側工具欄：固定寬、sticky 黏住視窗。maxHeight 綁同一個 workspaceH(=工作區可用高),
+            這樣工具欄不會比工作區高 → 不撐出整頁捲軸;面板多時欄內自行捲動。 */}
         <div
           style={{
             width: 300,
@@ -1738,7 +1738,7 @@ export default function CanvasEditor() {
             position: "sticky",
             top: 12,
             alignSelf: "flex-start",
-            maxHeight: "calc(100vh - 24px)",
+            maxHeight: workspaceH,
             overflowY: "auto",
             display: "flex",
             flexDirection: "column",
