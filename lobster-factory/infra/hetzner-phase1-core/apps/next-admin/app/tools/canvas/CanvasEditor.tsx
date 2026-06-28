@@ -1765,6 +1765,27 @@ export default function CanvasEditor() {
           ) : null}
         </div>
 
+        {/* 💾 匯出 / 下載 — 放最上方（主要輸出動作，免捲動）*/}
+        <SidebarPanel id="export" title="💾 匯出 / 下載" defaultPos={{ x: 816, y: 0 }} width={280}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <input
+              type="text"
+              value={editName}
+              onChange={(e) => { setEditName(e.target.value); nameRef.current = null; }}
+              placeholder="檔名"
+              title="下載檔名（不含副檔名）"
+              style={{ fontSize: 12, padding: "2px 6px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)", width: "100%" }}
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready || cropMode} onClick={download} title="下載全尺寸 PNG">PNG下載</button>
+              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready || cropMode} onClick={() => void downloadWebP()} title="下載 WebP，自動壓縮至 200KB 以內">WebP下載</button>
+            </div>
+            <button className="btn-primary" style={{ width: "100%" }} disabled={!ready || cropMode || saveState === "saving" || saveState === "saved"} onClick={() => void saveToDesigns()}>
+              {saveState === "saved" ? "已存入 ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}
+            </button>
+          </div>
+        </SidebarPanel>
+
         {/* 🧰 更多工具 — 形狀 / 鎖定 / 群組 / 畫筆 / 橡皮擦 / 設計檔（低頻，收合省空間）*/}
         <SidebarPanel id="more-tools" title="🧰 更多工具" defaultPos={{ x: 816, y: 0 }} width={280} defaultCollapsed>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1798,68 +1819,6 @@ export default function CanvasEditor() {
           </div>
         </SidebarPanel>
 
-        {/* 🔤 文字 — 整合：字型/顏色/字級 + 樣式切換(B/I/U/弧形) + 進階字型庫(Google Fonts/上傳)。
-            (原「文字樣式」+「字型庫」兩面板合併,避免重複混淆。) */}
-        <SidebarPanel id="text-style" title="🔤 文字" defaultPos={{ x: 816, y: 0 }} width={280} defaultCollapsed>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
-            <span style={{ opacity: 0.6 }}>{textSelected ? "套用到選取文字" : "新文字預設"}</span>
-            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 30 }}>字型</span>
-              <select className="btn-secondary" value={textFont} disabled={!ready} onChange={(e) => { setTextFont(e.target.value); applyTextStyle({ fontFamily: e.target.value }); }} style={{ flex: 1 }}>
-                {FONT_OPTIONS.map((f) => (<option key={f.label} value={f.value} style={{ fontFamily: f.value }}>{f.label}</option>))}
-              </select>
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 30 }}>顏色</span>
-              <input type="color" value={textColor} disabled={!ready} onChange={(e) => { setTextColor(e.target.value); applyTextStyle({ fill: e.target.value }); }} style={{ width: 36, height: 24, padding: 0, border: "1px solid var(--card-border)", borderRadius: 4, cursor: "pointer" }} />
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 30 }}>字級</span>
-              <input type="range" min={8} max={200} step={1} value={textSize} disabled={!ready} onChange={(e) => { const v = Number(e.target.value); setTextSize(v); applyTextStyle({ fontSize: v }); }} style={{ flex: 1 }} />
-              <span style={{ width: 28, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{textSize}</span>
-            </label>
-            {/* 樣式切換 */}
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              <button className="btn-secondary" style={{ fontSize: 13, fontWeight: 700 }} title="粗體（切換）" onClick={() => toggleText("fontWeight")}>B</button>
-              <button className="btn-secondary" style={{ fontSize: 13, fontStyle: "italic" }} title="斜體（切換）" onClick={() => toggleText("fontStyle")}>I</button>
-              <button className="btn-secondary" style={{ fontSize: 13, textDecoration: "underline" }} title="底線（切換）" onClick={() => toggleText("underline")}>U</button>
-              <button className="btn-secondary" style={{ fontSize: 12 }} title="文字沿弧形路徑" onClick={() => applyTextArc(true)}>〽️ 弧形</button>
-              <button className="btn-secondary" style={{ fontSize: 12 }} title="取消弧形（拉直）" onClick={() => applyTextArc(false)}>直</button>
-            </div>
-            {/* 進階字型庫：Google Fonts（中/英）+ 上傳字型 */}
-            <div style={{ borderTop: "1px solid var(--card-border)", paddingTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
-              <span style={{ opacity: 0.6, fontSize: 11 }}>更多字型（Google Fonts / 上傳）</span>
-              <FontLibrary
-                current={textFont}
-                onPick={(family) => {
-                  setTextFont(family);
-                  applyTextStyle({ fontFamily: family });
-                }}
-              />
-            </div>
-          </div>
-        </SidebarPanel>
-
-        {/* 💾 匯出 / 下載 */}
-        <SidebarPanel id="export" title="💾 匯出 / 下載" defaultPos={{ x: 816, y: 0 }} width={280}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <input
-              type="text"
-              value={editName}
-              onChange={(e) => { setEditName(e.target.value); nameRef.current = null; }}
-              placeholder="檔名"
-              title="下載檔名（不含副檔名）"
-              style={{ fontSize: 12, padding: "2px 6px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)", width: "100%" }}
-            />
-            <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready || cropMode} onClick={download} title="下載全尺寸 PNG">PNG下載</button>
-              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready || cropMode} onClick={() => void downloadWebP()} title="下載 WebP，自動壓縮至 200KB 以內">WebP下載</button>
-            </div>
-            <button className="btn-primary" style={{ width: "100%" }} disabled={!ready || cropMode || saveState === "saving" || saveState === "saved"} onClick={() => void saveToDesigns()}>
-              {saveState === "saved" ? "已存入 ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}
-            </button>
-          </div>
-        </SidebarPanel>
         {/* 📐 畫布尺寸 / DPI — 公分/公釐 + DPI 自設（參考 vector-trace-demo）。 */}
         <SidebarPanel id="canvas-size" title="📐 畫布尺寸 / DPI" defaultPos={{ x: 816, y: 0 }} width={236} defaultCollapsed>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
@@ -1929,6 +1888,48 @@ export default function CanvasEditor() {
             </div>
           </SidebarPanel>
         ) : null}
+
+        {/* 🔤 文字 — 整合：字型/顏色/字級 + 樣式切換(B/I/U/弧形) + 進階字型庫。放在圖層下方。
+            (原「文字樣式」+「字型庫」兩面板合併,避免重複混淆。) */}
+        <SidebarPanel id="text-style" title="🔤 文字" defaultPos={{ x: 816, y: 0 }} width={280} defaultCollapsed>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
+            <span style={{ opacity: 0.6 }}>{textSelected ? "套用到選取文字" : "新文字預設"}</span>
+            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 30 }}>字型</span>
+              <select className="btn-secondary" value={textFont} disabled={!ready} onChange={(e) => { setTextFont(e.target.value); applyTextStyle({ fontFamily: e.target.value }); }} style={{ flex: 1 }}>
+                {FONT_OPTIONS.map((f) => (<option key={f.label} value={f.value} style={{ fontFamily: f.value }}>{f.label}</option>))}
+              </select>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 30 }}>顏色</span>
+              <input type="color" value={textColor} disabled={!ready} onChange={(e) => { setTextColor(e.target.value); applyTextStyle({ fill: e.target.value }); }} style={{ width: 36, height: 24, padding: 0, border: "1px solid var(--card-border)", borderRadius: 4, cursor: "pointer" }} />
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 30 }}>字級</span>
+              <input type="range" min={8} max={200} step={1} value={textSize} disabled={!ready} onChange={(e) => { const v = Number(e.target.value); setTextSize(v); applyTextStyle({ fontSize: v }); }} style={{ flex: 1 }} />
+              <span style={{ width: 28, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{textSize}</span>
+            </label>
+            {/* 樣式切換 */}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <button className="btn-secondary" style={{ fontSize: 13, fontWeight: 700 }} title="粗體（切換）" onClick={() => toggleText("fontWeight")}>B</button>
+              <button className="btn-secondary" style={{ fontSize: 13, fontStyle: "italic" }} title="斜體（切換）" onClick={() => toggleText("fontStyle")}>I</button>
+              <button className="btn-secondary" style={{ fontSize: 13, textDecoration: "underline" }} title="底線（切換）" onClick={() => toggleText("underline")}>U</button>
+              <button className="btn-secondary" style={{ fontSize: 12 }} title="文字沿弧形路徑" onClick={() => applyTextArc(true)}>〽️ 弧形</button>
+              <button className="btn-secondary" style={{ fontSize: 12 }} title="取消弧形（拉直）" onClick={() => applyTextArc(false)}>直</button>
+            </div>
+            {/* 進階字型庫：Google Fonts（中/英）+ 上傳字型 */}
+            <div style={{ borderTop: "1px solid var(--card-border)", paddingTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ opacity: 0.6, fontSize: 11 }}>更多字型（Google Fonts / 上傳）</span>
+              <FontLibrary
+                current={textFont}
+                onPick={(family) => {
+                  setTextFont(family);
+                  applyTextStyle({ fontFamily: family });
+                }}
+              />
+            </div>
+          </div>
+        </SidebarPanel>
 
         {/* 🎨 物件效果（PS 圖層樣式）— always shown (collapsed); acts on the active object when one is selected. */}
         {(
