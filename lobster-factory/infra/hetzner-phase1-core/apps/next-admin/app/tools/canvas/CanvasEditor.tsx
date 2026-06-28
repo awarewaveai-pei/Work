@@ -217,6 +217,15 @@ export default function CanvasEditor() {
         preserveObjectStacking: true,
       });
       fabricRef.current = canvas;
+      // The artboard = the white canvas = the real export bounds. Give Fabric's wrapper a drop-shadow
+      // + crisp border so it stands out from the grey checker workspace → the user sees exactly where
+      // the usable area ends (Photoshop/Figma-style). setDimensions only touches size, not these.
+      const wrap = (canvas as unknown as { wrapperEl?: HTMLElement }).wrapperEl;
+      if (wrap) {
+        wrap.style.boxShadow = "0 3px 14px rgba(0,0,0,0.26)";
+        wrap.style.outline = "1px solid rgba(128,128,128,0.5)";
+        wrap.style.borderRadius = "2px";
+      }
       // Default 800×800 document so the auto-fit (relayoutCanvas) has a real size to scale from even
       // before a handoff/upload. Export uses these realW/realH. (Was null → no auto-fit on direct visit.)
       canvasMetaRef.current = { realW: 800, realH: 800, dispScale: 1, dpi: szDpi };
@@ -329,8 +338,8 @@ export default function CanvasEditor() {
           // Fit the preview into the visible workspace (width AND height) so it never exceeds one
           // viewport. Export stays at realW/realH. Subsequent resizes go through relayoutCanvas().
           const el = canvasContainerRef.current;
-          const availW = el ? Math.max(200, el.clientWidth - 4) : 650;
-          const availH = el && typeof window !== "undefined" ? Math.max(220, window.innerHeight - el.getBoundingClientRect().top - 20) : 650;
+          const availW = el ? Math.max(200, el.clientWidth - 36) : 650;
+          const availH = el ? Math.max(220, el.clientHeight - 36) : 650;
           const dispScale = fitDisplayScale(realW, realH, availW, availH);
           canvas.setZoom(dispScale);
           canvas.setDimensions({
@@ -704,8 +713,10 @@ export default function CanvasEditor() {
     const m = canvasMetaRef.current;
     const el = canvasContainerRef.current;
     if (!canvas || !m || !el || typeof window === "undefined") return;
-    const availW = Math.max(200, el.clientWidth - 4);
-    const availH = Math.max(220, window.innerHeight - el.getBoundingClientRect().top - 20);
+    // Fit inside the workspace container (fixed height) leaving a margin → the artboard floats with
+    // grey checker around it, so its real bounds are visible (not mistaken for the whole white area).
+    const availW = Math.max(200, el.clientWidth - 36);
+    const availH = Math.max(220, el.clientHeight - 36);
     const dispScale = fitDisplayScale(m.realW, m.realH, availW, availH);
     canvas.setZoom(dispScale);
     canvas.setDimensions({ width: Math.round(m.realW * dispScale), height: Math.round(m.realH * dispScale) });
@@ -1686,7 +1697,21 @@ export default function CanvasEditor() {
 
       {/* 畫布 + 右側可捲動工具欄（vector-trace-demo 風格）。面板垂直堆疊、可收合。 */}
       <div style={{ display: "flex", gap: 12, alignItems: "flex-start", width: "100%" }}>
-        <div ref={canvasContainerRef} style={{ border: "1px solid var(--card-border)", borderRadius: 8, flex: 1, minWidth: 0, background: "var(--card-bg)", display: "flex", justifyContent: "center", overflow: "hidden" }}>
+        <div
+          ref={canvasContainerRef}
+          style={{
+            border: "1px solid var(--card-border)", borderRadius: 8, flex: 1, minWidth: 0,
+            height: "calc(100vh - 110px)", // fixed workspace height → artboard floats centred inside it
+            display: "flex", justifyContent: "center", alignItems: "center", overflow: "hidden",
+            // 工作區 = 淡灰棋盤格（半透明灰，明暗主題皆可讀）。白色畫板(=匯出範圍)浮在上面、有陰影邊框 →
+            // 一眼看出「灰格=非畫布、不可用」「白卡=真正可用範圍」。
+            backgroundColor: "var(--card-bg)",
+            backgroundImage:
+              "linear-gradient(45deg, rgba(128,128,128,0.16) 25%, transparent 25%), linear-gradient(-45deg, rgba(128,128,128,0.16) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, rgba(128,128,128,0.16) 75%), linear-gradient(-45deg, transparent 75%, rgba(128,128,128,0.16) 75%)",
+            backgroundSize: "22px 22px",
+            backgroundPosition: "0 0, 0 11px, 11px -11px, -11px 0",
+          }}
+        >
           <canvas ref={canvasElRef} width={800} height={800} />
         </div>
 
