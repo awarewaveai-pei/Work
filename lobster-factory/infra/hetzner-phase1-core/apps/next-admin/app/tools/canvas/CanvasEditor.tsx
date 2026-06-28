@@ -1784,8 +1784,9 @@ export default function CanvasEditor() {
           </div>
         </SidebarPanel>
 
-        {/* 🔤 文字 — 字型 / 顏色 / 字級（套用到選取文字，或設定新文字預設）*/}
-        <SidebarPanel id="text-style" title="✏️ 文字樣式" defaultPos={{ x: 816, y: 0 }} width={280} defaultCollapsed>
+        {/* 🔤 文字 — 整合：字型/顏色/字級 + 樣式切換(B/I/U/弧形) + 進階字型庫(Google Fonts/上傳)。
+            (原「文字樣式」+「字型庫」兩面板合併,避免重複混淆。) */}
+        <SidebarPanel id="text-style" title="🔤 文字" defaultPos={{ x: 816, y: 0 }} width={280} defaultCollapsed>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
             <span style={{ opacity: 0.6 }}>{textSelected ? "套用到選取文字" : "新文字預設"}</span>
             <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -1803,6 +1804,25 @@ export default function CanvasEditor() {
               <input type="range" min={8} max={200} step={1} value={textSize} disabled={!ready} onChange={(e) => { const v = Number(e.target.value); setTextSize(v); applyTextStyle({ fontSize: v }); }} style={{ flex: 1 }} />
               <span style={{ width: 28, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{textSize}</span>
             </label>
+            {/* 樣式切換 */}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <button className="btn-secondary" style={{ fontSize: 13, fontWeight: 700 }} title="粗體（切換）" onClick={() => toggleText("fontWeight")}>B</button>
+              <button className="btn-secondary" style={{ fontSize: 13, fontStyle: "italic" }} title="斜體（切換）" onClick={() => toggleText("fontStyle")}>I</button>
+              <button className="btn-secondary" style={{ fontSize: 13, textDecoration: "underline" }} title="底線（切換）" onClick={() => toggleText("underline")}>U</button>
+              <button className="btn-secondary" style={{ fontSize: 12 }} title="文字沿弧形路徑" onClick={() => applyTextArc(true)}>〽️ 弧形</button>
+              <button className="btn-secondary" style={{ fontSize: 12 }} title="取消弧形（拉直）" onClick={() => applyTextArc(false)}>直</button>
+            </div>
+            {/* 進階字型庫：Google Fonts（中/英）+ 上傳字型 */}
+            <div style={{ borderTop: "1px solid var(--card-border)", paddingTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ opacity: 0.6, fontSize: 11 }}>更多字型（Google Fonts / 上傳）</span>
+              <FontLibrary
+                current={textFont}
+                onPick={(family) => {
+                  setTextFont(family);
+                  applyTextStyle({ fontFamily: family });
+                }}
+              />
+            </div>
           </div>
         </SidebarPanel>
 
@@ -2162,25 +2182,7 @@ export default function CanvasEditor() {
           </>
         )}
 
-        {/* 🔤 字型庫 — always shown (collapsed); text styling acts on the active text object. */}
-        {(
-          <SidebarPanel id="fonts" title="🔤 字型庫" defaultPos={{ x: 816, y: 454 }} width={240} defaultCollapsed>
-            <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-              <button className="btn-secondary" style={{ fontSize: 13, fontWeight: 700 }} title="粗體（切換）" onClick={() => toggleText("fontWeight")}>B</button>
-              <button className="btn-secondary" style={{ fontSize: 13, fontStyle: "italic" }} title="斜體（切換）" onClick={() => toggleText("fontStyle")}>I</button>
-              <button className="btn-secondary" style={{ fontSize: 13, textDecoration: "underline" }} title="底線（切換）" onClick={() => toggleText("underline")}>U</button>
-              <button className="btn-secondary" style={{ fontSize: 12 }} title="文字沿弧形路徑" onClick={() => applyTextArc(true)}>〽️ 弧形</button>
-              <button className="btn-secondary" style={{ fontSize: 12 }} title="取消弧形（拉直）" onClick={() => applyTextArc(false)}>直</button>
-            </div>
-            <FontLibrary
-              current={textFont}
-              onPick={(family) => {
-                setTextFont(family);
-                applyTextStyle({ fontFamily: family });
-              }}
-            />
-          </SidebarPanel>
-        )}
+        {/* (原獨立「🔤 字型庫」面板已併入上方「🔤 文字」面板,避免兩個文字面板重複混淆。) */}
         </div>
       </div>
     </div>
