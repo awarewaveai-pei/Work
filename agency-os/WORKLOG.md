@@ -2,6 +2,33 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-28
+
+### fix(netdata): SG web_log「unparsed=100%」誤報根因 — netdata user 不在 adm 群組讀不到 nginx log
+
+[任務理解] SG Netdata 反覆告警「Web log unparsed = 100%」(fp=7df3dd62, NEW→REOPENED flap)。表面是「log 無法解析」,真因是 netdata 根本讀不到 host nginx access.log。
+
+[現況分析]
+- netdata go.d web_log job tail `/var/log/nginx/access.log`(fd 確認);該 log 經 grep 證實 0/1179 行不符標準 combined(host nginx 無自訂 log_format)。
+- 但 netdata 把每一行都判 unmatched(excluded_requests.unmatched 陣列逐點 == requests 陣列;successful/bad/redirect 全 0%)→ parser 一行都沒成功。
+- `id netdata` = groups `netdata,docker`,**不在 adm**;log 為 `0640 www-data:adm`;`sudo -u netdata test -r` = NOT-READABLE。
+- 重啟 netdata 後 web_log charts 由 N 變 **0**(go.d 開檔 permission denied,建不了 chart)→ 鐵證讀不到。重啟前是靠 logrotate 殘留舊 fd 讀到 rotated 內容 → 產生畸形 unmatched 資料。
+
+[根因] netdata 服務帳號未加入 `adm` 群組 → 無法讀取 mode 0640 group=adm 的 nginx access.log。alarm `web_log_1m_unmatched` 有 `total_requests>120` gate,正常低流量被壓住=CLEAR,scanner 爆量 >120/min 才觸發 → 間歇 flap。副作用:web_log-based 5xx 監控同時失效。
+
+[已修改]（SG `5.223.93.113`,非 repo code）
+- `usermod -aG adm netdata` → netdata groups 加 `4(adm)`;`/etc/group` 持久化 `adm:x:4:syslog,netdata`(跨重啟生效)。
+- `systemctl restart netdata` 套用新群組。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`usermod -aG adm netdata; systemctl restart netdata; curl localhost:19999/api/v1/data?chart=web_log_nginx.requests_by_type` | exit=0 | 製造 10 個 200 請求後 `success=0.7`(parser 正常匹配)、`unmatched=0`(原 100%)、web_log charts count=12(原 0)。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — alarm `web_log_1m_unmatched` status=CLEAR value=0%;go.d fd 重新指向 access.log 且可讀;持久化確認。
+- BUGHUNT_WAIVED: NA -- 純 VPS 群組設定變更,無 repo code/symbol/callsite 受影響。
+
+[剩餘風險] 若日後重佈 netdata 或改 log group,可能再現;adm 群組賦予讀系統 log(監控代理標準做法,非特權)。
+
+[rollback] `gpasswd -d netdata adm && systemctl restart netdata`。
+
 ## 2026-06-27
 
 ### feat(oracle): 紫微十二宮逐星知識庫 — 14主星×12宮正統解讀引擎
@@ -14515,7 +14542,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-26 17:29:00 UTC_
+_Last synced: 2026-06-27 22:19:36 UTC_
 
 ## 2026-06-16 AO-CLOSE prep — 15:xx session close
 
@@ -15701,6 +15728,7 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~15000
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/2n (all fixed before commit)
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=prefillAppliedRef|ScriptRemotionPrefill|RemotionBridge|introEnabled | hits=0 (intro fields remain optional in API routes — no stale callers)
+
 
 
 
