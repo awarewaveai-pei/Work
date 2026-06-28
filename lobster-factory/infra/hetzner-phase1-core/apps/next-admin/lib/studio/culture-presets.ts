@@ -147,19 +147,10 @@ export const CULTURE_REGIONS: CultureGroup[] = [
   },
 ];
 
-// ── 鏡頭 Lenses — the cultural facet to draw from.
-//   key      = stable id (used by the dynamic API + cache key)
-//   hint     = English fragment telling the LLM what specifics to surface
+// ── 主題型別 MapTheme — 一個文化面向（兩模式共用；做地圖用 enLabel/kind，做圖案只用 zh/emoji/fallback）。
+//   key      = stable id (used by the dynamic API + cache key; must exist in route LENS_HINTS)
+//   hint     = English fragment for the LLM (display/doc only — runtime SSOT is route.ts LENS_HINTS)
 //   fallback = a few generic chips shown before / instead of a live fetch
-export interface CultureLens {
-  key: string;
-  zh: string;
-  emoji: string;
-  hint: string;
-  fallback: CultureItem[];
-}
-
-// ── 🗺️ 地圖主題型別（提前定義，CORE_TOPICS 共用）。
 //   enLabel = English noun phrase describing the map subject (inserted in prompt)
 //   kind    = render shape: "map" = country-silhouette tourist map with icons,
 //             "transit" = colored metro/subway line diagram,
@@ -218,7 +209,7 @@ export const CORE_TOPICS: MapTheme[] = [
       { zh: "藝術家", en: "renowned artist", desc: "知名藝術家" },
     ] },
   { key: "nature", zh: "自然", emoji: "🏞️", enLabel: "natural scenic spots", kind: "map",
-    hint: "signature landscapes, mountains, lakes, coasts and natural elements",
+    hint: "signature landscapes, plants and natural elements",
     fallback: [
       { zh: "山岳", en: "famous mountain", desc: "代表山岳" },
       { zh: "湖泊", en: "scenic lake", desc: "知名湖泊" },
@@ -233,79 +224,150 @@ export const CORE_TOPICS: MapTheme[] = [
     ] },
 ];
 
-// ── 🎨 做圖案專屬 — 視覺設計元素（做不成地圖：你不會做「配色地圖」）。
-const DESIGN_LENSES: CultureLens[] = [
-  { key: "garment", zh: "服飾", emoji: "👘",
+// ── 🗺️ 觀光延伸 — 觀光/空間概念。做地圖時是觀光主題；做圖案時也能當題材（例如「必吃美食」T恤）。
+// transport(themepark/metro/roadsign) 與 觀光二分(musteat/weirdfood/mustsee/hidden/mustbuy/
+// photospot) 的 key + hint 必須與 route.ts LENS_HINTS 同步（API 以 key 驗證）。
+const TOURIST_TOPICS: MapTheme[] = [
+  { key: "musteat", zh: "必吃", emoji: "😋", enLabel: "must-try foods foreign tourists love", kind: "map",
+    hint: "must-try crowd-pleasing iconic dishes, drinks and desserts that foreign tourists love and recommend",
+    fallback: [
+      { zh: "招牌必吃", en: "must-try signature dish", desc: "必吃招牌" },
+      { zh: "人氣小吃", en: "popular street food", desc: "人氣小吃" },
+      { zh: "招牌飲品", en: "famous local drink", desc: "招牌飲品" },
+    ] },
+  // 驚奇 = 所有讓外國人驚訝的事（不只食物：習俗、奇景、怪發明…）。改 hint 後需重跑 generator。
+  { key: "weirdfood", zh: "驚奇", emoji: "😲", enLabel: "surprising things that amaze foreign tourists", kind: "map",
+    hint: "surprising, shocking or fascinating things foreign tourists find amazing about this culture — unusual foods, quirky local customs, bizarre sights, odd inventions and curious local oddities",
+    fallback: [
+      { zh: "獵奇美食", en: "surprising local food", desc: "獵奇美食" },
+      { zh: "奇特習俗", en: "quirky local custom", desc: "特殊習俗" },
+      { zh: "在地奇景", en: "bizarre local sight", desc: "在地奇景" },
+    ] },
+  { key: "mustsee", zh: "必去", emoji: "🌟", enLabel: "must-visit famous attractions", kind: "map",
+    hint: "famous must-visit attractions, top sights and bucket-list places every tourist should see",
+    fallback: [
+      { zh: "必去景點", en: "must-visit attraction", desc: "必去景點" },
+      { zh: "熱門地標", en: "popular landmark", desc: "熱門地標" },
+      { zh: "名勝", en: "famous scenic spot", desc: "知名名勝" },
+    ] },
+  { key: "hidden", zh: "秘境", emoji: "🤫", enLabel: "hidden gem secret spots", kind: "map",
+    hint: "hidden gems, secret off-the-beaten-path spots and lesser-known places that locals love",
+    fallback: [
+      { zh: "私房秘境", en: "hidden gem spot", desc: "私房秘境" },
+      { zh: "在地小景", en: "local secret spot", desc: "在地小景" },
+      { zh: "隱藏巷弄", en: "hidden alley", desc: "隱藏巷弄" },
+    ] },
+  { key: "photospot", zh: "打卡", emoji: "📸", enLabel: "instagrammable photo spots", kind: "map",
+    hint: "the most photogenic instagrammable photo spots, scenic viewpoints and iconic backdrops",
+    fallback: [
+      { zh: "打卡熱點", en: "instagram photo spot", desc: "打卡熱點" },
+      { zh: "絕美視角", en: "scenic viewpoint", desc: "絕美視角" },
+      { zh: "網美景點", en: "photogenic backdrop", desc: "網美景點" },
+    ] },
+  { key: "mustbuy", zh: "必買", emoji: "🎁", enLabel: "must-buy souvenirs and specialties", kind: "map",
+    hint: "must-buy souvenirs, signature local products, famous gifts and shopping specialties tourists take home",
+    fallback: [
+      { zh: "必買伴手禮", en: "must-buy souvenir", desc: "必買伴手禮" },
+      { zh: "在地名產", en: "local famous product", desc: "在地名產" },
+      { zh: "特色小物", en: "local trinket", desc: "特色小物" },
+    ] },
+  { key: "themepark", zh: "遊樂園設施", emoji: "🎢", enLabel: "amusement parks and attractions", kind: "map",
+    hint: "famous amusement parks, theme parks, observation decks, zoos, aquariums and major tourist attractions",
+    fallback: [
+      { zh: "遊樂園", en: "amusement park", desc: "遊樂園" },
+      { zh: "摩天輪", en: "ferris wheel", desc: "摩天輪" },
+      { zh: "觀景台", en: "observation deck", desc: "觀景台" },
+    ] },
+  { key: "metro", zh: "捷運路線", emoji: "🚇", enLabel: "metro transit lines and stations", kind: "transit",
+    hint: "metro and subway lines with their colors, major interchange stations and rail transit hubs",
+    fallback: [
+      { zh: "捷運線", en: "metro line", desc: "捷運路線" },
+      { zh: "轉乘站", en: "interchange station", desc: "轉乘車站" },
+      { zh: "車站", en: "major station", desc: "主要車站" },
+    ] },
+  { key: "roadsign", zh: "交通號誌", emoji: "🚦", enLabel: "road signs and traffic signals", kind: "chart",
+    hint: "distinctive road signs, traffic signals, pedestrian markers and transportation symbols characteristic of the country",
+    fallback: [
+      { zh: "路標", en: "road sign", desc: "道路標誌" },
+      { zh: "紅綠燈", en: "traffic signal", desc: "交通號誌" },
+      { zh: "行人號誌", en: "pedestrian signal", desc: "行人號誌" },
+    ] },
+];
+
+// ── 🎨 設計延伸 — 視覺設計元素。做圖案時是設計題材；做地圖時也能渲染（例如「傳統服飾地圖」）。
+// 全 MapTheme：補 enLabel/kind 讓它們在 做地圖 模式也能組地圖 prompt。
+const DESIGN_TOPICS: MapTheme[] = [
+  { key: "garment", zh: "服飾", emoji: "👘", enLabel: "traditional garments and dress", kind: "map",
     hint: "traditional garments, dress, costume and clothing silhouettes",
     fallback: [
       { zh: "傳統服飾", en: "traditional costume", desc: "傳統服飾輪廓" },
       { zh: "頭飾", en: "traditional headdress", desc: "頭飾與冠帽" },
       { zh: "刺繡服", en: "embroidered garment", desc: "刺繡裝飾" },
     ] },
-  { key: "pattern", zh: "紋樣", emoji: "🧩",
+  { key: "pattern", zh: "紋樣", emoji: "🧩", enLabel: "traditional patterns and motifs", kind: "map",
     hint: "traditional decorative patterns, motifs and ornamental designs",
     fallback: [
       { zh: "幾何紋", en: "geometric pattern", desc: "幾何紋樣" },
       { zh: "花卉紋", en: "floral motif", desc: "花卉紋樣" },
       { zh: "圖騰", en: "totem pattern", desc: "圖騰符號" },
     ] },
-  { key: "palette", zh: "配色", emoji: "🎨",
+  { key: "palette", zh: "配色", emoji: "🎨", enLabel: "signature color palettes", kind: "map",
     hint: "signature traditional color palettes and named color combinations",
     fallback: [
       { zh: "大地色", en: "earthy ochre palette", desc: "大地土色" },
       { zh: "靛藍", en: "indigo and white palette", desc: "靛藍配色" },
       { zh: "鮮豔對比", en: "vivid contrasting palette", desc: "鮮豔對比" },
     ] },
-  { key: "weave", zh: "織法工藝", emoji: "🧵",
+  { key: "weave", zh: "織法工藝", emoji: "🧵", enLabel: "traditional textile crafts", kind: "map",
     hint: "traditional textile techniques, weaving, dyeing and craft methods",
     fallback: [
       { zh: "手織布", en: "handwoven textile", desc: "手織布工藝" },
       { zh: "蠟染", en: "batik wax-resist dye", desc: "蠟染工藝" },
       { zh: "刺繡", en: "folk embroidery", desc: "刺繡工藝" },
     ] },
-  { key: "symbol", zh: "符號", emoji: "🔯",
+  { key: "symbol", zh: "符號", emoji: "🔯", enLabel: "cultural symbols and emblems", kind: "map",
     hint: "iconic cultural symbols, emblems and sacred signs",
     fallback: [
       { zh: "護身符", en: "protective amulet", desc: "護身符號" },
       { zh: "神聖幾何", en: "sacred geometry", desc: "神聖幾何" },
       { zh: "吉祥符", en: "auspicious symbol", desc: "吉祥符號" },
     ] },
-  { key: "architecture", zh: "建築", emoji: "🏯",
+  { key: "architecture", zh: "建築", emoji: "🏯", enLabel: "architectural styles and buildings", kind: "map",
     hint: "iconic architecture, building styles and structural motifs",
     fallback: [
       { zh: "傳統建築", en: "traditional architecture", desc: "傳統建築" },
       { zh: "宗教建築", en: "temple architecture", desc: "宗教建築" },
       { zh: "屋頂線條", en: "distinctive rooflines", desc: "屋頂線條" },
     ] },
-  { key: "myth", zh: "神話", emoji: "🐉",
+  { key: "myth", zh: "神話", emoji: "🐉", enLabel: "myths and legendary creatures", kind: "map",
     hint: "mythology, folklore creatures, gods and legends",
     fallback: [
       { zh: "神話生物", en: "mythical creature", desc: "神話生物" },
       { zh: "神祇", en: "mythological deity", desc: "神話神祇" },
       { zh: "民間傳說", en: "folklore legend", desc: "民間傳說" },
     ] },
-  { key: "animal", zh: "動物", emoji: "🦁",
+  { key: "animal", zh: "動物", emoji: "🦁", enLabel: "iconic cultural animals", kind: "map",
     hint: "culturally iconic and symbolic animals",
     fallback: [
       { zh: "神聖動物", en: "sacred animal", desc: "神聖動物" },
       { zh: "圖騰獸", en: "totem animal", desc: "圖騰動物" },
       { zh: "代表鳥", en: "national bird", desc: "代表鳥類" },
     ] },
-  { key: "music", zh: "音樂", emoji: "🎵",
+  { key: "music", zh: "音樂", emoji: "🎵", enLabel: "traditional music and instruments", kind: "map",
     hint: "traditional musical instruments, genres and dances",
     fallback: [
       { zh: "傳統樂器", en: "traditional instrument", desc: "傳統樂器" },
       { zh: "民俗舞", en: "folk dance", desc: "民俗舞蹈" },
       { zh: "節奏音樂", en: "rhythmic folk music", desc: "節奏音樂" },
     ] },
-  { key: "art", zh: "藝術", emoji: "🖼️",
+  { key: "art", zh: "藝術", emoji: "🖼️", enLabel: "traditional art forms", kind: "map",
     hint: "representative art forms, painting styles and visual mediums",
     fallback: [
       { zh: "代表畫風", en: "traditional painting style", desc: "代表畫風" },
       { zh: "工藝美術", en: "decorative folk art", desc: "工藝美術" },
       { zh: "壁畫", en: "mural art", desc: "壁畫藝術" },
     ] },
-  { key: "script", zh: "文字書法", emoji: "✒️",
+  { key: "script", zh: "文字書法", emoji: "✒️", enLabel: "scripts and calligraphy", kind: "map",
     hint: "traditional scripts, calligraphy styles and lettering",
     fallback: [
       { zh: "書法", en: "traditional calligraphy", desc: "傳統書法" },
@@ -314,95 +376,12 @@ const DESIGN_LENSES: CultureLens[] = [
     ] },
 ];
 
-// 做圖案 = 共用核心 + 設計元素（核心在前，與做地圖一致）。
-export const CULTURE_LENSES: CultureLens[] = [...CORE_TOPICS, ...DESIGN_LENSES];
+// 全部主題 = 核心 + 觀光 + 設計。兩模式共用同一份；「做地圖／做圖案」只決定輸出格式，不篩主題。
+export const ALL_TOPICS: MapTheme[] = [...CORE_TOPICS, ...TOURIST_TOPICS, ...DESIGN_TOPICS];
 
-// ── 🗺️ 做地圖專屬 — 觀光/空間概念（做不成單張圖案，如捷運線路圖、必吃/必去 等觀光二分）。
-// transport 三主題 themepark/metro/roadsign 與 觀光二分 musteat/weirdfood/mustsee/hidden/
-// mustbuy/photospot 的 `key` + `hint` 必須與 route.ts LENS_HINTS 同步（API 以 key 驗證）。
-const MAP_EXTRA: MapTheme[] = [
-  {
-    key: "musteat", zh: "必吃", emoji: "😋", enLabel: "must-try foods foreign tourists love", kind: "map",
-    hint: "must-try crowd-pleasing iconic dishes, drinks and desserts that foreign tourists love and recommend",
-    fallback: [
-      { zh: "招牌必吃", en: "must-try signature dish", desc: "必吃招牌" },
-      { zh: "人氣小吃", en: "popular street food", desc: "人氣小吃" },
-      { zh: "招牌飲品", en: "famous local drink", desc: "招牌飲品" },
-    ],
-  },
-  {
-    key: "weirdfood", zh: "驚奇", emoji: "😲", enLabel: "surprising adventurous local foods", kind: "map",
-    hint: "surprising, adventurous, unusual or shocking local street foods that amaze or challenge foreign tourists (fermented, offal, blood, pungent or exotic dishes)",
-    fallback: [
-      { zh: "獵奇小吃", en: "adventurous street food", desc: "獵奇小吃" },
-      { zh: "重口味", en: "pungent local delicacy", desc: "重口味美食" },
-      { zh: "在地黑暗料理", en: "surprising local dish", desc: "在地驚奇料理" },
-    ],
-  },
-  {
-    key: "mustsee", zh: "必去", emoji: "🌟", enLabel: "must-visit famous attractions", kind: "map",
-    hint: "famous must-visit attractions, top sights and bucket-list places every tourist should see",
-    fallback: [
-      { zh: "必去景點", en: "must-visit attraction", desc: "必去景點" },
-      { zh: "熱門地標", en: "popular landmark", desc: "熱門地標" },
-      { zh: "名勝", en: "famous scenic spot", desc: "知名名勝" },
-    ],
-  },
-  {
-    key: "hidden", zh: "秘境", emoji: "🤫", enLabel: "hidden gem secret spots", kind: "map",
-    hint: "hidden gems, secret off-the-beaten-path spots and lesser-known places that locals love",
-    fallback: [
-      { zh: "私房秘境", en: "hidden gem spot", desc: "私房秘境" },
-      { zh: "在地小景", en: "local secret spot", desc: "在地小景" },
-      { zh: "隱藏巷弄", en: "hidden alley", desc: "隱藏巷弄" },
-    ],
-  },
-  {
-    key: "photospot", zh: "打卡", emoji: "📸", enLabel: "instagrammable photo spots", kind: "map",
-    hint: "the most photogenic instagrammable photo spots, scenic viewpoints and iconic backdrops",
-    fallback: [
-      { zh: "打卡熱點", en: "instagram photo spot", desc: "打卡熱點" },
-      { zh: "絕美視角", en: "scenic viewpoint", desc: "絕美視角" },
-      { zh: "網美景點", en: "photogenic backdrop", desc: "網美景點" },
-    ],
-  },
-  {
-    key: "mustbuy", zh: "必買", emoji: "🎁", enLabel: "must-buy souvenirs and specialties", kind: "map",
-    hint: "must-buy souvenirs, signature local products, famous gifts and shopping specialties tourists take home",
-    fallback: [
-      { zh: "必買伴手禮", en: "must-buy souvenir", desc: "必買伴手禮" },
-      { zh: "在地名產", en: "local famous product", desc: "在地名產" },
-      { zh: "特色小物", en: "local trinket", desc: "特色小物" },
-    ],
-  },
-  {
-    key: "themepark", zh: "遊樂園設施", emoji: "🎢", enLabel: "amusement parks and attractions", kind: "map",
-    hint: "famous amusement parks, theme parks, observation decks, zoos, aquariums and major tourist attractions",
-    fallback: [
-      { zh: "遊樂園", en: "amusement park", desc: "遊樂園" },
-      { zh: "摩天輪", en: "ferris wheel", desc: "摩天輪" },
-      { zh: "觀景台", en: "observation deck", desc: "觀景台" },
-    ],
-  },
-  {
-    key: "metro", zh: "捷運路線", emoji: "🚇", enLabel: "metro transit lines and stations", kind: "transit",
-    hint: "metro and subway lines with their colors, major interchange stations and rail transit hubs",
-    fallback: [
-      { zh: "捷運線", en: "metro line", desc: "捷運路線" },
-      { zh: "轉乘站", en: "interchange station", desc: "轉乘車站" },
-      { zh: "車站", en: "major station", desc: "主要車站" },
-    ],
-  },
-  {
-    key: "roadsign", zh: "交通號誌", emoji: "🚦", enLabel: "road signs and traffic signals", kind: "chart",
-    hint: "distinctive road signs, traffic signals, pedestrian markers and transportation symbols characteristic of the country",
-    fallback: [
-      { zh: "路標", en: "road sign", desc: "道路標誌" },
-      { zh: "紅綠燈", en: "traffic signal", desc: "交通號誌" },
-      { zh: "行人號誌", en: "pedestrian signal", desc: "行人號誌" },
-    ],
-  },
+// UI 分組標籤（核心在前，兩模式都顯示這同一份）。
+export const TOPIC_GROUPS: { label: string; items: MapTheme[] }[] = [
+  { label: "⭐ 核心（通用）", items: CORE_TOPICS },
+  { label: "🗺️ 觀光", items: TOURIST_TOPICS },
+  { label: "🎨 設計元素", items: DESIGN_TOPICS },
 ];
-
-// 做地圖 = 共用核心 + 觀光延伸（核心在前，與做圖案一致）。
-export const MAP_THEMES: MapTheme[] = [...CORE_TOPICS, ...MAP_EXTRA];

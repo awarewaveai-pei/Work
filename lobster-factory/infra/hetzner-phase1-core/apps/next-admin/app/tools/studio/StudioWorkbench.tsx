@@ -16,8 +16,8 @@ import {
 } from "@/lib/studio/prompt-presets";
 import {
   CULTURE_REGIONS,
-  CULTURE_LENSES,
-  MAP_THEMES,
+  ALL_TOPICS,
+  TOPIC_GROUPS,
   type CultureItem,
   type MapTheme,
 } from "@/lib/studio/culture-presets";
@@ -349,13 +349,12 @@ export default function StudioWorkbench() {
   // 🌍 世界文化 — region (single-select) + lens tab + picked culture chips (multi)
   const [region, setRegion] = useState<CultureItem | null>(null);
   const [regionTab, setRegionTab] = useState(CULTURE_REGIONS[0]?.group ?? "");
-  const [cultureLens, setCultureLens] = useState(CULTURE_LENSES[0]?.key ?? "");
+  const [topic, setTopic] = useState(ALL_TOPICS[0]?.key ?? ""); // 統一主題（兩模式共用同一份；做地圖/做圖案只決定輸出）
   const [cultureChips, setCultureChips] = useState<string[]>([]); // en tokens in prompt
-  const [cultureDyn, setCultureDyn] = useState<Record<string, CultureItem[]>>({}); // `${regionEn}|${lensKey}` → items
+  const [cultureDyn, setCultureDyn] = useState<Record<string, CultureItem[]>>({}); // `${regionEn}|${topicKey}` → items
   const [cultureFetching, setCultureFetching] = useState<Record<string, boolean>>({}); // per-key in-flight flag
   const [fusionRegion, setFusionRegion] = useState<CultureItem | null>(null); // 🎲 混搭骰 second culture
-  const [mapMode, setMapMode] = useState(false); // 🗺️ 地圖模式 — generate a whole illustrated tourist map
-  const [mapTheme, setMapTheme] = useState(MAP_THEMES[0]?.key ?? ""); // active map theme (地標/美食/捷運…)
+  const [mapMode, setMapMode] = useState(false); // 🗺️ 做地圖（true）vs 🎨 做圖案（false）— 只決定輸出格式
   const [fusionPickMode, setFusionPickMode] = useState(false); // ✋ 手選混搭 — next country click sets fusionRegion
   const [zoomImage, setZoomImage] = useState<string | null>(null); // 🔍 click-to-enlarge lightbox
   const [playMods, setPlayMods] = useState<string[]>([]); // 🎭 玩法 — selected treatment fragments (multi)
@@ -456,8 +455,8 @@ export default function StudioWorkbench() {
     // 🗺️ 地圖模式 — assemble a whole illustrated-map prompt from country + picked items.
     // Items priority: explicitly picked chips → AI-fetched set for this theme → theme fallback.
     if (mapMode && region) {
-      const mt = MAP_THEMES.find((t) => t.key === mapTheme) ?? MAP_THEMES[0]!;
-      const dyn = cultureDyn[`${region.en}|${mapTheme}`] ?? [];
+      const mt = ALL_TOPICS.find((t) => t.key === topic) ?? ALL_TOPICS[0]!;
+      const dyn = cultureDyn[`${region.en}|${topic}`] ?? [];
       const items = cultureChips.length
         ? cultureChips
         : dyn.length
@@ -487,7 +486,7 @@ export default function StudioWorkbench() {
     }
     const parts = [subject.trim(), ...cultureTokens, playClause, theme.trim(), vibe.trim(), resolvedStylePrompt, product.suffix].filter(Boolean);
     return parts.join(", ");
-  }, [subject, theme, vibe, resolvedStylePrompt, product, refMode, refImages.length, region, fusionRegion, cultureChips, mapMode, mapTheme, cultureDyn, playMods]);
+  }, [subject, theme, vibe, resolvedStylePrompt, product, refMode, refImages.length, region, fusionRegion, cultureChips, mapMode, topic, cultureDyn, playMods]);
 
   const effectivePrompt = promptTouched ? prompt : assembledPrompt;
 
@@ -570,13 +569,13 @@ export default function StudioWorkbench() {
     let bi = Math.floor(Math.random() * flat.length);
     if (bi === ai) bi = (bi + 1) % flat.length;
     const a = flat[ai]!, b = flat[bi]!;
-    const lens = CULTURE_LENSES[Math.floor(Math.random() * CULTURE_LENSES.length)] ?? CULTURE_LENSES[0]!;
+    const t = ALL_TOPICS[Math.floor(Math.random() * ALL_TOPICS.length)] ?? ALL_TOPICS[0]!;
     setRegion(a.it);
     setRegionTab(a.group);
     setFusionRegion(b.it);
-    setCultureLens(lens.key);
-    void fetchCulture(a.it.en, lens.key);
-    void fetchCulture(b.it.en, lens.key);
+    setTopic(t.key);
+    void fetchCulture(a.it.en, t.key);
+    void fetchCulture(b.it.en, t.key);
   }, [fetchCulture]);
 
   const fetchAllTrending = useCallback(async () => {
@@ -613,14 +612,14 @@ export default function StudioWorkbench() {
   const autoLoadedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!region) return;
-    const facetKey = mapMode ? mapTheme : cultureLens;
+    const facetKey = topic;
     const key = cultureRuntimeKey(region.en, facetKey);
     const stored = readStoredCulture(region.en, facetKey);
     if (stored) { setCultureDyn((prev) => (prev[key] ? prev : { ...prev, [key]: stored })); return; }
     if (autoLoadedRef.current.has(key)) return;
     autoLoadedRef.current.add(key);
     void fetchCulture(region.en, facetKey, { curatedOnly: true });
-  }, [region, cultureLens, mapMode, mapTheme, fetchCulture]);
+  }, [region, topic, fetchCulture]);
 
   // 🔍 Lightbox: close on Escape while an image is zoomed.
   useEffect(() => {
@@ -1052,27 +1051,24 @@ export default function StudioWorkbench() {
             })}
           </div>
 
-          {/* 鏡頭 lens tabs（一般文化模式）/ 地圖主題 tabs（地圖模式）*/}
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
-            {mapMode
-              ? MAP_THEMES.map((t) => (
-                  <button key={t.key} type="button" onClick={() => setMapTheme(t.key)} style={tabStyle(mapTheme === t.key)}>
+          {/* 主題清單（整合版）— 核心/觀光/設計 三組，兩模式共用同一份。單選一個主題。 */}
+          {TOPIC_GROUPS.map((g) => (
+            <div key={g.label} style={{ marginBottom: 6 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: "var(--text-muted)", margin: "2px 0 3px" }}>{g.label}</div>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {g.items.map((t) => (
+                  <button key={t.key} type="button" onClick={() => setTopic(t.key)} style={tabStyle(topic === t.key)}>
                     {t.emoji} {t.zh}
                   </button>
-                ))
-              : CULTURE_LENSES.map((l) => (
-                  <button key={l.key} type="button" onClick={() => setCultureLens(l.key)} style={tabStyle(cultureLens === l.key)}>
-                    {l.emoji} {l.zh}
-                  </button>
                 ))}
-          </div>
+              </div>
+            </div>
+          ))}
 
-          {/* 具體項目（dyn，可放地圖/🎨單獨生圖）與 分類（fallback，整體地圖）分開列。
-              facet = 地圖模式用 map theme，否則用文化鏡頭；兩者共用 region.en|key 快取。 */}
+          {/* 具體項目（dyn，可複選放地圖/🎨單獨生圖）與 分類（fallback，整體地圖）分開列。
+              facet = 目前選的主題（兩模式共用 region.en|topic 快取）。 */}
           {(() => {
-            const facet = mapMode
-              ? (MAP_THEMES.find((t) => t.key === mapTheme) ?? MAP_THEMES[0]!)
-              : (CULTURE_LENSES.find((l) => l.key === cultureLens) ?? CULTURE_LENSES[0]!);
+            const facet = ALL_TOPICS.find((t) => t.key === topic) ?? ALL_TOPICS[0]!;
             const dynKey = region ? `${region.en}|${facet.key}` : "";
             const dyn = dynKey ? cultureDyn[dynKey] : undefined;
             const fetching = dynKey ? !!cultureFetching[dynKey] : false;
