@@ -186,6 +186,10 @@ export default function CanvasEditor() {
 
   // Container width for dynamic MAX_DISP — keeps canvas within viewport without horizontal scroll.
   const [containerWidth, setContainerWidth] = useState(650);
+  // 🖥 Workspace height measured dynamically (container top → viewport bottom) instead of a hardcoded
+  // calc(100vh - 110px): self-adjusts when the error banner appears or the description wraps, so the
+  // workspace never overflows into a page scrollbar (critic follow-up on b1cc5bd8).
+  const [workspaceH, setWorkspaceH] = useState(560);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   // Guards against auto-reapplying 書布尺寸 when window resizes before user clicks 套用書布.
   const sizedByCanvasApply = useRef(false);
@@ -220,7 +224,7 @@ export default function CanvasEditor() {
       // The artboard = the white canvas = the real export bounds. Give Fabric's wrapper a drop-shadow
       // + crisp border so it stands out from the grey checker workspace → the user sees exactly where
       // the usable area ends (Photoshop/Figma-style). setDimensions only touches size, not these.
-      const wrap = (canvas as unknown as { wrapperEl?: HTMLElement }).wrapperEl;
+      const wrap = canvas.wrapperEl; // typed HTMLDivElement (Fabric) → a future rename fails at compile
       if (wrap) {
         wrap.style.boxShadow = "0 3px 14px rgba(0,0,0,0.26)";
         wrap.style.outline = "1px solid rgba(128,128,128,0.5)";
@@ -904,16 +908,26 @@ export default function CanvasEditor() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (ready && canvasMetaRef.current && sizedByCanvasApply.current) applyCanvasSize(); }, [szDpi]);
 
-  // 🖥 Re-fit the display whenever the canvas becomes ready or the viewport resizes (height too).
+  // 🖥 Measure the workspace height = container top → viewport bottom (dynamic; replaces the
+  // hardcoded calc(100vh-110px) so it self-adjusts to header reflow / an error banner appearing).
+  const measureWorkspaceH = useCallback(() => {
+    const el = canvasContainerRef.current;
+    if (!el || typeof window === "undefined") return;
+    const top = el.getBoundingClientRect().top;
+    setWorkspaceH(Math.max(280, Math.round(window.innerHeight - top - 16)));
+  }, []);
+  // Re-measure on ready, when the error banner toggles (shifts the container top), and on resize.
+  useEffect(() => { if (ready) measureWorkspaceH(); }, [ready, error, measureWorkspaceH]);
+  // Re-fit the canvas display whenever it becomes ready or the workspace height changes.
   useEffect(() => {
     if (ready && canvasMetaRef.current) relayoutCanvas();
-  }, [ready, relayoutCanvas]);
+  }, [ready, workspaceH, relayoutCanvas]);
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const onResize = () => { if (canvasMetaRef.current) relayoutCanvas(); };
+    const onResize = () => { measureWorkspaceH(); if (canvasMetaRef.current) relayoutCanvas(); };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [relayoutCanvas]);
+  }, [measureWorkspaceH, relayoutCanvas]);
 
   // ResizeObserver: track canvas container width so MAX_DISP stays within viewport.
   useEffect(() => {
@@ -1701,7 +1715,7 @@ export default function CanvasEditor() {
           ref={canvasContainerRef}
           style={{
             border: "1px solid var(--card-border)", borderRadius: 8, flex: 1, minWidth: 0,
-            height: "calc(100vh - 110px)", // fixed workspace height → artboard floats centred inside it
+            height: workspaceH, // dynamic workspace height (measured) → artboard floats centred inside it
             display: "flex", justifyContent: "center", alignItems: "center", overflow: "hidden",
             // 工作區 = 淡灰棋盤格（半透明灰，明暗主題皆可讀）。白色畫板(=匯出範圍)浮在上面、有陰影邊框 →
             // 一眼看出「灰格=非畫布、不可用」「白卡=真正可用範圍」。
