@@ -35,12 +35,15 @@ import {
 import { AI_TEXT_MODEL_GROUPS, AI_TEXT_MODELS, type AiTextModel } from "@/lib/ai/text-model-options";
 import { textModelCostLabel, textModelCostSummary } from "@/lib/ai/text-model-pricing";
 
+// suffix describes the FLAT print-ready ARTWORK (not the physical product) so literal models
+// (Nano Banana / Ideogram) don't render a t-shirt/mug. The aspect ratio still tailors the
+// composition to each product. Keep "no product mockup" so output is the design, not a photo.
 const PRODUCT_TYPES = [
-  { value: "tshirt", label: "T-shirt", aspect: "4:5" as AspectRatio, suffix: "t-shirt graphic design, centered composition, plain background" },
-  { value: "hoodie", label: "Hoodie", aspect: "4:5" as AspectRatio, suffix: "hoodie front print design, centered composition, plain background" },
-  { value: "mug", label: "Mug", aspect: "3:2" as AspectRatio, suffix: "mug wrap-around print design, horizontal composition, plain background" },
-  { value: "poster", label: "Poster / Wall Art", aspect: "2:3" as AspectRatio, suffix: "poster art print, full-bleed composition" },
-  { value: "sticker", label: "Sticker", aspect: "1:1" as AspectRatio, suffix: "die-cut sticker design, bold outline, plain background" },
+  { value: "tshirt", label: "T-shirt", aspect: "4:5" as AspectRatio, suffix: "isolated flat graphic artwork on plain white background, centered print-ready design, clean edges, NOT a product photo, no garment, no mockup" },
+  { value: "hoodie", label: "Hoodie", aspect: "4:5" as AspectRatio, suffix: "isolated flat graphic artwork on plain white background, centered print-ready design, clean edges, NOT a product photo, no garment, no mockup" },
+  { value: "mug", label: "Mug", aspect: "3:2" as AspectRatio, suffix: "isolated flat artwork on plain white background, horizontal band composition for a wrap print, print-ready, NOT a product photo, no mug, no mockup" },
+  { value: "poster", label: "Poster / Wall Art", aspect: "2:3" as AspectRatio, suffix: "full-bleed poster illustration, complete artwork filling the frame, no frame border, no mockup" },
+  { value: "sticker", label: "Sticker", aspect: "1:1" as AspectRatio, suffix: "die-cut sticker artwork with bold clean outline, isolated on plain white background, flat design, NOT a product photo, no mockup" },
   { value: "none", label: "（不限商品）", aspect: "1:1" as AspectRatio, suffix: "" },
 ];
 
