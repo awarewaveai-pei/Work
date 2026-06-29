@@ -4,6 +4,28 @@
 
 ## 2026-06-29
 
+### feat(security): S2 Batch 4 tenant guard — tools/designs + video/[id] IDOR closed
+
+**根本問題**:
+- `tools/designs` GET/POST 直接用 body/qparam 的 organizationId，無 effectiveOrgId → client 可讀寫任意 org 設計
+- `tools/designs` DELETE 已 select organization_id 但從未 assertOrgAccess → client 可刪外 org 資產
+- `video/[id]` DELETE：resolveOrgId() 讀 env var（常為 null）無任何 org 驗證 → client 可刪外 org 影片
+
+**修法**:
+- designs GET — `effectiveOrgId(request, qparam ?? envVar)`
+- designs POST — `effectiveOrgId(request, body.organizationId ?? envVar)`
+- designs DELETE — `assertOrgAccess(request, asset.organization_id)` after fetch
+- video DELETE — SELECT 加 `organization_id`；`assertOrgAccess(req, asset.organization_id)` after fetch；加注釋說明 resolveOrgId env filter 是 supplementary（env var 未設時 no-op）
+
+**[已修改]**
+- `app/api/tools/designs/route.ts` — import + GET effectiveOrgId + POST effectiveOrgId + DELETE assertOrgAccess
+- `app/api/video/[id]/route.ts` — import + SELECT 加 organization_id + assertOrgAccess + clarifying comment
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test | exit=0 | ms=1690 (0 tsc errors, 552 tests pass)
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/1n (N1: resolveOrgId env filter misleading when env var unset → 加注釋澄清；不阻塞)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=effectiveOrgId|assertOrgAccess|OrgAccessError|toOrgAccessResponse | hits=10 files (outreach/* 8 routes + designs + video/[id] + tenant-guard.ts 定義；無意外 callsite)
+
 ### feat(security): S2 Batch 3 outreach tenant guard — service-profiles IDOR closed
 
 **根本問題**: `app/api/outreach/service-profiles` 五條路徑（GET single/list、POST INSERT/UPDATE、DELETE）均無 tenant guard，client 可讀/改/刪任意 org 的 service profile（含 tone/USP/forbidden words 等 org 機密）。

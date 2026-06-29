@@ -3,6 +3,7 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { deleteVideoObjects } from "@/lib/storage/r2";
 import { videoObjectKey, resolveOrgId } from "@/lib/content/blocks/video-pipeline";
 import { readOpsRole } from "@/lib/ops-role";
+import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 export async function DELETE(
   req: NextRequest,
@@ -17,6 +18,9 @@ export async function DELETE(
   const { id } = await params;
   if (!id) return NextResponse.json({ ok: false, error: "missing id" }, { status: 400 });
 
+  // resolveOrgId() reads POD_DESIGNS_DEFAULT_ORG_ID — when unset (common), orgId=null and the
+  // .eq("organization_id", orgId) filter below is skipped. The actual tenant barrier is
+  // assertOrgAccess() below; this env filter is supplementary only.
   const orgId = resolveOrgId();
   const supabase = getSupabaseWriteClient();
   if (!supabase) return NextResponse.json({ ok: false, error: "db unavailable" }, { status: 503 });
@@ -24,7 +28,7 @@ export async function DELETE(
   // Fetch with org + mime_type scoping (mirrors history/route.ts pattern)
   let query = supabase
     .from("media_assets")
-    .select("id, object_url, metadata")
+    .select("id, object_url, metadata, organization_id")
     .eq("id", id)
     .eq("mime_type", "video/mp4");
   if (orgId) query = query.eq("organization_id", orgId);
@@ -33,6 +37,8 @@ export async function DELETE(
   if (fetchErr || !asset) {
     return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
   }
+  try { assertOrgAccess(req, (asset as Record<string, unknown>).organization_id as string | null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
   if (!asset.object_url) {
     return NextResponse.json({ ok: false, error: "asset_has_no_url" }, { status: 422 });

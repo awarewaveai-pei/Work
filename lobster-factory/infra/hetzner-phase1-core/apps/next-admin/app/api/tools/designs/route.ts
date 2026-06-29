@@ -5,6 +5,7 @@ import { canCreateAiImageJob, resolveOpsRole } from "../../../../lib/ops-role";
 import { getSupabaseReadClient, getSupabaseWriteClient } from "../../../../lib/supabase-server";
 import { buildDesignKey, deleteDesignObject, deleteVideoObjects, isR2Configured, parseImageDataUrl, putDesignObject } from "../../../../lib/storage/r2";
 import { MOCKUP_SOURCES } from "../../../../lib/studio/asset-group";
+import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "../../../../lib/tenant-guard";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -162,7 +163,9 @@ export async function POST(request: Request) {
     }
     parsed = p;
   }
-  const organizationId = body.organizationId ?? defaultOrganizationId();
+  let organizationId: string | null;
+  try { organizationId = effectiveOrgId(request, body.organizationId ?? defaultOrganizationId()); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   if (!organizationId || !isUuid(organizationId)) {
     return NextResponse.json(
       { ok: false, error: "organizationId is required (or set POD_DESIGNS_DEFAULT_ORG_ID)" },
@@ -296,6 +299,8 @@ export async function DELETE(request: Request) {
   if (fetchErr || !asset) {
     return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
   }
+  try { assertOrgAccess(request, (asset as Record<string, unknown>).organization_id as string | null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
   // Delete from the correct R2 bucket — videos live in R2_VIDEO_BUCKET ("lobster-videos"),
   // images in R2_DESIGNS_BUCKET ("lobster-designs"). Using deleteDesignObject for videos
@@ -346,7 +351,9 @@ export async function GET(request: Request) {
   resolveOpsRole(request);
 
   const url = new URL(request.url);
-  const organizationId = url.searchParams.get("organizationId") ?? defaultOrganizationId();
+  let organizationId: string | null;
+  try { organizationId = effectiveOrgId(request, url.searchParams.get("organizationId") ?? defaultOrganizationId()); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   if (!organizationId || !isUuid(organizationId)) {
     return NextResponse.json(
       { ok: false, error: "organizationId is required (or set POD_DESIGNS_DEFAULT_ORG_ID)" },
