@@ -12,7 +12,8 @@
   "dependencies": [],
   "conflicts": [],
   "steps": [
-    { "id": "theme-kadence", "type": "install_theme", "slug": "kadence" },
+    { "id": "theme-kadence",       "type": "install_theme",  "slug": "kadence" },
+    { "id": "plugin-mainwp-child", "type": "install_plugin", "slug": "mainwp-child" },
     {
       "id": "plugin-litespeed",
       "type": "conditional_plugin",

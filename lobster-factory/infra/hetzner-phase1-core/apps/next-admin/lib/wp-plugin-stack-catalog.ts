@@ -10,7 +10,7 @@
  */
 
 export type WpSiteType = "tourism" | "brand" | "ecommerce";
-export type WpPluginModule = "base" | "ecommerce" | "tourism" | "brand";
+export type WpPluginModule = "base" | "ecommerce" | "pod" | "tourism" | "brand";
 
 export interface WpPlugin {
   /** WP.org slug for wp plugin install, or descriptive key for PAID/DIRECT plugins */
@@ -38,7 +38,7 @@ export interface WpPlugin {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Catalog — 16 base + 12 ecommerce + 5 tourism + 3 brand = 36 total entries
+// Catalog — 16 base + 13 ecommerce + 1 pod + 5 tourism + 3 brand = 38 total entries
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const WP_PLUGIN_CATALOG: WpPlugin[] = [
@@ -94,11 +94,12 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
     module: "ecommerce",
   },
   { slug: "woocommerce-gateway-stripe",                 label: "WooCommerce Stripe Gateway",                    free: true,  required: true,  module: "ecommerce" },
+  { slug: "woocommerce-paypal-payments",                label: "PayPal Payments",                               free: true,  required: true,  module: "ecommerce" },
   { slug: "woocommerce-pdf-invoices-packing-slips",     label: "WooCommerce PDF Invoices & Packing Slips",      free: true,  required: true,  module: "ecommerce" },
-  { slug: "yith-woocommerce-wishlist",                  label: "YITH WooCommerce Wishlist",                     free: true,  required: true,  module: "ecommerce" },
+  { slug: "ti-woocommerce-wishlist",                    label: "WooCommerce Wishlist",                          free: true,  required: true,  module: "ecommerce" },
   {
-    slug: "yith-woocommerce-points-and-rewards",
-    label: "YITH WooCommerce Points and Rewards",
+    slug: "woocommerce-points-and-rewards",
+    label: "WooCommerce Points and Rewards",
     free: false,
     required: true,
     module: "ecommerce",
@@ -107,6 +108,18 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
   { slug: "variation-swatches-for-woocommerce",         label: "Variation Swatches for WooCommerce",            free: true,  required: true,  module: "ecommerce" },
   { slug: "cartflows",                                  label: "CartFlows ★",                                   free: true,  required: true,  module: "ecommerce" },
   { slug: "woo-cart-abandonment-recovery",              label: "WooCommerce Cart Abandonment Recovery",         free: true,  required: true,  module: "ecommerce" },
+
+  // ── POD MODULE (1 functional slot) ───────────────────────────────────────
+  // Only for wc-custom (POD/custom product ecommerce). Customer uploads their design file at checkout.
+  // Install source: manual-zip (/opt/lobster-plugins/woocommerce-product-addons.zip) — WordPressIT licence.
+
+  {
+    slug: "woocommerce-product-addons",
+    label: "WooCommerce Product Add-Ons",
+    free: false,
+    required: true,
+    module: "pod",
+  },
 
   // ── TOURISM MODULE (5 functional slots) ──────────────────────────────────
 
@@ -202,9 +215,11 @@ export function resolvePaidPlugins(
 // Replaces the wpSiteType + hasEcommerce combo in OnboardWizard v2.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Returns all WpPlugin entries for the given packs. Base is always included. */
+/** Returns all WpPlugin entries for the given packs. Base is always included.
+ *  pod always implies ecommerce — woocommerce-product-addons requires WooCommerce core. */
 export function resolvePluginsForPacks(packs: WpPluginModule[]): WpPlugin[] {
-  const packSet = new Set<WpPluginModule>([...packs, "base"]);
+  const effective: WpPluginModule[] = packs.includes("pod") ? [...packs, "ecommerce" as WpPluginModule] : packs;
+  const packSet = new Set<WpPluginModule>([...effective, "base"]);
   return WP_PLUGIN_CATALOG.filter((p) => packSet.has(p.module));
 }
 
@@ -245,7 +260,8 @@ export function resolveConditionalPlugins(packs: WpPluginModule[]): WpPlugin[] {
 }
 
 /** Auto-derives container manifest slug from selected packs. */
-export function derivePackageSlugFromPacks(packs: WpPluginModule[]): "wp-basic" | "wp-business" | "wc-core" {
+export function derivePackageSlugFromPacks(packs: WpPluginModule[]): "wp-basic" | "wp-business" | "wc-core" | "wc-custom" {
+  if (packs.includes("pod")) return "wc-custom";
   if (packs.includes("ecommerce")) return "wc-core";
   if (packs.includes("brand")) return "wp-business";
   return "wp-basic";

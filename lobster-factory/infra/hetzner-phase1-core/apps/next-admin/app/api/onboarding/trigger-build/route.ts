@@ -29,10 +29,9 @@ function toOrgSlug(name: string, suffix: string): string {
 }
 
 function toManifestSlug(packageSlug: unknown): { slug: BuildPackageSlug; downgraded: boolean } {
-  if (packageSlug === "wp-basic" || packageSlug === "wp-business" || packageSlug === "wc-core") {
+  if (packageSlug === "wp-basic" || packageSlug === "wp-business" || packageSlug === "wc-core" || packageSlug === "wc-custom") {
     return { slug: packageSlug, downgraded: false };
   }
-  // wc-custom not yet in create-wp-site SUPPORTED_MANIFEST_SLUGS — fallback to wc-core
   return { slug: "wc-core", downgraded: true };
 }
 

@@ -10,7 +10,7 @@ import { captureWorkflowException } from "../observability/sentry";
 import { captureWorkflowEvent } from "../observability/posthog";
 import { runAllIntegrations, type BuildIntegrations } from "../integrations/integration-steps";
 
-const SUPPORTED_MANIFEST_SLUGS = ["wp-basic", "wp-business", "wc-core"] as const;
+const SUPPORTED_MANIFEST_SLUGS = ["wp-basic", "wp-business", "wc-core", "wc-custom"] as const;
 
 /**
  * Stage 0 (B): write the terminal status back to the originating `ops_action_runs` row so it
@@ -60,7 +60,7 @@ function normalizeBuildConsolePayload(raw: unknown): unknown {
   }
   if (typeof o.manifestSlug !== "string") {
     const pkg = o.packageSlug;
-    if (pkg === "wp-basic" || pkg === "wp-business" || pkg === "wc-core") {
+    if (pkg === "wp-basic" || pkg === "wp-business" || pkg === "wc-core" || pkg === "wc-custom") {
       o.manifestSlug = pkg;
     }
   }
