@@ -11,7 +11,6 @@ export type StudioModel =
   | "ideogram-v4-turbo"
   | "ideogram-v4-quality"
   | "ideogram-character"
-  | "seedream-4.5"
   | "nano-banana-2"
   | "nano-banana-pro"
   | "imagen-4"
@@ -44,7 +43,6 @@ export const STUDIO_MODEL_OPTIONS: readonly StudioModelOption[] = [
   { value: "ideogram-v4-turbo", label: "Ideogram v4 Turbo", group: "Ideogram", costNt: 1, maxRefs: 0 },
   { value: "ideogram-v4-quality", label: "Ideogram v4 Quality", group: "Ideogram", costNt: 3, maxRefs: 0 },
   { value: "ideogram-character", label: "Ideogram Character", group: "Ideogram", costNt: 5, maxRefs: 1 },
-  { value: "seedream-4.5", label: "Seedream 4.5", group: "Google+", costNt: 1.3, maxRefs: 0 },
   { value: "nano-banana-2", label: "Nano Banana 2", group: "Google+", costNt: 2.2, maxRefs: 14 },
   { value: "nano-banana-pro", label: "Nano Banana Pro", group: "Google+", costNt: 4.4, maxRefs: 8 },
   { value: "imagen-4", label: "Imagen 4", group: "Google+", costNt: 1.3, maxRefs: 0 },
