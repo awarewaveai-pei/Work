@@ -23,7 +23,7 @@ import { roleHeader } from "@/lib/ops-role";
 import { CANVAS_NAME_KEY, toCanvasSrc, readCanvasSource } from "@/components/tools/canvas-handoff";
 import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
 import type { ColorGradeState } from "@/lib/studio/color-grade";
-import { buildFabricImageFilters, buildPresetFilters, buildEffectFilters, PRESET_FILTERS } from "./fabric-filters";
+import { buildFabricImageFilters, buildPresetFilters, buildEffectFilters, PRESET_FILTERS, buildHslMixerFilter, HSL_NEUTRAL, HSL_RANGES, hasAnyHslAdjustment, sanitizeHslMixer, type HslMixerState, type HslRange } from "./fabric-filters";
 import SidebarPanel from "@/components/tools/SidebarPanel";
 import FontLibrary from "@/components/tools/FontLibrary";
 import { posterizeDataUrl } from "@/lib/studio/posterize";
@@ -54,6 +54,7 @@ type AdjState = {
   vibrance: number; temp: number; blur: number; noise: number;
   contrast: number; shadows: number; highlights: number;
   exposure: number; clarity: number; dehaze: number;
+  hslMixer?: HslMixerState;
 };
 
 /**
@@ -150,6 +151,9 @@ export default function CanvasEditor() {
   const [exposure, setExposure] = useState(0);      // 曝光 -100..100
   const [clarity, setClarity] = useState(0);        // 清晰度 0..100
   const [dehaze, setDehaze] = useState(0);          // 去霧 0..100
+  // 🎨 HSL Color Mixer — 8 hue ranges × H/S/L (Photoshop-style targeted adjustment)
+  const [hslMixer, setHslMixer] = useState<HslMixerState>(() => JSON.parse(JSON.stringify(HSL_NEUTRAL)));
+  const [hslTab, setHslTab] = useState<HslRange>("all");
   // 🗂 群組 — track whether the active selection can be grouped / ungrouped.
   const [multiSelected, setMultiSelected] = useState(false); // ActiveSelection (≥2 objects)
   const [groupSelected, setGroupSelected] = useState(false); // a single Group object
@@ -182,6 +186,7 @@ export default function CanvasEditor() {
     setPresetId(null); setRemoveWhite(false);
     setVibrance(0); setTemp(0); setBlurv(0); setNoisev(0);
     setContrast(0); setShadows(0); setHighlights(0); setExposure(0); setClarity(0); setDehaze(0);
+    setHslMixer(JSON.parse(JSON.stringify(HSL_NEUTRAL)));
   }, [grade]);
 
   // Container width for dynamic MAX_DISP — keeps canvas within viewport without horizontal scroll.
@@ -210,6 +215,11 @@ export default function CanvasEditor() {
       }
       const fabric = await import("fabric");
       if (disposed || !canvasElRef.current) return;
+
+      // Force Canvas 2D filter backend so custom per-pixel filters (HslColorMixer) work correctly.
+      // Fabric v7 defaults to WebGL (enableGLFiltering=true); custom filters that only implement
+      // applyTo2d are silently skipped — WebGL runs the identity shader instead (critic 2026-06-29).
+      (fabric as unknown as { config?: { configure(o: Record<string, unknown>): void } }).config?.configure({ enableGLFiltering: false });
 
       // Persist our custom `name` (圖層改名) through toJSON/loadFromJSON + design save. Must be set
       // class-level BEFORE any object is created (Fabric v7 concatenates customProperties into
@@ -245,11 +255,13 @@ export default function CanvasEditor() {
           setVibrance(adj.vibrance ?? 0); setTemp(adj.temp ?? 0); setBlurv(adj.blur ?? 0); setNoisev(adj.noise ?? 0);
           setContrast(adj.contrast ?? 0); setShadows(adj.shadows ?? 0); setHighlights(adj.highlights ?? 0);
           setExposure(adj.exposure ?? 0); setClarity(adj.clarity ?? 0); setDehaze(adj.dehaze ?? 0);
+          setHslMixer(sanitizeHslMixer(adj.hslMixer));
         } else {
           grade.reset();
           setPresetId(null); setRemoveWhite(false);
           setVibrance(0); setTemp(0); setBlurv(0); setNoisev(0);
           setContrast(0); setShadows(0); setHighlights(0); setExposure(0); setClarity(0); setDehaze(0);
+          setHslMixer(sanitizeHslMixer(undefined));
         }
       };
 
@@ -406,6 +418,7 @@ export default function CanvasEditor() {
         ...buildFabricImageFilters(ns, grade.params),
         ...buildPresetFilters(ns, presetId, removeWhite),
         ...buildEffectFilters(ns, { vibrance, blur: blurv, noise: noisev, temp, contrast, shadows, highlights, exposure, clarity, dehaze }),
+        ...buildHslMixerFilter(ns, hslMixer),
       ];
       target.applyFilters();
       canvas.requestRenderAll();
@@ -415,6 +428,7 @@ export default function CanvasEditor() {
         grade: { ...grade.state }, presetId, removeWhite,
         vibrance, temp, blur: blurv, noise: noisev,
         contrast, shadows, highlights, exposure, clarity, dehaze,
+        hslMixer: JSON.parse(JSON.stringify(hslMixer)),
       };
       // ↩️ #4 record ONE undo step after the user stops dragging (debounced). Only when THIS object
       // is the genuine edit target — never for selection-sync (loadAdj) or undo/redo restore.
@@ -430,7 +444,7 @@ export default function CanvasEditor() {
     // snapshot intentionally omitted from deps (declared later; stable useCallback). grade.state read
     // via grade.params dep. userEditRef/snapTimerRef are refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grade.params, presetId, removeWhite, vibrance, blurv, noisev, temp, contrast, shadows, highlights, exposure, clarity, dehaze]);
+  }, [grade.params, presetId, removeWhite, vibrance, blurv, noisev, temp, contrast, shadows, highlights, exposure, clarity, dehaze, hslMixer]);
 
   const addText = useCallback(() => {
     const canvas = fabricRef.current;
@@ -2031,7 +2045,85 @@ export default function CanvasEditor() {
             </div>
           </SidebarPanel>
 
-          <SidebarPanel id="filters" title="🎨 濾鏡 / 去背 / 效果" defaultPos={{ x: 816, y: 370 }} width={272} defaultCollapsed>
+          {/* 🎨 HSL Color Mixer — Photoshop-style 8-range targeted H/S/L (精準版) */}
+          <SidebarPanel id="hslmixer" title="🎨 色彩混合器 HSL" defaultPos={{ x: 816, y: 370 }} width={272} defaultCollapsed>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
+              {/* Tab strip: 全部 + 8 ranges */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                <button
+                  className="btn-secondary"
+                  style={{ fontSize: 11, padding: "2px 7px", fontWeight: hslTab === "all" ? 700 : 400,
+                    borderBottom: hslTab === "all" ? "2px solid var(--accent)" : "2px solid transparent" }}
+                  onClick={() => setHslTab("all")}
+                >全部</button>
+                {HSL_RANGES.map((r) => (
+                  <button key={r.key} className="btn-secondary"
+                    style={{ fontSize: 11, padding: "2px 5px", fontWeight: hslTab === r.key ? 700 : 400,
+                      borderBottom: hslTab === r.key ? `2px solid ${r.color}` : "2px solid transparent" }}
+                    onClick={() => setHslTab(r.key)}
+                  >
+                    <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: r.color, marginRight: 3, verticalAlign: "middle" }} />
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Active range label */}
+              <div style={{ opacity: 0.55, fontSize: 11 }}>
+                {hslTab === "all" ? "全部色相（整體偏移）" : `${HSL_RANGES.find(r => r.key === hslTab)?.label ?? ""} 色段`}
+                {hasAnyHslAdjustment(hslMixer) && (
+                  <span style={{ color: "var(--accent)", marginLeft: 6 }}>已調整</span>
+                )}
+              </div>
+
+              {/* H / S / L sliders for current tab */}
+              {(
+                [
+                  { label: "色相 Hue", axis: "h" as const, min: -40, max: 40 },
+                  { label: "飽和度 Saturation", axis: "s" as const, min: -100, max: 100 },
+                  { label: "明度 Luminance", axis: "l" as const, min: -100, max: 100 },
+                ] satisfies { label: string; axis: "h" | "s" | "l"; min: number; max: number }[]
+              ).map((row) => {
+                const v = hslMixer[hslTab][row.axis];
+                return (
+                  <label key={row.axis} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span>{row.label}</span>
+                      <span style={{ opacity: 0.7, fontVariantNumeric: "tabular-nums", color: v !== 0 ? "var(--accent)" : undefined }}>
+                        {v > 0 ? `+${v}` : `${v}`}
+                      </span>
+                    </span>
+                    <input
+                      type="range" min={row.min} max={row.max} value={v}
+                      onChange={(e) => {
+                        markEdit();
+                        const nv = Number(e.target.value);
+                        setHslMixer(prev => ({
+                          ...prev,
+                          [hslTab]: { ...prev[hslTab], [row.axis]: nv },
+                        }));
+                      }}
+                      style={{ width: "100%" }}
+                    />
+                  </label>
+                );
+              })}
+
+              {/* Reset buttons */}
+              <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
+                <button className="btn-secondary" style={{ fontSize: 11 }}
+                  onClick={() => { markEdit(); setHslMixer(prev => ({ ...prev, [hslTab]: { h: 0, s: 0, l: 0 } })); }}>
+                  重置此色段
+                </button>
+                <button className="btn-secondary" style={{ fontSize: 11 }}
+                  onClick={() => { markEdit(); setHslMixer(JSON.parse(JSON.stringify(HSL_NEUTRAL))); }}>
+                  全部重置
+                </button>
+              </div>
+            </div>
+          </SidebarPanel>
+
+          <SidebarPanel id="filters" title="🎨 濾鏡 / 去背 / 效果" defaultPos={{ x: 816, y: 390 }} width={272} defaultCollapsed>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 <button

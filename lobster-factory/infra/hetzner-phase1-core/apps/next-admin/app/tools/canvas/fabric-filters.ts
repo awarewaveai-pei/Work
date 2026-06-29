@@ -17,6 +17,163 @@ import type { ColorGradeParams } from "@/lib/studio/color-grade";
  */
 const clampN = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
+// ── Photoshop-style targeted HSL Color Mixer ────────────────────────────────────────
+
+export type HslRange = "all" | "red" | "orange" | "yellow" | "green" | "aqua" | "blue" | "purple" | "magenta";
+export type HslAdj = { h: number; s: number; l: number };
+export type HslMixerState = Record<HslRange, HslAdj>;
+
+/** 8 perceptual hue ranges: center in normalized hue (0–1), half-width in same units. */
+export const HSL_RANGES: { key: HslRange; label: string; color: string; center: number; hw: number }[] = [
+  { key: "red",     label: "紅",  color: "#FF3B30", center: 0,     hw: 0.083 },
+  { key: "orange",  label: "橘黃", color: "#FF9500", center: 0.083, hw: 0.083 },
+  { key: "yellow",  label: "黃",  color: "#FFCC00", center: 0.167, hw: 0.083 },
+  { key: "green",   label: "綠",  color: "#34C759", center: 0.333, hw: 0.167 },
+  { key: "aqua",    label: "水綠", color: "#00C7BE", center: 0.500, hw: 0.083 },
+  { key: "blue",    label: "藍",  color: "#0A84FF", center: 0.667, hw: 0.111 },
+  { key: "purple",  label: "紫",  color: "#BF5AF2", center: 0.778, hw: 0.097 },
+  { key: "magenta", label: "洋紅", color: "#FF375F", center: 0.875, hw: 0.083 },
+];
+
+export const HSL_NEUTRAL: HslMixerState = {
+  all: { h: 0, s: 0, l: 0 }, red: { h: 0, s: 0, l: 0 }, orange: { h: 0, s: 0, l: 0 },
+  yellow: { h: 0, s: 0, l: 0 }, green: { h: 0, s: 0, l: 0 }, aqua: { h: 0, s: 0, l: 0 },
+  blue: { h: 0, s: 0, l: 0 }, purple: { h: 0, s: 0, l: 0 }, magenta: { h: 0, s: 0, l: 0 },
+};
+
+export function hasAnyHslAdjustment(state: HslMixerState): boolean {
+  return Object.values(state).some(a => a.h !== 0 || a.s !== 0 || a.l !== 0);
+}
+
+function hueDist(a: number, b: number): number {
+  const d = Math.abs(a - b);
+  return d > 0.5 ? 1 - d : d;
+}
+
+function rangeWeight(hue: number, center: number, hw: number): number {
+  const d = hueDist(hue, center);
+  if (d >= hw) return 0;
+  const t = 1 - d / hw;
+  return t * t; // quadratic falloff → smooth Photoshop-like boundary
+}
+
+function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+  const rn = r / 255, gn = g / 255, bn = b / 255;
+  const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h: number;
+  if (max === rn)      h = (gn - bn) / d + (gn < bn ? 6 : 0);
+  else if (max === gn) h = (bn - rn) / d + 2;
+  else                 h = (rn - gn) / d + 4;
+  return [h / 6, s, l];
+}
+
+function hue2rgb(p: number, q: number, t: number): number {
+  if (t < 0) t += 1;
+  if (t > 1) t -= 1;
+  if (t < 1 / 6) return p + (q - p) * 6 * t;
+  if (t < 1 / 2) return q;
+  if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+  return p;
+}
+
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  if (s === 0) { const v = Math.round(l * 255); return [v, v, v]; }
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  return [
+    Math.round(hue2rgb(p, q, h + 1 / 3) * 255),
+    Math.round(hue2rgb(p, q, h) * 255),
+    Math.round(hue2rgb(p, q, h - 1 / 3) * 255),
+  ];
+}
+
+function applyHslPixels(data: Uint8ClampedArray, state: HslMixerState): void {
+  const allAdj = state.all;
+  // Pre-filter to ranges that actually have non-zero adjustments (perf: skip no-op ranges)
+  const activeRanges = HSL_RANGES.filter(r => {
+    const a = state[r.key];
+    return a.h !== 0 || a.s !== 0 || a.l !== 0;
+  });
+
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] === 0) continue; // skip fully transparent
+    const [h, s, l] = rgbToHsl(data[i], data[i + 1], data[i + 2]);
+
+    // Weighted sum of hue-range adjustments (Lightroom-style: normalize by total weight)
+    let totalW = 0, wdh = 0, wds = 0, wdl = 0;
+    for (const range of activeRanges) {
+      const w = rangeWeight(h, range.center, range.hw);
+      if (w > 0) {
+        const adj = state[range.key];
+        wdh += adj.h * w; wds += adj.s * w; wdl += adj.l * w;
+        totalW += w;
+      }
+    }
+    const dh = totalW > 0 ? wdh / totalW : 0;
+    const ds = totalW > 0 ? wds / totalW : 0;
+    const dl = totalW > 0 ? wdl / totalW : 0;
+
+    const nh = ((h + (dh + allAdj.h) / 360) % 1 + 1) % 1;
+    const ns = Math.max(0, Math.min(1, s + (ds + allAdj.s) / 100));
+    const nl = Math.max(0, Math.min(1, l + (dl + allAdj.l) / 100));
+
+    const [nr, ng, nb] = hslToRgb(nh, ns, nl);
+    data[i] = nr; data[i + 1] = ng; data[i + 2] = nb;
+  }
+}
+
+/**
+ * Build a Photoshop-style targeted HSL Color Mixer filter.
+ * 8 hue ranges × 3 axes (H/S/L) + global "all" channel.
+ * Per-pixel canvas 2D processing via Fabric BaseFilter.applyTo2d.
+ */
+export function buildHslMixerFilter(
+  fabricNS: { filters: Record<string, unknown> },
+  state: HslMixerState
+): object[] {
+  if (!hasAnyHslAdjustment(state)) return [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const BaseFilter = (fabricNS.filters as Record<string, any>).BaseFilter as (new () => object) | undefined;
+  if (!BaseFilter) return [];
+  const snapshot: HslMixerState = JSON.parse(JSON.stringify(state));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  class HslColorMixer extends (BaseFilter as any) {
+    // Static type prevents cache-key collision with the BaseFilter identity shader in WebGL programCache.
+    // Also ensures toJSON serializes "HslColorMixer" (not "BaseFilter") for correct design round-trips.
+    static type = "HslColorMixer";
+    type = "HslColorMixer";
+    isNeutralState() { return false; }
+    applyTo2d(opts: { imageData: ImageData }) { applyHslPixels(opts.imageData.data, snapshot); }
+  }
+  return [new HslColorMixer()];
+}
+
+/**
+ * Sanitize an untrusted hslMixer value (from design JSON or img.adj) to a valid HslMixerState.
+ * Coerces non-finite / out-of-range values to neutral so applyHslPixels never receives NaN.
+ */
+export function sanitizeHslMixer(raw: unknown): HslMixerState {
+  const out: HslMixerState = JSON.parse(JSON.stringify(HSL_NEUTRAL));
+  if (!raw || typeof raw !== "object") return out;
+  const r = raw as Record<string, unknown>;
+  const fin = (v: unknown, lo: number, hi: number): number => {
+    const n = typeof v === "number" && isFinite(v) ? v : 0;
+    return Math.max(lo, Math.min(hi, n));
+  };
+  for (const key of (["all", ...HSL_RANGES.map(x => x.key)] as HslRange[])) {
+    const entry = r[key];
+    if (entry && typeof entry === "object") {
+      const e = entry as Record<string, unknown>;
+      out[key] = { h: fin(e.h, -40, 40), s: fin(e.s, -100, 100), l: fin(e.l, -100, 100) };
+    }
+  }
+  return out;
+}
+
 type FilterCtor = new (opts?: Record<string, unknown>) => object;
 
 /** One-click look presets → the matching Fabric filter class name. */
