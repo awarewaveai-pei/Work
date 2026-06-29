@@ -4,6 +4,19 @@
 
 ## 2026-06-29
 
+### fix(studio): region prompt 改為裝飾背景描述，保留文化視覺感
+
+**根本問題**: `"in Taiwanese style"` 過於簡短，AI 不生成背景文化元素（波紋/雲紋），圖像質感變差。
+**修法**: 改為 `"Taiwanese cultural decorative background with traditional patterns and motifs"`，明確指定為背景裝飾，AI 不會把它生成第三個角色，但會添加文化圖騰。
+
+**[已修改]**
+- `app/tools/studio/StudioWorkbench.tsx:471-475` — regionStyle 改為背景裝飾描述詞
+
+**[驗證結果]**
+- REALTEST_WAIVED: SMOKE_COVERED -- prompt string only; smoke covers route e2e
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial)
+
 ### fix(studio): region 改為 style 修飾語，消除第三角色
 
 **根本問題**: `cultureTokens` 把 `"Taiwanese cultural heritage"` 放第一個名詞，AI 把它當第三個物件生成（廟宇角色「臺灣文化遺產」），導致選 2 個 chip 卻出現 3 個角色。

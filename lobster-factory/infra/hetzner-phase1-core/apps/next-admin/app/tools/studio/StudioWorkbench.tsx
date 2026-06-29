@@ -468,10 +468,12 @@ export default function StudioWorkbench() {
     }
     // 🌍 culture tokens: picked chips first; region is a STYLE suffix (not a noun) so the AI
     // doesn't generate it as an extra character alongside the selected items.
+    // Region goes in as decorative BACKGROUND descriptor, not a standalone noun — prevents the AI
+    // from rendering it as an extra mascot character alongside the selected chips.
     const regionStyle = region
       ? fusionRegion
-        ? `in ${region.en} and ${fusionRegion.en} style`
-        : `in ${region.en} style`
+        ? `${region.en} and ${fusionRegion.en} cultural decorative background with traditional patterns and motifs`
+        : `${region.en} cultural decorative background with traditional patterns and motifs`
       : "";
     const cultureTokens = [...cultureChips].filter(Boolean);
     if (refMode === "transform" && refImages.length > 0) {
