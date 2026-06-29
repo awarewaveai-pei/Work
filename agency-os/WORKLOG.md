@@ -4,6 +4,25 @@
 
 ## 2026-06-29
 
+### feat(security): S2 Batch 3 outreach tenant guard — service-profiles IDOR closed
+
+**根本問題**: `app/api/outreach/service-profiles` 五條路徑（GET single/list、POST INSERT/UPDATE、DELETE）均無 tenant guard，client 可讀/改/刪任意 org 的 service profile（含 tone/USP/forbidden words 等 org 機密）。
+
+**修法**:
+- GET single — 抓完後 `assertOrgAccess(req, data.organization_id)` 再 return
+- GET list — `effectiveOrgId(req, qparam)` 取代 optional org filter
+- POST UPDATE — pre-read `select("organization_id")` + `assertOrgAccess`；**移除** `organization_id` from update payload（防止 org 改指）
+- POST INSERT — `effectiveOrgId(req, str(body.organizationId))` 取代直接用 body
+- DELETE — pre-read `select("organization_id")` + `assertOrgAccess` 再刪
+
+**[已修改]**
+- `app/api/outreach/service-profiles/route.ts` — import + GET single assertOrgAccess + GET list effectiveOrgId + POST UPDATE pre-read + assertOrgAccess + drop org from fields + POST INSERT effectiveOrgId + DELETE pre-read + assertOrgAccess
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test | exit=0 | ms=1600 (0 tsc errors, 552 tests pass)
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/1n (N1: GET single 403 vs 404 洩漏 existence=low risk，與 sibling 路由行為一致；不阻塞)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=effectiveOrgId|assertOrgAccess|OrgAccessError|toOrgAccessResponse | hits=7 files (全在 outreach/* 7 條路由 + tenant-guard.ts 定義；無意外 callsite)
+
 ### feat(security): S2 Batch 2 outreach tenant guard — messages/followups/suppression IDOR closed
 
 **根本問題**: `app/api/outreach/messages`、`followups`、`suppression` 三條路由未驗證 caller 是否屬於目標 org，client 可直接傳任意 leadId 或 id 進行跨 org 讀寫刪。
