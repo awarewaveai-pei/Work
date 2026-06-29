@@ -411,6 +411,13 @@ export default function StudioWorkbench() {
   const [allTopics, setAllTopics] = useState<Record<string, string[]>>({});
   const [trendingFetching, setTrendingFetching] = useState(false);
 
+  // 🗓️ 活動行事曆 — upcoming events from Supabase events table
+  interface UpcomingEvent { id: string; title: string; title_zh: string | null; event_date: string; category: string; emoji: string | null; marketing_window_start: string; marketing_lead_days: number; }
+  const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
+  const [eventsFetching, setEventsFetching] = useState(false);
+  const [eventCatFilter, setEventCatFilter] = useState<string>("全部");
+  const EVENT_CAT_FILTERS = ["全部", "mega", "sports", "holiday", "cultural"] as const;
+
   const bgInFlight = useRef<Record<string, boolean>>({});
   const mockupInFlight = useRef(false);
   const jobIdRef = useRef<string | null>(null);
@@ -609,6 +616,26 @@ export default function StudioWorkbench() {
     const stored = readStoredTrending();
     if (stored) setAllTopics(stored);
   }, []);
+
+  // 🗓️ Fetch upcoming events (next 90 days, marketing window already open or opening soon)
+  const fetchUpcomingEvents = useCallback(async () => {
+    setEventsFetching(true);
+    try {
+      const now = new Date().toISOString().slice(0, 10);
+      const until = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
+      const url = new URL("/api/tools/events/upcoming", window.location.origin);
+      url.searchParams.set("from", now);
+      url.searchParams.set("until", until);
+      const res = await fetch(url.toString());
+      if (res.ok) {
+        const json = (await res.json()) as { events: UpcomingEvent[] };
+        setUpcomingEvents(json.events ?? []);
+      }
+    } catch { /* silent */ }
+    setEventsFetching(false);
+  }, []);
+
+  useEffect(() => { void fetchUpcomingEvents(); }, [fetchUpcomingEvents]);
 
   // Auto-load items for the selected region×facet WITHOUT a click and WITHOUT spending:
   // localStorage first, else a curated-only fetch (pre-baked = free + instant; never the LLM).
@@ -1223,6 +1250,49 @@ export default function StudioWorkbench() {
                 );
               });
             })()}
+          </div>
+        </AccordionSection>
+
+        {/* 🗓️ 活動行事曆 — upcoming events for merchandise pre-selling */}
+        <AccordionSection
+          title="🗓️ 活動行事曆"
+          summary={upcomingEvents.length > 0 ? `${upcomingEvents.length} 個即將到來` : "載入中…"}
+        >
+          <p style={{ fontSize: 11, opacity: 0.55, margin: "0 0 8px" }}>點擊活動 → 自動填入主圖欄（為這個活動設計商品圖）</p>
+          {/* Category filter chips */}
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+            {EVENT_CAT_FILTERS.map((c) => (
+              <button key={c} type="button" onClick={() => setEventCatFilter(c)} style={tabStyle(eventCatFilter === c)}>{c}</button>
+            ))}
+            <button type="button" onClick={() => void fetchUpcomingEvents()} disabled={eventsFetching}
+              style={{ ...actionPill(eventsFetching), marginLeft: "auto" }}>
+              {eventsFetching ? "載入中…" : "🔄"}
+            </button>
+          </div>
+          {/* Event chips */}
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+            {upcomingEvents.length === 0 ? (
+              <span style={{ fontSize: 11, opacity: 0.45 }}>
+                {eventsFetching ? "載入中…" : "無資料 — 先在活動行事曆頁跑一次同步"}
+              </span>
+            ) : (upcomingEvents
+              .filter((e) => eventCatFilter === "全部" || e.category === eventCatFilter)
+              .slice(0, 30)
+              .map((e) => {
+                const label = `${e.emoji ?? "📅"} ${e.title_zh ?? e.title}`;
+                const active = subject === label;
+                const daysUntil = Math.ceil((new Date(e.event_date).getTime() - Date.now()) / 86400000);
+                return (
+                  <button key={e.id} type="button"
+                    title={`${e.event_date} · 提前 ${e.marketing_lead_days} 天備稿（${daysUntil} 天後）`}
+                    onClick={() => setSubject(active ? "" : label)}
+                    style={chipStyle(active)}>
+                    {active ? "✓ " : ""}{label}
+                    <span style={{ fontSize: 10, opacity: 0.55, marginLeft: 4 }}>{daysUntil}天</span>
+                  </button>
+                );
+              })
+            )}
           </div>
         </AccordionSection>
 
