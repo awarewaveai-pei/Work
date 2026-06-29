@@ -2,6 +2,39 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-29
+
+### AUTO_TASK_DONE — weekly-summary-2026-06-29
+
+**Task**: Weekly summary report generation (remote weekly-agent scheduled routine)
+**Period**: 2026-06-23 → 2026-06-29
+
+**[已修改]**
+- `agency-os/reports/weekly/weekly-summary-2026-06-29.md` (NEW) — full weekly summary
+- `agency-os/reports/weekly/weekly-automation-LATEST.md` (OVERWRITTEN) — same content as dated file
+
+**[驗證結果]**
+- REALTEST_WAIVED: SMOKE_COVERED -- read-only report generation; source files verified via git pull + grep
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_WAIVED: DOC_ONLY -- report file only; no code symbols changed
+- Sources read: TASKS.md, WORKLOG.md (grepped), CONVERSATION_MEMORY.md, integrated-status-LATEST.md, weekly-automation-LATEST.md (prev), daily/2026-06-23 through 2026-06-29
+
+**Key highlights this period**:
+- Banner Studio roadmap 100% complete (Tier-1/2/3 + AI compositing)
+- oracle.aware-wave.com live (8 endpoints; 紫米 knowledge base; paywall)
+- AI Customer Service U0-U5 deployed; U6 gated 8月
+- Provisioning Stage C: AI spec injection + hero image + brand colors
+- S1 Multi-Tenant Identity Foundation shipped (~20 IDOR items documented; S2-S5 roadmap)
+- EU Backup fully real-tested (402M e2e; DR drill passed)
+- netdata web_log unmatched=0% fixed (adm group)
+- AO retention corrected to 90 days (governance)
+
+**Risks carried forward**:
+- 🔴 Defender 木馬 OVERDUE 12 days
+- 🔴 POD A2 金流紅線
+- 🟠 SG app-code drift 4 commits
+- 🟠 S2 multi-tenant enforcement not yet applied
+
 ## 2026-06-28
 
 ### fix(netdata): SG web_log「unparsed=100%」誤報根因 — netdata user 不在 adm 群組讀不到 nginx log
