@@ -84,7 +84,7 @@ const TRENDING_CATEGORIES = [
 
 const TRANSFORM_MODEL: StudioModel = "flux-kontext-dev";
 const DEFAULT_SEARCH_DATA_MODEL: AiTextModel = "gpt-5.4-nano";
-const CULTURE_STORAGE_PREFIX = "studio_culture_v2";
+const CULTURE_STORAGE_PREFIX = "studio_culture_v3";
 const TRENDING_STORAGE_KEY = "studio_trending_v2";
 
 // Fixed seed so the edge-style preview thumbnails match what `applyEdge` actually composites.

@@ -4,6 +4,18 @@
 
 ## 2026-06-29
 
+### fix(studio): bump culture localStorage cache v2→v3
+
+**根本問題**: StudioWorkbench 的 auto-load 優先讀 localStorage（key 前綴 `studio_culture_v2_*`），`readStoredCulture` 回傳舊 AI 結果（含 小籠包/綠豆湯）直接跳過 curated fast-path，故 curated 修好的 大雞排 永遠不被看到。
+
+**[已修改]**
+- `app/tools/studio/StudioWorkbench.tsx:87` — `CULTURE_STORAGE_PREFIX` v2→v3，舊快取全自動失效，下次 auto-load 走 curated
+
+**[驗證結果]**
+- REALTEST_WAIVED: SMOKE_COVERED -- string constant rename only; full smoke covers the route end-to-end
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial)
+
 ### AUTO_TASK_DONE — weekly-summary-2026-06-29
 
 **Task**: Weekly summary report generation (remote weekly-agent scheduled routine)
