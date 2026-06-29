@@ -4,6 +4,62 @@
 
 ## 2026-06-29
 
+### feat(security): S2 batch-5 tenant guard — credentials/secret + build/runs + approvals IDOR closed
+
+**根本問題**: 6 個路由無 org 隔離（IDOR），client 可讀改刪其他 org 的憑證/build log/審批指令。
+
+**已修改**:
+- `app/api/ops/clients/credentials/route.ts` — GET/POST 改 `effectiveOrgId`；PATCH 加 pre-read+`assertOrgAccess`+`.eq("client_id",...)` atomic；DELETE 加 pre-read+`assertOrgAccess`+`.eq("client_id",...)` atomic
+- `app/api/ops/clients/credentials/secret/route.ts` — POST 加 `client_id` to SELECT+`assertOrgAccess`+atomic write；DELETE 加 pre-read+`assertOrgAccess`；**vault DELETE 改先 nullify `secret_ref`（DB-scoped），再 best-effort vault delete**（critic fix：vault fail 不再留 dangling ref）
+- `app/api/build/runs/[id]/route.ts` — 加 `organization_id` to SELECT + `assertOrgAccess`（前：零 auth gate；middleware 已驗 session，修補 org isolation）
+- `app/api/ops/approvals/route.ts` — 移 `resolveOpsRole` 到 query 前；加 `effectiveOrgId` → 動態 org filter（client 只見己方 queued commands）
+- `app/api/ops/approvals/[id]/approve/route.ts` — 加 `assertOrgAccess` after fetch（select("*") 含 organization_id）
+- `app/api/ops/approvals/[id]/reject/route.ts` — SELECT 補 `organization_id`；加 `assertOrgAccess` after fetch
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test | exit=0 | ms=~3000 — 0 type errors, 552 tests pass (pre+post critic fixes)
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/3n — TOCTOU race + vault DELETE ordering + type cast note; all 3 fixed in-batch
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=effectiveOrgId|assertOrgAccess|tenant-guard,client_credentials|ops_action_runs|command_requests | hits=expected (15 tenant-guard imports all accounted; adjacent unguarded routes: build/runs route.ts list + ops/workflow-runs/route.ts — noted in spawn_task for S2 follow-up; inbox/digest in PUBLIC_API_PATHS server-to-server = no IDOR)
+- WORKLOG: 本條目
+
+**S2 進度**: batch-1 outreach leads/inbox/connectors ✅ | batch-2 messages/followups/suppression ✅ | batch-3 service-profiles ✅ | batch-4 designs+video ✅ | batch-5 credentials+secret+build_runs+approvals ✅
+**剩餘 defer → S3**: `ops/repairs/*` (`repair_runs` 無 `organization_id`，需 DB migration)
+**backlog**: `build/runs` list route + `ops/workflow-runs/route.ts` (spawn_task issued)
+
+
+
+### feat(events): Global Events Calendar — Calendarific + TheSportsDB + hardcoded mega-events
+
+**根本問題**: 沒有辦法預先知道哪些節日/賽事即將到來，無法提前備稿預賣商品。
+
+**解決方案**:
+- `lib/events/types.ts` — GlobalEvent / EventRow 型別 + LEAD_DAYS 常數
+- `lib/events/calendarific.ts` — 20 國節日，每年 this+next year 同時拉
+- `lib/events/thesportsdb.ts` — 9 大聯賽 (NFL/NBA/MLB/NHL/PL/UCL/LaLiga/F1/ATP)
+- `lib/events/hardcoded.ts` — FIFA 2026/冬奧 2026/夏奧 2028/Super Bowl/Euro 2028
+- `lib/events/sync.ts` — 主協調器，批次 upsert Supabase events table
+- `app/api/tools/events/sync/route.ts` — admin-only POST endpoint
+- `app/tools/events/page.tsx` — 行銷日曆 dashboard (時間窗 + 分類篩選)
+- `packages/db/migrations/0053_global_events.sql` — events table + RLS
+- `packages/workflows/src/tasks/sync-global-events.ts` — Trigger.dev 每月 1 日 02:00 UTC
+
+**零成本**: Calendarific free tier 1000 req/mo, TheSportsDB public key=3。
+
+**驗證結果**:
+- REALTEST_WAIVED: NA -- API-only runtime, no local DB to hit; first real test = run sync after deploy
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=1c (roleHeader→readOpsRole fixed)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=roleHeader,syncGlobalEvents | hits=0
+- 型別檢查: `npx tsc --noEmit` — 0 errors (fixed roleHeader→readOpsRole)
+
+**下一步 (使用者操作)**:
+1. Supabase dashboard → SQL Editor → 貼上並執行 `packages/db/migrations/0053_global_events.sql`
+2. 確認 `CALENDARIFIC_API_KEY` 在 SG 的 `.env.local`（或 secrets vault 已有）
+3. 手動觸發一次同步：POST `/api/tools/events/sync`（admin 登入後）
+4. 到 `/tools/events` 查看行事曆
+5. Trigger.dev re-deploy 讓 monthly cron 啟動
+
+commit: 13b20eab
+
 ### feat(security): S2 Batch 4 tenant guard — tools/designs + video/[id] IDOR closed
 
 **根本問題**:

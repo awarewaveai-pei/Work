@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canWriteTenantConfig } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { deleteSecret } from "@/lib/secret-vault";
+import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 // Per-client credential vault — metadata CRUD (migration 0050).
 //
@@ -39,13 +40,16 @@ export async function GET(req: Request): Promise<Response> {
   const supabase = getSupabaseWriteClient();
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
-  const clientId = new URL(req.url).searchParams.get("clientId");
-  if (!clientId) return NextResponse.json({ ok: false, error: "clientId required" }, { status: 400 });
+  const clientIdParam = new URL(req.url).searchParams.get("clientId");
+  let orgFilter: string | null;
+  try { orgFilter = effectiveOrgId(req, clientIdParam); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+  if (!orgFilter) return NextResponse.json({ ok: false, error: "clientId required" }, { status: 400 });
 
   const { data, error } = await supabase
     .from(TABLE)
     .select("id, client_id, category, label, identifier, note, secret_ref, metadata, sort_order, created_at, updated_at")
-    .eq("client_id", clientId)
+    .eq("client_id", orgFilter)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true })
     .limit(LIST_LIMIT);
@@ -73,10 +77,13 @@ export async function POST(req: Request): Promise<Response> {
   try { body = await req.json(); }
   catch { return new NextResponse("invalid json", { status: 400 }); }
 
-  const client_id = str(body.clientId);
+  const clientIdRaw = str(body.clientId);
   const label = str(body.label);
   const category = str(body.category) ?? "other";
 
+  let client_id: string | null;
+  try { client_id = effectiveOrgId(req, clientIdRaw); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   if (!client_id) return NextResponse.json({ ok: false, error: "clientId required" }, { status: 400 });
   if (!label)     return NextResponse.json({ ok: false, error: "label required" }, { status: 400 });
   if (!VALID_CATEGORIES.has(category)) {
@@ -125,6 +132,12 @@ export async function PATCH(req: Request): Promise<Response> {
   const id = str(body.id);
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
 
+  const { data: existing, error: existErr } = await supabase.from(TABLE).select("client_id").eq("id", id).maybeSingle();
+  if (existErr) return NextResponse.json({ ok: false, error: existErr.message }, { status: 500 });
+  if (!existing) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+  try { assertOrgAccess(req, (existing as Record<string, unknown>).client_id as string | null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (body.label !== undefined) {
     const labelVal = str(body.label);
@@ -157,6 +170,7 @@ export async function PATCH(req: Request): Promise<Response> {
     .from(TABLE)
     .update(patch)
     .eq("id", id)
+    .eq("client_id", (existing as Record<string, unknown>).client_id as string)
     .select("id, client_id, category, label, identifier, note, secret_ref, metadata, sort_order, created_at, updated_at")
     .maybeSingle();
 
@@ -178,21 +192,23 @@ export async function DELETE(req: Request): Promise<Response> {
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
 
-  // Read secret_ref before deleting so we can clean the vault.
+  // Read secret_ref + client_id before deleting so we can clean the vault and verify org ownership.
   const { data: row, error: readErr } = await supabase
     .from(TABLE)
-    .select("secret_ref")
+    .select("secret_ref, client_id")
     .eq("id", id)
     .maybeSingle();
   if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
   if (!row) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+  try { assertOrgAccess(req, (row as Record<string, unknown>).client_id as string | null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
   // Best-effort vault cleanup before DB delete (so if DB delete succeeds, no orphan).
   if (row.secret_ref) {
     try { await deleteSecret(row.secret_ref); } catch { /* vault cleanup is best-effort */ }
   }
 
-  const { error } = await supabase.from(TABLE).delete().eq("id", id);
+  const { error } = await supabase.from(TABLE).delete().eq("id", id).eq("client_id", (row as Record<string, unknown>).client_id as string);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true });

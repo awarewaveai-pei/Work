@@ -6,6 +6,7 @@
 import { NextResponse } from "next/server";
 import { canApproveCommand, resolveOpsRole } from "../../../../../../lib/ops-role";
 import { getSupabaseWriteClient } from "../../../../../../lib/supabase-server";
+import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "../../../../../../lib/tenant-guard";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -43,7 +44,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
   const { data: row, error: fetchErr } = await supabase
     .from("command_requests")
-    .select("id,status,risk_level,metadata")
+    .select("id,status,risk_level,metadata,organization_id")
     .eq("id", id)
     .single();
 
@@ -53,6 +54,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       { status: 404 },
     );
   }
+  try { assertOrgAccess(request, (row as Record<string, unknown>).organization_id as string | null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
   if (row.status !== "queued") {
     return NextResponse.json(
