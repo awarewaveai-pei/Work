@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import {
   normalizeLead,
   flagDuplicatesInBatch,
@@ -41,10 +42,12 @@ export async function GET(req: Request): Promise<Response> {
   const supabase = getSupabaseWriteClient();
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const url = new URL(req.url);
-  const organizationId = url.searchParams.get("organizationId");
+  let orgFilter: string | null;
+  try { orgFilter = effectiveOrgId(req, url.searchParams.get("organizationId")); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   const status = url.searchParams.get("status");
   let query = supabase.from(TABLE).select("*").order("created_at", { ascending: false }).limit(LIST_LIMIT);
-  if (organizationId) query = query.eq("organization_id", organizationId);
+  if (orgFilter) query = query.eq("organization_id", orgFilter);
   if (status) query = query.eq("inbox_status", status);
   const { data, error } = await query;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
@@ -66,10 +69,13 @@ export async function POST(req: Request): Promise<Response> {
     return new NextResponse("invalid json", { status: 400 });
   }
 
-  const organizationId = typeof body.organizationId === "string" && body.organizationId.trim() ? body.organizationId.trim() : null;
-  if (organizationId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(organizationId)) {
+  const rawOrgId = typeof body.organizationId === "string" && body.organizationId.trim() ? body.organizationId.trim() : null;
+  if (rawOrgId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawOrgId)) {
     return NextResponse.json({ ok: false, error: "organizationId must be a uuid" }, { status: 400 });
   }
+  let organizationId: string | null;
+  try { organizationId = effectiveOrgId(req, rawOrgId); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   const rawList: RawLead[] = Array.isArray(body.leads)
     ? (body.leads as RawLead[])
     : body.lead && typeof body.lead === "object"
@@ -147,6 +153,11 @@ export async function DELETE(req: Request): Promise<Response> {
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
+  const { data: cur, error: readErr } = await supabase.from(TABLE).select("organization_id").eq("id", id).maybeSingle();
+  if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
+  if (!cur) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+  try { assertOrgAccess(req, (cur as Record<string, unknown>).organization_id as string | null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   const { error } = await supabase.from(TABLE).delete().eq("id", id);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
