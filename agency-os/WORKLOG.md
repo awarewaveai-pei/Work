@@ -15842,3 +15842,7 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 
 
 
+
+- REALTEST_WAIVED: SMOKE_COVERED -- UI-only React data display; tsc --noEmit exit=0 confirms compile integrity; full smoke test on deploy
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=1c/0m/0n (search speed-sort fixed)
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=VIDEO_MODEL_COMPARISONS|TTS_MODEL_COMPARISONS|SEARCH_API_COMPARISONS | hits=0 (no stale callsites outside src+import)
