@@ -466,17 +466,20 @@ export default function StudioWorkbench() {
       const extras = [playClause, resolvedStylePrompt, vibe.trim()].filter(Boolean).join(", ");
       return extras ? `${base}, ${extras}` : base;
     }
-    // 🌍 culture tokens: region adjective (+ 🎲 fusion culture) + any picked culture chips
-    const cultureTokens = [
-      region ? `${region.en} cultural heritage` : "",
-      fusionRegion ? `fused with ${fusionRegion.en} heritage` : "",
-      ...cultureChips,
-    ].filter(Boolean);
+    // 🌍 culture tokens: picked chips first; region is a STYLE suffix (not a noun) so the AI
+    // doesn't generate it as an extra character alongside the selected items.
+    const regionStyle = region
+      ? fusionRegion
+        ? `in ${region.en} and ${fusionRegion.en} style`
+        : `in ${region.en} style`
+      : "";
+    const cultureTokens = [...cultureChips].filter(Boolean);
     if (refMode === "transform" && refImages.length > 0) {
       const parts = [
         "Transform this image.",
         resolvedStylePrompt ? `Apply style: ${resolvedStylePrompt}.` : "",
         cultureTokens.length ? `Cultural influence: ${cultureTokens.join(", ")}.` : "",
+        regionStyle ? `Cultural context: ${regionStyle}.` : "",
         playClause ? `Style treatment: ${playClause}.` : "",
         vibe.trim() ? `Mood: ${vibe.trim()}.` : "",
         subject.trim() ? `Keep subject: ${subject.trim()}.` : "",
@@ -484,7 +487,7 @@ export default function StudioWorkbench() {
       ].filter(Boolean);
       return parts.join(" ");
     }
-    const parts = [subject.trim(), ...cultureTokens, playClause, theme.trim(), vibe.trim(), resolvedStylePrompt, product.suffix].filter(Boolean);
+    const parts = [subject.trim(), ...cultureTokens, playClause, regionStyle, theme.trim(), vibe.trim(), resolvedStylePrompt, product.suffix].filter(Boolean);
     return parts.join(", ");
   }, [subject, theme, vibe, resolvedStylePrompt, product, refMode, refImages.length, region, fusionRegion, cultureChips, mapMode, topic, cultureDyn, playMods]);
 

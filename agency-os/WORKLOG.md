@@ -4,6 +4,19 @@
 
 ## 2026-06-29
 
+### fix(studio): region 改為 style 修飾語，消除第三角色
+
+**根本問題**: `cultureTokens` 把 `"Taiwanese cultural heritage"` 放第一個名詞，AI 把它當第三個物件生成（廟宇角色「臺灣文化遺產」），導致選 2 個 chip 卻出現 3 個角色。
+**修法**: 移除 region 名詞句，改為 `regionStyle = "in Taiwanese style"` 後置，AI 看到的是「item1, item2, ... in Taiwanese style」而非三個並列名詞。fusion 邏輯同步更新為 `"in A and B style"`。
+
+**[已修改]**
+- `app/tools/studio/StudioWorkbench.tsx:470-488` — cultureTokens 只含 chips；regionStyle 後置於 parts
+
+**[驗證結果]**
+- REALTEST_WAIVED: SMOKE_COVERED -- prompt-assembly logic; smoke covers route e2e
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial)
+
 ### fix(studio): AI換一批結果不寫 localStorage
 
 **根本問題**: `storeCulture()` 對 `force=true` 的 AI 結果也寫入 localStorage，蓋過 curated 快取，導致頁面重載後永遠看到舊 AI 資料。
