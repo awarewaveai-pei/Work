@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 // Cold Outreach — Follow-up scheduling (task T11). Mutates co_leads.next_followup_date /
 // last_contact_date / do_not_contact. Reads go through the leads API (which already returns these
@@ -41,6 +42,13 @@ export async function POST(req: Request): Promise<Response> {
   const action = str(body.action);
   if (!leadId) return NextResponse.json({ ok: false, error: "leadId required" }, { status: 400 });
   if (!action) return NextResponse.json({ ok: false, error: "action required" }, { status: 400 });
+
+  // Verify caller owns this lead before mutating follow-up fields.
+  const { data: leadOrg, error: orgErr } = await supabase.from("co_leads").select("organization_id").eq("id", leadId).maybeSingle();
+  if (orgErr) return NextResponse.json({ ok: false, error: orgErr.message }, { status: 500 });
+  if (!leadOrg) return NextResponse.json({ ok: false, error: "lead not found" }, { status: 404 });
+  try { assertOrgAccess(req, (leadOrg as Record<string, unknown>).organization_id as string | null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   switch (action) {

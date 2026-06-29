@@ -4,6 +4,30 @@
 
 ## 2026-06-29
 
+### feat(security): S2 Batch 2 outreach tenant guard — messages/followups/suppression IDOR closed
+
+**根本問題**: `app/api/outreach/messages`、`followups`、`suppression` 三條路由未驗證 caller 是否屬於目標 org，client 可直接傳任意 leadId 或 id 進行跨 org 讀寫刪。
+
+**修法**:
+- `messages` GET — `effectiveOrgId` org filter（client 無法讀外 org 訊息）
+- `messages` POST — `assertOrgAccess(req, lead.organization_id)` lead 抓完後立即驗
+- `messages` PATCH — pre-read `organization_id` + `assertOrgAccess` 再 update
+- `messages` DELETE — pre-read org + `assertOrgAccess` 再 delete
+- `followups` POST — pre-read `co_leads.organization_id` by leadId + `assertOrgAccess` 再改 follow-up 欄位
+- `suppression` GET — `effectiveOrgId` org filter
+- `suppression` POST — `rawOrgId → UUID validation → effectiveOrgId` 防 org 偽造
+- `suppression` DELETE — pre-read org + `assertOrgAccess` 再刪
+
+**[已修改]**
+- `app/api/outreach/messages/route.ts` — import + GET org filter + POST assertOrgAccess on lead + PATCH pre-read + assertOrgAccess + DELETE pre-read + assertOrgAccess
+- `app/api/outreach/followups/route.ts` — import + POST pre-read lead org + assertOrgAccess before co_leads update
+- `app/api/outreach/suppression/route.ts` — import + GET effectiveOrgId + POST UUID validate + effectiveOrgId + DELETE pre-read + assertOrgAccess
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test | exit=0 | ms=2090 (0 tsc errors, 552 tests pass)
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/2n (N1: suppression leadId 跨 org 參照=optional fix; N2: TOCTOU defense-in-depth=optional; 兩者均不阻塞)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=effectiveOrgId|assertOrgAccess|OrgAccessError|toOrgAccessResponse | hits=19 (全在 3 個目標路由，無意外 callsite)
+
 ### fix(studio): region prompt 改為裝飾背景描述，保留文化視覺感
 
 **根本問題**: `"in Taiwanese style"` 過於簡短，AI 不生成背景文化元素（波紋/雲紋），圖像質感變差。
