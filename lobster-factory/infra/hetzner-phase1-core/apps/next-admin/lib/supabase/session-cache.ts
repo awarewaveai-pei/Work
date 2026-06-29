@@ -41,7 +41,12 @@ const STALE_MS = 120_000;    // within this window, tolerate transient auth-serv
 const MAX_STALE_USES = 8;    // consecutive transient-failure fallbacks before failing closed
 const MAX_ENTRIES = 500;     // bound memory
 
-type Entry = { role: OpsRole; at: number; staleUses: number };
+// Tenant identity is cached alongside the role so that the fresh-hit and stale-fallback paths
+// can inject x-ops-user-kind / x-ops-org-id without calling getUser() again. A missing entry
+// (first request, cache eviction) always forces a fresh getUser() which fills both fields.
+export type UserKind = "staff" | "client";
+export interface CachedIdentity { role: OpsRole; userKind: UserKind; orgId: string }
+type Entry = CachedIdentity & { at: number; staleUses: number };
 const cache = new Map<string, Entry>();
 
 function prune(now: number): void {
@@ -59,28 +64,36 @@ function prune(now: number): void {
   }
 }
 
-/** Cache hit only if validated within FRESH_MS — safe to skip the network call entirely. */
-export function getFreshCachedRole(key: string, now: number = Date.now()): OpsRole | null {
+/**
+ * Cache hit only if validated within FRESH_MS — safe to skip the network call entirely.
+ * Returns the full identity (role + tenant) so the middleware can inject all headers without
+ * a getUser() call.
+ */
+export function getFreshCachedRole(key: string, now: number = Date.now()): CachedIdentity | null {
   const e = cache.get(key);
-  return e && now - e.at <= FRESH_MS ? e.role : null;
+  return e && now - e.at <= FRESH_MS ? { role: e.role, userKind: e.userKind, orgId: e.orgId } : null;
 }
 
 /**
  * Stale fallback — use ONLY when a fresh network validation just failed transiently. Returns the
- * last good role if still inside STALE_MS AND under the consecutive-use cap; otherwise null
+ * last good identity if still inside STALE_MS AND under the consecutive-use cap; otherwise null
  * (fail closed). Each call consumes one allowance; a successful validation resets it.
  */
-export function consumeStaleCachedRole(key: string, now: number = Date.now()): OpsRole | null {
+export function consumeStaleCachedRole(key: string, now: number = Date.now()): CachedIdentity | null {
   const e = cache.get(key);
   if (!e || now - e.at > STALE_MS) return null;
   if (e.staleUses >= MAX_STALE_USES) return null;
   e.staleUses += 1;
-  return e.role;
+  return { role: e.role, userKind: e.userKind, orgId: e.orgId };
 }
 
 /** Record a successful network validation. Resets the stale-use allowance and moves to LRU tail. */
-export function cacheValidatedRole(key: string, role: OpsRole, now: number = Date.now()): void {
+export function cacheValidatedRole(
+  key: string,
+  identity: CachedIdentity,
+  now: number = Date.now()
+): void {
   cache.delete(key); // re-insert so re-validated entries sort to the tail (true LRU-ish ordering)
-  cache.set(key, { role, at: now, staleUses: 0 });
+  cache.set(key, { ...identity, at: now, staleUses: 0 });
   prune(now);
 }
