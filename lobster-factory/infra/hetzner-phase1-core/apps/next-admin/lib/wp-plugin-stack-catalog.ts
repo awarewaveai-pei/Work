@@ -6,6 +6,13 @@
  * ↩ = alternative slug (`alternativeSlug`) — used by resolveInstallableSlugs when primary is free: false
  * †  = optional (`required: false`) — Complianz, TranslatePress
  *
+ * installSource:
+ *   "wporg"       — WP.org; installed via `wp plugin install <slug> --activate` (default for free plugins)
+ *   "manual-zip"  — Paid zip; operator uploads to /opt/lobster-plugins/ on both VPS (WordPressIT bundle)
+ *   "release-url" — GitHub release zip; fetched from awarewaveai-pei/aware-wave-wp-bridge releases
+ *   "manifest"    — Installed by manifest step runner; NOT included in wp-install-plugins task
+ *   (omitted)     — Free WP.org plugin; same as "wporg", omitted for brevity
+ *
  * SYNC RULE: Any change here must be reflected in WP_CLIENT_PLUGIN_STACK.md, and vice versa.
  */
 
@@ -24,6 +31,14 @@ export interface WpPlugin {
   /** Which module this entry belongs to */
   module: WpPluginModule;
   /**
+   * How this plugin is installed.
+   * "wporg"       — WP.org; `wp plugin install <slug> --activate` (default for free plugins; omit for brevity)
+   * "manual-zip"  — Paid zip; operator uploads to /opt/lobster-plugins/ on each VPS (WordPressIT bundle)
+   * "release-url" — GitHub release zip; fetched from awarewaveai-pei/aware-wave-wp-bridge tag→Action
+   * "manifest"    — Installed by manifest step runner; excluded from wp-install-plugins task
+   */
+  installSource?: "wporg" | "manual-zip" | "release-url" | "manifest";
+  /**
    * Free alternative slug (↩). Used by resolveInstallableSlugs when free: false.
    * Omit if there is no free substitute and the plugin must be installed manually.
    */
@@ -32,41 +47,44 @@ export interface WpPlugin {
    * Server-side condition for installation.
    * "is_litespeed" — only install on LiteSpeed hosts; skip on Nginx/Apache.
    * When set, the plugin is excluded from auto-install and shown separately as conditional.
-   * Operator must explicitly enable via LOBSTER_CONDITION_<NAME>=true env var or manifest override.
    */
   condition?: "is_litespeed";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Catalog — 16 base + 13 ecommerce + 1 pod + 5 tourism + 3 brand = 38 total entries
+// Catalog — 18 base + 13 ecommerce + 1 pod + 5 tourism + 3 brand = 40 total entries
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const WP_PLUGIN_CATALOG: WpPlugin[] = [
 
-  // ── BASE MODULE (16 functional slots) ────────────────────────────────────
+  // ── BASE MODULE (18 functional slots) ────────────────────────────────────
 
-  { slug: "kadence",                          label: "Kadence Theme",                              free: true,  required: true,  module: "base" },
-  { slug: "kadence-blocks",                   label: "Kadence Blocks",                             free: true,  required: true,  module: "base" },
-  { slug: "wordfence",                        label: "Wordfence Security",                         free: true,  required: true,  module: "base" },
-  { slug: "wpvivid-backups-and-migration",    label: "WPvivid Backup",                             free: true,  required: true,  module: "base" },
-  { slug: "seo-by-rank-math",                 label: "Rank Math SEO",                              free: true,  required: true,  module: "base" },
-  { slug: "redirection",                      label: "Redirection",                                free: true,  required: true,  module: "base" },
-  { slug: "litespeed-cache",                  label: "LiteSpeed Cache ★",                          free: true,  required: true,  module: "base", condition: "is_litespeed" },
-  { slug: "shortpixel-image-optimiser",       label: "ShortPixel Image Optimiser ★",               free: true,  required: true,  module: "base" },
-  { slug: "really-simple-ssl",               label: "Really Simple SSL",                          free: true,  required: true,  module: "base" },
-  { slug: "fluentform",                       label: "Fluent Forms",                               free: true,  required: true,  module: "base" },
-  { slug: "fluent-smtp",                      label: "FluentSMTP",                                 free: true,  required: true,  module: "base" },
-  { slug: "fluent-crm",                       label: "FluentCRM",                                  free: true,  required: true,  module: "base" },
+  { slug: "mainwp-child",                      label: "MainWP Child",                               free: true,  required: true,  module: "base", installSource: "manifest" },
+  // Phase 1 TODO: wire release-url fetcher in provisioning flow (awarewaveai-pei/aware-wave-wp-bridge tag→Action zip)
+  { slug: "aware-wave-wp-bridge",              label: "AwareWave WP Bridge",                        free: false, required: true,  module: "base", installSource: "release-url" },
+  { slug: "kadence",                            label: "Kadence Theme",                              free: true,  required: true,  module: "base" },
+  { slug: "kadence-blocks",                     label: "Kadence Blocks",                             free: true,  required: true,  module: "base" },
+  { slug: "wordfence",                          label: "Wordfence Security",                         free: true,  required: true,  module: "base" },
+  { slug: "wpvivid-backups-and-migration",      label: "WPvivid Backup",                             free: true,  required: true,  module: "base" },
+  { slug: "seo-by-rank-math",                   label: "Rank Math SEO",                              free: true,  required: true,  module: "base" },
+  { slug: "redirection",                        label: "Redirection",                                free: true,  required: true,  module: "base" },
+  { slug: "litespeed-cache",                    label: "LiteSpeed Cache ★",                          free: true,  required: true,  module: "base", condition: "is_litespeed" },
+  { slug: "shortpixel-image-optimiser",         label: "ShortPixel Image Optimiser ★",               free: true,  required: true,  module: "base" },
+  { slug: "really-simple-ssl",                 label: "Really Simple SSL",                          free: true,  required: true,  module: "base" },
+  { slug: "fluentform",                         label: "Fluent Forms",                               free: true,  required: true,  module: "base" },
+  { slug: "fluent-smtp",                        label: "FluentSMTP",                                 free: true,  required: true,  module: "base" },
+  { slug: "fluent-crm",                         label: "FluentCRM",                                  free: true,  required: true,  module: "base" },
   {
     slug: "cleantalk-spam-protect",
     label: "CleanTalk ★ (→ Akismet ↩)",
     free: false,
     required: true,
     module: "base",
+    installSource: "manual-zip",
     alternativeSlug: "akismet",
   },
-  { slug: "duracelltomi-google-tag-manager",  label: "GTM4WP",                                     free: true,  required: true,  module: "base" },
-  { slug: "advanced-custom-fields",           label: "Advanced Custom Fields (ACF)",               free: true,  required: true,  module: "base" },
+  { slug: "duracelltomi-google-tag-manager",    label: "GTM4WP",                                     free: true,  required: true,  module: "base" },
+  { slug: "advanced-custom-fields",             label: "Advanced Custom Fields (ACF)",               free: true,  required: true,  module: "base" },
   {
     slug: "complianz-gdpr",
     label: "Complianz †",
@@ -75,7 +93,7 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
     module: "base",
   },
 
-  // ── ECOMMERCE MODULE (12 functional slots) ────────────────────────────────
+  // ── ECOMMERCE MODULE (13 functional slots) ────────────────────────────────
 
   { slug: "woocommerce",                                label: "WooCommerce",                                   free: true,  required: true,  module: "ecommerce" },
   {
@@ -84,6 +102,7 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
     free: false,
     required: true,
     module: "ecommerce",
+    installSource: "manual-zip",
   },
   { slug: "kadence-woocommerce-email-designer",         label: "Kadence WooCommerce Email Designer",            free: true,  required: true,  module: "ecommerce" },
   {
@@ -92,6 +111,7 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
     free: false,
     required: true,
     module: "ecommerce",
+    installSource: "manual-zip",
   },
   { slug: "woocommerce-gateway-stripe",                 label: "WooCommerce Stripe Gateway",                    free: true,  required: true,  module: "ecommerce" },
   { slug: "woocommerce-paypal-payments",                label: "PayPal Payments",                               free: true,  required: true,  module: "ecommerce" },
@@ -103,6 +123,7 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
     free: false,
     required: true,
     module: "ecommerce",
+    installSource: "manual-zip",
   },
   { slug: "fluent-reviews",                             label: "Fluent Reviews for WooCommerce",                free: true,  required: true,  module: "ecommerce" },
   { slug: "variation-swatches-for-woocommerce",         label: "Variation Swatches for WooCommerce",            free: true,  required: true,  module: "ecommerce" },
@@ -110,8 +131,8 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
   { slug: "woo-cart-abandonment-recovery",              label: "WooCommerce Cart Abandonment Recovery",         free: true,  required: true,  module: "ecommerce" },
 
   // ── POD MODULE (1 functional slot) ───────────────────────────────────────
-  // Only for wc-custom (POD/custom product ecommerce). Customer uploads their design file at checkout.
-  // Install source: manual-zip (/opt/lobster-plugins/woocommerce-product-addons.zip) — WordPressIT licence.
+  // Only for wc-custom. Customer uploads design file at checkout.
+  // Install: manual-zip (/opt/lobster-plugins/woocommerce-product-addons.zip) — WordPressIT licence.
 
   {
     slug: "woocommerce-product-addons",
@@ -119,6 +140,7 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
     free: false,
     required: true,
     module: "pod",
+    installSource: "manual-zip",
   },
 
   // ── TOURISM MODULE (5 functional slots) ──────────────────────────────────
@@ -132,6 +154,7 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
     free: false,
     required: true,
     module: "tourism",
+    installSource: "manual-zip",
     alternativeSlug: "leaflet-map",
   },
   {
@@ -176,12 +199,14 @@ export function resolvePluginStack(
 /**
  * Returns slugs that can be directly passed to `wp plugin install <slug> --activate`.
  *
- * Logic per entry in resolvePluginStack:
- *   condition set                      → skip (conditional: not auto-installed, shown separately)
- *   free: true                         → use plugin.slug
- *   free: false + alternativeSlug      → use alternativeSlug (free fallback ↩)
+ * Skips:
+ *   condition set                      → skip (conditional: not auto-installed)
+ *   installSource "manifest"           → skip (installed by manifest step)
+ *   installSource "release-url"        → skip (fetched via GitHub release, not WP.org)
  *   free: false + no alternativeSlug   → skip (operator must install manually)
- * Deduplicates: same slug appearing in multiple modules (e.g. CPT UI in tourism+brand) is installed once.
+ *   free: false + alternativeSlug      → use alternativeSlug (free fallback ↩)
+ *   free: true                         → use plugin.slug
+ * Deduplicates: same slug appearing in multiple modules is installed once.
  */
 export function resolveInstallableSlugs(
   siteType: WpSiteType,
@@ -191,6 +216,7 @@ export function resolveInstallableSlugs(
   const slugs: string[] = [];
   for (const plugin of resolvePluginStack(siteType, hasEcommerce)) {
     if (plugin.condition) continue;
+    if (plugin.installSource === "manifest" || plugin.installSource === "release-url") continue;
     const slug = plugin.free ? plugin.slug : plugin.alternativeSlug;
     if (slug && !seen.has(slug)) { seen.add(slug); slugs.push(slug); }
   }
@@ -198,15 +224,16 @@ export function resolveInstallableSlugs(
 }
 
 /**
- * Returns paid plugins that have no free alternative — these must be installed manually.
- * Plugins with alternativeSlug are NOT returned here (their free fallback is auto-installed).
+ * Returns plugins requiring manual zip installation (installSource: "manual-zip").
+ * Excludes: plugins with alternativeSlug (free fallback auto-installed)
+ *           and release-url plugins (GitHub release, handled separately).
  */
 export function resolvePaidPlugins(
   siteType: WpSiteType,
   hasEcommerce: boolean
 ): WpPlugin[] {
   return resolvePluginStack(siteType, hasEcommerce).filter(
-    (plugin) => !plugin.free && !plugin.alternativeSlug
+    (plugin) => !plugin.free && !plugin.alternativeSlug && plugin.installSource !== "release-url"
   );
 }
 
@@ -225,28 +252,33 @@ export function resolvePluginsForPacks(packs: WpPluginModule[]): WpPlugin[] {
 
 /**
  * Returns slugs for `wp plugin install --activate`.
- * Skips: conditional plugins (e.g. litespeed-cache on non-LiteSpeed hosts), paid-no-alt plugins.
- * Deduplicates: same slug appearing in multiple modules (CPT UI in tourism+brand) is listed once.
+ * Skips: conditional, manifest-installed, release-url, and paid-no-alt plugins.
+ * Deduplicates: same slug appearing in multiple modules is listed once.
  */
 export function resolveInstallableSlugsForPacks(packs: WpPluginModule[]): string[] {
   const seen = new Set<string>();
   const slugs: string[] = [];
   for (const plugin of resolvePluginsForPacks(packs)) {
     if (plugin.condition) continue;
+    if (plugin.installSource === "manifest" || plugin.installSource === "release-url") continue;
     const slug = plugin.free ? plugin.slug : plugin.alternativeSlug;
     if (slug && !seen.has(slug)) { seen.add(slug); slugs.push(slug); }
   }
   return slugs;
 }
 
-/** Returns paid plugins with no free alternative — must be installed manually. */
+/** Returns plugins requiring manual zip installation (installSource: "manual-zip").
+ *  Excludes plugins with alternativeSlug (free fallback auto-installed)
+ *  and release-url plugins (GitHub release, handled separately). */
 export function resolvePaidPluginsForPacks(packs: WpPluginModule[]): WpPlugin[] {
-  return resolvePluginsForPacks(packs).filter((p) => !p.free && !p.alternativeSlug);
+  return resolvePluginsForPacks(packs).filter(
+    (p) => !p.free && !p.alternativeSlug && p.installSource !== "release-url"
+  );
 }
 
 /**
  * Returns plugins with a server-side condition (e.g. litespeed-cache).
- * These are shown to the operator but NOT auto-installed — requires explicit host-type confirmation.
+ * These are shown to the operator but NOT auto-installed.
  * Deduplicates cross-module entries.
  */
 export function resolveConditionalPlugins(packs: WpPluginModule[]): WpPlugin[] {
@@ -261,15 +293,17 @@ export function resolveConditionalPlugins(packs: WpPluginModule[]): WpPlugin[] {
 
 /** Auto-derives container manifest slug from selected packs. */
 export function derivePackageSlugFromPacks(packs: WpPluginModule[]): "wp-basic" | "wp-business" | "wc-core" | "wc-custom" {
-  if (packs.includes("pod")) return "wc-custom";
+  if (packs.includes("pod"))       return "wc-custom";
   if (packs.includes("ecommerce")) return "wc-core";
-  if (packs.includes("brand")) return "wp-business";
+  if (packs.includes("brand"))     return "wp-business";
+  if (packs.includes("tourism"))   return "wp-business";
   return "wp-basic";
 }
 
 /** Auto-derives smoke profile from selected packs. */
 export function deriveSmokeProfileFromPacks(packs: WpPluginModule[]): "woocommerce" | "business" | "basic" {
   if (packs.includes("ecommerce")) return "woocommerce";
-  if (packs.includes("brand")) return "business";
+  if (packs.includes("brand"))     return "business";
+  if (packs.includes("tourism"))   return "business";
   return "basic";
 }

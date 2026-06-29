@@ -359,8 +359,8 @@ function Step1({
 // 純加法模型：基礎包（必裝）+ 3 個獨立 checkbox（電商 / 旅遊 / 形象）
 
 // Pre-computed module sizes (catalog is static)
-const BASE_PACK_SIZE      = WP_PLUGIN_CATALOG.filter((p) => p.module === "base").length;      // 16
-const ECOMMERCE_PACK_SIZE = WP_PLUGIN_CATALOG.filter((p) => p.module === "ecommerce").length; // 12
+const BASE_PACK_SIZE      = WP_PLUGIN_CATALOG.filter((p) => p.module === "base").length;      // 18 (incl. mainwp-child/manifest + wp-bridge/release-url)
+const ECOMMERCE_PACK_SIZE = WP_PLUGIN_CATALOG.filter((p) => p.module === "ecommerce").length; // 13
 const TOURISM_PACK_SIZE   = WP_PLUGIN_CATALOG.filter((p) => p.module === "tourism").length;   // 5
 const BRAND_PACK_SIZE     = WP_PLUGIN_CATALOG.filter((p) => p.module === "brand").length;     // 3
 
@@ -552,7 +552,8 @@ function Step2WpType({
                         {!p.free && p.alternativeSlug && (
                           <span className="dept-file-recommended"> ↩ {p.alternativeSlug}</span>
                         )}
-                        {!p.free && !p.alternativeSlug && " ⚠ 需手動上傳"}
+                        {!p.free && !p.alternativeSlug && p.installSource !== "release-url" && " ⚠ 需手動上傳"}
+                        {!p.free && !p.alternativeSlug && p.installSource === "release-url" && " ↗ GitHub release（自動）"}
                         {!p.required && " † 選配"}
                       </span>
                     </div>
