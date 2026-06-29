@@ -38,13 +38,16 @@ import { textModelCostLabel, textModelCostSummary } from "@/lib/ai/text-model-pr
 // suffix describes the FLAT print-ready ARTWORK (not the physical product) so literal models
 // (Nano Banana / Ideogram) don't render a t-shirt/mug. The aspect ratio still tailors the
 // composition to each product. Keep "no product mockup" so output is the design, not a photo.
+// Appended to every product suffix so the AI never invents extra subjects beyond what was listed.
+const NO_EXTRA_CHARS = "no extra characters or subjects beyond the ones explicitly listed";
+
 const PRODUCT_TYPES = [
-  { value: "tshirt", label: "T-shirt", aspect: "4:5" as AspectRatio, suffix: "isolated flat graphic artwork on plain white background, centered print-ready design, clean edges, NOT a product photo, no garment, no mockup" },
-  { value: "hoodie", label: "Hoodie", aspect: "4:5" as AspectRatio, suffix: "isolated flat graphic artwork on plain white background, centered print-ready design, clean edges, NOT a product photo, no garment, no mockup" },
-  { value: "mug", label: "Mug", aspect: "3:2" as AspectRatio, suffix: "isolated flat artwork on plain white background, horizontal band composition for a wrap print, print-ready, NOT a product photo, no mug, no mockup" },
-  { value: "poster", label: "Poster / Wall Art", aspect: "2:3" as AspectRatio, suffix: "full-bleed poster illustration, complete artwork filling the frame, no frame border, no mockup" },
-  { value: "sticker", label: "Sticker", aspect: "1:1" as AspectRatio, suffix: "die-cut sticker artwork with bold clean outline, isolated on plain white background, flat design, NOT a product photo, no mockup" },
-  { value: "none", label: "（不限商品）", aspect: "1:1" as AspectRatio, suffix: "" },
+  { value: "tshirt", label: "T-shirt", aspect: "4:5" as AspectRatio, suffix: `isolated flat graphic artwork on plain white background, centered print-ready design, clean edges, NOT a product photo, no garment, no mockup, ${NO_EXTRA_CHARS}` },
+  { value: "hoodie", label: "Hoodie", aspect: "4:5" as AspectRatio, suffix: `isolated flat graphic artwork on plain white background, centered print-ready design, clean edges, NOT a product photo, no garment, no mockup, ${NO_EXTRA_CHARS}` },
+  { value: "mug", label: "Mug", aspect: "3:2" as AspectRatio, suffix: `isolated flat artwork on plain white background, horizontal band composition for a wrap print, print-ready, NOT a product photo, no mug, no mockup, ${NO_EXTRA_CHARS}` },
+  { value: "poster", label: "Poster / Wall Art", aspect: "2:3" as AspectRatio, suffix: `full-bleed poster illustration, complete artwork filling the frame, no frame border, no mockup, ${NO_EXTRA_CHARS}` },
+  { value: "sticker", label: "Sticker", aspect: "1:1" as AspectRatio, suffix: `die-cut sticker artwork with bold clean outline, isolated on plain white background, flat design, NOT a product photo, no mockup, ${NO_EXTRA_CHARS}` },
+  { value: "none", label: "（不限商品）", aspect: "1:1" as AspectRatio, suffix: NO_EXTRA_CHARS },
 ];
 
 const ASPECTS: AspectRatio[] = ["1:1", "3:2", "2:3", "4:3", "3:4", "4:5", "16:9", "9:16"];
