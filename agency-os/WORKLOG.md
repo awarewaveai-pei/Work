@@ -4,6 +4,19 @@
 
 ## 2026-06-29
 
+### fix(studio): AI換一批結果不寫 localStorage
+
+**根本問題**: `storeCulture()` 對 `force=true` 的 AI 結果也寫入 localStorage，蓋過 curated 快取，導致頁面重載後永遠看到舊 AI 資料。
+**修法**: `fetchCulture` 中加 `if (!opts?.force)` guard，AI 結果只存 in-memory state，不持久化。curated + 換一批共存：換一批看得到新花樣，重新整理回 curated（含大雞排）。
+
+**[已修改]**
+- `app/tools/studio/StudioWorkbench.tsx:557` — `storeCulture` 加 `!opts?.force` guard
+
+**[驗證結果]**
+- REALTEST_WAIVED: SMOKE_COVERED -- single-line guard; smoke covers the route end-to-end
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial)
+
 ### fix(studio): bump culture localStorage cache v2→v3
 
 **根本問題**: StudioWorkbench 的 auto-load 優先讀 localStorage（key 前綴 `studio_culture_v2_*`），`readStoredCulture` 回傳舊 AI 結果（含 小籠包/綠豆湯）直接跳過 curated fast-path，故 curated 修好的 大雞排 永遠不被看到。

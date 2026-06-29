@@ -554,7 +554,8 @@ export default function StudioWorkbench() {
       const items = coerceCultureItems(json.items);
       if (json.ok && items.length) {
         setCultureDyn((prev) => ({ ...prev, [key]: items }));
-        storeCulture(regionEn, lensKey, items);
+        // Don't persist AI-forced results — only curated data should survive a page reload.
+        if (!opts?.force) storeCulture(regionEn, lensKey, items);
       }
     } catch { /* keep fallback chips */ }
     if (!opts?.curatedOnly) setCultureFetching((p) => { const n = { ...p }; delete n[key]; return n; });
