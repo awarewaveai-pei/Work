@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compactUpcomingEvents } from "./route";
+import { compactUpcomingEvents } from "./compact";
 
 describe("compactUpcomingEvents", () => {
   it("combines same-day same-title holidays across countries", () => {

@@ -1,24 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { compactUpcomingEvents, type UpcomingEventRow } from "./compact";
 
 export const runtime = "nodejs";
 
 const EVENT_CATEGORIES = ["mega", "sports", "holiday", "cultural"] as const;
 type EventCategory = typeof EVENT_CATEGORIES[number];
-
-interface UpcomingEventRow {
-  id: string;
-  title: string;
-  title_zh: string | null;
-  event_date: string;
-  event_end_date: string | null;
-  category: EventCategory;
-  emoji: string | null;
-  marketing_window_start: string;
-  marketing_lead_days: number;
-  country_codes: string[] | null;
-  region: string | null;
-}
 
 function dateParam(value: string | null, fallback: string): string {
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : fallback;
@@ -26,23 +13,6 @@ function dateParam(value: string | null, fallback: string): string {
 
 function categoryParam(value: string | null): EventCategory | null {
   return EVENT_CATEGORIES.includes(value as EventCategory) ? (value as EventCategory) : null;
-}
-
-export function compactUpcomingEvents(rows: UpcomingEventRow[]): UpcomingEventRow[] {
-  const byEvent = new Map<string, UpcomingEventRow>();
-  for (const row of rows) {
-    const key = [row.category, row.event_date, row.title_zh ?? row.title].join("\u0001");
-    const existing = byEvent.get(key);
-    if (!existing) {
-      byEvent.set(key, { ...row, country_codes: [...(row.country_codes ?? [])] });
-      continue;
-    }
-
-    const countries = new Set([...(existing.country_codes ?? []), ...(row.country_codes ?? [])]);
-    existing.country_codes = [...countries].sort();
-  }
-
-  return [...byEvent.values()];
 }
 
 export async function GET(req: Request) {
