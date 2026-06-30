@@ -8,6 +8,7 @@ import { buildCuratedEvents } from "./curated";
 export interface SyncResult {
   upserted: number;
   skipped: number;
+  pruned?: number;
   skippedFresh?: boolean;
   lastSyncedAt?: string | null;
   nextSyncDueAt?: string;
@@ -57,6 +58,44 @@ async function latestSyncedAt(db: SupabaseClient): Promise<string | null> {
   if (error) return null;
   const first = data?.[0] as { synced_at?: unknown } | undefined;
   return typeof first?.synced_at === "string" ? first.synced_at : null;
+}
+
+async function pruneStaleCuratedEvents(
+  db: SupabaseClient,
+  currentExternalIds: Set<string>,
+  syncedAt: string,
+): Promise<{ pruned: number; error?: string }> {
+  const { data, error } = await db
+    .from("events")
+    .select("external_id")
+    .eq("source", "hardcoded")
+    .eq("is_active", true)
+    .like("external_id", "curated:%");
+
+  if (error) {
+    return { pruned: 0, error: `Prune stale curated events: ${error.message}` };
+  }
+
+  const staleIds = (data ?? [])
+    .map((row: { external_id?: unknown }) => row.external_id)
+    .filter((externalId): externalId is string =>
+      typeof externalId === "string" && !currentExternalIds.has(externalId),
+    );
+
+  if (staleIds.length === 0) {
+    return { pruned: 0 };
+  }
+
+  const { error: updateError } = await db
+    .from("events")
+    .update({ is_active: false, synced_at: syncedAt })
+    .in("external_id", staleIds);
+
+  if (updateError) {
+    return { pruned: 0, error: `Prune stale curated events: ${updateError.message}` };
+  }
+
+  return { pruned: staleIds.length };
 }
 
 export async function syncGlobalEvents(opts: {
@@ -124,6 +163,24 @@ export async function syncGlobalEvents(opts: {
     }
   }
 
-  emit(`✅ Sync complete — upserted ${upserted}, errors: ${errors.length}`);
-  return { upserted, skipped: all.length - deduped.length, skippedFresh: false, lastSyncedAt, nextSyncDueAt, errors, log };
+  const currentCuratedIds = new Set(curated.map((event) => event.external_id));
+  const pruneResult = await pruneStaleCuratedEvents(db, currentCuratedIds, new Date().toISOString());
+  if (pruneResult.error) {
+    errors.push(pruneResult.error);
+    emit(`Prune skipped: ${pruneResult.error}`);
+  } else if (pruneResult.pruned > 0) {
+    emit(`Pruned ${pruneResult.pruned} stale curated events`);
+  }
+
+  emit(`✅ Sync complete — upserted ${upserted}, pruned ${pruneResult.pruned}, errors: ${errors.length}`);
+  return {
+    upserted,
+    skipped: all.length - deduped.length,
+    pruned: pruneResult.pruned,
+    skippedFresh: false,
+    lastSyncedAt,
+    nextSyncDueAt,
+    errors,
+    log,
+  };
 }
