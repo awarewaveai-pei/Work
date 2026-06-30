@@ -40,8 +40,7 @@ interface TSDBResponse {
   events: TSDBEvent[] | null;
 }
 
-function getCurrentSeason(leagueName: string): string {
-  const now = new Date();
+function getCurrentSeason(leagueName: string, now = new Date()): string {
   const y = now.getFullYear();
   const m = now.getMonth() + 1;
   // American sports: season spans two calendar years (e.g. 2024-2025)
@@ -56,8 +55,15 @@ function getCurrentSeason(leagueName: string): string {
   return String(y);
 }
 
-export async function fetchLeagueEvents(league: LeagueDef): Promise<GlobalEvent[]> {
-  const season = getCurrentSeason(league.name);
+function getNextSeason(leagueName: string, currentSeason: string): string {
+  if (currentSeason.includes("-")) {
+    const [start] = currentSeason.split("-").map(Number);
+    return `${start + 1}-${start + 2}`;
+  }
+  return String(Number(currentSeason) + 1);
+}
+
+async function fetchLeagueSeasonEvents(league: LeagueDef, season: string): Promise<GlobalEvent[]> {
   const url = `${BASE}/eventsseason.php?id=${league.id}&s=${season}`;
   const res = await fetch(url, { next: { revalidate: 0 } });
   if (!res.ok) throw new Error(`TheSportsDB ${league.name}: HTTP ${res.status}`);
@@ -79,9 +85,21 @@ export async function fetchLeagueEvents(league: LeagueDef): Promise<GlobalEvent[
       region: league.region,
       marketing_lead_days: calcLeadDays("sports", league.subcategory),
       source: "thesportsdb" as const,
-      external_id: `tsdb:${e.idEvent}`,
+      external_id: `tsdb:${season}:${e.idEvent}`,
       emoji: league.emoji,
     }));
+}
+
+export async function fetchLeagueEvents(league: LeagueDef): Promise<GlobalEvent[]> {
+  const current = getCurrentSeason(league.name);
+  const seasons = [current, getNextSeason(league.name, current)];
+  const byId = new Map<string, GlobalEvent>();
+  for (const season of seasons) {
+    const events = await fetchLeagueSeasonEvents(league, season);
+    for (const event of events) byId.set(event.external_id, event);
+    await new Promise(r => setTimeout(r, 200));
+  }
+  return [...byId.values()];
 }
 
 export async function fetchAllLeagues(

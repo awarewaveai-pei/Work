@@ -1,12 +1,16 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { type GlobalEvent, addDays } from "./types";
 import { fetchAllCountries } from "./calendarific";
 import { fetchAllLeagues } from "./thesportsdb";
 import { HARDCODED_EVENTS } from "./hardcoded";
+import { buildCuratedEvents } from "./curated";
 
 export interface SyncResult {
   upserted: number;
   skipped: number;
+  skippedFresh?: boolean;
+  lastSyncedAt?: string | null;
+  nextSyncDueAt?: string;
   errors: string[];
   log: string[];
 }
@@ -34,22 +38,51 @@ function buildUpsertRow(e: GlobalEvent) {
   };
 }
 
+function monthKey(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toISOString().slice(0, 7);
+}
+
+function nextMonthStart(now = new Date()): string {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
+}
+
+async function latestSyncedAt(db: SupabaseClient): Promise<string | null> {
+  const { data, error } = await db
+    .from("events")
+    .select("synced_at")
+    .not("synced_at", "is", null)
+    .order("synced_at", { ascending: false })
+    .limit(1);
+  if (error) return null;
+  const first = data?.[0] as { synced_at?: unknown } | undefined;
+  return typeof first?.synced_at === "string" ? first.synced_at : null;
+}
+
 export async function syncGlobalEvents(opts: {
   calendarificApiKey: string;
   supabaseUrl: string;
   supabaseServiceKey: string;
+  force?: boolean;
   onProgress?: (msg: string) => void;
 }): Promise<SyncResult> {
-  const { calendarificApiKey, supabaseUrl, supabaseServiceKey, onProgress } = opts;
+  const { calendarificApiKey, supabaseUrl, supabaseServiceKey, force = false, onProgress } = opts;
   const log: string[] = [];
   const errors: string[] = [];
   const emit = (msg: string) => { log.push(msg); onProgress?.(msg); };
 
   const db = createClient(supabaseUrl, supabaseServiceKey);
+  const now = new Date();
+  const lastSyncedAt = await latestSyncedAt(db);
+  const nextSyncDueAt = nextMonthStart(now);
+  if (!force && lastSyncedAt && monthKey(lastSyncedAt) === monthKey(now)) {
+    emit(`⏭️ Events already synced this month (${lastSyncedAt}); next monthly sync due ${nextSyncDueAt}`);
+    return { upserted: 0, skipped: 0, skippedFresh: true, lastSyncedAt, nextSyncDueAt, errors, log };
+  }
 
   // ── Collect from all sources ──────────────────────────────────────────────
   emit("📅 Fetching Calendarific holidays…");
-  const thisYear = new Date().getFullYear();
+  const thisYear = now.getFullYear();
   const nextYear = thisYear + 1;
   const [cal1, cal2] = await Promise.all([
     fetchAllCountries(calendarificApiKey, thisYear, emit),
@@ -62,7 +95,10 @@ export async function syncGlobalEvents(opts: {
   emit("📌 Loading hardcoded mega-events…");
   const hardcoded = HARDCODED_EVENTS;
 
-  const all: GlobalEvent[] = [...cal1, ...cal2, ...sports, ...hardcoded];
+  emit("🧭 Loading curated annual events…");
+  const curated = buildCuratedEvents([thisYear, nextYear]);
+
+  const all: GlobalEvent[] = [...cal1, ...cal2, ...sports, ...hardcoded, ...curated];
   emit(`✅ Total collected: ${all.length} events`);
 
   // ── Deduplicate by external_id (last write wins for updated data) ─────────
@@ -89,5 +125,5 @@ export async function syncGlobalEvents(opts: {
   }
 
   emit(`✅ Sync complete — upserted ${upserted}, errors: ${errors.length}`);
-  return { upserted, skipped: all.length - deduped.length, errors, log };
+  return { upserted, skipped: all.length - deduped.length, skippedFresh: false, lastSyncedAt, nextSyncDueAt, errors, log };
 }

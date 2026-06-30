@@ -14,6 +14,7 @@
 #     Daily  02:00 — backup-phase1.sh
 #     Daily  02:30 — verify-backup.sh
 #     Sunday 03:00 — docker-weekly-cleanup.sh
+#     Monthly 04:10 on day 1 — sync-events-monthly.sh
 #   EU (Supabase/Trigger stack):
 #     Daily  02:30 — backup-phase1.sh
 #     Daily  03:00 — verify-backup.sh
@@ -168,7 +169,35 @@ echo "  Verify:  daily ${VERIFY_HOUR}:$(printf '%02d' ${VERIFY_MIN}) UTC"
 echo "  Log:     /var/log/lobster-backup.log"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 3. Security hardening
+# 3. Monthly global events cache refresh (SG only)
+# ══════════════════════════════════════════════════════════════════════════════
+if [[ "$HOST_TYPE" == "sg" ]]; then
+  echo ""
+  echo "--- Monthly events cache sync ---"
+  EVENTS_SCRIPT="${COMPOSE_ROOT}/scripts/sync-events-monthly.sh"
+  if [[ -f "$EVENTS_SCRIPT" ]]; then
+    chmod +x "$EVENTS_SCRIPT"
+    EVENTS_CRON_FILE="/etc/cron.d/lobster-events-sync"
+    EVENTS_ENTRY="10 4 1 * * root COMPOSE_ROOT=${COMPOSE_ROOT} ${EVENTS_SCRIPT} >> /var/log/lobster-events-sync.log 2>&1"
+    cat > "$EVENTS_CRON_FILE" <<CREOF
+# Managed by install-maintenance-crons.sh — do not edit manually.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# Monthly global events cache refresh for next-admin Studio.
+${EVENTS_ENTRY}
+CREOF
+    chmod 0644 "$EVENTS_CRON_FILE"
+    echo "  Written: ${EVENTS_CRON_FILE}"
+    echo "  Schedule: monthly day 1 04:10 UTC"
+    echo "  Log:      /var/log/lobster-events-sync.log"
+  else
+    echo "  WARN: ${EVENTS_SCRIPT} not found"
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 4. Security hardening
 # ══════════════════════════════════════════════════════════════════════════════
 echo ""
 echo "--- Security hardening ---"
@@ -208,13 +237,13 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 4. Summary
+# 5. Summary
 # ══════════════════════════════════════════════════════════════════════════════
 echo ""
 echo "=== install-maintenance-crons DONE $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
 echo ""
 echo "Active cron files:"
-for CF in /etc/cron.d/docker-weekly-cleanup /etc/cron.d/lobster-backup; do
+for CF in /etc/cron.d/docker-weekly-cleanup /etc/cron.d/lobster-backup /etc/cron.d/lobster-events-sync; do
   if [[ -f "$CF" ]]; then
     echo "  ${CF}:"
     grep -v '^#' "$CF" | grep -v '^$' | grep -v '^SHELL' | grep -v '^PATH' | sed 's/^/    /'
@@ -222,7 +251,7 @@ for CF in /etc/cron.d/docker-weekly-cleanup /etc/cron.d/lobster-backup; do
 done
 echo ""
 echo "Root crontab entries (if any):"
-crontab -l 2>/dev/null | grep -E "backup|cleanup|verify" | sed 's/^/    /' || echo "    (none)"
+crontab -l 2>/dev/null | grep -E "backup|cleanup|verify|events-sync" | sed 's/^/    /' || echo "    (none)"
 echo ""
 echo "To test backup immediately:"
 echo "  ${BACKUP_SCRIPT}"

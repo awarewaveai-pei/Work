@@ -1,6 +1,6 @@
 export type EventCategory = "sports" | "holiday" | "cultural" | "mega";
 
-export type EventSource = "calendarific" | "thesportsdb" | "hardcoded";
+export type EventSource = "calendarific" | "thesportsdb" | "hardcoded" | "curated";
 
 export interface GlobalEvent {
   title: string;
@@ -32,6 +32,11 @@ export const LEAD_DAYS: Record<string, number> = {
   mega: 90,
   holiday_major: 90,   // Christmas, CNY, Halloween, Valentine's
   sports_final: 60,    // Super Bowl, NBA/MLB/NHL Finals
+  sports_season: 45,
+  commercial: 60,
+  family: 60,
+  national: 45,
+  religious: 60,
   holiday: 45,
   sports: 30,
   cultural: 45,

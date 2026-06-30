@@ -89,6 +89,37 @@ const TRANSFORM_MODEL: StudioModel = "flux-kontext-dev";
 const DEFAULT_SEARCH_DATA_MODEL: AiTextModel = "gpt-5.4-nano";
 const CULTURE_STORAGE_PREFIX = "studio_culture_v3";
 const TRENDING_STORAGE_KEY = "studio_trending_v2";
+const EVENT_CAT_FILTERS = [
+  { value: "all", label: "全部" },
+  { value: "sports", label: "運動" },
+  { value: "national", label: "國家節慶" },
+  { value: "cultural", label: "文化節慶" },
+  { value: "commercial", label: "商業檔期" },
+  { value: "family", label: "親情節日" },
+  { value: "mega", label: "大型事件" },
+  { value: "holiday", label: "假日" },
+] as const;
+const EVENT_COUNTRY_FILTERS = [
+  { value: "all", label: "全部國家" },
+  { value: "global", label: "Global" },
+  { value: "US", label: "US" },
+  { value: "TW", label: "TW" },
+  { value: "JP", label: "JP" },
+  { value: "GB", label: "GB" },
+  { value: "CA", label: "CA" },
+  { value: "AU", label: "AU" },
+  { value: "MX", label: "MX" },
+] as const;
+const EVENT_WINDOWS = [
+  { value: 30, label: "30天" },
+  { value: 90, label: "90天" },
+  { value: 180, label: "6個月" },
+  { value: 365, label: "1年" },
+] as const;
+const EVENT_SORTS = [
+  { value: "opportunity", label: "依機會" },
+  { value: "date", label: "依時間" },
+] as const;
 
 // Fixed seed so the edge-style preview thumbnails match what `applyEdge` actually composites.
 const EDGE_APPLY_SEED = 7;
@@ -341,9 +372,6 @@ function CategoryPicker({
   );
 }
 
-const SPORTS_RELATED_MEGA_SUBCATEGORIES = new Set(["world_cup", "olympics", "sports_final"]);
-const CULTURAL_HOLIDAY_SUBCATEGORIES = new Set(["holiday_major"]);
-
 export default function StudioWorkbench() {
   const [selectedModels, setSelectedModels] = useState<Set<StudioModel>>(new Set<StudioModel>(["flux-schnell"]));
   const [productType, setProductType] = useState("tshirt");
@@ -420,17 +448,24 @@ export default function StudioWorkbench() {
     title: string;
     title_zh: string | null;
     event_date: string;
+    event_end_date: string | null;
     category: string;
     subcategory: string | null;
     emoji: string | null;
     marketing_window_start: string;
     marketing_lead_days: number;
     country_codes: string[] | null;
+    region: string | null;
+    facets?: string[];
+    opportunity_score?: number;
   }
   const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
   const [eventsFetching, setEventsFetching] = useState(false);
-  const [eventCatFilter, setEventCatFilter] = useState<string>("全部");
-  const EVENT_CAT_FILTERS = ["全部", "mega", "sports", "holiday", "cultural"] as const;
+  const [eventCatFilter, setEventCatFilter] = useState<string>("all");
+  const [eventCountryFilter, setEventCountryFilter] = useState<string>("all");
+  const [eventWindowDays, setEventWindowDays] = useState<number>(365);
+  const [eventSort, setEventSort] = useState<"opportunity" | "date">("opportunity");
+  const [eventBrowserOpen, setEventBrowserOpen] = useState(false);
   const eventCountryLabel = useCallback((event: UpcomingEvent) => {
     const countries = [...new Set(event.country_codes ?? [])].filter(Boolean).sort();
     if (countries.length === 0) return "";
@@ -438,15 +473,8 @@ export default function StudioWorkbench() {
     return countries.length > 3 ? `${shown} +${countries.length - 3}` : shown;
   }, []);
   const eventMatchesCurrentFilter = useCallback((event: UpcomingEvent) => {
-    if (eventCatFilter === "全部") return true;
-    if (event.category === eventCatFilter) return true;
-    if (eventCatFilter === "sports") {
-      return event.category === "mega" && SPORTS_RELATED_MEGA_SUBCATEGORIES.has(event.subcategory ?? "");
-    }
-    if (eventCatFilter === "cultural") {
-      return event.category === "holiday" && CULTURAL_HOLIDAY_SUBCATEGORIES.has(event.subcategory ?? "");
-    }
-    return false;
+    if (eventCatFilter === "all") return true;
+    return (event.facets ?? [event.category]).includes(eventCatFilter);
   }, [eventCatFilter]);
 
   const bgInFlight = useRef<Record<string, boolean>>({});
@@ -648,16 +676,20 @@ export default function StudioWorkbench() {
     if (stored) setAllTopics(stored);
   }, []);
 
-  // 🗓️ Fetch upcoming events (next 90 days, marketing window already open or opening soon)
+  // 🗓️ Fetch upcoming events from the monthly-refreshed event cache.
   const fetchUpcomingEvents = useCallback(async () => {
     setEventsFetching(true);
     try {
       const now = new Date().toISOString().slice(0, 10);
-      const until = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
+      const until = new Date(Date.now() + eventWindowDays * 86400000).toISOString().slice(0, 10);
       const url = new URL("/api/tools/events/upcoming", window.location.origin);
       url.searchParams.set("from", now);
       url.searchParams.set("until", until);
-      if (eventCatFilter !== "全部") url.searchParams.set("category", eventCatFilter);
+      url.searchParams.set("days", String(eventWindowDays));
+      url.searchParams.set("sort", eventSort);
+      url.searchParams.set("limit", "120");
+      if (eventCatFilter !== "all") url.searchParams.set("category", eventCatFilter);
+      if (eventCountryFilter !== "all") url.searchParams.set("country", eventCountryFilter);
       const res = await fetch(url.toString());
       if (res.ok) {
         const json = (await res.json()) as { events: UpcomingEvent[] };
@@ -665,7 +697,7 @@ export default function StudioWorkbench() {
       }
     } catch { /* silent */ }
     setEventsFetching(false);
-  }, [eventCatFilter]);
+  }, [eventCatFilter, eventCountryFilter, eventSort, eventWindowDays]);
 
   useEffect(() => { void fetchUpcomingEvents(); }, [fetchUpcomingEvents]);
 
@@ -956,6 +988,28 @@ export default function StudioWorkbench() {
   const isTransformMode = refMode === "transform";
   const isMultiModel = selectedModels.size > 1;
   const anyResults = results.some((r) => !r.busy && r.image);
+  const visibleUpcomingEvents = useMemo(
+    () => upcomingEvents.filter(eventMatchesCurrentFilter),
+    [eventMatchesCurrentFilter, upcomingEvents],
+  );
+  const recommendedUpcomingEvents = useMemo(
+    () => visibleUpcomingEvents.slice(0, 10),
+    [visibleUpcomingEvents],
+  );
+  const groupedUpcomingEvents = useMemo(() => {
+    const groups = new Map<string, UpcomingEvent[]>();
+    const labelFor = (event: UpcomingEvent) => eventSort === "date" ? event.event_date.slice(0, 7) : "推薦";
+    for (const event of visibleUpcomingEvents) {
+      const label = labelFor(event);
+      groups.set(label, [...(groups.get(label) ?? []), event]);
+    }
+    return [...groups.entries()];
+  }, [eventSort, visibleUpcomingEvents]);
+  const buildEventLabel = useCallback((event: UpcomingEvent) => {
+    const countryLabel = eventCountryLabel(event);
+    const baseLabel = `${event.emoji ?? "📅"} ${event.title_zh ?? event.title}`;
+    return countryLabel ? `${baseLabel} (${countryLabel})` : baseLabel;
+  }, [eventCountryLabel]);
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 400px", gap: 16, padding: 16, alignItems: "start" }}>
@@ -1063,43 +1117,50 @@ export default function StudioWorkbench() {
         {/* 🗓️ 活動行事曆 — upcoming events for merchandise pre-selling */}
         <AccordionSection
           title="🗓️ 活動行事曆"
-          summary={upcomingEvents.length > 0 ? `${upcomingEvents.length} 個即將到來` : "載入中…"}
+          summary={visibleUpcomingEvents.length > 0 ? `${visibleUpcomingEvents.length} 個可用` : "載入中…"}
         >
           <p style={{ fontSize: 11, opacity: 0.55, margin: "0 0 8px" }}>點擊活動 → 自動填入主圖欄（為這個活動設計商品圖）</p>
-          {/* Category filter chips */}
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
-            {EVENT_CAT_FILTERS.map((c) => (
-              <button key={c} type="button" onClick={() => setEventCatFilter(c)} style={tabStyle(eventCatFilter === c)}>{c}</button>
+            {EVENT_CAT_FILTERS.map((filter) => (
+              <button key={filter.value} type="button" onClick={() => setEventCatFilter(filter.value)} style={tabStyle(eventCatFilter === filter.value)}>{filter.label}</button>
             ))}
             <button type="button" onClick={() => void fetchUpcomingEvents()} disabled={eventsFetching}
               style={{ ...actionPill(eventsFetching), marginLeft: "auto" }}>
               {eventsFetching ? "載入中…" : "🔄"}
             </button>
           </div>
-          {/* Event chips */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8 }}>
+            <select className="btn-secondary" value={eventCountryFilter} onChange={(e) => setEventCountryFilter(e.target.value)} style={{ fontSize: 12 }}>
+              {EVENT_COUNTRY_FILTERS.map((country) => <option key={country.value} value={country.value}>{country.label}</option>)}
+            </select>
+            <select className="btn-secondary" value={eventWindowDays} onChange={(e) => setEventWindowDays(Number(e.target.value))} style={{ fontSize: 12 }}>
+              {EVENT_WINDOWS.map((window_) => <option key={window_.value} value={window_.value}>{window_.label}</option>)}
+            </select>
+            <select className="btn-secondary" value={eventSort} onChange={(e) => setEventSort(e.target.value as "opportunity" | "date")} style={{ fontSize: 12 }}>
+              {EVENT_SORTS.map((sort) => <option key={sort.value} value={sort.value}>{sort.label}</option>)}
+            </select>
+            <button type="button" onClick={() => setEventBrowserOpen(true)} style={actionPill(false)}>
+              查看更多
+            </button>
+          </div>
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
             {(() => {
-              const visibleEvents = upcomingEvents
-                .filter(eventMatchesCurrentFilter)
-                .slice(0, 30);
-
-              if (visibleEvents.length === 0) {
+              if (recommendedUpcomingEvents.length === 0) {
                 return (
                   <span style={{ fontSize: 11, opacity: 0.45 }}>
-                    {eventsFetching ? "載入中…" : eventCatFilter === "全部" ? "無資料 — 先在活動行事曆頁跑一次同步" : `此分類暫無活動：${eventCatFilter}`}
+                    {eventsFetching ? "載入中…" : "此篩選暫無活動"}
                   </span>
                 );
               }
 
-              return visibleEvents.map((e) => {
+              return recommendedUpcomingEvents.map((e) => {
                 const countryLabel = eventCountryLabel(e);
-                const baseLabel = `${e.emoji ?? "📅"} ${e.title_zh ?? e.title}`;
-                const label = countryLabel ? `${baseLabel} (${countryLabel})` : baseLabel;
+                const label = buildEventLabel(e);
                 const active = subject === label;
                 const daysUntil = Math.ceil((new Date(e.event_date).getTime() - Date.now()) / 86400000);
                 return (
                   <button key={e.id} type="button"
-                    title={`${e.event_date} · ${e.category}${countryLabel ? ` · ${countryLabel}` : ""} · 提前 ${e.marketing_lead_days} 天備稿（${daysUntil} 天後）`}
+                    title={`${e.event_date} · ${(e.facets ?? [e.category]).join(", ")}${countryLabel ? ` · ${countryLabel}` : ""} · 提前 ${e.marketing_lead_days} 天備稿（${daysUntil} 天後）`}
                     onClick={() => setSubject(active ? "" : label)}
                     style={chipStyle(active)}>
                     {active ? "✓ " : ""}{label}
@@ -1711,6 +1772,113 @@ export default function StudioWorkbench() {
           )}
         </div>
       </div>
+
+      {eventBrowserOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setEventBrowserOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 2147483645,
+            background: "rgba(0,0,0,0.55)",
+            display: "flex",
+            justifyContent: "flex-end",
+          }}
+        >
+          <div
+            className="build-panel"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(720px, 100vw)",
+              height: "100vh",
+              overflowY: "auto",
+              padding: 16,
+              borderRadius: 0,
+              borderTop: 0,
+              borderRight: 0,
+              borderBottom: 0,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <div style={{ fontWeight: 800, fontSize: 16 }}>🗓️ 活動靈感</div>
+              <div style={{ fontSize: 12, opacity: 0.55 }}>{visibleUpcomingEvents.length} 筆 · 每月更新快取</div>
+              <button type="button" onClick={() => setEventBrowserOpen(false)} style={{ ...ghostBtn(), marginLeft: "auto" }}>關閉</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8, marginBottom: 12 }}>
+              <select className="btn-secondary" value={eventCatFilter} onChange={(e) => setEventCatFilter(e.target.value)} style={{ fontSize: 12 }}>
+                {EVENT_CAT_FILTERS.map((filter) => <option key={filter.value} value={filter.value}>{filter.label}</option>)}
+              </select>
+              <select className="btn-secondary" value={eventCountryFilter} onChange={(e) => setEventCountryFilter(e.target.value)} style={{ fontSize: 12 }}>
+                {EVENT_COUNTRY_FILTERS.map((country) => <option key={country.value} value={country.value}>{country.label}</option>)}
+              </select>
+              <select className="btn-secondary" value={eventWindowDays} onChange={(e) => setEventWindowDays(Number(e.target.value))} style={{ fontSize: 12 }}>
+                {EVENT_WINDOWS.map((window_) => <option key={window_.value} value={window_.value}>{window_.label}</option>)}
+              </select>
+              <select className="btn-secondary" value={eventSort} onChange={(e) => setEventSort(e.target.value as "opportunity" | "date")} style={{ fontSize: 12 }}>
+                {EVENT_SORTS.map((sort) => <option key={sort.value} value={sort.value}>{sort.label}</option>)}
+              </select>
+            </div>
+            {eventsFetching ? (
+              <p style={{ fontSize: 12, opacity: 0.6 }}>載入中…</p>
+            ) : groupedUpcomingEvents.length === 0 ? (
+              <p style={{ fontSize: 12, opacity: 0.6 }}>此篩選暫無活動。</p>
+            ) : (
+              <div style={{ display: "grid", gap: 12 }}>
+                {groupedUpcomingEvents.map(([group, events]) => (
+                  <section key={group}>
+                    <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.65, marginBottom: 6 }}>{group}</div>
+                    <div style={{ display: "grid", gap: 6 }}>
+                      {events.map((event) => {
+                        const label = buildEventLabel(event);
+                        const active = subject === label;
+                        const daysUntil = Math.ceil((new Date(event.event_date).getTime() - Date.now()) / 86400000);
+                        const countries = eventCountryLabel(event);
+                        return (
+                          <button
+                            key={event.id}
+                            type="button"
+                            onClick={() => {
+                              setSubject(active ? "" : label);
+                              setEventBrowserOpen(false);
+                            }}
+                            style={{
+                              textAlign: "left",
+                              border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+                              background: active ? "rgba(99,102,241,0.12)" : "rgba(127,127,127,0.04)",
+                              color: "var(--text-primary)",
+                              borderRadius: 8,
+                              padding: "9px 10px",
+                              cursor: "pointer",
+                              display: "grid",
+                              gridTemplateColumns: "1fr auto",
+                              gap: 8,
+                            }}
+                          >
+                            <span style={{ minWidth: 0 }}>
+                              <span style={{ display: "block", fontSize: 13, fontWeight: 700, overflowWrap: "anywhere" }}>
+                                {active ? "✓ " : ""}{label}
+                              </span>
+                              <span style={{ display: "block", fontSize: 11, opacity: 0.58, marginTop: 2 }}>
+                                {(event.facets ?? [event.category]).join(", ")}{countries ? ` · ${countries}` : ""}
+                              </span>
+                            </span>
+                            <span style={{ textAlign: "right", fontSize: 11, opacity: 0.7, whiteSpace: "nowrap" }}>
+                              <span style={{ display: "block", fontWeight: 700 }}>{event.event_date}</span>
+                              <span>{daysUntil >= 0 ? `${daysUntil}天` : "進行中"}</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Chip hover tooltip — position:FIXED at the viewport coords captured on hover,
           rendered at the grid root so it escapes the sticky control panel's overflow
