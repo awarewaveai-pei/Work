@@ -87,16 +87,6 @@ export function buildCuratedEventsForYear(year: number): GlobalEvent[] {
       emoji: "👔",
     }),
     fixedEvent({
-      title: "Taiwan Father's Day",
-      title_zh: "台灣父親節",
-      event_date: `${year}-08-08`,
-      category: "holiday",
-      subcategory: "family",
-      country_codes: ["TW"],
-      region: "asia",
-      emoji: "👔",
-    }),
-    fixedEvent({
       title: "Pride Month",
       title_zh: "Pride Month",
       event_date: `${year}-06-01`,
