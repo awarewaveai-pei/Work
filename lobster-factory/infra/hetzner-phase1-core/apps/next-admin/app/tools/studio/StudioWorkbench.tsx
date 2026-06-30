@@ -412,11 +412,27 @@ export default function StudioWorkbench() {
   const [trendingFetching, setTrendingFetching] = useState(false);
 
   // 🗓️ 活動行事曆 — upcoming events from Supabase events table
-  interface UpcomingEvent { id: string; title: string; title_zh: string | null; event_date: string; category: string; emoji: string | null; marketing_window_start: string; marketing_lead_days: number; }
+  interface UpcomingEvent {
+    id: string;
+    title: string;
+    title_zh: string | null;
+    event_date: string;
+    category: string;
+    emoji: string | null;
+    marketing_window_start: string;
+    marketing_lead_days: number;
+    country_codes: string[] | null;
+  }
   const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
   const [eventsFetching, setEventsFetching] = useState(false);
   const [eventCatFilter, setEventCatFilter] = useState<string>("全部");
   const EVENT_CAT_FILTERS = ["全部", "mega", "sports", "holiday", "cultural"] as const;
+  const eventCountryLabel = useCallback((event: UpcomingEvent) => {
+    const countries = [...new Set(event.country_codes ?? [])].filter(Boolean).sort();
+    if (countries.length === 0) return "";
+    const shown = countries.slice(0, 3).join(", ");
+    return countries.length > 3 ? `${shown} +${countries.length - 3}` : shown;
+  }, []);
 
   const bgInFlight = useRef<Record<string, boolean>>({});
   const mockupInFlight = useRef(false);
@@ -626,6 +642,7 @@ export default function StudioWorkbench() {
       const url = new URL("/api/tools/events/upcoming", window.location.origin);
       url.searchParams.set("from", now);
       url.searchParams.set("until", until);
+      if (eventCatFilter !== "全部") url.searchParams.set("category", eventCatFilter);
       const res = await fetch(url.toString());
       if (res.ok) {
         const json = (await res.json()) as { events: UpcomingEvent[] };
@@ -633,7 +650,7 @@ export default function StudioWorkbench() {
       }
     } catch { /* silent */ }
     setEventsFetching(false);
-  }, []);
+  }, [eventCatFilter]);
 
   useEffect(() => { void fetchUpcomingEvents(); }, [fetchUpcomingEvents]);
 
@@ -1046,28 +1063,36 @@ export default function StudioWorkbench() {
           </div>
           {/* Event chips */}
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-            {upcomingEvents.length === 0 ? (
-              <span style={{ fontSize: 11, opacity: 0.45 }}>
-                {eventsFetching ? "載入中…" : "無資料 — 先在活動行事曆頁跑一次同步"}
-              </span>
-            ) : (upcomingEvents
-              .filter((e) => eventCatFilter === "全部" || e.category === eventCatFilter)
-              .slice(0, 30)
-              .map((e) => {
-                const label = `${e.emoji ?? "📅"} ${e.title_zh ?? e.title}`;
+            {(() => {
+              const visibleEvents = upcomingEvents
+                .filter((e) => eventCatFilter === "全部" || e.category === eventCatFilter)
+                .slice(0, 30);
+
+              if (visibleEvents.length === 0) {
+                return (
+                  <span style={{ fontSize: 11, opacity: 0.45 }}>
+                    {eventsFetching ? "載入中…" : eventCatFilter === "全部" ? "無資料 — 先在活動行事曆頁跑一次同步" : `此分類暫無活動：${eventCatFilter}`}
+                  </span>
+                );
+              }
+
+              return visibleEvents.map((e) => {
+                const countryLabel = eventCountryLabel(e);
+                const baseLabel = `${e.emoji ?? "📅"} ${e.title_zh ?? e.title}`;
+                const label = countryLabel ? `${baseLabel} (${countryLabel})` : baseLabel;
                 const active = subject === label;
                 const daysUntil = Math.ceil((new Date(e.event_date).getTime() - Date.now()) / 86400000);
                 return (
                   <button key={e.id} type="button"
-                    title={`${e.event_date} · 提前 ${e.marketing_lead_days} 天備稿（${daysUntil} 天後）`}
+                    title={`${e.event_date} · ${e.category}${countryLabel ? ` · ${countryLabel}` : ""} · 提前 ${e.marketing_lead_days} 天備稿（${daysUntil} 天後）`}
                     onClick={() => setSubject(active ? "" : label)}
                     style={chipStyle(active)}>
                     {active ? "✓ " : ""}{label}
                     <span style={{ fontSize: 10, opacity: 0.55, marginLeft: 4 }}>{daysUntil}天</span>
                   </button>
                 );
-              })
-            )}
+              });
+            })()}
           </div>
         </AccordionSection>
 

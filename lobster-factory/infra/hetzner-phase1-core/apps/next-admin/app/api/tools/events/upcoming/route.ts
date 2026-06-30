@@ -3,10 +3,55 @@ import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 
+const EVENT_CATEGORIES = ["mega", "sports", "holiday", "cultural"] as const;
+type EventCategory = typeof EVENT_CATEGORIES[number];
+
+interface UpcomingEventRow {
+  id: string;
+  title: string;
+  title_zh: string | null;
+  event_date: string;
+  event_end_date: string | null;
+  category: EventCategory;
+  emoji: string | null;
+  marketing_window_start: string;
+  marketing_lead_days: number;
+  country_codes: string[] | null;
+  region: string | null;
+}
+
+function dateParam(value: string | null, fallback: string): string {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : fallback;
+}
+
+function categoryParam(value: string | null): EventCategory | null {
+  return EVENT_CATEGORIES.includes(value as EventCategory) ? (value as EventCategory) : null;
+}
+
+export function compactUpcomingEvents(rows: UpcomingEventRow[]): UpcomingEventRow[] {
+  const byEvent = new Map<string, UpcomingEventRow>();
+  for (const row of rows) {
+    const key = [row.category, row.event_date, row.title_zh ?? row.title].join("\u0001");
+    const existing = byEvent.get(key);
+    if (!existing) {
+      byEvent.set(key, { ...row, country_codes: [...(row.country_codes ?? [])] });
+      continue;
+    }
+
+    const countries = new Set([...(existing.country_codes ?? []), ...(row.country_codes ?? [])]);
+    existing.country_codes = [...countries].sort();
+  }
+
+  return [...byEvent.values()];
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const from  = searchParams.get("from")  ?? new Date().toISOString().slice(0, 10);
-  const until = searchParams.get("until") ?? new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  const defaultUntil = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
+  const from = dateParam(searchParams.get("from"), today);
+  const until = dateParam(searchParams.get("until"), defaultUntil);
+  const category = categoryParam(searchParams.get("category"));
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -15,14 +60,22 @@ export async function GET(req: Request) {
   }
 
   const db = createClient(supabaseUrl, supabaseKey);
-  const { data } = await db
+  let query = db
     .from("events")
-    .select("id, title, title_zh, event_date, category, emoji, marketing_window_start, marketing_lead_days")
+    .select("id, title, title_zh, event_date, event_end_date, category, emoji, marketing_window_start, marketing_lead_days, country_codes, region")
     .eq("is_active", true)
-    .gte("marketing_window_start", from)
+    .or(`event_date.gte.${from},event_end_date.gte.${from}`)
     .lte("marketing_window_start", until)
     .order("marketing_window_start", { ascending: true })
-    .limit(100);
+    .order("event_date", { ascending: true })
+    .limit(category ? 200 : 300);
 
-  return NextResponse.json({ events: data ?? [] });
+  if (category) query = query.eq("category", category);
+
+  const { data, error } = await query;
+  if (error) {
+    return NextResponse.json({ events: [], error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ events: compactUpcomingEvents((data ?? []) as UpcomingEventRow[]).slice(0, 100) });
 }
