@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { compactUpcomingEvents, type UpcomingEventRow } from "./compact";
+import { compactUpcomingEvents, eventMatchesCategoryFilter, type UpcomingEventRow } from "./compact";
 
 export const runtime = "nodejs";
 
@@ -32,20 +32,29 @@ export async function GET(req: Request) {
   const db = createClient(supabaseUrl, supabaseKey);
   let query = db
     .from("events")
-    .select("id, title, title_zh, event_date, event_end_date, category, emoji, marketing_window_start, marketing_lead_days, country_codes, region")
+    .select("id, title, title_zh, event_date, event_end_date, category, subcategory, emoji, marketing_window_start, marketing_lead_days, country_codes, region")
     .eq("is_active", true)
     .or(`event_date.gte.${from},event_end_date.gte.${from}`)
     .lte("marketing_window_start", until)
     .order("marketing_window_start", { ascending: true })
     .order("event_date", { ascending: true })
-    .limit(category ? 200 : 300);
+    .limit(500);
 
-  if (category) query = query.eq("category", category);
+  if (category === "sports") {
+    query = query.in("category", ["sports", "mega"]);
+  } else if (category === "cultural") {
+    query = query.in("category", ["cultural", "holiday"]);
+  } else if (category) {
+    query = query.eq("category", category);
+  }
 
   const { data, error } = await query;
   if (error) {
     return NextResponse.json({ events: [], error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ events: compactUpcomingEvents((data ?? []) as UpcomingEventRow[]).slice(0, 100) });
+  const events = compactUpcomingEvents((data ?? []) as UpcomingEventRow[]);
+  return NextResponse.json({
+    events: (category ? events.filter((event) => eventMatchesCategoryFilter(event, category)) : events).slice(0, 100),
+  });
 }

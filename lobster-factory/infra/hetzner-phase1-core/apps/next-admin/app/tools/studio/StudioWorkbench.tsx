@@ -341,6 +341,9 @@ function CategoryPicker({
   );
 }
 
+const SPORTS_RELATED_MEGA_SUBCATEGORIES = new Set(["world_cup", "olympics", "sports_final"]);
+const CULTURAL_HOLIDAY_SUBCATEGORIES = new Set(["holiday_major"]);
+
 export default function StudioWorkbench() {
   const [selectedModels, setSelectedModels] = useState<Set<StudioModel>>(new Set<StudioModel>(["flux-schnell"]));
   const [productType, setProductType] = useState("tshirt");
@@ -418,6 +421,7 @@ export default function StudioWorkbench() {
     title_zh: string | null;
     event_date: string;
     category: string;
+    subcategory: string | null;
     emoji: string | null;
     marketing_window_start: string;
     marketing_lead_days: number;
@@ -433,6 +437,17 @@ export default function StudioWorkbench() {
     const shown = countries.slice(0, 3).join(", ");
     return countries.length > 3 ? `${shown} +${countries.length - 3}` : shown;
   }, []);
+  const eventMatchesCurrentFilter = useCallback((event: UpcomingEvent) => {
+    if (eventCatFilter === "全部") return true;
+    if (event.category === eventCatFilter) return true;
+    if (eventCatFilter === "sports") {
+      return event.category === "mega" && SPORTS_RELATED_MEGA_SUBCATEGORIES.has(event.subcategory ?? "");
+    }
+    if (eventCatFilter === "cultural") {
+      return event.category === "holiday" && CULTURAL_HOLIDAY_SUBCATEGORIES.has(event.subcategory ?? "");
+    }
+    return false;
+  }, [eventCatFilter]);
 
   const bgInFlight = useRef<Record<string, boolean>>({});
   const mockupInFlight = useRef(false);
@@ -1065,7 +1080,7 @@ export default function StudioWorkbench() {
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
             {(() => {
               const visibleEvents = upcomingEvents
-                .filter((e) => eventCatFilter === "全部" || e.category === eventCatFilter)
+                .filter(eventMatchesCurrentFilter)
                 .slice(0, 30);
 
               if (visibleEvents.length === 0) {
