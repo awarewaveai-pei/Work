@@ -993,7 +993,85 @@ export default function StudioWorkbench() {
           </p>
         </AccordionSection>
 
-        {/* 🌍 世界文化 — region × lens, with AI-filled specific items (混搭靈感工具). Moved to FIRST per spec. */}
+        <AccordionSection title="🔥 時事靈感">
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <p style={{ fontSize: 11, opacity: 0.55, margin: 0 }}>點擊話題填入主圖欄（再點一次取消）</p>
+            <button type="button" disabled={trendingFetching} onClick={() => void fetchAllTrending()}
+              style={actionPill(trendingFetching)}>
+              {trendingFetching ? "搜尋中…" : "抓取今日熱搜"}
+            </button>
+          </div>
+          {/* Row 1: category tabs (圖一 layout) */}
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+            {TRENDING_CATEGORIES.map((cat) => (
+              <button key={cat.value} type="button" onClick={() => setTrendingTab(cat.value)} style={tabStyle(trendingTab === cat.value)}>
+                {cat.label}
+              </button>
+            ))}
+          </div>
+          {/* Row 2: topics of the active category — active chip shows 淺紫 bg + ✓ (selected = current subject) */}
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+            {(() => {
+              const topics = allTopics[trendingTab];
+              if (!topics) {
+                return <span style={{ fontSize: 11, opacity: 0.45 }}>{trendingFetching ? "搜尋中…" : "點「抓取今日熱搜」載入話題"}</span>;
+              }
+              return topics.map((t, i) => {
+                const active = subject === t;
+                return (
+                  <button key={`${trendingTab}-${i}`} type="button" onClick={() => setSubject(active ? "" : t)} style={chipStyle(active)}>
+                    {active ? "✓ " : ""}{t}
+                  </button>
+                );
+              });
+            })()}
+          </div>
+        </AccordionSection>
+
+        {/* 🗓️ 活動行事曆 — upcoming events for merchandise pre-selling */}
+        <AccordionSection
+          title="🗓️ 活動行事曆"
+          summary={upcomingEvents.length > 0 ? `${upcomingEvents.length} 個即將到來` : "載入中…"}
+        >
+          <p style={{ fontSize: 11, opacity: 0.55, margin: "0 0 8px" }}>點擊活動 → 自動填入主圖欄（為這個活動設計商品圖）</p>
+          {/* Category filter chips */}
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+            {EVENT_CAT_FILTERS.map((c) => (
+              <button key={c} type="button" onClick={() => setEventCatFilter(c)} style={tabStyle(eventCatFilter === c)}>{c}</button>
+            ))}
+            <button type="button" onClick={() => void fetchUpcomingEvents()} disabled={eventsFetching}
+              style={{ ...actionPill(eventsFetching), marginLeft: "auto" }}>
+              {eventsFetching ? "載入中…" : "🔄"}
+            </button>
+          </div>
+          {/* Event chips */}
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+            {upcomingEvents.length === 0 ? (
+              <span style={{ fontSize: 11, opacity: 0.45 }}>
+                {eventsFetching ? "載入中…" : "無資料 — 先在活動行事曆頁跑一次同步"}
+              </span>
+            ) : (upcomingEvents
+              .filter((e) => eventCatFilter === "全部" || e.category === eventCatFilter)
+              .slice(0, 30)
+              .map((e) => {
+                const label = `${e.emoji ?? "📅"} ${e.title_zh ?? e.title}`;
+                const active = subject === label;
+                const daysUntil = Math.ceil((new Date(e.event_date).getTime() - Date.now()) / 86400000);
+                return (
+                  <button key={e.id} type="button"
+                    title={`${e.event_date} · 提前 ${e.marketing_lead_days} 天備稿（${daysUntil} 天後）`}
+                    onClick={() => setSubject(active ? "" : label)}
+                    style={chipStyle(active)}>
+                    {active ? "✓ " : ""}{label}
+                    <span style={{ fontSize: 10, opacity: 0.55, marginLeft: 4 }}>{daysUntil}天</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </AccordionSection>
+
+        {/* 🌍 世界文化 — region × lens, with AI-filled specific items (混搭靈感工具). */}
         <AccordionSection title="🌍 世界文化" summary={region ? (fusionRegion ? `${region.zh}×${fusionRegion.zh}` : region.zh) : (cultureChips.length ? `${cultureChips.length} 元素` : "未選")}>
           <p style={{ fontSize: 11, opacity: 0.55, margin: "0 0 8px" }}>
             1️⃣ 選用途 → 2️⃣ 選國家 → 3️⃣ 選主題 → 項目自動跳出（免費），按「生成」
@@ -1216,84 +1294,6 @@ export default function StudioWorkbench() {
         <AccordionSection title="✨ 氛圍 Vibe" summary={vibe || "未填"}>
           <input className="btn-secondary" style={{ width: "100%", marginBottom: 8 }} value={vibe} onChange={(e) => setVibe(e.target.value)} placeholder="例：calm, ethereal" />
           <CategoryPicker categories={VIBE_CATEGORIES} value={vibe} onPick={setVibe} onTip={setTip} />
-        </AccordionSection>
-
-        <AccordionSection title="🔥 時事靈感">
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <p style={{ fontSize: 11, opacity: 0.55, margin: 0 }}>點擊話題填入主圖欄（再點一次取消）</p>
-            <button type="button" disabled={trendingFetching} onClick={() => void fetchAllTrending()}
-              style={actionPill(trendingFetching)}>
-              {trendingFetching ? "搜尋中…" : "抓取今日熱搜"}
-            </button>
-          </div>
-          {/* Row 1: category tabs (圖一 layout) */}
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
-            {TRENDING_CATEGORIES.map((cat) => (
-              <button key={cat.value} type="button" onClick={() => setTrendingTab(cat.value)} style={tabStyle(trendingTab === cat.value)}>
-                {cat.label}
-              </button>
-            ))}
-          </div>
-          {/* Row 2: topics of the active category — active chip shows 淺紫 bg + ✓ (selected = current subject) */}
-          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-            {(() => {
-              const topics = allTopics[trendingTab];
-              if (!topics) {
-                return <span style={{ fontSize: 11, opacity: 0.45 }}>{trendingFetching ? "搜尋中…" : "點「抓取今日熱搜」載入話題"}</span>;
-              }
-              return topics.map((t, i) => {
-                const active = subject === t;
-                return (
-                  <button key={`${trendingTab}-${i}`} type="button" onClick={() => setSubject(active ? "" : t)} style={chipStyle(active)}>
-                    {active ? "✓ " : ""}{t}
-                  </button>
-                );
-              });
-            })()}
-          </div>
-        </AccordionSection>
-
-        {/* 🗓️ 活動行事曆 — upcoming events for merchandise pre-selling */}
-        <AccordionSection
-          title="🗓️ 活動行事曆"
-          summary={upcomingEvents.length > 0 ? `${upcomingEvents.length} 個即將到來` : "載入中…"}
-        >
-          <p style={{ fontSize: 11, opacity: 0.55, margin: "0 0 8px" }}>點擊活動 → 自動填入主圖欄（為這個活動設計商品圖）</p>
-          {/* Category filter chips */}
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
-            {EVENT_CAT_FILTERS.map((c) => (
-              <button key={c} type="button" onClick={() => setEventCatFilter(c)} style={tabStyle(eventCatFilter === c)}>{c}</button>
-            ))}
-            <button type="button" onClick={() => void fetchUpcomingEvents()} disabled={eventsFetching}
-              style={{ ...actionPill(eventsFetching), marginLeft: "auto" }}>
-              {eventsFetching ? "載入中…" : "🔄"}
-            </button>
-          </div>
-          {/* Event chips */}
-          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-            {upcomingEvents.length === 0 ? (
-              <span style={{ fontSize: 11, opacity: 0.45 }}>
-                {eventsFetching ? "載入中…" : "無資料 — 先在活動行事曆頁跑一次同步"}
-              </span>
-            ) : (upcomingEvents
-              .filter((e) => eventCatFilter === "全部" || e.category === eventCatFilter)
-              .slice(0, 30)
-              .map((e) => {
-                const label = `${e.emoji ?? "📅"} ${e.title_zh ?? e.title}`;
-                const active = subject === label;
-                const daysUntil = Math.ceil((new Date(e.event_date).getTime() - Date.now()) / 86400000);
-                return (
-                  <button key={e.id} type="button"
-                    title={`${e.event_date} · 提前 ${e.marketing_lead_days} 天備稿（${daysUntil} 天後）`}
-                    onClick={() => setSubject(active ? "" : label)}
-                    style={chipStyle(active)}>
-                    {active ? "✓ " : ""}{label}
-                    <span style={{ fontSize: 10, opacity: 0.55, marginLeft: 4 }}>{daysUntil}天</span>
-                  </button>
-                );
-              })
-            )}
-          </div>
         </AccordionSection>
 
         {/* 🤖 圖片模型 — placed BEFORE 風格 (per spec). Tarot-style: provider tabs + vertical rows. */}
