@@ -40,7 +40,7 @@ function fixedEvent(args: {
   return {
     ...args,
     marketing_lead_days: calcLeadDays(args.category, args.subcategory),
-    source: "curated",
+    source: "hardcoded",
     external_id: `curated:${args.subcategory}:${args.event_date}:${args.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`,
   };
 }

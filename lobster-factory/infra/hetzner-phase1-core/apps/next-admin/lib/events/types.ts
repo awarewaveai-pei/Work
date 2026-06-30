@@ -1,6 +1,6 @@
 export type EventCategory = "sports" | "holiday" | "cultural" | "mega";
 
-export type EventSource = "calendarific" | "thesportsdb" | "hardcoded" | "curated";
+export type EventSource = "calendarific" | "thesportsdb" | "hardcoded";
 
 export interface GlobalEvent {
   title: string;
