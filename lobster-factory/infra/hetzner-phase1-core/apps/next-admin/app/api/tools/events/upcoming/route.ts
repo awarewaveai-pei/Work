@@ -50,7 +50,7 @@ export async function GET(req: Request) {
     ...listParam(searchParams.get("countries")),
   ];
   const sort = searchParams.get("sort") === "date" ? "date" : "opportunity";
-  const limit = intParam(searchParams.get("limit"), 50, 200);
+  const limit = intParam(searchParams.get("limit"), 50, 500);
   const offset = intParam(searchParams.get("offset"), 0, 5000);
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

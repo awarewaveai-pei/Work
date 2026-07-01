@@ -120,6 +120,7 @@ const EVENT_SORTS = [
   { value: "opportunity", label: "依機會" },
   { value: "date", label: "依時間" },
 ] as const;
+const EVENT_FETCH_LIMIT = 500;
 
 // Fixed seed so the edge-style preview thumbnails match what `applyEdge` actually composites.
 const EDGE_APPLY_SEED = 7;
@@ -687,7 +688,7 @@ export default function StudioWorkbench() {
       url.searchParams.set("until", until);
       url.searchParams.set("days", String(eventWindowDays));
       url.searchParams.set("sort", eventSort);
-      url.searchParams.set("limit", "120");
+      url.searchParams.set("limit", String(EVENT_FETCH_LIMIT));
       if (eventCatFilter !== "all") url.searchParams.set("category", eventCatFilter);
       if (eventCountryFilter !== "all") url.searchParams.set("country", eventCountryFilter);
       const res = await fetch(url.toString());
@@ -992,10 +993,6 @@ export default function StudioWorkbench() {
     () => upcomingEvents.filter(eventMatchesCurrentFilter),
     [eventMatchesCurrentFilter, upcomingEvents],
   );
-  const recommendedUpcomingEvents = useMemo(
-    () => visibleUpcomingEvents.slice(0, 10),
-    [visibleUpcomingEvents],
-  );
   const groupedUpcomingEvents = useMemo(() => {
     const groups = new Map<string, UpcomingEvent[]>();
     const labelFor = (event: UpcomingEvent) => eventSort === "date" ? event.event_date.slice(0, 7) : "推薦";
@@ -1143,31 +1140,67 @@ export default function StudioWorkbench() {
               查看更多
             </button>
           </div>
-          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+          <div style={{ display: "grid", gap: 8, maxHeight: 430, overflowY: "auto", paddingRight: 2 }}>
             {(() => {
-              if (recommendedUpcomingEvents.length === 0) {
+              if (eventsFetching) {
                 return (
                   <span style={{ fontSize: 11, opacity: 0.45 }}>
-                    {eventsFetching ? "載入中…" : "此篩選暫無活動"}
+                    載入中…
                   </span>
                 );
               }
 
-              return recommendedUpcomingEvents.map((e) => {
-                const countryLabel = eventCountryLabel(e);
-                const label = buildEventLabel(e);
-                const active = subject === label;
-                const daysUntil = Math.ceil((new Date(e.event_date).getTime() - Date.now()) / 86400000);
-                return (
-                  <button key={e.id} type="button"
-                    title={`${e.event_date} · ${(e.facets ?? [e.category]).join(", ")}${countryLabel ? ` · ${countryLabel}` : ""} · 提前 ${e.marketing_lead_days} 天備稿（${daysUntil} 天後）`}
-                    onClick={() => setSubject(active ? "" : label)}
-                    style={chipStyle(active)}>
-                    {active ? "✓ " : ""}{label}
-                    <span style={{ fontSize: 10, opacity: 0.55, marginLeft: 4 }}>{daysUntil}天</span>
-                  </button>
-                );
-              });
+              if (groupedUpcomingEvents.length === 0) {
+                return <span style={{ fontSize: 11, opacity: 0.45 }}>此篩選暫無活動</span>;
+              }
+
+              return groupedUpcomingEvents.map(([group, events]) => (
+                <section key={group}>
+                  <div style={{ fontSize: 11, fontWeight: 800, opacity: 0.58, marginBottom: 5 }}>{group}</div>
+                  <div style={{ display: "grid", gap: 5 }}>
+                    {events.map((event) => {
+                      const label = buildEventLabel(event);
+                      const active = subject === label;
+                      const daysUntil = Math.ceil((new Date(event.event_date).getTime() - Date.now()) / 86400000);
+                      const countries = eventCountryLabel(event);
+                      return (
+                        <button
+                          key={event.id}
+                          type="button"
+                          title={`${event.event_date} · ${(event.facets ?? [event.category]).join(", ")}${countries ? ` · ${countries}` : ""} · 提前 ${event.marketing_lead_days} 天備稿`}
+                          onClick={() => setSubject(active ? "" : label)}
+                          style={{
+                            textAlign: "left",
+                            border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+                            background: active ? "rgba(99,102,241,0.12)" : "rgba(127,127,127,0.04)",
+                            color: "var(--text-primary)",
+                            borderRadius: 6,
+                            padding: "8px 9px",
+                            cursor: "pointer",
+                            display: "grid",
+                            gridTemplateColumns: "1fr auto",
+                            gap: 8,
+                            alignItems: "center",
+                          }}
+                        >
+                          <span style={{ minWidth: 0 }}>
+                            <span style={{ display: "block", fontSize: 12, fontWeight: 750, overflowWrap: "anywhere" }}>
+                              {active ? "✓ " : ""}{label}
+                            </span>
+                            <span style={{ display: "block", fontSize: 10, opacity: 0.58, marginTop: 2 }}>
+                              {(event.facets ?? [event.category]).join(", ")}{countries ? ` · ${countries}` : ""}
+                            </span>
+                          </span>
+                          <span style={{ textAlign: "right", fontSize: 10, opacity: 0.72, whiteSpace: "nowrap" }}>
+                            <span style={{ display: "block", fontWeight: 800 }}>{event.event_date.slice(5)}</span>
+                            <span>{daysUntil >= 0 ? `${daysUntil}天` : "進行中"}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              ));
             })()}
           </div>
         </AccordionSection>
