@@ -31,16 +31,25 @@ describe("event country coverage", () => {
     expect(mena?.value.split(",")).toEqual(["AE", "SA", "TR", "EG", "MA"]);
   });
 
-  it("adds Western traveler Asia shortcut filters", () => {
-    const asia = EVENT_COUNTRY_FILTERS.find((filter) => filter.label === "歐美澳旅客熱門亞洲");
-    expect(asia?.value.split(",")).toEqual([
-      "JP", "KR", "TW", "HK", "SG", "TH", "VN", "ID", "PH", "MY", "KH", "LA", "IN", "LK", "NP", "MV",
+  it("lists Western traveler Asia markets as individual country filters", () => {
+    const leadingCountryFilters = EVENT_COUNTRY_FILTERS.slice(2, 18);
+    expect(leadingCountryFilters.map((filter) => filter.value)).toEqual([
+      "TH", "JP", "VN", "ID", "SG", "MY", "PH", "KH", "LA", "KR", "TW", "HK", "IN", "LK", "NP", "MV",
     ]);
+    for (const filter of leadingCountryFilters) {
+      expect(filter.value).not.toContain(",");
+    }
 
-    const southeastAsia = EVENT_COUNTRY_FILTERS.find((filter) => filter.label === "歐美澳熱門東南亞");
-    expect(southeastAsia?.value.split(",")).toEqual(["TH", "VN", "ID", "PH", "MY", "SG", "KH", "LA"]);
+    expect(EVENT_COUNTRY_FILTERS.some((filter) => filter.label.includes("歐美澳"))).toBe(false);
+  });
 
-    const southAsia = EVENT_COUNTRY_FILTERS.find((filter) => filter.label === "歐美澳熱門南亞");
-    expect(southAsia?.value.split(",")).toEqual(["IN", "LK", "NP", "MV"]);
+  it("has a single-country filter for every source country", () => {
+    const singleCountryFilters = new Set(
+      EVENT_COUNTRY_FILTERS.filter((filter) => !filter.value.includes(",")).map((filter) => filter.value),
+    );
+
+    for (const country of EVENT_SOURCE_COUNTRIES) {
+      expect(singleCountryFilters.has(country.code)).toBe(true);
+    }
   });
 });
