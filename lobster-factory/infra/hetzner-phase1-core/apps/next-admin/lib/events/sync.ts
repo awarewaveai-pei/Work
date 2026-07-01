@@ -4,6 +4,7 @@ import { fetchAllCountries } from "./calendarific";
 import { fetchAllLeagues } from "./thesportsdb";
 import { HARDCODED_EVENTS } from "./hardcoded";
 import { buildCuratedEvents } from "./curated";
+import { EVENT_SOURCE_COUNTRIES } from "./countries";
 
 export interface SyncResult {
   upserted: number;
@@ -60,6 +61,28 @@ async function latestSyncedAt(db: SupabaseClient): Promise<string | null> {
   return typeof first?.synced_at === "string" ? first.synced_at : null;
 }
 
+async function deactivateEventsByExternalId(
+  db: SupabaseClient,
+  externalIds: string[],
+  syncedAt: string,
+): Promise<{ pruned: number; error?: string }> {
+  const BATCH = 200;
+  let pruned = 0;
+  for (let i = 0; i < externalIds.length; i += BATCH) {
+    const batch = externalIds.slice(i, i + BATCH);
+    const { error } = await db
+      .from("events")
+      .update({ is_active: false, synced_at: syncedAt })
+      .in("external_id", batch);
+
+    if (error) {
+      return { pruned, error: error.message };
+    }
+    pruned += batch.length;
+  }
+  return { pruned };
+}
+
 async function pruneStaleCuratedEvents(
   db: SupabaseClient,
   currentExternalIds: Set<string>,
@@ -86,16 +109,54 @@ async function pruneStaleCuratedEvents(
     return { pruned: 0 };
   }
 
-  const { error: updateError } = await db
-    .from("events")
-    .update({ is_active: false, synced_at: syncedAt })
-    .in("external_id", staleIds);
-
-  if (updateError) {
-    return { pruned: 0, error: `Prune stale curated events: ${updateError.message}` };
+  const result = await deactivateEventsByExternalId(db, staleIds, syncedAt);
+  if (result.error) {
+    return { pruned: result.pruned, error: `Prune stale curated events: ${result.error}` };
   }
 
-  return { pruned: staleIds.length };
+  return result;
+}
+
+function countryFromCalendarificExternalId(externalId: string): string | null {
+  const match = /^cal:([^:]+):/.exec(externalId);
+  return match?.[1]?.toUpperCase() ?? null;
+}
+
+async function pruneStaleCalendarificCountries(
+  db: SupabaseClient,
+  currentCountries: Set<string>,
+  syncedAt: string,
+): Promise<{ pruned: number; error?: string }> {
+  const { data, error } = await db
+    .from("events")
+    .select("external_id")
+    .eq("source", "calendarific")
+    .eq("is_active", true)
+    .like("external_id", "cal:%")
+    .limit(10000);
+
+  if (error) {
+    return { pruned: 0, error: `Prune stale Calendarific countries: ${error.message}` };
+  }
+
+  const staleIds = (data ?? [])
+    .map((row: { external_id?: unknown }) => row.external_id)
+    .filter((externalId): externalId is string => {
+      if (typeof externalId !== "string") return false;
+      const country = countryFromCalendarificExternalId(externalId);
+      return !!country && !currentCountries.has(country);
+    });
+
+  if (staleIds.length === 0) {
+    return { pruned: 0 };
+  }
+
+  const result = await deactivateEventsByExternalId(db, staleIds, syncedAt);
+  if (result.error) {
+    return { pruned: result.pruned, error: `Prune stale Calendarific countries: ${result.error}` };
+  }
+
+  return result;
 }
 
 export async function syncGlobalEvents(opts: {
@@ -163,20 +224,27 @@ export async function syncGlobalEvents(opts: {
     }
   }
 
+  const syncedAt = new Date().toISOString();
   const currentCuratedIds = new Set(curated.map((event) => event.external_id));
-  const pruneResult = await pruneStaleCuratedEvents(db, currentCuratedIds, new Date().toISOString());
-  if (pruneResult.error) {
-    errors.push(pruneResult.error);
-    emit(`Prune skipped: ${pruneResult.error}`);
-  } else if (pruneResult.pruned > 0) {
-    emit(`Pruned ${pruneResult.pruned} stale curated events`);
+  const currentCalendarificCountries = new Set(EVENT_SOURCE_COUNTRIES.map((country) => country.code.toUpperCase()));
+  const pruneResults = [
+    await pruneStaleCuratedEvents(db, currentCuratedIds, syncedAt),
+    await pruneStaleCalendarificCountries(db, currentCalendarificCountries, syncedAt),
+  ];
+  const pruned = pruneResults.reduce((sum, result) => sum + result.pruned, 0);
+  for (const result of pruneResults) {
+    if (result.error) {
+      errors.push(result.error);
+      emit(`Prune skipped: ${result.error}`);
+    }
   }
+  if (pruned > 0) emit(`Pruned ${pruned} stale events`);
 
-  emit(`✅ Sync complete — upserted ${upserted}, pruned ${pruneResult.pruned}, errors: ${errors.length}`);
+  emit(`✅ Sync complete — upserted ${upserted}, pruned ${pruned}, errors: ${errors.length}`);
   return {
     upserted,
     skipped: all.length - deduped.length,
-    pruned: pruneResult.pruned,
+    pruned,
     skippedFresh: false,
     lastSyncedAt,
     nextSyncDueAt,
