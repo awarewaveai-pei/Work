@@ -16,4 +16,18 @@ describe("event country coverage", () => {
     expect(EVENT_COUNTRY_FILTERS.some((filter) => filter.label === "東亞 + 東南亞")).toBe(true);
     expect(EVENT_COUNTRY_FILTERS.some((filter) => filter.label === "東南亞")).toBe(true);
   });
+
+  it("separates South Asia and MENA tourism markets", () => {
+    const sourceCodes = new Set(EVENT_SOURCE_COUNTRIES.map((country) => country.code));
+    for (const code of ["IN", "MV", "TR", "EG"]) {
+      expect(sourceCodes.has(code)).toBe(true);
+      expect(EVENT_COUNTRY_FILTERS.some((filter) => filter.value === code)).toBe(true);
+    }
+
+    const southAsia = EVENT_COUNTRY_FILTERS.find((filter) => filter.label === "南亞");
+    expect(southAsia?.value.split(",")).toEqual(["IN", "MV"]);
+
+    const mena = EVENT_COUNTRY_FILTERS.find((filter) => filter.label === "中東/北非");
+    expect(mena?.value.split(",")).toEqual(["AE", "SA", "TR", "EG", "MA"]);
+  });
 });
