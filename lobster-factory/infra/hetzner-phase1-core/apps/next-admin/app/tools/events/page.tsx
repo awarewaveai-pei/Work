@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { EVENT_COUNTRY_FILTERS } from "@/lib/events/countries";
+import { EVENT_ALL_COUNTRIES_FILTER, EVENT_COUNTRY_FILTER_GROUPS } from "@/lib/events/countries";
 
 const WINDOWS = [
   { key: "30", label: "30 天", days: 30 },
@@ -145,7 +145,12 @@ export default function EventsPage() {
           {FILTERS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
         </select>
         <select className="btn-secondary" value={country} onChange={e => setCountry(e.target.value)}>
-          {EVENT_COUNTRY_FILTERS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+          <option value={EVENT_ALL_COUNTRIES_FILTER.value}>{EVENT_ALL_COUNTRIES_FILTER.label}</option>
+          {EVENT_COUNTRY_FILTER_GROUPS.map(group => (
+            <optgroup key={group.label} label={group.label}>
+              {group.options.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </optgroup>
+          ))}
         </select>
         <select className="btn-secondary" value={sort} onChange={e => setSort(e.target.value as SortMode)}>
           <option value="opportunity">依商品機會</option>

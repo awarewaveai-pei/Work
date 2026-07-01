@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { EVENT_COUNTRY_FILTERS, EVENT_SOURCE_COUNTRIES } from "./countries";
+import {
+  EVENT_ALL_COUNTRIES_FILTER,
+  EVENT_COUNTRY_FILTER_GROUPS,
+  EVENT_COUNTRY_FILTERS,
+  EVENT_SOURCE_COUNTRIES,
+} from "./countries";
 
 describe("event country coverage", () => {
   it("keeps source country codes unique", () => {
@@ -7,40 +12,52 @@ describe("event country coverage", () => {
     expect(new Set(codes).size).toBe(codes.length);
   });
 
-  it("covers East and Southeast Asia in source data and filters", () => {
+  it("covers Asian subregions in source data and grouped filters", () => {
     const sourceCodes = new Set(EVENT_SOURCE_COUNTRIES.map((country) => country.code));
-    for (const code of ["TW", "JP", "KR", "CN", "HK", "MO", "SG", "MY", "TH", "VN", "ID", "PH"]) {
+    for (const code of ["TW", "JP", "KR", "CN", "HK", "MO", "TH", "VN", "ID", "PH", "IN", "AE", "KZ"]) {
       expect(sourceCodes.has(code)).toBe(true);
     }
 
-    expect(EVENT_COUNTRY_FILTERS.some((filter) => filter.label === "東亞 + 東南亞")).toBe(true);
-    expect(EVENT_COUNTRY_FILTERS.some((filter) => filter.label === "東南亞")).toBe(true);
+    expect(EVENT_COUNTRY_FILTER_GROUPS.map((group) => group.label)).toEqual([
+      "亞洲 / 東亞",
+      "亞洲 / 東南亞",
+      "亞洲 / 南亞",
+      "亞洲 / 西亞",
+      "亞洲 / 中亞",
+      "歐洲",
+      "北美洲",
+      "南美洲",
+      "大洋洲",
+      "非洲",
+    ]);
   });
 
-  it("separates South Asia and MENA tourism markets", () => {
+  it("separates South Asia, West Asia, and Central Asia countries", () => {
     const sourceCodes = new Set(EVENT_SOURCE_COUNTRIES.map((country) => country.code));
-    for (const code of ["IN", "LK", "NP", "MV", "TR", "EG"]) {
+    for (const code of ["IN", "LK", "NP", "MV", "AE", "SA", "TR", "IL", "KZ", "UZ", "KG", "TJ", "TM"]) {
       expect(sourceCodes.has(code)).toBe(true);
       expect(EVENT_COUNTRY_FILTERS.some((filter) => filter.value === code)).toBe(true);
     }
 
-    const southAsia = EVENT_COUNTRY_FILTERS.find((filter) => filter.label === "南亞");
-    expect(southAsia?.value.split(",")).toEqual(["IN", "LK", "NP", "MV"]);
+    const southAsia = EVENT_COUNTRY_FILTER_GROUPS.find((group) => group.label === "亞洲 / 南亞");
+    expect(southAsia?.options.map((option) => option.value)).toEqual(["IN", "LK", "NP", "MV"]);
 
-    const mena = EVENT_COUNTRY_FILTERS.find((filter) => filter.label === "中東/北非");
-    expect(mena?.value.split(",")).toEqual(["AE", "SA", "TR", "EG", "MA"]);
+    const westAsia = EVENT_COUNTRY_FILTER_GROUPS.find((group) => group.label === "亞洲 / 西亞");
+    expect(westAsia?.options.map((option) => option.value)).toEqual(["AE", "SA", "TR", "IL", "JO", "QA", "OM"]);
+
+    const centralAsia = EVENT_COUNTRY_FILTER_GROUPS.find((group) => group.label === "亞洲 / 中亞");
+    expect(centralAsia?.options.map((option) => option.value)).toEqual(["KZ", "UZ", "KG", "TJ", "TM"]);
   });
 
-  it("lists Western traveler Asia markets as individual country filters", () => {
-    const leadingCountryFilters = EVENT_COUNTRY_FILTERS.slice(2, 18);
-    expect(leadingCountryFilters.map((filter) => filter.value)).toEqual([
-      "TH", "JP", "VN", "ID", "SG", "MY", "PH", "KH", "LA", "KR", "TW", "HK", "IN", "LK", "NP", "MV",
-    ]);
-    for (const filter of leadingCountryFilters) {
+  it("keeps the country dropdown selectable values country-only", () => {
+    expect(EVENT_COUNTRY_FILTERS[0]).toEqual(EVENT_ALL_COUNTRIES_FILTER);
+    expect(EVENT_COUNTRY_FILTERS.some((filter) => filter.value === "global")).toBe(false);
+    expect(EVENT_COUNTRY_FILTERS.some((filter) => filter.label.includes("歐美澳"))).toBe(false);
+
+    for (const filter of EVENT_COUNTRY_FILTERS.slice(1)) {
+      expect(filter.value).toMatch(/^[A-Z]{2}$/);
       expect(filter.value).not.toContain(",");
     }
-
-    expect(EVENT_COUNTRY_FILTERS.some((filter) => filter.label.includes("歐美澳"))).toBe(false);
   });
 
   it("has a single-country filter for every source country", () => {

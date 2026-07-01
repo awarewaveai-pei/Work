@@ -33,7 +33,7 @@ import {
   type EdgeMaskId,
 } from "@/lib/studio/edge-mask";
 import { AI_TEXT_MODEL_GROUPS, AI_TEXT_MODELS, type AiTextModel } from "@/lib/ai/text-model-options";
-import { EVENT_COUNTRY_FILTERS } from "@/lib/events/countries";
+import { EVENT_ALL_COUNTRIES_FILTER, EVENT_COUNTRY_FILTER_GROUPS } from "@/lib/events/countries";
 import { textModelCostLabel, textModelCostSummary } from "@/lib/ai/text-model-pricing";
 
 // suffix describes the FLAT print-ready ARTWORK (not the physical product) so literal models
@@ -1118,7 +1118,12 @@ export default function StudioWorkbench() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8 }}>
             <select className="btn-secondary" value={eventCountryFilter} onChange={(e) => setEventCountryFilter(e.target.value)} style={{ fontSize: 12 }}>
-              {EVENT_COUNTRY_FILTERS.map((country) => <option key={country.value} value={country.value}>{country.label}</option>)}
+              <option value={EVENT_ALL_COUNTRIES_FILTER.value}>{EVENT_ALL_COUNTRIES_FILTER.label}</option>
+              {EVENT_COUNTRY_FILTER_GROUPS.map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.options.map((country) => <option key={country.value} value={country.value}>{country.label}</option>)}
+                </optgroup>
+              ))}
             </select>
             <select className="btn-secondary" value={eventWindowDays} onChange={(e) => setEventWindowDays(Number(e.target.value))} style={{ fontSize: 12 }}>
               {EVENT_WINDOWS.map((window_) => <option key={window_.value} value={window_.value}>{window_.label}</option>)}
@@ -1834,7 +1839,12 @@ export default function StudioWorkbench() {
                 {EVENT_CAT_FILTERS.map((filter) => <option key={filter.value} value={filter.value}>{filter.label}</option>)}
               </select>
               <select className="btn-secondary" value={eventCountryFilter} onChange={(e) => setEventCountryFilter(e.target.value)} style={{ fontSize: 12 }}>
-                {EVENT_COUNTRY_FILTERS.map((country) => <option key={country.value} value={country.value}>{country.label}</option>)}
+                <option value={EVENT_ALL_COUNTRIES_FILTER.value}>{EVENT_ALL_COUNTRIES_FILTER.label}</option>
+                {EVENT_COUNTRY_FILTER_GROUPS.map((group) => (
+                  <optgroup key={group.label} label={group.label}>
+                    {group.options.map((country) => <option key={country.value} value={country.value}>{country.label}</option>)}
+                  </optgroup>
+                ))}
               </select>
               <select className="btn-secondary" value={eventWindowDays} onChange={(e) => setEventWindowDays(Number(e.target.value))} style={{ fontSize: 12 }}>
                 {EVENT_WINDOWS.map((window_) => <option key={window_.value} value={window_.value}>{window_.label}</option>)}
