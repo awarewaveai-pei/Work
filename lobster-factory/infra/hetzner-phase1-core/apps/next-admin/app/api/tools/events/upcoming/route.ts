@@ -10,6 +10,7 @@ import { compactUpcomingEvents, type UpcomingEventRow } from "./compact";
 export const runtime = "nodejs";
 
 const EVENT_FILTERS = ["mega", "sports", "holiday", "cultural", "national", "commercial", "family", "religious"] as const;
+const EVENT_QUERY_LIMIT = 8000;
 
 function dateParam(value: string | null, fallback: string): string {
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : fallback;
@@ -67,7 +68,7 @@ export async function GET(req: Request) {
     .lte("event_date", until)
     .or(`event_date.gte.${from},event_end_date.gte.${from}`)
     .order("event_date", { ascending: true })
-    .limit(2500);
+    .limit(EVENT_QUERY_LIMIT);
 
   const { data, error } = await query;
   if (error) {
