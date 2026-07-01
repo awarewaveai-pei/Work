@@ -41,14 +41,15 @@ import { textModelCostLabel, textModelCostSummary } from "@/lib/ai/text-model-pr
 // composition to each product. Keep "no product mockup" so output is the design, not a photo.
 // Appended to every product suffix so the AI never invents extra subjects beyond what was listed.
 const NO_EXTRA_CHARS = "no extra characters or subjects beyond the ones explicitly listed";
+const FULL_BLEED_FRAME = "full-bleed edge-to-edge composition, artwork fills the entire image frame, extend the design to the left and right edges, no empty side margins, no border";
 
 const PRODUCT_TYPES = [
-  { value: "tshirt", label: "T-shirt", aspect: "4:5" as AspectRatio, suffix: `isolated flat graphic artwork on plain white background, centered print-ready design, clean edges, NOT a product photo, no garment, no mockup, ${NO_EXTRA_CHARS}` },
-  { value: "hoodie", label: "Hoodie", aspect: "4:5" as AspectRatio, suffix: `isolated flat graphic artwork on plain white background, centered print-ready design, clean edges, NOT a product photo, no garment, no mockup, ${NO_EXTRA_CHARS}` },
-  { value: "mug", label: "Mug", aspect: "3:2" as AspectRatio, suffix: `isolated flat artwork on plain white background, horizontal band composition for a wrap print, print-ready, NOT a product photo, no mug, no mockup, ${NO_EXTRA_CHARS}` },
-  { value: "poster", label: "Poster / Wall Art", aspect: "2:3" as AspectRatio, suffix: `full-bleed poster illustration, complete artwork filling the frame, no frame border, no mockup, ${NO_EXTRA_CHARS}` },
-  { value: "sticker", label: "Sticker", aspect: "1:1" as AspectRatio, suffix: `die-cut sticker artwork with bold clean outline, isolated on plain white background, flat design, NOT a product photo, no mockup, ${NO_EXTRA_CHARS}` },
-  { value: "none", label: "（不限商品）", aspect: "1:1" as AspectRatio, suffix: NO_EXTRA_CHARS },
+  { value: "tshirt", label: "T-shirt", aspect: "4:5" as AspectRatio, suffix: `flat print-ready graphic artwork, ${FULL_BLEED_FRAME}, clean edges, NOT a product photo, no garment, no mockup, ${NO_EXTRA_CHARS}` },
+  { value: "hoodie", label: "Hoodie", aspect: "4:5" as AspectRatio, suffix: `flat print-ready graphic artwork, ${FULL_BLEED_FRAME}, clean edges, NOT a product photo, no garment, no mockup, ${NO_EXTRA_CHARS}` },
+  { value: "mug", label: "Mug", aspect: "3:2" as AspectRatio, suffix: `horizontal wrap-print artwork, ${FULL_BLEED_FRAME}, print-ready, NOT a product photo, no mug, no mockup, ${NO_EXTRA_CHARS}` },
+  { value: "poster", label: "Poster / Wall Art", aspect: "2:3" as AspectRatio, suffix: `full-bleed poster illustration, ${FULL_BLEED_FRAME}, complete artwork filling the frame, no frame border, no mockup, ${NO_EXTRA_CHARS}` },
+  { value: "sticker", label: "Sticker", aspect: "1:1" as AspectRatio, suffix: `die-cut sticker artwork with bold clean outline, ${FULL_BLEED_FRAME}, flat design, NOT a product photo, no mockup, ${NO_EXTRA_CHARS}` },
+  { value: "none", label: "（不限商品）", aspect: "1:1" as AspectRatio, suffix: `${FULL_BLEED_FRAME}, ${NO_EXTRA_CHARS}` },
 ];
 
 const ASPECTS: AspectRatio[] = ["1:1", "3:2", "2:3", "4:3", "3:4", "4:5", "16:9", "9:16"];
@@ -235,6 +236,15 @@ function storeTrending(topics: Record<string, string[]>): void {
   } catch {
     // Ignore quota/private-mode failures; the in-memory result still renders.
   }
+}
+
+function withFullBleedDirective(prompt: string): string {
+  const value = prompt.trim();
+  if (!value) return value;
+  if (/(full[- ]bleed|edge[- ]to[- ]edge|fills? the entire image frame|left and right edges)/i.test(value)) {
+    return value;
+  }
+  return `${value}, ${FULL_BLEED_FRAME}`;
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -523,7 +533,7 @@ export default function StudioWorkbench() {
           ? dyn.map((d) => d.en)
           : mt.fallback.map((d) => d.en);
       const base = buildMapPrompt({ regionEn: region.en, fusionEn: fusionRegion?.en, theme: mt, items });
-      const extras = [playClause, resolvedStylePrompt, vibe.trim()].filter(Boolean).join(", ");
+      const extras = [FULL_BLEED_FRAME, playClause, resolvedStylePrompt, vibe.trim()].filter(Boolean).join(", ");
       return extras ? `${base}, ${extras}` : base;
     }
     // 🌍 culture tokens: region adjective (+ 🎲 fusion culture) + any picked culture chips
@@ -548,7 +558,7 @@ export default function StudioWorkbench() {
     return parts.join(", ");
   }, [subject, theme, vibe, resolvedStylePrompt, product, refMode, refImages.length, region, fusionRegion, cultureChips, mapMode, topic, cultureDyn, playMods]);
 
-  const effectivePrompt = promptTouched ? prompt : assembledPrompt;
+  const effectivePrompt = withFullBleedDirective(promptTouched ? prompt : assembledPrompt);
 
   const activeResult = results[activeIdx] ?? null;
   const selectedSearchDataModel = AI_TEXT_MODELS.find((model) => model.value === searchDataModel) ?? AI_TEXT_MODELS[0];
@@ -1624,18 +1634,18 @@ export default function StudioWorkbench() {
 
           {/* Active result detail */}
           {activeResult && !activeResult.busy && activeResult.image ? (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 290px", gap: 16, alignItems: "flex-start" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16, alignItems: "flex-start", width: "100%" }}>
               {/* Left: canvas */}
-              <div>
+              <div style={{ width: "100%", minWidth: 0 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={activeResult.image} alt="generated design" title="點擊放大"
                 onClick={() => setZoomImage(activeResult.image)}
-                style={{ display: "block", width: "auto", height: "auto", maxWidth: "100%", maxHeight: isMultiModel ? 420 : 560, margin: "0 auto", objectFit: "contain", borderRadius: 8, background: "#fff", cursor: "zoom-in" }} />
+                style={{ display: "block", width: "100%", height: "auto", maxWidth: "100%", minWidth: 0, objectFit: "contain", borderRadius: 8, background: "#fff", cursor: "zoom-in" }} />
               <div style={{ textAlign: "center", fontSize: 11, opacity: 0.5, marginTop: 4 }}>🔍 點圖可放大檢視</div>
               </div>
 
               {/* Right: operations panel */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%", minWidth: 0 }}>
               {/* Action bar */}
               <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
                 {(() => {
