@@ -34,7 +34,7 @@ describe("event country coverage", () => {
 
   it("separates South Asia, West Asia, and Central Asia countries", () => {
     const sourceCodes = new Set(EVENT_SOURCE_COUNTRIES.map((country) => country.code));
-    for (const code of ["IN", "LK", "NP", "MV", "AE", "SA", "TR", "IL", "KZ", "UZ", "KG", "TJ", "TM"]) {
+    for (const code of ["IN", "LK", "NP", "MV", "AE", "SA", "TR", "JO", "QA", "OM", "KZ", "UZ", "KG", "TJ", "TM"]) {
       expect(sourceCodes.has(code)).toBe(true);
       expect(EVENT_COUNTRY_FILTERS.some((filter) => filter.value === code)).toBe(true);
     }
@@ -43,7 +43,7 @@ describe("event country coverage", () => {
     expect(southAsia?.options.map((option) => option.value)).toEqual(["IN", "LK", "NP", "MV"]);
 
     const westAsia = EVENT_COUNTRY_FILTER_GROUPS.find((group) => group.label === "亞洲 / 西亞");
-    expect(westAsia?.options.map((option) => option.value)).toEqual(["AE", "SA", "TR", "IL", "JO", "QA", "OM"]);
+    expect(westAsia?.options.map((option) => option.value)).toEqual(["AE", "SA", "TR", "JO", "QA", "OM"]);
 
     const centralAsia = EVENT_COUNTRY_FILTER_GROUPS.find((group) => group.label === "亞洲 / 中亞");
     expect(centralAsia?.options.map((option) => option.value)).toEqual(["KZ", "UZ", "KG", "TJ", "TM"]);

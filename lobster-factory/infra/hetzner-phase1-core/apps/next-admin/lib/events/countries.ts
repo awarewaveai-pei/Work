@@ -26,7 +26,7 @@ export interface EventCountryFilterGroup {
 const EAST_ASIA = ["TW", "JP", "KR", "CN", "HK", "MO"];
 const SOUTHEAST_ASIA = ["TH", "VN", "ID", "SG", "MY", "PH", "KH", "LA", "MM", "BN"];
 const SOUTH_ASIA = ["IN", "LK", "NP", "MV"];
-const WEST_ASIA = ["AE", "SA", "TR", "IL", "JO", "QA", "OM"];
+const WEST_ASIA = ["AE", "SA", "TR", "JO", "QA", "OM"];
 const CENTRAL_ASIA = ["KZ", "UZ", "KG", "TJ", "TM"];
 const TOURISM_EUROPE = ["GB", "IE", "FR", "DE", "IT", "ES", "NL", "BE", "CH", "AT", "GR", "PT", "IS", "CZ"];
 const NORTH_AMERICA = ["US", "CA", "MX"];
@@ -78,7 +78,6 @@ export const EVENT_COUNTRY_FILTER_GROUPS: readonly EventCountryFilterGroup[] = [
       { value: "AE", label: "AE 阿聯酋/UAE" },
       { value: "SA", label: "SA 沙烏地阿拉伯" },
       { value: "TR", label: "TR 土耳其" },
-      { value: "IL", label: "IL 以色列" },
       { value: "JO", label: "JO 約旦" },
       { value: "QA", label: "QA 卡達" },
       { value: "OM", label: "OM 阿曼" },

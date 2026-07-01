@@ -45,6 +45,17 @@ function fixedEvent(args: {
   };
 }
 
+const REGIONAL_NATIONAL_DAYS = [
+  { code: "JO", region: "west_asia", title: "Jordan Independence Day", title_zh: "約旦獨立日", month: 5, day: 25 },
+  { code: "QA", region: "west_asia", title: "Qatar National Day", title_zh: "卡達國慶日", month: 12, day: 18 },
+  { code: "OM", region: "west_asia", title: "Oman National Day", title_zh: "阿曼國慶日", month: 11, day: 18 },
+  { code: "KZ", region: "central_asia", title: "Kazakhstan Republic Day", title_zh: "哈薩克共和國日", month: 10, day: 25 },
+  { code: "UZ", region: "central_asia", title: "Uzbekistan Independence Day", title_zh: "烏茲別克獨立日", month: 9, day: 1 },
+  { code: "KG", region: "central_asia", title: "Kyrgyzstan Independence Day", title_zh: "吉爾吉斯獨立日", month: 8, day: 31 },
+  { code: "TJ", region: "central_asia", title: "Tajikistan Independence Day", title_zh: "塔吉克獨立日", month: 9, day: 9 },
+  { code: "TM", region: "central_asia", title: "Turkmenistan Independence Day", title_zh: "土庫曼獨立日", month: 9, day: 27 },
+] as const;
+
 export function buildCuratedEventsForYear(year: number): GlobalEvent[] {
   const mothersDay = nthWeekdayOfMonth(year, 5, 0, 2);
   const fathersDay = nthWeekdayOfMonth(year, 6, 0, 3);
@@ -178,6 +189,16 @@ export function buildCuratedEventsForYear(year: number): GlobalEvent[] {
       region: "global",
       emoji: "🏀",
     }),
+    ...REGIONAL_NATIONAL_DAYS.map((event) => fixedEvent({
+      title: event.title,
+      title_zh: event.title_zh,
+      event_date: `${year}-${String(event.month).padStart(2, "0")}-${String(event.day).padStart(2, "0")}`,
+      category: "holiday",
+      subcategory: "national",
+      country_codes: [event.code],
+      region: event.region,
+      emoji: "🎉",
+    })),
   ];
 }
 
