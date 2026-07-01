@@ -43,10 +43,11 @@ import { textModelCostLabel, textModelCostSummary } from "@/lib/ai/text-model-pr
 const NO_EXTRA_CHARS = "no extra characters or subjects beyond the ones explicitly listed";
 const FULL_BLEED_FRAME = "full-bleed edge-to-edge composition, artwork fills the entire image frame, extend the design to the left and right edges, no empty side margins, no border";
 const PRINT_SAFE_FRAME = "single standalone print graphic, transparent-background friendly or clean removable white background, no rectangular poster background, no full-bleed scene, keep all important elements fully inside the design with safe margins";
+const APPAREL_WIDE_PRINT_FRAME = "wide chest-print graphic, the artwork itself spans nearly the full printable width left to right, large horizontal composition, minimal empty side margins, transparent-background friendly or clean removable white background, no rectangular poster background, no full-bleed scene, do not crop important elements";
 
 const PRODUCT_TYPES = [
-  { value: "tshirt", label: "T-shirt", aspect: "4:5" as AspectRatio, suffix: `flat print-ready chest graphic artwork, ${PRINT_SAFE_FRAME}, clean edges, NOT a product photo, no garment, no mockup, ${NO_EXTRA_CHARS}` },
-  { value: "hoodie", label: "Hoodie", aspect: "4:5" as AspectRatio, suffix: `flat print-ready chest graphic artwork, ${PRINT_SAFE_FRAME}, clean edges, NOT a product photo, no garment, no mockup, ${NO_EXTRA_CHARS}` },
+  { value: "tshirt", label: "T-shirt", aspect: "4:5" as AspectRatio, suffix: `flat print-ready apparel artwork, ${APPAREL_WIDE_PRINT_FRAME}, clean edges, NOT a product photo, no garment, no mockup, ${NO_EXTRA_CHARS}` },
+  { value: "hoodie", label: "Hoodie", aspect: "4:5" as AspectRatio, suffix: `flat print-ready apparel artwork, ${APPAREL_WIDE_PRINT_FRAME}, clean edges, NOT a product photo, no garment, no mockup, ${NO_EXTRA_CHARS}` },
   { value: "mug", label: "Mug", aspect: "3:2" as AspectRatio, suffix: `horizontal wrap-print artwork, fill the printable width left to right while keeping important elements inside safe margins, print-ready, NOT a product photo, no mug, no mockup, ${NO_EXTRA_CHARS}` },
   { value: "poster", label: "Poster / Wall Art", aspect: "2:3" as AspectRatio, suffix: `full-bleed poster illustration, ${FULL_BLEED_FRAME}, complete artwork filling the frame, no frame border, no mockup, ${NO_EXTRA_CHARS}` },
   { value: "sticker", label: "Sticker", aspect: "1:1" as AspectRatio, suffix: `die-cut sticker artwork with bold clean outline, ${PRINT_SAFE_FRAME}, flat design, NOT a product photo, no mockup, ${NO_EXTRA_CHARS}` },
