@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import type { VideoServiceCapability } from "@/lib/content/video/render-client";
+import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 
 interface GenerateBody {
   topic?: string;
@@ -31,6 +32,11 @@ interface GenerateBody {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const { role } = resolveOpsRole(req);
+  if (!canCreateAiImageJob(role)) {
+    return NextResponse.json({ ok: false, status: 403, error: "forbidden" }, { status: 403 });
+  }
+
   let body: GenerateBody;
   try {
     body = (await req.json()) as GenerateBody;

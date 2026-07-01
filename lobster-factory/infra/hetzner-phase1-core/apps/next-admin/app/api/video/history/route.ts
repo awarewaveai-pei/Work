@@ -9,6 +9,8 @@
  *    → 每次靜默回 []（等同 designs route 的文件說明 line 342-344）。
  */
 import { NextRequest, NextResponse } from "next/server";
+import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
+import { effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 export interface VideoHistoryItem {
   id: string;
@@ -24,7 +26,12 @@ export interface VideoHistoryItem {
   imageModel?: string;
 }
 
-export async function GET(req: NextRequest): Promise<NextResponse> {
+export async function GET(req: NextRequest): Promise<Response> {
+  const { role } = resolveOpsRole(req);
+  if (!canCreateAiImageJob(role)) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
+
   const limit = Math.min(
     50,
     Math.max(1, parseInt(new URL(req.url).searchParams.get("limit") ?? "20", 10) || 20),
@@ -37,9 +44,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   }
 
-  // 限縮在預設 org（與 recordVideoAsset 使用相同 org）— 避免多租戶交叉洩漏
-  const { resolveOrgId } = await import("@/lib/content/blocks/video-pipeline");
-  const orgId = resolveOrgId();
+  // effectiveOrgId：client 強制綁自己的 org；staff 可不過濾（看全部）
+  let orgFilter: string | null;
+  try { orgFilter = effectiveOrgId(req, null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
   let query = supabase
     .from("media_assets")
@@ -50,8 +58,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  if (orgId) {
-    query = query.eq("organization_id", orgId);
+  if (orgFilter) {
+    query = query.eq("organization_id", orgFilter);
   }
 
   const { data, error } = await query;

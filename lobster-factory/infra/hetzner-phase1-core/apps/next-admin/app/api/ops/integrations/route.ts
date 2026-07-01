@@ -39,7 +39,12 @@ export interface IntegrationRow {
   created_at: string;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const resolved = resolveOpsRole(req);
+  if (!canWriteTenantConfig(resolved.role)) {
+    return NextResponse.json({ ok: false, error: "forbidden", role: resolved.role }, { status: 403 });
+  }
+
   const supabase = getSupabaseServerClient();
   if (!supabase) {
     return NextResponse.json({ ok: false, error: "supabase_not_configured" }, { status: 503 });
