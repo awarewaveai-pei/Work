@@ -49,10 +49,16 @@ export interface WpPlugin {
    * When set, the plugin is excluded from auto-install and shown separately as conditional.
    */
   condition?: "is_litespeed";
+  /**
+   * Modules whose selection causes this plugin to be excluded.
+   * E.g. excludeForModules: ["tourism"] — skip this plugin when the tourism pack is active.
+   * Note: "base" is always in the resolved packSet; do NOT use it as an exclusion key.
+   */
+  excludeForModules?: WpPluginModule[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Catalog — 18 base + 13 ecommerce + 1 pod + 5 tourism + 3 brand = 40 total entries
+// Catalog — 18 base + 13 ecommerce + 1 pod + 7 tourism + 3 brand = 42 total entries
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const WP_PLUGIN_CATALOG: WpPlugin[] = [
@@ -62,8 +68,8 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
   { slug: "mainwp-child",                      label: "MainWP Child",                               free: true,  required: true,  module: "base", installSource: "manifest" },
   // Phase 1 TODO: wire release-url fetcher in provisioning flow (awarewaveai-pei/aware-wave-wp-bridge tag→Action zip)
   { slug: "aware-wave-wp-bridge",              label: "AwareWave WP Bridge",                        free: false, required: true,  module: "base", installSource: "release-url" },
-  { slug: "kadence",                            label: "Kadence Theme",                              free: true,  required: true,  module: "base" },
-  { slug: "kadence-blocks",                     label: "Kadence Blocks",                             free: true,  required: true,  module: "base" },
+  { slug: "kadence",        label: "Kadence Theme",  free: true, required: true, module: "base", excludeForModules: ["tourism"] },
+  { slug: "kadence-blocks", label: "Kadence Blocks", free: true, required: true, module: "base", excludeForModules: ["tourism"] },
   { slug: "wordfence",                          label: "Wordfence Security",                         free: true,  required: true,  module: "base" },
   { slug: "wpvivid-backups-and-migration",      label: "WPvivid Backup",                             free: true,  required: true,  module: "base" },
   { slug: "seo-by-rank-math",                   label: "Rank Math SEO",                              free: true,  required: true,  module: "base" },
@@ -143,11 +149,23 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
     installSource: "manual-zip",
   },
 
-  // ── TOURISM MODULE (5 functional slots) ──────────────────────────────────
+  // ── TOURISM MODULE (7 functional slots) ──────────────────────────────────
+  // Theme: TravelWP (physcode.com, $35 one-time, installSource manual-zip).
+  // Replaces Kadence theme + Kadence Blocks (excluded via excludeForModules in BASE).
+  // Booking is handled via TravelWP + WooCommerce; no separate booking plugin needed.
 
-  { slug: "wp-travel-engine",                label: "WP Travel Engine ★",                          free: true,  required: true,  module: "tourism" },
-  { slug: "custom-post-type-ui",             label: "Custom Post Type UI (CPT UI)",                free: true,  required: true,  module: "tourism" },
-  { slug: "modula-best-grid-gallery",        label: "Modula Gallery",                              free: true,  required: true,  module: "tourism" },
+  {
+    slug: "travelwp",
+    label: "TravelWP Theme (Physcode, $35)",
+    free: false,
+    required: true,
+    module: "tourism",
+    installSource: "manual-zip",
+  },
+  { slug: "elementor",                  label: "Elementor",                                       free: true,  required: true,  module: "tourism" },
+  { slug: "woocommerce",               label: "WooCommerce (TravelWP booking)",                   free: true,  required: true,  module: "tourism" },
+  { slug: "custom-post-type-ui",        label: "Custom Post Type UI (CPT UI)",                    free: true,  required: true,  module: "tourism" },
+  { slug: "modula-best-grid-gallery",   label: "Modula Gallery",                                  free: true,  required: true,  module: "tourism" },
   {
     slug: "wp-maps-pro",
     label: "WP Maps Pro ★ (→ Leaflet ↩)",
@@ -188,6 +206,7 @@ export function resolvePluginStack(
 ): WpPlugin[] {
   const effectiveHasEcommerce = siteType === "ecommerce" ? true : hasEcommerce;
   return WP_PLUGIN_CATALOG.filter((plugin) => {
+    if (plugin.excludeForModules?.includes(siteType as unknown as WpPluginModule)) return false;
     if (plugin.module === "base") return true;
     if (plugin.module === "ecommerce") return effectiveHasEcommerce;
     if (plugin.module === "tourism") return siteType === "tourism";
@@ -243,11 +262,15 @@ export function resolvePaidPlugins(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Returns all WpPlugin entries for the given packs. Base is always included.
- *  pod always implies ecommerce — woocommerce-product-addons requires WooCommerce core. */
+ *  pod always implies ecommerce — woocommerce-product-addons requires WooCommerce core.
+ *  Plugins with excludeForModules are omitted when any of their listed modules is in packs. */
 export function resolvePluginsForPacks(packs: WpPluginModule[]): WpPlugin[] {
   const effective: WpPluginModule[] = packs.includes("pod") ? [...packs, "ecommerce" as WpPluginModule] : packs;
   const packSet = new Set<WpPluginModule>([...effective, "base"]);
-  return WP_PLUGIN_CATALOG.filter((p) => packSet.has(p.module));
+  return WP_PLUGIN_CATALOG.filter((p) => {
+    if (p.excludeForModules?.some(m => effective.includes(m))) return false;
+    return packSet.has(p.module);
+  });
 }
 
 /**
@@ -292,11 +315,11 @@ export function resolveConditionalPlugins(packs: WpPluginModule[]): WpPlugin[] {
 }
 
 /** Auto-derives container manifest slug from selected packs. */
-export function derivePackageSlugFromPacks(packs: WpPluginModule[]): "wp-basic" | "wp-business" | "wc-core" | "wc-custom" {
+export function derivePackageSlugFromPacks(packs: WpPluginModule[]): "wp-basic" | "wp-business" | "wp-tourism" | "wc-core" | "wc-custom" {
   if (packs.includes("pod"))       return "wc-custom";
   if (packs.includes("ecommerce")) return "wc-core";
   if (packs.includes("brand"))     return "wp-business";
-  if (packs.includes("tourism"))   return "wp-business";
+  if (packs.includes("tourism"))   return "wp-tourism";
   return "wp-basic";
 }
 

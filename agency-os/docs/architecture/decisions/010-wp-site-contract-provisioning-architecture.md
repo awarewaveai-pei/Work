@@ -33,7 +33,7 @@ drift-watcher.ts # Layer 5 — 持續艦隊合規監控
 
 ```ts
 tier: "operational"  // 每站必裝，系統維運必要（mainwp-child, wpvivid, kadence, wp-bridge, litespeed†）
-tier: "feature"      // 依客戶業務類型裝（WooCommerce, FluentCRM, WP Travel Engine...）
+tier: "feature"      // 依客戶業務類型裝（WooCommerce, FluentCRM, TravelWP, Elementor...）
 ```
 
 `operational` 外掛由 reconciler 強制收斂，不受 intake form 影響。
@@ -68,7 +68,7 @@ host: {
 | `core` | 原 `base`，每站功能基礎 | Kadence, FluentForms, Rank Math, Wordfence... |
 | `ecommerce` | WooCommerce 電商 | WooCommerce, Stripe, PayPal, CartFlows... |
 | `pod` | POD/客製電商專屬 | woocommerce-product-addons（客戶上傳設計稿）|
-| `tourism` | 觀光/預約 | WP Travel Engine, Modula, Maps... |
+| `tourism` | 觀光/預約 | TravelWP 主題, Elementor, WooCommerce, Modula, Maps... |
 | `brand` | 品牌/CRM | CPT UI, Popup Maker... |
 
 > POD 履約不裝 Printful WooCommerce 外掛（見 ADR 008）；履約走 native store API（app 端）。

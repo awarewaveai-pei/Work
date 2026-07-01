@@ -1,0 +1,40 @@
+{
+  "name": "wp-tourism",
+  "version": "1.0.0",
+  "schemaVersion": "1.0.0",
+  "target": "wordpress",
+  "applyMode": "full_install",
+  "description": "WordPress container manifest (tourism profile): TravelWP theme + operational plugins. User-facing plugins (Elementor, WooCommerce, FluentCRM, etc.) are owned by agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md §五.1 and installed via wp-install-plugins task — do NOT add user-facing plugins here. TravelWP zip must be present at /opt/lobster-plugins/travelwp.zip on the target VPS before applying.",
+  "guardrails": {
+    "allowEnvironments": ["staging", "production"],
+    "requireBackup": false,
+    "blockIfProduction": false
+  },
+  "dependencies": [],
+  "conflicts": [],
+  "steps": [
+    { "id": "theme-travelwp",    "type": "install_theme",  "slug": "travelwp" },
+    { "id": "plugin-mainwp-child", "type": "install_plugin", "slug": "mainwp-child" },
+    {
+      "id": "plugin-litespeed",
+      "type": "conditional_plugin",
+      "condition": "is_litespeed",
+      "slug": "litespeed-cache"
+    }
+  ],
+  "postInstall": [
+    { "type": "activate_theme",   "slug": "travelwp" },
+    { "type": "flush_permalinks" },
+    { "type": "set_option",        "key": "timezone_string", "value": "Asia/Taipei" }
+  ],
+  "verification": [
+    { "type": "check_homepage" },
+    { "type": "check_admin_login" },
+    { "type": "check_plugin_active", "slug": "mainwp-child" }
+  ],
+  "smokeProfile": "business",
+  "rollback": {
+    "strategy": "restore_backup_snapshot",
+    "backup_required_before_apply": false
+  }
+}

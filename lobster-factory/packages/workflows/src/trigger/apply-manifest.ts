@@ -25,7 +25,7 @@ import {
 import { captureWorkflowException } from "../observability/sentry";
 import { captureWorkflowEvent } from "../observability/posthog";
 
-const SUPPORTED_MANIFESTS = ["wp-basic", "wp-business", "wc-core", "wc-custom"] as const;
+const SUPPORTED_MANIFESTS = ["wp-basic", "wp-business", "wp-tourism", "wc-core", "wc-custom"] as const;
 type ManifestSlug = (typeof SUPPORTED_MANIFESTS)[number];
 
 const InputSchema = z.object({

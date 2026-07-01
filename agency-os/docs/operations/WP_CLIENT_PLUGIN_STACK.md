@@ -2,7 +2,7 @@
 
 > **Owner File** — WordPress 客戶站外掛標準堆疊（選型 + 組合邏輯）。  
 > **不涵蓋**：更新流程 → [`WP_MANAGED_UPDATES.md`](WP_MANAGED_UPDATES.md)；交付模式 → [`WORDPRESS_CLIENT_DELIVERY_MODELS.md`](WORDPRESS_CLIENT_DELIVERY_MODELS.md)。  
-> **Last updated**: 2026-06-29  
+> **Last updated**: 2026-07-02  
 > **讀者**：營運者、AI 代理、協作工程師
 
 ---
@@ -54,8 +54,8 @@
 
 | 類別 | 外掛 | installSource | WP.org Slug | 說明 |
 |------|------|--------------|-------------|------|
-| **主題框架** | Kadence Theme | wporg | `kadence` | 所有頁面基礎 |
-| **主題框架** | Kadence Blocks | wporg | `kadence-blocks` | 視覺區塊編輯器 |
+| **主題框架** | Kadence Theme | wporg | `kadence` | 所有頁面基礎（旅遊站排除，改用 TravelWP） |
+| **主題框架** | Kadence Blocks | wporg | `kadence-blocks` | 視覺區塊編輯器（旅遊站排除，改用 Elementor） |
 | **安全** | Wordfence Security | wporg | `wordfence` | 防火牆 + 惡意掃描 |
 | **備份** | WPvivid Backup | wporg | `wpvivid-backups-and-migration` | 連動 MainWP 管理 |
 | **SEO** | Rank Math SEO | wporg | `seo-by-rank-math` | SEO + Schema + 部落格結構化 |
@@ -111,12 +111,15 @@
 
 ### 5.1 旅遊業（追加）
 
-> 疊加在基礎全員之上；manifest slug = `wp-business`。  
-> 共 **5 個功能位**。
+> 疊加在基礎全員之上；manifest slug = `wp-tourism`（獨立 manifest，裝 TravelWP 主題而非 Kadence）。  
+> 旅遊站**不安裝** Kadence Theme + Kadence Blocks（catalog `excludeForModules: ["tourism"]`）。  
+> 共 **7 個功能位**。
 
 | 類別 | 外掛 | installSource | WP.org Slug | 說明 |
 |------|------|--------------|-------------|------|
-| **預約系統** | WP Travel Engine ★ | wporg | `wp-travel-engine` | 行程套裝首選 |
+| **主題** | TravelWP Theme（Physcode，$35） | manual-zip | `travelwp` | 旅遊業專屬主題，內建行程展示 + WooCommerce 預約整合；zip 放 `/opt/lobster-plugins/travelwp.zip` |
+| **頁面建構** | Elementor | wporg | `elementor` | TravelWP 使用 Elementor 建構版型（取代 Kadence Blocks） |
+| **預約金流** | WooCommerce | wporg | `woocommerce` | TravelWP 透過 WooCommerce 處理行程付款 / 預約 |
 | **內容類型** | Custom Post Type UI (CPT UI) | wporg | `custom-post-type-ui` | 建立「行程」「景點」自訂類型 |
 | **相片集** | Modula Gallery | wporg | `modula-best-grid-gallery` | 旅遊照片集、行程相冊 |
 | **地圖路線** | WP Maps Pro ★ → Leaflet ↩ | manual-zip / wporg | PAID → `leaflet-map` | 付費首選；無預算用 Leaflet 替代（自動） |
@@ -141,7 +144,7 @@
 |------|-------------|:------:|:-------:|:---:|:---:|:----:|:----:|:----:|
 | 名片站 | wp-basic | ✅ | ✅ | — | — | — | — | 18 |
 | 品牌+CRM | wp-business | ✅ | ✅ | — | — | — | ✅ | 21 |
-| 觀光/預約 | wp-business | ✅ | ✅ | — | — | ✅ | — | 23 |
+| 觀光/預約 | wp-tourism | ✅ | ✅（−Kadence 2） | — | — | ✅ | — | 23 |
 | 標準電商 | wc-core | ✅ | ✅ | ✅ | — | — | — | 31 |
 | POD 電商 | wc-custom | ✅ | ✅ | ✅ | ✅ | — | — | 32 |
 
@@ -181,11 +184,12 @@ LINE Pay（台灣）走 ECPay 支援，不需另裝外掛。
 
 ### 7.3 旅遊預約系統
 
+所有旅遊站一律使用 TravelWP 主題（manifest `wp-tourism`）+ WooCommerce，預約功能由主題原生提供。
+
 ```
-需求類型？
-  ├─ 行程套裝 / 多日遊 ──→ WP Travel Engine（Free 基礎功能夠用）
-  ├─ 單次預約 / 服務型 ──→ Amelia（Pro，含行事曆 + 付款整合）
-  └─ 純資訊展示（不含線上預約）──→ 不裝預約系統，CPT UI + ACF 展示即可
+有線上預約需求？
+  ├─ 是 ──→ TravelWP + WooCommerce（標準旅遊模組，已含蓋行程/付款）
+  └─ 否（純資訊展示）──→ TravelWP 主題仍裝；停用 WooCommerce checkout；CPT UI + ACF 展示即可
 ```
 
 ### 7.4 多語系
@@ -233,7 +237,8 @@ FluentSMTP 本身不提供郵件發送能力，需搭配 SMTP 供應商：
 
 ```
 1. 維運層：manifest 自動裝（mainwp-child、litespeed 條件）
-2. Kadence Theme + Blocks
+2. [非旅遊站] Kadence Theme + Blocks
+   [旅遊站]   TravelWP 主題（manifest wp-tourism 自動裝）+ Elementor
 3. Really Simple SSL（先強制 HTTPS）
 4. Wordfence（先建立安全基礎）
 5. WPvivid（先有備份才繼續）
@@ -277,7 +282,7 @@ FluentSMTP 本身不提供郵件發送能力，需搭配 SMTP 供應商：
 ┌──────────────────────────────────────────────────────────────────┐
 │ WP_CLIENT_PLUGIN_STACK.md（本文件，人類可讀 SSOT）                  │
 │   ↓ 手動同步（slug 維護責任見 §九）                                    │
-│ lib/wp-plugin-stack-catalog.ts（機器可讀 mirror，40 entries）        │
+│ lib/wp-plugin-stack-catalog.ts（機器可讀 mirror，42 entries）        │
 └──────────────────────────────────────────────────────────────────┘
         ↓                                          ↓
 ┌─────────────────────────┐          ┌─────────────────────────────┐
@@ -285,8 +290,9 @@ FluentSMTP 本身不提供郵件發送能力，需搭配 SMTP 供應商：
 │ packages/manifests/*.json│          │ resolveInstallableSlugsForPacks()│
 │                          │          │ resolvePaidPluginsForPacks()  │
 │ 職責：                    │          │                               │
-│ • install_theme (kadence)│          │ 職責：                          │
-│ • mainwp-child (維運)    │          │ • 18 base + 站型/電商/POD 模組 │
+│ • install_theme          │          │ 職責：                          │
+│   (kadence/travelwp)     │          │ • 18 base + 站型/電商/POD 模組 │
+│ • mainwp-child (維運)    │          │ • excludeForModules 過濾旅遊站  │
 │ • litespeed (主機條件)   │          │ • 動態組合（依 packs）           │
 │ • postInstall hooks      │          │ • 跳過 manifest/release-url   │
 │ • verification           │          │   來源（不重複安裝）             │
@@ -306,11 +312,11 @@ FluentSMTP 本身不提供郵件發送能力，需搭配 SMTP 供應商：
 |--------------|:----:|------|:--------:|
 | `manifest` | 1 | manifest step runner 安裝（mainwp-child） | ❌ 全自動 |
 | `release-url` | 1 | GitHub release zip 自動取得（wp-bridge，Phase 1）| ❌ 全自動（Phase 1 完成後）|
-| `wporg` | 32 | WP.org → `wp plugin install <slug>` | ❌ 全自動 |
+| `wporg` | 33 | WP.org → `wp plugin install <slug>` | ❌ 全自動 |
 | `manual-zip` + `alternativeSlug` | 2 | 付費首選，但有免費替代；替代品自動裝 | ❌ 全自動（裝替代）|
-| `manual-zip` 無替代 | 4 | 必須上傳 zip；見 §10.3 | ✅ 需操作員 |
+| `manual-zip` 無替代 | 5 | 必須上傳 zip；見 §10.3 | ✅ 需操作員 |
 
-> **4 個需操作員手動上傳的 zip**：Kadence Shop Kit、ECPay（綠界）、WooCommerce Points and Rewards、WooCommerce Product Add-Ons
+> **5 個需操作員手動上傳的 zip**：TravelWP Theme、Kadence Shop Kit、ECPay（綠界）、WooCommerce Points and Rewards、WooCommerce Product Add-Ons
 
 ### 10.3 付費 zip 交付 Runbook
 
@@ -318,6 +324,7 @@ FluentSMTP 本身不提供郵件發送能力，需搭配 SMTP 供應商：
 
 ```bash
 # 檔案命名規則（與 catalog slug 一致）
+/opt/lobster-plugins/travelwp.zip                        # 旅遊站主題，physcode.com $35
 /opt/lobster-plugins/kadence-shop-kit.zip
 /opt/lobster-plugins/ecpay-payment-gateway.zip
 /opt/lobster-plugins/woocommerce-points-and-rewards.zip
@@ -364,3 +371,4 @@ FluentSMTP 本身不提供郵件發送能力，需搭配 SMTP 供應商：
 | 2026-05-12 | 初版建立：基礎全員 + 電商模組 + 旅遊/形象模組 + 4 個決策樹 |
 | 2026-05-12 | 品質修訂：所有表格加入 WP.org Slug 欄；★/↩/† 標記規範；Complianz 選配說明 |
 | 2026-06-29 | 全面同步 catalog.ts（Phase 0 完成後）：新增維運層（mainwp-child/wp-bridge）；新增 installSource 欄位；新增 POD 模組；電商 12→13（+PayPal）；基礎 16→18；YITH 全部替換為 WooCommerce 官方/ThemeIsle；zip 交付改為 VPS /opt/lobster-plugins/；組合矩陣加 POD 電商欄；catalog entries 36→40 |
+| 2026-07-02 | 旅遊站切換 TravelWP 主題：移除 WP Travel Engine + Amelia；加 TravelWP（manual-zip）+ Elementor + WooCommerce；新增 manifest `wp-tourism`；Kadence+KadenceBlocks 加 `excludeForModules: ["tourism"]`；決策樹 §7.3 改寫；catalog entries 40→42 |

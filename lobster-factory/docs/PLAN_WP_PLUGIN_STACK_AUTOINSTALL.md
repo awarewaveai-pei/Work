@@ -333,7 +333,7 @@ Phase 4 需要 Phase 3 已有安裝結果資料。
 - Kadence Theme Pro / Kadence Blocks Pro / Kadence Shop Kit
 - WP Rocket（若選擇替代 LiteSpeed Cache）
 - CleanTalk
-- Amelia（旅遊預約）
+- TravelWP Theme（旅遊站主題，physcode.com）
 - YITH Points and Rewards
 - CartFlows Pro / FunnelKit Pro
 - WP Maps Pro

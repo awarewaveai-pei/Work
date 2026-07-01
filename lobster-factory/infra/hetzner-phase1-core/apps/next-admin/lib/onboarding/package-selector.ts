@@ -34,9 +34,9 @@ export function selectPackage(form: IntakeForm): PackageSelection {
   // removed from the intake as redundant with industry + needs_booking + pages_needed).
   if (form.industry === "tourism" || form.needs_booking || (form.pages_needed?.includes("booking") ?? false)) {
     return {
-      package_slug: "wp-business",
+      package_slug: "wp-tourism",
       packs: ["base", "tourism"],
-      rationale: "觀光旅遊 / 預約服務",
+      rationale: "觀光旅遊 / 預約服務（TravelWP 主題）",
     };
   }
 
