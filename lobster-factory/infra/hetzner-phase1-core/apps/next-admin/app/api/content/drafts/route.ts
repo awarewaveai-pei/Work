@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -67,8 +68,9 @@ function toListItem(r: Omit<DraftRow, "markdown" | "meta" | "form_snapshot">) {
 
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
 
-// GET /api/content/drafts            → list (light fields, newest first)
-// GET /api/content/drafts?id=<uuid>  → single draft (full markdown + meta + form snapshot)
+// GET /api/content/drafts                        → list (light fields, newest first)
+// GET /api/content/drafts?id=<uuid>              → single draft (full markdown + meta + form snapshot)
+// GET /api/content/drafts?organizationId=<uuid>  → list filtered to org (staff only; client forced to own)
 export async function GET(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
@@ -76,7 +78,8 @@ export async function GET(req: Request): Promise<Response> {
   const supabase = getSupabaseWriteClient();
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
-  const id = new URL(req.url).searchParams.get("id");
+  const sp = new URL(req.url).searchParams;
+  const id = sp.get("id");
 
   if (id) {
     const { data, error } = await supabase
@@ -86,20 +89,29 @@ export async function GET(req: Request): Promise<Response> {
       .maybeSingle();
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     if (!data) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+    try { assertOrgAccess(req, (data as DraftRow).organization_id); }
+    catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
     return NextResponse.json({ ok: true, draft: toFull(data as DraftRow) });
   }
 
-  const rawSiteId = new URL(req.url).searchParams.get("siteId");
+  const rawSiteId = sp.get("siteId");
   // Only filter by site_id when it is a valid UUID — env-sourced sites use non-UUID ids like "1",
   // which Postgres rejects with "invalid input syntax for type uuid" and returns a 500.
   const uuidRe    = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const siteId    = rawSiteId && uuidRe.test(rawSiteId) ? rawSiteId : null;
+
+  // Derive org filter: client users forced to own org; staff can pass ?organizationId= to filter.
+  let orgFilter: string | null;
+  try { orgFilter = effectiveOrgId(req, sp.get("organizationId")); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+
   let query = supabase
     .from("content_drafts")
     .select("id, organization_id, site_id, keyword, title, language, article_type, slug_hint, seo_score, status, created_at, updated_at")
     .order("created_at", { ascending: false })
     .limit(LIST_LIMIT);
   if (siteId) query = query.eq("site_id", siteId);
+  if (orgFilter) query = query.eq("organization_id", orgFilter);
   const { data, error } = await query;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
@@ -133,29 +145,47 @@ export async function POST(req: Request): Promise<Response> {
   const seoRaw = body.seoScore;
   const seoScore = typeof seoRaw === "number" && Number.isFinite(seoRaw) ? Math.round(seoRaw) : null;
 
+  // Resolve org: client forced to own org; staff can pass body.organizationId to scope.
+  let orgId: string | null;
+  try { orgId = effectiveOrgId(req, str(body.organizationId)); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+
   // Columns common to insert + update. meta / form_snapshot are jsonb — pass through as-is (objects).
   const fields = {
     keyword,
-    title:         str(body.title),
-    language:      str(body.language),
-    article_type:  str(body.articleType),
+    title:           str(body.title),
+    language:        str(body.language),
+    article_type:    str(body.articleType),
     markdown,
-    meta:          (body.meta ?? null) as object | null,
-    slug_hint:     str(body.slugHint),
-    seo_score:     seoScore,
+    meta:            (body.meta ?? null) as object | null,
+    slug_hint:       str(body.slugHint),
+    seo_score:       seoScore,
     ...(status === "published" || status === "archived" || status === "draft" ? { status } : {}),
-    form_snapshot: (body.formSnapshot ?? null) as object | null,
-    site_id:       str(body.siteId),
-    organization_id: str(body.organizationId),
+    form_snapshot:   (body.formSnapshot ?? null) as object | null,
+    site_id:         str(body.siteId),
+    organization_id: orgId,
   };
 
   if (id) {
-    const { data, error } = await supabase
+    // Pre-read to verify ownership before mutating.
+    const { data: existing, error: readErr } = await supabase
+      .from("content_drafts")
+      .select("organization_id")
+      .eq("id", id)
+      .maybeSingle();
+    if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
+    if (!existing) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+    try { assertOrgAccess(req, (existing as { organization_id: string | null }).organization_id); }
+    catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+
+    const existingOrgId = (existing as { organization_id: string | null }).organization_id;
+    let updateQ = supabase
       .from("content_drafts")
       .update({ ...fields, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .select("*")
-      .maybeSingle();
+      .eq("id", id);
+    // Add atomic org guard only when org_id is non-null; null rows are staff-only (assertOrgAccess passed).
+    if (existingOrgId) updateQ = updateQ.eq("organization_id", existingOrgId);
+    const { data, error } = await updateQ.select("*").maybeSingle();
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     if (!data) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
     return NextResponse.json({ ok: true, draft: toFull(data as DraftRow) });
@@ -181,7 +211,22 @@ export async function DELETE(req: Request): Promise<Response> {
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
 
-  const { error } = await supabase.from("content_drafts").delete().eq("id", id);
+  // Pre-read ownership before deleting.
+  const { data: row, error: readErr } = await supabase
+    .from("content_drafts")
+    .select("organization_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
+  if (!row) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+  try { assertOrgAccess(req, (row as { organization_id: string | null }).organization_id); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+
+  const rowOrgId = (row as { organization_id: string | null }).organization_id;
+  let deleteQ = supabase.from("content_drafts").delete().eq("id", id);
+  // Add atomic org guard only when org_id is non-null; null rows are staff-only (assertOrgAccess passed).
+  if (rowOrgId) deleteQ = deleteQ.eq("organization_id", rowOrgId);
+  const { error } = await deleteQ;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

@@ -2,6 +2,58 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-07-02
+
+### feat(security): S2 batch-6 tenant guard — content/drafts IDOR closed
+
+**根本問題**: `content_drafts` 所有 CRUD 無 `effectiveOrgId`/`assertOrgAccess`，staff 看全客戶草稿混合；Client 帳啟用後任何知道 UUID 的人可讀改刪外部 org 草稿（IDOR）。`content_sources` 是全域共享表（無 `organization_id`），不需改。
+
+**現況分析（Explore agent a11b1ec8a386dca87，45 tool calls）**:
+- 架構整體健全：middleware 強制 tenant identity；outreach/credentials/approvals/build runs 已有完整 guard（S2 batch 1-5）
+- Ops Clients：URL slug routing，tamper-proof
+- Outreach：`useActiveOrg()` hook + `effectiveOrgId()` 完整
+- **缺口 🔴**：`content/drafts` — GET/POST/DELETE 均無 org filter 或 ownership check
+- `content/sources`：全域表，intentionally unscoped，✓ 安全
+
+**已修改**:
+- `app/api/content/drafts/route.ts`:
+  - Import 加 `effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse`
+  - GET list：加 `?organizationId` 查詢參數 → `effectiveOrgId(req, ...)` → 動態 `.eq("organization_id", orgFilter)` （client 強制自己的 org；staff 可不傳→看全部）
+  - GET by ID：fetch 後加 `assertOrgAccess(req, row.organization_id)`
+  - POST insert：`effectiveOrgId(req, str(body.organizationId))` 取代直接 pass-through（client 自動綁到自己 org）
+  - POST update (with id)：pre-read `organization_id` → `assertOrgAccess` → 原子 `.eq("organization_id", ...)` (null-safe: null org_id 時不加 filter，staff-only path)
+  - DELETE：pre-read → `assertOrgAccess` → 原子 `.eq("organization_id", ...)` (null-safe 同上)
+
+**ContentStudio 前端相容性**: 不需改。`effectiveOrgId(req, null)` → staff = null（不過濾，看全部）；client 帳啟用後自動從 middleware `x-ops-org-id` 注入 org，草稿自動歸 org，不需前端傳。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~8000 — 0 type errors
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n — null-safe conditional filter handles both null-org (old staff drafts) and org-scoped rows correctly
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=content/drafts,content_drafts | hits=2 (route.ts ✓ patched, ContentStudio.tsx ✓ compatible — no body.organizationId sent = staff null-unscoped, client auto-enforced via middleware)
+- WORKLOG: 本條目
+
+**S2 進度**: batch-1 ✅ | batch-2 ✅ | batch-3 ✅ | batch-4 ✅ | batch-5 ✅ | **batch-6 content/drafts ✅**
+**剩餘 defer → S3**: `ops/repairs/*` (repair_runs 無 organization_id，需 DB migration)
+
+---
+
+**多租戶架構評估（用戶問：多客戶管理彼此是否串聯？）**:
+
+| 系統 | 隔離機制 | 狀態 |
+|---|---|---|
+| Ops Clients `/ops/clients/[slug]` | URL slug → server-side org lookup | ✅ 無洩漏 |
+| Outreach | `?org=UUID` + `effectiveOrgId()` + `assertOrgAccess()` | ✅ 無洩漏 |
+| Credentials | S2 batch-5 已修 | ✅ 無洩漏 |
+| Build Runs | S2 batch-5 已修 | ✅ 無洩漏 |
+| Approvals | S2 batch-5 已修 | ✅ 無洩漏 |
+| Content Drafts | **S2 batch-6 本次修** | ✅ 修後無洩漏 |
+| Content Sources | 全域共享（設計如此，無 org 欄） | ✅ 設計正確 |
+| ops/repairs/* | ❌ repair_runs 無 organization_id 欄 | ⏳ defer S3 DB migration |
+
+**Stage 1 onboarding 現況**: 前端程式「跳回第一步」bug 已在前一個 session 修好（handleTriggerBuild 加了 guard + error display）。2 筆卡住的 intake_forms 仍在 DB 待手動 retry。
+
+---
+
 ## 2026-06-29
 
 ### feat(security): S2 batch-5 tenant guard — credentials/secret + build/runs + approvals IDOR closed
@@ -14747,7 +14799,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-27 22:19:36 UTC_
+_Last synced: 2026-06-29 14:50:03 UTC_
 
 ## 2026-06-16 AO-CLOSE prep — 15:xx session close
 
@@ -15943,3 +15995,4 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 - REALTEST_WAIVED: SMOKE_COVERED -- UI-only React data display; tsc --noEmit exit=0 confirms compile integrity; full smoke test on deploy
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=1c/0m/0n (search speed-sort fixed)
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=VIDEO_MODEL_COMPARISONS|TTS_MODEL_COMPARISONS|SEARCH_API_COMPARISONS | hits=0 (no stale callsites outside src+import)
+
