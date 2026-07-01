@@ -38,6 +38,18 @@ function filterParams(searchParams: URLSearchParams): string[] {
   return [...new Set(values)].filter((item) => EVENT_FILTERS.includes(item as typeof EVENT_FILTERS[number]));
 }
 
+function countryDbFilter(countries: readonly string[]): string {
+  const normalized = countries
+    .map((country) => country.trim().toUpperCase())
+    .filter((country) => country === "GLOBAL" || /^[A-Z]{2}$/.test(country))
+    .map((country) => country === "GLOBAL" ? "global" : country);
+
+  if (normalized.length === 0) return "";
+  return [...new Set([...normalized, "global"])]
+    .map((country) => `country_codes.cs.{${country}}`)
+    .join(",");
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const today = new Date().toISOString().slice(0, 10);
@@ -61,7 +73,8 @@ export async function GET(req: Request) {
   }
 
   const db = createClient(supabaseUrl, supabaseKey);
-  const query = db
+  const countriesFilter = countryDbFilter(countries);
+  let query = db
     .from("events")
     .select("id, title, title_zh, event_date, event_end_date, category, subcategory, emoji, marketing_window_start, marketing_lead_days, country_codes, region, synced_at")
     .eq("is_active", true)
@@ -69,6 +82,7 @@ export async function GET(req: Request) {
     .or(`event_date.gte.${from},event_end_date.gte.${from}`)
     .order("event_date", { ascending: true })
     .limit(EVENT_QUERY_LIMIT);
+  if (countriesFilter) query = query.or(countriesFilter);
 
   const { data, error } = await query;
   if (error) {
