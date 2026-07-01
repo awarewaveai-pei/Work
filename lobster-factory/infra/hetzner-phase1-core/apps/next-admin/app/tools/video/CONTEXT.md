@@ -58,10 +58,16 @@ The Director and the Render Service never share state beyond the Timeline.
 _Avoid_: renderer, backend, encoder
 
 **Production Mode**:
-The user's per-video choice of which engine produces the video. Chosen at script
-handoff. Two values: Quick Engine and Director Engine. The two engines coexist
-permanently; the choice is never global.
-_Avoid_: render mode, quality tier, pipeline choice
+The user's per-video choice of which engine produces the video, made fresh each time —
+there is no global default (the picker merely rests on Quick Engine). Two coexisting
+values: Quick Engine and Director Engine. One render per request (never both at once).
+_Avoid_: render mode, quality tier, pipeline choice, default mode
+
+**Manual Template Mode**:
+A retained power-user path (separate from Production Mode): the user hand-picks ONE
+Template and fills its fields directly, bypassing the Director. Uses the same Render
+Service. Kept for one-off single-Template videos.
+_Avoid_: remotion templates tab, manual mode
 
 **Quick Engine**:
 The existing Python ffmpeg path (Ken Burns + drawtext subtitles + fade + concat).
