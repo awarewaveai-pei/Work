@@ -1,0 +1,260 @@
+import React from "react";
+import {
+  AbsoluteFill,
+  Audio,
+  Img,
+  Sequence,
+  interpolate,
+  spring,
+  useCurrentFrame,
+  useVideoConfig,
+} from "remotion";
+
+export interface SceneItem {
+  imageUrl: string;
+  text: string;
+  durationInSeconds: number;
+  logoUrl?: string;
+}
+
+// ── Private slide renderer ────────────────────────────────────────────────────
+// useCurrentFrame() is automatically 0-relative inside its parent <Sequence>.
+const Slide: React.FC<{
+  imageUrl: string;
+  text: string;
+  logoUrl?: string;
+  slideIndex: number;
+  bgColor: string;
+}> = ({ imageUrl, text, logoUrl, slideIndex, bgColor }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  const TEXT_DELAY = Math.round(fps * 2);
+
+  // Ken Burns: alternating zoom-in / zoom-out per slide
+  const zoomStart = slideIndex % 2 === 0 ? 1.15 : 1.0;
+  const zoomEnd = slideIndex % 2 === 0 ? 1.0 : 1.15;
+  const photoScale = interpolate(frame, [0, fps * 8], [zoomStart, zoomEnd], {
+    extrapolateRight: "clamp",
+    easing: (t) => Math.sin((t * Math.PI) / 2),
+  });
+
+  // Horizontal pan on every 3rd slide
+  const panX =
+    slideIndex % 3 === 2
+      ? interpolate(frame, [0, fps * 7.8], [-3, 3], {
+          extrapolateRight: "clamp",
+        })
+      : 0;
+
+  // Text: spring slide-in from alternating sides
+  const textProgress = spring({
+    fps,
+    frame: frame - TEXT_DELAY,
+    config: { damping: 40, stiffness: 160 },
+  });
+  const textSlideFrom = slideIndex % 2 === 0 ? -100 : 100;
+  const textTranslateX = interpolate(textProgress, [0, 1], [textSlideFrom, 0], {
+    extrapolateRight: "clamp",
+  });
+  const textOpacity = interpolate(
+    frame,
+    [TEXT_DELAY, TEXT_DELAY + fps * 0.5],
+    [0, 1],
+    { extrapolateRight: "clamp", extrapolateLeft: "clamp" }
+  );
+
+  const logoOpacity = interpolate(frame, [0, fps * 0.5], [0, 1], {
+    extrapolateRight: "clamp",
+  });
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: bgColor, overflow: "hidden" }}>
+      <div
+        style={{
+          position: "absolute",
+          left: "5%",
+          top: "2%",
+          width: "85%",
+          height: "96%",
+          overflow: "hidden",
+          borderRadius: 4,
+        }}
+      >
+        {imageUrl ? (
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              transform: `scale(${photoScale}) translateX(${panX}%)`,
+              transformOrigin: slideIndex % 3 === 2 ? "0% 50%" : "50% 50%",
+            }}
+          >
+            <Img
+              src={imageUrl}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          </div>
+        ) : (
+          <div
+            style={{ width: "100%", height: "100%", background: "#2d4a6e" }}
+          />
+        )}
+
+        {/* Headline overlay */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: slideIndex % 3 === 1 ? "auto" : "0",
+            top: slideIndex % 3 === 1 ? "0" : "55%",
+            left: slideIndex % 2 === 0 ? "2%" : "auto",
+            right: slideIndex % 2 !== 0 ? "2%" : "auto",
+            width: "60%",
+            transform: `translateX(${textTranslateX}%)`,
+            opacity: textOpacity,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "rgba(0,0,0,0.3)",
+              borderRadius: "8px",
+              padding: "12px 20px",
+            }}
+          >
+            <p
+              style={{
+                color: "#ffffff",
+                fontSize: 48,
+                fontFamily: "Noto Sans CJK SC, sans-serif",
+                fontWeight: 700,
+                lineHeight: 1.3,
+                margin: 0,
+                textShadow: "0 2px 6px rgba(0,0,0,0.4)",
+              }}
+            >
+              {text}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {logoUrl && (
+        <div
+          style={{
+            position: "absolute",
+            left: slideIndex % 2 === 0 ? "8.5%" : "auto",
+            right: slideIndex % 2 !== 0 ? "8.5%" : "auto",
+            top: "12%",
+            width: "11%",
+            opacity: logoOpacity,
+          }}
+        >
+          <Img src={logoUrl} style={{ width: "100%", objectFit: "contain" }} />
+        </div>
+      )}
+    </AbsoluteFill>
+  );
+};
+
+// ── Slide-in transition wrapper ───────────────────────────────────────────────
+// frame=0 inside the parent Sequence = start of this scene = start of the slide animation.
+const SlideIn: React.FC<{ fromLeft: boolean; children: React.ReactNode }> = ({
+  fromLeft,
+  children,
+}) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const progress = spring({
+    fps,
+    frame,
+    config: { damping: 45, stiffness: 200 },
+  });
+  const translateX = interpolate(
+    progress,
+    [0, 1],
+    [fromLeft ? -100 : 100, 0],
+    { extrapolateRight: "clamp" }
+  );
+  return (
+    <AbsoluteFill
+      style={{ transform: `translateX(${translateX}%)`, overflow: "hidden" }}
+    >
+      {children}
+    </AbsoluteFill>
+  );
+};
+
+// ── Duration helper (use in calculateMetadata and Composition static fallback) ─
+// Model: each scene runs for scene.durationInSeconds; next scene starts right after
+// the previous scene's pure duration ends.  Transition is "free" — the outgoing
+// scene gets an extra transitionDurationSeconds window so the spring can settle.
+// Total = sum of all pure scene durations (transitions don't add to total).
+export function calculateSceneSeriesDuration(
+  scenes: SceneItem[],
+  fps: number,
+  _transitionDurationSeconds = 1.0
+): number {
+  if (!scenes.length) return Math.round(fps * 3);
+  const total = scenes.reduce(
+    (acc, s) => acc + Math.round(fps * s.durationInSeconds),
+    0
+  );
+  return Math.max(total, Math.round(fps));
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+export const SceneSeries: React.FC<{
+  scenes: SceneItem[];
+  backgroundColor?: string;
+  audioUrl?: string;
+  transitionDurationSeconds?: number;
+}> = ({
+  scenes,
+  backgroundColor = "#0ebba2",
+  audioUrl,
+  transitionDurationSeconds = 1.0,
+}) => {
+  const { fps } = useVideoConfig();
+  const transitionFrames = Math.round(fps * transitionDurationSeconds);
+
+  // Compute each scene's absolute start: begins right after previous scene's pure duration.
+  let cursor = 0;
+  const sceneLayout = scenes.map((scene, i) => {
+    const sceneFrames = Math.round(fps * scene.durationInSeconds);
+    const start = cursor;
+    cursor += sceneFrames;
+    const isLast = i === scenes.length - 1;
+    // Extra transitionFrames on each outgoing scene so the spring completes.
+    const duration = isLast ? sceneFrames : sceneFrames + transitionFrames;
+    return { scene, start, sceneFrames, duration };
+  });
+
+  return (
+    <AbsoluteFill style={{ backgroundColor }}>
+      {sceneLayout.map(({ scene, start, duration }, i) => (
+        <Sequence key={i} from={start} durationInFrames={duration}>
+          {i === 0 ? (
+            <Slide
+              imageUrl={scene.imageUrl}
+              text={scene.text}
+              logoUrl={scene.logoUrl}
+              slideIndex={i}
+              bgColor={backgroundColor}
+            />
+          ) : (
+            <SlideIn fromLeft={i % 2 !== 0}>
+              <Slide
+                imageUrl={scene.imageUrl}
+                text={scene.text}
+                logoUrl={scene.logoUrl}
+                slideIndex={i}
+                bgColor={backgroundColor}
+              />
+            </SlideIn>
+          )}
+        </Sequence>
+      ))}
+      {audioUrl && <Audio src={audioUrl} />}
+    </AbsoluteFill>
+  );
+};

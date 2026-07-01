@@ -20,6 +20,11 @@ import {
   PhotoHighlightsSlidesZoom,
   PhotoHighlightsSlidesZoomDefaultProps,
 } from "./compositions/PhotoHighlightsSlidesZoom";
+import {
+  DynamicSlideshow,
+  DynamicSlideshowDefaultProps,
+  calculateSceneSeriesDuration,
+} from "./compositions/DynamicSlideshow";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -108,6 +113,33 @@ export const RemotionRoot: React.FC = () => {
           width: props.width ?? 1920,
           height: props.height ?? 1080,
         })}
+      />
+      <Composition
+        id="DynamicSlideshow"
+        component={DynamicSlideshow}
+        durationInFrames={calculateSceneSeriesDuration(
+          DynamicSlideshowDefaultProps.scenes ?? [],
+          DynamicSlideshowDefaultProps.fps ?? 30,
+          DynamicSlideshowDefaultProps.transitionDurationSeconds ?? 1.0
+        )}
+        fps={DynamicSlideshowDefaultProps.fps ?? 30}
+        width={DynamicSlideshowDefaultProps.width ?? 1920}
+        height={DynamicSlideshowDefaultProps.height ?? 1080}
+        defaultProps={DynamicSlideshowDefaultProps}
+        calculateMetadata={async ({ props }) => {
+          const fps = props.fps ?? 30;
+          const totalFrames = calculateSceneSeriesDuration(
+            props.scenes ?? [],
+            fps,
+            props.transitionDurationSeconds ?? 1.0
+          );
+          return {
+            durationInFrames: Math.max(totalFrames, fps),
+            fps,
+            width: props.width ?? 1920,
+            height: props.height ?? 1080,
+          };
+        }}
       />
     </>
   );

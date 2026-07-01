@@ -32,8 +32,10 @@ if (!R2_API_TOKEN || !R2_ACCOUNT_ID || !R2_VIDEO_PUBLIC_BASE) {
   console.warn("[remotion] WARN: R2 credentials incomplete — uploads will fail. Check R2_API_TOKEN / R2_ACCOUNT_ID / R2_VIDEO_PUBLIC_BASE.");
 }
 
-// Render limits (DoS prevention)
-const MAX_FRAMES = 3600; // 2 min at 30fps
+// Render limits (DoS prevention).
+// 18 000 = 10 min at 30 fps — needed for DynamicSlideshow long videos.
+// EU hardware limits actual throughput; callers should keep requests ≤ 3 min on EU.
+const MAX_FRAMES = 18000;
 const VALID_FPS = new Set([24, 25, 30, 60]);
 
 // ── Composition ID map ────────────────────────────────────────────────────────
@@ -43,7 +45,15 @@ const TEMPLATE_MAP: Record<string, string> = {
   "circle-mask-text-slideup-reveal": "CircleMaskTextSlideUpReveal",
   "product-review-typewriter": "ProductReviewTypewriter",
   "photo-highlights-slides-zoom": "PhotoHighlightsSlidesZoom",
+  // Director Engine — data-driven, variable N scenes.
+  // Duration is computed from scenes[] via calculateMetadata; callers do NOT pass durationInFrames.
+  "dynamic-slideshow": "DynamicSlideshow",
 };
+
+// Templates whose duration is derived from calculateMetadata (scenes[] array).
+// For these, the server trusts the composition's own durationInFrames rather than
+// clamping to the caller's rawFrames.
+const DATA_DRIVEN_TEMPLATES = new Set(["dynamic-slideshow"]);
 
 // ── Job store (in-memory) ─────────────────────────────────────────────────────
 interface RenderJob {
@@ -176,12 +186,15 @@ app.post("/render", requireAuth, (req: express.Request, res: express.Response) =
     return;
   }
 
-  // Clamp inputs to safe ranges (DoS prevention)
+  // Clamp inputs to safe ranges (DoS prevention).
+  // For data-driven templates (e.g. dynamic-slideshow), durationInFrames is derived from
+  // calculateMetadata after selectComposition — totalFrames is only used as a fallback.
   const fps = VALID_FPS.has(rawFps) ? rawFps : 30;
   const totalFrames = Math.min(
     rawFrames != null ? Math.max(1, Math.round(rawFrames)) : Math.round(fps * 12),
     MAX_FRAMES
   );
+  const isDataDriven = DATA_DRIVEN_TEMPLATES.has(templateId);
 
   const jobId = uuidv4();
   const job: RenderJob = { status: "pending", progress: 0, createdAt: Date.now() };
@@ -217,8 +230,10 @@ app.post("/render", requireAuth, (req: express.Request, res: express.Response) =
         inputProps,
       });
 
+      // Data-driven templates set durationInFrames via calculateMetadata; respect that value.
+      const renderFrames = isDataDriven ? composition.durationInFrames : totalFrames;
       await renderMedia({
-        composition: { ...composition, durationInFrames: totalFrames, fps, width, height },
+        composition: { ...composition, durationInFrames: renderFrames, fps, width, height },
         serveUrl,
         codec: "h264",
         outputLocation: outFile,
