@@ -240,6 +240,21 @@ function storeTrending(topics: Record<string, string[]>): void {
   }
 }
 
+function aspectPromptDirective(aspect: AspectRatio): string {
+  const orientation = aspect === "1:1"
+    ? "square"
+    : ["3:2", "4:3", "16:9"].includes(aspect)
+      ? "landscape"
+      : "portrait";
+  return `Output canvas must use selected aspect ratio ${aspect} (${orientation}); compose the artwork to fit that exact frame.`;
+}
+
+function promptWithAspect(prompt: string, aspect: AspectRatio): string {
+  const value = prompt.trim();
+  if (!value) return value;
+  return `${value}. ${aspectPromptDirective(aspect)}`;
+}
+
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -733,6 +748,7 @@ export default function StudioWorkbench() {
   // promptOverride lets 🎨 單獨生圖 generate one specific item; noRef forces text-to-image.
   const runGenerate = useCallback(async (opts?: { promptOverride?: string; noRef?: boolean }) => {
     const usePrompt = opts?.promptOverride ?? effectivePrompt;
+    const requestPrompt = promptWithAspect(usePrompt, aspect);
     const effRefMode: RefMode = opts?.noRef ? "none" : refMode;
     if (!usePrompt || usePrompt.trim().length < 3) {
       setResults([{ model: primaryModel, image: null, seed: null, error: "請先填主題/描述（prompt 至少 3 字）", busy: false }]);
@@ -779,7 +795,7 @@ export default function StudioWorkbench() {
         const res = await fetch("/api/tools/studio/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model: m, prompt: usePrompt, referenceImages: refsForModel, aspectRatio: aspect, _jobId: jobIdRef.current }),
+          body: JSON.stringify({ model: m, prompt: requestPrompt, referenceImages: refsForModel, aspectRatio: aspect, _jobId: jobIdRef.current }),
         });
         const json = (await res.json()) as { ok: boolean; image?: string; seed?: number | null; error?: string };
         slots[i] = json.ok && json.image
