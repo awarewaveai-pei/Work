@@ -1587,6 +1587,143 @@ export default function StudioWorkbench() {
         <button className="btn-primary" disabled={busy} onClick={() => void generate()}>
           {busy ? `生成中… (${results.filter((r) => !r.busy).length}/${results.length})` : isMultiModel ? `生成比較（${selectedModels.size} 個模型）` : "生成"}
         </button>
+
+        {activeResult && !activeResult.busy && activeResult.image ? (() => {
+          const m = activeResult.model;
+          const img = activeResult.image;
+          const saveState = saveStates[m] ?? "idle";
+          const bgState = bgStates[m] ?? "idle";
+          const origImg = originalImages[m];
+          const edgeState = edgeStates[m] ?? "idle";
+          const appliedEdge = edgeApplied[m];
+          return (
+            <div style={{ marginTop: 4, padding: 10, border: "1px solid var(--border)", borderRadius: 8, background: "var(--card-bg)", display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <button className="btn-primary" disabled={saveState === "saving" || saveState === "saved"} onClick={() => void saveToDesigns(m, img)}>
+                  {saveState === "saved" ? "已存入 My Designs" : saveState === "saving" ? "存入中…" : "存入 My Designs"}
+                </button>
+                <button className="btn-secondary" disabled={bgState === "removing" || bgState === "done"} onClick={() => void removeBg(m, img)}>
+                  {bgState === "done" ? "已去背" : bgState === "removing" ? "去背中…" : "去背（透明 PNG）"}
+                </button>
+                {bgState === "done" && origImg && (
+                  <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => restoreOriginal(m)}>還原原圖</button>
+                )}
+                {bgState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>去背失敗</span>}
+                {bgState === "done" && productType === "tshirt" && (
+                  <button className="btn-secondary" disabled={mockupState === "generating" || mockupState === "done"} onClick={() => void generateMockupFromDesign(img)}>
+                    {mockupState === "done" ? "產品預覽 ✓" : mockupState === "generating" ? "生成 Mockup…" : "產品 Mockup"}
+                  </button>
+                )}
+                {mockupState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>Mockup 失敗</span>}
+                <button className="btn-secondary" onClick={() => downloadImage(img, m)}>PNG下載</button>
+                <button className="btn-secondary" onClick={() => downloadImageWebP(img, m)}>WebP下載</button>
+                {activeResult.seed != null && <span style={{ fontSize: 12, opacity: 0.6 }}>seed {activeResult.seed}</span>}
+                {saveState === "saved" && <a href="/tools/designs" style={{ fontSize: 12 }}>查看 My Designs</a>}
+                {saveState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>存入失敗</span>}
+              </div>
+
+              <div style={{ paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>✨ 邊緣風格</span>
+                  {edgeState === "applying" && <span style={{ fontSize: 11, opacity: 0.6 }}>套用中…</span>}
+                  {edgeState === "error" && <span style={{ fontSize: 11, color: "var(--red)" }}>套用失敗</span>}
+                  {appliedEdge && (
+                    <button className="btn-secondary" style={{ fontSize: 11, marginLeft: "auto" }} onClick={() => restoreEdge(m)}>
+                      還原
+                    </button>
+                  )}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 6 }}>
+                  {edgePreviews.map((pv) => {
+                    const active = appliedEdge === pv.id;
+                    return (
+                      <button
+                        key={pv.id}
+                        type="button"
+                        title={pv.en}
+                        disabled={edgeState === "applying"}
+                        onClick={() => void applyEdge(m, pv.id)}
+                        style={{
+                          display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+                          minWidth: 0, padding: 4, borderRadius: 8, cursor: "pointer",
+                          background: active ? "rgba(99,102,241,0.15)" : "rgba(127,127,127,0.06)",
+                          border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+                          transition: "all 0.15s",
+                        }}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={pv.svg} alt={pv.zh} style={{ width: 40, height: 40, background: "#3a3a3a", borderRadius: 4 }} />
+                        <span style={{ fontSize: 10, opacity: 0.8, lineHeight: 1.1, textAlign: "center" }}>{pv.zh}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                  <span style={{ fontSize: 11, opacity: 0.6 }}>強度</span>
+                  <input
+                    type="range" min={10} max={90} step={1} value={edgeAmount}
+                    onChange={(e) => setEdgeAmount(Number(e.target.value))}
+                    onPointerUp={() => { if (appliedEdge) void applyEdge(m, appliedEdge); }}
+                    style={{ flex: 1 }}
+                  />
+                  <span style={{ fontSize: 11, opacity: 0.6, width: 30, textAlign: "right" }}>{edgeAmount}</span>
+                </div>
+              </div>
+
+              {mockups.length > 0 && (
+                <div style={{ paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+                  <p style={{ fontSize: 13, marginBottom: 6, opacity: 0.7 }}>產品預覽</p>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+                    {mockups.map((mockup) => {
+                      const st = savedMockups[mockup.url];
+                      return (
+                        <div key={mockup.url}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={mockup.url} alt={mockup.label} style={{ width: "100%", aspectRatio: "1 / 1", objectFit: "contain", background: "#111", borderRadius: 8, border: "1px solid var(--border)" }} />
+                          <div style={{ fontSize: 11, marginTop: 3, opacity: 0.8 }}>{mockup.label}</div>
+                          <button className="btn-secondary" style={{ fontSize: 11, marginTop: 3, width: "100%" }} disabled={st === "saving" || st === "saved"} onClick={() => void saveMockupToDesigns(mockup)}>
+                            {st === "saved" ? "已存" : st === "saving" ? "存入中…" : st === "error" ? "重試" : "存預覽"}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+                <button
+                  className="btn-secondary"
+                  style={{ width: "100%", marginBottom: 6 }}
+                  onClick={() => openInCanvas(activeResult.image, buildSemanticBase({ ...fileMeta, track: "編輯" }))}
+                >
+                  ✏️ 快速編輯
+                </button>
+                <AccordionSection title="✏️ AI image prompt（修圖）" defaultOpen={false}>
+                  <ImageEditPromptPanel
+                    sourceImage={activeResult.image}
+                    currentPrompt={effectivePrompt}
+                    imageModel={activeResult.model}
+                    target="pod-design"
+                    aspectRatio={aspect}
+                    title=""
+                    styleAnchor={{ model: activeResult.model, mode: refImages.length > 0 ? "image" : "text", stylePrompt: resolvedStylePrompt || effectivePrompt, subject: subject.trim(), refs: refImages.length, target: "pod-design" }}
+                    onEditedImage={(image, meta) => {
+                      setResults((prev) => prev.map((r, i) => i === activeIdx ? { ...r, image, seed: meta.seed } : r));
+                      setSaveStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
+                      setBgStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
+                      setOriginalImages((prev) => { const n = { ...prev }; delete n[activeResult.model]; return n; });
+                      setEdgeStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
+                      setEdgeOriginals((prev) => { const n = { ...prev }; delete n[activeResult.model]; return n; });
+                      setEdgeApplied((prev) => { const n = { ...prev }; delete n[activeResult.model]; return n; });
+                      setMockupState("idle"); setMockups([]); setSavedMockups({});
+                    }}
+                  />
+                </AccordionSection>
+              </div>
+            </div>
+          );
+        })() : null}
       </div>
 
       {/* ── Preview (LEFT column) ──────────────────────────────── */}
@@ -1643,7 +1780,7 @@ export default function StudioWorkbench() {
 
           {/* Active result detail */}
           {activeResult && !activeResult.busy && activeResult.image ? (
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(260px, 300px)", gap: 16, alignItems: "flex-start", width: "100%" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16, alignItems: "flex-start", width: "100%" }}>
               {/* Left: canvas */}
               <div style={{ width: "100%", minWidth: 0 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1654,7 +1791,7 @@ export default function StudioWorkbench() {
               </div>
 
               {/* Right: operations panel */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%", minWidth: 0, position: "sticky", top: 76, maxHeight: "calc(100vh - 96px)", overflowY: "auto", padding: 10, border: "1px solid var(--border)", borderRadius: 8, background: "var(--card-bg)" }}>
+              <div style={{ display: "none" }}>
               {/* Action bar */}
               <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 0, alignItems: "stretch" }}>
                 {(() => {
