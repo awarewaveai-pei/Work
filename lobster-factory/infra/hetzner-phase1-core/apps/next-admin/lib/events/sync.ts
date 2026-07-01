@@ -127,22 +127,33 @@ async function pruneStaleCalendarificCountries(
   currentCountries: Set<string>,
   syncedAt: string,
 ): Promise<{ pruned: number; error?: string }> {
-  const { data, error } = await db
-    .from("events")
-    .select("external_id")
-    .eq("source", "calendarific")
-    .eq("is_active", true)
-    .like("external_id", "cal:%")
-    .limit(10000);
+  const PAGE = 1000;
+  const activeCalendarificIds: string[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db
+      .from("events")
+      .select("external_id")
+      .eq("source", "calendarific")
+      .eq("is_active", true)
+      .like("external_id", "cal:%")
+      .order("external_id", { ascending: true })
+      .range(from, from + PAGE - 1);
 
-  if (error) {
-    return { pruned: 0, error: `Prune stale Calendarific countries: ${error.message}` };
+    if (error) {
+      return { pruned: 0, error: `Prune stale Calendarific countries: ${error.message}` };
+    }
+
+    const rows = data ?? [];
+    activeCalendarificIds.push(
+      ...rows
+        .map((row: { external_id?: unknown }) => row.external_id)
+        .filter((externalId): externalId is string => typeof externalId === "string"),
+    );
+    if (rows.length < PAGE) break;
   }
 
-  const staleIds = (data ?? [])
-    .map((row: { external_id?: unknown }) => row.external_id)
-    .filter((externalId): externalId is string => {
-      if (typeof externalId !== "string") return false;
+  const staleIds = activeCalendarificIds
+    .filter((externalId) => {
       const country = countryFromCalendarificExternalId(externalId);
       return !!country && !currentCountries.has(country);
     });
