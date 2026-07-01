@@ -19,15 +19,28 @@ describe("event country coverage", () => {
 
   it("separates South Asia and MENA tourism markets", () => {
     const sourceCodes = new Set(EVENT_SOURCE_COUNTRIES.map((country) => country.code));
-    for (const code of ["IN", "MV", "TR", "EG"]) {
+    for (const code of ["IN", "LK", "NP", "MV", "TR", "EG"]) {
       expect(sourceCodes.has(code)).toBe(true);
       expect(EVENT_COUNTRY_FILTERS.some((filter) => filter.value === code)).toBe(true);
     }
 
     const southAsia = EVENT_COUNTRY_FILTERS.find((filter) => filter.label === "南亞");
-    expect(southAsia?.value.split(",")).toEqual(["IN", "MV"]);
+    expect(southAsia?.value.split(",")).toEqual(["IN", "LK", "NP", "MV"]);
 
     const mena = EVENT_COUNTRY_FILTERS.find((filter) => filter.label === "中東/北非");
     expect(mena?.value.split(",")).toEqual(["AE", "SA", "TR", "EG", "MA"]);
+  });
+
+  it("adds Western traveler Asia shortcut filters", () => {
+    const asia = EVENT_COUNTRY_FILTERS.find((filter) => filter.label === "歐美澳旅客熱門亞洲");
+    expect(asia?.value.split(",")).toEqual([
+      "JP", "KR", "TW", "HK", "SG", "TH", "VN", "ID", "PH", "MY", "KH", "LA", "IN", "LK", "NP", "MV",
+    ]);
+
+    const southeastAsia = EVENT_COUNTRY_FILTERS.find((filter) => filter.label === "歐美澳熱門東南亞");
+    expect(southeastAsia?.value.split(",")).toEqual(["TH", "VN", "ID", "PH", "MY", "SG", "KH", "LA"]);
+
+    const southAsia = EVENT_COUNTRY_FILTERS.find((filter) => filter.label === "歐美澳熱門南亞");
+    expect(southAsia?.value.split(",")).toEqual(["IN", "LK", "NP", "MV"]);
   });
 });

@@ -14,7 +14,12 @@ export interface EventSourceCountry {
 
 const EAST_ASIA = ["TW", "JP", "KR", "CN", "HK", "MO"];
 const SOUTHEAST_ASIA = ["SG", "MY", "TH", "VN", "ID", "PH", "KH", "LA", "MM", "BN"];
-const SOUTH_ASIA = ["IN", "MV"];
+const SOUTH_ASIA = ["IN", "LK", "NP", "MV"];
+const WESTERN_TRAVELER_SOUTHEAST_ASIA = ["TH", "VN", "ID", "PH", "MY", "SG", "KH", "LA"];
+const WESTERN_TRAVELER_SOUTH_ASIA = ["IN", "LK", "NP", "MV"];
+const WESTERN_TRAVELER_ASIA = [
+  ...new Set(["JP", "KR", "TW", "HK", "SG", ...WESTERN_TRAVELER_SOUTHEAST_ASIA, ...WESTERN_TRAVELER_SOUTH_ASIA]),
+];
 const TOURISM_EUROPE = ["GB", "IE", "FR", "DE", "IT", "ES", "NL", "BE", "CH", "AT", "GR", "PT", "IS", "CZ"];
 const TOURISM_AMERICAS = ["US", "CA", "MX", "BR", "AR"];
 const OCEANIA = ["AU", "NZ"];
@@ -40,6 +45,9 @@ export const EVENT_SOURCE_COUNTRIES: EventSourceCountry[] = [
 export const EVENT_COUNTRY_FILTERS = [
   { value: "all", label: "全部國家" },
   { value: "global", label: "Global / 世界" },
+  { value: WESTERN_TRAVELER_ASIA.join(","), label: "歐美澳旅客熱門亞洲" },
+  { value: WESTERN_TRAVELER_SOUTHEAST_ASIA.join(","), label: "歐美澳熱門東南亞" },
+  { value: WESTERN_TRAVELER_SOUTH_ASIA.join(","), label: "歐美澳熱門南亞" },
   { value: [...EAST_ASIA, ...SOUTHEAST_ASIA].join(","), label: "東亞 + 東南亞" },
   { value: EAST_ASIA.join(","), label: "東亞" },
   { value: SOUTHEAST_ASIA.join(","), label: "東南亞" },
@@ -62,6 +70,8 @@ export const EVENT_COUNTRY_FILTERS = [
   { value: "PH", label: "PH 菲律賓" },
   { value: "KH", label: "KH 柬埔寨" },
   { value: "IN", label: "IN 印度" },
+  { value: "LK", label: "LK 斯里蘭卡" },
+  { value: "NP", label: "NP 尼泊爾" },
   { value: "MV", label: "MV 馬爾地夫" },
   { value: "AU", label: "AU 澳洲" },
   { value: "NZ", label: "NZ 紐西蘭" },
