@@ -113,12 +113,13 @@
 
 > 疊加在基礎全員之上；manifest slug = `wp-tourism`（獨立 manifest，裝 TravelWP 主題而非 Kadence）。  
 > 旅遊站**不安裝** Kadence Theme + Kadence Blocks（catalog `excludeForModules: ["tourism"]`）。  
-> 共 **7 個功能位**。
+> 共 **8 個功能位**。
 
 | 類別 | 外掛 | installSource | WP.org Slug | 說明 |
 |------|------|--------------|-------------|------|
 | **主題** | TravelWP Theme（Physcode，$35） | manual-zip | `travelwp` | 旅遊業專屬主題，內建行程展示 + WooCommerce 預約整合；zip 放 `/opt/lobster-plugins/travelwp.zip` |
-| **頁面建構** | Elementor | wporg | `elementor` | TravelWP 使用 Elementor 建構版型（取代 Kadence Blocks） |
+| **頁面建構** | Elementor | wporg | `elementor` | TravelWP 使用 Elementor 建構版型（取代 Kadence Blocks）；Pro 的基底必裝 |
+| **頁面建構 Pro** | Elementor Pro (WordPressIT) | manual-zip | `elementor-pro` | TravelWP demo 完整功能需要 Pro；zip → `/opt/lobster-plugins/elementor-pro.zip` |
 | **預約金流** | WooCommerce | wporg | `woocommerce` | TravelWP 透過 WooCommerce 處理行程付款 / 預約 |
 | **內容類型** | Custom Post Type UI (CPT UI) | wporg | `custom-post-type-ui` | 建立「行程」「景點」自訂類型 |
 | **相片集** | Modula Gallery | wporg | `modula-best-grid-gallery` | 旅遊照片集、行程相冊 |
@@ -314,9 +315,9 @@ FluentSMTP 本身不提供郵件發送能力，需搭配 SMTP 供應商：
 | `release-url` | 1 | GitHub release zip 自動取得（wp-bridge，Phase 1）| ❌ 全自動（Phase 1 完成後）|
 | `wporg` | 33 | WP.org → `wp plugin install <slug>` | ❌ 全自動 |
 | `manual-zip` + `alternativeSlug` | 2 | 付費首選，但有免費替代；替代品自動裝 | ❌ 全自動（裝替代）|
-| `manual-zip` 無替代 | 5 | 必須上傳 zip；見 §10.3 | ✅ 需操作員 |
+| `manual-zip` 無替代 | 6 | 必須上傳 zip；見 §10.3 | ✅ 需操作員 |
 
-> **5 個需操作員手動上傳的 zip**：TravelWP Theme、Kadence Shop Kit、ECPay（綠界）、WooCommerce Points and Rewards、WooCommerce Product Add-Ons
+> **6 個需操作員手動上傳的 zip**：TravelWP Theme、Elementor Pro、Kadence Shop Kit、ECPay（綠界）、WooCommerce Points and Rewards、WooCommerce Product Add-Ons
 
 ### 10.3 付費 zip 交付 Runbook
 
@@ -325,6 +326,7 @@ FluentSMTP 本身不提供郵件發送能力，需搭配 SMTP 供應商：
 ```bash
 # 檔案命名規則（與 catalog slug 一致）
 /opt/lobster-plugins/travelwp.zip                        # 旅遊站主題，physcode.com $35
+/opt/lobster-plugins/elementor-pro.zip                   # Elementor Pro，WordPressIT
 /opt/lobster-plugins/kadence-shop-kit.zip
 /opt/lobster-plugins/ecpay-payment-gateway.zip
 /opt/lobster-plugins/woocommerce-points-and-rewards.zip

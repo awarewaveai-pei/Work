@@ -171,6 +171,11 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   const resolved = resolveOpsRole(req);
+  // Coarse early gate: operator+ minimum (canMutateIntegration does fine-grained check later).
+  // Ensures DB client construction and body parsing are skipped for unauthorized callers.
+  if (!canWriteTenantConfig(resolved.role) && resolved.role !== "operator") {
+    return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });
+  }
 
   const supabase = getSupabaseWriteClient();
   if (!supabase) {

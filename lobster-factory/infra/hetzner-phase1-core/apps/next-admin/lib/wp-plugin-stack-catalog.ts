@@ -58,7 +58,7 @@ export interface WpPlugin {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Catalog — 18 base + 13 ecommerce + 1 pod + 7 tourism + 3 brand = 42 total entries
+// Catalog — 18 base + 13 ecommerce + 1 pod + 8 tourism + 3 brand = 43 total entries
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const WP_PLUGIN_CATALOG: WpPlugin[] = [
@@ -163,6 +163,7 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
     installSource: "manual-zip",
   },
   { slug: "elementor",                  label: "Elementor",                                       free: true,  required: true,  module: "tourism" },
+  { slug: "elementor-pro",              label: "Elementor Pro (WordPressIT)",                      free: false, required: true,  module: "tourism", installSource: "manual-zip" },
   { slug: "woocommerce",               label: "WooCommerce (TravelWP booking)",                   free: true,  required: true,  module: "tourism" },
   { slug: "custom-post-type-ui",        label: "Custom Post Type UI (CPT UI)",                    free: true,  required: true,  module: "tourism" },
   { slug: "modula-best-grid-gallery",   label: "Modula Gallery",                                  free: true,  required: true,  module: "tourism" },
