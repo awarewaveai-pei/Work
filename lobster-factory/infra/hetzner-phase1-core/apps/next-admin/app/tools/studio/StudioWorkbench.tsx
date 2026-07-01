@@ -1627,7 +1627,7 @@ export default function StudioWorkbench() {
 
           {/* Active result detail */}
           {activeResult && !activeResult.busy && activeResult.image ? (
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16, alignItems: "flex-start", width: "100%" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(260px, 300px)", gap: 16, alignItems: "flex-start", width: "100%" }}>
               {/* Left: canvas */}
               <div style={{ width: "100%", minWidth: 0 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1638,9 +1638,9 @@ export default function StudioWorkbench() {
               </div>
 
               {/* Right: operations panel */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%", minWidth: 0 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%", minWidth: 0, position: "sticky", top: 76, maxHeight: "calc(100vh - 96px)", overflowY: "auto", padding: 10, border: "1px solid var(--border)", borderRadius: 8, background: "var(--card-bg)" }}>
               {/* Action bar */}
-              <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 0, alignItems: "stretch" }}>
                 {(() => {
                   const m = activeResult.model;
                   const img = activeResult.image!;
