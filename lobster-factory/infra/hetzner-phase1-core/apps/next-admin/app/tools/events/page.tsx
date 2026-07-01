@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { EVENT_COUNTRY_FILTERS } from "@/lib/events/countries";
 
 const WINDOWS = [
   { key: "30", label: "30 天", days: 30 },
@@ -18,18 +19,6 @@ const FILTERS = [
   { value: "family", label: "親情節日" },
   { value: "mega", label: "大型事件" },
   { value: "holiday", label: "假日" },
-] as const;
-
-const COUNTRIES = [
-  { value: "all", label: "全部國家" },
-  { value: "global", label: "Global" },
-  { value: "US", label: "US" },
-  { value: "TW", label: "TW" },
-  { value: "JP", label: "JP" },
-  { value: "GB", label: "GB" },
-  { value: "CA", label: "CA" },
-  { value: "AU", label: "AU" },
-  { value: "MX", label: "MX" },
 ] as const;
 
 type SortMode = "opportunity" | "date";
@@ -156,7 +145,7 @@ export default function EventsPage() {
           {FILTERS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
         </select>
         <select className="btn-secondary" value={country} onChange={e => setCountry(e.target.value)}>
-          {COUNTRIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+          {EVENT_COUNTRY_FILTERS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
         </select>
         <select className="btn-secondary" value={sort} onChange={e => setSort(e.target.value as SortMode)}>
           <option value="opportunity">依商品機會</option>

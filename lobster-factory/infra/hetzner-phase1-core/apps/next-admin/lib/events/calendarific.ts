@@ -1,34 +1,9 @@
 import { type GlobalEvent, calcLeadDays } from "./types";
+import { EVENT_SOURCE_COUNTRIES } from "./countries";
 
 const BASE = "https://calendarific.com/api/v2";
 
-/** 20 countries with commercially interesting / visually distinct holidays for POD. */
-export const CALENDARIFIC_COUNTRIES = [
-  // Americas
-  { code: "US", region: "americas" },
-  { code: "MX", region: "americas" },
-  { code: "BR", region: "americas" },
-  { code: "AR", region: "americas" },
-  // Europe
-  { code: "GB", region: "europe" },
-  { code: "DE", region: "europe" },
-  { code: "FR", region: "europe" },
-  { code: "IE", region: "europe" },
-  { code: "ES", region: "europe" },
-  { code: "IT", region: "europe" },
-  // Asia
-  { code: "JP", region: "asia" },
-  { code: "KR", region: "asia" },
-  { code: "TW", region: "asia" },
-  { code: "CN", region: "asia" },
-  { code: "IN", region: "asia" },
-  { code: "TH", region: "asia" },
-  // Africa / Middle East / Oceania
-  { code: "NG", region: "africa" },
-  { code: "ZA", region: "africa" },
-  { code: "AU", region: "oceania" },
-  { code: "SA", region: "mideast" },
-] as const;
+export const CALENDARIFIC_COUNTRIES = EVENT_SOURCE_COUNTRIES;
 
 /** Holiday types worth syncing. Generic observances are only included by keyword below. */
 const INCLUDE_TYPES = new Set(["National holiday", "Local holiday", "Religious holiday"]);
@@ -117,7 +92,7 @@ export async function fetchCountryHolidays(
     });
 }
 
-/** Fetch all 20 countries for a given year. Rate-limit safe: sequential with 200ms gap. */
+/** Fetch curated tourism/POD countries for a given year. Rate-limit safe: sequential with 200ms gap. */
 export async function fetchAllCountries(
   apiKey: string,
   year: number,

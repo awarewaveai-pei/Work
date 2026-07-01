@@ -4,7 +4,7 @@ import { syncGlobalEvents } from "@/lib/events/sync";
 import { timingSafeEqual } from "@/lib/security/timingSafeEqual";
 
 export const runtime = "nodejs";
-export const maxDuration = 120; // Calendarific 20 countries takes ~15s; sports adds ~10s
+export const maxDuration = 180; // Calendarific curated tourism markets plus sports.
 
 function hasValidSyncKey(req: Request): boolean {
   const expected = process.env.OPS_PROXY_SHARED_SECRET;

@@ -41,6 +41,16 @@ describe("event facets", () => {
     }, ["TW"])).toBe(true);
   });
 
+  it("lets region filters pass multiple country codes", () => {
+    expect(eventMatchesCountries({
+      title: "Songkran",
+      event_date: "2027-04-13",
+      category: "cultural",
+      subcategory: "cultural",
+      country_codes: ["TH"],
+    }, ["SG", "MY", "TH", "VN"])).toBe(true);
+  });
+
   it("scores open marketing windows ahead of distant generic holidays", () => {
     const now = new Date("2026-06-30T00:00:00Z");
     const worldCup = scoreEventOpportunity({

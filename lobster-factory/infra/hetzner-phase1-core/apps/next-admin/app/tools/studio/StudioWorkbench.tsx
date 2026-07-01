@@ -33,6 +33,7 @@ import {
   type EdgeMaskId,
 } from "@/lib/studio/edge-mask";
 import { AI_TEXT_MODEL_GROUPS, AI_TEXT_MODELS, type AiTextModel } from "@/lib/ai/text-model-options";
+import { EVENT_COUNTRY_FILTERS } from "@/lib/events/countries";
 import { textModelCostLabel, textModelCostSummary } from "@/lib/ai/text-model-pricing";
 
 // suffix describes the FLAT print-ready ARTWORK (not the physical product) so literal models
@@ -98,17 +99,6 @@ const EVENT_CAT_FILTERS = [
   { value: "family", label: "親情節日" },
   { value: "mega", label: "大型事件" },
   { value: "holiday", label: "假日" },
-] as const;
-const EVENT_COUNTRY_FILTERS = [
-  { value: "all", label: "全部國家" },
-  { value: "global", label: "Global" },
-  { value: "US", label: "US" },
-  { value: "TW", label: "TW" },
-  { value: "JP", label: "JP" },
-  { value: "GB", label: "GB" },
-  { value: "CA", label: "CA" },
-  { value: "AU", label: "AU" },
-  { value: "MX", label: "MX" },
 ] as const;
 const EVENT_WINDOWS = [
   { value: 30, label: "30天" },
