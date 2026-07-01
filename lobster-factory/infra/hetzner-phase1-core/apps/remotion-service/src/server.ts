@@ -24,7 +24,9 @@ const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID ?? "";
 const R2_VIDEO_BUCKET = process.env.R2_VIDEO_BUCKET ?? "lobster-videos";
 const R2_VIDEO_PUBLIC_BASE = (process.env.R2_VIDEO_PUBLIC_BASE ?? "").replace(/\/$/, "");
 
-// Fail-loud on missing credentials so misconfigured containers surface early
+// NOTE: missing AUTH_TOKEN causes the service to fail-OPEN (all /render accepted).
+// This relies on the EU VPS firewall / nginx restricting port 8733 externally.
+// Always set RENDER_AUTH_TOKEN in production.
 if (!AUTH_TOKEN) {
   console.warn("[remotion] WARN: RENDER_AUTH_TOKEN is not set — all /render requests accepted without auth. Set this in production.");
 }
@@ -187,14 +189,49 @@ app.post("/render", requireAuth, (req: express.Request, res: express.Response) =
   }
 
   // Clamp inputs to safe ranges (DoS prevention).
-  // For data-driven templates (e.g. dynamic-slideshow), durationInFrames is derived from
-  // calculateMetadata after selectComposition — totalFrames is only used as a fallback.
   const fps = VALID_FPS.has(rawFps) ? rawFps : 30;
   const totalFrames = Math.min(
     rawFrames != null ? Math.max(1, Math.round(rawFrames)) : Math.round(fps * 12),
     MAX_FRAMES
   );
   const isDataDriven = DATA_DRIVEN_TEMPLATES.has(templateId);
+
+  // Validate data-driven payloads before touching the renderer.
+  // Without this, an oversized scenes[] array (within the 4 MB body limit) could drive
+  // calculateMetadata to return millions of frames, bypassing MAX_FRAMES entirely and
+  // OOM/hanging the single-process EU renderer for hours.
+  if (isDataDriven) {
+    const scenes = (props as Record<string, unknown>)["scenes"];
+    if (!Array.isArray(scenes) || scenes.length === 0) {
+      res.status(400).json({ error: "scenes must be a non-empty array" });
+      return;
+    }
+    if (scenes.length > 60) {
+      res.status(400).json({
+        error: `scenes exceeds maximum of 60 (got ${scenes.length})`,
+      });
+      return;
+    }
+    for (let idx = 0; idx < scenes.length; idx++) {
+      const s = scenes[idx] as Record<string, unknown>;
+      if (typeof s !== "object" || s === null) {
+        res.status(400).json({ error: `scenes[${idx}] must be an object` });
+        return;
+      }
+      const dur = s["durationInSeconds"];
+      if (
+        typeof dur !== "number" ||
+        !Number.isFinite(dur) ||
+        dur <= 0 ||
+        dur > 60
+      ) {
+        res.status(400).json({
+          error: `scenes[${idx}].durationInSeconds must be a finite number in (0, 60]; got ${String(dur)}`,
+        });
+        return;
+      }
+    }
+  }
 
   const jobId = uuidv4();
   const job: RenderJob = { status: "pending", progress: 0, createdAt: Date.now() };
@@ -230,8 +267,13 @@ app.post("/render", requireAuth, (req: express.Request, res: express.Response) =
         inputProps,
       });
 
-      // Data-driven templates set durationInFrames via calculateMetadata; respect that value.
-      const renderFrames = isDataDriven ? composition.durationInFrames : totalFrames;
+      // Data-driven templates set durationInFrames via calculateMetadata (scenes[] sum).
+      // Still clamp to MAX_FRAMES as a backstop — payload validation above is the primary
+      // guard; this prevents truncation surprises if a bypass ever reaches here.
+      const renderFrames = Math.min(
+        isDataDriven ? composition.durationInFrames : totalFrames,
+        MAX_FRAMES
+      );
       await renderMedia({
         composition: { ...composition, durationInFrames: renderFrames, fps, width, height },
         serveUrl,

@@ -185,20 +185,24 @@ const SlideIn: React.FC<{ fromLeft: boolean; children: React.ReactNode }> = ({
 };
 
 // ── Duration helper (use in calculateMetadata and Composition static fallback) ─
-// Model: each scene runs for scene.durationInSeconds; next scene starts right after
-// the previous scene's pure duration ends.  Transition is "free" — the outgoing
-// scene gets an extra transitionDurationSeconds window so the spring can settle.
-// Total = sum of all pure scene durations (transitions don't add to total).
+// Timing model:
+//   - Each scene's Sequence starts at sum(previous pure durations).
+//   - Non-last scenes get +transitionFrames extra so the outgoing scene stays visible
+//     while the incoming one slides in on top (slide-in over static, not cross-fade).
+//   - Total = sum of all pure scene durations; transitions do not add to total.
 export function calculateSceneSeriesDuration(
   scenes: SceneItem[],
   fps: number,
   _transitionDurationSeconds = 1.0
 ): number {
   if (!scenes.length) return Math.round(fps * 3);
-  const total = scenes.reduce(
-    (acc, s) => acc + Math.round(fps * s.durationInSeconds),
-    0
-  );
+  const total = scenes.reduce((acc, s) => {
+    const dur =
+      Number.isFinite(s.durationInSeconds) && s.durationInSeconds > 0
+        ? s.durationInSeconds
+        : 0;
+    return acc + Math.round(fps * dur);
+  }, 0);
   return Math.max(total, Math.round(fps));
 }
 
@@ -220,13 +224,20 @@ export const SceneSeries: React.FC<{
   // Compute each scene's absolute start: begins right after previous scene's pure duration.
   let cursor = 0;
   const sceneLayout = scenes.map((scene, i) => {
-    const sceneFrames = Math.round(fps * scene.durationInSeconds);
+    // Floor negative/NaN durations to 1 frame so Sequence bounds stay valid.
+    const safeDur =
+      Number.isFinite(scene.durationInSeconds) && scene.durationInSeconds > 0
+        ? scene.durationInSeconds
+        : 0;
+    const sceneFrames = Math.max(1, Math.round(fps * safeDur));
     const start = cursor;
     cursor += sceneFrames;
     const isLast = i === scenes.length - 1;
-    // Extra transitionFrames on each outgoing scene so the spring completes.
+    // Outgoing scenes get extra transitionFrames so the incoming SlideIn spring can
+    // complete while the outgoing scene is still visible beneath it (slide-in over static,
+    // not a cross-fade — the incoming scene is a later DOM sibling, so it renders on top).
     const duration = isLast ? sceneFrames : sceneFrames + transitionFrames;
-    return { scene, start, sceneFrames, duration };
+    return { scene, start, duration };
   });
 
   return (
