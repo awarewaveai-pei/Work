@@ -145,25 +145,26 @@ export async function POST(req: Request): Promise<Response> {
   const seoRaw = body.seoScore;
   const seoScore = typeof seoRaw === "number" && Number.isFinite(seoRaw) ? Math.round(seoRaw) : null;
 
-  // Resolve org: client forced to own org; staff can pass body.organizationId to scope.
+  // Resolve org for INSERT only: client forced to own org; staff can pass body.organizationId.
+  // UPDATE never reads orgId — it preserves the existing row's organization_id to prevent
+  // silent un-scoping when the caller (ContentStudio) omits organizationId from the payload.
   let orgId: string | null;
   try { orgId = effectiveOrgId(req, str(body.organizationId)); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
-  // Columns common to insert + update. meta / form_snapshot are jsonb — pass through as-is (objects).
-  const fields = {
+  // Content fields (no organization_id here — assignment is branch-specific; see below).
+  const contentFields = {
     keyword,
-    title:           str(body.title),
-    language:        str(body.language),
-    article_type:    str(body.articleType),
+    title:         str(body.title),
+    language:      str(body.language),
+    article_type:  str(body.articleType),
     markdown,
-    meta:            (body.meta ?? null) as object | null,
-    slug_hint:       str(body.slugHint),
-    seo_score:       seoScore,
+    meta:          (body.meta ?? null) as object | null,
+    slug_hint:     str(body.slugHint),
+    seo_score:     seoScore,
     ...(status === "published" || status === "archived" || status === "draft" ? { status } : {}),
-    form_snapshot:   (body.formSnapshot ?? null) as object | null,
-    site_id:         str(body.siteId),
-    organization_id: orgId,
+    form_snapshot: (body.formSnapshot ?? null) as object | null,
+    site_id:       str(body.siteId),
   };
 
   if (id) {
@@ -175,15 +176,18 @@ export async function POST(req: Request): Promise<Response> {
       .maybeSingle();
     if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
     if (!existing) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
-    try { assertOrgAccess(req, (existing as { organization_id: string | null }).organization_id); }
+    const existingOrgId = (existing as { organization_id: string | null }).organization_id;
+    try { assertOrgAccess(req, existingOrgId); }
     catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
-    const existingOrgId = (existing as { organization_id: string | null }).organization_id;
+    // UPDATE preserves organization_id from the row (never overwrites from the request body)
+    // so a staff edit of a client-owned draft never un-scopes the row.
+    // Atomicity note: .eq("organization_id", existingOrgId) guards non-null rows against a
+    // concurrent org reassignment; null-org rows (staff-only path) rely on the .eq("id", id) guard.
     let updateQ = supabase
       .from("content_drafts")
-      .update({ ...fields, updated_at: new Date().toISOString() })
+      .update({ ...contentFields, organization_id: existingOrgId, updated_at: new Date().toISOString() })
       .eq("id", id);
-    // Add atomic org guard only when org_id is non-null; null rows are staff-only (assertOrgAccess passed).
     if (existingOrgId) updateQ = updateQ.eq("organization_id", existingOrgId);
     const { data, error } = await updateQ.select("*").maybeSingle();
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
@@ -191,9 +195,12 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ ok: true, draft: toFull(data as DraftRow) });
   }
 
+  // INSERT: assign org from resolved orgId (client auto-bound; staff scopes via body or null).
+  // Tenant checks here are future-proof enforcement beneath the current canCreateAiImageJob role
+  // gate — so relaxing the role gate later won't silently reopen IDOR on this route.
   const { data, error } = await supabase
     .from("content_drafts")
-    .insert(fields)
+    .insert({ ...contentFields, organization_id: orgId })
     .select("*")
     .single();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });

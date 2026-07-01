@@ -27,8 +27,8 @@
 **ContentStudio 前端相容性**: 不需改。`effectiveOrgId(req, null)` → staff = null（不過濾，看全部）；client 帳啟用後自動從 middleware `x-ops-org-id` 注入 org，草稿自動歸 org，不需前端傳。
 
 **驗證結果**:
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~8000 — 0 type errors
-- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n — null-safe conditional filter handles both null-org (old staff drafts) and org-scoped rows correctly
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~8000 — 0 type errors (pre + post critic fix)
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/1n — Major: POST update overwrote organization_id to null when staff edits client draft (data corruption); Fixed: separated contentFields from insert-only orgId assignment; UPDATE now preserves existingOrgId. Minor: TOCTOU comment clarified (null-org rows: atomicity via id only, staff-only path). Suggestion: added future-proof comment on tenant checks beneath role gate.
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=content/drafts,content_drafts | hits=2 (route.ts ✓ patched, ContentStudio.tsx ✓ compatible — no body.organizationId sent = staff null-unscoped, client auto-enforced via middleware)
 - WORKLOG: 本條目
 
