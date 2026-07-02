@@ -1960,7 +1960,7 @@ function OutreachTab({ org }: Pick<ClientHubTabsProps, "org">) {
     try {
       const res = await fetch(`/api/ops/clients/${encodeURIComponent(org.slug)}/outreach-config`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...roleHeader() },
+        headers: { "Content-Type": "application/json", ...roleHeader("admin") },
         body: JSON.stringify(body),
       });
       const json = await res.json();
