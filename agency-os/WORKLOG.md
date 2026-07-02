@@ -4,6 +4,33 @@
 
 ## 2026-07-02
 
+### feat(video): Phase 0 AI Video Director — SceneSeries backbone + real render DoD ✅
+
+**根本問題**: 影片工具只有 Quick Engine（Python ffmpeg 固定 3-scene）；需要 Director Engine 支援 N scenes、data-driven duration、Ken Burns + slide-in 轉場。
+
+**已修改**:
+- `lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/src/compositions/SceneSeries.tsx` (NEW) — `SceneItem[]` 型別、`calculateSceneSeriesDuration()` duration helper、`SceneSeries` component（`<Sequence>` 堆疊、Ken Burns zoom、SlideIn 轉場、safeDur C2 fix）
+- `lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/src/compositions/DynamicSlideshow.tsx` (NEW) — Remotion Composition wrapper，global logoUrl fallback merge
+- `lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/src/Root.tsx` (MODIFIED) — 註冊 DynamicSlideshow + calculateMetadata（從 scenes[] sum 算 durationInFrames）
+- `lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/src/server.ts` (MODIFIED) — MAX_FRAMES 18000、DATA_DRIVEN_TEMPLATES、payload validation（C1 fix：scenes max 60、durationInSeconds in (0,60]）、Math.min backstop
+
+**Critic fix（session a19fe8d4a09ed40a3）**:
+- C1 🔴 OOM/DoS：DATA_DRIVEN bypass 跳過 MAX_FRAMES → 加 payload validation + Math.min backstop
+- C2 🔴 NaN/negative frames：`scene.durationInSeconds` 未驗證 → safeDur floor in SceneSeries + server-side type/range check
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker compose rebuild + curl /render × 3 | exit=0 | ms=varies
+  - 1-scene (5s): job done → https://pub-bd79a1c3b4554025bd92a6192b032427.r2.dev/remotion/2026-07-02/b4323cf3-8440-4f48-b7e5-09d2f0904571.mp4 — HTTP 200, 16MB ✅
+  - 3-scene (5s×3): job done → https://pub-bd79a1c3b4554025bd92a6192b032427.r2.dev/remotion/2026-07-02/060fe694-deeb-4bd9-bc89-3db889b4e1a9.mp4 — HTTP 200, 40MB ✅
+  - 20-scene (3s×20): job done → https://pub-bd79a1c3b4554025bd92a6192b032427.r2.dev/remotion/2026-07-02/bcdc7dfa-af49-4922-976b-ccf6cfe1ef08.mp4 — HTTP 200, 113MB ✅
+- REVIEW_DONE: critic=Deep | verdict=pass (after C1+C2 fix) | findings=2c/2m fixed — all Critical/Major patched before commit
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=SceneSeries|DynamicSlideshow|calculateSceneSeriesDuration|dynamic-slideshow|DATA_DRIVEN_TEMPLATES | hits=self-contained (remotion-service only, no downstream consumers in next-admin yet — Phase 3 will add render-client.ts)
+- WORKLOG: 本條目
+
+**剩餘 Phase 1–6**: Director AI → Timeline JSON → full production pipeline（deferred，Phase 0 DoD 完成後啟動）
+
+---
+
 ### feat(security): S2 batch-6 tenant guard — content/drafts IDOR closed
 
 **根本問題**: `content_drafts` 所有 CRUD 無 `effectiveOrgId`/`assertOrgAccess`，staff 看全客戶草稿混合；Client 帳啟用後任何知道 UUID 的人可讀改刪外部 org 草稿（IDOR）。`content_sources` 是全域共享表（無 `organization_id`），不需改。
