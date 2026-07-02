@@ -1,0 +1,141 @@
+// M2 — runner core guarantees, tested against FIXTURE rules (not the real
+// manifest): dispatch, block aggregation, crash isolation, missing-rule
+// fail-open, bad-JSON passthrough, matcher semantics, command expansion.
+
+import { test, before } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+
+import { runNode, makeTmpHome, HOOKS_DIR } from './helpers.mjs';
+
+const RUNNER = path.join(HOOKS_DIR, 'runner.js');
+let FIX; // fixture runner-home
+
+before(() => {
+  FIX = makeTmpHome();
+  fs.mkdirSync(path.join(FIX, 'rules'), { recursive: true });
+  const rule = (name, body) =>
+    fs.writeFileSync(path.join(FIX, 'rules', `${name}.js`), body);
+
+  rule('always-warn', `module.exports = { check: () => ({ warn: ['[Hook] warned'] }) };`);
+  rule('block-if-marker', `module.exports = { check: (ctx) =>
+    /MARKER/.test(ctx.command) ? { block: ['[Hook] BLOCKED: marker'] } : null };`);
+  rule('block-two', `module.exports = { check: (ctx) =>
+    /TWICE/.test(ctx.command) ? { block: ['[Hook] BLOCKED: second'] } : null };`);
+  rule('crasher', `module.exports = { check: () => { throw new Error('boom'); } };`);
+  rule('expanded-scan', `module.exports = { check: (ctx) =>
+    /^\\s*secret-verb\\b/im.test(ctx.commandExpanded) ? { block: ['[Hook] BLOCKED: expanded'] } : null };`);
+  rule('sid-echo', `module.exports = { check: (ctx) => ({ warn: ['sid=' + ctx.sid] }) };`);
+
+  fs.writeFileSync(path.join(FIX, 'rules.manifest.json'), JSON.stringify({
+    events: {
+      PreToolUse: [
+        { matcher: 'Bash', rules: ['crasher', 'block-if-marker', 'block-two', 'expanded-scan'] },
+        { matcher: 'Write|Edit', rules: ['always-warn'] },
+        { rules: ['sid-echo'] },
+        { matcher: '(broken[', rules: ['always-warn'] },
+      ],
+      Stop: [{ rules: ['missing-rule', 'always-warn'] }],
+    },
+  }));
+});
+
+function run(event, payload, opts = {}) {
+  return runNode(RUNNER, payload, {
+    args: [event],
+    env: { CLAUDE_HOOKS_RUNNER_HOME: FIX, ...(opts.env || {}) },
+    ...opts,
+  });
+}
+
+test('runner: bad JSON stdin → passthrough exit 0', () => {
+  const r = run('PreToolUse', '{{{not-json');
+  assert.equal(r.status, 0);
+  assert.equal(r.stdout, '{{{not-json');
+});
+
+test('runner: unknown event → passthrough exit 0', () => {
+  const r = run('NoSuchEvent', { tool_name: 'Bash', tool_input: { command: 'MARKER' } });
+  assert.equal(r.status, 0);
+});
+
+test('runner: matcher dispatch — Bash rule does not fire for Edit tool', () => {
+  const r = run('PreToolUse', { tool_name: 'Edit', tool_input: { command: 'MARKER' } });
+  assert.equal(r.status, 0);
+  assert.match(r.stderr, /warned/);            // Write|Edit group fired
+  assert.doesNotMatch(r.stderr, /BLOCKED/);    // Bash group did not
+});
+
+test('runner: matcher substring semantics — MultiEdit hits Write|Edit group (legacy parity)', () => {
+  const r = run('PreToolUse', { tool_name: 'MultiEdit', tool_input: {} });
+  assert.equal(r.status, 0);
+  assert.match(r.stderr, /warned/);
+});
+
+test('runner: omitted matcher matches every tool', () => {
+  const r = run('PreToolUse', { session_id: 'fixed-sid-1', tool_name: 'Glob', tool_input: {} });
+  assert.equal(r.status, 0);
+  assert.match(r.stderr, /sid=fixed-sid-1/);
+});
+
+test('runner: block aggregation — two blocking rules both report, single exit 2', () => {
+  const r = run('PreToolUse', { tool_name: 'Bash', tool_input: { command: 'MARKER TWICE' } });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /BLOCKED: marker/);
+  assert.match(r.stderr, /BLOCKED: second/);
+});
+
+test('runner: crash isolation — crasher fails open loudly, later rules still block', () => {
+  const r = run('PreToolUse', { tool_name: 'Bash', tool_input: { command: 'MARKER' } });
+  assert.equal(r.status, 2); // block-if-marker still fired after crasher blew up
+  assert.match(r.stderr, /fail-open.*crasher/);
+});
+
+test('runner: missing rule file → loud fail-open, remaining rules run, never blocks', () => {
+  const r = run('Stop', { tool_name: 'x' });
+  assert.equal(r.status, 0);
+  assert.match(r.stderr, /fail-open.*missing-rule/);
+  assert.match(r.stderr, /warned/);
+});
+
+test('runner: broken matcher regex → group skipped (fail-open), no crash', () => {
+  const r = run('PreToolUse', { tool_name: 'Bash', tool_input: { command: 'nothing' } });
+  assert.equal(r.status, 0);
+});
+
+test('runner: commandExpanded — bash -c wrapped verb is visible to line-anchored rules', () => {
+  const r = run('PreToolUse', {
+    tool_name: 'Bash',
+    tool_input: { command: 'bash -c "secret-verb now"' },
+  });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /BLOCKED: expanded/);
+});
+
+test('runner: commandExpanded — nested sh -lc single-quoted payload unwrapped', () => {
+  const r = run('PreToolUse', {
+    tool_name: 'Bash',
+    tool_input: { command: `sh -lc 'secret-verb deep'` },
+  });
+  assert.equal(r.status, 2);
+});
+
+test('runner: passthrough echoes stdin exactly on pass', () => {
+  const payload = JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'ok' } });
+  const r = run('PreToolUse', payload);
+  assert.equal(r.status, 0);
+  assert.equal(r.stdout, payload);
+});
+
+test('runner: real manifest parses and every referenced rule name is unique per group', () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(HOOKS_DIR, 'rules.manifest.json'), 'utf8'));
+  const events = Object.keys(manifest.events);
+  assert.ok(events.includes('PreToolUse') && events.includes('Stop'));
+  for (const [ev, groups] of Object.entries(manifest.events)) {
+    for (const g of groups) {
+      const names = g.rules || [];
+      assert.equal(new Set(names).size, names.length, `${ev} has duplicate rule in one group`);
+    }
+  }
+});
