@@ -4,6 +4,26 @@
 
 ## 2026-07-02
 
+### ops: upload paid plugin zips to EU + SG VPS `/opt/lobster-plugins/` ✅
+
+**操作**：將 `D:\Work\_paid-plugins\` 16 個 zip 上傳至兩台 VPS。
+
+**已上傳**（EU `204.168.175.41` + SG `5.223.93.113` → `/opt/lobster-plugins/`，共 51M）：
+travelwp / elementor-pro / elementor-pro-activator / advanced-google-maps /
+advanced-coupons-for-woocommerce / translatepress-multilingual（改名自 translatepress-business）/
+translatepress-add-on-seo-pack / kadence-pro / kadence-woo-template-builder /
+wp-rocket / mainwp-rocket-extension / wpml-sitepress-multilingual-cms /
+wpml-string-translation / wpml-woocommerce-multilingual /
+woocommerce-points-and-rewards / woocommerce-product-addons
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=ssh root@EU+SG "ls -lh /opt/lobster-plugins/" | exit=0 | ms=<2000 — 16 files, 51M, both servers identical ✅
+- REVIEW_WAIVED: NA -- file upload operation, no code change
+- BUGHUNT_WAIVED: NA -- no code change
+- WORKLOG: 本條目
+
+**用途**：Cloudways 旅遊業客戶部署時，從 Cloudways SSH → wget 從此 VPS → wp plugin install。詳見 `docs/operations/TOURISM_CLIENT_DEPLOYMENT_WORKFLOW.md`。
+
 ### feat(video): Phase 0 AI Video Director — SceneSeries backbone + real render DoD ✅
 
 **根本問題**: 影片工具只有 Quick Engine（Python ffmpeg 固定 3-scene）；需要 Director Engine 支援 N scenes、data-driven duration、Ken Burns + slide-in 轉場。
