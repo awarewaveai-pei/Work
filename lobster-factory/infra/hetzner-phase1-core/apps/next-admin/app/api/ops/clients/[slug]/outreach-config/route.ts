@@ -13,9 +13,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(
   _req: Request,
-  { params }: { params: { slug: string } },
+  { params }: { params: Promise<{ slug: string }> },
 ): Promise<Response> {
-  const { slug } = params;
+  const { slug } = await params;
   const supabase = getSupabaseWriteClient();
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
@@ -44,12 +44,12 @@ export async function GET(
 
 export async function POST(
   req: Request,
-  { params }: { params: { slug: string } },
+  { params }: { params: Promise<{ slug: string }> },
 ): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canWriteTenantConfig(role)) return new NextResponse("forbidden", { status: 403 });
 
-  const { slug } = params;
+  const { slug } = await params;
 
   let body: Record<string, unknown>;
   try {
