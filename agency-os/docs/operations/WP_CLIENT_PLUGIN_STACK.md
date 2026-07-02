@@ -113,17 +113,18 @@
 
 > 疊加在基礎全員之上；manifest slug = `wp-tourism`（獨立 manifest，裝 TravelWP 主題而非 Kadence）。  
 > 旅遊站**不安裝** Kadence Theme + Kadence Blocks（catalog `excludeForModules: ["tourism"]`）。  
-> 共 **8 個功能位**。
+> 共 **9 個功能位**。
 
 | 類別 | 外掛 | installSource | WP.org Slug | 說明 |
 |------|------|--------------|-------------|------|
 | **主題** | TravelWP Theme（Physcode，$35） | manual-zip | `travelwp` | 旅遊業專屬主題，內建行程展示 + WooCommerce 預約整合；zip 放 `/opt/lobster-plugins/travelwp.zip` |
 | **頁面建構** | Elementor | wporg | `elementor` | TravelWP 使用 Elementor 建構版型（取代 Kadence Blocks）；Pro 的基底必裝 |
 | **頁面建構 Pro** | Elementor Pro (WordPressIT) | manual-zip | `elementor-pro` | TravelWP demo 完整功能需要 Pro；zip → `/opt/lobster-plugins/elementor-pro.zip` |
+| **Pro 激活器** | Elementor Pro Activator（WordPressIT bundle） | manual-zip | `elementor-pro-activator` | WordPressIT zip 包含的授權激活外掛；需同 elementor-pro 一起裝 |
 | **預約金流** | WooCommerce | wporg | `woocommerce` | TravelWP 透過 WooCommerce 處理行程付款 / 預約 |
 | **內容類型** | Custom Post Type UI (CPT UI) | wporg | `custom-post-type-ui` | 建立「行程」「景點」自訂類型 |
 | **相片集** | Modula Gallery | wporg | `modula-best-grid-gallery` | 旅遊照片集、行程相冊 |
-| **地圖路線** | WP Maps Pro ★ → Leaflet ↩ | manual-zip / wporg | PAID → `leaflet-map` | 付費首選；無預算用 Leaflet 替代（自動） |
+| **地圖路線** | Advanced Google Maps (WordPressIT) | manual-zip | `advanced-google-maps` | 旅遊行程地圖路線；zip → `/opt/lobster-plugins/advanced-google-maps.zip` |
 | **多語系** | TranslatePress † | wporg | `translatepress-multilingual` | 有國際客源時選裝；† 選配 |
 
 ### 5.2 形象站 / 品牌站（追加）
@@ -145,7 +146,7 @@
 |------|-------------|:------:|:-------:|:---:|:---:|:----:|:----:|:----:|
 | 名片站 | wp-basic | ✅ | ✅ | — | — | — | — | 18 |
 | 品牌+CRM | wp-business | ✅ | ✅ | — | — | — | ✅ | 21 |
-| 觀光/預約 | wp-tourism | ✅ | ✅（−Kadence 2） | — | — | ✅ | — | 23 |
+| 觀光/預約 | wp-tourism | ✅ | ✅（−Kadence 2） | — | — | ✅ | — | 24 |
 | 標準電商 | wc-core | ✅ | ✅ | ✅ | — | — | — | 31 |
 | POD 電商 | wc-custom | ✅ | ✅ | ✅ | ✅ | — | — | 32 |
 
@@ -315,9 +316,10 @@ FluentSMTP 本身不提供郵件發送能力，需搭配 SMTP 供應商：
 | `release-url` | 1 | GitHub release zip 自動取得（wp-bridge，Phase 1）| ❌ 全自動（Phase 1 完成後）|
 | `wporg` | 33 | WP.org → `wp plugin install <slug>` | ❌ 全自動 |
 | `manual-zip` + `alternativeSlug` | 2 | 付費首選，但有免費替代；替代品自動裝 | ❌ 全自動（裝替代）|
-| `manual-zip` 無替代 | 6 | 必須上傳 zip；見 §10.3 | ✅ 需操作員 |
+| `manual-zip` 無替代 | 10 | 必須上傳 zip；見 §10.3 | ✅ 需操作員 |
 
-> **6 個需操作員手動上傳的 zip**：TravelWP Theme、Elementor Pro、Kadence Shop Kit、ECPay（綠界）、WooCommerce Points and Rewards、WooCommerce Product Add-Ons
+> **10 個需操作員手動上傳的 zip**：TravelWP Theme、Elementor Pro、Elementor Pro Activator、Advanced Google Maps、Kadence Pro、Kadence Shop Kit†、ECPay（綠界）、WooCommerce Points and Rewards、WooCommerce Product Add-Ons、Advanced Coupons  
+> †`kadence-shop-kit` slug 待確認：實體 zip 叫 `kadence-woo-template-builder`；可能已含在 `kadence-pro.zip`，首次部署前須測試
 
 ### 10.3 付費 zip 交付 Runbook
 
@@ -327,10 +329,14 @@ FluentSMTP 本身不提供郵件發送能力，需搭配 SMTP 供應商：
 # 檔案命名規則（與 catalog slug 一致）
 /opt/lobster-plugins/travelwp.zip                        # 旅遊站主題，physcode.com $35
 /opt/lobster-plugins/elementor-pro.zip                   # Elementor Pro，WordPressIT
-/opt/lobster-plugins/kadence-shop-kit.zip
+/opt/lobster-plugins/elementor-pro-activator.zip         # Elementor Pro Activator，WordPressIT bundle
+/opt/lobster-plugins/advanced-google-maps.zip            # 旅遊地圖，WordPressIT
+/opt/lobster-plugins/kadence-pro.zip                     # Kadence Pro Add-on，WordPressIT（所有非旅遊站）
+/opt/lobster-plugins/kadence-shop-kit.zip                # ⚠️ slug 待確認（zip 實體叫 kadence-woo-template-builder）
 /opt/lobster-plugins/ecpay-payment-gateway.zip
 /opt/lobster-plugins/woocommerce-points-and-rewards.zip
 /opt/lobster-plugins/woocommerce-product-addons.zip
+/opt/lobster-plugins/advanced-coupons-for-woocommerce.zip  # 所有裝 WooCommerce 的站
 ```
 
 **操作流程（WordPressIT）**：
@@ -374,3 +380,5 @@ FluentSMTP 本身不提供郵件發送能力，需搭配 SMTP 供應商：
 | 2026-05-12 | 品質修訂：所有表格加入 WP.org Slug 欄；★/↩/† 標記規範；Complianz 選配說明 |
 | 2026-06-29 | 全面同步 catalog.ts（Phase 0 完成後）：新增維運層（mainwp-child/wp-bridge）；新增 installSource 欄位；新增 POD 模組；電商 12→13（+PayPal）；基礎 16→18；YITH 全部替換為 WooCommerce 官方/ThemeIsle；zip 交付改為 VPS /opt/lobster-plugins/；組合矩陣加 POD 電商欄；catalog entries 36→40 |
 | 2026-07-02 | 旅遊站切換 TravelWP 主題：移除 WP Travel Engine + Amelia；加 TravelWP（manual-zip）+ Elementor + WooCommerce；新增 manifest `wp-tourism`；Kadence+KadenceBlocks 加 `excludeForModules: ["tourism"]`；決策樹 §7.3 改寫；catalog entries 40→42 |
+| 2026-07-02 | 旅遊模組補齊：加 `elementor-pro-activator`（WordPressIT bundle 必要）+ `advanced-google-maps`（取代 wp-maps-pro，操作員已有 zip）；catalog 43→44；zip 清單 6→8 |
+| 2026-07-02 | 補全 catalog：`kadence-pro`（base，exclude tourism）+ `advanced-coupons-for-woocommerce`（ecommerce + tourism 各一筆）；`kadence-shop-kit` 加 TODO 注記（zip 實體是 kadence-woo-template-builder，待測試）；catalog 44→47；zip 清單 8→10 |

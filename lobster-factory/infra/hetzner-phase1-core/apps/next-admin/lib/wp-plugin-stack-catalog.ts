@@ -58,24 +58,26 @@ export interface WpPlugin {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Catalog — 18 base + 13 ecommerce + 1 pod + 8 tourism + 3 brand = 43 total entries
+// Catalog — 20 base + 17 ecommerce + 1 pod + 12 tourism + 3 brand = 53 total entries
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const WP_PLUGIN_CATALOG: WpPlugin[] = [
 
-  // ── BASE MODULE (18 functional slots) ────────────────────────────────────
+  // ── BASE MODULE (20 functional slots) ────────────────────────────────────
 
   { slug: "mainwp-child",                      label: "MainWP Child",                               free: true,  required: true,  module: "base", installSource: "manifest" },
   // Phase 1 TODO: wire release-url fetcher in provisioning flow (awarewaveai-pei/aware-wave-wp-bridge tag→Action zip)
   { slug: "aware-wave-wp-bridge",              label: "AwareWave WP Bridge",                        free: false, required: true,  module: "base", installSource: "release-url" },
   { slug: "kadence",        label: "Kadence Theme",  free: true, required: true, module: "base", excludeForModules: ["tourism"] },
   { slug: "kadence-blocks", label: "Kadence Blocks", free: true, required: true, module: "base", excludeForModules: ["tourism"] },
+  { slug: "kadence-pro",    label: "Kadence Pro Add-on (WordPressIT)", free: false, required: true, module: "base", installSource: "manual-zip", excludeForModules: ["tourism"] },
   { slug: "wordfence",                          label: "Wordfence Security",                         free: true,  required: true,  module: "base" },
   { slug: "wpvivid-backups-and-migration",      label: "WPvivid Backup",                             free: true,  required: true,  module: "base" },
   { slug: "seo-by-rank-math",                   label: "Rank Math SEO",                              free: true,  required: true,  module: "base" },
   { slug: "redirection",                        label: "Redirection",                                free: true,  required: true,  module: "base" },
-  { slug: "litespeed-cache",                    label: "LiteSpeed Cache ★",                          free: true,  required: true,  module: "base", condition: "is_litespeed" },
-  { slug: "shortpixel-image-optimiser",         label: "ShortPixel Image Optimiser ★",               free: true,  required: true,  module: "base" },
+  { slug: "wp-rocket",                           label: "WP Rocket (WordPressIT)",                    free: false, required: true,  module: "base", installSource: "manual-zip", excludeForModules: ["tourism"] },
+  { slug: "mainwp-rocket-extension",            label: "MainWP Rocket Extension (WordPressIT)",      free: false, required: true,  module: "base", installSource: "manual-zip", excludeForModules: ["tourism"] },
+  { slug: "shortpixel-image-optimiser",         label: "ShortPixel Image Optimiser",                 free: true,  required: true,  module: "base" },
   { slug: "really-simple-ssl",                 label: "Really Simple SSL",                          free: true,  required: true,  module: "base" },
   { slug: "fluentform",                         label: "Fluent Forms",                               free: true,  required: true,  module: "base" },
   { slug: "fluent-smtp",                        label: "FluentSMTP",                                 free: true,  required: true,  module: "base" },
@@ -99,10 +101,12 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
     module: "base",
   },
 
-  // ── ECOMMERCE MODULE (13 functional slots) ────────────────────────────────
+  // ── ECOMMERCE MODULE (17 functional slots) ────────────────────────────────
 
   { slug: "woocommerce",                                label: "WooCommerce",                                   free: true,  required: true,  module: "ecommerce" },
   {
+    // TODO: verify slug — zip on disk is "kadence-woo-template-builder"; may be same plugin
+    // or may already be included inside kadence-pro.zip. Test before first deploy.
     slug: "kadence-shop-kit",
     label: "Kadence Shop Kit",
     free: false,
@@ -135,6 +139,11 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
   { slug: "variation-swatches-for-woocommerce",         label: "Variation Swatches for WooCommerce",            free: true,  required: true,  module: "ecommerce" },
   { slug: "cartflows",                                  label: "CartFlows ★",                                   free: true,  required: true,  module: "ecommerce" },
   { slug: "woo-cart-abandonment-recovery",              label: "WooCommerce Cart Abandonment Recovery",         free: true,  required: true,  module: "ecommerce" },
+  { slug: "advanced-coupons-for-woocommerce",           label: "Advanced Coupons for WooCommerce (Premium)",    free: false, required: true,  module: "ecommerce", installSource: "manual-zip" },
+  // WPML multilingual suite — optional; use when ecommerce site needs multiple languages
+  { slug: "wpml-sitepress-multilingual-cms",           label: "WPML Multilingual CMS (WordPressIT) †",         free: false, required: false, module: "ecommerce", installSource: "manual-zip" },
+  { slug: "wpml-string-translation",                   label: "WPML String Translation Addon †",               free: false, required: false, module: "ecommerce", installSource: "manual-zip" },
+  { slug: "wpml-woocommerce-multilingual",             label: "WPML WooCommerce Multilingual †",               free: false, required: false, module: "ecommerce", installSource: "manual-zip" },
 
   // ── POD MODULE (1 functional slot) ───────────────────────────────────────
   // Only for wc-custom. Customer uploads design file at checkout.
@@ -149,7 +158,7 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
     installSource: "manual-zip",
   },
 
-  // ── TOURISM MODULE (7 functional slots) ──────────────────────────────────
+  // ── TOURISM MODULE (12 functional slots) ─────────────────────────────────
   // Theme: TravelWP (physcode.com, $35 one-time, installSource manual-zip).
   // Replaces Kadence theme + Kadence Blocks (excluded via excludeForModules in BASE).
   // Booking is handled via TravelWP + WooCommerce; no separate booking plugin needed.
@@ -164,25 +173,22 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
   },
   { slug: "elementor",                  label: "Elementor",                                       free: true,  required: true,  module: "tourism" },
   { slug: "elementor-pro",              label: "Elementor Pro (WordPressIT)",                      free: false, required: true,  module: "tourism", installSource: "manual-zip" },
+  { slug: "elementor-pro-activator",    label: "Elementor Pro Activator (WordPressIT bundle)",     free: false, required: true,  module: "tourism", installSource: "manual-zip" },
   { slug: "woocommerce",               label: "WooCommerce (TravelWP booking)",                   free: true,  required: true,  module: "tourism" },
   { slug: "custom-post-type-ui",        label: "Custom Post Type UI (CPT UI)",                    free: true,  required: true,  module: "tourism" },
   { slug: "modula-best-grid-gallery",   label: "Modula Gallery",                                  free: true,  required: true,  module: "tourism" },
   {
-    slug: "wp-maps-pro",
-    label: "WP Maps Pro ★ (→ Leaflet ↩)",
+    slug: "advanced-google-maps",
+    label: "Advanced Google Maps (WordPressIT)",
     free: false,
     required: true,
     module: "tourism",
     installSource: "manual-zip",
-    alternativeSlug: "leaflet-map",
   },
-  {
-    slug: "translatepress-multilingual",
-    label: "TranslatePress †",
-    free: true,
-    required: false,
-    module: "tourism",
-  },
+  { slug: "advanced-coupons-for-woocommerce",    label: "Advanced Coupons for WooCommerce (Premium)", free: false, required: true,  module: "tourism", installSource: "manual-zip" },
+  { slug: "breeze",                        label: "Breeze (Cloudways cache)",                  free: true,  required: true,  module: "tourism" },
+  { slug: "translatepress-multilingual",  label: "TranslatePress Business (WordPressIT) †",    free: false, required: false, module: "tourism", installSource: "manual-zip" },
+  { slug: "translatepress-add-on-seo-pack", label: "TranslatePress SEO Pack Addon †",           free: false, required: false, module: "tourism", installSource: "manual-zip" },
 
   // ── BRAND MODULE (3 functional slots) ────────────────────────────────────
 
