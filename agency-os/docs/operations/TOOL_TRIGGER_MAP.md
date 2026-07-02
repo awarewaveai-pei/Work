@@ -1,7 +1,7 @@
 # Tool Trigger Map
 
 > 所有工具的觸發情形一覽。每次新增工具時同步更新本文件。
-> Last updated: 2026-06-03
+> Last updated: 2026-07-02
 
 ## 圖例
 
@@ -15,7 +15,7 @@
 
 ---
 
-## Slash Commands（34 個）
+## Slash Commands（41 個）
 
 ### AO 生命週期
 
@@ -76,9 +76,21 @@
 | `/strategy-review` | 多角度策略審查（紅藍隊 / pre-mortem）| 🟢 「要不要做 X」「值不值得」「策略審查」|
 | `/fix-sidebars` | 修 VSCode Claude Code / Codex sidebar | ⚪ 你說 sidebar 壞了 |
 
+### 2026-06 後新增（2026-07-02 稽核補登）
+
+| 指令 | 功能 | 觸發 |
+|------|------|------|
+| `/zoom-out` | 陌生模組地圖（caller/系統層定位）| 🟢 讀 code 碰到陌生區段時 Claude 自動跑，不問 |
+| `/browser-test` | Chrome MCP 真瀏覽器 e2e 測試 | 🟢 「幫我測」「瀏覽器測試」「live test」|
+| `/caveman` | token 壓縮 ~75%（本 project 永久預設）| 🟢 「caveman」「be brief」「less tokens」|
+| `/origin-lockdown` | SG VPS Cloudflare origin 鎖定（80/443 限 CF IP）| ⚪ 明確要求 |
+| `/provision-client` | 一鍵租 Hetzner + day-1 硬化 + DNS | 🟢 「一鍵架站」「租主機」「provision」（High 步驟等 go-ahead）|
+| `/wp-bridge-release` | wp-bridge 外掛發版（release repo tag → zip）| 🟢 改 wp-bridge code 且 bump 版號後自動 |
+| `/wp-redirect` | WordPress 301/302 轉址（Rank Math）| 🟢 「轉址」「redirect」|
+
 ---
 
-## Custom Skills（13 個）
+## Custom Skills（12 個）
 
 ### 治理 / 系統 Skills（原有 6 個）
 
@@ -91,7 +103,7 @@
 | `strategy-review` | 非工程策略多角度審查 | 🟢 策略決策 / 紅藍隊 / pre-mortem |
 | `ai-decision-intelligence` | 技術決策多 agent 辯論系統 | 🟢 via `/decide` 自動呼叫 |
 
-### 日常 Coding 工作流 Skills（新增 7 個，整合自 mattpocock/skills，2026-06-04）
+### 日常 Coding 工作流 Skills（6 個，整合自 mattpocock/skills，2026-06-04）
 
 | Skill | 功能 | 觸發 |
 |-------|------|------|
@@ -101,7 +113,14 @@
 | `diagnose` | 六段 debug loop（含 R0 WORKLOG 要求） | 🟢 「diagnose」「找不到 bug」「一直報錯」「效能問題」|
 | `prototype` | 邏輯原型（終端 app）或 UI 原型（多 variant route） | 🟢 「prototype」「做個原型」「試幾個設計」|
 | `improve-codebase-architecture` | 找架構加深機會，生成 HTML 報告 + grilling | 🟢 「架構改善」「重構機會」「很難測試」|
-| `/caveman`（command） | token 壓縮 75%，持續生效直到 stop caveman | 🟢 「caveman mode」「less tokens」「be brief」|
+
+### 瀏覽器測試 Skill（2026-07-02 稽核補登）
+
+| Skill | 功能 | 觸發 |
+|-------|------|------|
+| `browser-test` | Chrome MCP 驅動真實 Chrome 的 live e2e（登入態/Canvas/React state）| 🟢 「幫我測」「Chrome 測一下」「跑一下 e2e」|
+
+> 註：`/caveman` 是 slash command 非 skill，已移至 Slash Commands 表（2026-07-02 修正歸類）。
 
 ---
 

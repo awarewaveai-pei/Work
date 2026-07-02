@@ -2,15 +2,15 @@
 
 > 自訂 slash command 與 SKILL.md 技能的完整索引。
 > SSOT = `.claude/commands/*.md`（slash command）+ `.claude/skills/*/SKILL.md`（技能）。
-> Last generated: 2026-06-04
+> Last generated: 2026-07-02
 
 兩類：
-- **Slash commands**（`.claude/commands/*.md`，共 35）— 打 `/<name>` 觸發。
-- **Skills**（`.claude/skills/`，共 13）— 由 Skill 工具依描述/trigger 詞自動載入。
+- **Slash commands**（`.claude/commands/*.md`，共 41）— 打 `/<name>` 觸發。
+- **Skills**（`.claude/skills/`，共 12）— 由 Skill 工具依描述/trigger 詞自動載入。
 
 ---
 
-## A. Slash Commands（33）
+## A. Slash Commands（41）
 
 ### AO 生命週期 / 每日
 
@@ -80,7 +80,19 @@
 
 ---
 
-## B. Skills（13）
+### 維運 / 發版（2026-07-02 稽核補登）
+
+| 指令 | 描述 | 路徑 |
+|---|---|---|
+| `/browser-test` | Chrome MCP 真瀏覽器 e2e 測試入口。 | [commands/browser-test.md](commands/browser-test.md) |
+| `/origin-lockdown` | SG VPS Cloudflare origin 鎖定（80/443 限 CF IP）。 | [commands/origin-lockdown.md](commands/origin-lockdown.md) |
+| `/provision-client` | 一鍵租 Hetzner 主機 + day-1 硬化 + DNS。 | [commands/provision-client.md](commands/provision-client.md) |
+| `/wp-bridge-release` | wp-bridge 外掛發版（release repo tag → GitHub Release zip）。 | [commands/wp-bridge-release.md](commands/wp-bridge-release.md) |
+| `/wp-redirect` | WordPress 301/302 轉址（Rank Math）。 | [commands/wp-redirect.md](commands/wp-redirect.md) |
+
+---
+
+## B. Skills（12）
 
 ### 現有系統 Skills
 
@@ -91,7 +103,7 @@
 | `qa-review` | 在本地 dev 環境跑 QA 測試並產結構化報告。觸發：「跑 QA / 測試功能 / 找 bug / 上線前測試」。先跑 5-level 檢查。 | [skills/qa-review/SKILL.md](skills/qa-review/SKILL.md) |
 | `sdd-update` | 同步系統設計文件（SDD）與近期 code 改動。觸發：「更新 sdd / 同步設計文件 / 技術文件過時了」。先跑 5-level 檢查。 | [skills/sdd-update/SKILL.md](skills/sdd-update/SKILL.md) |
 | `strategy-review` | 非工程決策的多角度策略審查（選工具/客戶/商業/廠商/整合）：四角色協作、紅藍隊、pre-mortem，產可升 ADR 的決策紀錄。 | [skills/strategy-review/SKILL.md](skills/strategy-review/SKILL.md) |
-| `ai-decision-intelligence` | 技術決策多 agent 系統（工具選型、架構審查）。打包成 `.skill`（zip）。 | [skills/ai-decision-intelligence.skill](skills/ai-decision-intelligence.skill) |
+| `browser-test` | Chrome MCP 驅動真實 Chrome 的 live e2e 測試（登入態/Canvas/React state）。 | [skills/browser-test/SKILL.md](skills/browser-test/SKILL.md) |
 
 ### 日常 Coding 工作流 Skills（整合自 mattpocock/skills，2026-06-04）
 
