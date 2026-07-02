@@ -9,12 +9,16 @@ const nextConfig: NextConfig = {
   // Keep file tracing scoped to this app (avoid parent monorepo lockfile warnings in Docker / CI).
   outputFileTracingRoot: path.join(__dirname),
   webpack: (config) => {
-    // @workflows alias: makes packages/workflows importable from next-admin routes
-    // without a workspace install. Next.js bundles these files via webpack so they
-    // are included in the standalone output even though outputFileTracingRoot is scoped.
+    // @workflows alias: makes packages/workflows importable from next-admin routes.
+    // In Docker build the monorepo root is outside the build context, so sg-deploy
+    // rsyncs packages/workflows/src/ into apps/next-admin/packages/workflows/src/.
+    // Locally that subdirectory doesn't exist, so we fall back to the monorepo path.
+    const fs = require("fs");
+    const localPkg = path.join(__dirname, "packages/workflows/src");
+    const monoPkg = path.join(__dirname, "../../../../packages/workflows/src");
     config.resolve.alias = {
       ...(config.resolve.alias as Record<string, string> | undefined ?? {}),
-      "@workflows": path.join(__dirname, "../../../../packages/workflows/src"),
+      "@workflows": fs.existsSync(localPkg) ? localPkg : monoPkg,
     };
 
     // ssh2 (wp-update SSH route) lazily require()s two OPTIONAL native accelerators —

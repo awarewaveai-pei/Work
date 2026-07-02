@@ -173,6 +173,18 @@ for APP in "${APPS[@]}"; do
   rsync "${RSYNC_ARGS[@]}" "$SRC" "$DST" 2>&1 | tee -a "$LOG_FILE"
 done
 
+# 2.1 For next-admin: also copy packages/workflows/src/ into the Docker build context.
+# next.config.ts @workflows alias checks for this local copy first (Docker), then
+# falls back to the monorepo relative path (local dev). The main rsync uses --delete so
+# packages/ was removed from DST; we re-add it here before the docker build.
+if [[ " ${APPS[*]} " =~ " next-admin " ]]; then
+  _pkg_src="$REPO_DIR/lobster-factory/packages/workflows/src/"
+  _pkg_dst="$STAGING_DIR/apps/next-admin/packages/workflows/src/"
+  mkdir -p "$_pkg_dst"
+  log "--- rsync packages/workflows/src -> next-admin build context ---"
+  rsync -a --delete "$_pkg_src" "$_pkg_dst" 2>&1 | tee -a "$LOG_FILE"
+fi
+
 if [[ $DRY_RUN -eq 1 ]]; then
   log "DRY RUN complete; not rebuilding."
   exit 0
