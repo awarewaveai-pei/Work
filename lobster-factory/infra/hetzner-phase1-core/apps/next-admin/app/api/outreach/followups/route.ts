@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
-import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { getOrgSupabaseWriteClient } from "@/lib/org-client";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 // Cold Outreach — Follow-up scheduling (task T11). Mutates co_leads.next_followup_date /
@@ -23,13 +23,11 @@ const addDays = (n: number): string => {
 };
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-// POST { leadId, action, days?, date? }
+// POST { leadId, action, days?, date?, orgSlug? }
 //   action = set | snooze | complete | stop
 export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
-  const supabase = getSupabaseWriteClient();
-  if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   let body: Record<string, unknown>;
   try {
@@ -37,6 +35,9 @@ export async function POST(req: Request): Promise<Response> {
   } catch {
     return new NextResponse("invalid json", { status: 400 });
   }
+
+  const supabase = await getOrgSupabaseWriteClient(str(body.orgSlug));
+  if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   const leadId = str(body.leadId);
   const action = str(body.action);

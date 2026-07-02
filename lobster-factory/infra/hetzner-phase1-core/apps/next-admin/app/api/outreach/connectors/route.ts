@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
-import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { getOrgSupabaseWriteClient } from "@/lib/org-client";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 // Cold Outreach — Connector account CRUD (task T4). Table: co_connector_accounts (migration 0048).
@@ -32,10 +32,10 @@ function looksLikeSecret(s: string): boolean {
 }
 
 export async function GET(req: Request): Promise<Response> {
-  const supabase = getSupabaseWriteClient();
+  const url = new URL(req.url);
+  const supabase = await getOrgSupabaseWriteClient(url.searchParams.get("orgSlug"));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
-  const url = new URL(req.url);
   let orgFilter: string | null;
   try { orgFilter = effectiveOrgId(req, url.searchParams.get("organizationId")); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
@@ -54,15 +54,15 @@ export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
 
-  const supabase = getSupabaseWriteClient();
-  if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
-
   let body: Record<string, unknown>;
   try {
     body = await req.json();
   } catch {
     return new NextResponse("invalid json", { status: 400 });
   }
+
+  const supabase = await getOrgSupabaseWriteClient(str(body.orgSlug));
+  if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   const id = str(body.id);
   const connector_name = str(body.connectorName);
@@ -129,10 +129,11 @@ export async function DELETE(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
 
-  const supabase = getSupabaseWriteClient();
+  const params = new URL(req.url).searchParams;
+  const supabase = await getOrgSupabaseWriteClient(params.get("orgSlug"));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
-  const id = new URL(req.url).searchParams.get("id");
+  const id = params.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
   const { data: cur, error: readErr } = await supabase.from(TABLE).select("organization_id").eq("id", id).maybeSingle();
   if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
