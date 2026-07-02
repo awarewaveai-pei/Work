@@ -1,14 +1,14 @@
 {
   "name": "wp-business",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "schemaVersion": "1.0.0",
-  "target": "wordpress",
+  "target": "staging-only",
   "applyMode": "full_install",
   "description": "WordPress container manifest (business profile): Kadence theme + operational plugins. User-facing plugins (FluentCRM, Rank Math, GTM4WP, etc.) are owned by agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md §八 and installed via wp-install-plugins task — do NOT add user-facing plugins here.",
   "guardrails": {
-    "allowEnvironments": ["staging", "production"],
+    "allowEnvironments": ["staging"],
     "requireBackup": false,
-    "blockIfProduction": false
+    "blockIfProduction": true
   },
   "dependencies": [],
   "conflicts": [],

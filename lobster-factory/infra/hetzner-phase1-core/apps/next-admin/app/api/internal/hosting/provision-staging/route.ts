@@ -401,15 +401,20 @@ export async function POST(request: Request) {
       throw new Error(`wp core install failed: ${installResult.stdout} ${installResult.stderr}`);
     }
 
-    // 6. Install Kadence theme
-    const themeResult = await sshExec(
-      conn,
-      `docker exec -u www-data lobster-wordpress bash -c "${WP_CLI} theme install kadence kadence-child-theme-two --activate --path=${wpPath}/ --quiet 2>&1 || ${WP_CLI} theme install kadence --activate --path=${wpPath}/ --quiet 2>&1"`
-    );
-    const themeOk = themeResult.code === 0 || themeResult.stdout.includes("already installed");
+    // 6. Install base theme — skip for wp-tourism (apply-manifest installs TravelWP via localZip step)
+    let themeOk = true;
+    if (manifestSlug !== "wp-tourism") {
+      const themeResult = await sshExec(
+        conn,
+        `docker exec -u www-data lobster-wordpress bash -c "${WP_CLI} theme install kadence kadence-child-theme-two --activate --path=${wpPath}/ --quiet 2>&1 || ${WP_CLI} theme install kadence --activate --path=${wpPath}/ --quiet 2>&1"`
+      );
+      themeOk = themeResult.code === 0 || themeResult.stdout.includes("already installed");
+    }
 
-    // 7. Always install Kadence Blocks + base plugins; add manifest-specific slugs
-    const basePlugins = ["kadence-blocks", "seo-by-rank-math", "fluent-smtp", "litespeed-cache"];
+    // 7. Install base plugins; tourism uses Elementor/TravelWP so kadence-blocks is excluded
+    const basePlugins = manifestSlug === "wp-tourism"
+      ? ["seo-by-rank-math", "fluent-smtp"]
+      : ["kadence-blocks", "seo-by-rank-math", "fluent-smtp", "litespeed-cache"];
     const ecommercePlugins = manifestSlug === "wc-core" || manifestSlug === "wc-custom"
       ? ["woocommerce", "woo-gutenberg-products-block"]
       : [];

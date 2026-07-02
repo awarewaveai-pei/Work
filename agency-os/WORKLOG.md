@@ -4,6 +4,54 @@
 
 ## 2026-07-02
 
+### fix(provisioning): 修復 tourism onboarding pipeline 6 bugs + 1 架構缺口 ✅
+
+**根因**：wp-tourism.json（及 wp-basic/wp-business）的 `target:"wordpress"` 導致 apply-manifest Zod parse FAIL；`blockIfProduction:false` 觸發 guardrail throw；install-from-manifest.sh 無法安裝 paid theme（TravelWP 不在 WP.org）；postInstall steps（flush_permalinks / set_option）從未執行；trigger-build 不推導 pluginSlugs；contracts.ts 不認識 tourism pack。
+
+**已修改**：
+- `packages/manifests/wp-basic.json` v1.1.0→1.2.0: target→staging-only, blockIfProduction→true, allowEnvironments→["staging"]
+- `packages/manifests/wp-business.json` v1.1.0→1.2.0: 同上
+- `packages/manifests/wp-tourism.json` v1.0.0→1.1.0: 同上 + theme-travelwp step 加 `localZip:true`
+- `templates/woocommerce/scripts/install-from-manifest.sh`: 加 localZip 支援（fail-loud）+ postInstall 執行（activate_theme/flush_permalinks/set_option）
+- `packages/workflows/src/executor/installManifestStaging.ts`: 加 LOBSTER_PLUGIN_STORE 到 env allowlist
+- `apps/next-admin/app/api/onboarding/trigger-build/route.ts`: import resolveInstallableSlugsForPacks/resolvePaidPluginsForPacks + 推導 pluginSlugs/paidPluginCount + theme_family tourism→elementor
+- `apps/next-admin/lib/build-console/contracts.ts`: normalizeBuildRequest + smokeProfileFor 加 tourism case
+- `apps/next-admin/app/api/internal/hosting/provision-staging/route.ts`: wp-tourism 跳過 Kadence 安裝；basePlugins tourism 排除 kadence-blocks
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=tsc --noEmit (next-admin) | exit=0 | ms=~15000
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash -n install-from-manifest.sh | exit=0 | ms=<100
+- REALTEST_EVIDENCE: tool=Bash | cmd=DRY_RUN=1 bash install-from-manifest.sh wp-tourism.json (fake zip) | exit=0 | output=wp theme install /tmp/fake-plugins/travelwp.zip + wp rewrite flush --hard + wp option update timezone_string
+- REALTEST_EVIDENCE: tool=Bash | cmd=DRY_RUN=1 bash install-from-manifest.sh wp-basic.json | exit=0 | output=wp theme install kadence (WP.org path) + postInstall OK
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=target.*wordpress,blockIfProduction.*false,resolveInstallableSlugsForPacks,localZip | hits=0 stale claims (agency-os/scripts hits = RankMath docs + old health reports, irrelevant)
+
+### feat: 架站系統 Stage 2 + 3 + 4 程式實作 ✅
+
+**根因**：Stage 1（建站引擎）已通；Stage 2/3/4 程式缺口導致整個 intake→報價→建站→租機 閉環無法自動化。
+
+**已修改**：
+- `app/api/onboarding/submit/route.ts` — 加 x-ops-sync-key 雙路徑 auth（Stage 2）+ effectiveOrgId 防 IDOR 寫入（S5 安全修）
+- `packages/db/migrations/0055_intake_quote.sql` — intake_forms 加 quote_data JSONB + quote_status（Stage 3）
+- `app/api/onboarding/quote/route.ts` — GET/POST/PATCH 報價 CRUD + 狀態機（Stage 3）+ assertOrgAccess 三路徑 + organization_id 加入 select（S5 安全修）
+- `app/api/onboarding/trigger-build/route.ts` — 加報價 gate（Stage 3）+ assertOrgAccess（S5 安全修）+ 原子 CAS mutex（.neq+select，防並發雙租機）
+- `app/api/provision/route.ts` — 呼叫 provisionClient()，env-gated，auth 保護（Stage 4）+ tier/region 白名單驗證
+- `next.config.ts` — 加 @workflows webpack alias（→ packages/workflows/src）（Stage 4）
+- `tsconfig.json` — 加 @workflows/* path alias（Stage 4）
+- `app/build/BuildConsole.tsx` — Profile B 加「機層租機」可摺疊面板 + 結果顯示（Stage 4）+ provision 按鈕在 siteId/organizationId 空時 disabled（防孤兒 VM）
+- `agency-os/docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md` — Stage 2/3/4 標記完成
+
+**剩餘待做（ops 設定，非程式）**：
+- 跑 `0055_intake_quote.sql` migration 到 EU Supabase
+- n8n：建立 Fluent Form webhook → /api/onboarding/submit 的 workflow
+- SG `.env`：加 `LOBSTER_SERVER_ADAPTER` + `LOBSTER_SERVER_PROVISION_ENABLED` 才能開真機（目前 none = idle 安全）
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (×2 — 原始+安全修後) | exit=0 | ms=<30000 — 0 type errors ✅
+- REVIEW_DONE: critic=Standard | verdict=pass-after-fix | findings=2M/3m/0c — (M1) assertOrgAccess/effectiveOrgId 補入 submit+quote(GET/POST/PATCH)+trigger-build，匹配 S5 pattern；(M2) trigger-build 並發 CAS 修為原子 .neq("status","building")+select；(m1) provision tier/region 白名單；(m2) provision 按鈕在 siteId/orgId 空時 disabled；(m3) 報價自我審批分離暫緩 — 目前所有呼叫者為 staff-only operator，可接受
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=quote_status|quote_data|quote_approval_required,x-ops-sync-key|OPS_PROXY_SHARED_SECRET|hasSyncKey,provisionClient|buildServerAdapterFromEnv|serverTypeForTier|@workflows | hits=0 — all hits in new files only, follow established pattern (wp-report/wp-update/middleware.ts), no stale cross-refs
+- WORKLOG: 本條目（commit: f65f852a checkpoint，含全部安全修補）
+
 ### refactor(hooks): 治理系統 v2 — 單一 runner + 純規則模組（方案 D 絞殺式遷移全程完成）
 
 [任務理解] 全面稽核（三調查代理 + 10 項親測注入）確認四風險實錘：① 23 hooks 手刻生命週期 ×23、零測試、`_verify-shared` 頂層 require 單點（一檔壞 = 7 安全閘靜默死）② 兩份接線檔互漂（16 vs 20 hooks、自稱 15）③ 遠端 container 零 hook 接線 = 每個 web session 治理真空 ④ WORKLOG 15,708 行無 rotation、誠實鏈驗格式不驗真。操作者裁決：不要補丁，要乾淨架構（方案 D），全程不中停。
@@ -50,7 +98,6 @@
 
 - AUTO_TASK_DONE: hooks v2 runner 架構遷移 + 遠端接線 + 垃圾檔清理 + WORKLOG 輪替 + 規則優先序/信任邊界明文化
 
-## 2026-07-02
 
 ### ops: 清理測試垃圾客戶 org 記錄 ✅
 

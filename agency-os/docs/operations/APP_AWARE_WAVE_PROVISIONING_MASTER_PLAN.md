@@ -115,31 +115,36 @@ aware-wave.com (WP)            app.aware-wave.com (Next.js 15)
 **風險**：Medium（auth 邊界）。**檔案**：`trigger-build/route.ts`、onboarding 前端、`submit`/`generate-spec`。
 **⚠️ 注意**：`trigger-build/route.ts` 開頭註解已被另一 session 標記機層接入點 —— 動前先 `git log -5` 看是否有人在改。
 
-### Stage 2 — Fluent Form → intake 橋接 + 中央 FluentCRM
+### Stage 2 — Fluent Form → intake 橋接 + 中央 FluentCRM ✅ 程式完成
 **目標**：公開 aware-wave.com 的 Fluent Form 收件 → 自動進 (a) app 的 intake_forms、(b) 中央 FluentCRM（做客戶關係）。
-**步驟**：
-1. 決定橋接管道：Fluent Form webhook → n8n workflow → `POST /api/onboarding/submit`（建議走 n8n，與既有自動化一致；憑 `OPS_INBOX_INGEST_TOKEN` 模式做 auth）。
-2. 同一 webhook fan-out 到中央 FluentCRM（哪台 WP 當 CRM 主機要先定）→ 建 contact + tag。
-3. 欄位對映：Fluent Form 欄 → IntakeForm 型別（company_name/domain/language/package_slug…）。
-**驗收**：填一筆公開表單 → app intake_forms 出現 + FluentCRM contact 出現。
-**風險**：Medium。**前置**：Stage 1 通。**相關 agent**：`n8n-engineer`、`wordpress-plugin-expert`（Fluent 套件）。
+**已完成（2026-07-02）**：
+- `submit/route.ts` 已加入 x-ops-sync-key 雙路徑 auth（n8n 可直接 POST）。
+**待做（ops 設定，非程式）**：
+- 在 n8n 建立 Fluent Form webhook → `POST /api/onboarding/submit` 的 workflow（帶 `x-ops-sync-key` header）。
+- 同 webhook fan-out 到中央 FluentCRM（contact + tag）。
+**驗收**：填公開表單 → intake_forms 出現 + FluentCRM contact 出現。
+**風險**：Medium。
 
-### Stage 3 — 報價流（人工 + 之後 AI）
-**目標**：「我去填詳細需求 → 報價 → 討論定案 → 觸發建站」。
-**步驟**：
-1. 先做**人工報價**：後台一個 quote 草稿（intake → 規格 → 報價單）→ 操作者確認 → 才解鎖 trigger-build。
-2. 之後 **AI 報價**：用 spec_data + 規則/LLM 產出建議報價（package + 加購）。**先人工 gate，AI 只建議不自動成交**。
-**驗收**：一筆 intake → 產報價單 → 確認 → 建站。
-**風險**：Medium（金流相關 = High，需明示）。
+### Stage 3 — 報價流（人工 + 之後 AI）✅ 程式完成
+**目標**：「客戶填詳細需求 → 報價 → 討論定案 → 觸發建站」。
+**已完成（2026-07-02）**：
+- Migration `0055_intake_quote.sql`：`intake_forms` 加 `quote_data JSONB` + `quote_status TEXT DEFAULT 'none'`（帶 CHECK constraint）。
+- `app/api/onboarding/quote/route.ts`：GET/POST/PATCH — 完整報價生命週期 API。
+- `trigger-build/route.ts` 加報價 gate：`draft/pending_approval/rejected` → 409 `quote_approval_required`；`none/approved` → 通過。
+**待做**：
+- 跑 `0055_intake_quote.sql` migration 到 EU VPS Supabase（`docker exec supabase-db psql ...`）。
+- 前端操作頁（目前 API 已可用 curl / n8n 操作）。
+**風險**：Medium（migration 要 apply；不跑 migration gate 不生效）。
 
-### Stage 4 — 機層一鍵租機（接現成 provisionClient）
-**目標**：建站時先租一台硬化好的 Hetzner 主機（而非只在共用 SG 容器開 staging）。
-**步驟**（**不要重寫，照 EMBED_PROVISION_INTO_APP.md**）：
-1. 新增 `app/api/provision/route.ts`（或在 trigger-build 內插一段）呼叫 `provisionClient()`（機層在站層**之前**）。
-2. 安全閘：billable 開機要 approval（沿用 `approval_required` 機制）。
-3. env（**預設全 OFF = 安全**）：`LOBSTER_SERVER_ADAPTER=hetzner_cloud`、`LOBSTER_SERVER_PROVISION_ENABLED=true`、`HETZNER_STAGING_TOKEN`、secretStore sink。
-**驗收**：dry-run（不花錢）→ 真開一台 → ref.sshHost 餵站層建 WP → 全綠 + rollback 測試（失敗自動刪機無孤兒）。
-**風險**：**High（billable + 真開機）**，需明示 go-ahead。**現成資產**：provisionClient（M9 rollback 內建）、cli.ts（`/provision-client` 已用同函式）。
+### Stage 4 — 機層一鍵租機（接現成 provisionClient）✅ 程式完成
+**目標**：建站時先租一台硬化好的 Hetzner 主機。
+**已完成（2026-07-02）**：
+- `app/api/provision/route.ts`：呼叫 `provisionClient()`，ops-role + sync-key auth，env-gated 安全。
+- `next.config.ts` + `tsconfig.json`：加入 `@workflows` webpack alias 讓 next-admin 可 import packages/workflows。
+- `BuildConsole.tsx`：Profile B 顯示「機層租機」可摺疊面板，tier/region 選擇，結果即時顯示。
+**env 設定（上線前 SG .env 加）**：`LOBSTER_SERVER_ADAPTER=hetzner_cloud`、`LOBSTER_SERVER_PROVISION_ENABLED=true`、`HETZNER_STAGING_TOKEN`。預設 none = idle 安全。
+**驗收**：dry-run 確認回 `status:idle`（adapter=none）→ 改 env 開 hetzner_cloud + mock 測 dry_run → 開真機（需明示 go-ahead）。
+**風險**：**High（真開機 billable）**，env 預設 OFF 已保護。
 
 ### Stage 5 — 串接整套服務棧（願景終點）
 **目標**：建站同時自動接 Supabase Studio / n8n / Sentry / Netdata / Uptime Kuma / PostHog Cloud。

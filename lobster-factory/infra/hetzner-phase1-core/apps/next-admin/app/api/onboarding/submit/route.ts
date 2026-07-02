@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole } from "../../../../lib/ops-role";
+import { timingSafeEqual } from "../../../../lib/ops-inbox/verifyIngestToken";
 import { getSupabaseWriteClient } from "../../../../lib/supabase-server";
+import { effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "../../../../lib/tenant-guard";
 import type { IntakeForm } from "../../../../lib/onboarding/intake-form";
+
+// Auth: Supabase session (owner/admin/operator) OR server-to-server x-ops-sync-key.
+// Same dual-path pattern as trigger-build/route.ts — needed so n8n can POST here.
+const SYNC_KEY = process.env.OPS_PROXY_SHARED_SECRET ?? "";
 
 export async function POST(request: Request) {
   const resolved = resolveOpsRole(request);
   const allowed = ["owner", "admin", "operator"] as const;
-  if (!(allowed as readonly string[]).includes(resolved.role)) {
+  const hasSyncKey = !!(SYNC_KEY && timingSafeEqual(request.headers.get("x-ops-sync-key") ?? "", SYNC_KEY));
+  if (!(allowed as readonly string[]).includes(resolved.role) && !hasSyncKey) {
     return NextResponse.json({ ok: false, error: "forbidden", role: resolved.role }, { status: 403 });
   }
 
@@ -28,13 +35,22 @@ export async function POST(request: Request) {
     );
   }
 
+  // Org isolation: client callers cannot inject a foreign org_id (effectiveOrgId enforces this).
+  let resolvedOrgId: string | null;
+  try {
+    resolvedOrgId = effectiveOrgId(request, organization_id);
+  } catch (e) {
+    if (e instanceof OrgAccessError) return toOrgAccessResponse(e);
+    throw e;
+  }
+
   const supabase = getSupabaseWriteClient();
   if (!supabase) return NextResponse.json({ ok: false, error: "db_unavailable" }, { status: 503 });
 
   const { data, error } = await supabase
     .from("intake_forms")
     .insert({
-      organization_id: organization_id ?? null,
+      organization_id: resolvedOrgId,
       form_data: form,
       submitted_by: resolved.role,
       status: "pending",

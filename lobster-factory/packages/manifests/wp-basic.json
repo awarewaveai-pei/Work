@@ -1,14 +1,14 @@
 {
   "name": "wp-basic",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "schemaVersion": "1.0.0",
-  "target": "wordpress",
+  "target": "staging-only",
   "applyMode": "full_install",
   "description": "WordPress container manifest: Kadence theme + operational plugins (MainWP Child, host-conditional cache). User-facing plugin list is owned by agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md §八 and installed via wp-install-plugins task — do NOT add user-facing plugins here.",
   "guardrails": {
-    "allowEnvironments": ["staging", "production"],
+    "allowEnvironments": ["staging"],
     "requireBackup": false,
-    "blockIfProduction": false
+    "blockIfProduction": true
   },
   "dependencies": [],
   "conflicts": [],

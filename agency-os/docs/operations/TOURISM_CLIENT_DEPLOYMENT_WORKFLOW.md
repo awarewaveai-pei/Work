@@ -85,6 +85,7 @@ wp plugin install \
   migrate-guru \
   seo-by-rank-math \
   redirection \
+  internal-link-juicer \
   shortpixel-image-optimiser \
   really-simple-ssl \
   fluentform \
@@ -161,6 +162,7 @@ rm /tmp/*.zip
 | migrate-guru | Cloudways staging→live 遷移 |
 | seo-by-rank-math | SEO |
 | redirection | 301 重定向管理 |
+| internal-link-juicer | 內部連結 SEO（自動建議互連）|
 | shortpixel-image-optimiser | 圖片壓縮（需 API key） |
 | really-simple-ssl | SSL 強制 HTTPS |
 | fluentform | 表單 |

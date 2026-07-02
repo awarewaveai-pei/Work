@@ -16,8 +16,13 @@ import {
 import { resolveOpsRole } from "../../../../lib/ops-role";
 import { timingSafeEqual } from "../../../../lib/ops-inbox/verifyIngestToken";
 import { getSupabaseWriteClient } from "../../../../lib/supabase-server";
+import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "../../../../lib/tenant-guard";
 import { kickActionRunDispatcher } from "../../../../lib/kick-dispatcher";
 import type { IntakeForm, WebsiteSpec } from "../../../../lib/onboarding/intake-form";
+import {
+  resolveInstallableSlugsForPacks,
+  resolvePaidPluginsForPacks,
+} from "../../../../lib/wp-plugin-stack-catalog";
 
 // Auth: Supabase session (owner/admin/operator) OR server-to-server x-ops-sync-key.
 // Mirrors the dual-path pattern established in wp-update/route.ts.
@@ -64,24 +69,28 @@ export async function POST(request: Request) {
   // Read intake form
   const { data: intakeRow, error: intakeErr } = await supabase
     .from("intake_forms")
-    .select("id, form_data, organization_id, status")
+    .select("id, form_data, organization_id, status, quote_status")
     .eq("id", intake_form_id)
     .single();
   if (intakeErr || !intakeRow) {
     return NextResponse.json({ ok: false, error: "intake_form_not_found" }, { status: 404 });
   }
 
-  // C2: Idempotency gate — if already building, return existing run
-  if (intakeRow.status === "building") {
-    const { data: existingRun } = await supabase
-      .from("ops_action_runs")
-      .select("id")
-      .contains("metadata", { intake_form_id })
-      .in("status", ["pending", "running", "dispatched"])
-      .maybeSingle();
-    if (existingRun) {
-      return NextResponse.json({ ok: true, run_id: existingRun.id, idempotent: true });
-    }
+  // Org isolation: client callers can only trigger builds for their own org's intake forms.
+  try { assertOrgAccess(request, intakeRow.organization_id as string | null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+
+  // Stage 3 quote gate: block trigger-build while quote is in an active non-approved state.
+  // quote_status='none' (no quote) or 'approved' → allow through. 'draft'/'pending_approval'/'rejected' → block.
+  const quoteStatus = (intakeRow as Record<string, unknown>).quote_status as string | null | undefined;
+  const BLOCKED_QUOTE_STATES = new Set(["draft", "pending_approval", "rejected"]);
+  if (quoteStatus && BLOCKED_QUOTE_STATES.has(quoteStatus)) {
+    return NextResponse.json({
+      ok: false,
+      error: "quote_approval_required",
+      quote_status: quoteStatus,
+      detail: "Quote must be approved before triggering build. Use PATCH /api/onboarding/quote to advance status.",
+    }, { status: 409 });
   }
 
   // Read spec and cross-validate FK
@@ -114,14 +123,28 @@ export async function POST(request: Request) {
     ? (rawPacks as WpPluginModule[])
     : [];
   const { slug: manifestSlug, downgraded } = toManifestSlug(spec.package_slug);
+  const derivedPluginSlugs = resolveInstallableSlugsForPacks(safePacks);
+  const paidPluginCount = resolvePaidPluginsForPacks(safePacks).length;
 
-  // C2: Mark building before creating records (acts as a mutex for concurrent calls)
-  const { error: markErr } = await supabase
+  // Atomic CAS: only one concurrent request wins; others return idempotent.
+  // Using .neq("status","building") as the WHERE guard — if 0 rows updated, another request won.
+  const { data: markData, error: markErr } = await supabase
     .from("intake_forms")
     .update({ status: "building" })
-    .eq("id", intake_form_id);
+    .eq("id", intake_form_id)
+    .neq("status", "building")
+    .select("id");
   if (markErr) {
     return NextResponse.json({ ok: false, error: "status_update_failed", detail: markErr.message }, { status: 500 });
+  }
+  if (!markData || markData.length === 0) {
+    const { data: existingRun } = await supabase
+      .from("ops_action_runs")
+      .select("id")
+      .contains("metadata", { intake_form_id })
+      .in("status", ["pending", "running", "dispatched"])
+      .maybeSingle();
+    return NextResponse.json({ ok: true, run_id: existingRun?.id ?? null, idempotent: true });
   }
 
   // Resolve org — reuse bound org or create new
@@ -249,7 +272,7 @@ export async function POST(request: Request) {
         primary_domain: domain,
         locale: locale === "zh-TW" ? "zh_TW" : "en",
         status: "draft",
-        theme_family: "kadence",
+        theme_family: manifestSlug === "wp-tourism" ? "elementor" : "kadence",
         stack_profile: manifestSlug,
       })
       .select("id")
@@ -270,6 +293,8 @@ export async function POST(request: Request) {
     domain: stagingDomain,
     packageSlug: manifestSlug,
     selectedPacks: safePacks,
+    pluginSlugs: derivedPluginSlugs,
+    paidPluginCount,
     organizationId,
     workspaceId,
     projectId,

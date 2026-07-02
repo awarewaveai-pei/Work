@@ -60,6 +60,7 @@
 | **備份** | WPvivid Backup | wporg | `wpvivid-backups-and-migration` | 連動 MainWP 管理 |
 | **SEO** | Rank Math SEO | wporg | `seo-by-rank-math` | SEO + Schema + 部落格結構化 |
 | **SEO 跳轉** | Redirection | wporg | `redirection` | 管理 301/302，改版必用 |
+| **內部連結 SEO** | Internal Link Juicer | wporg | `internal-link-juicer` | 自動分析並建議內頁互連，提升 SEO juice 傳遞 |
 | **快取/效能** | LiteSpeed Cache ★ | wporg | `litespeed-cache` | 條件安裝（`is_litespeed` 主機才裝）；非 LiteSpeed 主機需另行處理 |
 | **圖片壓縮** | ShortPixel ★ | wporg | `shortpixel-image-optimiser` | 搭快取一起啟用 |
 | **SSL** | Really Simple SSL | wporg | `really-simple-ssl` | 強制 HTTPS |
