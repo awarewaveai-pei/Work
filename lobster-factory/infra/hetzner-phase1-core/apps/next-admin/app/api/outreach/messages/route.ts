@@ -5,10 +5,13 @@ import { getSecret } from "@/lib/secret-vault";
 import { checkColdGate, buildEvidenceSnapshot, lintMessage } from "@/lib/outreach/cold-gate";
 import { generateWithGemini } from "@/lib/outreach/ai-gemini";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
+import { generateWithClaude } from "@/lib/outreach/ai-claude";
+import { generateWithOpenAI } from "@/lib/outreach/ai-openai";
 
 // Cold Outreach — message generation (task T8) + list (task T9). Table: co_messages (migration 0048).
-// Flow: Cold Gate (block if no observation/source_url/do_not_contact) → resolve org's enabled Gemini
-// connector → getSecret(vault) → generate; if no key, fall back to a manual_prompt the operator pastes
+// Flow: Cold Gate (block if no observation/source_url/do_not_contact) → router ladder resolves the
+// best available AI connector (claude > openai > gemini > gemini_agency > manual_prompt) →
+// getSecret(vault) → generate; if no key anywhere, fall back to a manual_prompt the operator pastes
 // into ChatGPT/Claude. Output is linted, carries evidence_snapshot, and is stored as a DRAFT — never
 // auto-sent. Writes ops-role gated; GET authed-only.
 
@@ -117,60 +120,72 @@ export async function POST(req: Request): Promise<Response> {
   const forbidden = Array.isArray(sp?.forbidden_words) ? sp!.forbidden_words!.filter(Boolean) : [];
   const prompt = buildPrompt(lead, sp, forbidden);
 
-  // Resolve a Gemini key via the Free-Plan Router ladder: (1) this client's BYO connector, then
-  // (2) the agency default connector (organization_id IS NULL). credentials_ref → Supabase Vault.
+  // Resolve AI connector via router ladder: claude → openai → gemini → gemini_agency → manual_prompt.
+  // For each paid provider: try client BYO key first, then agency default (null org).
+  const AI_PROVIDERS = ["claude", "openai", "gemini", "gemini_agency"] as const;
+  type AiProvider = (typeof AI_PROVIDERS)[number];
+  let resolvedProvider: AiProvider | null = null;
   let apiKey: string | null = null;
-  let vaultError: string | null = null; // capture so a vault/RLS regression is OBSERVABLE, not silent
-  {
+  let vaultError: string | null = null;
+
+  for (const provider of AI_PROVIDERS) {
     const pickRef = async (orgFilter: "client" | "agency"): Promise<string | null> => {
       let q = supabase
         .from("co_connector_accounts")
         .select("credentials_ref")
-        .eq("connector_name", "gemini")
+        .eq("connector_name", provider)
         .eq("is_enabled", true)
         .not("credentials_ref", "is", null)
         .limit(1);
-      q = orgFilter === "client" && lead.organization_id ? q.eq("organization_id", lead.organization_id) : q.is("organization_id", null);
+      q = orgFilter === "client" && lead.organization_id
+        ? q.eq("organization_id", lead.organization_id)
+        : q.is("organization_id", null);
       const { data } = await q.maybeSingle();
       return (data as { credentials_ref?: string | null } | null)?.credentials_ref ?? null;
     };
-    // Step 1: client-specific (only when the lead belongs to a client). Step 2: agency default (null org).
     const ref = (lead.organization_id ? await pickRef("client") : null) ?? (await pickRef("agency"));
-    if (ref) {
-      try {
-        apiKey = await getSecret(ref);
-      } catch (e) {
-        apiKey = null; // vault read failed → degrade to manual, but RECORD the cause (critic minor #1)
-        vaultError = e instanceof Error ? e.message.slice(0, 80) : "vault read error";
-      }
+    if (!ref) continue;
+    try {
+      apiKey = await getSecret(ref);
+      resolvedProvider = provider;
+      break;
+    } catch (e) {
+      vaultError = e instanceof Error ? e.message.slice(0, 80) : "vault read error";
+      // vault error on one provider → try next rather than hard-fail
     }
   }
 
   const evidence = buildEvidenceSnapshot(lead);
-  let mode: "gemini" | "manual_prompt";
+  let mode: AiProvider | "manual_prompt";
   let bodyText: string;
   let aiModel: string | null = null;
 
-  if (apiKey) {
+  if (apiKey && resolvedProvider) {
     try {
-      const out = await generateWithGemini(apiKey, prompt);
+      let out: { text: string; model: string };
+      if (resolvedProvider === "claude") {
+        out = await generateWithClaude(apiKey, prompt);
+      } else if (resolvedProvider === "openai") {
+        out = await generateWithOpenAI(apiKey, prompt);
+      } else {
+        out = await generateWithGemini(apiKey, prompt);
+      }
       bodyText = out.text;
       aiModel = out.model;
-      mode = "gemini";
+      mode = resolvedProvider;
     } catch (e) {
-      // Generation failed (quota / network) → degrade to manual prompt rather than hard-fail.
       bodyText = prompt;
       mode = "manual_prompt";
-      aiModel = `gemini_failed:${e instanceof Error ? e.message.slice(0, 80) : "error"}`;
+      aiModel = `${resolvedProvider}_failed:${e instanceof Error ? e.message.slice(0, 80) : "error"}`;
     }
   } else {
-    bodyText = prompt; // operator pastes this into ChatGPT/Claude (極省模式 fallback)
+    bodyText = prompt; // operator pastes into ChatGPT/Claude (極省模式 fallback)
     mode = "manual_prompt";
-    // Distinguish "no key configured" (null) from "vault read failed" (regression to surface).
     aiModel = vaultError ? `vault_read_failed:${vaultError}` : null;
   }
 
-  const lint = lintMessage(mode === "gemini" ? bodyText : "", forbidden); // only lint real output
+  const isAiGenerated = mode !== "manual_prompt";
+  const lint = lintMessage(isAiGenerated ? bodyText : "", forbidden); // only lint real AI output
   const { data: created, error: createErr } = await supabase
     .from(TABLE)
     .insert({
@@ -182,8 +197,8 @@ export async function POST(req: Request): Promise<Response> {
       body: bodyText,
       ai_model: aiModel,
       personalization_score: null,
-      safety_score: mode === "gemini" ? lint.safety_score : null,
-      quality_gate_status: mode === "gemini" ? lint.quality_gate_status : null,
+      safety_score: isAiGenerated ? lint.safety_score : null,
+      quality_gate_status: isAiGenerated ? lint.quality_gate_status : null,
       evidence_snapshot: evidence,
       prompt_snapshot: { prompt, mode },
       status: "draft",
@@ -192,11 +207,11 @@ export async function POST(req: Request): Promise<Response> {
     .single();
   if (createErr) return NextResponse.json({ ok: false, error: createErr.message }, { status: 500 });
 
-  if (mode === "gemini") {
+  if (isAiGenerated) {
     await supabase.from("co_leads").update({ status: "message_generated", updated_at: new Date().toISOString() }).eq("id", lead.id);
   }
 
-  return NextResponse.json({ ok: true, mode, message: created, lint: mode === "gemini" ? lint : null });
+  return NextResponse.json({ ok: true, mode, message: created, lint: isAiGenerated ? lint : null });
 }
 
 // PATCH { id, status, body? } — human review action (approve / edit / skip). Never sends.

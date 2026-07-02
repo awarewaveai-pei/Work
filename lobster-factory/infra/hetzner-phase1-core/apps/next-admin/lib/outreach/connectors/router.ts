@@ -5,15 +5,21 @@
 // the chosen step. Cost-first design: every ladder ends in a free/manual step that is ALWAYS usable,
 // so the chosen step is never null — a need can degrade gracefully but never hard-block.
 //
-// Phase-1 active connectors: gemini (AI) + hunter (verify). snov / apify / places / brevo / gmail /
-// fluentsmtp are declared for forward-compat and only become usable once their connector is enabled.
+// Phase-1 active connectors: gemini (AI, free BYO) + hunter (verify).
+// Upgrade connectors (claude / openai) are declared and usable once the org enables them.
+// snov / apify / places / brevo / gmail / fluentsmtp are forward-compat stubs.
 
 import type { ConnectorNeed, FallbackStep, RouterContext, ResolvedLadder } from "./types";
 
 export const LADDERS: Record<ConnectorNeed, FallbackStep[]> = {
   ai_generation: [
+    // Upgrade tier — higher quality, client pays for their own key
+    { provider: "claude",        kind: "byo",    connectorName: "claude",        requiresConnector: true,  note: "客戶 BYO Claude key（品質最高，繁中尤佳）" },
+    { provider: "openai",        kind: "byo",    connectorName: "openai",        requiresConnector: true,  note: "客戶 BYO OpenAI key（GPT-4o-mini 預設）" },
+    // Free tier — default path, zero cost to client
     { provider: "gemini",        kind: "byo",    connectorName: "gemini",        requiresConnector: true,  note: "客戶 BYO Gemini free key（成本歸客戶，乘客戶數）" },
     { provider: "gemini_agency", kind: "agency", connectorName: "gemini_agency", requiresConnector: true,  note: "agency Gemini key（受 quota guard 限制）" },
+    // Fallback — no key at all
     { provider: "manual_prompt", kind: "manual",                                  requiresConnector: false, note: "產 prompt 讓 operator 手動貼 ChatGPT/Claude（極省模式）" },
   ],
   email_verification: [
