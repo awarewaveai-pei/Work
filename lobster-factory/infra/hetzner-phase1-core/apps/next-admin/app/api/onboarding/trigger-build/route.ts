@@ -64,11 +64,24 @@ export async function POST(request: Request) {
   // Read intake form
   const { data: intakeRow, error: intakeErr } = await supabase
     .from("intake_forms")
-    .select("id, form_data, organization_id, status")
+    .select("id, form_data, organization_id, status, quote_status")
     .eq("id", intake_form_id)
     .single();
   if (intakeErr || !intakeRow) {
     return NextResponse.json({ ok: false, error: "intake_form_not_found" }, { status: 404 });
+  }
+
+  // Stage 3 quote gate: block trigger-build while quote is in an active non-approved state.
+  // quote_status='none' (no quote) or 'approved' → allow through. 'draft'/'pending_approval'/'rejected' → block.
+  const quoteStatus = (intakeRow as Record<string, unknown>).quote_status as string | null | undefined;
+  const BLOCKED_QUOTE_STATES = new Set(["draft", "pending_approval", "rejected"]);
+  if (quoteStatus && BLOCKED_QUOTE_STATES.has(quoteStatus)) {
+    return NextResponse.json({
+      ok: false,
+      error: "quote_approval_required",
+      quote_status: quoteStatus,
+      detail: "Quote must be approved before triggering build. Use PATCH /api/onboarding/quote to advance status.",
+    }, { status: 409 });
   }
 
   // C2: Idempotency gate — if already building, return existing run

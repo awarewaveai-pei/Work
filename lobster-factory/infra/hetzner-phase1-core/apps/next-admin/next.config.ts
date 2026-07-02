@@ -9,6 +9,14 @@ const nextConfig: NextConfig = {
   // Keep file tracing scoped to this app (avoid parent monorepo lockfile warnings in Docker / CI).
   outputFileTracingRoot: path.join(__dirname),
   webpack: (config) => {
+    // @workflows alias: makes packages/workflows importable from next-admin routes
+    // without a workspace install. Next.js bundles these files via webpack so they
+    // are included in the standalone output even though outputFileTracingRoot is scoped.
+    config.resolve.alias = {
+      ...(config.resolve.alias as Record<string, string> | undefined ?? {}),
+      "@workflows": path.join(__dirname, "../../../../packages/workflows/src"),
+    };
+
     // ssh2 (wp-update SSH route) lazily require()s two OPTIONAL native accelerators —
     // `cpu-features` and a prebuilt `crypto/build/Release/sshcrypto.node` — inside try/catch,
     // falling back to pure JS when absent (which is always, on our node:20-alpine image).

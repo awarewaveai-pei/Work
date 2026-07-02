@@ -4,6 +4,32 @@
 
 ## 2026-07-02
 
+### feat: 架站系統 Stage 2 + 3 + 4 程式實作 ✅
+
+**根因**：Stage 1（建站引擎）已通；Stage 2/3/4 程式缺口導致整個 intake→報價→建站→租機 閉環無法自動化。
+
+**已修改**：
+- `app/api/onboarding/submit/route.ts` — 加 x-ops-sync-key 雙路徑 auth，n8n 可直接 POST（Stage 2）
+- `packages/db/migrations/0055_intake_quote.sql` — intake_forms 加 quote_data JSONB + quote_status（Stage 3）
+- `app/api/onboarding/quote/route.ts` — GET/POST/PATCH 報價 CRUD + 狀態機（Stage 3）
+- `app/api/onboarding/trigger-build/route.ts` — 加報價 gate：draft/pending_approval/rejected → 409；none/approved → 通過（Stage 3）
+- `app/api/provision/route.ts` — 呼叫 provisionClient()，env-gated，auth 保護（Stage 4）
+- `next.config.ts` — 加 @workflows webpack alias（→ packages/workflows/src）（Stage 4）
+- `tsconfig.json` — 加 @workflows/* path alias（Stage 4）
+- `app/build/BuildConsole.tsx` — Profile B 加「機層租機」可摺疊面板 + 結果顯示（Stage 4）
+- `agency-os/docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md` — Stage 2/3/4 標記完成
+
+**剩餘待做（ops 設定，非程式）**：
+- 跑 `0055_intake_quote.sql` migration 到 EU Supabase
+- n8n：建立 Fluent Form webhook → /api/onboarding/submit 的 workflow
+- SG `.env`：加 `LOBSTER_SERVER_ADAPTER` + `LOBSTER_SERVER_PROVISION_ENABLED` 才能開真機（目前 none = idle 安全）
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=<30000 — 0 type errors ✅
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=quote_status,provisionClient,@workflows,hasSyncKey | hits=0 (no stale references)
+- WORKLOG: 本條目
+
 ### ops: 清理測試垃圾客戶 org 記錄 ✅
 
 **根因**：建站系統測試過程遺留 3 個空殼 org（無任何資產/整合資料），污染 `/ops/clients` 列表。

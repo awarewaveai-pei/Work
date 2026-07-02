@@ -58,7 +58,7 @@ export interface WpPlugin {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Catalog — 21 base + 17 ecommerce + 1 pod + 12 tourism + 3 brand = 54 total entries
+// Catalog — 22 base + 17 ecommerce + 1 pod + 12 tourism + 3 brand = 55 total entries
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const WP_PLUGIN_CATALOG: WpPlugin[] = [
@@ -76,6 +76,7 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
   { slug: "migrate-guru",                       label: "Migrate Guru (Cloudways migration)",          free: true,  required: true,  module: "base" },
   { slug: "seo-by-rank-math",                   label: "Rank Math SEO",                              free: true,  required: true,  module: "base" },
   { slug: "redirection",                        label: "Redirection",                                free: true,  required: true,  module: "base" },
+  { slug: "internal-link-juicer",               label: "Internal Link Juicer",                       free: true,  required: true,  module: "base" },
   { slug: "wp-rocket",                           label: "WP Rocket (WordPressIT)",                    free: false, required: true,  module: "base", installSource: "manual-zip", excludeForModules: ["tourism"] },
   { slug: "mainwp-rocket-extension",            label: "MainWP Rocket Extension (WordPressIT)",      free: false, required: true,  module: "base", installSource: "manual-zip", excludeForModules: ["tourism"] },
   { slug: "shortpixel-image-optimiser",         label: "ShortPixel Image Optimiser",                 free: true,  required: true,  module: "base" },

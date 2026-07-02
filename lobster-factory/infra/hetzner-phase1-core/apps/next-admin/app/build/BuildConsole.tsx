@@ -123,6 +123,15 @@ type LiveRunStatus = {
   ended_at?: string | null;
 };
 
+type ProvisionStatus = "idle" | "dry_run" | "provisioned" | "reused" | "mock" | "blocked" | "rolled_back";
+type ProvisionResult = {
+  ok: boolean;
+  result?: { status: ProvisionStatus; ref?: Record<string, unknown>; plan?: unknown; message?: string; dns?: unknown };
+  adapter?: string;
+  error?: string;
+  detail?: string;
+};
+
 const TERMINAL_STATUSES = new Set(["completed", "failed", "dispatch_failed", "cancelled", "blocked"]);
 
 export default function BuildConsole() {
@@ -137,6 +146,13 @@ export default function BuildConsole() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showIntegrations, setShowIntegrations] = useState(true);
   const [showPrerequisites, setShowPrerequisites] = useState(true);
+
+  // Stage 4: machine-layer provision state (profile_b only)
+  const [showProvision, setShowProvision] = useState(false);
+  const [provisionLoading, setProvisionLoading] = useState(false);
+  const [provisionResult, setProvisionResult] = useState<ProvisionResult | null>(null);
+  const [provisionTier, setProvisionTier] = useState("business");
+  const [provisionRegion, setProvisionRegion] = useState("sin");
 
   // Pre-fill from /onboard Step 4 URL params
   useEffect(() => {
@@ -270,6 +286,31 @@ export default function BuildConsole() {
 
   const canEnqueue = form.executionMode === "enqueue";
 
+  const provisionMachine = async () => {
+    setProvisionLoading(true);
+    setProvisionResult(null);
+    try {
+      const res = await fetch("/api/provision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...roleHeader(actorRole) },
+        body: JSON.stringify({
+          siteId: form.siteId ?? crypto.randomUUID(),
+          siteName: form.clientName ?? "unnamed",
+          organizationId: form.organizationId ?? crypto.randomUUID(),
+          tier: provisionTier,
+          region: provisionRegion,
+          domain: form.domain ?? undefined,
+        }),
+      });
+      const json = (await res.json()) as ProvisionResult;
+      setProvisionResult(json);
+    } catch (err) {
+      setProvisionResult({ ok: false, error: err instanceof Error ? err.message : "request_failed" });
+    } finally {
+      setProvisionLoading(false);
+    }
+  };
+
   return (
     <div className="build-console">
 
@@ -299,6 +340,104 @@ export default function BuildConsole() {
           </button>
         ))}
       </div>
+
+      {/* ── Stage 4: Machine-layer provisioning (Profile B only) ──────────── */}
+      {profile === "profile_b" && (
+        <div className="build-panel" style={{ marginBottom: 16 }}>
+          <button
+            type="button"
+            className="build-integrations-toggle-btn"
+            style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", padding: "12px 0", textAlign: "left" }}
+            onClick={() => setShowProvision((v) => !v)}
+          >
+            <span>{showProvision ? "▼" : "▶"}</span>
+            <span className="section-title" style={{ marginBottom: 0 }}>
+              機層租機 (Hetzner VM Provision) — Stage 4
+            </span>
+            <span className="build-integrations-hint">
+              {provisionResult?.result?.status
+                ? `last: ${provisionResult.result.status}`
+                : "LOBSTER_SERVER_ADAPTER 控制；預設 idle (不花錢)"}
+            </span>
+          </button>
+
+          {showProvision && (
+            <div style={{ paddingTop: 8 }}>
+              <div className="build-alert build-alert-warning" style={{ marginBottom: 12, fontSize: 12 }}>
+                <strong>⚠ Billable action</strong> — 只有 <code>LOBSTER_SERVER_ADAPTER=hetzner_cloud</code> +{" "}
+                <code>LOBSTER_SERVER_PROVISION_ENABLED=true</code> 才會真的租機。
+                預設 <code>LOBSTER_SERVER_ADAPTER=none</code> → 回 <code>status:idle</code>（安全）。
+                機層必須在站層（Queue build）<strong>之前</strong>完成。
+              </div>
+
+              <div className="build-form-grid">
+                <div className="form-row">
+                  <label className="form-label">tier</label>
+                  <select className="form-select" value={provisionTier} onChange={(e) => setProvisionTier(e.target.value)}>
+                    <option value="starter">starter (cpx11)</option>
+                    <option value="business">business (cpx21)</option>
+                    <option value="commerce">commerce (cpx31)</option>
+                    <option value="premium">premium (cpx41)</option>
+                  </select>
+                </div>
+                <div className="form-row">
+                  <label className="form-label">region</label>
+                  <select className="form-select" value={provisionRegion} onChange={(e) => setProvisionRegion(e.target.value)}>
+                    <option value="sin">sin (Singapore)</option>
+                    <option value="nbg1">nbg1 (Nuremberg)</option>
+                    <option value="fsn1">fsn1 (Falkenstein)</option>
+                    <option value="hel1">hel1 (Helsinki)</option>
+                    <option value="ash">ash (Ashburn)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="build-kv-grid" style={{ marginBottom: 12 }}>
+                <div><span>siteId</span><strong style={{ fontSize: 11, fontFamily: "monospace" }}>{form.siteId ?? "(not set)"}</strong></div>
+                <div><span>organizationId</span><strong style={{ fontSize: 11, fontFamily: "monospace" }}>{form.organizationId ?? "(not set)"}</strong></div>
+                <div><span>domain (DNS)</span><strong style={{ fontSize: 11, fontFamily: "monospace" }}>{form.domain ?? "(skip DNS)"}</strong></div>
+              </div>
+
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={provisionLoading}
+                onClick={() => { void provisionMachine(); }}
+                style={{ fontWeight: 600, marginBottom: 12 }}
+              >
+                {provisionLoading ? "Provisioning…" : "🖥️ Provision Hetzner VM"}
+              </button>
+
+              {provisionResult && (
+                <div className={`build-alert ${provisionResult.ok ? "build-alert-ok" : "build-alert-blocked"}`}>
+                  {provisionResult.ok ? (
+                    <>
+                      <strong>status: {provisionResult.result?.status}</strong>
+                      {" · adapter: "}{provisionResult.adapter}
+                      {provisionResult.result?.status === "provisioned" || provisionResult.result?.status === "reused"
+                        ? (
+                          <div style={{ marginTop: 6, fontFamily: "monospace", fontSize: 11 }}>
+                            {JSON.stringify(provisionResult.result.ref, null, 2)}
+                          </div>
+                        ) : null}
+                      {provisionResult.result?.status === "dry_run" ? (
+                        <div style={{ marginTop: 6, fontSize: 11, color: "var(--text-muted)" }}>
+                          Dry-run plan returned — set LOBSTER_SERVER_PROVISION_ENABLED=true to rent.
+                        </div>
+                      ) : null}
+                      {provisionResult.result?.message ? (
+                        <div style={{ marginTop: 4, fontSize: 11 }}>{provisionResult.result.message}</div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>Error: {provisionResult.error}{provisionResult.detail ? <><br />{provisionResult.detail}</> : null}</>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="build-layout">
         <div className="build-panel">

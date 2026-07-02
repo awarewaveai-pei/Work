@@ -23,7 +23,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@workflows/*": ["../../../../packages/workflows/src/*"]
     }
   },
   "include": [

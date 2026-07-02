@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole } from "../../../../lib/ops-role";
+import { timingSafeEqual } from "../../../../lib/ops-inbox/verifyIngestToken";
 import { getSupabaseWriteClient } from "../../../../lib/supabase-server";
 import type { IntakeForm } from "../../../../lib/onboarding/intake-form";
+
+// Auth: Supabase session (owner/admin/operator) OR server-to-server x-ops-sync-key.
+// Same dual-path pattern as trigger-build/route.ts — needed so n8n can POST here.
+const SYNC_KEY = process.env.OPS_PROXY_SHARED_SECRET ?? "";
 
 export async function POST(request: Request) {
   const resolved = resolveOpsRole(request);
   const allowed = ["owner", "admin", "operator"] as const;
-  if (!(allowed as readonly string[]).includes(resolved.role)) {
+  const hasSyncKey = !!(SYNC_KEY && timingSafeEqual(request.headers.get("x-ops-sync-key") ?? "", SYNC_KEY));
+  if (!(allowed as readonly string[]).includes(resolved.role) && !hasSyncKey) {
     return NextResponse.json({ ok: false, error: "forbidden", role: resolved.role }, { status: 403 });
   }
 
