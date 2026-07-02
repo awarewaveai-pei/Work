@@ -93,7 +93,7 @@
 ## 已知信任邊界（明文，勿誤當保證）
 
 - `verify-closeout-completeness` 驗的是證據行「格式存在」，**不驗內容真實**（REALTEST/REVIEW/BUGHUNT 的 cmd/verdict 不被重放）。唯一內容驗真是 `bughunt-oracle`（僅覆蓋 `hits=0` + ASCII identifier + code 檔）。證據誠實靠操作紀律；偽造證據行可通過機械閘 —— 這是設計取捨（重放副作用指令不可行），不是漏洞待修。發現可疑證據 → 人工抽查 WORKLOG 對應 commit。
-- 機械閘全部 **fail-open**（閘壞 = 靜默放行 + 寫 `~/.claude/verify-gate-failures.log`）；閘的健康由 `bash scripts/test-hooks.sh` 驗證（41 案例），改 hooks 後必跑。
+- 機械閘全部 **fail-open**（閘壞 = 靜默放行 + 寫 `~/.claude/verify-gate-failures.log`）；閘的健康由 `bash scripts/test-hooks.sh` 驗證（案例數以套件輸出為準，禁止在文件手寫），改 hooks 後必跑。
 
 ## 執行安全
 
@@ -168,7 +168,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | `/sg-deploy` smoke check pass 後 | 自動跑 `/playwright smoke` |
 | 使用者問「系統狀態」/「是否健康」/「health」/「有沒有問題」 | 跑 `/health`；若回報 `sync_check: FAIL` → 接著跑 `/sync-check` |
 | 改動 governance 文件後（`AGENTS.md` / `CLAUDE.md` / `.cursor/rules/*.mdc` / hook `.js`）| 跑 `/doc-sync`；若改了 `.claude/commands/` 或 `.claude/agents/` 或 `.claude/skills/` → 同時跑 `/sync-check` 確認跨機一致 |
-| MCP tool 回 401 / 403 / connection failed / empty API response | 跑 `/vault-status`；若顯示 key 缺口 → 跑 `/vault-sync`。**🔧 機械閘**（2026-07-02）：`hooks/rules/mcp-health.js` 於 401/403 失敗時自動附 `/vault-status` 路由提示 |
+| MCP tool 回 401 / 403 / connection failed / empty API response | 跑 `/vault-status`；若顯示 key 缺口 → 跑 `/vault-sync`。使用者主動問「vault/密鑰/secret 不見了/API key 哪裡找」同此路由。**🔧 機械閘**（2026-07-02）：`hooks/rules/mcp-health.js` 於 401/403 失敗時自動附 `/vault-status` 路由提示 |
 | 使用者提到「客戶」/「soulful」/「WP 更新」/「外掛」/「maintenance」 | 先跑 `/client-status [slug]` 了解現況，再決定下一步 |
 | `/wp-maintenance safe-update` 完成 | 自動跑 `/playwright client <slug>` 確認無破壞 |
 | 使用者提到「一鍵架站」/「自動開站」/「provision」/「租主機」/「Hetzner 開機」/要在 app.aware-wave.com 加建站按鈕 | **先讀 [`lobster-factory/docs/hosting/EMBED_PROVISION_INTO_APP.md`](../lobster-factory/docs/hosting/EMBED_PROVISION_INTO_APP.md)**：「租 Hetzner 主機+day-1 硬化+DNS」**已寫好且真機驗證通過（2026-06-06）**，核心函式 `packages/workflows/src/provision/provisionClient.ts`。**直接呼叫，禁止重寫**。嵌進 app = 加 API route 呼叫 `provisionClient()`（雙觸發設計）。違反樣態：重新實作租機/cloud-init/secretStore 邏輯（已存在且驗過）。 |
@@ -176,23 +176,19 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | Telegram bot 無回應 / 沉默 > 30 分鐘 / 使用者說「Telegram 壞了」/「指令沒反應」 | 跑 `/command-plane-verify` |
 | 使用者說「別的 AI 處理好了」/「另一個 session 做了 X」/「之前已經做過」/「似乎完成了」（任何基礎設施 / 安全 / 功能改動）| **🔧 機械閘**（2026-07-02）：`hooks/rules/vbc-reminder.js` 於 UserPromptSubmit 偵測語境自動注入 VBC 提醒。**VBC 協議（強制，R4 SSOT）**：① 先讀 `agency-os/WORKLOG.md` 最近 3 個 `## YYYY-MM-DD` 區塊，找對應 `[已修改]` / `AUTO_TASK_DONE` / `REALTEST_EVIDENCE` → 完整理解「做了什麼、用什麼替代方案」② 才做正向驗證（確認效果符合記錄）③ **禁止**：只查單點系統（CF API / git diff / VPS 單一服務）就宣告「沒做好」— 單層消失可能代表另一層已接手。根因：2026-06-04 CF WAF=0 rules 誤報案例（未讀 WORKLOG 確認 LLAR 已裝） |
 | 使用者說「doc 過時了」/「更新設計文件」/「SDD 跟程式碼不一致」/「文件同步一下」 | 跑 `/sdd-update` |
-| 使用者說「跑 QA」/「找 bug」/「上線前測試」/「幫我測試一下」 | 跑 `/qa-review` |
-| 使用者說「幫我測」/「瀏覽器測試」/「browser test」/「Chrome 測一下」/「live test」/「測一下 XXX 頁面」/「幫我跑一下 e2e」 | 跑 `browser-test` skill（Chrome MCP 驅動真實 Chrome；先 `list_connected_browsers` 確認擴充功能已連線）|
+| 使用者要任何測試：「跑 QA/找 bug/上線前測試」「幫我測/瀏覽器/Chrome/e2e」「截圖/效能」 | QA 結構化報告 → `/qa-review`；真瀏覽器 e2e（登入態/Canvas/React state）→ `browser-test` skill（先 `list_connected_browsers`）；smoke/完整/截圖/perf → `/playwright smoke\|qa\|screenshot <url>\|perf` |
 | 任何 non-trivial R0 任務完成（輸出 [已修改] 後，準備進下一個任務）| 跑 `/checkpoint`（mid-session git save；tree 乾淨時靜默跳過） |
 | Repair Center 告警（`/api/ops/repairs/health` 回 503 / `ok: false` / Phase 4 失敗）| 跑 `/phase4-check`；若持續失敗 → 讀 `runbooks/HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md` |
-| 使用者提到「vault」/「密鑰」/「secret 不見了」/「API key 哪裡找」 | 跑 `/vault-status` 確認庫存；缺口 → `/vault-sync` |
 | AO-RESUME 且今日 TASKS 含部署相關任務 | 在 §7 下一步點名今日 deploy flow：`/check-drift` → `/verify` → go-ahead → `/sg-deploy` → `/playwright smoke` |
-| 使用者說「QA 跑一下」/「瀏覽器測試」/「截圖」/「效能測試」 | 對應跑 `/playwright smoke`（基礎）/`/playwright qa`（完整）/`/playwright screenshot <url>`/`/playwright perf` |
-| 使用者說「回顧一下」/「今天做了什麼」/「收工前看一下」/「要 close 了嗎」 | 跑 `/recap`（唯讀；確認後才跑 `/ao-close`） |
-| 使用者說「任務」/「還有什麼」/「今天要做哪些」/不確定目前 backlog 狀態 | 跑 `/tasks` 列出所有 open 待辦 |
-| **🔧 機械閘**：`hooks/rules/auto-repair-guard.js` 攔截 Auto-Repair 邏輯路徑（repair-center / webhooks / ops/repairs / sg-deploy.sh 等）| 首次觸發 BLOCK，re-issue 通過。① 讀 `reports/audit/auto-repair-2026-05-23.md`；② 跑 `scripts/audit-tools/dogfood-auto-repair.ps1 -Mode HealthOnly`；③ 修 C1-C5 → 更新 `AUDIT_REGISTRY.md`；④ 改 sg-deploy Step 7 / redactSecrets 等 → 更新 `DEPLOY_ROLLBACK_RUNBOOK.md`。路徑清單見 `mcp/claude-userlevel/hooks/rules/auto-repair-guard.js` |
-| 使用者說「grill me」/「問爆我」/「逼我想清楚」/「壓力測試計畫」/「對齊一下設計」 | 有 codebase 相關 → `grill-with-docs` skill（同時更新 CONTEXT.md + ADR）；純概念層 → `grill-me` skill。**禁止**：直接開始實作而不確認需求 |
-| 使用者說「TDD」/「寫測試」/「test-first」/「測試先行」/「red-green-refactor」 | 跑 `tdd` skill（整個紅綠重構流程，含垂直切片 + REALTEST_EVIDENCE 要求） |
-| 使用者說「做個原型」/「prototype」/「先試試看」/「試幾個設計」/「讓我玩一下」 | 跑 `prototype` skill（依問題類型路由：邏輯問題→LOGIC.md；UI→UI.md） |
-| 使用者說「架構改善」/「重構機會」/「模組太分散」/「很難測試」/「run improve-codebase」 | 跑 `improve-codebase-architecture` skill（探索 → HTML 報告 → grilling loop） |
+| 使用者說「回顧一下」/「今天做了什麼」/「收工前看一下」/「要 close 了嗎」 | 跑 `/recap`（唯讀；確認後才跑 `/ao-close`）；問「任務/還有什麼/今天要做哪些」→ `/tasks` 列 open 待辦 |
+| 編輯 Auto-Repair 邏輯路徑（repair-center / webhooks / ops/repairs / sg-deploy.sh 等）| **🔧 機械閘**：`hooks/rules/auto-repair-guard.js` 首次 BLOCK 並列出 4 步前置檢查（閘訊息即完整清單），照做後 re-issue 通過；路徑與步驟 SSOT 在該 rules 檔 |
+| 使用者說「grill me」/「問爆我」/「逼我想清楚」/「壓力測試計畫」/「對齊一下設計」 | 有 codebase 相關 → `grill-with-docs` skill（同時更新 CONTEXT.md + ADR）；純概念層 → `grill-me` skill。**Claude 自覺同觸發**：需求有歧義/多可能詮釋時，先 grill 再實作。**禁止**：直接開始實作而不確認需求 |
+| 使用者說「TDD」/「寫測試」/「test-first」/「測試先行」/「red-green-refactor」 | 跑 `tdd` skill（整個紅綠重構流程，含垂直切片 + REALTEST_EVIDENCE 要求）。**Claude 自覺同觸發**：開寫新 feature 而未先寫 test → 停下改走 TDD，禁止先寫全部 impl 再補 test |
+| 使用者說「做個原型」/「prototype」/「先試試看」/「試幾個設計」/「讓我玩一下」 | 跑 `prototype` skill（依問題類型路由：邏輯問題→LOGIC.md；UI→UI.md）。**Claude 自覺同觸發**：feature 出現 2+ 架構方向無法靠分析裁決 → 提議 prototype 驗證 |
+| 使用者說「架構改善」/「重構機會」/「模組太分散」/「很難測試」/「run improve-codebase」 | 跑 `improve-codebase-architecture` skill（探索 → HTML 報告 → grilling loop）。**Claude 自覺同觸發**：發現 shallow module（介面與實作一樣複雜）|
 | 使用者說「token 太多」/「caveman」/「be brief」/「壓縮一下」/「less tokens」 | 跑 `/caveman`（持續生效直到 "stop caveman"）|
 | 讀 code 時碰到完全陌生的模組區段、不知道 caller 是誰 | 主動跑 `/zoom-out`（不問使用者，直接輸出模組地圖） |
-| 使用者說「diagnose」/「debug this」/「一直報錯」/「找不到 bug」/「六段 debug」 | 跑 `diagnose` skill（6 段結構化 loop；複雜 root-cause 時 skill 內部 defer `debugger` agent）|
+| 使用者說「diagnose」/「debug this」/「一直報錯」/「找不到 bug」/「六段 debug」 | 跑 `diagnose` skill（6 段結構化 loop；複雜 root-cause 時 skill 內部 defer `debugger` agent）。**Claude 自覺同觸發**：debug 第一假說失敗或難複現 → 切 diagnose，不繼續猜 |
 
 ### 核心行為規則：宣告執行，不詢問
 
@@ -239,15 +235,10 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 |----------------|---------|
 | 要實作跨 3+ 模組 / 新功能設計 | 先召喚 `planner` agent 拆任務，再實作 |
 | 讀 code 時發現 bug / 異常行為 / 邏輯錯誤 | 召喚 `debugger` agent 系統性追根因 |
-| 改動涉及 auth / RLS / permission / 金流 | 改完後強制召喚 `critic` → `vuln-verifier` |
-| 改動 DB schema / migration / query | 改前召喚 `db-expert` 審查安全性 |
-| 改動 Supabase 相關（RLS / Edge Function / storage）| 召喚 `supabase-engineer` |
-| 改動 n8n workflow | 召喚 `n8n-engineer` |
-| 改動 nginx / docker-compose / Dockerfile | 先讀 `safe-infra-patch.sh` 規則，改後立即 health check |
-| 改動 WordPress 外掛 / 主題 / functions.php | 召喚 `wordpress-plugin-expert` |
+| 改動 auth/RLS/金流、DB schema/migration、Supabase、n8n、nginx/docker-compose/Dockerfile、WP 外掛主題路徑 | **🔧 機械閘**：`hooks/rules/file-path-router.js` 按路徑自動 BLOCK 並指路（7 類別）。照閘指示召喚對應 agent；**不可省**：auth 類改完 `critic` → Critical/High 再 `vuln-verifier`；DB 改前 `db-expert`；nginx/docker 先讀 `safe-infra-patch.sh` + 改後立即 health check（§Auto-Repair 紅線）|
 | 改動 wp-bridge 外掛 code（`lobster-factory/packages/wp-bridge-plugin/`）並要讓操作者拿到 → bump `AWBRIDGE_VERSION`（header+define 兩處）+ 通過 R0 後 **自動跑 `bash scripts/release-wp-bridge.sh`**（無需詢問），回報 Release URL。**核心坑**：外掛發佈正本是 `awarewaveai-pei/aware-wave-wp-bridge`（push tag `v*` → Action 出 zip）**不是 Work**；只 push Work ≠ 發版。詳 `runbooks/WP-BRIDGE-RELEASE-RUNBOOK.md` / `.claude/commands/wp-bridge-release.md` |
-| 改動 `.ts/.tsx` 任何檔案 | 完成前跑 `npx tsc --noEmit`，型別錯誤不得宣告完成 |
-| 完成任何 code 改動（`.ps1/.ts/.tsx/.js/.sh/.py`）| 跑 `/verify-recent`（syntax + critic + exec）|
+| 改動 `.ts/.tsx` 任何檔案 | 完成前 `npx tsc --noEmit` 必綠（**🔧** `batch-format.js` Stop 時自動跑）；型別錯誤不得宣告完成 |
+| 完成任何 code 改動（`.ps1/.ts/.tsx/.js/.sh/.py`）| 跑 `/verify-recent`（**🔧** verify-gate 三件套硬擋未驗證 commit）|
 | critic 回報 Critical 或 High 問題 | 召喚 `vuln-verifier` 寫 PoC 確認是否真實漏洞 |
 | 改動 governance 文件（`AGENTS.md` / `CLAUDE.md` / hooks / cursor rules）| 改後跑 `/doc-sync`；若同時改了 `.claude/commands/` `.claude/agents/` `.claude/skills/` → 跑 `/sync-check` |
 | 任何 R0 任務完成後（輸出 [已修改]）| 跑 `/checkpoint` 存 mid-session commit |
@@ -257,39 +248,23 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | 讀 log / SSH 進 VPS 看到 error / 異常 | 召喚 `incident-responder` 先 triage，再決定 runbook |
 | 發現問題需要 web 查規格 / API 文件 | 召喚 `web-researcher`，不靠訓練資料猜 |
 | 需要做技術選型 / 架構決策 | 召喚 `decision-intelligence`（`/decide`），不靠直覺推薦 |
-| 準備開始實作，但用戶需求尚未明確釐清（有歧義 / 多個可能詮釋）| 先跑 `grill-with-docs` skill 對齊，**禁止直接實作** |
-| Claude 自己開始寫一個新 feature 的 code，且尚未先寫任何 test | 停下，改用 `tdd` skill 垂直切片流程，**禁止先寫全部 impl 再補 test** |
-| 讀 code 時發現模組介面幾乎與實作一樣複雜（shallow module）| 建議跑 `improve-codebase-architecture` skill 找加深機會 |
-| 讀不熟悉的 code 段落，不清楚這個模組被誰呼叫 / 屬於哪個系統層 | 直接跑 `/zoom-out`，給出模組地圖（**不問使用者**）|
-| debug 過程中第一個假說驗證失敗，或 bug 無法快速複現 | 切換到 `diagnose` skill 六段 loop（**不繼續猜測**）|
-| 設計一個 feature 時出現 2+ 個架構方向、無法靠分析決定哪個對 | 提議用 `prototype` skill 快速驗證（說明問題 + 等確認）|
 
 ### 工作類型 → Agent/Tool 路由表
 
 | 使用者描述的工作 | 自動使用 |
 |--------------|---------|
-| 有 bug / 程式跑錯 / log 看不懂 / 行為異常 | `debugger` agent |
 | VPS / Docker / nginx 問題 / container crash | `devops-engineer` agent |
 | 前端頁面 / UI 設計 / landing page / component | `frontend-designer` agent |
-| 複雜 feature 跨 3+ 模組 / 需要拆任務 | `planner` agent 先拆再實作 |
 | 10+ 檔案重構 / rename / 搬移 | `refactor-specialist` agent |
 | 框架升級 / 套件 major version bump | `migration-engineer` agent |
 | MainWP 連不上 / child site 斷線 | `mainwp-engineer` agent |
 | WP 客戶備份 / 更新 / MainWP sync | `wordpress-maintenance-agent` agent |
 | PostHog 數據 / funnel / 轉換率 / feature flag | `posthog-analyst` agent |
 | 陌生 repo / 第一次接觸這個 codebase | `onboarder` agent |
-| 安全漏洞 / critic 回報疑似問題 | `vuln-verifier` agent 寫 PoC 驗證 |
-| 工具選型 / A vs B / 架構審查 | `decision-intelligence` agent（`/decide`）|
 | 策略 / 要不要做 X / 紅藍隊壓力測試 | `strategy-review` skill |
 | 新功能需求拆解 / 要加什麼功能 | `feature-plan` skill |
-| API 文件 / 規格 / 版本差異 | `web-researcher` agent |
-| 需求對齊 / 壓力測試計畫 / 確認術語 / 更新詞彙表 | `grill-with-docs` skill（有 codebase）/ `grill-me` skill（純概念）|
-| 測試先行 / TDD / red-green-refactor / 行為測試 | `tdd` skill（含 tests.md / mocking.md / deep-modules.md）|
-| 系統性除錯 / 六段 debug loop / 難以複現的 bug | `diagnose` skill → 複雜 root-cause 時 defer `debugger` agent |
-| 做原型 / 試設計 / 先跑跑看 | `prototype` skill（邏輯→終端 app；UI→多 variant route）|
-| 架構改善 / 加深機會 / 模組難測試 / 耦合太高 | `improve-codebase-architecture` skill（HTML 報告 + grilling）|
 
-→ 完整路由表（含所有 30 個工作類型）見 [`docs/operations/TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md)
+→ 完整路由表見 [`docs/operations/TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md)
 
 ### Subagent 交接協議（強制）
 
