@@ -7,6 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "../../../../lib/supabase-server";
+import { resolveOpsRole, canModifyIncidentStatus } from "@/lib/ops-role";
 import type { ClusterId } from "@/lib/department-catalog";
 
 export const dynamic = "force-dynamic";
@@ -107,7 +108,12 @@ export interface ClientRow {
   createdAt: string;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const resolved = resolveOpsRole(request);
+  if (!canModifyIncidentStatus(resolved.role) || resolved.source === "default_viewer") {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
+
   const supabase = getSupabaseServerClient();
   if (!supabase) {
     return NextResponse.json({ ok: false, error: "supabase_not_configured" }, { status: 503 });
