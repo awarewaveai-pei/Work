@@ -4,6 +4,7 @@
 // app_theme table is RLS-locked so only this server path can touch it. Requires
 // SUPABASE_SERVICE_ROLE_KEY: without it the client degrades to anon (RLS-denied) → reads
 // fail-open to globals.css defaults, writes fail-closed (500). The key is set in this stack.
+import { unstable_cache, revalidateTag } from "next/cache";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import type { SavedLayout } from "@/lib/theme/tokens";
 
@@ -13,17 +14,12 @@ export interface ThemeConfig {
 }
 
 const ROW_ID = "default";
-const READ_TIMEOUT_MS = 1500;
+const READ_TIMEOUT_MS = 3000;
+const CACHE_TAG = "theme-config";
 
 const EMPTY: ThemeConfig = { tokens: {}, layout: null };
 
-/**
- * Read saved theme overrides + sidebar layout for the single global row.
- * FAIL-OPEN: any missing config / DB error / timeout returns empty overrides, so
- * the app falls back to the globals.css defaults and rendering is NEVER blocked
- * or broken by a DB hiccup.
- */
-export async function getThemeConfig(): Promise<ThemeConfig> {
+async function fetchThemeConfig(): Promise<ThemeConfig> {
   try {
     const sb = getSupabaseServerClient();
     if (!sb) return EMPTY;
@@ -47,6 +43,27 @@ export async function getThemeConfig(): Promise<ThemeConfig> {
   } catch {
     return EMPTY;
   }
+}
+
+// Cached version: results live in Next.js Data Cache until invalidated by revalidateThemeCache().
+// This prevents every navigation from hitting Supabase — layout stays stable across page transitions.
+const getCachedThemeConfig = unstable_cache(fetchThemeConfig, [CACHE_TAG], {
+  tags: [CACHE_TAG],
+  revalidate: 300, // 5-min background refresh as a safety net
+});
+
+/**
+ * Read saved theme overrides + sidebar layout for the single global row.
+ * FAIL-OPEN: any missing config / DB error / timeout returns empty overrides.
+ * Result is cached in Next.js Data Cache; call revalidateThemeCache() after writes.
+ */
+export async function getThemeConfig(): Promise<ThemeConfig> {
+  return getCachedThemeConfig();
+}
+
+/** Invalidate the server-side cache after a successful save. */
+export function revalidateThemeCache(): void {
+  revalidateTag(CACHE_TAG);
 }
 
 /** Upsert the single global theme row. Throws on failure so the API returns 5xx. */

@@ -10,7 +10,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canWriteTenantConfig } from "../../../lib/ops-role";
 import { DEFAULT_TOKENS, VALID_TOKEN_NAMES, SAFE_VALUE_RE, type SavedLayout } from "../../../lib/theme/tokens";
-import { getThemeConfig, saveThemeConfig } from "../../../lib/theme/store";
+import { getThemeConfig, saveThemeConfig, revalidateThemeCache } from "../../../lib/theme/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -74,6 +74,7 @@ export async function POST(req: Request) {
 
   try {
     await saveThemeConfig(tokens, layout);
+    revalidateThemeCache();
   } catch (err) {
     return NextResponse.json(
       { ok: false, error: err instanceof Error ? err.message : "save_failed" },
