@@ -1917,9 +1917,168 @@ function CredentialsTab({ org }: Pick<ClientHubTabsProps, "org">) {
   );
 }
 
+// ── Cold Outreach tab ─────────────────────────────────────────────────────────
+
+function OutreachTab({ org }: Pick<ClientHubTabsProps, "org">) {
+  const [config, setConfig] = useState<{
+    selfServeEnabled: boolean;
+    hasSupabaseUrl: boolean;
+    hasSupabaseKey: boolean;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const [urlInput, setUrlInput] = useState("");
+  const [keyInput, setKeyInput] = useState("");
+  const [selfServe, setSelfServe] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/ops/clients/${encodeURIComponent(org.slug)}/outreach-config`);
+      if (!res.ok) throw new Error(`載入失敗 (${res.status})`);
+      const json = await res.json();
+      setConfig(json);
+      setSelfServe(json.selfServeEnabled ?? false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "載入失敗");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, [org.slug]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    const body: Record<string, unknown> = { selfServeEnabled: selfServe };
+    if (urlInput.trim()) body.supabaseUrl = urlInput.trim();
+    if (keyInput.trim()) body.supabaseKey = keyInput.trim();
+    try {
+      const res = await fetch(`/api/ops/clients/${encodeURIComponent(org.slug)}/outreach-config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...roleHeader() },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? `儲存失敗 (${res.status})`);
+      setUrlInput("");
+      setKeyInput("");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "儲存失敗");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const pill = (ok: boolean, yes: string, no: string) => (
+    <span style={{
+      display: "inline-block", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600,
+      background: ok ? "var(--badge-green-bg)" : "var(--badge-red-bg)",
+      color: ok ? "var(--badge-green-text)" : "var(--red)",
+      border: `1px solid ${ok ? "var(--green)" : "var(--red)"}`,
+    }}>{ok ? yes : no}</span>
+  );
+
+  return (
+    <div style={{ maxWidth: 540 }}>
+      <h2 style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>冷開發工作台設定</h2>
+      <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 20 }}>
+        設定 {org.name} 的獨立 Supabase（資料落在客戶自己的庫）及 self-serve 開關。
+      </p>
+
+      {loading && <p style={{ fontSize: 12, color: "var(--text-muted)" }}>載入中…</p>}
+      {error && <p style={{ fontSize: 12, color: "var(--red)", marginBottom: 12 }}>{error}</p>}
+
+      {config && !loading && (
+        <>
+          {/* Status badges */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+            {pill(config.hasSupabaseUrl, "Supabase URL ✓", "Supabase URL 未設定")}
+            {pill(config.hasSupabaseKey, "Service Key ✓", "Service Key 未設定")}
+            {pill(config.selfServeEnabled, "Self-serve 開啟", "Self-serve 關閉（代操模式）")}
+          </div>
+
+          {/* Supabase credentials */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>
+              Supabase Project URL{config.hasSupabaseUrl ? "（已設定，留空不更新）" : ""}
+            </label>
+            <input
+              type="text"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              placeholder="https://xxxx.supabase.co"
+              style={{
+                width: "100%", padding: "7px 10px", fontSize: 12, borderRadius: 6,
+                border: "1px solid var(--card-border)", background: "var(--bg-canvas)",
+                color: "var(--text-primary)", boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>
+              Service Role Key{config.hasSupabaseKey ? "（已設定，留空不更新）" : ""}
+            </label>
+            <input
+              type="password"
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+              placeholder="eyJhb…（存入 Vault，不留 DB）"
+              style={{
+                width: "100%", padding: "7px 10px", fontSize: 12, borderRadius: 6,
+                border: "1px solid var(--card-border)", background: "var(--bg-canvas)",
+                color: "var(--text-primary)", boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          {/* Self-serve toggle */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
+            <button
+              onClick={() => setSelfServe((v) => !v)}
+              style={{
+                width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer",
+                background: selfServe ? "var(--accent)" : "var(--card-border)",
+                position: "relative", transition: "background 0.2s",
+              }}
+            >
+              <span style={{
+                position: "absolute", top: 3, left: selfServe ? 20 : 3,
+                width: 16, height: 16, borderRadius: "50%", background: "#fff",
+                transition: "left 0.2s",
+              }} />
+            </button>
+            <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+              Self-serve 開放（客戶付費後可自行操作工作台）
+            </span>
+          </div>
+
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            style={{
+              padding: "8px 20px", borderRadius: 6, border: "none", cursor: saving ? "default" : "pointer",
+              background: saving ? "var(--card-border)" : "var(--accent)", color: "#fff",
+              fontSize: 12, fontWeight: 600, opacity: saving ? 0.7 : 1,
+            }}
+          >
+            {saving ? "儲存中…" : "儲存設定"}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
-const TABS = ["內容工具", "整合", "佈建", "維護", "設定", "品牌識別", "客服", "社群頻道", "憑證庫"] as const;
+const TABS = ["內容工具", "整合", "佈建", "維護", "設定", "品牌識別", "客服", "社群頻道", "憑證庫", "冷開發"] as const;
 type Tab = typeof TABS[number];
 
 export function ClientHubTabs(props: ClientHubTabsProps) {
@@ -2002,6 +2161,7 @@ export function ClientHubTabs(props: ClientHubTabsProps) {
         {activeTab === "客服" && <CustomerServiceTab org={org} />}
         {activeTab === "社群頻道" && <SocialChannelsTab org={org} />}
         {activeTab === "憑證庫" && <CredentialsTab org={org} />}
+        {activeTab === "冷開發" && <OutreachTab org={org} />}
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
-import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { getOrgSupabaseWriteClient } from "@/lib/org-client";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import {
   normalizeLead,
@@ -39,9 +39,9 @@ function classify(
 }
 
 export async function GET(req: Request): Promise<Response> {
-  const supabase = getSupabaseWriteClient();
-  if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const url = new URL(req.url);
+  const supabase = await getOrgSupabaseWriteClient(url.searchParams.get("orgSlug"));
+  if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   let orgFilter: string | null;
   try { orgFilter = effectiveOrgId(req, url.searchParams.get("organizationId")); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
@@ -54,13 +54,10 @@ export async function GET(req: Request): Promise<Response> {
   return NextResponse.json({ ok: true, items: data ?? [] });
 }
 
-// POST — import one or many. Body: { organizationId?, leads: RawLead[] }  OR  { organizationId?, lead: RawLead }
+// POST — import one or many. Body: { organizationId?, orgSlug?, leads: RawLead[] }  OR  { ..., lead: RawLead }
 export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
-
-  const supabase = getSupabaseWriteClient();
-  if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   let body: Record<string, unknown>;
   try {
@@ -68,6 +65,10 @@ export async function POST(req: Request): Promise<Response> {
   } catch {
     return new NextResponse("invalid json", { status: 400 });
   }
+
+  const orgSlug = typeof body.orgSlug === "string" && body.orgSlug.trim() ? body.orgSlug.trim() : null;
+  const supabase = await getOrgSupabaseWriteClient(orgSlug);
+  if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   const rawOrgId = typeof body.organizationId === "string" && body.organizationId.trim() ? body.organizationId.trim() : null;
   if (rawOrgId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawOrgId)) {
@@ -149,9 +150,10 @@ export async function POST(req: Request): Promise<Response> {
 export async function DELETE(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
-  const supabase = getSupabaseWriteClient();
+  const params = new URL(req.url).searchParams;
+  const supabase = await getOrgSupabaseWriteClient(params.get("orgSlug"));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
-  const id = new URL(req.url).searchParams.get("id");
+  const id = params.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
   const { data: cur, error: readErr } = await supabase.from(TABLE).select("organization_id").eq("id", id).maybeSingle();
   if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });

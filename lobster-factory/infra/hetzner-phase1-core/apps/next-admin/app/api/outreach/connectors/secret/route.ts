@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
-import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { getOrgSupabaseWriteClient } from "@/lib/org-client";
 import { putSecret, deleteSecret, connectorSecretRef } from "@/lib/secret-vault";
 
 // Cold Outreach — connector secret submission (task T4/Phase-B). The ONLY path that accepts a raw
@@ -14,13 +14,10 @@ export const dynamic = "force-dynamic";
 const TABLE = "co_connector_accounts";
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
 
-// POST { connectorId, value } — vault the key, attach ref to the connector, enable it.
+// POST { connectorId, value, orgSlug? } — vault the key, attach ref to the connector, enable it.
 export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
-
-  const supabase = getSupabaseWriteClient();
-  if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   let body: Record<string, unknown>;
   try {
@@ -28,6 +25,10 @@ export async function POST(req: Request): Promise<Response> {
   } catch {
     return new NextResponse("invalid json", { status: 400 });
   }
+
+  const orgSlug = typeof body.orgSlug === "string" && body.orgSlug.trim() ? body.orgSlug.trim() : null;
+  const supabase = await getOrgSupabaseWriteClient(orgSlug);
+  if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   const connectorId = str(body.connectorId);
   const value = typeof body.value === "string" ? body.value.trim() : "";
@@ -63,15 +64,16 @@ export async function POST(req: Request): Promise<Response> {
   return NextResponse.json({ ok: true, ref });
 }
 
-// DELETE ?connectorId=<uuid> — remove the vaulted key + clear the ref.
+// DELETE ?connectorId=<uuid>&orgSlug=<slug> — remove the vaulted key + clear the ref.
 export async function DELETE(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
 
-  const supabase = getSupabaseWriteClient();
+  const params = new URL(req.url).searchParams;
+  const supabase = await getOrgSupabaseWriteClient(params.get("orgSlug"));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
-  const connectorId = new URL(req.url).searchParams.get("connectorId");
+  const connectorId = params.get("connectorId");
   if (!connectorId) return NextResponse.json({ ok: false, error: "connectorId required" }, { status: 400 });
 
   const ref = connectorSecretRef(connectorId);
