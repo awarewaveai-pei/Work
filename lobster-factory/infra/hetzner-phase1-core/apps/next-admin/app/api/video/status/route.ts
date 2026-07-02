@@ -9,6 +9,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import type { RenderOutputMeta, RenderOutputs } from "@/lib/content/video/render-client";
+import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 
 const EXPECTED_VIDEO_DIMENSIONS: Record<string, { width: number; height: number }> = {
   "16x9": { width: 1920, height: 1080 },
@@ -37,6 +38,11 @@ function validateRenderOutputs(
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
+  const { role } = resolveOpsRole(req);
+  if (!canCreateAiImageJob(role)) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
+
   const jobId = new URL(req.url).searchParams.get("jobId");
   if (!jobId) {
     return NextResponse.json({ ok: false, error: "jobId is required" }, { status: 400 });

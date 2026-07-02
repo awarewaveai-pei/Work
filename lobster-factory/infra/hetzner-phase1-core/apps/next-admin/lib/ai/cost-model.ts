@@ -71,7 +71,6 @@ export const IMAGE_RATES: Record<string, { usd: number; label: string; vendor: s
   "ideogram-v4-turbo":   { usd: 0.03, label: "Ideogram v4 Turbo", vendor: "Ideogram/Replicate" },
   "ideogram-v4-quality": { usd: 0.10, label: "Ideogram v4 Quality", vendor: "Ideogram/Replicate" },
   "ideogram-character":  { usd: 0.15, label: "Ideogram Character", vendor: "Ideogram/Replicate" },
-  "seedream-4.5":        { usd: 0.04, label: "Seedream 4.5", vendor: "ByteDance/Replicate" },
   "nano-banana-2":       { usd: 0.067, label: "Nano Banana 2", vendor: "Google/Replicate" },
   "nano-banana-pro":     { usd: 0.15, label: "Nano Banana Pro", vendor: "Google/Replicate" },
   "imagen-4":            { usd: 0.04, label: "Imagen 4", vendor: "Google/Replicate" },

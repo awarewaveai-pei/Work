@@ -413,7 +413,7 @@ export async function POST(request: Request) {
     const ecommercePlugins = manifestSlug === "wc-core" || manifestSlug === "wc-custom"
       ? ["woocommerce", "woo-gutenberg-products-block"]
       : [];
-    const crmPlugins = pluginSlugs.includes("fluentcrm") ? ["fluentcrm"] : [];
+    const crmPlugins = pluginSlugs.includes("fluent-crm") ? ["fluent-crm"] : [];
     const formPlugins = ["fluentform"];
 
     const allPlugins = [...new Set([

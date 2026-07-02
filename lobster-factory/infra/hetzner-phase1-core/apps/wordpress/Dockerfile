@@ -10,6 +10,8 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction
 COPY mu-plugins/sentry.php ./sentry.php
 COPY mu-plugins/posthog.php ./posthog.php
 
+COPY php-upload-limits.ini /usr/local/etc/php/conf.d/awarewave-upload-limits.ini
+
 # Seed /usr/src/wordpress so mu-plugins are included when WordPress populates the volume on first run.
 RUN mkdir -p /usr/src/wordpress/wp-content/mu-plugins
 COPY mu-plugins/sentry.php /usr/src/wordpress/wp-content/mu-plugins/sentry.php

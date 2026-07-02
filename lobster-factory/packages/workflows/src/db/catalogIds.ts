@@ -2,6 +2,7 @@
  * Deterministic catalog IDs — must match SQL seeds:
  * - `0006_seed_catalog.sql` (wc-core baseline)
  * - `0023_dispatcher_enum_and_catalog_seeds.sql` (wp-basic, wp-business, adopt-client-os, ao-infrastructure-check)
+ * - `0024_wc_custom_catalog_seed.sql` (wc-custom — TODO: migration pending before LOBSTER_ENABLE_DB_WRITES=true)
  *
  * These IDs allow workflow_runs/package_install_runs to reference known workflow_versions/manifests
  * without having to query the catalog first.
@@ -10,6 +11,10 @@ export const LobsterCatalogIds = {
   wcCore: {
     packageVersionId: "9819a867-36b9-4470-bdb9-611a0751dba6",
     manifestId: "8760d0ba-35ae-483a-8fa6-abd19f5c6d4d",
+  },
+  wcCustom: {
+    packageVersionId: "a1b2c3d4-0005-4000-8000-000000000005",
+    manifestId: "a1b2c3d4-0006-4000-8000-000000000006",
   },
   wpBasic: {
     packageVersionId: "a1b2c3d4-0001-4000-8000-000000000001",
@@ -27,13 +32,18 @@ export const LobsterCatalogIds = {
   },
 } as const;
 
-export type ManifestSlug = "wp-basic" | "wp-business" | "wc-core";
+export type ManifestSlug = "wp-basic" | "wp-business" | "wc-core" | "wc-custom";
 
 export function catalogIdsForManifest(slug: ManifestSlug) {
   switch (slug) {
     case "wp-basic":    return LobsterCatalogIds.wpBasic;
     case "wp-business": return LobsterCatalogIds.wpBusiness;
     case "wc-core":     return LobsterCatalogIds.wcCore;
+    case "wc-custom":   return LobsterCatalogIds.wcCustom;
+    default: {
+      const exhaustiveCheck: never = slug;
+      throw new Error(`catalogIdsForManifest: unhandled manifest slug "${exhaustiveCheck}"`);
+    }
   }
 }
 

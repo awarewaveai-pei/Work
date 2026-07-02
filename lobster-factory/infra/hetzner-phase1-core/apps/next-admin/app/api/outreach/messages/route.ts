@@ -4,6 +4,7 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { getSecret } from "@/lib/secret-vault";
 import { checkColdGate, buildEvidenceSnapshot, lintMessage } from "@/lib/outreach/cold-gate";
 import { generateWithGemini } from "@/lib/outreach/ai-gemini";
+import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 // Cold Outreach — message generation (task T8) + list (task T9). Table: co_messages (migration 0048).
 // Flow: Cold Gate (block if no observation/source_url/do_not_contact) → resolve org's enabled Gemini
@@ -60,9 +61,14 @@ function buildPrompt(lead: LeadRow, sp: ProfileRow | null, forbidden: string[]):
 export async function GET(req: Request): Promise<Response> {
   const supabase = getSupabaseWriteClient();
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
-  const leadId = new URL(req.url).searchParams.get("leadId");
+  const url = new URL(req.url);
+  const leadId = url.searchParams.get("leadId");
+  let orgFilter: string | null;
+  try { orgFilter = effectiveOrgId(req, url.searchParams.get("organizationId")); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   let query = supabase.from(TABLE).select("*").order("created_at", { ascending: false }).limit(100);
   if (leadId) query = query.eq("lead_id", leadId);
+  if (orgFilter) query = query.eq("organization_id", orgFilter);
   const { data, error } = await query;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, messages: data ?? [] });
@@ -89,6 +95,8 @@ export async function POST(req: Request): Promise<Response> {
   if (leadErr) return NextResponse.json({ ok: false, error: leadErr.message }, { status: 500 });
   if (!leadData) return NextResponse.json({ ok: false, error: "lead not found" }, { status: 404 });
   const lead = leadData as LeadRow;
+  try { assertOrgAccess(req, lead.organization_id); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
   // Cold Gate — refuse to generate without evidence.
   const gate = checkColdGate(lead);
@@ -212,6 +220,12 @@ export async function PATCH(req: Request): Promise<Response> {
     return NextResponse.json({ ok: false, error: "valid status required (draft|approved|needs_edit|skipped)" }, { status: 400 });
   }
 
+  const { data: cur, error: curErr } = await supabase.from(TABLE).select("organization_id").eq("id", id).maybeSingle();
+  if (curErr) return NextResponse.json({ ok: false, error: curErr.message }, { status: 500 });
+  if (!cur) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+  try { assertOrgAccess(req, (cur as Record<string, unknown>).organization_id as string | null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+
   const patch: Record<string, unknown> = { status };
   const editedBody = str(body.body);
   if (editedBody) patch.body = editedBody;
@@ -230,6 +244,11 @@ export async function DELETE(req: Request): Promise<Response> {
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
+  const { data: cur, error: readErr } = await supabase.from(TABLE).select("organization_id").eq("id", id).maybeSingle();
+  if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
+  if (!cur) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+  try { assertOrgAccess(req, (cur as Record<string, unknown>).organization_id as string | null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   const { error } = await supabase.from(TABLE).delete().eq("id", id);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

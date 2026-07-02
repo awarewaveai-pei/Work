@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 // Cold Outreach — Suppression list (task T12). Table: co_suppression_list (migration 0048).
 // The send-time "do not contact" backbone. Writes ops-role gated; GET authed-only.
@@ -22,9 +23,11 @@ const APPLIES = new Set(["cold", "marketing", "transactional", "all"]);
 export async function GET(req: Request): Promise<Response> {
   const supabase = getSupabaseWriteClient();
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
-  const organizationId = new URL(req.url).searchParams.get("organizationId");
+  let orgFilter: string | null;
+  try { orgFilter = effectiveOrgId(req, new URL(req.url).searchParams.get("organizationId")); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   let query = supabase.from(TABLE).select("*").order("created_at", { ascending: false }).limit(LIST_LIMIT);
-  if (organizationId) query = query.eq("organization_id", organizationId);
+  if (orgFilter) query = query.eq("organization_id", orgFilter);
   const { data, error } = await query;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, entries: data ?? [] });
@@ -58,8 +61,11 @@ export async function POST(req: Request): Promise<Response> {
 
   // Validate uuid-typed columns up front so a bad id returns a clean 400, not a raw PG 22P02 leak (critic #1).
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const organizationId = str(body.organizationId);
-  if (organizationId && !UUID_RE.test(organizationId)) return NextResponse.json({ ok: false, error: "organizationId must be a uuid" }, { status: 400 });
+  const rawOrgId = str(body.organizationId);
+  if (rawOrgId && !UUID_RE.test(rawOrgId)) return NextResponse.json({ ok: false, error: "organizationId must be a uuid" }, { status: 400 });
+  let organizationId: string | null;
+  try { organizationId = effectiveOrgId(req, rawOrgId); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   const leadId = str(body.leadId);
   if (leadId && !UUID_RE.test(leadId)) return NextResponse.json({ ok: false, error: "leadId must be a uuid" }, { status: 400 });
   // jsonb evidence must be an object, not a scalar/array (critic #3).
@@ -93,6 +99,11 @@ export async function DELETE(req: Request): Promise<Response> {
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
+  const { data: cur, error: readErr } = await supabase.from(TABLE).select("organization_id").eq("id", id).maybeSingle();
+  if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
+  if (!cur) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+  try { assertOrgAccess(req, (cur as Record<string, unknown>).organization_id as string | null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   const { error } = await supabase.from(TABLE).delete().eq("id", id);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

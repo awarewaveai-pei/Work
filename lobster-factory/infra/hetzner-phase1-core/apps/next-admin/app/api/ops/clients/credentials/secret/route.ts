@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canWriteTenantConfig } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { putSecret, deleteSecret, clientCredSecretRef } from "@/lib/secret-vault";
+import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 // Per-client credential vault — secret byte ingestion (migration 0050).
 //
@@ -39,14 +40,16 @@ export async function POST(req: Request): Promise<Response> {
   if (!credentialId) return NextResponse.json({ ok: false, error: "credentialId required" }, { status: 400 });
   if (!value)        return NextResponse.json({ ok: false, error: "value required" }, { status: 400 });
 
-  // Confirm the credential row exists and belongs to a client (prevents vault writes for phantom IDs).
+  // Confirm the credential row exists and belongs to the caller's org (prevents vault writes for phantom/foreign IDs).
   const { data: row, error: readErr } = await supabase
     .from(TABLE)
-    .select("id")
+    .select("id, client_id")
     .eq("id", credentialId)
     .maybeSingle();
   if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
   if (!row)    return NextResponse.json({ ok: false, error: "credential not found" }, { status: 404 });
+  try { assertOrgAccess(req, (row as Record<string, unknown>).client_id as string | null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
   const ref = clientCredSecretRef(credentialId);
 
@@ -60,7 +63,8 @@ export async function POST(req: Request): Promise<Response> {
   const { error: updErr } = await supabase
     .from(TABLE)
     .update({ secret_ref: ref, updated_at: new Date().toISOString() })
-    .eq("id", credentialId);
+    .eq("id", credentialId)
+    .eq("client_id", (row as Record<string, unknown>).client_id as string);
 
   if (updErr) {
     // Compensate: remove the vault entry so it doesn't become an orphan.
@@ -83,20 +87,29 @@ export async function DELETE(req: Request): Promise<Response> {
   const credentialId = new URL(req.url).searchParams.get("credentialId");
   if (!credentialId) return NextResponse.json({ ok: false, error: "credentialId required" }, { status: 400 });
 
+  const { data: credRow, error: credReadErr } = await supabase
+    .from(TABLE)
+    .select("client_id")
+    .eq("id", credentialId)
+    .maybeSingle();
+  if (credReadErr) return NextResponse.json({ ok: false, error: credReadErr.message }, { status: 500 });
+  if (!credRow) return NextResponse.json({ ok: false, error: "credential not found" }, { status: 404 });
+  try { assertOrgAccess(req, (credRow as Record<string, unknown>).client_id as string | null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+
   const ref = clientCredSecretRef(credentialId);
 
-  try {
-    await deleteSecret(ref);
-  } catch (e) {
-    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "vault delete failed" }, { status: 500 });
-  }
-
-  const { error } = await supabase
+  // Nullify secret_ref first (org-scoped) so the ref cannot be re-used if vault delete fails.
+  // Mirrors the best-effort vault pattern in credentials/route.ts DELETE.
+  const { error: nullErr } = await supabase
     .from(TABLE)
     .update({ secret_ref: null, updated_at: new Date().toISOString() })
-    .eq("id", credentialId);
+    .eq("id", credentialId)
+    .eq("client_id", (credRow as Record<string, unknown>).client_id as string);
+  if (nullErr) return NextResponse.json({ ok: false, error: nullErr.message }, { status: 500 });
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  // Best-effort vault delete — ref is deterministic so a re-POST overwrites cleanly if this fails.
+  try { await deleteSecret(ref); } catch { /* best-effort; ref deterministic, re-POST overwrites */ }
 
   return NextResponse.json({ ok: true });
 }

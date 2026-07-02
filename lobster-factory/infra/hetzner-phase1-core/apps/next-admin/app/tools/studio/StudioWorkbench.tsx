@@ -16,8 +16,8 @@ import {
 } from "@/lib/studio/prompt-presets";
 import {
   CULTURE_REGIONS,
-  CULTURE_LENSES,
-  MAP_THEMES,
+  ALL_TOPICS,
+  TOPIC_GROUPS,
   type CultureItem,
   type MapTheme,
 } from "@/lib/studio/culture-presets";
@@ -33,15 +33,25 @@ import {
   type EdgeMaskId,
 } from "@/lib/studio/edge-mask";
 import { AI_TEXT_MODEL_GROUPS, AI_TEXT_MODELS, type AiTextModel } from "@/lib/ai/text-model-options";
+import { EVENT_ALL_COUNTRIES_FILTER, EVENT_COUNTRY_FILTER_GROUPS } from "@/lib/events/countries";
 import { textModelCostLabel, textModelCostSummary } from "@/lib/ai/text-model-pricing";
 
+// suffix describes the FLAT print-ready ARTWORK (not the physical product) so literal models
+// (Nano Banana / Ideogram) don't render a t-shirt/mug. The aspect ratio still tailors the
+// composition to each product. Keep "no product mockup" so output is the design, not a photo.
+// Appended to every product suffix so the AI never invents extra subjects beyond what was listed.
+const NO_EXTRA_CHARS = "no extra characters or subjects beyond the ones explicitly listed";
+const FULL_BLEED_FRAME = "full-bleed edge-to-edge composition, artwork fills the entire image frame, extend the design to the left and right edges, no empty side margins, no border";
+const PRINT_SAFE_FRAME = "single standalone print graphic, transparent-background friendly or clean removable white background, no rectangular poster background, no full-bleed scene, keep all important elements fully inside the design with safe margins";
+const APPAREL_WIDE_PRINT_FRAME = "wide chest-print graphic, the artwork itself spans nearly the full printable width left to right, large horizontal composition, minimal empty side margins, transparent-background friendly or clean removable white background, no rectangular poster background, no full-bleed scene, do not crop important elements";
+
 const PRODUCT_TYPES = [
-  { value: "tshirt", label: "T-shirt", aspect: "4:5" as AspectRatio, suffix: "t-shirt graphic design, centered composition, plain background" },
-  { value: "hoodie", label: "Hoodie", aspect: "4:5" as AspectRatio, suffix: "hoodie front print design, centered composition, plain background" },
-  { value: "mug", label: "Mug", aspect: "3:2" as AspectRatio, suffix: "mug wrap-around print design, horizontal composition, plain background" },
-  { value: "poster", label: "Poster / Wall Art", aspect: "2:3" as AspectRatio, suffix: "poster art print, full-bleed composition" },
-  { value: "sticker", label: "Sticker", aspect: "1:1" as AspectRatio, suffix: "die-cut sticker design, bold outline, plain background" },
-  { value: "none", label: "（不限商品）", aspect: "1:1" as AspectRatio, suffix: "" },
+  { value: "tshirt", label: "T-shirt", aspect: "4:5" as AspectRatio, suffix: `flat print-ready apparel artwork, ${APPAREL_WIDE_PRINT_FRAME}, clean edges, NOT a product photo, no garment, no mockup, ${NO_EXTRA_CHARS}` },
+  { value: "hoodie", label: "Hoodie", aspect: "4:5" as AspectRatio, suffix: `flat print-ready apparel artwork, ${APPAREL_WIDE_PRINT_FRAME}, clean edges, NOT a product photo, no garment, no mockup, ${NO_EXTRA_CHARS}` },
+  { value: "mug", label: "Mug", aspect: "3:2" as AspectRatio, suffix: `horizontal wrap-print artwork, fill the printable width left to right while keeping important elements inside safe margins, print-ready, NOT a product photo, no mug, no mockup, ${NO_EXTRA_CHARS}` },
+  { value: "poster", label: "Poster / Wall Art", aspect: "2:3" as AspectRatio, suffix: `full-bleed poster illustration, ${FULL_BLEED_FRAME}, complete artwork filling the frame, no frame border, no mockup, ${NO_EXTRA_CHARS}` },
+  { value: "sticker", label: "Sticker", aspect: "1:1" as AspectRatio, suffix: `die-cut sticker artwork with bold clean outline, ${PRINT_SAFE_FRAME}, flat design, NOT a product photo, no mockup, ${NO_EXTRA_CHARS}` },
+  { value: "none", label: "（不限商品）", aspect: "1:1" as AspectRatio, suffix: `${FULL_BLEED_FRAME}, ${NO_EXTRA_CHARS}` },
 ];
 
 const ASPECTS: AspectRatio[] = ["1:1", "3:2", "2:3", "4:3", "3:4", "4:5", "16:9", "9:16"];
@@ -81,8 +91,29 @@ const TRENDING_CATEGORIES = [
 
 const TRANSFORM_MODEL: StudioModel = "flux-kontext-dev";
 const DEFAULT_SEARCH_DATA_MODEL: AiTextModel = "gpt-5.4-nano";
-const CULTURE_STORAGE_PREFIX = "studio_culture_v2";
+const CULTURE_STORAGE_PREFIX = "studio_culture_v3";
 const TRENDING_STORAGE_KEY = "studio_trending_v2";
+const EVENT_CAT_FILTERS = [
+  { value: "all", label: "全部" },
+  { value: "sports", label: "運動" },
+  { value: "national", label: "國家節慶" },
+  { value: "cultural", label: "文化節慶" },
+  { value: "commercial", label: "商業檔期" },
+  { value: "family", label: "親情節日" },
+  { value: "mega", label: "大型事件" },
+  { value: "holiday", label: "假日" },
+] as const;
+const EVENT_WINDOWS = [
+  { value: 30, label: "30天" },
+  { value: 90, label: "90天" },
+  { value: 180, label: "6個月" },
+  { value: 365, label: "1年" },
+] as const;
+const EVENT_SORTS = [
+  { value: "opportunity", label: "依機會" },
+  { value: "date", label: "依時間" },
+] as const;
+const EVENT_FETCH_LIMIT = 500;
 
 // Fixed seed so the edge-style preview thumbnails match what `applyEdge` actually composites.
 const EDGE_APPLY_SEED = 7;
@@ -207,6 +238,21 @@ function storeTrending(topics: Record<string, string[]>): void {
   } catch {
     // Ignore quota/private-mode failures; the in-memory result still renders.
   }
+}
+
+function aspectPromptDirective(aspect: AspectRatio): string {
+  const orientation = aspect === "1:1"
+    ? "square"
+    : ["3:2", "4:3", "16:9"].includes(aspect)
+      ? "landscape"
+      : "portrait";
+  return `Output canvas must use selected aspect ratio ${aspect} (${orientation}); compose the artwork to fit that exact frame.`;
+}
+
+function promptWithAspect(prompt: string, aspect: AspectRatio): string {
+  const value = prompt.trim();
+  if (!value) return value;
+  return `${value}. ${aspectPromptDirective(aspect)}`;
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -346,13 +392,12 @@ export default function StudioWorkbench() {
   // 🌍 世界文化 — region (single-select) + lens tab + picked culture chips (multi)
   const [region, setRegion] = useState<CultureItem | null>(null);
   const [regionTab, setRegionTab] = useState(CULTURE_REGIONS[0]?.group ?? "");
-  const [cultureLens, setCultureLens] = useState(CULTURE_LENSES[0]?.key ?? "");
+  const [topic, setTopic] = useState(ALL_TOPICS[0]?.key ?? ""); // 統一主題（兩模式共用同一份；做地圖/做圖案只決定輸出）
   const [cultureChips, setCultureChips] = useState<string[]>([]); // en tokens in prompt
-  const [cultureDyn, setCultureDyn] = useState<Record<string, CultureItem[]>>({}); // `${regionEn}|${lensKey}` → items
+  const [cultureDyn, setCultureDyn] = useState<Record<string, CultureItem[]>>({}); // `${regionEn}|${topicKey}` → items
   const [cultureFetching, setCultureFetching] = useState<Record<string, boolean>>({}); // per-key in-flight flag
   const [fusionRegion, setFusionRegion] = useState<CultureItem | null>(null); // 🎲 混搭骰 second culture
-  const [mapMode, setMapMode] = useState(false); // 🗺️ 地圖模式 — generate a whole illustrated tourist map
-  const [mapTheme, setMapTheme] = useState(MAP_THEMES[0]?.key ?? ""); // active map theme (地標/美食/捷運…)
+  const [mapMode, setMapMode] = useState(false); // 🗺️ 做地圖（true）vs 🎨 做圖案（false）— 只決定輸出格式
   const [fusionPickMode, setFusionPickMode] = useState(false); // ✋ 手選混搭 — next country click sets fusionRegion
   const [zoomImage, setZoomImage] = useState<string | null>(null); // 🔍 click-to-enlarge lightbox
   const [playMods, setPlayMods] = useState<string[]>([]); // 🎭 玩法 — selected treatment fragments (multi)
@@ -406,6 +451,41 @@ export default function StudioWorkbench() {
   const [allTopics, setAllTopics] = useState<Record<string, string[]>>({});
   const [trendingFetching, setTrendingFetching] = useState(false);
 
+  // 🗓️ 活動行事曆 — upcoming events from Supabase events table
+  interface UpcomingEvent {
+    id: string;
+    title: string;
+    title_zh: string | null;
+    event_date: string;
+    event_end_date: string | null;
+    category: string;
+    subcategory: string | null;
+    emoji: string | null;
+    marketing_window_start: string;
+    marketing_lead_days: number;
+    country_codes: string[] | null;
+    region: string | null;
+    facets?: string[];
+    opportunity_score?: number;
+  }
+  const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
+  const [eventsFetching, setEventsFetching] = useState(false);
+  const [eventCatFilter, setEventCatFilter] = useState<string>("all");
+  const [eventCountryFilter, setEventCountryFilter] = useState<string>("all");
+  const [eventWindowDays, setEventWindowDays] = useState<number>(365);
+  const [eventSort, setEventSort] = useState<"opportunity" | "date">("opportunity");
+  const [eventBrowserOpen, setEventBrowserOpen] = useState(false);
+  const eventCountryLabel = useCallback((event: UpcomingEvent) => {
+    const countries = [...new Set(event.country_codes ?? [])].filter(Boolean).sort();
+    if (countries.length === 0) return "";
+    const shown = countries.slice(0, 3).join(", ");
+    return countries.length > 3 ? `${shown} +${countries.length - 3}` : shown;
+  }, []);
+  const eventMatchesCurrentFilter = useCallback((event: UpcomingEvent) => {
+    if (eventCatFilter === "all") return true;
+    return (event.facets ?? [event.category]).includes(eventCatFilter);
+  }, [eventCatFilter]);
+
   const bgInFlight = useRef<Record<string, boolean>>({});
   const mockupInFlight = useRef(false);
   const jobIdRef = useRef<string | null>(null);
@@ -453,15 +533,15 @@ export default function StudioWorkbench() {
     // 🗺️ 地圖模式 — assemble a whole illustrated-map prompt from country + picked items.
     // Items priority: explicitly picked chips → AI-fetched set for this theme → theme fallback.
     if (mapMode && region) {
-      const mt = MAP_THEMES.find((t) => t.key === mapTheme) ?? MAP_THEMES[0]!;
-      const dyn = cultureDyn[`${region.en}|${mapTheme}`] ?? [];
+      const mt = ALL_TOPICS.find((t) => t.key === topic) ?? ALL_TOPICS[0]!;
+      const dyn = cultureDyn[`${region.en}|${topic}`] ?? [];
       const items = cultureChips.length
         ? cultureChips
         : dyn.length
           ? dyn.map((d) => d.en)
           : mt.fallback.map((d) => d.en);
       const base = buildMapPrompt({ regionEn: region.en, fusionEn: fusionRegion?.en, theme: mt, items });
-      const extras = [playClause, resolvedStylePrompt, vibe.trim()].filter(Boolean).join(", ");
+      const extras = [product.suffix, playClause, resolvedStylePrompt, vibe.trim()].filter(Boolean).join(", ");
       return extras ? `${base}, ${extras}` : base;
     }
     // 🌍 culture tokens: region adjective (+ 🎲 fusion culture) + any picked culture chips
@@ -484,7 +564,7 @@ export default function StudioWorkbench() {
     }
     const parts = [subject.trim(), ...cultureTokens, playClause, theme.trim(), vibe.trim(), resolvedStylePrompt, product.suffix].filter(Boolean);
     return parts.join(", ");
-  }, [subject, theme, vibe, resolvedStylePrompt, product, refMode, refImages.length, region, fusionRegion, cultureChips, mapMode, mapTheme, cultureDyn, playMods]);
+  }, [subject, theme, vibe, resolvedStylePrompt, product, refMode, refImages.length, region, fusionRegion, cultureChips, mapMode, topic, cultureDyn, playMods]);
 
   const effectivePrompt = promptTouched ? prompt : assembledPrompt;
 
@@ -552,7 +632,8 @@ export default function StudioWorkbench() {
       const items = coerceCultureItems(json.items);
       if (json.ok && items.length) {
         setCultureDyn((prev) => ({ ...prev, [key]: items }));
-        storeCulture(regionEn, lensKey, items);
+        // Don't persist AI-forced results — only curated data should survive a page reload.
+        if (!opts?.force) storeCulture(regionEn, lensKey, items);
       }
     } catch { /* keep fallback chips */ }
     if (!opts?.curatedOnly) setCultureFetching((p) => { const n = { ...p }; delete n[key]; return n; });
@@ -567,13 +648,13 @@ export default function StudioWorkbench() {
     let bi = Math.floor(Math.random() * flat.length);
     if (bi === ai) bi = (bi + 1) % flat.length;
     const a = flat[ai]!, b = flat[bi]!;
-    const lens = CULTURE_LENSES[Math.floor(Math.random() * CULTURE_LENSES.length)] ?? CULTURE_LENSES[0]!;
+    const t = ALL_TOPICS[Math.floor(Math.random() * ALL_TOPICS.length)] ?? ALL_TOPICS[0]!;
     setRegion(a.it);
     setRegionTab(a.group);
     setFusionRegion(b.it);
-    setCultureLens(lens.key);
-    void fetchCulture(a.it.en, lens.key);
-    void fetchCulture(b.it.en, lens.key);
+    setTopic(t.key);
+    void fetchCulture(a.it.en, t.key);
+    void fetchCulture(b.it.en, t.key);
   }, [fetchCulture]);
 
   const fetchAllTrending = useCallback(async () => {
@@ -604,20 +685,45 @@ export default function StudioWorkbench() {
     if (stored) setAllTopics(stored);
   }, []);
 
+  // 🗓️ Fetch upcoming events from the monthly-refreshed event cache.
+  const fetchUpcomingEvents = useCallback(async () => {
+    setEventsFetching(true);
+    try {
+      const now = new Date().toISOString().slice(0, 10);
+      const until = new Date(Date.now() + eventWindowDays * 86400000).toISOString().slice(0, 10);
+      const url = new URL("/api/tools/events/upcoming", window.location.origin);
+      url.searchParams.set("from", now);
+      url.searchParams.set("until", until);
+      url.searchParams.set("days", String(eventWindowDays));
+      url.searchParams.set("sort", eventSort);
+      url.searchParams.set("limit", String(EVENT_FETCH_LIMIT));
+      if (eventCatFilter !== "all") url.searchParams.set("category", eventCatFilter);
+      if (eventCountryFilter !== "all") url.searchParams.set("country", eventCountryFilter);
+      const res = await fetch(url.toString());
+      if (res.ok) {
+        const json = (await res.json()) as { events: UpcomingEvent[] };
+        setUpcomingEvents(json.events ?? []);
+      }
+    } catch { /* silent */ }
+    setEventsFetching(false);
+  }, [eventCatFilter, eventCountryFilter, eventSort, eventWindowDays]);
+
+  useEffect(() => { void fetchUpcomingEvents(); }, [fetchUpcomingEvents]);
+
   // Auto-load items for the selected region×facet WITHOUT a click and WITHOUT spending:
   // localStorage first, else a curated-only fetch (pre-baked = free + instant; never the LLM).
   // The ref guards against an effect loop when a long-tail combo has no curated entry (empty).
   const autoLoadedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!region) return;
-    const facetKey = mapMode ? mapTheme : cultureLens;
+    const facetKey = topic;
     const key = cultureRuntimeKey(region.en, facetKey);
     const stored = readStoredCulture(region.en, facetKey);
     if (stored) { setCultureDyn((prev) => (prev[key] ? prev : { ...prev, [key]: stored })); return; }
     if (autoLoadedRef.current.has(key)) return;
     autoLoadedRef.current.add(key);
     void fetchCulture(region.en, facetKey, { curatedOnly: true });
-  }, [region, cultureLens, mapMode, mapTheme, fetchCulture]);
+  }, [region, topic, fetchCulture]);
 
   // 🔍 Lightbox: close on Escape while an image is zoomed.
   useEffect(() => {
@@ -642,6 +748,7 @@ export default function StudioWorkbench() {
   // promptOverride lets 🎨 單獨生圖 generate one specific item; noRef forces text-to-image.
   const runGenerate = useCallback(async (opts?: { promptOverride?: string; noRef?: boolean }) => {
     const usePrompt = opts?.promptOverride ?? effectivePrompt;
+    const requestPrompt = promptWithAspect(usePrompt, aspect);
     const effRefMode: RefMode = opts?.noRef ? "none" : refMode;
     if (!usePrompt || usePrompt.trim().length < 3) {
       setResults([{ model: primaryModel, image: null, seed: null, error: "請先填主題/描述（prompt 至少 3 字）", busy: false }]);
@@ -688,7 +795,7 @@ export default function StudioWorkbench() {
         const res = await fetch("/api/tools/studio/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model: m, prompt: usePrompt, referenceImages: refsForModel, aspectRatio: aspect, _jobId: jobIdRef.current }),
+          body: JSON.stringify({ model: m, prompt: requestPrompt, referenceImages: refsForModel, aspectRatio: aspect, _jobId: jobIdRef.current }),
         });
         const json = (await res.json()) as { ok: boolean; image?: string; seed?: number | null; error?: string };
         slots[i] = json.ok && json.image
@@ -891,6 +998,24 @@ export default function StudioWorkbench() {
   const isTransformMode = refMode === "transform";
   const isMultiModel = selectedModels.size > 1;
   const anyResults = results.some((r) => !r.busy && r.image);
+  const visibleUpcomingEvents = useMemo(
+    () => upcomingEvents.filter(eventMatchesCurrentFilter),
+    [eventMatchesCurrentFilter, upcomingEvents],
+  );
+  const groupedUpcomingEvents = useMemo(() => {
+    const groups = new Map<string, UpcomingEvent[]>();
+    const labelFor = (event: UpcomingEvent) => eventSort === "date" ? event.event_date.slice(0, 7) : "推薦";
+    for (const event of visibleUpcomingEvents) {
+      const label = labelFor(event);
+      groups.set(label, [...(groups.get(label) ?? []), event]);
+    }
+    return [...groups.entries()];
+  }, [eventSort, visibleUpcomingEvents]);
+  const buildEventLabel = useCallback((event: UpcomingEvent) => {
+    const countryLabel = eventCountryLabel(event);
+    const baseLabel = `${event.emoji ?? "📅"} ${event.title_zh ?? event.title}`;
+    return countryLabel ? `${baseLabel} (${countryLabel})` : baseLabel;
+  }, [eventCountryLabel]);
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 400px", gap: 16, padding: 16, alignItems: "start" }}>
@@ -960,7 +1085,141 @@ export default function StudioWorkbench() {
           </p>
         </AccordionSection>
 
-        {/* 🌍 世界文化 — region × lens, with AI-filled specific items (混搭靈感工具). Moved to FIRST per spec. */}
+        <AccordionSection title="🔥 時事靈感">
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <p style={{ fontSize: 11, opacity: 0.55, margin: 0 }}>點擊話題填入主圖欄（再點一次取消）</p>
+            <button type="button" disabled={trendingFetching} onClick={() => void fetchAllTrending()}
+              style={actionPill(trendingFetching)}>
+              {trendingFetching ? "搜尋中…" : "抓取今日熱搜"}
+            </button>
+          </div>
+          {/* Row 1: category tabs (圖一 layout) */}
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+            {TRENDING_CATEGORIES.map((cat) => (
+              <button key={cat.value} type="button" onClick={() => setTrendingTab(cat.value)} style={tabStyle(trendingTab === cat.value)}>
+                {cat.label}
+              </button>
+            ))}
+          </div>
+          {/* Row 2: topics of the active category — active chip shows 淺紫 bg + ✓ (selected = current subject) */}
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+            {(() => {
+              const topics = allTopics[trendingTab];
+              if (!topics) {
+                return <span style={{ fontSize: 11, opacity: 0.45 }}>{trendingFetching ? "搜尋中…" : "點「抓取今日熱搜」載入話題"}</span>;
+              }
+              return topics.map((t, i) => {
+                const active = subject === t;
+                return (
+                  <button key={`${trendingTab}-${i}`} type="button" onClick={() => setSubject(active ? "" : t)} style={chipStyle(active)}>
+                    {active ? "✓ " : ""}{t}
+                  </button>
+                );
+              });
+            })()}
+          </div>
+        </AccordionSection>
+
+        {/* 🗓️ 活動行事曆 — upcoming events for merchandise pre-selling */}
+        <AccordionSection
+          title="🗓️ 活動行事曆"
+          summary={visibleUpcomingEvents.length > 0 ? `${visibleUpcomingEvents.length} 個可用` : "載入中…"}
+        >
+          <p style={{ fontSize: 11, opacity: 0.55, margin: "0 0 8px" }}>點擊活動 → 自動填入主圖欄（為這個活動設計商品圖）</p>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+            {EVENT_CAT_FILTERS.map((filter) => (
+              <button key={filter.value} type="button" onClick={() => setEventCatFilter(filter.value)} style={tabStyle(eventCatFilter === filter.value)}>{filter.label}</button>
+            ))}
+            <button type="button" onClick={() => void fetchUpcomingEvents()} disabled={eventsFetching}
+              style={{ ...actionPill(eventsFetching), marginLeft: "auto" }}>
+              {eventsFetching ? "載入中…" : "🔄"}
+            </button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8 }}>
+            <select className="btn-secondary" value={eventCountryFilter} onChange={(e) => setEventCountryFilter(e.target.value)} style={{ fontSize: 12 }}>
+              <option value={EVENT_ALL_COUNTRIES_FILTER.value}>{EVENT_ALL_COUNTRIES_FILTER.label}</option>
+              {EVENT_COUNTRY_FILTER_GROUPS.map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.options.map((country) => <option key={country.value} value={country.value}>{country.label}</option>)}
+                </optgroup>
+              ))}
+            </select>
+            <select className="btn-secondary" value={eventWindowDays} onChange={(e) => setEventWindowDays(Number(e.target.value))} style={{ fontSize: 12 }}>
+              {EVENT_WINDOWS.map((window_) => <option key={window_.value} value={window_.value}>{window_.label}</option>)}
+            </select>
+            <select className="btn-secondary" value={eventSort} onChange={(e) => setEventSort(e.target.value as "opportunity" | "date")} style={{ fontSize: 12 }}>
+              {EVENT_SORTS.map((sort) => <option key={sort.value} value={sort.value}>{sort.label}</option>)}
+            </select>
+            <button type="button" onClick={() => setEventBrowserOpen(true)} style={actionPill(false)}>
+              查看更多
+            </button>
+          </div>
+          <div style={{ display: "grid", gap: 8, maxHeight: 430, overflowY: "auto", paddingRight: 2 }}>
+            {(() => {
+              if (eventsFetching) {
+                return (
+                  <span style={{ fontSize: 11, opacity: 0.45 }}>
+                    載入中…
+                  </span>
+                );
+              }
+
+              if (groupedUpcomingEvents.length === 0) {
+                return <span style={{ fontSize: 11, opacity: 0.45 }}>此篩選暫無活動</span>;
+              }
+
+              return groupedUpcomingEvents.map(([group, events]) => (
+                <section key={group}>
+                  <div style={{ fontSize: 11, fontWeight: 800, opacity: 0.58, marginBottom: 5 }}>{group}</div>
+                  <div style={{ display: "grid", gap: 5 }}>
+                    {events.map((event) => {
+                      const label = buildEventLabel(event);
+                      const active = subject === label;
+                      const daysUntil = Math.ceil((new Date(event.event_date).getTime() - Date.now()) / 86400000);
+                      const countries = eventCountryLabel(event);
+                      return (
+                        <button
+                          key={event.id}
+                          type="button"
+                          title={`${event.event_date} · ${(event.facets ?? [event.category]).join(", ")}${countries ? ` · ${countries}` : ""} · 提前 ${event.marketing_lead_days} 天備稿`}
+                          onClick={() => setSubject(active ? "" : label)}
+                          style={{
+                            textAlign: "left",
+                            border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+                            background: active ? "rgba(99,102,241,0.12)" : "rgba(127,127,127,0.04)",
+                            color: "var(--text-primary)",
+                            borderRadius: 6,
+                            padding: "8px 9px",
+                            cursor: "pointer",
+                            display: "grid",
+                            gridTemplateColumns: "1fr auto",
+                            gap: 8,
+                            alignItems: "center",
+                          }}
+                        >
+                          <span style={{ minWidth: 0 }}>
+                            <span style={{ display: "block", fontSize: 12, fontWeight: 750, overflowWrap: "anywhere" }}>
+                              {active ? "✓ " : ""}{label}
+                            </span>
+                            <span style={{ display: "block", fontSize: 10, opacity: 0.58, marginTop: 2 }}>
+                              {(event.facets ?? [event.category]).join(", ")}{countries ? ` · ${countries}` : ""}
+                            </span>
+                          </span>
+                          <span style={{ textAlign: "right", fontSize: 10, opacity: 0.72, whiteSpace: "nowrap" }}>
+                            <span style={{ display: "block", fontWeight: 800 }}>{event.event_date.slice(5)}</span>
+                            <span>{daysUntil >= 0 ? `${daysUntil}天` : "進行中"}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              ));
+            })()}
+          </div>
+        </AccordionSection>
+
+        {/* 🌍 世界文化 — region × lens, with AI-filled specific items (混搭靈感工具). */}
         <AccordionSection title="🌍 世界文化" summary={region ? (fusionRegion ? `${region.zh}×${fusionRegion.zh}` : region.zh) : (cultureChips.length ? `${cultureChips.length} 元素` : "未選")}>
           <p style={{ fontSize: 11, opacity: 0.55, margin: "0 0 8px" }}>
             1️⃣ 選用途 → 2️⃣ 選國家 → 3️⃣ 選主題 → 項目自動跳出（免費），按「生成」
@@ -1049,27 +1308,24 @@ export default function StudioWorkbench() {
             })}
           </div>
 
-          {/* 鏡頭 lens tabs（一般文化模式）/ 地圖主題 tabs（地圖模式）*/}
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
-            {mapMode
-              ? MAP_THEMES.map((t) => (
-                  <button key={t.key} type="button" onClick={() => setMapTheme(t.key)} style={tabStyle(mapTheme === t.key)}>
+          {/* 主題清單（整合版）— 核心/觀光/設計 三組，兩模式共用同一份。單選一個主題。 */}
+          {TOPIC_GROUPS.map((g) => (
+            <div key={g.label} style={{ marginBottom: 6 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: "var(--text-muted)", margin: "2px 0 3px" }}>{g.label}</div>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {g.items.map((t) => (
+                  <button key={t.key} type="button" onClick={() => setTopic(t.key)} style={tabStyle(topic === t.key)}>
                     {t.emoji} {t.zh}
                   </button>
-                ))
-              : CULTURE_LENSES.map((l) => (
-                  <button key={l.key} type="button" onClick={() => setCultureLens(l.key)} style={tabStyle(cultureLens === l.key)}>
-                    {l.emoji} {l.zh}
-                  </button>
                 ))}
-          </div>
+              </div>
+            </div>
+          ))}
 
-          {/* 具體項目（dyn，可放地圖/🎨單獨生圖）與 分類（fallback，整體地圖）分開列。
-              facet = 地圖模式用 map theme，否則用文化鏡頭；兩者共用 region.en|key 快取。 */}
+          {/* 具體項目（dyn，可複選放地圖/🎨單獨生圖）與 分類（fallback，整體地圖）分開列。
+              facet = 目前選的主題（兩模式共用 region.en|topic 快取）。 */}
           {(() => {
-            const facet = mapMode
-              ? (MAP_THEMES.find((t) => t.key === mapTheme) ?? MAP_THEMES[0]!)
-              : (CULTURE_LENSES.find((l) => l.key === cultureLens) ?? CULTURE_LENSES[0]!);
+            const facet = ALL_TOPICS.find((t) => t.key === topic) ?? ALL_TOPICS[0]!;
             const dynKey = region ? `${region.en}|${facet.key}` : "";
             const dyn = dynKey ? cultureDyn[dynKey] : undefined;
             const fetching = dynKey ? !!cultureFetching[dynKey] : false;
@@ -1186,41 +1442,6 @@ export default function StudioWorkbench() {
         <AccordionSection title="✨ 氛圍 Vibe" summary={vibe || "未填"}>
           <input className="btn-secondary" style={{ width: "100%", marginBottom: 8 }} value={vibe} onChange={(e) => setVibe(e.target.value)} placeholder="例：calm, ethereal" />
           <CategoryPicker categories={VIBE_CATEGORIES} value={vibe} onPick={setVibe} onTip={setTip} />
-        </AccordionSection>
-
-        <AccordionSection title="🔥 時事靈感">
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <p style={{ fontSize: 11, opacity: 0.55, margin: 0 }}>點擊話題填入主圖欄（再點一次取消）</p>
-            <button type="button" disabled={trendingFetching} onClick={() => void fetchAllTrending()}
-              style={actionPill(trendingFetching)}>
-              {trendingFetching ? "搜尋中…" : "抓取今日熱搜"}
-            </button>
-          </div>
-          {/* Row 1: category tabs (圖一 layout) */}
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
-            {TRENDING_CATEGORIES.map((cat) => (
-              <button key={cat.value} type="button" onClick={() => setTrendingTab(cat.value)} style={tabStyle(trendingTab === cat.value)}>
-                {cat.label}
-              </button>
-            ))}
-          </div>
-          {/* Row 2: topics of the active category — active chip shows 淺紫 bg + ✓ (selected = current subject) */}
-          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-            {(() => {
-              const topics = allTopics[trendingTab];
-              if (!topics) {
-                return <span style={{ fontSize: 11, opacity: 0.45 }}>{trendingFetching ? "搜尋中…" : "點「抓取今日熱搜」載入話題"}</span>;
-              }
-              return topics.map((t, i) => {
-                const active = subject === t;
-                return (
-                  <button key={`${trendingTab}-${i}`} type="button" onClick={() => setSubject(active ? "" : t)} style={chipStyle(active)}>
-                    {active ? "✓ " : ""}{t}
-                  </button>
-                );
-              });
-            })()}
-          </div>
         </AccordionSection>
 
         {/* 🤖 圖片模型 — placed BEFORE 風格 (per spec). Tarot-style: provider tabs + vertical rows. */}
@@ -1366,6 +1587,143 @@ export default function StudioWorkbench() {
         <button className="btn-primary" disabled={busy} onClick={() => void generate()}>
           {busy ? `生成中… (${results.filter((r) => !r.busy).length}/${results.length})` : isMultiModel ? `生成比較（${selectedModels.size} 個模型）` : "生成"}
         </button>
+
+        {activeResult && !activeResult.busy && activeResult.image ? (() => {
+          const m = activeResult.model;
+          const img = activeResult.image;
+          const saveState = saveStates[m] ?? "idle";
+          const bgState = bgStates[m] ?? "idle";
+          const origImg = originalImages[m];
+          const edgeState = edgeStates[m] ?? "idle";
+          const appliedEdge = edgeApplied[m];
+          return (
+            <div style={{ marginTop: 4, padding: 10, border: "1px solid var(--border)", borderRadius: 8, background: "var(--card-bg)", display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <button className="btn-primary" disabled={saveState === "saving" || saveState === "saved"} onClick={() => void saveToDesigns(m, img)}>
+                  {saveState === "saved" ? "已存入 My Designs" : saveState === "saving" ? "存入中…" : "存入 My Designs"}
+                </button>
+                <button className="btn-secondary" disabled={bgState === "removing" || bgState === "done"} onClick={() => void removeBg(m, img)}>
+                  {bgState === "done" ? "已去背" : bgState === "removing" ? "去背中…" : "去背（透明 PNG）"}
+                </button>
+                {bgState === "done" && origImg && (
+                  <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => restoreOriginal(m)}>還原原圖</button>
+                )}
+                {bgState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>去背失敗</span>}
+                {bgState === "done" && productType === "tshirt" && (
+                  <button className="btn-secondary" disabled={mockupState === "generating" || mockupState === "done"} onClick={() => void generateMockupFromDesign(img)}>
+                    {mockupState === "done" ? "產品預覽 ✓" : mockupState === "generating" ? "生成 Mockup…" : "產品 Mockup"}
+                  </button>
+                )}
+                {mockupState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>Mockup 失敗</span>}
+                <button className="btn-secondary" onClick={() => downloadImage(img, m)}>PNG下載</button>
+                <button className="btn-secondary" onClick={() => downloadImageWebP(img, m)}>WebP下載</button>
+                {activeResult.seed != null && <span style={{ fontSize: 12, opacity: 0.6 }}>seed {activeResult.seed}</span>}
+                {saveState === "saved" && <a href="/tools/designs" style={{ fontSize: 12 }}>查看 My Designs</a>}
+                {saveState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>存入失敗</span>}
+              </div>
+
+              <div style={{ paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>✨ 邊緣風格</span>
+                  {edgeState === "applying" && <span style={{ fontSize: 11, opacity: 0.6 }}>套用中…</span>}
+                  {edgeState === "error" && <span style={{ fontSize: 11, color: "var(--red)" }}>套用失敗</span>}
+                  {appliedEdge && (
+                    <button className="btn-secondary" style={{ fontSize: 11, marginLeft: "auto" }} onClick={() => restoreEdge(m)}>
+                      還原
+                    </button>
+                  )}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 6 }}>
+                  {edgePreviews.map((pv) => {
+                    const active = appliedEdge === pv.id;
+                    return (
+                      <button
+                        key={pv.id}
+                        type="button"
+                        title={pv.en}
+                        disabled={edgeState === "applying"}
+                        onClick={() => void applyEdge(m, pv.id)}
+                        style={{
+                          display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+                          minWidth: 0, padding: 4, borderRadius: 8, cursor: "pointer",
+                          background: active ? "rgba(99,102,241,0.15)" : "rgba(127,127,127,0.06)",
+                          border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+                          transition: "all 0.15s",
+                        }}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={pv.svg} alt={pv.zh} style={{ width: 40, height: 40, background: "#3a3a3a", borderRadius: 4 }} />
+                        <span style={{ fontSize: 10, opacity: 0.8, lineHeight: 1.1, textAlign: "center" }}>{pv.zh}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                  <span style={{ fontSize: 11, opacity: 0.6 }}>強度</span>
+                  <input
+                    type="range" min={10} max={90} step={1} value={edgeAmount}
+                    onChange={(e) => setEdgeAmount(Number(e.target.value))}
+                    onPointerUp={() => { if (appliedEdge) void applyEdge(m, appliedEdge); }}
+                    style={{ flex: 1 }}
+                  />
+                  <span style={{ fontSize: 11, opacity: 0.6, width: 30, textAlign: "right" }}>{edgeAmount}</span>
+                </div>
+              </div>
+
+              {mockups.length > 0 && (
+                <div style={{ paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+                  <p style={{ fontSize: 13, marginBottom: 6, opacity: 0.7 }}>產品預覽</p>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+                    {mockups.map((mockup) => {
+                      const st = savedMockups[mockup.url];
+                      return (
+                        <div key={mockup.url}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={mockup.url} alt={mockup.label} style={{ width: "100%", aspectRatio: "1 / 1", objectFit: "contain", background: "#111", borderRadius: 8, border: "1px solid var(--border)" }} />
+                          <div style={{ fontSize: 11, marginTop: 3, opacity: 0.8 }}>{mockup.label}</div>
+                          <button className="btn-secondary" style={{ fontSize: 11, marginTop: 3, width: "100%" }} disabled={st === "saving" || st === "saved"} onClick={() => void saveMockupToDesigns(mockup)}>
+                            {st === "saved" ? "已存" : st === "saving" ? "存入中…" : st === "error" ? "重試" : "存預覽"}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+                <button
+                  className="btn-secondary"
+                  style={{ width: "100%", marginBottom: 6 }}
+                  onClick={() => openInCanvas(activeResult.image, buildSemanticBase({ ...fileMeta, track: "編輯" }))}
+                >
+                  ✏️ 快速編輯
+                </button>
+                <AccordionSection title="✏️ AI image prompt（修圖）" defaultOpen={false}>
+                  <ImageEditPromptPanel
+                    sourceImage={activeResult.image}
+                    currentPrompt={effectivePrompt}
+                    imageModel={activeResult.model}
+                    target="pod-design"
+                    aspectRatio={aspect}
+                    title=""
+                    styleAnchor={{ model: activeResult.model, mode: refImages.length > 0 ? "image" : "text", stylePrompt: resolvedStylePrompt || effectivePrompt, subject: subject.trim(), refs: refImages.length, target: "pod-design" }}
+                    onEditedImage={(image, meta) => {
+                      setResults((prev) => prev.map((r, i) => i === activeIdx ? { ...r, image, seed: meta.seed } : r));
+                      setSaveStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
+                      setBgStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
+                      setOriginalImages((prev) => { const n = { ...prev }; delete n[activeResult.model]; return n; });
+                      setEdgeStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
+                      setEdgeOriginals((prev) => { const n = { ...prev }; delete n[activeResult.model]; return n; });
+                      setEdgeApplied((prev) => { const n = { ...prev }; delete n[activeResult.model]; return n; });
+                      setMockupState("idle"); setMockups([]); setSavedMockups({});
+                    }}
+                  />
+                </AccordionSection>
+              </div>
+            </div>
+          );
+        })() : null}
       </div>
 
       {/* ── Preview (LEFT column) ──────────────────────────────── */}
@@ -1422,20 +1780,20 @@ export default function StudioWorkbench() {
 
           {/* Active result detail */}
           {activeResult && !activeResult.busy && activeResult.image ? (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 290px", gap: 16, alignItems: "flex-start" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16, alignItems: "flex-start", width: "100%" }}>
               {/* Left: canvas */}
-              <div>
+              <div style={{ width: "100%", minWidth: 0 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={activeResult.image} alt="generated design" title="點擊放大"
                 onClick={() => setZoomImage(activeResult.image)}
-                style={{ display: "block", width: "auto", height: "auto", maxWidth: "100%", maxHeight: isMultiModel ? 420 : 560, margin: "0 auto", objectFit: "contain", borderRadius: 8, background: "#fff", cursor: "zoom-in" }} />
+                style={{ display: "block", width: "100%", height: "auto", maxWidth: "100%", minWidth: 0, objectFit: "contain", borderRadius: 8, background: "#fff", cursor: "zoom-in" }} />
               <div style={{ textAlign: "center", fontSize: 11, opacity: 0.5, marginTop: 4 }}>🔍 點圖可放大檢視</div>
               </div>
 
               {/* Right: operations panel */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "none" }}>
               {/* Action bar */}
-              <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 0, alignItems: "stretch" }}>
                 {(() => {
                   const m = activeResult.model;
                   const img = activeResult.image!;
@@ -1598,6 +1956,118 @@ export default function StudioWorkbench() {
           )}
         </div>
       </div>
+
+      {eventBrowserOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setEventBrowserOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 2147483645,
+            background: "rgba(0,0,0,0.55)",
+            display: "flex",
+            justifyContent: "flex-end",
+          }}
+        >
+          <div
+            className="build-panel"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(720px, 100vw)",
+              height: "100vh",
+              overflowY: "auto",
+              padding: 16,
+              borderRadius: 0,
+              borderTop: 0,
+              borderRight: 0,
+              borderBottom: 0,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <div style={{ fontWeight: 800, fontSize: 16 }}>🗓️ 活動靈感</div>
+              <div style={{ fontSize: 12, opacity: 0.55 }}>{visibleUpcomingEvents.length} 筆 · 每月更新快取</div>
+              <button type="button" onClick={() => setEventBrowserOpen(false)} style={{ ...ghostBtn(), marginLeft: "auto" }}>關閉</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8, marginBottom: 12 }}>
+              <select className="btn-secondary" value={eventCatFilter} onChange={(e) => setEventCatFilter(e.target.value)} style={{ fontSize: 12 }}>
+                {EVENT_CAT_FILTERS.map((filter) => <option key={filter.value} value={filter.value}>{filter.label}</option>)}
+              </select>
+              <select className="btn-secondary" value={eventCountryFilter} onChange={(e) => setEventCountryFilter(e.target.value)} style={{ fontSize: 12 }}>
+                <option value={EVENT_ALL_COUNTRIES_FILTER.value}>{EVENT_ALL_COUNTRIES_FILTER.label}</option>
+                {EVENT_COUNTRY_FILTER_GROUPS.map((group) => (
+                  <optgroup key={group.label} label={group.label}>
+                    {group.options.map((country) => <option key={country.value} value={country.value}>{country.label}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+              <select className="btn-secondary" value={eventWindowDays} onChange={(e) => setEventWindowDays(Number(e.target.value))} style={{ fontSize: 12 }}>
+                {EVENT_WINDOWS.map((window_) => <option key={window_.value} value={window_.value}>{window_.label}</option>)}
+              </select>
+              <select className="btn-secondary" value={eventSort} onChange={(e) => setEventSort(e.target.value as "opportunity" | "date")} style={{ fontSize: 12 }}>
+                {EVENT_SORTS.map((sort) => <option key={sort.value} value={sort.value}>{sort.label}</option>)}
+              </select>
+            </div>
+            {eventsFetching ? (
+              <p style={{ fontSize: 12, opacity: 0.6 }}>載入中…</p>
+            ) : groupedUpcomingEvents.length === 0 ? (
+              <p style={{ fontSize: 12, opacity: 0.6 }}>此篩選暫無活動。</p>
+            ) : (
+              <div style={{ display: "grid", gap: 12 }}>
+                {groupedUpcomingEvents.map(([group, events]) => (
+                  <section key={group}>
+                    <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.65, marginBottom: 6 }}>{group}</div>
+                    <div style={{ display: "grid", gap: 6 }}>
+                      {events.map((event) => {
+                        const label = buildEventLabel(event);
+                        const active = subject === label;
+                        const daysUntil = Math.ceil((new Date(event.event_date).getTime() - Date.now()) / 86400000);
+                        const countries = eventCountryLabel(event);
+                        return (
+                          <button
+                            key={event.id}
+                            type="button"
+                            onClick={() => {
+                              setSubject(active ? "" : label);
+                              setEventBrowserOpen(false);
+                            }}
+                            style={{
+                              textAlign: "left",
+                              border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+                              background: active ? "rgba(99,102,241,0.12)" : "rgba(127,127,127,0.04)",
+                              color: "var(--text-primary)",
+                              borderRadius: 8,
+                              padding: "9px 10px",
+                              cursor: "pointer",
+                              display: "grid",
+                              gridTemplateColumns: "1fr auto",
+                              gap: 8,
+                            }}
+                          >
+                            <span style={{ minWidth: 0 }}>
+                              <span style={{ display: "block", fontSize: 13, fontWeight: 700, overflowWrap: "anywhere" }}>
+                                {active ? "✓ " : ""}{label}
+                              </span>
+                              <span style={{ display: "block", fontSize: 11, opacity: 0.58, marginTop: 2 }}>
+                                {(event.facets ?? [event.category]).join(", ")}{countries ? ` · ${countries}` : ""}
+                              </span>
+                            </span>
+                            <span style={{ textAlign: "right", fontSize: 11, opacity: 0.7, whiteSpace: "nowrap" }}>
+                              <span style={{ display: "block", fontWeight: 700 }}>{event.event_date}</span>
+                              <span>{daysUntil >= 0 ? `${daysUntil}天` : "進行中"}</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Chip hover tooltip — position:FIXED at the viewport coords captured on hover,
           rendered at the grid root so it escapes the sticky control panel's overflow

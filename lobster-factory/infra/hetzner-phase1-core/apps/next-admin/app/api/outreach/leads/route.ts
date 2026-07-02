@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { scoreLead } from "@/lib/outreach/scoring";
+import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 // Cold Outreach — Leads CRUD + Approve-to-Leads (task T7). Table: co_leads (migration 0048).
 // Approve flow: read a co_lead_inbox row → mechanical score → insert co_leads → mark inbox approved.
@@ -38,14 +39,18 @@ export async function GET(req: Request): Promise<Response> {
     const { data, error } = await supabase.from(TABLE).select("*").eq("id", id).maybeSingle();
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     if (!data) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+    try { assertOrgAccess(req, (data as Record<string, unknown>).organization_id as string | null); }
+    catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
     return NextResponse.json({ ok: true, lead: data });
   }
 
-  const organizationId = url.searchParams.get("organizationId");
+  let orgFilter: string | null;
+  try { orgFilter = effectiveOrgId(req, url.searchParams.get("organizationId")); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   const status = url.searchParams.get("status");
   const priority = url.searchParams.get("priority");
   let query = supabase.from(TABLE).select("*").order("score", { ascending: false }).limit(LIST_LIMIT);
-  if (organizationId) query = query.eq("organization_id", organizationId);
+  if (orgFilter) query = query.eq("organization_id", orgFilter);
   if (status) query = query.eq("status", status);
   if (priority) query = query.eq("priority", priority);
   const { data, error } = await query;
@@ -67,6 +72,11 @@ export async function POST(req: Request): Promise<Response> {
     return new NextResponse("invalid json", { status: 400 });
   }
 
+  // Pre-resolve org for the manual create/update path (approve path resolves its own org from inbox row).
+  let orgId: string | null;
+  try { orgId = effectiveOrgId(req, str(body.organizationId)); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+
   // --- Approve-from-inbox path ---
   const fromInboxId = str(body.fromInboxId);
   if (fromInboxId) {
@@ -75,6 +85,9 @@ export async function POST(req: Request): Promise<Response> {
     if (!inbox) return NextResponse.json({ ok: false, error: "inbox row not found" }, { status: 404 });
 
     const row = inbox as Record<string, unknown>;
+    // Verify caller may act on this inbox item's org before promoting it to a lead.
+    try { assertOrgAccess(req, row.organization_id as string | null); }
+    catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
     const lead: ScoreInput = {
       name: (row.normalized_name as string | null) ?? "(未命名)",
       industry: row.normalized_industry as string | null,
@@ -135,7 +148,7 @@ export async function POST(req: Request): Promise<Response> {
   const scores = scoreLead(base, { isDuplicate: false, doNotContact: false });
 
   const fields = {
-    organization_id: str(body.organizationId),
+    organization_id: orgId,
     name,
     industry: base.industry,
     website: base.website,
@@ -156,6 +169,13 @@ export async function POST(req: Request): Promise<Response> {
   };
 
   if (id) {
+    // Verify caller owns this lead before overwriting.
+    const { data: cur, error: curErr } = await supabase.from(TABLE).select("organization_id").eq("id", id).maybeSingle();
+    if (curErr) return NextResponse.json({ ok: false, error: curErr.message }, { status: 500 });
+    if (!cur) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+    try { assertOrgAccess(req, (cur as Record<string, unknown>).organization_id as string | null); }
+    catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+
     const { data, error } = await supabase
       .from(TABLE)
       .update({ ...fields, updated_at: new Date().toISOString() })
@@ -179,6 +199,11 @@ export async function DELETE(req: Request): Promise<Response> {
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
+  const { data: cur, error: readErr } = await supabase.from(TABLE).select("organization_id").eq("id", id).maybeSingle();
+  if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
+  if (!cur) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+  try { assertOrgAccess(req, (cur as Record<string, unknown>).organization_id as string | null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   const { error } = await supabase.from(TABLE).delete().eq("id", id);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

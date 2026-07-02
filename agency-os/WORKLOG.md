@@ -35,6 +35,380 @@
 
 - AUTO_TASK_DONE: hooks v2 runner 架構遷移 + 遠端接線 + 垃圾檔清理 + WORKLOG 輪替 + 規則優先序/信任邊界明文化
 
+## 2026-07-02
+
+### ops: 清理測試垃圾客戶 org 記錄 ✅
+
+**根因**：建站系統測試過程遺留 3 個空殼 org（無任何資產/整合資料），污染 `/ops/clients` 列表。
+
+**已刪除**（EU Supabase DB `supabase-db` container，psql DELETE + CASCADE）：
+- `awarewave-868301` (AwareWave) — id `bc77b757-...`
+- `green-valley-farm-10dd18` (Green Valley Farm) — id `25a141f1-...`
+- `ssasd-63a120` (ssasd) — id `0938e0b4-...`
+
+**同步清理**：`workflow_runs` 4 筆（無 FK constraint，手動 DELETE）
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=psql SELECT+DELETE+browser /ops/clients | exit=0 | ms=<5000 — DB 2 orgs, UI 2 orgs ✅
+- REVIEW_WAIVED: NA -- DB 刪除操作，無程式碼變動
+- BUGHUNT_WAIVED: NA -- 無程式碼變動
+- WORKLOG: 本條目
+
+**剩餘**：`/ops/clients` 現只有 `awarewave-ops` + `soulful-expression`。
+
+### ops: upload paid plugin zips to EU + SG VPS `/opt/lobster-plugins/` ✅
+
+**操作**：將 `D:\Work\_paid-plugins\` 16 個 zip 上傳至兩台 VPS。
+
+**已上傳**（EU `204.168.175.41` + SG `5.223.93.113` → `/opt/lobster-plugins/`，共 51M）：
+travelwp / elementor-pro / elementor-pro-activator / advanced-google-maps /
+advanced-coupons-for-woocommerce / translatepress-multilingual（改名自 translatepress-business）/
+translatepress-add-on-seo-pack / kadence-pro / kadence-woo-template-builder /
+wp-rocket / mainwp-rocket-extension / wpml-sitepress-multilingual-cms /
+wpml-string-translation / wpml-woocommerce-multilingual /
+woocommerce-points-and-rewards / woocommerce-product-addons
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=ssh root@EU+SG "ls -lh /opt/lobster-plugins/" | exit=0 | ms=<2000 — 16 files, 51M, both servers identical ✅
+- REVIEW_WAIVED: NA -- file upload operation, no code change
+- BUGHUNT_WAIVED: NA -- no code change
+- WORKLOG: 本條目
+
+**用途**：Cloudways 旅遊業客戶部署時，從 Cloudways SSH → wget 從此 VPS → wp plugin install。詳見 `docs/operations/TOURISM_CLIENT_DEPLOYMENT_WORKFLOW.md`。
+
+### feat(video): Phase 0 AI Video Director — SceneSeries backbone + real render DoD ✅
+
+**根本問題**: 影片工具只有 Quick Engine（Python ffmpeg 固定 3-scene）；需要 Director Engine 支援 N scenes、data-driven duration、Ken Burns + slide-in 轉場。
+
+**已修改**:
+- `lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/src/compositions/SceneSeries.tsx` (NEW) — `SceneItem[]` 型別、`calculateSceneSeriesDuration()` duration helper、`SceneSeries` component（`<Sequence>` 堆疊、Ken Burns zoom、SlideIn 轉場、safeDur C2 fix）
+- `lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/src/compositions/DynamicSlideshow.tsx` (NEW) — Remotion Composition wrapper，global logoUrl fallback merge
+- `lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/src/Root.tsx` (MODIFIED) — 註冊 DynamicSlideshow + calculateMetadata（從 scenes[] sum 算 durationInFrames）
+- `lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/src/server.ts` (MODIFIED) — MAX_FRAMES 18000、DATA_DRIVEN_TEMPLATES、payload validation（C1 fix：scenes max 60、durationInSeconds in (0,60]）、Math.min backstop
+
+**Critic fix（session a19fe8d4a09ed40a3）**:
+- C1 🔴 OOM/DoS：DATA_DRIVEN bypass 跳過 MAX_FRAMES → 加 payload validation + Math.min backstop
+- C2 🔴 NaN/negative frames：`scene.durationInSeconds` 未驗證 → safeDur floor in SceneSeries + server-side type/range check
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker compose rebuild + curl /render × 3 | exit=0 | ms=varies
+  - 1-scene (5s): job done → https://pub-bd79a1c3b4554025bd92a6192b032427.r2.dev/remotion/2026-07-02/b4323cf3-8440-4f48-b7e5-09d2f0904571.mp4 — HTTP 200, 16MB ✅
+  - 3-scene (5s×3): job done → https://pub-bd79a1c3b4554025bd92a6192b032427.r2.dev/remotion/2026-07-02/060fe694-deeb-4bd9-bc89-3db889b4e1a9.mp4 — HTTP 200, 40MB ✅
+  - 20-scene (3s×20): job done → https://pub-bd79a1c3b4554025bd92a6192b032427.r2.dev/remotion/2026-07-02/bcdc7dfa-af49-4922-976b-ccf6cfe1ef08.mp4 — HTTP 200, 113MB ✅
+- REVIEW_DONE: critic=Deep | verdict=pass (after C1+C2 fix) | findings=2c/2m fixed — all Critical/Major patched before commit
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=SceneSeries|DynamicSlideshow|calculateSceneSeriesDuration|dynamic-slideshow|DATA_DRIVEN_TEMPLATES | hits=self-contained (remotion-service only, no downstream consumers in next-admin yet — Phase 3 will add render-client.ts)
+- WORKLOG: 本條目
+
+**剩餘 Phase 1–6**: Director AI → Timeline JSON → full production pipeline（deferred，Phase 0 DoD 完成後啟動）
+
+---
+
+### feat(security): S2 batch-6 tenant guard — content/drafts IDOR closed
+
+**根本問題**: `content_drafts` 所有 CRUD 無 `effectiveOrgId`/`assertOrgAccess`，staff 看全客戶草稿混合；Client 帳啟用後任何知道 UUID 的人可讀改刪外部 org 草稿（IDOR）。`content_sources` 是全域共享表（無 `organization_id`），不需改。
+
+**現況分析（Explore agent a11b1ec8a386dca87，45 tool calls）**:
+- 架構整體健全：middleware 強制 tenant identity；outreach/credentials/approvals/build runs 已有完整 guard（S2 batch 1-5）
+- Ops Clients：URL slug routing，tamper-proof
+- Outreach：`useActiveOrg()` hook + `effectiveOrgId()` 完整
+- **缺口 🔴**：`content/drafts` — GET/POST/DELETE 均無 org filter 或 ownership check
+- `content/sources`：全域表，intentionally unscoped，✓ 安全
+
+**已修改**:
+- `app/api/content/drafts/route.ts`:
+  - Import 加 `effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse`
+  - GET list：加 `?organizationId` 查詢參數 → `effectiveOrgId(req, ...)` → 動態 `.eq("organization_id", orgFilter)` （client 強制自己的 org；staff 可不傳→看全部）
+  - GET by ID：fetch 後加 `assertOrgAccess(req, row.organization_id)`
+  - POST insert：`effectiveOrgId(req, str(body.organizationId))` 取代直接 pass-through（client 自動綁到自己 org）
+  - POST update (with id)：pre-read `organization_id` → `assertOrgAccess` → 原子 `.eq("organization_id", ...)` (null-safe: null org_id 時不加 filter，staff-only path)
+  - DELETE：pre-read → `assertOrgAccess` → 原子 `.eq("organization_id", ...)` (null-safe 同上)
+
+**ContentStudio 前端相容性**: 不需改。`effectiveOrgId(req, null)` → staff = null（不過濾，看全部）；client 帳啟用後自動從 middleware `x-ops-org-id` 注入 org，草稿自動歸 org，不需前端傳。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~8000 — 0 type errors (pre + post critic fix)
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/1n — Major: POST update overwrote organization_id to null when staff edits client draft (data corruption); Fixed: separated contentFields from insert-only orgId assignment; UPDATE now preserves existingOrgId. Minor: TOCTOU comment clarified (null-org rows: atomicity via id only, staff-only path). Suggestion: added future-proof comment on tenant checks beneath role gate.
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=content/drafts,content_drafts | hits=2 (route.ts ✓ patched, ContentStudio.tsx ✓ compatible — no body.organizationId sent = staff null-unscoped, client auto-enforced via middleware)
+- WORKLOG: 本條目
+
+**S2 進度**: batch-1 ✅ | batch-2 ✅ | batch-3 ✅ | batch-4 ✅ | batch-5 ✅ | **batch-6 content/drafts ✅**
+**剩餘 defer → S3**: `ops/repairs/*` (repair_runs 無 organization_id，需 DB migration)
+
+---
+
+**多租戶架構評估（用戶問：多客戶管理彼此是否串聯？）**:
+
+| 系統 | 隔離機制 | 狀態 |
+|---|---|---|
+| Ops Clients `/ops/clients/[slug]` | URL slug → server-side org lookup | ✅ 無洩漏 |
+| Outreach | `?org=UUID` + `effectiveOrgId()` + `assertOrgAccess()` | ✅ 無洩漏 |
+| Credentials | S2 batch-5 已修 | ✅ 無洩漏 |
+| Build Runs | S2 batch-5 已修 | ✅ 無洩漏 |
+| Approvals | S2 batch-5 已修 | ✅ 無洩漏 |
+| Content Drafts | **S2 batch-6 本次修** | ✅ 修後無洩漏 |
+| Content Sources | 全域共享（設計如此，無 org 欄） | ✅ 設計正確 |
+| ops/repairs/* | ❌ repair_runs 無 organization_id 欄 | ⏳ defer S3 DB migration |
+
+**Stage 1 onboarding 現況**: 前端程式「跳回第一步」bug 已在前一個 session 修好（handleTriggerBuild 加了 guard + error display）。2 筆卡住的 intake_forms 仍在 DB 待手動 retry。
+
+---
+
+### fix(security): S5 — assertOrgAccess guards on social + integrations routes ✅
+
+**根本問題**: 5 個 API 路由以 `clientId` / `organizationId`（= org UUID）作為查詢/寫入鍵，但只有 ops-role gate（無 tenant-level org guard）。Client org 的 owner/admin/operator 若通過 role gate，可傳入任意 org UUID 讀取/修改其他租戶的 Postiz 社群連接或 integration binding（IDOR）。
+
+**已修改**:
+- `app/api/content/social-publish/route.ts` — POST：`clientId`（org UUID → `social_postiz_connections.client_id`）加 `assertOrgAccess(req, clientId)` after role gate + string validate
+- `app/api/content/social-channels/route.ts` — GET：同樣呼叫 `listIntegrations(clientId)` → 加 `assertOrgAccess(req, clientId)` after query param validate
+- `app/api/content/social-admin/connections/route.ts` — POST + DELETE：`clientId`（same FK）→ 各加 `assertOrgAccess(req, clientId)`
+- `app/api/ops/integrations/route.ts` — POST：`organizationId` body param → 加 `assertOrgAccess(req, organizationId)` after `verifyOwnership`；PATCH：fetch record by `id` → 加 `assertOrgAccess(req, current.organization_id)` post-fetch
+
+**guard 語意**：
+- `staff`（`x-ops-user-kind` absent/staff）→ `assertOrgAccess` no-op，保持跨租戶管理能力
+- `client`（`x-ops-user-kind: client` + `x-ops-org-id: <uuid>`）→ `targetOrgId ≠ ctx.orgId` 時 throw OrgAccessError → 403
+- null/undefined targetOrgId 對 client fail-closed（`String(null)` = `"null"` ≠ real UUID）
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~8000 — 0 type errors
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test --run | exit=0 | ms=1710 — 568/568 pass
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n — 6 focus areas all clean: guard ordering correct in all 4 files, null-safe inputs, assertOrgAccess null targetOrgId fails-closed, PATCH TOCTOU safe (immutable PK), no role-gate bypass path, all routes covered by middleware matcher
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=listIntegrations,social_postiz_connections,tenant_integration_bindings | hits=1 new finding (social-channels was also calling listIntegrations with unguarded clientId → patched same batch; webhooks/tenant-integration has no clientId param — safe)
+- WORKLOG: 本條目
+
+---
+
+## 2026-06-29
+
+### feat(security): S2 batch-5 tenant guard — credentials/secret + build/runs + approvals IDOR closed
+
+**根本問題**: 6 個路由無 org 隔離（IDOR），client 可讀改刪其他 org 的憑證/build log/審批指令。
+
+**已修改**:
+- `app/api/ops/clients/credentials/route.ts` — GET/POST 改 `effectiveOrgId`；PATCH 加 pre-read+`assertOrgAccess`+`.eq("client_id",...)` atomic；DELETE 加 pre-read+`assertOrgAccess`+`.eq("client_id",...)` atomic
+- `app/api/ops/clients/credentials/secret/route.ts` — POST 加 `client_id` to SELECT+`assertOrgAccess`+atomic write；DELETE 加 pre-read+`assertOrgAccess`；**vault DELETE 改先 nullify `secret_ref`（DB-scoped），再 best-effort vault delete**（critic fix：vault fail 不再留 dangling ref）
+- `app/api/build/runs/[id]/route.ts` — 加 `organization_id` to SELECT + `assertOrgAccess`（前：零 auth gate；middleware 已驗 session，修補 org isolation）
+- `app/api/ops/approvals/route.ts` — 移 `resolveOpsRole` 到 query 前；加 `effectiveOrgId` → 動態 org filter（client 只見己方 queued commands）
+- `app/api/ops/approvals/[id]/approve/route.ts` — 加 `assertOrgAccess` after fetch（select("*") 含 organization_id）
+- `app/api/ops/approvals/[id]/reject/route.ts` — SELECT 補 `organization_id`；加 `assertOrgAccess` after fetch
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test | exit=0 | ms=~3000 — 0 type errors, 552 tests pass (pre+post critic fixes)
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/3n — TOCTOU race + vault DELETE ordering + type cast note; all 3 fixed in-batch
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=effectiveOrgId|assertOrgAccess|tenant-guard,client_credentials|ops_action_runs|command_requests | hits=expected (15 tenant-guard imports all accounted; adjacent unguarded routes: build/runs route.ts list + ops/workflow-runs/route.ts — noted in spawn_task for S2 follow-up; inbox/digest in PUBLIC_API_PATHS server-to-server = no IDOR)
+- WORKLOG: 本條目
+
+**S2 進度**: batch-1 outreach leads/inbox/connectors ✅ | batch-2 messages/followups/suppression ✅ | batch-3 service-profiles ✅ | batch-4 designs+video ✅ | batch-5 credentials+secret+build_runs+approvals ✅
+**剩餘 defer → S3**: `ops/repairs/*` (`repair_runs` 無 `organization_id`，需 DB migration)
+**backlog**: `build/runs` list route + `ops/workflow-runs/route.ts` (spawn_task issued)
+
+
+
+### feat(events): Global Events Calendar — Calendarific + TheSportsDB + hardcoded mega-events
+
+**根本問題**: 沒有辦法預先知道哪些節日/賽事即將到來，無法提前備稿預賣商品。
+
+**解決方案**:
+- `lib/events/types.ts` — GlobalEvent / EventRow 型別 + LEAD_DAYS 常數
+- `lib/events/calendarific.ts` — 20 國節日，每年 this+next year 同時拉
+- `lib/events/thesportsdb.ts` — 9 大聯賽 (NFL/NBA/MLB/NHL/PL/UCL/LaLiga/F1/ATP)
+- `lib/events/hardcoded.ts` — FIFA 2026/冬奧 2026/夏奧 2028/Super Bowl/Euro 2028
+- `lib/events/sync.ts` — 主協調器，批次 upsert Supabase events table
+- `app/api/tools/events/sync/route.ts` — admin-only POST endpoint
+- `app/tools/events/page.tsx` — 行銷日曆 dashboard (時間窗 + 分類篩選)
+- `packages/db/migrations/0053_global_events.sql` — events table + RLS
+- `packages/workflows/src/tasks/sync-global-events.ts` — Trigger.dev 每月 1 日 02:00 UTC
+
+**零成本**: Calendarific free tier 1000 req/mo, TheSportsDB public key=3。
+
+**驗證結果**:
+- REALTEST_WAIVED: NA -- API-only runtime, no local DB to hit; first real test = run sync after deploy
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=1c (roleHeader→readOpsRole fixed)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=roleHeader,syncGlobalEvents | hits=0
+- 型別檢查: `npx tsc --noEmit` — 0 errors (fixed roleHeader→readOpsRole)
+
+**下一步 (使用者操作)**:
+1. Supabase dashboard → SQL Editor → 貼上並執行 `packages/db/migrations/0053_global_events.sql`
+2. 確認 `CALENDARIFIC_API_KEY` 在 SG 的 `.env.local`（或 secrets vault 已有）
+3. 手動觸發一次同步：POST `/api/tools/events/sync`（admin 登入後）
+4. 到 `/tools/events` 查看行事曆
+5. Trigger.dev re-deploy 讓 monthly cron 啟動
+
+commit: 13b20eab
+
+### feat(security): S2 Batch 4 tenant guard — tools/designs + video/[id] IDOR closed
+
+**根本問題**:
+- `tools/designs` GET/POST 直接用 body/qparam 的 organizationId，無 effectiveOrgId → client 可讀寫任意 org 設計
+- `tools/designs` DELETE 已 select organization_id 但從未 assertOrgAccess → client 可刪外 org 資產
+- `video/[id]` DELETE：resolveOrgId() 讀 env var（常為 null）無任何 org 驗證 → client 可刪外 org 影片
+
+**修法**:
+- designs GET — `effectiveOrgId(request, qparam ?? envVar)`
+- designs POST — `effectiveOrgId(request, body.organizationId ?? envVar)`
+- designs DELETE — `assertOrgAccess(request, asset.organization_id)` after fetch
+- video DELETE — SELECT 加 `organization_id`；`assertOrgAccess(req, asset.organization_id)` after fetch；加注釋說明 resolveOrgId env filter 是 supplementary（env var 未設時 no-op）
+
+**[已修改]**
+- `app/api/tools/designs/route.ts` — import + GET effectiveOrgId + POST effectiveOrgId + DELETE assertOrgAccess
+- `app/api/video/[id]/route.ts` — import + SELECT 加 organization_id + assertOrgAccess + clarifying comment
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test | exit=0 | ms=1690 (0 tsc errors, 552 tests pass)
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/1n (N1: resolveOrgId env filter misleading when env var unset → 加注釋澄清；不阻塞)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=effectiveOrgId|assertOrgAccess|OrgAccessError|toOrgAccessResponse | hits=10 files (outreach/* 8 routes + designs + video/[id] + tenant-guard.ts 定義；無意外 callsite)
+
+### feat(security): S2 Batch 3 outreach tenant guard — service-profiles IDOR closed
+
+**根本問題**: `app/api/outreach/service-profiles` 五條路徑（GET single/list、POST INSERT/UPDATE、DELETE）均無 tenant guard，client 可讀/改/刪任意 org 的 service profile（含 tone/USP/forbidden words 等 org 機密）。
+
+**修法**:
+- GET single — 抓完後 `assertOrgAccess(req, data.organization_id)` 再 return
+- GET list — `effectiveOrgId(req, qparam)` 取代 optional org filter
+- POST UPDATE — pre-read `select("organization_id")` + `assertOrgAccess`；**移除** `organization_id` from update payload（防止 org 改指）
+- POST INSERT — `effectiveOrgId(req, str(body.organizationId))` 取代直接用 body
+- DELETE — pre-read `select("organization_id")` + `assertOrgAccess` 再刪
+
+**[已修改]**
+- `app/api/outreach/service-profiles/route.ts` — import + GET single assertOrgAccess + GET list effectiveOrgId + POST UPDATE pre-read + assertOrgAccess + drop org from fields + POST INSERT effectiveOrgId + DELETE pre-read + assertOrgAccess
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test | exit=0 | ms=1600 (0 tsc errors, 552 tests pass)
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/1n (N1: GET single 403 vs 404 洩漏 existence=low risk，與 sibling 路由行為一致；不阻塞)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=effectiveOrgId|assertOrgAccess|OrgAccessError|toOrgAccessResponse | hits=7 files (全在 outreach/* 7 條路由 + tenant-guard.ts 定義；無意外 callsite)
+
+### feat(security): S2 Batch 2 outreach tenant guard — messages/followups/suppression IDOR closed
+
+**根本問題**: `app/api/outreach/messages`、`followups`、`suppression` 三條路由未驗證 caller 是否屬於目標 org，client 可直接傳任意 leadId 或 id 進行跨 org 讀寫刪。
+
+**修法**:
+- `messages` GET — `effectiveOrgId` org filter（client 無法讀外 org 訊息）
+- `messages` POST — `assertOrgAccess(req, lead.organization_id)` lead 抓完後立即驗
+- `messages` PATCH — pre-read `organization_id` + `assertOrgAccess` 再 update
+- `messages` DELETE — pre-read org + `assertOrgAccess` 再 delete
+- `followups` POST — pre-read `co_leads.organization_id` by leadId + `assertOrgAccess` 再改 follow-up 欄位
+- `suppression` GET — `effectiveOrgId` org filter
+- `suppression` POST — `rawOrgId → UUID validation → effectiveOrgId` 防 org 偽造
+- `suppression` DELETE — pre-read org + `assertOrgAccess` 再刪
+
+**[已修改]**
+- `app/api/outreach/messages/route.ts` — import + GET org filter + POST assertOrgAccess on lead + PATCH pre-read + assertOrgAccess + DELETE pre-read + assertOrgAccess
+- `app/api/outreach/followups/route.ts` — import + POST pre-read lead org + assertOrgAccess before co_leads update
+- `app/api/outreach/suppression/route.ts` — import + GET effectiveOrgId + POST UUID validate + effectiveOrgId + DELETE pre-read + assertOrgAccess
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test | exit=0 | ms=2090 (0 tsc errors, 552 tests pass)
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/2n (N1: suppression leadId 跨 org 參照=optional fix; N2: TOCTOU defense-in-depth=optional; 兩者均不阻塞)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=effectiveOrgId|assertOrgAccess|OrgAccessError|toOrgAccessResponse | hits=19 (全在 3 個目標路由，無意外 callsite)
+
+### fix(studio): region prompt 改為裝飾背景描述，保留文化視覺感
+
+**根本問題**: `"in Taiwanese style"` 過於簡短，AI 不生成背景文化元素（波紋/雲紋），圖像質感變差。
+**修法**: 改為 `"Taiwanese cultural decorative background with traditional patterns and motifs"`，明確指定為背景裝飾，AI 不會把它生成第三個角色，但會添加文化圖騰。
+
+**[已修改]**
+- `app/tools/studio/StudioWorkbench.tsx:471-475` — regionStyle 改為背景裝飾描述詞
+
+**[驗證結果]**
+- REALTEST_WAIVED: SMOKE_COVERED -- prompt string only; smoke covers route e2e
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial)
+
+### fix(studio): region 改為 style 修飾語，消除第三角色
+
+**根本問題**: `cultureTokens` 把 `"Taiwanese cultural heritage"` 放第一個名詞，AI 把它當第三個物件生成（廟宇角色「臺灣文化遺產」），導致選 2 個 chip 卻出現 3 個角色。
+**修法**: 移除 region 名詞句，改為 `regionStyle = "in Taiwanese style"` 後置，AI 看到的是「item1, item2, ... in Taiwanese style」而非三個並列名詞。fusion 邏輯同步更新為 `"in A and B style"`。
+
+**[已修改]**
+- `app/tools/studio/StudioWorkbench.tsx:470-488` — cultureTokens 只含 chips；regionStyle 後置於 parts
+
+**[驗證結果]**
+- REALTEST_WAIVED: SMOKE_COVERED -- prompt-assembly logic; smoke covers route e2e
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial)
+
+### fix(studio): AI換一批結果不寫 localStorage
+
+**根本問題**: `storeCulture()` 對 `force=true` 的 AI 結果也寫入 localStorage，蓋過 curated 快取，導致頁面重載後永遠看到舊 AI 資料。
+**修法**: `fetchCulture` 中加 `if (!opts?.force)` guard，AI 結果只存 in-memory state，不持久化。curated + 換一批共存：換一批看得到新花樣，重新整理回 curated（含大雞排）。
+
+**[已修改]**
+- `app/tools/studio/StudioWorkbench.tsx:557` — `storeCulture` 加 `!opts?.force` guard
+
+**[驗證結果]**
+- REALTEST_WAIVED: SMOKE_COVERED -- single-line guard; smoke covers the route end-to-end
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial)
+
+### fix(studio): bump culture localStorage cache v2→v3
+
+**根本問題**: StudioWorkbench 的 auto-load 優先讀 localStorage（key 前綴 `studio_culture_v2_*`），`readStoredCulture` 回傳舊 AI 結果（含 小籠包/綠豆湯）直接跳過 curated fast-path，故 curated 修好的 大雞排 永遠不被看到。
+
+**[已修改]**
+- `app/tools/studio/StudioWorkbench.tsx:87` — `CULTURE_STORAGE_PREFIX` v2→v3，舊快取全自動失效，下次 auto-load 走 curated
+
+**[驗證結果]**
+- REALTEST_WAIVED: SMOKE_COVERED -- string constant rename only; full smoke covers the route end-to-end
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial)
+
+### AUTO_TASK_DONE — weekly-summary-2026-06-29
+
+**Task**: Weekly summary report generation (remote weekly-agent scheduled routine)
+**Period**: 2026-06-23 → 2026-06-29
+
+**[已修改]**
+- `agency-os/reports/weekly/weekly-summary-2026-06-29.md` (NEW) — full weekly summary
+- `agency-os/reports/weekly/weekly-automation-LATEST.md` (OVERWRITTEN) — same content as dated file
+
+**[驗證結果]**
+- REALTEST_WAIVED: SMOKE_COVERED -- read-only report generation; source files verified via git pull + grep
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_WAIVED: DOC_ONLY -- report file only; no code symbols changed
+- Sources read: TASKS.md, WORKLOG.md (grepped), CONVERSATION_MEMORY.md, integrated-status-LATEST.md, weekly-automation-LATEST.md (prev), daily/2026-06-23 through 2026-06-29
+
+**Key highlights this period**:
+- Banner Studio roadmap 100% complete (Tier-1/2/3 + AI compositing)
+- oracle.aware-wave.com live (8 endpoints; 紫米 knowledge base; paywall)
+- AI Customer Service U0-U5 deployed; U6 gated 8月
+- Provisioning Stage C: AI spec injection + hero image + brand colors
+- S1 Multi-Tenant Identity Foundation shipped (~20 IDOR items documented; S2-S5 roadmap)
+- EU Backup fully real-tested (402M e2e; DR drill passed)
+- netdata web_log unmatched=0% fixed (adm group)
+- AO retention corrected to 90 days (governance)
+
+**Risks carried forward**:
+- 🔴 Defender 木馬 OVERDUE 12 days
+- 🔴 POD A2 金流紅線
+- 🟠 SG app-code drift 4 commits
+- 🟠 S2 multi-tenant enforcement not yet applied
+
+## 2026-06-28
+
+### fix(netdata): SG web_log「unparsed=100%」誤報根因 — netdata user 不在 adm 群組讀不到 nginx log
+
+[任務理解] SG Netdata 反覆告警「Web log unparsed = 100%」(fp=7df3dd62, NEW→REOPENED flap)。表面是「log 無法解析」,真因是 netdata 根本讀不到 host nginx access.log。
+
+[現況分析]
+- netdata go.d web_log job tail `/var/log/nginx/access.log`(fd 確認);該 log 經 grep 證實 0/1179 行不符標準 combined(host nginx 無自訂 log_format)。
+- 但 netdata 把每一行都判 unmatched(excluded_requests.unmatched 陣列逐點 == requests 陣列;successful/bad/redirect 全 0%)→ parser 一行都沒成功。
+- `id netdata` = groups `netdata,docker`,**不在 adm**;log 為 `0640 www-data:adm`;`sudo -u netdata test -r` = NOT-READABLE。
+- 重啟 netdata 後 web_log charts 由 N 變 **0**(go.d 開檔 permission denied,建不了 chart)→ 鐵證讀不到。重啟前是靠 logrotate 殘留舊 fd 讀到 rotated 內容 → 產生畸形 unmatched 資料。
+
+[根因] netdata 服務帳號未加入 `adm` 群組 → 無法讀取 mode 0640 group=adm 的 nginx access.log。alarm `web_log_1m_unmatched` 有 `total_requests>120` gate,正常低流量被壓住=CLEAR,scanner 爆量 >120/min 才觸發 → 間歇 flap。副作用:web_log-based 5xx 監控同時失效。
+
+[已修改]（SG `5.223.93.113`,非 repo code）
+- `usermod -aG adm netdata` → netdata groups 加 `4(adm)`;`/etc/group` 持久化 `adm:x:4:syslog,netdata`(跨重啟生效)。
+- `systemctl restart netdata` 套用新群組。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`usermod -aG adm netdata; systemctl restart netdata; curl localhost:19999/api/v1/data?chart=web_log_nginx.requests_by_type` | exit=0 | 製造 10 個 200 請求後 `success=0.7`(parser 正常匹配)、`unmatched=0`(原 100%)、web_log charts count=12(原 0)。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — alarm `web_log_1m_unmatched` status=CLEAR value=0%;go.d fd 重新指向 access.log 且可讀;持久化確認。
+- BUGHUNT_WAIVED: NA -- 純 VPS 群組設定變更,無 repo code/symbol/callsite 受影響。
+
+[剩餘風險] 若日後重佈 netdata 或改 log group,可能再現;adm 群組賦予讀系統 log(監控代理標準做法,非特權)。
+
+[rollback] `gpasswd -d netdata adm && systemctl restart netdata`。
+
 ## 2026-06-27
 
 ### feat(oracle): 紫微十二宮逐星知識庫 — 14主星×12宮正統解讀引擎
@@ -4769,6 +5143,16 @@ AUTO_TASK_DONE: fix ao-resume rebase conflict on .agency-state state files
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~15000
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/2n (all fixed before commit)
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=prefillAppliedRef|ScriptRemotionPrefill|RemotionBridge|introEnabled | hits=0 (intro fields remain optional in API routes — no stale callers)
+
+
+
+
+
+
+
+- REALTEST_WAIVED: SMOKE_COVERED -- UI-only React data display; tsc --noEmit exit=0 confirms compile integrity; full smoke test on deploy
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=1c/0m/0n (search speed-sort fixed)
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=VIDEO_MODEL_COMPARISONS|TTS_MODEL_COMPARISONS|SEARCH_API_COMPARISONS | hits=0 (no stale callsites outside src+import)
 
 ## 2026-06-15
 

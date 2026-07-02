@@ -37,11 +37,15 @@ const ALL = args.includes("--all");
 const FORCE = args.includes("--force");
 if (!ONLY && !ALL) { console.error("pass --only=<regionEn> or --all"); process.exit(1); }
 
-// ── Parse region.en list from CULTURE_REGIONS (the part BEFORE CULTURE_LENSES) ───────
+// ── Parse region.en list from the CULTURE_REGIONS array ONLY (anchor on its declaration and
+// stop at the array close `\n];`, so later consts like CORE_TOPICS/TOURIST_TOPICS — which also
+// contain `en:` fallback fields — can never be mis-parsed as regions). ──────────────────────
 const presetsSrc = readFileSync(PRESETS, "utf8");
-const regionsBlock = presetsSrc.split("export const CULTURE_LENSES")[0];
+const afterDecl = presetsSrc.split("export const CULTURE_REGIONS")[1] ?? "";
+const regionsBlock = afterDecl.split("\n];")[0];
 const regions = [...regionsBlock.matchAll(/en:\s*"([^"]+)"/g)].map((m) => m[1]);
 const uniqRegions = [...new Set(regions)];
+if (uniqRegions.length < 50) { console.error(`parsed only ${uniqRegions.length} regions (expected ~60) — CULTURE_REGIONS parse likely broke`); process.exit(1); }
 
 // ── Parse LENS_HINTS (key → hint) from the route (the SSOT the API validates against) ─
 const routeSrc = readFileSync(ROUTE, "utf8");

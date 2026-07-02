@@ -12,8 +12,9 @@ export const maxDuration = 30;
 
 const CURATED = CURATED_ITEMS as Record<string, CultureItem[]>;
 
-// Lens key to English fragment describing what specifics to surface. Kept in sync
-// with CULTURE_LENSES[].hint in lib/studio/culture-presets.ts.
+// Topic key → English fragment describing what specifics to surface. This is the RUNTIME
+// SSOT (the generator parses these; the live LLM fallback uses them). Must have an entry for
+// every ALL_TOPICS key in lib/studio/culture-presets.ts (27 keys; API validates body.lens here).
 const LENS_HINTS: Record<string, string> = {
   garment: "traditional garments, dress, costume and clothing silhouettes",
   pattern: "traditional decorative patterns, motifs and ornamental designs",
@@ -22,7 +23,7 @@ const LENS_HINTS: Record<string, string> = {
   symbol: "iconic cultural symbols, emblems and sacred signs",
   food: "iconic dishes, street food, desserts, drinks, local fruits and regional snacks",
   musteat: "must-try crowd-pleasing iconic dishes, drinks and desserts that foreign tourists love and recommend",
-  weirdfood: "surprising, adventurous, unusual or shocking local street foods that amaze or challenge foreign tourists (fermented, offal, blood, pungent or exotic dishes)",
+  weirdfood: "surprising, shocking or fascinating things foreign tourists find amazing about this culture — unusual foods, quirky local customs, bizarre sights, odd inventions and curious local oddities",
   music: "traditional musical instruments, genres and dances",
   art: "representative art forms, painting styles and visual mediums",
   architecture: "iconic architecture, building styles and structural motifs",
@@ -33,7 +34,7 @@ const LENS_HINTS: Record<string, string> = {
   nature: "signature landscapes, plants and natural elements",
   animal: "culturally iconic and symbolic animals",
   script: "traditional scripts, calligraphy styles and lettering",
-  // 🗺️ map-only themes — keep in sync with MAP_THEMES in lib/studio/culture-presets.ts
+  // 觀光/地圖向主題（兩模式皆可用）— keep keys+hints in sync with TOURIST_TOPICS/CORE_TOPICS in culture-presets.ts
   heritage: "historic heritage sites, monuments, ancient ruins, old temples and landmark heritage buildings",
   themepark: "famous amusement parks, theme parks, observation decks, zoos, aquariums and major tourist attractions",
   metro: "metro and subway lines with their colors, major interchange stations and rail transit hubs",

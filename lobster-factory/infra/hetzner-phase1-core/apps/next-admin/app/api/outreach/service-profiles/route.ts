@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 // Cold Outreach — Service Profile CRUD (task T3). Table: co_service_profiles (migration 0048).
 // Access model (§B0.1): service-role-only table; this route is the only accessor. Writes are
@@ -42,12 +43,16 @@ export async function GET(req: Request): Promise<Response> {
     const { data, error } = await supabase.from(TABLE).select("*").eq("id", id).maybeSingle();
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     if (!data) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+    try { assertOrgAccess(req, (data as Record<string, unknown>).organization_id as string | null); }
+    catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
     return NextResponse.json({ ok: true, profile: data });
   }
 
-  const organizationId = url.searchParams.get("organizationId");
+  let orgFilter: string | null;
+  try { orgFilter = effectiveOrgId(req, url.searchParams.get("organizationId")); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   let query = supabase.from(TABLE).select("*").order("created_at", { ascending: false }).limit(LIST_LIMIT);
-  if (organizationId) query = query.eq("organization_id", organizationId);
+  if (orgFilter) query = query.eq("organization_id", orgFilter);
   const { data, error } = await query;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, profiles: data ?? [] });
@@ -72,8 +77,8 @@ export async function POST(req: Request): Promise<Response> {
   const service_name = str(body.serviceName);
   if (!service_name) return NextResponse.json({ ok: false, error: "serviceName required" }, { status: 400 });
 
-  const fields = {
-    organization_id: str(body.organizationId),
+  // Content-only fields shared between INSERT and UPDATE.
+  const contentFields = {
     industry: str(body.industry),
     service_name,
     positioning: str(body.positioning),
@@ -88,9 +93,16 @@ export async function POST(req: Request): Promise<Response> {
   };
 
   if (id) {
+    // UPDATE — verify caller owns the existing row before mutating.
+    const { data: cur, error: readErr } = await supabase.from(TABLE).select("organization_id").eq("id", id).maybeSingle();
+    if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
+    if (!cur) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+    try { assertOrgAccess(req, (cur as Record<string, unknown>).organization_id as string | null); }
+    catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+    // organization_id is NOT updated — re-assigning a profile to another org is not allowed.
     const { data, error } = await supabase
       .from(TABLE)
-      .update({ ...fields, updated_at: new Date().toISOString() })
+      .update({ ...contentFields, updated_at: new Date().toISOString() })
       .eq("id", id)
       .select("*")
       .maybeSingle();
@@ -99,7 +111,15 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ ok: true, profile: data });
   }
 
-  const { data, error } = await supabase.from(TABLE).insert(fields).select("*").single();
+  // INSERT — pin organization_id via effectiveOrgId (client → own org; staff → body value).
+  let insertOrgId: string | null;
+  try { insertOrgId = effectiveOrgId(req, str(body.organizationId)); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+  const { data, error } = await supabase
+    .from(TABLE)
+    .insert({ ...contentFields, organization_id: insertOrgId })
+    .select("*")
+    .single();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, profile: data }, { status: 201 });
 }
@@ -114,6 +134,12 @@ export async function DELETE(req: Request): Promise<Response> {
 
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
+
+  const { data: cur, error: readErr } = await supabase.from(TABLE).select("organization_id").eq("id", id).maybeSingle();
+  if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
+  if (!cur) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+  try { assertOrgAccess(req, (cur as Record<string, unknown>).organization_id as string | null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
   const { error } = await supabase.from(TABLE).delete().eq("id", id);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });

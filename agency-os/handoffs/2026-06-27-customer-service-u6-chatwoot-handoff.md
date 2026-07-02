@@ -28,7 +28,7 @@
 
 **步驟（搬家細節 SSOT = `runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`）**：
 1. **買機**（操作者刷卡）：i7-7700 / 64GB / **2×512GB SSD（絕不 HDD）** / ~€48.70月 / FSN — 見 runbook **§0b**
-2. **裝 OS + RAID 1 + SMART**（runbook §3）
+2. **裝 OS + RAID 1 + SMART**（runbook §3）—— ⚠️ **順序坑**：RAID 1 = 開機進 **Hetzner `rescue` → `smartctl` 先驗兩碟健康（壞碟趁早換）→ `installimage` 選 RAID 1（會清碟重裝 OS，不是在活 OS 上加）→ reboot → `cat /proc/mdstat` 看 `[UU]`**。SSH 硬化（key-only/ufw/fail2ban）+ 裝 Chatwoot 都在 RAID OS 起來**之後**才做。別先 ssh 進預設 OS 驗機/硬化——那個 OS 會被 installimage 蓋掉。
 3. **裝 Chatwoot Community**（docker-compose，greenfield，零搬遷風險）+ 走「新部署 6 項」（healthcheck/smoke/rollback/notify/typecheck）
 4. **★ 接線（讓 Chatwoot 接上已建好的 AI 大腦 —— 這是 U6 真正的工）**：見下「接線步驟」
 5. EU 服務之後照 runbook §5 一台台搬 → 退雲端兩台

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseServerClient, getSupabaseWriteClient } from "@/lib/supabase-server";
 import { checkIntegrationHealth } from "@/lib/repair-os/integration-health";
 import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
+import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import type { OpsRole } from "@/lib/ops-contracts";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +40,12 @@ export interface IntegrationRow {
   created_at: string;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const resolved = resolveOpsRole(req);
+  if (!canWriteTenantConfig(resolved.role)) {
+    return NextResponse.json({ ok: false, error: "forbidden", role: resolved.role }, { status: 403 });
+  }
+
   const supabase = getSupabaseServerClient();
   if (!supabase) {
     return NextResponse.json({ ok: false, error: "supabase_not_configured" }, { status: 503 });
@@ -113,6 +119,8 @@ export async function POST(req: Request) {
   if (ownershipError) {
     return NextResponse.json({ ok: false, error: ownershipError }, { status: 400 });
   }
+  try { assertOrgAccess(req, organizationId); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
   const now = new Date().toISOString();
   const metadata = normalizeMetadata(body.api_metadata);
@@ -166,6 +174,11 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   const resolved = resolveOpsRole(req);
+  // Coarse early gate: operator+ minimum (canMutateIntegration does fine-grained check later).
+  // Ensures DB client construction and body parsing are skipped for unauthorized callers.
+  if (!canWriteTenantConfig(resolved.role) && resolved.role !== "operator") {
+    return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });
+  }
 
   const supabase = getSupabaseWriteClient();
   if (!supabase) {
@@ -197,6 +210,8 @@ export async function PATCH(req: Request) {
   if (fetchError || !current) {
     return NextResponse.json({ ok: false, error: "integration_not_found", details: fetchError?.message ?? null }, { status: 404 });
   }
+  try { assertOrgAccess(req, String((current as Record<string, unknown>).organization_id)); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
   const now = new Date().toISOString();
   const currentMeta = normalizeMetadata((current as Record<string, unknown>).api_metadata);

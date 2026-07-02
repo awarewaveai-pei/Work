@@ -23,7 +23,7 @@ import { roleHeader } from "@/lib/ops-role";
 import { CANVAS_NAME_KEY, toCanvasSrc, readCanvasSource } from "@/components/tools/canvas-handoff";
 import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
 import type { ColorGradeState } from "@/lib/studio/color-grade";
-import { buildFabricImageFilters, buildPresetFilters, buildEffectFilters, PRESET_FILTERS } from "./fabric-filters";
+import { buildFabricImageFilters, buildPresetFilters, buildEffectFilters, PRESET_FILTERS, buildHslMixerFilter, HSL_NEUTRAL, HSL_RANGES, hasAnyHslAdjustment, sanitizeHslMixer, type HslMixerState, type HslRange } from "./fabric-filters";
 import SidebarPanel from "@/components/tools/SidebarPanel";
 import FontLibrary from "@/components/tools/FontLibrary";
 import { posterizeDataUrl } from "@/lib/studio/posterize";
@@ -54,6 +54,7 @@ type AdjState = {
   vibrance: number; temp: number; blur: number; noise: number;
   contrast: number; shadows: number; highlights: number;
   exposure: number; clarity: number; dehaze: number;
+  hslMixer?: HslMixerState;
 };
 
 /**
@@ -150,6 +151,9 @@ export default function CanvasEditor() {
   const [exposure, setExposure] = useState(0);      // 曝光 -100..100
   const [clarity, setClarity] = useState(0);        // 清晰度 0..100
   const [dehaze, setDehaze] = useState(0);          // 去霧 0..100
+  // 🎨 HSL Color Mixer — 8 hue ranges × H/S/L (Photoshop-style targeted adjustment)
+  const [hslMixer, setHslMixer] = useState<HslMixerState>(() => JSON.parse(JSON.stringify(HSL_NEUTRAL)));
+  const [hslTab, setHslTab] = useState<HslRange>("all");
   // 🗂 群組 — track whether the active selection can be grouped / ungrouped.
   const [multiSelected, setMultiSelected] = useState(false); // ActiveSelection (≥2 objects)
   const [groupSelected, setGroupSelected] = useState(false); // a single Group object
@@ -182,10 +186,15 @@ export default function CanvasEditor() {
     setPresetId(null); setRemoveWhite(false);
     setVibrance(0); setTemp(0); setBlurv(0); setNoisev(0);
     setContrast(0); setShadows(0); setHighlights(0); setExposure(0); setClarity(0); setDehaze(0);
+    setHslMixer(JSON.parse(JSON.stringify(HSL_NEUTRAL)));
   }, [grade]);
 
   // Container width for dynamic MAX_DISP — keeps canvas within viewport without horizontal scroll.
   const [containerWidth, setContainerWidth] = useState(650);
+  // 🖥 Workspace height measured dynamically (container top → viewport bottom) instead of a hardcoded
+  // calc(100vh - 110px): self-adjusts when the error banner appears or the description wraps, so the
+  // workspace never overflows into a page scrollbar (critic follow-up on b1cc5bd8).
+  const [workspaceH, setWorkspaceH] = useState(560);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   // Guards against auto-reapplying 書布尺寸 when window resizes before user clicks 套用書布.
   const sizedByCanvasApply = useRef(false);
@@ -207,6 +216,11 @@ export default function CanvasEditor() {
       const fabric = await import("fabric");
       if (disposed || !canvasElRef.current) return;
 
+      // Force Canvas 2D filter backend so custom per-pixel filters (HslColorMixer) work correctly.
+      // Fabric v7 defaults to WebGL (enableGLFiltering=true); custom filters that only implement
+      // applyTo2d are silently skipped — WebGL runs the identity shader instead (critic 2026-06-29).
+      (fabric as unknown as { config?: { configure(o: Record<string, unknown>): void } }).config?.configure({ enableGLFiltering: false });
+
       // Persist our custom `name` (圖層改名) through toJSON/loadFromJSON + design save. Must be set
       // class-level BEFORE any object is created (Fabric v7 concatenates customProperties into
       // every toObject; per-instance assignment is ignored). Confirmed: fabricjs discussion #10176.
@@ -217,6 +231,15 @@ export default function CanvasEditor() {
         preserveObjectStacking: true,
       });
       fabricRef.current = canvas;
+      // The artboard = the white canvas = the real export bounds. Give Fabric's wrapper a drop-shadow
+      // + crisp border so it stands out from the grey checker workspace → the user sees exactly where
+      // the usable area ends (Photoshop/Figma-style). setDimensions only touches size, not these.
+      const wrap = canvas.wrapperEl; // typed HTMLDivElement (Fabric) → a future rename fails at compile
+      if (wrap) {
+        wrap.style.boxShadow = "0 3px 14px rgba(0,0,0,0.26)";
+        wrap.style.outline = "1px solid rgba(128,128,128,0.5)";
+        wrap.style.borderRadius = "2px";
+      }
       // Default 800×800 document so the auto-fit (relayoutCanvas) has a real size to scale from even
       // before a handoff/upload. Export uses these realW/realH. (Was null → no auto-fit on direct visit.)
       canvasMetaRef.current = { realW: 800, realH: 800, dispScale: 1, dpi: szDpi };
@@ -232,11 +255,13 @@ export default function CanvasEditor() {
           setVibrance(adj.vibrance ?? 0); setTemp(adj.temp ?? 0); setBlurv(adj.blur ?? 0); setNoisev(adj.noise ?? 0);
           setContrast(adj.contrast ?? 0); setShadows(adj.shadows ?? 0); setHighlights(adj.highlights ?? 0);
           setExposure(adj.exposure ?? 0); setClarity(adj.clarity ?? 0); setDehaze(adj.dehaze ?? 0);
+          setHslMixer(sanitizeHslMixer(adj.hslMixer));
         } else {
           grade.reset();
           setPresetId(null); setRemoveWhite(false);
           setVibrance(0); setTemp(0); setBlurv(0); setNoisev(0);
           setContrast(0); setShadows(0); setHighlights(0); setExposure(0); setClarity(0); setDehaze(0);
+          setHslMixer(sanitizeHslMixer(undefined));
         }
       };
 
@@ -329,8 +354,8 @@ export default function CanvasEditor() {
           // Fit the preview into the visible workspace (width AND height) so it never exceeds one
           // viewport. Export stays at realW/realH. Subsequent resizes go through relayoutCanvas().
           const el = canvasContainerRef.current;
-          const availW = el ? Math.max(200, el.clientWidth - 4) : 650;
-          const availH = el && typeof window !== "undefined" ? Math.max(220, window.innerHeight - el.getBoundingClientRect().top - 20) : 650;
+          const availW = el ? Math.max(200, el.clientWidth - 36) : 650;
+          const availH = el ? Math.max(220, el.clientHeight - 36) : 650;
           const dispScale = fitDisplayScale(realW, realH, availW, availH);
           canvas.setZoom(dispScale);
           canvas.setDimensions({
@@ -393,6 +418,7 @@ export default function CanvasEditor() {
         ...buildFabricImageFilters(ns, grade.params),
         ...buildPresetFilters(ns, presetId, removeWhite),
         ...buildEffectFilters(ns, { vibrance, blur: blurv, noise: noisev, temp, contrast, shadows, highlights, exposure, clarity, dehaze }),
+        ...buildHslMixerFilter(ns, hslMixer),
       ];
       target.applyFilters();
       canvas.requestRenderAll();
@@ -402,6 +428,7 @@ export default function CanvasEditor() {
         grade: { ...grade.state }, presetId, removeWhite,
         vibrance, temp, blur: blurv, noise: noisev,
         contrast, shadows, highlights, exposure, clarity, dehaze,
+        hslMixer: JSON.parse(JSON.stringify(hslMixer)),
       };
       // ↩️ #4 record ONE undo step after the user stops dragging (debounced). Only when THIS object
       // is the genuine edit target — never for selection-sync (loadAdj) or undo/redo restore.
@@ -417,7 +444,7 @@ export default function CanvasEditor() {
     // snapshot intentionally omitted from deps (declared later; stable useCallback). grade.state read
     // via grade.params dep. userEditRef/snapTimerRef are refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grade.params, presetId, removeWhite, vibrance, blurv, noisev, temp, contrast, shadows, highlights, exposure, clarity, dehaze]);
+  }, [grade.params, presetId, removeWhite, vibrance, blurv, noisev, temp, contrast, shadows, highlights, exposure, clarity, dehaze, hslMixer]);
 
   const addText = useCallback(() => {
     const canvas = fabricRef.current;
@@ -704,8 +731,10 @@ export default function CanvasEditor() {
     const m = canvasMetaRef.current;
     const el = canvasContainerRef.current;
     if (!canvas || !m || !el || typeof window === "undefined") return;
-    const availW = Math.max(200, el.clientWidth - 4);
-    const availH = Math.max(220, window.innerHeight - el.getBoundingClientRect().top - 20);
+    // Fit inside the workspace container (fixed height) leaving a margin → the artboard floats with
+    // grey checker around it, so its real bounds are visible (not mistaken for the whole white area).
+    const availW = Math.max(200, el.clientWidth - 36);
+    const availH = Math.max(220, el.clientHeight - 36);
     const dispScale = fitDisplayScale(m.realW, m.realH, availW, availH);
     canvas.setZoom(dispScale);
     canvas.setDimensions({ width: Math.round(m.realW * dispScale), height: Math.round(m.realH * dispScale) });
@@ -893,16 +922,26 @@ export default function CanvasEditor() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (ready && canvasMetaRef.current && sizedByCanvasApply.current) applyCanvasSize(); }, [szDpi]);
 
-  // 🖥 Re-fit the display whenever the canvas becomes ready or the viewport resizes (height too).
+  // 🖥 Measure the workspace height = container top → viewport bottom (dynamic; replaces the
+  // hardcoded calc(100vh-110px) so it self-adjusts to header reflow / an error banner appearing).
+  const measureWorkspaceH = useCallback(() => {
+    const el = canvasContainerRef.current;
+    if (!el || typeof window === "undefined") return;
+    const top = el.getBoundingClientRect().top;
+    setWorkspaceH(Math.max(280, Math.round(window.innerHeight - top - 16)));
+  }, []);
+  // Re-measure on ready, when the error banner toggles (shifts the container top), and on resize.
+  useEffect(() => { if (ready) measureWorkspaceH(); }, [ready, error, measureWorkspaceH]);
+  // Re-fit the canvas display whenever it becomes ready or the workspace height changes.
   useEffect(() => {
     if (ready && canvasMetaRef.current) relayoutCanvas();
-  }, [ready, relayoutCanvas]);
+  }, [ready, workspaceH, relayoutCanvas]);
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const onResize = () => { if (canvasMetaRef.current) relayoutCanvas(); };
+    const onResize = () => { measureWorkspaceH(); if (canvasMetaRef.current) relayoutCanvas(); };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [relayoutCanvas]);
+  }, [measureWorkspaceH, relayoutCanvas]);
 
   // ResizeObserver: track canvas container width so MAX_DISP stays within viewport.
   useEffect(() => {
@@ -1675,6 +1714,13 @@ export default function CanvasEditor() {
     return () => window.removeEventListener("keydown", onKey);
   }, [ready, canUndo, canRedo, drawMode, inpaintMode, cropMode, anySelected, undo, redo, deleteSelected, cancelCrop, exitInpaint, applyDrawMode]);
 
+  const canvasBusy = cropMode || inpaintMode;
+  const objectToolsDisabled = !ready || canvasBusy || !anySelected;
+  const imageToolsDisabled = !ready || canvasBusy || !imageSelected;
+  const textToolsDisabled = !ready || canvasBusy || !textSelected;
+  const imageToolHint = !imageSelected ? "先選取圖片後才能使用。" : canvasBusy ? "先完成或取消目前的編輯模式。" : null;
+  const objectToolHint = !anySelected ? "先選取畫布上的物件後才能使用。" : canvasBusy ? "先完成或取消目前的編輯模式。" : null;
+
   return (
     <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
       <h1 style={{ fontSize: 18, margin: 0 }}>✏️ 快速編輯 Canvas</h1>
@@ -1686,12 +1732,26 @@ export default function CanvasEditor() {
 
       {/* 畫布 + 右側可捲動工具欄（vector-trace-demo 風格）。面板垂直堆疊、可收合。 */}
       <div style={{ display: "flex", gap: 12, alignItems: "flex-start", width: "100%" }}>
-        <div ref={canvasContainerRef} style={{ border: "1px solid var(--card-border)", borderRadius: 8, flex: 1, minWidth: 0, background: "var(--card-bg)", display: "flex", justifyContent: "center", overflow: "hidden" }}>
+        <div
+          ref={canvasContainerRef}
+          style={{
+            border: "1px solid var(--card-border)", borderRadius: 8, flex: 1, minWidth: 0,
+            height: workspaceH, // dynamic workspace height (measured) → artboard floats centred inside it
+            display: "flex", justifyContent: "center", alignItems: "center", overflow: "hidden",
+            // 工作區 = 淡灰棋盤格（半透明灰，明暗主題皆可讀）。白色畫板(=匯出範圍)浮在上面、有陰影邊框 →
+            // 一眼看出「灰格=非畫布、不可用」「白卡=真正可用範圍」。
+            backgroundColor: "var(--card-bg)",
+            backgroundImage:
+              "linear-gradient(45deg, rgba(128,128,128,0.16) 25%, transparent 25%), linear-gradient(-45deg, rgba(128,128,128,0.16) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, rgba(128,128,128,0.16) 75%), linear-gradient(-45deg, transparent 75%, rgba(128,128,128,0.16) 75%)",
+            backgroundSize: "22px 22px",
+            backgroundPosition: "0 0, 0 11px, 11px -11px, -11px 0",
+          }}
+        >
           <canvas ref={canvasElRef} width={800} height={800} />
         </div>
 
-        {/* 右側工具欄：固定寬、sticky 黏住視窗並吃滿可視高度（畫布很高時整頁會捲，sticky 讓工具欄
-            永遠完整在畫面內、用滿垂直空間 → 一次看到更多工具，少捲動）。 */}
+        {/* 右側工具欄：固定寬、sticky 黏住視窗。maxHeight 綁同一個 workspaceH(=工作區可用高),
+            這樣工具欄不會比工作區高 → 不撐出整頁捲軸;面板多時欄內自行捲動。 */}
         <div
           style={{
             width: 300,
@@ -1699,7 +1759,7 @@ export default function CanvasEditor() {
             position: "sticky",
             top: 12,
             alignSelf: "flex-start",
-            maxHeight: "calc(100vh - 24px)",
+            maxHeight: workspaceH,
             overflowY: "auto",
             display: "flex",
             flexDirection: "column",
@@ -1726,6 +1786,28 @@ export default function CanvasEditor() {
           ) : null}
         </div>
 
+        {/* 💾 匯出 / 下載 — 放最上方（主要輸出動作，免捲動）*/}
+        <SidebarPanel id="export" title="💾 匯出 / 下載" defaultPos={{ x: 816, y: 0 }} width={280}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <input
+              type="text"
+              value={editName}
+              onChange={(e) => { setEditName(e.target.value); nameRef.current = null; }}
+              placeholder="檔名"
+              title="下載檔名（不含副檔名）"
+              style={{ fontSize: 12, padding: "2px 6px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)", width: "100%" }}
+            />
+            {canvasBusy ? <span style={{ fontSize: 11, opacity: 0.65 }}>先套用或取消目前的編輯模式，才能下載或存檔。</span> : null}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready || canvasBusy} onClick={download} title="下載全尺寸 PNG">PNG下載</button>
+              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready || canvasBusy} onClick={() => void downloadWebP()} title="下載 WebP，自動壓縮至 200KB 以內">WebP下載</button>
+            </div>
+            <button className="btn-primary" style={{ width: "100%" }} disabled={!ready || canvasBusy || saveState === "saving" || saveState === "saved"} onClick={() => void saveToDesigns()}>
+              {saveState === "saved" ? "已存入 ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}
+            </button>
+          </div>
+        </SidebarPanel>
+
         {/* 🧰 更多工具 — 形狀 / 鎖定 / 群組 / 畫筆 / 橡皮擦 / 設計檔（低頻，收合省空間）*/}
         <SidebarPanel id="more-tools" title="🧰 更多工具" defaultPos={{ x: 816, y: 0 }} width={280} defaultCollapsed>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1734,9 +1816,9 @@ export default function CanvasEditor() {
               <button className="btn-secondary" disabled={!ready} onClick={() => addShape("rect")} title="加方框">▭</button>
               <button className="btn-secondary" disabled={!ready} onClick={() => addShape("circle")} title="加圓形">◯</button>
               <button className="btn-secondary" disabled={!ready} onClick={() => addShape("line")} title="加線條">／</button>
-              <button className="btn-secondary" disabled={!ready || !anySelected} onClick={toggleLock} title="鎖定／解鎖選取物件（防誤移）">{lockSelected ? "🔒 已鎖定" : "🔓 鎖定"}</button>
-              {multiSelected ? (<button className="btn-secondary" disabled={!ready} onClick={groupSelection} title="把選取的多個物件組成群組">🗂 群組</button>) : null}
-              {groupSelected ? (<button className="btn-secondary" disabled={!ready} onClick={ungroupSelection} title="把群組拆回個別物件">🗂 解散</button>) : null}
+              <button className="btn-secondary" disabled={objectToolsDisabled} onClick={toggleLock} title={objectToolHint ?? "鎖定／解鎖選取物件（防誤移）"}>{lockSelected ? "🔒 已鎖定" : "🔓 鎖定"}</button>
+              {multiSelected ? (<button className="btn-secondary" disabled={!ready || canvasBusy} onClick={groupSelection} title="把選取的多個物件組成群組">🗂 群組</button>) : null}
+              {groupSelected ? (<button className="btn-secondary" disabled={!ready || canvasBusy} onClick={ungroupSelection} title="把群組拆回個別物件">🗂 解散</button>) : null}
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
               <button className="btn-secondary" disabled={!ready || inpaintMode || cropMode} style={{ fontWeight: drawMode === "draw" ? 700 : 400 }} onClick={() => applyDrawMode(drawMode === "draw" ? "off" : "draw")} title="自由繪筆">✏️ 畫筆</button>
@@ -1750,7 +1832,7 @@ export default function CanvasEditor() {
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
               <span style={{ fontSize: 11, opacity: 0.6 }}>設計檔</span>
-              <button className="btn-secondary" disabled={!ready || cropMode} onClick={exportDesign} title="匯出可再編輯的設計檔（.design.json）">💾 匯出</button>
+              <button className="btn-secondary" disabled={!ready || canvasBusy} onClick={exportDesign} title="匯出可再編輯的設計檔（.design.json）">💾 匯出</button>
               <label className="btn-secondary" style={{ cursor: ready ? "pointer" : "default" }} title="載入先前匯出的設計檔">
                 📂 載入
                 <input type="file" accept="application/json,.json" style={{ display: "none" }} disabled={!ready} onChange={(e) => { importDesign(e.target.files?.[0] ?? null); e.target.value = ""; }} />
@@ -1759,48 +1841,6 @@ export default function CanvasEditor() {
           </div>
         </SidebarPanel>
 
-        {/* 🔤 文字 — 字型 / 顏色 / 字級（套用到選取文字，或設定新文字預設）*/}
-        <SidebarPanel id="text-style" title="✏️ 文字樣式" defaultPos={{ x: 816, y: 0 }} width={280} defaultCollapsed>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
-            <span style={{ opacity: 0.6 }}>{textSelected ? "套用到選取文字" : "新文字預設"}</span>
-            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 30 }}>字型</span>
-              <select className="btn-secondary" value={textFont} disabled={!ready} onChange={(e) => { setTextFont(e.target.value); applyTextStyle({ fontFamily: e.target.value }); }} style={{ flex: 1 }}>
-                {FONT_OPTIONS.map((f) => (<option key={f.label} value={f.value} style={{ fontFamily: f.value }}>{f.label}</option>))}
-              </select>
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 30 }}>顏色</span>
-              <input type="color" value={textColor} disabled={!ready} onChange={(e) => { setTextColor(e.target.value); applyTextStyle({ fill: e.target.value }); }} style={{ width: 36, height: 24, padding: 0, border: "1px solid var(--card-border)", borderRadius: 4, cursor: "pointer" }} />
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 30 }}>字級</span>
-              <input type="range" min={8} max={200} step={1} value={textSize} disabled={!ready} onChange={(e) => { const v = Number(e.target.value); setTextSize(v); applyTextStyle({ fontSize: v }); }} style={{ flex: 1 }} />
-              <span style={{ width: 28, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{textSize}</span>
-            </label>
-          </div>
-        </SidebarPanel>
-
-        {/* 💾 匯出 / 下載 */}
-        <SidebarPanel id="export" title="💾 匯出 / 下載" defaultPos={{ x: 816, y: 0 }} width={280}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <input
-              type="text"
-              value={editName}
-              onChange={(e) => { setEditName(e.target.value); nameRef.current = null; }}
-              placeholder="檔名"
-              title="下載檔名（不含副檔名）"
-              style={{ fontSize: 12, padding: "2px 6px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)", width: "100%" }}
-            />
-            <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready || cropMode} onClick={download} title="下載全尺寸 PNG">PNG下載</button>
-              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready || cropMode} onClick={() => void downloadWebP()} title="下載 WebP，自動壓縮至 200KB 以內">WebP下載</button>
-            </div>
-            <button className="btn-primary" style={{ width: "100%" }} disabled={!ready || cropMode || saveState === "saving" || saveState === "saved"} onClick={() => void saveToDesigns()}>
-              {saveState === "saved" ? "已存入 ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}
-            </button>
-          </div>
-        </SidebarPanel>
         {/* 📐 畫布尺寸 / DPI — 公分/公釐 + DPI 自設（參考 vector-trace-demo）。 */}
         <SidebarPanel id="canvas-size" title="📐 畫布尺寸 / DPI" defaultPos={{ x: 816, y: 0 }} width={236} defaultCollapsed>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
@@ -1871,50 +1911,92 @@ export default function CanvasEditor() {
           </SidebarPanel>
         ) : null}
 
+        {/* 🔤 文字 — 整合：字型/顏色/字級 + 樣式切換(B/I/U/弧形) + 進階字型庫。放在圖層下方。
+            (原「文字樣式」+「字型庫」兩面板合併,避免重複混淆。) */}
+        <SidebarPanel id="text-style" title="🔤 文字" defaultPos={{ x: 816, y: 0 }} width={280} defaultCollapsed>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
+            <span style={{ opacity: 0.6 }}>{textSelected ? "套用到選取文字" : "新文字預設"}</span>
+            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 30 }}>字型</span>
+              <select className="btn-secondary" value={textFont} disabled={!ready} onChange={(e) => { setTextFont(e.target.value); applyTextStyle({ fontFamily: e.target.value }); }} style={{ flex: 1 }}>
+                {FONT_OPTIONS.map((f) => (<option key={f.label} value={f.value} style={{ fontFamily: f.value }}>{f.label}</option>))}
+              </select>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 30 }}>顏色</span>
+              <input type="color" value={textColor} disabled={!ready} onChange={(e) => { setTextColor(e.target.value); applyTextStyle({ fill: e.target.value }); }} style={{ width: 36, height: 24, padding: 0, border: "1px solid var(--card-border)", borderRadius: 4, cursor: "pointer" }} />
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 30 }}>字級</span>
+              <input type="range" min={8} max={200} step={1} value={textSize} disabled={!ready} onChange={(e) => { const v = Number(e.target.value); setTextSize(v); applyTextStyle({ fontSize: v }); }} style={{ flex: 1 }} />
+              <span style={{ width: 28, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{textSize}</span>
+            </label>
+            {/* 樣式切換 */}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <button className="btn-secondary" disabled={textToolsDisabled} style={{ fontSize: 13, fontWeight: 700 }} title={textSelected ? "粗體（切換）" : "先選取文字後才能使用。"} onClick={() => toggleText("fontWeight")}>B</button>
+              <button className="btn-secondary" disabled={textToolsDisabled} style={{ fontSize: 13, fontStyle: "italic" }} title={textSelected ? "斜體（切換）" : "先選取文字後才能使用。"} onClick={() => toggleText("fontStyle")}>I</button>
+              <button className="btn-secondary" disabled={textToolsDisabled} style={{ fontSize: 13, textDecoration: "underline" }} title={textSelected ? "底線（切換）" : "先選取文字後才能使用。"} onClick={() => toggleText("underline")}>U</button>
+              <button className="btn-secondary" disabled={textToolsDisabled} style={{ fontSize: 12 }} title={textSelected ? "文字沿弧形路徑" : "先選取文字後才能使用。"} onClick={() => applyTextArc(true)}>〽️ 弧形</button>
+              <button className="btn-secondary" disabled={textToolsDisabled} style={{ fontSize: 12 }} title={textSelected ? "取消弧形（拉直）" : "先選取文字後才能使用。"} onClick={() => applyTextArc(false)}>直</button>
+            </div>
+            {/* 進階字型庫：Google Fonts（中/英）+ 上傳字型 */}
+            <div style={{ borderTop: "1px solid var(--card-border)", paddingTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ opacity: 0.6, fontSize: 11 }}>更多字型（Google Fonts / 上傳）</span>
+              <FontLibrary
+                current={textFont}
+                onPick={(family) => {
+                  setTextFont(family);
+                  applyTextStyle({ fontFamily: family });
+                }}
+              />
+            </div>
+          </div>
+        </SidebarPanel>
+
         {/* 🎨 物件效果（PS 圖層樣式）— always shown (collapsed); acts on the active object when one is selected. */}
         {(
           <SidebarPanel id="effects" title="🎨 物件效果" defaultPos={{ x: 816, y: 286 }} width={260} defaultCollapsed>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <label style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 2 }}>
               <span style={{ display: "flex", justifyContent: "space-between" }}><span>透明度</span><span style={{ opacity: 0.7 }}>{objOpacity}%</span></span>
-              <input type="range" min={0} max={100} value={objOpacity} onChange={(e) => { const v = Number(e.target.value); setObjOpacity(v); setActiveProp({ opacity: v / 100 }); }} />
+              <input type="range" min={0} max={100} value={objOpacity} disabled={objectToolsDisabled} onChange={(e) => { const v = Number(e.target.value); setObjOpacity(v); setActiveProp({ opacity: v / 100 }); }} />
             </label>
             <label style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 2 }}>
               混合模式
-              <select className="btn-secondary" value={objBlend} onChange={(e) => { setObjBlend(e.target.value); setActiveProp({ globalCompositeOperation: e.target.value === "normal" ? "source-over" : e.target.value }); }}>
+              <select className="btn-secondary" value={objBlend} disabled={objectToolsDisabled} onChange={(e) => { setObjBlend(e.target.value); setActiveProp({ globalCompositeOperation: e.target.value === "normal" ? "source-over" : e.target.value }); }}>
                 {["normal", "multiply", "screen", "overlay", "darken", "lighten", "difference", "color-dodge", "color-burn", "soft-light", "hard-light"].map((m) => (
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
             </label>
             <div style={{ display: "flex", gap: 6 }}>
-              <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => flipActive("x")}>↔ 水平翻轉</button>
-              <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => flipActive("y")}>↕ 垂直翻轉</button>
+              <button className="btn-secondary" disabled={objectToolsDisabled} style={{ fontSize: 12 }} title={objectToolHint ?? undefined} onClick={() => flipActive("x")}>↔ 水平翻轉</button>
+              <button className="btn-secondary" disabled={objectToolsDisabled} style={{ fontSize: 12 }} title={objectToolHint ?? undefined} onClick={() => flipActive("y")}>↕ 垂直翻轉</button>
             </div>
             <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
-              <input type="checkbox" checked={objShadow} onChange={(e) => toggleShadow(e.target.checked)} /> 陰影 Drop shadow
+              <input type="checkbox" checked={objShadow} disabled={objectToolsDisabled} onChange={(e) => toggleShadow(e.target.checked)} /> 陰影 Drop shadow
             </label>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                <input type="checkbox" checked={objStroke} onChange={(e) => toggleStroke(e.target.checked)} /> 描邊 Stroke
+                <input type="checkbox" checked={objStroke} disabled={objectToolsDisabled} onChange={(e) => toggleStroke(e.target.checked)} /> 描邊 Stroke
               </label>
               {objStroke ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 22 }}>
-                  <input type="color" value={objStrokeColor} onChange={(e) => { setObjStrokeColor(e.target.value); setActiveProp({ stroke: e.target.value }); }} style={{ width: 30, height: 22, padding: 0 }} />
-                  <input type="range" min={1} max={40} value={objStrokeWidth} onChange={(e) => { const w = Number(e.target.value); setObjStrokeWidth(w); setActiveProp({ strokeWidth: w }); }} style={{ flex: 1 }} />
+                  <input type="color" value={objStrokeColor} disabled={objectToolsDisabled} onChange={(e) => { setObjStrokeColor(e.target.value); setActiveProp({ stroke: e.target.value }); }} style={{ width: 30, height: 22, padding: 0 }} />
+                  <input type="range" min={1} max={40} value={objStrokeWidth} disabled={objectToolsDisabled} onChange={(e) => { const w = Number(e.target.value); setObjStrokeWidth(w); setActiveProp({ strokeWidth: w }); }} style={{ flex: 1 }} />
                   <span style={{ width: 22, textAlign: "right" }}>{objStrokeWidth}</span>
                 </div>
               ) : null}
             </div>
             {!imageSelected ? (
-              <button className="btn-secondary" style={{ fontSize: 12 }} onClick={applyGradient} title="把選取的文字/形狀填成漸層（左色用畫筆顏色）">🌈 漸層填色</button>
+              <button className="btn-secondary" disabled={objectToolsDisabled || imageSelected} style={{ fontSize: 12 }} onClick={applyGradient} title={!anySelected ? "先選取文字或形狀後才能使用。" : "把選取的文字/形狀填成漸層（左色用畫筆顏色）"}>🌈 漸層填色</button>
             ) : null}
             {/* ✂️ 剪裁遮罩 clipPath */}
             <div style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12 }}>
               <span style={{ opacity: 0.6 }}>遮罩</span>
-              <button className="btn-secondary" style={{ fontSize: 12 }} title="圓形遮罩" onClick={() => applyClip("circle")}>⬤</button>
-              <button className="btn-secondary" style={{ fontSize: 12 }} title="圓角遮罩" onClick={() => applyClip("round")}>▢</button>
-              <button className="btn-secondary" style={{ fontSize: 12 }} title="移除遮罩" onClick={() => applyClip("none")}>無</button>
+              <button className="btn-secondary" disabled={objectToolsDisabled} style={{ fontSize: 12 }} title={objectToolHint ?? "圓形遮罩"} onClick={() => applyClip("circle")}>⬤</button>
+              <button className="btn-secondary" disabled={objectToolsDisabled} style={{ fontSize: 12 }} title={objectToolHint ?? "圓角遮罩"} onClick={() => applyClip("round")}>▢</button>
+              <button className="btn-secondary" disabled={objectToolsDisabled} style={{ fontSize: 12 }} title={objectToolHint ?? "移除遮罩"} onClick={() => applyClip("none")}>無</button>
             </div>
           </div>
           </SidebarPanel>
@@ -1925,12 +2007,16 @@ export default function CanvasEditor() {
           <>
           {/* 3 個獨立可拖面板：調色 / 濾鏡效果 / AI 去除 */}
           <SidebarPanel id="grade" title="🎨 調色 / 色階 Levels" defaultPos={{ x: 816, y: 328 }} width={272} defaultCollapsed>
-            <ColorGradePanel state={grade.state} onSet={(k, v) => { markEdit(); grade.set(k, v); }} onReset={() => { markEdit(); grade.reset(); }} neutral={grade.neutral} />
+            <fieldset disabled={imageToolsDisabled} style={{ border: 0, padding: 0, margin: 0 }}>
+              {imageToolHint ? <span style={{ display: "block", fontSize: 11, opacity: 0.65, marginBottom: 8 }}>{imageToolHint}</span> : null}
+              <ColorGradePanel state={grade.state} onSet={(k, v) => { markEdit(); grade.set(k, v); }} onReset={() => { markEdit(); grade.reset(); }} neutral={grade.neutral} />
+            </fieldset>
           </SidebarPanel>
 
           {/* 🎛 調整 Adjustments — PS-style contrast / shadows / highlights + auto corrections */}
           <SidebarPanel id="adjust" title="🎛 調整 Adjustments" defaultPos={{ x: 816, y: 348 }} width={272} defaultCollapsed>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <fieldset disabled={imageToolsDisabled} style={{ border: 0, padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+              {imageToolHint ? <span style={{ fontSize: 11, opacity: 0.65 }}>{imageToolHint}</span> : null}
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 <button className="btn-secondary" style={{ fontSize: 12 }} onClick={autoContrast} title="分析畫素亮度範圍，自動設黑白點">自動對比</button>
                 <button className="btn-secondary" style={{ fontSize: 12 }} onClick={autoColor} title="中性灰平衡，自動矯正偏色">自動色彩</button>
@@ -1949,12 +2035,13 @@ export default function CanvasEditor() {
                   <input type="range" min={row.min} max={row.max} value={row.v} onChange={(e) => { markEdit(); row.set(Number(e.target.value)); }} style={{ width: "100%" }} />
                 </label>
               ))}
-            </div>
+            </fieldset>
           </SidebarPanel>
 
           {/* 🎞 Camera RAW — exposure / clarity / dehaze sliders */}
           <SidebarPanel id="cameraraw" title="🎞 Camera RAW 效果" defaultPos={{ x: 816, y: 368 }} width={272} defaultCollapsed>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <fieldset disabled={imageToolsDisabled} style={{ border: 0, padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+              {imageToolHint ? <span style={{ fontSize: 11, opacity: 0.65 }}>{imageToolHint}</span> : null}
               {([
                 { label: "曝光 Exposure", v: exposure, set: setExposure, min: -100, max: 100 },
                 { label: "清晰度 Clarity", v: clarity, set: setClarity, min: 0, max: 100 },
@@ -1968,11 +2055,91 @@ export default function CanvasEditor() {
                   <input type="range" min={row.min} max={row.max} value={row.v} onChange={(e) => { markEdit(); row.set(Number(e.target.value)); }} style={{ width: "100%" }} />
                 </label>
               ))}
-            </div>
+            </fieldset>
           </SidebarPanel>
 
-          <SidebarPanel id="filters" title="🎨 濾鏡 / 去背 / 效果" defaultPos={{ x: 816, y: 370 }} width={272} defaultCollapsed>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {/* 🎨 HSL Color Mixer — Photoshop-style 8-range targeted H/S/L (精準版) */}
+          <SidebarPanel id="hslmixer" title="🎨 色彩混合器 HSL" defaultPos={{ x: 816, y: 370 }} width={272} defaultCollapsed>
+            <fieldset disabled={imageToolsDisabled} style={{ border: 0, padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
+              {imageToolHint ? <span style={{ fontSize: 11, opacity: 0.65 }}>{imageToolHint}</span> : null}
+              {/* Tab strip: 全部 + 8 ranges */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                <button
+                  className="btn-secondary"
+                  style={{ fontSize: 11, padding: "2px 7px", fontWeight: hslTab === "all" ? 700 : 400,
+                    borderBottom: hslTab === "all" ? "2px solid var(--accent)" : "2px solid transparent" }}
+                  onClick={() => setHslTab("all")}
+                >全部</button>
+                {HSL_RANGES.map((r) => (
+                  <button key={r.key} className="btn-secondary"
+                    style={{ fontSize: 11, padding: "2px 5px", fontWeight: hslTab === r.key ? 700 : 400,
+                      borderBottom: hslTab === r.key ? `2px solid ${r.color}` : "2px solid transparent" }}
+                    onClick={() => setHslTab(r.key)}
+                  >
+                    <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: r.color, marginRight: 3, verticalAlign: "middle" }} />
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Active range label */}
+              <div style={{ opacity: 0.55, fontSize: 11 }}>
+                {hslTab === "all" ? "全部色相（整體偏移）" : `${HSL_RANGES.find(r => r.key === hslTab)?.label ?? ""} 色段`}
+                {hasAnyHslAdjustment(hslMixer) && (
+                  <span style={{ color: "var(--accent)", marginLeft: 6 }}>已調整</span>
+                )}
+              </div>
+
+              {/* H / S / L sliders for current tab */}
+              {(
+                [
+                  { label: "色相 Hue", axis: "h" as const, min: -40, max: 40 },
+                  { label: "飽和度 Saturation", axis: "s" as const, min: -100, max: 100 },
+                  { label: "明度 Luminance", axis: "l" as const, min: -100, max: 100 },
+                ] satisfies { label: string; axis: "h" | "s" | "l"; min: number; max: number }[]
+              ).map((row) => {
+                const v = hslMixer[hslTab][row.axis];
+                return (
+                  <label key={row.axis} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span>{row.label}</span>
+                      <span style={{ opacity: 0.7, fontVariantNumeric: "tabular-nums", color: v !== 0 ? "var(--accent)" : undefined }}>
+                        {v > 0 ? `+${v}` : `${v}`}
+                      </span>
+                    </span>
+                    <input
+                      type="range" min={row.min} max={row.max} value={v}
+                      onChange={(e) => {
+                        markEdit();
+                        const nv = Number(e.target.value);
+                        setHslMixer(prev => ({
+                          ...prev,
+                          [hslTab]: { ...prev[hslTab], [row.axis]: nv },
+                        }));
+                      }}
+                      style={{ width: "100%" }}
+                    />
+                  </label>
+                );
+              })}
+
+              {/* Reset buttons */}
+              <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
+                <button className="btn-secondary" style={{ fontSize: 11 }}
+                  onClick={() => { markEdit(); setHslMixer(prev => ({ ...prev, [hslTab]: { h: 0, s: 0, l: 0 } })); }}>
+                  重置此色段
+                </button>
+                <button className="btn-secondary" style={{ fontSize: 11 }}
+                  onClick={() => { markEdit(); setHslMixer(JSON.parse(JSON.stringify(HSL_NEUTRAL))); }}>
+                  全部重置
+                </button>
+              </div>
+            </fieldset>
+          </SidebarPanel>
+
+          <SidebarPanel id="filters" title="🎨 濾鏡 / 去背 / 效果" defaultPos={{ x: 816, y: 390 }} width={272} defaultCollapsed>
+            <fieldset disabled={imageToolsDisabled} style={{ border: 0, padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+              {imageToolHint ? <span style={{ fontSize: 11, opacity: 0.65 }}>{imageToolHint}</span> : null}
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 <button
                   className="btn-secondary"
@@ -2008,11 +2175,12 @@ export default function CanvasEditor() {
                   <input type="range" min={row.min} max={row.max} value={row.v} onChange={(e) => { markEdit(); row.set(Number(e.target.value)); }} />
                 </label>
               ))}
-            </div>
+            </fieldset>
           </SidebarPanel>
 
           <SidebarPanel id="inpaint" title="🪄 去除 / 生成填色（AI）" defaultPos={{ x: 816, y: 412 }} width={272} defaultCollapsed>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <fieldset disabled={!inpaintMode && imageToolsDisabled} style={{ border: 0, padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+              {!inpaintMode && imageToolHint ? <span style={{ fontSize: 11, opacity: 0.65 }}>{imageToolHint}</span> : null}
               {!inpaintMode ? (
                 <>
                   <button className="btn-secondary" onClick={() => startInpaint("remove")}>🪄 去除不要的部分</button>
@@ -2056,12 +2224,13 @@ export default function CanvasEditor() {
                   </div>
                 </>
               )}
-            </div>
+            </fieldset>
           </SidebarPanel>
 
           {/* 🖼 擴圖（flux-fill-pro outpaint）+ 🎚 色調分離（bake）— both replace the selected image. */}
           <SidebarPanel id="genfx" title="🖼 擴圖 / 🎚 色調分離" defaultPos={{ x: 816, y: 454 }} width={272} defaultCollapsed>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <fieldset disabled={imageToolsDisabled || genBusy} style={{ border: 0, padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 12 }}>
+              {imageToolHint ? <span style={{ fontSize: 11, opacity: 0.65 }}>{imageToolHint}</span> : null}
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <span style={{ fontSize: 12, fontWeight: 600 }}>🖼 擴圖 Outpaint（AI 往外補畫面）</span>
                 <input
@@ -2089,12 +2258,13 @@ export default function CanvasEditor() {
                 </label>
                 <button className="btn-secondary" disabled={genBusy} onClick={() => void posterizeSelected()}>套用色調分離</button>
               </div>
-            </div>
+            </fieldset>
           </SidebarPanel>
 
           {/* ✂️ 邊緣遮罩 — brush/grunge edge on the selected image → transparent PNG */}
           <SidebarPanel id="edge-mask" title="✂️ 邊緣遮罩（筆刷邊）" defaultPos={{ x: 816, y: 496 }} width={276} defaultCollapsed>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
+            <fieldset disabled={imageToolsDisabled || genBusy} style={{ border: 0, padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
+              {imageToolHint ? <span style={{ fontSize: 11, opacity: 0.65 }}>{imageToolHint}</span> : null}
               <div style={{ opacity: 0.6 }}>點筆刷 → 把選取的圖套有機邊（透明 PNG）。可換不同筆刷。</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(44px, 1fr))", gap: 5 }}>
                 {EDGE_PREVIEWS.map((pv) => {
@@ -2132,30 +2302,12 @@ export default function CanvasEditor() {
                 <span style={{ opacity: 0.6, width: 30, textAlign: "right" }}>{edgeAmount}</span>
               </div>
               {genBusy ? <span style={{ opacity: 0.6 }}>套用中…</span> : null}
-            </div>
+            </fieldset>
           </SidebarPanel>
           </>
         )}
 
-        {/* 🔤 字型庫 — always shown (collapsed); text styling acts on the active text object. */}
-        {(
-          <SidebarPanel id="fonts" title="🔤 字型庫" defaultPos={{ x: 816, y: 454 }} width={240} defaultCollapsed>
-            <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-              <button className="btn-secondary" style={{ fontSize: 13, fontWeight: 700 }} title="粗體（切換）" onClick={() => toggleText("fontWeight")}>B</button>
-              <button className="btn-secondary" style={{ fontSize: 13, fontStyle: "italic" }} title="斜體（切換）" onClick={() => toggleText("fontStyle")}>I</button>
-              <button className="btn-secondary" style={{ fontSize: 13, textDecoration: "underline" }} title="底線（切換）" onClick={() => toggleText("underline")}>U</button>
-              <button className="btn-secondary" style={{ fontSize: 12 }} title="文字沿弧形路徑" onClick={() => applyTextArc(true)}>〽️ 弧形</button>
-              <button className="btn-secondary" style={{ fontSize: 12 }} title="取消弧形（拉直）" onClick={() => applyTextArc(false)}>直</button>
-            </div>
-            <FontLibrary
-              current={textFont}
-              onPick={(family) => {
-                setTextFont(family);
-                applyTextStyle({ fontFamily: family });
-              }}
-            />
-          </SidebarPanel>
-        )}
+        {/* (原獨立「🔤 字型庫」面板已併入上方「🔤 文字」面板,避免兩個文字面板重複混淆。) */}
         </div>
       </div>
     </div>

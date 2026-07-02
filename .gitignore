@@ -15,6 +15,9 @@
 # --- Local backup directory (machine-local snapshots; never commit) ---
 Backups/
 
+# --- Paid plugin zips (licensed binaries; upload to VPS /opt/lobster-plugins/ via SFTP) ---
+_paid-plugins/
+
 # Runtime subdirectories (Claude Code internal state, not project source)
 .claude/backups/
 .claude/cache/

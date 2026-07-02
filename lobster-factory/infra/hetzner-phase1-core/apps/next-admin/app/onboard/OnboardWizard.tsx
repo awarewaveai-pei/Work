@@ -359,14 +359,14 @@ function Step1({
 // 純加法模型：基礎包（必裝）+ 3 個獨立 checkbox（電商 / 旅遊 / 形象）
 
 // Pre-computed module sizes (catalog is static)
-const BASE_PACK_SIZE      = WP_PLUGIN_CATALOG.filter((p) => p.module === "base").length;      // 16
-const ECOMMERCE_PACK_SIZE = WP_PLUGIN_CATALOG.filter((p) => p.module === "ecommerce").length; // 12
-const TOURISM_PACK_SIZE   = WP_PLUGIN_CATALOG.filter((p) => p.module === "tourism").length;   // 5
+const BASE_PACK_SIZE      = WP_PLUGIN_CATALOG.filter((p) => p.module === "base").length;      // 18 (incl. mainwp-child/manifest + wp-bridge/release-url)
+const ECOMMERCE_PACK_SIZE = WP_PLUGIN_CATALOG.filter((p) => p.module === "ecommerce").length; // 13
+const TOURISM_PACK_SIZE   = WP_PLUGIN_CATALOG.filter((p) => p.module === "tourism").length;   // 7 (TravelWP/Elementor/WooCommerce/CPT UI/Modula/Maps/TranslatePress)
 const BRAND_PACK_SIZE     = WP_PLUGIN_CATALOG.filter((p) => p.module === "brand").length;     // 3
 
 const ADDON_PACKS: { id: WpPluginModule; label: string; desc: string; emoji: string; count: number }[] = [
   { id: "ecommerce", label: "電商包",       desc: "WooCommerce / 金流 / CartFlows / Email Designer",  emoji: "🛒", count: ECOMMERCE_PACK_SIZE },
-  { id: "tourism",   label: "旅遊包",       desc: "WP Travel Engine / CPT UI / Modula Gallery / 地圖", emoji: "🏝️", count: TOURISM_PACK_SIZE   },
+  { id: "tourism",   label: "旅遊包",       desc: "TravelWP 主題 / Elementor / WooCommerce / CPT UI / Modula / 地圖", emoji: "🏝️", count: TOURISM_PACK_SIZE   },
   { id: "brand",     label: "形象 / 品牌包", desc: "CPT UI / Modula Gallery / Popup Maker",             emoji: "🎨", count: BRAND_PACK_SIZE     },
 ];
 
@@ -552,7 +552,8 @@ function Step2WpType({
                         {!p.free && p.alternativeSlug && (
                           <span className="dept-file-recommended"> ↩ {p.alternativeSlug}</span>
                         )}
-                        {!p.free && !p.alternativeSlug && " ⚠ 需手動上傳"}
+                        {!p.free && !p.alternativeSlug && p.installSource !== "release-url" && " ⚠ 需手動上傳"}
+                        {!p.free && !p.alternativeSlug && p.installSource === "release-url" && " ↗ GitHub release（自動）"}
                         {!p.required && " † 選配"}
                       </span>
                     </div>

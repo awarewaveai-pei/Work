@@ -4,9 +4,18 @@ import { useState, useMemo } from "react";
 import {
   TEXT_MODEL_COMPARISONS,
   CODING_TOOL_COMPARISONS,
+  VIDEO_MODEL_COMPARISONS,
+  TTS_MODEL_COMPARISONS,
+  SEARCH_API_COMPARISONS,
+  VIDEO_MODEL_SOURCES,
+  TTS_MODEL_SOURCES,
+  SEARCH_API_SOURCES,
   AI_MODEL_SOURCES,
   type TextModelComparison,
   type CodingToolComparison,
+  type VideoModelComparison,
+  type TtsModelComparison,
+  type SearchApiComparison,
 } from "@/lib/ai/model-comparison";
 import {
   TAROT_MODEL_COMPARISONS,
@@ -16,7 +25,7 @@ import {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Tab = "text" | "image" | "coding";
+type Tab = "text" | "image" | "coding" | "video" | "tts" | "search";
 type SortKey = "default" | "cost" | "speed";
 type SortDir = "asc" | "desc";
 type SortMode = "default" | "cost" | "speed"; // kept for compat
@@ -24,7 +33,10 @@ type SortMode = "default" | "cost" | "speed"; // kept for compat
 type TaggedText = TextModelComparison & { _type: "text" };
 type TaggedImage = TarotModelComparison & { _type: "image" };
 type TaggedCoding = CodingToolComparison & { _type: "coding" };
-type AnyModel = TaggedText | TaggedImage | TaggedCoding;
+type TaggedVideo = VideoModelComparison & { _type: "video" };
+type TaggedTts = TtsModelComparison & { _type: "tts" };
+type TaggedSearch = SearchApiComparison & { _type: "search" };
+type AnyModel = TaggedText | TaggedImage | TaggedCoding | TaggedVideo | TaggedTts | TaggedSearch;
 
 // ── Color maps ────────────────────────────────────────────────────────────────
 
@@ -53,6 +65,11 @@ const TEXT_SOURCE_LABEL: Record<string, string> = {
 };
 
 const TWD = 32;
+
+// Latency string → numeric rank (1=fastest). Shared by SearchCard and sortedSearch.
+const LATENCY_RANK: Record<string, number> = {
+  "< 200ms": 1, "< 500ms": 2, "< 1s": 3, "1–3s": 4, "> 3s": 5,
+};
 
 // ── Utility functions ─────────────────────────────────────────────────────────
 
@@ -347,6 +364,147 @@ function CodingCard({ m, sel, onToggle }: { m: CodingToolComparison; sel: boolea
   );
 }
 
+function VideoCard({ m, sel, onToggle }: { m: VideoModelComparison; sel: boolean; onToggle: () => void }) {
+  const spd = SPEED_STYLE[m.speedRank];
+  const cstUsd = m.costPerSecUsd * 5; // 5-second clip
+  const cst = m.costPerSecUsd === 0 ? { label: "訂閱制", color: "var(--accent)", bg: "var(--ai-bg)" }
+    : cstUsd < 0.05 ? { label: "$", color: "var(--badge-green-text)", bg: "var(--badge-green-bg)" }
+    : cstUsd < 0.15 ? { label: "$$", color: "var(--accent)", bg: "var(--ai-bg)" }
+    : cstUsd < 0.30 ? { label: "$$$", color: "var(--build-risk-medium-text)", bg: "var(--build-risk-medium-bg)" }
+    : { label: "$$$$", color: "var(--build-risk-medium-text)", bg: "var(--build-risk-medium-bg)" };
+  return (
+    <div style={sel ? CARD_SEL : CARD}>
+      <CardHeader
+        selected={sel} onToggle={onToggle}
+        vendor={m.vendor} name={m.model} sub={m.surface}
+        badges={<><Chip {...spd} /><Chip {...cst} /></>}
+      />
+      <div style={{ display:"flex", alignItems:"baseline", gap:8, padding:"8px 0 4px", borderBottom:"1px solid var(--card-border)", marginBottom:8 }}>
+        {m.costPerSecUsd === 0
+          ? <span style={{ fontSize:13, fontWeight:700, color:"var(--text-primary)" }}>訂閱包含</span>
+          : <>
+              <span style={{ fontSize:15, fontWeight:700, color:"var(--text-primary)" }}>
+                NT${(m.costPerSecUsd * TWD).toFixed(2)}
+              </span>
+              <span style={{ fontSize:12, fontWeight:600, color:"var(--text-secondary)" }}>/ 秒</span>
+              <span style={{ marginLeft:"auto", fontSize:11.5, color:"var(--text-muted)", fontWeight:600 }}>
+                US${m.costPerSecUsd.toFixed(4)}/s · 最長 {m.maxDurationSec}s
+              </span>
+            </>
+        }
+      </div>
+      <div style={{ marginBottom:10 }}>
+        <InfoRow label="最適合">{m.bestFor}</InfoRow>
+        <InfoRow label="風格">{m.style}</InfoRow>
+        <InfoRow label="費用說明">{m.costNote}</InfoRow>
+        <InfoRow label="解析度">{m.outputRes}</InfoRow>
+      </div>
+      <ProCon strengths={m.strengths} tradeoffs={m.tradeoffs} />
+      <div style={{ display:"flex", gap:5, flexWrap:"wrap" }}>
+        {m.sourceKeys.map((k) => {
+          const url = VIDEO_MODEL_SOURCES[k as keyof typeof VIDEO_MODEL_SOURCES];
+          return url ? <SrcLink key={k} href={url} label={k} /> : null;
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TtsCard({ m, sel, onToggle }: { m: TtsModelComparison; sel: boolean; onToggle: () => void }) {
+  const spd = SPEED_STYLE[m.speedRank];
+  const cst = m.costPer1kCharsUsd === 0 ? { label: "免費", color: "var(--badge-green-text)", bg: "var(--badge-green-bg)" }
+    : m.costPer1kCharsUsd < 0.01 ? { label: "$", color: "var(--badge-green-text)", bg: "var(--badge-green-bg)" }
+    : m.costPer1kCharsUsd < 0.05 ? { label: "$$", color: "var(--accent)", bg: "var(--ai-bg)" }
+    : { label: "$$$", color: "var(--build-risk-medium-text)", bg: "var(--build-risk-medium-bg)" };
+  const qualityColor: Record<string, string> = { 基礎:"#64748b", 良好:"#1e40af", 優:"#065f46", 最佳:"#9d174d" };
+  return (
+    <div style={sel ? CARD_SEL : CARD}>
+      <CardHeader
+        selected={sel} onToggle={onToggle}
+        vendor={m.vendor} name={m.model} sub={m.surface}
+        badges={
+          <>
+            <Chip {...spd} />
+            <Chip {...cst} />
+            <span style={{ display:"inline-flex", alignItems:"center", padding:"2px 8px", borderRadius:999, fontSize:10.5, fontWeight:700, color:qualityColor[m.quality] ?? "#64748b", background:"var(--bg-subtle)" }}>{m.quality}</span>
+          </>
+        }
+      />
+      <div style={{ display:"flex", alignItems:"baseline", gap:8, padding:"8px 0 4px", borderBottom:"1px solid var(--card-border)", marginBottom:8 }}>
+        {m.costPer1kCharsUsd === 0
+          ? <span style={{ fontSize:15, fontWeight:700, color:"var(--badge-green-text)" }}>免費</span>
+          : <>
+              <span style={{ fontSize:15, fontWeight:700, color:"var(--text-primary)" }}>
+                NT${(m.costPer1kCharsUsd * TWD).toFixed(2)}
+              </span>
+              <span style={{ fontSize:12, fontWeight:600, color:"var(--text-secondary)" }}>/ 1k 字</span>
+              <span style={{ marginLeft:"auto", fontSize:11.5, color:"var(--text-muted)", fontWeight:600 }}>
+                US${m.costPer1kCharsUsd.toFixed(3)}/1k chars
+              </span>
+            </>
+        }
+      </div>
+      <div style={{ marginBottom:10 }}>
+        <InfoRow label="最適合">{m.bestFor}</InfoRow>
+        <InfoRow label="語言">{m.languages}</InfoRow>
+        <InfoRow label="音色">{m.voiceCount}{m.cloning && <span style={{ marginLeft:6, fontSize:10, fontWeight:700, color:"var(--badge-green-text)", background:"var(--badge-green-bg)", padding:"1px 6px", borderRadius:4 }}>音色複製</span>}</InfoRow>
+        <InfoRow label="費用說明">{m.costNote}</InfoRow>
+      </div>
+      <ProCon strengths={m.strengths} tradeoffs={m.tradeoffs} />
+      <div style={{ display:"flex", gap:5, flexWrap:"wrap" }}>
+        {m.sourceKeys.map((k) => {
+          const url = TTS_MODEL_SOURCES[k as keyof typeof TTS_MODEL_SOURCES];
+          return url ? <SrcLink key={k} href={url} label={k} /> : null;
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SearchCard({ m, sel, onToggle }: { m: SearchApiComparison; sel: boolean; onToggle: () => void }) {
+  const spd = SPEED_STYLE[LATENCY_RANK[m.latency] ?? 3];
+  const cst = m.costPer1kQueriesUsd === 0 ? { label: "免費", color: "var(--badge-green-text)", bg: "var(--badge-green-bg)" }
+    : m.costPer1kQueriesUsd < 2 ? { label: "$", color: "var(--badge-green-text)", bg: "var(--badge-green-bg)" }
+    : m.costPer1kQueriesUsd < 4 ? { label: "$$", color: "var(--accent)", bg: "var(--ai-bg)" }
+    : { label: "$$$", color: "var(--build-risk-medium-text)", bg: "var(--build-risk-medium-bg)" };
+  return (
+    <div style={sel ? CARD_SEL : CARD}>
+      <CardHeader
+        selected={sel} onToggle={onToggle}
+        vendor={m.vendor} name={m.product} sub={m.surface}
+        badges={<><Chip {...spd} /><Chip {...cst} /></>}
+      />
+      <div style={{ display:"flex", alignItems:"baseline", gap:8, padding:"8px 0 4px", borderBottom:"1px solid var(--card-border)", marginBottom:8 }}>
+        {m.costPer1kQueriesUsd === 0
+          ? <span style={{ fontSize:15, fontWeight:700, color:"var(--badge-green-text)" }}>免費額度</span>
+          : <>
+              <span style={{ fontSize:15, fontWeight:700, color:"var(--text-primary)" }}>
+                NT${(m.costPer1kQueriesUsd * TWD).toFixed(0)}
+              </span>
+              <span style={{ fontSize:12, fontWeight:600, color:"var(--text-secondary)" }}>/ 1k 次</span>
+              <span style={{ marginLeft:"auto", fontSize:11.5, color:"var(--text-muted)", fontWeight:600 }}>
+                US${m.costPer1kQueriesUsd.toFixed(2)}/1k queries
+              </span>
+            </>
+        }
+      </div>
+      <div style={{ marginBottom:10 }}>
+        <InfoRow label="最適合">{m.bestFor}</InfoRow>
+        <InfoRow label="風格">{m.style}</InfoRow>
+        <InfoRow label="回傳類型">{m.resultsType}</InfoRow>
+        <InfoRow label="費用說明">{m.costNote}</InfoRow>
+      </div>
+      <ProCon strengths={m.strengths} tradeoffs={m.tradeoffs} />
+      <div style={{ display:"flex", gap:5, flexWrap:"wrap" }}>
+        {m.sourceKeys.map((k) => {
+          const url = SEARCH_API_SOURCES[k as keyof typeof SEARCH_API_SOURCES];
+          return url ? <SrcLink key={k} href={url} label={k} /> : null;
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Compare modal ─────────────────────────────────────────────────────────────
 
 function CompareModal({ models, onClose }: { models: AnyModel[]; onClose: () => void }) {
@@ -373,6 +531,34 @@ function CompareModal({ models, onClose }: { models: AnyModel[]; onClose: () => 
     { label: "Seed",    get: (m) => (m as TaggedImage).seedSupport },
     { label: "優勢",    get: (m) => (m as TaggedImage).strengths },
     { label: "限制",    get: (m) => (m as TaggedImage).tradeoffs },
+  ] : type === "video" ? [
+    { label: "供應商",   get: (m) => (m as TaggedVideo).vendor },
+    { label: "最適合",   get: (m) => (m as TaggedVideo).bestFor },
+    { label: "風格",     get: (m) => (m as TaggedVideo).style },
+    { label: "每秒成本", get: (m) => `US$${(m as TaggedVideo).costPerSecUsd.toFixed(4)} / NT$${((m as TaggedVideo).costPerSecUsd * TWD).toFixed(2)}` },
+    { label: "最長時長", get: (m) => `${(m as TaggedVideo).maxDurationSec}s` },
+    { label: "解析度",   get: (m) => (m as TaggedVideo).outputRes },
+    { label: "優勢",     get: (m) => (m as TaggedVideo).strengths },
+    { label: "限制",     get: (m) => (m as TaggedVideo).tradeoffs },
+  ] : type === "tts" ? [
+    { label: "供應商",   get: (m) => (m as TaggedTts).vendor },
+    { label: "最適合",   get: (m) => (m as TaggedTts).bestFor },
+    { label: "語言",     get: (m) => (m as TaggedTts).languages },
+    { label: "音色數",   get: (m) => (m as TaggedTts).voiceCount },
+    { label: "音色複製", get: (m) => (m as TaggedTts).cloning ? "✅ 支援" : "❌ 不支援" },
+    { label: "每1k字",  get: (m) => `US$${(m as TaggedTts).costPer1kCharsUsd.toFixed(3)}` },
+    { label: "品質",     get: (m) => (m as TaggedTts).quality },
+    { label: "優勢",     get: (m) => (m as TaggedTts).strengths },
+    { label: "限制",     get: (m) => (m as TaggedTts).tradeoffs },
+  ] : type === "search" ? [
+    { label: "供應商",   get: (m) => (m as TaggedSearch).vendor },
+    { label: "最適合",   get: (m) => (m as TaggedSearch).bestFor },
+    { label: "風格",     get: (m) => (m as TaggedSearch).style },
+    { label: "回傳類型", get: (m) => (m as TaggedSearch).resultsType },
+    { label: "延遲",     get: (m) => (m as TaggedSearch).latency },
+    { label: "每1k次",  get: (m) => `US$${(m as TaggedSearch).costPer1kQueriesUsd.toFixed(2)}` },
+    { label: "優勢",     get: (m) => (m as TaggedSearch).strengths },
+    { label: "限制",     get: (m) => (m as TaggedSearch).tradeoffs },
   ] : [
     { label: "供應商", get: (m) => (m as TaggedCoding).vendor },
     { label: "最適合", get: (m) => (m as TaggedCoding).bestFor },
@@ -385,8 +571,11 @@ function CompareModal({ models, onClose }: { models: AnyModel[]; onClose: () => 
   ];
 
   const names = models.map((m) =>
-    m._type === "text" ? (m as TaggedText).model :
-    m._type === "image" ? (m as TaggedImage).label :
+    m._type === "text"   ? (m as TaggedText).model :
+    m._type === "image"  ? (m as TaggedImage).label :
+    m._type === "video"  ? (m as TaggedVideo).model :
+    m._type === "tts"    ? (m as TaggedTts).model :
+    m._type === "search" ? (m as TaggedSearch).product :
     (m as TaggedCoding).tool
   );
 
@@ -473,6 +662,9 @@ export default function AiModelsClient() {
   const [selText,   setSelText]   = useState<Set<string>>(new Set());
   const [selImage,  setSelImage]  = useState<Set<string>>(new Set());
   const [selCoding, setSelCoding] = useState<Set<string>>(new Set());
+  const [selVideo,  setSelVideo]  = useState<Set<string>>(new Set());
+  const [selTts,    setSelTts]    = useState<Set<string>>(new Set());
+  const [selSearch, setSelSearch] = useState<Set<string>>(new Set());
   const [cmpOpen, setCmpOpen] = useState(false);
 
   function handleSort(k: SortKey) {
@@ -481,8 +673,18 @@ export default function AiModelsClient() {
     else { setSortKey(k); setSortDir("asc"); }
   }
 
-  const curSel    = tab === "text" ? selText   : tab === "image" ? selImage  : selCoding;
-  const setCurSel = tab === "text" ? setSelText : tab === "image" ? setSelImage : setSelCoding;
+  const curSel =
+    tab === "text"   ? selText   :
+    tab === "image"  ? selImage  :
+    tab === "coding" ? selCoding :
+    tab === "video"  ? selVideo  :
+    tab === "tts"    ? selTts    : selSearch;
+  const setCurSel =
+    tab === "text"   ? setSelText   :
+    tab === "image"  ? setSelImage  :
+    tab === "coding" ? setSelCoding :
+    tab === "video"  ? setSelVideo  :
+    tab === "tts"    ? setSelTts    : setSelSearch;
 
   function toggle(id: string) {
     setCurSel((prev) => {
@@ -516,11 +718,35 @@ export default function AiModelsClient() {
     return r;
   }, [sortKey, sortDir]);
 
+  const sortedVideo = useMemo(() => {
+    const r = [...VIDEO_MODEL_COMPARISONS];
+    if (sortKey === "cost")  r.sort((a, b) => (a.costPerSecUsd - b.costPerSecUsd) * dir);
+    if (sortKey === "speed") r.sort((a, b) => (a.speedRank - b.speedRank) * dir);
+    return r;
+  }, [sortKey, sortDir]);
+
+  const sortedTts = useMemo(() => {
+    const r = [...TTS_MODEL_COMPARISONS];
+    if (sortKey === "cost")  r.sort((a, b) => (a.costPer1kCharsUsd - b.costPer1kCharsUsd) * dir);
+    if (sortKey === "speed") r.sort((a, b) => (a.speedRank - b.speedRank) * dir);
+    return r;
+  }, [sortKey, sortDir]);
+
+  const sortedSearch = useMemo(() => {
+    const r = [...SEARCH_API_COMPARISONS];
+    if (sortKey === "cost")  r.sort((a, b) => (a.costPer1kQueriesUsd - b.costPer1kQueriesUsd) * dir);
+    if (sortKey === "speed") r.sort((a, b) => ((LATENCY_RANK[a.latency] ?? 3) - (LATENCY_RANK[b.latency] ?? 3)) * dir);
+    return r;
+  }, [sortKey, sortDir]);
+
   const cmpModels = useMemo((): AnyModel[] => {
     if (tab === "text")   return TEXT_MODEL_COMPARISONS.filter((m) => selText.has(m.model)).map((m) => ({ ...m, _type: "text" as const }));
     if (tab === "image")  return TAROT_MODEL_COMPARISONS.filter((m) => selImage.has(m.id)).map((m) => ({ ...m, _type: "image" as const }));
+    if (tab === "video")  return VIDEO_MODEL_COMPARISONS.filter((m) => selVideo.has(m.model)).map((m) => ({ ...m, _type: "video" as const }));
+    if (tab === "tts")    return TTS_MODEL_COMPARISONS.filter((m) => selTts.has(m.model)).map((m) => ({ ...m, _type: "tts" as const }));
+    if (tab === "search") return SEARCH_API_COMPARISONS.filter((m) => selSearch.has(m.product)).map((m) => ({ ...m, _type: "search" as const }));
     return CODING_TOOL_COMPARISONS.filter((m) => selCoding.has(m.tool)).map((m) => ({ ...m, _type: "coding" as const }));
-  }, [tab, selText, selImage, selCoding]);
+  }, [tab, selText, selImage, selCoding, selVideo, selTts, selSearch]);
 
   const tabBtn = (active: boolean): React.CSSProperties => ({
     padding:"7px 18px", borderRadius:7, fontSize:13, fontWeight:700,
@@ -538,6 +764,9 @@ export default function AiModelsClient() {
         <button style={tabBtn(tab==="text")}   onClick={() => changeTab("text")}>文字生成 {TEXT_MODEL_COMPARISONS.length}</button>
         <button style={tabBtn(tab==="image")}  onClick={() => changeTab("image")}>圖片生成 {TAROT_MODEL_COMPARISONS.length}</button>
         <button style={tabBtn(tab==="coding")} onClick={() => changeTab("coding")}>Coding 工具 {CODING_TOOL_COMPARISONS.length}</button>
+        <button style={tabBtn(tab==="video")}  onClick={() => changeTab("video")}>影片生成 {VIDEO_MODEL_COMPARISONS.length}</button>
+        <button style={tabBtn(tab==="tts")}    onClick={() => changeTab("tts")}>語音/TTS {TTS_MODEL_COMPARISONS.length}</button>
+        <button style={tabBtn(tab==="search")} onClick={() => changeTab("search")}>搜尋 API {SEARCH_API_COMPARISONS.length}</button>
       </div>
 
       {/* Controls */}
@@ -557,15 +786,12 @@ export default function AiModelsClient() {
 
       {/* Cards */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(310px, 1fr))", gap:14 }}>
-        {tab === "text" && sortedText.map((m) => (
-          <TextCard   key={m.model} m={m} sel={selText.has(m.model)}    onToggle={() => toggle(m.model)} />
-        ))}
-        {tab === "image" && sortedImage.map((m) => (
-          <ImageCard  key={m.id}    m={m} sel={selImage.has(m.id)}      onToggle={() => toggle(m.id)} />
-        ))}
-        {tab === "coding" && sortedCoding.map((m) => (
-          <CodingCard key={m.tool}  m={m} sel={selCoding.has(m.tool)}   onToggle={() => toggle(m.tool)} />
-        ))}
+        {tab === "text"   && sortedText.map((m)   => <TextCard   key={m.model}   m={m} sel={selText.has(m.model)}      onToggle={() => toggle(m.model)} />)}
+        {tab === "image"  && sortedImage.map((m)  => <ImageCard  key={m.id}      m={m} sel={selImage.has(m.id)}        onToggle={() => toggle(m.id)} />)}
+        {tab === "coding" && sortedCoding.map((m) => <CodingCard key={m.tool}    m={m} sel={selCoding.has(m.tool)}     onToggle={() => toggle(m.tool)} />)}
+        {tab === "video"  && sortedVideo.map((m)  => <VideoCard  key={m.model}   m={m} sel={selVideo.has(m.model)}     onToggle={() => toggle(m.model)} />)}
+        {tab === "tts"    && sortedTts.map((m)    => <TtsCard    key={m.model}   m={m} sel={selTts.has(m.model)}       onToggle={() => toggle(m.model)} />)}
+        {tab === "search" && sortedSearch.map((m) => <SearchCard key={m.product} m={m} sel={selSearch.has(m.product)}  onToggle={() => toggle(m.product)} />)}
       </div>
 
       {/* Compare modal */}

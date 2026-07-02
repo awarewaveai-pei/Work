@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { canApproveCommand, canModifyIncidentStatus, resolveOpsRole } from "@/lib/ops-role";
+import { effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { startRepairFromIncident } from "@/lib/repair-center/service";
 
 export const runtime = "nodejs";
@@ -59,12 +60,18 @@ export async function GET(request: Request) {
   const limitRaw = Number(searchParams.get("limit") ?? "100");
   const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(200, limitRaw)) : 100;
 
-  const { data, error } = await supabase
+  let orgFilter: string | null;
+  try { orgFilter = effectiveOrgId(request, null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+
+  let query = supabase
     .from("repair_runs")
     // Primary C4 fix: explicit column allow-list — audit_log NEVER returned in list view.
     .select(LIST_COLUMNS)
     .order("created_at", { ascending: false })
     .limit(limit);
+  if (orgFilter) query = query.eq("organization_id", orgFilter);
+  const { data, error } = await query;
 
   if (error) return NextResponse.json({ ok: false, error: "repair_runs_fetch_failed", details: error.message }, { status: 409 });
   return NextResponse.json({ ok: true, runs: data ?? [], role: resolved.role });

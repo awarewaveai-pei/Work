@@ -10,6 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 
 interface DraftBody {
   topic?: string;
@@ -33,6 +34,11 @@ interface DraftBody {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const { role } = resolveOpsRole(req);
+  if (!canCreateAiImageJob(role)) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
+
   let body: DraftBody;
   try {
     body = (await req.json()) as DraftBody;

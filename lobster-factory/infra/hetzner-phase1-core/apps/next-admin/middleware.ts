@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseMiddlewareClient, isSupabaseAuthConfigured } from "@/lib/supabase/ssr";
-import { getFreshCachedRole, consumeStaleCachedRole, cacheValidatedRole } from "@/lib/supabase/session-cache";
+import { getFreshCachedRole, consumeStaleCachedRole, cacheValidatedRole, type CachedIdentity } from "@/lib/supabase/session-cache";
 import type { OpsRole } from "@/lib/ops-contracts";
 
 // Identity layer for the admin console (Supabase Auth, email+password).
@@ -15,7 +15,11 @@ import type { OpsRole } from "@/lib/ops-contracts";
 // with x-ops-sync-key. In ALL cases client-supplied identity headers are stripped first, so
 // authorization on those routes comes only from their own token, never a spoofable header.
 
-const CLAIM_HEADERS = ["x-ops-claims-role", "x-user-role", "x-clerk-role"] as const;
+const CLAIM_HEADERS = [
+  "x-ops-claims-role", "x-user-role", "x-clerk-role",
+  // Tenant identity — set only by this middleware; strip client-supplied values.
+  "x-ops-user-kind", "x-ops-org-id",
+] as const;
 const SIMULATED_HEADER = "x-ops-simulated-role";
 const SYNC_KEY_HEADER = "x-ops-sync-key";
 
@@ -96,6 +100,20 @@ function resolveRoleFromUser(appMetadata: Record<string, unknown> | undefined): 
   return "viewer";
 }
 
+/** Extract tenant identity from app_metadata (server-controlled, not user-tamperable). */
+function resolveTenantFromMeta(meta: Record<string, unknown> | undefined): Pick<CachedIdentity, "userKind" | "orgId"> {
+  const userKind = String(meta?.user_kind ?? "").toLowerCase() === "client" ? "client" : "staff";
+  const orgId = typeof meta?.org_id === "string" ? meta.org_id.trim() : "";
+  return { userKind, orgId };
+}
+
+/** Inject identity headers. Centralised so fresh-cache, network, and stale paths all stay in sync. */
+function applyIdentityHeaders(headers: Headers, identity: CachedIdentity): void {
+  headers.set("x-ops-claims-role", identity.role);
+  headers.set("x-ops-user-kind", identity.userKind);
+  if (identity.orgId) headers.set("x-ops-org-id", identity.orgId);
+}
+
 function blockedResponse(request: NextRequest): NextResponse {
   const { pathname, search } = request.nextUrl;
   if (pathname.startsWith("/api/")) {
@@ -135,41 +153,46 @@ export async function middleware(request: NextRequest) {
   // and skip the auth call. This collapses a page-load's parallel sub-requests into ~1 upstream
   // validation, which is what prevents the burst from tripping Cloudflare's per-IP rate limit on
   // the auth host (the root cause of logged-in users being bounced to /login).
+  // All three identity headers (role + tenant) are injected from the cache so client users are
+  // never silently elevated to staff on the fast path.
   if (sessionKey) {
     const fresh = getFreshCachedRole(sessionKey);
     if (fresh !== null) {
-      baseHeaders.set("x-ops-claims-role", fresh);
+      applyIdentityHeaders(baseHeaders, fresh);
       return NextResponse.next({ request: { headers: baseHeaders } });
     }
   }
 
   const { supabase, response } = createSupabaseMiddlewareClient(request);
 
-  let role: OpsRole | null = null;
+  let identity: CachedIdentity | null = null;
   let refreshedCookies = false;
   try {
     const { data, error } = await supabase.auth.getUser();
     if (!error && data.user) {
-      role = resolveRoleFromUser(data.user.app_metadata as Record<string, unknown> | undefined);
+      const meta = data.user.app_metadata as Record<string, unknown> | undefined;
+      const role = resolveRoleFromUser(meta);
+      const { userKind, orgId } = resolveTenantFromMeta(meta);
+      identity = { role, userKind, orgId };
       refreshedCookies = true;
-      if (sessionKey) cacheValidatedRole(sessionKey, role);
+      if (sessionKey) cacheValidatedRole(sessionKey, identity);
     } else if (error && sessionKey && isTransientAuthError(error)) {
       // Auth server unreachable / throttled — don't punish a logged-in user. Trust the last
       // good validation for THIS token if it is still within the stale window and under cap.
-      role = consumeStaleCachedRole(sessionKey);
+      identity = consumeStaleCachedRole(sessionKey);
     }
   } catch (err) {
     if (sessionKey && isTransientAuthError(err)) {
-      role = consumeStaleCachedRole(sessionKey);
+      identity = consumeStaleCachedRole(sessionKey);
     }
-    // Any other throw → role stays null → fail closed below.
+    // Any other throw → identity stays null → fail closed below.
   }
 
-  if (role === null) {
+  if (identity === null) {
     return blockedResponse(request);
   }
 
-  baseHeaders.set("x-ops-claims-role", role);
+  applyIdentityHeaders(baseHeaders, identity);
 
   const finalResponse = NextResponse.next({ request: { headers: baseHeaders } });
   // Preserve any refreshed-session cookies the Supabase client wrote onto `response`.

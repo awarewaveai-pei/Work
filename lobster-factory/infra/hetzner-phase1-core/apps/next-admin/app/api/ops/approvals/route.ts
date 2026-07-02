@@ -9,6 +9,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "../../../../lib/supabase-server";
 import { resolveOpsRole } from "../../../../lib/ops-role";
+import { effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "../../../../lib/tenant-guard";
 
 // Use server client (service role) because command_requests has RLS enabled and
 // the anon role cannot read it. RBAC is enforced at API/page layer above this.
@@ -25,7 +26,13 @@ export async function GET(request: Request) {
   const limitRaw = Number(searchParams.get("limit") ?? "50");
   const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(200, limitRaw)) : 50;
 
-  const { data, error } = await supabase
+  // Surface caller's role so the UI can hide the Approve button for non-owner/admin.
+  const resolved = resolveOpsRole(request);
+  let orgFilter: string | null;
+  try { orgFilter = effectiveOrgId(request, null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+
+  let query = supabase
     .from("command_requests")
     .select(
       "id,organization_id,source,actor_type,actor_ref,command,args,risk_level,status,trace_id,received_at,metadata",
@@ -34,6 +41,8 @@ export async function GET(request: Request) {
     .in("risk_level", ["high", "critical"])
     .order("received_at", { ascending: false })
     .limit(limit);
+  if (orgFilter) query = query.eq("organization_id", orgFilter);
+  const { data, error } = await query;
 
   if (error) {
     return NextResponse.json(
@@ -41,9 +50,6 @@ export async function GET(request: Request) {
       { status: 409 },
     );
   }
-
-  // Surface caller's role so the UI can hide the Approve button for non-owner/admin.
-  const resolved = resolveOpsRole(request);
 
   return NextResponse.json({
     ok: true,

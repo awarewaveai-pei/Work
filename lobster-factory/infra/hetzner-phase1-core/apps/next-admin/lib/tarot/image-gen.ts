@@ -3,7 +3,6 @@
 //   flux-schnell/dev  → Replicate BFL (text2img; dev adds img2img)
 //   openai-low/med/hi → OpenAI gpt-image-1
 //   ideogram-*        → Ideogram via Replicate (v2a-turbo/v3-balanced/v4-turbo/v4-quality/character)
-//   seedream-4.5      → ByteDance Seedream via Replicate
 //   nano-banana-2/pro → Google Gemini Image via Replicate
 //   imagen-4          → Google Imagen 4 via Replicate
 //   flux-2-max        → BFL Flux.2 Max via Replicate
@@ -31,7 +30,6 @@ export type TarotModel =
   | "ideogram-v4-turbo"
   | "ideogram-v4-quality"
   | "ideogram-character"
-  | "seedream-4.5"
   | "nano-banana-2"
   | "nano-banana-pro"
   | "imagen-4"
@@ -198,18 +196,6 @@ export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
         character_reference_image: referenceImages[0],
       };
     },
-  },
-  // ── ByteDance Seedream via Replicate ──────────────────────────────────────
-  // Live schema: aspect_ratio enum includes ALL five of our ratios (incl. 4:5). No seed.
-  "seedream-4.5": {
-    provider: "replicate",
-    slug: "bytedance/seedream-4.5",
-    supportsImg2img: false,
-    buildInput: ({ prompt, aspectRatio }) => ({
-      prompt,
-      aspect_ratio: aspectRatio,
-      size: "2K",
-    }),
   },
   // ── Google models via Replicate (no seed param on any of them) ────────────
   "nano-banana-2": {

@@ -1,0 +1,92 @@
+import { type GlobalEvent } from "./types";
+
+/** Mega-events known years in advance — Olympics, World Cup, etc.
+ *  Update this list as new editions are announced. */
+export const HARDCODED_EVENTS: GlobalEvent[] = [
+  // ── FIFA World Cup 2026 ──────────────────────────────────────
+  {
+    title: "FIFA World Cup 2026 — Group Stage",
+    title_zh: "2026 FIFA 世界盃 — 小組賽",
+    event_date: "2026-06-11",
+    event_end_date: "2026-07-05",
+    category: "mega",
+    subcategory: "world_cup",
+    country_codes: ["US", "CA", "MX"],
+    region: "global",
+    marketing_lead_days: 90,
+    source: "hardcoded",
+    external_id: "mega:fifa-world-cup-2026-group",
+    emoji: "⚽",
+  },
+  {
+    title: "FIFA World Cup 2026 — Final",
+    title_zh: "2026 FIFA 世界盃 — 決賽",
+    event_date: "2026-07-19",
+    category: "mega",
+    subcategory: "world_cup",
+    country_codes: ["global"],
+    region: "global",
+    marketing_lead_days: 90,
+    source: "hardcoded",
+    external_id: "mega:fifa-world-cup-2026-final",
+    emoji: "🏆",
+  },
+  // ── Winter Olympics 2026 (Milan-Cortina) ─────────────────────
+  {
+    title: "Winter Olympics 2026 — Milan-Cortina",
+    title_zh: "2026 米蘭科爾蒂納冬季奧運",
+    event_date: "2026-02-06",
+    event_end_date: "2026-02-22",
+    category: "mega",
+    subcategory: "olympics",
+    country_codes: ["IT"],
+    region: "global",
+    marketing_lead_days: 90,
+    source: "hardcoded",
+    external_id: "mega:winter-olympics-2026",
+    emoji: "🏅",
+  },
+  // ── Summer Olympics 2028 (Los Angeles) ───────────────────────
+  {
+    title: "Summer Olympics 2028 — Los Angeles",
+    title_zh: "2028 洛杉磯夏季奧運",
+    event_date: "2028-07-14",
+    event_end_date: "2028-07-30",
+    category: "mega",
+    subcategory: "olympics",
+    country_codes: ["US"],
+    region: "global",
+    marketing_lead_days: 90,
+    source: "hardcoded",
+    external_id: "mega:summer-olympics-2028",
+    emoji: "🏅",
+  },
+  // ── Super Bowl 2026 ──────────────────────────────────────────
+  {
+    title: "Super Bowl LX 2026",
+    title_zh: "2026 超級盃",
+    event_date: "2026-02-01",
+    category: "mega",
+    subcategory: "sports_final",
+    country_codes: ["US"],
+    region: "americas",
+    marketing_lead_days: 60,
+    source: "hardcoded",
+    external_id: "mega:super-bowl-lx-2026",
+    emoji: "🏈",
+  },
+  // ── UEFA Euro 2028 ───────────────────────────────────────────
+  {
+    title: "UEFA Euro 2028",
+    title_zh: "2028 歐洲盃",
+    event_date: "2028-06-01",
+    category: "mega",
+    subcategory: "sports_final",
+    country_codes: ["GB", "IE"],
+    region: "europe",
+    marketing_lead_days: 90,
+    source: "hardcoded",
+    external_id: "mega:euro-2028",
+    emoji: "⚽",
+  },
+];

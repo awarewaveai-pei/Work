@@ -45,7 +45,7 @@ export interface IntakeForm {
 
 // ── Website Spec (Claude-generated output) ──────────────────────────────────
 
-export type PackageSlug = "wp-basic" | "wp-business" | "wc-core" | "wc-custom";
+export type PackageSlug = "wp-basic" | "wp-business" | "wp-tourism" | "wc-core" | "wc-custom";
 
 export interface SitemapPage {
   slug: string;

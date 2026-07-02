@@ -4,7 +4,7 @@ export type { WpSiteType, WpPluginModule };
 export type BuildProfile = "profile_a" | "profile_b" | "profile_c";
 export type BuildExecutionMode = "plan_only" | "enqueue";
 export type BuildEnvironment = "staging" | "production";
-export type BuildPackageSlug = "wp-basic" | "wp-business" | "wc-core";
+export type BuildPackageSlug = "wp-basic" | "wp-business" | "wp-tourism" | "wc-core" | "wc-custom";
 export type BuildProvider = "awarewave-internal" | "hostinger" | "cloudways" | "generic-wordpress" | "manual";
 export type BuildRiskLevel = "low" | "medium" | "high";
 export type BuildRunStatus = "planned" | "queued" | "blocked";
@@ -258,6 +258,7 @@ function smokeProfileFor(req: BuildRunRequest): BuildPlan["smokeProfile"] {
   if (req.wpSiteType === "brand") return "business";
   if (req.packageSlug === "wc-core") return "woocommerce";
   if (req.packageSlug === "wp-business") return "business";
+  if (req.packageSlug === "wp-tourism") return "business";
   return "basic";
 }
 
