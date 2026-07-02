@@ -1,24 +1,30 @@
 // HARD block `git commit` (and friends) while unverified code files exist.
 // Accident-prevention, not adversarial defense — see legacy header, semantics
-// preserved. Detection runs on commandExpanded so shell-wrapped commits are
-// also caught (intended diff).
-const RE_GIT_COMMIT = /\bgit\s+(?:-[a-zA-Z0-9-]+\s+|-[a-zA-Z0-9-]+\s+\S+\s+|-C\s+\S+\s+)*commit(?=\s|$|["';|&])/;
-const RE_GH_PR_MERGE = /\bgh\s+pr\s+merge\b/;
-const RE_HUB_COMMIT = /\bhub\s+commit\b/;
+// preserved for real invocations.
+//
+// Command detection runs against ctx.commandSegments (command positions:
+// line starts and post-&&/||/;/| tokens), so `cd x && git commit` is caught
+// while prose/heredoc text that merely mentions "git commit" is not (live
+// false-positive 2026-07-02 while writing hook docs; the legacy full-text
+// regex had the same latent class). base64-pipe detection stays full-text —
+// its signature IS the pipe chain.
+const RE_GIT_COMMIT = /^(?:sudo\s+)?git\s+(?:-[a-zA-Z0-9-]+\s+|-[a-zA-Z0-9-]+\s+\S+\s+|-C\s+\S+\s+)*commit(?=\s|$|["';|&])/;
+const RE_GH_PR_MERGE = /^(?:sudo\s+)?gh\s+pr\s+merge\b/;
+const RE_HUB_COMMIT = /^(?:sudo\s+)?hub\s+commit\b/;
 const RE_BASE64_PIPE_BASH = /\bbase64\s+-d?[^|]*\|\s*(?:bash|sh|zsh|powershell)\b/i;
 
-function detectBlockReason(cmd) {
-  if (RE_GIT_COMMIT.test(cmd)) return 'git commit';
-  if (RE_GH_PR_MERGE.test(cmd)) return 'gh pr merge';
-  if (RE_HUB_COMMIT.test(cmd)) return 'hub commit';
-  if (RE_BASE64_PIPE_BASH.test(cmd)) return 'base64 | shell (obfuscated commit attempt?)';
+function detectBlockReason(segments, fullText) {
+  if (segments.some((s) => RE_GIT_COMMIT.test(s))) return 'git commit';
+  if (segments.some((s) => RE_GH_PR_MERGE.test(s))) return 'gh pr merge';
+  if (segments.some((s) => RE_HUB_COMMIT.test(s))) return 'hub commit';
+  if (RE_BASE64_PIPE_BASH.test(fullText)) return 'base64 | shell (obfuscated commit attempt?)';
   return null;
 }
 
 module.exports = {
   check(ctx) {
     const shared = ctx.shared;
-    const reason = detectBlockReason(ctx.commandExpanded);
+    const reason = detectBlockReason(ctx.commandSegments || [], ctx.commandExpanded);
     if (!reason) return null;
 
     const tf = shared.getTrackerPath(ctx.sid);

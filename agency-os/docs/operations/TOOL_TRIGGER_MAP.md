@@ -205,65 +205,73 @@
 
 ---
 
-## Hooks（25 個）
+## Hooks（runner v2 — 單一 runner + 純規則模組）
 
-全部 🔴 機械強制。
+全部 🔴 機械強制。**接線唯一正本：`mcp/claude-userlevel/hooks/rules.manifest.json`**（本表為快照，數量/清單以 manifest 為準；SessionStart banner 自動報實數）。所有事件經 `node runner.js <event>` 進入，runner 保證：規則 crash = 大聲 fail-open（不擋工作、不拖垮其他規則）、只有 exit 2 是 BLOCK、`bash -c` 字串包裹會被解包掃描、指令偵測以 command-position segments 執行（散文/heredoc 提及指令不誤攔）。
 
 ### PreToolUse（在工具呼叫前）
 
-| Hook | 攔截對象 | 作用 |
+| Rule | 攔截對象 | 作用 |
 |------|---------|------|
-| `git-log-injector.js` | Write\|Edit（首次）| BLOCK：顯示 git log -10，防並行 session 重工 |
-| `high-risk-bash-warn.js` | Bash | BLOCK：偵測 `docker compose down/stop`、VPS rsync/scp、DB migrate deploy |
-| `branch-protection.js` | Bash | BLOCK：禁止建新 branch / force push main |
-| `commit-quality.js` | Bash | BLOCK：git commit 前檢查 debugger statements + secrets |
-| `auto-repair-guard.js` | Write\|Edit | BLOCK（首次/分類）：編輯 Auto-Repair 邏輯路徑前強制 4 pre-checks |
-| `file-path-router.js` | Write\|Edit | BLOCK（首次/分類）：編輯特定路徑時路由到正確 agent（auth/db/supabase/n8n/nginx/wp/trigger）|
-| `config-protection.js` | Write\|Edit | BLOCK：禁止修改 linter/formatter config |
-| `suggest-compact.js` | Write\|Edit | WARN：每 ~50 次 tool call 建議 /compact |
-| `large-file-warner.js` | Read | WARN 500KB / BLOCK 2MB：保護 context window |
-| `mcp-health.js pre` | mcp__.\* | 執行前檢查 MCP server 健康 |
-| inline rm -rf | Bash | BLOCK：`rm -rf` |
-| inline force push | Bash | BLOCK：`git push -f main/master` |
-| inline --no-verify | Bash | BLOCK：`--no-verify` flag |
+| `rules/dangerous-bash.js` | Bash | BLOCK：指令位置的 rm -rf、git --no-verify（取代舊 inline blockers — 舊版讀錯欄位從未生效，v2 起真正執法）|
+| `rules/branch-protection.js` | Bash | BLOCK：force push 到保護分支；main 上 commit 提示 |
+| `rules/commit-quality.js` | Bash | BLOCK：git commit 前檢查 staged debugger statements + secrets |
+| `rules/verify-gate-commit.js` | Bash | BLOCK：tracker 有未驗證 code 檔時拒絕 git commit / gh pr merge |
+| `rules/high-risk-bash-warn.js` | Bash | BLOCK：docker compose down/stop、VPS rsync/scp、DB migrate deploy；首行 `# CONFIRMED-HIGH-RISK:` 解鎖；bash -c 包裹也攔 |
+| `rules/sensitive-file-block.js` | Write\|Edit | BLOCK：寫入 .env/.pem/.key、/secrets/、credentials 路徑 |
+| `rules/git-log-injector.js` | Write\|Edit（首次）| BLOCK：顯示上一完整 session 全部 commits（fallback -10），防並行 session 重工 |
+| `rules/auto-repair-guard.js` | Write\|Edit | BLOCK（首次/分類）：編輯 Auto-Repair 邏輯路徑前強制 4 pre-checks |
+| `rules/config-protection.js` | Write\|Edit | BLOCK：禁止修改 linter/formatter config |
+| `rules/suggest-compact.js` | Write\|Edit | WARN：每 ~50 次 tool call 建議 /compact |
+| `rules/file-path-router.js` | Write\|Edit | BLOCK（首次/分類）：路由到正確 agent（auth/db/supabase/n8n/nginx/wp/trigger）|
+| `rules/mcp-health.js` | mcp__.\* | 執行前檢查 MCP server 健康（backoff 斷路器）|
+| `rules/large-file-warner.js` | Read | WARN 500KB / BLOCK 2MB：保護 context window |
 
 ### PostToolUse（工具呼叫後）
 
-| Hook | 攔截對象 | 作用 |
+| Rule | 攔截對象 | 作用 |
 |------|---------|------|
-| `code-change-tracker.js` | Write\|Edit | 記錄修改的 code 檔到 tracker；.ps1 額外提醒跑 audit-encoding |
-| `accumulator.js` | Write\|Edit | 累積修改的 JS/TS 檔，供 Stop 時 batch format |
-| `design-quality.js` | Write\|Edit | 偵測 generic template-like 前端 UI，發出警告 |
-| `test-runner.js` | Write\|Edit | 自動跑相鄰 test 檔（.test.ts 等）並回報失敗 |
-| `audit-log.js` | Bash | 記錄所有 bash 指令（自動 redact secrets）|
-| `agent-dispatch-log.js` | Agent | 記錄 agent 召喚到 reports/agent-dispatch/ |
-| `log-error.sh` | .\* | 記錄所有 tool 錯誤到 ~/.claude/error-log.md |
-| `mcp-health.js failure` | mcp__.\* | 追蹤 MCP 失敗，exponential backoff |
+| `rules/log-error.js` | .\* | 記錄 tool 錯誤到 ~/.claude/error-log.md（JS 化，不再依賴 jq）|
+| `rules/audit-log.js` | Bash | 記錄所有 bash 指令（自動 redact secrets）|
+| `rules/accumulator.js` | Write\|Edit | 累積修改的 JS/TS 檔，供 Stop 時 batch format |
+| `rules/design-quality.js` | Write\|Edit | 偵測 generic template-like 前端 UI，發出警告 |
+| `rules/test-runner.js` | Write\|Edit | 自動跑相鄰 test 檔並回報失敗 |
+| `rules/code-change-tracker.js` | Write\|Edit | 記錄修改的 code 檔到 tracker；.ps1 額外提醒跑 audit-encoding |
+| `rules/agent-dispatch-log.js` | Agent | 記錄 agent 召喚到 reports/agent-dispatch/ |
+| `rules/mcp-health.js` | mcp__.\*（PostToolUseFailure）| 追蹤 MCP 失敗，exponential backoff |
 
 ### Stop（Claude 完成一次回應後）
 
+| Rule | 作用 |
+|------|------|
+| `rules/batch-format.js` | Prettier format + tsc --noEmit 跑所有累積的 JS/TS 改動 |
+| `rules/check-console.js` | 偵測修改檔案中的 stray console.log |
+| `rules/cost-tracker.js` | 記錄 token 使用量與估算成本 |
+| `rules/session-summary.js` | 寫 session summary 到 ~/.claude/sessions/ |
+| `rules/verify-gate-stop.js` | 顯示本 session 未驗證的 code 檔清單 + 提醒跑 /verify-recent |
+
+### SessionStart / UserPromptSubmit（機器層）
+
 | Hook | 作用 |
 |------|------|
-| `verify-gate-stop.js` | 顯示本 session 未驗證的 code 檔清單 + 提醒跑 /verify-recent |
-| `batch-format.js` | Prettier format + tsc --noEmit 跑所有累積的 JS/TS 改動 |
-| `check-console.js` | 偵測修改檔案中的 stray console.log |
-| `cost-tracker.js` | 記錄 token 使用量與估算成本 |
-| `session-summary.js` | 寫 session summary 到 ~/.claude/sessions/ |
+| `rules/session-banner.js` | SessionStart：報告治理狀態（規則/事件數由 manifest 推導，不手寫）|
+| `ao-resume-on-prompt.ps1` | UserPromptSubmit（僅工作站）：偵測開工關鍵字 → 觸發 AO-RESUME（300 秒去重）|
+| `post-push-trigger-deploy.ps1` | git push 後（僅工作站）：自動觸發 Trigger.dev deploy（若設定）|
 
-### UserPromptSubmit / SessionStart
+### 環境覆蓋
 
-| Hook | 作用 |
-|------|------|
-| `ao-resume-on-prompt.ps1` | UserPromptSubmit：偵測開工關鍵字 → 觸發 AO-RESUME（300 秒去重）|
-| `post-push-trigger-deploy.ps1` | git push 後自動觸發 Trigger.dev deploy（若設定）|
+| 環境 | 接線 | 狀態 |
+|------|------|------|
+| Windows 工作站 ×2 | `settings.template.json` → sync 到 `~/.claude/settings.json` | `sync-claude-userlevel.ps1` 後生效 |
+| 遠端 container（Claude Code web）| `scripts/wire-remote-hooks.sh` 產生 `.claude/settings.local.json`（gitignored）| 2026-07-02 前遠端**零機械閘**（稽核發現）；建議設為環境 setup script |
 
----
+閘健康驗證：`bash scripts/test-hooks.sh`（runner 保證 + 全規則裁決矩陣）。
 
 ## 觸發統計
 
 | 觸發類型 | 數量 | 說明 |
 |---------|------|------|
-| 🔴 Hook 機械強制 | 25 hooks | 100% 可靠，我無法繞過 |
+| 🔴 Hook 機械強制 | rules.manifest.json 全清單（26 規則）| 依 runner 結構保證；閘壞 = 大聲 fail-open 非靜默 |
 | 🟠 File-path-router | 7 類別（db/supabase/n8n/auth/nginx/wp/trigger）| 100% 可靠，編輯路徑時自動 |
 | 🟡 AO 生命週期 | 2（ao-resume / ao-close）| 100% 可靠 |
 | 🟢 AGENTS.md 自判 | ~55 個工具 | 中等可靠，靠我的情境判斷 |

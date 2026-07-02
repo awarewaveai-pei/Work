@@ -742,7 +742,7 @@ try {
         $utf8NoBom2 = New-Object System.Text.UTF8Encoding $false
         # Snapshot the OUTGOING close stamp to ao-close-prev.txt BEFORE overwriting ao-close-last.
         # [ao-close-prev -> ao-close-last] then bounds the LAST completed work session (commits made
-        # between the previous close and this one). Consumer: git-log-injector.js prints every commit
+        # between the previous close and this one). Consumer: hooks/rules/git-log-injector.js prints every commit
         # of that window, uncapped — replacing the fixed `-10` that truncated >10-commit sessions.
         # Closes are chronological, so prev < last ALWAYS (never a backwards/empty window) and no
         # date-guard is needed (unlike a resume-anchored design, which a same-day re-resume corrupts).

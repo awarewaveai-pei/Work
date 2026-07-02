@@ -12,7 +12,7 @@
 
 **修改任何檔案前，必須先輸出以下區塊，等待明確批准後才可動手：**
 [任務理解] 根本問題是什麼（非表面症狀）
-[現況分析] 已讀的相關檔案、架構、依賴、資料流、控制流與既有慣例；**必含 `git log` 輸出**（看近期 commits 是否已有同議題改動，避免重工；**機械閘**：`git-log-injector.js` 每 session 首次 Edit 前 exit-2 BLOCK 顯示**上一個完整 session（兩次 AO-CLOSE 之間）的全部 commit**（2026-06-12 起；不再固定 `-10`，避免 >10 commit 的 session 被截斷；錨點缺/格式錯時 fallback `-10`）；re-issue 通過）
+[現況分析] 已讀的相關檔案、架構、依賴、資料流、控制流與既有慣例；**必含 `git log` 輸出**（看近期 commits 是否已有同議題改動，避免重工；**機械閘**：`hooks/rules/git-log-injector.js` 每 session 首次 Edit 前 exit-2 BLOCK 顯示**上一個完整 session（兩次 AO-CLOSE 之間）的全部 commit**（2026-06-12 起；不再固定 `-10`，避免 >10 commit 的 session 被截斷；錨點缺/格式錯時 fallback `-10`）；re-issue 通過）
 [風險清單] 衝突、重工、相容性、安全、資料一致性問題
 [方案比較] 方案A最小修改 vs 方案B較完整，各附優缺點／風險／rollback
 [建議方案] 推薦哪個，為什麼它最穩定低風險
@@ -45,7 +45,7 @@
 [rollback] 如何安全回復
 
 **禁止：**
-未讀現有邏輯即重寫 / 建立重複模組 / 猜測補未知 / 刪除未確認無用的檔案 / 硬編密鑰 / 臨時 workaround / **未跑 `git log` 即 Edit**（**機械閘**：`git-log-injector.js` exit-2 BLOCK，顯示上一個完整 session 的全部 commit；根因: 2026-05-22 14:38）
+未讀現有邏輯即重寫 / 建立重複模組 / 猜測補未知 / 刪除未確認無用的檔案 / 硬編密鑰 / 臨時 workaround / **未跑 `git log` 即 Edit**（**機械閘**：`hooks/rules/git-log-injector.js` exit-2 BLOCK，顯示上一個完整 session 的全部 commit；根因: 2026-05-22 14:38）
 
 **遇到以下情況立即停止並回報，不得硬做：**
 架構衝突 / 缺少關鍵資訊 / 可能資料遺失 / 安全風險 / 無法驗證 / 取捨影響產品方向
@@ -78,7 +78,22 @@
 | Medium          | 核心邏輯、新依賴、auth                               | 先說計畫，同意再做           |
 | **High — STOP** | prod deploy、破壞性 migration、金流、身分/RLS、憑證、無法回滾 | 停止，說風險，等明示 go ahead |
 
-禁止：跳錯處、硬編密鑰、直衝 prod、一次蓋整個系統。**機械閘 (High)**：`high-risk-bash-warn.js` 自動 BLOCK `docker compose down/stop`、VPS rsync/scp、DB migration deploy；需命令第一行加 `# CONFIRMED-HIGH-RISK: <reason>` 解鎖。
+禁止：跳錯處、硬編密鑰、直衝 prod、一次蓋整個系統。**機械閘 (High)**：`hooks/rules/high-risk-bash-warn.js` 自動 BLOCK `docker compose down/stop`、VPS rsync/scp、DB migration deploy；需命令第一行加 `# CONFIRMED-HIGH-RISK: <reason>` 解鎖。
+
+## 規則優先序（衝突裁決，2026-07-02 稽核補齊）
+
+規則間張力（R0「任何檔案等批准」vs「宣告執行不詢問」vs 風險分級「Low 直接做」vs AO 預授權）依此優先序裁決，**高者勝**：
+
+1. **AO 生命週期預授權**（AO-RESUME / AO-CLOSE 明列操作）→ 直接執行，R0 逐項批准不適用（原文見 §R0 例外段）。
+2. **操作風險分級**：High-STOP 一律等明示 go-ahead（機械閘強制）；Low / Medium 依分級表處置 —— 「宣告執行，不詢問」只適用於 Low/Medium。
+3. **R0 批准區塊**：適用於「使用者請求的實質修改任務」的開工前對齊（輸出七段區塊等批准）。R0 的「任何檔案」讀作「任務範疇內的實質修改」，不覆蓋上兩層已授權/已分級的操作；Low 級小修依分級表直接做並說明假設，不需重複走 R0 批准。
+
+一句話：**預授權 > 風險分級 > R0 逐項批准**。條文再衝突時引用本段，不各自表述。
+
+## 已知信任邊界（明文，勿誤當保證）
+
+- `verify-closeout-completeness` 驗的是證據行「格式存在」，**不驗內容真實**（REALTEST/REVIEW/BUGHUNT 的 cmd/verdict 不被重放）。唯一內容驗真是 `bughunt-oracle`（僅覆蓋 `hits=0` + ASCII identifier + code 檔）。證據誠實靠操作紀律；偽造證據行可通過機械閘 —— 這是設計取捨（重放副作用指令不可行），不是漏洞待修。發現可疑證據 → 人工抽查 WORKLOG 對應 commit。
+- 機械閘全部 **fail-open**（閘壞 = 靜默放行 + 寫 `~/.claude/verify-gate-failures.log`）；閘的健康由 `bash scripts/test-hooks.sh` 驗證（41 案例），改 hooks 後必跑。
 
 ## 執行安全
 
@@ -99,7 +114,7 @@ Auto-repair Issue 必含中文摘要（問題/原因/修法/風險/建議）。�
 SG `5.223.93.113` / EU `204.168.175.41` — 容器細節見 [`docs/operations/AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md)（拓樸唯一正本）。  
 **搬機 / 上 dedicated / EU→大機·SG→EU 遷移唯一正本**：[`runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`](../runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md)（備份/RAID/還原/遷移；動機器前必讀 §7 checklist）。  
 ClickHouse 版本鎖定：`25.7.x`，**禁升 latest / 24.x**。  
-Secrets: `scripts/secrets-vault.ps1 -Action get -Name <KEY_NAME>`（輸出 `NAME=遮罩值`，僅供確認存在；實值消費走 `mcp/user-env.ps1` / env）；key names 在 `mcp/user-env.ps1`；**禁止硬編**。
+Secrets: `scripts/secrets-vault.ps1 -Action get -Name <KEY_NAME>`（輸出 `NAME=遮罩值`，僅供確認存在；實值消費走 `mcp/user-env.ps1`（各機由 `mcp/user-env.template.ps1` 生成，不進 git）/ env）；key names 在 `mcp/user-env.template.ps1`；**禁止硬編**。
 
 **部署規則（強制）**：
 - SG 部署走 `/root/lobster-phase1/scripts/sg-deploy.sh`（**勿**直接 git pull）
@@ -144,8 +159,8 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | EU VPS `infra-alerts` 出現 scanner 路徑（`/.aws/`、`/.ssh/`、`/wp-config`）且 bad request % > 50 | SSH EU 確認；若持續 → Cloudflare WAF PATCH API 追加 block rule；curl 實測 403。詳見 `runbooks/CLOUDFLARE-WAF-SETUP.md §API 維護` |
 | next-admin 程式碼改動後 sg-deploy 失敗且 log 含 `npm test FAILED` | ① 在本機 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/` 跑 `npm test` 查看失敗詳情；② 修好測試或修好程式碼（二擇一，視測試是否合理）；③ commit + push；④ 重跑 `sg-deploy.sh next-admin`。**禁止**：繞過 test gate（--skip-pull + 手動 rsync 或直接 `docker compose build`）。 |
 | 訊息含 reboot 訊號（`needs reboot` / `重啟` 等）**且**含 VPS 識別字（EU/SG IP 或主機名）| 先讀 `reports/status/auto-reboot-LATEST.md`（verdict 🟢/🟡/🔴）。< 16h → auto-reboot 自動處理，不主動跑指令。≥ 16h 或非 🟢 → escalate 手動 `/sg-reboot` 或 `/eu-reboot`（High risk，等 go-ahead）。AO-RESUME 時必點名 verdict。詳見 `runbooks/VPS-AUTO-REBOOT-RUNBOOK.md` |
-| 任何 `Edit`／`Write`／`MultiEdit` 寫入或修改 `.ps1` 檔（CP950 trap class，2026-05-22 backfill-missed-daily.ps1 真實爆過）| **🔧 機械閘**：`code-change-tracker.js` 修改 .ps1 時自動提示。立即執行 `/audit-encoding --file <該檔絕對路徑>`（exit 0=放行；exit 1=fix：wrap capture site 或加 AUDIT_REGISTRY 豁免）。詳：[.claude/commands/audit-encoding.md](../.claude/commands/audit-encoding.md) |
-| 任何 `Edit`／`Write`／`MultiEdit` 改動 code 檔（`.ps1 .ts .tsx .js .jsx .mjs .sh .py`）後即將完成 R0 任務（準備寫 [驗證結果]）| **🔧 機械閘**：`verify-gate-stop.js` session 結束時提醒。Review 段寫入前強制跑 `/review`（critic subagent，**外部 oracle**）；critic 結論納入 [驗證結果] Review 段。**禁止**：以自我描述替代 critic output。詳：[`.claude/commands/review.md`](../.claude/commands/review.md) |
+| 任何 `Edit`／`Write`／`MultiEdit` 寫入或修改 `.ps1` 檔（CP950 trap class，2026-05-22 backfill-missed-daily.ps1 真實爆過）| **🔧 機械閘**：`hooks/rules/code-change-tracker.js` 修改 .ps1 時自動提示。立即執行 `/audit-encoding --file <該檔絕對路徑>`（exit 0=放行；exit 1=fix：wrap capture site 或加 AUDIT_REGISTRY 豁免）。詳：[.claude/commands/audit-encoding.md](../.claude/commands/audit-encoding.md) |
+| 任何 `Edit`／`Write`／`MultiEdit` 改動 code 檔（`.ps1 .ts .tsx .js .jsx .mjs .sh .py`）後即將完成 R0 任務（準備寫 [驗證結果]）| **🔧 機械閘**：`hooks/rules/verify-gate-stop.js` session 結束時提醒。Review 段寫入前強制跑 `/review`（critic subagent，**外部 oracle**）；critic 結論納入 [驗證結果] Review 段。**禁止**：以自我描述替代 critic output。詳：[`.claude/commands/review.md`](../.claude/commands/review.md) |
 | 任何 audit / 抓蟲 / bug class / encoding / silent fail / 工具化 / class-by-class 相關問題或情境 | 先讀 [`docs/operations/BUG_HUNT_PROTOCOL.md`](docs/operations/BUG_HUNT_PROTOCOL.md)（方法 SSOT，5-tier 觸發 + 9-step playbook + KPI）+ [`docs/operations/AUDIT_REGISTRY.md`](docs/operations/AUDIT_REGISTRY.md)（狀態 SSOT）再回答，不靠常識 / 不臨機自創流程 |
 | 操作者說「apply audit」／「apply the patches」／「套用 audit」／「把 audit 修一修」／「處理好所有的事」並指涉一份 `agency-os/reports/audit/*.md`（或可從 WORKLOG / AUDIT_REGISTRY 推得最近未 apply 的 logic audit）| **立即執行 `/apply-audit <report-path>`**：強制 §Patch Errata fold-in 在改 code 前 + 跨檔抓蟲 catch-up（grep callsites of new symbols across `lobster-factory/`、`agency-os/`）+ 4-action verify per patch + AUDIT_REGISTRY 🔴 TRACKED → 🔴 FIXED 含 commit hash + WORKLOG entry 含 R0+R4 4 動作。**禁止**：跳過 Errata 折回直接 apply（2026-05-23 三次 push-back 的根因）；Medium-High 風險 patch（prod deploy script / auth / DB migration）沒操作者明示 OK 就 apply。詳：[`.claude/commands/apply-audit.md`](../.claude/commands/apply-audit.md) |
 | 操作者說 `/tomo <hint>` | secret check → context 抽取 → 6 段 packet → 直接寫 `handoffs/` + TASKS + WORKLOG → commit + push（無 propose 確認）。詳見 [`.claude/commands/tomo.md`](../.claude/commands/tomo.md) |
@@ -170,7 +185,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | 使用者說「QA 跑一下」/「瀏覽器測試」/「截圖」/「效能測試」 | 對應跑 `/playwright smoke`（基礎）/`/playwright qa`（完整）/`/playwright screenshot <url>`/`/playwright perf` |
 | 使用者說「回顧一下」/「今天做了什麼」/「收工前看一下」/「要 close 了嗎」 | 跑 `/recap`（唯讀；確認後才跑 `/ao-close`） |
 | 使用者說「任務」/「還有什麼」/「今天要做哪些」/不確定目前 backlog 狀態 | 跑 `/tasks` 列出所有 open 待辦 |
-| **🔧 機械閘**：`auto-repair-guard.js` 攔截 Auto-Repair 邏輯路徑（repair-center / webhooks / ops/repairs / sg-deploy.sh 等）| 首次觸發 BLOCK，re-issue 通過。① 讀 `reports/audit/auto-repair-2026-05-23.md`；② 跑 `dogfood-auto-repair.ps1 -Mode HealthOnly`；③ 修 C1-C5 → 更新 `AUDIT_REGISTRY.md`；④ 改 sg-deploy Step 7 / redactSecrets 等 → 更新 `DEPLOY_ROLLBACK_RUNBOOK.md`。路徑清單見 `mcp/claude-userlevel/hooks/auto-repair-guard.js` |
+| **🔧 機械閘**：`hooks/rules/auto-repair-guard.js` 攔截 Auto-Repair 邏輯路徑（repair-center / webhooks / ops/repairs / sg-deploy.sh 等）| 首次觸發 BLOCK，re-issue 通過。① 讀 `reports/audit/auto-repair-2026-05-23.md`；② 跑 `scripts/audit-tools/dogfood-auto-repair.ps1 -Mode HealthOnly`；③ 修 C1-C5 → 更新 `AUDIT_REGISTRY.md`；④ 改 sg-deploy Step 7 / redactSecrets 等 → 更新 `DEPLOY_ROLLBACK_RUNBOOK.md`。路徑清單見 `mcp/claude-userlevel/hooks/rules/auto-repair-guard.js` |
 | 使用者說「grill me」/「問爆我」/「逼我想清楚」/「壓力測試計畫」/「對齊一下設計」 | 有 codebase 相關 → `grill-with-docs` skill（同時更新 CONTEXT.md + ADR）；純概念層 → `grill-me` skill。**禁止**：直接開始實作而不確認需求 |
 | 使用者說「TDD」/「寫測試」/「test-first」/「測試先行」/「red-green-refactor」 | 跑 `tdd` skill（整個紅綠重構流程，含垂直切片 + REALTEST_EVIDENCE 要求） |
 | 使用者說「做個原型」/「prototype」/「先試試看」/「試幾個設計」/「讓我玩一下」 | 跑 `prototype` skill（依問題類型路由：邏輯問題→LOGIC.md；UI→UI.md） |

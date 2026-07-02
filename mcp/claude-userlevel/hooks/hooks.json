@@ -1,79 +1,15 @@
 {
-  "description": "Claude Code Dev Team hooks (15 total): commit quality, cost tracking, MCP health, config protection, design quality, batch format, audit log, compact suggestion, error logging, test runner, branch protection, large file warner, session summary.",
+  "description": "Claude Code governance hooks — plugin wiring. All judgment logic lives in rules/ and is enumerated ONLY in rules.manifest.json (do not hand-write hook counts anywhere; the SessionStart banner derives them). Each event invokes the single runner, which dispatches by tool_name, isolates rule failures (structural fail-open), and aggregates block verdicts. Companion wiring: settings.template.json (user-level machines) and scripts/wire-remote-hooks.sh (remote containers).",
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": ".*",
         "hooks": [
           {
             "type": "command",
-            "command": "input=$(cat | jq -r '.input // empty'); if echo \"$input\" | grep -qE 'rm\\s+(-[a-zA-Z]*r[a-zA-Z]*f|--recursive.*--force|-rf)'; then echo 'BLOCKED: rm -rf is dangerous' >&2; exit 2; fi; exit 0",
-            "description": "Block rm -rf"
-          },
-          {
-            "type": "command",
-            "command": "input=$(cat | jq -r '.input // empty'); if echo \"$input\" | grep -qE 'git\\s+push.*(-f|--force).*\\s+(main|master)'; then echo 'BLOCKED: Force pushing to main/master is not allowed.' >&2; exit 2; fi; exit 0",
-            "description": "Block force push to main/master"
-          },
-          {
-            "type": "command",
-            "command": "node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const i=JSON.parse(d);const cmd=i.tool_input?.command||'';if(/--no-verify/.test(cmd)){process.stderr.write('[devteam] BLOCKED: --no-verify is not allowed. Let git hooks run.\\n');process.exit(2)}process.stdout.write(d)})\"",
-            "description": "Block --no-verify flag (git hooks must run)"
-          },
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/branch-protection.js",
-            "description": "Block direct commits / force pushes on main / master / production"
-          },
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/commit-quality.js",
-            "description": "Pre-commit: block debugger statements and secrets in staged files"
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "filepath=$(cat | jq -r '.file_path // .filePath // empty'); if echo \"$filepath\" | grep -qE '\\.(env|pem|key)$|/secrets/|credentials'; then echo \"BLOCKED: Cannot modify sensitive file: $filepath\" >&2; exit 2; fi; exit 0",
-            "description": "Block writes to .env, .pem, .key, credentials files"
-          },
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/config-protection.js",
-            "description": "Block modifications to linter/formatter config files"
-          },
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/suggest-compact.js",
-            "description": "Suggest /compact every ~50 tool calls"
-          },
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/file-path-router.js",
-            "description": "Route to specialist agent based on file path (auth/db/supabase/n8n/nginx/wp/trigger)"
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__.*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/mcp-health.js pre",
-            "description": "Check MCP server health before tool execution"
-          }
-        ]
-      },
-      {
-        "matcher": "Read",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/large-file-warner.js",
-            "description": "Warn at 500KB, block at 2MB to protect context"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/runner.js PreToolUse",
+            "timeout": 60,
+            "description": "Governance runner — PreToolUse rules (see rules.manifest.json)"
           }
         ]
       }
@@ -84,62 +20,22 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/log-error.sh",
-            "description": "Record errors to ~/.claude/error-log.md"
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/audit-log.js",
-            "description": "Audit log all bash commands with auto-redaction"
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/accumulator.js",
-            "description": "Accumulate edited JS/TS files for batch format at Stop"
-          },
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/design-quality.js",
-            "timeout": 10,
-            "description": "Warn on generic template-looking frontend UI"
-          },
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/test-runner.js",
-            "timeout": 60,
-            "description": "Run sibling test files and report failures"
-          }
-        ]
-      },
-      {
-        "matcher": "Agent",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/agent-dispatch-log.js",
-            "description": "Log agent dispatches to agency-os/reports/agent-dispatch/dispatch-YYYYMMDD.jsonl"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/runner.js PostToolUse",
+            "timeout": 90,
+            "description": "Governance runner — PostToolUse rules (see rules.manifest.json)"
           }
         ]
       }
     ],
     "PostToolUseFailure": [
       {
-        "matcher": "mcp__.*",
+        "matcher": ".*",
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/mcp-health.js failure",
-            "description": "Track MCP server failures with exponential backoff"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/runner.js PostToolUseFailure",
+            "timeout": 30,
+            "description": "Governance runner — failure tracking (see rules.manifest.json)"
           }
         ]
       }
@@ -150,24 +46,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/batch-format.js",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/runner.js Stop",
             "timeout": 300,
-            "description": "Batch format (Prettier) + typecheck (tsc) all edited JS/TS files"
-          },
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/check-console.js",
-            "description": "Check for stray console.log in modified files"
-          },
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/cost-tracker.js",
-            "description": "Track token usage and estimated cost per response"
-          },
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/session-summary.js",
-            "description": "Append session summary to ~/.claude/sessions/ for later search"
+            "description": "Governance runner — Stop rules (see rules.manifest.json)"
           }
         ]
       }
@@ -178,7 +59,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '[devteam] Dev team online — 12 agents + 15 hooks active. Three red lines: closure discipline, fact-driven, exhaustiveness.' >&2; exit 0"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/runner.js SessionStart",
+            "timeout": 15,
+            "description": "Governance runner — session banner (counts derived from rules.manifest.json)"
           }
         ]
       }

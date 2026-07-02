@@ -4,7 +4,7 @@
   "theme": "light",
   "model": "claude-sonnet-4-6",
   "permissions": {
-    "_defaultMode_comment": "bypassPermissions = no per-command prompts. Only valid in user-level ~/.claude/settings.json (Claude Code ignores it in project-shared .claude/settings.json for safety). 'skipDangerousModePermissionPrompt' suppresses the one-time entry confirmation. Hard guardrails come from 'deny' below + hooks/branch-protection.js + hooks/hooks.json's PreToolUse rm-rf block. See mcp/claude-userlevel/README.md.",
+    "_defaultMode_comment": "bypassPermissions = no per-command prompts. Only valid in user-level ~/.claude/settings.json (Claude Code ignores it in project-shared .claude/settings.json for safety). 'skipDangerousModePermissionPrompt' suppresses the one-time entry confirmation. Hard guardrails come from 'deny' below + the governance runner rules (hooks/rules/branch-protection.js, hooks/rules/dangerous-bash.js — see hooks/rules.manifest.json). See mcp/claude-userlevel/README.md.",
     "defaultMode": "bypassPermissions",
     "skipDangerousModePermissionPrompt": true,
     "allow": [
@@ -42,6 +42,7 @@
     ]
   },
   "hooks": {
+    "_comment": "Portable governance hooks run through ONE runner (hooks/runner.js); the event→rules wiring lives in hooks/rules.manifest.json — never enumerate hooks here. Only machine-level PowerShell automations (AO-RESUME trigger, post-push deploy) are wired directly.",
     "UserPromptSubmit": [
       {
         "matcher": ".*",
@@ -56,62 +57,12 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": ".*",
         "hooks": [
           {
             "type": "command",
-            "command": "node ~/.claude/hooks/branch-protection.js"
-          },
-          {
-            "type": "command",
-            "command": "node ~/.claude/hooks/commit-quality.js"
-          },
-          {
-            "type": "command",
-            "command": "node ~/.claude/hooks/verify-gate-commit.js"
-          },
-          {
-            "type": "command",
-            "command": "node ~/.claude/hooks/high-risk-bash-warn.js"
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ~/.claude/hooks/git-log-injector.js"
-          },
-          {
-            "type": "command",
-            "command": "node ~/.claude/hooks/auto-repair-guard.js"
-          },
-          {
-            "type": "command",
-            "command": "node ~/.claude/hooks/config-protection.js"
-          },
-          {
-            "type": "command",
-            "command": "node ~/.claude/hooks/suggest-compact.js"
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ~/.claude/hooks/mcp-health.js pre"
-          }
-        ]
-      },
-      {
-        "matcher": "Read",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ~/.claude/hooks/large-file-warner.js"
+            "command": "node ~/.claude/hooks/runner.js PreToolUse",
+            "timeout": 60
           }
         ]
       }
@@ -122,7 +73,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/log-error.sh"
+            "command": "node ~/.claude/hooks/runner.js PostToolUse",
+            "timeout": 90
           }
         ]
       },
@@ -131,48 +83,22 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ~/.claude/hooks/audit-log.js"
-          },
-          {
-            "type": "command",
             "if": "Bash(*git push*)",
             "command": "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File ~/.claude/hooks/post-push-trigger-deploy.ps1",
             "timeout": 360000,
             "statusMessage": "Checking if Trigger.dev auto-deploy is needed..."
           }
         ]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ~/.claude/hooks/accumulator.js"
-          },
-          {
-            "type": "command",
-            "command": "node ~/.claude/hooks/design-quality.js",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "node ~/.claude/hooks/test-runner.js",
-            "timeout": 60
-          },
-          {
-            "type": "command",
-            "command": "node ~/.claude/hooks/code-change-tracker.js"
-          }
-        ]
       }
     ],
     "PostToolUseFailure": [
       {
-        "matcher": "mcp__*",
+        "matcher": ".*",
         "hooks": [
           {
             "type": "command",
-            "command": "node ~/.claude/hooks/mcp-health.js failure"
+            "command": "node ~/.claude/hooks/runner.js PostToolUseFailure",
+            "timeout": 30
           }
         ]
       }
@@ -183,24 +109,20 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ~/.claude/hooks/batch-format.js",
+            "command": "node ~/.claude/hooks/runner.js Stop",
             "timeout": 300
-          },
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
           {
             "type": "command",
-            "command": "node ~/.claude/hooks/check-console.js"
-          },
-          {
-            "type": "command",
-            "command": "node ~/.claude/hooks/cost-tracker.js"
-          },
-          {
-            "type": "command",
-            "command": "node ~/.claude/hooks/session-summary.js"
-          },
-          {
-            "type": "command",
-            "command": "node ~/.claude/hooks/verify-gate-stop.js"
+            "command": "node ~/.claude/hooks/runner.js SessionStart",
+            "timeout": 15
           }
         ]
       }

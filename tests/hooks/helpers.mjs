@@ -1,11 +1,11 @@
-// Shared helpers for hook tests: spawn a hook (or the v2 runner) with a JSON
-// payload on stdin and capture { status, stdout, stderr }.
+// Shared helpers for hook tests: spawn the v2 runner with a JSON payload on
+// stdin and capture { status, stdout, stderr }.
 //
 // Design notes:
-//   - Every spawn gets an ISOLATED HOME (tmp dir) so hooks that write to
+//   - Every spawn gets an ISOLATED HOME (tmp dir) so rules that write to
 //     ~/.claude (mcp-health, audit-log, session-summary, log-error) never touch
 //     the real user profile during tests.
-//   - session_id is randomized per test unless pinned, so flag-file hooks
+//   - session_id is randomized per test unless pinned, so flag-file rules
 //     (git-log-injector, auto-repair-guard, file-path-router) start fresh.
 //   - TMPDIR is NOT isolated by default (flag helpers use os.tmpdir()); tests
 //     that need flag isolation pin a unique session_id instead.
@@ -47,25 +47,6 @@ export function runNode(scriptPath, payload, { args = [], cwd = REPO_ROOT, env =
       CLAUDE_SESSION_ID: '',
       ...env,
     },
-  });
-  return { status: r.status, stdout: r.stdout || '', stderr: r.stderr || '', home: HOME };
-}
-
-export function runHook(hookFile, payload, opts = {}) {
-  return runNode(path.join(HOOKS_DIR, hookFile), payload, opts);
-}
-
-// Run one of the inline shell hooks from hooks.json verbatim (documents their
-// live behavior, including the `.input` field bug).
-export function runShell(command, payload, { cwd = REPO_ROOT, env = {}, home } = {}) {
-  const HOME = home || makeTmpHome();
-  const input = typeof payload === 'string' ? payload : JSON.stringify(payload);
-  const r = spawnSync('bash', ['-c', command], {
-    input,
-    cwd,
-    encoding: 'utf8',
-    timeout: 30000,
-    env: { ...process.env, HOME, USERPROFILE: HOME, ...env },
   });
   return { status: r.status, stdout: r.stdout || '', stderr: r.stderr || '', home: HOME };
 }

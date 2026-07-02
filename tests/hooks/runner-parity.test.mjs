@@ -268,6 +268,60 @@ test('ID-1b: --no-verify still blocks (inline parity)', () => {
   assert.match(r.stderr, /--no-verify is not allowed/);
 });
 
+test('ID-1c: FALSE-POSITIVE REGRESSION — heredoc/docs text mentioning rm -rf must NOT block (live incident 2026-07-02)', () => {
+  const heredoc = [
+    'python3 - <<\'PY\'',
+    's = "| `rules/dangerous-bash.js` | Bash | BLOCK：`rm -rf`、`--no-verify` |"',
+    'print(s)',
+    'PY',
+  ].join('\n');
+  const r = run('PreToolUse', { session_id: freshSid('p'), tool_name: 'Bash', tool_input: { command: heredoc } });
+  assert.equal(r.status, 0);
+});
+
+test('ID-1d: line-start rm -rf inside a multi-line script still blocks', () => {
+  const r = run('PreToolUse', {
+    session_id: freshSid('p'),
+    tool_name: 'Bash',
+    tool_input: { command: 'echo cleaning\nrm -rf /srv/data\necho done' },
+  });
+  assert.equal(r.status, 2);
+});
+
+test('ID-1e: chained `cd x && rm -rf y` blocks (command-position segments)', () => {
+  const r = run('PreToolUse', {
+    session_id: freshSid('p'),
+    tool_name: 'Bash',
+    tool_input: { command: 'cd /tmp && rm -rf ./scratch' },
+  });
+  assert.equal(r.status, 2);
+});
+
+test('ID-5: prose mention of "git commit" with non-empty tracker does NOT block (live incident 2026-07-02)', () => {
+  const sid = freshSid('pid5');
+  writeTracker(sid, ['/x/foo.ts']);
+  const heredoc = [
+    'python3 - <<\'PY\'',
+    's = "| `rules/commit-quality.js` | Bash | BLOCK：git commit 前檢查 staged debugger |"',
+    's += "git `--no-verify`（取代舊 inline）"',
+    'print(s)',
+    'PY',
+  ].join('\n');
+  const r = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: heredoc } });
+  assert.equal(r.status, 0);
+  fs.rmSync(trackerPathFor(sid), { force: true });
+});
+
+test('ID-5b: chained `cd x && git commit` with tracker still blocks (real invocation)', () => {
+  const sid = freshSid('pid5b');
+  writeTracker(sid, ['/x/foo.ts']);
+  const repo = makeGitRepo({ branch: 'feature' });
+  const r = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: 'cd sub && git commit -m x' } }, { cwd: repo });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /UNVERIFIED CODE FILES/);
+  fs.rmSync(trackerPathFor(sid), { force: true });
+});
+
 test('ID-2: .env write now BLOCKS (legacy inline was a no-op)', () => {
   const tmp = makeTmpHome();
   const r = run('PreToolUse', { session_id: freshSid('p'), tool_name: 'Write', tool_input: { file_path: '/x/prod.env' } }, { cwd: tmp });

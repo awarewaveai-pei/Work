@@ -73,6 +73,25 @@ function expandCommand(cmd) {
   return seen.join('\n');
 }
 
+// Split expanded command text into COMMAND-POSITION segments: the start of
+// every line plus the token after each shell chain operator (&& || ; |).
+// Rules that must distinguish "invoking rm -rf" from "prose that mentions
+// rm -rf" anchor ^ against these segments instead of the full text.
+// (Two live false-positives on 2026-07-02 — a docs heredoc tripped the
+// dangerous-bash and verify-gate-commit gates — created this helper.)
+// Deliberately NOT split on backticks/$() — markdown-heavy commands would
+// turn every inline code span into a fake command position.
+function commandSegments(expanded) {
+  const segs = [];
+  for (const line of String(expanded).split('\n')) {
+    for (const part of line.split(/&&|\|\||;|\|/)) {
+      const t = part.trim();
+      if (t) segs.push(t);
+    }
+  }
+  return segs;
+}
+
 function collectFiles(toolInput) {
   const files = [];
   if (toolInput && toolInput.file_path) files.push(toolInput.file_path);
@@ -117,13 +136,15 @@ function main() {
         ? payload.tool_input : {};
       const command = String(toolInput.command || '');
 
+      const expanded = expandCommand(command);
       const ctx = {
         event,
         payload,
         toolName,
         toolInput,
         command,
-        commandExpanded: expandCommand(command),
+        commandExpanded: expanded,
+        commandSegments: commandSegments(expanded),
         files: collectFiles(toolInput),
         sid: shared ? shared.getSessionId(payload) : 'no-shared-lib',
         cwd: process.cwd(),
