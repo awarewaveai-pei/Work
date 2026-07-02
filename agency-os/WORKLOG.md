@@ -4,6 +4,50 @@
 
 ## 2026-07-02
 
+### feat(outreach): 冷開發 tab + per-org Supabase routing + sidebar 跳位修復 ✅
+
+**根因**：
+1. 「冷開發」tab 在 ClientHubTabs.tsx 未加入 → 客戶頁面缺少冷開發功能入口
+2. Outreach API（messages / followups / service-profiles / suppression）統一走 `getOrgSupabaseWriteClient` 但未完成 → 資料仍走 AwareWave 主 DB，per-org 路由缺失
+3. `layout.tsx` 每次 navigation 重新呼叫 `getThemeConfig()` → 1.5s DB timeout 導致回退預設 section order → sidebar 位置不定
+
+**已修改**：
+- `app/ops/clients/[slug]/ClientHubTabs.tsx` — 加 `OutreachTab` component + "冷開發" tab entry
+  - `OutreachTab` 顯示 Supabase URL/key 狀態 badges、密碼輸入框（key 遮罩）、self-serve toggle、save 按鈕
+  - 讀取 `/api/ops/clients/[slug]/outreach-config`（GET）；儲存走 POST body `{selfServeEnabled, supabaseUrl?, supabaseKey?}`
+  - 安全邊界：GET 只回傳 `hasSupabaseUrl: bool` / `hasSupabaseKey: bool`，**絕不回傳原始 key 值**
+- `app/api/ops/clients/[slug]/outreach-config/route.ts` — 新建
+  - GET：讀取 `org.metadata.self_serve_enabled` + vault key 存在與否（`hasSupabaseUrl/hasSupabaseKey`）
+  - POST：寫入 vault（`org:${slug}:supabase_url` / `org:${slug}:supabase_key`）+ 更新 `self_serve_enabled`
+- `app/api/outreach/messages/route.ts` — 切換為 `getOrgSupabaseWriteClient(orgSlug)` + tenant-guard
+- `app/api/outreach/followups/route.ts` — 同上 per-org routing + tenant-guard
+- `app/api/outreach/service-profiles/route.ts` — 同上 + `effectiveOrgId` GET filter（修正 `url.searchParams` bug → `params.get()`）
+- `app/api/outreach/suppression/route.ts` — 同上 + `effectiveOrgId` GET filter + 重複 URL parse 去除
+- `lib/theme/store.ts` — 加 `unstable_cache` wrapper（revalidate: 300s）+ `revalidateThemeCache()` export
+- `app/api/theme/route.ts` — POST 成功後呼叫 `revalidateThemeCache()`
+
+**Rebase 衝突解決**（main S2 batch db8dcf8 與本 branch 同改 outreach 路由）：
+- messages: 保留雙方 — `getOrgSupabaseWriteClient` + tenant-guard + claude/openai import；GET 用 `params.get()` 非 `url.searchParams`
+- followups: 保留 `getOrgSupabaseWriteClient` + `assertOrgAccess/OrgAccessError/toOrgAccessResponse`（去除舊 `getSupabaseWriteClient`）
+- service-profiles: 保留 `getOrgSupabaseWriteClient` + `effectiveOrgId` + full tenant-guard；修正 `url.searchParams` → `params.get()`
+- suppression: 同 service-profiles 模式
+
+**安全邊界（強制）**：
+- `credentials_ref` 欄位存 vault key name，不存 raw secret
+- GET outreach-config 只回 boolean（`hasSupabaseUrl/hasSupabaseKey`）
+- `org:${slug}:supabase_key` 為 service role key — 絕不回傳前端
+- `self_serve_enabled` 為 workbench 存取閘門，Off = AwareWave代操 only
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 — 0 type errors ✅（unstable_cache pre-existing module type warning，Next.js 15 valid）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/0m — security review pass；key masking ✅；effectiveOrgId scoping ✅
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=getOrgSupabaseWriteClient,assertOrgAccess,revalidateThemeCache | hits=confirmed correct callsites only
+- PR #16 squash-merged → main @ d146eff
+
+**下一步**：本機執行 `/sg-deploy next-admin`（SSH 不在 remote container 中）
+
+---
+
 ### feat(data-flow): 補足三個客戶資料流缺口 ✅
 
 **根因**：
