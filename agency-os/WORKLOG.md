@@ -101,6 +101,30 @@ woocommerce-points-and-rewards / woocommerce-product-addons
 
 ---
 
+### fix(security): S5 — assertOrgAccess guards on social + integrations routes ✅
+
+**根本問題**: 5 個 API 路由以 `clientId` / `organizationId`（= org UUID）作為查詢/寫入鍵，但只有 ops-role gate（無 tenant-level org guard）。Client org 的 owner/admin/operator 若通過 role gate，可傳入任意 org UUID 讀取/修改其他租戶的 Postiz 社群連接或 integration binding（IDOR）。
+
+**已修改**:
+- `app/api/content/social-publish/route.ts` — POST：`clientId`（org UUID → `social_postiz_connections.client_id`）加 `assertOrgAccess(req, clientId)` after role gate + string validate
+- `app/api/content/social-channels/route.ts` — GET：同樣呼叫 `listIntegrations(clientId)` → 加 `assertOrgAccess(req, clientId)` after query param validate
+- `app/api/content/social-admin/connections/route.ts` — POST + DELETE：`clientId`（same FK）→ 各加 `assertOrgAccess(req, clientId)`
+- `app/api/ops/integrations/route.ts` — POST：`organizationId` body param → 加 `assertOrgAccess(req, organizationId)` after `verifyOwnership`；PATCH：fetch record by `id` → 加 `assertOrgAccess(req, current.organization_id)` post-fetch
+
+**guard 語意**：
+- `staff`（`x-ops-user-kind` absent/staff）→ `assertOrgAccess` no-op，保持跨租戶管理能力
+- `client`（`x-ops-user-kind: client` + `x-ops-org-id: <uuid>`）→ `targetOrgId ≠ ctx.orgId` 時 throw OrgAccessError → 403
+- null/undefined targetOrgId 對 client fail-closed（`String(null)` = `"null"` ≠ real UUID）
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~8000 — 0 type errors
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test --run | exit=0 | ms=1710 — 568/568 pass
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n — 6 focus areas all clean: guard ordering correct in all 4 files, null-safe inputs, assertOrgAccess null targetOrgId fails-closed, PATCH TOCTOU safe (immutable PK), no role-gate bypass path, all routes covered by middleware matcher
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=listIntegrations,social_postiz_connections,tenant_integration_bindings | hits=1 new finding (social-channels was also calling listIntegrations with unguarded clientId → patched same batch; webhooks/tenant-integration has no clientId param — safe)
+- WORKLOG: 本條目
+
+---
+
 ## 2026-06-29
 
 ### feat(security): S2 batch-5 tenant guard — credentials/secret + build/runs + approvals IDOR closed
