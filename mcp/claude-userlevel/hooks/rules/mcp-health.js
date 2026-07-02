@@ -61,7 +61,15 @@ module.exports = {
           lastError: errText.slice(0, 200),
         };
         saveState(state);
-        return { warn: [`[Hook] MCP ${server} marked unhealthy (attempt ${fc}), retry after ${Math.round(backoff / 1000)}s`] };
+        const warn = [`[Hook] MCP ${server} marked unhealthy (attempt ${fc}), retry after ${Math.round(backoff / 1000)}s`];
+        // Vault-gap mechanization (2026-07-02, Phase 4): AGENTS.md trigger
+        // 「MCP tool 回 401/403 → /vault-status；缺口 → /vault-sync」 was
+        // semantic-only (audit rank #4). Auth-shaped failures now carry the
+        // routing hint mechanically.
+        if (/\b(401|403)\b/.test(errText)) {
+          warn.push(`[Hook] ${server} failed with 401/403 — credentials gap? Run /vault-status; if a key is missing, /vault-sync (AGENTS.md trigger).`);
+        }
+        return { warn };
       }
       return null;
     }

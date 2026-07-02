@@ -236,7 +236,7 @@
 | `rules/branch-protection.js` | Bash | BLOCK：force push 到保護分支；main 上 commit 提示 |
 | `rules/commit-quality.js` | Bash | BLOCK：git commit 前檢查 staged debugger statements + secrets |
 | `rules/verify-gate-commit.js` | Bash | BLOCK：tracker 有未驗證 code 檔時拒絕 git commit / gh pr merge |
-| `rules/high-risk-bash-warn.js` | Bash | BLOCK：docker compose down/stop、VPS rsync/scp、DB migrate deploy；首行 `# CONFIRMED-HIGH-RISK:` 解鎖；bash -c 包裹也攔 |
+| `rules/high-risk-bash-warn.js` | Bash | BLOCK：docker compose down/stop、VPS rsync/scp、DB migrate deploy、**ssh→prod VPS 部署/重啟**（sg-deploy/systemctl restart/reboot，2026-07-02 Phase 4）；首行 `# CONFIRMED-HIGH-RISK:` 解鎖；bash -c 包裹也攔 |
 | `rules/sensitive-file-block.js` | Write\|Edit | BLOCK：寫入 .env/.pem/.key、/secrets/、credentials 路徑 |
 | `rules/git-log-injector.js` | Write\|Edit（首次）| BLOCK：顯示上一完整 session 全部 commits（fallback -10），防並行 session 重工 |
 | `rules/auto-repair-guard.js` | Write\|Edit | BLOCK（首次/分類）：編輯 Auto-Repair 邏輯路徑前強制 4 pre-checks |
@@ -274,6 +274,7 @@
 | Hook | 作用 |
 |------|------|
 | `rules/session-banner.js` | SessionStart：報告治理狀態（規則/事件數由 manifest 推導，不手寫）|
+| `rules/vbc-reminder.js` | UserPromptSubmit：偵測「他方已完成」語境 → 注入 VBC 協議提醒（2026-07-02 Phase 4，非阻擋）|
 | `ao-resume-on-prompt.ps1` | UserPromptSubmit（僅工作站）：偵測開工關鍵字 → 觸發 AO-RESUME（300 秒去重）|
 | `post-push-trigger-deploy.ps1` | git push 後（僅工作站）：自動觸發 Trigger.dev deploy（若設定）|
 
@@ -290,7 +291,7 @@
 
 | 觸發類型 | 數量 | 說明 |
 |---------|------|------|
-| 🔴 Hook 機械強制 | rules.manifest.json 全清單（26 規則）| 依 runner 結構保證；閘壞 = 大聲 fail-open 非靜默 |
+| 🔴 Hook 機械強制 | rules.manifest.json 全清單（27 規則）| 依 runner 結構保證；閘壞 = 大聲 fail-open 非靜默 |
 | 🟠 File-path-router | 7 類別（db/supabase/n8n/auth/nginx/wp/trigger）| 100% 可靠，編輯路徑時自動 |
 | 🟡 AO 生命週期 | 2（ao-resume / ao-close）| 100% 可靠 |
 | 🟢 AGENTS.md 自判 | ~55 個工具 | 中等可靠，靠我的情境判斷 |

@@ -31,6 +31,21 @@
 - 工作站需 `sync-claude-userlevel.ps1 -Mode merge` 後 v2 才生效；sync 前舊 ~/.claude/hooks 副本繼續用舊接線（行為不變，無害）。
 - 遠端環境需把 `scripts/wire-remote-hooks.sh` 登記為 environment setup script 才每 session 自動接線（本 session 已手動接上）。
 
+### 第二波（同日續）：Phase 4 規則機械化 + .ps1 實測補完 + 併回 main
+
+[已修改]
+- 併回 main：合併 origin/main（84 平行 commits）；WORKLOG 衝突以 theirs 為基底+插回 block+重輪替（112 blocks 精確守恆，2026-02-27 雙副本依「較新 _Last synced 勝」裁決）；daily 衝突聯集（保留工作站 8 條 --ack 稽核）；server 端 ff push main（非 force）。
+- Phase 4（高後果 semantic-only 前三名 → 機械閘）：① deploy flow — `high-risk-bash-warn.js` 新 pattern 攔 ssh→prod VPS 的 sg-deploy/systemctl restart/docker down/reboot（唯讀 ssh 不受影響）② VBC — 新規則 `vbc-reminder.js` 於 UserPromptSubmit 偵測「他方已完成」語境注入 VBC 協議（runner 新增 context 通道；prompt 事件禁 stdin 回灌防 context 汙染）③ vault — `mcp-health.js` 401/403 失敗自動附 `/vault-status` 路由提示。三接線（settings.template/hooks.json/wire-remote-hooks）同步補 UserPromptSubmit。
+- .ps1 風險關閉：container 內裝 PowerShell 7.4.7 → 兩支改動腳本 Parser 語法驗證 PASS + `commit-checkpoint.ps1` E2E 真跑（temp repo + $null/null/CJK 垃圾檔：junk-guard 全數 unstage、只 commit 真工作、exit 0）。
+- AGENTS.md 三列觸發標記 🔧 機械閘；TOOL_TRIGGER_MAP 同步（27 規則）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh | exit=0 | ms=6000 — 60/60（Phase 4 新增 7 案例：prod-ssh 攔/ACK/唯讀放行、VBC 注入/靜默/英文、403 vault 提示）
+- REALTEST_EVIDENCE: tool=Bash | cmd=pwsh -File scripts/commit-checkpoint.ps1 -Message test -WorkRoot <tmprepo> | exit=0 | ms=3000 — junk 3/3 unstaged、real.md 單獨入 commit（PowerShell 7.4.7 真跑）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=前波 critic 架構審查涵蓋 runner context 通道設計（prompt 事件 stdout=context 注入為 Claude Code 文件化行為）；新規則為既有 pattern 的同構延伸，60 案例回歸全綠
+- BUGHUNT_DONE: scope=agency-os scripts .claude mcp | grep=UserPromptSubmit|vbc-reminder | hits=3 wiring files（全部為本次刻意接線）+ docs 已同步
+- 殘留：遠端 claude/* 分支刪除被 git proxy 拒（僅工作站可清）；ao-close.ps1 全流程仍需工作站首跑觀察（語法已驗、rotation 段 try/catch 包裹）
+
 [rollback] 每里程碑獨立 commit（M1 03d624b / M2 198ad66 / M3 388fb36 / M4a 52b951f / M4b 本 commit）；`git revert` 對應 commit 即回舊世界；WORKLOG 輪替可逆（archive 檔內容原封，貼回即還原）。
 
 - AUTO_TASK_DONE: hooks v2 runner 架構遷移 + 遠端接線 + 垃圾檔清理 + WORKLOG 輪替 + 規則優先序/信任邊界明文化

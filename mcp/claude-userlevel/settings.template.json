@@ -51,6 +51,11 @@
             "type": "command",
             "command": "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File ~/.claude/hooks/ao-resume-on-prompt.ps1",
             "timeout": 1200
+          },
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/runner.js UserPromptSubmit",
+            "timeout": 15
           }
         ]
       }

@@ -20,6 +20,15 @@ const HIGH_RISK_PATTERNS = [
     re: /^\s*(?:sudo\s+)?(?:(?:prisma|knex|sequelize|typeorm|drizzle-kit)\s+migrate\s+(?:deploy|run|latest)|npm\s+run\s+(?:db:)?migrate(?:\s|$))/im,
     label: 'database migration deploy — potentially irreversible schema change',
   },
+  {
+    // Deploy-flow mechanization (2026-07-02, Phase 4): ssh to a production VPS
+    // running deploy / restart / shutdown verbs. Was semantic-only (audit rank
+    // #1 high-consequence gap: 「部署」 trigger relied on Claude remembering
+    // /check-drift → /verify → tsc → go-ahead). Read-only ssh (logs, cat,
+    // health checks) is untouched — only mutating verbs match.
+    re: /^\s*(?:sudo\s+)?ssh\b[^\n]*(?:5\.223\.93\.113|204\.168\.175\.41)[^\n]*(?:sg-deploy|rollback-phase1|auto-deploy-next-admin|systemctl\s+(?:restart|stop)|docker[\s-]+compose\s+(?:down|stop|restart)|\breboot\b|\bshutdown\b)/im,
+    label: 'remote deploy/restart on production VPS — deploy flow first: /check-drift → /verify → tsc (if .ts changed) → operator go-ahead (AGENTS.md §部署流程觸發)',
+  },
 ];
 
 function isLeadingAck(cmd) {

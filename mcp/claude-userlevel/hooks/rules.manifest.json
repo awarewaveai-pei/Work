@@ -25,20 +25,28 @@
       },
       {
         "matcher": "^mcp__",
-        "rules": ["mcp-health"]
+        "rules": [
+          "mcp-health"
+        ]
       },
       {
         "matcher": "^Read$",
-        "rules": ["large-file-warner"]
+        "rules": [
+          "large-file-warner"
+        ]
       }
     ],
     "PostToolUse": [
       {
-        "rules": ["log-error"]
+        "rules": [
+          "log-error"
+        ]
       },
       {
         "matcher": "Bash",
-        "rules": ["audit-log"]
+        "rules": [
+          "audit-log"
+        ]
       },
       {
         "matcher": "Write|Edit",
@@ -51,13 +59,17 @@
       },
       {
         "matcher": "Agent",
-        "rules": ["agent-dispatch-log"]
+        "rules": [
+          "agent-dispatch-log"
+        ]
       }
     ],
     "PostToolUseFailure": [
       {
         "matcher": "^mcp__",
-        "rules": ["mcp-health"]
+        "rules": [
+          "mcp-health"
+        ]
       }
     ],
     "Stop": [
@@ -73,7 +85,16 @@
     ],
     "SessionStart": [
       {
-        "rules": ["session-banner"]
+        "rules": [
+          "session-banner"
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "rules": [
+          "vbc-reminder"
+        ]
       }
     ]
   }

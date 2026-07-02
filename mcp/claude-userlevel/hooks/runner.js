@@ -125,11 +125,17 @@ function main() {
   process.stdin.on('data', (c) => { d += c; });
   process.stdin.on('end', () => {
     let blocks = [];
+    const contexts = [];
+    // UserPromptSubmit is special: stdout on exit 0 is INJECTED INTO CLAUDE'S
+    // CONTEXT (not a passthrough channel). Rules return { context: [lines] }
+    // for that injection; the raw stdin JSON must NEVER be echoed on this
+    // event or it would spam the context on every prompt.
+    const isPromptEvent = event === 'UserPromptSubmit';
     try {
       let payload;
       try { payload = JSON.parse(d); } catch (_) { payload = null; }
       if (payload === null || typeof payload !== 'object') {
-        process.stdout.write(d);
+        if (!isPromptEvent) process.stdout.write(d);
         return; // unparseable stdin → passthrough (fail-open)
       }
 
@@ -175,6 +181,9 @@ function main() {
             if (res && Array.isArray(res.warn)) {
               for (const ln of res.warn) process.stderr.write(ln + '\n');
             }
+            if (res && Array.isArray(res.context)) {
+              contexts.push(...res.context);
+            }
             if (res && Array.isArray(res.block) && res.block.length) {
               blocks.push(...res.block);
             }
@@ -194,6 +203,15 @@ function main() {
       // flush-guarded exit(2) — required on Windows pipes
       process.stderr.write('', () => process.exit(2));
       return;
+    }
+    if (isPromptEvent) {
+      // stdout here = context injection; emit ONLY rule-produced context.
+      for (const ln of contexts) process.stdout.write(ln + '\n');
+      return;
+    }
+    if (contexts.length) {
+      // context on non-prompt events degrades to a stderr warn (visible, not injected)
+      for (const ln of contexts) process.stderr.write(ln + '\n');
     }
     process.stdout.write(d);
   });

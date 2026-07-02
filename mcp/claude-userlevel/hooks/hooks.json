@@ -65,6 +65,19 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/runner.js UserPromptSubmit",
+            "timeout": 15,
+            "description": "Governance runner — prompt-context rules (see rules.manifest.json)"
+          }
+        ]
+      }
     ]
   }
 }

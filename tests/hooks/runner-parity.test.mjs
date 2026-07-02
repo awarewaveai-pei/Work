@@ -285,6 +285,53 @@ test('session banner derives counts from manifest (no hand-written numbers)', ()
   assert.match(r.stderr, new RegExp(`${distinct.size} rules across ${Object.keys(manifest.events).length} events`));
 });
 
+// ---------------------------------------------------------------- Phase 4 mechanized rules
+test('P4-1: ssh to prod VPS running sg-deploy → BLOCK; ACK passes; read-only ssh passes', () => {
+  const b = run('PreToolUse', { session_id: freshSid('p4'), tool_name: 'Bash', tool_input: { command: "ssh root@5.223.93.113 'bash /root/lobster-phase1/scripts/sg-deploy.sh next-admin'" } });
+  assert.equal(b.status, 2);
+  assert.match(b.stderr, /deploy flow first/);
+  const ack = run('PreToolUse', { session_id: freshSid('p4'), tool_name: 'Bash', tool_input: { command: "# CONFIRMED-HIGH-RISK: drift clean, verify green, operator go-ahead\nssh root@5.223.93.113 'bash sg-deploy.sh next-admin'" } });
+  assert.equal(ack.status, 0);
+  const ro = run('PreToolUse', { session_id: freshSid('p4'), tool_name: 'Bash', tool_input: { command: "ssh root@5.223.93.113 'docker ps'" } });
+  assert.equal(ro.status, 0, 'read-only ssh must pass');
+});
+
+test('P4-1b: ssh prod systemctl restart → BLOCK; non-prod IP → pass', () => {
+  const b = run('PreToolUse', { session_id: freshSid('p4'), tool_name: 'Bash', tool_input: { command: 'ssh root@204.168.175.41 systemctl restart n8n' } });
+  assert.equal(b.status, 2);
+  const other = run('PreToolUse', { session_id: freshSid('p4'), tool_name: 'Bash', tool_input: { command: 'ssh root@10.0.0.5 bash sg-deploy.sh' } });
+  assert.equal(other.status, 0, 'non-prod IP not in scope');
+});
+
+test('P4-2: VBC prompt trigger → context injected on stdout, raw JSON NOT echoed', () => {
+  const r = run('UserPromptSubmit', { session_id: freshSid('p4'), prompt: '別的 AI 已經處理好 WAF 了，你確認一下' });
+  assert.equal(r.status, 0);
+  assert.match(r.stdout, /VBC 協議/);
+  assert.doesNotMatch(r.stdout, /"prompt"/); // no stdin passthrough on prompt events
+});
+
+test('P4-2b: neutral prompt → completely silent stdout (no context spam)', () => {
+  const r = run('UserPromptSubmit', { session_id: freshSid('p4'), prompt: '幫我看一下 canvas 的字體大小' });
+  assert.equal(r.status, 0);
+  assert.equal(r.stdout, '');
+});
+
+test('P4-2c: english "another session already fixed it" also triggers', () => {
+  const r = run('UserPromptSubmit', { session_id: freshSid('p4'), prompt: 'another session already fixed the nginx config, please verify' });
+  assert.equal(r.status, 0);
+  assert.match(r.stdout, /VBC/);
+});
+
+test('P4-3: MCP failure with 403 → vault-status hint; plain timeout → no hint', () => {
+  const home = makeTmpHome();
+  const auth = run('PostToolUseFailure', { session_id: freshSid('p4'), tool_name: 'mcp__vaulty__do', error: 'HTTP 403 Forbidden' }, { home });
+  assert.equal(auth.status, 0);
+  assert.match(auth.stderr, /vault-status/);
+  const to = run('PostToolUseFailure', { session_id: freshSid('p4'), tool_name: 'mcp__slowsrv__do', error: 'timed out' }, { home });
+  assert.equal(to.status, 0);
+  assert.doesNotMatch(to.stderr, /vault-status/);
+});
+
 // ---------------------------------------------------------------- INTENDED DIFFS
 test('ID-1: rm -rf now BLOCKS (legacy inline was a no-op)', () => {
   const r = run('PreToolUse', { session_id: freshSid('p'), tool_name: 'Bash', tool_input: { command: 'rm -rf /tmp/x' } });
