@@ -50,7 +50,7 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (×2 — 原始+安全修後) | exit=0 | ms=<30000 — 0 type errors ✅
 - REVIEW_DONE: critic=Standard | verdict=pass-after-fix | findings=2M/3m/0c — (M1) assertOrgAccess/effectiveOrgId 補入 submit+quote(GET/POST/PATCH)+trigger-build，匹配 S5 pattern；(M2) trigger-build 並發 CAS 修為原子 .neq("status","building")+select；(m1) provision tier/region 白名單；(m2) provision 按鈕在 siteId/orgId 空時 disabled；(m3) 報價自我審批分離暫緩 — 目前所有呼叫者為 staff-only operator，可接受
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=quote_status|quote_data|quote_approval_required,x-ops-sync-key|OPS_PROXY_SHARED_SECRET|hasSyncKey,provisionClient|buildServerAdapterFromEnv|serverTypeForTier|@workflows | hits=0 — all hits in new files only, follow established pattern (wp-report/wp-update/middleware.ts), no stale cross-refs
-- WORKLOG: 本條目
+- WORKLOG: 本條目（commit: f65f852a checkpoint，含全部安全修補）
 
 ### refactor(hooks): 治理系統 v2 — 單一 runner + 純規則模組（方案 D 絞殺式遷移全程完成）
 
