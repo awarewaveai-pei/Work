@@ -110,6 +110,9 @@ const MANIFEST_ENV_ALLOWLIST = [
   "PATHEXT",
   "COMSPEC",
   "SYSTEMDRIVE",
+  // Path to paid plugin/theme zips on the host (non-secret; default /opt/lobster-plugins).
+  // Set in Trigger.dev worker env: LOBSTER_PLUGIN_STORE=/opt/lobster-plugins
+  "LOBSTER_PLUGIN_STORE",
 ] as const;
 
 export function buildManifestChildEnv(dryRun: boolean): NodeJS.ProcessEnv {

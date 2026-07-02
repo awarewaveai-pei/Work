@@ -184,6 +184,7 @@ export function normalizeBuildRequest(payload: BuildRunRequest): BuildRunRequest
   let derivedSlug: BuildPackageSlug;
   if (payload.selectedPacks) {
     derivedSlug = payload.selectedPacks.includes("ecommerce") ? "wc-core"
+      : payload.selectedPacks.includes("tourism") ? "wp-tourism"
       : payload.selectedPacks.includes("brand") ? "wp-business"
       : "wp-basic";
   } else {
@@ -250,7 +251,7 @@ function smokeProfileFor(req: BuildRunRequest): BuildPlan["smokeProfile"] {
   // Pack-based model (OnboardWizard v2)
   if (req.selectedPacks) {
     if (req.selectedPacks.includes("ecommerce")) return "woocommerce";
-    if (req.selectedPacks.includes("brand")) return "business";
+    if (req.selectedPacks.includes("tourism") || req.selectedPacks.includes("brand")) return "business";
     return "basic";
   }
   // Legacy: wpSiteType + hasEcommerce

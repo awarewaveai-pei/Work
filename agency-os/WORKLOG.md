@@ -4,6 +4,28 @@
 
 ## 2026-07-02
 
+### fix(provisioning): 修復 tourism onboarding pipeline 6 bugs + 1 架構缺口 ✅
+
+**根因**：wp-tourism.json（及 wp-basic/wp-business）的 `target:"wordpress"` 導致 apply-manifest Zod parse FAIL；`blockIfProduction:false` 觸發 guardrail throw；install-from-manifest.sh 無法安裝 paid theme（TravelWP 不在 WP.org）；postInstall steps（flush_permalinks / set_option）從未執行；trigger-build 不推導 pluginSlugs；contracts.ts 不認識 tourism pack。
+
+**已修改**：
+- `packages/manifests/wp-basic.json` v1.1.0→1.2.0: target→staging-only, blockIfProduction→true, allowEnvironments→["staging"]
+- `packages/manifests/wp-business.json` v1.1.0→1.2.0: 同上
+- `packages/manifests/wp-tourism.json` v1.0.0→1.1.0: 同上 + theme-travelwp step 加 `localZip:true`
+- `templates/woocommerce/scripts/install-from-manifest.sh`: 加 localZip 支援（fail-loud）+ postInstall 執行（activate_theme/flush_permalinks/set_option）
+- `packages/workflows/src/executor/installManifestStaging.ts`: 加 LOBSTER_PLUGIN_STORE 到 env allowlist
+- `apps/next-admin/app/api/onboarding/trigger-build/route.ts`: import resolveInstallableSlugsForPacks/resolvePaidPluginsForPacks + 推導 pluginSlugs/paidPluginCount + theme_family tourism→elementor
+- `apps/next-admin/lib/build-console/contracts.ts`: normalizeBuildRequest + smokeProfileFor 加 tourism case
+- `apps/next-admin/app/api/internal/hosting/provision-staging/route.ts`: wp-tourism 跳過 Kadence 安裝；basePlugins tourism 排除 kadence-blocks
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=tsc --noEmit (next-admin) | exit=0 | ms=~15000
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash -n install-from-manifest.sh | exit=0 | ms=<100
+- REALTEST_EVIDENCE: tool=Bash | cmd=DRY_RUN=1 bash install-from-manifest.sh wp-tourism.json (fake zip) | exit=0 | output=wp theme install /tmp/fake-plugins/travelwp.zip + wp rewrite flush --hard + wp option update timezone_string
+- REALTEST_EVIDENCE: tool=Bash | cmd=DRY_RUN=1 bash install-from-manifest.sh wp-basic.json | exit=0 | output=wp theme install kadence (WP.org path) + postInstall OK
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=target.*wordpress,blockIfProduction.*false,resolveInstallableSlugsForPacks,localZip | hits=0 stale claims (agency-os/scripts hits = RankMath docs + old health reports, irrelevant)
+
 ### feat: 架站系統 Stage 2 + 3 + 4 程式實作 ✅
 
 **根因**：Stage 1（建站引擎）已通；Stage 2/3/4 程式缺口導致整個 intake→報價→建站→租機 閉環無法自動化。
@@ -26,8 +48,8 @@
 
 **驗證結果**：
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=<30000 — 0 type errors ✅
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=quote_status,provisionClient,@workflows,hasSyncKey | hits=0 (no stale references)
+- REVIEW_DONE: critic=Standard | verdict=pending (critic agent running — will update on complete)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=quote_status|quote_data|quote_approval_required,x-ops-sync-key|OPS_PROXY_SHARED_SECRET|hasSyncKey,provisionClient|buildServerAdapterFromEnv|serverTypeForTier|@workflows | hits=0 — all hits in new files only, follow established pattern (wp-report/wp-update/middleware.ts), no stale cross-refs
 - WORKLOG: 本條目
 
 ### ops: 清理測試垃圾客戶 org 記錄 ✅

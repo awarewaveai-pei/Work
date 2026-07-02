@@ -18,6 +18,10 @@ import { timingSafeEqual } from "../../../../lib/ops-inbox/verifyIngestToken";
 import { getSupabaseWriteClient } from "../../../../lib/supabase-server";
 import { kickActionRunDispatcher } from "../../../../lib/kick-dispatcher";
 import type { IntakeForm, WebsiteSpec } from "../../../../lib/onboarding/intake-form";
+import {
+  resolveInstallableSlugsForPacks,
+  resolvePaidPluginsForPacks,
+} from "../../../../lib/wp-plugin-stack-catalog";
 
 // Auth: Supabase session (owner/admin/operator) OR server-to-server x-ops-sync-key.
 // Mirrors the dual-path pattern established in wp-update/route.ts.
@@ -127,6 +131,8 @@ export async function POST(request: Request) {
     ? (rawPacks as WpPluginModule[])
     : [];
   const { slug: manifestSlug, downgraded } = toManifestSlug(spec.package_slug);
+  const derivedPluginSlugs = resolveInstallableSlugsForPacks(safePacks);
+  const paidPluginCount = resolvePaidPluginsForPacks(safePacks).length;
 
   // C2: Mark building before creating records (acts as a mutex for concurrent calls)
   const { error: markErr } = await supabase
@@ -262,7 +268,7 @@ export async function POST(request: Request) {
         primary_domain: domain,
         locale: locale === "zh-TW" ? "zh_TW" : "en",
         status: "draft",
-        theme_family: "kadence",
+        theme_family: manifestSlug === "wp-tourism" ? "elementor" : "kadence",
         stack_profile: manifestSlug,
       })
       .select("id")
@@ -283,6 +289,8 @@ export async function POST(request: Request) {
     domain: stagingDomain,
     packageSlug: manifestSlug,
     selectedPacks: safePacks,
+    pluginSlugs: derivedPluginSlugs,
+    paidPluginCount,
     organizationId,
     workspaceId,
     projectId,
