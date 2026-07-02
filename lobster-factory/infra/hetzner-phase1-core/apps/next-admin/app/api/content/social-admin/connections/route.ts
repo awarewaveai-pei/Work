@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canWriteTenantConfig } from "@/lib/ops-role";
+import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { listAllIntegrations, getPostizConfig } from "@/lib/content/postiz";
 
@@ -29,6 +30,9 @@ export async function POST(req: Request): Promise<Response> {
   if (!clientId || typeof clientId !== "string") {
     return new NextResponse("clientId required", { status: 400 });
   }
+  try { assertOrgAccess(req, clientId); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+
   if (!postizIntegrationId || typeof postizIntegrationId !== "string") {
     return new NextResponse("postizIntegrationId required", { status: 400 });
   }
@@ -110,6 +114,9 @@ export async function DELETE(req: Request): Promise<Response> {
 
   if (!clientId) return new NextResponse("clientId required", { status: 400 });
   if (!integrationId) return new NextResponse("integrationId required", { status: 400 });
+
+  try { assertOrgAccess(req, clientId); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
   const db = getSupabaseWriteClient();
   if (!db) return new NextResponse("database not configured", { status: 503 });

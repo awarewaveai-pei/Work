@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
+import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import {
   getPostizConfig,
   listIntegrations,
@@ -44,6 +45,9 @@ export async function POST(req: Request): Promise<Response> {
   if (!clientId || typeof clientId !== "string") {
     return new NextResponse("clientId required", { status: 400 });
   }
+  try { assertOrgAccess(req, clientId); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+
   if (!mode || (mode !== "draft" && mode !== "now")) {
     return new NextResponse("mode must be 'draft' or 'now'", { status: 400 });
   }
