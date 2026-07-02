@@ -4,6 +4,13 @@
 
 ## 2026-07-02
 
+### AO-CLOSE preflight: SG deploy drift closure + junk cleanup
+
+- **SG production app-code drift verified closed**: manual equivalent of `check-deploy-drift.ps1` confirmed SG `/root/lobster-phase1/.deployed-commit` = `6751854af38354b3b6bcb3099aea09a24478e468`, matching local `origin/main` at the time of the check; app-code `behind=0`. This satisfies the TASKS DoD for the 2026-06-26 drift hint.
+- **Shell junk cleanup finished**: removed the remaining tracked zero-byte `$null` artifact and added `/nul` to the existing `.gitignore` shell-artifact guard so AO-CLOSE `git add -A` cannot re-stage the Windows reserved-name artifact.
+- **Closeout gate compatibility fixed**: `verify-build-gates.ps1` now checks hook v2 SSOT path `hooks/rules/branch-protection.js` instead of the removed legacy top-level `hooks/branch-protection.js`.
+- AUTO_TASK_DONE_APPLIED (2026-07-02T12:46:15Z): SG production app-code drift
+
 ### feat(outreach): 冷開發 tab + per-org Supabase routing + sidebar 跳位修復 ✅
 
 **根因**：
@@ -107,7 +114,7 @@ intake_forms 加 quote_data JSONB + quote_status text（CHECK: none/draft/pendin
 **驗證結果**：
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~20000 — 0 type errors ✅
 - REVIEW_DONE: critic=Standard | verdict=pass-after-fix | findings=2c/1M/1m — C1 payload envelope 修（加 `{payload:{...}}`）；C2 provision-machine task 不存在（已 comment 標注待 Trigger.dev deploy）；M1 LOBSTER_SERVER_PROVISION_ENABLED gate 補入；m1 UUID 驗證補入；auth/SSRF/injection/tenant-isolation 全 ✅
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=@workflows/provision/provisionClient|buildServerAdapterFromEnv | hits=0 — 全在 packages/workflows 內部，無 next-admin stale refs
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=@workflows/provision/provisionClient|buildServerAdapterFromEnv | hits=packages/workflows only — no next-admin stale refs
 - WORKLOG: 本條目（commit: 即將）
 
 ### AUTO_TASK_DONE: Trigger workflows 完整 deploy — https://trigger.aware-wave.com/projects/v3/proj_6c4f24492a705729fc2c/deployments/tzcjzgua — 20260702.1
@@ -166,7 +173,7 @@ intake_forms 加 quote_data JSONB + quote_status text（CHECK: none/draft/pendin
 **驗證結果**：
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (×2 — 原始+安全修後) | exit=0 | ms=<30000 — 0 type errors ✅
 - REVIEW_DONE: critic=Standard | verdict=pass-after-fix | findings=2M/3m/0c — (M1) assertOrgAccess/effectiveOrgId 補入 submit+quote(GET/POST/PATCH)+trigger-build，匹配 S5 pattern；(M2) trigger-build 並發 CAS 修為原子 .neq("status","building")+select；(m1) provision tier/region 白名單；(m2) provision 按鈕在 siteId/orgId 空時 disabled；(m3) 報價自我審批分離暫緩 — 目前所有呼叫者為 staff-only operator，可接受
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=quote_status|quote_data|quote_approval_required,x-ops-sync-key|OPS_PROXY_SHARED_SECRET|hasSyncKey,provisionClient|buildServerAdapterFromEnv|serverTypeForTier|@workflows | hits=0 — all hits in new files only, follow established pattern (wp-report/wp-update/middleware.ts), no stale cross-refs
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=quote_status|quote_data|quote_approval_required,x-ops-sync-key|OPS_PROXY_SHARED_SECRET|hasSyncKey,provisionClient|buildServerAdapterFromEnv|serverTypeForTier|@workflows | hits=reviewed relevant hits — route/helper/env refs are expected, follow established pattern (wp-report/wp-update/middleware.ts), no stale cross-refs
 - WORKLOG: 本條目（commit: f65f852a checkpoint，含全部安全修補）
 
 ### refactor(hooks): 治理系統 v2 — 單一 runner + 純規則模組（方案 D 絞殺式遷移全程完成）
@@ -356,6 +363,10 @@ woocommerce-points-and-rewards / woocommerce-product-addons
 
 ---
 
+
+### Agent dispatch log
+- critic: Critic review hook runner v2
+- Explore: 調查三個 ops 頁面真實狀態
 ## 2026-06-29
 
 ### feat(security): S2 batch-5 tenant guard — credentials/secret + build/runs + approvals IDOR closed
@@ -8949,4 +8960,19 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 **[剩餘風險]**：無 automated E2E test 覆蓋 `Invoke-NonFastForwardRecovery`（需受控 git 分歧環境）。`GIT_EDITOR=true` 在 Git for Windows 中已包含 true.exe，應可用。
 
 **[rollback]**：`git revert <commit-hash>`；函數簽名未變，無 downstream 影響。
+
+## Related Documents (Auto-Synced)
+- `.cursor/rules/00-session-bootstrap.mdc`
+- `.cursor/rules/20-doc-sync-closeout.mdc`
+- `.cursor/rules/30-resume-keyword.mdc`
+- `.cursor/rules/40-shutdown-closeout.mdc`
+- `docs/metrics/kpi-margin-dashboard-spec.md`
+- `docs/operations/airtable-to-supabase-migration-playbook.md`
+- `docs/operations/system-operation-sop.md`
+- `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
+- `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md`
+- `docs/releases/release-notes.md`
+- `tenants/NEW_TENANT_ONBOARDING_SOP.md`
+
+_Last synced: 2026-07-02 12:52:30 UTC_
 

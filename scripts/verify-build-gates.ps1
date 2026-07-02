@@ -171,7 +171,7 @@ $requiredClaudeUserlevelFiles = @(
     "README.md",
     "hooks\hooks.json",
     "hooks\ao-resume-on-prompt.ps1",
-    "hooks\branch-protection.js"
+    "hooks\rules\branch-protection.js"
 )
 foreach ($rel in $requiredClaudeUserlevelFiles) {
     $abs = Join-Path $claudeUserlevelDir $rel
