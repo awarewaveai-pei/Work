@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
-import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { getOrgSupabaseWriteClient } from "@/lib/org-client";
 import { getSecret } from "@/lib/secret-vault";
 import { checkColdGate, buildEvidenceSnapshot, lintMessage } from "@/lib/outreach/cold-gate";
 import { generateWithGemini } from "@/lib/outreach/ai-gemini";
@@ -62,12 +62,12 @@ function buildPrompt(lead: LeadRow, sp: ProfileRow | null, forbidden: string[]):
 }
 
 export async function GET(req: Request): Promise<Response> {
-  const supabase = getSupabaseWriteClient();
+  const params = new URL(req.url).searchParams;
+  const supabase = await getOrgSupabaseWriteClient(params.get("orgSlug"));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
-  const url = new URL(req.url);
-  const leadId = url.searchParams.get("leadId");
+  const leadId = params.get("leadId");
   let orgFilter: string | null;
-  try { orgFilter = effectiveOrgId(req, url.searchParams.get("organizationId")); }
+  try { orgFilter = effectiveOrgId(req, params.get("organizationId")); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   let query = supabase.from(TABLE).select("*").order("created_at", { ascending: false }).limit(100);
   if (leadId) query = query.eq("lead_id", leadId);
@@ -77,13 +77,10 @@ export async function GET(req: Request): Promise<Response> {
   return NextResponse.json({ ok: true, messages: data ?? [] });
 }
 
-// POST { leadId } — generate a cold-email draft.
+// POST { leadId, orgSlug? } — generate a cold-email draft.
 export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
-
-  const supabase = getSupabaseWriteClient();
-  if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   let body: Record<string, unknown>;
   try {
@@ -91,6 +88,9 @@ export async function POST(req: Request): Promise<Response> {
   } catch {
     return new NextResponse("invalid json", { status: 400 });
   }
+
+  const supabase = await getOrgSupabaseWriteClient(str(body.orgSlug));
+  if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const leadId = str(body.leadId);
   if (!leadId) return NextResponse.json({ ok: false, error: "leadId required" }, { status: 400 });
 
@@ -214,13 +214,11 @@ export async function POST(req: Request): Promise<Response> {
   return NextResponse.json({ ok: true, mode, message: created, lint: isAiGenerated ? lint : null });
 }
 
-// PATCH { id, status, body? } — human review action (approve / edit / skip). Never sends.
+// PATCH { id, status, body?, orgSlug? } — human review action (approve / edit / skip). Never sends.
 const ALLOWED_STATUS = new Set(["draft", "approved", "needs_edit", "skipped"]);
 export async function PATCH(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
-  const supabase = getSupabaseWriteClient();
-  if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   let body: Record<string, unknown>;
   try {
@@ -228,6 +226,9 @@ export async function PATCH(req: Request): Promise<Response> {
   } catch {
     return new NextResponse("invalid json", { status: 400 });
   }
+
+  const supabase = await getOrgSupabaseWriteClient(str(body.orgSlug));
+  if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const id = str(body.id);
   const status = str(body.status);
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
@@ -255,9 +256,10 @@ export async function PATCH(req: Request): Promise<Response> {
 export async function DELETE(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
-  const supabase = getSupabaseWriteClient();
+  const params = new URL(req.url).searchParams;
+  const supabase = await getOrgSupabaseWriteClient(params.get("orgSlug"));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
-  const id = new URL(req.url).searchParams.get("id");
+  const id = params.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
   const { data: cur, error: readErr } = await supabase.from(TABLE).select("organization_id").eq("id", id).maybeSingle();
   if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });

@@ -53,3 +53,11 @@ export function connectorSecretRef(connectorAccountId: string): string {
 export function clientCredSecretRef(credentialId: string): string {
   return `client_cred:${credentialId}`;
 }
+
+/** Vault ref for a per-org Supabase credential (url or service_role key).
+ *  Set via: putSecret(orgSupabaseRef('soulful-expression','url'), 'https://xxx.supabase.co')
+ *           putSecret(orgSupabaseRef('soulful-expression','key'), 'service_role_key_here')
+ */
+export function orgSupabaseRef(orgSlug: string, type: "url" | "key"): string {
+  return `org:${orgSlug}:supabase_${type}`;
+}
