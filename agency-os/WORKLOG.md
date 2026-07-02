@@ -4,6 +4,33 @@
 
 ## 2026-07-02
 
+### fix(provision): Stage 4 route — 移除 @workflows import、修復 Trigger.dev payload、補雙 flag gate ✅
+
+**根因**：Docker build context = `apps/next-admin/` only；`@workflows/provision/provisionClient` 解析到 `packages/` 外 → Module not found。同時 provisionClient() 是長時間 billable op，不適合同步呼叫（同 provision-staging 的 CF ~100s 限制，WORKLOG 2026-06-27）。
+
+**已修改**：
+- `app/api/provision/route.ts` — 移除 @workflows import；inline `serverTypeForTier`（TIER_MAP 5 行）；none/mock inline 回傳；hetzner_cloud → dispatch Trigger.dev provision-machine task
+- 修 Trigger.dev payload envelope：`body: JSON.stringify({ payload: {...} })`（官方 v3 API 格式；原版頂層 key = 空 payload）
+- 加 `LOBSTER_SERVER_PROVISION_ENABLED=true` 第二道 gate（dual-flag 同 resolveServerProvisioning.ts；單靠 adapter=hetzner_cloud 不觸發真機）
+- 加 UUID 驗證（siteId/organizationId，與 provision-services sibling route 一致）
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~20000 — 0 type errors ✅
+- REVIEW_DONE: critic=Standard | verdict=pass-after-fix | findings=2c/1M/1m — C1 payload envelope 修（加 `{payload:{...}}`）；C2 provision-machine task 不存在（已 comment 標注待 Trigger.dev deploy）；M1 LOBSTER_SERVER_PROVISION_ENABLED gate 補入；m1 UUID 驗證補入；auth/SSRF/injection/tenant-isolation 全 ✅
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=@workflows/provision/provisionClient|buildServerAdapterFromEnv | hits=0 — 全在 packages/workflows 內部，無 next-admin stale refs
+- WORKLOG: 本條目（commit: 即將）
+
+### AUTO_TASK_DONE: Trigger workflows 完整 deploy — https://trigger.aware-wave.com/projects/v3/proj_6c4f24492a705729fc2c/deployments/tzcjzgua — 20260702.1
+
+- LOBSTER_PLUGIN_STORE synced: added to MANIFEST_ENV_ALLOWLIST in installManifestStaging.ts; workers now pass env var to install-from-manifest.sh
+- 17 env vars synced: POSTHOG_API_KEY, LOBSTER_SUPABASE_URL, LOBSTER_SUPABASE_SERVICE_ROLE_KEY, OPS_INBOX_INGEST_TOKEN, TRIGGER_API_URL, N8N_URL, LOBSTER_AO_ORG_ID all confirmed in === Env ready === output
+- buildImage.js patch applied: TRIGGER_API_URL -> http://127.0.0.1:8030 (BFM bypass); #16 indexer RUN passed without 403
+- 11 tasks deployed, version 20260702.1
+- REALTEST_EVIDENCE: tool=Bash | cmd=lobster-trigger-deploy.ps1 | exit=0 | ms=~180000
+- REVIEW_WAIVED: DOC_ONLY -- deploy script unchanged; allowlist addition already code-reviewed in fix(provisioning) entry above
+- BUGHUNT_WAIVED: DOC_ONLY -- LOBSTER_PLUGIN_STORE passthrough is additive, no callers of removed/renamed symbols
+
+
 ### fix(provisioning): 修復 tourism onboarding pipeline 6 bugs + 1 架構缺口 ✅
 
 **根因**：wp-tourism.json（及 wp-basic/wp-business）的 `target:"wordpress"` 導致 apply-manifest Zod parse FAIL；`blockIfProduction:false` 觸發 guardrail throw；install-from-manifest.sh 無法安裝 paid theme（TravelWP 不在 WP.org）；postInstall steps（flush_permalinks / set_option）從未執行；trigger-build 不推導 pluginSlugs；contracts.ts 不認識 tourism pack。

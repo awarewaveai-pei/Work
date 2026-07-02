@@ -2,7 +2,8 @@
 // Dispatches to Trigger.dev (provision-machine task) for billable hetzner_cloud mode
 // to avoid CF ~100s timeout (long-running op — same constraint as provision-staging).
 // Env-gated: LOBSTER_SERVER_ADAPTER=none (default) → idle; =mock → dry-run plan;
-//            =hetzner_cloud → dispatches Trigger.dev provision-machine task (billable).
+//            =hetzner_cloud + LOBSTER_SERVER_PROVISION_ENABLED=true → billable dispatch.
+// NOTE: provision-machine Trigger.dev task must be deployed before hetzner_cloud path works.
 // Auth: ops-role (owner/admin/operator) OR x-ops-sync-key.
 
 import { NextResponse } from "next/server";
@@ -55,6 +56,14 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(siteId)) {
+    return NextResponse.json({ ok: false, error: "invalid_site_id", detail: "siteId must be a UUID" }, { status: 422 });
+  }
+  if (!UUID_RE.test(organizationId)) {
+    return NextResponse.json({ ok: false, error: "invalid_organization_id", detail: "organizationId must be a UUID" }, { status: 422 });
+  }
+
   const VALID_TIERS = new Set(["starter", "business", "commerce", "premium"]);
   const VALID_REGIONS = new Set(["sin", "nbg1", "fsn1", "hel1", "ash"]);
   if (!VALID_TIERS.has(tier)) {
@@ -101,7 +110,19 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // ── hetzner_cloud (billable) → dispatch Trigger.dev provision-machine task ──
+  // Requires BOTH LOBSTER_SERVER_ADAPTER=hetzner_cloud AND LOBSTER_SERVER_PROVISION_ENABLED=true
+  // (dual-gate: same pattern as packages/workflows/src/hosting/resolveServerProvisioning.ts).
+  // NOTE: provision-machine Trigger.dev task must be deployed separately before this path works.
   if (adapterMode === "hetzner_cloud") {
+    const billableEnabled = process.env.LOBSTER_SERVER_PROVISION_ENABLED === "true";
+    if (!billableEnabled) {
+      return NextResponse.json({
+        ok: true,
+        result: { outcome: "idle", detail: "LOBSTER_SERVER_PROVISION_ENABLED not set — dry-run gate active" },
+        adapter: "hetzner_cloud_gated",
+      });
+    }
+
     const triggerToken = (process.env.TRIGGER_ACCESS_TOKEN ?? "").trim();
     const triggerBase = (process.env.TRIGGER_API_URL ?? "https://trigger.aware-wave.com").replace(/\/$/, "");
     if (!triggerToken) {
@@ -122,20 +143,15 @@ export async function POST(req: Request): Promise<Response> {
           "Content-Type": "application/json",
           Authorization: `Bearer ${triggerToken}`,
         },
+        // Trigger.dev v3 API requires payload wrapped in { payload: {...} }
         body: JSON.stringify({
-          siteId,
-          siteName,
-          organizationId,
-          tier,
-          serverType,
-          region,
-          domain: domain ?? null,
+          payload: { siteId, siteName, organizationId, tier, serverType, region, domain: domain ?? null },
         }),
       });
       if (!res.ok) {
-        const err = await res.text();
+        const errText = await res.text();
         return NextResponse.json(
-          { ok: false, error: "trigger_dispatch_failed", detail: err.slice(0, 300) },
+          { ok: false, error: "trigger_dispatch_failed", detail: errText.slice(0, 300) },
           { status: 502 },
         );
       }
