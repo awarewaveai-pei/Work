@@ -3,6 +3,94 @@
 import { useState } from "react";
 import type { IntakeForm, WebsiteSpec } from "@/lib/onboarding/intake-form";
 
+interface IntakeHistoryItem {
+  id: string;
+  organization_id: string | null;
+  status: string;
+  submitted_at: string;
+  submitted_by: string;
+  form_data: Record<string, unknown>;
+}
+
+function statusBadge(status: string): string {
+  if (status === "live") return "badge-green";
+  if (status === "building" || status === "spec_generated") return "badge-gray";
+  if (status === "cancelled") return "badge-red";
+  return "badge-gray";
+}
+
+function IntakeHistory() {
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<IntakeHistoryItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function load() {
+    if (loading) return;
+    setLoading(true);
+    setErr(null);
+    try {
+      const r = await fetch("/api/onboarding/submit");
+      if (r.status === 401 || r.status === 403) { setErr("請重新登入或權限不足"); return; }
+      const j = await r.json() as { ok: boolean; intake_forms?: IntakeHistoryItem[]; error?: string };
+      if (!j.ok) throw new Error(j.error ?? "載入失敗");
+      setItems(j.intake_forms ?? []);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function toggle() {
+    if (!open && items.length === 0 && !err) void load();
+    setOpen((v) => !v);
+  }
+
+  return (
+    <div style={{ maxWidth: 680, margin: "0 auto 12px", padding: "0 16px" }}>
+      <button type="button" onClick={toggle} className="btn-secondary" style={{ fontSize: 13 }}>
+        {open ? "收起歷史 ↑" : "歷史提交紀錄 ↓"}
+      </button>
+      {open && (
+        <div className="intake-card" style={{ marginTop: 8 }}>
+          {loading ? (
+            <p className="card-sub">載入中…</p>
+          ) : err ? (
+            <p className="card-sub" style={{ color: "var(--badge-red-text)" }}>{err}</p>
+          ) : items.length === 0 ? (
+            <p className="card-sub">尚無提交紀錄。</p>
+          ) : (
+            <>
+            <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>最近 20 筆</p>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr>
+                  {(["公司", "產業", "狀態", "提交時間", "提交者"] as const).map((h) => (
+                    <th key={h} style={{ textAlign: "left", padding: "4px 8px", color: "var(--text-secondary)", fontWeight: 600 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <tr key={item.id} style={{ borderTop: "1px solid var(--card-border)" }}>
+                    <td style={{ padding: "7px 8px", fontWeight: 600 }}>{String(item.form_data.company_name ?? "—")}</td>
+                    <td style={{ padding: "7px 8px", color: "var(--text-secondary)" }}>{String(item.form_data.industry ?? "—")}</td>
+                    <td style={{ padding: "7px 8px" }}><span className={`card-badge ${statusBadge(item.status)}`}>{item.status}</span></td>
+                    <td style={{ padding: "7px 8px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{item.submitted_at ? new Date(item.submitted_at).toLocaleString("zh-TW") : "—"}</td>
+                    <td style={{ padding: "7px 8px", color: "var(--text-secondary)" }}>{item.submitted_by}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const STEPS = [
   { num: 1, label: "公司品牌", duration: "2 min" },
   { num: 2, label: "客群", duration: "1 min" },
@@ -165,6 +253,8 @@ export default function OnboardingPage() {
   // ── Spec result view ──────────────────────────────────────────
   if ((flow === "done" || flow === "triggering" || flow === "triggered") && spec) {
     return (
+      <div>
+      <IntakeHistory />
       <div className="intake-page-wrap">
         <div className="intake-card">
           <div className="intake-result-header">
@@ -243,6 +333,7 @@ export default function OnboardingPage() {
           )}
         </div>
       </div>
+      </div>
     );
   }
 
@@ -287,6 +378,8 @@ export default function OnboardingPage() {
 
   // ── Multi-step form ───────────────────────────────────────────
   return (
+    <div>
+    <IntakeHistory />
     <div className="intake-page-wrap">
       {/* Page title outside the card */}
       <div className="intake-page-head">
@@ -567,6 +660,7 @@ export default function OnboardingPage() {
           )}
         </div>
       </div>
+    </div>
     </div>
   );
 }

@@ -4,6 +4,33 @@
 
 ## 2026-07-02
 
+### feat(data-flow): 補足三個客戶資料流缺口 ✅
+
+**根因**：
+1. `GET /api/onboarding/submit` 不存在 → 表單提交後無法查歷史
+2. `GET /api/ops/repairs` 不支援 `?client_slug=` → 外部工具按客戶篩選修復記錄失效（頁面端已有，API 一致性缺口）
+3. `/ops/onboarding` 無歷史面板 → 表單送出後紀錄消失
+
+**已修改**：
+- `app/api/onboarding/submit/route.ts` — 加 GET handler：`getSupabaseServerClient()`（service-role，bypass service-role-only RLS）+ `effectiveOrgId` org 過濾，回傳 `{ ok: true, intake_forms: [...] }`，limit 1–100 預設 20，雙 auth path 同 POST
+- `app/ops/onboarding/page.tsx` — 加 `IntakeHistory` Client Component（懶載入，展開觸發 fetch）：401/403 → 明確錯誤訊息；`submitted_at` null guard；「最近 20 筆」hint；兩個 return path（spec-result + form）均渲染
+- `app/api/ops/repairs/route.ts` — GET handler 加 `?client_slug=` filter（`.eq("client_slug", clientSlug)`），與 `organization_id` 並存
+
+**不需改**：Outreach（OrgSwitcher+layout+useActiveOrg 早已實作）；Repair Center 頁面（server component 直查 Supabase，client_slug filter 已有）
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~5000 — 0 type errors ✅
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/3m — m1 401 error msg（已修）m2 Date null guard（已修）m3 pagination hint（已加）；auth/tenant-isolation/injection/JSX structure 全 ✅
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=intake_forms,/api/onboarding/submit,client_slug | hits=0 stale claims（docs 僅描述 POST，不衝突）
+
+### ops: 0055_intake_quote.sql migration applied to EU Supabase ✅
+
+intake_forms 加 quote_data JSONB + quote_status text（CHECK: none/draft/pending_approval/approved/rejected）+ partial index。PostgREST schema cache reload。現有 1 筆 quote_status='none' 正常。
+
+- REALTEST_EVIDENCE: tool=mcp__hetzner-ssh | cmd=psql -U supabase_admin ALTER TABLE + CREATE INDEX + NOTIFY | exit=0 | ms=~2000
+- REVIEW_WAIVED: DOC_ONLY -- additive schema change, no existing rows affected, no code change
+- BUGHUNT_WAIVED: NA -- schema-only migration, no symbol rename/removal
+
 ### fix(provision): Stage 4 route — 移除 @workflows import、修復 Trigger.dev payload、補雙 flag gate ✅
 
 **根因**：Docker build context = `apps/next-admin/` only；`@workflows/provision/provisionClient` 解析到 `packages/` 外 → Module not found。同時 provisionClient() 是長時間 billable op，不適合同步呼叫（同 provision-staging 的 CF ~100s 限制，WORKLOG 2026-06-27）。

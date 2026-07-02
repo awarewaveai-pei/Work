@@ -59,6 +59,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const limitRaw = Number(searchParams.get("limit") ?? "100");
   const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(200, limitRaw)) : 100;
+  const clientSlug = searchParams.get("client_slug")?.trim() || null;
 
   let orgFilter: string | null;
   try { orgFilter = effectiveOrgId(request, null); }
@@ -71,6 +72,7 @@ export async function GET(request: Request) {
     .order("created_at", { ascending: false })
     .limit(limit);
   if (orgFilter) query = query.eq("organization_id", orgFilter);
+  if (clientSlug) query = query.eq("client_slug", clientSlug);
   const { data, error } = await query;
 
   if (error) return NextResponse.json({ ok: false, error: "repair_runs_fetch_failed", details: error.message }, { status: 409 });
