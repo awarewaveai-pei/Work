@@ -16,6 +16,9 @@ const LIST_LIMIT = 200;
 
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const uuid = (v: unknown): string | null => { const s = str(v); return s && UUID_RE.test(s) ? s : null; };
+
 interface ScoreInput {
   name?: string | null;
   industry?: string | null;
@@ -45,7 +48,7 @@ export async function GET(req: Request): Promise<Response> {
   }
 
   let orgFilter: string | null;
-  try { orgFilter = effectiveOrgId(req, url.searchParams.get("organizationId")); }
+  try { orgFilter = effectiveOrgId(req, uuid(url.searchParams.get("organizationId"))); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   const status = url.searchParams.get("status");
   const priority = url.searchParams.get("priority");
@@ -74,7 +77,7 @@ export async function POST(req: Request): Promise<Response> {
 
   // Pre-resolve org for the manual create/update path (approve path resolves its own org from inbox row).
   let orgId: string | null;
-  try { orgId = effectiveOrgId(req, str(body.organizationId)); }
+  try { orgId = effectiveOrgId(req, uuid(body.organizationId)); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
   // --- Approve-from-inbox path ---
