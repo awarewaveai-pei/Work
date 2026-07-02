@@ -23,6 +23,25 @@
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/3m — m1 401 error msg（已修）m2 Date null guard（已修）m3 pagination hint（已加）；auth/tenant-isolation/injection/JSX structure 全 ✅
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=intake_forms,/api/onboarding/submit,client_slug | hits=0 stale claims（docs 僅描述 POST，不衝突）
 
+### fix(ops-inbox): repair_runs.client_slug 根因修復 ✅
+
+**根因**：`IncidentDraft` 型別未包含 `client_slug` → 所有 normalizer 無法傳遞此欄位 → `upsert_incident_atomic` SQL function 不寫入 `ops_incidents.client_slug` → `startRepairFromIncident()` 複製到 `repair_runs.client_slug` 時永遠 null。
+
+**已修改**：
+- `lib/ops-inbox/types.ts` — `IncidentDraft` Pick 加入 `"client_slug"`（optional，其他 normalizer 不設 = null，不破壞型別）
+- `lib/ops-inbox/normalize/uptime-kuma.ts` — 從 monitor tags 讀 `client` tag（`tags.find(t => t.name === "client")?.value`），加 trim/lowercase/length ≤64/`/^[a-z0-9-]+$/` 驗證後寫 `client_slug`；無效/缺 tag → null
+- `lib/ops-inbox/upsertIncidentAtomic.ts` — 傳 `p_client_slug: draft.client_slug ?? null`；更新 docblock 參考 migration 0056
+- `packages/db/migrations/0056_upsert_incident_atomic_add_client_slug.sql` — BEGIN/COMMIT 包 DROP+CREATE（避免空窗）；DROP 13-arg（0036 版），CREATE OR REPLACE 14-arg 加 `p_client_slug text DEFAULT NULL`；INSERT 含 `client_slug`；ON CONFLICT UPDATE: `COALESCE(excluded.client_slug, ops_incidents.client_slug)`（保留已存在非 null 值）
+
+**Uptime Kuma 設定（operator 手動）**：在客戶監控器加 tag `name=client, value=<slug>`
+
+**⚠️ Migration 待套用**：`0056_upsert_incident_atomic_add_client_slug.sql` 需手動在 EU Supabase 執行，再 `NOTIFY pgrst, 'reload schema';`
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~5000 — 0 type errors ✅
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/3m — m1 migration 加 BEGIN/COMMIT（已修）m2 tag charset 驗證（已修）m3 stale comment（已修）；tag spoofing = low-impact（denorm filter 非 authz key）；COALESCE 語意正確
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=upsert_incident_atomic,IncidentDraft,client_slug | hits=0 stale claims（3 migration + 1 TS，全部正確）
+
 ### ops: 0055_intake_quote.sql migration applied to EU Supabase ✅
 
 intake_forms 加 quote_data JSONB + quote_status text（CHECK: none/draft/pending_approval/approved/rejected）+ partial index。PostgREST schema cache reload。現有 1 筆 quote_status='none' 正常。

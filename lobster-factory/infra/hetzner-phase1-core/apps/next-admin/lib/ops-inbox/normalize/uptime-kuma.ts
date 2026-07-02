@@ -26,6 +26,11 @@ export function normalizeUptimeKuma(raw: any): IncidentDraft {
     kumaHostnameToService(monitor.url) ??
     kumaMonitorNameToService(monitor.name);
 
+  const rawClientTag = tags.find((t) => t.name === "client")?.value;
+  const clientSlug = rawClientTag && /^[a-z0-9-]+$/.test(rawClientTag.trim().toLowerCase().slice(0, 64))
+    ? rawClientTag.trim().toLowerCase().slice(0, 64)
+    : null;
+
   const title = isDown ? `Uptime: ${monitor.name} is DOWN` : `Uptime: ${monitor.name} ${heartbeat.msg ?? "event"}`;
 
   return {
@@ -40,5 +45,6 @@ export function normalizeUptimeKuma(raw: any): IncidentDraft {
     message: heartbeat.msg ?? null,
     raw,
     tags: { kuma_type: monitor.type, kuma_url: monitor.url, hostname: monitor.hostname },
+    client_slug: clientSlug,
   };
 }

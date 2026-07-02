@@ -74,7 +74,7 @@ export interface Incident {
 
 export type IncidentDraft = Pick<
   Incident,
-  "source" | "external_id" | "fingerprint" | "signal_type" | "severity" | "service" | "environment" | "title" | "message" | "raw" | "tags"
+  "source" | "external_id" | "fingerprint" | "signal_type" | "severity" | "service" | "environment" | "title" | "message" | "raw" | "tags" | "client_slug"
 >;
 
 export interface IncidentSnapshot {
