@@ -125,31 +125,17 @@ export const DEFAULT_SECTIONS: NavSection[] = [
 
 // Saved shape: { sectionOrder: string[], itemOrders: Record<sectionId, string[]> } — see SavedLayout in lib/theme/tokens.
 
-// These sections are always pinned to the top regardless of any saved drag order.
-const PINNED_TOP_SECTIONS = ['overview', 'build-onboard', 'clients-ops'];
-
 function applyLayout(sections: NavSection[], layout: SavedLayout): NavSection[] {
   const map = new Map(sections.map(s => [s.id, s]));
-  const pinnedSet = new Set(PINNED_TOP_SECTIONS);
 
-  // Pinned sections always first, in their DEFAULT_SECTIONS order
-  const pinned = PINNED_TOP_SECTIONS.flatMap(id => map.has(id) ? [map.get(id)!] : []);
-
-  // Apply saved section order for everything else
-  let rest: NavSection[];
+  // Apply section order
+  let ordered: NavSection[];
   if (layout.sectionOrder) {
-    rest = layout.sectionOrder
-      .filter(id => !pinnedSet.has(id))
-      .flatMap(id => map.has(id) ? [map.get(id)!] : []);
-    // Append any new sections not in saved order and not pinned
-    sections.forEach(s => {
-      if (!pinnedSet.has(s.id) && !layout.sectionOrder!.includes(s.id)) rest.push(s);
-    });
+    ordered = layout.sectionOrder.flatMap(id => map.has(id) ? [map.get(id)!] : []);
+    sections.forEach(s => { if (!layout.sectionOrder!.includes(s.id)) ordered.push(s); });
   } else {
-    rest = sections.filter(s => !pinnedSet.has(s.id));
+    ordered = [...sections];
   }
-
-  const ordered = [...pinned, ...rest];
 
   // Apply item orders per section
   if (layout.itemOrders) {
