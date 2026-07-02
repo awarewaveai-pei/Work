@@ -12,8 +12,8 @@
     - PASS (exit 0): all scanned files clean
 
   This is COMPLEMENTARY to:
-    - mcp/claude-userlevel/hooks/commit-quality.js  (commit-time, scans .js/.ts/.py)
-    - mcp/claude-userlevel/hooks/audit-log.js       (post-tool, redacts logs)
+    - mcp/claude-userlevel/hooks/rules/commit-quality.js  (commit-time, scans .js/.ts/.py)
+    - mcp/claude-userlevel/hooks/rules/audit-log.js       (post-tool, redacts logs)
   This scanner targets gitignored config files those hooks never see.
 
 .PARAMETER Strict

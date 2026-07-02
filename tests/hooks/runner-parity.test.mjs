@@ -85,6 +85,18 @@ test('parity: staged debugger + git commit → BLOCK (commit-quality)', () => {
   assert.match(r.stderr, /debugger statement/);
 });
 
+test('ID-6: SELF-SCAN EXEMPTION — staged governance/test files containing gate patterns do NOT deadlock commit', () => {
+  const repo = makeGitRepo({
+    branch: 'feature',
+    files: {
+      'mcp/claude-userlevel/hooks/rules/commit-quality.js': 'const re = /\\bdebugger\\b/;\n',
+      'tests/hooks/fixture.js': 'debugger;\n',
+    },
+  });
+  const r = run('PreToolUse', { session_id: freshSid('p'), tool_name: 'Bash', tool_input: { command: 'git commit -m x' } }, { cwd: repo });
+  assert.equal(r.status, 0);
+});
+
 test('parity: git commit with non-empty tracker → BLOCK (verify-gate-commit)', () => {
   const sid = freshSid('pvgc');
   writeTracker(sid, ['/x/foo.ts']);

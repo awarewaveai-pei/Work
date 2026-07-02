@@ -156,3 +156,9 @@ agency-os/Backups/
 
 # Orphaned deploy worktree directories
 .deploy-*/
+
+# --- Shell-artifact junk guard (2026-07-02 incident: PS-style redirection under bash
+# created literal $null/null files; a doc-content word-split created CJK-named 0-byte
+# files; auto-checkpoint's `git add -A` then committed them into the SSOT) ---
+/$null
+/null
