@@ -4,7 +4,6 @@
 
 ## 2026-07-02
 
-<<<<<<< HEAD
 ### fix(provisioning): 修復 tourism onboarding pipeline 6 bugs + 1 架構缺口 ✅
 
 **根因**：wp-tourism.json（及 wp-basic/wp-business）的 `target:"wordpress"` 導致 apply-manifest Zod parse FAIL；`blockIfProduction:false` 觸發 guardrail throw；install-from-manifest.sh 無法安裝 paid theme（TravelWP 不在 WP.org）；postInstall steps（flush_permalinks / set_option）從未執行；trigger-build 不推導 pluginSlugs；contracts.ts 不認識 tourism pack。
@@ -52,7 +51,7 @@
 - REVIEW_DONE: critic=Standard | verdict=pass-after-fix | findings=2M/3m/0c — (M1) assertOrgAccess/effectiveOrgId 補入 submit+quote(GET/POST/PATCH)+trigger-build，匹配 S5 pattern；(M2) trigger-build 並發 CAS 修為原子 .neq("status","building")+select；(m1) provision tier/region 白名單；(m2) provision 按鈕在 siteId/orgId 空時 disabled；(m3) 報價自我審批分離暫緩 — 目前所有呼叫者為 staff-only operator，可接受
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=quote_status|quote_data|quote_approval_required,x-ops-sync-key|OPS_PROXY_SHARED_SECRET|hasSyncKey,provisionClient|buildServerAdapterFromEnv|serverTypeForTier|@workflows | hits=0 — all hits in new files only, follow established pattern (wp-report/wp-update/middleware.ts), no stale cross-refs
 - WORKLOG: 本條目
-=======
+
 ### refactor(hooks): 治理系統 v2 — 單一 runner + 純規則模組（方案 D 絞殺式遷移全程完成）
 
 [任務理解] 全面稽核（三調查代理 + 10 項親測注入）確認四風險實錘：① 23 hooks 手刻生命週期 ×23、零測試、`_verify-shared` 頂層 require 單點（一檔壞 = 7 安全閘靜默死）② 兩份接線檔互漂（16 vs 20 hooks、自稱 15）③ 遠端 container 零 hook 接線 = 每個 web session 治理真空 ④ WORKLOG 15,708 行無 rotation、誠實鏈驗格式不驗真。操作者裁決：不要補丁，要乾淨架構（方案 D），全程不中停。
@@ -99,8 +98,6 @@
 
 - AUTO_TASK_DONE: hooks v2 runner 架構遷移 + 遠端接線 + 垃圾檔清理 + WORKLOG 輪替 + 規則優先序/信任邊界明文化
 
-## 2026-07-02
->>>>>>> origin/main
 
 ### ops: 清理測試垃圾客戶 org 記錄 ✅
 
