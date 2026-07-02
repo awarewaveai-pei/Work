@@ -45,10 +45,22 @@ function keepMonths(now = new Date()) {
 
 function parse(text) {
   // Split into header (everything before the first day heading) + blocks.
-  const re = /^## (20\d{2}-\d{2}-\d{2})\b.*$/gm;
+  // Fence-aware (critic 2026-07-02 finding 1): a `## 20xx-xx-xx` line inside a
+  // ``` / ~~~ code fence is CONTENT (WORKLOG entries paste command output and
+  // WORKLOG-format examples), not a block boundary — the naive regex split a
+  // kept block and mis-filed its tail into the wrong archive month.
+  const lines = text.split('\n');
   const marks = [];
-  let m;
-  while ((m = re.exec(text)) !== null) marks.push({ date: m[1], start: m.index });
+  let inFence = false;
+  let offset = 0;
+  for (const line of lines) {
+    if (/^(```|~~~)/.test(line)) inFence = !inFence;
+    if (!inFence) {
+      const m = /^## (20\d{2}-\d{2}-\d{2})\b/.exec(line);
+      if (m) marks.push({ date: m[1], start: offset });
+    }
+    offset += line.length + 1; // +1 for the split '\n'
+  }
   if (marks.length === 0) return { header: text, blocks: [] };
   const header = text.slice(0, marks[0].start);
   const blocks = marks.map((mk, i) => ({
@@ -94,22 +106,29 @@ function main() {
     return;
   }
 
+  // Write order + failure model (critic 2026-07-02 findings 2a/2b):
+  //   1. Archive appends are IDEMPOTENT — a block whose exact text is already
+  //      in the target file is skipped, so the promised "next close retries"
+  //      cannot duplicate content after a partial failure.
+  //   2. WORKLOG.md is rewritten atomically (temp file + rename on the same
+  //      volume) — a crash mid-write can never truncate the VBC SSOT.
   fs.mkdirSync(ARCHIVE_DIR, { recursive: true });
   for (const [k, list] of [...byMonth.entries()].sort()) {
     const file = path.join(ARCHIVE_DIR, `${k}.md`);
-    const isNew = !fs.existsSync(file);
-    const head = isNew
+    const existing = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
+    const head = existing === null
       ? `# WORKLOG archive ${k}\n\n> Rotated out of agency-os/WORKLOG.md by scripts/rotate-worklog.mjs. Newest-first. Do not append by hand — write today's work to WORKLOG.md.\n\n`
       : '';
-    // Newest-first within the file: new batch is OLDER than existing archive
-    // content only if the file already has newer blocks — in practice each
-    // month file receives its blocks exactly once, so append order is fine.
-    fs.appendFileSync(file, head + list.map((b) => b.text.trimEnd() + '\n\n').join(''));
+    const fresh = list.filter((b) => existing === null || !existing.includes(b.text.trimEnd()));
+    if (head === '' && fresh.length === 0) continue; // fully rotated already
+    fs.appendFileSync(file, head + fresh.map((b) => b.text.trimEnd() + '\n\n').join(''));
   }
 
   const rebuilt = header.trimEnd() + '\n\n' +
     keptSorted.map((b) => b.text.trimEnd() + '\n\n').join('');
-  fs.writeFileSync(WORKLOG, rebuilt);
+  const tmp = WORKLOG + '.rotate-tmp';
+  fs.writeFileSync(tmp, rebuilt);
+  fs.renameSync(tmp, WORKLOG);
 
   const lines = rebuilt.split('\n').length;
   console.log(`rotate-worklog: moved ${moved.length} blocks to ${byMonth.size} archive file(s); WORKLOG.md now ${kept.length} blocks / ${lines} lines (months kept: ${[...keep].join(', ')}).`);

@@ -57,5 +57,5 @@ cat > "$TARGET" <<JSON
 }
 JSON
 
-node -e "JSON.parse(require('fs').readFileSync('$TARGET','utf8'))" \
+node -e "JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'))" "$TARGET" \
   && echo "wire-remote-hooks: wrote $TARGET (valid JSON). Hooks arm at next session start."

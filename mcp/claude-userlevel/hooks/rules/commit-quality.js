@@ -23,7 +23,11 @@ const SECRETS = [
 module.exports = {
   check(ctx) {
     const segs = ctx.commandSegments || [];
-    if (!segs.some((s) => /^(?:sudo\s+)?git\b.*\bcommit\b/.test(s))) return null;
+    // Same tight pattern as verify-gate-commit (critic finding 5): the loose
+    // `git\b.*\bcommit\b` also matched `git commit-tree` / `commit-graph`,
+    // silently undoing that rule's careful lookahead exclusion.
+    const RE_GIT_COMMIT = /^(?:sudo\s+)?git\s+(?:-[a-zA-Z0-9-]+\s+|-[a-zA-Z0-9-]+\s+\S+\s+|-C\s+\S+\s+)*commit(?=\s|$|["';|&])/;
+    if (!segs.some((s) => RE_GIT_COMMIT.test(s))) return null;
     if (/--amend/.test(ctx.commandExpanded)) return null;
 
     const r = spawnSync('git', ['diff', '--cached', '--name-only', '--diff-filter=ACMR'], { encoding: 'utf8' });

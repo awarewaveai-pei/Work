@@ -62,18 +62,19 @@ try {
     # redirection run under bash) and 0-byte files whose NAMES are doc-content
     # fragments (word-split of a heredoc). Those got committed into the SSOT on
     # 2026-06-20 (16d95c8). Policy: UNSTAGE junk and continue (never abort; the
-    # checkpoint's real work must still be saved). Junk = root-level staged path
-    # that is `$null`/`null`, or a 0-byte file with any non-ASCII character in
-    # its name (covers the CJK word-split class).
-    $stagedAll = @(git diff --cached --name-only)
-    foreach ($f in $stagedAll) {
-        if ($f -match '[\\/]') { continue }  # root-level only
-        $isNullish = ($f -eq '$null' -or $f -eq 'null')
-        $isZeroByte = (Test-Path -LiteralPath $f) -and ((Get-Item -LiteralPath $f).Length -eq 0)
-        $hasWeirdName = ($f -match '[^ -~]')
-        if ($isNullish -or ($isZeroByte -and $hasWeirdName)) {
-            git reset -q -- ":(literal)$f" 2>$null
-            Write-Host "commit-checkpoint: UNSTAGED junk artifact '$f' (shell-artifact guard; see .gitignore note)" -ForegroundColor Yellow
+    # checkpoint's real work must still be saved).
+    # Delegated to Node (critic 2026-07-02 finding 3): with git's default
+    # core.quotePath=true, non-ASCII staged names reach PowerShell as
+    # octal-escaped ASCII, so a PS-side non-ASCII test never fires. The Node
+    # helper reads raw bytes via NUL-separated output and works identically on
+    # every platform. Best-effort: node missing = guard skipped with warning.
+    $junkGuard = Join-Path $PSScriptRoot "checkpoint-junk-guard.mjs"
+    if (Test-Path -LiteralPath $junkGuard) {
+        try {
+            & node $junkGuard --repo $WorkRoot
+            if ($LASTEXITCODE -ne 0) { Write-Warning "commit-checkpoint: junk guard exited $LASTEXITCODE (continuing)" }
+        } catch {
+            Write-Warning "commit-checkpoint: junk guard unavailable (node missing?): $_"
         }
     }
     git diff --cached --quiet

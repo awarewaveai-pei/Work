@@ -19,10 +19,10 @@
 - WORKLOG 月度輪替：`scripts/rotate-worklog.mjs`（保留當月+上月，其餘 → WORKLOG-archive/YYYY-MM.md）；一次性遷移 66 blocks（15,708 → 8,356 行，尾部亂序修復，108 blocks 守恆驗證）；ao-close.ps1 接入（best-effort 不擋收工）。
 
 [驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh | exit=0 | ms=4600 — 47/47（runner 13 + parity 34）；另 M1 舊系統鎖定 48/48 於刪除前通過
-- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/wire-remote-hooks.sh && node runner.js <本 session 活體> | exit=2(BLOCK)/0(pass) — runner 於本 session 真實執法四次：git-log-injector BLOCK Write、dangerous-bash/verify-gate-commit 攔 heredoc（暴露 false-positive 類缺陷 → commandSegments 根治 + 回歸鎖定 ID-1c/1d/1e/5/5b/6）
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh | exit=0 | ms=5600 — 最終 54/54（runner core 13 + parity 36 + maintenance-scripts 5，含 critic findings 全部回歸案例）；M1 舊系統鎖定 48/48 於刪除前通過
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/wire-remote-hooks.sh && node runner.js <本 session 活體> | exit=2(BLOCK)/0(pass) — runner 於本 session 真實執法六次：git-log-injector BLOCK Write、dangerous-bash/verify-gate-commit 攔 heredoc、verify-gate-commit 攔「rm tracker + commit 同指令」的繞閘嘗試（rm 因 PreToolUse BLOCK 根本沒跑）
 - REALTEST_EVIDENCE: tool=Bash | cmd=node scripts/rotate-worklog.mjs | exit=0 | ms=300 — 108 blocks 守恆（42 main + 66 archive），抽樣 block 內容完整
-- REVIEW_PENDING: critic=Deep 已派遣（背景審 runner/rules/rotation/ps1 guard）；正式 REVIEW_DONE 於 critic 回報並折入 findings 後在後續 commit 補上 — 不預寫 verdict
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/5m/1n — 五 Major/Medium 全數折入同日修復並各加回歸測試：①rotate-worklog fence 內 `## 日期` 誤判 block 邊界（→ fence-aware parse）②rotate 非原子/重試會重複 archive（→ tmp+rename + 冪等 append）③checkpoint junk guard 在 core.quotePath=true 下對 CJK 名失效（→ 改 node checkpoint-junk-guard.mjs 走 -z 原始位元組，PS 只負責呼叫）④rm -Rf/-r -f/--force 變體漏攔（→ token 解析 recursive+force）⑤commit-quality 誤攔 git commit-tree（→ 對齊 verify-gate 的 lookahead RE）；minor：runner stdin setEncoding utf8（CJK chunk 邊界）+ wire-remote 驗證改 argv 傳參。critic 另確認：manifest = 兩份舊接線的精確聯集、無漏接、lib/shared 與 flags 乾淨、settings.local 正確 gitignored
 - BUGHUNT_DONE: scope=agency-os scripts .claude mcp | grep=claude-userlevel/hooks/[a-z_-]*.js (excl runner/rules/lib) | hits=0 — 三輪修正後（verify-recent-ack.ps1 硬依賴、scan-local-config、mcp-secrets-runbook、兩份 README、TOOL_TRIGGER_MAP、AGENTS.md）
 - 遷移中活體發現並修復 3 個 v2 自身缺陷：dangerous-bash 全文掃描誤攔文件（→ 行首/segment 錨定）、verify-gate-commit 散文 "git commit" 誤攔（→ commandSegments）、commit-quality 自指涉死鎖（legacy 潛伏地雷：其原始碼含 debugger 字樣，改它 = 被自己擋死無解 → SELF_EXEMPT hooks/tests 路徑）
 

@@ -85,6 +85,24 @@ test('parity: staged debugger + git commit → BLOCK (commit-quality)', () => {
   assert.match(r.stderr, /debugger statement/);
 });
 
+test('ID-7 (critic-4): rm -Rf / split-flag / long-form variants all block', () => {
+  for (const cmd of ['rm -Rf /x', 'rm -r -f /x', 'rm -R --force /x', 'rm --force --recursive /x', 'sudo rm -fR /x']) {
+    const r = run('PreToolUse', { session_id: freshSid('p'), tool_name: 'Bash', tool_input: { command: cmd } });
+    assert.equal(r.status, 2, `should block: ${cmd}`);
+  }
+  // plain recursive-without-force and force-without-recursive stay allowed
+  for (const cmd of ['rm -r /x', 'rm -f /x']) {
+    const r = run('PreToolUse', { session_id: freshSid('p'), tool_name: 'Bash', tool_input: { command: cmd } });
+    assert.equal(r.status, 0, `should pass: ${cmd}`);
+  }
+});
+
+test('ID-8 (critic-5): git commit-tree with staged debugger does NOT trip commit-quality', () => {
+  const repo = makeGitRepo({ branch: 'feature', files: { 'bad.js': 'debugger;\n' } });
+  const r = run('PreToolUse', { session_id: freshSid('p'), tool_name: 'Bash', tool_input: { command: 'git commit-tree HEAD^{tree} -m x' } }, { cwd: repo });
+  assert.equal(r.status, 0);
+});
+
 test('ID-6: SELF-SCAN EXEMPTION — staged governance/test files containing gate patterns do NOT deadlock commit', () => {
   const repo = makeGitRepo({
     branch: 'feature',

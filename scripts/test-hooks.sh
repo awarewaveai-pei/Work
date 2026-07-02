@@ -9,6 +9,7 @@
 #                                         crash isolation, block aggregation)
 #   tests/hooks/runner-parity.test.mjs  — every rule's verdict matrix + the
 #                                         manifest↔rules completeness check
+#   tests/hooks/maintenance-scripts.test.mjs — rotate-worklog + checkpoint-junk-guard
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-node --test tests/hooks/runner-core.test.mjs tests/hooks/runner-parity.test.mjs
+node --test tests/hooks/runner-core.test.mjs tests/hooks/runner-parity.test.mjs tests/hooks/maintenance-scripts.test.mjs

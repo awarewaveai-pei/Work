@@ -118,6 +118,10 @@ function matcherHits(matcher, toolName) {
 function main() {
   const event = process.argv[2] || '';
   let d = '';
+  // utf8 decoding on the stream (critic finding 6): without setEncoding, a
+  // multibyte character split across chunk boundaries decodes to U+FFFD twice
+  // — corrupts CJK command text in audit logs and future content matching.
+  process.stdin.setEncoding('utf8');
   process.stdin.on('data', (c) => { d += c; });
   process.stdin.on('end', () => {
     let blocks = [];
