@@ -57,6 +57,32 @@ try {
         exit 0
     }
 
+    # Shell-artifact junk guard (2026-07-02): `git add -A` blindly staged stray
+    # files created by shell accidents: literal `$null`/`null` (PowerShell-style
+    # redirection run under bash) and 0-byte files whose NAMES are doc-content
+    # fragments (word-split of a heredoc). Those got committed into the SSOT on
+    # 2026-06-20 (16d95c8). Policy: UNSTAGE junk and continue (never abort; the
+    # checkpoint's real work must still be saved).
+    # Delegated to Node (critic 2026-07-02 finding 3): with git's default
+    # core.quotePath=true, non-ASCII staged names reach PowerShell as
+    # octal-escaped ASCII, so a PS-side non-ASCII test never fires. The Node
+    # helper reads raw bytes via NUL-separated output and works identically on
+    # every platform. Best-effort: node missing = guard skipped with warning.
+    $junkGuard = Join-Path $PSScriptRoot "checkpoint-junk-guard.mjs"
+    if (Test-Path -LiteralPath $junkGuard) {
+        try {
+            & node $junkGuard --repo $WorkRoot
+            if ($LASTEXITCODE -ne 0) { Write-Warning "commit-checkpoint: junk guard exited $LASTEXITCODE (continuing)" }
+        } catch {
+            Write-Warning "commit-checkpoint: junk guard unavailable (node missing?): $_"
+        }
+    }
+    git diff --cached --quiet
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "commit-checkpoint: only junk was staged; nothing to commit after guard." -ForegroundColor Yellow
+        exit 0
+    }
+
     # Basename `.env` only; common key material (not all possible secrets)
     $blocked = @(
         "[\\/]\.env$",

@@ -1,7 +1,7 @@
 # Tool Trigger Map
 
 > 所有工具的觸發情形一覽。每次新增工具時同步更新本文件。
-> Last updated: 2026-06-03
+> Last updated: 2026-07-02
 
 ## 圖例
 
@@ -15,7 +15,7 @@
 
 ---
 
-## Slash Commands（34 個）
+## Slash Commands（41 個）
 
 ### AO 生命週期
 
@@ -76,9 +76,21 @@
 | `/strategy-review` | 多角度策略審查（紅藍隊 / pre-mortem）| 🟢 「要不要做 X」「值不值得」「策略審查」|
 | `/fix-sidebars` | 修 VSCode Claude Code / Codex sidebar | ⚪ 你說 sidebar 壞了 |
 
+### 2026-06 後新增（2026-07-02 稽核補登）
+
+| 指令 | 功能 | 觸發 |
+|------|------|------|
+| `/zoom-out` | 陌生模組地圖（caller/系統層定位）| 🟢 讀 code 碰到陌生區段時 Claude 自動跑，不問 |
+| `/browser-test` | Chrome MCP 真瀏覽器 e2e 測試 | 🟢 「幫我測」「瀏覽器測試」「live test」|
+| `/caveman` | token 壓縮 ~75%（本 project 永久預設）| 🟢 「caveman」「be brief」「less tokens」|
+| `/origin-lockdown` | SG VPS Cloudflare origin 鎖定（80/443 限 CF IP）| ⚪ 明確要求 |
+| `/provision-client` | 一鍵租 Hetzner + day-1 硬化 + DNS | 🟢 「一鍵架站」「租主機」「provision」（High 步驟等 go-ahead）|
+| `/wp-bridge-release` | wp-bridge 外掛發版（release repo tag → zip）| 🟢 改 wp-bridge code 且 bump 版號後自動 |
+| `/wp-redirect` | WordPress 301/302 轉址（Rank Math）| 🟢 「轉址」「redirect」|
+
 ---
 
-## Custom Skills（13 個）
+## Custom Skills（12 個）
 
 ### 治理 / 系統 Skills（原有 6 個）
 
@@ -91,7 +103,7 @@
 | `strategy-review` | 非工程策略多角度審查 | 🟢 策略決策 / 紅藍隊 / pre-mortem |
 | `ai-decision-intelligence` | 技術決策多 agent 辯論系統 | 🟢 via `/decide` 自動呼叫 |
 
-### 日常 Coding 工作流 Skills（新增 7 個，整合自 mattpocock/skills，2026-06-04）
+### 日常 Coding 工作流 Skills（6 個，整合自 mattpocock/skills，2026-06-04）
 
 | Skill | 功能 | 觸發 |
 |-------|------|------|
@@ -101,7 +113,14 @@
 | `diagnose` | 六段 debug loop（含 R0 WORKLOG 要求） | 🟢 「diagnose」「找不到 bug」「一直報錯」「效能問題」|
 | `prototype` | 邏輯原型（終端 app）或 UI 原型（多 variant route） | 🟢 「prototype」「做個原型」「試幾個設計」|
 | `improve-codebase-architecture` | 找架構加深機會，生成 HTML 報告 + grilling | 🟢 「架構改善」「重構機會」「很難測試」|
-| `/caveman`（command） | token 壓縮 75%，持續生效直到 stop caveman | 🟢 「caveman mode」「less tokens」「be brief」|
+
+### 瀏覽器測試 Skill（2026-07-02 稽核補登）
+
+| Skill | 功能 | 觸發 |
+|-------|------|------|
+| `browser-test` | Chrome MCP 驅動真實 Chrome 的 live e2e（登入態/Canvas/React state）| 🟢 「幫我測」「Chrome 測一下」「跑一下 e2e」|
+
+> 註：`/caveman` 是 slash command 非 skill，已移至 Slash Commands 表（2026-07-02 修正歸類）。
 
 ---
 
@@ -205,65 +224,74 @@
 
 ---
 
-## Hooks（25 個）
+## Hooks（runner v2 — 單一 runner + 純規則模組）
 
-全部 🔴 機械強制。
+全部 🔴 機械強制。**接線唯一正本：`mcp/claude-userlevel/hooks/rules.manifest.json`**（本表為快照，數量/清單以 manifest 為準；SessionStart banner 自動報實數）。所有事件經 `node runner.js <event>` 進入，runner 保證：規則 crash = 大聲 fail-open（不擋工作、不拖垮其他規則）、只有 exit 2 是 BLOCK、`bash -c` 字串包裹會被解包掃描、指令偵測以 command-position segments 執行（散文/heredoc 提及指令不誤攔）。
 
 ### PreToolUse（在工具呼叫前）
 
-| Hook | 攔截對象 | 作用 |
+| Rule | 攔截對象 | 作用 |
 |------|---------|------|
-| `git-log-injector.js` | Write\|Edit（首次）| BLOCK：顯示 git log -10，防並行 session 重工 |
-| `high-risk-bash-warn.js` | Bash | BLOCK：偵測 `docker compose down/stop`、VPS rsync/scp、DB migrate deploy |
-| `branch-protection.js` | Bash | BLOCK：禁止建新 branch / force push main |
-| `commit-quality.js` | Bash | BLOCK：git commit 前檢查 debugger statements + secrets |
-| `auto-repair-guard.js` | Write\|Edit | BLOCK（首次/分類）：編輯 Auto-Repair 邏輯路徑前強制 4 pre-checks |
-| `file-path-router.js` | Write\|Edit | BLOCK（首次/分類）：編輯特定路徑時路由到正確 agent（auth/db/supabase/n8n/nginx/wp/trigger）|
-| `config-protection.js` | Write\|Edit | BLOCK：禁止修改 linter/formatter config |
-| `suggest-compact.js` | Write\|Edit | WARN：每 ~50 次 tool call 建議 /compact |
-| `large-file-warner.js` | Read | WARN 500KB / BLOCK 2MB：保護 context window |
-| `mcp-health.js pre` | mcp__.\* | 執行前檢查 MCP server 健康 |
-| inline rm -rf | Bash | BLOCK：`rm -rf` |
-| inline force push | Bash | BLOCK：`git push -f main/master` |
-| inline --no-verify | Bash | BLOCK：`--no-verify` flag |
+| `rules/dangerous-bash.js` | Bash | BLOCK：指令位置的 rm -rf、git --no-verify（取代舊 inline blockers — 舊版讀錯欄位從未生效，v2 起真正執法）|
+| `rules/branch-protection.js` | Bash | BLOCK：force push 到保護分支；main 上 commit 提示 |
+| `rules/commit-quality.js` | Bash | BLOCK：git commit 前檢查 staged debugger statements + secrets |
+| `rules/verify-gate-commit.js` | Bash | BLOCK：tracker 有未驗證 code 檔時拒絕 git commit / gh pr merge |
+| `rules/high-risk-bash-warn.js` | Bash | BLOCK：docker compose down/stop、VPS rsync/scp、DB migrate deploy、**ssh→prod VPS 部署/重啟**（sg-deploy/systemctl restart/reboot，2026-07-02 Phase 4）；首行 `# CONFIRMED-HIGH-RISK:` 解鎖；bash -c 包裹也攔 |
+| `rules/sensitive-file-block.js` | Write\|Edit | BLOCK：寫入 .env/.pem/.key、/secrets/、credentials 路徑 |
+| `rules/git-log-injector.js` | Write\|Edit（首次）| BLOCK：顯示上一完整 session 全部 commits（fallback -10），防並行 session 重工 |
+| `rules/auto-repair-guard.js` | Write\|Edit | BLOCK（首次/分類）：編輯 Auto-Repair 邏輯路徑前強制 4 pre-checks |
+| `rules/config-protection.js` | Write\|Edit | BLOCK：禁止修改 linter/formatter config |
+| `rules/suggest-compact.js` | Write\|Edit | WARN：每 ~50 次 tool call 建議 /compact |
+| `rules/file-path-router.js` | Write\|Edit | BLOCK（首次/分類）：路由到正確 agent（auth/db/supabase/n8n/nginx/wp/trigger）|
+| `rules/mcp-health.js` | mcp__.\* | 執行前檢查 MCP server 健康（backoff 斷路器）|
+| `rules/large-file-warner.js` | Read | WARN 500KB / BLOCK 2MB：保護 context window |
 
 ### PostToolUse（工具呼叫後）
 
-| Hook | 攔截對象 | 作用 |
+| Rule | 攔截對象 | 作用 |
 |------|---------|------|
-| `code-change-tracker.js` | Write\|Edit | 記錄修改的 code 檔到 tracker；.ps1 額外提醒跑 audit-encoding |
-| `accumulator.js` | Write\|Edit | 累積修改的 JS/TS 檔，供 Stop 時 batch format |
-| `design-quality.js` | Write\|Edit | 偵測 generic template-like 前端 UI，發出警告 |
-| `test-runner.js` | Write\|Edit | 自動跑相鄰 test 檔（.test.ts 等）並回報失敗 |
-| `audit-log.js` | Bash | 記錄所有 bash 指令（自動 redact secrets）|
-| `agent-dispatch-log.js` | Agent | 記錄 agent 召喚到 reports/agent-dispatch/ |
-| `log-error.sh` | .\* | 記錄所有 tool 錯誤到 ~/.claude/error-log.md |
-| `mcp-health.js failure` | mcp__.\* | 追蹤 MCP 失敗，exponential backoff |
+| `rules/log-error.js` | .\* | 記錄 tool 錯誤到 ~/.claude/error-log.md（JS 化，不再依賴 jq）|
+| `rules/audit-log.js` | Bash | 記錄所有 bash 指令（自動 redact secrets）|
+| `rules/accumulator.js` | Write\|Edit | 累積修改的 JS/TS 檔，供 Stop 時 batch format |
+| `rules/design-quality.js` | Write\|Edit | 偵測 generic template-like 前端 UI，發出警告 |
+| `rules/test-runner.js` | Write\|Edit | 自動跑相鄰 test 檔並回報失敗 |
+| `rules/code-change-tracker.js` | Write\|Edit | 記錄修改的 code 檔到 tracker；.ps1 額外提醒跑 audit-encoding |
+| `rules/agent-dispatch-log.js` | Agent | 記錄 agent 召喚到 reports/agent-dispatch/ |
+| `rules/mcp-health.js` | mcp__.\*（PostToolUseFailure）| 追蹤 MCP 失敗，exponential backoff |
 
 ### Stop（Claude 完成一次回應後）
 
+| Rule | 作用 |
+|------|------|
+| `rules/batch-format.js` | Prettier format + tsc --noEmit 跑所有累積的 JS/TS 改動 |
+| `rules/check-console.js` | 偵測修改檔案中的 stray console.log |
+| `rules/cost-tracker.js` | 記錄 token 使用量與估算成本 |
+| `rules/session-summary.js` | 寫 session summary 到 ~/.claude/sessions/ |
+| `rules/verify-gate-stop.js` | 顯示本 session 未驗證的 code 檔清單 + 提醒跑 /verify-recent |
+
+### SessionStart / UserPromptSubmit（機器層）
+
 | Hook | 作用 |
 |------|------|
-| `verify-gate-stop.js` | 顯示本 session 未驗證的 code 檔清單 + 提醒跑 /verify-recent |
-| `batch-format.js` | Prettier format + tsc --noEmit 跑所有累積的 JS/TS 改動 |
-| `check-console.js` | 偵測修改檔案中的 stray console.log |
-| `cost-tracker.js` | 記錄 token 使用量與估算成本 |
-| `session-summary.js` | 寫 session summary 到 ~/.claude/sessions/ |
+| `rules/session-banner.js` | SessionStart：報告治理狀態（規則/事件數由 manifest 推導，不手寫）|
+| `rules/vbc-reminder.js` | UserPromptSubmit：偵測「他方已完成」語境 → 注入 VBC 協議提醒（2026-07-02 Phase 4，非阻擋）|
+| `ao-resume-on-prompt.ps1` | UserPromptSubmit（僅工作站）：偵測開工關鍵字 → 觸發 AO-RESUME（300 秒去重）|
+| `post-push-trigger-deploy.ps1` | git push 後（僅工作站）：自動觸發 Trigger.dev deploy（若設定）|
 
-### UserPromptSubmit / SessionStart
+### 環境覆蓋
 
-| Hook | 作用 |
-|------|------|
-| `ao-resume-on-prompt.ps1` | UserPromptSubmit：偵測開工關鍵字 → 觸發 AO-RESUME（300 秒去重）|
-| `post-push-trigger-deploy.ps1` | git push 後自動觸發 Trigger.dev deploy（若設定）|
+| 環境 | 接線 | 狀態 |
+|------|------|------|
+| Windows 工作站 ×2 | `settings.template.json` → sync 到 `~/.claude/settings.json` | `sync-claude-userlevel.ps1` 後生效 |
+| 遠端 container（Claude Code web）| `scripts/wire-remote-hooks.sh` 產生 `.claude/settings.local.json`（gitignored）| 2026-07-02 前遠端**零機械閘**（稽核發現）；建議設為環境 setup script |
 
----
+閘健康驗證：`bash scripts/test-hooks.sh`（runner 保證 + 全規則裁決矩陣）。
 
 ## 觸發統計
 
 | 觸發類型 | 數量 | 說明 |
 |---------|------|------|
-| 🔴 Hook 機械強制 | 25 hooks | 100% 可靠，我無法繞過 |
+| 🔴 Hook 機械強制 | rules.manifest.json 全清單（27 規則）| 依 runner 結構保證；閘壞 = 大聲 fail-open 非靜默 |
 | 🟠 File-path-router | 7 類別（db/supabase/n8n/auth/nginx/wp/trigger）| 100% 可靠，編輯路徑時自動 |
 | 🟡 AO 生命週期 | 2（ao-resume / ao-close）| 100% 可靠 |
 | 🟢 AGENTS.md 自判 | ~55 個工具 | 中等可靠，靠我的情境判斷 |

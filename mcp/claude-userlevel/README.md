@@ -24,7 +24,7 @@ Claude Code 的設定分三層：
 
 ```
 mcp/claude-userlevel/
-├── hooks/                            # 19 個 hook 檔（跨機完全一致；用 ${CLAUDE_PLUGIN_ROOT} 與 ~/.claude 路徑）
+├── hooks/                            # runner v2：runner.js + rules.manifest.json + rules/ + lib/（跨機完全一致）
 │   ├── hooks.json
 │   ├── ao-resume-on-prompt.ps1
 │   ├── branch-protection.js
@@ -54,7 +54,7 @@ project-level commands 在 repo 開啟時優先；user-level 作為不開 repo �
 - `theme`（"light"）
 - `permissions.deny`（git push --force / -f / gh pr merge / git checkout -b / git switch -c / git switch --create / git branch — CLAUDE.md 強制分支保護）
 - `permissions.additionalDirectories`（用 `${USERPROFILE}` `${MONOREPO_ROOT}` 變數展開）
-- `hooks` 段（呼叫 ~/.claude/hooks/* 的所有 hook 設定）
+- `hooks` 段（薄接線：每個 event 呼叫 ~/.claude/hooks/runner.js；規則清單在 rules.manifest.json）
 
 **保留（preserveKeys）**：
 - `permissions.allow`（每機 Claude Code 自動累積；含 session 特定路徑與密鑰，不該入 git）
@@ -97,9 +97,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\sync-claude-userlevel.ps1 -Mo
 ## 如何擴充與刪減（30 年穩定）
 
 ### 加新 hook
-1. 把新 hook 檔丟進 `mcp/claude-userlevel/hooks/`
-2. （若 hook 要被觸發）改 `mcp/claude-userlevel/hooks/hooks.json` 加 matcher
-3. （若 settings.json `hooks` 段要對應）改 `mcp/claude-userlevel/settings.template.json`
+1. 把新規則寫進 `mcp/claude-userlevel/hooks/rules/<name>.js`（`module.exports = { check(ctx) }`）+ `tests/hooks/runner-parity.test.mjs` 加 case
+2. （若 hook 要被觸發）改 `mcp/claude-userlevel/hooks/rules.manifest.json` 加規則（接線檔 hooks.json/settings.template 已薄化為 call runner，不再逐 hook 列舉）
+3. settings.template.json 的 hooks 段**不需要動**（接線已薄化；只有機器層 .ps1 automations 才直接接在這）
 4. commit + push
 5. 兩台跑 `sync-claude-userlevel.ps1 -Mode merge`
 

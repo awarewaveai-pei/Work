@@ -36,6 +36,15 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
+  const VALID_TIERS = new Set(["starter", "business", "commerce", "premium"]);
+  const VALID_REGIONS = new Set(["sin", "nbg1", "fsn1", "hel1", "ash"]);
+  if (!VALID_TIERS.has(tier)) {
+    return NextResponse.json({ ok: false, error: "invalid_tier", valid: ["starter","business","commerce","premium"] }, { status: 422 });
+  }
+  if (!VALID_REGIONS.has(region)) {
+    return NextResponse.json({ ok: false, error: "invalid_region", valid: ["sin","nbg1","fsn1","hel1","ash"] }, { status: 422 });
+  }
+
   const serverAdapter = buildServerAdapterFromEnv({ region });
 
   const dnsConfig =

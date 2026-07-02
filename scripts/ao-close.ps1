@@ -530,6 +530,21 @@ if (Test-Path -LiteralPath $dispatchScript) {
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $dispatchScript -WorkRoot $WorkRoot
 }
 
+# WORKLOG monthly rotation (2026-07-02): keep current + previous month in
+# WORKLOG.md; older day-blocks move to agency-os/WORKLOG-archive/YYYY-MM.md.
+# Best-effort: node missing or script failure never blocks close-out (the next
+# close retries). Runs BEFORE git add so rotated files land in this commit.
+$rotateScript = Join-Path $WorkRoot "scripts\rotate-worklog.mjs"
+if (Test-Path -LiteralPath $rotateScript) {
+    Write-Host "== AO-CLOSE: WORKLOG monthly rotation ==" -ForegroundColor Cyan
+    try {
+        & node $rotateScript --repo $WorkRoot
+        if ($LASTEXITCODE -ne 0) { Write-Warning "AO-CLOSE: rotate-worklog exited $LASTEXITCODE (non-fatal; will retry next close)" }
+    } catch {
+        Write-Warning "AO-CLOSE: rotate-worklog failed (non-fatal): $_"
+    }
+}
+
 Write-Host ""
 Write-Host "=== AO-CLOSE: automation boundary (every run) ===" -ForegroundColor Cyan
 Write-Host "SCRIPT DID: daily scaffold; inbox guard; merge-closeout-inbox (verbatim -> WORKLOG + memory/daily + CONVERSATION_MEMORY pointer); recap; verify/guard/report; apply AUTO_TASK_DONE -> TASKS; after git add, verify-closeout-completeness (default strict) before commit." -ForegroundColor Green
@@ -742,7 +757,7 @@ try {
         $utf8NoBom2 = New-Object System.Text.UTF8Encoding $false
         # Snapshot the OUTGOING close stamp to ao-close-prev.txt BEFORE overwriting ao-close-last.
         # [ao-close-prev -> ao-close-last] then bounds the LAST completed work session (commits made
-        # between the previous close and this one). Consumer: git-log-injector.js prints every commit
+        # between the previous close and this one). Consumer: hooks/rules/git-log-injector.js prints every commit
         # of that window, uncapped — replacing the fixed `-10` that truncated >10-commit sessions.
         # Closes are chronological, so prev < last ALWAYS (never a backwards/empty window) and no
         # date-guard is needed (unlike a resume-anchored design, which a same-day re-resume corrupts).

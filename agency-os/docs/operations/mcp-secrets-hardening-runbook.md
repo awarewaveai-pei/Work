@@ -60,7 +60,7 @@
 
 ## Local Plaintext Scanner（每次 verify-build-gates 自動跑）
 
-**目的**：補上 `mcp/claude-userlevel/hooks/commit-quality.js` 的盲區。那個 hook 只在 `git commit` 時掃 `.js/.ts/.py`；本機 gitignored 的 config（`.claude/settings.json`、`.cursor/mcp.json`、`mcp/user-env.ps1`）它看不到，但這些檔案會在磁碟上累積明文 secret。
+**目的**：補上 `mcp/claude-userlevel/hooks/rules/commit-quality.js` 的盲區。那個 hook 只在 `git commit` 時掃 `.js/.ts/.py`；本機 gitignored 的 config（`.claude/settings.json`、`.cursor/mcp.json`、`mcp/user-env.ps1`）它看不到，但這些檔案會在磁碟上累積明文 secret。
 
 ### 自動觸發
 
@@ -172,6 +172,6 @@ full config lines to the baseline.
 
 - `scripts/scan-local-config-for-secrets.ps1`（本掃描器）
 - `scripts/secrets-vault.ps1`（DPAPI vault）
-- `mcp/claude-userlevel/hooks/commit-quality.js`（commit-time, code-files-only）
+- `mcp/claude-userlevel/hooks/rules/commit-quality.js`（commit-time, code-files-only）
 - `agency-os/docs/operations/local-secrets-vault-dpapi.md`（vault 完整手冊）
 - `agency-os/docs/operations/security-secrets-policy.md`（policy 正本）

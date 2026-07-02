@@ -1,0 +1,101 @@
+{
+  "_comment": "SSOT wiring for the hook runner (runner.js). Event → matcher-groups → ordered rule names (rules/<name>.js). This file is the ONLY place hooks are enumerated — settings.template.json, hooks.json and the remote generator all just invoke `node runner.js <event>`. Matcher is an unanchored regex on tool_name (same semantics Claude Code applies to its own matcher field); omit it to match every tool. Do not hand-write hook counts anywhere: the session-banner rule derives counts from this file.",
+  "events": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "rules": [
+          "dangerous-bash",
+          "branch-protection",
+          "commit-quality",
+          "verify-gate-commit",
+          "high-risk-bash-warn"
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "rules": [
+          "sensitive-file-block",
+          "git-log-injector",
+          "auto-repair-guard",
+          "config-protection",
+          "suggest-compact",
+          "file-path-router"
+        ]
+      },
+      {
+        "matcher": "^mcp__",
+        "rules": [
+          "mcp-health"
+        ]
+      },
+      {
+        "matcher": "^Read$",
+        "rules": [
+          "large-file-warner"
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "rules": [
+          "log-error"
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "rules": [
+          "audit-log"
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "rules": [
+          "accumulator",
+          "design-quality",
+          "test-runner",
+          "code-change-tracker"
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "rules": [
+          "agent-dispatch-log"
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "^mcp__",
+        "rules": [
+          "mcp-health"
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "rules": [
+          "batch-format",
+          "check-console",
+          "cost-tracker",
+          "session-summary",
+          "verify-gate-stop"
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "rules": [
+          "session-banner"
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "rules": [
+          "vbc-reminder"
+        ]
+      }
+    ]
+  }
+}

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canWriteTenantConfig } from "@/lib/ops-role";
 import { timingSafeEqual } from "@/lib/ops-inbox/verifyIngestToken";
 import { getSupabaseServerClient, getSupabaseWriteClient } from "@/lib/supabase-server";
+import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,13 +36,16 @@ export async function GET(req: Request): Promise<Response> {
 
   const { data, error } = await supabase
     .from("intake_forms")
-    .select("id, quote_data, quote_status, status, form_data")
+    .select("id, quote_data, quote_status, status, form_data, organization_id")
     .eq("id", intakeFormId)
     .single();
 
   if (error || !data) {
     return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
   }
+
+  try { assertOrgAccess(req, (data as Record<string, unknown>).organization_id as string | null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
   return NextResponse.json({ ok: true, quote_data: data.quote_data, quote_status: data.quote_status, intake_status: data.status });
 }
@@ -67,11 +71,15 @@ export async function POST(req: Request): Promise<Response> {
   // Verify form exists and quote isn't already approved
   const { data: existing, error: fetchErr } = await supabase
     .from("intake_forms")
-    .select("id, quote_status")
+    .select("id, quote_status, organization_id")
     .eq("id", intake_form_id)
     .single();
 
   if (fetchErr || !existing) return NextResponse.json({ ok: false, error: "intake_form_not_found" }, { status: 404 });
+
+  try { assertOrgAccess(req, (existing as Record<string, unknown>).organization_id as string | null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+
   if (existing.quote_status === "approved") {
     return NextResponse.json({ ok: false, error: "quote_already_approved", detail: "Cannot modify an approved quote" }, { status: 409 });
   }
@@ -107,11 +115,14 @@ export async function PATCH(req: Request): Promise<Response> {
 
   const { data: existing, error: fetchErr } = await supabase
     .from("intake_forms")
-    .select("id, quote_status, quote_data")
+    .select("id, quote_status, quote_data, organization_id")
     .eq("id", intake_form_id)
     .single();
 
   if (fetchErr || !existing) return NextResponse.json({ ok: false, error: "intake_form_not_found" }, { status: 404 });
+
+  try { assertOrgAccess(req, (existing as Record<string, unknown>).organization_id as string | null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
   const current = existing.quote_status as QuoteStatus;
 

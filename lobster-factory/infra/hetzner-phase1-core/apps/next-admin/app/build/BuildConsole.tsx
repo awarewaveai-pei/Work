@@ -294,9 +294,9 @@ export default function BuildConsole() {
         method: "POST",
         headers: { "Content-Type": "application/json", ...roleHeader(actorRole) },
         body: JSON.stringify({
-          siteId: form.siteId ?? crypto.randomUUID(),
+          siteId: form.siteId,
           siteName: form.clientName ?? "unnamed",
-          organizationId: form.organizationId ?? crypto.randomUUID(),
+          organizationId: form.organizationId,
           tier: provisionTier,
           region: provisionRegion,
           domain: form.domain ?? undefined,
@@ -401,7 +401,7 @@ export default function BuildConsole() {
               <button
                 type="button"
                 className="btn-secondary"
-                disabled={provisionLoading}
+                disabled={provisionLoading || !form.siteId || !form.organizationId}
                 onClick={() => { void provisionMachine(); }}
                 style={{ fontWeight: 600, marginBottom: 12 }}
               >

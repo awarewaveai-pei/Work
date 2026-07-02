@@ -555,3 +555,11 @@ _Last synced: 2026-06-26 01:40:18 UTC_
 
 
 
+
+## 2026-07-02 治理系統 v2 — hook runner 架構遷移（里程碑）
+
+- 全面稽核證據化四風險後，操作者裁決方案 D（乾淨架構非補丁）：23 個手刻 hook + 5 inline → 單一 `runner.js` + `rules.manifest.json`（接線唯一正本）+ 26 純規則模組。fail-open/隔離/SID 統一為結構保證；測試 0 → 54 案例（`bash scripts/test-hooks.sh`）。
+- 關鍵發現與修復：遠端 session 原本**零機械閘**（`scripts/wire-remote-hooks.sh` 關閉真空）；`.claude/settings.json` 絕不可 git-track（工作站 junction 相撞）；legacy inline blockers 讀錯 stdin 欄位從未生效；commit-quality 自指涉死鎖地雷；11 個垃圾檔（16d95c8 auto-checkpoint 入庫）清除 + `checkpoint-junk-guard.mjs`。
+- WORKLOG 改為月度輪替（當月+上月留主檔，餘 → `WORKLOG-archive/YYYY-MM.md`），15,708→8,356 行，ao-close 自動執行。
+- AGENTS.md 新增 §規則優先序（預授權 > 風險分級 > R0 逐項批准）與 §已知信任邊界（evidence 驗格式不驗真、機械閘 fail-open）。
+- 完整記錄：WORKLOG `## 2026-07-02`；分支 `claude/system-feedback-t7zo8r`（M1 03d624b → M4c 4ce5e4a）。

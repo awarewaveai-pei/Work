@@ -1,14 +1,14 @@
 <#
 .SYNOPSIS
   Shared SID derivation for verify-recent + verify-recent-ack.
-  MUST stay byte-compatible with mcp/claude-userlevel/hooks/_verify-shared.js getSessionId().
+  MUST stay byte-compatible with mcp/claude-userlevel/hooks/lib/shared.js getSessionId().
 
 .DESCRIPTION
   Dot-source from any PowerShell consumer:
     . "$repoRoot\scripts\verify-sid-shared.ps1"
     $sid = Get-VerifySid
 
-  Priority order (must match _verify-shared.js getSessionId):
+  Priority order (must match lib/shared.js getSessionId):
     1. (NOT SUPPORTED IN PS) stdin's session_id field — only the JS hooks receive that
     2. $env:CLAUDE_CODE_SESSION_ID — verified live to be set by Claude Code in both bash + powershell
     3. $env:CLAUDE_SESSION_ID — legacy/dev-tooling name

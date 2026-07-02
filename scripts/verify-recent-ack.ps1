@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   Replaces the previous markdown-prose --skip flow with an explicit script that:
-    1. Reads the tracker file (matches the SID derivation in _verify-shared.js)
+    1. Reads the tracker file (matches the SID derivation in hooks/lib/shared.js)
     2. Appends a verbatim audit record to agency-os/memory/daily/<today>.md
     3. ONLY THEN deletes the tracker (atomicity — never delete before log written)
   If step 2 fails, step 3 does not run (tracker stays, gate stays blocked).
@@ -23,7 +23,7 @@
   powershell -File scripts/verify-recent-ack.ps1 -Reason "Comment-only edit, no functional change"
 
 .NOTES
-  Companion to mcp/claude-userlevel/hooks/verify-gate-{stop,commit}.js + /verify-recent slash command.
+  Companion to mcp/claude-userlevel/hooks/rules/verify-gate-{stop,commit}.js + /verify-recent slash command.
 #>
 param(
     [Parameter(Mandatory = $true)]
@@ -42,7 +42,7 @@ if (-not $WorkRoot) {
 }
 
 # Dot-source the shared SID derivation. Single source of truth — must stay byte-compatible
-# with mcp/claude-userlevel/hooks/_verify-shared.js getSessionId().
+# with mcp/claude-userlevel/hooks/lib/shared.js getSessionId().
 . (Join-Path $PSScriptRoot "verify-sid-shared.ps1")
 
 $sid = Get-VerifySid
@@ -60,7 +60,7 @@ if ($files.Count -eq 0) {
     exit 0
 }
 
-# Risk-tier classification (2026-06-12) — reuse the JS SSOT (_verify-shared.classifyRisk) via node so
+# Risk-tier classification (2026-06-12) — reuse the JS SSOT (hooks/lib/shared.js classifyRisk) via node so
 # the high/normal tier definition NEVER drifts between the hooks and this script (R4). --ack still
 # clears (the gate is accident-prevention, not adversarial), but high-risk files (auth/payment/RLS/
 # migration/deploy) get a LOUD, distinct audit trail so an acknowledged shortcut on a dangerous path
@@ -69,8 +69,8 @@ if ($files.Count -eq 0) {
 # written as '??' (CP950 trap, WORKLOG 2026-05-22 + critic 2026-06-12). Keep all output ASCII.
 $highRisk = @()
 try {
-    $sharedJs = (Join-Path $WorkRoot "mcp\claude-userlevel\hooks\_verify-shared.js") -replace '\\', '/'
-    if (Test-Path -LiteralPath ($WorkRoot + "\mcp\claude-userlevel\hooks\_verify-shared.js")) {
+    $sharedJs = (Join-Path $WorkRoot "mcp\claude-userlevel\hooks\lib\shared.js") -replace '\\', '/'
+    if (Test-Path -LiteralPath ($WorkRoot + "\mcp\claude-userlevel\hooks\lib\shared.js")) {
         $nodeCode = "const s=require(process.argv[1]);for(const f of process.argv.slice(2)){const c=s.classifyRisk(f);if(c.tier==='high')console.log(f+'\t'+c.why);}"
         $out = & node -e $nodeCode $sharedJs @files 2>$null
         if ($LASTEXITCODE -eq 0 -and $out) { $highRisk = @($out | Where-Object { $_ }) }

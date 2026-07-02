@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole } from "../../../../lib/ops-role";
 import { timingSafeEqual } from "../../../../lib/ops-inbox/verifyIngestToken";
 import { getSupabaseWriteClient } from "../../../../lib/supabase-server";
+import { effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "../../../../lib/tenant-guard";
 import type { IntakeForm } from "../../../../lib/onboarding/intake-form";
 
 // Auth: Supabase session (owner/admin/operator) OR server-to-server x-ops-sync-key.
@@ -34,13 +35,22 @@ export async function POST(request: Request) {
     );
   }
 
+  // Org isolation: client callers cannot inject a foreign org_id (effectiveOrgId enforces this).
+  let resolvedOrgId: string | null;
+  try {
+    resolvedOrgId = effectiveOrgId(request, organization_id);
+  } catch (e) {
+    if (e instanceof OrgAccessError) return toOrgAccessResponse(e);
+    throw e;
+  }
+
   const supabase = getSupabaseWriteClient();
   if (!supabase) return NextResponse.json({ ok: false, error: "db_unavailable" }, { status: 503 });
 
   const { data, error } = await supabase
     .from("intake_forms")
     .insert({
-      organization_id: organization_id ?? null,
+      organization_id: resolvedOrgId,
       form_data: form,
       submitted_by: resolved.role,
       status: "pending",

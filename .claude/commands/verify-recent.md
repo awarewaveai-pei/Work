@@ -1,7 +1,7 @@
 Verify all code files modified this session (syntax + critic + real exec test).
 
-Companion to the harness-enforced rule (`mcp/claude-userlevel/hooks/code-change-tracker.js` +
-`verify-gate-stop.js` + `verify-gate-commit.js`). git commit is HARD-blocked until tracker is cleared.
+Companion to the harness-enforced rule (`mcp/claude-userlevel/hooks/rules/code-change-tracker.js` +
+`rules/verify-gate-stop.js` + `rules/verify-gate-commit.js`). git commit is HARD-blocked until tracker is cleared.
 
 ## Arguments
 
@@ -11,7 +11,7 @@ Companion to the harness-enforced rule (`mcp/claude-userlevel/hooks/code-change-
 - Unknown flag → **error and exit**; do NOT default to full verify.
 
 > **Risk-tier routing (2026-06-12).** The verify-gate hooks classify every tracked file via
-> `_verify-shared.classifyRisk()` and print its tier. **HIGH-risk files** (auth / RLS / permission /
+> `hooks/lib/shared.js classifyRisk()` and print its tier. **HIGH-risk files** (auth / RLS / permission /
 > secrets / `.env` / api-key / payment / migration / deploy / docker / nginx / CI) **must use full
 > verify (no arg)** — `--trivial` is NOT sufficient and `--ack` is discouraged (it still clears, but
 > `verify-recent-ack.ps1` writes a LOUD high-risk section to the daily audit so the shortcut is never
@@ -139,6 +139,6 @@ verify-recent: <mode>
 
 - Operator flagged this 2026-05-22: critic + real-test were being skipped, accumulating silent bugs (CP950 encoding bug in `backfill-missed-daily.ps1` is the canonical example).
 - Memory rules are soft. Hook + slash command + commit gate is the harness-enforced rule.
-- SSOT: `mcp/claude-userlevel/hooks/{_verify-shared,code-change-tracker,verify-gate-stop,verify-gate-commit}.js` + `.claude/commands/verify-recent.md` + `scripts/verify-recent-ack.ps1`.
+- SSOT: `mcp/claude-userlevel/hooks/lib/shared.js` + `hooks/rules/{code-change-tracker,verify-gate-stop,verify-gate-commit}.js` + `.claude/commands/verify-recent.md` + `scripts/verify-recent-ack.ps1`.
 - Audit trail for failures: `~/.claude/verify-gate-failures.log` (one line per hook exception).
 - BUGHUNT spec lives in AGENTS.md R0 §抓蟲; required root list lives in `scripts/verify-closeout-completeness.ps1` `$bhRequiredRoots`. verify-recent only executes and records — no duplicate definitions here.
