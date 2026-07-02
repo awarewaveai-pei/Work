@@ -58,12 +58,12 @@ export interface WpPlugin {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Catalog — 20 base + 17 ecommerce + 1 pod + 12 tourism + 3 brand = 53 total entries
+// Catalog — 21 base + 17 ecommerce + 1 pod + 12 tourism + 3 brand = 54 total entries
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const WP_PLUGIN_CATALOG: WpPlugin[] = [
 
-  // ── BASE MODULE (20 functional slots) ────────────────────────────────────
+  // ── BASE MODULE (21 functional slots) ────────────────────────────────────
 
   { slug: "mainwp-child",                      label: "MainWP Child",                               free: true,  required: true,  module: "base", installSource: "manifest" },
   // Phase 1 TODO: wire release-url fetcher in provisioning flow (awarewaveai-pei/aware-wave-wp-bridge tag→Action zip)
@@ -73,6 +73,7 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
   { slug: "kadence-pro",    label: "Kadence Pro Add-on (WordPressIT)", free: false, required: true, module: "base", installSource: "manual-zip", excludeForModules: ["tourism"] },
   { slug: "wordfence",                          label: "Wordfence Security",                         free: true,  required: true,  module: "base" },
   { slug: "wpvivid-backups-and-migration",      label: "WPvivid Backup",                             free: true,  required: true,  module: "base" },
+  { slug: "migrate-guru",                       label: "Migrate Guru (Cloudways migration)",          free: true,  required: true,  module: "base" },
   { slug: "seo-by-rank-math",                   label: "Rank Math SEO",                              free: true,  required: true,  module: "base" },
   { slug: "redirection",                        label: "Redirection",                                free: true,  required: true,  module: "base" },
   { slug: "wp-rocket",                           label: "WP Rocket (WordPressIT)",                    free: false, required: true,  module: "base", installSource: "manual-zip", excludeForModules: ["tourism"] },
