@@ -4,6 +4,25 @@
 
 ## 2026-07-02
 
+### ops: 清理測試垃圾客戶 org 記錄 ✅
+
+**根因**：建站系統測試過程遺留 3 個空殼 org（無任何資產/整合資料），污染 `/ops/clients` 列表。
+
+**已刪除**（EU Supabase DB `supabase-db` container，psql DELETE + CASCADE）：
+- `awarewave-868301` (AwareWave) — id `bc77b757-...`
+- `green-valley-farm-10dd18` (Green Valley Farm) — id `25a141f1-...`
+- `ssasd-63a120` (ssasd) — id `0938e0b4-...`
+
+**同步清理**：`workflow_runs` 4 筆（無 FK constraint，手動 DELETE）
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=psql SELECT+DELETE+browser /ops/clients | exit=0 | ms=<5000 — DB 2 orgs, UI 2 orgs ✅
+- REVIEW_WAIVED: NA -- DB 刪除操作，無程式碼變動
+- BUGHUNT_WAIVED: NA -- 無程式碼變動
+- WORKLOG: 本條目
+
+**剩餘**：`/ops/clients` 現只有 `awarewave-ops` + `soulful-expression`。
+
 ### ops: upload paid plugin zips to EU + SG VPS `/opt/lobster-plugins/` ✅
 
 **操作**：將 `D:\Work\_paid-plugins\` 16 個 zip 上傳至兩台 VPS。
