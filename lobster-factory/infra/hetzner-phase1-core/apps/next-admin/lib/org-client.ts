@@ -2,29 +2,77 @@
 // Breaks the circular-import that would arise if getOrgSupabaseWriteClient lived in
 // supabase-server.ts (which secret-vault.ts already imports from).
 //
-// Vault key convention (set once per client onboarding):
-//   putSecret(orgSupabaseRef(slug,'url'), 'https://<ref>.supabase.co')
-//   putSecret(orgSupabaseRef(slug,'key'), '<service_role_key>')
+// Resolution order (first hit wins):
+//  1. Explicit vault keys set via outreach-config API:
+//       org:{slug}:supabase_url  /  org:{slug}:supabase_key
+//  2. Credentials library (client_credentials table) — automatic bridge:
+//       URL row  = identifier contains ".supabase.co"  OR  label ilike "%supabase%url%"
+//       Key row  = any other row with label ilike "%supabase%" (not the URL row)
+//  3. Agency write client fallback (single-tenant mode).
 //
-// When no org-specific credentials exist, falls back to the agency write client.
-// This means existing single-tenant routes work unchanged — orgSlug is always optional.
+// This means credentials already stored in 憑證庫 are automatically used for outreach
+// without needing a separate entry in the outreach-config UI.
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { getSecret, orgSupabaseRef } from "@/lib/secret-vault";
 
+type CredRow = { label: string; identifier: string | null; secret_ref: string };
+
+async function resolveFromCredentialsLib(orgSlug: string): Promise<{ url: string; key: string } | null> {
+  const agency = getSupabaseWriteClient();
+  if (!agency) return null;
+  try {
+    const { data: org } = await agency.from("organizations").select("id").eq("slug", orgSlug).maybeSingle();
+    if (!org) return null;
+    const { data: rows } = await agency
+      .from("client_credentials")
+      .select("label, identifier, secret_ref")
+      .eq("client_id", (org as { id: string }).id)
+      .not("secret_ref", "is", null);
+    if (!rows?.length) return null;
+    const creds = rows as CredRow[];
+    const urlRow = creds.find(
+      c =>
+        c.identifier?.includes(".supabase.co") ||
+        (c.label.toLowerCase().includes("supabase") && c.label.toLowerCase().includes("url")),
+    );
+    const keyRow = creds.find(
+      c => c !== urlRow && c.label.toLowerCase().includes("supabase"),
+    );
+    if (!urlRow || !keyRow) return null;
+    const [url, key] = await Promise.all([getSecret(urlRow.secret_ref), getSecret(keyRow.secret_ref)]);
+    if (!url || !key) return null;
+    return { url, key };
+  } catch {
+    return null;
+  }
+}
+
 export async function getOrgSupabaseWriteClient(
   orgSlug: string | null | undefined,
 ): Promise<SupabaseClient | null> {
   if (!orgSlug) return getSupabaseWriteClient();
+
+  // Fast path: explicit vault keys (set via outreach-config or onboarding).
   try {
     const [url, key] = await Promise.all([
       getSecret(orgSupabaseRef(orgSlug, "url")),
       getSecret(orgSupabaseRef(orgSlug, "key")),
     ]);
-    if (!url || !key) return getSupabaseWriteClient();
-    return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    if (url && key) return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
   } catch {
-    return getSupabaseWriteClient();
+    // vault unavailable — fall through to credentials library
   }
+
+  // Fallback: credentials library (憑證庫) — auto-bridge, no duplicate entry needed.
+  const fromLib = await resolveFromCredentialsLib(orgSlug);
+  if (fromLib) {
+    return createClient(fromLib.url, fromLib.key, { auth: { persistSession: false, autoRefreshToken: false } });
+  }
+
+  return getSupabaseWriteClient();
 }
+
+/** Exported for use by outreach-config GET to report the credentials source. */
+export { resolveFromCredentialsLib };
