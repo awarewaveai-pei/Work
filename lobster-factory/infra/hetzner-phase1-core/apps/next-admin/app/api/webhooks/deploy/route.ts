@@ -10,6 +10,7 @@ import type { Incident, IncidentSnapshot } from "@/lib/ops-inbox/types";
 import { verifyIngestToken } from "@/lib/ops-inbox/verifyIngestToken";
 import { readWebhookBody } from "@/lib/ops-inbox/readRequestBody";
 import { dispatchNotifications } from "@/lib/ops-inbox/notify/dispatcher";
+import { autoVerifyRunsOnDeploySuccess, reapStaleRuns } from "@/lib/repair-center/hygiene";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,9 +64,41 @@ export async function POST(req: Request) {
     Sentry.captureException(e);
   }
 
+  // Closed loop (A3): deploy_success = sg-deploy's health + smoke gates passed
+  // on the VPS, so repair runs waiting in deploy_pending/deploying for this app
+  // are verified and resolved. Fail-open — a verify failure must not fail the
+  // deploy event ingest.
+  let autoVerified = 0;
+  try {
+    if ((raw as { event?: unknown }).event === "deploy_success") {
+      const app = String((raw as { app?: unknown }).app ?? "");
+      if (app) {
+        const verify = await autoVerifyRunsOnDeploySuccess(supabase, {
+          app,
+          deployedCommit: typeof (raw as { deployed_commit?: unknown }).deployed_commit === "string"
+            ? ((raw as { deployed_commit?: string }).deployed_commit)
+            : undefined,
+        });
+        autoVerified = verify.verified;
+      }
+    }
+  } catch (e) {
+    Sentry.captureException(e);
+  }
+
+  // Opportunistic hygiene: the VPS cron hits this webhook regularly, making it
+  // the natural heartbeat for the stale-run reaper (no scheduler exists in
+  // next-admin). Idempotent + fail-open.
+  try {
+    await reapStaleRuns(supabase);
+  } catch (e) {
+    Sentry.captureException(e);
+  }
+
   return NextResponse.json({
     incident_id: upserted.id,
     transition: transition.kind,
     occurrence_count: upserted.occurrence_count,
+    auto_verified_runs: autoVerified,
   });
 }

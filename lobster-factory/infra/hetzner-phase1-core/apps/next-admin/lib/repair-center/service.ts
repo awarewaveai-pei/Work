@@ -39,7 +39,7 @@ export async function fetchRepairRunWithIncident(id: string): Promise<RepairRunW
 export async function startRepairFromIncident(args: {
   incidentId: string;
   actor: string;
-  source: "web" | "slack";
+  source: "web" | "slack" | "telegram";
   /**
    * C5 critical-severity gate bypass. Set true ONLY when called from
    * confirmCriticalRun() after explicit operator second confirmation. Slack callbacks

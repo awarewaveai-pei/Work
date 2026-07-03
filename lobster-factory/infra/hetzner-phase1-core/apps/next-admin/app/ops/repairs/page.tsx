@@ -5,6 +5,7 @@ import { canApproveCommand, readOpsRole } from "@/lib/ops-role";
 import { effectiveOrgId, OrgAccessError } from "@/lib/tenant-guard";
 import { buildIntegrationBlockers, type IntegrationBlocker } from "@/lib/repair-os/integration-blockers";
 import { REPAIR_SOURCE_POLICIES, policyCatalogForSource, policyForIncident, repairPolicyLabel } from "@/lib/repair-center/policy";
+import { collapseStormChildren } from "@/lib/repair-center/correlate";
 import type { RepairIncident, RepairRun } from "@/lib/repair-center/types";
 import { RepairActions } from "./RepairActions";
 import { AutoRefresh } from "../../AutoRefresh";
@@ -120,9 +121,12 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
   const ownedRunIncidentIds = new Set(
     runs.filter((r) => ACTIVE_STATES.includes(r.state) || r.state === "human_only").map((r) => r.incident_id),
   );
-  const queue = incidents
-    .filter((i) => !ownedRunIncidentIds.has(i.id))
-    .map((i) => ({ incident: i, policy: policyForIncident(i.source, i.severity) }));
+  // Storm collapse (A3): children whose parent incident is also queued fold
+  // into the parent row (badge shows the count). A child whose parent is
+  // resolved/absent stays visible as its own actionable row.
+  const openQueueIncidents = incidents.filter((i) => !ownedRunIncidentIds.has(i.id));
+  const { visible: queueIncidents, childCount: stormChildCount } = collapseStormChildren(openQueueIncidents);
+  const queue = queueIncidents.map((i) => ({ incident: i, policy: policyForIncident(i.source, i.severity) }));
   const recentRuns = runs.slice(0, 30);
   const blocked = systemMode !== "normal";
   const backupGate = readBackupGate();
@@ -221,6 +225,9 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
                         <span style={pillStyle}>{incident.source}</span>
                         <span style={policy === "human_only" ? warnPillStyle : okPillStyle}>{repairPolicyLabel(policy)}</span>
                         {incident.client_slug ? <span style={pillStyle}>{incident.client_slug}</span> : null}
+                        {(stormChildCount.get(incident.id) ?? 0) > 0 ? (
+                          <span style={pillStyle}>+{stormChildCount.get(incident.id)} 筆關聯告警</span>
+                        ) : null}
                       </div>
                       <Link href={`/ops/inbox/${incident.id}`} style={{ ...linkStyle, fontWeight: 700 }}>
                         {incident.title}

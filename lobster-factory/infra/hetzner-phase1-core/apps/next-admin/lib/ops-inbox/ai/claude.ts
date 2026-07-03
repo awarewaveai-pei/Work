@@ -3,7 +3,7 @@ import type { Incident } from "@/lib/ops-inbox/types";
 
 const CLAUDE_TIMEOUT_MS = 12_000;
 
-export async function summarizeIncidentWithClaude(incident: Incident): Promise<string> {
+export async function summarizeIncidentWithClaude(incident: Incident, evidenceText?: string): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("missing ANTHROPIC_API_KEY");
 
@@ -18,6 +18,7 @@ export async function summarizeIncidentWithClaude(incident: Incident): Promise<s
     incident.message ? `Message: ${incident.message}` : "",
     `Occurrences: ${incident.occurrence_count}`,
     `Raw: ${JSON.stringify(incident.raw).slice(0, 4000)}`,
+    evidenceText ? `\n=== 系統自動蒐證 ===\n${evidenceText}` : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -29,9 +30,10 @@ export async function summarizeIncidentWithClaude(incident: Incident): Promise<s
     const response = await client.messages.create(
       {
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 200,
-        system:
-          "You are an SRE assistant. Summarize the incident in Traditional Chinese in 1-2 concise sentences: probable root cause + first remediation action. Be direct, no markdown.",
+        max_tokens: evidenceText ? 400 : 200,
+        system: evidenceText
+          ? "You are an SRE diagnostician. Using the incident AND the collected evidence (correlated alerts, fingerprint history, recent deploys, past repairs, live host state), respond in Traditional Chinese with exactly three lines:\n根因假說: <most likely cause, cite evidence>\n立即動作: <one concrete first action>\n驗證方式: <how to confirm the fix worked>\nBe direct, no markdown."
+          : "You are an SRE assistant. Summarize the incident in Traditional Chinese in 1-2 concise sentences: probable root cause + first remediation action. Be direct, no markdown.",
         messages: [{ role: "user", content: userMessage }],
       },
       { signal: controller.signal },

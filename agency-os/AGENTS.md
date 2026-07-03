@@ -135,7 +135,7 @@ Secrets: `scripts/secrets-vault.ps1 -Action get -Name <KEY_NAME>`（輸出 `NAME
 ## Lobster Factory 操作規則（所有 Agent 強制）
 
 - **Routing 三件套（同一 PR 必須同步）**：`lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` + `lobster-factory/workflow-risk-matrix.json` + `lobster-factory/docs/ROUTING_MATRIX.md`
-- **自動化安全預設**：DB 寫入預設 OFF（`LOBSTER_ENABLE_DB_WRITES=true` 才開）；Manifest 預設 off（`LOBSTER_EXECUTE_MANIFEST_STEPS=true` + `LOBSTER_MANIFEST_EXECUTION_MODE=dry_run|apply`）
+- **自動化安全預設**：DB 寫入預設 OFF（`LOBSTER_ENABLE_DB_WRITES=true` 才開）；Manifest 預設 off（`LOBSTER_EXECUTE_MANIFEST_STEPS=true` + `LOBSTER_MANIFEST_EXECUTION_MODE=dry_run|apply`）；自動 remediation 預設 OFF（`AUTO_REMEDIATE_ENABLED=true` + `AUTO_REMEDIATE_SERVICE_WHITELIST=<逗號分隔 compose service>` 兩者都設才生效，空白名單 = 全不匹配；目錄 SSOT：next-admin `lib/repair-center/remediations/`，四段契約 precheck→execute→healthcheck→rollback）
 - **Trigger.dev 憑證（不可互換）**：`tr_pat_*` = CLI deploy（`TRIGGER_DEPLOY_PAT`）；`tr_prod_*` = SDK runtime（`TRIGGER_ACCESS_TOKEN`）
 - Cursor rules 正本：`agency-os/.cursor/rules/`（repo 根 `.cursor/rules/` 是 mirror，不改正本）
 - 監控分工：SG endpoint-alert 打本機端口（避免 hairpin timeout）；EU Uptime Kuma 負責 public reachability。詳見 [`AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md)

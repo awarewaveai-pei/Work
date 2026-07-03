@@ -1,5 +1,6 @@
 import type { IncidentSeverity } from "../types";
 import type { NotificationContext, NotificationResult, Notifier } from "./types";
+import { canApprovePolicy, policyForIncident } from "@/lib/repair-center/policy";
 
 const TELEGRAM_API = "https://api.telegram.org";
 const MAX_LEN = 4000;
@@ -88,12 +89,19 @@ function formatTelegramIncident(ctx: NotificationContext): string {
   const srcLabel = SOURCE_CN[i.source] ?? i.source;
   const ruleLabelCN = RULE_CN[ctx.rule] ?? "新告警 (NEW)";
 
+  // One-command approval (A3): production incidents whose source policy is
+  // approvable can be pushed into the repair pipeline straight from the phone.
+  // The command goes through the full command plane (allow-listed actors,
+  // idempotency, kill-switch, policy) — this line is a shortcut, not a bypass.
+  const approvable = i.environment === "production" && canApprovePolicy(policyForIncident(i.source, i.severity));
+
   const lines = [
     `${sevLabel}告警 — ${srcLabel}`,
     `狀態：${ruleLabelCN}`,
     i.title,
     i.message ?? "",
     `（技術資訊：severity=${i.severity} source=${i.source} rule=${ctx.rule} fp=${fp} count=${i.occurrence_count}）`,
+    approvable ? `核准修復：/approve_repair ${i.id}` : "",
     incidentUrl,
   ].filter(Boolean);
 

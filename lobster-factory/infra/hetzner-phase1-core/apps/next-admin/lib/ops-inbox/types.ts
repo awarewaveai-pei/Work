@@ -11,7 +11,7 @@ export type IncidentEnvironment = "development" | "staging" | "production";
 export interface AiDiagnosis {
   provider: "gemini" | "chatgpt" | "claude" | "cursor" | "other";
   model?: string;
-  role: "auto-classify" | "diagnosis" | "rca" | "manual-paste";
+  role: "auto-classify" | "diagnosis" | "rca" | "manual-paste" | "evidence";
   summary: string;
   tokens?: number;
   cost_usd?: number;
@@ -44,6 +44,8 @@ export interface Incident {
   organization_id?: string | null;
   asset_id?: string | null;
   client_slug?: string | null;
+  /** Storm correlation (migration 0058) — earliest open sibling in the same window. */
+  parent_incident_id?: string | null;
   source: IncidentSource;
   external_id: string;
   fingerprint: string;
