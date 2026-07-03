@@ -42,7 +42,10 @@ describe("M1: state validation guard (extracted logic)", () => {
     if (!(REPAIR_RUN_STATES as readonly string[]).includes(bodyState)) {
       return { ok: false, error: "invalid_state_value" };
     }
-    if (isTerminalState(runState)) {
+    // Mirrors service.ts updateRunLinks: human_only → resolved (結案) is the one
+    // permitted write to a terminal run; everything else stays blocked.
+    const isCloseHumanOnly = runState === "human_only" && bodyState === "resolved";
+    if (isTerminalState(runState) && !isCloseHumanOnly) {
       return { ok: false, error: "run_in_terminal_state" };
     }
     return null;
@@ -71,6 +74,14 @@ describe("M1: state validation guard (extracted logic)", () => {
   it("terminal → terminal write is also blocked (no state resurrection)", () => {
     expect(validateStateInput("resolved", "resolved")).toEqual({ ok: false, error: "run_in_terminal_state" });
     expect(validateStateInput("rolled_back", "human_only")).toEqual({ ok: false, error: "run_in_terminal_state" });
+  });
+
+  it("結案 exception: human_only → resolved is allowed (the closeRun button)", () => {
+    expect(validateStateInput("resolved", "human_only")).toBeNull();
+    // …but only from human_only; other terminal states stay locked.
+    expect(validateStateInput("resolved", "rolled_back")).toEqual({ ok: false, error: "run_in_terminal_state" });
+    // …and only to resolved; human_only cannot re-enter active states.
+    expect(validateStateInput("repairing", "human_only")).toEqual({ ok: false, error: "run_in_terminal_state" });
   });
 });
 

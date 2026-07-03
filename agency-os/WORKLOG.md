@@ -4,6 +4,31 @@
 
 ## 2026-07-03
 
+### feat(ops): 維護 tab 工作流程紀錄補齊 + Repair Center 結案死路修復 + /ops/integrations 租戶隔離
+
+[任務理解] 操作者截圖問「這是壞掉吧?」：①`/ops/clients/soulful-expression` 維護 tab「最近工作流程執行」恆空——根因 wp-update route 從不寫 `ops_action_runs`（維護動作零稽核軌跡）；②`/ops/repairs` 修復紀錄多筆「失敗：run_in_terminal_state」——根因 結案按鈕只在 state=human_only 顯示（run-state.ts:34），但 human_only 是 terminal state、updateRunLinks 的 m6 閘擋掉所有 terminal 寫入（service.ts:410）→ 結案永遠失敗（設計自相矛盾）；③`/ops/integrations` server component 用 service-role 查詢、無 effectiveOrgId → client 登入可見全部客戶連線登記（與 repairs/approvals 已修的 S2 契約不一致）。
+
+[已修改]
+- `migrations/0057_seed_wp_maintenance_action.sql` + `scripts/0057_..._down.sql`（down=soft-disable，因 ops_action_runs FK ON DELETE RESTRICT，db-expert Major 折入）：catalog seed `ops.maintenance.wp-plugin-update`
+- `wp-update/route.ts`：beginActionRun（catalog lookup + self-seed 同值 upsert 冪等 fail-open）+ finishActionRun（completed/failed + output_payload + ended_at）接入 SSE 四終端路徑；actor_role=Clerk role 或 sync-key 機器路徑記 operator；critic 2 Major 折入——wave3 健康檢查結果併入 ok（CLI 成功但站掛 ≠ completed）、wave1 health-abort（stopped 且 0 失敗）不再記 ok；write client 缺失時 console.warn（db-expert suggestion）
+- `repair-center/service.ts`：updateRunLinks 加唯一例外 human_only→resolved（結案語義）；其他 terminal 寫入照舊全擋；`__tests__/update-run-links.test.ts` 鏡射更新 + 新 3 斷言案例
+- `ops/integrations/page.tsx`：effectiveOrgId/OrgAccessError 同 repairs 模式；orgs/assets/bindings 三查詢 orgFilter；未綁 org fail-closed（API route 本已有 assertOrgAccess，僅頁面漏）
+- `ops/clients/[slug]/page.tsx` + `ClientHubTabs.tsx`：action_id(uuid)→action_key 目錄解析傳入 RunRow；維護 tab 顯示可讀 key；佈建 tab buildRuns filter 原本 `action_id.includes("build")` 對 uuid 永遠 false（潛在死 panel，順手修）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test (next-admin) | exit=0 | ms=7000（574/574，+1 新案例）
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/2m/4n — 2 Major（wave3 健康被忽略、wave1 abort 記 completed）同日折入；Minor：running 卡死 reaper（follow-up）、audit 寫入移到開場 log 後（已折入）、error_summary 含 ssh host（接受，內部表）
+- REVIEW_DONE: critic=db-expert | verdict=SAFE | findings=0c/1m/2n — Major down-file 已補（soft-disable）；0057 無自動 apply 路徑：以 route self-seed 為主要機制（明文接受），migration 檔為 schema history
+- BUGHUNT_DONE: scope=lobster-factory agency-os scripts | grep=run_in_terminal_state|wp_update_latest|WpUpdateLatest|action_id.includes | hits=9+6+3+1 — 全部核對：測試鏡射已同步、wp_update_latest 消費者（ClientCard/clientStatus/wp-report）新欄位 additive 相容、佈建 tab uuid filter 已修
+- WORKLOG: 本 entry
+
+[剩餘風險 / follow-up]
+- ops_action_runs 卡在 running（maxDuration 300s 殺掉 / process crash / SSE cancel）無 reaper —— 數據衛生類，後續加 stale-running 掃描（archiveStaleRuns 有先例）
+- 0057 需在 EU Supabase 手動 apply 或依賴 route self-seed（首次跑 wp-update 即自動補 catalog row）
+- 維護 tab 歷史將從「下一次外掛更新」開始累積（既往動作無從回填）
+
+[rollback] 單 commit revert；DB 面 down script = soft-disable（enabled=false），稽核列保留。
+
 ### feat(tenant-chain): 多客戶自動串聯三斷點修復 — 監控告警自動歸屬客戶（critic 2 Major 折入）
 
 [任務理解] 鏈路稽核（同日）證實：ops 三頁骨架真、但自動修復管線 0 次實戰，且「新客戶資料自動流入」斷在三處——自動建的 Kuma monitor ①沒掛 webhook 通知 ②沒貼 client tag ③slug 從無人解析成 organization_id（所有 webhook incident org 恆 NULL，org 隔離形同虛設）。操作者裁決全部處理。

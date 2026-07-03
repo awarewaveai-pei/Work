@@ -96,6 +96,10 @@ export interface RunRow {
   status: string;
   started_at: string | null;
   ended_at: string | null;
+  /** ops_action_runs.metadata — writers stamp action_key here for display. */
+  metadata?: Record<string, unknown> | null;
+  /** Resolved from ops_action_catalog by page.tsx (action_id is just a uuid). */
+  action_key?: string | null;
 }
 
 export interface InstallRunRow {
@@ -660,7 +664,13 @@ function IntegrationsTab({ integrations }: Pick<ClientHubTabsProps, "integration
 }
 
 function ProvisioningTab({ deptSummary, runs, cfg }: Pick<ClientHubTabsProps, "deptSummary" | "runs" | "cfg">) {
-  const buildRuns = runs.filter((r) => r.action_id?.includes("build") || r.action_id?.includes("provision"));
+  // action_key resolved from the catalog by page.tsx; the legacy action_id
+  // check never matched (action_id is a uuid) — kept only as a harmless fallback.
+  const buildRuns = runs.filter((r) => {
+    const key = r.action_key ?? "";
+    return key.includes("build") || key.includes("provision") || key.includes("create-wp-site") || key.includes("adopt")
+      || r.action_id?.includes("build") || r.action_id?.includes("provision");
+  });
 
   return (
     <>
@@ -816,7 +826,7 @@ function MaintenanceTab({ org, cfg, wp, runs, installRuns }: Pick<ClientHubTabsP
                   : "var(--text-muted)";
             return (
               <div key={run.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid var(--bg-canvas)", fontSize: 11 }}>
-                <span style={{ fontFamily: "monospace", flex: 1, color: "var(--text-secondary)", fontSize: 10 }}>{run.action_id ?? "—"}</span>
+                <span style={{ fontFamily: "monospace", flex: 1, color: "var(--text-secondary)", fontSize: 10 }}>{run.action_key ?? (typeof run.metadata?.action_key === "string" ? run.metadata.action_key : null) ?? run.action_id ?? "—"}</span>
                 <span style={{ color, fontWeight: 600 }}>{run.status}</span>
                 <span style={{ color: "var(--text-muted)" }}>{relativeTime(run.started_at)}</span>
               </div>

@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import type { CSSProperties } from "react";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { effectiveOrgId, OrgAccessError } from "@/lib/tenant-guard";
 import type { AssetRow, IntegrationRow } from "@/app/api/ops/integrations/route";
 import { buildIntegrationBlockers, readLastHealthCheck } from "@/lib/repair-os/integration-blockers";
 import { IntegrationCreatePanel, IntegrationRowActions } from "./IntegrationControls";
@@ -36,23 +38,45 @@ export default async function IntegrationsPage() {
   const supabase = getSupabaseServerClient();
   if (!supabase) return <ErrorPanel message="Supabase not configured." />;
 
-  const orgRes = await supabase
+  // Tenant scoping (2026-07-03): same effectiveOrgId contract as /ops/repairs —
+  // this server component queries with the service-role client, which bypasses
+  // RLS. staff → null (all orgs); client → own org only; client without an org
+  // binding → fail closed. Without this, a client login would see every
+  // client's connection registry (providers, secret_ref names, last_error).
+  const h = await headers();
+  const reqLike = new Request("http://localhost", { headers: h });
+  let orgFilter: string | null = null;
+  try {
+    orgFilter = effectiveOrgId(reqLike, null);
+  } catch (e) {
+    if (e instanceof OrgAccessError) {
+      return <ErrorPanel message="帳號未綁定組織（org binding missing）— 無法載入資料。" />;
+    }
+    throw e;
+  }
+
+  let orgQuery = supabase
     .from("organizations")
     .select("id,slug,name,type,status,metadata")
     .order("created_at", { ascending: true });
+  if (orgFilter) orgQuery = orgQuery.eq("id", orgFilter);
+  const orgRes = await orgQuery;
 
   if (orgRes.error) return <ErrorPanel message={orgRes.error.message} />;
 
-  const [assetRes, integrationRes] = await Promise.all([
-    supabase
-      .from("assets")
-      .select("id,organization_id,slug,name,asset_type,environment,primary_url,provider,status")
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("tenant_integration_bindings")
-      .select("id,organization_id,asset_id,provider,secret_ref,external_hint,api_metadata,provisioning_source,status,last_error,last_tested_at,last_seen_at,created_at")
-      .order("created_at", { ascending: true }),
-  ]);
+  let assetQuery = supabase
+    .from("assets")
+    .select("id,organization_id,slug,name,asset_type,environment,primary_url,provider,status")
+    .order("created_at", { ascending: true });
+  if (orgFilter) assetQuery = assetQuery.eq("organization_id", orgFilter);
+
+  let integrationQuery = supabase
+    .from("tenant_integration_bindings")
+    .select("id,organization_id,asset_id,provider,secret_ref,external_hint,api_metadata,provisioning_source,status,last_error,last_tested_at,last_seen_at,created_at")
+    .order("created_at", { ascending: true });
+  if (orgFilter) integrationQuery = integrationQuery.eq("organization_id", orgFilter);
+
+  const [assetRes, integrationRes] = await Promise.all([assetQuery, integrationQuery]);
 
   const organizations = (orgRes.data ?? []) as OrganizationRow[];
   const assets = (assetRes.data ?? []) as AssetRow[];

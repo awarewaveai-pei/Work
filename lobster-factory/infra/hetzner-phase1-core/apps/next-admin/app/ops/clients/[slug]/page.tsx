@@ -90,6 +90,26 @@ export default async function ClientDetailPage({
       : Promise.resolve({ data: [], error: null }),
   ]);
 
+  // ── Resolve action_id → action_key for display/filtering ───────────────────
+  // ops_action_runs.action_id is a uuid; the tabs need the human-readable
+  // catalog key (e.g. ops.profile-b.create-wp-site, ops.maintenance.wp-plugin-update).
+  const runRows = (runsResult.data ?? []) as Array<Record<string, unknown>>;
+  const actionIds = [...new Set(runRows.map((r) => r.action_id).filter((v): v is string => typeof v === "string"))];
+  let actionKeyById = new Map<string, string>();
+  if (actionIds.length > 0) {
+    const { data: catalogRows } = await supabase
+      .from("ops_action_catalog")
+      .select("id,action_key")
+      .in("id", actionIds);
+    actionKeyById = new Map(
+      ((catalogRows ?? []) as Array<{ id: string; action_key: string }>).map((c) => [c.id, c.action_key]),
+    );
+  }
+  const runs = runRows.map((r) => ({
+    ...r,
+    action_key: typeof r.action_id === "string" ? actionKeyById.get(r.action_id) ?? null : null,
+  }));
+
   // ── M3 department coverage (server-side) ────────────────────────────────────
   const selectedIds: ClusterId[] = Array.isArray(cfg.department_selection)
     ? (cfg.department_selection as ClusterId[])
@@ -143,7 +163,7 @@ export default async function ClientDetailPage({
       cfg={cfg}
       health={health}
       wp={wp}
-      runs={(runsResult.data ?? []) as Parameters<typeof ClientHubTabs>[0]["runs"]}
+      runs={runs as Parameters<typeof ClientHubTabs>[0]["runs"]}
       installRuns={(installRunsResult.data ?? []) as Parameters<typeof ClientHubTabs>[0]["installRuns"]}
       deptSummary={deptSummary}
       integrations={(integrationsResult.data ?? []) as Parameters<typeof ClientHubTabs>[0]["integrations"]}

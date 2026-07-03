@@ -83,6 +83,107 @@ function sshExec(
   });
 }
 
+// ── ops_action_runs audit trail (2026-07-03) ─────────────────────────────────
+// Every wave run is recorded so /ops/clients/[slug] 維護 tab「最近工作流程執行」
+// shows maintenance history. Recording is fail-open: any failure here must
+// never block the actual plugin updates.
+
+const WP_UPDATE_ACTION_KEY = "ops.maintenance.wp-plugin-update";
+
+async function beginActionRun(opts: {
+  organizationId: string;
+  clientSlug: string;
+  actorRole: "owner" | "admin" | "operator" | "viewer";
+  wave: string;
+  plugins: string[];
+}): Promise<string | null> {
+  try {
+    const supabaseWrite = getSupabaseWriteClient();
+    if (!supabaseWrite) {
+      // Without the service-role key no run is recorded and the 維護 tab history
+      // silently goes empty — make the misconfiguration observable.
+      console.warn("[wp-update] SUPABASE_SERVICE_ROLE_KEY missing — audit run not recorded");
+      return null;
+    }
+
+    let { data: action } = await supabaseWrite
+      .from("ops_action_catalog")
+      .select("id")
+      .eq("action_key", WP_UPDATE_ACTION_KEY)
+      .maybeSingle();
+
+    if (!action?.id) {
+      // Self-seed — same values as migrations/0057_seed_wp_maintenance_action.sql
+      // (keep in sync). Covers deploys where the migration hasn't been applied yet.
+      const { data: seeded } = await supabaseWrite
+        .from("ops_action_catalog")
+        .upsert(
+          {
+            action_key: WP_UPDATE_ACTION_KEY,
+            display_name: "WP plugin update (maintenance)",
+            risk_level: "medium",
+            environment_scope: "staging_and_production",
+            enabled: true,
+            metadata: { requires_approval: false, source: "wp-update-route-self-seed" },
+          },
+          { onConflict: "action_key" },
+        )
+        .select("id")
+        .maybeSingle();
+      action = seeded ?? null;
+    }
+    if (!action?.id) return null;
+
+    const runId = crypto.randomUUID();
+    const { error } = await supabaseWrite.from("ops_action_runs").insert({
+      id: runId,
+      action_id: action.id,
+      organization_id: opts.organizationId,
+      actor_role: opts.actorRole,
+      status: "running",
+      trace_id: `wp-update-${runId}`,
+      input_payload: { wave: opts.wave, plugins: opts.plugins },
+      metadata: {
+        action_key: WP_UPDATE_ACTION_KEY,
+        client_slug: opts.clientSlug,
+        source: "web_ui",
+      },
+    });
+    if (error) {
+      console.warn("[wp-update] ops_action_runs insert failed (fail-open):", error.message);
+      return null;
+    }
+    return runId;
+  } catch (e) {
+    console.warn("[wp-update] beginActionRun failed (fail-open):", e);
+    return null;
+  }
+}
+
+async function finishActionRun(
+  runId: string | null,
+  ok: boolean,
+  output: Record<string, unknown>,
+  errorSummary?: string,
+): Promise<void> {
+  if (!runId) return;
+  try {
+    const supabaseWrite = getSupabaseWriteClient();
+    if (!supabaseWrite) return;
+    await supabaseWrite
+      .from("ops_action_runs")
+      .update({
+        status: ok ? "completed" : "failed",
+        output_payload: output,
+        error_summary: errorSummary ?? null,
+        ended_at: new Date().toISOString(),
+      })
+      .eq("id", runId);
+  } catch (e) {
+    console.warn("[wp-update] finishActionRun failed (fail-open):", e);
+  }
+}
+
 // ── Health probe ──────────────────────────────────────────────────────────────
 
 async function checkHealth(url: string): Promise<{ ok: boolean; status: number | null }> {
@@ -183,6 +284,11 @@ export async function POST(
     return new Response("Invalid plugin slug in client_config waves", { status: 400 });
   }
 
+  // Audit actor: Clerk role when it authorized the call, otherwise the
+  // machine sync-key path acted — record as operator.
+  const { role: resolvedRole } = resolveOpsRole(request);
+  const actorRole = canSyncWpReport(resolvedRole) ? resolvedRole : "operator";
+
   // ── SSE stream ───────────────────────────────────────────────────────────
 
   const encoder = new TextEncoder();
@@ -200,6 +306,7 @@ export async function POST(
       const log = (message: string) => send({ type: "log", message });
 
       let conn: SshClient | null = null;
+      let auditRunId: string | null = null;
 
       try {
         // ── Validate plugin list ────────────────────────────────────────
@@ -214,6 +321,14 @@ export async function POST(
 
         log(`🚀 開始 ${wave} 更新，共 ${plugins.length} 個外掛`);
         log(`   外掛清單：${plugins.join(", ")}`);
+
+        auditRunId = await beginActionRun({
+          organizationId: org.id,
+          clientSlug: org.slug,
+          actorRole,
+          wave,
+          plugins,
+        });
 
         // ── Connect SSH ─────────────────────────────────────────────────
         log(`🔗 正在連接 SSH ${cfg.ssh_host}:${cfg.ssh_port ?? 22}...`);
@@ -238,19 +353,24 @@ export async function POST(
           const batchOk = batchResult.code === 0;
           log(batchOk ? "✅ 批次更新完成" : `❌ 批次更新失敗（exit ${batchResult.code}）`);
 
-          // Health check
+          // Health check — folds into the recorded outcome: a CLI-successful
+          // update that leaves the site down must not be recorded as ok.
+          let siteHealthy: boolean | null = null;
           if (cfg.site_url) {
             log("🏥 健康檢查...");
             const h = await checkHealth(cfg.site_url);
+            siteHealthy = h.ok;
             log(`   HTTP ${h.status ?? "timeout"} — ${h.ok ? "✅ 正常" : "❌ 異常"}`);
           }
 
+          const wave3Ok = batchOk && siteHealthy !== false;
           const result = {
             wave,
             ran_at: new Date().toISOString(),
-            ok: batchOk,
+            ok: wave3Ok,
             updated_count: batchOk ? plugins.length : 0,
             failed_count: batchOk ? 0 : plugins.length,
+            site_healthy: siteHealthy,
             client: org.slug,
             plugins_group: wave,
             results: plugins.map((p) => ({
@@ -262,6 +382,7 @@ export async function POST(
           };
 
           await writeFinalResult(org.id, org.slug, meta, result, supabase);
+          await finishActionRun(auditRunId, wave3Ok, result);
           send({ type: "done", result });
           conn.end();
           controller.close();
@@ -276,6 +397,7 @@ export async function POST(
           status: "updated" | "failed";
         }> = [];
         let stopped = false;
+        let lastHealthOk: boolean | null = null;
 
         for (const plugin of plugins) {
           if (stopped) break;
@@ -308,6 +430,7 @@ export async function POST(
           if (cfg.site_url) {
             log("🏥 健康檢查...");
             const h = await checkHealth(cfg.site_url);
+            lastHealthOk = h.ok;
             log(`   HTTP ${h.status ?? "timeout"} — ${h.ok ? "✅ 正常" : "❌ 異常"}`);
             if (!h.ok && wave === "wave1") {
               log("🚨 Wave1：網站回應異常，停止更新");
@@ -319,9 +442,11 @@ export async function POST(
 
         const updatedCount = results.filter((r) => r.status === "updated").length;
         const failedCount = results.filter((r) => r.status === "failed").length;
-        const allOk = failedCount === 0;
+        // A health-triggered abort (stopped with zero failed commands) is NOT ok —
+        // the site went unhealthy mid-run and the audit trail must say so.
+        const allOk = failedCount === 0 && !stopped;
 
-        log(`\n📊 完成：已更新 ${updatedCount}，失敗 ${failedCount}`);
+        log(`\n📊 完成：已更新 ${updatedCount}，失敗 ${failedCount}${stopped ? "（中途停止）" : ""}`);
 
         const finalResult = {
           wave,
@@ -329,16 +454,20 @@ export async function POST(
           ok: allOk,
           updated_count: updatedCount,
           failed_count: failedCount,
+          stopped,
+          site_healthy: lastHealthOk,
           client: org.slug,
           plugins_group: wave,
           results,
         };
 
         await writeFinalResult(org.id, org.slug, meta, finalResult, supabase);
+        await finishActionRun(auditRunId, allOk, finalResult);
         send({ type: "done", result: finalResult });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         log(`🔴 錯誤：${msg}`);
+        await finishActionRun(auditRunId, false, {}, msg);
         send({ type: "error", message: msg });
       } finally {
         try {

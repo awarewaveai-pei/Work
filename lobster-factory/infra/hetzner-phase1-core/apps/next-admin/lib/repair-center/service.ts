@@ -407,7 +407,12 @@ export async function updateRunLinks(
       return { ok: false, error: "invalid_state_value", details: { received: body.state, allowed: [...REPAIR_RUN_STATES] } };
     }
     // m6: use strict version — run.state is string (DB NOT NULL); undefined must not pass as "terminal".
-    if (isStrictTerminalState(run.state)) {
+    // Exception (2026-07-03): human_only → resolved is the 結案 button's transition —
+    // visibleRunButtons() only shows 結案 on human_only runs, so blocking it made every
+    // click dead-end with run_in_terminal_state. Only this one transition is exempt;
+    // all other writes to terminal runs stay blocked (no state resurrection).
+    const isCloseHumanOnly = run.state === "human_only" && body.state === "resolved";
+    if (isStrictTerminalState(run.state) && !isCloseHumanOnly) {
       return { ok: false, error: "run_in_terminal_state", details: { state: run.state } };
     }
   }
