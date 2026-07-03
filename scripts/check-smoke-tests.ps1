@@ -86,23 +86,26 @@ try {
 }
 
 # --- Check 3: Client sites health ---
-$clientsUrl = "$AppBaseUrl/api/ops/clients"
+# Uses /api/ops/summary (PUBLIC_API_PATHS, no session needed) instead of /api/ops/clients:
+# that route sits behind the Supabase-session middleware (401 for server-to-server callers)
+# and its payload carries no health field anyway — summary reads the same organizations table.
+$clientsUrl = "$AppBaseUrl/api/ops/summary"
 try {
-    $resp = Invoke-RestMethod -Uri $clientsUrl -Headers $authHeader -TimeoutSec 10 -ErrorAction Stop
-    $clients = @($resp.clients)
-    if ($clients.Count -eq 0) {
+    $resp = Invoke-RestMethod -Uri $clientsUrl -TimeoutSec 10 -ErrorAction Stop
+    $tenants = @($resp.tenants)
+    if ($tenants.Count -eq 0) {
         $results["client_sites"] = "skip:no_clients"
     } else {
-        $unhealthy = @($clients | Where-Object {
-            $_.health -and $_.health.status -and $_.health.status -notin @("ok","healthy","up")
+        $inactive = @($tenants | Where-Object {
+            $_.status -and $_.status -notin @("active","ok","healthy")
         })
-        if ($unhealthy.Count -eq 0) {
-            $results["client_sites"] = "ok:$($clients.Count)_healthy"
+        if ($inactive.Count -eq 0) {
+            $results["client_sites"] = "ok:$($tenants.Count)_active"
         } else {
-            $names = ($unhealthy | ForEach-Object {
+            $names = ($inactive | ForEach-Object {
                 if ($_.slug) { $_.slug } elseif ($_.name) { $_.name } else { "unknown" }
             }) -join ","
-            $results["client_sites"] = "warn:unhealthy=$names"
+            $results["client_sites"] = "warn:inactive=$names"
         }
     }
 } catch {
@@ -118,6 +121,9 @@ try {
     $n8nBaseUrl = [System.Environment]::GetEnvironmentVariable("N8N_API_BASE_URL", "User")
     if (-not $n8nBaseUrl) { $n8nBaseUrl = $env:N8N_API_BASE_URL }
     if (-not $n8nBaseUrl) { $n8nBaseUrl = "https://n8n.aware-wave.com" }
+    # N8N_API_BASE_URL may or may not already include /api/v1 (differs per machine) —
+    # normalize to the bare host so the path below never doubles (root cause of skip:exception 404).
+    $n8nBaseUrl = ($n8nBaseUrl.TrimEnd("/") -replace "/api/v1$", "")
 
     if ($n8nApiKey) {
         $since = (Get-Date).ToUniversalTime().AddHours(-24).ToString("yyyy-MM-ddTHH:mm:ssZ")

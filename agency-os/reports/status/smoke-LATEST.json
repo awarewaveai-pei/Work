@@ -1,14 +1,14 @@
 ﻿{
     "checks":  {
-                   "n8n_failures":  "skip:exception",
+                   "n8n_failures":  "ok:none_24h",
                    "repair_detail":  {
                                          "ok":  true,
                                          "system_mode":  "normal",
                                          "table_ok":  true
                                      },
-                   "client_sites":  "skip:http401",
+                   "client_sites":  "ok:2_active",
                    "n8n_mcp":  "ok",
                    "repair_center":  "ok"
                },
-    "generated":  "2026-07-03 08:48:36"
+    "generated":  "2026-07-03 08:58:52"
 }
