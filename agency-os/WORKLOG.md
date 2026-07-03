@@ -9099,4 +9099,5 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-07-02 12:52:30 UTC_
+_Last synced: 2026-07-03 15:37:19 UTC_
+
