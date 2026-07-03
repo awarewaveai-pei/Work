@@ -14,6 +14,7 @@ import { setSystemModeHandler } from "./systemModeControl";
 import { triggerWorkflowHandler } from "./triggerWorkflow";
 import { replayDeadLetterHandler } from "./replayDeadLetter";
 import { normalModeHandler } from "./normalMode";
+import { approveRepairHandler } from "./approveRepair";
 
 export const phase1Handlers: Record<string, CommandHandler> = {
   "/start": startHandler,
@@ -32,6 +33,9 @@ export const phase1Handlers: Record<string, CommandHandler> = {
   // Phase 2b — Trigger.dev medium-risk dispatch (workflow kick-off + DLQ diag).
   "/trigger_staging_workflow": triggerWorkflowHandler,
   "/replay_dead_letter":       replayDeadLetterHandler,
+  // A3 (2026-07-03) — one-command repair approval from the phone. Same
+  // pipeline + gates as the web 核准修復 button; medium risk (backup + issue).
+  "/approve_repair":           approveRepairHandler,
   // Phase 2c — kill-switch UNLOCK (high-risk; ops console approval only).
   // Registered here so the approval API can look it up; Telegram source is
   // hard-blocked from high-risk commands by policyEngine, so this entry is

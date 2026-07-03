@@ -4,6 +4,31 @@
 
 ## 2026-07-03
 
+### feat(auto-repair): A1 證據引擎 + A3 閉環 + A2 白名單 remediation — 自動維修從「自動文書」升級成「會自己治病」
+
+[任務理解] 操作者裁決「A 全做」（更想要 B → A 的三塊直接設計成 B orchestrator 的地基：證據層 = 診斷 agent 輸入、remediation 目錄 = 動作層、閉環 = 狀態機骨架）。現況痛點：repairing 之後無執行者、AI 只會一句摘要、同一次事故三筆獨立 incident、無 reaper/自動結案、核准要開電腦。
+
+[已修改]
+- **A1 證據引擎**：新 `lib/repair-center/evidence.ts`（5 收集器逐段 fail-open：同窗告警/同指紋歷史/48h 部署/修復史/SSH 主機快照——快照僅平台事件、10s 硬上限、指令零插值）；`ssh.ts` 集中 `readSshTarget`+新 `sshExecOnce`（connect+exec 同一時限），`backup.ts` 去重改 import；`claude.ts`/`gemini.ts` 接受 evidenceText → 三行結構輸出（根因假說/立即動作/驗證方式）；`triggerAutoClassify` 先蒐證再問模型，證據存 `ai_diagnoses` role="evidence"（新 union 值；IncidentCard 只挑 auto-classify 不受影響）
+- **A3 閉環**：migration `0058` parent_incident_id（+down）；`correlate.ts`（linkStormParent 僅首次發生時鏈到同窗最早 open 事件、同租戶 scope、防鏈防環；collapseStormChildren 純函式）接進 `upsertIncidentAtomic` + `/ops/repairs` 佇列折疊（「+N 筆關聯告警」badge）；`hygiene.ts`（autoVerifyRunsOnDeploySuccess：deploy_success=sg-deploy 閘門已過 → deploy_pending/deploying runs 按 service 嚴格匹配自動 resolved+passed；reapStaleRuns：backing_up/approved/deploying 超 6h → 回 triage_needed 附 audit（絕不私自進終態）、ops_action_runs running 超 2h → failed）；deploy webhook 接 auto-verify + 機會式 reaper（VPS cron 4h 心跳）；手動 `POST /api/ops/repairs/reaper`；Telegram `/approve_repair <uuid>`（handler 走完整 command plane：allowlist/idempotency/kill-switch/policy medium；critical 仍卡 console 二次確認）+ 告警訊息帶核准指令行
+- **A2 Remediation 執行器**：`lib/ops-actions/record.ts` 通用 ops_action_runs 記錄器（wp-update route 重構改用，去重複）；`remediations/`（types 四段契約 / engine：flag 閘+30min 指紋冷卻+全程稽核+incident tag 落痕 / restart-unhealthy-container：SG 平台限定、AUTO_REMEDIATE_SERVICE_WHITELIST 白名單（空=全不匹配）、precheck 實證容器真的壞、execute 單一 bounded restart、healthcheck 15s 後複查、rollback=文件化 no-op）；uptime_kuma/netdata webhook 接 auto 路徑（AUTO_REMEDIATE_ENABLED 預設 OFF）；手動 `POST /api/ops/repairs/remediate`（RBAC，不受 flag 限制）；AGENTS.md §自動化安全預設 登錄兩個新 flag
+- 22 個新測試（evidence 純函式/collapse/reaper 述詞/remediation 白名單紀律與四段契約）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test (next-admin) | exit=0 | ms=7140（596/596，+22 新案例）
+- REVIEW_DONE: critic=Deep | verdict=pending-fold | findings=審查進行中，folding commit 隨後（本 entry 於折入後更新）
+- BUGHUNT_DONE: scope=lobster-factory agency-os scripts | grep=readSshTarget|sshExecOnce|summarizeIncidentWith|ai_diagnoses role 消費者|positiveIntEnv 殘留 | hits=全數核對 — backup/health route/evidence/remediations 共用 ssh.ts 單一定義；IncidentCard 只挑 auto-classify；無孤兒引用
+- WORKLOG: 本 entry
+- 環境限制：dogfood-auto-repair.ps1 與 /doc-sync 需 pwsh（容器無）+ prod host 被 proxy 擋 → 工作站補跑；auto-repair-guard 機械閘 pre-check 以讀 audit baseline 替代
+
+[剩餘風險 / follow-up]
+- Remediation execute+healthcheck（最壞 ~85s）在 webhook request path 內同步執行 —— SG 為 docker 常駐（無 serverless 時限）可接受；量大時改佇列（B orchestrator 自然歸宿）
+- Kuma/netdata 誤報+偽造 payload 理論上可觸發白名單服務重啟：三重防線（ingest token + 白名單 + precheck 實證容器狀態）後殘餘風險 = 已認證攻擊者重啟一台本來就 unhealthy 的容器，可接受
+- 0057/0058 需工作站或下次 deploy 後手動 apply（0058 未 apply 時 correlation 靜默跳過、fail-open 已驗）
+- 啟用自動 remediation 的操作步驟：SG env 設 `AUTO_REMEDIATE_ENABLED=true` + `AUTO_REMEDIATE_SERVICE_WHITELIST=next-admin`（建議先只放一個服務觀察一週）
+
+[rollback] 單 commit revert；0058 down script 安全（app fail-open）；remediation 全停 = 清空白名單或拔 flag。
+
 ### feat(ops): 維護 tab 工作流程紀錄補齊 + Repair Center 結案死路修復 + /ops/integrations 租戶隔離
 
 [任務理解] 操作者截圖問「這是壞掉吧?」：①`/ops/clients/soulful-expression` 維護 tab「最近工作流程執行」恆空——根因 wp-update route 從不寫 `ops_action_runs`（維護動作零稽核軌跡）；②`/ops/repairs` 修復紀錄多筆「失敗：run_in_terminal_state」——根因 結案按鈕只在 state=human_only 顯示（run-state.ts:34），但 human_only 是 terminal state、updateRunLinks 的 m6 閘擋掉所有 terminal 寫入（service.ts:410）→ 結案永遠失敗（設計自相矛盾）；③`/ops/integrations` server component 用 service-role 查詢、無 effectiveOrgId → client 登入可見全部客戶連線登記（與 repairs/approvals 已修的 S2 契約不一致）。

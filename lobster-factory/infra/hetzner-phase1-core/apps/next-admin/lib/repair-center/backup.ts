@@ -1,5 +1,5 @@
 import type { RepairRunWithIncident } from "./types";
-import { connectSsh, readPrivateKeyFromEnv, sshExec, type SshTarget } from "./ssh";
+import { connectSsh, readSshTarget, sshExec, type SshTarget } from "./ssh";
 
 export interface BackupGateResult {
   ok: boolean;
@@ -94,11 +94,6 @@ function boolEnv(name: string, fallback: boolean): boolean {
   return fallback;
 }
 
-function positiveIntEnv(name: string, fallback: number): number {
-  const raw = Number(process.env[name]);
-  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : fallback;
-}
-
 function safeScriptPath(raw: string, fallback: string): string {
   const value = raw.trim() || fallback;
   // M8: reject `..` before regex — `.` is allowed for filenames (e.g. backup-phase1.sh)
@@ -109,20 +104,6 @@ function safeScriptPath(raw: string, fallback: string): string {
     throw new Error(`unsafe_script_path:${value}`);
   }
   return value;
-}
-
-function readSshTarget(prefix: "SG" | "EU"): SshTarget | null {
-  const host = env(`AUTO_REPAIR_${prefix}_SSH_HOST`);
-  const username = env(`AUTO_REPAIR_${prefix}_SSH_USER`) || "root";
-  const keyEnv = env(`AUTO_REPAIR_${prefix}_SSH_KEY_ENV`) || `AUTO_REPAIR_${prefix}_SSH_KEY_B64`;
-  const privateKey = readPrivateKeyFromEnv(keyEnv);
-  if (!host || !privateKey) return null;
-  return {
-    host,
-    username,
-    port: positiveIntEnv(`AUTO_REPAIR_${prefix}_SSH_PORT`, 22),
-    privateKey,
-  };
 }
 
 async function runRemoteScript(args: {

@@ -21,6 +21,7 @@ import {
   getSupabaseWriteClient,
 } from "../../../../../../lib/supabase-server";
 import { timingSafeEqual } from "../../../../../../lib/ops-inbox/verifyIngestToken";
+import { beginOpsActionRun, finishOpsActionRun } from "../../../../../../lib/ops-actions/record";
 import type { ClientConfig } from "../../../../../../app/api/ops/clients/route";
 
 export const dynamic = "force-dynamic";
@@ -84,105 +85,31 @@ function sshExec(
 }
 
 // ── ops_action_runs audit trail (2026-07-03) ─────────────────────────────────
-// Every wave run is recorded so /ops/clients/[slug] 維護 tab「最近工作流程執行」
-// shows maintenance history. Recording is fail-open: any failure here must
-// never block the actual plugin updates.
+// Every wave run is recorded via the shared recorder (lib/ops-actions/record)
+// so /ops/clients/[slug] 維護 tab「最近工作流程執行」shows maintenance history.
+// Seed values mirror migrations/0057_seed_wp_maintenance_action.sql.
 
 const WP_UPDATE_ACTION_KEY = "ops.maintenance.wp-plugin-update";
 
-async function beginActionRun(opts: {
+function beginActionRun(opts: {
   organizationId: string;
   clientSlug: string;
   actorRole: "owner" | "admin" | "operator" | "viewer";
   wave: string;
   plugins: string[];
 }): Promise<string | null> {
-  try {
-    const supabaseWrite = getSupabaseWriteClient();
-    if (!supabaseWrite) {
-      // Without the service-role key no run is recorded and the 維護 tab history
-      // silently goes empty — make the misconfiguration observable.
-      console.warn("[wp-update] SUPABASE_SERVICE_ROLE_KEY missing — audit run not recorded");
-      return null;
-    }
-
-    let { data: action } = await supabaseWrite
-      .from("ops_action_catalog")
-      .select("id")
-      .eq("action_key", WP_UPDATE_ACTION_KEY)
-      .maybeSingle();
-
-    if (!action?.id) {
-      // Self-seed — same values as migrations/0057_seed_wp_maintenance_action.sql
-      // (keep in sync). Covers deploys where the migration hasn't been applied yet.
-      const { data: seeded } = await supabaseWrite
-        .from("ops_action_catalog")
-        .upsert(
-          {
-            action_key: WP_UPDATE_ACTION_KEY,
-            display_name: "WP plugin update (maintenance)",
-            risk_level: "medium",
-            environment_scope: "staging_and_production",
-            enabled: true,
-            metadata: { requires_approval: false, source: "wp-update-route-self-seed" },
-          },
-          { onConflict: "action_key" },
-        )
-        .select("id")
-        .maybeSingle();
-      action = seeded ?? null;
-    }
-    if (!action?.id) return null;
-
-    const runId = crypto.randomUUID();
-    const { error } = await supabaseWrite.from("ops_action_runs").insert({
-      id: runId,
-      action_id: action.id,
-      organization_id: opts.organizationId,
-      actor_role: opts.actorRole,
-      status: "running",
-      trace_id: `wp-update-${runId}`,
-      input_payload: { wave: opts.wave, plugins: opts.plugins },
-      metadata: {
-        action_key: WP_UPDATE_ACTION_KEY,
-        client_slug: opts.clientSlug,
-        source: "web_ui",
-      },
-    });
-    if (error) {
-      console.warn("[wp-update] ops_action_runs insert failed (fail-open):", error.message);
-      return null;
-    }
-    return runId;
-  } catch (e) {
-    console.warn("[wp-update] beginActionRun failed (fail-open):", e);
-    return null;
-  }
+  return beginOpsActionRun({
+    actionKey: WP_UPDATE_ACTION_KEY,
+    displayName: "WP plugin update (maintenance)",
+    riskLevel: "medium",
+    organizationId: opts.organizationId,
+    actorRole: opts.actorRole,
+    inputPayload: { wave: opts.wave, plugins: opts.plugins },
+    metadata: { client_slug: opts.clientSlug, source: "web_ui" },
+  });
 }
 
-async function finishActionRun(
-  runId: string | null,
-  ok: boolean,
-  output: Record<string, unknown>,
-  errorSummary?: string,
-): Promise<void> {
-  if (!runId) return;
-  try {
-    const supabaseWrite = getSupabaseWriteClient();
-    if (!supabaseWrite) return;
-    await supabaseWrite
-      .from("ops_action_runs")
-      .update({
-        status: ok ? "completed" : "failed",
-        output_payload: output,
-        error_summary: errorSummary ?? null,
-        ended_at: new Date().toISOString(),
-      })
-      .eq("id", runId);
-  } catch (e) {
-    console.warn("[wp-update] finishActionRun failed (fail-open):", e);
-  }
-}
+const finishActionRun = finishOpsActionRun;
 
 // ── Health probe ──────────────────────────────────────────────────────────────
 

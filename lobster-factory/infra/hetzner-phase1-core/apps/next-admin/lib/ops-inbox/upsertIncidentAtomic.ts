@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Incident, IncidentDraft } from "./types";
 import { computeFingerprintV2 } from "./fingerprint";
+import { linkStormParent } from "@/lib/repair-center/correlate";
 
 // Negative cache for slug→org resolution (critic 2026-07-03 minor): a flapping
 // monitor carrying a slug with no matching organization would otherwise hit
@@ -82,5 +83,15 @@ export async function upsertIncidentAtomic(
   } catch (e) {
     console.warn("[ops-inbox] slug→org attribution failed (fail-open):", e);
   }
+
+  // Storm correlation (A3): link this incident to the earliest open sibling
+  // in the same ±15min window / tenant scope. Only on first occurrence — a
+  // flapping monitor must not pay a correlation query per heartbeat. Fail-open
+  // inside linkStormParent; requires migration 0058 (missing column → update
+  // fails silently, ingest unaffected).
+  if (incident.occurrence_count <= 1) {
+    incident = await linkStormParent(supabase, incident);
+  }
+
   return { data: incident, error: null };
 }

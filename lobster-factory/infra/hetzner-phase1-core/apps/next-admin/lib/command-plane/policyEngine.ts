@@ -28,6 +28,11 @@ const RISK_TABLE: Record<string, RiskLevel> = {
   "/replay_dead_letter": "medium",
   "/trigger_staging_workflow": "medium",
   "/create_issue": "medium",
+  // A3: same worst case as trigger_staging_workflow — a pre-repair backup and a
+  // GitHub issue. Critical incidents still hold at the ops-console second
+  // confirmation inside startRepairFromIncident, so Telegram cannot fast-track
+  // a critical repair.
+  "/approve_repair": "medium",
 
   // high: requires approval (ops console SSO).
   // /normal_mode is high so Telegram cannot unlock the killswitch — that path

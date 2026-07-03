@@ -5,15 +5,16 @@ const GEMINI_TIMEOUT_MS = 12_000;
 // gemini-2.0-flash-lite: cheaper, faster, stable on v1beta
 const GEMINI_MODEL = "gemini-2.0-flash-lite";
 
-export async function summarizeIncidentWithGemini(incident: Incident): Promise<string> {
+export async function summarizeIncidentWithGemini(incident: Incident, evidenceText?: string): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("missing GEMINI_API_KEY");
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
   const prompt = [
-    "You are an SRE assistant. Summarize this incident in Traditional Chinese.",
-    "Respond in 1-2 concise sentences with probable root cause + first action.",
+    evidenceText
+      ? "You are an SRE diagnostician. Using the incident AND the collected evidence, respond in Traditional Chinese with exactly three lines:\n根因假說: <most likely cause, cite evidence>\n立即動作: <one concrete first action>\n驗證方式: <how to confirm the fix worked>\nBe direct, no markdown."
+      : "You are an SRE assistant. Summarize this incident in Traditional Chinese.\nRespond in 1-2 concise sentences with probable root cause + first action.",
     "",
     `Source: ${incident.source}`,
     `Severity: ${incident.severity}`,
@@ -23,6 +24,7 @@ export async function summarizeIncidentWithGemini(incident: Incident): Promise<s
     incident.message ? `Message: ${incident.message}` : "",
     `Occurrences: ${incident.occurrence_count}`,
     `Raw: ${JSON.stringify(incident.raw).slice(0, 4000)}`,
+    evidenceText ? `\n=== 系統自動蒐證 ===\n${evidenceText}` : "",
   ]
     .filter(Boolean)
     .join("\n");
