@@ -4,6 +4,27 @@
 
 ## 2026-07-03
 
+### ops: Uptime Kuma — Soulful Expression monitor 新增 ✅
+
+**背景**：今日 session 加 `client_slug` 鏈路已通（types.ts → normalizer → upsert RPC），但 Uptime Kuma 全部 22 個 monitor 皆為 AwareWave infra，無客戶站 → 趁機加 Soulful Expression。
+
+**做了什麼**：
+- EU VPS SSH 直接操作 SQLite（v1.23.17 無 REST `GET /api/monitor` 端點，走 socket.io）
+- INSERT monitor id=23：`Soulful Expression (soulfulexpression.org)` → `https://soulfulexpression.org/` | type=http, interval=60s, maxretries=1
+- 建 tag id=3 `client` (#6366F1)；monitor_tag: tag_id=2 (Soulful Expression 分組) + tag_id=3 (client=soulful-expression)
+- 手動 INSERT monitor_notification → Telegram Pei (id=3) + Slack #infra-alerts (id=4)
+- docker restart uptime-kuma（兩次：tags 後 + notifications 後）；確認 Up 6s healthy
+
+**[驗證結果]**（R0 四動作）：
+- REALTEST_EVIDENCE: tool=SSH | cmd=sqlite3 SELECT monitor id=23 + docker ps healthy | exit=0 | ms=~8000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（純 DB insert + restart，無 code change）
+- BUGHUNT_WAIVED: NA -- no code change, DB-only operation
+- WORKLOG: 本條目
+
+**normalizer 接通**：下次 Uptime Kuma 對 soulfulexpression.org DOWN webhook → tag `client=soulful-expression` → `client_slug` 寫入 ops_incidents。
+
+---
+
 ### ops: AO-RESUME §6 阻塞清理 — 0056 已套確認 + smoke 兩檢修復 + Stage 2 n8n 橋接建成 ✅
 
 **① migration 0056（§6 稱「未 apply」→ 實為 stale 報告）**：VBC 實查 EU `pg_proc` → `upsert_incident_atomic` 已是 14-arg 含 `p_client_slug text DEFAULT NULL`（幾乎確定 2026-07-02 session 套 0055 同場套了 0056 但漏記 WORKLOG——本行即補記）。本日補做：pre-state function def 備份至 EU `/root/db-backups/pre-0056-upsert_incident_atomic-20260703.sql`、`NOTIFY pgrst reload`、14-arg RPC 走 PostgREST e2e（201→row `client_slug=testclient`→刪測試 row）。鏈路末端：Uptime Kuma 22 個 monitor 全為 infra、無客戶站 monitor → 目前無需掛 `client` tag；未來建客戶 monitor 時掛 `client=<slug>` tag 即接通。
