@@ -61,13 +61,23 @@ export async function POST(request: Request) {
 
   const { form: rawForm, organization_id } = body;
 
+  // Guard: rawForm must be a non-null object before coercion (malformed webhook → clean 422).
+  if (!rawForm || typeof rawForm !== "object") {
+    return NextResponse.json(
+      { ok: false, error: "missing_required_fields", required: ["company_name", "industry", "pages_needed"] },
+      { status: 422 }
+    );
+  }
+
   // Coerce FluentForm webhook strings → IntakeForm types.
-  // FluentForm sends "yes"/"no" for booleans; pages_needed may arrive as comma-separated string.
+  // FluentForm sends "yes"/"no"/"true"/"1" for booleans; pages_needed may be comma-separated.
+  const TRUTHY = new Set(["yes", "true", "1", "on"]);
+  const toBool = (v: unknown): boolean => v === true || (typeof v === "string" && TRUTHY.has(v.toLowerCase()));
   const form: IntakeForm = {
     ...rawForm,
-    has_ecommerce: rawForm.has_ecommerce === true || (rawForm.has_ecommerce as unknown) === "yes",
-    needs_crm: rawForm.needs_crm === true || (rawForm.needs_crm as unknown) === "yes",
-    needs_booking: rawForm.needs_booking === true || (rawForm.needs_booking as unknown) === "yes",
+    has_ecommerce: toBool(rawForm.has_ecommerce),
+    needs_crm: toBool(rawForm.needs_crm),
+    needs_booking: toBool(rawForm.needs_booking),
     pages_needed: Array.isArray(rawForm.pages_needed)
       ? rawForm.pages_needed
       : typeof rawForm.pages_needed === "string"
