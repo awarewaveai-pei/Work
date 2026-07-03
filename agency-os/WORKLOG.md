@@ -3,7 +3,6 @@
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
 ## 2026-07-03
-## 2026-07-03
 
 ### feat(tenant-chain): 多客戶自動串聯三斷點修復 — 監控告警自動歸屬客戶（critic 2 Major 折入）
 
@@ -75,6 +74,14 @@
 - WORKLOG: 本條目
 
 **[剩餘風險 / rollback]**：0056 rollback 寫在 migration 檔尾（DROP 14-arg + 重跑 0036 + NOTIFY）；smoke 腳本 rollback = git revert；n8n workflow rollback = deactivate/delete workflow `RbrHNu3BUEmpNWeT` + 刪兩 credential。
+
+### ops(remote-monthly-agent) 月度報告（原檔尾錯位塊，歸位）
+
+- 09:00 : remote-monthly-agent: monthly review 2026-07 generated -> reports/monthly/monthly-review-2026-07.md (governance drift overall: SKIPPED — no PowerShell in Linux container)
+  AUTO_TASK_DONE: monthly-review-2026-07
+  REALTEST_WAIVED: NA -- report generation, no runtime state to test
+  REVIEW_WAIVED: DOC_ONLY -- markdown report, no code changed
+  BUGHUNT_WAIVED: DOC_ONLY -- no code symbols modified
 
 ## 2026-07-02
 
@@ -9068,12 +9075,3 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
 _Last synced: 2026-07-02 12:52:30 UTC_
-
-
-## 2026-07-03
-
-- 09:00 : remote-monthly-agent: monthly review 2026-07 generated -> reports/monthly/monthly-review-2026-07.md (governance drift overall: SKIPPED — no PowerShell in Linux container)
-  AUTO_TASK_DONE: monthly-review-2026-07
-  REALTEST_WAIVED: NA -- report generation, no runtime state to test
-  REVIEW_WAIVED: DOC_ONLY -- markdown report, no code changed
-  BUGHUNT_WAIVED: DOC_ONLY -- no code symbols modified
