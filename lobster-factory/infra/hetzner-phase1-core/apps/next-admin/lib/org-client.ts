@@ -17,7 +17,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { getSecret, orgSupabaseRef } from "@/lib/secret-vault";
 
-type CredRow = { label: string; identifier: string | null; secret_ref: string };
+// secret_ref is nullable when identifier itself IS the value (e.g. a public project URL).
+type CredRow = { label: string; identifier: string | null; secret_ref: string | null };
 
 async function resolveFromCredentialsLib(orgSlug: string): Promise<{ url: string; key: string } | null> {
   const agency = getSupabaseWriteClient();
@@ -25,23 +26,38 @@ async function resolveFromCredentialsLib(orgSlug: string): Promise<{ url: string
   try {
     const { data: org } = await agency.from("organizations").select("id").eq("slug", orgSlug).maybeSingle();
     if (!org) return null;
+    // Include rows where secret_ref IS null — URL rows store the value directly in identifier.
     const { data: rows } = await agency
       .from("client_credentials")
       .select("label, identifier, secret_ref")
-      .eq("client_id", (org as { id: string }).id)
-      .not("secret_ref", "is", null);
+      .eq("client_id", (org as { id: string }).id);
     if (!rows?.length) return null;
     const creds = rows as CredRow[];
+
+    // URL row: identifier is the Supabase project URL itself, OR label signals "supabase"+"url".
     const urlRow = creds.find(
       c =>
         c.identifier?.includes(".supabase.co") ||
         (c.label.toLowerCase().includes("supabase") && c.label.toLowerCase().includes("url")),
     );
-    const keyRow = creds.find(
-      c => c !== urlRow && c.label.toLowerCase().includes("supabase"),
-    );
+
+    // Key row: prefer service_role identifier; fall back to any other supabase-labelled row.
+    // Anon key lacks write access — service_role is required for outreach DB operations.
+    const keyRow =
+      creds.find(c => c !== urlRow && c.identifier === "service_role") ??
+      creds.find(c => c !== urlRow && c.label.toLowerCase().includes("supabase"));
+
     if (!urlRow || !keyRow) return null;
-    const [url, key] = await Promise.all([getSecret(urlRow.secret_ref), getSecret(keyRow.secret_ref)]);
+
+    // URL may live directly in identifier (public project endpoint, not a vault secret).
+    const url =
+      urlRow.identifier?.startsWith("https://") && urlRow.identifier.includes(".supabase.co")
+        ? urlRow.identifier
+        : urlRow.secret_ref
+          ? await getSecret(urlRow.secret_ref)
+          : null;
+
+    const key = keyRow.secret_ref ? await getSecret(keyRow.secret_ref) : null;
     if (!url || !key) return null;
     return { url, key };
   } catch {
