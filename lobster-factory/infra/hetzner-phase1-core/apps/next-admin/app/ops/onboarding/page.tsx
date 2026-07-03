@@ -182,34 +182,57 @@ export default function OnboardingPage() {
     setError(null);
     setFlow("submitting");
 
-    const submitRes = await fetch("/api/onboarding/submit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ form }),
-    });
-    const submitData = await submitRes.json();
-    if (!submitData.ok) {
-      setError(`Submit failed: ${submitData.error}`);
-      setFlow("error");
-      return;
-    }
-    setIntakeId(submitData.intake_form_id);
-    setFlow("generating");
+    // Same hardening as handleTriggerBuild: text-first parse + try/catch so a
+    // network error or non-JSON error page (502 HTML) never strands the spinner.
+    try {
+      const submitRes = await fetch("/api/onboarding/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ form }),
+      });
+      const submitText = await submitRes.text();
+      let submitData: { ok?: boolean; error?: string; intake_form_id?: string };
+      try {
+        submitData = JSON.parse(submitText);
+      } catch {
+        setError(`Submit failed: 伺服器回應非預期（HTTP ${submitRes.status}）${submitText ? ` — ${submitText.slice(0, 160)}` : ""}`);
+        setFlow("error");
+        return;
+      }
+      if (!submitRes.ok || !submitData.ok || !submitData.intake_form_id) {
+        setError(`Submit failed: ${submitData.error ?? `HTTP ${submitRes.status}`}`);
+        setFlow("error");
+        return;
+      }
+      setIntakeId(submitData.intake_form_id);
+      setFlow("generating");
 
-    const genRes = await fetch("/api/onboarding/generate-spec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ intake_form_id: submitData.intake_form_id }),
-    });
-    const genData = await genRes.json();
-    if (!genData.ok) {
-      setError(`Spec generation failed: ${genData.error}`);
+      const genRes = await fetch("/api/onboarding/generate-spec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intake_form_id: submitData.intake_form_id }),
+      });
+      const genText = await genRes.text();
+      let genData: { ok?: boolean; error?: string; spec?: WebsiteSpec; website_spec_id?: string };
+      try {
+        genData = JSON.parse(genText);
+      } catch {
+        setError(`Spec generation failed: 伺服器回應非預期（HTTP ${genRes.status}）${genText ? ` — ${genText.slice(0, 160)}` : ""}`);
+        setFlow("error");
+        return;
+      }
+      if (!genRes.ok || !genData.ok || !genData.spec) {
+        setError(`Spec generation failed: ${genData.error ?? `HTTP ${genRes.status}`}`);
+        setFlow("error");
+        return;
+      }
+      setSpec(genData.spec);
+      setWebsiteSpecId(genData.website_spec_id ?? null);
+      setFlow("done");
+    } catch (e) {
+      setError(`提交失敗：${e instanceof Error ? e.message : String(e)}`);
       setFlow("error");
-      return;
     }
-    setSpec(genData.spec);
-    setWebsiteSpecId(genData.website_spec_id ?? null);
-    setFlow("done");
   }
 
   async function handleTriggerBuild() {

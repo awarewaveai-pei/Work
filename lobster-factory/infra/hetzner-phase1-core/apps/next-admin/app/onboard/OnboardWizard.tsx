@@ -854,12 +854,14 @@ function Step5Launch({
   selectedDepts,
   providers,
   provResult,
+  orgResult,
   onBack,
 }: {
   info: ClientInfo;
   selectedDepts: Set<ClusterId>;
   providers: string[];
   provResult: ProvResult | null;
+  orgResult: { ok: boolean; message?: string } | null;
   onBack: () => void;
 }) {
   const totalPlugins = resolvePluginsForPacks(info.selectedPacks).length;
@@ -896,6 +898,13 @@ function Step5Launch({
       <div className="build-alert build-alert-ok" style={{ marginBottom: 20 }}>
         客戶設定完成。以下是本次上線的摘要。
       </div>
+
+      {orgResult && !orgResult.ok ? (
+        <div className="build-alert build-alert-blocked" style={{ marginBottom: 20 }}>
+          ⚠ organization 記錄自動建立<strong>失敗</strong>{orgResult.message ? `：${orgResult.message}` : ""}。
+          Build run 會引用不存在的 organizationId — 請先手動完成下方「下一步」第 2 項（建立 organization 記錄）再啟動 Build Console。
+        </div>
+      ) : null}
 
       <div className="build-kv-grid">
         <div><span>Client</span><strong>{info.clientName || "—"}</strong></div>
@@ -961,16 +970,22 @@ export default function OnboardWizard() {
   const [provLoading, setProvLoading] = useState(false);
   const [provResult, setProvResult] = useState<ProvResult | null>(null);
   const [orgCreating, setOrgCreating] = useState(false);
+  const [orgResult, setOrgResult] = useState<{ ok: boolean; message?: string } | null>(null);
 
   const patchInfo = useCallback((patch: Partial<ClientInfo>) => {
     setInfo((prev) => ({ ...prev, ...patch }));
   }, []);
 
   // Auto-register client in Supabase organizations table when entering Step 5.
-  // Non-blocking: wizard advances regardless of result.
+  // Non-blocking: wizard advances regardless of result — but the outcome must be
+  // VISIBLE in Step 5 (a silently missing org row breaks the build run later).
   const createOrgRecord = async () => {
-    if (!info.tenantSlug.trim() || !info.clientName.trim()) return;
+    if (!info.tenantSlug.trim() || !info.clientName.trim()) {
+      setOrgResult({ ok: false, message: "缺 slug / client name，未嘗試建立" });
+      return;
+    }
     setOrgCreating(true);
+    setOrgResult(null);
     try {
       const clientConfig: Record<string, unknown> = { platform: "wordpress" };
       if (info.profile === "profile_b") {
@@ -981,7 +996,7 @@ export default function OnboardWizard() {
         if (info.wpAdminUrl) clientConfig.wp_admin_url = info.wpAdminUrl;
         clientConfig.hosting_type = info.provider;
       }
-      await fetch("/api/ops/organizations", {
+      const res = await fetch("/api/ops/organizations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -992,8 +1007,24 @@ export default function OnboardWizard() {
           metadata: { client_config: clientConfig },
         }),
       });
-    } catch {
-      // non-blocking — wizard advances regardless
+      if (res.ok) {
+        setOrgResult({ ok: true });
+      } else {
+        const text = await res.text();
+        let detail = "";
+        try {
+          const json = JSON.parse(text) as { error?: string; detail?: string };
+          detail = json.error ?? json.detail ?? "";
+        } catch {
+          detail = text.slice(0, 120);
+        }
+        setOrgResult({
+          ok: false,
+          message: `HTTP ${res.status}${detail ? ` — ${detail}` : ""}${res.status === 403 ? "（此 API 需要 owner/admin 權限）" : ""}`,
+        });
+      }
+    } catch (err) {
+      setOrgResult({ ok: false, message: err instanceof Error ? err.message : "network error" });
     } finally {
       setOrgCreating(false);
     }
@@ -1107,6 +1138,7 @@ export default function OnboardWizard() {
               selectedDepts={selectedDepts}
               providers={providers}
               provResult={provResult}
+              orgResult={orgResult}
               onBack={() => setStep(4)}
             />
           )}

@@ -124,10 +124,19 @@ type LiveRunStatus = {
   ended_at?: string | null;
 };
 
-type ProvisionStatus = "idle" | "dry_run" | "provisioned" | "reused" | "mock" | "blocked" | "rolled_back";
+// Mirrors /api/provision response contract: result.outcome (NOT result.status).
+// idle = adapter none/gated, mock = dry-run fake data, dispatched = Trigger.dev provision-machine task fired.
+type ProvisionOutcome = "idle" | "mock" | "dispatched";
 type ProvisionResult = {
   ok: boolean;
-  result?: { status: ProvisionStatus; ref?: Record<string, unknown>; plan?: unknown; message?: string; dns?: unknown };
+  result?: {
+    outcome?: ProvisionOutcome;
+    runId?: string | null;
+    detail?: string;
+    serverIp?: string;
+    serverType?: string;
+    region?: string;
+  };
   adapter?: string;
   error?: string;
   detail?: string;
@@ -149,7 +158,9 @@ export default function BuildConsole() {
   const [response, setResponse] = useState<BuildRunResponse | null>(null);
   const [pollingRunId, setPollingRunId] = useState<string | null>(null);
   const [liveStatus, setLiveStatus] = useState<LiveRunStatus | null>(null);
+  const [pollError, setPollError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollFailsRef = useRef(0);
   const [showIntegrations, setShowIntegrations] = useState(true);
   const [showPrerequisites, setShowPrerequisites] = useState(true);
 
@@ -215,22 +226,50 @@ export default function BuildConsole() {
   // Start/stop polling based on pollingRunId
   useEffect(() => {
     if (!pollingRunId) return;
+    pollFailsRef.current = 0;
+    setPollError(null);
+
+    const stopPolling = () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = null;
+    };
+
+    // Surface persistent failures instead of polling forever in silence:
+    // 404/403 are definitive (bad runId / no access) → stop immediately;
+    // anything else stops after 5 consecutive failures.
+    const MAX_CONSECUTIVE_FAILS = 5;
+    const registerFailure = (message: string, definitive = false) => {
+      pollFailsRef.current += 1;
+      if (definitive || pollFailsRef.current >= MAX_CONSECUTIVE_FAILS) {
+        setPollError(message);
+        stopPolling();
+      }
+    };
 
     const poll = async () => {
       try {
         const res = await fetch(`/api/build/runs/${pollingRunId}`);
-        if (!res.ok) return;
+        if (!res.ok) {
+          registerFailure(
+            `Run 查詢失敗（HTTP ${res.status}）— runId 可能不存在或無存取權限，已停止輪詢。`,
+            res.status === 404 || res.status === 403,
+          );
+          return;
+        }
         const json = (await res.json()) as { ok: boolean; run?: LiveRunStatus };
         if (json.ok && json.run) {
+          pollFailsRef.current = 0;
+          setPollError(null);
           setLiveStatus(json.run);
           if (TERMINAL_STATUSES.has(json.run.status)) {
             // Stop polling once we reach a terminal state
-            if (pollRef.current) clearInterval(pollRef.current);
-            pollRef.current = null;
+            stopPolling();
           }
+        } else {
+          registerFailure(`Run 查詢失敗（${json && "error" in json ? String((json as Record<string, unknown>).error) : "unexpected response"}）— 已停止輪詢。`);
         }
-      } catch {
-        // ignore transient network errors during polling
+      } catch (err) {
+        registerFailure(`Run 查詢網路錯誤（${err instanceof Error ? err.message : "network error"}）— 已停止輪詢。`);
       }
     };
 
@@ -248,6 +287,7 @@ export default function BuildConsole() {
     setResponse(null);
     setPollingRunId(null);
     setLiveStatus(null);
+    setPollError(null);
   };
 
   const update = <K extends keyof BuildRunRequest>(key: K, value: BuildRunRequest[K]) => {
@@ -379,8 +419,8 @@ export default function BuildConsole() {
               機層租機 (Hetzner VM Provision) — Stage 4
             </span>
             <span className="build-integrations-hint">
-              {provisionResult?.result?.status
-                ? `last: ${provisionResult.result.status}`
+              {provisionResult?.result?.outcome
+                ? `last: ${provisionResult.result.outcome}`
                 : "LOBSTER_SERVER_ADAPTER 控制；預設 idle (不花錢)"}
             </span>
           </button>
@@ -436,21 +476,21 @@ export default function BuildConsole() {
                 <div className={`build-alert ${provisionResult.ok ? "build-alert-ok" : "build-alert-blocked"}`}>
                   {provisionResult.ok ? (
                     <>
-                      <strong>status: {provisionResult.result?.status}</strong>
+                      <strong>outcome: {provisionResult.result?.outcome ?? "unknown"}</strong>
                       {" · adapter: "}{provisionResult.adapter}
-                      {provisionResult.result?.status === "provisioned" || provisionResult.result?.status === "reused"
-                        ? (
-                          <div style={{ marginTop: 6, fontFamily: "monospace", fontSize: 11 }}>
-                            {JSON.stringify(provisionResult.result.ref, null, 2)}
-                          </div>
-                        ) : null}
-                      {provisionResult.result?.status === "dry_run" ? (
-                        <div style={{ marginTop: 6, fontSize: 11, color: "var(--text-muted)" }}>
-                          Dry-run plan returned — set LOBSTER_SERVER_PROVISION_ENABLED=true to rent.
+                      {provisionResult.result?.outcome === "dispatched" ? (
+                        <div style={{ marginTop: 6, fontSize: 11 }}>
+                          已派工 Trigger.dev provision-machine task
+                          {provisionResult.result.runId ? <> — runId: <code>{provisionResult.result.runId}</code></> : null}
                         </div>
                       ) : null}
-                      {provisionResult.result?.message ? (
-                        <div style={{ marginTop: 4, fontSize: 11 }}>{provisionResult.result.message}</div>
+                      {provisionResult.result?.outcome === "mock" ? (
+                        <div style={{ marginTop: 6, fontFamily: "monospace", fontSize: 11 }}>
+                          {JSON.stringify(provisionResult.result, null, 2)}
+                        </div>
+                      ) : null}
+                      {(provisionResult.result?.detail ?? provisionResult.detail) ? (
+                        <div style={{ marginTop: 4, fontSize: 11 }}>{provisionResult.result?.detail ?? provisionResult.detail}</div>
                       ) : null}
                     </>
                   ) : (
@@ -931,18 +971,18 @@ export default function BuildConsole() {
           <div className="build-panel-head">
             <div>
               <div className="section-title">Live run status</div>
-              <h2>{liveStatus?.status ?? "polling…"}</h2>
+              <h2>{liveStatus?.status ?? (pollError ? "查詢失敗" : "polling…")}</h2>
             </div>
             <span
               className={`card-badge ${
-                !liveStatus ? "badge-gray"
+                !liveStatus ? (pollError ? "badge-red" : "badge-gray")
                 : liveStatus.status === "completed" ? "badge-green"
                 : liveStatus.status === "failed" || liveStatus.status === "dispatch_failed" ? "badge-red"
                 : liveStatus.status === "dispatched" || liveStatus.status === "running" ? "badge-yellow"
                 : "badge-gray"
               }`}
             >
-              {liveStatus ? liveStatus.status : "…"}
+              {liveStatus ? liveStatus.status : pollError ? "error" : "…"}
             </span>
           </div>
 
@@ -962,7 +1002,9 @@ export default function BuildConsole() {
             ) : null}
           </div>
 
-          {!liveStatus || !TERMINAL_STATUSES.has(liveStatus.status) ? (
+          {pollError ? (
+            <div className="build-alert build-alert-blocked">{pollError}</div>
+          ) : !liveStatus || !TERMINAL_STATUSES.has(liveStatus.status) ? (
             <div className="build-alert build-alert-ok">
               Polling every 3 s — waiting for run status updates…
             </div>

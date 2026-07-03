@@ -60,8 +60,9 @@ async function resolveFromCredentialsLib(orgSlug: string): Promise<{ url: string
     }
 
     // URL may live directly in identifier (public project endpoint, not a vault secret).
+    // Works for both managed (.supabase.co) and self-hosted Supabase instances.
     const url =
-      urlRow.identifier?.startsWith("https://") && urlRow.identifier.includes(".supabase.co")
+      urlRow.identifier?.startsWith("https://")
         ? urlRow.identifier
         : urlRow.secret_ref
           ? await getSecret(urlRow.secret_ref)
