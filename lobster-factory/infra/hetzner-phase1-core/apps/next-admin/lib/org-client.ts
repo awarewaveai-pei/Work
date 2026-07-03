@@ -41,13 +41,23 @@ async function resolveFromCredentialsLib(orgSlug: string): Promise<{ url: string
         (c.label.toLowerCase().includes("supabase") && c.label.toLowerCase().includes("url")),
     );
 
-    // Key row: prefer service_role identifier; fall back to any other supabase-labelled row.
+    // Key row: prefer service_role identifier (case-insensitive); fall back to any other
+    // supabase-labelled row that isn't the anon/publishable tier.
     // Anon key lacks write access — service_role is required for outreach DB operations.
     const keyRow =
-      creds.find(c => c !== urlRow && c.identifier === "service_role") ??
-      creds.find(c => c !== urlRow && c.label.toLowerCase().includes("supabase"));
+      creds.find(c => c !== urlRow && c.identifier?.toLowerCase() === "service_role") ??
+      creds.find(
+        c =>
+          c !== urlRow &&
+          c.label.toLowerCase().includes("supabase") &&
+          !c.label.toLowerCase().includes("anon") &&
+          !c.label.toLowerCase().includes("publishable"),
+      );
 
-    if (!urlRow || !keyRow) return null;
+    if (!urlRow || !keyRow) {
+      console.warn("[org-client] resolveFromCredentialsLib: urlRow=%s keyRow=%s slug=%s", !!urlRow, !!keyRow, orgSlug);
+      return null;
+    }
 
     // URL may live directly in identifier (public project endpoint, not a vault secret).
     const url =
@@ -60,7 +70,8 @@ async function resolveFromCredentialsLib(orgSlug: string): Promise<{ url: string
     const key = keyRow.secret_ref ? await getSecret(keyRow.secret_ref) : null;
     if (!url || !key) return null;
     return { url, key };
-  } catch {
+  } catch (err) {
+    console.warn("[org-client] resolveFromCredentialsLib threw for slug=%s:", orgSlug, err);
     return null;
   }
 }
