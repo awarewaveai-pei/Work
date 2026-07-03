@@ -3,6 +3,8 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-07-02 (AO-CLOSE, long session window 2026-06-12T05:27Z → 2026-07-02)** — Last AO-RESUME stamp was still `2026-06-12T05:27:33.6508893Z`, so this closeout covered a large 2,306 first-parent commit window instead of only today's work. Main completed themes: next-admin/content-studio/canvas/video/oracle/POD feature and fix batches; multi-tenant security guard rollout S1–S5; cold outreach Phase 1 and per-org Supabase routing; customer-service U0–U5 plus U6 Chatwoot handoff gated on buying the dedicated server; WordPress provisioning/catalog/tourism pipeline fixes; ops-inbox `client_slug` propagation; sg-deploy/workflows build fixes; governance hook v2, WORKLOG rotation, junk guard, and command/skill index sync. SG deploy drift was rechecked during closeout: SG `.deployed-commit` matched `origin/main` (`6751854a...`), so `SG production app-code drift` was marked done via WORKLOG `AUTO_TASK_DONE`. A final housekeeping commit removed tracked `$null` and added `/nul` to `.gitignore` to keep AO-CLOSE from staging shell artifacts.
+
 - **2026-06-26 (AO-CLOSE retention correction)** — 使用者抓到 AO-CLOSE 仍有 `>30 days` report prune 與既有 90 天保留期不一致。已完成兩段修正並 push：`cba741aa` 把 AO-CLOSE command/prior-close guard 改回 90 天並恢復 `reports/ao-close/2026-05-25-1837.md`；`625e6442` 補齊 AO-CLOSE/AO-RESUME report README、`agency-os/README.md` archive 範例與 `scripts/archive-old-reports.ps1` 預設 `KeepDays=90`。驗證：相關 PowerShell 腳本 parse OK，current AO retention authoritative grep 對 stale 30-day tokens 為 0 matches；歷史 WORKLOG/report/log/cache 不回寫。
 
 - **2026-06-24 (AO-CLOSE #2, CanvasEditor 匯出移右側工具欄)** — 窗：本 Claude Code session（2026-06-24 上午）。使用者要求：① PNG下載/WebP下載/存入 My Designs 全部移到右側工具欄；② PNG 不再顯示尺寸標籤。**已完成**：CanvasEditor.tsx — 頂部工具列移除 editName input + 3 顆按鈕；右側工具欄新增 SidebarPanel id="export" title="💾 匯出 / 下載" 作為第一個 Panel；移除死狀態 exportPxLabel + setExportPxLabel（state 宣告 + 2 call sites）；修 stale comment；修 WebP tooltip 150KB→200KB 對齊實際壓縮目標。**驗證**：tsc 0 + vitest 487/487 + critic Deep 0C/0M（2 minor 已修）+ BUGHUNT hits=4（全 doc 歷史紀錄，無程式碼 callsite）。**部署**：SG commit `c8d9d34f`，healthy 6s，smoke 4/4，playwright 26/32（6 skip = auth-gated 正常）。Canvas 整輪瀏覽器實測仍待操作者。
@@ -506,7 +508,7 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-06-26 01:40:18 UTC_
+_Last synced: 2026-07-02 12:45:31 UTC_
 
 ## 2026-06-16 AO-CLOSE memory — session window 2026-06-11T05:07Z → 2026-06-16 afternoon
 
@@ -563,3 +565,4 @@ _Last synced: 2026-06-26 01:40:18 UTC_
 - WORKLOG 改為月度輪替（當月+上月留主檔，餘 → `WORKLOG-archive/YYYY-MM.md`），15,708→8,356 行，ao-close 自動執行。
 - AGENTS.md 新增 §規則優先序（預授權 > 風險分級 > R0 逐項批准）與 §已知信任邊界（evidence 驗格式不驗真、機械閘 fail-open）。
 - 完整記錄：WORKLOG `## 2026-07-02`；分支 `claude/system-feedback-t7zo8r`（M1 03d624b → M4c 4ce5e4a）。
+

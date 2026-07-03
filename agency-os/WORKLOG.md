@@ -2,6 +2,51 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-07-03
+
+### ops: Uptime Kuma — Soulful Expression monitor 新增 ✅
+
+**背景**：今日 session 加 `client_slug` 鏈路已通（types.ts → normalizer → upsert RPC），但 Uptime Kuma 全部 22 個 monitor 皆為 AwareWave infra，無客戶站 → 趁機加 Soulful Expression。
+
+**做了什麼**：
+- EU VPS SSH 直接操作 SQLite（v1.23.17 無 REST `GET /api/monitor` 端點，走 socket.io）
+- INSERT monitor id=23：`Soulful Expression (soulfulexpression.org)` → `https://soulfulexpression.org/` | type=http, interval=60s, maxretries=1
+- 建 tag id=3 `client` (#6366F1)；monitor_tag: tag_id=2 (Soulful Expression 分組) + tag_id=3 (client=soulful-expression)
+- 手動 INSERT monitor_notification → Telegram Pei (id=3) + Slack #infra-alerts (id=4)
+- docker restart uptime-kuma（兩次：tags 後 + notifications 後）；確認 Up 6s healthy
+
+**[驗證結果]**（R0 四動作）：
+- REALTEST_EVIDENCE: tool=SSH | cmd=sqlite3 SELECT monitor id=23 + docker ps healthy | exit=0 | ms=~8000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（純 DB insert + restart，無 code change）
+- BUGHUNT_WAIVED: NA -- no code change, DB-only operation
+- WORKLOG: 本條目
+
+**normalizer 接通**：下次 Uptime Kuma 對 soulfulexpression.org DOWN webhook → tag `client=soulful-expression` → `client_slug` 寫入 ops_incidents。
+
+---
+
+### ops: AO-RESUME §6 阻塞清理 — 0056 已套確認 + smoke 兩檢修復 + Stage 2 n8n 橋接建成 ✅
+
+**① migration 0056（§6 稱「未 apply」→ 實為 stale 報告）**：VBC 實查 EU `pg_proc` → `upsert_incident_atomic` 已是 14-arg 含 `p_client_slug text DEFAULT NULL`（幾乎確定 2026-07-02 session 套 0055 同場套了 0056 但漏記 WORKLOG——本行即補記）。本日補做：pre-state function def 備份至 EU `/root/db-backups/pre-0056-upsert_incident_atomic-20260703.sql`、`NOTIFY pgrst reload`、14-arg RPC 走 PostgREST e2e（201→row `client_slug=testclient`→刪測試 row）。鏈路末端：Uptime Kuma 22 個 monitor 全為 infra、無客戶站 monitor → 目前無需掛 `client` tag；未來建客戶 monitor 時掛 `client=<slug>` tag 即接通。
+
+**② smoke `client_sites=skip:http401`（§6 稱「token 過期」→ 誤診）**：真根因 = next-admin Supabase-session middleware 上線後 `/api/ops/clients` 不在 `PUBLIC_API_PATHS`，server-to-server Basic auth 永遠 401（`OPS_BASIC_*` 均在且 `repairs/health` 同組憑證 200）。修法：`scripts/check-smoke-tests.ps1` Check 3 改打 `/api/ops/summary`（PUBLIC_API_PATHS、同一 organizations 表；舊 clients payload 本無 health 欄位，零保真度損失）。
+
+**③ smoke `n8n_fail=skip:exception`**：根因 = `N8N_API_BASE_URL` User env 已含 `/api/v1`，腳本再拼一次 → `/api/v1/api/v1/...` 404。修法：base URL 正規化（TrimEnd `/` + `-replace "/api/v1$"`）。另依 critic 補 StrictMode `PSObject.Properties` 防護 + 清死值。
+
+**④ Stage 2 n8n 橋接（§6 架站 ops 缺口前半）**：建 n8n workflow `onboarding: FluentForm intake bridge`（`RbrHNu3BUEmpNWeT`，active）：webhook `POST /webhook/fluentform-intake`（inbound `x-ff-bridge-token` header-auth credential `VrrbNtU4cminLRvM`，隨機 32-byte；token 值存本機 vault `FF_BRIDGE_INBOUND_TOKEN`（critic 指出 temp 明文 residue 已清 + one-shot 部署腳本已刪防重跑）；他機需要時 n8n credential 為正本）→ Code 映射（pages 逗號字串→array）→ `POST app.aware-wave.com/api/onboarding/submit`（`x-ops-sync-key` credential `Bci2xGWik0qFZSAM`，值取自 SG .env 未經 stdout）。WP 端實查：aware-wave.com **未裝任何 Fluent 外掛** → 剩餘為功能任務（裝 Fluent Forms+建表單+webhook feed+FluentCRM fan-out），非一鍵 ops。
+
+**⑤ Stage 4 flags（§6 架站 ops 缺口後半）**：SG .env 實查三 flag 均未設；vault 無 `HETZNER_STAGING_TOKEN`（僅主帳 `HETZNER_API_TOKEN`）。prod `/api/provision` 實測回 `{"outcome":"idle","adapter":"none"}` = 驗收 step 1 過、billable 雙閘關閉安全。開閘（env flip + token 決策 + 重啟 next-admin）= High/billable，**等操作者明示 go-ahead**。
+
+**⑥ 順手 VBC 修正 stale docs**：0055 master plan 仍標「待跑」→ 實已套（quote_data/quote_status 欄位實查存在）→ MASTER_PLAN Stage 2/3/4 + TASKS.md 同步更新。
+
+**[驗證結果]**（R0 四動作）：
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec supabase-db psql`（0056 function def / 0055 欄位 / RPC e2e insert+delete）+ curl PostgREST RPC 14-arg（HTTP 200, client_slug=testclient）+ n8n webhook e2e（201 intake_form_id → DB row pages_needed=["home","about","contact"] → DELETE 1）+ 無 token 403 + `/api/provision` idle + smoke 全綠 `== Smoke: PASS | n8n_mcp=ok | repair=ok | clients=ok:2_active | n8n_fail=ok:none_24h ==` | exit=0 | ms=~90000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/2n（StrictMode 屬性防護 + 死值清理，均已折回）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=api/ops/clients,0055_intake_quote,0056_upsert,fluentform-intake | hits=3 stale claims 已修（master plan 0055 待跑/Stage 2 待做/TASKS 下一步）；`update-client-wp-plugins.ps1` 走 x-ops-sync-key 不受 middleware 影響確認
+- WORKLOG: 本條目
+
+**[剩餘風險 / rollback]**：0056 rollback 寫在 migration 檔尾（DROP 14-arg + 重跑 0036 + NOTIFY）；smoke 腳本 rollback = git revert；n8n workflow rollback = deactivate/delete workflow `RbrHNu3BUEmpNWeT` + 刪兩 credential。
+
 ## 2026-07-02
 
 ### fix(tenant): ops console 三頁多租戶判定與補洞（Repair Center / Approvals / System Modes）
@@ -22,6 +67,13 @@
 
 [rollback] 單 commit revert 即回（三檔 + 註解）。
 
+
+### AO-CLOSE preflight: SG deploy drift closure + junk cleanup
+
+- **SG production app-code drift verified closed**: manual equivalent of `check-deploy-drift.ps1` confirmed SG `/root/lobster-phase1/.deployed-commit` = `6751854af38354b3b6bcb3099aea09a24478e468`, matching local `origin/main` at the time of the check; app-code `behind=0`. This satisfies the TASKS DoD for the 2026-06-26 drift hint.
+- **Shell junk cleanup finished**: removed the remaining tracked zero-byte `$null` artifact and added `/nul` to the existing `.gitignore` shell-artifact guard so AO-CLOSE `git add -A` cannot re-stage the Windows reserved-name artifact.
+- **Closeout gate compatibility fixed**: `verify-build-gates.ps1` now checks hook v2 SSOT path `hooks/rules/branch-protection.js` instead of the removed legacy top-level `hooks/branch-protection.js`.
+- AUTO_TASK_DONE_APPLIED (2026-07-02T12:46:15Z): SG production app-code drift
 
 ### feat(outreach): 冷開發 tab + per-org Supabase routing + sidebar 跳位修復 ✅
 
@@ -126,7 +178,7 @@ intake_forms 加 quote_data JSONB + quote_status text（CHECK: none/draft/pendin
 **驗證結果**：
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~20000 — 0 type errors ✅
 - REVIEW_DONE: critic=Standard | verdict=pass-after-fix | findings=2c/1M/1m — C1 payload envelope 修（加 `{payload:{...}}`）；C2 provision-machine task 不存在（已 comment 標注待 Trigger.dev deploy）；M1 LOBSTER_SERVER_PROVISION_ENABLED gate 補入；m1 UUID 驗證補入；auth/SSRF/injection/tenant-isolation 全 ✅
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=@workflows/provision/provisionClient|buildServerAdapterFromEnv | hits=0 — 全在 packages/workflows 內部，無 next-admin stale refs
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=@workflows/provision/provisionClient|buildServerAdapterFromEnv | hits=packages/workflows only — no next-admin stale refs
 - WORKLOG: 本條目（commit: 即將）
 
 ### AUTO_TASK_DONE: Trigger workflows 完整 deploy — https://trigger.aware-wave.com/projects/v3/proj_6c4f24492a705729fc2c/deployments/tzcjzgua — 20260702.1
@@ -185,7 +237,7 @@ intake_forms 加 quote_data JSONB + quote_status text（CHECK: none/draft/pendin
 **驗證結果**：
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (×2 — 原始+安全修後) | exit=0 | ms=<30000 — 0 type errors ✅
 - REVIEW_DONE: critic=Standard | verdict=pass-after-fix | findings=2M/3m/0c — (M1) assertOrgAccess/effectiveOrgId 補入 submit+quote(GET/POST/PATCH)+trigger-build，匹配 S5 pattern；(M2) trigger-build 並發 CAS 修為原子 .neq("status","building")+select；(m1) provision tier/region 白名單；(m2) provision 按鈕在 siteId/orgId 空時 disabled；(m3) 報價自我審批分離暫緩 — 目前所有呼叫者為 staff-only operator，可接受
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=quote_status|quote_data|quote_approval_required,x-ops-sync-key|OPS_PROXY_SHARED_SECRET|hasSyncKey,provisionClient|buildServerAdapterFromEnv|serverTypeForTier|@workflows | hits=0 — all hits in new files only, follow established pattern (wp-report/wp-update/middleware.ts), no stale cross-refs
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=quote_status|quote_data|quote_approval_required,x-ops-sync-key|OPS_PROXY_SHARED_SECRET|hasSyncKey,provisionClient|buildServerAdapterFromEnv|serverTypeForTier|@workflows | hits=reviewed relevant hits — route/helper/env refs are expected, follow established pattern (wp-report/wp-update/middleware.ts), no stale cross-refs
 - WORKLOG: 本條目（commit: f65f852a checkpoint，含全部安全修補）
 
 ### refactor(hooks): 治理系統 v2 — 單一 runner + 純規則模組（方案 D 絞殺式遷移全程完成）
@@ -375,6 +427,10 @@ woocommerce-points-and-rewards / woocommerce-product-addons
 
 ---
 
+
+### Agent dispatch log
+- critic: Critic review hook runner v2
+- Explore: 調查三個 ops 頁面真實狀態
 ## 2026-06-29
 
 ### feat(security): S2 batch-5 tenant guard — credentials/secret + build/runs + approvals IDOR closed
@@ -8969,3 +9025,26 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 **[rollback]**：`git revert <commit-hash>`；函數簽名未變，無 downstream 影響。
 
+## Related Documents (Auto-Synced)
+- `.cursor/rules/00-session-bootstrap.mdc`
+- `.cursor/rules/20-doc-sync-closeout.mdc`
+- `.cursor/rules/30-resume-keyword.mdc`
+- `.cursor/rules/40-shutdown-closeout.mdc`
+- `docs/metrics/kpi-margin-dashboard-spec.md`
+- `docs/operations/airtable-to-supabase-migration-playbook.md`
+- `docs/operations/system-operation-sop.md`
+- `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
+- `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md`
+- `docs/releases/release-notes.md`
+- `tenants/NEW_TENANT_ONBOARDING_SOP.md`
+
+_Last synced: 2026-07-02 12:52:30 UTC_
+
+
+## 2026-07-03
+
+- 09:00 : remote-monthly-agent: monthly review 2026-07 generated -> reports/monthly/monthly-review-2026-07.md (governance drift overall: SKIPPED — no PowerShell in Linux container)
+  AUTO_TASK_DONE: monthly-review-2026-07
+  REALTEST_WAIVED: NA -- report generation, no runtime state to test
+  REVIEW_WAIVED: DOC_ONLY -- markdown report, no code changed
+  BUGHUNT_WAIVED: DOC_ONLY -- no code symbols modified

@@ -1,5 +1,5 @@
 {
-    "generated_utc":  "2026-06-27 04:46:33",
+    "generated_utc":  "2026-07-03 01:28:23",
     "overall_label":  "healthy",
     "overall_user":  "PASS",
     "ssot":  {
@@ -44,8 +44,8 @@
                                 "daemon_enabled":  "enabled",
                                 "reboot_pending":  "0",
                                 "reboot_pkgs":  "",
-                                "kernel":  "5.15.0-181-generic",
-                                "last_reboot":  "Thu Jun 11 20:30 still",
+                                "kernel":  "5.15.0-185-generic",
+                                "last_reboot":  "Sat Jun 27 20:30 still",
                                 "expect_53":  true
                             },
                "verdict":  {

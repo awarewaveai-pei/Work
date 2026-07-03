@@ -1,5 +1,5 @@
 {
-    "generatedAt":  "2026-06-27T04:46:23.9295920Z",
+    "generatedAt":  "2026-07-03T01:28:12.7371282Z",
     "overall":  "PASS",
     "fatal":  false,
     "fatalReason":  "",
@@ -11,12 +11,12 @@
                "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|0 2 * * * root /root/lobster-phase1/scripts/backup-phase1.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261|30 2 * * * root /root/lobster-phase1/scripts/verify-backup.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261",
                "retention_days":  "7",
                "retention_source":  "static",
-               "backup_size":  "13G",
-               "latest_time":  "2026-06-27 02:31:24",
-               "oldest_time":  "2026-06-20 02:00:02",
+               "backup_size":  "15G",
+               "latest_time":  "2026-07-02 02:31:25",
+               "oldest_time":  "2026-06-25 02:00:01",
                "backup_age_days":  "0",
                "verify_result":  "PASSED",
-               "verify_time":  "2026-06-27T02:30:12Z"
+               "verify_time":  "2026-07-02T02:30:14Z"
            },
     "eu":  {
                "host":  "204.168.175.41",
@@ -26,12 +26,12 @@
                "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|30 2 * * * root /root/scripts/backup-eu-stack.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261|0 3 * * * root /root/scripts/verify-backup-eu.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261",
                "retention_days":  "7",
                "retention_source":  "static",
-               "backup_size":  "8.5G",
-               "latest_time":  "2026-06-27 02:31:15",
-               "oldest_time":  "2026-06-20 02:30:45",
+               "backup_size":  "11G",
+               "latest_time":  "2026-07-02 02:31:17",
+               "oldest_time":  "2026-06-25 02:30:49",
                "backup_age_days":  "0",
                "verify_result":  "PASSED",
-               "verify_time":  "2026-06-27T03:00:17Z"
+               "verify_time":  "2026-07-02T03:00:16Z"
            },
     "reportPath":  "agency-os/reports/status/backup-health-LATEST.md"
 }

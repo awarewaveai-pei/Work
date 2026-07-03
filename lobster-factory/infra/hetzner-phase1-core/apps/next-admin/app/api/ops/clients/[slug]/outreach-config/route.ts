@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canWriteTenantConfig } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { getSecret, putSecret, orgSupabaseRef } from "@/lib/secret-vault";
+import { resolveFromCredentialsLib } from "@/lib/org-client";
 
 // Cold Outreach Workbench — per-client Supabase config + self-serve gate.
-// GET: returns hasSupabaseUrl/hasSupabaseKey status + selfServeEnabled (never returns secret values).
+// GET: returns hasSupabaseUrl/hasSupabaseKey status + supabaseSource + selfServeEnabled.
+//      Checks both the explicit vault keys (org:{slug}:supabase_*) AND the credentials library
+//      (client_credentials table) so entries in 憑證庫 are automatically reflected here.
 // POST: writes Supabase URL/key to Vault + toggles selfServeEnabled in org metadata.
 // Auth: canWriteTenantConfig (owner/admin only).
 
@@ -32,14 +35,35 @@ export async function GET(
 
   let hasSupabaseUrl = false;
   let hasSupabaseKey = false;
+  let supabaseSource: "vault" | "credentials_library" | null = null;
+
+  // Check explicit vault keys first (fast path).
   try {
-    hasSupabaseUrl = !!(await getSecret(orgSupabaseRef(slug, "url")));
-    hasSupabaseKey = !!(await getSecret(orgSupabaseRef(slug, "key")));
+    const [u, k] = await Promise.all([
+      getSecret(orgSupabaseRef(slug, "url")),
+      getSecret(orgSupabaseRef(slug, "key")),
+    ]);
+    if (u) { hasSupabaseUrl = true; supabaseSource = "vault"; }
+    if (k) { hasSupabaseKey = true; supabaseSource = "vault"; }
   } catch {
-    // vault unavailable — treat as not set
+    // vault unavailable — fall through
   }
 
-  return NextResponse.json({ ok: true, selfServeEnabled, hasSupabaseUrl, hasSupabaseKey });
+  // Fallback: credentials library bridge (憑證庫 auto-detection).
+  if (!hasSupabaseUrl || !hasSupabaseKey) {
+    try {
+      const fromLib = await resolveFromCredentialsLib(slug);
+      if (fromLib) {
+        if (!hasSupabaseUrl) hasSupabaseUrl = true;
+        if (!hasSupabaseKey) hasSupabaseKey = true;
+        if (!supabaseSource) supabaseSource = "credentials_library";
+      }
+    } catch {
+      // ignore — credentials library check is best-effort
+    }
+  }
+
+  return NextResponse.json({ ok: true, selfServeEnabled, hasSupabaseUrl, hasSupabaseKey, supabaseSource });
 }
 
 export async function POST(

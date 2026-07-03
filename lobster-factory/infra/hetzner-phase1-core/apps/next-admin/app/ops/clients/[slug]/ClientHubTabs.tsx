@@ -1924,6 +1924,7 @@ function OutreachTab({ org }: Pick<ClientHubTabsProps, "org">) {
     selfServeEnabled: boolean;
     hasSupabaseUrl: boolean;
     hasSupabaseKey: boolean;
+    supabaseSource: "vault" | "credentials_library" | null;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1997,13 +1998,18 @@ function OutreachTab({ org }: Pick<ClientHubTabsProps, "org">) {
       {config && !loading && (
         <>
           {/* Status badges */}
-          <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
             {pill(config.hasSupabaseUrl, "Supabase URL ✓", "Supabase URL 未設定")}
             {pill(config.hasSupabaseKey, "Service Key ✓", "Service Key 未設定")}
             {pill(config.selfServeEnabled, "Self-serve 開啟", "Self-serve 關閉（代操模式）")}
           </div>
+          {config.supabaseSource === "credentials_library" && (
+            <p style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 16 }}>
+              ✦ 已從「憑證庫」自動帶入 Supabase 憑證
+            </p>
+          )}
 
-          {/* Supabase credentials */}
+          {/* Supabase credentials — only show inputs if not yet configured from either source */}
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>
               Supabase Project URL{config.hasSupabaseUrl ? "（已設定，留空不更新）" : ""}
