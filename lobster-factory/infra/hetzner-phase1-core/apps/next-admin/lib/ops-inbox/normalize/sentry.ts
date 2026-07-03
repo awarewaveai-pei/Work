@@ -22,6 +22,14 @@ export function normalizeSentry(raw: any): IncidentDraft {
   const message: string | null = event.message ?? issue.culprit ?? null;
   const externalId: string = String(issue.id ?? event.event_id ?? Date.now());
 
+  // Client attribution (2026-07-03): Sentry projects created by
+  // integration-steps use the org slug as project slug, so a valid-shaped
+  // project_slug doubles as client_slug. Non-client projects (e.g. internal
+  // "next-admin") simply won't match any organizations.slug at the
+  // upsertIncidentAtomic resolve step — attribution stays NULL, harmless.
+  const normalizedSlug = projectSlug?.trim().toLowerCase().slice(0, 64);
+  const clientSlug = normalizedSlug && /^[a-z0-9-]+$/.test(normalizedSlug) ? normalizedSlug : null;
+
   return {
     source: "sentry",
     external_id: externalId,
@@ -33,6 +41,7 @@ export function normalizeSentry(raw: any): IncidentDraft {
     title,
     message,
     raw,
+    client_slug: clientSlug,
     tags: { sentry_level: level, project_slug: projectSlug ?? null },
   };
 }

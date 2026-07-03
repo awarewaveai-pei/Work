@@ -403,6 +403,25 @@ export const adoptClientOs = task({
 
       // ── Step 9b: run integrations (Uptime Kuma, Sentry, PostHog, n8n, MainWP) ──
       logger.info("adopt-client-os: step 9b - running integrations");
+      // Client attribution (critic 2026-07-03 Major-1): without the org slug the
+      // adopted client's monitors carry no `client` tag and its incidents can
+      // never resolve to an organization — the exact chain break this batch
+      // fixes on the create path. Best-effort: a failed lookup only skips
+      // attribution, never the integrations themselves.
+      let adoptClientSlug: string | undefined;
+      try {
+        const orgRows = (await supabaseRestQuery(getSupabaseCreds(), "organizations", {
+          id: `eq.${input.organizationId}`,
+          select: "slug",
+          limit: 1,
+        })) as Array<{ slug?: string }>;
+        const rawSlug = orgRows[0]?.slug?.trim().toLowerCase();
+        if (rawSlug && /^[a-z0-9-]{1,64}$/.test(rawSlug)) adoptClientSlug = rawSlug;
+      } catch (e) {
+        logger.warn("adopt-client-os: org slug lookup failed — integrations run without client attribution", {
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
       const integrationResults = await runAllIntegrations(
         input.integrations as BuildIntegrations | undefined,
         {
@@ -410,6 +429,7 @@ export const adoptClientOs = task({
           adminUrl: input.wpAdminUrl,
           clientName: input.siteUrl, // use siteUrl as name since adopt doesn't always have a friendly name
           profile: "profile_c",
+          clientSlug: adoptClientSlug,
         }
       );
       const integrationErrors = integrationResults.filter((r) => r.status === "error");

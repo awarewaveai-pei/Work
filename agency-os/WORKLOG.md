@@ -3,6 +3,35 @@
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
 ## 2026-07-03
+## 2026-07-03
+
+### feat(tenant-chain): 多客戶自動串聯三斷點修復 — 監控告警自動歸屬客戶（critic 2 Major 折入）
+
+[任務理解] 鏈路稽核（同日）證實：ops 三頁骨架真、但自動修復管線 0 次實戰，且「新客戶資料自動流入」斷在三處——自動建的 Kuma monitor ①沒掛 webhook 通知 ②沒貼 client tag ③slug 從無人解析成 organization_id（所有 webhook incident org 恆 NULL，org 隔離形同虛設）。操作者裁決全部處理。
+
+[已修改]
+- 斷點③（咽喉點）`lib/ops-inbox/upsertIncidentAtomic.ts`：RPC 後 slug→organizations.id 解析 + UPDATE（WHERE org IS NULL 冪等、fail-open、60s 負快取防 flapping 重查；不動 RPC 簽名，避開 0055/PGRST202 兩週斷線類）
+- 斷點①② `workflows/integrations/integration-steps.ts`：Kuma HTTP+SSL monitor 建立時貼 `{name:"client",value:<org slug>}` tag + `notificationIDList` 掛共用 webhook 通知（cfg.notificationId）；Sentry project slug 改優先用 org slug（未來專案自動可歸屬）+ 409 視為已存在（冪等）
+- slug 貫穿：`trigger-build/route.ts`（org slug 新建捕捉/重用 fetch + UPTIME_KUMA_NOTIFICATION_ID env 顯式驗證含 misconfig warn）→ `contracts.ts`（BuildRunRequest.clientSlug，**不符規格降 undefined 不擋 build** — critic Major-2 fail-open）→ `create-wp-site.ts`（zod optional）→ runAllIntegrations
+- critic Major-1：`adopt-client-os.ts` 同步補 clientSlug（supabaseRestQuery 解析 org slug，失敗只跳過歸屬不擋 adopt）— 否則 adopt 客戶整條鏈原封不動
+- Sentry 歸屬：`normalize/sentry.ts` project_slug 驗證後作 client_slug（與 kuma 同正則）+ 新測試檔 `normalize-sentry.test.ts`（5 案例：valid/null/注入形/截斷/tags 保留）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=40000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test ×2 (next-admin vitest 573/573 · workflows vitest 75/75) | exit=0 | ms=8000
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/2m/6n — 2 Major（adopt 路徑斷鏈、非規範 slug 硬掛 build）+ 4 Minor（負快取、Sentry 409、NaN/0 env guard、內嵌賦值）全數同日折入；其餘 2 Minor 記錄為 follow-up（見剩餘風險）
+- BUGHUNT_DONE: scope=lobster-factory agency-os scripts | grep=runAllIntegrations|clientSlug|registerUptimeKumaMonitor call sites | hits=2 callers（create-wp-site + adopt-client-os，皆已接線）；normalize/* 全掃 client_slug 覆蓋（uptime-kuma 既有 + sentry 本次；grafana/netdata 無 per-client 維度，記 follow-up）
+
+[剩餘風險 / follow-up]
+- Kuma `client` tag 的 API 格式（{name,value} vs 預建 tag_id）未對真實 EU Kuma 實測（container proxy 不通）——沿用既有 groupName pattern；工作站下次建站 REALTEST 確認 tag 落地
+- 一次性 operator 設定：EU Kuma 建共用 ops-inbox webhook notification → 其 id 填 env `UPTIME_KUMA_NOTIFICATION_ID`（SG next-admin env）
+- defense-in-depth：持 ingest token 者可用合法形 slug 偽造跨租戶歸屬（critic minor；真解在 per-source token + 輪替）
+- Sentry slug 50 字上限 vs org slug 64：>50 的 org slug 歸屬會靜默斷（toOrgSlug 典型 ~43，接受並註記）
+- grafana/netdata normalizer 無 client 維度（純 infra 源，暫不需要）
+
+[rollback] 單 commit revert（7 檔 + 1 測試檔）。
+
+
 
 ### ops: Uptime Kuma — Soulful Expression monitor 新增 ✅
 

@@ -149,6 +149,7 @@ export async function POST(request: Request) {
 
   // Resolve org — reuse bound org or create new
   let organizationId: string | null = (intakeRow.organization_id as string | null) ?? null;
+  let organizationSlug: string | null = null;
 
   // Carry the spec's brand colours into client_config.brandColors so the design tools
   // (Banner Studio "選擇品牌帶入配色" + /ops/clients Settings editor) pick them up.
@@ -163,12 +164,13 @@ export async function POST(request: Request) {
 
   if (!organizationId) {
     const suffix = crypto.randomUUID().slice(0, 6);
+    organizationSlug = toOrgSlug(companyName, suffix);
     const { data: org, error: orgErr } = await supabase
       .from("organizations")
       .insert({
         type: "client",
         name: companyName,
-        slug: toOrgSlug(companyName, suffix),
+        slug: organizationSlug,
         status: "active",
         default_locale: locale,
         metadata: { intake_form_id, website_spec_id, source: "onboarding_portal", ...clientConfigSeed },
@@ -188,6 +190,16 @@ export async function POST(request: Request) {
     if (bindErr) {
       return NextResponse.json({ ok: false, error: "org_bind_failed" }, { status: 500 });
     }
+  }
+
+  // Reused org path: fetch its slug so monitoring/Sentry attribution can be threaded.
+  if (!organizationSlug && organizationId) {
+    const { data: orgRow } = await supabase
+      .from("organizations")
+      .select("slug")
+      .eq("id", organizationId)
+      .maybeSingle();
+    organizationSlug = (orgRow?.slug as string | undefined) ?? null;
   }
 
   // Resolve workspace — reuse existing default or create
@@ -296,6 +308,7 @@ export async function POST(request: Request) {
     pluginSlugs: derivedPluginSlugs,
     paidPluginCount,
     organizationId,
+    clientSlug: organizationSlug ?? undefined,
     workspaceId,
     projectId,
     siteId,
@@ -306,7 +319,22 @@ export async function POST(request: Request) {
     integrations: {
       uptimeKuma:
         process.env.UPTIME_KUMA_URL && process.env.UPTIME_KUMA_API_KEY
-          ? { url: process.env.UPTIME_KUMA_URL, apiKey: process.env.UPTIME_KUMA_API_KEY }
+          ? {
+              url: process.env.UPTIME_KUMA_URL,
+              apiKey: process.env.UPTIME_KUMA_API_KEY,
+              // Shared ops-inbox webhook notification in Uptime Kuma; without it
+              // auto-created monitors never deliver DOWN events to the pipeline.
+              notificationId: (() => {
+                const raw = process.env.UPTIME_KUMA_NOTIFICATION_ID;
+                if (!raw) return undefined;
+                const n = Number(raw);
+                if (!Number.isFinite(n) || n <= 0) {
+                  console.warn(`[trigger-build] UPTIME_KUMA_NOTIFICATION_ID misconfigured ("${raw}") — monitors will be created WITHOUT webhook notification`);
+                  return undefined;
+                }
+                return n;
+              })(),
+            }
           : undefined,
       sentry: process.env.SENTRY_AUTH_TOKEN
         ? { org: "aware-wave", authToken: process.env.SENTRY_AUTH_TOKEN }

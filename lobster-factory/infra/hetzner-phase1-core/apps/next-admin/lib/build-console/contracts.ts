@@ -22,6 +22,8 @@ export interface UptimeKumaConfig {
   apiKey: string;
   /** Optional group to put the monitor in (integer ID or name) */
   groupName?: string;
+  /** Shared ops-inbox webhook notification id in Uptime Kuma (auto-created monitors deliver DOWN events through it) */
+  notificationId?: number;
 }
 
 export interface SentryConfig {
@@ -69,6 +71,8 @@ export interface BuildRunRequest {
   executionMode?: BuildExecutionMode;
   actorUserId?: string;
   organizationId?: string;
+  /** organizations.slug — threads client attribution to monitoring/Sentry (chain audit 2026-07-03) */
+  clientSlug?: string;
   workspaceId?: string;
   projectId?: string;
   siteId?: string;
@@ -198,6 +202,13 @@ export function normalizeBuildRequest(payload: BuildRunRequest): BuildRunRequest
     provider: payload.provider ?? defaultProviderFor(payload.profile),
     locale: payload.locale?.trim() || "en_US",
     clientName: payload.clientName?.trim(),
+    // Fail-open (critic 2026-07-03 Major-2): a reused org whose slug predates
+    // toOrgSlug conventions must lose ATTRIBUTION, not the whole build — the
+    // trigger schema hard-rejects non-conforming slugs, so drop them here.
+    clientSlug: (() => {
+      const cs = payload.clientSlug?.trim().toLowerCase();
+      return cs && /^[a-z0-9-]{1,64}$/.test(cs) ? cs : undefined;
+    })(),
     domain: payload.domain?.trim(),
     siteUrl: payload.siteUrl?.trim(),
     wpAdminUrl: payload.wpAdminUrl?.trim(),

@@ -127,6 +127,7 @@ const InputSchema = z.preprocess(
   normalizeBuildConsolePayload,
   z.object({
     organizationId: z.string().uuid(),
+    clientSlug: z.string().regex(/^[a-z0-9-]+$/).max(64).optional(),
     workspaceId: z.string().uuid(),
     projectId: z.string().uuid(),
     siteId: z.string().uuid(),
@@ -433,6 +434,7 @@ export const createWpSite = task({
           adminUrl,
           clientName: input.siteName,
           profile: "profile_b",
+          clientSlug: input.clientSlug,
         }
       );
       const integrationErrors = integrationResults.filter((r) => r.status === "error");

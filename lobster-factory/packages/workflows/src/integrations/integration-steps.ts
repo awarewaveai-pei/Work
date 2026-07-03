@@ -17,6 +17,11 @@ export type UptimeKumaConfig = {
   url: string;
   apiKey: string;
   groupName?: string;
+  /** Shared ops-inbox webhook notification (Uptime Kuma notification id).
+   *  When set, every auto-created monitor is wired to POST heartbeats to
+   *  app.aware-wave.com/api/webhooks/uptime-kuma — without it a DOWN event
+   *  never reaches the incident pipeline (2026-07-03 chain audit 缺件①). */
+  notificationId?: number;
 };
 
 export type SentryConfig = {
@@ -64,13 +69,21 @@ export type IntegrationResult = {
 export async function registerUptimeKumaMonitor(
   cfg: UptimeKumaConfig | undefined,
   siteUrl: string,
-  clientName: string
+  clientName: string,
+  clientSlug?: string
 ): Promise<IntegrationResult> {
   if (!cfg?.url || !cfg?.apiKey) {
     return { service: "uptime_kuma", status: "skipped", detail: "uptimeKuma config not provided" };
   }
 
   // Uptime Kuma API v1: POST /api/v1/monitor
+  // The `client` tag is what normalize/uptime-kuma.ts reads to attribute the
+  // incident to a customer (tag name "client", value = org slug). Without it
+  // every heartbeat lands with client_slug=null (2026-07-03 chain audit 缺件②).
+  const tags = [
+    ...(cfg.groupName ? [{ name: cfg.groupName }] : []),
+    ...(clientSlug ? [{ name: "client", value: clientSlug }] : []),
+  ];
   const body = {
     type: 1,        // HTTP(S)
     name: `[${clientName}] ${siteUrl}`,
@@ -79,8 +92,8 @@ export async function registerUptimeKumaMonitor(
     retryInterval: 60,
     maxretries: 3,
     upsideDown: false,
-    notificationIDList: {},
-    ...(cfg.groupName ? { tags: [{ name: cfg.groupName }] } : {}),
+    notificationIDList: cfg.notificationId ? { [String(cfg.notificationId)]: true } : {},
+    ...(tags.length ? { tags } : {}),
   };
 
   try {
@@ -118,7 +131,8 @@ export async function registerUptimeKumaMonitor(
 export async function registerUptimeKumaSslMonitor(
   cfg: UptimeKumaConfig | undefined,
   siteUrl: string,
-  clientName: string
+  clientName: string,
+  clientSlug?: string
 ): Promise<IntegrationResult> {
   if (!cfg?.url || !cfg?.apiKey) {
     return { service: "uptime_kuma_ssl", status: "skipped", detail: "uptimeKuma config not provided" };
@@ -128,12 +142,15 @@ export async function registerUptimeKumaSslMonitor(
   }
 
   const hostname = new URL(siteUrl).hostname;
+  const sslTags = clientSlug ? [{ name: "client", value: clientSlug }] : [];
   const body = {
     type: 4,   // DNS / SSL cert
     name: `[${clientName}] SSL ${hostname}`,
     hostname,
     port: 443,
     interval: 3600,
+    notificationIDList: cfg.notificationId ? { [String(cfg.notificationId)]: true } : {},
+    ...(sslTags.length ? { tags: sslTags } : {}),
   };
 
   try {
@@ -173,15 +190,19 @@ export async function registerUptimeKumaSslMonitor(
 export async function createSentryProject(
   cfg: SentryConfig | undefined,
   clientName: string,
-  platform = "javascript"
+  platform = "javascript",
+  clientSlug?: string
 ): Promise<IntegrationResult> {
   if (!cfg?.org || !cfg?.authToken) {
     return { service: "sentry", status: "skipped", detail: "sentry config not provided" };
   }
 
   // Sentry API: POST /api/0/teams/{org}/{team}/projects/
+  // Prefer the org slug as project slug: normalize/sentry.ts attributes
+  // incidents to a customer via project_slug, so aligning the two makes
+  // Sentry alerts auto-attribute (2026-07-03 chain audit 缺件④ partial).
   const team = cfg.team ?? cfg.org;
-  const slug = clientName
+  const slug = (clientSlug || clientName)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
@@ -197,6 +218,11 @@ export async function createSentryProject(
       body: JSON.stringify({ name: clientName, slug, platform }),
     });
 
+    if (res.status === 409) {
+      // Idempotency (critic 2026-07-03): re-running onboarding for the same org
+      // hits an existing project — that is success, not failure.
+      return { service: "sentry", status: "ok", detail: `Project already exists (slug: ${slug})` };
+    }
     if (!res.ok) {
       return { service: "sentry", status: "error", detail: `HTTP ${res.status} (response body redacted)` };
     }
@@ -373,6 +399,8 @@ export async function runAllIntegrations(
     adminUrl: string;
     clientName: string;
     profile: string;
+    /** organizations.slug — threads client attribution into monitor tags + Sentry project slug */
+    clientSlug?: string;
   }
 ): Promise<IntegrationResult[]> {
   if (!integrations) {
@@ -387,9 +415,9 @@ export async function runAllIntegrations(
   }
 
   const results = await Promise.allSettled([
-    registerUptimeKumaMonitor(integrations.uptimeKuma, site.siteUrl, site.clientName),
-    registerUptimeKumaSslMonitor(integrations.uptimeKuma, site.siteUrl, site.clientName),
-    createSentryProject(integrations.sentry, site.clientName),
+    registerUptimeKumaMonitor(integrations.uptimeKuma, site.siteUrl, site.clientName, site.clientSlug),
+    registerUptimeKumaSslMonitor(integrations.uptimeKuma, site.siteUrl, site.clientName, site.clientSlug),
+    createSentryProject(integrations.sentry, site.clientName, "javascript", site.clientSlug),
     capturePostHogOnboardingEvent(integrations.postHog, site.siteUrl, site.clientName, site.profile),
     triggerN8nOnboarding(integrations.n8n, {
       event: "client_onboarded",

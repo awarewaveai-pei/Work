@@ -2,6 +2,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Incident, IncidentDraft } from "./types";
 import { computeFingerprintV2 } from "./fingerprint";
 
+// Negative cache for slug→org resolution (critic 2026-07-03 minor): a flapping
+// monitor carrying a slug with no matching organization would otherwise hit
+// the organizations table on every heartbeat. Module-scoped and best-effort —
+// serverless instances each keep their own copy, which is fine for a cache.
+const UNRESOLVED_SLUG_TTL_MS = 60_000;
+const unresolvedSlugUntil = new Map<string, number>();
+
 /**
  * Calls the upsert_incident_atomic PL/pgSQL function (migration 0056, latest).
  * occurrence_count is incremented via SET count + 1 inside the row lock —
@@ -38,5 +45,42 @@ export async function upsertIncidentAtomic(
     .single();
 
   if (error) return { data: null, error: error.message };
-  return { data: data as Incident, error: null };
+
+  // Tenant attribution (2026-07-03 chain audit 缺件③, the critical break):
+  // client_slug reached ops_incidents (0056) but NOTHING resolved it into
+  // organization_id, so every webhook incident carried NULL org and the
+  // org-filtered views/repair_runs stayed empty for client scopes forever.
+  // Single choke point for every source; best-effort UPDATE keeps ingest
+  // fail-open (an attribution failure must never drop an incident), and the
+  // WHERE organization_id IS NULL guard makes retries idempotent and never
+  // overwrites an attribution set elsewhere. RPC signature untouched — no
+  // migration dependency (the 0055/PGRST202 two-week-outage class).
+  let incident = data as Incident;
+  try {
+    if (
+      incident?.client_slug &&
+      !incident.organization_id &&
+      (unresolvedSlugUntil.get(incident.client_slug) ?? 0) < Date.now()
+    ) {
+      const { data: org } = await supabase
+        .from("organizations")
+        .select("id")
+        .eq("slug", incident.client_slug)
+        .maybeSingle();
+      if (org?.id) {
+        unresolvedSlugUntil.delete(incident.client_slug);
+        const { error: updErr } = await supabase
+          .from("ops_incidents")
+          .update({ organization_id: org.id })
+          .eq("id", incident.id)
+          .is("organization_id", null);
+        if (!updErr) incident = { ...incident, organization_id: org.id };
+      } else {
+        unresolvedSlugUntil.set(incident.client_slug, Date.now() + UNRESOLVED_SLUG_TTL_MS);
+      }
+    }
+  } catch (e) {
+    console.warn("[ops-inbox] slug→org attribution failed (fail-open):", e);
+  }
+  return { data: incident, error: null };
 }
