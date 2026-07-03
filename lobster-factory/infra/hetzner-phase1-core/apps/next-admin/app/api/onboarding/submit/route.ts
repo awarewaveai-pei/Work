@@ -59,7 +59,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
 
-  const { form, organization_id } = body;
+  const { form: rawForm, organization_id } = body;
+
+  // Coerce FluentForm webhook strings → IntakeForm types.
+  // FluentForm sends "yes"/"no" for booleans; pages_needed may arrive as comma-separated string.
+  const form: IntakeForm = {
+    ...rawForm,
+    has_ecommerce: rawForm.has_ecommerce === true || (rawForm.has_ecommerce as unknown) === "yes",
+    needs_crm: rawForm.needs_crm === true || (rawForm.needs_crm as unknown) === "yes",
+    needs_booking: rawForm.needs_booking === true || (rawForm.needs_booking as unknown) === "yes",
+    pages_needed: Array.isArray(rawForm.pages_needed)
+      ? rawForm.pages_needed
+      : typeof rawForm.pages_needed === "string"
+        ? (rawForm.pages_needed as string).split(",").map((s) => s.trim()).filter(Boolean) as IntakeForm["pages_needed"]
+        : [],
+  };
+
   // primary_goal was DEPRECATED 2026-06-05 (removed from the intake form) — requiring it here
   // hard-failed every real UI submission with missing_required_fields. Validate the fields the
   // form actually collects (see intake-form.ts required set): company_name, industry, pages_needed.
