@@ -96,8 +96,10 @@ try {
     if ($tenants.Count -eq 0) {
         $results["client_sites"] = "skip:no_clients"
     } else {
+        # PSObject.Properties guard: StrictMode throws on absent members, which the outer
+        # catch would mislabel as skip:unreachable. summary emits status "active" | "risk".
         $inactive = @($tenants | Where-Object {
-            $_.status -and $_.status -notin @("active","ok","healthy")
+            ($_.PSObject.Properties.Name -contains "status") -and $_.status -and $_.status -ne "active"
         })
         if ($inactive.Count -eq 0) {
             $results["client_sites"] = "ok:$($tenants.Count)_active"

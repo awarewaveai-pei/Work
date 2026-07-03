@@ -82,7 +82,7 @@ aware-wave.com (WP)            app.aware-wave.com (Next.js 15)
 |---|---|---|
 | 有 pending run → 建真 staging WP → 狀態 completed | ✅ **已驗證** | 2026-06-06 e2e run `655197bf` completed + curl 200（WORKLOG）|
 | 客戶填表 → 自動生出那個 pending run | ❌ **未通** | 2 筆 intake_forms 卡 `spec_generated`，0 run（症狀：按「觸發建站」跳回第一步）|
-| Fluent Form（公開 WP）→ intake 橋接 | ❌ 未做 | 無橋接程式 |
+| Fluent Form（公開 WP）→ intake 橋接 | 🟡 n8n 端已建+e2e 驗 | workflow `RbrHNu3BUEmpNWeT`（2026-07-03）；WP 端 Fluent Forms 未裝，表單+webhook feed 待建 |
 | 中央 FluentCRM（收客資料進 CRM）| ❌ 未做 | — |
 | AI 自動報價 | ❌ 未做 | — |
 | 機層一鍵租機（Hetzner+硬化+DNS）| 🟡 **寫好未接** | provisionClient 真機驗證；EMBED 文件 ready；app 按鈕沒呼叫 |
@@ -119,9 +119,12 @@ aware-wave.com (WP)            app.aware-wave.com (Next.js 15)
 **目標**：公開 aware-wave.com 的 Fluent Form 收件 → 自動進 (a) app 的 intake_forms、(b) 中央 FluentCRM（做客戶關係）。
 **已完成（2026-07-02）**：
 - `submit/route.ts` 已加入 x-ops-sync-key 雙路徑 auth（n8n 可直接 POST）。
-**待做（ops 設定，非程式）**：
-- 在 n8n 建立 Fluent Form webhook → `POST /api/onboarding/submit` 的 workflow（帶 `x-ops-sync-key` header）。
-- 同 webhook fan-out 到中央 FluentCRM（contact + tag）。
+**已完成（2026-07-03）**：
+- n8n workflow `onboarding: FluentForm intake bridge`（id `RbrHNu3BUEmpNWeT`，active）：Webhook `POST https://n8n.aware-wave.com/webhook/fluentform-intake`（inbound header auth `x-ff-bridge-token`，credential `VrrbNtU4cminLRvM`）→ Code 映射（pages 逗號字串→array，容錯 flat/nested payload）→ HTTP POST `/api/onboarding/submit`（`x-ops-sync-key` credential `Bci2xGWik0qFZSAM`）。
+- e2e 已驗：測試 POST → 201 `intake_form_id` → EU DB row（status=pending、pages_needed 正確 array）→ 測試 row 已刪；無 token → 403（不裸奔）。
+**待做（WP 端，非 ops 一鍵）**：
+- aware-wave.com WP **未裝任何 Fluent 外掛**（2026-07-03 wp plugin list 實查）→ 需裝 Fluent Forms + 建公開 intake 表單 + 表單 webhook feed 指向上述 URL（帶 `x-ff-bridge-token` header；token 值在 n8n credential，遺失可在 n8n 重生成並同步兩端）。
+- FluentCRM fan-out（contact + tag）— 待 FluentCRM 裝好後在同一 workflow 加節點。
 **驗收**：填公開表單 → intake_forms 出現 + FluentCRM contact 出現。
 **風險**：Medium。
 
@@ -132,9 +135,9 @@ aware-wave.com (WP)            app.aware-wave.com (Next.js 15)
 - `app/api/onboarding/quote/route.ts`：GET/POST/PATCH — 完整報價生命週期 API。
 - `trigger-build/route.ts` 加報價 gate：`draft/pending_approval/rejected` → 409 `quote_approval_required`；`none/approved` → 通過。
 **待做**：
-- 跑 `0055_intake_quote.sql` migration 到 EU VPS Supabase（`docker exec supabase-db psql ...`）。
+- ~~跑 `0055_intake_quote.sql` migration~~ ✅ 已套 EU（2026-07-02 WORKLOG「0055_intake_quote.sql migration applied」；2026-07-03 再驗 quote_data/quote_status 欄位存在）。
 - 前端操作頁（目前 API 已可用 curl / n8n 操作）。
-**風險**：Medium（migration 要 apply；不跑 migration gate 不生效）。
+**風險**：Low（gate 已生效）。
 
 ### Stage 4 — 機層一鍵租機（接現成 provisionClient）✅ 程式完成
 **目標**：建站時先租一台硬化好的 Hetzner 主機。
@@ -143,7 +146,8 @@ aware-wave.com (WP)            app.aware-wave.com (Next.js 15)
 - `next.config.ts` + `tsconfig.json`：加入 `@workflows` webpack alias 讓 next-admin 可 import packages/workflows。
 - `BuildConsole.tsx`：Profile B 顯示「機層租機」可摺疊面板，tier/region 選擇，結果即時顯示。
 **env 設定（上線前 SG .env 加）**：`LOBSTER_SERVER_ADAPTER=hetzner_cloud`、`LOBSTER_SERVER_PROVISION_ENABLED=true`、`HETZNER_STAGING_TOKEN`。預設 none = idle 安全。
-**驗收**：dry-run 確認回 `status:idle`（adapter=none）→ 改 env 開 hetzner_cloud + mock 測 dry_run → 開真機（需明示 go-ahead）。
+**現況（2026-07-03 實查）**：SG .env 三個 flag 均未設（確認缺）；vault 無 `HETZNER_STAGING_TOKEN`（僅有主帳 `HETZNER_API_TOKEN`）→ 開閘前需決定：另開 Hetzner staging project 專用 token（建議，隔離爆炸半徑）或暫用主 token。Trigger.dev workflows 2026-07-02 已完整 deploy（WORKLOG AUTO_TASK_DONE），provision-machine 前置可能已就位，開閘時順驗。
+**驗收**：✅ step 1 dry-run 確認回 `status:idle`（adapter=none；2026-07-03 sync-key POST 實測 `{"outcome":"idle","adapter":"none"}`）→ 改 env 開 hetzner_cloud + mock 測 dry_run → 開真機（需明示 go-ahead）。
 **風險**：**High（真開機 billable）**，env 預設 OFF 已保護。
 
 ### Stage 5 — 串接整套服務棧（願景終點）

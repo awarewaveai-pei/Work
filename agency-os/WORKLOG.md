@@ -2,6 +2,30 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-07-03
+
+### ops: AO-RESUME §6 阻塞清理 — 0056 已套確認 + smoke 兩檢修復 + Stage 2 n8n 橋接建成 ✅
+
+**① migration 0056（§6 稱「未 apply」→ 實為 stale 報告）**：VBC 實查 EU `pg_proc` → `upsert_incident_atomic` 已是 14-arg 含 `p_client_slug text DEFAULT NULL`（幾乎確定 2026-07-02 session 套 0055 同場套了 0056 但漏記 WORKLOG——本行即補記）。本日補做：pre-state function def 備份至 EU `/root/db-backups/pre-0056-upsert_incident_atomic-20260703.sql`、`NOTIFY pgrst reload`、14-arg RPC 走 PostgREST e2e（201→row `client_slug=testclient`→刪測試 row）。鏈路末端：Uptime Kuma 22 個 monitor 全為 infra、無客戶站 monitor → 目前無需掛 `client` tag；未來建客戶 monitor 時掛 `client=<slug>` tag 即接通。
+
+**② smoke `client_sites=skip:http401`（§6 稱「token 過期」→ 誤診）**：真根因 = next-admin Supabase-session middleware 上線後 `/api/ops/clients` 不在 `PUBLIC_API_PATHS`，server-to-server Basic auth 永遠 401（`OPS_BASIC_*` 均在且 `repairs/health` 同組憑證 200）。修法：`scripts/check-smoke-tests.ps1` Check 3 改打 `/api/ops/summary`（PUBLIC_API_PATHS、同一 organizations 表；舊 clients payload 本無 health 欄位，零保真度損失）。
+
+**③ smoke `n8n_fail=skip:exception`**：根因 = `N8N_API_BASE_URL` User env 已含 `/api/v1`，腳本再拼一次 → `/api/v1/api/v1/...` 404。修法：base URL 正規化（TrimEnd `/` + `-replace "/api/v1$"`）。另依 critic 補 StrictMode `PSObject.Properties` 防護 + 清死值。
+
+**④ Stage 2 n8n 橋接（§6 架站 ops 缺口前半）**：建 n8n workflow `onboarding: FluentForm intake bridge`（`RbrHNu3BUEmpNWeT`，active）：webhook `POST /webhook/fluentform-intake`（inbound `x-ff-bridge-token` header-auth credential `VrrbNtU4cminLRvM`，隨機 32-byte）→ Code 映射（pages 逗號字串→array）→ `POST app.aware-wave.com/api/onboarding/submit`（`x-ops-sync-key` credential `Bci2xGWik0qFZSAM`，值取自 SG .env 未經 stdout）。WP 端實查：aware-wave.com **未裝任何 Fluent 外掛** → 剩餘為功能任務（裝 Fluent Forms+建表單+webhook feed+FluentCRM fan-out），非一鍵 ops。
+
+**⑤ Stage 4 flags（§6 架站 ops 缺口後半）**：SG .env 實查三 flag 均未設；vault 無 `HETZNER_STAGING_TOKEN`（僅主帳 `HETZNER_API_TOKEN`）。prod `/api/provision` 實測回 `{"outcome":"idle","adapter":"none"}` = 驗收 step 1 過、billable 雙閘關閉安全。開閘（env flip + token 決策 + 重啟 next-admin）= High/billable，**等操作者明示 go-ahead**。
+
+**⑥ 順手 VBC 修正 stale docs**：0055 master plan 仍標「待跑」→ 實已套（quote_data/quote_status 欄位實查存在）→ MASTER_PLAN Stage 2/3/4 + TASKS.md 同步更新。
+
+**[驗證結果]**（R0 四動作）：
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec supabase-db psql`（0056 function def / 0055 欄位 / RPC e2e insert+delete）+ curl PostgREST RPC 14-arg（HTTP 200, client_slug=testclient）+ n8n webhook e2e（201 intake_form_id → DB row pages_needed=["home","about","contact"] → DELETE 1）+ 無 token 403 + `/api/provision` idle + smoke 全綠 `== Smoke: PASS | n8n_mcp=ok | repair=ok | clients=ok:2_active | n8n_fail=ok:none_24h ==` | exit=0 | ms=~90000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/2n（StrictMode 屬性防護 + 死值清理，均已折回）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=api/ops/clients,0055_intake_quote,0056_upsert,fluentform-intake | hits=3 stale claims 已修（master plan 0055 待跑/Stage 2 待做/TASKS 下一步）；`update-client-wp-plugins.ps1` 走 x-ops-sync-key 不受 middleware 影響確認
+- WORKLOG: 本條目
+
+**[剩餘風險 / rollback]**：0056 rollback 寫在 migration 檔尾（DROP 14-arg + 重跑 0036 + NOTIFY）；smoke 腳本 rollback = git revert；n8n workflow rollback = deactivate/delete workflow `RbrHNu3BUEmpNWeT` + 刪兩 credential。
+
 ## 2026-07-02
 
 ### AO-CLOSE preflight: SG deploy drift closure + junk cleanup
