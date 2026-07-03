@@ -237,7 +237,11 @@ export default function BuildConsole() {
     // Surface persistent failures instead of polling forever in silence:
     // 404/403 are definitive (bad runId / no access) → stop immediately;
     // anything else stops after 5 consecutive failures.
+    // A dispatched enqueue run whose Trigger.dev worker died never reaches a
+    // terminal status — cap total polls (~10 min at 3 s) so we don't beacon forever.
     const MAX_CONSECUTIVE_FAILS = 5;
+    const MAX_TOTAL_POLLS = 200;
+    let totalPolls = 0;
     const registerFailure = (message: string, definitive = false) => {
       pollFailsRef.current += 1;
       if (definitive || pollFailsRef.current >= MAX_CONSECUTIVE_FAILS) {
@@ -247,6 +251,12 @@ export default function BuildConsole() {
     };
 
     const poll = async () => {
+      totalPolls += 1;
+      if (totalPolls > MAX_TOTAL_POLLS) {
+        setPollError("已輪詢超過 10 分鐘仍未達終止狀態，已停止輪詢 — run 可能仍在背景執行，重新整理頁面可續看。");
+        stopPolling();
+        return;
+      }
       try {
         const res = await fetch(`/api/build/runs/${pollingRunId}`);
         if (!res.ok) {
@@ -366,7 +376,15 @@ export default function BuildConsole() {
           domain: form.domain ?? undefined,
         }),
       });
-      const json = (await res.json()) as ProvisionResult;
+      // Text-first parse (same pattern as the onboarding handlers): a non-JSON
+      // error page (502 HTML) must not collapse into a generic "request_failed".
+      const text = await res.text();
+      let json: ProvisionResult;
+      try {
+        json = JSON.parse(text) as ProvisionResult;
+      } catch {
+        json = { ok: false, error: `HTTP ${res.status}`, detail: text.slice(0, 160) };
+      }
       setProvisionResult(json);
     } catch (err) {
       setProvisionResult({ ok: false, error: err instanceof Error ? err.message : "request_failed" });

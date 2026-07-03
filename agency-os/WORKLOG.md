@@ -2,6 +2,27 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-07-04
+
+### fix(next-admin): onboarding/build console 4 個 UI 吞錯 bug 修復（deploy local_direct 前置）
+
+[任務理解] 操作者問「/ops/onboarding /onboard /build 能否真正架站」→ workflow 全面稽核（7 agents，程式+生產 DB 實查）結論：引擎已驗、`bd135952` local_direct 已寫好未部署；但 4 個 UI 吞錯 bug 會讓失敗看起來像「工具壞了」。操作者指示：先修 bug → 部署 → 生產實測。
+
+[已修改]
+- `app/build/BuildConsole.tsx`：①機層租機面板契約對齊 `/api/provision` 實際回傳（`result.outcome` idle|mock|dispatched；原 UI 讀不存在的 `result.status` → 成功 banner 永遠空白）②run polling 吞錯修復：連續失敗 5 次或 404/403 即停止輪詢並顯示紅 alert（原本壞 runId 無限靜默輪詢）③critic Minor 折入：輪詢總數上限 200（~10 min，dispatched 卡死不再永久 beacon）+ provisionMachine text-first parse
+- `app/onboard/OnboardWizard.tsx`：createOrgRecord 原空 catch 吞錯＋不查 res.ok（operator 403 靜默失敗 → build run 引用不存在的 organizationId）→ res.ok 檢查 + text-first parse + Step5 可見警告 banner（保留 non-blocking 前進設計）
+- `app/ops/onboarding/page.tsx`：handleSubmit 的 submit/generate-spec 兩個 fetch 補 try/catch + text-first parse（原 network error/HTML 502 → unhandled rejection、spinner 永卡）；比照同檔 handleTriggerBuild 既有 pattern
+- 註：BuildConsole/page.tsx 首輪改動被平行 session AO-RESUME hook 掃進 auto-checkpoint `bf5bd491`；OnboardWizard + critic minors 在本 commit
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test (next-admin) | exit=0 | ms=2080（47 files / 574 tests 全過，含全部修復後重跑）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/2minor — 契約逐欄核對 ✓、polling race/cleanup/stale-closure ✓、404/403 definitive-stop 路由解析 ✓；2 Minor（dispatched 無限輪詢、provisionMachine 缺 text-first parse）同日折入；Note（Step4 按鈕 double-fire）接受不修——org upsert onConflict:slug 冪等
+- BUGHUNT_DONE: scope=agency-os scripts lobster-factory | grep=ProvisionStatus | hits=0 — 移除的型別以 oracle 同等條件（code exts、排除編輯檔）實搜 0 殘留；新 symbol（orgResult/pollError/pollFailsRef/ProvisionOutcome）grep 確認僅存在編輯檔內自洽；agency-os/scripts docs 無 stale 主張（provisionResult/createOrgRecord 0 命中）
+- WORKLOG: 本 entry；生產 e2e REALTEST 將於 sg-deploy 後補記
+
+[剩餘風險] local_direct 同步建站貼 CF ~100s 上限（provision ~71-90s + seed）——bd135952 已知取捨，長期解法 same-host worker；本次修復純 UI 層不影響該路徑。
+[rollback] 單 commit revert（UI-only，無 DB/schema 變更）。
+
 ## 2026-07-03
 
 ### feat(ops): 維護 tab 工作流程紀錄補齊 + Repair Center 結案死路修復 + /ops/integrations 租戶隔離
