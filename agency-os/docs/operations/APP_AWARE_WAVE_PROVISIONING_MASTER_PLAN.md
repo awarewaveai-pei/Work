@@ -123,7 +123,7 @@ aware-wave.com (WP)            app.aware-wave.com (Next.js 15)
 - n8n workflow `onboarding: FluentForm intake bridge`（id `RbrHNu3BUEmpNWeT`，active）：Webhook `POST https://n8n.aware-wave.com/webhook/fluentform-intake`（inbound header auth `x-ff-bridge-token`，credential `VrrbNtU4cminLRvM`）→ Code 映射（pages 逗號字串→array，容錯 flat/nested payload）→ HTTP POST `/api/onboarding/submit`（`x-ops-sync-key` credential `Bci2xGWik0qFZSAM`）。
 - e2e 已驗：測試 POST → 201 `intake_form_id` → EU DB row（status=pending、pages_needed 正確 array）→ 測試 row 已刪；無 token → 403（不裸奔）。
 **待做（WP 端，非 ops 一鍵）**：
-- aware-wave.com WP **未裝任何 Fluent 外掛**（2026-07-03 wp plugin list 實查）→ 需裝 Fluent Forms + 建公開 intake 表單 + 表單 webhook feed 指向上述 URL（帶 `x-ff-bridge-token` header；token 值在 n8n credential，遺失可在 n8n 重生成並同步兩端）。
+- aware-wave.com WP **未裝任何 Fluent 外掛**（2026-07-03 wp plugin list 實查）→ 需裝 Fluent Forms + 建公開 intake 表單 + 表單 webhook feed 指向上述 URL（帶 `x-ff-bridge-token` header；token 值：本機 vault `FF_BRIDGE_INBOUND_TOKEN`，n8n credential `VrrbNtU4cminLRvM` 為正本，遺失可重生成並同步兩端）。
 - FluentCRM fan-out（contact + tag）— 待 FluentCRM 裝好後在同一 workflow 加節點。
 **驗收**：填公開表單 → intake_forms 出現 + FluentCRM contact 出現。
 **風險**：Medium。

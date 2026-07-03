@@ -12,7 +12,7 @@
 
 **③ smoke `n8n_fail=skip:exception`**：根因 = `N8N_API_BASE_URL` User env 已含 `/api/v1`，腳本再拼一次 → `/api/v1/api/v1/...` 404。修法：base URL 正規化（TrimEnd `/` + `-replace "/api/v1$"`）。另依 critic 補 StrictMode `PSObject.Properties` 防護 + 清死值。
 
-**④ Stage 2 n8n 橋接（§6 架站 ops 缺口前半）**：建 n8n workflow `onboarding: FluentForm intake bridge`（`RbrHNu3BUEmpNWeT`，active）：webhook `POST /webhook/fluentform-intake`（inbound `x-ff-bridge-token` header-auth credential `VrrbNtU4cminLRvM`，隨機 32-byte）→ Code 映射（pages 逗號字串→array）→ `POST app.aware-wave.com/api/onboarding/submit`（`x-ops-sync-key` credential `Bci2xGWik0qFZSAM`，值取自 SG .env 未經 stdout）。WP 端實查：aware-wave.com **未裝任何 Fluent 外掛** → 剩餘為功能任務（裝 Fluent Forms+建表單+webhook feed+FluentCRM fan-out），非一鍵 ops。
+**④ Stage 2 n8n 橋接（§6 架站 ops 缺口前半）**：建 n8n workflow `onboarding: FluentForm intake bridge`（`RbrHNu3BUEmpNWeT`，active）：webhook `POST /webhook/fluentform-intake`（inbound `x-ff-bridge-token` header-auth credential `VrrbNtU4cminLRvM`，隨機 32-byte；token 值存本機 vault `FF_BRIDGE_INBOUND_TOKEN`（critic 指出 temp 明文 residue 已清 + one-shot 部署腳本已刪防重跑）；他機需要時 n8n credential 為正本）→ Code 映射（pages 逗號字串→array）→ `POST app.aware-wave.com/api/onboarding/submit`（`x-ops-sync-key` credential `Bci2xGWik0qFZSAM`，值取自 SG .env 未經 stdout）。WP 端實查：aware-wave.com **未裝任何 Fluent 外掛** → 剩餘為功能任務（裝 Fluent Forms+建表單+webhook feed+FluentCRM fan-out），非一鍵 ops。
 
 **⑤ Stage 4 flags（§6 架站 ops 缺口後半）**：SG .env 實查三 flag 均未設；vault 無 `HETZNER_STAGING_TOKEN`（僅主帳 `HETZNER_API_TOKEN`）。prod `/api/provision` 實測回 `{"outcome":"idle","adapter":"none"}` = 驗收 step 1 過、billable 雙閘關閉安全。開閘（env flip + token 決策 + 重啟 next-admin）= High/billable，**等操作者明示 go-ahead**。
 
