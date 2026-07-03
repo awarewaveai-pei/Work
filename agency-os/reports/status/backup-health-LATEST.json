@@ -1,5 +1,5 @@
 {
-    "generatedAt":  "2026-07-03T01:53:57.6004454Z",
+    "generatedAt":  "2026-07-03T02:22:48.4846707Z",
     "overall":  "PASS",
     "fatal":  false,
     "fatalReason":  "",
@@ -12,8 +12,8 @@
                "retention_days":  "7",
                "retention_source":  "static",
                "backup_size":  "15G",
-               "latest_time":  "2026-07-02 02:31:25",
-               "oldest_time":  "2026-06-25 02:00:01",
+               "latest_time":  "2026-07-03 02:00:02",
+               "oldest_time":  "2026-06-26 02:00:01",
                "backup_age_days":  "0",
                "verify_result":  "PASSED",
                "verify_time":  "2026-07-02T02:30:14Z"
@@ -27,7 +27,7 @@
                "retention_days":  "7",
                "retention_source":  "static",
                "backup_size":  "11G",
-               "latest_time":  "2026-07-02 02:31:17",
+               "latest_time":  "2026-07-03 02:01:04",
                "oldest_time":  "2026-06-25 02:30:49",
                "backup_age_days":  "0",
                "verify_result":  "PASSED",
