@@ -297,7 +297,7 @@ function Step1({
       <div className="onboard-uuid-block" style={{ marginTop: 16 }}>
         <div className="section-title" style={{ marginBottom: 4 }}>SSH 接入（一鍵自動安裝外掛必填）</div>
         <p className="form-hint" style={{ marginBottom: 12 }}>
-          填入後，按下 Launch 會由 Trigger.dev 自動 SSH 安裝外掛。
+          填入後，Build Console 可用 <code>local_direct</code> 由 next-admin 直接 SSH 安裝外掛。
           Profile B 新站可留空（hosting adapter 之後會自動填）。
           憑證走 vault 引用，**不**在此貼真實 SSH key。
         </p>
@@ -426,7 +426,7 @@ function Step2WpType({
     <div className="onboard-step-body">
       <div className="build-alert build-alert-ok" style={{ marginBottom: 16 }}>
         <strong>純加法模型</strong>：基礎包（必裝 {BASE_PACK_SIZE} 個）＋ 勾選任意加購包，可疊加。
-        清單依據 <code>WP_CLIENT_PLUGIN_STACK.md</code>，由 Trigger.dev 透過 WP-CLI 自動安裝。
+        清單依據 <code>WP_CLIENT_PLUGIN_STACK.md</code>，由 local direct build 或選配背景派工透過 WP-CLI 自動安裝。
       </div>
 
       {/* ── Base pack (always-on, locked) ─────────────────────────────────── */}
@@ -819,7 +819,7 @@ function Step4Svc({
           style={{ marginBottom: 12 }}>
           {provResult.ok ? (
             <>
-              ✓ Trigger.dev 已接受 — runId: <code>{provResult.runId ?? "unknown"}</code>
+              ✓ 外部服務開通請求已送出 — runId: <code>{provResult.runId ?? "unknown"}</code>
               <br />Providers: {provResult.providers?.join(", ")}
             </>
           ) : (
@@ -837,7 +837,7 @@ function Step4Svc({
           onClick={onSubmit}
           style={{ fontWeight: 600 }}
         >
-          {loading ? "開通中…" : `⚡ 一鍵開通 ${providers.length} 個服務`}
+          {loading ? "開通中…" : `開通選取的 ${providers.length} 個外部服務`}
         </button>
         <button type="button" className="btn-primary" onClick={onNext}>
           {provResult?.ok ? "下一步 → 啟動 Build ✓" : "跳過 →"}
@@ -869,7 +869,9 @@ function Step5Launch({
 
   const params = new URLSearchParams({
     profile: info.profile,
+    executionMode: "local_direct",
     clientName: info.clientName,
+    clientSlug: info.tenantSlug,
     environment: "staging",
     organizationId: info.organizationId,
     workspaceId: info.workspaceId,
@@ -927,7 +929,7 @@ function Step5Launch({
       <ol style={{ paddingLeft: 20, lineHeight: 2 }}>
         <li>將 <code>DEPARTMENT_SELECTION.json</code>（Step 3 複製的 JSON）貼入 <code>tenants/{info.tenantSlug || "<slug>"}/core/</code></li>
         <li>在 Supabase 建立 organization / workspace / project / site 記錄（使用上方 UUID）</li>
-        <li>點擊「啟動 Build Console」→ 選擇 <code>enqueue</code> 模式執行部署（外掛將由 Trigger.dev 自動安裝）</li>
+        <li>點擊「啟動 Build Console」→ 預設使用 <code>local_direct</code> 直接建 staging 站；需要背景派工時才改用 <code>enqueue</code></li>
       </ol>
 
       <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
@@ -954,7 +956,7 @@ export default function OnboardWizard() {
   const [step, setStep] = useState<WizardStep>(1);
   const [info, setInfo] = useState<ClientInfo>(makeDefaultClient);
   const [selectedDepts, setSelectedDepts] = useState<Set<ClusterId>>(new Set(SMB_DEFAULT_CLUSTERS));
-  const [providers, setProviders] = useState<string[]>(["sentry", "posthog", "uptime_kuma", "n8n"]);
+  const [providers, setProviders] = useState<string[]>([]);
   const [hints, setHints] = useState<Record<string, string>>({});
   const [provLoading, setProvLoading] = useState(false);
   const [provResult, setProvResult] = useState<ProvResult | null>(null);
@@ -1078,7 +1080,7 @@ export default function OnboardWizard() {
 
       {step >= 4 && (
         <div className="build-panel" style={{ marginTop: 16 }}>
-          <StepHeader step={4} current={step} label="Step 4 — 開通外部服務帳號" />
+          <StepHeader step={4} current={step} label="Step 4 — 選配外部服務" />
           {step === 4 && (
             <Step4Svc
               info={info}

@@ -136,6 +136,7 @@ export default function OnboardingPage() {
   const [intakeId, setIntakeId] = useState<string | null>(null);
   const [websiteSpecId, setWebsiteSpecId] = useState<string | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
+  const [buildStatus, setBuildStatus] = useState<string | null>(null);
 
   const [form, setForm] = useState<Partial<IntakeForm>>({
     industry: "service",
@@ -227,7 +228,7 @@ export default function OnboardingPage() {
       });
       // Read as text first so a non-JSON error page (500/HTML) doesn't throw and crash the handler.
       const text = await res.text();
-      let data: { ok?: boolean; error?: string; details?: string; run_id?: string };
+      let data: { ok?: boolean; error?: string; details?: string; run_id?: string; build_status?: string };
       try {
         data = JSON.parse(text);
       } catch {
@@ -241,6 +242,7 @@ export default function OnboardingPage() {
         return;
       }
       setRunId(data.run_id ?? null);
+      setBuildStatus(data.build_status ?? null);
       setFlow("triggered");
     } catch (e) {
       // Network/abort error — keep the operator on the spec view with a clear message,
@@ -314,9 +316,10 @@ export default function OnboardingPage() {
 
           {flow === "triggered" && runId ? (
             <div className="intake-success-banner">
-              <strong>已排入建站佇列</strong>
+              <strong>{buildStatus === "completed" ? "建站已完成" : buildStatus === "failed" ? "建站執行失敗" : "建站 Run 已建立"}</strong>
               <p style={{ margin: "0.5rem 0 0", fontSize: "0.85rem" }}>Run ID：<code>{runId}</code></p>
-              <a href="/build" className="intake-success-link">前往 /build 查看進度 →</a>
+              {buildStatus ? <p style={{ margin: "0.25rem 0 0", fontSize: "0.85rem" }}>Build status：<code>{buildStatus}</code></p> : null}
+              <a href={`/build?runId=${encodeURIComponent(runId)}`} className="intake-success-link">前往 /build 查看進度 →</a>
             </div>
           ) : (
             <div className="intake-result-actions">
@@ -325,7 +328,7 @@ export default function OnboardingPage() {
                 {flow === "triggering" ? "排入中..." : "觸發建站 →"}
               </button>
               <button
-                onClick={() => { setFlow("form"); setFormStep(1); setSpec(null); setIntakeId(null); setWebsiteSpecId(null); setRunId(null); setError(null); }}
+                onClick={() => { setFlow("form"); setFormStep(1); setSpec(null); setIntakeId(null); setWebsiteSpecId(null); setRunId(null); setBuildStatus(null); setError(null); }}
                 className="btn-secondary">
                 建立另一個
               </button>

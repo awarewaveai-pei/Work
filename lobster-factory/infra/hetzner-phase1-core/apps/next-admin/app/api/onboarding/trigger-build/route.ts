@@ -17,7 +17,6 @@ import { resolveOpsRole } from "../../../../lib/ops-role";
 import { timingSafeEqual } from "../../../../lib/ops-inbox/verifyIngestToken";
 import { getSupabaseWriteClient } from "../../../../lib/supabase-server";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "../../../../lib/tenant-guard";
-import { kickActionRunDispatcher } from "../../../../lib/kick-dispatcher";
 import type { IntakeForm, WebsiteSpec } from "../../../../lib/onboarding/intake-form";
 import {
   resolveInstallableSlugsForPacks,
@@ -300,7 +299,7 @@ export async function POST(request: Request) {
 
   const buildPayload: BuildRunRequest = {
     profile: "profile_b",
-    executionMode: "enqueue",
+    executionMode: "local_direct",
     clientName: companyName,
     domain: stagingDomain,
     packageSlug: manifestSlug,
@@ -386,14 +385,16 @@ export async function POST(request: Request) {
     environment_id: null,
     actor_user_id: null,
     actor_role: resolved.role,
-    status: "pending",
+    status: "running",
     approval_required: plan.approvalRequired,
     approval_status: plan.approvalRequired ? "pending" : "none",
     trace_id: traceId,
+    started_at: new Date().toISOString(),
     input_payload: input,
     output_payload: { plan },
     metadata: {
       source: "onboarding_portal",
+      execution_mode: "local_direct",
       role_source: resolved.source,
       profile: plan.profile,
       workflow_id: plan.workflowId,
@@ -409,10 +410,121 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "enqueue_failed" }, { status: 500 });
   }
 
-  const dispatcherKick = await kickActionRunDispatcher();
+  const token = process.env.LOBSTER_HOSTING_API_TOKEN?.trim();
+  if (!token) {
+    await supabase
+      .from("ops_action_runs")
+      .update({
+        status: "failed",
+        error_summary: "hosting_token_not_configured",
+        ended_at: new Date().toISOString(),
+        output_payload: { plan, local_direct: { attempted: true, ok: false, error: "hosting_token_not_configured" } },
+      })
+      .eq("id", runId);
+    return NextResponse.json({
+      ok: true,
+      build_status: "failed",
+      error: "hosting_token_not_configured",
+      run_id: runId,
+      organization_id: organizationId,
+      workspace_id: workspaceId,
+      project_id: projectId,
+      site_id: siteId,
+      trace_id: traceId,
+      execution_mode: "local_direct",
+      local_direct: { attempted: true, ok: false, error: "hosting_token_not_configured" },
+    });
+  }
+
+  let provision: Record<string, unknown> = {};
+  let seed: Record<string, unknown> | null = null;
+  let finalStatus: "completed" | "failed" = "failed";
+  let errorSummary: string | null = null;
+
+  try {
+    const provisionEndpoint = new URL("/api/internal/hosting/provision-staging", request.url);
+    const provisionRes = await fetch(provisionEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        organizationId,
+        siteId,
+        siteName: companyName,
+        manifestSlug,
+        pluginSlugs: derivedPluginSlugs,
+        websiteSpecId: website_spec_id,
+      }),
+    });
+    const provisionText = await provisionRes.text();
+    try {
+      provision = provisionText ? JSON.parse(provisionText) as Record<string, unknown> : {};
+    } catch {
+      provision = { error: "non_json_response", detail: provisionText.slice(0, 500) };
+    }
+    if (Array.isArray(provision.provisioningNotes)) {
+      provision.provisioningNotes = provision.provisioningNotes.map((note) => {
+        const text = String(note);
+        return text.startsWith("Admin:") ? "Admin: admin / [redacted]" : note;
+      });
+    }
+
+    finalStatus = provisionRes.ok ? "completed" : "failed";
+    errorSummary = provisionRes.ok ? null : String(provision.detail ?? provision.error ?? `HTTP ${provisionRes.status}`).slice(0, 500);
+
+    if (provisionRes.ok && typeof provision.wpRootPath === "string") {
+      const seedRes = await fetch(provisionEndpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          mode: "seed",
+          websiteSpecId: website_spec_id,
+          wpPath: provision.wpRootPath,
+          siteId,
+        }),
+      });
+      const seedText = await seedRes.text();
+      try {
+        seed = seedText ? JSON.parse(seedText) as Record<string, unknown> : {};
+      } catch {
+        seed = { error: "non_json_response", detail: seedText.slice(0, 500) };
+      }
+      if (!seedRes.ok || seed.ok === false) {
+        finalStatus = "failed";
+        errorSummary = String(seed.detail ?? seed.error ?? `HTTP ${seedRes.status}`).slice(0, 500);
+      }
+    }
+  } catch (error) {
+    errorSummary = error instanceof Error ? error.message : String(error);
+    provision = { error: "local_direct_request_failed", detail: errorSummary.slice(0, 500) };
+  }
+
+  await supabase
+    .from("ops_action_runs")
+    .update({
+      status: finalStatus,
+      error_summary: errorSummary,
+      ended_at: new Date().toISOString(),
+      output_payload: {
+        plan,
+        local_direct: {
+          attempted: true,
+          ok: finalStatus === "completed",
+          provision,
+          ...(seed ? { seed } : {}),
+        },
+      },
+    })
+    .eq("id", runId);
 
   return NextResponse.json({
     ok: true,
+    build_status: finalStatus,
     run_id: runId,
     organization_id: organizationId,
     workspace_id: workspaceId,
@@ -420,6 +532,13 @@ export async function POST(request: Request) {
     site_id: siteId,
     trace_id: traceId,
     manifest_downgraded: downgraded || undefined,
-    dispatcher_kick: dispatcherKick,
+    execution_mode: "local_direct",
+    local_direct: {
+      attempted: true,
+      ok: finalStatus === "completed",
+      provision,
+      ...(seed ? { seed } : {}),
+    },
+    ...(errorSummary ? { error: "local_direct_failed", details: errorSummary } : {}),
   });
 }

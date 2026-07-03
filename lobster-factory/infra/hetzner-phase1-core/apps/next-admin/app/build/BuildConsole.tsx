@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   buildConsolePlan,
+  isUuid,
   type BuildExecutionMode,
   type BuildIntegrations,
   type BuildPackageSlug,
@@ -133,6 +134,11 @@ type ProvisionResult = {
 };
 
 const TERMINAL_STATUSES = new Set(["completed", "failed", "dispatch_failed", "cancelled", "blocked"]);
+const EXECUTION_MODES: BuildExecutionMode[] = ["plan_only", "local_direct", "enqueue"];
+
+function parseExecutionMode(value: string | undefined): BuildExecutionMode | undefined {
+  return value && EXECUTION_MODES.includes(value as BuildExecutionMode) ? value as BuildExecutionMode : undefined;
+}
 
 export default function BuildConsole() {
   const searchParams = useSearchParams();
@@ -154,18 +160,27 @@ export default function BuildConsole() {
   const [provisionTier, setProvisionTier] = useState("business");
   const [provisionRegion, setProvisionRegion] = useState("sin");
 
-  // Pre-fill from /onboard Step 4 URL params
+  // Pre-fill from /onboard Step 4 URL params, or poll an existing run linked
+  // from the onboarding intake flow.
   useEffect(() => {
+    const str = (key: string) => searchParams.get(key) ?? undefined;
+    const runId = str("runId") ?? str("run_id");
+    if (runId && isUuid(runId)) {
+      setPollingRunId(runId);
+    }
+
     const p = searchParams.get("profile") as BuildProfile | null;
     if (!p || !PROFILE_DEFAULTS[p]) return;
     const base = { ...PROFILE_DEFAULTS[p] };
-    const str = (key: string) => searchParams.get(key) ?? undefined;
     base.clientName    = str("clientName")    ?? base.clientName;
+    base.clientSlug    = str("clientSlug")    ?? base.clientSlug;
     base.environment   = (str("environment") as "staging" | "production") ?? base.environment;
     base.organizationId = str("organizationId") ?? base.organizationId;
     base.workspaceId   = str("workspaceId")   ?? base.workspaceId;
     base.projectId     = str("projectId")     ?? base.projectId;
     base.siteId        = str("siteId")        ?? base.siteId;
+    base.websiteSpecId = str("websiteSpecId") ?? str("website_spec_id") ?? base.websiteSpecId;
+    const requestedExecutionMode = parseExecutionMode(str("executionMode") ?? str("execution_mode"));
     if (p === "profile_b") {
       base.domain      = str("domain")        ?? base.domain;
       base.provider    = (str("provider") as BuildProvider) ?? base.provider;
@@ -191,7 +206,7 @@ export default function BuildConsole() {
     const sshRefRaw = searchParams.get("sshCredentialsRef");
     if (sshRefRaw) base.sshCredentialsRef = sshRefRaw;
     setProfile(p);
-    setForm({ ...base, executionMode: "enqueue" });
+    setForm({ ...base, executionMode: requestedExecutionMode ?? "local_direct" });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -273,7 +288,7 @@ export default function BuildConsole() {
       });
       const json = (await res.json()) as BuildRunResponse;
       setResponse(json);
-      // Start polling if a run was enqueued in Supabase
+      // Start polling if a run was written to Supabase
       if (json.ok && json.run?.supabaseRunId) {
         setPollingRunId(json.run.supabaseRunId);
       }
@@ -285,6 +300,15 @@ export default function BuildConsole() {
   };
 
   const canEnqueue = form.executionMode === "enqueue";
+  const canLocalDirect = form.executionMode === "local_direct";
+  const needsRegistryIds = canEnqueue || canLocalDirect;
+  const submitLabel = loading
+    ? "Submitting..."
+    : canLocalDirect
+      ? "Run local build"
+      : canEnqueue
+        ? "Queue guarded run"
+        : "Create run plan";
 
   const provisionMachine = async () => {
     setProvisionLoading(true);
@@ -317,7 +341,7 @@ export default function BuildConsole() {
       {/* ── Onboard hint banner ──────────────────────────────────────────── */}
       {searchParams.get("profile") ? (
         <div className="build-alert build-alert-ok" style={{ marginBottom: 16 }}>
-          ✓ 已從 New Client Onboarding 帶入客戶資料 — 確認欄位後選擇 <code>enqueue</code> 模式執行。
+          ✓ 已從 New Client Onboarding 帶入客戶資料 — 預設使用 <code>local_direct</code> 直接建 staging 站；只有需要背景派工時才改用 <code>enqueue</code>。
         </div>
       ) : (
         <div className="build-alert build-alert-warning" style={{ marginBottom: 16 }}>
@@ -511,10 +535,7 @@ export default function BuildConsole() {
             <SelectInput
               label="executionMode"
               value={(form.executionMode ?? "plan_only") as BuildExecutionMode}
-              options={[
-                { value: "plan_only", label: "plan_only" },
-                { value: "enqueue", label: "enqueue" },
-              ]}
+              options={EXECUTION_MODES.map((mode) => ({ value: mode, label: mode }))}
               onChange={(value) => update("executionMode", value)}
             />
             <SelectInput
@@ -540,7 +561,7 @@ export default function BuildConsole() {
             <TextInput label="clientName" value={form.clientName} onChange={(value) => update("clientName", value)} />
           </div>
 
-          {canEnqueue ? (
+          {needsRegistryIds ? (
             <div className="build-form-grid">
               <TextInput
                 label="organizationId"
@@ -675,8 +696,8 @@ export default function BuildConsole() {
                 )}
               </div>
               <p className="form-hint" style={{ marginTop: 8, fontSize: 11, marginBottom: 0 }}>
-                Enqueue 後 Trigger.dev 自動觸發 wp-install-plugins task；SSH 執行需在 EU 機器設定{" "}
-                <code>LOBSTER_EXECUTE_MANIFEST_STEPS=true</code> 才會真的安裝（否則 dry-run）。
+                <code>local_direct</code> 會由 next-admin 直接呼叫 hosting bridge 建 staging 站；<code>enqueue</code> 才會交給 Trigger.dev 背景派工。
+                SSH manifest 執行仍需在 EU 機器設定 <code>LOBSTER_EXECUTE_MANIFEST_STEPS=true</code>。
               </p>
             </div>
           )}
@@ -827,8 +848,8 @@ export default function BuildConsole() {
           </div>
 
           <button type="button" className="btn-primary build-submit" disabled={loading} onClick={submit}>
-            <span aria-hidden="true">{canEnqueue ? ">" : "+"}</span>
-            {loading ? "Submitting..." : canEnqueue ? "Queue guarded run" : "Create run plan"}
+            <span aria-hidden="true">{canEnqueue || canLocalDirect ? ">" : "+"}</span>
+            {submitLabel}
           </button>
         </div>
 
@@ -943,7 +964,7 @@ export default function BuildConsole() {
 
           {!liveStatus || !TERMINAL_STATUSES.has(liveStatus.status) ? (
             <div className="build-alert build-alert-ok">
-              Polling every 3 s — waiting for dispatcher to pick up run…
+              Polling every 3 s — waiting for run status updates…
             </div>
           ) : liveStatus.status === "completed" ? (
             <div className="build-alert build-alert-ok">

@@ -2,12 +2,12 @@ import type { WpSiteType, WpPluginModule } from "../wp-plugin-stack-catalog";
 export type { WpSiteType, WpPluginModule };
 
 export type BuildProfile = "profile_a" | "profile_b" | "profile_c";
-export type BuildExecutionMode = "plan_only" | "enqueue";
+export type BuildExecutionMode = "plan_only" | "enqueue" | "local_direct";
 export type BuildEnvironment = "staging" | "production";
 export type BuildPackageSlug = "wp-basic" | "wp-business" | "wp-tourism" | "wc-core" | "wc-custom";
 export type BuildProvider = "awarewave-internal" | "hostinger" | "cloudways" | "generic-wordpress" | "manual";
 export type BuildRiskLevel = "low" | "medium" | "high";
-export type BuildRunStatus = "planned" | "queued" | "blocked";
+export type BuildRunStatus = "planned" | "queued" | "running" | "completed" | "failed" | "blocked";
 
 // ─────────────────────────────────────────────
 // Integration configs — passed through to workflow so they can call each
@@ -152,6 +152,17 @@ export type DispatcherKickInfo =
   | { attempted: false; reason: "no_secret" }
   | { attempted: true; ok: boolean; httpStatus: number; detail?: string };
 
+export type LocalDirectBuildInfo = {
+  attempted: true;
+  ok: boolean;
+  status: "completed" | "failed";
+  httpStatus?: number;
+  error?: string;
+  detail?: string;
+  provision?: Record<string, unknown>;
+  seed?: Record<string, unknown>;
+};
+
 export interface BuildRunResult {
   id: string;
   traceId: string;
@@ -169,6 +180,8 @@ export interface BuildRunResult {
   };
   /** Present when executionMode was enqueue and DB write succeeded */
   dispatcherKick?: DispatcherKickInfo;
+  /** Present when executionMode was local_direct and DB write succeeded */
+  localDirect?: LocalDirectBuildInfo;
 }
 
 export interface BuildRunResponse {
@@ -221,11 +234,16 @@ export function normalizeBuildRequest(payload: BuildRunRequest): BuildRunRequest
 export function validateBuildRequest(input: BuildRunRequest): string[] {
   const errors: string[] = [];
   if (!input.profile) errors.push("profile is required");
-  if (input.executionMode && input.executionMode !== "plan_only" && input.executionMode !== "enqueue") {
-    errors.push("executionMode must be plan_only or enqueue");
+  if (
+    input.executionMode &&
+    input.executionMode !== "plan_only" &&
+    input.executionMode !== "enqueue" &&
+    input.executionMode !== "local_direct"
+  ) {
+    errors.push("executionMode must be plan_only, enqueue, or local_direct");
   }
-  if (input.executionMode === "enqueue" && !input.organizationId) {
-    errors.push("organizationId is required when executionMode is enqueue");
+  if ((input.executionMode === "enqueue" || input.executionMode === "local_direct") && !input.organizationId) {
+    errors.push(`organizationId is required when executionMode is ${input.executionMode}`);
   }
   if (input.environment && input.environment !== "staging" && input.environment !== "production") {
     errors.push("environment must be staging or production");
@@ -321,14 +339,14 @@ function profileAPlan(input: BuildRunRequest, environment: BuildEnvironment): Bu
       { id: "supabase_sep", label: "Supabase staging/production separation check", gate: "Staging and production Supabase projects are confirmed separate with no shared service role keys", automation: "automated" },
       { id: "rls", label: "Tenant isolation smoke", gate: "Supabase RLS smoke returns no cross-tenant leak", automation: "automated" },
       { id: "edge", label: "Cloudflare Access check", gate: "Internal tools are behind Access or an equivalent policy", automation: "automated" },
-      { id: "monitoring", label: "Service health check", gate: "Trigger.dev, n8n, Sentry, PostHog, and Uptime Kuma health checks pass", automation: "automated" },
+      { id: "monitoring", label: "Service health check", gate: "Core app, Supabase, hosting bridge, and any enabled optional integrations pass health checks", automation: "automated" },
       { id: "netdata", label: "Netdata check (self-managed servers)", gate: "Netdata alerts and dashboards are configured for AO-managed infrastructure", automation: "automated" },
       { id: "report", label: "AO infrastructure status report", gate: "ao_health_checks evidence is written or exported", automation: "automated" },
     ],
     requiredEvidence: [
       "Supabase staging and production separation",
-      "Trigger.dev reachable",
-      "n8n reachable",
+      "Optional Trigger.dev health if enqueue mode is enabled",
+      "Optional n8n health if webhook integrations are enabled",
       "Cloudflare Access policy evidence",
       "RLS isolation smoke result",
       "Monitoring endpoint status",
