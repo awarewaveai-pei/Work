@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { canApproveCommand, readOpsRole } from "@/lib/ops-role";
+import { effectiveOrgId, OrgAccessError } from "@/lib/tenant-guard";
 import { ApprovalList } from "./ApprovalList";
 import { AutoRefresh } from "../../AutoRefresh";
 
@@ -25,8 +26,22 @@ interface CommandRequestRow {
 }
 
 export default async function ApprovalsPage() {
-  const role = readOpsRole(new Request("http://localhost", { headers: await headers() }));
+  const reqLike = new Request("http://localhost", { headers: await headers() });
+  const role = readOpsRole(reqLike);
   const canAct = canApproveCommand(role);
+
+  // Tenant scoping (2026-07-02): mirror app/api/ops/approvals/route.ts (S2) —
+  // this server component queries with the service-role client and previously
+  // bypassed the API's org filter. Staff → null (all orgs, unchanged today);
+  // client → own org only; client without org binding → fail closed.
+  let orgFilter: string | null = null;
+  let orgAccessDenied = false;
+  try {
+    orgFilter = effectiveOrgId(reqLike, null);
+  } catch (e) {
+    if (e instanceof OrgAccessError) orgAccessDenied = true;
+    else throw e;
+  }
 
   const supabase = getSupabaseServerClient();
   let pending: CommandRequestRow[] = [];
@@ -34,8 +49,10 @@ export default async function ApprovalsPage() {
 
   if (!supabase) {
     dbError = "Supabase client not configured.";
+  } else if (orgAccessDenied) {
+    dbError = "Account has no org binding — cannot load approvals.";
   } else {
-    const { data, error } = await supabase
+    let query = supabase
       .from("command_requests")
       .select(
         "id,organization_id,source,actor_type,actor_ref,command,args,risk_level,status,trace_id,received_at,metadata",
@@ -44,6 +61,8 @@ export default async function ApprovalsPage() {
       .in("risk_level", ["high", "critical"])
       .order("received_at", { ascending: false })
       .limit(50);
+    if (orgFilter) query = query.eq("organization_id", orgFilter);
+    const { data, error } = await query;
     if (error) dbError = error.message;
     else pending = (data ?? []) as CommandRequestRow[];
   }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { canApproveCommand, readOpsRole } from "@/lib/ops-role";
+import { effectiveOrgId, OrgAccessError } from "@/lib/tenant-guard";
 import { buildIntegrationBlockers, type IntegrationBlocker } from "@/lib/repair-os/integration-blockers";
 import { REPAIR_SOURCE_POLICIES, policyCatalogForSource, policyForIncident, repairPolicyLabel } from "@/lib/repair-center/policy";
 import type { RepairIncident, RepairRun } from "@/lib/repair-center/types";
@@ -20,9 +21,25 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
   const sp = searchParams ? await searchParams : {};
   const clientSlug = sp.client_slug?.trim() || "";
   const h = await headers();
-  const role = readOpsRole(new Request("http://localhost", { headers: h }));
+  const reqLike = new Request("http://localhost", { headers: h });
+  const role = readOpsRole(reqLike);
   const canAct = canApproveCommand(role);
   const supabase = getSupabaseServerClient();
+
+  // Tenant scoping (2026-07-02): this server component queries with the
+  // service-role client, BYPASSING the org filters the API routes gained in
+  // S2/S4 — a client login reaching this page would see every org's incidents.
+  // Same effectiveOrgId contract as app/api/ops/repairs/route.ts: staff → null
+  // (all orgs, today's behavior unchanged); client → own org; client without
+  // an org binding → fail closed (no queries).
+  let orgFilter: string | null = null;
+  let orgAccessDenied = false;
+  try {
+    orgFilter = effectiveOrgId(reqLike, null);
+  } catch (e) {
+    if (e instanceof OrgAccessError) orgAccessDenied = true;
+    else throw e;
+  }
 
   let incidents: RepairIncident[] = [];
   let runs: RepairRun[] = [];
@@ -32,6 +49,8 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
 
   if (!supabase) {
     dbError = "Supabase client 尚未設定。";
+  } else if (orgAccessDenied) {
+    dbError = "帳號未綁定組織（org binding missing）— 無法載入資料。";
   } else {
     let incidentQuery = supabase
         .from("ops_incidents")
@@ -40,27 +59,39 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
         .order("last_seen_at", { ascending: false })
         .limit(80);
     if (clientSlug) incidentQuery = incidentQuery.eq("client_slug", clientSlug);
+    if (orgFilter) incidentQuery = incidentQuery.eq("organization_id", orgFilter);
 
     let runQuery = supabase.from("repair_runs").select("*").is("archived_at", null).order("created_at", { ascending: false }).limit(100);
     if (clientSlug) runQuery = runQuery.eq("client_slug", clientSlug);
+    if (orgFilter) runQuery = runQuery.eq("organization_id", orgFilter);
+
+    let orgQuery = supabase
+        .from("organizations")
+        .select("id,slug,name")
+        .order("created_at", { ascending: true });
+    if (orgFilter) orgQuery = orgQuery.eq("id", orgFilter);
+
+    let integrationQuery = supabase
+        .from("tenant_integration_bindings")
+        .select("id,organization_id,provider,status,last_error,api_metadata")
+        .order("created_at", { ascending: true });
+    if (orgFilter) integrationQuery = integrationQuery.eq("organization_id", orgFilter);
 
     const [incidentRes, runRes, modeRes, orgRes, integrationRes] = await Promise.all([
       incidentQuery,
       runQuery,
+      // Deliberately NOT org-filtered (critic 2026-07-02): system_modes is the
+      // platform-global kill switch — a client user seeing the global mode is
+      // by design (they must know WHY repair actions are blocked). Only the
+      // enum value leaks; no other org's data.
       supabase
         .from("system_modes")
         .select("mode")
         .eq("scope_type", "global")
         .is("scope_id", null)
         .maybeSingle(),
-      supabase
-        .from("organizations")
-        .select("id,slug,name")
-        .order("created_at", { ascending: true }),
-      supabase
-        .from("tenant_integration_bindings")
-        .select("id,organization_id,provider,status,last_error,api_metadata")
-        .order("created_at", { ascending: true }),
+      orgQuery,
+      integrationQuery,
     ]);
     if (incidentRes.error) dbError = incidentRes.error.message;
     if (runRes.error) dbError = runRes.error.message;

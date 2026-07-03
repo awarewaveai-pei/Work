@@ -4,6 +4,25 @@
 
 ## 2026-07-02
 
+### fix(tenant): ops console 三頁多租戶判定與補洞（Repair Center / Approvals / System Modes）
+
+[任務理解] 操作者認為三個 /ops 頁面「是廢的且多客戶不適用」。VBC 調查推翻前半：三頁全是活功能（repairs=完整 incident→backup→GitHub 修復管線；approvals=Telegram/Slack 高風險指令審批，佇列稀疏是 policy 設計；system-modes=全域 kill switch，被修復管線真實消費）。後半戳中真缺口：server component 用 service-role 直查、繞過 API 的 org filter。
+
+[已修改]
+- `lib/repair-center/service.ts`：repair_runs insert 補 `organization_id`（隱藏 bug：0054 只回填歷史，新 run 一直寫 NULL → 被 org-filtered GET 靜默隱藏）
+- `app/ops/repairs/page.tsx` + `app/ops/approvals/page.tsx`：套用與 API route 相同的 effectiveOrgId 模式（staff→null 全量不變；client→own org；client 無 org 綁定→fail closed）；repairs 頁四條查詢（incidents/runs/organizations/bindings）各補 filter；system_modes 刻意不過濾（全域 kill switch by design，註解明示）
+- 判定不動：system-modes 維持 global 單租戶設計（緊急煞車語意正確）；repairs 頁 select("*") 不改（runs 未傳 client component，無 RSC 洩漏，避免第二份欄位白名單）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=40000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test (next-admin vitest) | exit=0 | ms=6850 — 568/568 tests、46 files 全過
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/1n — Minor（system_modes 對 client 顯示全域 mode）判 by-design 並補註解折入；五審查重點（Request header 存活/organizations .eq("id")/staff 不誤擋/與 API 一致性/空字串邊界）全 clean
+- BUGHUNT_DONE: scope=lobster-factory agency-os scripts | grep=effectiveOrgId|organization_id (repair-center/ops pages call sites) | hits=全部一致 — 上游鏈確認：ops_incidents.organization_id 自 0028 存在；一般監控 webhook 走 client_slug（工作站 c1e8b4d 方向），incident org 未填時本修復傳 NULL，上游補齊自動生效
+- 遺留（非阻擋，critic 🔵）：0054 回填若有殘留 NULL-org 歷史列，client 視角 queue 可能重列已有 run 的 incident（startRepair 會 reuse row，無重複風險）；page 省略 default_viewer guard 靠 middleware fail-closed 保證，動 matcher 時複查
+
+[rollback] 單 commit revert 即回（三檔 + 註解）。
+
+
 ### feat(outreach): 冷開發 tab + per-org Supabase routing + sidebar 跳位修復 ✅
 
 **根因**：

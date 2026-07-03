@@ -109,6 +109,11 @@ export async function startRepairFromIncident(args: {
         incident_id: i.id,
         source: i.source,
         client_slug: i.client_slug ?? null,
+        // Tenant propagation (2026-07-02): migration 0054 backfilled historical
+        // repair_runs.organization_id FROM ops_incidents, but new runs were
+        // still inserted without it — every post-migration run had NULL org,
+        // silently invisible to the org-filtered GET (route.ts S4 patch).
+        organization_id: i.organization_id ?? null,
         policy,
         state: policy === "human_only" ? "human_only" : "detected",
         github_owner: target.owner,
