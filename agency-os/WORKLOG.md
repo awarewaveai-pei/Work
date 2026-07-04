@@ -21,10 +21,33 @@
 - BUGHUNT_WAIVED: DOC_ONLY -- compose env var entry；無 TS/JS symbol 改動，無 callsite drift 風險
 
 [剩餘風險]
-- Phase 2 WP 側尚未完成：FluentForm 表單 + FluentCRM feed + webhook feed。endpoint 已開啟但無 WP 觸發點。
 - docker-compose.yml repo 本地版本落後 SG 機器版本（SG 有 WPBRIDGE_PRIVATE_KEY 等後加的 vars；repo 未同步）→ 現存技術債，不影響本次功能。
 
 [rollback] 從 SG .env 移除 ONBOARDING_PUBLIC_INTAKE_TOKEN 一行 + docker compose up --force-recreate next-admin；endpoint 回到 fail-safe 關閉（401，code 無需 revert）。
+
+### fix(onboarding/security): WP FluentForm webhook 從 OPS_PROXY_SHARED_SECRET 切換至 narrow Bearer token
+
+[任務理解] 舊 webhook feed "Supabase Intake" 發現使用 OPS_PROXY_SHARED_SECRET（x-ops-sync-key）送往 /api/onboarding/submit → 爆炸半徑 = 全後端 operator 操作。Phase 2 核心安全修復：改用 ONBOARDING_PUBLIC_INTAKE_TOKEN（narrow，只管 intake-public 一條路由）。
+
+[已修改]
+- `wp_fluentform_form_meta` (form_id=3, `_fluentform_webhook_feeds`)：
+  - 舊：URL=`/api/onboarding/submit` + `x-ops-sync-key: <OPS_PROXY_SHARED_SECRET>`
+  - 新：URL=`/api/onboarding/intake-public` + `Authorization: Bearer <ONBOARDING_PUBLIC_INTAKE_TOKEN>`
+  - feed_name: "Public Intake (intake-public)"；request_body 欄位映射不變（company_name/industry/pages_needed/budget_tier 等 11 個欄位）
+- FluentCRM feed 確認：已有 "CRM Contact" feed，tags=prospect,website-inquiry，email={inputs.contact_email}，update_contact=yes — 無需修改
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl intake-public with real token | exit=0 | ms=8000 — ok=True, intake_id=5c0b0307, next=awaiting_build_approval（AI spec 生成成功）
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp eval verify webhook feed URL + auth header | exit=0 — url=intake-public, Authorization=Bearer fcc0b3c1..., status=yes
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — DB update via WP-CLI $wpdb->update 1 row；OPS_PROXY_SHARED_SECRET 不再出現在任何 WP-facing 設定
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=OPS_PROXY_SHARED_SECRET | hits=0 in WP feed (已移除)；grep=ONBOARDING_PUBLIC_INTAKE_TOKEN | hits=3（.env/docker-compose×2 — 全正確位置）
+- BUGHUNT_WAIVED: DOC_ONLY -- WP DB 改動無 TS/JS symbol；coerce helper call sites 未變
+
+[剩餘風險]
+- FluentCRM `list_id` 為空 → contact 建立但不加入任何 mailing list，可後續在 FluentCRM 後台指定
+- Phase 3（operator 觸發建站按鈕 / n8n 停用 / Master Plan 文件更新）仍待辦
+
+[rollback] wp eval 將 _fluentform_webhook_feeds 改回舊值（url=/submit, x-ops-sync-key）；或禁用該 feed（status=no）
 
 
 
