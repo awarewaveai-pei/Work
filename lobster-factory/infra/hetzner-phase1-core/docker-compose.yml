@@ -397,6 +397,8 @@ services:
       POD_ICC_JapanColor2001Coated: ${POD_ICC_JapanColor2001Coated:-}
       POD_ICC_USWebCoatedSWOP: ${POD_ICC_USWebCoatedSWOP:-}
       POD_ICC_CoatedFOGRA39: ${POD_ICC_CoatedFOGRA39:-}
+      # Public customer intake door — narrow-scoped token (FluentForm webhook only)
+      ONBOARDING_PUBLIC_INTAKE_TOKEN: ${ONBOARDING_PUBLIC_INTAKE_TOKEN:-}
     ports:
       - "${NEXT_ADMIN_HOST_PORT:-127.0.0.1:3002}:3000"
     depends_on:
