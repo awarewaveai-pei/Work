@@ -16,7 +16,7 @@ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK4ihPieknnd+m8VVWEm9SOvLY1JPXTlgmup1D+aivDP
 ```
 
 - [ ] 跟客戶確認：她的 email（註冊用）+ 她的信用卡（帳號一開始就是她的，不掛我們名下）
-- [ ] 網域：她名下註冊（Namecheap/Cloudflare Registrar），還沒買就現場一起買
+- [ ] 網域：**Cloudways 不賣網域**，另在 **Namecheap（https://www.namecheap.com/）** 買 — 用她的 email 註冊 + 她的卡付（.com 約 $10-12/年，續費通知才會找她本人）。還沒買就現場一起買
 
 ---
 
