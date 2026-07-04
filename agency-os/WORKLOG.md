@@ -4,6 +4,24 @@
 
 ## 2026-07-05
 
+### revert(nginx): 還原 aware-wave.com/start/ → WordPress FluentForm
+
+[根因] 上一個 session 未授權將 /start/ 301 redirect 到 app.aware-wave.com/intake（Next.js form），繞過原始設計的 FluentForm → MySQL + FluentCRM → Supabase → 建站觸發流程。
+
+[已修改]
+1. `lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/lobster-aware-wave-locations.inc` — 移除 4 行 redirect block
+2. SG VPS `/etc/nginx/snippets/lobster-aware-wave-locations.inc` — 同步移除 + nginx reload
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl -sI --max-redirs 0 https://aware-wave.com/start/ | exit=0 | HTTP 200 from WordPress
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=/start/.*intake | hits=0
+
+[原始設計（已還原）]
+客戶 → aware-wave.com/start/ → FluentForm (WP) → MySQL + FluentCRM → webhook → Supabase → 觸發建站
+
+---
+
 ### incident(eu-vps): ClickHouse OOM death spiral 根治 — 20GB crash-loop log 清除 + 記憶體上限重配置
 
 [任務理解]
