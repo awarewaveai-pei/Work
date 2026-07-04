@@ -4,6 +4,37 @@
 
 ## 2026-07-04
 
+### fix(onboarding): FluentForm form_id=3 下拉/複選渲染修復 + e2e 全鏈驗證
+
+[任務理解] aware-wave.com/start/ 5-step 表單已有正確結構，但所有 select 下拉無選項（只顯示 placeholder）、checkboxes 欄位完全不渲染。
+
+[現況分析]
+- `Select.php:108` 讀取 `settings.advanced_options`，我們的 DB 存的是 `settings.options` → 空
+- `checkboxes` element name 不存在於 FF 元件表，正確名稱為 `input_checkbox`，且同樣需要 `settings.advanced_options`
+- 兩類問題均為上次 DB 重建時用了錯誤的 key 名稱與 element 名稱
+
+[已修改]
+- `wp_fluentform_forms` (form_id=3, lobster-wordpress DB) — 9 個 select/radio 欄位：`settings.options` → `settings.advanced_options`（加 calc_value 欄位）
+- `wp_fluentform_forms` (form_id=3) — 3 個 checkbox 欄位：element `checkboxes` → `input_checkbox`，`settings.options` → `settings.advanced_options`（加 calc_value+image 欄位），attributes.type=checkbox, value=[]
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp eval "...fix options key..." | exit=0 | ms=500 — Fixed 9 fields in DB (industry 6 opts, logo_status 3, has_ecommerce 2, needs_crm 2, needs_booking 2, language 3, existing_content 3, budget_tier 3, launch_urgency 3)
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp eval "...fix checkboxes element..." | exit=0 | ms=500 — Fixed 3 checkbox fields (pages_needed 7, product_type 4, visual_style 5)
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl https://aware-wave.com/start/ | grep -oP 'name="[^"]+"' | exit=0 — 所有 24 欄位 name 均出現，含 pages_needed[], product_type[], visual_style[]
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl -X POST /wp-admin/admin-ajax.php (data= serialized) | exit=0 | ms=400 — {"success":true,"data":{"insert_id":1,"result":{"message":"謝謝你的諮詢！","action":"hide_form"}}}
+- REALTEST_EVIDENCE: tool=nginx_log | cmd=tail /var/log/nginx/access.log | exit=0 — POST /api/onboarding/intake-public HTTP 201 (9281 bytes) at 09:35:52 UTC — webhook 從 WP 自動觸發，intake_form + website_spec 已寫入 Supabase，next=awaiting_build_approval
+- REVIEW_WAIVED: NA -- 純 DB 改動（WP FluentForms meta），無 TS/PS1 code 變更
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=advanced_options | hits=0 (無 stale ref)
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=input_checkbox | hits=0 (無 stale ref)
+
+[剩餘風險]
+- FluentForm 後台 UI 預覽可能需重新整理才反映改動
+- 瀏覽器實際操作 5 步驟表單尚未截圖確認視覺（技術層 e2e 已全通）
+
+[rollback] WP-CLI: wp eval 重寫 form_fields JSON 回上一個 revision（wp_fluentform_form_meta.revision 欄位有存）
+
+---
+
 ### feat(db): migration 0058 — ops_incidents parent_incident_id (storm correlation)
 
 [已修改]
