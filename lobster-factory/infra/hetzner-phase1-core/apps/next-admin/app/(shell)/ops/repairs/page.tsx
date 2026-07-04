@@ -236,7 +236,7 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
                         {incident.service ?? "主機層級"} · 最近看到 {new Date(incident.last_seen_at).toLocaleString("zh-TW")}
                       </div>
                     </div>
-                    <RepairActions incidentId={incident.id} canAct={canAct && !blocked} mode="start" policy={q.policy} />
+                    <RepairActions incidentId={incident.id} canAct={canAct && !blocked} mode="start" policy={policy} />
                   </div>
                 ))}
               </div>

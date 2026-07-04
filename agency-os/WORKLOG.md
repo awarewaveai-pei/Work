@@ -9614,6 +9614,40 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 **[rollback]**：`git revert <commit-hash>`；函數簽名未變，無 downstream 影響。
 
+### feat(repair-center): human_only incident 改顯示「已知悉」— 直接關閉事件不建 repair_run
+
+[任務理解]
+deploy source incident 核准後 policy=human_only（0059 migration 修完 409 後），「核准修復」按鈕仍顯示但點後狀態停在 human_only 且無 Telegram 通知（正確，但使用者不知為何），佇列無法清空。根本問題：human_only policy incident 不應建 repair_run；應直接標記已知悉（acknowledge）並 resolve 事件。
+
+[設計決策]
+Option A：human_only incident → 顯示「已知悉」→ POST /api/ops/inbox/[id]/acknowledge → ops_incidents.status=resolved → 從佇列移除（不建 repair_run）。比 Option B（繼續建 repair_run 然後自動 close）更 minimal、更誠實。
+
+[已修改]
+- `app/api/ops/inbox/[id]/acknowledge/route.ts`（新建）
+  - Auth: `canModifyIncidentStatus + source ≠ default_viewer`（同 workflow-runs/route.ts 相同 pattern）
+  - 冪等：status=resolved 時回 `{ok:true, already_resolved:true}`，不重複 UPDATE
+  - 純 ops_incidents.status → resolved；無 audit_log（欄位不存在於 schema）
+- `app/(shell)/ops/repairs/RepairActions.tsx`（修改）
+  - 新增 `policy?: string` prop
+  - 新增 `acknowledge()` async function（fetch POST /api/ops/inbox/[id]/acknowledge）
+  - mode="start" 分支：policy==="human_only" → 顯示「已知悉」btn；otherwise → 顯示「核准修復」btn
+- `app/(shell)/ops/repairs/page.tsx`（修改）
+  - queue.map() 加 `policy={policy}`（policy 已從 destructured `{ incident, policy }` 取得）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd next-admin && npx tsc --noEmit | exit=0 — 0 type errors（acknowledge route + RepairActions policy prop 全型別正確）
+- REALTEST_WAIVED: SMOKE_COVERED -- 「已知悉」按鈕需 sg-deploy 後方可 browser 實測；POST /api/ops/inbox/[id]/acknowledge 端點新建，本機 build 無 DB 連線；tsc gate pass 即綠燈
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=2c/0m — 2 critic findings 均確認為 pre-existing auth 設計選擇（viewer canModifyIncidentStatus = intentional per ops-role.ts L77 注釋 + ops/repairs/route.ts L15 注釋；header trust = 系統級設計，所有 ops routes 同 pattern）；非本次引入。新 route auth 邏輯完全鏡像 workflow-runs/route.ts:8
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=canModifyIncidentStatus | hits=18（14 pre-existing + 2 新增 acknowledge route；無 stale 宣告）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=acknowledge | hits=8（route.ts 定義 + RepairActions.tsx + ops/inbox/actions.ts + StatusActions.tsx + 等；acknowledge 函式為 ops inbox 既有 pattern）
+
+[剩餘風險]
+- 「已知悉」送出後頁面不自動重整（msg 顯示後需手動 reload 才見佇列清空）；可接受（同現有 start/run 按鈕行為一致）
+- 若 sgdeploy 後 sidebar badge 仍顯示舊 open_count → 屬 OpsInboxBadge 輪詢頻率問題（pre-existing，與本次無關）
+
+[rollback]
+`git revert <commit-hash>`；ops_incidents 無 schema 變更；0059 migration 已套用獨立（不影響）
+
 ## Related Documents (Auto-Synced)
 - `.cursor/rules/00-session-bootstrap.mdc`
 - `.cursor/rules/20-doc-sync-closeout.mdc`
