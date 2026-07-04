@@ -4,6 +4,45 @@
 
 ## 2026-07-04
 
+### feat(repair-center): auto-remediation pipeline wiring (startRepairFromIncident)
+
+[任務理解]
+`startRepairFromIncident()` 在設定 `state: "repairing"` 後直接 return，從不呼叫 `tryRemediate()`。補救目錄（catalog）已有 `restart-unhealthy-container` 可自動執行，但只能靠人工到 UI 觸發。Migration 0028 agent 確認已套用，無需重做。
+
+[現況分析]
+- uptime-kuma/route.ts 在 webhook ingest 時已有 `tryRemediate` fire-and-forget（A2 fast path，無備份）
+- service.ts 的 pipeline 是 documented path（backup + GitHub issue + run state tracking）
+- `tryRemediate(mode:"auto")` 有 30min cooldown keyed on service — 兩路徑自然協調不衝突
+- 缺口：pipeline 到達 `repairing` 後無 auto `tryRemediate()` 呼叫
+
+[已修改]
+- `lib/repair-center/service.ts`:
+  1. import `findRemediation, tryRemediate` from `./remediations/engine`
+  2. 在 `startRepairFromIncident` 結尾加 auto-remediation extension block（~75 行）：
+     - null guard on `repaired`（mirror M7：repairing 轉態失敗 → hard stop）
+     - `findRemediation(i)` pre-check（catalog matchers must be pure）
+     - `tryRemediate(mode:"auto")` → ok → conditional UPDATE `.eq("state","repairing")` → `resolved`
+     - `tryRemediate(mode:"auto")` → fail → conditional UPDATE `.eq("state","repairing")` → `triage_needed`
+     - `!attempted` → fall through → `repairing`（flag off / cooldown / no match）
+     - Conditional UPDATE mirrors `escalateAnalysisOnlyRun` atomic pattern（lost-write race guard）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd next-admin && npx tsc --noEmit | exit=0 | ms=N/A
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd next-admin && npm test | exit=0 | ms=1790 — 50/50 test files, 599/599 tests pass
+- REALTEST_EVIDENCE: tool=Bash | cmd=scripts/audit-tools/dogfood-auto-repair.ps1 -Mode HealthOnly | exit=2 | ms=N/A — 10/10 invariants pass, 1 cosmetic warn (github_app_status=unverified，與本次無關)
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m — Critic raised 3 Medium (null guard, lost-write race, double findRemediation doc). 全部已修，re-run tsc+test pass
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=tryRemediate | hits=8 (service.ts 2 new + route.ts existing + engine.ts definition — 全部預期)
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=findRemediation | hits=0 outside engine.ts+service.ts (no stale callers)
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=catalog_remediation | hits=0 (no stale claims)
+
+[剩餘風險]
+- `tryRemediate(mode:"auto")` 讓 pipeline 延長 ~60s（SSH restart + 15s healthcheck）。已知且可接受（pipeline 已是長任務）
+- `uptime-kuma` 今日仍是 `analysis_only` policy → pipeline 走完才能觸發 auto-remediation；webhook fast-path 已先行。若 webhook 在 30min 內跑過 → pipeline cooldown 命中 → 落回 `repairing`（design intent）
+- 未增加 unit test for the new block（需 mock tryRemediate；留下次迭代）
+
+[rollback]
+revert 兩處 service.ts 改動（import + auto-remediation block），`npx tsc --noEmit` 確認即完成回滾
+
 ### fix(onboarding): FluentForm form_id=3 下拉/複選渲染修復 + e2e 全鏈驗證
 
 [任務理解] aware-wave.com/start/ 5-step 表單已有正確結構，但所有 select 下拉無選項（只顯示 placeholder）、checkboxes 欄位完全不渲染。

@@ -2,6 +2,7 @@ import { getSupabaseServerClient, getSupabaseWriteClient } from "@/lib/supabase-
 import type { Incident } from "@/lib/ops-inbox/types";
 import { appendAudit } from "./audit";
 import { runPreRepairBackup } from "./backup";
+import { findRemediation, tryRemediate } from "./remediations/engine";
 import { createRepairIssue, postEscalationComment, resolveGithubTarget } from "./github";
 import {
   canApprovePolicy,
@@ -282,7 +283,92 @@ export async function startRepairFromIncident(args: {
     }),
   });
 
-  return { ok: true, run: { ...(repaired ?? run), incident: i as any } };
+  // Mirror M7: if the repairing state transition itself failed (network drop /
+  // row vanished), do not proceed to auto-remediation — the run is in an
+  // unknown state. Operator must fix via UI, same as the backing_up → approved gap.
+  if (!repaired) {
+    console.error(
+      `[repair] run ${run.id}: state transition to "repairing" failed. Auto-remediation skipped.`,
+    );
+    return {
+      ok: false,
+      run: { ...run, incident: i as any },
+      error: "state_transition_failed_at_repairing",
+      details: { hint: "Update run state to 'repairing' manually via /ops/repairs UI." },
+    };
+  }
+
+  // Auto-remediation: if a catalog entry matches and the flag is on, attempt
+  // now rather than waiting for a human to click "Run Remediation". All safety
+  // envelopes (flag gate, cooldown, precheck, healthcheck, audit) live inside
+  // tryRemediate — this block only wires the run-state transitions.
+  //
+  // Catalog matchers must be pure functions: the pre-check here and tryRemediate's
+  // internal match must see identical results. No stateful or time-dependent matchers.
+  if (findRemediation(i)) {
+    const rem = await tryRemediate(supabase, i, { mode: "auto", actor: "system" });
+    if (rem.attempted && rem.ok) {
+      // Conditional UPDATE (.eq("state","repairing")) guards against a lost-write
+      // race: an operator could click "Mark Deploy Pending" in the ~60s window
+      // while remediation was running SSH + healthcheck. Mirrors escalateAnalysisOnlyRun's
+      // atomic conditional pattern. If the guard fails (returns null), the operator's
+      // action was already in flight — return the repairing row; next UI reload corrects.
+      const { data: resolvedData } = await supabase
+        .from("repair_runs")
+        .update({
+          state: "resolved",
+          deploy_status: "passed",
+          deploy_ref: `catalog:${rem.key}`,
+          deploy_checked_at: new Date().toISOString(),
+          audit_log: appendAudit(repaired.audit_log, {
+            actor: "system",
+            action: "catalog_remediation_success",
+            data: {
+              key: rem.key,
+              action_run_id: rem.action_run_id,
+              steps: rem.steps,
+            },
+          }),
+        })
+        .eq("id", run.id)
+        .eq("state", "repairing")
+        .select("*")
+        .maybeSingle();
+      const autoResolved = resolvedData as RepairRun | null;
+      return { ok: true, run: { ...(autoResolved ?? repaired), incident: i as any } };
+    }
+    if (rem.attempted && !rem.ok) {
+      const { data: failedData } = await supabase
+        .from("repair_runs")
+        .update({
+          state: "triage_needed",
+          deploy_status: "failed",
+          audit_log: appendAudit(repaired.audit_log, {
+            actor: "system",
+            action: "catalog_remediation_failed",
+            data: {
+              key: rem.key,
+              reason: rem.reason,
+              action_run_id: rem.action_run_id,
+              steps: rem.steps,
+            },
+          }),
+        })
+        .eq("id", run.id)
+        .eq("state", "repairing")
+        .select("*")
+        .maybeSingle();
+      const autoFailed = failedData as RepairRun | null;
+      return {
+        ok: false,
+        run: { ...(autoFailed ?? repaired), incident: i as any },
+        error: "catalog_remediation_failed",
+      };
+    }
+    // !rem.attempted (flag off / cooldown / no_organization) → fall through to repairing
+  }
+
+  return { ok: true, run: { ...repaired, incident: i as any } };
 }
 
 /**
