@@ -26,6 +26,8 @@
 param(
     [string]$WorkRoot = "",
     [string]$ZoneId   = "f21b1919632fee2221647908a94fdcac",
+    [string]$RateLimitRulesetId = "e29e21021ab641b38a4067735a027907",
+    [string]$ScannerFloodRateLimitRuleId = "b8ffa72df8d44ea78a09bd0ababf8abb",
     [bool]$WpLoginProtectedByServerSide = $true
 )
 
@@ -69,6 +71,8 @@ $overall    = "WARN"
 $botMode    = "unknown"
 $ruleCount  = 0
 $xmlrpcOk   = $false
+$rateLimitRuleStatus = "unknown"
+$rateLimitAdminCarveout = "unknown"
 $errorMsg   = ""
 
 if (-not $token) {
@@ -96,10 +100,34 @@ if (-not $token) {
         if (-not $errorMsg) { $errorMsg = "firewall/rules API: $($_.Exception.Message)" }
     }
 
+    try {
+        # 3. WAF rate-limit rule: global scanner flood defense must not catch normal WP admin bursts.
+        $rl = Invoke-RestMethod -Uri "https://api.cloudflare.com/client/v4/zones/$ZoneId/rulesets/$RateLimitRulesetId" `
+                -Headers $cfH -TimeoutSec 10 -ErrorAction Stop
+        $rateRule = @($rl.result.rules) | Where-Object { $_.id -eq $ScannerFloodRateLimitRuleId } | Select-Object -First 1
+        if ($rateRule) {
+            $rateLimitRuleStatus = if ($rateRule.enabled -and $rateRule.action -eq "block") { "enabled/block" } else { "not-blocking" }
+            $expr = [string]$rateRule.expression
+            $hasAdminCarveout =
+                $expr -match '/wp-admin/' -and
+                $expr -match '/wp-json/' -and
+                $expr -match '/wp-content/' -and
+                $expr -match '/wp-includes/'
+            $rateLimitAdminCarveout = if ($hasAdminCarveout) { "present" } else { "missing" }
+        } else {
+            $rateLimitRuleStatus = "missing"
+            $rateLimitAdminCarveout = "missing"
+        }
+    } catch {
+        if (-not $errorMsg) { $errorMsg = "rate-limit ruleset API: $($_.Exception.Message)" }
+        $rateLimitRuleStatus = "error"
+        $rateLimitAdminCarveout = "unknown"
+    }
+
     if ($WpLoginProtectedByServerSide) {
         # wp-login/xmlrpc defended server-side (LLAR + nginx + fail2ban) since 2026-06-04.
         # CF wp-login geo rules are intentionally absent; scanner/path rules may exist.
-        if ($botMode -eq "ON") {
+        if ($botMode -eq "ON" -and $rateLimitAdminCarveout -ne "missing") {
             $overall = "PASS"
         } else {
             # bot=OFF or error → genuine CF posture issue, still WARN.
@@ -163,6 +191,8 @@ $lines = @(
     "| Bot Fight Mode | $botMode |",
     "| WAF firewall rules count | $ruleCount$(if ($WpLoginProtectedByServerSide) { ' (informational; wp-login is server-side)' }) |",
     "| xmlrpc.php block rule | $(if ($xmlrpcOk) { 'present' } elseif ($WpLoginProtectedByServerSide) { 'server-side (nginx/LLAR)' } else { 'MISSING' }) |",
+    "| Scanner flood rate-limit rule | $rateLimitRuleStatus |",
+    "| WP admin rate-limit carve-outs | $rateLimitAdminCarveout |",
     "| Origin lockdown (SG) | $lockdownStatus$(if ($lockdownStatus -eq 'inactive') { ' warning: direct-origin attacks possible' }) |",
     "| CF ipset cf-ipv4 entries | $(if ($lockdownIpCount -gt 0) { $lockdownIpCount } else { 'N/A' }) |",
     "| CF ipset cf-ipv6 entries | $(if ($lockdownIpv6Count -gt 0) { $lockdownIpv6Count } else { 'N/A' }) |"

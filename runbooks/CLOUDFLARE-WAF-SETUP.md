@@ -225,3 +225,22 @@ IPv6（7 段）：2400:cb00::/32 等
 - **fail2ban 仍在**：lockdown 後 fail2ban 對直打 origin 的 IP 無作用（因 iptables DROP 更早），但 CF-proxied 流量的 real-IP banning 仍靠 nginx real_ip module
 - **IPv6**：ip6tables 同步鎖定，ufw 在此 server 未安裝
 - **Script**：`lobster-factory/infra/hetzner-phase1-core/scripts/cf-origin-lockdown.sh`
+
+# Rate-limit rule policy (2026-07-04)
+
+Rule `b8ffa72df8d44ea78a09bd0ababf8abb` is the global scanner-flood rule
+(`>50 requests / 10s`, block for 10s). It must exclude normal WordPress
+operator/admin bursts while keeping login and scanner defenses intact.
+
+Required carve-outs:
+- Exclude `app.aware-wave.com` and `supabase.aware-wave.com`.
+- Exclude `aware-wave.com` paths beginning with `/wp-admin/`, `/wp-json/`,
+  `/wp-content/`, and `/wp-includes/`.
+- Do not exclude `/wp-login.php`.
+- Do not exclude scanner paths such as `/.env`, `/.git`, `/wp-config`,
+  `/.aws/`, `/.ssh/`, or `/xmlrpc.php`.
+
+Server-side defense remains:
+- `wp-login.php`: LLAR + host Nginx `wp_login` rate limit + fail2ban.
+- scanner paths: Cloudflare custom WAF + host Nginx `scanner-block.inc`.
+- origin bypass: SG Origin Lockdown on ports 80/443.
