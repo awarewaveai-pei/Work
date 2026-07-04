@@ -113,11 +113,6 @@
         proxy_redirect off;
     }
 
-    # Customer intake redirect: WP /start/ page → React intake form with AI spec preview.
-    # Exact-match (=) takes priority over the catch-all location /.
-    location = /start  { return 301 https://app.aware-wave.com/intake; }
-    location = /start/ { return 301 https://app.aware-wave.com/intake; }
-
     location / {
         limit_req zone=req_perip burst=50 nodelay;
         proxy_pass http://127.0.0.1:8080/;
