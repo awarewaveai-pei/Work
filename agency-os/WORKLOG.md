@@ -81,9 +81,10 @@ MONGOLIA-03 建站失敗（ops_action_runs id: 4770d735），error_summary="fetc
 - DB（直接 PATCH）：intake_forms id=cfc9f8e8 status: "building" → "spec_generated"
 
 [驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | result=no errors
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | result=0 errors
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test (next-admin vitest) | exit=0 | ms=1790 — 599/599 passed
 - REALTEST_EVIDENCE: tool=Bash | cmd=PATCH intake_forms status=spec_generated | exit=0 | result=status:"spec_generated" confirmed
-- REVIEW_DONE: critic=Deep | verdict=pending (critic agent running) | findings=TBD
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/1n — minor: AbortSignal.timeout missing from fetchWithRetry; fixed before commit (110s per-attempt timeout, stays under maxDuration=120s)
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=provision-staging,local_direct,status.*building | hits=no stale claims
 - BUGHUNT_DONE: scope=agency-os/docs | grep=request.url hairpin | hits=0
 
