@@ -39,6 +39,9 @@ const PUBLIC_API_PATHS = new Set<string>([
   // Auth is a narrow Bearer token (ONBOARDING_PUBLIC_INTAKE_TOKEN), not the session cookie.
   // Rate-limited to 5 req/10 min; never triggers builds.
   "/api/onboarding/intake-public",
+  // Browser-origin public intake (no bearer token; rate-limited by global submit count).
+  // Powers the public form at /intake — same data pipeline as intake-public.
+  "/api/onboarding/intake-browser",
 ]);
 
 function isDevelopment(): boolean {
@@ -211,5 +214,6 @@ export const config = {
   // server-to-server endpoint families that carry their own auth (auth/webhooks/internal).
   // PUBLIC_API_PATHS + the x-ops-sync-key check above exempt the remaining /api/ops/*
   // server-to-server callers.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|login|api/auth|api/webhooks|api/internal|tarot-frames|edge-masks/|vector-editor.html).*)"],
+  // `intake` excluded: the public form at /intake needs no session (auth is in intake-browser API route).
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|login|intake|api/auth|api/webhooks|api/internal|tarot-frames|edge-masks/|vector-editor.html).*)"],
 };
