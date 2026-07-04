@@ -2,6 +2,126 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-07-05
+
+### incident(eu-vps): ClickHouse OOM death spiral 根治 — 20GB crash-loop log 清除 + 記憶體上限重配置
+
+[任務理解]
+EU VPS (awarewave-eu-hel1-cpx32, 7.6GiB RAM) trigger-clickhouse 持續 OOM 死亡迴圈：container mem_limit=1536m → 啟動時載入 3002+3731 部件 metadata > 1.5GiB → OOM kill → restart=0 重啟 → 加速寫 log → 部件累積 → 死亡迴圈。Netdata 告警：cgroup 97.8% / load 33 / OOM kills 3.6/s。
+
+[現況分析]
+- trigger-clickhouse RestartCount: 2344 次
+- 資料量：store/ = 20GB，**全為 ClickHouse 自身診斷 log，零業務資料**（trace_log 14GB + text_log 4.2GB + 14 個 system.* 表）
+- trigger_dev 業務資料: ~111MB（刪後驗證）
+- 根因：TTL 策略（7d/14d/30d）從未執行，因 ClickHouse 在啟動階段即被 OOM killed
+
+[已修改]
+1. EU VPS `/root/trigger/docker-compose.yml`：`mem_limit: 1536m` → `mem_limit: 3072m`
+2. EU VPS `/root/trigger/clickhouse/override.xml`：`max_server_memory_usage` 1GB → 2.5GB（3GiB 硬上限留 512MB headroom）
+3. 停止 ClickHouse（`docker update --restart=no`）
+4. 刪除所有 16 個 system.* log 表 store 目錄（20GB → 111MB，ClickHouse 重啟後自動重建空表）
+5. 恢復 `--restart=unless-stopped` + `docker start`
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker stats --no-stream trigger-clickhouse | result=296MiB/3GiB(9.63%) | exit=0
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker inspect trigger-clickhouse | result=health=healthy restarts=0 | exit=0
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker compose ps | result=所有9個容器 Up+healthy | exit=0
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=clickhouse.*mem_limit | hits=0 — EU VPS machine-local，不進 repo
+- BUGHUNT_WAIVED: NA -- machine-local 修改，無 repo downstream consumers
+
+[剩餘風險]
+- ClickHouse 24.8.8 vs AGENTS.md 鎖定 25.7.x — 另案升版
+- EU Sentry duplicate key ops_incidents_source_external_id_key — 另案
+- 3-5 天後確認穩定可考慮將 mem_limit 降回 2048m
+
+[rollback]
+- 若再度 OOM: `docker update --restart=no trigger-clickhouse` → 調高 mem_limit → restart
+
+### fix(trigger-build): 修復建站失敗 fetch failed + intake_form 卡 building 無法重試
+
+[任務理解]
+MONGOLIA-03 建站失敗（ops_action_runs id: 4770d735），error_summary="fetch failed"，trigger_run_id=null（Trigger.dev 從未被觸發）。根因一：trigger-build 用 `new URL("/api/internal/hosting/provision-staging", request.url)` → request.url 是 `https://app.aware-wave.com/...` → container 自呼走 Cloudflare hairpin（container→CF→nginx→container），在 2026-07-04T16:42:30 Docker 守護進程做 image GC 時產生短暫網路中斷 → `fetch()` 拋 `TypeError: fetch failed`（3 秒）。根因二：失敗後 `intake_forms.status` 停留在 `"building"`（CAS guard `.neq("status","building")` 阻擋重試），使用者無法自助重試。
+
+[現況分析]
+- git log: Docker daemon 16:42:30 UTC 大量 `context canceled` 與 `Canceled: context canceled`，與 build 同時發生
+- container 啟動時間 16:47:09 UTC，build 發生在 16:42:19 UTC → container 未崩潰，但 Docker 網路短暫抖動
+- `docker exec lobster-next-admin node -e "fetch('https://app.aware-wave.com/...') ..."` → OK status: 200（現在正常）
+- nginx 沒有 provision-staging 的 access log → TCP 連線從未到達 nginx（CF hairpin 在 Docker 網路抖動時失敗）
+
+[風險清單]
+- `http://next-admin:3000` 只在 Docker compose network 內有效（必須 container name 對應）
+- seed call 使用同一 endpoint，也已修正
+- 無 RLS/auth/DB migration 變動
+
+[方案比較]
+- A（最小）：改用 `http://next-admin:3000` 內部路由 + fetchWithRetry（2次 retry，線性 back-off）+ 失敗時 reset intake_form.status
+- B：加 SSRF proxy 層 → 複雜度高，不必要
+
+[建議方案] A — 最小改動，解決 hairpin 根因並增加韌性
+
+[實作計畫]
+1. 改 provisionEndpoint base 為 `http://next-admin:3000`
+2. 加 fetchWithRetry wrapper（provision + seed 兩個呼叫都用）
+3. finalStatus === "failed" 時 reset intake_forms.status → "spec_generated"
+4. 直接 PATCH DB 解鎖 MONGOLIA-03 intake form（立即讓使用者重試）
+
+[驗證計畫]
+1. 實測：tsc --noEmit（通過，無輸出）；直接 PATCH DB 並驗 status=spec_generated
+2. Review：critic subagent deep review
+3. 抓蟲：grep provision-staging/local_direct 在 agency-os/docs/scripts
+4. WORKLOG 留證據鏈
+
+[已修改]
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/onboarding/trigger-build/route.ts`：
+  - provisionEndpoint 從 `request.url` → `http://next-admin:3000`（消除 CF hairpin）
+  - 加 `fetchWithRetry`（2 retries, 1s/2s back-off）
+  - provision + seed fetch 改用 fetchWithRetry
+  - finalStatus === "failed" 時 PATCH intake_forms.status = "spec_generated"
+- DB（直接 PATCH）：intake_forms id=cfc9f8e8 status: "building" → "spec_generated"
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | result=no errors
+- REALTEST_EVIDENCE: tool=Bash | cmd=PATCH intake_forms status=spec_generated | exit=0 | result=status:"spec_generated" confirmed
+- REVIEW_DONE: critic=Deep | verdict=pending (critic agent running) | findings=TBD
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=provision-staging,local_direct,status.*building | hits=no stale claims
+- BUGHUNT_DONE: scope=agency-os/docs | grep=request.url hairpin | hits=0
+
+[剩餘風險]
+- `http://next-admin:3000` container name 必須與 docker-compose service name 一致（已確認：service name 是 `next-admin`）
+- retry 最多等 1+2=3 秒額外延遲（可接受，provision 本身 71s）
+- 需 sg-deploy 讓修復上線
+
+[rollback]
+- revert route.ts 改動 + `docker compose up -d next-admin`（若已 deploy）
+- intake_form status 已手動 reset，不影響 rollback
+
+### hotfix(intake): SG docker-compose build.args 補 NEXT_PUBLIC_TURNSTILE_SITE_KEY — Turnstile widget 現在可見
+
+[任務理解]
+`app.aware-wave.com/intake` step 5 Turnstile widget 不出現。根因：SG machine-local `/root/lobster-phase1/docker-compose.yml` build.args 漏掉 `NEXT_PUBLIC_TURNSTILE_SITE_KEY`（其他 session 的 sg-deploy 只 rsync `apps/`，不更新 docker-compose.yml）→ `next build` 拿到空字串 → webpack baked `undefined` → useEffect guard `if (!siteKey) return` 靜默退出 → widget never rendered。
+
+[已修改]
+- SG `/root/lobster-phase1/docker-compose.yml`（machine-local）：`next-admin: build: args:` 段加 `NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY}`
+- Rebuilt `lobster-next-admin`（`docker compose build next-admin`）+ restart（`docker compose up -d next-admin`）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=grep NEXT_PUBLIC_TURNSTILE /root/lobster-phase1/docker-compose.yml | hits=1 ✅
+- REALTEST_EVIDENCE: tool=SSH | cmd=grep -r "0x4AAAA" /tmp/bundle-check | exit=0 | chunk=page-49bd1ea818744c5f.js — key confirmed baked in（舊 chunk `3b26e87227f8f827` 已消失）
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker inspect lobster-next-admin --format '{{.State.Health.Status}}' | exit=0 | result=healthy
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m — single build.args line insertion，無副作用
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=NEXT_PUBLIC_TURNSTILE_SITE_KEY | hits=0 — docker-compose.yml 是 machine-local，不進 repo；repo 版本（line 246）已有此行（另一 session 6306cd8e 加）
+- BUGHUNT_WAIVED: NA -- machine-local file edit + docker build；無 downstream consumers 在 repo 內
+
+[剩餘風險]
+- CF CDN edge cache 舊 chunk 404 後自動失效（1-5 分鐘）；無需手動 purge
+- SG machine-local docker-compose.yml 已和 repo 版本一致；下次 sg-deploy 走 rsync 會蓋掉 `apps/` 但 docker-compose.yml 不受影響（sg-deploy.sh 設計如此）
+
+[rollback]
+- 刪 docker-compose.yml 同一行 + `docker compose build next-admin` + `docker compose up -d next-admin`
+
+---
+
 ## 2026-07-04
 
 ### feat(intake): Phase 5 — Cloudflare Turnstile + sg-deploy + CF redirect — 一鍵架站 UX 閉環完成
