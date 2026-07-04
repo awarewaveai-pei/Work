@@ -4,6 +4,41 @@
 
 ## 2026-07-04
 
+### feat(intake): Phase 5 — Cloudflare Turnstile + sg-deploy + CF redirect — 一鍵架站 UX 閉環完成
+
+[任務理解]
+客戶填 `aware-wave.com/start/` WP 表單後只看到 FluentForm 預設「謝謝」，整套 AI 建站引擎對客戶完全不透明。根本問題：React `/intake` 表單（能顯示 AI spec 預覽）存在 code 但從未部署；`/start/` 從未 redirect 過去；Turnstile keys 未注入 build pipeline。
+
+[已修改]
+- `Dockerfile`：加 `ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY=` + `ENV NEXT_PUBLIC_TURNSTILE_SITE_KEY=$NEXT_PUBLIC_TURNSTILE_SITE_KEY`（build-time 注入）
+- `docker-compose.yml`：build args 加 `NEXT_PUBLIC_TURNSTILE_SITE_KEY`；runtime env 加 `NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY`
+- SG `.env`：加 `NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAADvkZD4yg2iE0h8Y` + `TURNSTILE_SECRET_KEY=0x4AAAAAADvkZIhA5gxdiQy8f4vF3Kd_AuU`（CF Turnstile Managed widget 2026-07-04 新建）
+- `nginx/system-sites/lobster-aware-wave-locations.inc`：加 `location = /start` + `location = /start/` → `return 301 https://app.aware-wave.com/intake`（exact-match，優先於 WP catch-all）
+- SG `/etc/nginx/snippets/lobster-aware-wave-locations.inc`：同步套用 nginx redirect（直接 edit + reload）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 — 0 type errors
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test | exit=0 | tests=599/599 (50 files)
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy next-admin 6306cd8e | exit=0 | smoke=all OK (login+summary+nginx+node-api) | /intake=○static-generated in build output
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl https://aware-wave.com/start/ --max-redirs 0 | HTTP 301 Location: https://app.aware-wave.com/intake
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl https://app.aware-wave.com/intake | HTTP 200
+- REALTEST_EVIDENCE: tool=Bash | cmd=playwright smoke | exit=0 | 26/26 pass (0 failed, 6 skipped)
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0M/0m — Dockerfile/docker-compose/nginx changes reviewed
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=NEXT_PUBLIC_TURNSTILE_SITE_KEY | hits=3
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=TURNSTILE_SECRET_KEY | hits=2
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=/start/ | hits=1 (nginx snippet only)
+
+[剩餘風險]
+- CF Turnstile widget 未做瀏覽器視覺確認（user 需親自訪問 app.aware-wave.com/intake step 5 確認 widget 出現）
+- Rate-limit insert-then-ordinal 仍非原子（技術債，burst=5 低風險）
+- nginx redirect 直接 edit on VPS；next sg-deploy nginx 會覆寫 → 已同步更新 repo source
+
+[rollback]
+- Turnstile：SG .env 刪兩行；sg-deploy rebuild（NEXT_PUBLIC_* build-time，必 rebuild）
+- nginx redirect：ssh SG → 刪 snippets 那 3 行 → nginx -s reload（30 秒）
+
+---
+
 ### fix(repair-center): 修復 repair_runs_source_check 缺少 'deploy' — 所有 deploy incident 核准修復 409
 
 [任務理解]
