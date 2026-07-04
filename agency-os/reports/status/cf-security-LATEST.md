@@ -1,6 +1,6 @@
 ﻿# Cloudflare security check
 
-- Generated: 2026-07-04 09:25:56
+- Generated: 2026-07-04 09:44:27
 - Zone: f21b1919632fee2221647908a94fdcac (aware-wave.com)
 - **Overall: PASS**
 
@@ -10,6 +10,8 @@
 | Bot Fight Mode | ON |
 | WAF firewall rules count | 1 (informational; wp-login is server-side) |
 | xmlrpc.php block rule | present |
+| Scanner flood rate-limit rule | enabled/block |
+| WP admin rate-limit carve-outs | present |
 | Origin lockdown (SG) | active |
 | CF ipset cf-ipv4 entries | 15 |
 | CF ipset cf-ipv6 entries | 7 |

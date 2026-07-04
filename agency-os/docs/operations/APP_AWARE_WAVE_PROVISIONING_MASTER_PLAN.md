@@ -82,6 +82,7 @@ aware-wave.com (WP)            app.aware-wave.com (Next.js 15)
 |---|---|---|
 | 有 pending run → 建真 staging WP → 狀態 completed | ✅ **已驗證** | 2026-06-06 e2e run `655197bf` completed + curl 200（WORKLOG）|
 | **submit → generate-spec → trigger-build 全鏈自動建站（local_direct，不靠 Trigger.dev）** | ✅ **生產已驗**（2026-07-04）| e2e：submit 201 → spec 201（Claude 生成）→ trigger-build `local_direct` build_status=completed run `d21ab292`（~230s）→ https://aware-wave.com/staging/e2e-verify-0704-6e2b91/ curl 200 + seed 內容 + AI hero 圖。`bd135952` local_direct + 4 個 UI 吞錯修復（WORKLOG 2026-07-04）已 deploy `f9172be2`。⚠️ 限制：瀏覽器 UI 走 CF 的外層 request 會被 ~100s 上限切斷（建站仍完成，UI 拿不到回應）→ same-host worker 為 follow-up |
+| **ops /ops/onboarding 觸發建站按鈕（spec_generated → building → completed）** | ✅ **生產已驗**（2026-07-04）| Phase 3：intake 5c0b0307 spec_generated → trigger-build API（模擬按鈕） → ok=true, run cdfe06f8 completed → https://aware-wave.com/staging/test-wp-webhook-co-5c1bd1/ 200 ✅；c78a05c9 已 deploy |
 | ~~客戶填表 → 自動生出那個 pending run~~（已被 local_direct 取代：run 直接 running→completed，不經 pending）| ✅ 已通 | 同上；舊症狀「跳回第一步」前端 bug 已修（1c70853e + 2026-07-04 handleSubmit 硬化）|
 | Fluent Form（公開 WP）→ intake 橋接 | ✅ **E2E 完整**（2026-07-04）| FluentForms Pro 6.2.5 已裝；form_id=3（11 欄位）；webhook feed → `/api/onboarding/intake-public`（Bearer narrow token）；FluentCRM feed 已配置（contact+tag prospect/website-inquiry）；n8n bridge `RbrHNu3BUEmpNWeT` **已停用**（active=False，被直接 webhook 取代）；WORKLOG Phase 2+3 |
 | 中央 FluentCRM（收客資料進 CRM）| ✅ **已配置**（2026-07-04）| FluentForms FluentCRM feed：contact+tag prospect/website-inquiry，update_contact=yes；中央 CRM feed 跟 FluentForm 提交綁定 |
@@ -100,16 +101,14 @@ aware-wave.com (WP)            app.aware-wave.com (Next.js 15)
 ### ✅ Stage 0 — 建站引擎閉環（DONE 2026-06-06）
 站層 timeout 45s→95s + blocked 狀態回寫；pending run → 真站 → completed 已證。詳 STAGE0 文件。
 
-### 🔜 Stage 1 — ops 觸發建站（spec_generated → building）【**待 sg-deploy + 生產驗收**】
+### ✅ Stage 1 — ops 觸發建站（spec_generated → building → completed）（DONE 2026-07-04）
 **目標**：ops 看到公開 intake `spec_generated` → 一鍵觸發建站，不靠手塞 DB。
-**已完成（2026-07-04 code done）**：
+**已完成**：
 - `submit/route.ts` GET：加入 `website_specs(id, generated_at)` embed + sort DESC → `website_spec_id` 確定性取最新 spec（critic Major 同日折入）
 - `app/ops/onboarding/page.tsx` IntakeHistory：`status=spec_generated && website_spec_id` 顯示「觸發建站」按鈕 → POST `/api/onboarding/trigger-build {website_spec_id, intake_form_id}`；成功前端 status 改 building + "已排入 ✓"；失敗行內錯誤
-- tsc ✓（0 errors）；n8n bridge `RbrHNu3BUEmpNWeT` 已停用（不再衝突）
-**待做**：
-- **sg-deploy next-admin**（Phase 3 code 尚未推到 SG）
-- **生產驗收**：以公開 intake 筆 status=spec_generated → ops 頁點「觸發建站」→ building → ops_action_runs completed → staging curl 200
-**風險**：Low（code 已通 tsc；trigger-build 有 server-side CAS + quota gate；auth 走 ops session，按鈕在 /ops/ 路徑下）
+- sg-deploy c78a05c9（2026-07-04）：healthy 8s；4 smoke 端點 200；playwright smoke 26/26
+- 生產驗收（2026-07-04）：intake `5c0b0307` spec_generated → trigger-build → ok=true, completed, run `cdfe06f8` → https://aware-wave.com/staging/test-wp-webhook-co-5c1bd1/ curl 200 ✅
+**限制**：intake_forms status 在 `building` 後無 terminal 轉換（known gap；run=completed + site live = 實質完成）
 
 ### ✅ Stage 2 — Fluent Form → intake 橋接 + 中央 FluentCRM（DONE 2026-07-04）
 **目標**：公開 aware-wave.com 的 Fluent Form 收件 → 自動進 (a) app 的 intake_forms（含 AI 生規格）、(b) 中央 FluentCRM（做客戶關係）。

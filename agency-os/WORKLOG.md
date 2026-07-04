@@ -4,6 +4,48 @@
 
 ## 2026-07-04
 
+### fix(edge/wp-admin): 後台 Rate limit exceeded 根治 — Cloudflare + host Nginx 分層限流
+
+[任務理解] 使用者回報 `aware-wave.com/wp-admin/admin.php?page=fluent_forms_add_ons` 等後台操作常變成白底 `Rate limit exceeded`。要求不是單點加大 quota，而是在理解 Cloudflare / SG host Nginx / Docker Nginx / WordPress 管理端流量後，做最小、可驗證、可回滾的長期修復。
+
+[現況分析]
+- live path = Browser → Cloudflare → SG host Nginx `:443` → `lobster-wordpress:8080`；Docker `lobster-nginx` `default.conf` 仍服務 port 80 / 同構模板，但不是 HTTPS 主路徑。
+- Cloudflare rate-limit rule `b8ffa72df8d44ea78a09bd0ababf8abb` 原為全站 `>50 req / 10s`，只排除 `app.aware-wave.com` / `supabase.aware-wave.com`，未排除 WordPress 後台 burst。
+- SG host Nginx `aware-wave-phase1` 原在 `server {}` 層套 `limit_req zone=req_perip burst=50 nodelay`，導致 `/wp-admin/` 載入 Gutenberg / FluentCRM / LLAR 等大量 JS/CSS 時被同一個 public scanner bucket 誤傷。
+- REALROOT_CAUSE_EVIDENCE: SG `/var/log/nginx/access.log` 於 `2026-07-04 00:51:40 UTC` 有同一操作者 IPv6 對 `/wp-includes/js/dist/*.js`、`/wp-content/plugins/fluent-crm/...`、LLAR CSS/font 等後台資產連續 `429 580`，referrer 為 `/wp-admin/`。
+
+[已修改]
+- `lobster-factory/infra/hetzner-phase1-core/nginx/aware-wave-security.conf`：新增 host Nginx location-level zones：`wp_login 5r/m`、`wp_admin 120r/s`、`wp_assets 120r/s`；保留 `req_perip 30r/s` 與 `conn_perip 50`。
+- `nginx/system-sites/aware-wave-phase1.conf`：移除 server-level 全站 `limit_req`，改由 location snippets 套用。
+- `nginx/system-sites/lobster-aware-wave-locations.inc`：新增 `wp-login.php` 嚴格限流；`/wp-admin/`、`/wp-json/`、`/wp-content/`、`/wp-includes/` 改獨立高 burst bucket；公開 fallback `/` 保留 `req_perip burst=50`。
+- `nginx/default.conf`：同步 Docker Nginx 模板，移除 `/wp-admin/` 誤用 `wplogin 5r/m`，新增 `wpadmin/wpasset 120r/s`。
+- Cloudflare live rule `b8ffa72df8d44ea78a09bd0ababf8abb`：保留 enabled/block + 50/10s，expression 新增排除 `aware-wave.com` / `www.aware-wave.com` 的 `/wp-admin`, `/wp-admin/*`, `/wp-json/*`, `/wp-content/*`, `/wp-includes/*`；不排除 `/wp-login.php`。
+- `scripts/check-cloudflare-security.ps1` + `agency-os/reports/status/cf-security-LATEST.md`：新增 scanner-flood rate-limit rule 與 WP admin carve-out 檢查。
+- `runbooks/CLOUDFLARE-WAF-SETUP.md`：補 rate-limit carve-out policy（檔案既有亂碼，採末尾 ASCII section，避免碰舊內容）。
+
+[部署 / 回滾點]
+- CF backup: `D:\tmp\wp-admin-rate-limit-20260704-093901\cf-rate-limit-ruleset-before.json` + `cf-rate-limit-rule-before.json`。
+- SG backup: `/root/nginx-backups/wp-admin-rate-limit-20260704-093901/`（`aware-wave-phase1.before`、`lobster-aware-wave-locations.inc.before`、`aware-wave-security.conf.before`、`docker-default.conf.before`）。
+- live deployed SHA: `aware-wave-security.conf=142f5f1c...`、`aware-wave-phase1=c59788d...`、`lobster-aware-wave-locations.inc=c26e82e...`、Docker `default.conf=4ebed95...`。
+
+[驗證結果]
+- REALTEST_EVIDENCE: `nginx -t` + `docker exec lobster-nginx nginx -t` PASS；host Nginx reload + Docker Nginx reload PASS。
+- REALTEST_EVIDENCE: Cloudflare API readback PASS — rule enabled=True, action=block, period=10, requests=50, expression 含 WP admin carve-outs。
+- REALTEST_EVIDENCE: `scripts/check-cloudflare-security.ps1 -WorkRoot D:\Work` → PASS；report 顯示 Bot Fight ON、scanner flood rate-limit enabled/block、WP admin carve-outs present、Origin Lockdown active。
+- REALTEST_EVIDENCE: curl smoke — `/` 200；`/wp-login.php` 200；`/wp-admin/admin.php?page=fluent_forms_add_ons` 302；`/wp-admin/admin-ajax.php` 400；`/wp-json/` 200；`/wp-includes/js/dist/components.min.js` 200；LLAR stylesheet 200；`/xmlrpc.php` 403；`/.aws/credentials` 403。
+- REALTEST_EVIDENCE: burst test from operator IP — 80 concurrent requests each to `/wp-includes/js/dist/components.min.js`, LLAR stylesheet, and `/wp-json/` all returned `200=80`; no 429.
+- REALTEST_EVIDENCE: SG log check after deploy window (`2026-07-04 01:40-01:59 UTC`) — no `/wp-admin|wp-includes|wp-content|wp-json` 429 and no general 429 in that window.
+
+[剩餘風險]
+- 操作者仍需在瀏覽器真後台操作一次確認 UX；server-side evidence 已證明原 429 source eliminated for admin/assets/REST.
+- `runbooks/CLOUDFLARE-WAF-SETUP.md` 既有 encoding drift 未在本任務整修；本次只追加 ASCII policy，避免擴大風險。
+
+[rollback]
+- Cloudflare：PUT/PATCH 回 `D:\tmp\wp-admin-rate-limit-20260704-093901\cf-rate-limit-rule-before.json` 的 expression/rule。
+- SG host Nginx：從 `/root/nginx-backups/wp-admin-rate-limit-20260704-093901/` 還原 3 檔 → `nginx -t && systemctl reload nginx`。
+- Docker Nginx：還原 `docker-default.conf.before` 到 `/root/lobster-phase1/nginx/default.conf` → `docker exec lobster-nginx nginx -t && docker exec lobster-nginx nginx -s reload`。
+- repo：revert 本次 7 檔與 cf-security report 更新。
+
 ### feat(onboarding): Phase 2 — ONBOARDING_PUBLIC_INTAKE_TOKEN SG 部署 + intake-public endpoint 啟用
 
 [已修改]
@@ -124,12 +166,15 @@
 [驗證結果]
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=8000 — 0 type errors
 - REALTEST_EVIDENCE: tool=Bash | cmd=n8n POST /deactivate RbrHNu3BUEmpNWeT | exit=0 | ms=500 — active=False ✓
+- REALTEST_EVIDENCE: tool=SSH | cmd=bash /root/lobster-phase1/scripts/sg-deploy.sh next-admin | exit=0 | ms=420000 — deployed c78a05c9；healthy 8s；smoke /login 200 / /api/ops/summary 200 / nginx 200 / node-api 200 all OK
+- REALTEST_EVIDENCE: tool=SSH | cmd=playwright smoke | exit=0 | ms=24400 — 26 passed / 0 failed / 6 skipped（auth-gated）
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl trigger-build intake=5c0b0307 spec=a1f24214 (sync-key, server-side) | exit=0 | ms=280000 — ok=true, build_status=completed, run_id=cdfe06f8；stagingSiteUrl=https://aware-wave.com/staging/test-wp-webhook-co-5c1bd1/ curl 200 (1.3s)；intake status=building ✓（Stage 1 prod verify PASS）
 - REVIEW_DONE: critic=Standard | verdict=pass/warn | findings=0c/1m/2n — 1 Major（website_spec_id 非確定性取 [0]：generated_at 加進 embed + sort DESC 已同日折入修 submit/route.ts:38,52）；2 Minor（triggering string→Set、optimistic "building" 不反映 failed build）接受延後（server CAS + ops-only UI，有界風險）
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=website_spec_id,handleRowTrigger | hits=4 (agency-os docs/WORKLOG 歷史引用；lobster-factory 僅在 3 個直接修改檔案；scripts 0 hits)；IntakeHistoryItem 無跨檔引用
 
 [剩餘風險]
-- `triggering` state 為 string|null（非 Set）→ 同時點兩行時，第二行覆蓋 triggering，第一行按鈕重新啟用（double-fire 可能）；trigger-build 是冪等的（同 website_spec_id 重複呼叫不壞），ops-only UI，風險低
-- sg-deploy Phase 3 code 尚未跑
+- `triggering` state 為 string|null（非 Set）→ 同時點兩行時可能 double-fire；trigger-build server CAS 防重建，ops-only UI，風險低
+- intake_forms `building` 後無 terminal 轉換（known gap，2026-07-04 WORKLOG 舊記錄）；run=completed + site live = 完整驗收
 
 [rollback] `git revert`（UI-only）；n8n 重新 activate：POST /api/v1/workflows/RbrHNu3BUEmpNWeT/activate
 
@@ -9282,4 +9327,3 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
 _Last synced: 2026-07-03 15:37:19 UTC_
-
