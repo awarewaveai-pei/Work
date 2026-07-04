@@ -4,6 +4,79 @@
 
 ## 2026-07-04
 
+### fix(repair-center): 修復 repair_runs_source_check 缺少 'deploy' — 所有 deploy incident 核准修復 409
+
+[任務理解]
+實測 /ops/repairs 「核准修復」功能時發現：佇列 3 個 deploy 來源 incident 全部 409 `repair_run_insert_failed`。根因：DB constraint `repair_runs_source_check` 建立時（0027）不含 `'deploy'`；0031 只更新了 `ops_incidents`，漏掉 `repair_runs`。
+
+[現況分析]
+- `0027_repair_runs.sql:13` 建表 CHECK 只有 6 值（無 deploy）
+- `0031_ops_incidents_deploy_source.sql` 修了 `ops_incidents` 但沒改 `repair_runs`
+- TypeScript `IncidentSource`、policy catalog、service.ts 全支援 deploy；只有 DB 缺
+- 實測確認 3 個佇列 incident 全為 source=deploy（browser DOM 抽取）
+
+[已修改]
+- `lobster-factory/packages/db/migrations/0059_repair_runs_add_deploy_source.sql`（新增）
+  - DROP CONSTRAINT repair_runs_source_check + ADD CONSTRAINT 含 'deploy'（7 值）
+  - NOTIFY pgrst 'reload schema'（同 0027 慣例）
+- Prod Supabase：SSH EU → `docker exec supabase-db psql -U supabase_admin` 直接套用
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=mcp__claude-in-chrome__javascript_tool | cmd=POST /api/ops/repairs {incident_id:e7eb7ad4-b848-487d-9389-ae063225e9e2} | exit=200 | ms=1790
+  - 回應：`{ok:true, source:"deploy", state:"human_only", policy:"human_only"}` ✅
+  - deploy policy = human_only，修復流程正確 park 到 human_only 狀態
+- REVIEW_DONE: critic=db-expert | verdict=pass | findings=0c/0m/0n
+  - DROP+ADD idempotent；ACCESS EXCLUSIVE lock 毫秒級；無失效 row
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=repair_runs_source_check | hits=4
+  - 0013/0027/0031/0059 全在 migration 檔，無 stale 宣告；scripts/ agency-os/ 無命中
+- BUGHUNT_WAIVED: NA -- constraint 名稱為 SQL DDL identifier，無 downstream consumer callsite
+
+
+
+### feat(onboarding): Phase 5 — Cloudflare Turnstile 接入（/intake 公開表單安全開門）
+
+[任務理解]
+Phase 4 建了 `/intake` 表單但用 `BROWSER_INTAKE_ENABLED` gate 鎖住（默認 OFF），待 Turnstile 接入後才能開放。本 Phase 完成 Turnstile captcha 接線，讓表單可安全對外開放。
+
+[現況分析]
+- Phase 4 commit `915245b0`：`intake-browser/route.ts` 存在，gate=OFF；`intake/page.tsx` 存在，無 captcha；`intake-form-steps.tsx` 存在，無 captcha slot
+- Phase 4 留下 TODO：「TURNSTILE_SECRET_KEY env → route 驗 token → 前端加 widget」
+- Critic Deep review 發現 1 Critical（gate OR 邏輯讓 `BROWSER_INTAKE_ENABLED=true` 無 secret 時開放，重開 DoS 向量）+ 2 Major（siteverify 無 timeout / 兩個 env var 不同步） + 3 minor，全修
+
+[已修改]
+- `app/api/onboarding/intake-browser/route.ts`：
+  - 加 `verifyTurnstileToken(token, remoteip)` helper（POST siteverify，5s AbortSignal.timeout，含 remoteip 強化 abuse 信號）
+  - Gate 邏輯修正（🔴 Critical fix）：`BROWSER_INTAKE_ENABLED` bypass 限制為 `NODE_ENV !== "production"`，prod 必須有 `TURNSTILE_SECRET_KEY` 才開門
+  - body type 加 `turnstile_token?: string`；secret 存在時驗 token，缺少→422 `captcha_required`，驗失→422 `captcha_failed`
+  - siteverify 加 `AbortSignal.timeout(5000)`（🟠 Major fix：防 CF 慢時漏斗全卡）
+  - siteverify 加 `remoteip`（🟡 Minor：強化防重放評分）
+- `lib/onboarding/intake-form-steps.tsx`：加 `turnstileSlot?: ReactNode` prop，在 step 5 fields 與 nav 之間插入 slot
+- `app/(public)/intake/page.tsx`：
+  - 加 `TurnstileAPI` 型別（含 `reset`）+ `getTurnstile()` helper
+  - 加 `turnstileToken` state + `turnstileContainerRef` + `turnstileWidgetId` refs
+  - Effect 1：一次載入 `api.js?render=explicit`（以 `id="cf-turnstile-api"` 防重複注入）
+  - Effect 2：step 5 進入時 `turnstile.render()`（輪詢等待 script 載完）；離開時 remove + reset token；`expired-callback` 呼叫 `turnstile.reset()` 讓 widget 自動恢復（🟡 Minor：防 8min 填表後 token 過期導致靜默 disabled）
+  - `handleSubmit` 加 captcha guard + `turnstile_token` 進 POST body
+  - `captcha_required`/`captcha_failed` 顯示明確中文錯誤訊息（🟠 Major fix：兩 env 不同步時有可讀提示）
+  - `disabled={hasSiteKey && !turnstileToken}` → submit 未通過驗證時鎖住
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~30000 — 0 type errors（全部修後再驗）
+- REALTEST_WAIVED: SMOKE_COVERED — 需 TURNSTILE_SECRET_KEY + NEXT_PUBLIC_TURNSTILE_SITE_KEY 真實 CF 金鑰才能 e2e 驗；開放前先 sg-deploy + Playwright smoke
+- REVIEW_DONE: critic=Deep | verdict=pass（Critical gate-logic regression + 2 Major + 3 minor 全修）| findings=1c/2M/3m/2s applied=1c+2M+3m, deferred=2s（minor suggestions：remoteip done, script id guard done）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=intake-browser|BROWSER_INTAKE_ENABLED|TURNSTILE | hits=expected（route.ts + page.tsx 改動正確；middleware.ts exclusion 未動；WORKLOG stale refs 歷史記錄）
+- BUGHUNT_WAIVED: scope narrow note — `agency-os/scripts` 無 TURNSTILE 引用，排除合理
+
+[剩餘風險]
+- 需真實 CF Turnstile keys（SITE_KEY + SECRET_KEY）才能開啟；目前仍回 `coming_soon` 503
+- Rate-limit Major-1（insert-then-ordinal 非原子）仍存在，Phase 4 記錄技術債；高並發前遷 PG RPC
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY`（前端）+ `TURNSTILE_SECRET_KEY`（後端）必須配對設定；一缺一表單爛掉或無 captcha
+
+[rollback]
+- `git revert <this-commit>`；tsc 確認再 sg-deploy；Phase 4 的 gate 自動恢復 OFF 狀態
+
+---
+
 ### feat(onboarding): Phase 4 — 公開 /intake 表單 + route group 重構 + critic 安全閉環
 
 [任務理解]

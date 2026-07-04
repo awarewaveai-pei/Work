@@ -32,8 +32,9 @@ export default function PublicIntakePage() {
   useEffect(() => {
     const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
     if (!siteKey) return;
-    if (document.querySelector('script[src*="challenges.cloudflare.com/turnstile"]')) return;
+    if (document.getElementById("cf-turnstile-api")) return;
     const script = document.createElement("script");
+    script.id = "cf-turnstile-api";
     script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
     script.async = true;
     document.head.appendChild(script);
@@ -55,7 +56,11 @@ export default function PublicIntakePage() {
       turnstileWidgetId.current = ts.render(turnstileContainerRef.current, {
         sitekey: siteKey,
         callback: (token: string) => setTurnstileToken(token),
-        "expired-callback": () => setTurnstileToken(null),
+        "expired-callback": () => {
+          setTurnstileToken(null);
+          const cur = turnstileWidgetId.current;
+          if (cur != null) try { getTurnstile()?.reset(cur); } catch { /* ignore */ }
+        },
         "error-callback": () => setTurnstileToken(null),
       });
       return true;
@@ -149,6 +154,11 @@ export default function PublicIntakePage() {
       if (res.status === 429) {
         const wait = data.retry_after_seconds ? `請 ${Math.ceil(data.retry_after_seconds / 60)} 分鐘後再試。` : "";
         setError(`目前提交次數較多，${wait}`);
+        setFlow("error");
+        return;
+      }
+      if (data.error === "captcha_required" || data.error === "captcha_failed") {
+        setError("人機驗證未通過，請重新完成驗證後提交");
         setFlow("error");
         return;
       }
