@@ -441,9 +441,29 @@ export async function POST(request: Request) {
   let finalStatus: "completed" | "failed" = "failed";
   let errorSummary: string | null = null;
 
+  // Retry wrapper for transient Docker/network failures (e.g. Docker daemon "context canceled"
+  // during image GC). Two retries with linear back-off; last error is rethrown.
+  // Per-attempt timeout (110s) stays under provision-staging's maxDuration=120s and leaves
+  // retry budget within the nginx proxy_read_timeout=300s window.
+  async function fetchWithRetry(url: URL, init: RequestInit, retries = 2): Promise<Response> {
+    for (let i = 0; i <= retries; i++) {
+      try {
+        return await fetch(url, { ...init, signal: AbortSignal.timeout(110_000) });
+      } catch (e) {
+        if (i === retries) throw e;
+        await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+      }
+    }
+    throw new Error("unreachable");
+  }
+
   try {
-    const provisionEndpoint = new URL("/api/internal/hosting/provision-staging", request.url);
-    const provisionRes = await fetch(provisionEndpoint, {
+    // Use internal Docker service name (http://next-admin:3000) instead of the public URL so
+    // the provision call stays within the Docker network. Calling via https://app.aware-wave.com
+    // creates a Cloudflare hairpin (container → CF → server → container) which is fragile under
+    // transient Docker-daemon network events. Root cause of 2026-07-04 fetch failed failure.
+    const provisionEndpoint = new URL("/api/internal/hosting/provision-staging", "http://next-admin:3000");
+    const provisionRes = await fetchWithRetry(provisionEndpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -475,7 +495,7 @@ export async function POST(request: Request) {
     errorSummary = provisionRes.ok ? null : String(provision.detail ?? provision.error ?? `HTTP ${provisionRes.status}`).slice(0, 500);
 
     if (provisionRes.ok && typeof provision.wpRootPath === "string") {
-      const seedRes = await fetch(provisionEndpoint, {
+      const seedRes = await fetchWithRetry(provisionEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -521,6 +541,16 @@ export async function POST(request: Request) {
       },
     })
     .eq("id", runId);
+
+  // On failure, roll intake_form back to spec_generated so the user can retry without
+  // contacting support. Without this, status stays at "building" forever (CAS guard blocks
+  // re-entry). The org/ws/project/site records are preserved for idempotent re-use.
+  if (finalStatus === "failed") {
+    await supabase
+      .from("intake_forms")
+      .update({ status: "spec_generated" })
+      .eq("id", intake_form_id);
+  }
 
   return NextResponse.json({
     ok: true,
