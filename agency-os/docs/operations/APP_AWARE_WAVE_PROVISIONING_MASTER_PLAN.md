@@ -81,7 +81,8 @@ aware-wave.com (WP)            app.aware-wave.com (Next.js 15)
 | 能力 | 狀態 | 證據 |
 |---|---|---|
 | 有 pending run → 建真 staging WP → 狀態 completed | ✅ **已驗證** | 2026-06-06 e2e run `655197bf` completed + curl 200（WORKLOG）|
-| 客戶填表 → 自動生出那個 pending run | ❌ **未通** | 2 筆 intake_forms 卡 `spec_generated`，0 run（症狀：按「觸發建站」跳回第一步）|
+| **submit → generate-spec → trigger-build 全鏈自動建站（local_direct，不靠 Trigger.dev）** | ✅ **生產已驗**（2026-07-04）| e2e：submit 201 → spec 201（Claude 生成）→ trigger-build `local_direct` build_status=completed run `d21ab292`（~230s）→ https://aware-wave.com/staging/e2e-verify-0704-6e2b91/ curl 200 + seed 內容 + AI hero 圖。`bd135952` local_direct + 4 個 UI 吞錯修復（WORKLOG 2026-07-04）已 deploy `f9172be2`。⚠️ 限制：瀏覽器 UI 走 CF 的外層 request 會被 ~100s 上限切斷（建站仍完成，UI 拿不到回應）→ same-host worker 為 follow-up |
+| ~~客戶填表 → 自動生出那個 pending run~~（已被 local_direct 取代：run 直接 running→completed，不經 pending）| ✅ 已通 | 同上；舊症狀「跳回第一步」前端 bug 已修（1c70853e + 2026-07-04 handleSubmit 硬化）|
 | Fluent Form（公開 WP）→ intake 橋接 | 🟡 n8n 端已建+e2e 驗 | workflow `RbrHNu3BUEmpNWeT`（2026-07-03）；WP 端 Fluent Forms 未裝，表單+webhook feed 待建 |
 | 中央 FluentCRM（收客資料進 CRM）| ❌ 未做 | — |
 | AI 自動報價 | ❌ 未做 | — |
