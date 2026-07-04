@@ -1,3 +1,6 @@
+-- safe_to_auto_apply: true
+-- reason: ADD COLUMN IF NOT EXISTS (nullable, no default) + partial index IF NOT EXISTS + NOTIFY pgrst.
+--         All operations are metadata-only, idempotent, and carry no hard-block patterns.
 -- Storm correlation (Auto-Repair A3, 2026-07-03).
 -- One outage fires uptime_kuma + sentry + netdata as separate incidents.
 -- parent_incident_id links later siblings to the earliest open incident in the

@@ -124,6 +124,16 @@ if [[ $SKIP_PULL -eq 0 ]]; then
     exec "$_staging_scripts/sg-deploy.sh" "${_reexec[@]}"
   fi
   log "deploy scripts synced"
+
+  # 1.7. auto-apply safe migrations (after script sync so classifier is fresh from git).
+  #      Fail-open: non-zero exit is logged but does not abort deploy.
+  if [[ -x "$_staging_scripts/auto-apply-safe-migrations.sh" ]]; then
+    log "--- auto-apply safe migrations ---"
+    bash "$_staging_scripts/auto-apply-safe-migrations.sh" 2>&1 | tee -a "$LOG_FILE" || \
+      log "WARN: auto-apply-safe-migrations.sh exited non-zero (fail-open; deploy continues)"
+  else
+    log "WARN: auto-apply-safe-migrations.sh not found in $_staging_scripts (will sync on next pull)"
+  fi
 fi
 
 # 2. rsync each app

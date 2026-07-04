@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+# auto-apply-safe-migrations.sh — auto-apply SAFE migrations from the repo.
+#
+# Called by sg-deploy.sh (Step 1.7) after git pull and script self-sync.
+# Fail-open: any unexpected error logs a warning and exits 0 so the deploy
+# continues regardless.
+#
+# State file: /root/lobster-phase1/.migration-state
+#   Plain text, one applied migration number per line.
+#   Bootstrap: if absent on first run, seeds 1–57 (known-applied baseline).
+#
+# Prerequisites (one-time, human-side):
+#   Add SUPABASE_AWAREWAVE_POSTGRES_DSN to /root/lobster-phase1/.env
+#   Value: Supabase Dashboard → Settings → Database → Connection string (Direct,
+#   not Pooler — Direct mode supports SET session vars and NOTIFY).
+#
+# Options:
+#   --dry-run   classify and report without running psql or mutating state
+
+set -uo pipefail
+
+STAGING_DIR="${STAGING_DIR:-/root/lobster-phase1}"
+REPO_DIR="${REPO_DIR:-/root/Work}"
+MIGRATIONS_DIR="$REPO_DIR/lobster-factory/packages/db/migrations"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+STATE_FILE="$STAGING_DIR/.migration-state"
+ENV_FILE="$STAGING_DIR/.env"
+DRY_RUN=0
+[[ "${1:-}" == "--dry-run" ]] && DRY_RUN=1
+
+ts()  { date -u +%Y-%m-%dT%H:%M:%SZ; }
+log() { echo "[$(ts)] auto-apply-migrations: $*"; }
+
+# ─── Fail-open trap ──────────────────────────────────────────────────────────
+trap 'log "UNEXPECTED ERROR (line $LINENO) — auto-apply skipped (fail-open)"; exit 0' ERR
+
+[[ "$DRY_RUN" -eq 1 ]] && log "DRY-RUN mode — classify only, no psql, no state writes"
+
+# ─── Resolve DSN ─────────────────────────────────────────────────────────────
+DSN=""
+if [[ -f "$ENV_FILE" ]]; then
+  DSN=$(grep -E '^SUPABASE_AWAREWAVE_POSTGRES_DSN=' "$ENV_FILE" \
+        | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
+fi
+
+if [[ -z "$DSN" && "$DRY_RUN" -eq 0 ]]; then
+  log "WARN: SUPABASE_AWAREWAVE_POSTGRES_DSN not set in $ENV_FILE"
+  log "WARN: Add it (Supabase > Settings > Database > Connection string, Direct mode)"
+  log "WARN: Auto-apply skipped until DSN is configured"
+  _send_telegram "⚠️ Migration auto-apply: SUPABASE_AWAREWAVE_POSTGRES_DSN missing in SG .env\nSet the Direct Postgres DSN to enable automatic migration apply."
+  exit 0
+fi
+
+# ─── Bootstrap state file ────────────────────────────────────────────────────
+if [[ ! -f "$STATE_FILE" ]]; then
+  log "No state file — bootstrapping with migrations 1-57 (known-applied baseline)"
+  seq 1 57 > "$STATE_FILE"
+fi
+
+declare -A APPLIED
+while IFS= read -r n; do
+  [[ "$n" =~ ^[0-9]+$ ]] && APPLIED["$n"]=1
+done < "$STATE_FILE"
+
+# ─── Discover unapplied migrations ───────────────────────────────────────────
+SAFE_FILES=()
+DANGEROUS_FILES=()
+
+while IFS= read -r f; do
+  base=$(basename "$f")
+  num="${base%%_*}"
+  [[ "$num" =~ ^[0-9]+$ ]] || continue
+  n=$((10#$num))
+  [[ "${APPLIED[$n]+set}" == "set" ]] && continue  # already applied
+
+  if bash "$SCRIPT_DIR/classify-migration.sh" "$f" >/dev/null 2>&1; then
+    SAFE_FILES+=("$f")
+  else
+    reason=$(bash "$SCRIPT_DIR/classify-migration.sh" "$f" 2>&1 | head -1 || echo "classified DANGEROUS")
+    DANGEROUS_FILES+=("$base: $reason")
+    log "DANGEROUS: $base — $reason"
+  fi
+done < <(ls "$MIGRATIONS_DIR"/[0-9][0-9][0-9][0-9]_*.sql 2>/dev/null | sort)
+
+log "Pending: ${#SAFE_FILES[@]} safe, ${#DANGEROUS_FILES[@]} dangerous"
+
+# ─── Telegram helper ─────────────────────────────────────────────────────────
+_send_telegram() {
+  local msg="$1"
+  local token chat_id
+  token=$(grep -E '^TELEGRAM_BOT_TOKEN=' "$ENV_FILE" 2>/dev/null \
+          | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
+  chat_id=$(grep -E '^TELEGRAM_ALLOWED_CHAT_IDS=' "$ENV_FILE" 2>/dev/null \
+            | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" | cut -d',' -f1 | tr -d ' ' || true)
+  [[ -z "$token" || -z "$chat_id" ]] && return 0
+  local payload
+  payload=$(TGCID="$chat_id" TGMSG="$msg" python3 -c \
+    'import json,os; print(json.dumps({"chat_id":os.environ["TGCID"],"text":os.environ["TGMSG"],"disable_web_page_preview":True}))' \
+    2>/dev/null || true)
+  [[ -z "$payload" ]] && return 0
+  curl -sS -o /dev/null -X POST -H "Content-Type: application/json" \
+    --data "$payload" \
+    "https://api.telegram.org/bot${token}/sendMessage" 2>/dev/null || true
+}
+
+# ─── Alert on DANGEROUS migrations ───────────────────────────────────────────
+if [[ "${#DANGEROUS_FILES[@]}" -gt 0 ]]; then
+  msg="⚠️ Migration auto-apply: ${#DANGEROUS_FILES[@]} migration(s) require human review"$'\n'
+  for entry in "${DANGEROUS_FILES[@]}"; do
+    msg+="  • $entry"$'\n'
+    log "Human required: $entry"
+  done
+  msg+=$'\n'"Apply manually: psql \"\$SUPABASE_AWAREWAVE_POSTGRES_DSN\" -f <file>"
+  _send_telegram "$msg"
+fi
+
+# ─── Apply SAFE migrations ────────────────────────────────────────────────────
+APPLIED_NOW=()
+FAILED_APPLY=()
+
+for f in "${SAFE_FILES[@]}"; do
+  base=$(basename "$f")
+  num="${base%%_*}"
+  n=$((10#$num))
+  log "Applying: $base"
+
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "  DRY-RUN: skipping psql for $base"
+    continue
+  fi
+
+  if psql "$DSN" -v ON_ERROR_STOP=1 -q -f "$f" 2>&1 | \
+       while IFS= read -r line; do log "  psql: $line"; done; then
+    echo "$n" >> "$STATE_FILE"
+    APPLIED["$n"]=1
+    APPLIED_NOW+=("$base")
+    log "  OK: $base applied"
+  else
+    FAILED_APPLY+=("$base")
+    log "  FAIL: $base — psql error, left for human review"
+  fi
+done
+
+# ─── Summary notification ─────────────────────────────────────────────────────
+if [[ "${#APPLIED_NOW[@]}" -gt 0 ]]; then
+  msg="✅ Migration auto-apply: ${#APPLIED_NOW[@]} migration(s) applied successfully"$'\n'
+  for entry in "${APPLIED_NOW[@]}"; do
+    msg+="  • $entry"$'\n'
+  done
+  [[ "${#FAILED_APPLY[@]}" -gt 0 ]] && msg+="⚠️ Failed: ${FAILED_APPLY[*]}"
+  _send_telegram "$msg"
+  log "Applied: ${APPLIED_NOW[*]}"
+fi
+
+if [[ "${#FAILED_APPLY[@]}" -gt 0 ]]; then
+  log "WARN: ${#FAILED_APPLY[@]} migration(s) failed to apply — human review required"
+  msg="❌ Migration auto-apply FAILED: ${FAILED_APPLY[*]}"$'\n'"Check SG VPS auto-deploy.log"
+  _send_telegram "$msg"
+fi
+
+[[ "${#SAFE_FILES[@]}" -eq 0 && "${#DANGEROUS_FILES[@]}" -eq 0 ]] && \
+  log "All migrations up to date"
+
+exit 0

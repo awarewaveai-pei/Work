@@ -4,6 +4,36 @@
 
 ## 2026-07-04
 
+### feat(auto-repair): 安全的 Migration 自動套用 (B)
+
+[任務理解] 全自動修復系統最後一塊人工環節。目標：additive/idempotent migrations 在每次 sg-deploy 自動套用；destructive migrations 永遠擋下並送 Telegram 告警。分類器採 conservative whitelist（兩閘：annotation + hard-block）。
+
+[現況分析] 59 個 migrations；0001–0057 已全部手動 apply；現有 apply pattern 從開發機跑，SG VPS 無自動化流程。sg-deploy.sh 已有 self-sync 機制（Step 1.8），可在 git pull 後自動更新腳本。
+
+[已修改]
+- `lobster-factory/infra/hetzner-phase1-core/scripts/classify-migration.sh`（新增）：兩閘分類器。Gate 1：`-- safe_to_auto_apply: true` annotation 必須存在；Gate 2：six hard-block regex 模式（DROP TABLE / TRUNCATE / DROP COLUMN / ALTER TYPE / bare UPDATE / bare DELETE）無法被 annotation 覆蓋。Exit 0=SAFE, 1=DANGEROUS。
+- `lobster-factory/infra/hetzner-phase1-core/scripts/auto-apply-safe-migrations.sh`（新增）：runner。Bootstrap 狀態檔（1-57 baseline）→ 發現 unapplied → classify → psql apply（SAFE）/ Telegram 告警（DANGEROUS / apply 失敗）。STAGING_DIR/REPO_DIR env-overridable for testing。Fail-open（trap ERR → exit 0）。
+- `lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh`：Step 1.7 — git pull 後、self-sync 後、typecheck 前，呼叫 auto-apply-safe-migrations.sh（fail-open）。
+- `lobster-factory/packages/db/migrations/0058_ops_incidents_parent_incident.sql`：加 `-- safe_to_auto_apply: true` annotation（ADD COLUMN IF NOT EXISTS + CREATE INDEX IF NOT EXISTS + NOTIFY pgrst — 全部 idempotent）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=classify-migration.sh 0058 | exit=0 (SAFE) | ms=50
+- REALTEST_EVIDENCE: tool=Bash | cmd=classify-migration.sh 0057 (no annotation) | exit=1 (DANGEROUS) | ms=50
+- REALTEST_EVIDENCE: tool=Bash | cmd=classify-migration.sh mock-DROP TABLE (annotated) | exit=1 (DANGEROUS, hard-block override) | ms=50
+- REALTEST_EVIDENCE: tool=Bash | cmd=auto-apply-safe-migrations.sh --dry-run | exit=0 | finds 1 SAFE (0058), bootstrap=57 lines | ms=1200
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash -n on all 3 scripts | exit=0 (syntax OK)
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3major/3minor — 0 Critical; 3 Major all folded (_send_telegram before DSN, --single-transaction, multiline-aware normalization+flock+ALTER TYPE); 3 Minor folded (tr -d '\r', single classify capture, quoted-table UPDATE anchor)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=safe_to_auto_apply | hits=2 (0058 sql + classify-migration.sh) | expected
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=classify-migration\|auto-apply-safe-migrations | hits=6 (sg-deploy.sh call site + auto-apply self-ref + WORKLOG entries) | all expected, no stale refs
+
+[剩餘風險]
+- 一次性人工：SUPABASE_AWAREWAVE_POSTGRES_DSN 需要加到 SG VPS /root/lobster-phase1/.env（Direct Postgres DSN，不是 Pooler）。未設 → fail-open + Telegram warn，不影響 deploy。
+- 0058 尚未人工 apply（原計畫）。現在有了 annotation，只要 DSN 設好，下次 sg-deploy 會自動 apply。
+- `psql` 需要在 SG VPS 可用（標準 postgres-client 套件）。
+
+[rollback] 移除 auto-apply-safe-migrations.sh / classify-migration.sh；在 sg-deploy.sh 刪 Step 1.7 block；無 DB 影響（state file 在 VPS 本地）。
+
+
 ### feat(onboarding): FluentForm 雙寫管道 Phase 1 — coerce helper + middleware 公開路徑 + MCP wordpress 停用
 
 [任務理解] 接上 session：FluentForm（WP側）→ Supabase `intake_forms`（app側）雙寫 Plan A。三個 code gap：①middleware 缺 intake-public 公開路徑 ②submit route 有 coerce 但 intake-public 沒有 ③coerce 邏輯重複。同時修 WordPress MCP ERR_INVALID_URL。
