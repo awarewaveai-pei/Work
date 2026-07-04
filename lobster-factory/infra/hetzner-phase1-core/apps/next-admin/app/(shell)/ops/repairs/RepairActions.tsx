@@ -11,12 +11,32 @@ interface Props {
   runState?: string;
   canEscalate?: boolean;
   archivedAt?: string | null;
+  /** policy from the incident's source — shows "已知悉" instead of "核准修復" for human_only */
+  policy?: string;
 }
 
-export function RepairActions({ canAct, mode, incidentId, runId, runState, canEscalate, archivedAt }: Props) {
+export function RepairActions({ canAct, mode, incidentId, runId, runState, canEscalate, archivedAt, policy }: Props) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [ok, setOk] = useState<boolean | null>(null);
+
+  async function acknowledge() {
+    if (!incidentId) return;
+    if (!confirm("確認已知悉此事件？事件將標記為已解決並從佇列移除，不會建立修復流程。")) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/ops/inbox/${incidentId}/acknowledge`, { method: "POST" });
+      const json = await res.json();
+      setOk(json.ok === true);
+      setMsg(json.ok ? "已知悉。事件已從佇列移除。" : `失敗：${json.error ?? "未知錯誤"}`);
+    } catch (e) {
+      setOk(false);
+      setMsg((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function start() {
     if (!incidentId) return;
@@ -198,9 +218,15 @@ export function RepairActions({ canAct, mode, incidentId, runId, runState, canEs
   return (
     <div style={{ display: "grid", gap: 8, justifyItems: "end", minWidth: 144 }}>
       {mode === "start" ? (
-        <button type="button" className="btn-primary" disabled={busy} onClick={start}>
-          {busy ? "啟動中..." : "核准修復"}
-        </button>
+        policy === "human_only" ? (
+          <button type="button" className="btn-secondary" disabled={busy} onClick={acknowledge}>
+            {busy ? "處理中..." : "已知悉"}
+          </button>
+        ) : (
+          <button type="button" className="btn-primary" disabled={busy} onClick={start}>
+            {busy ? "啟動中..." : "核准修復"}
+          </button>
+        )
       ) : (
         <>
           {btns!.addPr && (
