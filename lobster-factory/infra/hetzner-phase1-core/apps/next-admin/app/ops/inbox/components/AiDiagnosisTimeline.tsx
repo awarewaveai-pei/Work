@@ -9,7 +9,16 @@ export function AiDiagnosisTimeline({ diagnoses }: { diagnoses: Incident["ai_dia
         {diagnoses.map((d, idx) => (
           <li key={`${d.created_at}-${idx}`} style={{ marginBottom: 8 }}>
             <strong>{d.provider}</strong> · {d.role} · {new Date(d.created_at).toLocaleString()}
-            <div style={{ color: "var(--text-secondary)" }}>{d.summary}</div>
+            {d.role === "evidence" ? (
+              // The evidence bundle can be ~6000 chars — collapse it so the
+              // timeline stays readable; the full text is available on expand.
+              <details style={{ color: "var(--text-secondary)", marginTop: 2 }}>
+                <summary style={{ cursor: "pointer" }}>系統自動蒐證（點開查看）</summary>
+                <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, marginTop: 4 }}>{d.summary}</pre>
+              </details>
+            ) : (
+              <div style={{ color: "var(--text-secondary)" }}>{d.summary}</div>
+            )}
           </li>
         ))}
       </ul>

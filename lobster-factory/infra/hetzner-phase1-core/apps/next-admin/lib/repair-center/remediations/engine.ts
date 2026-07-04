@@ -52,11 +52,17 @@ async function resolveOrgId(supabase: SupabaseClient, incident: Incident): Promi
 }
 
 async function inCooldown(supabase: SupabaseClient, incident: Incident, key: string): Promise<boolean> {
+  // Keyed on the target SERVICE, not the incident fingerprint: a flapping
+  // monitor that varies its title (cert-expiry countdowns, changing messages)
+  // would mint new fingerprints and dodge a fingerprint-keyed cooldown. The
+  // service is what we actually restart, so it is the correct throttle unit.
+  const service = incident.service?.trim();
+  if (!service) return false; // no service → nothing to throttle (matcher won't fire anyway)
   const since = new Date(Date.now() - REMEDIATION_COOLDOWN_MS).toISOString();
   const { data, error } = await supabase
     .from("ops_action_runs")
     .select("id")
-    .contains("metadata", { action_key: `ops.remediation.${key}`, incident_fingerprint: incident.fingerprint })
+    .contains("metadata", { action_key: `ops.remediation.${key}`, remediation_service: service })
     .gte("started_at", since)
     .limit(1);
   if (error) return false; // fail-open toward attempting — precheck still guards reality
@@ -103,6 +109,7 @@ export async function tryRemediate(
       },
       metadata: {
         incident_fingerprint: incident.fingerprint,
+        remediation_service: incident.service?.trim() ?? null,
         client_slug: incident.client_slug ?? null,
         source: opts.mode === "auto" ? "auto_remediate" : "manual_remediate",
       },

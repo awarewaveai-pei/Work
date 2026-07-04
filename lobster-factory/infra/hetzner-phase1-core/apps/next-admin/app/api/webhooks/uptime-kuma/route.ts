@@ -11,7 +11,7 @@ import { verifyIngestSource } from "@/lib/ops-inbox/verifyIngestToken";
 import { readWebhookBody } from "@/lib/ops-inbox/readRequestBody";
 import { triggerAutoClassify } from "@/lib/ops-inbox/ai/triggerAutoClassify";
 import { dispatchNotifications } from "@/lib/ops-inbox/notify/dispatcher";
-import { tryRemediate, type RemediationOutcome } from "@/lib/repair-center/remediations/engine";
+import { tryRemediate } from "@/lib/repair-center/remediations/engine";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -67,17 +67,22 @@ export async function POST(req: Request) {
 
   // Auto-remediation (A2): deterministic allowlisted self-heal. No-ops unless
   // AUTO_REMEDIATE_ENABLED=true AND the service is in the whitelist AND the
-  // precheck confirms the container is actually broken. Fail-open — never
-  // affects ingest.
-  let remediation: RemediationOutcome | null = null;
+  // precheck confirms the container is actually broken. Fire-and-forget — the
+  // execute+settle+healthcheck window (~85s) must NOT block the ingest ack, or
+  // a storm would pin a Node request + live SSH session per DOWN webhook and
+  // Uptime-Kuma would time out and retry. This is a long-lived Node process
+  // (next start in Docker), so the floating promise runs to completion; a
+  // container restart mid-remediation leaves a "running" ops_action_runs row
+  // that the reaper closes. tryRemediate is internally fail-open.
   if (transition.kind === "new" || transition.kind === "reopened") {
-    remediation = await tryRemediate(supabase, upserted as Incident, { mode: "auto", actor: "webhook:uptime_kuma" });
+    void tryRemediate(supabase, upserted as Incident, { mode: "auto", actor: "webhook:uptime_kuma" }).catch(
+      (e) => Sentry.captureException(e),
+    );
   }
 
   return NextResponse.json({
     incident_id: upserted.id,
     transition: transition.kind,
     occurrence_count: upserted.occurrence_count,
-    ...(remediation?.attempted ? { remediation: { key: remediation.key, ok: remediation.ok } } : {}),
   });
 }

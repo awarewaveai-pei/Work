@@ -11,7 +11,6 @@ import { verifyIngestSource } from "@/lib/ops-inbox/verifyIngestToken";
 import { readWebhookBody } from "@/lib/ops-inbox/readRequestBody";
 import { triggerAutoClassify } from "@/lib/ops-inbox/ai/triggerAutoClassify";
 import { dispatchNotifications } from "@/lib/ops-inbox/notify/dispatcher";
-import { tryRemediate, type RemediationOutcome } from "@/lib/repair-center/remediations/engine";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -101,17 +100,14 @@ export async function POST(req: Request) {
     Sentry.captureException(e);
   }
 
-  // Auto-remediation (A2): flag-gated + whitelisted + precheck-proven.
-  // Fail-open — never affects ingest.
-  let remediation: RemediationOutcome | null = null;
-  if (transition.kind === "new" || transition.kind === "reopened") {
-    remediation = await tryRemediate(supabase, upserted as Incident, { mode: "auto", actor: "webhook:netdata" });
-  }
+  // No auto-remediation hook here: normalizeNetdata sets service=null (netdata
+  // alarms are host-level, not per-compose-service), so the restart remediation
+  // matcher can never fire on netdata. Wiring it would be dead code. Re-add once
+  // a netdata-alarm → compose-service mapping exists (follow-up).
 
   return NextResponse.json({
     incident_id: upserted.id,
     transition: transition.kind,
     occurrence_count: upserted.occurrence_count,
-    ...(remediation?.attempted ? { remediation: { key: remediation.key, ok: remediation.ok } } : {}),
   });
 }

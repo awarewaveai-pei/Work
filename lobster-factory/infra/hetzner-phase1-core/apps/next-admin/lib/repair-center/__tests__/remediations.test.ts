@@ -48,9 +48,16 @@ describe("restartUnhealthyContainer.matches — allowlist discipline", () => {
     else process.env.AUTO_REMEDIATE_SERVICE_WHITELIST = savedWhitelist;
   });
 
-  it("matches a whitelisted platform uptime_kuma/netdata production incident", () => {
+  it("matches a whitelisted platform uptime_kuma production incident", () => {
     expect(restartUnhealthyContainer.matches(baseIncident())).toBe(true);
-    expect(restartUnhealthyContainer.matches(baseIncident({ source: "netdata", signal_type: "resource" }))).toBe(true);
+  });
+
+  it("never matches netdata — its alarms are host-level (service=null in prod)", () => {
+    // Real netdata incidents have service=null (normalizeNetdata), so the
+    // matcher would never fire; the source guard makes that explicit.
+    expect(restartUnhealthyContainer.matches(baseIncident({ source: "netdata", signal_type: "resource", service: null }))).toBe(false);
+    // Even a (non-real) netdata incident carrying a whitelisted service is rejected by source.
+    expect(restartUnhealthyContainer.matches(baseIncident({ source: "netdata", signal_type: "resource" }))).toBe(false);
   });
 
   it("never matches client-scoped incidents (platform stack only)", () => {
@@ -70,6 +77,12 @@ describe("restartUnhealthyContainer.matches — allowlist discipline", () => {
     expect(restartUnhealthyContainer.matches(baseIncident({ source: "sentry", signal_type: "error" }))).toBe(false);
     expect(restartUnhealthyContainer.matches(baseIncident({ source: "deploy", signal_type: "deployment" }))).toBe(false);
     expect(restartUnhealthyContainer.matches(baseIncident({ environment: "staging" }))).toBe(false);
+  });
+
+  it("cooldown keys on service, so a null-service incident is never throttle-eligible", () => {
+    // (documents the engine.inCooldown early-return contract via the matcher:
+    // a matched incident always has a non-null whitelisted service)
+    expect(restartUnhealthyContainer.matches(baseIncident({ service: null }))).toBe(false);
   });
 
   it("rejects service names with shell metacharacters via the SERVICE_RE gate", () => {

@@ -70,7 +70,10 @@ export const restartUnhealthyContainer: Remediation = {
   matches(incident: Incident): boolean {
     if (incident.environment !== "production") return false;
     if (incident.client_slug) return false; // platform stack only
-    if (incident.source !== "uptime_kuma" && incident.source !== "netdata") return false;
+    // uptime_kuma only: it carries a per-service monitor name. netdata alarms
+    // are host-level (service=null) so they can never resolve to a compose
+    // service — supporting them here would be untestable dead code.
+    if (incident.source !== "uptime_kuma") return false;
     const svc = serviceOf(incident);
     return !!svc && whitelist().has(svc);
   },

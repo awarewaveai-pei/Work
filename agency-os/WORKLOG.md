@@ -15,9 +15,10 @@
 - 22 個新測試（evidence 純函式/collapse/reaper 述詞/remediation 白名單紀律與四段契約）
 
 [驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test (next-admin) | exit=0 | ms=7140（596/596，+22 新案例）
-- REVIEW_DONE: critic=Deep | verdict=pending-fold | findings=審查進行中，folding commit 隨後（本 entry 於折入後更新）
-- BUGHUNT_DONE: scope=lobster-factory agency-os scripts | grep=readSshTarget|sshExecOnce|summarizeIncidentWith|ai_diagnoses role 消費者|positiveIntEnv 殘留 | hits=全數核對 — backup/health route/evidence/remediations 共用 ssh.ts 單一定義；IncidentCard 只挑 auto-classify；無孤兒引用
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test (next-admin) | exit=0 | ms=6890（599/599，folding 後）
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/2m/6n — 2 Major 全折入：①remediation execute/settle/healthcheck 改 fire-and-forget（不再阻塞 webhook request path）②autoVerify 改 noteDeploySuccessOnPendingRuns（service-scoped deploy 不能證明 fix 已上 → 只註記不自動結案，人工按確認部署）；Minor 折入：cooldown 改以 service 為 key、netdata 死 hook 移除+matcher 限 uptime_kuma、reaper backing_up 改 12h 分層天花板、autoVerify limit 20→100、evidence timeline UI 折疊。critic 驗證乾淨：SSH 注入零風險（字元集閘）、健康容器無法被偽造告警重啟（precheck 實證）、storm 無鏈無環、Telegram 核准不繞閘、fail-open 全數成立、RLS/secrets 無洩漏
+- REVIEW_DONE: critic=db-expert | verdict=SAFE→fixed | findings=1c/2m/1n — Critical NOTIFY pgrst reload（up+down）+ lock_timeout 守衛全折入；RETURNS SETOF 故 RPC 無需重建
+- BUGHUNT_DONE: scope=lobster-factory agency-os scripts | grep=readSshTarget|sshExecOnce|summarizeIncidentWith|ai_diagnoses role 消費者|autoVerify|TRANSIENT_STATES|remediation_service | hits=全數核對 — backup/health route/evidence/remediations 共用 ssh.ts 單一定義；IncidentCard 只挑 auto-classify；rename 後無孤兒引用；test 鏡射同步
 - WORKLOG: 本 entry
 - 環境限制：dogfood-auto-repair.ps1 與 /doc-sync 需 pwsh（容器無）+ prod host 被 proxy 擋 → 工作站補跑；auto-repair-guard 機械閘 pre-check 以讀 audit baseline 替代
 
