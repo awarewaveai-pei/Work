@@ -4,6 +4,7 @@ import { timingSafeEqual } from "../../../../lib/ops-inbox/verifyIngestToken";
 import { getSupabaseWriteClient, getSupabaseServerClient } from "../../../../lib/supabase-server";
 import { effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "../../../../lib/tenant-guard";
 import type { IntakeForm } from "../../../../lib/onboarding/intake-form";
+import { coerceFluentFormPayload } from "../../../../lib/onboarding/coerce-fluent-form";
 
 // Auth: Supabase session (owner/admin/operator) OR server-to-server x-ops-sync-key.
 // Same dual-path pattern as trigger-build/route.ts — needed so n8n can POST here.
@@ -69,21 +70,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // Coerce FluentForm webhook strings → IntakeForm types.
-  // FluentForm sends "yes"/"no"/"true"/"1" for booleans; pages_needed may be comma-separated.
-  const TRUTHY = new Set(["yes", "true", "1", "on"]);
-  const toBool = (v: unknown): boolean => v === true || (typeof v === "string" && TRUTHY.has(v.toLowerCase()));
-  const form: IntakeForm = {
-    ...rawForm,
-    has_ecommerce: toBool(rawForm.has_ecommerce),
-    needs_crm: toBool(rawForm.needs_crm),
-    needs_booking: toBool(rawForm.needs_booking),
-    pages_needed: Array.isArray(rawForm.pages_needed)
-      ? rawForm.pages_needed
-      : typeof rawForm.pages_needed === "string"
-        ? (rawForm.pages_needed as string).split(",").map((s) => s.trim()).filter(Boolean) as IntakeForm["pages_needed"]
-        : [],
-  };
+  const form = coerceFluentFormPayload(rawForm as unknown as Record<string, unknown>);
 
   // primary_goal was DEPRECATED 2026-06-05 (removed from the intake form) — requiring it here
   // hard-failed every real UI submission with missing_required_fields. Validate the fields the

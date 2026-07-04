@@ -175,7 +175,8 @@
                                               }
                                   },
                     "wordpress":  {
-                                      "enabled":  true,
+                                      "enabled":  false,
+                                      "note":  "DISABLED: WP_API_URL env not set → ERR_INVALID_URL every session. Re-enable after setting WP_API_URL + WORDPRESS_JWT_TOKEN in user-env.ps1.",
                                       "transport":  "stdio",
                                       "command":  "cmd",
                                       "args":  [

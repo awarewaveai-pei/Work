@@ -66,19 +66,6 @@
                                                                    },
                                                            "command":  "powershell"
                                                        },
-                       "wordpress":  {
-                                         "args":  [
-                                                      "/c",
-                                                      "npx",
-                                                      "-y",
-                                                      "@automattic/mcp-wordpress-remote@latest"
-                                                  ],
-                                         "env":  {
-                                                     "JWT_TOKEN":  "${env:WORDPRESS_JWT_TOKEN}",
-                                                     "WP_API_URL":  "${env:WP_API_URL}"
-                                                 },
-                                         "command":  "cmd"
-                                     },
                        "n8n":  {
                                    "args":  [
                                                 "${workspaceFolder}\\scripts\\run-n8n-mcp.mjs"

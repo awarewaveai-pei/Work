@@ -4,6 +4,34 @@
 
 ## 2026-07-04
 
+### feat(onboarding): FluentForm 雙寫管道 Phase 1 — coerce helper + middleware 公開路徑 + MCP wordpress 停用
+
+[任務理解] 接上 session：FluentForm（WP側）→ Supabase `intake_forms`（app側）雙寫 Plan A。三個 code gap：①middleware 缺 intake-public 公開路徑 ②submit route 有 coerce 但 intake-public 沒有 ③coerce 邏輯重複。同時修 WordPress MCP ERR_INVALID_URL。
+
+[已修改]
+- `lib/onboarding/coerce-fluent-form.ts`（新增）：FluentForm 字串型別強制轉換共用 helper + **allow-list**（critic Major：原 spread `...raw` 會把所有攻擊者欄位帶進 DB 和 Claude prompt → 現在只映射已知 IntakeForm 欄位，字串長度夾緊）。
+- `app/api/onboarding/intake-public/route.ts`：① import coerce helper ② `body` 型別改 `Record<string, unknown>` ③ 新增 **64 KB 硬頂**（critic Major：原無 body size cap）再 JSON.parse ④ 套用 `coerceFluentFormPayload` 後再驗必填欄位
+- `app/api/onboarding/submit/route.ts`：import coerce helper，移除原本內嵌的 TRUTHY/toBool/spread 區塊（DRY）
+- `middleware.ts`：PUBLIC_API_PATHS 加入 `/api/onboarding/intake-public`（FluentForm webhook 從 WP 打出，無 session cookie，需繞過 session gate；路由本身用 narrow Bearer token + rate-limit 自管 auth）
+- `mcp/registry.template.json`：`wordpress.enabled: false`（ERR_INVALID_URL root cause：WP_API_URL 未設；加 note 說明何時可重開）→ sync-mcp-config.ps1 已同步所有 IDE
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test (next-admin) | exit=0 | ms=2320 — 599 tests passed
+- REVIEW_DONE: critic=Deep | verdict=pass/warn | findings=0c/2major/3minor — 0 Critical；2 Major 同日折入（allow-list + 64KB cap）；3 Minor（trigger-build 不區分 public_intake、rate-limit 非原子、rollback race）接受延後（有界風險；rate-limit 原始程式碼 comment 已記錄修法方向）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=coerceFluentFormPayload | hits=3（僅在 3 個預期檔案：helper+2 routes）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=intake-public | hits=2（middleware.ts route.ts；docs/WORKLOG 記錄是歷史引用非 stale 主張）
+- WORKLOG: 本 entry
+
+[剩餘風險]
+- `ONBOARDING_PUBLIC_INTAKE_TOKEN` 尚未設定於 SG .env → endpoint 仍 fail-safe 關閉（401）。Phase 2 待辦：SSH SG → 生成 token → docker restart → vault 存檔。
+- FluentForm 表單尚未建立（無表單 = 無 WP 側 webhook 觸發點）。Phase 2 待辦：WP admin 建表單 + webhook feed。
+- Minor：`trigger-build` 不區分 `submitted_by='public_intake'` 的列（operator 可能誤建公開表單提交的站）→ spawn task 追蹤。
+
+[rollback] `git revert HEAD`；MCP：registry.template.json 把 wordpress.enabled 改回 true 重跑 sync-mcp-config.ps1
+
+
+
 ### fix(next-admin): onboarding/build console 4 個 UI 吞錯 bug 修復（deploy local_direct 前置）
 
 [任務理解] 操作者問「/ops/onboarding /onboard /build 能否真正架站」→ workflow 全面稽核（7 agents，程式+生產 DB 實查）結論：引擎已驗、`bd135952` local_direct 已寫好未部署；但 4 個 UI 吞錯 bug 會讓失敗看起來像「工具壞了」。操作者指示：先修 bug → 部署 → 生產實測。
@@ -16,11 +44,19 @@
 
 [驗證結果]
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test (next-admin) | exit=0 | ms=2080（47 files / 574 tests 全過，含全部修復後重跑）
+- REALTEST_EVIDENCE: tool=SSH | cmd=bash /root/lobster-phase1/scripts/sg-deploy.sh next-admin | exit=0 | ms=282000（deployed f9172be2；server 端 596 tests 過、healthy 7s、4 smoke 端點 200；rollback snapshot rollback-20260703-235731）
+- REALTEST_EVIDENCE: tool=curl | cmd=生產全鏈 e2e：POST submit(sync-key)→201 intake fb51a13d → POST generate-spec→201 spec dcd927ad（Claude 真生成）→ POST trigger-build(local_direct, 容器內直打)→200 build_status=completed run d21ab292 | exit=0 | ms=230000（00:04:13→00:08:03）
+- REALTEST_EVIDENCE: tool=curl | cmd=curl https://aware-wave.com/staging/e2e-verify-0704-6e2b91/ | exit=0 | ms=1020 — HTTP 200 + title「E2E-Verify-0704 – 專業服務，值得信賴」（AI tagline 落地）；EU psql 實查 run d21ab292=completed、org e2e-verify-0704-5c1356 存在；站上 16 個 base pack 外掛 wp plugin list 實列
+- REALTEST_EVIDENCE: tool=curl | cmd=/ops/onboarding|/onboard|/build → 307(session gate)、/login → 200；/api/provision(sync-key) → {"outcome":"idle","adapter":"none"}（修正後 UI 契約與實回傳一致）| exit=0 | ms=4000
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/2minor — 契約逐欄核對 ✓、polling race/cleanup/stale-closure ✓、404/403 definitive-stop 路由解析 ✓；2 Minor（dispatched 無限輪詢、provisionMachine 缺 text-first parse）同日折入；Note（Step4 按鈕 double-fire）接受不修——org upsert onConflict:slug 冪等
 - BUGHUNT_DONE: scope=agency-os scripts lobster-factory | grep=ProvisionStatus | hits=0 — 移除的型別以 oracle 同等條件（code exts、排除編輯檔）實搜 0 殘留；新 symbol（orgResult/pollError/pollFailsRef/ProvisionOutcome）grep 確認僅存在編輯檔內自洽；agency-os/scripts docs 無 stale 主張（provisionResult/createOrgRecord 0 命中）
-- WORKLOG: 本 entry；生產 e2e REALTEST 將於 sg-deploy 後補記
+- WORKLOG: 本 entry（生產 e2e 證據已補記）
 
-[剩餘風險] local_direct 同步建站貼 CF ~100s 上限（provision ~71-90s + seed）——bd135952 已知取捨，長期解法 same-host worker；本次修復純 UI 層不影響該路徑。
+[剩餘風險]
+- **CF ~100s 上限 vs 實測全建站 ~230s**：local_direct 在容器內直打可通（本次 e2e），但瀏覽器 UI 走 CF 的 trigger-build 外層 request 會被切斷（建站仍在 server 端完成、run 會 completed，只是 UI 拿不到 run_id 回應）→ same-host worker 是真正解法（bd135952 已知取捨，今日量化）。
+- intake_forms 建站成功後停留 status=building（無 terminal 轉換）— 生命週期小缺口，follow-up。
+- e2e 測試站 https://aware-wave.com/staging/e2e-verify-0704-6e2b91/ + EU org e2e-verify-0704-5c1356 留作可點擊證據，之後清理（比照 2026-07-02 測試 org 清理程序）。
+- sync-key = 全站 server-to-server operator 身份（middleware.ts:139 放行 + OPS_ROLE_RESOLUTION_MODE=claims_with_simulated_fallback + OPS_ALLOW_SIMULATED_ROLE_FALLBACK=true 實查）— by design 但值得知道爆炸半徑。
 [rollback] 單 commit revert（UI-only，無 DB/schema 變更）。
 
 ## 2026-07-03

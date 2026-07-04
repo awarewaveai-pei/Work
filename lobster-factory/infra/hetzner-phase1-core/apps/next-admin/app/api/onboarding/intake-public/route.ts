@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { timingSafeEqual } from "../../../../lib/security/timingSafeEqual";
 import { getSupabaseWriteClient } from "../../../../lib/supabase-server";
 import { generateWebsiteSpec } from "../../../../lib/onboarding/spec-generator";
-import type { IntakeForm } from "../../../../lib/onboarding/intake-form";
+import { coerceFluentFormPayload } from "../../../../lib/onboarding/coerce-fluent-form";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,16 +42,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
-  let body: { form?: IntakeForm };
+  // Hard-cap body at 64 KB before JSON.parse — prevents unbounded payload reaching DB or Claude.
+  const rawText = await request.text();
+  if (rawText.length > 65_536) {
+    return NextResponse.json({ ok: false, error: "request_too_large" }, { status: 413 });
+  }
+  let body: { form?: Record<string, unknown> };
   try {
-    body = await request.json();
+    body = JSON.parse(rawText) as { form?: Record<string, unknown> };
   } catch {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
 
-  // Required per intake-form.ts (primary_goal is deprecated 2026-06-05 — do NOT require it,
-  // or schema-correct modern intakes 422-fail). pages_needed drives the sitemap.
-  const form = body.form;
+  // Coerce FluentForm webhook strings (booleans as "yes"/"no", pages_needed as comma-joined)
+  // then validate required fields. Required per intake-form.ts — primary_goal is deprecated
+  // 2026-06-05, do NOT require it. pages_needed drives the sitemap.
+  const form = body.form ? coerceFluentFormPayload(body.form) : undefined;
   if (!form?.company_name || !form?.industry || !form?.pages_needed?.length) {
     return NextResponse.json(
       { ok: false, error: "missing_required_fields", required: ["company_name", "industry", "pages_needed"] },
