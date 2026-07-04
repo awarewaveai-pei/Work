@@ -36,11 +36,29 @@ export const dynamic = "force-dynamic";
 
 const BROWSER_INTAKE_WINDOW_MIN = 10;
 const BROWSER_INTAKE_MAX_PER_WINDOW = 5;
+const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+
+async function verifyTurnstileToken(token: string): Promise<boolean> {
+  const secret = process.env.TURNSTILE_SECRET_KEY;
+  if (!secret) return false;
+  try {
+    const res = await fetch(TURNSTILE_VERIFY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ secret, response: token }).toString(),
+    });
+    const data = (await res.json()) as { success?: boolean };
+    return data.success === true;
+  } catch {
+    return false;
+  }
+}
 
 export async function POST(request: Request) {
-  // Feature gate: disabled until Cloudflare Turnstile captcha is wired in.
-  // See comment block above for the full security rationale.
-  if (!process.env.BROWSER_INTAKE_ENABLED) {
+  // Gate: TURNSTILE_SECRET_KEY presence means captcha is active and is the real security gate.
+  // BROWSER_INTAKE_ENABLED allows non-captcha dev/ops overrides.
+  // Coming-soon 503 only fires when BOTH are absent.
+  if (!process.env.BROWSER_INTAKE_ENABLED && !process.env.TURNSTILE_SECRET_KEY) {
     return NextResponse.json(
       { ok: false, error: "coming_soon", message: "Public intake form is coming soon." },
       { status: 503 },
@@ -52,11 +70,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "request_too_large" }, { status: 413 });
   }
 
-  let body: { form?: Record<string, unknown> };
+  let body: { form?: Record<string, unknown>; turnstile_token?: string };
   try {
-    body = JSON.parse(rawText) as { form?: Record<string, unknown> };
+    body = JSON.parse(rawText) as { form?: Record<string, unknown>; turnstile_token?: string };
   } catch {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
+  }
+
+  // Verify Cloudflare Turnstile captcha when the secret key is configured.
+  if (process.env.TURNSTILE_SECRET_KEY) {
+    if (!body.turnstile_token) {
+      return NextResponse.json({ ok: false, error: "captcha_required" }, { status: 422 });
+    }
+    const captchaOk = await verifyTurnstileToken(body.turnstile_token);
+    if (!captchaOk) {
+      return NextResponse.json({ ok: false, error: "captcha_failed" }, { status: 422 });
+    }
   }
 
   const form = body.form ? coerceFluentFormPayload(body.form) : undefined;

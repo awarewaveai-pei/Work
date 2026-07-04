@@ -1,14 +1,81 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { IntakeForm, WebsiteSpec } from "@/lib/onboarding/intake-form";
 import { IntakeFormSteps } from "@/lib/onboarding/intake-form-steps";
+
+type TurnstileAPI = {
+  render: (container: HTMLElement, opts: {
+    sitekey: string;
+    callback: (token: string) => void;
+    "expired-callback": () => void;
+    "error-callback": () => void;
+  }) => string;
+  remove: (id: string) => void;
+};
+
+function getTurnstile(): TurnstileAPI | undefined {
+  return (window as unknown as { turnstile?: TurnstileAPI }).turnstile;
+}
 
 export default function PublicIntakePage() {
   const [flow, setFlow] = useState<"form" | "submitting" | "done" | "error">("form");
   const [formStep, setFormStep] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [spec, setSpec] = useState<WebsiteSpec | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileContainerRef = useRef<HTMLDivElement>(null);
+  const turnstileWidgetId = useRef<string | null>(null);
+
+  // Load Turnstile script once on mount (no-op if not configured or already loaded).
+  useEffect(() => {
+    const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+    if (!siteKey) return;
+    if (document.querySelector('script[src*="challenges.cloudflare.com/turnstile"]')) return;
+    const script = document.createElement("script");
+    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+    script.async = true;
+    document.head.appendChild(script);
+  }, []);
+
+  // Render / tear-down the Turnstile widget when entering / leaving step 5.
+  useEffect(() => {
+    const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+    if (!siteKey || flow !== "form" || formStep !== 5) return;
+
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    const doRender = () => {
+      const ts = getTurnstile();
+      if (!ts || !turnstileContainerRef.current) return false;
+      if (turnstileWidgetId.current != null) {
+        try { ts.remove(turnstileWidgetId.current); } catch { /* already gone */ }
+      }
+      turnstileWidgetId.current = ts.render(turnstileContainerRef.current, {
+        sitekey: siteKey,
+        callback: (token: string) => setTurnstileToken(token),
+        "expired-callback": () => setTurnstileToken(null),
+        "error-callback": () => setTurnstileToken(null),
+      });
+      return true;
+    };
+
+    if (!doRender()) {
+      interval = setInterval(() => {
+        if (doRender()) { clearInterval(interval!); interval = null; }
+      }, 300);
+    }
+
+    return () => {
+      if (interval != null) clearInterval(interval);
+      const ts = getTurnstile();
+      if (ts && turnstileWidgetId.current != null) {
+        try { ts.remove(turnstileWidgetId.current); } catch { /* already gone */ }
+        turnstileWidgetId.current = null;
+      }
+      setTurnstileToken(null);
+    };
+  }, [flow, formStep]);
 
   const [form, setForm] = useState<Partial<IntakeForm>>({
     industry: "service",
@@ -51,6 +118,10 @@ export default function PublicIntakePage() {
       setError("請確認必填欄位已填寫（公司名稱、頁面）");
       return;
     }
+    if (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken) {
+      setError("請完成人機驗證");
+      return;
+    }
     setError(null);
     setFlow("submitting");
 
@@ -58,7 +129,7 @@ export default function PublicIntakePage() {
       const res = await fetch("/api/onboarding/intake-browser", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ form }),
+        body: JSON.stringify({ form, turnstile_token: turnstileToken ?? undefined }),
       });
       const text = await res.text();
       let data: { ok?: boolean; error?: string; spec?: WebsiteSpec; retry_after_seconds?: number };
@@ -217,6 +288,8 @@ export default function PublicIntakePage() {
           onPrev={prevStep}
           onSubmit={handleSubmit}
           submitLabel="提交需求 →"
+          disabled={!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken}
+          turnstileSlot={<div ref={turnstileContainerRef} />}
         />
       </div>
     </div>

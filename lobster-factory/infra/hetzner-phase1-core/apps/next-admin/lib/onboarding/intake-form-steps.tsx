@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { IntakeForm } from "./intake-form";
 
 export const STEPS = [
@@ -48,6 +49,7 @@ interface IntakeFormStepsProps {
   onSubmit: () => void;
   submitLabel?: string;
   disabled?: boolean;
+  turnstileSlot?: ReactNode;
 }
 
 export function IntakeFormSteps({
@@ -60,6 +62,7 @@ export function IntakeFormSteps({
   onSubmit,
   submitLabel = "生成網站規格 →",
   disabled = false,
+  turnstileSlot,
 }: IntakeFormStepsProps) {
   const set = (k: keyof IntakeForm, v: unknown) => onChange(k, v);
 
@@ -314,6 +317,11 @@ export function IntakeFormSteps({
             </select>
           </div>
         </div>
+      )}
+
+      {/* ── Captcha (step 5 only) ── */}
+      {formStep === 5 && turnstileSlot && (
+        <div style={{ marginTop: "1rem", marginBottom: "0.25rem" }}>{turnstileSlot}</div>
       )}
 
       {/* ── Navigation ── */}
