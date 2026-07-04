@@ -26,7 +26,30 @@
 
 [rollback] wp post delete 15 --force
 
+---
 
+### fix(onboarding): FluentForm 5-step 表單重建 + coerce helper comma-split 修復
+
+[任務理解] FluentForm form_id=3 是扁平單頁、無 form_step 元素、缺少 9 個欄位（primary_color/secondary_color/logo_status/needs_crm/product_type/visual_style/reference_sites/language/existing_content），且 coerce helper 對 visual_style/product_type 只處理 Array（FluentForm 實際送 comma-separated string）→ 這兩個欄位永遠 undefined。
+
+[已修改]
+- `wp_fluentform_forms` (form_id=3, lobster-wordpress DB)：重建為 5-step（form_step + 4 × step_end + 25 個欄位元素），完全對齊 ops/onboarding 五張頁面結構（公司品牌/客群/功能需求/視覺參考/素材時程）
+- `wp_fluentform_form_meta` (form_id=3, _fluentform_webhook_feeds)：更新 request_body 映射，新增全部 9 個欄位
+- `lib/onboarding/coerce-fluent-form.ts`：新增 `toCommaSplit<T>()` helper；visual_style/product_type/pages_needed 改用 comma-split；reference_sites 新增 newline-split 路徑；language max 10→20
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp eval-file /tmp/update_form3.php | exit=0 | ms=2000 — form_fields update: 1 row(s), webhook feed update: 1 row(s), JSON length: 14064
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp eval count+list elements | exit=0 — 25 elements correct 5-step structure
+- REALTEST_EVIDENCE: tool=node | cmd=inline assertion suite (6 groups) | exit=0 | ms=200 — All assertions passed
+- REVIEW_DONE: critic=Standard | verdict=pending | findings=awaiting-critic-agent
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=coerceFluentFormPayload | hits=4 (all expected: coerce-fluent-form.ts, WORKLOG.md, submit/route.ts, intake-public/route.ts)
+- BUGHUNT_DONE: scope=lobster-factory | grep=toCommaSplit | hits=1 (only in coerce-fluent-form.ts)
+
+[剩餘風險]
+- FluentForm checkboxes 實際送 comma-sep 或 JSON array 視 WP 版本可能有差；field 真實提交需人工確認
+- reference_sites textarea newline 送出格式需一次瀏覽器測試確認
+
+[rollback] SSH: wp eval-file 重建舊 form_fields / DB: UPDATE 回 c28e7d64 之前 JSON
 
 ### fix(edge/wp-admin): 後台 Rate limit exceeded 根治 — Cloudflare + host Nginx 分層限流
 
