@@ -42,9 +42,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
+  // Hard-cap body at 64 KB before JSON.parse — prevents unbounded payload reaching DB or Claude.
+  const rawText = await request.text();
+  if (rawText.length > 65_536) {
+    return NextResponse.json({ ok: false, error: "request_too_large" }, { status: 413 });
+  }
   let body: { form?: Record<string, unknown> };
   try {
-    body = await request.json();
+    body = JSON.parse(rawText) as { form?: Record<string, unknown> };
   } catch {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
