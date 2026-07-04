@@ -4,6 +4,30 @@
 
 ## 2026-07-04
 
+### feat(onboarding): Phase 2 — ONBOARDING_PUBLIC_INTAKE_TOKEN SG 部署 + intake-public endpoint 啟用
+
+[已修改]
+- `/root/lobster-phase1/.env`（SG）：新增 `ONBOARDING_PUBLIC_INTAKE_TOKEN=<hex32>` — openssl rand -hex 32 生成
+- `/root/lobster-phase1/docker-compose.yml`（SG，machine-local）：next-admin environment 區塊新增 `ONBOARDING_PUBLIC_INTAKE_TOKEN: ${ONBOARDING_PUBLIC_INTAKE_TOKEN:-}` — 原本 explicit env block 未列此 key，docker restart 無法載入
+- `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`（repo 本地）：同步加入相同 env var entry（POD_ICC_CoatedFOGRA39 之後）
+- `lobster-next-admin` container：`docker compose up -d --no-deps --force-recreate next-admin` 重建
+- vault：`secrets-vault.ps1 -Action set -Name ONBOARDING_PUBLIC_INTAKE_TOKEN`
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=docker exec lobster-next-admin printenv ONBOARDING_PUBLIC_INTAKE_TOKEN | exit=0 | ms=500 — token 前 20 chars 確認 `fcc0b3c1e6dcdb33718f`
+- REALTEST_EVIDENCE: tool=Bash | cmd=curl -s -X POST https://app.aware-wave.com/api/onboarding/intake-public -H "Authorization: Bearer wrongtoken" | exit=0 | ms=800 — `{"ok":false,"error":"unauthorized"}` 401 ✓ endpoint 啟用、token gate 生效
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — env var 注入無 code 邏輯改動；compose entry pattern 與同檔其他 secret entries 一致
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=ONBOARDING_PUBLIC_INTAKE_TOKEN | hits=3（.env SG / docker-compose.yml SG / docker-compose.yml repo — 全 3 個正確位置）
+- BUGHUNT_WAIVED: DOC_ONLY -- compose env var entry；無 TS/JS symbol 改動，無 callsite drift 風險
+
+[剩餘風險]
+- Phase 2 WP 側尚未完成：FluentForm 表單 + FluentCRM feed + webhook feed。endpoint 已開啟但無 WP 觸發點。
+- docker-compose.yml repo 本地版本落後 SG 機器版本（SG 有 WPBRIDGE_PRIVATE_KEY 等後加的 vars；repo 未同步）→ 現存技術債，不影響本次功能。
+
+[rollback] 從 SG .env 移除 ONBOARDING_PUBLIC_INTAKE_TOKEN 一行 + docker compose up --force-recreate next-admin；endpoint 回到 fail-safe 關閉（401，code 無需 revert）。
+
+
+
 ### feat(onboarding): FluentForm 雙寫管道 Phase 1 — coerce helper + middleware 公開路徑 + MCP wordpress 停用
 
 [任務理解] 接上 session：FluentForm（WP側）→ Supabase `intake_forms`（app側）雙寫 Plan A。三個 code gap：①middleware 缺 intake-public 公開路徑 ②submit route 有 coerce 但 intake-public 沒有 ③coerce 邏輯重複。同時修 WordPress MCP ERR_INVALID_URL。
