@@ -41,7 +41,7 @@
 - REALTEST_EVIDENCE: tool=SSH | cmd=wp eval-file /tmp/update_form3.php | exit=0 | ms=2000 — form_fields update: 1 row(s), webhook feed update: 1 row(s), JSON length: 14064
 - REALTEST_EVIDENCE: tool=SSH | cmd=wp eval count+list elements | exit=0 — 25 elements correct 5-step structure
 - REALTEST_EVIDENCE: tool=node | cmd=inline assertion suite (6 groups) | exit=0 | ms=200 — All assertions passed
-- REVIEW_DONE: critic=Standard | verdict=pending | findings=awaiting-critic-agent
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1M-fixed/2m — Major: toCommaSplit無clamp→已修(MAX_CSV_ITEMS=20,MAX_CSV_ITEM_LEN=50+array branch filter string-only); Minor: empty[]/string非對稱(可接受); Suggestion: submit/route body cap留待後續
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=coerceFluentFormPayload | hits=4 (all expected: coerce-fluent-form.ts, WORKLOG.md, submit/route.ts, intake-public/route.ts)
 - BUGHUNT_DONE: scope=lobster-factory | grep=toCommaSplit | hits=1 (only in coerce-fluent-form.ts)
 
