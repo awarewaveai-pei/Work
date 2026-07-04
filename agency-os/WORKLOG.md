@@ -4,6 +4,28 @@
 
 ## 2026-07-04
 
+### feat(db): migration 0058 — ops_incidents parent_incident_id (storm correlation)
+
+[已修改]
+- EU Supabase Postgres (`ops_incidents`): `ADD COLUMN parent_incident_id uuid REFERENCES ops_incidents(id) ON DELETE SET NULL` + `idx_ops_incidents_parent` index + `NOTIFY pgrst`
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec supabase-db psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 < 0058.sql | exit=0 | ms=800 — SET / ALTER TABLE / RESET / CREATE INDEX / NOTIFY
+- REALTEST_EVIDENCE: tool=SSH | cmd=\\d public.ops_incidents | grep parent_incident_id | exit=0 — column + FK + index 全部確認存在
+- REVIEW_WAIVED: NA -- 純 SQL migration；無 TS/PS1 檔案改動
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=parent_incident_id | hits=0
+- BUGHUNT_WAIVED: NA -- 新增可空欄位，無 downstream call sites 需更新
+
+[剩餘風險]
+- application code (upsertIncidentAtomic) 尚未填值（欄位 nullable，功能 inert 直到 code 更新）
+- PostgREST schema cache 已 NOTIFY reload；若 REST 仍看不到欄位，重啟 supabase-rest container
+
+[rollback] `ALTER TABLE ops_incidents DROP COLUMN parent_incident_id;`（資料全 NULL，安全）
+
+---
+
+## 2026-07-04
+
 ### fix(onboarding): FluentForm 表單頁補建 — aware-wave.com/start/ 缺口修復
 
 [任務理解] FluentForm webhook feed 已正確指向 intake-public，但 **無任何 WP 頁面嵌入表單**，客戶無公開 URL 可填表。用戶點名「根本沒做好」。
