@@ -1,16 +1,18 @@
 // Closed-loop hygiene (Auto-Repair A3, 2026-07-03).
 //
-// 1. autoVerifyRunsOnDeploySuccess — when the VPS auto-deploy script reports
-//    deploy_success for an app, repair runs sitting in deploy_pending/deploying
-//    for that service are verified and resolved. The deploy script itself ran
-//    the health + smoke gates (sg-deploy.sh), so deploy_success IS the health
-//    signal — no second probe, no guessing.
-// 2. reapStaleRuns — a run stuck mid-pipeline (backing_up / approved /
-//    deploying) or an ops_action_runs row stuck "running" after a process kill
-//    is flagged back to human attention instead of rotting as "in progress"
-//    forever. The reaper NEVER moves anything to a terminal state on its own —
-//    repair runs go back to triage_needed; only action runs (pure audit rows)
-//    are closed as failed.
+// 1. noteDeploySuccessOnPendingRuns — when the VPS auto-deploy script reports
+//    deploy_success for an app, annotate repair runs sitting in
+//    deploy_pending/deploying for that service with an audit note. It does NOT
+//    auto-resolve: the deploy cron fires on ANY push to a service, not only the
+//    fix's merge commit, and the run does not record the fix commit — so
+//    resolving on a service match would falsely close a loop and claim
+//    verification that never happened. The operator confirms via the existing
+//    「確認部署」button once they know the deploy included the fix.
+// 2. reapStaleRuns — a run stuck mid-pipeline or an ops_action_runs row stuck
+//    "running" after a process kill is flagged back to human attention instead
+//    of rotting as "in progress" forever. The reaper NEVER moves a repair run
+//    to a terminal state — it returns them to triage_needed; only action runs
+//    (pure audit rows) are closed as failed.
 //
 // Both are deterministic, idempotent, and safe to call repeatedly from any
 // heartbeat (deploy webhook, manual route, future cron).
@@ -19,38 +21,45 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { appendAudit } from "./audit";
 import type { RepairRun } from "./types";
 
-/** Pipeline states that are transient by design — minutes, not days. */
-export const TRANSIENT_STATES = ["backing_up", "approved", "deploying"] as const;
-export const DEFAULT_REPAIR_STALE_HOURS = 6;
+// Fast mid-pipeline states: transitions that should take minutes. A run parked
+// here past the ceiling means a lost callback or a killed process.
+export const FAST_TRANSIENT_STATES = ["approved", "deploying"] as const;
+// backing_up runs a synchronous two-VPS backup; give it a much longer ceiling
+// so a legitimately slow backup is never reaped out from under its own
+// completion write.
+export const BACKUP_STATE = "backing_up" as const;
+export const DEFAULT_FAST_STALE_HOURS = 6;
+export const DEFAULT_BACKUP_STALE_HOURS = 12;
 export const DEFAULT_ACTION_STALE_HOURS = 2;
 
 export function staleCutoffIso(hours: number, now: Date = new Date()): string {
   return new Date(now.getTime() - hours * 3_600_000).toISOString();
 }
 
-export interface AutoVerifyResult {
+export interface NoteDeployResult {
   ok: boolean;
-  verified: number;
+  annotated: number;
   runIds: string[];
   error?: string;
 }
 
 /**
- * Resolve deploy-stage repair runs for `app` after a successful deploy.
- * Matching is strict: the run's own incident must belong to the same service.
+ * Annotate (NOT resolve) deploy-stage repair runs for `app` after a successful
+ * deploy. Matching is by service; resolution stays with the human because a
+ * service-scoped deploy signal cannot prove the specific fix shipped.
  */
-export async function autoVerifyRunsOnDeploySuccess(
+export async function noteDeploySuccessOnPendingRuns(
   supabase: SupabaseClient,
   args: { app: string; deployedCommit?: string; actor?: string },
-): Promise<AutoVerifyResult> {
+): Promise<NoteDeployResult> {
   try {
     const { data, error } = await supabase
       .from("repair_runs")
       .select("*")
       .in("state", ["deploy_pending", "deploying"])
       .is("archived_at", null)
-      .limit(20);
-    if (error) return { ok: false, verified: 0, runIds: [], error: error.message };
+      .limit(100);
+    if (error) return { ok: false, annotated: 0, runIds: [], error: error.message };
 
     const rows = (data ?? []) as RepairRun[];
     // Two-step service match (no FK-name coupling): run → its incident's service.
@@ -72,14 +81,10 @@ export async function autoVerifyRunsOnDeploySuccess(
       const { error: updErr } = await supabase
         .from("repair_runs")
         .update({
-          state: "resolved",
-          deploy_status: "passed",
-          deploy_checked_at: new Date().toISOString(),
-          ...(args.deployedCommit ? { deploy_ref: args.deployedCommit } : {}),
           audit_log: appendAudit(run.audit_log, {
             actor: args.actor ?? "system",
-            action: "auto_verified_by_deploy",
-            detail: `sg-deploy reported deploy_success for ${args.app} (health + smoke gates passed on the VPS).`,
+            action: "deploy_success_observed",
+            detail: `sg-deploy reported deploy_success for ${args.app}. If this deploy included the fix, confirm via 確認部署 to close the run. NOT auto-resolved (deploy is service-scoped, not commit-matched).`,
             data: { deployed_commit: args.deployedCommit ?? null },
           }),
         })
@@ -87,9 +92,9 @@ export async function autoVerifyRunsOnDeploySuccess(
         .in("state", ["deploy_pending", "deploying"]); // concurrency guard: only if still in a deploy state
       if (!updErr) runIds.push(run.id);
     }
-    return { ok: true, verified: runIds.length, runIds };
+    return { ok: true, annotated: runIds.length, runIds };
   } catch (e) {
-    return { ok: false, verified: 0, runIds: [], error: e instanceof Error ? e.message : String(e) };
+    return { ok: false, annotated: 0, runIds: [], error: e instanceof Error ? e.message : String(e) };
   }
 }
 
@@ -107,24 +112,33 @@ export interface ReaperResult {
  */
 export async function reapStaleRuns(
   supabase: SupabaseClient,
-  opts?: { repairStaleHours?: number; actionStaleHours?: number },
+  opts?: { fastStaleHours?: number; backupStaleHours?: number; actionStaleHours?: number },
 ): Promise<ReaperResult> {
-  const repairCutoff = staleCutoffIso(opts?.repairStaleHours ?? DEFAULT_REPAIR_STALE_HOURS);
   const actionCutoff = staleCutoffIso(opts?.actionStaleHours ?? DEFAULT_ACTION_STALE_HOURS);
   const result: ReaperResult = { ok: true, repair_runs_flagged: 0, action_runs_closed: 0 };
 
-  try {
-    const { data, error } = await supabase
-      .from("repair_runs")
-      .select("id,state,updated_at,audit_log")
-      .in("state", [...TRANSIENT_STATES])
-      .lt("updated_at", repairCutoff)
-      .is("archived_at", null)
-      .limit(50);
-    if (error) {
-      result.ok = false;
-      result.error = error.message;
-    } else {
+  // Two ceilings: fast mid-pipeline states at 6h; backing_up at 12h so a
+  // legitimately slow two-VPS backup is never reaped out from under its own
+  // completion write.
+  const tiers: Array<{ states: string[]; cutoff: string }> = [
+    { states: [...FAST_TRANSIENT_STATES], cutoff: staleCutoffIso(opts?.fastStaleHours ?? DEFAULT_FAST_STALE_HOURS) },
+    { states: [BACKUP_STATE], cutoff: staleCutoffIso(opts?.backupStaleHours ?? DEFAULT_BACKUP_STALE_HOURS) },
+  ];
+
+  for (const tier of tiers) {
+    try {
+      const { data, error } = await supabase
+        .from("repair_runs")
+        .select("id,state,updated_at,audit_log")
+        .in("state", tier.states)
+        .lt("updated_at", tier.cutoff)
+        .is("archived_at", null)
+        .limit(50);
+      if (error) {
+        result.ok = false;
+        result.error = error.message;
+        continue;
+      }
       for (const run of (data ?? []) as Array<Pick<RepairRun, "id" | "state" | "audit_log"> & { updated_at: string }>) {
         const { error: updErr } = await supabase
           .from("repair_runs")
@@ -141,10 +155,10 @@ export async function reapStaleRuns(
           .eq("state", run.state); // concurrency guard: skip if it moved meanwhile
         if (!updErr) result.repair_runs_flagged += 1;
       }
+    } catch (e) {
+      result.ok = false;
+      result.error = e instanceof Error ? e.message : String(e);
     }
-  } catch (e) {
-    result.ok = false;
-    result.error = e instanceof Error ? e.message : String(e);
   }
 
   try {
