@@ -1,9 +1,9 @@
 import { Suspense } from "react";
 import { LoginForm } from "./LoginForm";
 
-// /login is exempt from the auth gate (see middleware.ts). It renders a full-viewport
-// overlay (position:fixed) so the root-layout sidebar shell is covered — the operator
-// sees a clean login screen, not the admin chrome they aren't authenticated for yet.
+// /login is a top-level route outside the (shell) route group, so it renders with no
+// sidebar at all. The full-viewport overlay is kept for visual clarity (fills the body-bg).
+// See middleware.ts matcher — /login is excluded from the session gate.
 export const dynamic = "force-dynamic";
 
 export default function LoginPage() {

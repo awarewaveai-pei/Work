@@ -69,6 +69,11 @@ export default function PublicIntakePage() {
         setFlow("error");
         return;
       }
+      if (res.status === 503 && data.error === "coming_soon") {
+        setError("線上表單即將開放，請透過 Email 聯絡我們：hello@aware-wave.com");
+        setFlow("error");
+        return;
+      }
       if (res.status === 429) {
         const wait = data.retry_after_seconds ? `請 ${Math.ceil(data.retry_after_seconds / 60)} 分鐘後再試。` : "";
         setError(`目前提交次數較多，${wait}`);

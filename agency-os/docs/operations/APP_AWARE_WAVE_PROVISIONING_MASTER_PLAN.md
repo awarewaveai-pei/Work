@@ -85,6 +85,7 @@ aware-wave.com (WP)            app.aware-wave.com (Next.js 15)
 | **ops /ops/onboarding 觸發建站按鈕（spec_generated → building → completed）** | ✅ **生產已驗**（2026-07-04）| Phase 3：intake 5c0b0307 spec_generated → trigger-build API（模擬按鈕） → ok=true, run cdfe06f8 completed → https://aware-wave.com/staging/test-wp-webhook-co-5c1bd1/ 200 ✅；c78a05c9 已 deploy |
 | ~~客戶填表 → 自動生出那個 pending run~~（已被 local_direct 取代：run 直接 running→completed，不經 pending）| ✅ 已通 | 同上；舊症狀「跳回第一步」前端 bug 已修（1c70853e + 2026-07-04 handleSubmit 硬化）|
 | Fluent Form（公開 WP）→ intake 橋接 | ✅ **E2E 完整**（2026-07-04）| FluentForms Pro 6.2.5 已裝；form_id=3（11 欄位）；webhook feed → `/api/onboarding/intake-public`（Bearer narrow token）；FluentCRM feed 已配置（contact+tag prospect/website-inquiry）；n8n bridge `RbrHNu3BUEmpNWeT` **已停用**（active=False，被直接 webhook 取代）；WORKLOG Phase 2+3 |
+| `app.aware-wave.com/intake` 公開 React 表單（`intake-browser` API）| 🟡 **已建 · feature gate OFF**（2026-07-04）| route group 重構（(shell)/(public)）；React 5-step 表單 + lib/onboarding/intake-form-steps.tsx 共用元件；`BROWSER_INTAKE_ENABLED` env gate（默認 OFF；待 Cloudflare Turnstile 接入後開）；tsc 0 error + 599 tests 通過；WORKLOG 2026-07-04 Phase 4 |
 | 中央 FluentCRM（收客資料進 CRM）| ✅ **已配置**（2026-07-04）| FluentForms FluentCRM feed：contact+tag prospect/website-inquiry，update_contact=yes；中央 CRM feed 跟 FluentForm 提交綁定 |
 | AI 自動報價 | ❌ 未做 | — |
 | 機層一鍵租機（Hetzner+硬化+DNS）| 🟡 **寫好未接** | provisionClient 真機驗證；EMBED 文件 ready；app 按鈕沒呼叫 |

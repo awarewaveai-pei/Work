@@ -17,15 +17,36 @@ export const dynamic = "force-dynamic";
 //   - Returns a subset of the spec (enough for the thank-you view); the full
 //     internal spec is available to operators via /ops/onboarding history.
 //
+// ⚠ SECURITY PRECONDITION (from intake-public/route.ts:25-26):
+//   A public-web (browser-origin) form must add a server-verified captcha
+//   (e.g. Cloudflare Turnstile) before this door is opened to production
+//   traffic. Without it the global rate-limit bucket can be locked by a single
+//   caller, denying the entire lead-capture funnel (one 6-req/10-min loop
+//   saturates the shared counter for every prospect worldwide).
+//
+//   BROWSER_INTAKE_ENABLED env var gates this route. Leave unset (default) in
+//   production until Cloudflare Turnstile verification is wired into both the
+//   public form and this handler. Set to "true" only after the captcha check
+//   is in place.
+//
 // Security: this path is listed in PUBLIC_API_PATHS and in the middleware matcher
 // exclusion, so it receives no Supabase session cookie injection. Authorization
-// comes entirely from the rate limit + body validation below.
+// comes from BROWSER_INTAKE_ENABLED gate + rate limit + body validation.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const BROWSER_INTAKE_WINDOW_MIN = 10;
 const BROWSER_INTAKE_MAX_PER_WINDOW = 5;
 
 export async function POST(request: Request) {
+  // Feature gate: disabled until Cloudflare Turnstile captcha is wired in.
+  // See comment block above for the full security rationale.
+  if (!process.env.BROWSER_INTAKE_ENABLED) {
+    return NextResponse.json(
+      { ok: false, error: "coming_soon", message: "Public intake form is coming soon." },
+      { status: 503 },
+    );
+  }
+
   const rawText = await request.text();
   if (rawText.length > 65_536) {
     return NextResponse.json({ ok: false, error: "request_too_large" }, { status: 413 });
@@ -83,8 +104,11 @@ export async function POST(request: Request) {
 
   const result = await generateWebsiteSpec(form, intakeId);
   if (result.ok === false) {
+    // Roll back the counted row so this failure doesn't consume a rate-limit slot
+    // (an attacker could otherwise deliberately trigger Claude failures to fill the bucket).
+    await supabase.from("intake_forms").delete().eq("id", intakeId);
     return NextResponse.json(
-      { ok: false, error: "spec_generation_failed" },
+      { ok: false, error: "spec_generation_failed", intake_form_id: intakeId },
       { status: 502 },
     );
   }
@@ -101,15 +125,19 @@ export async function POST(request: Request) {
     .single();
   if (specErr || !specRow) {
     return NextResponse.json(
-      { ok: false, error: "spec_store_failed" },
+      { ok: false, error: "spec_store_failed", intake_form_id: intakeId },
       { status: 500 },
     );
   }
 
-  await supabase
+  const { error: statusErr } = await supabase
     .from("intake_forms")
     .update({ status: "spec_generated" })
     .eq("id", intakeId);
+  if (statusErr) {
+    // M8 pattern: spec exists but intake stayed 'pending' — log for operator reconciliation.
+    console.error("[intake-browser] intake status update failed", { intakeId, error: statusErr.message });
+  }
 
   // Return the spec so the public thank-you view can display the design preview.
   // No trigger-build action is available to the public — that stays on ops/onboarding.

@@ -4,6 +4,60 @@
 
 ## 2026-07-04
 
+### feat(onboarding): Phase 4 — 公開 /intake 表單 + route group 重構 + critic 安全閉環
+
+[任務理解]
+完成 onboarding portal 的「公開入口」缺口：既有的 `aware-wave.com/start/` WP 表單需依賴 FluentForm + webhook，而 `app.aware-wave.com/intake` 可作為直連公開表單，由 React 前端直接送出、後端 `intake-browser` API 處理，完全繞過 FluentForm 依賴。同時修正架構缺陷：原 `app/ops/`、`app/tools/` 等所有 admin 頁面和公開頁面共享同一層 layout（帶 sidebar），需用 Next.js route group 隔離。
+
+[現況分析]
+- `git log` 顯示 `bbacfd1c`/`3f31d5ee` 為本 session auto-checkpoint commits，含全部實作
+- 原 `app/layout.tsx` 渲染 sidebar → 公開頁面也會有 admin chrome，不可接受
+- 原所有 admin 路徑在 `app/ops/`、`app/tools/` 等 → 改移至 `app/(shell)/` route group
+- `middleware.ts` 未排除 `/intake`、`/api/onboarding/intake-browser` → 公開頁面被 session gate 擋
+
+[已修改]
+**Route group 重構（~20 檔）**：
+- `app/layout.tsx`：移除 sidebar；只剩 html+body+theme CSS vars+PHProvider
+- `app/(shell)/layout.tsx`（新建）：sidebar shell，async 讀 `getThemeConfig()`
+- `app/(public)/layout.tsx`（新建）：bare passthrough，無 sidebar
+- `app/ops/` → `app/(shell)/ops/`（git mv）；`app/tools/` → `app/(shell)/tools/`（git mv）
+- 所有 `../../lib/` → `@/lib/`；`../../../lib/` → `@/lib/`；`@/app/tools/` → `@/app/(shell)/tools/`（批次修）
+- `app/SidebarNav.tsx`：OpsInboxBadge import → `(shell)/ops/inbox/`
+- `middleware.ts`：PUBLIC_API_PATHS 加 `/api/onboarding/intake-browser`；matcher 排除 `intake`
+
+**新檔案**：
+- `lib/onboarding/intake-form-steps.tsx`（新建）：`"use client"` 共用元件，exports STEPS/PAGES_OPTIONS/PRODUCT_TYPES/VISUAL_STYLES/toggleArr/IntakeFormSteps，從 `ops/onboarding/page.tsx` 抽取，兩端共用
+- `app/(public)/intake/page.tsx`（新建）：公開入口表單，5-step，呼叫 `intake-browser` API，顯示 spec 預覽感謝頁
+- `app/api/onboarding/intake-browser/route.ts`（新建）：無 bearer token，BROWSER_INTAKE_ENABLED feature gate（默認 OFF，待 Turnstile 接入後才開），insert-then-ordinal rate limit（5/10min，獨立 bucket），呼叫 `coerceFluentFormPayload` + `generateWebsiteSpec`
+
+**Critic 安全閉環（本次 code 改動）**：
+- `intake-browser/route.ts`：加 `BROWSER_INTAKE_ENABLED` feature gate（🔴 Critical 修復：無 captcha 不得開放，global bucket 鎖定攻擊向量）；spec 生成失敗時 DELETE 已計數列（🟠 Major：防攻擊者故意觸發失敗填滿 bucket）；status 更新捕捉並 log error（🟡 Minor：M8 parity）；錯誤 response 加入 `intake_form_id`（🟡 Minor：operator 可 reconcile）
+- `app/(public)/intake/page.tsx`：處理 503 `coming_soon` 回傳顯示友善文字
+- `app/login/page.tsx`：修正 stale comment（sidebar 說明已無效，/login 在 (shell) group 外）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=<30000 — 0 type errors
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test (next-admin) | exit=0 | ms=1780 — 50 files / 599 tests 全過（含 contentStudioImageModels.test.ts 確認路徑正確）
+- REALTEST_WAIVED: SMOKE_COVERED — sg-deploy 待 push 後執行；/intake 公開表單待 Playwright smoke 確認（BROWSER_INTAKE_ENABLED=false 時回 coming_soon；auth-gate 驗 /ops/onboarding 仍需 session）
+- REVIEW_DONE: critic=Deep | verdict=High（整體風險）| findings=2c/2M/3m/2s — 2 Critical（global bucket DoS + captcha 前提違反）同日全修（feature gate OFF + spec-fail rollback）；2 Major（rate-limit race + 失敗列不清理）Major-1 記錄為技術債（TODO: PG RPC atomic gate）；Major-2 同日修；3 Minor 全修；2 Suggestion 延後（Turnstile 接入時一起做）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=BROWSER_INTAKE_ENABLED | hits=1（只在 intake-browser/route.ts，無 stale ref）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=IntakeFormSteps | hits=3（intake-form-steps.tsx 定義 + ops/onboarding/page.tsx + intake/page.tsx — 全預期 callsite）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=intake-browser | hits=0（agency-os/scripts 無 stale 主張，WORKLOG 歷史引用不算）
+
+[剩餘風險]
+- `intake-browser` route 由 `BROWSER_INTAKE_ENABLED` gate 鎖定；**不部署到 prod 直到 Cloudflare Turnstile 驗證接入**（TODO：Turnstile site key → CF dashboard → TURNSTILE_SECRET_KEY env → route 驗 token → /intake 前端加 Turnstile widget）
+- Rate-limit insert-then-ordinal 仍非原子（Major-1）；prod 啟用前應遷移至 PG advisory lock RPC（有界，burst=5 同時請求，非持續漏洞）
+- `/intake` 公開 URL 可直接訪問（不需登入），但表單送出回 `coming_soon`，無 Claude 消耗，無 DB 寫入
+- `aware-wave.com/start/` Cloudflare redirect → `app.aware-wave.com/intake` 尚未設定（視覺確認後再做）
+
+[rollback]
+- Route group 重構：`git revert bbacfd1c 3f31d5ee <critic-fix-commit>`；tsc 確認再 sg-deploy
+- intake-browser route：feature gate 已 OFF，不影響 prod；直接 revert commit 即可
+
+---
+
+## 2026-07-04
+
 ### feat(repair-center): auto-remediation pipeline wiring (startRepairFromIncident)
 
 [任務理解]
