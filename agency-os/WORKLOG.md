@@ -4,6 +4,30 @@
 
 ## 2026-07-04
 
+### fix(onboarding): FluentForm 表單頁補建 — aware-wave.com/start/ 缺口修復
+
+[任務理解] FluentForm webhook feed 已正確指向 intake-public，但 **無任何 WP 頁面嵌入表單**，客戶無公開 URL 可填表。用戶點名「根本沒做好」。
+
+[已修改]
+- `wp_posts`（lobster-wordpress DB）：新建 page ID=15，post_name=start，post_status=publish，post_title=客戶建站諮詢，post_content=`<!-- wp:shortcode -->[fluentform id="3"]<!-- /wp:shortcode -->`
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp post create --post_name=start --porcelain | exit=0 | ms=500 — post_id=15
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl -o /dev/null -w "%{http_code}" https://aware-wave.com/start/ | exit=0 | ms=1200 — 200
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl https://aware-wave.com/start/ | grep fluentform | exit=0 — fluentform CSS/JS loaded, 客戶建站諮詢 title
+- REVIEW_WAIVED: NA -- WP post create via WP-CLI；無 TS/JS/PS1 改動；表單欄位已驗（company_name/industry/pages_needed 等 11 欄皆在 webhook request_body 映射中）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=aware-wave.com/start | hits=0 (新增，無 stale ref 需修)
+- BUGHUNT_WAIVED: NA -- WP DB 改動無 code symbol；webhook feed 配置未動
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl -X POST intake-public with token + test payload | exit=0 | ms=8500 — ok=true, intake_form_id=a1816575-7d52-4625-b232-9e3926ca7c3f, website_spec_id=ed77fe95-df18-4d27-9bf5-319b1aa6655f, next=awaiting_build_approval（全鏈 e2e 通過）
+
+[剩餘風險]
+- 表單樣式依 aware-wave.com 主題（Kadence），視覺需人工確認
+- 端到端瀏覽器提交 → intake_forms DB 寫入 尚未做（webhook 已確認正確配置，技術上可行）
+
+[rollback] wp post delete 15 --force
+
+
+
 ### fix(edge/wp-admin): 後台 Rate limit exceeded 根治 — Cloudflare + host Nginx 分層限流
 
 [任務理解] 使用者回報 `aware-wave.com/wp-admin/admin.php?page=fluent_forms_add_ons` 等後台操作常變成白底 `Rate limit exceeded`。要求不是單點加大 quota，而是在理解 Cloudflare / SG host Nginx / Docker Nginx / WordPress 管理端流量後，做最小、可驗證、可回滾的長期修復。
