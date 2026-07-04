@@ -12,6 +12,7 @@ type TurnstileAPI = {
     "error-callback": () => void;
   }) => string;
   remove: (id: string) => void;
+  reset: (id: string) => void;
 };
 
 function getTurnstile(): TurnstileAPI | undefined {

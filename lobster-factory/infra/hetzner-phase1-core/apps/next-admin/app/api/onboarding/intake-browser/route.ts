@@ -38,14 +38,17 @@ const BROWSER_INTAKE_WINDOW_MIN = 10;
 const BROWSER_INTAKE_MAX_PER_WINDOW = 5;
 const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
-async function verifyTurnstileToken(token: string): Promise<boolean> {
+async function verifyTurnstileToken(token: string, remoteip?: string): Promise<boolean> {
   const secret = process.env.TURNSTILE_SECRET_KEY;
   if (!secret) return false;
   try {
+    const params: Record<string, string> = { secret, response: token };
+    if (remoteip) params.remoteip = remoteip;
     const res = await fetch(TURNSTILE_VERIFY_URL, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ secret, response: token }).toString(),
+      body: new URLSearchParams(params).toString(),
+      signal: AbortSignal.timeout(5000),
     });
     const data = (await res.json()) as { success?: boolean };
     return data.success === true;
@@ -55,10 +58,15 @@ async function verifyTurnstileToken(token: string): Promise<boolean> {
 }
 
 export async function POST(request: Request) {
-  // Gate: TURNSTILE_SECRET_KEY presence means captcha is active and is the real security gate.
-  // BROWSER_INTAKE_ENABLED allows non-captcha dev/ops overrides.
-  // Coming-soon 503 only fires when BOTH are absent.
-  if (!process.env.BROWSER_INTAKE_ENABLED && !process.env.TURNSTILE_SECRET_KEY) {
+  // Gate: TURNSTILE_SECRET_KEY is the production security gate. The form is open iff the secret
+  // is present (captcha will be enforced below). BROWSER_INTAKE_ENABLED is a dev/staging bypass
+  // restricted to NODE_ENV !== "production" so an env-var mistake cannot open the door in prod
+  // without captcha — which would re-open the global-bucket DoS vector described above.
+  // ⚠ Both NEXT_PUBLIC_TURNSTILE_SITE_KEY (frontend) and TURNSTILE_SECRET_KEY (backend) must be
+  //   set together in every deploy; a mismatch silently breaks the form or disables captcha.
+  const hasSecret = !!process.env.TURNSTILE_SECRET_KEY;
+  const devBypass = !hasSecret && process.env.BROWSER_INTAKE_ENABLED === "true" && process.env.NODE_ENV !== "production";
+  if (!hasSecret && !devBypass) {
     return NextResponse.json(
       { ok: false, error: "coming_soon", message: "Public intake form is coming soon." },
       { status: 503 },
@@ -82,7 +90,8 @@ export async function POST(request: Request) {
     if (!body.turnstile_token) {
       return NextResponse.json({ ok: false, error: "captcha_required" }, { status: 422 });
     }
-    const captchaOk = await verifyTurnstileToken(body.turnstile_token);
+    const remoteip = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? undefined;
+    const captchaOk = await verifyTurnstileToken(body.turnstile_token, remoteip);
     if (!captchaOk) {
       return NextResponse.json({ ok: false, error: "captcha_failed" }, { status: 422 });
     }
