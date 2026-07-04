@@ -1,5 +1,5 @@
 {
-    "generatedAt":  "2026-07-04T01:25:40.6522584Z",
+    "generatedAt":  "2026-07-04T06:04:17.6438538Z",
     "overall":  "PASS",
     "fatal":  false,
     "fatalReason":  "",
@@ -12,11 +12,11 @@
                "retention_days":  "7",
                "retention_source":  "static",
                "backup_size":  "16G",
-               "latest_time":  "2026-07-03 02:31:27",
-               "oldest_time":  "2026-06-26 02:00:01",
+               "latest_time":  "2026-07-04 02:31:26",
+               "oldest_time":  "2026-06-27 02:00:02",
                "backup_age_days":  "0",
                "verify_result":  "PASSED",
-               "verify_time":  "2026-07-03T02:30:14Z"
+               "verify_time":  "2026-07-04T02:30:18Z"
            },
     "eu":  {
                "host":  "204.168.175.41",
@@ -27,11 +27,11 @@
                "retention_days":  "7",
                "retention_source":  "static",
                "backup_size":  "11G",
-               "latest_time":  "2026-07-03 02:31:18",
-               "oldest_time":  "2026-06-26 02:30:51",
+               "latest_time":  "2026-07-04 02:31:17",
+               "oldest_time":  "2026-06-26 06:01:01",
                "backup_age_days":  "0",
                "verify_result":  "PASSED",
-               "verify_time":  "2026-07-03T03:00:16Z"
+               "verify_time":  "2026-07-04T03:00:16Z"
            },
     "reportPath":  "agency-os/reports/status/backup-health-LATEST.md"
 }
