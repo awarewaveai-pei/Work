@@ -9,7 +9,7 @@
 
 ## 出發前（在家做）
 
-- [ ] 下面 public key 存手機記事本（可公開，不是密碼）：
+- [ ] 下面 public key 存手機記事本（可公開，不是密碼）。**用途：現場步驟 3 會貼進 Cloudways「SSH Public Keys」欄**，貼了 Claude 才能遠端進主機建站：
 
 ```
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK4ihPieknnd+m8VVWEm9SOvLY1JPXTlgmup1D+aivDP user@DESKTOP-N33595I
@@ -32,9 +32,9 @@ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK4ihPieknnd+m8VVWEm9SOvLY1JPXTlgmup1D+aivDP
 | Size | **1GB**（$11/月固定；不夠日後一鍵升 2GB）|
 | Location | **Frankfurt**（歐洲客群近；日韓客群多改 Singapore）|
 
-3. 等 ~5 分鐘開好 → **Server → Master Credentials** 頁：
-   - [ ] 啟用 **SSH Access**
-   - [ ] SSH keys → 貼上面 public key
+3. 等 ~5 分鐘開好 → 左側選單 **Server → Master Credentials** 頁：
+   - [ ] 啟用 **SSH Access**（同頁開關）
+   - [ ] 找 **SSH Public Keys** 欄 → 按 Add/新增 → 把手機記事本那串 `ssh-ed25519 AAAA...` 整行貼上 → **Save**
 4. 開 Claude（Claude Code web / claude.ai）貼：
    > Cloudways 開好了，IP = x.x.x.x，SSH user = ___，客戶名 = ___，網域 = ___，開始建站
 5. （網域）DNS A record 指到 IP — Cloudways 面板有教學，或丟給 Claude 遠端指導
