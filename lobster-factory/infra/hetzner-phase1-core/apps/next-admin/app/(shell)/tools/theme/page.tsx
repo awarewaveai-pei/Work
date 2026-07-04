@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { DEFAULT_SECTIONS, itemKey, type NavSection } from '../../SidebarNav';
+import { DEFAULT_SECTIONS, itemKey, type NavSection } from '@/app/SidebarNav';
 
 // ── Token definitions ───────────────────────────────────────────────────────
 type TokenDef = { name: string; default: string; type: 'color' | 'text' };

@@ -1,4 +1,4 @@
-import { resolveStylePrompt } from "../../app/tools/tarot/cards";
+import { resolveStylePrompt } from "../../app/(shell)/tools/tarot/cards";
 import {
   isAspectRatio,
   isStudioModel,

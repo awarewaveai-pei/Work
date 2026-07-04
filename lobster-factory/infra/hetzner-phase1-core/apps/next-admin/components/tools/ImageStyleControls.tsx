@@ -1,6 +1,6 @@
 "use client";
 
-import { STYLE_CATALOG } from "@/app/tools/tarot/tarotStyles";
+import { STYLE_CATALOG } from "@/app/(shell)/tools/tarot/tarotStyles";
 import { STUDIO_MODEL_OPTIONS, type StudioModel } from "@/lib/studio/model-options";
 
 type Props = {

@@ -19,7 +19,7 @@
  */
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { StaticCanvas, FabricImage } from "fabric";
-import { buildFabricImageFilters } from "@/app/tools/canvas/fabric-filters";
+import { buildFabricImageFilters } from "@/app/(shell)/tools/canvas/fabric-filters";
 import type { ColorGradeParams } from "@/lib/studio/color-grade";
 
 export type GradedPreviewHandle = {

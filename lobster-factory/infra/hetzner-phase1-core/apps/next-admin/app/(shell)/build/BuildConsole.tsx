@@ -204,7 +204,7 @@ export default function BuildConsole() {
     }
     // Plugin stack params from OnboardWizard Step 2 (pack-based model)
     const selectedPacksRaw = searchParams.get("selectedPacks");
-    if (selectedPacksRaw) base.selectedPacks = selectedPacksRaw.split(",").filter(Boolean) as import("../../lib/build-console/contracts").WpPluginModule[];
+    if (selectedPacksRaw) base.selectedPacks = selectedPacksRaw.split(",").filter(Boolean) as import("@/lib/build-console/contracts").WpPluginModule[];
     const pluginSlugsRaw = searchParams.get("pluginSlugs");
     if (pluginSlugsRaw) base.pluginSlugs = pluginSlugsRaw.split(",").filter(Boolean);
     const paidCount = Number(searchParams.get("paidPluginCount") ?? "0") || undefined;
