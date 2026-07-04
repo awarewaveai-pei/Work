@@ -35,6 +35,10 @@ const PUBLIC_API_PATHS = new Set<string>([
   // external uptime monitors). Its expensive SSH/GitHub probes are TTL-cached (see the route)
   // so public reachability is not a DoS lever.
   "/api/ops/repairs/health",
+  // Public intake door for FluentForm webhook → Supabase dual-write.
+  // Auth is a narrow Bearer token (ONBOARDING_PUBLIC_INTAKE_TOKEN), not the session cookie.
+  // Rate-limited to 5 req/10 min; never triggers builds.
+  "/api/onboarding/intake-public",
 ]);
 
 function isDevelopment(): boolean {
