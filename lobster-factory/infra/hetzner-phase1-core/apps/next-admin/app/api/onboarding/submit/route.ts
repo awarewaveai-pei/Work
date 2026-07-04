@@ -35,14 +35,25 @@ export async function GET(request: Request) {
 
   let query = supabase
     .from("intake_forms")
-    .select("id, organization_id, status, submitted_at, submitted_by, form_data")
+    .select("id, organization_id, status, submitted_at, submitted_by, form_data, website_specs(id, generated_at)")
     .order("submitted_at", { ascending: false })
     .limit(limit);
   if (orgFilter) query = query.eq("organization_id", orgFilter);
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, intake_forms: data ?? [] });
+  const intake_forms = (data ?? []).map((row) => ({
+    id: row.id,
+    organization_id: row.organization_id,
+    status: row.status,
+    submitted_at: row.submitted_at,
+    submitted_by: row.submitted_by,
+    form_data: row.form_data,
+    // Sort by generated_at DESC so [0] is always the newest spec when N≥2.
+    website_spec_id: ((row.website_specs as { id: string; generated_at: string }[] | null) ?? [])
+      .sort((a, b) => b.generated_at.localeCompare(a.generated_at))[0]?.id ?? null,
+  }));
+  return NextResponse.json({ ok: true, intake_forms });
 }
 
 export async function POST(request: Request) {

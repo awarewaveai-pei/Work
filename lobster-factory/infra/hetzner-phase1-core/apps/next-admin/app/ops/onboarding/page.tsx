@@ -10,6 +10,7 @@ interface IntakeHistoryItem {
   submitted_at: string;
   submitted_by: string;
   form_data: Record<string, unknown>;
+  website_spec_id?: string | null;
 }
 
 function statusBadge(status: string): string {
@@ -24,6 +25,9 @@ function IntakeHistory() {
   const [items, setItems] = useState<IntakeHistoryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [triggering, setTriggering] = useState<string | null>(null);
+  const [triggered, setTriggered] = useState<Set<string>>(new Set());
+  const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
 
   async function load() {
     if (loading) return;
@@ -39,6 +43,35 @@ function IntakeHistory() {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleRowTrigger(item: IntakeHistoryItem) {
+    if (!item.website_spec_id) {
+      setRowErrors((e) => ({ ...e, [item.id]: "無規格 ID，請重新生成規格" }));
+      return;
+    }
+    setTriggering(item.id);
+    setRowErrors((e) => { const n = { ...e }; delete n[item.id]; return n; });
+    try {
+      const res = await fetch("/api/onboarding/trigger-build", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ website_spec_id: item.website_spec_id, intake_form_id: item.id }),
+      });
+      const text = await res.text();
+      let data: { ok?: boolean; error?: string; run_id?: string };
+      try { data = JSON.parse(text) as typeof data; } catch { data = {}; }
+      if (!res.ok || !data.ok) {
+        setRowErrors((e) => ({ ...e, [item.id]: data.error ?? `HTTP ${res.status}` }));
+      } else {
+        setTriggered((s) => new Set([...s, item.id]));
+        setItems((prev) => prev.map((r) => r.id === item.id ? { ...r, status: "building" } : r));
+      }
+    } catch (e) {
+      setRowErrors((prev) => ({ ...prev, [item.id]: e instanceof Error ? e.message : String(e) }));
+    } finally {
+      setTriggering(null);
     }
   }
 
@@ -66,7 +99,7 @@ function IntakeHistory() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr>
-                  {(["公司", "產業", "狀態", "提交時間", "提交者"] as const).map((h) => (
+                  {(["公司", "產業", "狀態", "提交時間", "提交者", "操作"] as const).map((h) => (
                     <th key={h} style={{ textAlign: "left", padding: "4px 8px", color: "var(--text-secondary)", fontWeight: 600 }}>{h}</th>
                   ))}
                 </tr>
@@ -79,6 +112,27 @@ function IntakeHistory() {
                     <td style={{ padding: "7px 8px" }}><span className={`card-badge ${statusBadge(item.status)}`}>{item.status}</span></td>
                     <td style={{ padding: "7px 8px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{item.submitted_at ? new Date(item.submitted_at).toLocaleString("zh-TW") : "—"}</td>
                     <td style={{ padding: "7px 8px", color: "var(--text-secondary)" }}>{item.submitted_by}</td>
+                    <td style={{ padding: "7px 8px" }}>
+                      {triggered.has(item.id) ? (
+                        <span style={{ color: "var(--badge-green-text, green)", fontSize: 12 }}>已排入 ✓</span>
+                      ) : item.status === "spec_generated" && item.website_spec_id ? (
+                        <>
+                          <button
+                            onClick={() => void handleRowTrigger(item)}
+                            disabled={triggering === item.id}
+                            className="btn-primary"
+                            style={{ fontSize: 12, padding: "3px 10px" }}
+                          >
+                            {triggering === item.id ? "排入中…" : "觸發建站"}
+                          </button>
+                          {rowErrors[item.id] && (
+                            <p style={{ color: "var(--badge-red-text, red)", fontSize: 11, margin: "2px 0 0" }}>{rowErrors[item.id]}</p>
+                          )}
+                        </>
+                      ) : rowErrors[item.id] ? (
+                        <span style={{ color: "var(--badge-red-text, red)", fontSize: 11 }}>{rowErrors[item.id]}</span>
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>

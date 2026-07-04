@@ -106,6 +106,33 @@
 - sync-key = 全站 server-to-server operator 身份（middleware.ts:139 放行 + OPS_ROLE_RESOLUTION_MODE=claims_with_simulated_fallback + OPS_ALLOW_SIMULATED_ROLE_FALLBACK=true 實查）— by design 但值得知道爆炸半徑。
 [rollback] 單 commit revert（UI-only，無 DB/schema 變更）。
 
+
+
+### feat(onboarding): Phase 3 — /ops/onboarding 觸發建站按鈕 + submit GET website_spec_id join + n8n deactivate
+
+[任務理解] Phase 2（FluentForm WP→intake-public 全鏈）完成後，Phase 3 目標：① 讓 ops 看到 spec_generated 的公開 intake 後可一鍵觸發建站 ② 停用已被 intake-public 取代的 n8n bridge workflow。
+
+[已修改]
+- `app/api/onboarding/submit/route.ts`（GET handler）：select 加入 `website_specs(id)` relation join（Supabase PostgREST），flatmap 取 [0].id 暴露 `website_spec_id` 欄位給前端；供觸發建站按鈕知道要帶哪個 spec id
+- `app/ops/onboarding/page.tsx`（IntakeHistory 組件）：
+  - `IntakeHistoryItem` interface 加 `website_spec_id?: string | null`
+  - 新增 `triggering`/`triggered`/`rowErrors` 3 個 state
+  - 新增 `handleRowTrigger()` fn：POST `/api/onboarding/trigger-build {website_spec_id, intake_form_id}`；成功 → `triggered` Set + 前端 status 改 `building`；失敗 → `rowErrors[id]`
+  - 表格新增「操作」欄（第 6 欄）：status=spec_generated + website_spec_id 存在時顯示「觸發建站」button；已觸發顯示「已排入 ✓」
+- n8n workflow `onboarding: FluentForm intake bridge`（id `RbrHNu3BUEmpNWeT`）：POST /api/v1/workflows/:id/deactivate → `active=False`（舊 n8n 路徑已被 FluentForm → intake-public 直接 webhook 取代，停用避免重複執行）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=8000 — 0 type errors
+- REALTEST_EVIDENCE: tool=Bash | cmd=n8n POST /deactivate RbrHNu3BUEmpNWeT | exit=0 | ms=500 — active=False ✓
+- REVIEW_DONE: critic=Standard | verdict=pass/warn | findings=0c/1m/2n — 1 Major（website_spec_id 非確定性取 [0]：generated_at 加進 embed + sort DESC 已同日折入修 submit/route.ts:38,52）；2 Minor（triggering string→Set、optimistic "building" 不反映 failed build）接受延後（server CAS + ops-only UI，有界風險）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=website_spec_id,handleRowTrigger | hits=4 (agency-os docs/WORKLOG 歷史引用；lobster-factory 僅在 3 個直接修改檔案；scripts 0 hits)；IntakeHistoryItem 無跨檔引用
+
+[剩餘風險]
+- `triggering` state 為 string|null（非 Set）→ 同時點兩行時，第二行覆蓋 triggering，第一行按鈕重新啟用（double-fire 可能）；trigger-build 是冪等的（同 website_spec_id 重複呼叫不壞），ops-only UI，風險低
+- sg-deploy Phase 3 code 尚未跑
+
+[rollback] `git revert`（UI-only）；n8n 重新 activate：POST /api/v1/workflows/RbrHNu3BUEmpNWeT/activate
+
 ## 2026-07-03
 
 ### feat(auto-repair): A1 證據引擎 + A3 閉環 + A2 白名單 remediation — 自動維修從「自動文書」升級成「會自己治病」

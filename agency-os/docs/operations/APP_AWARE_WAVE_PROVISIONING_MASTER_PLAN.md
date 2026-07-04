@@ -83,8 +83,8 @@ aware-wave.com (WP)            app.aware-wave.com (Next.js 15)
 | 有 pending run → 建真 staging WP → 狀態 completed | ✅ **已驗證** | 2026-06-06 e2e run `655197bf` completed + curl 200（WORKLOG）|
 | **submit → generate-spec → trigger-build 全鏈自動建站（local_direct，不靠 Trigger.dev）** | ✅ **生產已驗**（2026-07-04）| e2e：submit 201 → spec 201（Claude 生成）→ trigger-build `local_direct` build_status=completed run `d21ab292`（~230s）→ https://aware-wave.com/staging/e2e-verify-0704-6e2b91/ curl 200 + seed 內容 + AI hero 圖。`bd135952` local_direct + 4 個 UI 吞錯修復（WORKLOG 2026-07-04）已 deploy `f9172be2`。⚠️ 限制：瀏覽器 UI 走 CF 的外層 request 會被 ~100s 上限切斷（建站仍完成，UI 拿不到回應）→ same-host worker 為 follow-up |
 | ~~客戶填表 → 自動生出那個 pending run~~（已被 local_direct 取代：run 直接 running→completed，不經 pending）| ✅ 已通 | 同上；舊症狀「跳回第一步」前端 bug 已修（1c70853e + 2026-07-04 handleSubmit 硬化）|
-| Fluent Form（公開 WP）→ intake 橋接 | 🟡 n8n 端已建+e2e 驗 | workflow `RbrHNu3BUEmpNWeT`（2026-07-03）；WP 端 Fluent Forms 未裝，表單+webhook feed 待建 |
-| 中央 FluentCRM（收客資料進 CRM）| ❌ 未做 | — |
+| Fluent Form（公開 WP）→ intake 橋接 | ✅ **E2E 完整**（2026-07-04）| FluentForms Pro 6.2.5 已裝；form_id=3（11 欄位）；webhook feed → `/api/onboarding/intake-public`（Bearer narrow token）；FluentCRM feed 已配置（contact+tag prospect/website-inquiry）；n8n bridge `RbrHNu3BUEmpNWeT` **已停用**（active=False，被直接 webhook 取代）；WORKLOG Phase 2+3 |
+| 中央 FluentCRM（收客資料進 CRM）| ✅ **已配置**（2026-07-04）| FluentForms FluentCRM feed：contact+tag prospect/website-inquiry，update_contact=yes；中央 CRM feed 跟 FluentForm 提交綁定 |
 | AI 自動報價 | ❌ 未做 | — |
 | 機層一鍵租機（Hetzner+硬化+DNS）| 🟡 **寫好未接** | provisionClient 真機驗證；EMBED 文件 ready；app 按鈕沒呼叫 |
 | 串接 Uptime Kuma / Sentry | 🟡 部分 | create-wp-site `input.integrations` 有走，但 onboarding 預設沒帶 token |
@@ -100,34 +100,33 @@ aware-wave.com (WP)            app.aware-wave.com (Next.js 15)
 ### ✅ Stage 0 — 建站引擎閉環（DONE 2026-06-06）
 站層 timeout 45s→95s + blocked 狀態回寫；pending run → 真站 → completed 已證。詳 STAGE0 文件。
 
-### 🔜 Stage 1 — 接通入口（form → 自動生 run）【**立即下一步**】
-**目標**：客戶在 onboarding 填完 → 不靠人手塞 DB，就一路建到站。
-**精確診斷步驟**：
-1. 抓那 2 筆卡 `spec_generated` 的 intake_forms + 對應 website_specs id。
-2. 直接 `POST /api/onboarding/trigger-build {website_spec_id, intake_form_id}`（帶正確 ops role header）→ **看精確錯誤碼**。可疑早退點（trigger-build/route.ts 行號）：
-   - L35-39 `resolveOpsRole` → 公開 onboarding 流程**可能沒 ops role → 403 forbidden**（最可疑）
-   - L52-57 missing_fields（UI 沒帶 spec/intake id？「跳回第一步」很可能是這個）
-   - L276-282 validation_failed / L285-290 profile_gate_blocked
-   - L293-300 action_catalog_missing（`plan.actionKey` 對不到 catalog）
-3. **對症修**：
-   - 若 role 403 → onboarding portal 要嘛走專屬內部 token、要嘛 trigger-build 對 onboarding 來源放寬（但要有 auth，不能裸奔）。
-   - 若 UI「跳回第一步」→ 修前端：generate-spec 回來後正確帶 `website_spec_id`+`intake_form_id` 呼叫 trigger-build，成功才前進、失敗顯示錯誤（不靜默 reset）。
-4. **驗收**：在 onboarding UI 走完一筆 → intake_forms `spec_generated → building`、ops_action_runs `pending→completed`、staging 站 curl 200。**全程不碰 DB**。
-**風險**：Medium（auth 邊界）。**檔案**：`trigger-build/route.ts`、onboarding 前端、`submit`/`generate-spec`。
-**⚠️ 注意**：`trigger-build/route.ts` 開頭註解已被另一 session 標記機層接入點 —— 動前先 `git log -5` 看是否有人在改。
+### 🔜 Stage 1 — ops 觸發建站（spec_generated → building）【**待 sg-deploy + 生產驗收**】
+**目標**：ops 看到公開 intake `spec_generated` → 一鍵觸發建站，不靠手塞 DB。
+**已完成（2026-07-04 code done）**：
+- `submit/route.ts` GET：加入 `website_specs(id, generated_at)` embed + sort DESC → `website_spec_id` 確定性取最新 spec（critic Major 同日折入）
+- `app/ops/onboarding/page.tsx` IntakeHistory：`status=spec_generated && website_spec_id` 顯示「觸發建站」按鈕 → POST `/api/onboarding/trigger-build {website_spec_id, intake_form_id}`；成功前端 status 改 building + "已排入 ✓"；失敗行內錯誤
+- tsc ✓（0 errors）；n8n bridge `RbrHNu3BUEmpNWeT` 已停用（不再衝突）
+**待做**：
+- **sg-deploy next-admin**（Phase 3 code 尚未推到 SG）
+- **生產驗收**：以公開 intake 筆 status=spec_generated → ops 頁點「觸發建站」→ building → ops_action_runs completed → staging curl 200
+**風險**：Low（code 已通 tsc；trigger-build 有 server-side CAS + quota gate；auth 走 ops session，按鈕在 /ops/ 路徑下）
 
-### Stage 2 — Fluent Form → intake 橋接 + 中央 FluentCRM ✅ 程式完成
-**目標**：公開 aware-wave.com 的 Fluent Form 收件 → 自動進 (a) app 的 intake_forms、(b) 中央 FluentCRM（做客戶關係）。
+### ✅ Stage 2 — Fluent Form → intake 橋接 + 中央 FluentCRM（DONE 2026-07-04）
+**目標**：公開 aware-wave.com 的 Fluent Form 收件 → 自動進 (a) app 的 intake_forms（含 AI 生規格）、(b) 中央 FluentCRM（做客戶關係）。
 **已完成（2026-07-02）**：
-- `submit/route.ts` 已加入 x-ops-sync-key 雙路徑 auth（n8n 可直接 POST）。
+- `submit/route.ts` 已加入 x-ops-sync-key 雙路徑 auth。
+- `intake-public/route.ts` + `coerce-fluent-form.ts` + middleware + 64KB cap + allow-list（critic 2Major 同日折入）。
 **已完成（2026-07-03）**：
-- n8n workflow `onboarding: FluentForm intake bridge`（id `RbrHNu3BUEmpNWeT`，active）：Webhook `POST https://n8n.aware-wave.com/webhook/fluentform-intake`（inbound header auth `x-ff-bridge-token`，credential `VrrbNtU4cminLRvM`）→ Code 映射（pages 逗號字串→array，容錯 flat/nested payload）→ HTTP POST `/api/onboarding/submit`（`x-ops-sync-key` credential `Bci2xGWik0qFZSAM`）。
-- e2e 已驗：測試 POST → 201 `intake_form_id` → EU DB row（status=pending、pages_needed 正確 array）→ 測試 row 已刪；無 token → 403（不裸奔）。
-**待做（WP 端，非 ops 一鍵）**：
-- aware-wave.com WP **未裝任何 Fluent 外掛**（2026-07-03 wp plugin list 實查）→ 需裝 Fluent Forms + 建公開 intake 表單 + 表單 webhook feed 指向上述 URL（帶 `x-ff-bridge-token` header；token 值：本機 vault `FF_BRIDGE_INBOUND_TOKEN`，n8n credential `VrrbNtU4cminLRvM` 為正本，遺失可重生成並同步兩端）。
-- FluentCRM fan-out（contact + tag）— 待 FluentCRM 裝好後在同一 workflow 加節點。
-**驗收**：填公開表單 → intake_forms 出現 + FluentCRM contact 出現。
-**風險**：Medium。
+- n8n workflow `onboarding: FluentForm intake bridge`（id `RbrHNu3BUEmpNWeT`）建立 + e2e 驗（n8n → submit → DB row）。
+**已完成（2026-07-04，決策：改直連，廢 n8n 橋）**：
+- aware-wave.com WP：FluentForms Pro 6.2.5 已裝；form_id=3（11 欄位含 company_name/industry/pages_needed/budget_tier/contact_email 等）已建。
+- FluentForm webhook feed：改指 `/api/onboarding/intake-public`（含 Bearer ONBOARDING_PUBLIC_INTAKE_TOKEN，narrow-scoped）→ FluentForm 直打 app，不過 n8n 橋。
+- FluentCRM feed：`CRM Contact`（tags=prospect,website-inquiry，update_contact=yes）與 form_id=3 綁定。
+- n8n `RbrHNu3BUEmpNWeT` **已停用**（active=False，2026-07-04 PATCH /deactivate）：直連取代後冗餘，停用避免重複觸發。
+- 安全修正：舊 webhook 從 OPS_PROXY_SHARED_SECRET（爆炸半徑=全後端）換成 ONBOARDING_PUBLIC_INTAKE_TOKEN（narrow，僅 intake-public）。
+- e2e 已驗：FluentForm POST → ok=True, intake_id=5c0b0307, next=awaiting_build_approval（AI spec 生成成功）；無 token → 401 ✓。
+**ONBOARDING_PUBLIC_INTAKE_TOKEN** 已在 SG `.env` + docker-compose.yml env block + container `printenv` 確認 + vault 存檔。
+**驗收**：✅ FluentForm 填寫 → intake_forms 出現 status=spec_generated + website_spec_id → /ops/onboarding 顯示「觸發建站」按鈕（Stage 1 對接）。
 
 ### Stage 3 — 報價流（人工 + 之後 AI）✅ 程式完成
 **目標**：「客戶填詳細需求 → 報價 → 討論定案 → 觸發建站」。
