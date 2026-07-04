@@ -1,6 +1,6 @@
 # VPS auto-reboot health
 
-- Generated: 2026-07-04 16:22:56 UTC
+- Generated: 2026-07-04 16:39:09 UTC
 - **Overall: 🟢 PASS**
 - SSOT: `lobster-factory/infra/hetzner-phase1-core/auto-reboot/`
 - Runbook: `runbooks/VPS-AUTO-REBOOT-RUNBOOK.md`
