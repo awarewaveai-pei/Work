@@ -52,7 +52,9 @@ function walkMarkdownFiles(rootDir, out = []) {
   return out;
 }
 
-const linkRe = /\[([^\]]*)\]\(([^)]+)\)/g;
+// CommonMark allows balanced parens in link URLs (e.g. Next.js route groups like (shell)).
+// The inner group matches: non-paren chars OR a balanced (inner) pair — one level deep.
+const linkRe = /\[([^\]]*)\]\(((?:[^()]*|\([^()]*\))*)\)/g;
 
 /** Repo-relative markdown paths that commonly fork (Single Owner / charter §4.3). Warn-only unless --strict-canonical-dupes */
 const canonicalDupPatterns = [

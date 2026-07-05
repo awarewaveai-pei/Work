@@ -1,6 +1,6 @@
 # AI 影片導演 — R0 實作計畫（B）
 
-> 設計術語 SSOT：[`CONTEXT.md`](./CONTEXT.md)　決策：[`ADR 009`](../../../../../../../../agency-os/docs/architecture/decisions/009-ai-video-director-dual-engine.md)
+> 設計術語 SSOT：[`CONTEXT.md`](./CONTEXT.md)　決策：[`ADR 009`](../../../../../../../../../agency-os/docs/architecture/decisions/009-ai-video-director-dual-engine.md)
 > 狀態：待批准。批准後進 C（Phase 0 最小可跑 PoC）。
 
 ## [任務理解]

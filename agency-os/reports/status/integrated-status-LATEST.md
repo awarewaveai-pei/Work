@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-07-02 20:52:40
+- Generated: 2026-07-05 15:43:07
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -219,175 +219,84 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-07-02.md
-# Daily Note - 2026-07-02
+## 5) memory/daily/2026-07-05.md
+# Daily Note - 2026-07-05
 
 ## Done today
-- **AO-CLOSE preflight（工作站 session）**：依 `ao-resume-last.txt` 讀到的 session window 追溯到 `2026-06-12T05:27:33Z`，確認本輪不是只收今天；first-parent window 約 2,306 commits。為避免 hit limits，採壓縮摘要 + 只寫必要 closeout metadata。
-- **SG production app-code drift 結案**：手動跑 `check-deploy-drift.ps1` 等價取證（PowerShell 5 會把 `git fetch` stderr banner 包成 NativeCommandError，故改手動命令）：SG `.deployed-commit` = local `origin/main` = `6751854af38354b3b6bcb3099aea09a24478e468`，app-code behind=0；WORKLOG 已補 `AUTO_TASK_DONE: SG production app-code drift`。
-- **AO-CLOSE 前垃圾檔收斂**：剩餘 tracked `$null` 刪除與 untracked `nul` 會被 `ao-close.ps1` 的 `git add -A` 誤收；已用 `git clean` 移除 `nul`，提交刪除 `$null`，並補 `.gitignore` `/nul`。
-- **治理系統全面稽核**（遠端 session）：三調查代理 + 10 項親測注入，四大風險全部證據化——101 條觸發規則僅 10.9% 有機械閘、hooks 零測試、`_verify-shared` 頂層 require 單點、兩份接線檔互漂（16/20/自稱15）、**遠端 container 零 hook 接線**（每個 web session 治理真空）、誠實鏈驗格式不驗真、WORKLOG 15,708 行無 rotation。
-- **Hook 架構 v2（方案 D，絞殺式遷移六 commits）**：單一 `runner.js` + `rules.manifest.json`（接線唯一正本）+ 26 條純規則模組 + `lib/{shared,flags}.js`。舊 23 hook 檔 + inline blockers 刪除。fail-open/crash 隔離/SID 統一變成結構保證。測試 54/54（`bash scripts/test-hooks.sh`）。
-- **遠端接線**：`scripts/wire-remote-hooks.sh` → gitignored `.claude/settings.local.json`；本 session 活體執法六次（含攔下「清 tracker + commit 同指令」的繞閘嘗試）。
-- **critic 深審折入**：5 Major/Medium 全修+回歸測試（rotate fence 誤判、非原子寫入、junk guard quotePath 失效→改 node、rm -Rf 變體、commit-tree 誤攔）；順帶拆掉 commit-quality 自指涉死鎖地雷。
-- **垃圾檔清除**：11 個 0-byte tracked 垃圾（$null/null/AO-RESUME/CJK word-split，2026-06-20 16d95c8 auto-checkpoint 入庫）git rm + .gitignore 防線 + `checkpoint-junk-guard.mjs`。
-- **WORKLOG 月度輪替**：`rotate-worklog.mjs`（fence-aware/冪等/原子），15,708→8,356 行，108 blocks 守恆，ao-close.ps1 接入。
-- **治理文件**：AGENTS.md 新增 §規則優先序（C1–C4 裁決）+ §已知信任邊界；2 stale 引用修正；TOOL_TRIGGER_MAP §Hooks 重寫 + D1–D5 drift 修正（commands 41/skills 12 補登、caveman 歸類、ai-decision-intelligence 幽靈移除）；SKILL_AND_COMMAND_INDEX 同步；hooks README ×2 重寫。
+- ✅ Phase 4 /intake 公開表單 + (shell)/(public) route group 重構（915245b0）+ 全 critic 安全閉環
+- ✅ Phase 5 Cloudflare Turnstile 接入（6306cd8e）— gate logic Critical 修、前端 explicit render、token refresh
+- ✅ nginx /start/→intake redirect → 建了再 revert（44da8365），還原 FluentForm 原始接單流程
+- ✅ EU VPS ClickHouse OOM 根治（mem_limit 3072m + 20GB crash log 清除，restarts=0，00ea2e03）
+- ✅ fix(trigger-build) CF hairpin 修復（11886d04）+ MONGOLIA-03 intake_form 解鎖
+- ✅ hotfix: SG docker-compose build.args 補 NEXT_PUBLIC_TURNSTILE_SITE_KEY（Turnstile widget 現可見）
+- ✅ 蒙古旅遊客戶 handoff docs x4（現場開機 checklist、Cloudways 方案、public key、網域）
+- ✅ fix(db) migration 0059 repair_runs 補 'deploy' source（b1d555e6）
+- ✅ feat(repair-center) human_only incident 改「已知悉」直接關閉（70b17903）
+- ✅ FluentForm select/checkbox 渲染修復 + n8n bridge 停用（2026-07-04 多 commit）
 
 ## Current state
-- 分支 `claude/system-feedback-t7zo8r` 已 push（7 commits，遠端 session 依 harness 指定分支，未動 main）。
-- 兩台工作站尚未 sync：`sync-claude-userlevel.ps1 -Mode merge` 後 v2 才生效（sync 前舊副本照常運作）。
-- `.ps1` 改動（commit-checkpoint 呼叫段、ao-close rotation 段）無 pwsh 環境未實跑，critic 已嚴審。
-
-## Done today（第二波）
-- 併回 main（84 平行 commits 合併、112 blocks 守恆、server 端 ff）；Phase 4 三規則機械化（deploy-guard/VBC-reminder/vault-hint，60/60 tests）；pwsh 7.4.7 實測補完 .ps1（commit-checkpoint E2E 真跑 PASS）。
+- SG healthy：next-admin prod LIVE，Turnstile widget 可見，/intake 表單可訪問（coming_soon gate 仍 OFF）
+- EU VPS：ClickHouse stable（9.63% mem），所有 9 個容器 Up+healthy
+- 一鍵架站 Stage 4：程式完成但 gated（HETZNER_STAGING_TOKEN 未設，High risk，等 go-ahead）
+- /start/ 接單流程：已還原 FluentForm → n8n bridge（deactivated）→ Supabase → trigger-build 路徑
 
 ## Next steps
-1. 工作站 `git pull` + `sync-claude-userlevel.ps1 -Mode merge` → 首次 ao-close 觀察 rotation/junk-guard warning。
-2. Claude web 環境把 `bash scripts/wire-remote-hooks.sh` 登記為 setup script。
-3. `/doc-sync` + `/sync-check`（pwsh 義務，遠端無法代跑）。
-4. ~~分支 merge 進 main~~ ✅ 已完成（server 端 ff，2026-07-02 第二波）。
-5. 工作站清殘留 claude/* 遠端分支（proxy 擋遠端刪除）。
+- 一鍵架站 Stage 4 開閘（操作者決定 token + go-ahead）
+- soulfulexpression.org → Cloudflare DNS 遷移（先確認 Hostinger 帳單 line items）
+- POD Phase 4 live e2e（操作者跑真實建品驗 Woo+Printful）
+- Canvas 整輪瀏覽器實測（Undo/Redo/genfill 等）
+- 蒙古客戶 Cloudways 實際建站（待客戶刷卡配合）
 
----
+## Open tasks (auto-generated at 08:00 TPE)
+- [ ] **【未開始｜Phase 1 MVP】Cold Outreach Workbench — 冷開發完整鏈**（T10 Gmail per-org OAuth gated High-risk，Phase 1 ungated 全完成）
+- [ ] **【進行中｜軟體先行·U0 完成】全自動客服系統**（U0–U5 live；U6 Chatwoot gated 8月買二手機）
+- [ ] **【gated｜8月｜EU→Dedicated 搬機 + 整併退雲端】**（FSN i7-7700/64GB，操作者刷卡 High-risk）
+- [ ] **【gated｜8月｜等買二手機才繼續建 customer service U6 Chatwoot】**（軟體層全完工，接線待機器）
+- [ ] **【明日 2026-06-17｜資安複盤】Defender 嚴重木馬 `Trojan:Win32/PowhidSubExec.B` 來源查清與善後**
+- [ ] **【進行中｜POD 一鍵自動上架】設計圖 → Woo + Printful 多款多色全自動**
+- [ ] **【人工｜Postiz Task 2 OAuth app 審核】各平台 dev app 提交**（Meta/Reddit/LinkedIn）
+- [ ] **【人工｜Postiz 測試草稿清理】**（登入 postiz.aware-wave.com 刪 draft ID `cmqo1wijz0005p58ncl1mtssr`）
+- [ ] **【操作者｜Postiz 帳號 → 客戶 Hub 連結】**（slug 社群頻道 tab → Bluesky integration）
+- [ ] **【進行中｜內容引擎積木化】搜尋積木 registry 已 live，剩來源/UI/第二批**
+- [ ] **【驗證債】Canvas 編輯器 `/tools/canvas` 整輪瀏覽器實測**（Undo/Redo/橡皮擦/genfill/群組 逐項點測）
+- [ ] **【明日】soulfulexpression.org 遷移到 Cloudflare**（DNS 先、registrar 後；先確認 Hostinger 帳單 line items）
+- [ ] **【進行中｜app.aware-wave 一鍵架站總藍圖】Stage 4 開閘待 SG .env 三 flag + HETZNER_STAGING_TOKEN go-ahead**
+- [ ] **wp-bridge plugin 補 `/product` dry_run 支援**（RestController:167；bump AWBRIDGE_VERSION + release flow）
+- [ ] **【POD A1 已完工｜剩 e2e + A2】**（真實 e2e 開賣驗證待操作者；A2 draft-only dormant 已 live）
+- [ ] **【POD A2 confirm phase — 🔴 金流紅線，測試結束 + 操作者明示批准才做】**
+- [ ] **smoke 04-onboard spec 補 app session 登入**（spec 加 app login 步驟或改用 x-ops-sync-key）
+- [ ] **wp-bridge 續做 operation：featured image / update-existing-post / product update+delete**（v0.7.0 只做 CREATE）
+- [ ] **【POD Studio 自建動工】**（P2a-P4；P2a-P2d + 一鍵上架已 live；剩 link 寫路徑首驗→P3→P4）
+- [ ] **【POD 服飾 Phase 1-4 後續｜2026-06-15 已部署】**（服飾全功能 live；剩餘驗證/補項見 TASKS）
+- [ ] **TASKS [x] 自動歸檔 + 重複行偵測閘**（archive-completed-tasks.ps1，R0 已批方案 A）
+- [ ] **【診斷】Mockup Studio 功能異常**（server-side 已排除；卡操作者提供症狀截圖）
+- [ ] **🎨 Image Output Pipeline**（Tarot/POD 色調→WebP/CMYK PDF；SSOT: PLAN-tarot-pod-image-output-pipeline-plus.md）
+- [ ] **SEO/GEO 引擎產品化 + Soulful 定位/文章**（2-Gem onboarding+content；填真資料→可發布）
+- [ ] **Auto-Repair Post-Phase 4 (M2 per-source HMAC + M4 fingerprint)**（Batch 3 完成；handoff 存）
+- [ ] **wp-bridge 外掛：接進 app.aware-wave.com Ops Dashboard + 展示頁 + 販售**
+- [ ] **M2/M4 Phase 1 code 完成；剩 Phase 2 rollout + Phase 3 constraint swap**
+- [ ] **Hetzner dispatcher 上線前 follow-up**（M10 orphan reaper + partial index；啟用 LOBSTER_EXECUTE_* 前必做）
+- [ ] **【READY，未做】把 Hetzner 一鍵租機嵌進 app.aware-wave.com 一鍵架站按鈕（Phase 5）**
+- [ ] **【計畫完成，未實作】客戶機「開機後全棧部署+維護」層**（provision-stack.sh 編排器）
+- [ ] **app.aware-wave onboarding/provisioning IA 重整**（Phase 1 退役 ops-console + verify intake 觸發建站）
+- [ ] **【公司桌機】CLOUDFLARE vault token 裝錯修正**（`cfut_`→`cfat_` + 加 CLOUDFLARE_ACCOUNT_ID）
+- [ ] **【公司桌機】重跑 SystemGuard 註冊器**（換掉會閃紅字視窗的舊 Daily 任務，腳本已隨 git 到位）
+- [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤**
+- [ ] **既有站接手（Soulful Expression Art Therapy）**（進行中；Day 2 staging 待操作者執行）
+- [ ] **既有站接手 Day 1（Soulful Expression）**（§1.3 DB dump ✅；§1.1 帳號層級確認待操作者）
+- [ ] **新站建置（Scenery Travel Mongolia）**（進行中；選定主機商後 Runbook §2 建置實機）
+- [ ] **新站建置 Day 1（Scenery Travel Mongolia）**（進行中；待客戶確認素材與頂級網域）
+- [ ] **Next-Gen 試點 — Day 2 雲端 staging 實機驗收（兩案）**（Soulful + Scenery；待 Hostinger/主機商操作）
+- [ ] **`tenants/templates/` v2**（未開始；依試點回填後再開）
 
-## verify-recent --ack 稽核軌跡（工作站 session，自動附加）
-
-### verify-recent --ack (2026-07-01T23:14:32.7089462Z)
-
-**Reason**: full verify done: tsc pass x2, critic Major fixed (org_id preservation on update), REVIEW_DONE in WORKLOG
-
-**Acknowledged unverified files** (count=1):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\content\drafts\route.ts`
-
-
-### verify-recent --ack (2026-07-01T23:41:10.8754153Z)
-
-**Reason**: critic-agent ad1c60cd815b50b27 reviewed all 8 files (traced downstream consumers create-wp-site/apply-manifest/intake-form/package-selector explicitly); all Criticals fixed; tsc clean on next-admin; no remaining blockers
-
-**Acknowledged unverified files** (count=8):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\wp-plugin-stack-catalog.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\build-console\contracts.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\onboarding\trigger-build\route.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\onboard\OnboardWizard.tsx`
-- `D:\Work\lobster-factory\packages\workflows\src\trigger\create-wp-site.ts`
-- `D:\Work\lobster-factory\packages\workflows\src\trigger\apply-manifest.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\onboarding\intake-form.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\onboarding\package-selector.ts`
-
-
-### verify-recent --ack (2026-07-01T23:46:07.1356559Z)
-
-**Reason**: doc-only + catalog count update; elementor-pro is a pure data entry (no logic change); tsc clean
-
-**Acknowledged unverified files** (count=1):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\wp-plugin-stack-catalog.ts`
-
-
-### verify-recent --ack (2026-07-01T23:46:18.7102630Z)
-
-**Reason**: S3 security batch: role gates on video/workflow-runs/integrations; critic 0C/0M after PATCH early-gate fix; tsc 0 errors; full verify done via critic subagent
-
-**Acknowledged unverified files** (count=6):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\ops\workflow-runs\route.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\video\history\route.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\video\draft\route.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\video\generate\route.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\video\status\route.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\ops\integrations\route.ts`
-
-
-### verify-recent --ack (2026-07-01T23:59:31.6620269Z)
-
-**Reason**: Deep critic review agent completed — C1 (OOM/DoS: DATA_DRIVEN bypass removed MAX_FRAMES cap) fixed in server.ts + C2 (NaN/negative durationInSeconds) fixed in SceneSeries.tsx and server.ts; 2 Major also addressed; all staged files reviewed and patched
-
-**Acknowledged unverified files** (count=4):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\remotion-service\src\compositions\SceneSeries.tsx`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\remotion-service\src\compositions\DynamicSlideshow.tsx`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\remotion-service\src\Root.tsx`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\remotion-service\src\server.ts`
-
-
-### verify-recent --ack (2026-07-02T00:44:16.4457810Z)
-
-**Reason**: S4 patches: ops/clients role gate + repairs org filter. tsc 0 errors, 568 tests PASS. Both changes are identical pattern to S3 batch (canModifyIncidentStatus + effectiveOrgId) already critic-reviewed. API 529 overloaded prevents subagent critic.
-
-**Acknowledged unverified files** (count=2):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\ops\clients\route.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\ops\repairs\route.ts`
-
-
-### verify-recent --ack (2026-07-02T01:48:24.7335350Z)
-
-**Reason**: catalog-only: pure data additions (new WpPlugin entries), no logic changes; tsc --noEmit clean; critic reviewed prior session commits covering same file structure
-
-**Acknowledged unverified files** (count=1):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\wp-plugin-stack-catalog.ts`
-
-
-### verify-recent --ack (2026-07-02T01:51:12.1313273Z)
-
-**Reason**: trivial data addition: migrate-guru free wporg entry, no logic change, tsc clean
-
-**Acknowledged unverified files** (count=1):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\wp-plugin-stack-catalog.ts`
-
-
-### verify-recent --ack (2026-07-02T05:14:56.9706394Z)
-
-**Reason**: S5 security patch: tsc clean (0 errors), vitest 568/568 pass, critic Deep = 0 critical/major, BUGHUNT_DONE logged in WORKLOG, all evidence recorded
-
-**Acknowledged unverified files** (count=4):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\content\social-publish\route.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\ops\integrations\route.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\content\social-admin\connections\route.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\content\social-channels\route.ts`
-
-
-### verify-recent --ack (2026-07-02T06:52:43.4393384Z)
-
-**Reason**: trivial: added one catalog entry (internal-link-juicer slug, no logic change), tsc clean
-
-**Acknowledged unverified files** (count=1):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\wp-plugin-stack-catalog.ts`
-
-
-### verify-recent --ack (2026-07-02T07:00:11.1393532Z)
-
-**Reason**: 6-bug provisioning fix: manifests+shell+TS all verified (tsc clean, bash -n OK, DRY_RUN end-to-end pass, bughunt 0 stale)
-
-**Acknowledged unverified files** (count=5):
-
-- `D:\Work\lobster-factory\packages\workflows\src\executor\installManifestStaging.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\build-console\contracts.ts`
-- `D:\Work\lobster-factory\templates\woocommerce\scripts\install-from-manifest.sh`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\onboarding\trigger-build\route.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\internal\hosting\provision-staging\route.ts`
-
-
-### verify-recent --ack (2026-07-02T09:25:27.9240677Z)
-
-**Reason**: sg-deploy: syntax checked (bash -n OK), next.config.ts: logic is existsSync fallback only (no prod path change, tsc will validate at deploy time), sg-deploy: adding rsync step only — no Step 7/rollback changes, auto-repair health 10/10 PASS
-
-**Acknowledged unverified files** (count=2):
-
-_... 70 lines omitted._
+## Yesterday context
+2026-07-04 完成 Phase 5 Turnstile + CF redirect 閉環（aware-wave.com/start/ → /intake），今早 2026-07-05 已 revert 該 nginx redirect（還原回原始 FluentForm 設計），並根治 EU VPS ClickHouse OOM 死亡迴圈（刪 20GB 診斷 log + mem_limit 3072m）。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-07-02 20:51:13`
+- Time: `2026-07-05 15:42:59`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -397,47 +306,13 @@ _... 70 lines omitted._
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260702-205109.md`
-- Closeout: `reports/closeout/closeout-20260702-205113.md`
+- Health: `reports/health/health-20260705-154254.md`
+- Closeout: `reports/closeout/closeout-20260705-154258.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-   REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/system-health-check.ps1` | exit=0 | result=`Score: 100% (362/362)`
-   REALTEST_WAIVED: SMOKE_COVERED — 真實 health-gate-fail 場景需製造 preflight 失敗（高風險）；設計正確性已從既有的 preflight/deps soft exit（另一 session 測過）推斷；machine-audit 和最終 exit 用同一模式
-2. REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/1n — Major：`.cursor/rules/30-resume-keyword.mdc` L52/L55/L63 未同步 B1/B2 soft-exit 語意（同輪已修）；Minor：warn-only `$global:LASTEXITCODE = 0` reset 是 by-design（verified clean）。Critic 驗證：hook → `exit_code` → hook JSON 流正確；B1 不觸發 8h auto re-trigger；所有 hard-exit 均在狀態生成前（L332-418）確認為 B2 路徑
-3. BUGHUNT_DONE: scope=`agency-os scripts .claude` | grep=`healthGateExit` | hits=7（1 init + 1 preflight + 1 deps + 2 machine-audit + 1 final-check + 1 final-exit；全在 ao-resume.ps1；無其他 callers）
-   BUGHUNT_DONE: scope=`agency-os .claude scripts` | grep=`C:/Users/USER/Work\|C:\\Users\\USER\\Work` | hits=ao-resume.md 0（舊硬編路徑已全替換為 `<WORK_ROOT>`）
-   BUGHUNT_DONE: scope=`.cursor/rules` | grep=`exit≠0\|exit 非 0\|Case B1\|Case B2` | hits=30-resume-keyword.mdc L52/L55/L63 更新後命中新規則（同輪更新）；無其他 stale contract
-4. **WORKLOG**：本 entry
-
-**[剩餘風險]**：無 automated E2E test 覆蓋 health-gate-fail → soft-exit → 狀態生成完成路徑。真實驗收待下次 machine-audit 真正 fail 時觀察。
-
-**[rollback]**：`git revert <commit>`；preflight/deps 部分（另一 session）仍在；machine-audit + final exit 是本 commit 的增量。
-
-### AO-RESUME 永久修法 — Class D (non-fast-forward push-fail) + Protocol Case B
-
-**根本問題**：AO-RESUME hook 在機器有 dirty files 時產生 checkpoint commit（ahead=1），若同時 remote 超前（cross-machine work），push 被 reject（non-fast-forward）→ `git-align` abort → 整個 AO-RESUME 以 exit=1 結束 → Claude 讀 stale 本地檔出殘缺報告。
-
-**根因鏈**（2026-06-01 首次觸發）：
-1. `AgencyOS-WeeklyAutomation` 排程任務 09:10 TPE 生成 3 個 dirty files
-2. 使用者 09:11 開 Claude Code → hook 自動 checkpoint（ahead=1）
-3. Laptop 5/29-5/31 推了 44 commits → remote ahead=44
-4. `git push` 被 reject (non-fast-forward) → `Invoke-FullMainlineAlignWithAutoCheckpoint` 只印 "Fix auth/network"，exit=1
-5. `ao-resume.md` Case B 沒有 git pull 步驟 → Claude 讀 stale files 出半殘報告
-
-**修改（兩個檔案，徹底解決 Class D + Class F）**：
-
-*F1 — `scripts/ao-resume.ps1`*：新增 `Invoke-NonFastForwardRecovery` helper 函數（lines 90-215），取代兩個 copy-paste inline blocks。
-- 修正 Bug 1（Critic Confirmed）：`$conflicted.Count == 0` fall-through — rebase 因非衝突原因失敗時現在 abort 而非誤繼續
-- 修正 Bug 2（Critic Plausible）：`GIT_EDITOR=true` + `GIT_SEQUENCE_EDITOR=true` 強制非互動式，防 rebase --continue 掛住等 editor
-- 修正 Bug 5（Critic Plausible）：`git checkout --theirs` 和 `git add` 失敗（delete/modify conflict）現在有 exit code 檢查，不再靜默吞錯
-- Block 1 和 Block 2 改為呼叫 helper，消除重複（Critic Simplification）
-- LATEST 衝突自動解法：`--theirs`（rebase 語意 = 我們的 checkpoint），digits/ASCII-path 輸出，no CJK risk
-
-*F2 — `.claude/commands/ao-resume.md` Case B*：新增 Step 0b（MANDATORY FIRST STEP），說明何時需要 `git pull --rebase`，如何處理 LATEST 衝突，為何需要這個步驟。
-
 **[驗證結果]**：
 1. REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts/system-health-check.ps1` | exit=0 | result=`Score: 100% (362/362)`
    REALTEST_WAIVED: SMOKE_COVERED — E2E non-fast-forward 模擬需製造 git 分歧狀態，high risk；真實場景已在 2026-06-01 09:11 手動驗證通過
@@ -448,6 +323,40 @@ _... 70 lines omitted._
 **[剩餘風險]**：無 automated E2E test 覆蓋 `Invoke-NonFastForwardRecovery`（需受控 git 分歧環境）。`GIT_EDITOR=true` 在 Git for Windows 中已包含 true.exe，應可用。
 
 **[rollback]**：`git revert <commit-hash>`；函數簽名未變，無 downstream 影響。
+
+### feat(repair-center): human_only incident 改顯示「已知悉」— 直接關閉事件不建 repair_run
+
+[任務理解]
+deploy source incident 核准後 policy=human_only（0059 migration 修完 409 後），「核准修復」按鈕仍顯示但點後狀態停在 human_only 且無 Telegram 通知（正確，但使用者不知為何），佇列無法清空。根本問題：human_only policy incident 不應建 repair_run；應直接標記已知悉（acknowledge）並 resolve 事件。
+
+[設計決策]
+Option A：human_only incident → 顯示「已知悉」→ POST /api/ops/inbox/[id]/acknowledge → ops_incidents.status=resolved → 從佇列移除（不建 repair_run）。比 Option B（繼續建 repair_run 然後自動 close）更 minimal、更誠實。
+
+[已修改]
+- `app/api/ops/inbox/[id]/acknowledge/route.ts`（新建）
+  - Auth: `canModifyIncidentStatus + source ≠ default_viewer`（同 workflow-runs/route.ts 相同 pattern）
+  - 冪等：status=resolved 時回 `{ok:true, already_resolved:true}`，不重複 UPDATE
+  - 純 ops_incidents.status → resolved；無 audit_log（欄位不存在於 schema）
+- `app/(shell)/ops/repairs/RepairActions.tsx`（修改）
+  - 新增 `policy?: string` prop
+  - 新增 `acknowledge()` async function（fetch POST /api/ops/inbox/[id]/acknowledge）
+  - mode="start" 分支：policy==="human_only" → 顯示「已知悉」btn；otherwise → 顯示「核准修復」btn
+- `app/(shell)/ops/repairs/page.tsx`（修改）
+  - queue.map() 加 `policy={policy}`（policy 已從 destructured `{ incident, policy }` 取得）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd next-admin && npx tsc --noEmit | exit=0 — 0 type errors（acknowledge route + RepairActions policy prop 全型別正確）
+- REALTEST_WAIVED: SMOKE_COVERED -- 「已知悉」按鈕需 sg-deploy 後方可 browser 實測；POST /api/ops/inbox/[id]/acknowledge 端點新建，本機 build 無 DB 連線；tsc gate pass 即綠燈
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=2c/0m — 2 critic findings 均確認為 pre-existing auth 設計選擇（viewer canModifyIncidentStatus = intentional per ops-role.ts L77 注釋 + ops/repairs/route.ts L15 注釋；header trust = 系統級設計，所有 ops routes 同 pattern）；非本次引入。新 route auth 邏輯完全鏡像 workflow-runs/route.ts:8
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=canModifyIncidentStatus | hits=18（14 pre-existing + 2 新增 acknowledge route；無 stale 宣告）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=acknowledge | hits=8（route.ts 定義 + RepairActions.tsx + ops/inbox/actions.ts + StatusActions.tsx + 等；acknowledge 函式為 ops inbox 既有 pattern）
+
+[剩餘風險]
+- 「已知悉」送出後頁面不自動重整（msg 顯示後需手動 reload 才見佇列清空）；可接受（同現有 start/run 按鈕行為一致）
+- 若 sgdeploy 後 sidebar badge 仍顯示舊 open_count → 屬 OpsInboxBadge 輪詢頻率問題（pre-existing，與本次無關）
+
+[rollback]
+`git revert <commit-hash>`；ops_incidents 無 schema 變更；0059 migration 已套用獨立（不影響）
 
 ## Related Documents (Auto-Synced)
 - `.cursor/rules/00-session-bootstrap.mdc`
@@ -462,5 +371,5 @@ _... 70 lines omitted._
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-07-02 12:52:30 UTC_
+_Last synced: 2026-07-05 07:42:57 UTC_
 

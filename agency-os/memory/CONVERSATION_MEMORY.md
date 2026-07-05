@@ -3,6 +3,8 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-07-05 (AO-CLOSE, session window 2026-07-04 → 2026-07-05)** — Short session focused on onboarding public intake + infrastructure fixes. Key completed: (1) **Phase 4 /intake 公開表單** — Next.js route group 重構 (shell)/(public)、5-step React form、intake-browser API with feature gate + rate limit、critic 安全閉環（2 Critical + 2 Major 全修，915245b0）; (2) **Phase 5 Cloudflare Turnstile 接入**（6306cd8e）— gate logic Critical fix（prod bypass 必須有 SECRET_KEY）+ 前端 widget explicit render + token refresh; (3) nginx /start/→intake redirect 建了再 revert — 還原 FluentForm 原始接單流程（WP→FluentCRM→Supabase→觸發建站，44da8365）; (4) **EU VPS ClickHouse OOM 根治** — mem_limit 1536m→3072m，20GB crash log 清除，restarts=0，healthy（00ea2e03）; (5) **trigger-build CF hairpin 修復**（11886d04）— 改用 http://next-admin:3000 內部路由 + fetchWithRetry（2 retries）+ failed 時 reset intake_form.status→"spec_generated"；MONGOLIA-03 手動解鎖可重試; (6) 蒙古旅遊客戶 handoff docs x4（現場開機 checklist + Cloudways 方案）; (7) repair_runs_source_check 補 'deploy'（0059 migration）; (8) human_only incident 改「已知悉」UI（70b17903）. 仍開放：Stage 4 開閘（High risk，需 go-ahead）、soulfulexpression.org CF DNS 遷移、POD Phase 4 e2e、Canvas 整輪瀏覽器實測。
+
 - **2026-07-02 (AO-CLOSE, long session window 2026-06-12T05:27Z → 2026-07-02)** — Last AO-RESUME stamp was still `2026-06-12T05:27:33.6508893Z`, so this closeout covered a large 2,306 first-parent commit window instead of only today's work. Main completed themes: next-admin/content-studio/canvas/video/oracle/POD feature and fix batches; multi-tenant security guard rollout S1–S5; cold outreach Phase 1 and per-org Supabase routing; customer-service U0–U5 plus U6 Chatwoot handoff gated on buying the dedicated server; WordPress provisioning/catalog/tourism pipeline fixes; ops-inbox `client_slug` propagation; sg-deploy/workflows build fixes; governance hook v2, WORKLOG rotation, junk guard, and command/skill index sync. SG deploy drift was rechecked during closeout: SG `.deployed-commit` matched `origin/main` (`6751854a...`), so `SG production app-code drift` was marked done via WORKLOG `AUTO_TASK_DONE`. A final housekeeping commit removed tracked `$null` and added `/nul` to `.gitignore` to keep AO-CLOSE from staging shell artifacts.
 
 - **2026-06-26 (AO-CLOSE retention correction)** — 使用者抓到 AO-CLOSE 仍有 `>30 days` report prune 與既有 90 天保留期不一致。已完成兩段修正並 push：`cba741aa` 把 AO-CLOSE command/prior-close guard 改回 90 天並恢復 `reports/ao-close/2026-05-25-1837.md`；`625e6442` 補齊 AO-CLOSE/AO-RESUME report README、`agency-os/README.md` archive 範例與 `scripts/archive-old-reports.ps1` 預設 `KeepDays=90`。驗證：相關 PowerShell 腳本 parse OK，current AO retention authoritative grep 對 stale 30-day tokens 為 0 matches；歷史 WORKLOG/report/log/cache 不回寫。
@@ -508,7 +510,7 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-07-02 12:45:31 UTC_
+_Last synced: 2026-07-05 07:32:37 UTC_
 
 ## 2026-06-16 AO-CLOSE memory — session window 2026-06-11T05:07Z → 2026-06-16 afternoon
 
@@ -565,4 +567,5 @@ _Last synced: 2026-07-02 12:45:31 UTC_
 - WORKLOG 改為月度輪替（當月+上月留主檔，餘 → `WORKLOG-archive/YYYY-MM.md`），15,708→8,356 行，ao-close 自動執行。
 - AGENTS.md 新增 §規則優先序（預授權 > 風險分級 > R0 逐項批准）與 §已知信任邊界（evidence 驗格式不驗真、機械閘 fail-open）。
 - 完整記錄：WORKLOG `## 2026-07-02`；分支 `claude/system-feedback-t7zo8r`（M1 03d624b → M4c 4ce5e4a）。
+
 

@@ -1,25 +1,25 @@
 # Backup health report
 
-- Generated: 2026-07-05 01:50:30
+- Generated: 2026-07-05 15:26:37
 - Overall: **PASS**
 
 ## SG (5.223.93.113)
 - Cron file: /etc/cron.d/lobster-backup => **present**
 - Cron schedule (non-comment lines): SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|0 2 * * * root /root/lobster-phase1/scripts/backup-phase1.sh >> /var/log/lobster-backup.log 2>&1|30 2 * * * root /root/lobster-phase1/scripts/verify-backup.sh >> /var/log/lobster-backup.log 2>&1
 - Retention days (RETENTION_DAYS): 7 (source: static)
-- Backup dir size: 16G
-- Latest backup file time: 2026-07-04 02:31:26
-- Oldest backup file time: 2026-06-27 02:00:02
+- Backup dir size: 17G
+- Latest backup file time: 2026-07-05 02:31:18
+- Oldest backup file time: 2026-06-28 02:00:01
 - Backup age: 0d
-- Verify result: PASSED (2026-07-04T02:30:18Z)
+- Verify result: PASSED (2026-07-05T02:30:22Z)
 
 ## EU (204.168.175.41)
 - Cron file: /etc/cron.d/eu-backup => **present**
 - Cron schedule (non-comment lines): SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|30 2 * * * root /root/scripts/backup-eu-stack.sh >> /var/log/eu-backup.log 2>&1|0 3 * * * root /root/scripts/verify-backup-eu.sh >> /var/log/eu-backup.log 2>&1
 - Retention days (RETENTION_DAYS): 7 (source: static)
 - Backup dir size: 11G
-- Latest backup file time: 2026-07-04 02:31:17
-- Oldest backup file time: 2026-06-26 06:01:01
+- Latest backup file time: 2026-07-05 02:31:10
+- Oldest backup file time: 2026-06-28 02:31:13
 - Backup age: 0d
-- Verify result: PASSED (2026-07-04T03:00:16Z)
+- Verify result: PASSED (2026-07-05T03:00:16Z)
 

@@ -36,7 +36,7 @@
 後台 review 一眼 → 按 publish 開賣(✋ 開賣 + 扣款送印是人工,金流紅線)
 ```
 
-**做得到嗎?做得到。** 6 步骨架(印刷檔→商品圖→平拍→文案→Woo→Printful)的串接器 `runAll` **已經存在**([PublishWizard.tsx:392](../infra/hetzner-phase1-core/apps/next-admin/app/tools/publish/PublishWizard.tsx))。本 plan = 把它從「單款 + 2 張普通圖」升級成「多款 + 批次精緻 mockup + hex 多色對接」。
+**做得到嗎?做得到。** 6 步骨架(印刷檔→商品圖→平拍→文案→Woo→Printful)的串接器 `runAll` **已經存在**([PublishWizard.tsx:392](../infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/publish/PublishWizard.tsx))。本 plan = 把它從「單款 + 2 張普通圖」升級成「多款 + 批次精緻 mockup + hex 多色對接」。
 
 ---
 

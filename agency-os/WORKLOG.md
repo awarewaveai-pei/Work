@@ -22,6 +22,38 @@
 
 ---
 
+### AO-CLOSE 2026-07-05 — Session summary (window: 2026-07-04 → 2026-07-05)
+
+本輪完成（2026-07-04/05）：
+- ✅ feat(onboarding/public-intake): Phase 4 — /intake 公開表單 + (shell)/(public) route group 重構 + critic 安全閉環（915245b0）
+- ✅ feat(intake): Phase 5 — Cloudflare Turnstile 接入 + 前端 widget + gate logic Critical 修（6306cd8e）
+- ✅ feat(nginx): redirect /start/ → /intake（76576dc9）→ 後因接單流程考量 reverted（44da8365）還原 FluentForm 原始接單流程
+- ✅ fix(db): repair_runs_source_check 補 'deploy' — migration 0059 apply EU prod（b1d555e6）
+- ✅ feat(repair-center): human_only incident 改「已知悉」直接關閉，不建 repair_run（70b17903）
+- ✅ fix(onboarding): FluentForm select/checkbox 渲染、coerce-comma-split、n8n bridge 停用（多 commit 2026-07-04）
+- ✅ EU VPS ClickHouse OOM death spiral 根治（mem_limit 1536m→3072m + 20GB crash log 清除，restarts=0）（00ea2e03）
+- ✅ fix(trigger-build): CF hairpin → http://next-admin:3000 + fetchWithRetry + intake_form rollback（11886d04）
+- ✅ hotfix(intake): SG docker-compose build.args 補 NEXT_PUBLIC_TURNSTILE_SITE_KEY（Turnstile widget 現可見）
+- ✅ 蒙古旅遊客戶 handoff docs x4 — 現場開機 checklist、Cloudways 方案、public key 位置、網域 Namecheap（ef71b328 f5abcdf7 998e5bab 8d642e77）
+
+未做（仍開放）：
+- 一鍵架站 Stage 4 開閘（需 HETZNER_STAGING_TOKEN vault + SG env 三 flag + sg-deploy，High risk，等 go-ahead）
+- soulfulexpression.org → Cloudflare DNS 遷移
+- POD Phase 4 e2e（操作者 live e2e 建 Woo+Printful 商品）
+- Canvas 整輪瀏覽器實測
+- 蒙古客戶 Cloudways 實際建站（待客戶刷卡+配合）
+
+- AUTO_TASK_DONE: doc-link-fix Phase 4 route group (shell) broken links — validate-doc-integrity.mjs regex + 3 doc links fixed
+- REALTEST_EVIDENCE: tool=Bash | cmd=node lobster-factory/scripts/validate-doc-integrity.mjs | exit=0 | result=Doc integrity PASSED
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker stats trigger-clickhouse | result=296MiB/3GiB(9.63%) | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | result=0 errors (Phase 4+5+trigger-build)
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m — session overall summary + doc link fix (regex change one-liner, balanced-paren pattern)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=intake.*hairpin|request\.url.*provision | hits=0
+- BUGHUNT_DONE: scope=lobster-factory/scripts | grep=linkRe | hits=1 (validate-doc-integrity.mjs only, no downstream callers)
+- BUGHUNT_WAIVED: NA -- 蒙古 handoff docs = doc-only；nginx revert = self-contained cleanup
+
+---
+
 ### incident(eu-vps): ClickHouse OOM death spiral 根治 — 20GB crash-loop log 清除 + 記憶體上限重配置
 
 [任務理解]
@@ -9800,5 +9832,5 @@ Option A：human_only incident → 顯示「已知悉」→ POST /api/ops/inbox/
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-07-04 14:30:03 UTC_
+_Last synced: 2026-07-05 07:42:57 UTC_
 
