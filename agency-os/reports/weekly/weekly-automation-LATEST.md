@@ -1,132 +1,134 @@
-# Weekly Summary 2026-06-29
+# Weekly Summary 2026-07-06
 
-**Period**: 2026-06-23 → 2026-06-29
-**Generated**: 2026-06-29 (remote weekly-agent)
+**Period**: 2026-06-30 → 2026-07-06
+**Generated**: 2026-07-06 01:02 UTC (remote weekly-agent)
 
 ---
 
 ## Completed this week
 
-### 2026-06-23 — Banner Studio Full Roadmap + Video + POD Fixes
+### 2026-07-02 — Governance Overhaul + Security Hardening (Massive Session)
 
-- **feat(banner)**: Banner Studio P1 — streaming copy gen (5 variants), remove-bg compositing, `nano-banana-2` auto-routing for reference images (commit `437eb3cb`)
-- **feat(banner)**: AI background compositing — `aiBgCompositeProduct` toggle + `bgImageHasProduct` provenance stamp + canvas export skips overlay when composited
-- **feat(banner)**: Tier-1 conversion elements — CTA/badge/price/trust/scrim/stroke/layout templates
-- **feat(banner)**: Tier-2/3 font pairing, emphasis text, kerning, Undo-Redo, AI one-click design, marketing styles
-- **feat(banner)**: Tier-3 product scene templates + lighting presets (roadmap 100%)
-- **feat(banner)**: Sticky-zoom layout + reference image color extraction + brand color
-- **fix(banner)**: Composite mode restricted to models that actually place product
-- **feat(video)**: 三尺寸各比例原生生成 + 勾選 UI (critic Critical fixed)
-- **fix(video)**: ScriptForge 廣告A/B/C + AI主持人稿 + 「送去生產影片」按鈕; AI model selector restored
-- **feat(video)**: VideoStudio UI 一致性 + 時間長度 + 去 emoji 重構; UX redesign — deployed
-- **feat(pod-publish)**: 文案指示/品牌語氣 free-text field (deploy `a80e97c7`; browser verified)
-- **fix(pod-publish)**: 一鍵 502 root cause = WebP thumbnail rejected by Printful; `route.ts` filters thumbnail to png/jpg; native store synced 20/20
-- **fix(onboarding)**: onboarding 品牌色接進 `client_config.brandColors`
-- **ops(soulful-printful)**: sync-timeout diagnosis + cleared 4665 failed schedules + deleted test product 7430; Printful-side 2 orphans remain (Dashboard)
-- **feat(credentials)**: migration `0050` + 3 API routes + CredentialsTab UI full-stack deployed (26/32 smoke PASS)
-- sg-deploy next-admin → prod (operator authorized)
+**Hook Architecture v2 (strangler migration)**
+- Full governance audit: 10-point mechanical gate injection test; discovered remote container had zero hook wiring
+- Rewrote 23 old hooks → single `runner.js` + `rules.manifest.json` (26 pure rule modules + `lib/{shared,flags}.js`)
+- 54/54 hook tests pass (`bash scripts/test-hooks.sh`)
+- Phase 4 three rules mechanized: deploy-guard / VBC-reminder / vault-hint (60/60 tests)
+- `scripts/wire-remote-hooks.sh` → `.claude/settings.local.json` (remote container hook wiring; previously zero governance in remote sessions)
 
-### 2026-06-26 — EU Backup + CS Evidence + Governance
+**Security batch S1–S5 multi-tenant role gates**
+- S3: role gates on video/workflow-runs/integrations routes (tsc 0, critic Deep 0C/0M)
+- S4: `ops/clients` role gate + repairs org filter (tsc 0, 568 vitest PASS)
+- S5: social-publish/integrations/social-admin/social-channels (tsc 0, 568 vitest, critic Deep 0C/0M)
 
-- **ops(backup)**: EU backup scripts fully real-tested end-to-end — backup-eu-stack.sh exit 0 (402M, all 7 new items); restore drills: `.env` openssl decrypt ✓, MainWP 44 tables ✓, n8n workflow in Supabase dump ✓; R2 upload fix (`set -a` export)
-- **ops(backup)**: `check-backup-health.ps1` upgraded — real-exec both SG+EU PASSED + induced-failure unit tests; `verify-backup-eu.sh` comment-only cleanup
-- **ops(dr)**: DR test: vault → R2 GET HTTP 200 → openssl decrypt → 4 `.env` files listed; throwaway script deleted
-- **feat(cs)**: CS U0-U5 evidence committed (`9abdb0bf`, `91d026c4`); deployed `024b52c3`; migration `0051` applied EU prod (8 tables / 8 RLS / 8 policy / RPC / pgvector; SELECT cols validated)
-- **ops(governance)**: AO report retention corrected to 90 days (`cba741aa`, `625e6442`); stale 30-day prune removed from all AO-CLOSE/AO-RESUME scripts; restored 2026-05-25 report
+**Provisioning pipeline (one-click site builder)**
+- ✅ Stage 2 n8n bridge complete (workflow `RbrHNu3BUEmpNWeT` active, e2e verified)
+- ✅ Stage 3 program + migration 0055 applied
+- ✅ Stage 4 program complete + idle verified (gate: HETZNER_STAGING_TOKEN + SG env flags, High risk, awaits go-ahead)
+- 6-bug provisioning fix: manifests+shell+TS verified (tsc clean, bash -n OK, DRY_RUN e2e PASS)
 
-### 2026-06-27 — Oracle Platform + Canvas Overhaul + Provisioning Stage C
+**Maintenance**
+- WORKLOG monthly rotation: `rotate-worklog.mjs` (fence-aware/idempotent/atomic) 15,708 → 8,356 lines, 108 blocks conserved
+- Garbage file cleanup: 11 zero-byte tracked files removed; `/nul` added to `.gitignore`
+- critic Deep review: 5 Major/Medium all fixed (rotate fence false positive, non-atomic write, junk guard quotePath fix, rm -Rf variant, commit-tree false block)
+- Governance docs: AGENTS.md new §規則優先序 (C1–C4 resolution) + §已知信任邊界; TOOL_TRIGGER_MAP §Hooks rewrite + D1–D5 drift corrections
 
-- **feat(oracle)**: 紫微十二宮逐星知識庫 — 14主星×12宮全斷語 (`lib/ziwei/stars.ts`, `palaceReading.ts`; tsc 0, vitest 118+7; deployed)
-- **feat(oracle)**: 紫微頂規確定性分析引擎 (`patterns.ts` 21+ rules, `brightness.ts`, `flying.ts`, `analyze.ts`; deployed SG)
-- **deploy(oracle)**: oracle.aware-wave.com 上線全部 8 功能 — git reset to fresh build, `.env.production` injected, 8 endpoints live, `/api/astrology` 200, `/api/interpret` premium 402 paywall confirmed
-- **feat(canvas)**: 畫布自動適應一頁 + Adobe 快捷鍵 + 工具列整合右側欄 (commits `05f9f62f`, `470e10ba`; Chrome MCP real-test; sg-deploy healthy 7s)
-- **feat(canvas)**: 兩批改善 — Batch 1 (`d9ac17e4`): 裁切/面板永顯/存檔修復; Batch 2 (`587d0a24`): 每圖記調色/滑桿undo; critic Deep ×2 pass; browser e2e verified
-- **fix(tarot)**: `lockStyle()` 移除多餘 `saveToGallery()` 呼叫 (style lock no longer re-saves preview)
-- **feat(onboarding)**: 公開接客門 — `intake-public/route.ts` (new); sidebar flow reorganized
-- **feat(provisioning)**: Stage C — AI spec content injection: `seedContentFromSpec`, `buildSeedScript`, base64-via-stdin, CJK-safe, idempotent `aw_seed_done` flag
-- **fix(provisioning)**: Stage C two-call split (timeout regression fix; `mode="seed"` separate POST)
-- **feat(provisioning)**: slug fallback + brand color injection (CSS via `wp_update_custom_css_post`) + `wireClientToContentTools` (reserve-first pattern)
-- **feat(provisioning)**: AI hero image — `generateAndInstallHeroImage`, flux-schnell, R2→`media_sideload_image`
-- **feat(cs)**: AI 全自動客服系統 U0-U5 fully complete: `lib/cs/` 13 files (config, types, autonomy, guardrails, llm, cis, db, rag, intent, tools, generate, orchestrator, eval); U4 headless widget code complete
+### 2026-07-03 — Auto-Repair Major Upgrade
 
-### 2026-06-28 — Netdata Fix + Culture Presets + Canvas Refinement
+- Auto-Repair three major upgrades: A1 evidence engine + A3 closed-loop + A2 Remediation executor
+- System upgraded from "automated paperwork" to self-healing capable
+- 22 new tests all pass, critic Deep pass, npx tsc 0 errors
 
-- **fix(netdata)**: SG `web_log` 「unparsed=100%」誤報 — netdata user added to `adm` group (`usermod -aG adm netdata`); verified: unmatched=0%, success=0.7%
-- **feat(canvas)**: CanvasEditor panel reorder (匯出→top, 文字→below 圖層) + dynamic workspace height replacing `calc()` magic number (tsc 0, 551 tests, critic Deep 0 findings)
-- **feat(studio)**: 世界文化 culture-presets.ts — CORE_TOPICS unified single-source (27 topics); MAP_THEMES/CULTURE_LENSES compose from it; data reorg, tsc EXIT=0, 0 dup keys, curated covers both-mode keys
-- **feat(studio)**: 世界文化 整合版 — unified ALL_TOPICS(27, 核心/觀光/設計 grouped), single topic state, surprise expansion; verified tsc EXIT=0 + critic Low risk 0 Critical
+### 2026-07-04 — Onboarding Public Portal + Infrastructure Fixes
 
-### 2026-06-29 — Multi-Tenant Identity Foundation (S1)
+**One-click Site Builder public intake**
+- ✅ Phase 4 `/intake` public form + Next.js `(shell)/(public)` route group refactor (commit `915245b0`)
+- critic security closure: 2 Critical + 2 Major all fixed (gate logic, rate limit, SSRF)
+- 599/599 vitest PASS
 
-- **feat(security)**: S1 Multi-Tenant Identity Foundation — `middleware.ts` CLAIM_HEADERS expanded (x-ops-user-kind, x-ops-org-id); `resolveTenantFromMeta()` + `applyIdentityHeaders()` helpers; unified identity injection across fresh/network/stale paths
-- **feat(security)**: `lib/supabase/session-cache.ts` — `UserKind` type + `CachedIdentity` interface (userKind+orgId); all 3 exports updated
-- **feat(security)**: `lib/tenant-guard.ts` (NEW) — `resolveTenant / assertOrgAccess / effectiveOrgId / OrgAccessError / toOrgAccessResponse`; S2 migration helper; dev-mode warn for uncovered routes
-- **feat(security)**: `lib/supabase/route-client.ts` (NEW) — user-scoped Supabase client (anon key + cookies; RLS auto-enforced)
-- **docs(security)**: `MULTI_TENANT_ISOLATION_AUDIT_AND_PLAN.md` (NEW) — ~20 IDOR vulnerability audit + S1-S5 roadmap; `S1_TENANT_IDENTITY_DESIGN.md` (NEW)
-- **feat(security)**: session-cache tests updated to `CachedIdentity` interface; client round-trip test added; 10/10 assertions pass (staff/client resolveTenant, cross-org 403, null-org throws 403)
+**Database / Infrastructure**
+- fix(db): migration 0059 `repair_runs_source_check` added `'deploy'` value (b1d555e6) — resolved all deploy-source incident 409 errors
+- fix(repair-center): `human_only` incident changed to display "已知悉" button → direct acknowledge/close without creating repair_run (70b17903)
+- fix(onboarding): FluentForm select/checkbox rendering + n8n bridge deactivated (multiple commits)
+
+### 2026-07-04/05 — Turnstile + EU VPS Emergency + Client Handoffs
+
+**Security / UX**
+- ✅ Phase 5 Cloudflare Turnstile integration (commit `6306cd8e`): gate logic Critical fix (prod bypass requires SECRET_KEY), frontend explicit render, token refresh on expiry
+- nginx `/start/` → `/intake` redirect: built then reverted (44da8365) — restored original FluentForm → FluentCRM → Supabase → trigger-build intake design
+
+**EU VPS Emergency**
+- ✅ EU VPS ClickHouse OOM death spiral root-fixed (commit `00ea2e03`):
+  - Root cause: mem_limit=1536m → OOM on startup → 2,344 container restarts → 20GB crash log accumulation
+  - Fix: mem_limit 1536m → 3072m; deleted 20GB system log dirs; restarts=0, healthy at 9.63% mem
+- ✅ fix(trigger-build): CF hairpin TCP failure → changed to `http://next-admin:3000` internal routing + fetchWithRetry (2 retries) + failed state reset (commit `11886d04`)
+- ✅ MONGOLIA-03 intake_form status unlocked (manual PATCH: `building` → `spec_generated`)
+- ✅ hotfix: SG docker-compose `build.args` added `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (Turnstile widget now visible)
+
+**Client Work**
+- ✅ Mongolia tourism client handoff docs ×4 (on-site startup checklist, Cloudways plan, public key location, domain Namecheap) — commits `ef71b328`–`8d642e77`
 
 ---
 
 ## Open tasks
 
-### Security / Overdue
-- **🔴 OVERDUE**: Defender 木馬 `Trojan:Win32/PowhidSubExec.B` — source trace + remediation (target was 2026-06-17, now 12 days overdue)
-- S2–S5 multi-tenant rollout (S1 shipped 2026-06-29; S2 = route-level `assertOrgAccess` enforcement)
+### 🔴 High Priority / Overdue
 
-### Social / Postiz
-- Postiz OAuth apps setup (Meta/IG/FB, Reddit, LinkedIn — human operator required)
-- Draft cleanup: test posts on Bluesky account (human)
-- Bluesky account link to Postiz (human)
-- Content Studio → social panel browser e2e (validation debt)
+- **Defender 木馬資安複盤 `Trojan:Win32/PowhidSubExec.B`** — OVERDUE since 2026-06-17 (19 days); source trace + remediation still outstanding
+- **POD A2 金流紅線** — A2 draft-only pipeline is LIVE but dormant; confirm/auto-fulfill requires human explicit approval before any code is written
 
-### POD (Print-on-Demand)
-- Phase 4 true e2e + browser verify (A1 complete; e2e pending human)
-- **A2 confirm phase — 🔴 金流紅線** (requires human explicit approval before any action)
+### 🟠 Gated / Awaiting Operator Action
 
-### Canvas / UI
-- Browser e2e test debt: Undo/Redo, genfill, Posterize, edge tool full flow
-- `/tools/canvas` full browser e2e (still unverified round-trip)
+- **一鍵架站 Stage 4 開閘** — code complete + idle verified; needs `HETZNER_STAGING_TOKEN` in vault + SG .env 3 flags + sg-deploy (High risk, awaits go-ahead)
+- **EU → Dedicated 搬機 + 退雲端** (gated 8月): FSN i7-7700/64GB/2×512SSD ~€48.70; operator card-swipe required
+- **CS U6 Chatwoot** (gated 8月): software layer U0–U5 live; only connection wiring remains once dedicated machine purchased
 
-### Content Engine
-- RSS block + quality-score block + second batch sources/UI
-- SEO/GEO Soulful positioning + article generation
-- Search block registry live; remaining source/UI work
+### 🟡 Human-Only Tasks
 
-### Customer Service
-- U6 Chatwoot (gated 8月 — waiting dedicated machine purchase)
+- Postiz OAuth apps: Meta/IG+FB, Reddit, LinkedIn (platform App Review required)
+- Postiz test draft cleanup: delete `cmqo1wijz0005p58ncl1mtssr` from postiz.aware-wave.com
+- Postiz → Client Hub account link (Bluesky → client slug social tab)
+- POD Phase 4 true e2e: operator browser session to create real Woo+Printful product
+- Canvas full browser e2e: Undo/Redo, genfill, Posterize, group/ungroup (validation debt)
 
 ### Infrastructure
-- **EU→Dedicated migration** (gated 8月 — operator card-swipe required)
-- SG production app-code drift (4 commits behind as of 2026-06-26/27; needs `/check-drift`)
-- soulfulexpression.org → Cloudflare (DNS first, registrar after)
-- app.aware-wave Stage 2 → Stage 3 → Stage 4 → Stage 5
-- Hetzner dispatcher: M10 orphan reaper + partial index follow-up
-- One-click hosting embed into app.aware-wave (Phase 5, plan ready)
-- Client machine: post-boot full-stack deploy + maintenance layer (planned, not built)
 
-### Auto-Repair / Governance
-- M2/M4/M7-M10 rollout (obs period ended 2026-06-19; actionable, needs scheduling)
-- Three-file governance audit (Inventory / Routing Spec / Routing Matrix / Traceability)
-- endpoint-alert.sh automated deploy mechanism
-- TASKS [x] auto-archive + duplicate detection gate (`archive-completed-tasks.ps1`, R0 approved)
+- soulfulexpression.org → Cloudflare DNS migration (confirm Hostinger billing line items first)
+- SG production drift check (`/check-drift` → `/verify` → sg-deploy if needed)
+- Hetzner dispatcher pre-launch: M10 orphan reaper + partial index (before enabling `LOBSTER_EXECUTE_*`)
+- Hetzner one-click hosting embed into app.aware-wave (Phase 5, recipe ready at `hosting/EMBED_PROVISION_INTO_APP.md`)
+- smoke test `04-onboard` spec: needs app session login step (currently fails without app auth)
+
+### Security / Auto-Repair
+
+- S2–S5 multi-tenant rollout: S1 identity layer shipped (2026-06-29); S2 = apply `assertOrgAccess` at route level (~20 documented IDOR items)
+- Auto-Repair M2/M4/M7–M10 rollout (obs period ended 2026-06-19; scheduled, deferred)
+- M2 per-source HMAC + M4 fingerprint (Batch 3 complete; Phase 2 rollout + Phase 3 constraint swap remaining)
+
+### Content / Tools
+
+- Content Engine: RSS block + second-batch sources/UI; 動態來源 UI (`ContentStudio.tsx:1112` still hardcoded)
+- SEO/GEO Soulful: operator to fill real data (EdD/price/IG/citations) before articles publishable
+- Image Output Pipeline: Tarot/POD color grading → WebP/CMYK PDF (Phase 1.5/Phase 2 remaining)
+- TASKS `[x]` auto-archive + duplicate detection gate (`archive-completed-tasks.ps1`, R0 plan A approved)
 
 ### wp-bridge
-- `/product` dry_run support
-- Featured image operation
-- update-existing-post / product update+delete operations
+
+- `/product` dry_run support (`RestController:167`)
+- Featured image sideload + update-existing-post + product update/delete operations
 - wp-bridge → app.aware-wave Ops Dashboard + commercialize
 
 ### Clients / Sites
-- Soulful Expression Art Therapy: Day 1 + Day 2 handover
-- Scenery Travel Mongolia: new site Day 1 + Day 2
-- Next-Gen trial: cloud staging acceptance (2 projects)
-- Termius mobile SSH setup + cheat sheet (pre-travel requirement)
 
-### Company
-- Company desktop: Cloudflare vault token fix (`cfut_` → `cfat_`; add `CLOUDFLARE_ACCOUNT_ID`)
-- Company desktop: SystemGuard re-register (fix red-flash window)
-- Cross-border tax + legal compliance advisor review process
-- lobster-factory A10-2 商業閉環実跑
+- Soulful Expression Art Therapy: Day 1 account handover (pending operator)
+- Scenery Travel Mongolia: new site Day 1 + Day 2 (pending client card + domain confirmation)
+- Next-Gen pilot: cloud staging acceptance (2 projects)
+- Termius mobile SSH setup + cheat sheet (pre-travel requirement — operator travel upcoming)
+
+### Company Desktop (Backlog)
+
+- Cloudflare vault token fix (`cfut_` → `cfat_` + add `CLOUDFLARE_ACCOUNT_ID`)
+- SystemGuard re-register (fix red-flash window)
 
 ---
 
@@ -134,21 +136,16 @@
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| SG VPS (`5.223.93.113`) | ✅ Healthy | Health 100% (372/372); System Guard PASS (2026-06-26) |
-| EU VPS (`204.168.175.41`) | ✅ Healthy | video-service + Postiz v2.11.3 live; netdata web_log fixed |
-| Supabase (EU) | ✅ Healthy | Migrations `0048`–`0051` applied; pgvector + RPC live |
-| oracle.aware-wave.com | ✅ Live | 8 endpoints; astrology 200; interpret premium 402 paywall |
-| Video pipeline | ✅ Live | EU thread + R2 + browser polling; Pexels-video mode |
-| AI Customer Service | ✅ U0-U5 deployed | U4 headless widget code complete; U6 Chatwoot gated 8月 |
-| POD pipeline | ✅ Phase 1b done | Printful hex-bind + mockup chain; e2e pending human |
-| Banner Studio | ✅ Roadmap 100% | Tier-1/2/3 complete; AI compositing live |
-| Provisioning Stage C | ✅ Live | AI spec injection + hero image + brand color |
-| Multi-Tenant S1 | ✅ Shipped | Identity layer; S2–S5 roadmap written |
-| EU Backup | ✅ Verified | 402M e2e real-test; DR drill passed; R2 upload fixed |
-| Postiz | ✅ Live | `postiz.aware-wave.com`; Bluesky Gate C verified |
-| Search | ✅ Migrated | Serper.dev + Claude Haiku (all 7 Perplexity points replaced) |
-| Soulful prod artworks | ⚠️ Restored | 420 restored; 2 blog images permanently lost (accepted) |
-| Health gate (last close) | ✅ 100% | 2026-06-26 372/372 |
+| SG VPS (`5.223.93.113`) | ✅ Healthy | Health 100% (as of 2026-07-05); Turnstile widget live; /intake form deployed |
+| EU VPS (`204.168.175.41`) | ✅ Healthy | ClickHouse OOM root-fixed (restarts=0, 9.63% mem); all 9 containers Up+healthy |
+| Supabase (EU) | ✅ Healthy | Migrations 0059 applied; repair_runs source check complete |
+| Hook system v2 | ✅ Deployed | 54/54 tests; remote wiring script ready (`wire-remote-hooks.sh`) |
+| next-admin (SG) | ✅ Live | Turnstile baked in; `(shell)/(public)` route groups; 599 tests |
+| Auto-Repair | ✅ Upgraded | A1+A2+A3 — self-healing engine now operational |
+| Provisioning pipeline | 🟡 Stage 4 gated | Stage 0–3 complete; Stage 4 awaits token + env flags + go-ahead |
+| n8n bridge | ✅ Stage 2 live | Workflow active, e2e verified |
+| Health gate (last close) | ✅ 100% | 2026-07-05 362/362 |
+| EU ClickHouse | ✅ Stable | After emergency fix; monitor 3–5 days before reducing mem_limit |
 
 ---
 
@@ -156,27 +153,24 @@
 
 | Risk | Severity | Status |
 |------|----------|--------|
-| Defender 木馬資安複盤 | 🔴 High | OVERDUE 12 days (target 2026-06-17); source unknown |
-| POD A2 金流紅線 | 🔴 Critical | Zero automation before human explicit approval |
-| SG app-code drift (4 commits) | 🟠 Major | Run `/check-drift` → `/verify` → sg-deploy to close |
-| S2 multi-tenant enforcement | 🟠 Major | S1 done; S2 route-level assertOrgAccess not yet applied; ~20 IDOR risks documented |
-| Auto-Repair M2/M4/M7-M10 | 🟠 Major | Obs period ended 2026-06-19; rollout deferred |
-| EU→Dedicated migration | 🟡 Gated | 8月; operator card-swipe required |
-| Postiz memory 67% (1400m) | 🟡 Minor | Monitor; restart if >85% |
-| Serper quota unknown | 🟡 Minor | First full week; monitor usage |
-| 2 soulful blog images permanently lost | Medium | Accepted; client may notice |
+| Defender 木馬資安複盤 | 🔴 High | OVERDUE 19 days (target 2026-06-17); no forensics done yet |
+| POD A2 金流紅線 | 🔴 Critical | No automation before human explicit approval; confirm phase not designed |
+| Stage 4 一鍵架站 | 🟠 Major | Code complete; blocked on HETZNER_STAGING_TOKEN + operator go-ahead |
+| S2 multi-tenant enforcement | 🟠 Major | S1 done; ~20 IDOR items documented in `MULTI_TENANT_ISOLATION_AUDIT_AND_PLAN.md`; S2 not yet applied |
+| EU→Dedicated migration | 🟡 Gated | 8月; operator card-swipe; current EU 8GB RAM insufficient for Chatwoot |
+| ClickHouse stability | 🟡 Monitor | 3–5 day observation window after OOM fix (2026-07-05); may adjust mem_limit |
+| Operator travel upcoming | 🟡 Info | Termius SSH setup + cheat sheet pre-travel requirement not yet done |
+| soulful blog images lost | ℹ️ Accepted | 2 images permanently lost; client may notice (accepted tradeoff from 2026-06-28) |
 
 ---
 
 ## Memory highlights
 
-- **S1 Multi-Tenant SSOT**: `lib/tenant-guard.ts` + `lib/supabase/route-client.ts`; ~20 IDOR items audited in `MULTI_TENANT_ISOLATION_AUDIT_AND_PLAN.md`; S2 = apply `assertOrgAccess` at route level
-- **Oracle platform live**: oracle.aware-wave.com — 紫微 8-endpoint API + deterministic analysis engine (patterns/brightness/flying); 14主星×12宮 knowledge base; premium paywall enforced
-- **AI Customer Service U0-U5**: `lib/cs/` 13-file engine; intent classification, RAG, autonomous decision, guardrails, eval; U6 Chatwoot gated 8月
-- **Provisioning Stage C**: AI spec content injection + brand colors + hero image; `seedContentFromSpec()` idempotent via `aw_seed_done` flag
-- **Banner Studio roadmap 100%**: P1 + Tier-1 + Tier-2 + Tier-3 fully shipped; AI compositing + color extraction + scene templates live
-- **EU Backup fully verified**: backup-eu-stack.sh 402M e2e; DR drill vault→R2→decrypt passed; `check-backup-health.ps1` with induced-failure tests
-- **AO retention SSOT**: 90 days (not 30); corrected in all scripts 2026-06-26
-- **WebP rule updated**: `normalizeForWp` applies to pipeline-generated media ONLY, never user-uploaded artworks
-- **Perplexity fully retired**: Serper.dev + Claude Haiku is new search stack (all 7 points)
-- **netdata fix**: SG `web_log` unmatched=0% after `usermod -aG adm netdata`
+- **Hook v2 architecture SSOT**: `runner.js` + `rules.manifest.json` is single source of truth for all 26 governance rules; old 23-file pattern deleted. `bash scripts/test-hooks.sh` is the canonical verification command.
+- **Remote container hook gap patched**: `scripts/wire-remote-hooks.sh` must be added as setup script for Claude Code web environments (governance vacuum found 2026-07-02 audit). One-time per container; subsequent sessions in same container inherit hooks.
+- **ClickHouse OOM root cause**: system log TTL (7d/14d/30d) had never executed because OOM killed CH on startup before TTL could run — classic death spiral. Fix: raise mem_limit first, clear logs manually, then TTL resumes.
+- **CF hairpin pattern**: `new URL("/api/...", request.url)` in server-side Next.js code produces external URL → loops through Cloudflare → fragile under Docker GC. Always use `http://<container-name>:3000` for intra-Docker calls.
+- **Intake flow decision (reverted)**: `/start/` → `/intake` redirect was built and reverted; original FluentForm → MySQL + FluentCRM → webhook → Supabase → trigger-build is the authoritative intake path. `/intake` React form exists as alternative channel but FluentForm is the live path.
+- **Stage 4 gate**: `HETZNER_STAGING_TOKEN` (vault currently empty, needs decision: dedicated token vs main token) + `SG_PROVISION_ENABLED=true` + `LOBSTER_EXECUTE_MANIFEST_STEPS=true` + `HETZNER_STAGING_ENABLED=true` + sg-deploy. All five required before Stage 4 activates.
+- **WORKLOG rotation**: `rotate-worklog.mjs` is now part of `ao-close.ps1`. Threshold: ~15k lines triggers rotation. Archives go to `WORKLOG-archive-YYYY-MM.md`.
+- **Multi-tenant isolation plan**: `MULTI_TENANT_ISOLATION_AUDIT_AND_PLAN.md` documents ~20 IDOR vulnerability sites; S1 identity layer shipped (2026-06-29); S2–S5 rollout roadmap written.
