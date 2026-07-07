@@ -14,16 +14,21 @@
     "status": "Succeeded"
   },
   "last_failure": {
-    "task_id": "wpvivid-1ceaacaf6d5ef",
-    "unix_utc": 1782087225,
-    "iso_utc": "2026-06-22T00:13:45Z",
+    "task_id": "wpvivid-37bfb06731ac6",
+    "unix_utc": 1783296909,
+    "iso_utc": "2026-07-06T00:15:09Z",
     "status": "Failed",
-    "reason": "Failed,"
+    "reason": "Failed, A exception (WPvivid_Google_Service_Exception) occurred"
   },
-  "synced_at_utc": "2026-06-30T01:11:03Z",
+  "synced_at_utc": "2026-07-07T01:11:02Z",
   "synced_by": "auto -- sync-backup-status-from-mainwp.sh (EU cron) from MainWP DB report_addon truth source",
   "truth_source": "mwp_mainwp_wpvividmeta WHERE site_id=2 AND option_name='report_addon' on EU VPS mainwp-web container",
   "backup_history_since_last_sync": [
+    {
+      "iso_utc": "2026-07-06T00:15:09Z",
+      "status": "Failed",
+      "reason": "Failed, A exception (WPvivid_Google_Service_Exception) occurred"
+    },
     {
       "iso_utc": "2026-06-29T00:19:14Z",
       "status": "Succeeded"
@@ -61,10 +66,6 @@
     },
     {
       "iso_utc": "2026-05-09T11:08:15Z",
-      "status": "Succeeded"
-    },
-    {
-      "iso_utc": "2026-05-09T09:13:21Z",
       "status": "Succeeded"
     }
   ],
