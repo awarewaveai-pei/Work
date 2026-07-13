@@ -1,134 +1,83 @@
-# Weekly Summary 2026-07-06
+# Weekly Summary 2026-07-13
 
-**Period**: 2026-06-30 → 2026-07-06
-**Generated**: 2026-07-06 01:02 UTC (remote weekly-agent)
+**Period**: 2026-07-07 → 2026-07-13
+**Generated**: 2026-07-13 01:06 UTC (remote weekly-agent)
 
 ---
 
 ## Completed this week
 
-### 2026-07-02 — Governance Overhaul + Security Hardening (Massive Session)
+**No operator sessions recorded this week (2026-07-07 – 2026-07-13).**
 
-**Hook Architecture v2 (strangler migration)**
-- Full governance audit: 10-point mechanical gate injection test; discovered remote container had zero hook wiring
-- Rewrote 23 old hooks → single `runner.js` + `rules.manifest.json` (26 pure rule modules + `lib/{shared,flags}.js`)
-- 54/54 hook tests pass (`bash scripts/test-hooks.sh`)
-- Phase 4 three rules mechanized: deploy-guard / VBC-reminder / vault-hint (60/60 tests)
-- `scripts/wire-remote-hooks.sh` → `.claude/settings.local.json` (remote container hook wiring; previously zero governance in remote sessions)
+The operator is on planned travel (noted as upcoming in the 2026-07-06 weekly). Daily notes for 07-07 through 07-13 all contain empty "Done today / Current state / Next steps" placeholders. The WORKLOG contains no entries after the 2026-07-06 remote-weekly-agent entry. System has been idle for 7 days.
 
-**Security batch S1–S5 multi-tenant role gates**
-- S3: role gates on video/workflow-runs/integrations routes (tsc 0, critic Deep 0C/0M)
-- S4: `ops/clients` role gate + repairs org filter (tsc 0, 568 vitest PASS)
-- S5: social-publish/integrations/social-admin/social-channels (tsc 0, 568 vitest, critic Deep 0C/0M)
-
-**Provisioning pipeline (one-click site builder)**
-- ✅ Stage 2 n8n bridge complete (workflow `RbrHNu3BUEmpNWeT` active, e2e verified)
-- ✅ Stage 3 program + migration 0055 applied
-- ✅ Stage 4 program complete + idle verified (gate: HETZNER_STAGING_TOKEN + SG env flags, High risk, awaits go-ahead)
-- 6-bug provisioning fix: manifests+shell+TS verified (tsc clean, bash -n OK, DRY_RUN e2e PASS)
-
-**Maintenance**
-- WORKLOG monthly rotation: `rotate-worklog.mjs` (fence-aware/idempotent/atomic) 15,708 → 8,356 lines, 108 blocks conserved
-- Garbage file cleanup: 11 zero-byte tracked files removed; `/nul` added to `.gitignore`
-- critic Deep review: 5 Major/Medium all fixed (rotate fence false positive, non-atomic write, junk guard quotePath fix, rm -Rf variant, commit-tree false block)
-- Governance docs: AGENTS.md new §規則優先序 (C1–C4 resolution) + §已知信任邊界; TOOL_TRIGGER_MAP §Hooks rewrite + D1–D5 drift corrections
-
-### 2026-07-03 — Auto-Repair Major Upgrade
-
-- Auto-Repair three major upgrades: A1 evidence engine + A3 closed-loop + A2 Remediation executor
-- System upgraded from "automated paperwork" to self-healing capable
-- 22 new tests all pass, critic Deep pass, npx tsc 0 errors
-
-### 2026-07-04 — Onboarding Public Portal + Infrastructure Fixes
-
-**One-click Site Builder public intake**
-- ✅ Phase 4 `/intake` public form + Next.js `(shell)/(public)` route group refactor (commit `915245b0`)
-- critic security closure: 2 Critical + 2 Major all fixed (gate logic, rate limit, SSRF)
-- 599/599 vitest PASS
-
-**Database / Infrastructure**
-- fix(db): migration 0059 `repair_runs_source_check` added `'deploy'` value (b1d555e6) — resolved all deploy-source incident 409 errors
-- fix(repair-center): `human_only` incident changed to display "已知悉" button → direct acknowledge/close without creating repair_run (70b17903)
-- fix(onboarding): FluentForm select/checkbox rendering + n8n bridge deactivated (multiple commits)
-
-### 2026-07-04/05 — Turnstile + EU VPS Emergency + Client Handoffs
-
-**Security / UX**
-- ✅ Phase 5 Cloudflare Turnstile integration (commit `6306cd8e`): gate logic Critical fix (prod bypass requires SECRET_KEY), frontend explicit render, token refresh on expiry
-- nginx `/start/` → `/intake` redirect: built then reverted (44da8365) — restored original FluentForm → FluentCRM → Supabase → trigger-build intake design
-
-**EU VPS Emergency**
-- ✅ EU VPS ClickHouse OOM death spiral root-fixed (commit `00ea2e03`):
-  - Root cause: mem_limit=1536m → OOM on startup → 2,344 container restarts → 20GB crash log accumulation
-  - Fix: mem_limit 1536m → 3072m; deleted 20GB system log dirs; restarts=0, healthy at 9.63% mem
-- ✅ fix(trigger-build): CF hairpin TCP failure → changed to `http://next-admin:3000` internal routing + fetchWithRetry (2 retries) + failed state reset (commit `11886d04`)
-- ✅ MONGOLIA-03 intake_form status unlocked (manual PATCH: `building` → `spec_generated`)
-- ✅ hotfix: SG docker-compose `build.args` added `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (Turnstile widget now visible)
-
-**Client Work**
-- ✅ Mongolia tourism client handoff docs ×4 (on-site startup checklist, Cloudways plan, public key location, domain Namecheap) — commits `ef71b328`–`8d642e77`
+Last completed work (reference — carried from prior week):
+- Phase 4 `/intake` public form + `(shell)/(public)` route group refactor (commit `915245b0`)
+- Phase 5 Cloudflare Turnstile integration (commit `6306cd8e`)
+- EU VPS ClickHouse OOM root-fix: mem_limit 1536m→3072m, 20GB crash logs cleared (commit `00ea2e03`)
+- fix(trigger-build): CF hairpin → `http://next-admin:3000` + fetchWithRetry (commit `11886d04`)
+- migration 0059 repair_runs_source_check added 'deploy' value (commit `b1d555e6`)
+- Ops Inbox acknowledge route for human_only incidents (commit `70b17903`)
+- Mongolia tourism client handoff docs ×4 (commits `ef71b328`–`8d642e77`)
 
 ---
 
 ## Open tasks
 
-### 🔴 High Priority / Overdue
+### 🔴 Critical / High Priority
 
-- **Defender 木馬資安複盤 `Trojan:Win32/PowhidSubExec.B`** — OVERDUE since 2026-06-17 (19 days); source trace + remediation still outstanding
-- **POD A2 金流紅線** — A2 draft-only pipeline is LIVE but dormant; confirm/auto-fulfill requires human explicit approval before any code is written
+- **【資安複盤 OVERDUE】Defender 木馬 `Trojan:Win32/PowhidSubExec.B` 善後** — Target was 2026-06-17; now **26 days overdue**. Temp file cleanup + scheduled task verification + hook hardening still outstanding.
+- **POD A2 金流紅線** — A2 draft-only pipeline is LIVE but dormant; confirm/auto-fulfill phase not designed; requires explicit operator approval before any work begins.
 
 ### 🟠 Gated / Awaiting Operator Action
 
-- **一鍵架站 Stage 4 開閘** — code complete + idle verified; needs `HETZNER_STAGING_TOKEN` in vault + SG .env 3 flags + sg-deploy (High risk, awaits go-ahead)
+- **一鍵架站 Stage 4 開閘** — Code complete + idle verified (2026-07-03); needs `HETZNER_STAGING_TOKEN` in vault + SG .env 3 flags + sg-deploy (High/billable, awaits go-ahead)
 - **EU → Dedicated 搬機 + 退雲端** (gated 8月): FSN i7-7700/64GB/2×512SSD ~€48.70; operator card-swipe required
-- **CS U6 Chatwoot** (gated 8月): software layer U0–U5 live; only connection wiring remains once dedicated machine purchased
+- **CS U6 Chatwoot** (gated 8月): U0–U5 software layer live; Chatwoot wiring awaits dedicated machine
+- **POD Phase 4 true e2e**: operator browser session to create real Woo+Printful product
+- **Cold Outreach Workbench T10**: Gmail per-org OAuth (gated High-risk; T1–T9+T11+T12 all complete)
 
 ### 🟡 Human-Only Tasks
 
 - Postiz OAuth apps: Meta/IG+FB, Reddit, LinkedIn (platform App Review required)
 - Postiz test draft cleanup: delete `cmqo1wijz0005p58ncl1mtssr` from postiz.aware-wave.com
 - Postiz → Client Hub account link (Bluesky → client slug social tab)
-- POD Phase 4 true e2e: operator browser session to create real Woo+Printful product
 - Canvas full browser e2e: Undo/Redo, genfill, Posterize, group/ungroup (validation debt)
+- soulfulexpression.org → Cloudflare DNS migration (confirm Hostinger billing line items first)
+- Termius mobile SSH setup + cheat sheet (pre-travel requirement — **may now be past due**)
 
 ### Infrastructure
 
-- soulfulexpression.org → Cloudflare DNS migration (confirm Hostinger billing line items first)
-- SG production drift check (`/check-drift` → `/verify` → sg-deploy if needed)
 - Hetzner dispatcher pre-launch: M10 orphan reaper + partial index (before enabling `LOBSTER_EXECUTE_*`)
-- Hetzner one-click hosting embed into app.aware-wave (Phase 5, recipe ready at `hosting/EMBED_PROVISION_INTO_APP.md`)
-- smoke test `04-onboard` spec: needs app session login step (currently fails without app auth)
+- Hetzner one-click hosting embed into app.aware-wave.com (Phase 5, recipe at `hosting/EMBED_PROVISION_INTO_APP.md`)
+- smoke test `04-onboard` spec: needs app session login step
+- `app.aware-wave` onboarding/provisioning IA restructure (Phase 1 ops-console retirement)
+- **Company desktop**: Cloudflare vault token fix (`cfut_` → `cfat_` + `CLOUDFLARE_ACCOUNT_ID`) + SystemGuard re-register
 
 ### Security / Auto-Repair
 
-- S2–S5 multi-tenant rollout: S1 identity layer shipped (2026-06-29); S2 = apply `assertOrgAccess` at route level (~20 documented IDOR items)
-- Auto-Repair M2/M4/M7–M10 rollout (obs period ended 2026-06-19; scheduled, deferred)
-- M2 per-source HMAC + M4 fingerprint (Batch 3 complete; Phase 2 rollout + Phase 3 constraint swap remaining)
+- S2 multi-tenant enforcement: ~20 IDOR sites documented in `MULTI_TENANT_ISOLATION_AUDIT_AND_PLAN.md`; S1 done, S2–S5 not yet applied
+- Auto-Repair M2 per-source HMAC + M4 fingerprint (Batch 3 complete; Phase 2 rollout pending)
 
 ### Content / Tools
 
-- Content Engine: RSS block + second-batch sources/UI; 動態來源 UI (`ContentStudio.tsx:1112` still hardcoded)
-- SEO/GEO Soulful: operator to fill real data (EdD/price/IG/citations) before articles publishable
-- Image Output Pipeline: Tarot/POD color grading → WebP/CMYK PDF (Phase 1.5/Phase 2 remaining)
+- Content Engine: RSS block + second-batch sources; `ContentStudio.tsx:1112` hardcoded source list
+- SEO/GEO Soulful: real data (EdD/price/IG/citations) needed before articles publishable
+- Image Output Pipeline: Tarot/POD color grading → WebP/CMYK PDF (Phase 1.5/2 remaining)
 - TASKS `[x]` auto-archive + duplicate detection gate (`archive-completed-tasks.ps1`, R0 plan A approved)
+- Mockup Studio diagnosis: server-side healthy; awaiting operator to provide symptom details
 
 ### wp-bridge
 
-- `/product` dry_run support (`RestController:167`)
-- Featured image sideload + update-existing-post + product update/delete operations
-- wp-bridge → app.aware-wave Ops Dashboard + commercialize
+- `/product` dry_run support (`RestController:167`; bump AWBRIDGE_VERSION + release flow)
+- Featured image sideload + update-existing-post + product update/delete
+- wp-bridge → app.aware-wave.com Ops Dashboard + commercialize
 
 ### Clients / Sites
 
 - Soulful Expression Art Therapy: Day 1 account handover (pending operator)
 - Scenery Travel Mongolia: new site Day 1 + Day 2 (pending client card + domain confirmation)
 - Next-Gen pilot: cloud staging acceptance (2 projects)
-- Termius mobile SSH setup + cheat sheet (pre-travel requirement — operator travel upcoming)
-
-### Company Desktop (Backlog)
-
-- Cloudflare vault token fix (`cfut_` → `cfat_` + add `CLOUDFLARE_ACCOUNT_ID`)
-- SystemGuard re-register (fix red-flash window)
 
 ---
 
@@ -136,16 +85,17 @@
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| SG VPS (`5.223.93.113`) | ✅ Healthy | Health 100% (as of 2026-07-05); Turnstile widget live; /intake form deployed |
-| EU VPS (`204.168.175.41`) | ✅ Healthy | ClickHouse OOM root-fixed (restarts=0, 9.63% mem); all 9 containers Up+healthy |
-| Supabase (EU) | ✅ Healthy | Migrations 0059 applied; repair_runs source check complete |
-| Hook system v2 | ✅ Deployed | 54/54 tests; remote wiring script ready (`wire-remote-hooks.sh`) |
-| next-admin (SG) | ✅ Live | Turnstile baked in; `(shell)/(public)` route groups; 599 tests |
-| Auto-Repair | ✅ Upgraded | A1+A2+A3 — self-healing engine now operational |
-| Provisioning pipeline | 🟡 Stage 4 gated | Stage 0–3 complete; Stage 4 awaits token + env flags + go-ahead |
-| n8n bridge | ✅ Stage 2 live | Workflow active, e2e verified |
+| SG VPS (`5.223.93.113`) | ✅ Last known healthy | Health 100% as of 2026-07-05; no sessions since to verify current state |
+| EU VPS (`204.168.175.41`) | ✅ Last known healthy | ClickHouse OOM root-fixed 2026-07-05; all 9 containers Up+healthy at last check |
+| Supabase (EU) | ✅ Last known healthy | Migrations through 0059 applied |
+| Hook system v2 | ✅ Deployed | 54/54 tests; remote wiring script ready |
+| next-admin (SG) | ✅ Last known live | Turnstile baked in; 599 tests; `(shell)/(public)` route groups |
+| Auto-Repair | ✅ A1+A2+A3 | Self-healing engine operational |
+| Provisioning pipeline | 🟡 Stage 4 gated | Stages 0–3 complete; Stage 4 awaits token + env flags + go-ahead |
 | Health gate (last close) | ✅ 100% | 2026-07-05 362/362 |
-| EU ClickHouse | ✅ Stable | After emergency fix; monitor 3–5 days before reducing mem_limit |
+| Operator status | 🟡 Traveling | No sessions 2026-07-07 to 2026-07-13; return expected ~August |
+
+> ⚠️ No health checks have run since 2026-07-05. EU VPS ClickHouse stability window (3–5 days post-fix) has elapsed unmonitored. Recommend running `/health` + `/smoke-test` upon operator return.
 
 ---
 
@@ -153,24 +103,23 @@
 
 | Risk | Severity | Status |
 |------|----------|--------|
-| Defender 木馬資安複盤 | 🔴 High | OVERDUE 19 days (target 2026-06-17); no forensics done yet |
+| Defender 木馬資安複盤 | 🔴 High | **26 days OVERDUE** (target 2026-06-17); temp file + scheduled task + hook audit not done |
 | POD A2 金流紅線 | 🔴 Critical | No automation before human explicit approval; confirm phase not designed |
-| Stage 4 一鍵架站 | 🟠 Major | Code complete; blocked on HETZNER_STAGING_TOKEN + operator go-ahead |
-| S2 multi-tenant enforcement | 🟠 Major | S1 done; ~20 IDOR items documented in `MULTI_TENANT_ISOLATION_AUDIT_AND_PLAN.md`; S2 not yet applied |
-| EU→Dedicated migration | 🟡 Gated | 8月; operator card-swipe; current EU 8GB RAM insufficient for Chatwoot |
-| ClickHouse stability | 🟡 Monitor | 3–5 day observation window after OOM fix (2026-07-05); may adjust mem_limit |
-| Operator travel upcoming | 🟡 Info | Termius SSH setup + cheat sheet pre-travel requirement not yet done |
-| soulful blog images lost | ℹ️ Accepted | 2 images permanently lost; client may notice (accepted tradeoff from 2026-06-28) |
+| No monitoring during travel | 🟠 Major | 7-day idle window; EU VPS ClickHouse unmonitored post-OOM fix; SG drift unknown |
+| S2 multi-tenant enforcement | 🟠 Major | ~20 IDOR items; S1 done, S2–S5 not yet applied |
+| Stage 4 一鍵架站 | 🟠 Major | Code complete; blocked on `HETZNER_STAGING_TOKEN` + operator go-ahead |
+| EU→Dedicated migration | 🟡 Gated | 8月; operator card-swipe; EU 8GB RAM insufficient for Chatwoot |
+| Termius SSH pre-travel setup | 🟡 Possibly missed | Was listed as "before travel" requirement; unconfirmed if done |
+| soulful blog images lost | ℹ️ Accepted | 2 images permanently lost; client may notice (accepted tradeoff 2026-06-28) |
 
 ---
 
 ## Memory highlights
 
-- **Hook v2 architecture SSOT**: `runner.js` + `rules.manifest.json` is single source of truth for all 26 governance rules; old 23-file pattern deleted. `bash scripts/test-hooks.sh` is the canonical verification command.
-- **Remote container hook gap patched**: `scripts/wire-remote-hooks.sh` must be added as setup script for Claude Code web environments (governance vacuum found 2026-07-02 audit). One-time per container; subsequent sessions in same container inherit hooks.
-- **ClickHouse OOM root cause**: system log TTL (7d/14d/30d) had never executed because OOM killed CH on startup before TTL could run — classic death spiral. Fix: raise mem_limit first, clear logs manually, then TTL resumes.
-- **CF hairpin pattern**: `new URL("/api/...", request.url)` in server-side Next.js code produces external URL → loops through Cloudflare → fragile under Docker GC. Always use `http://<container-name>:3000` for intra-Docker calls.
-- **Intake flow decision (reverted)**: `/start/` → `/intake` redirect was built and reverted; original FluentForm → MySQL + FluentCRM → webhook → Supabase → trigger-build is the authoritative intake path. `/intake` React form exists as alternative channel but FluentForm is the live path.
-- **Stage 4 gate**: `HETZNER_STAGING_TOKEN` (vault currently empty, needs decision: dedicated token vs main token) + `SG_PROVISION_ENABLED=true` + `LOBSTER_EXECUTE_MANIFEST_STEPS=true` + `HETZNER_STAGING_ENABLED=true` + sg-deploy. All five required before Stage 4 activates.
-- **WORKLOG rotation**: `rotate-worklog.mjs` is now part of `ao-close.ps1`. Threshold: ~15k lines triggers rotation. Archives go to `WORKLOG-archive-YYYY-MM.md`.
-- **Multi-tenant isolation plan**: `MULTI_TENANT_ISOLATION_AUDIT_AND_PLAN.md` documents ~20 IDOR vulnerability sites; S1 identity layer shipped (2026-06-29); S2–S5 rollout roadmap written.
+- **Operator on travel**: System has been idle since 2026-07-06. No commits or sessions recorded 2026-07-07 through 2026-07-13. Expected return ~August for EU dedicated server purchase and CS U6 Chatwoot wiring.
+- **Intake flow decision**: `/start/` → `/intake` React form redirect was built and reverted (2026-07-05). Authoritative path remains: FluentForm → MySQL+FluentCRM → webhook → Supabase → trigger-build. The `/intake` form exists as an alternative but is gated OFF.
+- **CF hairpin pattern**: Never use `new URL("/api/...", request.url)` in server-side Next.js for intra-Docker calls. Always use `http://<container-name>:3000`.
+- **ClickHouse OOM pattern**: System log TTL (7d/14d/30d) never ran because OOM killed ClickHouse before TTL could execute. Fix: raise mem_limit first → manually delete log dirs → TTL resumes normally.
+- **Stage 4 gate requires 5 conditions**: `HETZNER_STAGING_TOKEN` (vault currently empty) + `SG_PROVISION_ENABLED=true` + `LOBSTER_EXECUTE_MANIFEST_STEPS=true` + `HETZNER_STAGING_ENABLED=true` + sg-deploy.
+- **Hook v2 SSOT**: `runner.js` + `rules.manifest.json` — 26 pure rule modules. `bash scripts/test-hooks.sh` is canonical verification. `scripts/wire-remote-hooks.sh` must be run in each new remote container.
+- **WORKLOG rotation**: `rotate-worklog.mjs` runs at AO-CLOSE when >15k lines. Archives to `WORKLOG-archive-YYYY-MM.md`.
