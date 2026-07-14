@@ -7,10 +7,10 @@
   "backup_destination_label": "Update_Backup",
   "backup_schedule_cron": "weekly (start_time 2026-05-09 11:05:16 UTC)",
   "last_success": {
-    "task_id": "wpvivid-62575366dc6b8",
-    "unix_utc": 1782692354,
-    "iso_utc": "2026-06-29T00:19:14Z",
-    "iso_tpe": "2026-06-29T08:19:14+08:00",
+    "task_id": "wpvivid-5dd749f4aef3f",
+    "unix_utc": 1783901704,
+    "iso_utc": "2026-07-13T00:15:04Z",
+    "iso_tpe": "2026-07-13T08:15:04+08:00",
     "status": "Succeeded"
   },
   "last_failure": {
@@ -20,10 +20,14 @@
     "status": "Failed",
     "reason": "Failed, A exception (WPvivid_Google_Service_Exception) occurred"
   },
-  "synced_at_utc": "2026-07-07T01:11:02Z",
+  "synced_at_utc": "2026-07-14T01:11:02Z",
   "synced_by": "auto -- sync-backup-status-from-mainwp.sh (EU cron) from MainWP DB report_addon truth source",
   "truth_source": "mwp_mainwp_wpvividmeta WHERE site_id=2 AND option_name='report_addon' on EU VPS mainwp-web container",
   "backup_history_since_last_sync": [
+    {
+      "iso_utc": "2026-07-13T00:15:04Z",
+      "status": "Succeeded"
+    },
     {
       "iso_utc": "2026-07-06T00:15:09Z",
       "status": "Failed",
@@ -63,10 +67,6 @@
       "iso_utc": "2026-05-16T13:35:14Z",
       "status": "Failed",
       "reason": "Failed, /home/u942075013/domains/soulfulexpression.org/public_html/wp-content/wpvividbackups/soulfulexpression.org_wpvivid-389495d5500f8_2026-05-16-11-05_backup_all.part001.zip not found. The file ..."
-    },
-    {
-      "iso_utc": "2026-05-09T11:08:15Z",
-      "status": "Succeeded"
     }
   ],
   "automated_sync": "DONE 2026-06-08: scripts/sync-backup-status-from-mainwp.sh on EU VPS, daily cron 01:11 UTC, queries report_addon and rewrites this file only when the backup task changes. last_success/last_failure/synced_at_utc/synced_by/backup_history_since_last_sync are machine-owned; other fields stay human-editable. Manual fallback: edit by hand (the script preserves unlisted keys)."
