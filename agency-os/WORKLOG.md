@@ -2,6 +2,51 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-07-20
+
+### AUTO_TASK_DONE: 週報生成 + 影片系統全面修復 + 安全漏洞修補（遠端 session）
+
+[根因彙整]
+1. 週報：2026-07-14→07-20 連續第二週無 session，操作者旅行中
+2. 影片系統 7 個問題（critic 稽核）：3 個 API 路由缺 role gate / 1 個 SSRF / 1 個 duration slider 假計算 / 1 個 reconcile regex 截斷 / 1 個 upsert 無對應 unique constraint
+3. 安全漏洞：packages/workflows high=3（systeminformation 鏈）
+
+[已修改]
+1. `agency-os/reports/weekly/weekly-summary-2026-07-20.md` — 週報（繁中）
+2. `agency-os/reports/weekly/weekly-automation-LATEST.md` — 同步更新
+3. `app/api/video/render-draft/route.ts` — role gate (resolveOpsRole + canCreateAiImageJob)
+4. `app/api/video/regenerate-image/route.ts` — role gate
+5. `app/api/video/upload-asset/route.ts` — role gate
+6. `app/api/video/remotion-render/route.ts` — role gate + SSRF (ALLOWED_HOSTS + templateId allowlist)
+7. `app/api/video/remotion-status/route.ts` — role gate
+8. `app/(shell)/tools/video/VideoStudio.tsx` — duration slider 改 derived computation；加「預計 N 個場景」提示
+9. `lib/content/video/reconcile.ts` — OUTPUT_FORMATS regex；primary URL 選擇 16x9 ?? youtube_linkedin ?? 9x16
+10. `lib/content/blocks/video-pipeline.ts` — insert → upsert(onConflict: "object_key", ignoreDuplicates: true)
+11. `app/api/video/cleanup/route.ts` — Math.max(1, days) 防 0/負值全刪
+12. `app/api/video/history/route.ts` — service-role client 缺失時回 warning 欄位
+13. `packages/db/migrations/0060_media_assets_object_key_unique.sql` — 新增 partial unique index
+14. `packages/db/scripts/0060_media_assets_object_key_unique_down.sql` — rollback
+15. `agency-os/TASKS.md` — 加 migration 0060 待套用任務
+16. `packages/workflows/package-lock.json` — npm audit fix（high=3→0）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run (packages/workflows) | exit=0 | 75/75 pass
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm audit --json | exit=0 | high=0 confirmed
+- REALTEST_WAIVED: VIDEO_API_CHANGES -- remote container, no live Supabase/R2 credentials; tsc pre-existing errors confirmed pre-existing (91 errors before our changes)
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=7c/0m/0n (all 7 fixed)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=recordVideoAsset,onConflict,object_key | hits=1 (migration 0060 adds constraint)
+- BUGHUNT_DONE: scope=lobster-factory | grep=canCreateAiImageJob,resolveOpsRole | hits=5 (all video API routes now gated)
+
+[剩餘風險]
+- migration 0060 未套用 EU Supabase prod → 已記入 TASKS.md（需 SSH EU VPS）
+- 18 moderate npm vulns（opentelemetry 鏈 via @trigger.dev/sdk）→ 需上游釋出相容修復，force-fix 為 breaking change
+
+[rollback]
+- npm: `git checkout packages/workflows/package-lock.json && npm install`
+- migration: `drop index if exists uq_media_assets_object_key;`
+
+---
+
 ## 2026-07-05
 
 ### revert(nginx): 還原 aware-wave.com/start/ → WordPress FluentForm
