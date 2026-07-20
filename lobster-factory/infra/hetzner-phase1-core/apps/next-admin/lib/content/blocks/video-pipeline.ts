@@ -80,8 +80,9 @@ export async function recordVideoAsset(params: {
   const supabase = getSupabaseWriteClient();
   if (!supabase) return;
   const objectKey = videoObjectKey(params.primaryUrl);
-  // Upsert (not insert) on object_key: /status poll and reconcile cron may race →
-  // ignoreDuplicates=true keeps the first write and silently skips the duplicate.
+  // Upsert on object_key: /status poll and reconcile cron may race on the same finished job.
+  // Requires migration 0060 (uq_media_assets_object_key partial unique index) to be applied;
+  // without it Supabase silently falls back to INSERT and duplicates can still appear.
   const { error } = await supabase.from("media_assets").upsert(
     {
       organization_id: params.organizationId,
