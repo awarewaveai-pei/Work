@@ -53,10 +53,15 @@ export async function reconcileVideos(): Promise<ReconcileResult> {
     cursor = j.result_info?.is_truncated ? j.result_info?.cursor : undefined;
   } while (cursor);
 
-  // 2) 找出有 landscape 主檔（16x9 新 / youtube_linkedin 舊）的影片組（dir = sanitized 標題）
+  // 2) 找出含任何已知格式檔案的影片組（dir = sanitized 標題）。
+  // 原先只匹配 16x9|youtube_linkedin → 9x16-only 影片永遠找不到。
+  // 現在匹配全部 OUTPUT_FORMATS 中的任一格式後綴。
+  const FORMAT_SUFFIX_RE = new RegExp(
+    `^video\\/(.+)\\/(?:${OUTPUT_FORMATS.join("|")})\\.mp4$`
+  );
   const dirs = new Set<string>();
   for (const k of keys) {
-    const m = /^video\/(.+)\/(?:16x9|youtube_linkedin)\.mp4$/.exec(k);
+    const m = FORMAT_SUFFIX_RE.exec(k);
     if (m) dirs.add(m[1]);
   }
 
@@ -67,7 +72,7 @@ export async function reconcileVideos(): Promise<ReconcileResult> {
     for (const fmt of OUTPUT_FORMATS) {
       if (keys.includes(`video/${dir}/${fmt}.mp4`)) outputs[fmt] = `${cfg.publicBase}/video/${dir}/${fmt}.mp4`;
     }
-    const primary = outputs["16x9"] ?? outputs["youtube_linkedin"];
+    const primary = outputs["16x9"] ?? outputs["youtube_linkedin"] ?? outputs["9x16"] ?? outputs["4x5"] ?? Object.values(outputs)[0];
     if (!primary) continue;
     // 存在性檢查用與 recordVideoAsset 相同的 object_key 推導（編碼一致 → idempotent）
     const checkKey = videoObjectKey(primary);

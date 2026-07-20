@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const days = Number(body.days ?? 30);
+  const days = Math.max(1, Number(body.days) || 30);
   const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
 
   const supabase = getSupabaseWriteClient();

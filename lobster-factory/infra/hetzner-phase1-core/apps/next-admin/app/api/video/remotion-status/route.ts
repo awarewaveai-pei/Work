@@ -8,8 +8,14 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { pollRemotion } from "@/lib/content/video/remotion-client";
+import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
+  const { role } = resolveOpsRole(req);
+  if (!canCreateAiImageJob(role)) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
+
   const jobId = new URL(req.url).searchParams.get("jobId");
   if (!jobId) {
     return NextResponse.json({ ok: false, error: "jobId 為必填" }, { status: 400 });

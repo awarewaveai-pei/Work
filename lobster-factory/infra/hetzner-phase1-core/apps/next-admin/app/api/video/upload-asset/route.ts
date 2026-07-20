@@ -12,6 +12,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 
 // 本 route 在 handler 內 Buffer.from(arrayBuffer) + 透過 r2.ts 用 node:crypto → 必須 nodejs runtime（與其餘 78 個 Buffer/上傳 route 一致；防 edge 預設翻轉的地雷）。
 export const runtime = "nodejs";
@@ -42,6 +43,11 @@ function magicMatches(mime: string, buf: Buffer): boolean {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const { role } = resolveOpsRole(req);
+  if (!canCreateAiImageJob(role)) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
+
   // 解析前先用 Content-Length 擋超大 body（防 req.formData() 把整包讀進記憶體致 OOM）。
   // 注意：chunked 上傳 Content-Length 可缺/可偽 → 真正後盾是 nginx client_max_body_size，此為深度防禦。
   const declaredLen = Number(req.headers.get("content-length") ?? "0");

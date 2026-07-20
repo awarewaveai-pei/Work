@@ -173,7 +173,6 @@ interface ScriptRemotionPrefill {
 
 export default function VideoStudio({ initial, remotionInitial }: { initial?: VideoStudioInitial; remotionInitial?: ScriptRemotionPrefill } = {}) {
   // ── Config knobs ──
-  const [totalScenes] = useState(initial?.scenes?.length ?? 6);
   const [customScenes] = useState(initial?.customScenes ?? 3);
   const [imageModel, setImageModel] = useState(() => {
     const m = initial?.mediaMode;
@@ -186,6 +185,8 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
     return vendorForModel(DEFAULT_IMAGE_MODEL); // pexels: vendor unused
   });
   const [targetMinutes, setTargetMinutes] = useState(initial?.duration ?? 1);
+  // Derived: ~2 scenes/min, clamped [3, 12]. When initial scenes provided, override with their length.
+  const totalScenes = initial?.scenes?.length ?? Math.min(12, Math.max(3, Math.round(targetMinutes * 2)));
   const [voiceModelId, setVoiceModelId] = useState(VOICE_MODELS[0].id);
   const [videoCaps, setVideoCaps] = useState<VideoCapabilities | null>(null);
   const voiceSelection = useMemo(() => parseVoiceModel(voiceModelId), [voiceModelId]);
@@ -777,6 +778,9 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
                         style={{ width: "100%", accentColor: "var(--accent)" }} disabled={isBusy} />
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--text-muted)" }}>
                         <span>1 分</span><span>5 分</span><span>10 分</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--text-secondary)", textAlign: "right" }}>
+                        預計 <b>{totalScenes}</b> 個場景
                       </div>
                     </div>
                   )}

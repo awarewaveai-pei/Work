@@ -80,30 +80,35 @@ export async function recordVideoAsset(params: {
   const supabase = getSupabaseWriteClient();
   if (!supabase) return;
   const objectKey = videoObjectKey(params.primaryUrl);
-  const { error } = await supabase.from("media_assets").insert({
-    organization_id: params.organizationId,
-    storage_backend: "r2",
-    asset_domain: "ai_generated",
-    object_key: objectKey,
-    object_url: params.primaryUrl,
-    mime_type: "video/mp4",
-    byte_size: 0,
-    is_current: true,
-    metadata: {
-      title: params.title,
-      formats: params.outputs,
-      selectedFormats: params.formats ?? Object.keys(params.outputs),
-      formatCount: Object.keys(params.outputs).length,
-      sceneCount: params.sceneCount,
-      visualBreakdown: params.visualBreakdown,
-      imageModel: params.imageModel,
-      source: params.source,
-      serviceCapability: params.serviceCapability,
-      outputMeta: params.outputMeta,
-      renderedAt: new Date().toISOString(),
+  // Upsert (not insert) on object_key: /status poll and reconcile cron may race →
+  // ignoreDuplicates=true keeps the first write and silently skips the duplicate.
+  const { error } = await supabase.from("media_assets").upsert(
+    {
+      organization_id: params.organizationId,
+      storage_backend: "r2",
+      asset_domain: "ai_generated",
+      object_key: objectKey,
+      object_url: params.primaryUrl,
+      mime_type: "video/mp4",
+      byte_size: 0,
+      is_current: true,
+      metadata: {
+        title: params.title,
+        formats: params.outputs,
+        selectedFormats: params.formats ?? Object.keys(params.outputs),
+        formatCount: Object.keys(params.outputs).length,
+        sceneCount: params.sceneCount,
+        visualBreakdown: params.visualBreakdown,
+        imageModel: params.imageModel,
+        source: params.source,
+        serviceCapability: params.serviceCapability,
+        outputMeta: params.outputMeta,
+        renderedAt: new Date().toISOString(),
+      },
     },
-  });
-  if (error) console.warn("[video-pipeline] media_assets insert failed (best-effort):", error.message);
+    { onConflict: "object_key", ignoreDuplicates: true },
+  );
+  if (error) console.warn("[video-pipeline] media_assets upsert failed (best-effort):", error.message);
 }
 
 /** 刪除本輪上傳的 Flux 暫存物件（render 消費完後清，防 R2 累積）。永不拋。 */

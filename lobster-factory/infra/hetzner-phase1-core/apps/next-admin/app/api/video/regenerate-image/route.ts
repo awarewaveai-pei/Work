@@ -11,6 +11,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 
 interface RegenBody {
   imagePrompt?: string;
@@ -24,6 +25,11 @@ interface RegenBody {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const { role } = resolveOpsRole(req);
+  if (!canCreateAiImageJob(role)) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
+
   let body: RegenBody;
   try {
     body = (await req.json()) as RegenBody;

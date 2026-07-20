@@ -37,9 +37,13 @@ export async function GET(req: NextRequest): Promise<Response> {
     Math.max(1, parseInt(new URL(req.url).searchParams.get("limit") ?? "20", 10) || 20),
   );
 
-  // service-role client → 繞過 RLS（server-side only，不外洩到瀏覽器）
+  // service-role client → 繞過 RLS（server-side only，不外洩到瀏覽器）。
+  // 若 write client 不可用，fallback 到 read client（anon）但 RLS 會把結果擋空；
+  // 此時在 response 加 warning 欄位，讓呼叫方知道結果不可信而非靜默回空陣列。
   const { getSupabaseWriteClient, getSupabaseReadClient } = await import("@/lib/supabase-server");
-  const supabase = getSupabaseWriteClient() ?? getSupabaseReadClient();
+  const writeClient = getSupabaseWriteClient();
+  const supabase = writeClient ?? getSupabaseReadClient();
+  const usingReadClient = !writeClient;
   if (!supabase) {
     return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   }
@@ -94,5 +98,9 @@ export async function GET(req: NextRequest): Promise<Response> {
     };
   });
 
-  return NextResponse.json({ ok: true, items });
+  return NextResponse.json({
+    ok: true,
+    items,
+    ...(usingReadClient ? { warning: "service-role client unavailable; read-only client used — RLS may have filtered results" } : {}),
+  });
 }

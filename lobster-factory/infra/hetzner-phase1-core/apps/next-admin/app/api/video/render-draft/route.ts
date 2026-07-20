@@ -18,6 +18,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import type { VideoServiceCapability } from "@/lib/content/video/render-client";
+import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 
 interface RenderDraftBody {
   scenes?: { id: number; narration: string }[];
@@ -36,6 +37,11 @@ interface RenderDraftBody {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const { role } = resolveOpsRole(req);
+  if (!canCreateAiImageJob(role)) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
+
   let body: RenderDraftBody;
   try {
     body = (await req.json()) as RenderDraftBody;
