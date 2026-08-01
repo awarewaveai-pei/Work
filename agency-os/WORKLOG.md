@@ -2,6 +2,13 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-08-01
+
+- 01:00 UTC : remote-monthly-agent: monthly review 2026-07 (full month) generated → reports/monthly/monthly-review-2026-07.md + reports/monthly/monthly-review-LATEST.md (governance drift: SKIPPED — no PowerShell; estimated WARN, RoutingSpec ~113 days stale)
+- REALTEST_WAIVED: DOC_ONLY -- report generation; no executable code changed
+- REVIEW_WAIVED: DOC_ONLY -- monthly review document; prose review only
+- BUGHUNT_WAIVED: DOC_ONLY -- no code modified
+
 ## 2026-07-20
 
 ### AUTO_TASK_DONE: 週報生成 + 影片系統全面修復 + 安全漏洞修補（遠端 session）
