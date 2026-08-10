@@ -2,6 +2,10 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-08-10
+
+- 01:11 UTC : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-08-10.md
+
 ## 2026-08-03
 
 - 01:06 UTC : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-08-03.md
