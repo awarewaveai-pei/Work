@@ -1,6 +1,6 @@
-﻿# Governance Docs Drift - 2026-06
+﻿# Governance Docs Drift - 2026-08
 
-- Generated: 2026-06-03 17:23:56 +08:00
+- Generated: 2026-08-12 17:35:06 +08:00
 - Overall: **WARN**
 - Scope: 4 long-term governance documents
 
@@ -18,20 +18,20 @@
 
 | Doc | Path | Last modified (UTC) |
 |-----|------|----------------------|
-| Inventory | agency-os/docs/operations/cursor-mcp-and-plugin-inventory.md | 2026-06-03 05:51 |
-| RoutingSpec | lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md | 2026-04-10 07:37 |
-| RoutingMatrix | lobster-factory/docs/ROUTING_MATRIX.md | 2026-04-10 07:37 |
-| Traceability | agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md | 2026-05-18 06:50 |
+| Inventory | agency-os/docs/operations/cursor-mcp-and-plugin-inventory.md | 2026-06-26 17:29 |
+| RoutingSpec | lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md | 2026-04-21 10:55 |
+| RoutingMatrix | lobster-factory/docs/ROUTING_MATRIX.md | 2026-04-21 10:55 |
+| Traceability | agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md | 2026-05-20 10:55 |
 
 ## Findings
 
 - mcp_set_consistency: shared=9 ; only_in_inventory=9 ; only_in_spec=0
   - only in inventory: awarewave-ops, chatgpt-fast, chatgpt-latest, claude-fast, claude-latest, gemini-fast, gemini-latest, hetzner-ssh, supabase-awarewave-postgres
-- mtime_drift: span=54 days (youngest=2026-06-03; oldest=2026-04-10)
-  - Inventory: 2026-06-03 (age 0 days)
-  - RoutingSpec: 2026-04-10 (age 54 days)
-  - RoutingMatrix: 2026-04-10 (age 54 days)
-  - Traceability: 2026-05-18 (age 16 days)
+- mtime_drift: span=66 days (youngest=2026-06-26; oldest=2026-04-21)
+  - Inventory: 2026-06-26 (age 47 days)
+  - RoutingSpec: 2026-04-21 (age 113 days)
+  - RoutingMatrix: 2026-04-21 (age 113 days)
+  - Traceability: 2026-05-20 (age 84 days)
 
 ## Notes
 

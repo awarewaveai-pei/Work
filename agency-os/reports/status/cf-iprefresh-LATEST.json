@@ -1,1 +1,1 @@
-﻿{"v4_ranges":0,"status":"ok","message":"Refresh completed: v4=0 v6=0","generated":"2026-06-16 21:37:18","v6_ranges":0}
+﻿{"v4_ranges":0,"status":"error","message":"refresh exited 1: [cf-lockdown] ERROR: ipsets not found. Run --apply first.\n","generated":"2026-08-12 17:35:11","v6_ranges":0}

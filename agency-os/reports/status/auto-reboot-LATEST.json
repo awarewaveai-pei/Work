@@ -1,5 +1,5 @@
 {
-    "generated_utc":  "2026-07-05 07:26:47",
+    "generated_utc":  "2026-08-12 09:33:50",
     "overall_label":  "healthy",
     "overall_user":  "PASS",
     "ssot":  {
@@ -17,10 +17,10 @@
                                 "sha53":  "",
                                 "daemon_active":  "active",
                                 "daemon_enabled":  "enabled",
-                                "reboot_pending":  "1",
-                                "reboot_pkgs":  "linux-image-6.8.0-134-generic,linux-base",
-                                "kernel":  "6.8.0-124-generic",
-                                "last_reboot":  "Wed Jun 3 20:00 still",
+                                "reboot_pending":  "0",
+                                "reboot_pkgs":  "",
+                                "kernel":  "6.8.0-137-generic",
+                                "last_reboot":  "Fri Aug 7 20:00 still",
                                 "expect_53":  false
                             },
                "verdict":  {
@@ -28,7 +28,7 @@
                                "reasons":  [
 
                                            ],
-                               "pending":  true
+                               "pending":  false
                            }
            },
     "eu":  {
@@ -44,8 +44,8 @@
                                 "daemon_enabled":  "enabled",
                                 "reboot_pending":  "0",
                                 "reboot_pkgs":  "",
-                                "kernel":  "5.15.0-185-generic",
-                                "last_reboot":  "Sat Jun 27 20:30 still",
+                                "kernel":  "5.15.0-187-generic",
+                                "last_reboot":  "Sat Aug 8 20:30 still",
                                 "expect_53":  true
                             },
                "verdict":  {

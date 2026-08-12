@@ -1,7 +1,7 @@
 ﻿{
     "system_review":  "PASS",
-    "governance_drift":  "PASS",
+    "governance_drift":  "WARN",
     "cf_ip_refresh":  "PASS",
-    "generated":  "2026-06-16 21:37:18",
-    "supabase_memory":  "PASS (36.76%)"
+    "generated":  "2026-08-12 17:35:12",
+    "supabase_memory":  "PASS (34.02%)"
 }
