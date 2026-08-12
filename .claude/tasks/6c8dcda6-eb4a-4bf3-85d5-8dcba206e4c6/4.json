@@ -1,9 +1,0 @@
-{
-  "id": "4",
-  "subject": "PublishWizard.tsx: pfcreate 一鍵 native 前端接線 + critic 修正",
-  "description": "接線 pfcreate action 到 UI（6 edits + variantMapDropped 接住 + 按鈕 disabled 對齊 400 contract + 雙提交防護 + faithful flag + 橘色警告 UI）。tsc clean、bughunt done、critic Review、commit、deploy。",
-  "activeForm": "接線 pfcreate 前端 + critic Review",
-  "status": "completed",
-  "blocks": [],
-  "blockedBy": []
-}
