@@ -1,4 +1,4 @@
-# /etc/default/awarewave-endpoint-alert.local
+﻿# /etc/default/awarewave-endpoint-alert.local
 # Drop-in override - survives sync-hetzner-slack-alert-webhooks.ps1 rewrites.
 # Install: copy this to /etc/default/awarewave-endpoint-alert.local on VPS.
 #
@@ -32,5 +32,6 @@ CHECK_URLS_SLOW="https://uptime.aware-wave.com/api/entry-page"
 # TIMEOUT_SEC_SLOW=20
 
 # OPS_INCIDENTS_WEBHOOK_URL: send all infra alerts to #ops-incidents (superset channel).
-# Get value from vault: scripts/secrets-vault.ps1 -Action get -Name OPS_INBOX_SLACK_INCIDENTS_WEBHOOK
+# Real value lives in mcp/user-env.ps1 (OPS_INBOX_SLACK_INCIDENTS_WEBHOOK).
+# `secrets-vault.ps1 -Action get` prints a MASKED value - confirm-only, do not paste it here.
 OPS_INCIDENTS_WEBHOOK_URL="<from vault: OPS_INBOX_SLACK_INCIDENTS_WEBHOOK>"

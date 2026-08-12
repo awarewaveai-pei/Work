@@ -1,4 +1,4 @@
-# MCP & API 服務憑證地圖
+﻿# MCP & API 服務憑證地圖
 
 > **重要**：此檔不含明文密鑰。實際值存於 `mcp/user-env.ps1`（gitignored）。
 > 請將 `user-env.ps1` 備份到 Google Drive / 1Password / 加密隨身碟。
@@ -98,7 +98,7 @@ Get-Process ssh | Stop-Process
 | 位置 | 內容 |
 |---|---|
 | `mcp/user-env.ps1` | **主檔**，所有明文 key（gitignored，只在本機） |
-| `scripts/secrets-vault.ps1 -Action get -Name <KEY>` | VPS 密碼、JWT keys（用 vault 存取，不存明文檔） |
+| `scripts/secrets-vault.ps1 -Action get -Name <KEY>` | **僅確認 vault 裡有沒有這把**，輸出為遮罩 `abcd****xy`。真值取自本機 `mcp\user-env.ps1`，或用 `-Action run -Names <KEY> -Command "<cmd>"` 注入子行程 |
 | Windows Registry（`setx` 寫入） | 所有 env vars，開機後自動載入 |
 
 > **備份建議**：定期將 `mcp/user-env.ps1` 複製到 Google Drive 或 1Password Secure Note。

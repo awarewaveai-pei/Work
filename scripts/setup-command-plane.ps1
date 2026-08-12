@@ -66,20 +66,52 @@ if (-not (Test-Path $vault))   { throw "secrets-vault.ps1 not found at $vault" }
 Write-Host ""
 Write-Host "Step 1/3: writing secrets to local DPAPI vault..." -ForegroundColor Cyan
 
-$existingSecret = & $vault -Action get -Name TELEGRAM_WEBHOOK_SECRET 2>$null
-if (-not [string]::IsNullOrWhiteSpace($existingSecret) -and -not $Force) {
-  $secret = $existingSecret.Trim()
-  Write-Host "  [reuse] TELEGRAM_WEBHOOK_SECRET already in vault — keeping existing value." -ForegroundColor DarkGray
+# The vault is the SSOT for the real value and can be read directly.
+# `secrets-vault.ps1 -Action get` must NOT be used here: it is confirm-only and
+# prints "NAME=abcd****xy" (masked). Until 2026-08-12 this script took that whole
+# masked line as the secret, then wrote it back with `-Action set` - the reuse
+# path silently DESTROYED the real stored secret and registered the mask with
+# Telegram. It also could not survive a first run, because `-Action get` throws
+# when the secret is absent and `2>$null` does not catch a terminating error.
+. (Join-Path $PSScriptRoot '_vault-helpers.ps1')
+
+$vaultStore      = $null
+$hasStoredSecret = $false
+try {
+  $vaultStore      = Read-VaultStore (Resolve-VaultPath)
+  $hasStoredSecret = Test-VaultSecret -Store $vaultStore -Name 'TELEGRAM_WEBHOOK_SECRET'
+} catch {
+  # No vault yet - first run on a fresh machine. Fall through and generate.
+  Write-Host "  [init]  No vault found yet; a fresh secret will be generated." -ForegroundColor DarkGray
+}
+
+if ($hasStoredSecret -and -not $Force) {
+  $secret = "$(Get-VaultSecret -Store $vaultStore -Name 'TELEGRAM_WEBHOOK_SECRET')".Trim()
+  if (Test-VaultValueLooksMasked -Value $secret) {
+    throw "The stored TELEGRAM_WEBHOOK_SECRET is a MASKED value - an earlier run of this script wrote the output of 'secrets-vault -Action get' back into the vault. The real secret is lost; re-run with -Force to generate a new one, then rebuild + redeploy next-admin and re-register the webhook."
+  }
+  # Report drift instead of silently overwriting either side. Fingerprints only -
+  # never print the values themselves.
+  $envSecret = "$($env:TELEGRAM_WEBHOOK_SECRET)".Trim()
+  if ($envSecret -and ($envSecret -ne $secret)) {
+    Write-Host "  [drift] This machine's TELEGRAM_WEBHOOK_SECRET differs from the vault." -ForegroundColor Yellow
+    Write-Host "          Using the VAULT value. To align this machine afterwards, run:" -ForegroundColor Yellow
+    Write-Host "            .\scripts\secrets-vault.ps1 -Action sync-cursor-mcp-user-env" -ForegroundColor Yellow
+  }
+  Write-Host "  [reuse] TELEGRAM_WEBHOOK_SECRET already in vault - keeping existing value." -ForegroundColor DarkGray
   Write-Host "          (Pass -Force to regenerate; also requires server rebuild + redeploy.)" -ForegroundColor DarkGray
 } else {
-  if ($Force -and -not [string]::IsNullOrWhiteSpace($existingSecret)) {
+  if ($Force -and $hasStoredSecret) {
     Write-Host "  [force] Regenerating TELEGRAM_WEBHOOK_SECRET (-Force specified)." -ForegroundColor Yellow
     Write-Host "  [WARN]  You MUST rebuild + redeploy next-admin after this, or Telegram" -ForegroundColor Yellow
     Write-Host "          and the server will have mismatched secrets (silent failure)." -ForegroundColor Yellow
   }
   $rand   = New-Object byte[] 32
   [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($rand)
-  $secret = [Convert]::ToBase64String($rand)
+  # base64url: Telegram's setWebhook secret_token accepts only A-Z a-z 0-9 _ -
+  # (core.telegram.org/bots/api#setwebhook). Standard base64 always ends in '='
+  # and often contains '+' or '/', which the API rejects with 400.
+  $secret = [Convert]::ToBase64String($rand).TrimEnd('=').Replace('+', '-').Replace('/', '_')
   Write-Host "  [new]   Generated fresh TELEGRAM_WEBHOOK_SECRET." -ForegroundColor Cyan
 }
 
@@ -127,7 +159,7 @@ Write-Host "  1) Apply migration (if not already applied):"
 Write-Host "       lobster-factory/packages/db/migrations/0025_always_on_command_plane.sql"
 Write-Host "  2) Add these lines to .env on the server (all now in docker-compose.yml):"
 Write-Host "       TELEGRAM_BOT_TOKEN=$BotToken"
-Write-Host "       TELEGRAM_WEBHOOK_SECRET=<vault value — run: .\scripts\secrets-vault.ps1 -Action get -Name TELEGRAM_WEBHOOK_SECRET>"
+Write-Host "       TELEGRAM_WEBHOOK_SECRET=<real value from mcp\user-env.ps1 on this machine — NOT from 'secrets-vault -Action get', which prints a mask>"
 Write-Host "       TELEGRAM_ALLOWED_USER_IDS=$UserId"
 Write-Host "       TELEGRAM_ALLOWED_CHAT_IDS=$ChatId"
 Write-Host "       COMMAND_PLANE_DEFAULT_ORG_ID=$OrgId"

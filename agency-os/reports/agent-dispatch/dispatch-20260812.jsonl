@@ -1,0 +1,2 @@
+{"ts":"2026-08-12T11:19:17.934Z","task_id":"dlg-20260812-111917-5d8f","agent":"critic","description":"Critic review of Telegram secret fix","result_snippet":"## Critic Report — Telegram notifier / secrets-vault 變更\n\n審了 5 個檔案全文 + 相關 call sites（`_vault-helpers.ps1`、`configure-telegram-webhook.ps1`、`mcp/user-env.ps1`、9 份 runbook）。實測 PowerShell 5.1 語意 7 項（scrat…"}
+{"ts":"2026-08-12T11:27:24.214Z","task_id":"dlg-20260812-112724-ff2b","agent":"critic","description":"Re-review after fixes","result_snippet":""}

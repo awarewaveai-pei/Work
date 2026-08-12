@@ -4,6 +4,73 @@
 
 ## 2026-08-12
 
+### AUTO_TASK_DONE: `.claude` junction 中途斷線防護 + health 回 100% + 07-26 備份失敗結案
+
+[根因]
+1. **junction**：`ensure-claude-junction.ps1`（2026-05-28 因同類事故誤刪 49 檔而建）接在兩個 hook 的 UserPromptSubmit STEP 0 與 health gate 12b —— 兩者都健在，**但都是單點時刻檢查**。今天 junction 是在 hook 跑完之後才斷的，於是 session 中途的 auto-checkpoint 直接把 `.claude/plans/` 12 個檔當成刪除 commit 掉（`853cd26a`，已 revert）。缺的是「staging 前最後一道防線」。
+2. **health 99.7%**：`verify-archive-tasks-lift` 以字首比對把封存項對到 TASKS 的 `- [ ]`。2026-07-05 封存的 8 條有 6 條對不上 —— 但其中 5 條**其實已在 TASKS**，只是被包在較長條目內或前面多了 `【驗證債】` 之類前綴。硬加 6 行會製造重複待辦。
+3. **2026-07-26 異地備份 FAIL**：`WordPress archive failed` → `backup-phase1.sh` 依設計 FATAL 中止（不上傳半殘備份）→ 異地當天無檔 → verify 正確報 FAIL。告警鏈運作正常，非缺陷。
+
+[已修改]
+1. `scripts/commit-checkpoint.ps1` — `git add -A` 前新增 junction 完整性閘：`.claude` 有被 git 追蹤但磁碟上不存在 → throw 並指向 `ensure-claude-junction.ps1`，不進行 staging
+2. `agency-os/reports/ao-close/2026-07-05-1543.md` — 5 條重複封存項加 `<!-- archive-only: ... -->` 標記（gate 既有逃生門），各自指向真正 owner 的 TASKS 條目
+3. `agency-os/TASKS.md` — 補回唯一真缺的一條「蒙古客戶 Cloudways 實際建站」
+
+[驗證結果]
+- junction 閘**隔離 repo 實測**（不碰本機 junction）：CASE A 健康 → `exit=0 fired=False`（不誤報）；CASE B `.claude` 移除 → `exit=1 fired=True`，且 **staged deletions=0**，證實擋在 `git add -A` 之前
+- `verify-archive-tasks-lift.ps1`：FAIL(6) → **PASS exit=0**（標記需與 bullet 同一行，`:189` 是對 bullet 自身 text 比對 —— first attempt 放到次行無效，已修正）
+- `system-health-check.ps1`：99.7%(371/372) → **100% (372/372)**，Critical Gate PASS
+- 07-26 事件：`grep -c "WordPress archive failed"` = **1**（僅該日），其後每日 verify 全 PASSED，判定單次事件、無需修法
+- REALTEST_EVIDENCE: tool=Bash | cmd=test_junction_guard.ps1（隔離 git repo 雙 case）+ verify-archive-tasks-lift.ps1 + system-health-check.ps1 + SSH grep lobster-backup.log | exit=0 | ms=~600000
+- REVIEW_DONE: critic=Manual-readback | verdict=pass | findings=0c/0m/0n （註：junction 閘為 10 行純防禦邏輯，已用雙 case 實測涵蓋正/負路徑）
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,.cursor | grep=ensure-claude-junction | hits=2
+  - 兩個 hook 的 STEP 0 接線都健在（`mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1:92-97`、`.cursor/hooks/run-ao-resume-on-prompt.ps1:97`）+ health gate 12b —— 新閘是補「中途斷線」缺口，非重複既有機制
+
+[剩餘風險]
+- junction 閘只擋 `commit-checkpoint.ps1` 這條路徑；若有其他地方直接 `git add -A` + commit 仍可繞過
+- 2026-07-26 當天無備份（已過保留期，無法補；SG 本機當時的 local backup 亦不完整）
+- 治理漂移 `mcp_set_consistency` **未處理**：9 個 MCP server 只在 Inventory、不在 `MCP_TOOL_ROUTING_SPEC.md`（RoutingSpec/Matrix 已 113 天未更新）。需為每個 server 做路由與風險分級判斷，屬實質設計工作，另案處理
+
+### AUTO_TASK_DONE: Telegram 手機告警靜默 404 根治 —— 「vault 遮罩值被當真值用」bug class 全面清除
+
+[根因]
+`scripts/secrets-vault.ps1 -Action get` 是**確認存在**用途，輸出 `NAME=8584****pI`（遮罩，`Mask-Value` at `secrets-vault.ps1:88`）。三處把它當真值消費：
+1. `ao-resume.ps1:825`（月度巡檢）、`phase4-weekly-check.ps1:216`（Phase 4 週巡檢）→ 打 `https://api.telegram.org/bot<遮罩>/sendMessage` → Telegram 回 404 → 各自被 catch 成一行黃字 WARN 吞掉。Slack 走 `$env:`（`notify-ops.ps1:14`）沒事 → 症狀＝「Slack 收得到、手機幾週收不到」。
+2. `setup-command-plane.ps1:69`（更危險）→ 把整行 `NAME=遮罩` 當 secret 重用，再 `-Action set` **寫回 vault**，等於毀掉真實 webhook secret 並拿遮罩去 setWebhook。
+另有 12 處人類文件教人用 `-Action get` 取真值 —— 包含 502 事故手冊的 root 密碼、以及**這次 Telegram 靜默事件自己的 runbook**（照做會把遮罩貼進 server `.env`）。
+
+[已修改]
+1. `scripts/lib/telegram-notify.ps1`（新）— 共用通知器。真值解析序：`$env:` →（缺）`_vault-helpers.ps1` `Get-VaultSecret` 直讀 vault。守衛：遮罩值拒送、token/chatId 正向格式驗證、`ok=false` 視為失敗
+2. `scripts/_vault-helpers.ps1` — 新增 `Test-VaultValueLooksMasked`（遮罩判定單一定義處）
+3. `scripts/ao-resume.ps1` / `scripts/phase4-weekly-check.ps1` — 改呼叫 helper，並保留 try/catch
+4. `scripts/setup-command-plane.ps1` — 改用 `Read-VaultStore`/`Test-VaultSecret`/`Get-VaultSecret`；vault 為真值 SSOT；env 與 vault 不一致只報 `[drift]` 不覆寫任一邊；新 secret 改 base64url
+5. `scripts/secrets-vault.ps1` — `get` 動作自己印出 NOTE 說明是遮罩（一處修好勝過改 12 份文件）
+6. 12 處文件更正（見 BUGHUNT）
+
+[驗證結果]
+- **critic（外部 oracle）round 1 打回，發現我第一版修法比原 bug 更糟**，全部照修：
+  - 🔴 C1：原本在 helper 內 dot-source `mcp/user-env.ps1`，該檔對 72 個變數跑 `setx`（全機持久化）會覆蓋 vault 同步值＝憑證 drift class 再生；且 `*>$null` 擋不住 terminating error。改用 `_vault-helpers.ps1` 直讀 vault（零副作用）
+  - 🔴 C2：我拿掉了 `ao-resume.ps1` 原有的 try/catch → 通知 throw 會中止 AO-RESUME 並跳過 `$monthlyStamp` 寫入 → 每次 session 重試、永久壞掉。已補回
+  - 🟠 M1 首次執行必 abort（`-Action get` 對不存在的 key 是 terminating throw，`2>$null` 攔不住）／M2 錯誤訊息給的補救指令方向相反（`import-user-env` 是 user-env→vault，照做會覆蓋 vault）／M3 reuse 路徑仍把 env 值寫回 vault 未比對／M4 標準 base64 含 `+/=`，Telegram `secret_token` 只收 `A-Za-z0-9_-` 會 400
+  - 🟡 m1 未 trim／m2 守衛未涵蓋 ChatId 且缺正向驗證／m3 丟棄回應未檢查 `ok`／m5 缺 `#requires`+StrictMode
+- 6 檔 PowerShell parse OK
+- 守衛實測（`$ErrorActionPreference='Stop'` 下，模擬 ao-resume 環境）：遮罩 token → `Sent=False`；格式不符 token → `Sent=False`；非數字 chatId → `Sent=False`；**三者皆未 throw**（C2 路徑安全）
+- C1 回歸測試：清空 process env 後呼叫 → token 由 vault 解出、chatId=8286448653、`PRINTFUL_API_KEY` 的 User-level env **前後未變**（證實 setx 副作用已消除）
+- 真實投遞兩次：`Sent=True | delivered to chat 8286448653`
+- `audit-cp950-traps.ps1`：四個改動 .ps1 全 CLEAN
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell test_telegram2.ps1（parse+守衛+vault fallback+副作用比對）+ 真實 Send-OpsTelegram | exit=0 | ms=~300000
+- REVIEW_DONE: critic=Deep | verdict=fail→fixed | findings=2C/6M/5m（round 1 全部處理後 round 2 複審）
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,lobster-factory,mcp,.claude | grep=Action get -Name | hits=12
+  - 12 處人類文件誤導全部更正；另確認 VPS 端 4 支 bash 與 `configure-telegram-webhook.ps1` 都從 `.env`/`$env:` 讀真值，未受影響
+
+[剩餘風險]
+- **憑證外洩需評估輪替**：critic round 1 為確認 `user-env.ps1` 副作用而讀取該檔，`TELEGRAM_BOT_TOKEN` 與 `PRINTFUL_API_KEY` 兩把真值因此出現在本 session 的工具輸出中。檔案本身未進 git，但若 transcript 離開本機，建議輪替這兩把
+- `setup-command-plane.ps1` 的分支未實跑（會寫 vault + 呼叫 Telegram setWebhook，屬 High risk），僅靜態走查 + critic 複審
+- 若 `_vault-helpers.ps1` 缺失，`Test-VaultValueLooksMasked` 未定義 —— 已列入 critic round 2 複審項
+
+[rollback]
+`git revert` 本 commit；`scripts/lib/telegram-notify.ps1` 為新檔，移除後兩支呼叫端會落到 `else` 分支印 WARN 並跳過通知（不影響其餘流程）
+
 ### AUTO_TASK_DONE: packages/workflows 每週安全掃描 35 漏洞 → 0（含掃描器結構性補強）
 
 [根因]

@@ -1,4 +1,4 @@
-# app.aware-wave.com — 目前狀態權威文件（CURRENT STATE）
+﻿# app.aware-wave.com — 目前狀態權威文件（CURRENT STATE）
 
 > **這份檔的用途**：任何 AI / 工程師要改 app.aware-wave.com（Lobster Factory Admin Console）**之前先讀這份**，了解網站「現在」長怎樣、怎麼登入、怎麼部署、有哪些陷阱。
 > **與其他文件分工**：
@@ -14,7 +14,7 @@ app.aware-wave.com = AwareWave 的維運後台（Next.js 15 + React 19，部署�
 
 **登入**：
 - 開 `https://app.aware-wave.com` → 單一登入頁（Supabase Auth）。
-- 帳號：`awarewaveai@gmail.com`（role = **owner**）。密碼在 vault：`secrets-vault.ps1 -Action get -Name APP_AWARE_WAVE_ADMIN_PASSWORD`。
+- 帳號：`awarewaveai@gmail.com`（role = **owner**）。密碼真值在本機 `mcp\user-env.ps1` 的 `APP_AWARE_WAVE_ADMIN_PASSWORD`（`secrets-vault.ps1 -Action get` 只印遮罩，僅供確認存在）。
 - 登入後完整存取。改密碼：Supabase Studio（`studio.aware-wave.com/project/default`）→ Authentication → Users。
 
 ---

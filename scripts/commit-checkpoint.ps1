@@ -26,6 +26,27 @@ try {
         throw "Not a git repository: $WorkRoot"
     }
 
+    # Junction integrity, checked at the LAST possible moment (2026-08-12).
+    # `ensure-claude-junction.ps1` already runs at UserPromptSubmit STEP 0 in both
+    # hooks, and health gate 12b covers AO-CLOSE — but both are point-in-time. If
+    # the junction dies MID-session (observed 2026-08-12: 12 files under
+    # .claude/plans/ were staged as deletions and committed as 853cd26a), every
+    # earlier check has already passed and nothing stands between `git add -A` and
+    # a commit that deletes the whole shared .claude/ tree for every machine.
+    # This is the last line of defence, so it runs immediately before staging.
+    $claudeJunction = Join-Path $WorkRoot ".claude"
+    $claudeTracked = @(git ls-files -- ".claude" 2>$null)
+    if ($claudeTracked.Count -gt 0 -and -not (Test-Path -LiteralPath $claudeJunction)) {
+        throw @"
+Refusing checkpoint: '.claude' is tracked in git ($($claudeTracked.Count) files) but does not exist on disk.
+The junction is broken, so 'git add -A' would stage every one of those files as a DELETION
+and propagate it to all machines on push.
+
+Repair it first, then re-run:
+  powershell -NoProfile -ExecutionPolicy Bypass -File "$WorkRoot\scripts\ensure-claude-junction.ps1"
+"@
+    }
+
     if ($Paths.Count -eq 0) {
         if ($DryRun) {
             Write-Host "[dry-run] would: git add -A" -ForegroundColor Cyan

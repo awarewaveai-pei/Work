@@ -1,4 +1,4 @@
-param(
+﻿param(
     [ValidateSet("init", "set", "set-prompt", "get", "list", "remove", "run", "import-mcp", "import-user-env", "sync-copilot-mcp-env", "sync-cursor-mcp-user-env")]
     [string]$Action = "list",
     [string]$Name = "",
@@ -149,6 +149,12 @@ switch ($Action) {
         $plain = Unprotect-Secret -CipherText $store.secrets[$Name].cipher
         $masked = Mask-Value -Text $plain
         Write-Output "$Name=$masked"
+        # Say it out loud. Callers have repeatedly treated this masked line as the
+        # real value: ao-resume.ps1 / phase4-weekly-check.ps1 posted it to the
+        # Telegram API (silent 404 for weeks) and setup-command-plane.ps1 wrote it
+        # back into the vault, destroying the stored secret. The hint goes to the
+        # information stream so `... | Select-String '='` style parsing is unaffected.
+        Write-Information "  NOTE: value above is MASKED (confirm-only). Real values are consumed from mcp/user-env.ps1 or the environment - never from this command." -InformationAction Continue
         exit 0
     }
 

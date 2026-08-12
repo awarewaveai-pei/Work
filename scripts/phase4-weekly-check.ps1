@@ -211,29 +211,30 @@ Write-Host "`n報告 → $latestPath" -ForegroundColor DarkGray
 
 # ── Telegram 通知 ──────────────────────────────────────────────────────────
 if (-not $SkipTelegram) {
+    # Real values come from the environment (mcp/user-env.ps1), never from
+    # `secrets-vault -Action get` — that returns a MASKED value and made this
+    # notification 404 silently until 2026-08-12. See scripts/lib/telegram-notify.ps1.
     try {
-        $vaultScript = Join-Path $WorkRoot "scripts\secrets-vault.ps1"
-        $tokenRaw  = (& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $vaultScript -Action get -Name TELEGRAM_BOT_TOKEN  2>&1 | Select-String '=')
-        $chatRaw   = (& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $vaultScript -Action get -Name TELEGRAM_ALLOWED_CHAT_IDS 2>&1 | Select-String '=')
-        $token  = $tokenRaw.ToString().Split('=', 2)[1].Trim()
-        $chatId = $chatRaw.ToString().Split('=',  2)[1].Trim().Split(',')[0].Trim()
-
-        if ($token -and $chatId) {
-            $emoji = if ($allPass) { '✅' } else { '⚠️' }
-            $text  = "$emoji Repair Center Phase 4 週巡檢 $($now.ToString('MM/dd HH:mm'))`n"
-            $text += "1 重複修復: $($results.check1.status)`n"
-            $text += "2 needs-human-review: $($results.check2.status)`n"
-            $text += "3 備份新鮮度: $($results.check3.status)`n"
-            if (-not $allPass) { $text += "`n詳細: reports/repair-center/phase4-LATEST.md" }
-            $body  = @{ chat_id = $chatId; text = $text } | ConvertTo-Json -Compress
-            $resp  = Invoke-RestMethod -Method Post -Uri "https://api.telegram.org/bot$token/sendMessage" `
-                         -ContentType 'application/json' -Body $body -ErrorAction Stop
-            Write-Host "Telegram 通知已發送 → chat $chatId" -ForegroundColor Green
+    $tgLib = Join-Path $WorkRoot "scripts\lib\telegram-notify.ps1"
+    if (Test-Path -LiteralPath $tgLib) {
+        . $tgLib
+        $emoji = if ($allPass) { '✅' } else { '⚠️' }
+        $text  = "$emoji Repair Center Phase 4 週巡檢 $($now.ToString('MM/dd HH:mm'))`n"
+        $text += "1 重複修復: $($results.check1.status)`n"
+        $text += "2 needs-human-review: $($results.check2.status)`n"
+        $text += "3 備份新鮮度: $($results.check3.status)`n"
+        if (-not $allPass) { $text += "`n詳細: reports/repair-center/phase4-LATEST.md" }
+        $tgResult = Send-OpsTelegram -Text $text -WorkRoot $WorkRoot
+        if ($tgResult.Sent) {
+            Write-Host "Telegram 通知已發送（$($tgResult.Reason)）" -ForegroundColor Green
         } else {
-            Write-Host "WARN: Telegram 憑證無法讀取，跳過通知" -ForegroundColor Yellow
+            Write-Host "WARN: Telegram 發送失敗 — $($tgResult.Reason)" -ForegroundColor Yellow
         }
+    } else {
+        Write-Host "WARN: 找不到 scripts\lib\telegram-notify.ps1，跳過通知" -ForegroundColor Yellow
+    }
     } catch {
-        Write-Host "WARN: Telegram 發送失敗 — $_" -ForegroundColor Yellow
+        Write-Host "WARN: Telegram 發送失敗 - $_" -ForegroundColor Yellow
     }
 }
 

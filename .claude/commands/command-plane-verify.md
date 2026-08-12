@@ -1,4 +1,4 @@
-Diagnose why the Telegram bot is silent. Runs the -Verify check and inspects docker env on SG.
+﻿Diagnose why the Telegram bot is silent. Runs the -Verify check and inspects docker env on SG.
 
 ## Step 1 — Webhook URL + recent errors (local, no SSH needed)
 
@@ -38,7 +38,7 @@ Compare vault secret (local) vs server `.env`:
 
 ```powershell
 # Local vault value:
-.\scripts\secrets-vault.ps1 -Action get -Name TELEGRAM_WEBHOOK_SECRET
+.\scripts\secrets-vault.ps1 -Action get -Name TELEGRAM_WEBHOOK_SECRET   # 輸出為遮罩，僅供確認存在（真值在 mcp\user-env.ps1）   # 輸出為遮罩，僅供確認存在（真值在 mcp\user-env.ps1）
 ```
 
 ```bash

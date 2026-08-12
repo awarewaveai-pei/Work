@@ -1,4 +1,4 @@
-# Command Plane — Telegram Silence Runbook
+﻿# Command Plane — Telegram Silence Runbook
 
 > **Owner**: 本檔
 > **觸發時機**: Telegram bot 不回覆任何指令（包含 `/status`、`/start`）
@@ -59,8 +59,10 @@ TELEGRAM_ALLOWED_CHAT_IDS=...
 grep TELEGRAM /root/lobster-phase1/.env
 grep COMMAND_PLANE /root/lobster-phase1/.env
 
-# 若缺少，從 vault 取值後加入 .env（在本機執行）:
-.\scripts\secrets-vault.ps1 -Action get -Name TELEGRAM_WEBHOOK_SECRET
+# 若缺少，需把真值加入 .env。真值來源＝本機 mcp\user-env.ps1 的 TELEGRAM_WEBHOOK_SECRET。
+# 【不要】用 -Action get 取值：那是確認存在用，只會印出遮罩 abcd****xy，貼進 .env 會讓 bot 永久靜默。
+# 只確認「vault 裡有沒有這把」時才用：
+.\scripts\secrets-vault.ps1 -Action get -Name TELEGRAM_WEBHOOK_SECRET   # 輸出為遮罩，僅供確認存在
 
 # 加進 server .env 後 rebuild：
 cd /root/lobster-phase1
@@ -93,8 +95,10 @@ ANTHROPIC_API_KEY=<from vault>
 **確認兩端 secret 一致**：
 
 ```powershell
-# 本機 vault 的 secret
+# 本機 vault 是否有這把（輸出為遮罩，不可拿去比對值）
 .\scripts\secrets-vault.ps1 -Action get -Name TELEGRAM_WEBHOOK_SECRET
+# 要比對兩端是否一致，用指紋（不外洩真值）：
+. .\scripts\_vault-helpers.ps1; Get-VaultSecretFingerprint -Store (Read-VaultStore (Resolve-VaultPath)) -Name TELEGRAM_WEBHOOK_SECRET
 ```
 
 ```bash

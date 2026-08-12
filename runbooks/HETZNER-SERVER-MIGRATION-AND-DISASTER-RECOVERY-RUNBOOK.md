@@ -1,4 +1,4 @@
-# EU 自架 Stack — 備份 / RAID / 災難還原 Runbook（上 Dedicated 主機的安全前提）
+﻿# EU 自架 Stack — 備份 / RAID / 災難還原 Runbook（上 Dedicated 主機的安全前提）
 
 > **這份文件是什麼**：EU VPS（`204.168.175.41`，跑 Supabase + Trigger + n8n + Postiz + MainWP + Uptime Kuma）
 > 若要從 Hetzner **Cloud** 搬到便宜很多的 **Dedicated auction（Serverbörse）** 二手實體機，會失去 Cloud 的「硬體壞自動遷移」。
@@ -306,7 +306,7 @@ docker rm -f drill-pg
 ```bash
 # 確認加密的 .env 備份解得開。金鑰來源二選一：
 #   EU 機上：source /etc/default/eu-backup; export BACKUP_ENC_KEY
-#   本機/異機：BACKUP_ENC_KEY=$(secrets-vault.ps1 -Action get ... 取實值) export
+#   本機/異機：真值在本機 mcp\user-env.ps1 的 BACKUP_ENC_KEY（-Action get 只印遮罩，解不開備份）
 openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -in "$OUT/env.tar.gz.enc" | tar tzf - 2>&1 | head
 # 期望列出 4 個 .env 路徑（root/supabase/.env 等）= ✅ 密鑰救得回
 ```

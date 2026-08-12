@@ -1,4 +1,4 @@
-# Runbook: Postiz 社群發佈整合 — 日常維護與事件處置
+﻿# Runbook: Postiz 社群發佈整合 — 日常維護與事件處置
 
 > **Established**: 2026-06-22
 > **SSOT**: `agency-os/docs/operations/POSTIZ_SOCIAL_PUBLISHING_PLAN.md`
@@ -110,7 +110,7 @@ x-ratelimit-reset: 3600 (秒)
 
 **API Key 位置**：
 - SG：`/root/lobster-phase1/.env` → `POSTIZ_API_KEY`
-- Vault：`scripts/secrets-vault.ps1 -Action get -Name POSTIZ_API_KEY`
+- Vault：`scripts/secrets-vault.ps1 -Action get -Name POSTIZ_API_KEY`（僅確認存在，輸出為遮罩；真值在本機 `mcp\user-env.ps1`）
 
 **輪替步驟**：
 
@@ -236,7 +236,7 @@ curl -s "https://supabase.aware-wave.com/rest/v1/social_postiz_connections" \
 ssh -i ~/.ssh/hetzner_trigger root@204.168.175.41 "cd /root/postiz && docker compose ps"
 
 # 從 vault 取 key（確認存在）
-.\scripts\secrets-vault.ps1 -Action get -Name POSTIZ_API_KEY
+.\scripts\secrets-vault.ps1 -Action get -Name POSTIZ_API_KEY   # 輸出為遮罩，僅供確認存在；真值在 mcp\user-env.ps1
 ```
 
 ---

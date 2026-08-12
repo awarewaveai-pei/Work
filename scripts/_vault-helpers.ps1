@@ -91,6 +91,18 @@ function Get-VaultSecret {
     return Unprotect-VaultSecret -CipherText $entry.Value.cipher
 }
 
+function Test-VaultValueLooksMasked {
+    # True when a value looks like the output of `secrets-vault.ps1 -Action get`,
+    # which is CONFIRM-ONLY and prints e.g. `8584****pI`. Callers have repeatedly
+    # mistaken that masked line for the real secret (2026-08-12: it was POSTed to
+    # the Telegram API, and written back into the vault). Any real secret in this
+    # system - bot token, chat id, base64url webhook secret, API key - is
+    # asterisk-free, so this predicate has no false positives.
+    [CmdletBinding()]
+    param([string]$Value)
+    return ($Value -match '\*')
+}
+
 function Get-VaultSecretFingerprint {
     # Returns a stable SHA-256 prefix of the secret value, useful for cross-machine
     # diff comparisons without exposing the value itself.

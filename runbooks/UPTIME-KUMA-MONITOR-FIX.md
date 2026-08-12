@@ -1,4 +1,4 @@
-# Uptime Kuma Monitor Fix
+﻿# Uptime Kuma Monitor Fix
 
 **症狀**：Telegram `/health` 顯示 CRITICAL / open incidents，但服務容器本身 healthy。  
 **根因**：Monitor URL 或 headers 設定錯誤，導致 Kuma 收到 403/404/timeout。
@@ -40,8 +40,8 @@ curl -s -o /dev/null -w "%{http_code}" \
 # 預期：200
 ```
 
-> 若不知道 `x-ops-proxy-auth` 值，從 SG VPS 的 `.env` 或 vault 取得：  
-> `scripts/secrets-vault.ps1 -Action get -Name OPS_PROXY_SHARED_SECRET`
+> 若不知道 `x-ops-proxy-auth` 值，從 SG VPS 的 `.env`，或本機 `mcp\user-env.ps1` 的 `OPS_PROXY_SHARED_SECRET` 取得。  
+> **不要**用 `secrets-vault.ps1 -Action get`：那是確認存在用，只印遮罩值。
 
 ### 4. 備份 DB 再修改
 ```bash

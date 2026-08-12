@@ -213,6 +213,8 @@
 
 #### 客戶試點 — Scenery Travel Mongolia（新站建置）
 
+- [ ] **蒙古客戶 Cloudways 實際建站**：待客戶刷卡配合 —— **【未開始】** 現場開機 checklist 與 Cloudways 方案已備（`handoffs/2026-07-05-mongolia-client-onsite-checklist.md`；網域在 Namecheap 買，Cloudways 不賣網域）。**阻塞**：需客戶本人刷卡開 Cloudways 帳號。（2026-08-12 從 AO-CLOSE 2026-07-05 封存補回 TASKS）
+
 - [ ] **新站建置（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；**Day 2 書面**：canonical staging **提案** `https://staging.scenery-travel.mn/` 已寫入 registry／SITE_PROFILE。**下一步：**選定主機商後 Runbook §2 建置實機 + 客戶訪談補 Discovery。
   - 本項目標：完成 M1 啟動（tenant/site/project + 雲端 staging 可用 + Discovery 國際需求補齊）
 - [ ] **新站建置 Day 1（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架 + Discovery 骨架完成。**下一步：**與客戶確認素材與頂級網域，選定主機商 → 銜接 **`TASKS`**「Day 2 雲端 staging 實機驗收」。

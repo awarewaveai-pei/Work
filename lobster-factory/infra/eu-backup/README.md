@@ -1,4 +1,4 @@
-# EU Stack 備份腳本（repo 版控正本）
+﻿# EU Stack 備份腳本（repo 版控正本）
 
 > 📍 機器拓樸正本見 [`AWAREWAVE_STACK_QUICKREF.md`](../../../agency-os/docs/operations/AWAREWAVE_STACK_QUICKREF.md)。
 > 完整備份/RAID/還原/遷移策略見 [`runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`](../../../runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md)。
@@ -20,7 +20,7 @@ ssh -i ~/.ssh/hetzner_trigger root@204.168.175.41 'chmod +x /root/scripts/{backu
 
 ## 密鑰（`.env` 加密）
 
-`BACKUP_ENC_KEY` 在 EU `/etc/default/eu-backup`（**不進備份**）+ 鏡像於本機 vault（`secrets-vault.ps1 -Action get -Name BACKUP_ENC_KEY`）。
+`BACKUP_ENC_KEY` 在 EU `/etc/default/eu-backup`（**不進備份**）+ 鏡像於本機 vault（`secrets-vault.ps1 -Action get -Name BACKUP_ENC_KEY` 僅確認存在，輸出為遮罩；還原時的真值取自本機 `mcp\user-env.ps1`）。
 還原 `env.tar.gz.enc`：`openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -in env.tar.gz.enc | tar xzf - -C /`。
 
 ## 異地狀態

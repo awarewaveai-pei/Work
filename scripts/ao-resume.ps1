@@ -819,22 +819,28 @@ if ($runMonthly) {
         $global:LASTEXITCODE = 0
     }
 
-    # Telegram
+    # Telegram — real values come from the environment (mcp/user-env.ps1), never
+    # from `secrets-vault -Action get`, which returns a MASKED value and produced
+    # a silent 404 here until 2026-08-12. See scripts/lib/telegram-notify.ps1.
+    # Wrapped: a notifier failure must never abort AO-RESUME. If it did, the
+    # $monthlyStamp write below would be skipped, the next session would decide
+    # the monthly review is still due, and the same throw would repeat forever.
     try {
-        $vaultScript = Join-Path $WorkRoot "scripts\secrets-vault.ps1"
-        $tokenRaw = (& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $vaultScript -Action get -Name TELEGRAM_BOT_TOKEN  2>&1 | Select-String '=')
-        $chatRaw  = (& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $vaultScript -Action get -Name TELEGRAM_ALLOWED_CHAT_IDS 2>&1 | Select-String '=')
-        $token  = $tokenRaw.ToString().Split('=', 2)[1].Trim()
-        $chatId = $chatRaw.ToString().Split('=',  2)[1].Trim().Split(',')[0].Trim()
-        if ($token -and $chatId) {
+        $tgLib = Join-Path $WorkRoot "scripts\lib\telegram-notify.ps1"
+        if (Test-Path -LiteralPath $tgLib) {
+            . $tgLib
             $tgText = "$overallEmoji 月度系統巡檢 $monthLabel`n$bodyText"
-            $tgBody = @{ chat_id = $chatId; text = $tgText } | ConvertTo-Json -Compress
-            Invoke-RestMethod -Method Post -Uri "https://api.telegram.org/bot$token/sendMessage" `
-                -ContentType 'application/json' -Body $tgBody -ErrorAction Stop | Out-Null
-            Write-Host "  Telegram 通知已發送" -ForegroundColor DarkCyan
+            $tgResult = Send-OpsTelegram -Text $tgText -WorkRoot $WorkRoot
+            if ($tgResult.Sent) {
+                Write-Host "  Telegram 通知已發送（$($tgResult.Reason)）" -ForegroundColor DarkCyan
+            } else {
+                Write-Host "  WARN: Telegram 通知失敗 - $($tgResult.Reason)" -ForegroundColor Yellow
+            }
+        } else {
+            Write-Host "  WARN: 找不到 scripts\lib\telegram-notify.ps1，略過 Telegram 通知" -ForegroundColor Yellow
         }
     } catch {
-        Write-Host "  WARN: Telegram 通知失敗 — $_" -ForegroundColor Yellow
+        Write-Host "  WARN: Telegram 通知失敗 - $_" -ForegroundColor Yellow
     }
 
     # Update stamp
