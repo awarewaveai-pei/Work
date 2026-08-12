@@ -36,8 +36,20 @@
 Set-StrictMode -Version Latest
 
 # Vault read helpers + the shared masked-value predicate live in one place.
+# Loaded UNCONDITIONALLY and on purpose: if this were best-effort, a missing lib
+# would leave Test-VaultValueLooksMasked undefined, and under a caller running
+# $ErrorActionPreference='SilentlyContinue' (phase4-weekly-check.ps1) the masked
+# guard below would evaluate to $false and FAIL OPEN - sending with whatever
+# credential it was handed. Failing fast here is caught by both callers' try/catch
+# and degrades to "no notification", never to "unguarded notification".
 $script:OpsVaultLib = Join-Path (Split-Path -Parent $PSScriptRoot) '_vault-helpers.ps1'
-if (Test-Path -LiteralPath $script:OpsVaultLib) { . $script:OpsVaultLib }
+if (-not (Test-Path -LiteralPath $script:OpsVaultLib)) {
+    throw "telegram-notify.ps1 requires scripts\_vault-helpers.ps1 (not found at $script:OpsVaultLib)"
+}
+. $script:OpsVaultLib
+if (-not (Get-Command Test-VaultValueLooksMasked -ErrorAction SilentlyContinue)) {
+    throw "scripts\_vault-helpers.ps1 loaded but Test-VaultValueLooksMasked is undefined - refusing to run with the masked-credential guard disabled."
+}
 
 function Get-OpsTelegramCredential {
     param([string]$WorkRoot)
@@ -89,10 +101,13 @@ function Send-OpsTelegram {
     }
     # Positive format checks - strictly stronger than "contains no asterisk".
     if ($cred.Token -notmatch '^\d+:[A-Za-z0-9_-]{30,}$') {
-        return [pscustomobject]@{ Sent = $false; Reason = 'TELEGRAM_BOT_TOKEN does not match the documented format <digits>:<35+ base64url chars>' }
+        return [pscustomobject]@{ Sent = $false; Reason = 'TELEGRAM_BOT_TOKEN does not match the documented format <digits>:<30+ base64url chars>' }
     }
     if ($cred.ChatId -notmatch '^-?\d+$') {
-        return [pscustomobject]@{ Sent = $false; Reason = "TELEGRAM_ALLOWED_CHAT_IDS first entry '$($cred.ChatId)' is not a numeric chat id" }
+        # Report shape only. This branch fires precisely when the value is not what
+        # we expect - including a bot token mis-set into TELEGRAM_ALLOWED_CHAT_IDS -
+        # and this Reason is written to ao-resume's on-disk log.
+        return [pscustomobject]@{ Sent = $false; Reason = "TELEGRAM_ALLOWED_CHAT_IDS first entry is not a numeric chat id (length=$($cred.ChatId.Length))" }
     }
 
     # PS 5.1's ConvertTo-Json emits literal CJK rather than \uXXXX escapes, so the
@@ -108,7 +123,10 @@ function Send-OpsTelegram {
             $desc = if ($resp.PSObject.Properties.Name -contains 'description') { $resp.description } else { '(no description)' }
             return [pscustomobject]@{ Sent = $false; Reason = "Telegram returned ok=false: $desc" }
         }
-        return [pscustomobject]@{ Sent = $true; Reason = "delivered to chat $($cred.ChatId)" }
+        # Chat id is vault-managed credential material and this Reason lands in
+        # agency-os/.agency-state/ao-resume-hook-last.{log,json}. Last 4 only.
+        $tail = if ($cred.ChatId.Length -gt 4) { $cred.ChatId.Substring($cred.ChatId.Length - 4) } else { '****' }
+        return [pscustomobject]@{ Sent = $true; Reason = "delivered (chat ...$tail)" }
     } catch {
         # $_.Exception.Message carries the HTTP status, never the URI, so the
         # token cannot leak through this path (verified 2026-08-12).

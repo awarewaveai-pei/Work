@@ -35,7 +35,10 @@ try {
     # a commit that deletes the whole shared .claude/ tree for every machine.
     # This is the last line of defence, so it runs immediately before staging.
     $claudeJunction = Join-Path $WorkRoot ".claude"
-    $claudeTracked = @(git ls-files -- ".claude" 2>$null)
+    # UTF-8 wrapped: tracked paths under .claude/ may contain non-ASCII, and a
+    # CP950 console mangles them on capture (scripts/audit-cp950-traps.ps1 trap class).
+    . (Join-Path $PSScriptRoot '_console-encoding-helpers.ps1')
+    $claudeTracked = @(Invoke-WithUtf8Console { & git ls-files -- ".claude" 2>$null })
     if ($claudeTracked.Count -gt 0 -and -not (Test-Path -LiteralPath $claudeJunction)) {
         throw @"
 Refusing checkpoint: '.claude' is tracked in git ($($claudeTracked.Count) files) but does not exist on disk.

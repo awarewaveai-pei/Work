@@ -59,7 +59,13 @@
 - 真實投遞兩次：`Sent=True | delivered to chat 8286448653`
 - `audit-cp950-traps.ps1`：四個改動 .ps1 全 CLEAN
 - REALTEST_EVIDENCE: tool=Bash | cmd=powershell test_telegram2.ps1（parse+守衛+vault fallback+副作用比對）+ 真實 Send-OpsTelegram | exit=0 | ms=~300000
-- REVIEW_DONE: critic=Deep | verdict=fail→fixed | findings=2C/6M/5m（round 1 全部處理後 round 2 複審）
+- **critic round 2**：確認 round 1 的 11 項全部關閉（M1/M4 還被實證超出我的宣稱：3000 次 base64url 取樣 0 失敗、長度恆為 43；`-Action set` 經 `Ensure-Store` 確實能在無 vault 的新機自建），但**我的改寫又新引入 1C+2M**，已全修：
+  - 🔴 N1：`setup-command-plane.ps1` 驗了「vault 讀出的值」卻沒驗「操作者輸入的 `-BotToken`」。`Write-Store` 無備份 + Step 2 同步全機 ⇒ 有人把 `-Action get` 的遮罩輸出貼進 `-BotToken`（正是多份 runbook 以前教的動作）＝不可逆摧毀真 token。已在任何寫入前加輸入驗證（遮罩 + 格式 + trim）
+  - 🟠 N2：`_vault-helpers.ps1` 是「有才載入」，而 `phase4-weekly-check.ps1:27` 用 `SilentlyContinue` ⇒ 檔案不見時 `Test-VaultValueLooksMasked` 未定義、判斷式取 `$false`、**守衛 fail-open 照送**。改成無條件載入 + 函式存在性斷言，fail-closed
+  - 🟠 N3：secret 重新產生有兩條分支不印 rebuild/redeploy 警告，其中「vault 有這把但 DPAPI 解不開」（第二台機的必然情境）會靜默換新 secret 並重新註冊 Telegram ⇒ SG 仍是舊的、401 靜默。已區分「entry 不存在」與「entry 解不開」並在後者直接 throw；警告改為每條產生路徑都印
+  - 🟡 N4/N5 憑證片段寫進 on-disk log（chat id 全值、被拒值內插）→ 改為只留末 4 碼／只報長度；N6 drift 指示冗贅、N9 訊息與 regex 不符、N11 未 Dispose、N13 漏網文件 一併修
+- REVIEW_DONE: critic=Deep | verdict=fail→fixed（兩輪）| findings=round1 2C/6M/5m + round2 1C/2M/4m，全數處理
+- round 3 實測：N1 三種惡意輸入（遮罩 token／整行 `NAME=遮罩`／格式錯）全部 refused，且 **vault 檔 SHA256 前後相同**＝證實擋在第一次寫入之前；N2 在 `SilentlyContinue` 下 fail-closed；N4/N5 原始碼比對確認不再內插憑證；round-2 全部守衛無回歸；真實投遞 `Sent=True | delivered (chat ...8653)`
 - BUGHUNT_DONE: scope=agency-os,scripts,runbooks,lobster-factory,mcp,.claude | grep=Action get -Name | hits=12
   - 12 處人類文件誤導全部更正；另確認 VPS 端 4 支 bash 與 `configure-telegram-webhook.ps1` 都從 `.env`/`$env:` 讀真值，未受影響
 

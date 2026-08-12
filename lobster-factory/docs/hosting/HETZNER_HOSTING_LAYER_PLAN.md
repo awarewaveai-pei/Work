@@ -49,7 +49,7 @@
 - 🔴 **`HETZNER_API_TOKEN` 為空**（`mcp/user-env.ps1:14`）— Phase 3 真機開機**硬前提**，需一次性手動填（Hetzner dashboard → Security → API tokens）。`HETZNER_API_BASE_URL` 已有（`:12`）。
 - ✅ `CLOUDFLARE_API_TOKEN` 有效（`:8`）+ Zone ID `f21b1919632fee2221647908a94fdcac` → DNS 自動化 creds 備齊（但 repo **無 DNS record helper**，需新建）。
 - ✅ `RESEND_API_KEY` 有效（`:5`）→ SMTP 共用 pool 可立即用，friction #3 creds 解決。
-- ✅ `secrets-vault.ps1 -Action get -Name <KEY>`（確認旗標是 `-Name` 非 `-Key`）。
+- ✅ `secrets-vault.ps1 -Action get -Name <KEY>`（確認旗標是 `-Name` 非 `-Key`）。⚠️ 該指令輸出為**遮罩值**，僅供確認存在；真值取自本機 `mcp\user-env.ps1`。
 - ⚠️ `install-maintenance-crons.sh` 冪等 + host 偵測，但**靠 hostname 比對 sg/eu**（`:35-43`）；`backup-phase1.sh` **寫死容器名** `lobster-wordpress-db`/`lobster-wordpress`（`:55,75`）→ 新租戶要復用，須**沿用同套容器命名**（見 D3 決策 3）。
 
 ---
