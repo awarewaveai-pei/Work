@@ -4,6 +4,32 @@
 
 ## 2026-08-12
 
+### AUTO_TASK_DONE: packages/workflows 每週安全掃描 35 漏洞 → 0（含掃描器結構性補強）
+
+[根因]
+每週掃描（`.github/workflows/weekly-workflows-security-audit.yml`，週一 01:30 UTC）持續告警 high=6→10，但沒人知道要做什麼。查下去有兩層：
+1. **依賴層**：`package.json` 的 `overrides` 已不再保護對應套件。兩種成因症狀相同 —— (a) 上游公告範圍擴大到吃掉原本的下限（`fast-uri` 釘 `^3.1.2`，公告長到 `<=3.1.4`）；(b) 下限是 caret 範圍、其實**允許**修補版，但 lockfile 鎖住舊解析，而 `npm install` 不會自己在範圍內往上跳。
+2. **流程層（真正的病）**：掃描器只列漏洞 + 一段「決策範本」問句，**從不指出 override 已失效、也不給修法**。所以每週響、每週無動作，high 就一路爬。
+另：`npm audit fix --force` 的建議是把 `trigger.dev` 從 4.4.6 **降級**到 1.0.8（砍掉整個 SDK 世代），不可採用。
+
+[已修改]
+1. `lobster-factory/packages/workflows/package.json` — 直接依賴 `@trigger.dev/{sdk,build}` + `trigger.dev` 4.4.6 → 4.5.10（三者鎖同版）；`overrides` 下限拉到修補版，全部**限縮在同一 major** 內以保持 semver 安全：`tar ^7.5.22` / `fast-uri ^3.1.5` / `brace-expansion ^5.0.9` / `ip-address ^10.5.0` / `hono ^4.13.1`，新增 `nanoid ^3.3.18` / `postcss ^8.5.26` / `engine.io ^6.6.9` / `socket.io ^4.8.3` / `express-rate-limit ^8.6.2` / `@hono/node-server ^2.1.0` / `body-parser ^2.3.0` / `@opentelemetry/core ^2.10.0`
+2. `lobster-factory/packages/workflows/package-lock.json` — 重新解析
+3. `lobster-factory/scripts/audit-workflows-security.mjs` — 新增 §Override health（偵測「有 override 卻仍中招」= 失效，並列出 `NOT OVERRIDDEN` 候選）+ §Remediation playbook 取代原本的問句式決策範本（含「不可用 --force 降級」與「repo 修好 ≠ prod 修好」兩條紅線）
+
+[驗證結果]
+- `npm audit`：total 35（high 10 / moderate 24 / low 1）→ **total 0**
+- `npm test`（vitest）：11 檔 / **75 測全過**（改依賴前後各跑一次，結果一致）
+- 掃描器新邏輯**注入故障實測**：把 `fast-uri` 釘成有洞的 `3.1.4` → `npm install` → 報告確實輸出 `STALE OVERRIDE fast-uri: pinned 3.1.4 but advisory covers 3.0.0 - 3.1.4`；還原 `^3.1.5` 後回到 `All overrides cover their advisories`。傳遞性回音（`ajv`）正確地未被誤報為 stale
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm audit --json + npm test + 注入 fast-uri@3.1.4 重跑 audit:workflows-security | exit=0 | ms=~600000
+- REVIEW_DONE: critic=Manual-readback | verdict=pass | findings=0c/0m/1n （註：依本 session 政策未召 critic subagent；改以 `node --check` + 讀回新增區塊 + 注入故障實測。n=1：`@opentelemetry/core` 被強制到 2.10.0 而族群其他套件仍 2.7.x，semver 相容但 otel 家族向來要求版本對齊，需觀察）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.github | grep=audit:workflows-security\|overrides\|@trigger.dev/sdk | hits=3（workflow yml 的 severity gate 路徑正確；`lobster-factory/package.json` script 註冊正確；無其他 package 沿用同一組 overrides）
+
+[剩餘風險]
+- **repo 修好 ≠ production 修好**：`packages/workflows` 是部署到 EU self-hosted Trigger.dev 的，必須重新 deploy（需 `tr_pat_*` = `TRIGGER_DEPLOY_PAT`）新依賴樹才會生效。**本次未部署**（High risk，需操作者 go-ahead）
+- `@trigger.dev/sdk` 4.4.6→4.5.10 為 minor 升級，單元測試過，但未經 Trigger.dev 實機 run 驗證
+- override 需人維護：新機制只保證「失效時會被明確指出」，不會自動修
+
 ### AUTO_TASK_DONE: SG 磁碟 90% 根治（offsite 備份無 retention）+ Uptime Kuma 403 假告警根治
 
 [根因]

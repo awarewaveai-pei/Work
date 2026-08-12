@@ -5,7 +5,7 @@
     "type": "module",
     "dependencies": {
         "@sentry/node": "^10.50.0",
-        "@trigger.dev/sdk": "4.4.6",
+        "@trigger.dev/sdk": "4.5.10",
         "posthog-node": "^5.32.0",
         "ssh2": "^1.16.0",
         "zod": "^3.22.0"
@@ -15,22 +15,30 @@
         "test:watch": "vitest"
     },
     "devDependencies": {
-        "@trigger.dev/build": "4.4.6",
-        "trigger.dev": "4.4.6",
+        "@trigger.dev/build": "4.5.10",
+        "trigger.dev": "4.5.10",
         "tsx": "^4.21.0",
         "vitest": "^4.1.5"
     },
     "overrides": {
         "systeminformation": "^5.31.6",
-        "tar": "^7.5.13",
+        "tar": "^7.5.22",
         "cookie": "^1.1.1",
         "esbuild": "^0.28.1",
-        "fast-uri": "^3.1.2",
-        "hono": "^4.12.18",
-        "brace-expansion": "^5.0.6",
-        "ip-address": "^10.2.0",
+        "fast-uri": "^3.1.5",
+        "hono": "^4.13.1",
+        "body-parser": "^2.3.0",
+        "@opentelemetry/core": "^2.10.0",
+        "brace-expansion": "^5.0.9",
+        "ip-address": "^10.5.0",
         "ws": "^8.20.1",
         "socket.io-adapter": "^2.5.7",
-        "protobufjs": "^7.5.8"
+        "protobufjs": "^7.5.8",
+        "nanoid": "^3.3.18",
+        "postcss": "^8.5.26",
+        "engine.io": "^6.6.9",
+        "socket.io": "^4.8.3",
+        "express-rate-limit": "^8.6.2",
+        "@hono/node-server": "^2.1.0"
     }
 }
