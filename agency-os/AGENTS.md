@@ -322,7 +322,7 @@ Hook `ao-resume-on-prompt.ps1` 自動觸發 → 讀 `.agency-state/ao-resume-hoo
 
 ## AO-RESUME / AO-CLOSE 快速續接
 
-**雙機前提**：個人筆電 + 公司桌機兩台；所有環境以「repo 共用 + 各機獨立 env/vault」處理，不假設單機。
+**機器前提（2026-08-12 更新）**：**目前僅個人筆電一台**（操作者已離職，公司桌機退場）。環境仍以「repo 共用 + 各機獨立 env/vault」處理 —— 這個設計**不因單機而改**，將來加機器即可直接用；跨機 import 回報「無其他機器較新匯出」是正常狀態。
 
 **AO-RESUME**：IDE hook 自動跑 `ao-resume.ps1 -FullMainlineParity` → 寫入 `.agency-state/ao-resume-hook-last.json`（300 秒去重）。代理讀狀態檔回 AO-RESUME 報告（§0–§8）；Exit 0 = 可開工；禁止叫使用者手動 pull。詳見 `.claude/commands/ao-resume.md`。  
 `ao-resume.ps1` 同時自動執行 `scripts/check-smoke-tests.ps1`（application-layer smoke：n8n MCP + Repair Center health + 客戶網站健康 + n8n workflow 失敗）→ 寫 `reports/status/smoke-LATEST.json` → Claude 在 §1 系統快照回報。使用者不需要記得跑 `/smoke-test`。  
@@ -367,5 +367,5 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-07-05 07:38:05 UTC_
+_Last synced: 2026-08-12 11:48:56 UTC_
 

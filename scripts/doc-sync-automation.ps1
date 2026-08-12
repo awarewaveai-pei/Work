@@ -34,7 +34,12 @@ function To-RelPath {
     param([string]$Root, [string]$PathValue)
     $rootUri = New-Object System.Uri(($Root.TrimEnd('\') + '\'))
     $fullPath = if ([System.IO.Path]::IsPathRooted($PathValue)) { $PathValue } else { Join-Path $Root $PathValue }
-    $fileUri = New-Object System.Uri((Resolve-Path $fullPath).Path)
+    # -LiteralPath is required: the repo contains Next.js route folders such as
+    # app/ops/clients/[slug] and app/(shell), and without it PowerShell treats
+    # '[' / ']' as wildcard metacharacters, resolves nothing, and then
+    # $null.Path throws under Set-StrictMode -Version Latest. That made
+    # doc-sync-automation.ps1 -AutoDetect abort for every caller (2026-08-12).
+    $fileUri = New-Object System.Uri((Resolve-Path -LiteralPath $fullPath).Path)
     return [System.Uri]::UnescapeDataString($rootUri.MakeRelativeUri($fileUri).ToString()).Replace('\', '/')
 }
 

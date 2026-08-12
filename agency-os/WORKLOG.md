@@ -10028,8 +10028,7 @@ Option A：human_only incident → 顯示「已知悉」→ POST /api/ops/inbox/
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-07-05 07:42:57 UTC_
-
+_Last synced: 2026-08-12 11:48:56 UTC_
 
 ## 2026-07-13
 
@@ -10051,4 +10050,6 @@ _Last synced: 2026-07-05 07:42:57 UTC_
 
 ### Machine appendix (monthly-system-review)
 - 2026-08-12 17:34:55 : gates=SKIPPED (ReportOnly) ; integrated-status: generate-integrated-status-report.ps1 OK ; supabase-memory: PASS (supabase-studio memory at 34.26% (< 85%))
+
+
 
