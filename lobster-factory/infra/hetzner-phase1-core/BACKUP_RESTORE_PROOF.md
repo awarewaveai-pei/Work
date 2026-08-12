@@ -65,7 +65,8 @@
 - Backup script: `scripts/backup-phase1.sh` (cron daily 02:00 UTC)
 - Verify script: `scripts/verify-backup.sh` (cron daily 02:30 UTC)
 - Local retention: 7 days (`BACKUP_RETAIN_DAYS`)
-- Offsite: pending `RCLONE_REMOTE` configuration (rclone installed, target: Hetzner Object Storage fsn1)
+- Offsite retention: 14 days (`OFFSITE_RETAIN_DAYS`, added 2026-08-12) — the pushing host prunes its own copies on the receiving host
+- Offsite: `RCLONE_REMOTE=eu-backup:/root/backups/from-sg` (rclone sftp remote → EU VPS 204.168.175.41)
 - Cron file: `/etc/cron.d/lobster-backup`
 - Log: `/var/log/lobster-backup.log`
 
@@ -111,6 +112,7 @@
 - Cron file: `/etc/cron.d/eu-backup`
 - Log: `/var/log/eu-backup.log`
 - Local retention: 7 days
+- Offsite retention: 14 days (`OFFSITE_RETAIN_DAYS`, added 2026-08-12) — the pushing host prunes its own copies on the receiving host
 - Offsite: rsync to SG VPS (`/root/lobster-phase1/backups/from-eu/`) via SSH key `/root/.ssh/backup_to_sg`
 
 ### EU Restore Drill #1 — 2026-05-08

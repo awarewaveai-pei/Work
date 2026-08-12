@@ -7,6 +7,7 @@
 #   BACKUP_DIR           — output root (default: ./backups, absolute recommended for cron)
 #   BACKUP_RETAIN_DAYS   — delete local backups older than N days (default: 7)
 #   RCLONE_REMOTE        — rclone destination (e.g. b2:bucket/lobster-phase1); empty = skip
+#   OFFSITE_RETAIN_DAYS  — purge offsite copies older than N days (default: 14)
 #   WORDPRESS_DB_NAME    — database name (required)
 #   WORDPRESS_DB_ROOT_PASSWORD — root password (required)
 #
@@ -128,6 +129,27 @@ if [[ -n "${RCLONE_REMOTE}" ]]; then
   fi
 else
   log "  SKIP: RCLONE_REMOTE not set — no offsite upload"
+fi
+
+# --- 5b. Offsite retention (purge the copies we pushed) ---
+# Root cause 2026-08-12: section 6 below only prunes BACKUP_DIR on THIS host.
+# The copies uploaded to the rclone remote were never purged -> 96 snapshots / 31G on EU.
+# Rule: retention follows the producer. Whoever pushes a copy also prunes it.
+# Only runs after a successful upload, so a failed push never deletes history.
+OFFSITE_RETAIN_DAYS="${OFFSITE_RETAIN_DAYS:-14}"
+if [[ "$OFFSITE_OK" == "true" && -n "${RCLONE_REMOTE}" && "${OFFSITE_RETAIN_DAYS}" -gt 0 ]]; then
+  OFFSITE_CUTOFF="$(date -u -d "${OFFSITE_RETAIN_DAYS} days ago" +%Y-%m-%d)"
+  OFFSITE_PRUNED=0
+  while read -r offsite_dir; do
+    [[ "$offsite_dir" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || continue
+    [[ "$offsite_dir" < "$OFFSITE_CUTOFF" ]] || continue
+    if rclone purge "${RCLONE_REMOTE}/${offsite_dir}" >/dev/null 2>&1; then
+      OFFSITE_PRUNED=$((OFFSITE_PRUNED + 1))
+    else
+      log "  WARN: offsite purge failed for ${offsite_dir} (non-fatal)"
+    fi
+  done < <(rclone lsf --dirs-only "${RCLONE_REMOTE}" 2>/dev/null | sed 's:/$::')
+  log "Offsite retention: purged ${OFFSITE_PRUNED} snapshot(s) older than ${OFFSITE_CUTOFF} from ${RCLONE_REMOTE}"
 fi
 
 # --- 6. Retention cleanup (only after successful local backup) ---

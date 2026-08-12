@@ -2,6 +2,43 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-08-12
+
+### AUTO_TASK_DONE: SG 磁碟 90% 根治（offsite 備份無 retention）+ Uptime Kuma 403 假告警根治
+
+[根因]
+1. **磁碟**：offsite 備份的 retention 只清「本機」。EU `backup-eu-stack.sh:162` rsync 推副本到 SG `backups/from-eu/`，但同檔 `:176-178` 的 prune 只掃 EU 自己的 `BACKUP_DIR`；SG `backup-phase1.sh:135-137` 同樣只掃自己。→ 兩邊互推的副本從 2026-05-08 起零清理：SG 囤 97 份/30G（磁碟 90.2%，約 17 天爆）、EU 囤 96 份/31G。**設計缺陷是對稱的，不是單邊 bug。**
+2. **Kuma 403**：monitor 26/27 用 `https://aware-wave.com/...` 從 EU VPS 監控，被自家 Cloudflare Bot Fight Mode 發 JS challenge（`cf-mitigated: challenge` + "Just a moment..." → 403）。Kuma 不跑 JS ⇒ 永久假 DOWN；真實使用者不受影響。`runbooks/UPTIME-KUMA-MONITOR-FIX.md` 早已載明「禁止從 EU 監控 CF-proxied URL」，這兩個 monitor 違反該規則。
+3. **附帶**：monitor 27 keyword 設成 `AwareWave`，但公網與 origin 頁面實際字串是 `Aware Wave`／`aware-wave`（`grep -c "AwareWave"` = 0）⇒ 即使修好 403 仍會假 DOWN。雙重壞掉。
+
+[已修改]
+1. `lobster-factory/infra/eu-backup/backup-eu-stack.sh` — 新增 §5b Offsite retention（`OFFSITE_RETAIN_DAYS`，預設 14）：rsync 成功後 ssh 到 SG，只刪符合 `^\d{4}-\d{2}-\d{2}$` 且早於 cutoff 的目錄
+2. `lobster-factory/infra/hetzner-phase1-core/scripts/backup-phase1.sh` — 對稱新增 §5b（走 `rclone lsf --dirs-only` + `rclone purge`）
+3. `lobster-factory/infra/hetzner-phase1-core/BACKUP_RESTORE_PROOF.md` — 補 offsite retention 兩處；修過期聲稱「Offsite: pending RCLONE_REMOTE configuration, target Hetzner Object Storage」→ 實為 `eu-backup:` sftp remote
+4. `lobster-factory/infra/hetzner-phase1-core/MAINTENANCE_CALENDAR.md` — Retention 拆本機/異地兩條
+5. **live**：EU `/root/scripts/backup-eu-stack.sh`、SG `/root/lobster-phase1/scripts/backup-phase1.sh`（各留 `.bak-20260812`）
+6. **live**：EU Kuma DB monitor 26/27 → `http://5.223.93.113/...` + `{"Host":"aware-wave.com"}`；27 keyword → `Aware Wave`（DB 備份 `kuma.db.bak-20260812`）
+
+[驗證結果]
+- 磁碟：SG `df -h /` 90%(65G) → **48%(35G)**；EU 79%(114G) → **65%(93G)**。`from-eu` 30G→5.9G（97→14 份）、`from-sg` 31G→9.3G（96→15 份）
+- 選取邏輯先 dry-run 再執行：`would-purge=81 keep=15`，無非日期目錄誤入
+- Kuma heartbeat 表可見切換點：`10:09:41 status=0 "Request failed with status code 403"` → `10:10:24 status=1 "200 - OK"` / `"200 - OK, keyword is found"`
+- repo 正本與 live 檔 sha256 逐一比對相同（`6b2ca93d…` / `c0df49d0…`），無 drift
+- REALTEST_EVIDENCE: tool=SSH | cmd=ssh hetzner-sg 'df -h /' + kuma heartbeat SELECT + sha256sum repo vs live | exit=0 | ms=~900000
+- REVIEW_DONE: critic=Manual-readback | verdict=pass | findings=0c/0m/1n （註：依本 session 政策未召 critic subagent，改以 `sed -n` 讀回兩支腳本改動段 + `bash -n` 語法檢查；n=1 為 EU 版 prune 依賴遠端 `/tmp` 可寫）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks | grep=from-eu\|from-sg\|OFFSITE_RETAIN_DAYS\|BACKUP_RETAIN_DAYS | hits=5
+  - 命中重點：repo 內有兩支腳本正本（只改機器＝重建即退版，同 `endpoint-alert.sh` 風險 class）→ 已回填；3 處文件過期聲稱 → 已修
+
+[剩餘風險]
+- 兩支腳本的 §5b 尚未經歷真實 cron 執行（下次 02:00/02:30 UTC）；今日是以相同指令手動實跑驗證，非 cron path
+- `OFFSITE_RETAIN_DAYS=14 > BACKUP_RETAIN_DAYS=7`：異地保留比本機久（刻意，異地是災難備援），但兩者未在單一檔案集中定義
+- Kuma 26/27 改打 origin 後不再涵蓋「公網＋CF 可達性」；該視角現只剩 SG endpoint-alert + 手機通知（且 Telegram 推播目前 404 壞中）
+
+[rollback]
+- 腳本：`cp <path>.bak-20260812 <path>`（兩台），repo 端 `git revert` 本 commit
+- Kuma：`cp kuma.db.bak-20260812 kuma.db && docker restart uptime-kuma`
+- 已刪備份不可回復（SG/EU 各自本機 7 天 + R2 仍在）
+
 ## 2026-08-10
 
 - 01:11 UTC : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-08-10.md

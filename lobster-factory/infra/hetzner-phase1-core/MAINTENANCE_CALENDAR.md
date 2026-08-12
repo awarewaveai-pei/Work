@@ -18,7 +18,8 @@
 
 - [x] **Daily backup** `02:00 UTC (SG)` — `backup-phase1.sh` 自動執行：WordPress DB + uploads + n8n volume → 本機 `${BACKUP_DIR}`；若設定 `RCLONE_REMOTE` 則同步異地
 - [x] **Daily verify** `02:30 UTC (SG)` — `verify-backup.sh` 自動驗證檔案完整性（gzip/tar integrity）；失敗時發 Slack 告警
-- [x] **Retention** — 自動清除超過 `BACKUP_RETAIN_DAYS`（預設 7 天）的本機備份
+- [x] **Retention（本機）** — 自動清除超過 `BACKUP_RETAIN_DAYS`（預設 7 天）的本機備份
+- [x] **Retention（異地）** — 自動清除超過 `OFFSITE_RETAIN_DAYS`（預設 14 天）推到對方機器的副本（2026-08-12 新增）。原則：**誰推送誰負責清理**；只在推送成功後才清，推送失敗不刪歷史
 
 ## 每月
 

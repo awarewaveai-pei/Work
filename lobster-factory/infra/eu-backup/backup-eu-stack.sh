@@ -8,6 +8,7 @@
 #   OFFSITE_HOST         — SG VPS IP for cross-VPS backup (default: 5.223.93.113)
 #   OFFSITE_KEY          — SSH key for offsite (default: /root/.ssh/backup_to_sg)
 #   OFFSITE_DIR          — remote dir (default: /root/lobster-phase1/backups/from-eu)
+#   OFFSITE_RETAIN_DAYS  — delete offsite copies older than N days (default: 14)
 #
 # Cron: /etc/cron.d/eu-backup (02:30 UTC daily)
 # Log:  /var/log/eu-backup.log
@@ -169,6 +170,23 @@ if [[ -f "${OFFSITE_KEY}" ]]; then
 else
   log "  SKIP: no offsite key at ${OFFSITE_KEY}"
   OFFSITE_OK=false
+fi
+
+# --- 5b. Offsite retention (prune the copies we pushed) ---
+# Root cause 2026-08-12: section 6 below only prunes BACKUP_DIR on THIS host.
+# The copies rsynced to SG were never pruned -> 97 snapshots / 30G -> SG disk 90%.
+# Rule: retention follows the producer. Whoever pushes a copy also prunes it.
+# Only runs after a successful rsync, so a failed push never deletes history.
+OFFSITE_RETAIN_DAYS="${OFFSITE_RETAIN_DAYS:-14}"
+if [[ "$OFFSITE_OK" == "true" && "${OFFSITE_RETAIN_DAYS}" -gt 0 ]]; then
+  OFFSITE_CUTOFF="$(date -u -d "${OFFSITE_RETAIN_DAYS} days ago" +%Y-%m-%d)"
+  if OFFSITE_PRUNED=$(ssh -i "${OFFSITE_KEY}" -o StrictHostKeyChecking=no -o ConnectTimeout=30 \
+      "root@${OFFSITE_HOST}" \
+      "cd '${OFFSITE_DIR}' && ls -1 | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' | awk '\$1 < \"${OFFSITE_CUTOFF}\"' > /tmp/offsite-prune.txt; wc -l < /tmp/offsite-prune.txt; xargs -a /tmp/offsite-prune.txt -r -d '\n' rm -r --" 2>/dev/null); then
+    log "Offsite retention: pruned ${OFFSITE_PRUNED} snapshot(s) older than ${OFFSITE_CUTOFF} on ${OFFSITE_HOST}"
+  else
+    log "  WARN: offsite retention prune failed (non-fatal; all copies intact)"
+  fi
 fi
 
 # --- 6. Retention cleanup ---
