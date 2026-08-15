@@ -218,9 +218,10 @@
   - **三筆訂閱現況**（2026-08-15 帳單截圖確認，推翻先前「$80/年」的假設）：Hosting $215.76 → **2026-11-12**（不續約）／`.ORG` Domain $53.97 → 2028-06-03（付到 2028）／Starter Business Email $76.32 → 2029-06-03（**預付近 3 年，保留**）
   - **信箱不受影響**（2026-08-15 查官方文件三項獨立證據）：① Hostinger 支援文原句「Since emails are stored on a separate infrastructure, they are not included in hosting plan reactivations or file backups」② Business Email 是可獨立購買產品、不需 hosting ③ DNS 管理綁網域不綁 hosting（網域付到 2028）。**故不需開 support ticket**。搬 DNS 到 CF 後三個依賴全部脫鉤
   - **執行順序（不可跳序）**：① DNS 搬 Cloudflare（免費，同時永久修好 IPv6）→ ② 網站搬自有主機（搬去哪取決於是否買 dedicated 機）→ ③ 網域轉 CF Registrar（$53.97→~$9.77，2028 前隨時，轉移自動 +1 年）→ ④ 讓 hosting 自然到期
-  - **DNS 對照表（13 筆，8 筆與信箱有關）**：[`core/DNS_MIGRATION_RECORD_MAP.md`](tenants/company-soulful-expression/core/DNS_MIGRATION_RECORD_MAP.md) —— 含「AAAA 刻意不建」「哪些 CNAME 不可開 Proxy」「切換前檢核」「回滾方式」
+  - **DNS 對照表（Cloudflare 實際 14 筆；清點表 13 筆已證實漏掉 `hostingermail-c`）**：[`core/DNS_MIGRATION_RECORD_MAP.md`](tenants/company-soulful-expression/core/DNS_MIGRATION_RECORD_MAP.md) —— 含「AAAA 刻意不建」「哪些 CNAME 不可開 Proxy」「🔴 DKIM 實況：實際簽章 selector 是 `hostingermail1`」「回滾方式（回滾會失去 `hostingermail1`，需先補）」
   - **安全網已就緒**（2026-08-15）：DB（288 表）+ uploads（11,001 檔）已備份並**移出 Hostinger 至 EU**，三地 SHA-256 一致，見 [`core/BACKUP_RESTORE_PROOF.md`](tenants/company-soulful-expression/core/BACKUP_RESTORE_PROOF.md) Record #2
-  - **待辦**：搬遷量已量測（檔案 1.5 GB／DB ~103 MB，plugins 619M 皆為正常大型外掛、無備份垃圾）→ 決定目標主機 → 建 CF zone 並照對照表建 13 筆記錄 → 操作者在 Hostinger 改 nameserver → 驗證（網站 200 + **寄收測試信** + DKIM/SPF）→ 搬站 → 還原演練
+  - **待辦**：搬遷量已量測（檔案 1.5 GB／DB ~103 MB，plugins 619M 皆為正常大型外掛、無備份垃圾）→ ~~建 CF zone~~ ✅ → ~~操作者改 nameserver~~ ✅ 2026-08-15 → ~~驗證（網站 200 + 寄收測試信 + DKIM/SPF）~~ ✅ 2026-08-16 **mail-tester 10/10，SPF/DKIM/DMARC 三項 pass** → 決定目標主機 → 搬站 → 還原演練
+- [ ] **🟠 Soulful 網站寄不出信（既存故障，非搬遷造成）** —— FluentSMTP 的 SMTP 主機設成 `pop.hostinger.com:587`，該埠**不接受連線**；正確為 `smtp.hostinger.com:587`（實測 `220 ESMTP`）。故障證據：`wp_fsmpt_email_logs` id=90 **2026-08-03** 已同樣 `Could not connect to SMTP host`（早於 DNS 切換 12 天）。**已實測確認修法有效**：執行期覆寫主機名後 `wp_mail()` 回 `SENT_OK` 且 mail-tester 10/10（DB 未改動，`has_pop=1 / has_smtp=0` 驗證）。**待操作者同意後改設定**（WP 後台 FluentSMTP → 連線 → Host 改 `smtp.hostinger.com`）。影響面：表單通知、訂單信、FluentCRM 寄送目前全部靜默失敗
 
 
 - [ ] **既有站接手（Soulful Expression Art Therapy）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；**Day 2 書面** staging canonical URL 已入 registry／SITE_PROFILE／`02_EXECUTION_PLAN`。**下一步：**Day 1 Runbook §1.1–1.3（操作者登入）+ **`TASKS`**「Day 2 實機驗收」。

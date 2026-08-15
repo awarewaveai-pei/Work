@@ -2,6 +2,39 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-08-16
+
+### AUTO_TASK_DONE: Soulful 信箱實測 10/10 + 揪出兩個既存問題（網站寄不出信、DKIM selector 文件錯誤）
+
+[任務]
+操作者要求「有別的方式可以驗證嗎? 你去處理好」—— 把「寄一封測試信」這件原本要她手動做的事改為代理全自動完成，並取得 SPF/DKIM/DMARC 的機器判定。
+
+[已修改]
+1. `agency-os/tenants/company-soulful-expression/core/DNS_MIGRATION_RECORD_MAP.md` —— 新增「🔴 DKIM 實況」節；標記原 13 筆清點表不完整；回滾段補 `hostingermail1` 警告
+2. `agency-os/TASKS.md` —— DNS 對照表描述更正為 14 筆；搬遷待辦勾銷已完成三項；**新增 🟠 網站寄不出信任務**
+
+[驗證結果]
+- **自動化路徑**：瀏覽器開 mail-tester 取一次性地址 → SSH 進 Hostinger 用網站自己的 `wp_mail()` 寄出 → 瀏覽器讀回判定。全程無需操作者介入
+- **最終結果 `10/10`**：`spf=pass`（`include:_spf.mail.hostinger.com` 命中）、`dkim=pass`（2048-bit、`header.d=soulfulexpression.org`）、`dmarc=pass`。**信箱線正式結案**
+- **第一次測試 2.8/10 是我的路徑選錯，不是網域有問題** —— 首次改用主機本身 MTA（PHP `mail()`）繞過 FluentSMTP，那條路不簽 DKIM 且 envelope-from 是主機網域 ⇒ `dmarc=fail`。誠實記錄：若當時就下結論會誤報客戶信箱壞掉
+- **🔴 既存故障（非搬遷造成）**：FluentSMTP 主機設為 `pop.hostinger.com:587`，實測該埠不接受連線；`smtp.hostinger.com:587` 回 `220 ESMTP`。`wp_fsmpt_email_logs` id=90 於 **2026-08-03** 已同樣錯誤 ⇒ 早於切換 12 天，**與 DNS 無關**
+- **修法已實測有效但未套用**：用 `pre_option_fluentmail-settings` 執行期覆寫主機名後 `wp_mail()` 回 `SENT_OK`（`host_used=smtp.hostinger.com`）。**DB 未被改動** —— 以獨立行程查 `wp_options` 得 `has_pop=1 / has_smtp=0`（腳本內自帶的「未持久化」檢查因 filter 仍掛著而失效，已改用乾淨行程重驗）
+- **🔴 DKIM selector 文件與實況不符**：實際簽章用 `hostingermail1`，但對照表只記 `hostingermail-a`/`-b`。CF zone 實為 **14 筆**（12 筆 13:43 UTC 批次 + `hostingermail-c`/`hostingermail1` 於 14:54 UTC 補建，**repo 內零記錄**）
+- **向舊權威伺服器求證**（`dig @ns1.dns-parking.com`）：Hostinger 舊 zone 有 `-a`/`-b`/`-c`，**沒有 `hostingermail1`** ⇒ ① 原清點漏掉 `-c`（只猜了 a/b 兩個 selector 名）② 推論：**切換前該網域 DKIM 很可能本來就是失效的**，這次遷移順帶修好 ③ 回滾會失去 `hostingermail1`，不再是零損失
+- 四個 selector 內容實查：`-a` 有金鑰（未用）、`-b`/`-c` 為 `p=` 空值、`hostingermail1` 有金鑰（實際使用）
+- REALTEST_EVIDENCE: tool=Bash | cmd=ssh hostinger wp eval-file smtp-probe.php + /dev/tcp 埠測試 + wp db query 日誌與 options + dig @ns1.dns-parking.com + mail-tester 判定讀回 | exit=0 | ms=~1500000
+- REVIEW_DONE: critic=Manual-readback | verdict=pass | findings=0c/1m/0n （1m = 探測腳本自帶的「未持久化」檢查無效，當場改用獨立行程重驗）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=13 筆 | hits=4
+  - 對照表標題、切換前檢核、TASKS 兩處全部更正；WORKLOG 歷史 entry 刻意保留原值（記錄當時認知，非 stale claim）
+
+[剩餘風險]
+- **網站寄信仍是壞的** —— 修法已驗證但屬客戶站設定變更（Medium），等操作者明示才套用
+- `hostingermail1` 的 14:54 UTC 補建**來源不明**（repo 無記錄）。金鑰能通過驗證 ⇒ 確實來自 Hostinger，非杜撰；但流程上是一次未留痕的變更
+- `hostingermail-a` 留著未用、`-b`/`-c` 為空值 —— 無害，未動
+
+[rollback]
+本輪未改動任何線上設定（DNS / 網站 / 資料庫皆原樣），僅文件更新。文件回滾 `git revert` 即可。
+
 ## 2026-08-15
 
 ### AUTO_TASK_DONE: Soulful nameserver 切換完成 — 委派已轉 Cloudflare，zone active，全項驗證通過

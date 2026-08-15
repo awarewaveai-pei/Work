@@ -15,7 +15,7 @@
 
 ---
 
-## 完整記錄清單（13 筆）
+## 清點當下的記錄清單（13 筆 —— 事後證實不完整，見表後警告）
 
 | # | 型別 | 名稱 | 值 | CF Proxy | 關鍵性 |
 |---|------|------|-----|----------|--------|
@@ -35,6 +35,32 @@
 
 **未發現**：CAA 記錄、萬用字元（`*`）記錄、staging/dev/api/cdn 等子網域、其他驗證用 TXT。
 
+> ⚠️ **上表已知不完整** —— 逐型別清點是靠「猜 selector 名稱」探測 `_domainkey`，只猜了 `-a` / `-b`，**漏掉 `hostingermail-c`**。實際 Cloudflare zone 為 **14 筆**，DKIM 實況見下一節。上表保留原樣是為了誠實記錄清點當下的認知，**不要拿它當回滾清單**。
+
+---
+
+## 🔴 DKIM 實況（2026-08-16 實測修正）
+
+清點表的 DKIM 欄位**與實際簽章情形不符**。實測（mail-tester，10/10、`dkim=pass`）顯示 Hostinger 目前簽章用的 selector 是 **`hostingermail1`**：
+
+```
+dkim=pass (2048-bit key) header.d=soulfulexpression.org header.s=hostingermail1
+```
+
+四個 selector 的真實狀態：
+
+| selector | Hostinger 舊 zone | Cloudflare zone | 內容 | 是否實際使用 |
+|---|---|---|---|---|
+| `hostingermail-a` | ✅ CNAME | ✅ CNAME | 有金鑰（2048-bit） | ❌ 未用（舊的） |
+| `hostingermail-b` | ✅ CNAME | ✅ CNAME | `p=` **空值** | ❌ |
+| `hostingermail-c` | ✅ CNAME | ✅ CNAME（14:54 UTC 補建） | `p=` **空值** | ❌ |
+| `hostingermail1` | ❌ **不存在** | ✅ TXT（14:54 UTC 新建，內嵌公鑰） | 有金鑰（2048-bit） | ✅ **就是這把** |
+
+**兩個推論**（證據強，但標示為推論）：
+
+1. **切換前該網域的 DKIM 很可能是失效的** —— Hostinger 自己的 zone 從未發布 `hostingermail1`，而它們的外寄 MTA（經 MailChannels relay）用該 selector 簽章。驗證方查不到金鑰 ⇒ `dkim=fail`。搬到 Cloudflare 並補上這筆之後才 `dkim=pass`。**這次遷移不只沒弄壞信箱，還修好了一個既存問題。**
+2. **因此回滾有代價** —— 把 nameserver 改回 `ns1/ns2.dns-parking.com` 會失去 `hostingermail1`，DKIM 退回失效狀態（DMARC 是 `p=none`，信仍會送達，但認證分數掉、進垃圾桶風險升高）。**回滾仍然可行且安全，但不再是「零損失」**，若要回滾請先在 Hostinger DNS 區域補上 `hostingermail1` TXT。
+
 ---
 
 ## ⚠️ AAAA 記錄要「刻意不建」
@@ -53,7 +79,7 @@ MX 本身不是 proxy 的對象；`autodiscover` / `autoconfig` / DKIM 這些 CN
 
 ## 切換前檢核（每項打勾才動 nameserver）
 
-- [ ] 13 筆記錄已在 Cloudflare 建好（`ftp` 可略）
+- [x] **14 筆**記錄已在 Cloudflare 建好（12 筆批次 + `hostingermail-c` / `hostingermail1` 補建）
 - [ ] 逐筆與本表對照一次（特別是 SPF 的 `~all`、DKIM 的完整 CNAME 目標）
 - [ ] 重新 `dig` 一次確認 SOA serial 未變（變了代表 Hostinger 端有異動，需重新清點）
 - [ ] Cloudflare 端 TTL 先設低（切換後觀察期用）
@@ -63,6 +89,8 @@ MX 本身不是 proxy 的對象；`autodiscover` / `autoconfig` / DKIM 這些 CN
 ## 回滾
 
 Hostinger 端 nameserver 改回 `ns1.dns-parking.com` / `ns2.dns-parking.com` 即可。**因此切換前不要刪除 Hostinger 的 DNS 區域**，保留原始區域作為回滾路徑。
+
+⚠️ **回滾前先讀上面「DKIM 實況」** —— Hostinger 舊 zone 沒有 `hostingermail1`，直接回滾會讓 DKIM 退回失效狀態。要無損回滾，先在 Hostinger DNS 補一筆 `hostingermail1._domainkey` TXT（值從 Cloudflare zone 複製）。
 
 ---
 
