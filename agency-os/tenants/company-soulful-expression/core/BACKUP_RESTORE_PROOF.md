@@ -38,6 +38,42 @@ truth_source: agency-os/tenants/company-soulful-expression/core/BACKUP_AUTO_STAT
 
 > **注意**：`uploads/` 未包含於此備份。Day 2 staging 複製時 Hostinger 面板提供「全站複製」功能，可一次包含 DB + files。此備份的用途為：有可下載的 DB dump 作為最低安全底線，可在緊急時從本機匯入還原資料庫。
 
+## Backup Record #2 — 2026-08-15（Hosting 退場前的完整安全網）
+
+> **背景**：操作者 2026-08-15 決定 **Premium Web Hosting 不續約**（$215.76/年）。Hostinger hosting
+> **2026-11-12 到期**，網站必須在此之前搬離。Record #1 的 DB dump 已是 3 個月前（2026-05-08），
+> 不足以作為搬遷的還原點，故重新製作並**移出 Hostinger**。
+
+| 欄位 | 值 |
+|---|---|
+| Backup timestamp | **2026-08-15 12:23:53 UTC** |
+| Backup method | `mysqldump --single-transaction --quick --default-character-set=utf8mb4 \| gzip -9` via Hostinger SSH；uploads 以 `tar czf -` 串流下載（不在來源端落地大檔） |
+| Backup scope | **DB + uploads**（Record #1 只有 DB） |
+| DB | `u942075013_hDaEZ`，**288 張表**，解壓後 **107,990,474 bytes**（~103 MB），壓縮後 **15 MB** |
+| DB SHA-256 | `d71ce13086ace8d6d386afd2ad4ad8eb64c058b102150d8d5a68c6525d31bd3d` |
+| Uploads | **11,001 個項目**，壓縮後 **632 MB** |
+| Uploads SHA-256 | `cb4daf29243d334403ec37c663514956c8bd93a696833de379ca26f095d6c79c` |
+| Storage（異地） | EU VPS `204.168.175.41:/root/backups/clients/soulful/`（**不在 Hostinger**，主機到期不受影響） |
+| Storage（本機） | `/tmp` 暫存，非長期保存位置 |
+| Operator | Claude（SSH session 2026-08-15） |
+
+### 完整性驗證（四項，全部實測）
+
+| 檢查 | 結果 |
+|---|---|
+| `gzip -t` DB | **OK** |
+| DB dump 結尾標記 | `-- Dump completed on 2026-08-15 12:23:59` —— mysqldump **僅在成功結束時**寫入此行 |
+| DB 表數比對 | dump 內 `CREATE TABLE` **288** == 資料庫 `information_schema` 實際 **288** |
+| `tar -tzf` uploads | **OK**（完整讀取整個封存） |
+| uploads 檔案數比對 | 封存 **11,001** == 來源 `find \| wc -l` **11,001** |
+| 跨三地 SHA-256 | Hostinger / 本機 / EU **三地完全一致**（DB 與 uploads 各自比對） |
+
+### 尚未涵蓋 / 已知限制
+
+- **plugins（619 MB）與 themes（22 MB）未備份** —— 判定為可重新安裝的第三方程式碼，非不可取代資料。搬遷時以乾淨安裝 + 設定還原處理；若要 bit-for-bit 全站快照，搬遷當下另做。
+- **未執行還原演練（restore drill）** —— 上述為完整性驗證，非「還原後網站可運作」的證明。還原演練應於目標主機就緒後執行，並回寫本檔。
+- 本備份是**搬遷前的安全網**，非取代日常備份；WPvivid/MainWP 例行備份不受影響。
+
 ## Backup Milestone — 2026-05-09（MainWP + WPvivid 自動化建立）
 
 - 2026-05-09: MainWP Dashboard 連線修復，WPvivid Backup v0.9.126 在 child site 已 installed + active（[WORKLOG 2026-05-09 §MainWP WPvivid](../../../WORKLOG.md)）

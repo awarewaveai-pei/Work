@@ -4,6 +4,37 @@
 
 ## 2026-08-15
 
+### AUTO_TASK_DONE: Soulful hosting 退場決策 + 搬遷安全網（DNS 清點 + 可還原備份）
+
+[根因]
+操作者提供 Hostinger 帳單截圖，**推翻先前「$80/年」的假設**：實際是三筆獨立訂閱，且**三筆自動續約全部關閉**。真正的問題不是網域費，而是 **Premium Web Hosting $215.76/年於 2026-11-12 到期** —— 操作者決定不續約，於是這變成一條硬死線：什麼都不做，客戶網站當天下線。
+先前 TASKS 寫的「11 月前轉 registrar」是**基於錯誤前提**（誤以為 $80 是網域費）；網域其實付到 2028-06-03，信箱付到 2029-06-03，**11 月死線屬於 hosting**。
+
+[已修改]
+1. `agency-os/tenants/company-soulful-expression/core/DNS_MIGRATION_RECORD_MAP.md`（新）—— 13 筆記錄完整對照表
+2. `agency-os/tenants/company-soulful-expression/core/BACKUP_RESTORE_PROOF.md` —— 新增 Backup Record #2
+3. `agency-os/TASKS.md` —— 新增 🔴 硬死線任務，含三筆訂閱現況、信箱查證結論、不可跳序的四步執行順序
+
+[驗證結果]
+- **信箱存續問題以官方文件查證（非推測）**，三項獨立證據：① Hostinger 支援文原句 *"Since emails are stored on a separate infrastructure, they are not included in hosting plan reactivations or file backups"* ② Business Email 為可獨立購買產品、不需 hosting ③ DNS 管理綁網域不綁 hosting。**結論：hosting 不續約不影響信箱，且不需開 support ticket**。誠實限制：官方無單一句直述此情境，結論由三項事實組成；但搬 DNS 到 CF 後三個依賴全部脫鉤，推論即使有誤也已無風險
+- **DNS 清點採逐型別查詢**（`dig ANY` 不可靠故未用），涵蓋 apex 全型別 + 信箱子網域 + 30 個常見子網域 + 萬用字元探測 → **13 筆，其中 8 筆與信箱有關**；確認無 CAA、無萬用字元、無 staging/api 等額外子網域。本機無 `dig`，改於 EU 執行（首次在本機跑全空白，若未察覺會誤判為「沒有記錄」）
+- **關鍵設計決定**：`AAAA → 2a02:4780:...` **刻意不遷移** —— 那正是 30 天實測中 94% 失敗的來源；apex/www 開 CF proxy 後由 Cloudflare 提供 IPv6，此即 IPv6 問題的永久解
+- **備份完整性四項實測**：`gzip -t` OK；dump 結尾 `-- Dump completed on 2026-08-15 12:23:59`（mysqldump 僅成功時寫入）；**dump 內 288 個 `CREATE TABLE` == 資料庫實際 288 張表**；`tar -tzf` OK 且**封存 11,001 檔 == 來源 `find` 11,001 檔**
+- **異地驗證**：DB 與 uploads 各自的 SHA-256 在 **Hostinger / 本機 / EU 三地完全一致**；已存於 EU `/root/backups/clients/soulful/`（不在 Hostinger，主機到期不受影響），EU 磁碟 56%
+- REALTEST_EVIDENCE: tool=SSH | cmd=dig 逐型別清點 + mysqldump/tar 備份 + gzip -t/tar -tzf + 表數與檔數比對 + 三地 sha256sum | exit=0 | ms=~1500000
+- REVIEW_DONE: critic=Manual-readback | verdict=pass | findings=0c/0m/0n （註：本次為唯讀清點＋建立備份，未改動任何生產設定）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=DNS_MIGRATION_RECORD_MAP | hits=1
+  - 既有 `cloudflare-wpml-migration-plan.md:85` 記錄的正是那個 $80 疑問，現已有答案；該計畫書的「11 月前轉 registrar」前提需依本次結論修正（已在新任務中載明正確順序）
+
+[剩餘風險]
+- **plugins（619 MB）與 themes（22 MB）未備份** —— 判定為可重新安裝的第三方程式碼；若要 bit-for-bit 全站快照需於搬遷當下另做
+- **未執行還原演練** —— 以上是完整性驗證，不等於「還原後網站可運作」。需待目標主機就緒後執行並回寫 `BACKUP_RESTORE_PROOF.md`
+- **搬去哪尚未決定** —— 取決於是否買 dedicated 機；EU 現有容量雖已改善（load 0.5、可用記憶體 2GB），但 8GB 機器再加一個 WordPress 仍緊
+- 本機 `/tmp` 的副本非長期保存位置；長期副本在 EU
+
+[rollback]
+本次未改動任何生產設定（唯讀清點 + 新增備份檔），無需回滾。備份檔如需移除：EU `/root/backups/clients/soulful/`。
+
 ### AUTO_TASK_DONE: MCP 路由治理漂移歸零 + Soulful IPv6 量化與告警噪音修正
 
 [根因]
