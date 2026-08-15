@@ -118,16 +118,74 @@ truth_source: agency-os/tenants/company-soulful-expression/core/BACKUP_AUTO_STAT
 
 ## Restore Drill Record
 
-- Drill date: **待執行（阻塞：staging 環境 `provision_pending`）**
-- Restore target: `staging.soulfulexpression.org`（待 Hostinger 面板建立子網域後進行）
-- Duration: 預計 < 30 分鐘（DB import + WP config adjust）
-- Result: **PENDING**
-- **Drill due after**: 2026-08-06（baseline 5/8 + 90 天）— Phase 4 會在 due date 過後觸發 WARN
+### ✅ Drill #1 — 2026-08-16（已執行，PASS）
 
-> **計劃**：Day 2 staging 建立（Hostinger hPanel → Subdomains + All-in-One WP Migration plugin）完成後，立即執行：
-> 1. 在 staging 目標站執行 `mysql < soulful_db_20260508_160734.sql`（或 plugin import）
-> 2. 確認 staging 後台可登入 + 首頁可開（關鍵頁驗收）
-> 3. 回填本節 Drill 結果 + 更新 `ENVIRONMENT_REGISTRY.md` `Last Restore Test` + 更新 frontmatter `restore_drill_due_after`
+**方法改變**：原計畫卡在「等 Hostinger 建 staging 子網域」已近 3 個月未動。改為**在 EU 上開拋棄式容器還原**，不依賴任何 Hostinger 資源、不碰正式站，當天就跑完。
+
+| 項目 | 值 |
+|---|---|
+| Drill date | 2026-08-16 |
+| 還原標的 | EU VPS 拋棄式容器 `soulful-drill-db`（`mariadb:11`，**未對外開埠**） |
+| 來源 | `/root/backups/clients/soulful/db-20260815-122353.sql.gz` + `uploads-20260815.tar.gz` |
+| DB 匯入耗時 | **8.1 秒**，零錯誤 |
+| uploads 解開耗時 | 4.8 秒 |
+| Result | **PASS** |
+
+**驗證項目（全部實測，非閱讀）**：
+
+| 檢查 | 期望 | 實測 |
+|---|---|---|
+| 還原表數 | 288（來源實際表數） | **288** ✅ |
+| `siteurl` / `home` | `https://soulfulexpression.org` | 相符 ✅ |
+| 已發布文章 | — | 706 publish / 63 draft / 16 private / 2797 inherit |
+| 使用者數 | — | 3 |
+| uploads 檔案數 | 11,001（封存清單） | **11,001** ✅ |
+| **DB 附件 ↔ 磁碟檔案交叉比對** | 0 遺失 | **750 筆全部存在，missing=0** ✅ |
+| 圖片檔真實性（magic bytes） | JPEG `ffd8ff` | 抽驗 3 筆全部相符 ✅ |
+
+**最強的一項是交叉比對** —— 從 `wp_postmeta._wp_attached_file` 取出每一筆附件路徑，逐一確認實體檔案存在。這證明的不只是「檔案解得開」，而是**資料庫與檔案彼此一致**，不存在「有記錄但圖不見」的斷裂。
+
+### 🔴 Drill 揭露的缺口 —— 備份原本不完整
+
+演練同時發現：`uploads-20260815.tar.gz` 內容**只有 `uploads/`**，不含 `plugins` / `themes` / `mu-plugins` / `languages`。
+
+嚴重性：站上有 **~17 個付費外掛**（ACF Pro、Kadence Pro 三件、Fluent Pro 三件、Ultimate Member 八個擴充、CartFlows、Permalink Manager Pro…）。免費外掛可從 wordpress.org 重抓，**付費的沒有備份就要靠授權與廠商帳號才拿得回來**。完整清單見 [`SITE_CODE_MANIFEST.md`](SITE_CODE_MANIFEST.md)。
+
+**當日補做**：見下方 Backup Record #3。
+
+**不需備份者**：WP core 6.9.6（官方可重抓）、`wp-config.php`（含 DB 憑證，新主機本來就要重寫）。
+
+**下次演練**：搬到新主機後，用新主機做一次「完整站還原 + 開得起來」的演練（本次因缺程式碼無法驗證「站能開」，只驗證了資料層）。
+
+## Backup Record #3 — 2026-08-16（程式碼備份，補上 Drill #1 揭露的缺口）
+
+| 項目 | 值 |
+|---|---|
+| 內容 | `wp-content/` 之 `plugins` + `themes` + `mu-plugins` + `languages` |
+| 檔案 | `/root/backups/clients/soulful/code-20260816.tar.gz`（EU VPS） |
+| 大小 | 122 MB（來源 686 MB） |
+| 封存項目數 | **38,991** |
+| SHA-256 | `a6cd877ba73fcf75e74f1190e48b347d9274b4c4f004c23c88a63d3d2e31baeb` |
+| 兩地雜湊比對 | Hostinger 端與 EU 端 **完全一致** ✅ |
+| `gzip -t` | OK ✅ |
+
+**內容抽驗**（確認付費外掛真的在裡面，非只看檔名）：
+
+| 外掛 | 封存檔案數 |
+|---|---|
+| `advanced-custom-fields-pro` | 687 |
+| `kadence-pro` | 363 |
+| `fluentformpro` | 483 |
+| `permalink-manager-pro` | 145 |
+| `um-woocommerce` | 64 |
+
+自訂 mu-plugin `fix-update-plugin-prop.php` 亦確認在內。
+
+**刻意不含**：`wp-config.php`（含 DB 憑證；新主機需重寫）、WP core（官方可重抓）、`uploads`（已有獨立備份）、`wpvividbackups` / `litespeed` / `gravatars` 等快取與外掛產生物。
+
+**傳輸方式**：Hostinger → 本機 → EU 串流（`ssh cat | ssh cat`），不經第三方、不落地暫存於雲端硬碟。
+
+> 三份備份合計 769 MB，全部存放於 **EU VPS**（不在 Hostinger），2026-11-12 hosting 到期不受影響。
 
 ## Artefacts
 

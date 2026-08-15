@@ -4,6 +4,40 @@
 
 ## 2026-08-16
 
+### AUTO_TASK_DONE: Soulful 還原演練 PASS + 補上備份缺口（程式碼原本完全沒備份）
+
+[任務]
+搬站前先證明「備份救得回來」。原計畫的演練卡在「等 Hostinger 建 staging 子網域」已近 3 個月未動，改用不依賴 Hostinger 的方式執行。
+
+[已修改]
+1. `agency-os/tenants/company-soulful-expression/core/BACKUP_RESTORE_PROOF.md` —— Restore Drill Record 由 PENDING 改為 **Drill #1 PASS**（含逐項實測表）+ 新增 **Backup Record #3**（程式碼備份）
+2. `agency-os/tenants/company-soulful-expression/core/SITE_CODE_MANIFEST.md`（新）—— 站台重建清單：核心/PHP 版本、38 外掛逐一版本、**付費 vs 免費分類**、主機專屬外掛的搬遷處置
+3. `agency-os/TASKS.md` —— 安全網敘述更新為三份備份 + 演練 PASS；新增授權盤點待辦
+4. **EU VPS**（非 repo）：新增 `/root/backups/clients/soulful/code-20260816.tar.gz`
+
+[驗證結果]
+- **演練方法改變**：不等 staging，改在 EU 開拋棄式 `mariadb:11` 容器（**未對外開埠**），不碰正式站、不依賴 Hostinger 任何資源
+- **DB 還原**：匯入 **8.1 秒零錯誤**；還原表數 **288**，與來源記錄數字相符；`siteurl`/`home` 正確；706 publish / 63 draft / 16 private / 2797 inherit；3 users
+- **uploads 還原**：解開 4.8 秒，**11,001 筆**與封存清單相符（10,925 檔 + 76 目錄，701 MB）
+- **最強的一項 —— DB↔檔案交叉比對**：由 `wp_postmeta._wp_attached_file` 取出全部 **750 筆**附件路徑逐一檢查實體檔案，**missing=0**。這證明的是「資料庫與檔案彼此一致」，不只是「壓縮檔解得開」
+- **檔案真實性**：抽驗 3 張圖 magic bytes 皆 `ffd8ff`（真 JPEG），非零位元組或截斷檔
+- **🔴 演練揭露的缺口**：`uploads-20260815.tar.gz` 內容**只有 `uploads/`** —— `plugins`(619M) / `themes`(22M) / `mu-plugins` / `languages` **完全沒備份**。站上 **~17 個付費外掛**（ACF Pro、Kadence 三件、Fluent 三件、UM 八個擴充、CartFlows、Permalink Manager Pro…）**遺失即需靠授權與廠商帳號才拿得回來**
+- **當日補做並驗證**：來源打包 122 MB / **38,991 項** → `gzip -t` OK → 串流至 EU（`ssh cat | ssh cat`，不經第三方）→ **兩地 SHA-256 完全一致** `a6cd877b…` → 逐一抽驗付費外掛確實在內（ACF Pro 687 檔 / Kadence Pro 363 / FluentForm Pro 483 / Permalink Manager Pro 145 / UM Woo 64）+ 自訂 mu-plugin `fix-update-plugin-prop.php` 在內
+- **降低風險的意外發現**：**沒有子佈景**（`stylesheet`=`template`=`kadence`）⇒ 佈景客製存在資料庫的 Kadence 設定裡，已隨 DB 備份保存
+- **收尾**：Hostinger `/tmp` 暫存已刪、EU 演練容器與解開的檔案已清、EU 磁碟 56% 未變
+- REALTEST_EVIDENCE: tool=Bash | cmd=docker run mariadb:11 + zcat\|mariadb 匯入 + information_schema 表數/wp_options/wp_posts 查詢 + tar -xzf + wp_postmeta 附件逐筆比對 + od magic bytes + tar/gzip -t + 兩地 sha256sum | exit=0 | ms=~2400000
+- REVIEW_DONE: critic=Manual-readback | verdict=pass | findings=0c/1m/0n （1m＝原備份缺程式碼，當日補齊）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=BACKUP_RESTORE_PROOF | hits=3
+  - `TASKS.md` 安全網段、`BACKUP_RESTORE_PROOF.md` 自身、新建的 `SITE_CODE_MANIFEST.md` 互引一致；原「Drill due after 2026-08-06 逾期」狀態已由 Drill #1 消解
+
+[剩餘風險]
+- **本次只驗到資料層，沒驗「站能開」** —— 演練當下缺程式碼備份，無法啟動完整 WordPress。程式碼補上後應在新主機做一次完整還原演練（已寫入文件的「下次演練」）
+- **授權未盤點** —— 程式碼可照搬，但更新與支援需有效授權；授權在誰名下、是否續約未確認，已開 TASKS 待辦
+- 三份備份只在 EU 單一地點；EU 本身若失效即無副本（現階段可接受，搬站後應建立第二地）
+
+[rollback]
+本輪未改動任何線上狀態（正式站唯讀、演練容器已銷毀）。EU 上新增的備份檔為純增量，刪除即回復原狀。
+
 ### AUTO_TASK_DONE: 修好 Soulful 網站寄不出信 + 補上站外監控（外掛自帶通知走同一條壞通道）
 
 [任務]
