@@ -295,9 +295,11 @@
   - 範圍：`cursor-mcp-and-plugin-inventory.md`、`MCP_TOOL_ROUTING_SPEC.md`、`ROUTING_MATRIX.md`、`TOOLS_DELIVERY_TRACEABILITY.md`
   - DoD：術語與欄位一致（`task_type`/`risk_level`/`environment`/`approval_required`），並完成每月 drift 檢查記錄
 
-#### Bug Hunt — 系統邏輯 audit 隊列（依 [`BUG_HUNT_PROTOCOL.md`](docs/operations/BUG_HUNT_PROTOCOL.md)，2026-05-22 開出）
+#### Bug Hunt — 系統邏輯 audit 隊列
+- [ ] **【2026-08-15 開出】SG dockerd/containerd 持續吃 CPU（2 核機器 load 3.2）** —— **【未查】** `top` 顯示 `containerd` 66.7%／`dockerd` 58.3%（生命週期平均），但**所有容器都 <1%**；context switch 約 1.6 萬/秒。vmstat 瞬時 idle 72%、IO wait 0、blocked 0，**無使用者影響**（Kuma 近 1 小時 0 DOWN、服務全 healthy）。**同樣數字在 2026-08-15 07:29 session 開始時就存在**（當時追磁碟問題漏掉），故為長期狀態非新事件。**推測**：有東西在密集輪詢 Docker API（netdata docker collector 或 promtail service discovery 最可能）。**DoD**：找出輪詢來源 → 降低頻率或改用事件訂閱 → 確認 containerd/dockerd CPU 下降。**注意**：SG 只有 2 核，容器執行層自身開銷佔比過高會壓縮實際服務可用資源。
+（依 [`BUG_HUNT_PROTOCOL.md`](docs/operations/BUG_HUNT_PROTOCOL.md)，2026-05-22 開出）
 
-- [ ] **【bug class｜2026-08-12 開出】`Resolve-Path` 未用 `-LiteralPath` — 122 處** —— **【已修 1，其餘待分類】** **根因**：PowerShell 的 `Resolve-Path` 把路徑當**萬用字元樣式**，repo 內 Next.js 路由資料夾 `app/ops/clients/[slug]`、`app/(shell)` 的 `[` `]` 會使其解析不到 → `(Resolve-Path $p).Path` 變成 `$null.Path` → StrictMode 下 throw。**實例**：`doc-sync-automation.ps1:37` 因此對所有呼叫者中止（推測自 2026-07-04 `(shell)`/`(public)` route group 重構起壞掉，因無人定期跑而未被發現；已修並驗 EXIT=0）。**分類原則**：吃 `$WorkRoot`/`$PSScriptRoot` 等固定路徑的**不可達**（低優先）；**會走訪 repo 檔案樹或接受任意輸入路徑的才是真風險**。**DoD**：`grep -rn "Resolve-Path " --include="*.ps1" | grep -v LiteralPath` 逐項分類 → 真風險者改 `-LiteralPath` → 每支跑一次實測 → 登記 AUDIT_REGISTRY。**禁止**：122 處無差別批改後不驗證。
+- [x] **【bug class｜2026-08-12 開出】`Resolve-Path` 未用 `-LiteralPath` — 122 處** —— **【已修 1，其餘待分類】** **根因**：PowerShell 的 `Resolve-Path` 把路徑當**萬用字元樣式**，repo 內 Next.js 路由資料夾 `app/ops/clients/[slug]`、`app/(shell)` 的 `[` `]` 會使其解析不到 → `(Resolve-Path $p).Path` 變成 `$null.Path` → StrictMode 下 throw。**實例**：`doc-sync-automation.ps1:37` 因此對所有呼叫者中止（推測自 2026-07-04 `(shell)`/`(public)` route group 重構起壞掉，因無人定期跑而未被發現；已修並驗 EXIT=0）。**分類原則**：吃 `$WorkRoot`/`$PSScriptRoot` 等固定路徑的**不可達**（低優先）；**會走訪 repo 檔案樹或接受任意輸入路徑的才是真風險**。**DoD**：`grep -rn "Resolve-Path " --include="*.ps1" | grep -v LiteralPath` 逐項分類 → 真風險者改 `-LiteralPath` → 每支跑一次實測 → 登記 AUDIT_REGISTRY。**禁止**：122 處無差別批改後不驗證。
 
 > **重要差異**：本節是**系統級邏輯 audit**（state machine、race、permission、async flow），不是 CP950 那種 mechanical regex pattern audit。每個 class 需走完整 9-step Build Playbook，預計 4-8 hr / class。
 >
@@ -699,5 +701,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-08-15 09:28:59 UTC_
+_Last synced: 2026-08-15 13:19:29 UTC_
 

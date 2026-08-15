@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-08-12 17:34:43
+- Generated: 2026-08-15 21:19:40
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -219,120 +219,160 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-08-12.md
-# Daily Note - 2026-08-12
+## 5) memory/daily/2026-08-15.md
+# Daily Note - 2026-08-15
 
 ## Done today
-(fill in at AO-CLOSE)
+（session 窗口：2026-08-12 AO-RESUME → 2026-08-15 AO-CLOSE，跨 3 天）
+
+### 事故根治
+- **EU 全機卡死** — `trigger-clickhouse` 吃滿 1 CPU 限額（101.79%），EU load 4.9 / swap 3082MB。症狀卻是「SG 服務 timeout」；鑑別關鍵：EU→SG **ICMP 0% 遺失但 TCP:80 掛 11/20**，同時筆電→SG **20/20 全通**。根因是它在合併自己的遙測：`system` **16.89 GiB / 6.4 億列** vs 應用資料 `trigger_dev` 僅 **49 MiB / 62 萬列**（345 倍），`trace_log` 每小時 124 萬列。修法＝關掉產生源（非再清一次資料）。結果 CPU **101.79%→4.5%**、load **4.03→0.50**、`system` 表 **16.90 GiB→79.65 MiB**、EU→SG TCP **20/20**
+- **SG 磁碟 90%** — offsite 備份兩邊都只清自己家、沒人清對方推來的副本（SG 囤 97 份/30G、EU 囤 96 份/31G）。兩支腳本對稱補 `OFFSITE_RETAIN_DAYS`。SG **90%→48%**、EU **79%→65%**
+
+### 監控（本輪最大發現：告警一直有偵測到，只是沒有出口）
+- `cgroup_ram_in_use` 在 clickhouse 上 **08-10→08-15 觸發 483 次**、峰值 93.5% —— 但 `notification.to = silent`（netdata stock 模板預設）
+- **EU 根本沒有通知出口**：`custom_sender()` 是原廠空殼、`DEFAULT_RECIPIENT_CUSTOM` 空 → 自安裝以來所有告警石沉大海
+- 修完後實測時又抓到兩個自造 bug：CRLF 讓 token 尾端多 `\r`（Bearer 靜默失敗）、EU→ops-inbox 被 CF Bot Fight Mode 擋 403（與 08-12 Kuma 假 DOWN 同 class）→ 腳本加 `OPS_INBOX_RESOLVE`
+- Telegram 手機告警靜默：`secrets-vault -Action get` 的**遮罩值**被當真 token 用（3 支腳本 + 12 份文件同一 class）
+
+### 其餘
+- **Origin lockdown** — 腳本無允許清單，而 9 個 Kuma monitor + EU netdata 剛改成直打 SG origin，直接套用會自我封鎖。允許清單由 nginx log **152 個非 CF 來源全數分類**得出（最易漏：docker 閘道 1,987 次＝SG 自己的健檢）
+- **`Resolve-Path` 缺 `-LiteralPath` 170 處/96 檔**全清 — 先分類確認 **0 處故意用萬用字元**才批改
+- **workflows 部署到 EU prod** — 8/12 修的 35 個漏洞才真正生效
+- **MCP 路由漂移歸零** — 一半是 glob 誤判、一半是真缺 3 個高風險 MCP
+- **`check-clickhouse-health.ps1`** 接入 AO-RESUME，監測 bug class（system/app 比值）防第五次復發
+- **Soulful**：帳單推翻「$80/年」假設 → hosting **2026-11-12** 硬死線；信箱存續已查證；DNS 13 筆對照表 + 備份三地驗證；2026-06-13 的 716 行 brief 作廢前提接回現況
+- **離職單機化**：治理文件改單機（跨機機制保留休眠）；桌機憑證依三項確認結案
 
 ## Current state
-(fill in at AO-CLOSE)
+- health-check **100% (372/372)**；git 乾淨、與 origin 一致（`0bbc6bbd`）
+- SG 磁碟 55%／EU 磁碟 56%、load 0.63、ClickHouse 19.6%／Kuma 近 1 小時 **0 DOWN**
+- 告警鏈已通：下次出事會進手機，且指向源頭而非下游症狀
 
 ## Next steps
-(fill in at AO-CLOSE)
+1. **買不買 dedicated 機** —— 唯一擋路的決策，同時影響 Soulful 網站去處（死線 2026-11-12）、客服 U6、EU 搬機、退兩台雲端
+2. Soulful DNS 搬 Cloudflare（①你在 CF 加 zone → ②我照對照表建 13 筆 → ③你核對 → ④你改 nameserver）
+3. **未查**：SG load 3.2 於 2 核機器，由 `dockerd`+`containerd` 而非任何容器造成。session 開始即存在（我當時追磁碟問題時漏掉），無使用者影響
 
 ## Open tasks (auto-generated at 08:00 TPE)
-- [ ] 【待套用｜DB migration】migration 0060 apply 到 EU Supabase prod
-- [ ] 【未開始｜Phase 1 MVP】Cold Outreach Workbench — 冷開發完整鏈
-- [ ] 【進行中｜軟體先行·U0 完成】全自動客服系統
-- [ ] 【gated｜8月｜EU→Dedicated 搬機 + 整併退雲端】
-- [ ] 【gated｜8月｜等買二手機才繼續建 customer service U6 Chatwoot】
-- [ ] 【明日 2026-06-17｜資安複盤】Defender 嚴重木馬 `Trojan:Win32/PowhidSubExec.B` 來源查清與善後
-- [ ] 【進行中｜POD 一鍵自動上架】設計圖 → Woo + Printful 多款多色全自動
-- [ ] 【人工｜Postiz Task 2 OAuth app 審核】各平台 dev app 提交
-- [ ] 【人工｜Postiz 測試草稿清理】刪 draft ID `cmqo1wijz0005p58ncl1mtssr`
-- [ ] 【操作者｜Postiz 帳號 → 客戶 Hub 連結】soulfulexpression.bsky.social → ContentStudio
-- [ ] 【進行中｜內容引擎積木化】搜尋積木 registry 已 live，剩來源/UI/第二批
-- [ ] 【驗證債】Canvas 編輯器 `/tools/canvas` 整輪瀏覽器實測
-- [ ] 【明日】soulfulexpression.org 遷移到 Cloudflare（DNS 先、registrar 後）
-- [ ] 【進行中｜app.aware-wave 一鍵架站總藍圖】MASTER PLAN Stage 4 開閘
-- [ ] wp-bridge plugin 補 `/product` dry_run 支援
-- [ ] 【POD A1 已完工｜剩 e2e + A2】真實 e2e 開賣驗證
-- [ ] 【POD A2 confirm phase — 🔴 金流紅線】自動扣款 + 送印（需明示批准）
-- [ ] smoke 04-onboard spec 補 app session 登入
-- [ ] wp-bridge 續做 operation：featured image / update-existing-post / product update+delete
-- [ ] 【POD Studio 自建動工】plan in `.claude/plans/pod-studio-p2a-p4-execution-PLAN.md`
-- [ ] 【POD 服飾 Phase 1-4 後續】服飾 POD 全功能 live，剩餘未做項目
-- [ ] TASKS [x] 自動歸檔 + 重複行偵測閘（archive-completed-tasks.ps1）
-- [ ] 【診斷】Mockup Studio 功能異常 — 卡操作者症狀，待操作者提供錯誤細節
-- [ ] 🎨 Image Output Pipeline（Tarot/POD: 色調→WebP/CMYK PDF/Fabric.js Canvas）
-- [ ] SEO/GEO 引擎產品化 + Soulful 定位/文章
-- [ ] Auto-Repair Post-Phase 4 (M2 per-source HMAC + M4 fingerprint)
-- [ ] wp-bridge 外掛：接進 app.aware-wave.com Ops Dashboard + 展示頁 + 販售
-- [ ] M2/M4 Phase 1 code 完成；剩 Phase 2 rollout + Phase 3 constraint swap
-- [ ] Hetzner dispatcher 上線前 follow-up（M10 orphan reaper + partial index）
-- [ ] 【READY，未做】把 Hetzner 一鍵租機嵌進 app.aware-wave.com（Phase 5）
-- [ ] 【計畫完成，未實作】客戶機「開機後全棧部署+維護」層
-- [ ] app.aware-wave onboarding/provisioning IA 重整
-- [ ] 【公司桌機】CLOUDFLARE vault token 裝錯修正
-- [ ] 【公司桌機】重跑 SystemGuard 註冊器
-- [ ] （出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤
-- [ ] 既有站接手（Soulful Expression Art Therapy）
-- [ ] 既有站接手 Day 1（Soulful Expression）
-- [ ] 新站建置（Scenery Travel Mongolia）
-- [ ] 新站建置 Day 1（Scenery Travel Mongolia）
-- [ ] Next-Gen 試點 — Day 2 雲端 staging 實機驗收（兩案）
-- [ ] `tenants/templates/` v2（未開始）
-- [ ] `lobster-factory` A10-2 商業閉環實跑（未開始）
-- [ ] 【2026-06-05 開出】塔羅牌工具 → MEGA → WooCommerce 三階段路線圖
-- [ ] 【2026-05-30 開出】endpoint-alert.sh 自動化部署機制
-- [ ] 三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability）
-- [ ] 【🟠 Major M2-M4/M7-M10 + 🟡 Minor m2-m6/m8-m11】audit items
-- [ ] （Phase 4 觀察期）AwareWave 自動告警維修系統 v3.2
-- [ ] 建立跨國稅務與法遵顧問審核流程
+- [ ] **【待套用｜DB migration】migration 0060 apply 到 EU Supabase prod**
+- [ ] **【未開始｜Phase 1 MVP】Cold Outreach Workbench — 冷開發完整鏈**
+- [ ] **【進行中｜軟體先行·U0 完成】全自動客服系統**
+- [ ] **【gated｜8月｜EU→Dedicated 搬機 + 整併退雲端】**
+- [ ] **🔴【資安｜離職善後】公司桌機退場憑證盤點與輪替決策**
+- [ ] **【gated｜8月｜等買二手機才繼續建 customer service U6 Chatwoot】**
+- [ ] **【明日 2026-06-17｜資安複盤】Defender 嚴重木馬 `Trojan:Win32/PowhidSubExec.B` 來源查清與善後**
+- [ ] **【進行中｜POD 一鍵自動上架】設計圖 → Woo + Printful 多款多色全自動**
+- [ ] **【人工｜Postiz Task 2 OAuth app 審核】各平台 dev app 提交**
+- [ ] **【人工｜Postiz 測試草稿清理】**
+- [ ] **【操作者｜Postiz 帳號 → 客戶 Hub 連結】**
+- [ ] **【進行中｜內容引擎積木化】搜尋積木 registry 已 live，剩來源/UI/第二批**
+- [ ] **【驗證債】Canvas 編輯器 `/tools/canvas` 整輪瀏覽器實測**
+- [ ] **【明日】soulfulexpression.org 遷移到 Cloudflare（DNS 先、registrar 後）**
+- [ ] **【進行中｜app.aware-wave 一鍵架站總藍圖】MASTER PLAN Stage 0 閉環已驗，Stage 1 進行中**
+- [ ] **wp-bridge plugin 補 `/product` dry_run 支援**
+- [ ] **【POD A1 已完工｜剩 e2e + A2】**
+- [ ] **【POD A2 confirm phase】**
+- [ ] **smoke 04-onboard spec 補 app session 登入**
+- [ ] **wp-bridge 續做 operation：featured image / update-existing-post / product update+delete**
+- [ ] **【POD Studio 自建動工】**
+- [ ] **【POD 服飾 Phase 1-4 後續｜2026-06-15 已部署 37dfba85】**
+- [ ] **TASKS [x] 自動歸檔 + 重複行偵測閘（archive-completed-tasks.ps1，R0 已批方案A）**
+- [ ] **【診斷】Mockup Studio 功能異常**
+- [ ] **🎨 Image Output Pipeline（Tarot/POD 色調→WebP/CMYK PDF/Fabric.js Canvas）**
+- [ ] **SEO/GEO 引擎產品化 + Soulful 定位/文章**
+- [ ] **Auto-Repair Post-Phase 4 (M2 per-source HMAC + M4 fingerprint)**
+- [ ] **wp-bridge 外掛：接進 app.aware-wave.com Ops Dashboard + aware-wave.com 展示頁 + 販售**
+- [ ] **M2/M4 Phase 1 code 完成；剩 Phase 2 rollout + Phase 3 constraint swap**
+- [ ] **Hetzner dispatcher 上線前 follow-up（啟用 LOBSTER_EXECUTE_* 前必做）**
+- [ ] **【READY，未做】把 Hetzner 一鍵租機嵌進 app.aware-wave.com 一鍵架站按鈕（Phase 5）**
+- [ ] **【計畫完成，未實作】客戶機「開機後全棧部署+維護」層（provider 無關）**
+- [ ] **app.aware-wave onboarding/provisioning IA 重整**
+- [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤**
+- [ ] **既有站接手（Soulful Expression Art Therapy）**
+- [ ] **既有站接手 Day 1（Soulful Expression）**
+- [ ] **蒙古客戶 Cloudways 實際建站：待客戶刷卡配合**
+- [ ] **新站建置（Scenery Travel Mongolia）**
+- [ ] **新站建置 Day 1（Scenery Travel Mongolia）**
+- [ ] **Next-Gen 試點**
+- [ ] **`tenants/templates/` v2**
+- [ ] **`lobster-factory` A10-2 商業閉環實跑**
+- [ ] **【2026-06-05 開出】塔羅牌工具 → MEGA → WooCommerce 三階段路線圖**
+- [ ] **【2026-05-30 開出】endpoint-alert.sh 自動化部署機制**
+- [ ] **三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability）**
+- [ ] **【bug class｜2026-08-12 開出】`Resolve-Path` 未用 `-LiteralPath`**
+- [ ] **【🟠 Major M2-M4/M7-M10 + 🟡 Minor m2-m6/m8-m11】**
+- [ ] **（Phase 4 觀察期）AwareWave 自動告警維修系統 v3.2**
+- [ ] **建立跨國稅務與法遵顧問審核流程（法律文件外部審核）**
 
 ## Yesterday context
-最後 WORKLOG 條目為自動化週報生成（2026-07-27）：`remote-weekly-agent` 生成 `reports/weekly/weekly-summary-2026-07-27.md`。近期無人工 AO-CLOSE 記錄，主要任務仍在開放狀態。
+最後 WORKLOG 紀錄為 2026-08-12 monthly-system-review：gates=SKIPPED (ReportOnly)；Supabase memory 34.26%（< 85% 健康）。無當日人工操作記錄，系統定期巡檢正常。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
-- Mode: `daily`
-- Time: `2026-08-11 13:10:38`
-- Health score: **99.2%**
+- Mode: `manual`
+- Time: `2026-08-15 21:17:20`
+- Health score: **100%**
 - Threshold: **100%**
-- Health gate exit code: **1**
+- Health gate exit code: **0**
 - Closeout report exists: **YES**
-- Result: **FAIL**
-- Auto-repair attempted: **YES**
-- Auto-repair result: **FAIL**
+- Result: **PASS**
+- Auto-repair attempted: **NO**
+- Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260811-131036.md`
-- Closeout: `reports/closeout/closeout-20260811-130953.md`
+- Health: `reports/health/health-20260815-211715.md`
+- Closeout: `reports/closeout/closeout-20260815-211720.md`
 
 ## Action
-- Blocking issues detected. Review latest health/closeout reports immediately.
+- No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-[設計決策]
-Option A：human_only incident → 顯示「已知悉」→ POST /api/ops/inbox/[id]/acknowledge → ops_incidents.status=resolved → 從佇列移除（不建 repair_run）。比 Option B（繼續建 repair_run 然後自動 close）更 minimal、更誠實。
 
-[已修改]
-- `app/api/ops/inbox/[id]/acknowledge/route.ts`（新建）
-  - Auth: `canModifyIncidentStatus + source ≠ default_viewer`（同 workflow-runs/route.ts 相同 pattern）
-  - 冪等：status=resolved 時回 `{ok:true, already_resolved:true}`，不重複 UPDATE
-  - 純 ops_incidents.status → resolved；無 audit_log（欄位不存在於 schema）
-- `app/(shell)/ops/repairs/RepairActions.tsx`（修改）
-  - 新增 `policy?: string` prop
-  - 新增 `acknowledge()` async function（fetch POST /api/ops/inbox/[id]/acknowledge）
-  - mode="start" 分支：policy==="human_only" → 顯示「已知悉」btn；otherwise → 顯示「核准修復」btn
-- `app/(shell)/ops/repairs/page.tsx`（修改）
-  - queue.map() 加 `policy={policy}`（policy 已從 destructured `{ incident, policy }` 取得）
+| 系統 | 隔離機制 | 狀態 |
+|---|---|---|
+| Ops Clients `/ops/clients/[slug]` | URL slug → server-side org lookup | ✅ 無洩漏 |
+| Outreach | `?org=UUID` + `effectiveOrgId()` + `assertOrgAccess()` | ✅ 無洩漏 |
+| Credentials | S2 batch-5 已修 | ✅ 無洩漏 |
+| Build Runs | S2 batch-5 已修 | ✅ 無洩漏 |
+| Approvals | S2 batch-5 已修 | ✅ 無洩漏 |
+| Content Drafts | **S2 batch-6 本次修** | ✅ 修後無洩漏 |
+| Content Sources | 全域共享（設計如此，無 org 欄） | ✅ 設計正確 |
+| ops/repairs/* | ❌ repair_runs 無 organization_id 欄 | ⏳ defer S3 DB migration |
 
-[驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=cd next-admin && npx tsc --noEmit | exit=0 — 0 type errors（acknowledge route + RepairActions policy prop 全型別正確）
-- REALTEST_WAIVED: SMOKE_COVERED -- 「已知悉」按鈕需 sg-deploy 後方可 browser 實測；POST /api/ops/inbox/[id]/acknowledge 端點新建，本機 build 無 DB 連線；tsc gate pass 即綠燈
-- REVIEW_DONE: critic=Standard | verdict=warn | findings=2c/0m — 2 critic findings 均確認為 pre-existing auth 設計選擇（viewer canModifyIncidentStatus = intentional per ops-role.ts L77 注釋 + ops/repairs/route.ts L15 注釋；header trust = 系統級設計，所有 ops routes 同 pattern）；非本次引入。新 route auth 邏輯完全鏡像 workflow-runs/route.ts:8
-- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=canModifyIncidentStatus | hits=18（14 pre-existing + 2 新增 acknowledge route；無 stale 宣告）
-- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=acknowledge | hits=8（route.ts 定義 + RepairActions.tsx + ops/inbox/actions.ts + StatusActions.tsx + 等；acknowledge 函式為 ops inbox 既有 pattern）
+**Stage 1 onboarding 現況**: 前端程式「跳回第一步」bug 已在前一個 session 修好（handleTriggerBuild 加了 guard + error display）。2 筆卡住的 intake_forms 仍在 DB 待手動 retry。
 
-[剩餘風險]
-- 「已知悉」送出後頁面不自動重整（msg 顯示後需手動 reload 才見佇列清空）；可接受（同現有 start/run 按鈕行為一致）
-- 若 sgdeploy 後 sidebar badge 仍顯示舊 open_count → 屬 OpsInboxBadge 輪詢頻率問題（pre-existing，與本次無關）
+---
 
-[rollback]
-`git revert <commit-hash>`；ops_incidents 無 schema 變更；0059 migration 已套用獨立（不影響）
+### fix(security): S5 — assertOrgAccess guards on social + integrations routes ✅
+
+**根本問題**: 5 個 API 路由以 `clientId` / `organizationId`（= org UUID）作為查詢/寫入鍵，但只有 ops-role gate（無 tenant-level org guard）。Client org 的 owner/admin/operator 若通過 role gate，可傳入任意 org UUID 讀取/修改其他租戶的 Postiz 社群連接或 integration binding（IDOR）。
+
+**已修改**:
+- `app/api/content/social-publish/route.ts` — POST：`clientId`（org UUID → `social_postiz_connections.client_id`）加 `assertOrgAccess(req, clientId)` after role gate + string validate
+- `app/api/content/social-channels/route.ts` — GET：同樣呼叫 `listIntegrations(clientId)` → 加 `assertOrgAccess(req, clientId)` after query param validate
+- `app/api/content/social-admin/connections/route.ts` — POST + DELETE：`clientId`（same FK）→ 各加 `assertOrgAccess(req, clientId)`
+- `app/api/ops/integrations/route.ts` — POST：`organizationId` body param → 加 `assertOrgAccess(req, organizationId)` after `verifyOwnership`；PATCH：fetch record by `id` → 加 `assertOrgAccess(req, current.organization_id)` post-fetch
+
+**guard 語意**：
+- `staff`（`x-ops-user-kind` absent/staff）→ `assertOrgAccess` no-op，保持跨租戶管理能力
+- `client`（`x-ops-user-kind: client` + `x-ops-org-id: <uuid>`）→ `targetOrgId ≠ ctx.orgId` 時 throw OrgAccessError → 403
+- null/undefined targetOrgId 對 client fail-closed（`String(null)` = `"null"` ≠ real UUID）
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~8000 — 0 type errors
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test --run | exit=0 | ms=1710 — 568/568 pass
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n — 6 focus areas all clean: guard ordering correct in all 4 files, null-safe inputs, assertOrgAccess null targetOrgId fails-closed, PATCH TOCTOU safe (immutable PK), no role-gate bypass path, all routes covered by middleware matcher
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=listIntegrations,social_postiz_connections,tenant_integration_bindings | hits=1 new finding (social-channels was also calling listIntegrations with unguarded clientId → patched same batch; webhooks/tenant-integration has no clientId param — safe)
+- WORKLOG: 本條目
+
+---
+
+
+### Agent dispatch log
+- critic: Critic review hook runner v2
+- Explore: 調查三個 ops 頁面真實狀態
 
 ## Related Documents (Auto-Synced)
 - `.cursor/rules/00-session-bootstrap.mdc`
@@ -347,21 +387,5 @@ Option A：human_only incident → 顯示「已知悉」→ POST /api/ops/inbox/
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-07-05 07:42:57 UTC_
+_Last synced: 2026-08-15 13:19:29 UTC_
 
-
-## 2026-07-13
-
-- 01:06 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-07-13.md
-
-## 2026-07-06
-
-- 01:02 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-07-06.md
-
-## 2026-07-20
-
-- 01:05 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-07-20.md
-
-## 2026-07-27
-
-- 01:06 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-07-27.md

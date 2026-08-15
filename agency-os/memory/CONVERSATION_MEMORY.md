@@ -510,7 +510,7 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-07-05 07:32:37 UTC_
+_Last synced: 2026-08-15 13:17:19 UTC_
 
 ## 2026-06-16 AO-CLOSE memory — session window 2026-06-11T05:07Z → 2026-06-16 afternoon
 
@@ -568,4 +568,13 @@ _Last synced: 2026-07-05 07:32:37 UTC_
 - AGENTS.md 新增 §規則優先序（預授權 > 風險分級 > R0 逐項批准）與 §已知信任邊界（evidence 驗格式不驗真、機械閘 fail-open）。
 - 完整記錄：WORKLOG `## 2026-07-02`；分支 `claude/system-feedback-t7zo8r`（M1 03d624b → M4c 4ce5e4a）。
 
+- **2026-08-15 (AO-CLOSE 筆電 session, 窗口 08-12 AO-RESUME → 08-15)** — 10 個實質 commit，全部圍繞「反覆復發的事故」與「沉默的監控」兩個主題。
+  **① EU 全機卡死根治**：症狀是「SG 服務大量 timeout」，但 SG 完全健康。鑑別關鍵是 EU→SG ICMP 0% 遺失但 TCP:80 掛 11/20、同時筆電→SG 20/20 全通 → 問題在 EU 出向。根因 `trigger-clickhouse` 吃滿 1 CPU 限額（101.79%），EU load 4.9/swap 3082MB，行程被 CPU 飢餓卡住。它在忙的是自己的遙測：system 16.89 GiB/6.4 億列 vs 應用資料 trigger_dev 僅 49 MiB/62 萬列（**345 倍**），trace_log 每小時新增 124 萬列。
+  **② 為何四個月修四次又復發**（查 git log --follow override.xml）：04-20 cap 600→800MB／04-29 cap→1.6GB+首次 TTL／07-05 清 20GB 日誌+limit→3072m／08-15 才第一次關掉產生源。**不是 code 衝突或髒 code**（只有一個設定檔），是同一個病治標四次；記憶體上限推高 4 倍。04-29 的 commit 註解就已指名 trace_log —— 診斷三個半月前就對了，行動卻是調高上限。天花板墊高使瓶頸從 RAM 移到 CPU，症狀每次看起來都像新的。**TTL 治「留多久」不治「產生多快」**。
+  **③ 監控沉默根治**：告警一直正確偵測（cgroup_ram_in_use 在 clickhouse 上 08-10→08-15 觸發 **483 次**、峰值 93.5%），但 `notification.to = silent`（netdata stock 模板預設）。另 EU 根本沒有通知出口（custom_sender 是原廠空殼、DEFAULT_RECIPIENT_CUSTOM 空）。兩個獨立破口都修，並發現 EU→ops-inbox 被 CF Bot Fight Mode 擋 403（與 08-12 Kuma 假 DOWN 同 class）→ 腳本加 OPS_INBOX_RESOLVE 走 curl --resolve。
+  **④ Origin lockdown（差點自我封鎖）**：腳本無允許清單，而 9 個 Kuma monitor + EU netdata 剛改成直打 SG origin。允許清單由 nginx log **152 個非 CF 來源全數分類**得出，最易漏的是 docker 閘道 1,987 次（SG 自己的內部健檢）。套用後四項驗證 + 鎖定後監控存活驗證。
+  **⑤ 其餘**：`Resolve-Path` 缺 `-LiteralPath` 170 處/96 檔全清（先分類確認 0 處故意用萬用字元才批改；根因是 `[slug]`/`(shell)` 路由資料夾，曾使 doc-sync 對所有呼叫者中止）；workflows 部署到 EU prod（35 漏洞修正才生效）；MCP 路由漂移歸零（一半是 glob 誤判、一半是真缺 3 個高風險 MCP）；新增 `check-clickhouse-health.ps1` 接入 AO-RESUME 監測 bug class（system/app 比值）防第五次復發。
+  **⑥ Soulful**：帳單截圖推翻「$80/年」假設 —— 三筆獨立訂閱、自動續約全關、hosting **2026-11-12 到期**且操作者決定不續約 → 硬死線。信箱存續以官方文件三項證據查證（不受影響、不需開 ticket）。已備妥 DNS 13 筆對照表（AAAA 刻意不搬＝IPv6 永久解）+ DB 288 表/uploads 11,001 檔備份移出 Hostinger 三地雜湊一致。並把 2026-06-13 的 716 行 brief 作廢前提接回現況，消除三套真相。
+  **⑦ 離職單機化**：公司桌機退場，治理文件改為單機（跨機機制保留休眠）；桌機憑證依操作者三項確認結案。
+  **未解**：買不買 dedicated 機（擋 Soulful 去處/客服 U6/EU 搬機/退雲端）；SG load 3.2 於 2 核機器、由 dockerd+containerd 而非任何容器造成（session 開始即存在，我當時漏掉，無使用者影響，未查）。
 
