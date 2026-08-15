@@ -1,7 +1,7 @@
 ﻿# Governance Docs Drift - 2026-08
 
-- Generated: 2026-08-12 17:35:06 +08:00
-- Overall: **WARN**
+- Generated: 2026-08-15 17:36:21 +08:00
+- Overall: **PASS**
 - Scope: 4 long-term governance documents
 
 ## Status by check
@@ -12,26 +12,25 @@
 | mtime_drift | PASS |
 | cross_reference | PASS |
 | footer_present | PASS |
-| mcp_set_consistency | WARN |
+| mcp_set_consistency | PASS |
 
 ## Documents
 
 | Doc | Path | Last modified (UTC) |
 |-----|------|----------------------|
-| Inventory | agency-os/docs/operations/cursor-mcp-and-plugin-inventory.md | 2026-06-26 17:29 |
-| RoutingSpec | lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md | 2026-04-21 10:55 |
-| RoutingMatrix | lobster-factory/docs/ROUTING_MATRIX.md | 2026-04-21 10:55 |
+| Inventory | agency-os/docs/operations/cursor-mcp-and-plugin-inventory.md | 2026-08-15 09:35 |
+| RoutingSpec | lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md | 2026-08-15 09:33 |
+| RoutingMatrix | lobster-factory/docs/ROUTING_MATRIX.md | 2026-08-15 09:36 |
 | Traceability | agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md | 2026-05-20 10:55 |
 
 ## Findings
 
-- mcp_set_consistency: shared=9 ; only_in_inventory=9 ; only_in_spec=0
-  - only in inventory: awarewave-ops, chatgpt-fast, chatgpt-latest, claude-fast, claude-latest, gemini-fast, gemini-latest, hetzner-ssh, supabase-awarewave-postgres
-- mtime_drift: span=66 days (youngest=2026-06-26; oldest=2026-04-21)
-  - Inventory: 2026-06-26 (age 47 days)
-  - RoutingSpec: 2026-04-21 (age 113 days)
-  - RoutingMatrix: 2026-04-21 (age 113 days)
-  - Traceability: 2026-05-20 (age 84 days)
+- mcp_set_consistency: shared=20 ; only_in_inventory=0 ; only_in_spec=0
+- mtime_drift: span=87 days (youngest=2026-08-15; oldest=2026-05-20)
+  - Inventory: 2026-08-15 (age 0 days)
+  - RoutingSpec: 2026-08-15 (age 0 days)
+  - RoutingMatrix: 2026-08-15 (age 0 days)
+  - Traceability: 2026-05-20 (age 87 days)
 
 ## Notes
 

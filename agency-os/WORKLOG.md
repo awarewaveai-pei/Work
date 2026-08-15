@@ -4,6 +4,41 @@
 
 ## 2026-08-15
 
+### AUTO_TASK_DONE: MCP 路由治理漂移歸零 + Soulful IPv6 量化與告警噪音修正
+
+[根因]
+1. **`mcp_set_consistency` 長期 WARN**：檢查器（`check-governance-docs-drift.ps1:150-171`）以**精確名稱**比對 Inventory 與 RoutingSpec 兩份文件。查下去發現**一半是誤判、一半是真缺口**：
+   - 6 個 LLM wrapper（chatgpt/claude/gemini × fast/latest）**其實早就寫在 spec 裡**，但寫成萬用字元 `chatgpt-*`、`claude-*`、`gemini-*` —— 機器比對看不到 glob，於是誤報「缺失」。
+   - 3 個是**真的沒寫**：`supabase-awarewave-postgres`（**可執行任意 SQL**）、`hetzner-ssh`（prod OS 層 `ssh_exec`）、`awarewave-ops`（營運 HTTP 代理）—— 而且正好是全套裡爆炸半徑最大的三個。
+   - 額外發現：`grok-fast` / `grok-latest` 在 `mcp/registry.template.json`（SSOT，22 個 server）內，但 **Inventory 文件漏列**。
+2. **Soulful IPv6 告警噪音**：monitor 23/24/25 設定為 `maxretries=1, retry_interval=0` —— **單次閃斷立即報 DOWN**，而同機的 EU 服務類 monitor 都是 `maxretries=2, retry_interval=60`。設定不一致，非 Soulful 特有問題。
+
+[已修改]
+1. `lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` — 於既有「Cursor / IDE MCP keys → routing」表新增 3 列高風險 MCP（各附風險說明與「**不是 `task_type` owner**」的邊界）；LLM wrapper 那列的 glob **展開為精確名稱**，並註明原因（機器比對用精確名，glob 會被讀成缺失）
+2. `agency-os/docs/operations/cursor-mcp-and-plugin-inventory.md` — 補上 `grok-fast` / `grok-latest`
+3. `lobster-factory/docs/ROUTING_MATRIX.md` — 依「三件套同一 PR 必須同步」加高風險 MCP 附註，明寫它們**不新增任何 `task_type`**
+4. EU Kuma DB — monitor 23/24/25（Soulful）與 26/27（AwareWave）`maxretries` 1→2、`retry_interval` 0→60，對齊房規（DB 備份 `kuma.db.bak-20260815-retry`）
+5. `agency-os/TASKS.md` — 把 IPv6 實測數據掛進 Cloudflare 遷移待辦，作為該遷移的**技術驅動理由**（原本只有帳單理由）
+
+[驗證結果]
+- **未為了消警告而亂塞內容**：先讀 spec 自身的優先序表（第 4 列明寫 Inventory 是「IDE / Cursor MCP only」「never overrides... for production orchestration」），確認把 6 個 IDE 草稿工具塞進編排 spec 是錯的，才決定「展開名稱 + 只補真正有 prod 風險的 3 個」
+- `check-governance-docs-drift.ps1 -Force`：`mcp_set_consistency` **WARN → PASS**（`only_in_inventory` 9→0、`only_in_spec` 2→0）；`mtime_drift` 亦 **PASS**（三件套同批更新）；**Overall: WARN → PASS**（五項全綠）
+- `node scripts/validate-workflow-routing-policy.mjs`：**PASSED**（未新增 task_type，JSON 鏡像不需改動 —— 已實跑確認而非假設）
+- **Soulful IPv6 量化**（30 天 Kuma 資料，非憑兩筆告警下結論）：三個 monitor 各約 42,000 次檢查，失敗率 **0.107%–0.115%**；失敗原因 **130/139（94%）為 IPv6 專屬**（`ETIMEDOUT 2a02:4780:3:724:...` 119、`ECONNREFUSED` 11），其餘 9 次才是一般性斷線
+- 當下實測：IPv6 **30/30 全通**、IPv4 **10/10 全通** → 確認是低頻間歇，非持續故障
+- 重試設定生效驗證：Kuma 重啟後 healthy（~15s），DB 讀回 5 個 monitor 全為 `maxretries=2, retry_interval=60`，近 2 分鐘心跳 **68 UP / 0 DOWN**
+- REALTEST_EVIDENCE: tool=SSH | cmd=drift check -Force + validate-workflow-routing-policy.mjs + Kuma 30 天統計 SQL + IPv6/IPv4 連續探測 + 重試設定讀回 | exit=0 | ms=~900000
+- REVIEW_DONE: critic=Manual-readback | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,mcp | grep=mcp_set_consistency | hits=2
+  - ① 檢查器用的 known-name 允許清單與 `mcp/registry.template.json`（22 個 server）比對，發現 Inventory 漏列 grok（已補）；`claude-fast/latest` 在兩份文件內但不在 registry，屬各機 MCP 組態差異，非本次範圍
+  - ② 確認 `workflow-risk-matrix.json` 為 task_type 結構鏡像，本次未動 task_type 故不需改（以 validator 實跑確認）
+
+[剩餘風險]
+- **Soulful IPv6 的失敗並未消除** —— 只是不再為單次閃斷告警。真實 IPv6 訪客仍約每 900 次請求遇到 1 次失敗。這是**客戶主機商（Hostinger）的網路品質問題，非我方可修**；永久解＝已排程的 Cloudflare 遷移（CF 邊緣終結 IPv6、回源走 IPv4），卡在操作者查 Hostinger 帳單
+- `maxretries` 提高使 DOWN 偵測延遲約 1 分鐘（刻意取捨，與 EU 服務類 monitor 一致）
+- Kuma monitor 設定存在 DB、**不在 git**；重建 Kuma 需依此紀錄重設
+- 檢查器的 known-name 允許清單仍是硬編（`check-governance-docs-drift.ps1:150`）；新增 MCP 時需同步更新該清單，否則不會被檢查到
+
 ### AUTO_TASK_DONE: workflows 部署到 EU prod + `Resolve-Path` bug class 全清（170 處）
 
 [根因]

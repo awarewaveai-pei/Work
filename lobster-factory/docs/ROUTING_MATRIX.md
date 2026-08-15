@@ -14,6 +14,14 @@ Define a deterministic routing policy for Lobster Factory requests so each reque
 
 If this matrix and `MCP_TOOL_ROUTING_SPEC.md` disagree, **update the spec first**, then this file, then `workflow-risk-matrix.json`, in one change set.
 
+> **High-risk MCP annex (2026-08-15).** Three MCP servers can act on production without
+> being `task_type` owners, so they are classified in the spec's
+> *Cursor / IDE MCP keys → routing* table rather than here:
+> `supabase-awarewave-postgres` (executes arbitrary SQL), `hetzner-ssh` (OS-level
+> `ssh_exec` on prod), `awarewave-ops` (ops HTTP proxy, no shell). They add **no**
+> `task_type` rows — production changes still route through `manifest_apply`,
+> `incident_repair` or `deploy_production` with the approvals below.
+
 ## Routing Principles
 - Route by `task_type`, `risk_level`, and `environment`.
 - Production-impacting actions require human approval.
