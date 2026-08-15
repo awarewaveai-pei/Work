@@ -221,7 +221,8 @@
   - **DNS 對照表（Cloudflare 實際 14 筆；清點表 13 筆已證實漏掉 `hostingermail-c`）**：[`core/DNS_MIGRATION_RECORD_MAP.md`](tenants/company-soulful-expression/core/DNS_MIGRATION_RECORD_MAP.md) —— 含「AAAA 刻意不建」「哪些 CNAME 不可開 Proxy」「🔴 DKIM 實況：實際簽章 selector 是 `hostingermail1`」「回滾方式（回滾會失去 `hostingermail1`，需先補）」
   - **安全網已就緒**（2026-08-15）：DB（288 表）+ uploads（11,001 檔）已備份並**移出 Hostinger 至 EU**，三地 SHA-256 一致，見 [`core/BACKUP_RESTORE_PROOF.md`](tenants/company-soulful-expression/core/BACKUP_RESTORE_PROOF.md) Record #2
   - **待辦**：搬遷量已量測（檔案 1.5 GB／DB ~103 MB，plugins 619M 皆為正常大型外掛、無備份垃圾）→ ~~建 CF zone~~ ✅ → ~~操作者改 nameserver~~ ✅ 2026-08-15 → ~~驗證（網站 200 + 寄收測試信 + DKIM/SPF）~~ ✅ 2026-08-16 **mail-tester 10/10，SPF/DKIM/DMARC 三項 pass** → 決定目標主機 → 搬站 → 還原演練
-- [ ] **🟠 Soulful 網站寄不出信（既存故障，非搬遷造成）** —— FluentSMTP 的 SMTP 主機設成 `pop.hostinger.com:587`，該埠**不接受連線**；正確為 `smtp.hostinger.com:587`（實測 `220 ESMTP`）。故障證據：`wp_fsmpt_email_logs` id=90 **2026-08-03** 已同樣 `Could not connect to SMTP host`（早於 DNS 切換 12 天）。**已實測確認修法有效**：執行期覆寫主機名後 `wp_mail()` 回 `SENT_OK` 且 mail-tester 10/10（DB 未改動，`has_pop=1 / has_smtp=0` 驗證）。**待操作者同意後改設定**（WP 後台 FluentSMTP → 連線 → Host 改 `smtp.hostinger.com`）。影響面：表單通知、訂單信、FluentCRM 寄送目前全部靜默失敗
+- [x] **✅ Soulful 網站寄不出信 —— 已修（2026-08-16，既存故障，非搬遷造成）** —— FluentSMTP 主機設成 `pop.hostinger.com:587`（該埠不接受連線），已改為 `smtp.hostinger.com:587`。故障證據：`wp_fsmpt_email_logs` id=90 **2026-08-03** 已同樣 `Could not connect to SMTP host`，早於 DNS 切換 12 天。修後實測：正常路徑 `wp_mail()` 回 `SENT_OK`、日誌 id=93/94 轉 `sent`、mail-tester **10/10**（SPF/DKIM/DMARC 三項 pass）。掃過 `wp_options` 無其他 `pop.hostinger.com` 殘留。**回滾**：把該連線 Host 改回 `pop.hostinger.com`（只有這一個欄位變動）
+  - **監控補強**：`scripts/check-smoke-tests.ps1` 新增 Check 5 `client_mail`，每次 AO-RESUME 查最近 7 天寄信失敗數。**不用外掛自帶的失敗通知** —— 它自己也走 `wp_mail`，警報會跟被監控的通道一起死
 
 
 - [ ] **既有站接手（Soulful Expression Art Therapy）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；**Day 2 書面** staging canonical URL 已入 registry／SITE_PROFILE／`02_EXECUTION_PLAN`。**下一步：**Day 1 Runbook §1.1–1.3（操作者登入）+ **`TASKS`**「Day 2 實機驗收」。
@@ -708,5 +709,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-08-15 14:30:03 UTC_
+_Last synced: 2026-08-15 16:48:09 UTC_
 

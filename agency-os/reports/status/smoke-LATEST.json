@@ -1,14 +1,15 @@
 ﻿{
     "checks":  {
+                   "repair_center":  "ok",
+                   "n8n_mcp":  "ok",
+                   "client_mail":  "warn:soulful_2_failed_7d",
+                   "client_sites":  "ok:5_active",
                    "n8n_failures":  "ok:none_24h",
                    "repair_detail":  {
                                          "ok":  true,
                                          "system_mode":  "normal",
                                          "table_ok":  true
-                                     },
-                   "client_sites":  "ok:5_active",
-                   "n8n_mcp":  "ok",
-                   "repair_center":  "ok"
+                                     }
                },
-    "generated":  "2026-08-15 23:41:29"
+    "generated":  "2026-08-16 00:51:08"
 }

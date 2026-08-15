@@ -13,6 +13,7 @@
     2. Repair Center health  (GET /api/ops/repairs/health)
     3. Client sites health   (GET /api/ops/clients)
     4. n8n workflow failures (GET n8n/api/v1/executions?status=error — last 24h)
+    5. Client outbound mail  (SSH soulful -> wp_fsmpt_email_logs failures, last 7d)
   ops-console-smoke skipped here — requires TenantId which varies by tenant.
   Run /smoke-test manually for full DoD including ops-console.
 #>
@@ -42,6 +43,10 @@ $userEnv = Join-Path $root "mcp\user-env.ps1"
 if (Test-Path -LiteralPath $userEnv) {
     try { . $userEnv } catch {}
 }
+
+# Console-encoding helpers (Invoke-WithUtf8Console) for the ssh capture in Check 5.
+$encHelpers = Join-Path $PSScriptRoot "_console-encoding-helpers.ps1"
+if (Test-Path -LiteralPath $encHelpers) { . $encHelpers }
 
 $results = @{}
 
@@ -150,6 +155,54 @@ try {
     $results["n8n_failures"] = "skip:exception"
 }
 
+# --- Check 5: Client outbound mail (soulful) ---
+# Why this exists: FluentSMTP pointed at pop.hostinger.com:587 (a port that refuses
+# connections), so every wp_mail() failed silently from 2026-08-03 to 2026-08-16 and
+# nobody noticed. FluentSMTP's own failure notice is useless here because it is itself
+# delivered through wp_mail — the alert dies with the channel it watches. So the check
+# has to come from outside the site.
+try {
+    $mailHost = $env:HOSTINGER_SOULFUL_SSH_HOST; if (-not $mailHost) { $mailHost = "191.101.230.176" }
+    $mailPort = $env:HOSTINGER_SOULFUL_SSH_PORT; if (-not $mailPort) { $mailPort = "65002" }
+    $mailUser = $env:HOSTINGER_SOULFUL_SSH_USER; if (-not $mailUser) { $mailUser = "u942075013" }
+    $mailKey  = Join-Path $env:USERPROFILE ".ssh\hostinger_soulful"
+
+    if (-not (Test-Path -LiteralPath $mailKey)) {
+        $results["client_mail"] = "skip:no_ssh_key"
+    } elseif (-not (Get-Command Invoke-WithUtf8Console -ErrorAction SilentlyContinue)) {
+        # No unwrapped fallback on purpose: a bare `& ssh` capture is exactly the
+        # CP950 trap class that audit-cp950-traps.ps1 exists to catch.
+        $results["client_mail"] = "skip:no_enc_helper"
+    } else {
+        # PowerShell strips quotes when handing arguments to native ssh, which tore the
+        # SQL apart on the remote side ("syntax error near unexpected token `('").
+        # Base64 the whole remote script so nothing needs quoting in transit -- same
+        # pattern the repo already uses for the CJK/cron encoding trap.
+        $sql       = "SELECT COUNT(*) FROM wp_fsmpt_email_logs WHERE status='failed' AND created_at > (UTC_TIMESTAMP() - INTERVAL 7 DAY);"
+        $remoteCmd = "cd domains/soulfulexpression.org/public_html && wp db query " + [char]34 + $sql + [char]34 + " --skip-column-names"
+        $b64       = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($remoteCmd))
+        $sshArgs   = @("-i", $mailKey, "-p", $mailPort, "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
+                       "-o", "StrictHostKeyChecking=accept-new", "$mailUser@$mailHost",
+                       "echo $b64 | base64 -d | bash")
+        $raw = Invoke-WithUtf8Console { & ssh @sshArgs 2>&1 }
+
+        $failCount = $null
+        foreach ($line in @($raw)) {
+            if ("$line".Trim() -match '^\d+$') { $failCount = [int]"$line".Trim(); break }
+        }
+
+        if ($null -eq $failCount) {
+            $results["client_mail"] = "skip:unparsed"
+        } elseif ($failCount -eq 0) {
+            $results["client_mail"] = "ok:no_failures_7d"
+        } else {
+            $results["client_mail"] = "warn:soulful_${failCount}_failed_7d"
+        }
+    }
+} catch {
+    $results["client_mail"] = "skip:exception"
+}
+
 # --- Write LATEST JSON ---
 $stamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
 $payload = @{
@@ -160,12 +213,12 @@ $json = $payload | ConvertTo-Json -Depth 5
 Set-Content -Path (Join-Path $reportDir "smoke-LATEST.json") -Value $json -Encoding UTF8
 
 # --- Summary line for console ---
-$checks    = @("n8n_mcp","repair_center","client_sites","n8n_failures")
+$checks    = @("n8n_mcp","repair_center","client_sites","n8n_failures","client_mail")
 $hasWarn   = $checks | Where-Object { $results[$_] -like "warn:*" -or $results[$_] -like "fail:*" }
 $allSkip   = ($checks | Where-Object { $results[$_] -notlike "skip:*" }).Count -eq 0
 $overall   = if ($hasWarn) { "WARN" } elseif ($allSkip) { "SKIP" } else { "PASS" }
 $colour    = if ($overall -eq "PASS") { "Green" } elseif ($overall -eq "SKIP") { "DarkGray" } else { "Yellow" }
 
-Write-Host ("== Smoke: {0} | n8n_mcp={1} | repair={2} | clients={3} | n8n_fail={4} ==" -f `
-    $overall, $results["n8n_mcp"], $results["repair_center"], $results["client_sites"], $results["n8n_failures"]) -ForegroundColor $colour
+Write-Host ("== Smoke: {0} | n8n_mcp={1} | repair={2} | clients={3} | n8n_fail={4} | mail={5} ==" -f `
+    $overall, $results["n8n_mcp"], $results["repair_center"], $results["client_sites"], $results["n8n_failures"], $results["client_mail"]) -ForegroundColor $colour
 exit 0

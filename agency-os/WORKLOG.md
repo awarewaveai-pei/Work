@@ -4,6 +4,42 @@
 
 ## 2026-08-16
 
+### AUTO_TASK_DONE: 修好 Soulful 網站寄不出信 + 補上站外監控（外掛自帶通知走同一條壞通道）
+
+[任務]
+操作者「要去處理完善」= 授權套用上一輪已驗證的 FluentSMTP 修法，並把事情做到不會重演。
+
+[已修改]
+1. **soulful 正式站 FluentSMTP**：連線 `a9e0fd61…` 的 `host` 由 `pop.hostinger.com` → `smtp.hostinger.com`（port 587 / tls / auth / sender 皆未動）
+2. `scripts/check-smoke-tests.ps1` —— 新增 Check 5 `client_mail`（SSH 查 `wp_fsmpt_email_logs` 近 7 天失敗數）+ 引入 `_console-encoding-helpers.ps1`
+3. `agency-os/AGENTS.md` —— smoke 清單補第 5 項並載明「站內通知不可監控站內寄信」的理由
+4. `agency-os/TASKS.md` —— 🟠 任務結案為 ✅
+
+[驗證結果]
+- **修改只碰一個欄位**：patch 腳本逐 connection 比對，只在 `host === pop.hostinger.com` 時改寫，輸出 `before/after` 對照，`changed=1`
+- **持久化以獨立行程驗證**（不信自己腳本的回報）：`wp db query` 直查 `wp_options` 得 `has_pop=0 / has_smtp=1`
+- **走正常路徑實寄**（無任何執行期覆寫）：`SENT_OK`、`host_used=smtp.hostinger.com port=587`
+- **mail-tester 10/10**：`spf=pass`、`dkim=pass`（2048-bit、`header.s=hostingermail1`）、`dmarc=pass`
+- **日誌轉綠**：`wp_fsmpt_email_logs` id=93/94 `sent`（對照 id=90/91/92 `failed`）
+- **殘留掃描**：`SELECT option_name FROM wp_options WHERE option_value LIKE '%pop.hostinger.com%'` → 0 列
+- **監控實跑兩輪**：首輪回 `mail=skip:unparsed`，根因是 **PowerShell 呼叫原生 ssh 會吃掉引號**，SQL 在遠端被拆散（`syntax error near unexpected token '('`）→ 改用 repo 既有的 base64 傳遞模式 → 回 `mail=warn:soulful_2_failed_7d`（那 2 筆正是今天測試的失敗，7 天後自然消失）
+- **編碼閘擋下一次**：`audit-cp950-traps` 抓到未防護的 `& ssh` capture；第一次修仍紅（我留的 fallback 分支本身就是裸 capture）；移除 fallback 改為缺 helper 即 skip → `scanned=1 clean=1 drift=0`
+- **不採用外掛自帶失敗通知的理由**（讀 `fluent-smtp/app/Hooks/Handlers/SchedulerHandler.php:56-90` 確認）：`sendDailyDigest()` 經 `wp_mail` 送出，SMTP 掛掉時警報一起掛。監控必須來自站外
+- REALTEST_EVIDENCE: tool=Bash | cmd=wp eval-file smtp-fix.php + wp db query wp_options/wp_fsmpt_email_logs + wp_mail 正常路徑實寄 + mail-tester 判定讀回 + check-smoke-tests.ps1 x2 + audit-cp950-traps.ps1 x3 | exit=0 | ms=~1800000
+- REVIEW_DONE: critic=Manual-readback | verdict=pass | findings=0c/2m/1n （2m 皆當場修掉：ssh 引號被吞、fallback 分支違反編碼紀律；1n＝變數名 `$script` 與 `$script:` 範圍修飾字易混淆，改名 `$remoteCmd` 後重跑 parse／編碼稽核／實跑三項）
+  - 未採納的觀察：ssh 無整體逾時（僅 `ConnectTimeout=15`）—— `BatchMode=yes` 已排除互動卡住，且失敗一律 fail-open，不值得為此加複雜度
+  - 確認非新增風險：SSH host/port/user 的 fallback 常數早已存在於 git-tracked 的 `mcp/user-env.template.ps1:74-76`；金鑰本體仍是機器本地，未進 repo
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=smoke-LATEST | hits=4
+  - `ao-resume.ps1:727-728` 只負責呼叫、`.claude/commands/ao-resume.md:175-177` 寫的是「一行摘要」不綁固定檢查數 ⇒ 新增 key 不會打壞讀取端；`AGENTS.md:329` 的四項清單已補為五項（其餘命中在 `Backups/` 快照，刻意不動）
+
+[剩餘風險]
+- `client_mail` 只覆蓋 soulful 一家（其餘客戶站無 FluentSMTP 或無 SSH 憑證）；要擴充需逐站補 key
+- 該檢查每次 AO-RESUME 多一次 SSH（~3 秒），失敗一律 fail-open 走 `skip:*`，不會擋住 AO-RESUME
+- 未來 7 天 `client_mail` 會持續 WARN（今天測試留下的 2 筆失敗），非新故障
+
+[rollback]
+① 網站：FluentSMTP 該連線 Host 改回 `pop.hostinger.com`（僅此一欄）② 監控與文件：`git revert` 本 commit
+
 ### AUTO_TASK_DONE: Soulful 信箱實測 10/10 + 揪出兩個既存問題（網站寄不出信、DKIM selector 文件錯誤）
 
 [任務]
@@ -1730,5 +1766,5 @@ woocommerce-points-and-rewards / woocommerce-product-addons
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-08-15 14:30:03 UTC_
+_Last synced: 2026-08-15 16:48:09 UTC_
 
