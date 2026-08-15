@@ -21,6 +21,7 @@
       "overwriteKeys": [
         "autoUpdatesChannel",
         "theme",
+        "cleanupPeriodDays",
         "permissions.defaultMode",
         "permissions.skipDangerousModePermissionPrompt",
         "permissions.deny",

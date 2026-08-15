@@ -4,6 +4,38 @@
 
 ## 2026-08-16
 
+### AUTO_TASK_DONE: 查明 pinned session 內容消失根因（預設 30 天保留）+ 目標主機拍板
+
+[任務]
+操作者截圖 9 個 pinned session 問「裡面的內容都不見了?」。同一輪告知搬站目標主機為新購二手 Hetzner 機，且 soulful 是她自有產業。
+
+[已修改]
+1. `mcp/claude-userlevel/settings.template.json` —— 新增 `cleanupPeriodDays: 365` + 事故成因註解
+2. `mcp/claude-userlevel/manifest.json` —— `overwriteKeys` 加入 `cleanupPeriodDays`（**關鍵**：不加這行設定不會被同步）
+3. `core/SITE_MIGRATION_RUNBOOK.md` / `TASKS.md` —— 寫入目標主機決議 + 所有權澄清 + 多站設計提醒
+4. `memory/project_hetzner_dedicated_plan.md` + `MEMORY.md` —— 採購計畫升級為有硬死線
+
+[驗證結果]
+- **確認內容真的消失**：`list_events` 回 `transcript file was cleaned up`；檔案系統實查 `~/.claude/projects/D--Work/` **只剩 2 個 .jsonl**（本 session 5.1 MB + 前一日 25 MB），9 個 pinned session 的逐字稿全數不存在
+- **session 本身沒消失**：`list_sessions` 顯示 11 筆全部存在且 `isArchived=false` —— **側邊欄標題還在但內容已空**，這正是它沒被察覺的原因
+- **根因（官方文件佐證，非推測）**：`cleanupPeriodDays` 未設定 → 用預設值。Claude Code changelog 第 225 行原文載明 `delete conversation history older than 30 days`。Pinned sessions 為 2026-06-23 ~ 07-04，距今 43–54 天 ⇒ 已過期被清。**Pin 不會豁免清理**
+- **確認不可復原**：回收桶無 `.jsonl`；`agency-os/Backups/` 無副本；`history.jsonl`（提問歷史）**停在 2026-05-23**，涵蓋不到 6–7 月
+- **知識實際損失評估（VBC：不只看 transcript，查替代來源）**：`memory/` 74 檔未受影響（獨立於 transcript）。逐主題查 repo 留存 —— Hetzner 494 / Postiz 112 / 二手 65 / Oracle 51 / Remotion 17 命中，`Centaur` 由 `ADR 009` 保存，`圖片發文` 由 `POSTIZ_SOCIAL_PUBLISHING_PLAN.md` 涵蓋。**唯一真正無痕跡者：`WooCommerce country material restrictions`**
+- **修復實測**：首次改 template 後 sync 回報 PASS 但 `cleanupPeriodDays` **未生效** —— 讀 `sync-claude-userlevel.ps1:315` 確認 merge 模式**只複製 manifest `overwriteKeys` 列名的 key**（設計如此非 bug）。補進 manifest 後重跑 → 實查 `~/.claude/settings.json` 得 **365** ✅
+- **誠實記錄**：若當時只看 sync 的 `RESULT: PASS` 就宣告修好，會是假修復
+- REALTEST_EVIDENCE: tool=Bash | cmd=ccd list_sessions/list_events + ls ~/.claude/projects + grep changelog cleanupPeriodDays + find 回收桶與備份 + history.jsonl 時間範圍 + 逐主題 grep 留存 + sync-claude-userlevel.ps1 x2 + 讀回 settings.json | exit=0 | ms=~1200000
+- REVIEW_DONE: critic=Manual-readback | verdict=pass | findings=0c/1m/0n （1m＝第一次修復未生效，讀 sync 腳本找出 manifest 未列名，已修正並實測）
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp | grep=cleanupPeriodDays | hits=3
+  - `settings.template.json`、`manifest.json`、本 WORKLOG；`scripts/verify-settings-governed-keys.mjs` 讀 manifest 動態取 key，無硬編清單需同步
+
+[剩餘風險]
+- **已消失的內容無法復原** —— `WooCommerce country material restrictions` 在 repo 無任何痕跡，該主題結論已永久遺失
+- 365 天只是加寬窗口，**不是備份**。長期知識仍須落在 WORKLOG / TASKS / ADR / memory（已寫入 template 註解提醒）
+- 設定僅本機生效；將來新增機器需跑 `sync-claude-userlevel.ps1` 才會帶過去
+
+[rollback]
+`settings.template.json` 與 `manifest.json` 移除該 key 後重跑 sync；文件與 memory 變更 `git revert`。
+
 ### AUTO_TASK_DONE: 補上搬站執行手冊 + 清掉 5 份文件的過期 staging 主張
 
 [任務]
