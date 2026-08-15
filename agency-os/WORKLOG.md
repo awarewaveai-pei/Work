@@ -4,6 +4,42 @@
 
 ## 2026-08-15
 
+### AUTO_TASK_DONE: 監控沉默根治 —— 告警一直有偵測到，只是從來沒有出口
+
+[根因]
+承上則事故：ClickHouse 把 EU 拖垮五天，操作者只收到下游症狀（端點 timeout），沒有任何一則指向源頭。查下去發現**不是「沒有告警」，是「告警送不出去」**，而且是兩個各自獨立的破口：
+1. **EU 根本沒有通知出口**：`health_alarm_notify.conf` 雖有 `SEND_CUSTOM="YES"`，但 `DEFAULT_RECIPIENT_CUSTOM=""` 且 `custom_sender()` 是原廠空殼（只 log `custom_sender() is not configured`）。SG 有真實 sender，**EU 從安裝以來從未接線** —— EU 的 netdata 告警一律石沉大海。
+2. **容器告警原廠即靜音**：netdata stock `health.d/cgroups.conf` 對 `cgroup_10min_cpu_usage` 與 `cgroup_ram_in_use` 寫死 `to: silent`（通用主機上會太吵）。它們**偵測完全正確** —— `cgroup_ram_in_use` 在 `trigger-clickhouse` 上於 08-10 07:23 → 08-15 07:45 期間觸發 **483 次**、峰值 93.5% —— 但每一次 `notification.to` 都是 `silent` 而被丟棄。
+（VBC 註記：查證過程先後排除「health 引擎沒開」(364 條告警已載入)、「Telegram/Slack 未設定」(兩者皆 YES)、「trigger 容器沒有 CPU 告警」(29 個容器全都有 —— 此為我一度因輸出被 `tail` 截斷而誤判，已更正)。）
+
+[已修改]
+1. `lobster-factory/infra/netdata/netdata-ops-inbox-notify.sh`（新，repo 正本）+ 部署至**兩台** `/usr/local/bin/`（sha `b003de66…` 相同）—— 由 SG 既有版本移植，並新增可選 `OPS_INBOX_RESOLVE` 支援
+2. `lobster-factory/infra/netdata/health.d/cgroups.conf`（新，repo 正本）+ 部署至**兩台** `/etc/netdata/health.d/` —— 兩條 docker-cgroup 模板 `to: silent` → `to: sysadmin`，並加 `delay: up 10m`（該告警 5 天觸發 483 次，直接放行會變噪音；持續 10 分鐘才通知，真實事故持續數天仍會觸發）。k8s_* 模板維持靜音（此處無 k8s）
+3. EU `/etc/netdata/health_alarm_notify.conf`：`DEFAULT_RECIPIENT_CUSTOM=""` → `"ops-inbox"`，`custom_sender()` 空殼 → SG 實作（備份 `.bak-20260815`）
+4. EU `/etc/netdata/ops-inbox-webhook.env`（新，640 root:netdata，不進 git）：token 由本機 vault 讀出經 stdin 寫入（不經命令列，避免出現在任一台的行程清單）
+5. `lobster-factory/infra/netdata/README.md`（新）—— 部署步驟、驗證指令、CRLF 與 pinned-copy 兩個坑
+
+[驗證結果]
+- 重載後 EU 容器告警 **58 個實例的 recipient 全部從 `silent` 變 `sysadmin`**
+- `alarm-notify.sh test sysadmin`：WARNING / CRITICAL / CLEAR **三段全部 `# OK`**，Slack 實際送達 `#alerts-infra`
+- **測試中抓到自己製造的 bug**：PowerShell 管線把 env 檔寫成 CRLF → `source` 報 `$'\r': command not found`，且 token 尾端多一個 `\r` 會讓 Bearer 認證靜默失敗。已 `sed` 清除並重驗（token 長度 64、`source` 乾淨通過）
+- **再抓到第二個 bug**：EU POST `https://app.aware-wave.com/...` 回 **403「Just a moment...」** —— Cloudflare Bot Fight Mode 擋機房 IP，與 2026-08-12 Kuma 假 DOWN 同一 class。SG 因自己就是來源站而回 200。修法：腳本新增可選 `OPS_INBOX_RESOLVE=host:port:ip` → `curl --resolve` 直連來源，保留 SNI／Host／憑證驗證；EU 設、SG 留空，**同一份腳本不分叉**
+- 修正後實測：EU 手動 curl **HTTP=200**；再以**真正的通知腳本** `bash -x` 執行，trace 確認 `--resolve app.aware-wave.com:443:5.223.93.113` 實際生效、curl 執行、`exit=0`
+- REALTEST_EVIDENCE: tool=SSH | cmd=alarm-notify.sh test sysadmin + ops-inbox curl (403→200) + bash -x 真實腳本執行 + alarms API recipient 比對 | exit=0 | ms=~1500000
+- REVIEW_DONE: critic=Manual-readback | verdict=pass | findings=0c/2m/0n （註：設定檔與 shell 腳本，非應用程式碼；以 `bash -n` + 兩台 sha256 比對 + 三段通知實測取代 critic。2 個 minor 皆為我在過程中自造並當場修掉的 CRLF 與 CF-403）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks | grep=netdata-ops-inbox-notify | hits=2
+  - ① repo 原本**只有** SG 的 `health.d/aware-wave.conf`，通知腳本無正本 → 已建 `lobster-factory/infra/netdata/` 收納兩台共用檔
+  - ② `OBSERVABILITY_P1_P2_ROLLOUT.md` 未載明 EU 排除，確認 EU 是漏做非刻意
+
+[剩餘風險]
+- `health.d/cgroups.conf` 是 netdata v2.11.0 stock 模板的**釘選副本**（`netdata edit-config` 的既定作法）；netdata 大版本升級後需重新與新 stock 檔比對，README 已註明
+- 本次只解除 CPU/RAM 兩條容器告警的靜音；其餘 stock 靜音告警未動（避免一次放行造成噪音）
+- `delay: up 10m` 表示短於 10 分鐘的尖峰不會通知 —— 這是刻意取捨
+- EU 的 `ops-inbox-webhook.env` 不進 git（含 token）；新機重建時需依 README 從 vault 重新產生
+
+[rollback]
+兩台各自 `rm /etc/netdata/health.d/cgroups.conf`（回到 stock 靜音）；EU `cp /etc/netdata/health_alarm_notify.conf.bak-20260815 /etc/netdata/health_alarm_notify.conf`；`killall -USR2 netdata` 重載；repo 端 `git revert`。
+
 ### AUTO_TASK_DONE: EU 全機卡死根治 —— ClickHouse 把 CPU 100% 用在合併自己的遙測
 
 [根因]
