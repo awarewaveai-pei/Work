@@ -1,27 +1,93 @@
 <?xml version="1.0"?>
 <clickhouse>
-  <!-- v4 Goose migrations (e.g. task_runs_v1) use JSON columns; CH 24.x requires this -->
-  <profiles>
-    <default>
-      <allow_experimental_json_type>1</allow_experimental_json_type>
-    </default>
-  </profiles>
-
   <!--
-    Docker mem_limit for clickhouse service = 4096m.
-    Internal cap is set to ~3.5 GiB (3758096384 bytes) to leave ~512 MiB headroom
+    Docker mem_limit for clickhouse service = 3072m (3 GiB).
+    Internal cap set to 2.5 GiB (2684354560 bytes) to leave ~512 MiB headroom
     for OS page cache and Docker overhead.
 
-    History: originally set to 800 MB (800000000) which was too low once
-    ClickHouse system logs accumulate — trace_log alone grew to 324 MiB,
-    text_log to 263 MiB, causing RSS to exceed the cap and trigger
-    MEMORY_LIMIT_EXCEEDED on every trigger-webapp startup (crash-loop).
-    Raised 2026-04-29.
-
-    TTL policies below keep system logs bounded by retention windows so RSS
-    does not creep up without action.
+    History:
+      Originally 800 MB — too low once system logs accumulated.
+      Raised 2026-04-29 to 3.5 GiB cap when docker limit was 4096m.
+      Reduced 2026-07-05: docker limit changed to 1536m (cap/comment were stale).
+      Root cause of OOM death spiral: 3002+ fragmented parts in task_events table
+      required > 1.5 GiB RSS at startup; container was OOM-killed 2344 times.
+      Fix: raised docker limit to 3072m, cap to 2.5 GiB; truncated system logs;
+      background merge will reduce part count over 2-3 days.
   -->
-  <max_server_memory_usage>3758096384</max_server_memory_usage>
+  <max_server_memory_usage>2684354560</max_server_memory_usage>
+
+  <!--
+    REMOVED (was here until 2026-07-05, absence confirmed deliberate 2026-08-15):
+      <profiles><default><allow_experimental_json_type>1</allow_experimental_json_type>
+
+    It existed because v4 Goose migrations (task_runs_v1 etc.) use JSON columns and
+    ClickHouse 24.x gated that type behind an experimental flag. On the pinned
+    25.7.x line the setting reports value=1, changed=0, tier=Production — i.e. it is
+    the built-in default and no longer experimental. Verified on 25.7.5 by creating a
+    JSON column successfully and by the fact that trigger_dev.task_runs_v2 /
+    task_events_v2 / metrics_v1 already store JSON columns and work.
+
+    Do not re-add it: it is dead configuration on the pinned version. If ClickHouse is
+    ever downgraded below 25.x (AGENTS.md forbids this), restore it first.
+  -->
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       2026-08-15 — SYSTEM LOG VOLUME AT SOURCE (not just retention)
+
+       Incident: the container sat at 100% of its 1-CPU limit indefinitely,
+       merging its own telemetry. EU load stayed ~5 with 3 GiB of swap in use,
+       which starved every other process on the host — including Uptime Kuma,
+       whose outbound checks then timed out. Every EU-originated monitor
+       (SG services + client sites) flapped together while SG itself was
+       provably healthy: ICMP EU->SG showed 0% loss, but TCP :80 failed 11/20;
+       the same test from a laptop passed 20/20.
+
+       Measured split at the time of diagnosis:
+         system      16.89 GiB   643,628,136 rows   <- ClickHouse's own telemetry
+         trigger_dev 49.00 MiB       624,481 rows   <- the actual application data
+       i.e. ~345x more self-telemetry than real data, and trace_log alone was
+       ingesting 1,240,456 rows/hour.
+
+       Why the 2026-07-04 fix below (TTL) did not hold: TTL bounds how long rows
+       are KEPT, not how fast they are PRODUCED. Verified still working at
+       diagnosis time (trace_log spanned 10 days against a 7-day TTL, text_log
+       exactly 14). The merge load is driven by the production rate, so 7 days of
+       a 1.24M rows/hour firehose is still 200M+ rows to merge continuously.
+       Retention tuning cannot fix a generation-rate problem — the generators
+       themselves have to be turned off or slowed down. That is what follows.
+  ═══════════════════════════════════════════════════════════════════════ -->
+
+  <!-- trace_log: the sampling profiler. 10.25 GiB / 446M rows, 1.24M rows/hour,
+       and never queried by anyone here. Removing the config disables the trace
+       collector outright, which is the documented way to switch it off. Re-enable
+       temporarily (delete this line, restart) only for a deliberate perf
+       investigation, and turn it back off afterwards. -->
+  <trace_log remove="1"/>
+
+  <!-- asynchronous_metric_log: 99.5M rows, and its event_date range started at
+       1970-01-01, so part pruning could not work on it either. Host-level metrics
+       are already collected by Netdata + Grafana, so this table is pure overhead. -->
+  <asynchronous_metric_log remove="1"/>
+
+  <!-- metric_log: kept — it is the only ClickHouse-internal metric source — but
+       the default 7.5s flush created one part per flush, ~11.5k parts/day, which
+       is what produced the 402 active parts and the permanent merge backlog.
+       At 60s the part rate drops ~8x while the metrics stay usable. -->
+  <metric_log>
+    <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
+    <flush_interval_milliseconds>60000</flush_interval_milliseconds>
+  </metric_log>
+
+  <!-- text_log: 5.33 GiB / 90M rows in 14 days = ~6.4M rows/day, because it
+       mirrors EVERY server log line into a table. Container logs already go to
+       Docker's json driver, so this exists only for in-SQL post-incident search.
+       Restricting it to warning-and-above keeps that value and removes the flood;
+       3 days is enough for the incident window it is actually used in. -->
+  <text_log>
+    <level>warning</level>
+    <ttl>event_date + INTERVAL 3 DAY DELETE</ttl>
+    <flush_interval_milliseconds>30000</flush_interval_milliseconds>
+  </text_log>
 
   <!-- ── System log TTL: tiered retention policy ──────────────────────────
        Rationale:
@@ -29,21 +95,12 @@
          14d — query & text logs (useful for post-incident perf regression)
          30d — error log (recurring / rare bugs need a month of history)
   ──────────────────────────────────────────────────────────────────────── -->
-  <trace_log>
-    <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
-  </trace_log>
-  <metric_log>
-    <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
-  </metric_log>
-  <asynchronous_metric_log>
-    <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
-  </asynchronous_metric_log>
   <processors_profile_log>
     <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
   </processors_profile_log>
-  <text_log>
-    <ttl>event_date + INTERVAL 14 DAY DELETE</ttl>
-  </text_log>
+  <latency_log>
+    <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
+  </latency_log>
   <query_log>
     <ttl>event_date + INTERVAL 14 DAY DELETE</ttl>
   </query_log>

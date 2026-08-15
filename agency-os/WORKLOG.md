@@ -2,6 +2,50 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-08-15
+
+### AUTO_TASK_DONE: EU 全機卡死根治 —— ClickHouse 把 CPU 100% 用在合併自己的遙測
+
+[根因]
+操作者收到大量「SG 服務 timeout」告警。**SG 完全健康，問題全在 EU**：
+1. `trigger-clickhouse` 持續吃滿它的 1 CPU 限額（`cpus: "1.0"`，實測 101.79%），EU load 撐在 4.0–4.9、swap 用掉 3082MB/4095MB、可用記憶體僅 303MB。行程（含 Uptime Kuma 與手動 curl）被 CPU 飢餓卡住數秒 → 連線 timeout。
+2. 因此**所有從 EU 打出去的 monitor 同時中斷、同時恢復**（SG 服務 + 客戶站），而打 `127.0.0.1` 的從不告警 —— 這個同步性就是「監控端自己卡住」而非「被監控端掛掉」的指紋。
+3. ClickHouse 在忙什麼：`system` 資料庫 **16.89 GiB / 643,628,136 列**，而真正的應用資料 `trigger_dev` 只有 **49 MiB / 624,481 列** —— **345 倍的自我遙測**。其中 `system.trace_log`（取樣分析器）10.25 GiB / 4.47 億列，**每小時新增 1,240,456 列**，merge 永遠追不上。
+4. **為什麼 2026-07-05（commit `00ea2e03`）修過又復發**：那次清掉 20GB 日誌並在 `override.xml` 設了 TTL。TTL **確實有效**（實測 trace_log 只留 10 天對 7 天 TTL、text_log 剛好 14 天），但 **TTL 治的是「留多久」，不是「產生多快」**。每小時 124 萬列的來源沒關掉，7 天照樣是 2 億列要合併。retention 調校無法解決 generation-rate 問題 —— 這就是補釘。
+
+[已修改]
+1. `lobster-factory/infra/trigger/clickhouse/override.xml` + EU `/root/trigger/clickhouse/override.xml`（兩者 byte-identical，sha `1671a611…`）：
+   - `<trace_log remove="1"/>` — 關閉取樣分析器（無人查詢、純開銷；官方即以移除設定作為停用方式）
+   - `<asynchronous_metric_log remove="1"/>` — 9950 萬列且 `event_date` 起點是 1970-01-01（分區裁剪對它失效）；主機指標已由 Netdata+Grafana 涵蓋
+   - `metric_log` 保留但 `flush_interval_milliseconds` 7.5s → **60s**（預設每次 flush 產生一個 part ≈ 每天 1.15 萬個，這才是 402 個活躍 part 與永久 merge 積壓的成因）
+   - `text_log` 加 `<level>warning</level>` + TTL 14d → 3d + flush 30s（原本把**每一行**伺服器日誌寫進表，14 天 9047 萬列）
+   - 補註解說明 2026-07-05 遺失的 `allow_experimental_json_type` **不需加回**（見 BUGHUNT ①）
+2. EU 上 `DROP` `system.trace_log` / `system.text_log_0` / `system.asynchronous_metric_log`，`TRUNCATE system.metric_log`
+
+[驗證結果]
+- 鑑別診斷（逐項排除，非猜測）：SG load 0.5、容器零重啟、fail2ban 無 EU IP、**ipset 全空**、iptables policy ACCEPT、`ListenOverflows=0`、conntrack 135/65536 → SG 端全部排除
+- **決定性對照**：EU→SG `ICMP` **0% 遺失**（RTT 179ms，mdev 0.75ms）但 `TCP:80` **20 次掛 11 次**；同一時間**筆電→SG:80 20/20 全通** → 確定問題在 EU 出向
+- 設定生效驗證（**先驗證再清存量**，否則刪完會長回來）：重啟後 `trace_log` 新增 **0 列**、`asynchronous_metric_log` **0 列**、`text_log` 只剩 `Error` 等級
+- 成效：ClickHouse CPU **101.79% → 4.46%**、MEM 2.616→1.203 GiB、EU load 1分鐘 **4.03 → 0.50**、可用記憶體 303MB → 1747MB、磁碟 96G(67%) → 79G(55%)、`system` 表 **16.90 GiB → 79.65 MiB**
+- **應用資料未受損**：`trigger_dev` 48.99 MiB / 624,502 列（清理前 49.00 MiB / 624,481，差異為正常持續寫入）
+- 端到端：EU→SG TCP:80 **20/20 全通**（修復前 9/20）；Kuma 全部心跳回 `status=1`；Trigger.dev 8 個容器全 healthy
+- 暫態錯誤已收斂：清理當下有 780 次 `Code: 241`(MEMORY_LIMIT_EXCEEDED，背景 merge 啃積壓)，最近 2 分鐘 **0 個 `<Error>`、0 個進行中 merge**
+- REALTEST_EVIDENCE: tool=SSH | cmd=EU/SG 資源與封包層鑑別 + ClickHouse system.parts/processes/merges 查詢 + docker restart + 20 次 TCP 連線對照 + Kuma heartbeat | exit=0 | ms=~2400000
+- REVIEW_DONE: critic=Manual-readback | verdict=pass | findings=0c/0m/0n （註：本次改動為伺服器設定 XML 非程式碼；以 `xml.dom.minidom` 解析驗證 + repo/live sha256 比對 + 逐項行為實測取代 critic）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=override.xml | hits=3
+  - ① **repo 正本與機器早已漂移**（改動前 sha 不同）：repo 版更舊（還寫 mem_limit 4096m），但含機器上沒有的 `allow_experimental_json_type`。實測 25.7.5 上該設定 `value=1, changed=0, tier=Production`＝內建預設，JSON 欄位建立測試通過，`trigger_dev` 多張表本來就在用 JSON → **確認為死設定，不加回並在檔案內註明原因**
+  - ② EU 29 個容器中 **27 個已有 mem_limit**（僅 2 個 build 用容器沒有）→ TASKS 中「每容器 mem_limit 未做」的說法已過期，同批修正
+  - ③ 確認 repo 內 `lobster-factory/infra/trigger/` 是 SSOT，本次改動已同步回 repo（避免重蹈今日稍早 backup 腳本只改機器的覆轍）
+
+[剩餘風險]
+- **監控缺口（未修）**：EU `/etc/netdata/health.d/` 有 **0 條自訂告警**。磁碟有告警（所以 SG 90% 有通知），但「單一容器吃滿 CPU 限額」「load 持續 5」「swap 用掉 75%」全部無告警 —— 這就是源頭沉默數日、只看得到下游症狀的原因。應依 `runbooks/ADD-PERIODIC-HEALTH-CHECK.md` 既有 pattern 補，不另建機制
+- swap 已用的 3GB 不會自動歸還，需壓力解除後逐步釋放（現 2798MB 且下降中）
+- EU 8GB 跑 Supabase+Trigger+n8n+Postiz+MainWP+Kuma 本就吃緊；本次爭取到空間，但不改變「買 dedicated 機」的長期需求
+- `metric_log` 的 flush 60s 是折衷；若日後仍見 part 累積，下一步是直接 `remove="1"`（Netdata 已覆蓋主機指標）
+
+[rollback]
+`cp /root/trigger/clickhouse/override.xml.bak-20260815 /root/trigger/clickhouse/override.xml && docker restart trigger-clickhouse`；repo 端 `git revert`。已 DROP 的遙測表無法復原（ClickHouse 會依設定自行重建需要的表）。
+
 ## 2026-08-12
 
 ### AUTO_TASK_DONE: `.claude` junction 中途斷線防護 + health 回 100% + 07-26 備份失敗結案
