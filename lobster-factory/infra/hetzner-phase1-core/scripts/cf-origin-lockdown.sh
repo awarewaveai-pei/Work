@@ -42,6 +42,34 @@ CF_IPS_URL_V6="https://www.cloudflare.com/ips-v6"
 BACKUP_DIR="/root/cf-lockdown-backup-$(date +%Y%m%d-%H%M%S)"
 REVERT_PID_FILE="/tmp/cf-lockdown-revert.pid"
 
+# Trusted non-Cloudflare sources allowed to reach 80/443 directly.
+# MUST include every host that talks to this origin by IP, or the lockdown will cut
+# it off. The list below was derived empirically from nginx access.log rather than
+# assumed - every non-Cloudflare source hitting this origin was classified first:
+#
+#   204.168.175.41   EU VPS, 15942 req  - Uptime Kuma (9 monitors poll this origin
+#                                         directly) + netdata alert delivery
+#                                         (curl --resolve). Both were pointed at the
+#                                         origin on purpose because Cloudflare Bot
+#                                         Fight Mode challenges datacenter IPs.
+#   172.17/18/21.0.0/16  docker bridges, 1987 req - SG's OWN internal checks
+#                                         (/, /health, /nginx_status). Container ->
+#                                         host published port traverses INPUT, so
+#                                         these are dropped too without this entry.
+#   (everything else)  36 req - wp_filemanager.php probes, nmaplowercheck, /HNAP1,
+#                                         rtsp:// - scanners. Blocking them is the
+#                                         entire point of the lockdown.
+#
+# Re-run that classification before changing this list:
+#   docker exec lobster-nginx sh -lc 'cat /var/log/nginx/access.log' | awk '{print $1}' \
+#     | sort | uniq -c | sort -rn      # then subtract cloudflare.com/ips-v4
+#
+# Override without editing this file by creating /etc/default/cf-origin-lockdown:
+#   TRUSTED_SRC_V4="204.168.175.41 203.0.113.7"
+TRUSTED_IPSET_V4="origin-trusted-v4"
+TRUSTED_SRC_V4="${TRUSTED_SRC_V4:-204.168.175.41 172.17.0.0/16 172.18.0.0/16 172.21.0.0/16}"
+[[ -f /etc/default/cf-origin-lockdown ]] && source /etc/default/cf-origin-lockdown
+
 # Hardcoded CF IPv4 ranges (fallback if download fails)
 CF_IPV4_RANGES=(
   "173.245.48.0/20"
@@ -86,6 +114,24 @@ ensure_ipset() {
     log "ipset not found -- installing..."
     apt-get install -y ipset
   fi
+}
+
+# ---------------------------------------------------------------------------
+# Trusted (non-CF) origin sources
+# ---------------------------------------------------------------------------
+populate_trusted_v4() {
+  if [[ -z "${TRUSTED_SRC_V4// /}" ]]; then
+    log "No TRUSTED_SRC_V4 configured -- skipping trusted ipset."
+    return 0
+  fi
+  ipset create "$TRUSTED_IPSET_V4" hash:net family inet maxelem 1024 2>/dev/null || true
+  ipset flush "$TRUSTED_IPSET_V4"
+  local ip
+  for ip in $TRUSTED_SRC_V4; do
+    [[ -z "$ip" ]] && continue
+    ipset add "$TRUSTED_IPSET_V4" "$ip" 2>/dev/null || warn "could not add trusted src: $ip"
+  done
+  log "Trusted ipset $TRUSTED_IPSET_V4 populated: $TRUSTED_SRC_V4"
 }
 
 # ---------------------------------------------------------------------------
@@ -223,6 +269,24 @@ apply_ipv4_rules() {
       fi
     fi
   done
+
+  # Step 2b: Allow trusted non-CF sources (monitoring). MUST come before the DROP.
+  # Without this the EU VPS - Uptime Kuma + netdata alerting - is cut off and the
+  # origin becomes unmonitored the moment the lockdown is applied.
+  if [[ -n "${TRUSTED_SRC_V4// /}" ]]; then
+    for port in 80 443; do
+      if ipv4_rule_exists INPUT -p tcp --dport "$port" -m set --match-set "$TRUSTED_IPSET_V4" src -j ACCEPT; then
+        log "Trusted ipset rule for port $port already present -- skipping."
+      else
+        if [[ "$preview" == "1" ]]; then
+          log "[PREVIEW] Would ADD: iptables -A INPUT -p tcp --dport $port -m set --match-set $TRUSTED_IPSET_V4 src -j ACCEPT ($TRUSTED_SRC_V4)"
+        else
+          iptables -A INPUT -p tcp --dport "$port" -m set --match-set "$TRUSTED_IPSET_V4" src -j ACCEPT
+          log "Added trusted-source ACCEPT for tcp dport $port ($TRUSTED_SRC_V4)."
+        fi
+      fi
+    done
+  fi
 
   # Step 3: Add explicit DROP for 80/443 (after CF-ACCEPT, catches all non-CF traffic)
   # Self-contained: lockdown works regardless of INPUT chain policy.
@@ -407,6 +471,7 @@ cmd_apply() {
   take_backup
   populate_ipset_v4
   populate_ipset_v6
+  populate_trusted_v4
   apply_ipv4_rules "0"
   apply_ipv6_rules "0"
   schedule_auto_revert "$BACKUP_DIR/rules.v4.bak" "$BACKUP_DIR/rules.v6.bak"

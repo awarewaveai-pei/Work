@@ -584,6 +584,26 @@ if (Test-Path -LiteralPath $autoRebootHealthScript) {
     $global:LASTEXITCODE = 0
 }
 
+# --- ClickHouse self-telemetry health (warn-only; catches the 4x-recurring EU flood class) ---
+# Rationale: ClickHouse was "fixed" on 2026-04-20 / 04-29 / 07-05 / 08-15 and came back each
+# time, because the first three fixes raised the memory ceiling or deleted accumulated rows
+# instead of stopping the generators. Nobody saw the trend between incidents. This snapshot
+# reports self-telemetry vs application data as a ratio, so the next flood is visible early
+# and regardless of which table produces it. Writes reports/status/clickhouse-LATEST.md.
+$clickhouseHealthScript = Join-Path $WorkRoot "scripts\check-clickhouse-health.ps1"
+if (Test-Path -LiteralPath $clickhouseHealthScript) {
+    Write-Host ""
+    Write-Host "== AO-RESUME: ClickHouse self-telemetry snapshot (warn-only) ==" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $clickhouseHealthScript -WorkRoot $WorkRoot
+    $chExit = $LASTEXITCODE
+    if ($chExit -ne 0) {
+        Write-Host "WARN: ClickHouse health snapshot returned non-zero (see agency-os/reports/status/clickhouse-LATEST.md)." -ForegroundColor Yellow
+        Write-Host "      AO-RESUME continues because this check is warn-only." -ForegroundColor Yellow
+        Write-Host ""
+    }
+    $global:LASTEXITCODE = 0
+}
+
 # --- Claude routine output freshness (warn-only; surfaces silent routine failure at startup) ---
 # Rationale: a cloud routine whose source drifts / auth lapses / gets disabled stops landing
 # its report — and the operator should learn this at AO-RESUME (when they can act), not only

@@ -1,0 +1,22 @@
+{
+    "schemaVersion":  1,
+    "generatedAtUtc":  "2026-08-15T08:57:23.6218150Z",
+    "host":  "204.168.175.41",
+    "container":  "trigger-clickhouse",
+    "appDatabase":  "trigger_dev",
+    "systemBytes":  84687868,
+    "systemRows":  3219776,
+    "appBytes":  51364756,
+    "appRows":  624646,
+    "ratio":  1.6,
+    "activeMerges":  0,
+    "maxPartsPerTable":  9,
+    "topSystemTable":  "query_log:20139479",
+    "traceLogRowsLastHour":  0,
+    "asyncMetricLogRowsLastHour":  0,
+    "verdict":  "healthy",
+    "verdictLabel":  "PASS",
+    "findings":  [
+
+                 ]
+}

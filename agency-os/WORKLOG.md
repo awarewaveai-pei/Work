@@ -4,6 +4,35 @@
 
 ## 2026-08-15
 
+### AUTO_TASK_DONE: ClickHouse 第五次復發防治 + Origin lockdown（含避免自我封鎖的允許清單）
+
+[根因]
+1. **ClickHouse 反覆復發**：查完四個月歷史（`git log --follow override.xml`）確認**不是 code 衝突或髒 code** —— 只有一個設定檔、沒有兩套設定打架。是**同一個病被治標四次**：04-20 cap 600→800MB／04-29 cap 800MB→1.6GB + 首次 TTL／07-05 清 20GB 日誌 + limit→3072m／08-15 才第一次關掉產生源。記憶體上限被推高 4 倍、容器限額 3 倍。**04-29 的 commit 註解就已指名 `trace_log`**，診斷早在三個半月前就對了，但行動是調高上限而非關掉它。天花板一路墊高使瓶頸從 RAM 移到 CPU，症狀每次看起來都像新的。缺的是「兩次事故之間看得到趨勢」的機制。
+2. **Origin lockdown 的致命交互作用**：`cf-origin-lockdown.sh` 只允許 CF IP 段、其餘 DROP，**且無任何允許清單機制**。但 8/12 與 8/15 我剛把兩條承重路徑改成直打 SG origin（9 個 Kuma monitor + EU netdata 的 `--resolve`）。直接套用會**當場打死自己的監控系統**。
+
+[已修改]
+1. `scripts/check-clickhouse-health.ps1`（新）—— 依 `runbooks/ADD-PERIODIC-HEALTH-CHECK.md` 既有 pattern。**監測 bug class 而非特定表**：以 `system` vs 應用 DB 的**位元組比**為主訊號（事故時 345:1），另偵測 08-15 關掉的兩個產生源是否又在寫入（以「過去一小時列數」為 runtime 事實，不看設定檔）。閾值 ratio 5x/20x、絕對值 2GiB/8GiB、merge 積壓 10
+2. `scripts/ao-resume.ps1` —— 接入 warn-only 區塊（每次 AO-RESUME 自動跑）
+3. `agency-os/AGENTS.md` —— 觸發表新增一列，明寫「**禁止**用調高 mem_limit／清資料了事 —— 那正是前三次復發的原因」
+4. `lobster-factory/infra/hetzner-phase1-core/scripts/cf-origin-lockdown.sh` —— 新增 `TRUSTED_SRC_V4` 允許清單（`origin-trusted-v4` ipset，ACCEPT 置於 CF 規則之後、DROP 之前），可由 `/etc/default/cf-origin-lockdown` 覆寫；並在檔內記錄清單的**實證來源**與重跑分類的指令
+
+[驗證結果]
+- ClickHouse 檢查**雙路徑實測**：正常 → `PASS ratio=1.6x`（system 80.58 MiB / app 48.99 MiB）；**故障注入**（`-AppDatabase default`，僅 665 bytes）→ `FAIL ratio=127323.4x` 且理由正確。報告檔 emoji 正常（🟢）
+- 允許清單**不是猜的**：分析 nginx access.log 全部 152 個非 CF 來源後分類 —— EU VPS 15,942 次（Kuma+netdata）／docker 閘道 1,987 次（SG 自己的 `/`、`/health`、`/nginx_status`，容器→主機發佈埠會經 INPUT，不加就會被 DROP）／其餘 36 次全是掃描器（`wp_filemanager.php`、`nmaplowercheck`、`/HNAP1`、`rtsp://`）＝本來就該擋。據此加入 EU IP + 三個 docker 子網（172.17/18/21.0.0/16）
+- `--preview` 確認規則順序：CF ACCEPT → **trusted ACCEPT** → DROP
+- `--apply` 後 120 秒內四項驗證全過：公網經 CF `HTTP=200 + CF-Ray`／EU→origin `HTTP=200`／**筆電→origin `HTTP=000`（確認鎖定生效）**／SSH `ok` → `--confirm` 持久化
+- **鎖定後監控存活驗證**：Kuma 近 2 分鐘 `UP=52 / DOWN=0`；EU netdata→ops-inbox `HTTP=200`
+- REALTEST_EVIDENCE: tool=SSH | cmd=check-clickhouse-health.ps1 正常+故障注入 + nginx log 來源分類 + lockdown preview/apply/confirm + 鎖定後 Kuma/netdata 存活驗證 | exit=0 | ms=~1800000
+- REVIEW_DONE: critic=Manual-readback | verdict=pass | findings=0c/0m/0n （註：以 PS AST parse + `bash -n` + 雙路徑故障注入 + 鎖定後存活驗證取代 critic）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=check-clickhouse-health | hits=2
+  - ① 無命名衝突（`clickhouse-LATEST` 為新檔名）
+  - ② **鎖定的交互作用**：確認 9 個 Kuma monitor + EU netdata `--resolve` + SG docker 內部健檢共三類會被 lockdown 影響，全部納入允許清單並於鎖定後逐一實測存活
+
+[剩餘風險]
+- 允許清單是**當下**的實證結果；日後新增任何直打 origin 的來源（新監控、新機器）必須同步更新 `TRUSTED_SRC_V4`，否則會被靜默 DROP。檔內已附重跑分類的指令
+- ClickHouse 檢查的 ratio 閾值（5x/20x）是依現況（1.6x）訂的經驗值，非理論最佳
+- lockdown 後，直打 origin 的除錯（我今天用過多次）需改從 EU 或經 CF
+
 ### AUTO_TASK_DONE: 監控沉默根治 —— 告警一直有偵測到，只是從來沒有出口
 
 [根因]

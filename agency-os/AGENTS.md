@@ -154,6 +154,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | 使用者問某段時間的 Slack / Telegram / 告警 / incident | `scripts/fetch-external-signals.ps1 -From ... -To ...`（無時區預設 CST/UTC+8）|
 | AO-RESUME digest `since_utc` 比需要範圍早 > 2 小時 | 補跑 `/signals -From <需要起點>` |
 | AO-RESUME | 讀 `reports/status/cf-security-LATEST.md`，列入外部信號段（mtime >24h 才重跑腳本）|
+| AO-RESUME／使用者問「Trigger.dev 慢」「EU 卡卡的」「ClickHouse 又爆了嗎」 | 讀 `reports/status/clickhouse-LATEST.md`，於 §1 系統快照點名 verdict（🟢/🟡/🔴）+ **system/app 資料比**。該比值是 4 次復發的共同前兆（2026-08-15 事故時為 345:1）。🟡/🔴 → 檢查 `lobster-factory/infra/trigger/clickhouse/override.xml` 的產生源設定是否被還原；**禁止**用「調高 mem_limit / 清資料」了事 —— 那正是前三次復發的原因 |
 | 使用者問 Cloudflare 設定是否正常 | `scripts/check-cloudflare-security.ps1` |
 | `fetch-external-signals` Telegram 欄出現 `error.*401\|error.*403` | ① curl inbox/digest 確認 403/401 類型；② `secrets-vault.ps1 -Action import-user-env`；③ 更新 `OPS_INBOX_INGEST_TOKEN` 到 User registry；④ 重跑確認 ok。詳見 `runbooks/CLOUDFLARE-WAF-SETUP.md §API 維護` |
 | EU VPS `infra-alerts` 出現 scanner 路徑（`/.aws/`、`/.ssh/`、`/wp-config`）且 bad request % > 50 | SSH EU 確認；若持續 → Cloudflare WAF PATCH API 追加 block rule；curl 實測 403。詳見 `runbooks/CLOUDFLARE-WAF-SETUP.md §API 維護` |
