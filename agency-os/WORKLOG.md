@@ -4,6 +4,35 @@
 
 ## 2026-08-15
 
+### AUTO_TASK_DONE: Soulful nameserver 切換完成 — 委派已轉 Cloudflare，zone active，全項驗證通過
+
+[任務]
+操作者於 Hostinger registrar 面板把 nameserver 由 `ns1/ns2.dns-parking.com` 改為 `anirban.ns.cloudflare.com` / `irma.ns.cloudflare.com`（清空欄位 3–6，**未並存兩組**）。本輪為切換後驗證。
+
+[已修改]
+無檔案改動（唯讀驗證）。實際改動發生在 Hostinger registrar 面板（操作者手動執行）與 Cloudflare 端自動轉態。
+
+[驗證結果]
+- **委派已生效**：`8.8.8.8` / `1.1.1.1` / `9.9.9.9` 三個獨立 resolver **全部回 Cloudflare NS**（TTL 21600 / 86400 / 3600），無一殘留 dns-parking
+- **首次跑腳本 §1 誤報 FAIL 的根因**：Windows DNS client cache 殘留舊 NS RRset。同一次執行中 §3 已回 Cloudflare 的 AAAA（`2606:4700:*`）＝ 自相矛盾，據此判定為快取而非真失敗；`Clear-DnsClientCache` 後重跑 §1 立即 PASS。**不是「還沒傳播」，切換當下即已生效**
+- **Cloudflare zone `bb1358fe8d3e1d73c822bdb31d3cd823` → `status=active`**（`paused=false`）；`original_name_servers` 仍記錄 dns-parking，即回滾目標
+- **驗證腳本全綠**：14 項全 PASS（委派 / HTTPS 200 且 `Server=cloudflare` / IPv6 已改由 CF 提供 / MX×2 / SPF / DMARC / DKIM×2 且未被 proxy / autodiscover / autoconfig / google-site-verification）
+- **IPv6 永久解已生效**：AAAA = `2606:4700:3036::ac43:8448`, `2606:4700:3032::6815:4a9`（Cloudflare），Hostinger 的 `2a02:4780:*` 已不再被回答 —— 30 天實測 94% 失敗來源就此消失
+- **HTTP→HTTPS 重導正常**：apex 與 www 皆 `301 → https://`（由 origin 提供；CF `always_use_https=off` 但 `automatic_https_rewrites=on`）
+- CF SSL 設定讀回：`ssl=full`（非 Flexible，無重導迴圈風險）、`min_tls_version=1.0`
+- REALTEST_EVIDENCE: tool=Bash | cmd=Resolve-DnsName NS @8.8.8.8/1.1.1.1/9.9.9.9 + Clear-DnsClientCache + verify-soulful-cutover.ps1 + CF API zones/settings + curl -w redirect_url | exit=0 | ms=~240000
+- REVIEW_WAIVED: NA -- 本輪無檔案改動，為唯讀驗證
+- BUGHUNT_WAIVED: NA -- 本輪無檔案改動，為唯讀驗證
+
+[剩餘風險]
+- **信箱未經人工實測** —— DNS 記錄全在不等於信收得到。仍需寄一封進、回一封出（唯一無法用 DNS 證明的項目）
+- `min_tls_version=1.0` 為 CF 預設，建議日後調至 1.2（非緊急，不影響現況）
+- **Hostinger DNS 區域必須保留不刪** —— 那是唯一回滾路徑，直到 2026-11-12 hosting 到期後才失去意義
+- 全球傳播最長 24 小時，部分 ISP 遞迴解析器可能仍持有舊 NS 快取；期間新舊兩邊指向同一批 MX 與同一網站 IP，**無服務中斷風險**
+
+[rollback]
+Hostinger registrar 面板 nameserver 改回 `ns1.dns-parking.com` / `ns2.dns-parking.com`；Hostinger 的 DNS 記錄從未改動，回滾即完整還原。
+
 ### AUTO_TASK_DONE: Soulful CF zone 建立 + 12 筆記錄 + 切換驗證腳本（等操作者改 nameserver）
 
 [任務]
