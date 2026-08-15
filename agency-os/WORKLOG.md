@@ -4,6 +4,40 @@
 
 ## 2026-08-15
 
+### AUTO_TASK_DONE: Soulful CF zone 建立 + 12 筆記錄 + 切換驗證腳本（等操作者改 nameserver）
+
+[任務]
+操作者決定 hosting 不續約（死線 2026-11-12）並要求「全權處理、不能出錯」。DNS/CDN 搬 Cloudflare **不受買機決策影響**（網站仍留 Hostinger，CF 只做代理），故先行處理；同時它是 IPv6 間歇失效的永久解。
+
+[已修改]
+1. **Cloudflare（操作者帳號 `aea1a836…`）**：新建 zone `soulfulexpression.org`（Free 方案、`jump_start=false` 避免自動掃描汙染精選記錄集）+ **12 筆 DNS 記錄**
+2. `scripts/verify-soulful-cutover.ps1`（新）—— 切換後的唯讀驗證腳本，依失敗代價排序（委派 → 網站 → IPv6 → **信箱**）
+
+[驗證結果]
+- **「不能出錯」＝把「可能漏掉」降到零。三個獨立來源交叉驗證**（非單一列舉）：
+  ① 逐型別列舉（經 8.8.8.8）→ 12 筆
+  ② **權威直查** `ns1.dns-parking.com`（不經快取）→ 完全相符
+  ③ **CT logs**（crt.sh，曾簽發憑證的所有名稱）→ **只有 apex + www，無隱藏子網域**
+  另：**SOA serial `2026081301` 與清點時相同** ⇒ 期間無人改過 Hostinger zone；CAA 無；萬用字元無
+- **AXFR 已嘗試**（`dig @ns1/@ns2 AXFR`）→ 被拒（設定良好，符合預期），故改採上述三重驗證
+- CF 端讀回實際 API 狀態逐筆核對：12 筆全部建立，**10 項信箱關鍵檢核全 PASS**（MX×2 含優先序、SPF、DMARC、DKIM×2 且 dns-only、autodiscover/autoconfig dns-only、google-site-verification、**AAAA 確認未建立**）
+- **兩個設計決定**：`AAAA` 刻意不建（該位址即 30 天實測 94% 失敗來源；apex/www 開 proxy 後由 CF 提供 IPv6、回源走 IPv4）；信箱相關 8 筆**一律 dns-only**（開 proxy 會回傳 CF 的 IP，DKIM 驗證與用戶端自動設定會壞）
+- **驗證腳本切換前實跑**：正確判定「尚未委派」FAIL、IPv6 仍為 Hostinger WARN、信箱記錄全 PASS ⇒ 邏輯能正確區分切換前後
+- 過程中修掉自己造成的兩個 bug：① 檔案無 BOM → PS 5.1 在 Big5 主控台把含 CJK 的字串誤判為未結束（repo 既有 CP950 trap class，已補 BOM）② `Invoke-WebRequest` 未加 `-UseBasicParsing` → PS 5.1 會呼叫 IE 引擎而失敗（網站其實正常）
+- REALTEST_EVIDENCE: tool=Bash | cmd=CF API 建 zone/記錄 + 讀回核對 + dig 權威直查 + crt.sh CT logs + AXFR 嘗試 + verify-soulful-cutover.ps1 實跑 | exit=0 | ms=~900000
+- REVIEW_DONE: critic=Manual-readback | verdict=pass | findings=0c/0m/2n （2 個 n 為我自造並當場修掉的 BOM 與 UseBasicParsing）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=soulfulexpression | hits=6
+  - 對照表、備份證明、TASKS 硬死線、brief 現況更新、驗證腳本、WORKLOG 六處引用一致，無殘留的舊 `$80` 前提
+
+[剩餘風險 / 邊界]
+- **我無法改 nameserver** —— vault 內無 Hostinger API 憑證，且改 nameserver 是 registrar 面板操作（我持有的 SSH 僅及於 hosting 帳號）。**這一步必須操作者本人做**，是「全權處理」的硬邊界
+- zone 目前 `status=pending`，**對現網零影響**；未切換前所有記錄不生效
+- **切換前不可刪除 Hostinger 的 DNS 區域** —— 那是唯一回滾路徑
+- DNS 檢查無法證明「信真的收得到」，切換後**必須人工寄收一封測試信**
+
+[rollback]
+Hostinger nameserver 改回 `ns1.dns-parking.com` / `ns2.dns-parking.com`；CF zone 可保留（不生效）或刪除。
+
 ### TASKS sync（本輪 session 窗口：2026-08-12 AO-RESUME → 2026-08-15 AO-CLOSE）
 
 - AUTO_TASK_DONE_APPLIED (2026-08-15T13:17:28Z): 【bug class｜2026-08-12 開出】
