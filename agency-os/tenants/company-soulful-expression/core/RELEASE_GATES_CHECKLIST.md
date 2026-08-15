@@ -5,7 +5,7 @@
 ## Context
 
 - Tenant: Soulful Expression Art Therapy
-- Site: soulfulexpression.org（production）；staging **canonical**：`https://staging.soulfulexpression.org/`（**lifecycle=`provision_pending`** 直至 Pilot A §2 驗收——見 `ENVIRONMENT_REGISTRY.md`）
+- Site: soulfulexpression.org（production）；**staging 已作廢**（`lifecycle=abandoned`，2026-08-16——見 `ENVIRONMENT_REGISTRY.md`）。目前無 staging，變更一律走 backup-gated safe update；搬到新主機後再視需要建立
 - Release ID:
 - Target environment: staging -> production
 - Change owner:

@@ -1,6 +1,16 @@
 # Day 2 Staging — Operator Step-by-Step Guide
 # Soulful Expression Art Therapy
 
+> # ⛔ 本文已作廢，請勿照做（2026-08-16）
+>
+> Hostinger hosting **2026-11-12 到期且已決定不續約**。在一台即將退場的主機上建 staging 是白工，而且會多一份要一起搬的東西。
+>
+> - 這份文件當初要解決的問題是「沒有安全的地方驗還原」 —— **已用別的方式解決**：2026-08-16 在 EU 開拋棄式容器完成還原演練並 PASS（見 [`core/BACKUP_RESTORE_PROOF.md`](../../core/BACKUP_RESTORE_PROOF.md) Drill #1）
+> - 現在要做的事是**搬站**，不是建 staging → 請改讀 [`core/SITE_MIGRATION_RUNBOOK.md`](../../core/SITE_MIGRATION_RUNBOOK.md)
+> - 環境現況 SSOT：[`core/ENVIRONMENT_REGISTRY.md`](../../core/ENVIRONMENT_REGISTRY.md)（staging `lifecycle=abandoned`）
+>
+> 保留本文僅為歷史紀錄。若日後在**新主機**上要建 staging，步驟會完全不同（不再是 Hostinger 面板操作）。
+
 > **目標**：建立 `https://staging.soulfulexpression.org/`，內容從 production 複製，後台可登入，關鍵頁可開。
 > **估時**：約 20–40 分鐘（視 All-in-One WP Migration 匯出速度而定）。
 > **前提**：已有 Hostinger 帳號登入權限。

@@ -4,8 +4,8 @@
 - Site: soulfulexpression-org
 - Stage: Live
 - Production URL: https://soulfulexpression.org/
-- Staging URL（canonical，見 `core/ENVIRONMENT_REGISTRY.md`）: **https://staging.soulfulexpression.org/** — **lifecycle：**書面已登記；雲端實機仍待 Runbook Pilot A §2
-- Hosting: Hostinger
+- Staging URL（見 `core/ENVIRONMENT_REGISTRY.md`）: **無** — `lifecycle=abandoned`（2026-08-16）；hosting 2026-11-12 不續約，不在退場中的主機建 staging
+- Hosting: Hostinger（**2026-11-12 到期，搬遷中** —— 步驟見 `core/SITE_MIGRATION_RUNBOOK.md`）
 - Region: APAC
 - WP Version: **6.9.4**（Day 1 §1.2 盤點 2026-05-08）
 - PHP Version: **8.2.30**（Day 1 §1.2 盤點 2026-05-08）

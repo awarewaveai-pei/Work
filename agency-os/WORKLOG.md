@@ -4,6 +4,43 @@
 
 ## 2026-08-16
 
+### AUTO_TASK_DONE: 補上搬站執行手冊 + 清掉 5 份文件的過期 staging 主張
+
+[任務]
+操作者問「你做了什麼紀錄讓之後換 server 不會有問題？之前應該有做檔案起來」。實際清點既有文件，補缺、修錯。
+
+[現況分析]
+既有文件 41 份（`find` 實查）。搬遷相關可用的有 4 份，但**最關鍵的一份不存在**：沒有任何文件寫「這個站怎麼從 Hostinger 搬到新主機」。`runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md` 是**我們自己 VPS 搬機**用的，不適用於客戶 WordPress 站搬離共享主機。
+
+[已修改]
+1. `core/SITE_MIGRATION_RUNBOOK.md`（**新**）—— 搬站步驟／切換／回滾 SSOT，§0–§8 + 已知的坑附錄
+2. `core/ENVIRONMENT_REGISTRY.md` —— production 列由 2026-05-08 舊值更新為實查值；staging 列標記 `abandoned`；DNS/SSL 段整段重寫；Change Control 指向新 runbook
+3. `ACCESS_REGISTER.md` / `SITES_INDEX.md` / `core/RELEASE_GATES_CHECKLIST.md` / `sites/soulfulexpression-org/SITE_PROFILE.md` —— 移除 staging `provision_pending` 主張
+4. `projects/…/DAY2_STAGING_OPERATOR_GUIDE.md` —— 頂部加 ⛔ 作廢橫幅（照做會白工）
+5. `projects/…/02_EXECUTION_PLAN.md` —— Day 2 驗收結果改為「不再執行」
+
+[驗證結果]
+- **既有文件實查**：`find` 列出 41 份 .md/.json 並逐份標註最後異動日；非憑印象作答
+- **證實兩份 SSOT 已過期**（實查對照，非推測）：`ENVIRONMENT_REGISTRY.md` 記 WP 6.9.4 / PHP 8.2.30 / 備份僅本機 DB dump / 還原測試「未執行」；實際為 **6.9.6 / 8.2.31 / EU 三份備份 / 2026-08-16 演練 PASS**。`10_DISCOVERY.md` 記 35 active / plugins 579 MB；實際 **38 active / 619 MB**
+- **處置差異化**：`ENVIRONMENT_REGISTRY.md` 是現況 SSOT ⇒ 直接改正；`10_DISCOVERY.md` 是 Day 1 當下快照 ⇒ 刻意不追改，改在 registry 註明「現行基線以此表為準」，避免把歷史記錄改成假的
+- **staging 決議寫入**：原計畫在 Hostinger 建 staging 卡 3 個月；hosting 已定不續約 ⇒ 標 `abandoned` 並說明原目的已由 EU 容器演練達成
+- **連鎖 stale 全數清除**：Grep `provision_pending|待實機|staging.soulfulexpression` 命中 5 份 soulful 文件全部處理；剩餘 2 筆為 `SITES_INDEX.md:13`（通用規則說明）與其他租戶檔案，**刻意不動**
+- **相對連結實測**：`DAY2_STAGING_OPERATOR_GUIDE.md` 內 3 條 `../../core/*` 連結逐一 `test -f` 驗證 OK（該檔位於 projects 子目錄，深度易錯）
+- **BOM 稽核**：`audit-cross-machine-bom` 漂移僅在 `memory/*.md`（走 Google Drive 那批），**本輪改動的 repo 內 .md 皆未列入** —— 屬既有狀態，非本輪造成
+- `doc-sync-automation.ps1` 已跑，metadata 區塊同步
+- REALTEST_EVIDENCE: tool=Bash | cmd=find 文件清點 + git log 逐檔日期 + Grep provision_pending 連鎖搜尋 + test -f 相對連結驗證 + audit-cross-machine-bom + doc-sync-automation | exit=0 | ms=~900000
+- REVIEW_DONE: critic=Manual-readback | verdict=pass | findings=0c/0m/1n （1n＝bash `grep` 對這批 .md 回空值，改用 Grep 工具才命中；已改用後者完成搜尋，未影響結論）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=provision_pending | hits=7
+  - 5 份 soulful 文件已修正；`SITES_INDEX.md:13` 為通用規則、`company-scenery-travel-mongolia` 與 `tenants/templates` 屬其他租戶／範本，皆刻意保留
+
+[剩餘風險]
+- 搬站 runbook 的 §3「建置新主機」仍偏通用 —— 目標主機拍板後需補具體規格與指令
+- `10_DISCOVERY.md` 內容過期但刻意保留為歷史快照；若他人只讀該檔會拿到舊數字（已在 registry 加交叉註記緩解，非完全消除）
+- `memory/*.md` 的 BOM 漂移為既有問題，本輪未處理
+
+[rollback]
+純文件變更，`git revert` 即可；無線上狀態改動。
+
 ### AUTO_TASK_DONE: Soulful 還原演練 PASS + 補上備份缺口（程式碼原本完全沒備份）
 
 [任務]
@@ -1800,5 +1837,5 @@ woocommerce-points-and-rewards / woocommerce-product-addons
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-08-15 16:48:09 UTC_
+_Last synced: 2026-08-15 17:35:33 UTC_
 

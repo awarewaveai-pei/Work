@@ -2,7 +2,7 @@
 
 | Site | Type | Stage | Staging URL | Production URL | Hosting | Region | Last Backup | Last Restore Test | Owner | Notes |
 |------|------|-------|-------------|----------------|---------|--------|-------------|-------------------|-------|-------|
-| soulfulexpression-org | Therapy / Wellness | Live | https://staging.soulfulexpression.org/（`lifecycle=provision_pending`） | https://soulfulexpression.org/ | Hostinger | APAC | 待補 | 待補 | Agency OS + Client | Staging **canonical** 與 `core/ENVIRONMENT_REGISTRY.md` 一致；實機待 Pilot A §2 |
+| soulfulexpression-org | Therapy / Wellness | Live | —（`lifecycle=abandoned` 2026-08-16） | https://soulfulexpression.org/ | Hostinger（**2026-11-12 到期，搬遷中**） | APAC | 2026-08-15 DB+uploads／2026-08-16 code（EU） | **2026-08-16 PASS** | Agency OS + Client | Staging 已作廢，見 `core/ENVIRONMENT_REGISTRY.md`；搬站步驟見 `core/SITE_MIGRATION_RUNBOOK.md` |
 
 ## Stage 定義
 - Discovery：需求釐清中

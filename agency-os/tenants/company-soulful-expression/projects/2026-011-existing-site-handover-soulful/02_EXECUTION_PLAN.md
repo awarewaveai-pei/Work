@@ -21,9 +21,9 @@
 - WORKLOG 連結：`WORKLOG.md ## 2026-MM-DD`
 
 ### Day 2 記錄
-- **Canonical staging URL（repo）**：`https://staging.soulfulexpression.org/` — 見 `core/ENVIRONMENT_REGISTRY.md`
-- **建立方式（預設）**：Hostinger 子網域 + 自 production 複製／staging 工具 — `docs/operations/PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md` §2
-- **驗收結果**：🔲 待實機（後台可登入 + 關鍵頁可開）
+- ~~**Canonical staging URL（repo）**：`https://staging.soulfulexpression.org/`~~
+- ~~**建立方式（預設）**：Hostinger 子網域 + 自 production 複製／staging 工具~~
+- **驗收結果**：⛔ **不再執行（2026-08-16 決議）** —— hosting 2026-11-12 不續約，不在退場中的主機建 staging。原目的（安全驗還原）已由 EU 拋棄式容器演練達成並 PASS（`core/BACKUP_RESTORE_PROOF.md` Drill #1）。後續工作改為搬站，見 `core/SITE_MIGRATION_RUNBOOK.md`
 
 ## 阻塞記錄
 | 日期 | 阻塞描述 | 解法 / 決策 |
