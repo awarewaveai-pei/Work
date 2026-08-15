@@ -1,5 +1,11 @@
 # soulfulexpression.org — DNS 遷移對照表（Hostinger → Cloudflare）
 
+> **這份是「執行用」文件，只管 DNS 記錄怎麼搬。**
+> 更大的脈絡（主機架構、WPML 多語、CF 快取/APO、Supabase、安全性）在需求 brief：
+> [`../docs/cloudflare-wpml-migration-plan.md`](../docs/cloudflare-wpml-migration-plan.md)
+> —— 該檔開頭有 **2026-08-15 現況更新**，載明它哪些前提已作廢，先讀那段再讀本文。
+> 硬死線與執行順序追蹤於 `agency-os/TASKS.md`「🔴【硬死線 2026-11-12】」。
+
 > **用途**：Cloudflare 只會提供「我們手動建進去的記錄」。任何一條漏掉，切換 nameserver 的當下就會靜默消失。
 > **最貴的漏失是信箱** —— Starter Business Email 已預付到 2029-06-03，漏掉 MX/SPF/DKIM 客戶就直接收不到信。
 >

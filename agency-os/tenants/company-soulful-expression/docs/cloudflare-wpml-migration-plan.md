@@ -1,5 +1,38 @@
 # Claude Brief：Soulful Expression 網站、主機、Cloudflare、WordPress 多語架構整理
 
+> ## ⚠️ 讀本檔前必看：2026-08-15 現況更新（部分前提已作廢）
+>
+> 本檔寫於 **2026-06-13**，是操作者交付給 Claude 的需求 brief（12 個章節、716 行）。
+> 其中**部分前提在之後已被推翻或已有答案**。照原文規劃前先讀這一段。
+>
+> | 本檔章節 | 2026-08-15 狀態 |
+> |---|---|
+> | **§2.1** 「請查 Hostinger US$80/年到底包含什麼」 | ✅ **已解答，且假設本身是錯的**。實際為**三筆獨立訂閱**（2026-08-15 帳單截圖）：`Premium Web Hosting` **$215.76** → 2026-11-12／`.ORG Domain` **$53.97** → 2028-06-03／`Starter Business Email` **$76.32** → 2029-06-03。**沒有任何一筆是 $80**，且**三筆自動續約全部關閉** |
+> | **§2.2** Cloudflare 網域轉移步驟 | 🟡 部分完成。結論：轉移**不急**（網域付到 2028），且**轉移會自動 +1 年**；但**順序必須是 DNS 先、registrar 後**，理由見下 |
+> | **§6** 主機架構選項 A/B/C（CX43／2×CX32／保留 SG CX22） | ❌ **已作廢**。2026-06-27 決策改為**買二手 dedicated 機**（FSN i7-7700／64GB／2×512SSD／~€48.70），SSOT：[`runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`](../../../../runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md) §0b |
+> | **§12** 最終架構建議 | ❌ **仍未產出** —— 卡在「買不買 dedicated 機」的決策 |
+>
+> ### 本檔寫成後才發生、但會改變規劃的三件事
+>
+> 1. **hosting 決定不續約**（操作者 2026-08-15）→ 產生硬死線 **2026-11-12**，網站必須在此之前搬離，否則客戶站下線。追蹤於 `agency-os/TASKS.md`「🔴【硬死線 2026-11-12】」
+> 2. **信箱存續已查證**：Hostinger 官方文件「emails are stored on a separate infrastructure」+ Business Email 可獨立購買 + DNS 綁網域不綁 hosting → **hosting 到期不影響信箱**，不需開 support ticket
+> 3. **IPv6 間歇失效已量化**：30 天約 42,000 次檢查、失敗率 0.11%，其中 **94% 為 IPv6 專屬**。→ 遷移時 **AAAA 記錄刻意不搬**，改由 Cloudflare proxy 提供 IPv6，此即永久解
+>
+> ### 執行順序（不可跳序）
+>
+> ```
+> ① DNS 搬 Cloudflare      ← 免費，同時永久修好 IPv6；不動任何付費訂閱
+> ② 網站搬自有主機          ← 2026-11-12 前；去處取決於是否買 dedicated 機
+> ③ 網域轉 CF Registrar     ← ①② 穩定後隨時（$53.97 → ~$9.77）
+> ④ 讓 hosting 自然到期      ← 2026-11-12
+> ```
+>
+> ### 執行用文件（本檔是需求 brief，不是操作手冊）
+>
+> - **DNS 13 筆完整對照表**（含哪些不可開 proxy、切換前檢核、回滾）：[`../core/DNS_MIGRATION_RECORD_MAP.md`](../core/DNS_MIGRATION_RECORD_MAP.md)
+> - **搬遷前備份與驗證**：[`../core/BACKUP_RESTORE_PROOF.md`](../core/BACKUP_RESTORE_PROOF.md) Record #2
+> - **完整根因與證據鏈**：`agency-os/WORKLOG.md` 2026-08-15
+
 ## 你的角色
 
 請你扮演一位資深 WordPress / Cloudflare / VPS 架構顧問，幫我把目前的主機、網域、WordPress 多語網站、Cloudflare 快取與未來遷移計畫整理成可執行方案。
