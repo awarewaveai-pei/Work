@@ -24,6 +24,36 @@
 
 ---
 
+## 0.5 買機器前要決定的三件事（下單前讀，買錯難回頭）
+
+### ① 機房位置 —— 最容易忽略的一項
+
+現行主機 `sg-nme-web624.main-hosting.eu` 的 `sg` 表示**站目前在新加坡／亞洲**。Hetzner 的二手拍賣機主要在**德國／芬蘭**，搬過去等於 origin 從亞洲移到歐洲。
+
+| 頁面類型 | 影響 |
+|---|---|
+| 一般頁面／文章／圖片 | 幾乎無感 —— Cloudflare 邊緣快取擋掉 |
+| **登入後頁面／購物車／結帳** | **會變慢** —— 不可快取，每次回源到歐洲 |
+
+⇒ 下單前確認訪客主要地區。若多在亞洲，這是要有意識接受的取捨（換來規格與成本的巨大優勢），不是可以忽略的細節。
+
+### ② 規格下限
+
+- RAM：64 GB 是原定規格，以「不只放 soulful」而言合理
+- **磁碟務必 SSD/NVMe，不要為省錢選 HDD** —— WooCommerce + Ultimate Member 的資料庫吃 IO
+
+### ③ 要不要 RAID
+
+二手機常見兩顆碟。做 **RAID1（鏡射）** = 一顆壞掉站還活著，代價是可用空間少一半。以正式站而言值得。
+
+> 備份／RAID／還原的既有正本：[`runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`](../../../../runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md) —— **下單前先翻 §7 checklist**。
+
+### 買到之後要交給代理的東西
+
+只有兩樣：**機器 IP** + **root SSH 存取**。其餘建置、搬遷、驗證由代理執行。
+
+---
+
 ## 1. 新主機最低需求
 
 > **目標主機已定（2026-08-16 決議）：搬到新購的二手 Hetzner 主機**（同 `memory/project_hetzner_dedicated_plan.md` 的採購計畫）。
