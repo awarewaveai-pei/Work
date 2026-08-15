@@ -65,6 +65,12 @@
 #### 待釐清 / 明日提醒
 > `/tomo` 自動寫入此分類
 
+- [ ] **🔴【資安】2026-08-15 transcript 憑證外洩 — 三項待輪換** —— **【待操作者處理】** 本次 session 有三組憑證因我的疏失進入對話紀錄，若 transcript 會離開本機（雲端記錄／報告存檔）即視為外洩：
+  - `TELEGRAM_BOT_TOKEN`、`PRINTFUL_API_KEY` —— critic subagent 為查證 `mcp/user-env.ps1` 副作用而讀取該檔（round 1）
+  - **Google 帳號 `soulfulexpression01@gmail.com` 的密碼** —— 我 grep `AWARE_WAVE_CREDENTIALS.md` 時遮罩規則只涵蓋 `:` `=` `：`，未涵蓋 markdown 表格的 `|` 分隔符
+  **根因（同一類、犯了兩次）**：讀含憑證的檔案時，遮罩是「輸出後才套用」而非「不讀取值」。**改善**：日後查證這類檔案改用 `grep -c` / 欄位名列舉 / `Get-VaultSecretFingerprint`，不輸出行內容。
+  **DoD**：三項各自輪換並更新 vault 與 `AWARE_WAVE_CREDENTIALS.md`；Telegram token 換發後需重跑 `scripts/configure-telegram-webhook.ps1`。
+
 - [x] **🔴【資安｜離職善後】公司桌機退場憑證盤點與輪替決策** —— **【2026-08-15 結案｜操作者確認】** 三項確認：① 該機**已交還** ② 上面**未登入**操作者的 Google 帳號（`G:\` vault 不再同步）③ 公司**無整機備份**。操作者判定「都確定已清除」，據此**不執行憑證輪替**。殘留風險（已知並接受）：交還的實體磁碟若未經抹除，`mcp/user-env.ps1` 明文 token 與三把 SSH 私鑰理論上仍可還原；若日後得知該機被轉手或磁碟未清，應立即改走輪替流程（SG/EU `authorized_keys` + root、Hostinger 金鑰、`user-env.ps1` 內全部 token）。**⚠️ 換 SSH 金鑰前務必先確保新金鑰可登入，否則自鎖**。
 
 - [ ] **【gated｜8月｜等買二手機才繼續建 customer service U6 Chatwoot】** — 軟體層(cs-engine U0–U5 + widget U4)已上 prod 並 live 驗；只剩裝 Chatwoot + 接線（建 `app/api/cs/chatwoot-webhook` 呼叫 `handleInbound`、MockTransport 換 ChatwootTransport）。**買機=操作者刷卡(High risk)，7月出國→8月回來辦**。完整冷啟動步驟序、接線 file:line、8 通道現實全在接手包 → handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md
