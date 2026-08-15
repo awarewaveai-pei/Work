@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Writes gitignored agent bootstrap prompt files under agency-os/.agency-state.
 
@@ -14,7 +14,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrWhiteSpace($WorkRoot)) {
-    $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 } else {
     $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
 }

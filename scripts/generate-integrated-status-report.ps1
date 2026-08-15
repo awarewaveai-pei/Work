@@ -1,4 +1,4 @@
-# Assembles one markdown report from TASKS, Lobster checklist, memory, daily, status, WORKLOG tail.
+﻿# Assembles one markdown report from TASKS, Lobster checklist, memory, daily, status, WORKLOG tail.
 # ASCII-only literals; Windows PowerShell 5.1 friendly. Uses -Tail for WORKLOG to avoid loading huge files.
 
 param(
@@ -12,9 +12,9 @@ function Resolve-AgencyRoot {
     param([string]$InputRoot)
     $resolved = $null
     if ($InputRoot -and (Test-Path $InputRoot)) {
-        $resolved = (Resolve-Path $InputRoot).Path
+        $resolved = (Resolve-Path -LiteralPath $InputRoot).Path
     } elseif ($PSScriptRoot) {
-        $resolved = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+        $resolved = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
     } else {
         $resolved = (Get-Location).Path
     }
@@ -22,7 +22,7 @@ function Resolve-AgencyRoot {
     # Monorepo guardrail: if invoked from D:\Work, force canonical agency root.
     $agencyCandidate = Join-Path $resolved "agency-os"
     if (Test-Path (Join-Path $agencyCandidate "scripts\generate-integrated-status-report.ps1")) {
-        return (Resolve-Path $agencyCandidate).Path
+        return (Resolve-Path -LiteralPath $agencyCandidate).Path
     }
 
     return $resolved
@@ -202,7 +202,7 @@ if (Test-Path $lobsterPath) {
     }
     [void]$sb.AppendLine("")
     $rel = $lobsterPath
-    try { $rel = (Resolve-Path $lobsterPath).Path } catch { }
+    try { $rel = (Resolve-Path -LiteralPath $lobsterPath).Path } catch { }
     [void]$sb.AppendLine("*Checklist path:* ``$rel``")
     [void]$sb.AppendLine("")
 } else {

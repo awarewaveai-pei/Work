@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
 .SYNOPSIS
   Adversarial test matrix for git-safe-ops.ps1 and ao-close.ps1 git network operations.
@@ -20,7 +20,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$WorkRoot    = (Resolve-Path (Join-Path $PSScriptRoot ".." )).Path
+$WorkRoot    = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot ".." )).Path
 $LibPath     = Join-Path $WorkRoot "scripts\lib\git-safe-ops.ps1"
 $AoClosePath = Join-Path $WorkRoot "scripts\ao-close.ps1"
 

@@ -1,4 +1,4 @@
-# import-cross-machine-memory.ps1
+﻿# import-cross-machine-memory.ps1
 # Auto-imports all cross-machine files from the sync folder on AO-RESUME.
 # Called by ao-resume.ps1 (non-blocking). Silent no-op when no AO-SYNC folder exists.
 #
@@ -56,9 +56,9 @@ if (-not $WorkRoot) {
     $fromWorkScripts   = Join-Path $PSScriptRoot "..\agency-os\scripts\system-guard.ps1"
     $fromAgencyScripts = Join-Path $PSScriptRoot "system-guard.ps1"
     if (Test-Path -LiteralPath $fromWorkScripts) {
-        $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+        $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
     } elseif (Test-Path -LiteralPath $fromAgencyScripts) {
-        $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+        $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..")).Path
     }
 }
 # Normalise WorkRoot to Windows-style backslash before deriving project key.

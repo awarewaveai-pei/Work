@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Blocks AO-CLOSE push when staged "significant" changes lack WORKLOG evidence for today.
 
@@ -21,7 +21,7 @@ if ($Gate -eq "off") {
 }
 
 if (-not $WorkRoot) {
-    $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 } else {
     $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
 }

@@ -4,6 +4,32 @@
 
 ## 2026-08-15
 
+### AUTO_TASK_DONE: workflows 部署到 EU prod + `Resolve-Path` bug class 全清（170 處）
+
+[根因]
+1. **workflows 未部署**：2026-08-12 把 `packages/workflows` 的 35 個依賴漏洞修到 0，但那只在 repo。Trigger.dev 的 worker 跑的是**部署當下打包的映像**，不重新部署 production 就還是舊依賴樹。
+2. **`Resolve-Path` 缺 `-LiteralPath`**：PowerShell 的 `Resolve-Path` 把 `-Path` 當**萬用字元樣式**。repo 內有 Next.js 路由資料夾 `app/ops/clients/[slug]`、`app/(shell)`，帶 `[` `]` 的路徑會解析不到，`(Resolve-Path $p).Path` 在 StrictMode 下就 `$null.Path` 拋錯。這正是 `doc-sync-automation.ps1 -AutoDetect` 從 2026-07-04 route-group 重構起對**所有呼叫者**中止、直到 2026-08-15 才被發現的原因。
+
+[已修改]
+1. **EU Trigger.dev 部署**：走既有正本 `scripts/lobster-trigger-deploy.ps1`（未用臨時指令 —— 該腳本處理 CF Bot Fight Mode 的 IPv4 強制、`syncEnvVars` 的 vault 憑證注入、buildImage 修補，ad-hoc deploy 會失敗或部署出沒有憑證的 worker）
+2. **170 處 `Resolve-Path` → `-LiteralPath`**，橫跨 96 檔（`scripts/` `mcp/` `agency-os/` `lobster-factory/` `.claude/`）
+
+[驗證結果]
+- **改動前先分類，未盲目批改**（她明確要求不要補丁式）：170 處逐一歸類 →「故意用萬用字元」**0 處**（唯一疑似的 `check-three-way-sync.ps1:29` 是 `$bp['WorkRoot']` 雜湊表索引語法誤判，非路徑 glob）／管線用法 `| Resolve-Path` **0 處**（那種無法直接插參數）／唯一顯式 `-Path` 在 vendored `node_modules` → 已排除。確認 `-LiteralPath` 在全部站點都是正確語意後才動手
+- **排除 `.claude/worktrees/`**：那是獨立的 git worktree（另一個檢出），dry-run 原本掃到 353 處，排除後為 170 處
+- 改動後**每一個**被改的檔案跑 PowerShell AST 解析：**OK=96 / FAIL=0**
+- 實際執行測試：`system-health-check.ps1` EXIT=0 **100% (372/372)**；`doc-sync-automation.ps1 -AutoDetect` EXIT=0（原本壞掉的那支）；`check-clickhouse-health.ps1` PASS
+- 部署驗證：`Successfully deployed version 20260815.1`、**11 個 task**、**17 個 env var 同步**；部署前 `npm audit` **total=0**、`vitest 75/75`；部署後 8 個 trigger 容器全 healthy、supervisor **0 錯誤**、webapp 近 30 分鐘**非 s2 錯誤 0 個**（`s2_is_disabled` 經查 7 天內出現 26 次＝自架環境每次部署都會記的長期良性訊息，非本次造成）
+- REALTEST_EVIDENCE: tool=Bash | cmd=lobster-trigger-deploy.ps1 + npm audit/test + 96 檔 AST 解析 + system-health-check + doc-sync -AutoDetect | exit=0 | ms=~1200000
+- REVIEW_DONE: critic=Manual-readback | verdict=pass | findings=0c/0m/0n （註：機械式單參數插入，以「全數 AST 解析 + 三支關鍵腳本實跑」取代 critic）
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,lobster-factory,.claude | grep=Resolve-Path | hits=0
+  - 排除 node_modules/worktrees/Backups 後，**已無任何未帶 `-LiteralPath` 的 `Resolve-Path`**；現有 228 處全部合規
+
+[剩餘風險]
+- `.claude/worktrees/suspicious-ritchie-c9482b/` 內仍有未修版本（獨立 worktree，刻意不動；該 worktree 若被合併回來需重跑本次修法）
+- 註解行被刻意跳過，所以描述此 bug 的說明文字維持原樣（正確行為）
+- Trigger.dev CLI 提示有 4.5.11 新版（目前 4.5.10）；未一併升級，避免把依賴修復與 CLI 升級混在同一次部署
+
 ### AUTO_TASK_DONE: ClickHouse 第五次復發防治 + Origin lockdown（含避免自我封鎖的允許清單）
 
 [根因]
@@ -10137,7 +10163,7 @@ Option A：human_only incident → 顯示「已知悉」→ POST /api/ops/inbox/
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-08-12 11:48:56 UTC_
+_Last synced: 2026-08-15 09:28:59 UTC_
 
 ## 2026-07-13
 
@@ -10159,6 +10185,7 @@ _Last synced: 2026-08-12 11:48:56 UTC_
 
 ### Machine appendix (monthly-system-review)
 - 2026-08-12 17:34:55 : gates=SKIPPED (ReportOnly) ; integrated-status: generate-integrated-status-report.ps1 OK ; supabase-memory: PASS (supabase-studio memory at 34.26% (< 85%))
+
 
 
 

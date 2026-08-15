@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$Args
 )
@@ -248,7 +248,7 @@ switch ($command) {
         exit 0
     }
     "templates" {
-        $workRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+        $workRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
         $ex1 = Join-Path $workRoot "examples\xai-web-search-template.json"
         $ex2 = Join-Path $workRoot "examples\xai-function-calling-template.json"
         Write-Output "Templates:"

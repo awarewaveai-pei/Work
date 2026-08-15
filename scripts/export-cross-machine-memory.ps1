@@ -83,9 +83,9 @@ if (-not $WorkRoot) {
     $fromWorkScripts   = Join-Path $PSScriptRoot "..\agency-os\scripts\system-guard.ps1"
     $fromAgencyScripts = Join-Path $PSScriptRoot "system-guard.ps1"
     if (Test-Path -LiteralPath $fromWorkScripts) {
-        $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+        $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
     } elseif (Test-Path -LiteralPath $fromAgencyScripts) {
-        $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+        $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..")).Path
     }
 }
 if (-not $WorkRoot) {

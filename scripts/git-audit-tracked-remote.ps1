@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$WorkRoot = "",
     [switch]$NoFetch,
     [string]$Pattern = ""
@@ -8,9 +8,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 if ($WorkRoot) {
-    $WorkRoot = (Resolve-Path $WorkRoot).Path
+    $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
 } elseif ($PSScriptRoot) {
-    $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 } else {
     $WorkRoot = (Get-Location).Path
 }

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$WorkspaceRoot = ""
 )
 
@@ -9,9 +9,9 @@ function Resolve-WorkspaceRoot {
     param([string]$InputRoot)
     $resolved = $null
     if ($InputRoot -and (Test-Path $InputRoot)) {
-        $resolved = (Resolve-Path $InputRoot).Path
+        $resolved = (Resolve-Path -LiteralPath $InputRoot).Path
     } elseif ($PSScriptRoot) {
-        $resolved = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+        $resolved = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
     } else {
         $resolved = (Get-Location).Path
     }
@@ -19,7 +19,7 @@ function Resolve-WorkspaceRoot {
     # Monorepo guardrail: if this path is the monorepo parent of agency-os, use agency-os as workspace root.
     $agencyCandidate = Join-Path $resolved "agency-os"
     if (Test-Path (Join-Path $agencyCandidate "scripts\system-health-check.ps1")) {
-        return (Resolve-Path $agencyCandidate).Path
+        return (Resolve-Path -LiteralPath $agencyCandidate).Path
     }
 
     return $resolved
@@ -218,11 +218,11 @@ $docIntegrityScriptB = Join-Path (Join-Path $root "..") $docRel
 $workParent = $null
 $docIntegrityScript = $null
 if (Test-Path $docIntegrityScriptA) {
-    $workParent = (Resolve-Path $root).Path
-    $docIntegrityScript = (Resolve-Path $docIntegrityScriptA).Path
+    $workParent = (Resolve-Path -LiteralPath $root).Path
+    $docIntegrityScript = (Resolve-Path -LiteralPath $docIntegrityScriptA).Path
 } elseif (Test-Path $docIntegrityScriptB) {
-    $workParent = (Resolve-Path (Join-Path $root "..")).Path
-    $docIntegrityScript = (Resolve-Path $docIntegrityScriptB).Path
+    $workParent = (Resolve-Path -LiteralPath (Join-Path $root "..")).Path
+    $docIntegrityScript = (Resolve-Path -LiteralPath $docIntegrityScriptB).Path
 }
 if ($docIntegrityScript -and (Test-Path $docIntegrityScript)) {
     $hadWorkRoot = Test-Path env:LOBSTER_WORK_ROOT

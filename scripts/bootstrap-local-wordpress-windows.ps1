@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   啟動本機 MariaDB（無 Windows 服務時以背景 mysqld）、建庫、並在 repo 外 .scratch 目錄安裝 WordPress。
 
@@ -46,7 +46,7 @@ $ErrorActionPreference = "Stop"
 function Get-RepoRoot {
     $here = $PSScriptRoot
     if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Path }
-    return (Resolve-Path (Join-Path $here "..")).Path
+    return (Resolve-Path -LiteralPath (Join-Path $here "..")).Path
 }
 
 function Test-MysqlReady {

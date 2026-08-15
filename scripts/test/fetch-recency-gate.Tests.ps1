@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Regression tests for scripts/lib/fetch-recency-gate.ps1.
 
@@ -10,7 +10,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 . (Join-Path $repoRoot 'scripts\lib\fetch-recency-gate.ps1')
 
 $script:fail = 0

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$WorkspaceRoot = ""
 )
 
@@ -25,9 +25,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 if (-not $WorkspaceRoot) {
-    $WorkspaceRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    $WorkspaceRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 } else {
-    $WorkspaceRoot = (Resolve-Path $WorkspaceRoot).Path
+    $WorkspaceRoot = (Resolve-Path -LiteralPath $WorkspaceRoot).Path
 }
 
 function Extract-NormalizedHttpsUrl {

@@ -32,7 +32,7 @@ if (-not $WorkRoot) {
     try { $WorkRoot = (Invoke-WithUtf8Console { git -C $PSScriptRoot rev-parse --show-toplevel 2>$null }).Trim() } catch {}
     if (-not $WorkRoot) { $WorkRoot = Split-Path $PSScriptRoot -Parent }
 }
-if (Test-Path $WorkRoot) { $WorkRoot = (Resolve-Path $WorkRoot).Path }
+if (Test-Path $WorkRoot) { $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path }
 
 $reportDir = Join-Path $WorkRoot "agency-os\reports\repair-center"
 $null = New-Item -ItemType Directory -Force -Path $reportDir

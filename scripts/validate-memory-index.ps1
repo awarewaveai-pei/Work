@@ -1,4 +1,4 @@
-# validate-memory-index.ps1
+﻿# validate-memory-index.ps1
 # Verifies that every link in MEMORY.md points to an existing file, and every
 # *.md file in the memory directory (except MEMORY.md) has an entry in MEMORY.md.
 #
@@ -18,9 +18,9 @@ if (-not $WorkRoot) {
     $fromWorkScripts   = Join-Path $PSScriptRoot "..\agency-os\scripts\system-guard.ps1"
     $fromAgencyScripts = Join-Path $PSScriptRoot "system-guard.ps1"
     if (Test-Path -LiteralPath $fromWorkScripts) {
-        $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+        $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
     } elseif (Test-Path -LiteralPath $fromAgencyScripts) {
-        $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+        $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..")).Path
     }
 }
 if (-not $WorkRoot) {

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   可重複執行的「本機開發環境」稽核：對齊 monorepo、Git、Node（與 CI）、npm 依賴、可選工具與憑證占位（不讀取密鑰內容）。
 
@@ -62,9 +62,9 @@ $criticalFail = $false
 $warnCount = 0
 
 if (-not $WorkRoot) {
-    $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 } else {
-    $WorkRoot = (Resolve-Path $WorkRoot).Path
+    $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
 }
 
 Set-Location -LiteralPath $WorkRoot

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   One-shot shared AI governance setup for this repo.
 
@@ -22,7 +22,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrWhiteSpace($WorkRoot)) {
-    $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 } else {
     $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
 }

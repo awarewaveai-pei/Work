@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Loads optional .\mcp\user-env.ps1 then runs JSON-RPC smoke against N8N_MCP_URL.
 
@@ -15,7 +15,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrWhiteSpace($WorkspaceRoot)) {
-    $WorkspaceRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    $WorkspaceRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 }
 if ([string]::IsNullOrWhiteSpace($EnvScriptPath)) {
     $EnvScriptPath = Join-Path $WorkspaceRoot "mcp\user-env.ps1"

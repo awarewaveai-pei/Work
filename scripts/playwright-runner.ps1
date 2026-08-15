@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Playwright E2E test runner - orchestrates install, execution, and evidence archival.
 
@@ -87,7 +87,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 # --- Paths ---------------------------------------------------------------------
-$MonoRoot  = Resolve-Path (Join-Path $PSScriptRoot '..')
+$MonoRoot  = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')
 $TestsDir  = Join-Path $MonoRoot 'lobster-factory\infra\hetzner-phase1-core\tests'
 $TenantsDir= Join-Path $MonoRoot 'agency-os\tenants'
 $ArchiveBase = Join-Path $MonoRoot 'agency-os\reports\e2e'

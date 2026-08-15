@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
 .SYNOPSIS
     Monthly drift check across 4 long-term governance documents.
@@ -51,7 +51,7 @@ $ErrorActionPreference = "Stop"
 
 if (-not $WorkRoot) {
     if ($PSScriptRoot) {
-        $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+        $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
     } else {
         $WorkRoot = (Get-Location).Path
     }

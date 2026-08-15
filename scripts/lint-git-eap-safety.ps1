@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Regression gate for the PS5.1 native-command-stderr footgun (the recurring AO-RESUME
   crash class). Flags `& <cmd> ... 2>&1` and bare `*>&1` capture sites that run under
@@ -43,9 +43,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 if (-not $WorkRoot) {
-    $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 } else {
-    $WorkRoot = (Resolve-Path $WorkRoot).Path
+    $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
 }
 
 # ── Resolve target files ────────────────────────────────────────────────────

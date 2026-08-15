@@ -1,4 +1,4 @@
-# Ensures lobster-factory/packages/workflows has node_modules matching package-lock.json.
+﻿# Ensures lobster-factory/packages/workflows has node_modules matching package-lock.json.
 
 param(
     [string]$WorkRoot = "",
@@ -10,12 +10,12 @@ $ErrorActionPreference = "Stop"
 
 if (-not $WorkRoot) {
     if ($PSScriptRoot) {
-        $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+        $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
     } else {
         $WorkRoot = (Get-Location).Path
     }
 } else {
-    $WorkRoot = (Resolve-Path $WorkRoot).Path
+    $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
 }
 
 $wfDir = Join-Path $WorkRoot "lobster-factory\packages\workflows"

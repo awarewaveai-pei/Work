@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)][string]$TenantSlug,
     [string]$WorkspaceRoot = "",
     [switch]$RemoveOnly
@@ -9,8 +9,8 @@ $ErrorActionPreference = "Stop"
 
 function Resolve-WorkspaceRoot {
     param([string]$InputRoot)
-    if ($InputRoot -and (Test-Path $InputRoot)) { return (Resolve-Path $InputRoot).Path }
-    if ($PSScriptRoot) { return (Resolve-Path (Join-Path $PSScriptRoot "..")).Path }
+    if ($InputRoot -and (Test-Path $InputRoot)) { return (Resolve-Path -LiteralPath $InputRoot).Path }
+    if ($PSScriptRoot) { return (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path }
     return (Get-Location).Path
 }
 
@@ -40,7 +40,7 @@ function Encode-ExtraArgsB64 {
 }
 
 $root = Resolve-WorkspaceRoot -InputRoot $WorkspaceRoot
-$monorepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$monorepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..")).Path
 $launcher = Join-Path $monorepoRoot "scripts\scheduled-task-launcher.ps1"
 if (-not (Test-Path -LiteralPath $launcher)) {
     throw "Missing scheduled-task-launcher.ps1 at $launcher (expected monorepo root scripts)."

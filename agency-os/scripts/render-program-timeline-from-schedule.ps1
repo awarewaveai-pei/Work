@@ -1,4 +1,4 @@
-# Renders docs/overview/PROGRAM_TIMELINE.md (tables + Mermaid Gantt) from PROGRAM_SCHEDULE.json.
+﻿# Renders docs/overview/PROGRAM_TIMELINE.md (tables + Mermaid Gantt) from PROGRAM_SCHEDULE.json.
 # PS 5.1: keep this file ASCII-only; Chinese copy lives in JSON (section_title, tasks, etc.).
 # Invoked by generate-integrated-status-report.ps1 (AO-CLOSE).
 
@@ -15,15 +15,15 @@ function Resolve-AgencyRoot {
     param([string]$InputRoot)
     $resolved = $null
     if ($InputRoot -and (Test-Path $InputRoot)) {
-        $resolved = (Resolve-Path $InputRoot).Path
+        $resolved = (Resolve-Path -LiteralPath $InputRoot).Path
     } elseif ($PSScriptRoot) {
-        $resolved = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+        $resolved = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
     } else {
         $resolved = (Get-Location).Path
     }
     $agencyCandidate = Join-Path $resolved "agency-os"
     if (Test-Path (Join-Path $agencyCandidate "scripts\render-program-timeline-from-schedule.ps1")) {
-        return (Resolve-Path $agencyCandidate).Path
+        return (Resolve-Path -LiteralPath $agencyCandidate).Path
     }
     return $resolved
 }

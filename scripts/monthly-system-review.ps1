@@ -1,4 +1,4 @@
-# Monthly pipeline: verify-build-gates (monorepo) -> integrated status report -> optional WORKLOG appendix.
+﻿# Monthly pipeline: verify-build-gates (monorepo) -> integrated status report -> optional WORKLOG appendix.
 # Run from monorepo scheduled task. ASCII-friendly; Windows PowerShell 5.1.
 
 param(
@@ -13,8 +13,8 @@ $ErrorActionPreference = "Stop"
 
 function Resolve-AgencyRoot {
     param([string]$InputRoot)
-    if ($InputRoot -and (Test-Path $InputRoot)) { return (Resolve-Path $InputRoot).Path }
-    if ($PSScriptRoot) { return (Resolve-Path (Join-Path $PSScriptRoot "..")).Path }
+    if ($InputRoot -and (Test-Path $InputRoot)) { return (Resolve-Path -LiteralPath $InputRoot).Path }
+    if ($PSScriptRoot) { return (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path }
     return (Get-Location).Path
 }
 

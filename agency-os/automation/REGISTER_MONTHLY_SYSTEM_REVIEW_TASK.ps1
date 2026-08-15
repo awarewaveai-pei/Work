@@ -1,4 +1,4 @@
-# Registers monthly task via Register-ScheduledTask (AgencyOS-MonthlySystemReview).
+﻿# Registers monthly task via Register-ScheduledTask (AgencyOS-MonthlySystemReview).
 
 param(
     [string]$WorkspaceRoot = "",
@@ -13,8 +13,8 @@ $ErrorActionPreference = "Stop"
 
 function Resolve-WorkspaceRoot {
     param([string]$InputRoot)
-    if ($InputRoot -and (Test-Path $InputRoot)) { return (Resolve-Path $InputRoot).Path }
-    if ($PSScriptRoot) { return (Resolve-Path (Join-Path $PSScriptRoot "..")).Path }
+    if ($InputRoot -and (Test-Path $InputRoot)) { return (Resolve-Path -LiteralPath $InputRoot).Path }
+    if ($PSScriptRoot) { return (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path }
     return (Get-Location).Path
 }
 
@@ -47,7 +47,7 @@ $monthlyScript = Join-Path $root "scripts\monthly-system-review.ps1"
 if (-not (Test-Path -LiteralPath $monthlyScript)) {
     throw "Missing monthly script: $monthlyScript"
 }
-$monorepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$monorepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..")).Path
 $launcher = Join-Path $monorepoRoot "scripts\scheduled-task-launcher.ps1"
 if (-not (Test-Path -LiteralPath $launcher)) {
     throw "Missing scheduled-task-launcher.ps1 at $launcher (expected monorepo root scripts)."

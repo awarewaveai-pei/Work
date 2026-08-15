@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Warn-only watchdog: are the 3 Anthropic cloud routines still landing their reports
   in awarewaveai-pei/Work? Writes agency-os/reports/status/routine-freshness-LATEST.md
@@ -30,7 +30,7 @@ $ErrorActionPreference = "Stop"
 # which crashed the first cut — caught by real-exec test, not parse.)
 if (-not $WorkRoot) {
     $scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
-    $WorkRoot = (Resolve-Path (Join-Path $scriptDir "..")).Path
+    $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $scriptDir "..")).Path
 }
 
 # Routine output contract — SSOT mirrored in system-health-check.ps1 §11.

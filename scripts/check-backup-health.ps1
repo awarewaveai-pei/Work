@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 [CmdletBinding()]
 param(
     [string]$SgHost = "5.223.93.113",
@@ -21,7 +21,7 @@ function Resolve-Root {
         return (Resolve-Path -LiteralPath $InputRoot).Path
     }
     if ($PSScriptRoot) {
-        return (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+        return (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
     }
     return (Get-Location).Path
 }

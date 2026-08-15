@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Repair common user-level Codex MCP config issues on Windows.
 
@@ -23,7 +23,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrWhiteSpace($WorkspaceRoot)) {
-    $WorkspaceRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    $WorkspaceRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 }
 if ([string]::IsNullOrWhiteSpace($UserConfigPath)) {
     $UserConfigPath = Join-Path $env:USERPROFILE ".codex\config.toml"

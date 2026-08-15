@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$WorkRoot = "",
     [switch]$SkipVerify,
     [switch]$StrictDirty,
@@ -32,12 +32,12 @@ function Get-GitStashCount {
 
 if (-not $WorkRoot) {
     if ($PSScriptRoot) {
-        $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+        $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
     } else {
         $WorkRoot = (Get-Location).Path
     }
 } else {
-    $WorkRoot = (Resolve-Path $WorkRoot).Path
+    $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
 }
 
 Push-Location $WorkRoot

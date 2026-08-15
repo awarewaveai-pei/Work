@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
   Deploy @lobster-factory/workflows to self-hosted Trigger (local Docker build + registry push).
@@ -40,10 +40,10 @@ $ErrorActionPreference = "Stop"
 function Resolve-LobsterFactoryRoot {
     param([string]$Hint)
     if ($Hint -and (Test-Path $Hint)) {
-        return (Resolve-Path $Hint).Path
+        return (Resolve-Path -LiteralPath $Hint).Path
     }
     # Script lives at infra/trigger/
-    $rp = Resolve-Path (Join-Path $PSScriptRoot "..\..")
+    $rp = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..")
     $candidate = $rp.Path
     if (-not (Test-Path (Join-Path $candidate "packages\workflows\trigger.config.ts"))) {
         throw "Cannot find packages/workflows under LobsterFactoryRoot: $candidate"

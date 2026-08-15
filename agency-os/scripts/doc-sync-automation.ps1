@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$WorkspaceRoot = "",
     [string[]]$ChangedFiles = @(),
     [switch]$AutoDetect,
@@ -14,9 +14,9 @@ function Resolve-WorkspaceRoot {
     param([string]$InputRoot)
     $resolved = $null
     if ($InputRoot -and (Test-Path $InputRoot)) {
-        $resolved = (Resolve-Path $InputRoot).Path
+        $resolved = (Resolve-Path -LiteralPath $InputRoot).Path
     } elseif ($PSScriptRoot) {
-        $resolved = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+        $resolved = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
     } else {
         $resolved = (Get-Location).Path
     }
@@ -24,7 +24,7 @@ function Resolve-WorkspaceRoot {
     # Monorepo guardrail: if invoked from D:\Work, force canonical agency root.
     $agencyCandidate = Join-Path $resolved "agency-os"
     if (Test-Path (Join-Path $agencyCandidate "scripts\doc-sync-automation.ps1")) {
-        return (Resolve-Path $agencyCandidate).Path
+        return (Resolve-Path -LiteralPath $agencyCandidate).Path
     }
 
     return $resolved

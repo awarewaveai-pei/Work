@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Back up and sanitize user-level Cursor / Claude MCP config files.
 
@@ -26,7 +26,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrWhiteSpace($WorkspaceRoot)) {
-    $WorkspaceRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    $WorkspaceRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 }
 
 if ([string]::IsNullOrWhiteSpace($BackupRoot)) {

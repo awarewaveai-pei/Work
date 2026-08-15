@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$WorkRoot = "",
     # 不寫入快照（僅測試／極少數 CI）；預設一律寫入 agency-os/.agency-state/open-tasks-snapshot.md
     [switch]$NoSnapshot
@@ -15,9 +15,9 @@ if ($PSVersionTable.PSVersion.Major -lt 7) {
 }
 
 if ($WorkRoot) {
-    $WorkRoot = (Resolve-Path $WorkRoot).Path
+    $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
 } elseif ($PSScriptRoot) {
-    $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 } else {
     $WorkRoot = (Get-Location).Path
 }

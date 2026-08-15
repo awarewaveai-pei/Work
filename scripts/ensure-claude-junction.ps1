@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
 .SYNOPSIS
   Ensure d:\Work\.claude (monorepo .claude) is a junction (mount point) to ~/.claude.
@@ -73,7 +73,7 @@ if (-not $WorkRoot) {
   if ($envRoot -and (Test-Path -LiteralPath $envRoot)) {
     $WorkRoot = $envRoot
   } else {
-    $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+    $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
   }
 }
 if (-not $UserProfile) { $UserProfile = $env:USERPROFILE }

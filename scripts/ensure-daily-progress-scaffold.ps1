@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Ensures today's WORKLOG heading and memory/daily note exist (minimal scaffold).
 
@@ -15,7 +15,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 if (-not $WorkRoot) {
-    $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 } else {
     $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
 }

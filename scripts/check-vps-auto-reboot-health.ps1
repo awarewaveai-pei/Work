@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
 .SYNOPSIS
 SSH SG + EU; verify B-Minimal auto-reboot config integrity; write LATEST report.
@@ -60,7 +60,7 @@ function Resolve-Root {
         return (Resolve-Path -LiteralPath $InputRoot).Path
     }
     if ($PSScriptRoot) {
-        return (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+        return (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
     }
     return (Get-Location).Path
 }

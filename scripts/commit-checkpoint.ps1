@@ -1,4 +1,4 @@
-# Local-only git checkpoint (no push). Intended for the agent to run at milestones;
+﻿# Local-only git checkpoint (no push). Intended for the agent to run at milestones;
 # the operator does not need to run this by hand unless the environment blocks git.
 param(
     [Parameter(Mandatory = $true)]
@@ -12,9 +12,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 if ($WorkRoot) {
-    $WorkRoot = (Resolve-Path $WorkRoot).Path
+    $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
 } elseif ($PSScriptRoot) {
-    $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 } else {
     $WorkRoot = (Get-Location).Path
 }

@@ -1,4 +1,4 @@
-# Seeds agency-os/.agency-state/closeout-inbox.md from the tracked template when missing.
+﻿# Seeds agency-os/.agency-state/closeout-inbox.md from the tracked template when missing.
 # Convention: new ### blocks go immediately after the first `---` in the file (newest on top). See closeout-inbox-TEMPLATE.md.
 # Run from monorepo root: powershell -ExecutionPolicy Bypass -File .\scripts\init-closeout-inbox.ps1
 
@@ -10,7 +10,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 if (-not $WorkRoot) {
-    $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 } else {
     $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
 }

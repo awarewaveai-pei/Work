@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Start @modelcontextprotocol/server-filesystem with stable local roots.
 
@@ -12,7 +12,7 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$workspaceRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$workspaceRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 $userHome = $env:USERPROFILE
 if ([string]::IsNullOrWhiteSpace($userHome)) {
     throw "USERPROFILE is not set."

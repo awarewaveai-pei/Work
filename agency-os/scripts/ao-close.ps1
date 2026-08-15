@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$WorkRoot = "",
     [string]$CommitMessage = "",
     [string]$CommitMessageFile = "",
@@ -22,7 +22,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 # Single-owner design: real implementation lives in monorepo root scripts\ao-close.ps1.
-$ownerScript = Resolve-Path (Join-Path $PSScriptRoot "..\..\scripts\ao-close.ps1")
+$ownerScript = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..\scripts\ao-close.ps1")
 if (-not (Test-Path -LiteralPath $ownerScript)) {
     Write-Error "ao-close wrapper: owner script missing at $ownerScript"
     exit 1

@@ -27,9 +27,9 @@ $ErrorActionPreference = "Stop"
 
 function Resolve-Root {
     param([string]$InputRoot)
-    if ($InputRoot -and (Test-Path $InputRoot)) { return (Resolve-Path $InputRoot).Path }
+    if ($InputRoot -and (Test-Path $InputRoot)) { return (Resolve-Path -LiteralPath $InputRoot).Path }
     if ($PSScriptRoot) {
-        $candidate = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+        $candidate = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
         $aoCandidate = Join-Path $candidate "agency-os"
         if (Test-Path (Join-Path $aoCandidate "TASKS.md")) { return $aoCandidate }
         return $candidate

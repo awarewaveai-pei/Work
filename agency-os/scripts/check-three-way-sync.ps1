@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$WorkRoot = "",
     [switch]$SkipVerify,
     [switch]$StrictDirty,
@@ -12,7 +12,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..")).Path
 $owner = Join-Path $repoRoot "scripts\check-three-way-sync.ps1"
 if (-not (Test-Path -LiteralPath $owner)) {
     Write-Error "check-three-way-sync wrapper: owner missing at $owner"
@@ -26,7 +26,7 @@ foreach ($k in $PSBoundParameters.Keys) {
 if (-not $bp.ContainsKey('WorkRoot') -or [string]::IsNullOrWhiteSpace([string]$bp['WorkRoot'])) {
     $bp['WorkRoot'] = $repoRoot
 } else {
-    $bp['WorkRoot'] = (Resolve-Path $bp['WorkRoot']).Path
+    $bp['WorkRoot'] = (Resolve-Path -LiteralPath $bp['WorkRoot']).Path
 }
 
 & $owner @bp

@@ -1,4 +1,4 @@
-# append-agent-dispatch-to-worklog.ps1
+﻿# append-agent-dispatch-to-worklog.ps1
 # Reads today's agent-dispatch JSONL and appends a summary block to WORKLOG.md.
 # Idempotent: skips if block already present. Always exits 0 (non-blocking).
 # Called by: scripts/ao-close.ps1 (after apply-closeout-task-checkmarks, before git add)
@@ -11,9 +11,9 @@ if (-not $WorkRoot) {
     $fromWork   = Join-Path $PSScriptRoot "..\agency-os\scripts\system-guard.ps1"
     $fromAgency = Join-Path $PSScriptRoot "system-guard.ps1"
     if (Test-Path -LiteralPath $fromWork) {
-        $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+        $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
     } elseif (Test-Path -LiteralPath $fromAgency) {
-        $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+        $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..")).Path
     }
 }
 if (-not $WorkRoot) { exit 0 }

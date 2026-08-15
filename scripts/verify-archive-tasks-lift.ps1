@@ -69,7 +69,7 @@ if (-not $WorkRoot) {
   if ($envRoot -and (Test-Path -LiteralPath $envRoot)) {
     $WorkRoot = $envRoot
   } else {
-    $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+    $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
   }
 }
 

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)]
     [string]$TenantSlug,
     [Parameter(Mandatory = $true)]
@@ -14,7 +14,7 @@ function Resolve-AgencyRoot {
     if ($InputRoot -and (Test-Path -LiteralPath $InputRoot)) {
         return (Resolve-Path -LiteralPath $InputRoot).Path
     }
-    return (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    return (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 }
 
 $root = Resolve-AgencyRoot -InputRoot $WorkspaceRoot

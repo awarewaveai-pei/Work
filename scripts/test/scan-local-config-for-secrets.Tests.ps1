@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Regression tests for scripts/scan-local-config-for-secrets.ps1.
 
@@ -10,7 +10,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $scanner = Join-Path $repoRoot 'scripts\scan-local-config-for-secrets.ps1'
 
 $script:fail = 0

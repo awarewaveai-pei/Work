@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$WorkspaceRoot = ""
 )
 
@@ -11,7 +11,7 @@ function Resolve-AgencyRoot {
         return (Resolve-Path -LiteralPath $InputRoot).Path
     }
     # Monorepo: scripts/ lives next to agency-os/; default folder must be agency-os (not repo root).
-    $monorepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    $monorepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
     $agencyNested = Join-Path $monorepoRoot "agency-os"
     $sopProbe = Join-Path $agencyNested "tenants\NEW_TENANT_ONBOARDING_SOP.md"
     if (Test-Path -LiteralPath $sopProbe) {

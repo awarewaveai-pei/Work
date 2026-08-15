@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   一鍵：fetch → 本機 main 與 origin/main 完全一致 →（可選）nested AO-RESUME。**預設永遠停在 main**，不切換到其他 Git 分支。
 
@@ -67,9 +67,9 @@ $ErrorActionPreference = "Stop"
 $AllowMissingFeatureBranch = -not $RequireFeatureBranch
 
 if (-not $WorkRoot) {
-    $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 } else {
-    $WorkRoot = (Resolve-Path $WorkRoot).Path
+    $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
 }
 
 $aoResume = Join-Path $WorkRoot "scripts\ao-resume.ps1"

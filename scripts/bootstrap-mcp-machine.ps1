@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Bootstrap MCP on a new machine from this repo.
 
@@ -24,7 +24,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrWhiteSpace($WorkspaceRoot)) {
-    $WorkspaceRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    $WorkspaceRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 }
 if ([string]::IsNullOrWhiteSpace($EnvScriptPath)) {
     $EnvScriptPath = Join-Path $WorkspaceRoot "mcp\user-env.ps1"

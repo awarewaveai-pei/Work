@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Verifies BUGHUNT_DONE: hits=0 claims by running a literal search of identifier-type
   patterns in the declared scope, excluding staged files.
@@ -272,7 +272,7 @@ if ($WorklogSectionFile) {
     if ($BhGate -eq "off") { exit 0 }
 
     if (-not $BhWorkRoot) {
-        $BhWorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+        $BhWorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
     } else {
         $BhWorkRoot = (Resolve-Path -LiteralPath $BhWorkRoot).Path
     }

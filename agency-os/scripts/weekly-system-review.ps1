@@ -1,4 +1,4 @@
-# Weekly pipeline: verify-build-gates (monorepo) -> integrated status report -> optional WORKLOG appendix.
+﻿# Weekly pipeline: verify-build-gates (monorepo) -> integrated status report -> optional WORKLOG appendix.
 # Run from agency-os (scheduled task) or via D:\Work\scripts\weekly-system-review.ps1 wrapper.
 # ASCII-friendly; Windows PowerShell 5.1.
 
@@ -14,8 +14,8 @@ $ErrorActionPreference = "Stop"
 
 function Resolve-AgencyRoot {
     param([string]$InputRoot)
-    if ($InputRoot -and (Test-Path $InputRoot)) { return (Resolve-Path $InputRoot).Path }
-    if ($PSScriptRoot) { return (Resolve-Path (Join-Path $PSScriptRoot "..")).Path }
+    if ($InputRoot -and (Test-Path $InputRoot)) { return (Resolve-Path -LiteralPath $InputRoot).Path }
+    if ($PSScriptRoot) { return (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path }
     return (Get-Location).Path
 }
 

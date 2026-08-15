@@ -1,4 +1,4 @@
-# AO-CLOSE: ensure-daily-progress-scaffold -> closeout inbox guard -> merge-closeout-inbox-into-progress ->
+﻿# AO-CLOSE: ensure-daily-progress-scaffold -> closeout inbox guard -> merge-closeout-inbox-into-progress ->
 #   print-today-closeout-recap (see -SkipTodayRecap) -> verify-build-gates ->
 #   system-guard (doc-sync + health + guard) -> generate integrated-status report ->
 #   optional apply-closeout-task-checkmarks -> git add -> verify-closeout-completeness -> git commit + push.
@@ -48,14 +48,14 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 if ($WorkRoot) {
-    $WorkRoot = (Resolve-Path $WorkRoot).Path
+    $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
 } else {
     $fromWorkScripts = Join-Path $PSScriptRoot "..\agency-os\scripts\system-guard.ps1"
     $fromAgencyScripts = Join-Path $PSScriptRoot "system-guard.ps1"
     if (Test-Path -LiteralPath $fromWorkScripts) {
-        $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+        $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
     } elseif (Test-Path -LiteralPath $fromAgencyScripts) {
-        $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+        $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..")).Path
     } else {
         Write-Error "ao-close: cannot locate system-guard.ps1 (expected under monorepo). PSScriptRoot=$PSScriptRoot"
         exit 1
@@ -76,7 +76,7 @@ if (Test-Path -LiteralPath $gitSafeOpsLib) {
 
 $healthReportUtils = Join-Path $WorkRoot "scripts\health-report-utils.ps1"
 if (Test-Path -LiteralPath $healthReportUtils) {
-    . (Resolve-Path $healthReportUtils).Path
+    . (Resolve-Path -LiteralPath $healthReportUtils).Path
 }
 
 # Four-phase refactor (2026-06-09): single quality-gate collector. Quality gates record
@@ -86,7 +86,7 @@ if (Test-Path -LiteralPath $healthReportUtils) {
 # exits, only batched reporting. Preconditions (git topology / infra) stay fail-fast below.
 $gateLib = Join-Path $WorkRoot "scripts\lib\ao-close-gates.ps1"
 if (Test-Path -LiteralPath $gateLib) {
-    . (Resolve-Path $gateLib).Path
+    . (Resolve-Path -LiteralPath $gateLib).Path
     $gate = New-CloseoutGate
 } else {
     Write-Error "ao-close: missing quality-gate lib at $gateLib"

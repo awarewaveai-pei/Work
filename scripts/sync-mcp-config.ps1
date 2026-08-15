@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Generate portable MCP client configs from one repo-managed registry.
 
@@ -31,7 +31,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrWhiteSpace($WorkspaceRoot)) {
-    $WorkspaceRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    $WorkspaceRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 }
 if ([string]::IsNullOrWhiteSpace($RegistryPath)) {
     $RegistryPath = Join-Path $WorkspaceRoot "mcp\registry.template.json"

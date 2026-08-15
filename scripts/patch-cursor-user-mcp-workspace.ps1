@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Replace ${workspaceFolder} / ${userHome} in %USERPROFILE%\.cursor\mcp.json with real paths.
 
@@ -22,7 +22,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrWhiteSpace($WorkspaceRoot)) {
-    $WorkspaceRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    $WorkspaceRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 }
 if ([string]::IsNullOrWhiteSpace($UserMcpPath)) {
     $UserMcpPath = Join-Path $env:USERPROFILE ".cursor\mcp.json"
