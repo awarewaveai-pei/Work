@@ -171,6 +171,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | 改動 governance 文件後（`AGENTS.md` / `CLAUDE.md` / `.cursor/rules/*.mdc` / hook `.js`）| 跑 `/doc-sync`；若改了 `.claude/commands/` 或 `.claude/agents/` 或 `.claude/skills/` → 同時跑 `/sync-check` 確認跨機一致 |
 | MCP tool 回 401 / 403 / connection failed / empty API response | 跑 `/vault-status`；若顯示 key 缺口 → 跑 `/vault-sync`。使用者主動問「vault/密鑰/secret 不見了/API key 哪裡找」同此路由。**🔧 機械閘**（2026-07-02）：`hooks/rules/mcp-health.js` 於 401/403 失敗時自動附 `/vault-status` 路由提示 |
 | 使用者提到「客戶」/「soulful」/「WP 更新」/「外掛」/「maintenance」 | 先跑 `/client-status [slug]` 了解現況，再決定下一步 |
+| 使用者提到「搬站」/「換主機」/「機器買好了」/「二手 Hetzner」/「soulful 搬」/「Hostinger 到期」/給一個新主機 IP | **先讀 [`tenants/company-soulful-expression/core/SITE_MIGRATION_RUNBOOK.md`](tenants/company-soulful-expression/core/SITE_MIGRATION_RUNBOOK.md)**（步驟／切換／回滾 SSOT），再依 §0.5 → §3 → §4 → §5 → §6 執行。**硬死線 2026-11-12**（Hostinger hosting 不續約）。**禁止**：不讀 runbook 就開始建機或搬檔；重做已完成項（CF zone 14 筆已建、nameserver 已切、信箱 mail-tester 10/10、EU 三份備份 769 MB、還原演練 Drill #1 PASS）|
 | `/wp-maintenance safe-update` 完成 | 自動跑 `/playwright client <slug>` 確認無破壞 |
 | 使用者提到「一鍵架站」/「自動開站」/「provision」/「租主機」/「Hetzner 開機」/要在 app.aware-wave.com 加建站按鈕 | **先讀 [`lobster-factory/docs/hosting/EMBED_PROVISION_INTO_APP.md`](../lobster-factory/docs/hosting/EMBED_PROVISION_INTO_APP.md)**：「租 Hetzner 主機+day-1 硬化+DNS」**已寫好且真機驗證通過（2026-06-06）**，核心函式 `packages/workflows/src/provision/provisionClient.ts`。**直接呼叫，禁止重寫**。嵌進 app = 加 API route 呼叫 `provisionClient()`（雙觸發設計）。違反樣態：重新實作租機/cloud-init/secretStore 邏輯（已存在且驗過）。 |
 | 使用者提到「app.aware-wave」/「onboarding」/「建站」/「佈建」/「企業佈建」/「ops-console」/「做 Stage N」/「繼續（上次那個建站的）」 | **先讀 [`docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`](docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md) 的「🚀 開工必讀（按順序）」7 步**（藍圖+最新真相+程式+活資料），讀完即完全掌握狀況再動工。這份是 5 階段總藍圖 SSOT（Stage 0 建站引擎已驗；現況/下一步以該檔 §2/§3 為準）。**禁止**：不讀 plan 就臆測卡點；重寫已存在的站層/機層；碰 Tarot（另一 AI 處理）。 |
@@ -369,5 +370,5 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-08-15 16:48:09 UTC_
+_Last synced: 2026-08-15 18:08:27 UTC_
 
