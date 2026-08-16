@@ -225,6 +225,7 @@
 - [ ] **🔴【硬死線 2026-11-12】Soulful 網站搬離 Hostinger（hosting 不續約，操作者 2026-08-15 決定）** —— **【進行中】** Hostinger `Premium Web Hosting` $215.76/年，**自動續約已關閉**，**2026-11-12 到期**。什麼都不做 = 客戶網站當天下線。
   - **三筆訂閱現況**（2026-08-15 帳單截圖確認，推翻先前「$80/年」的假設）：Hosting $215.76 → **2026-11-12**（不續約）／`.ORG` Domain $53.97 → 2028-06-03（付到 2028）／Starter Business Email $76.32 → 2029-06-03（**預付近 3 年，保留**）
   - **信箱不受影響**（2026-08-15 查官方文件三項獨立證據）：① Hostinger 支援文原句「Since emails are stored on a separate infrastructure, they are not included in hosting plan reactivations or file backups」② Business Email 是可獨立購買產品、不需 hosting ③ DNS 管理綁網域不綁 hosting（網域付到 2028）。**故不需開 support ticket**。搬 DNS 到 CF 後三個依賴全部脫鉤
+  - **📅 日曆提醒已建立（2026-08-16，`peijingartstudio@gmail.com`）** —— **勿重複建立**：① `2026-09-30` 買二手 Hetzner 機（前 1 天彈窗 + 前 7 天 email）② `2026-10-15` 搬站進度檢查 ③ `2026-11-05` 到期前 7 天最後確認 ④ `2026-11-12` hosting 到期（紅色標記，前 1 天彈窗 + 前 14 天 email）。每則描述內含當下該做什麼、文件路徑、以及「別取消 Hostinger 帳號」警告。**註**：操作者的 AwareWaveAI Google 帳號（`awarewaveai@gmail.com`）未連到 Claude connector，故寫入主日曆
   - **🚀 執行手冊（開工先讀這份）**：[`core/SITE_MIGRATION_RUNBOOK.md`](tenants/company-soulful-expression/core/SITE_MIGRATION_RUNBOOK.md) —— §0.5 買機前三個決定（機房位置／SSD／RAID）、§1–§5 建置與搬遷、§6 切換與回滾、§7 切換後、§8 讓 hosting 到期。**操作者只需做兩件事：買機器（給 IP + root SSH）、切換當天點頭**
   - **執行順序（不可跳序）**：① ~~DNS 搬 Cloudflare~~ ✅ 2026-08-15（同時永久修好 IPv6）→ ② **網站搬新購二手 Hetzner 機**（目標已定，見下）→ ③ 網域轉 CF Registrar（**建議搬站穩定後再做**，見下）→ ④ 讓 hosting 自然到期
   - **③ 網域轉 CF Registrar — 2026-08-16 查證後的實況（勿依舊記載行動）**：
