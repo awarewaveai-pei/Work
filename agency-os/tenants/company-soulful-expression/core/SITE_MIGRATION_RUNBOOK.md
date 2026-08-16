@@ -192,7 +192,7 @@ Hostinger 主機在 2026-11-12 前都還活著，舊站原封不動 —— 這�
 | 訂閱 | 到期 | 狀態 |
 |---|---|---|
 | Premium Web Hosting | 2026-11-12 | **讓它到期** |
-| `.ORG` 網域 | 2028-06-03 | **保留**（或轉 Cloudflare Registrar） |
+| `.ORG` 網域 | 註冊局 **2028-06-02**（Hostinger 帳單顯示 06-03 = 計費日，非錯誤）| **保留**；轉 Cloudflare Registrar 建議**搬站穩定後**再做 —— 轉移會 **+1 年**（ICANN 強制，不損失既有年限），但網域目前為 `clientTransferProhibited` 需先解鎖取 EPP code，且**信箱是否綁定網域註冊商尚未確認**。詳見 `TASKS.md` 硬死線任務 ③ |
 | Starter Business Email | 2029-06-03 | **保留** —— 客戶信箱住在這裡 |
 
 取消帳號會把還有效的網域與信箱一起帶走。

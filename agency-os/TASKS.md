@@ -226,7 +226,15 @@
   - **三筆訂閱現況**（2026-08-15 帳單截圖確認，推翻先前「$80/年」的假設）：Hosting $215.76 → **2026-11-12**（不續約）／`.ORG` Domain $53.97 → 2028-06-03（付到 2028）／Starter Business Email $76.32 → 2029-06-03（**預付近 3 年，保留**）
   - **信箱不受影響**（2026-08-15 查官方文件三項獨立證據）：① Hostinger 支援文原句「Since emails are stored on a separate infrastructure, they are not included in hosting plan reactivations or file backups」② Business Email 是可獨立購買產品、不需 hosting ③ DNS 管理綁網域不綁 hosting（網域付到 2028）。**故不需開 support ticket**。搬 DNS 到 CF 後三個依賴全部脫鉤
   - **🚀 執行手冊（開工先讀這份）**：[`core/SITE_MIGRATION_RUNBOOK.md`](tenants/company-soulful-expression/core/SITE_MIGRATION_RUNBOOK.md) —— §0.5 買機前三個決定（機房位置／SSD／RAID）、§1–§5 建置與搬遷、§6 切換與回滾、§7 切換後、§8 讓 hosting 到期。**操作者只需做兩件事：買機器（給 IP + root SSH）、切換當天點頭**
-  - **執行順序（不可跳序）**：① ~~DNS 搬 Cloudflare~~ ✅ 2026-08-15（同時永久修好 IPv6）→ ② **網站搬新購二手 Hetzner 機**（目標已定，見下）→ ③ 網域轉 CF Registrar（$53.97→~$9.77，2028 前隨時，轉移自動 +1 年）→ ④ 讓 hosting 自然到期
+  - **執行順序（不可跳序）**：① ~~DNS 搬 Cloudflare~~ ✅ 2026-08-15（同時永久修好 IPv6）→ ② **網站搬新購二手 Hetzner 機**（目標已定，見下）→ ③ 網域轉 CF Registrar（**建議搬站穩定後再做**，見下）→ ④ 讓 hosting 自然到期
+  - **③ 網域轉 CF Registrar — 2026-08-16 查證後的實況（勿依舊記載行動）**：
+    - **不會損失既有年限**：CF 官方文件明載 gTLD（含 `.org`）轉移「includes a one-year registration extension **from your current expiration date**」，為 **ICANN 強制**，非優惠 ⇒ `2028-06-02` → `2029-06-02`，**+1 年**
+    - **註冊局到期日為 `2028-06-02`**（RDAP 直查 PIR；註冊日 2025-06-02，三年期，對應帳單 $53.97）。文件他處記載的 `2028-06-03` 來自 **Hostinger 帳單截圖**（續約扣款日）—— **兩者皆非錯誤**，是「註冊局到期（UTC）」與「商家計費日」的正常差異。**以轉移／到期判斷為準時用註冊局的 `06-02`**
+    - **目前狀態 `clientTransferProhibited`（鎖定）** —— 轉移前需操作者在 Hostinger 解鎖 + 取得 EPP auth code
+    - **2026-08-15 改 nameserver 不影響轉移資格** —— ICANN 60 天鎖針對「註冊人姓名／組織／email 變更」，DNS 變更不算
+    - **🔴 未解問題（轉移前必須先釐清）**：Business Email（付至 2029-06-03）住在 Hostinger。「hosting 到期不影響信箱」已查證紮實，但「**把網域轉走**」是不同的事 —— Hostinger 是否把信箱服務綁在網域註冊於其名下，**查無明確答案**。賭錯＝客戶信箱中斷 + 預付款可能無法取回。**轉移前先向 Hostinger 確認**
+    - **建議時程**：搬站完成且穩定後再處理。2028 到期，無時間壓力；搬站期間同時動 registrar 會讓可出錯的地方變成兩處
+    - **費用**：CF Registrar 零加價（照註冊局成本）。舊記載 `~$9.77` 可能已過時（`.org` 批發價近年調漲），**以下單當下 CF 頁面顯示為準**
   - **DNS 對照表（Cloudflare 實際 14 筆；清點表 13 筆已證實漏掉 `hostingermail-c`）**：[`core/DNS_MIGRATION_RECORD_MAP.md`](tenants/company-soulful-expression/core/DNS_MIGRATION_RECORD_MAP.md) —— 含「AAAA 刻意不建」「哪些 CNAME 不可開 Proxy」「🔴 DKIM 實況：實際簽章 selector 是 `hostingermail1`」「回滾方式（回滾會失去 `hostingermail1`，需先補）」
   - **安全網已就緒且已驗證**（2026-08-16 更新）：DB（288 表）+ uploads（11,001 檔）+ **程式碼（38,991 檔，含 ~17 個付費外掛）** 三份共 769 MB 存於 EU，SHA-256 兩地一致。**還原演練 2026-08-16 PASS**（EU 拋棄式容器：288 表還原、750 筆附件與磁碟檔案零遺失交叉比對通過）。見 [`core/BACKUP_RESTORE_PROOF.md`](tenants/company-soulful-expression/core/BACKUP_RESTORE_PROOF.md) Drill #1 + Record #3
   - **✅ 目標主機已定（2026-08-16）**：搬到**新購的二手 Hetzner 主機**（同 `memory/project_hetzner_dedicated_plan.md`）。原「決定目標主機」阻塞解除，剩下的路徑是「買機 → 建置 → 搬 → 切換」。**注意**：該機預期不只放 soulful，建置時按多站設計

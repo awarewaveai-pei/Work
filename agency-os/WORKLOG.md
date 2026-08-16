@@ -4,6 +4,34 @@
 
 ## 2026-08-16
 
+### AUTO_TASK_DONE: 查證網域轉 CF Registrar 是否損失既有年限（結論：不損失，但先別轉）
+
+[任務]
+操作者問「之前談到 domain 移到 Cloudflare 但可以不損失在 Hostinger 的 2 年?」。涉及金錢與難回復操作，查官方文件與註冊局實況，不憑印象答。
+
+[已修改]
+1. `agency-os/TASKS.md` —— 硬死線任務 ③ 由一行擴為完整查證結果（含未解風險與建議時程）
+2. `core/SITE_MIGRATION_RUNBOOK.md` §8 —— `.ORG` 列補註冊局到期日、鎖定狀態、信箱未解問題
+
+[驗證結果]
+- **不損失既有年限，且 +1 年**（Cloudflare 官方文件原文）：gTLD（含 `.org`）「transfer price includes a one-year registration extension **from your current expiration date**. This is an **ICANN requirement**」⇒ `2028-06-02` → `2029-06-02`。是 ICANN 強制，非 CF 優惠
+- **RDAP 直查 PIR 註冊局**（非二手資料）：到期 `2028-06-02`、註冊 `2025-06-02`（三年期，對應帳單 $53.97）、registrar `HOSTINGER operations, UAB`、狀態 **`clientTransferProhibited`**
+- **日期差異查清並更正我自己的誤判**：初判「文件記 06-03 有誤」→ 比對 `cloudflare-wpml-migration-plan.md:10` 後發現 06-03 出自 **Hostinger 帳單截圖**（計費日），06-02 出自註冊局（UTC 到期）。**兩者皆非錯誤**，已改寫為並存說明；若當時直接「更正」會把正確的帳單資料改成錯的
+- **昨日改 nameserver 不影響轉移資格**：ICANN 60 天鎖針對「註冊人姓名／組織／email 變更」；RDAP `last changed = 2026-08-15` 即該次 NS 變更，不觸發鎖
+- **🔴 查無答案的風險（誠實標示）**：Business Email（付至 2029-06-03）住 Hostinger。「hosting 到期不影響信箱」已有三項證據，但「**網域轉走**」是不同情境，**查無明確說法**。故建議搬站穩定後再轉，且轉前先向 Hostinger 確認
+- **費用不引用舊數字**：CF Registrar 零加價已確認；repo 舊記 `~$9.77` 無法從官方頁面佐證（未列 `.org` 價格），改註明「以下單當下 CF 頁面為準」
+- REALTEST_EVIDENCE: tool=WebFetch | cmd=CF registrar transfer docs + RDAP publicinterestregistry.org/rdap/domain/soulfulexpression.org + CF registrar pricing page | exit=0 | ms=~180000
+- REVIEW_WAIVED: DOC_ONLY -- 純文件更新，無程式碼改動
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=2028-06-03 | hits=7
+  - 現況文件 2 處已補並存說明（TASKS 硬死線、runbook §8）；其餘 5 處為歷史紀錄（WORKLOG、worklog-excerpt、已作廢的 TASKS:119、剛存檔的 ao-resume 報告、帳單來源文件）**刻意保留原值** —— 那些記的是帳單事實，改掉反而失真
+
+[剩餘風險]
+- 信箱與網域註冊商的綁定關係仍未確認，屬**待操作者向 Hostinger 查證**的項目
+- `.org` 轉移實際費用未取得官方數字，下單前需現場確認
+
+[rollback]
+純文件變更，`git revert` 即可。
+
 ### AUTO_TASK_DONE: 查明 pinned session 內容消失根因（預設 30 天保留）+ 目標主機拍板
 
 [任務]
