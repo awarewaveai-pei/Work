@@ -2648,3 +2648,7 @@ INFO:     127.0.0.1:51773 - "GET /api/log/6a8a0cba2b3e?lines=40 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:50101 - "GET /api/log/6a8a0cba2b3e?lines=40 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:51773 - "GET /api/status/6a8a0cba2b3e HTTP/1.1" 200 OK
 INFO:     127.0.0.1:51773 - "GET /api/prompt/6a8a0cba2b3e HTTP/1.1" 200 OK
+[PPT] 10 頁 -> D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\meeting-service\jobs\6a8a0cba2b3e\slides.pptx
+[完成] 全流程結束
+INFO:     127.0.0.1:57451 - "POST /api/submit-summary/6a8a0cba2b3e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57451 - "GET /api/status/6a8a0cba2b3e HTTP/1.1" 200 OK
