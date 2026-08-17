@@ -80,5 +80,5 @@
 - `docs/operations/security-secrets-policy.md`
 - `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md`
 
-_Last synced: 2026-08-15 18:08:27 UTC_
+_Last synced: 2026-08-17 14:30:03 UTC_
 
