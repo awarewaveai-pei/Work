@@ -12,11 +12,11 @@ import shutil
 import threading
 import uuid
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi import Body, FastAPI, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 
-from pipeline import run_pipeline
+from lib import summarize
+from pipeline import resume_after_summary, run_pipeline_phase1
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 JOBS_DIR = os.path.join(BASE_DIR, "jobs")
@@ -66,16 +66,11 @@ async def upload(file: UploadFile = File(...), diarize: bool = True,
                 raise HTTPException(413, f"檔案超過 {MAX_UPLOAD_MB}MB 上限")
             out.write(chunk)
 
-    for key in ("ANTHROPIC_API_KEY",):
-        if not os.environ.get(key):
-            shutil.rmtree(job_dir, ignore_errors=True)
-            raise HTTPException(500, f"環境變數 {key} 未設定；請在 mcp/user-env.ps1 補上後重啟本服務")
-    if diarize and not os.environ.get("HF_TOKEN"):
-        # 講者分離缺 token 不擋主流程——pipeline 內會自動退回無標籤繼續跑
-        pass
+    # 摘要階段不呼叫 API（見 pipeline.py 開頭說明），不需要 ANTHROPIC_API_KEY。
+    # 講者分離缺 HF_TOKEN 也不擋主流程——pipeline 內會自動退回無標籤繼續跑。
 
     thread = threading.Thread(
-        target=run_pipeline,
+        target=run_pipeline_phase1,
         args=(job_dir, media_path),
         kwargs={"model_name": model, "do_diarize": diarize},
         daemon=True,
@@ -83,6 +78,33 @@ async def upload(file: UploadFile = File(...), diarize: bool = True,
     thread.start()
 
     return {"job_id": job_id}
+
+
+@app.get("/api/prompt/{job_id}")
+def get_prompt(job_id: str):
+    """階段 1 完成後，取得可直接貼進任一 Claude 對話的完整 prompt。"""
+    job_dir = _job_dir(job_id)
+    path = os.path.join(job_dir, "prompt.txt")
+    if not os.path.exists(path):
+        raise HTTPException(404, "prompt 尚未產生（可能還在轉錄/講者分離階段）")
+    with open(path, encoding="utf-8") as f:
+        return PlainTextResponse(f.read())
+
+
+@app.post("/api/submit-summary/{job_id}")
+def submit_summary(job_id: str, body: dict = Body(...)):
+    """使用者把 Claude 回傳的 JSON 貼回這裡，接手產生 PPT/教練稿/會議記錄。"""
+    job_dir = _job_dir(job_id)
+    raw = body.get("text", "")
+    try:
+        minutes = summarize.parse_pasted_json(raw)
+    except Exception as e:
+        raise HTTPException(400, f"無法解析為 JSON：{type(e).__name__}: {e}")
+
+    errors = resume_after_summary(job_dir, minutes)
+    if errors:
+        raise HTTPException(422, "; ".join(errors))
+    return {"ok": True}
 
 
 @app.get("/api/status/{job_id}")

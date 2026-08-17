@@ -62,9 +62,25 @@
     text-decoration: none; background: var(--bg); border: 1px solid var(--border); color: var(--ink);
   }
   .downloads a:hover { border-color: var(--accent); color: var(--accent); }
-  .err { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: 12px; border-radius: 8px; font-size: 13px; }
+  .err { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: 12px; border-radius: 8px; font-size: 13px; white-space: pre-wrap; }
   .hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
   .badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #e0f2fe; color: #0369a1; }
+  .step-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff;
+    font-size: 12px; font-weight: 700; margin-right: 8px;
+  }
+  textarea {
+    width: 100%; box-sizing: border-box; border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px; font-size: 12px; font-family: Consolas, monospace; resize: vertical;
+  }
+  #promptBox { height: 160px; background: #f8fafc; color: var(--muted); }
+  #pasteBack { height: 140px; }
+  .copyBtn {
+    background: var(--bg); color: var(--ink); border: 1px solid var(--border);
+    padding: 6px 14px; font-size: 12px; font-weight: 600; border-radius: 6px; cursor: pointer; margin-top: 8px;
+  }
+  .copyBtn:hover { border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -95,6 +111,17 @@
     <pre id="log"></pre>
   </div>
 
+  <div class="card" id="summaryCard" style="display:none">
+    <p><span class="step-num">1</span><b>複製下面這段 prompt</b>，貼進任一 Claude 對話視窗（用你的訂閱額度，不額外收費）</p>
+    <textarea id="promptBox" readonly></textarea>
+    <button class="copyBtn" id="copyPromptBtn">複製 prompt</button>
+
+    <p style="margin-top:20px"><span class="step-num">2</span><b>把 Claude 回傳的 JSON 貼在這裡</b>，按送出</p>
+    <textarea id="pasteBack" placeholder="貼上 Claude 回傳的完整 JSON..."></textarea>
+    <button class="copyBtn" id="submitSummaryBtn" style="background:var(--accent);color:#fff;border:none">送出，繼續產生 PPT</button>
+    <div id="summaryErr"></div>
+  </div>
+
   <div class="card" id="resultCard" style="display:none">
     <div id="resultBody"></div>
   </div>
@@ -103,8 +130,9 @@
 <script>
 const STAGES = [
   ["preflight","檢查檔案"], ["transcribe","轉錄"], ["merge","段落合併"],
-  ["hallucination_check","幻覺偵測"], ["diarize","講者分離"], ["summarize","AI 摘要"],
-  ["build_deck","生成 PPT"], ["build_notes","寫入講稿"], ["build_minutes_md","會議記錄"], ["done","完成"],
+  ["hallucination_check","幻覺偵測"], ["diarize","講者分離"], ["preparing_prompt","準備摘要 prompt"],
+  ["awaiting_summary","等待貼上摘要"], ["build_deck","生成 PPT"], ["build_notes","寫入講稿"],
+  ["build_minutes_md","會議記錄"], ["done","完成"],
 ];
 const DOWNLOAD_LABELS = {
   minutes_md: "會議記錄 (.md)", slides: "PPT (.pptx)", coach: "報告教練 (.md)",
@@ -171,7 +199,10 @@ function renderStages(activeStage, doneSet) {
   }).join("");
 }
 
+let currentJobId = null;
+
 async function poll(jobId) {
+  currentJobId = jobId;
   const seen = new Set();
   const timer = setInterval(async () => {
     const [statusResp, logResp] = await Promise.all([
@@ -194,12 +225,65 @@ async function poll(jobId) {
       showError(status.error);
       return;
     }
+    if (status.stage === "awaiting_summary" && !status.done) {
+      clearInterval(timer);
+      await showSummaryStep(jobId);
+      return;
+    }
     if (status.done) {
       clearInterval(timer);
       showResult(jobId, status);
     }
   }, 1500);
 }
+
+async function showSummaryStep(jobId) {
+  document.getElementById("progressCard").style.display = "none";
+  document.getElementById("summaryCard").style.display = "block";
+  const resp = await fetch(`/api/prompt/${jobId}`);
+  const text = await resp.text();
+  document.getElementById("promptBox").value = text;
+}
+
+document.getElementById("copyPromptBtn").addEventListener("click", () => {
+  const box = document.getElementById("promptBox");
+  box.select();
+  navigator.clipboard.writeText(box.value).then(() => {
+    document.getElementById("copyPromptBtn").textContent = "已複製 ✓";
+    setTimeout(() => { document.getElementById("copyPromptBtn").textContent = "複製 prompt"; }, 1500);
+  });
+});
+
+document.getElementById("submitSummaryBtn").addEventListener("click", async () => {
+  const text = document.getElementById("pasteBack").value.trim();
+  const errBox = document.getElementById("summaryErr");
+  errBox.innerHTML = "";
+  if (!text) { errBox.innerHTML = '<div class="err">還沒貼東西</div>'; return; }
+
+  const btn = document.getElementById("submitSummaryBtn");
+  btn.disabled = true; btn.textContent = "處理中...";
+  try {
+    const resp = await fetch(`/api/submit-summary/${currentJobId}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}));
+      errBox.innerHTML = `<div class="err">${body.detail || ("HTTP " + resp.status)}</div>`;
+      btn.disabled = false; btn.textContent = "送出，繼續產生 PPT";
+      return;
+    }
+    document.getElementById("summaryCard").style.display = "none";
+    document.getElementById("progressCard").style.display = "block";
+    renderStages("build_deck", new Set(["preflight","transcribe","merge","hallucination_check","diarize","preparing_prompt","awaiting_summary"]));
+    // build_deck/notes/minutes_md 是同步跑完才回應的，回應到達就代表 done
+    const s = await (await fetch(`/api/status/${currentJobId}`)).json();
+    showResult(currentJobId, s);
+  } catch (e) {
+    errBox.innerHTML = `<div class="err">送出失敗：${e}</div>`;
+    btn.disabled = false; btn.textContent = "送出，繼續產生 PPT";
+  }
+});
 
 function showError(msg) {
   document.getElementById("resultCard").style.display = "block";
