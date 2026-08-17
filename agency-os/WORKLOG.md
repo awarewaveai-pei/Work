@@ -1899,3 +1899,9 @@ woocommerce-points-and-rewards / woocommerce-product-addons
 
 _Last synced: 2026-08-15 18:08:27 UTC_
 
+
+## 2026-08-17
+- 自動週報代理：weekly summary 生成 → reports/weekly/weekly-summary-2026-08-17.md
+  - REALTEST_WAIVED: DOC_ONLY -- automated report generation, no code change
+  - REVIEW_WAIVED: DOC_ONLY -- report content verified against WORKLOG/TASKS source files
+  - BUGHUNT_WAIVED: DOC_ONLY -- no code change
