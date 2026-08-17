@@ -275,9 +275,13 @@ document.getElementById("submitSummaryBtn").addEventListener("click", async () =
     }
     document.getElementById("summaryCard").style.display = "none";
     document.getElementById("progressCard").style.display = "block";
-    renderStages("build_deck", new Set(["preflight","transcribe","merge","hallucination_check","diarize","preparing_prompt","awaiting_summary"]));
-    // build_deck/notes/minutes_md 是同步跑完才回應的，回應到達就代表 done
+    // resume_after_summary 是同步跑完才回應——HTTP 200 回來的當下，
+    // build_deck/build_notes/build_minutes_md 全部已完成，直接用真實 status
+    // 更新階段列表，不要留在送出當下畫的過場畫面（先前這裡漏更新，卡在
+    // "生成PPT" 沒跳到"完成"，看起來像卡住，其實下面下載按鈕早就好了）。
     const s = await (await fetch(`/api/status/${currentJobId}`)).json();
+    const allSeen = new Set(STAGES.map(([k]) => k));
+    renderStages(s.stage, allSeen);
     showResult(currentJobId, s);
   } catch (e) {
     errBox.innerHTML = `<div class="err">送出失敗：${e}</div>`;
