@@ -39,8 +39,9 @@
 
 ### ② 規格下限
 
-- RAM：64 GB 是原定規格，以「不只放 soulful」而言合理
-- **磁碟務必 SSD/NVMe，不要為省錢選 HDD** —— WooCommerce + Ultimate Member 的資料庫吃 IO
+- RAM：**128 GB ECC**（2026-08-17 上修，原定 64 GB 已作廢）—— 這台不只放 soulful，還要承載 Chatwoot + EU 全部服務 + 多站 WP。決策與負載帳：[`reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md`](../../../reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md)
+- CPU：**≥8C/16T**；**ECC 記憶體為硬門檻**（要跑 Supabase / Chatwoot / ClickHouse 的正式資料）
+- **磁碟務必 SSD/NVMe，不要為省錢選 HDD** —— WooCommerce + Ultimate Member 的資料庫吃 IO；**RAID1 後可用容量 ≥1 TB**
 
 ### ③ 要不要 RAID
 

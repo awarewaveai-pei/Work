@@ -30,7 +30,15 @@
 >
 > ★ **重要脈絡（只讀本 runbook 會漏掉）**：AI 客服的「大腦」—— cs-engine + RAG + 操作 UI（U0–U5）+ headless widget 程式碼（U4）—— **已建好且上 prod 驗證過**（部署在 SG `lobster-next-admin`，讀 EU Supabase 的 cs_* 表；餵知識→pgvector 已 live 驗證 embed_dim=1536）。本搬家的 **Chatwoot = 該系統 U6（最後一塊）= 收件匣那層**。Chatwoot 裝好後的**接線步驟**（建 AgentBot webhook route 呼叫 `lib/cs` 的 `handleInbound`、widget 把 `MockTransport` 換 `ChatwootTransport`）+ 8 月冷啟動完整接手 → **`agency-os/handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md`**（這份是接手第一讀）。
 
-**選定機型（Serverbörse auction 條件）**：
+**選定機型** —— 🔴 **本表已於 2026-08-17 被規格上修取代。下單前讀新決策，不要照下表買。**
+
+> **新正本**：[`agency-os/reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md`](../agency-os/reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md)
+> **上修後的規格下限**：**128GB ECC / ≥8C16T / ≥1TB NVMe 可 RAID1**。首選 **OVH KS-6**（Epyc 7351p 16C32T / 128GB DDR4 ECC / 2×1TB NVMe soft RAID / **$59.80 月** ≈ €51–54）；Hetzner auction 若出現 128GB ECC + ≥2TB NVMe **≤€65/月** 則改選 Hetzner。**觀望截止 2026-08-31，硬買機死線 2026-09-30。**
+> **為什麼改**：操作者 2026-08-17 聲明工作負載為「**很多網站和自架工具**」，下表的負載模型（Chatwoot + EU 現有服務）不含多站 WP 租戶。重算後 RAM 需求 37–58 GB → 64GB 僅剩 ~9% headroom，對承載 ClickHouse（已 OOM 復發 4 次）的整併主機不可接受。且 128GB ECC 價格帶只比下表貴 €3–6/月，「64GB 是 auction 地板價」的前提已不成立。
+> **下表其餘決策全部有效**（Chatwoot greenfield 先行、單台 + RAID1 + R2、HA 第二台延後、絕不 HDD）。
+
+<details>
+<summary>⚠️ 已取代 — 2026-06-27 原選定機型表（保留為歷史紀錄，勿照此下單）</summary>
 
 | 項目 | 選定 | 為什麼 |
 |---|---|---|
@@ -40,7 +48,11 @@
 | 價 | ~**€48.70/月**（≈NT$1600）| 64GB 地板價；單價比雲端便宜一半多 |
 | 機房 | Falkenstein（FSN）| 與 EU(Helsinki) 異 DC → 未來留一台即天然異地 |
 
-> ⚠️ **絕對金額比現在貴**（EU+SG 雲端 ~€28 → 一台 €48.70），但 RAM 12GB→64GB（5×），單價便宜一半多。省錢靠**搬完退掉雲端兩台**，結算在單台 €48.70（不是疊加）。
+</details>
+
+**機房**：德國境內即可（原選 FSN；新首選 KS-6 在 Limburg DE）—— 與 EU(Helsinki) 異 DC 的天然異地性質不變。
+
+> ⚠️ **絕對金額比現在貴**（EU+SG 雲端 ~€28 → 一台 €51–54），但 RAM 12GB→**128GB**（10×）。省錢靠**搬完退掉雲端兩台**，結算在單台（不是疊加）。
 
 **執行順序（關鍵：Chatwoot greenfield 先行，不被 EU 搬移綁架）**：
 ```
@@ -324,7 +336,8 @@ openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -in "$OUT/env.tar.g
 - [x] **演練還原成功一次**（§6 A/C + MainWP/n8n 內容驗證）— 2026-06-26
 - [x] **修 R2 upload WARN**（2026-06-26：`set -a` export 修；實測 10/10 HTTP 200）→ 真 3-2-1 成立
 - [x] 備份失敗會 surface（2026-06-26：`check-backup-health.ps1` 讀 verify 判定，FAILED→AO-RESUME WARN；非 Telegram 而是開工自動報，涵蓋「壞了」+「停了」）
-- [ ] 機型已選（§0b 2026-06-27：i7-7700 / 64GB / **2× 512GB SSD** / ~€48.70/月 / FSN）— **待操作者下單**（刷卡非 Claude）
+- [ ] 機型已選（**2026-08-17 上修**：**128GB ECC / ≥8C16T / ≥1TB NVMe RAID1**；首選 OVH KS-6 $59.80，Hetzner auction ≤€65 則改選 Hetzner；**觀望截止 8/31、買機死線 9/30**）— **待操作者下單**（刷卡非 Claude）。正本 [`2026-08-17-dedicated-host-spec-upgrade.md`](../agency-os/reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md)；§0b 舊表（i7-7700/64GB/€48.70）已作廢
+- [ ] **下單前逐項確認**（KS-6 路線）：可裝 Ubuntu LTS + 自訂分割 + soft RAID1／rescue mode 可用／「Backup Agent free licence」實際容量／刷卡幣別與匯率 — 見決策文件「下單前必須驗證的事」
 - [ ] auction 機：雙碟 NVMe/SSD + RAID 1 + SMART 健康 + mdadm 告警
 - [ ] **Chatwoot greenfield 先上**（EU 搬移前；§0b 順序 step 3）→ 接 cs-engine AgentBot webhook + headless widget
 - [ ] **每容器設記憶體上限**（docker-compose `mem_limit`）→ 防一個服務吃爆拖垮全部（EU 現況痛點）

@@ -71,7 +71,7 @@
   **根因（同一類、犯了兩次）**：讀含憑證的檔案時，遮罩是「輸出後才套用」而非「不讀取值」。**改善**：日後查證這類檔案改用 `grep -c` / 欄位名列舉 / `Get-VaultSecretFingerprint`，不輸出行內容。
   **DoD**：三項各自輪換並更新 vault 與 `AWARE_WAVE_CREDENTIALS.md`；Telegram token 換發後需重跑 `scripts/configure-telegram-webhook.ps1`。
 
-- [ ] **⏭️ Soulful 搬站：機器買到後的接手點（硬死線 2026-11-12，建議 9/30 前買機）** —— DNS/信箱/備份/演練皆已完成，**唯一阻塞是機器還沒買**。目標主機已定：新購二手 Hetzner（`memory/project_hetzner_dedicated_plan.md`）。
+- [ ] **⏭️ Soulful 搬站：機器買到後的接手點（硬死線 2026-11-12，買機死線 9/30）** —— DNS/信箱/備份/演練皆已完成，**唯一阻塞是機器還沒買**。**規格已定案（2026-08-17）：128GB ECC / ≥8C16T / ≥1TB NVMe RAID1；首選 OVH KS-6 $59.80，Hetzner auction ≤€65（128G ECC + ≥2TB）則改選 Hetzner；觀望截止 8/31** —— 決策正本 [`reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md`](reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md)（取代 DR runbook §0b 機型表）。
   - **操作者說一句話即可接手**：例「機器買好了，IP 是 x.x.x.x」或「soulful 搬站繼續」。不需要重述背景 —— 全部在下列文件裡。
   - **AI 接手第一步**：讀 [`tenants/company-soulful-expression/core/SITE_MIGRATION_RUNBOOK.md`](tenants/company-soulful-expression/core/SITE_MIGRATION_RUNBOOK.md)（步驟/切換/回滾 SSOT），再依序 §0.5 → §3 → §4 → §5 → §6。
   - **已完成、不要重做**：① CF zone 14 筆記錄 + nameserver 已切（2026-08-15）② 信箱 mail-tester **10/10**（SPF/DKIM/DMARC 三項 pass）③ EU 三份備份 769 MB（DB 15M + uploads 632M + code 122M）④ 還原演練 **Drill #1 PASS** ⑤ FluentSMTP 主機名已修（`pop`→`smtp.hostinger.com`）
@@ -227,7 +227,7 @@
   - **信箱不受影響**（2026-08-15 查官方文件三項獨立證據）：① Hostinger 支援文原句「Since emails are stored on a separate infrastructure, they are not included in hosting plan reactivations or file backups」② Business Email 是可獨立購買產品、不需 hosting ③ DNS 管理綁網域不綁 hosting（網域付到 2028）。**故不需開 support ticket**。搬 DNS 到 CF 後三個依賴全部脫鉤
   - **📅 日曆提醒已建立（2026-08-16，`peijingartstudio@gmail.com`）** —— **勿重複建立**：① `2026-09-30` 買二手 Hetzner 機（前 1 天彈窗 + 前 7 天 email）② `2026-10-15` 搬站進度檢查 ③ `2026-11-05` 到期前 7 天最後確認 ④ `2026-11-12` hosting 到期（紅色標記，前 1 天彈窗 + 前 14 天 email）。每則描述內含當下該做什麼、文件路徑、以及「別取消 Hostinger 帳號」警告。**註**：操作者的 AwareWaveAI Google 帳號（`awarewaveai@gmail.com`）未連到 Claude connector，故寫入主日曆
   - **🚀 執行手冊（開工先讀這份）**：[`core/SITE_MIGRATION_RUNBOOK.md`](tenants/company-soulful-expression/core/SITE_MIGRATION_RUNBOOK.md) —— §0.5 買機前三個決定（機房位置／SSD／RAID）、§1–§5 建置與搬遷、§6 切換與回滾、§7 切換後、§8 讓 hosting 到期。**操作者只需做兩件事：買機器（給 IP + root SSH）、切換當天點頭**
-  - **執行順序（不可跳序）**：① ~~DNS 搬 Cloudflare~~ ✅ 2026-08-15（同時永久修好 IPv6）→ ② **網站搬新購二手 Hetzner 機**（目標已定，見下）→ ③ 網域轉 CF Registrar（**建議搬站穩定後再做**，見下）→ ④ 讓 hosting 自然到期
+  - **執行順序（不可跳序）**：① ~~DNS 搬 Cloudflare~~ ✅ 2026-08-15（同時永久修好 IPv6）→ ② **網站搬新購二手 dedicated 機**（目標與規格已定，見下；供應商 OVH 或 Hetzner 依 8/31 前 auction 結果）→ ③ 網域轉 CF Registrar（**建議搬站穩定後再做**，見下）→ ④ 讓 hosting 自然到期
   - **③ 網域轉 CF Registrar — 2026-08-16 查證後的實況（勿依舊記載行動）**：
     - **不會損失既有年限**：CF 官方文件明載 gTLD（含 `.org`）轉移「includes a one-year registration extension **from your current expiration date**」，為 **ICANN 強制**，非優惠 ⇒ `2028-06-02` → `2029-06-02`，**+1 年**
     - **註冊局到期日為 `2028-06-02`**（RDAP 直查 PIR；註冊日 2025-06-02，三年期，對應帳單 $53.97）。文件他處記載的 `2028-06-03` 來自 **Hostinger 帳單截圖**（續約扣款日）—— **兩者皆非錯誤**，是「註冊局到期（UTC）」與「商家計費日」的正常差異。**以轉移／到期判斷為準時用註冊局的 `06-02`**
@@ -238,10 +238,16 @@
     - **費用**：CF Registrar 零加價（照註冊局成本）。舊記載 `~$9.77` 可能已過時（`.org` 批發價近年調漲），**以下單當下 CF 頁面顯示為準**
   - **DNS 對照表（Cloudflare 實際 14 筆；清點表 13 筆已證實漏掉 `hostingermail-c`）**：[`core/DNS_MIGRATION_RECORD_MAP.md`](tenants/company-soulful-expression/core/DNS_MIGRATION_RECORD_MAP.md) —— 含「AAAA 刻意不建」「哪些 CNAME 不可開 Proxy」「🔴 DKIM 實況：實際簽章 selector 是 `hostingermail1`」「回滾方式（回滾會失去 `hostingermail1`，需先補）」
   - **安全網已就緒且已驗證**（2026-08-16 更新）：DB（288 表）+ uploads（11,001 檔）+ **程式碼（38,991 檔，含 ~17 個付費外掛）** 三份共 769 MB 存於 EU，SHA-256 兩地一致。**還原演練 2026-08-16 PASS**（EU 拋棄式容器：288 表還原、750 筆附件與磁碟檔案零遺失交叉比對通過）。見 [`core/BACKUP_RESTORE_PROOF.md`](tenants/company-soulful-expression/core/BACKUP_RESTORE_PROOF.md) Drill #1 + Record #3
-  - **✅ 目標主機已定（2026-08-16）**：搬到**新購的二手 Hetzner 主機**（同 `memory/project_hetzner_dedicated_plan.md`）。原「決定目標主機」阻塞解除，剩下的路徑是「買機 → 建置 → 搬 → 切換」。**注意**：該機預期不只放 soulful，建置時按多站設計
+  - **✅ 目標主機已定（2026-08-16）＋規格已定案（2026-08-17）**：搬到**新購的二手 dedicated 機**。原「決定目標主機」阻塞解除，剩下的路徑是「買機 → 建置 → 搬 → 切換」。**注意**：該機預期不只放 soulful，建置時按多站設計
+    - **規格下限**：**128GB ECC / ≥8C16T / ≥1TB NVMe 可 RAID1**（2026-08-17 上修，原 64GB 作廢 —— 負載重算後 37–58GB，64GB 僅剩 ~9% headroom 且 ClickHouse 已 OOM 復發 4 次）
+    - **首選 OVH KS-6** $59.80/月（Epyc 7351p 16C32T / 128G DDR4 ECC / 2×1TB NVMe soft RAID / Limburg DE）+ $43.20 一次裝機 —— 比原核准的 €48.70 只貴 €3–6/月，換到 RAM 2× + 核數 4×
+    - **改選 Hetzner 的條件**：auction 出現 **128G ECC + ≥2TB NVMe ≤ €65/月**（auction 有降價計時器，掛牌價非底價）→ 選它（同商 + Robot + RMA 更好）
+    - **時程**：**觀望截止 8/31**（等不到就買 KS-6）→ **買機死線 9/30**（既有日曆提醒）
+    - **決策正本**：[`reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md`](reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md) —— 取代 `runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md` §0b 機型表；§0b 其餘決策（Chatwoot 先行 / 單台+RAID1+R2 / HA 延後）不變
+    - **下單前確認**：可裝 Ubuntu LTS + 自訂分割 + soft RAID1／rescue mode／Backup Agent 實際容量／刷卡幣別匯率
   - **所有權澄清**：soulfulexpression.org 是**操作者自己的產業**，非第三方客戶 —— 授權盤點、切換時段等皆自己決定，不需對外協調
   - **⚠️ 授權盤點（搬遷前必做）**：站上 ~17 個付費外掛分屬 5–6 組授權（ACF Pro／Kadence 三件／Fluent 三件／Ultimate Member 八個擴充／CartFlows／Permalink Manager Pro）。程式碼已備份可照搬、站會跑，但**更新與支援需要有效授權**，需自行確認續約狀態。清單見 [`core/SITE_CODE_MANIFEST.md`](tenants/company-soulful-expression/core/SITE_CODE_MANIFEST.md)
-  - **待辦**：搬遷量已量測（檔案 1.5 GB／DB ~103 MB，plugins 619M 皆為正常大型外掛、無備份垃圾）→ ~~建 CF zone~~ ✅ → ~~操作者改 nameserver~~ ✅ 2026-08-15 → ~~驗證（網站 200 + 寄收測試信 + DKIM/SPF）~~ ✅ 2026-08-16 **mail-tester 10/10，三項 pass** → ~~決定目標主機~~ ✅ 2026-08-16（二手 Hetzner）→ ~~還原演練~~ ✅ 2026-08-16 PASS → **⏭️ 下一步：買機器**（操作者，建議 2026-09-30 前）→ 建置 → 搬站 → 切換（需 go-ahead）→ 完整還原演練 Drill #2
+  - **待辦**：搬遷量已量測（檔案 1.5 GB／DB ~103 MB，plugins 619M 皆為正常大型外掛、無備份垃圾）→ ~~建 CF zone~~ ✅ → ~~操作者改 nameserver~~ ✅ 2026-08-15 → ~~驗證（網站 200 + 寄收測試信 + DKIM/SPF）~~ ✅ 2026-08-16 **mail-tester 10/10，三項 pass** → ~~決定目標主機~~ ✅ 2026-08-16（二手 dedicated）→ ~~還原演練~~ ✅ 2026-08-16 PASS → ~~定案機器規格~~ ✅ 2026-08-17（128G ECC / ≥8C16T / ≥1TB RAID1；首選 KS-6）→ **⏭️ 下一步：買機器**（操作者刷卡，**觀望截止 8/31、死線 9/30**）→ 建置 → 搬站 → 切換（需 go-ahead）→ 完整還原演練 Drill #2
 - [x] **✅ Soulful 網站寄不出信 —— 已修（2026-08-16，既存故障，非搬遷造成）** —— FluentSMTP 主機設成 `pop.hostinger.com:587`（該埠不接受連線），已改為 `smtp.hostinger.com:587`。故障證據：`wp_fsmpt_email_logs` id=90 **2026-08-03** 已同樣 `Could not connect to SMTP host`，早於 DNS 切換 12 天。修後實測：正常路徑 `wp_mail()` 回 `SENT_OK`、日誌 id=93/94 轉 `sent`、mail-tester **10/10**（SPF/DKIM/DMARC 三項 pass）。掃過 `wp_options` 無其他 `pop.hostinger.com` 殘留。**回滾**：把該連線 Host 改回 `pop.hostinger.com`（只有這一個欄位變動）
   - **監控補強**：`scripts/check-smoke-tests.ps1` 新增 Check 5 `client_mail`，每次 AO-RESUME 查最近 7 天寄信失敗數。**不用外掛自帶的失敗通知** —— 它自己也走 `wp_mail`，警報會跟被監控的通道一起死
 

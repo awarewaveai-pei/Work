@@ -4,6 +4,47 @@
 
 ## 2026-08-17
 
+### AUTO_TASK_DONE: Dedicated 主機規格上修 64GB → 128GB ECC（§0b 機型表作廢）
+
+[任務]
+操作者貼 OVH KS-6 截圖（Epyc 7351p / 128G DDR4 ECC / 2×1TB NVMe soft RAID / $59.80月）問「你看如何」，接著貼三台 Hetzner Server Auction 128GB 機比價，並在被建議 64GB 機型後回「**你確定?! 我之後會有很多網站和自架工具**」。這句話推翻了 §0b（2026-06-27）的負載模型前提，觸發機型規格重審。
+
+[已修改]
+1. **新增** `agency-os/reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md` —— 決策正本（負載帳／五候選比較／決策規則／下單前驗證清單／剩餘風險／switch conditions）
+2. `agency-os/reports/decisions/INDEX.md` —— 加一列；並修正檔頭「所有決策皆由 `/decide` 面板產出」的過期主張（本篇是主代理直接決策，無 debate transcript，需可辨識）
+3. `runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md` §0b —— 機型表加「已取代」橫幅 + 摺疊保留原表為歷史；機房列改為「德國境內即可」；省錢註解的 €48.70 → €51–54、RAM 5× → 10×
+4. 同檔 §7 checklist —— 「機型已選」項改為新規格 + 死線；新增「下單前逐項確認」項（Ubuntu LTS + 自訂分割 + soft RAID1 / rescue mode / Backup Agent 容量 / 刷卡幣別）
+5. `agency-os/tenants/company-soulful-expression/core/SITE_MIGRATION_RUNBOOK.md` §0.5 ② —— RAM 下限 64GB → 128GB ECC；補 CPU ≥8C16T、ECC 硬門檻、RAID1 後可用 ≥1TB
+6. `agency-os/TASKS.md` —— 接手點條目（:74）、執行順序 ②、目標主機條目（:241 展開為六個子項）、待辦鏈（:244）四處同步規格與死線；「二手 Hetzner」→「二手 dedicated」（供應商未定）
+7. `memory/project_hetzner_dedicated_plan.md` —— 規格與供應商候選更新
+
+[根因]
+§0b 選 i7-7700/64GB 的理由寫得很清楚：「auction **地板價**、4C8T 夠用」。該判斷在兩個前提下成立 —— ① 負載 = Chatwoot + EU 現有服務（**不含多站 WP 租戶**）② 64GB 是可得的最低價位。操作者這次同時打破兩者：聲明了多站 + 自架工具的負載，並找到 128GB ECC 只貴 €3–6/月的價格帶。**這不是 §0b 當時判斷錯，是輸入變了。**
+
+我自己的第一版建議（AX42 64GB，排序 ECC > 單核速度 > 支援 > 價格）同樣踩在舊負載模型上，被操作者一句話推翻。決策文件內明文記載此次翻轉與其依據，避免將來的人以為排序是品牌偏好。
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 純文件決策記錄與交叉引用更新，無 code 改動
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n
+  - 自審讀回：§0b 全文 + §7 全文 + `SITE_MIGRATION_RUNBOOK.md §0.5` 全文，確認 supersede 範圍**只涵蓋機型表三列**（CPU/RAM/價），§0b 其餘決策（Chatwoot greenfield 先行、單台+RAID1+R2 夠用、HA 第二台延後、絕不 HDD）皆完整保留且在新文件「§0b 未變動的部分」重述
+  - markdown code-fence 與表格對齊檢查通過；`<details>` 標籤成對
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks | grep=64\s?GB\|64G\b\|二手 Hetzner\|二手拍賣 | hits=30
+  - 分類處置：**規範性**（會導致買錯機）3 處全修 —— DR runbook §0b 表 + §7「機型已選」+ `SITE_MIGRATION_RUNBOOK.md:42`
+  - **歷史性**紀錄刻意不改（27 處）：`reports/weekly/*`（7 檔）、`reports/monthly/*`（2 檔）、`reports/ao-resume/*`（3 檔）、`memory/daily/*`（4 檔）、`handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md`、`docs/Customer_service/Customer_service_BUILD_PLAN.md:155`、`tenants/.../cloudflare-wpml-migration-plan.md:12` 的 €48.70／64GB 記載 —— 皆為「當時決策是什麼」的存檔敘述，改掉等於偽造歷史。三份 SSOT 已指向新正本，讀者不會照舊表下單
+  - `scripts/` 零命中（規格未進任何腳本，無 call site 風險）
+- 交叉引用實測：新檔到 DR runbook 的相對路徑 `../agency-os/reports/decisions/...`、DR runbook 到新檔、`SITE_MIGRATION_RUNBOOK` 到新檔 `../../../reports/decisions/...`、TASKS 到新檔 —— 四條依各檔所在深度逐一核算
+
+[剩餘風險]
+- **匯率未證實**：$59.80 → €51–54 以 1.10–1.17 區間換算，未查即時匯率。若歐元走弱，KS-6 與 §0b 原核准 €48.70 的差距會擴大。決策文件已標示「以實際刷卡匯率為準」
+- **AX42 官方價未取得**（Hetzner 2026-06-15 全線改名 -1/-2/-3 重新定價，官網頁面抓不到金額），€46–57 來自第三方列表。此候選已被 64GB 天花板淘汰，價格不影響結論，但文件內已標示需自行確認
+- **OVH Eco 運維品質是社群評價，非一手經驗** —— 「無 IPMI/KVM、RMA 較慢、常缺貨」無法在此驗證。官方載明 99.9% SLA + 自動換件。這是本決策 confidence 0.78（非 0.9+）的主因
+- **KS-6 的 OS 安裝自由度未驗證**：能否裝 Ubuntu LTS + 自訂分割 + soft RAID1 只從產品名含 "Soft RAID" 推斷。已列入「下單前必須驗證」與 §7 checklist，但若實際不支援自訂分割，整個 KS-6 路線需重評
+- **1TB 可用碟是真天花板**（3 年估 400G–1T）。緩解靠備份外放；§7 尚缺的「第二異地取代 SG-offsite」項可一併解決
+- 本決策**未經 `/decide` 面板交叉檢驗**（無 Skeptic/Judge）。文件檔頭與 INDEX 檔頭皆已標示，避免將來被當成 panel-vetted 結論
+
+[避免再發生]
+機型／容量決策必須把**負載模型當成顯式前提寫進文件**，並列為 switch condition 第一條。§0b 沒寫錯任何一句，但它的「4C8T 夠用」隱含了一份未寫下的負載清單 —— 兩個月後負載加了多站，沒有任何機制會提醒「那個判斷的前提已經不在了」。這次靠操作者一句反問才發現。凡是「X 夠用」的結論，都要在同一段寫下「在什麼負載下夠用」。
+
 ### AUTO_TASK_DONE: smoke check 的「偵測器啞了卻報 PASS」根治（跨模型 oracle 首次實戰）
 
 [任務]
