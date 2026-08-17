@@ -1,0 +1,28 @@
+# 僅限本機安裝（GPU 依賴，見 README.md）。
+# torch/torchaudio 需另外從 CUDA index 裝，見 README.md「安裝」章節，
+# 這裡列出的是 pip 預設 index 會裝到的 CPU 版本號，之後要 --force-reinstall 換 CUDA 版。
+
+# ASR
+faster-whisper==1.2.1
+av==18.1.0
+
+# 講者分離
+pyannote.audio==4.0.7
+scikit-learn==1.9.0
+
+# CUDA 執行庫（Windows 需 os.add_dll_directory 手動註冊，見 lib/transcribe.py）
+nvidia-cublas-cu12
+nvidia-cudnn-cu12
+
+# PPT 生成
+python-pptx==1.0.2
+
+# 摘要（Claude API）
+anthropic==0.122.0
+
+# 操作頁面
+fastapi==0.137.0
+uvicorn==0.49.0
+python-multipart==0.0.32
+
+numpy==2.4.6
