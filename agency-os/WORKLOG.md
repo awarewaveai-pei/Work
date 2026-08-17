@@ -2,6 +2,46 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-08-17
+
+### AUTO_TASK_DONE: smoke check 的「偵測器啞了卻報 PASS」根治（跨模型 oracle 首次實戰）
+
+[任務]
+操作者問「Claude Code + Codex 搭配是否最佳」。結論：該配置解的是成本問題，本 repo 沒有；有價值的是**跨模型互審**（不同模型盲點不重疊）。試跑一次驗證實效，Codex 在 `0d28d78c` 的 diff 上抓到 2 條真問題、0 假陽性，遂修之。
+
+[已修改]
+1. `scripts/check-smoke-tests.ps1` —— Check 5 補 `$LASTEXITCODE` 捕捉；`skip:unparsed`→`warn:unparsed`、`skip:exception`→`warn:exception`；新增 `quiet_days`（距上次成功寄信天數）第二訊號與 `-MailQuietDayLimit`（預設 10）；新增 `$noEvidence` 集合與 `$criticalChecks`／`blind_spots`；verdict 計算移到 JSON 寫入**之前**，`overall` 與 `blind_spots` 納入 JSON
+2. `agency-os/AGENTS.md` §AO-RESUME —— 補「判讀 smoke 結果」段：直接讀 `overall`/`blind_spots` 不要心算；門檻必須低於 FluentSMTP 的 14 天保留
+
+[根因]
+修寄信那次（`0d28d78c`）把「警報與被監控通道一起死」的模式**複製進了監控腳本自己**：ssh/查詢失敗 → `skip:*` → summary 的 `$hasWarn` 只認 `warn:*`/`fail:*` → `$allSkip` 又要求五項全 skip → **唯一的寄信偵測器啞掉，總結論照樣 PASS**。`$ErrorActionPreference="SilentlyContinue"` 讓錯誤全域靜音，使其更難察覺。
+
+[驗證結果]
+- **修改前後對照（決定性證據）**：同樣拿掉 SSH 金鑰，舊版 `== Smoke: PASS | mail=skip:no_ssh_key ==`；新版 `== Smoke: WARN | mail=skip:no_ssh_key | BLIND: client_mail=skip:no_ssh_key ==`
+- **8 個負向情境全通過**：N1 無金鑰→WARN+blind／N2 ssh exit 255→warn+blind／N3 解析失敗→warn+blind／N4 健康 3d→PASS／N5 40d→warn／N6 無 sent 紀錄→`warn:no_send_within_log_window`／N7 12d（>10）→warn／N8 9d（≤10）→PASS。測試檔全在 `$env:TEMP\smoke-negtest`，未落 repo
+- **實測揪出 Codex 沒問到的耦合**：`fluentmail-settings` 的 `log_saved_interval_days=14`，FluentSMTP 每日 cron 清 14 天前日誌 ⇒ `quiet_days` 上限約 14。原訂 21 天門檻**是永遠觸發不到的死碼**，且靜默滿 14 天後 `sent` 列被清空會誤報「從未成功寄過」。門檻改 10（同時低於 14 保留與 13 天事故長度），訊息改為 `no_send_within_log_window`
+- **門檻無歷史基準可訂（誠實標示）**：日誌表僅存 14 天（08-03～08-17，6 筆），且完全落在故障期＋修復當天。10 是依「兩個天花板」推得，非依實際流量調校
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/check-smoke-tests.ps1 + negtest.ps1 (8 cases) + beforeafter.ps1 (pre-change proof) + retention2.ps1 (wp option get fluentmail-settings) | exit=0 | ms=~240000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/0n
+  - 外部 oracle = Codex CLI (gpt-5.4, `codex exec -s read-only`)，非自我描述。兩條 finding 皆驗證為真並修正：① 21 天門檻長於它要防的 13 天事故 ② `blind_spots` 只認 `skip:*`，漏掉 `warn:ssh_exit`/`warn:unparsed`/`warn:exception` 這三種同樣「零證據」的狀態（我自己的 N2 測試輸出早已顯示 `blind:[]`，當下沒看出來）
+  - **第二輪覆審**（對最終狀態，因首輪審的是修正前版本）：1 finding，驗證為真但屬設計邊界非 bug —— 見剩餘風險第一條。兩處修正本身未引入新問題
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=skip:unparsed,no_failures_7d,gracefully skipped,MailQuietDayLimit | hits=3
+  - `WORKLOG.md:156` 的 `skip:unparsed` 是當日敘事非過期主張，保留；`.claude/worktrees/suspicious-ritchie-c9482b/` 有腳本舊副本造成假陽性（2026-07-04 殘留 worktree），已開待辦另案清理；`agency-os/AGENTS.md` 的 smoke 說明已同步更新
+- 編碼稽核：`audit-cp950-traps.ps1 -File scripts/check-smoke-tests.ps1` → scanned=1 clean=1 drift=0，exit 0
+
+[剩餘風險]
+- **偵測窗口未歸零（Codex 覆審確認）**：`quiet_days` 量的是「最後一次成功寄信有多新」，不是「現在還能不能寄」。若今天成功、明天壞掉、之後無人觸發寄信 → `failed7d=0, quiet_days=1` → 仍報 PASS，最長可撐 `MailQuietDayLimit`(10) 天。從事故當時的 13 天縮短但未消除。**唯一能歸零的做法是主動探測**；下一步建議做 SMTP handshake 探針（TCP 連 `smtp.hostinger.com:587` + EHLO/STARTTLS，**不寄信**）—— 原事故正是「該埠拒絕連線」，握手探針幾秒內就能抓到，且無送達率／垃圾信副作用。刻意不做合成寄信：新增對外寄信副作用，失敗面比解決的還多
+- `MailQuietDayLimit=10` 未經真實安靜期驗證，可能產生噪音；累積數月健康資料後應回頭檢視
+- `client_mail` 仍只覆蓋 soulful 一家；搬離 Hostinger 後 `HOSTINGER_SOULFUL_SSH_*` 與金鑰路徑需同步改（`SITE_MIGRATION_RUNBOOK.md:178` 已列）
+- FluentSMTP 若調整 `log_saved_interval_days`，門檻註解的推導前提需重算
+- `$criticalChecks` 目前只列 `client_mail`；其餘四項若也成為某類靜默故障的唯一偵測器，需自行加入
+
+[避免再發生]
+「偵測器啞了」與「一切正常」不可以長成同一個樣子。新增任何監控時，先問：這個檢查失敗時，總結論會變成什麼？若答案是 PASS 或沉默，就是同一個 bug class。
+
+[rollback]
+`git revert <commit>`；或單檔 `git checkout HEAD~1 -- scripts/check-smoke-tests.ps1`。純腳本與文件變更，無資料遷移。
+
 ## 2026-08-16
 
 ### AUTO_TASK_DONE: 查證網域轉 CF Registrar 是否損失既有年限（結論：不損失，但先別轉）

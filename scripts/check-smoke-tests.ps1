@@ -8,18 +8,38 @@
   agency-os/reports/status/smoke-LATEST.json
 
 .NOTES
-  Checks (all gracefully skipped on error — never breaks AO-RESUME):
+  Never breaks AO-RESUME (always exit 0), but "skip" is NOT universally benign:
+  a check listed in $criticalChecks is the sole detector of a silent-failure class,
+  so its skip degrades the run to WARN instead of being swallowed (see summary block).
+
+  Checks:
     1. n8n MCP connectivity  (scripts/n8n-mcp-smoke.ps1)
     2. Repair Center health  (GET /api/ops/repairs/health)
     3. Client sites health   (GET /api/ops/clients)
     4. n8n workflow failures (GET n8n/api/v1/executions?status=error — last 24h)
-    5. Client outbound mail  (SSH soulful -> wp_fsmpt_email_logs failures, last 7d)
+    5. Client outbound mail  (SSH soulful -> wp_fsmpt_email_logs; failures last 7d
+       AND days since last successful send) — CRITICAL
   ops-console-smoke skipped here — requires TenantId which varies by tenant.
   Run /smoke-test manually for full DoD including ops-console.
 #>
 param(
     [string]$WorkRoot   = "",
-    [string]$AppBaseUrl = "https://app.aware-wave.com"
+    [string]$AppBaseUrl = "https://app.aware-wave.com",
+    # Days without a successful outbound send before Check 5 warns.
+    #
+    # MUST stay below TWO ceilings, or the check is worse than useless:
+    #   1. FluentSMTP prunes its own log table on a daily cron — soulful's
+    #      fluentmail-settings has "log_saved_interval_days":"14" (verified 2026-08-17).
+    #      Past 14 quiet days every 'sent' row is deleted, so quiet_days can never exceed
+    #      ~14; any limit at or above that makes this branch unreachable dead code.
+    #   2. The incident being defended against ran 13 days (2026-08-03 -> 08-16). A limit
+    #      longer than the outage it exists to catch defeats the purpose.
+    # 10 leaves headroom under both. Raise only if the plugin's retention is raised first.
+    #
+    # NOTE: this is not tuned to observed traffic — it cannot be. Retention caps the log at
+    # 14 days, so no healthy-cadence baseline longer than that is obtainable. Revisit once
+    # several quiet months have shown whether 10 produces noise.
+    [int]$MailQuietDayLimit = 10
 )
 
 Set-StrictMode -Version Latest
@@ -49,6 +69,12 @@ $encHelpers = Join-Path $PSScriptRoot "_console-encoding-helpers.ps1"
 if (Test-Path -LiteralPath $encHelpers) { . $encHelpers }
 
 $results = @{}
+
+# Checks that ran but produced NO measurement this time. Kept separate from $results
+# because the verdict string alone cannot express it: "warn:ssh_exit255" and
+# "skip:no_ssh_key" are both "we learned nothing", while "warn:soulful_2_failed_7d" is a
+# real observation. Blind-spot reporting keys off this, not off string prefixes.
+$noEvidence = @{}
 
 # --- Check 1: n8n MCP connectivity ---
 $n8nScript = Join-Path $root "scripts\n8n-mcp-smoke.ps1"
@@ -168,57 +194,112 @@ try {
     $mailKey  = Join-Path $env:USERPROFILE ".ssh\hostinger_soulful"
 
     if (-not (Test-Path -LiteralPath $mailKey)) {
-        $results["client_mail"] = "skip:no_ssh_key"
+        $results["client_mail"]    = "skip:no_ssh_key"
+        $noEvidence["client_mail"] = $true
     } elseif (-not (Get-Command Invoke-WithUtf8Console -ErrorAction SilentlyContinue)) {
         # No unwrapped fallback on purpose: a bare `& ssh` capture is exactly the
         # CP950 trap class that audit-cp950-traps.ps1 exists to catch.
-        $results["client_mail"] = "skip:no_enc_helper"
+        $results["client_mail"]    = "skip:no_enc_helper"
+        $noEvidence["client_mail"] = $true
     } else {
         # PowerShell strips quotes when handing arguments to native ssh, which tore the
         # SQL apart on the remote side ("syntax error near unexpected token `('").
         # Base64 the whole remote script so nothing needs quoting in transit -- same
         # pattern the repo already uses for the CJK/cron encoding trap.
-        $sql       = "SELECT COUNT(*) FROM wp_fsmpt_email_logs WHERE status='failed' AND created_at > (UTC_TIMESTAMP() - INTERVAL 7 DAY);"
+        # Two signals in ONE round-trip. Failure count alone cannot tell "healthy" apart
+        # from "already broken, just not exercised yet": a dead SMTP host that nobody has
+        # tried to send through logs zero failed rows and would read as ok. quiet_days
+        # (age of the newest successful send) supplies the missing liveness evidence.
+        # quiet_days = -1 means the table holds no successful send at all.
+        $sql       = "SELECT (SELECT COUNT(*) FROM wp_fsmpt_email_logs WHERE status='failed' AND created_at > (UTC_TIMESTAMP() - INTERVAL 7 DAY)) AS failed7d, IFNULL(DATEDIFF(UTC_TIMESTAMP(), (SELECT MAX(created_at) FROM wp_fsmpt_email_logs WHERE status='sent')), -1) AS quiet_days;"
         $remoteCmd = "cd domains/soulfulexpression.org/public_html && wp db query " + [char]34 + $sql + [char]34 + " --skip-column-names"
         $b64       = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($remoteCmd))
         $sshArgs   = @("-i", $mailKey, "-p", $mailPort, "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
                        "-o", "StrictHostKeyChecking=accept-new", "$mailUser@$mailHost",
                        "echo $b64 | base64 -d | bash")
-        $raw = Invoke-WithUtf8Console { & ssh @sshArgs 2>&1 }
+        $raw      = Invoke-WithUtf8Console { & ssh @sshArgs 2>&1 }
+        $sshExit  = $LASTEXITCODE   # capture immediately: any later command overwrites it
 
+        # Strictly anchored: ssh writes advisory banners to stderr (e.g. the post-quantum
+        # key-exchange warning) which 2>&1 folds into $raw. Only a bare "<int>\t<int>" row
+        # is accepted as the result.
         $failCount = $null
+        $quietDays = $null
         foreach ($line in @($raw)) {
-            if ("$line".Trim() -match '^\d+$') { $failCount = [int]"$line".Trim(); break }
+            if ("$line".Trim() -match '^(\d+)\s+(-?\d+)$') {
+                $failCount = [int]$matches[1]
+                $quietDays = [int]$matches[2]
+                break
+            }
         }
 
-        if ($null -eq $failCount) {
-            $results["client_mail"] = "skip:unparsed"
-        } elseif ($failCount -eq 0) {
-            $results["client_mail"] = "ok:no_failures_7d"
-        } else {
+        # A transport/query failure means this detector produced NO evidence. It must not
+        # read as a benign skip — that is exactly how the 2026-08-03 outage stayed hidden.
+        if ($sshExit -ne 0) {
+            $results["client_mail"]    = "warn:ssh_exit$sshExit"
+            $noEvidence["client_mail"] = $true
+        } elseif ($null -eq $failCount) {
+            $results["client_mail"]    = "warn:unparsed"
+            $noEvidence["client_mail"] = $true
+        } elseif ($failCount -gt 0) {
             $results["client_mail"] = "warn:soulful_${failCount}_failed_7d"
+        } elseif ($quietDays -lt 0) {
+            # No 'sent' row survives in the table. With retention at 14 days this means
+            # "nothing sent successfully within the log window", NOT "never sent" — the
+            # evidence aged out rather than never existing. Word it as what we can know.
+            $results["client_mail"] = "warn:no_send_within_log_window"
+        } elseif ($quietDays -gt $MailQuietDayLimit) {
+            $results["client_mail"] = "warn:no_send_${quietDays}d"
+        } else {
+            $results["client_mail"] = "ok:no_failures_7d_last_send_${quietDays}d"
         }
     }
 } catch {
-    $results["client_mail"] = "skip:exception"
+    # The detector itself threw — same reasoning as above, this is a blind spot, not a skip.
+    $results["client_mail"]    = "warn:exception"
+    $noEvidence["client_mail"] = $true
 }
+
+# --- Verdict ---
+# Computed BEFORE the JSON write so the report carries the conclusion. Without it every
+# reader (Claude in AO-RESUME §1, a human skimming the file) has to re-derive the verdict
+# by hand, and each re-derivation is a chance to repeat the swallow-the-skip bug below.
+$checks    = @("n8n_mcp","repair_center","client_sites","n8n_failures","client_mail")
+
+# Checks that are the ONLY detector of a silent-failure class. For these, "skip" means
+# monitoring has stopped, so reporting PASS would repeat the mistake that caused the
+# 2026-08-03 mail outage: FluentSMTP's own failure notice travelled through wp_mail, so
+# the alarm died with the channel it was watching. A detector that goes quiet must be
+# louder than one that reports nothing wrong.
+$criticalChecks = @("client_mail")
+
+$hasWarn    = @($checks | Where-Object { $results[$_] -like "warn:*" -or $results[$_] -like "fail:*" })
+# Keyed on "produced no measurement", not on the verdict prefix: warn:ssh_exit255 and
+# skip:no_ssh_key are equally blind, and matching "skip:*" alone would report an empty
+# blind_spots list while the detector had in fact learned nothing.
+$blindSpots = @($criticalChecks | Where-Object { $noEvidence.ContainsKey($_) -and $noEvidence[$_] })
+$allSkip    = @($checks | Where-Object { $results[$_] -notlike "skip:*" }).Count -eq 0
+$overall    = if ($hasWarn.Count -gt 0 -or $blindSpots.Count -gt 0) { "WARN" } elseif ($allSkip) { "SKIP" } else { "PASS" }
+$colour     = if ($overall -eq "PASS") { "Green" } elseif ($overall -eq "SKIP") { "DarkGray" } else { "Yellow" }
 
 # --- Write LATEST JSON ---
 $stamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
 $payload = @{
-    generated = $stamp
-    checks    = $results
+    generated   = $stamp
+    overall     = $overall
+    blind_spots = @($blindSpots)   # critical detectors that produced no evidence this run
+    checks      = $results
 }
 $json = $payload | ConvertTo-Json -Depth 5
 Set-Content -Path (Join-Path $reportDir "smoke-LATEST.json") -Value $json -Encoding UTF8
 
 # --- Summary line for console ---
-$checks    = @("n8n_mcp","repair_center","client_sites","n8n_failures","client_mail")
-$hasWarn   = $checks | Where-Object { $results[$_] -like "warn:*" -or $results[$_] -like "fail:*" }
-$allSkip   = ($checks | Where-Object { $results[$_] -notlike "skip:*" }).Count -eq 0
-$overall   = if ($hasWarn) { "WARN" } elseif ($allSkip) { "SKIP" } else { "PASS" }
-$colour    = if ($overall -eq "PASS") { "Green" } elseif ($overall -eq "SKIP") { "DarkGray" } else { "Yellow" }
+# Surface WHICH detector went blind — "WARN" with no reason sends the reader hunting.
+$blindNote = ""
+if ($blindSpots.Count -gt 0) {
+    $blindNote = " | BLIND: " + (($blindSpots | ForEach-Object { "$_=$($results[$_])" }) -join ",")
+}
 
-Write-Host ("== Smoke: {0} | n8n_mcp={1} | repair={2} | clients={3} | n8n_fail={4} | mail={5} ==" -f `
-    $overall, $results["n8n_mcp"], $results["repair_center"], $results["client_sites"], $results["n8n_failures"], $results["client_mail"]) -ForegroundColor $colour
+Write-Host ("== Smoke: {0} | n8n_mcp={1} | repair={2} | clients={3} | n8n_fail={4} | mail={5}{6} ==" -f `
+    $overall, $results["n8n_mcp"], $results["repair_center"], $results["client_sites"], $results["n8n_failures"], $results["client_mail"], $blindNote) -ForegroundColor $colour
 exit 0
