@@ -1,5 +1,30 @@
 ﻿# Worklog
 
+## 2026-08-17（追加）— meeting-service 建立（本機操作頁面）
+
+**根因/動機**：agency-os 前期以 scratchpad 腳本驗證「會議錄音→逐字稿→講者分離→PPT→報告教練」全鏈可行（見 [[project_meeting_to_ppt_pipeline]] memory）。操作者要求（1）把驗證過的腳本存進 repo，（2）做可點的操作頁面取代手動跑指令。R0 判定：GPU 只在操作者筆電（SG 4GB/EU CPX32 皆無 GPU，CPU 路線實測 0.3x realtime 已判死），故本服務刻意不走 sg-deploy 部署 SOP，僅本機執行。
+
+**已修改**：新增 `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/`：
+- `lib/`：transcribe.py（GPU 探針+CUDA DLL 註冊）、merge_segments.py、hallucination.py（幻覺偵測）、diarize.py（pyannote 講者分離+三層貼標回退）、deck.py（PPT 生成+`plan_slides()`頁數計畫）、speaker_notes.py（講稿寫入備忘稿，頁數不符硬失敗）、minutes_md.py、summarize.py
+- `pipeline.py`：`run_pipeline_phase1()`（自動段，跑到 awaiting_summary）+ `resume_after_summary()`（貼回 JSON 後接手產出）
+- `app.py`：FastAPI，僅 bind 127.0.0.1；`/api/upload` `/api/prompt/{id}` `/api/submit-summary/{id}` `/api/status/{id}` `/api/log/{id}` `/api/download/{id}/{kind}`
+- `templates/index.html`：拖拉上傳 + 進度輪詢 + 複製prompt/貼回JSON兩步驟 + 下載
+- `README.md`：實測數字、6 個環境坑、架構決策記錄
+
+**架構轉折（同一 session 內發生，值得記）**：`summarize.py` 原設計呼叫 Claude API 自動摘要。操作者明確表示不額外付費、只用訂閱額度。嘗試改用 `claude -p` headless CLI（訂閱 session 不計 API 費）——**三次真實測試證實在 Windows+Git Bash 巢狀呼叫環境下不可靠**（process 變孤兒、stdout 管線斷裂，非猜測，已用 `Get-Process`/檔案時間戳驗證）。最終改為人工回路：`summarize.py` 只產生 prompt 字串，使用者貼進任一 Claude 對話（用訂閱），JSON 貼回頁面觸發 `resume_after_summary()`。零 API 費用、零環境賭注。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl -X POST http://127.0.0.1:8420/api/upload` 上傳真實 90 秒音檔（BU5.m4a 切片）→ 輪詢至 awaiting_summary → 撰寫真實 minutes JSON → `curl -X POST /api/submit-summary` → 驗證 slides.pptx(4頁)/meeting_notes.md/coach.md/transcript.srt 皆可透過 `/api/download` 真實下載(HTTP 200) | exit=0 | ms=~15000
+  - 過程中發現並修正真 bug：舊 server process（`Stop-Process` 用了 bash job PID 非真實 Windows PID，未真的殺掉）佔用 port 8420，導致第一輪測試打到含舊 API-based summarize.py 的 stale server。改用 `Get-NetTCPConnection` 查真實 PID 後解決，兩次事故（含更早的 `claude -p` 孤兒 process）確立教訓：**Windows 上 bash `$!`/`kill` 對非原生 fork 的 process 不可信，凡涉及背景 server/CLI wrapper 一律用 netstat/Get-Process 查真實 PID**
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n（deck.py 原 `Emu(int(Inches(w)))` 冗餘寫法已順手簡化為 `Inches(w)`，非引入 bug）
+- BUGHUNT_DONE: scope=agency-os,scripts,meeting-service | grep=`meeting.service\|meeting_service\|run_pipeline\b` | hits=0
+
+**剩餘風險**：講者分離約 10% 段落靠鄰近推定補標；貼上流程仰賴使用者忠實複製 Claude 回傳內容，`parse_pasted_json()` 已容錯 markdown fence 但無法防使用者手動改壞 JSON 結構（`validate()` 會擋頁數不符，但不驗證欄位內容真實性）。
+
+**Rollback**：整個 `apps/meeting-service/` 為新增目錄，未修改任何既有檔案；刪除該目錄即完全回復。
+
+
+
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
 ## 2026-08-17
