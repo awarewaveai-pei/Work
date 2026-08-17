@@ -99,12 +99,15 @@
 
 ## 下單前必須驗證的事（KS-6 路線）
 
-- [ ] **OS 安裝自由度**：能否裝 Ubuntu 22.04/24.04 LTS + **自訂分割 + soft RAID1**（產品名已含 "Soft RAID"，判斷可行，但要在下單前確認控制台實際提供）
-- [ ] **Rescue mode 是否可用**（無 IPMI/KVM 時的唯一救援路徑）
-- [ ] **"Backup Agent — Free licence" 實際內容**（容量、是否需另付 Backup Storage）—— 影響 1TB 磁碟天花板的緩解方案
+**2026-08-17 補充查證**（WebSearch + WebFetch，非一手操作經驗，來源見各項）：
+
+- [x] **OS 安裝自由度 — 已查，疑慮解除**：OVH 官方安裝流程有「Customise the partition configuration」勾選項，可在硬體/OS 限制內自訂分割與 RAID；Rescue mode 確認存在（SSH 進臨時系統救援/修 boot/清碟重裝）。此為 Kimsufi/OVH dedicated 產品線通用能力，非 KS-6 專屬不確定項。**原「選項 A/C 最大單點未知」不成立。**（來源：[OVHcloud getting-started guide](https://docs.ovhcloud.com/en/guides/bare-metal-cloud/dedicated-servers/getting-started-with-dedicated-server-eco)、[rescue mode 官方文件](https://help.ovhcloud.com/csm/en-dedicated-servers-ovhcloud-rescue)）
+- [x] **匯率 — 已查**：2026-08-17 即時 EUR/USD ≈ 1.1589。$59.80 ≈ **€51.60**；首月 $103（含裝機費）≈ **€88.9**。與原估 €51–54 區間吻合，比 §0b 核准的 €48.70 只貴約 **€3/月**，判斷不變
+- [ ] **"Backup Agent — Free licence" 實際容量 — 仍未驗證**：OVH 官方比較頁列出 Standard 系列 500GB / So You Start 系列 100GB / Rise 系列 500GB 免費 Backup Storage，**但 Kimsufi（Eco 最低階線）未單獨列出數字**，KS-6 產品頁本身也抓不到這格內容。保守推估落在 100GB 量級（比 SYS 低一階），**但這是推論非查證結果**。下單前需在 OVH 控制台或客服直接確認 —— 影響 1TB 磁碟天花板的緩解規劃，但不影響是否下單
+- [x] **OVH Eco 運維品質 — 已查，方向正向但有具體警訊**：硬體故障自動偵測、人工更換（非全自動）；社群評價「excellent, quick and effective」，但亦有具體反例「HDD/零件故障最長等過 20 天」、一般回報「1–2 天回應，非最快」；**無 IPMI/KVM 遠端主控台**（自助服務型，故障時只能靠 rescue mode + ticket）。RAID1 + R2 異地備份是此風險唯一緩解，非消除（來源：LowEndTalk 社群討論，非一手經驗，方向性參考）
+- [ ] **Rescue mode 是否可用**（無 IPMI/KVM 時的唯一救援路徑；上一項已確認產品線通用存在，仍需在實際 KS-6 控制台按一次驗證）
 - [ ] **SMART 健康值**（二手碟，開機後立即查；§7 已有此項）
 - [ ] **mdadm 降級告警**接上通知（§7 已有此項）
-- [ ] 實際刷卡幣別與匯率（頁面顯示 USD，帳單可能為 EUR）
 
 ---
 
@@ -113,7 +116,7 @@
 | 風險 | 嚴重度 | 緩解 |
 |---|---|---|
 | **1TB 可用碟是真天花板** —— 3年估：10 站 ~100G + ClickHouse 50–200G + Supabase 20–50G + Chatwoot PG/uploads + Docker 50G + 本機備份保留 200–500G = **400G–1T** | 中高 | 備份**必須**外放（R2 已在用；§7 尚缺「第二異地」項可一併解決）。本機不留長期備份保留 |
-| **OVH Eco 運維品質 < Hetzner Robot** —— 無 IPMI/KVM、Eco 線 RMA 實務速度社群評價較差、常缺貨 | 中 | 官方載明 99.9% SLA + 自動觸發換件。RAID1 + R2 + §0b「整機死從 R2 還原數小時」已涵蓋最壞情況 |
+| **OVH Eco 運維品質 < Hetzner Robot** —— 無 IPMI/KVM；社群回報硬體更換 1–2 天到最長 20 天不等，變異區間大 | 中 | 官方載明 99.9% SLA + 自動偵測（人工更換非全自動）。RAID1 + R2 + §0b「整機死從 R2 還原數小時」已涵蓋最壞情況；無 KVM 意味卡死時只能靠 rescue mode，非零風險（2026-08-17 補查證，來源 LowEndTalk 社群，非一手經驗）|
 | **舊硬體**（Epyc Naples，2017）剩餘壽命 | 中 | ECC + RAID1 + SMART 監控 + R2。同風險亦存在於所有 auction 二手機（含 §0b 原案 i7-7700，2017 同期）|
 | **Naples NUMA 分區**（4 die／可能 4 NUMA node）未 pin CPU 時 DB 效能可能掉 | 低 | 裝機時量測；必要時 docker `cpuset-cpus` pin |
 | **供應商分裂** —— 現有 EU 機在 Hetzner (hel1)，新機在 OVH → 多一套 provider 流程 | 低 | `provisionClient.ts` 本就設計為 adapter seam（`memory/project_multi_provider_provisioning.md`）；且整併完成後 EU 雲端要退掉，分裂是暫時的 |
