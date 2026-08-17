@@ -19,7 +19,7 @@ import os
 import time
 import traceback
 
-from lib import deck, diarize, hallucination, merge_segments, minutes_md, speaker_notes, summarize
+from lib import deck, diarize, hallucination, keep_awake, merge_segments, minutes_md, speaker_notes, summarize
 from lib.transcribe import transcribe, write_srt
 
 
@@ -60,6 +60,7 @@ def run_pipeline_phase1(job_dir: str, media_path: str, model_name: str = "large-
     awaiting_summary（成功）或 error（失敗），不會是 done。"""
     log = JobLogger(job_dir)
     write_status(job_dir, stage="preflight", error=None, done=False, started_at=time.time())
+    keep_awake.prevent_sleep()
 
     try:
         write_status(job_dir, stage="transcribe")
@@ -121,6 +122,10 @@ def run_pipeline_phase1(job_dir: str, media_path: str, model_name: str = "large-
         log(f"[FAIL] {type(e).__name__}: {e}\n{tb}")
         write_status(job_dir, stage="error", error=f"{type(e).__name__}: {e}", done=True)
     finally:
+        # awaiting_summary 這段使用者在操作瀏覽器（複製/貼上），本身會產生
+        # 滑鼠鍵盤活動重置 Windows 閒置計時，不需要人工續命；只有這段無人值守
+        # 的自動化區間需要 prevent_sleep。
+        keep_awake.allow_sleep()
         log.close()
 
 
@@ -128,6 +133,7 @@ def resume_after_summary(job_dir: str, minutes: dict) -> list:
     """回傳驗證錯誤清單；非空代表未寫任何檔案，呼叫端應把錯誤顯示給使用者
     讓他們拿去要求重新生成，而不是硬吞壞資料。"""
     log = JobLogger(job_dir)
+    keep_awake.prevent_sleep()
     try:
         errs = summarize.validate(minutes)
         if errs:
@@ -159,4 +165,5 @@ def resume_after_summary(job_dir: str, minutes: dict) -> list:
         write_status(job_dir, stage="error", error=f"{type(e).__name__}: {e}", done=True)
         return [f"{type(e).__name__}: {e}"]
     finally:
+        keep_awake.allow_sleep()
         log.close()
