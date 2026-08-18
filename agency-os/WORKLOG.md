@@ -1,5 +1,33 @@
 ﻿# Worklog
 
+## 2026-08-19 — KS-6 安裝計畫與官方文件交叉查證
+
+[任務]
+操作者要求：「OVH KS-6 安裝是否有官方一套完整的教學？你應該去看，或是網路上任何相關安裝教學」——在昨天補完 4/20 挖礦事件修正後，要求對照官方一手資料驗證 P1/P2 計畫是否還有缺口，而非只靠事故 runbook 反推。
+
+[已修改]
+1. `agency-os/reports/decisions/2026-08-18-dedicated-host-purchase-timing.md` —— P2 新增 P2.5（SSH 改非標準埠）/ P2.5b（建非 root 工作帳號）/ P2.5c（下單查 OVHcloud Network Firewall 是否含於 Kimsufi 線）；「為什麼要加這五項」註解區塊補上完整查證來源與結論
+2. `runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md` §7 —— 同步三個新 checklist 項
+
+[查證過程與發現]
+查四份一手來源：① `docs.ovhcloud.com` 官方 Kimsufi/So You Start/Rise 安裝教學（分割/RAID/SSH key/rescue mode/**Kimsufi 線無 IPMI**）② Kimsufi 官方部落格防火牆教學 ③ `docs.ovhcloud.com` 官方硬化指南（securing-a-dedicated-server）④ Docker 官方文件（packet-filtering-firewalls）。
+
+**核心發現**：①②③ 三份**官方文件全部只教 UFW/iptables，完全沒提 Docker 會繞過 UFW 這件事**。Docker 官方文件④ 承認兩者互不相容，但明確表示「不背書任何特定解法」——DOCKER-USER chain 只是社群事實標準（`chaifeng/ufw-docker` 等專案），不是任何一方官方欽定的做法。**這解釋了 2026-04-20 事故為何會發生**：當時若照 OVH/Kimsufi 官方教學逐步操作，UFW 會裝好、看起來完整，但漏洞依然存在——不是操作疏漏，是官方教學本身在這一步不完整。這件事本身印證了操作者原本的質疑（設定沒做完善），也說明為什麼這類問題不會被「照教學做」自然擋掉。
+
+③ 硬化指南額外提供兩項先前計畫沒有的建議（SSH 改非標準埠、建非 root 工作帳號），已補入計畫。另提及「500GB 免費備份儲存」，但研判該頁面泛用於 OVH 主流 Dedicated Server 線、非 Eco/Kimsufi 特定（與先前查證「Kimsufi 未單獨列出 Backup Agent 容量」不衝突）——不影響已定案的 R2 備份路線，僅列為下單時可順手確認的加分項，未列為阻擋。
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 官方文件查證 + 決策文件更新，無 code/infra 改動
+- REVIEW_DONE: 自審 | verdict=pass —— 四份來源逐一 WebFetch/WebSearch 取得原文摘錄後才寫入結論，未憑記憶臆測；P1/P2 既有步驟（分割/RAID/SSH key/rescue mode）與官方教學逐項比對一致，無需修改
+- BUGHUNT_DONE: scope=agency-os,runbooks | grep=P2.5b|P2.5c|Network Firewall | hits=兩份文件（決策文件+DR runbook）同步新增，無第三處遺漏
+
+[剩餘風險]
+- OVHcloud Network Firewall（基礎設施層）是否含於 Kimsufi 線**未查到明確資料**，標記 [unverified]，已排入 P2.5c 下單時查——若無此功能不影響既有 DOCKER-USER chain 防護方案，純屬額外加分項
+- Docker/UFW 不相容問題本身**沒有官方認證的單一正解**，DOCKER-USER chain 是社群共識最佳實踐；未來 Docker 或 OVH 若推出官方解法，應重新評估是否有更簡單的做法
+
+[避免再發生]
+延續昨天的規則（寫新主機計畫先核對 runbooks/ 既有事故文件），再加一條：**官方廠商教學不能預設涵蓋所有安全考量**——這次驗證明確顯示 OVH/Kimsufi 自己的官方文件都漏了 Docker/UFW 這個坑。跨供應商、跨層（廠商教學 + 事故 runbook + 上游套件官方文件）三方交叉查證，才抓得到單一來源看不到的缺口。
+
 ## 2026-08-18（追加）— KS-6 安裝計畫補：修正與 2026-04-20 挖礦入侵同款的 UFW-only 漏洞
 
 [任務]

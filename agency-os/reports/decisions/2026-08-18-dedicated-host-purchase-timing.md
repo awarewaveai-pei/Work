@@ -277,13 +277,17 @@ Advocates 在比較機器，Reviewers 在比較供應商，Skeptic 在攻擊硬�
 | P2.4 | **防火牆：UFW + DOCKER-USER chain 雙層**（🔴 2026-04-20 SG 挖礦入侵事件的根因修正，見下方專節）| `ufw default deny incoming; ufw allow 22,80,443; ufw enable`；**再加** `iptables -I DOCKER-USER -i eth0 -j DROP` + 允許 80/443/established；驗 `iptables -L DOCKER-USER -v -n` 有規則、`nmap` 從外部掃 5432/6379/8123/9000/5678 全部 filtered |
 | P2.4b | **所有非對外服務 port 一律綁 `127.0.0.1:`**（compose 層第一道防線，不依賴防火牆）| Postgres/Redis/ClickHouse/MinIO/n8n/Chatwoot 內部 port 全部 `"127.0.0.1:PORT:PORT"`；只有 webapp 的 80/443 用 `0.0.0.0:`。裝機時逐服務對照 4/20 事件 runbook §8-1 的危險 port 表 |
 | P2.4c | **所有預設密碼全部更換**（4/20 事件的第二根因：Supabase 預設密碼從未改過）| 每個服務密碼 ≥32 字元、`openssl rand -hex 32` 產生，存 vault 不進 git。裝機當下逐一過一遍：Postgres/Redis/MinIO/n8n/Chatwoot/Grafana 等 |
-| P2.5 | SSH 硬化 | `PermitRootLogin prohibit-password`、`PasswordAuthentication no`、**禁止任何 geo/IP 白名單**（操作者國際旅行）+ `fail2ban` |
+| P2.5 | SSH 硬化 | `PermitRootLogin prohibit-password`、`PasswordAuthentication no`、**禁止任何 geo/IP 白名單**（操作者國際旅行）+ `fail2ban` + **SSH port 改非標準埠**（49152–65535 區間，OVH 官方硬化指南建議，擋自動化掃描）|
+| P2.5b | **建非 root 工作帳號**（OVH 官方硬化指南建議，2026-08-19 補）| root 僅供緊急救援；日常操作/部署走 `sudo` 的一般帳號，降低憑證外洩時的直接爆炸半徑 |
+| P2.5c | **下單時檢查 KS-6 是否含 OVHcloud Network Firewall**（基礎設施層，2026-08-19 發現，[unverified] Kimsufi 線是否開放此功能）| 若有 → 開通當作第二道防線（封包到主機前就擋，與主機上 Docker 設定無關，比 DOCKER-USER chain 更前置）；若無 → 維持 P2.4/4b/4c 的主機層防護不變，不影響決策 |
 | P2.6 | `unattended-upgrades` 開啟（僅 security）| 驗 `unattended-upgrade --dry-run -d` |
 | P2.7 | Docker + compose 安裝，daemon 設 log rotation | `/etc/docker/daemon.json`：`log-driver: json-file, max-size: 10m, max-file: 3`（不設 = 磁碟被 log 吃掉，1TB 天花板下更致命）|
 | P2.8 | **rescue mode 實按一次**（§7 未勾項）| 在 OVH Manager 觸發 rescue → SSH 進臨時系統 → 確認能 `mount` 主系統碟 → 切回。**無 IPMI/KVM，這是唯一救援路徑，必須在平時驗過一次** |
 | P2.9 | **上線前跑一次 `runbooks/SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md` §10 預防性檢查清單**（每項打勾）| 這份清單就是 4/20 事件事後寫的，逐項對照防止同類重演。**任何服務上線前都跑一次，不只裝機當下一次** |
 
 > ⚠️ **為什麼要加這五項（P2.4/4b/4c/P2.9）**：2026-04-20 SG 主機（`wordpress-ubuntu-4gb-sin-1`）曾因 Supabase PostgreSQL port 暴露 `0.0.0.0` + 預設密碼未改，被植入 XMRig 挖礦程式（CPU 99.7%/Swap 91.5%）。事後查出根本機制：**Docker 啟動容器時直接寫 iptables `DOCKER` chain，執行順序在 UFW 的 `INPUT` chain 之前——`ufw deny 5432` 在面板上顯示生效，實際流量根本不經過 UFW，照樣連得進去**。原始 P2.4（單純 UFW）會複製同一個漏洞到 KS-6。完整事故記錄與根治法：[`runbooks/HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md`](../../../runbooks/HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md) + [`runbooks/SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md`](../../../runbooks/SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md)。
+>
+> **2026-08-19 官方文件交叉查證（操作者要求）**：查了 OVH 官方安裝教學、Kimsufi 官方防火牆部落格、OVH 官方硬化指南、Docker 官方文件四份。結論：① 官方安裝流程（分割/RAID/rescue mode/無 IPMI）與 P1/P2 現有寫法一致，無缺口 ② **Kimsufi 官方防火牆教學與 OVH 官方硬化指南都只教 UFW/iptables，完全沒提 Docker 會繞過這件事**——這解釋了 4/20 事故為何會發生：照官方教學做，防護看起來完整，漏洞照樣在 ③ Docker 官方文件承認 UFW/Docker 互不相容，但**不背書任何特定解法**；DOCKER-USER chain 是社群事實標準（`chaifeng/ufw-docker` 等），非官方欽定但業界公認 ④ OVH 官方硬化指南另建議 SSH 改非標準埠 + 建非 root 帳號（已補為 P2.5/P2.5b）+ 提到 OVHcloud Network Firewall 基礎設施層防火牆（**Kimsufi 線是否開放未查到明確資料**，已列 P2.5c 下單時查）⑤ 硬化指南提及「500GB 免費備份儲存」，但該頁面疑似泛用於 OVH 主流 Dedicated Server 線（非 Eco/Kimsufi 特定），與先前查證的「Kimsufi 未單獨列出 Backup Agent 容量」不衝突——**不影響已定案的 R2 備份路線**，僅供下單時順手確認是否額外可用。
 
 **成功標準：** `/proc/mdstat` 顯示 `[UU]`；兩顆 `percentage_used` 已記錄；rescue mode 進出各一次成功
 **回滾：** 任一項不過 → 重裝 OS（1 小時）或要求換碟（1–2 天）；此時無任何資料在機上，成本僅時間
