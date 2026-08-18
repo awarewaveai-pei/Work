@@ -1,5 +1,30 @@
 ﻿# Worklog
 
+## 2026-08-19（第二輪追加）— 補第二批坑：ClickHouse 系統表 TTL / restart policy / image pinning / Cloudflare SSL 模式 / n8n 授權
+
+[任務]
+操作者追問「還有什麼要注意的？」，延續同一輪稽核再挖一批先前未覆蓋的類別。
+
+[已修改]
+1. `runbooks/KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md` —— 新增六項：通用主機層三項（`restart: unless-stopped`／image tag 釘版本／`fstrim.timer`）、ClickHouse 系統紀錄表 TTL（🔴 與既有「系統遙測吃 CPU」是不同問題，這個吃磁碟）、Chatwoot 社群版現存 402 bug、n8n Sustainable Use License 授權情境（🔴 需操作者確認）、Cloudflare SSL/TLS 模式（新增 Cloudflare/切換專節）；驗收清單同步擴充
+2. `agency-os/reports/decisions/2026-08-18-dedicated-host-purchase-timing.md` —— P2.10 擴充三項；新增 P8.2b（切換前確認 Cloudflare zone Full Strict）
+3. `agency-os/TASKS.md` —— 更新清單重點摘要；新增待操作者回答項（n8n 授權使用情境）
+
+[本輪最重要的發現]
+**ClickHouse 系統紀錄表（`system.query_log`/`trace_log`/`part_log`/`metric_log`）預設沒有 TTL，會無限長大**——這跟第一輪查到的「系統遙測 merge 吃 CPU」是不同機制的兩個問題（一個吃 CPU、一個吃磁碟），容易被誤認成同一件事而漏掉。真實案例 `system.trace_log` 六週長到 97GB 把磁碟塞滿。更麻煩的是**升級/重啟後 ClickHouse 有時會建新表，TTL 設定不會自動繼承**，需要每次重新確認。對 1TB 天花板的這台機器，這是除了 `override.xml` 之外第二個必須裝機時就處理的 ClickHouse 項目，不能等出事才發現。
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 純研究彙整 + 決策文件/TASKS 交叉引用更新，無 code/infra 改動
+- REVIEW_DONE: 自審 | verdict=pass —— 六項新增逐一核對是否已接進對應安裝計畫步驟（P2.10/P8.2b/驗收清單），確認 ClickHouse 系統表 TTL 與既有「系統遙測吃 CPU」項並列而非合併覆蓋（兩者機制不同不可互相取代）
+- BUGHUNT_DONE: scope=agency-os,runbooks | grep=system.trace_log|Sustainable Use License|P8.2b | hits=三處新增皆定位在預期檔案（清單文件+決策文件+TASKS），無遺漏
+
+[剩餘風險]
+- n8n 授權問題**尚待操作者回答**，若答案是「有幫客戶跑付費自動化」，需要另開一輪評估 Enterprise License 成本或改用其他工具，本輪僅止於標記待確認
+- Chatwoot 402 bug 的 GitHub issue 在查證當下（2026-08-19）未見官方明確修復狀態，裝機時若真的遇到需要臨場查最新進度，非一次性可解決
+
+[避免再發生]
+本輪示範了「同一大類問題可能有兩個不同機制」的陷阱——ClickHouse 的 CPU 問題與磁碟問題乍看都是「系統遙測」，但根因、修法、觸發條件完全不同，若只查一次就當作已覆蓋，會漏掉另一半。查證類問題時，同一服務下若有多個症狀關鍵字（CPU/磁碟/記憶體各查一次），不要因為都指向「系統遙測」就合併成一項處理。
+
 ## 2026-08-19（追加）— 全套自架服務已知坑清單（安全/吃資源/跑不順）
 
 [任務]

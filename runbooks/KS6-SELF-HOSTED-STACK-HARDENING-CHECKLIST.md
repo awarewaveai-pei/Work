@@ -15,6 +15,9 @@
 | **Transparent Huge Pages（THP）啟用** | Redis 延遲升高、記憶體用量異常 | `echo never > /sys/kernel/mm/transparent_hugepage/enabled`，寫進開機腳本（THP 每次重開機會重置）|
 | Docker 日誌/映像/build cache 無限增長 | 可吃掉 20–50GB+ 且不會主動提醒，1TB 天花板下更致命 | 已有 log rotation（P2.7）；另加**每週 `docker system prune -af`**（不加 `--volumes`，避免誤刪暫停容器的真實資料）|
 | 資料庫 volume 跟系統碟混在一起 | 任何一個服務資料暴增會拖垮整台機器 | P7.1 多站設計已規劃；Docker volume 預設路徑 `/var/lib/docker`，若時間允許可考慮獨立掛載點 |
+| **Docker compose 用 `restart: on-failure`**（2026-08-19 新增）| 誤以為比較「保守」，實際上：主機正常關機時 daemon 會主動停掉容器（非錯誤退出）→ 重開機後 `on-failure` **不會**把它拉回來，服務停在那裡沒人發現 | 全部服務統一用 `restart: unless-stopped`（不是 `always`、不是 `on-failure`）| [oneuptime](https://oneuptime.com/blog/post/2026-01-16-docker-restart-policies/view) |
+| **Docker image 用 `:latest` tag**（2026-08-19 新增）| registry 隨時可能推新版到 `latest`，下次 `docker compose pull` 就在不知情下換了版本，可能是破壞性更新，rollback 也對不上舊 tag 內容 | compose 檔全部**明確釘版本號**（例如 `postgres:16.4` 不是 `postgres:latest`）；升級是刻意動作，不是意外 | [Medium](https://medium.com/@tofaau/pin-your-docker-images-to-a-digest-to-avoid-surprise-breaks-6607eee649a6) |
+| **NVMe 沒排 TRIM**（2026-08-19 新增）| 沒有定期 TRIM，SSD 內部回收機制不知道哪些區塊已刪除，寫入延遲數週內可能惡化 50–200% | 排 `fstrim.timer`（Ubuntu 內建，預設每週跑一次即可，不建議 `discard` mount option 持續 trim，效能衝擊更大）；驗 `systemctl status fstrim.timer` | [dev.to](https://dev.to/lyraalishaikh/stop-letting-ssd-performance-rot-practical-fstrimtimer-on-linux-3ido) |
 
 ---
 
@@ -41,6 +44,7 @@
 | Part 數量爆增（小批次頻繁寫入）| 查詢變慢、啟動變慢，嚴重時觸發 `parts_to_throw_insert` 內部限制直接拒寫 | 寫入一律走批次，不要逐筆 insert | 同上 |
 | **Trigger.dev 官方 compose 預設用 `bitnamilegacy/clickhouse:latest`**（凍結在 25.5.2）| webapp 送的 client 設定 25.5 版不接受，**所有 insert 失敗，Dashboard 完全看不到任何 run 紀錄**（表面看起來像壞掉但其實是版本不合） | 若重裝 Trigger.dev stack，**改用官方 tag（≥25.8，如 26.2）**，不要用 Bitnami legacy 標籤 | [Trigger.dev GitHub issue #4325](https://github.com/triggerdotdev/trigger.dev/issues/4325) |
 | MinIO 當 ClickHouse 儲存後端時開 bucket versioning | ClickHouse merge 過程會頻繁寫入/更新同一批檔案，開版本控制會讓儲存量暴增且回不去 | **不要**對 ClickHouse 用的 MinIO bucket 開 versioning（跟 P3.2 R2 備份桶開 versioning 是不同的桶，不要混淆）| [Altinity](https://altinity.com/blog/integrating-clickhouse-with-minio) |
+| 🔴 **`system.query_log`/`trace_log`/`part_log`/`metric_log` 這些系統自己的紀錄表，預設沒有 TTL，會無限長大**（2026-08-19 新增，**跟上面「系統遙測吃 CPU」是不同問題，這個是吃磁碟**）| 真實案例：`system.trace_log` 六週長到 **97GB**，把整個磁碟塞滿。這是**除了 override.xml 產生源之外，1TB 天花板下第二個必須先設的 ClickHouse 項目** | 在 `/etc/clickhouse-server/config.d/` 逐一對 `query_log`/`trace_log`/`part_log`/`metric_log`/`text_log`/`asynchronous_metric_log` 設 TTL（建議 7–14 天）。**已知陷阱**：升級或重啟後 ClickHouse 有時會建新表（`query_log_2`、`query_log_3`...），新表**不會繼承**舊表的 TTL 設定，要重新對新表逐一設定，不能設一次就當永久 | [langfuse-k8s issue #333](https://github.com/langfuse/langfuse-k8s/issues/333)、[Altinity clickhouse-operator issue #1241](https://github.com/Altinity/clickhouse-operator/issues/1241) |
 
 ---
 
@@ -51,6 +55,8 @@
 | Redis < 7.0 | Sidekiq 容器反覆自動停止，看起來像裝壞了 | 確認 compose 裡 Redis image 版本 ≥7.0 | [GitHub #10740](https://github.com/orgs/chatwoot/discussions/10740) |
 | Sidekiq 長期執行後記憶體漲到 1GB+（已知 memory 增長模式）| 若 mem_limit 抓太緊會被 OOM-kill，太鬆會排擠其他服務 | 現有計畫 Sidekiq 併入 Chatwoot 8G 額度內，需實測後微調；**觀察 30 天後的實際峰值再調整 mem_limit，不要一開始猜死** | [官方系統需求文件](https://developers.chatwoot.com/self-hosted/deployment/requirements) |
 | Redis `vm.overcommit_memory` 未設（同通用主機層那條）| Chatwoot 對話資料是「唯一真相源」，background save 失敗風險影響最大 | 已在通用主機層第一項處理，這裡標記為 Chatwoot 適用 | [Our Code World](https://ourcodeworld.com/articles/read/2083/how-to-remove-redis-warning-on-docker-memory-overcommit-must-be-enabled) |
+| 🟡 **社群版現存 bug（2026 年 2 月回報，未明確修復狀態）：建新收件匣可能報 `Account limit exceeded`（402）**（2026-08-19 新增）| 官方文件沒寫任何帳號/收件匣數量限制，此行為疑似非預期。**若 P5.1 建 Chatwoot 收件匣時遇到這個錯誤，先查此 issue 對照，不要當成自己裝錯重查半天** | 裝機時若遇到，查 GitHub issue 最新留言是否已有修法/版本號；必要時回報上游或找替代版本 | [Chatwoot GitHub #13422](https://github.com/chatwoot/chatwoot/issues/13422) |
+| **授權（MIT，寬鬆，資訊性提醒）**| Chatwoot Community Edition 是 MIT license，比 n8n 的 Sustainable Use License 寬鬆很多，內部 + 對客戶使用都不受限 | 不影響現有計畫，僅供對照下方 n8n 授權項 | — |
 
 ---
 
@@ -60,6 +66,7 @@
 |---|---|---|---|
 | 執行紀錄（execution data）預設不清除 | DB 表無限增長，拖慢查詢、吃磁碟 | 設定 `EXECUTIONS_DATA_PRUNE=true` + `EXECUTIONS_DATA_MAX_AGE=336`（14 天）| [n8n 官方文件](https://docs.n8n.io/hosting/scaling/execution-data/) |
 | Binary data（下載/處理過的檔案）每次執行都存一份 | 大量重複檔案佔滿磁碟，且不會自動清 | 設定 `N8N_BINARY_DATA_TTL=60`（分鐘），逾時自動清理 | 同上 |
+| 🔴 **Sustainable Use License 限制（2026-08-19 新增，需操作者確認使用情境）**| 免費僅限「自己公司內部用途」。**若拿 n8n 幫客戶跑付費自動化、或把 n8n 嵌進賣給客戶的產品，需要付費 Enterprise License**——這不是技術坑，是法律/授權問題 | **待操作者確認**：現有 n8n 用途是否僅限內部維運（Telegram/監控/排程），還是有幫客戶跑付費自動化？前者不需處理，後者需評估 Enterprise License 或改用其他工具 | [n8n 官方授權文件](https://docs.n8n.io/sustainable-use-license/) |
 | Wait node / 長迴圈 workflow 把資料留在記憶體中 | 多個並發長時間 workflow 疊加會造成記憶體洩漏式增長 | 監控記憶體趨勢；必要時 `NODE_OPTIONS --max-old-space-size` 調整 | [n8n 官方文件](https://docs.n8n.io/deploy/host-n8n/configure-n8n/scaling/fix-memory-issues) |
 | （若未來改用 SQLite，目前是 Postgres 可跳過）刪除的執行紀錄不會自動釋放磁碟空間 | 空間被保留給未來資料重用，`df` 顯示的數字誤導人 | 現行架構走 supabase-db 內的 Postgres，此坑不適用；若未來拆出獨立 SQLite 需另評估 | [n8n 官方文件](https://docs.n8n.io/hosting/scaling/execution-data/) |
 
@@ -117,17 +124,26 @@
 
 ---
 
+## Cloudflare / 切換相關（soulful P7/P8 適用）
+
+| 坑 | 後果 | 修法 | 來源 |
+|---|---|---|---|
+| 🔴 **Zone SSL/TLS 模式若是 Flexible，切換到新機會出現重導向迴圈**（2026-08-19 新增）| Flexible 模式下 Cloudflare 用明文 HTTP 連 origin；若 origin（WordPress/nginx）設了 HTTP→HTTPS 強制轉址，CF 跟 origin 會互踢皮球，訪客看到 `ERR_TOO_MANY_REDIRECTS`。**這是 origin 遷移最常見的切換當天事故之一** | 確認 Cloudflare zone SSL/TLS 模式是 **Full (Strict)**（不是 Flexible）；新機已裝 Cloudflare Origin Certificate（P5.2 已規劃）；可選加碼：開 Authenticated Origin Pulls，讓 origin 只信任帶 CF client cert 的請求 | [Cloudflare 官方文件](https://developers.cloudflare.com/ssl/origin-configuration/ssl-modes/full/) |
+
+---
+
 ## 驗收方式（裝機/服務上線前，逐服務跑一次）
 
-- [ ] 通用主機層 4 項全過
+- [ ] 通用主機層：4 項舊有 + `restart: unless-stopped` 全站統一 + image tag 全部釘版本 + `fstrim.timer` 已排程
 - [ ] Supabase：`.env` 全部密鑰非預設值 + RLS 全表開啟 + service_role 不在前端 + port 內部化
-- [ ] ClickHouse：記憶體上限 80% + 批次寫入 + `override.xml` 產生源已修 +（若重裝 Trigger.dev）ClickHouse 用官方 tag ≥25.8
-- [ ] Chatwoot：Redis ≥7.0 + `vm.overcommit_memory=1` 已設
-- [ ] n8n：`EXECUTIONS_DATA_PRUNE`/`EXECUTIONS_DATA_MAX_AGE`/`N8N_BINARY_DATA_TTL` 已設
+- [ ] ClickHouse：記憶體上限 80% + 批次寫入 + `override.xml` 產生源已修 + **系統紀錄表（query_log/trace_log/part_log 等）TTL 已設，且重啟後重新確認新表也有 TTL** +（若重裝 Trigger.dev）ClickHouse 用官方 tag ≥25.8
+- [ ] Chatwoot：Redis ≥7.0 + `vm.overcommit_memory=1` 已設 + 建收件匣時若遇 402 先查已知 issue
+- [ ] n8n：`EXECUTIONS_DATA_PRUNE`/`EXECUTIONS_DATA_MAX_AGE`/`N8N_BINARY_DATA_TTL` 已設 + **授權使用情境已與操作者確認**
 - [ ] WordPress×10：transient/revision 清理排程已建
 - [ ] MainWP：Child 版本 >5.3.3，裝完立即連 Dashboard
 - [ ] Postiz：`NOT_SECURED` 已移除
 - [ ] Uptime Kuma：面板不對外，只公開 status page；版本已更新
+- [ ] soulful 切換：Cloudflare zone SSL/TLS 模式為 Full (Strict)，非 Flexible
 
 ---
 

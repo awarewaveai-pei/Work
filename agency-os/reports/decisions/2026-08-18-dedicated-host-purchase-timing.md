@@ -284,7 +284,7 @@ Advocates 在比較機器，Reviewers 在比較供應商，Skeptic 在攻擊硬�
 | P2.7 | Docker + compose 安裝，daemon 設 log rotation | `/etc/docker/daemon.json`：`log-driver: json-file, max-size: 10m, max-file: 3`（不設 = 磁碟被 log 吃掉，1TB 天花板下更致命）|
 | P2.8 | **rescue mode 實按一次**（§7 未勾項）| 在 OVH Manager 觸發 rescue → SSH 進臨時系統 → 確認能 `mount` 主系統碟 → 切回。**無 IPMI/KVM，這是唯一救援路徑，必須在平時驗過一次** |
 | P2.9 | **上線前跑一次 `runbooks/SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md` §10 預防性檢查清單**（每項打勾）| 這份清單就是 4/20 事件事後寫的，逐項對照防止同類重演。**任何服務上線前都跑一次，不只裝機當下一次** |
-| P2.10 | **對照 `runbooks/KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md` 通用主機層 4 項**（2026-08-19 新增：Redis `vm.overcommit_memory` / THP / docker prune / volume 隔離）| Chatwoot/n8n/Postiz 都用到 Redis，這是 host 層一次設定、全站共用的設定，裝機階段一次做掉 |
+| P2.10 | **對照 `runbooks/KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md` 通用主機層全項**（2026-08-19 新增：Redis `vm.overcommit_memory`/THP/docker prune/volume 隔離/**`restart: unless-stopped` 統一**/**image tag 全部釘版本不用 `:latest`**/**`fstrim.timer` 排程**）| 前四項是全站共用設定裝機時一次做；後三項是避免「重開機服務不會自己回來」「升級版本悄悄跳掉」「NVMe 效能隨時間慢慢劣化」三種容易被忽略的坑 |
 
 > ⚠️ **為什麼要加這五項（P2.4/4b/4c/P2.9）**：2026-04-20 SG 主機（`wordpress-ubuntu-4gb-sin-1`）曾因 Supabase PostgreSQL port 暴露 `0.0.0.0` + 預設密碼未改，被植入 XMRig 挖礦程式（CPU 99.7%/Swap 91.5%）。事後查出根本機制：**Docker 啟動容器時直接寫 iptables `DOCKER` chain，執行順序在 UFW 的 `INPUT` chain 之前——`ufw deny 5432` 在面板上顯示生效，實際流量根本不經過 UFW，照樣連得進去**。原始 P2.4（單純 UFW）會複製同一個漏洞到 KS-6。完整事故記錄與根治法：[`runbooks/HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md`](../../../runbooks/HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md) + [`runbooks/SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md`](../../../runbooks/SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md)。
 >
@@ -382,6 +382,7 @@ Advocates 在比較機器，Reviewers 在比較供應商，Skeptic 在攻擊硬�
 |---|---|---|
 | P8.1 | 選離峰時段（站上有 WooCommerce + 會員註冊）| 操作者自訂（自有產業，不需對外協調）|
 | P8.2 | **資料增量**：切換當下用最新 DB | 準備期間仍在收訂單與註冊；不做這步會遺失這段資料 |
+| P8.2b | **切換前確認 Cloudflare zone SSL/TLS 模式為 Full (Strict)**（2026-08-19 新增，非 Flexible）| Flexible 模式下切換會出現 CF 與 origin 互踢皮球的重導向迴圈（`ERR_TOO_MANY_REDIRECTS`），是 origin 遷移最常見的切換當天事故之一。新機的 Origin Certificate（P5.2）裝好後這裡才是真正生效的開關 |
 | P8.3 | 改一筆 Cloudflare A 記錄 | 秒級生效 |
 | P8.4 | 切換後 30 分鐘複驗 §5 關鍵四項 | 首頁 / 會員登入 / 結帳 / 表單收信 |
 | P8.5 | 24–48h 觀察 | uptime + 錯誤率 + TTFB vs 基線 + `client_mail` 失敗數 |
