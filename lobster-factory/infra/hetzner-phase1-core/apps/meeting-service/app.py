@@ -46,7 +46,7 @@ def index():
 
 @app.post("/api/upload")
 async def upload(file: UploadFile = File(...), diarize: bool = True,
-                  model: str = "large-v3"):
+                  model: str = "large-v3", sync_drive: bool = False):
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in ALLOWED_EXT:
         raise HTTPException(400, f"不支援的副檔名 {ext}；允許：{', '.join(sorted(ALLOWED_EXT))}")
@@ -72,7 +72,7 @@ async def upload(file: UploadFile = File(...), diarize: bool = True,
     thread = threading.Thread(
         target=run_pipeline_phase1,
         args=(job_dir, media_path),
-        kwargs={"model_name": model, "do_diarize": diarize},
+        kwargs={"model_name": model, "do_diarize": diarize, "sync_drive": sync_drive},
         daemon=True,
     )
     thread.start()

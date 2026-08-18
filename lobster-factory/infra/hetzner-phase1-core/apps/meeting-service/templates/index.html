@@ -103,6 +103,10 @@
         </select>
       </label>
     </div>
+    <div class="opts" style="margin-top:10px">
+      <label><input type="checkbox" id="syncDriveOpt"> 完成後同步到 Google Drive（ECT/會議記錄/日期）</label>
+    </div>
+    <p class="hint">⚠️ 勾選會把 PPT/會議記錄/逐字稿複製到雲端，跟「音檔絕不外流」的原則相反。敏感會議請不要勾。</p>
     <button id="startBtn" disabled>開始處理</button>
   </div>
 
@@ -132,7 +136,7 @@ const STAGES = [
   ["preflight","檢查檔案"], ["transcribe","轉錄"], ["merge","段落合併"],
   ["hallucination_check","幻覺偵測"], ["diarize","講者分離"], ["preparing_prompt","準備摘要 prompt"],
   ["awaiting_summary","等待貼上摘要"], ["build_deck","生成 PPT"], ["build_notes","寫入講稿"],
-  ["build_minutes_md","會議記錄"], ["done","完成"],
+  ["build_minutes_md","會議記錄"], ["sync_drive","同步 Google Drive"], ["done","完成"],
 ];
 const DOWNLOAD_LABELS = {
   minutes_md: "會議記錄 (.md)", slides: "PPT (.pptx)", coach: "報告教練 (.md)",
@@ -164,6 +168,7 @@ startBtn.addEventListener("click", async () => {
   startBtn.disabled = true;
   const diarize = document.getElementById("diarizeOpt").checked;
   const model = document.getElementById("modelOpt").value;
+  const syncDrive = document.getElementById("syncDriveOpt").checked;
 
   const fd = new FormData();
   fd.append("file", file);
@@ -174,7 +179,7 @@ startBtn.addEventListener("click", async () => {
 
   let resp;
   try {
-    resp = await fetch(`/api/upload?diarize=${diarize}&model=${model}`, { method: "POST", body: fd });
+    resp = await fetch(`/api/upload?diarize=${diarize}&model=${model}&sync_drive=${syncDrive}`, { method: "POST", body: fd });
   } catch (e) {
     showError("上傳失敗：" + e);
     return;
@@ -307,6 +312,14 @@ function showResult(jobId, status) {
       html += ` · <span style="color:var(--red)">講者分離失敗，已略過（${status.diarize_error}）</span>`;
     }
     html += "</p>";
+  }
+  if (status.drive_sync_result) {
+    const r = status.drive_sync_result;
+    if (r.ok) {
+      html += `<p class="hint">☁ 已同步到 ${r.dest}（${r.files.length} 個檔案）</p>`;
+    } else {
+      html += `<p class="hint" style="color:var(--red)">☁ Drive 同步失敗：${r.error}（本地檔案不受影響）</p>`;
+    }
   }
   html += `<div class="downloads">${Object.entries(DOWNLOAD_LABELS).map(([kind, label]) =>
     `<a href="/api/download/${jobId}/${kind}" target="_blank">${label}</a>`).join("")}</div>`;

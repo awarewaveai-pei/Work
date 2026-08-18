@@ -19,7 +19,7 @@ import os
 import time
 import traceback
 
-from lib import deck, diarize, hallucination, keep_awake, merge_segments, minutes_md, speaker_notes, summarize
+from lib import archive, deck, diarize, hallucination, keep_awake, merge_segments, minutes_md, speaker_notes, summarize
 from lib.transcribe import transcribe, write_srt
 
 
@@ -55,11 +55,16 @@ def write_status(job_dir: str, **fields):
 
 
 def run_pipeline_phase1(job_dir: str, media_path: str, model_name: str = "large-v3",
-                         do_diarize: bool = True) -> None:
+                         do_diarize: bool = True, sync_drive: bool = False) -> None:
     """呼叫端（app.py）用背景執行緒跑這個函式。結束時 stage 為
-    awaiting_summary（成功）或 error（失敗），不會是 done。"""
+    awaiting_summary（成功）或 error（失敗），不會是 done。
+
+    sync_drive 在上傳當下就決定（勾選框），要持久化到 status.json，
+    因為 resume_after_summary() 是後續另一次 HTTP 請求才觸發，
+    中間隔著使用者去別的對話貼摘要，不能靠記憶體變數傳遞。"""
     log = JobLogger(job_dir)
-    write_status(job_dir, stage="preflight", error=None, done=False, started_at=time.time())
+    write_status(job_dir, stage="preflight", error=None, done=False, started_at=time.time(),
+                 sync_drive=sync_drive)
     keep_awake.prevent_sleep()
 
     try:
@@ -154,6 +159,16 @@ def resume_after_summary(job_dir: str, minutes: dict) -> list:
 
         write_status(job_dir, stage="build_minutes_md")
         minutes_md.write(minutes, os.path.join(job_dir, "meeting_notes.md"))
+
+        sync_drive = json.load(open(_status_path(job_dir), encoding="utf-8")).get("sync_drive", False)
+        if sync_drive:
+            write_status(job_dir, stage="sync_drive")
+            result = archive.sync_to_drive(job_dir, minutes, os.path.basename(job_dir))
+            if result["ok"]:
+                log(f"[Drive 同步] {len(result['files'])} 個檔案 -> {result['dest']}")
+            else:
+                log(f"[warn] Drive 同步失敗（本地產出不受影響）: {result['error']}")
+            write_status(job_dir, drive_sync_result=result)
 
         write_status(job_dir, stage="done", done=True, finished_at=time.time())
         log("[完成] 全流程結束")

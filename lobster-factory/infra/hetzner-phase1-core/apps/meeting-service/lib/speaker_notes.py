@@ -77,6 +77,8 @@ def write_coach_md(coaching: dict, minutes: dict, path: str) -> str:
             lines.append(f"- {t}")
 
     text = "\n".join(lines) + "\n"
-    with open(path, "w", encoding="utf-8") as f:
+    # 走 Google Drive 同步的 .md 需 UTF-8 BOM，否則 Big5 系統 CJK 亂碼
+    # （見 minutes_md.py 同一慣例；archive.py 會把這支直接複製進 Drive）
+    with open(path, "w", encoding="utf-8-sig") as f:
         f.write(text)
     return path
