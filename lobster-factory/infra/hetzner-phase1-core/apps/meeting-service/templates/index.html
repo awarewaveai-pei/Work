@@ -123,9 +123,14 @@
         <li><b>自己貼</b>——用下面的步驟，複製 prompt 貼給任一 AI（Claude、免費版 ChatGPT 都可以），再把回傳的 JSON 貼回來。</li>
       </ol>
     </div>
-    <p><span class="step-num">1</span><b>複製下面這段 prompt</b>，貼進任一 AI 對話視窗（Claude、免費版 ChatGPT 等皆可，用既有額度不額外收費）</p>
+    <p><span class="step-num">1</span><b>複製下面這段 prompt</b>，貼進任一 AI 對話視窗</p>
     <textarea id="promptBox" readonly></textarea>
-    <button class="copyBtn" id="copyPromptBtn">複製 prompt</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <button class="copyBtn" id="copyPromptBtn">只複製</button>
+      <button class="copyBtn" id="openChatGPTBtn">複製 + 開啟免費 ChatGPT</button>
+      <button class="copyBtn" id="openClaudeBtn">複製 + 開啟 Claude.ai</button>
+    </div>
+    <p class="hint">按「開啟」會複製 prompt 到剪貼簿並開新分頁，你進去點輸入框按 Ctrl+V 貼上即可，不用自己找網址。</p>
 
     <p style="margin-top:20px"><span class="step-num">2</span><b>把 AI 回傳的 JSON 貼在這裡</b>，按送出</p>
     <textarea id="pasteBack" placeholder="貼上 Claude 回傳的完整 JSON..."></textarea>
@@ -263,9 +268,22 @@ document.getElementById("copyPromptBtn").addEventListener("click", () => {
   box.select();
   navigator.clipboard.writeText(box.value).then(() => {
     document.getElementById("copyPromptBtn").textContent = "已複製 ✓";
-    setTimeout(() => { document.getElementById("copyPromptBtn").textContent = "複製 prompt"; }, 1500);
+    setTimeout(() => { document.getElementById("copyPromptBtn").textContent = "只複製"; }, 1500);
   });
 });
+
+function copyThenOpen(btnId, url) {
+  document.getElementById(btnId).addEventListener("click", () => {
+    const box = document.getElementById("promptBox");
+    navigator.clipboard.writeText(box.value).then(() => {
+      window.open(url, "_blank");
+    });
+  });
+}
+// ChatGPT/Claude 都不支援用網址參數預填輸入框（沒有公開這種 API），
+// 所以只能做到「複製+開新分頁」，貼上這動作還是要使用者自己按 Ctrl+V。
+copyThenOpen("openChatGPTBtn", "https://chatgpt.com/");
+copyThenOpen("openClaudeBtn", "https://claude.ai/new");
 
 document.getElementById("submitSummaryBtn").addEventListener("click", async () => {
   const text = document.getElementById("pasteBack").value.trim();
