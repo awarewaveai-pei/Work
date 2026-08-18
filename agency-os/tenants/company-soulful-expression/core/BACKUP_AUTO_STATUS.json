@@ -7,10 +7,10 @@
   "backup_destination_label": "Update_Backup",
   "backup_schedule_cron": "weekly (start_time 2026-05-09 11:05:16 UTC)",
   "last_success": {
-    "task_id": "wpvivid-ee66f37b1bfc9",
-    "unix_utc": 1785111311,
-    "iso_utc": "2026-07-27T00:15:11Z",
-    "iso_tpe": "2026-07-27T08:15:11+08:00",
+    "task_id": "wpvivid-02daeea9609b4",
+    "unix_utc": 1786925704,
+    "iso_utc": "2026-08-17T00:15:04Z",
+    "iso_tpe": "2026-08-17T08:15:04+08:00",
     "status": "Succeeded"
   },
   "last_failure": {
@@ -20,10 +20,14 @@
     "status": "Failed",
     "reason": "Failed,"
   },
-  "synced_at_utc": "2026-08-11T01:11:02Z",
+  "synced_at_utc": "2026-08-18T01:11:03Z",
   "synced_by": "auto -- sync-backup-status-from-mainwp.sh (EU cron) from MainWP DB report_addon truth source",
   "truth_source": "mwp_mainwp_wpvividmeta WHERE site_id=2 AND option_name='report_addon' on EU VPS mainwp-web container",
   "backup_history_since_last_sync": [
+    {
+      "iso_utc": "2026-08-17T00:15:04Z",
+      "status": "Succeeded"
+    },
     {
       "iso_utc": "2026-08-10T00:15:04Z",
       "status": "Failed",
@@ -62,10 +66,6 @@
     },
     {
       "iso_utc": "2026-06-15T00:15:09Z",
-      "status": "Succeeded"
-    },
-    {
-      "iso_utc": "2026-06-08T00:15:04Z",
       "status": "Succeeded"
     }
   ],
