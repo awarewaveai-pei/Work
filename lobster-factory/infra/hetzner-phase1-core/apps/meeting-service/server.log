@@ -70,3 +70,4 @@ INFO:     127.0.0.1:50847 - "GET /api/log/e61b121e42e2?lines=40 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:54192 - "GET /api/status/e61b121e42e2 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:54192 - "GET /api/prompt/e61b121e42e2 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:57805 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53322 - "GET / HTTP/1.1" 200 OK
