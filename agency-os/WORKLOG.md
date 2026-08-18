@@ -1,5 +1,39 @@
 ﻿# Worklog
 
+## 2026-08-18 — Dedicated 主機採購時機定案：立刻買 KS-6（月租）+ 死線前範圍閘
+
+[任務]
+操作者昨日（8/17）核准 128GB ECC 規格上修後追問「為什麼不乾脆買 KS-6？」，質疑既有「觀望 Hetzner auction 至 8/31」規則。第一輪 decision-intelligence 面板因 API session 額度撞頂中斷（`failed`，額度 11:30pm 重置）；重跑第二輪完整跑完 19-stage（Advocate×7/Reviewer×4/動態代理×2/專家×3/Skeptic/Judge/Pre-mortem，信心值 0.79，耗時 43 分鐘/282K tokens——操作者當場指出此成本，已記入 [[feedback_...]] 待補記憶：已有初判的問題不該整套面板重跑，應先自行深查再決定是否值得召喚面板）。
+
+[已修改]
+1. **新增** `agency-os/reports/decisions/2026-08-18-dedicated-host-purchase-timing.md` —— 決策正本：C6（立刻買 KS-6 月租 + 平行觀望 + 死線前範圍閘）勝出，7 候選權衡矩陣、Pre-mortem（整併停擺使成本案反轉 €1,008、128GB 掩蓋 ClickHouse 病灶、需本人在線×旅行的排程衝突）、安裝/上線/風險/觀測計畫、ADR 骨架
+2. `agency-os/reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md` —— 決策規則段落標記已取代（保留歷史於 `<details>`）指向 08-18 正本；Backup Agent 容量查證項改為「依賴已移除」（改走 R2）
+3. `agency-os/reports/decisions/INDEX.md` —— 加一列
+4. `runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md` §7 —— 「機型已選」拆出獨立「採購時機」項指向新正本；新增 P2.2（nvme 磨耗）/P2.8（rescue mode 實測）/P4.1（Drill#2 計時）/W4 排程四個 checklist 項
+5. `agency-os/TASKS.md` —— soulful 搬站區塊六處同步：採購時機定案、月租理由、範圍閘、出國行程已排除、決策正本連結、待辦鏈
+
+[根因]
+§0b（6/27）與 8/17 規格決策的「觀望兩週」規則基於未檢驗的假設：只算了「等 Hetzner」的路徑，沒查 OVH 月租條款。Legal Reviewer 查證 OVH 月租可隨時取消（官方支援文件），使「換更好機器」的選擇權可用 $43.20 買到且有效 36 個月，不需用 D-86 死線前不可再生的 13 天日曆餘裕支付同一個東西。DevOps Reviewer 另拆出關鍵路徑：死線只綁 soulful（12.5 工作日），EU/SG 整併完全不綁，塞進同一個 87 天窗口是把兩個獨立賭注捆在一起。
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 純決策文件與交叉引用更新
+- REVIEW_DONE: 自審，critic=Standard | verdict=pass | findings=0c/0m/0n —— 讀回 08-17/08-18 兩份決策文件全文 + DR runbook §7 + TASKS.md 改動段落，確認 08-18 對 08-17 的 supersede 範圍僅限「決策規則」段與 Backup Agent 項，規格層（128GB ECC 等）與 §0b 其餘決策（Chatwoot 先行/單台+RAID1+R2/HA 延後）完整保留未變動；markdown `<details>` 標籤成對
+- BUGHUNT_DONE: scope=agency-os,runbooks | grep=觀望截止 8/31 | hits=5（`2026-08-17-*.md` 為刻意保留的歷史紀錄段落、`2026-08-18-*.md` 為新文件本身提及舊規則作對照、DR runbook 與 TASKS.md 已於本次修正、`.agency-state/open-tasks-snapshot.md` 為自動產生快照不手動編輯，下次 AO-RESUME 自動刷新）
+
+[操作者當場回答的四個開放問題，已寫回文件與 TASKS.md]
+① 月租 vs 12個月承諾 → 月租（原話「有點想省43.2 但又怕出事」——月租正是解法：花$43.20買30天觀察期，全綠後再評估轉承諾，不必在未驗證的二手機上一開始就簽12個月）
+② 9–11月/2027Q1 出國行程 → 無，Pre-mortem 第二號死因（需本人在線×旅行排程衝突）解除，W4 整併可照11/20起兩週一台排程
+③ 20個付費外掛（`SITE_CODE_MANIFEST.md` 標題誤植17個，清單實列20個，已標記文件計數誤差）授權狀態 → 大致有效，P7.7 仍需切換前逐項確認到期日
+④ soulful 訪客地區 → 混合/不確定，照原計畫不預投資 Argo，切換前後量 TTFB 再決定
+
+[剩餘風險]
+- 本次採購時機決策未經人工二次覆核（面板信心值 0.79，非 0.9+，主因：KS-6 當下庫存未知、建置工時為估算、Hetzner auction 13天命中率為工作估計值）
+- 決策依賴的「12個月承諾價是否與月租同價」仍 [unverified]——若承諾價顯著更低，30天後轉承諾的吸引力會變化，複審時需查
+- 操作者尚未實際下單；本輪工作僅完成文件與決策層，執行層（P1–P8）尚未開始
+
+[避免再發生]
+「已有初判的問題」與「從零開始的複雜決策」該用不同力度處理。這次操作者先問「為什麼不乾脆買」，我已用自己的分析給出結論（買，理由三點），操作者仍要求跑完整面板做交叉驗證——這是合理需求，但面板第一次因額度撞頂中斷、第二次跑了43分鐘/282K tokens 才拿到結果，操作者當場質疑成本。以後遇到「已有清楚初判、只想交叉驗證」的情況，應先問是否需要完整19-stage，或提議先用更輕量的方式（例如我自行加深一輪分析）。
+
 ## 2026-08-17（追加）— meeting-service 建立（本機操作頁面）
 
 **根因/動機**：agency-os 前期以 scratchpad 腳本驗證「會議錄音→逐字稿→講者分離→PPT→報告教練」全鏈可行（見 [[project_meeting_to_ppt_pipeline]] memory）。操作者要求（1）把驗證過的腳本存進 repo，（2）做可點的操作頁面取代手動跑指令。R0 判定：GPU 只在操作者筆電（SG 4GB/EU CPX32 皆無 GPU，CPU 路線實測 0.3x realtime 已判死），故本服務刻意不走 sg-deploy 部署 SOP，僅本機執行。

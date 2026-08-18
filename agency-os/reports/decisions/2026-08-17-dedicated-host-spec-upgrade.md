@@ -86,12 +86,23 @@
 
 ---
 
-## 決策規則（照做，不必再逛）
+## 決策規則（2026-08-18 已被時機層決策取代 —— 見下方通知）
+
+> 🔴 **本段第 2–3 條已於 2026-08-18 取代。** 正本：[`2026-08-18-dedicated-host-purchase-timing.md`](2026-08-18-dedicated-host-purchase-timing.md)（decision-intelligence 19-stage 面板，信心值 0.79）。
+> **新規則**：不觀望到 8/31，**今天立刻下單 KS-6，選月租**（不要 12 個月承諾）。觀望期改由 OVH 月租的隨時可退條款承載，不再由日曆餘裕承載——同一個「換更好機器」的選擇權，用 $43.20 就能買到且有效 36 個月，不必用死線前的 13 天不可再生資源去買。KS-6 已查證常缺貨，「等不到才買」的退路本身沒有保證。
+> 下方原規則保留為歷史紀錄，**勿依此執行**。
+
+<details>
+<summary>已取代的原規則（2026-08-17，歷史紀錄）</summary>
 
 1. Hetzner Server Auction 篩選：**ECC ✓ + RAM ≥128GB + NVMe ≥2TB**，按價排序，每 2–3 天看一次
 2. 出現 **≤ €65/月** → **立刻下單 Hetzner**（勝 KS-6：同商、Robot 面板、RMA 較好、磁碟天花板 2TB+）
 3. **2026-08-31 仍未出現 → 下單 KS-6**，停止觀望
 4. **2026-09-30 = 絕對死線**（既有 Google 日曆提醒，`TASKS.md:228`）—— 不得逾越，後面要留搬站 + 觀察期至 11-12
+
+</details>
+
+**現行規則**：① 今天下單 KS-6，月租 ② auction 觀望不停，但只在 soulful 生產資料**落地新機前**命中才換機，落地後命中記入下次換機評估 ③ 死線前範圍閘：11/12 前只做 Chatwoot + soulful，EU/SG 整併排 11/20 之後（六個具名任務，兩週一台）
 
 **為什麼給兩週觀望**：Hetzner auction 的 `HH:MM:SS left` 倒數是**降價計時器**，未成交機器價格隨掛牌時間遞減。€130.70 是新掛牌價非底價。同商的運維價值值得等兩週，但不值得壓縮搬站觀察期。
 
@@ -103,7 +114,7 @@
 
 - [x] **OS 安裝自由度 — 已查，疑慮解除**：OVH 官方安裝流程有「Customise the partition configuration」勾選項，可在硬體/OS 限制內自訂分割與 RAID；Rescue mode 確認存在（SSH 進臨時系統救援/修 boot/清碟重裝）。此為 Kimsufi/OVH dedicated 產品線通用能力，非 KS-6 專屬不確定項。**原「選項 A/C 最大單點未知」不成立。**（來源：[OVHcloud getting-started guide](https://docs.ovhcloud.com/en/guides/bare-metal-cloud/dedicated-servers/getting-started-with-dedicated-server-eco)、[rescue mode 官方文件](https://help.ovhcloud.com/csm/en-dedicated-servers-ovhcloud-rescue)）
 - [x] **匯率 — 已查**：2026-08-17 即時 EUR/USD ≈ 1.1589。$59.80 ≈ **€51.60**；首月 $103（含裝機費）≈ **€88.9**。與原估 €51–54 區間吻合，比 §0b 核准的 €48.70 只貴約 **€3/月**，判斷不變
-- [ ] **"Backup Agent — Free licence" 實際容量 — 仍未驗證**：OVH 官方比較頁列出 Standard 系列 500GB / So You Start 系列 100GB / Rise 系列 500GB 免費 Backup Storage，**但 Kimsufi（Eco 最低階線）未單獨列出數字**，KS-6 產品頁本身也抓不到這格內容。保守推估落在 100GB 量級（比 SYS 低一階），**但這是推論非查證結果**。下單前需在 OVH 控制台或客服直接確認 —— 影響 1TB 磁碟天花板的緩解規劃，但不影響是否下單
+- [x] **"Backup Agent — Free licence" 實際容量 — 依賴已移除（2026-08-18）**：不再追查此項。備份一律走既有 R2（$0.015/GB-月、零 egress、已跑通、異商異地）。同商同地的 OVH Backup Agent 在 2021-03-10 SBG2 機房火災中已被證明不算真備份——已驗異地備份嚴格優於未驗同商備份，追查其容量的工程時間反而超過三年 R2 費用。詳見 [`2026-08-18-dedicated-host-purchase-timing.md`](2026-08-18-dedicated-host-purchase-timing.md) FinOps 段
 - [x] **OVH Eco 運維品質 — 已查，方向正向但有具體警訊**：硬體故障自動偵測、人工更換（非全自動）；社群評價「excellent, quick and effective」，但亦有具體反例「HDD/零件故障最長等過 20 天」、一般回報「1–2 天回應，非最快」；**無 IPMI/KVM 遠端主控台**（自助服務型，故障時只能靠 rescue mode + ticket）。RAID1 + R2 異地備份是此風險唯一緩解，非消除（來源：LowEndTalk 社群討論，非一手經驗，方向性參考）
 - [ ] **Rescue mode 是否可用**（無 IPMI/KVM 時的唯一救援路徑；上一項已確認產品線通用存在，仍需在實際 KS-6 控制台按一次驗證）
 - [ ] **SMART 健康值**（二手碟，開機後立即查；§7 已有此項）

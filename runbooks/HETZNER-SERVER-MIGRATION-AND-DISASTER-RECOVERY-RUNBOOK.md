@@ -336,8 +336,13 @@ openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -in "$OUT/env.tar.g
 - [x] **演練還原成功一次**（§6 A/C + MainWP/n8n 內容驗證）— 2026-06-26
 - [x] **修 R2 upload WARN**（2026-06-26：`set -a` export 修；實測 10/10 HTTP 200）→ 真 3-2-1 成立
 - [x] 備份失敗會 surface（2026-06-26：`check-backup-health.ps1` 讀 verify 判定，FAILED→AO-RESUME WARN；非 Telegram 而是開工自動報，涵蓋「壞了」+「停了」）
-- [ ] 機型已選（**2026-08-17 上修**：**128GB ECC / ≥8C16T / ≥1TB NVMe RAID1**；首選 OVH KS-6 $59.80，Hetzner auction ≤€65 則改選 Hetzner；**觀望截止 8/31、買機死線 9/30**）— **待操作者下單**（刷卡非 Claude）。正本 [`2026-08-17-dedicated-host-spec-upgrade.md`](../agency-os/reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md)；§0b 舊表（i7-7700/64GB/€48.70）已作廢
-- [ ] **下單前逐項確認**（KS-6 路線）：可裝 Ubuntu LTS + 自訂分割 + soft RAID1／rescue mode 可用／「Backup Agent free licence」實際容量／刷卡幣別與匯率 — 見決策文件「下單前必須驗證的事」
+- [ ] 機型已選（**2026-08-17 上修**：**128GB ECC / ≥8C16T / ≥1TB NVMe RAID1**；首選 OVH KS-6 $59.80）— **待操作者下單**（刷卡非 Claude）。正本 [`2026-08-17-dedicated-host-spec-upgrade.md`](../agency-os/reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md)；§0b 舊表（i7-7700/64GB/€48.70）已作廢
+- [ ] **採購時機已定（2026-08-18）：立刻買，選月租，不要 12 個月承諾** —— 不再觀望到 8/31。理由與量化：[`2026-08-18-dedicated-host-purchase-timing.md`](../agency-os/reports/decisions/2026-08-18-dedicated-host-purchase-timing.md)。觀望改由月租退出權承載（隨時可退，非日曆餘裕）；月租跑滿 30 天全綠後再評估轉 12 個月
+- [ ] **下單前逐項確認**（KS-6 路線）：可裝 Ubuntu LTS + 自訂分割 + soft RAID1／rescue mode 可用／刷卡幣別與匯率。**Backup Agent 容量已移除依賴**（改走 R2）
+- [ ] **P2.2** 二手 NVMe 磨耗檢查：`nvme smart-log` 兩顆碟，`percentage_used` > 40% 資料落地前要求換碟
+- [ ] **P2.8** rescue mode 平時實按一次驗證可用（無 IPMI/KVM，這是唯一救援路徑）
+- [ ] **P4.1** Drill #2：從 R2 完整還原到拋棄式機器，計時，目標 < 4 小時
+- [ ] **W4（EU/SG 整併）明確排 2026-11-20 之後**，六個服務各一具名任務，兩週一台 —— 操作者已確認 9–11 月與 2027 Q1 無出國行程，排程無阻礙
 - [ ] auction 機：雙碟 NVMe/SSD + RAID 1 + SMART 健康 + mdadm 告警
 - [ ] **Chatwoot greenfield 先上**（EU 搬移前；§0b 順序 step 3）→ 接 cs-engine AgentBot webhook + headless widget
 - [ ] **每容器設記憶體上限**（docker-compose `mem_limit`）→ 防一個服務吃爆拖垮全部（EU 現況痛點）
