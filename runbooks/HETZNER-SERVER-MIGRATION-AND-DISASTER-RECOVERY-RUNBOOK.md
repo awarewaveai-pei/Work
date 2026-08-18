@@ -343,6 +343,11 @@ openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -in "$OUT/env.tar.g
 - [ ] **P2.8** rescue mode 平時實按一次驗證可用（無 IPMI/KVM，這是唯一救援路徑）
 - [ ] **P4.1** Drill #2：從 R2 完整還原到拋棄式機器，計時，目標 < 4 小時
 - [ ] **W4（EU/SG 整併）明確排 2026-11-20 之後**，六個服務各一具名任務，兩週一台 —— 操作者已確認 9–11 月與 2027 Q1 無出國行程，排程無阻礙
+- [ ] 🔴 **P2.4 防火牆用 UFW + DOCKER-USER chain 雙層，不能只設 UFW**（2026-08-18 追加，修正 2026-04-20 SG 挖礦入侵同款漏洞——Docker 寫 iptables `DOCKER` chain，執行順序在 UFW `INPUT` chain 之前，單純 UFW 攔不住）。事故記錄與根治法：[`SECURITY-INCIDENT-CRYPTO-MINER.md`](HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md) / [`SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md`](SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md)
+- [ ] **P2.4b** 所有非對外服務 port（Postgres/Redis/ClickHouse/MinIO/n8n/Chatwoot）一律 compose 層綁 `127.0.0.1:`，不依賴防火牆當唯一防線
+- [ ] **P2.4c** 所有服務預設密碼全部更換為 `openssl rand -hex 32`，存 vault 不進 git（4/20 事件第二根因：Supabase 預設密碼從未改過）
+- [ ] **P2.9** 上線前逐項跑 `SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md` §10 預防性檢查清單（不只裝機當下跑一次，每次新服務上線前都跑）
+- [ ] **P6.10** 每週安全稽核 cron（§8-6 現成腳本）：找 0.0.0.0 綁定的資料庫類 port / 可疑進程 / `/tmp` 新檔案 / `authorized_keys` 異動 → 異常寫 status，AO-RESUME 讀
 - [ ] auction 機：雙碟 NVMe/SSD + RAID 1 + SMART 健康 + mdadm 告警
 - [ ] **Chatwoot greenfield 先上**（EU 搬移前；§0b 順序 step 3）→ 接 cs-engine AgentBot webhook + headless widget
 - [ ] **每容器設記憶體上限**（docker-compose `mem_limit`）→ 防一個服務吃爆拖垮全部（EU 現況痛點）

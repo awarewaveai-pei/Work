@@ -274,11 +274,16 @@ Advocates 在比較機器，Reviewers 在比較供應商，Skeptic 在攻擊硬�
 | P2.1 | 驗證 RAID1 真的建起來了 | `cat /proc/mdstat` 必須看到 `[UU]`（兩顆都 up）。看到 `[U_]` 或無 md 裝置 → **停止**，重裝 |
 | P2.2 | **二手 NVMe 磨耗檢查（§7 只寫 SMART，不夠）** | `nvme smart-log /dev/nvme0n1 | grep -E 'percentage_used|media_errors|unsafe_shutdowns'`，兩顆都查。**percentage_used > 40% → 開 ticket 要求換碟**（在你還沒放任何資料時要求，比一年後容易）。同時 `smartctl -a` 存基線到 `agency-os/reports/status/` |
 | P2.3 | 確認前一位租戶資料已清 | `lsblk -f` 不應有非預期分割或檔案系統標籤；有 → `wipefs -a` 後重裝 |
-| P2.4 | 防火牆：只開 22 / 80 / 443 | `ufw default deny incoming; ufw allow 22,80,443; ufw enable`；驗 `ufw status verbose` |
+| P2.4 | **防火牆：UFW + DOCKER-USER chain 雙層**（🔴 2026-04-20 SG 挖礦入侵事件的根因修正，見下方專節）| `ufw default deny incoming; ufw allow 22,80,443; ufw enable`；**再加** `iptables -I DOCKER-USER -i eth0 -j DROP` + 允許 80/443/established；驗 `iptables -L DOCKER-USER -v -n` 有規則、`nmap` 從外部掃 5432/6379/8123/9000/5678 全部 filtered |
+| P2.4b | **所有非對外服務 port 一律綁 `127.0.0.1:`**（compose 層第一道防線，不依賴防火牆）| Postgres/Redis/ClickHouse/MinIO/n8n/Chatwoot 內部 port 全部 `"127.0.0.1:PORT:PORT"`；只有 webapp 的 80/443 用 `0.0.0.0:`。裝機時逐服務對照 4/20 事件 runbook §8-1 的危險 port 表 |
+| P2.4c | **所有預設密碼全部更換**（4/20 事件的第二根因：Supabase 預設密碼從未改過）| 每個服務密碼 ≥32 字元、`openssl rand -hex 32` 產生，存 vault 不進 git。裝機當下逐一過一遍：Postgres/Redis/MinIO/n8n/Chatwoot/Grafana 等 |
 | P2.5 | SSH 硬化 | `PermitRootLogin prohibit-password`、`PasswordAuthentication no`、**禁止任何 geo/IP 白名單**（操作者國際旅行）+ `fail2ban` |
 | P2.6 | `unattended-upgrades` 開啟（僅 security）| 驗 `unattended-upgrade --dry-run -d` |
 | P2.7 | Docker + compose 安裝，daemon 設 log rotation | `/etc/docker/daemon.json`：`log-driver: json-file, max-size: 10m, max-file: 3`（不設 = 磁碟被 log 吃掉，1TB 天花板下更致命）|
 | P2.8 | **rescue mode 實按一次**（§7 未勾項）| 在 OVH Manager 觸發 rescue → SSH 進臨時系統 → 確認能 `mount` 主系統碟 → 切回。**無 IPMI/KVM，這是唯一救援路徑，必須在平時驗過一次** |
+| P2.9 | **上線前跑一次 `runbooks/SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md` §10 預防性檢查清單**（每項打勾）| 這份清單就是 4/20 事件事後寫的，逐項對照防止同類重演。**任何服務上線前都跑一次，不只裝機當下一次** |
+
+> ⚠️ **為什麼要加這五項（P2.4/4b/4c/P2.9）**：2026-04-20 SG 主機（`wordpress-ubuntu-4gb-sin-1`）曾因 Supabase PostgreSQL port 暴露 `0.0.0.0` + 預設密碼未改，被植入 XMRig 挖礦程式（CPU 99.7%/Swap 91.5%）。事後查出根本機制：**Docker 啟動容器時直接寫 iptables `DOCKER` chain，執行順序在 UFW 的 `INPUT` chain 之前——`ufw deny 5432` 在面板上顯示生效，實際流量根本不經過 UFW，照樣連得進去**。原始 P2.4（單純 UFW）會複製同一個漏洞到 KS-6。完整事故記錄與根治法：[`runbooks/HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md`](../../../runbooks/HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md) + [`runbooks/SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md`](../../../runbooks/SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md)。
 
 **成功標準：** `/proc/mdstat` 顯示 `[UU]`；兩顆 `percentage_used` 已記錄；rescue mode 進出各一次成功
 **回滾：** 任一項不過 → 重裝 OS（1 小時）或要求換碟（1–2 天）；此時無任何資料在機上，成本僅時間
@@ -340,8 +345,9 @@ Advocates 在比較機器，Reviewers 在比較供應商，Skeptic 在攻擊硬�
 | P6.7 | **計費中主機台數 + 月總額**（Pre-mortem 新增）| 每月人工核對，寫進 30/90/365 天複審 | 台數 > 1 且已過切換 +120 天 → WARN；總額 > €70 → WARN |
 | P6.8 | soulful 非快取路徑 TTFB | 切換前先量 Hostinger 基線（結帳、登入各 10 次 p95），切換後同法量 | 惡化 > 400ms → 觸發快取/Argo 評估 |
 | P6.9 | 擴充 `check-smoke-tests.ps1` | 新機納入 client site 健康 + `client_mail` 檢查 | 沿用既有門檻 |
+| P6.10 | **每週安全稽核腳本**（4/20 事件 runbook §8-6 現成腳本）| cron 跑 `security-audit.sh`：可疑進程 / `docker ps` 找 0.0.0.0 綁定的非 80/443 port / `/tmp` 新檔案 / `authorized_keys` / 登入紀錄 → 異常寫 `reports/status/`，AO-RESUME 讀 | 任何 0.0.0.0 綁定的資料庫類 port 出現 → 立即 |
 
-**成功標準：** 上述九項都能在 AO-RESUME 看到，且 P6.1 用 `mdadm --fail`（軟性）實測告警真的會響
+**成功標準：** 上述十項都能在 AO-RESUME 看到，且 P6.1 用 `mdadm --fail`（軟性）實測告警真的會響，P6.10 手動塞一個測試用 0.0.0.0 綁定驗證真的會抓到
 **回滾：** N/A（純新增觀測）
 
 ### P7 —— soulful 建置 + §5 十四項切換前驗證（5 天 / 24 小時）
@@ -441,6 +447,7 @@ Advocates 在比較機器，Reviewers 在比較供應商，Skeptic 在攻擊硬�
 | **17 個付費外掛授權失效 → 無安全更新** | med | med | P7.7 切換前逐項盤點；失效且面向網際網路者續約或替換 | 操作者（P7.7）|
 | **回滾時遺失切換後產生的訂單與會員註冊**（Customer Voice + Skeptic 獨立發現）| med | high | P8.7 把反向增量寫入回滾程序（現有 §6 未涵蓋）| 代理（P8.7）|
 | **整併後單機成為總爆炸半徑**（Supabase + Chatwoot + 10 站 + MainWP token + n8n 憑證同機）| low | **cat** | 容器隔離 + 每站獨立 DB user + origin lockdown + SSH key-only + fail2ban；**R2 只給新機 write-only token，讀/刪 token 留本機 vault**；R2 versioning | 代理（P3.1/P3.2）|
+| 🔴 **Docker 服務 port 繞過 UFW 直接暴露公網**（2026-04-20 SG 挖礦入侵的確切根因，原 P2.4 草案曾複製同一漏洞，08-18 已修正）| med | **cat** | P2.4 DOCKER-USER chain + P2.4b 全部內部 port 綁 `127.0.0.1:` + P2.4c 全部預設密碼更換 + P2.9 上線前逐項跑 §10 檢查清單 + P6.10 每週稽核偵測 0.0.0.0 綁定 | 代理（P2.4/4b/4c/P2.9）|
 | **死線破線** | low（C6 下）| **cat** | 10/15 硬檢查點；未達標即執行 **C7 續約 Hostinger 一年（€186）** —— 可晚到 11 月初買，故不需現在買，但必須明文留在架上 | 操作者（10/15）|
 | **WP 快取層重建事故**（object cache 把未登入頁餵給登入會員）| med | med | §5 驗證**必須用真實會員帳號**測（admin 常繞過快取邏輯）| 代理（P7.8）|
 | **FX：$ 計價、EUR 消費** —— ±10% = ±€186／3 年 | med | low | 已知曝險，不對沖（成本高於曝險）；列為下次換機次要考量（Hetzner 為 EUR）| — |

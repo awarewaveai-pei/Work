@@ -1,5 +1,30 @@
 ﻿# Worklog
 
+## 2026-08-18（追加）— KS-6 安裝計畫補：修正與 2026-04-20 挖礦入侵同款的 UFW-only 漏洞
+
+[任務]
+操作者質疑「主機設定根本沒有做完善，是我發現後補的」，並提到曾被攻擊、被挖礦。查證發現這不是空泛印象——`runbooks/SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md` 記錄 2026-04-20 SG 主機真實入侵事件：Supabase PostgreSQL port 5432 暴露 `0.0.0.0` + 預設密碼未改，攻擊者植入 XMRig。更嚴重的是：**我當天稍早（同一 session）在 08-18 決策文件寫的 P2.4 防火牆步驟（單純 `ufw allow/deny`）與造成該次入侵的漏洞是同一類**——Docker 啟動容器直接寫 iptables `DOCKER` chain，執行順序在 UFW `INPUT` chain 之前，`ufw deny 5432` 面板顯示生效但實際攔不住。若不修正，KS-6 會在建置階段就複製四月那次的確切漏洞。
+
+[已修改]
+1. `agency-os/reports/decisions/2026-08-18-dedicated-host-purchase-timing.md` —— P2 安裝步驟新增 P2.4（UFW+DOCKER-USER chain 雙層）/ P2.4b（內部 port 全綁 127.0.0.1）/ P2.4c（全部預設密碼更換）/ P2.9（上線前跑 §10 檢查清單）；P6 新增 P6.10（每週安全稽核 cron）；風險登記冊新增一列並標記 🔴，直接點名「原 P2.4 草案曾複製同一漏洞，08-18 已修正」
+2. `runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md` §7 —— 同步新增五個 checklist 項，指向兩份 4/20 事件 runbook
+
+[根因]
+兩層根因，都真實發生過：① 2026-04-20 事件本身：暴露的 DB port + 未改的預設密碼 ② 這次規劃階段的重演風險：即使有現成的事故 runbook 存在（`SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md` §8/§10 早就寫好 DOCKER-USER chain 解法），寫新機安裝計畫時沒有主動去對照，導致同一類防護窗口幾乎再次留空。**制度上存在教訓、但沒有機制強迫新規劃去讀它**——這正是操作者說「一直用補丁」的結構性原因：知識存在但不會自動接到下一次規劃。
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 純決策文件修正，無 code/infra 改動（尚未買機，無可測環境）
+- REVIEW_DONE: 自審 | verdict=pass —— 對照 `SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md` §8-1/§8-2/§8-6/§10 逐條核對新增的 P2.4/4b/4c/P2.9/P6.10 是否覆蓋原文全部建議項（iptables 雙層 / compose 綁 127.0.0.1 / 密碼強度 / 週期稽核 / 上線前檢查清單）—— 五項全覆蓋，無遺漏
+- BUGHUNT_DONE: scope=agency-os,runbooks | grep=P2.4|DOCKER-USER|127.0.0.1 | hits=兩份文件（決策文件+DR runbook）已同步，無第三處遺漏舊版單純 UFW 描述
+
+[剩餘風險]
+- 這些是**規劃層修正**，尚未實機驗證——KS-6 還沒買，P2.4/4b/4c 的實際生效要等裝機後用 `nmap` 從外部掃描才能確認（已寫入 P2.4 成功標準）
+- 密碼輪換範圍（P2.4c）目前只列出常見服務類型，實際裝機時每加一個新服務都要記得跟進，這仍是人工紀律，未自動化
+- 週期稽核（P6.10）目前設計為 cron 寫 status 檔讓 AO-RESUME 讀，尚未實測告警真的會被看到（成功標準已加「手動塞測試用 0.0.0.0 綁定驗證真的抓到」，但要等裝機後才能跑）
+
+[避免再發生]
+操作者的原話「主機設定根本沒有做完善，還是我發現後補的」——這次示範了同一模式差點在規劃階段重演：即使事故 runbook 已經寫好解法，新的安裝計畫草案沒有主動去核對它。**規則**：任何涉及新主機/新服務上線的安裝計畫，寫完初稿後必須逐一核對 `runbooks/` 裡同類型的既有事故 runbook（尤其標題含「SECURITY」「INCIDENT」「BREACH」），不能只憑經驗記憶重寫防護步驟。
+
 ## 2026-08-18 — Dedicated 主機採購時機定案：立刻買 KS-6（月租）+ 死線前範圍閘
 
 [任務]
