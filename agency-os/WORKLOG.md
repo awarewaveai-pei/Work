@@ -1,5 +1,35 @@
 ﻿# Worklog
 
+## 2026-08-19（追加）— 全套自架服務已知坑清單（安全/吃資源/跑不順）
+
+[任務]
+操作者要求：「我們系統裡面所有的東西你都去查應該注意什麼，才不會有安全漏洞或是跑不順，或是很愚蠢的事，像莫名的被吃掉 ram 或空間，各種事項」——延續前兩輪（4/20 事故修正、官方文件交叉查證），把範圍擴到 KS-6 上要跑的**全部服務**：Supabase、ClickHouse、Chatwoot、Trigger.dev、n8n、WordPress×10、MainWP、Postiz、Uptime Kuma。
+
+[已修改]
+1. **新增** `runbooks/KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md` —— 逐服務已知坑清單，每項附官方文件/GitHub issue/CVE/安全通報原始連結，非憑記憶列舉
+2. `agency-os/reports/decisions/2026-08-18-dedicated-host-purchase-timing.md` —— P2 新增 P2.10（通用主機層 Redis sysctl/THP）；P5.1 補 Redis 版本要求；P7 新增 P7.10（WP 清理排程）/P7.11（MainWP Child 版本）
+3. `agency-os/TASKS.md` —— 加一段指向新清單並點名三個重點發現
+
+[查證方式與重點發現]
+用 WebSearch 對每個服務各查 1-2 輪（官方文件優先，GitHub issue/社群報告次之），共約 12 輪查詢。**三個值得特別記的發現**：
+
+1. **ClickHouse 系統遙測 merge 佔用閒置 CPU 是 Trigger.dev 官方 repo 上的已知 issue**（[#4343](https://github.com/triggerdotdev/trigger.dev/issues/4343)）——這證實了 8/15 那次「system/app 資料比 345:1」事故不是這套環境獨有的巧合，是 Trigger.dev v4 自架 ClickHouse 的社群已知問題。既有的 `override.xml` 修法方向正確，且不必再懷疑是不是哪裡設定錯
+2. **MainWP Child CVE-2024-10783**：≤5.2 版本有權限提升漏洞，**5.3.3 之前的修法都不完整**。這台機器未來要接 10 個 WP 站的 MainWP，若裝的是舊版 Child plugin，每個新裝但還沒連上 Dashboard 的子站都有暴露窗口。已列為 P7.11 強制檢查項
+3. **Uptime Kuma 有真實 RCE CVE**（hostname 欄位驗證只在前端做，可繞過注入指令）+ 社群統計約 15,000 台因設定錯誤公開暴露內網資訊。這台機器計畫用 Uptime Kuma 監控（現有 EU 已在用），面板本身**絕對不能對外**，只有唯讀的 status page 可以公開——兩者容易被搞混
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 純研究彙整 + 決策文件/TASKS 交叉引用更新，無 code/infra 改動
+- REVIEW_DONE: 自審 | verdict=pass —— 逐項核對新增的 P2.10/P5.1/P7.10/P7.11 是否對應清單文件裡的具體條目，無斷鏈；清單文件內每個坑都附一手來源連結，非二手轉述
+- BUGHUNT_DONE: scope=agency-os,runbooks | grep=KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST | hits=3（決策文件 P2.10 一處 + TASKS.md 一處 + 清單文件自身頁首的正本聲明），三處互相指涉一致
+
+[剩餘風險]
+- 這是**規劃層彙整**，尚未實機驗證——多數項目要等實際裝上該服務才能確認修法生效（例如 Redis vm.overcommit_memory 要看到警告訊息消失、ClickHouse 記憶體上限要壓力測試才知道 80% 夠不夠）
+- 查證時間點是 2026-08-19，部分 CVE/GitHub issue 若之後有更新修法，需要在實際裝機時重新確認版本號是否仍適用
+- 覆蓋的是「已知」的坑（有文件/issue/CVE 記載的），無法保證涵蓋所有可能問題——這是研究的本質限制，不是清單本身的缺陷
+
+[避免再發生]
+延續前兩輪的紀律：規劃新主機/新服務前，除了對照既有事故 runbook，**還要對每個要裝的軟體本身做一輪外部已知問題查證**（官方文件 + GitHub issue tracker + CVE 資料庫），不能只靠內部經驗或事故史。三層防線疊起來：內部事故記錄（4/20 挖礦）+ 廠商官方文件（OVH 安裝/硬化指南）+ 各軟體上游的已知問題（這次新增）。
+
 ## 2026-08-19 — KS-6 安裝計畫與官方文件交叉查證
 
 [任務]

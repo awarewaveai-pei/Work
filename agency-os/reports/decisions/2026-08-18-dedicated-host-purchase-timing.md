@@ -284,6 +284,7 @@ Advocates 在比較機器，Reviewers 在比較供應商，Skeptic 在攻擊硬�
 | P2.7 | Docker + compose 安裝，daemon 設 log rotation | `/etc/docker/daemon.json`：`log-driver: json-file, max-size: 10m, max-file: 3`（不設 = 磁碟被 log 吃掉，1TB 天花板下更致命）|
 | P2.8 | **rescue mode 實按一次**（§7 未勾項）| 在 OVH Manager 觸發 rescue → SSH 進臨時系統 → 確認能 `mount` 主系統碟 → 切回。**無 IPMI/KVM，這是唯一救援路徑，必須在平時驗過一次** |
 | P2.9 | **上線前跑一次 `runbooks/SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md` §10 預防性檢查清單**（每項打勾）| 這份清單就是 4/20 事件事後寫的，逐項對照防止同類重演。**任何服務上線前都跑一次，不只裝機當下一次** |
+| P2.10 | **對照 `runbooks/KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md` 通用主機層 4 項**（2026-08-19 新增：Redis `vm.overcommit_memory` / THP / docker prune / volume 隔離）| Chatwoot/n8n/Postiz 都用到 Redis，這是 host 層一次設定、全站共用的設定，裝機階段一次做掉 |
 
 > ⚠️ **為什麼要加這五項（P2.4/4b/4c/P2.9）**：2026-04-20 SG 主機（`wordpress-ubuntu-4gb-sin-1`）曾因 Supabase PostgreSQL port 暴露 `0.0.0.0` + 預設密碼未改，被植入 XMRig 挖礦程式（CPU 99.7%/Swap 91.5%）。事後查出根本機制：**Docker 啟動容器時直接寫 iptables `DOCKER` chain，執行順序在 UFW 的 `INPUT` chain 之前——`ufw deny 5432` 在面板上顯示生效，實際流量根本不經過 UFW，照樣連得進去**。原始 P2.4（單純 UFW）會複製同一個漏洞到 KS-6。完整事故記錄與根治法：[`runbooks/HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md`](../../../runbooks/HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md) + [`runbooks/SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md`](../../../runbooks/SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md)。
 >
@@ -324,7 +325,7 @@ Advocates 在比較機器，Reviewers 在比較供應商，Skeptic 在攻擊硬�
 
 | # | 任務 | 細節 |
 |---|---|---|
-| P5.1 | Chatwoot（Rails + PG + Redis）docker compose 部署 | 官方 compose 為基礎；**每個容器都設 `mem_limit`**（§7 未勾項）—— Chatwoot 8G / PG 4G / Redis 1G |
+| P5.1 | Chatwoot（Rails + PG + Redis）docker compose 部署 | 官方 compose 為基礎；**每個容器都設 `mem_limit`**（§7 未勾項）—— Chatwoot 8G / PG 4G / Redis 1G；**Redis image 版本 ≥7.0**（<7.0 會讓 Sidekiq 反覆自動停止，見 `KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md` Chatwoot 節）|
 | P5.2 | 反向代理 + Cloudflare Origin Certificate + origin lockdown | 只允許 Cloudflare IP 連 80/443（repo 有 `/origin-lockdown` 做法）|
 | P5.3 | 接 cs-engine AgentBot webhook | 照 `handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md`：建 AgentBot webhook route 呼叫 `lib/cs` 的 `handleInbound` |
 | P5.4 | widget `MockTransport` → `ChatwootTransport` | 同上 handoff |
@@ -369,8 +370,10 @@ Advocates 在比較機器，Reviewers 在比較供應商，Skeptic 在攻擊硬�
 | P7.7 | **17 個付費外掛授權狀態盤點**（Security 要求）| 逐項記錄到期日。**任何已失效且面向網際網路的外掛 → 切換前續約或替換** |
 | P7.8 | §5 十四項驗證（用本機 hosts 檔，零訪客影響）| 首頁/文章/**會員登入（用真實會員帳號，不是 admin）**/WooCommerce 結帳到付款前一步/FluentForms 收信/媒體抽 10 張含舊年份/後台外掛清單對 manifest/`wp cron event list`/Rank Math 轉址 |
 | P7.9 | 量 TTFB 基線（P6.8）| 切換前在 Hostinger 上量，切換後對照 |
+| P7.10 | **`wp_options` autoload / transient / revision 清理排程**（2026-08-19 新增，10 站都要設）| 對照 `KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md` WordPress 節；WooCommerce 站尤其容易 `wp_postmeta` 無界增長，拖慢全站 |
+| P7.11 | **MainWP Child 版本確認 >5.3.3**（CVE-2024-10783 權限提升，2026-08-19 新增）| 裝機時直接抓最新版；每個子站裝完 Child **立刻**接上 Dashboard，縮短未連線暴露視窗 |
 
-**成功標準：** §5 十四項**全部**通過（runbook 原話：「任何一項不過就不要切換」）
+**成功標準：** §5 十四項**全部**通過（runbook 原話：「任何一項不過就不要切換」）+ `KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md` 驗收清單全過
 **回滾：** 新舊並存不傷害任何人；慢慢修，不設時限（這是 48 天餘裕買到的東西）
 
 ### P8 —— 切換 + 觀察（1.5 天 / 6 小時）★ High risk，需操作者明示 go-ahead
