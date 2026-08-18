@@ -116,6 +116,13 @@
   </div>
 
   <div class="card" id="summaryCard" style="display:none">
+    <div style="background:#eef1ff;border:1px solid var(--accent);border-radius:8px;padding:12px;margin-bottom:16px">
+      <b>兩種做法，選一種：</b>
+      <ol style="margin:8px 0 0;padding-left:20px;font-size:13px;color:var(--muted)">
+        <li><b>請 Claude Code 幫你處理</b>——如果你正在跟 Claude Code 對話，直接說「處理 job <code id="jobIdHint"></code>」，它會自己讀 prompt、寫 JSON、送出，你什麼都不用做。</li>
+        <li><b>自己貼</b>——用下面的步驟，複製 prompt 貼給任一 AI（Claude、免費版 ChatGPT 都可以），再把回傳的 JSON 貼回來。</li>
+      </ol>
+    </div>
     <p><span class="step-num">1</span><b>複製下面這段 prompt</b>，貼進任一 AI 對話視窗（Claude、免費版 ChatGPT 等皆可，用既有額度不額外收費）</p>
     <textarea id="promptBox" readonly></textarea>
     <button class="copyBtn" id="copyPromptBtn">複製 prompt</button>
@@ -245,6 +252,7 @@ async function poll(jobId) {
 async function showSummaryStep(jobId) {
   document.getElementById("progressCard").style.display = "none";
   document.getElementById("summaryCard").style.display = "block";
+  document.getElementById("jobIdHint").textContent = jobId;
   const resp = await fetch(`/api/prompt/${jobId}`);
   const text = await resp.text();
   document.getElementById("promptBox").value = text;
