@@ -21,6 +21,21 @@
 
 ---
 
+## 🔴 既有服務搬遷（非新裝）專屬坑（2026-08-19 新增）
+
+> 上面所有節都是「在新機從零裝一個服務」的角度寫的。**SG 五個服務（next-admin/WordPress+DB/Node API/oracle-web/Redis）是「把已經在跑的東西搬過去」，性質不同**——舊設定、舊憑證、舊資料原封不動搬過來，反而會把舊機的問題一起帶過去。EU 六服務也適用（雖然那邊多數走 dump/restore 不是整個 volume 搬，風險略低，但同樣要過這節）。
+
+| 坑 | 後果 | 修法 |
+|---|---|---|
+| **密碼/憑證原封不動搬過去** | 舊密碼如果早就外洩或太弱，搬機是唯一低成本的換密碼時機——不換等於把舊風險原樣帶到新機 | 每個服務搬遷時**評估是否可以順手轉一輪密碼**（DB 密碼、內部服務間的 API key）。**只轉你控制兩端的**（例如 WordPress↔MariaDB 之間的密碼）；**對外共用的憑證（第三方 API key、client 看得到的東西）先不要動**，避免搬遷當天同時處理「憑證失效」的額外變數 |
+| **檔案權限在還原/rsync 後跑掉** | WordPress 最常見的搬機事故之一：擁有者變成 `root`，PHP-FPM 用 `www-data` 讀不到，直接 403/500 | 搬完立即 `chown -R www-data:www-data`（或對應的 docker 內部使用者）跑一次，不要假設 rsync/tar 會保留正確權限 |
+| **設定檔裡寫死舊 IP / hostname** | nginx upstream、DB host、內部服務間呼叫如果寫的是舊機 IP（不是 service name 或環境變數），DNS 都切好了，內部呼叫還是打不通 | 搬遷前 `grep -r` 舊機 IP 找出所有寫死的地方，改成 docker network 內的 service name 或環境變數，不要在新機上複製舊機那份原封不動的設定 |
+| **SSH known_hosts 沒更新** | 任何原本會 SSH 進舊機的腳本/cron（例如跨機備份、部署腳本），搬機後對到新 IP 會撞 `Host key verification failed` 卡住，且錯誤不會直接顯示成「服務壞了」，容易誤判 | 搬遷後盤點所有會 SSH 到這台機器的腳本（`grep -rl` repo 內的 IP），更新目標 IP + 讓對方機器的 `known_hosts` 接受新機指紋 |
+| **Cron / WP-Cron 路徑寫死** | P7.1 的多站設計是 `/srv/sites/<slug>/`，如果舊機路徑結構不同（例如舊路徑是 `/var/www/html`），照抄的 cron entry 會指向不存在的路徑，靜默失敗 | 搬遷後 `crontab -l` 逐條核對路徑；WordPress 站另外 `wp cron event list` 確認排程存在且會執行（呼應既有 P7.8 驗證項）|
+| **舊帳號/舊 key 沒有一起關掉** | 搬遷常見心態是「先讓新機跑起來再說」，舊機上的 SSH key、admin 帳號、deploy key 就這樣被遺忘留著，新機也可能因為複製了舊機的 `authorized_keys` 而帶著不再需要的信任關係 | 搬遷完成、確認新機穩定運作後，**明確列出舊機上所有的存取憑證，逐一確認去留**，不要讓「反正舊機要退役了」變成沒人處理的藉口 |
+
+---
+
 ## Supabase（承載客戶主資料，風險等級最高）
 
 | 坑 | 後果 | 修法 | 來源 |
