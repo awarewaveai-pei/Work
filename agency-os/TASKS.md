@@ -244,7 +244,16 @@
     - **✅ 採購時機已定案（2026-08-18）：立刻下單，不觀望等待** —— 觀望的「獎品」是多付 €445–484／3年換運維品質，不是省錢；OVH 月租可隨時取消（官方條款），同一個「換更好機器」的選擇權用 $43.20 買，有效期 36 個月，不必用死線餘裕買。**KS-6 已查證常缺貨**，「等不到 Hetzner 才買 KS-6」的退路本身沒保證。決策正本 [`reports/decisions/2026-08-18-dedicated-host-purchase-timing.md`](reports/decisions/2026-08-18-dedicated-host-purchase-timing.md)（19-stage decision-intelligence 面板，信心值 0.79）
     - **選月租，不要 12 個月承諾**（操作者 2026-08-18 確認：「有點想省 $43.20 但又怕出事」）—— 多付 $43.20 買的正是「30 天觀察期後才承諾」：這台是 2017 年二手 Naples 平台，NVMe 磨耗/NUMA/RMA 品質全未驗證。月租跑滿 30 天全綠、SMART/mdadm 正常、未觸發 RMA 後再評估轉 12 個月（買機+30天複審項）
     - **觀望不停，但改由月租承載**：繼續每 2–3 天看 Hetzner auction（篩 ECC + 128GB + ≥2TB + ≤€65）。soulful 生產資料落地新機**前**命中 → 退 KS-6 換機；落地後命中 → 記入下次換機評估，不動生產機
-    - **死線前範圍閘**：11/12 前只做 Chatwoot 試機 → soulful 搬完切換。**EU/SG 整併明確排到 2026-11-20 之後**（六個具名服務，每兩週搬一台，寫進日曆）—— Pre-mortem 發現：這個決策的財務承諾（省下雲端 €28/月）沒有外部強制力，若不排具體日期，18 個月後很可能三台機器仍並存、白花 €1,008
+    - **死線前範圍閘**：11/12 前只做 Chatwoot 試機 → soulful 搬完切換。**EU/SG 整併明確排到 2026-11-20 之後**——Pre-mortem 發現：這個決策的財務承諾（省下雲端 €28/月）沒有外部強制力，若不排具體日期，18 個月後很可能三台機器仍並存、白花 €1,008。**操作者 2026-08-19 明確澄清：不是只搬 soulful，EU 和 SG 都要搬過去退役**——以下為具名待辦，避免「範圍閘」變無限期拖延：
+      - [ ] EU①Supabase（**High-risk，需操作者本人在線**，六服務中風險最高、放最後搬）
+      - [ ] EU②Trigger.dev（含 ClickHouse——**搬前先確認 `override.xml` 產生源設定已生效**，2026-08-19 在原機實測過這個坑，同一套修法要複製過去）
+      - [ ] EU③n8n
+      - [ ] EU④Postiz
+      - [ ] EU⑤MainWP（Dashboard 端；child site token 需隨遷移重新確認連線）
+      - [ ] EU⑥Uptime Kuma
+      - [ ] SG⑦next-admin + WordPress + WordPress-DB + Node API（可能一波搬，四個容器互相依賴）
+      - [ ] SG⑧oracle-web + 觀測堆疊（Loki/Grafana/Promtail，若仍需要；**2026-08-19 SSH 實查發現這 4 個容器不在 `AWAREWAVE_STACK_QUICKREF.md` 拓樸表裡，搬遷前先重新 `docker ps` 核對，不要照表操課漏掉**）
+      - [ ] 兩台雲端主機確認已無流量 → 安全關閉 → 帳單確認只剩一台在計費（呼應 Pre-mortem「切換 +120 天仍 &gt;1 台在跑」的預警指標）
     - **✅ 出國行程已確認排除**（操作者 2026-08-18：「沒有，這幾個月都在」）—— Pre-mortem 判定的第二號死因（§5 Supabase 整併是 High-risk、需本人在線）已解除，W4 可照 11/20 起兩週一台的節奏排，不必等行程確認
     - **決策正本**：[`reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md`](reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md)（規格：128GB ECC 等）+ [`reports/decisions/2026-08-18-dedicated-host-purchase-timing.md`](reports/decisions/2026-08-18-dedicated-host-purchase-timing.md)（時機：立刻買）—— 取代 `runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md` §0b 機型表；§0b 其餘決策（Chatwoot 先行 / 單台+RAID1+R2 / HA 延後）不變
     - **下單前確認**：可裝 Ubuntu LTS + 自訂分割 + soft RAID1／rescue mode／刷卡幣別匯率。**Backup Agent 容量一項已移除**（改走既有 R2，同商同地備份在 2021 OVH SBG2 火災中已證實不算備份）
