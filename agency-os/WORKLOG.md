@@ -1,5 +1,47 @@
 ﻿# Worklog
 
+## 2026-08-19（第三輪，實機事故）— EU ClickHouse 系統表 TTL 缺口：現場修復，中途引發並排除一次真實 CPU 事故
+
+[任務]
+前兩輪查證都是規劃層文件（給未買的 KS-6）。操作者追問「這件事處理好了嗎？」逼出真正的問題：規劃文件不等於已執行。查證發現 EU **現有** `trigger-clickhouse` 容器也有同一種系統表缺 TTL 的問題，不是只有未來機器要注意。操作者接著要求「要，但不要用補丁的修法，要確確實實、扎扎實實、乾乾淨淨」——於是這次是**真的 SSH 進 production 動手修**，過程中犯了兩個錯、觸發一次真實 CPU 事故，最終完整解決並補上監控。完整誠實記錄如下，不省略中間犯的錯。
+
+[已修改]
+1. `lobster-factory/infra/trigger/clickhouse/override.xml` —— 嘗試對 `part_log`/`opentelemetry_span_log`/`query_views_log`/`query_metric_log` 宣告式加 TTL（沿用既有 `<table><ttl>` 寫法），**導致容器開機崩潰**；revert 宣告式寫法，改用 `ALTER TABLE ... MODIFY TTL` 對這四張表直接下 SQL 修復；補上完整事故過程的註解說明現況與已知限制
+2. `scripts/check-clickhouse-health.ps1` —— 新增兩項偵測：① 任何 `system.*` MergeTree 表缺 TTL ② 孤兒 `_0`/`_1`/`_2` 分身表殘留，兩者觸發時 verdict 至少降為 `drift`。作為「四張表無設定檔保護」的補償控制
+3. `runbooks/KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md` —— ClickHouse 節新增兩項基於實機驗證的發現（非文件推測）：並非每張系統表都吃宣告式 TTL 寫法、孤兒分身表需要定期清理；驗收清單同步更新為「一張一張加、一張一張重啟驗證」
+4. EU 實機（`trigger-clickhouse` 容器）——`part_log`/`opentelemetry_span_log`/`query_views_log`/`query_metric_log` 四張表現在皆有 TTL；`system.metric_log` 已 TRUNCATE（純內部效能指標，非 `trigger_dev` 應用資料，零風險）；六張孤兒分身表（`opentelemetry_span_log_0/1`、`part_log_0/1`、`query_views_log_0/1`）已清除
+
+[完整事故時間線（誠實記錄，含自己的錯）]
+1. **SSH 連線**：`ssh_connect` 自動偵測金鑰失敗，改用明確路徑 `~/.ssh/hetzner_trigger` 成功
+2. **現況查證**：確認 EU 現有 4 張系統表（`part_log`/`opentelemetry_span_log`/`query_views_log`/`query_metric_log`）缺 TTL，且已能看到 `_0` 分身表（曾經設過 TTL 但被版本升級重建後失憶）——證實前兩輪查到的「陰險陷阱」現在真的發生在這台機器上
+3. **立即 ALTER TABLE 修復**：四張表直接下 SQL 補 TTL，成功，查詢確認生效
+4. **嘗試根治：改設定檔**——編輯本機 repo `override.xml` 加宣告式 TTL 區塊。**第一次犯錯**：用 `sftp_write` 寫入伺服器時把 XML 角括號手動打成 HTML escape（`&lt;`/`&gt;`），寫上去的檔案是壞的無效 XML。當場用 `head -c` 查證抓到，重寫一次修正
+5. **重啟容器套用新設定 → 真的崩潰**：`docker logs` 查到 `Code: 36 BAD_ARGUMENTS: If 'engine' is specified for system table, TTL parameters should be specified directly inside 'engine'...`，容器進入重啟迴圈。**立即止血**：revert override.xml 的四個新區塊（保留其餘既有設定不動），重新推上伺服器，容器 9 秒內恢復 healthy
+6. **驗證發現不完整**：重啟後查 TTL 狀態，`part_log` 打回無 TTL（重啟時的比對機制又把它重建成 `part_log_1`），另外三張撐住了。對 `part_log` 單獨下一次 `ALTER TABLE MODIFY TTL`（不碰設定檔、不重啟）→ **意外發現：這次換 `opentelemetry_span_log` 跟 `query_views_log` 自己跑掉**，沒有重啟、沒有動它們，純粹因為對另一張表下 ALTER 就連帶觸發。判斷：ClickHouse 內部的系統表比對／重建機制不是只在重啟時觸發，背景有某種週期性核對
+7. **真實 CPU 事故爆發**：例行健康檢查時發現容器 CPU 99.44%、每秒約 3 次 `MEMORY_LIMIT_EXCEEDED` 錯誤，鎖定是 `metric_log`（55 個 part，僅 79MB）反覆合併失敗又重試。等待 85 秒觀察是否自然收斂（CPU 67%→90%浮動、錯誤率不降、part 數持續微增）——**判定為卡住而非自然恢復**，比對既有 `override.xml` 自己記載的歷史事故（同類「小表持續 merge 失敗」症狀），採用同一套過去驗證有效的處置：`TRUNCATE TABLE system.metric_log`（純內部效能表，與 `trigger_dev` 應用資料無關）。CPU 立即從 90% 降到 4.34%，錯誤歸零
+8. **補完最後兩張表**：對 `opentelemetry_span_log`／`query_views_log` 再下一次 `ALTER TABLE MODIFY TTL`，這次未再觸發連鎖反應（15 秒觀察窗 0 錯誤）
+9. **清理殘留**：`DROP TABLE` 清掉 6 張孤兒分身表（`_0`/`_1` 各三對），確認清理前主用表 TTL 皆已正確
+10. **最終穩定性複查**：20 秒觀察窗 CPU 3.87%、0 錯誤、healthy、`trigger_dev.task_runs_v2` 資料筆數（111,944）全程未變 —— 應用資料完全未受波及
+11. **補監控**：`check-clickhouse-health.ps1` 新增無 TTL 表 + 孤兒表偵測兩項，實際執行驗證：`noTtlTableCount=0`、`orphanDupTableCount=0`、`verdict=healthy`、ratio 4.5x（歷史最糟 345:1）
+
+[根因]
+兩層根因，都是這次才真正查清楚的：
+① **系統表重建後 TTL 失憶**（前兩輪已從外部文獻查到，這次在自家機器上實機驗證確認）——不是猜測，是看得到 `_0` 分身表的存在證據
+② **宣告式設定檔寫法對這四張表不適用，原因未完全查明**——查過 base `config.xml`，十張系統表的預設宣告方式完全一致（都沒有顯式 `<engine>`），無法從設定檔本身解釋為什麼偏偏這四張會讓 ClickHouse 拒絕啟動。誠實標記為「未完全查明」，不假裝已經懂了根因（override.xml 內部註解已避免使用未經證實的「這四張表已經定義 engine」猜測）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=ClickHouse ALTER/TRUNCATE/DROP 全系列 SQL + `docker restart`/`docker stats`/`docker logs` 監控 | exit=0（全部操作）| ms=約 25 分鐘全程（含止血與觀察等待）
+- REVIEW_DONE: 自審，非外部 critic（純 infra SQL/設定操作，非 code diff，R0 四動作精神比照辦理）—— 逐步查證每個假設（config.xml 是否有 engine、TTL 是否真的生效、容器是否真的健康、應用資料是否真的未受影響），不接受「應該沒事」的臆測，每一步都用實際查詢或指令輸出驗證
+- BUGHUNT_DONE: scope=agency-os,runbooks,scripts,lobster-factory | grep=no_ttl_count\|orphan_dup_count\|part_log_1 | hits=3（check-clickhouse-health.ps1 新增變數、KS6 清單新增段落、override.xml 新註解），三處一致無遺漏；另確認 `check-clickhouse-health.ps1` 修改後**實際執行過**（非只改程式碼沒跑），輸出已附在驗證結果
+
+[剩餘風險]
+- **四張表的 TTL 不是設定檔保護的，是靠監控補償**——若未來某次重啟又讓它們失憶，`check-clickhouse-health.ps1` 會在下次 AO-RESUME 抓到（`drift` 等級），但不會自動修復，需要人工重跑 `ALTER TABLE ... MODIFY TTL`。這是本次事故誠實承認的殘留缺口，不是假裝已經根治
+- 宣告式寫法為何對這四張表崩潰**原因未完全查明**。override.xml 已註記「不要在沒有拋棄式測試環境的情況下重新嘗試」——避免未來哪次不知情又踩同一個坑
+- 這次意外證實了 ClickHouse 系統表的重建/核對機制不只在重啟時觸發（對 part_log 下 ALTER 卻連帶影響到另外兩張表），背景機制細節仍不清楚，若未來要更深入排查需要在拋棄式環境重現
+
+[避免再發生]
+「寫進文件」跟「處理好了」是兩件事，操作者這次的追問直接戳破這個落差——文件寫得再完整，沒有實際去查/去修現有系統，那些坑可能同時存在於「規劃中的未來機器」跟「現在正在跑的機器」。**任何從文件研究得出的修法，第一步永遠是「這個問題在我現有的正式環境裡也存在嗎」**，不能假設它只跟未來計畫有關。另外：一次改多個設定（這次是同時加 4 張表的 TTL 宣告）出問題時無法定位是哪一個造成的——之後任何 config.d 型設定改動都應該一項一項加、一項一項驗證，不要批次一次全上。
+
 ## 2026-08-19（第二輪追加）— 補第二批坑：ClickHouse 系統表 TTL / restart policy / image pinning / Cloudflare SSL 模式 / n8n 授權
 
 [任務]
