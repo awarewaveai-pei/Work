@@ -44,7 +44,9 @@
 | Part 數量爆增（小批次頻繁寫入）| 查詢變慢、啟動變慢，嚴重時觸發 `parts_to_throw_insert` 內部限制直接拒寫 | 寫入一律走批次，不要逐筆 insert | 同上 |
 | **Trigger.dev 官方 compose 預設用 `bitnamilegacy/clickhouse:latest`**（凍結在 25.5.2）| webapp 送的 client 設定 25.5 版不接受，**所有 insert 失敗，Dashboard 完全看不到任何 run 紀錄**（表面看起來像壞掉但其實是版本不合） | 若重裝 Trigger.dev stack，**改用官方 tag（≥25.8，如 26.2）**，不要用 Bitnami legacy 標籤 | [Trigger.dev GitHub issue #4325](https://github.com/triggerdotdev/trigger.dev/issues/4325) |
 | MinIO 當 ClickHouse 儲存後端時開 bucket versioning | ClickHouse merge 過程會頻繁寫入/更新同一批檔案，開版本控制會讓儲存量暴增且回不去 | **不要**對 ClickHouse 用的 MinIO bucket 開 versioning（跟 P3.2 R2 備份桶開 versioning 是不同的桶，不要混淆）| [Altinity](https://altinity.com/blog/integrating-clickhouse-with-minio) |
-| 🔴 **`system.query_log`/`trace_log`/`part_log`/`metric_log` 這些系統自己的紀錄表，預設沒有 TTL，會無限長大**（2026-08-19 新增，**跟上面「系統遙測吃 CPU」是不同問題，這個是吃磁碟**）| 真實案例：`system.trace_log` 六週長到 **97GB**，把整個磁碟塞滿。這是**除了 override.xml 產生源之外，1TB 天花板下第二個必須先設的 ClickHouse 項目** | 在 `/etc/clickhouse-server/config.d/` 逐一對 `query_log`/`trace_log`/`part_log`/`metric_log`/`text_log`/`asynchronous_metric_log` 設 TTL（建議 7–14 天）。**已知陷阱**：升級或重啟後 ClickHouse 有時會建新表（`query_log_2`、`query_log_3`...），新表**不會繼承**舊表的 TTL 設定，要重新對新表逐一設定，不能設一次就當永久 | [langfuse-k8s issue #333](https://github.com/langfuse/langfuse-k8s/issues/333)、[Altinity clickhouse-operator issue #1241](https://github.com/Altinity/clickhouse-operator/issues/1241) |
+| 🔴 **`system.query_log`/`trace_log`/`part_log`/`metric_log` 這些系統自己的紀錄表，預設沒有 TTL，會無限長大**（2026-08-19 新增，**跟上面「系統遙測吃 CPU」是不同問題，這個是吃磁碟**）| 真實案例：`system.trace_log` 六週長到 **97GB**，把整個磁碟塞滿。這是**除了 override.xml 產生源之外，1TB 天花板下第二個必須先設的 ClickHouse 項目** | 在 `config.d/` 逐一對系統表設 TTL（建議 7–14 天）。**已知陷阱**：升級或重啟後 ClickHouse 有時會建新表（`query_log_2`、`query_log_3`...），新表**不會繼承**舊表的 TTL 設定，要重新對新表逐一設定，不能設一次就當永久 | [langfuse-k8s issue #333](https://github.com/langfuse/langfuse-k8s/issues/333)、[Altinity clickhouse-operator issue #1241](https://github.com/Altinity/clickhouse-operator/issues/1241) |
+| 🔴 **並非每張系統表都吃這套 `config.d` 宣告式寫法**（2026-08-19 EU 實機驗證發現，非文件推測）| 在 EU 現有機器上實測：`query_log`/`metric_log`/`text_log`/`processors_profile_log`/`latency_log`/`error_log` 六張表用 `<table><ttl>...</ttl></table>` 宣告式寫法正常生效且撐過重啟；但 `part_log`/`opentelemetry_span_log`/`query_views_log`/`query_metric_log` 四張表用同樣寫法**直接讓 ClickHouse 開機崩潰**（`BAD_ARGUMENTS: ttl setting doesn't make sense`），查過 base config.xml 確認十張表定義方式完全一致、無法從設定檔本身看出差異原因，根因未完全查明 | **KS-6 裝機時比照辦理**：先用宣告式寫法**一張一張加、一張一張重啟驗證**，不要一次全加後才重啟（那樣崩潰時不知道是哪張表的問題）。若某張表宣告式寫法導致崩潰，改用 `ALTER TABLE system.<table> MODIFY TTL ...` 直接對已建立的表下 SQL（不進 config.d），**但這種表的 TTL 不保證撐過未來的表重建循環**，必須額外接上監控（見下方驗收項）| 本次事故：`agency-os/WORKLOG.md` 2026-08-19、`lobster-factory/infra/trigger/clickhouse/override.xml` 內部註解 |
+| 🟡 **系統表被 ClickHouse 自動重建成 `_0`/`_1`/`_2`... 分身後，舊分身不會自動清掉**（2026-08-19 實測發現）| 每次重建循環都留下一個孤兒表，長期下來會累積一堆沒人用但佔磁碟空間的分身表 | 定期（或每次裝機驗收時）用 `SELECT name FROM system.tables WHERE database='system' AND name LIKE '%\_0' OR name LIKE '%\_1'` 抓出來，確認目前使用中的表 TTL 正常後，`DROP TABLE` 清掉分身 | 同上 |
 
 ---
 
@@ -136,7 +138,7 @@
 
 - [ ] 通用主機層：4 項舊有 + `restart: unless-stopped` 全站統一 + image tag 全部釘版本 + `fstrim.timer` 已排程
 - [ ] Supabase：`.env` 全部密鑰非預設值 + RLS 全表開啟 + service_role 不在前端 + port 內部化
-- [ ] ClickHouse：記憶體上限 80% + 批次寫入 + `override.xml` 產生源已修 + **系統紀錄表（query_log/trace_log/part_log 等）TTL 已設，且重啟後重新確認新表也有 TTL** +（若重裝 Trigger.dev）ClickHouse 用官方 tag ≥25.8
+- [ ] ClickHouse：記憶體上限 80% + 批次寫入 + `override.xml` 產生源已修 + **系統紀錄表（query_log/trace_log/part_log 等）TTL 已設，一張一張加、一張一張重啟驗證**（不要一次全加）+ 若某張表宣告式寫法崩潰，改用 `ALTER TABLE ... MODIFY TTL` 並接上 `check-clickhouse-health.ps1` 的無 TTL 表偵測 + 孤兒 `_N` 分身表已清 +（若重裝 Trigger.dev）ClickHouse 用官方 tag ≥25.8
 - [ ] Chatwoot：Redis ≥7.0 + `vm.overcommit_memory=1` 已設 + 建收件匣時若遇 402 先查已知 issue
 - [ ] n8n：`EXECUTIONS_DATA_PRUNE`/`EXECUTIONS_DATA_MAX_AGE`/`N8N_BINARY_DATA_TTL` 已設 + **授權使用情境已與操作者確認**
 - [ ] WordPress×10：transient/revision 清理排程已建
