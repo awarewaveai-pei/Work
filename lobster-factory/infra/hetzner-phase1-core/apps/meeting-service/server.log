@@ -3,3 +3,85 @@ INFO:     127.0.0.1:60559 - "GET / HTTP/1.1" 200 OK
 INFO:     127.0.0.1:60559 - "GET /favicon.ico HTTP/1.1" 404 Not Found
 INFO:     127.0.0.1:52954 - "GET / HTTP/1.1" 200 OK
 INFO:     127.0.0.1:52149 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50417 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55152 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55152 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:60156 - "POST /api/upload?diarize=true&model=large-v3&sync_drive=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57558 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57558 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57558 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57558 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57558 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57558 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57558 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57558 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57558 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57558 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57558 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57558 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57558 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57558 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57558 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57558 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57558 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57558 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57558 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57558 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57558 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57558 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+[FAIL] ImportError: DLL load failed while importing stream: 應用程式控制原則已封鎖此檔案。
+Traceback (most recent call last):
+  File "D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\meeting-service\pipeline.py", line 72, in run_pipeline_phase1
+    result = transcribe(media_path, model_name=model_name, log=log)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\meeting-service\lib\transcribe.py", line 76, in transcribe
+    preflight(media_path, log)
+  File "D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\meeting-service\lib\transcribe.py", line 58, in preflight
+    import av
+  File "C:\Users\user1115\AppData\Local\Programs\Python\Python312\Lib\site-packages\av\__init__.py", line 23, in <module>
+    from av.audio.codeccontext import AudioCodecContext
+  File "C:\Users\user1115\AppData\Local\Programs\Python\Python312\Lib\site-packages\av\audio\__init__.py", line 1, in <module>
+    from .frame import AudioFrame as AudioFrame
+  File "av/audio/frame.py", line 1, in init av.audio.frame
+    import cython
+    ^^^^^^^^^^^
+  File "av/frame.py", line 1, in init av.frame
+    import cython
+    ^^^^^^^^^^^
+  File "C:\Users\user1115\AppData\Local\Programs\Python\Python312\Lib\site-packages\av\codec\__init__.py", line 1, in <module>
+    from .codec import (
+  File "av/codec/codec.py", line 1, in init av.codec.codec
+    from enum import Flag, IntEnum, IntFlag
+    ^^^^^^^^^^^
+  File "av/codec/hwaccel.py", line 1, in init av.codec.hwaccel
+    import weakref
+    ^^^^^^^^^^^
+  File "C:\Users\user1115\AppData\Local\Programs\Python\Python312\Lib\site-packages\av\video\__init__.py", line 2, in <module>
+    from .stream import VideoStream as VideoStream
+ImportError: DLL load failed while importing stream: 應用程式控制原則已封鎖此檔案。
+
+INFO:     127.0.0.1:57558 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60156 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62278 - "GET / HTTP/1.1" 200 OK
