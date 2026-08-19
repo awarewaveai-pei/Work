@@ -176,3 +176,5 @@ INFO:     127.0.0.1:60209 - "GET /api/status/b3762c67f814 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:60882 - "GET /api/log/b3762c67f814?lines=40 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:60209 - "GET /api/status/b3762c67f814 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:60209 - "GET /api/prompt/b3762c67f814 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62005 - "GET /api/status/b3762c67f814 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53318 - "GET /api/prompt/b3762c67f814 HTTP/1.1" 200 OK
