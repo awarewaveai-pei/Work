@@ -11,6 +11,9 @@ if (Get-NetTCPConnection -LocalPort 8420 -ErrorAction SilentlyContinue) {
 }
 
 $env:HF_TOKEN = [Environment]::GetEnvironmentVariable("HF_TOKEN", "User")
+# 未設定時保持空白，Google Drive 同步功能就會安全停用（見 lib/archive.py 開頭說明）。
+# 別人拿這份程式去自己電腦跑，這裡天生就是空的，不會意外連到操作者的雲端路徑。
+$env:MEETING_DRIVE_BASE = [Environment]::GetEnvironmentVariable("MEETING_DRIVE_BASE", "User")
 $env:PYTHONIOENCODING = "utf-8"
 $env:PYTHONUNBUFFERED = "1"
 

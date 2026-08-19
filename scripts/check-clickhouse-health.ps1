@@ -143,6 +143,9 @@ echo "max_parts=$(q "SELECT max(c) FROM (SELECT count() AS c FROM system.parts W
 echo "top_table=$(q "SELECT concat(table,':',toString(sum(bytes_on_disk))) FROM system.parts WHERE active AND database='system' GROUP BY table ORDER BY sum(bytes_on_disk) DESC LIMIT 1")"
 echo "trace_log_recent=$(q "SELECT count() FROM system.trace_log WHERE event_time > now() - INTERVAL 1 HOUR")"
 echo "async_metric_log_recent=$(q "SELECT count() FROM system.asynchronous_metric_log WHERE event_time > now() - INTERVAL 1 HOUR")"
+echo "no_ttl_count=$(q "SELECT count() FROM system.tables WHERE database='system' AND engine='MergeTree' AND position(engine_full,'TTL')=0")"
+echo "no_ttl_names=$(q "SELECT arrayStringConcat(groupArray(name),',') FROM system.tables WHERE database='system' AND engine='MergeTree' AND position(engine_full,'TTL')=0")"
+echo "orphan_dup_count=$(q "SELECT count() FROM system.tables WHERE database='system' AND (name LIKE '%\\_0' OR name LIKE '%\\_1' OR name LIKE '%\\_2')")"
 '@
 $remoteScript = $remoteScript.Replace("__APPDB__", $AppDatabase)
 
@@ -165,6 +168,7 @@ $systemBytes = 0L; $appBytes = 0L; $merges = 0L; $maxParts = 0L
 $traceRecent = 0L; $asyncRecent = 0L; $systemRows = 0L; $appRows = 0L
 $topTable = ""
 $ratio = 0.0
+$noTtlCount = 0L; $noTtlNames = ""; $orphanDupCount = 0L
 
 if ($res.ExitCode -ne 0) {
     Set-Worst "broken"
@@ -179,8 +183,28 @@ if ($res.ExitCode -ne 0) {
     $topTable    = Parse-Kv $res.Output "top_table"
     $traceRecent = To-Long (Parse-Kv $res.Output "trace_log_recent")
     $asyncRecent = To-Long (Parse-Kv $res.Output "async_metric_log_recent")
+    $noTtlCount  = To-Long (Parse-Kv $res.Output "no_ttl_count")
+    $noTtlNames  = Parse-Kv $res.Output "no_ttl_names"
+    $orphanDupCount = To-Long (Parse-Kv $res.Output "orphan_dup_count")
 
     if ($appBytes -gt 0) { $ratio = [math]::Round($systemBytes / [double]$appBytes, 1) }
+
+    # 2026-08-19: a system log table's TTL does not survive every rename-and-recreate
+    # cycle (ClickHouse creates <table>_N and drops the old TTL when the config-derived
+    # definition no longer matches on restart). Declaring <ttl> in override.xml survives
+    # this for most tables but crashed ClickHouse (BAD_ARGUMENTS) for four of them the one
+    # time it was tried together; those four are now TTL'd via live ALTER TABLE instead,
+    # which has no config backing and can silently drift back to no-TTL on a future
+    # restart. This is the compensating control for that known gap - see WORKLOG
+    # 2026-08-19 and lobster-factory/infra/trigger/clickhouse/override.xml.
+    if ($noTtlCount -gt 0) {
+        Set-Worst "drift"
+        $reasons += "$noTtlCount system table(s) have no TTL and will grow unbounded: $noTtlNames"
+    }
+    if ($orphanDupCount -gt 0) {
+        Set-Worst "drift"
+        $reasons += "$orphanDupCount orphaned renamed system table(s) (_0/_1/_2 suffix) left behind by a past rename-and-recreate cycle - safe to DROP after confirming the active table has the correct TTL"
+    }
 
     # Regression of the generators switched off on 2026-08-15. Rows arriving in the
     # last hour is the runtime truth; the config file alone can be right while a
@@ -247,6 +271,8 @@ $lines += ("| active merges | {0} |" -f $merges)
 $lines += ("| max parts in one system table | {0} |" -f $maxParts)
 $lines += ("| trace_log rows last hour | {0} (expected 0 - disabled 2026-08-15) |" -f $traceRecent)
 $lines += ("| asynchronous_metric_log rows last hour | {0} (expected 0 - disabled 2026-08-15) |" -f $asyncRecent)
+$lines += ("| system tables missing TTL | {0}{1} |" -f $noTtlCount, $(if ($noTtlNames) { " ($noTtlNames)" } else { "" }))
+$lines += ("| orphaned renamed tables (_0/_1/_2) | {0} |" -f $orphanDupCount)
 $lines += ""
 $lines += "## Findings"
 $lines += ""
@@ -286,6 +312,9 @@ $payload = [ordered]@{
     topSystemTable  = $topTable
     traceLogRowsLastHour = $traceRecent
     asyncMetricLogRowsLastHour = $asyncRecent
+    noTtlTableCount = $noTtlCount
+    noTtlTableNames = $noTtlNames
+    orphanDupTableCount = $orphanDupCount
     verdict         = $worst
     verdictLabel    = $userLabel
     findings        = $reasons

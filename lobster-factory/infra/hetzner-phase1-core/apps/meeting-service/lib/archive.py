@@ -8,17 +8,21 @@ r"""選擇性同步輸出到 Google Drive（ECT/會議記錄/<日期>/）。
 音檔、transcript.json 完整結構、diarize_spans.json 等中間產物——音檔本身
 比逐字稿更敏感（含聲紋），不該進雲端。
 
-路徑寫死 H:\我的雲端硬碟\ECT\會議記錄（2026-08-18 從實際掛載點確認：
-操作者有兩個 Google 帳號同時掛載，G: 跟 H:，ECT 這個共用資料夾在 H:
-帳號底下，不在預設的 G: 我的雲端硬碟）。若掛載點改變會直接找不到路徑
-而丟出清楚的錯誤，不會靜默寫錯地方。
+路徑走環境變數 MEETING_DRIVE_BASE，不寫死在程式碼裡——這支檔案可能被複製
+到別人的電腦（例如給家人自己裝一份），寫死路徑等於把操作者的客戶名稱
+（資料夾名 ECT）跟帳號資訊帶去別人的機器。未設定環境變數時功能直接停用
+（回報清楚原因），不會用錯誤的預設值意外寫到不相干的地方。
+
+操作者本機設定（2026-08-18 從實際掛載點確認：操作者有兩個 Google 帳號
+同時掛載，G: 跟 H:，ECT 這個共用資料夾在 H: 帳號底下）：
+    setx MEETING_DRIVE_BASE "H:\我的雲端硬碟\ECT\會議記錄"
 """
 import datetime
 import os
 import re
 import shutil
 
-DRIVE_BASE = r"H:\我的雲端硬碟\ECT\會議記錄"
+DRIVE_BASE = os.environ.get("MEETING_DRIVE_BASE")
 
 _INVALID_FS_CHARS = re.compile(r'[\\/:*?"<>|]')
 
@@ -33,10 +37,13 @@ def sync_to_drive(job_dir: str, minutes: dict, job_id: str) -> dict:
     """回傳 {"ok": bool, "dest": str, "files": [...], "error": str|None}。
     不丟例外給呼叫端——同步失敗不該讓整個 job 判定為失敗（PPT 等本地產出
     已經成功了），只回報同步本身的狀態。"""
+    if not DRIVE_BASE:
+        return {"ok": False, "dest": None, "files": [],
+                "error": "未設定環境變數 MEETING_DRIVE_BASE，Google Drive 同步功能未啟用"}
     if not os.path.isdir(DRIVE_BASE):
         return {"ok": False, "dest": None, "files": [],
                 "error": f"找不到 Google Drive 路徑 {DRIVE_BASE}；"
-                         f"檢查掛載是否還在（可能是 H: 代號變了，或該帳號登出了）"}
+                         f"檢查掛載是否還在（可能是磁碟代號變了，或該帳號登出了）"}
 
     date_folder = datetime.datetime.now().strftime("%Y%m%d")
     dest_dir = os.path.join(DRIVE_BASE, date_folder)

@@ -107,4 +107,37 @@
   <error_log>
     <ttl>event_date + INTERVAL 30 DAY DELETE</ttl>
   </error_log>
+
+  <!-- ── 2026-08-19 — part_log / opentelemetry_span_log / query_views_log /
+       query_metric_log: TTL applied LIVE, not declared here ────────────────
+       These four had no TTL (confirmed: 6-week-old part_log data, unbounded
+       growth risk same class as the 2026-08-15 incident, just disk instead
+       of CPU). Declaring them here with the same <table><ttl> form used
+       above crashed the container on startup: "Code: 36. BAD_ARGUMENTS: If
+       'engine' is specified for system table, TTL parameters should be
+       specified directly inside 'engine' and 'ttl' setting doesn't make
+       sense." The base /opt/bitnami/clickhouse/etc/config.xml definitions
+       for all ten default system log tables were checked directly and NONE
+       declare an explicit <engine> — so what actually triggers this for
+       these four specifically is still unconfirmed, not the "engine already
+       defined" theory floated during triage. Do not re-attempt the config
+       form without testing on a disposable ClickHouse container first; the
+       live instance crash-looped once already tonight recovering from it.
+
+       What IS applied and verified working: `ALTER TABLE system.<table>
+       MODIFY TTL ...` run live against the running container (same interval
+       values as the tiering rationale above: 7d for part_log/
+       opentelemetry_span_log/query_metric_log, 14d for query_views_log).
+       This is NOT config-backed, so it is not guaranteed to survive a future
+       rename-and-recreate cycle the way the tables above are — confirmed
+       live: two of the four reverted to no-TTL from an unrelated ALTER on a
+       third table, with no restart involved, then were re-applied. Six
+       orphaned `_0`/`_1` tables left over from the churn were DROPed after
+       confirming the active table had the correct TTL.
+
+       Compensating control: scripts/check-clickhouse-health.ps1 now checks
+       `system.tables` for any MergeTree table with no TTL and for orphaned
+       `_N`-suffixed tables every AO-RESUME run, so a future silent drift back
+       to no-TTL on these four is caught rather than requiring a manual audit
+       to rediscover it. Full incident account: WORKLOG.md 2026-08-19. -->
 </clickhouse>
