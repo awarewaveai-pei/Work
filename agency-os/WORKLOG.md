@@ -1,5 +1,32 @@
 ﻿# Worklog
 
+## 2026-08-19（第八輪）— 「你做啊」：實查 oracle-web/觀測堆疊用途 + SG 七項逐一對照表；意外發現本機明文金鑰堆積
+
+[任務]
+操作者對上一輪自己留的兩個開放問題（觀測堆疊/oracle-web 用途未確認、服務搬遷坑未拆到單一服務顆粒度）直接回「你做啊」——不接受再丟回給操作者，要求真的查證+寫出來。
+
+[已修改]
+1. SSH 進 SG 實查：`docker inspect oracle-web`（image/env/port）+ 找到 `Projects/internal/ziwei-doushu/deploy/DEPLOY-SG.md`，確認是真實產品「Oracle」紫微斗數命理 app，有 DNS+TLS+`/api/health`，非測試殘留；`docker inspect` 三個觀測容器 + 讀 `docker-compose.observability.yml`，確認是 SG 主機自己的日誌監控（Loki+Promtail+Grafana，loopback-only+SSH tunnel），有正式文件 `OBSERVABILITY_P1_P2_ROLLOUT.md`，為防過去 502 事故而建
+2. `runbooks/KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md` —— 新增「SG 七項服務逐一對照」表，六項通用搬遷坑（密碼/檔案權限/寫死IP/SSH/cron/舊帳號）對到每個具體服務，不是抽象套用
+3. `agency-os/TASKS.md` —— SG⑩/⑫ 的「待確認」標記改為「✅ 已查證」+ 具體用途說明；SG⑫ 從「觀測堆疊」補齊為完整項（先前只在段落文字提過，未列成待辦）；移除跟新對照表重複的舊通用提醒句
+
+[意外發現，非本次任務目標]
+驗證「有沒有把查到的東西寫進文件時不小心洩漏機密」時，例行 grep 金鑰片段，**意外抓到一個跟本次任務無關的真實問題**：`agency-os/Backups/claude-userlevel-*/mcp.json.before` 有 **17 個以上**的本機備份快照檔案，每個都含完整明文 OpenAI API key（`sk-proj-niF7…DgPrUA`，2026-06-05 WORKLOG 記載過的同一把 key）。查證 `git check-ignore` + `git ls-files` 確認：**這個資料夾整個被 `.gitignore` 排除，從未進過 git，不是 repo/GitHub 外洩**——是本機磁碟上，`sync-claude-userlevel.ps1 -Mode merge` 每次執行前的 `.before` 快照機制，把當下的 `mcp.json`（內含明文金鑰）原樣複製了 17 次以上，越積越多。已回報給操作者，尚未處理（金鑰是否要轉、舊快照是否要清，是操作者的決定，非我能單方面做的動作）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker inspect`×4 + `docker-compose.observability.yml`讀取 + Grafana health check curl | exit=0 | oracle-web 確認為 Next.js standalone 應用綁 127.0.0.1:3010；Grafana 確認 200 on 127.0.0.1:3009
+- REALTEST_EVIDENCE: tool=Bash | cmd=Python 連結掃描 + `grep -rn "sk-proj-"` 全 repo | exit=0 | 連結全通過；金鑰掃描確認本次新增內容零洩漏（只**描述**發現明文 key 這件事，未貼出實際數值），同時意外揪出上述 17 份本機快照
+- REVIEW_DONE: 自審 | 核對新增的 SG 對照表七列跟 TASKS.md 的 SG⑦–⑫ 六項＋一句話一一對應，未遺漏任何服務
+- BUGHUNT_DONE: scope=agency-os,runbooks | grep=SG⑩oracle-web（oracle.aware-wave.com；\*\*2026-08-19 SSH 實查發現不在\|待操作者決定 | hits=0（舊的「待確認」措辭已完全被查證後的內容取代）
+
+[剩餘風險]
+- **本機明文金鑰堆積尚未處理**——這是本輪最大的殘留項，優先權其實高於 SG 服務搬遷細節，但屬於操作者決定範疇（轉不轉、清不清）不便自行處理
+- SG 七項對照表裡「密碼是否可轉」的判斷（例如 WordPress↔DB 密碼建議轉、oracle-web 的 OpenAI key 務必轉）是我依據「你控制兩端 vs 對外共用」的原則推論，實際搬遷時仍需操作者對每一把金鑰的實際用途做最終確認
+- oracle-web 的 OpenAI 帳單狀態未重新查證（2026-06-05 WORKLOG 記載過 `billing_hard_limit_reached`），搬遷前應確認這把 key 目前是否還有效、額度是否足夠
+
+[避免再發生]
+延續本輪「不要空口確認，實際去查」的模式——這次連查證動作本身的副作用（例行 grep）都抓到了一個計畫外的真實問題。這印證了一個原則：**驗證時用真實查詢，即使查的目的不是為了找那個問題，也可能順帶抓到**。這是「扎實」查證方法本身的紅利，不是巧合。
+
 ## 2026-08-19（第七輪）— 兩個「殘留缺口」實際處理：SG 拆具名項 + 服務搬遷專屬坑 + 主動掃第四個過期條件句
 
 [任務]

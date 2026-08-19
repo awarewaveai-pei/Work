@@ -34,6 +34,19 @@
 | **Cron / WP-Cron 路徑寫死** | P7.1 的多站設計是 `/srv/sites/<slug>/`，如果舊機路徑結構不同（例如舊路徑是 `/var/www/html`），照抄的 cron entry 會指向不存在的路徑，靜默失敗 | 搬遷後 `crontab -l` 逐條核對路徑；WordPress 站另外 `wp cron event list` 確認排程存在且會執行（呼應既有 P7.8 驗證項）|
 | **舊帳號/舊 key 沒有一起關掉** | 搬遷常見心態是「先讓新機跑起來再說」，舊機上的 SSH key、admin 帳號、deploy key 就這樣被遺忘留著，新機也可能因為複製了舊機的 `authorized_keys` 而帶著不再需要的信任關係 | 搬遷完成、確認新機穩定運作後，**明確列出舊機上所有的存取憑證，逐一確認去留**，不要讓「反正舊機要退役了」變成沒人處理的藉口 |
 
+### SG 七項服務逐一對照（2026-08-19 SSH 實查，非通用原則的抽象套用）
+
+> **觀測堆疊與 oracle-web 已查證用途，非待確認項**：oracle-web 是真實產品（紫微斗數命理 app「Oracle」，`Projects/internal/ziwei-doushu/`，有 DNS + TLS + `/api/health` 健康檢查）；觀測堆疊（Loki/Promtail/Grafana）是 SG 主機自己的日誌監控（loopback-only + SSH tunnel 存取，正式文件 [`OBSERVABILITY_P1_P2_ROLLOUT.md`](../agency-os/docs/operations/OBSERVABILITY_P1_P2_ROLLOUT.md)，為防過去的 502 事故而建）。**兩個都搬，不是要退役的東西。**
+
+| 服務 | 密碼/憑證 | 檔案權限 | 寫死 IP | SSH known_hosts | Cron | 舊帳號 |
+|---|---|---|---|---|---|---|
+| **next-admin** | 檢查是否有獨立 API key（非 Supabase 那組，這組已走 vault）| 低風險（standalone build，少量本機寫入）| 確認 `NEXT_PUBLIC_*` 沒寫死 SG IP | N/A | N/A | 檢查是否有測試/除錯用的殘留帳號 |
+| **WordPress + WordPress-DB** | **建議轉**（MariaDB 密碼，WP↔DB 內部關係，你控制兩端）| 🔴 **高風險，必做**：`chown -R www-data:www-data` | `wp-config.php` 的 `DB_HOST` 確認走 docker network name 不是 IP | N/A（除非有 SFTP 部署腳本）| 🔴 **高風險**：`wp cron event list` 逐條核對 | WP admin 帳號 + 舊 MainWP child 連線 key |
+| **Node API** | 檢查其環境變數的資料庫/服務憑證是否可轉 | 低風險 | 檢查是否呼叫其他 SG 服務用寫死 IP 而非 service name | N/A | 檢查是否有排程任務 | API key 盤點 |
+| **oracle-web** | 🔴 **已查證：環境變數含明文 OpenAI API key**（`docker inspect` 直接看得到），**搬遷時務必改走 vault 引用，不要原封不動複製 env**| 低風險（standalone build）| `NEXT_PUBLIC_SITE_URL` 是網域非 IP，安全；檢查有無其他硬編碼 | N/A | 此類應用通常無排程，仍需確認 | 單一服務，風險低 |
+| **Redis** | 檢查現況是否有設密碼（loopback-only 常見「反正外部連不到」而空密碼，**新機多服務共用同一個 Redis，建議補上密碼**）| RDB/AOF 持久化檔案擁有者需比照新機使用者 | 連線方為 IP 或 service name | N/A | N/A | N/A |
+| **觀測堆疊（Grafana）** | 🔴 **建議轉**：`GF_SECURITY_ADMIN_USER`/密碼組是獨立於其他服務的憑證，搬遷是低成本換密碼時機 | Loki data volume 擁有者 | Grafana datasource 設定檢查是否寫死 SG IP | 現有存取模式是 SSH tunnel 到 `127.0.0.1:3009`——**新機的 tunnel 指令要更新成新 IP**，不是 known_hosts 問題但同一類「換機後忘記更新存取方式」的坑 | N/A | Grafana 使用者帳號盤點 |
+
 ---
 
 ## Supabase（承載客戶主資料，風險等級最高）
