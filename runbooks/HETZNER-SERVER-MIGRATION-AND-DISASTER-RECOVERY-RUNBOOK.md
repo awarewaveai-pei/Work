@@ -351,7 +351,6 @@ openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -in "$OUT/env.tar.g
 - [ ] **P2.5** SSH port 改非標準埠（49152–65535）（2026-08-19 對照 OVH 官方硬化指南補）
 - [ ] **P2.5b** 建非 root 工作帳號，root 僅供緊急救援（OVH 官方硬化指南建議）
 - [ ] **P2.5c** 下單時查 KS-6 是否含 OVHcloud Network Firewall（基礎設施層，封包到主機前擋，[unverified] Kimsufi 線是否開放）
-- [ ] auction 機：雙碟 NVMe/SSD + RAID 1 + SMART 健康 + mdadm 告警
 - [ ] **Chatwoot greenfield 先上**（EU 搬移前；§0b 順序 step 3）→ 接 cs-engine AgentBot webhook + headless widget
 - [ ] **每容器設記憶體上限**（docker-compose `mem_limit`）→ 防一個服務吃爆拖垮全部（EU 現況痛點）
 - [ ] Chatwoot PG dump + uploads volume 納入 `backup-eu-stack.sh`（Chatwoot 上線後；§0b）
