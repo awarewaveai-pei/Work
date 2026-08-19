@@ -1,6 +1,6 @@
 # ClickHouse health (EU)
 
-- Generated: 2026-08-18 12:07:58
+- Generated: 2026-08-19 12:17:39
 - Overall: **🟡 WARN**
 - Host: 204.168.175.41 / container `trigger-clickhouse`
 
@@ -8,18 +8,18 @@
 
 | Metric | Value |
 |--------|-------|
-| system database | 228.31 MiB (3,932,481 rows) |
-| trigger_dev (application) | 45.28 MiB (548,212 rows) |
-| ratio (system / app) | 5x |
-| largest system table | text_log:96959427 |
-| active merges | 2 |
-| max parts in one system table | 42 |
+| system database | 322.95 MiB (4,338,135 rows) |
+| trigger_dev (application) | 43.98 MiB (522,973 rows) |
+| ratio (system / app) | 7.3x |
+| largest system table | text_log:169344364 |
+| active merges | 0 |
+| max parts in one system table | 58 |
 | trace_log rows last hour | 0 (expected 0 - disabled 2026-08-15) |
 | asynchronous_metric_log rows last hour | 0 (expected 0 - disabled 2026-08-15) |
 
 ## Findings
 
-- self-telemetry is 5x the application data (warn at 5x)
+- self-telemetry is 7.3x the application data (warn at 5x)
 
 ## Why this check exists
 
