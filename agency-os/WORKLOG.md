@@ -31,8 +31,16 @@
 
 [驗證結果]
 - REALTEST_EVIDENCE: tool=SSH | cmd=ClickHouse ALTER/TRUNCATE/DROP 全系列 SQL + `docker restart`/`docker stats`/`docker logs` 監控 | exit=0（全部操作）| ms=約 25 分鐘全程（含止血與觀察等待）
-- REVIEW_DONE: 自審，非外部 critic（純 infra SQL/設定操作，非 code diff，R0 四動作精神比照辦理）—— 逐步查證每個假設（config.xml 是否有 engine、TTL 是否真的生效、容器是否真的健康、應用資料是否真的未受影響），不接受「應該沒事」的臆測，每一步都用實際查詢或指令輸出驗證
-- BUGHUNT_DONE: scope=agency-os,runbooks,scripts,lobster-factory | grep=no_ttl_count\|orphan_dup_count\|part_log_1 | hits=3（check-clickhouse-health.ps1 新增變數、KS6 清單新增段落、override.xml 新註解），三處一致無遺漏；另確認 `check-clickhouse-health.ps1` 修改後**實際執行過**（非只改程式碼沒跑），輸出已附在驗證結果
+- REVIEW_DONE: critic=Deep（外部 oracle，非自我描述）| verdict=pass-after-fix | findings=0c/2m fixed/3n（`check-clickhouse-health.ps1` 新增的三行 remote probe + PS 解析邏輯）
+  - **Major M1（已修）**：兩個新偵測（無 TTL 表 / 孤兒表）查詢失敗時會靜默 fail-open 成「0」，跟真正健康時的輸出一模一樣——偵測器啞了會長得像一切正常，正是 `AGENTS.md` 明文警告過的同款 bug class。修法：加 `mergetree_total` canary（活表數量不可能真的是 0，目前實測固定 11），數值 ≤0 時整段判為 blind spot 發 `drift`，不信任當次的無 TTL/孤兒表結果
+  - **Major M2（已修）**：孤兒表偵測寫死只抓 `_0`/`_1`/`_2` 三個後綴，但 ClickHouse 的重建後綴是無上限遞增的（`_3`、`_4`...），偵測範圍會隨著問題惡化而更看不見。改用 `match(name,'_[0-9]+$')` 正則，同時副作用消掉了原本三層 shell 跳脫（PowerShell here-string→base64→sh→ClickHouse）的脆弱依賴
+  - **Minor m1（已修）**：count 跟 names 原本是兩次獨立查詢，中間若目錄表變動會兜不起來，兩者拆開合成一句「N system table(s)... : 」+ 空字串。改成一次查詢回傳 `count|names` 組合字串，PS 端 split 解析
+  - **Minor m2（已修）**：`groupArray` 沒有排序保證，同樣輸入可能因查詢執行順序不同而回傳不同順序的名稱，導致這個有進 git 的報表檔案無謂地每次跑都 diff。改用 `arraySort(groupArray(...))`
+  - **Suggestion S2（已修）**：孤兒表通常也會被判定「無 TTL」，兩個偵測會對同一個殘留物重複開兩條 finding，且「will grow unbounded」用詞對已經沒人寫入的孤兒表不準確。無 TTL 查詢改為排除符合孤兒表正則的名稱
+  - **Suggestion S3（已修）**：表名若含 `|` 會弄壞 markdown 表格列（目前無實際攻擊路徑，純防禦性）。markdown 輸出前跳脫 `\|`，JSON 端不需要（`ConvertTo-Json` 本身處理）
+  - **Suggestion S1（已解決，非直接修，是 M2 的副作用）**：原本的跳脫在 ClickHouse 25.7 上其實是對的，但依賴官方文件沒承諾的寬鬆解析行為；改用 `match()` 正則後這個依賴整個消失，不需要再討論跳脫層數
+  - 全部修正後重跑語法檢查（PASS）+ 實際對 EU 執行（非模擬）：`mergeTreeTablesSeen=11`、`noTtlTableCount=0`、`orphanDupTableCount=0`、`verdict=healthy`，markdown 輸出人工核對格式正確
+- BUGHUNT_DONE: scope=agency-os,runbooks,scripts,lobster-factory | grep=no_ttl_count\|no_ttl_names\|orphan_dup_count\|mergetree_total | hits=0 stale（critic 修正後舊變數名 `no_ttl_count`/`no_ttl_names` 已完全被 `no_ttl_combo` 取代，全域搜尋確認無殘留引用）；`part_log_1`/KS6 清單/override.xml 三處交叉引用一致
 
 [剩餘風險]
 - **四張表的 TTL 不是設定檔保護的，是靠監控補償**——若未來某次重啟又讓它們失憶，`check-clickhouse-health.ps1` 會在下次 AO-RESUME 抓到（`drift` 等級），但不會自動修復，需要人工重跑 `ALTER TABLE ... MODIFY TTL`。這是本次事故誠實承認的殘留缺口，不是假裝已經根治

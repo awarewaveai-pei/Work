@@ -143,9 +143,9 @@ echo "max_parts=$(q "SELECT max(c) FROM (SELECT count() AS c FROM system.parts W
 echo "top_table=$(q "SELECT concat(table,':',toString(sum(bytes_on_disk))) FROM system.parts WHERE active AND database='system' GROUP BY table ORDER BY sum(bytes_on_disk) DESC LIMIT 1")"
 echo "trace_log_recent=$(q "SELECT count() FROM system.trace_log WHERE event_time > now() - INTERVAL 1 HOUR")"
 echo "async_metric_log_recent=$(q "SELECT count() FROM system.asynchronous_metric_log WHERE event_time > now() - INTERVAL 1 HOUR")"
-echo "no_ttl_count=$(q "SELECT count() FROM system.tables WHERE database='system' AND engine='MergeTree' AND position(engine_full,'TTL')=0")"
-echo "no_ttl_names=$(q "SELECT arrayStringConcat(groupArray(name),',') FROM system.tables WHERE database='system' AND engine='MergeTree' AND position(engine_full,'TTL')=0")"
-echo "orphan_dup_count=$(q "SELECT count() FROM system.tables WHERE database='system' AND (name LIKE '%\\_0' OR name LIKE '%\\_1' OR name LIKE '%\\_2')")"
+echo "mergetree_total=$(q "SELECT count() FROM system.tables WHERE database='system' AND engine='MergeTree'")"
+echo "no_ttl_combo=$(q "SELECT concat(toString(count()),'|',arrayStringConcat(arraySort(groupArray(name)),',')) FROM system.tables WHERE database='system' AND engine='MergeTree' AND NOT match(name,'_[0-9]+$') AND position(engine_full,'TTL')=0")"
+echo "orphan_dup_count=$(q "SELECT count() FROM system.tables WHERE database='system' AND engine='MergeTree' AND match(name,'_[0-9]+$')")"
 '@
 $remoteScript = $remoteScript.Replace("__APPDB__", $AppDatabase)
 
@@ -168,7 +168,7 @@ $systemBytes = 0L; $appBytes = 0L; $merges = 0L; $maxParts = 0L
 $traceRecent = 0L; $asyncRecent = 0L; $systemRows = 0L; $appRows = 0L
 $topTable = ""
 $ratio = 0.0
-$noTtlCount = 0L; $noTtlNames = ""; $orphanDupCount = 0L
+$noTtlCount = 0L; $noTtlNames = ""; $orphanDupCount = 0L; $mergetreeTotal = 0L
 
 if ($res.ExitCode -ne 0) {
     Set-Worst "broken"
@@ -183,27 +183,51 @@ if ($res.ExitCode -ne 0) {
     $topTable    = Parse-Kv $res.Output "top_table"
     $traceRecent = To-Long (Parse-Kv $res.Output "trace_log_recent")
     $asyncRecent = To-Long (Parse-Kv $res.Output "async_metric_log_recent")
-    $noTtlCount  = To-Long (Parse-Kv $res.Output "no_ttl_count")
-    $noTtlNames  = Parse-Kv $res.Output "no_ttl_names"
+    $mergetreeTotal = To-Long (Parse-Kv $res.Output "mergetree_total")
     $orphanDupCount = To-Long (Parse-Kv $res.Output "orphan_dup_count")
+
+    # count and names come back as one atomic "count|comma,sorted,names" field so a
+    # transient catalog change between two separate queries can't split them apart
+    # (critic 2026-08-19 m1: two independent round-trips could disagree).
+    $noTtlCombo = Parse-Kv $res.Output "no_ttl_combo"
+    if ($noTtlCombo) {
+        $comboParts = $noTtlCombo.Split("|", 2)
+        $noTtlCount = To-Long $comboParts[0]
+        $noTtlNames = if ($comboParts.Length -gt 1) { $comboParts[1] } else { "" }
+    }
 
     if ($appBytes -gt 0) { $ratio = [math]::Round($systemBytes / [double]$appBytes, 1) }
 
-    # 2026-08-19: a system log table's TTL does not survive every rename-and-recreate
-    # cycle (ClickHouse creates <table>_N and drops the old TTL when the config-derived
-    # definition no longer matches on restart). Declaring <ttl> in override.xml survives
-    # this for most tables but crashed ClickHouse (BAD_ARGUMENTS) for four of them the one
-    # time it was tried together; those four are now TTL'd via live ALTER TABLE instead,
-    # which has no config backing and can silently drift back to no-TTL on a future
-    # restart. This is the compensating control for that known gap - see WORKLOG
-    # 2026-08-19 and lobster-factory/infra/trigger/clickhouse/override.xml.
-    if ($noTtlCount -gt 0) {
+    # critic 2026-08-19 M1: system.tables can never legitimately report 0 MergeTree
+    # tables (11 today) - if the probe query itself failed (memory-limit error,
+    # TOO_MANY_SIMULTANEOUS_QUERIES, etc, all `2>/dev/null`'d by `q()`), no_ttl/orphan
+    # would render as a clean "0" that is indistinguishable from genuinely healthy.
+    # That failure mode overlaps exactly with the incident conditions this script
+    # exists to catch (AGENTS.md: "偵測器啞了不可以長得像一切正常"), so treat it as a
+    # blind spot rather than trusting the zero.
+    if ($mergetreeTotal -le 0) {
         Set-Worst "drift"
-        $reasons += "$noTtlCount system table(s) have no TTL and will grow unbounded: $noTtlNames"
-    }
-    if ($orphanDupCount -gt 0) {
-        Set-Worst "drift"
-        $reasons += "$orphanDupCount orphaned renamed system table(s) (_0/_1/_2 suffix) left behind by a past rename-and-recreate cycle - safe to DROP after confirming the active table has the correct TTL"
+        $reasons += "TTL/orphan probe returned nothing this run (mergetree_total=$mergetreeTotal) - detector blind, no-TTL and orphan-table results below are not trustworthy"
+    } else {
+        # 2026-08-19: a system log table's TTL does not survive every rename-and-recreate
+        # cycle (ClickHouse creates <table>_N and drops the old TTL when the config-derived
+        # definition no longer matches on restart). Declaring <ttl> in override.xml survives
+        # this for most tables but crashed ClickHouse (BAD_ARGUMENTS) for four of them the one
+        # time it was tried together; those four are now TTL'd via live ALTER TABLE instead,
+        # which has no config backing and can silently drift back to no-TTL on a future
+        # restart. This is the compensating control for that known gap - see WORKLOG
+        # 2026-08-19 and lobster-factory/infra/trigger/clickhouse/override.xml.
+        # (Orphaned _N tables are excluded from this query - they're covered by the
+        # orphan-count check below, and being unwritten leftovers they don't "grow".)
+        if ($noTtlCount -gt 0) {
+            Set-Worst "drift"
+            $namesPart = if ($noTtlNames) { ": $noTtlNames" } else { " (names unavailable)" }
+            $reasons += "$noTtlCount system table(s) have no TTL and will grow unbounded$namesPart"
+        }
+        if ($orphanDupCount -gt 0) {
+            Set-Worst "drift"
+            $reasons += "$orphanDupCount orphaned renamed system table(s) (_<N> suffix, any generation) left behind by a past rename-and-recreate cycle - safe to DROP after confirming the active table has the correct TTL"
+        }
     }
 
     # Regression of the generators switched off on 2026-08-15. Rows arriving in the
@@ -271,8 +295,13 @@ $lines += ("| active merges | {0} |" -f $merges)
 $lines += ("| max parts in one system table | {0} |" -f $maxParts)
 $lines += ("| trace_log rows last hour | {0} (expected 0 - disabled 2026-08-15) |" -f $traceRecent)
 $lines += ("| asynchronous_metric_log rows last hour | {0} (expected 0 - disabled 2026-08-15) |" -f $asyncRecent)
-$lines += ("| system tables missing TTL | {0}{1} |" -f $noTtlCount, $(if ($noTtlNames) { " ($noTtlNames)" } else { "" }))
-$lines += ("| orphaned renamed tables (_0/_1/_2) | {0} |" -f $orphanDupCount)
+# critic 2026-08-19 S3: a `|` in a table name would break this markdown row (no
+# attack path today - names come from system.tables, not user input - but cheap
+# to guard). JSON payload below needs no escaping, ConvertTo-Json handles it.
+$noTtlNamesMd = $noTtlNames -replace '\|', '\|'
+$lines += ("| system tables missing TTL | {0}{1} |" -f $noTtlCount, $(if ($noTtlNamesMd) { " ($noTtlNamesMd)" } else { "" }))
+$lines += ("| orphaned renamed tables (_<N> suffix) | {0} |" -f $orphanDupCount)
+$lines += ("| MergeTree tables seen this run | {0}{1} |" -f $mergetreeTotal, $(if ($mergetreeTotal -le 0) { " (blind spot - see findings)" } else { "" }))
 $lines += ""
 $lines += "## Findings"
 $lines += ""
@@ -312,6 +341,7 @@ $payload = [ordered]@{
     topSystemTable  = $topTable
     traceLogRowsLastHour = $traceRecent
     asyncMetricLogRowsLastHour = $asyncRecent
+    mergeTreeTablesSeen = $mergetreeTotal
     noTtlTableCount = $noTtlCount
     noTtlTableNames = $noTtlNames
     orphanDupTableCount = $orphanDupCount
