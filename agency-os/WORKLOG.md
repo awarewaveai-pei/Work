@@ -1,5 +1,28 @@
 ﻿# Worklog
 
+## 2026-08-19（第六輪）— 補 §5 遷移 runbook 的 SG DNS 表（原本明寫「不要動」，現已過期）
+
+[任務]
+操作者問「移轉流程有寫嗎？」。查證：DR runbook §5 確實有真實遷移步驟（凍結寫入→取 dump→還原→切 DNS→平行驗證→退機→回滾），非空清單。但 §5 step 5 的 DNS 對照表只涵蓋 EU 九筆記錄，SG 那組原文寫「`apex`/`api`/`app`/`oracle` + `www` 不要動（除非也搬 SG）」——這句話在本輪對話早些時候操作者確認「EU 和 SG 都要搬」之後已經過期。回報後操作者選擇「現在查並補上」。
+
+[已修改]
+1. `runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md` §5 —— live 查詢 Cloudflare API 取得 SG 五筆記錄（apex/api/app/oracle 皆 A record 指向 `5.223.93.113` 且全部 proxied；www 為 CNAME 跟隨 apex），比照 EU 表格式補上第二張表；同時提醒改 SG 這組時要把 P2.4/4b/4c 的雙層防火牆/密碼硬化標準套用過去（SG 現況沒有經過 4/20 事件後補的強化）
+
+[查證方式]
+`mcp/user-env.ps1` 載入 `CLOUDFLARE_API_TOKEN` → 直接呼叫 Cloudflare API 查 zone `f21b1919632fee2221647908a94fdcac` 的即時 DNS 記錄（非讀舊文件、非憑記憶），過濾出 `content=5.223.93.113`（SG IP）與 `www` 記錄，逐筆核對 type/proxied 狀態。查到的五筆與 §5 原文「SG 那 4 個 + www」的既有描述數量一致，只是原文從未把這五筆的實際內容列成表格。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(PowerShell+Cloudflare API) | cmd=`Invoke-RestMethod` 查 dns_records | exit=0 | 回傳 21 筆記錄，過濾後 SG 相關 5 筆全部核對
+- REVIEW_DONE: 自審 | 讀回 §5 整段確認新表插入位置不打斷原有步驟編號，EU 表與 SG 表視覺區隔清楚（🔴 2026-08-19 更新標記），不會被誤讀成同一批
+- BUGHUNT_DONE: scope=agency-os,runbooks | grep=SG 那 4 個 | hits=0（原本過期的那句已被表格取代，改動後重新搜尋確認清零）
+
+[剩餘風險]
+- SG 五筆記錄的 proxied 狀態是本輪查證的即時快照；DNS 記錄可能在遷移執行前又被別的變動異動，執行遷移當天仍應重新查一次 live 清單，不要直接信任本文件裡的表格是當下最新狀態（表格本身已標註查證日期，用途是「知道大概是什麼」，不是「當天照抄不用再查」）
+- SG 服務搬遷時的硬化套用（P2.4/4b/4c）只是文字提醒，尚未展開成具體的 SG 專屬硬化清單——真正搬遷 next-admin/WordPress/Node API 這組時，建議對照 `KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md` 逐項再核一次，該清單目前是以「新機從零裝」的角度寫的，沒有專門處理「舊服務搬過來」這個情境的坑（例如 WordPress 資料庫用戶密碼是否要在搬遷時一併換掉）
+
+[避免再發生]
+延續本輪對話已經出現兩次的模式（TASKS.md 那句沒真的改、日曆事件沒同步、現在是 §5 的 SG 段）：**任何文件裡寫「不要動 X，除非 Y」這種條件句，一旦 Y 成真，必須主動回頭找出那句話並處理，不能假設它會自己被注意到。** 這類條件句是文件裡最容易被遺忘的地雷，因為它在條件不成立時看起來完全正確、不會被日常閱讀觸發警覺。
+
 ## 2026-08-19（第五輪）— 純索引裝機順序文件 + 補上被壓成附註的 EU/SG 整併具名待辦
 
 [任務]
