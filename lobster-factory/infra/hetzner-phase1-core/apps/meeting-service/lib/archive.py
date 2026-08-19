@@ -57,6 +57,7 @@ def sync_to_drive(job_dir: str, minutes: dict, job_id: str) -> dict:
     plan = [
         ("slides.pptx", f"{title}_會議記錄.pptx"),
         ("meeting_notes.md", f"{title}_會議記錄.md"),
+        ("meeting_record.xlsx", f"{title}_會議記錄.xlsx"),
         ("coach.md", f"{title}_報告教練.md"),
         ("diarized.txt", f"{title}_逐字稿.txt"),
         ("merged.txt", f"{title}_逐字稿.txt"),  # 沒做講者分離時的備援來源

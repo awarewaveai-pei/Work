@@ -1,0 +1,67 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node 'D:\\Work\\.codex\\hooks\\runner.js' PreToolUse",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node 'D:\\Work\\.codex\\hooks\\runner.js' PostToolUse",
+            "timeout": 90
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node 'D:\\Work\\.codex\\hooks\\runner.js' SessionStart",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File 'D:\\Work\\.codex\\hooks\\ao-resume-on-prompt.ps1'",
+            "timeout": 1200
+          },
+          {
+            "type": "command",
+            "command": "node 'D:\\Work\\.codex\\hooks\\runner.js' UserPromptSubmit",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node 'D:\\Work\\.codex\\hooks\\runner.js' Stop",
+            "timeout": 300
+          }
+        ]
+      }
+    ]
+  }
+}

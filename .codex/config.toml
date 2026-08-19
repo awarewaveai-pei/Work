@@ -1,7 +1,18 @@
-# Repo-local Codex config intentionally does not define MCP servers.
-# Shared MCP source of truth lives in:
-# - D:\Work\mcp\registry.template.json
-# - D:\Work\scripts\sync-mcp-config.ps1
-#
-# Keeping this file empty avoids stale project-level MCP overrides from
-# shadowing the managed user-level config in %USERPROFILE%\.codex\config.toml.
+[mcp_servers.canva]
+command = "cmd"
+args = [
+    "/c",
+    "npx",
+    "-y",
+    "mcp-remote@latest",
+    "https://mcp.canva.com/mcp",
+]
+
+[mcp_servers.hetzner-ssh]
+command = "cmd"
+args = [
+    "/c",
+    "npx",
+    "-y",
+    "mcp-server-ssh",
+]

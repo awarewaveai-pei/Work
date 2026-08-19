@@ -1,0 +1,4 @@
+{
+  "_comment": "Forces CommonJS for all .js hooks in this directory, overriding the monorepo root package.json which declares \"type\": \"module\". Required so hooks can use require() — they're synced to ~/.claude/hooks/ where there's no parent package.json, but during local testing they run inside the repo where ESM would otherwise be the default. This is a sibling override only; do not add dependencies or scripts here.",
+  "type": "commonjs"
+}

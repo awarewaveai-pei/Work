@@ -19,7 +19,7 @@ import os
 import time
 import traceback
 
-from lib import archive, deck, diarize, hallucination, keep_awake, merge_segments, minutes_md, speaker_notes, summarize
+from lib import archive, deck, diarize, excel, hallucination, keep_awake, merge_segments, minutes_md, speaker_notes, summarize
 from lib.transcribe import transcribe, write_srt
 
 
@@ -159,6 +159,10 @@ def resume_after_summary(job_dir: str, minutes: dict) -> list:
 
         write_status(job_dir, stage="build_minutes_md")
         minutes_md.write(minutes, os.path.join(job_dir, "meeting_notes.md"))
+
+        write_status(job_dir, stage="build_excel")
+        excel.build(minutes, os.path.join(job_dir, "meeting_record.xlsx"))
+        log("[Excel] 五個工作表 -> meeting_record.xlsx")
 
         sync_drive = json.load(open(_status_path(job_dir), encoding="utf-8")).get("sync_drive", False)
         if sync_drive:

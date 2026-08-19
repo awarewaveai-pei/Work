@@ -130,6 +130,7 @@ def log_tail(job_id: str, lines: int = 60):
 DOWNLOADS = {
     "minutes_md": ("meeting_notes.md", "text/markdown; charset=utf-8"),
     "slides": ("slides.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
+    "excel": ("meeting_record.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
     "coach": ("coach.md", "text/markdown; charset=utf-8"),
     "transcript_srt": ("transcript.srt", "application/x-subrip"),
     "transcript_json": ("transcript.json", "application/json"),
