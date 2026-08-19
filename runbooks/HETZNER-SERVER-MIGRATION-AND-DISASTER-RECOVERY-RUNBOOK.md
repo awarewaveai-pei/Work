@@ -258,9 +258,20 @@ done
    | `supabase` / `studio` / `n8n` / `trigger` / `uptime` / `mainwp` / `postiz` | 🟠 proxied | 平台/自動化/監控入口；改 A record content 即可（CF 邊緣不變）|
    | `remotion-svc` / `video-svc` | ⚪ **DNS-only（刻意，勿開 proxy）** | **影片 render 超過 CF 100s proxy 超時 → 開 proxy 會 524 弄壞它**（nginx read_timeout 600s）。保護靠 **X-Render-Token（無 token→401）+ TLS**（2026-06-26 實測確認）。搬機改 A record IP 後仍維持 grey/DNS-only。代價：origin IP 公開（可接受，已 token+TLS）；想隱藏 IP 又保長請求 → 未來可考慮 Cloudflare Tunnel(cloudflared)，非必要 |
 
-   - SG 那 4 個（`apex` / `api` / `app` / `oracle`）+ `www`(CNAME→apex) **不要動**（除非也搬 SG）。
    - 查當前 live 清單：`curl -H "Authorization: Bearer <CLOUDFLARE_API_TOKEN>" "https://api.cloudflare.com/client/v4/zones/f21b1919632fee2221647908a94fdcac/dns_records?per_page=200"`。
    - 概念分工（哪些該指哪台）正本：[`CLOUDFLARE_HETZNER_PHASE1.md`](../agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md)。
+
+   **🔴 2026-08-19 更新：本節原本只涵蓋 EU，SG 那組原寫「不要動（除非也搬 SG）」——操作者已確認 SG 也要整併，故補上 SG 對照表（同日 live 查證，非沿用舊資料）：**
+
+   | 子網域 | 目前指向 | CF 代理 | 搬遷後動作 |
+   |--------|---------|--------|-----------|
+   | `aware-wave.com`（apex）| SG `5.223.93.113` | 🟠 proxied | 改 A record content 指向新機 IP |
+   | `api` | SG `5.223.93.113` | 🟠 proxied | 同上（Node API）|
+   | `app` | SG `5.223.93.113` | 🟠 proxied | 同上（next-admin）|
+   | `oracle` | SG `5.223.93.113` | 🟠 proxied | 同上（oracle-web）|
+   | `www` | CNAME → `aware-wave.com` | 🟠 proxied | 不用動，跟著 apex 走 |
+
+   SG 的 5 筆全部走 CF proxy（跟 EU 的 `remotion-svc`/`video-svc` 那種刻意 DNS-only 不同類，沒有超時例外要顧慮）——**改 SG 這組時務必連同 P2.4/4b/4c 的防火牆與密碼硬化一起做**（這幾個服務原本在 SG 沒有經過 4/20 事件後補的雙層防火牆，搬新機時要用新機的硬化標準重新設，不要原封不動照搬舊設定）。
 6. **平行驗證**：兩機都在，逐項對比（資料筆數、登入、佈建、監控）。
 7. 觀察 24–48h 無誤 → 退掉 Cloud 機。
 - **回滾**：任何驗證失敗 → DNS 切回 Cloud（原機未退），零資料遺失。
