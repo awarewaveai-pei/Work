@@ -1,5 +1,32 @@
 ﻿# Worklog
 
+## 2026-08-19（第四輪）— 主機採購文件組全面覆核：抓到一句自己聲稱已修但沒修的話
+
+[任務]
+操作者問「你有去檢視並確認所有的內容都對嗎？」——針對整晚產出的六份主機採購/安裝文件組（規格決策、時機決策、KS6 硬化清單、DR runbook、SITE_MIGRATION_RUNBOOK、TASKS.md）。不是空泛保證「有」，實際做一次連結完整性 + 內容一致性覆核。
+
+[已修改]
+1. `agency-os/reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md` —— TL;DR 段落的「觀望截止 2026-08-31」是活文字（非摺疊歷史區塊），與同檔後段「決策規則已於 2026-08-18 取代」矛盾。加刪除線 + 取代提示，讀者不會先看到過期指令
+2. `agency-os/TASKS.md` —— 「執行順序」段落仍寫「供應商 OVH 或 Hetzner 依 8/31 前 auction 結果」——**這正是我自己在 08-18 決策文件的 BUGHUNT_DONE 裡聲稱「TASKS.md 已於本次修正」的那一行，但實際沒有修正**。已修正為反映立刻買 KS-6 的現行決策
+3. `runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md` §7 —— 移除一行已被 P2.2 等更精確項目取代的舊通用提醒（`auction 機：雙碟 NVMe/SSD + RAID 1 + SMART 健康 + mdadm 告警`），非錯誤內容，純重複
+4. **Google 日曆事件**（`sqltp5perqprkmcct4nvkqrdns`，2026-09-30 死線提醒）—— 標題與內文仍寫「買二手 Hetzner 機」，未反映 08-18 「立刻買 OVH KS-6」決策。透過 calendar MCP 直接更新標題與內文，加註「這是萬一還沒買的最後防線，不是原定計畫」，附上規格/時機/硬化三份文件路徑
+
+[根因]
+**這是一次「聲稱驗證但沒真的驗證」被抓到的具體案例**——08-18 WORKLOG 的 BUGHUNT_DONE 寫「TASKS.md 已於本次修正」，但當時只改了 TASKS.md 裡另外幾處，這一行漏改，而 BUGHUNT_DONE 的字面聲稱掩蓋了這個遺漏，直到操作者直接追問才被系統性覆核抓出來。**這正好是整個晚上在講的同一個問題模式，這次發生在我自己身上。**
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=Python 腳本掃描 6 份文件的全部 markdown 連結、驗證每個都指向存在的檔案 | exit=0 | 結果=ALL LINKS OK（改動前後各跑一次）
+- REALTEST_EVIDENCE: tool=mcp calendar | cmd=`search_events`找到事件 + `update_event`更新標題與內文 | exit=0 | 結果=`updated: 2026-08-19T05:47:28Z` 確認
+- REVIEW_DONE: 自審 | 對 6 份文件跑 `grep 8/31\|觀望截止` 找出全部提及該規則的位置，逐一分類「刻意保留的歷史記載」vs「還在生效的活文字」，只改後者
+- BUGHUNT_DONE: scope=agency-os,runbooks | grep=依 8/31 前 auction | hits=0（改動後重新搜尋確認清零，此為對上次同一聲稱的補漏重驗）
+
+[剩餘風險]
+- 覆核範圍限定在「本次採購決策相關的 6 份文件 + 1 個日曆事件」，未對整個 repo 做全域一致性掃描——若還有其他角落引用舊決策（例如 memory/daily 或更早的 ao-resume 快照），維持原樣不動，那些是歷史存檔非現行指引
+- 日曆事件更新後未做二次讀取驗證顯示內容（僅信任 API 回傳的 `updated` 時間戳與回聲的 description 欄位），若日曆端有額外快取延遲，操作者實際看到的可能有些微延遲
+
+[避免再發生]
+「BUGHUNT_DONE: hits=N」這類聲稱必須是實際重新查詢後的結果，不能是「上次做過類似的事所以這次應該也做了」的推論。這次錯誤具體發生在：改了 TASKS.md 的其他行，就順手宣稱整個「8/31」相關的清理都做了，沒有對這個特定字串重新 grep 驗證。以後任何 BUGHUNT_DONE 宣告前，回頭對宣告的確切 grep pattern 重新跑一次，不能用記憶推論代替。
+
 ## 2026-08-19（第三輪，實機事故）— EU ClickHouse 系統表 TTL 缺口：現場修復，中途引發並排除一次真實 CPU 事故
 
 [任務]
