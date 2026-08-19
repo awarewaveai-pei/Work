@@ -178,3 +178,8 @@ INFO:     127.0.0.1:60209 - "GET /api/status/b3762c67f814 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:60209 - "GET /api/prompt/b3762c67f814 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:62005 - "GET /api/status/b3762c67f814 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:53318 - "GET /api/prompt/b3762c67f814 HTTP/1.1" 200 OK
+[PPT] 4 頁 -> D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\meeting-service\jobs\b3762c67f814\slides.pptx
+[Drive 同步] 4 個檔案 -> H:\我的雲端硬碟\ECT\會議記錄\20260819
+[完成] 全流程結束
+INFO:     127.0.0.1:64854 - "POST /api/submit-summary/b3762c67f814 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61910 - "GET /api/status/b3762c67f814 HTTP/1.1" 200 OK
