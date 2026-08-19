@@ -251,8 +251,13 @@
       - [ ] EU④Postiz
       - [ ] EU⑤MainWP（Dashboard 端；child site token 需隨遷移重新確認連線）
       - [ ] EU⑥Uptime Kuma
-      - [ ] SG⑦next-admin + WordPress + WordPress-DB + Node API（可能一波搬，四個容器互相依賴）
-      - [ ] SG⑧oracle-web + 觀測堆疊（Loki/Grafana/Promtail，若仍需要；**2026-08-19 SSH 實查發現這 4 個容器不在 `AWAREWAVE_STACK_QUICKREF.md` 拓樸表裡，搬遷前先重新 `docker ps` 核對，不要照表操課漏掉**）
+      - [ ] SG⑦next-admin（app.aware-wave.com；DNS 見 DR runbook §5 SG 表）
+      - [ ] SG⑧WordPress + WordPress-DB（一對搬，DB 緊耦合；apex/www 指向這裡）
+      - [ ] SG⑨Node API（api.aware-wave.com）
+      - [ ] SG⑩oracle-web（oracle.aware-wave.com；**2026-08-19 SSH 實查發現不在 `AWAREWAVE_STACK_QUICKREF.md` 拓樸表裡，搬遷前重新 `docker ps` 核對這個服務實際在做什麼，不要照舊文件猜**）
+      - [ ] SG⑪Redis（共用快取層，隨最後一個依賴它的服務一起搬，不單獨排波）
+      - [ ] **🔴 待操作者決定**：觀測堆疊（Loki/Grafana/Promtail，**2026-08-19 SSH 查到存在但同樣不在拓樸文件裡，用途未確認**）——搬過去繼續用，還是退役改用 EU 既有的 Uptime Kuma + 這次新補的 `check-clickhouse-health.ps1` 監控模式？不確定用途前不要預設搬
+      - [ ] **服務搬遷（非新裝）專屬檢查**——照 [`KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md`](../runbooks/KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md) 新增的「既有服務搬遷」節，SG 每個服務搬遷時都要過一次（密碼輪替/檔案權限/寫死路徑），不是新機硬化清單就夠
       - [ ] 兩台雲端主機確認已無流量 → 安全關閉 → 帳單確認只剩一台在計費（呼應 Pre-mortem「切換 +120 天仍 &gt;1 台在跑」的預警指標）
     - **✅ 出國行程已確認排除**（操作者 2026-08-18：「沒有，這幾個月都在」）—— Pre-mortem 判定的第二號死因（§5 Supabase 整併是 High-risk、需本人在線）已解除，W4 可照 11/20 起兩週一台的節奏排，不必等行程確認
     - **決策正本**：[`reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md`](reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md)（規格：128GB ECC 等）+ [`reports/decisions/2026-08-18-dedicated-host-purchase-timing.md`](reports/decisions/2026-08-18-dedicated-host-purchase-timing.md)（時機：立刻買）—— 取代 `runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md` §0b 機型表；§0b 其餘決策（Chatwoot 先行 / 單台+RAID1+R2 / HA 延後）不變

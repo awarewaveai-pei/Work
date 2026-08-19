@@ -85,3 +85,4 @@ ImportError: DLL load failed while importing stream: 應用程式控制原則已
 INFO:     127.0.0.1:57558 - "GET /api/status/81222d5c87b0 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:60156 - "GET /api/log/81222d5c87b0?lines=40 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:62278 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62230 - "GET / HTTP/1.1" 200 OK
