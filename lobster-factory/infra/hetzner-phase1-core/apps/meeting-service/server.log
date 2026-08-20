@@ -1,4 +1,1 @@
 會議錄音處理 — 僅限本機執行 http://127.0.0.1:8420
-INFO:     127.0.0.1:64962 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:60779 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:60779 - "GET /favicon.ico HTTP/1.1" 404 Not Found
