@@ -55,7 +55,8 @@ def write_status(job_dir: str, **fields):
 
 
 def run_pipeline_phase1(job_dir: str, media_path: str, model_name: str = "large-v3",
-                         do_diarize: bool = True, sync_drive: bool = False) -> None:
+                         do_diarize: bool = True, sync_drive: bool = False,
+                         use_api: bool = False) -> None:
     """呼叫端（app.py）用背景執行緒跑這個函式。結束時 stage 為
     awaiting_summary（成功）或 error（失敗），不會是 done。
 
@@ -116,10 +117,32 @@ def run_pipeline_phase1(job_dir: str, media_path: str, model_name: str = "large-
             transcript_text, result["audio_duration_sec"],
             hallucination_stats=hall_stats, overlap_sec=overlap_sec, speakers=speakers,
         )
+        # 無論走哪條路都先寫 prompt.txt——API 模式失敗時退回人工回路，
+        # 轉錄/分離的工作不能因為 API 出錯就整份作廢。
         with open(os.path.join(job_dir, "prompt.txt"), "w", encoding="utf-8") as f:
             f.write(prompt)
-        log(f"[prompt] {len(prompt)} 字元 -> prompt.txt，等待貼上摘要結果")
+        log(f"[prompt] {len(prompt)} 字元 -> prompt.txt")
 
+        api_key = settings.get_api_key() if use_api else ""
+        if use_api and api_key:
+            try:
+                write_status(job_dir, stage="summarize_via_api")
+                minutes = summarize.summarize_via_api(
+                    transcript_text, result["audio_duration_sec"], api_key,
+                    hallucination_stats=hall_stats, overlap_sec=overlap_sec,
+                    speakers=speakers, log=log,
+                )
+                errs = _finalize_from_minutes(job_dir, minutes, log)
+                if not errs:
+                    return  # 外層 finally 會處理 allow_sleep/log.close
+                # 理論上不會發生：summarize_via_api 內部已用同一個
+                # validate() 把關過。留這段是防禦性的，不是預期路徑。
+                raise RuntimeError(f"API 產生的摘要未通過最終驗證: {errs}")
+            except Exception as e:
+                log(f"[warn] API 自動摘要失敗，退回人工回路: {type(e).__name__}: {e}")
+                write_status(job_dir, api_error=f"{type(e).__name__}: {e}")
+
+        log("[prompt] 等待貼上摘要結果")
         write_status(job_dir, stage="awaiting_summary", done=False)
 
     except Exception as e:
@@ -134,50 +157,59 @@ def run_pipeline_phase1(job_dir: str, media_path: str, model_name: str = "large-
         log.close()
 
 
+def _finalize_from_minutes(job_dir: str, minutes: dict, log) -> list:
+    """從已驗證通過的 minutes JSON 做完 PPT/教練稿/會議記錄/Excel/Drive 同步到
+    done。resume_after_summary()（人工回路）與 run_pipeline_phase1() 的 API
+    分支共用這段，避免兩條路各寫一份建置邏輯而彼此漂移。
+
+    回傳驗證錯誤清單；非空代表未寫任何檔案。呼叫端負責 keep_awake/log 生命週期，
+    這裡不管。"""
+    errs = summarize.validate(minutes)
+    if errs:
+        log(f"[驗證失敗] {'; '.join(errs)}")
+        return errs
+
+    json.dump(minutes, open(os.path.join(job_dir, "minutes.json"), "w", encoding="utf-8"),
+              ensure_ascii=False, indent=2)
+
+    write_status(job_dir, stage="build_deck")
+    pptx_path = os.path.join(job_dir, "slides.pptx")
+    n_slides = deck.build(minutes, pptx_path)
+    log(f"[PPT] {n_slides} 頁 -> {pptx_path}")
+
+    write_status(job_dir, stage="build_notes")
+    speaker_notes.attach_notes(pptx_path, minutes["coaching"])
+    speaker_notes.write_coach_md(minutes["coaching"], minutes, os.path.join(job_dir, "coach.md"))
+
+    write_status(job_dir, stage="build_minutes_md")
+    minutes_md.write(minutes, os.path.join(job_dir, "meeting_notes.md"))
+
+    write_status(job_dir, stage="build_excel")
+    excel.build(minutes, os.path.join(job_dir, "meeting_record.xlsx"))
+    log("[Excel] 五個工作表 -> meeting_record.xlsx")
+
+    sync_drive = json.load(open(_status_path(job_dir), encoding="utf-8")).get("sync_drive", False)
+    if sync_drive:
+        write_status(job_dir, stage="sync_drive")
+        result = archive.sync_to_drive(job_dir, minutes, os.path.basename(job_dir))
+        if result["ok"]:
+            log(f"[Drive 同步] {len(result['files'])} 個檔案 -> {result['dest']}")
+        else:
+            log(f"[warn] Drive 同步失敗（本地產出不受影響）: {result['error']}")
+        write_status(job_dir, drive_sync_result=result)
+
+    write_status(job_dir, stage="done", done=True, finished_at=time.time())
+    log("[完成] 全流程結束")
+    return []
+
+
 def resume_after_summary(job_dir: str, minutes: dict) -> list:
     """回傳驗證錯誤清單；非空代表未寫任何檔案，呼叫端應把錯誤顯示給使用者
     讓他們拿去要求重新生成，而不是硬吞壞資料。"""
     log = JobLogger(job_dir)
     keep_awake.prevent_sleep()
     try:
-        errs = summarize.validate(minutes)
-        if errs:
-            log(f"[驗證失敗] {'; '.join(errs)}")
-            return errs
-
-        json.dump(minutes, open(os.path.join(job_dir, "minutes.json"), "w", encoding="utf-8"),
-                  ensure_ascii=False, indent=2)
-
-        write_status(job_dir, stage="build_deck")
-        pptx_path = os.path.join(job_dir, "slides.pptx")
-        n_slides = deck.build(minutes, pptx_path)
-        log(f"[PPT] {n_slides} 頁 -> {pptx_path}")
-
-        write_status(job_dir, stage="build_notes")
-        speaker_notes.attach_notes(pptx_path, minutes["coaching"])
-        speaker_notes.write_coach_md(minutes["coaching"], minutes, os.path.join(job_dir, "coach.md"))
-
-        write_status(job_dir, stage="build_minutes_md")
-        minutes_md.write(minutes, os.path.join(job_dir, "meeting_notes.md"))
-
-        write_status(job_dir, stage="build_excel")
-        excel.build(minutes, os.path.join(job_dir, "meeting_record.xlsx"))
-        log("[Excel] 五個工作表 -> meeting_record.xlsx")
-
-        sync_drive = json.load(open(_status_path(job_dir), encoding="utf-8")).get("sync_drive", False)
-        if sync_drive:
-            write_status(job_dir, stage="sync_drive")
-            result = archive.sync_to_drive(job_dir, minutes, os.path.basename(job_dir))
-            if result["ok"]:
-                log(f"[Drive 同步] {len(result['files'])} 個檔案 -> {result['dest']}")
-            else:
-                log(f"[warn] Drive 同步失敗（本地產出不受影響）: {result['error']}")
-            write_status(job_dir, drive_sync_result=result)
-
-        write_status(job_dir, stage="done", done=True, finished_at=time.time())
-        log("[完成] 全流程結束")
-        return []
-
+        return _finalize_from_minutes(job_dir, minutes, log)
     except Exception as e:
         tb = traceback.format_exc()
         log(f"[FAIL] {type(e).__name__}: {e}\n{tb}")

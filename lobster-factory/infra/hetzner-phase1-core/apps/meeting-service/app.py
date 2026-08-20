@@ -15,7 +15,7 @@ import uuid
 from fastapi import Body, FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 
-from lib import summarize
+from lib import settings, summarize
 from pipeline import resume_after_summary, run_pipeline_phase1
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -46,10 +46,14 @@ def index():
 
 @app.post("/api/upload")
 async def upload(file: UploadFile = File(...), diarize: bool = True,
-                  model: str = "large-v3", sync_drive: bool = False):
+                  model: str = "large-v3", sync_drive: bool = False,
+                  use_api: bool = False):
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in ALLOWED_EXT:
         raise HTTPException(400, f"不支援的副檔名 {ext}；允許：{', '.join(sorted(ALLOWED_EXT))}")
+
+    if use_api and not settings.has_api_key():
+        raise HTTPException(400, "尚未在設定頁填入 API key，無法使用 API 自動處理")
 
     job_id = uuid.uuid4().hex[:12]
     job_dir = os.path.join(JOBS_DIR, job_id)
@@ -66,18 +70,35 @@ async def upload(file: UploadFile = File(...), diarize: bool = True,
                 raise HTTPException(413, f"檔案超過 {MAX_UPLOAD_MB}MB 上限")
             out.write(chunk)
 
-    # 摘要階段不呼叫 API（見 pipeline.py 開頭說明），不需要 ANTHROPIC_API_KEY。
+    # 預設走人工回路（貼上/叫 Claude Code），不呼叫 API，不需要 ANTHROPIC_API_KEY。
+    # use_api=True 且已設定 key 時，pipeline 內會直接呼叫 summarize_via_api()，
+    # 真的會計費；key 由使用者自行在 /api/settings 填入，不共用操作者的訂閱。
     # 講者分離缺 HF_TOKEN 也不擋主流程——pipeline 內會自動退回無標籤繼續跑。
 
     thread = threading.Thread(
         target=run_pipeline_phase1,
         args=(job_dir, media_path),
-        kwargs={"model_name": model, "do_diarize": diarize, "sync_drive": sync_drive},
+        kwargs={"model_name": model, "do_diarize": diarize, "sync_drive": sync_drive,
+                "use_api": use_api},
         daemon=True,
     )
     thread.start()
 
     return {"job_id": job_id}
+
+
+@app.get("/api/settings")
+def get_settings():
+    """回傳是否已設定 key + 遮罩版本，絕不回傳明文。"""
+    return {"has_api_key": settings.has_api_key(), "masked_api_key": settings.masked_api_key()}
+
+
+@app.post("/api/settings")
+def save_settings(body: dict = Body(...)):
+    """設定頁存 API key。空字串等同清除設定，退回人工回路模式。"""
+    key = (body.get("anthropic_api_key") or "").strip()
+    settings.set_api_key(key)
+    return {"has_api_key": settings.has_api_key(), "masked_api_key": settings.masked_api_key()}
 
 
 @app.get("/api/prompt/{job_id}")

@@ -88,6 +88,26 @@
   <h1>會議錄音處理 <span class="badge">僅限本機</span></h1>
   <p class="sub">上傳 → 轉錄 → 講者分離 → 會議記錄 → PPT → 報告教練。全程在這台機器執行，音檔不外流。</p>
 
+  <div class="card" id="settingsCard">
+    <div id="settingsHeader" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer">
+      <b style="font-size:14px">⚙ API 設定 <span id="apiStatusBadge" class="badge" style="background:#f1f5f9;color:var(--muted)">檢查中...</span></b>
+      <span id="settingsToggle" style="font-size:12px;color:var(--muted)">展開 ▾</span>
+    </div>
+    <div id="settingsBody" style="display:none;margin-top:14px">
+      <p class="hint" style="margin-top:0">
+        選填。填入自己的 Anthropic API key 後，上傳時可勾選「自動處理」，
+        不用手動貼 prompt——但每次呼叫會真的計費（不是訂閱額度）。
+        不填就只能用下面「貼上」的免費做法。key 只存在這台電腦本機，不會上傳到任何地方。
+      </p>
+      <input type="password" id="apiKeyInput" placeholder="sk-ant-..." style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:Consolas,monospace">
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+        <button class="copyBtn" id="saveApiKeyBtn" style="margin-top:0">儲存</button>
+        <button class="copyBtn" id="clearApiKeyBtn" style="margin-top:0">清除</button>
+        <span id="apiKeySaveMsg" class="hint" style="margin:0"></span>
+      </div>
+    </div>
+  </div>
+
   <div class="card" id="uploadCard">
     <div id="drop">
       <p class="big">拖拉檔案到這裡，或點擊選擇</p>
@@ -107,6 +127,9 @@
       <label><input type="checkbox" id="syncDriveOpt"> 完成後同步到 Google Drive（ECT/會議記錄/日期）</label>
     </div>
     <p class="hint">⚠️ 勾選會把 PPT/會議記錄/逐字稿複製到雲端，跟「音檔絕不外流」的原則相反。敏感會議請不要勾。</p>
+    <div class="opts" id="useApiRow" style="margin-top:10px;display:none">
+      <label><input type="checkbox" id="useApiOpt"> 自動處理（用 API，會計費，跳過手動貼上）</label>
+    </div>
     <button id="startBtn" disabled>開始處理</button>
   </div>
 
@@ -116,6 +139,7 @@
   </div>
 
   <div class="card" id="summaryCard" style="display:none">
+    <div id="apiFallbackBanner" class="err" style="display:none;margin-bottom:16px"></div>
     <div style="background:#eef1ff;border:1px solid var(--accent);border-radius:8px;padding:12px;margin-bottom:16px">
       <b>兩種做法，選一種：</b>
       <ol style="margin:8px 0 0;padding-left:20px;font-size:13px;color:var(--muted)">
@@ -147,13 +171,64 @@
 const STAGES = [
   ["preflight","檢查檔案"], ["transcribe","轉錄"], ["merge","段落合併"],
   ["hallucination_check","幻覺偵測"], ["diarize","講者分離"], ["preparing_prompt","準備摘要 prompt"],
-  ["awaiting_summary","等待貼上摘要"], ["build_deck","生成 PPT"], ["build_notes","寫入講稿"],
-  ["build_minutes_md","會議記錄"], ["build_excel","生成 Excel"], ["sync_drive","同步 Google Drive"], ["done","完成"],
+  ["summarize_via_api","API 自動摘要"], ["awaiting_summary","等待貼上摘要"], ["build_deck","生成 PPT"],
+  ["build_notes","寫入講稿"], ["build_minutes_md","會議記錄"], ["build_excel","生成 Excel"],
+  ["sync_drive","同步 Google Drive"], ["done","完成"],
 ];
 const DOWNLOAD_LABELS = {
   minutes_md: "會議記錄 (.md)", slides: "PPT (.pptx)", excel: "會議記錄 (.xlsx)", coach: "報告教練 (.md)",
   transcript_srt: "字幕檔 (.srt)", diarized_txt: "逐字稿-含講者 (.txt)", merged_txt: "逐字稿 (.txt)",
 };
+
+// --- API 設定 ---
+async function loadApiSettings() {
+  const s = await (await fetch("/api/settings")).json();
+  const badge = document.getElementById("apiStatusBadge");
+  if (s.has_api_key) {
+    badge.textContent = `已設定 (${s.masked_api_key})`;
+    badge.style.background = "#dcfce7"; badge.style.color = "#166534";
+    document.getElementById("useApiRow").style.display = "flex";
+  } else {
+    badge.textContent = "未設定";
+    badge.style.background = "#f1f5f9"; badge.style.color = "var(--muted)";
+    document.getElementById("useApiRow").style.display = "none";
+  }
+  return s;
+}
+loadApiSettings();
+
+document.getElementById("settingsHeader").addEventListener("click", () => {
+  const body = document.getElementById("settingsBody");
+  const toggle = document.getElementById("settingsToggle");
+  const open = body.style.display !== "none";
+  body.style.display = open ? "none" : "block";
+  toggle.textContent = open ? "展開 ▾" : "收合 ▴";
+});
+
+document.getElementById("saveApiKeyBtn").addEventListener("click", async () => {
+  const key = document.getElementById("apiKeyInput").value.trim();
+  const msg = document.getElementById("apiKeySaveMsg");
+  if (!key) { msg.textContent = "先貼上 key 再儲存"; msg.style.color = "var(--red)"; return; }
+  await fetch("/api/settings", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ anthropic_api_key: key }),
+  });
+  document.getElementById("apiKeyInput").value = "";
+  msg.textContent = "已儲存 ✓"; msg.style.color = "var(--green)";
+  await loadApiSettings();
+});
+
+document.getElementById("clearApiKeyBtn").addEventListener("click", async () => {
+  const msg = document.getElementById("apiKeySaveMsg");
+  await fetch("/api/settings", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ anthropic_api_key: "" }),
+  });
+  document.getElementById("apiKeyInput").value = "";
+  document.getElementById("useApiOpt").checked = false;
+  msg.textContent = "已清除"; msg.style.color = "var(--muted)";
+  await loadApiSettings();
+});
 
 let file = null;
 const drop = document.getElementById("drop");
@@ -181,6 +256,7 @@ startBtn.addEventListener("click", async () => {
   const diarize = document.getElementById("diarizeOpt").checked;
   const model = document.getElementById("modelOpt").value;
   const syncDrive = document.getElementById("syncDriveOpt").checked;
+  const useApi = document.getElementById("useApiOpt").checked;
 
   const fd = new FormData();
   fd.append("file", file);
@@ -191,7 +267,7 @@ startBtn.addEventListener("click", async () => {
 
   let resp;
   try {
-    resp = await fetch(`/api/upload?diarize=${diarize}&model=${model}&sync_drive=${syncDrive}`, { method: "POST", body: fd });
+    resp = await fetch(`/api/upload?diarize=${diarize}&model=${model}&sync_drive=${syncDrive}&use_api=${useApi}`, { method: "POST", body: fd });
   } catch (e) {
     showError("上傳失敗：" + e);
     return;
@@ -244,7 +320,7 @@ async function poll(jobId) {
     }
     if (status.stage === "awaiting_summary" && !status.done) {
       clearInterval(timer);
-      await showSummaryStep(jobId);
+      await showSummaryStep(jobId, status.api_error);
       return;
     }
     if (status.done) {
@@ -254,13 +330,20 @@ async function poll(jobId) {
   }, 1500);
 }
 
-async function showSummaryStep(jobId) {
+async function showSummaryStep(jobId, apiError) {
   document.getElementById("progressCard").style.display = "none";
   document.getElementById("summaryCard").style.display = "block";
   document.getElementById("jobIdHint").textContent = jobId;
   const resp = await fetch(`/api/prompt/${jobId}`);
   const text = await resp.text();
   document.getElementById("promptBox").value = text;
+  const banner = document.getElementById("apiFallbackBanner");
+  if (apiError) {
+    banner.style.display = "block";
+    banner.textContent = `⚠ API 自動處理失敗，已退回手動貼上模式（轉錄/講者分離的結果都還在，沒有浪費）：${apiError}`;
+  } else {
+    banner.style.display = "none";
+  }
 }
 
 document.getElementById("copyPromptBtn").addEventListener("click", () => {
