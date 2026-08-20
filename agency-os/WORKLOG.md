@@ -1,5 +1,47 @@
 ﻿# Worklog
 
+## 2026-08-20 — 跨模型 oracle 制度化：`codex-oracle.ps1` + AGENTS 分工規則
+
+### AUTO_TASK_DONE: 把 08-17 驗證有效的 Codex oracle 從「當次對話」變成常駐機制
+
+[任務]
+承 2026-08-17「smoke 偵測器啞了卻報 PASS」該輪。oracle 已證明有效，但只存在於當次對話：呼叫參數靠記（前三輪就忘了 `-o`，各噴 ~120KB 進 context）、分工規則沒寫下來、session 結束即蒸發。操作者另定協作邊界：Claude 為唯一寫入者，Codex 只做唯讀審查或明確委派的獨立子任務，**不得共編同檔**。
+
+[已修改]
+1. `scripts/codex-oracle.ps1`（新增）—— 唯一入口。硬寫死 `-s read-only`（Codex 不寫的機械半邊）與 `-c mcp_servers={}`（config.toml 宣告的 `chatgpt-*`/`gemini-*`/`grok-*` 是按 token 計費的 API proxy，與 ChatGPT 訂閱不同帳；實測 log 證實它們原本會被自動拉起）。`-o` 只取最終訊息
+2. `agency-os/AGENTS.md` §跨模型 oracle —— 分工表（讀/寫分界）、寫入不可委派的理由、唯一入口、四條禁止、兩份產出原則。刻意接在 §已知信任邊界之後：該節說明閘只驗格式不驗內容，oracle 正是補那個缺口
+3. `agency-os/TASKS.md` —— 記錄操作者「不輪換憑證」的決定與該理由未涵蓋的風險（Hetzner 可刪機、Cloudflare 可改 DNS，與資料量無關）
+
+[根因／設計依據]
+分工線先前被畫在「規劃 vs 執行」（外部建議的形狀）。那條線會逼著寫入者換人，而本 repo 的治理**實作成 Claude Code hooks**（`git-log-injector` / `file-path-router` / `high-risk-bash-warn` / `verify-gate-commit` / `audit-cp950-traps`），換人 = 全部失效。改畫在「讀 vs 寫」後三個目標同時成立：安全（單一寫入者在閘內）、有效（每個判斷點有外部模型）、經濟（最貴的批量讀跑在額度較寬的一側）。
+
+[驗證結果]
+- **context 成本實測**：裸 `codex exec` 122KB → 包裝後 143B / 366B / 514B（同類問題）。約 850 倍
+- **dogfood：讓 oracle 審自己的包裝腳本，抓到 4 條，全部驗證為真**
+  ① `-DiffRef <commit>` 用 `git diff` = 比對工作樹 vs 該 commit，**不是**審那個 commit → 改用 `git show --format= --patch`（含 `..` 才走 diff）
+  ② git 錯誤經 `2>&1` 併入 diff 文字且無 exit 檢查 → 打錯 ref 會讓 oracle「審查 git 的錯誤訊息」→ 補 exit code 檢查
+  ③ **無 `-Path` 時把 repo 內全部 untracked 檔案內嵌送給第三方** → 補副檔名允許清單 + 機密檔名封鎖清單（`env|secret|credential|token|password|vault|id_rsa`、`.pem/.key/.pfx`）+ 明列哪些送出、哪些略過
+  ④ `Get-Content -Raw` 未指定編碼，PS 5.1 對無 BOM 檔案用 CP950 解碼 → CJK 在送出前就亂碼 → 補 `-Encoding UTF8`
+- **修 ② 時自己引入 regression 並修掉**：git 的 CRLF 警告寫 stderr，`$ErrorActionPreference='Stop'` 下原生指令 stderr 成為終止錯誤，無害警告直接中止執行 → 抽出 `Invoke-Git`，區域性設 `Continue`，以 exit code 為權威
+- **負向實測**：打錯 ref（`deadbeefdeadbeef`）→ fail fast 並印出 git 原文，未拿去審；`-DiffRef 2b5d3ba7` → 正確回傳該 commit 的 4 個檔案；working tree 模式 → 正確含入 untracked 的新腳本
+- **修掉一個啟動即失敗的 bug**：`Start-Process -FilePath 'codex'` 解析到 npm 的 `.ps1` shim（不是有效 Win32 程式）→ 加 `Resolve-CodexExe`，優先取 `.cmd`/`.exe`
+- REALTEST_EVIDENCE: tool=Bash | cmd=codex-oracle.ps1 -Mode inspect / -Mode review (bad ref, single commit, working tree) + Parser::ParseFile + audit-cp950-traps | exit=0 | ms=~300000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/4m/0n
+  - 外部 oracle = Codex 審 Codex 包裝腳本本身（`codex exec -s read-only`）。4 條全驗證為真並修正
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=codex-oracle,codex exec,mcp_servers | hits=3
+  - 3 筆為本次新增的自我引用；`CURSOR_AGENT_RUNTIME_PLAYBOOK.md` / `mcp-add-server-quickstart.md` 的 `mcp_servers` 是「如何為 Codex 加 MCP」的既有說明，與本次無衝突，保留
+- 編碼稽核：`audit-cp950-traps -File scripts/codex-oracle.ps1` → clean=1 drift=0
+
+[剩餘風險]
+- **oracle 有效性樣本仍偏少且有指向性**：至今 3 輪 / 11 條 finding 全中，但每次 prompt 都由我撰寫，等於我指定了往哪裡看。「我完全沒有假說」的 diff 尚未測過；該測試做完前不宜宣稱這套機制普遍有效
+- untracked 內嵌的機密封鎖是**檔名比對**，非內容掃描；命名不含關鍵字的機密檔仍可能被送出
+- `Invoke-Git` 以 exit code 為權威，若 git 未來以 0 退出但輸出錯誤文字則失效（目前無此案例）
+- review gate（`/codex:setup --enable-review-gate`）尚未開啟，目前靠 AGENTS.md 規則而非機械強制
+- Codex CLI 0.123.0 對伺服器回傳的 `max` reasoning level 不認識，每次呼叫在 stderr 留一行 `failed to refresh available models`；回退用本地快取，不影響執行
+
+[rollback]
+`git revert <commit>`；`scripts/codex-oracle.ps1` 為新增檔，刪除即可，無其他程式依賴。
+
 ## 2026-08-19（第八輪）— 「你做啊」：實查 oracle-web/觀測堆疊用途 + SG 七項逐一對照表；意外發現本機明文金鑰堆積
 
 [任務]
