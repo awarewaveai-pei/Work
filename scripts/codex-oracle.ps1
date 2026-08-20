@@ -273,6 +273,21 @@ if ($Mode -eq 'review') {
         [void]$sb.AppendLine($Prompt)
         [void]$sb.AppendLine()
     }
+
+    # A digest is bounded by the question asked. On 2026-08-17 the single decisive fact
+    # about a change (the plugin prunes its log table at 14 days, making the new 21-day
+    # threshold unreachable dead code) appeared in neither review round — nobody asked.
+    # This standing question exists to attack that boundary directly.
+    [void]$sb.AppendLine('# BEFORE YOU ANSWER')
+    [void]$sb.AppendLine()
+    [void]$sb.AppendLine('The questions above define what the author already suspects. The costly mistakes')
+    [void]$sb.AppendLine('live outside them. Before writing findings, ask yourself: what does this change')
+    [void]$sb.AppendLine('DEPEND ON that is not visible in the diff — a config value, a retention or')
+    [void]$sb.AppendLine('timeout setting, a schema assumption, a cron job, an upstream default, a value')
+    [void]$sb.AppendLine('set far above in the same file? Go read it rather than assuming it. If any such')
+    [void]$sb.AppendLine('dependency contradicts the change, that is a finding and it outranks everything')
+    [void]$sb.AppendLine('you were explicitly asked about.')
+    [void]$sb.AppendLine()
     [void]$sb.AppendLine('# OUTPUT FORMAT')
     [void]$sb.AppendLine()
     [void]$sb.AppendLine('FINDING N: <one-line claim>')
