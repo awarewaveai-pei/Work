@@ -1,16 +1,16 @@
-"""會議錄音 -> 逐字稿 -> 講者分離 -> [人工貼上摘要] -> PPT -> 報告教練。
+"""會議錄音 -> 逐字稿 -> 講者分離 -> 摘要（人工回路或 API 二選一）-> PPT -> 報告教練。
 
-分兩段執行，中間停在「等待摘要」：
-  run_pipeline_phase1() — preflight/transcribe/merge/hallucination/diarize，
-    全自動、全本機、零費用。結束後寫 prompt.txt，stage="awaiting_summary"。
-  resume_after_summary() — 使用者把 phase1 產生的 prompt 貼進任一 Claude 對話
-    （用訂閱額度，非 API 計費），把回傳 JSON 貼回頁面觸發這段：
-    build_deck/build_notes/build_minutes_md。
+摘要階段兩條路並存：
+  - 人工回路（預設，零費用）：phase1 結束停在 stage="awaiting_summary"，
+    使用者把 prompt.txt 複製到任一 AI 對話（用既有訂閱，非 API 計費），
+    JSON 貼回頁面觸發 resume_after_summary()。
+  - API 模式（2026-08-20 新增，選填）：上傳時勾選 use_api 且已在設定頁填
+    API key，phase1 內直接呼叫 summarize.summarize_via_api()，一路做完，
+    不停在 awaiting_summary。這是給客戶端用的——客戶碰不到操作者的
+    Claude Code 對話視窗，「人工回路」對客戶不成立。真的會計費。
 
-為什麼不是單一函式自動跑完：摘要階段需要 LLM 產生 tldr/decisions/topics/
-coaching，若走 API 要另外付費；nested `claude -p` headless 呼叫在這個
-Windows+Git Bash 環境下經三次真實測試不可靠（孤兒 process、stdout 斷裂）。
-人工回路零額外花費、零環境賭注。
+    API 呼叫失敗時**不判定整個 job 失敗**——退回 awaiting_summary，
+    prompt.txt 已經寫好，使用者仍可手動貼上完成，轉錄/分離的工作不浪費。
 
 單一 job 目錄隔離所有輸出，每個階段更新 status.json 供 app.py 輪詢。
 """
@@ -19,7 +19,7 @@ import os
 import time
 import traceback
 
-from lib import archive, deck, diarize, excel, hallucination, keep_awake, merge_segments, minutes_md, speaker_notes, summarize
+from lib import archive, deck, diarize, excel, hallucination, keep_awake, merge_segments, minutes_md, settings, speaker_notes, summarize
 from lib.transcribe import transcribe, write_srt
 
 

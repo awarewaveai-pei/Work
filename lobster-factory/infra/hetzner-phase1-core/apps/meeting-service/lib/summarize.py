@@ -1,18 +1,26 @@
-"""逐字稿 -> 貼上用 prompt（不呼叫 API，零額外費用）。
+"""逐字稿 -> 摘要 JSON，兩條路並存。
 
-2026-08-17 原本設計是呼叫 Claude API（見 git 歷史）。改版原因：使用者要求
-不額外付費，只用 Claude Code 訂閱額度；而 nested `claude -p` headless 呼叫
-在這個 Windows + Git Bash 環境下經三次真實測試證實不可靠（孤兒 process、
-stdout 管線斷裂）。改為人工回路：本函式產生一份完整 prompt，使用者複製到
-任一 Claude 對話視窗（用訂閱，非 API 計費），把回傳的 JSON 貼回頁面，
-pipeline.resume_after_summary() 接手完成 PPT/教練稿/會議記錄。
+**貼上模式（預設，零費用）**：build_prompt() 產生完整 prompt，使用者複製到
+任一 AI 對話視窗（用既有訂閱額度，非 API 計費），把回傳的 JSON 貼回頁面，
+pipeline.resume_after_summary() 接手完成 PPT/教練稿/會議記錄。2026-08-17
+原本設計是呼叫 Claude API（見 git 歷史），因使用者要求零額外費用而改版；
+nested `claude -p` headless 呼叫在 Windows+Git Bash 環境下經三次真實測試
+證實不可靠（孤兒 process、stdout 管線斷裂），才走人工回路這條路。
+
+**API 模式（2026-08-20 新增，選填，需自行填 key）**：summarize_via_api()
+直接呼叫 Anthropic API，跳過貼上這一步。這是給客戶端用的——客戶碰不到
+操作者的 Claude Code 對話視窗，「叫我處理」這條路對客戶不成立，只有
+「自己貼」或「真正的 API」兩選一。key 由使用者在網頁設定頁自行填入
+（見 lib/settings.py），不共用操作者的訂閱或憑證，每次呼叫真實計費。
+
+兩條路共用同一份 INSTRUCTIONS/SCHEMA，行為一致；也共用 validate()，
+API 模式下若驗證失敗會自動重試一次（人工回路則是使用者自己看錯誤訊息
+決定要不要回去要求 AI 重新生成）。
 
 Schema 與規則沿用 2026-08-17 對 BU5.m4a 手動處理時學到的教訓：
   - 不是每段錄音都是「會議」——閒聊不可硬套決議格式編造不存在的東西
   - 講者標籤（A/B/C）是演算法推定，_provenance 要誠實說明限制
-  - coaching.per_slide 長度必須「精確等於」deck.plan_slides() 的頁數，
-    這是一次性單一 prompt 生成，由 LLM 自己維持一致（就像人工當時做的一樣）；
-    pipeline 端仍會用 validate() 硬擋數量不符，不寄望 prompt 遵從率 100%
+  - coaching.per_slide 長度必須「精確等於」deck.plan_slides() 的頁數
 """
 import json
 import re
@@ -122,6 +130,65 @@ def parse_pasted_json(text: str) -> dict:
     if start == -1 or end == -1 or end <= start:
         raise ValueError("找不到有效的 JSON 物件（沒有 { }）")
     return json.loads(text[start:end + 1])
+
+
+MODEL = "claude-sonnet-4-6"
+API_MAX_RETRIES = 2  # 首次 + 1 次修正重試；沒有人在旁邊看，壞了要自己救一次
+
+
+def summarize_via_api(transcript_text: str, audio_duration_sec: float, api_key: str,
+                       hallucination_stats: dict = None, overlap_sec: float = None,
+                       speakers: list = None, log=print) -> dict:
+    """直接呼叫 Anthropic API 產生摘要 JSON。會真的計費，呼叫前呼叫端應自行
+    確認使用者已同意（app.py 的 upload 端點已要求 use_api 需搭配已設定的 key）。
+
+    失敗（驗證不過、API 錯誤）時丟例外，讓 pipeline 走 error 狀態，不靜默吞掉。
+    """
+    import anthropic
+
+    if not api_key:
+        raise RuntimeError("未設定 API key，無法使用 API 模式")
+
+    client = anthropic.Anthropic(api_key=api_key)
+    prompt = build_prompt(transcript_text, audio_duration_sec,
+                          hallucination_stats=hallucination_stats,
+                          overlap_sec=overlap_sec, speakers=speakers)
+
+    last_errs = None
+    for attempt in range(1, API_MAX_RETRIES + 1):
+        log(f"[API 摘要] 第 {attempt} 次呼叫 {MODEL} ...")
+        user_msg = prompt
+        if last_errs:
+            user_msg += (
+                "\n\n---\n上一次你的輸出有以下問題，請修正後重新輸出完整 JSON：\n"
+                + "\n".join(f"- {e}" for e in last_errs)
+            )
+        try:
+            resp = client.messages.create(
+                model=MODEL, max_tokens=8192,
+                messages=[{"role": "user", "content": user_msg}],
+            )
+        except anthropic.APIStatusError as e:
+            raise RuntimeError(f"API 呼叫失敗（HTTP {e.status_code}）：{e.message}") from e
+        except anthropic.APIError as e:
+            raise RuntimeError(f"API 呼叫失敗：{e}") from e
+
+        text = resp.content[0].text
+        try:
+            minutes = parse_pasted_json(text)
+        except ValueError as e:
+            last_errs = [f"回應無法解析為 JSON：{e}"]
+            log(f"[API 摘要] 第 {attempt} 次解析失敗，{'重試' if attempt < API_MAX_RETRIES else '放棄'}")
+            continue
+
+        errs = validate(minutes)
+        if not errs:
+            log(f"[API 摘要] 第 {attempt} 次通過驗證")
+            return minutes
+        last_errs = errs
+        log(f"[API 摘要] 第 {attempt} 次驗證失敗：{errs}；{'重試' if attempt < API_MAX_RETRIES else '放棄'}")
+
+    raise RuntimeError(f"API 產生的摘要經 {API_MAX_RETRIES} 次嘗試仍不符規格：{last_errs}")
 
 
 def validate(minutes: dict) -> list:

@@ -1,5 +1,6 @@
 jobs/*
 !jobs/.gitkeep
+.settings.json
 .ecapa/
 *.venv/
 __pycache__/
