@@ -2199,3 +2199,11 @@ INFO:     127.0.0.1:61262 - "GET /api/log/fdbc28210553?lines=40 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:64033 - "GET /api/log/fdbc28210553?lines=40 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:61262 - "GET /api/status/fdbc28210553 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:61262 - "GET /api/prompt/fdbc28210553 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61199 - "GET /api/status/fdbc28210553 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61847 - "GET /api/prompt/fdbc28210553 HTTP/1.1" 200 OK
+[PPT] 11 頁 -> D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\meeting-service\jobs\fdbc28210553\slides.pptx
+[Excel] 五個工作表 -> meeting_record.xlsx
+[Drive 同步] 5 個檔案 -> H:\我的雲端硬碟\ECT\會議記錄\20260820
+[完成] 全流程結束
+INFO:     127.0.0.1:51557 - "POST /api/submit-summary/fdbc28210553 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57619 - "GET /api/status/fdbc28210553 HTTP/1.1" 200 OK
