@@ -66,3 +66,4 @@ INFO:     127.0.0.1:54458 - "GET /api/status/498e6bbfcc83 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:55034 - "GET /api/log/498e6bbfcc83?lines=40 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:55034 - "GET /api/prompt/498e6bbfcc83 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:53936 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65446 - "GET /favicon.ico HTTP/1.1" 404 Not Found
