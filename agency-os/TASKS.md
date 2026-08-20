@@ -50,6 +50,8 @@
 
 ### 未完成
 
+- [ ] **【已知風險｜操作者已決定不輪換｜2026-08-17】`~/.codex/config.toml` 明文憑證** — 該檔以明文存約 30 組正式憑證（Supabase `service_role`、Hetzner API token、Cloudflare API token、Resend、Slack、Sentry、n8n、Grafana 密碼、Trigger prod token 等）。2026-08-17 稽核 Codex 設定時另被印入 session transcript（transcript 保留期已於 `75512998` 改為 365 天）。**操作者 2026-08-17 明確決定不輪換**，理由：站台新、資料量少。⚠️ 該理由**不涵蓋** Hetzner（可刪伺服器）與 Cloudflare（可改 DNS 指向）——這兩者風險與資料量無關。**未做的補救**：① 輪換 ② 移出明文改用 `mcp/user-env.ps1` 既有的環境變數引用模式。前一次同類事件見 `0961263f`（2026-08-15 三項待輪換，狀態未確認）。重啟此項的時機：任何一把 token 疑似外流、或客戶資料量成長後重新評估。
+
 - [ ] **【待套用｜DB migration】migration 0060 apply 到 EU Supabase prod** — `media_assets.object_key` 單欄 unique index（`uq_media_assets_object_key`）。`recordVideoAsset()` 的 upsert 在沒有這個 index 前會靜默降級為 insert，影片歷史仍可能重複。**套用指令**：`docker exec supabase-db psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 < lobster-factory/packages/db/migrations/0060_media_assets_object_key_unique.sql`。rollback：`scripts/0060_media_assets_object_key_unique_down.sql`。程式碼 commit `276693e` 已推。**⚠️ 需 SSH 進 EU VPS，回來後立即套用。**
 
 #### 🆕 Cold Outreach Workbench（AI 冷拜訪 + FluentCRM 暖名單工作台）
