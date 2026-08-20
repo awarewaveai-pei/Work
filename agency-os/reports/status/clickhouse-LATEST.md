@@ -1,19 +1,19 @@
 # ClickHouse health (EU)
 
-- Generated: 2026-08-19 19:15:08
-- Overall: **🟢 PASS**
+- Generated: 2026-08-20 14:38:04
+- Overall: **🟡 WARN**
 - Host: 204.168.175.41 / container `trigger-clickhouse`
 
 ## Self-telemetry vs application data
 
 | Metric | Value |
 |--------|-------|
-| system database | 164.13 MiB (3,202,107 rows) |
-| trigger_dev (application) | 44.02 MiB (523,981 rows) |
-| ratio (system / app) | 3.7x |
-| largest system table | text_log:127183751 |
+| system database | 220.07 MiB (3,438,530 rows) |
+| trigger_dev (application) | 42.72 MiB (497,989 rows) |
+| ratio (system / app) | 5.2x |
+| largest system table | text_log:167319707 |
 | active merges | 0 |
-| max parts in one system table | 7 |
+| max parts in one system table | 15 |
 | trace_log rows last hour | 0 (expected 0 - disabled 2026-08-15) |
 | asynchronous_metric_log rows last hour | 0 (expected 0 - disabled 2026-08-15) |
 | system tables missing TTL | 0 |
@@ -22,7 +22,7 @@
 
 ## Findings
 
-- No drift. Generation rate and volume are within budget.
+- self-telemetry is 5.2x the application data (warn at 5x)
 
 ## Why this check exists
 

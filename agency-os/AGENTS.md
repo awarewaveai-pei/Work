@@ -95,6 +95,36 @@
 - `verify-closeout-completeness` 驗的是證據行「格式存在」，**不驗內容真實**（REALTEST/REVIEW/BUGHUNT 的 cmd/verdict 不被重放）。唯一內容驗真是 `bughunt-oracle`（僅覆蓋 `hits=0` + ASCII identifier + code 檔）。證據誠實靠操作紀律；偽造證據行可通過機械閘 —— 這是設計取捨（重放副作用指令不可行），不是漏洞待修。發現可疑證據 → 人工抽查 WORKLOG 對應 commit。
 - 機械閘全部 **fail-open**（閘壞 = 靜默放行 + 寫 `~/.claude/verify-gate-failures.log`）；閘的健康由 `bash scripts/test-hooks.sh` 驗證（案例數以套件輸出為準，禁止在文件手寫），改 hooks 後必跑。
 
+## 跨模型 oracle（Codex 協作，2026-08-17 起）
+
+**存在理由**：上一節說明機械閘只驗「證據行格式存在」，不驗內容正確。**閘擋的是「忘記做」，不是「做錯」。** 補這個缺口的唯一手段是外部模型——同一個模型審自己，盲點與產出同源。實證：2026-08-17 三輪覆審共 7 條 finding 全為真、0 假陽性，其中 4 條發生在「我自己剛寫完並認為沒問題」的 code 上。
+
+**分工線畫在「讀 vs 寫」，不是「規劃 vs 執行」。** 按規劃/執行切會逼著寫入者換人，治理層就是在那裡失效。
+
+| 工作 | 執行者 |
+|------|--------|
+| **任何寫入 `D:\Work`** | **Claude（唯一寫入者，結構性限制非偏好）** |
+| 大量讀檔 / 跨檔掃描 / R0 抓蟲步驟 / 報告消化 | Codex 優先（操作者 Codex 額度較寬） |
+| 設計、取捨、架構決策 | Claude |
+| 對抗式覆審（R0 [驗證計畫] Review 動作） | Codex 產 findings → **Claude 逐條驗真偽** |
+| repo 外拋棄式工作（`D:\tmp` 原型、一次性腳本、demo） | Codex 全包，Claude 不插手 |
+| prod deploy / DB migration / 憑證 | Claude + 操作者明示 go-ahead。**不可委派** |
+
+**為什麼寫入不可委派**：`git-log-injector`、`file-path-router`、`high-risk-bash-warn`、`verify-gate-commit`、`audit-cp950-traps` 全部是 **Claude Code hooks**。Codex 是另一個 process，這些閘對它不存在。它寫的 code 零攔截，到 AO-CLOSE 撞上 `verify-closeout-completeness` 才發現證據鏈缺漏。
+
+**唯一入口**：`scripts/codex-oracle.ps1`（`-Mode inspect|review`）。硬寫死 `-s read-only` 與 `-c mcp_servers={}`，不接受參數覆蓋。
+
+```powershell
+# 規劃前：讓 Codex 讀，回摘要（省 Claude context）
+.\scripts\codex-oracle.ps1 -Mode inspect -Prompt "<具體問題>"
+# 寫完 code 後：對抗式覆審（預設審 working tree，含 untracked 新檔）
+.\scripts\codex-oracle.ps1 -Mode review -Context "<這個改動要解決什麼>"
+```
+
+**禁止**：① 直接跑裸 `codex exec`（會漏 `-o`，單次噴 ~120KB 進 context；也會拉起 config.toml 的 MCP）② 用 `chatgpt-*`／`gemini-*`／`grok-*` MCP 工具當 oracle —— 那些走 `OPENAI_API_KEY`／`GEMINI_API_KEY` **按 token 計費**，與 ChatGPT 訂閱是兩套帳；`codex` CLI 走訂閱（`authMethod: chatgpt`），零額外費用 ③ 直接採用 findings 而不驗證——**每條必須 Grep 確認 `file:line` 真實存在**，AGENTS.md §Subagent 交接協議的驗證要求同樣適用 ④ 讓 Claude 與 Codex 同時修改同一份檔案（操作者 2026-08-17 明確指示）。
+
+**給 Codex 的 prompt 只放決策結果，不放推理過程**：R0 七段區塊是給操作者批准用的；Codex 只需要 Decision / Constraints / Files / Acceptance。兩份產出，不同讀者。
+
 ## 執行安全
 
 不做不可逆破壞操作；生產環境先列風險與 rollback 方案；客戶新增需求先判定 `docs/operations/scope-change-policy.md`。

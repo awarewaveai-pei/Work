@@ -66,16 +66,41 @@ $ErrorActionPreference = 'Stop'
 $encHelpers = Join-Path $PSScriptRoot '_console-encoding-helpers.ps1'
 if (Test-Path -LiteralPath $encHelpers) { . $encHelpers }
 
+function Invoke-Git {
+    <#
+      Runs git and returns @{ Text; Exit }.
+
+      Two traps handled here:
+      - git writes advisory text to stderr (CRLF-conversion warnings, hint blocks). Under
+        $ErrorActionPreference='Stop' a native command's stderr becomes a TERMINATING error
+        in PowerShell 5.1, so a harmless warning would abort the run. The exit code is the
+        authority on success; stderr text is informational.
+      - captured output may contain CJK (commit subjects, diff bodies), so it goes through
+        the UTF-8 console wrapper.
+    #>
+    param([string[]]$GitArgs, [string]$Root)
+
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $out  = Invoke-WithUtf8Console { & git -C $Root @GitArgs 2>&1 }
+        $code = $LASTEXITCODE
+        if ($null -eq $code) { $code = 0 }
+        return @{ Text = (@($out) -join "`n"); Exit = $code }
+    } finally {
+        $ErrorActionPreference = $prev
+    }
+}
+
 function Resolve-RepoRoot {
     param([string]$Given)
     if ($Given -and (Test-Path -LiteralPath $Given)) {
         return (Resolve-Path -LiteralPath $Given).Path
     }
-    $top = $null
     if (Get-Command Invoke-WithUtf8Console -ErrorAction SilentlyContinue) {
-        $top = Invoke-WithUtf8Console { & git rev-parse --show-toplevel 2>$null }
+        $r = Invoke-Git -GitArgs @('rev-parse','--show-toplevel') -Root (Get-Location).Path
+        if ($r.Exit -eq 0 -and $r.Text.Trim()) { return ($r.Text.Trim() -replace '/', '\') }
     }
-    if ($top) { return ("$top".Trim() -replace '/', '\') }
     if ($PSScriptRoot) { return (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path }
     return (Get-Location).Path
 }
@@ -134,20 +159,38 @@ $diffFile = $null
 if ($Mode -eq 'review') {
     $diffFile = Join-Path $env:TEMP ("codex-oracle-diff-{0}.patch" -f ([guid]::NewGuid().ToString('N').Substring(0,8)))
     try {
-        $diffArgs = @('diff')
-        if ($DiffRef) { $diffArgs += $DiffRef }
+        # `git diff <commit>` compares the WORKING TREE against that commit — it does not
+        # show what the commit changed. Reviewing a single commit needs `git show`; only a
+        # two-dot/three-dot range belongs on `git diff`.
+        if ($DiffRef) {
+            if ($DiffRef -match '\.\.') { $diffArgs = @('diff', $DiffRef) }
+            else                        { $diffArgs = @('show', '--format=', '--patch', $DiffRef) }
+        } else {
+            $diffArgs = @('diff')
+        }
         if ($Path.Count -gt 0) { $diffArgs += @('--') + $Path }
 
-        $diff     = Invoke-WithUtf8Console { & git -C $root @diffArgs 2>&1 }
-        $diffText = (@($diff) -join "`n")
+        $r        = Invoke-Git -GitArgs $diffArgs -Root $root
+        $diffText = $r.Text
+
+        # stderr is folded into the text, so without an exit-code check a typo'd ref would
+        # be handed to the oracle AS the diff and it would dutifully review git's error.
+        if ($r.Exit -ne 0) {
+            Write-Error "git $($diffArgs -join ' ') failed (exit=$($r.Exit)): $($diffText.Trim())"
+            exit 2
+        }
 
         if (-not $DiffRef) {
             # Working tree: the unstaged diff alone misses anything already staged, which
             # is the normal pre-commit state and exactly what needs reviewing.
             $stagedArgs = @('diff', '--cached')
             if ($Path.Count -gt 0) { $stagedArgs += @('--') + $Path }
-            $staged     = Invoke-WithUtf8Console { & git -C $root @stagedArgs 2>&1 }
-            $diffText   = ((@($staged) -join "`n") + "`n" + $diffText).Trim()
+            $rs = Invoke-Git -GitArgs $stagedArgs -Root $root
+            if ($rs.Exit -ne 0) {
+                Write-Error "git diff --cached failed (exit=$($rs.Exit)): $($rs.Text.Trim())"
+                exit 2
+            }
+            $diffText = ($rs.Text + "`n" + $diffText).Trim()
         }
 
         # Untracked files are invisible to `git diff`. Left unhandled, a review of a
@@ -155,24 +198,49 @@ if ($Mode -eq 'review') {
         # the reviewer goes blind while looking like it passed. Same failure class this
         # repo hit in check-smoke-tests.ps1 (skip treated as PASS), so it is handled here
         # rather than trusted to the caller noticing.
+        #
+        # But inlining sends file contents to a third party, so scope is deliberately
+        # narrow: reviewable source extensions only, never anything whose name suggests a
+        # secret, and every inlined path is printed so the caller sees what left the machine.
         if (-not $DiffRef) {
-            $untracked = @(Invoke-WithUtf8Console { & git -C $root ls-files --others --exclude-standard 2>$null } |
-                           ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+            $reviewableExt = @('.ps1','.psm1','.ts','.tsx','.js','.jsx','.mjs','.cjs','.sh',
+                               '.py','.sql','.json','.yml','.yaml','.toml','.md','.php','.css','.html')
+            $secretish     = '(^|[\\/._-])(env|secret|secrets|credential|credentials|token|tokens|password|passwd|vault|id_rsa|id_ed25519)([\\/._-]|$)|\.(pem|key|pfx|p12|crt|keystore)$'
+
+            $ru        = Invoke-Git -GitArgs @('ls-files','--others','--exclude-standard') -Root $root
+            $untracked = @($ru.Text -split "`n" | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
             if ($Path.Count -gt 0) {
                 $untracked = @($untracked | Where-Object {
                     $f = $_
                     ($Path | Where-Object { $f -like (($_ -replace '\\', '/').TrimEnd('/') + '*') }).Count -gt 0
                 })
             }
+
+            $inlined = @()
+            $skipped = @()
             foreach ($u in $untracked) {
                 $full = Join-Path $root ($u -replace '/', '\')
                 if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { continue }
-                if ((Get-Item -LiteralPath $full).Length -gt 512KB) {
-                    $diffText += "`n`n--- NEW UNTRACKED FILE (too large to inline): $u ---"
-                    continue
+                if ($u -match $secretish) { $skipped += "$u (name suggests a secret)"; continue }
+                if ($reviewableExt -notcontains ([IO.Path]::GetExtension($u).ToLower())) {
+                    $skipped += "$u (not a reviewable source type)"; continue
                 }
-                $body = Get-Content -LiteralPath $full -Raw
+                if ((Get-Item -LiteralPath $full).Length -gt 512KB) {
+                    $skipped += "$u (larger than 512KB)"; continue
+                }
+                # -Encoding UTF8 is required: Windows PowerShell 5.1 decodes BOM-less files
+                # with the ANSI codepage (CP950 here), which mangles CJK before it is sent.
+                $body = Get-Content -LiteralPath $full -Raw -Encoding UTF8
                 $diffText += "`n`n--- NEW UNTRACKED FILE: $u ---`n" + $body
+                $inlined  += $u
+            }
+
+            if ($inlined.Count -gt 0) {
+                Write-Host ("codex-oracle: inlining {0} untracked file(s): {1}" -f $inlined.Count, ($inlined -join ', ')) -ForegroundColor DarkGray
+            }
+            if ($skipped.Count -gt 0) {
+                # Announced, not swallowed: an unreviewed new file is a gap the caller must know about.
+                Write-Host ("codex-oracle: NOT reviewed ({0}): {1}" -f $skipped.Count, ($skipped -join '; ')) -ForegroundColor DarkYellow
             }
         }
 
