@@ -1,6 +1,6 @@
 # Meeting Service — 會議錄音 → 逐字稿 → 會議記錄 → PPT → 報告教練
 
-錄音/影片上傳 → 本機轉錄 → 講者分離 → AI 摘要（貼上式，Claude/ChatGPT 皆可）→ PPT + 報告教練。**全程本機執行，音檔不外流**，零 API 費用。
+錄音/影片上傳 → 本機轉錄 → 講者分離 → AI 摘要（預設貼上式，零費用；選填 API 自動處理，見下方）→ PPT + 報告教練。**全程本機執行，音檔不外流**。
 
 ## ⚠️ 為什麼只能本機跑，不部署到 SG/EU
 
@@ -34,9 +34,9 @@ python app.py
   勾選同步選項只會安全回報「未設定」，**不會觸發任何登入畫面、不會用到操作者
   的任何帳號**——這功能全程只是檢查本機檔案路徑，從來不呼叫 Google 的登入 API。
 
-**摘要階段不需要 API key**，見下方「為什麼摘要是人工回路」。
+**摘要階段預設不需要 API key**（人工回路模式）。想用 API 自動處理見下方「摘要階段二：API 自動處理」。
 
-## 摘要階段：貼上式人工回路
+## 摘要階段一：貼上式人工回路（預設，零費用）
 
 轉錄/合併/幻覺偵測/講者分離全自動跑完後，頁面停在「等待貼上摘要」：
 1. 頁面顯示一段完整 prompt，複製貼進**任一** AI 對話（Claude、免費版 ChatGPT 皆可，用既有額度不額外收費）
@@ -47,15 +47,32 @@ python app.py
 判斷該不該把閒聊硬套決議格式）通常弱於 Claude Sonnet/Opus。`validate()` 只擋結構性
 錯誤（頁數不符），不驗證內容判斷是否準確——貼回去前建議先看一眼 JSON 內容合不合理。
 
-**為什麼不是全自動呼叫 API**：使用者要求零額外花費，只用訂閱額度。原本設計呼叫
-Claude API（見 git 歷史），但那是按量計費。改用 `claude` CLI headless 模式
+**為什麼預設不是全自動呼叫 API**：操作者本人用這支服務要求零額外花費，只用訂閱額度。
+原本設計呼叫 Claude API（見 git 歷史），但那是按量計費。改用 `claude` CLI headless 模式
 （`claude -p`，走訂閱 session 不計 API 費）在 2026-08-17 經三次真實測試證實
 在 Windows + Git Bash 巢狀呼叫環境下不可靠——process 變成孤兒、stdout 管線斷裂，
-拿不到輸出。人工回路是目前唯一驗證過會動、且零額外花費的路。
+拿不到輸出。人工回路是操作者自用時唯一驗證過會動、且零額外花費的路。
 
 `lib/summarize.py` 的 `validate()` 會檢查貼回的 JSON 頁數是否與投影片頁數一致
 （`deck.plan_slides()` 是唯一真相源），不一致會擋下並回報錯誤，不會靜默產生
 講稿與投影片錯位的成品。
+
+## 摘要階段二：API 自動處理（選填，2026-08-20 新增，給客戶用）
+
+人工回路的前提是使用者能操作 Claude Code 對話視窗——**客戶沒有這個**，所以給客戶的版本
+需要「自己貼上」或「真正的 API」兩選一。API 模式讓客戶不用複製貼上，全自動跑完：
+
+1. 網頁最上方「⚙ API 設定」展開，貼入自己的 Anthropic API key，按儲存
+   （key 只存在本機 `.settings.json`，`.gitignore` 排除，絕不進版本控制、絕不上傳）
+2. 上傳檔案時會多出「自動處理（用 API，會計費，跳過手動貼上）」勾選框（key 未設定時不顯示）
+3. 勾選後上傳，整個流程（含摘要）全自動跑到 done，不停在等待貼上
+
+API 呼叫失敗（key 失效、額度用完、網路問題）時**不會判定整個工作失敗**——自動退回
+人工回路，`prompt.txt` 已經寫好，頁面照樣顯示貼上步驟，轉錄/講者分離的成果不會浪費。
+`GET/POST /api/settings` 管理 key（`lib/settings.py`）；`summarize.summarize_via_api()`
+用同一份 `validate()` 把關，驗證失敗會自動重試一次帶錯誤訊息的修正 prompt。
+
+**真的會計費**，跟人工回路（用訂閱額度）不同，是兩條路並存，不是取代關係。
 
 ## 安裝細節
 
@@ -83,7 +100,8 @@ lib/
   merge_segments.py  VAD 切碎段落合併成可讀輪次
   hallucination.py   信心分數抓不到的幻覺偵測（見下方坑 1）
   diarize.py      pyannote 講者分離 + 三層貼標回退
-  summarize.py    Claude API 兩段式呼叫：核心 minutes -> 對齊頁數的講稿
+  settings.py     本機 API key 存取（給客戶端填自己的 key，不進版本控制）
+  summarize.py    build_prompt()（人工回路）+ summarize_via_api()（選填自動）共用同一份 schema/validate()
   deck.py         minutes -> PPTX，plan_slides() 是頁數對齊的唯一真相源
   speaker_notes.py   講稿寫入 PPT 備忘稿 + 報告教練 md（頁數不符會硬失敗）
   minutes_md.py   minutes -> 會議記錄 md

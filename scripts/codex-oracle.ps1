@@ -397,6 +397,34 @@ Write-Host ""
 
 $bytes = [Text.Encoding]::UTF8.GetByteCount($answer)
 Write-Host ("codex-oracle: exit={0} ms={1} answer={2}B" -f $exit, $sw.ElapsedMilliseconds, $bytes) -ForegroundColor DarkGray
+# Persist the answer into the repo. TEMP-only output made this collaboration
+# unfalsifiable: nothing on disk distinguished "ran the oracle" from "said I ran it",
+# so the only enforcement was the agent's own memory -- the exact failure mode the
+# governance gates exist to remove. verify-closeout-completeness reads this directory;
+# deleting these files is a governance regression, not cleanup.
+$oracleDir = Join-Path $root 'agency-os\reports\oracle'
+if (-not (Test-Path -LiteralPath $oracleDir)) {
+    New-Item -ItemType Directory -Path $oracleDir -Force | Out-Null
+}
+$artifact = Join-Path $oracleDir (('{0}-{1}-{2}.md' -f (Get-Date -Format 'yyyy-MM-dd'), $Mode, $stamp))
+$meta = @(
+    ('# codex-oracle {0} -- {1}' -f $Mode, (Get-Date -Format 'yyyy-MM-dd HH:mm:ss K')),
+    '',
+    ('- mode: `{0}`' -f $Mode),
+    ('- target: `{0}`' -f $(if ($DiffRef) { $DiffRef } else { 'working tree (staged + unstaged + untracked)' })),
+    ('- context: {0}' -f $(if ($Context) { $Context } else { '(none given)' })),
+    ('- exit: {0} | elapsed: {1}ms | answer: {2}B' -f $exit, $sw.ElapsedMilliseconds, $bytes),
+    '',
+    '> Codex output, NOT verified truth. R0 requires the caller to confirm every',
+    '> `file:line` before acting on it. Archived so that SKIPPING the oracle is',
+    '> visible -- not so that its findings are trusted.',
+    '',
+    '---',
+    '',
+    $answer
+)
+Set-Content -LiteralPath $artifact -Value ($meta -join [Environment]::NewLine) -Encoding UTF8
+Write-Host ("codex-oracle: artifact -> {0}" -f $artifact) -ForegroundColor DarkGray
 
 if ($Mode -eq 'review') {
     # Count only, never a verdict: whether a finding is real is the caller's judgement,

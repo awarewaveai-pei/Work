@@ -215,6 +215,33 @@ try {
         Write-Host "== REVIEW: no evidence in today's WORKLOG -- add REVIEW_DONE: or REVIEW_WAIVED: ==" -ForegroundColor Yellow
     }
 
+    # ORACLE gate: code changes require a cross-model review ARTIFACT, not a claim.
+    # Every other gate here validates that an evidence LINE exists -- a line the author
+    # types, so "forgot to review" and "remembered to write the line" are indistinguishable.
+    # This artifact is written by scripts/codex-oracle.ps1 itself when it runs, so a
+    # forgotten oracle pass cannot be papered over by remembering the paperwork.
+    # It still does not prove the findings were ACTED on -- that remains operator
+    # discipline (see AGENTS.md §已知信任邊界). It closes the "forgot" hole only.
+    # Waiver: - ORACLE_WAIVED: <reason>   (visible in WORKLOG, never silent)
+    if ($hasCodeStaged) {
+        $oracleDir   = Join-Path $WorkRoot "agency-os\reports\oracle"
+        $todayOracle = @()
+        if (Test-Path -LiteralPath $oracleDir) {
+            $todayOracle = @(Get-ChildItem -LiteralPath $oracleDir -Filter ("{0}-review-*.md" -f $today) -File -ErrorAction SilentlyContinue)
+        }
+        $hasOracleWaiver = ($section -match '(?m)^\s*-\s*ORACLE_WAIVED:\s+\S')
+        if ($todayOracle.Count -eq 0 -and -not $hasOracleWaiver) {
+            $orMsg = ("verify-closeout-completeness: code files staged but no cross-model review artifact dated {0} in agency-os/reports/oracle/." -f $today) +
+                     " Run: .\scripts\codex-oracle.ps1 -Mode review -Context '<what this change solves>'" +
+                     (" OR add: - ORACLE_WAIVED: <one-line reason> to {0}. Gate={1}" -f $hdr, $Gate)
+            if ($Gate -eq "strict") { Write-Host $orMsg -ForegroundColor Red; exit 1 }
+            Write-Warning $orMsg
+        } elseif ($todayOracle.Count -gt 0) {
+            Write-Host ("== ORACLE artifacts today: {0} ==" -f $todayOracle.Count) -ForegroundColor Cyan
+            foreach ($o in $todayOracle) { Write-Host ("  agency-os/reports/oracle/{0}" -f $o.Name) -ForegroundColor DarkGray }
+        }
+    }
+
     # BUGHUNT gate: all significant staged changes require BUGHUNT_DONE: or BUGHUNT_WAIVED:.
     # Legitimate exceptions -> BUGHUNT_WAIVED: <DOC_ONLY|NA> -- <reason>
     $hasBughuntEvidence = $false
