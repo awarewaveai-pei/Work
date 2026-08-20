@@ -206,9 +206,13 @@ if ($Mode -eq 'review') {
             $reviewableExt = @('.ps1','.psm1','.ts','.tsx','.js','.jsx','.mjs','.cjs','.sh',
                                '.py','.sql','.json','.yml','.yaml','.toml','.md','.php','.css','.html')
             $secretish     = '(^|[\\/._-])(env|secret|secrets|credential|credentials|token|tokens|password|passwd|vault|id_rsa|id_ed25519)([\\/._-]|$)|\.(pem|key|pfx|p12|crt|keystore)$'
+            # FINDING 3 (codex, 2026-08-20): oracle artifacts are untracked .md under a
+            # non-ignored path, so a SECOND review would inline the FIRST review's prose
+            # as "new source" -- self-inflicted by persisting artifacts. Excluded here.
+            $selfArtifacts = '^agency-os/reports/oracle/'
 
             $ru        = Invoke-Git -GitArgs @('ls-files','--others','--exclude-standard') -Root $root
-            $untracked = @($ru.Text -split "`n" | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+            $untracked = @($ru.Text -split "`n" | ForEach-Object { "$_".Trim() } | Where-Object { $_ -and $_ -notmatch $selfArtifacts })
             if ($Path.Count -gt 0) {
                 $untracked = @($untracked | Where-Object {
                     $f = $_

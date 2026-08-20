@@ -215,32 +215,66 @@ try {
         Write-Host "== REVIEW: no evidence in today's WORKLOG -- add REVIEW_DONE: or REVIEW_WAIVED: ==" -ForegroundColor Yellow
     }
 
-    # ORACLE gate: code changes require a cross-model review ARTIFACT, not a claim.
+    # ORACLE gate: source changes require a cross-model review ARTIFACT, not a claim.
     # Every other gate here validates that an evidence LINE exists -- a line the author
-    # types, so "forgot to review" and "remembered to write the line" are indistinguishable.
+    # types, so "forgot to review" and "remembered to write the line" look identical.
     # This artifact is written by scripts/codex-oracle.ps1 itself when it runs, so a
     # forgotten oracle pass cannot be papered over by remembering the paperwork.
-    # It still does not prove the findings were ACTED on -- that remains operator
-    # discipline (see AGENTS.md §已知信任邊界). It closes the "forgot" hole only.
+    # It still does not prove the findings were ACTED on -- that stays operator
+    # discipline (AGENTS.md §已知信任邊界). It closes the "forgot" hole only.
     # Waiver: - ORACLE_WAIVED: <reason>   (visible in WORKLOG, never silent)
-    if ($hasCodeStaged) {
-        $oracleDir   = Join-Path $WorkRoot "agency-os\reports\oracle"
+    #
+    # Deliberately NOT reusing $codeExts: that list drives REALTEST/DEBUG-TAG and omits
+    # .sql/.yml/.php, which in this repo means DB migrations, docker-compose and the
+    # wp-bridge plugin would skip cross-model review entirely (codex FINDING 2,
+    # 2026-08-20 -- 214 such files tracked). Widening $codeExts instead would silently
+    # extend three unrelated gates, so the broader set is scoped to this gate.
+    $oracleExts = $codeExts + @('.sql', '.yml', '.yaml', '.php', '.tf', '.tfvars')
+    $oracleStaged = @()
+    foreach ($sf in $significant) {
+        $ext = try { [System.IO.Path]::GetExtension($sf).ToLowerInvariant() } catch { if ($sf -match '\.(\w+)$') { ".$($Matches[1].ToLowerInvariant())" } else { '' } }
+        if ($oracleExts -contains $ext) { $oracleStaged += $sf }
+    }
+    if ($oracleStaged.Count -gt 0) {
+        $oracleDir   = Join-Path $WorkRoot 'agency-os\reports\oracle'
         $todayOracle = @()
         if (Test-Path -LiteralPath $oracleDir) {
-            $todayOracle = @(Get-ChildItem -LiteralPath $oracleDir -Filter ("{0}-review-*.md" -f $today) -File -ErrorAction SilentlyContinue)
+            $todayOracle = @(Get-ChildItem -LiteralPath $oracleDir -Filter ('{0}-review-*.md' -f $today) -File -ErrorAction SilentlyContinue)
         }
         $hasOracleWaiver = ($section -match '(?m)^\s*-\s*ORACLE_WAIVED:\s+\S')
         if ($todayOracle.Count -eq 0 -and -not $hasOracleWaiver) {
-            $orMsg = ("verify-closeout-completeness: code files staged but no cross-model review artifact dated {0} in agency-os/reports/oracle/." -f $today) +
+            $orMsg = ("verify-closeout-completeness: source files staged ({0}) but no cross-model review artifact dated {1} in agency-os/reports/oracle/." -f ($oracleStaged -join ', '), $today) +
                      " Run: .\scripts\codex-oracle.ps1 -Mode review -Context '<what this change solves>'" +
                      (" OR add: - ORACLE_WAIVED: <one-line reason> to {0}. Gate={1}" -f $hdr, $Gate)
             if ($Gate -eq "strict") { Write-Host $orMsg -ForegroundColor Red; exit 1 }
             Write-Warning $orMsg
-        } elseif ($todayOracle.Count -gt 0) {
-            Write-Host ("== ORACLE artifacts today: {0} ==" -f $todayOracle.Count) -ForegroundColor Cyan
+        }
+        elseif ($todayOracle.Count -gt 0) {
+            # Same-day existence alone would pass a morning review against an afternoon
+            # rewrite (codex FINDING 1, 2026-08-20). Binding to diff content is not
+            # possible -- the oracle reads the working tree BEFORE staging, so no hash
+            # of the staged diff can match. Ordering is the available signal: the newest
+            # artifact must post-date the newest source file it claims to have reviewed.
+            $newestArtifact = ($todayOracle | Sort-Object LastWriteTime -Descending | Select-Object -First 1)
+            $staleAgainst = @()
+            foreach ($sf in $oracleStaged) {
+                $full = Join-Path $WorkRoot ($sf.Replace('/', '\'))
+                if (-not (Test-Path -LiteralPath $full)) { continue }   # deleted file: nothing to review
+                $mt = (Get-Item -LiteralPath $full -ErrorAction SilentlyContinue)
+                if ($mt -and $mt.LastWriteTime -gt $newestArtifact.LastWriteTime) { $staleAgainst += $sf }
+            }
+            if ($staleAgainst.Count -gt 0 -and -not $hasOracleWaiver) {
+                $stMsg = ("verify-closeout-completeness: newest oracle artifact ({0}, {1}) predates staged source edited after it: {2}." -f $newestArtifact.Name, $newestArtifact.LastWriteTime.ToString('HH:mm:ss'), ($staleAgainst -join ', ')) +
+                         " The review did not see the final code. Re-run: .\scripts\codex-oracle.ps1 -Mode review -Context '<what changed>'" +
+                         (" OR add: - ORACLE_WAIVED: <one-line reason> to {0}. Gate={1}" -f $hdr, $Gate)
+                if ($Gate -eq "strict") { Write-Host $stMsg -ForegroundColor Red; exit 1 }
+                Write-Warning $stMsg
+            }
+            Write-Host ("== ORACLE artifacts today: {0} (newest {1}) ==" -f $todayOracle.Count, $newestArtifact.LastWriteTime.ToString('HH:mm:ss')) -ForegroundColor Cyan
             foreach ($o in $todayOracle) { Write-Host ("  agency-os/reports/oracle/{0}" -f $o.Name) -ForegroundColor DarkGray }
         }
     }
+
 
     # BUGHUNT gate: all significant staged changes require BUGHUNT_DONE: or BUGHUNT_WAIVED:.
     # Legitimate exceptions -> BUGHUNT_WAIVED: <DOC_ONLY|NA> -- <reason>
