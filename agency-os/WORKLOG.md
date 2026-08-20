@@ -42,6 +42,29 @@
 [rollback]
 `git revert <commit>`；`scripts/codex-oracle.ps1` 為新增檔，刪除即可，無其他程式依賴。
 
+### 追記：覆審加入固定的「你沒被問到但重要」提問
+
+[任務]
+操作者問「是不是應該全部交給 Codex 讀、整理好給我」，並明確指定優先序：**不要有意外或錯誤**。
+
+[結論：不應該全委派]
+若依摘要寫 code，等於修改一份自己從未看過的檔案 —— 摘要對不對無從判斷，因為沒有原文可對照。且 Codex 摘要一次、我再向操作者摘要一次 = 兩次有損壓縮疊加。
+正確切法是**廣 vs 深**，不是「讀 vs 不讀」：Codex 讀很多檔案但淺（相關的東西在哪），我讀少數檔案但完整（這段到底怎麼運作）。**Codex 幫我縮小範圍，不幫我理解內容**；我要改、要負責的檔案永遠是我親眼看過全文的。
+
+[已修改]
+- `scripts/codex-oracle.ps1` —— review 模式在 SPECIFIC QUESTIONS 之後插入固定段落，要求它先自問：這個改動依賴哪些 diff 裡看不到的東西（config 值／保留期／timeout／schema 假設／cron／upstream 預設／同檔案更上方的設定），去讀而不是假設；若該依賴與改動矛盾，優先序高於所有被明確詢問的項目。
+- 根因：**摘要的邊界 = 問題的邊界**。2026-08-17 決定性的 `log_saved_interval_days=14` 兩輪覆審都沒出現，因為沒人問到。
+
+[驗證結果]
+- 語法 `Parser::ParseFile` → OK；實跑 `-Mode review -DiffRef 2b5d3ba7` → 正常產出，且引用的是**當前檔案狀態**（門檻 10）而非 Context 裡我故意給的舊值 21，證實它讀的是 repo 原文不是只讀 diff
+- **⚠️ 此提問的效果尚未被證明**：用來測試的那個洞（retention 耦合）已在該檔案補好，沒有隱藏依賴可抓，所以這次跑出來的是既有的設計邊界 finding。真正的驗證要等下一個含此類隱藏依賴的改動
+- REALTEST_EVIDENCE: tool=Bash | cmd=codex-oracle.ps1 -Mode review -DiffRef 2b5d3ba7 + Parser::ParseFile | exit=0 | ms=~210000
+- REVIEW_WAIVED: NA -- 本次改動只動 prompt 模板文字，不含邏輯分支；邏輯部分已於本日前一則完成四動作驗證
+- BUGHUNT_WAIVED: NA -- 新增字串常數，無符號被引用
+
+[流程失誤（記錄以免再犯）]
+本次改動被 auto-checkpoint hook 以通用訊息提交後，我對**已 push 的 commit** 執行 `--amend`，導致本地與遠端分岔、push 被拒。以 `git reset --soft origin/main` 復原（樹內容相同，無工作遺失），改以本追記補證據鏈。**規則：checkpoint hook 搶先提交且已 push 時，不得 amend，改用後續 commit 或 WORKLOG 補述。**
+
 ## 2026-08-19（第八輪）— 「你做啊」：實查 oracle-web/觀測堆疊用途 + SG 七項逐一對照表；意外發現本機明文金鑰堆積
 
 [任務]
