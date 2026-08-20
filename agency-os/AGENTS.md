@@ -125,6 +125,15 @@
 
 **給 Codex 的 prompt 只放決策結果，不放推理過程**：R0 七段區塊是給操作者批准用的；Codex 只需要 Decision / Constraints / Files / Acceptance。兩份產出，不同讀者。
 
+### Session 衛生（context 成本，2026-08-20 起）
+
+**每一輪對話都會把整段歷史重送一次**，所以早期塞進 context 的東西之後每輪都在重複付費。這比 oracle 分工更大的槓桿，順序不可顛倒：
+
+1. **一個任務一個 session**。任務完成 → AO-CLOSE（狀態落進 `WORKLOG.md`／`TASKS.md`／memory）→ `/clear`。本 repo 的狀態不在對話裡而在檔案裡，所以 clear 幾乎零損失——這是 AO 生命週期設計的直接紅利。任務**進行中**不要 clear（重讀檔案比留著貴）；只是變長變鈍用 `/compact`。
+2. **不讓大輸出進 context**：讀檔用 `sed -n 'A,Bp'` 取片段而非整檔；工具輸出先 `grep`／`tail` 過濾；外部 CLI 一律導向檔案再取需要的部分。反例：2026-08-20 三次裸 `codex exec` 各噴 ~120KB，合計 ~366KB 永久佔用該 session 每一輪。
+3. **設計討論每三輪自問「這該落地成文件了嗎」**。討論留在對話裡 = 每輪重付且 session 結束即蒸發；寫進 repo = 付一次。
+4. **任務結束時主動提醒操作者 `/clear`**，不等對方想到。
+
 ## 執行安全
 
 不做不可逆破壞操作；生產環境先列風險與 rollback 方案；客戶新增需求先判定 `docs/operations/scope-change-policy.md`。
