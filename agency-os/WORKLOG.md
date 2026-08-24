@@ -2,6 +2,32 @@
 
 ## 2026-08-24
 
+### AUTO_TASK_DONE: 撤掉 mirror-directory 推測邏輯，改回資料明確化（round 2 stop-hook，同一議題第三輪）
+
+[任務]
+上一輪加的 mirror-directory 推測邏輯（目錄命中後對照同列已解析檔案的檔名自動生成配對）被自動 stop-gate review BLOCK：「new mirror-directory inference adds undeclared drift pairs」。同時收到另一個獨立訊號：有個 background codex 任務跑了 19 分鐘卡在查 GitHub commit status，跟本次改動無關，`/codex:cancel` 本身因環境問題失敗（`taskkill` 參數被吃掉），判斷不影響實際工作、不繼續糾結，留著。
+
+[根因]
+自己重新推演找到具體反例：這個腳本的核心設計原則是「只信任 backtick 明確宣告的路徑，不猜測」（Finding 2 才剛用同一個原則拒絕了正則式範圍解析）。但 mirror 推測邏輯本質上違反了這個原則——用「同一列裡目錄跟某個檔名恰好都存在」當作隱含關係，一旦矩陣資料混進不相關的巧合（例如同一列同時有一個目錄候選路徑，跟另一個純粹只是叫 `README.md` 的無關檔案），就會生成一組完全不是原意、且不可追溯回矩陣任何明文宣告的假配對——而且真的發生了：`REMOTE_WORKSTATION_STARTUP.md` 那一列的 `agency-os` 其實是散文裡「避免根與 agency-os 載入規則分叉」這句話中間的普通字詞被 backtick 包住（原始資料的瑕疵，不是特意宣告的路徑），推測邏輯會把它當成目錄，去比對同列的 `../README.md`，生成 `agency-os/README.md` 這組使用者從未宣告過的配對。
+
+[已修改]
+1. `scripts/check-change-impact-matrix-drift.ps1`——完整移除 `Resolve-MatrixDir` 函式與整段 mirror 擴充邏輯（含上一輪自己抓到的 collection-modified bug 修正），回到最初「解析成功記一對、解析失敗記一個 skip」的單純設計，恢復跟 Finding 2 同一套「never guess」原則的一致性
+2. `docs/CHANGE_IMPACT_MATRIX.md` line 26——把根目錄鏡像關係從「目錄引用+散文註解」改成 3 條明確的 backtick 路徑（`../.cursor/rules/00-session-bootstrap.mdc` 等 3 個，逐一用 `Test-Path` 驗證存在才寫入）；同時拿掉散文裡 `` `agency-os` `` 這個誤用的 backtick 包裹（本來就不是路徑宣告，只是提及子系統名稱），從源頭避免以後又被當成候選路徑
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node codex-companion.mjs status`（真實查詢背景任務狀態）| 確認完成的任務給出上述 finding，另一個進行中任務跟本次無關、`cancel` 因環境問題失敗但不影響工作，判斷留著不繼續處理
+- REALTEST_EVIDENCE: tool=Bash | cmd=移除推測邏輯 + 展開矩陣資料後 `check-change-impact-matrix-drift.ps1 -Force`（真實執行）| exit=1（WARN，rows=76 pairs=395 warn=7 fail=0 skipped=5，比推測版少 2 對——證實推測邏輯確實多生成了不該存在的配對；3 個明確鏡像對正確計入 395 對但未被 WARN，代表根目錄鏡像檔案實際上是同步的，真實資料驗證了根因分析）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`grep -n '` + '`' + `agency-os` + '`' + `' docs/CHANGE_IMPACT_MATRIX.md` 確認該字詞不再以 backtick 包裹形式出現，從資料源頭杜絕再次被誤判
+- REVIEW_WAIVED: NA -- 這是撤銷+改資料的收斂動作，不是新設計；根因是自己重新推演矩陣資料找到具體反例後才動手，未再另跑一輪外部 codex-oracle review（同一議題第三輪，邊際效益遞減，判斷手動反例驗證已足夠紮實）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`Resolve-MatrixDir\|mirrorFiles\|rowDirs\|(mirror)` | hits=3（全部在 WORKLOG.md 描述上一輪歷史事件的文字裡，正確保留不修改；程式碼與矩陣資料裡無殘留）
+
+[剩餘風險]
+- 這是同一段程式碼被同一個外部 reviewer 連續回報問題的第三輪（round1 完全沒檢查鏡像關係、round2 加推測邏輯又被打回）。已達到今天稍早寫進 AGENTS.md 的「連續 2 次強制不變量分析」門檻，這次的不變量分析結論：「只信任明確宣告，資料不夠明確就修資料，不要教程式碼用巧合猜測」——這條原則現在回頭看應該從一開始就貫穿到底，round 2 的推測邏輯是違反自己原則的偏離，非新洞
+- 矩陣資料裡若還有類似「散文裡巧合被 backtick 包住的普通字詞」的瑕疵尚未被發現，會被腳本正確歸類為「解析成路徑但找不到對應檔案」的 skip（不會誤判成配對），屬於已被 skip 機制正確兜底的風險等級，非未受保護的漏洞
+
+[rollback]
+`git diff` 對應 2 個檔案，皆可用 `git revert` 單一 commit 完整回復（會連帶恢復 mirror 推測邏輯與舊版矩陣資料，等於回到被 BLOCK 的狀態，正常情況不會這樣做）。
+
 ### AUTO_TASK_DONE: 補跑真實 review，修掉漂移腳本 2 個真 finding（Stop-hook 自動 review 本身壞掉的替代方案）
 
 [任務]

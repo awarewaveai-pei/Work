@@ -147,27 +147,6 @@ function Resolve-MatrixPath {
     return $resolved.Path
 }
 
-# Same two-base search as Resolve-MatrixPath, but accepts a DIRECTORY instead of
-# rejecting one. Used for the "mirror" pattern below: a row like REMOTE_WORKSTATION_
-# STARTUP.md's impacted list names specific agency-os/.cursor/rules/*.mdc files AND
-# separately references the bare directory `../.cursor/rules/`, with a prose note that
-# same-named files there must stay mirrored (codex CONFIRMED finding, 2026-08-24: the
-# first version of this script only ever rejected that directory span outright, so the
-# real root-level mirror files it points at were never checked at all).
-function Resolve-MatrixDir {
-    param([string]$RawPath, [string]$AgencyRoot, [string]$RepoRoot)
-    $p = ($RawPath.Trim()) -replace '\\', '/'
-    if (-not $p) { return $null }
-    foreach ($base in @($AgencyRoot, $RepoRoot)) {
-        $candidate = Join-Path $base $p
-        try {
-            $hit = Resolve-Path -LiteralPath $candidate -ErrorAction SilentlyContinue
-        } catch { $hit = $null }
-        if ($hit -and (Test-Path -LiteralPath $hit.Path -PathType Container)) { return $hit.Path }
-    }
-    return $null
-}
-
 # ---------- Parse the matrix table ----------
 # Deliberately backtick-only extraction -- see script header for why. `[regex]::Matches`
 # on each column independently means a row's left column keeps only its FIRST backtick
@@ -205,50 +184,12 @@ foreach ($line in $matrixLines) {
     }
     $mainMtime = (Get-Item -LiteralPath $mainResolved).LastWriteTimeUtc
 
-    # Two collections built as this row's impacted list is walked: files that resolved
-    # (candidates for the mirror-basename match below) and directories that resolved
-    # (the "../.cursor/rules/" style bare-directory references). Unresolved directory
-    # hits are handled in a second pass over $rowDirs once the whole row's file list is
-    # known, so basename matching isn't order-dependent on where in the cell the
-    # directory span happened to appear relative to the specific files.
-    $rowFiles = New-Object System.Collections.Generic.List[object]
-    $rowDirs  = New-Object System.Collections.Generic.List[string]
-
     foreach ($impRaw in $impactedRaws) {
         $impResolved = Resolve-MatrixPath -RawPath $impRaw -AgencyRoot $agencyRoot -RepoRoot $WorkRoot
-        if ($impResolved) {
-            $rowFiles.Add([pscustomobject]@{ Raw = $impRaw; Resolved = $impResolved }) | Out-Null
+        if (-not $impResolved) {
+            $skipped.Add([pscustomobject]@{ Main = $mainRaw; Impacted = $impRaw; Reason = 'impacted path did not resolve to an existing file' }) | Out-Null
             continue
         }
-        $dirResolved = Resolve-MatrixDir -RawPath $impRaw -AgencyRoot $agencyRoot -RepoRoot $WorkRoot
-        if ($dirResolved) {
-            $rowDirs.Add($dirResolved) | Out-Null
-            continue
-        }
-        $skipped.Add([pscustomobject]@{ Main = $mainRaw; Impacted = $impRaw; Reason = 'impacted path did not resolve to an existing file or directory' }) | Out-Null
-    }
-
-    # Mirror expansion (codex CONFIRMED finding, 2026-08-24): a bare directory reference
-    # sitting alongside specific same-named files in the same row's impacted list (e.g.
-    # `.cursor/rules/40-shutdown-closeout.mdc` next to `../.cursor/rules/`) means "this
-    # file must also stay in sync with its same-named copy in that directory" -- add a
-    # pair for each such match, on top of the file itself already queued below. Collected
-    # into a SEPARATE list first, not appended to $rowFiles mid-loop: mutating a
-    # List[object] while foreach-enumerating it throws "Collection was modified" in .NET.
-    $mirrorFiles = New-Object System.Collections.Generic.List[object]
-    foreach ($dir in $rowDirs) {
-        foreach ($rf in $rowFiles) {
-            $basename = Split-Path -Path $rf.Resolved -Leaf
-            $mirrorCandidate = Join-Path $dir $basename
-            if ((Test-Path -LiteralPath $mirrorCandidate -PathType Leaf) -and ($mirrorCandidate -ne $rf.Resolved)) {
-                $mirrorFiles.Add([pscustomobject]@{ Raw = "$dir$basename (mirror)"; Resolved = (Resolve-Path -LiteralPath $mirrorCandidate).Path }) | Out-Null
-            }
-        }
-    }
-    foreach ($mf in $mirrorFiles) { $rowFiles.Add($mf) | Out-Null }
-
-    foreach ($rf in $rowFiles) {
-        $impResolved = $rf.Resolved
         # A doc legitimately lists itself among its own impacted files in a few rows
         # (self-referential "review docs/CHANGE_IMPACT_MATRIX.md too" entries) -- same
         # file compared to itself is always zero drift, not worth a pair record.
@@ -257,7 +198,7 @@ foreach ($line in $matrixLines) {
         $driftDays = [math]::Round(($mainMtime - $impMtime).TotalDays, 1)
         $pairs.Add([pscustomobject]@{
             Main         = $mainRaw
-            Impacted     = $rf.Raw
+            Impacted     = $impRaw
             MainMtime    = $mainMtime
             ImpactedMtime = $impMtime
             DriftDays    = $driftDays
