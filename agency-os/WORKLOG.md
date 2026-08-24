@@ -92,6 +92,35 @@ Round 1 把 unverifiable（deletion 因無 mtime 無法判定新鮮度）跟 sta
 [rollback]
 `git diff scripts/verify-closeout-completeness.ps1` 還原單一 hunk。
 
+### AUTO_TASK_DONE: ORACLE gate deletion 用 `.git/index` mtime 當 staging 時間代理（round 3，同 session 第三次 Codex stop-hook）
+
+[任務]
+Round 2 修完後，同一顆 Codex stop-hook 第三次抓到問題：「Deletions can still bypass the ORACLE stop-gate with only an earlier same-day artifact」。
+
+[根因]
+Round 2 為了避免 round 1「永遠無法解除的強制 waiver」問題，把 deletion 完全退回只看外層「當天有無任一 artifact」這條寬鬆門檻（純 warn、不擋）。但這條門檻對 deletion 沒有任何新鮮度要求——一份跟這次刪檔完全無關、發生在刪檔之前好幾小時的舊 artifact 一樣能讓 gate 放行，只印一則容易被忽略的警告，等於變相繞過。
+
+[已修改]
+1. 實驗先行確認假設：`git diff --cached --name-only`（本檔案自己在 line 54 就會呼叫）是純讀取操作，不會動到 `.git/index` 的 mtime；只有真的 `git add`/`git rm` 才會（scratch repo 實測，見驗證結果）。這代表 `.git/index` mtime 可以當「最近一次 staging 動作發生的時間」的可靠代理
+2. `scripts/verify-closeout-completeness.ps1:275-330` —— 新增 `$indexStageTime`（透過 `Invoke-WithUtf8Console { git rev-parse --absolute-git-dir 2>$null }` 解出真正的 git dir，再讀該目錄下 `index` 的 mtime，容錯 worktree/submodule）；deletion 現在分三種結果：無法解出 index mtime → 不可判定，走 round 2 的 warn-only 保底（line 302）；index mtime 晚於最新 artifact → 真的過期，併入 `$staleAgainst` 走既有硬擋（可解——事後重跑 oracle 會產生比 index mtime 更新的 artifact，line 303）；index mtime 不晚於最新 artifact → review 確實在 staging 之後跑過，靜默放行（fall-through，不加進任何清單）
+
+[實測發現的自身 bug（second pair of eyes 抓到，非 review 抓到）]
+第一版把「index mtime 解不出來」跟「index mtime 有解但沒有晚於 artifact（該放行的情況）」誤用同一個 `else` 接住，導致所有本該靜默通過的 deletion 都被誤判成 unverifiable、印警告。用真實 scratch git repo 跑整合測試才抓到（debug trace 印出 indexStageTime=13:34:09 < newestArtifact=13:37:04，照設計應該放行卻走錯分支）。改成 `if (-not $indexStageTime) {...} elseif ($indexStageTime -gt ...) {...}` 三分支後重測全過。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=在 scratch git repo（真實 `git init`+commit+`git rm` staged deletion，非合成資料）對真正的 `scripts/verify-closeout-completeness.ps1`（用 `-WorkRoot` 指向該 repo）跑 4 組真實情境 | exit=0（4/4 pass：A=只有過期 artifact→exit 1 硬擋且訊息正確；B=staging 後才產生的新 artifact→exit 0 靜默通過無任何訊息；C=暫時搬走 `.git/index` 模擬無法解析→exit 0 只印警告不擋；D=過期情境但補 `ORACLE_WAIVED`→exit 0 完全靜默）| ms=~2000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`stat .git/index` 前後對照 `git diff --cached --name-only`（本檔案自己會呼叫的指令）執行前後 mtime，確認純讀取操作不動 index | exit=0（mtime 完全一致：1787549646 兩次相同；`git rm` 後才變成 1787549649）
+- REVIEW_WAIVED: NA -- critic 本 session 第 3 次呼叫仍 529（Anthropic 服務端持續過載，非本地問題，判斷不再重試）；手動 review：worktree 情境下 `--absolute-git-dir` 會回該 worktree 專屬 git dir（含專屬 index），語意正確非退化；DateTime `-gt` 比較同機同來源無時區風險；`git rev-parse --absolute-git-dir` 輸出純 ASCII 路徑，`/audit-encoding --file` 掃過 CLEAN
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`indexStageTime\|absolute-git-dir` | hits=7（全部在同一檔案內：宣告/呼叫/讀取/三分支判斷/註解引用，無其他 call site）
+
+[剩餘風險]
+- index mtime 理論上可能被「同時間另一個終端機在跑 `git status`」以外的操作影響（例如某些 git 版本在 stat-refresh 時仍可能改寫 index）——本次僅實測驗證當前環境的 git 版本行為，非跨版本保證；跟既有 stale 檢查用檔案 mtime 的風險等級相同，非本次新增的風險類別
+- `test-hooks.sh` 仍無 ORACLE gate 專屬案例（三輪累積的既有缺口，非本次引入，建議之後補一次性測試涵蓋這三種分支）
+- critic 外部驗證本 session 全程不可用（3 次 529），三輪修正都僅靠手動 review + 真實整合測試把關，建議下個 session 有空檔時對整段 ORACLE gate 補跑一次 `/review`
+
+[rollback]
+`git diff scripts/verify-closeout-completeness.ps1` 還原單一 hunk，無其他檔案依賴。
+
 ## 2026-08-20 — 跨模型 oracle 制度化：`codex-oracle.ps1` + AGENTS 分工規則
 
 ### AUTO_TASK_DONE: 把 08-17 驗證有效的 Codex oracle 從「當次對話」變成常駐機制

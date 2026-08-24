@@ -262,38 +262,62 @@ try {
             # of the staged diff can match. Ordering is the available signal: the newest
             # artifact must post-date the newest source file it claims to have reviewed.
             $newestArtifact = ($todayOracle | Sort-Object LastWriteTime -Descending | Select-Object -First 1)
+
+            # A staged DELETION has no file mtime to compare (codex FINDING 3, round 2),
+            # but the .git index DOES have one: any `git add`/`git rm` rewrites it, while
+            # read-only commands (git status/diff, including this script's own
+            # `git diff --cached` above) leave its mtime untouched -- verified empirically
+            # 2026-08-24 (stat before/after `git diff --cached --name-only`: unchanged;
+            # before/after `git rm`: bumped). That makes it a reliable proxy for "when was
+            # the most recent staging action" -- close enough to answer "did the newest
+            # review run after this deletion was staged", which round 2 gave up on
+            # answering at all (codex stop-hook, round 3: same-day existence alone let a
+            # deletion staged hours after a stale morning review pass with only a warning).
+            # Resolution path stays open (unlike round 1): re-running oracle after staging
+            # produces an artifact newer than the index mtime that is already fixed, so
+            # this is genuinely fixable, not a permanent forced waiver.
+            $indexStageTime = $null
+            try {
+                $gitDirOut = (Invoke-WithUtf8Console { git rev-parse --absolute-git-dir 2>$null })
+                if ($LASTEXITCODE -eq 0 -and $gitDirOut) {
+                    $idxPath = Join-Path ($gitDirOut | Select-Object -First 1) 'index'
+                    if (Test-Path -LiteralPath $idxPath) {
+                        $indexStageTime = (Get-Item -LiteralPath $idxPath -ErrorAction SilentlyContinue).LastWriteTime
+                    }
+                }
+            } catch { $indexStageTime = $null }
+
             $staleAgainst = @()
             $unverifiable = @()
             foreach ($sf in $oracleStaged) {
                 $full = Join-Path $WorkRoot ($sf.Replace('/', '\'))
-                # A staged DELETION has no mtime to compare, so freshness is unprovable
-                # here (codex FINDING 3, round 2). Skipping silently would reopen the
-                # stale-review hole for deletions, so it is reported instead -- the same
-                # 'a blind detector must not look like a pass' rule as check-smoke-tests.
-                if (-not (Test-Path -LiteralPath $full)) { $unverifiable += $sf; continue }
+                if (-not (Test-Path -LiteralPath $full)) {
+                    # Deletion: use the index-mtime proxy when available (resolvable --
+                    # same remedy as a stale modification). Three outcomes, not two:
+                    # proxy unresolved -> genuinely undecidable (round-2 warn-only bucket);
+                    # proxy resolved and newer than the review -> stale (hard-blockable,
+                    # same as a modified file); proxy resolved and NOT newer -> the review
+                    # ran after this was staged, so it passes silently like any other
+                    # non-stale file (falls through, added to neither list).
+                    if (-not $indexStageTime) { $unverifiable += $sf }
+                    elseif ($indexStageTime -gt $newestArtifact.LastWriteTime) { $staleAgainst += $sf }
+                    continue
+                }
                 $mt = (Get-Item -LiteralPath $full -ErrorAction SilentlyContinue)
                 if ($mt -and $mt.LastWriteTime -gt $newestArtifact.LastWriteTime) { $staleAgainst += $sf }
             }
             if ($staleAgainst.Count -gt 0 -and -not $hasOracleWaiver) {
-                $stMsg = ("verify-closeout-completeness: newest oracle artifact ({0}, {1}) predates staged source edited after it: {2}." -f $newestArtifact.Name, $newestArtifact.LastWriteTime.ToString('HH:mm:ss'), ($staleAgainst -join ', ')) +
-                         " The review did not see the final code. Re-run: .\scripts\codex-oracle.ps1 -Mode review -Context '<what changed>'" +
+                $stMsg = ("verify-closeout-completeness: newest oracle artifact ({0}, {1}) predates staged change(s) made after it: {2}." -f $newestArtifact.Name, $newestArtifact.LastWriteTime.ToString('HH:mm:ss'), ($staleAgainst -join ', ')) +
+                         " The review did not see the final staged state. Re-run: .\scripts\codex-oracle.ps1 -Mode review -Context '<what changed>'" +
                          (" OR add: - ORACLE_WAIVED: <one-line reason> to {0}. Gate={1}" -f $hdr, $Gate)
                 if ($Gate -eq "strict") { Write-Host $stMsg -ForegroundColor Red; exit 1 }
                 Write-Warning $stMsg
             }
             if ($unverifiable.Count -gt 0 -and -not $hasOracleWaiver) {
-                # Deletion has no mtime, so it was collected above but never gated on --
-                # that let deletions silently pass regardless of whether any oracle ever
-                # saw them (2026-08-24 fix, round 1). Round 2 (codex stop-hook): hard-failing
-                # this is undecidable, not just unproven -- Test-Path on a deleted file is
-                # ALWAYS false, so no re-run of codex-oracle at any time could ever clear a
-                # strict block here. That is not a stale-review gap closing, it is a
-                # mandatory waiver for every future deletion forever, which trains the same
-                # waiver-reflex habit this file's own lockfile-by-name exclusion (above)
-                # exists to avoid. The outer $todayOracle.Count -eq 0 branch already
-                # requires same-day artifact EXISTENCE for these files -- that is the
-                # applicable bar for a deletion. Report visibly, never hard-block.
-                $uvMsg = ("verify-closeout-completeness: staged deletion(s) cannot be freshness-checked against oracle artifact ({0}, {1}): {2}." -f $newestArtifact.Name, $newestArtifact.LastWriteTime.ToString('HH:mm:ss'), ($unverifiable -join ', ')) +
+                # Only reached when the index-mtime proxy itself could not be resolved
+                # (e.g. `git rev-parse --absolute-git-dir` failed). Genuinely undecidable,
+                # same as round 2 -- report, never hard-block (see block comment above).
+                $uvMsg = ("verify-closeout-completeness: staged deletion(s) cannot be freshness-checked against oracle artifact ({0}, {1}) -- git index mtime unavailable: {2}." -f $newestArtifact.Name, $newestArtifact.LastWriteTime.ToString('HH:mm:ss'), ($unverifiable -join ', ')) +
                          " Same-day oracle artifact exists (required above) but cannot confirm it covered this deletion." +
                          (" OR add: - ORACLE_WAIVED: <one-line reason> to {0} to silence this note." -f $hdr)
                 Write-Warning $uvMsg
