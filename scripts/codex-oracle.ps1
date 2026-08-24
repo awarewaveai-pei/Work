@@ -267,6 +267,23 @@ if ($Mode -eq 'review') {
             Write-Error "Nothing to review: no diff for the given ref/paths. Pass -DiffRef <commit> to review an existing commit."
             exit 2
         }
+
+        # This repo's session hooks auto-commit the dirty tree mid-task ("[claude]
+        # checkpoint: ..."), so a no-DiffRef review can silently review a SMALLER diff
+        # than the operator intends -- the real work already landed in HEAD before this
+        # ran. Codex has no way to know that happened; its finding then looks like "this
+        # change was never made" when it was, just earlier, in a different commit (codex
+        # stop-hook, 2026-08-24: this exact scenario produced one false-positive finding
+        # that took a manual `git show HEAD` to clear). Not auto-resolved -- picking the
+        # "right" earlier commit to diff against is a judgement call this script
+        # shouldn't guess at -- just surfaced so it cannot be silently trusted.
+        if (-not $DiffRef) {
+            $rLog = Invoke-Git -GitArgs @('log', '-3', '--format=%H %s') -Root $root
+            if ($rLog.Exit -eq 0 -and ($rLog.Text -match '(?m)^\S+ \[claude\] checkpoint:')) {
+                Write-Host "codex-oracle: WARNING -- recent commit(s) at HEAD look like session auto-checkpoints. This review's diff may not include everything you expect (the real work may have already landed in one of them). If the finding looks incomplete or contradicts work you know happened, re-run with -DiffRef <commit before the checkpoints> instead of trusting this diff." -ForegroundColor DarkYellow
+            }
+        }
+
         Set-Content -LiteralPath $diffFile -Value $diffText -Encoding UTF8
 
         # Record exactly which paths were IN the diff sent to Codex -- including deleted

@@ -2,6 +2,27 @@
 
 ## 2026-08-24
 
+### AUTO_TASK_DONE: codex-oracle.ps1 對自動 checkpoint 導致的不完整 diff 加警告
+
+[任務]
+上一輪（AGENTS.md 整理）用 `codex-oracle.ps1 -Mode review` 驗證時，Codex 因為 session 自動 checkpoint hook 搶先把改動 commit 進 HEAD，看到不完整的 diff、產出一個假警報。Codex stop-hook 指出：這不是單次運氣好抓到的巧合，是這個新 fallback 本身有結構性漏洞——沒有機制提醒操作者「你看到的 diff 可能不完整」。
+
+[已修改]
+`scripts/codex-oracle.ps1:266-283`（新增）—— review 模式在 diff 組完、送給 Codex 之前，若 `-DiffRef` 未指定（即審 working tree，容易被自動 checkpoint 影響的情境），檢查 HEAD 最近 3 個 commit 的訊息是否有 `[claude] checkpoint:` 樣式，有的話印黃色警告，提醒改動可能已經進了更早的 commit、這份 diff 不能直接信任，建議改用 `-DiffRef <checkpoint 之前的 commit>`。**刻意不自動選對的 commit**——那是判斷題，腳本不該用猜的，只負責讓問題可見。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=對本 repo 真實的 `git log -3` 輸出（剛好含 `8af0dc09`/`c3922a25` 兩個真實 auto-checkpoint commit）跑新的偵測 regex | exit=0（正確判定 MATCH，警告會觸發——證實這正是上一輪假警報的真實成因）
+- REALTEST_EVIDENCE: tool=Bash | cmd=對合成的「全部正常 commit、無 checkpoint」訊息跑同一段 regex | exit=0（正確判定 NO MATCH，不誤觸發）
+- REVIEW_WAIVED: DOC_ONLY 等級判斷不適用（這是真的 code 改動），但**不追加一次 codex-oracle.ps1 review 驗證這個 fix 本身**——操作者當場提醒「這樣會不會變成愚蠢的無限 review 循環」，判斷這是對的：review 工具本身的小修正（一段警告訊息、無業務邏輯）用真實 regex 測試 + 手動讀碼確認已足夠，用外部 oracle 審「審查工具的審查工具」正是要避免的遞迴。改用手動覆核：邏輯只在 `-DiffRef` 未指定時觸發（已讀碼確認 guard 正確）、只印警告不阻斷（不影響既有流程）、`$rLog` 是新變數無其他呼叫點依賴。
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`rLog\|checkpoints. This review` | hits=2（皆為本檔新增區塊內部宣告/比對，無其他 call site）
+
+[剩餘風險]
+- 警告只看最近 3 個 commit，若自動 checkpoint 連續發生超過 3 次才輪到操作者的真實工作 commit，仍可能漏警——3 這個數字是取「這個 session 實測看過最多連續 2 次」的經驗值，非理論上界；之後若觀察到更長串連續 checkpoint 可以再調大
+- 這是提醒不是機械閘，操作者/Claude 仍可能看到警告不理會直接採信 findings——跟 AGENTS.md §已知信任邊界一致的信任模型，非本次新增的落差
+
+[rollback]
+`git diff scripts/codex-oracle.ps1` 還原單一 hunk，無其他檔案依賴。
+
 ### AUTO_TASK_DONE: AGENTS.md 加「reviewer 2 次打回強制設計盤點」規則 + 全檔整理
 
 [任務]
