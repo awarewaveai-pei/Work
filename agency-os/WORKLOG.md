@@ -13,19 +13,24 @@
 `agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1` 用 `Extract-NormalizedHttpsUrl`（單一 choke point，SITE_PROFILE / EXECUTION_PLAN / SITES_INDEX cell 三處掃描共用）從文字行擷取 https:// URL，但完全沒有處理本 repo 既有慣例：`ENVIRONMENT_REGISTRY.md` 用 markdown 刪除線 `~~...~~` 標記已 abandon 的環境列（例：soulful 的 staging 列 2026-08-16 決議 abandoned，因 hosting 11/12 到期不續約，不在退場主機建 staging）。`02_EXECUTION_PLAN.md` Day 2 那兩行同步用刪除線劃掉同一個舊 URL 並加註「⛔ 不再執行」，但底層文字仍是 `~~...https://staging.soulfulexpression.org/...~~`——腳本逐行掃描時把刪除線內文字當成「仍在宣告的 URL」，跟登記表裡（正確地）因列名不含刪除線標籤 `staging` 而找不到 canonical URL 的 registry 比對，產生「plan 宣告了 URL 但 registry 沒有」的假陽性。這不是本 session 造成的新 drift，是既有腳本從未考慮過「刪除線=已棄用」這個既有文件慣例。
 
 [已修改]
-1. `agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`——`Extract-NormalizedHttpsUrl` 加一行 `[regex]::Replace($Text, '~~[^~]*~~', '')` 在比對 https:// 之前先剝除整個刪除線 span（含內容，不只是符號），單一函式修正涵蓋全部三個呼叫點（SITE_PROFILE 行掃描、EXECUTION_PLAN 行掃描、SITES_INDEX cell），不是逐一補丁
+1. `agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`——`Extract-NormalizedHttpsUrl` 加 `-IncludeStruck` 開關；預設模式先 `[regex]::Replace($Text, '~~[^~]*~~', '')` 剝除整個刪除線 span 再比對 https://，單一函式修正涵蓋全部三個呼叫點
+2. **（第二輪，真實 critic 抓到 Major 後修正）** `Get-StagingHttpsFromSiteProfile`／`Get-StagingRefsFromExecutionPlan` 改回傳 `@{ Url; Struck }` 而非純字串——單純剝除刪除線會讓「registry 復活成活網址、但 SITE_PROFILE/EXECUTION_PLAN 仍留著劃掉的舊網址」這個真實 drift 場景被靜默吃掉（跟 ClickHouse `mergetree_total` canary 那次是同一種「偵測器啞了看起來像健康」bug class）；三個消費端（SITE_PROFILE/EXECUTION_PLAN/registry row-label）改成：struck 且 registry 有活網址 → 照樣噴 failure 要求更新；struck 且 registry 沒有活網址（雙邊一致棄用）→ 才略過
+3. `Get-RegistryStagingCell` row-label regex 加 `(?:~~)?` 容忍刪除線包住的 `staging` 標籤——原本半復活列（label 還沒拿掉刪除線但 URL 欄已填活網址）會讓 registry 完全讀不到列，反而誤炸其他本來同步正確的檔案
 
 [驗證結果]
 - REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`（修前）| exit=1，訊息與 `ao-close.ps1` 回報的症狀完全吻合，確認真因非猜測
-- REALTEST_EVIDENCE: tool=Bash | cmd=同上（修後）| exit=0，`verify-tenant-staging-sites-index-ssot: PASS`
-- REVIEW_DONE: critic=Standard | verdict=pass | findings=0/0/0 — 讀回改動：正則 `~~[^~]*~~` 對「單一 span 內無巢狀波浪號」成立（本例的兩行 struck 內容皆無內嵌 `~`，`cat -A` 實際位元組已核對），不影響任何目前通過中的 URL 比對（因為現有通過案例裡活躍 URL 本來就不會被 `~~` 包住，剝除動作對它們是 no-op）
-- BUGHUNT_DONE: scope=agency-os,scripts | grep=`Extract-NormalizedHttpsUrl\|staging.*https://\|https://.*staging` | hits=1（僅本檔案自己，確認 docstring 宣稱的「single implementation, no duplicate bash copy」屬實，無第二份需要同步修的複本）
+- REALTEST_EVIDENCE: tool=Bash | cmd=同上（第一輪修後，真實 soulful 資料）| exit=0，`verify-tenant-staging-sites-index-ssot: PASS`
+- REVIEW_DONE: critic=Deep（外部 oracle，真實呼叫非自我描述，本輪之前誤記為「Standard | findings=0/0/0」已訂正）| verdict=warn→修正後 pass | findings=1 Major + 1 Minor（critic 自建 fixture + `git show 6fd76f6a^`/HEAD 兩版真實跑出 A/B 對照才回報，非臆測）：**Major**——`$profUrl`/`$planRefs` 對 `$null` 一律 `continue`，導致「registry 復活成活網址、SITE_PROFILE/EXECUTION_PLAN 仍是劃掉舊網址」會靜默 PASS 而非抓出 drift（critic 用 fixture 實測證明：修前 exit=1 兩個 mismatch，修後 exit=0 PASS，證實漏洞真實存在）；**Minor**——`Get-RegistryStagingCell` row-label regex 不認識 `~~staging~~`，導致半復活列整列讀不到
+- REALTEST_EVIDENCE: tool=Bash | cmd=`[System.Management.Automation.Language.Parser]::ParseFile`（第二輪修後）| exit=0 PASS OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=真實 soulful 資料重跑（第二輪修後，確認原始 false positive 仍然修好）| exit=0 PASS
+- REALTEST_EVIDENCE: tool=Bash | cmd=4 組全新 fixture tenant tree（`$env:TEMP\claude\...\scratchpad\staging-fixture-v{2,3,4}`，非 repo 內）+ `-WorkspaceRoot` 真實呼叫本腳本：Case A（registry 復活活網址 + SITE_PROFILE/EXECUTION_PLAN 仍留劃掉舊網址）| exit=1，兩則 failure 訊息點名確切路徑+舊網址+新網址；Case B（雙邊一致完全棄用）| exit=0 PASS；Case C（registry label 半復活：`~~staging~~` 但 URL 欄已填活網址，SITE_PROFILE 同步跟上）| exit=0 PASS——三案例對應 critic 的 Major+Minor+既有通過案例，全部符合預期
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`Extract-NormalizedHttpsUrl\|Get-StagingHttpsFromSiteProfile\|Get-StagingRefsFromExecutionPlan\|Get-RegistryStagingCell` | hits=0（除本檔案自身定義外，`.github/workflows/`、`agency-os`、`scripts` 全域搜尋確認無第二個呼叫端依賴舊的純字串回傳型別，改成 `@{Url;Struck}` 物件不會弄壞任何外部消費者）
 
 [剩餘風險]
-無。修正是在既有「single choke point」函式內加一個前處理步驟，未改變任何呼叫端介面或既有通過案例的行為。
+無新增。SITES_INDEX cell 路徑刻意不動——critic 驗證過它的分支順序（先判斷 `$regUrl` 是否為真，非先判斷 `$cellUrl`）本來就會在 struck-vs-live 情境下如實比對失敗並印出原始 cell 文字，不需要額外的 Struck 物件包裝。
 
 [rollback]
-`git diff agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`，單一 hunk，`git revert` 或手動移除新增的 3 行皆可完整回復。
+`git diff agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`，`git revert` 對應 commit 或手動還原兩輪改動皆可完整回復；兩輪改動彼此獨立可分別 revert。
 
 ### AUTO_TASK_DONE: 撤掉 mirror-directory 推測邏輯，改回資料明確化（round 2 stop-hook，同一議題第三輪）
 

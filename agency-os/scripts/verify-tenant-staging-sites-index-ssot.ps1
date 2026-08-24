@@ -31,17 +31,21 @@ if (-not $WorkspaceRoot) {
 }
 
 function Extract-NormalizedHttpsUrl {
-    param([string]$Text)
+    param([string]$Text, [switch]$IncludeStruck)
     if ([string]::IsNullOrWhiteSpace($Text)) { return $null }
     # Drop markdown strikethrough spans first — repo convention marks abandoned/
     # decommissioned URLs as ~~https://...~~ (see ENVIRONMENT_REGISTRY.md staging
-    # rows). A struck-through URL is not an active declaration and must not be
-    # extracted, in any of this script's three scan sites (SITE_PROFILE line,
-    # EXECUTION_PLAN line, SITES_INDEX cell) — single choke point, fixed once here.
-    $liveText = [regex]::Replace($Text, '~~[^~]*~~', '')
-    if ([string]::IsNullOrWhiteSpace($liveText)) { return $null }
+    # rows). A struck-through URL is not a LIVE declaration; callers that need to
+    # tell "nothing here" apart from "struck here" (to still flag stale-but-struck
+    # references against a since-revived live registry URL) pass -IncludeStruck to
+    # get the URL back without stripping. Single choke point for both modes.
+    $scanText = $Text
+    if (-not $IncludeStruck) {
+        $scanText = [regex]::Replace($Text, '~~[^~]*~~', '')
+        if ([string]::IsNullOrWhiteSpace($scanText)) { return $null }
+    }
     # Conservative hostname/path only — stops before whitespace, `（`, backticks, or |
-    $m = [regex]::Match($liveText, '(?i)https://[a-z0-9][a-z0-9./_-]*')
+    $m = [regex]::Match($scanText, '(?i)https://[a-z0-9][a-z0-9./_-]*')
     if (-not $m.Success) { return $null }
     return ($m.Value.TrimEnd('/')).ToLowerInvariant()
 }
@@ -49,7 +53,11 @@ function Extract-NormalizedHttpsUrl {
 function Get-RegistryStagingCell {
     param([string]$FilePath)
     $raw = Get-Content -LiteralPath $FilePath -Raw -Encoding UTF8
-    $m = [regex]::Match($raw, '(?m)^\|\s*staging\s*\|\s*([^|\r\n]+)\|')
+    # Label tolerates an optional ~~strikethrough~~ wrap (abandoned-row convention) so a
+    # half-revived row (label still struck, URL cell updated to a live one) is still read
+    # instead of silently returning null and causing false failures against other files
+    # that already reference the (correct, live) URL.
+    $m = [regex]::Match($raw, '(?m)^\|\s*(?:~~)?staging(?:~~)?\s*\|\s*([^|\r\n]+)\|')
     if (-not $m.Success) { return $null }
     return $m.Groups[1].Value.Trim()
 }
@@ -115,20 +123,24 @@ function Get-StagingHttpsFromSiteProfile {
     foreach ($line in $lines) {
         if ($line -notmatch '(?i)staging\s+url') { continue }
         $u = Extract-NormalizedHttpsUrl -Text $line
-        if ($u) { return $u }
+        if ($u) { return @{ Url = $u; Struck = $false } }
+        $su = Extract-NormalizedHttpsUrl -Text $line -IncludeStruck
+        if ($su) { return @{ Url = $su; Struck = $true } }
     }
     return $null
 }
 
 function Get-StagingRefsFromExecutionPlan {
     param([string]$FilePath)
-    $refs = New-Object System.Collections.Generic.List[string]
+    $refs = New-Object System.Collections.Generic.List[hashtable]
     if (-not (Test-Path -LiteralPath $FilePath)) { return $refs }
     $lines = @(Get-Content -LiteralPath $FilePath -Encoding UTF8)
     foreach ($line in $lines) {
         if ($line -notmatch '(?i)staging') { continue }
         $u = Extract-NormalizedHttpsUrl -Text $line
-        if ($u) { [void]$refs.Add($u) }
+        if ($u) { [void]$refs.Add(@{ Url = $u; Struck = $false }); continue }
+        $su = Extract-NormalizedHttpsUrl -Text $line -IncludeStruck
+        if ($su) { [void]$refs.Add(@{ Url = $su; Struck = $true }) }
     }
     return $refs
 }
@@ -194,10 +206,19 @@ foreach ($tenant in $tenantDirs) {
         $profPath = Join-Path $siteDir.FullName "SITE_PROFILE.md"
         if (-not (Test-Path -LiteralPath $profPath)) { continue }
 
-        $profUrl = Get-StagingHttpsFromSiteProfile -FilePath $profPath
-        if (-not $profUrl) { continue }
+        $prof = Get-StagingHttpsFromSiteProfile -FilePath $profPath
+        if (-not $prof) { continue }
 
         $rel = "${tenantName}/sites/$($siteDir.Name)/SITE_PROFILE.md"
+        if ($prof.Struck) {
+            if ($regUrl) {
+                [void]$failures.Add(
+                    "${rel}: SITE_PROFILE strikes out staging URL '$($prof.Url)' but ENVIRONMENT_REGISTRY staging is live '$regUrl' -- update SITE_PROFILE to the canonical URL or confirm staging is truly retired."
+                )
+            }
+            continue
+        }
+        $profUrl = $prof.Url
         if ($regUrl) {
             if ($profUrl -ne $regUrl) {
                 [void]$failures.Add(
@@ -223,7 +244,16 @@ foreach ($tenant in $tenantDirs) {
         if ($planRefs.Count -eq 0) { continue }
 
         $rel = "${tenantName}/projects/$($projDir.Name)/02_EXECUTION_PLAN.md"
-        foreach ($planUrl in $planRefs) {
+        foreach ($planRef in $planRefs) {
+            if ($planRef.Struck) {
+                if ($regUrl) {
+                    [void]$failures.Add(
+                        "${rel}: execution plan strikes out staging URL '$($planRef.Url)' but ENVIRONMENT_REGISTRY staging is live '$regUrl' -- update to the canonical URL or confirm staging is truly retired."
+                    )
+                }
+                continue
+            }
+            $planUrl = $planRef.Url
             if ($regUrl) {
                 if ($planUrl -ne $regUrl) {
                     [void]$failures.Add(
