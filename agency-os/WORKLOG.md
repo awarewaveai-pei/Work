@@ -2,6 +2,50 @@
 
 ## 2026-08-25
 
+### AUTO_TASK_DONE: Canva 登入視窗反覆彈出 —— 根因是 `@latest` 每次改版都把 token 快取沖掉
+
+[任務]
+操作者回報「登入 canva 的視窗一直跳出來」。
+
+[根因 —— 兩層疊加，不是 Canva 的問題]
+`mcp-remote` 把 OAuth token 存在**含版本號**的路徑：`~/.mcp-auth/mcp-remote-<版本>/`。設定寫 `mcp-remote@latest`，npx 每次啟動都拉最新版 —— 版本一跳就換目錄，等同從未登入過，於是重跑 OAuth、開瀏覽器。
+
+| 快取目錄 | tokens.json | 觀察 |
+|---|---|---|
+| `mcp-remote-0.1.49/` | ✅ 561B, 08-24 20:58 | 唯一成功登入過的一版 |
+| `mcp-remote-0.2.0/` | ❌ 無 | 3 個失敗 code_verifier |
+| `mcp-remote-0.2.1/` | ❌ 無 | 14 個 code_verifier，02:17→04:08 兩小時彈 14 次 |
+
+第二層：proxy 進程從不退出。清理前 `Get-CimInstance Win32_Process` 數到 **36 個** `node.exe` 跑 `mcp-remote`，最早的存活自 08-24 09:54。code_verifier 檔名帶 PID（`_33700`、`_53972`…）證明是多個並行實例各自跑 OAuth、互搶同一把 lock，誰都沒完成。
+
+初判曾懷疑「兩個 IDE 搶 lock」，查進程後推翻：Cursor 當下 **0 個進程**，14 次彈窗全部來自 Claude Code 多 session。
+
+[已修改]
+1. `mcp/registry.template.json:29` —— canva 的 `mcp-remote@latest` → `mcp-remote@0.1.49`（唯一存有含 `refresh_token` 之 tokens.json 的版本）。版本釘死＝快取路徑固定＝登入一次即長期有效。
+2. `.mcp.json` / `.cursor/mcp.json` —— 跑 `scripts/sync-mcp-config.ps1` 自 SSOT 重新產生。
+3. `C:\Users\user1115\.cursor\mcp.json`（user-level，**不進 git**）—— 手改同一處釘版。此檔不在 sync 腳本覆蓋範圍（腳本只寫 `$WorkspaceRoot\.cursor\mcp.json`，見 `scripts/sync-mcp-config.ps1:626-640`），留著 `@latest` 會在下次開 Cursor 時把版本再推到最新、把剛釘好的快取整個作廢。
+4. `C:\Users\user1115\.claude\mcp.json` —— **還原為 `{}`**。跑 sync 時發現該腳本預設會把 20 個 server 寫進來，違反 CLAUDE.md「`~/.claude/mcp.json` 強制為 `{}`」；自 `mcp/claude-userlevel/mcp.template.json` 還原。詳見下方 [剩餘風險] FINDING 1。
+
+[驗證結果]
+- 殺進程：`killed=36 remaining=0`，且事前確認 36 個全部指向 `https://mcp.canva.com/mcp`（無其他 mcp-remote 消費者，不會誤殺別的 MCP）。
+- 實測：釘版後直接起 proxy，log 顯示 `Connected to remote server using StreamableHTTPClientTransport` + `Proxy established successfully`，**全程未開瀏覽器、無 authorize URL**；`~/.mcp-auth/` 未新增版本目錄（釘版生效）；tokens.json 的 `expires_at` 由 `2026-08-24 16:58:55Z`（已過期 3.4h）刷新為 `2026-08-25 00:20:30Z`（+4h）—— 亦即 refresh 走通、無需人工登入。log 中兩行 `Proactive token refresh failed, falling back to the stored token` 是預先刷新失敗，連線時的 refresh 仍成功，不影響結果。測試 proxy 已自行退出，殘留 0。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx -y mcp-remote@0.1.49 https://mcp.canva.com/mcp | exit=0 | ms=30000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+  - external oracle = Codex CLI（`scripts/codex-oracle.ps1 -Mode review`），artifact: `agency-os/reports/oracle/2026-08-25-review-febc2300.md`
+  - 2 條 findings 逐條 Grep 驗證屬實，且**皆指向 sync 工具本身而非本次改動**，見 [剩餘風險]
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,.cursor,machine-wide-mcp-configs | grep=mcp-remote@latest | hits=1
+  - 唯一命中 `agency-os/TASKS.md:220`，是 2026-08-12 已標【關閉】的公司桌機 Cloudflare MCP 歷史條目，與 canva 無關、不改寫已關閉紀錄。
+  - 另做機器全域掃描（`~/.codex/config.toml`、`~/.copilot/mcp-config.json`、`~/.gemini/settings.json`、`claude_desktop_config.json`、兩處 `settings.json`）：`@latest` 殘留 **0**。這一類問題在本機已整類關閉，不只 canva 一個實例。
+
+[剩餘風險 —— 兩條皆為 sync 工具的既有缺陷，本次未修]
+不變量：**每一個會被 MCP host 實際讀取的設定檔，都必須有一條 repo 管得到的產生路徑**。以下兩處違反，本次只手工關掉實例、未關掉整類：
+- **FINDING 1（CONFIRMED，本次親自踩到）**：`scripts/sync-mcp-config.ps1:643-653` 預設（`-SkipClaude` 未給）就把整份 registry 寫進 `~/.claude/mcp.json`，直接違反 `CLAUDE.md:33-34` 的 `{}` 不變量。亦即**照 CLAUDE.md 指示跑 sync 就會破壞 CLAUDE.md 的規定**。已手工還原，但下次任何人跑 sync 會再度破壞。
+- **FINDING 2（CONFIRMED）**：user-level `%USERPROFILE%\.cursor\mcp.json` 沒有任何 repo 管得到的產生路徑（`sync-mcp-config.ps1` 只寫 workspace 那份）。本次的手改在新機／其他 repo 無法重現，彈窗迴圈可在本 workspace 之外復發。
+兩條已開 TASKS 治本項。
+
+[rollback]
+`git revert` 本 commit 即還原 `mcp/registry.template.json` / `.mcp.json` / `.cursor/mcp.json`；user-level 兩檔不在 git，手動改回 `mcp-remote@latest`（不建議 —— 那正是本次的病灶）。
+
 ### AUTO_TASK_DONE: issue #15 每週安全稽核 —— 修的不是漏洞，是「永遠不可能變綠的閘」
 
 [任務]

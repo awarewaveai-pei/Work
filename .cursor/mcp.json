@@ -110,7 +110,7 @@
                                                   "/c",
                                                   "npx",
                                                   "-y",
-                                                  "mcp-remote@latest",
+                                                  "mcp-remote@0.1.49",
                                                   "https://mcp.canva.com/mcp"
                                               ],
                                      "command":  "cmd"
