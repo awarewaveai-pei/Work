@@ -1,6 +1,6 @@
 # ClickHouse health (EU)
 
-- Generated: 2026-08-20 15:50:14
+- Generated: 2026-08-24 12:50:53
 - Overall: **🟡 WARN**
 - Host: 204.168.175.41 / container `trigger-clickhouse`
 
@@ -8,21 +8,23 @@
 
 | Metric | Value |
 |--------|-------|
-| system database | 223.64 MiB (3,468,461 rows) |
-| trigger_dev (application) | 42.75 MiB (498,185 rows) |
-| ratio (system / app) | 5.2x |
-| largest system table | text_log:169936573 |
-| active merges | 1 |
-| max parts in one system table | 14 |
+| system database | 363.16 MiB (4,132,295 rows) |
+| trigger_dev (application) | 37.80 MiB (398,187 rows) |
+| ratio (system / app) | 9.6x |
+| largest system table | text_log:230988291 |
+| active merges | 2 |
+| max parts in one system table | 76 |
 | trace_log rows last hour | 0 (expected 0 - disabled 2026-08-15) |
 | asynchronous_metric_log rows last hour | 0 (expected 0 - disabled 2026-08-15) |
-| system tables missing TTL | 0 |
-| orphaned renamed tables (_<N> suffix) | 0 |
-| MergeTree tables seen this run | 11 |
+| system tables missing TTL | 3 (opentelemetry_span_log,part_log,query_views_log) |
+| orphaned renamed tables (_<N> suffix) | 3 |
+| MergeTree tables seen this run | 14 |
 
 ## Findings
 
-- self-telemetry is 5.2x the application data (warn at 5x)
+- 3 system table(s) have no TTL and will grow unbounded: opentelemetry_span_log,part_log,query_views_log
+- 3 orphaned renamed system table(s) (_<N> suffix, any generation) left behind by a past rename-and-recreate cycle - safe to DROP after confirming the active table has the correct TTL
+- self-telemetry is 9.6x the application data (warn at 5x)
 
 ## Why this check exists
 

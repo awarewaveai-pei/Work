@@ -97,7 +97,11 @@
       <p class="hint" style="margin-top:0">
         選填。填入自己的 Anthropic API key 後，上傳時可勾選「自動處理」，
         不用手動貼 prompt——但每次呼叫會真的計費（不是訂閱額度）。
-        不填就只能用下面「貼上」的免費做法。key 只存在這台電腦本機，不會上傳到任何地方。
+        不填就只能用下面「貼上」的免費做法。<b>key 存檔只存在這台電腦本機</b>
+        （不進版本控制、不會被其他頁面讀到）；但勾選「自動處理」時，key 本身
+        會當作認證資訊送到 Anthropic 的伺服器——這是呼叫 API 本來就需要的，
+        逐字稿內容也會一起送出去，跟下面「貼上」做法音檔/逐字稿完全不外流
+        不是同一回事，敏感會議請用「貼上」。
       </p>
       <input type="password" id="apiKeyInput" placeholder="sk-ant-..." style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:Consolas,monospace">
       <div style="display:flex;gap:8px;align-items:center;margin-top:8px">

@@ -19,7 +19,7 @@ import os
 import time
 import traceback
 
-from lib import archive, deck, diarize, excel, hallucination, keep_awake, merge_segments, minutes_md, settings, speaker_notes, summarize
+from lib import archive, deck, diarize, excel, hallucination, keep_awake, merge_segments, minutes_md, speaker_notes, summarize
 from lib.transcribe import transcribe, write_srt
 
 
@@ -42,6 +42,9 @@ def _status_path(job_dir: str) -> str:
 
 
 def write_status(job_dir: str, **fields):
+    """寫檔用 tmp+os.replace 做原子替換——這支被背景 thread 高頻呼叫（每個
+    stage 轉換都寫一次），app.py 的 /api/status 同時每 1.5s 輪詢同一個檔案；
+    若直接開檔截斷寫入，輪詢有機會讀到寫一半的檔案而 JSONDecodeError。"""
     path = _status_path(job_dir)
     cur = {}
     if os.path.exists(path):
@@ -51,18 +54,25 @@ def write_status(job_dir: str, **fields):
             cur = {}
     cur.update(fields)
     cur["updated_at"] = time.time()
-    json.dump(cur, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    tmp_path = f"{path}.tmp{os.getpid()}"
+    json.dump(cur, open(tmp_path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    os.replace(tmp_path, path)
 
 
 def run_pipeline_phase1(job_dir: str, media_path: str, model_name: str = "large-v3",
                          do_diarize: bool = True, sync_drive: bool = False,
-                         use_api: bool = False) -> None:
+                         use_api: bool = False, api_key: str = "") -> None:
     """呼叫端（app.py）用背景執行緒跑這個函式。結束時 stage 為
     awaiting_summary（成功）或 error（失敗），不會是 done。
 
     sync_drive 在上傳當下就決定（勾選框），要持久化到 status.json，
     因為 resume_after_summary() 是後續另一次 HTTP 請求才觸發，
-    中間隔著使用者去別的對話貼摘要，不能靠記憶體變數傳遞。"""
+    中間隔著使用者去別的對話貼摘要，不能靠記憶體變數傳遞。
+
+    api_key 同理在上傳當下由 app.py 讀出、當參數傳進來，不在這裡才去讀
+    settings.py 目前的值——轉錄+講者分離常跑好幾分鐘，這段時間夠使用者在
+    設定頁換掉或清除 key；若這裡才讀，job 實際用的 key 會跟使用者上傳當下
+    看到的「已設定」狀態對不上。"""
     log = JobLogger(job_dir)
     write_status(job_dir, stage="preflight", error=None, done=False, started_at=time.time(),
                  sync_drive=sync_drive)
@@ -123,24 +133,32 @@ def run_pipeline_phase1(job_dir: str, media_path: str, model_name: str = "large-
             f.write(prompt)
         log(f"[prompt] {len(prompt)} 字元 -> prompt.txt")
 
-        api_key = settings.get_api_key() if use_api else ""
         if use_api and api_key:
+            write_status(job_dir, stage="summarize_via_api")
+            minutes = None
             try:
-                write_status(job_dir, stage="summarize_via_api")
                 minutes = summarize.summarize_via_api(
                     transcript_text, result["audio_duration_sec"], api_key,
                     hallucination_stats=hall_stats, overlap_sec=overlap_sec,
                     speakers=speakers, log=log,
                 )
+            except Exception as e:
+                # 只有「拿摘要」這步失敗才叫得動人工回路退路——重貼一次
+                # prompt 是真的能救回來的。有拿到 minutes 之後的建置失敗
+                # 不歸這裡管，見下面 else 分支的說明。
+                log(f"[warn] API 自動摘要失敗，退回人工回路: {type(e).__name__}: {e}")
+                write_status(job_dir, api_error=f"{type(e).__name__}: {e}")
+            else:
+                # API 已經成功回傳合規的 minutes；再往下建 PPT/Excel 失敗
+                # （硬碟滿、檔案被鎖）是真的系統錯誤，使用者重貼同一份 JSON
+                # 只會撞到同一道牆——不可誤標成 api_error 退回人工回路掩蓋
+                # 真正原因，讓外層 except 把它當成貨真價實的 job 失敗處理。
                 errs = _finalize_from_minutes(job_dir, minutes, log)
                 if not errs:
                     return  # 外層 finally 會處理 allow_sleep/log.close
                 # 理論上不會發生：summarize_via_api 內部已用同一個
                 # validate() 把關過。留這段是防禦性的，不是預期路徑。
                 raise RuntimeError(f"API 產生的摘要未通過最終驗證: {errs}")
-            except Exception as e:
-                log(f"[warn] API 自動摘要失敗，退回人工回路: {type(e).__name__}: {e}")
-                write_status(job_dir, api_error=f"{type(e).__name__}: {e}")
 
         log("[prompt] 等待貼上摘要結果")
         write_status(job_dir, stage="awaiting_summary", done=False)

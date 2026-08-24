@@ -1,5 +1,5 @@
 {
-    "generatedAt":  "2026-08-20T07:49:57.5947727Z",
+    "generatedAt":  "2026-08-24T04:50:32.7212203Z",
     "overall":  "PASS",
     "fatal":  false,
     "fatalReason":  "",
@@ -11,12 +11,12 @@
                "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|0 2 * * * root /root/lobster-phase1/scripts/backup-phase1.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261|30 2 * * * root /root/lobster-phase1/scripts/verify-backup.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261",
                "retention_days":  "7",
                "retention_source":  "static",
-               "backup_size":  "13G",
-               "latest_time":  "2026-08-20 02:32:56",
-               "oldest_time":  "2026-08-13 02:00:01",
+               "backup_size":  "14G",
+               "latest_time":  "2026-08-24 02:32:57",
+               "oldest_time":  "2026-08-17 02:00:01",
                "backup_age_days":  "0",
                "verify_result":  "PASSED",
-               "verify_time":  "2026-08-20T02:30:21Z"
+               "verify_time":  "2026-08-24T02:30:21Z"
            },
     "eu":  {
                "host":  "204.168.175.41",
@@ -27,11 +27,11 @@
                "retention_days":  "7",
                "retention_source":  "static",
                "backup_size":  "15G",
-               "latest_time":  "2026-08-20 02:31:36",
-               "oldest_time":  "2026-08-13 02:31:38",
+               "latest_time":  "2026-08-24 02:31:41",
+               "oldest_time":  "2026-08-17 02:31:38",
                "backup_age_days":  "0",
                "verify_result":  "PASSED",
-               "verify_time":  "2026-08-20T03:00:21Z"
+               "verify_time":  "2026-08-24T03:00:21Z"
            },
     "reportPath":  "agency-os/reports/status/backup-health-LATEST.md"
 }

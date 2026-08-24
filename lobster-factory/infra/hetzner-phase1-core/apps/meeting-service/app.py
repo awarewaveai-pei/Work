@@ -52,7 +52,11 @@ async def upload(file: UploadFile = File(...), diarize: bool = True,
     if ext not in ALLOWED_EXT:
         raise HTTPException(400, f"不支援的副檔名 {ext}；允許：{', '.join(sorted(ALLOWED_EXT))}")
 
-    if use_api and not settings.has_api_key():
+    # key 在上傳當下就讀出來、往下傳給背景 thread，不要讓 thread 自己在跑到
+    # 摘要階段時才去讀 settings.py 目前的值——轉錄+講者分離常常要跑好幾分鐘，
+    # 這段時間夠使用者在設定頁換掉或清除 key，屆時才讀會用錯 key 或誤退回人工。
+    api_key = settings.get_api_key() if use_api else ""
+    if use_api and not api_key:
         raise HTTPException(400, "尚未在設定頁填入 API key，無法使用 API 自動處理")
 
     job_id = uuid.uuid4().hex[:12]
@@ -79,7 +83,7 @@ async def upload(file: UploadFile = File(...), diarize: bool = True,
         target=run_pipeline_phase1,
         args=(job_dir, media_path),
         kwargs={"model_name": model, "do_diarize": diarize, "sync_drive": sync_drive,
-                "use_api": use_api},
+                "use_api": use_api, "api_key": api_key},
         daemon=True,
     )
     thread.start()
@@ -134,7 +138,13 @@ def status(job_id: str):
     path = os.path.join(job_dir, "status.json")
     if not os.path.exists(path):
         return {"stage": "starting", "done": False}
-    return JSONResponse(json.load(open(path, encoding="utf-8")))
+    try:
+        return JSONResponse(json.load(open(path, encoding="utf-8")))
+    except (json.JSONDecodeError, OSError):
+        # write_status() 用原子 rename 寫檔（見 pipeline.py），理論上讀不到
+        # 半寫狀態；這裡留防禦性 fallback 是給極端情況（例如檔案系統本身
+        # 不支援 atomic rename），寧可讓前端下一輪 1.5s 再 poll，也不要 500。
+        return {"stage": "starting", "done": False}
 
 
 @app.get("/api/log/{job_id}")

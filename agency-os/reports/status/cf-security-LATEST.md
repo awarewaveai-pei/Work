@@ -1,6 +1,6 @@
 ﻿# Cloudflare security check
 
-- Generated: 2026-08-20 15:50:20
+- Generated: 2026-08-24 12:51:03
 - Zone: f21b1919632fee2221647908a94fdcac (aware-wave.com)
 - **Overall: PASS**
 
@@ -12,9 +12,9 @@
 | xmlrpc.php block rule | present |
 | Scanner flood rate-limit rule | enabled/block |
 | WP admin rate-limit carve-outs | present |
-| Origin lockdown (SG) | active |
-| CF ipset cf-ipv4 entries | 15 |
-| CF ipset cf-ipv6 entries | 7 |
+| Origin lockdown (SG) | inactive warning: direct-origin attacks possible |
+| CF ipset cf-ipv4 entries | N/A |
+| CF ipset cf-ipv6 entries | N/A |
 
 ## wp-login / xmlrpc protection
 - Mode: **server-side** (LLAR + nginx rate-limit + fail2ban) -- architecture decision 2026-06-04.
@@ -23,9 +23,9 @@
 - This check verifies CF posture plus Origin Lockdown; WordPress plugin protection is verified separately (client-status / WP plugin checks).
 
 ## Origin Lockdown (SG 5.223.93.113)
-- Status: **active**
-- CF IPv4 ranges in ipset: 15
-- CF IPv6 ranges in ipset: 7
+- Status: **inactive**
+- CF IPv4 ranges in ipset: 0
+- CF IPv6 ranges in ipset: 0
 - Architecture: iptables allows only CF IPs on 80/443 -- direct-origin scanners DROP before nginx
-- Maintenance: use /origin-lockdown status or scripts/refresh-cf-origin-ips.ps1; rollback only for emergency recovery.
+- To apply: /origin-lockdown apply (HIGH RISK, go-ahead required)
 - Runbook: runbooks/CLOUDFLARE-WAF-SETUP.md #Origin-Lockdown-SOP
