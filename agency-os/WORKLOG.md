@@ -153,6 +153,42 @@ git 對含空格/特殊字元的路徑會在 diff header 加引號（`diff --git
 [rollback]
 `git diff scripts/codex-oracle.ps1 scripts/verify-closeout-completeness.ps1` 還原兩個 hunk，兩檔改動互相依賴（producer/consumer 配對），需一起回滾或都保留。
 
+### AUTO_TASK_DONE: ORACLE gate quoted-path 檔名修正，附帶發現更嚴重的既有洞（round 5，同 session 第五次 Codex stop-hook）
+
+[任務]
+Round 4 修完後，同一顆 Codex stop-hook 第五次抓到問題：「quoted-path deletions will false-fail the new ORACLE gate」——正是我 round 4 [已知限制] 段自己記錄、決定不修的那個案例。
+
+[根因與過程]
+先查證再下結論：我 round 4 宣稱「本 repo 命名慣例不會有空格檔名」從未實際驗證過，`git ls-files | grep ' '` 一查發現 632 個真實 tracked 檔案在 `agency-os/docs/RankMath/` 底下就有空格（`404 & Redirections/` 整批 KB 文件）——這個宣稱本身就違反 R4「聲稱即驗證」。
+進一步用 scratch repo 實測發現：**空格本身其實不會觸發 git 的 C-quoting**（`diff --git a/file with space.md b/file with space.md` 是不加引號的），我的 regex 對這個情況原本就是對的。真正會觸發 quoting 的是**非 ASCII 字元**（例如 RankMath 檔名裡常見的 unicode 智慧引號 U+2019）——這類路徑 git 預設（`core.quotepath=true`）會印成 `"Website\342\200\231s Handler.php"` 這種加引號+八進位轉義的字串。
+**附帶發現（比 round 5 原問題更嚴重）**：`scripts/verify-closeout-completeness.ps1:145-146` 既有的副檔名判斷（`[System.IO.Path]::GetExtension` + regex fallback `\.(\w+)$`）對這種加引號字串直接回傳空字串（regex 要求 `\w+$` 收在字串尾端，但實際尾端是 `"` 引號字元，永遠不會命中）——用真實 PowerShell 指令驗證確認。這代表**任何含非 ASCII 字元的檔名，過去從未觸發過 REALTEST / DEBUG-TAG / ORACLE 任何一個閘**，不是判斷錯誤，是完全沒被看見。修正這個根因同時關掉了這個更大的洞。
+查證這個修法是否是我發明的：grep `core.quotepath` 發現 `scripts/checkpoint-junk-guard.mjs:38` 和 `tests/hooks/maintenance-scripts.test.mjs:89` 兩處早就用同樣的 `-c core.quotepath=false`（還多加了 `-z` NUL 分隔）處理過一模一樣的問題——證實這是本 repo 已驗證過的正確手法，不是我自創。
+
+[已修改]
+1. `scripts/codex-oracle.ps1:69-95`（`Invoke-Git` 函式）—— 所有 git 呼叫統一改用 `git -c core.quotepath=false -C $Root @GitArgs`，這是全檔唯一的 git 呼叫入口（已 grep 確認無其他繞過點），連帶修好 `files-reviewed` regex 抽取 + untracked 檔案 inline 判斷（後者附帶正向副作用：過去 unicode 檔名的 untracked 新檔也會因同樣理由被靜默跳過 inline review，現在能正確抓到）
+2. `scripts/verify-closeout-completeness.ps1:54-61`（`$staged` 來源）—— 同樣改用 `git -c core.quotepath=false diff --cached --name-only`，這是全域唯一決定 `$staged`/`$significant`/`$oracleStaged` 內容的地方，一處修好全部下游受益
+
+[未採用的方案]
+比照 `-z` NUL 分隔輸出：更徹底（連殘留的「路徑本身含引號/反斜線」極端案例都能處理），但需要把 `Invoke-WithUtf8Console` 包裝下的逐行捕獲機制改成原始 byte 讀取再手動 split，改動範圍與風險明顯更大。`core.quotepath=false` 已解決 round 5 實際點名的問題與 632 個真實檔案的實際情境，`-z` 列為已知取捨、非本輪必要。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`git ls-files \| grep ' '` 對真實 repo 查證 632 個含空格的真實 tracked 檔案存在 | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=scratch repo 建立真實含 U+2019 unicode 字元的 `.php` 檔案、真實 `git rm` staged deletion，比對 `git diff --cached --name-only` 有無 `-c core.quotepath=false` 的輸出差異 | exit=0（無修正：`"Website\342\200\231s Handler.php"` 加引號轉義；有修正：`Website's Handler.php` 原始可讀字串）
+- REALTEST_EVIDENCE: tool=Bash | cmd=對真正的 `scripts/verify-closeout-completeness.ps1`（`-WorkRoot` 指向該 scratch repo，經 PowerShell 原生 `Out-File -Encoding utf8` 讀回避免 bash pipe 轉導造成的顯示層亂碼干擾判讀）跑 3 組新情境（K=無 artifact→擋且訊息顯示正確可讀檔名、L=files-reviewed 正確列出 unicode 檔名→靜默放行、M=舊格式無 files-reviewed→擋且訊息可讀）| exit=0（3/3 pass）
+- REALTEST_EVIDENCE: tool=Bash | cmd=對 round 3-4 用的 ASCII scratch repo 重跑 2 組回歸測試（內容確認放行案例、純過期硬擋案例）| exit=0（2/2 pass，確認本輪修正未破壞前四輪行為；本 session 累計 15 組真實整合情境）
+- REALTEST_EVIDENCE: tool=Bash | cmd=對加引號字串手動跑既有的副檔名判斷 fallback 邏輯 | exit=0（確證回傳空字串，佐證附帶發現的既有洞為真，非臆測）
+- REVIEW_WAIVED: NA -- critic 本 session 第 6 次呼叫仍 529（Anthropic 服務端持續過載）；手動針對 4 個自問問題逐一排查：① grep 確認兩檔內無其他解析 quoted 字串/`--- a/`/`+++ b/` 的邏輯依賴舊的加引號格式，`core.quotepath=false` 不會破壞既有解析；② grep 確認 `Invoke-Git` 是 codex-oracle.ps1 唯一 git 呼叫點，無繞過路徑；③ ls-files 的行為改變是正向副作用（見上）非需額外處理的風險；④ `/audit-encoding` 兩檔皆 CLEAN，新增的 `-c core.quotepath=false` 是純 ASCII 字面值
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`core\.quotepath` | hits=6（`checkpoint-junk-guard.mjs`/`maintenance-scripts.test.mjs` 既有兩處 + 本次新增兩處程式碼 + 兩處說明性註解，語意一致無衝突）
+
+[剩餘風險]
+- 仍未處理的極端情況（路徑本身含字面雙引號/反斜線字元，即使 `core.quotepath=false` 仍會被 quote）——比 632 個 unicode 檔名的情境窄得多，記為已知取捨（見上）
+- 舊格式 oracle artifact（round 1-4 產生、無 `files-reviewed` 行）持續存在的一次性轉換成本（round 4 已記錄，不重複）
+- critic 外部驗證本 session 全程不可用（累計 6 次 529），五輪修正全靠手動 review + 真實整合測試把關，**強烈建議下個 session 優先跑一次完整 `/review` 覆蓋 `codex-oracle.ps1` 全檔 + `verify-closeout-completeness.ps1:1-360`**（含本輪修正在內，五輪程式碼從未經過外部覆審）
+- `test-hooks.sh` 仍無 ORACLE gate 專屬案例（五輪累積的既有缺口，非本次引入）
+
+[rollback]
+`git diff scripts/codex-oracle.ps1 scripts/verify-closeout-completeness.ps1` 還原兩個 hunk，兩檔互相依賴需一起回滾或都保留。
+
 ## 2026-08-20 — 跨模型 oracle 制度化：`codex-oracle.ps1` + AGENTS 分工規則
 
 ### AUTO_TASK_DONE: 把 08-17 驗證有效的 Codex oracle 從「當次對話」變成常駐機制

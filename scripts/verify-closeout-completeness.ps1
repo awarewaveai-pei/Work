@@ -51,7 +51,14 @@ try {
         exit 0
     }
 
-    $staged = @(Invoke-WithUtf8Console { git diff --cached --name-only } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    # -c core.quotepath=false: without it, git C-quotes+octal-escapes any path with a
+    # non-ASCII byte (e.g. `"Website\342\200\231s Guide.md"` instead of the real
+    # `Website's Guide.md`) -- every downstream Test-Path/extension/regex check in this
+    # script operates on that garbled literal string instead of the real path (codex
+    # stop-hook, round 5: this broke deletion content-verification for such files; the
+    # same corruption already silently existed for every other gate in this file, for
+    # any of the 632 non-ASCII-named tracked files in agency-os/docs/RankMath/ alone).
+    $staged = @(Invoke-WithUtf8Console { git -c core.quotepath=false diff --cached --name-only } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     if ($staged.Count -eq 0) {
         exit 0
     }

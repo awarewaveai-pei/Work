@@ -70,20 +70,27 @@ function Invoke-Git {
     <#
       Runs git and returns @{ Text; Exit }.
 
-      Two traps handled here:
+      Three traps handled here:
       - git writes advisory text to stderr (CRLF-conversion warnings, hint blocks). Under
         $ErrorActionPreference='Stop' a native command's stderr becomes a TERMINATING error
         in PowerShell 5.1, so a harmless warning would abort the run. The exit code is the
         authority on success; stderr text is informational.
       - captured output may contain CJK (commit subjects, diff bodies), so it goes through
         the UTF-8 console wrapper.
+      - core.quotepath defaults to true, which C-quotes+octal-escapes any path containing
+        a non-ASCII byte in diff headers and --name-only output (e.g. a literal
+        `"Website\342\200\231s Guide.md"` instead of `Website's Guide.md`). The
+        files-reviewed extraction below regex-matches the diff header directly, so a
+        quoted path would silently fail to match and the review would look like it never
+        touched that file (codex stop-hook, round 5). -c here is the single choke point
+        for every git call this script makes.
     #>
     param([string[]]$GitArgs, [string]$Root)
 
     $prev = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
-        $out  = Invoke-WithUtf8Console { & git -C $Root @GitArgs 2>&1 }
+        $out  = Invoke-WithUtf8Console { & git -c core.quotepath=false -C $Root @GitArgs 2>&1 }
         $code = $LASTEXITCODE
         if ($null -eq $code) { $code = 0 }
         return @{ Text = (@($out) -join "`n"); Exit = $code }
