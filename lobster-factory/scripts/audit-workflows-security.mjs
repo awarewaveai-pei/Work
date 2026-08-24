@@ -226,9 +226,18 @@ writeFileSync(latestPath, content, "utf8");
 // Machine-readable verdict so the workflow gate READS a decision instead of re-deriving
 // policy in YAML. One place decides; the gate only enforces.
 const verdictPath = resolve(reportsDir, "workflows-npm-audit-LATEST.json");
+// RUN BINDING, not just a timestamp. These report files are committed to git, so a checkout
+// always has a LATEST.json on disk - and a time window cannot tell "this run produced it"
+// from "someone committed a freshly generated one minutes before this run started". That is
+// not hypothetical: on 2026-08-25 the verdict JSON was committed at 20:30 UTC and the
+// workflow was dispatched at 20:37, seven minutes apart. A 30-minute freshness check would
+// have accepted the committed copy as this run's output. Stamping the run id makes the
+// question exact instead of probabilistic: either this run wrote the file or it did not.
 writeFileSync(verdictPath, `${JSON.stringify({
-  schemaVersion: 1,
+  schemaVersion: 2,
   generatedAtUtc: ts.toISOString(),
+  runId: process.env.GITHUB_RUN_ID || null,
+  runAttempt: process.env.GITHUB_RUN_ATTEMPT || null,
   verdict,
   shippedHighCritical: shippedHigh,
   counts,

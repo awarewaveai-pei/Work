@@ -1,6 +1,8 @@
 {
-  "schemaVersion": 1,
-  "generatedAtUtc": "2026-08-24T20:18:50.586Z",
+  "schemaVersion": 2,
+  "generatedAtUtc": "2026-08-24T20:47:48.525Z",
+  "runId": null,
+  "runAttempt": null,
   "verdict": "pass",
   "shippedHighCritical": 0,
   "counts": {

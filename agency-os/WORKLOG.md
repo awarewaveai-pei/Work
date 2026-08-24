@@ -90,6 +90,13 @@ Codex stop-time review 抓到：**新的安全閘在稽核管線失敗時，會�
 
 **六情境實測**（每種都驗 payload 零裸引號、零內嵌換行）：健康+已接受 → ✅ 正確措辭；產生步驟失敗 → 🚨 未知；無 verdict → 🚨 未知；**舊 JSON（committed 舊檔情境）→ 🚨 未知**；JSON 不存在 → 🚨 未知；shipped 曝險 → 🚨 高危。
 
+**第二次 stop-time review：時間窗擋不住「剛 commit 進去的新檔」**
+Codex 再抓：「stale-report guard 仍然只綁時間，沒有綁執行」。**而我自己剛好就製造了那個情境**——20:30 UTC commit 了 `workflows-npm-audit-LATEST.json`，20:37 dispatch workflow，相差 **7 分鐘**。若當時產生報告那步失敗，checkout 出來的 committed JSON 會顯示「7 分鐘前」，順利通過 30 分鐘新鮮度檢查，於是用一份**這次執行根本沒產生**的檔案去發告警。時間窗只能區分「舊」與「新」，區分不了「誰產生的」。
+
+改為**執行綁定**（identity check，不是機率）：稽核腳本把 `GITHUB_RUN_ID` / `GITHUB_RUN_ATTEMPT` 寫進裁決檔（schemaVersion 1→2），gate 要求兩者與本次執行**精確相符**才信任。本機產生時為 `null`，正是 CI 該拒絕的形狀。另加縱深防禦：產生報告前先 `rm -f` 掉 checkout 帶進來的 LATEST 檔——不存在的檔案就不可能被誤認成本次輸出。
+同時修掉診斷可讀性：原本失敗時把 node 堆疊塞進訊息，160 字元上限一截就只剩 `verdict_json_error=[e`，**說了「未知」卻沒說為什麼**。改為輸出單行明確原因。
+**追加五情境實測**：本次執行的檔案 → `yes`；**時間很新但 runId 不同 → `no`（`ERR run-mismatch got=888 want=999`）**；committed 本機副本 `runId=null` → `no`；同一 run 但 attempt 不符 → `no`；檔案不存在 → `no`（`ERR unreadable-or-invalid-json`）。每種仍驗 payload 零引號零換行。
+
 [剩餘風險]
 - `deepmerge-ts` 的接受期限到 **2026-11-23**。屆時若 `@prisma/config` 仍未放掉精確釘版，閘會再度轉紅並要求重新決定 —— **這是刻意的**，不是待辦遺漏。
 - 本輪把 dev-only finding 由「硬擋」降為「需登記」。若未來出現**可修**的 dev 端漏洞，它會以 `unacknowledged` 觸發失敗；但若有人便宜行事把它登記掉而不修，這道閘擋不住 —— 那屬操作紀律，與 AGENTS.md §已知信任邊界 同性質。

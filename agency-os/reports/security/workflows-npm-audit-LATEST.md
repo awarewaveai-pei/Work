@@ -1,6 +1,6 @@
 # Workflows npm audit report
 
-- Generated UTC: 2026-08-24T20:18:50.586Z
+- Generated UTC: 2026-08-24T20:47:48.525Z
 - Path: `lobster-factory/packages/workflows`
 - Total: 2
 - Critical: 0
