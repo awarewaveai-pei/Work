@@ -36,11 +36,16 @@ An entrenched failure is treated as worse than a fresh one: a single red run is 
 flake or a work-in-progress, while a workflow that has been red for days is a gate that has
 been switched off without anyone deciding to switch it off.
 
+A run counts as healthy only if its conclusion is on a short ALLOWLIST (success / skipped /
+neutral). Anything else - cancelled, action_required, stale, startup_failure, or a conclusion
+GitHub adds in future - is reported rather than assumed fine, so unknown values fail closed.
+
 Verdict:
-  GREEN healthy - every workflow's latest run on the default branch succeeded (or is pending)
-  YELLOW drift  - at least one workflow's latest run failed
-  RED broken    - a workflow has been failing for >= 3 consecutive runs or >= 7 days
-                  (the 2026-08-15 case was 4 runs / 10 days), or gh itself could not answer
+  GREEN healthy - every workflow's latest concluded run on the default branch is healthy
+  YELLOW drift  - a workflow's latest run is not healthy, or a workflow is disabled
+  RED broken    - a workflow has been unhealthy for >= 3 consecutive runs or >= 7 days
+                  (the 2026-08-15 case was 4 runs / 10 days), gh could not answer, or the
+                  workflow list came back truncated so the report cannot claim completeness
 
 Exit code: always 0 (warn-only, same convention as the sibling checks).
 
@@ -58,6 +63,10 @@ param(
     # Runs inspected PER WORKFLOW (not a global sample - see the enumeration comment below).
     # Only needs to be deep enough to measure a failure streak; 20 covers weeks of a weekly job.
     [int]$RunsPerWorkflow = 20,
+    # Ceiling for the workflow enumeration. Far above any plausible repo; if a result ever
+    # comes back AT this number the script reports a blind spot rather than assuming it saw
+    # everything (see the truncation check below).
+    [int]$WorkflowListLimit = 200,
     [switch]$Json
 )
 
@@ -74,6 +83,23 @@ $ICON_BROKEN  = [char]::ConvertFromUtf32(0x1F534)  # red circle
 # that has been off since then. Calibrated on the 2026-08-15 case: 4 runs across 10 days.
 $ENTRENCHED_RUNS = 3
 $ENTRENCHED_DAYS = 7
+
+# Conclusions treated as a healthy run. This is deliberately an ALLOWLIST OF GOOD VALUES.
+# GitHub's conclusion set includes success, failure, cancelled, skipped, neutral, timed_out,
+# action_required, stale, startup_failure - and may grow. Enumerating the BAD ones (which an
+# earlier version of this file did) means every value not on that list, including any future
+# addition, is silently scored as healthy. Enumerating the good ones fails closed instead:
+# an unrecognised conclusion is reported, not waved through.
+#   success  - the run passed.
+#   skipped  - no jobs ran (path filters / job-level `if`); nothing was asserted, but nothing
+#              failed either, so it is not a fault. Shown in the table, no verdict change.
+#   neutral  - a check deliberately reported "no opinion".
+$HEALTHY_CONCLUSIONS = @("success", "skipped", "neutral")
+
+function Test-RunHealthy {
+    param([string]$Conclusion)
+    return ($HEALTHY_CONCLUSIONS -contains $Conclusion.ToLowerInvariant())
+}
 
 function Resolve-Root {
     param([string]$InputRoot)
@@ -128,7 +154,12 @@ if (-not $ghCmd) {
         return @{ ExitCode = $code; Output = $o }
     }
 
-    $wfRes = Invoke-Gh -GhArgs @("workflow", "list", "--limit", "100", "--json", "name,id,state")
+    # --limit is a boundary, and a boundary you cannot see past is a blind spot. Raise it well
+    # beyond any plausible repo, then CHECK whether the result came back at the limit: if it
+    # did, more may exist and this run cannot claim to have seen everything. Round 3 removed
+    # the run-sampling boundary and left this one, which is the same defect one level up
+    # (codex oracle 2026-08-25 round 4, FINDING 1 - confirmed).
+    $wfRes = Invoke-Gh -GhArgs @("workflow", "list", "--limit", "$WorkflowListLimit", "--json", "name,id,state")
     if ($wfRes.ExitCode -ne 0 -or -not $wfRes.Output) {
         Set-Worst "broken"
         $firstLine = if ($wfRes.Output) { ($wfRes.Output -split "`n")[0] } else { "(no output)" }
@@ -144,6 +175,11 @@ if (-not $ghCmd) {
             $reasons += "no workflows are defined in this repository - nothing to check, which is itself worth noticing"
         } else {
             $probeOk = $true
+            # Truncation is indistinguishable from "that is all of them" unless you look.
+            if (@($wfList).Count -ge $WorkflowListLimit) {
+                Set-Worst "broken"
+                $reasons += "BLIND SPOT: gh returned exactly $WorkflowListLimit workflows, the requested maximum - there may be more that were never inspected. Raise -WorkflowListLimit."
+            }
             $byWorkflow = @{}
             foreach ($wf in @($wfList)) {
                 # Disabled workflows are reported but cannot fail; skipping them silently would
@@ -159,12 +195,16 @@ if (-not $ghCmd) {
                 $wfRuns = $null
                 try { $wfRuns = $runRes.Output | ConvertFrom-Json } catch { $wfRuns = $null }
                 if ($null -eq $wfRuns) { $wfRuns = @() }
-                $byWorkflow[$wfName] = @{ Runs = @($wfRuns); State = [string]$wf.state }
+                # Keyed by workflow ID, never by display name: two workflow files may carry the
+                # same `name:`, and hashing on it lets a green one overwrite a red one so the
+                # red never appears at all (codex oracle 2026-08-25 round 4, FINDING 2).
+                $byWorkflow[[string]$wf.id] = @{ Name = $wfName; Runs = @($wfRuns); State = [string]$wf.state }
             }
 
-            foreach ($name in ($byWorkflow.Keys | Sort-Object)) {
-                $list = $byWorkflow[$name].Runs
-                $wfState = $byWorkflow[$name].State
+            foreach ($wfId in ($byWorkflow.Keys | Sort-Object { $byWorkflow[$_].Name })) {
+                $name = $byWorkflow[$wfId].Name
+                $list = $byWorkflow[$wfId].Runs
+                $wfState = $byWorkflow[$wfId].State
                 if ($wfState -and $wfState -ne "active") {
                     Set-Worst "drift"
                     $reasons += "'$name' is $wfState - a workflow that is not active is a gate that is switched off"
@@ -183,13 +223,18 @@ if (-not $ghCmd) {
                 }
 
                 $latest = $concluded[0]
-                $isFail = ($latest.conclusion -in @("failure", "timed_out", "startup_failure"))
+                # ALLOWLIST THE GOOD VALUES. The previous version enumerated three failure
+                # conclusions, which silently treated everything else - `cancelled`,
+                # `action_required`, `stale`, and any conclusion GitHub adds later - as healthy.
+                # Enumerating bad values fails OPEN on anything new; enumerating good values
+                # fails CLOSED (codex oracle 2026-08-25 round 4, FINDING 3 - confirmed).
+                $isFail = -not (Test-RunHealthy -Conclusion ([string]$latest.conclusion))
 
                 $streak = 0
                 $since = $null
                 if ($isFail) {
                     foreach ($r in $concluded) {
-                        if ($r.conclusion -in @("failure", "timed_out", "startup_failure")) {
+                        if (-not (Test-RunHealthy -Conclusion ([string]$r.conclusion))) {
                             $streak++
                             $since = $r.createdAt
                         } else { break }

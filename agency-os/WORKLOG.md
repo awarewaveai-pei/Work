@@ -92,6 +92,11 @@ Merge 每欄開一個寫入緩衝，所以 `metric_log` 一次 merge 固定要 ~
   - **實測（6 種情境）**：A) CI 條件（無 `.env`）→ PASS，image 正確解析為 compose 預設；B) prod 條件（有 `.env`）→ PASS；C) 明確傳入 env-file → PASS；D) env-file 用**引號**包值 → compose 正確剝除 → PASS（R3-F2 關閉）；E) env-file 指向**不同 tag** → 驗證器確實改用該 tag（`99.9.9-does-not-exist`）而非退回預設，exit 125（R3-F1 關閉）；F) 目錄下無 compose → **明確 FAIL、拒絕猜測**，exit 1。
   - **列舉法的直接證據**：改版後找到 **10 個 workflow**，取樣法只看到 5 個 —— **有 5 個 workflow 之前完全不可見**（R3-F3 證實）。
   - **自查再抓一個我剛引入的 bug**：讀回時發現 `fail()` 定義在第 92 行、卻在第 73 行的 image 解析區塊就被呼叫，`docker` 可用性檢查也在使用 docker 之後。會 fail-closed 但訊息是 `fail: command not found`。已把兩者上移到第一次使用之前。
+- REVIEW_DONE（第四輪，只審「依第三輪修的那三個檔」）: critic=Deep | verdict=pass-after-fix | findings=0c/3m/0n —— **三條全真，而且都是我在第三輪就寫下的那個不變量、卻只點狀套用沒窮盡**
+  - R4-F1：`gh workflow list --limit 100` 是另一道取樣邊界。我第三輪拆掉了 run 取樣，**卻把 workflow 列表的取樣留著**——同一個缺陷高一層。修法不只是把數字調大：改為 `-WorkflowListLimit 200` **並偵測截斷**（回傳筆數等於上限時 → BLIND SPOT + FAIL，因為「剛好這麼多」與「被截斷」在資料上無法區分，除非去看）。實測 `-WorkflowListLimit 3` → FAIL + BLIND SPOT。
+  - R4-F2：`$byWorkflow` 用**顯示名稱**當 key，兩個 workflow 檔可以有相同 `name:`，綠的會覆蓋紅的且紅的完全不出現。改用 workflow id 當 key、name 只做顯示。實測 10 個 workflow → 報表 10 列，無合併。
+  - R4-F3：只列舉 `failure/timed_out/startup_failure` 三種失敗結論 → **其餘一切（`cancelled`、`action_required`、`stale`，以及 GitHub 未來新增的任何值）都被靜默當成健康**。改為**列舉「好值」的白名單**（`success`/`skipped`/`neutral`），未知值一律 fail-closed。**這是真的在發生，不是假設**：實測本 repo 近 200 次 main 執行含 **6 次 `cancelled`**，舊邏輯全部放行。
+  - **不變量沒有再擴充，是我上一輪沒有窮盡**：第三輪已寫下「檢查器用比真實系統更窄的捷徑解析輸入 → 沒命中就靜默通過」，但我只套用在 image 解析與 run 取樣兩處。這一輪把同一條規則掃過剩下三處：**邊界（要偵測截斷）、鍵（要唯一）、值域（要列舉好值而非壞值）**。第三條是類別殺手——**列舉壞值對新值 fail-open，列舉好值才 fail-closed**。
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.github | grep=clickhouse-config-check | hits=3
   - ① `AGENTS.md:234` 教代理盯資料比（本次事故證明會漏）→ 已改
   - ② `WORKLOG.md` 2026-08-19 的技術結論已被證偽 → 已加訂正
