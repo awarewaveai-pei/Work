@@ -333,6 +333,29 @@ try {
                 } catch { }
             }
 
+            # Round 7 (codex CONFIRMED): a bare path in deletions-reviewed only proves
+            # SOME deletion of that path was reviewed today. If the file is restored,
+            # edited, and deleted again the same day, the stale path-only entry would
+            # wrongly vouch for a deletion of DIFFERENT content that was never reviewed.
+            # codex-oracle.ps1 now writes `path@blobhash` entries (falling back to a bare
+            # path only if it could not read the hash) -- compute the hash of what is
+            # ACTUALLY staged for deletion right now, from the same `index <hash>..0000000`
+            # line git prints, so the match binds to the specific version, not just the
+            # path. A bare-path entry in $confirmedDeletedPaths (old-format artifact, or
+            # codex-oracle's own fallback) still counts as confirmation -- graceful
+            # degradation to round 6's precision, not a hard requirement for the hash.
+            $currentDeletionHash = @{}
+            try {
+                $fullStagedDiff = (Invoke-WithUtf8Console { git -c core.quotepath=false diff --cached }) -join "`n"
+                foreach ($block in [regex]::Split($fullStagedDiff, '(?m)(?=^diff --git )')) {
+                    $dm2 = [regex]::Match($block, '(?m)^diff --git a/.+? b/(.+?)\s*$')
+                    if (-not $dm2.Success) { continue }
+                    if ($block -notmatch '(?m)^deleted file mode') { continue }
+                    $ixm2 = [regex]::Match($block, '(?m)^index ([0-9a-f]+)\.\.')
+                    if ($ixm2.Success) { $currentDeletionHash[$dm2.Groups[1].Value] = $ixm2.Groups[1].Value }
+                }
+            } catch { }
+
             $staleAgainst    = @()
             $unverifiable    = @()
             $unconfirmed     = @()
@@ -350,7 +373,8 @@ try {
                     # $confirmedDeletedPaths comment above) is strictly stronger evidence
                     # than timing -- it doesn't need a timing gate in front of it, only
                     # behind it as a fallback when that confirmation isn't available.
-                    if ($confirmedDeletedPaths.Contains($sf)) { continue }
+                    $hashConfirmed = $currentDeletionHash.ContainsKey($sf) -and $confirmedDeletedPaths.Contains(('{0}@{1}' -f $sf, $currentDeletionHash[$sf]))
+                    if ($hashConfirmed -or $confirmedDeletedPaths.Contains($sf)) { continue }
                     if (-not $indexStageTime) { $unverifiable += $sf }
                     elseif ($indexStageTime -gt $newestArtifact.LastWriteTime) { $staleAgainst += $sf }
                     else { $unconfirmed += $sf }

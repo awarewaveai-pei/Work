@@ -229,6 +229,35 @@ critic subagent 這個 session 累計 6 次 529 後停止依賴它；改用 `scr
 [rollback]
 `git diff scripts/codex-oracle.ps1 scripts/verify-closeout-completeness.ps1` 還原兩個 hunk，兩檔互相依賴需一起回滾或都保留。
 
+### AUTO_TASK_DONE: deletions-reviewed 綁 blob hash，堵住同日「刪除→復原→改內容→再刪除」誤證（round 7，同 session 第七次 Codex stop-hook）
+
+[任務]
+Round 6 修完後，同一顆 Codex stop-hook 第七次抓到問題：「path-only `deletions-reviewed` metadata still lets a later same-day re-delete ship unreviewed」。
+
+[根因]
+Round 6 把 deletion 確認綁定到路徑字串（`deletions-reviewed: <path1>, <path2>`），但路徑只認「這個檔案今天有沒有被刪除過並審過」，不認「審的是哪一個版本」。同一天內完全可能發生：檔案 A 被刪除→審過（記錄 `deletions-reviewed: A`）→操作者復原（`git reset`/`git checkout`）→改了內容→又刪一次（這次沒重跑 oracle）——第二次刪除的是完全不同的內容，但因為 `$confirmedDeletedPaths` 只比對路徑字串，第一次的舊記錄會誤證第二次從未被審過的刪除。
+
+[已修改]
+1. `scripts/codex-oracle.ps1:293-311`——diff 逐檔區塊解析時，對每個 `deleted file mode` 區塊額外抓 git 自己印的 `index <hash>..0000000` 這行（該檔被刪除前內容的 blob hash），組成 `<path>@<hash>` 格式寫入 `deletions-reviewed`（抓不到 hash 的極端情況退回純路徑，不遺失訊號）
+2. `scripts/verify-closeout-completeness.ps1:336-357`——新增 `$currentDeletionHash`：對「目前真正 staged 的完整 diff」（不是 `--name-only`，這次要抓 hash）跑同一套逐檔區塊解析，取得每個 staged deletion 現在對應的 blob hash；比對邏輯改成「路徑+hash 都對得上」才算強確認，退回「純路徑比對」當作舊格式 artifact 的相容備援（graceful degradation，不是新增一道會擋人的門檻）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=scratch repo 完整重現 Codex 描述的情境：`target.php` v1 內容真實刪除+`git rm`，取得其真實 blob hash（`4cbeec2...`），偽造第一次的審核記錄；接著真實 `git reset`+`git checkout` 復原、改成 v2 內容、`commit`、`git rm` 再刪一次（真實 blob hash變成 `38b308a...`，與 v1 不同）；用第一次（v1 hash）的舊記錄跑 gate | exit=1（正確擋下，不被舊記錄誤放行，訊息為既有 stale 文字）
+- REALTEST_EVIDENCE: tool=Bash | cmd=同一情境換成用正確（v2 hash）的記錄跑 gate | exit=0（正確放行）
+- REALTEST_EVIDENCE: tool=Bash | cmd=用真正的 `codex-oracle.ps1 -Mode review`（真實呼叫，非模擬，~85 秒）對這個 scratch repo 的第二次刪除跑真實 review，確認 artifact 正確寫出 `deletions-reviewed: target.php@38b308a`（跟 git 真實 blob hash 完全吻合）；用這份真實 artifact（非手工偽造）跑真正的 consumer 腳本 | exit=0（真 producer + 真 consumer 全流程通過）
+- REALTEST_EVIDENCE: tool=Bash | cmd=完整回歸測試（R1 舊格式純路徑仍可放行、R2 真過期硬擋、R3 index 無法解析退回 warn-only、R4 waiver 靜音）對 round 1-6 用過的 ASCII scratch repo 重跑 | exit 各自符合預期（4/4 pass）；本 session 累計 25+ 組真實整合情境
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（**外部 oracle = 真正的 `codex-oracle.ps1 -Mode review`**，對這輪修法本身跑真實 review，回報 `NO FINDINGS`；artifact：`agency-os/reports/oracle/2026-08-24-review-27e02329.md`，惟該次 review 是對 scratch repo 跑的，非本 repo 路徑限定 review——本輪修正檔案較小、邏輯直接沿用 round 6 已驗過的架構，判斷風險可接受）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`currentDeletionHash\|hashConfirmed` | hits=4（全部在 `verify-closeout-completeness.ps1` 內部宣告/賦值/比對，無其他 call site；`codex-oracle.ps1` 端無對應符號因為它只負責產生 hash 不消費，不需要命中）
+
+[剩餘風險]
+- 抽出的 hash 是 git diff 顯示的縮寫長度（非固定 40 碼），producer/consumer 都各自對同一份 repo 在相近時間點跑 `git diff`，縮寫長度理論上一致，但沒有針對「兩邊縮寫長度不同導致誤判不符」的邊界案例額外測試——風險評估：git 的縮寫長度演算法對同一批物件在短時間內應該穩定，且 fallback（純路徑比對）在此情況下仍會生效，不會變成「永遠卡住」
+- 舊格式 artifact（round 1-6 產生，`deletions-reviewed` 是純路徑無 hash）仍可用路徑比對放行——這是刻意保留的相容行為非疏漏
+- `test-hooks.sh` 仍無 ORACLE gate 專屬案例（七輪累積的既有缺口，非本次引入）
+- 本輪已是同一段 ~150 行邏輯的第七次修正；若還有第八輪，建議先跳出來重新設計而非繼續加分支判斷
+
+[rollback]
+`git diff scripts/codex-oracle.ps1 scripts/verify-closeout-completeness.ps1` 還原兩個 hunk，兩檔互相依賴需一起回滾或都保留。
+
 ## 2026-08-20 — 跨模型 oracle 制度化：`codex-oracle.ps1` + AGENTS 分工規則
 
 ### AUTO_TASK_DONE: 把 08-17 驗證有效的 Codex oracle 從「當次對話」變成常駐機制

@@ -290,6 +290,12 @@ if ($Mode -eq 'review') {
         # needs the stronger claim for the deletion-confirmation check, so deletions get
         # their own list, populated only when the file's diff block actually contains
         # `deleted file mode` (git's own marker for a pure deletion).
+        # Round 7 (codex CONFIRMED): a bare path in deletions-reviewed only proves SOME
+        # deletion of that path was reviewed today -- if the file gets restored, edited,
+        # and deleted again later the same day, the stale path-only entry would wrongly
+        # vouch for a deletion of DIFFERENT content that was never reviewed. Bind to the
+        # blob hash git already prints for the removed content (`index <hash>..0000000`)
+        # so a confirmation matches the specific version reviewed, not just the path.
         $reviewedPaths = New-Object System.Collections.Generic.List[string]
         $deletedPaths  = New-Object System.Collections.Generic.List[string]
         foreach ($block in [regex]::Split($diffText, '(?m)(?=^diff --git )')) {
@@ -297,7 +303,13 @@ if ($Mode -eq 'review') {
             if (-not $dm.Success) { continue }
             $p = $dm.Groups[1].Value
             $reviewedPaths.Add($p)
-            if ($block -match '(?m)^deleted file mode') { $deletedPaths.Add($p) }
+            if ($block -match '(?m)^deleted file mode') {
+                $ixm = [regex]::Match($block, '(?m)^index ([0-9a-f]+)\.\.')
+                # Fallback to bare path if the index line is ever absent (unexpected diff
+                # shape) -- degrades to round 6's precision rather than losing the signal.
+                if ($ixm.Success) { $deletedPaths.Add(('{0}@{1}' -f $p, $ixm.Groups[1].Value)) }
+                else { $deletedPaths.Add($p) }
+            }
         }
         foreach ($u in $inlined) { $reviewedPaths.Add($u) }
         $reviewedPathsList = (@($reviewedPaths) | Select-Object -Unique) -join ', '
@@ -481,9 +493,10 @@ $meta = @(
         else { '(n/a for this mode)' }
     )),
     # Deliberately separate from files-reviewed (round 6): only paths whose diff block
-    # carried git's own `deleted file mode` marker land here. See the extraction comment
-    # above for why a file's mere presence in files-reviewed is not enough to confirm a
-    # DELETION of it was reviewed, as opposed to some earlier modification.
+    # carried git's own `deleted file mode` marker land here, each as `path@blobhash`
+    # (round 7) so a same-day re-delete of different content after this one can't be
+    # vouched for by this entry. See the extraction comment above for why a file's mere
+    # presence in files-reviewed is not enough to confirm a DELETION of it was reviewed.
     ('- deletions-reviewed: {0}' -f $(
         if ((Get-Variable -Name deletedPathsList -ErrorAction SilentlyContinue) -and $deletedPathsList) { $deletedPathsList }
         else { '(none)' }
