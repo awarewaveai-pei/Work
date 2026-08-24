@@ -4,6 +4,49 @@
 
 - 01:06 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-08-24.md
 
+### meeting-service：API 自動處理選項（給客戶用）+ 網路版安裝手冊
+
+[任務]
+客戶筆電無 GPU，本機版「叫 Claude Code 處理」這條路對客戶不成立（碰不到操作者的對話視窗）。加一條選填的 API 自動處理路徑：客戶自己在設定頁填 Anthropic API key，上傳時勾選即可全自動跑完，不用手動貼 JSON。另外先把「之後也要做網路版」的安裝手冊寫好存進 TASKS，待觸發。
+
+[已修改]
+1. `lib/settings.py`（新增）—— 本機 `.settings.json` 存 API key（gitignore 排除），`get/set/has/masked_api_key()`
+2. `lib/summarize.py` —— 新增 `summarize_via_api()`：呼叫 Anthropic API，沿用既有 `validate()` 把關，失敗重試一次帶修正 prompt
+3. `pipeline.py` —— `run_pipeline_phase1()` 加 `use_api`/`api_key` 參數；抽出 `_finalize_from_minutes()` 給人工回路（`resume_after_summary`）與 API 分支共用，避免兩條路各寫一份建置邏輯
+4. `app.py` —— `/api/settings` GET/POST；`/api/upload` 加 `use_api` 參數與守門
+5. `templates/index.html` —— 設定卡片（填/存/清 key）+ 上傳勾選框 + API 失敗退回人工回路的橫幅提示
+6. `NETWORK_VERSION_INSTALL_RUNBOOK.md`（新增）+ `TASKS.md` —— 網路版（GPU 伺服器＋瀏覽器端）完整安裝手冊，待使用者明確觸發，非本次施工範圍
+
+[跨模型 oracle 覆審與修正（兩輪）]
+`codex-oracle.ps1 -Mode review` 對這批改動跑了兩輪（`reports/oracle/2026-08-20-review-d35fedbd.md` + `reports/oracle/2026-08-24-review-d41a8020.md`），共 8 個 finding，逐條驗證+修正：
+- **F1 key 競態**：`run_pipeline_phase1` 原本在摘要階段才讀 `settings.get_api_key()`；轉錄+講者分離常跑好幾分鐘，這段時間夠使用者換掉/清除 key，屆時讀到的 key 跟上傳當下看到的「已設定」狀態對不上 → 改成 `app.py` 上傳當下就讀出 key、當參數往下傳，pipeline 不再自己讀
+- **F2 隱私文案不實**：設定頁原文說 key「不會上傳到任何地方」，但 API 模式下 key 本來就要當認證資訊送到 Anthropic——這是 API 呼叫的本質不是漏洞，但文案講錯了 → 補充說明 key 存檔本身不外流，但用 API 模式時 key 與逐字稿確實會送到 Anthropic，跟「貼上」做法完全不外流不是同一回事
+- **F3 暫時性錯誤不重試**：`summarize_via_api` 的 retry loop 對 `anthropic.APIStatusError`/`APIError` 一律立刻放棄，包含真正該重試的網路抖動/429/5xx → 改成先攔截 `APIConnectionError`/`RateLimitError`/`InternalServerError` 才 continue；第二輪 oracle 再抓到還漏了 529（`OverloadedError`）跟 409（`ConflictError`），比對已安裝 SDK `_client.py` 的 status code 映射（不是憑印象）補齊
+- **F4 建置失敗被誤標成 API 失敗**：原本 try/except 把 `summarize_via_api()` 呼叫跟後續 `_finalize_from_minutes()`（建 PPT/Excel）包在同一個 try 裡，硬碟滿之類的建置錯誤會被誤標成 `api_error` 退回人工回路——使用者重貼同一份 JSON 只會撞到同一道牆 → 拆成 try/except-else，只有「拿摘要」這步失敗才走人工回路退路，建置失敗讓外層當成真正的 job error
+- **F5 status.json 讀寫競態**：`write_status()` 直接開檔截斷寫入，`/api/status` 同時每 1.5s 輪詢，有機會讀到寫一半的檔案 500 → 改 tmp+`os.replace()` 原子寫入 + `/api/status` 讀端防禦性 try/except；第二輪 oracle 再抓到防禦性 fallback 會讓前端輪詢在持續讀取異常時卡住不報錯 → 加輪詢端 stuck-counter，超過 15 秒卡在 `starting` 顯示警告（不中斷輪詢，仍在重試）
+- F6/settings.py 非阻塞面：`_save()`/`_load()` 一併改成同款 tmp+`os.replace()` 原子寫入（跟 write_status 同一套理由）；殘留的「存檔請求 vs 上傳請求」排序競態（單一使用者手動連點兩個按鈕才會踩到）判定不值得為此加分散式鎖，記為已知限制不追加修正
+
+[實測發現的額外真實 bug（review 沒抓到）]
+真實 threaded read/write 壓力測試（模擬 status.json 高頻寫入 + 前端輪詢同時讀）跑出 `os.replace()` 在 Windows 上因為讀端短暫持有 handle 丟 `PermissionError`（WinError 5，sharing violation）——這是 review 靜態分析看不到的，只有真的跑並發才會現形。修法：`os.replace()` 包一層重試（指數退避，20 次上限 ~5 秒），寫完立即用 `with` 關檔縮短持有窗口。修完重跑壓力測試零錯誤零殘留 tmp 檔通過。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -c "import app; print([r.path for r in app.app.routes...])"` (全部路由含 `/api/settings` GET+POST 正確註冊) | exit=0 | ms=~800
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python <scratchpad>/test_status_atomic.py`（真實多執行緒同時寫入+讀取 status.json，含 app.py 實際的例外處理範圍） | exit=0（PASS，0 JSONDecodeError，0 殘留 tmp 檔）| ms=~3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python <scratchpad>/test_summarize_retry.py`（monkeypatch 真實 anthropic SDK 例外類別跑 summarize_via_api：529 重試成功、409 耗盡重試後 RuntimeError、401 立即放棄不重試、parse 失敗才夾帶修正 prompt）| exit=0（4/4 PASS）| ms=~600
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -c "import lib.settings as s; s.set_api_key(...); assert ...; s.set_api_key(orig)"`（設定檔存/讀/遮罩/清除 round-trip，還原原始狀態）| exit=0 | ms=~200
+- REVIEW_DONE: critic=Deep | verdict=pass（兩輪皆為 CONFIRMED 且全數修正，第二輪覆審已無新增 finding 外的遺漏）| findings=8c/0m/0n
+  - 外部 oracle = Codex CLI（`codex exec -s read-only`），非自我描述；artifact 見上方兩份 report 路徑
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/meeting-service | grep=`run_pipeline_phase1\|summarize_via_api\|_finalize_from_minutes\|use_api\|settings\.get_api_key` | hits=6（全部為本次改動的合理呼叫點：app.py/pipeline.py/lib/summarize.py/templates/index.html/README.md/NETWORK_VERSION_INSTALL_RUNBOOK.md，README.md 既有描述與修正後行為一致未過期）
+- ORACLE_WAIVED: 兩輪 codex-oracle 之後（`d35fedbd`→修正→`d41a8020`）又追加的 4 處小改（summarize.py 補 529/409 到重試 tuple、pipeline.py write_status 加 Windows PermissionError 指數退避重試、settings.py 同款 tmp+os.replace 原子寫入、index.html 前端 stuck-counter）沒有第三輪 oracle artifact 覆蓋其後的時間戳。取代方案：write_status 的併發修正已用真實 threaded 壓力測試驗證（見上方 REALTEST，0 錯誤 0 殘留），summarize.py 的 529/409 重試已用真實 SDK 例外型別 monkeypatch 驗證（見上方 REALTEST，4/4 PASS）——這兩項是最關鍵的併發/例外分類正確性，已有比靜態 review 更強的實測證據；settings.py 改動是複製已驗證過的既有模式；index.html 改動是純顯示層 fallback，不影響管線正確性。判斷再多跑一輪 oracle 的邊際價值低於其時間成本，非省略不驗證。
+
+[剩餘風險]
+- settings.py 存檔請求 vs 上傳請求的排序競態未解（見上方 F6 說明），評估為單一使用者本機工具下的可接受風險，非本次修正範圍
+- API 模式尚未用真實 key 打過真實 Anthropic 端點（`.settings.json` 目前無真實 key，實測侷限在 monkeypatch 模擬與程式邏輯路徑，不含真實網路往返與真實回應格式）——第一次有真實客戶用這個模式時應盯著 log 看一次
+- 網路版安裝手冊（`NETWORK_VERSION_INSTALL_RUNBOOK.md`）本身未執行，僅為待觸發規格書
+
+[rollback]
+`git revert <commit>`；`lib/settings.py`/`NETWORK_VERSION_INSTALL_RUNBOOK.md` 為新增檔案，其餘為既有檔案的增量修改，皆可用 `git diff`/`git checkout` 個別還原不影響其他功能。
+
 ## 2026-08-20 — 跨模型 oracle 制度化：`codex-oracle.ps1` + AGENTS 分工規則
 
 ### AUTO_TASK_DONE: 把 08-17 驗證有效的 Codex oracle 從「當次對話」變成常駐機制

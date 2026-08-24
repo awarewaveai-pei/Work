@@ -281,6 +281,16 @@ try {
                 if ($Gate -eq "strict") { Write-Host $stMsg -ForegroundColor Red; exit 1 }
                 Write-Warning $stMsg
             }
+            if ($unverifiable.Count -gt 0 -and -not $hasOracleWaiver) {
+                # Deletion has no mtime, so it was collected above but never gated on --
+                # that let deletions silently pass regardless of whether any oracle ever
+                # saw them (2026-08-24 fix). Unverifiable must fail the same as stale.
+                $uvMsg = ("verify-closeout-completeness: staged deletion(s) cannot be freshness-checked against oracle artifact ({0}, {1}): {2}." -f $newestArtifact.Name, $newestArtifact.LastWriteTime.ToString('HH:mm:ss'), ($unverifiable -join ', ')) +
+                         " Re-run: .\scripts\codex-oracle.ps1 -Mode review -Context '<what changed>'" +
+                         (" OR add: - ORACLE_WAIVED: <one-line reason> to {0}. Gate={1}" -f $hdr, $Gate)
+                if ($Gate -eq "strict") { Write-Host $uvMsg -ForegroundColor Red; exit 1 }
+                Write-Warning $uvMsg
+            }
             Write-Host ("== ORACLE artifacts today: {0} (newest {1}) ==" -f $todayOracle.Count, $newestArtifact.LastWriteTime.ToString('HH:mm:ss')) -ForegroundColor Cyan
             foreach ($o in $todayOracle) { Write-Host ("  agency-os/reports/oracle/{0}" -f $o.Name) -ForegroundColor DarkGray }
         }
