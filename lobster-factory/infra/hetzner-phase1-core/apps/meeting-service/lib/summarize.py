@@ -168,11 +168,16 @@ def summarize_via_api(transcript_text: str, audio_duration_sec: float, api_key: 
                 model=MODEL, max_tokens=8192,
                 messages=[{"role": "user", "content": user_msg}],
             )
-        except (anthropic.APIConnectionError, anthropic.RateLimitError, anthropic.InternalServerError) as e:
-            # 這三類是暫時性的（網路抖動/429/伺服器端 5xx），跟輸出內容
-            # 好壞無關，重試才有意義；不能套用上面「上次輸出有問題」的
-            # 修正提示（沒有輸出可修正）。last_errs 保持 None 讓下一輪的
-            # user_msg 維持原始 prompt，不夾帶不相干的錯誤訊息進去問模型。
+        except (anthropic.APIConnectionError, anthropic.RateLimitError, anthropic.InternalServerError,
+                anthropic.OverloadedError, anthropic.ConflictError) as e:
+            # 五類都是暫時性的（網路抖動/429/伺服器端 5xx/529 過載/409 鎖衝突，
+            # 對照已安裝 SDK _client.py 的 status code 映射逐一核對過，不是憑
+            # 印象猜），跟輸出內容好壞無關，重試才有意義；不能套用上面
+            # 「上次輸出有問題」的修正提示（沒有輸出可修正）。last_errs 保持
+            # None 讓下一輪的 user_msg 維持原始 prompt，不夾帶不相干的錯誤
+            # 訊息進去問模型。註：SDK 本身對 408/409/429/5xx 已有一層透明
+            # 自動重試（_base_client.py _should_retry），這裡的例外代表那層
+            # 也已經放棄；再包一層屬於防禦性的第二道保險，不是重複無意義。
             log(f"[API 摘要] 第 {attempt} 次暫時性錯誤（{type(e).__name__}），"
                 f"{'重試' if attempt < API_MAX_RETRIES else '放棄'}: {e}")
             if attempt >= API_MAX_RETRIES:

@@ -139,7 +139,8 @@ def status(job_id: str):
     if not os.path.exists(path):
         return {"stage": "starting", "done": False}
     try:
-        return JSONResponse(json.load(open(path, encoding="utf-8")))
+        with open(path, encoding="utf-8") as f:
+            return JSONResponse(json.load(f))
     except (json.JSONDecodeError, OSError):
         # write_status() 用原子 rename 寫檔（見 pipeline.py），理論上讀不到
         # 半寫狀態；這裡留防禦性 fallback 是給極端情況（例如檔案系統本身

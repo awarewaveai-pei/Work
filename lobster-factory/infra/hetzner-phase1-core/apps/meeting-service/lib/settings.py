@@ -18,13 +18,23 @@ def _load() -> dict:
     if not os.path.exists(SETTINGS_PATH):
         return {}
     try:
-        return json.load(open(SETTINGS_PATH, encoding="utf-8"))
+        with open(SETTINGS_PATH, encoding="utf-8") as f:
+            return json.load(f)
     except (json.JSONDecodeError, OSError):
         return {}
 
 
 def _save(data: dict):
-    json.dump(data, open(SETTINGS_PATH, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    # tmp+os.replace 原子寫入，理由同 pipeline.py write_status()：避免
+    # /api/settings 存檔的瞬間，剛好被另一個請求的 _load() 讀到寫一半的檔案。
+    # 上傳當下的 key 快照（app.py）仍可能讀到「存檔前」的舊值——這是請求
+    # 排序的問題，不是檔案損毀，本檔案原子化解決的是後者，不試圖處理前者
+    # （單一使用者的本機工具，UI 上兩個按鈕手動連續點擊才會踩到，不值得為此
+    # 加分散式鎖）。
+    tmp_path = f"{SETTINGS_PATH}.tmp{os.getpid()}"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp_path, SETTINGS_PATH)
 
 
 def get_api_key() -> str:

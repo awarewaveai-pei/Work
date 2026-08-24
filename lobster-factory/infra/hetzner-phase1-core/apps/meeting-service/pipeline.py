@@ -44,19 +44,42 @@ def _status_path(job_dir: str) -> str:
 def write_status(job_dir: str, **fields):
     """寫檔用 tmp+os.replace 做原子替換——這支被背景 thread 高頻呼叫（每個
     stage 轉換都寫一次），app.py 的 /api/status 同時每 1.5s 輪詢同一個檔案；
-    若直接開檔截斷寫入，輪詢有機會讀到寫一半的檔案而 JSONDecodeError。"""
+    若直接開檔截斷寫入，輪詢有機會讀到寫一半的檔案而 JSONDecodeError。
+
+    os.replace() 本身在 Windows 上實測會因為讀端短暫持有檔案 handle 丟
+    PermissionError（WinError 5，sharing violation）——這是真實測過會發生的
+    情況，不是理論風險（2026-08-20 threaded read/write 壓力測試重現，緊湊迴圈
+    下 5 次重試/0.05s 固定間隔仍不夠，改指數退避 20 次上限 ~5 秒才穩定過關）。
+    retry 是唯一務實做法：檔案鎖是別的 process/thread 造成的瞬時狀態，不是
+    這裡的邏輯錯誤，等一下通常就通了；實際情境是 1.5s 輪詢，這個預算遠超
+    需要，只有在測試用的緊湊迴圈下才會逼近上限。"""
     path = _status_path(job_dir)
     cur = {}
     if os.path.exists(path):
         try:
-            cur = json.load(open(path, encoding="utf-8"))
+            with open(path, encoding="utf-8") as f:
+                cur = json.load(f)
         except Exception:
             cur = {}
     cur.update(fields)
     cur["updated_at"] = time.time()
     tmp_path = f"{path}.tmp{os.getpid()}"
-    json.dump(cur, open(tmp_path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
-    os.replace(tmp_path, path)
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(cur, f, ensure_ascii=False, indent=2)
+    max_attempts = 20
+    for attempt in range(max_attempts):
+        try:
+            os.replace(tmp_path, path)
+            return
+        except PermissionError:
+            if attempt == max_attempts - 1:
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+                raise
+            time.sleep(min(0.5, 0.02 * (2 ** attempt)))
+            time.sleep(0.05)
 
 
 def run_pipeline_phase1(job_dir: str, media_path: str, model_name: str = "large-v3",

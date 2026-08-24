@@ -301,6 +301,11 @@ let currentJobId = null;
 async function poll(jobId) {
   currentJobId = jobId;
   const seen = new Set();
+  // "starting" 只該在 status.json 還沒被背景 thread 建出來的最初一兩次
+  // 輪詢出現（正常是幾百毫秒內就轉 preflight）。如果它一直卡在這個值，
+  // 代表 /api/status 持續讀不到檔案（見 app.py 的防禦性 fallback 說明），
+  // 不是「還在等」——要讓使用者看得到，不能無限轉圈圈假裝正常。
+  let stuckStartingCount = 0;
   const timer = setInterval(async () => {
     const [statusResp, logResp] = await Promise.all([
       fetch(`/api/status/${jobId}`), fetch(`/api/log/${jobId}?lines=40`),
@@ -308,13 +313,25 @@ async function poll(jobId) {
     const status = await statusResp.json();
     const log = await logResp.json();
 
+    if (status.stage === "starting") {
+      stuckStartingCount++;
+    } else {
+      stuckStartingCount = 0;
+    }
+
     for (const [k] of STAGES) {
       const i = STAGES.findIndex(([kk]) => kk === status.stage);
       const j = STAGES.findIndex(([kk]) => kk === k);
       if (j < i) seen.add(k);
     }
     renderStages(status.stage, seen);
-    document.getElementById("log").textContent = log.lines.join("\n");
+    // stuck 警告要接在 log 內容「之後」設，不然下面這行本身就會把它蓋掉。
+    let logText = log.lines.join("\n");
+    if (stuckStartingCount >= 10) {
+      logText += "\n⚠ 狀態檔案持續讀取異常（超過 15 秒卡在 starting），仍在重試中；" +
+        "若一直沒變化，代表 job 可能已經在跑但狀態顯示壞了，可以重新整理頁面再確認進度。";
+    }
+    document.getElementById("log").textContent = logText;
     document.getElementById("log").scrollTop = 999999;
 
     if (status.error) {
