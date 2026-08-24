@@ -40,6 +40,39 @@ export const FORMAT_SPEC: Record<
 /** 預設輸出全部三格式（前端「全選」對應；未指定時的後備）。 */
 export const DEFAULT_VIDEO_FORMATS = ["16x9", "9x16", "4x5"];
 
+/**
+ * 一組 render 產出的「主要輸出」挑選順序 —— **單一真相，禁止在呼叫端各自寫 fallback 鏈**。
+ *
+ * 為何必須共用：`media_assets.object_key` 由主要輸出的 URL 導出（videoObjectKey），所以
+ * 這個順序**就是該列的身分**。2026-08-24 Codex 覆審抓到 `/api/video/status` 用
+ * `16x9 ?? youtube_linkedin ?? Object.values(outputs)[0]`，而對帳 sweep 用
+ * `16x9 ?? youtube_linkedin ?? 9x16 ?? 4x5 ?? Object.values(outputs)[0]` —— 兩條鏈不同。
+ * 當一次 render 只選了 ["4x5","9x16"]（normalizeVideoFormats 允許）時兩邊會挑到不同格式、
+ * 導出不同 object_key，於是同一支影片變成兩列（複合鍵不再衝突，去重失效）。
+ *
+ * 也涵蓋 R2 裡歷史存在的全部格式名（對帳掃描共用同一份清單，避免兩邊清單漂移）。
+ */
+export const PRIMARY_OUTPUT_PRIORITY = [
+  "16x9",
+  "youtube_linkedin",
+  "9x16",
+  "4x5",
+  "tiktok_reels",
+  "instagram_facebook",
+  "twitter_reddit_bluesky",
+];
+
+/** 依 PRIMARY_OUTPUT_PRIORITY 挑主要輸出 URL；未知格式以**排序後**的鍵當決勝，不用插入順序。 */
+export function pickPrimaryOutput(outputs: Record<string, string>): string | undefined {
+  for (const fmt of PRIMARY_OUTPUT_PRIORITY) {
+    if (outputs[fmt]) return outputs[fmt];
+  }
+  // 決勝刻意用 sort 而非 Object.values(...)[0]：後者取決於插入／JSON 序列化順序，
+  // 正是上面那個「兩邊挑到不同格式」的不確定性來源。
+  const rest = Object.keys(outputs).sort();
+  return rest.length > 0 ? outputs[rest[0]] : undefined;
+}
+
 /** 過濾出合法格式（落在 FORMAT_SPEC）；空 → 後備全三格式。單一 SSOT，避免各路徑各自硬編。 */
 export function normalizeVideoFormats(formats?: string[]): string[] {
   const valid = (formats ?? []).filter((f) => f in FORMAT_SPEC);
@@ -76,13 +109,42 @@ export async function recordVideoAsset(params: {
   source?: "generate" | "draft";
   serviceCapability?: VideoServiceCapability;
   outputMeta?: RenderOutputMeta;
+  /**
+   * True only for the caller that holds the REAL render metadata (/api/video/status,
+   * which has recordParams: title, sceneCount, formats, visualBreakdown, imageModel).
+   * Such a caller merges on conflict so it can enrich a row that the reconcile sweep
+   * already inserted with placeholders (reconcile.ts:83 passes `title: dir,
+   * sceneCount: 0` because that is all an R2 listing can know).
+   *
+   * Gap-fillers leave this false so they can never clobber richer data. Without this
+   * split, whichever writer lands first wins permanently: if the user closes the tab
+   * and the 15-minute sweep records the row first, the gallery would show the
+   * directory name as the title and 0 scenes forever.
+   */
+  authoritative?: boolean;
 }): Promise<void> {
   const supabase = getSupabaseWriteClient();
   if (!supabase) return;
   const objectKey = videoObjectKey(params.primaryUrl);
-  // Upsert on object_key: /status poll and reconcile cron may race on the same finished job.
-  // Requires migration 0060 (uq_media_assets_object_key partial unique index) to be applied;
-  // without it Supabase silently falls back to INSERT and duplicates can still appear.
+  // Upsert arbiter = uq_media_assets_org_backend_key_version (migrations 0011/0038,
+  // already live on EU prod). /status poll and reconcile cron can race on the same
+  // finished job; conflicting on the full composite makes the second write a no-op.
+  //
+  // Why the composite and NOT a single-column unique(object_key) — measured on EU prod
+  // 2026-08-24, do not "simplify" this back:
+  //   * object_key is derived from the video TITLE (video-service/pipeline.py:687,718
+  //     `re.sub(r"[^\w一-鿿]", "_", out_name)[:40]`), with no uuid and no org
+  //     prefix, so it collides across tenants. A global unique(object_key) would make a
+  //     second org's row vanish via DO NOTHING while its render still overwrote the R2
+  //     object — cross-tenant data loss.
+  //   * It would also kill the version/is_current multi-version model that 0011:49-50
+  //     deliberately introduced, and break the 'wp_uploads' backend namespace (0011:41),
+  //     whose keys ("2026/08/hero.jpg") collide across sites by nature.
+  //   * `version` is intentionally omitted below: it defaults to 1 (0011:49) and defaults
+  //     are applied before conflict detection, so the composite arbiter still matches.
+  // (A short-lived migration 0060 tried the single-column route and was reverted the same
+  //  day: PostgREST emits a bare `ON CONFLICT (object_key)`, which cannot even infer a
+  //  PARTIAL unique index — it errors outright rather than deduping. See WORKLOG 2026-08-24.)
   const { error } = await supabase.from("media_assets").upsert(
     {
       organization_id: params.organizationId,
@@ -107,7 +169,12 @@ export async function recordVideoAsset(params: {
         renderedAt: new Date().toISOString(),
       },
     },
-    { onConflict: "object_key", ignoreDuplicates: true },
+    {
+      onConflict: "organization_id,storage_backend,object_key,version",
+      // Authoritative writer merges (DO UPDATE) to enrich placeholder rows;
+      // gap-fillers ignore (DO NOTHING) so they never overwrite richer data.
+      ignoreDuplicates: !params.authoritative,
+    },
   );
   if (error) console.warn("[video-pipeline] media_assets upsert failed (best-effort):", error.message);
 }

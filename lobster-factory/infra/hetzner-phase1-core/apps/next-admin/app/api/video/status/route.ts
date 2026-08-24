@@ -77,7 +77,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   if (poll.status === "done") {
     // 收尾：記 media_assets（best-effort，只記一次）+ 清 R2 暫存
-    const { recordVideoAsset, cleanupVideoInputKeys } = await import("@/lib/content/blocks/video-pipeline");
+    const { recordVideoAsset, cleanupVideoInputKeys, pickPrimaryOutput } = await import("@/lib/content/blocks/video-pipeline");
     const validationError = validateRenderOutputs(poll.outputs, poll.outputMeta, job.recordParams?.formats);
     if (validationError) {
       if (job.r2Keys?.length) await cleanupVideoInputKeys(job.r2Keys);
@@ -85,7 +85,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: true, status: "error", error: validationError, statusCode: 502 });
     }
     if (!job.recorded && job.recordParams) {
-      const primaryUrl = poll.outputs["16x9"] ?? poll.outputs["youtube_linkedin"] ?? Object.values(poll.outputs)[0];
+      // 與對帳 sweep 共用同一個挑選函式（單一真相）。兩邊若各寫 fallback 鏈，只選了
+      // 非 16x9 格式的 render 會被兩邊導出不同 object_key → 同一支影片變兩列。
+      const primaryUrl = pickPrimaryOutput(poll.outputs);
       if (primaryUrl && primaryUrl.startsWith("https://")) {
         try {
           await recordVideoAsset({
@@ -100,6 +102,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             source: job.recordParams.source,
             serviceCapability: job.recordParams.serviceCapability,
             outputMeta: poll.outputMeta,
+            // This path owns the real render metadata; the reconcile sweep only has
+            // placeholders. Merge on conflict so a sweep that got there first is
+            // enriched rather than freezing `title: <dir>` / `sceneCount: 0`.
+            authoritative: true,
           });
         } catch (e) {
           console.warn("[video/status] recordVideoAsset threw (best-effort):", e);

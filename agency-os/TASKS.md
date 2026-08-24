@@ -52,7 +52,13 @@
 
 - [ ] **【已知風險｜操作者已決定不輪換｜2026-08-17】`~/.codex/config.toml` 明文憑證** — 該檔以明文存約 30 組正式憑證（Supabase `service_role`、Hetzner API token、Cloudflare API token、Resend、Slack、Sentry、n8n、Grafana 密碼、Trigger prod token 等）。2026-08-17 稽核 Codex 設定時另被印入 session transcript（transcript 保留期已於 `75512998` 改為 365 天）。**操作者 2026-08-17 明確決定不輪換**，理由：站台新、資料量少。⚠️ 該理由**不涵蓋** Hetzner（可刪伺服器）與 Cloudflare（可改 DNS 指向）——這兩者風險與資料量無關。**未做的補救**：① 輪換 ② 移出明文改用 `mcp/user-env.ps1` 既有的環境變數引用模式。前一次同類事件見 `0961263f`（2026-08-15 三項待輪換，狀態未確認）。重啟此項的時機：任何一把 token 疑似外流、或客戶資料量成長後重新評估。
 
-- [ ] **【待套用｜DB migration】migration 0060 apply 到 EU Supabase prod** — `media_assets.object_key` 單欄 unique index（`uq_media_assets_object_key`）。`recordVideoAsset()` 的 upsert 在沒有這個 index 前會靜默降級為 insert，影片歷史仍可能重複。**套用指令**：`docker exec supabase-db psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 < lobster-factory/packages/db/migrations/0060_media_assets_object_key_unique.sql`。rollback：`scripts/0060_media_assets_object_key_unique_down.sql`。程式碼 commit `276693e` 已推。**⚠️ 需 SSH 進 EU VPS，回來後立即套用。**
+- [x] **【✅ 2026-08-24 結案，但不是照原方案｜DB migration】migration 0060 —— 實測證明是錯的修法，已撤回，改走零 DDL 的 client 端修正** — 原方案（`media_assets.object_key` 單欄 unique index）在 EU prod 實測後推翻，三個發現：① **修不好它宣稱要修的 bug**：PostgREST 送的是裸 `ON CONFLICT (object_key)`，對 partial index 一律 `ERROR: there is no unique or exclusion constraint matching the ON CONFLICT specification`，套之前之後都一樣壞 ② **原註解的 ROOT CAUSE 是假的**：不是「靜默降級為 insert 造成重複」，而是**直接 error 被 `video-pipeline.ts:112` 當 best-effort 吞掉 → 影片列從來沒被寫進去過** ③ **改 plain index 雖可動但語意錯**：`object_key` 由影片標題衍生（`video-service/pipeline.py:687,718` `re.sub(r"[^\w一-鿿]","_",out_name)[:40]`，無 uuid、無 org prefix），全域 unique 會讓「兩 org 同標題」時第二個 org 的列靜默消失，並殺掉 `0011:49-50` 刻意設計的 `version` 多版本能力與 `wp_uploads` backend 命名空間。**實際修法**：`video-pipeline.ts` 的 `onConflict` 改用**早就在 prod 的** composite index `uq_media_assets_org_backend_key_version`（`0011:90-91`）—— 零 migration、零鎖、跨租戶隔離與 versioning 全保住。migration 0060 與其 down script 已刪除；本 session 誤套上 prod 的 index 已用 `lock_timeout` 保護下 drop 還原。**⚠️ code 改動需下次 `sg-deploy` 才生效**（非 regression，該路徑本來就一直 error）。db-expert 覆審 1C+4M 全數逐條 Grep 驗證屬實。
+
+- [ ] **🔴【2026-08-24 開出｜跨租戶資料覆寫】影片 R2 object_key 由標題衍生，無 uuid／無 org 前綴** — `video-service/pipeline.py:687` 與 `:718` 皆為 `safe_name = re.sub(r"[^\w一-鿿]", "_", out_name)[:40]`，`server.py:242` 組成 `base_key = "video/" + basename(out_dir)`。後果：① **兩個 org 生成同標題影片 → org B 的檔案直接覆寫 org A 在 R2 上的物件**（`_r2_put` 無 if-none-match）② `lib/storage/r2.ts:171-215` 的刪除是 LIST 整個 `video/<dir>/` 後全刪 → org A 刪自己的影片會**連帶刪掉 org B 的檔案** ③ 同 org 同標題重生成 → R2 覆寫但 DB metadata（`renderedAt`/`sceneCount`）停在第一次，畫廊顯示舊資料播新影片。**這是 index 修不了的真根因**（2026-08-24 評估 migration 0060 時由 db-expert 發現並經 Grep 驗證）。**修法方向**：key 生成加 uuid 或 org prefix（對照組：`lib/storage/r2.ts:86-94` `buildDesignKey()` = `designs/YYYY-MM/<uuid>.<ext>` 才是 collision-free 的正確寫法；同一 repo 兩套策略）。**注意**：改 key 格式需同時處理既有 142 列的向後相容（`videoObjectKey()` 存查共用邏輯、`reconcile.ts:79` 的 `.eq("object_key", ...)`）。
+  - **⚠️ 同根的另外兩個缺陷（2026-08-24 Codex round 2 發現，經 Grep 驗證屬實，**刻意未修**，理由見下）**：
+    - **(a) 對帳 sweep 把所有孤兒記到單一預設 org** —— `reconcile.ts:39` `resolveOrgId()` 不帶參數 → 回 `POD_DESIGNS_DEFAULT_ORG_ID`。實測 EU prod 有 **5 個 org、2 個有 media**，屬真多租戶。org B 關掉分頁 → sweep 把它的影片記到 org A 名下（org A 的畫廊看得到 org B 的影片，org B 永遠沒有自己的列）。**根本無法在不改 key 格式的前提下修**：R2 key 裡完全沒有租戶資訊，sweep 無從得知孤兒屬於誰 —— 這正是本任務主體要解的問題。
+    - **(b) 存在性探測未帶 org** —— `reconcile.ts:79` `.eq("object_key", checkKey)` 沒有 `.eq("organization_id", ...)`，別的 org 的列會讓本 org 的孤兒被誤判為「已記錄」而永遠不補。
+    - **🔴 為何不單獨修 (b)**：目前 (b) 這個「漏帶 org」的探測**意外地抑制了一部分 (a) 的誤歸屬寫入**。若只把 (b) 修正確，會讓**更多**別人的影片被寫進預設 org 名下 —— 修一個 bug 反而放大另一個。兩者必須與主體（key 加租戶前綴）**一起**處理。動工時三件事同一批做，不可拆。
 
 #### 🆕 Cold Outreach Workbench（AI 冷拜訪 + FluentCRM 暖名單工作台）
 
@@ -318,6 +324,8 @@
 - [x] **【✅ 2026-05-28 關閉】Trigger.dev `TaskRunStatus` enum 不相容查詢來源追查** —— **【已完成 2026-05-28】** **背景**：EU reboot 後 trigger-postgres log 出現 `ERROR: invalid input value for enum "TaskRunStatus": "FAILED"` 和 `"QUEUED"`（v3-era 名稱，v4 已移除）。**現況**：① 頻率極低（過去 7 天僅 2 次，均在 2026-05-22 04:09-04:10 UTC 出現）② 查詢字串不在我們 repo（已 grep 全域）③ Trigger.dev 本身健康，無實際失敗，僅 log noise ④ 真實使用 status 只有 3 種（COMPLETED_SUCCESSFULLY / COMPLETED_WITH_ERRORS / TIMED_OUT）。**疑似來源**：Trigger.dev 內部 observability/admin endpoint 或 trigger-webapp 自身週期任務。**DoD**：① 連續觀察 7-14 天記錄 ERROR 頻率與時間分布；② 若 > 10 次/天則升級追查（找 pg_stat_statements / 開 trigger-webapp debug log）；③ 若維持 < 5 次/週則關閉並列為已知 upstream cosmetic issue。
 
 #### 工具層 / 基礎建設 / 治理
+
+- [ ] **【2026-08-25 開出】`ao-resume-last.txt` 錨點卡在 2026-06-12，AO-CLOSE 視窗計算長期失真** — `agency-os/.agency-state/ao-resume-last.txt` 實測值 `2026-06-12T05:27:33.6508893Z`，距今 2.5 個月未推進；`ao-close-prev.txt`=`2026-08-24T12:13:10Z`、`ao-close-last.txt`=`2026-08-24T12:14:06Z` 兩者只差 56 秒（同日兩次 close 嘗試）。後果：`.claude/commands/ao-close.md` 要求存檔涵蓋「上次 AO-RESUME → 本次 AO-CLOSE」，但依錨點算出的視窗是 6/12→今天，與實際工作區間對不上，**逼得每次收工都要手選「真實區間」繞過**（2026-08-24-2014.md 就是這樣寫的，敘述誠實但錨點沒修）。CONVERSATION_MEMORY 2026-07-02 已記過同一現象，**未修**。**根因待查**：`ao-resume.ps1` 只在「寫出真實 AO-RESUME 存檔」時推進 stamp，而 hook 自動觸發那輪印的是 `AO-RESUME stamp NOT advanced (auto-refresh / non-interactive)` —— 代理事後補寫存檔時沒有回頭推進錨點。**DoD**：確認推進條件、補上代理寫完 archive 後推進 stamp 的路徑（或改由 `verify-aoresume-archive.ps1` 帶動），並讓 AO-CLOSE 視窗不再需要人工手選。（2026-08-25 Codex round-5 覆審抓到，經讀三個錨點檔實測確認）
 
 - [ ] **【2026-08-24 開出】CHANGE_IMPACT_MATRIX 漂移偵測腳本首輪 7 個 WARN 待人工確認** — `scripts/check-change-impact-matrix-drift.ps1` 2026-08-24 首次接進月度巡檢（`ao-resume.ps1` monthly check #5），真實跑出 7 對 WARN（全部是 `docs/operations/cursor-enterprise-rules-index.md` / `docs/operations/cursor-mcp-and-plugin-inventory.md` / `../docs/spec/raw/Cursor  Rules for AI/README-部署說明.md` 宣告的 impacted，vs `.cursor/rules/64-architecture-mcp-routing.mdc` / `65-build-standards-data-state.mdc` / `66-skills-observability-protocol.mdc` 三個 `.mdc` 檔案，4 月未更新但主文件近期持續改動，drift 127-141 天）。這是純資訊性快照非 build gate，**待下次月度巡檢時人工判斷**這三個 `.mdc` 是否真的過期需要更新，或只是穩定未變不需動。報告：`agency-os/reports/governance/impact-matrix-drift-LATEST.md`。
 
@@ -764,5 +772,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-08-24 08:30:11 UTC_
+_Last synced: 2026-08-24 16:38:44 UTC_
 

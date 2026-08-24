@@ -10,9 +10,7 @@
  * 不加 EU↔SG 反向耦合（不在 EU 放任何 SG 憑證）；重用 recordVideoAsset（記錄邏輯單一真相）。
  */
 import { getSupabaseWriteClient } from "../../supabase-server";
-import { recordVideoAsset, resolveOrgId, videoObjectKey } from "../blocks/video-pipeline";
-
-const OUTPUT_FORMATS = ["16x9", "9x16", "4x5", "youtube_linkedin", "tiktok_reels", "instagram_facebook", "twitter_reddit_bluesky"];
+import { recordVideoAsset, resolveOrgId, videoObjectKey, pickPrimaryOutput } from "../blocks/video-pipeline";
 
 function r2cfg(): { apiToken: string; accountId: string; bucket: string; publicBase: string } | null {
   const apiToken = process.env.R2_API_TOKEN;
@@ -53,26 +51,31 @@ export async function reconcileVideos(): Promise<ReconcileResult> {
     cursor = j.result_info?.is_truncated ? j.result_info?.cursor : undefined;
   } while (cursor);
 
-  // 2) 找出含任何已知格式檔案的影片組（dir = sanitized 標題）。
-  // 原先只匹配 16x9|youtube_linkedin → 9x16-only 影片永遠找不到。
-  // 現在匹配全部 OUTPUT_FORMATS 中的任一格式後綴。
-  const FORMAT_SUFFIX_RE = new RegExp(
-    `^video\\/(.+)\\/(?:${OUTPUT_FORMATS.join("|")})\\.mp4$`
-  );
-  const dirs = new Set<string>();
+  // 2) 依 R2 實際存在的檔案分組（dir = sanitized 標題，fmt = 檔名）。
+  //
+  // 格式段刻意用 `([^/]+)` 收**任何**格式名，不用已知清單過濾。理由（2026-08-24
+  // Codex round 3 抓到）：`/api/video/status` 拿到的是 EU 回傳的原始 `poll.outputs`，
+  // 未知格式（例如日後新增的 `1x1`）也會被 pickPrimaryOutput 的排序退路挑中並記錄；
+  // 若這裡先用已知清單過濾，同一支影片對 sweep 就是隱形的 —— 兩個呼叫端「共用挑選
+  // 函式」但「候選集不同」，等於沒有真正統一。收全部格式後兩邊看到的輸入形狀才一致。
+  const FORMAT_SUFFIX_RE = /^video\/(.+)\/([^/]+)\.mp4$/;
+  const groups = new Map<string, Record<string, string>>();
   for (const k of keys) {
     const m = FORMAT_SUFFIX_RE.exec(k);
-    if (m) dirs.add(m[1]);
+    if (!m) continue;
+    const dir = m[1];
+    const fmt = m[2];
+    let g = groups.get(dir);
+    if (!g) { g = {}; groups.set(dir, g); }
+    g[fmt] = `${cfg.publicBase}/${k}`;
   }
 
   // 3) 缺 media_assets 的補上（依 object_key 去重 → idempotent）
   let recorded = 0;
-  for (const dir of dirs) {
-    const outputs: Record<string, string> = {};
-    for (const fmt of OUTPUT_FORMATS) {
-      if (keys.includes(`video/${dir}/${fmt}.mp4`)) outputs[fmt] = `${cfg.publicBase}/video/${dir}/${fmt}.mp4`;
-    }
-    const primary = outputs["16x9"] ?? outputs["youtube_linkedin"] ?? outputs["9x16"] ?? outputs["4x5"] ?? Object.values(outputs)[0];
+  for (const [dir, outputs] of groups) {
+    // 與 /api/video/status 共用同一個挑選函式 —— 兩邊必須導出同一個 object_key，
+    // 否則同一支影片會變成兩列（見 pickPrimaryOutput 註解的 2026-08-24 案例）。
+    const primary = pickPrimaryOutput(outputs);
     if (!primary) continue;
     // 存在性檢查用與 recordVideoAsset 相同的 object_key 推導（編碼一致 → idempotent）
     const checkKey = videoObjectKey(primary);
@@ -86,5 +89,5 @@ export async function reconcileVideos(): Promise<ReconcileResult> {
       /* best-effort：下輪再補 */
     }
   }
-  return { ok: true, checked: dirs.size, recorded };
+  return { ok: true, checked: groups.size, recorded };
 }

@@ -57,30 +57,47 @@ invisible to the next AO-RESUME on a different machine, where the operator's
 memory is not available. This caused the 5/28 18:46 "SG deploy 落後 3 commits"
 silent drop.
 
-For each bullet planned:
-1. Identify a distinctive token (typically the **bold-text title** like `**Batch 3**`).
-2. Grep `agency-os/TASKS.md` for `^- \[ \]` lines containing the token.
+**每一條 bullet 必須明確宣告它住在哪裡，二選一，沒有第三種寫法**（2026-08-24 改版：
+舊版靠 bold token / 滑動視窗 / 前綴猜測，同日一次噴出 4 條假失敗，猜測引擎已刪除。
+同一原則見 `AGENTS.md`「只信任明確宣告，資料不夠明確就修資料，不要教程式碼用巧合猜測」）：
 
-> **Token gotcha (codified 2026-06-12 after 2nd recurrence)**: the matcher only
-> reads the FIRST ~30 chars of an *un-bolded* bullet. A bullet that LEADS with
-> parenthetical/decoration prefix — `（主線）…`, `（次要）…`, `【明日優先】…` — yields a
-> useless prefix token and FAILS the lift gate even when the task IS on TASKS.md
-> (false negative, not a real silent-drop). **Rule: whenever a bullet leads with
-> such decoration, wrap the exact identifier that appears in the TASKS.md `- [ ]`
-> line in `**bold**`** so the bold-token path matches regardless of prefix —
-> e.g. `- （主線）app.aware-wave **Stage 1 接通入口**（本日未動）。`. The same
-> `Stage 1 接通入口` bullet defeated the gate in BOTH the 0333 and 1820 archives
-> on 2026-06-11 before this was codified.
-3. If no match: add a new `- [ ]` entry to TASKS.md under the appropriate
-   `####` section, commit it as part of this AO-CLOSE.
-4. If the item is genuinely transient (e.g. already resolved during the
-   session-close gap, like an auto-deployed drift), annotate the archive bullet:
+1. **在任務板上** → 加 `<!-- tasks-ref: <substring> -->`
 
    ```
-   - **<title>** — <description> <!-- archive-only: <one-sentence reason> -->
+   - **<title>** — <description> <!-- tasks-ref: <TASKS.md 該條 - [ ] 行裡的一段字> -->
    ```
 
-   The HTML comment escape hatch skips the lift check while documenting why.
+   **解析不變量：ref 必須命中「恰好一條」open `- [ ]` 行。**
+   - 命中 0 條 → FAIL（東西不在板上，正是這道閘要抓的靜默漏接）
+   - 命中 ≥2 條 → **FAIL**（閘無法證明是哪一條，等於什麼都沒證明）。訊息會列出所有
+     候選，把 ref 加長到唯一為止即可
+   - 比對針對**整行**，不截斷 —— 真實任務行動輒數千字元，識別用的參照（尤其 handoff
+     連結）常在敘述深處。防「短 ref 撞到無關敘述」靠的是上面的唯一性規則，不是截斷
+
+   **動作順序**：先確認 TASKS.md 真的有那條（沒有就先新增 `- [ ]` 並在本次 AO-CLOSE
+   一起 commit），再寫 ref。
+
+   > **handoff bullet 也走這條路**。舊版有個「文字裡帶 `handoffs/<slug>` 就自動算數」
+   > 的捷徑，2026-08-24 移除：實測 `2026-06-27-customer-service-u6-chatwoot-handoff`
+   > 這個 slug **同時出現在 3 條不同的 open 任務裡**，slug 根本不是唯一識別碼，那條
+   > 捷徑建立在一個假前提上。handoff slug 仍然是很好的 `tasks-ref` 值，只是要像其他
+   > 東西一樣被宣告並證明唯一。
+
+2. **刻意不進任務板** → 加 `<!-- archive-only: <理由> -->`
+
+   ```
+   - **<title>** — <description> <!-- archive-only: <一句話理由> -->
+   ```
+
+   用於真正短暫的項目（session gap 中已自行解決）、或已由其他機制追蹤（例如
+   `spawn_task` 背景任務）。**禁止**拿它來消音「其實有在 TASKS.md 追蹤」的項目 ——
+   那是寫假 metadata，該用 path 1。
+
+   **`<理由>` 必填、不可空白**（閘會擋 `<!-- archive-only: -->`）。長度不限 ——
+   「已解決」這種 3 字理由完全合格；閘只驗「你有沒有寫」，寫得好不好是人看的。
+
+沒有任何標註的 bullet 一律 FAIL，閘不會替你猜 —— 因為「這到底是不是任務」是個
+必須被回答的問題，用猜的回答正是這道閘存在的理由。
 
 **Mechanical gate**: `scripts/verify-archive-tasks-lift.ps1` runs from
 `scripts/system-health-check.ps1` and Add-CriticalFailure on any unlifted bullet.

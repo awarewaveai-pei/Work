@@ -12,11 +12,54 @@
 
   Reads the newest `agency-os/reports/ao-close/YYYY-MM-DD-HHMM.md`, extracts
   bullets under `## 未完成` and `## 明日優先` sections, and for each bullet
-  greps TASKS.md for a matching `- [ ]` line. Mismatches are reported.
+  requires an EXPLICIT, MACHINE-VERIFIABLE declaration of where it lives.
 
-  Escape hatch: a bullet ending with HTML comment
-    `<!-- archive-only: <reason> -->`
-  is intentionally archive-only and skipped (counted as warning only).
+  DESIGN INVARIANT (2026-08-24 rewrite):
+    A gate that verifies "X is tracked in Y" must compare DECLARED IDENTITY,
+    never LEXICAL SIMILARITY. Similarity matching produces both false-pass
+    (a token coincidentally appears inside an unrelated task's narrative) and
+    false-fail (the same item worded differently in archive vs TASKS).
+    The pre-2026-08-24 implementation guessed via bold-token extraction,
+    8-12 char sliding windows and 30/20/12/8 char prefixes; on 2026-08-24 it
+    reported 4 false failures at once. That guessing engine is DELETED — this
+    is the same bug class removed from check-change-impact-matrix-drift.ps1
+    the same day ("only trust explicit declarations; if the data is not
+    explicit enough, fix the data — do not teach the code to guess").
+
+  RESOLUTION INVARIANT: a declaration must resolve to EXACTLY ONE open task.
+    0 matches  -> the item is not on the board (the silent-drop this gate exists for)
+    >1 matches -> the gate cannot prove WHICH task was lifted, so it has proved
+                  nothing; a missing lift of the intended task would hide behind
+                  an unrelated match. Ambiguity is failure, not success.
+
+  Every bullet must take exactly one of two paths:
+
+    1. `<!-- tasks-ref: <substring> -->`  (positive)
+       The substring must occur in exactly one open `- [ ]` line in TASKS.md.
+       Declaring is not trusting: it is matched, counted, and must be unique.
+       Matching runs against the WHOLE line — an earlier revision truncated each
+       task line to its first 120 chars to force "title anchoring", which broke
+       every real handoff reference in this repo (measured 2026-08-24: the three
+       tasks carrying handoff links hold them at chars 1756 / 1315 / 439, so all
+       three false-failed). The uniqueness requirement above is what keeps a short
+       ref from silently matching unrelated narrative prose — a coincidental extra
+       match now surfaces as an ambiguity failure instead of a false pass.
+
+    2. `<!-- archive-only: <reason> -->`  (negative)
+       Intentionally NOT a task-board item. Skipped, with the reason recorded.
+
+  There is deliberately no `handoffs/<slug>` auto-path. It was removed on
+  2026-08-24 after measurement showed the assumption behind it was false: a slug
+  is NOT a unique identifier in this repo — `2026-06-27-customer-service-u6-
+  chatwoot-handoff` appears in three separate open tasks. An auto-path built on a
+  false uniqueness claim is the same defect class as the guessing engine it
+  replaced. A handoff slug is still a perfectly good `tasks-ref` value; it just
+  has to be declared and proven unique like everything else.
+
+  A bullet carrying neither annotation FAILS with an actionable message. There is
+  deliberately no heuristic fallback: an unannotated bullet is an unanswered
+  question ("is this a task or not?"), and answering it by guessing is the very
+  failure this gate exists to prevent.
 
   Exit codes:
     0 — all lifted (or archive-only annotated) — PASS
@@ -46,11 +89,10 @@
   ordering (assumes ISO date prefix). Same pattern as .claude/commands/ao-close.md
   Step 3 archive write path.
 
-  The matching algorithm is intentionally lenient on prose but anchored on a
-  stable "token" — the first 20-40 chars after stripping leading markdown
-  bullet/decoration. Operators control match strength: a bullet titled
-  `**SG deploy** — production 落後 3 commits` produces token `SG deploy` which
-  matches any TASKS.md line containing `SG deploy`.
+  The writer side of this contract lives in `.claude/commands/ao-close.md`
+  Step 2.5 — AO-CLOSE must emit one of the three annotations above for every
+  未完成 / 明日優先 bullet. Changing the annotation vocabulary here requires
+  updating that file in the same commit, or the next AO-CLOSE blocks itself.
 #>
 
 [CmdletBinding()]
@@ -161,138 +203,105 @@ if ($latestArchive -and (Test-Path -LiteralPath $latestArchive)) {
   }
 }
 
-# 4) For each bullet, derive a token and grep TASKS.md ---------------------
-# Token strategy: strip markdown decoration (**, `, [], etc.), take first
-# meaningful 20-40 chars. Operators control match strength.
+# 4) For each bullet, resolve its explicit declaration ---------------------
+# No token derivation, no similarity matching — see DESIGN INVARIANT in the
+# header block. Each bullet declares where it lives; this section verifies the
+# declaration against the real board.
 $tasksContent = if (Test-Path -LiteralPath $tasksPath) {
   Get-Content -LiteralPath $tasksPath -Raw -Encoding UTF8
 } else { '' }
 
-# Pre-filter to only `- [ ]` lines for performance and accuracy.
-# Anchor: only match tokens that appear within the first 120 chars of the
-# `- [ ]` line. This prevents false positives where a token appears deep
-# inside another task's narrative description (observed: "SG deploy" appears
-# in a Phase 4 task narrative without being its own task).
+# Pre-filter to only `- [ ]` lines. Lines are kept WHOLE (no truncation): real
+# task lines in this repo run to thousands of chars and legitimately carry their
+# identifying references — handoff links most of all — deep in the narrative.
+# Coincidental matches are caught by the uniqueness rule below, not by truncation.
 $openTaskLines = @(($tasksContent -split "`r?`n") | Where-Object { $_ -match '^\s*-\s+\[\s\]' })
-# Build per-line anchored search strings: only first 120 chars of each line.
-$openTaskHeads = @($openTaskLines | ForEach-Object {
-  if ($_.Length -gt 120) { $_.Substring(0, 120) } else { $_ }
-})
-$openTaskBlob  = $openTaskHeads -join "`n"
+
+# Return every open task line containing $Needle. Count drives the verdict:
+# 0 = not on the board, 1 = proven, >1 = ambiguous (cannot prove which).
+function Get-MatchingOpenTasks {
+  param([string]$Needle)
+  $escaped = [regex]::Escape($Needle)
+  return @($openTaskLines | Where-Object { $_ -match $escaped })
+}
+
+# Short excerpt of a task line, for disambiguation messages.
+function Get-TaskExcerpt {
+  param([string]$Line)
+  $t = $Line.Trim()
+  if ($t.Length -gt 70) { return $t.Substring(0, 70) + '...' }
+  return $t
+}
 
 $lifted    = 0
 $missing   = 0
 $skipped   = 0  # archive-only annotated
 
 foreach ($b in $bullets) {
-  # Archive-only escape hatch — explicit HTML comment
-  if ($b.text -match '<!--\s*archive-only:\s*(.+?)\s*-->') {
+  # --- Contradiction guard: "exactly one of two paths" must be ENFORCED ------
+  # Without this, whichever branch is tested first silently wins and the other
+  # declaration is never validated — the spec would say "exactly one" while the
+  # code accepted both. A bullet claiming to be simultaneously on and off the
+  # task board is unresolvable metadata, not a pass.
+  $hasArchiveOnly = $b.text -match '<!--\s*archive-only:'
+  $hasTasksRef    = $b.text -match '<!--\s*tasks-ref:'
+  if ($hasArchiveOnly -and $hasTasksRef) {
+    $missing++
+    Add-Finding 'fail' "Bullet carries BOTH archive-only and tasks-ref — contradictory declarations. Keep exactly one: tasks-ref if it is on the board, archive-only if it deliberately is not." $b.text $b.section
+    continue
+  }
+
+  # --- Negative path: explicitly declared as NOT a task-board item ----------
+  # The payload is validated, not just detected: this gate's whole claim about
+  # archive-only is that the rationale gets recorded. `(.*?)` (not `.+?`) so a
+  # blank reason still MATCHES here and is rejected with a precise message,
+  # instead of falling through to the generic "no declaration" branch.
+  if ($b.text -match '<!--\s*archive-only:\s*(.*?)\s*-->') {
     $reason = $matches[1].Trim()
+    # Empty is the only machine-decidable failure. A length threshold was tried
+    # (min 4) and removed on 2026-08-25: it false-failed legitimate short CJK
+    # reasons like 已解決 (3 chars) while still accepting meaningless padding
+    # like "aaaa", i.e. it was a heuristic proxy for a property no gate can
+    # actually check. "Did you state a reason" is enforceable; "is the reason
+    # any good" is a human judgement and stays with the reader.
+    if ($reason.Length -eq 0) {
+      $missing++
+      Add-Finding 'fail' "archive-only has no reason. State why this is deliberately off the task board — a blank rationale records nothing and defeats the annotation." $b.text $b.section
+      continue
+    }
     $skipped++
     Add-Finding 'info' "Archive-only (reason: $reason)" $b.text $b.section
     continue
   }
 
-  # Auto lifted: bullet references a handoff slug that also appears in TASKS - [ ].
-  # Matches both: handoffs/2026-06-06-2044-slug.md  AND  handoffs/2026-06-06-2044 (no extension).
-  # This covers the common AO-CLOSE style "（TASKS 已開 → handoffs/YYYY-MM-DD-HHMM-slug）".
-  if ($b.text -match 'handoffs/(\d{4}-\d{2}-\d{2}-\d{4}(?:-[^)\s.]+)?)') {
-    $slug = $matches[1]
-    $slugEscaped = [regex]::Escape($slug)
-    if ($openTaskBlob -match $slugEscaped) {
-      $lifted++
-      Add-Finding 'info' "Lifted via handoff slug: $slug" $b.text $b.section
+  # --- Positive path: explicit tasks-ref, resolved to EXACTLY ONE open task --
+  # Declaring is not trusting. 0 matches = not on the board. >1 matches = the
+  # gate cannot prove which task was lifted, so it has proved nothing.
+  if ($b.text -match '<!--\s*tasks-ref:\s*(.+?)\s*-->') {
+    $ref = $matches[1].Trim()
+    if ($ref.Length -lt 4) {
+      $missing++
+      Add-Finding 'fail' "tasks-ref too short to identify a task (min 4 chars): '$ref'" $b.text $b.section
       continue
     }
-  }
-
-  # Auto-classify: bullet claims "（TASKS …" or "(TASKS" or "TASKS:" — already on task board.
-  # （ = full-width （ — avoids CP950/BOM encoding trap in regex bracket class.
-  # Runs token-matching to verify: if a bold token exists in TASKS → lifted (verified).
-  # If not verified → warn (visible in output/state-file, not a hard fail) rather than silent skip.
-  if ($b.text -match '[\(（]TASKS|TASKS:') {
-    $verifyTokens = @()
-    $cleanVerify  = ($b.text -replace '<!--.*?-->', '').Trim()
-    $boldVerify   = [regex]::Matches($cleanVerify, '\*\*([^*]+)\*\*')
-    foreach ($mv in $boldVerify) {
-      $bv = $mv.Groups[1].Value.Trim() -replace '`', ''
-      if ($bv.Length -ge 4 -and $bv.Length -le 80) { $verifyTokens += $bv }
-    }
-    $verifyMatched = $false
-    foreach ($tv in $verifyTokens) {
-      if ($openTaskBlob -match [regex]::Escape($tv)) { $verifyMatched = $true; break }
-    }
-    if ($verifyMatched) {
+    $hits = Get-MatchingOpenTasks -Needle $ref
+    if ($hits.Count -eq 1) {
       $lifted++
-      Add-Finding 'info' "Lifted via TASKS reference + token verified" $b.text $b.section
+      Add-Finding 'info' "Lifted via tasks-ref (resolved to exactly 1 open task): $ref" $b.text $b.section
+    } elseif ($hits.Count -eq 0) {
+      $missing++
+      Add-Finding 'fail' "tasks-ref declared but matches NO open '- [ ]' line: '$ref' — fix the ref, or add the task to TASKS.md" $b.text $b.section
     } else {
-      $skipped++
-      Add-Finding 'warn' "TASKS-ref auto-skipped but bold token not found in TASKS.md — verify manually or add archive-only comment" $b.text $b.section
+      $missing++
+      $excerpts = ($hits | ForEach-Object { Get-TaskExcerpt $_ }) -join ' || '
+      Add-Finding 'fail' "tasks-ref '$ref' is AMBIGUOUS — matches $($hits.Count) open tasks, so it cannot prove which one was lifted. Lengthen the ref until it is unique. Candidates: $excerpts" $b.text $b.section
     }
     continue
   }
 
-  # Token strategy: prefer **bold-text** identifiers (operators write
-  # `- [ ] **Batch 3** — ...` style); fall back to sliding-window substrings.
-  # Each candidate is tried against TASKS.md `- [ ]` lines until one matches.
-  #
-  # Strip leading bullet metadata: `[ ]`, `[x]`, backticks-wrapped `[ ]`
-  $clean = $b.text
-  $clean = $clean -replace '^`?\[[ x]\]`?\s*', ''
-  $clean = $clean.Trim()
-
-  # Primary candidates: bold-text fragments (most distinctive identifier),
-  # plus sliding sub-windows of each bold token to handle prefix/decoration
-  # mismatches (e.g. archive `筆電 ` vs TASKS `筆電跑 `).
-  $tokens = @()
-  $boldMatches = [regex]::Matches($clean, '\*\*([^*]+)\*\*')
-  foreach ($m in $boldMatches) {
-    $bold = $m.Groups[1].Value.Trim() -replace '`', ''
-    if ($bold.Length -ge 4 -and $bold.Length -le 80) {
-      $tokens += $bold
-      # Also try 8-12-char sliding windows so partial matches succeed
-      if ($bold.Length -ge 8) {
-        for ($start = 0; $start -le ($bold.Length - 8); $start++) {
-          $win = $bold.Substring($start, [Math]::Min(12, $bold.Length - $start)).Trim()
-          if ($win.Length -ge 8 -and $win -notmatch '^\s+$') { $tokens += $win }
-        }
-      }
-    }
-  }
-
-  # Fallback candidates: sliding-window of cleaned text (no markdown)
-  $plain = $clean -replace '\*\*', '' -replace '`', ''
-  $plain = $plain.Trim()
-  if ($tokens.Count -eq 0) {
-    if ($plain.Length -lt 6) {
-      Add-Finding 'warn' "Bullet too short for token match: '$plain'" $b.text $b.section
-      continue
-    }
-    foreach ($len in @(30, 20, 12, 8)) {
-      if ($plain.Length -ge $len) {
-        $tokens += $plain.Substring(0, $len).Trim()
-      }
-    }
-  }
-
-  $matched = $false
-  $matchedToken = ''
-  foreach ($t in $tokens) {
-    $escaped = [regex]::Escape($t)
-    if ($openTaskBlob -match $escaped) {
-      $matched = $true
-      $matchedToken = $t
-      break
-    }
-  }
-
-  if ($matched) {
-    $lifted++
-    # Don't pollute findings with every PASS; only count.
-  } else {
-    $missing++
-    Add-Finding 'fail' "Not lifted to TASKS.md (no `- [ ]` line matches first chars of bullet)" $b.text $b.section
-  }
+  # --- No explicit declaration: fail loud, never guess ----------------------
+  $missing++
+  Add-Finding 'fail' "No lift declaration. Add '<!-- tasks-ref: <substring unique to one open - [ ] line> -->' if this IS on the task board, or '<!-- archive-only: <reason> -->' if it deliberately is not." $b.text $b.section
 }
 
 if ($missing -gt 0) {
