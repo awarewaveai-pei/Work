@@ -1,6 +1,6 @@
 {
     "schemaVersion":  1,
-    "generatedAtUtc":  "2026-08-24T19:30:19.1885371Z",
+    "generatedAtUtc":  "2026-08-24T19:44:30.8711333Z",
     "branch":  "main",
     "sampledRuns":  100,
     "probeOk":  true,
@@ -31,11 +31,11 @@
                       },
                       {
                           "name":  "Trigger infra config guard",
-                          "latest":  "failure",
-                          "consecutiveFailures":  4,
-                          "failingSinceUtc":  "2026-08-15T08:04:50Z",
-                          "failingDays":  9,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/32763510230"
+                          "latest":  "success",
+                          "consecutiveFailures":  0,
+                          "failingSinceUtc":  "",
+                          "failingDays":  0,
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/32769817943"
                       },
                       {
                           "name":  "Weekly workflows security audit",
@@ -46,10 +46,9 @@
                           "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/32683910784"
                       }
                   ],
-    "verdict":  "broken",
-    "verdictLabel":  "FAIL",
+    "verdict":  "drift",
+    "verdictLabel":  "WARN",
     "findings":  [
-                     "\u0027Trigger infra config guard\u0027 has been failing for 4 consecutive run(s) over 9 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/32763510230",
                      "\u0027Weekly workflows security audit\u0027 latest run on main is failure: https://github.com/awarewaveai-pei/Work/actions/runs/32683910784"
                  ]
 }

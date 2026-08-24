@@ -1,7 +1,7 @@
 # CI health (GitHub Actions, branch main)
 
-- Generated: 2026-08-25 03:30:19
-- Overall: **🔴 FAIL**
+- Generated: 2026-08-25 03:44:30
+- Overall: **🟡 WARN**
 - Sampled: last 100 runs on `main`
 
 ## Workflows
@@ -11,12 +11,11 @@
 | Auto-Repair - Claude Code | skipped | - | - |
 | Lobster workflows package — validate (main) | success | - | - |
 | next-admin — TypeScript typecheck | success | - | - |
-| Trigger infra config guard | failure | 4 | 9d |
+| Trigger infra config guard | success | - | - |
 | Weekly workflows security audit | failure | 1 | 1d |
 
 ## Findings
 
-- 'Trigger infra config guard' has been failing for 4 consecutive run(s) over 9 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/32763510230
 - 'Weekly workflows security audit' latest run on main is failure: https://github.com/awarewaveai-pei/Work/actions/runs/32683910784
 
 ## Why this check exists
