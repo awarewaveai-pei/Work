@@ -373,8 +373,22 @@ try {
                     # $confirmedDeletedPaths comment above) is strictly stronger evidence
                     # than timing -- it doesn't need a timing gate in front of it, only
                     # behind it as a fallback when that confirmation isn't available.
-                    $hashConfirmed = $currentDeletionHash.ContainsKey($sf) -and $confirmedDeletedPaths.Contains(('{0}@{1}' -f $sf, $currentDeletionHash[$sf]))
-                    if ($hashConfirmed -or $confirmedDeletedPaths.Contains($sf)) { continue }
+                    # Round 8 (codex CONFIRMED, found while reviewing round 7 itself): a
+                    # bare-path entry in $confirmedDeletedPaths (old artifact predating
+                    # hash tracking, or codex-oracle's own extraction fallback) must NOT
+                    # count as confirmation whenever we CAN compute the current deletion's
+                    # hash -- that bare entry might be from an EARLIER deletion of
+                    # DIFFERENT content, which is exactly the gap round 7 closed. Accepting
+                    # it here would silently reopen it for every pre-round-7 artifact still
+                    # dated today. Bare-path matching is only valid when we ALSO cannot
+                    # determine the current hash (symmetric uncertainty -- e.g. hash
+                    # extraction itself failed), matching this file's existing pattern of
+                    # only degrading a check when the stronger signal is genuinely
+                    # unavailable, not just inconvenient.
+                    if ($currentDeletionHash.ContainsKey($sf)) {
+                        if ($confirmedDeletedPaths.Contains(('{0}@{1}' -f $sf, $currentDeletionHash[$sf]))) { continue }
+                    }
+                    elseif ($confirmedDeletedPaths.Contains($sf)) { continue }
                     if (-not $indexStageTime) { $unverifiable += $sf }
                     elseif ($indexStageTime -gt $newestArtifact.LastWriteTime) { $staleAgainst += $sf }
                     else { $unconfirmed += $sf }

@@ -246,7 +246,7 @@ Round 6 把 deletion 確認綁定到路徑字串（`deletions-reviewed: <path1>,
 - REALTEST_EVIDENCE: tool=Bash | cmd=同一情境換成用正確（v2 hash）的記錄跑 gate | exit=0（正確放行）
 - REALTEST_EVIDENCE: tool=Bash | cmd=用真正的 `codex-oracle.ps1 -Mode review`（真實呼叫，非模擬，~85 秒）對這個 scratch repo 的第二次刪除跑真實 review，確認 artifact 正確寫出 `deletions-reviewed: target.php@38b308a`（跟 git 真實 blob hash 完全吻合）；用這份真實 artifact（非手工偽造）跑真正的 consumer 腳本 | exit=0（真 producer + 真 consumer 全流程通過）
 - REALTEST_EVIDENCE: tool=Bash | cmd=完整回歸測試（R1 舊格式純路徑仍可放行、R2 真過期硬擋、R3 index 無法解析退回 warn-only、R4 waiver 靜音）對 round 1-6 用過的 ASCII scratch repo 重跑 | exit 各自符合預期（4/4 pass）；本 session 累計 25+ 組真實整合情境
-- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（**外部 oracle = 真正的 `codex-oracle.ps1 -Mode review`**，對這輪修法本身跑真實 review，回報 `NO FINDINGS`；artifact：`agency-os/reports/oracle/2026-08-24-review-27e02329.md`，惟該次 review 是對 scratch repo 跑的，非本 repo 路徑限定 review——本輪修正檔案較小、邏輯直接沿用 round 6 已驗過的架構，判斷風險可接受）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（**外部 oracle = 真正的 `codex-oracle.ps1 -Mode review`**，對這輪修法本身跑真實 review，回報 `NO FINDINGS`；⚠️ 2026-08-24 事後訂正：當時 artifact 路徑寫成 `agency-os/reports/oracle/2026-08-24-review-27e02329.md`，看起來像本 repo 路徑，但那次呼叫用 `-RepoRoot` 指向 scratch test repo，該檔案實際只存在 `C:\Users\...\Temp\...\scratchpad\oracle-redelete-test\agency-os\reports\oracle\` 下、從未進這個 repo——即使原文有加註「該次 review 是對 scratch repo 跑的」，路徑本身仍構成無法驗證的證據引用。Codex stop-hook 第八度抓到此問題（見下方 round 8 entry），已對本 repo 真實的 round 7 commit（`b0c964a9`）補跑一次真實 review 取得可驗證的 in-repo artifact）
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=`currentDeletionHash\|hashConfirmed` | hits=4（全部在 `verify-closeout-completeness.ps1` 內部宣告/賦值/比對，無其他 call site；`codex-oracle.ps1` 端無對應符號因為它只負責產生 hash 不消費，不需要命中）
 
 [剩餘風險]
@@ -257,6 +257,41 @@ Round 6 把 deletion 確認綁定到路徑字串（`deletions-reviewed: <path1>,
 
 [rollback]
 `git diff scripts/codex-oracle.ps1 scripts/verify-closeout-completeness.ps1` 還原兩個 hunk，兩檔互相依賴需一起回滾或都保留。
+
+### AUTO_TASK_DONE: 修正 round 7 證據鏈斷裂 + 關掉舊格式 bare-path fallback 重開的洞（round 8，同 session 第八次 Codex stop-hook）
+
+[任務]
+Round 7 修完後，同一顆 Codex stop-hook 第八次抓到問題：「previous turn leaves a broken oracle-evidence trail」。
+
+[根因 1：證據鏈斷裂]
+Round 7 的 `REVIEW_DONE` 引用了 `agency-os/reports/oracle/2026-08-24-review-27e02329.md`，但那次 `codex-oracle.ps1` 呼叫用 `-RepoRoot` 指向 scratch test repo，artifact 實際寫在 Windows Temp 底下的 throwaway 目錄，從未進這個 repo。即使原文有加註說明是 scratch repo 跑的，這個路徑仍是一個查不到的懸空引用——對照 `agency-os/AGENTS.md` §已知信任邊界講的「偽造證據行可通過機械閘」，這正是那類問題的具體案例（非惡意偽造，是引用了錯誤位置的真實檔案）。
+
+[修正 1：補一份真正的 in-repo 證據 + 診斷並修好 codex CLI 版本問題]
+嘗試對本 repo 真實的 round 7 commit（`b0c964a9`）補跑 `codex-oracle.ps1 -Mode review -DiffRef b0c964a9`，連續 3 次逾時（240s/420s/180s）。查 raw log 發現真正原因：codex CLI 卡在 model-refresh 階段丟 `unknown variant "max"` decode 錯誤——已安裝版本 `0.123.0` 落後最新版 `0.149.1` 達 26 個小版號，後端新增的 reasoning tier `max`這支 CLI 解不出來。跑 `npm install -g @openai/codex` 更新後問題消失，重跑成功（237 秒，這次 Codex 主動用 MCP 工具讀真實檔案、查 git 官方文件驗證 blob hash 縮寫長度的假設，比之前更徹底所以更花時間，非卡死）。真實 artifact 已進 `agency-os/reports/oracle/2026-08-24-partialreview-71090006.md`。
+
+[根因 2：這次真實 review 又抓到一個真洞]
+Codex 對 round 7 commit 的真實 review 回報 CONFIRMED finding：round 7 為了相容舊格式 artifact，保留了「純路徑比對」當 fallback（`$confirmedDeletedPaths.Contains($sf)`，不管有沒有 hash）。但這個 fallback 沒有條件限制——任何 round 1-7 之前產生、只有純路徑沒有 hash 的 artifact，遇到「同一天再刪一次不同內容」的情境，一樣會被純路徑 fallback 誤判成已確認，等於重新打開 round 7 才剛關掉的洞，而且是在 round 7 上線當天就會發生（過渡期而非長期缺口，但過渡期本身就是漏洞視窗）。
+
+[已修改（第二版修正）]
+`scripts/verify-closeout-completeness.ps1:376-395`——純路徑 fallback 改成「只有在我們自己也算不出目前這次刪除的 hash 時才允許」：`$currentDeletionHash.ContainsKey($sf)` 為真時，只認 `path@hash` 精確比對，舊格式的純路徑記錄不再算數；只有兩邊都算不出 hash（真正對稱的不確定）才退回純路徑比對。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npm view @openai/codex version` 對照 `codex --version` 確認版本落差（0.123.0 vs 0.149.1），`npm install -g @openai/codex` 後 `codex --version` 確認升級成功 | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=對本 repo 真實 commit `b0c964a9` 跑真正的 `codex-oracle.ps1 -Mode review -DiffRef`（真實呼叫，非模擬，237 秒）| exit=0，artifact 落在本 repo 真實路徑 `agency-os/reports/oracle/2026-08-24-partialreview-71090006.md`（已進 git，可驗證）
+- REALTEST_EVIDENCE: tool=Bash | cmd=scratch repo 精確重現 Codex 描述的情境：清空其他 artifact，只留一份「純路徑、無 hash」的舊格式 artifact 宣稱 `target.php` 已審過，此時 staged 的其實是內容不同的第二次刪除（真實 hash `38b308a`）| exit=1（第一版修正錯誤放行 exit=0；補上第二版修正後正確擋下，訊息為既有 unconfirmed 文字）
+- REALTEST_EVIDENCE: tool=Bash | cmd=同情境換成正確 `path@hash` 記錄 | exit=0（正確放行，確認沒有過度擋)
+- REALTEST_EVIDENCE: tool=Bash | cmd=完整回歸測試（單次刪除+正確 hash 放行、真過期無任何確認硬擋、waiver 靜音）三案例對 ASCII scratch repo 重跑 | exit 各自符合預期（3/3 pass）；本 session 累計 28+ 組真實整合情境
+- REVIEW_WAIVED: NA -- 對本輪第二版修正本身補跑真實 `codex-oracle.ps1 -Mode review` 逾時（300 秒，同一顆已更新版本的 CLI 這次做更深入調查來不及在時限內完成，非故障）；判斷不再重試（累計本輪已花 3 次逾時+1 次成功+1 次再逾時的真實呼叫時間，遵照使用者本 session 稍早明確的效率回饋，不無限重試同一個外部呼叫）；改手動逐行覆核第二版修正的三個分支（可算 hash 時只認精確比對、算不出時退回純路徑、兩者都失敗時走既有 unverifiable warn-only），邏輯與已通過的真實整合測試一致
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`currentDeletionHash\|sfHash` | hits=4（全部在同一檔案內部宣告/比對，無其他 call site；WORKLOG round 7 entry 的錯誤路徑引用已在上方訂正，非本次新增的過期聲稱）
+
+[剩餘風險]
+- codex-oracle.ps1 呼叫在做深度調查（讀檔+web search）時可能超過一般預期的 timeout（本次見過 84s 到 237s 到逾時 300s+ 不等），下次呼叫建議預設給 300-420 秒緩衝，避免誤判為卡死而重複重試
+- 本輪起才確認 codex CLI 版本管理本身也是一個需要留意的維護面（AGENTS.md 目前沒有提到需要定期檢查 codex CLI 版本），建議之後找機會補一條「codex CLI 版本落後太多會導致 model-refresh 失敗」的維護提醒到 runbook 或 AGENTS.md，非本次範圍
+- `test-hooks.sh` 仍無 ORACLE gate 專屬案例（八輪累積的既有缺口，非本次引入）
+- 這是同一段邏輯的第八次修正；已在 round 7 WORKLOG 留過「該停下重新設計」的提醒但這次仍是修補而非重設計——理由：round 8 的兩個問題（證據鏈路徑錯誤、bare-path fallback 條件不足）都是具體、局部、可精準定位的缺陷，不是設計方向錯誤，重新設計不會比精準修補更有效率；若下一輪（round 9）再出現，才真的該停下來重新設計而非第三次援引這個理由
+
+[rollback]
+`git diff scripts/verify-closeout-completeness.ps1` 還原單一 hunk（本輪只動了 consumer 端）；round 7 WORKLOG 訂正屬文字修正無程式碼影響。
 
 ## 2026-08-20 — 跨模型 oracle 制度化：`codex-oracle.ps1` + AGENTS 分工規則
 
