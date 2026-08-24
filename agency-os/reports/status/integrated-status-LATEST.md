@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-08-24 20:12:00
+- Generated: 2026-08-24 20:13:57
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
