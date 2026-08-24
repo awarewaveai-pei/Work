@@ -1,7 +1,7 @@
 # CI health (GitHub Actions, branch main)
 
-- Generated: 2026-08-25 04:13:11
-- Overall: **🟡 WARN**
+- Generated: 2026-08-25 04:25:35
+- Overall: **🟢 PASS**
 - Method: every workflow enumerated; last 20 run(s) of each inspected on `main`
 
 ## Workflows
@@ -16,12 +16,12 @@
 | SG Deploy (self-hosted runner) | success | - | - |
 | Tenant staging SSOT | none | - | - |
 | Trigger infra config guard | success | - | - |
-| Weekly workflows security audit | failure | 1 | 1d |
+| Weekly workflows security audit | success | - | - |
 | ziwei — typecheck · test · build | none | - | - |
 
 ## Findings
 
-- 'Weekly workflows security audit' latest run on main is failure: https://github.com/awarewaveai-pei/Work/actions/runs/32683910784
+- Every workflow's latest run on main succeeded.
 
 ## Why this check exists
 

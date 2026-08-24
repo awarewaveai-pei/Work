@@ -1,6 +1,6 @@
 {
     "schemaVersion":  1,
-    "generatedAtUtc":  "2026-08-24T20:13:11.4211937Z",
+    "generatedAtUtc":  "2026-08-24T20:25:35.2737497Z",
     "branch":  "main",
     "runsPerWorkflow":  20,
     "probeOk":  true,
@@ -11,7 +11,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/29719033130"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/32773778098"
                       },
                       {
                           "name":  "Auto-Repair - PR Notification",
@@ -27,7 +27,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/31593280950"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/32773438315"
                       },
                       {
                           "name":  "next-admin — TypeScript typecheck",
@@ -71,11 +71,11 @@
                       },
                       {
                           "name":  "Weekly workflows security audit",
-                          "latest":  "failure",
-                          "consecutiveFailures":  1,
-                          "failingSinceUtc":  "2026-08-24T02:41:52Z",
-                          "failingDays":  1,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/32683910784"
+                          "latest":  "success",
+                          "consecutiveFailures":  0,
+                          "failingSinceUtc":  "",
+                          "failingDays":  0,
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/32773585313"
                       },
                       {
                           "name":  "ziwei — typecheck · test · build",
@@ -86,9 +86,9 @@
                           "url":  ""
                       }
                   ],
-    "verdict":  "drift",
-    "verdictLabel":  "WARN",
+    "verdict":  "healthy",
+    "verdictLabel":  "PASS",
     "findings":  [
-                     "\u0027Weekly workflows security audit\u0027 latest run on main is failure: https://github.com/awarewaveai-pei/Work/actions/runs/32683910784"
+
                  ]
 }
