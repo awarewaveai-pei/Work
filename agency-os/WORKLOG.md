@@ -70,6 +70,28 @@ session Stop hook 觸發的 Codex stop-time review 回報：ORACLE gate（`verif
 [rollback]
 `git diff scripts/verify-closeout-completeness.ps1` 還原單一 hunk 即可，無其他檔案依賴此改動。
 
+### AUTO_TASK_DONE: ORACLE gate unverifiable 分支改回 warn-only（round 2，同 session Codex stop-hook 抓到）
+
+[任務]
+Round 1 修完後，同一顆 Codex stop-hook 又抓到新問題：「staged deletions now hard-fail ORACLE gate unless waived」。
+
+[根因]
+Round 1 把 unverifiable（deletion 因無 mtime 無法判定新鮮度）跟 stale（有 mtime、可判定為過期）用同一套 hard-fail 邏輯處理。但 `Test-Path` 對已刪除檔案永遠回 false——不管操作者事後多晚重跑 `codex-oracle.ps1`，這條件永遠無法被「修正」清除，等於變相要求**每一次刪檔都得補 `ORACLE_WAIVED`**，跟本檔案自己對 lockfile 用檔名排除（而非強制 waiver）的設計哲學互相矛盾（`AGENTS.md` 已明講：強制 waiver 會訓練操作者機械式打 waiver，稀釋這道閘的訊號）。外層 `$todayOracle.Count -eq 0` 分支本就已要求「當天至少一份 artifact 存在」，這才是 deletion 這種不可判定情況該適用的門檻。
+
+[已修改]
+`scripts/verify-closeout-completeness.ps1:284-298` —— `$unverifiable` 分支拿掉 `if ($Gate -eq "strict") { exit 1 }`，只保留 `Write-Warning`；waiver 仍可用來完全靜音；stale 分支（line 277-283）不受影響，繼續 strict 硬擋（因為 stale 是可判定、真的能靠重跑 oracle 解決）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=複製新版程式碼包成 function 跑 3 組情境（deletion 無 waiver strict/deletion 有 waiver/無 deletion）於 `D:\tmp\test-oracle-unverifiable-v2.ps1` | exit=0（3/3 pass：strict 下 deletion 不再擋、rc 皆 0，waiver 仍可靜音，無 deletion 不誤觸發）| ms=~350
+- REVIEW_WAIVED: NA -- critic 服務仍不可用（同前次 529，未再重試以免浪費 token）；手動 review：`$hasOracleWaiver` 仍共用不變、stale 分支邏輯完全未動、訊息文字改為純告知不再提「Gate=$Gate」（因已不受 Gate 影響，移除避免誤導操作者以為還會被擋）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`unverifiable` | hits=4（同前次，全部同檔案內部，無外部依賴）
+
+[剩餘風險]
+與上一輪相同（`test-hooks.sh` 無此 gate 專屬案例、critic 待補跑一次事後複核）
+
+[rollback]
+`git diff scripts/verify-closeout-completeness.ps1` 還原單一 hunk。
+
 ## 2026-08-20 — 跨模型 oracle 制度化：`codex-oracle.ps1` + AGENTS 分工規則
 
 ### AUTO_TASK_DONE: 把 08-17 驗證有效的 Codex oracle 從「當次對話」變成常駐機制

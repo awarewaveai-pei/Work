@@ -284,11 +284,18 @@ try {
             if ($unverifiable.Count -gt 0 -and -not $hasOracleWaiver) {
                 # Deletion has no mtime, so it was collected above but never gated on --
                 # that let deletions silently pass regardless of whether any oracle ever
-                # saw them (2026-08-24 fix). Unverifiable must fail the same as stale.
+                # saw them (2026-08-24 fix, round 1). Round 2 (codex stop-hook): hard-failing
+                # this is undecidable, not just unproven -- Test-Path on a deleted file is
+                # ALWAYS false, so no re-run of codex-oracle at any time could ever clear a
+                # strict block here. That is not a stale-review gap closing, it is a
+                # mandatory waiver for every future deletion forever, which trains the same
+                # waiver-reflex habit this file's own lockfile-by-name exclusion (above)
+                # exists to avoid. The outer $todayOracle.Count -eq 0 branch already
+                # requires same-day artifact EXISTENCE for these files -- that is the
+                # applicable bar for a deletion. Report visibly, never hard-block.
                 $uvMsg = ("verify-closeout-completeness: staged deletion(s) cannot be freshness-checked against oracle artifact ({0}, {1}): {2}." -f $newestArtifact.Name, $newestArtifact.LastWriteTime.ToString('HH:mm:ss'), ($unverifiable -join ', ')) +
-                         " Re-run: .\scripts\codex-oracle.ps1 -Mode review -Context '<what changed>'" +
-                         (" OR add: - ORACLE_WAIVED: <one-line reason> to {0}. Gate={1}" -f $hdr, $Gate)
-                if ($Gate -eq "strict") { Write-Host $uvMsg -ForegroundColor Red; exit 1 }
+                         " Same-day oracle artifact exists (required above) but cannot confirm it covered this deletion." +
+                         (" OR add: - ORACLE_WAIVED: <one-line reason> to {0} to silence this note." -f $hdr)
                 Write-Warning $uvMsg
             }
             Write-Host ("== ORACLE artifacts today: {0} (newest {1}) ==" -f $todayOracle.Count, $newestArtifact.LastWriteTime.ToString('HH:mm:ss')) -ForegroundColor Cyan
