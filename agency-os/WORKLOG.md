@@ -59,9 +59,13 @@ Merge 每欄開一個寫入緩衝，所以 `metric_log` 一次 merge 固定要 ~
 
 還查出一筆 SSOT 漂移：repo compose 寫 `mem_limit: 4096m`、prod 實跑 3072m，源頭是 `35834a0d`（2026-06-13）—— 一個 **auto-checkpoint commit 把工作區裡沒提交的編輯掃進 git**，從未部署，漂了 10 週。已對齊並加機械閘鎖住兩份檔案的耦合。
 
+**關於 auto-checkpoint 的一則觀察（本輪親身遇到，非推測）**：本 session 的程式碼變更是被 auto-checkpoint commit 掃進 git 並 push 的，**而當時 verify gate 仍在擋我自己的 `git commit`**。原因是 PreToolUse hook 只能攔代理的工具呼叫，攔不到另一個 hook 內部的 git 操作——架構上如此，不是 bug。但後果要講明白：**「未通過 verify gate 的程式碼不會進 main」這個保證，實際上不成立**；auto-checkpoint 是一條繞過路徑。這與上面 `mem_limit` 漂了 10 週是同一個機制的兩種後果（一個是掃進沒打算提交的編輯，一個是掃過驗證閘）。本輪不改動該 hook（超出範圍且需要操作者決定取捨），但記錄在此，因為它正是「為什麼問題會持續發生」的同一類答案：**保證寫在文件裡，機制上沒有真的成立。**
+
 [驗證結果]
 - **拋棄式容器實測（部署前，override.xml 註解明令要求）**：第一版 `background_pool_size=2` → **exit 36 攔下**（這個若直接上 prod 就是第二次 crash-loop）；最終版 → 7/7 表帶 TTL、退役表 0 張存在、最寬 `query_log:84`、soft limit 生效。
 - **prod 修復前後**：CPU **100.04% → 5.0%**；容器記憶體 1,019 MiB → 498 MiB；host load 1.83 → 1.10；free 316 MB → 896 MB；code 241 最後一筆 **18:49:30**（`metric_log` DROP 前殘餘），其後 13 分鐘 0 筆，`MergesMutationsMemoryTracking=0`。
+- **1 小時滾動窗清空後的最終驗證（19:56 UTC）**：`mergefail1h=0`、`stalled=0`、`merges=0`、`widest=query_log:84`，verdict 由 🔴 FAIL 降為 🟡 WARN，唯一剩餘 finding 是資料比 5.6x（text_log 錯誤噴發殘留，3 天 TTL 自然排掉，**不手動清**）。
+- **CI 真機驗證（最強證據）**：auto-checkpoint 把改動推上去後，`Trigger infra config guard` run `32769817943` **通過**，且 `gh run view --json jobs` 確認**兩個 step 都真的執行**（靜態閘 + 行為驗證），29 秒。該 workflow 自 2026-08-15 起連續 4 次紅之後，這是第一次綠 —— 而且是綠在「閘真的驗了東西」而不是「閘空轉」。
 - **system 表最終狀態**：12 張全部有 TTL，`remaining_without_ttl=0`，孤兒 0 張。
 - `validate-override.sh` **雙路徑實測**：good config → PASS；壞設定 A（server 拒絕啟動）→ exit 1 並印容器 log；壞設定 B（未宣告 TTL）→ exit 1 並列出 15 張無 TTL 表。
 - `validate-config.ps1` **三路徑實測**：現況 → exit 0；竄改 `mem_limit` 為 4096m → exit 1；竄改 `text_log` level 為 `fatal` → exit 1（該 level 是 merge 失敗偵測器的依賴，調高會讓偵測器靜默變瞎）；還原 → exit 0。
@@ -79,6 +83,15 @@ Merge 每欄開一個寫入緩衝，所以 `metric_log` 一次 merge 固定要 ~
   - **類別掃描（AGENTS.md 規定同一 reviewer 二次回報後必做）**：兩條的共同類別是「閘斷言『存在』而非『它該釘住的值』」。逐一檢查本輪新增的 9 條斷言，**只有 merge 預算那一條屬於此類**，其餘（六個退役產生源／`max_server_memory_usage`／`mem_limit`／`text_log` level）本來就釘實值。類別已完整列舉並關閉，非逐點打補丁。
   - **自查連帶發現（比上面兩條嚴重，oracle 沒抓到）**：追 R2-FINDING 1 的 regex 為何對不到時，發現 `validate-config.ps1` 的 `Assert-Match`/`Assert-NoMatch` 走 `Select-String`，**以 CP950 預設編碼解讀含 CJK 的檔案**。實測 `.env.example`：預設解碼得 102 個換行、UTF-8 得 119 個（**吞掉 17 個行尾**），長度 5423 vs 4951。後果不只是 `^` 錨點失效——**`Assert-NoMatch` 可能找不到實際存在的字串，於是閘因為瞎掉而通過**。這正是本輪一直在講的同一個 bug class，出現在我正在加固的那道閘本身。改為 `[System.IO.File]::ReadAllText($p, UTF8)` + `.Contains()`。與 `scripts/audit-cp950-traps.ps1` 稽核的是同一個 trap class（該工具查指令輸出，這裡是檔案讀取）。
   - 修完 **5 條路徑實測**：正常 → exit 0；預算值竄改 → 1；image tag 兩處不一致 → 1；`metric_log` 被復活 → 1；`mem_limit` 竄改 → 1；全部還原 → 0。
+- REVIEW_DONE（第三輪）: critic=Deep | verdict=pass-after-fix | findings=0c/3m/0n —— **三條全真，且觸發 AGENTS.md「同一 reviewer 連續 2 次回報 → 第 3 次修正前強制不變量分析」**
+  - R3-F1：`preflight-clickhouse.ps1 -EnvFile` 只做存在性檢查，沒傳給驗證器 → 驗證器固定讀 `../.env`，可能對「不是要部署的那個 build」回報 PASS。
+  - R3-F2：自寫 sed 只認 `KEY=value` 裸值，Compose 的 `.env` 允許引號等形式。
+  - R3-F3：`check-ci-health.ps1` 用 `gh run list --limit 100` 全域取樣，低頻 workflow 一旦被較忙的 workflow 擠出視窗就**整個消失**，其他綠的話就報 PASS。
+  - **不變量分析（強制，不逐點修）**：把 R3 三條 + R2 兩條 + 我自己的 CP950 發現放在一起，是同一個形狀 —— **檢查器用一條比真實系統更窄的捷徑解析自己的輸入；捷徑沒命中時退化成「靜默通過」而非「大聲失敗」**。完整不變量：**閘所解析的每一個輸入，要嘛用與真實系統同一條規則解析，要嘛在解析不完整時判定為 BLIND/FAIL，不得退化為 PASS。**
+  - **依不變量修，而非依 finding 修**：① image 解析**停止自行實作**，改為呼叫 `docker compose config --images`——那就是真實系統的規則本身（自動處理 `--env-file`／`.env`／shell env／預設／插值／引號）。一次同時關掉 R2-F1、R3-F1、R3-F2 三條，而不是打三個補丁。解析不到時**明確 FAIL 並拒絕猜測**。② CI 檢查改為**列舉**（`gh workflow list` → 逐一查該 workflow 的 runs），不再全域取樣；順帶新增「workflow 被停用」偵測（那也是一種閘被關掉）。
+  - **實測（6 種情境）**：A) CI 條件（無 `.env`）→ PASS，image 正確解析為 compose 預設；B) prod 條件（有 `.env`）→ PASS；C) 明確傳入 env-file → PASS；D) env-file 用**引號**包值 → compose 正確剝除 → PASS（R3-F2 關閉）；E) env-file 指向**不同 tag** → 驗證器確實改用該 tag（`99.9.9-does-not-exist`）而非退回預設，exit 125（R3-F1 關閉）；F) 目錄下無 compose → **明確 FAIL、拒絕猜測**，exit 1。
+  - **列舉法的直接證據**：改版後找到 **10 個 workflow**，取樣法只看到 5 個 —— **有 5 個 workflow 之前完全不可見**（R3-F3 證實）。
+  - **自查再抓一個我剛引入的 bug**：讀回時發現 `fail()` 定義在第 92 行、卻在第 73 行的 image 解析區塊就被呼叫，`docker` 可用性檢查也在使用 docker 之後。會 fail-closed 但訊息是 `fail: command not found`。已把兩者上移到第一次使用之前。
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.github | grep=clickhouse-config-check | hits=3
   - ① `AGENTS.md:234` 教代理盯資料比（本次事故證明會漏）→ 已改
   - ② `WORKLOG.md` 2026-08-19 的技術結論已被證偽 → 已加訂正

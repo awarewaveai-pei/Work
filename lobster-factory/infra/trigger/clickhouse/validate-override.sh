@@ -59,14 +59,19 @@ command -v docker >/dev/null 2>&1 || fail "docker is not available"
 # `docker compose config --images` IS that rule. It applies --env-file, .env, shell
 # environment, defaults and interpolation exactly as `docker compose up` would.
 COMPOSE_DIR="$HERE/.."
+COMPOSE_SERVICE="clickhouse"
 ENV_FILE="${2:-}"           # optional; must be the same file the deploy will use
 IMAGE_OVERRIDE="${3:-}"     # escape hatch for deliberately testing another build
 
+# Ask compose for THIS SERVICE's image by name. An earlier version listed every image and
+# grepped for 'clickhouse', which happened to work only because exactly one image matched -
+# a property of today's compose file, not a guarantee. Naming the service removes the
+# ambiguity instead of relying on it.
 resolve_image() {
     local args=(compose)
     [ -n "$ENV_FILE" ] && args+=(--env-file "$ENV_FILE")
-    args+=(config --images)
-    ( cd "$COMPOSE_DIR" && docker "${args[@]}" 2>/dev/null ) | grep -m1 'clickhouse' || true
+    args+=(config --images "$COMPOSE_SERVICE")
+    ( cd "$COMPOSE_DIR" && docker "${args[@]}" 2>/dev/null ) | head -1
 }
 
 if [ -n "$IMAGE_OVERRIDE" ]; then
