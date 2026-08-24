@@ -1,24 +1,24 @@
 # ClickHouse health (EU)
 
-- Generated: 2026-08-25 03:44:27
-- Overall: **🔴 FAIL**
+- Generated: 2026-08-25 03:48:09
+- Overall: **🟡 WARN**
 - Host: 204.168.175.41 / container `trigger-clickhouse`
 
 ## Self-telemetry vs application data
 
 | Metric | Value |
 |--------|-------|
-| system database | 212.23 MiB (3,498,136 rows) |
-| trigger_dev (application) | 37.88 MiB (400,313 rows) |
+| system database | 212.25 MiB (3,498,667 rows) |
+| trigger_dev (application) | 37.87 MiB (400,313 rows) |
 | ratio (system / app) | 5.6x |
 | largest system table | text_log:181972761 |
 | active merges | 0 |
 | merges stalled at progress=0 | 0 (expected 0) |
-| failed merge tasks last hour | 449 (text_log 449 / part_log 0; expected 0) |
-| server-wide MEMORY_LIMIT_EXCEEDED last hour | 450 (not attributed to a source) |
+| failed merge tasks last hour | 123 (text_log 123 / part_log 0; expected 0) |
+| server-wide MEMORY_LIMIT_EXCEEDED last hour | 123 (not attributed to a source) |
 | merge memory budget | 1.00 GiB |
 | max parts in one system partition | 8 |
-| max parts in one trigger_dev partition | 5 (raw_task_runs_payload_v1) |
+| max parts in one trigger_dev partition | 4 (raw_task_runs_payload_v1) |
 | widest system log table | query_log (84 columns) |
 | retired generators present | 0 (expected 0) |
 | system tables missing TTL | 0 |
@@ -27,8 +27,8 @@
 
 ## Findings
 
-- 449 background merge task failures in the last hour (text_log=449 part_log=0; fail at 200) - merges are aborting and being retried, so their parts are never consumed; check the widest table and see override.xml MERGE MEMORY BUDGET
-- 450 server-wide MEMORY_LIMIT_EXCEEDED errors in the last hour (warn at 20) - source not attributed; could be merges, mutations or user queries
+- 123 background merge task failures in the last hour (text_log=123 part_log=0; warn at 5)
+- 123 server-wide MEMORY_LIMIT_EXCEEDED errors in the last hour (warn at 20) - source not attributed; could be merges, mutations or user queries
 - self-telemetry is 5.6x the application data (warn at 5x)
 
 ## Why this check exists

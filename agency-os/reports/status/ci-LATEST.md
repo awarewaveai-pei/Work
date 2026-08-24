@@ -1,6 +1,6 @@
 # CI health (GitHub Actions, branch main)
 
-- Generated: 2026-08-25 03:44:30
+- Generated: 2026-08-25 03:48:12
 - Overall: **🟡 WARN**
 - Sampled: last 100 runs on `main`
 

@@ -132,6 +132,18 @@ Playwright smoke 首輪 24/2，兩條失敗均為 `page.captureScreenshot: Proto
 - REVIEW_WAIVED: NA -- 本批是「偵測器盲點 + 機械式路由到既有已驗證的 lib SSOT」，無新設計；每一步都以真實執行驗證（含被修測試套件自身通過、lint 前後數字對照 20→51→41 sites / 0→31→21→0 violations），且假陽性是我自己發現並修掉而非等 reviewer 指出
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=`Invoke-SafeGitCapture\|Invoke-GitShown\|Invoke-FixtureGit\|reGitStderr` | hits=0 殘留（新 helper 皆為檔案內自洽；`check-deploy-drift`/`check-three-way-sync` 皆新增 lib dot-source，無其他消費端依賴舊行為）
 
+[round 2 — stop-hook Codex 抓到我把「大聲崩潰」改成「安靜錯答案」]
+宣告收工後 session stop-hook 的 Codex 覆審回報：「`check-deploy-drift.ps1` can still return stale drift results after a failed fetch」。**驗證屬實，且是我這個 commit 引入的**。
+- **根因**：`:144` 我寫成 `$null = Invoke-SafeGitCapture -GitArgs @("fetch","origin","main")` —— **ExitCode 被丟棄**。修前 fetch 失敗會拋 `NativeCommandError`（醜，但看得見）；路由到 lib 之後它不再拋，於是失敗變成靜默，後續 `rev-parse origin/main` 會用**本地過期 ref** 照樣成功 → 這道部署閘回報一個過期的 drift 結論。**最糟情況：實際落後卻說「已同步」**，而它正是 sg-deploy 的前置閘。
+- **不變量（本 session 第二次踩同一類）**：**把「崩潰式失敗訊號」換成「回傳值式」時，每個呼叫點都必須消費那個回傳值。** 否則重構等於把大聲失敗改成安靜的錯答案 —— 就是本 repo 反覆記載的「偵測器啞了看起來像健康」bug class（ClickHouse canary、staging URL 刪除線、archive-lift 誤報同族）。
+- **已修 2 處**：① `check-deploy-drift.ps1` fetch 失敗 → `Emit-Result` ERROR/FAIL 並附 `fetchExitCode` + 原始 git 訊息 ② `test-git-safe-ops-matrix.ps1` 的 `Invoke-FixtureGit` 改為非零即 `throw`（同款：改用 scoped EAP 後失敗不再自動拋，fixture 建置失敗會靜默，測試在後面以「測試環境壞了」的假象爆掉而非停在出錯那行）。
+- **`:179` deep-fetch fallback 檢查後判定安全**，不動：它的結果由隨後的 `cat-file` ExitCode 實質檢查（`$catRes2.ExitCode`），非漏檢。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`$env:TEMP\...\scratchpad\test-drift-stalefetch.ps1` —— 建 scratch repo **先 fetch 成功產生真的 `origin/main` ref、再把 remote 改成打不通的 URL**，精確重現「stale ref 可解析 + fetch 失敗」這個危險組合，並把**真的那支腳本**（連同 lib 與 `_console-encoding-helpers.ps1`）複製進去跑（非重寫邏輯）| exit=0 PASS：腳本輸出 `[ERROR] git fetch origin main failed (exit 128) — refusing to report drift against a stale origin/main`、附 `Could not resolve host`、**exit=3 且完全沒有 drift 判決**
+- REALTEST_EVIDENCE: tool=Bash | cmd=正常路徑回歸 `check-deploy-drift.ps1 -AppCodeOnly` | **exit=0 PASS，behind:0**（修 fetch 檢查沒有弄壞 happy path）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`test-git-safe-ops-matrix.ps1`（fixture 已改為失敗即 throw）| **8 passed / 0 failed**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`verify-build-gates.ps1` | violations 0 / `Score: 100% (372/372)` / ALL PASSED
+- **附帶自證**：這個測試 harness 第一版自己也踩到同一個 trap（`& powershell ... 2>&1` 在 EAP=Stop 下被子行程的 stderr 炸掉），加 scoped guard 才跑得起來 —— 實地示範了這個陷阱有多容易複製。
+
 [剩餘風險]
 - `test-git-safe-ops-matrix.ps1` T4 輸出仍可見一則 `NativeCommandError`，來自**被測的 `Invoke-SafeGitPush` 內部**（非我改的 fixture，`:33` 是唯一 raw git 且已被 scoped EAP 守衛）。測試判定 PASS，代表 lib 有處理，但這則噪音值得日後看一眼
 - 放寬後的正則仍是字串比對，理論上可能有其他形式的假陽性；目前全 repo 21 個 sites 皆已人工確認
