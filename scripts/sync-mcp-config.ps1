@@ -21,7 +21,6 @@ param(
     [switch]$IncludeDisabled,
     [switch]$StrictEnv,
     [switch]$SkipWorkspaceConfig,
-    [switch]$SkipClaude,
     [switch]$SkipCodex,
     [switch]$SkipCopilot,
     [switch]$SkipGemini
@@ -109,6 +108,20 @@ function ConvertTo-PlainObject {
             $items += ,(ConvertTo-PlainObject $item)
         }
         return $items
+    }
+
+    # PSCustomObject is handled explicitly (not via the generic property walk below) so that an
+    # EMPTY JSON object still comes back as @{}. The property walk only builds a map when there is
+    # at least one property, so `{}` used to fall through and return the raw PSCustomObject --
+    # which has no .Keys/.ContainsKey, breaking every caller that treats the result as a map.
+    # Found 2026-08-25 by feeding `{"mcpServers":{}}` (the sanitized state of a user-level Cursor
+    # config) to the duplicate-server detector below.
+    if ($InputObject -is [System.Management.Automation.PSCustomObject]) {
+        $map = @{}
+        foreach ($prop in @($InputObject.PSObject.Properties)) {
+            $map[$prop.Name] = ConvertTo-PlainObject $prop.Value
+        }
+        return $map
     }
 
     $props = @($InputObject.PSObject.Properties)
@@ -383,48 +396,6 @@ function Convert-ServerToCopilotConfig {
     return $out
 }
 
-function Convert-ServerToClaudeConfig {
-    param([string]$Name, [hashtable]$Server)
-
-    if (-not (Should-IncludeServer -Name $Name -Server $Server -Client "claude")) {
-        return $null
-    }
-
-    $out = @{}
-    $transport = [string]$Server["transport"]
-    if ($transport -eq "http") {
-        $out["type"] = "http"
-        $out["url"] = Resolve-EnvValue -StringValue ([string]$Server["url"]) -Mode "Concrete"
-        if ([string]::IsNullOrWhiteSpace([string]$out["url"])) {
-            $script:Warnings.Add("Skip $Name for Claude because the URL resolved to an empty value.")
-            return $null
-        }
-        if ($Server.ContainsKey("headers")) {
-            $headers = Resolve-MapValues -Map (ConvertTo-PlainObject $Server["headers"]) -Mode "Concrete"
-            if (-not (Test-ResolvedMap -ServerName $Name -Map $headers -Kind "Claude")) {
-                return $null
-            }
-            $out["headers"] = $headers
-        }
-    } else {
-        $out["command"] = Resolve-EnvValue -StringValue ([string]$Server["command"]) -Mode "Concrete"
-        $args = @()
-        foreach ($arg in $Server["args"]) {
-            $args += ,(Resolve-EnvValue -StringValue ([string]$arg) -Mode "Concrete")
-        }
-        $out["args"] = $args
-        if ($Server.ContainsKey("env")) {
-            $optionalKeys = Get-OptionalEnvKeys -Server $Server
-            $envMap = Resolve-MapValues -Map (ConvertTo-PlainObject $Server["env"]) -Mode "Concrete"
-            if (-not (Test-ResolvedMap -ServerName $Name -Map $envMap -Kind "Claude" -OptionalKeys $optionalKeys)) {
-                return $null
-            }
-            $out["env"] = Remove-EmptyOptionalEnv -Map $envMap -OptionalKeys $optionalKeys
-        }
-    }
-    return $out
-}
-
 function Convert-ServerToGeminiConfig {
     param([string]$Name, [hashtable]$Server)
 
@@ -640,18 +611,25 @@ if (-not $SkipWorkspaceConfig) {
     Write-Utf8NoBomFile -Path $cursorMcpPath -Content ($workspaceDoc | ConvertTo-Json -Depth 20)
 }
 
-if (-not $SkipClaude) {
-    $claudeServers = @{}
-    foreach ($name in ($servers.Keys | Sort-Object)) {
-        $serverConfig = Convert-ServerToClaudeConfig -Name $name -Server (ConvertTo-PlainObject $servers[$name])
-        if ($null -ne $serverConfig) {
-            $claudeServers[$name] = $serverConfig
-        }
-    }
-    $claudeDoc = @{ mcpServers = $claudeServers }
-    $claudePath = Join-Path $env:USERPROFILE ".claude\mcp.json"
-    Write-Utf8NoBomFile -Path $claudePath -Content ($claudeDoc | ConvertTo-Json -Depth 20)
-}
+# `%USERPROFILE%\.claude\mcp.json` is deliberately NOT written by this script.
+# Ownership belongs to scripts/sync-claude-userlevel.ps1, which replaces it with
+# `{"mcpServers":{}}` from mcp/claude-userlevel/mcp.template.json (see the "mcp"
+# entry in mcp/claude-userlevel/manifest.json): CLAUDE.md requires that file to
+# stay empty, and the repo-root `.mcp.json` (project scope) is the real SSOT for
+# shared MCP servers.
+#
+# This script used to write the full registry there -- added 2026-04-23 chasing a
+# "same server list on six clients" goal, superseded by the empty-file rule. Two
+# scripts owning one file meant whichever ran last won, so following CLAUDE.md's
+# own instruction to run this sync silently repopulated the file CLAUDE.md says
+# must be empty. Every Claude session then loaded the repo's servers a second time
+# on top of project `.mcp.json` -- double-launching each one. For OAuth servers
+# behind `mcp-remote` that means two proxies racing the same token lock, which is
+# how 2026-08-25 ended up with 36 zombie node processes and 14 browser popups in
+# two hours (see WORKLOG 2026-08-25).
+#
+# Removed 2026-08-25. Do not re-add: edit mcp/claude-userlevel/mcp.template.json
+# and run scripts/sync-claude-userlevel.ps1 instead.
 
 if (-not $SkipCopilot) {
     $copilotServers = @{}
@@ -722,6 +700,95 @@ if (-not $SkipCodex) {
     Write-Utf8NoBomFile -Path $codexPath -Content $updated
 }
 
+# Cursor loads BOTH the project `.cursor/mcp.json` and the user-level
+# `%USERPROFILE%\.cursor\mcp.json`. Only the first is repo-managed, so any server
+# named in both launches twice per Cursor window -- the same double-launch hazard
+# described above for `~/.claude/mcp.json`.
+#
+# That file is intentionally not written here: it is a global Cursor config
+# applying to every repo on the machine, so publishing this repo's servers into it
+# would leak them into unrelated projects. It cannot be silently ignored either,
+# because a fix applied there by hand (e.g. pinning `mcp-remote` to a fixed
+# version) is invisible to the repo and unreproducible on a new machine.
+# So: detect and report, never mutate.
+# Compare what Cursor actually loads from each file, not the registry: a server
+# can sit in the registry yet be excluded from the project Cursor config, and such
+# a server does not double-launch. Over-reporting would train the operator to
+# ignore this warning, which is the failure mode it exists to prevent.
+$projectCursorPath = Join-Path $WorkspaceRoot ".cursor\mcp.json"
+$userCursorPath = Join-Path $env:USERPROFILE ".cursor\mcp.json"
+
+function Get-McpServerNames {
+    param([string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return @()
+    }
+    $doc = ConvertTo-PlainObject (Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json)
+    if ($null -eq $doc -or -not $doc.ContainsKey("mcpServers")) {
+        return @()
+    }
+    return @((ConvertTo-PlainObject $doc["mcpServers"]).Keys)
+}
+
+if (Test-Path -LiteralPath $userCursorPath) {
+    try {
+        $projectCursorNames = Get-McpServerNames -Path $projectCursorPath
+        $userCursorNames = Get-McpServerNames -Path $userCursorPath
+        $userCursorDupes = @($userCursorNames | Where-Object { $projectCursorNames -contains $_ } | Sort-Object)
+        if ($userCursorDupes.Count -gt 0) {
+            $script:Warnings.Add("User-level Cursor MCP ($userCursorPath) redefines $($userCursorDupes.Count) server(s) that the project config also defines: $($userCursorDupes -join ', '). Cursor loads both files, so each of these launches twice per window. Remove them there -- $projectCursorPath is the SSOT.")
+        }
+    } catch {
+        $script:Warnings.Add("Could not compare Cursor MCP configs -- duplicate-server check skipped: $($_.Exception.Message)")
+    }
+}
+
+# Claude Code keeps local/user and project-scoped MCP servers in `%USERPROFILE%\.claude.json`,
+# NOT in the legacy `~/.claude\mcp.json` that sync-claude-userlevel.ps1 normalizes. See
+# agency-os/docs/operations/mcp-add-server-quickstart.md and collaborator-ai-agent-rules.md.
+# Stale project keys accumulate there whenever `claude` is started from an unrelated directory,
+# and no sync step has ever looked at that file -- so enforcing the empty-file rule on the legacy
+# path while ignoring this one would give false confidence.
+# Report only: scripts/sanitize-user-mcp-config.ps1 already owns clearing these entries
+# (Clear-ClaudeProjectMcpEntries). Doing it here too would recreate the two-owners bug that this
+# change removed.
+$claudeUserJsonPath = Join-Path $env:USERPROFILE ".claude.json"
+if (Test-Path -LiteralPath $claudeUserJsonPath) {
+    try {
+        # Deliberately NOT ConvertFrom-Json. That cmdlet throws on this file because Claude Code
+        # writes project keys that differ only by case (e.g. 'C:/WINDOWS/system32' and
+        # 'C:/WINDOWS/System32') and its PSCustomObject build uses case-insensitive property names.
+        # `-AsHashtable` would parse it but does not exist before PowerShell 6, and this machine
+        # runs Windows PowerShell 5.1 with no pwsh on PATH. JavaScriptSerializer ships with .NET
+        # Framework and builds an ordinal Dictionary, so both keys survive.
+        Add-Type -AssemblyName System.Web.Extensions -ErrorAction Stop
+        $jsonReader = New-Object System.Web.Script.Serialization.JavaScriptSerializer
+        $jsonReader.MaxJsonLength = [int]::MaxValue
+        $claudeUserDoc = $jsonReader.DeserializeObject((Get-Content -LiteralPath $claudeUserJsonPath -Raw -Encoding UTF8))
+        if ($null -ne $claudeUserDoc -and $claudeUserDoc.ContainsKey("projects")) {
+            $populatedProjects = @()
+            $claudeProjects = $claudeUserDoc["projects"]
+            foreach ($projectKey in @($claudeProjects.Keys)) {
+                $project = $claudeProjects[$projectKey]
+                if ($null -eq $project -or -not $project.ContainsKey("mcpServers")) { continue }
+                $projectMcpNames = @($project["mcpServers"].Keys)
+                if ($projectMcpNames.Count -eq 0) { continue }
+                $entry = "$projectKey ($($projectMcpNames.Count): $($projectMcpNames -join ', '))"
+                if (($projectKey -replace '/', '\') -eq $WorkspaceRoot.TrimEnd('\')) {
+                    $entry += " <-- THIS workspace; these launch ON TOP OF .mcp.json"
+                }
+                $populatedProjects += $entry
+            }
+            if ($populatedProjects.Count -gt 0) {
+                $script:Warnings.Add("$claudeUserJsonPath carries project-scoped MCP servers that no sync step manages: $($populatedProjects -join ' | '). scripts/sanitize-user-mcp-config.ps1 owns clearing them -- but note its Clear-ClaudeProjectMcpEntries uses 'ConvertFrom-Json -AsHashtable', which does not exist on Windows PowerShell 5.1, so verify it actually runs before trusting it.")
+            }
+        }
+    } catch {
+        $script:Warnings.Add("Could not read $claudeUserJsonPath -- stale project-MCP check skipped: $($_.Exception.Message)")
+    }
+}
+
 if ($StrictEnv -and $script:MissingVars.Count -gt 0) {
     throw ("Missing required environment variables: " + ((@($script:MissingVars) | Sort-Object) -join ", "))
 }
@@ -729,7 +796,7 @@ if ($StrictEnv -and $script:MissingVars.Count -gt 0) {
 Write-Host "MCP sync complete." -ForegroundColor Green
 Write-Host "  workspace : $(if ($SkipWorkspaceConfig) { 'skipped' } else { Join-Path $WorkspaceRoot '.mcp.json' })" -ForegroundColor Gray
 Write-Host "  cursor    : $(if ($SkipWorkspaceConfig) { 'skipped' } else { Join-Path $WorkspaceRoot '.cursor\mcp.json' })" -ForegroundColor Gray
-Write-Host "  claude    : $(if ($SkipClaude) { 'skipped' } else { Join-Path $env:USERPROFILE '.claude\mcp.json' })" -ForegroundColor Gray
+Write-Host "  claude    : not written -- owned by sync-claude-userlevel.ps1, must stay {}" -ForegroundColor Gray
 Write-Host "  codex     : $(if ($SkipCodex) { 'skipped' } else { Join-Path $env:USERPROFILE '.codex\config.toml' })" -ForegroundColor Gray
 Write-Host "  copilot   : $(if ($SkipCopilot) { 'skipped' } else { Join-Path $env:USERPROFILE '.copilot\mcp-config.json' })" -ForegroundColor Gray
 Write-Host "  gemini    : $(if ($SkipGemini) { 'skipped' } else { Join-Path $env:USERPROFILE '.gemini\settings.json' })" -ForegroundColor Gray

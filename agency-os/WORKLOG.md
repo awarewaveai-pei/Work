@@ -2,6 +2,70 @@
 
 ## 2026-08-25
 
+### AUTO_TASK_DONE: MCP 設定檔的「兩個腳本共同擁有一個檔案」—— 前一則 oracle FINDING 1/2 治本
+
+[任務]
+承上則（canva 彈窗釘版）。該次 oracle 兩條 CONFIRMED findings 指向 sync 工具本身，操作者指示繼續修。
+
+[根因 —— 不是旗標預設值錯，是重複所有權]
+`~/.claude/mcp.json` 同時被兩個腳本寫：
+| 腳本 | 行為 | 依據 |
+|---|---|---|
+| `sync-claude-userlevel.ps1` | 正規化為 `{}` | `mcp/claude-userlevel/manifest.json` 的 `mcp` 條目（`replace-json`）、`CLAUDE.md:33-34`、另有四份 docs 同主張 |
+| `sync-mcp-config.ps1` | 寫入完整 registry（20 servers） | 2026-04-23「六端同清單」設計的遺留（`WORKLOG-archive/2026-04.md:354`），已被 2026-05-07 的空檔規則取代但程式碼沒撤 |
+
+誰後跑誰贏。後果：**照 `CLAUDE.md` 的指示跑 sync，就會破壞 `CLAUDE.md` 自己的規定** —— 而被寫進去的 20 個 server 會讓每個 Claude session 在 project `.mcp.json` 之外再載入一次，等於每個 server 雙重啟動。對 `mcp-remote` 這類 OAuth server，雙重啟動＝兩個 proxy 搶同一把 token lock，正是上一則 36 個殭屍進程的放大器。
+
+[已修改]
+1. `scripts/sync-mcp-config.ps1` —— 移除 `-SkipClaude` 參數、移除寫 `~/.claude/mcp.json` 的整段、移除因此成為 dead code 的 `Convert-ServerToClaudeConfig`；原地留下說明註解（含「不要加回來，改 `mcp.template.json` + 跑 `sync-claude-userlevel.ps1`」）。
+2. 同檔新增**偵測器 A**：user-level `%USERPROFILE%\.cursor\mcp.json` 與 project `.cursor/mcp.json` 同名 server 的重複偵測。**比對兩個檔案磁碟上的實際內容，刻意不比對 registry** —— 初版比對 registry 多報 2 個（`supabase`/`wordpress` 在 registry 但不輸出到 cursor config，不會雙重啟動），而多報會訓練操作者忽略警告，正是這個偵測器要防的失效模式。
+3. 同檔新增**偵測器 B**：`~/.claude.json` 的 project-scoped `mcpServers`。存在理由見 [驗證結果] oracle FINDING。
+4. 同檔修 `ConvertTo-PlainObject`：**空 JSON 物件**先前落到 fall-through `return $InputObject`，回傳裸 PSCustomObject（無 `.Keys`/`.ContainsKey`），任何把結果當 map 用的呼叫端都會炸。改為明確處理 PSCustomObject 分支。
+5. `scripts/ao-resume.ps1` —— **純註解**。原註解宣稱「merge 必須在 sync-mcp-config 之後跑，因為後者會寫 `.claude/mcp.json`」，該前提已被本次改動消滅；標記 SUPERSEDED 並保留歷史脈絡，載重的只剩「必須在 verify 之前」。
+
+[驗證結果]
+- **實測 1（不變量）**：同一條指令、同一起始狀態，修前 `~/.claude/mcp.json` 0 → 20 servers（上一則親眼所見），修後跑兩次仍為 **0**。
+- **實測 2（所有權交接）**：刻意汙染成 1 個假 server → 跑 `sync-claude-userlevel.ps1 -Mode merge` → log 印 `-> mcp.json normalized to {}` → 回到 0。**證明移除唯一 writer 後仍有人強制不變量，不是留下缺口。**
+- **實測 3（零回歸）**：改 `ConvertTo-PlainObject`（共用 helper）後重跑 sync，`.mcp.json` / `.cursor/mcp.json` / copilot / codex 四份產出**逐檔 byte-identical**。
+- **實測 4（偵測器邊界，先測後修）**：對 user-level cursor config 依序餵 malformed JSON / 缺 `mcpServers` / 空 `{}` / JSON array / 檔案不存在。**空 `{}` 當場噴假錯誤**（`找不到屬性 'Keys'`）—— 那正是該檔被 sanitize 後的正常狀態，偵測器會對健康狀態喊狼。回頭修 `ConvertTo-PlainObject`（見 [已修改] 4）後重測五案全部正確：空物件靜默、缺 key 靜默、檔案不存在靜默、malformed 警告、單一重疊精確報 1。
+- **實測 5（偵測器 B 撞真實資料）**：初版用 `ConvertFrom-Json`，在真檔上直接失敗 —— `~/.claude.json` 有僅大小寫不同的兩個 project key（`C:/WINDOWS/system32` 與 `C:/WINDOWS/System32`），PSCustomObject 屬性名大小寫不敏感故拋重複鍵。改用 `JavaScriptSerializer`（.NET Framework 內建、ordinal Dictionary）後正確解析 11 個 project、命中 1 個 populated。
+- `verify-build-gates`: **ALL PASSED**，`system-health-check` **100% (372/372)**，`.mcp.json server list matches registry template` OK。
+- `audit-cp950-traps` 對 `sync-mcp-config.ps1`：`clean=1 drift=0`。（`ao-resume.ps1` 有 drift=17，經比對 `git show HEAD:` **全部既存**，與本次純註解改動無關，已另開背景任務。）
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/sync-mcp-config.ps1 (+ sync-claude-userlevel.ps1 -Mode merge, verify-build-gates.ps1) | exit=0 | ms=41000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+  - external oracle = Codex CLI，三輪：`2026-08-25-review-febc2300.md`（FINDING 1/2，觸發本次工作）→ `-40b1825e.md`（`~/.claude.json` 才是 Claude Code 真正讀的 user-scope 檔）→ `-f265aab1.md`（3 條，全部逐條 Grep 驗證屬實）。
+  - **首次呼叫逾時 900s**：Context 塞了整段推理。AGENTS.md §跨模型 oracle 明寫「給 Codex 的 prompt 只放決策結果，不放推理過程」—— 我違反了自己 repo 的規則。改成 Decision/Constraints/Acceptance 後 375s 完成。
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,.cursor | grep=SkipClaude\|Convert-ServerToClaudeConfig | hits=2
+  - `scripts/ao-resume.ps1:469` 與 `:451` 兩處排序註解的前提已失效 → 均已修正並標記 SUPERSEDED。
+  - **這次抓蟲一開始漏了 `:451`**：grep pattern 只用了「被移除的符號名」，而該註解描述的是**行為**（「sync-mcp-config writes the full server list back into .claude/mcp.json」）不含任何符號名，是靠 oracle round 3 才連帶翻出來。教訓：移除某個行為時，抓蟲 pattern 必須同時涵蓋「符號名」與「那個行為的自然語言描述」。
+  - `sanitize-user-mcp-config.ps1` 的 `$SkipClaudeLegacy`/`$SkipClaudeUserJson` 是不同腳本的不同參數，不受影響。
+  - `WORKLOG-archive/2026-04.md:354`、`CONVERSATION_MEMORY.md:122` 是有日期的歷史紀錄，不改寫。
+
+[不變量分析（AGENTS.md 強制：同一 reviewer 對同一段程式碼連續回報 ≥2 次，第 3 次修正前必須先做）]
+**不變量**：每一個 MCP host 會實際讀取的設定檔，必須恰好有**一個** repo-managed writer，且該 writer 的意圖必須與該檔的治理規則一致。
+
+三輪覆審合起來顯示，我今天只關掉了**三個 writer 中的一個**：
+
+| 檔案 | 已知 writers | 意圖是否一致 |
+|---|---|---|
+| `~/.claude/mcp.json` | ① `sync-mcp-config`（本次移除）② `sync-claude-userlevel` → `{}` ③ **`sanitize-user-mcp-config:176` → 寫入 2 個 server 的 fallback** | ❌ 三個 writer、兩種相反意圖 |
+| `~/.cursor/mcp.json` | **`sanitize-user-mcp-config:172`**（把 repo `.mcp.json` 複製過去） | ❌ 與 `mcp-add-server-quickstart.md` 要求該檔保持 `{}` 直接矛盾；等於親手製造本次偵測器 A 要抓的重複狀態 |
+| `~/.claude.json` | `sanitize-user-mcp-config:180`（清除）—— 但 PS 5.1 上根本跑不起來 | ❌ writer 存在但不作用 |
+
+**結論：這一類問題沒有關掉。** 本次改動是必要但不充分 —— 它移除了一個 rogue writer 並讓另外兩個變得**可見**（偵測器），但 `sanitize-user-mcp-config.ps1` 仍是同一個 bug class 的第二、三個實例。
+
+**為什麼在此停手而非繼續修**：修好 sanitize 需要先決定「這三個檔各自**應該**裝什麼」—— 那是治理政策決策（例：user-level Cursor 該不該完全空白？legacy `~/.claude/mcp.json` 的 copilot/trigger fallback 還有存在意義嗎？），不是機械修正，且超出操作者這次授權的範圍（授權內容是前一輪的 FINDING 1/2）。AGENTS.md 對「只關掉實例不關掉整類」的要求是**在 WORKLOG 明說並取得同意才能繼續逐點修** —— 本段即為該聲明。已開 TASKS 治本項待決策。
+
+**實務風險有界**：AO-RESUME 每個 session 都會跑 `sync-claude-userlevel -Mode merge`，所以就算有人手動跑了 sanitize 把 `~/.claude/mcp.json` 汙染成 2 個 server，下一次 AO-RESUME 仍會壓回 `{}`。亦即本次改動**沒有讓任何情境變差**，只是把原本被 `sync-mcp-config` 覆寫所遮蔽的 drift 變成可見。
+
+[剩餘風險]
+- **`sanitize-user-mcp-config.ps1` 在本機跑不起來**（oracle FINDING 追下去發現）：`Clear-ClaudeProjectMcpEntries`（`:138`）用 `ConvertFrom-Json -AsHashtable`，該參數 PowerShell 6 才有；本機是 **5.1.26100.9168 且無 pwsh**。`mcp/README.md:91` 把它記載為清理 `~/.claude.json` 的正式手段 —— **文件上的補救措施實際上不會執行**。偵測器 B 的警告文字已明寫這件事，不讓人空跑。已開背景任務。
+- `~/.claude.json` 現存 1 筆 stale project MCP：`C:/WINDOWS/System32` 掛 7 個 server。**不影響 `D:\Work`**（project-scoped，cwd 不同），但屬該清不清的死設定，待上一條修好後一併清。
+- 偵測器只警告不改檔，仍靠人看警告。這是刻意取捨：那兩個檔是全機器全域設定，由 repo 腳本擅自改寫會把本 repo 的 server 洩漏到不相干專案。
+
+[rollback]
+`git revert` 本 commit。回復後 `sync-mcp-config.ps1` 會恢復寫 `~/.claude/mcp.json`，屆時需再跑一次 `sync-claude-userlevel.ps1 -Mode merge` 把該檔壓回 `{}`。
+
 ### AUTO_TASK_DONE: Canva 登入視窗反覆彈出 —— 根因是 `@latest` 每次改版都把 token 快取沖掉
 
 [任務]
