@@ -47,6 +47,29 @@
 [rollback]
 `git revert <commit>`；`lib/settings.py`/`NETWORK_VERSION_INSTALL_RUNBOOK.md` 為新增檔案，其餘為既有檔案的增量修改，皆可用 `git diff`/`git checkout` 個別還原不影響其他功能。
 
+### AUTO_TASK_DONE: ORACLE gate false-pass on staged deletions（Codex stop-hook 抓到）
+
+[任務]
+session Stop hook 觸發的 Codex stop-time review 回報：ORACLE gate（`verify-closeout-completeness.ps1`）對 staged deletion 有 false-pass 漏洞。
+
+[根因]
+`scripts/verify-closeout-completeness.ps1:266-276`：staged deletion 因磁碟上檔案已不存在，`Test-Path` 回 false，被收進 `$unverifiable` 陣列（line 273），但該陣列蒐集後從未被讀取/判斷。註解（line 269-272）宣稱「reported instead」，但實作沒真的 report——只要當天任一 oracle artifact 存在（不論審的是什麼），staged deletion 一律靜默通過，即使從未被任何 oracle 審過。
+
+[已修改]
+1. `scripts/verify-closeout-completeness.ps1:284-293`（新增）—— 比照既有 `$staleAgainst` 區塊（line 277-283）補上 `$unverifiable.Count -gt 0` 判斷：無 `ORACLE_WAIVED` 時 strict 擋（exit 1）、warn 印警告，訊息指向重跑 `codex-oracle.ps1` 或補 waiver
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=複製新增的實際程式碼（非重寫）包成 function，餵 4 組真實情境（staged deletion 無 waiver strict/staged deletion 有 waiver/無 deletion/staged deletion 但 Gate=warn）於 `D:\tmp\test-oracle-unverifiable.ps1` | exit=0（4/4 assertion pass：strict 正確擋且訊息含檔名、waiver 正確放行、無 deletion 不誤觸發、warn 模式不阻斷）| ms=~400
+- REVIEW_WAIVED: NA -- critic subagent 4 次呼叫皆回 `API Error: 529 Overloaded`（Anthropic 服務端過載，非本地問題），改用手動 review：讀回新增區塊確認與 `$staleAgainst` 結構一致、共用同一 `$hasOracleWaiver`（範圍正確，deletion 與 stale 本質同屬「無法確認已審」）、`$uvMsg` 純英文無 CP950 風險（`/audit-encoding --file` 掃過 CLEAN）、renames 不受影響（`git diff --cached --name-only` 對 rename 只列新路徑，走一般 mtime 分支非本次改動範圍）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`unverifiable` | hits=4（全部在同一檔案內：宣告×1、收集×1、新判斷式×1、訊息組字串×1，無其他 call site 依賴舊行為；`agency-os/AGENTS.md:129` 對 ORACLE gate 的一般性描述本就成立，不需連動修文件）
+
+[剩餘風險]
+- `test-hooks.sh` 目前無 ORACLE gate 專屬案例（沒有此次之前也沒有），本次修正未補（scope 外，屬既有缺口非本次引入）
+- critic 外部驗證這次因服務過載跳過，僅手動 review；建議下次 session 有空檔時補跑一次 `/review` 對這段做事後複核
+
+[rollback]
+`git diff scripts/verify-closeout-completeness.ps1` 還原單一 hunk 即可，無其他檔案依賴此改動。
+
 ## 2026-08-20 — 跨模型 oracle 制度化：`codex-oracle.ps1` + AGENTS 分工規則
 
 ### AUTO_TASK_DONE: 把 08-17 驗證有效的 Codex oracle 從「當次對話」變成常駐機制
