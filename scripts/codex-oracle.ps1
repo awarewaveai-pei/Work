@@ -168,7 +168,13 @@ if ($Mode -eq 'review') {
         } else {
             $diffArgs = @('diff')
         }
-        if ($Path.Count -gt 0) { $diffArgs += @('--') + $Path }
+        # FINDING 4 (codex round 2, 2026-08-20): AO-CLOSE runs `git add -A` before the
+        # gate, so a rerun after any later gate failure would see the PREVIOUS artifact
+        # as STAGED content. Excluding it from the untracked collector alone was not
+        # enough -- the artifact directory is excluded from every diff, staged or not.
+        $excludeArtifacts = ':(exclude)agency-os/reports/oracle'
+        if ($Path.Count -gt 0) { $diffArgs += @('--') + $Path + @($excludeArtifacts) }
+        else                   { $diffArgs += @('--', '.', $excludeArtifacts) }
 
         $r        = Invoke-Git -GitArgs $diffArgs -Root $root
         $diffText = $r.Text
@@ -184,7 +190,8 @@ if ($Mode -eq 'review') {
             # Working tree: the unstaged diff alone misses anything already staged, which
             # is the normal pre-commit state and exactly what needs reviewing.
             $stagedArgs = @('diff', '--cached')
-            if ($Path.Count -gt 0) { $stagedArgs += @('--') + $Path }
+            if ($Path.Count -gt 0) { $stagedArgs += @('--') + $Path + @($excludeArtifacts) }
+            else                   { $stagedArgs += @('--', '.', $excludeArtifacts) }
             $rs = Invoke-Git -GitArgs $stagedArgs -Root $root
             if ($rs.Exit -ne 0) {
                 Write-Error "git diff --cached failed (exit=$($rs.Exit)): $($rs.Text.Trim())"
@@ -410,11 +417,17 @@ $oracleDir = Join-Path $root 'agency-os\reports\oracle'
 if (-not (Test-Path -LiteralPath $oracleDir)) {
     New-Item -ItemType Directory -Path $oracleDir -Force | Out-Null
 }
-$artifact = Join-Path $oracleDir (('{0}-{1}-{2}.md' -f (Get-Date -Format 'yyyy-MM-dd'), $Mode, $stamp))
+# FINDING 1 (codex round 2, 2026-08-20): -Path / -DiffRef narrow what was reviewed, but
+# the gate only pattern-matches '<date>-review-*.md'. A scoped review would therefore
+# vouch for files it never saw. Scoped runs are named 'partialreview' so the gate's
+# filter cannot match them; the scope is also recorded in the metadata below.
+$artifactKind = if ($Mode -eq 'review' -and ($DiffRef -or $Path.Count -gt 0)) { 'partialreview' } else { $Mode }
+$artifact = Join-Path $oracleDir (('{0}-{1}-{2}.md' -f (Get-Date -Format 'yyyy-MM-dd'), $artifactKind, $stamp))
 $meta = @(
     ('# codex-oracle {0} -- {1}' -f $Mode, (Get-Date -Format 'yyyy-MM-dd HH:mm:ss K')),
     '',
     ('- mode: `{0}`' -f $Mode),
+    ('- scope: {0}' -f $(if ($Path.Count -gt 0) { '-Path ' + ($Path -join ', ') + '  <-- PARTIAL: does not satisfy the ORACLE gate' } else { 'whole repo' })),
     ('- target: `{0}`' -f $(if ($DiffRef) { $DiffRef } else { 'working tree (staged + unstaged + untracked)' })),
     ('- context: {0}' -f $(if ($Context) { $Context } else { '(none given)' })),
     ('- exit: {0} | elapsed: {1}ms | answer: {2}B' -f $exit, $sw.ElapsedMilliseconds, $bytes),

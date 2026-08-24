@@ -229,11 +229,17 @@ try {
     # wp-bridge plugin would skip cross-model review entirely (codex FINDING 2,
     # 2026-08-20 -- 214 such files tracked). Widening $codeExts instead would silently
     # extend three unrelated gates, so the broader set is scoped to this gate.
-    $oracleExts = $codeExts + @('.sql', '.yml', '.yaml', '.php', '.tf', '.tfvars')
+    # Round 2 (codex FINDING 2): .json/.toml/.html/.css were still unreviewed while
+    # codex-oracle already treats them as source. Lockfiles are excluded by NAME, not
+    # by extension: they are generated artifacts, so requiring a cross-model review of
+    # a regenerated package-lock.json would train the operator to reach for the waiver.
+    $oracleExts = $codeExts + @('.sql', '.yml', '.yaml', '.php', '.tf', '.tfvars',
+                                '.json', '.toml', '.html', '.css', '.cjs')
+    $oracleExcludeNames = '(?i)(^|/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|composer\.lock|Cargo\.lock|poetry\.lock)$'
     $oracleStaged = @()
     foreach ($sf in $significant) {
         $ext = try { [System.IO.Path]::GetExtension($sf).ToLowerInvariant() } catch { if ($sf -match '\.(\w+)$') { ".$($Matches[1].ToLowerInvariant())" } else { '' } }
-        if ($oracleExts -contains $ext) { $oracleStaged += $sf }
+        if (($oracleExts -contains $ext) -and ($sf -notmatch $oracleExcludeNames)) { $oracleStaged += $sf }
     }
     if ($oracleStaged.Count -gt 0) {
         $oracleDir   = Join-Path $WorkRoot 'agency-os\reports\oracle'
@@ -257,9 +263,14 @@ try {
             # artifact must post-date the newest source file it claims to have reviewed.
             $newestArtifact = ($todayOracle | Sort-Object LastWriteTime -Descending | Select-Object -First 1)
             $staleAgainst = @()
+            $unverifiable = @()
             foreach ($sf in $oracleStaged) {
                 $full = Join-Path $WorkRoot ($sf.Replace('/', '\'))
-                if (-not (Test-Path -LiteralPath $full)) { continue }   # deleted file: nothing to review
+                # A staged DELETION has no mtime to compare, so freshness is unprovable
+                # here (codex FINDING 3, round 2). Skipping silently would reopen the
+                # stale-review hole for deletions, so it is reported instead -- the same
+                # 'a blind detector must not look like a pass' rule as check-smoke-tests.
+                if (-not (Test-Path -LiteralPath $full)) { $unverifiable += $sf; continue }
                 $mt = (Get-Item -LiteralPath $full -ErrorAction SilentlyContinue)
                 if ($mt -and $mt.LastWriteTime -gt $newestArtifact.LastWriteTime) { $staleAgainst += $sf }
             }

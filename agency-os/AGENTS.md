@@ -121,6 +121,19 @@
 .\scripts\codex-oracle.ps1 -Mode review -Context "<這個改動要解決什麼>"
 ```
 
+**機械閘（2026-08-20 起，ORACLE gate）**：上面那條路由表本身**不是自動化** —— 它是文字規則，靠代理自覺。閘補的就是這個缺口：
+
+| 環節 | 機制 |
+|------|------|
+| 產證據 | `codex-oracle.ps1` 每次跑完把答案寫進 `agency-os/reports/oracle/YYYY-MM-DD-<mode>-<stamp>.md`（進 git，不刪）|
+| 驗證據 | `verify-closeout-completeness.ps1` §ORACLE gate：staged 含 source 檔時，該目錄必須有**當日**且**時間戳晚於最後一次改檔**的 review artifact |
+| 豁免 | 當日 WORKLOG 加 `- ORACLE_WAIVED: <理由>`（看得見，不可靜默省略）|
+| 涵蓋副檔名 | `$codeExts` + `.sql .yml .yaml .php .tf .tfvars` —— **刻意不共用 `$codeExts`**，因為那份清單同時驅動 REALTEST/DEBUG-TAG，放寬會靜默擴大三個不相干的閘。SSOT 在 `verify-closeout-completeness.ps1` `$oracleExts` |
+
+時間戳比對是刻意選的：oracle 讀的是**尚未 stage 的工作樹**，所以無法用 staged diff 的 hash 綁定；「artifact 必須晚於它宣稱審過的檔案」是唯一可機器驗證的順序關係。它擋的是「早上審完、下午改了才 commit」（codex FINDING 1）。
+
+**閘擋不到的**：artifact 存在 ≠ findings 被處理。這仍是操作紀律（見 §已知信任邊界）。閘關掉的只有「忘記跑」這個洞。
+
 **禁止**：① 直接跑裸 `codex exec`（會漏 `-o`，單次噴 ~120KB 進 context；也會拉起 config.toml 的 MCP）② 用 `chatgpt-*`／`gemini-*`／`grok-*` MCP 工具當 oracle —— 那些走 `OPENAI_API_KEY`／`GEMINI_API_KEY` **按 token 計費**，與 ChatGPT 訂閱是兩套帳；`codex` CLI 走訂閱（`authMethod: chatgpt`），零額外費用 ③ 直接採用 findings 而不驗證——**每條必須 Grep 確認 `file:line` 真實存在**，AGENTS.md §Subagent 交接協議的驗證要求同樣適用 ④ 讓 Claude 與 Codex 同時修改同一份檔案（操作者 2026-08-17 明確指示）。
 
 **給 Codex 的 prompt 只放決策結果，不放推理過程**：R0 七段區塊是給操作者批准用的；Codex 只需要 Decision / Constraints / Files / Acceptance。兩份產出，不同讀者。
@@ -423,5 +436,5 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-08-17 14:30:03 UTC_
+_Last synced: 2026-08-24 04:00:39 UTC_
 

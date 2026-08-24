@@ -64,6 +64,10 @@
 
 - [ ] **【gated｜8月｜EU→Dedicated 搬機 + 整併退雲端】** — **動機**：上 Chatwoot（CS U6）需 ~8GB，EU 8GB(已吃 3G swap)/SG 4GB 都塞不下。**決策**（runbook §0b，2026-06-27）：買**二手 dedicated**（FSN i7-7700/64GB/2×512SSD/~€48.70）當主力，Chatwoot greenfield 先上 → EU 服務照 §5 逐台搬（Supabase/Trigger/n8n/Postiz/MainWP/Uptime）→ 退 SG+EU 兩台雲端。單台+RAID 1+R2 夠用，HA 第二台延後。**搬家/RAID/還原 SSOT**：[`runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`](../runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md)（§0b 決策/§3 RAID/§5 遷移/§7 checklist）。**§7 gate（5 項，現卡）**：❌ 買機（**操作者刷卡，High risk**）❌ auction 機 RAID 1+SMART+mdadm 告警 ❌ Chatwoot greenfield+接線 ✅ 每容器 `mem_limit`（2026-08-15 實測：EU 29 個執行中容器有 **27 個已設限**，僅 `buildx_buildkit_trigger0` / `trigger-registry` 兩個 build 用容器未設；此項實質已完成）❌ 第二異地取代 SG-offsite。**已綠**：備份補漏全補 / `.env` 加密 / 還原演練過(2026-06-26) / R2 真 3-2-1 / 救援鑰 off-machine / DNS 9 record 清單 / §4 端到端驗。**時程**：7月出國→8月回來辦。冷啟動接手包：[`handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md`](handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md)。
 
+#### 🆕 會議服務網路版（給無 GPU 客戶用，待觸發）
+
+- [ ] **【未開始｜待使用者明確下指令】會議服務網路版安裝** — 客戶筆電無 NVIDIA GPU（2026-08-20 確認），本機版 CPU 路線慢 20-27 倍不可用。**完整安裝手冊（含動工前三題決策 + 方案比較 + T1-T7 步驟 + DoD）已寫好**：[`lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/NETWORK_VERSION_INSTALL_RUNBOOK.md`](../lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/NETWORK_VERSION_INSTALL_RUNBOOK.md)。**觸發方式**：使用者說「網路版繼續」等義詞，AI 直接讀該檔依序執行，不用重述背景。**動工前必答三題**（該檔已列）：① 客戶是否同意錄音上傳到伺服器（本機版音檔不外流原則會被推翻）② GPU 伺服器方案（推薦先租雲端 GPU instance，如 RunPod/Vast.ai）③ 服務幾個客戶（決定要不要現在就做多租戶隔離）。同日已完成的相關工作：本機版 API 自動處理選項（`lib/settings.py` + `summarize_via_api()` + 網頁設定頁，給客戶「自己貼上」或「填自己 API key」二選一，已驗證上線）。
+
 #### 待釐清 / 明日提醒
 > `/tomo` 自動寫入此分類
 
@@ -758,5 +762,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-08-20 06:23:19 UTC_
+_Last synced: 2026-08-24 04:00:39 UTC_
 

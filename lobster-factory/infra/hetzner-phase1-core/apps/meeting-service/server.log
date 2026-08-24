@@ -1,13 +1,7 @@
 會議錄音處理 — 僅限本機執行 http://127.0.0.1:8420
-INFO:     127.0.0.1:59718 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:59718 - "GET /api/settings HTTP/1.1" 200 OK
-INFO:     127.0.0.1:59718 - "GET /favicon.ico HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:50143 - "GET /api/settings HTTP/1.1" 200 OK
-INFO:     127.0.0.1:50144 - "POST /api/settings HTTP/1.1" 200 OK
-INFO:     127.0.0.1:50145 - "GET /api/settings HTTP/1.1" 200 OK
-INFO:     127.0.0.1:50146 - "POST /api/settings HTTP/1.1" 200 OK
-INFO:     127.0.0.1:50147 - "GET /api/settings HTTP/1.1" 200 OK
-INFO:     127.0.0.1:50151 - "POST /api/upload?use_api=true HTTP/1.1" 400 Bad Request
-INFO:     127.0.0.1:50154 - "POST /api/upload?use_api=true HTTP/1.1" 400 Bad Request
-INFO:     127.0.0.1:60535 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:60535 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50150 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50150 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65217 - "POST /api/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65217 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60733 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60733 - "GET /api/settings HTTP/1.1" 200 OK

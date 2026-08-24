@@ -14,6 +14,11 @@
                                                  ]
                                     },
                     "canva":  {
+                                  "clients":  {
+                                                  "codex":  {
+                                                                "exclude":  true
+                                                            }
+                                              },
                                   "enabled":  true,
                                   "transport":  "stdio",
                                   "command":  "cmd",
