@@ -1,6 +1,6 @@
 # ClickHouse health (EU)
 
-- Generated: 2026-08-25 03:56:37
+- Generated: 2026-08-25 04:08:35
 - Overall: **🟡 WARN**
 - Host: 204.168.175.41 / container `trigger-clickhouse`
 
@@ -8,8 +8,8 @@
 
 | Metric | Value |
 |--------|-------|
-| system database | 212.27 MiB (3,500,194 rows) |
-| trigger_dev (application) | 37.87 MiB (400,337 rows) |
+| system database | 212.33 MiB (3,501,951 rows) |
+| trigger_dev (application) | 37.88 MiB (400,361 rows) |
 | ratio (system / app) | 5.6x |
 | largest system table | text_log:181972761 |
 | active merges | 0 |
