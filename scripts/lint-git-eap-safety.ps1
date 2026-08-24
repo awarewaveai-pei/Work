@@ -69,7 +69,7 @@ if ($Paths -and $Paths.Count -gt 0) {
 # node/powershell with the same footgun — is tracked separately as a follow-up audit; many of
 # those are already try/catch-handled or routed via Invoke-WithUtf8Console).
 # `2>$null` discards stderr (no merge → no throw) → intentionally NOT matched.
-$reGitStderr   = '&\s+git\b[^|]*\s2>&1'
+$reGitStderr   = '(?:&\s+)?\bgit\b[^|]*\s2>&1'
 $reEapContinue = '\$ErrorActionPreference\s*=\s*["'']?Continue'
 $reEapStop     = '\$ErrorActionPreference\s*=\s*["'']?Stop'
 $reEapRestore  = '\$ErrorActionPreference\s*=\s*\$'   # restore to a saved variable
@@ -87,12 +87,21 @@ foreach ($file in $targets) {
     $fileSetsStop = [bool]($lines | Where-Object { $_ -match $reEapStop })
 
     $inBlockComment = $false
+    $inHereString   = $false
     for ($i = 0; $i -lt $lines.Count; $i++) {
         $line = [string]$lines[$i]
         $trim = $line.TrimStart()
         # Track <# ... #> block comments (skip their content).
         if ($inBlockComment) { if ($line -match '#>') { $inBlockComment = $false }; continue }
         if ($trim -match '^<#') { if ($line -notmatch '#>') { $inBlockComment = $true }; continue }
+        # Track here-strings (@" ... "@ / @' ... '@) and skip their content. Needed once the
+        # detector stopped requiring the `&` call operator: scripts that ship a REMOTE bash
+        # script as a here-string (e.g. lobster-trigger-deploy.ps1:71 `$deployBash = @"`)
+        # contain lines like `git -C /root/Work pull ... 2>&1 | tail -5` that are bash, never
+        # executed by PowerShell, and therefore cannot raise NativeCommandError. Flagging them
+        # would be a false positive — and a detector that cries wolf gets ignored.
+        if ($inHereString) { if ($trim -match '^[''"]@') { $inHereString = $false }; continue }
+        if ($line -match '@[''"]\s*$') { $inHereString = $true; continue }
         if ($trim.StartsWith('#')) { continue }                       # line comment
         if ($line -notmatch $reGitStderr) { continue }
         # Skip ONLY a whole-line assignment whose RHS is a string constant (regex/doc lines

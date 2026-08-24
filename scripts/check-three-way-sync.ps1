@@ -12,6 +12,19 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# git 走 lib SSOT。PS 5.1 在 EAP=Stop 下把 native stderr 當 error record，而 `git fetch`
+# 成功時本來就往 stderr 印 "From https://..." → 裸的 `git ... 2>&1` 會在成功路徑上拋
+# NativeCommandError（2026-08-25：check-deploy-drift.ps1 就是這樣長期壞掉的）。
+. (Join-Path $PSScriptRoot 'lib\git-safe-ops.ps1')
+
+# 保留原本「輸出給使用者看 + 隨後檢查 $LASTEXITCODE」的語義，呼叫端邏輯不需改動。
+function Invoke-GitShown {
+    param([Parameter(Mandatory = $true)][string[]] $GitArgs)
+    $r = Invoke-SafeGitCapture -GitArgs $GitArgs
+    if ($r.Output) { $r.Output | Out-Host }
+    $global:LASTEXITCODE = $r.ExitCode
+}
+
 function Write-Result {
     param(
         [string]$Label,
@@ -86,7 +99,7 @@ try {
 
     $stashCountAtStart = Get-GitStashCount
 
-    git fetch origin 2>&1 | Out-Host
+    Invoke-GitShown @("fetch","origin")
     if ($LASTEXITCODE -ne 0) {
         Write-Result -Label "git fetch origin" -Pass $false -Detail "fetch failed (network/auth?)"
         exit 1
@@ -103,7 +116,7 @@ try {
     $notBehindOrigin = ($ab.Behind -eq 0)
 
     if ($AutoFix) {
-        git fetch origin 2>&1 | Out-Host
+        Invoke-GitShown @("fetch","origin")
         if ($LASTEXITCODE -ne 0) {
             Write-Result -Label "git fetch (AutoFix)" -Pass $false -Detail "fetch failed"
             exit 1
@@ -124,18 +137,18 @@ try {
                 }
                 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
                 Write-Host "== AO-RESUME: stashing before fast-forward pull ==" -ForegroundColor Yellow
-                git stash push -m "ao-resume-before-pull-$stamp" 2>&1 | Out-Host
+                Invoke-GitShown @("stash","push","-m","ao-resume-before-pull-$stamp")
                 if ($LASTEXITCODE -ne 0) {
                     Write-Result -Label "AutoFix stash" -Pass $false -Detail "git stash push failed"
                     exit 1
                 }
             }
-            git pull --ff-only origin main 2>&1 | Out-Host
+            Invoke-GitShown @("pull","--ff-only","origin","main")
             if ($LASTEXITCODE -ne 0) {
                 Write-Result -Label "AutoFix pull" -Pass $false -Detail "Fast-forward failed. Try: git status; git pull --rebase origin main; or reset to origin/main if remote is truth."
                 exit 1
             }
-            git fetch origin 2>&1 | Out-Host
+            Invoke-GitShown @("fetch","origin")
             if ($LASTEXITCODE -ne 0) { exit 1 }
             $head = (git rev-parse --short HEAD).Trim()
             $remote = (git rev-parse --short origin/main).Trim()
@@ -152,7 +165,7 @@ try {
             if ($AllowAutoStashUnexpected) {
                 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
                 Write-Host "== AO-RESUME: stashing unexpected (auto-repair) ==" -ForegroundColor Yellow
-                git stash push -m "ao-resume-unexpected-dirty-$stamp" 2>&1 | Out-Host
+                Invoke-GitShown @("stash","push","-m","ao-resume-unexpected-dirty-$stamp")
                 if ($LASTEXITCODE -ne 0) {
                     Write-Result -Label "stash unexpected" -Pass $false -Detail "git stash push failed"
                     exit 1
@@ -163,7 +176,7 @@ try {
             }
         }
 
-        git fetch origin 2>&1 | Out-Host
+        Invoke-GitShown @("fetch","origin")
         if ($LASTEXITCODE -ne 0) { exit 1 }
         $head = (git rev-parse --short HEAD).Trim()
         $remote = (git rev-parse --short origin/main).Trim()

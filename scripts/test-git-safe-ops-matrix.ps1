@@ -20,6 +20,21 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# Fixture git 呼叫專用。**刻意不走 lib/git-safe-ops.ps1** —— 那正是本檔要測的對象，
+# 用被測物件搭建自己的測試環境會讓 lib 的 bug 偽裝成「測試環境壞了」而非測試失敗。
+# 改用 lint 認可的另一種安全形式：scoped EAP='Continue' + finally 還原。
+# 為何需要：PS 5.1 在 EAP=Stop 下把 native stderr 當 error record，而 git init/commit
+# 等成功時也會往 stderr 印訊息 → 裸呼叫會在成功路徑上拋 NativeCommandError。
+function Invoke-FixtureGit {
+    param([Parameter(Mandatory = $true)][string[]] $GitArgs)
+    $savedEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & git @GitArgs 2>&1 | Out-Null
+        return $(if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE })
+    } finally { $ErrorActionPreference = $savedEap }
+}
+
 $WorkRoot    = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot ".." )).Path
 $LibPath     = Join-Path $WorkRoot "scripts\lib\git-safe-ops.ps1"
 $AoClosePath = Join-Path $WorkRoot "scripts\ao-close.ps1"
@@ -46,12 +61,12 @@ function New-TempGitRepo {
     New-Item -ItemType Directory -Path $dir -Force | Out-Null
     Push-Location $dir
     try {
-        git init -q 2>&1 | Out-Null
-        git config user.email "test@test.com" 2>&1 | Out-Null
-        git config user.name  "Test"           2>&1 | Out-Null
+        Invoke-FixtureGit @("init","-q") | Out-Null
+        Invoke-FixtureGit @("config","user.email","test@test.com") | Out-Null
+        Invoke-FixtureGit @("config","user.name","Test") | Out-Null
         [System.IO.File]::WriteAllText((Join-Path $dir 'init.txt'), 'init')
-        git add . 2>&1 | Out-Null
-        git commit -m 'init' -q 2>&1 | Out-Null
+        Invoke-FixtureGit @("add",".") | Out-Null
+        Invoke-FixtureGit @("commit","-m","init","-q") | Out-Null
     } finally { Pop-Location }
     return $dir
 }
@@ -74,8 +89,8 @@ Test-Case "T2: Stale lock file removed before fetch" {
     . $LibPath
     $repoDir   = New-TempGitRepo 't2'
     $originDir = Join-Path $env:TEMP ("git-safe-origin-t2-$(Get-Date -Format 'HHmmssff')")
-    git clone --bare $repoDir $originDir -q 2>&1 | Out-Null
-    Push-Location $repoDir; try { git remote add origin $originDir 2>&1 | Out-Null } finally { Pop-Location }
+    Invoke-FixtureGit @("clone","--bare",$repoDir,$originDir,"-q") | Out-Null
+    Push-Location $repoDir; try { Invoke-FixtureGit @("remote","add","origin",$originDir) | Out-Null } finally { Pop-Location }
 
     $lockDir  = Join-Path $repoDir ".git\refs\remotes\origin"
     New-Item -ItemType Directory -Path $lockDir -Force | Out-Null
@@ -96,7 +111,7 @@ Test-Case "T3: Fetch failure recorded in ledger, throws" {
     . $LibPath
     $repoDir = New-TempGitRepo 't3'
     Push-Location $repoDir
-    try { git remote add origin "https://invalid.example.invalid/repo.git" 2>&1 | Out-Null }
+    try { Invoke-FixtureGit @("remote","add","origin","https://invalid.example.invalid/repo.git") | Out-Null }
     finally { Pop-Location }
 
     $threw = $false
@@ -115,15 +130,15 @@ Test-Case "T4: Invoke-SafeGitPush happy path" {
     . $LibPath
     $repoDir   = New-TempGitRepo 't4'
     $originDir = Join-Path $env:TEMP ("git-safe-origin-t4-$(Get-Date -Format 'HHmmssff')")
-    git clone --bare $repoDir $originDir -q 2>&1 | Out-Null
+    Invoke-FixtureGit @("clone","--bare",$repoDir,$originDir,"-q") | Out-Null
     Push-Location $repoDir
     try {
-        git remote add origin $originDir 2>&1 | Out-Null
-        git fetch origin -q 2>&1 | Out-Null
-        git branch --set-upstream-to=origin/master master 2>&1 | Out-Null
+        Invoke-FixtureGit @("remote","add","origin",$originDir) | Out-Null
+        Invoke-FixtureGit @("fetch","origin","-q") | Out-Null
+        Invoke-FixtureGit @("branch","--set-upstream-to=origin/master","master") | Out-Null
         [System.IO.File]::WriteAllText((Join-Path $repoDir 't4.txt'), 't4')
-        git add . 2>&1 | Out-Null
-        git commit -m 't4' -q 2>&1 | Out-Null
+        Invoke-FixtureGit @("add",".") | Out-Null
+        Invoke-FixtureGit @("commit","-m","t4","-q") | Out-Null
     } finally { Pop-Location }
 
     Invoke-SafeGitPush -WorkRoot $repoDir -Branch 'master'

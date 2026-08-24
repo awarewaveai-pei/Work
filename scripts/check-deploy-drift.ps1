@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
 .SYNOPSIS
     Detect deploy drift: how many commits behind production lobster-next-admin (and other apps) are.
@@ -60,6 +60,12 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# git 一律走 lib SSOT。PS 5.1 在 EAP=Stop 下把 native stderr 當 error record，
+# 而 `git fetch` 正常運作時就會往 stderr 印 "From https://..."，所以裸的
+# `git ... 2>&1` 會在**成功**路徑上拋 NativeCommandError（2026-08-25 實測：本腳本
+# :138 每次都炸，部署前置閘等於長期不可用）。lib 內用 scoped EAP='Continue' + finally 還原。
+. (Join-Path $PSScriptRoot 'lib\git-safe-ops.ps1')
 Set-StrictMode -Version Latest
 
 # CP950 protection for ssh stdout capture (see scripts/_console-encoding-helpers.ps1).
@@ -135,9 +141,11 @@ $repoRoot = Resolve-RepoRoot
 Push-Location $repoRoot
 try {
     if (-not $SkipFetch) {
-        $null = git fetch origin main 2>&1
+        $null = Invoke-SafeGitCapture -GitArgs @("fetch","origin","main")
     }
-    $localHead = (git rev-parse origin/main 2>&1).Trim()
+    $rpRes = Invoke-SafeGitCapture -GitArgs @("rev-parse","origin/main")
+    $localHead = $rpRes.Text.Trim()
+    $global:LASTEXITCODE = $rpRes.ExitCode
     if ($LASTEXITCODE -ne 0 -or -not $localHead) {
         $msg = "Cannot resolve origin/main (is this a git repo with a 'main' branch on origin?)"
         if ($Strict) { Emit-Result -Status "FAIL" -ExitCode 2 -Message $msg -Data @{ repoRoot = $repoRoot } }
@@ -164,13 +172,13 @@ if (-not $deployedCommit) {
 # 4. Compute behind
 Push-Location $repoRoot
 try {
-    git cat-file -e "$deployedCommit^{commit}" 2>&1 | Out-Null
-    $haveDeployed = ($LASTEXITCODE -eq 0)
+    $catRes = Invoke-SafeGitCapture -GitArgs @("cat-file","-e","$deployedCommit^{commit}")
+    $haveDeployed = ($catRes.ExitCode -eq 0)
     if (-not $haveDeployed) {
         # Try fetching the specific commit (deep fetch fallback)
-        $null = git fetch origin $deployedCommit 2>&1
-        git cat-file -e "$deployedCommit^{commit}" 2>&1 | Out-Null
-        $haveDeployed = ($LASTEXITCODE -eq 0)
+        $null = Invoke-SafeGitCapture -GitArgs @("fetch","origin",$deployedCommit)
+        $catRes2 = Invoke-SafeGitCapture -GitArgs @("cat-file","-e","$deployedCommit^{commit}")
+        $haveDeployed = ($catRes2.ExitCode -eq 0)
     }
     if (-not $haveDeployed) {
         $msg = "Deployed commit $deployedCommit not present in local clone (try 'git fetch origin')."
@@ -184,13 +192,13 @@ try {
             "lobster-factory/infra/hetzner-phase1-core/nginx/",
             "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml"
         )
-        $behindCommits = @(git rev-list "$deployedCommit..$localHead" -- @appPaths 2>&1 | Where-Object { $_ -match '^[0-9a-f]{7,40}$' })
-        $aheadCommits  = @(git rev-list "$localHead..$deployedCommit" -- @appPaths 2>&1 | Where-Object { $_ -match '^[0-9a-f]{7,40}$' })
+        $behindCommits = @((Invoke-SafeGitCapture -GitArgs (@("rev-list","$deployedCommit..$localHead","--") + $appPaths)).Output | Where-Object { $_ -match '^[0-9a-f]{7,40}$' })
+        $aheadCommits  = @((Invoke-SafeGitCapture -GitArgs (@("rev-list","$localHead..$deployedCommit","--") + $appPaths)).Output | Where-Object { $_ -match '^[0-9a-f]{7,40}$' })
         $behind = $behindCommits.Count
         $ahead  = $aheadCommits.Count
     } else {
-        $behindStr = (git rev-list --count "$deployedCommit..$localHead" 2>&1).Trim()
-        $aheadStr  = (git rev-list --count "$localHead..$deployedCommit" 2>&1).Trim()
+        $behindStr = (Invoke-SafeGitCapture -GitArgs @("rev-list","--count","$deployedCommit..$localHead")).Text.Trim()
+        $aheadStr  = (Invoke-SafeGitCapture -GitArgs @("rev-list","--count","$localHead..$deployedCommit")).Text.Trim()
         $behind = [int]$behindStr
         $ahead  = [int]$aheadStr
     }

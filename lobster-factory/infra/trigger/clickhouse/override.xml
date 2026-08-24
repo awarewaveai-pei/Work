@@ -1,18 +1,24 @@
 <?xml version="1.0"?>
 <clickhouse>
   <!--
-    Docker mem_limit for clickhouse service = 3072m (3 GiB).
+    Docker mem_limit for clickhouse service = 3072m (3 GiB), cpus = "1.0".
     Internal cap set to 2.5 GiB (2684354560 bytes) to leave ~512 MiB headroom
     for OS page cache and Docker overhead.
 
     History:
-      Originally 800 MB — too low once system logs accumulated.
+      Originally 800 MB - too low once system logs accumulated.
       Raised 2026-04-29 to 3.5 GiB cap when docker limit was 4096m.
       Reduced 2026-07-05: docker limit changed to 1536m (cap/comment were stale).
       Root cause of OOM death spiral: 3002+ fragmented parts in task_events table
       required > 1.5 GiB RSS at startup; container was OOM-killed 2344 times.
       Fix: raised docker limit to 3072m, cap to 2.5 GiB; truncated system logs;
       background merge will reduce part count over 2-3 days.
+
+    DO NOT RAISE THIS VALUE. Four of the five ClickHouse incidents on this host
+    were "fixed" by raising a ceiling; each time the bottleneck moved (RAM -> RAM
+    -> RAM -> CPU) and the symptom looked new. The cap is a budget, and everything
+    below is written to fit inside it. If something does not fit, shrink the thing,
+    not the budget. The arithmetic is in the MERGE MEMORY BUDGET section.
   -->
   <max_server_memory_usage>2684354560</max_server_memory_usage>
 
@@ -22,7 +28,7 @@
 
     It existed because v4 Goose migrations (task_runs_v1 etc.) use JSON columns and
     ClickHouse 24.x gated that type behind an experimental flag. On the pinned
-    25.7.x line the setting reports value=1, changed=0, tier=Production — i.e. it is
+    25.7.x line the setting reports value=1, changed=0, tier=Production - i.e. it is
     the built-in default and no longer experimental. Verified on 25.7.5 by creating a
     JSON column successfully and by the fact that trigger_dev.task_runs_v2 /
     task_events_v2 / metrics_v1 already store JSON columns and work.
@@ -32,30 +38,84 @@
   -->
 
   <!-- ══════════════════════════════════════════════════════════════════════
-       2026-08-15 — SYSTEM LOG VOLUME AT SOURCE (not just retention)
+       2026-08-25 - MERGE MEMORY BUDGET (incident #5 root cause)
 
-       Incident: the container sat at 100% of its 1-CPU limit indefinitely,
-       merging its own telemetry. EU load stayed ~5 with 3 GiB of swap in use,
-       which starved every other process on the host — including Uptime Kuma,
-       whose outbound checks then timed out. Every EU-originated monitor
-       (SG services + client sites) flapped together while SG itself was
-       provably healthy: ICMP EU->SG showed 0% loss, but TCP :80 failed 11/20;
-       the same test from a laptop passed 20/20.
+       Symptom: container pegged at 100% CPU for three days; system.error_log
+       recorded 29,507 MEMORY_LIMIT_EXCEEDED (code 241) in six hours; three
+       concurrent merges on system.metric_log sat at progress=0 forever:
 
-       Measured split at the time of diagnosis:
-         system      16.89 GiB   643,628,136 rows   <- ClickHouse's own telemetry
-         trigger_dev 49.00 MiB       624,481 rows   <- the actual application data
-       i.e. ~345x more self-telemetry than real data, and trace_log alone was
-       ingesting 1,240,456 rows/hour.
+         (total) memory limit exceeded: would use 2.50 GiB
+         (attempt to allocate chunk of 4.16 MiB bytes),
+         current RSS: 1.18 GiB, maximum: 2.50 GiB
 
-       Why the 2026-07-04 fix below (TTL) did not hold: TTL bounds how long rows
-       are KEPT, not how fast they are PRODUCED. Verified still working at
-       diagnosis time (trace_log spanned 10 days against a 7-day TTL, text_log
-       exactly 14). The merge load is driven by the production rate, so 7 days of
-       a 1.24M rows/hour firehose is still 200M+ rows to merge continuously.
-       Retention tuning cannot fix a generation-rate problem — the generators
-       themselves have to be turned off or slowed down. That is what follows.
+       Mechanism - this is a WIDTH problem, not a volume problem:
+         system.metric_log       1,344 columns
+         system.query_metric_log   939 columns
+         system.query_log           84 columns   <- everything else is narrow
+       A merge opens one write stream per column, each with its own compression
+       buffer, so a metric_log merge costs ~800 MiB no matter how few rows it
+       merges. That cost cannot be tuned away; it follows the column count.
+       Vertical merge does not rescue it either: the table was already above
+       vertical_merge_algorithm_min_rows_to_activate (131072) and still cost that.
+
+       Why it became a permanent loop rather than a slow query:
+         merge needs ~800 MiB -> total would exceed 2.5 GiB -> merge aborts ->
+         parts are not consumed (83 active parts) -> next attempt picks up even
+         MORE parts -> aborts again -> each abort writes a line to system.text_log
+         -> text_log became the largest system table (171 MiB, 116,770 error rows
+         in 24h) -> which is itself what pushed the system/app ratio to 8.3x.
+       The alarm was partly measuring the alarm's own error spam. Nothing in that
+       loop self-corrects, and it survives restarts: it is a ratchet.
+
+       THE DEFECT, stated as one fact:
+         merges_mutations_memory_usage_soft_limit reported 0 at runtime, and that
+         setting's own documentation says 0 means unlimited. Background merges had
+         NO memory bound at all inside a container whose entire budget is 2.5 GiB,
+         so the scheduler was free to start a second and third ~800 MiB merge while
+         the first was still running - and 3 x ~800 MiB plus base RSS is over cap.
+       (system.server_settings reports EFFECTIVE values, not file values. Proven on
+       the disposable container used to validate this file: a configured 2.5 GiB
+       max_server_memory_usage was read back as 1.05 GiB, ClickHouse having clamped
+       it to that container's 1200m cgroup. So the 0 above is the real runtime
+       state, not an unread config line.)
+
+       THE INVARIANT (re-check this arithmetic before changing anything below):
+         base RSS (~0.9 GiB) + all concurrent merges <= 2.5 GiB
+       Bounding merges at 1.0 GiB gives 0.9 + 1.0 = 1.9 GiB, leaving ~0.6 GiB of
+       headroom for queries. Since one metric_log merge alone costs ~0.8 GiB, that
+       bound also means "at most one wide merge at a time" - expressed as the
+       budget itself rather than as a proxy for it.
+
+       Why not cap background_pool_size instead (the obvious first idea): the pool
+       size is load-bearing for three other settings
+       (number_of_free_entries_in_pool_to_execute_mutation = 20,
+       ..._to_lower_max_size_of_merge = 8, ..._to_execute_optimize_entire_partition
+       = 25), and ClickHouse refuses to start if the pool is smaller than the first
+       of them - verified: a disposable container with background_pool_size=2 exits
+       with code 36 BAD_ARGUMENTS. Capping the pool therefore drags in three more
+       coupled knobs to express one budget. The memory limit expresses it directly.
+
+       Fixes applied, in order of how much they matter:
+         1. background merges bounded by memory           (immediately below)
+         2. query_metric_log removed - the second wide table
+         3. metric_log production cut ~50x
   ═══════════════════════════════════════════════════════════════════════ -->
+
+  <!-- Hard budget for all background merges and mutations combined. Must stay
+       comfortably below max_server_memory_usage minus steady-state RSS. This is
+       the single setting that makes the incident-#5 loop impossible: when merges
+       already hold 1 GiB, the scheduler starts no more of them, so the total can
+       no longer reach the cap and abort the merge that was already running.
+       If ClickHouse ever grows metric_log past ~1 GiB per merge, this bound must
+       be re-derived - check-clickhouse-health.ps1 alerts on merge failures. -->
+  <merges_mutations_memory_usage_soft_limit>1073741824</merges_mutations_memory_usage_soft_limit>
+
+  <!-- ── System log generators ────────────────────────────────────────────
+       Ordering note: retention (TTL) bounds how long rows are KEPT; it does
+       nothing about how fast they are PRODUCED, and merge cost follows
+       production. Every generator below is therefore configured at the source
+       first and given a TTL second.
+  ──────────────────────────────────────────────────────────────────────── -->
 
   <!-- trace_log: the sampling profiler. 10.25 GiB / 446M rows, 1.24M rows/hour,
        and never queried by anyone here. Removing the config disables the trace
@@ -69,20 +129,44 @@
        are already collected by Netdata + Grafana, so this table is pure overhead. -->
   <asynchronous_metric_log remove="1"/>
 
-  <!-- metric_log: kept — it is the only ClickHouse-internal metric source — but
-       the default 7.5s flush created one part per flush, ~11.5k parts/day, which
-       is what produced the 402 active parts and the permanent merge backlog.
-       At 60s the part rate drops ~8x while the metrics stay usable. -->
+  <!-- query_metric_log: 939 columns - the second-widest table in the instance and
+       therefore the second source of ~800 MiB merges. It currently holds 1 row, so
+       it looks harmless, but it fills per-query once queries run long enough to be
+       sampled, and at that point it is indistinguishable from the metric_log
+       problem above. system.query_log (84 columns) already records per-query
+       timing, memory and ProfileEvents, which is what anyone here would read.
+       Removing it makes "at most one wide table" a property of the config rather
+       than a coincidence of current traffic - that is what turns the budget above
+       into an invariant instead of a lucky measurement. -->
+  <query_metric_log remove="1"/>
+
+  <!-- metric_log: KEPT - it is the only ClickHouse-internal metric source, and
+       after five recurrences the forensic value is real. But it is the 1,344-column
+       table whose merges cost ~800 MiB each, so its production rate is cut hard:
+
+         collect_interval  1s  -> 10s   : 86,400 -> 8,640 rows/day  (10x fewer)
+         flush_interval    60s -> 300s  : 1,440  -> 288  parts/day  (5x fewer)
+
+       Net ~50x less merge work. Per-merge memory is unchanged (width, not rows),
+       which is why the concurrency cap above is the load-bearing fix and this is
+       the belt to its braces. 10s resolution is ample for post-incident forensics
+       on a single-CPU container; Netdata covers anything needing finer grain.
+       2026-08-15 note: the 7.5s default flush created ~11.5k parts/day and 402
+       active parts - that is the behaviour being corrected here, permanently. -->
   <metric_log>
     <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
-    <flush_interval_milliseconds>60000</flush_interval_milliseconds>
+    <collect_interval_milliseconds>10000</collect_interval_milliseconds>
+    <flush_interval_milliseconds>300000</flush_interval_milliseconds>
   </metric_log>
 
   <!-- text_log: 5.33 GiB / 90M rows in 14 days = ~6.4M rows/day, because it
        mirrors EVERY server log line into a table. Container logs already go to
        Docker's json driver, so this exists only for in-SQL post-incident search.
        Restricting it to warning-and-above keeps that value and removes the flood;
-       3 days is enough for the incident window it is actually used in. -->
+       3 days is enough for the incident window it is actually used in.
+       2026-08-25: this table reaching 171 MiB was a SYMPTOM of the merge loop
+       above (116,770 merge-failure lines in 24h), not a generator problem of its
+       own. No change needed here; it shrinks on its own once merges succeed. -->
   <text_log>
     <level>warning</level>
     <ttl>event_date + INTERVAL 3 DAY DELETE</ttl>
@@ -91,9 +175,14 @@
 
   <!-- ── System log TTL: tiered retention policy ──────────────────────────
        Rationale:
-         7d  — high-volume traces/metrics (replaced by Netdata for long-term)
-         14d — query & text logs (useful for post-incident perf regression)
-         30d — error log (recurring / rare bugs need a month of history)
+         7d  - high-volume traces/metrics (replaced by Netdata for long-term)
+         14d - query & view logs (useful for post-incident perf regression)
+         30d - error log (recurring / rare bugs need a month of history)
+
+       EVERY system log table that exists must appear in this file with a TTL.
+       A table with no declared TTL grows until the disk fills; a table whose TTL
+       was applied with a live ALTER loses it on the next restart (proven below).
+       scripts/check-clickhouse-health.ps1 enforces both halves of that rule.
   ──────────────────────────────────────────────────────────────────────── -->
   <processors_profile_log>
     <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
@@ -107,37 +196,66 @@
   <error_log>
     <ttl>event_date + INTERVAL 30 DAY DELETE</ttl>
   </error_log>
+  <asynchronous_insert_log>
+    <ttl>event_date + INTERVAL 3 DAY DELETE</ttl>
+  </asynchronous_insert_log>
 
-  <!-- ── 2026-08-19 — part_log / opentelemetry_span_log / query_views_log /
-       query_metric_log: TTL applied LIVE, not declared here ────────────────
-       These four had no TTL (confirmed: 6-week-old part_log data, unbounded
-       growth risk same class as the 2026-08-15 incident, just disk instead
-       of CPU). Declaring them here with the same <table><ttl> form used
-       above crashed the container on startup: "Code: 36. BAD_ARGUMENTS: If
-       'engine' is specified for system table, TTL parameters should be
-       specified directly inside 'engine' and 'ttl' setting doesn't make
-       sense." The base /opt/bitnami/clickhouse/etc/config.xml definitions
-       for all ten default system log tables were checked directly and NONE
-       declare an explicit <engine> — so what actually triggers this for
-       these four specifically is still unconfirmed, not the "engine already
-       defined" theory floated during triage. Do not re-attempt the config
-       form without testing on a disposable ClickHouse container first; the
-       live instance crash-looped once already tonight recovering from it.
+  <!-- ══════════════════════════════════════════════════════════════════════
+       2026-08-25 - part_log / query_views_log / opentelemetry_span_log:
+       TTL moved from live ALTER into this file (the 2026-08-19 gap, closed)
 
-       What IS applied and verified working: `ALTER TABLE system.<table>
-       MODIFY TTL ...` run live against the running container (same interval
-       values as the tiering rationale above: 7d for part_log/
-       opentelemetry_span_log/query_metric_log, 14d for query_views_log).
-       This is NOT config-backed, so it is not guaranteed to survive a future
-       rename-and-recreate cycle the way the tables above are — confirmed
-       live: two of the four reverted to no-TTL from an unrelated ALTER on a
-       third table, with no restart involved, then were re-applied. Six
-       orphaned `_0`/`_1` tables left over from the churn were DROPed after
-       confirming the active table had the correct TTL.
+       What 2026-08-19 concluded: "these four tables reject the declarative
+       <ttl> form, reason unconfirmed", so their TTL was applied with live
+       `ALTER TABLE ... MODIFY TTL` and the health check was added as a
+       compensating control. That conclusion was WRONG, and the way it was
+       wrong is worth keeping: all four were declared in one edit, ONE of them
+       crashed the container, and the whole batch was blamed for it.
 
-       Compensating control: scripts/check-clickhouse-health.ps1 now checks
-       `system.tables` for any MergeTree table with no TTL and for orphaned
-       `_N`-suffixed tables every AO-RESUME run, so a future silent drift back
-       to no-TTL on these four is caught rather than requiring a manual audit
-       to rediscover it. Full incident account: WORKLOG.md 2026-08-19. -->
+       What is actually true - read from the running instance's MERGED config at
+       /bitnami/clickhouse/data/preprocessed_configs/config.xml, which is the
+       file 2026-08-19 did not look at (it checked the base config.xml only):
+
+         opentelemetry_span_log  base config DOES define <engine>, with an
+                                 upstream comment calling it a workaround for
+                                 this table having no 'event_time'. A sibling
+                                 <ttl> is therefore rejected exactly as the
+                                 error said: "If 'engine' is specified for
+                                 system table, TTL parameters should be
+                                 specified directly inside 'engine'".
+         part_log                no <engine>. Same shape as
+         query_views_log         processors_profile_log, which has carried a
+         query_metric_log        declarative <ttl> from this file for months.
+
+       So: three take the plain form, one needs the TTL inside <engine>, and
+       query_metric_log is removed above, so it needs neither.
+
+       Why this matters more than the TTLs themselves: a live ALTER is not
+       durable. The EU host auto-reboots at 20:30 UTC (runbooks/
+       VPS-AUTO-REBOOT-RUNBOOK.md); on the 2026-08-22 reboot ClickHouse rebuilt
+       these three tables from config, renamed the ALTER'd ones to <table>_0,
+       and the new ones came up with no TTL. Verified after the fact: the _0
+       orphans still carried the TTL, the live tables did not. Auto-reboot and
+       ClickHouse were each behaving correctly on their own; the defect was a
+       correction stored outside the only place that survives a restart. The
+       config-declared TTLs came through that same reboot untouched, which is
+       the entire argument for this section.
+  ═══════════════════════════════════════════════════════════════════════ -->
+  <part_log>
+    <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
+  </part_log>
+  <query_views_log>
+    <ttl>event_date + INTERVAL 14 DAY DELETE</ttl>
+  </query_views_log>
+
+  <!-- TTL embedded in <engine> because the base config defines an engine for this
+       table (see above). Partition and order keys are copied verbatim from the
+       upstream definition - changing them is not the intent, adding TTL is. -->
+  <opentelemetry_span_log>
+    <engine>
+      engine MergeTree
+      partition by toYYYYMM(finish_date)
+      order by (finish_date, finish_time_us)
+      ttl finish_date + INTERVAL 7 DAY DELETE
+    </engine>
+  </opentelemetry_span_log>
 </clickhouse>
