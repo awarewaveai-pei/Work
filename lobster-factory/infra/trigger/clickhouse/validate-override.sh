@@ -24,7 +24,11 @@
 #   5. the merge memory budget is in force       2026-08-25 unbounded merge memory
 #
 # USAGE
-#   ./validate-override.sh [path/to/override.xml] [image-tag]
+#   ./validate-override.sh [override.xml] [env-file] [image-override]
+#
+# Pass the SAME --env-file the deploy will use; the image is then resolved by docker
+# compose itself from that file. The third argument is an escape hatch for deliberately
+# testing a different build and should not be used by automation.
 # Requires docker and the ClickHouse image. Runs entirely in a throwaway container with
 # its own storage: it never touches the trigger stack, its volumes, or its network.
 # Exit 0 = safe to deploy. Non-zero = do not deploy; the reason is printed.
@@ -34,30 +38,49 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OVERRIDE="${1:-$HERE/override.xml}"
 
-# The image tag is DERIVED, never repeated here. Validating a config against a different
-# ClickHouse build than the one that will run it is worse than not validating at all: the
-# answer looks authoritative and is about the wrong software.
+# Defined before anything else: the image-resolution block below is the first thing that can
+# fail, and it must fail with a readable message rather than "fail: command not found".
+fail() { echo "FAIL: $*" >&2; exit 1; }
+command -v docker >/dev/null 2>&1 || fail "docker is not available"
+
+# THE IMAGE IS RESOLVED BY DOCKER COMPOSE ITSELF, never re-parsed here.
 #
-# Precedence matches what docker compose itself resolves, most specific first:
-#   1. explicit $2                       - a human deliberately testing another build
-#   2. .env CLICKHOUSE_IMAGE_TAG         - what THIS host actually deploys
-#   3. docker-compose.yml default        - what a host without .env gets (this is CI's case)
-#   4. hard-coded fallback               - only if the compose file is unreadable
-# Step 2 exists because compose reads ${CLICKHOUSE_IMAGE_TAG:-default}: a .env that pins a
-# different build silently wins over the compose default, and validating the default would
-# then be validating a build nobody runs (codex oracle 2026-08-25 round 2, FINDING 1).
-# validate-config.ps1 additionally asserts the compose default and .env.example agree.
-COMPOSE="$HERE/../docker-compose.yml"
-ENVFILE="$HERE/../.env"
-IMAGE_TAG="${2:-}"
-if [ -z "$IMAGE_TAG" ] && [ -f "$ENVFILE" ]; then
-    IMAGE_TAG=$(sed -n 's/^[[:space:]]*CLICKHOUSE_IMAGE_TAG=[[:space:]]*\([^[:space:]#]*\).*/\1/p' "$ENVFILE" | head -1)
+# Validating a config against a different ClickHouse build than the one that will run it is
+# worse than not validating at all: the answer looks authoritative and is about the wrong
+# software. Three separate versions of this script got that wrong in a row, each time by
+# re-implementing a slice of Compose's own resolution rules and each time missing a slice:
+# a hard-coded tag ignored the compose default; reading the compose default ignored .env;
+# hand-parsing .env ignored Compose's quoting rules and the caller's --env-file. Each fix
+# was narrower than the real rule, and every miss degraded to "validate something else and
+# report PASS" (codex oracle 2026-08-25 rounds 2 and 3).
+#
+# The invariant behind all of them: a gate must resolve its inputs with the SAME rule the
+# real system uses, or fail loudly when it cannot - never quietly proceed with a guess.
+# `docker compose config --images` IS that rule. It applies --env-file, .env, shell
+# environment, defaults and interpolation exactly as `docker compose up` would.
+COMPOSE_DIR="$HERE/.."
+ENV_FILE="${2:-}"           # optional; must be the same file the deploy will use
+IMAGE_OVERRIDE="${3:-}"     # escape hatch for deliberately testing another build
+
+resolve_image() {
+    local args=(compose)
+    [ -n "$ENV_FILE" ] && args+=(--env-file "$ENV_FILE")
+    args+=(config --images)
+    ( cd "$COMPOSE_DIR" && docker "${args[@]}" 2>/dev/null ) | grep -m1 'clickhouse' || true
+}
+
+if [ -n "$IMAGE_OVERRIDE" ]; then
+    IMAGE="$IMAGE_OVERRIDE"
+else
+    IMAGE="$(resolve_image)"
+    # No silent fallback. If Compose cannot tell us what it would run, we do not know what to
+    # validate, and a guess here is exactly the failure mode this block exists to remove.
+    [ -n "$IMAGE" ] || fail "could not resolve the ClickHouse image via 'docker compose config --images' in $COMPOSE_DIR${ENV_FILE:+ (--env-file $ENV_FILE)} - refusing to guess a tag"
 fi
-if [ -z "$IMAGE_TAG" ] && [ -f "$COMPOSE" ]; then
-    IMAGE_TAG=$(sed -n 's/.*bitnamilegacy\/clickhouse:\${CLICKHOUSE_IMAGE_TAG:-\([^}]*\)}.*/\1/p' "$COMPOSE" | head -1)
-fi
-IMAGE_TAG="${IMAGE_TAG:-25.7.5-debian-12-r0}"
-IMAGE="bitnamilegacy/clickhouse:${IMAGE_TAG}"
+case "$IMAGE" in
+    *clickhouse*) : ;;
+    *) fail "resolved image '$IMAGE' does not look like a ClickHouse image" ;;
+esac
 NAME="ch-override-validate-$$"
 # Width above which a system log table cannot be merged inside the container's memory
 # budget. The same number appears as $WIDTH_WARN in scripts/check-clickhouse-health.ps1, but
@@ -71,10 +94,7 @@ WIDTH_LIMIT=200
 EXPECTED_MERGE_BUDGET=1073741824
 RETIRED="'trace_log','asynchronous_metric_log','metric_log','query_metric_log','query_thread_log','s3queue_log'"
 
-fail() { echo "FAIL: $*" >&2; exit 1; }
-
 [ -f "$OVERRIDE" ] || fail "override file not found: $OVERRIDE"
-command -v docker >/dev/null 2>&1 || fail "docker is not available"
 
 # Fail fast on malformed XML before spending 30s on a container that cannot possibly start.
 if command -v python3 >/dev/null 2>&1; then

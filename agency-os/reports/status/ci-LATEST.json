@@ -1,8 +1,8 @@
 {
     "schemaVersion":  1,
-    "generatedAtUtc":  "2026-08-24T19:48:12.7445954Z",
+    "generatedAtUtc":  "2026-08-24T19:52:40.1826057Z",
     "branch":  "main",
-    "sampledRuns":  100,
+    "runsPerWorkflow":  20,
     "probeOk":  true,
     "workflows":  [
                       {
@@ -12,6 +12,14 @@
                           "failingSinceUtc":  "",
                           "failingDays":  0,
                           "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/29719033130"
+                      },
+                      {
+                          "name":  "Auto-Repair - PR Notification",
+                          "latest":  "none",
+                          "consecutiveFailures":  0,
+                          "failingSinceUtc":  "",
+                          "failingDays":  0,
+                          "url":  ""
                       },
                       {
                           "name":  "Lobster workflows package — validate (main)",
@@ -30,6 +38,30 @@
                           "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/32760929211"
                       },
                       {
+                          "name":  "Release Gate (main)",
+                          "latest":  "none",
+                          "consecutiveFailures":  0,
+                          "failingSinceUtc":  "",
+                          "failingDays":  0,
+                          "url":  ""
+                      },
+                      {
+                          "name":  "SG Deploy (self-hosted runner)",
+                          "latest":  "success",
+                          "consecutiveFailures":  0,
+                          "failingSinceUtc":  "",
+                          "failingDays":  0,
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/27410815267"
+                      },
+                      {
+                          "name":  "Tenant staging SSOT",
+                          "latest":  "none",
+                          "consecutiveFailures":  0,
+                          "failingSinceUtc":  "",
+                          "failingDays":  0,
+                          "url":  ""
+                      },
+                      {
                           "name":  "Trigger infra config guard",
                           "latest":  "success",
                           "consecutiveFailures":  0,
@@ -44,6 +76,14 @@
                           "failingSinceUtc":  "2026-08-24T02:41:52Z",
                           "failingDays":  1,
                           "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/32683910784"
+                      },
+                      {
+                          "name":  "ziwei — typecheck · test · build",
+                          "latest":  "none",
+                          "consecutiveFailures":  0,
+                          "failingSinceUtc":  "",
+                          "failingDays":  0,
+                          "url":  ""
                       }
                   ],
     "verdict":  "drift",

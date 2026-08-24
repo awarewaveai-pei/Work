@@ -1,18 +1,23 @@
 # CI health (GitHub Actions, branch main)
 
-- Generated: 2026-08-25 03:48:12
+- Generated: 2026-08-25 03:52:40
 - Overall: **🟡 WARN**
-- Sampled: last 100 runs on `main`
+- Method: every workflow enumerated; last 20 run(s) of each inspected on `main`
 
 ## Workflows
 
 | Workflow | Latest | Consecutive failures | Failing for |
 |----------|--------|----------------------|-------------|
 | Auto-Repair - Claude Code | skipped | - | - |
+| Auto-Repair - PR Notification | none | - | - |
 | Lobster workflows package — validate (main) | success | - | - |
 | next-admin — TypeScript typecheck | success | - | - |
+| Release Gate (main) | none | - | - |
+| SG Deploy (self-hosted runner) | success | - | - |
+| Tenant staging SSOT | none | - | - |
 | Trigger infra config guard | success | - | - |
 | Weekly workflows security audit | failure | 1 | 1d |
+| ziwei — typecheck · test · build | none | - | - |
 
 ## Findings
 

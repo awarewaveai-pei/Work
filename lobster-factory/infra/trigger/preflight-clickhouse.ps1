@@ -69,7 +69,13 @@ if (-not $bash) {
 Write-Host "Running clickhouse/validate-override.sh (boots a disposable ClickHouse) ..." -ForegroundColor Cyan
 Push-Location -LiteralPath $here
 try {
-  & $bash.Source "clickhouse/validate-override.sh"
+  # -EnvFile MUST be forwarded. The validator resolves the ClickHouse image by asking
+  # docker compose what it would run, and compose answers differently per env file. An
+  # earlier version verified this file existed and then called the validator with no
+  # arguments, so `-EnvFile .env.prod` validated whatever `.env` happened to say - i.e. it
+  # could report PASS against a build that was not the one being deployed
+  # (codex oracle 2026-08-25 round 3, FINDING 1).
+  & $bash.Source "clickhouse/validate-override.sh" "clickhouse/override.xml" $EnvFile
   $exit = $LASTEXITCODE
 } finally {
   Pop-Location

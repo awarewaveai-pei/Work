@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
 .SYNOPSIS
 Report the state of GitHub Actions workflows on main; write reports/status/ci-LATEST.md (+ .json).
@@ -24,9 +24,14 @@ this either - the operator has to be told without remembering to ask, which mean
 ride an already-running flow. AO-RESUME is that flow.
 
 WHAT THIS CHECKS
-For each workflow, the most recent run on the default branch:
-  - conclusion of the latest run (success / failure / cancelled / timed_out / ...)
+Every workflow is ENUMERATED (`gh workflow list`) and then queried individually - it does
+not sample "the last N runs" across the repo. A weekly job falls out of any such window the
+moment busier workflows produce N newer runs, and would then be missing from the report
+rather than reported as red, which is the same silent-pass shape this check exists to catch.
+Per workflow, on the default branch:
+  - conclusion of the latest concluded run (success / failure / timed_out / ...)
   - how many consecutive runs have failed, and for how long
+  - whether the workflow is disabled at all (a gate someone switched off)
 An entrenched failure is treated as worse than a fresh one: a single red run is often a
 flake or a work-in-progress, while a workflow that has been red for days is a gate that has
 been switched off without anyone deciding to switch it off.
@@ -50,7 +55,9 @@ crashes on multi-byte chars without BOM. Emoji are produced at output time only.
 [CmdletBinding()]
 param(
     [string]$WorkRoot = "",
-    [int]$Limit = 100,
+    # Runs inspected PER WORKFLOW (not a global sample - see the enumeration comment below).
+    # Only needs to be deep enough to measure a failure streak; 20 covers weeks of a weekly job.
+    [int]$RunsPerWorkflow = 20,
     [switch]$Json
 )
 
@@ -99,50 +106,78 @@ if (-not $ghCmd) {
     Set-Worst "broken"
     $reasons += "BLIND SPOT: the gh CLI is not installed, so CI state could not be read at all - this is not a passing check"
 } else {
-    $raw = ""
-    $ghExit = 0
-    try {
-        Push-Location -LiteralPath $root
+    # ENUMERATE the workflows, then ask about each one. Do NOT sample the last N runs across
+    # all workflows: a low-frequency workflow (the weekly security audit, say) drops out of
+    # that window as soon as busier workflows produce N newer runs, and it then vanishes from
+    # the report entirely - so a red weekly gate reads as PASS purely because the repo got
+    # busy. That is the same shape as every other bug this file exists to catch: the checker
+    # resolving its inputs by a shortcut narrower than reality, then degrading to a silent
+    # pass (codex oracle 2026-08-25 round 3, FINDING 3 - confirmed).
+    # Cost is one API call per workflow, which is a handful.
+    function Invoke-Gh {
+        param([string[]]$GhArgs)
+        $o = ""; $code = 0
         try {
-            $out = Invoke-WithUtf8Console {
-                & gh run list --branch $defaultBranch --limit $Limit --json workflowName,conclusion,status,createdAt,displayTitle,url 2>&1
-            }
-            $ghExit = $LASTEXITCODE
-            $raw = (($out | ForEach-Object { [string]$_ }) -join "`n").Trim()
-        } finally { Pop-Location }
-    } catch {
-        $ghExit = 1
-        $raw = $_.Exception.Message
+            Push-Location -LiteralPath $root
+            try {
+                $captured = Invoke-WithUtf8Console { & gh @GhArgs 2>&1 }
+                $code = $LASTEXITCODE
+                $o = (($captured | ForEach-Object { [string]$_ }) -join "`n").Trim()
+            } finally { Pop-Location }
+        } catch { $code = 1; $o = $_.Exception.Message }
+        return @{ ExitCode = $code; Output = $o }
     }
 
-    if ($ghExit -ne 0 -or -not $raw) {
+    $wfRes = Invoke-Gh -GhArgs @("workflow", "list", "--limit", "100", "--json", "name,id,state")
+    if ($wfRes.ExitCode -ne 0 -or -not $wfRes.Output) {
         Set-Worst "broken"
-        $firstLine = if ($raw) { ($raw -split "`n")[0] } else { "(no output)" }
-        $reasons += "BLIND SPOT: gh run list failed (exit $ghExit): $firstLine - CI state unknown, treat as unverified rather than healthy"
+        $firstLine = if ($wfRes.Output) { ($wfRes.Output -split "`n")[0] } else { "(no output)" }
+        $reasons += "BLIND SPOT: gh workflow list failed (exit $($wfRes.ExitCode)): $firstLine - CI state unknown, treat as unverified rather than healthy"
     } else {
-        $runs = $null
-        try { $runs = $raw | ConvertFrom-Json } catch { $runs = $null }
-        if ($null -eq $runs) {
+        $wfList = $null
+        try { $wfList = $wfRes.Output | ConvertFrom-Json } catch { $wfList = $null }
+        if ($null -eq $wfList) {
             Set-Worst "broken"
-            $reasons += "BLIND SPOT: gh returned output that is not valid JSON - CI state unknown"
+            $reasons += "BLIND SPOT: gh workflow list returned output that is not valid JSON - CI state unknown"
+        } elseif (@($wfList).Count -eq 0) {
+            Set-Worst "drift"
+            $reasons += "no workflows are defined in this repository - nothing to check, which is itself worth noticing"
         } else {
             $probeOk = $true
-            # Newest first is gh's own ordering; group by workflow and keep that order.
             $byWorkflow = @{}
-            foreach ($r in @($runs)) {
-                $name = [string]$r.workflowName
-                if (-not $name) { continue }
-                if (-not $byWorkflow.ContainsKey($name)) { $byWorkflow[$name] = New-Object System.Collections.ArrayList }
-                [void]$byWorkflow[$name].Add($r)
+            foreach ($wf in @($wfList)) {
+                # Disabled workflows are reported but cannot fail; skipping them silently would
+                # hide "someone turned the gate off", so they are surfaced below instead.
+                $wfName = [string]$wf.name
+                if (-not $wfName) { continue }
+                $runRes = Invoke-Gh -GhArgs @("run", "list", "--workflow", [string]$wf.id, "--branch", $defaultBranch, "--limit", "$RunsPerWorkflow", "--json", "conclusion,status,createdAt,url")
+                if ($runRes.ExitCode -ne 0) {
+                    Set-Worst "broken"
+                    $reasons += "BLIND SPOT: could not read runs for '$wfName' (exit $($runRes.ExitCode)) - its state is unknown"
+                    continue
+                }
+                $wfRuns = $null
+                try { $wfRuns = $runRes.Output | ConvertFrom-Json } catch { $wfRuns = $null }
+                if ($null -eq $wfRuns) { $wfRuns = @() }
+                $byWorkflow[$wfName] = @{ Runs = @($wfRuns); State = [string]$wf.state }
             }
 
             foreach ($name in ($byWorkflow.Keys | Sort-Object)) {
-                $list = $byWorkflow[$name]
+                $list = $byWorkflow[$name].Runs
+                $wfState = $byWorkflow[$name].State
+                if ($wfState -and $wfState -ne "active") {
+                    Set-Worst "drift"
+                    $reasons += "'$name' is $wfState - a workflow that is not active is a gate that is switched off"
+                }
                 # Skip runs that have not finished; the latest CONCLUDED run is the state.
                 $concluded = @($list | Where-Object { $_.conclusion -and $_.conclusion -ne "" })
                 if ($concluded.Count -eq 0) {
+                    # "none" and "pending" are different facts and must not render alike: a
+                    # workflow that has never run on this branch (PR-only, workflow_dispatch)
+                    # is normal, while one whose runs are all still in flight is transient.
+                    $latestLabel = if (@($list).Count -eq 0) { "none" } else { "pending" }
                     $workflows += [ordered]@{
-                        name = $name; latest = "pending"; consecutiveFailures = 0; failingSinceUtc = ""; failingDays = 0; url = ""
+                        name = $name; latest = $latestLabel; consecutiveFailures = 0; failingSinceUtc = ""; failingDays = 0; url = ""
                     }
                     continue
                 }
@@ -190,7 +225,7 @@ if (-not $ghCmd) {
 
             if ($workflows.Count -eq 0) {
                 Set-Worst "drift"
-                $reasons += "no workflow runs found on '$defaultBranch' in the last $Limit runs - either CI is not wired up or the probe is looking at the wrong branch"
+                $reasons += "workflows are defined but none has ever run on '$defaultBranch' - either CI is not wired up or the probe is looking at the wrong branch"
             }
         }
     }
@@ -210,7 +245,7 @@ $lines += "# CI health (GitHub Actions, branch $defaultBranch)"
 $lines += ""
 $lines += ("- Generated: {0}" -f $now.ToString("yyyy-MM-dd HH:mm:ss"))
 $lines += ("- Overall: **{0} {1}**" -f $icon, $userLabel)
-$lines += ("- Sampled: last {0} runs on ``{1}``" -f $Limit, $defaultBranch)
+$lines += ("- Method: every workflow enumerated; last {0} run(s) of each inspected on ``{1}``" -f $RunsPerWorkflow, $defaultBranch)
 $lines += ""
 $lines += "## Workflows"
 $lines += ""
@@ -252,7 +287,7 @@ $payload = [ordered]@{
     schemaVersion  = 1
     generatedAtUtc = $now.ToUniversalTime().ToString("o")
     branch         = $defaultBranch
-    sampledRuns    = $Limit
+    runsPerWorkflow = $RunsPerWorkflow
     probeOk        = $probeOk
     workflows      = $workflows
     verdict        = $worst
