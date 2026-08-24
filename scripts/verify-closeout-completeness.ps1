@@ -297,28 +297,37 @@ try {
             # Round 4 (codex stop-hook): timing lining up proves ORDERING, not that this
             # file's diff was actually IN what Codex read -- an unrelated same-day review
             # could satisfy the timing check by coincidence. codex-oracle.ps1 now records
-            # which paths were literally in the diff it sent (`- files-reviewed:` line in
-            # the artifact, added alongside this fix). Build the union of paths confirmed
-            # across ALL of today's artifacts, not just the newest -- an earlier run can
-            # legitimately confirm a path even when the newest run was about something
-            # else, matching the existing lenient "any same-day artifact" philosophy above.
-            # Old-format artifacts (predating this fix) have no such line and confirm
-            # nothing -- that is a one-time transition cost, not an ongoing gap.
-            $confirmedReviewedPaths = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::OrdinalIgnoreCase)
+            # which paths were literally in a diff sent to it. Build the union across ALL
+            # of today's artifacts, not just the newest -- an earlier run can legitimately
+            # confirm a path even when the newest run was about something else, matching
+            # the existing lenient "any same-day artifact" philosophy above. Old-format
+            # artifacts (predating this fix) have no such line and confirm nothing -- a
+            # one-time transition cost, not an ongoing gap.
+            #
+            # Round 6 (codex CONFIRMED finding): the general files-reviewed list only
+            # proves SOME diff for that path was sent -- not that it was reviewed AS A
+            # DELETION specifically. A path can land there from an earlier review of a
+            # plain modification, then get deleted later without a re-review. codex-
+            # oracle.ps1 now writes a SEPARATE `- deletions-reviewed:` line, populated only
+            # when the file's diff block carried git's `deleted file mode` marker -- read
+            # that one here instead of the general list, so this check answers the actual
+            # question ("was this deletion reviewed"), not the weaker one ("was this path
+            # mentioned in some diff").
+            $confirmedDeletedPaths = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::OrdinalIgnoreCase)
             foreach ($art in $todayOracle) {
                 try {
                     $artText = [System.IO.File]::ReadAllText($art.FullName, $utf8)
                     # [regex]::Match (first hit only) is deliberate, not Matches: the real
-                    # files-reviewed line always precedes Codex's own prose answer in the
+                    # metadata line always precedes Codex's own prose answer in the
                     # artifact (metadata block first, then a `---` separator, then $answer
                     # -- see codex-oracle.ps1's $meta array). If Codex's answer happened to
-                    # echo back a line that also starts with "- files-reviewed:", the first
-                    # match still resolves to the real metadata line, not the echo.
-                    $flMatch = [regex]::Match($artText, '(?m)^-\s*files-reviewed:\s*(.*)$')
-                    if ($flMatch.Success) {
-                        foreach ($p in ($flMatch.Groups[1].Value -split '\s*,\s*')) {
+                    # echo back a line that also starts with "- deletions-reviewed:", the
+                    # first match still resolves to the real metadata line, not the echo.
+                    $dlMatch = [regex]::Match($artText, '(?m)^-\s*deletions-reviewed:\s*(.*)$')
+                    if ($dlMatch.Success) {
+                        foreach ($p in ($dlMatch.Groups[1].Value -split '\s*,\s*')) {
                             $pt = $p.Trim()
-                            if ($pt -and $pt -ne '(n/a for this mode)' -and $pt -ne '(none parsed)') { [void]$confirmedReviewedPaths.Add($pt) }
+                            if ($pt -and $pt -ne '(none)') { [void]$confirmedDeletedPaths.Add($pt) }
                         }
                     }
                 } catch { }
@@ -330,16 +339,21 @@ try {
             foreach ($sf in $oracleStaged) {
                 $full = Join-Path $WorkRoot ($sf.Replace('/', '\'))
                 if (-not (Test-Path -LiteralPath $full)) {
-                    # Deletion: index-mtime proxy first (resolvable -- same remedy as a
-                    # stale modification), THEN content confirmation (also resolvable the
-                    # same way). Four outcomes: proxy unresolved -> undecidable (round-2
-                    # warn-only); proxy says staged after the review -> stale; proxy says
-                    # staged before, but no artifact's files-reviewed list names this path
-                    # -> timing lined up by coincidence, not proven (round 4); proxy AND
-                    # content both confirm -> passes silently like any other non-stale file.
+                    # Deletion: content confirmation is checked FIRST, ahead of the
+                    # index-mtime proxy. Round 6 (codex, file:line-anchored): .git/index
+                    # mtime is GLOBAL -- staging any unrelated file after a genuinely
+                    # reviewed deletion bumps it, and the old ordering ran that noisy
+                    # timing check before ever consulting confirmed paths, so a deletion
+                    # truly reviewed could still be hard-blocked by later unrelated
+                    # staging. Content confirmation (now specifically "reviewed AS A
+                    # DELETION", not just "path mentioned in some diff" -- see
+                    # $confirmedDeletedPaths comment above) is strictly stronger evidence
+                    # than timing -- it doesn't need a timing gate in front of it, only
+                    # behind it as a fallback when that confirmation isn't available.
+                    if ($confirmedDeletedPaths.Contains($sf)) { continue }
                     if (-not $indexStageTime) { $unverifiable += $sf }
                     elseif ($indexStageTime -gt $newestArtifact.LastWriteTime) { $staleAgainst += $sf }
-                    elseif (-not $confirmedReviewedPaths.Contains($sf)) { $unconfirmed += $sf }
+                    else { $unconfirmed += $sf }
                     continue
                 }
                 $mt = (Get-Item -LiteralPath $full -ErrorAction SilentlyContinue)
@@ -353,12 +367,12 @@ try {
                 Write-Warning $stMsg
             }
             if ($unconfirmed.Count -gt 0 -and -not $hasOracleWaiver) {
-                # Timing was fine (staged before the newest review) but no artifact's
-                # files-reviewed record names this deletion -- the ordering was coincidence,
-                # not proof. Resolvable the same way as stale: re-run oracle now that the
-                # deletion is staged, which will record it in files-reviewed this time.
-                $ucMsg = ("verify-closeout-completeness: staged deletion(s) not found in any today's oracle files-reviewed record, despite passing timing: {0}." -f ($unconfirmed -join ', ')) +
-                         " The review that ran may not have actually included this file. Re-run: .\scripts\codex-oracle.ps1 -Mode review -Context '<what changed>'" +
+                # No today's artifact's deletions-reviewed record names this deletion --
+                # either it was never reviewed, or an earlier review only saw it as a
+                # modification (files-reviewed) but never as the deletion itself.
+                # Resolvable: re-run oracle now that the deletion is staged.
+                $ucMsg = ("verify-closeout-completeness: staged deletion(s) not confirmed in any today's oracle deletions-reviewed record: {0}." -f ($unconfirmed -join ', ')) +
+                         " The review that ran may not have actually included this file's deletion. Re-run: .\scripts\codex-oracle.ps1 -Mode review -Context '<what changed>'" +
                          (" OR add: - ORACLE_WAIVED: <one-line reason> to {0}. Gate={1}" -f $hdr, $Gate)
                 if ($Gate -eq "strict") { Write-Host $ucMsg -ForegroundColor Red; exit 1 }
                 Write-Warning $ucMsg

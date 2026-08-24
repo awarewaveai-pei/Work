@@ -189,6 +189,46 @@ Round 4 修完後，同一顆 Codex stop-hook 第五次抓到問題：「quoted-
 [rollback]
 `git diff scripts/codex-oracle.ps1 scripts/verify-closeout-completeness.ps1` 還原兩個 hunk，兩檔互相依賴需一起回滾或都保留。
 
+### AUTO_TASK_DONE: ORACLE gate deletion 確認邏輯改「內容優先於時序」+ 拆分 deletions-reviewed（round 6，同 session 第六次 Codex stop-hook）
+
+[任務]
+Round 5 修完後，同一顆 Codex stop-hook 第六次抓到問題：「the unicode fix still leaves ORACLE hard-blocking reviewed deletions for space-named source files that already exist in this repo」。使用者同時指出本輪 token 消耗過大，critic subagent 連續 529 過載（累計 6 次）——當場改變作法：**Review 驗證步驟改直接呼叫 `scripts/codex-oracle.ps1`，不再依賴掛掉的 critic**。
+
+[根因（Codex 精準定位，非猜測）]
+先用 scratch repo 重現 unicode/空格檔名的正常案例，結果一次就過（round 5 的 quotepath 修正對這些案例其實是對的）。改用 `codex-oracle.ps1 -Mode inspect` 直接問 Codex 具體是哪一行——不到 4 分鐘拿到精確 file:line 回答：deletion 分支原本的判斷順序是「先查 `.git/index` 全域 mtime 是否過期，通過才檢查 `$confirmedReviewedPaths`（round 4 加的內容確認）」。但 index mtime 是**全域**的——deletion 明明已經被真實 review 過，只要之後 stage 任何一個不相干的檔案（`git add`/`git rm` 任何東西），index mtime 就會被推晚，讓「已審過」的 deletion 被過期檢查先擋下，內容確認根本沒機會發揮作用。
+
+[已修改（第一版）]
+`scripts/verify-closeout-completeness.ps1` deletion 分支：把 `$confirmedReviewedPaths.Contains($sf)` 的檢查移到**最前面**，時序檢查（stale/unconfirmed）降級成內容確認不到時的備援，不再攔在前面。
+
+[追加發現：Codex 用真正的 `codex-oracle.ps1 -Mode review`（路徑限定，審這次修法本身）二度抓到問題]
+用 `-Path scripts/verify-closeout-completeness.ps1` 對第一版修法跑真實 path-scoped review（非 inspect，是真的 review 模式），Codex 回報 CONFIRMED：`files-reviewed` 只證明「這個路徑出現在某次送給 Codex 的 diff 裡」，不能區分「這次是被當成刪除審的」還是「只是之前審過內容修改，之後才被刪掉、從沒被當成刪除重審過」——內容優先的新邏輯反而讓一個從未被審過的刪除，靠一份審過它「舊內容」的過期 artifact 矇混過關。
+
+[已修改（第二版，關掉這個洞）]
+1. `scripts/codex-oracle.ps1:272-304`——diff 抽取邏輯改用 `[regex]::Split` 把 diffText 切成逐檔區塊，每塊除了抓路徑，額外檢查該區塊是否含 git 自己的 `deleted file mode` 標記；有的話該路徑額外進入新的 `$deletedPaths` 清單（跟原本泛用的 `$reviewedPaths`「檔案出現過」分開）
+2. `scripts/codex-oracle.ps1:483-490`——artifact metadata 新增獨立的 `- deletions-reviewed: <路徑清單>` 行（`(none)` 表示這次 review 沒審到任何刪除），跟既有 `- files-reviewed:` 並存不取代
+3. `scripts/verify-closeout-completeness.ps1:297-330`——`$confirmedReviewedPaths` 整個換成 `$confirmedDeletedPaths`，只解析 `- deletions-reviewed:` 這一行；deletion 確認邏輯現在問的是「這個檔案的**刪除動作**有沒有被審過」而不是「這個路徑有沒有出現在任何 diff 裡」
+4. 同時修正 `scripts/codex-oracle.ps1:279-284` 已過時的「known limitation」註解（round 5 quotepath 修正後，空格/unicode 已經不是問題，只剩字面雙引號/反斜線這種本 repo 不存在的極端情況，註解原本沒更新）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=用 `codex-oracle.ps1 -Mode review`（真實呼叫，非模擬）跑 2 次：① 對本次修法本身跑 path-scoped review 抓到上述 CONFIRMED 洞 ② 對 scratch repo 混合 modify+delete+new-file 的真實 diff 跑完整 review，確認 artifact 正確寫出 `files-reviewed` 含全部 3 檔、`deletions-reviewed` 只含真正被刪的那個 | exit=0（2/2 真實呼叫成功，各花 ~120-220 秒）
+- REALTEST_EVIDENCE: tool=Bash | cmd=對真正的 `scripts/verify-closeout-completeness.ps1`（`-WorkRoot` 指向真實 scratch repo，用真實 codex-oracle.ps1 產出的 artifact，非手工偽造）重現 Codex 原始情境：真審過的 deletion + 之後 stage 不相干檔案污染 index mtime | exit=0（放行，證實修好）
+- REALTEST_EVIDENCE: tool=Bash | cmd=反向驗證 Codex 第二次抓到的洞已關閉：artifact 只有 `files-reviewed` 提到該路徑、`deletions-reviewed` 寫 `(none)` | exit=1（正確擋下，訊息文字為新版「not confirmed in any today's oracle deletions-reviewed record」）
+- REALTEST_EVIDENCE: tool=Bash | cmd=完整回歸測試（真過期硬擋、index 無法解析退回 warn-only、ORACLE_WAIVED 靜音）三案例對 round 1-5 用過的 ASCII scratch repo 重跑 | exit 各自符合預期（3/3 pass）；本 session 累計 20+ 組真實整合情境
+- REVIEW_DONE: critic=Deep | verdict=warn→修正後 pass | findings=2c/0m/0n（**外部 oracle = 真正的 `codex-oracle.ps1 -Mode inspect` + `-Mode review`，不是自我描述，也不是失效的 critic subagent**；兩次呼叫的 artifact 路徑分別是 `agency-os/reports/oracle/2026-08-24-inspect-4611a390.md` 與 `agency-os/reports/oracle/2026-08-24-partialreview-f3991bc4.md`）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`deletions-reviewed\|deletedPaths\|confirmedDeletedPaths\|confirmedReviewedPaths` | hits=14（`confirmedReviewedPaths` 舊符號已完全移除、無殘留死碼；`confirmedDeletedPaths`/`deletedPaths`/`deletions-reviewed` 在兩檔內生產/消費配對一致；agency-os 內命中皆為歷史 WORKLOG entry 或 oracle report 存檔，非過期現況聲稱，不需連動修正）
+
+[流程改變（記錄給下個 session）]
+critic subagent 這個 session 累計 6 次 529 後停止依賴它；改用 `scripts/codex-oracle.ps1`（`-Mode inspect` 問具體問題、`-Mode review -Path <file>` 審具體修法）當作 R0 [驗證計畫] Review 動作的實際執行者，這本來就是 AGENTS.md「跨模型 oracle」章節定義的角色分工，這次是真正照著做，不是繞過 critic 硬做別的。
+
+[剩餘風險]
+- 舊格式 artifact（round 1-4 產生、只有 `files-reviewed` 沒有 `deletions-reviewed`）現在會讓引用它們的 deletion 一律落入 unconfirmed——比 round 4 那次轉換成本更明確（deletions-reviewed 是全新欄位，round 1-5 的 artifact 全部沒有），但同樣一次性、下次任何人跑 review 就會有新格式
+- 極端情況（路徑本身含字面雙引號/反斜線字元）仍未處理，記錄為已知取捨（round 5 遺留，未變）
+- `test-hooks.sh` 仍無 ORACLE gate 專屬案例（六輪累積的既有缺口，非本次引入）
+- 本輪起改用 codex-oracle.ps1 直接驗證，證實可行且比 critic 更貼近 AGENTS.md 原始設計；critic subagent 是否還要繼續在其他任務類型（PR review、漏洞鏈）保留，留待之後視情況判斷，非本次範圍
+
+[rollback]
+`git diff scripts/codex-oracle.ps1 scripts/verify-closeout-completeness.ps1` 還原兩個 hunk，兩檔互相依賴需一起回滾或都保留。
+
 ## 2026-08-20 — 跨模型 oracle 制度化：`codex-oracle.ps1` + AGENTS 分工規則
 
 ### AUTO_TASK_DONE: 把 08-17 驗證有效的 Codex oracle 從「當次對話」變成常駐機制

@@ -276,19 +276,32 @@ if ($Mode -eq 'review') {
         # infer "the review probably covered this file" from mtime ordering, which proves
         # timing lined up, not that the file's diff was actually in what Codex read (codex
         # stop-hook, round 4: a deletion could pass on ordering alone with no such check).
-        # KNOWN LIMITATION: git C-quotes header paths containing spaces/specials as
-        # `diff --git "a/x y" "b/x y"` -- this regex expects the unquoted `a/`/`b/` form
-        # and will not capture those, so a deletion of such a path would show as
-        # unconfirmed downstream even when genuinely reviewed (over-blocking, not a
-        # silent gap). Not fixed here: this repo's naming convention (kebab/snake_case,
-        # AGENTS.md) has no such paths in practice: adding quote-stripping for a case that
-        # cannot currently occur is exactly the premature generality R0 warns against.
+        # `Invoke-Git` runs every git call with `-c core.quotepath=false` (round 5), so
+        # header paths with spaces or non-ASCII characters arrive unquoted here -- the
+        # regex below expects exactly that unquoted `a/`/`b/` form. (Literal double-quote
+        # or backslash BYTES in a filename would still force quoting regardless of this
+        # setting; no such path exists in this repo, verified via `git ls-files`, so that
+        # residual case is not handled -- premature generality R0 warns against.)
+        #
+        # files-reviewed vs deletions-reviewed (round 6, codex CONFIRMED finding): a path
+        # appearing in files-reviewed only proves SOME diff for that path was sent to
+        # Codex -- it does not distinguish "reviewed as a deletion" from "reviewed as a
+        # prior modification, before being deleted later without a re-review". The gate
+        # needs the stronger claim for the deletion-confirmation check, so deletions get
+        # their own list, populated only when the file's diff block actually contains
+        # `deleted file mode` (git's own marker for a pure deletion).
         $reviewedPaths = New-Object System.Collections.Generic.List[string]
-        foreach ($dm in [regex]::Matches($diffText, '(?m)^diff --git a/.+? b/(.+?)\s*$')) {
-            $reviewedPaths.Add($dm.Groups[1].Value)
+        $deletedPaths  = New-Object System.Collections.Generic.List[string]
+        foreach ($block in [regex]::Split($diffText, '(?m)(?=^diff --git )')) {
+            $dm = [regex]::Match($block, '(?m)^diff --git a/.+? b/(.+?)\s*$')
+            if (-not $dm.Success) { continue }
+            $p = $dm.Groups[1].Value
+            $reviewedPaths.Add($p)
+            if ($block -match '(?m)^deleted file mode') { $deletedPaths.Add($p) }
         }
         foreach ($u in $inlined) { $reviewedPaths.Add($u) }
         $reviewedPathsList = (@($reviewedPaths) | Select-Object -Unique) -join ', '
+        $deletedPathsList  = (@($deletedPaths) | Select-Object -Unique) -join ', '
     } catch {
         Write-Error "Failed to collect diff: $($_.Exception.Message)"
         exit 2
@@ -466,6 +479,14 @@ $meta = @(
     ('- files-reviewed: {0}' -f $(
         if ((Get-Variable -Name reviewedPathsList -ErrorAction SilentlyContinue) -and $reviewedPathsList) { $reviewedPathsList }
         else { '(n/a for this mode)' }
+    )),
+    # Deliberately separate from files-reviewed (round 6): only paths whose diff block
+    # carried git's own `deleted file mode` marker land here. See the extraction comment
+    # above for why a file's mere presence in files-reviewed is not enough to confirm a
+    # DELETION of it was reviewed, as opposed to some earlier modification.
+    ('- deletions-reviewed: {0}' -f $(
+        if ((Get-Variable -Name deletedPathsList -ErrorAction SilentlyContinue) -and $deletedPathsList) { $deletedPathsList }
+        else { '(none)' }
     )),
     '',
     '> Codex output, NOT verified truth. R0 requires the caller to confirm every',
