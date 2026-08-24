@@ -2,6 +2,32 @@
 
 ## 2026-08-24
 
+### AUTO_TASK_DONE: AGENTS.md 加「reviewer 2 次打回強制設計盤點」規則 + 全檔整理
+
+[任務]
+今天 ORACLE gate deletion 追蹤機制被同一顆 Codex 連續打回 8 輪（round 1-8，見本檔上方各 round 條目），操作者要求：把「reviewer 連續 2 次打回同一段程式碼 → 第 3 次前必須先做不變量分析」寫成沒有自由裁量空間的明文規則，並順便整理 `agency-os/AGENTS.md` 全檔。
+
+[已修改]
+1. `agency-os/AGENTS.md` §跨模型 oracle（line 138）—— 新增強制規則：同一 reviewer 連續回報 2 次 → 第 3 次修正前必須先做不變量分析，**禁止**用「範圍夠小」「邏輯直接沿用前一輪」當理由跳過（round 8 WORKLOG 就是這樣寫的，這條專門堵這個漏洞）
+2. `agency-os/AGENTS.md` §跨模型 oracle（line 129-134）—— 修正過期描述：ORACLE gate 原文只講「時間戳晚於最後改檔」，但今天 8 輪後刪除的檔案已改用 `path@blob-hash` 內容綁定，原文沒更新會誤導未來 session
+3. `agency-os/AGENTS.md` §代理自動工具使用規則 + §Claude工作自觸發規則 —— 去重 3 條在兩張表裡逐字重複的列（doc-sync / sg-deploy 後 playwright / wp-maintenance 後 playwright），統一留在後者（流程完成觸發，非使用者關鍵字觸發），前者加一行說明去重理由
+4. `agency-os/AGENTS.md` —— 「Session 衛生」從「跨模型 oracle」底下的 `###` 子章節升級成獨立 `##` 章節（內容是通用 context 管理，跟 Codex 協作是平行主題不是從屬）
+5. `agency-os/AGENTS.md` §Claude工作自觸發規則（line 234）+ `.claude/commands/review.md` —— 修掉一個真矛盾：AGENTS.md line 109 已經把 Review 驗證動作歸給 Codex，但另一條觸發列寫死 `/review` 只能用 critic subagent、無備援；兩處都補上「critic 連續失敗 2 次 → 改用 codex-oracle.ps1」的明文 fallback（今天 critic 該 session 連續 6 次 529 就是這個矛盾的具體案例）
+6. 跑 `scripts/doc-sync-automation.ps1 -AutoDetect`：Single Owner Policy Check PASS，無 broken link/missing Owner 警告，自動更新 12 份文件的 Related-Documents 區塊（含 AGENTS.md 自己的 `_Last synced_` 時間戳）
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 治理文件整理，無可執行邏輯；改用文件完整性檢查代替：code-fence 配對確認（`grep -c '^```'` = 2，成對）、內部 `§XXX` 章節引用逐一 grep 確認對應標題仍存在（§R0 例外段/§已知信任邊界/§Claude工作自觸發規則/§任務完成標準/§Auto-Repair紅線/§Subagent交接協議 全部命中）、`doc-sync-automation.ps1 -AutoDetect` 執行 PASS 視為本次的 REALTEST_EVIDENCE 替代：`- REALTEST_EVIDENCE: tool=Bash | cmd=doc-sync-automation.ps1 -AutoDetect | exit=0 | ms=~2000`（Single Owner Policy Check PASS，無 broken link）
+- REVIEW_DONE: critic=Deep | verdict=pass（1 finding，驗證後判定 FALSE POSITIVE）| findings=0c/0m/1n —— **外部 oracle = 真正的 `codex-oracle.ps1 -Mode review -Path`**（不是 critic subagent，照本次剛寫的 fallback 規則直接用 Codex，非繞過）；artifact：`agency-os/reports/oracle/2026-08-24-partialreview-1ec8a3ef.md`。Finding 內容：「review.md 說『mirrors AGENTS.md』但這個 diff 沒改到 AGENTS.md」——查證後確認是假警報：Codex 是對 `git diff HEAD` 跑 review，而本次 AGENTS.md 的實質改動已被 session 自動 checkpoint hook（`8af0dc09`/`c3922a25`）搶先 commit 進 HEAD，變成 Codex 眼中「這個 diff 沒有」但實際上「已經在 HEAD 裡」——用 `git show HEAD:agency-os/AGENTS.md | grep` 直接對照確認內容真的在，非漏改
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=`時間戳晚於最後一次改檔的 review artifact\|強制跑 .\/review.（critic subagent` | hits=2（皆為 AGENTS.md 本檔內部：一處是刻意保留的「修改」情境描述仍正確、一處是本次修正的目標列本身；另掃 `critic.*外部 oracle` 命中的 12 個檔案全數為歷史 WORKLOG/報告存檔，非現況治理文件，不需連動修正）
+
+[剩餘風險]
+- `.claude/commands/review.md` 的 fallback 是文字指示（Claude 讀了才會照做），不是機械閘強制——跟 AGENTS.md 大部分規則同一個信任邊界（見 §已知信任邊界），非本次新增的風險類別
+- AGENTS.md 開頭直接跳 R0 → R4，沒有 R1-R3（那三條在 CLAUDE.md），今天沒有處理這個跨檔編號落差，因為範圍是「整理 AGENTS.md 本身」，牽動 CLAUDE.md 是另一個決定，留待之後視需要處理
+- 4 張觸發表（代理自動工具使用規則 / Claude工作自觸發規則 / 工作類型→Agent路由表 / 問題症狀→Runbook路由表）維持分開，只去重了確認重複的 3 列，沒有做更大範圍的表格合併——判斷 4 張表語意各自獨立（使用者關鍵字 / Claude自我觸發 / 工作類型分類 / 症狀對應），硬合併會降低可掃描性，不是遺漏
+
+[rollback]
+`git diff 82cccf38 HEAD -- agency-os/AGENTS.md` 看本次全部異動；`git diff -- .claude/commands/review.md` 看 fallback 新增；皆為純文字修改，無程式邏輯依賴，可用 `git revert` 個別回復。
+
 - 01:06 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-08-24.md
 
 ### meeting-service：API 自動處理選項（給客戶用）+ 網路版安裝手冊
