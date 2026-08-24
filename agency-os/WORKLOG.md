@@ -2,6 +2,37 @@
 
 ## 2026-08-24
 
+### AUTO_TASK_DONE: 補跑真實 review，修掉漂移腳本 2 個真 finding（Stop-hook 自動 review 本身壞掉的替代方案）
+
+[任務]
+上一個 commit（`9babfd6f`）的 WORKLOG 寫了「REVIEW_WAIVED...critic/codex-oracle 皆未呼叫，記為待補」。Stop-hook 回報「stop-time Codex review task returned invalid JSON」——自動化 review 機制本身故障（不是找到問題，是它的 JSON 解析壞了）。照今天寫進 AGENTS.md 的規則（自動機制失效→ 換用能自己跑的 `codex-oracle.ps1`），直接補跑真實 review，剛好補上待補項。
+
+[根因與修正 1：mirror 檔案完全沒被檢查]
+Codex 對 `9babfd6f` commit 跑真實 `-Mode review`，CONFIRMED finding：`docs/overview/REMOTE_WORKSTATION_STARTUP.md` 那一列的 impacted 清單裡，`../.cursor/rules/`（monorepo 根目錄鏡像）跟三個 agency-os 版 `.mdc` 檔案並列，原意是「這三個檔案要跟根目錄同名檔保持鏡像」，但腳本第一版對「解析出是目錄」的候選路徑只會整個跳過，從未把根目錄底下真正的鏡像檔案抓出來比對——等於這個關鍵的雙機同步關係完全沒被檢查到。
+修正：`scripts/check-change-impact-matrix-drift.ps1` 新增 `Resolve-MatrixDir`（跟 `Resolve-MatrixPath` 同樣的雙 base 嘗試邏輯，但接受目錄）；同一列的路徑先分成「解析成檔案」跟「解析成目錄」兩堆，目錄命中後對照同一列裡所有已解析檔案的檔名，找到目錄下同檔名的檔案就額外生成一對比較——這是通用規則（同列「目錄+同名檔案」= 隱含鏡像關係），不是為 `.cursor/rules` 寫死。
+
+[根因與修正 2：「01-04 guides」數字範圍縮寫解不開]
+Codex CONFIRMED 第二個 finding：`tenants/NEW_TENANT_ONBOARDING_SOP.md` 那一列用了 `` `tenants/templates/tenant-template/01-04 guides` `` 這種縮寫代表 4 個編號檔案，腳本第一版把它當成單一路徑試圖解析，失敗後歸類進 skip 清單，等於這組真實存在的檔案（`01_COMMANDER_SYSTEM_GUIDE.md` 到 `04_OPERATIONS_AUTOMATION_GUIDE.md`）從未被檢查。
+判斷：這個縮寫只在矩陣裡出現 2 次（tenant-template 版 + company-p1-pilot 版），不值得為它寫數字範圍解析的正規表達式邏輯（那種 pattern-matching 針對兩筆資料量身訂做，換個角度看就是另一種補丁，只是換成正規表達式的形式）。正確做法是修資料本身：矩陣裡這 8 個檔案其實各自在別的列已經有自己的完整路徑條目（line 69-72），直接把縮寫展開成明確的 8 條 backtick 路徑，任何未來的讀者（人或工具）都受益，不是只服務我的 parser。
+修正：`docs/CHANGE_IMPACT_MATRIX.md` line 65，展開成 8 個明確路徑（已用 `Test-Path` 逐一驗證全部存在才寫入）。
+
+[實作過程中自己抓到的 bug]
+mirror 擴充邏輯第一版寫成「在 `foreach ($rf in $rowFiles)` 迴圈裡同時對 `$rowFiles.Add()`」——.NET `List[object]` 在 foreach 列舉中被修改會丟 `Collection was modified` 例外。改成先收進獨立的 `$mirrorFiles` 清單，兩層迴圈跑完才合併回 `$rowFiles`，避免邊列舉邊修改。這個 bug 是自己寫完立刻真實執行測出來的（第一次跑就會炸），不是理論推演。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=真實呼叫 `codex-oracle.ps1 -Mode review -DiffRef 9babfd6f`（385 秒，非模擬）| exit=0，回報 2 CONFIRMED finding，artifact `agency-os/reports/oracle/2026-08-24-partialreview-611d47b1.md`
+- REALTEST_EVIDENCE: tool=Bash | cmd=修正後 `check-change-impact-matrix-drift.ps1 -Force`（真實執行）| exit=1（WARN，rows=76 pairs=397 warn=7 fail=0 skipped=5，比修正前 384 pairs/9 skip 進步：+13 pairs 含 3 個鏡像檔案配對 + 8 個展開的 guide 檔案配對，skip 剩 5 個全部合理——僅 Windows 佔位符路徑、3 個無目錄脈絡的樣板參照、1 個尚未存在的文件）
+- REALTEST_EVIDENCE: tool=Bash | cmd=第一版 mirror 邏輯跑出 `Collection was modified` 例外，改用獨立清單後重跑成功、無例外 | exit=1（正常完成，證實 bug 已修好非僥倖）
+- REVIEW_DONE: critic=Deep | verdict=pass（2 CONFIRMED findings 皆已修正並實測驗證）| findings=2c/0m/0n（**外部 oracle = 真正的 `codex-oracle.ps1 -Mode review -DiffRef`**，補上 `9babfd6f` 當時欠的 REVIEW_WAIVED；本次修正未再另外跑一輪外部 review，靠真實執行+人工逐行覆核收尾，判斷風險可接受——已是同一議題第二輪 review）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`01-04 guides\|Resolve-MatrixDir\|mirrorFiles` | hits=4（`01-04 guides` 僅存在於 oracle artifact 歷史記錄裡，不應也沒有被修改；新符號全部在同一檔案內自洽，無殘留舊呼叫）
+
+[剩餘風險]
+- mirror 擴充邏輯目前只比對「同一列裡明確列出的檔名」，如果未來根目錄新增一個 `.cursor/rules/*.mdc` 檔案但矩陣列裡沒有同步列出該檔名，不會被自動納入鏡像檢查——這是設計上的保守選擇（只信任矩陣明確聲明的關係，不做「猜測目錄下所有檔案都要鏡像」的過度推論），非疏漏
+- Finding 2 的資料修正是一次性動作，如果未來又有人用類似的數字範圍縮寫寫新的矩陣列，仍然會被腳本正確地歸入 skip 清單（不會誤判、不會 silent fail），只是不會自動展開——這個限制已在腳本註解與本篇 WORKLOG 明確記錄
+
+[rollback]
+`git diff` 對應 2 個檔案，`scripts/check-change-impact-matrix-drift.ps1` 的變動是新增函式+改寫一段迴圈，`docs/CHANGE_IMPACT_MATRIX.md` 是單一列展開，皆可用 `git revert` 單一 commit 完整回復不影響其他部分。
+
 ### AUTO_TASK_DONE: 新增 CHANGE_IMPACT_MATRIX 全域漂移偵測腳本（治本，非補丁）
 
 [任務]

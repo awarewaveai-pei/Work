@@ -1,8 +1,8 @@
 ﻿# Change Impact Matrix Drift - 2026-08
 
-- Generated: 2026-08-24 19:17:28 +08:00
+- Generated: 2026-08-24 19:35:29 +08:00
 - Overall: **WARN**
-- Rows parsed: 76 | Pairs checked: 384 | Pairs skipped (unresolved path): 9
+- Rows parsed: 76 | Pairs checked: 397 | Pairs skipped (unresolved path): 5
 - Thresholds: WARN > 90 days, FAIL > 180 days (one-directional: main doc newer than impacted file)
 
 ## Flagged pairs (7 WARN, 0 FAIL)
@@ -17,22 +17,18 @@
 | WARN | `docs/operations/cursor-mcp-and-plugin-inventory.md` | `.cursor/rules/64-architecture-mcp-routing.mdc` | 2026-08-24 | 2026-04-18 | 127.8 |
 | WARN | `../docs/spec/raw/Cursor  Rules for AI/README-部署說明.md` | `.cursor/rules/64-architecture-mcp-routing.mdc` | 2026-08-24 | 2026-04-18 | 127.8 |
 
-## Skipped (9 entries -- path did not resolve to an existing file)
+## Skipped (5 entries -- path did not resolve to an existing file)
 
 Not an error: template placeholders (專案 X.md), non-existent-yet docs, and the one intentional
 Windows-absolute path in the matrix (AWARE_WAVE_CREDENTIALS.md) all land here by design.
 
 | 主文件 | Raw impacted text | Reason |
 |--------|--------------------|--------|
-| `docs/overview/REMOTE_WORKSTATION_STARTUP.md` | `../.cursor/rules/` | impacted path did not resolve to an existing file |
-| `docs/overview/REMOTE_WORKSTATION_STARTUP.md` | `agency-os` | impacted path did not resolve to an existing file |
-| `docs/wordpress_mainwp_plan.md` | `C:\Users\USER\Desktop\AWARE_WAVE_CREDENTIALS.md` | impacted path did not resolve to an existing file |
-| `docs/sales/cr-pricing-rules.md` | `01_SCOPE_AND_CR.md` | impacted path did not resolve to an existing file |
-| `docs/standards/wordpress-custom-dev-guidelines.md` | `02_EXECUTION_PLAN.md` | impacted path did not resolve to an existing file |
-| `docs/standards/wordpress-custom-dev-guidelines.md` | `03_HANDOVER_CRITERIA.md` | impacted path did not resolve to an existing file |
-| `docs/metrics/kpi-margin-dashboard-spec.md` | `FINANCIAL_LEDGER.md` | impacted path did not resolve to an existing file |
-| `tenants/NEW_TENANT_ONBOARDING_SOP.md` | `tenants/templates/tenant-template/01-04 guides` | impacted path did not resolve to an existing file |
-| `tenants/NEW_TENANT_ONBOARDING_SOP.md` | `tenants/company-p1-pilot/01-04 guides` | impacted path did not resolve to an existing file |
+| `docs/wordpress_mainwp_plan.md` | `C:\Users\USER\Desktop\AWARE_WAVE_CREDENTIALS.md` | impacted path did not resolve to an existing file or directory |
+| `docs/sales/cr-pricing-rules.md` | `01_SCOPE_AND_CR.md` | impacted path did not resolve to an existing file or directory |
+| `docs/standards/wordpress-custom-dev-guidelines.md` | `02_EXECUTION_PLAN.md` | impacted path did not resolve to an existing file or directory |
+| `docs/standards/wordpress-custom-dev-guidelines.md` | `03_HANDOVER_CRITERIA.md` | impacted path did not resolve to an existing file or directory |
+| `docs/metrics/kpi-margin-dashboard-spec.md` | `FINANCIAL_LEDGER.md` | impacted path did not resolve to an existing file or directory |
 
 ## Notes
 
