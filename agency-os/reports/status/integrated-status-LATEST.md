@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-08-15 21:19:40
+- Generated: 2026-08-24 20:12:00
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -219,100 +219,92 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-08-15.md
-# Daily Note - 2026-08-15
+## 5) memory/daily/2026-08-24.md
+# Daily Note - 2026-08-24
 
 ## Done today
-（session 窗口：2026-08-12 AO-RESUME → 2026-08-15 AO-CLOSE，跨 3 天）
+**Session window = 2026-08-15 AO-CLOSE → 2026-08-24 AO-CLOSE（9 天、199 commits、跨多個 session，上次 AO-RESUME 沒有正確推進導致這段從沒真正收工過）。完整敘事見 `memory/CONVERSATION_MEMORY.md` 2026-08-24 條目。**
 
-### 事故根治
-- **EU 全機卡死** — `trigger-clickhouse` 吃滿 1 CPU 限額（101.79%），EU load 4.9 / swap 3082MB。症狀卻是「SG 服務 timeout」；鑑別關鍵：EU→SG **ICMP 0% 遺失但 TCP:80 掛 11/20**，同時筆電→SG **20/20 全通**。根因是它在合併自己的遙測：`system` **16.89 GiB / 6.4 億列** vs 應用資料 `trigger_dev` 僅 **49 MiB / 62 萬列**（345 倍），`trace_log` 每小時 124 萬列。修法＝關掉產生源（非再清一次資料）。結果 CPU **101.79%→4.5%**、load **4.03→0.50**、`system` 表 **16.90 GiB→79.65 MiB**、EU→SG TCP **20/20**
-- **SG 磁碟 90%** — offsite 備份兩邊都只清自己家、沒人清對方推來的副本（SG 囤 97 份/30G、EU 囤 96 份/31G）。兩支腳本對稱補 `OFFSITE_RETAIN_DAYS`。SG **90%→48%**、EU **79%→65%**
+08-16～08-23（其他 session，非本次對話經手）：Soulful 搬站 CF zone+nameserver 切換 14 項 PASS、信箱實測 10/10 揪出寄不出信 bug 並修好、還原演練 PASS+補齊備份缺口；dedicated 主機規格上修至 128GB ECC，**08-18 定案立刻買月租**（機器截至今日仍未買）；跨模型 oracle 系統首建；ClickHouse 監控修復；transcript 保留期 30→365 天修正。
 
-### 監控（本輪最大發現：告警一直有偵測到，只是沒有出口）
-- `cgroup_ram_in_use` 在 clickhouse 上 **08-10→08-15 觸發 483 次**、峰值 93.5% —— 但 `notification.to = silent`（netdata stock 模板預設）
-- **EU 根本沒有通知出口**：`custom_sender()` 是原廠空殼、`DEFAULT_RECIPIENT_CUSTOM` 空 → 自安裝以來所有告警石沉大海
-- 修完後實測時又抓到兩個自造 bug：CRLF 讓 token 尾端多 `\r`（Bearer 靜默失敗）、EU→ops-inbox 被 CF Bot Fight Mode 擋 403（與 08-12 Kuma 假 DOWN 同 class）→ 腳本加 `OPS_INBOX_RESOLVE`
-- Telegram 手機告警靜默：`secrets-vault -Action get` 的**遮罩值**被當真 token 用（3 支腳本 + 12 份文件同一 class）
-
-### 其餘
-- **Origin lockdown** — 腳本無允許清單，而 9 個 Kuma monitor + EU netdata 剛改成直打 SG origin，直接套用會自我封鎖。允許清單由 nginx log **152 個非 CF 來源全數分類**得出（最易漏：docker 閘道 1,987 次＝SG 自己的健檢）
-- **`Resolve-Path` 缺 `-LiteralPath` 170 處/96 檔**全清 — 先分類確認 **0 處故意用萬用字元**才批改
-- **workflows 部署到 EU prod** — 8/12 修的 35 個漏洞才真正生效
-- **MCP 路由漂移歸零** — 一半是 glob 誤判、一半是真缺 3 個高風險 MCP
-- **`check-clickhouse-health.ps1`** 接入 AO-RESUME，監測 bug class（system/app 比值）防第五次復發
-- **Soulful**：帳單推翻「$80/年」假設 → hosting **2026-11-12** 硬死線；信箱存續已查證；DNS 13 筆對照表 + 備份三地驗證；2026-06-13 的 716 行 brief 作廢前提接回現況
-- **離職單機化**：治理文件改單機（跨機機制保留休眠）；桌機憑證依三項確認結案
+08-24（今日，全程參與）：
+1. **ORACLE gate deletion 追蹤機制 8 輪修正**（`verify-closeout-completeness.ps1`+`codex-oracle.ps1`）：從「deletion 完全繞過 gate」一路修到「path@blob-hash 內容綁定」，途中順手發現 `core.quotepath` 既有 bug 讓特殊字元檔名完全不觸發 REALTEST/ORACLE 三個閘（影響 632+ 真實檔案）。反思：8 輪本質是同一設計問題被拆成 8 個小修，已把「reviewer 連續打回 2 次強制不變量分析」寫進 AGENTS.md 明文規則。
+2. **AGENTS.md 治理整理**：延續 2026-07-02 已核准的瘦身方法論（未重新發明拆檔案架構，因為那個方案 7 週前已被明確否決），去重+修正過期描述+補 R1-R3 說明+修 `/review` fallback 矛盾；順手修好 stale 7 週的 `TOOL_TRIGGER_MAP.md`。
+3. **通用漂移偵測腳本**（`scripts/check-change-impact-matrix-drift.ps1`）：使用者問「這樣就夠了嗎」後新增，解析 `CHANGE_IMPACT_MATRIX.md` 全部 ~85 條關係防止再有文件像 TOOL_TRIGGER_MAP.md 一樣悄悄 stale。過程中兩度被 stop-hook 打回真 finding，其中一次是自己教程式碼用「目錄+同名檔案」推測隱含關係反而製造假配對，最終改成撤掉推測邏輯、把矩陣資料本身寫明確。
 
 ## Current state
-- health-check **100% (372/372)**；git 乾淨、與 origin 一致（`0bbc6bbd`）
-- SG 磁碟 55%／EU 磁碟 56%、load 0.63、ClickHouse 19.6%／Kuma 近 1 小時 **0 DOWN**
-- 告警鏈已通：下次出事會進手機，且指向源頭而非下游症狀
+- 全部改動已 commit + push 到 `main`（無 force push、無跳過 gate）
+- `check-change-impact-matrix-drift.ps1` 已接進 `ao-resume.ps1` 月度檢查第 5 項，下次月度巡檢會自動涵蓋
+- AGENTS.md 新增的「reviewer 連續 2 次強制不變量分析」規則已生效
+- dedicated 主機仍未購買（延續 08-15 未解項，非今日新增）
 
 ## Next steps
-1. **買不買 dedicated 機** —— 唯一擋路的決策，同時影響 Soulful 網站去處（死線 2026-11-12）、客服 U6、EU 搬機、退兩台雲端
-2. Soulful DNS 搬 Cloudflare（①你在 CF 加 zone → ②我照對照表建 13 筆 → ③你核對 → ④你改 nameserver）
-3. **未查**：SG load 3.2 於 2 核機器，由 `dockerd`+`containerd` 而非任何容器造成。session 開始即存在（我當時追磁碟問題時漏掉），無使用者影響
+- （非急迫）逐一回填 `memory/daily/2026-08-16.md`～`2026-08-23.md` 8 個空白 stub，或接受這是已知歷史缺口
+- （已開獨立任務 task_b82a2211）`scripts/ao-resume.ps1` 17 個既有未受保護 git 輸出擷取點待修
+- 下次月度巡檢留意 `check-change-impact-matrix-drift.ps1` 首次真實跑出的 7 個 WARN 候選（`.cursor/rules/*.mdc` 4 月未更新 vs 索引文件近期改動）是否需要真的處理
+- dedicated 主機採購仍是 Soulful 搬站/客服 U6/EU 搬機的共同阻塞點
 
 ## Open tasks (auto-generated at 08:00 TPE)
-- [ ] **【待套用｜DB migration】migration 0060 apply 到 EU Supabase prod**
-- [ ] **【未開始｜Phase 1 MVP】Cold Outreach Workbench — 冷開發完整鏈**
-- [ ] **【進行中｜軟體先行·U0 完成】全自動客服系統**
-- [ ] **【gated｜8月｜EU→Dedicated 搬機 + 整併退雲端】**
-- [ ] **🔴【資安｜離職善後】公司桌機退場憑證盤點與輪替決策**
-- [ ] **【gated｜8月｜等買二手機才繼續建 customer service U6 Chatwoot】**
-- [ ] **【明日 2026-06-17｜資安複盤】Defender 嚴重木馬 `Trojan:Win32/PowhidSubExec.B` 來源查清與善後**
-- [ ] **【進行中｜POD 一鍵自動上架】設計圖 → Woo + Printful 多款多色全自動**
-- [ ] **【人工｜Postiz Task 2 OAuth app 審核】各平台 dev app 提交**
-- [ ] **【人工｜Postiz 測試草稿清理】**
-- [ ] **【操作者｜Postiz 帳號 → 客戶 Hub 連結】**
-- [ ] **【進行中｜內容引擎積木化】搜尋積木 registry 已 live，剩來源/UI/第二批**
-- [ ] **【驗證債】Canvas 編輯器 `/tools/canvas` 整輪瀏覽器實測**
-- [ ] **【明日】soulfulexpression.org 遷移到 Cloudflare（DNS 先、registrar 後）**
-- [ ] **【進行中｜app.aware-wave 一鍵架站總藍圖】MASTER PLAN Stage 0 閉環已驗，Stage 1 進行中**
-- [ ] **wp-bridge plugin 補 `/product` dry_run 支援**
-- [ ] **【POD A1 已完工｜剩 e2e + A2】**
-- [ ] **【POD A2 confirm phase】**
-- [ ] **smoke 04-onboard spec 補 app session 登入**
-- [ ] **wp-bridge 續做 operation：featured image / update-existing-post / product update+delete**
-- [ ] **【POD Studio 自建動工】**
-- [ ] **【POD 服飾 Phase 1-4 後續｜2026-06-15 已部署 37dfba85】**
-- [ ] **TASKS [x] 自動歸檔 + 重複行偵測閘（archive-completed-tasks.ps1，R0 已批方案A）**
-- [ ] **【診斷】Mockup Studio 功能異常**
-- [ ] **🎨 Image Output Pipeline（Tarot/POD 色調→WebP/CMYK PDF/Fabric.js Canvas）**
-- [ ] **SEO/GEO 引擎產品化 + Soulful 定位/文章**
-- [ ] **Auto-Repair Post-Phase 4 (M2 per-source HMAC + M4 fingerprint)**
-- [ ] **wp-bridge 外掛：接進 app.aware-wave.com Ops Dashboard + aware-wave.com 展示頁 + 販售**
-- [ ] **M2/M4 Phase 1 code 完成；剩 Phase 2 rollout + Phase 3 constraint swap**
-- [ ] **Hetzner dispatcher 上線前 follow-up（啟用 LOBSTER_EXECUTE_* 前必做）**
-- [ ] **【READY，未做】把 Hetzner 一鍵租機嵌進 app.aware-wave.com 一鍵架站按鈕（Phase 5）**
-- [ ] **【計畫完成，未實作】客戶機「開機後全棧部署+維護」層（provider 無關）**
-- [ ] **app.aware-wave onboarding/provisioning IA 重整**
-- [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤**
-- [ ] **既有站接手（Soulful Expression Art Therapy）**
-- [ ] **既有站接手 Day 1（Soulful Expression）**
-- [ ] **蒙古客戶 Cloudways 實際建站：待客戶刷卡配合**
-- [ ] **新站建置（Scenery Travel Mongolia）**
-- [ ] **新站建置 Day 1（Scenery Travel Mongolia）**
-- [ ] **Next-Gen 試點**
-- [ ] **`tenants/templates/` v2**
-- [ ] **`lobster-factory` A10-2 商業閉環實跑**
-- [ ] **【2026-06-05 開出】塔羅牌工具 → MEGA → WooCommerce 三階段路線圖**
-- [ ] **【2026-05-30 開出】endpoint-alert.sh 自動化部署機制**
-- [ ] **三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability）**
-- [ ] **【bug class｜2026-08-12 開出】`Resolve-Path` 未用 `-LiteralPath`**
-- [ ] **【🟠 Major M2-M4/M7-M10 + 🟡 Minor m2-m6/m8-m11】**
-- [ ] **（Phase 4 觀察期）AwareWave 自動告警維修系統 v3.2**
-- [ ] **建立跨國稅務與法遵顧問審核流程（法律文件外部審核）**
+- [ ] 【已知風險｜操作者已決定不輪換｜2026-08-17】`~/.codex/config.toml` 明文憑證
+- [ ] 【待套用｜DB migration】migration 0060 apply 到 EU Supabase prod
+- [ ] 【未開始｜Phase 1 MVP】Cold Outreach Workbench — 冷開發完整鏈
+- [ ] 【進行中｜軟體先行·U0 完成】全自動客服系統
+- [ ] 【gated｜8月｜EU→Dedicated 搬機 + 整併退雲端】
+- [ ] 🔴【資安】2026-08-15 transcript 憑證外洩 — 三項待輪換
+- [ ] ⏭️ Soulful 搬站：機器買到後的接手點（硬死線 2026-11-12，買機死線 9/30）
+- [ ] 【gated｜8月｜等買二手機才繼續建 customer service U6 Chatwoot】
+- [ ] 【明日 2026-06-17｜資安複盤】Defender 嚴重木馬 `Trojan:Win32/PowhidSubExec.B` 來源查清與善後
+- [ ] 【進行中｜POD 一鍵自動上架】設計圖 → Woo + Printful 多款多色全自動
+- [ ] 【人工｜Postiz Task 2 OAuth app 審核】各平台 dev app 提交
+- [ ] 【人工｜Postiz 測試草稿清理】
+- [ ] 【操作者｜Postiz 帳號 → 客戶 Hub 連結】
+- [ ] 【進行中｜內容引擎積木化】搜尋積木 registry 已 live，剩來源/UI/第二批
+- [ ] 【驗證債】Canvas 編輯器 `/tools/canvas` 整輪瀏覽器實測
+- [ ] 【進行中｜app.aware-wave 一鍵架站總藍圖】MASTER PLAN = `docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`
+- [ ] wp-bridge plugin 補 `/product` dry_run 支援
+- [ ] 【POD A1 已完工｜剩 e2e + A2】
+- [ ] 【POD A2 confirm phase — 🔴 金流紅線，測試結束 + 操作者明示批准才做】
+- [ ] smoke 04-onboard spec 補 app session 登入
+- [ ] wp-bridge 續做 operation：featured image
+- [ ] 【POD Studio 自建動工】
+- [ ] 【POD 服飾 Phase 1-4 後續｜2026-06-15 已部署 37dfba85】
+- [ ] TASKS [x] 自動歸檔 + 重複行偵測閘（archive-completed-tasks.ps1，**R0 已批方案A**，照 packet 直接動工免重提案）
+- [ ] 【診斷】Mockup Studio 功能異常 — server-side 已排除（2026-06-16），卡操作者症狀
+- [ ] 🎨 Image Output Pipeline
+- [ ] SEO/GEO 引擎產品化 + Soulful 定位/文章
+- [ ] Auto-Repair Post-Phase 4 (M2 per-source HMAC + M4 fingerprint) — Batch 3 已完成
+- [ ] wp-bridge 外掛：接進 app.aware-wave.com Ops Dashboard + aware-wave.com 展示頁 + 販售
+- [ ] M2/M4 Phase 1 code 完成；剩 Phase 2 rollout + Phase 3 constraint swap + 3 side item
+- [ ] **Hetzner dispatcher 上線前 follow-up（啟用 LOBSTER_EXECUTE_* 前必做，現 gated OFF）**
+- [ ] 【READY，未做】把 Hetzner 一鍵租機嵌進 app.aware-wave.com 一鍵架站按鈕（Phase 5）
+- [ ] 【計畫完成，未實作】客戶機「開機後全棧部署+維護」層（provider 無關）
+- [ ] app.aware-wave onboarding/provisioning IA 重整
+- [ ] （出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤
+- [ ] 🔴【硬死線 2026-11-12】Soulful 網站搬離 Hostinger（hosting 不續約）
+- [ ] 既有站接手（Soulful Expression Art Therapy）
+- [ ] 既有站接手 Day 1（Soulful Expression）
+- [ ] 蒙古客戶 Cloudways 實際建站
+- [ ] 新站建置（Scenery Travel Mongolia）
+- [ ] 新站建置 Day 1（Scenery Travel Mongolia）
+- [ ] Next-Gen 試點 — Day 2 雲端 staging 實機驗收（兩案）
+- [ ] `tenants/templates/` v2 —— 【未開始】依試點回填後再開
+- [ ] `lobster-factory` A10-2 商業閉環實跑 —— 【未開始】
+- [ ] 【2026-06-05 開出】塔羅牌工具 → MEGA → WooCommerce 三階段路線圖
+- [ ] 【2026-05-30 開出】endpoint-alert.sh 自動化部署機制
+- [ ] 三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability）
+- [ ] 【2026-08-15 開出】SG dockerd/containerd 持續吃 CPU（2 核機器 load 3.2）
+- [ ] 【🟠 Major M2-M4/M7-M10 + 🟡 Minor m2-m6/m8-m11】
+- [ ] （Phase 4 觀察期）AwareWave 自動告警維修系統 v3.2 — Phase 4 觀察期進行中
+- [ ] 建立跨國稅務與法遵顧問審核流程（法律文件外部審核）
 
 ## Yesterday context
-最後 WORKLOG 紀錄為 2026-08-12 monthly-system-review：gates=SKIPPED (ReportOnly)；Supabase memory 34.26%（< 85% 健康）。無當日人工操作記錄，系統定期巡檢正常。
+最後 WORKLOG 條目（2026-08-17）：自動週報代理生成 `reports/weekly/weekly-summary-2026-08-17.md`，無 code 改動。上一個有實質工作的 session 未見於最後 20 行，WORKLOG 最新條目為報告自動化。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-08-15 21:17:20`
+- Time: `2026-08-24 20:06:44`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -322,29 +314,13 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260815-211715.md`
-- Closeout: `reports/closeout/closeout-20260815-211720.md`
+- Health: `reports/health/health-20260824-200640.md`
+- Closeout: `reports/closeout/closeout-20260824-200643.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-
-| 系統 | 隔離機制 | 狀態 |
-|---|---|---|
-| Ops Clients `/ops/clients/[slug]` | URL slug → server-side org lookup | ✅ 無洩漏 |
-| Outreach | `?org=UUID` + `effectiveOrgId()` + `assertOrgAccess()` | ✅ 無洩漏 |
-| Credentials | S2 batch-5 已修 | ✅ 無洩漏 |
-| Build Runs | S2 batch-5 已修 | ✅ 無洩漏 |
-| Approvals | S2 batch-5 已修 | ✅ 無洩漏 |
-| Content Drafts | **S2 batch-6 本次修** | ✅ 修後無洩漏 |
-| Content Sources | 全域共享（設計如此，無 org 欄） | ✅ 設計正確 |
-| ops/repairs/* | ❌ repair_runs 無 organization_id 欄 | ⏳ defer S3 DB migration |
-
-**Stage 1 onboarding 現況**: 前端程式「跳回第一步」bug 已在前一個 session 修好（handleTriggerBuild 加了 guard + error display）。2 筆卡住的 intake_forms 仍在 DB 待手動 retry。
-
----
-
 ### fix(security): S5 — assertOrgAccess guards on social + integrations routes ✅
 
 **根本問題**: 5 個 API 路由以 `clientId` / `organizationId`（= org UUID）作為查詢/寫入鍵，但只有 ops-role gate（無 tenant-level org guard）。Client org 的 owner/admin/operator 若通過 role gate，可傳入任意 org UUID 讀取/修改其他租戶的 Postiz 社群連接或 integration binding（IDOR）。
@@ -387,5 +363,21 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-08-15 13:19:29 UTC_
+_Last synced: 2026-08-24 12:11:50 UTC_
+
+## 2026-08-17
+- 自動週報代理：weekly summary 生成 → reports/weekly/weekly-summary-2026-08-17.md
+  - REALTEST_WAIVED: DOC_ONLY -- automated report generation, no code change
+  - REVIEW_WAIVED: DOC_ONLY -- report content verified against WORKLOG/TASKS source files
+  - BUGHUNT_WAIVED: DOC_ONLY -- no code change
+
+
+
+
+
+
+
+
+
+
 

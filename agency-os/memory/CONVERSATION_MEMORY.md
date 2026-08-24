@@ -510,7 +510,7 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-08-15 13:17:19 UTC_
+_Last synced: 2026-08-24 11:57:12 UTC_
 
 ## 2026-06-16 AO-CLOSE memory — session window 2026-06-11T05:07Z → 2026-06-16 afternoon
 
@@ -577,4 +577,21 @@ _Last synced: 2026-08-15 13:17:19 UTC_
   **⑥ Soulful**：帳單截圖推翻「$80/年」假設 —— 三筆獨立訂閱、自動續約全關、hosting **2026-11-12 到期**且操作者決定不續約 → 硬死線。信箱存續以官方文件三項證據查證（不受影響、不需開 ticket）。已備妥 DNS 13 筆對照表（AAAA 刻意不搬＝IPv6 永久解）+ DB 288 表/uploads 11,001 檔備份移出 Hostinger 三地雜湊一致。並把 2026-06-13 的 716 行 brief 作廢前提接回現況，消除三套真相。
   **⑦ 離職單機化**：公司桌機退場，治理文件改為單機（跨機機制保留休眠）；桌機憑證依操作者三項確認結案。
   **未解**：買不買 dedicated 機（擋 Soulful 去處/客服 U6/EU 搬機/退雲端）；SG load 3.2 於 2 核機器、由 dockerd+containerd 而非任何容器造成（session 開始即存在，我當時漏掉，無使用者影響，未查）。
+
+- **2026-08-24（AO-CLOSE，窗口 08-15 AO-CLOSE → 08-24，199 commits，跨 9 天多 session）**
+
+  **08-16～08-23（其他 session，git log 摘要，非本次對話直接經手）**：Soulful 搬站續進度——CF zone 建立+nameserver 切換驗證 14 項全 PASS、信箱實測 10/10 揪出既存寄不出信 bug 並修好（外掛自帶通知走同一條壞通道，改站外監控）、還原演練 PASS+補齊程式碼原本完全沒備份的缺口、搬站執行手冊補完。Dedicated 主機採購：規格從 64GB 上修到 128GB ECC（原機型表作廢），KS-6 對照官方文件交叉查證補兩項硬化步驟，**08-18 定案立刻買月租不觀望到 8/31**（機器本身截至 08-24 仍未買，唯一阻塞）。跨模型 oracle 系統首建（`codex-oracle.ps1` + AGENTS 讀寫分界分工規則），首戰即抓到 smoke 偵測器啞掉卻報 PASS 的 bug。ClickHouse TTL/orphan table 監控修復（critic 驗證）。安全：2026-08-15 transcript 憑證外洩記錄三項待輪換、transcript 保留期 30→365 天修正（已致 9 個 pinned session 內容永久消失，屬已知代價非本次造成）。AGENTS.md 補 session 衛生四條（context 每輪重送的槓桿）。**這 8 天期間沒有任何 AO-CLOSE**，`memory/daily/2026-08-16.md`～`2026-08-23.md` 全部停在 `(fill in at AO-CLOSE)` 骨架，本次僅回填今日檔案，不逐一回填（見下方剩餘風險）。
+
+  **08-24（本次對話，全程參與）—— 圍繞「同一個 ORACLE gate 洞被同一顆 Codex 連續打回 8 輪」與後續「AGENTS.md 治理整理」兩個主軸**：
+
+  **① ORACLE gate deletion 追蹤機制，8 輪修正（`verify-closeout-completeness.ps1` §ORACLE gate + `codex-oracle.ps1`）**：round1 deletion 完全繞過 gate（`$unverifiable` 收集後從未讀取）；round2 修過頭變成永久卡死（deletion 因無 mtime 無法判定，硬擋等於強制每次都要 waiver）；round3 改用 `.git/index` mtime 當 staging 時間代理（先實測確認 `git diff --cached` 不動 index、只有 `git add/rm` 才動）；round4 發現時序對得上不等於內容有被審過，改抓 `deletions-reviewed` 內容確認；round5 unicode/空格檔名因 git quoting 誤判，改用 `core.quotepath=false`（順手發現這個既有 bug 讓 REALTEST/ORACLE 三個閘對特殊字元檔名完全沒生效，影響本 repo 至少 632 個真實檔案）；round6 deletions-reviewed 只綁路徑，同日「刪除→復原→改內容→再刪除」會被舊記錄誤證，改綁 `path@blob-hash`；round7 舊格式 bare-path fallback 重新打開 round6 剛關的洞，收斂成「連我們自己都算不出 hash 才退回純路徑」；round8 補正 round7 引用了一份只存在 scratch 測試目錄、從未進 repo 的 artifact 路徑（過程中發現 Codex CLI 版本落後 26 個小版號導致卡死，`npm install -g @openai/codex` 更新後恢復正常）。全程累計 28+ 組真實整合情境測試（非模擬）。
+  **反思（使用者當場點破）**：8 輪換來 3 小時，本質是同一個設計問題（「怎麼證明這次刪除真的被審過」）被拆成 8 個獨立小修，沒有在 round 3 左右停下做不變量分析。已把「同一 reviewer 連續回報 2 次 → 第 3 次前必須先做不變量分析，禁止用『範圍小』當理由跳過」寫進 AGENTS.md 明文規則，直接堵這個漏洞——round 8 自己就是用「範圍小」搪塞過去的具體反例。同時確認 critic subagent（該 session 連續 6 次 529）與 Codex-the-oracle 是兩條不同資源，前者掛掉不代表協作機制本身失敗，已把「critic 連續失敗 2 次 → 換用 `codex-oracle.ps1`」的 fallback 寫進 AGENTS.md 與 `.claude/commands/review.md`。
+
+  **② AGENTS.md 治理整理**：原本想把 4 張 trigger table 拆去獨立懶載入檔案省 token，讀到 `reports/audit/agents-slimming-proposal-2026-07-02.md` 才發現這個方案 7 週前已被明確否決（AGENTS.md 每 session 自動載入、獨立檔案不會，外移=規則對 AI 隱形=蒸發風險比 token 成本更嚴重）——改用同一套已核准的 A/B/C/D 方法論做延續性整理（去重 4 對新增的重複列、修正過期的 ORACLE gate 描述、補 R1-R3 編號說明、修掉 `/review` 只能用 critic 無 fallback 的矛盾）。順手發現 `docs/operations/TOOL_TRIGGER_MAP.md`（AGENTS.md 自稱的「完整路由表」）已 stale 7 週，補齊並把它加進 `CHANGE_IMPACT_MATRIX.md` 的 impacted 清單防止再度 stale。
+
+  **③ 使用者追問「這樣就夠了嗎」→ 通用漂移偵測腳本**：發現剛補的那條只是提醒等級（doc-sync 印出來、沒人看就沒用），要求「確確實實處理好、不得用補丁方式」。新增 `scripts/check-change-impact-matrix-drift.ps1`：解析 `CHANGE_IMPACT_MATRIX.md` 全部 ~85 條關係，逐對比對 mtime 漂移，>90/180 天 WARN/FAIL，parser 只認 backtick 包住的字串當候選路徑（矩陣資料混了全形逗號/括號中文註解/巢狀 backtick/樣板參照/Windows 絕對路徑佔位符等 8 種格式變異，這個原則讓它們自然被忽略）。接進 `ao-resume.ps1` 月度檢查第 5 項。真實執行抓到並修好一個路徑解析漏洞（`CLAUDE.md` 在 repo 根不在 agency-os 底下，改成雙 base fallback）。
+  **後續兩輪 stop-hook 打回**：自動 review 機制本身回傳無效 JSON（機制故障非發現問題）→ 補跑真實 `codex-oracle.ps1 review`，抓到 2 個真 finding（mirror 目錄未被檢查、「01-04 guides」數字範圍縮寫解不開）；第一版修法（教程式碼用「目錄+同名檔案」推測隱含關係）又被打回「undeclared drift pairs」——自己重新推演找到具體反例（矩陣資料裡一個散文用詞被誤 backtick 包住，推測邏輯會生出完全不相關的假配對），改成**撤掉推測邏輯，回頭把矩陣資料本身寫明確**（跟修「01-04 guides」同一個原則：資料不夠明確就修資料，不要教程式碼猜）。
+
+  **剩餘未解**：dedicated 機仍未購買（同 08-15 未解項延續）；`memory/daily/2026-08-16.md`～`2026-08-23.md` 8 個 stub 未回填（AO-CLOSE 指示只補今日檔案，這是已知、非本次引入的缺口）；`scripts/ao-resume.ps1` 有 17 個既有的、跟今天工作無關的未受保護 git 輸出擷取點，已用 spawn_task 記錄成獨立任務（task_b82a2211）未動手修。
+
 

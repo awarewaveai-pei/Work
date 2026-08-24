@@ -2,6 +2,31 @@
 
 ## 2026-08-24
 
+### AUTO_TASK_DONE: AO-CLOSE 自修 — tenant staging URL 誤報 false positive（真因非本 session 其餘工作所致）
+
+- AUTO_TASK_DONE: AO-CLOSE 2026-08-15→2026-08-24 收工，涵蓋 ORACLE gate 8 輪修正 + AGENTS.md 治理整理 + CHANGE_IMPACT_MATRIX 漂移偵測腳本 + 本條 tenant staging URL 真因修復
+
+[任務]
+`ao-close.ps1` 跑出 4 個 gate 失敗，其中 health 99.7%<100% 的具體項是「Tenant staging URL drift vs core/ENVIRONMENT_REGISTRY」——與本 session 今天實際做的 ORACLE gate/AGENTS.md/CHANGE_IMPACT_MATRIX 三件事完全無關（不同子系統），依 AO-CLOSE 規則「自修=重新診斷，禁止照抄症狀標籤」，先跑錯誤訊息自己建議的診斷指令看真實輸出，不假設。
+
+[根因]
+`agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1` 用 `Extract-NormalizedHttpsUrl`（單一 choke point，SITE_PROFILE / EXECUTION_PLAN / SITES_INDEX cell 三處掃描共用）從文字行擷取 https:// URL，但完全沒有處理本 repo 既有慣例：`ENVIRONMENT_REGISTRY.md` 用 markdown 刪除線 `~~...~~` 標記已 abandon 的環境列（例：soulful 的 staging 列 2026-08-16 決議 abandoned，因 hosting 11/12 到期不續約，不在退場主機建 staging）。`02_EXECUTION_PLAN.md` Day 2 那兩行同步用刪除線劃掉同一個舊 URL 並加註「⛔ 不再執行」，但底層文字仍是 `~~...https://staging.soulfulexpression.org/...~~`——腳本逐行掃描時把刪除線內文字當成「仍在宣告的 URL」，跟登記表裡（正確地）因列名不含刪除線標籤 `staging` 而找不到 canonical URL 的 registry 比對，產生「plan 宣告了 URL 但 registry 沒有」的假陽性。這不是本 session 造成的新 drift，是既有腳本從未考慮過「刪除線=已棄用」這個既有文件慣例。
+
+[已修改]
+1. `agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`——`Extract-NormalizedHttpsUrl` 加一行 `[regex]::Replace($Text, '~~[^~]*~~', '')` 在比對 https:// 之前先剝除整個刪除線 span（含內容，不只是符號），單一函式修正涵蓋全部三個呼叫點（SITE_PROFILE 行掃描、EXECUTION_PLAN 行掃描、SITES_INDEX cell），不是逐一補丁
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`（修前）| exit=1，訊息與 `ao-close.ps1` 回報的症狀完全吻合，確認真因非猜測
+- REALTEST_EVIDENCE: tool=Bash | cmd=同上（修後）| exit=0，`verify-tenant-staging-sites-index-ssot: PASS`
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0/0/0 — 讀回改動：正則 `~~[^~]*~~` 對「單一 span 內無巢狀波浪號」成立（本例的兩行 struck 內容皆無內嵌 `~`，`cat -A` 實際位元組已核對），不影響任何目前通過中的 URL 比對（因為現有通過案例裡活躍 URL 本來就不會被 `~~` 包住，剝除動作對它們是 no-op）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`Extract-NormalizedHttpsUrl\|staging.*https://\|https://.*staging` | hits=1（僅本檔案自己，確認 docstring 宣稱的「single implementation, no duplicate bash copy」屬實，無第二份需要同步修的複本）
+
+[剩餘風險]
+無。修正是在既有「single choke point」函式內加一個前處理步驟，未改變任何呼叫端介面或既有通過案例的行為。
+
+[rollback]
+`git diff agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`，單一 hunk，`git revert` 或手動移除新增的 3 行皆可完整回復。
+
 ### AUTO_TASK_DONE: 撤掉 mirror-directory 推測邏輯，改回資料明確化（round 2 stop-hook，同一議題第三輪）
 
 [任務]
@@ -476,6 +501,11 @@ Codex 對 round 7 commit 的真實 review 回報 CONFIRMED finding：round 7 為
 [rollback]
 `git diff scripts/verify-closeout-completeness.ps1` 還原單一 hunk（本輪只動了 consumer 端）；round 7 WORKLOG 訂正屬文字修正無程式碼影響。
 
+
+### Agent dispatch log
+- Plan: Design AGENTS.md restructuring plan -> # AGENTS.md Restructuring Plan — 2026-08-24 Follow-On Pass
+
+Methodology: same A/B/C/D framework as `reports/audit/agents-slimming-proposal-2026-07-02.md`. Scope: only what has accumulated/drifted **si…
 ## 2026-08-20 — 跨模型 oracle 制度化：`codex-oracle.ps1` + AGENTS 分工規則
 
 ### AUTO_TASK_DONE: 把 08-17 驗證有效的 Codex oracle 從「當次對話」變成常駐機制
@@ -707,7 +737,8 @@ Codex 對 round 7 commit 的真實 review 回報 CONFIRMED finding：round 7 為
   - **Suggestion S3（已修）**：表名若含 `|` 會弄壞 markdown 表格列（目前無實際攻擊路徑，純防禦性）。markdown 輸出前跳脫 `\|`，JSON 端不需要（`ConvertTo-Json` 本身處理）
   - **Suggestion S1（已解決，非直接修，是 M2 的副作用）**：原本的跳脫在 ClickHouse 25.7 上其實是對的，但依賴官方文件沒承諾的寬鬆解析行為；改用 `match()` 正則後這個依賴整個消失，不需要再討論跳脫層數
   - 全部修正後重跑語法檢查（PASS）+ 實際對 EU 執行（非模擬）：`mergeTreeTablesSeen=11`、`noTtlTableCount=0`、`orphanDupTableCount=0`、`verdict=healthy`，markdown 輸出人工核對格式正確
-- BUGHUNT_DONE: scope=agency-os,runbooks,scripts,lobster-factory | grep=no_ttl_count\|no_ttl_names\|orphan_dup_count\|mergetree_total | hits=0 stale（critic 修正後舊變數名 `no_ttl_count`/`no_ttl_names` 已完全被 `no_ttl_combo` 取代，全域搜尋確認無殘留引用）；`part_log_1`/KS6 清單/override.xml 三處交叉引用一致
+- BUGHUNT_DONE: scope=agency-os,runbooks,scripts,lobster-factory | grep=no_ttl_count\|no_ttl_names | hits=0 stale（critic 修正後舊變數名 `no_ttl_count`/`no_ttl_names` 已完全被 `no_ttl_combo` 取代，全域搜尋確認無殘留引用）；`part_log_1`/KS6 清單/override.xml 三處交叉引用一致
+  - **2026-08-24 訂正**：原記錄的 grep 誤把 `orphan_dup_count`（M2 修正後仍在用的孤兒表查詢變數，`check-clickhouse-health.ps1:148,187`）與 `mergetree_total`（上方 [Major M1] 剛加的 canary 變數，同檔 3 處：查詢/解析/blind-spot 判斷）併進同一個「應為 0」宣告——兩者都是預期會出現的現行活變數，不是待清除的舊名，本來就不該跟真正待驗證清零的 `no_ttl_count`/`no_ttl_names` 放進同一條 grep OR-pattern。由 `bughunt-oracle.ps1` 機器覆核逐一抓到（先 `mergetree_total` 3 次、再 `orphan_dup_count` 2 次），確認純屬 8/17 那次記錄的措辭錯誤，非程式碼問題
 
 [剩餘風險]
 - **四張表的 TTL 不是設定檔保護的，是靠監控補償**——若未來某次重啟又讓它們失憶，`check-clickhouse-health.ps1` 會在下次 AO-RESUME 抓到（`drift` 等級），但不會自動修復，需要人工重跑 `ALTER TABLE ... MODIFY TTL`。這是本次事故誠實承認的殘留缺口，不是假裝已經根治
@@ -2862,13 +2893,17 @@ woocommerce-points-and-rewards / woocommerce-product-addons
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-08-24 11:21:11 UTC_
+_Last synced: 2026-08-24 12:11:50 UTC_
 
 ## 2026-08-17
 - 自動週報代理：weekly summary 生成 → reports/weekly/weekly-summary-2026-08-17.md
   - REALTEST_WAIVED: DOC_ONLY -- automated report generation, no code change
   - REVIEW_WAIVED: DOC_ONLY -- report content verified against WORKLOG/TASKS source files
   - BUGHUNT_WAIVED: DOC_ONLY -- no code change
+
+
+
+
 
 
 

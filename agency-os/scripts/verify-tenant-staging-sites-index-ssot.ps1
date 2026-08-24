@@ -33,8 +33,15 @@ if (-not $WorkspaceRoot) {
 function Extract-NormalizedHttpsUrl {
     param([string]$Text)
     if ([string]::IsNullOrWhiteSpace($Text)) { return $null }
+    # Drop markdown strikethrough spans first — repo convention marks abandoned/
+    # decommissioned URLs as ~~https://...~~ (see ENVIRONMENT_REGISTRY.md staging
+    # rows). A struck-through URL is not an active declaration and must not be
+    # extracted, in any of this script's three scan sites (SITE_PROFILE line,
+    # EXECUTION_PLAN line, SITES_INDEX cell) — single choke point, fixed once here.
+    $liveText = [regex]::Replace($Text, '~~[^~]*~~', '')
+    if ([string]::IsNullOrWhiteSpace($liveText)) { return $null }
     # Conservative hostname/path only — stops before whitespace, `（`, backticks, or |
-    $m = [regex]::Match($Text, '(?i)https://[a-z0-9][a-z0-9./_-]*')
+    $m = [regex]::Match($liveText, '(?i)https://[a-z0-9][a-z0-9./_-]*')
     if (-not $m.Success) { return $null }
     return ($m.Value.TrimEnd('/')).ToLowerInvariant()
 }
