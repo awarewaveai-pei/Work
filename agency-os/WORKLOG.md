@@ -2,6 +2,35 @@
 
 ## 2026-08-24
 
+### AUTO_TASK_DONE: 新增 CHANGE_IMPACT_MATRIX 全域漂移偵測腳本（治本，非補丁）
+
+[任務]
+使用者問「這樣就夠了嗎」，我查出上一個 commit 補的 CHANGE_IMPACT_MATRIX.md 那條只是提醒等級（doc-sync 印出來、沒人真的去看就沒用），跟 `check-governance-docs-drift.ps1` 給另外 4 份文件的機械化保護不是同一等級，而且那支腳本寫死只管那 4 份、無法直接擴充。使用者明確要求「確確實實處理好、不得用補丁方式、要乾乾淨淨扎扎實實的 code」——選了「現在就做通用漂移偵測腳本」。
+
+[已修改]
+1. `scripts/check-change-impact-matrix-drift.ps1`（新增）—— 通用腳本，解析 `docs/CHANGE_IMPACT_MATRIX.md` 全部 ~85 條「主文件→必查文件」關係，逐對比對 mtime 漂移天數，>90 天 WARN、>180 天 FAIL，沿用 `check-governance-docs-drift.ps1` 既有的門檻慣例與輸出三件套（`reports/governance/impact-matrix-drift-{YYYY-MM}.md` + `-LATEST.md` + `reports/status/impact-matrix-drift-LATEST.md`）。Parser 設計：只把 markdown backtick 包住的字串當候選路徑（該矩陣檔案混了全形/半形逗號分隔、括號中文註解、巢狀 backtick、「專案 X.md」樣板參照、Windows 絕對路徑佔位符等至少 8 種格式變異，backtick-only 抽取策略讓這些全部自然被忽略，不用為每種寫特判）；解不出的路徑明確進「Skipped」清單並附理由，不靜默丟棄、不用猜的
+2. `scripts/check-change-impact-matrix-drift.ps1`（真實執行後修正）—— 第一版路徑解析只試 agency-os-relative 一種 base，真實跑出來後發現 `CLAUDE.md`（在 repo 根目錄不在 agency-os 底下）與 `../README.md` 反向引用的 `agency-os/docs/...` 路徑被誤判成「解不出來」；改成依序嘗試 agency-os-relative 與 WorkRoot-relative 兩種 base，抓到就用——這是通用修正不是為這兩個特例寫死
+3. `scripts/ao-resume.ps1`——月度檢查區塊新增第 5 項 `impact_matrix_drift`，比照既有 4 項（system_review/supabase_memory/governance_drift/cf_ip_refresh）完全同樣的呼叫、exit code 對應、`$monthlyPayload` JSON、Slack/Telegram 通知格式寫法，沒有另開一套邏輯
+4. `.claude/commands/ao-resume.md` + `agency-os/AGENTS.md`——順手訂正一個既有的過期宣稱：AGENTS.md 原文寫「月度三項檢查」，但 `ao-resume.ps1` 本來就有 4 項（漏列 `cf_ip_refresh`），今天加第 5 項後更新成正確的「五項」並列全
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=第一版 `check-change-impact-matrix-drift.ps1 -Force`（真實執行，非模擬）| exit=1（WARN，rows=76 pairs=373 warn=7 fail=0 skipped=16）；人工讀報告內容抓到 CLAUDE.md 相關 2 條屬解析器誤判，非真的無法解析
+- REALTEST_EVIDENCE: tool=Bash | cmd=修正路徑解析邏輯後重跑 `-Force` | exit=1（WARN，rows=76 pairs=384 warn=7 fail=0 skipped=9，+11 pairs 正確解析、-7 誤判消失）；逐條核對剩餘 9 個 skip 全部合理（目錄參照/樣板佔位符/尚未存在的文件），7 個 WARN 全部是真實訊號（`.cursor/rules/*.mdc` 4 月就沒動過、索引文件今天才改）；額外用 `Resolve-Path` 手動驗證 `CLAUDE.md` 確實唯一解析到 `D:\Work\CLAUDE.md`，無歧義誤判風險
+- REALTEST_EVIDENCE: tool=Bash | cmd=`grep -n "impact_matrix_drift" scripts/ao-resume.ps1` 確認新 key 在 5 個使用點（賦值×2、JSON payload、humanDesc、通知迴圈）字串完全一致無 typo；真實呼叫 `check-change-impact-matrix-drift.ps1 -WorkRoot D:\Work`（不加 -Force，模擬 ao-resume.ps1 實際呼叫方式）確認「報告已存在時 exit 0」的既有慣例（跟 sibling 腳本一致，非新問題）
+- REVIEW_WAIVED: NA -- 純新增腳本+既有腳本小幅擴充，邏輯直接沿用 `check-governance-docs-drift.ps1` 已驗證過的架構（門檻、輸出格式、`$monthlyResults` 整合方式全部照抄同一套慣例），非全新設計；critic/codex-oracle 皆未呼叫，判斷風險可接受但記為待補
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=`impact_matrix_drift\|check-change-impact-matrix-drift\|月度三項檢查` | hits=7（新符號用點全部預期內；「月度三項檢查」舊宣稱 0 殘留）
+
+[過程中發現但刻意不修的東西]
+`scripts/ao-resume.ps1` 有 17 個既有的（跟本次改動無關，`git diff --stat` 確認我的改動只在 795-829 行）未受保護的 git 輸出擷取點（`audit-cp950-traps.ps1` 抓到），已用 spawn_task 記錄成獨立任務（task_b82a2211），不在本次順手改——範圍太大且跟今天主題無關，順手改違反「一次只做一件事」。
+
+[剩餘風險]
+- 90/180 天門檻直接沿用既有腳本慣例沒有重新驗證是否適合這份矩陣（~85 條關係，波動範圍比原本 4 份文件大很多）；本次首跑結果（373→384 對中僅 7 條 WARN）顯示門檻沒有製造大量假警報，暫判合理，但只有一個月份的樣本
+- `docs/wordpress_mainwp_plan.md` 那一列的路徑寫法（monorepo root 但沒有 `../` 前綴）是矩陣原始資料本身不一致，這次用雙 base fallback 解決了它，但矩陣裡若還有其他我沒實際測到的相同型態不一致，理論上仍會被雙 base 邏輯正確處理（不是只對這一列特判），風險可控
+- 沒有針對本次新增的兩支邏輯跑外部 review（critic 或 codex-oracle），純靠手動逐行覆核 + 真實執行輸出核對
+
+[rollback]
+`git diff` 對應 4 個檔案（1 新增 3 修改）皆為獨立可回復；`scripts/check-change-impact-matrix-drift.ps1` 整檔刪除即可完全移除新功能，`ao-resume.ps1`/`AGENTS.md`/`ao-resume.md` 的改動各自是獨立 hunk，`git revert` 單一 commit 可完整回復不影響既有 4 項月度檢查。
+
 ### AUTO_TASK_DONE: AGENTS.md 延續 2026-07-02 瘦身提案第二輪 + TOOL_TRIGGER_MAP.md 補新鮮度
 
 [任務]
@@ -2776,13 +2805,14 @@ woocommerce-points-and-rewards / woocommerce-product-addons
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-08-24 10:42:04 UTC_
+_Last synced: 2026-08-24 11:21:11 UTC_
 
 ## 2026-08-17
 - 自動週報代理：weekly summary 生成 → reports/weekly/weekly-summary-2026-08-17.md
   - REALTEST_WAIVED: DOC_ONLY -- automated report generation, no code change
   - REVIEW_WAIVED: DOC_ONLY -- report content verified against WORKLOG/TASKS source files
   - BUGHUNT_WAIVED: DOC_ONLY -- no code change
+
 
 
 

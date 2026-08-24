@@ -795,15 +795,29 @@ if ($runMonthly) {
         $global:LASTEXITCODE = 0
     } else { $monthlyResults["cf_ip_refresh"] = "SKIP" }
 
+    # 5. Change Impact Matrix drift check (2026-08-24 — generalizes the same gap that let
+    #    TOOL_TRIGGER_MAP.md go 7 weeks stale: check every declared 主文件->impacted pair
+    #    in docs/CHANGE_IMPACT_MATRIX.md for one-directional mtime drift, not just the 4
+    #    docs check #3 above already covers.)
+    $impactMatrixDrift = Join-Path $WorkRoot "scripts\check-change-impact-matrix-drift.ps1"
+    if (Test-Path -LiteralPath $impactMatrixDrift) {
+        Write-Host "  -> check-change-impact-matrix-drift..." -ForegroundColor DarkCyan
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $impactMatrixDrift -WorkRoot $WorkRoot
+        $matrixDriftExit = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+        $monthlyResults["impact_matrix_drift"] = if ($matrixDriftExit -eq 0) { "PASS" } elseif ($matrixDriftExit -eq 1) { "WARN" } else { "FAIL" }
+        $global:LASTEXITCODE = 0
+    } else { $monthlyResults["impact_matrix_drift"] = "SKIP" }
+
     # Write consolidated monthly-LATEST.json to reports/status/ — single place to read.
     $monthlyStatusDir = Join-Path $WorkRoot "agency-os\reports\status"
     $null = New-Item -ItemType Directory -Force -Path $monthlyStatusDir
     $monthlyPayload = @{
-        generated        = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-        system_review    = $monthlyResults["system_review"]
-        supabase_memory  = $monthlyResults["supabase_memory"]
-        governance_drift = $monthlyResults["governance_drift"]
-        cf_ip_refresh    = $monthlyResults["cf_ip_refresh"]
+        generated            = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+        system_review        = $monthlyResults["system_review"]
+        supabase_memory      = $monthlyResults["supabase_memory"]
+        governance_drift     = $monthlyResults["governance_drift"]
+        cf_ip_refresh        = $monthlyResults["cf_ip_refresh"]
+        impact_matrix_drift  = $monthlyResults["impact_matrix_drift"]
     }
     $monthlyPayload | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $monthlyStatusDir "monthly-LATEST.json") -Encoding UTF8
 
@@ -815,15 +829,16 @@ if ($runMonthly) {
 
     # Human-readable descriptions for each check
     $humanDesc = @{
-        system_review    = "系統架構 / build gates / 程式碼品質"
-        supabase_memory  = "EU 資料庫記憶體使用量"
-        governance_drift = "四份核心治理文件一致性"
-        cf_ip_refresh    = "CF origin IP ranges on SG ipset"
+        system_review        = "系統架構 / build gates / 程式碼品質"
+        supabase_memory      = "EU 資料庫記憶體使用量"
+        governance_drift     = "四份核心治理文件一致性"
+        cf_ip_refresh        = "CF origin IP ranges on SG ipset"
+        impact_matrix_drift  = "CHANGE_IMPACT_MATRIX 全部關係漂移"
     }
 
     # Build body lines (技術術語 + 人話)
     $lines = @()
-    foreach ($key in @("system_review","supabase_memory","governance_drift","cf_ip_refresh")) {
+    foreach ($key in @("system_review","supabase_memory","governance_drift","cf_ip_refresh","impact_matrix_drift")) {
         $val   = $monthlyResults[$key]
         $icon  = if ($val -like "PASS*") { "✅" } elseif ($val -like "WARN*") { "⚠️" } elseif ($val -like "FAIL*") { "❌" } else { "⏭" }
         $lines += "$icon $($humanDesc[$key]): $val"

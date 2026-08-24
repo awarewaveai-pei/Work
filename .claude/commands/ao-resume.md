@@ -176,8 +176,8 @@ Smoke tests (from `smoke-LATEST.json`):
 - If file exists: 一行摘要 `🟢 Smoke PASS | n8n=ok | repair=ok` 或 `🔴 Smoke WARN | ...`
 - If file missing: 靜默略過
 
-Monthly checks (from `monthly-LATEST.json`):
-- If file exists: 一行摘要 `📅 Monthly YYYY-MM-DD | system_review=ok | supabase=ok | governance=ok`
+Monthly checks (from `monthly-LATEST.json`, 5 項，2026-08-24 補 impact_matrix_drift）:
+- If file exists: 一行摘要 `📅 Monthly YYYY-MM-DD | system_review=ok | supabase=ok | governance=ok | cf_ip=ok | impact_matrix=ok`
 - If file missing: 靜默略過（尚未跑過月度檢查）
 
 Cross-machine import result (從 ao-resume-hook-last.json log_tail 或手動跑 import 的輸出讀取):

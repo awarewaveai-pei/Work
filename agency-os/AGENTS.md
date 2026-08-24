@@ -398,7 +398,7 @@ Hook `ao-resume-on-prompt.ps1` 自動觸發 → 讀 `.agency-state/ao-resume-hoo
 `ao-resume.ps1` 同時自動執行 `scripts/check-smoke-tests.ps1`（application-layer smoke：n8n MCP + Repair Center health + 客戶網站健康 + n8n workflow 失敗 + **客戶站外寄信失敗**）→ 寫 `reports/status/smoke-LATEST.json` → Claude 在 §1 系統快照回報。使用者不需要記得跑 `/smoke-test`。  
 `client_mail` 檢查的存在理由：soulful 的 FluentSMTP 曾指向不接受連線的 `pop.hostinger.com:587`，`wp_mail()` 從 2026-08-03 到 2026-08-16 全部靜默失敗無人察覺。**外掛自帶的失敗通知本身也走 `wp_mail`，警報與被監控的通道一起死**，故監控必須來自站外。  
 **判讀 smoke 結果（2026-08-17 起）**：`smoke-LATEST.json` 自帶 `overall` 與 `blind_spots` 兩個欄位，**直接讀，不要自己心算**。`blind_spots` 非空 = 某個關鍵偵測器這輪「什麼都沒量到」（SSH 掛了 / 金鑰不見 / 解析失敗），此時 `overall` 一律 WARN —— 因為「偵測器啞了」不可以長得像「一切正常」，那正是 2026-08-03 事故的形狀。`client_mail` 除了近 7 天失敗數，另查**距上次成功寄信天數**（門檻 `-MailQuietDayLimit`，預設 10）：只數失敗無法分辨「健康」與「已壞但還沒人用到」。門檻**必須低於 14** —— FluentSMTP 的 `log_saved_interval_days=14` 每日清舊日誌，設 14 以上該分支永遠觸發不到。  
-每 30 天自動執行月度三項檢查（warn-only）：`monthly-system-review.ps1` / `check-supabase-memory-monthly.ps1` / `check-governance-docs-drift.ps1`。結果寫 `reports/`，Claude 在 §1 回報。
+每 30 天自動執行月度五項檢查（warn-only，2026-08-24 訂正：原文寫「三項」但 `ao-resume.ps1` 早就是四項，今天再加第五項）：`monthly-system-review.ps1` / `check-supabase-memory-monthly.ps1` / `check-governance-docs-drift.ps1`（4 份核心治理文件一致性）/ `refresh-cf-origin-ips.ps1` / `check-change-impact-matrix-drift.ps1`（`docs/CHANGE_IMPACT_MATRIX.md` 全部 ~85 條關係的 mtime 漂移，不只 4 份核心文件）。結果寫 `reports/`，Claude 在 §1 回報。
 
 **AO-CLOSE**（關機/收工任何表達）：先補 `WORKLOG.md` AUTO_TASK_DONE + 更新 `CONVERSATION_MEMORY.md`，再跑 `.\scripts\ao-close.ps1`。預設門檻：health-check 100%（未達 100% 代理**自行嘗試自修後重跑**，修不好才列具體失敗項問一題；**禁止**主動提議 `-AllowNonPerfectHealth`）。步驟 SSOT：`docs/operations/end-of-day-checklist.md`；關鍵字行為 SSOT：Cursor → `.cursor/rules/40-shutdown-closeout.mdc`；Claude Code → `.claude/commands/ao-close.md`。
 
@@ -439,5 +439,5 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-08-24 10:42:04 UTC_
+_Last synced: 2026-08-24 11:21:11 UTC_
 
