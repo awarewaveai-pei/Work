@@ -1,5 +1,9 @@
 ﻿# Worklog
 
+## 2026-08-24
+
+- 01:06 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-08-24.md
+
 ## 2026-08-20 — 跨模型 oracle 制度化：`codex-oracle.ps1` + AGENTS 分工規則
 
 ### AUTO_TASK_DONE: 把 08-17 驗證有效的 Codex oracle 從「當次對話」變成常駐機制
