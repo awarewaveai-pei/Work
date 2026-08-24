@@ -30,8 +30,13 @@ function Invoke-FixtureGit {
     $savedEap = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
-        & git @GitArgs 2>&1 | Out-Null
-        return $(if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE })
+        $out = & git @GitArgs 2>&1
+        $code = $(if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE })
+        # 同一個不變量：改用 scoped EAP='Continue' 後，失敗不再自動拋，所以這裡必須自己拋。
+        # 否則 fixture 建置失敗會靜默，測試在後面以看不懂的形式爆掉（「測試環境壞了」的假象）
+        # 而不是在出錯的那一行停住。舊的裸呼叫是靠 NativeCommandError 提供這個大聲失敗。
+        if ($code -ne 0) { throw ("fixture git failed (exit $code): git " + ($GitArgs -join ' ') + "`n" + ($out -join "`n")) }
+        return $code
     } finally { $ErrorActionPreference = $savedEap }
 }
 

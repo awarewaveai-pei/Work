@@ -604,6 +604,25 @@ if (Test-Path -LiteralPath $clickhouseHealthScript) {
     $global:LASTEXITCODE = 0
 }
 
+# --- CI health (warn-only; surfaces a gate that has quietly gone red) ---
+# Rationale: nothing in this repo looked at GitHub Actions. Found 2026-08-25 while
+# root-causing the fifth ClickHouse incident - `Trigger infra config guard` had failed on
+# every push since 2026-08-15 (four red runs over ten days), and the commit that turned it
+# red was the fix for the FOURTH ClickHouse incident. So the gate that existed to stop
+# ClickHouse config regressions was itself off for the whole window in which the next
+# ClickHouse incident developed, and no flow the operator runs would have mentioned it.
+# Writes reports/status/ci-LATEST.md. Pattern: runbooks/ADD-PERIODIC-HEALTH-CHECK.md.
+$ciHealthScript = Join-Path $WorkRoot "scripts\check-ci-health.ps1"
+if (Test-Path -LiteralPath $ciHealthScript) {
+    Write-Host ""
+    Write-Host "== AO-RESUME: CI health snapshot (warn-only) ==" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ciHealthScript -WorkRoot $WorkRoot
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "WARN: CI health snapshot returned non-zero (see agency-os/reports/status/ci-LATEST.md)." -ForegroundColor Yellow
+    }
+    $global:LASTEXITCODE = 0
+}
+
 # --- Claude routine output freshness (warn-only; surfaces silent routine failure at startup) ---
 # Rationale: a cloud routine whose source drifts / auth lapses / gets disabled stops landing
 # its report — and the operator should learn this at AO-RESUME (when they can act), not only

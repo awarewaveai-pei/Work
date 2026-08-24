@@ -29,8 +29,38 @@ If the check needs to run continuously / on alerts → use Sentry/netdata/uptime
 | Backup health (SG + EU cron + dirs) | [`scripts/check-backup-health.ps1`](../scripts/check-backup-health.ps1) | `agency-os/reports/status/backup-health-LATEST.md` |
 | Cloudflare security (bot fight + WAF) | [`scripts/check-cloudflare-security.ps1`](../scripts/check-cloudflare-security.ps1) | `agency-os/reports/status/cf-security-LATEST.md` |
 | VPS auto-reboot config | [`scripts/check-vps-auto-reboot-health.ps1`](../scripts/check-vps-auto-reboot-health.ps1) | `agency-os/reports/status/auto-reboot-LATEST.md` |
+| ClickHouse self-telemetry + merge health | [`scripts/check-clickhouse-health.ps1`](../scripts/check-clickhouse-health.ps1) | `agency-os/reports/status/clickhouse-LATEST.md` |
+| CI health (GitHub Actions on main) | [`scripts/check-ci-health.ps1`](../scripts/check-ci-health.ps1) | `agency-os/reports/status/ci-LATEST.md` |
 
-All three follow the same shape. New checks must follow it too.
+All of them follow the same shape. New checks must follow it too.
+
+### 2026-08-25 addendum — measure the MECHANISM, not the last incident's signature
+
+Added after the fifth ClickHouse incident, where an existing check built from this runbook
+reported only YELLOW throughout a three-day outage and was *mathematically incapable* of
+reporting worse. Every threshold in it had been calibrated against how the PREVIOUS incident
+looked — accumulated data volume — and the new one had a different signature: merges that
+could not complete, which pins volume LOW while the box burns.
+
+So when you write the verdict logic, ask two questions, not one:
+
+1. **What does the failure look like?** (the outcome — size, ratio, count)
+2. **What is the failure DOING?** (the mechanism — operations failing, retrying, stalling,
+   a queue that never drains, a limit that is not in force)
+
+A check with only (1) catches a rerun of the last incident and nothing else. Add at least one
+probe for (2), and prefer probes that read the *operation* rather than its aftermath — e.g.
+"how many merge tasks failed in the last hour" beats "how big did the table get".
+
+Two related traps found the same day, both worth copying into a new check:
+
+- **Two independent sources beat one.** The merge-failure probe reads both `text_log` and
+  `part_log` and takes the max, so one going blind cannot read as healthy. During that
+  incident `part_log` alone would have reported 0, because the table had itself been
+  recreated and lost its history.
+- **Name what you actually measured.** The first version of that probe counted a
+  server-wide error code and reported it as "merges are failing" — true during the incident,
+  false in general, and it would have sent the next reader down the wrong path.
 
 ### Step 1 — Write `scripts/check-<thing>.ps1`
 

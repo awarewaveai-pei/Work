@@ -67,38 +67,62 @@
        The alarm was partly measuring the alarm's own error spam. Nothing in that
        loop self-corrects, and it survives restarts: it is a ratchet.
 
-       THE DEFECT, stated as one fact:
-         merges_mutations_memory_usage_soft_limit reported 0 at runtime, and that
-         setting's own documentation says 0 means unlimited. Background merges had
-         NO memory bound at all inside a container whose entire budget is 2.5 GiB,
-         so the scheduler was free to start a second and third ~800 MiB merge while
-         the first was still running - and 3 x ~800 MiB plus base RSS is over cap.
-       (system.server_settings reports EFFECTIVE values, not file values. Proven on
-       the disposable container used to validate this file: a configured 2.5 GiB
-       max_server_memory_usage was read back as 1.05 GiB, ClickHouse having clamped
-       it to that container's 1200m cgroup. So the 0 above is the real runtime
-       state, not an unread config line.)
+       THE DEFECT, stated precisely (two layers - the second is the one that
+       makes this a design fault rather than a missing setting):
 
-       THE INVARIANT (re-check this arithmetic before changing anything below):
-         base RSS (~0.9 GiB) + all concurrent merges <= 2.5 GiB
-       Bounding merges at 1.0 GiB gives 0.9 + 1.0 = 1.9 GiB, leaving ~0.6 GiB of
-       headroom for queries. Since one metric_log merge alone costs ~0.8 GiB, that
-       bound also means "at most one wide merge at a time" - expressed as the
-       budget itself rather than as a proxy for it.
+         1. Background merges had no memory bound at all.
+            merges_mutations_memory_usage_soft_limit reported 0 at runtime, and
+            that setting's own documentation says 0 means unlimited. So the
+            scheduler was free to start a second and third ~800 MiB merge while
+            the first was still running, and 3 x ~800 MiB plus base RSS is over
+            cap. (system.server_settings reports EFFECTIVE values, not file
+            values - proven on the disposable container used to validate this
+            file, where a configured 2.5 GiB max_server_memory_usage was read
+            back as 1.05 GiB after ClickHouse clamped it to that container's
+            1200m cgroup. The 0 was the real runtime state, not an unread line.)
 
-       Why not cap background_pool_size instead (the obvious first idea): the pool
-       size is load-bearing for three other settings
-       (number_of_free_entries_in_pool_to_execute_mutation = 20,
-       ..._to_lower_max_size_of_merge = 8, ..._to_execute_optimize_entire_partition
-       = 25), and ClickHouse refuses to start if the pool is smaller than the first
-       of them - verified: a disposable container with background_pool_size=2 exits
-       with code 36 BAD_ARGUMENTS. Capping the pool therefore drags in three more
-       coupled knobs to express one budget. The memory limit expresses it directly.
+         2. Setting that bound does not fix it, which is the important part.
+            With the limit set to 1 GiB, ClickHouse still scheduled TWO
+            concurrent metric_log merges - measured on production, not assumed.
+            The scheduler estimates a merge's memory from the parts' size on
+            disk (~115 MiB for the whole table) and is blind to the per-column
+            write buffers that make the real cost ~800 MiB. A budget cannot be
+            enforced by an estimator that cannot see the cost.
+
+       So the defect is not "a setting was missing". It is that a table existed
+       whose merge cost neither fits the budget NOR is visible to the mechanism
+       that is supposed to police the budget. Only removing such a table closes
+       it; the soft limit below is kept as defence in depth for future tables
+       whose cost the estimator CAN see.
+
+       THE INVARIANT:
+         no system-log table may be wide enough that one merge of it exceeds the
+         merge budget - i.e. base RSS (~0.9 GiB) + concurrent merges <= 2.5 GiB.
+
+       Two knobs were tried against this invariant and BOTH were rejected on
+       measurement, which is worth recording so nobody re-proposes them:
+
+         background_pool_size=2 - refused to start. The pool size is load-bearing
+           for three other settings (number_of_free_entries_in_pool_to_execute_
+           mutation = 20, ..._to_lower_max_size_of_merge = 8, ..._to_execute_
+           optimize_entire_partition = 25) and ClickHouse exits with code 36
+           BAD_ARGUMENTS when the pool is smaller than the first. Verified on a
+           disposable container. Sizing it down consistently is possible, but a
+           pool small enough to serialise wide merges also serialises application
+           merges - which is what produced 2026-07-05 (3002 fragmented parts).
+
+         merges_mutations_memory_usage_soft_limit=1GiB - applied cleanly but did
+           not bind, for the reason given in layer 2 of THE DEFECT above. Kept
+           regardless, as defence in depth for tables the estimator CAN size.
+
+       So the invariant is met the only way it can be: by removing the two tables
+       whose merges do not fit.
 
        Fixes applied, in order of how much they matter:
-         1. background merges bounded by memory           (immediately below)
-         2. query_metric_log removed - the second wide table
-         3. metric_log production cut ~50x
+         1. metric_log removed        - 1,344 columns, the incident-#5 cause
+         2. query_metric_log removed  - 939 columns, the same hazard, dormant
+         3. background merges bounded by memory (immediately below)
+       After this file the widest system log table is query_log at 84 columns.
   ═══════════════════════════════════════════════════════════════════════ -->
 
   <!-- Hard budget for all background merges and mutations combined. Must stay
@@ -140,24 +164,42 @@
        into an invariant instead of a lucky measurement. -->
   <query_metric_log remove="1"/>
 
-  <!-- metric_log: KEPT - it is the only ClickHouse-internal metric source, and
-       after five recurrences the forensic value is real. But it is the 1,344-column
-       table whose merges cost ~800 MiB each, so its production rate is cut hard:
+  <!-- metric_log: REMOVED. 1,344 columns - the table whose merges cost ~800 MiB
+       each and which caused incident #5. It was deliberately kept on 2026-08-15
+       as "the only ClickHouse-internal metric source", with only its flush
+       interval slowed. That judgement is reversed here, and the reason is not
+       "it got worse" - it is that keeping it makes the memory budget unenforceable
+       in principle:
 
-         collect_interval  1s  -> 10s   : 86,400 -> 8,640 rows/day  (10x fewer)
-         flush_interval    60s -> 300s  : 1,440  -> 288  parts/day  (5x fewer)
+         A single background pool holds both this table's ~800 MiB merges and
+         trigger_dev's ~5 MiB merges, with ~1.3 GiB of spare budget. Sizing the
+         pool so that only ONE wide merge can run (background_pool_size=1) also
+         serialises every application merge - which is how 2026-07-05 happened
+         (3002 fragmented parts in task_events, 2344 OOM-kills). Sizing it for
+         application throughput lets two wide merges overlap and blow the cap.
+         The two requirements are in direct conflict FOR AS LONG AS a table this
+         wide shares the pool. No setting resolves that; removing the table does.
 
-       Net ~50x less merge work. Per-merge memory is unchanged (width, not rows),
-       which is why the concurrency cap above is the load-bearing fix and this is
-       the belt to its braces. 10s resolution is ample for post-incident forensics
-       on a single-CPU container; Netdata covers anything needing finer grain.
-       2026-08-15 note: the 7.5s default flush created ~11.5k parts/day and 402
-       active parts - that is the behaviour being corrected here, permanently. -->
-  <metric_log>
-    <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
-    <collect_interval_milliseconds>10000</collect_interval_milliseconds>
-    <flush_interval_milliseconds>300000</flush_interval_milliseconds>
-  </metric_log>
+       And the memory limit below does not rescue it either, which was measured
+       rather than assumed: with merges_mutations_memory_usage_soft_limit set to
+       1 GiB, ClickHouse still scheduled TWO concurrent metric_log merges. Its
+       scheduler estimates merge cost from part size on disk (~115 MiB total),
+       and is blind to the per-column write buffers that make the real cost ~800
+       MiB. An estimator that cannot see the cost cannot enforce a budget on it.
+
+       What is lost: a time series of ClickHouse-internal counters that nothing
+       here has ever queried. What remains: system.metrics / system.events (live
+       counters), system.query_log (84 columns, per-query ProfileEvents and
+       memory), system.error_log, system.text_log, system.part_log,
+       system.processors_profile_log, plus Netdata + Grafana at host and
+       container level. asynchronous_metric_log was removed on 2026-08-15 for
+       the same reason and nothing was lost.
+
+       THE RULE THIS ESTABLISHES: no system-log table may be wide enough that a
+       single merge of it exceeds the merge budget. After this file, the widest
+       remaining system log table is query_log at 84 columns.
+       check-clickhouse-health.ps1 alerts if a wide one ever reappears. -->
+  <metric_log remove="1"/>
 
   <!-- text_log: 5.33 GiB / 90M rows in 14 days = ~6.4M rows/day, because it
        mirrors EVERY server log line into a table. Container logs already go to
@@ -173,16 +215,35 @@
     <flush_interval_milliseconds>30000</flush_interval_milliseconds>
   </text_log>
 
+  <!-- query_thread_log / s3queue_log: REMOVED. Both exist on disk here as empty
+       tables, and neither has a writer in this stack: query_thread_log only fills
+       when log_query_threads is enabled (per-THREAD rows, i.e. a multiple of
+       query_log's volume), and s3queue_log only when an S3Queue table engine is
+       used. Leaving an unwritten table with no TTL sitting there is the exact
+       shape of the 2026-08-19 part_log finding, just with the clock not started
+       yet. Removing them means the clock can never start. -->
+  <query_thread_log remove="1"/>
+  <s3queue_log remove="1"/>
+
   <!-- ── System log TTL: tiered retention policy ──────────────────────────
        Rationale:
-         7d  - high-volume traces/metrics (replaced by Netdata for long-term)
+         3d  - high-churn text/insert logs
+         7d  - part & span logs (replaced by Netdata for long-term trends)
          14d - query & view logs (useful for post-incident perf regression)
          30d - error log (recurring / rare bugs need a month of history)
+         90d - crash & backup logs (rare, small, and the most valuable to still
+               have when someone finally goes looking)
 
-       EVERY system log table that exists must appear in this file with a TTL.
-       A table with no declared TTL grows until the disk fills; a table whose TTL
-       was applied with a live ALTER loses it on the next restart (proven below).
-       scripts/check-clickhouse-health.ps1 enforces both halves of that rule.
+       THE RULE: every MergeTree table in the `system` database must carry a TTL.
+       It does not matter whether the TTL comes from this file or from ClickHouse's
+       own base config (blob_storage_log, for instance, ships with one) - what
+       matters is the outcome on the running server, because that is the thing that
+       actually bounds disk growth. check-clickhouse-health.ps1 checks the outcome
+       in system.tables on every AO-RESUME, so a table that ClickHouse adds in a
+       future version with no TTL is caught the same way part_log was.
+
+       A TTL applied with a live ALTER does NOT satisfy this rule: it is erased by
+       the next restart. See the 2026-08-25 section at the end of this file.
   ──────────────────────────────────────────────────────────────────────── -->
   <processors_profile_log>
     <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
@@ -199,6 +260,15 @@
   <asynchronous_insert_log>
     <ttl>event_date + INTERVAL 3 DAY DELETE</ttl>
   </asynchronous_insert_log>
+  <!-- Rare and small, but the two you most regret not having. Note crash_log has
+       no partition_by in the base config; TTL still applies, it is just evaluated
+       without partition pruning - harmless at this table's volume. -->
+  <crash_log>
+    <ttl>event_date + INTERVAL 90 DAY DELETE</ttl>
+  </crash_log>
+  <backup_log>
+    <ttl>event_date + INTERVAL 90 DAY DELETE</ttl>
+  </backup_log>
 
   <!-- ══════════════════════════════════════════════════════════════════════
        2026-08-25 - part_log / query_views_log / opentelemetry_span_log:

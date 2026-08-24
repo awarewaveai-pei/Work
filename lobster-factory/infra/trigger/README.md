@@ -89,29 +89,31 @@ docker compose --env-file .env up -d
 
 （**刪 volume 會毀資料**；沒把握先做備份。）
 
-### 4. 啟動前先做 ClickHouse config preflight（建議必做）
+### 4. 啟動前先做 ClickHouse config preflight（**必做**，不是建議）
 
-**Windows（PowerShell）建議一鍵跑**（會先確認 Docker 引擎已起、再跑靜態檢查與容器內 **Bitnami setup + `extract-from-config`**，合併驗證 `override.xml`）：
+> **為什麼是必做**：ClickHouse **沒有**靜態 config 驗證器 —— 25.7 的 `clickhouse-server --help` 只有 `--config-file`，`--check-config` 不存在。唯一能告訴你設定是好的，是「有一台伺服器用它成功啟動」。2026-08-19 一次 `override.xml` 編輯讓 EU 正式容器進入 crash loop，當時號稱在守這件事的閘（`clickhouse-config-check` 服務）其實從加入的第一天就是空轉的，已於 2026-08-25 移除。
+
+**Windows（PowerShell）一鍵跑**（確認 Docker 引擎已起 → 靜態檢查 → 拋棄式容器實啟驗證）：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\preflight-clickhouse.ps1
 ```
 
-若出現 `npipe://.../docker_engine` /「找不到 pipe」：代表 **Docker Desktop 尚未起來**——請先開啟 Docker Desktop，等鯨魚圖示 **Running** 後再執行。**勿**在 PowerShell 單獨貼 `--profile preflight`（那不是完整指令，會Syntax 錯誤）。
+若出現 `npipe://.../docker_engine` /「找不到 pipe」：代表 **Docker Desktop 尚未起來**——請先開啟 Docker Desktop，等鯨魚圖示 **Running** 後再執行。
 
-**手動兩段式（macOS／Linux／CI 也可）** — 先跑靜態防回歸檢查（會擋掉 `latency_log` 與 `latest` 漂移）：
+**手動兩段式（macOS／Linux／CI 也可）** — 先跑靜態防回歸檢查（image tag 釘版本、六個已退役產生源仍為 `remove="1"`、merge 記憶體預算存在且非 0、記憶體上限未被調高）：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\validate-config.ps1
 ```
 
-再跑容器內 config 檢查（**整行**複製；須在含 `.env` 的本目錄）：
+再跑行為驗證（會起一個拋棄式 ClickHouse，用候選設定實際開機，然後斷言：每張 system 表都有 TTL、退役產生源沒回來、沒有過寬的表、merge 記憶體預算生效）：
 
 ```bash
-docker compose --env-file .env --profile preflight run --rm clickhouse-config-check
+./clickhouse/validate-override.sh
 ```
 
-若 preflight 失敗，先修正 `clickhouse/override.xml` 或版本標籤，再進行正式啟動。
+兩者都在 `.github/workflows/trigger-infra-config-guard.yml` 內強制執行。若 preflight 失敗，先修正 `clickhouse/override.xml` 或版本標籤，再進行正式啟動。
 
 ### 5. 啟動
 

@@ -1,6 +1,17 @@
-# Runs validate-config.ps1 then: docker compose --profile preflight run --rm clickhouse-config-check
-# (container runs Bitnami setup + clickhouse extract-from-config — validates merged config incl. override.xml)
-# Requires Docker engine running (Docker Desktop on Windows).
+# ClickHouse config preflight: static guardrails, then behavioural validation.
+#
+#   1. validate-config.ps1            text-level invariants (image pins, retired
+#                                     generators still disabled, memory budget unchanged)
+#   2. clickhouse/validate-override.sh boots a disposable ClickHouse 25.7.5 with the
+#                                     candidate override.xml and asserts the invariants
+#                                     against the running server
+#
+# Step 2 used to be `docker compose --profile preflight run --rm clickhouse-config-check`,
+# which never worked: it invoked `clickhouse-server --check-config`, but that binary is not
+# on PATH in the bitnami image and `--check-config` does not exist in ClickHouse 25.7. The
+# comment that used to sit here claimed it "validates merged config incl. override.xml" -
+# it validated nothing, and it reported success every time. See the removed service block
+# in docker-compose.yml. Requires Docker engine running (Docker Desktop on Windows).
 param(
   [string]$EnvFile = ".env"
 )
@@ -42,10 +53,23 @@ if ($LASTEXITCODE -ne 0) {
   exit $LASTEXITCODE
 }
 
-Write-Host "Running clickhouse-config-check (docker compose --profile preflight) ..." -ForegroundColor Cyan
+$validator = Join-Path $here "clickhouse\validate-override.sh"
+if (-not (Test-Path -LiteralPath $validator)) {
+  throw "Missing clickhouse/validate-override.sh at $validator"
+}
+
+$bash = Get-Command bash -ErrorAction SilentlyContinue
+if (-not $bash) {
+  Write-Host "[preflight] bash not found - cannot run the behavioural validator." -ForegroundColor Yellow
+  Write-Host "            Git for Windows ships it; or run it on any Docker host:" -ForegroundColor Gray
+  Write-Host "            ./clickhouse/validate-override.sh" -ForegroundColor Gray
+  exit 2
+}
+
+Write-Host "Running clickhouse/validate-override.sh (boots a disposable ClickHouse) ..." -ForegroundColor Cyan
 Push-Location -LiteralPath $here
 try {
-  docker compose --env-file $EnvFile --profile preflight run --rm clickhouse-config-check
+  & $bash.Source "clickhouse/validate-override.sh"
   $exit = $LASTEXITCODE
 } finally {
   Pop-Location

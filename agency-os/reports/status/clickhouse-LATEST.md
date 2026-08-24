@@ -1,37 +1,46 @@
 # ClickHouse health (EU)
 
-- Generated: 2026-08-25 02:20:00
-- Overall: **🟡 WARN**
+- Generated: 2026-08-25 03:39:23
+- Overall: **🔴 FAIL**
 - Host: 204.168.175.41 / container `trigger-clickhouse`
 
 ## Self-telemetry vs application data
 
 | Metric | Value |
 |--------|-------|
-| system database | 331.51 MiB (4,045,350 rows) |
-| trigger_dev (application) | 37.87 MiB (400,109 rows) |
-| ratio (system / app) | 8.8x |
-| largest system table | text_log:180439872 |
-| active merges | 2 |
-| max parts in one system table | 82 |
-| trace_log rows last hour | 0 (expected 0 - disabled 2026-08-15) |
-| asynchronous_metric_log rows last hour | 0 (expected 0 - disabled 2026-08-15) |
-| system tables missing TTL | 3 (opentelemetry_span_log,part_log,query_views_log) |
-| orphaned renamed tables (_<N> suffix) | 3 |
-| MergeTree tables seen this run | 14 |
+| system database | 212.17 MiB (3,497,161 rows) |
+| trigger_dev (application) | 37.87 MiB (400,289 rows) |
+| ratio (system / app) | 5.6x |
+| largest system table | text_log:181972761 |
+| active merges | 0 |
+| merges stalled at progress=0 | 0 (expected 0) |
+| failed merge tasks last hour | 883 (text_log 883 / part_log 0; expected 0) |
+| server-wide MEMORY_LIMIT_EXCEEDED last hour | 895 (not attributed to a source) |
+| merge memory budget | 1.00 GiB |
+| max parts in one system partition | 8 |
+| max parts in one trigger_dev partition | 4 (raw_task_runs_payload_v1) |
+| widest system log table | query_log (84 columns) |
+| retired generators present | 0 (expected 0) |
+| system tables missing TTL | 0 |
+| orphaned renamed tables (_<N> suffix) | 0 |
+| MergeTree tables seen this run | 12 |
 
 ## Findings
 
-- 3 system table(s) have no TTL and will grow unbounded: opentelemetry_span_log,part_log,query_views_log
-- 3 orphaned renamed system table(s) (_<N> suffix, any generation) left behind by a past rename-and-recreate cycle - safe to DROP after confirming the active table has the correct TTL
-- self-telemetry is 8.8x the application data (warn at 5x)
+- 883 background merge task failures in the last hour (text_log=883 part_log=0; fail at 200) - merges are aborting and being retried, so their parts are never consumed; check the widest table and see override.xml MERGE MEMORY BUDGET
+- 895 server-wide MEMORY_LIMIT_EXCEEDED errors in the last hour (warn at 20) - source not attributed; could be merges, mutations or user queries
+- self-telemetry is 5.6x the application data (warn at 5x)
 
 ## Why this check exists
 
-ClickHouse was fixed four times in four months (2026-04-20 / 04-29 / 07-05 / 08-15).
+ClickHouse was fixed five times in five months (2026-04-20 / 04-29 / 07-05 / 08-15 / 08-25).
 The first three raised the memory ceiling or deleted accumulated rows; none of them
 stopped the generators, so it returned with a different symptom each time (OOM, then
-OOM death spiral, then a permanently pegged CPU). This check watches the ratio rather
-than any single table, so the next flood is visible even if it comes from somewhere new.
+OOM death spiral, then a permanently pegged CPU). 08-15 stopped the biggest generators.
+08-25 was different again: merges of a 1,344-column table could not fit the memory cap,
+so they aborted and retried forever - and because the parts were never consumed, VOLUME
+STAYED LOW and every volume-based threshold here stayed green through a three-day outage.
+So this check now watches the mechanism (merge failures, stalled merges, part backlog,
+table width, memory budget in force) as well as the outcome (ratio, bytes).
 
 Config SSOT: `lobster-factory/infra/trigger/clickhouse/override.xml`

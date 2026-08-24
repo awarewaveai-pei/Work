@@ -231,7 +231,8 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | 使用者問某段時間的 Slack / Telegram / 告警 / incident | `scripts/fetch-external-signals.ps1 -From ... -To ...`（無時區預設 CST/UTC+8）|
 | AO-RESUME digest `since_utc` 比需要範圍早 > 2 小時 | 補跑 `/signals -From <需要起點>` |
 | AO-RESUME | 讀 `reports/status/cf-security-LATEST.md`，列入外部信號段（mtime >24h 才重跑腳本）|
-| AO-RESUME／使用者問「Trigger.dev 慢」「EU 卡卡的」「ClickHouse 又爆了嗎」 | 讀 `reports/status/clickhouse-LATEST.md`，於 §1 系統快照點名 verdict（🟢/🟡/🔴）+ **system/app 資料比**。該比值是 4 次復發的共同前兆（2026-08-15 事故時為 345:1）。🟡/🔴 → 檢查 `lobster-factory/infra/trigger/clickhouse/override.xml` 的產生源設定是否被還原；**禁止**用「調高 mem_limit / 清資料」了事 —— 那正是前三次復發的原因 |
+| AO-RESUME／使用者問「Trigger.dev 慢」「EU 卡卡的」「ClickHouse 又爆了嗎」 | 讀 `reports/status/clickhouse-LATEST.md`，於 §1 系統快照點名 verdict（🟢/🟡/🔴）。**要同時看兩類訊號，不可只看資料比**：① **結果面** system/app 資料比（2026-08-15 事故時 345:1）② **機制面** 失敗的 merge 數／stalled merges／單一分區 part 數／最寬系統表欄數／merge 記憶體預算是否生效。2026-08-25 第 5 次事故證明**光看資料比會漏**：merge 失敗時 part 不被消耗，資料量反而停在低點，該次燒了 3 天 CPU 100% 而資料比只有 8.3x（門檻 5x），偵測器在數學上不可能升到 🔴。🟡/🔴 → 檢查 `override.xml` 的產生源設定是否被還原；**禁止**用「調高 mem_limit / 清資料」了事 —— 那正是前三次復發的原因，`max_server_memory_usage` 現由 `validate-config.ps1` 機械鎖定 |
+| AO-RESUME／使用者問「CI 過了嗎」「build 綠的嗎」「Actions 有沒有壞」 | 讀 `reports/status/ci-LATEST.md`，於 §1 系統快照點名 verdict（🟢/🟡/🔴）。🔴 = 某個 workflow 已**連續紅 ≥3 次或 ≥7 天**——那不是 flake，是一道閘已經關掉那麼久了（2026-08-15 起 `Trigger infra config guard` 紅了 4 次 10 天沒人發現，直接促成第 5 次 ClickHouse 事故）。**BLIND SPOT 字樣 = `gh` 讀不到，一律當未驗證不當健康** |
 | 使用者問 Cloudflare 設定是否正常 | `scripts/check-cloudflare-security.ps1` |
 | `fetch-external-signals` Telegram 欄出現 `error.*401\|error.*403` | ① curl inbox/digest 確認 403/401 類型；② `secrets-vault.ps1 -Action import-user-env`；③ 更新 `OPS_INBOX_INGEST_TOKEN` 到 User registry；④ 重跑確認 ok。詳見 `runbooks/CLOUDFLARE-WAF-SETUP.md §API 維護` |
 | EU VPS `infra-alerts` 出現 scanner 路徑（`/.aws/`、`/.ssh/`、`/wp-config`）且 bad request % > 50 | SSH EU 確認；若持續 → Cloudflare WAF PATCH API 追加 block rule；curl 實測 403。詳見 `runbooks/CLOUDFLARE-WAF-SETUP.md §API 維護` |
@@ -444,5 +445,5 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-08-24 16:38:44 UTC_
+_Last synced: 2026-08-24 19:21:02 UTC_
 

@@ -8,9 +8,9 @@ Auto-called by ao-resume.ps1 alongside check-backup-health.ps1 / check-cloudflar
 / check-vps-auto-reboot-health.ps1. Writes agency-os/reports/status/clickhouse-LATEST.md (+ .json).
 
 WHY THIS EXISTS
-ClickHouse on EU was "fixed" four times in four months (2026-04-20, 04-29, 07-05, 08-15) and
-came back every time, because the first three fixes only ever raised the ceiling or deleted
-what had already accumulated:
+ClickHouse on EU was "fixed" five times in five months and came back every time, because
+each fix only ever raised the ceiling, deleted what had accumulated, or corrected the one
+table that happened to be blowing up:
 
   04-20  OOM            -> memory cap 600MB -> 800MB
   04-29  OOM again      -> cap 800MB -> 1.6GB, mem_limit 1024m -> 2048m, first TTLs
@@ -18,6 +18,9 @@ what had already accumulated:
          spiral (2344 OOM-kills)
   08-15  CPU pegged     -> finally disabled the GENERATORS (trace_log etc.)
          100% for days
+  08-25  CPU pegged     -> removed the two ULTRA-WIDE tables (metric_log 1,344
+         again, 3 days     columns, query_metric_log 939); moved every system-log
+                           TTL into config so a restart cannot erase it
 
 The 2026-04-29 commit comment already named trace_log by name. The diagnosis was right
 three and a half months before the generators were switched off; every intervention in
@@ -25,18 +28,46 @@ between treated whichever resource had blown up rather than the input rate. Beca
 ceiling kept rising, the bottleneck migrated from RAM to CPU and the symptom looked new
 each time.
 
+WHY THIS FILE GREW ON 2026-08-25 (read before adding a threshold)
+Incident #5 ran for three days at 100% CPU while THIS CHECK reported only YELLOW, and it
+was mathematically incapable of reporting anything worse: system data was 313 MiB (warn
+at 2 GiB), concurrent merges were 3 (warn at 10), and the ratio was 8.3x. Every threshold
+here had been calibrated against the SIGNATURE of the 2026-08-15 incident - accumulated
+volume - and #5 had a different signature because the generators were already off. Its
+mechanism was merges that could not complete: a 1,344-column table needs ~800 MiB per
+merge, several ran at once, the 2.5 GiB cap aborted them, the parts were never consumed,
+and the next attempt picked up even more parts. Volume stayed low precisely BECAUSE the
+merges were failing.
+So the probes below now measure the MECHANISM as well as the outcome: merge failures,
+stalled merges, part backlog, table width, and whether the memory budget is still in
+force. A detector calibrated on the last incident only ever catches the last incident.
+
 WHAT THIS CHECKS (the class, not the specific table)
-The durable signal is a ratio: a healthy analytics DB stores far more application data than
-self-telemetry. At the 2026-08-15 incident it was inverted 345:1 (system 16.89 GiB /
-643,628,136 rows vs trigger_dev 49 MiB / 624,481 rows). Any future table that starts
-flooding - not just trace_log - moves that ratio, so this keeps working when the specific
-offender changes. Regression of the two generators disabled on 2026-08-15 is also detected
-directly, in case a netdata/ClickHouse upgrade or a config revert re-enables them.
+  ratio           system bytes vs application bytes. At the 2026-08-15 incident it was
+                  inverted 345:1. Any table that starts flooding moves it.
+  merge failures  failed background merge tasks per hour, from two independent
+                  merge-specific sources (text_log's MergeTreeBackgroundExecutor and
+                  part_log's MergeParts error column). The #5 mechanism; 116,770 such
+                  log rows in 24h went completely unreported by the pre-2026-08-25 checks.
+  server-wide OOM MEMORY_LIMIT_EXCEEDED per hour, reported separately and worded
+                  separately, because system.error_log cannot attribute a cause.
+  stalled merges  merges at progress=0 for over a minute - a merge that cannot finish.
+  part backlog    max active parts in one PARTITION, in BOTH databases - an absolute
+                  level, not a trend. The application side closes the 2026-07-05 class
+                  (3002 parts in task_events).
+  table width     widest system-log table. metric_log had 1,344 columns; nothing that
+                  wide can be merged inside this container's budget.
+  budget in force merges_mutations_memory_usage_soft_limit != 0, i.e. background merges
+                  still have a memory bound at all.
+  no TTL          any system MergeTree table with no TTL - unbounded disk growth.
+  retired tables  any generator removed in override.xml that has come back.
 
 Verdict:
-  GREEN healthy - ratio and volume within budget, no disabled generator writing again
-  YELLOW drift  - ratio > 5x, or system data > 2 GiB, or a persistent merge backlog
-  RED broken    - ratio > 20x, or system data > 8 GiB, or a disabled generator is ingesting
+  GREEN healthy - everything within budget, no retired generator back, merges completing
+  YELLOW drift  - ratio > 5x, system data > 2 GiB, merge backlog, part backlog, a table
+                  wider than 200 columns, no-TTL table, orphan table, budget not in force
+  RED broken    - ratio > 20x, system data > 8 GiB, a retired generator is ingesting,
+                  sustained merge failures, or merges stalled at zero progress
 
 Exit code: always 0 (warn-only, same convention as the sibling checks).
 
@@ -68,13 +99,58 @@ $ICON_HEALTHY = [char]::ConvertFromUtf32(0x1F7E2)  # green circle
 $ICON_DRIFT   = [char]::ConvertFromUtf32(0x1F7E1)  # yellow circle
 $ICON_BROKEN  = [char]::ConvertFromUtf32(0x1F534)  # red circle
 
-# Thresholds. Ratio is the primary signal; the absolute sizes stop a tiny app
-# database from making an ordinary system database look catastrophic.
+# Thresholds. Ratio is the primary OUTCOME signal; the absolute sizes stop a tiny app
+# database from making an ordinary system database look catastrophic. The MERGEFAIL /
+# STALLED / PARTS / WIDTH thresholds are the MECHANISM signals added after 2026-08-25,
+# when the outcome signals alone could not exceed YELLOW during a three-day outage.
 $RATIO_WARN  = 5
 $RATIO_FAIL  = 20
 $BYTES_WARN  = 2GB
 $BYTES_FAIL  = 8GB
 $MERGE_WARN  = 10
+
+# Failed background merge tasks in the last hour (merge-specific; see the probe comment).
+# A healthy instance is flat zero here - a merge either succeeds or is not attempted - so
+# WARN is deliberately low. The 2026-08-25 incident ran at roughly 4,900/hour.
+$MERGEFAIL_WARN = 5
+$MERGEFAIL_FAIL = 200
+
+# Server-wide MEMORY_LIMIT_EXCEEDED (code 241) in the last hour, from any source: merges,
+# mutations, or user queries. Reported separately from merge failures so the two are never
+# confused - during the 2026-08-25 incident they coincided, but they need not.
+# system.error_log.value is a per-interval delta, not a cumulative counter: verified
+# 2026-08-25 by observing rows stop appearing entirely once the errors stopped
+# (0 rows / sum 0 in the following 15 minutes), which rules out sum() inflation.
+$OOM241_WARN = 20
+
+# Merges sitting at progress=0 for over a minute. On a healthy instance this is 0: a merge
+# either progresses or finishes. Anything above zero means merges are being retried, which
+# is the shape of the 2026-08-25 ratchet, so it is a hard failure rather than a warning.
+$STALLED_FAIL = 1
+
+# Max ACTIVE parts in a single PARTITION, checked in both databases (see the probe comment
+# for why per-partition and not per-table). This is an ABSOLUTE LEVEL check, not a trend
+# detector: it answers "is the backlog large right now", and a run where parts crept from
+# 5 to 29 still reports healthy (codex oracle 2026-08-25 FINDING 3 - confirmed true; the
+# prose used to claim trend detection and has been corrected).
+# A cross-run trend detector was considered and rejected: this script runs on AO-RESUME,
+# which is irregular by hours or days, so a delta between two runs has no stable time base
+# and would produce noise, not signal.
+# The absolute levels are what make that acceptable. Calibration, all measured on this
+# instance: healthy is 11 in system and 4 in trigger_dev; ClickHouse's own protections do
+# not engage until parts_to_delay_insert=1000 and parts_to_throw_insert=3000. So 30/80
+# fires one to two orders of magnitude before ClickHouse would throttle or reject inserts,
+# which leaves ample room to notice a slow climb between two AO-RESUME runs.
+# Incident values: 2026-08-25 (system.metric_log) 83; 2026-07-05 (trigger_dev.task_events)
+# 3002 - i.e. that one had already hit parts_to_throw_insert and was refusing writes.
+$PARTS_WARN = 30
+$PARTS_FAIL = 80
+
+# Widest system-log table, in columns. After 2026-08-25 the widest is query_log at 84.
+# metric_log (removed) was 1,344 and query_metric_log (removed) was 939 - a merge of a
+# table that wide costs ~800 MiB in per-column write buffers and cannot fit this budget.
+# Warn only: width is a hazard, not a fault, until merges actually start failing.
+$WIDTH_WARN = 200
 
 function Resolve-Root {
     param([string]$InputRoot)
@@ -139,11 +215,40 @@ echo "system_rows=$(q "SELECT sum(rows) FROM system.parts WHERE active AND datab
 echo "app_bytes=$(q "SELECT sum(bytes_on_disk) FROM system.parts WHERE active AND database='__APPDB__'")"
 echo "app_rows=$(q "SELECT sum(rows) FROM system.parts WHERE active AND database='__APPDB__'")"
 echo "merges=$(q "SELECT count() FROM system.merges")"
-echo "max_parts=$(q "SELECT max(c) FROM (SELECT count() AS c FROM system.parts WHERE active AND database='system' GROUP BY table)")"
+# Parts are counted PER PARTITION, not per table. ClickHouse never merges across
+# partitions, so a table partitioned by day legitimately holds one part per day:
+# trigger_dev.metrics_v1 (PARTITION BY toDate(bucket_start), 60-day TTL) shows 61 parts
+# per table and 4 per partition. Counting per table would fail that healthy table
+# permanently, and a permanently-red detector gets ignored - which is how this whole
+# class of incident stays invisible. Per partition, a high count really is a backlog.
+echo "max_parts=$(q "SELECT max(c) FROM (SELECT count() AS c FROM system.parts WHERE active AND database='system' GROUP BY table, partition)")"
+echo "app_max_parts_combo=$(q "SELECT concat(table,':',toString(c)) FROM (SELECT table, count() AS c FROM system.parts WHERE active AND database='__APPDB__' GROUP BY table, partition ORDER BY c DESC LIMIT 1)")"
 echo "top_table=$(q "SELECT concat(table,':',toString(sum(bytes_on_disk))) FROM system.parts WHERE active AND database='system' GROUP BY table ORDER BY sum(bytes_on_disk) DESC LIMIT 1")"
-echo "trace_log_recent=$(q "SELECT count() FROM system.trace_log WHERE event_time > now() - INTERVAL 1 HOUR")"
-echo "async_metric_log_recent=$(q "SELECT count() FROM system.asynchronous_metric_log WHERE event_time > now() - INTERVAL 1 HOUR")"
 echo "mergetree_total=$(q "SELECT count() FROM system.tables WHERE database='system' AND engine='MergeTree'")"
+# Mechanism probes (2026-08-25). Merge failures are counted from two INDEPENDENT
+# merge-specific sources and the verdict takes the larger, so one going blind does not
+# read as healthy:
+#   text_log   MergeTreeBackgroundExecutor is the logger that runs background merge and
+#              mutation tasks; an Error from it means a merge task failed, whatever the
+#              cause. Proven signal: 116,770 such rows in 24h during the incident. Needs
+#              <level>warning</level> or lower in override.xml, which is set.
+#   part_log   MergeParts rows carry an `error` column; non-zero is a failed merge.
+# Deliberately NOT keyed on error code 241: system.error_log is server-wide, so a heavy
+# ad-hoc query that runs out of memory would be reported as a merge loop and send the
+# operator down the wrong path (codex oracle 2026-08-25 FINDING 2 - confirmed true).
+# Code 241 is still probed below, but reported as its own server-wide signal.
+echo "merge_fail_1h=$(q "SELECT count() FROM system.text_log WHERE event_time > now() - INTERVAL 1 HOUR AND logger_name = 'MergeTreeBackgroundExecutor' AND level IN ('Fatal','Critical','Error')")"
+echo "merge_fail_partlog_1h=$(q "SELECT count() FROM system.part_log WHERE event_time > now() - INTERVAL 1 HOUR AND event_type = 'MergeParts' AND error != 0")"
+echo "oom_241_1h=$(q "SELECT sum(value) FROM system.error_log WHERE code=241 AND event_time > now() - INTERVAL 1 HOUR")"
+echo "stalled_merges=$(q "SELECT count() FROM system.merges WHERE progress = 0 AND elapsed > 60")"
+echo "widest_combo=$(q "SELECT concat(table,':',toString(count())) FROM system.columns WHERE database='system' AND table IN (SELECT name FROM system.tables WHERE database='system' AND engine='MergeTree') GROUP BY table ORDER BY count() DESC LIMIT 1")"
+echo "merge_budget=$(q "SELECT value FROM system.server_settings WHERE name='merges_mutations_memory_usage_soft_limit'")"
+# Existence, not row counts: ClickHouse only creates a system log table when its logger is
+# enabled, so a retired generator existing at all means override.xml was reverted or a
+# ClickHouse upgrade re-introduced it. Row-count probes on a dropped table return an error
+# that q() swallows into "0", which is indistinguishable from healthy - the exact blind
+# spot AGENTS.md warns about, so existence is the signal.
+echo "retired_combo=$(q "SELECT concat(toString(count()),'|',arrayStringConcat(arraySort(groupArray(name)),',')) FROM system.tables WHERE database='system' AND name IN ('trace_log','asynchronous_metric_log','metric_log','query_metric_log','query_thread_log','s3queue_log')")"
 echo "no_ttl_combo=$(q "SELECT concat(toString(count()),'|',arrayStringConcat(arraySort(groupArray(name)),',')) FROM system.tables WHERE database='system' AND engine='MergeTree' AND NOT match(name,'_[0-9]+$') AND position(engine_full,'TTL')=0")"
 echo "orphan_dup_count=$(q "SELECT count() FROM system.tables WHERE database='system' AND engine='MergeTree' AND match(name,'_[0-9]+$')")"
 '@
@@ -165,10 +270,27 @@ function Set-Worst {
 }
 
 $systemBytes = 0L; $appBytes = 0L; $merges = 0L; $maxParts = 0L
-$traceRecent = 0L; $asyncRecent = 0L; $systemRows = 0L; $appRows = 0L
+$systemRows = 0L; $appRows = 0L
 $topTable = ""
 $ratio = 0.0
 $noTtlCount = 0L; $noTtlNames = ""; $orphanDupCount = 0L; $mergetreeTotal = 0L
+$mergeFail1h = 0L; $stalledMerges = 0L; $mergeBudget = 0L
+$widestTable = ""; $widestCols = 0L
+$appMaxParts = 0L; $appMaxPartsTable = ""
+$retiredCount = 0L; $retiredNames = ""
+
+# "table:number" -> name + value. Used by widest_combo and app_max_parts_combo so the name
+# and its number arrive from one query and cannot disagree (same reasoning as no_ttl_combo).
+function Split-Combo {
+    param([string]$Combo)
+    if (-not $Combo) { return @{ Name = ""; Value = 0L } }
+    $idx = $Combo.LastIndexOf(":")
+    if ($idx -lt 0) { return @{ Name = $Combo; Value = 0L } }
+    return @{
+        Name  = $Combo.Substring(0, $idx)
+        Value = (To-Long $Combo.Substring($idx + 1))
+    }
+}
 
 if ($res.ExitCode -ne 0) {
     Set-Worst "broken"
@@ -181,10 +303,29 @@ if ($res.ExitCode -ne 0) {
     $merges      = To-Long (Parse-Kv $res.Output "merges")
     $maxParts    = To-Long (Parse-Kv $res.Output "max_parts")
     $topTable    = Parse-Kv $res.Output "top_table"
-    $traceRecent = To-Long (Parse-Kv $res.Output "trace_log_recent")
-    $asyncRecent = To-Long (Parse-Kv $res.Output "async_metric_log_recent")
     $mergetreeTotal = To-Long (Parse-Kv $res.Output "mergetree_total")
     $orphanDupCount = To-Long (Parse-Kv $res.Output "orphan_dup_count")
+    # Two independent merge-failure sources; the larger wins so that one probe returning
+    # an empty string (query error swallowed by q()) cannot mask the other.
+    $mergeFailText  = To-Long (Parse-Kv $res.Output "merge_fail_1h")
+    $mergeFailParts = To-Long (Parse-Kv $res.Output "merge_fail_partlog_1h")
+    $mergeFail1h    = [Math]::Max($mergeFailText, $mergeFailParts)
+    $oom241         = To-Long (Parse-Kv $res.Output "oom_241_1h")
+    $stalledMerges  = To-Long (Parse-Kv $res.Output "stalled_merges")
+    $mergeBudget    = To-Long (Parse-Kv $res.Output "merge_budget")
+
+    $widest = Split-Combo (Parse-Kv $res.Output "widest_combo")
+    $widestTable = $widest.Name; $widestCols = $widest.Value
+
+    $appParts = Split-Combo (Parse-Kv $res.Output "app_max_parts_combo")
+    $appMaxPartsTable = $appParts.Name; $appMaxParts = $appParts.Value
+
+    $retiredCombo = Parse-Kv $res.Output "retired_combo"
+    if ($retiredCombo) {
+        $retiredParts = $retiredCombo.Split("|", 2)
+        $retiredCount = To-Long $retiredParts[0]
+        $retiredNames = if ($retiredParts.Length -gt 1) { $retiredParts[1] } else { "" }
+    }
 
     # count and names come back as one atomic "count|comma,sorted,names" field so a
     # transient catalog change between two separate queries can't split them apart
@@ -209,14 +350,14 @@ if ($res.ExitCode -ne 0) {
         Set-Worst "drift"
         $reasons += "TTL/orphan probe returned nothing this run (mergetree_total=$mergetreeTotal) - detector blind, no-TTL and orphan-table results below are not trustworthy"
     } else {
-        # 2026-08-19: a system log table's TTL does not survive every rename-and-recreate
-        # cycle (ClickHouse creates <table>_N and drops the old TTL when the config-derived
-        # definition no longer matches on restart). Declaring <ttl> in override.xml survives
-        # this for most tables but crashed ClickHouse (BAD_ARGUMENTS) for four of them the one
-        # time it was tried together; those four are now TTL'd via live ALTER TABLE instead,
-        # which has no config backing and can silently drift back to no-TTL on a future
-        # restart. This is the compensating control for that known gap - see WORKLOG
-        # 2026-08-19 and lobster-factory/infra/trigger/clickhouse/override.xml.
+        # A system log table's TTL does not survive a rename-and-recreate cycle: ClickHouse
+        # renames the old table to <table>_N and builds a fresh one from the config-derived
+        # definition, so anything applied with a live ALTER is silently lost. That is exactly
+        # what the 2026-08-22 auto-reboot did to part_log / query_views_log /
+        # opentelemetry_span_log, whose TTLs had been applied by ALTER on 2026-08-19.
+        # Since 2026-08-25 every system log TTL is declared in override.xml instead, which
+        # survives restarts - so a non-zero count here now means either a ClickHouse upgrade
+        # added a new log table nobody has declared yet, or override.xml was reverted.
         # (Orphaned _N tables are excluded from this query - they're covered by the
         # orphan-count check below, and being unwritten leftovers they don't "grow".)
         if ($noTtlCount -gt 0) {
@@ -230,16 +371,68 @@ if ($res.ExitCode -ne 0) {
         }
     }
 
-    # Regression of the generators switched off on 2026-08-15. Rows arriving in the
-    # last hour is the runtime truth; the config file alone can be right while a
-    # container still runs an older config.
-    if ($traceRecent -gt 0) {
+    # Regression of the generators removed in override.xml (2026-08-15 and 2026-08-25).
+    # Existence is the runtime truth: the config file can be right while the container
+    # still runs an older config, and ClickHouse only creates these tables when their
+    # logger is enabled.
+    if ($retiredCount -gt 0) {
         Set-Worst "broken"
-        $reasons += "system.trace_log is ingesting again ($traceRecent rows in the last hour) - the 2026-08-15 generator fix has been reverted or lost"
+        $namesPart = if ($retiredNames) { ": $retiredNames" } else { " (names unavailable)" }
+        $reasons += "$retiredCount retired system log table(s) have come back$namesPart - override.xml was reverted or a ClickHouse upgrade re-enabled the logger"
     }
-    if ($asyncRecent -gt 0) {
+
+    # The 2026-08-25 mechanism. Merges that abort never consume their parts, so the next
+    # attempt takes on more parts and fails harder; the loop is a ratchet that does not
+    # self-correct and survives restarts. Volume stays LOW while this happens, which is
+    # why the ratio and byte thresholds below cannot see it.
+    $mergeFailSrc = "text_log=$mergeFailText part_log=$mergeFailParts"
+    if ($mergeFail1h -ge $MERGEFAIL_FAIL) {
         Set-Worst "broken"
-        $reasons += "system.asynchronous_metric_log is ingesting again ($asyncRecent rows in the last hour)"
+        $reasons += "$mergeFail1h background merge task failures in the last hour ($mergeFailSrc; fail at $MERGEFAIL_FAIL) - merges are aborting and being retried, so their parts are never consumed; check the widest table and see override.xml MERGE MEMORY BUDGET"
+    } elseif ($mergeFail1h -ge $MERGEFAIL_WARN) {
+        Set-Worst "drift"
+        $reasons += "$mergeFail1h background merge task failures in the last hour ($mergeFailSrc; warn at $MERGEFAIL_WARN)"
+    }
+
+    # Separate signal, separate wording: this one is server-wide and says nothing about
+    # where the memory went. Merge failures above are the merge-specific claim.
+    if ($oom241 -ge $OOM241_WARN) {
+        Set-Worst "drift"
+        $reasons += "$oom241 server-wide MEMORY_LIMIT_EXCEEDED errors in the last hour (warn at $OOM241_WARN) - source not attributed; could be merges, mutations or user queries"
+    }
+    if ($stalledMerges -ge $STALLED_FAIL) {
+        Set-Worst "broken"
+        $reasons += "$stalledMerges merge(s) stalled at progress=0 for over a minute - a merge that cannot complete will never release its parts"
+    }
+
+    # Merge memory budget still in force. 0 means unlimited, which is what allowed three
+    # concurrent ~800 MiB merges inside a 2.5 GiB cap on 2026-08-25.
+    if ($mergeBudget -le 0) {
+        Set-Worst "drift"
+        $reasons += "merges_mutations_memory_usage_soft_limit is 0 (unlimited) - background merges have no memory bound; override.xml sets this and the running container is not honouring it"
+    }
+
+    # Width hazard. Nothing this wide can be merged inside the container budget.
+    if ($widestCols -ge $WIDTH_WARN) {
+        Set-Worst "drift"
+        $reasons += "widest system log table is $widestTable at $widestCols columns (warn at $WIDTH_WARN) - a merge costs roughly one write buffer per column; metric_log at 1,344 columns is what caused 2026-08-25"
+    }
+
+    # Part ratchet, both databases. System side caught 2026-08-25 (83 parts in metric_log);
+    # application side covers 2026-07-05 (3002 parts in trigger_dev.task_events).
+    if ($maxParts -ge $PARTS_FAIL) {
+        Set-Worst "broken"
+        $reasons += "a system partition holds $maxParts active parts (fail at $PARTS_FAIL) - merges are not keeping up"
+    } elseif ($maxParts -ge $PARTS_WARN) {
+        Set-Worst "drift"
+        $reasons += "a system partition holds $maxParts active parts (warn at $PARTS_WARN)"
+    }
+    if ($appMaxParts -ge $PARTS_FAIL) {
+        Set-Worst "broken"
+        $reasons += "one $AppDatabase.$appMaxPartsTable partition holds $appMaxParts active parts (fail at $PARTS_FAIL) - this is the 2026-07-05 shape (3002 parts, 2344 OOM-kills at startup)"
+    } elseif ($appMaxParts -ge $PARTS_WARN) {
+        Set-Worst "drift"
+        $reasons += "one $AppDatabase.$appMaxPartsTable partition holds $appMaxParts active parts (warn at $PARTS_WARN)"
     }
 
     if ($appBytes -le 0) {
@@ -292,9 +485,14 @@ $lines += ("| {0} (application) | {1} ({2:N0} rows) |" -f $AppDatabase, (Format-
 $lines += ("| ratio (system / app) | {0}x |" -f $ratio)
 $lines += ("| largest system table | {0} |" -f ($(if ($topTable) { $topTable } else { "n/a" })))
 $lines += ("| active merges | {0} |" -f $merges)
-$lines += ("| max parts in one system table | {0} |" -f $maxParts)
-$lines += ("| trace_log rows last hour | {0} (expected 0 - disabled 2026-08-15) |" -f $traceRecent)
-$lines += ("| asynchronous_metric_log rows last hour | {0} (expected 0 - disabled 2026-08-15) |" -f $asyncRecent)
+$lines += ("| merges stalled at progress=0 | {0} (expected 0) |" -f $stalledMerges)
+$lines += ("| failed merge tasks last hour | {0} (text_log {1} / part_log {2}; expected 0) |" -f $mergeFail1h, $mergeFailText, $mergeFailParts)
+$lines += ("| server-wide MEMORY_LIMIT_EXCEEDED last hour | {0} (not attributed to a source) |" -f $oom241)
+$lines += ("| merge memory budget | {0} |" -f $(if ($mergeBudget -gt 0) { Format-Size $mergeBudget } else { "0 - UNLIMITED" }))
+$lines += ("| max parts in one system partition | {0} |" -f $maxParts)
+$lines += ("| max parts in one {0} partition | {1}{2} |" -f $AppDatabase, $appMaxParts, $(if ($appMaxPartsTable) { " ($appMaxPartsTable)" } else { "" }))
+$lines += ("| widest system log table | {0} |" -f $(if ($widestTable) { "$widestTable ($widestCols columns)" } else { "n/a" }))
+$lines += ("| retired generators present | {0}{1} (expected 0) |" -f $retiredCount, $(if ($retiredNames) { " ($($retiredNames -replace '\|', '\|'))" } else { "" }))
 # critic 2026-08-19 S3: a `|` in a table name would break this markdown row (no
 # attack path today - names come from system.tables, not user input - but cheap
 # to guard). JSON payload below needs no escaping, ConvertTo-Json handles it.
@@ -313,11 +511,15 @@ if ($reasons.Count -eq 0) {
 $lines += ""
 $lines += "## Why this check exists"
 $lines += ""
-$lines += "ClickHouse was fixed four times in four months (2026-04-20 / 04-29 / 07-05 / 08-15)."
+$lines += "ClickHouse was fixed five times in five months (2026-04-20 / 04-29 / 07-05 / 08-15 / 08-25)."
 $lines += "The first three raised the memory ceiling or deleted accumulated rows; none of them"
 $lines += "stopped the generators, so it returned with a different symptom each time (OOM, then"
-$lines += "OOM death spiral, then a permanently pegged CPU). This check watches the ratio rather"
-$lines += "than any single table, so the next flood is visible even if it comes from somewhere new."
+$lines += "OOM death spiral, then a permanently pegged CPU). 08-15 stopped the biggest generators."
+$lines += "08-25 was different again: merges of a 1,344-column table could not fit the memory cap,"
+$lines += "so they aborted and retried forever - and because the parts were never consumed, VOLUME"
+$lines += "STAYED LOW and every volume-based threshold here stayed green through a three-day outage."
+$lines += "So this check now watches the mechanism (merge failures, stalled merges, part backlog,"
+$lines += "table width, memory budget in force) as well as the outcome (ratio, bytes)."
 $lines += ""
 $lines += "Config SSOT: ``lobster-factory/infra/trigger/clickhouse/override.xml``"
 
@@ -326,7 +528,7 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 [System.IO.File]::WriteAllText((Join-Path $reportDir "clickhouse-LATEST.md"), $content, $utf8NoBom)
 
 $payload = [ordered]@{
-    schemaVersion   = 1
+    schemaVersion   = 2
     generatedAtUtc  = $now.ToUniversalTime().ToString("o")
     host            = $EuHost
     container       = $Container
@@ -339,8 +541,18 @@ $payload = [ordered]@{
     activeMerges    = $merges
     maxPartsPerTable = $maxParts
     topSystemTable  = $topTable
-    traceLogRowsLastHour = $traceRecent
-    asyncMetricLogRowsLastHour = $asyncRecent
+    appMaxPartsPerTable = $appMaxParts
+    appMaxPartsTable = $appMaxPartsTable
+    mergeFailuresLastHour = $mergeFail1h
+    mergeFailuresTextLog = $mergeFailText
+    mergeFailuresPartLog = $mergeFailParts
+    serverWideOom241LastHour = $oom241
+    stalledMerges   = $stalledMerges
+    mergeMemoryBudgetBytes = $mergeBudget
+    widestSystemLogTable = $widestTable
+    widestSystemLogColumns = $widestCols
+    retiredTablesPresent = $retiredCount
+    retiredTableNames = $retiredNames
     mergeTreeTablesSeen = $mergetreeTotal
     noTtlTableCount = $noTtlCount
     noTtlTableNames = $noTtlNames
@@ -358,7 +570,7 @@ if ($Json) {
     $payload | ConvertTo-Json -Depth 6
 } else {
     Write-Host ("ClickHouse health: {0} {1}" -f $icon, $userLabel)
-    Write-Host ("  system={0} app={1} ratio={2}x merges={3}" -f (Format-Size $systemBytes), (Format-Size $appBytes), $ratio, $merges)
+    Write-Host ("  system={0} app={1} ratio={2}x merges={3} stalled={4} mergefail1h={5} widest={6}" -f (Format-Size $systemBytes), (Format-Size $appBytes), $ratio, $merges, $stalledMerges, $mergeFail1h, $(if ($widestTable) { "${widestTable}:${widestCols}" } else { "n/a" }))
     foreach ($r in $reasons) { Write-Host ("  - {0}" -f $r) -ForegroundColor Yellow }
 }
 

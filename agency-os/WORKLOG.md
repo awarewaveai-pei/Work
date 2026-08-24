@@ -2,6 +2,101 @@
 
 ## 2026-08-25
 
+### AUTO_TASK_DONE: ClickHouse 第 5 次復發根治 —— 不是量的問題是「寬度」的問題，外加四個圍著它空轉的閘
+
+[任務]
+操作者看到 AO-RESUME §1 那行「ClickHouse 🟡 WARN — 資料比 8.3x⋯非本輪新增，是既有已知監控項⋯暫不需動作」，問：**「為什麼這件事繼續發生?」** 接著指示「你做最佳處理，要能跑 20 年，不能用補丁式修護」。
+
+[現況分析 — 那句「暫不需動作」是錯的]
+實測進 EU 才發現同一個病**當下正在燒**：容器 CPU **100.04%**（持續三天）、`system.error_log` code 241 `MEMORY_LIMIT_EXCEEDED` **6 小時 29,507 次**、3 個 `system.metric_log` merge 卡在 `progress=0`、`text_log` 24h 內 116,770 行全是那個 merge 失敗訊息。
+
+[根因 — 是寬度不是容量]
+
+| 表 | 欄數 |
+|---|---|
+| `system.metric_log` | **1,344** |
+| `system.query_metric_log` | **939** |
+| `system.query_log`（其餘全部都窄） | 84 |
+
+Merge 每欄開一個寫入緩衝，所以 `metric_log` 一次 merge 固定要 ~800 MiB，**與列數無關**（vertical merge 也救不了：實測該表早已超過 `vertical_merge_algorithm_min_rows_to_activate=131072` 仍是這個代價）。而 `merges_mutations_memory_usage_soft_limit` 實際生效值是 **0＝無上限**，於是排程器可以在 2.5 GiB 上限內同時啟動三個 ~800 MiB 的 merge → 全部撞牆 abort → **parts 不被消耗** → 下一輪撿更多 parts → 更會撞 → 每次 abort 寫一行 `text_log`。棘輪，不自癒，且撐過重啟。
+
+**關鍵性質：merge 失敗時資料量反而停在低點**（parts 沒被合併掉但也沒繼續長），所以所有以「累積量」為基礎的門檻全部是綠的。
+
+[為什麼是第 5 次 —— 四層]
+1. **這次的觸發**：2026-08-22 20:30 UTC 的 **auto-reboot** 把 8/19 用 live `ALTER` 加上的三張表 TTL 洗掉（`_0` 孤兒仍帶 TTL、活表沒有 —— 實測確認）。8/19 的 [剩餘風險] 一字不差預言了這件事，監控也如期報 `noTtlTableCount=3`，**沒有人接**。
+2. **8/19 的技術結論是錯的**：當時說「這四張表不吃宣告式 TTL，原因未查明」。真相是四張一起加、**只有 `opentelemetry_span_log`** 因 base config 真的有 `<engine>`（上游註解自稱 workaround）而報錯，整批被一張連坐。當時查了 base `config.xml`，沒查 `preprocessed_configs/config.xml`（合併後的生效設定）—— 那份裡 `<engine>` 一眼可見。
+3. **8/15 刻意留下 `metric_log`**（理由：唯一的內部指標來源），只把 flush 放慢，沒有驗「1,344 欄的表在 2.5 GiB 預算下 merge 得動嗎」。降低產生速率 ≠ 讓下游負擔進得了預算。
+4. **圍著這份設定的閘全部是空轉的**（本輪一併查出並修好，見下）。
+
+[不變量分析 —— 這一步改掉了我原本的設計]
+第一版方案是壓 `background_pool_size=2`。拋棄式容器實測 **exit 36 BAD_ARGUMENTS**：pool 大小是 `number_of_free_entries_in_pool_to_execute_mutation`(20) 等三個設定的承載體，壓它要連帶改三個耦合旋鈕。
+第二版改用 `merges_mutations_memory_usage_soft_limit=1GiB`。上 prod 後**實測沒有生效**：仍同時排了兩個 `metric_log` merge —— 因為 ClickHouse 排程時的記憶體估算是看 **part 磁碟大小**（全表才 115 MiB），對「每欄一個緩衝」完全是瞎的。**估不到成本的估算器無法執行預算。**
+於是回到不變量本身：**同一個 background pool 裡同時裝著 800 MiB 的項目和 5 MiB 的項目，而餘裕只有 1.3 GiB。** 把 pool 壓到只容一個寬 merge → 同時餓死應用表的 merge → 那正是 2026-07-05 事故（`task_events` 3002 個碎片 part）。兩個需求**只要那張寬表還在同一個 pool 就結構性衝突**，沒有任何設定能同時滿足。
+→ 唯一解是**把那個 800 MiB 的項目移走**。確立規則：**任何系統紀錄表都不得寬到單次 merge 超出 merge 預算。**
+
+[已修改]
+1. `lobster-factory/infra/trigger/clickhouse/override.xml` —— `metric_log`(1,344 欄) 與 `query_metric_log`(939 欄) 改 `remove="1"`（改後全庫最寬 = `query_log` 84 欄）；`part_log`/`query_views_log` 改宣告式 `<ttl>`、`opentelemetry_span_log` 改 engine 內嵌 TTL（live ALTER 依賴解除）；補 `crash_log`/`backup_log` 90d TTL、`query_thread_log`/`s3queue_log` 退役（兩張空表、無 writer、無 TTL＝定時炸彈）；加 `merges_mutations_memory_usage_soft_limit`（縱深防禦，不是主修）。註解寫進完整的預算算式與**兩個被實測否決的方案**，避免下次有人重提。
+2. `scripts/check-clickhouse-health.ps1` —— 補機制面探測：失敗 merge 數（`text_log` 的 `MergeTreeBackgroundExecutor` + `part_log` 的 `MergeParts error!=0`，**取兩者最大值**，任一瞎掉不會看起來像健康）、stalled merges、**每分區** part 數（system + 應用庫兩邊）、最寬系統表欄數、merge 預算是否生效；退役產生源改用「表是否存在」判定（避免對已刪表下查詢、錯誤被 `q()` 吞成 0 的 fail-open）。schemaVersion 1→2。
+3. `lobster-factory/infra/trigger/clickhouse/validate-override.sh`（新）—— 真正的行為驗證器：起拋棄式 ClickHouse 用候選設定實際開機，斷言 5 項不變量。
+4. `lobster-factory/infra/trigger/docker-compose.yml` —— 移除永遠不可能有效的 `clickhouse-config-check` 服務；`mem_limit` 4096m→**3072m** 對齊 prod 實跑值。
+5. `lobster-factory/infra/trigger/validate-config.ps1` —— 移除過期的 `latency_log` 斷言；改為 6 條真不變量（六個退役產生源仍 `remove="1"`／merge 預算存在且非 0／`max_server_memory_usage` 鎖定／compose `mem_limit` 鎖定／行為驗證器存在）。
+6. `lobster-factory/infra/trigger/preflight-clickhouse.ps1` + `README.md` + `.github/workflows/trigger-infra-config-guard.yml` —— 全部改指向真驗證器；CI 新增行為驗證 job。
+7. `agency-os/AGENTS.md` ClickHouse 路由規則 —— 原文教代理盯「資料比」，本次事故正好證明 merge 失敗時該比值不會動；改為結果面＋機制面兩類訊號都要看。
+8. `agency-os/WORKLOG.md` 2026-08-19 [剩餘風險] —— 加訂正：該風險已於 8/22 實現，且該則的技術結論已被證偽。
+9. **EU 正式機**：部署上述設定並重啟（healthy，RestartCount=0）；DROP 12 張表（`metric_log` 115.81 MiB、`query_metric_log`、`query_thread_log`、`s3queue_log` 及 8 張 `_N` 孤兒），DROP 前有守衛檢查「所有現役表都已有 TTL」才動手。
+10. `scripts/check-ci-health.ps1`（新）+ `scripts/ao-resume.ps1` 接線 + `AGENTS.md` 觸發列 —— **repo 原本完全沒有任何機制在看 GitHub Actions**（`gh run` 只出現在 wp-bridge 發版腳本裡）。這是「CI 紅 10 天沒人知道」的結構性缺口：只修 ClickHouse 而留著它，下一個壞掉的閘會用一模一樣的方式重演。依 `runbooks/ADD-PERIODIC-HEALTH-CHECK.md` 既有 pattern 實作（第 4、5 個實例），verdict 分級刻意把「連續紅 ≥3 次或 ≥7 天」升為 🔴：那不是 flake，是一道閘已經關掉那麼久。`gh` 讀不到時回報 **BLIND SPOT + FAIL**，不回報健康。
+11. `runbooks/ADD-PERIODIC-HEALTH-CHECK.md` —— 補 2026-08-25 addendum：**寫 verdict 邏輯要問兩個問題，不是一個**（① 失敗長什麼樣＝結果面 ② 失敗正在做什麼＝機制面）。只有 ① 的檢查只抓得到上一次事故的重演。附兩個同日踩到的陷阱：兩個獨立來源取 max（單一來源瞎掉不會像健康）、以及「measure 什麼就叫什麼」（第一版把 server-wide 錯誤碼報成「merge 失敗」，事故當下為真、一般情況為假）。
+12. **CI 檢查首跑即抓到第二個紅燈**：`Weekly workflows security audit` —— 該閘是**正常運作在報真問題**（偵測到 high/critical 漏洞就 exit 1 並開 issue），對應 **issue #15（`packages/workflows`，2026-06-15 開，已 10 週未處理）**。正確分級為 🟡（streak=1，8/17 那次綠）。**本輪不處理**，屬獨立議題，已向操作者點名。
+
+[四個空轉的閘（本輪額外查出）]
+
+| 閘 | 壞法 |
+|---|---|
+| `clickhouse-config-check` compose 服務 | `clickhouse-server` 不在 PATH（在 `/opt/bitnami/clickhouse/bin/`）**且** `--check-config` 在 25.7 根本不存在（`--help` 只有 `--config-file`）。每次輸出 `not found`，而 README 教的 `\| tail` 把 exit code 吞掉 → **從加入第一天起無條件回報成功** |
+| `preflight-clickhouse.ps1` | 包著上面那個服務，註解還宣稱「validates merged config incl. override.xml」 |
+| `validate-config.ps1` | 斷言 `<latency_log>` 不得存在（24.8 時代的規則），但 8/15 事故修復合法地把它加回去 → 從此每次執行都 throw |
+| CI `trigger-infra-config-guard` | 跑上面那支 → **自 2026-08-15 08:04:50Z 起連續 4 次失敗、紅了 10 天**。諷刺點：讓它變紅的正是**第 4 次事故的修復 commit** |
+
+還查出一筆 SSOT 漂移：repo compose 寫 `mem_limit: 4096m`、prod 實跑 3072m，源頭是 `35834a0d`（2026-06-13）—— 一個 **auto-checkpoint commit 把工作區裡沒提交的編輯掃進 git**，從未部署，漂了 10 週。已對齊並加機械閘鎖住兩份檔案的耦合。
+
+[驗證結果]
+- **拋棄式容器實測（部署前，override.xml 註解明令要求）**：第一版 `background_pool_size=2` → **exit 36 攔下**（這個若直接上 prod 就是第二次 crash-loop）；最終版 → 7/7 表帶 TTL、退役表 0 張存在、最寬 `query_log:84`、soft limit 生效。
+- **prod 修復前後**：CPU **100.04% → 5.0%**；容器記憶體 1,019 MiB → 498 MiB；host load 1.83 → 1.10；free 316 MB → 896 MB；code 241 最後一筆 **18:49:30**（`metric_log` DROP 前殘餘），其後 13 分鐘 0 筆，`MergesMutationsMemoryTracking=0`。
+- **system 表最終狀態**：12 張全部有 TTL，`remaining_without_ttl=0`，孤兒 0 張。
+- `validate-override.sh` **雙路徑實測**：good config → PASS；壞設定 A（server 拒絕啟動）→ exit 1 並印容器 log；壞設定 B（未宣告 TTL）→ exit 1 並列出 15 張無 TTL 表。
+- `validate-config.ps1` **三路徑實測**：現況 → exit 0；竄改 `mem_limit` 為 4096m → exit 1；竄改 `text_log` level 為 `fatal` → exit 1（該 level 是 merge 失敗偵測器的依賴，調高會讓偵測器靜默變瞎）；還原 → exit 0。
+- `check-ci-health.ps1` **實跑真實 GitHub**：verdict 🔴 FAIL，正確抓到 `Trigger infra config guard` 連續 4 次紅、9 天（與我先前手動 `gh run list` 查到的結果互相印證），並額外抓到我原本不知道的第二個紅燈。
+- `ao-resume.ps1` 語法 PASS；CP950 稽核 drift 數改動前後皆 17、新增區塊 0 個 capture site（既有 backlog，`AUDIT_REGISTRY.md:102` 已列為 Low，非本次引入）。
+- 升級後的 health check 立刻把 verdict 從 🟡 WARN 拉到 🔴 FAIL（同一台機、同一時刻），證明原偵測器的盲點是真的。
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker run 拋棄式驗證 x5 + docker restart trigger-clickhouse x3 + ClickHouse DROP/FLUSH/ALTER 系列 + check-clickhouse-health.ps1 實跑 x4 + validate-override.sh 三路徑 + validate-config.ps1 三路徑 + docker compose config | exit=0 | ms=~9000000
+- REVIEW_DONE: critic=Deep（外部 oracle = Codex CLI，非自我描述）| verdict=pass-after-fix | findings=1c/2m/0n
+  - **FINDING 1（駁回，附反證）**：宣稱 `error_log.value` 是累計快照、`sum()` 會把 1 次錯誤灌成 ~3600。實測反證：code 241 的 row 在 18:49:30 後**完全停止出現**（其後 15 分鐘 0 rows / sum 0）；若是累計計數器，row 會永遠繼續出現且值不減。code 60 同形（118 rows / sum 212，只在錯誤真正發生的時點有 row）。該欄在 25.7.5 是每區間 delta。
+  - **FINDING 2（真，已修）**：code 241 是 server-wide，一個吃記憶體的使用者查詢會被報成「merge 迴圈」而把人導向錯的方向。改為兩個 merge 專屬來源取 max，code 241 另立欄位、另立措辭（「來源未歸因」）。
+  - **FINDING 3（真，已修）**：文件宣稱偵測 ratchet（趨勢），實作是絕對門檻，5→29 的緩慢爬升會是綠的。修正措辭為「絕對水位」，並記錄**為什麼否決跨執行趨勢偵測**（本檢查跑在 AO-RESUME，間隔數小時到數天，delta 沒有穩定時間基準），同時補上校準依據：ClickHouse 自身 `parts_to_delay_insert=1000`／`parts_to_throw_insert=3000`，本檢查 30/80 提早一到兩個數量級（2026-07-05 的 3002 正好撞上 throw 線）。
+- REVIEW_DONE（第二輪，同一 oracle 對修正後的 code 再審）: critic=Deep | verdict=pass-after-fix | findings=0c/2m/0n —— **兩條都真，且引出一條更嚴重的自查發現**
+  - **R2-FINDING 1（真，已修）**：行為驗證器可能對「錯的 ClickHouse build」回報 PASS。我在 oracle 啟動後已先把寫死的 tag 改成從 compose 推導，但它點出的另一條路徑我確實沒堵：**prod 用的是 `.env` 的 `CLICKHOUSE_IMAGE_TAG`，會蓋過 compose 預設**。改為 `$2 → .env → compose 預設 → 硬編` 四段優先序（與 docker compose 自己的解析一致），並加靜態閘斷言 compose 預設與 `.env.example` 一致、且必須落在 25.7.x 線上。
+  - **R2-FINDING 2（真，已修）**：merge 預算的閘只斷言「存在且非 0」，但我在文件裡把它描述成已機械鎖定 —— 改成 64 MiB 或 2 GiB 都會靜默通過。改為釘死 `1073741824`，靜態閘與行為驗證器兩邊都改（實測：改成 512 MiB → 兩邊都擋下）。
+  - **類別掃描（AGENTS.md 規定同一 reviewer 二次回報後必做）**：兩條的共同類別是「閘斷言『存在』而非『它該釘住的值』」。逐一檢查本輪新增的 9 條斷言，**只有 merge 預算那一條屬於此類**，其餘（六個退役產生源／`max_server_memory_usage`／`mem_limit`／`text_log` level）本來就釘實值。類別已完整列舉並關閉，非逐點打補丁。
+  - **自查連帶發現（比上面兩條嚴重，oracle 沒抓到）**：追 R2-FINDING 1 的 regex 為何對不到時，發現 `validate-config.ps1` 的 `Assert-Match`/`Assert-NoMatch` 走 `Select-String`，**以 CP950 預設編碼解讀含 CJK 的檔案**。實測 `.env.example`：預設解碼得 102 個換行、UTF-8 得 119 個（**吞掉 17 個行尾**），長度 5423 vs 4951。後果不只是 `^` 錨點失效——**`Assert-NoMatch` 可能找不到實際存在的字串，於是閘因為瞎掉而通過**。這正是本輪一直在講的同一個 bug class，出現在我正在加固的那道閘本身。改為 `[System.IO.File]::ReadAllText($p, UTF8)` + `.Contains()`。與 `scripts/audit-cp950-traps.ps1` 稽核的是同一個 trap class（該工具查指令輸出，這裡是檔案讀取）。
+  - 修完 **5 條路徑實測**：正常 → exit 0；預算值竄改 → 1；image tag 兩處不一致 → 1；`metric_log` 被復活 → 1；`mem_limit` 竄改 → 1；全部還原 → 0。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.github | grep=clickhouse-config-check | hits=3
+  - ① `AGENTS.md:234` 教代理盯資料比（本次事故證明會漏）→ 已改
+  - ② `WORKLOG.md` 2026-08-19 的技術結論已被證偽 → 已加訂正
+  - ③ `.claude/worktrees/suspicious-ritchie-*/` 有舊 compose 副本 → `.gitignore:48` 已排除的暫存檢出，非 repo 內容，不處理
+  - 移除的 JSON 欄位 `traceLogRowsLastHour`/`asyncMetricLogRowsLastHour` 全域 0 個程式消費者（僅 `ao-resume.ps1` 呼叫腳本 + AGENTS.md 指示讀 .md），schema 改版安全
+
+[剩餘風險]
+- `text_log` 仍有 173 MiB 的 merge 失敗噴發殘留、資料比暫時 5.6x（>5x 門檻）。3 天 TTL 會自然排掉，**不需要人工清**——手動清正是前幾次復發的做法。
+- 升級後的 health check 在修復後最多 1 小時內仍會報 FAIL（失敗 merge 數是 1 小時滾動窗）。這是誠實的落後指標，不是 bug。
+- `metric_log` 移除後，ClickHouse 內部計數器的**時間序列**沒有了（`system.metrics`/`system.events` 的當下值、`query_log` 的每查詢 ProfileEvents、Netdata/Grafana 的主機與容器層都還在）。這是刻意取捨，寫在 override.xml 註解裡。
+- 行為驗證器需要 Docker + 1.1GB image。CI 上會多花數分鐘（僅在觸及 `lobster-factory/infra/trigger/**` 時觸發）。
+- 本輪**沒有**動 `max_server_memory_usage`（2.5 GiB）與 `mem_limit`（3072m）—— 刻意的，那是紅線；現在兩者都由 `validate-config.ps1` 機械鎖定。
+
+[rollback]
+- 設定：`cp /root/trigger/clickhouse/override.xml.bak-20260825-pre-merge-budget /root/trigger/clickhouse/override.xml && docker restart trigger-clickhouse`（會退回無 TTL + 兩張寬表，只在確認新設定造成更糟的問題時才做）。
+- 已 DROP 的 12 張表無法還原，全部是 ClickHouse 自我遙測，零應用資料（`trigger_dev` 未被觸及）。
+- repo：`git revert` 本 commit；compose 的 `mem_limit` 若要退回 4096m 需同步改 `validate-config.ps1` Guardrail 5b（閘會擋，這是刻意的）。
+
 ### AUTO_TASK_DONE: sg-deploy 上線 + 修好長期壞掉的 deploy-drift 前置閘（並補上讓它壞掉的 lint 盲點）
 
 [任務]
@@ -993,6 +1088,7 @@ Methodology: same A/B/C/D framework as `reports/audit/agents-slimming-proposal-2
 
 [剩餘風險]
 - **四張表的 TTL 不是設定檔保護的，是靠監控補償**——若未來某次重啟又讓它們失憶，`check-clickhouse-health.ps1` 會在下次 AO-RESUME 抓到（`drift` 等級），但不會自動修復，需要人工重跑 `ALTER TABLE ... MODIFY TTL`。這是本次事故誠實承認的殘留缺口，不是假裝已經根治
+  - **2026-08-25 訂正（此風險已實現，且本則的技術結論被證偽）**：① 這個缺口在 **2026-08-22 20:30 UTC 的 auto-reboot** 就實現了 —— `part_log`/`opentelemetry_span_log`/`query_views_log` 三張表全數打回無 TTL，`_0` 孤兒仍帶著 TTL，正是本則預言的形狀；監控如預期抓到（`noTtlTableCount=3`），但**沒有人接**，一路帶進 8/25 的第 5 次事故。② 本則上方「宣告式 `<ttl>` 對這四張表不適用，原因未完全查明」的結論**是錯的**：真相是四張一起加、其中**只有 `opentelemetry_span_log`** 因 base config 確實有 `<engine>` 而報錯（官方註解自稱 workaround），整批被一張的錯誤連坐。當時查的是 base `config.xml`，沒查 `/bitnami/clickhouse/data/preprocessed_configs/config.xml`（合併後的生效設定），那份裡面看得到 `<engine>`。③ 三張表的 TTL 已於 2026-08-25 全部改為設定檔宣告（`opentelemetry_span_log` 用 engine 內嵌形式），live ALTER 依賴解除。完整記錄見本檔 2026-08-25 條目
 - 宣告式寫法為何對這四張表崩潰**原因未完全查明**。override.xml 已註記「不要在沒有拋棄式測試環境的情況下重新嘗試」——避免未來哪次不知情又踩同一個坑
 - 這次意外證實了 ClickHouse 系統表的重建/核對機制不只在重啟時觸發（對 part_log 下 ALTER 卻連帶影響到另外兩張表），背景機制細節仍不清楚，若未來要更深入排查需要在拋棄式環境重現
 
@@ -3144,13 +3240,14 @@ woocommerce-points-and-rewards / woocommerce-product-addons
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-08-24 16:38:44 UTC_
+_Last synced: 2026-08-24 19:21:02 UTC_
 
 ## 2026-08-17
 - 自動週報代理：weekly summary 生成 → reports/weekly/weekly-summary-2026-08-17.md
   - REALTEST_WAIVED: DOC_ONLY -- automated report generation, no code change
   - REVIEW_WAIVED: DOC_ONLY -- report content verified against WORKLOG/TASKS source files
   - BUGHUNT_WAIVED: DOC_ONLY -- no code change
+
 
 
 

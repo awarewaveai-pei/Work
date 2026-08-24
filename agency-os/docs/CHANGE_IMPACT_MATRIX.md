@@ -102,5 +102,5 @@
 - `docs/operations/new-doc-linkage-checklist.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-08-24 16:38:44 UTC_
+_Last synced: 2026-08-24 19:21:02 UTC_
 

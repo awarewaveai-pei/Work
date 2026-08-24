@@ -1,0 +1,55 @@
+{
+    "schemaVersion":  1,
+    "generatedAtUtc":  "2026-08-24T19:30:19.1885371Z",
+    "branch":  "main",
+    "sampledRuns":  100,
+    "probeOk":  true,
+    "workflows":  [
+                      {
+                          "name":  "Auto-Repair - Claude Code",
+                          "latest":  "skipped",
+                          "consecutiveFailures":  0,
+                          "failingSinceUtc":  "",
+                          "failingDays":  0,
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/29719033130"
+                      },
+                      {
+                          "name":  "Lobster workflows package — validate (main)",
+                          "latest":  "success",
+                          "consecutiveFailures":  0,
+                          "failingSinceUtc":  "",
+                          "failingDays":  0,
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/31593280950"
+                      },
+                      {
+                          "name":  "next-admin — TypeScript typecheck",
+                          "latest":  "success",
+                          "consecutiveFailures":  0,
+                          "failingSinceUtc":  "",
+                          "failingDays":  0,
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/32760929211"
+                      },
+                      {
+                          "name":  "Trigger infra config guard",
+                          "latest":  "failure",
+                          "consecutiveFailures":  4,
+                          "failingSinceUtc":  "2026-08-15T08:04:50Z",
+                          "failingDays":  9,
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/32763510230"
+                      },
+                      {
+                          "name":  "Weekly workflows security audit",
+                          "latest":  "failure",
+                          "consecutiveFailures":  1,
+                          "failingSinceUtc":  "2026-08-24T02:41:52Z",
+                          "failingDays":  1,
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/32683910784"
+                      }
+                  ],
+    "verdict":  "broken",
+    "verdictLabel":  "FAIL",
+    "findings":  [
+                     "\u0027Trigger infra config guard\u0027 has been failing for 4 consecutive run(s) over 9 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/32763510230",
+                     "\u0027Weekly workflows security audit\u0027 latest run on main is failure: https://github.com/awarewaveai-pei/Work/actions/runs/32683910784"
+                 ]
+}

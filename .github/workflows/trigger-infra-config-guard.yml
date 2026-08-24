@@ -24,7 +24,17 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Guard deprecated and floating config
+      - name: Static guardrails (image pins, retired generators, memory budget)
         shell: pwsh
         run: |
           ./lobster-factory/infra/trigger/validate-config.ps1
+
+      # Static text checks cannot tell you whether ClickHouse will actually START with a
+      # config: there is no static validator for it, and `--check-config` does not exist in
+      # 25.7. On 2026-08-19 an override.xml edit crash-looped the live EU container because
+      # nothing here could catch it. This step boots a disposable ClickHouse with the
+      # candidate config and asserts the invariants against the running server.
+      - name: Behavioural validation (boots ClickHouse with the candidate config)
+        run: |
+          chmod +x ./lobster-factory/infra/trigger/clickhouse/validate-override.sh
+          ./lobster-factory/infra/trigger/clickhouse/validate-override.sh

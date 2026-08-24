@@ -141,7 +141,18 @@ $repoRoot = Resolve-RepoRoot
 Push-Location $repoRoot
 try {
     if (-not $SkipFetch) {
-        $null = Invoke-SafeGitCapture -GitArgs @("fetch","origin","main")
+        # ExitCode 必須被消費。把「崩潰式失敗訊號」換成「回傳值式」時，每個呼叫點都得檢查
+        # 回傳值 —— 否則等於把大聲失敗改成安靜的錯答案：fetch 失敗後 rev-parse origin/main
+        # 會用**本地過期 ref** 照樣成功，於是這道部署閘回報一個過期的 drift 結論
+        # （最糟情況：實際落後卻說「已同步」）。2026-08-25 路由到 lib 時漏掉這點，由 Codex
+        # stop-time review 抓到。這正是本 repo 反覆出現的「偵測器啞了看起來像健康」bug class。
+        $fetchRes = Invoke-SafeGitCapture -GitArgs @("fetch","origin","main")
+        if ($fetchRes.ExitCode -ne 0) {
+            $msg = "git fetch origin main failed (exit $($fetchRes.ExitCode)) — refusing to report drift against a stale origin/main. Use -SkipFetch only if you accept a possibly-stale local ref."
+            $fetchData = @{ repoRoot = $repoRoot; fetchExitCode = $fetchRes.ExitCode; fetchOutput = $fetchRes.Text }
+            if ($Strict) { Emit-Result -Status "FAIL" -ExitCode 2 -Message $msg -Data $fetchData }
+            Emit-Result -Status "ERROR" -ExitCode 3 -Message $msg -Data $fetchData
+        }
     }
     $rpRes = Invoke-SafeGitCapture -GitArgs @("rev-parse","origin/main")
     $localHead = $rpRes.Text.Trim()

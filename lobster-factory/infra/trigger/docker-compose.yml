@@ -67,7 +67,13 @@ services:
     container_name: trigger-clickhouse
     restart: unless-stopped
     logging: *trigger-logging
-    mem_limit: 4096m
+    # 3072m is load-bearing, not a guess: clickhouse/override.xml sizes
+    # max_server_memory_usage (2.5 GiB) and the whole MERGE MEMORY BUDGET section against
+    # it, and validate-config.ps1 fails if the two stop agreeing. Production has run 3072m
+    # since 2026-07-05; the 4096m that stood here from 2026-06-13 to 2026-08-25 was never
+    # deployed - it entered the repo through an auto-checkpoint commit sweeping up an
+    # uncommitted working-tree edit, and drifted silently for ten weeks.
+    mem_limit: 3072m
     cpus: "1.0"
     environment:
       CLICKHOUSE_ADMIN_USER: ${CLICKHOUSE_USER:-default}
@@ -91,25 +97,23 @@ services:
       retries: 5
       start_period: 20s
 
-  clickhouse-config-check:
-    image: bitnamilegacy/clickhouse:${CLICKHOUSE_IMAGE_TAG:-25.7.5-debian-12-r0}
-    container_name: trigger-clickhouse-config-check
-    profiles: ["preflight"]
-    restart: "no"
-    logging: *trigger-logging
-    command:
-      [
-        "/bin/sh",
-        "-lc",
-        "clickhouse-server --config-file=/bitnami/clickhouse/etc/config.xml --check-config",
-      ]
-    environment:
-      CLICKHOUSE_ADMIN_USER: ${CLICKHOUSE_USER:-default}
-      CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_PASSWORD:-password}
-    volumes:
-      - ./clickhouse/override.xml:/bitnami/clickhouse/etc/config.d/override.xml:ro
-    networks:
-      - lf-trg-webapp
+  # clickhouse-config-check (removed 2026-08-25) - it never worked and could not have.
+  #
+  # It ran `clickhouse-server --config-file=... --check-config`, which fails twice over:
+  # `clickhouse-server` is not on PATH in the bitnami image (it is in
+  # /opt/bitnami/clickhouse/bin/), and `--check-config` does not exist in ClickHouse 25.7 -
+  # `--help` lists only `--config-file`. Every run printed "clickhouse-server: not found",
+  # and the documented `| tail` pipeline swallowed the exit code, so the preflight gate
+  # reported success unconditionally from the day it was added. On 2026-08-19 an
+  # override.xml edit put the live container into a crash loop; this was the gate that was
+  # meant to prevent that.
+  #
+  # Replaced by clickhouse/validate-override.sh, which validates the only way ClickHouse
+  # config can be validated - by starting a server with it on a disposable container - and
+  # then asserts the invariants (TTLs present, retired generators absent, no over-wide
+  # table, merge memory bound in force). Run it before deploying a config change:
+  #     ./clickhouse/validate-override.sh
+  # It is also enforced in .github/workflows/trigger-infra-config-guard.yml.
 
   registry:
     image: registry:${REGISTRY_IMAGE_TAG:-2}
