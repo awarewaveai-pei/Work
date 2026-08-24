@@ -25,6 +25,8 @@ Deduplicate the file list. If no changed files → report "No changes to review.
 
 ## Step 3 — Spawn critic subagent
 
+**Fallback (2026-08-24)**: if critic fails twice in a row on this review (API error / timeout — e.g. 529 Overloaded), stop retrying critic and switch to `.\scripts\codex-oracle.ps1 -Mode review -Context "<what changed>"` instead. Use its findings the same way as critic's for Step 4. This mirrors AGENTS.md §跨模型 oracle's routing table, which already assigns the Review action to Codex — critic and codex-oracle.ps1 are two paths to the same R0 verification requirement, not competing mandates. Root cause for adding this: 2026-08-24, critic hit 529 six times in one session while codex-oracle.ps1 (after a CLI version update) worked reliably.
+
 Pass the following brief to the **critic** subagent (subagent_type: critic):
 
 ### Quick brief
