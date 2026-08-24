@@ -79,6 +79,17 @@
 - REVIEW_DONE: critic=Deep（外部 oracle = Codex CLI）| verdict=pass | findings=0c/0m/0n（本次改動於同批次 review 中）
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.github | grep=audit:workflows-security | hits=1（僅 `lobster-factory/package.json:24` 的 script 定義，未改名，無 stale 引用；`--audit-level=high` 字串在 workflow 內已全數移除或改寫為說明用途）
 
+[收工前 stop-time review 追加修正 —— 我自己剛放進去的同類洞]
+Codex stop-time review 抓到：**新的安全閘在稽核管線失敗時，會送出綠色「通過」告警**。查證後比它說的更糟——`workflows-npm-audit-LATEST.md/.json` **本身是 committed 進 git 的**，所以 checkout 時磁碟上永遠有一份舊的。失效鏈：產生報告步驟失敗 → gate 步驟被跳過（無 `if: always()`）→ `steps.gate.outputs.verdict` 為空 → 通知步驟因 `if: always()` 照跑 → 從**上週的 committed 報告** grep 出數字 → 每個分支都沒中 → 掉進 `else` → 送出「所有套件安全，本週沒有發現任何漏洞」。**掃描器壞掉，卻用上週資料發綠燈全清。** 這正是 2026-08-03 `client_mail` 事故的形狀，也正是 AGENTS.md「偵測器啞了不可以長得像一切正常」講的那件事——而我把它放進了自己剛建的閘。
+
+修法（fail-closed，三個獨立條件都成立才信任任何數字）：① 產生報告步驟必須 success（加 `id: report`）② gate 必須產出 verdict ③ 裁決 JSON 必須可解析**且 `generatedAtUtc` 屬於本次執行**（30 分鐘新鮮度）——第三點才是排除 committed 舊檔的關鍵。任一不成立 → 送出「掃描沒有跑完，安全狀態未知」，措辭明寫「這不是『沒問題』，是『這週沒量到』」，永不落入 ✅ 分支。
+
+**測試又逼出兩個我沒發現的問題**：
+- ✅ 訊息說「所有套件安全，本週沒有發現任何漏洞」，同一行技術資訊卻寫 `high=2`——**訊息在說謊**（verdict=pass 是因為那 2 個是工具鏈且已登記接受）。新增一個分支：有已接受項目時改說「通過（無待辦）／正式環境曝險為 0／工具鏈另有 N 項已登記、有到期日的風險接受」。
+- 未知狀態的技術資訊直接內嵌 node 的**多行堆疊**，而訊息會被塞進 curl 的 JSON payload——**多行會撐破 JSON，告警根本送不出去**，偏偏是在最需要它送出的時刻。改為壓成單行、去除引號與反斜線、截斷 160 字元。
+
+**六情境實測**（每種都驗 payload 零裸引號、零內嵌換行）：健康+已接受 → ✅ 正確措辭；產生步驟失敗 → 🚨 未知；無 verdict → 🚨 未知；**舊 JSON（committed 舊檔情境）→ 🚨 未知**；JSON 不存在 → 🚨 未知；shipped 曝險 → 🚨 高危。
+
 [剩餘風險]
 - `deepmerge-ts` 的接受期限到 **2026-11-23**。屆時若 `@prisma/config` 仍未放掉精確釘版，閘會再度轉紅並要求重新決定 —— **這是刻意的**，不是待辦遺漏。
 - 本輪把 dev-only finding 由「硬擋」降為「需登記」。若未來出現**可修**的 dev 端漏洞，它會以 `unacknowledged` 觸發失敗；但若有人便宜行事把它登記掉而不修，這道閘擋不住 —— 那屬操作紀律，與 AGENTS.md §已知信任邊界 同性質。
