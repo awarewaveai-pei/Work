@@ -2,6 +2,32 @@
 
 ## 2026-08-24
 
+### AUTO_TASK_DONE: checkpoint 警告補上 empty-diff 分支（round 2，同一顆 Codex 立刻回打）
+
+[任務]
+上一輪加完 checkpoint 警告，同一顆 Codex stop-hook 立刻回報：「The new checkpoint warning still misses the empty-diff case it is supposed to explain」。
+
+[根因]
+警告偵測邏輯（`$looksLikeCheckpointed` 判斷）寫在 `if (-not $diffText.Trim()) { exit 2 }` 這個空 diff 提早離開之後——剛好排除了這個警告最該處理的最嚴重情況：auto-checkpoint 把**全部**改動都吸收掉，diff 完全是空的。這種時候操作者只會看到通用的「Nothing to review」，看不出是被 checkpoint 搶走，不是真的沒改東西。
+
+[已修改]
+`scripts/codex-oracle.ps1:266-298`——把 `$looksLikeCheckpointed` 的計算搬到空 diff 檢查**之前**；空 diff 分支依判斷結果印不同訊息（有 checkpoint 嫌疑 → 明講「很可能是因為改動已經進了更早的 commit，不是沒改東西」；沒有 → 維持原本通用訊息，不誤導）；非空 diff 分支的既有警告邏輯不變。
+
+[事故：測試過程中誤在真實 repo 建了一個空 commit]
+第一次搭 scratch repo 測試時 `mkdir`/`cd` 因為權限被 hook 擋下而失敗，但 bash 沒有 `set -e` 導致後續指令沒停、繼續在當前目錄（也就是真正的 `D:\Work`）執行，`git commit --allow-empty -m "[claude] checkpoint: ..."` 因此在真實 repo 建了一個空 commit（`a7e75143`）。立刻查證：`git log origin/main` 確認尚未 push（remote 仍在上一輪的 `caa00204`），`git show --stat` 確認是真的空 commit（無檔案異動），用 `git reset --soft HEAD~1` 安全移除，working tree/index 完全不受影響。之後重跑改用 `set -e` + 每步驟印 `pwd` 確認目錄正確，未再發生。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=對真正的 `scripts/codex-oracle.ps1`（`-RepoRoot` 指向 3 個獨立 scratch repo）跑 3 組真實情境：① 空 diff + HEAD 有 checkpoint commit → 增強訊息正確觸發（exit=1，訊息含「likely because the work already landed there」）② 空 diff + HEAD 無 checkpoint commit → 維持原通用訊息、不誤導 ③ 非空 diff + HEAD 有 checkpoint commit → 警告正確印出（用 `-TimeoutSec 3` 讓它印完警告後才因逾時退出，不用真的等完整 codex API 呼叫）| exit 各自符合預期（3/3 pass）
+- REVIEW_WAIVED: NA -- 同上一輪判斷，這是對 review 工具本身的小範圍修正（調整分支順序 + 訊息文字），已用 3 組真實腳本執行驗證，不再追加一次 codex-oracle review 去審這個 fix，避免陷入 review 審查工具的遞迴（操作者上一輪已提醒這個風險）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`looksLikeCheckpointed` | hits=4（全部在同一檔案內部宣告/賦值/兩處判斷，無其他 call site）
+
+[剩餘風險]
+- 與上一輪相同：只看最近 3 個 commit，連續 checkpoint 超過 3 次會漏警（既有記錄，未變）
+- 空 commit 誤建事故雖已安全修復且從未進 remote，仍記錄在此供未來 session 參考同類 bash `cd` 失敗風險——`set -e` 或每步驟驗證 `pwd` 是這次的具體教訓
+
+[rollback]
+`git diff scripts/codex-oracle.ps1` 還原單一 hunk，無其他檔案依賴。
+
 ### AUTO_TASK_DONE: codex-oracle.ps1 對自動 checkpoint 導致的不完整 diff 加警告
 
 [任務]

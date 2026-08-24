@@ -263,25 +263,38 @@ if ($Mode -eq 'review') {
             }
         }
 
+        # This repo's session hooks auto-commit the dirty tree mid-task ("[claude]
+        # checkpoint: ..."), so a no-DiffRef review can silently review a SMALLER (or
+        # completely EMPTY) diff than the operator intends -- the real work already
+        # landed in HEAD before this ran. Codex has no way to know that happened; its
+        # finding then looks like "this change was never made" when it was, just
+        # earlier, in a different commit (codex stop-hook, 2026-08-24: this exact
+        # scenario produced one false-positive finding that took a manual `git show
+        # HEAD` to clear). Computed BEFORE the empty-diff check below on purpose (round
+        # 2 of this same fix, codex stop-hook again): the fully-absorbed case -- ALL of
+        # the work already auto-committed, leaving nothing at all to diff -- is the more
+        # severe manifestation of this exact problem, and it hits the generic "Nothing
+        # to review" exit first if this check runs after it, silently excluding the case
+        # the warning exists to explain. Not auto-resolved -- picking the "right" earlier
+        # commit to diff against is a judgement call this script shouldn't guess at --
+        # just surfaced so neither an empty nor a non-empty diff is silently trusted.
+        $looksLikeCheckpointed = $false
+        if (-not $DiffRef) {
+            $rLog = Invoke-Git -GitArgs @('log', '-3', '--format=%H %s') -Root $root
+            $looksLikeCheckpointed = ($rLog.Exit -eq 0 -and ($rLog.Text -match '(?m)^\S+ \[claude\] checkpoint:'))
+        }
+
         if (-not $diffText.Trim()) {
-            Write-Error "Nothing to review: no diff for the given ref/paths. Pass -DiffRef <commit> to review an existing commit."
+            if ($looksLikeCheckpointed) {
+                Write-Error "Nothing to review -- AND recent commit(s) at HEAD look like session auto-checkpoints, so this is likely because the work already landed there, not because nothing changed. Re-run with -DiffRef <commit before the checkpoints> to review it."
+            } else {
+                Write-Error "Nothing to review: no diff for the given ref/paths. Pass -DiffRef <commit> to review an existing commit."
+            }
             exit 2
         }
 
-        # This repo's session hooks auto-commit the dirty tree mid-task ("[claude]
-        # checkpoint: ..."), so a no-DiffRef review can silently review a SMALLER diff
-        # than the operator intends -- the real work already landed in HEAD before this
-        # ran. Codex has no way to know that happened; its finding then looks like "this
-        # change was never made" when it was, just earlier, in a different commit (codex
-        # stop-hook, 2026-08-24: this exact scenario produced one false-positive finding
-        # that took a manual `git show HEAD` to clear). Not auto-resolved -- picking the
-        # "right" earlier commit to diff against is a judgement call this script
-        # shouldn't guess at -- just surfaced so it cannot be silently trusted.
-        if (-not $DiffRef) {
-            $rLog = Invoke-Git -GitArgs @('log', '-3', '--format=%H %s') -Root $root
-            if ($rLog.Exit -eq 0 -and ($rLog.Text -match '(?m)^\S+ \[claude\] checkpoint:')) {
-                Write-Host "codex-oracle: WARNING -- recent commit(s) at HEAD look like session auto-checkpoints. This review's diff may not include everything you expect (the real work may have already landed in one of them). If the finding looks incomplete or contradicts work you know happened, re-run with -DiffRef <commit before the checkpoints> instead of trusting this diff." -ForegroundColor DarkYellow
-            }
+        if ($looksLikeCheckpointed) {
+            Write-Host "codex-oracle: WARNING -- recent commit(s) at HEAD look like session auto-checkpoints. This review's diff may not include everything you expect (the real work may have already landed in one of them). If the finding looks incomplete or contradicts work you know happened, re-run with -DiffRef <commit before the checkpoints> instead of trusting this diff." -ForegroundColor DarkYellow
         }
 
         Set-Content -LiteralPath $diffFile -Value $diffText -Encoding UTF8
