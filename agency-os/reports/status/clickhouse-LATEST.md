@@ -1,6 +1,6 @@
 # ClickHouse health (EU)
 
-- Generated: 2026-08-24 16:26:02
+- Generated: 2026-08-24 17:00:16
 - Overall: **🟡 WARN**
 - Host: 204.168.175.41 / container `trigger-clickhouse`
 
@@ -8,12 +8,12 @@
 
 | Metric | Value |
 |--------|-------|
-| system database | 375.44 MiB (4,206,994 rows) |
-| trigger_dev (application) | 37.81 MiB (398,691 rows) |
-| ratio (system / app) | 9.9x |
-| largest system table | text_log:239185227 |
-| active merges | 0 |
-| max parts in one system table | 79 |
+| system database | 377.68 MiB (4,219,120 rows) |
+| trigger_dev (application) | 37.85 MiB (398,791 rows) |
+| ratio (system / app) | 10x |
+| largest system table | text_log:240512969 |
+| active merges | 2 |
+| max parts in one system table | 81 |
 | trace_log rows last hour | 0 (expected 0 - disabled 2026-08-15) |
 | asynchronous_metric_log rows last hour | 0 (expected 0 - disabled 2026-08-15) |
 | system tables missing TTL | 3 (opentelemetry_span_log,part_log,query_views_log) |
@@ -24,7 +24,7 @@
 
 - 3 system table(s) have no TTL and will grow unbounded: opentelemetry_span_log,part_log,query_views_log
 - 3 orphaned renamed system table(s) (_<N> suffix, any generation) left behind by a past rename-and-recreate cycle - safe to DROP after confirming the active table has the correct TTL
-- self-telemetry is 9.9x the application data (warn at 5x)
+- self-telemetry is 10x the application data (warn at 5x)
 
 ## Why this check exists
 

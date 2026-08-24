@@ -1,17 +1,17 @@
 {
     "schemaVersion":  1,
-    "generatedAtUtc":  "2026-08-24T08:26:02.8001818Z",
+    "generatedAtUtc":  "2026-08-24T09:00:16.1704449Z",
     "host":  "204.168.175.41",
     "container":  "trigger-clickhouse",
     "appDatabase":  "trigger_dev",
-    "systemBytes":  393676023,
-    "systemRows":  4206994,
-    "appBytes":  39647625,
-    "appRows":  398691,
-    "ratio":  9.9,
-    "activeMerges":  0,
-    "maxPartsPerTable":  79,
-    "topSystemTable":  "text_log:239185227",
+    "systemBytes":  396031289,
+    "systemRows":  4219120,
+    "appBytes":  39684852,
+    "appRows":  398791,
+    "ratio":  10,
+    "activeMerges":  2,
+    "maxPartsPerTable":  81,
+    "topSystemTable":  "text_log:240512969",
     "traceLogRowsLastHour":  0,
     "asyncMetricLogRowsLastHour":  0,
     "mergeTreeTablesSeen":  14,
@@ -23,6 +23,6 @@
     "findings":  [
                      "3 system table(s) have no TTL and will grow unbounded: opentelemetry_span_log,part_log,query_views_log",
                      "3 orphaned renamed system table(s) (_\u003cN\u003e suffix, any generation) left behind by a past rename-and-recreate cycle - safe to DROP after confirming the active table has the correct TTL",
-                     "self-telemetry is 9.9x the application data (warn at 5x)"
+                     "self-telemetry is 10x the application data (warn at 5x)"
                  ]
 }
