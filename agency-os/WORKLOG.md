@@ -1,5 +1,53 @@
 ﻿# Worklog
 
+## 2026-08-25
+
+### AUTO_TASK_DONE: 影片管線接上既有租戶 seam（治本，非改 key 格式那層）+ critic 抓到 1 Critical 已修
+
+[任務]
+操作者裁決「reconcile 跨租戶 → 治本改 key 格式」。動工做 R0 現況分析時發現**真根因比 key 格式深一層**，改了範圍並回報後執行。
+
+[根因（比原判斷更深）]
+`lib/tenant-guard.ts:108` 的 `effectiveOrgId(req, requested)` 是本 app **既有的**每請求租戶解析器（client 帳號強制綁回自己的 org、無綁定 fail closed），`designs`/`presets` 路由都在用（`designs/route.ts:167,355`）。**影片管線從來沒接上它** —— 四條 video 路徑全部呼叫無參數的 `resolveOrgId()` → 直接吃 `POD_DESIGNS_DEFAULT_ORG_ID`（`generate/route.ts:120` 的註解甚至自承「ctx 無 organizationId」）。所以 reconcile 的誤歸屬**不是 reconcile 的 bug**：正常路徑 `/status` 也記到同一個預設 org，整條管線實質單租戶，而 app 其他部分不是。實測 EU prod `ORG_COUNT=5 / ORGS_WITH_MEDIA=2`。
+**若只做 key 格式**，我會把預設 org 編進每把 key 再宣稱它「租戶隔離」—— 正是今天剛寫進 AGENTS.md 的最惡樣態（改資料使宣稱與真實不符）。
+
+[已修改]
+1. `app/api/video/generate/route.ts` + `render-draft/route.ts` —— 改用 `effectiveOrgId(req, resolveDefaultOrgId())`，`OrgAccessError` → `toOrgAccessResponse`。**解析刻意前移到提交 EU 之前**：無合法歸屬要在花掉渲染算力前擋下（原本在 EU 提交後才解析）
+2. `lib/content/blocks/video-pipeline.ts` —— 新增 `buildVideoOutName(orgId,title)` = `<org8>_<rand10>_<slug>` 與 `parseOrgPrefixFromDir()`。**唯一性必須前置**：EU `pipeline.py:687,718` 做 `[:40]` 截斷，放後面的唯一性會被切掉等於沒加
+3. `video-render.ts` —— 第二條渲染路徑同步（`render-draft` 走這個積木）
+4. `lib/content/video/reconcile.ts` —— 租戶改由 key 前綴反解（`organizations` 建 prefix→id map，撞碼設 null 一律拒絕）；存在性探測補 `.eq("organization_id", ownerOrgId)` 對齊 upsert arbiter 的唯一性域；舊格式/解不出 → `skippedLegacy`/`skippedUnresolved` 計數後跳過，**不再猜預設 org**
+5. `lib/content/blocks/__tests__/video-out-name.test.ts`（新增）—— 含 EU sanitiser 的鏡像實作，確保前綴真的活過截斷
+
+[critic 覆審（auth 邊界強制）與逐條處置]
+`critic` agent Deep review 回 **1 Critical + 6 Major + 7 Minor**，逐條驗證：
+- **🔴 C1 CONFIRMED 已修**：`app/api/video/reconcile/route.ts` **完全沒有 auth**，而 docstring 宣稱「由 middleware 放行」—— `middleware.ts:146` 的 `hasValidSyncKey()` 是 **exempt（有 key 就跳過 session 檢查）不是 require**，沒帶 key 時走一般 session 驗證後照樣執行。任何登入帳號（含 viewer、含他租戶 client）可 ① 觸發跨 org 寫入 ② 讀回全租戶影片組數聚合 ③ 無限觸發整桶 R2 LIST。**既有洞，但我的改動讓它變成跨租戶歸屬的即時驅動器**。修法：照 `cleanup/route.ts:18-23` 補 route-level `x-ops-sync-key` 驗證，改用既有 SSOT `lib/security/timingSafeEqual.ts`（不做第三份拷貝）
+- **🟠 M1 已修**：`buildVideoOutName` 用 `Math.random()` 產生 public unsigned bucket 的 capability token。R2 video bucket 是公開直讀（畫廊 `<video src>`），key 的不可猜測性**就是**這支影片唯一的機密性控制；V8 xorshift128+ 可由連續輸出還原狀態。改 `randomBytes(5)`（同 repo `r2.ts:93` 既有正解）
+- **🟠 M3 已修**：`video/[id]/route.ts` 的 env org filter 被我的改動從「無害」變成**硬阻斷** —— 舊行為所有列都在預設 org 故永遠命中，改動後 client 自己的影片不匹配 → `.single()` 404 → `assertOrgAccess` 根本走不到 → **擁有者永遠無法刪自己的影片**。移除該 filter，真正屏障是 `assertOrgAccess`（同 `designs/route.ts:293-302` 形狀）
+- **🟠 M4 已修**：大小寫/uuid 版本三處判準不一致 —— `resolveOrgId` regex 帶 `/i` 收大寫、`buildVideoOutName` 未 `.toLowerCase()`、`parseOrgPrefixFromDir` 只收 `[0-9a-f]`。後果是大寫 org id 的**每一支新影片**都反解成 null → 永久計入 `skippedLegacy`，看起來像舊資料 backlog 而非新 bug。另放寬 uuid regex 的版本 nibble（v6/v7 org id 會走 `noorg_` 但 DB 列仍帶該 org，兩路徑各說各話）
+- **🟠 M5 已修**：積木內用 `resolveOrgId(ctx.organizationId)`，ctx 缺欄位時 `?? process.env` **退回預設 org 前綴** —— 正是本次要消滅的 bug 被留在 fallback 裡，而我的註解還寫成「退回舊行為…少了租戶前綴」（假聲稱）。改為吃明確的 `string | null`，缺失走 `noorg_` fail-closed
+- **🟠 M2 經實測判定已關閉**：攻擊需要「cutover 前就存在、且標題剛好構成合法新前綴」的 R2 物件。唯讀稽核（SG 容器內打 CF API）：`TOTAL_OBJECTS=11`、**`NEW_FORMAT_PREFIX_HITS=0`**。且 cutover 後標題一律被前綴推到第 20 字元之後，無法再佔位 → 攻擊窗口前後皆關
+- **🟠 M6 經實測判定無現存曝險**：legacy prefix-LIST 刪除需要跨租戶共用目錄。實測 R2 只有 **2 個 video 目錄**（`三個習慣_…` 2 檔、`蒙古旅遊_…` 1 檔）、無共用；新 key 帶隨機碼後不可能再形成共用目錄
+- **Minor 7 條**：`/status` 無 `assertOrgAccess`、reconcile 從「大聲失敗」變「安靜成功」、`checked` 語義變動、`skippedLegacy` 是垃圾桶指標、註解字數不符、兩條 read path 對 staff scope 不一致、`MULTI_TENANT_ISOLATION_AUDIT_AND_PLAN.md` 行號已漂移且未收錄四條 video route → **全數轉 TASKS，未在本批修**
+
+[critic 對我設計的類別級批評（接受，已轉待辦）]
+critic 指出 M2/M4/M5 是**同一類問題的三個實例**：「把租戶身分編碼進一個有損字串、再從字串反解回來」。真正的不變量是「**歸屬在 submit 當下就已知且權威，不該事後從 object key 猜**」，治本是持久化 `outName → organization_id` mapping，一次關掉整類（並可移除 public URL 上的租戶指紋）。**這個批評成立，而且我的 key-prefix 方案本身就屬於我整個 session 在刪的那一類。** 本批已關掉三個危險實例（M4/M5 是會靜默出事的），類別級重設計轉 TASKS 另案，未假裝已解決。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run` | **52 檔 / 622 測全過**（新增 `video-out-name.test.ts` 10 測，含 EU sanitiser 鏡像、跨租戶同標題分離、大寫 org 前綴、`noorg_` fail-closed、near-miss 拒絕）
+- REALTEST_EVIDENCE: tool=SSH | cmd=SG 容器內 `node -e fetch(CF R2 objects API)` 唯讀稽核 | `TOTAL_OBJECTS=11 NEW_FORMAT_PREFIX_HITS=0`、2 個 legacy 目錄無共用 → M2/M6 現存曝險為零（**實測而非推論**）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`grep -n matcher middleware.ts` + 讀 `:18-22,120-121` | matcher 未排除 `api/video`、`CLAIM_HEADERS` 先剝除 client 自帶 header → 確認第 1 步**真的生效**而非裝飾（這是最容易「加了等於沒加」的地方）
+- REVIEW_DONE: critic=Deep | verdict=warn→修正後 pass | findings=1c/6m/7n（外部 oracle = `critic` agent，非自我描述；每條以 Read/Grep/實測驗證後才採納或反駁）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`resolveOrgId\|effectiveOrgId\|buildVideoOutName\|parseOrgPrefixFromDir\|submitRender` | hits=0 殘留（`submitRender` 全 repo 僅 2 個呼叫端，皆已改；`resolveOrgId` 已從 `video/[id]`、`video-render` 移除且無未使用 import）
+
+[剩餘風險]
+- **類別級重設計未做**（persisted `outName→org` mapping），已轉 TASKS 並註明「M2/M4/M5 是同一類，逐點修會再被打回」
+- 7 條 Minor 未修，全數轉 TASKS（其中 `/status` 缺 `assertOrgAccess` 與 reconcile 可觀測性倒退兩條建議優先）
+- **code 改動需 `sg-deploy` 才生效**；C1 是既有洞，部署前 prod 仍暴露
+
+[rollback]
+`git revert` 單一 commit 可完整回復；無 DB migration、無 EU video-service 改動（out_name 由 next-admin 決定，EU 只是照單消毒 → 不需重新部署 EU）。
+
 ## 2026-08-24
 
 ### AUTO_TASK_DONE: archive-lift 閘刪除猜測引擎，改明確宣告（根因修，非標 archive-only 補丁）

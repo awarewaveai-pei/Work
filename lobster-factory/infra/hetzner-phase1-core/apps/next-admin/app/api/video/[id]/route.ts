@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { deleteVideoObjects } from "@/lib/storage/r2";
-import { videoObjectKey, resolveOrgId } from "@/lib/content/blocks/video-pipeline";
+import { videoObjectKey } from "@/lib/content/blocks/video-pipeline";
 import { readOpsRole } from "@/lib/ops-role";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
@@ -18,10 +18,13 @@ export async function DELETE(
   const { id } = await params;
   if (!id) return NextResponse.json({ ok: false, error: "missing id" }, { status: 400 });
 
-  // resolveOrgId() reads POD_DESIGNS_DEFAULT_ORG_ID — when unset (common), orgId=null and the
-  // .eq("organization_id", orgId) filter below is skipped. The actual tenant barrier is
-  // assertOrgAccess() below; this env filter is supplementary only.
-  const orgId = resolveOrgId();
+  // No env-based org filter here. It used to read POD_DESIGNS_DEFAULT_ORG_ID and was called
+  // "supplementary only" — true only while EVERY video row was written under that same default
+  // org. Once rows carry their real tenant (2026-08-25), that filter turns into a hard blocker:
+  // a client's own video no longer matches, .single() 404s, and assertOrgAccess never even runs,
+  // so the owner can never delete their own video. The real tenant barrier is assertOrgAccess()
+  // below — same shape as app/api/tools/designs/route.ts, which the UI actually uses.
+  // (2026-08-25 critic M3)
   const supabase = getSupabaseWriteClient();
   if (!supabase) return NextResponse.json({ ok: false, error: "db unavailable" }, { status: 503 });
 
@@ -31,7 +34,6 @@ export async function DELETE(
     .select("id, object_url, metadata, organization_id")
     .eq("id", id)
     .eq("mime_type", "video/mp4");
-  if (orgId) query = query.eq("organization_id", orgId);
   const { data: asset, error: fetchErr } = await query.single();
 
   if (fetchErr || !asset) {

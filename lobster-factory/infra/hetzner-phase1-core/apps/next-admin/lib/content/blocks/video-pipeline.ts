@@ -22,6 +22,7 @@ import {
 import { submitRender, type RenderOutputMeta, type RenderOutputs, type VideoServiceCapability } from "../video/render-client";
 import { generateTarotImage, isTarotModel } from "../../tarot/image-gen";
 import { getSupabaseWriteClient } from "../../supabase-server";
+import { randomBytes } from "node:crypto";
 
 /**
  * 輸出格式 → 生圖長寬比 + Pexels 取向 + 風格框景詞。
@@ -79,11 +80,50 @@ export function normalizeVideoFormats(formats?: string[]): string[] {
   return valid.length > 0 ? valid : [...DEFAULT_VIDEO_FORMATS];
 }
 
+/**
+ * 組出送給 EU 的 `out_name` —— 它決定 R2 目錄，因而決定 `media_assets.object_key`，
+ * 因而決定這列資產的身分。**唯一性與租戶前綴必須放在字串最前面。**
+ *
+ * 為何前置：EU `video-service/pipeline.py:687,718` 會做
+ * `re.sub(r"[^\w一-鿿]", "_", out_name)[:40]` —— **只保留前 40 字元**。放在後面的
+ * 唯一性會被截掉，等於沒加。（`_` 與十六進位字元都是 `\w`，消毒不會動到前綴。）
+ *
+ * 為何需要：2026-08-25 之前 out_name 直接是影片標題，於是 object_key =
+ * `video/<標題前40字>/<fmt>.mp4` —— 無 uuid、無租戶。後果：兩個租戶用同一個標題時
+ * 後者的 R2 物件直接覆寫前者、DB 列互相遮蔽、刪除會誤刪對方的檔案。
+ *
+ * 格式：`<org 前8碼>_<10 碼隨機>_<標題slug>`（前綴固定 20 字元，標題佔剩下 20 字元僅供人類辨識）。
+ * org 前綴讓對帳 sweep 能從 R2 key 反解出擁有者（不必再猜預設 org）；隨機碼保證同租戶同標題
+ * 重複生成不互相覆寫。
+ */
+export function buildVideoOutName(orgId: string | null, title: string): string {
+  // CSPRNG，不是 Math.random()：R2 video bucket 是 public + unsigned（畫廊直接 <video src>），
+  // 所以 object key 的不可猜測性就是這支影片唯一的機密性控制。V8 的 Math.random 是 xorshift128+，
+  // 可由連續輸出還原內部狀態，而攻擊者能從自己的 /status 回應讀回樣本。同 repo 既有正解：
+  // lib/storage/r2.ts buildDesignKey() 用 randomUUID()。（2026-08-25 critic M1）
+  const rand = randomBytes(5).toString("hex");
+  const slug = (title ?? "").trim().slice(0, 20) || "video";
+  if (!orgId) return `noorg_${rand}_${slug}`;
+  // .toLowerCase() 不可省：resolveOrgId 的 uuid regex 帶 /i 會放行大寫 uuid，而
+  // parseOrgPrefixFromDir 只收 [0-9a-f]。少了它，大寫 org id 產生的每一支新影片都會
+  // 被反解成 null → 永久計入 skippedLegacy，看起來像「舊資料 backlog」而非新 bug。
+  return `${orgId.replace(/-/g, "").toLowerCase().slice(0, 8)}_${rand}_${slug}`;
+}
+
+/** 從 R2 目錄名反解租戶前綴（對帳用）。舊格式（無前綴）回 null → 呼叫端必須 fail closed，不得猜。 */
+export function parseOrgPrefixFromDir(dir: string): string | null {
+  const m = /^([0-9a-f]{8})_[0-9a-f]{10}_/.exec(dir);
+  return m ? m[1] : null;
+}
+
 /** POD_DESIGNS_DEFAULT_ORG_ID（designs route 同規約）；ctx.organizationId 優先。 */
 export function resolveOrgId(ctxOrgId?: string): string | null {
   const v = ctxOrgId ?? process.env.POD_DESIGNS_DEFAULT_ORG_ID ?? null;
   if (!v) return null;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v) ? v : null;
+  // 版本/variant nibble 刻意放寬為通用 uuid：原本限 v1-v5 + variant [89ab]，遇到 UUIDv7
+  // 之類的 org id 會回 null → out_name 走 noorg_ 分支，但 recordParams 仍帶著那個 org
+  // → 同一支影片「DB 歸屬正確、R2 key 無租戶」，兩條路徑各說各話。（2026-08-25 critic M4）
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) ? v : null;
 }
 
 /** 渲染完成後記一筆 media_assets（asset_domain=ai_generated + mime video/mp4，靠 mime 與圖片區分）。
@@ -132,11 +172,13 @@ export async function recordVideoAsset(params: {
   //
   // Why the composite and NOT a single-column unique(object_key) — measured on EU prod
   // 2026-08-24, do not "simplify" this back:
-  //   * object_key is derived from the video TITLE (video-service/pipeline.py:687,718
-  //     `re.sub(r"[^\w一-鿿]", "_", out_name)[:40]`), with no uuid and no org
-  //     prefix, so it collides across tenants. A global unique(object_key) would make a
-  //     second org's row vanish via DO NOTHING while its render still overwrote the R2
-  //     object — cross-tenant data loss.
+  //   * LEGACY rows (everything written before 2026-08-25) have an object_key derived
+  //     straight from the video TITLE — `video/<title-slug>/<fmt>.mp4`, no uuid, no org
+  //     prefix — so those keys collide across tenants. A global unique(object_key) would
+  //     make a second org's row vanish via DO NOTHING while its render still overwrote
+  //     the R2 object: cross-tenant data loss. New keys carry an org+random prefix
+  //     (buildVideoOutName), but the 142 legacy rows on EU prod do not, and this arbiter
+  //     has to stay correct for both.
   //   * It would also kill the version/is_current multi-version model that 0011:49-50
   //     deliberately introduced, and break the 'wp_uploads' backend namespace (0011:41),
   //     whose keys ("2026/08/hero.jpg") collide across sites by nature.
@@ -429,7 +471,9 @@ register({
     const sub = await submitRender(
       scenes.map((s) => ({ id: s.id, narration: s.narration })),
       [], // 多格式走 formatAssets（下方 opts）；位置參數 assets 忽略
-      title,
+      // out_name 決定 R2 目錄 → object_key → 這列資產的身分。帶租戶前綴+隨機碼，
+      // 不再直接送標題（見 buildVideoOutName 註解的跨租戶覆寫案例）。
+      buildVideoOutName((ctx.organizationId as string | undefined) ?? null, title),
       undefined,
       {
         ttsProvider: ctx.ttsProvider as string | undefined,

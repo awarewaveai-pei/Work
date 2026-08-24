@@ -9,6 +9,7 @@
  */
 import { register, type BlockCtx } from "./registry";
 import { submitRender } from "../video/render-client";
+import { buildVideoOutName } from "./video-pipeline";
 
 register({
   id: "video/render",
@@ -40,7 +41,9 @@ register({
     return submitRender(
       scenes.map((s) => ({ id: s.id, narration: s.narration })),
       assets,
-      title,      // submitRender 第 3 參數 = outName（輸出檔名前綴），勿與後續位置參數對調
+      // submitRender 第 3 參數 = outName → 決定 R2 目錄 → object_key → 資產身分。
+      // 帶租戶前綴+隨機碼（同 video/pipeline 積木），不再直接送標題。勿與後續位置參數對調。
+      buildVideoOutName((ctx.organizationId as string | undefined) ?? null, title),
       undefined,  // baseUrl（用 VIDEO_SERVICE_URL 預設）
       {
         ttsProvider: ctx.ttsProvider as string | undefined,

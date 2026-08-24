@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { VideoServiceCapability } from "@/lib/content/video/render-client";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
+import { effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 interface GenerateBody {
   topic?: string;
@@ -49,6 +50,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, status: 400, error: "topic 為必填" }, { status: 400 });
   }
 
+  // 租戶身分：走 app 既有的唯一解析器（designs/presets 同一條 seam），**不是**全域預設值。
+  // client 帳號一律綁回自己的 org、無綁定則 fail closed；ops 帳號維持既有行為（吃 env 預設）。
+  // 解析刻意放在提交 EU **之前**：失敗要在花掉渲染算力前擋下，而不是等 EU 跑完才發現這筆
+  // 影片沒有合法歸屬（2026-08-25：本路徑原本在 EU 提交後才呼叫無參數的 resolveOrgId()）。
+  const { resolveOrgId: resolveDefaultOrgId } = await import("@/lib/content/blocks/video-pipeline");
+  let orgId: string | null;
+  try { orgId = effectiveOrgId(req, resolveDefaultOrgId()); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e) as NextResponse; throw e; }
+
   // Side-effect import to populate the block registry
   await import("@/lib/content/blocks/register-all");
   const { byId } = await import("@/lib/content/blocks/registry");
@@ -79,6 +89,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     introTitle: body.introTitle,
     introDuration: body.introDuration,
     outputFormats: body.outputFormats,
+    // 供積木組出帶租戶身分的 R2 目錄名（見 buildVideoOutName）。ctx 是 BlockCtx（index signature），
+    // 積木讀不到就退回舊行為，所以這個欄位缺失是「少了租戶前綴」而非崩潰。
+    organizationId: orgId,
   };
 
   // prepare 回傳（pending handle）— 單一 interface + optional（避免 union narrowing TS 邊角）
@@ -97,7 +110,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const { createJob, finishJob, updateJobStep } = await import("@/lib/content/video/job-store");
-  const { resolveOrgId, cleanupVideoInputKeys } = await import("@/lib/content/blocks/video-pipeline");
+  const { cleanupVideoInputKeys } = await import("@/lib/content/blocks/video-pipeline");
   const job = await createJob();
 
   // 關鍵：**同步**呼叫 prepare（Claude 腳本 + Flux 圖並行 + 提交 EU，~25s，無背景工作、不撞 CF 100s）。
@@ -117,7 +130,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   if (prep.ok && prep.euJobId) {
-    const orgId = resolveOrgId(); // ctx 無 organizationId → 用 POD_DESIGNS_DEFAULT_ORG_ID
+    // orgId 已在提交 EU 之前解析完成（見上方 effectiveOrgId 區塊），此處直接使用。
     await finishJob(job.id, {
       status: "running",
       euJobId: prep.euJobId,

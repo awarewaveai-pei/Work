@@ -19,6 +19,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { VideoServiceCapability } from "@/lib/content/video/render-client";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
+import { effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 interface RenderDraftBody {
   scenes?: { id: number; narration: string }[];
@@ -50,6 +51,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const { scenes, imageUrls, formatImageUrls, formats: bodyFormats, r2Keys: clientR2Keys = [], title = "影片" } = body;
+
+  // 租戶身分走 app 既有唯一解析器（同 generate route 與 designs/presets），非全域預設值。
+  // 放在提交 EU 之前：無合法歸屬要在花掉渲染算力前擋下。
+  const { resolveOrgId: resolveDefaultOrgId } = await import("@/lib/content/blocks/video-pipeline");
+  let orgId: string | null;
+  try { orgId = effectiveOrgId(req, resolveDefaultOrgId()); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e) as NextResponse; throw e; }
 
   if (!Array.isArray(scenes) || scenes.length === 0) {
     return NextResponse.json({ ok: false, error: "scenes 為必填非空陣列" }, { status: 400 });
@@ -122,7 +130,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const { createJob, finishJob } = await import("@/lib/content/video/job-store");
-  const { resolveOrgId } = await import("@/lib/content/blocks/video-pipeline");
 
   // 收斂到 video/render 積木（D 接線）：本 route 仍負責素材 host 白名單 + r2Keys 重導（安全閘），
   // 僅把「提交 EU 渲染」這步委派給積木（submitRender 的單一入口）。
@@ -137,6 +144,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // 多格式 → 傳 formatAssets+formats（EU 原生多格式）；否則舊單組 assets。
     ...(useMulti ? { formatAssets: urlGroups, formats: bodyFormats } : { assets: imageUrls }),
     title,
+    organizationId: orgId,   // 積木用來組帶租戶身分的 out_name
     ttsProvider: body.ttsProvider,
     ttsVoice: body.ttsVoice,
     introTitle: body.introTitle,
@@ -151,7 +159,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const job = await createJob();
-  const orgId = resolveOrgId();
+  // orgId 已在提交 EU 之前解析（見上方 effectiveOrgId 區塊）。
   await finishJob(job.id, {
     status: "running",
     euJobId: sub.jobId,
