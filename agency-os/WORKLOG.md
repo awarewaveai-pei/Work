@@ -2,6 +2,30 @@
 
 ## 2026-08-24
 
+### AUTO_TASK_DONE: AGENTS.md 延續 2026-07-02 瘦身提案第二輪 + TOOL_TRIGGER_MAP.md 補新鮮度
+
+[任務]
+使用者要求把整理過的 AGENTS.md 做到「完美」：可運行 20 年、真正被遵循、不多吃 token、最具效益與正確性。我原本打算把 4 張 trigger table 拆去獨立懶載入檔案，讀到 `reports/audit/agents-slimming-proposal-2026-07-02.md` 才發現這個確切方案 7 週前已經被考慮過並明確否決（理由：AGENTS.md 每 session 自動載入、獨立檔案不會，外移規則 = 規則對 AI 隱形 = 蒸發風險比 token 成本更嚴重）。改用 Plan agent 沿用同一套已核准的 A/B/C/D 方法論，對 7 月之後新增的內容做延續性整理。
+
+[已修改]
+1. `agency-os/AGENTS.md` line 249（代理自動工具使用規則表）—— 刪除跟 line 313（Claude工作自觸發規則表）逐字重複的 `/checkpoint` 觸發列（今天發現的第 4 對重複，前 3 對已在前一個 commit 修過），把「tree 乾淨時靜默跳過」補充細節併進倖存那行，語意零損失
+2. `agency-os/AGENTS.md` R0 標題下（line 9）—— 新增一行說明：「R1/R2 定義在 CLAUDE.md；R3 未使用（保留）」。用 `git log -S"R3："` 對兩份檔案的完整歷史查證，確認 R3 從未被定義過，不是被刪除，是編號本來就沒用到，避免未來讀者誤以為規則缺漏
+3. `agency-os/docs/operations/TOOL_TRIGGER_MAP.md`（AGENTS.md 自己在工作類型路由表宣稱的「完整路由表」，但 `Last updated: 2026-07-02`，已 stale 7 週）—— 新增「跨模型 Oracle」章節（codex-oracle.ps1 兩種模式 + ORACLE gate + bughunt-oracle，之前完全沒收錄，grep 確認 0 命中）；補 2 個漏掉的 runbook（自動排程監控手冊、Hetzner 搬遷手冊）；`/review` 列補上今天新加的 critic→codex-oracle fallback；Last updated 改 2026-08-24；🟢 計數約略值從 ~55 調整為 ~59（新增 4 列，🔴 那行的「27 規則」是 `rules.manifest.json` 的實際計數，已查證 ORACLE gate/bughunt-oracle 不在該檔案裡，故不調整避免灌水）
+4. `agency-os/docs/CHANGE_IMPACT_MATRIX.md` line 37（AGENTS.md 那一列）—— 加入 `docs/operations/TOOL_TRIGGER_MAP.md` 到 Impacted 清單。這是它會悄悄 stale 7 週都沒人發現的根本原因，不補這條下次又會重新 stale
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 純文件整理，無可執行邏輯；改用文件完整性檢查：`grep -c '^```'` 確認兩檔 code-fence 無異常（AGENTS.md 仍 2 成對，TOOL_TRIGGER_MAP.md 本來就 0 個）、grep 確認去重/新增內容確實落地、`git log -S"R3："` 查證 R3 編號主張為真
+- REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/doc-sync-automation.ps1 -AutoDetect`（兩次，Part A 後一次、Part B 後一次） | exit=0（兩次皆 Single Owner Policy Check PASS，無 broken link）
+- REVIEW_WAIVED: NA -- 純文件表格新增/去重/日期更新，無程式邏輯；改用 Plan agent 產出的方案本身已含逐項查證（grep 確認重複行、確認 CHANGE_IMPACT_MATRIX.md 缺口、確認 hook 檔案存在），我在採用前逐條驗證過關鍵 finding，未直接採用未驗證的 agent 輸出
+- BUGHUNT_DONE: scope=agency-os | grep=`Runbooks（10 個）\|~55 個工具` | hits=0（確認沒有其他地方還引用 TOOL_TRIGGER_MAP.md 更新前的舊計數）
+
+[剩餘風險]
+- TOOL_TRIGGER_MAP.md 的 🟢/⚪ 計數本來就是約略值（原文用 `~`），這次只是同精度調整，不是重新精確盤點全文件，未來若要做到精確計數需要另外排時間逐條數
+- CHANGE_IMPACT_MATRIX.md 目前只有 AGENTS.md→TOOL_TRIGGER_MAP.md 單向依賴，沒有加反向（TOOL_TRIGGER_MAP.md 改動時要不要回頭檢查 AGENTS.md）——判斷不需要，因為這份地圖本來就是 AGENTS.md 的附屬參考，不會反向驅動 AGENTS.md 的規則內容
+
+[rollback]
+`git diff` 對應本次改動的 4 個檔案皆為純文字增刪，`git revert` 單一 commit 可完整回復。
+
 ### AUTO_TASK_DONE: checkpoint 警告補上 empty-diff 分支（round 2，同一顆 Codex 立刻回打）
 
 [任務]
@@ -2752,13 +2776,14 @@ woocommerce-points-and-rewards / woocommerce-product-addons
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-08-24 08:30:11 UTC_
+_Last synced: 2026-08-24 10:42:04 UTC_
 
 ## 2026-08-17
 - 自動週報代理：weekly summary 生成 → reports/weekly/weekly-summary-2026-08-17.md
   - REALTEST_WAIVED: DOC_ONLY -- automated report generation, no code change
   - REVIEW_WAIVED: DOC_ONLY -- report content verified against WORKLOG/TASKS source files
   - BUGHUNT_WAIVED: DOC_ONLY -- no code change
+
 
 
 

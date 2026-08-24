@@ -6,6 +6,8 @@
 
 ### R0：架構師模式（所有任務強制，優先級最高）
 
+> R1/R2 定義在 `CLAUDE.md`（多機設定同步／任務完成強制）；R3 未使用（保留編號，未來若需要再定義）。本檔案（AGENTS.md）由 `CLAUDE.md` 開頭 `@agency-os/AGENTS.md` 整篇引入，兩檔規則共用同一套編號空間。
+
 目標：完整理解現有系統後，做最小、穩定、安全、可維護、可驗證、可回滾的修改，能穩定運行 30 年。
 思維準則（每個決策都要過）：多角度優先 / 30 年工程紀律 / 零重工原則 / 完整閉環 / 最小爆炸半徑。
 品質標準：輸出含完整指令 + 確切路徑 + 預期結果；每個發現附 `file:line` 證據，不接受「可能是」。
@@ -246,7 +248,6 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | 使用者說「別的 AI 處理好了」/「另一個 session 做了 X」/「之前已經做過」/「似乎完成了」（任何基礎設施 / 安全 / 功能改動）| **🔧 機械閘**（2026-07-02）：`hooks/rules/vbc-reminder.js` 於 UserPromptSubmit 偵測語境自動注入 VBC 提醒。**VBC 協議（強制，R4 SSOT）**：① 先讀 `agency-os/WORKLOG.md` 最近 3 個 `## YYYY-MM-DD` 區塊，找對應 `[已修改]` / `AUTO_TASK_DONE` / `REALTEST_EVIDENCE` → 完整理解「做了什麼、用什麼替代方案」② 才做正向驗證（確認效果符合記錄）③ **禁止**：只查單點系統（CF API / git diff / VPS 單一服務）就宣告「沒做好」— 單層消失可能代表另一層已接手。根因：2026-06-04 CF WAF=0 rules 誤報案例（未讀 WORKLOG 確認 LLAR 已裝） |
 | 使用者說「doc 過時了」/「更新設計文件」/「SDD 跟程式碼不一致」/「文件同步一下」 | 跑 `/sdd-update` |
 | 使用者要任何測試：「跑 QA/找 bug/上線前測試」「幫我測/瀏覽器/Chrome/e2e」「截圖/效能」 | QA 結構化報告 → `/qa-review`；真瀏覽器 e2e（登入態/Canvas/React state）→ `browser-test` skill（先 `list_connected_browsers`）；smoke/完整/截圖/perf → `/playwright smoke\|qa\|screenshot <url>\|perf` |
-| 任何 non-trivial R0 任務完成（輸出 [已修改] 後，準備進下一個任務）| 跑 `/checkpoint`（mid-session git save；tree 乾淨時靜默跳過） |
 | Repair Center 告警（`/api/ops/repairs/health` 回 503 / `ok: false` / Phase 4 失敗）| 跑 `/phase4-check`；若持續失敗 → 讀 `runbooks/HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md` |
 | AO-RESUME 且今日 TASKS 含部署相關任務 | 在 §7 下一步點名今日 deploy flow：`/check-drift` → `/verify` → go-ahead → `/sg-deploy` → `/playwright smoke` |
 | 使用者說「回顧一下」/「今天做了什麼」/「收工前看一下」/「要 close 了嗎」 | 跑 `/recap`（唯讀；確認後才跑 `/ao-close`）；問「任務/還有什麼/今天要做哪些」→ `/tasks` 列 open 待辦 |
@@ -310,7 +311,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | 完成任何 code 改動（`.ps1/.ts/.tsx/.js/.sh/.py`）| 跑 `/verify-recent`（**🔧** verify-gate 三件套硬擋未驗證 commit）|
 | critic 回報 Critical 或 High 問題 | 召喚 `vuln-verifier` 寫 PoC 確認是否真實漏洞 |
 | 改動 governance 文件（`AGENTS.md` / `CLAUDE.md` / hooks / cursor rules）| 改後跑 `/doc-sync`；若同時改了 `.claude/commands/` `.claude/agents/` `.claude/skills/` → 跑 `/sync-check` |
-| 任何 R0 任務完成後（輸出 [已修改]）| 跑 `/checkpoint` 存 mid-session commit |
+| 任何 R0 任務完成後（輸出 [已修改]）| 跑 `/checkpoint` 存 mid-session commit（tree 乾淨時靜默跳過）|
 | 準備 sg-deploy 前 | 自動跑 `/check-drift` + `/verify` + `tsc --noEmit`（有 ts 改動時）|
 | sg-deploy 完成後 | 自動跑 `/playwright smoke` |
 | wp-maintenance safe-update 完成後 | 自動跑 `/playwright client <slug>` |
@@ -438,5 +439,5 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-08-24 08:30:11 UTC_
+_Last synced: 2026-08-24 10:42:04 UTC_
 

@@ -1,7 +1,7 @@
 # Tool Trigger Map
 
 > 所有工具的觸發情形一覽。每次新增工具時同步更新本文件。
-> Last updated: 2026-07-02
+> Last updated: 2026-08-24
 
 ## 圖例
 
@@ -34,7 +34,7 @@
 | 指令 | 功能 | 觸發 |
 |-----|------|------|
 | `/verify-recent` | Code 改動驗證（syntax + critic + exec）| 🔴 Hook `verify-gate-commit.js`（git commit 前 BLOCK）+ `verify-gate-stop.js`（Stop 提醒）|
-| `/review` | Critic subagent code review | 🔴 Hook `verify-gate-stop.js` 提醒；🟢 R0 任務完成前強制跑 |
+| `/review` | Critic subagent code review | 🔴 Hook `verify-gate-stop.js` 提醒；🟢 R0 任務完成前強制跑；critic 連續失敗（529/逾時）≥2 次 → fallback 到 `codex-oracle.ps1 -Mode review`（2026-08-24 起）|
 | `/verify` | Build gates + 治理 gate | 🟢 準備 sg-deploy 前自動跑 |
 | `/apply-audit` | 套用 audit 報告 patches | 🟢 你說「apply audit」「套用 audit」「把 audit 修一修」|
 | `/audit-encoding` | `.ps1` CP950 encoding 稽核 | 🔴 Hook `code-change-tracker.js`（.ps1 修改後提醒）|
@@ -87,6 +87,19 @@
 | `/provision-client` | 一鍵租 Hetzner + day-1 硬化 + DNS | 🟢 「一鍵架站」「租主機」「provision」（High 步驟等 go-ahead）|
 | `/wp-bridge-release` | wp-bridge 外掛發版（release repo tag → zip）| 🟢 改 wp-bridge code 且 bump 版號後自動 |
 | `/wp-redirect` | WordPress 301/302 轉址（Rank Math）| 🟢 「轉址」「redirect」|
+
+---
+
+## 跨模型 Oracle（Codex 協作，2026-08-17 起）
+
+完整分工原則、機械閘細節見 `AGENTS.md §跨模型 oracle`；本節只列工具本身的觸發時機。
+
+| 工具/環節 | 功能 | 觸發 |
+|-----|------|------|
+| `scripts/codex-oracle.ps1 -Mode inspect` | Codex 唯讀讀 repo，回摘要問答 | 🟢 規劃前想省 Claude context 時；`-Prompt "<具體問題>"` |
+| `scripts/codex-oracle.ps1 -Mode review` | Codex 對抗式覆審 working tree（含 untracked 新檔）| 🟢 R0 [驗證計畫] Review 動作；`/review` 的 critic 連續失敗 ≥2 次時的 fallback（2026-08-24 起）|
+| ORACLE gate（`verify-closeout-completeness.ps1` §ORACLE gate）| staged 含 source 檔時強制要求當日 review artifact 存在 | 🔴 Hook（AO-CLOSE 自動強制）；刪除的檔案改用 `path@blob-hash` 內容綁定（2026-08-24），修改的檔案仍用時間戳排序 |
+| `bughunt-oracle.ps1` | 機器驗證 `BUGHUNT_DONE hits=0` 宣告是否為真 | 🔴 Hook（AO-CLOSE commit 時，僅覆蓋 ASCII identifier + code 檔）|
 
 ---
 
@@ -207,7 +220,7 @@
 
 ---
 
-## Runbooks（10 個）
+## Runbooks（12 個）
 
 | Runbook | 查閱時機 | 觸發 |
 |---------|---------|------|
@@ -221,6 +234,8 @@
 | `ADD-PERIODIC-HEALTH-CHECK.md` | 新增週期性健康檢查的 SOP | ⚪ 需要新增健康檢查時 |
 | `CLOUDFLARE-WAF-SETUP.md` | WAF 規則 / scanner 攻擊 / DDoS | 🟢 WAF/掃描攻擊事件 |
 | `VPS-AUTO-REBOOT-RUNBOOK.md` | VPS reboot 訊號 escalation | 🟢 reboot 訊號 + 距現在 ≥ 16h |
+| `自動排程監控與手機Telegram警報-維護手冊.md` | 雲端排程報告沒更新 / routine source 漂移 / 週報月報 stale | 🟢 排程異常訊號 |
+| `HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md` | EU/SG 搬機 / 上 dedicated / 備份策略 / RAID / 災難還原 | 🟢 動機器前必讀 §7 checklist |
 
 ---
 
@@ -294,5 +309,5 @@
 | 🔴 Hook 機械強制 | rules.manifest.json 全清單（27 規則）| 依 runner 結構保證；閘壞 = 大聲 fail-open 非靜默 |
 | 🟠 File-path-router | 7 類別（db/supabase/n8n/auth/nginx/wp/trigger）| 100% 可靠，編輯路徑時自動 |
 | 🟡 AO 生命週期 | 2（ao-resume / ao-close）| 100% 可靠 |
-| 🟢 AGENTS.md 自判 | ~55 個工具 | 中等可靠，靠我的情境判斷 |
+| 🟢 AGENTS.md 自判 | ~59 個工具（含 2026-08-24 補的跨模型 oracle + 2 runbook）| 中等可靠，靠我的情境判斷 |
 | ⚪ 需你發動 | ~20 個工具 | High-risk 等 go-ahead / 純 user intent 類 |

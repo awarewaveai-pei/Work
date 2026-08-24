@@ -34,7 +34,7 @@
 | `docs/operations/system-guard-and-notification.md` | `README.md`, `AGENTS.md`, `RESUME_AFTER_REBOOT.md`, `automation/REGISTER_SYSTEM_GUARD_TASKS.ps1`, `scripts/system-guard.ps1` |
 | `docs/operations/end-to-end-linkage-checklist.md` | `docs/operations/new-doc-linkage-checklist.md`, `scripts/system-guard.ps1`, `scripts/system-health-check.ps1`, `scripts/doc-sync-automation.ps1`, `README.md` |
 | `docs/operations/new-doc-linkage-checklist.md` | `docs/operations/end-to-end-linkage-checklist.md`, `docs/operations/cursor-enterprise-rules-index.md`, `docs/CHANGE_IMPACT_MATRIX.md`, `docs/change-impact-map.json`, `docs/DOCS_INDEX.md`, `scripts/register-new-governance-doc.ps1`, `scripts/doc-sync-automation.ps1`, `scripts/system-health-check.ps1`, `scripts/verify-tenant-staging-sites-index-ssot.ps1` |
-| `AGENTS.md` | `docs/operations/new-doc-linkage-checklist.md`, `docs/operations/cursor-enterprise-rules-index.md`, `docs/CHANGE_IMPACT_MATRIX.md`, `scripts/register-new-governance-doc.ps1`, `README.md` |
+| `AGENTS.md` | `docs/operations/new-doc-linkage-checklist.md`, `docs/operations/cursor-enterprise-rules-index.md`, `docs/CHANGE_IMPACT_MATRIX.md`, `scripts/register-new-governance-doc.ps1`, `README.md`, `docs/operations/TOOL_TRIGGER_MAP.md` |
 | `scripts/register-new-governance-doc.ps1` | `docs/operations/new-doc-linkage-checklist.md`, `docs/change-impact-map.json`, `docs/CHANGE_IMPACT_MATRIX.md`, `AGENTS.md` |
 | `docs/operations/CLAUDE_EXECUTION_BLUEPRINT_30Y.md` | `CLAUDE.md`, `AGENTS.md`, `docs/operations/cursor-enterprise-rules-index.md`, `docs/operations/dual-ide-coexistence-strategy.md`, `docs/operations/OPS_DOCS_INDEX.md`, `docs/CHANGE_IMPACT_MATRIX.md` |
 | `docs/operations/dual-ide-coexistence-strategy.md` | `CLAUDE.md`, `AGENTS.md`, `docs/operations/cursor-enterprise-rules-index.md`, `docs/operations/CLAUDE_EXECUTION_BLUEPRINT_30Y.md`, `docs/operations/OPS_DOCS_INDEX.md`, `docs/CHANGE_IMPACT_MATRIX.md` |
@@ -102,5 +102,5 @@
 - `docs/operations/new-doc-linkage-checklist.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-08-24 08:30:11 UTC_
+_Last synced: 2026-08-24 10:44:20 UTC_
 
