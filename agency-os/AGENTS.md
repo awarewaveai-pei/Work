@@ -126,19 +126,22 @@
 | 環節 | 機制 |
 |------|------|
 | 產證據 | `codex-oracle.ps1` 每次跑完把答案寫進 `agency-os/reports/oracle/YYYY-MM-DD-<mode>-<stamp>.md`（進 git，不刪）|
-| 驗證據 | `verify-closeout-completeness.ps1` §ORACLE gate：staged 含 source 檔時，該目錄必須有**當日**且**時間戳晚於最後一次改檔**的 review artifact |
+| 驗證據（修改） | `verify-closeout-completeness.ps1` §ORACLE gate：staged 含 source 檔時，該目錄必須有**當日**且**時間戳晚於最後一次改檔**的 review artifact |
+| 驗證據（刪除） | 2026-08-24 改版：刪除的檔案沒有 mtime 可比對時間戳，改綁**內容**——artifact 記錄 `- deletions-reviewed: <path>@<blob-hash>`（git diff header 的 `index <hash>..0000000`），gate 對「目前真正 staged 的刪除」算出同一顆 hash，要求路徑+hash 精確相符才算確認；純路徑比對（舊格式 artifact）只在雙方都算不出 hash 時才當備援，避免同日「刪除→復原→改內容→再刪除」被舊記錄誤證（8 輪修正細節見 `WORKLOG.md` 2026-08-24 各 round 條目） |
 | 豁免 | 當日 WORKLOG 加 `- ORACLE_WAIVED: <理由>`（看得見，不可靜默省略）|
 | 涵蓋副檔名 | `$codeExts` + `.sql .yml .yaml .php .tf .tfvars` —— **刻意不共用 `$codeExts`**，因為那份清單同時驅動 REALTEST/DEBUG-TAG，放寬會靜默擴大三個不相干的閘。SSOT 在 `verify-closeout-completeness.ps1` `$oracleExts` |
 
-時間戳比對是刻意選的：oracle 讀的是**尚未 stage 的工作樹**，所以無法用 staged diff 的 hash 綁定；「artifact 必須晚於它宣稱審過的檔案」是唯一可機器驗證的順序關係。它擋的是「早上審完、下午改了才 commit」（codex FINDING 1）。
+修改的時間戳比對是刻意選的：oracle 讀的是**尚未 stage 的工作樹**，所以無法用 staged diff 內容直接綁定；「artifact 必須晚於它宣稱審過的檔案」是唯一可機器驗證的順序關係。它擋的是「早上審完、下午改了才 commit」（codex FINDING 1）。刪除則相反——檔案內容本身（git blob）在被刪前就已定案，反而可以做到比時間戳更精確的內容綁定，2026-08-24 那輪才改用 hash。
 
 **閘擋不到的**：artifact 存在 ≠ findings 被處理。這仍是操作紀律（見 §已知信任邊界）。閘關掉的只有「忘記跑」這個洞。
+
+**同一 reviewer 對同一段程式碼連續回報 2 次 → 第 3 次修正前必須先做不變量分析（強制，2026-08-24 起）**：不能再逐點打補丁。寫一段「這一類問題的完整不變量是什麼」，確認這次修正是關掉整類問題還是只關掉這一個實例；只關掉實例要在 WORKLOG 明說並取得使用者同意才能繼續逐點修。**禁止**用「範圍夠小」「邏輯直接沿用前一輪」當理由跳過這一步——這正是 2026-08-24 ORACLE gate deletion 追蹤機制被同一顆 Codex 連續打回 8 輪的根因：每輪只修被指出的那一行，没有停下來問「這一類問題還有哪裡沒堵到」（完整案例見 `WORKLOG.md` 2026-08-24 round 1–8）。
 
 **禁止**：① 直接跑裸 `codex exec`（會漏 `-o`，單次噴 ~120KB 進 context；也會拉起 config.toml 的 MCP）② 用 `chatgpt-*`／`gemini-*`／`grok-*` MCP 工具當 oracle —— 那些走 `OPENAI_API_KEY`／`GEMINI_API_KEY` **按 token 計費**，與 ChatGPT 訂閱是兩套帳；`codex` CLI 走訂閱（`authMethod: chatgpt`），零額外費用 ③ 直接採用 findings 而不驗證——**每條必須 Grep 確認 `file:line` 真實存在**，AGENTS.md §Subagent 交接協議的驗證要求同樣適用 ④ 讓 Claude 與 Codex 同時修改同一份檔案（操作者 2026-08-17 明確指示）。
 
 **給 Codex 的 prompt 只放決策結果，不放推理過程**：R0 七段區塊是給操作者批准用的；Codex 只需要 Decision / Constraints / Files / Acceptance。兩份產出，不同讀者。
 
-### Session 衛生（context 成本，2026-08-20 起）
+## Session 衛生（context 成本，2026-08-20 起）
 
 **每一輪對話都會把整段歷史重送一次**，所以早期塞進 context 的東西之後每輪都在重複付費。這比 oracle 分工更大的槓桿，順序不可顛倒：
 
@@ -213,6 +216,8 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 
 ## 代理自動工具使用規則（Claude 主動執行）
 
+以下列的是「使用者說了某句話 → 觸發」。流程完成後自動接續的下一步（deploy 完成後跑 smoke、governance 文件改完後 doc-sync 等）不重複列在這裡，見下方 §Claude 工作自觸發規則（2026-08-24 去重：兩表曾各自維護同一批列，改為單一正本）。
+
 | 觸發情境 | 立即執行 |
 |---------|---------|
 | 使用者提到「改外觀 / 改顏色 / 改主題 / theme / 字體 / 側欄樣式 / 換配色 / 外觀不對 / appearance」 | **先讀** [`app/(shell)/tools/theme/THEME_ARCHITECTURE_APPEARANCE.md`](../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/theme/THEME_ARCHITECTURE_APPEARANCE.md)（外觀系統 SSOT：哪個檔改什麼 + 改完怎麼上線）。**禁止**臆測哪個檔；90% 調整只碰 `lib/theme/tokens.ts` 或 `app/tools/theme/page.tsx` |
@@ -226,18 +231,15 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | next-admin 程式碼改動後 sg-deploy 失敗且 log 含 `npm test FAILED` | ① 在本機 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/` 跑 `npm test` 查看失敗詳情；② 修好測試或修好程式碼（二擇一，視測試是否合理）；③ commit + push；④ 重跑 `sg-deploy.sh next-admin`。**禁止**：繞過 test gate（--skip-pull + 手動 rsync 或直接 `docker compose build`）。 |
 | 訊息含 reboot 訊號（`needs reboot` / `重啟` 等）**且**含 VPS 識別字（EU/SG IP 或主機名）| 先讀 `reports/status/auto-reboot-LATEST.md`（verdict 🟢/🟡/🔴）。< 16h → auto-reboot 自動處理，不主動跑指令。≥ 16h 或非 🟢 → escalate 手動 `/sg-reboot` 或 `/eu-reboot`（High risk，等 go-ahead）。AO-RESUME 時必點名 verdict。詳見 `runbooks/VPS-AUTO-REBOOT-RUNBOOK.md` |
 | 任何 `Edit`／`Write`／`MultiEdit` 寫入或修改 `.ps1` 檔（CP950 trap class，2026-05-22 backfill-missed-daily.ps1 真實爆過）| **🔧 機械閘**：`hooks/rules/code-change-tracker.js` 修改 .ps1 時自動提示。立即執行 `/audit-encoding --file <該檔絕對路徑>`（exit 0=放行；exit 1=fix：wrap capture site 或加 AUDIT_REGISTRY 豁免）。詳：[.claude/commands/audit-encoding.md](../.claude/commands/audit-encoding.md) |
-| 任何 `Edit`／`Write`／`MultiEdit` 改動 code 檔（`.ps1 .ts .tsx .js .jsx .mjs .sh .py`）後即將完成 R0 任務（準備寫 [驗證結果]）| **🔧 機械閘**：`hooks/rules/verify-gate-stop.js` session 結束時提醒。Review 段寫入前強制跑 `/review`（critic subagent，**外部 oracle**）；critic 結論納入 [驗證結果] Review 段。**禁止**：以自我描述替代 critic output。詳：[`.claude/commands/review.md`](../.claude/commands/review.md) |
+| 任何 `Edit`／`Write`／`MultiEdit` 改動 code 檔（`.ps1 .ts .tsx .js .jsx .mjs .sh .py`）後即將完成 R0 任務（準備寫 [驗證結果]）| **🔧 機械閘**：`hooks/rules/verify-gate-stop.js` session 結束時提醒。Review 段寫入前強制跑 `/review`（critic subagent，**外部 oracle**）；critic 結論納入 [驗證結果] Review 段。**禁止**：以自我描述替代 critic output。**critic 連續失敗（529/逾時）≥ 2 次 → 改用 `.\scripts\codex-oracle.ps1 -Mode review -Context "<改動說明>"` 當替代 oracle，不再重試同一個失效工具**（2026-08-24：critic 該 session 連續 6 次 529，codex-oracle.ps1 更新至最新版後正常運作；§跨模型 oracle 分工表本就把 Review 動作歸給 Codex，兩者是同一件事的兩條路徑，不是互斥）。詳：[`.claude/commands/review.md`](../.claude/commands/review.md) |
 | 任何 audit / 抓蟲 / bug class / encoding / silent fail / 工具化 / class-by-class 相關問題或情境 | 先讀 [`docs/operations/BUG_HUNT_PROTOCOL.md`](docs/operations/BUG_HUNT_PROTOCOL.md)（方法 SSOT，5-tier 觸發 + 9-step playbook + KPI）+ [`docs/operations/AUDIT_REGISTRY.md`](docs/operations/AUDIT_REGISTRY.md)（狀態 SSOT）再回答，不靠常識 / 不臨機自創流程 |
 | 操作者說「apply audit」／「apply the patches」／「套用 audit」／「把 audit 修一修」／「處理好所有的事」並指涉一份 `agency-os/reports/audit/*.md`（或可從 WORKLOG / AUDIT_REGISTRY 推得最近未 apply 的 logic audit）| **立即執行 `/apply-audit <report-path>`**：強制 §Patch Errata fold-in 在改 code 前 + 跨檔抓蟲 catch-up（grep callsites of new symbols across `lobster-factory/`、`agency-os/`）+ 4-action verify per patch + AUDIT_REGISTRY 🔴 TRACKED → 🔴 FIXED 含 commit hash + WORKLOG entry 含 R0+R4 4 動作。**禁止**：跳過 Errata 折回直接 apply（2026-05-23 三次 push-back 的根因）；Medium-High 風險 patch（prod deploy script / auth / DB migration）沒操作者明示 OK 就 apply。詳：[`.claude/commands/apply-audit.md`](../.claude/commands/apply-audit.md) |
 | 操作者說 `/tomo <hint>` | secret check → context 抽取 → 6 段 packet → 直接寫 `handoffs/` + TASKS + WORKLOG → commit + push（無 propose 確認）。詳見 [`.claude/commands/tomo.md`](../.claude/commands/tomo.md) |
 | **部署流程觸發**：使用者說「部署」/「deploy」/「推上去」/「可以上了」/「上線」 | ① `/check-drift` 確認 drift 清零 ② `/verify` 確認 build gate 通過 ③ 若有 `.ts/.tsx` 改動先在本機跑 `npx tsc --noEmit` ④ 三者 pass 才**提議**（不自動）`/sg-deploy`，等明示 go-ahead。**🔧 機械閘**（2026-07-02）：`hooks/rules/high-risk-bash-warn.js` BLOCK ssh→prod VPS 的 sg-deploy/systemctl restart/docker down/reboot，首行 `# CONFIRMED-HIGH-RISK:` 解鎖 |
-| `/sg-deploy` smoke check pass 後 | 自動跑 `/playwright smoke` |
 | 使用者問「系統狀態」/「是否健康」/「health」/「有沒有問題」 | 跑 `/health`；若回報 `sync_check: FAIL` → 接著跑 `/sync-check` |
-| 改動 governance 文件後（`AGENTS.md` / `CLAUDE.md` / `.cursor/rules/*.mdc` / hook `.js`）| 跑 `/doc-sync`；若改了 `.claude/commands/` 或 `.claude/agents/` 或 `.claude/skills/` → 同時跑 `/sync-check` 確認跨機一致 |
 | MCP tool 回 401 / 403 / connection failed / empty API response | 跑 `/vault-status`；若顯示 key 缺口 → 跑 `/vault-sync`。使用者主動問「vault/密鑰/secret 不見了/API key 哪裡找」同此路由。**🔧 機械閘**（2026-07-02）：`hooks/rules/mcp-health.js` 於 401/403 失敗時自動附 `/vault-status` 路由提示 |
 | 使用者提到「客戶」/「soulful」/「WP 更新」/「外掛」/「maintenance」 | 先跑 `/client-status [slug]` 了解現況，再決定下一步 |
 | 使用者提到「搬站」/「換主機」/「機器買好了」/「二手 Hetzner」/「soulful 搬」/「Hostinger 到期」/給一個新主機 IP | **先讀 [`tenants/company-soulful-expression/core/SITE_MIGRATION_RUNBOOK.md`](tenants/company-soulful-expression/core/SITE_MIGRATION_RUNBOOK.md)**（步驟／切換／回滾 SSOT），再依 §0.5 → §3 → §4 → §5 → §6 執行。**硬死線 2026-11-12**（Hostinger hosting 不續約）。**禁止**：不讀 runbook 就開始建機或搬檔；重做已完成項（CF zone 14 筆已建、nameserver 已切、信箱 mail-tester 10/10、EU 三份備份 769 MB、還原演練 Drill #1 PASS）|
-| `/wp-maintenance safe-update` 完成 | 自動跑 `/playwright client <slug>` 確認無破壞 |
 | 使用者提到「一鍵架站」/「自動開站」/「provision」/「租主機」/「Hetzner 開機」/要在 app.aware-wave.com 加建站按鈕 | **先讀 [`lobster-factory/docs/hosting/EMBED_PROVISION_INTO_APP.md`](../lobster-factory/docs/hosting/EMBED_PROVISION_INTO_APP.md)**：「租 Hetzner 主機+day-1 硬化+DNS」**已寫好且真機驗證通過（2026-06-06）**，核心函式 `packages/workflows/src/provision/provisionClient.ts`。**直接呼叫，禁止重寫**。嵌進 app = 加 API route 呼叫 `provisionClient()`（雙觸發設計）。違反樣態：重新實作租機/cloud-init/secretStore 邏輯（已存在且驗過）。 |
 | 使用者提到「app.aware-wave」/「onboarding」/「建站」/「佈建」/「企業佈建」/「ops-console」/「做 Stage N」/「繼續（上次那個建站的）」 | **先讀 [`docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`](docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md) 的「🚀 開工必讀（按順序）」7 步**（藍圖+最新真相+程式+活資料），讀完即完全掌握狀況再動工。這份是 5 階段總藍圖 SSOT（Stage 0 建站引擎已驗；現況/下一步以該檔 §2/§3 為準）。**禁止**：不讀 plan 就臆測卡點；重寫已存在的站層/機層；碰 Tarot（另一 AI 處理）。 |
 | Telegram bot 無回應 / 沉默 > 30 分鐘 / 使用者說「Telegram 壞了」/「指令沒反應」 | 跑 `/command-plane-verify` |
