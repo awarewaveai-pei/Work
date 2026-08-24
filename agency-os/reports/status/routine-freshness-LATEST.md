@@ -1,5 +1,5 @@
 ﻿# Claude routine output freshness
-- generated: 2026-08-24 21:55 (local)
+- generated: 2026-08-25 02:15 (local)
 
 - OK    Phase 4 weekly: 0d old (max 8d)
 - OK    Weekly review: 0d old (max 9d)
