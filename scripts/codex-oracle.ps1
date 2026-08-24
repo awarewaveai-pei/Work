@@ -155,6 +155,7 @@ $rules = @(
 
 $sb       = New-Object System.Text.StringBuilder
 $diffFile = $null
+$inlined  = @()   # untracked files inlined into the diff; populated below only when reviewing the working tree
 
 if ($Mode -eq 'review') {
     $diffFile = Join-Path $env:TEMP ("codex-oracle-diff-{0}.patch" -f ([guid]::NewGuid().ToString('N').Substring(0,8)))
@@ -260,6 +261,27 @@ if ($Mode -eq 'review') {
             exit 2
         }
         Set-Content -LiteralPath $diffFile -Value $diffText -Encoding UTF8
+
+        # Record exactly which paths were IN the diff sent to Codex -- including deleted
+        # files, whose `diff --git a/<path> b/<path>` header survives even though there is
+        # no post-change content (verified empirically 2026-08-24: git still emits it for a
+        # pure deletion). Persisted into the artifact below. Without this, the gate can only
+        # infer "the review probably covered this file" from mtime ordering, which proves
+        # timing lined up, not that the file's diff was actually in what Codex read (codex
+        # stop-hook, round 4: a deletion could pass on ordering alone with no such check).
+        # KNOWN LIMITATION: git C-quotes header paths containing spaces/specials as
+        # `diff --git "a/x y" "b/x y"` -- this regex expects the unquoted `a/`/`b/` form
+        # and will not capture those, so a deletion of such a path would show as
+        # unconfirmed downstream even when genuinely reviewed (over-blocking, not a
+        # silent gap). Not fixed here: this repo's naming convention (kebab/snake_case,
+        # AGENTS.md) has no such paths in practice: adding quote-stripping for a case that
+        # cannot currently occur is exactly the premature generality R0 warns against.
+        $reviewedPaths = New-Object System.Collections.Generic.List[string]
+        foreach ($dm in [regex]::Matches($diffText, '(?m)^diff --git a/.+? b/(.+?)\s*$')) {
+            $reviewedPaths.Add($dm.Groups[1].Value)
+        }
+        foreach ($u in $inlined) { $reviewedPaths.Add($u) }
+        $reviewedPathsList = (@($reviewedPaths) | Select-Object -Unique) -join ', '
     } catch {
         Write-Error "Failed to collect diff: $($_.Exception.Message)"
         exit 2
@@ -431,6 +453,13 @@ $meta = @(
     ('- target: `{0}`' -f $(if ($DiffRef) { $DiffRef } else { 'working tree (staged + unstaged + untracked)' })),
     ('- context: {0}' -f $(if ($Context) { $Context } else { '(none given)' })),
     ('- exit: {0} | elapsed: {1}ms | answer: {2}B' -f $exit, $sw.ElapsedMilliseconds, $bytes),
+    # Machine-checkable record of which paths were IN the diff (round 4 fix). 'inspect'
+    # mode has no diff, so it never sets $reviewedPathsList -- StrictMode would throw on
+    # a bare reference, hence the Get-Variable guard rather than assuming Mode.
+    ('- files-reviewed: {0}' -f $(
+        if ((Get-Variable -Name reviewedPathsList -ErrorAction SilentlyContinue) -and $reviewedPathsList) { $reviewedPathsList }
+        else { '(n/a for this mode)' }
+    )),
     '',
     '> Codex output, NOT verified truth. R0 requires the caller to confirm every',
     '> `file:line` before acting on it. Archived so that SKIPPING the oracle is',

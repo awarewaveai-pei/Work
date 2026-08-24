@@ -287,20 +287,52 @@ try {
                 }
             } catch { $indexStageTime = $null }
 
-            $staleAgainst = @()
-            $unverifiable = @()
+            # Round 4 (codex stop-hook): timing lining up proves ORDERING, not that this
+            # file's diff was actually IN what Codex read -- an unrelated same-day review
+            # could satisfy the timing check by coincidence. codex-oracle.ps1 now records
+            # which paths were literally in the diff it sent (`- files-reviewed:` line in
+            # the artifact, added alongside this fix). Build the union of paths confirmed
+            # across ALL of today's artifacts, not just the newest -- an earlier run can
+            # legitimately confirm a path even when the newest run was about something
+            # else, matching the existing lenient "any same-day artifact" philosophy above.
+            # Old-format artifacts (predating this fix) have no such line and confirm
+            # nothing -- that is a one-time transition cost, not an ongoing gap.
+            $confirmedReviewedPaths = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::OrdinalIgnoreCase)
+            foreach ($art in $todayOracle) {
+                try {
+                    $artText = [System.IO.File]::ReadAllText($art.FullName, $utf8)
+                    # [regex]::Match (first hit only) is deliberate, not Matches: the real
+                    # files-reviewed line always precedes Codex's own prose answer in the
+                    # artifact (metadata block first, then a `---` separator, then $answer
+                    # -- see codex-oracle.ps1's $meta array). If Codex's answer happened to
+                    # echo back a line that also starts with "- files-reviewed:", the first
+                    # match still resolves to the real metadata line, not the echo.
+                    $flMatch = [regex]::Match($artText, '(?m)^-\s*files-reviewed:\s*(.*)$')
+                    if ($flMatch.Success) {
+                        foreach ($p in ($flMatch.Groups[1].Value -split '\s*,\s*')) {
+                            $pt = $p.Trim()
+                            if ($pt -and $pt -ne '(n/a for this mode)' -and $pt -ne '(none parsed)') { [void]$confirmedReviewedPaths.Add($pt) }
+                        }
+                    }
+                } catch { }
+            }
+
+            $staleAgainst    = @()
+            $unverifiable    = @()
+            $unconfirmed     = @()
             foreach ($sf in $oracleStaged) {
                 $full = Join-Path $WorkRoot ($sf.Replace('/', '\'))
                 if (-not (Test-Path -LiteralPath $full)) {
-                    # Deletion: use the index-mtime proxy when available (resolvable --
-                    # same remedy as a stale modification). Three outcomes, not two:
-                    # proxy unresolved -> genuinely undecidable (round-2 warn-only bucket);
-                    # proxy resolved and newer than the review -> stale (hard-blockable,
-                    # same as a modified file); proxy resolved and NOT newer -> the review
-                    # ran after this was staged, so it passes silently like any other
-                    # non-stale file (falls through, added to neither list).
+                    # Deletion: index-mtime proxy first (resolvable -- same remedy as a
+                    # stale modification), THEN content confirmation (also resolvable the
+                    # same way). Four outcomes: proxy unresolved -> undecidable (round-2
+                    # warn-only); proxy says staged after the review -> stale; proxy says
+                    # staged before, but no artifact's files-reviewed list names this path
+                    # -> timing lined up by coincidence, not proven (round 4); proxy AND
+                    # content both confirm -> passes silently like any other non-stale file.
                     if (-not $indexStageTime) { $unverifiable += $sf }
                     elseif ($indexStageTime -gt $newestArtifact.LastWriteTime) { $staleAgainst += $sf }
+                    elseif (-not $confirmedReviewedPaths.Contains($sf)) { $unconfirmed += $sf }
                     continue
                 }
                 $mt = (Get-Item -LiteralPath $full -ErrorAction SilentlyContinue)
@@ -312,6 +344,17 @@ try {
                          (" OR add: - ORACLE_WAIVED: <one-line reason> to {0}. Gate={1}" -f $hdr, $Gate)
                 if ($Gate -eq "strict") { Write-Host $stMsg -ForegroundColor Red; exit 1 }
                 Write-Warning $stMsg
+            }
+            if ($unconfirmed.Count -gt 0 -and -not $hasOracleWaiver) {
+                # Timing was fine (staged before the newest review) but no artifact's
+                # files-reviewed record names this deletion -- the ordering was coincidence,
+                # not proof. Resolvable the same way as stale: re-run oracle now that the
+                # deletion is staged, which will record it in files-reviewed this time.
+                $ucMsg = ("verify-closeout-completeness: staged deletion(s) not found in any today's oracle files-reviewed record, despite passing timing: {0}." -f ($unconfirmed -join ', ')) +
+                         " The review that ran may not have actually included this file. Re-run: .\scripts\codex-oracle.ps1 -Mode review -Context '<what changed>'" +
+                         (" OR add: - ORACLE_WAIVED: <one-line reason> to {0}. Gate={1}" -f $hdr, $Gate)
+                if ($Gate -eq "strict") { Write-Host $ucMsg -ForegroundColor Red; exit 1 }
+                Write-Warning $ucMsg
             }
             if ($unverifiable.Count -gt 0 -and -not $hasOracleWaiver) {
                 # Only reached when the index-mtime proxy itself could not be resolved

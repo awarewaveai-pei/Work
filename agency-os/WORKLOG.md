@@ -121,6 +121,38 @@ Round 2 為了避免 round 1「永遠無法解除的強制 waiver」問題，把
 [rollback]
 `git diff scripts/verify-closeout-completeness.ps1` 還原單一 hunk，無其他檔案依賴。
 
+### AUTO_TASK_DONE: ORACLE gate deletion 加內容驗證（round 4，同 session 第四次 Codex stop-hook）
+
+[任務]
+Round 3 修完後，同一顆 Codex stop-hook 第四次抓到問題：「staged deletions can still pass without the oracle ever seeing them」。
+
+[根因]
+Round 3 只驗證「時間對得上」（deletion 的 staging 時間早於最新 artifact），但時間對得上只證明「順序」，不證明「這個檔案的 diff 真的有出現在送給 Codex 的內容裡」——一份完全不相關、但剛好發生在 staging 之後的當日 artifact，一樣能靠時序矇混過關。深入讀 `codex-oracle.ps1` 發現：artifact 目前只存 Codex 的文字回答，從未記錄「這次到底審了哪些檔案」——這是可以補的具體缺口，不是抽象的「無法驗證」。
+
+[已修改]
+1. `scripts/codex-oracle.ps1:157`（新增）—— 頂層預宣告 `$inlined = @()`，避免 `-DiffRef` 模式下 StrictMode 對未賦值變數丟例外
+2. `scripts/codex-oracle.ps1:265-282`（新增）—— diffText 組完後，用 regex `^diff --git a/.+? b/(.+?)\s*$` 從實際送給 Codex 的 diff 內容抓出所有出現過的路徑（含刪除的檔案——git 對純刪除仍會印 `diff --git a/<path> b/<path>` header，已用真實 scratch repo 的 diff 輸出驗證），加上 inlined 的 untracked 檔案清單，組成 `$reviewedPathsList`
+3. `scripts/codex-oracle.ps1:449-456`（新增）—— artifact metadata 新增 `- files-reviewed: <路徑清單>` 行；`inspect` 模式沒有 diff，用 `Get-Variable -ErrorAction SilentlyContinue` 防呆
+4. `scripts/verify-closeout-completeness.ps1:290-360`（改寫 deletion 分支）—— 新增 `$confirmedReviewedPaths`：對「今天」所有非 partial review artifact 的 `files-reviewed` 行取聯集（不只看最新一份——同一天較早的 artifact 一樣能證明覆蓋，維持既有「當天任一 artifact 即可」的寬鬆哲學）；deletion 現在四種結果：index mtime 解不出來→不可判定（round 2 warn-only 保底）；index mtime 晚於最新 artifact→過期（既有硬擋）；index mtime 不晚於，但沒有任何 artifact 的 files-reviewed 列出這個路徑→時序矇混、內容沒證實（新增 `$unconfirmed`，比照 stale 硬擋，可解——重跑 oracle 這次就會被記錄進 files-reviewed）；index mtime 不晚於且內容有列出→真正證實覆蓋，靜默放行
+
+[已知限制（記錄不修，避免過度工程）]
+git 對含空格/特殊字元的路徑會在 diff header 加引號（`diff --git "a/x y" "b/x y"`），目前的 regex 抓不到，會讓這類路徑的刪除誤判成 unconfirmed（過度擋、不是靜默漏掉）。本 repo 命名慣例（kebab/snake_case，AGENTS.md 明定）不會出現這種路徑，故未處理——現在去補一個目前不可能發生的情況違反 R0「不做超前的泛化」。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=對真實 scratch git repo 的 `git diff --cached` 輸出（真實 staged deletion，非合成）跑實際的 regex 抽取邏輯 | exit=0（正確抽出 `dummy.php`）
+- REALTEST_EVIDENCE: tool=Bash | cmd=對真正的 `scripts/verify-closeout-completeness.ps1`（`-WorkRoot` 指向真實 scratch git repo，非抽函式）跑 6 組新情境（E=無 files-reviewed 舊格式→擋、F=有 files-reviewed 且列出該路徑→靜默放行、G=有 files-reviewed 但沒列出→擋、H=不確定情境+waiver→靜默放行、I=回歸測試「只有過期 artifact」仍走 stale 訊息非 unconfirmed 訊息、J=回歸測試「index 解不出來」仍走 round-2 warn-only 保底）| exit=0（6/6 pass，含 2 組回歸測試確認前三輪修正未被破壞）| ms=~3000（累計本 session 四輪共 10 組真實整合情境全過）
+- REVIEW_WAIVED: NA -- critic 本 session 第 5 次呼叫仍 529（Anthropic 服務端持續過載，非本地問題）；手動 review 針對自己會問 critic 的五個問題逐一檢查：① regex 對 rename 抓的是新路徑（正確，跟 `git diff --cached --name-only` 回報的路徑一致）；含空格路徑的已知限制見上方；② `$reviewedPathsList` 是頂層 script 變數，實際呼叫方式是每次全新 process 執行，無跨呼叫殘留風險；③ `[regex]::Match`（非 `Matches`）刻意只取第一個命中——metadata 區塊在 `$answer`（Codex 文字回答）之前寫入，就算 Codex 回答裡剛好複誦一行 `- files-reviewed:` 格式的文字，第一個命中仍是真正的 metadata 行，已補註解說明此依賴順序的安全性；④ 新增的抽取邏輯是對已捕獲字串跑 regex，沒有新的外部指令擷取點，`/audit-encoding` 兩檔皆 CLEAN；⑤ 多重 deletion 同時處理的情況邏輯上是獨立迴圈逐檔案處理，無共享可變狀態污染疑慮
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`files-reviewed\|reviewedPaths\|confirmedReviewedPaths\|reviewedPathsList` | hits=13（全部在 `codex-oracle.ps1`/`verify-closeout-completeness.ps1` 兩檔內部生產/消費配對，無其他 call site；agency-os 內 0 命中，無過期文件聲稱需要連動修正）
+
+[剩餘風險]
+- 含空格/特殊字元路徑的已知限制（見上方，記錄不修）
+- 舊格式 artifact（本 session round 1-3 產生的，無 `files-reviewed` 行）現在會讓任何引用它們的 deletion 落入 unconfirmed——這是一次性轉換成本，不是長期缺口，下次任何人跑 `codex-oracle.ps1 -Mode review` 就會產生新格式 artifact
+- critic 外部驗證本 session全程不可用（累計 5 次 529），四輪修正都僅靠手動 review + 真實整合測試把關，強烈建議下個 session 有空檔時對整段 ORACLE gate（`verify-closeout-completeness.ps1:218-360` + `codex-oracle.ps1` 全檔）補跑一次完整 `/review`
+- `test-hooks.sh` 仍無 ORACLE gate 專屬案例（四輪累積的既有缺口，非本次引入）
+
+[rollback]
+`git diff scripts/codex-oracle.ps1 scripts/verify-closeout-completeness.ps1` 還原兩個 hunk，兩檔改動互相依賴（producer/consumer 配對），需一起回滾或都保留。
+
 ## 2026-08-20 — 跨模型 oracle 制度化：`codex-oracle.ps1` + AGENTS 分工規則
 
 ### AUTO_TASK_DONE: 把 08-17 驗證有效的 Codex oracle 從「當次對話」變成常駐機制
