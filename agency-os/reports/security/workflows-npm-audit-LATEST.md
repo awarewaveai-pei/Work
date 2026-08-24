@@ -1,20 +1,31 @@
 # Workflows npm audit report
 
-- Generated UTC: 2026-08-12T10:50:50.057Z
+- Generated UTC: 2026-08-24T20:18:50.586Z
 - Path: `lobster-factory/packages/workflows`
-- Total: 0
+- Total: 2
 - Critical: 0
-- High: 0
+- High: 2
 - Moderate: 0
 - Low: 0
 
 ## Findings
 
-- No vulnerabilities reported.
+- `@prisma/config`: severity=`high`, direct=`false`, fixAvailable=`true`, via=deepmerge-ts
+- `deepmerge-ts`: severity=`high`, direct=`false`, fixAvailable=`true`, via=deepmerge-ts (1145093)
 
 ## Override health
 
-- All overrides cover their advisories; nothing stale.
+- NOT OVERRIDDEN `deepmerge-ts`: advisory covers `<8.0.0` — add an override if upstream has not bumped it.
+
+## Exposure split
+
+- Shipped dependencies (`npm audit --omit=dev`) high+critical: **0**
+- High/critical advisories with their own CVE: **1** (deepmerge-ts)
+
+Accepted (dated, expiring - not silenced):
+- `deepmerge-ts` GHSA-ggr8-5vv4-36mx - accepted until **2026-11-23**, then it fails this gate again.
+
+- Gate verdict: **pass** (shipped = hard fail; toolchain = unacknowledged or expired; pass = nothing outstanding)
 
 ## Remediation playbook
 

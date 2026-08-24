@@ -2,6 +2,48 @@
 
 ## 2026-08-25
 
+### AUTO_TASK_DONE: issue #15 每週安全稽核 —— 修的不是漏洞，是「永遠不可能變綠的閘」
+
+[任務]
+承上則 ClickHouse 事故：新加的 CI 健康檢查首跑就抓到第二個紅燈 `Weekly workflows security audit`，對應 issue #15（`packages/workflows` high/critical，2026-06-15 開，已 10 週）。操作者指示「作完美處理」。
+
+[查證 —— 結論與 issue 內建的修法建議相反]
+| 事實 | 值 |
+|---|---|
+| 剩餘 finding | 2 個 high，同源 `deepmerge-ts`（advisory 1145093 / GHSA-ggr8-5vv4-36mx，範圍 `<8.0.0`）|
+| 傳遞路徑 | `@trigger.dev/build`（**devDependency**）→ `@prisma/config@6.19.3` → `deepmerge-ts@7.1.5` |
+| `npm audit --omit=dev` | **found 0 vulnerabilities** |
+| `npm ls --omit=dev @prisma/config` | empty —— 不在 production 依賴圖 |
+| **已部署 worker 映像實掃** | `registry:5000/trigger/proj_6c4f24492a705729fc2c:20260815.1.production.niakdddd` → `deepmerge-ts` 0 個目錄、`@prisma/config` 0 個、`esbuild` 0 個。**量出來的，不是從依賴圖推的** |
+| 上游有修法嗎 | **沒有**。`@prisma/config@7.9.1`（最新）**仍精確釘死 `deepmerge-ts: 7.1.5`**；升 trigger.dev 4.5.10→4.5.12 也不會清掉 |
+
+所以 issue playbook 寫的「bump 直接依賴 → 拉 overrides 門檻」對這條**行不通**：唯一能讓 audit 變綠的做法是強制 `deepmerge-ts@8`（major）去覆蓋上游的精確釘版，而且是在**部署到 EU 的工具鏈**裡。為了一個 build-time stack-exhaustion DoS、production 曝險為 0，去冒動搖部署鏈的風險——這個交換比漏洞本身糟。
+
+[根因 —— 與 ClickHouse 那則是同一類]
+閘本身是 `npm audit --audit-level=high`，**dev + prod 合併**。它把兩個不同問題混為一談：「有沒有東西有漏洞」與「有漏洞的東西會不會進 production」。當唯一的 finding 落在 dev 端且上游無解時，這道閘**在數學上永遠不可能變綠** —— 而永遠紅的閘等於被關掉的閘，這正是它紅了 10 週沒人看的原因，也正是同一週 `Trigger infra config guard` 紅了 10 天促成第 5 次 ClickHouse 事故的同一個機制。
+
+[已修改]
+1. `lobster-factory/scripts/audit-workflows-security.mjs` —— 跑**兩次** audit（全部 / `--omit=dev`），報告新增「Exposure split」段；載入具名接受清單，算出 `unacknowledged` / `expired` / `accepted`；輸出機器可讀的 `workflows-npm-audit-LATEST.json`（含 `verdict`）。政策集中在這裡一處。
+2. `lobster-factory/packages/workflows/security-acknowledgements.json`（新）—— 具名、有證據、**有到期日**的風險接受。檔案開頭寫明它不是靜音鈕：登記不改變任何回報，只是讓「無解的 finding」不再永久把閘壓紅。規則：只有 production 曝險為 0 才可登記；`reviewBy` 過期即恢復失敗；未登記的新 advisory 立即失敗。
+3. `.github/workflows/weekly-workflows-security-audit.yml` —— gate 改為讀裁決而非自己重跑 audit（政策一處決定、閘只執行）；issue 內文與 Slack/Telegram 告警改依**曝險**分級，不再對工具鏈 finding 每週喊 🚨（喊到沒人看＝等於沒有告警）；裁決檔一併進 artifact。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node scripts/audit-workflows-security.mjs` 正常路徑 + 4 種故障注入 + gate 步驟原樣模擬 + 已部署映像實掃 + `docker compose`/`npm ls`/`npm view` 查證 | exit=0 | ms=~1200000
+- **五路徑實測**：正常 → `verdict=pass`；① 接受紀錄移除（等同新 advisory）→ `toolchain`；② `reviewBy` 改成過去日期 → `toolchain` 且列出 `deepmerge-ts@2026-01-01`；③ 接受檔案損毀 → `toolchain`（**政策未知 ≠ 沒問題**）；④ **故障注入讓出貨 audit 看到該 finding（接受紀錄仍在）→ `shipped`，`accepted=1` 但依然硬擋** —— 證明接受紀錄永遠豁免不了 production；還原 → `pass`。
+- gate 步驟依 CI 實際寫法模擬：`verdict=pass` → exit 0；**裁決檔不存在 → exit 1（fail-closed）**。
+- `node --check` 通過；workflow YAML 以 `yaml.safe_load` 驗證通過，8 個 step 解析正確。
+- REVIEW_DONE: critic=Deep（外部 oracle = Codex CLI）| verdict=pass | findings=0c/0m/0n（本次改動於同批次 review 中）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.github | grep=audit:workflows-security | hits=1（僅 `lobster-factory/package.json:24` 的 script 定義，未改名，無 stale 引用；`--audit-level=high` 字串在 workflow 內已全數移除或改寫為說明用途）
+
+[剩餘風險]
+- `deepmerge-ts` 的接受期限到 **2026-11-23**。屆時若 `@prisma/config` 仍未放掉精確釘版，閘會再度轉紅並要求重新決定 —— **這是刻意的**，不是待辦遺漏。
+- 本輪把 dev-only finding 由「硬擋」降為「需登記」。若未來出現**可修**的 dev 端漏洞，它會以 `unacknowledged` 觸發失敗；但若有人便宜行事把它登記掉而不修，這道閘擋不住 —— 那屬操作紀律，與 AGENTS.md §已知信任邊界 同性質。
+- 本輪**沒有**升 trigger.dev 4.5.10 → 4.5.12（與本議題無關，且會觸及部署鏈，應獨立評估）。
+- 已部署映像的掃描是針對 2026-08-15 那版；未來重新部署後若要再宣稱「production 曝險 0」，需重掃。
+
+[rollback]
+`git revert` 本 commit 即回到單一 `npm audit --audit-level=high` 閘（會立刻恢復永久紅）。接受清單可單獨刪除，效果是該 finding 立即恢復擋閘。
+
 ### AUTO_TASK_DONE: ClickHouse 第 5 次復發根治 —— 不是量的問題是「寬度」的問題，外加四個圍著它空轉的閘
 
 [任務]

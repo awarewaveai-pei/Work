@@ -182,7 +182,7 @@ lines.push("");
 lines.push("## Exposure split");
 lines.push("");
 lines.push(`- Shipped dependencies (\`npm audit --omit=dev\`) high+critical: **${shippedHigh}**`);
-lines.push(`- Toolchain-only high/critical advisories: **${ownAdvisories.length - (shippedHigh > 0 ? 0 : 0)}** (${ownAdvisories.map((a) => a.package).join(", ") || "none"})`);
+lines.push(`- High/critical advisories with their own CVE: **${ownAdvisories.length}** (${ownAdvisories.map((a) => a.package).join(", ") || "none"})`);
 if (ackReadError) {
   lines.push(`- WARN: security-acknowledgements.json unreadable (${ackReadError}) - treating every finding as unacknowledged.`);
 }
@@ -223,5 +223,23 @@ const latestPath = resolve(reportsDir, "workflows-npm-audit-LATEST.md");
 writeFileSync(reportPath, content, "utf8");
 writeFileSync(latestPath, content, "utf8");
 
+// Machine-readable verdict so the workflow gate READS a decision instead of re-deriving
+// policy in YAML. One place decides; the gate only enforces.
+const verdictPath = resolve(reportsDir, "workflows-npm-audit-LATEST.json");
+writeFileSync(verdictPath, `${JSON.stringify({
+  schemaVersion: 1,
+  generatedAtUtc: ts.toISOString(),
+  verdict,
+  shippedHighCritical: shippedHigh,
+  counts,
+  advisories: ownAdvisories,
+  accepted,
+  expired,
+  unacknowledged,
+  acknowledgementFileError: ackReadError || null,
+}, null, 2)}\n`, "utf8");
+
 console.log(`Wrote: ${reportPath}`);
 console.log(`Wrote: ${latestPath}`);
+console.log(`Wrote: ${verdictPath}`);
+console.log(`Gate verdict: ${verdict} (shipped high/critical = ${shippedHigh})`);

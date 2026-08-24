@@ -49,19 +49,43 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: workflows-npm-audit
-          path: agency-os/reports/security/workflows-npm-audit-LATEST.md
+          path: |
+            agency-os/reports/security/workflows-npm-audit-LATEST.md
+            agency-os/reports/security/workflows-npm-audit-LATEST.json
           if-no-files-found: warn
 
-      # Gate: non-zero exit iff a high/critical vulnerability is present.
-      - name: Severity gate (high+)
+      # Gate: read the verdict the audit script already computed. Policy lives in ONE place
+      # (lobster-factory/scripts/audit-workflows-security.mjs + packages/workflows/
+      # security-acknowledgements.json); this step only enforces it.
+      #
+      # It used to be a bare `npm audit --audit-level=high` over dev AND prod dependencies.
+      # That conflated two different questions - "is anything vulnerable" and "does it reach
+      # production" - and on 2026-08-25 it had been red for ten weeks on a finding with zero
+      # production reach and no upstream remediation available. A gate that cannot go green
+      # is a gate nobody reads; the same week, a different permanently-red workflow is exactly
+      # how the fifth ClickHouse incident got its window.
+      #
+      #   verdict=shipped    a shipped dependency has a high/critical vuln. Unconditional
+      #                      failure - no acknowledgement can excuse this one.
+      #   verdict=toolchain  build/deploy-only finding that is unacknowledged, or whose dated
+      #                      acceptance has expired, or the acknowledgement file is unreadable.
+      #   verdict=pass       nothing outstanding.
+      #
+      # A missing or unreadable verdict file makes `node -e` throw, so the gate fails closed.
+      - name: Severity gate (shipped = hard fail; toolchain = dated acknowledgements)
         id: gate
         continue-on-error: true
-        run: npm audit --audit-level=high
-        working-directory: lobster-factory/packages/workflows
+        run: |
+          VERDICT=$(node -e "console.log(require('./agency-os/reports/security/workflows-npm-audit-LATEST.json').verdict)")
+          echo "verdict=${VERDICT}" >> "$GITHUB_OUTPUT"
+          echo "Gate verdict: ${VERDICT}"
+          [ "${VERDICT}" = "pass" ] || exit 1
 
       - name: Open or update tracking issue on high/critical findings
         if: steps.gate.outcome == 'failure'
         uses: actions/github-script@v7
+        env:
+          GATE_VERDICT: ${{ steps.gate.outputs.verdict }}
         with:
           script: |
             const fs = require('fs');
@@ -79,7 +103,7 @@ jobs:
               `Weekly dependency audit found **high or critical** vulnerabilities in \`lobster-factory/packages/workflows\`.`,
               ``,
               `- Run: ${runUrl}`,
-              `- Severity gate: \`npm audit --audit-level=high\` failed`,
+              `- Gate verdict: \`${process.env.GATE_VERDICT || 'unknown'}\` (\`shipped\` = reaches production, unconditional; \`toolchain\` = build/deploy only, unacknowledged or expired acceptance)`,
               ``,
               `## Report`,
               ``,
@@ -125,11 +149,18 @@ jobs:
           CRITICAL=$(grep "^- Critical:" "$REPORT" | grep -oE "[0-9]+" || echo "0")
           HIGH=$(grep "^- High:"     "$REPORT" | grep -oE "[0-9]+" || echo "0")
           MODERATE=$(grep "^- Moderate:" "$REPORT" | grep -oE "[0-9]+" || echo "0")
+          VERDICT="${{ steps.gate.outputs.verdict }}"
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          TECH="total=${TOTAL} critical=${CRITICAL} high=${HIGH} moderate=${MODERATE}"
-          if [ "${CRITICAL}" -gt 0 ] || [ "${HIGH}" -gt 0 ]; then
+          TECH="verdict=${VERDICT} total=${TOTAL} critical=${CRITICAL} high=${HIGH} moderate=${MODERATE}"
+          # Alarm level follows EXPOSURE, not the raw count. Crying wolf every week about a
+          # build-toolchain finding with no production reach is precisely how a channel stops
+          # being read - and an unread alarm is the same as no alarm.
+          if [ "${VERDICT}" = "shipped" ]; then
             SLACK_MSG=":rotating_light: *每週套件安全掃描 — 發現高危漏洞，需要立即處理*\n套件中有嚴重安全問題，請盡快查看並修復\n（技術資訊：${TECH}）\n已自動建立 GitHub Issue 追蹤\n<${RUN_URL}|查看報告>"
             TG_MSG="🚨 每週套件安全掃描 — 發現高危漏洞，需要立即處理\n套件中有嚴重安全問題，請盡快查看並修復\n（技術資訊：${TECH}）\n已自動建立 GitHub Issue 追蹤\n${RUN_URL}"
+          elif [ "${VERDICT}" = "toolchain" ]; then
+            SLACK_MSG=":warning: *每週套件安全掃描 — 建置工具鏈有未處理的漏洞*\n這個漏洞不會進到正式環境（production 曝險為 0），但它沒有登記風險接受、或接受期限已過，需要有人看一次\n（技術資訊：${TECH}）\n<${RUN_URL}|查看報告>"
+            TG_MSG="⚠️ 每週套件安全掃描 — 建置工具鏈有未處理的漏洞\n不會進到正式環境（production 曝險為 0），但沒有登記風險接受或已過期，需要有人看一次\n（技術資訊：${TECH}）\n${RUN_URL}"
           elif [ "${MODERATE}" -gt 0 ]; then
             SLACK_MSG=":warning: *每週套件安全掃描 — 發現中度風險*\n有套件存在已知漏洞，建議近期修復，目前尚無緊急風險\n（技術資訊：${TECH}）\n<${RUN_URL}|查看報告>"
             TG_MSG="⚠️ 每週套件安全掃描 — 發現中度風險\n有套件存在已知漏洞，建議近期修復，目前尚無緊急風險\n（技術資訊：${TECH}）\n${RUN_URL}"
@@ -146,8 +177,8 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"chat_id\":\"${TELEGRAM_CHAT_ID}\",\"text\":\"${TG_MSG}\"}"
 
-      - name: Fail job if high/critical found
+      - name: Fail job if the gate did not pass
         if: steps.gate.outcome == 'failure'
         run: |
-          echo "::error::High/critical vulnerability present — see opened issue and report artifact."
+          echo "::error::Security gate verdict '${{ steps.gate.outputs.verdict }}' — see the opened issue and the report artifact."
           exit 1
