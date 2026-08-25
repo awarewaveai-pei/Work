@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
 .SYNOPSIS
   Run Codex as a READ-ONLY external oracle: repo inspection or adversarial review.
@@ -278,22 +278,29 @@ if ($Mode -eq 'review') {
         # the warning exists to explain. Not auto-resolved -- picking the "right" earlier
         # commit to diff against is a judgement call this script shouldn't guess at --
         # just surfaced so neither an empty nor a non-empty diff is silently trusted.
-        $looksLikeCheckpointed = $false
+        # Generalised 2026-08-25 from '[claude] checkpoint:' to any '[claude] ' automated
+        # commit. The per-prompt auto-checkpoint that motivated this warning is gone, but the
+        # HAZARD is not: ao-close.ps1 also runs `git add -A` + commit, this repo already has
+        # 101 '[claude] chore: AO-CLOSE sync' commits, and a PARALLEL session's AO-CLOSE can
+        # commit THIS session's working tree. Keying on the checkpoint prefix alone would
+        # have retired the warning while the thing it warns about still happens -- a guard
+        # must be scoped to the hazard, not to the string that happened to trigger it first.
+        $looksLikeAutoCommitted = $false
         if (-not $DiffRef) {
             $rLog = Invoke-Git -GitArgs @('log', '-3', '--format=%H %s') -Root $root
-            $looksLikeCheckpointed = ($rLog.Exit -eq 0 -and ($rLog.Text -match '(?m)^\S+ \[claude\] checkpoint:'))
+            $looksLikeAutoCommitted = ($rLog.Exit -eq 0 -and ($rLog.Text -match '(?m)^\S+ \[claude\] '))
         }
 
         if (-not $diffText.Trim()) {
-            if ($looksLikeCheckpointed) {
-                Write-Error "Nothing to review -- AND recent commit(s) at HEAD look like session auto-checkpoints, so this is likely because the work already landed there, not because nothing changed. Re-run with -DiffRef <commit before the checkpoints> to review it."
+            if ($looksLikeAutoCommitted) {
+                Write-Error "Nothing to review -- AND recent commit(s) at HEAD are automated ones ([claude] checkpoint / AO-CLOSE sync), so this is likely because the work already landed there, not because nothing changed. Re-run with -DiffRef <commit before the checkpoints> to review it."
             } else {
                 Write-Error "Nothing to review: no diff for the given ref/paths. Pass -DiffRef <commit> to review an existing commit."
             }
             exit 2
         }
 
-        if ($looksLikeCheckpointed) {
+        if ($looksLikeAutoCommitted) {
             Write-Host "codex-oracle: WARNING -- recent commit(s) at HEAD look like session auto-checkpoints. This review's diff may not include everything you expect (the real work may have already landed in one of them). If the finding looks incomplete or contradicts work you know happened, re-run with -DiffRef <commit before the checkpoints> instead of trusting this diff." -ForegroundColor DarkYellow
         }
 
