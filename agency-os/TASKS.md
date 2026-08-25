@@ -50,6 +50,8 @@
 
 ### 未完成
 
+- [ ] **【已知限制｜2026-08-25 開｜2026-08-31 自動解除】Codex 額度耗盡，跨模型 oracle 路徑不可用** — `codex exec` 直測回 `You've hit your usage limit ... try again at Aug 31st, 2026 12:41 PM`。影響：① AGENTS.md §跨模型 oracle 把 R0 [驗證計畫] 的 Review 動作路由給 Codex —— 該路徑至 8/31 不可用，期間 Review 改走 `critic` subagent ② codex plugin 的 **stop-time review gate 每次收工都會失敗並擋住 session 結束**，且它顯示的錯誤是誤導的（`DEP0190 DeprecationWarning` 只是 stderr 上唯一的文字，真正的額度錯誤在空的 stdout 裡）。若擋住工作流程，用 `/codex:setup` 暫時關掉 stop-time review gate，8/31 後再開。**根因不在本 repo**（vendor plugin + 訂閱額度），不要去改 `~/.claude/plugins/cache/` 底下的 vendor code。⚠️ 額度是本 session 五次 oracle 覆審燒掉的 —— 之後 oracle 用量要節制：prompt 只放 Decision/Constraints/Acceptance（AGENTS.md 已有此規則，本 session 第一次呼叫因塞了整段推理而 timeout），且避免對同一份大 diff 反覆重跑。
+
 - [x] **【✅ 2026-08-25 04:30 UTC 結案，比預期早兩天】確認 ClickHouse 資料比真的落回 🟢，而不是卡在 🟡** —— **結果**：`verdict=PASS`、`ratio=3.8`（5.6 → 4.8 → 3.8）、`findings=[]`、`mergefail1h=0`、`stalled=0`、無 TTL 表 0、孤兒 0、最寬 `query_log:84`。TTL 如實測預期執行（08-22 那批於 08-25 00:00 UTC 到期），**未做任何手動清理**。原條目內容保留於下：
   - **【原待辦】** — 第 5 次事故修復後，`check-clickhouse-health.ps1` 的 `mergefail1h` 已歸 0，但資料比仍 **5.6x**（門檻 5x），因為 `system.text_log` 還存著事故期間 ~170 MiB 的 merge 失敗訊息。**預期會自己排掉**：實測 TTL 為 `event_date + toIntervalDay(3)`，ClickHouse 已算出 `delete_ttl_info_min = 2026-08-25 00:00 UTC`，三天份（08-22 158,896 列／08-23 244,736／08-24 172,256）分別於 08-25／08-26／08-27 到期，屆時 system 應降到 ~40 MiB、比值約 1.1x。**為什麼仍需要一條待辦**：卡住的 🟡 和正在排乾的 🟡 在報表上長得一模一樣，而「永久黃燈 = 被忽略」正是本次事故的核心教訓（`Trigger infra config guard` 紅了 10 天沒人看）。**DoD**：2026-08-27（或之後首次 AO-RESUME）確認 `clickhouse-LATEST.md` 的 ratio < 5x 且 verdict 🟢 → 本條打勾；**若仍 ≥ 5x**，代表 TTL 沒在執行或有新的產生源，需查 `system.parts` 的 `delete_ttl_info_*` 與 text_log 各日列數，**禁止手動 TRUNCATE 了事**（那正是前幾次復發的做法）。
 
