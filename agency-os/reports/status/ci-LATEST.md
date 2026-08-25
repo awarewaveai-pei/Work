@@ -1,6 +1,6 @@
 # CI health (GitHub Actions, branch main)
 
-- Generated: 2026-08-25 11:42:12
+- Generated: 2026-08-25 11:45:28
 - Overall: **🟢 PASS**
 - Method: every workflow enumerated; last 20 run(s) of each inspected on `main`
 
