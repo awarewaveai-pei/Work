@@ -189,36 +189,21 @@ try {
     $autoCheckpointSummary = ""
     $allLogLines = New-Object System.Collections.Generic.List[string]
 
+    # REMOVED 2026-08-25: the pre-AO-RESUME auto-checkpoint that used to live here.
+    # This was the THIRD call site of commit-checkpoint (after the per-prompt one above and
+    # a fallback inside ao-resume.ps1) and the last one still authoring commits. It existed
+    # because git-align needs a clean tree; ao-resume.ps1 now always passes -AllowStash, so
+    # git-align parks the dirty tree in a named stash and restores it in its finally.
+    # Committing here would publish the operator's in-progress work to main under a message
+    # that describes nothing, on every single AO-RESUME.
+    # $autoCheckpoint* stay declared above: they are still reported in the state file, and
+    # now truthfully read "attempted=false" because nothing is attempted.
     $dirtyBefore = Get-GitDirtyEntries -RepoRoot $root
     if (@($dirtyBefore).Count -gt 0) {
-        $autoCheckpointAttempted = $true
-        $checkpointScript = Join-Path $root "scripts\commit-checkpoint.ps1"
-        if (Test-Path -LiteralPath $checkpointScript) {
-            Push-Location -LiteralPath $root
-            try {
-                $allLogLines.Add("== AO-RESUME hook: dirty tree detected; auto-checkpoint before FullMainlineParity ==") | Out-Null
-                $savedEAP2 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-                $cpOut = @(
-                    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $checkpointScript -Message "[claude] checkpoint: auto-save dirty tree before AO-RESUME hook" 2>&1
-                )
-                $ErrorActionPreference = $savedEAP2
-                $autoCheckpointExit = $LASTEXITCODE
-                foreach ($line in $cpOut) { $allLogLines.Add([string]$line) | Out-Null }
-            }
-            finally {
-                Pop-Location | Out-Null
-            }
-
-            $dirtyAfterCp = Get-GitDirtyEntries -RepoRoot $root
-            $autoCheckpointCommitted = (@($dirtyAfterCp).Count -lt @($dirtyBefore).Count)
-            $autoCheckpointSummary = "dirty_before=$(@($dirtyBefore).Count); dirty_after=$(@($dirtyAfterCp).Count)"
-        }
-        else {
-            $autoCheckpointExit = 1
-            $autoCheckpointSummary = "commit-checkpoint script missing"
-            $allLogLines.Add("AO-RESUME hook warning: scripts/commit-checkpoint.ps1 not found; continue without checkpoint.") | Out-Null
-        }
+        $allLogLines.Add("== AO-RESUME hook: dirty tree detected; git-align will stash and restore it (no commit) ==") | Out-Null
+        $autoCheckpointSummary = "dirty=$(@($dirtyBefore).Count); handled by git-align -AllowStash (no commit)"
     }
+
 
     # Record the session_id we are handling so the next prompt in THIS session does not re-trigger
     # (only a genuinely new session_id should). Written before the run so a failing run still

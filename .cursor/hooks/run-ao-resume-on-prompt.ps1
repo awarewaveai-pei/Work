@@ -1,4 +1,4 @@
-# Cursor beforeSubmitPrompt: when the user message is AO-RESUME, run the real
+﻿# Cursor beforeSubmitPrompt: when the user message is AO-RESUME, run the real
 # ao-resume.ps1 on disk (not "rules only"). Writes agency-os/.agency-state
 # artifacts for the agent to read; always returns continue=true so chat proceeds.
 Set-StrictMode -Version Latest
@@ -126,34 +126,16 @@ try {
     $autoCheckpointSummary = ""
     $allLogLines = New-Object System.Collections.Generic.List[string]
 
+    # REMOVED 2026-08-25: pre-AO-RESUME auto-checkpoint. Same reasoning as the Claude hook
+    # (mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1): ao-resume.ps1 now always passes
+    # -AllowStash, so git-align stashes the dirty tree under a unique name and restores it
+    # in its finally. Committing here published in-progress work to main on every AO-RESUME.
     $dirtyBefore = Get-GitDirtyEntries -RepoRoot $root
     if ($dirtyBefore.Count -gt 0) {
-        $autoCheckpointAttempted = $true
-        $checkpointScript = Join-Path $root "scripts\commit-checkpoint.ps1"
-        if (Test-Path -LiteralPath $checkpointScript) {
-            Push-Location -LiteralPath $root
-            try {
-                $allLogLines.Add("== AO-RESUME hook: dirty tree detected; auto-checkpoint before FullMainlineParity ==") | Out-Null
-                $cpOut = @(
-                    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $checkpointScript -Message "[cursor] checkpoint: auto-save dirty tree before AO-RESUME hook" *>&1
-                )
-                $autoCheckpointExit = $LASTEXITCODE
-                foreach ($line in $cpOut) { $allLogLines.Add([string]$line) | Out-Null }
-            }
-            finally {
-                Pop-Location | Out-Null
-            }
-
-            $dirtyAfterCp = Get-GitDirtyEntries -RepoRoot $root
-            $autoCheckpointCommitted = ($dirtyAfterCp.Count -lt $dirtyBefore.Count)
-            $autoCheckpointSummary = "dirty_before=$($dirtyBefore.Count); dirty_after=$($dirtyAfterCp.Count)"
-        }
-        else {
-            $autoCheckpointExit = 1
-            $autoCheckpointSummary = "commit-checkpoint script missing"
-            $allLogLines.Add("AO-RESUME hook warning: scripts/commit-checkpoint.ps1 not found; continue without checkpoint.") | Out-Null
-        }
+        $allLogLines.Add("== AO-RESUME hook: dirty tree detected; git-align will stash and restore it (no commit) ==") | Out-Null
+        $autoCheckpointSummary = "dirty=$($dirtyBefore.Count); handled by git-align -AllowStash (no commit)"
     }
+
 
     Push-Location -LiteralPath $root
     try {
