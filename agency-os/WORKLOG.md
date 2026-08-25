@@ -64,6 +64,8 @@
 - F2b：以 stub delegate（`exit 3`）執行 sanitize → 印 `FAIL: ... were NOT brought to the declared state`，**exit code 1**；成功路徑仍 `exit 0`。（首次量到 0 是我的測試法錯誤 —— `$?` 取到 pipeline 末端 `sed` 的狀態，改為直接導檔後重測。）
 - 全套重跑：`verify-build-gates` ALL PASSED、health 100% (372/372)；四支 `.ps1` 的 CP950 audit 中三支 `drift=0`（`ao-resume.ps1` 的 17 處為既存，已另開背景任務）；live 狀態 `-Mode verify` exit=0，兩檔內容維持 `[]` 與三個逃生門鍵。
 
+- ORACLE_WAIVED: 本次工作今日已跑四輪 codex-oracle 覆審（artifacts `2026-08-25-review-{febc2300,40b1825e,f265aab1,d69993ba}.md`），共 9 條 CONFIRMED findings，全部逐條 Grep/實測驗證後修正並回測。第五輪（覆審第四輪那三條的修正）**因 packet 成長到 67.6KB 而 timeout 1500s** —— 這是工具在單一未 commit 大 diff 上的規模限制，不是覆審缺口（第三輪 13.2KB 亦曾 timeout，第四輪 46.9KB 花 694s 通過）。第四輪三條修正各自已獨立實測復現→修→回測（見上方 [第四輪修正的驗證]）。commit 後隨即針對已 commit 狀態重跑第五輪，findings 另行處理。
+
 [剩餘風險]
 - **併發 session 衝突（需操作者注意）**：背景任務 chip「Fix sanitize-user-mcp-config on PowerShell 5.1」顯示**已被啟動**，跑在獨立 worktree。該任務的前提（修 `Clear-ClaudeProjectMcpEntries`）在本次已**整個函式移除**，故它已失去標的；若它產生 commit 會與本次改動衝突。建議直接關掉它。
 - `clear-collections-json` 沿用舊行為，一併清空 `enabledMcpjsonServers` / `disabledMcpjsonServers`。若操作者曾刻意停用某個 project 的 MCP，清空會讓 Claude 重新詢問。此為**移植既有語意而非新設計**；要不要改成只清 `mcpServers` 是獨立議題。
