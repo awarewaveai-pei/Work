@@ -1,8 +1,8 @@
-# Cold Outreach Workbench — Phase 1 Build Plan（MVP 實作排程）
+﻿# Cold Outreach Workbench — Phase 1 Build Plan（MVP 實作排程）
 
 > 對應 SSOT：[`COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md`](./COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md)
 > 範圍：Spec §G3 Phase 1 + §G4 MVP，已折入決策（客戶 Gmail / 你幫找 / 訂閱 / 無 SES / `co_` prefix）與 PART H（Free-Plan Router 前移 Phase 1）。
-> 建立：2026-06-23｜狀態：未開始
+> 建立：2026-06-23｜狀態：**進行中 — Phase 1 ungated 全完成，剩 T10（Gmail per-org OAuth，⚠️High，gated）**（2026-08-25 訂正：原寫「未開始」已過期；T1 migration `0048_co_outreach_core.sql`、T2–T9/T11/T12 的 `lib/outreach/` + 7 條 `app/api/outreach/*` route + `app/(shell)/outreach` UI 均已落地）
 
 ---
 

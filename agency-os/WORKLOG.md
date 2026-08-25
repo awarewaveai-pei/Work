@@ -2,6 +2,58 @@
 
 ## 2026-08-25
 
+### AUTO_TASK_DONE: TASKS.md 近 2 個月結案盤點 —— 4 條真結案、8 條標籤過期、2 條新開
+
+[任務]
+操作者：「檢查近 2 個月的 worklog / conversation / memory，哪些已經處理掉的去 TASKS 改成已處理」。
+
+[現況分析]
+語料 = `WORKLOG.md`（7/02–8/25，496 KB，反時序）+ `WORKLOG-archive/2026-06.md`（6/25 起）+ `memory/daily/` 62 檔 + `CONVERSATION_MEMORY.md` + `git log`。
+比對對象 = `TASKS.md` 未完成區 76 條（61 主項 + 15 子項）+ Backlog 1 條。
+**方法上刻意不採信 `memory/daily/` 的 open-task 清單**——那份是從 TASKS.md 自動生成的，拿它當證據會變成自我證明；只採納它額外附註的人工註解，且一律回頭找 commit / 檔案 / 實測紀錄複驗。
+**平行 session 警示**：本輪對話期間 HEAD 由 `9fd18858` 前進到 `680db6c6`（另一 session 落了 `c63bdc5c`/`680db6c6`），工作樹另有他人未提交的 `scripts/codex-oracle.ps1`。故 commit 具名兩個檔案，不用 `git add -A`。
+
+[已修改]
+1. `agency-os/TASKS.md` —— 4 條 `- [ ]` → `- [x]` 並附結案證據（含 commit hash / file:line / 實測數字）
+2. `agency-os/TASKS.md` —— 8 條標籤過期項改文字（不結案）
+3. `agency-os/TASKS.md` —— 2 條本輪抓蟲新發現入庫
+4. `agency-os/docs/cold_email/COLD_OUTREACH_PHASE1_BUILD_PLAN.md:5` —— 檔頭「狀態：未開始」訂正（R4：聲稱即驗證）
+
+**結案 4 條（每條都有硬證據，非「看起來像做完了」）**
+- **auto-checkpoint 繞過 verify gate** —— 原條目寫「需操作者決策，三條路各有代價」，實際走的是**第四條：整類移除**。三個自動 commit 呼叫點全清：`8c3ac617`（每則訊息）→ `c63bdc5c`（對齊前髒工作區改具名 stash + finally 保證取回）→ `680db6c6`（AO-RESUME 前第三處，由 C3 呼叫者稽核抓出）。至此 `commit-checkpoint.ps1` 在自動流程零呼叫點。
+- **影片 R2 object_key 跨租戶覆寫** —— `buildVideoOutName` + 接上既有 `effectiveOrgId` seam，已部署 `1d15e867`；R2 唯讀稽核 `TOTAL_OBJECTS=11 / NEW_FORMAT_PREFIX_HITS=0`。續辦（類別級重設計、critic Minor 7 條）本來就各有獨立條目，**不隨本條一起關**。
+- **Auto-Repair Phase 4 觀察期** —— 期滿 2026-06-19；`reports/repair-center/` 連續 7 份週報至 `phase4-2026-08-21.md`，轉 BAU。
+- **三檔長期治理巡檢** —— DoD「每月 drift 記錄」已由 `ao-resume.ps1` monthly check #3/#5 機械化承接，證據在 `reports/governance/`。**殘留 2026-07 缺一期，寫進結案行不藏起來。**
+
+**標籤過期 8 條（改文字、維持開放）** —— 這類比「忘記打勾」更危險：條目本身變成假情報。
+- `Cold Outreach Workbench` 標【未開始】**但 T1 migration `0048_co_outreach_core.sql` + `lib/outreach/` 9 檔 + 7 條 API route + `app/(shell)/outreach` UI 全在**，唯一剩 T10 Gmail per-org OAuth（gated）。`memory/daily/` 自 2026-07-05 就寫「Phase 1 ungated 全完成」，TASKS 兩個月沒同步。
+- `全自動客服系統` 標「U0 完成」，實際 U0–U5 + widget U4 已 prod live（WORKLOG-archive 2026-06-27）。
+- Soulful 買機條的「觀望截止 8/31」**已被 `reports/decisions/2026-08-18-dedicated-host-purchase-timing.md` 明文取代**（改為立刻下單 + 月租，觀望由退出權承載）。這條錯得有後果：它會讓人以為還有 6 天可以想。
+- `Hetzner dispatcher follow-up` 的 ② partial index **早已存在**（`0037_ops_action_runs_pending_dispatch_index.sql:18`），只剩 ① orphan reaper。
+- `Canvas 整輪瀏覽器實測` 的自動適應／Ctrl+Z undo／工具列 **2026-06-27 已真機 e2e 驗過**，剩 Redo / 排版 / 生成填色 / 群組 / `.design.json`。
+- `Day 2 staging 實機驗收（兩案）` 的 **Soulful 半邊 2026-08-16 已決議 abandon**（hosting 11/12 到期，不在退場主機建 staging），改為只剩 Scenery；連帶訂正「既有站接手」條的下一步。
+- Defender 木馬複盤標【明日 2026-06-17】→ 逾期 69 天。
+
+**新開 2 條（本輪抓蟲副產物）**
+- **Soulful staging abandon 未傳播到 3 份文件** —— `NEXT_GEN_DELIVERY_BLUEPRINT_V1.md:141`、`PRODUCTION_RUNBOOK_PILOT_A_...:33,35`、`DAY2_STAGING_OPERATOR_GUIDE.md:14,33` 仍以肯定語氣要人去建那個子網域。**2026-08-16 WORKLOG 聲稱「命中 5 份 soulful 文件全部處理」，本輪 grep 證明未涵蓋這 3 份** —— 屬「聲稱已修但沒修」樣態，修法要連當初 grep 的範圍一起檢討。
+- **Phase 4 週巡檢 Check 3 誤報 `restore drill overdue (due 2026-08-06)`** —— 還原演練 Drill #1 **2026-08-16 已 PASS**。偵測器長期掛假 WARNING，操作者會學會略過它，真逾期時就看不見 —— 同 ClickHouse canary / archive-lift 誤報那條 bug class。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -NoProfile -File scripts/print-open-tasks.ps1`（改前/改後各一次，真的解析改後的 TASKS.md）| exit=0 | 開放數 77 → 73（結案 4）→ 75（新開 2），與逐條預期完全一致
+- REALTEST_EVIDENCE: tool=Bash | cmd=`git log -1 --format=%s%n%b 8c3ac617 / c63bdc5c / 680db6c6` + `git show HEAD:mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1 \| grep 'REMOVED 2026-08-25'` | exit=0 | `:147` 與 `:192` 兩處 tombstone 都在 HEAD 版本裡 → auto-checkpoint 結案主張經**讀回實際檔案**確認，非只讀 commit 訊息
+- REALTEST_EVIDENCE: tool=Bash | cmd=檔案存在性反證 `ls scripts/archive-completed-tasks.ps1` / `ls scripts/ \| grep endpoint-alert` / `find . -name provision-stack.sh` | exit=1/空 | **三支腳本都不存在 → L179/L361/L230 確認維持開放**（防誤結案的反向驗證，比正向找證據更重要）
+- REALTEST_EVIDENCE: tool=Bash | cmd=BOM/行數/code-fence 完整性檢查（`raw[:3]==b'ï»¿'`、code-fence 奇偶檢查）| exit=0 | BOM 保留、fence 成對、無 `[x]` 行殘留矛盾的「【進行中】」
+- REVIEW_DONE: critic=Quick（自審讀回 `git diff -U0` 全部 13 個 hunk）| verdict=pass（初審 warn→已修）| findings=0c/1m/0n —— Major：Phase 4 結案行內殘留兩處 `**【進行中】**` 與 `- [x]` 自相矛盾，已改為「歷史狀態：進行中」並補結案證據段；機器複驗殘留 0 行。**外部 oracle 不可用**：Codex 額度耗盡至 2026-08-31（見同日獨立條目），本批為 DOC_ONLY 無程式碼改動，故以自審 + 機器斷言替代。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=`觀望截止\|未開始｜Phase 1 MVP\|狀態：未開始\|軟體先行·U0 完成\|staging\.soulfulexpression\|archive-completed-tasks` | hits=6（**全部人工判讀**）—— `reports/status/integrated-status-*`、`reports/ao-resume/*`、`memory/daily/*`、`.agency-state/open-tasks-snapshot.md` 屬**當時狀態的歷史快照，刻意不動**（改它們等於竄改紀錄）；`reports/decisions/2026-08-17-*.md:21` 已自帶「已於 2026-08-18 推翻」警語，正確；**唯一真 stale 的 3 份 soulful 文件已入庫成新待辦**（見上）。`.claude/worktrees/laughing-engelbart-cbdb3a/` 為他人 worktree，不越界。
+
+[剩餘風險]
+- **結案判準是「DoD 達成」而非「有人做過相關的事」**，但 DoD 本身寫得寬鬆的條目（如三檔治理巡檢）仍有判斷空間；四條結案行都把證據寫進條目本身，日後可反查推翻。
+- 未逐條複驗的仍有 ~50 條（POD／wp-bridge／Auto-Repair Major-Minor 隊列等），本輪只能證明它們**近 2 個月無完成證據**，不等於它們的內文都還準確。標籤過期在本檔是系統性問題而非個案。
+- 平行 session 正在動 `scripts/codex-oracle.ps1`；本 commit 具名檔案，未波及。
+
+[rollback]
+`git revert` 單一 commit 即完整回復兩個檔案；無程式碼、無 migration、無部署。
+
 ### AUTO_TASK_DONE: `sanitize-user-mcp-config.ps1` 補上 `[CmdletBinding()]` —— 並記錄一次完整的平行重工
 
 [任務]
