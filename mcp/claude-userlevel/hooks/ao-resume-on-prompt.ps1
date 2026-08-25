@@ -1,4 +1,4 @@
-# Claude Code UserPromptSubmit: when the user message is AO-RESUME, run the real
+﻿# Claude Code UserPromptSubmit: when the user message is AO-RESUME, run the real
 # ao-resume.ps1 on disk (not "rules only"). Writes agency-os/.agency-state
 # artifacts for the agent to read; always returns continue=true so chat proceeds.
 #
@@ -144,26 +144,25 @@ try {
         if ($sessionId -ne $lastSessionId) { $autoTriggerAoResume = $true }
     }
 
-    # Auto-checkpoint on every prompt if working tree is dirty — BUT only for plain
-    # non-AO-RESUME prompts when auto-trigger is not active. When auto-trigger fires,
-    # ao-resume.ps1's FullMainlineParity path handles dirty-tree via
-    # Invoke-FullMainlineAlignWithAutoCheckpoint, so no standalone checkpoint is needed.
-    $dirtyCheck = Get-GitDirtyEntries -RepoRoot $root
-    if (@($dirtyCheck).Count -gt 0 -and -not $isAoResume -and -not $autoTriggerAoResume) {
-        $checkpointScript = Join-Path $root "scripts\commit-checkpoint.ps1"
-        if (Test-Path -LiteralPath $checkpointScript) {
-            Push-Location -LiteralPath $root
-            try {
-                $savedEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-                & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $checkpointScript -Message "[claude] checkpoint: auto-save on session start" 2>&1 | Out-Null
-                $ErrorActionPreference = $savedEAP
-            } finally {
-                Pop-Location | Out-Null
-            }
-        }
-        Write-HookResponse '{"continue":true}'
-        exit 0
-    }
+    # REMOVED 2026-08-25: per-prompt auto-checkpoint (git add -A + commit on EVERY user
+    # prompt whenever the tree was dirty). Do not re-add it. It is not a save point that
+    # was tuned badly - it had no alignment role at all: this branch committed and then
+    # `exit 0`, while dirty-tree handling for AO-RESUME lives in the FullMainlineParity
+    # path below. Removing it drops straight through to the identical early-exit that
+    # follows, so behaviour is unchanged except that nothing is committed.
+    #
+    # It produced 2,568 commits (56.4% of this repo's history) with messages that carry
+    # neither root cause nor verification (violating CLAUDE.md R2), and six documented
+    # harm classes, none of which any tuning could remove because they all stem from the
+    # same thing - it authored commits nobody asked for:
+    #   - committed 49 tracked files as deletions (2026-05-28, bad commit 0d63eb9)
+    #   - committed 12 .claude/plans files as deletions (853cd26a, junction broke mid-session)
+    #   - swept an uncommitted mem_limit edit into the repo; drifted from prod for 10 weeks (35834a0d)
+    #   - reverted a fix every session, making the underlying bug look recurring
+    #   - stole sessions' work, leaving external review a diff of nothing to review
+    #   - pushed code to main while the verify gate was blocking that same code
+    # Documented saves, searched across all WORKLOG history: zero.
+    # Full analysis: agency-os/WORKLOG.md 2026-08-25.
 
     if (-not $isAoResume -and -not $autoTriggerAoResume) {
         Write-HookResponse '{"continue":true}'
