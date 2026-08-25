@@ -2,6 +2,45 @@
 
 ## 2026-08-25
 
+### AUTO_TASK_DONE: Codex stop-time review gate 暫時停用至 2026-08-31（額度用罄，非閘的問題）
+
+[任務]
+收工時 stop hook 連續兩次擋下，訊息是 `The stop-time Codex review task failed: (node:...) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true...`。
+
+[根因 —— 訊息本身是誤導]
+DEP0190 不是失敗原因，是**遮住失敗原因的東西**。`stop-review-gate-hook.mjs:121` 寫 `String(result.stderr || result.stdout || "")`：子行程真正的錯誤在 **stdout**（`{"status":1,"threadId":"01a0374f-...","rawOutput":""}`），stderr 只有那句無害的 deprecation warning（該 plugin 自己用 `shell: true` 傳參造成）。`||` 讓 stderr 優先，於是真正的原因被丟掉。手動分離兩個串流 + `codex-companion.mjs status --all --json` 才查出實情：
+
+```
+job task-mt87cnhq-4oqkk0 → failed
+"You've hit your usage limit ... try again at Aug 31st, 2026 12:41 PM."
+```
+
+認證與 CLI 都正常（`ChatGPT login active for peijingartstudio@gmail.com`、`codex-cli 0.149.1`），**純粹是用量額度用罄**。閘不是「發現問題」，是「跑不起來」，且會持續失敗到 8/31。
+
+**額度是本日消耗的**：為第 5 次 ClickHouse 事故跑了四輪對抗式覆審（11 條 finding、10 條為真、1 條實測駁回）。這是紀律的真實成本，不是意外。
+
+[已修改]
+1. **停用 stop-time review gate**（操作者於 05:08 UTC 明示選擇）—— 走官方開關 `codex-companion.mjs setup --disable-review-gate`，**非改檔**；實測 `stopReviewGate: True → False`。
+2. `agency-os/TASKS.md` —— 兩條入庫：① **2026-08-31 到期重啟**（含 DoD 與「禁止因為順手而保持停用」）② 上游缺陷紀錄（`stop-review-gate-hook.mjs:121` 的 `||` 遮蔽問題，屬 plugin 快取目錄、更新即覆蓋，不在本 repo 修，附繞過查法）。
+
+[為何是停用而非留著每次 bypass]
+閘每次收工都失敗，會訓練出「看到它失敗就略過」的習慣——**那正是本日整場事故的核心機制**（`Trigger infra config guard` 紅了 10 天沒人看，直接促成第 5 次 ClickHouse 事故）。一個必定失敗的閘比沒有閘更糟，因為它同時消耗注意力並製造麻木。停用 + 具名到期日，是本日替安全稽核建立的同一個模式：**接受要有名字、有證據、會過期。**
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=手動分離 stdout/stderr 重現 companion `task` 失敗 + `status --all --json` 取真因 + `setup --disable-review-gate` + 前後 `status --json` 比對 | exit=0 | ms=~180000
+- 停用前 `stopReviewGate = True` → 停用後 `stopReviewGate = False`（同一支 `status --json` 讀取，非推測）
+- 失敗時間戳 `2026-08-25T05:08:26.775Z` 與本次 stop hook 觸發時間吻合，確認不是舊紀錄
+- REVIEW_WAIVED: NA -- 本項為設定切換（官方開關）＋兩條 TASKS 入庫，無程式碼改動；且外部 oracle 正是本項處理的對象，額度用罄無法自審
+- BUGHUNT_WAIVED: NA -- 無程式碼改動；受影響檔案位於 `~/.claude/plugins/cache/`（第三方、非 repo 資產、gitignored）
+
+[剩餘風險]
+- **2026-08-31 之前沒有 stop-time 外部覆審**。本日工作已過四輪 oracle，邊際損失低；但期間新工作缺這一層，需靠 `/review`、`verify-recent` 與 AO-CLOSE 機械閘承接。
+- 若 8/31 後忘記重啟，`TASKS.md` 那條是唯一提醒——它不像安全稽核那條有機制會自己把閘轉紅。**這是本次接受的已知不對稱**：停用一道閘之後，就沒有那道閘來提醒你它被停用了。
+- 上游 `||` 遮蔽缺陷未修（非本 repo）；同類情況再發生時，查法已寫進 TASKS。
+
+[rollback]
+`node ~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs setup --enable-review-gate`，再跑 `status --json` 確認 `stopReviewGate: True`。
+
 ### AUTO_TASK_DONE: MCP 設定檔重複所有權 —— 整類關閉（不是關掉三個實例）
 
 [任務]
