@@ -2,6 +2,107 @@
 
 ## 2026-08-25
 
+### AUTO_TASK_DONE: 停用 auto-checkpoint —— 一個存檔按鈕被當成管線零件用了三個月
+
+[任務]
+操作者追問「為什麼 ClickHouse 這件事繼續發生」時，查到 `Trigger infra config guard` 紅了 10 天沒人看。順著「為什麼沒人看」查下去，發現本 repo **56.4% 的 commit（2,568／4,552）** 是 auto-checkpoint 產生的。操作者連續追問四輪（「有存在必要嗎」→「造成很多問題嗎」→「是不是只是記錄」→「我記得它是用來記錄進行中事件的」），逼出完整查證。
+
+[根因 —— 用途被改變，不是設計錯誤]
+三份文件對它的設計契約說法完全一致：
+- `.claude/commands/checkpoint.md`：「mid-session git checkpoint」「**Do not push** — push is reserved for AO-CLOSE」
+- `scripts/README.md:13`：「Mid-session git checkpoint **(no push)**」
+- `commit-checkpoint.ps1` 檔頭：「Local-only (**no push**). Intended for the agent to run **at milestones**」
+
+**三處都寫「不 push」，三處都寫「里程碑」。沒有任何一處說它是流程的必要環節。**
+
+時間線：腳本存在於 repo 的 initial snapshot（2026-04-05，比 git 歷史還早）→ **2026-05-07 `451f8deb` 把它接進 `ao-resume-on-prompt.ps1` 開始自動呼叫** → 為了讓自動產生的 commit 不被 align 的 `reset --hard` 沖掉，被迫加上 push（`ao-resume.ps1:298` 註解自承：「publish checkpoint before align reset; avoids orphan local-only commits」）。
+
+**那個 push 不是功能，是 checkpoint 自己製造的問題的損害控制。** 而它正是未驗證程式碼進 main 的路徑。
+
+[六類危害，全部有 commit 佐證]
+1. 誤刪 **49 個 tracked file**（2026-05-28，壞 commit `0d63eb9`，`WORKLOG-archive/2026-05.md:661` 記錄完整鏈：`git pull --rebase` 失敗中 + junction 斷 → auto-checkpoint 把顯示為 deleted 的檔案 commit）
+2. 誤刪 **12 個 `.claude/plans/` 檔**（`853cd26a`，junction 於 session 中途斷裂）
+3. **把修好的東西改回去**（`WORKLOG-archive/2026-06.md:518`：「治標每 session 被平行 checkpoint 還原，recurring」）
+4. **SSOT 漂移 10 週**（`35834a0d` 把工作區裡沒打算提交的 `mem_limit: 2048m→4096m` 掃進 repo，從未部署）
+5. **外部覆審審了空氣**（搶先 commit → `git diff HEAD` 變空 → Codex 回報「沒問題」，`WORKLOG.md:880,903`）
+6. **吞掉 AO-CLOSE 閘的可見性**（`WORKLOG.md:151` 實測：400 commit 中 **23 個 human commit 對閘完全隱形**，可導致帶著未發布人工工作放行）
+
+**效益：搜遍全部 WORKLOG 歷史，「checkpoint 救回工作」紀錄 0 筆。**
+
+[為什麼是「用途錯置」而非「設計不良」]
+每一類危害都是「拿掉『手動』兩個字」之後才出現的：
+- 存檔點**偶爾**跑 → `git add -A` 無妨；變成**每則訊息**跑 → 掃進沒打算提交的東西
+- 存檔點**不 push** → 進不了 main；被迫 push → 成為繞過 verify gate 的路徑
+- 存檔點**由人按** → 時機由人判斷；變成自動 → junction 斷時照樣提交
+
+它掛在 `UserPromptSubmit`（`~/.claude/settings.json:691`，matcher `.*`），條件是「工作區髒就跑」。**而 session 正在工作時工作區必然是髒的——所以它不是偶爾搶 commit，是每一則訊息都在搶。**
+
+[已修改]
+1. `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1` —— 移除**兩處**呼叫：`:152` 每則訊息分支（`8c3ac617`）、`:195` AO-RESUME 前分支（`680db6c6`）。前者刪除後控制流落到 `:168` 完全相同的 early-exit，行為差異僅「不再 commit」。保留 tombstone 註解說明為何移除。
+2. `.cursor/hooks/run-ao-resume-on-prompt.ps1` —— 同樣移除（獨立實作，非鏡像）。`.codex/hooks/` 為鏡像，同步。
+3. `scripts/ao-resume.ps1` —— 移除第三處（checkpoint 後備路徑）；永遠對 git-align 傳 `-AllowStash`；函式改名 `Invoke-FullMainlineAlignWithAutoCheckpoint` → `...WithRetry`（已無 checkpoint，舊名是對不存在行為的聲稱）；新增 **stranded align-stash 偵測器**（`c63bdc5c`）。
+4. `scripts/git-align-main-aoresume-feature.ps1` —— `-AllowStash` 由「stash 後不 pop」改為**具名 stash + finally 保證取回**；取回失敗印出 ref 與復原指令並 exit 3；`.PARAMETER` 與 throw 訊息中「does not auto-pop」訂正（那兩句已成假話）。
+5. `scripts/commit-checkpoint.ps1` —— `-Paths` 改 **Mandatory + ValidateNotNullOrEmpty**，刪除 `git add -A` 分支（`7251d14d`）。整份重寫，檔頭改寫為誠實描述新職責。
+6. `scripts/ao-close.ps1` —— **兩個守衛搬家**至 `:584` 的 `git add -A` 之前（junction 完整性、shell 垃圾檔）。
+7. `scripts/codex-oracle.ps1` —— 空 diff 警告由 `[claude] checkpoint:` **泛化為 `[claude] `**（`cc78570b`）。
+
+[關鍵判斷：三個既有補丁怎麼處理]
+判準是**危害是否消失**，不是**觸發字串是否過期**。我前兩輪用錯判準，被操作者連續退回兩次才修正：
+
+| 補丁 | 第一輪我說 | 查證後 | 依據 |
+|---|---|---|---|
+| junction 守衛 | 隨 `git add -A` 一起死 | **搬家** | 危害是「任何 `git add -A` + 斷掉的 junction」；`ao-close.ps1:584` 是最後一個，且註解自承 gate 12b 只是 point-in-time |
+| junk guard | 可刪 | **搬家** | 唯一消費者是 checkpoint，但 `ao-close` 那條路**完全裸奔** |
+| oracle 空 diff 警告 | 死碼可刪 | **泛化** | repo 有 **101 個 `AO-CLOSE sync`** 自動 commit，平行 session 的 AO-CLOSE 可吞掉本 session 的 diff |
+
+另訂正：`ensure-claude-junction.ps1` 實際被呼叫處是 **2 個**（`system-health-check.ps1:724`、hook `:97`），非我先前說的 7——先前的 grep 把註解算進去了。
+
+[撤回的提案]
+原本要一併把 `reset --hard origin/main` 改為 `pull --ff-only`。**撤回**：`git-align...ps1:237` 與 `:30` 顯示它在本機超前時**預設中止**而非沖掉，且移除 auto-checkpoint 後本機超前的情況只會更少。併進來只會擴大爆炸半徑、模糊事故歸因。一個改動一個目的。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=拋棄式 repo × 2（hook 間諜測試、align + bare remote）+ A/B 對照 + 五路徑 stash 測試 + 四路徑 -Paths 測試 + regex 五情境 + 三份 hook md5 校對 + sync-claude-userlevel 生效驗證 | exit=0 | ms=~5400000
+- **hook A/B（間諜腳本證明有無被呼叫）**：T1 每則訊息+髒工作區 → 修改前 spy=YES 產生 commit／修改後 spy=NO；T2 回歸（新 session → AO-RESUME 路徑）→ 修改前後皆 `ao_resume_ran=YES`，僅 spy 由 YES 轉 NO。
+- **stash 五路徑**：正常取回 exit=0 內容還原殘留 0／pop 衝突 exit=3 stash 保留 1 衝突標記存在／**平行 stash：取回自己的 MINE，他人 stash 原封不動**（`git stash` 是 repo 全域，裸 `pop` 會取走別人的）／僅未追蹤檔 exit=0 無誤報／完全乾淨 exit=0 不建 stash。
+- **偵測器雙向**：無殘留→安靜；有殘留→點名 ref + 復原指令。
+- **`-Paths` 四路徑**：不傳→擋；傳→**只提交指名的 `dirty.txt`**，`other.txt` 仍未提交；路徑不存在→擋。
+- **regex 五情境**：checkpoint／AO-CLOSE sync／daily scaffold → MATCH；人工 commit、`[cursor]` → no match。
+- 生效驗證：SSOT + `.codex` 鏡像 + `~/.claude/` 活檔 md5 三者一致，經 `sync-claude-userlevel.ps1 -Mode merge` RESULT: PASS。
+- CP950：hook drift 改動前後皆 1（既有）；`commit-checkpoint` **7→5**（減少，且與 `AUDIT_REGISTRY.md:113` 記載預期值一致）；`ao-resume` drift=0。
+- REVIEW_WAIVED: NA -- 外部 oracle 不可用（Codex 額度用罄至 2026-08-31，見 `7934eb9e`）。以自審 + 上述真實行為測試替代，並在下方誠實列出自己造成的三個 bug。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude,.codex,.cursor,mcp | grep=commit-checkpoint | hits=3
+  - ① hook `:195` 第三個呼叫點（**若漏掉，前兩階段等於沒生效**）→ 已移除
+  - ② `.cursor/hooks/` 獨立實作亦有呼叫 → 已移除
+  - ③ `tomo.md:54` 用 `-Message` + `-Paths` 具名形式 → 不受 `-Paths` 必填影響，保留
+
+[本輪我自己造成、又自己抓到的三個 bug]
+無外部 oracle，全靠真實行為測試逼出來：
+1. **退出碼放在到不了的地方**：判定原本置於 try/finally **之後**，但 `-ContinueWithFeatureBranch:$false` 這條最常見路徑用 `return` 離開腳本作用域——finally 會跑，之後的程式碼永遠不跑。訊息印了、旗標設了，腳本仍 exit 0。移進 finally（唯一所有離開路徑都經過處）。
+2. **「髒」不蘊含「有東西被 stash」**：`Test-WorktreeClean` 把未追蹤檔算成髒，`git stash push` 預設卻忽略它們——只有未追蹤變更時不會產生 stash，finally 卻去找從未存在的 stash 並誤報失敗。改為確認 stash 真的存在才記名。
+3. **漏掉第三個呼叫點**（見 BUGHUNT ①）。是呼叫者稽核抓到的，不是靠印象。
+
+另記一次方法錯誤：用行號盲切區塊造成**兩次**語法損壞，`git checkout` 還原時連帶清掉同批未提交的修改。137 行的檔案應該整份讀完重寫，不該盲切。
+
+[操作者決策：不補「session 中途死掉」的自動存檔]
+操作者提出「checkpoint 原本是為了 session 滿了或無法繼續時記錄當前狀況」。查證後：**checkpoint 從來不記狀態**——訊息 `auto-save on session start` 載入零資訊，它保存的是位元組不是脈絡。真正在做這件事的是三層機制：
+- `session-summary.js`（Stop hook，每輪自動）→ `~/.claude/sessions/<date>-<sid>.md`，含 git status + git log（`.gitignore:36`，不進 git）
+- `/tomo` handoff packet（手動，六段敘述 + TASKS + WORKLOG）
+- `WORKLOG.md`（AO-CLOSE）
+
+但確實存在一個**真實取捨**，已向操作者點名：移除前，session 死掉的未提交工作會在下次 AO-RESUME 被 commit **並 push 到 origin**（對「整台機器掛掉」有保護）；移除後只留在本機（stash 保護 `reset --hard`，但不上遠端）。
+**操作者選擇：不補（選項①）。** 理由：`session-summary` 每輪自動記錄、檔案本身在磁碟上、`/tomo` 隨時可產生完整交接；而「機器掛掉」這個風險 checkpoint 本來也沒真的解決——它同樣要等下次 AO-RESUME 才 push，中間死掉一樣沒上去。
+已評估未採用的選項：② Stop hook 在工作區髒時提示跑 `/tomo`（提醒而非自動 commit）③ 限縮版自動提交（只 commit 不 push）。若日後機器故障風險上升，從 ② 開始。
+
+[剩餘風險]
+- **未提交工作不再上遠端**：機器故障會失去進行中的工作。這是刻意接受的取捨（見上）。
+- **stash pop 衝突是新引入的風險**，被放進最常走的啟動路徑。已用 exit 3 + 明確復原指令 + AO-RESUME 偵測器三層處理，但無法完全消除。
+- **`ao-close.ps1` 仍有 `git add -A`**：那是 repo 裡最後一個盲目 stage，兩個守衛已搬到它前面，但它本身仍會把工作區所有東西提交。這是 AO-CLOSE 的設計（收工本來就要全部收），不是缺陷。
+- 歷史那 **2,568 個 checkpoint commit 不動**——rewrite 對有三個寫入者（本機／EU VPS／雲端 routine）的 repo 是災難。只停止繼續產生。
+- `.cursor/` 相關改動已做，但操作者已表明 **Cursor 退場**；該資料夾 31 檔／217K 且 `AGENTS.md` 有 6+ 處把 cursor rules 列為 SSOT，屬獨立議題，本輪未處理。
+
+[rollback]
+逐 commit `git revert`：`cc78570b`（oracle 泛化）→ `7251d14d`（-Paths 必填 + 守衛搬家）→ `680db6c6`（第三呼叫點）→ `c63bdc5c`（stash）→ `8c3ac617`（每則訊息分支）。各階段獨立可回滾。回滾後需重跑 `scripts/sync-claude-userlevel.ps1 -Mode merge` 讓 `~/.claude/hooks/` 生效。
+
 ### AUTO_TASK_DONE: TASKS.md 近 2 個月結案盤點 —— 4 條真結案、8 條標籤過期、2 條新開
 
 [任務]
