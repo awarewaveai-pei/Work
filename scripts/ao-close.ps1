@@ -581,10 +581,57 @@ try {
         exit 1
     }
 
+    # ── Last line of defence before `git add -A` (moved here 2026-08-25) ──────────
+    # These two guards lived in commit-checkpoint.ps1 and protected ITS `git add -A`.
+    # That call site is gone (checkpoint now requires explicit -Paths), but the hazards
+    # were never about which script staged everything -- they are about `git add -A`
+    # itself, and this is now the only one left in the repo. Leaving the guards behind
+    # in a script that no longer stages blindly would have retired the protection while
+    # keeping the danger.
+
+    # Guard 1 -- broken .claude junction. ensure-claude-junction.ps1 runs at
+    # UserPromptSubmit STEP 0 and at health gate 12b, but both are point-in-time: if the
+    # junction dies mid-session, every earlier check has already passed and nothing
+    # stands between `git add -A` and a commit that deletes the whole shared .claude/
+    # tree for every machine. Observed twice: 49 tracked files (2026-05-28, 0d63eb9) and
+    # 12 files under .claude/plans/ (853cd26a). Runs immediately before staging.
+    $claudeJunction = Join-Path $WorkRoot ".claude"
+    # UTF-8 wrapped: tracked paths under .claude/ may contain non-ASCII, and a CP950
+    # console mangles them on capture (scripts/audit-cp950-traps.ps1 trap class).
+    $claudeTracked = @(Invoke-WithUtf8Console { & git ls-files -- ".claude" 2>$null })
+    if ($claudeTracked.Count -gt 0 -and -not (Test-Path -LiteralPath $claudeJunction)) {
+        Write-Error @"
+ao-close: refusing to stage. '.claude' is tracked in git ($($claudeTracked.Count) files)
+but does not exist on disk. The junction is broken, so 'git add -A' would stage every one
+of those files as a DELETION and propagate it to all machines on push.
+
+Repair it first, then re-run:
+  powershell -NoProfile -ExecutionPolicy Bypass -File "$WorkRoot\scripts\ensure-claude-junction.ps1"
+"@
+        exit 1
+    }
+
     git add -A
     if ($LASTEXITCODE -ne 0) {
         Write-Error "ao-close: git add failed"
         exit 1
+    }
+
+    # Guard 2 -- shell-artifact junk. `git add -A` blindly stages stray files created by
+    # shell accidents: literal `$null`/`null` (PowerShell-style redirection run under
+    # bash) and 0-byte files whose NAMES are doc-content fragments (word-split heredoc).
+    # Those reached the SSOT on 2026-06-20 (16d95c8). Policy: UNSTAGE junk and continue,
+    # never abort -- the close-out's real work must still be committed.
+    # Delegated to Node: with git's default core.quotePath=true, non-ASCII staged names
+    # reach PowerShell as octal-escaped ASCII, so a PS-side non-ASCII test never fires.
+    $junkGuard = Join-Path $PSScriptRoot "checkpoint-junk-guard.mjs"
+    if (Test-Path -LiteralPath $junkGuard) {
+        try {
+            & node $junkGuard --repo $WorkRoot
+            if ($LASTEXITCODE -ne 0) { Write-Warning "ao-close: junk guard exited $LASTEXITCODE (continuing)" }
+        } catch {
+            Write-Warning "ao-close: junk guard unavailable ($($_.Exception.Message)); continuing"
+        }
     }
 
     # Sensitive-path gate input. Hardening, NOT a fix for a reachable bug -- stated plainly so a

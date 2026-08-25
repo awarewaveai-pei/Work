@@ -1,16 +1,31 @@
-﻿# Local-only git checkpoint (no push). Intended for the agent to run at milestones;
-# the operator does not need to run this by hand unless the environment blocks git.
+# Scoped, local-only git commit helper (no push).
+#
+# 2026-08-25: this script no longer stages blindly. `-Paths` is mandatory, the `git add -A`
+# fallback is gone, and every automated caller has been removed. It exists now for one job:
+# committing a NAMED set of paths on behalf of a command that knows exactly what it changed
+# (today: .claude/commands/tomo.md). For ordinary work use `git commit -m "<message>"` --
+# it is the same thing, and CLAUDE.md R2 wants the message to carry root cause + verification.
+#
+# Why the change: as an automated whole-tree committer this script produced 2,568 commits
+# (56.4% of repo history) and six documented harm classes -- 49 tracked files committed as
+# deletions (2026-05-28, 0d63eb9), 12 more (853cd26a), an uncommitted mem_limit edit swept
+# in and left drifting from production for ten weeks (35834a0d), fixes silently reverted,
+# external review handed empty diffs, and code pushed to main while the verify gate was
+# blocking it. None of that came from the staging logic being wrong; it came from staging
+# everything, automatically, on a schedule nobody chose. Requiring named paths removes the
+# class at the signature level instead of guarding against it.
+# Full analysis: agency-os/WORKLOG.md 2026-08-25.
 param(
     [Parameter(Mandatory = $true)]
     [string]$Message,
     [string]$WorkRoot = "",
-    [string[]]$Paths = @(),
+    [Parameter(Mandatory = $true)]
+    [ValidateNotNullOrEmpty()]
+    [string[]]$Paths,
     [switch]$DryRun
 )
-
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
-
 if ($WorkRoot) {
     $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
 } elseif ($PSScriptRoot) {
@@ -26,47 +41,22 @@ try {
         throw "Not a git repository: $WorkRoot"
     }
 
-    # Junction integrity, checked at the LAST possible moment (2026-08-12).
-    # `ensure-claude-junction.ps1` already runs at UserPromptSubmit STEP 0 in both
-    # hooks, and health gate 12b covers AO-CLOSE — but both are point-in-time. If
-    # the junction dies MID-session (observed 2026-08-12: 12 files under
-    # .claude/plans/ were staged as deletions and committed as 853cd26a), every
-    # earlier check has already passed and nothing stands between `git add -A` and
-    # a commit that deletes the whole shared .claude/ tree for every machine.
-    # This is the last line of defence, so it runs immediately before staging.
-    $claudeJunction = Join-Path $WorkRoot ".claude"
-    # UTF-8 wrapped: tracked paths under .claude/ may contain non-ASCII, and a
-    # CP950 console mangles them on capture (scripts/audit-cp950-traps.ps1 trap class).
-    . (Join-Path $PSScriptRoot '_console-encoding-helpers.ps1')
-    $claudeTracked = @(Invoke-WithUtf8Console { & git ls-files -- ".claude" 2>$null })
-    if ($claudeTracked.Count -gt 0 -and -not (Test-Path -LiteralPath $claudeJunction)) {
-        throw @"
-Refusing checkpoint: '.claude' is tracked in git ($($claudeTracked.Count) files) but does not exist on disk.
-The junction is broken, so 'git add -A' would stage every one of those files as a DELETION
-and propagate it to all machines on push.
+    # The broken-junction and shell-junk guards that used to sit here MOVED to
+    # scripts/ao-close.ps1 on 2026-08-25, immediately before its `git add -A` -- the only
+    # blind staging left in the repo, and therefore the only place those hazards can still
+    # occur. Deleting them along with this script's `git add -A` would have retired the
+    # protection while leaving the danger. Nothing to guard here any more: only the paths
+    # the caller names are staged, so a broken junction cannot become a mass deletion.
 
-Repair it first, then re-run:
-  powershell -NoProfile -ExecutionPolicy Bypass -File "$WorkRoot\scripts\ensure-claude-junction.ps1"
-"@
-    }
-
-    if ($Paths.Count -eq 0) {
-        if ($DryRun) {
-            Write-Host "[dry-run] would: git add -A" -ForegroundColor Cyan
-        } else {
-            git add -A
+    foreach ($p in $Paths) {
+        $full = Join-Path $WorkRoot $p
+        if (-not (Test-Path -LiteralPath $full)) {
+            throw "Path not found: $p"
         }
-    } else {
-        foreach ($p in $Paths) {
-            $full = Join-Path $WorkRoot $p
-            if (-not (Test-Path -LiteralPath $full)) {
-                throw "Path not found: $p"
-            }
-            if ($DryRun) {
-                Write-Host "[dry-run] would: git add -- $p" -ForegroundColor Cyan
-            } else {
-                git add -- $p
-            }
+        if ($DryRun) {
+            Write-Host "[dry-run] would: git add -- $p" -ForegroundColor Cyan
+        } else {
+            git add -- $p
         }
     }
 
@@ -77,33 +67,7 @@ Repair it first, then re-run:
 
     git diff --cached --quiet
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "commit-checkpoint: nothing staged to commit (working tree clean or no changes after add)." -ForegroundColor Yellow
-        exit 0
-    }
-
-    # Shell-artifact junk guard (2026-07-02): `git add -A` blindly staged stray
-    # files created by shell accidents: literal `$null`/`null` (PowerShell-style
-    # redirection run under bash) and 0-byte files whose NAMES are doc-content
-    # fragments (word-split of a heredoc). Those got committed into the SSOT on
-    # 2026-06-20 (16d95c8). Policy: UNSTAGE junk and continue (never abort; the
-    # checkpoint's real work must still be saved).
-    # Delegated to Node (critic 2026-07-02 finding 3): with git's default
-    # core.quotePath=true, non-ASCII staged names reach PowerShell as
-    # octal-escaped ASCII, so a PS-side non-ASCII test never fires. The Node
-    # helper reads raw bytes via NUL-separated output and works identically on
-    # every platform. Best-effort: node missing = guard skipped with warning.
-    $junkGuard = Join-Path $PSScriptRoot "checkpoint-junk-guard.mjs"
-    if (Test-Path -LiteralPath $junkGuard) {
-        try {
-            & node $junkGuard --repo $WorkRoot
-            if ($LASTEXITCODE -ne 0) { Write-Warning "commit-checkpoint: junk guard exited $LASTEXITCODE (continuing)" }
-        } catch {
-            Write-Warning "commit-checkpoint: junk guard unavailable (node missing?): $_"
-        }
-    }
-    git diff --cached --quiet
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "commit-checkpoint: only junk was staged; nothing to commit after guard." -ForegroundColor Yellow
+        Write-Host "commit-checkpoint: nothing staged to commit (named paths had no changes)." -ForegroundColor Yellow
         exit 0
     }
 
