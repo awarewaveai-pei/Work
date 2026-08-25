@@ -47,6 +47,11 @@ if (-not (Get-Variable -Name CommitMessageFile -Scope Script -ErrorAction Silent
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# CP950 protection for native-git stdout capture (see scripts/_console-encoding-helpers.ps1).
+# Unconditional on purpose: the git-safe-ops dot-source below is Test-Path-guarded, so relying
+# on it transitively would leave Invoke-WithUtf8Console undefined exactly when the lib is absent.
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
+
 if ($WorkRoot) {
     $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
 } else {
@@ -144,7 +149,7 @@ function Get-GitPreflightSnapshot {
             $statusLine = $statusLine.Trim()
         }
 
-        $branch = (git rev-parse --abbrev-ref HEAD 2>$null).Trim()
+        $branch = (Invoke-WithUtf8Console { git rev-parse --abbrev-ref HEAD 2>$null }).Trim()
         $remoteRef = if ([string]::IsNullOrWhiteSpace($branch) -or $branch -eq "HEAD") { "" } else { "origin/$branch" }
         $remoteFound = $false
         $ahead = $null
@@ -200,7 +205,15 @@ if ($preflight.RemoteFound -and $null -ne $preflight.Ahead -and $null -ne $prefl
         # just because the auto-checkpoint hook ran between the last push and AO-CLOSE.
         Push-Location $WorkRoot
         try {
-            $aheadSubjects = @(& git log "origin/$($preflight.Branch)..HEAD" --format="%s" 2>$null)
+            # CP950 wrap is load-bearing here, not cosmetic: this captures commit SUBJECTS, which
+            # in this repo are overwhelmingly CJK. Decoding UTF-8 as Big5 can swallow the newline
+            # between two subjects and merge them onto one line (same failure that broke
+            # backfill-missed-daily.ps1 on 2026-05-22). A human subject absorbed into the preceding
+            # "[claude] checkpoint:" line then matches the checkpoint regex below, $humanCommits
+            # drops to 0, and this gate waves through unpublished human work.
+            # Reproduced 2026-08-25 on a big5 console: 400 commits -> bare capture returned 377
+            # lines and 177 of 200 human commits; wrapped returned 400 / 200.
+            $aheadSubjects = @(Invoke-WithUtf8Console { & git log "origin/$($preflight.Branch)..HEAD" --format="%s" 2>$null })
         } finally { Pop-Location }
         $humanCommits = @($aheadSubjects | Where-Object { $_ -notmatch '^\[claude\] (checkpoint:|chore: AO-CLOSE)' })
         if ($aheadSubjects.Count -gt 0 -and $humanCommits.Count -eq 0) {
@@ -237,7 +250,7 @@ if (-not $SkipInboxGuard -and $InboxGuardMode -ne "off") {
         $today = Get-Date
         $dayStart = (Get-Date -Year $today.Year -Month $today.Month -Day $today.Day -Hour 0 -Minute 0 -Second 0)
         $since = $dayStart.ToString("yyyy-MM-dd HH:mm:ss")
-        $branch = (git rev-parse --abbrev-ref HEAD 2>$null).Trim()
+        $branch = (Invoke-WithUtf8Console { git rev-parse --abbrev-ref HEAD 2>$null }).Trim()
         if ([string]::IsNullOrWhiteSpace($branch) -or $branch -eq "HEAD") {
             Write-Host "AO-CLOSE inbox guard: detached HEAD; skip commit coverage check." -ForegroundColor DarkGray
             $todayCommits = @()
@@ -374,7 +387,7 @@ if (-not $SkipPush -and -not $AllowPushWhileBehind) {
             }
         }
 
-        $branch = (git rev-parse --abbrev-ref HEAD).Trim()
+        $branch = (Invoke-WithUtf8Console { git rev-parse --abbrev-ref HEAD }).Trim()
         if ($branch -ne "HEAD") {
             $remoteRef = "origin/$branch"
             git rev-parse --verify $remoteRef 2>$null | Out-Null
@@ -574,7 +587,22 @@ try {
         exit 1
     }
 
-    $staged = @(git diff --cached --name-only | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    # Sensitive-path gate input. Hardening, NOT a fix for a reachable bug -- stated plainly so a
+    # future reader does not treat this as load-bearing and does not re-derive the analysis:
+    # a CP950 capture here CAN swallow a newline and merge two staged paths, but it cannot defeat
+    # this gate. `git diff --cached --name-only` emits index order = sorted by path bytes, so every
+    # ASCII path (`.claude/...` = 0x2E, `mcp-local-wrappers/...` = 0x6D) sorts BEFORE every
+    # non-ASCII path (0xE4+) and can never be the absorbed tail of a mojibaked predecessor. A
+    # sensitive path under a CJK directory survives too: merging preserves the `/` in front of
+    # `.claude`, and `\.credentials\.json$` still anchors at the end of the merged string.
+    # Verified empirically 2026-08-25 (303 staged files, 3 sensitive, core.quotePath=false, big5
+    # console): bare and wrapped both matched 3/3.
+    # Kept anyway for two reasons:
+    #  - -c core.quotepath=false pins the path encoding instead of inheriting an unowned git
+    #    config, so this gate's behaviour stops depending on a setting nobody owns.
+    #  - it makes this query byte-identical to the sibling gate at
+    #    verify-closeout-completeness.ps1:61, so the two cannot drift apart.
+    $staged = @(Invoke-WithUtf8Console { git -c core.quotepath=false diff --cached --name-only } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     $sensitive = @($staged | Where-Object { $_ -match '(?i)(^|/)\.claude/|\.credentials\.json$|(^|/)mcp-local-wrappers/node_modules/' })
     if ($sensitive.Count -gt 0) {
         Add-CloseoutGateResult -Gate $gate -Name "sensitive path guard" -Failed $true -Detail ("staged sensitive/ignored path(s): " + ($sensitive -join ", ")) -Fix "git reset these paths and add to .gitignore; memory/.claude must not enter git (CLAUDE.md R1)"
@@ -652,7 +680,7 @@ try {
         Write-Host "== AO-CLOSE: nothing to commit (working tree clean after add) ==" -ForegroundColor DarkGray
     }
 
-    $branch = (git rev-parse --abbrev-ref HEAD).Trim()
+    $branch = (Invoke-WithUtf8Console { git rev-parse --abbrev-ref HEAD }).Trim()
     Write-Host "== AO-CLOSE: git push origin $branch ==" -ForegroundColor Cyan
     # Phase C (2026-05-30): was bare `git push origin $branch` — same NativeCommandError issue as fetch.
     if (Get-Command Invoke-SafeGitPush -ErrorAction SilentlyContinue) {

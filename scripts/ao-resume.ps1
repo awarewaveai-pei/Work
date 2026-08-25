@@ -110,7 +110,7 @@ function Invoke-NonFastForwardRecovery {
     # 1. Determine if remote is ahead (non-fast-forward case).
     $behindCount = 0
     try {
-        $bStr = (& git -C $Root rev-list --count "HEAD..origin/main" 2>$null | Select-Object -Last 1)
+        $bStr = (Invoke-WithUtf8Console { & git -C $Root rev-list --count "HEAD..origin/main" 2>$null } | Select-Object -Last 1)
         if ($bStr -match '^\s*(\d+)\s*$') { $behindCount = [int]$Matches[1] }
     } catch { }
     if ($behindCount -eq 0) { return -1 }  # Not NFF; caller uses original error path
@@ -119,13 +119,13 @@ function Invoke-NonFastForwardRecovery {
 
     # 2. Pull --rebase: replay our local checkpoint commits on top of the remote state.
     $savedEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-    & git -C $Root pull --rebase origin main 2>&1 | Out-Host
+    Invoke-WithUtf8Console { & git -C $Root pull --rebase origin main 2>&1 } | Out-Host
     $pullExit = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
     $ErrorActionPreference = $savedEAP
 
     if ($pullExit -ne 0) {
         # 3. Rebase stopped. Check what kind of failure this is.
-        $conflicted = @(& git -C $Root diff --name-only --diff-filter=U 2>$null |
+        $conflicted = @(Invoke-WithUtf8Console { & git -C $Root diff --name-only --diff-filter=U 2>$null } |
             Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 
         if ($conflicted.Count -eq 0) {
@@ -134,7 +134,7 @@ function Invoke-NonFastForwardRecovery {
             Write-Host "AO-RESUME: pull --rebase failed with no conflict markers (git internal error?). Aborting rebase." -ForegroundColor Red
             Write-Host "  Re-run AO-RESUME after verifying no stale .git/index.lock or pre-rebase hook errors." -ForegroundColor Yellow
             $savedEAP2 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-            & git -C $Root rebase --abort 2>&1 | Out-Null
+            Invoke-WithUtf8Console { & git -C $Root rebase --abort 2>&1 } | Out-Null
             $ErrorActionPreference = $savedEAP2
             return $pullExit
         }
@@ -146,7 +146,7 @@ function Invoke-NonFastForwardRecovery {
             $nonLatest | ForEach-Object { Write-Host ("  conflict: {0}" -f $_) -ForegroundColor Red }
             Write-Host "  Fix: resolve conflicts manually, git add, git rebase --continue, then re-run AO-RESUME." -ForegroundColor Yellow
             $savedEAP2 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-            & git -C $Root rebase --abort 2>&1 | Out-Null
+            Invoke-WithUtf8Console { & git -C $Root rebase --abort 2>&1 } | Out-Null
             $ErrorActionPreference = $savedEAP2
             return 1
         }
@@ -158,7 +158,7 @@ function Invoke-NonFastForwardRecovery {
         $resolveOk = $true
         foreach ($cf in $conflicted) {
             Write-Host ("  auto-resolve: {0}" -f $cf) -ForegroundColor DarkYellow
-            & git -C $Root checkout --theirs -- $cf 2>&1 | Out-Null
+            Invoke-WithUtf8Console { & git -C $Root checkout --theirs -- $cf 2>&1 } | Out-Null
             $checkoutExit = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
             if ($checkoutExit -ne 0) {
                 # checkout --theirs fails on delete/modify conflicts; treat as unresolvable.
@@ -166,7 +166,7 @@ function Invoke-NonFastForwardRecovery {
                 $resolveOk = $false
                 break
             }
-            & git -C $Root add -- $cf 2>&1 | Out-Null
+            Invoke-WithUtf8Console { & git -C $Root add -- $cf 2>&1 } | Out-Null
             $addExit = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
             if ($addExit -ne 0) {
                 Write-Host ("  ERROR: git add failed for '{0}'. Aborting." -f $cf) -ForegroundColor Red
@@ -178,7 +178,7 @@ function Invoke-NonFastForwardRecovery {
 
         if (-not $resolveOk) {
             $savedEAP4 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-            & git -C $Root rebase --abort 2>&1 | Out-Null
+            Invoke-WithUtf8Console { & git -C $Root rebase --abort 2>&1 } | Out-Null
             $ErrorActionPreference = $savedEAP4
             return 1
         }
@@ -188,7 +188,7 @@ function Invoke-NonFastForwardRecovery {
         $savedEditor = $env:GIT_EDITOR; $env:GIT_EDITOR = 'true'
         $savedSeqEditor = $env:GIT_SEQUENCE_EDITOR; $env:GIT_SEQUENCE_EDITOR = 'true'
         $savedEAP5 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-        & git -C $Root rebase --continue 2>&1 | Out-Host
+        Invoke-WithUtf8Console { & git -C $Root rebase --continue 2>&1 } | Out-Host
         $pullExit = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
         $ErrorActionPreference = $savedEAP5
         $env:GIT_EDITOR = $savedEditor
@@ -197,7 +197,7 @@ function Invoke-NonFastForwardRecovery {
         if ($pullExit -ne 0) {
             Write-Host ("AO-RESUME: rebase --continue failed after auto-resolve (exit {0}). Aborting." -f $pullExit) -ForegroundColor Red
             $savedEAP6 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-            & git -C $Root rebase --abort 2>&1 | Out-Null
+            Invoke-WithUtf8Console { & git -C $Root rebase --abort 2>&1 } | Out-Null
             $ErrorActionPreference = $savedEAP6
             return $pullExit
         }
@@ -206,7 +206,7 @@ function Invoke-NonFastForwardRecovery {
     # 6. Rebase succeeded. Push the rebased commits.
     Write-Host "== AO-RESUME: pull --rebase succeeded; pushing... ==" -ForegroundColor Cyan
     $savedEAP7 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-    & git -C $Root push 2>&1 | Out-Host
+    Invoke-WithUtf8Console { & git -C $Root push 2>&1 } | Out-Host
     $pushExit2 = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
     $ErrorActionPreference = $savedEAP7
     if ($pushExit2 -ne 0) {
@@ -238,7 +238,7 @@ function Invoke-FullMainlineAlignWithAutoCheckpoint {
     }
 
     $statusShort = @(
-        git -C $Root status --short 2>$null |
+        Invoke-WithUtf8Console { git -C $Root status --short 2>$null } |
         Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
     )
     if ($statusShort.Count -eq 0) {
@@ -248,7 +248,7 @@ function Invoke-FullMainlineAlignWithAutoCheckpoint {
         # a phantom exit-1 that would skip all downstream AO-RESUME steps.
         $aheadCount = 0
         try {
-            $aStr = (& git -C $Root rev-list --count "origin/main..HEAD" 2>$null | Select-Object -Last 1)
+            $aStr = (Invoke-WithUtf8Console { & git -C $Root rev-list --count "origin/main..HEAD" 2>$null } | Select-Object -Last 1)
             if ($aStr -match '^\s*(\d+)\s*$') { $aheadCount = [int]$Matches[1] }
         } catch { }
         if ($aheadCount -gt 0) {
@@ -264,7 +264,7 @@ function Invoke-FullMainlineAlignWithAutoCheckpoint {
                 $savedEAPPush1 = $ErrorActionPreference
                 $ErrorActionPreference = "Continue"
                 try {
-                    & git push 2>&1 | Out-Host
+                    Invoke-WithUtf8Console { & git push 2>&1 } | Out-Host
                     $pushExit = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
                 } finally { $ErrorActionPreference = $savedEAPPush1 }
             } finally { Pop-Location }
@@ -298,13 +298,13 @@ function Invoke-FullMainlineAlignWithAutoCheckpoint {
     Write-Host "== AO-RESUME: git push (publish checkpoint before align reset; avoids orphan local-only commits) ==" -ForegroundColor Yellow
     Push-Location -LiteralPath $Root
     try {
-        $null = git rev-parse --git-dir 2>$null
+        $null = Invoke-WithUtf8Console { git rev-parse --git-dir 2>$null }
         if ($LASTEXITCODE -eq 0) {
             # Local Continue: see L125 above for full rationale (git push stderr vs strict mode).
             $savedEAPPush2 = $ErrorActionPreference
             $ErrorActionPreference = "Continue"
             try {
-                & git push 2>&1 | Out-Host
+                Invoke-WithUtf8Console { & git push 2>&1 } | Out-Host
                 $pushExit = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
             } finally { $ErrorActionPreference = $savedEAPPush2 }
             if ($pushExit -ne 0) {
@@ -376,7 +376,7 @@ if ($FullMainlineParity) {
             # NativeCommandError — and this is try/FINALLY (no catch), so it would propagate
             # and abort AO-RESUME before git-align even runs.
             $savedEAPRefresh = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-            try { & git update-index --really-refresh 2>&1 | Out-Null }
+            try { Invoke-WithUtf8Console { & git update-index --really-refresh 2>&1 } | Out-Null }
             finally { $ErrorActionPreference = $savedEAPRefresh }
         } finally { Pop-Location }
 

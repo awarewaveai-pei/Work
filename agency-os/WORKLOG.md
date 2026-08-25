@@ -112,6 +112,85 @@ job task-mt87cnhq-4oqkk0 → failed
 
 [rollback]
 `git revert` 本 commit 即可：manifest 少兩條宣告、兩支 `.mjs` 消失、sanitize 回到自帶三個 writer 的版本。回復後需手動再跑一次 `sync-claude-userlevel.ps1 -Mode merge` 把 user-level 檔壓回宣告狀態。
+### AUTO_TASK_DONE: CP950 capture-trap class —— 從 ao-resume 的 17 行追到兩個被靜默解除的 AO-CLOSE 閘
+
+[任務]
+`audit-cp950-traps.ps1` 對 `scripts/ao-resume.ps1` 回報 drift=17。同日稍早的 MCP 所有權那則 WORKLOG（該則 [驗證結果] 段的 `audit-cp950-traps` 行：「`ao-resume.ps1` 有 drift=17，經比對 `git show HEAD:` 全部既存」）已確認與當時工作無關，並開了背景任務 `task_b82a2211` 追蹤。本則結掉它。（**刻意不用行號自指** —— 同日另有並行 session 在寫本檔，行號合併後必然位移。）
+（`task_b82a2211` 的 chip 建於前一個 session，`dismiss_task` 回「id 不跨重啟保存」，無法機械撤銷 —— 以本條目為結案紀錄。）
+
+[根因分級 —— 三層，不是一層]
+zh-TW Windows 的 `[Console]::OutputEncoding` 預設 CP950。PowerShell 捕捉原生指令 stdout 時用它解碼，UTF-8 多位元組序列被當 Big5 解 → ① CJK 變亂碼 ② **吞掉換行，兩行併成一行**（②才是真正會改變程式行為的那個，也是 2026-05-22 `backfill-missed-daily.ps1` 的原始爆點）。
+
+本次實測到的三層：
+
+| 層 | 檔案 | 捕的是什麼 | 壞掉會怎樣 |
+|---|---|---|---|
+| 呼叫端 | `ao-resume.ps1` 17 處 | rebase 衝突檔路徑 | `git checkout --theirs -- <亂碼>` 失敗 → auto-rebase 放棄 |
+| **SSOT lib** | `lib/git-safe-ops.ps1` 4 處 | 所有經 `Invoke-SafeGit*` 的輸出 | 全 repo「照規矩走 lib」的呼叫端都拿不到編碼保護 |
+| **安全閘** | `ao-close.ps1` `:216` / 4×`$branch` | commit subject、branch 名 | **AO-CLOSE 的 `-AllowAheadCommits` 閘被繞過** |
+
+[不變量 —— R0 補丁判準要求先回答再動手]
+**本 repo 任何 PowerShell 對原生 `git` 的呼叫，都必須同時滿足 (a) UTF-8 console 解碼、(b) EAP=Continue 不被 git 正常 stderr 炸掉，且 `$LASTEXITCODE` 保留。**
+
+兩個 footgun、兩支 linter（`audit-cp950-traps.ps1` / `lint-git-eap-safety.ps1`）、但只有一個 SSOT library —— 而 `lib/git-safe-ops.ps1` 只解決了 (b)。**只包 ao-resume 的 17 行 = 只關掉眼前的實例**：下一個「照文件走 lib」的呼叫端仍會拿到半套保護，而且該 lib 從未被登錄進 AUDIT_REGISTRY 的 backlog 表（2026-05-30 才建立，晚於該表）。所以 lib 一起修，這才是關掉整類。
+
+[已修改]
+1. `scripts/ao-resume.ps1` —— 17 個 capture site 包 `Invoke-WithUtf8Console`。helper 早在 `:36` 就 dot-source 了，裸的只有 call site。**17 增 17 刪，行數不變（1248 CRLF 前後相同）**，控制流／EAP save-restore／`Out-Host`/`Out-Null`／exit code 處理全數原樣。
+2. `scripts/lib/git-safe-ops.ps1` —— 新增 helper dot-source + `Invoke-SafeGitFetch`/`Push`/`Capture` 共 4 處包裹。5 個 dot-source 呼叫端全部已自帶 `Set-StrictMode -Version Latest`（逐檔確認），故注入的 StrictMode 零行為變化。**該檔無 BOM，新增內容一律純 ASCII**（腳本內建斷言：非 ASCII 行數前後皆 8）。
+3. `scripts/ao-close.ps1` —— 新增**無條件** helper dot-source（下方既有的 git-safe-ops dot-source 帶 `Test-Path` 守衛，靠它遞移載入等於「lib 不見時 `Invoke-WithUtf8Console` 剛好也不見」）+ 6 處包裹（行號皆為改後現值）：`:216` 的 commit-subject 捕捉、`$branch` 四處（`:152` `:253` `:390` `:683`）、`:605` 的 staged-path 捕捉（後者另加 `-c core.quotepath=false`，理由見下方不變量分析）。
+   - **操作者授權的是 `:147` + `:203`（授權當下的行號，現為 `:152` / `:216`），我做了 6 處**：`$branch` 那行在檔內有四個一模一樣的兄弟，只包其中一個、留三個不動，正是 R0 補丁判準禁止的樣態。同一機械動作、零控制流改動，逐處在 [驗證結果] 有據。若不同意，回退這兩行即可。
+   - `:216` 上方留了 8 行註解說明「這個包裹是載重的、不是美化」，含重現數據 —— 下一個讀到的人不會誤以為可以拿掉。
+4. `agency-os/docs/operations/AUDIT_REGISTRY.md` —— ao-resume 由 🟡 TRACKED → 🔴 FIXED；補登 `lib/git-safe-ops.ps1`（原本從未入帳）；ao-close 由 22 改 18 並**訂正其風險說明**；backlog 總數 117 → 85；TOOL 段補記 lib 現已同時滿足兩個不變量。
+5. `agency-os/TASKS.md` —— 開 `ao-close.ps1` 剩餘 18 個 site 逐點判讀項（附判準）。
+
+[驗證結果]
+- **實測 0（trap 真實性，先證明再修）**：本機 `[Console]::OutputEncoding = big5`。fixture repo 設 `core.quotePath=false`，CJK 檔名經 `git diff --cached --name-only`：wrapped 得 `U+6E2C 8A66 002D…`（正確），bare 得 `U+769C 7948 5CAB 002D…` —— **2 個字變 3 個字**，是 byte 層損毀不是顯示問題。pattern-test 9/9 PASS（含 `$LASTEXITCODE` 傳遞、非零 exit、bare form、closure 抓 `$cf`、EAP=Stop 語意不變、caller encoding 還原）。
+- **實測 1（ao-resume，OLD vs NEW 對照）**：用 AST 從**實際檔案**抽出 `Invoke-NonFastForwardRecovery` 原始碼（不重寫），對 fixture repo 跑真實 rebase 衝突（CJK `-LATEST.md`、`core.quotePath=false`）。**OLD**：`git checkout --theirs failed for '測試-LATEST.md'` → 放棄 → rc=1 → **遠端 commit 從 log 消失**。**NEW**：auto-resolve → rebase 完成 → push → rc=0 → log 三筆齊全。
+  - 附帶觀察：OLD 那行在畫面上**看起來是正確的中文**（mojibake 來回往返假象），NEW 反而顯示成 `����`。字串對 → 顯示醜；字串壞 → 顯示「正常」。這正是這類 bug 難以目視發現的原因。
+- **實測 2（吞換行，機制層）**：222 個 CJK subject commit，bare capture 回 **196 行**（少 26 行），wrapped 回 222 行。
+- **實測 3（ao-close `:203` 閘 bypass，決定性）**：400 commit（200 human + 200 CJK-subject checkpoint，即本 repo 每天的真實形狀）。套用 `ao-close.ps1:205` 的**原始 regex**：bare → 377 行 / **human 177**；wrapped → 400 行 / **human 200**。**23 個 human commit 對閘完全隱形**。被吞的長相：`[claude] checkpoint: ?..........?docs: human work item 194`。若 ahead 全被這樣吞掉，`$humanCommits.Count -eq 0` → AO-CLOSE 帶著未發布人工工作放行。
+- **實測 4（ao-close `:147`，OLD vs NEW）**：AST 抽出實際 `Get-GitPreflightSnapshot`，對非 ASCII branch 名跑。**OLD**：`Branch` 錯（2 字變 3 字）、`RemoteFound=False` → **整個 ahead/behind preflight 區塊（含 `:203` 的閘）被跳過**。**NEW**：`Branch` 正確、`RemoteFound=True`。
+- **實測 5（零回歸）**：`git-safe-ops.ps1 -SelfTest` **12/12**（T5 證明 `@GitArgs` splat 在新 scriptblock 內正常）；`test-git-safe-ops-matrix.ps1` **T1–T8 8/8**；三檔 `Parser::ParseFile` 各 0 error；`ao-resume.ps1` 以 `-File` 實跑至 `:337` 守衛正常退出（證明 param binding + `:36` dot-source + 全檔函式定義在真實 `powershell -File` 下可載入）；`lint-git-eap-safety` 前後皆 **133 檔 / 21 sites / 0 violations**。
+- **audit 前後**：`ao-resume.ps1` 17→**0**；`lib/git-safe-ops.ps1` 4→**0**；`ao-close.ps1` 23→**17**；repo-wide **111→84**（scanned=167, clean=143）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/audit-cp950-traps.ps1 (+ lib/git-safe-ops.ps1 -SelfTest, test-git-safe-ops-matrix.ps1, lint-git-eap-safety.ps1, AST-extracted Invoke-NonFastForwardRecovery / Get-GitPreflightSnapshot OLD-vs-NEW on fixture repos) | exit=0 | ms=~180000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n
+  - external oracle = Codex CLI（`codex-oracle.ps1 -Mode review`），三輪，artifacts 在 `agency-os/reports/oracle/`：
+    | 輪 | artifact | 對改動本身 | 對「同類還有哪裡沒堵到」 |
+    |---|---|---|---|
+    | 1（ao-resume + lib） | `2026-08-25-review-eb2e0466.md` | **0 finding** | 2 CONFIRMED → `ao-close.ps1:203` / `:147`（當時行號，現 `:216` / `:152`） |
+    | 2（三檔） | `2026-08-25-review-59a81b5e.md` | **0 finding** | 1 PLAUSIBLE → 宣稱 `ao-close.ps1:598` |
+    | 3（三檔最終態，並要求它推翻我的 17 項分類） | `2026-08-25-review-1706ab36.md` | **0 finding** | **NO FINDINGS** — 分類未被推翻 |
+  - **三輪都沒對我的改動本身提出任何 finding**；rounds 1–2 的 3 條全部是「這一類還有哪裡沒堵到」，且全部已處置（2 條重現後修好、1 條驗證為不可達仍加固）。round 3 的 prompt 明確要求它**推翻**我對剩餘 17 個 site 的分類，回 NO FINDINGS。verdict=pass 指的是最終狀態，過程中提出的 findings 見上表。
+  - **逐條驗證（AGENTS.md 禁止直接採用）**：round 1 兩條 file:line 屬實 → 各寫重現腳本（實測 3 / 實測 4）確認可達後才動手。round 2 那條 **file:line 錯了** —— `:598` 是 `$patch = (Invoke-SafeGitCapture ...)`，早已受保護；它描述的 staged-path 捕捉實際在 `:590`。substance 對、行號差 8（Codex 讀的是改到一半的工作樹；兩者現為 `:613` / `:605`）。**而且驗證後判定不可達**（見下方不變量分析），仍改但在程式碼註解裡明寫「這是 hardening 不是修 bug」。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp | grep=Invoke-WithUtf8Console|Invoke-SafeGitCapture|core.quotepath|task_b82a2211 | hits=4
+  - **`core.quotepath` 命中 3 處，推翻了 registry 的原始風險判斷**：`codex-oracle.ps1:93`、`verify-closeout-completeness.ps1:61`、`:349` 都**刻意**傳 `-c core.quotepath=false`。registry 說 ao-resume 那 17 個「捕的是 ASCII 路徑所以 Low」，那層保護其實只是 `core.quotePath` 的預設值 `true` —— 沒有任何人擁有那個 config，而 repo 自己在三個地方主動關掉它。**Low 的前提是借來的，不是設計出來的。**
+  - `task_b82a2211` 命中 4 個檔（`CONVERSATION_MEMORY.md:595`、`memory/daily/2026-08-24.md:21`、`reports/ao-close/2026-08-24-2014.md:24`、`reports/status/integrated-status-LATEST.md:243`）。前三者是**有日期的歷史紀錄／archive**，不改寫（`reports/ao-close` 那筆自己標了 `archive-only`）；`integrated-status-LATEST.md` 是 `generate-integrated-status-report.ps1` 的產出，下次重跑自然更新，手改會被覆蓋。
+  - `Invoke-WithUtf8Console` 全 repo 呼叫端逐一看過，無因本次改動而失效者；`test-git-safe-ops-matrix.ps1:33` 仍被 audit 標記為 unprotected —— **刻意保留**，該檔 `:23-25` 自己寫明「刻意不走 lib，因為 lib 正是本檔要測的對象」。
+
+[不變量分析（AGENTS.md 強制：同一 reviewer 對同一段程式碼連續回報 ≥2 次，第 3 次修正前必須先做，禁止用「範圍夠小」跳過）]
+Codex 對 `ao-close.ps1` 連續兩輪回報（round 1 的 `:203`/`:147`，round 2 的 staged-path）。依規則，第三次不得再逐點修。
+
+**這一類問題的完整不變量**：`ao-close.ps1` 中每一個原生 git 捕捉，只要其**值**（非僅 exit code）流入任何 gate／條件／迴圈／寫入，就必須在 UTF-8 console 下解碼；只進 `Out-Host`/`Out-Null` 純顯示者可留白，但必須逐一登錄理由。
+
+所以不再猜下一個實例在哪，直接把**全部 18 個**殘餘 site 連同消費端一次分類：
+
+| 類別 | 數 | 行 | 判定 |
+|---|---|---|---|
+| 只取 `$LASTEXITCODE` / `Out-Null` / 純顯示 | 12 | 131, 145, 159, 259, 371, 382, 393, 578, 584, 671, 673, 690 | 值不進決策，留白 |
+| 餵決策，但捕獲值結構上必為 ASCII | 5 | 162, 395（`rev-list --count`＝純數字）／172（`status --porcelain` 只用 `.Count -gt 0`，併行只會 N→N-1，非空永不歸零）／266（`%h` 短 hash）／**318**（`--grep="chore: AO-CLOSE sync"` 把 subject 釘成 ASCII，且 `-1` 只回一行、無鄰居可併） | 留白，理由入 registry |
+| 餵決策**且**捕獲非 ASCII | 1 | **605** | 已包裹 |
+
+**`:318` 值得特別記一筆**：它跟已證實有問題的 `:216` 是同一支 `git log --pretty=format:"%s"`，我原本判它同型。逐項驗證後**不是** —— `--grep` 把 subject 釘死成 ASCII、`-1` 讓吞換行無對象可吞。「長得像」不等於「是」，這兩個方向都要驗。
+
+**`:605` 的結論是「不可達」，不是「已修好一個漏洞」**：`git diff --cached --name-only` 依 index 順序（path bytes 排序）輸出，ASCII 敏感路徑（`.claude/` = 0x2E、`mcp-local-wrappers/` = 0x6D）永遠排在非 ASCII（0xE4+）之前，不可能成為被吸走的尾巴；CJK 目錄下的敏感檔被併行時，`.claude` 前面那個 `/` 仍在，`\.credentials\.json$` 也仍錨在合併字串尾端。實測（303 個 staged 檔、3 個敏感、`core.quotePath=false`、big5 console）：bare 與 wrapped 都命中 3/3。仍然改的兩個理由寫在程式碼註解裡（拔掉對無人擁有的 `core.quotePath` 的依賴；與兄弟閘 `verify-closeout-completeness.ps1:61` 對齊）。
+
+**這一類在 `ao-close.ps1` 已關閉**：不是「還沒被發現的實例變少」，而是 18 個全部有具名消費端與判定。下一輪 oracle 若再報這個檔，應該是我的分類錯了，而不是又多一個實例 —— 那是可證偽的宣稱，這正是重點。
+
+[剩餘風險]
+- `ao-close.ps1` 尚有 17 個未包裹 site，但**已全部分類**（見上表），非未知 backlog。今天證明了 registry 原本「其餘 21 個是 ASCII metadata」這種籠統判斷會漏掉閘級 bug —— 訂正後的 registry 逐項寫明消費端。
+- `lib/git-safe-ops.ps1` **無 BOM 且含 8 行非 ASCII**（註解裡的 `—` / `→`）。目前 `audit-cp950-traps` 的 parse-break 檢查判定安全，但這是 `playwright-runner.ps1`（2026-05-30）與 `rebuild-content-studio-4cards.ps1`（今日 TASKS）同一個 subclass 的潛在對象。本次未動，新增內容全程保持 ASCII 以免惡化。
+- 非 ASCII **branch 名**作為 git **引數**傳遞（`Invoke-SafeGitPush -Branch`）走的是 arg encoding 而非 `[Console]::OutputEncoding`，不在本次修正範圍。實務上 repo 政策 main-only（`settings.json` deny 硬擋建 branch），故非活躍路徑。
+- 本次三檔皆為 AO 生命週期關鍵路徑。回退粒度為單檔：`git checkout HEAD -- <file>`，純疊加式包裹，無介面／schema 變更。
 
 ### AUTO_TASK_DONE: MCP 設定檔的「兩個腳本共同擁有一個檔案」—— 前一則 oracle FINDING 1/2 治本
 

@@ -42,6 +42,25 @@
 
 param([switch]$SelfTest)
 
+# CP950 protection. SSOT for the wrapper: scripts/_console-encoding-helpers.ps1.
+# Every git call in this file captures stdout. On a Big5 console [Console]::OutputEncoding
+# decodes those bytes as CP950, which mangles UTF-8: CJK turns to garbage AND a multi-byte
+# sequence can swallow a newline, silently merging two output lines into one (the original
+# 2026-05-22 backfill-missed-daily.ps1 break). The sharpest case here is ao-close.ps1's
+# `Invoke-SafeGitCapture @('diff','--cached','-U0')`, whose captured CJK diff content is
+# matched against `(?m)^\+<<<<<<< ` -- a merged line breaks that anchor, so a real conflict
+# marker would pass the AO-CLOSE gate unnoticed (detector silently disarmed).
+# This file is the documented SSOT for safe git invocation, so the wrapper belongs HERE:
+# every caller routed through Invoke-SafeGit* inherits the protection instead of each one
+# re-deriving it. Companion audit: scripts/audit-cp950-traps.ps1.
+# $PSScriptRoot is THIS file's directory (scripts/lib) even when dot-sourced by a caller in
+# scripts/ or hooks/ -- verified 2026-08-25. MyInvocation fallback mirrors audit-cp950-traps.ps1
+# for the piped / Invoke-Expression case where $PSScriptRoot is empty.
+$gsoLibDir = if ($PSScriptRoot) { $PSScriptRoot }
+             elseif ($MyInvocation.MyCommand.Path) { Split-Path -Parent $MyInvocation.MyCommand.Path }
+             else { (Get-Location).Path }
+. (Join-Path $gsoLibDir '..\_console-encoding-helpers.ps1')
+
 # ---------------------------------------------------------------------------
 # Write-GitNetworkLedger — ring-buffer JSON log (20 entries)
 # File: agency-os/.agency-state/git-network-last.json (gitignored, transient)
@@ -138,7 +157,7 @@ function Invoke-SafeGitFetch {
             $savedEAP = $ErrorActionPreference
             $ErrorActionPreference = 'Continue'
             try {
-                & git @gitArgs 2>&1 | Out-Host
+                Invoke-WithUtf8Console { & git @gitArgs 2>&1 } | Out-Host
                 $lastExit = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
             } finally {
                 $ErrorActionPreference = $savedEAP
@@ -194,7 +213,7 @@ function Invoke-SafeGitPush {
         Push-Location -LiteralPath $WorkRoot
         try {
             $savedEAP = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-            try { $Branch = (& git rev-parse --abbrev-ref HEAD 2>&1).Trim() }
+            try { $Branch = (Invoke-WithUtf8Console { & git rev-parse --abbrev-ref HEAD 2>&1 }).Trim() }
             finally { $ErrorActionPreference = $savedEAP }
         } finally { Pop-Location | Out-Null }
         if (-not $Branch -or $Branch -eq 'HEAD') {
@@ -210,7 +229,7 @@ function Invoke-SafeGitPush {
         $savedEAP = $ErrorActionPreference
         $ErrorActionPreference = 'Continue'
         try {
-            & git @gitArgs 2>&1 | Out-Host
+            Invoke-WithUtf8Console { & git @gitArgs 2>&1 } | Out-Host
             $pushExit = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
         } finally {
             $ErrorActionPreference = $savedEAP
@@ -262,7 +281,7 @@ function Invoke-SafeGitCapture {
         $savedEAP = $ErrorActionPreference
         $ErrorActionPreference = 'Continue'
         try {
-            $out  = & git @GitArgs 2>&1
+            $out  = Invoke-WithUtf8Console { & git @GitArgs 2>&1 }
             $code = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
         } finally {
             $ErrorActionPreference = $savedEAP
