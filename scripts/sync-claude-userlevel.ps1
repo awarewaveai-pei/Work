@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Sync Claude Code user-level files (hooks/, settings.json, mcp.json) from repo SSOT.
 
@@ -44,7 +44,11 @@ param(
   [ValidateSet('install','merge','verify','dry-run')]
   [string]$Mode = 'merge',
   [switch]$NoBackup,
-  [switch]$Strict
+  [switch]$Strict,
+  # Explicit repo root. Without it the root is discovered from the current directory, which
+  # is wrong when another script delegates here from outside the repo -- or, worse, silently
+  # resolves to a DIFFERENT repo when cwd happens to be inside one (codex FINDING 2).
+  [string]$MonorepoRootOverride = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -71,7 +75,14 @@ function Resolve-MonorepoRoot {
   throw "Cannot locate monorepo root. Run from inside the repo, or set `$env:MONOREPO_ROOT."
 }
 
-$MonorepoRoot = Resolve-MonorepoRoot
+if (-not [string]::IsNullOrWhiteSpace($MonorepoRootOverride)) {
+  if (-not (Test-Path -LiteralPath $MonorepoRootOverride)) {
+    throw "MonorepoRootOverride does not exist: $MonorepoRootOverride"
+  }
+  $MonorepoRoot = $MonorepoRootOverride.TrimEnd('')
+} else {
+  $MonorepoRoot = Resolve-MonorepoRoot
+}
 $UserProfile = $env:USERPROFILE
 $ClaudeRoot = Join-Path $UserProfile '.claude'
 $SsotRoot = Join-Path $MonorepoRoot 'mcp\claude-userlevel'
@@ -422,6 +433,145 @@ function Sync-Json-Replace($spec, [string]$mode) {
   Write-Host "  -> mcp.json normalized to {} (project .mcp.json is real SSOT)" -ForegroundColor Green
 }
 
+# ---------- Helper-status contract ----------
+# Both Node-backed handlers below report a status token rather than a bare count, because
+# "nothing found" and "could not tell" must never look alike. Anything that is not an
+# established end state fails the sync -- a detector that goes quiet must not be able to
+# masquerade as a clean bill of health (2026-08-25 codex FINDING 1/3).
+#
+#   clean    - verified: nothing to do
+#   repaired - drift found and fixed
+#   drift    - drift found, not written (expected in verify / dry-run only)
+#   blocked  - could not determine, or could not repair what it found
+function Resolve-HelperStatus {
+  param(
+    [string[]]$HelperOutput,
+    [string]$Mode,
+    [string]$Label
+  )
+
+  $statusLine = @($HelperOutput) | Where-Object { $_ -match '^RESULT status=' } | Select-Object -Last 1
+  if (-not $statusLine) {
+    Write-Host "  WARN: $Label produced no RESULT line -- treating as blocked" -ForegroundColor Yellow
+    return 'blocked'
+  }
+  if ($statusLine -notmatch 'status=(\w+)') { return 'blocked' }
+  $status = $Matches[1]
+
+  # In a writing mode, 'drift' means the helper saw work it was supposed to do and did not
+  # do it. That is a failure, not a report.
+  if ($status -eq 'drift' -and ($Mode -eq 'merge' -or $Mode -eq 'install')) {
+    Write-Host "  WARN: $Label found drift but did not repair it in mode=$Mode" -ForegroundColor Yellow
+    return 'blocked'
+  }
+  return $status
+}
+
+# ---------- JSON PRUNE-DUPLICATE (user-level Cursor MCP) ----------
+# Governs a file that must NOT simply be replaced. Cursor merges the project
+# .cursor/mcp.json with this user-level file, so a key present in both launches
+# twice; but a key present ONLY here is the documented escape hatch for an MCP
+# that must never enter the repo (mcp-add-server-quickstart.md). So: remove the
+# colliding keys, keep the rest.
+#
+# The comparison and the write both live in the Node helper, for two reasons:
+# PowerShell 5.1 ConvertTo-Json flattens 1-element arrays into objects, which
+# would silently corrupt an MCP whose `args` has one element; and splitting
+# "detect" from "write" across two languages would mean two definitions of
+# "duplicate" that can drift apart.
+function Sync-Json-PruneDuplicate($spec, [string]$mode) {
+  $tgt = Expand-Vars $spec.target
+  $cmp = Expand-Vars $spec.compareAgainst
+  $collection = [string]$spec.collection
+  if ([string]::IsNullOrWhiteSpace($collection)) { $collection = 'mcpServers' }
+
+  Write-Host "[cursor-mcp] target=$tgt" -ForegroundColor Yellow
+  Write-Host "  compare: $cmp"
+
+  if (-not (Test-Path $cmp)) {
+    Write-Host "  SKIP: compare file missing -- run scripts\sync-mcp-config.ps1 first" -ForegroundColor Magenta
+    return
+  }
+
+  $helper = Join-Path $MonorepoRoot 'scripts\prune-duplicate-mcp-servers.mjs'
+  if (-not (Test-Path $helper)) {
+    Write-Host "  WARN: helper missing at $helper -- cannot evaluate duplicates" -ForegroundColor Yellow
+    if ($mode -eq 'verify') { $script:exitCode = 1 }
+    return
+  }
+
+  # 'install' behaves like 'merge' here, matching the other handlers.
+  $effectiveMode = if ($mode -eq 'install') { 'merge' } else { $mode }
+  if ($effectiveMode -eq 'merge') { Backup-Path $tgt 'cursor-mcp.json.before' }
+
+  $helperOut = Invoke-WithUtf8Console { & node $helper --target $tgt --compare $cmp --collection $collection --mode $effectiveMode 2>&1 }
+  $helperExit = $LASTEXITCODE
+  foreach ($line in @($helperOut)) { Write-Host "  $line" }
+
+  if ($helperExit -ne 0) {
+    Write-Host "  WARN: prune helper exited $helperExit -- duplicates NOT evaluated" -ForegroundColor Yellow
+    # A helper that could not run must never read as "clean": that is the
+    # detector-goes-quiet failure this file is here to prevent.
+    $script:exitCode = 1
+    return
+  }
+
+  $status = Resolve-HelperStatus -HelperOutput @($helperOut) -Mode $effectiveMode -Label 'prune helper'
+  $driftLabel3 = if ($status -eq 'clean') {'no'} else {'YES'}
+  Write-Host ("  drift: {0} (status={1})" -f $driftLabel3, $status)
+
+  if ($status -eq 'blocked') { $script:exitCode = 1; return }
+  if ($status -eq 'drift') { $script:exitCode = 1; return }
+  if ($status -eq 'repaired') {
+    Write-Host "  -> user-level Cursor MCP pruned (restart Cursor to drop the duplicate processes)" -ForegroundColor Green
+  }
+}
+
+# ---------- JSON CLEAR-COLLECTIONS (~/.claude.json project MCP drift) ----------
+# Empties named collections inside every projects["<cwd>"] entry. Delegated to Node
+# for two reasons specific to this file, both of which silently defeated the previous
+# PowerShell implementation: ConvertFrom-Json throws on Claude Code's case-variant
+# project keys ('C:/WINDOWS/system32' vs '.../System32') because PSCustomObject
+# property names are case-insensitive, `-AsHashtable` does not exist on PS 5.1, and
+# ConvertTo-Json would flatten 1-element arrays across the operator's entire Claude
+# state on write.
+function Sync-Json-ClearCollections($spec, [string]$mode) {
+  $tgt = Expand-Vars $spec.target
+  $collections = @($spec.collections) -join ','
+  if ([string]::IsNullOrWhiteSpace($collections)) { $collections = 'mcpServers' }
+
+  Write-Host "[claude-user-json] target=$tgt" -ForegroundColor Yellow
+  Write-Host "  collections: $collections"
+
+  $helper = Join-Path $MonorepoRoot 'scripts\clear-claude-project-mcp.mjs'
+  if (-not (Test-Path $helper)) {
+    Write-Host "  WARN: helper missing at $helper -- cannot evaluate drift" -ForegroundColor Yellow
+    if ($mode -eq 'verify') { $script:exitCode = 1 }
+    return
+  }
+
+  $effectiveMode = if ($mode -eq 'install') { 'merge' } else { $mode }
+  if ($effectiveMode -eq 'merge') { Backup-Path $tgt 'claude.json.before' }
+
+  $helperOut = Invoke-WithUtf8Console { & node $helper --target $tgt --collections $collections --mode $effectiveMode 2>&1 }
+  $helperExit = $LASTEXITCODE
+  foreach ($line in @($helperOut)) { Write-Host "  $line" }
+
+  if ($helperExit -ne 0) {
+    Write-Host "  WARN: clear helper exited $helperExit -- drift NOT evaluated" -ForegroundColor Yellow
+    $script:exitCode = 1
+    return
+  }
+
+  $status = Resolve-HelperStatus -HelperOutput @($helperOut) -Mode $effectiveMode -Label 'clear helper'
+  $driftLabel4 = if ($status -eq 'clean') {'no'} else {'YES'}
+  Write-Host ("  drift: {0} (status={1})" -f $driftLabel4, $status)
+
+  # 'blocked' in merge covers the anti-clobber guard refusing to write: drift was detected
+  # and NOT repaired, so this run must not report success (codex FINDING 1).
+  if ($status -eq 'blocked' -or $status -eq 'drift') { $script:exitCode = 1 }
+}
+
 # ---------- Dispatch by manifest ----------
 foreach ($name in $manifest.files.PSObject.Properties.Name) {
   $spec = $manifest.files.$name
@@ -431,6 +581,8 @@ foreach ($name in $manifest.files.PSObject.Properties.Name) {
     'directory'    { Sync-Directory-Mirror $spec $Mode $name }
     'merge-json'   { Sync-Json-Merge $spec $Mode }
     'replace-json' { Sync-Json-Replace $spec $Mode }
+    'prune-duplicate-json' { Sync-Json-PruneDuplicate $spec $Mode }
+    'clear-collections-json' { Sync-Json-ClearCollections $spec $Mode }
     default        { Write-Host "  SKIP unknown type: $($spec.type)" -ForegroundColor Magenta }
   }
 }

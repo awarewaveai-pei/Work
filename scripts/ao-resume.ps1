@@ -453,9 +453,10 @@ if (-not $SkipOpenTasksList -and (Test-Path -LiteralPath $openTasksScript)) {
 # .claude/mcp.json (= ~/.claude/mcp.json via junction), undoing the normalization; merge running
 # after was what kept the file at {} before the H2 verify gate. sync-mcp-config no longer writes
 # that file at all (duplicate ownership removed), so this ordering is no longer load-bearing.
-# NOTE: sanitize-user-mcp-config.ps1 is still a writer of ~/.claude/mcp.json and writes a
-# NON-empty two-server fallback -- it is not part of this flow, but running it by hand will
-# reintroduce drift until the next merge. See TASKS.md 2026-08-25.
+# sync-claude-userlevel.ps1 is now the ONLY writer of every governed user-level config
+# (~/.claude/mcp.json, ~/.cursor/mcp.json, ~/.claude.json), per mcp/claude-userlevel/manifest.json.
+# sanitize-user-mcp-config.ps1 backs those files up and delegates here rather than rewriting them,
+# so running it by hand can no longer reintroduce drift.
 $mcpSyncScript = Join-Path $WorkRoot "scripts\sync-mcp-config.ps1"
 if (Test-Path -LiteralPath $mcpSyncScript) {
     Write-Host ""

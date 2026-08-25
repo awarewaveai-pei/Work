@@ -1,4 +1,4 @@
-# scripts/
+﻿# scripts/
 
 All scripts live in this flat directory. Paths are hard-coded as `scripts\<name>.ps1` across the codebase — do not move files into subdirectories without updating every `Join-Path` reference.
 
@@ -56,7 +56,7 @@ All scripts live in this flat directory. Paths are hard-coded as `scripts\<name>
 | `sync-claude-userlevel.ps1` | Sync `mcp/claude-userlevel/` SSOT → `~/.claude/{hooks,settings.json,mcp.json}` (modes: install/merge/verify/dry-run) |
 | `apply-shared-ai-governance.ps1` | One-shot: MCP sync + closeout inbox seed + bootstrap prompts |
 | `verify-shared-ai-governance.ps1` | Verify MCP governance state |
-| `sanitize-user-mcp-config.ps1` | Remove plaintext secrets from user-level MCP files |
+| `sanitize-user-mcp-config.ps1` | Back up user-level MCP files, then delegate the rewrite to `sync-claude-userlevel.ps1` (the single writer) |
 | `patch-codex-user-mcp-config.ps1` | Patch Codex user MCP config |
 | `patch-cursor-user-mcp-workspace.ps1` | Patch Cursor workspace MCP |
 | `repair-user-mcp-json-escapes.ps1` | Fix malformed JSON escapes in MCP files |

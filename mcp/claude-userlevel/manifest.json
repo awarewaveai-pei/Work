@@ -1,5 +1,5 @@
 {
-  "_comment": "Manifest for cross-machine Claude Code user-level alignment. Defines what files in ~/.claude/ are governed by this SSOT. scripts/sync-claude-userlevel.ps1 reads this. Edit this file to add/remove governed files.",
+  "_comment": "Manifest for cross-machine user-level AI-client alignment. Declares WHICH user-level config files are governed and WHAT each must contain. scripts/sync-claude-userlevel.ps1 is the only writer; it reads this file and dispatches by type. Scope is deliberately NOT limited to ~/.claude/ -- any user-level config an AI client actually loads belongs here, because an ungoverned file is one no script can be held to. No other script may write a path declared here: a second writer carrying its own opinion is exactly the duplicate-ownership bug fixed 2026-08-25 (see WORKLOG). Edit this file to add/remove governed files.",
   "version": "1.0.0",
   "userLevelRoot": "${USERPROFILE}\\.claude",
   "files": {
@@ -36,6 +36,25 @@
       "target": "${USERPROFILE}\\.claude\\mcp.json",
       "syncMode": "replace",
       "description": "Per CLAUDE.md, ~/.claude/mcp.json must be empty; project-scoped .mcp.json is the SSOT"
+    },
+    "cursor-mcp": {
+      "type": "prune-duplicate-json",
+      "compareAgainst": "${MONOREPO_ROOT}\\.cursor\\mcp.json",
+      "target": "${USERPROFILE}\\.cursor\\mcp.json",
+      "collection": "mcpServers",
+      "syncMode": "prune",
+      "description": "Cursor loads the project .cursor/mcp.json AND this user-level file, so a server named in both launches twice per window. Policy per mcp-add-server-quickstart.md: keep this file at {\"mcpServers\":{}} EXCEPT keys that do not collide with the project config -- those are the escape hatch for an MCP that must never enter the repo. Hence prune-duplicate, not replace: replacing would delete that escape hatch, which is why this file went ungoverned for so long."
+    },
+    "claude-user-json": {
+      "type": "clear-collections-json",
+      "target": "${USERPROFILE}\\.claude.json",
+      "collections": [
+        "mcpServers",
+        "enabledMcpjsonServers",
+        "disabledMcpjsonServers"
+      ],
+      "syncMode": "clear",
+      "description": "Claude Code keeps per-project MCP state here under projects[\"<cwd>\"]. This is the file Claude actually loads for local/project scope -- NOT the legacy ~/.claude/mcp.json above. Entries accumulate whenever claude is started from an unrelated directory and stack on top of the repo .mcp.json, which is the SSOT, so they are drift and get emptied. Handled by scripts/clear-claude-project-mcp.mjs because PowerShell cannot safely touch this file: ConvertFrom-Json throws on its case-variant project keys, -AsHashtable does not exist on PS 5.1, and ConvertTo-Json would flatten 1-element arrays across the operator entire Claude state."
     },
     "commands": {
       "type": "directory",

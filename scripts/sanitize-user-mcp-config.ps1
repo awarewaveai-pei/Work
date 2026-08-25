@@ -1,25 +1,58 @@
 ﻿<#
 .SYNOPSIS
-  Back up and sanitize user-level Cursor / Claude MCP config files.
+  Back up user-level MCP config files that may hold plaintext secrets, then hand them
+  to their single governed writer.
 
 .DESCRIPTION
-  Creates uniquely named backups, then:
+  This script does exactly two things:
 
-  - rewrites %USERPROFILE%\.cursor\mcp.json to an env-based form derived from
-    repo-root .mcp.json
-  - rewrites %USERPROFILE%\.claude\mcp.json to a minimal non-secret fallback
-  - clears project-level mcpServers entries from %USERPROFILE%\.claude.json so
-    repo-root .mcp.json becomes the project source of truth
+    1. Takes uniquely named, timestamped backups of the user-level files that
+       historically carried plaintext tokens:
+         %USERPROFILE%\.cursor\mcp.json
+         %USERPROFILE%\.claude\mcp.json
+         %USERPROFILE%\.claude.json
 
-  This script never writes secrets into repo-tracked files. Use -WhatIf to
-  preview backup and target paths before making changes.
+    2. Delegates the actual rewrite to scripts/sync-claude-userlevel.ps1, which is the
+       ONLY writer for all three. What each file must contain is declared in
+       mcp/claude-userlevel/manifest.json, not decided here.
+
+  It deliberately does NOT rewrite those files itself.
+
+  Until 2026-08-25 it did, carrying its own hardcoded idea of what each should hold --
+  making it the second and third writer of files the manifest already governed, with a
+  contradictory intent. That produced three failures, all invisible until an external
+  review went looking:
+
+    - It wrote a two-server fallback into ~/.claude/mcp.json, which CLAUDE.md requires
+      to be {}. Every run therefore left drift that check-claude-sync.ps1 H2 would then
+      flag, and whichever of the two scripts ran last decided the outcome.
+    - That fallback hardcoded C:\Users\USER\Work\scripts\start-trigger-mcp.ps1, so on
+      any machine whose repo lives elsewhere the trigger MCP could not start. The bug
+      was masked for months because sync-mcp-config.ps1 happened to overwrite the file
+      afterwards.
+    - It copied the repo .mcp.json into ~/.cursor/mcp.json, recreating precisely the
+      duplicate-server state that mcp-add-server-quickstart.md tells operators to avoid
+      -- Cursor loads both files, so every duplicated server launched twice.
+
+  The invariant this now respects: every user-level config an AI client actually loads
+  has exactly one repo-managed writer, and that writer derives its intent from the
+  manifest. A script with a private opinion about a governed file is the bug, however
+  reasonable the opinion. See WORKLOG 2026-08-25.
+
+.PARAMETER WorkspaceRoot
+  Monorepo root. Defaults to the parent of this script's directory.
+
+.PARAMETER BackupRoot
+  Where to place the timestamped backup directory. Defaults to <WorkspaceRoot>\Backups.
+
+.PARAMETER SkipDelegate
+  Take the backups but do not invoke sync-claude-userlevel.ps1. For the case where you
+  want a restore point before running the sync yourself.
 #>
 param(
     [string]$WorkspaceRoot = "",
     [string]$BackupRoot = "",
-    [switch]$SkipCursor,
-    [switch]$SkipClaudeLegacy,
-    [switch]$SkipClaudeUserJson
+    [switch]$SkipDelegate
 )
 
 Set-StrictMode -Version Latest
@@ -36,25 +69,11 @@ if ([string]::IsNullOrWhiteSpace($BackupRoot)) {
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $backupDir = Join-Path $BackupRoot ("mcp-sanitize-" + $timestamp)
 
+# The paths are listed here only so they can be backed up. Their required CONTENT is
+# declared in mcp/claude-userlevel/manifest.json -- do not encode expectations here.
 $cursorPath = Join-Path $env:USERPROFILE ".cursor\mcp.json"
 $claudeLegacyPath = Join-Path $env:USERPROFILE ".claude\mcp.json"
 $claudeJsonPath = Join-Path $env:USERPROFILE ".claude.json"
-$workspaceMcpPath = Join-Path $WorkspaceRoot ".mcp.json"
-
-function Write-Utf8NoBomFile {
-    param(
-        [string]$Path,
-        [string]$Content
-    )
-
-    $parent = Split-Path -Parent $Path
-    if (-not (Test-Path -LiteralPath $parent)) {
-        New-Item -ItemType Directory -Path $parent -Force | Out-Null
-    }
-
-    $encoding = New-Object System.Text.UTF8Encoding $false
-    [System.IO.File]::WriteAllText($Path, $Content, $encoding)
-}
 
 function Backup-FileUnique {
     param(
@@ -83,82 +102,6 @@ function Backup-FileUnique {
     return $targetPath
 }
 
-function Get-SanitizedCursorConfig {
-    param([string]$SharedWorkspaceMcpPath)
-
-    if (-not (Test-Path -LiteralPath $SharedWorkspaceMcpPath)) {
-        throw "Workspace MCP file not found: $SharedWorkspaceMcpPath"
-    }
-
-    $shared = Get-Content -LiteralPath $SharedWorkspaceMcpPath -Raw -Encoding UTF8
-    $shared = $shared -replace '\$\{([A-Z_][A-Z0-9_]*)\}', '${env:$1}'
-    $shared = $shared -replace [regex]::Escape('"' + $WorkspaceRoot.Replace('\', '\\') + '"'), '"${workspaceFolder}"'
-    $shared = $shared -replace [regex]::Escape('"' + $env:USERPROFILE.Replace('\', '\\') + '"'), '"${userHome}"'
-    return $shared
-}
-
-function Get-SanitizedClaudeLegacyConfig {
-    return @'
-{
-  "mcpServers": {
-    "copilot": {
-      "type": "http",
-      "url": "https://api.githubcopilot.com/mcp",
-      "headers": {
-        "Authorization": "Bearer ${COPILOT_MCP_BEARER_TOKEN}"
-      }
-    },
-    "trigger": {
-      "command": "powershell",
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "C:\\Users\\USER\\Work\\scripts\\start-trigger-mcp.ps1",
-        "-ProjectRef",
-        "${TRIGGER_PROJECT_REF}"
-      ],
-      "env": {
-        "TRIGGER_API_URL": "${TRIGGER_API_URL}"
-      }
-    }
-  }
-}
-'@
-}
-
-function Clear-ClaudeProjectMcpEntries {
-    param([string]$ClaudeJsonPath)
-
-    if (-not (Test-Path -LiteralPath $ClaudeJsonPath)) {
-        return $false
-    }
-
-    $cfg = Get-Content -LiteralPath $ClaudeJsonPath -Raw -Encoding UTF8 | ConvertFrom-Json -AsHashtable
-    if (-not $cfg.ContainsKey("projects")) {
-        return $false
-    }
-
-    foreach ($key in @($cfg["projects"].Keys)) {
-        $project = $cfg["projects"][$key]
-        if ($project -is [hashtable]) {
-            if ($project.ContainsKey("mcpServers")) {
-                $project["mcpServers"] = @{}
-            }
-            if ($project.ContainsKey("enabledMcpjsonServers")) {
-                $project["enabledMcpjsonServers"] = @()
-            }
-            if ($project.ContainsKey("disabledMcpjsonServers")) {
-                $project["disabledMcpjsonServers"] = @()
-            }
-        }
-    }
-
-    Write-Utf8NoBomFile -Path $ClaudeJsonPath -Content ($cfg | ConvertTo-Json -Depth 100)
-    return $true
-}
-
 $backups = @()
 foreach ($path in @($cursorPath, $claudeLegacyPath, $claudeJsonPath)) {
     $backupPath = Backup-FileUnique -SourcePath $path -BackupDirectory $backupDir
@@ -167,29 +110,49 @@ foreach ($path in @($cursorPath, $claudeLegacyPath, $claudeJsonPath)) {
     }
 }
 
-if (-not $SkipCursor) {
-    $cursorSanitized = Get-SanitizedCursorConfig -SharedWorkspaceMcpPath $workspaceMcpPath
-    Write-Utf8NoBomFile -Path $cursorPath -Content $cursorSanitized
-}
-
-if (-not $SkipClaudeLegacy) {
-    Write-Utf8NoBomFile -Path $claudeLegacyPath -Content (Get-SanitizedClaudeLegacyConfig)
-}
-
-if (-not $SkipClaudeUserJson) {
-    $null = Clear-ClaudeProjectMcpEntries -ClaudeJsonPath $claudeJsonPath
-}
-
-Write-Host "User MCP sanitization complete." -ForegroundColor Green
-Write-Host "  backup dir      : $backupDir" -ForegroundColor Gray
-Write-Host "  cursor user mcp : $(if ($SkipCursor) { 'skipped' } else { $cursorPath })" -ForegroundColor Gray
-Write-Host "  claude legacy   : $(if ($SkipClaudeLegacy) { 'skipped' } else { $claudeLegacyPath })" -ForegroundColor Gray
-Write-Host "  claude user json: $(if ($SkipClaudeUserJson) { 'skipped' } else { $claudeJsonPath })" -ForegroundColor Gray
+Write-Host "User MCP backup complete." -ForegroundColor Green
+Write-Host "  backup dir : $backupDir" -ForegroundColor Gray
 
 if ($backups.Count -gt 0) {
     Write-Host ""
     Write-Host "Backups:" -ForegroundColor Cyan
     foreach ($backup in $backups) {
-        Write-Host "  - $backup" -ForegroundColor Cyan
+        Write-Host "  $backup" -ForegroundColor Gray
     }
+} else {
+    Write-Host "  (no user-level MCP files present to back up)" -ForegroundColor Gray
 }
+
+if ($SkipDelegate) {
+    Write-Host ""
+    Write-Host "-SkipDelegate given: not invoking sync-claude-userlevel.ps1." -ForegroundColor Yellow
+    Write-Host "Run it yourself to apply the manifest:" -ForegroundColor Yellow
+    Write-Host "  powershell -File .\scripts\sync-claude-userlevel.ps1 -Mode merge" -ForegroundColor Yellow
+    return
+}
+
+$userlevelSync = Join-Path $WorkspaceRoot "scripts\sync-claude-userlevel.ps1"
+if (-not (Test-Path -LiteralPath $userlevelSync)) {
+    throw "Single writer missing: $userlevelSync (git pull to restore it)"
+}
+
+Write-Host ""
+Write-Host "Delegating the rewrite to the single governed writer..." -ForegroundColor Cyan
+# Pass the repo root explicitly. The delegate otherwise discovers it from the current
+# directory, which is wrong when this script is invoked by absolute path from elsewhere --
+# and silently resolves to a DIFFERENT repo if cwd happens to sit inside one.
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $userlevelSync -Mode merge -MonorepoRootOverride $WorkspaceRoot
+$syncExit = $LASTEXITCODE
+$global:LASTEXITCODE = 0
+
+if ($syncExit -ne 0) {
+    Write-Host ""
+    Write-Host "FAIL: sync-claude-userlevel.ps1 exited $syncExit -- user-level files were NOT brought to the declared state." -ForegroundColor Red
+    Write-Host "      Backups above are your restore point. Re-run after fixing the cause." -ForegroundColor Yellow
+    # Exit non-zero. Reporting success here would tell the operator (and apply-shared-ai-governance.ps1,
+    # which invokes this via Invoke-CheckedScript) that plaintext/drift was cleaned when it was not.
+    exit 1
+}
+
+Write-Host ""
+Write-Host "Done. Fully exit and reopen Cursor / Claude Code so they reload their config." -ForegroundColor Green

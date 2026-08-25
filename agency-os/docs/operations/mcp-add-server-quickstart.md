@@ -1,4 +1,4 @@
-# MCP 新增快速手冊（常用）
+﻿# MCP 新增快速手冊（常用）
 
 > 用途：你每次要加新 MCP server 時，照這份做即可。  
 > 目標：新增快、可回復、不把機密留在 repo。
@@ -62,12 +62,20 @@ powershell -ExecutionPolicy Bypass -File .\scripts\sanitize-user-mcp-config.ps1
 
 此腳本會：
 
-1. 先把原檔備份到 `Backups/mcp-sanitize-<timestamp>/`
-2. 把 **Cursor** user-level MCP 改寫成 env 版
-3. 把 **Claude** legacy `~/.claude/mcp.json` 改成最小非明文 fallback
-4. 清掉 **`~/.claude.json`** 裡殘留的 project-level `mcpServers`，讓 repo 根 **`.mcp.json`** 成為專案真相
+1. 先把原檔備份到 `Backups/mcp-sanitize-<timestamp>/`（該目錄已在 `.gitignore`，不會進 git）
+2. 把改寫工作**交給唯一寫入者** `scripts/sync-claude-userlevel.ps1 -Mode merge`
+
+它**自己不改寫任何檔案**。三個檔各自該裝什麼，宣告在 `mcp/claude-userlevel/manifest.json`：
+
+| 檔案 | manifest 條目（型別） | 結果 |
+|---|---|---|
+| `~/.claude/mcp.json` | `mcp`（`replace-json`）| 正規化為 `{"mcpServers":{}}` |
+| `~/.cursor/mcp.json` | `cursor-mcp`（`prune-duplicate-json`）| 移除與專案檔**同名**的 server；**保留**不重複的鍵 —— 即上方 §路徑原則 的例外條款（某 MCP 絕不能進 repo 時的逃生門）|
+| `~/.claude.json` | `claude-user-json`（`clear-collections-json`）| 清空 project-scoped `mcpServers` / `enabledMcpjsonServers` / `disabledMcpjsonServers`，讓 repo 根 `.mcp.json` 成為專案真相 |
 
 跑完後請**完全結束** Cursor / Claude Code，再重開。
+
+> **2026-08-25 之前這裡是錯的。** 本腳本當時自帶三份寫入邏輯，與本文件上方 §路徑原則 直接牴觸：把兩個 server 寫進規定應為 `{}` 的 `~/.claude/mcp.json`；把 repo `.mcp.json` 整份複製進 user-level Cursor 設定，親手製造 §路徑原則 要求避免的重複；而清 `~/.claude.json` 的實作用了 PowerShell 6 才有的 `-AsHashtable`，在 PS 5.1 上**從未真的執行過**。根因是同一個檔案有多個寫入者、各自帶著沒被交叉檢查的意圖。詳見 `WORKLOG.md` 2026-08-25。
 
 ## 重灌/換機版（完整重建）
 

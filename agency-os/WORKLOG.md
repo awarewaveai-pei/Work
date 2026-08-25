@@ -2,6 +2,76 @@
 
 ## 2026-08-25
 
+### AUTO_TASK_DONE: MCP 設定檔重複所有權 —— 整類關閉（不是關掉三個實例）
+
+[任務]
+承上則。上一則只移除三個 rogue writer 中的一個，並在 WORKLOG 明載「這一類問題沒有關掉」。操作者指示「做完美處理，不能用補丁方式貼貼補補」。
+
+[先修正我自己的一個誤判]
+上一則把它歸類為「需要操作者決策：三個檔各自該裝什麼」。**這是錯的 —— 政策早就寫死了**，而且是同一份文件自打嘴巴：
+- `mcp-add-server-quickstart.md` §路徑原則：`%USERPROFILE%\.cursor\mcp.json`「請維持 `{"mcpServers":{}}`」、「禁止寫死 `C:\Users\...\Work\...`」
+- 同一份文件 50 行後的 §明文機密清理：描述 sanitize 會「把 Cursor user-level MCP 改寫成 env 版」「改成最小非明文 fallback」—— 而那個 fallback 裡寫死的正是 `C:\Users\USER\Work\scripts\start-trigger-mcp.ps1`
+
+所以不存在待決策事項。是腳本與文件的清理段落違反了文件自己的路徑原則、`CLAUDE.md` 與 `manifest.json`。把「腳本不符合已寫死的規則」誤判成「規則還沒定」，是我判斷錯誤。
+
+[不變量 —— 這次針對的是它，不是三個症狀]
+**每一個 AI client 實際會載入的 user-level 設定檔，必須恰好有一個 repo-managed writer，且該 writer 的意圖必須衍生自宣告，而不是自己內建一份看法。**
+
+為什麼三個 writer 各自都「看起來合理」卻集體造成 bug：知識散落在四處（`manifest.json` 宣告、`CLAUDE.md` 散文、quickstart 散文、各腳本硬編），沒有任何一處是機器可檢的單一事實，所以每個作者都獨立決定要寫什麼，而沒有任何機制偵測到彼此矛盾。**症狀是重複寫入，病灶是「宣告不存在」。**
+
+關鍵是 `sync-claude-userlevel.ps1` 的 `.NOTES` 早就寫明了正解：「30-year design: ALL governed paths come from manifest.json. To add a new file under cross-machine governance, just edit manifest.json. **Script logic stays unchanged.**」機制一直都在，只是沒人把那兩個檔納入。所以本次不是發明新機制，是把既有機制用完。
+
+[已修改]
+1. `mcp/claude-userlevel/manifest.json` —— 新增兩條宣告，並把 `_comment` 的治理範圍從「~/.claude/ 底下的檔」擴大為「AI client 實際載入的 user-level 設定檔」，明文寫入「宣告於此的路徑，其他腳本一律不得寫入」。
+   - `cursor-mcp`（`prune-duplicate-json`）→ `~/.cursor/mcp.json`
+   - `claude-user-json`（`clear-collections-json`）→ `~/.claude.json`
+2. `scripts/sync-claude-userlevel.ps1` —— 新增兩個 handler + dispatcher case。**型別選擇是有理由的**：Cursor 那份**不能**用既有的 `replace-json`，因為 quickstart 明載「僅當某 MCP 絕不能進 repo 時，才在使用者檔加入與專案不重複的鍵名」—— 粗暴清空會刪掉那道逃生門，這正是該檔長年沒有 owner 的原因。故實作為「移除同名鍵、保留不同名鍵」。
+3. `scripts/prune-duplicate-mcp-servers.mjs`（新）、`scripts/clear-claude-project-mcp.mjs`（新）—— 兩個 Node helper。**為何是 Node 而非 PowerShell**：① PS 5.1 `ConvertTo-Json` 把單元素陣列序列化成物件，會靜默毀掉 `args` 只有一個元素的 MCP ② `~/.claude.json` 有僅大小寫不同的 project key（`C:/WINDOWS/system32` vs `System32`），PSCustomObject 屬性名大小寫不敏感 → `ConvertFrom-Json` 直接拋重複鍵，而 `-AsHashtable` 是 PS 6 才有的參數 —— **這就是舊實作在本機從未真正執行過的原因**。偵測與寫入都放在同一支 helper，避免「重複」有兩份定義各自漂移。
+4. `scripts/sanitize-user-mcp-config.ps1` —— **三個 writer 全部移除**，只保留它獨有的價值（備份可能含明文 token 的三個檔），改為委派給唯一寫入者。`-SkipCursor` / `-SkipClaudeLegacy` / `-SkipClaudeUserJson` 一併移除（全 repo 唯一呼叫點 `apply-shared-ai-governance.ps1:51` 只傳 `-WorkspaceRoot`，已確認）。檔頭寫明三個舊行為各自造成什麼後果，防止有人加回來。
+5. `scripts/sync-mcp-config.ps1` —— **移除上一則新增的兩個偵測器**。理由：那兩個檔納入 manifest 後，`sync-claude-userlevel -Mode verify` 既偵測又修復、且 `check-claude-sync` H2 對 drift 硬失敗，嚴格強於這裡印一行警告。留著等於同一個檢查有兩份實作、可各自漂移 —— 那正是本次要消滅的形狀，不能自己又造一個。原地留註解說明為何移除。
+6. 文件：`mcp-add-server-quickstart.md` §明文機密清理 改寫為與自己的 §路徑原則 一致（含三檔對照表與「2026-08-25 之前這裡是錯的」說明）、`mcp/README.md`、`scripts/README.md`、`scripts/ao-resume.ps1` 註解。
+
+[驗證結果]
+- **實測 1（政策逃生門真的保住）**：`-Mode verify` 對 `~/.cursor/mcp.json` 報 `duplicates (10)` 並列出 `preserved (3, no collision): wordpress, perplexity, supabase`；merge 後該檔剩下正好那 3 個。若當初用 `replace-json` 這 3 個會被刪掉。
+- **實測 2（verify 不寫檔）**：verify 模式跑完 `diff` 確認目標檔 byte-unchanged，exit=1（drift 正確餵給 H2 gate）；merge 後再 verify → exit=0。
+- **實測 3（`~/.claude.json` round-trip 無損）**：merge 後與備份逐鍵比對，**差異只有 3 個 key**：`cachedGrowthBookFeaturesAt`、`pluginUsage.codex@openai-codex.lastUsedAt`、`usageCount 292→294` —— 全是 Claude Code 自己在該期間的寫入（292→294 正好是我跑的兩次 codex-oracle），**零筆可歸因於 helper**。目標 collection 7→0，13 個 project key 全數保留。
+- **實測 4（fixture 涵蓋 PS 做不到的案例）**：對含**兩個僅大小寫不同 project key** 的 fixture 跑 merge —— 兩個 key 都存活、單元素陣列 `["only-one"]` 完整、巢狀 `[1]` 完整、`history` 未被動、`disabledMcpjsonServers` 正確清成 `[]`、沒有 collection 的 project 不被無中生有加欄位。再跑一次 → `populated=0`（idempotent）。
+- **實測 5（併發保護，先發現才補的）**：實測 3 的比對意外暴露 Claude Code 會**持續寫入** `~/.claude.json`，代表 read-modify-write 會吃掉併發寫入。補上 stat(mtime+size) 前後比對，並用「背景執行緒每 2ms 改檔」的 race test 驗證：helper 印 `file changed under us since read -- not written`、`cleared=0`，目標資料與併發寫入者的 `liveCounter` **雙雙存活**。
+- **實測 6（sanitize 由「製造 drift」變成 drift-neutral）**：跑完整支 sanitize，`~/.claude/mcp.json` 前後皆 `[]`、`~/.cursor/mcp.json` 前後皆那 3 個逃生門鍵，隨後 `-Mode verify` exit=0。**舊行為是跑完必留 drift**。
+- **實測 7（備份不會外洩）**：sanitize 的備份含 58KB 的 `~/.claude.json` 全量複本。確認 `.gitignore:16 Backups/` 逐檔命中（`git check-ignore -v` 對實際檔案驗證，非對目錄），`git status` 看不到。
+- `verify-build-gates`: **ALL PASSED**、health **100% (372/372)**；三支 `.ps1` 的 `audit-cp950-traps` 全 `clean=1 drift=0`；`.mcp.json` 與改動前快照 byte-identical。
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/sanitize-user-mcp-config.ps1 (+ sync-claude-userlevel.ps1 -Mode verify/merge, node fixture + race tests, verify-build-gates.ps1) | exit=0 | ms=52000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=見本則末尾 oracle 第四輪
+  - external oracle = Codex CLI；第三輪 artifact `agency-os/reports/oracle/2026-08-25-review-f265aab1.md` 的 3 條 CONFIRMED 即本次治本標的，逐條已消滅。
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,.cursor | grep=Get-SanitizedCursorConfig\|Get-SanitizedClaudeLegacyConfig\|Clear-ClaudeProjectMcpEntries\|SkipClaudeLegacy\|SkipCursor + 行為描述（"最小非明文 fallback"／"minimal non-secret fallback"／"改寫成 env 版"／"env-based placeholders"）| hits=0
+  - **這次 pattern 同時涵蓋「符號名」與「行為的自然語言描述」** —— 上一則的教訓：只 grep 符號名會漏掉 `ao-resume.ps1:451` 那種純文字描述的過期主張。行為描述類 4 個 pattern 全數 0 命中（文件已全部改完）。剩餘符號名命中僅存在於 WORKLOG／TASKS／oracle artifact 等有日期的歷史紀錄，不改寫。
+
+[oracle 第四輪 —— 3 條 CONFIRMED，全部落在我這次新寫的 code]
+三條表面各異，**根因是同一個**：新程式碼存在「沒能確認終態、卻回報 clean」的路徑 —— 正是我這次宣稱要消滅的那一類失效。逐條實測復現後，**不逐點修，改成一份契約**：
+
+| # | 症狀（已實測復現） | 
+|---|---|
+| 1 | `~/.claude.json` 併發保護中止寫入後，merge 仍以 `RESULT: PASS` 收場 —— 偵測到 drift、沒修、卻回報成功 |
+| 2 | sanitize 委派時未傳 repo 根，delegate 從 cwd 推導（在別的 repo 內執行會解析到**錯誤的 repo**）；且委派失敗只印 warning 就 `exit 0` |
+| 3 | JSON 合法但 schema 錯誤（`{"mcpServers":"copilot"}`）被當成空集合 → 回報 clean。實測確認：修前輸出 `no duplicates ... RESULT duplicates=0` |
+
+**統一修法（非三個補丁）**：兩支 helper 的輸出契約改為 `RESULT status=clean|drift|repaired|blocked`，PowerShell 端新增**單一**共用評估器 `Resolve-HelperStatus`，規則一句話 —— **凡不是 clean 或 repaired，一律讓 sync 失敗**；在寫入模式看到 `drift`（該修而沒修）同樣視為 blocked。`blocked` 涵蓋「schema 錯誤」與「併發保護拒寫」兩種「無法確認終態」。另加 `-MonorepoRootOverride` 讓委派不再依賴 cwd，sanitize 委派失敗改為 `exit 1`。
+
+[第四輪修正的驗證]
+- F3：`{"mcpServers":"copilot"}` → `target file has mcpServers of wrong type (string); expected an object` + `status=blocked`；`{"enabledMcpjsonServers":"copilot"}` → `P .enabledMcpjsonServers is string, expected object or array` + `status=blocked`。
+- F1 端到端：對真實 `~/.claude.json` 注入假 drift + 背景執行緒每 2ms 改檔跑 merge → `status=blocked`、`RESULT: DRIFT DETECTED (mode=merge, exit=1)`，**exit code 1**（修前是 PASS）。測後已還原，確認注入鍵與 churn 鍵皆不存在。
+- F2a：`cd /d/tmp` 後以絕對路徑執行 sanitize → delegate 正確印 `monorepo root : D:\Work`、`RESULT: PASS`。
+- F2b：以 stub delegate（`exit 3`）執行 sanitize → 印 `FAIL: ... were NOT brought to the declared state`，**exit code 1**；成功路徑仍 `exit 0`。（首次量到 0 是我的測試法錯誤 —— `$?` 取到 pipeline 末端 `sed` 的狀態，改為直接導檔後重測。）
+- 全套重跑：`verify-build-gates` ALL PASSED、health 100% (372/372)；四支 `.ps1` 的 CP950 audit 中三支 `drift=0`（`ao-resume.ps1` 的 17 處為既存，已另開背景任務）；live 狀態 `-Mode verify` exit=0，兩檔內容維持 `[]` 與三個逃生門鍵。
+
+[剩餘風險]
+- **併發 session 衝突（需操作者注意）**：背景任務 chip「Fix sanitize-user-mcp-config on PowerShell 5.1」顯示**已被啟動**，跑在獨立 worktree。該任務的前提（修 `Clear-ClaudeProjectMcpEntries`）在本次已**整個函式移除**，故它已失去標的；若它產生 commit 會與本次改動衝突。建議直接關掉它。
+- `clear-collections-json` 沿用舊行為，一併清空 `enabledMcpjsonServers` / `disabledMcpjsonServers`。若操作者曾刻意停用某個 project 的 MCP，清空會讓 Claude 重新詢問。此為**移植既有語意而非新設計**；要不要改成只清 `mcpServers` 是獨立議題。
+- 併發保護是 stat 比對而非檔案鎖，理論上仍有極小的 TOCTOU 窗口。選擇放棄的原因：檔案鎖會與 Claude Code 自身的寫入相互卡死，而失敗模式（本輪不清、下輪再清）無害。
+
+[rollback]
+`git revert` 本 commit 即可：manifest 少兩條宣告、兩支 `.mjs` 消失、sanitize 回到自帶三個 writer 的版本。回復後需手動再跑一次 `sync-claude-userlevel.ps1 -Mode merge` 把 user-level 檔壓回宣告狀態。
+
 ### AUTO_TASK_DONE: MCP 設定檔的「兩個腳本共同擁有一個檔案」—— 前一則 oracle FINDING 1/2 治本
 
 [任務]

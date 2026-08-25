@@ -1,4 +1,4 @@
-# MCP Shared Registry
+﻿# MCP Shared Registry
 
 This directory is the single source of truth for MCP server definitions that need to work across:
 
@@ -88,7 +88,7 @@ If a machine already has plaintext secrets in user-level Cursor or Claude MCP fi
 powershell -ExecutionPolicy Bypass -File .\scripts\sanitize-user-mcp-config.ps1
 ```
 
-This creates a timestamped backup under `Backups/`, rewrites `~/.cursor/mcp.json` to env-based placeholders derived from the shared project config, rewrites legacy `~/.claude/mcp.json` to a minimal non-secret fallback, and clears stale project-scoped MCP entries from `~/.claude.json`.
+This takes a timestamped backup under `Backups/` (gitignored), then hands the rewrite to `scripts/sync-claude-userlevel.ps1 -Mode merge`, which is the single writer for all three files. What each must contain is declared in `mcp/claude-userlevel/manifest.json`: `~/.claude/mcp.json` is normalized to `{"mcpServers":{}}`; `~/.cursor/mcp.json` has servers that collide with the project config pruned while non-colliding keys are preserved; `~/.claude.json` has its project-scoped MCP collections emptied. The sanitize script no longer rewrites anything itself -- until 2026-08-25 it did, with its own hardcoded expectations that contradicted the manifest (see WORKLOG 2026-08-25).
 
 Current official config locations this repo aligns with:
 

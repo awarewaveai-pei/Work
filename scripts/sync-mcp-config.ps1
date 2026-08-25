@@ -700,94 +700,21 @@ if (-not $SkipCodex) {
     Write-Utf8NoBomFile -Path $codexPath -Content $updated
 }
 
-# Cursor loads BOTH the project `.cursor/mcp.json` and the user-level
-# `%USERPROFILE%\.cursor\mcp.json`. Only the first is repo-managed, so any server
-# named in both launches twice per Cursor window -- the same double-launch hazard
-# described above for `~/.claude/mcp.json`.
+# NOTE (2026-08-25): this script briefly carried two warn-only detectors here -- one for
+# user-level vs project Cursor MCP duplicates, one for project-scoped mcpServers left in
+# ~/.claude.json. Both are gone, deliberately.
 #
-# That file is intentionally not written here: it is a global Cursor config
-# applying to every repo on the machine, so publishing this repo's servers into it
-# would leak them into unrelated projects. It cannot be silently ignored either,
-# because a fix applied there by hand (e.g. pinning `mcp-remote` to a fixed
-# version) is invisible to the repo and unreproducible on a new machine.
-# So: detect and report, never mutate.
-# Compare what Cursor actually loads from each file, not the registry: a server
-# can sit in the registry yet be excluded from the project Cursor config, and such
-# a server does not double-launch. Over-reporting would train the operator to
-# ignore this warning, which is the failure mode it exists to prevent.
-$projectCursorPath = Join-Path $WorkspaceRoot ".cursor\mcp.json"
-$userCursorPath = Join-Path $env:USERPROFILE ".cursor\mcp.json"
-
-function Get-McpServerNames {
-    param([string]$Path)
-
-    if (-not (Test-Path -LiteralPath $Path)) {
-        return @()
-    }
-    $doc = ConvertTo-PlainObject (Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json)
-    if ($null -eq $doc -or -not $doc.ContainsKey("mcpServers")) {
-        return @()
-    }
-    return @((ConvertTo-PlainObject $doc["mcpServers"]).Keys)
-}
-
-if (Test-Path -LiteralPath $userCursorPath) {
-    try {
-        $projectCursorNames = Get-McpServerNames -Path $projectCursorPath
-        $userCursorNames = Get-McpServerNames -Path $userCursorPath
-        $userCursorDupes = @($userCursorNames | Where-Object { $projectCursorNames -contains $_ } | Sort-Object)
-        if ($userCursorDupes.Count -gt 0) {
-            $script:Warnings.Add("User-level Cursor MCP ($userCursorPath) redefines $($userCursorDupes.Count) server(s) that the project config also defines: $($userCursorDupes -join ', '). Cursor loads both files, so each of these launches twice per window. Remove them there -- $projectCursorPath is the SSOT.")
-        }
-    } catch {
-        $script:Warnings.Add("Could not compare Cursor MCP configs -- duplicate-server check skipped: $($_.Exception.Message)")
-    }
-}
-
-# Claude Code keeps local/user and project-scoped MCP servers in `%USERPROFILE%\.claude.json`,
-# NOT in the legacy `~/.claude\mcp.json` that sync-claude-userlevel.ps1 normalizes. See
-# agency-os/docs/operations/mcp-add-server-quickstart.md and collaborator-ai-agent-rules.md.
-# Stale project keys accumulate there whenever `claude` is started from an unrelated directory,
-# and no sync step has ever looked at that file -- so enforcing the empty-file rule on the legacy
-# path while ignoring this one would give false confidence.
-# Report only: scripts/sanitize-user-mcp-config.ps1 already owns clearing these entries
-# (Clear-ClaudeProjectMcpEntries). Doing it here too would recreate the two-owners bug that this
-# change removed.
-$claudeUserJsonPath = Join-Path $env:USERPROFILE ".claude.json"
-if (Test-Path -LiteralPath $claudeUserJsonPath) {
-    try {
-        # Deliberately NOT ConvertFrom-Json. That cmdlet throws on this file because Claude Code
-        # writes project keys that differ only by case (e.g. 'C:/WINDOWS/system32' and
-        # 'C:/WINDOWS/System32') and its PSCustomObject build uses case-insensitive property names.
-        # `-AsHashtable` would parse it but does not exist before PowerShell 6, and this machine
-        # runs Windows PowerShell 5.1 with no pwsh on PATH. JavaScriptSerializer ships with .NET
-        # Framework and builds an ordinal Dictionary, so both keys survive.
-        Add-Type -AssemblyName System.Web.Extensions -ErrorAction Stop
-        $jsonReader = New-Object System.Web.Script.Serialization.JavaScriptSerializer
-        $jsonReader.MaxJsonLength = [int]::MaxValue
-        $claudeUserDoc = $jsonReader.DeserializeObject((Get-Content -LiteralPath $claudeUserJsonPath -Raw -Encoding UTF8))
-        if ($null -ne $claudeUserDoc -and $claudeUserDoc.ContainsKey("projects")) {
-            $populatedProjects = @()
-            $claudeProjects = $claudeUserDoc["projects"]
-            foreach ($projectKey in @($claudeProjects.Keys)) {
-                $project = $claudeProjects[$projectKey]
-                if ($null -eq $project -or -not $project.ContainsKey("mcpServers")) { continue }
-                $projectMcpNames = @($project["mcpServers"].Keys)
-                if ($projectMcpNames.Count -eq 0) { continue }
-                $entry = "$projectKey ($($projectMcpNames.Count): $($projectMcpNames -join ', '))"
-                if (($projectKey -replace '/', '\') -eq $WorkspaceRoot.TrimEnd('\')) {
-                    $entry += " <-- THIS workspace; these launch ON TOP OF .mcp.json"
-                }
-                $populatedProjects += $entry
-            }
-            if ($populatedProjects.Count -gt 0) {
-                $script:Warnings.Add("$claudeUserJsonPath carries project-scoped MCP servers that no sync step manages: $($populatedProjects -join ' | '). scripts/sanitize-user-mcp-config.ps1 owns clearing them -- but note its Clear-ClaudeProjectMcpEntries uses 'ConvertFrom-Json -AsHashtable', which does not exist on Windows PowerShell 5.1, so verify it actually runs before trusting it.")
-            }
-        }
-    } catch {
-        $script:Warnings.Add("Could not read $claudeUserJsonPath -- stale project-MCP check skipped: $($_.Exception.Message)")
-    }
-}
+# They were built while those two files had no owner, so warning was the only honest move:
+# this script must not write them (they are machine-global; publishing this repo's servers
+# into them would leak them into unrelated projects). Once both files were declared in
+# mcp/claude-userlevel/manifest.json, scripts/sync-claude-userlevel.ps1 gained the ability
+# to detect AND repair them, and check-claude-sync.ps1 H2 hard-fails on the drift -- which
+# is strictly stronger than a warning printed here.
+#
+# Keeping both would mean two implementations of the same check, free to drift apart. That
+# is the duplicate-ownership shape this whole change removed, so it does not get to survive
+# in detector form. Drift in user-level MCP config is reported by:
+#   powershell -File .\scripts\sync-claude-userlevel.ps1 -Mode verify
 
 if ($StrictEnv -and $script:MissingVars.Count -gt 0) {
     throw ("Missing required environment variables: " + ((@($script:MissingVars) | Sort-Object) -join ", "))
