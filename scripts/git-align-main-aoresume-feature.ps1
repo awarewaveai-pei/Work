@@ -21,7 +21,8 @@
   若功能分支比遠端超前，在合併 main 後執行 `git push -u origin <branch>`。
 
 .PARAMETER AllowStash
-  工作區不乾淨時，先 `git stash push` 再繼續（結束後**不**自動 pop，請自行處理）。
+  工作區不乾淨時，先 `git stash push` 具名暫存再繼續，結束時（無論成功或失敗）**自動依名稱取回**。
+  取回失敗時不會靜默：印出 stash ref 與復原指令，並以 exit 3 回報，避免工作被遺落在 stash 裡。
 
 .PARAMETER SkipAoResume
   只做 Git 步驟（fetch／reset main／切回功能分支／merge），**不**呼叫 `ao-resume.ps1`（供 `ao-resume -FullMainlineParity` 內嵌呼叫，避免遞迴）。
@@ -196,6 +197,13 @@ function Test-WorktreeClean {
     return [string]::IsNullOrWhiteSpace($r.Text)
 }
 
+# Name of the stash this run created, if any. Declared OUTSIDE the try so the finally
+# block can always see it -- restoring the operator's work must not depend on how the try
+# exited. Empty means "this run stashed nothing", which is the only case where doing
+# nothing in finally is correct.
+$script:AlignStashName = ''
+$script:AlignStashPopFailed = $false
+
 Push-Location -LiteralPath $WorkRoot
 try {
     Write-Host "== git-align-main-aoresume-feature (WorkRoot=$WorkRoot) ==" -ForegroundColor Cyan
@@ -207,11 +215,15 @@ try {
 
     if (-not (Test-WorktreeClean)) {
         if (-not $AllowStash) {
-            throw "Working tree is dirty. Commit, discard, or re-run with -AllowStash (creates stash; does not auto-pop)."
+            throw "Working tree is dirty. Commit, discard, or re-run with -AllowStash (stashes under a unique name and restores it automatically when done)."
         }
         $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-        Write-Host "== Stashing dirty tree (git-align-main-$stamp) ==" -ForegroundColor Yellow
-        Invoke-Git @("stash", "push", "-m", "git-align-main-aoresume-feature-$stamp")
+        # Unique per run: the finally block finds THIS stash by name rather than popping
+        # whatever is on top, which could belong to a parallel session or to the operator.
+        # `git stash` is repo-global, so "the top of the stack" is never a safe identifier.
+        $script:AlignStashName = "git-align-main-aoresume-feature-$stamp"
+        Write-Host "== Stashing dirty tree ($script:AlignStashName) ==" -ForegroundColor Yellow
+        Invoke-Git @("stash", "push", "-m", $script:AlignStashName)
     }
 
     # --- Mainline parity ---
@@ -323,7 +335,55 @@ To intentionally discard those commits (destructive): pass -AllowResetAheadOfOri
 
     Write-Host "== Done: main aligned; $FeatureBranch merged with main if needed; AO-RESUME passed on both. ==" -ForegroundColor Green
 } finally {
+    # RESTORE THE OPERATOR'S WORK. This runs however the try exited -- success, throw, or
+    # the aheadMain guard -- because work parked in a stash that nobody pops is work lost
+    # in slow motion. Before 2026-08-25 this script stashed and never popped (its own
+    # -AllowStash help text said "does not auto-pop"), which is why the caller preferred
+    # auto-commit: a commit could not strand anything, a stash could.
+    #
+    # Deliberately does NOT use Invoke-Git: that helper throws, and a throw raised inside
+    # finally replaces the original exception, hiding why the align actually failed.
+    if ($script:AlignStashName) {
+        $entry = & git stash list --format="%gd %gs" 2>$null |
+                 Where-Object { $_ -like "*$($script:AlignStashName)*" } |
+                 Select-Object -First 1
+        if (-not $entry) {
+            # Nothing to restore under our name. Report it rather than assuming success:
+            # a stash that vanished is not the same as a stash that came back.
+            Write-Host "== WARNING: stash '$($script:AlignStashName)' not found; nothing restored ==" -ForegroundColor Yellow
+            $script:AlignStashPopFailed = $true
+        } else {
+            $ref = ($entry -split '\s+')[0]
+            Write-Host "== Restoring stashed work ($ref = $($script:AlignStashName)) ==" -ForegroundColor Cyan
+            & git stash pop $ref
+            if ($LASTEXITCODE -ne 0) {
+                # `git stash pop` KEEPS the stash on conflict, so the work still exists.
+                # Say so loudly and name the ref: silence here is what turns a conflict
+                # into a lost afternoon.
+                $script:AlignStashPopFailed = $true
+                Write-Host "" -ForegroundColor Red
+                Write-Host "== STASH POP FAILED (exit $LASTEXITCODE) ==" -ForegroundColor Red
+                Write-Host "   Your work is NOT lost -- git keeps the stash when pop conflicts." -ForegroundColor Red
+                Write-Host "   Recover with:  git stash list   then   git stash pop $ref" -ForegroundColor Red
+                Write-Host "   Stash name: $($script:AlignStashName)" -ForegroundColor Red
+                Write-Host "" -ForegroundColor Red
+            }
+        }
+    }
     Pop-Location
+
+    # Exit code is decided HERE, not after the try/finally, because several paths leave the
+    # try with `return` (e.g. the -ContinueWithFeatureBranch:$false path at the "Done (main
+    # only)" branch). `return` at script scope unwinds the whole script: finally still runs,
+    # but nothing after the try/finally does. A check placed there is unreachable on the
+    # most common invocation -- which is exactly how the first version of this guard failed
+    # its own test (2026-08-25): the message printed, the flag was set, and the script still
+    # exited 0. finally is the only place that every exit path passes through.
+    #
+    # This deliberately overrides any other exit code: if the align failed AND the stash did
+    # not come back, the unrestored stash is the more actionable of the two, and both are
+    # non-zero so the caller still sees failure either way.
+    if ($script:AlignStashPopFailed) { exit 3 }
 }
 
 # Explicit exit 0 ensures callers (ao-resume, CI) see success even when the last
