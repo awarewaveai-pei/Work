@@ -2,6 +2,46 @@
 
 ## 2026-08-25
 
+### AUTO_TASK_DONE: `sanitize-user-mcp-config.ps1` 補上 `[CmdletBinding()]` —— 並記錄一次完整的平行重工
+
+[任務]
+被指派修「`Clear-ClaudeProjectMcpEntries` 在 PS 5.1 跑不起來」（原 `TASKS.md` 項）。**做完才發現同一個 bug 已由另一個 session 在 `origin/main` 修掉，且修得更徹底。** 本則主要價值在記錄重工如何發生，以及只保留一項真正還缺的修正。
+
+[平行重工的事實]
+我在 session 開始時跑了 `git log`（R0 要求），HEAD 在 `53f41f69`。但**沒有 `git fetch`** —— 對岸此時已有 6 個 commit，其中 `ddcb4cb5` 正是同一議題的治本。R0 的機械閘（`git-log-injector`）只看本地 log，看不到 remote，所以它擋不住這一類重工。
+
+[對岸的修法比我的好，好在哪]
+| 面向 | 我的（已捨棄） | `origin/main` |
+|---|---|---|
+| 路線 | 修 PowerShell 實作，改用 `JavaScriptSerializer` | **刪掉 PowerShell 實作**，改由 `clear-claude-project-mcp.mjs`（Node）處理 |
+| 所有權 | sanitize 仍自己寫 `~/.claude.json` | sanitize 只備份，**委派給 `sync-claude-userlevel.ps1` 這個唯一 writer**；意圖來自 `manifest.json` |
+| 範圍 | 只修 `~/.claude.json` 一個檔 | 同時關掉 `TASKS.md` 那個「待操作者決策」的重複所有權項（三個檔一起） |
+| 行數 | 439 | 158 |
+| 我漏掉的危害 | — | **PS `ConvertTo-Json` 會把單元素陣列壓成物件** —— 對這個承載完整 Claude Code 狀態的檔案是有損改寫 |
+
+我的診斷（大小寫重複鍵、`-AsHashtable` 是 PS 6+、本機無 `pwsh`）與對岸完全一致，但**結論不同**：我去修那個實作，對方判斷該實作根本不該存在。後者才是治本 —— 「一個對受管檔案有私人意見的腳本，本身就是 bug，不管那個意見多合理」（`sanitize-user-mcp-config.ps1:37-40`）。
+
+[唯一保留的修正]
+對岸重寫後的 `param()` **仍無 `[CmdletBinding()]`**，因此非 advanced script，PowerShell 會**靜默吞掉**未知具名參數並照常執行。本 session 親身踩到：對重構前的版本下 `-WhatIf` 以為在預覽，它實際開始執行破壞路徑，只因當時 worktree 缺 `.mcp.json` 才在寫入前 throw。現在該檔雖已改為「只備份 + 委派」，風險縮小但未消失（仍會建備份、仍會呼叫真正的 sync writer）。故補上 `[CmdletBinding()]`，並在原地留下為何 load-bearing 的說明。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/sanitize-user-mcp-config.ps1 -WhatIf | exit=1 | ms=400
+  - 修前：`-WhatIf` 被靜默吞掉、腳本照常執行；修後：`找不到符合參數名稱 'WhatIf' 的參數`（`NamedParameterNotFound`），不執行
+  - 正常路徑未受影響：`-WorkspaceRoot D:\Work -BackupRoot D:\Work\Backups -SkipDelegate` exit=0，三個檔備份成功、正確跳過委派
+  - AST 檢查：三個宣告參數（WorkspaceRoot／BackupRoot／SkipDelegate）綁定不變，`CmdletBinding` 屬性存在
+  - `/audit-encoding` exit 0（scanned=1 clean=1 drift=0）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+  - 改動為單一屬性 + 註解，無邏輯分支；以 AST 驗證屬性生效並實測兩條路徑（未知參數／正常參數）
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp | grep=CmdletBinding | hits=0
+  - 全 repo 其他 `.ps1` 未發現「文件宣稱可預覽但 param block 非 advanced」的同類實例
+- ORACLE_WAIVED: Codex 額度已用罄至 2026-08-31（`b0ec5fcb` 已查明並入庫，`7934eb9e` 據此暫停 stop-time review gate），外部 oracle 路徑不可用。本次改動為單一屬性新增，已以 AST + 雙路徑實測覆蓋。
+  - **訂正**：本 session 稍早曾把同一個 codex 失敗歸因於「packet 過大」再改口為「CLI 等待 stdin」，**兩個都錯**。真因是額度用罄 —— 與 `b0ec5fcb` 記錄的第一層誤導完全相同（空 stdout 讓人去猜 stderr 上的雜訊）。同一個坑在兩個 session 各踩一次，可見「工具靜默失敗時，先查額度／認證，再猜技術原因」值得成為預設順序。
+
+[教訓]
+1. **R0 的 `git log` 應該配 `git fetch`**。本地 log 看不見對岸，機械閘也不會提醒；長任務開工前多一次 fetch，成本近乎零。
+2. **同一診斷可以導出兩種結論**：「修好這個實作」與「這個實作不該存在」。後者通常才是治本，值得在動手前多問一次。
+3. 工具靜默失敗（空輸出、無錯誤訊息）時，**額度／認證優先於技術假設**。
+
 ### AUTO_TASK_DONE: Codex stop-time review gate 暫時停用至 2026-08-31（額度用罄，非閘的問題）
 
 [任務]

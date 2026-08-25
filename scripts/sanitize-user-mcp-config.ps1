@@ -49,6 +49,14 @@
   Take the backups but do not invoke sync-claude-userlevel.ps1. For the case where you
   want a restore point before running the sync yourself.
 #>
+# [CmdletBinding()] is load-bearing, not decoration. Without it this is not an advanced
+# script, so PowerShell SILENTLY SWALLOWS unrecognised named parameters and runs anyway.
+# A caller who types -WhatIf (or any typo) believing they are previewing gets a real run
+# against real user-level files instead. Observed 2026-08-25: an operator passed -WhatIf
+# to the pre-refactor version expecting a preview; it executed the destructive path and
+# only aborted because an unrelated file happened to be missing. With this attribute the
+# same call fails fast with NamedParameterNotFound.
+[CmdletBinding()]
 param(
     [string]$WorkspaceRoot = "",
     [string]$BackupRoot = "",
