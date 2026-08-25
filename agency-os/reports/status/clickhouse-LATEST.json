@@ -1,17 +1,17 @@
 {
     "schemaVersion":  2,
-    "generatedAtUtc":  "2026-08-24T20:49:41.2263655Z",
+    "generatedAtUtc":  "2026-08-25T03:41:49.5822723Z",
     "host":  "204.168.175.41",
     "container":  "trigger-clickhouse",
     "appDatabase":  "trigger_dev",
-    "systemBytes":  222867649,
-    "systemRows":  3507255,
-    "appBytes":  39728392,
-    "appRows":  400459,
-    "ratio":  5.6,
+    "systemBytes":  189417931,
+    "systemRows":  3236758,
+    "appBytes":  39191077,
+    "appRows":  384115,
+    "ratio":  4.8,
     "activeMerges":  0,
-    "maxPartsPerTable":  8,
-    "topSystemTable":  "text_log:181972761",
+    "maxPartsPerTable":  7,
+    "topSystemTable":  "text_log:151322777",
     "appMaxPartsPerTable":  5,
     "appMaxPartsTable":  "raw_task_runs_payload_v1",
     "mergeFailuresLastHour":  0,
@@ -28,9 +28,9 @@
     "noTtlTableCount":  0,
     "noTtlTableNames":  "",
     "orphanDupTableCount":  0,
-    "verdict":  "drift",
-    "verdictLabel":  "WARN",
+    "verdict":  "healthy",
+    "verdictLabel":  "PASS",
     "findings":  [
-                     "self-telemetry is 5.6x the application data (warn at 5x)"
+
                  ]
 }
