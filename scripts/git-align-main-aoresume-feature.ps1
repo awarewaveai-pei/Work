@@ -221,9 +221,24 @@ try {
         # Unique per run: the finally block finds THIS stash by name rather than popping
         # whatever is on top, which could belong to a parallel session or to the operator.
         # `git stash` is repo-global, so "the top of the stack" is never a safe identifier.
-        $script:AlignStashName = "git-align-main-aoresume-feature-$stamp"
-        Write-Host "== Stashing dirty tree ($script:AlignStashName) ==" -ForegroundColor Yellow
-        Invoke-Git @("stash", "push", "-m", $script:AlignStashName)
+        $stashCandidate = "git-align-main-aoresume-feature-$stamp"
+        Write-Host "== Stashing dirty tree ($stashCandidate) ==" -ForegroundColor Yellow
+        Invoke-Git @("stash", "push", "-m", $stashCandidate)
+
+        # "dirty" does NOT imply "something was stashed". Test-WorktreeClean counts
+        # untracked files as dirty, but `git stash push` without -u ignores them, so a tree
+        # whose only changes are untracked produces "No local changes to save" and no stash
+        # entry at all. Recording the name unconditionally made the finally block hunt for a
+        # stash that was never created and report a phantom restore failure (caught by the
+        # clean-tree case in this change's own test matrix, 2026-08-25).
+        # Not stashing untracked files is safe here: `reset --hard` does not touch them.
+        $stashExists = @(& git stash list --format="%gs" 2>$null |
+                         Where-Object { $_ -like "*$stashCandidate*" }).Count -gt 0
+        if ($stashExists) {
+            $script:AlignStashName = $stashCandidate
+        } else {
+            Write-Host "== Nothing was stashed (untracked-only changes); they survive the reset as-is ==" -ForegroundColor DarkGray
+        }
     }
 
     # --- Mainline parity ---

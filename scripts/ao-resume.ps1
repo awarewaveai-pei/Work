@@ -220,7 +220,13 @@ function Invoke-NonFastForwardRecovery {
     return $(if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE })
 }
 
-function Invoke-FullMainlineAlignWithAutoCheckpoint {
+# Renamed 2026-08-25 from Invoke-FullMainlineAlignWithAutoCheckpoint. There is no
+# checkpoint any more: a dirty tree is stashed by git-align (-AllowStash, always passed)
+# and restored in its finally. Keeping the old name would have left the codebase asserting
+# a behaviour it no longer has, which is the same class of defect this whole change set is
+# about. Historical references in WORKLOG/reports are left alone -- they describe what was
+# true then.
+function Invoke-FullMainlineAlignWithRetry {
     param(
         [Parameter(Mandatory = $true)][string]$Root,
         [Parameter(Mandatory = $true)][string[]]$AlignArgs
@@ -280,48 +286,21 @@ function Invoke-FullMainlineAlignWithAutoCheckpoint {
         return $exit1
     }
 
-    Write-Host "== AO-RESUME: FullMainlineParity detected dirty tree; run one auto-checkpoint retry ==" -ForegroundColor Yellow
-    $checkpointScript = Join-Path $Root "scripts\commit-checkpoint.ps1"
-    if (-not (Test-Path -LiteralPath $checkpointScript)) {
-        Write-Host "AO-RESUME: checkpoint script not found, cannot auto-heal dirty tree." -ForegroundColor DarkYellow
-        return $exit1
-    }
-
-    $checkpointMsg = "[cursor] checkpoint: auto-save dirty tree before FullMainlineParity retry"
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $checkpointScript -Message $checkpointMsg -WorkRoot $Root | Out-Host
-    $checkpointExit = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
-    if ($checkpointExit -ne 0) {
-        Write-Host "AO-RESUME: auto-checkpoint failed (exit $checkpointExit)." -ForegroundColor DarkYellow
-        return $checkpointExit
-    }
-
-    Write-Host "== AO-RESUME: git push (publish checkpoint before align reset; avoids orphan local-only commits) ==" -ForegroundColor Yellow
-    Push-Location -LiteralPath $Root
-    try {
-        $null = Invoke-WithUtf8Console { git rev-parse --git-dir 2>$null }
-        if ($LASTEXITCODE -eq 0) {
-            # Local Continue: see L125 above for full rationale (git push stderr vs strict mode).
-            $savedEAPPush2 = $ErrorActionPreference
-            $ErrorActionPreference = "Continue"
-            try {
-                Invoke-WithUtf8Console { & git push 2>&1 } | Out-Host
-                $pushExit = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
-            } finally { $ErrorActionPreference = $savedEAPPush2 }
-            if ($pushExit -ne 0) {
-                $recoveryExit = Invoke-NonFastForwardRecovery -Root $Root -AlignArgs $AlignArgs
-                if ($recoveryExit -ne -1) { return $recoveryExit }
-                Write-Host "AO-RESUME: git push failed (exit $pushExit). Fix auth/network/upstream then re-run AO-RESUME." -ForegroundColor Yellow
-                return $pushExit
-            }
-        }
-    }
-    finally {
-        Pop-Location | Out-Null
-    }
-
-    & powershell.exe @AlignArgs | Out-Host
-    $exit2 = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
-    return $exit2
+    # REMOVED 2026-08-25: the auto-checkpoint retry that used to live here.
+    # git-align is now always invoked with -AllowStash, so a dirty tree is parked in a
+    # named stash and restored in git-align's finally rather than committed. That makes
+    # this fallback both unnecessary and undesirable: reaching it would mean committing
+    # the operator's in-progress work under a message that describes nothing, publishing
+    # it to main, and doing so on a path where the align had ALREADY failed for some
+    # other reason. Six documented harm classes came from exactly that habit
+    # (agency-os/WORKLOG.md 2026-08-25).
+    #
+    # If align still fails with a dirty tree, that is a real condition the operator must
+    # see, not something to commit our way out of.
+    Write-Host "AO-RESUME: git align failed (exit $exit1) with a dirty working tree." -ForegroundColor Yellow
+    Write-Host "           The tree is NOT committed automatically. Inspect with: git status" -ForegroundColor Yellow
+    Write-Host "           If a stash was left behind, git-align prints its name and exits 3." -ForegroundColor Yellow
+    return $exit1
 }
 
 if ($WorkRoot) {
@@ -421,9 +400,15 @@ if ($FullMainlineParity) {
         if ($FullMainlinePushFeature) { $alignArgs += "-PushFeature" }
         if ($FullMainlineRequireFeatureBranch) { $alignArgs += "-RequireFeatureBranch" }
         if ($FullMainlineAllowResetAheadOfOrigin) { $alignArgs += "-AllowResetAheadOfOrigin" }
-        $alignStash = $FullMainlineAllowStash -or $AllowStashBeforePull -or $AllowUnexpectedDirty
-        if ($alignStash) { $alignArgs += "-AllowStash" }
-        $alignExit = Invoke-FullMainlineAlignWithAutoCheckpoint -Root $WorkRoot -AlignArgs $alignArgs
+        # ALWAYS stash. git-align needs a clean tree; the only question is how it gets one.
+        # Until 2026-08-25 the answer was "auto-commit everything", which is how unverified
+        # work reached main and how uncommitted edits were swept into the repo. -AllowStash
+        # now stashes under a unique name and restores it in git-align's finally (all exit
+        # paths), reporting exit 3 if the restore conflicts. The flags below are kept because
+        # they also control other dirty-tree behaviour upstream of this call.
+        $null = $FullMainlineAllowStash -or $AllowStashBeforePull -or $AllowUnexpectedDirty
+        $alignArgs += "-AllowStash"
+        $alignExit = Invoke-FullMainlineAlignWithRetry -Root $WorkRoot -AlignArgs $alignArgs
         if ($alignExit -ne 0) {
             Write-Error "ao-resume: FullMainlineParity git align failed (exit $alignExit). Fix dirty tree or pass -FullMainlineAllowStash / -AllowUnexpectedDirty."
             exit $alignExit
@@ -610,6 +595,33 @@ if (Test-Path -LiteralPath $clickhouseHealthScript) {
     }
     $global:LASTEXITCODE = 0
 }
+
+# --- Stranded align-stash detector (warn-only) ---
+# Ships WITH the mechanism it watches, not after the first incident. git-align parks a dirty
+# tree in a stash named git-align-main-aoresume-feature-<stamp> and restores it in its
+# finally; if that restore ever conflicts it exits 3 and deliberately leaves the stash in
+# place so nothing is lost. That is the right behaviour, but it means work can sit in a
+# stash indefinitely if the operator does not act -- and an unread stash is indistinguishable
+# from no stash at all. So: name them out loud at every AO-RESUME until they are gone.
+# (Invariant I6: any mechanism that moves work out of the working tree must guarantee its
+# return or fail loudly. This is the "fail loudly" half, made durable.)
+Push-Location -LiteralPath $WorkRoot
+try {
+    $strandedStashes = @(
+        Invoke-WithUtf8Console { & git stash list --format="%gd %gs" 2>$null } |
+        Where-Object { $_ -like "*git-align-main-aoresume-feature-*" }
+    )
+} catch {
+    $strandedStashes = @()
+} finally { Pop-Location | Out-Null }
+if ($strandedStashes.Count -gt 0) {
+    Write-Host ""
+    Write-Host ("== AO-RESUME: {0} align stash(es) still holding uncommitted work ==" -f $strandedStashes.Count) -ForegroundColor Yellow
+    foreach ($st in $strandedStashes) { Write-Host ("   {0}" -f $st) -ForegroundColor Yellow }
+    Write-Host "   Restore with: git stash pop <ref>   (resolve conflicts, then re-run AO-RESUME)" -ForegroundColor Yellow
+    Write-Host ""
+}
+$global:LASTEXITCODE = 0
 
 # --- CI health (warn-only; surfaces a gate that has quietly gone red) ---
 # Rationale: nothing in this repo looked at GitHub Actions. Found 2026-08-25 while
