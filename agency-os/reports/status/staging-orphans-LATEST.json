@@ -1,0 +1,162 @@
+﻿{
+    "generated_utc":  "2026-08-26T10:26:37Z",
+    "overall":  "CRITICAL",
+    "blind_spots":  [
+
+                    ],
+    "counts":  {
+                   "unregistered":  4,
+                   "dir_only":  0,
+                   "db_only":  6,
+                   "unknown":  0,
+                   "row_only":  0,
+                   "complete":  3
+               },
+    "orphan_total":  10,
+    "staging_disk_mb":  1969.7,
+    "findings":  [
+                     {
+                         "slug":  "e2e-verify-0704-6e2b91",
+                         "class":  "complete",
+                         "dir":  true,
+                         "sizeKb":  365660,
+                         "db":  "wp_s_6e2b917e2efc46b89cdbcb",
+                         "dbPresent":  true,
+                         "row":  true,
+                         "active":  "f",
+                         "org":  "9e6e0993-d535-438b-a252-64cecdd91cca"
+                     },
+                     {
+                         "slug":  "fresh-brew-coffee-f2a3b4",
+                         "class":  "unregistered",
+                         "dir":  true,
+                         "sizeKb":  95392,
+                         "db":  "wp_s_f2a3b4c5d6e789abcdef00",
+                         "dbPresent":  true,
+                         "row":  false,
+                         "active":  "",
+                         "org":  ""
+                     },
+                     {
+                         "slug":  "green-valley-farm-28ba09",
+                         "class":  "unregistered",
+                         "dir":  true,
+                         "sizeKb":  221844,
+                         "db":  "wp_s_28ba09a5733c49b1819fc6",
+                         "dbPresent":  true,
+                         "row":  false,
+                         "active":  "",
+                         "org":  ""
+                     },
+                     {
+                         "slug":  "mongolia-03-a49272",
+                         "class":  "complete",
+                         "dir":  true,
+                         "sizeKb":  562460,
+                         "db":  "wp_s_a492729fd89145d780b9cb",
+                         "dbPresent":  true,
+                         "row":  true,
+                         "active":  "f",
+                         "org":  "d6d1e845-1c8d-43aa-bee9-1c50df78b105"
+                     },
+                     {
+                         "slug":  "ssasd-8ebcd4",
+                         "class":  "unregistered",
+                         "dir":  true,
+                         "sizeKb":  312832,
+                         "db":  "wp_s_8ebcd496056049a8883944",
+                         "dbPresent":  true,
+                         "row":  false,
+                         "active":  "",
+                         "org":  ""
+                     },
+                     {
+                         "slug":  "test-pilot",
+                         "class":  "unregistered",
+                         "dir":  true,
+                         "sizeKb":  95392,
+                         "db":  "wp_staging_testpilot",
+                         "dbPresent":  true,
+                         "row":  false,
+                         "active":  "",
+                         "org":  ""
+                     },
+                     {
+                         "slug":  "test-wp-webhook-co-5c1bd1",
+                         "class":  "complete",
+                         "dir":  true,
+                         "sizeKb":  363380,
+                         "db":  "wp_s_5c1bd18ee4924d959194ab",
+                         "dbPresent":  true,
+                         "row":  true,
+                         "active":  "f",
+                         "org":  "37fdf3e3-55b4-4c22-a0dc-39bf1eb36313"
+                     },
+                     {
+                         "slug":  "(none)",
+                         "class":  "db_only",
+                         "dir":  false,
+                         "sizeKb":  0,
+                         "db":  "wp_s_29972023e7d14c3d86cac5",
+                         "dbPresent":  true,
+                         "row":  false,
+                         "active":  "",
+                         "org":  ""
+                     },
+                     {
+                         "slug":  "(none)",
+                         "class":  "db_only",
+                         "dir":  false,
+                         "sizeKb":  0,
+                         "db":  "wp_s_76e3cd2d311342eb9eb524",
+                         "dbPresent":  true,
+                         "row":  false,
+                         "active":  "",
+                         "org":  ""
+                     },
+                     {
+                         "slug":  "(none)",
+                         "class":  "db_only",
+                         "dir":  false,
+                         "sizeKb":  0,
+                         "db":  "wp_s_89488120950641239fe965",
+                         "dbPresent":  true,
+                         "row":  false,
+                         "active":  "",
+                         "org":  ""
+                     },
+                     {
+                         "slug":  "(none)",
+                         "class":  "db_only",
+                         "dir":  false,
+                         "sizeKb":  0,
+                         "db":  "wp_s_97dc2433ccd74d0fb0d93d",
+                         "dbPresent":  true,
+                         "row":  false,
+                         "active":  "",
+                         "org":  ""
+                     },
+                     {
+                         "slug":  "(none)",
+                         "class":  "db_only",
+                         "dir":  false,
+                         "sizeKb":  0,
+                         "db":  "wp_s_cca9e58e68ea4129ba1944",
+                         "dbPresent":  true,
+                         "row":  false,
+                         "active":  "",
+                         "org":  ""
+                     },
+                     {
+                         "slug":  "(none)",
+                         "class":  "db_only",
+                         "dir":  false,
+                         "sizeKb":  0,
+                         "db":  "wp_s_cfc84c52469b4b91b2accf",
+                         "dbPresent":  true,
+                         "row":  false,
+                         "active":  "",
+                         "org":  ""
+                     }
+                 ]
+}

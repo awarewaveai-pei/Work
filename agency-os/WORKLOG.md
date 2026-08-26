@@ -2,6 +2,84 @@
 
 ## 2026-08-26
 
+### AUTO_TASK_DONE: 補上佈建的拆除路徑 + 三層對帳偵測器（不變量的另一半）
+
+[任務]
+操作者指出真正該修的不是那 3 筆髒資料，而是不變量：**佈建流程建立的每一種持久資源，都
+必須有對應的拆除路徑。** 並指示「做最完美的處理，你要自己 REVIEW」（Codex 已不可用）。
+
+[先把 rollback 與 teardown 分開]
+這個 codebase 每一層都有 mid-flight rollback，沒有任何一層有成功後的拆除：
+`HetznerHostingAdapter.ts:132` 的 `teardown()` 只在 create 失敗的 catch 呼叫（`:289`）、
+`dns.ts:117` 同理、`provision-staging:263` 也一樣。全 repo grep `deprovision|teardown|
+decommission` 沒有第二種用法。代價可以數：SG staging 目錄 7 個（2.0 GB）、資料庫 13 個、
+`wp_sites` 只有 3 列 —— 三層各自獨立在漏。
+
+[已修改]
+- **新增** `lobster-factory/infra/hetzner-phase1-core/scripts/deprovision-staging.sh`（223 行）
+  四層一次拆：Supabase `wp_sites` 列 → org 的 `client_config.site_url` → MariaDB → 檔案系統。
+  預設 DRY RUN；`--apply` 另需 `--confirm <slug>`；先備份（mysqldump + tar + 資料列 JSON +
+  MANIFEST）並驗證非空才動手。跟著 sg-deploy 的 rsync 上機（`sg-deploy.sh:117`）。
+- **新增** `scripts/check-staging-orphans.ps1`（234 行）三層對帳，寫
+  `reports/status/staging-orphans-LATEST.{md,json}`，分類 complete / unregistered / dir_only /
+  db_only / row_only。
+- `scripts/ao-resume.ps1`：掛上對帳（warn-only，12 小時節流）。**沒有這一步它只是個沒人會
+  記得跑的腳本** —— slash command 不是自動化，這是 repo 明文判準。
+
+[為什麼拆除是腳本而不是 HTTP route]
+佈建是 route，因為 Trigger.dev 要呼叫它；拆除今天沒有編排器需要呼叫，只有操作者。把「刪光
+一個站」掛到 `LOBSTER_HOSTING_API_TOKEN` 後面，會讓那把今天只能建立的 token 也能摧毀 ——
+token 外洩的爆炸半徑放大一級，換來一個沒人要用的呼叫方式。將來 app 真的需要「刪除客戶」
+按鈕時，走 next-admin 既有的 SSH 路徑呼叫這支即可（同一條信任邊界，不新增 HTTP 能力）。
+
+[自審抓到並修掉的（外部 oracle 不可用，這是自己打自己的結果）]
+1. **拆一半**：`curl` 對 HTTP 4xx/5xx 回 exit 0。Supabase 掛掉時腳本會若無其事繼續
+   `DROP DATABASE` 與 `rm -rf`，留下一個 row_only 孤兒 —— 正是這支腳本要消滅的狀態，不能
+   自己製造。改為檢查狀態碼，非 2xx 即中止（SG 側完全未動，備份留著）；憑證讀不到也中止。
+2. `--keep-days` 直接餵給 `find -mtime`，負數會讓保留策略變成「立刻刪光所有備份」。加守衛。
+3. wp-cli 以 root 執行會被擋（"YIKES! running this as root"），錯誤走 stderr、stdout 留空 →
+   `DB_NAME` 讀成空字串。守衛 fail-closed 擋住了（不會誤刪），但工具完全不能用。改 `-u www-data`。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`deprovision-staging.sh`（守衛 9 例 + canary 全流程 ×2）| exit=0/2 | ms=~1500
+  - **守衛**：`../../../etc` 路徑穿越、`Bad_Slug` 非法字元、空 slug、不存在的 slug、非 WP 目錄、
+    未知參數、confirm 不符、`--keep-days -1`、`--keep-days abc` —— 9 例全部 exit=2 拒絕
+  - **canary #1**（舊碼）：自建拋棄式站 → dry-run 確認零改動 → apply → **四層全部 GONE**
+    （檔案 / 資料庫 / wp_sites 列）→ **還原演練**：從備份取回 PAYLOAD.txt 內容、db.sql 含資料列
+  - **canary #2**（改寫後的 apply 路徑）：同上，`deleted 1 row(s) (HTTP 204)` 走到新的狀態碼分支
+  - **交叉印證**：canary 拆完後跑對帳器，`grep -c canary` = 0，且孤兒數與磁碟量精確回到 canary
+    之前的數值（10 / 1969.7 MB）—— 兩個獨立工具互相確認，不是同一段程式自我背書
+- REALTEST_EVIDENCE: tool=Bash | cmd=`check-staging-orphans.ps1` | exit=1 | ms=~40000
+  - verdict=CRITICAL orphans=10 disk=1969.7MB blind_spots=0；分類與我手動查證的結果逐項相符
+    （3 complete / 6 db_only / 4 unregistered）
+  - 內嵌的 org metadata 邏輯另做 5 個單元測試：指向本站→清除且保留其他鍵、**指向別處→不得
+    改動**、尾斜線視為同一個、無列不炸、metadata 為 null 不炸
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=3c/0m/0n
+  - **oracle 不可用，改為寫出來的對抗自審**（見上段 1–3，皆為自審發現且已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`deprovision-staging\|check-staging-orphans\|staging-orphans-LATEST` | hits=0 過期引用
+  - 所有引用一致；報告中的 `/root/lobster-phase1/scripts/deprovision-staging.sh` 於本次 sg-deploy
+    rsync 後成立（R4：聲稱即驗證，部署前該路徑不存在）
+- ORACLE_WAIVED: 操作者告知 Codex 本 session 不可用，並明示由我自己 review
+- WORKLOG: 本則
+
+[這個檔踩過的五個坑，寫進 .NOTES 以免後人踩回去]
+PS 5.1 讀無 BOM 的 .ps1 當 CP950（CJK 全毀）／here-string 的 CRLF 會毒死遠端 bash／
+`bash -s` 從 stdin 餵腳本會被迴圈吃掉／含引號的指令當 ssh 參數會被 PS 拆散／EAP=Stop 下
+原生指令的 stderr 會拋 NativeCommandError 讓探測整個掉進 catch（報告變成「全是盲點」）。
+最後兩個特別值得記：**它們都會讓偵測器安靜地失去視力，而不是報錯。**
+
+[剩餘風險]
+- `db_only`（6 個只剩資料庫、沒有目錄）拆不動：腳本刻意要求目錄存在且含 wp-config.php，
+  否則無法證明要 DROP 的是哪一個。這一類要人工確認後手動處理，已寫進報告。
+- 現存 10 個孤兒 / 1969.7 MB **尚未清理** —— 本次只交付拆除路徑與偵測器，清理是操作者的決定。
+- 元件接線層仍無自動測試（前一則已開 TASKS）。
+
+[rollback]
+兩支新腳本都是新增檔，`git revert` 即可；`ao-resume.ps1` 的改動是 +28 行的獨立區塊。
+SG 上的 `/root/lobster-phase1/scripts/deprovision-staging.sh` 由 rsync 佈署，revert 後下次
+sg-deploy 會移除。已拆除的 canary 有備份可還原（保留 90 天）。
+
+
 ### AUTO_TASK_DONE: EU nginx 還原 Cloudflare 真實用戶端 IP（步驟 A 完成並端到端驗證）
 
 [任務]

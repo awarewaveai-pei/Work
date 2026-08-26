@@ -656,6 +656,34 @@ if (Test-Path -LiteralPath $routineFreshScript) {
     $global:LASTEXITCODE = 0
 }
 
+# --- staging 站三層對帳（warn-only；佈建漏出來的殘留要看得見）---
+# Rationale: 佈建會在三個地方留東西（SG 檔案系統 / MariaDB / Supabase wp_sites），而在
+# 2026-08-26 之前沒有任何拆除路徑，於是漂移到 7 目錄 / 13 資料庫 / 3 列都沒人知道。
+# deprovision-staging.sh 補上拆除，這支補上「漏了要看得見」。12 小時內跑過就跳過 —— 這個
+# 檢查要開十幾個 docker exec，每次 AO-RESUME 都重跑不划算，而漂移是以天計的（同 cf-security
+# 的 mtime 節流作法）。
+$stagingOrphanScript = Join-Path $WorkRoot "scripts\check-staging-orphans.ps1"
+$stagingOrphanReport = Join-Path $WorkRoot "agency-os\reports\status\staging-orphans-LATEST.json"
+if (Test-Path -LiteralPath $stagingOrphanScript) {
+    $soFresh = $false
+    if (Test-Path -LiteralPath $stagingOrphanReport) {
+        $soAge = (Get-Date) - (Get-Item -LiteralPath $stagingOrphanReport).LastWriteTime
+        if ($soAge.TotalHours -lt 12) { $soFresh = $true }
+    }
+    if ($soFresh) {
+        Write-Host ""
+        Write-Host "== AO-RESUME: staging orphan reconcile (skipped, report < 12h old) ==" -ForegroundColor DarkGray
+    } else {
+        Write-Host ""
+        Write-Host "== AO-RESUME: staging orphan reconcile (warn-only) ==" -ForegroundColor Cyan
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $stagingOrphanScript -WorkRoot $WorkRoot
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "WARN: staging 三層對帳有孤兒或盲點（見 agency-os/reports/status/staging-orphans-LATEST.md）。" -ForegroundColor Yellow
+        }
+        $global:LASTEXITCODE = 0
+    }
+}
+
 # Fetch external signals (Telegram ops inbox + Slack) since last AO-CLOSE — non-blocking.
 # Pass -From explicitly so the gap window is always (last AO-CLOSE → now), not a stale fallback.
 $fetchSignalsScript = Join-Path $WorkRoot "scripts\fetch-external-signals.ps1"
