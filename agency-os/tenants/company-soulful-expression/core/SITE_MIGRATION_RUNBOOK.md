@@ -39,9 +39,10 @@
 
 ### ② 規格下限
 
-- RAM：**128 GB ECC**（2026-08-17 上修，原定 64 GB 已作廢）—— 這台不只放 soulful，還要承載 Chatwoot + EU 全部服務 + 多站 WP。決策與負載帳：[`reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md`](../../../reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md)
+- RAM：**128 GB ECC**（2026-08-17 上修，原定 64 GB 已作廢）—— 原始規畫是這台不只放 soulful，還要承載 Chatwoot + EU 全部服務 + 多站 WP。決策與負載帳：[`reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md`](../../../reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md)
 - CPU：**≥8C/16T**；**ECC 記憶體為硬門檻**（要跑 Supabase / Chatwoot / ClickHouse 的正式資料）
 - **磁碟務必 SSD/NVMe，不要為省錢選 HDD** —— WooCommerce + Ultimate Member 的資料庫吃 IO；**RAID1 後可用容量 ≥1 TB**
+- **⚠️ 2026-08-26 實況偏離**：KS-6 缺貨，實際下單 **OVH SYS-GAME-2**（8c/16t／**64GB ECC**／**2×960GB RAID1**，皆低於本節下限）。已與操作者對齊：**這台範圍縮小為僅承接 soulful，不再承載 Chatwoot/EU 服務**（那些留在原機或另評估）。下方 §1「目標主機」與此節其餘規格敘述維持原樣（作為若未來換機時的規格參考），實際建置以此則為準。詳見決策文件切換條件段 + `WORKLOG.md` 2026-08-26「Soulful 搬遷主機」entry。
 
 ### ③ 要不要 RAID
 
@@ -57,8 +58,8 @@
 
 ## 1. 新主機最低需求
 
-> **目標主機已定（2026-08-16 決議）：搬到新購的二手 Hetzner 主機**（同 `memory/project_hetzner_dedicated_plan.md` 的採購計畫）。
-> 該等級機器（大記憶體 + 大磁碟）遠超本站需求，下表因此是「最低門檻」而非規格建議 —— 真正要注意的是**軟體版本要對齊**，不是硬體夠不夠。
+> **目標主機已定（2026-08-26 更新）：OVH SYS-GAME-2**（149.202.64.114，Ubuntu 24.04 已裝、RAID1 已驗；憑證在 `AWARE_WAVE_CREDENTIALS.md`「OVH Dedicated Server」節）——**不是**原規劃的二手 Hetzner（KS-6 缺貨改買，見上方 §0.5②）。
+> 機器等級（8c/16t／64GB ECC／2×960GB RAID1）超過本站需求，下表因此是「最低門檻」而非規格建議 —— 真正要注意的是**軟體版本要對齊**，不是硬體夠不夠。
 >
 > **所有權澄清**：soulfulexpression.org 是**操作者自己的產業**，不是第三方客戶。文中的「授權確認」「約時間」因此是自己決定，不需對外協調。
 
