@@ -158,8 +158,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: err.error }, { status: err.status });
   }
 
-  const job = await createJob();
-  // orgId 已在提交 EU 之前解析（見上方 effectiveOrgId 區塊）。
+  // orgId 已在提交 EU 之前解析（見上方 effectiveOrgId 區塊），此處寫進列 → /api/video/status
+  // 的租戶閘有東西可讀（同 generate route；不可改用稍後的 recordParams，理由見 job-store.ts）。
+  let job: Awaited<ReturnType<typeof createJob>>;
+  try {
+    job = await createJob(orgId);
+  } catch (e: unknown) {
+    // EU 渲染已於上方 render.run() 提交，這裡失敗＝「算力已花但沒有進度票」。刻意不試圖取消 EU：
+    // 影片仍會落到 R2，且 out_name 已帶 org 前綴 → 對帳 sweep 會把它補進畫廊
+    // （lib/content/video/reconcile.ts:95-98）。回 500 讓失敗可見，不假裝成功。
+    console.error("[video/render-draft] createJob failed (EU render already submitted):", e);
+    return NextResponse.json(
+      { ok: false, error: "無法建立影片工作（job 儲存失敗）；渲染仍在進行，稍後可於歷史紀錄查看" },
+      { status: 500 },
+    );
+  }
   await finishJob(job.id, {
     status: "running",
     euJobId: sub.jobId,

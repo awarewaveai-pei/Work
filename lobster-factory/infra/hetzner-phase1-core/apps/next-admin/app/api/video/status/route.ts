@@ -6,10 +6,14 @@
  *   - EU done    → **此刻**記錄 media_assets（best-effort）+ 清 R2 暫存 + 標記 job done → 回 done+video
  *   - EU error   → 標記 job error → 回 error
  * 收尾全在這個快速請求內完成 → 不依賴任何背景工作（繞開 Next.js 背景限制）。
+ *
+ * 授權兩層：① 角色閘 canCreateAiImageJob（viewer 擋掉）② 租戶閘 assertOrgAccess，讀 job 之後
+ * 立刻執行、在任何回傳資料的分支之前（見下方註解）。
  */
 import { NextRequest, NextResponse } from "next/server";
 import type { RenderOutputMeta, RenderOutputs } from "@/lib/content/video/render-client";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
+import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 const EXPECTED_VIDEO_DIMENSIONS: Record<string, { width: number; height: number }> = {
   "16x9": { width: 1920, height: 1080 },
@@ -53,6 +57,23 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (!job) {
     return NextResponse.json({ ok: false, error: "job_not_found" }, { status: 404 });
   }
+
+  // ── 租戶閘 ──────────────────────────────────────────────────────────────────
+  // 位置很重要：必須在**第一個回傳資料的分支之前**。下面 :status==="done" 那支直接回
+  // job.video（該次 render 全部格式的 R2 URL）+ title —— 那是本 route 最有價值的外洩點，
+  // 而且它會在走到下方 recordVideoAsset 之前就 return。原始 finding 寫「在 recordVideoAsset
+  // 之前補」，照那個位置補出來的是一道**對已完成 job 完全無效**的假閘（2026-08-26 覆核）。
+  //
+  // 讀 job.organizationId（createJob 建立列時寫定）而**不是** job.recordParams?.organizationId：
+  // recordParams 在 prepare 失敗時根本不存在（generate/route.ts:142、:168），拿它當依據會讓
+  // client 對自己失敗的 render 永久 403，連錯誤訊息都拿不到。所有權必須獨立於 record payload。
+  //
+  // organizationId 為 null 的情況：① 本 migration（0060）之前建立的 in-flight 列 —— 受該表
+  // 1h TTL 自限 ② staff 且 POD_DESIGNS_DEFAULT_ORG_ID 未設。兩者 assertOrgAccess 都放行 staff、
+  // 擋下 client，即 fail-closed。（client 帳號無 org 綁定時 effectiveOrgId 早在建 job 時就拋，
+  // 所以「client 的 job 沒有 org」不可能發生 —— lib/tenant-guard.ts:113-119。）
+  try { assertOrgAccess(req, job.organizationId ?? null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e) as NextResponse; throw e; }
 
   // 已結束 → 直接回
   if (job.status === "done") {

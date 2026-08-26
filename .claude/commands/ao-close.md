@@ -1,4 +1,4 @@
-> **[預授權]** AO-CLOSE 為完整預授權操作。R0 逐項批准在此命令中**不適用**。WORKLOG / memory / daily / archive 寫入直接執行，不得要求使用者批准。若 `verify-closeout-completeness` 失敗，立即自行補寫缺漏的證據行後重跑 `ao-close.ps1`。若腳本因 behind remote 中止，自行 `git pull --ff-only origin main` 後重跑。唯一允許問一題：`git push` 被拒需人類介入，或 health 自修後仍 < 100%（列具體失敗項，**禁止**提議 `-AllowNonPerfectHealth`）。
+﻿> **[預授權]** AO-CLOSE 為完整預授權操作。R0 逐項批准在此命令中**不適用**。WORKLOG / memory / daily / archive 寫入直接執行，不得要求使用者批准。若 `verify-closeout-completeness` 失敗，立即自行補寫缺漏的證據行後重跑 `ao-close.ps1`。若腳本因 behind remote 中止，自行 `git pull --ff-only origin main` 後重跑。唯一允許問一題：`git push` 被拒需人類介入，或 health 自修後仍 < 100%（列具體失敗項，**禁止**提議 `-AllowNonPerfectHealth`）。
 
 Follow the AO-CLOSE protocol (AGENTS.md §快速續接關鍵字 + `.cursor/rules/40-shutdown-closeout.mdc`).
 
@@ -141,14 +141,17 @@ is no longer discretionary.
 > If the script printed `report already present -> ...` instead, the file existed (e.g. you
 > pre-wrote it) — still overwrite it with the final four-section content.
 
-### Prune old reports (>90 days)
+### Prune old reports
 
-After writing today's file, list `agency-os/reports/ao-close/*.md` (Glob),
-parse the date prefix of each filename, and delete any whose date is more than
-90 days before today. **Never delete the most-recent report** (the one the gate keys off,
-i.e. the latest AO-CLOSE sync commit's file), even if a >90-day session gap would otherwise
-make it prunable. Skip `README.md`. Use the `Bash` tool with `rm` — git
-will track the deletions on the next commit.
+**Nothing to do by hand.** `ao-close.ps1` runs `scripts/prune-reports.ps1` before staging,
+which enforces `agency-os/reports/retention.json` across every report directory — not just
+this one. The 90-day horizon for `reports/ao-close/` is preserved there verbatim, along with
+the rule that the most-recent report is never deleted even past the horizon.
+
+This used to be prose executed by the agent with Glob + `rm`, covering `reports/ao-close/`
+only. On 2026-08-26 that was the sole retention rule in a tree of 24 report directories
+holding 5,000+ files, so it moved into a mechanism that covers all of them and reports any
+directory that declares no retention at all.
 
 If the archive folder doesn't exist yet, create it first.
 

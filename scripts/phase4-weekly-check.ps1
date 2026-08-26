@@ -43,200 +43,122 @@ $results   = [ordered]@{}
 
 Write-Host "== Phase 4 週巡檢 $dateLabel ==" -ForegroundColor Cyan
 
-# ── Check 1: 重複修復偵測 ──────────────────────────────────────────────────
-Write-Host "`n[Check 1] 重複修復偵測..." -ForegroundColor Cyan
-$check1Status = "PASS"
-$check1Detail = ""
-try {
-    $prJson = & gh pr list --repo awarewaveai-pei/Work --label auto-repair --state all --limit 30 --json number,title,createdAt 2>$null
-    if ($LASTEXITCODE -eq 0 -and $prJson) {
-        $prs = $prJson | ConvertFrom-Json
-        # Group by simplified title (first 40 chars, lowercase, strip PR# prefix)
-        $titleMap = @{}
-        foreach ($pr in $prs) {
-            $key = ($pr.title -replace '#\d+', '' -replace '\s+', ' ').Trim().ToLower().Substring(0, [Math]::Min(40, $pr.title.Length))
-            if (-not $titleMap[$key]) { $titleMap[$key] = @() }
-            $titleMap[$key] += "#$($pr.number)"
-        }
-        $dupes = $titleMap.GetEnumerator() | Where-Object { $_.Value.Count -ge 2 }
-        if (@($dupes).Count -gt 0) {
-            $check1Status = "WARNING"
-            $check1Detail = ($dupes | ForEach-Object { "$($_.Value -join ', '): $($_.Key)..." }) -join "; "
-            Write-Host "   WARNING: 重複修復 — $check1Detail" -ForegroundColor Yellow
-        } else {
-            Write-Host "   PASS: 無重複修復 ($($prs.Count) auto-repair PRs 已檢查)" -ForegroundColor Green
-        }
-    } else {
-        $check1Status = "SKIP"
-        $check1Detail = "gh CLI 不可用或無 PR"
-        Write-Host "   SKIP: $check1Detail" -ForegroundColor DarkYellow
-    }
-} catch {
-    $check1Status = "SKIP"
-    $check1Detail = "錯誤: $_"
+# ── 執行單一 checker ───────────────────────────────────────────────────────
+# 2026-08-26：本檔不再自己實作任何檢查。全部邏輯在 scripts/phase4-checks.py，
+# 雲端 routine 與本檔呼叫同一支。這是為了關掉一個真的發生過的失效：CHECK 4 於
+# 2026-05-23 只加進雲端 prompt，本檔三個月不知道它存在 —— 所謂「備援」其實是
+# 另一顆不同的偵測器。以後新增檢查改 .py 一處，兩邊同時生效，不必動雲端 prompt。
+#
+# $ErrorActionPreference 從 SilentlyContinue 改為 Continue：舊值正是 Check 3 在
+# 資料寫壞時整段靜默跳過、卻仍宣告健康的成因（2026-08-26 實測重現）。這裡改為
+# 逐一檢查 exit code，任何失敗都必須看得見。
+$ErrorActionPreference = "Continue"
+
+$checker     = Join-Path $WorkRoot "scripts\phase4-checks.py"
+$stamp       = $now.ToString("yyyy-MM-dd HH:mm")
+$dateOnly    = $now.ToString("yyyy-MM-dd")
+$latestPath  = Join-Path $reportDir "phase4-LATEST.md"
+$archivePath = Join-Path $reportDir "phase4-$dateOnly.md"
+$trigger     = "手動 fallback (scripts\phase4-weekly-check.ps1)"
+
+function Write-SkipReport {
+    param([string]$Reason)
+    # 跑不起來時絕不可以長得像健康：四項全部 SKIP，理由直接寫進報告本體。
+    $lines = @(
+        "# Repair Center Phase 4 週巡檢",
+        "- 日期: $stamp TPE",
+        "- 觸發: $trigger",
+        "- Check 1 重複修復: SKIP — $Reason",
+        "- Check 2 needs-human-review PR: SKIP — $Reason",
+        "- Check 3 租戶備份健康: SKIP — $Reason",
+        "- Check 4 VPS auto-reboot SSOT: SKIP — $Reason",
+        "- 整體: ⚠️ 0 項需注意, 4 項 SKIP"
+    )
+    $body = ($lines -join "`n") + "`n"
+    $utf8 = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($latestPath,  $body, $utf8)
+    [System.IO.File]::WriteAllText($archivePath, $body, $utf8)
+    Write-Host "WARN: checker 無法執行 — $Reason" -ForegroundColor Red
+    return $body
 }
-$results["check1"] = @{ status = $check1Status; detail = $check1Detail }
 
-# ── Check 2: needs-human-review 開放 PR ───────────────────────────────────
-Write-Host "`n[Check 2] needs-human-review PR..." -ForegroundColor Cyan
-$check2Status = "PASS"
-$check2Detail = ""
-try {
-    $prJson2 = & gh pr list --repo awarewaveai-pei/Work --label needs-human-review --state open --limit 10 --json number,title,url 2>$null
-    if ($LASTEXITCODE -eq 0 -and $prJson2) {
-        $prs2 = $prJson2 | ConvertFrom-Json
-        if (@($prs2).Count -gt 0) {
-            $check2Status = "WARNING"
-            $check2Detail = (@($prs2) | ForEach-Object { "#$($_.number): $($_.title)" }) -join " | "
-            Write-Host "   WARNING: $(@($prs2).Count) 個 PR 需人工審查 — $check2Detail" -ForegroundColor Yellow
-        } else {
-            Write-Host "   PASS: 無開放中 needs-human-review PR" -ForegroundColor Green
-        }
-    } else {
-        $check2Status = "SKIP"
-        $check2Detail = "gh CLI 不可用"
-        Write-Host "   SKIP: $check2Detail" -ForegroundColor DarkYellow
-    }
-} catch {
-    $check2Status = "SKIP"
-    $check2Detail = "錯誤: $_"
+$python = $null
+foreach ($cand in @("python3", "python", "py")) {
+    $found = Get-Command $cand -ErrorAction SilentlyContinue
+    if ($found) { $python = $found.Source; break }
 }
-$results["check2"] = @{ status = $check2Status; detail = $check2Detail }
 
-# ── Check 3: BACKUP_RESTORE_PROOF 健康（status frontmatter + JSON cross-truth）──
-# 2026-05-30: 退役舊「抓最新日期」proxy 邏輯（會誤報 not-onboarded tenant），改對齊
-# cloud routine AgencyOS-RepairCenterPhase4Weekly 的 status-frontmatter 邏輯：
-#   not-onboarded → SKIP（靜默，不算 WARNING）
-#   active → 3A restore_drill_due_after 逾期 + 3B BACKUP_AUTO_STATUS.json last_success > 8 天
-Write-Host "`n[Check 3] BACKUP_RESTORE_PROOF 健康（status frontmatter）..." -ForegroundColor Cyan
-$check3Status = "PASS"
-$check3Detail = ""
-$proofFiles   = Get-ChildItem -Path (Join-Path $WorkRoot "agency-os\tenants") -Filter "BACKUP_RESTORE_PROOF.md" -Recurse -ErrorAction SilentlyContinue |
-                Where-Object { $_.FullName -notmatch "template" }
-$warnList = @()
-$nowUtc   = (Get-Date).ToUniversalTime()
-foreach ($f in $proofFiles) {
-    $tenantSlug = ($f.FullName -split '\\' | Where-Object { $_ -like 'company-*' } | Select-Object -First 1)
-    if (-not $tenantSlug) { $tenantSlug = Split-Path (Split-Path $f.DirectoryName -Parent) -Leaf }
-    $raw = Get-Content -LiteralPath $f.FullName -Raw -ErrorAction SilentlyContinue
+$telegramText = $null
+$allPass      = $false
 
-    $status = $null
-    $fmMatch = [regex]::Match($raw, '(?ms)\A---\s*\r?\n(.*?)\r?\n---')
-    if ($fmMatch.Success) {
-        $sMatch = [regex]::Match($fmMatch.Groups[1].Value, '(?m)^\s*status:\s*(\S+)')
-        if ($sMatch.Success) { $status = $sMatch.Groups[1].Value.Trim() }
-    }
-
-    if ($status -eq 'not-onboarded') {
-        Write-Host "   SKIP: $tenantSlug — not-onboarded" -ForegroundColor DarkGray
-        continue
-    }
-    if ($status -ne 'active') {
-        $warnList += "${tenantSlug}: 未知/缺 status frontmatter ($status)"
-        Write-Host "   WARNING: $tenantSlug — 未知 status '$status'" -ForegroundColor Yellow
-        continue
-    }
-
-    $tenantWarn = @()
-
-    # 3A — restore drill due
-    $drillMatch = [regex]::Match($fmMatch.Groups[1].Value, '(?m)^\s*restore_drill_due_after:\s*(\d{4}-\d{2}-\d{2})')
-    if ($drillMatch.Success) {
-        $due = [datetime]::ParseExact($drillMatch.Groups[1].Value, 'yyyy-MM-dd', $null)
-        if ($nowUtc.Date -gt $due.Date) {
-            $tenantWarn += "restore drill overdue (due $($drillMatch.Groups[1].Value))"
-        }
-    }
-
-    # 3B — automated backup freshness (truth source)
-    $jsonPath = Join-Path $f.DirectoryName "BACKUP_AUTO_STATUS.json"
-    if (-not (Test-Path $jsonPath)) {
-        $tenantWarn += "BACKUP_AUTO_STATUS.json missing — no truth source"
-    } else {
-        try {
-            $j       = Get-Content -LiteralPath $jsonPath -Raw | ConvertFrom-Json
-            $unix    = [long]$j.last_success.unix_utc
-            $lastUtc = [datetimeoffset]::FromUnixTimeSeconds($unix).UtcDateTime
-            $ageDays = [Math]::Floor(($nowUtc - $lastUtc).TotalDays)
-            if ($ageDays -gt 8) {
-                $tenantWarn += "last success ${ageDays}d ago ($($j.last_success.iso_utc)); over 8d"
-            }
-        } catch {
-            $tenantWarn += "BACKUP_AUTO_STATUS.json parse error / missing last_success.unix_utc"
-        }
-    }
-
-    if ($tenantWarn.Count -gt 0) {
-        $warnList += "${tenantSlug}: $($tenantWarn -join ', ')"
-        Write-Host "   WARNING: $tenantSlug — $($tenantWarn -join ', ')" -ForegroundColor Yellow
-    } else {
-        Write-Host "   OK: $tenantSlug — active, drill+backup fresh" -ForegroundColor Green
-    }
-}
-if (@($proofFiles).Count -eq 0) {
-    $check3Status = "SKIP"
-    $check3Detail = "無 BACKUP_RESTORE_PROOF.md 找到"
-    Write-Host "   SKIP: $check3Detail" -ForegroundColor DarkYellow
-} elseif ($warnList.Count -gt 0) {
-    $check3Status = "WARNING"
-    $check3Detail = $warnList -join "; "
+if (-not $python) {
+    $null = Write-SkipReport -Reason "找不到 python3/python（checker 需要 Python 3）"
+    $telegramText = "⚠️ Repair Center Phase 4 週巡檢 $stamp`n四項全部 SKIP：本機找不到 Python 3"
+} elseif (-not (Test-Path -LiteralPath $checker)) {
+    $null = Write-SkipReport -Reason "找不到 $checker"
+    $telegramText = "⚠️ Repair Center Phase 4 週巡檢 $stamp`n四項全部 SKIP：找不到 phase4-checks.py"
 } else {
-    Write-Host "   PASS: active tenant 備份健康；not-onboarded 已 SKIP" -ForegroundColor Green
+    $errFile = [System.IO.Path]::GetTempFileName()
+    try {
+        # Invoke-WithUtf8Console：外部命令 stdout 在 Big5 主機上會被 CP950 解碼吃掉
+        # 中文與換行（見 scripts/_console-encoding-helpers.ps1 檔頭）。JSON 含中文，必包。
+        $raw = Invoke-WithUtf8Console {
+            & $python $checker --repo $WorkRoot --format json --write `
+                --timestamp $stamp --trigger $trigger 2>$errFile
+        }
+        $rc = $LASTEXITCODE
+        $stderrText = ""
+        if (Test-Path -LiteralPath $errFile) {
+            $stderrText = ((Get-Content -LiteralPath $errFile -Raw -ErrorAction SilentlyContinue) + "").Trim()
+        }
+
+        if ($rc -ne 0) {
+            $null = Write-SkipReport -Reason "checker exit=$rc $stderrText"
+            $telegramText = "⚠️ Repair Center Phase 4 週巡檢 $stamp`n四項全部 SKIP：checker exit=$rc"
+        } else {
+            $json = $null
+            try { $json = ($raw -join "`n") | ConvertFrom-Json } catch { $json = $null }
+            if (-not $json) {
+                $null = Write-SkipReport -Reason "checker 輸出不是合法 JSON"
+                $telegramText = "⚠️ Repair Center Phase 4 週巡檢 $stamp`n四項全部 SKIP：checker 輸出無法解析"
+            } else {
+                # 報告檔已由 checker 以 --write 寫入（單一寫入者 → 兩個呼叫端不會產出
+                # 不同行尾或不同格式的同名檔）。這裡只負責顯示與通知。
+                Write-Host $json.report
+                $telegramText = $json.telegram
+                $allPass = (($json.warnings -eq 0) -and ($json.skips -eq 0))
+            }
+        }
+    } finally {
+        Remove-Item -LiteralPath $errFile -Force -ErrorAction SilentlyContinue
+    }
 }
-$results["check3"] = @{ status = $check3Status; detail = $check3Detail }
 
-# ── 寫報告 ─────────────────────────────────────────────────────────────────
-$warnCount = @($results.Values | Where-Object { $_.status -eq "WARNING" }).Count
-$skipCount = @($results.Values | Where-Object { $_.status -eq "SKIP" }).Count
-$allPass   = ($warnCount -eq 0)
-$overall   = if ($warnCount -eq 0 -and $skipCount -eq 0) { "✅ 全PASS" }
-             elseif ($skipCount -eq 0) { "⚠️ $warnCount 項需注意" }
-             else { "⚠️ $warnCount 項需注意, $skipCount 項 SKIP" }
-
-$report = @"
-# Repair Center Phase 4 週巡檢
-- 日期: $dateLabel CST
-- Check 1 重複修復: $($results.check1.status)$(if ($results.check1.detail) { " — $($results.check1.detail)" })
-- Check 2 needs-human-review PR: $($results.check2.status)$(if ($results.check2.detail) { " — $($results.check2.detail)" })
-- Check 3 BACKUP_RESTORE_PROOF: $($results.check3.status)$(if ($results.check3.detail) { " — $($results.check3.detail)" })
-- 整體: $overall
-"@
-
-$utf8 = New-Object System.Text.UTF8Encoding $false
-$latestPath = Join-Path $reportDir "phase4-LATEST.md"
-$archivePath = Join-Path $reportDir "phase4-$($now.ToString('yyyy-MM-dd')).md"
-[System.IO.File]::WriteAllText($latestPath,  $report + "`n", $utf8)
-[System.IO.File]::WriteAllText($archivePath, $report + "`n", $utf8)
-Write-Host "`n報告 → $latestPath" -ForegroundColor DarkGray
+Write-Host "報告 → $latestPath" -ForegroundColor DarkGray
 
 # ── Telegram 通知 ──────────────────────────────────────────────────────────
 if (-not $SkipTelegram) {
-    # Real values come from the environment (mcp/user-env.ps1), never from
-    # `secrets-vault -Action get` — that returns a MASKED value and made this
-    # notification 404 silently until 2026-08-12. See scripts/lib/telegram-notify.ps1.
+    # 通知內容同樣來自 checker 的單一輸出（$json.telegram），不在這裡重新拼字串 ——
+    # 否則 Check 4 那種「只加一邊」的漏接會在通知層重演一次。
+    # 真值來自環境（mcp/user-env.ps1），絕不走 `secrets-vault -Action get`：那會回遮罩值，
+    # 曾讓本通知靜默 404 直到 2026-08-12。見 scripts/lib/telegram-notify.ps1。
     try {
-    $tgLib = Join-Path $WorkRoot "scripts\lib\telegram-notify.ps1"
-    if (Test-Path -LiteralPath $tgLib) {
-        . $tgLib
-        $emoji = if ($allPass) { '✅' } else { '⚠️' }
-        $text  = "$emoji Repair Center Phase 4 週巡檢 $($now.ToString('MM/dd HH:mm'))`n"
-        $text += "1 重複修復: $($results.check1.status)`n"
-        $text += "2 needs-human-review: $($results.check2.status)`n"
-        $text += "3 備份新鮮度: $($results.check3.status)`n"
-        if (-not $allPass) { $text += "`n詳細: reports/repair-center/phase4-LATEST.md" }
-        $tgResult = Send-OpsTelegram -Text $text -WorkRoot $WorkRoot
-        if ($tgResult.Sent) {
-            Write-Host "Telegram 通知已發送（$($tgResult.Reason)）" -ForegroundColor Green
+        $tgLib = Join-Path $WorkRoot "scripts\lib\telegram-notify.ps1"
+        if (Test-Path -LiteralPath $tgLib) {
+            . $tgLib
+            $tgResult = Send-OpsTelegram -Text $telegramText -WorkRoot $WorkRoot
+            if ($tgResult.Sent) {
+                Write-Host "Telegram 通知已發送（$($tgResult.Reason)）" -ForegroundColor Green
+            } else {
+                Write-Host "WARN: Telegram 發送失敗 — $($tgResult.Reason)" -ForegroundColor Yellow
+            }
         } else {
-            Write-Host "WARN: Telegram 發送失敗 — $($tgResult.Reason)" -ForegroundColor Yellow
+            Write-Host "WARN: 找不到 scripts\lib\telegram-notify.ps1，跳過通知" -ForegroundColor Yellow
         }
-    } else {
-        Write-Host "WARN: 找不到 scripts\lib\telegram-notify.ps1，跳過通知" -ForegroundColor Yellow
-    }
     } catch {
         Write-Host "WARN: Telegram 發送失敗 - $_" -ForegroundColor Yellow
     }
 }
 
-Write-Host "`n== Phase 4 週巡檢完成: $overall ==" -ForegroundColor $(if ($allPass) { 'Green' } else { 'Yellow' })
+Write-Host "== Phase 4 週巡檢完成 ==" -ForegroundColor $(if ($allPass) { 'Green' } else { 'Yellow' })
 exit 0

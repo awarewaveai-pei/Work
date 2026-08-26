@@ -4,8 +4,10 @@ status: not-onboarded
 onboarded_at: null
 backup_schedule: null
 backup_destination: null
-restore_drill_due_after: null
-last_known_success_utc: null
+# 2026-08-26 schema：記錄演練「事實」，到期日由 scripts/phase4-checks.py 推算
+# （舊 restore_drill_due_after / last_known_success_utc 為推導值與手抄鏡像，已退役）
+restore_drill_interval_days: 90
+restore_drills:
 truth_source: null
 ---
 

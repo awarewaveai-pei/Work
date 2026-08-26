@@ -111,7 +111,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const { createJob, finishJob, updateJobStep } = await import("@/lib/content/video/job-store");
   const { cleanupVideoInputKeys } = await import("@/lib/content/blocks/video-pipeline");
-  const job = await createJob();
+
+  // 租戶身分在**建立列的當下**就寫進 job（上方 :59 已解析完成）。/api/video/status 的租戶閘
+  // 讀的是這個欄位，而不是下方才寫入的 recordParams —— prepare 失敗時（:128 / :154）
+  // recordParams 根本不存在，拿它當授權依據等於讓 client 永遠看不到自己失敗的原因。
+  // createJob 現在會在 insert 失敗時拋出（不再靜默降級成「之後每次 /status 都 job_not_found」）。
+  let job: Awaited<ReturnType<typeof createJob>>;
+  try {
+    job = await createJob(orgId);
+  } catch (e: unknown) {
+    console.error("[video/generate] createJob failed:", e);
+    return NextResponse.json(
+      { ok: false, status: 500, error: "無法建立影片工作（job 儲存失敗）" },
+      { status: 500 },
+    );
+  }
 
   // 關鍵：**同步**呼叫 prepare（Claude 腳本 + Flux 圖並行 + 提交 EU，~25s，無背景工作、不撞 CF 100s）。
   // 渲染在 EU thread 跑（持久）；/status 輪詢 EU 收尾。無 after()/fire-and-forget → 不再撞 Next.js 背景限制。

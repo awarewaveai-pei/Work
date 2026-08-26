@@ -581,6 +581,16 @@ try {
         exit 1
     }
 
+    # ── Report retention (added 2026-08-26) ──────────────────────────────────────
+    # Runs BEFORE staging so deletions land in the same commit as the close-out, rather than
+    # showing up as unexplained removals in the next one. Warn-only by contract: housekeeping
+    # must never block a close-out. Policy: agency-os/reports/retention.json.
+    $pruneScript = Join-Path $PSScriptRoot "prune-reports.ps1"
+    if (Test-Path -LiteralPath $pruneScript) {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $pruneScript -WorkRoot $WorkRoot | Out-Host
+        $global:LASTEXITCODE = 0
+    }
+
     # ── Unverified-code gate (added 2026-08-25) ──────────────────────────────────
     # AO-CLOSE commits AND pushes. Until now it consulted verify-build-gates and
     # verify-closeout-completeness but never the per-session code-change tracker, so code

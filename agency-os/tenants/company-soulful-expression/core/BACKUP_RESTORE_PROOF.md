@@ -5,9 +5,16 @@ onboarded_at: 2026-05-08
 backup_schedule: weekly
 backup_destination: googledrive
 backup_destination_label: "Update_Backup (WPvivid auth_id wpvivid-auth-ca9352c3bbbf3, MainWP remote_id wpvivid-remote-69ff0a63b77ab)"
-restore_drill_due_after: 2026-08-06   # baseline 2026-05-08 + 90 days
-last_known_success_utc: 2026-06-08T00:15:04Z
-last_known_success_task_id: wpvivid-6e68a5af17f93
+# restore_drill_due_after 已於 2026-08-26 退役：那是「推導值」，演練做完沒人回頭改它就變成假警報，
+# 被推前又能無聲關掉整條檢查。改記錄演練「事實」，到期日由 phase4-checks.py 自行推算。
+restore_drill_interval_days: 90
+restore_drills:
+  - date: 2026-08-16
+    result: PASS
+    scope: data-layer
+    note: "Drill #1 — EU 拋棄式容器；288 表還原、750 筆附件與磁碟零遺失。未含程式碼，故未驗「站能開起來」"
+# last_known_success_utc / last_known_success_task_id 同日移除：它們是 BACKUP_AUTO_STATUS.json 的手抄鏡像，
+# 全 repo 無任何消費端，實際已停在 2026-06-08 爛了 70 天。真值一律看下面那份 JSON。
 truth_source: agency-os/tenants/company-soulful-expression/core/BACKUP_AUTO_STATUS.json
 ---
 
@@ -71,7 +78,7 @@ truth_source: agency-os/tenants/company-soulful-expression/core/BACKUP_AUTO_STAT
 ### 尚未涵蓋 / 已知限制
 
 - **plugins（619 MB）與 themes（22 MB）未備份** —— 判定為可重新安裝的第三方程式碼，非不可取代資料。搬遷時以乾淨安裝 + 設定還原處理；若要 bit-for-bit 全站快照，搬遷當下另做。
-- **未執行還原演練（restore drill）** —— 上述為完整性驗證，非「還原後網站可運作」的證明。還原演練應於目標主機就緒後執行，並回寫本檔。
+- ~~**未執行還原演練（restore drill）**~~ —— 上述為完整性驗證，非「還原後網站可運作」的證明。**【已解除 2026-08-16】**隔日即以 EU 拋棄式容器完成 Drill #1（PASS），見下方 §Restore Drill Record。此行保留為 08-15 當下的真實限制記錄，勿當現況讀。
 - 本備份是**搬遷前的安全網**，非取代日常備份；WPvivid/MainWP 例行備份不受影響。
 
 ## Backup Milestone — 2026-05-09（MainWP + WPvivid 自動化建立）
@@ -195,5 +202,5 @@ truth_source: agency-os/tenants/company-soulful-expression/core/BACKUP_AUTO_STAT
 | SHA-256 checksum | `849db7848992308dd4dd0b7a88c19add60b9b737463a90ba19a93da9566264b1` |
 | 5/22 Google Drive ZIP | `G:\我的雲端硬碟\wpvivid_backup\soulfulexpression.org_wpvivid-ea9a8f38850c5_2026-05-22-10-53_backup_all.part001.zip` |
 | MainWP DB truth source | `mwp_mainwp_wpvividmeta WHERE site_id=2 AND option_name='report_addon'` on EU VPS mainwp-web container |
-| Restore log path | 待 staging restore drill 產生 |
-| Screenshot/report | 待 Day 2 staging 驗收 |
+| Restore log path | Drill #1（2026-08-16）逐項實測結果直接記於本檔 §Restore Drill Record；staging 路線已 abandon，不會再有 staging 版本 |
+| Screenshot/report | 同上（Day 2 staging 已 abandon，見 `ENVIRONMENT_REGISTRY.md` staging 列） |

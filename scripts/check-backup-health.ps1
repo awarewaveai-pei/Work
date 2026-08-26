@@ -206,12 +206,17 @@ if ($fatal) {
 }
 
 $latestPath = Join-Path $statusDir "backup-health-LATEST.md"
-$datedPath = Join-Path $statusDir ("backup-health-" + $stamp.ToString("yyyyMMdd-HHmmss") + ".md")
 $jsonPath = Join-Path $statusDir "backup-health-LATEST.json"
 
+# Dated per-run copy REMOVED 2026-08-26. It was added alongside this check on 2026-05-08
+# (eff28b5a) and had accumulated 1,336 files by 2026-08-26 -- while the four sibling checks
+# written to the same directory (clickhouse / ci / auto-reboot / smoke) all write LATEST only.
+# This was the outlier, not the pattern. Every one of those copies recorded a PASS; backup
+# FAILURES are written to WORKLOG with root cause, which is where anyone actually looks.
+# Retention for whatever does accumulate here now lives in agency-os/reports/retention.json,
+# enforced by scripts/prune-reports.ps1.
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 [System.IO.File]::WriteAllText($latestPath, $markdown.ToString(), $utf8NoBom)
-[System.IO.File]::WriteAllText($datedPath, $markdown.ToString(), $utf8NoBom)
 
 $payload = [ordered]@{
     generatedAt = $stamp.ToUniversalTime().ToString("o")
