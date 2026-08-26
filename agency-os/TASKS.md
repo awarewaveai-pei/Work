@@ -325,6 +325,10 @@
 
 > 已由 critic 驗證屬實、尚未修。優先於任何功能。
 
+- [ ] **【2026-08-26 開出｜小】R2 裡 8 個 `remotion/` 物件（~200MB）從未被任何對帳涵蓋** — `reconcile.ts` 的 `FORMAT_SUFFIX_RE = /^video\/(.+)\/([^/]+)\.mp4$/` 只收 `video/` 前綴，而 remotion-service 寫的是 `remotion/YYYY-MM-DD/<uuid>.mp4`（`apps/remotion-service/src/server.ts:293`）。實測 R2 有 8 個此類物件（2026-06-24 五個、2026-07-02 三個，最大 113MB），**全部不在 media_assets、也不在任何清理排程**（`video/cleanup` 也只刪 media_assets 有列的）。等於一個持續長大且無人看管的儲存桶分區。**先決定要不要留**：remotion 產出目前有無使用者可見的入口？沒有的話直接刪比補對帳便宜。
+
+- [ ] **【2026-08-26 開出｜等一個決定】R2 `video/蒙古旅遊___熱情分享型主持人稿/4x5.mp4` 是真孤兒（23MB）** — 無 media_assets 列、目錄名無 org 前綴（2026-08-25 之前的格式）→ reconcile 一律 fail-closed 不猜擁有者。**告警上線後會持續報 `orphanUnattributable=1` 直到處理掉**（這是正確行為，它確實是孤兒）。選項：① 補記到某個 org（`organizations` 有 `d6d1e845 mongolia-03` 這個測試租戶，名稱吻合但**不可據此推定**）② 直接刪除物件。**需操作者判斷這支影片還要不要**。
+
 - [ ] **🔴 EU 的保留政策把「還原演練證明過的備份」刪掉了**
   - `🔴 現行` · `2026-08-26 發現` · `可直接做`
   - **一句話**：2026-08-16 演練 PASS 的那三份 Soulful 備份，被每晚的保留清理當成過期快照 `rm -rf` 掉了。
@@ -369,8 +373,8 @@
   - **✅ ⑤ `buildVideoOutName` 註解字數（2026-08-26 完成）** — `noorg_` 分支是 17 字元（6+10+1）不是 20；org 分支 20 字元（8+1+10+1）。註解已改為兩分支分列。
   - **✅ ⑦ inventory 漏收（2026-08-26 完成）** — 不只原述的 4 條：`/api/video/*` **共 14 條，12 條從未收錄**。已在 `MULTI_TENANT_ISOLATION_AUDIT_AND_PLAN.md` 新增 §2.3.1 全量盤點（14 條逐檔實讀 + 機器核對角色閘/租戶閘）與 §2.3.2（⑥ 的決策記錄）。原 `:61,62` 漂移行號一併訂正。
   - **⚠️ ④ 敘述已過期** — `reconcile.ts:96,98` 早已拆成 `skippedLegacy` + `skippedUnresolved` 兩個計數器。真問題不是「沒拆」，而是 `skippedLegacy` 仍同時吸收「真舊 backlog」與「今天剛產生的 `noorg_` 新影片」（後者是 live bug 指標，前者是惰性存量）。
-  - **⏸ ②③ 刻意不做（不是忘記）** — 2026-08-26 實測 R2：`TOTAL_OBJECTS=11 / TOTAL_DIRS=2 / NEW_ORG_PREFIX=0 / NOORG=0 / LEGACY=2`。所以 reconcile 每 15 分回的是 `checked=2, recorded=0, skippedLegacy=2`，**永遠不變**。此刻接告警＝裝一個永遠在叫的警報器（AGENTS.md 明文最糟樣態）。**正確順序：先處理掉那 2 個 legacy 目錄（確認歸屬後補記或刪除）讓 baseline 歸零，再接告警**。cron 腳本 `/root/lobster-phase1/scripts/reconcile-videos.sh` → `/var/log/reconcile-videos.log` **不在 repo**（drift，一併處理）。
-  - **➡️ ⑥ 移出本條** — 見 §2.3.2，屬產品決策非工程 bug。
+  - **✅ ②③④ 一起解決（2026-08-26）** — 治的不是「資料髒」而是**分類順序**：`reconcile.ts` 舊版在存在性檢查之前就 `skippedLegacy++`，所以「舊格式但早就在畫廊裡」的影片被永久計成 skipped。實測 EU prod 2 個 legacy 目錄裡 1 個早有 media_assets 列、1 個才是真孤兒。已改為「先算 object_key → 先查存在性 → 最後分類」，`ReconcileResult` 重寫為**窮盡且互斥**（`recorded`/`alreadyRecorded`/`orphanUnattributable`/`noPrimary`/`probeFailed`/`recordFailed`），回傳前自我檢查 `sum === checked`，不符回 `ok:false`。③ 因此自動解決（`checked` 語義明確且可驗證）；④ 的「垃圾桶指標」被 `orphanUnattributable` 取代。cron 腳本 `reconcile-videos.sh` **已收進 git**（原本只在 `/root/lobster-phase1/scripts/`，是 drift），並接上 Telegram 告警：綁 `orphanUnattributable`、狀態改變即時通知、同一問題每 24h 一次。8 個 vitest + 突變測試（把順序改回舊版 → 4 條轉紅）。
+  - **✅ ⑥ 結案（2026-08-26，操作者拍板「管理員看得到全部客戶」）** — `tools/designs/route.ts` GET 移除 `?? defaultOrganizationId()`，staff 未指定 org 時不過濾，對齊 `video/history:53`。POST 寫路徑不動（insert 必須有明確 org）。**副作用已知**：staff 現在看得到其他 org 的設計圖（實測 1 列），而該 route 的 DELETE 本來就只憑 id 無 org 檢查 → 「看得到就刪得掉」。非新增權限（staff 定義上 full access），但曝險面變大；DELETE 補檢查是 audit doc §2.3 既有 🔴，另案。
 
 - [ ] **【2026-08-26 開出｜🔴 跨租戶寫入｜與 `wp_sites` org migration 綁定，不可單獨修】`/api/video/embed-to-wp` 可寫入任一客戶的 WordPress 站** — `app/api/video/embed-to-wp/route.ts:23` 的 `siteId` 直接取自 request body，`:33` 呼叫 `getWpSites()`；`lib/content/wp-sites.ts:55-77` **零 org 過濾**，回傳全部 active 站 + 全部 token，缺 `siteId` 時 fallback `sites[0]`。
   - `:70-79` 用該站 token 對任意 `postId` 送 `POST /wp-json/wp/v2/posts/<id>`（X-HTTP-Method-Override: PUT）覆寫內容。

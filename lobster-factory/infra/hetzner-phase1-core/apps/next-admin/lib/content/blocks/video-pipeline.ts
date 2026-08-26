@@ -109,7 +109,8 @@ export function buildVideoOutName(orgId: string | null, title: string): string {
   if (!orgId) return `noorg_${rand}_${slug}`;
   // .toLowerCase() 不可省：resolveOrgId 的 uuid regex 帶 /i 會放行大寫 uuid，而
   // parseOrgPrefixFromDir 只收 [0-9a-f]。少了它，大寫 org id 產生的每一支新影片都會
-  // 被反解成 null → 永久計入 skippedLegacy，看起來像「舊資料 backlog」而非新 bug。
+  // 被反解成 null → 永久計入 reconcile 的 unattributableByMissingPrefix，看起來像「舊資料
+  // backlog」而非新 bug（2026-08-26 前該欄位叫 skippedLegacy）。
   return `${orgId.replace(/-/g, "").toLowerCase().slice(0, 8)}_${rand}_${slug}`;
 }
 

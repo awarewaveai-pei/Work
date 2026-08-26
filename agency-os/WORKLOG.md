@@ -2,6 +2,62 @@
 
 ## 2026-08-26
 
+### AUTO_TASK_DONE: reconcile 的計數器在測錯的東西 + designs 讀路徑對齊 staff 全域語意
+
+[任務]
+操作者從「記下來但沒做的四件」中選定：① R2 清理 + reconcile 告警 ② embed-to-wp 跨租戶寫入
+③ designs/history 可見範圍（選「管理員看得到全部客戶」）。本 entry 完成 ①③；② 因需
+`wp_sites` 加欄位且牽動 7 條 route，另出計畫等 go-ahead。
+
+[根因：不是「資料髒」，是計數器的分類順序錯了]
+`reconcile.ts` 舊版在**存在性檢查之前**就 `skippedLegacy++; continue;`。後果：一支「舊格式但
+早就在畫廊裡」的影片會被永久計成 skipped。EU prod 實測正是這個形狀：
+
+| R2 目錄 | media_assets | 舊計數器 | 真實狀態 |
+|---|---|---|---|
+| `三個習慣_創業人也能一覺到天亮` | ✅ 有列（org 39ad4149）| skippedLegacy | **完全不是問題** |
+| `蒙古旅遊___熱情分享型主持人稿`（僅 4x5）| ❌ 無 | skippedLegacy | **真孤兒，唯一該告警的** |
+
+所以 `skippedLegacy=2` 永遠不變 → 既不能當告警（永遠非零）也不能當健康指標
+（`recorded/checked` 永遠 0/2）。**先清資料再接告警是治標**：不改分類順序，下一支舊格式影片
+入庫後計數器又會卡住。
+
+[已修改]
+| 檔案 | 改動 |
+|---|---|
+| `lib/content/video/reconcile.ts` | 分類順序改為「先算 object_key → 先查存在性 → 最後分類」；`ReconcileResult` 重寫為**窮盡且互斥**的分類（`recorded` / `alreadyRecorded` / `orphanUnattributable` / `noPrimary` / `probeFailed` / `recordFailed`），回傳前自我檢查 `sum === checked`，不符回 `ok:false`。新增 `probeFailed` / `recordFailed` 兩個誠實的失敗桶 —— 舊版查詢失敗與補記拋出都是靜默 `continue`，數字加不起來卻長得很正常 |
+| `scripts/reconcile-videos.sh`（**新收進 git**）| 原本只存在於 `/root/lobster-phase1/scripts/`（drift）。sg-deploy 的 sync 步驟會 rsync 本目錄，所以改這裡即生效。加上 Telegram 告警：綁 `orphanUnattributable`（唯一需要人介入的數字），狀態改變即時通知、同一問題每 24h 提醒一次（無去重＝每天 96 則＝保證被靜音）|
+| `app/api/tools/designs/route.ts` | GET 的 `?? defaultOrganizationId()` 移除 → staff 未指定 org 時不過濾（看全部），對齊 `/api/video/history:53`。**POST 寫路徑不動**（insert 必須有明確 org）|
+| `lib/content/blocks/video-pipeline.ts` | 註解裡的 `skippedLegacy` 改為新欄位名 |
+| `lib/content/video/__tests__/reconcile-classify.test.ts`（新） | 8 測，含 EU prod 現況重現 |
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && npx vitest run` | exit=0 | ms=~1900（54 檔 / 637 測全過；較前 53/629 增 1 檔 8 測）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`ssh hetzner-sg docker exec lobster-next-admin node -e "<R2 + media_assets 交叉比對>"` | exit=0 | ms=~1800
+  - R2：`TOTAL_DIRS=2`；media_assets：`video/mp4` 僅 **1 列**（org 39ad4149）→ 證實「1 個已入庫 + 1 個真孤兒」，不是 2 個孤兒
+  - 另發現 R2 有 **8 個 `remotion/` 物件（~200MB）完全不在 reconcile 的正則涵蓋內**（`^video/...`），是第二類從未被對帳的孤兒 → 已記 TASKS
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash -n reconcile-videos.sh` + 7 案例狀態機測試（含 `set -euo pipefail`）| exit=0 | ms=~200
+  - 案例：緊湊 JSON / 有孤兒 / `ok:false` / 舊版無欄位 / 完全非 JSON / pretty-print / 相似欄位名干擾 —— 全部分類正確且**不會在 errexit 下死掉**
+- REVIEW_DONE: critic=Deep（**自審**，見 ORACLE_WAIVED）| verdict=pass-with-fixes | findings=0C/2M/1m（全部當場修訖）
+  - M1 **告警腳本會自己靜默死掉**：`set -euo pipefail` 下欄位缺失時 `grep` 回非零 → 整支腳本當場結束。這是最糟的失敗模式（告警消失但看起來正常）。修：`|| true` + 前置條件顯式檢查（缺 `.env` / 缺密鑰改為寫 log 後 `exit 1`，而非靜默）
+  - M2 **JSON 解析押在「輸出永遠緊湊」上**：`"ok": true`（帶空白）會解析失敗 → 永久假警報。修：正則允許 `[[:space:]]*`
+  - m3 `video-pipeline.ts:112` 註解仍指舊欄位名 → 更新
+  - **突變測試**：把「判定為孤兒」搬回存在性檢查之前（舊版行為）→ **4 條測試轉紅**（含 EU prod 現況重現那條）。還原後 8/8 綠
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`skippedLegacy\|skippedUnresolved\|ReconcileResult\|defaultOrganizationId` | hits=0 斷裂引用
+  - 舊欄位**無任何程式消費**（只有註解與測試敘述），故重新命名安全；唯一 stale 註解已修
+  - `defaultOrganizationId()` 仍由 designs POST（`:167`）使用 —— 刻意保留，寫入必須有明確 org
+- ORACLE_WAIVED: 操作者本 session 明確告知 Codex 額度已用盡，改以自審 + 突變測試替代（同前一 entry）
+
+[剩餘風險]
+- **designs 可見範圍改變的副作用**：staff 現在看得到其他 org 的設計圖（實測僅 1 列，org `2bf60452`），而 `tools/designs` DELETE 本來就只憑 id、無 org 檢查 → 以前「看不到所以點不到」，現在**看得到就刪得掉**。對 staff（定義上 full access）語意一致，非新增權限，但曝險面確實變大。DELETE 補 org 檢查是 audit doc §2.3 既有的 🔴，未在本批處理
+- 蒙古旅遊那支真孤兒**尚未處理**，所以告警上線後會立刻報 `orphanUnattributable=1`。這是正確行為（它確實是孤兒），但要先決定「補記還是刪除」才會歸零
+- `remotion/` 那 8 個物件仍完全不在對帳涵蓋內
+
+[rollback]
+`git revert <本 commit>` → `sg-deploy`；cron 腳本會隨 sg-deploy 的 script sync 一併回到舊版。
+無 DB 改動，無 migration 需回滾。
+
+
 ### AUTO_TASK_DONE: 定位「大批 commit 掃走別人工作」的根因 + Soulful 備份兩層同時查證
 
 [任務]

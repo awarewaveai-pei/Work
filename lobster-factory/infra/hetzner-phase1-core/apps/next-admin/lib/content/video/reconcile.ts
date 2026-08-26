@@ -21,30 +21,61 @@ function r2cfg(): { apiToken: string; accountId: string; bucket: string; publicB
   return { apiToken, accountId, bucket, publicBase };
 }
 
+/**
+ * 分類必須「窮盡且互斥」：checked === recorded + alreadyRecorded + orphanUnattributable + noPrimary。
+ * 這條不變量由 reconcileVideos 在回傳前自我檢查（見底部），並由 __tests__/reconcile-classify.test.ts 釘住。
+ *
+ * 2026-08-26 之前的形狀是壞的：`skippedLegacy++` 發生在存在性檢查**之前**，所以一支「舊格式但
+ * 早就在畫廊裡」的影片會被永久計成 skipped。實測 EU prod：2 個 legacy 目錄裡 1 個早已有
+ * media_assets 列、1 個才是真孤兒 —— 舊計數器把兩者混成 `skippedLegacy=2`，既無法當告警
+ * （永遠非零）也無法當健康指標（`recorded/checked` 永遠 0/2）。
+ */
 export interface ReconcileResult {
   ok: boolean;
-  checked: number;   // R2 內偵測到的影片組數
-  recorded: number;  // 本次補記的孤兒數
-  /** 舊格式 key（無租戶前綴）→ 無法判定擁有者，刻意不補記。非錯誤，但必須可見。 */
-  skippedLegacy: number;
-  /** 前綴解析不出唯一 org（不存在或撞碼）→ 同樣拒絕猜測。 */
-  skippedUnresolved: number;
+  /** R2 內偵測到的影片組數（全部分類之和）。 */
+  checked: number;
+  /** 本次補記的孤兒數。 */
+  recorded: number;
+  /** 已在 media_assets（不論擁有者是否可判定）→ 無需任何動作。 */
+  alreadyRecorded: number;
+  /**
+   * **唯一需要人介入的數字**：檔案在 R2、不在 media_assets、且擁有者無法判定 →
+   * 使用者永遠看不到這支影片。這是告警該綁的值（非零即需處理）。
+   */
+  orphanUnattributable: number;
+  /** orphanUnattributable 的成因拆解（診斷用，不用來告警）。 */
+  unattributableByMissingPrefix: number;
+  unattributableByUnresolvedPrefix: number;
+  /** 該組取不到任何主要輸出 URL（理論上不會發生；獨立計數以維持分類窮盡）。 */
+  noPrimary: number;
+  /** 存在性查詢本身失敗 → 「不知道」必須有自己的桶，不得併進任何一個「知道」的分類。 */
+  probeFailed: number;
+  /** 補記時拋出（下輪會再試）。同上：失敗不可偽裝成其他分類。 */
+  recordFailed: number;
   error?: string;
+}
+
+function emptyResult(): ReconcileResult {
+  return {
+    ok: true, checked: 0, recorded: 0, alreadyRecorded: 0, orphanUnattributable: 0,
+    unattributableByMissingPrefix: 0, unattributableByUnresolvedPrefix: 0, noPrimary: 0,
+    probeFailed: 0, recordFailed: 0,
+  };
 }
 
 /** 掃 R2 video bucket → 補缺的 media_assets。idempotent、self-healing。 */
 export async function reconcileVideos(): Promise<ReconcileResult> {
   const cfg = r2cfg();
-  if (!cfg) return { ok: false, checked: 0, recorded: 0, skippedLegacy: 0, skippedUnresolved: 0, error: "R2 video env 未設定" };
+  if (!cfg) return { ...emptyResult(), ok: false, error: "R2 video env 未設定" };
   const supabase = getSupabaseWriteClient();
-  if (!supabase) return { ok: false, checked: 0, recorded: 0, skippedLegacy: 0, skippedUnresolved: 0, error: "supabase 未設定" };
+  if (!supabase) return { ...emptyResult(), ok: false, error: "supabase 未設定" };
 
   // 租戶來源 = R2 key 自帶的 org 前綴，**不再是 POD_DESIGNS_DEFAULT_ORG_ID**。
   // 舊行為把每個孤兒都記到同一個預設 org：實測 EU prod 有 5 個 org、2 個有 media，
   // 所以那等於把 B 租戶的影片放進 A 租戶的媒體庫（A 看得到、B 永遠沒有自己的列）。
   // R2 key 本來就沒有租戶資訊 —— 這是 buildVideoOutName 要把 org 前綴寫進目錄名的原因。
   const { data: orgRows, error: orgErr } = await supabase.from("organizations").select("id");
-  if (orgErr) return { ok: false, checked: 0, recorded: 0, skippedLegacy: 0, skippedUnresolved: 0, error: "organizations 查詢失敗" };
+  if (orgErr) return { ...emptyResult(), ok: false, error: "organizations 查詢失敗" };
   // 前綴 → org id。撞碼時標記為 null，之後一律拒絕（寧可不補也不記到錯的租戶）。
   const byPrefix = new Map<string, string | null>();
   for (const row of (orgRows ?? []) as { id: string }[]) {
@@ -60,7 +91,7 @@ export async function reconcileVideos(): Promise<ReconcileResult> {
     u.searchParams.set("per_page", "1000");
     if (cursor) u.searchParams.set("cursor", cursor);
     const r = await fetch(u.toString(), { headers: { Authorization: `Bearer ${cfg.apiToken}` }, signal: AbortSignal.timeout(30_000) });
-    if (!r.ok) return { ok: false, checked: 0, recorded: 0, skippedLegacy: 0, skippedUnresolved: 0, error: `r2_list_${r.status}` };
+    if (!r.ok) return { ...emptyResult(), ok: false, error: `r2_list_${r.status}` };
     const j = (await r.json()) as { result?: { key: string }[]; result_info?: { cursor?: string; is_truncated?: boolean } };
     for (const o of j.result ?? []) keys.push(o.key);
     cursor = j.result_info?.is_truncated ? j.result_info?.cursor : undefined;
@@ -85,39 +116,68 @@ export async function reconcileVideos(): Promise<ReconcileResult> {
     g[fmt] = `${cfg.publicBase}/${k}`;
   }
 
-  // 3) 缺 media_assets 的補上（依 org + object_key 去重 → idempotent）
-  let recorded = 0;
-  let skippedLegacy = 0;
-  let skippedUnresolved = 0;
+  // 3) 逐組分類；缺 media_assets 且擁有者可判定者補上。
+  //
+  // **順序是這次修正的本體**：先算 object_key、先查存在性，最後才分類。舊版在存在性檢查之前
+  // 就 `skippedLegacy++; continue;`，於是「舊格式但早就在畫廊裡」的影片被永久計成 skipped
+  // （實測 EU prod 2 個 legacy 目錄，1 個早有列、1 個才是真孤兒，卻一起變成 skippedLegacy=2）。
+  //
+  // 探測的 scope 分兩種，兩種都有理由：
+  //   • 擁有者可判定 → 必須帶 org（與 recordVideoAsset 的唯一性域一致）。只用 object_key 查會
+  //     讓「別的租戶剛好有同名 key」的列擋掉本租戶的補記（2026-08-25 critic）。
+  //   • 擁有者不可判定 → 這一分支**永遠不寫入**（fail-closed），所以改用不帶 org 的探測純粹做
+  //     分類；它不可能抑制任何補記，因為這裡本來就不補。
+  //     刻意接受的近似：舊格式 key 由標題衍生，理論上兩個租戶可能撞同名。撞到時本組會被算成
+  //     alreadyRecorded 而非孤兒 → 告警不響。這是刻意取捨：擁有者未知時本就無法斷言「對誰而言
+  //     缺了」，而讓告警永遠有雜訊比偶爾漏一筆更糟（永久告警＝被忽略的偵測器）。
+  let recorded = 0, alreadyRecorded = 0, noPrimary = 0, probeFailed = 0, recordFailed = 0;
+  let unattributableByMissingPrefix = 0, unattributableByUnresolvedPrefix = 0;
+
   for (const [dir, outputs] of groups) {
-    // 擁有者只能從 key 反解，解不出就**不補**。這是刻意的 fail-closed：
-    // 跨租戶把影片記到錯的人名下，比「暫時沒被自癒」嚴重得多。
-    const prefix = parseOrgPrefixFromDir(dir);
-    if (!prefix) { skippedLegacy++; continue; }
-    const ownerOrgId = byPrefix.get(prefix) ?? null;
-    if (!ownerOrgId) { skippedUnresolved++; continue; }
     // 與 /api/video/status 共用同一個挑選函式 —— 兩邊必須導出同一個 object_key，
     // 否則同一支影片會變成兩列（見 pickPrimaryOutput 註解的 2026-08-24 案例）。
     const primary = pickPrimaryOutput(outputs);
-    if (!primary) continue;
-    // 存在性檢查用與 recordVideoAsset 相同的 object_key 推導（編碼一致 → idempotent）
+    if (!primary) { noPrimary++; continue; }
     const checkKey = videoObjectKey(primary);
-    // 存在性檢查必須與 recordVideoAsset 的唯一性域一致（org + object_key）。
-    // 只用 object_key 查會讓「另一個租戶剛好有同名 key」的列擋掉本租戶的補記。
-    const { data, error } = await supabase
-      .from("media_assets")
-      .select("id")
-      .eq("object_key", checkKey)
-      .eq("organization_id", ownerOrgId)
-      .limit(1);
-    if (error) continue;            // 查詢失敗 → 跳過本筆，下輪再試
-    if (data && data.length > 0) continue; // 已記錄
+
+    // 擁有者只能從 key 反解，解不出就**不補**：跨租戶記到錯的人名下，比「暫時沒被自癒」嚴重得多。
+    const prefix = parseOrgPrefixFromDir(dir);
+    const ownerOrgId = prefix ? (byPrefix.get(prefix) ?? null) : null;
+
+    let probe = supabase.from("media_assets").select("id").eq("object_key", checkKey);
+    if (ownerOrgId) probe = probe.eq("organization_id", ownerOrgId);
+    const { data, error } = await probe.limit(1);
+    if (error) { probeFailed++; continue; }
+    if (data && data.length > 0) { alreadyRecorded++; continue; }
+
+    if (!ownerOrgId) {
+      if (!prefix) unattributableByMissingPrefix++;
+      else unattributableByUnresolvedPrefix++;
+      continue;
+    }
+
     try {
       await recordVideoAsset({ organizationId: ownerOrgId, primaryUrl: primary, outputs, title: dir, sceneCount: 0 });
       recorded++;
     } catch {
-      /* best-effort：下輪再補 */
+      recordFailed++; // best-effort：下輪再補，但不假裝這組已處理
     }
   }
-  return { ok: true, checked: groups.size, recorded, skippedLegacy, skippedUnresolved };
+
+  const orphanUnattributable = unattributableByMissingPrefix + unattributableByUnresolvedPrefix;
+  const result: ReconcileResult = {
+    ok: true,
+    checked: groups.size,
+    recorded, alreadyRecorded, orphanUnattributable,
+    unattributableByMissingPrefix, unattributableByUnresolvedPrefix,
+    noPrimary, probeFailed, recordFailed,
+  };
+
+  // 不變量自查：分類窮盡且互斥。不符表示上面漏了一條 continue 分支 —— 回 ok:false 讓它「大聲」，
+  // 而不是回一組加不起來、卻長得很正常的數字（那正是本次要根除的形狀）。
+  const sum = recorded + alreadyRecorded + orphanUnattributable + noPrimary + probeFailed + recordFailed;
+  if (sum !== result.checked) {
+    return { ...result, ok: false, error: `classification_mismatch: sum=${sum} checked=${result.checked}` };
+  }
+  return result;
 }

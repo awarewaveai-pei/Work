@@ -351,14 +351,22 @@ export async function GET(request: Request) {
   resolveOpsRole(request);
 
   const url = new URL(request.url);
+  // 讀路徑的租戶語意（2026-08-26 對齊 /api/video/history）：
+  //   • client  → effectiveOrgId 強制綁回自己的 org，無綁定則拋 403
+  //   • staff   → 不帶 ?organizationId 時為 null = **不過濾，看全部 org**
+  //
+  // 為何改：本 route 原本是 `?? defaultOrganizationId()`，等於 staff 永遠只看得到
+  // POD_DESIGNS_DEFAULT_ORG_ID 那一個 org；而讀同一張 media_assets 的 /api/video/history
+  // 用的是 `effectiveOrgId(req, null)`（staff 看全部）。同一批資料、兩個畫面、兩種集合。
+  // 對齊方向選 history，因為 lib/tenant-guard.ts:6 對 staff 的定義就是「Full access to all orgs」
+  // —— 是 designs 這一邊與文件模型衝突。操作者 2026-08-26 明示採「管理員看得到全部客戶」。
+  //
+  // **寫路徑（POST）不受影響**：insert 必須有明確 org，仍走 defaultOrganizationId() 後備。
   let organizationId: string | null;
-  try { organizationId = effectiveOrgId(request, url.searchParams.get("organizationId") ?? defaultOrganizationId()); }
+  try { organizationId = effectiveOrgId(request, url.searchParams.get("organizationId")); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
-  if (!organizationId || !isUuid(organizationId)) {
-    return NextResponse.json(
-      { ok: false, error: "organizationId is required (or set POD_DESIGNS_DEFAULT_ORG_ID)" },
-      { status: 400 },
-    );
+  if (organizationId && !isUuid(organizationId)) {
+    return NextResponse.json({ ok: false, error: "organizationId must be a uuid" }, { status: 400 });
   }
 
   // 影片與圖片同屬 asset_domain="ai_generated"（DB CHECK 僅允許 ai_generated/wp_product/wp_blog），
@@ -385,11 +393,13 @@ export async function GET(request: Request) {
   let query = supabase
     .from("media_assets")
     .select("id,object_key,object_url,mime_type,byte_size,created_at,metadata")
-    .eq("organization_id", organizationId)
     .eq("storage_backend", "r2")
     .eq("asset_domain", "ai_generated")
     .like("mime_type", mimePrefix)
     .eq("is_current", true);
+
+  // null = staff 未指定 → 不過濾（看全部 org）。client 走不到這裡帶 null（effectiveOrgId 會先拋）。
+  if (organizationId) query = query.eq("organization_id", organizationId);
 
   if (group === "mockup") {
     // 商品照: any mockup save-source (MOCKUP_SOURCES SSOT). or-of-eq keeps each disjunct a primitive.
