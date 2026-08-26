@@ -2,6 +2,58 @@
 
 ## 2026-08-26
 
+### AUTO_TASK_DONE: EU nginx 還原 Cloudflare 真實用戶端 IP（步驟 A 完成並端到端驗證）
+
+[任務]
+操作者：「做最完美的處理，你要自己 REVIEW」。針對前一則調查的步驟 A（host nginx real_ip 還原）執行。
+
+[前置檢查（動手前，全部先驗）]
+- `nginx -V` → **`with-http_realip_module` 已編入**（沒有的話 `nginx -t` 會直接失敗）
+- `grep -rnE '\$remote_addr|^\s*(allow|deny)\s' /etc/nginx/` → **無 allow/deny 依賴**，可安全套用
+- **關鍵發現**：`conf.d/rate-limit-zones.conf` 三個 zone（`wp_login 5r/m`、`wp_admin 30r/m`、`general 30r/s`）**全部 key 在 `$binary_remote_addr`** —— 先前等於所有訪客共用少數 CF 邊緣 key，限流形同虛設，而攻擊者換邊緣就拿到全新額度
+- 另有 4 個 vhost 使用 `proxy_set_header X-Real-IP $remote_addr`（mainwp 佔 3 處），會一併受惠
+
+[已修改（EU 生產主機，非 repo）]
+新增 `/etc/nginx/conf.d/cloudflare-realip.conf`：22 條 `set_real_ip_from`（Cloudflare 官方 15 IPv4 + 7 IPv6，取自 `https://www.cloudflare.com/ips-v4|v6`）+ `real_ip_header CF-Connecting-IP`。
+- **放 http context 而非單一 vhost**：這台所有站點一次修好，不是替 mainwp 打一個補丁。
+- **安全性**：`set_real_ip_from` 只在請求「來自」CF 網段時才信任該 header，直連 origin 者無法偽造。
+- 檔頭寫入來源 URL、抓取時間戳、過期風險與對應待辦。
+
+[執行程序（照 safe-infra-patch 規矩）]
+1. `tar czf /root/nginx-backup-20260826-100423.tar.gz -C /etc nginx`（16K，sha256 `9be4264be6a7164b…`）
+2. 部署前確認檔案不存在（避免覆蓋既有設定）
+3. `install -m 644 -o root -g root`
+4. `nginx -t` → 失敗即 `rm` 新檔並中止（腳本內建）
+5. `systemctl reload nginx` → 失敗即還原
+6. 逐項驗證（見下）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`nginx -t` | `syntax is ok` / `test is successful`
+- REALTEST_EVIDENCE: tool=SSH | cmd=行首計數 `grep -c '^set_real_ip_from'` | **22**（預期 22）；`^real_ip_header` **1**（預期 1）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`systemctl reload nginx` + `is-active` | `active`
+- REALTEST_EVIDENCE: tool=curl | cmd=經 CF 打 `wp-login.php?realip-verify-<ts>` | **host nginx 與容器 Apache 日誌皆記到 `2001:b400:e132:c44b:78ea:7929:988f:c605`**（真實 IPv6），非 `172.6x` CF 位址 —— **端到端，下游也修好**
+- REALTEST_EVIDENCE: tool=curl | cmd=臨時 `_ra_check.php` 讀 PHP superglobal | `REMOTE_ADDR` = `CF-Connecting-IP` = `X-Real-IP` = `X-Forwarded-For` = 真實 IPv6。**LLAR 讀的正是 `REMOTE_ADDR`** → 目標達成。臨時檔已刪除
+- REVIEW_DONE: critic=自審（對抗式，四個角度）| verdict=warn→補齊後 pass | findings=0c/2m/0n
+
+[自我覆審（操作者指定）—— 抓到自己兩個缺口]
+- **M1：我只測了 mainwp，但 snippet 在 http context 會影響全部 vhost。** 補測 `n8n` `200` / `trigger` `302` / `studio` `401` —— 皆為各自的正常回應，無 vhost 受損。**這是我原本會漏掉的迴歸面。**
+- **M2：LLAR 裡殘留 key 在 CF 位址上的計數**（`172.71.164.176`:3、`172.71.164.166`:1）。那些現已無意義，且若累積到門檻會封鎖一個 CF 節點、誤傷共用該節點的正常訪客。已清 `limit_login_retries` / `_valid` / `lockouts`，**刻意保留** `limit_login_logged`（98 IP）與 `lockouts_total=322` 作為攻擊證據。
+- **偽造可能性覆審**：直連 origin 者送假 `CF-Connecting-IP` 不被信任（來源 IP 不在 CF 清單）；送假 `X-Forwarded-For` 時 host nginx 的 `$proxy_add_x_forwarded_for` 會把真實來源附加在最右，容器 Apache 由右往左取第一個非信任代理 → 仍得到真實 IP。**兩條偽造路徑皆封閉。**
+- **`real_ip_recursive` 是否需要**：`CF-Connecting-IP` 只含單一位址，不需要。已在檔內註明理由。
+
+[我自己留下的殘留風險（已入庫，不掩蓋）]
+**CF 網段清單是靜態的，且沒有任何偵測器。** CF 新增網段後，來自該網段的請求會悄悄退回顯示 CF IP —— 服務不中斷、無告警、LLAR 與限流對那部分流量再次失效。
+**這正是本日反覆抓到的同一類問題（靜態設定靜默漂移 + artifact 無讀者）。修好一個洞卻埋下同型的另一個等於沒學到**，故已開獨立待辦，含 `scripts/check-cf-realip-drift.ps1` 的具體修法與「刪一段網段必須 FAIL」的反向驗證要求。
+
+[剩餘風險]
+- **步驟 B（UFW 鎖 origin）未做**，前置未滿足（`refresh-cf-origin-ips` 自 08-12 `status=error`、`v4_ranges=0`，先鎖會自鎖）。
+- **步驟 C（`awmainwp` 改名／2FA）未做**，需操作者在後台執行。
+- 攻擊仍可直連 origin，但**現在會被有效攔截**：直連者 `REMOTE_ADDR` 本就是真實 IP，經 CF 者已還原，兩條路徑的 LLAR 封鎖與 nginx 限流都對真實 IP 生效。步驟 B 是把攻擊擋在更外層，不是唯一防線。
+- 未實地驗證「LLAR 真的會鎖住一個真實 IP」（需製造連續失敗登入，會產生噪音並可能鎖到自己）。以 `REMOTE_ADDR` 已為真實 IP 的機制驗證替代。
+
+[rollback]
+`rm /etc/nginx/conf.d/cloudflare-realip.conf && nginx -t && systemctl reload nginx`；或自 `/root/nginx-backup-20260826-100423.tar.gz` 完整還原。repo 側純文字，`git revert` 單一 commit。
+
 ### AUTO_TASK_DONE: 客戶頁的 hostname 猜測（第二份抄本）+ 佈建從未寫入租戶歸屬
 
 [任務]
