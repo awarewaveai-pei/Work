@@ -581,6 +581,34 @@ try {
         exit 1
     }
 
+    # ── Unverified-code gate (added 2026-08-25) ──────────────────────────────────
+    # AO-CLOSE commits AND pushes. Until now it consulted verify-build-gates and
+    # verify-closeout-completeness but never the per-session code-change tracker, so code
+    # that never passed /verify-recent could still reach main through this door.
+    # The auto-checkpoint that used to walk through the same door on every prompt is gone
+    # (2026-08-25); this is the last one, and unlike that one it is at least deliberate.
+    # Refusing rather than warning: AO-CLOSE is preauthorised to self-heal, so the correct
+    # response is to run /verify-recent and re-run, not to publish and hope.
+    $sidHelper = Join-Path $PSScriptRoot "verify-sid-shared.ps1"
+    if (Test-Path -LiteralPath $sidHelper) {
+        . $sidHelper
+        $ttf = Get-VerifyTrackerPath -Sid (Get-VerifySid)
+        if ($ttf -and (Test-Path -LiteralPath $ttf)) {
+            $pending = @(Get-Content -LiteralPath $ttf -Encoding UTF8 |
+                         ForEach-Object { $_.Trim() } |
+                         Where-Object { $_ -and $_ -notmatch '^#' })
+            if ($pending.Count -gt 0) {
+                Write-Error @"
+ao-close: refusing to commit -- $($pending.Count) code file(s) have not been verified this session:
+$($pending -join "`n")
+
+Run /verify-recent (or /verify-recent --trivial for comment-only edits), then re-run AO-CLOSE.
+"@
+                exit 1
+            }
+        }
+    }
+
     # ── Last line of defence before `git add -A` (moved here 2026-08-25) ──────────
     # These two guards lived in commit-checkpoint.ps1 and protected ITS `git add -A`.
     # That call site is gone (checkpoint now requires explicit -Paths), but the hazards
