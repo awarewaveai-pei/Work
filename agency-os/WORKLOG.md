@@ -48,8 +48,24 @@
   「顯示成別的客戶」。目前 prod 5 列的 organization_id 全非 null，故本次部署無實際影響。
 - 上一則的接線層無自動測試缺口不變。
 
+[部署（本日兩個 commit 一起上）]
+- 前置閘：`check-deploy-drift` → prod 落後 5 commit（app code 僅本日這兩個）；
+  `verify-build-gates` → ALL PASSED；system-health 100% (312/312)
+- REALTEST_EVIDENCE: tool=SSH | cmd=`/root/lobster-phase1/scripts/sg-deploy.sh next-admin` | exit=0 | ms=~230000
+  - `.deployed-commit` 439499c7 → **4666333b**；`lobster-next-admin` healthy after 8s，容器名正常（無 `<id>_` 改名）
+  - sg-deploy 內建 smoke 4/4 OK（next-admin /login、/api/ops/summary、nginx/wordpress、node-api health）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`playwright-runner.ps1 -Mode smoke` | exit=0 | ms=~29400
+  - 26 passed / 0 failed / 6 skipped（skip 皆為需憑證的 authenticated 斷言）
+  - 證據：`agency-os/reports/e2e/2026-08-26/smoke/`
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin grep ...` | exit=0 | ms=~1500
+  - **驗的是跑在 prod 容器裡的產物本身，不只是 commit hash**：
+    `includeInactive` 出現在 `/app/.next/server/app/api/content/sites/route.js`；
+    `unresolvedRequest` 出現在 `tools/content/page.js` 與對應的 client chunk；
+    客戶頁 `ops/clients/[slug]/page.js` 的 `ilike` = **0 次**、`organization_id` = **4 次**
+
 [rollback]
 `git revert <本 commit>` → `sg-deploy`。三處改動皆為查詢／欄位層級，無 schema 變更、無資料遷移。
+上一版 prod commit 為 `439499c7`。
 
 
 ### AUTO_TASK_DONE: active 過濾收斂成 route 預設 —— 三輪覆審逼出一條不變量，外加一個 prod 跨租戶寫入
