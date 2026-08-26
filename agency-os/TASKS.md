@@ -333,6 +333,22 @@
 
 > 已由 critic 驗證屬實、尚未修。優先於任何功能。
 
+- [ ] **【2026-08-26 開出｜🔴 唯一今天就可被利用的一條｜非 env 一鍵可解】`OPS_PROXY_SHARED_SECRET` 實質是全站 operator + staff 萬用憑證** — **實測證據（SG prod 容器內，2026-08-26）**：帶 `x-ops-sync-key` 打 `/api/video/history?limit=2` → **HTTP 200 並回傳真實跨 org 影片資料**；不帶 → 401。**機制**：`middleware.ts:146` 對 `hasValidSyncKey()` 是 **passthrough**（剝掉所有身分標頭後放行，不注入 claims）→ 路由端 `ops-role.ts:42-50` 拿不到 claims → 進 simulated fallback；SG 實測 env 為 `NODE_ENV=production` 但 `OPS_ROLE_RESOLUTION_MODE=claims_with_simulated_fallback` + `OPS_ALLOW_SIMULATED_ROLE_FALLBACK=true` + `OPS_SIMULATED_FALLBACK_ROLE=operator` → **每一條 matcher 內的 route 都發 operator**，同時 `tenant-guard.ts:43` 無 `x-ops-user-kind` 一律當 `staff`（全 org 存取）。`ops-role.ts:23-28` 那句「production 預設 claims_only」被 env 明文覆蓋，等於失效。**受影響面**＝middleware matcher 內**全部** route，遠大於真正驗 key 的那 2 條（`video/reconcile`、`video/cleanup`），含 `video/embed-to-wp`（可寫任一客戶 WP 站）、`tools/designs` DELETE 等。`middleware.ts:12-16` 的 docstring 宣稱「authorization on those routes comes only from their own token」—— 對那 2 條為真，對其餘為假。
+  - **🔴 不可用 env flip 了事**：實查有 **7 條 route 同時檢 sync-key 又有角色閘**，把 fallback 關掉會直接打斷它們（其 key 檢查過關後角色降 viewer → 403）：`ops/clients/[slug]/wp-update`、`ops/clients/[slug]/wp-report`（WP 外掛自動化）、`onboarding/{quote,submit,trigger-build}`、`provision`、`tools/events/sync`。
+  - **不變量**：「通過 server-to-server 認證」必須是一個**明確的 principal**，帶自己定義的權限，而不是「缺少 claims 標頭時的預設值」。目前的形狀是 fail-**open**：少一個標頭 = 拿到 operator。
+  - **修法方向**（需先設計，勿直接改 env）：middleware 驗到合法 sync-key 時**主動注入**一個 automation 專用身分（例如 `x-ops-claims-role: <automation-role>` + 明確 org 或 staff 標記），讓下游閘讀得到真實 principal；同時把 `OPS_ALLOW_SIMULATED_ROLE_FALLBACK` 在 prod 關掉，讓 `ops-role.ts:23-28` 的 production 預設真正生效。**High risk（身分/RLS）**，需操作者明示 go-ahead。
+  - **發現經過**：2026-08-26 為驗證 `/api/video/status` 新租戶閘而打 sync-key，預期 403（viewer 被角色閘擋）卻得到 404（已過角色閘）→ 順線追出。**不是本次改動造成的，是既有狀態。**
+
+- [ ] **Soulful 每週備份近 8 次失敗 4 次，已 9 天沒有成功備份**
+  - `🔴 現行` · `2026-08-26 開出` · `可直接做（診斷唯讀）`
+  - **一句話**：11/12 要搬的那個客戶站，它的自動備份管線有一半在失敗，而這件事今天才第一次被看見。
+  - **證據**：`agency-os/tenants/company-soulful-expression/core/BACKUP_AUTO_STATUS.json` —— 失敗 `2026-08-24`／`2026-08-10`／`2026-08-03`／`2026-07-06`，成功 `08-17`／`07-27`／`07-20`／`07-13`。`last_success.iso_utc = 2026-08-17T00:15:04Z`（9 天前）。
+  - **唯一有具體原因的那次**：`2026-07-06` 回 `WPvivid_Google_Service_Exception` → 指向 Google Drive 授權／配額。其餘幾次 `reason` 只有 `"Failed,"`，等於沒有原因。
+  - **為什麼今天才看見**：Phase 4 Check 3 先前被卡在誤報的 3A，2026-08-26 修好後 3B/3C 才第一次真的量到東西。這正是 `detector-contract` 那條要處理的同一類問題。
+  - **不要誤讀**：2026-08-16 還原演練 PASS 用的是 EU 上三份手動備份（769 MB），**不是**這條 WPvivid → Google Drive 管線。兩者是不同東西，演練通過不代表這條管線健康。
+  - **下一步**：① 讀 MainWP DB `mwp_mainwp_wpvividmeta` site_id=2 的完整 `report_addon` 取真實錯誤字串 ② 判斷是 Google Drive token 過期、配額滿、還是站上 WPvivid 執行逾時 ③ 修好後連跑兩週確認連續成功。
+  - **完成定義**：連續 2 次週備份 `Succeeded`，且 `last_failure.reason` 不再是空字串（失敗必須帶得走的原因）。
+
 - [ ] **`cf-iprefresh` 偵測器已 error 14 天，而且沒有任何讀者**
   - `🔴 現行` · `2026-08-26 開出` · `可直接做`
   - **一句話**：守 SG 80/443 只開放給 Cloudflare IP 的 origin lockdown，其狀態檔壞了兩週沒人知道。
@@ -382,13 +398,13 @@
   - **完成定義**：塞一份 `measured=0/overall=PASS` 的假 artifact 必須 FAIL（證明不是永遠綠）；`smoke-LATEST.json` 必須 PASS（證明不是永遠紅）；現況掃描必須點名 `cf-iprefresh`。
   - **Phase 2（另計）**：8 支補 `measured` 並改 fail-closed，由上面那道閘逼出來，一次一支。
 
-- [ ] **Phase 4 Check 3 有三套實作，兩套讀已退役欄位**
-  - `🟠 現行` · `2026-08-26 開出` · `⚠️ 平行 session 進行中，我沒有動`
-  - **一句話**：tenant 資料今天換了 schema，但每週真正在跑的那套沒跟著換。
-  - **證據**：tenant 檔已改記錄事實（`restore_drills:` + `restore_drill_interval_days`，見 `agency-os/tenants/company-soulful-expression/core/BACKUP_RESTORE_PROOF.md`）；但 `scripts/phase4-weekly-check.ps1:143` 與 `agency-os/automation/claude-routines/phase4-weekly.md:81-83` 仍解析已退役的 `restore_drill_due_after`。
-  - **後果**：`$drillMatch.Success=false` → 3A **靜默 PASS**。正確版 `scripts/phase4-checks.py:349`（欄位缺失回 WARNING，fail-closed，自帶 selftest）目前 **untracked 且沒有任何呼叫端**。
-  - **最急的一項**：雲端 routine 才是每週產 `phase4-LATEST.md` 的那個。若不更新，**下週五的 Check 3 會靜默通過**。
-  - **邊界**：`phase4-checks.py`／`check-backup-health.ps1`／4 份 tenant 檔都在平行 session 的未提交工作樹裡。AGENTS.md 紅線禁止兩個 agent 同改一檔 —— **本條只記錄，不動手**。
+- [ ] **Phase 4 雲端 routine 仍在解析已退役的 `restore_drill_due_after`**
+  - `🟡 現行` · `2026-08-26 開出`
+  - **一句話**：本機那套已經修好了，雲端那套沒有 —— 而雲端那套才是每週真正在跑的。
+  - **今日已被平行 session 修掉的部分**：`scripts/phase4-weekly-check.ps1` 已無 `restore_drill_due_after` 參照（grep = 0）；`scripts/phase4-checks.py` 已進版控；2026-08-26 14:28 那輪 Check 3 正確回報 `3A 還原演練: PASS — 最近 PASS 2026-08-16，下次到期 2026-11-14`。
+  - **剩下的**：`agency-os/automation/claude-routines/phase4-weekly.md` 仍有 **5 處**參照該退役欄位（`:69`、`:81-83` 等）。
+  - **完成定義**：該 md 改為讀 `restore_drills` + `restore_drill_interval_days`（對齊 `scripts/phase4-checks.py:329-353`），或直接改成呼叫該 py，不再維護第二套邏輯。
+  - **注意**：這條原本寫「三套實作」，2026-08-26 訂正為只剩雲端一套。
 
 - [ ] **`check-backup-health.ps1` 把「無法證明可還原」當成健康**
   - `🟡 潛伏` · `2026-08-26 開出` · `⚠️ 平行 session 正在改這支`
