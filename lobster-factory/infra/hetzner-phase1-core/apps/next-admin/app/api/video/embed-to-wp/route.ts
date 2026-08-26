@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
-import { getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
+import { resolveWpSite } from "@/lib/content/wp-sites";
+import { OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,13 +31,13 @@ export async function POST(req: Request): Promise<Response> {
   if (isNaN(postId)) return NextResponse.json({ ok: false, error: "postId must be a positive integer" }, { status: 400 });
 
   // Resolve site auth
-  const { sites, tokens, usernames } = await getWpSites();
-  const site = siteId ? sites.find(s => s.id === siteId) : sites[0];
-  if (!site) return NextResponse.json({ ok: false, error: "Site not found" }, { status: 404 });
-  const token = tokens[site.id];
-  if (!token) return NextResponse.json({ ok: false, error: "No token for site" }, { status: 503 });
-  const authHdr = wpAuthHeader(usernames[site.id] ?? "", token);
-  const base = site.url.replace(/\/+$/, "");
+  let resolved;
+  try { resolved = await resolveWpSite(req, siteId); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+  if (!resolved) return NextResponse.json({ ok: false, error: "Site not found" }, { status: 404 });
+  if (!resolved.token) return NextResponse.json({ ok: false, error: "No token for site" }, { status: 503 });
+  const authHdr = resolved.authHeader;
+  const base = resolved.site.url.replace(/\/+$/, "");
 
   // Fetch current post content
   let currentContent = "";

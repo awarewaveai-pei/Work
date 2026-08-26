@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
-import { getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
+import { listAccessibleWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,7 +70,9 @@ export async function GET(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
 
-  const { sites, tokens, usernames } = await getWpSites();
+  // 多站畫面：不是「取一個站」而是「列出呼叫者有權看的站」。staff 取得全部（與舊行為相同），
+  // client 只會看到自己的 —— 否則日曆會直接把別的客戶的文章標題攛在畫面上。
+  const { sites, tokens, usernames } = await listAccessibleWpSites(req);
   if (sites.length === 0) {
     return NextResponse.json({ ok: false, error: "No WordPress sites configured" }, { status: 503 });
   }

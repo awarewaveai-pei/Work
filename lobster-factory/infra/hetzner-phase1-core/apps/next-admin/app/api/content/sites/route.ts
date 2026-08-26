@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { getWpSites } from "@/lib/content/wp-sites";
+import { canAccessOrg } from "@/lib/tenant-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,37 +69,37 @@ export async function GET(req: Request): Promise<Response> {
     const [sitesResult, orgsResult] = await Promise.all([
       supabase
         .from("wp_sites")
-        .select("id, name, url, color, active, note, created_at, token, username, content_defaults")
+        .select("id, name, url, color, active, note, created_at, token, username, content_defaults, organization_id")
         .order("created_at"),
       supabase
         .from("organizations")
-        .select("slug, metadata")
+        .select("id, slug")
         .order("created_at"),
     ]);
 
     if (!sitesResult.error && sitesResult.data) {
-      // Build hostname → org_slug map from organizations.metadata.client_config.site_url
-      // First-writer-wins on duplicate hostnames (deterministic via created_at order).
-      const hostnameSlugMap = new Map<string, string>();
-      for (const org of (orgsResult.data ?? []) as Array<{ slug: string; metadata: unknown }>) {
-        const meta = org.metadata;
-        if (typeof meta !== "object" || meta === null) continue;
-        const clientConfig = (meta as Record<string, unknown>).client_config as { site_url?: string } | undefined;
-        if (clientConfig?.site_url) {
-          try {
-            const host = new URL(clientConfig.site_url).hostname;
-            if (!hostnameSlugMap.has(host)) hostnameSlugMap.set(host, org.slug);
-          } catch { /* skip malformed URL */ }
-        }
+      // org_slug 直接來自 wp_sites.organization_id（migration 0061），**不再用 hostname 猜**。
+      //
+      // 舊做法是「把 organizations.metadata.client_config.site_url 的 hostname 對上 wp_sites.url
+      // 的 hostname」。兩個問題：① 同一個 hostname 下的多個站會全部對到同一個 org —— 實測 EU prod
+      // 的 3 個 staging 站都是 aware-wave.com/staging/<slug>，hostname 完全相同，first-writer-wins
+      // 直接把它們標成錯的租戶 ② 這是「把身分編碼進字串再反解」的同一類問題，和影片 out_name 那條
+      // 是同一個 class。既然 wp_sites 現在有權威的 organization_id，就沒有理由再猜。
+      const orgSlugById = new Map<string, string>();
+      for (const org of (orgsResult.data ?? []) as Array<{ id: string; slug: string }>) {
+        orgSlugById.set(org.id, org.slug);
       }
 
       const sites: ManagedSite[] = (sitesResult.data as Array<{
         id: string; name: string; url: string; color: string;
         active: boolean; note: string | null; created_at: string; token: string; username: string;
-        content_defaults: SiteContentDefaults | null;
-      }>).map(r => {
-        let org_slug: string | null = null;
-        try { org_slug = hostnameSlugMap.get(new URL(r.url).hostname) ?? null; } catch { /* skip */ }
+        content_defaults: SiteContentDefaults | null; organization_id: string | null;
+      }>)
+        // 租戶過濾：staff 看全部（canAccessOrg 恆真），client 只看自己的站。列表若不過濾，
+        // 客戶會直接在下拉選單裡看到其他客戶的網域名稱。
+        .filter(r => canAccessOrg(req, r.organization_id))
+        .map(r => {
+        const org_slug: string | null = r.organization_id ? (orgSlugById.get(r.organization_id) ?? null) : null;
         return {
           id: r.id,
           name: r.name,

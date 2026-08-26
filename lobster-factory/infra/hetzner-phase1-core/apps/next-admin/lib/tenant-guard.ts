@@ -79,6 +79,26 @@ export function toOrgAccessResponse(e: OrgAccessError): Response {
 }
 
 /**
+ * Non-throwing form of the access rule.
+ * - staff: always true.
+ * - client: targetOrgId must equal ctx.orgId; null targetOrgId (unscoped row) is false.
+ *
+ * Exists because some call sites need to FILTER rather than reject — e.g. picking the first
+ * site a caller may use when no siteId was supplied (lib/content/wp-sites.ts resolveWpSite),
+ * or listing only the sites they may see. Those must not be written as try/catch around
+ * assertOrgAccess: a second hand-written copy of the rule is how the two drift apart.
+ * assertOrgAccess below is defined in terms of this function so there is exactly one rule.
+ */
+export function canAccessOrg(
+  req: Request | { headers: Headers },
+  targetOrgId: string | null | undefined
+): boolean {
+  const ctx = resolveTenant(req);
+  if (ctx.userKind === "staff") return true; // full access
+  return Boolean(ctx.orgId) && ctx.orgId === targetOrgId;
+}
+
+/**
  * Assert the caller may access data scoped to `targetOrgId`.
  * - staff: always passes.
  * - client: targetOrgId must equal ctx.orgId; null targetOrgId (unscoped row) also blocks.
@@ -88,9 +108,7 @@ export function assertOrgAccess(
   req: Request | { headers: Headers },
   targetOrgId: string | null | undefined
 ): void {
-  const ctx = resolveTenant(req);
-  if (ctx.userKind === "staff") return; // full access
-  if (!ctx.orgId || ctx.orgId !== targetOrgId) {
+  if (!canAccessOrg(req, targetOrgId)) {
     throw new OrgAccessError();
   }
 }

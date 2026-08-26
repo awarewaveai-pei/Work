@@ -2,6 +2,71 @@
 
 ## 2026-08-26
 
+### AUTO_TASK_DONE: WordPress 站的租戶邊界 —— 7 條 route 抄同一段沒有閘的取站邏輯
+
+[任務]
+操作者拍板做 embed-to-wp（原以為是一條 route 的洞）。實讀後確認是**一整類**：7 條 route 各自寫
+`const site = (siteId && sites.find(s => s.id === siteId)) || sites[0];`，而 `getWpSites()` 零 org
+過濾、回傳每個 active 站與它的 Application Password。其中**兩條會寫入**：
+`video/embed-to-wp` 改寫文章內容、`content/wp-post` 發文。第 8 條 `publishToWordPress`
+（主要發文核心）同樣吃 caller 給的 siteId、同樣沒有閘。
+
+[修法：一個 seam，不是 7 個 assert]
+在 7 個地方各補一次 `assertOrgAccess` 等於把同一條規則抄七遍，遲早分叉。改為：
+`lib/content/wp-sites.ts` 新增 `resolveWpSite(req, siteId)` 作為**唯一允許用呼叫端 siteId 取站的入口**，
+7 條 route 全部收斂過去；多站畫面（內容日曆）用 `listAccessibleWpSites(req)`。
+
+`|| sites[0]` **不砍掉而是縮範圍**成「呼叫者有權存取的第一個」—— 前端確實有不帶 siteId 的呼叫
+（`ContentStudio.tsx:1087`、`:1260` 的 `selectedSiteId ? ... : ""`），砍掉會讓「還沒選站」的畫面壞掉。
+
+[已修改]
+| 檔案 | 改動 |
+|---|---|
+| `packages/db/migrations/0061_wp_sites_add_org.sql`（新）| `wp_sites` 加 `organization_id` + backfill。backfill **不猜**：3 個站名與 org 名完全相同，另 2 個（Soulful / AwareWave）以 URL 明確對映。`DO` 區塊回報未對映列數（不 abort） |
+| `packages/db/scripts/0061_wp_sites_add_org_down.sql`（新）| drop index + column，註明回滾順序 |
+| `lib/tenant-guard.ts` | 新增 `canAccessOrg()` **非拋出版**，`assertOrgAccess` 改為以它實作 → 規則只有一份。存在理由：filter 場景（挑第一個可存取的站、列可見清單）若用 try/catch 包 assert，等於手寫第二份規則 |
+| `lib/content/wp-sites.ts` | `WpSite.organizationId`；`getWpSites` 選出該欄；新增 `resolveWpSite()` / `listAccessibleWpSites()` |
+| `app/api/video/embed-to-wp`、`content/{wp-post,categories,tags,patterns,related-posts}` | 收斂到 `resolveWpSite`；404（找不到）與 403（沒權限）刻意分開 |
+| `app/api/content/calendar` | 改用 `listAccessibleWpSites(req)` —— 多站畫面若不過濾，客戶會直接看到別家的文章標題 |
+| `lib/content/publish/wordpress-core.ts` | `publishToWordPress(body, req)` 的 req 改**必填**。選填會在漏傳時靜默退回不安全行為，編譯器不會說話 |
+| `lib/content/blocks/publish-wordpress.ts` | headless 入口無 HTTP 身分 → **缺 `ctx.request` 一律拒發**，不預設成 staff。（`lib/content/pipeline.ts` 目前未被任何 route 接線，dormant） |
+| `app/api/content/sites/route.ts` | org_slug 改讀 `organization_id`，**移除 hostname 猜測**；列表加 `canAccessOrg` 過濾 |
+| `lib/content/__tests__/wp-sites-tenant.test.ts`（新）| 11 測 |
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`psql -U supabase_admin -f 0061 (BEGIN…ROLLBACK 預演)` | exit=0 | ms=~2200
+  - 預演即驗 backfill：5 個站**全部**對到正確 org（`still_null=0`），ROLLBACK 後欄位消失 → 零持久化
+- REALTEST_EVIDENCE: tool=SSH | cmd=`psql -U supabase_admin --single-transaction -f 0061_apply.sql` | exit=0 | ms=~1800
+  - `UPDATE 3` / `UPDATE 1` / `UPDATE 1`，NOTICE：`all wp_sites rows mapped to an organization`
+  - PostgREST 讀回驗證：5 站 org 前綴 `2bf60452 / 39ad4149 / 9e6e0993 / 37fdf3e3 / d6d1e845` 全部正確
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && npx vitest run` | exit=0 | ms=~1900（55 檔 / 648 測全過）
+- REVIEW_DONE: critic=Deep（**自審**，見 ORACLE_WAIVED）| verdict=pass | findings=0C/0M/0m 新增
+  - **突變測試**：把 `resolveWpSite` 改回舊行為（移除 assert + 還原 `sites[0]`）→ **4 條測試轉紅**（含「client 未指定 siteId 時取到的是自己的站而非清單第一個」）。還原後 11/11 綠
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`getWpSites\|sites\[0\]\|hostnameSlugMap\|publishToWordPress` | hits=0 未收斂的取站點
+  - `getWpSites()` 的直接呼叫端剩 3 處且皆為正當用途：`resolveWpSite` / `listAccessibleWpSites`（seam 本體）與 `content/sites` 的 env fallback 清單
+  - `hostnameSlugMap` 已完全移除（0 命中）
+  - `publishToWordPress` 兩個呼叫端皆已帶身分（route 傳 `req`、block fail-closed）
+- ORACLE_WAIVED: 操作者本 session 明確告知 Codex 額度已用盡，改以自審 + 突變測試替代（同前兩則 entry）
+
+[順帶修掉的第二套機制]
+`content/sites` 原本用「organizations.metadata.client_config.site_url 的 hostname」對 `wp_sites.url` 的
+hostname 來推 org_slug，first-writer-wins。**實測 EU prod 3 個 staging 站的 hostname 全是
+`aware-wave.com`（只有 path 不同）→ 它們一直被標成錯的租戶。** 這和影片 out_name 是同一個
+class（把身分編碼進字串再反解）。既然 `wp_sites.organization_id` 是權威來源，該猜測整段刪除。
+
+[剩餘風險]
+- `wp_sites` 有 3 個 staging 站（`E2E-Verify-0704` / `Test WP Webhook Co` / `MONGOLIA-03`）
+  **實測 WP REST 全部回 404**，即已不存在的死站卻仍 `active=true`。不影響本次改動（它們現在
+  歸屬正確），但下拉選單會列出三個連不上的站 → 已記 TASKS
+- `publish/wordpress` 積木在接線時**必須**把觸發的 Request 放進 `ctx.request`，否則一律拒發。
+  這是刻意的 fail-closed；接線者若不知情會以為積木壞了，故已寫進該檔註解
+
+[rollback]
+1. `git revert <本 commit>` → `sg-deploy`
+2. `psql -U supabase_admin -f 0061_wp_sites_add_org_down.sql`（先 revert code 再 drop 欄位；
+   欄位掉了而新碼還在 = client 被拒絕所有站）
+
+
 ### AUTO_TASK_DONE: Soulful 自動備份加上 Dropbox 第二目的地（含四次自我訂正）
 
 [任務]

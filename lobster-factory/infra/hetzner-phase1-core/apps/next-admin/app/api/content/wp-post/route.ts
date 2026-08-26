@@ -1,18 +1,22 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
-import { getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
+import { resolveWpSite } from "@/lib/content/wp-sites";
+import { OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Resolve site auth server-side from siteId
-async function getSiteAuth(siteId: string): Promise<{ url: string; authHeader: string } | null> {
-  const { sites, tokens, usernames } = await getWpSites();
-  const site = sites.find(s => s.id === siteId);
-  if (!site) return null;
-  const token = tokens[siteId];
-  if (!token) return null;
-  return { url: site.url, authHeader: wpAuthHeader(usernames[siteId] ?? "", token) };
+// Resolve site auth server-side from siteId.
+// `req` 必須傳進來：租戶檢查在 resolveWpSite 裡，少了 req 就沒有身分可驗 —— 這條 route 會
+// **發文到該站**，是本批七條裡風險最高的兩條之一。
+// @throws OrgAccessError（呼叫端轉 403）；回 null = 找不到站或缺 token（呼叫端回 404）。
+async function getSiteAuth(
+  req: Request,
+  siteId: string,
+): Promise<{ url: string; authHeader: string } | null> {
+  const resolved = await resolveWpSite(req, siteId);
+  if (!resolved || !resolved.token) return null;
+  return { url: resolved.site.url, authHeader: resolved.authHeader };
 }
 
 // PATCH /api/content/wp-post — update WP post (date, status, title)
@@ -29,7 +33,9 @@ export async function PATCH(req: Request): Promise<Response> {
   if (!siteId) return NextResponse.json({ ok: false, error: "siteId required" }, { status: 400 });
   if (isNaN(postId)) return NextResponse.json({ ok: false, error: "postId must be a positive integer" }, { status: 400 });
 
-  const site = await getSiteAuth(siteId);
+  let site;
+  try { site = await getSiteAuth(req, siteId); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   if (!site) return NextResponse.json({ ok: false, error: "Site not found or token missing" }, { status: 404 });
 
   // Build WP patch payload — only include explicitly provided fields
@@ -94,7 +100,9 @@ export async function DELETE(req: Request): Promise<Response> {
   if (!siteId || isNaN(postId))
     return NextResponse.json({ ok: false, error: "siteId and postId (positive integer) required" }, { status: 400 });
 
-  const site = await getSiteAuth(siteId);
+  let site;
+  try { site = await getSiteAuth(req, siteId); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   if (!site) return NextResponse.json({ ok: false, error: "Site not found" }, { status: 404 });
 
   let res: Response;

@@ -28,7 +28,7 @@ export async function POST(req: Request): Promise<Response> {
     return new NextResponse("invalid json", { status: 400 });
   }
 
-  const result = await publishToWordPress(body);
+  const result = await publishToWordPress(body, req);
   if (result.ok) {
     // 成功一律 JSON；result 只含該路徑實際產生的鍵（post_id/edit_url + featured_set 或 view_url），
     // 與舊版兩種成功回應位元相同。

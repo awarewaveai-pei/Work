@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
-import { getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
+import { resolveWpSite } from "@/lib/content/wp-sites";
+import { OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { decodeWpEntities } from "@/lib/content/wp-entities";
 
 export const runtime = "nodejs";
@@ -20,15 +21,14 @@ export async function GET(req: Request): Promise<Response> {
   const url    = new URL(req.url);
   const siteId = url.searchParams.get("siteId") ?? "";
 
-  const { sites, tokens, usernames } = await getWpSites();
-  if (sites.length === 0) return NextResponse.json({ ok: true, patterns: [] });
-
-  const site     = (siteId && sites.find(s => s.id === siteId)) || sites[0];
-  const token    = tokens[site.id] ?? "";
-  const username = usernames[site.id] ?? "";
+  let resolved;
+  try { resolved = await resolveWpSite(req, siteId); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+  if (!resolved) return NextResponse.json({ ok: true, patterns: [] });
+  const site = resolved.site;
   // wp_block is not publicly listable — without a token the endpoint 401s, so skip cleanly.
-  if (!token) return NextResponse.json({ ok: true, patterns: [], note: "no auth token for this site" });
-  const authHeaders = { Authorization: wpAuthHeader(username, token) };
+  if (!resolved.token) return NextResponse.json({ ok: true, patterns: [], note: "no auth token for this site" });
+  const authHeaders = { Authorization: resolved.authHeader };
 
   const params = new URLSearchParams({
     per_page: "100",

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
-import { getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
+import { resolveWpSite } from "@/lib/content/wp-sites";
+import { OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,22 +25,21 @@ export async function POST(req: Request): Promise<Response> {
   const siteId = typeof body.siteId === "string" ? body.siteId : "";
   const limit  = typeof body.limit === "number" ? Math.min(Math.max(1, body.limit), 8) : 5;
 
-  const { sites, tokens, usernames } = await getWpSites();
-  if (sites.length === 0) {
-    // No site configured is not an error for the caller — it just means no internal links to weave.
+  let resolved;
+  try { resolved = await resolveWpSite(req, siteId); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+  if (!resolved) {
+    // No accessible site is not an error for the caller — it just means no internal links to weave.
     return NextResponse.json({ ok: true, posts: [] });
   }
-
-  const site = (siteId && sites.find(s => s.id === siteId)) || sites[0];
-  const token    = tokens[site.id] ?? "";
-  const username = usernames[site.id] ?? "";
+  const site = resolved.site;
 
   // WP REST relevance search. Relevant content lives in BOTH posts AND pages on real sites
   // (verified on soulful: insights/* are posts, healing-modules/* are pages), so query both
   // and merge. orderby=relevance is valid only with `search`, which is always present here.
   // Note: WP search ANDs the terms, so an over-specific multi-word keyword can return 0 — that
   // is acceptable (the generator then adds no internal links rather than fabricating fakes).
-  const authHeaders = token ? { Authorization: wpAuthHeader(username, token) } : {};
+  const authHeaders = resolved.authHeader ? { Authorization: resolved.authHeader } : {};
   const fetchType = async (restBase: "posts" | "pages"): Promise<RelatedPost[]> => {
     const params = new URLSearchParams({
       search: keyword,

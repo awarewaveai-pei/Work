@@ -9,7 +9,8 @@
  * 契約 SSOT：`lib/content/blocks/README.md`。本檔不做角色閘（role gate 屬 HTTP 殼，留在 route）；
  * 不依賴 `Request`/`NextResponse` → 可被任何 Node runtime 呼叫、可單獨測試、可整段移植。
  */
-import { getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
+import { resolveWpSite, getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
+import { OrgAccessError } from "@/lib/tenant-guard";
 import { isBridgeConfigured, bridgeBaseUrl, createPost } from "@/lib/studio/wp-bridge-client";
 import { markdownToBlocks } from "@/lib/content/markdown-to-blocks";
 import { decodeWpEntities } from "@/lib/content/wp-entities";
@@ -307,26 +308,39 @@ async function resolveTermIds(
  * 發佈一篇 markdown 文章到 WordPress（draft-first；Bridge 站走簽章 /post，其餘走標準 REST）。
  * 行為與原 `app/api/content/publish/route.ts` POST 完全相同，唯一差別是回傳結構化結果而非 NextResponse。
  */
-export async function publishToWordPress(body: WordPressPublishInput): Promise<WordPressPublishResult> {
+export async function publishToWordPress(
+  body: WordPressPublishInput,
+  /**
+   * 呼叫者的身分來源（**必填**，2026-08-26）。這條路徑會**發文到指定的站**，而 `body.siteId`
+   * 完全由呼叫端給定 —— 沒有身分就沒有東西可以驗，等於任何過了角色閘的人都能發到任一客戶站。
+   * 做成必填而非選填：選填參數漏傳時會靜默退回舊的不安全行為，編譯器不會說話。
+   */
+  req: Request | { headers: Headers },
+): Promise<WordPressPublishResult> {
   // Resolve target site: use siteId if provided, otherwise fall back to env vars
   const siteId = typeof body.siteId === "string" ? body.siteId.trim() : "";
   let wpApiUrl: string | undefined;
   let wpToken: string | undefined;
   let wpUsername = "";
 
-  const { sites, tokens, usernames } = await getWpSites();
-  if (siteId) {
-    const site = sites.find(s => s.id === siteId);
-    if (!site) return { ok: false, status: 400, error: `Site '${siteId}' not found`, wire: "text" };
-    wpApiUrl   = site.url;
-    wpToken    = tokens[siteId];
-    wpUsername = usernames[siteId] ?? "";
-  } else if (sites.length > 0) {
-    // No explicit siteId — fall back to first available site (DB or env)
-    const site = sites[0];
-    wpApiUrl   = site.url;
-    wpToken    = tokens[site.id];
-    wpUsername = usernames[site.id] ?? "";
+  const { sites } = await getWpSites();
+  if (siteId || sites.length > 0) {
+    // 指定站 → 驗租戶；未指定 → 取「呼叫者有權存取的第一個」（staff 等同舊的 sites[0]）
+    let resolved;
+    try {
+      resolved = await resolveWpSite(req, siteId);
+    } catch (e) {
+      if (e instanceof OrgAccessError) {
+        return { ok: false, status: 403, error: e.message, wire: "text" };
+      }
+      throw e;
+    }
+    if (!resolved) {
+      return { ok: false, status: 400, error: siteId ? `Site '${siteId}' not found` : "No accessible site", wire: "text" };
+    }
+    wpApiUrl   = resolved.site.url;
+    wpToken    = resolved.token || undefined;
+    wpUsername = resolved.username;
   } else {
     // Last-resort legacy env vars (single-site deployments without WP_SITE_i_* scheme)
     wpApiUrl = process.env.WP_API_URL;
