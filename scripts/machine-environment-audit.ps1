@@ -275,32 +275,11 @@ if (-not (Test-Path -LiteralPath $vaultPath)) {
     }
 }
 
-# --- Cursor MCP: repo SSOT + optional empty user file (avoid duplicate merge) ---
-$mcpProject = Join-Path $WorkRoot ".cursor\mcp.json"
-if (-not (Test-Path -LiteralPath $mcpProject)) {
-    Write-Audit -Level WARN -Message "Project .cursor/mcp.json missing at $mcpProject — MCP server list should live at monorepo root (see agency-os/docs/operations/mcp-add-server-quickstart.md)."
-    $warnCount++
-} else {
-    Write-Audit -Level OK -Message "Project .cursor/mcp.json present (SSOT; paths should use `${workspaceFolder} in JSON)."
-}
-
-$mcpUser = Join-Path $env:USERPROFILE ".cursor\mcp.json"
-if (-not (Test-Path -LiteralPath $mcpUser)) {
-    Write-Audit -Level WARN -Message "User .cursor/mcp.json not found at $mcpUser — create minimal {""mcpServers"":{}} per agency-os/docs/operations/cursor-mcp-and-plugin-inventory.md"
-    $warnCount++
-} else {
-    Write-Audit -Level OK -Message "User .cursor/mcp.json present (use empty mcpServers unless adding keys that are not in project SSOT)."
-}
-
-# --- Optional full gate ---
-if ($RunVerifyGates -and -not $criticalFail) {
-    Write-Host "== Running verify-build-gates.ps1 ==" -ForegroundColor Cyan
-    & powershell -ExecutionPolicy Bypass -NoProfile -File (Join-Path $WorkRoot "scripts\verify-build-gates.ps1") -WorkRoot $WorkRoot
-    if ($LASTEXITCODE -ne 0) {
-        Write-Audit -Level FAIL -Message "verify-build-gates failed (exit $LASTEXITCODE)."
-        $criticalFail = $true
-    }
-}
+# Cursor MCP checks REMOVED 2026-08-26: Cursor is retired and .cursor/ is deleted, so both
+# checks would have warned on every audit run forever. A detector that can never go green is
+# a detector that gets ignored -- the exact mechanism behind the ClickHouse recurrence this
+# repo spent 2026-08-25 unpicking. Claude Code MCP config is covered by the checks above and
+# by mcp/claude-userlevel/manifest.json.
 
 if ($Strict -and $warnCount -gt 0) {
     Write-Audit -Level FAIL -Message "-Strict: treating $warnCount warning(s) as failure."

@@ -8,7 +8,7 @@
     [switch]$AllowPendingStash,
     [switch]$SkipWorkflowsDeps,
     [switch]$SkipOpenTasksList,
-    # 與 GitHub 主線對齊：`fetch` → `checkout main` → `reset --hard origin/main` →（**預設不切功能分支**；可選切回功能分支並 `merge origin/main`）。**不**與 Autopilot（`-SkipStrictEnvironmentAudit`）併用。關鍵字 **AO-RESUME** 由 `.cursor/rules/30-resume-keyword.mdc` 預設傳此旗標。
+    # 與 GitHub 主線對齊：`fetch` → `checkout main` → `reset --hard origin/main` →（**預設不切功能分支**；可選切回功能分支並 `merge origin/main`）。**不**與 Autopilot（`-SkipStrictEnvironmentAudit`）併用。關鍵字 **AO-RESUME** 由 `.claude/commands/ao-resume.md` 預設傳此旗標（Cursor 於 2026-08-26 退場）。
     [switch]$FullMainlineParity,
     [string]$FullMainlineFeatureBranch = "",
     [switch]$FullMainlinePushFeature,
@@ -58,10 +58,6 @@ function Show-AoResumeQuickFix {
             Write-Host '  powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1 -WorkRoot . -FetchOrigin'
             Write-Host "  (Then re-run AO-RESUME after fixing WARN/FAIL)"
         }
-        "rules-consistency" {
-            Write-Host '  powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\sync-enterprise-cursor-rules-to-monorepo-root.ps1 -MonorepoRoot .'
-            Write-Host "  (Then re-run AO-RESUME)"
-        }
         default {
             Write-Host '  powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1'
         }
@@ -82,14 +78,12 @@ function Assert-AoResumeRuleConsistency {
         return 1
     }
 
-    $syncVerify = Join-Path $Root "scripts\sync-enterprise-cursor-rules-to-monorepo-root.ps1"
-    if (Test-Path -LiteralPath $syncVerify) {
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $syncVerify -MonorepoRoot $Root -VerifyOnly -Quiet
-        if ($LASTEXITCODE -ne 0) {
-            Write-Error "ao-resume: rules mirror consistency check failed (root .cursor/rules != agency-os canonical)."
-            return $LASTEXITCODE
-        }
-    }
+    # Cursor rules mirror check REMOVED 2026-08-26: Cursor is retired, and both
+    # .cursor/rules (mirror) and agency-os/.cursor/rules (canonical) are deleted. The
+    # check was already guarded by Test-Path on the sync script, so it would have
+    # self-skipped -- removed outright rather than left as a dormant branch referring to
+    # directories that no longer exist. The owner-spec Version check above still applies:
+    # it governs .claude rules too, not just Cursor's.
     return 0
 }
 
@@ -319,7 +313,7 @@ if (-not (Test-Path -LiteralPath $checkScript)) {
 
 $rulesConsistencyExit = Assert-AoResumeRuleConsistency -Root $WorkRoot
 if ($rulesConsistencyExit -ne 0) {
-    Show-AoResumeQuickFix -Step "rules-consistency" -ExitCode $rulesConsistencyExit
+    Show-AoResumeQuickFix -Step "default" -ExitCode $rulesConsistencyExit
     exit $rulesConsistencyExit
 }
 

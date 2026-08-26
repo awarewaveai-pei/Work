@@ -1,4 +1,4 @@
-> **Owner**：規則整併「分階段執行」視角。對應舊 Cursor 檔名 **`rules-stability-consolidation_*.plan.md`**。  
+﻿> **Owner**：規則整併「分階段執行」視角。對應舊 Cursor 檔名 **`rules-stability-consolidation_*.plan.md`**。  
 > **憲法正文**：[`rules-version-and-enforcement.md`](../operations/rules-version-and-enforcement.md)。**收斂目標與 DoD**見同軌 [`PLAN_30_YEAR_RULE_CONSOLIDATION.md`](PLAN_30_YEAR_RULE_CONSOLIDATION.md)。
 
 # Rules 長期穩定整併計畫
@@ -30,7 +30,7 @@
 
 - 在 [`scripts/ao-resume.ps1`](../../../scripts/ao-resume.ps1) 加入 preflight 前置檢查：
   - Owner 檔版本標記存在
-  - 規則鏡像一致性 [`sync-enterprise-cursor-rules-to-monorepo-root.ps1`](../../../scripts/sync-enterprise-cursor-rules-to-monorepo-root.ps1) `-VerifyOnly`
+  - 規則鏡像一致性 `sync-enterprise-cursor-rules-to-monorepo-root.ps1`（Cursor 已於 2026-08-26 退場，檔案已刪除） `-VerifyOnly`
   - 失敗即中止 + 單行 quick-fix
 - 保持 `agency-os/scripts/ao-resume.ps1` 為 wrapper（單一程式 Owner 在 root）
 
@@ -62,9 +62,9 @@
 
 - [`rules-version-and-enforcement.md`](../operations/rules-version-and-enforcement.md)
 - [`scripts/ao-resume.ps1`](../../../scripts/ao-resume.ps1)
-- [`agency-os/.cursor/rules/30-resume-keyword.mdc`](../../.cursor/rules/30-resume-keyword.mdc)
-- [`.cursor/rules/30-resume-keyword.mdc`](../../../.cursor/rules/30-resume-keyword.mdc)
-- [`sync-enterprise-cursor-rules-to-monorepo-root.ps1`](../../../scripts/sync-enterprise-cursor-rules-to-monorepo-root.ps1)
+- `agency-os/.cursor/rules/30-resume-keyword.mdc`（Cursor 已於 2026-08-26 退場，檔案已刪除）
+- `.cursor/rules/30-resume-keyword.mdc`（Cursor 已於 2026-08-26 退場，檔案已刪除）
+- `sync-enterprise-cursor-rules-to-monorepo-root.ps1`（Cursor 已於 2026-08-26 退場，檔案已刪除）
 - [`cursor-enterprise-rules-index.md`](../operations/cursor-enterprise-rules-index.md)
 
 ## 風險控制

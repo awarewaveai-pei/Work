@@ -1,4 +1,4 @@
-# Agency OS v1
+﻿# Agency OS v1
 
 多客戶網站建置、客製系統、維運與行銷整合的營運框架。
 
@@ -34,8 +34,8 @@
 | 收工／關機 | [end-of-day-checklist.md](docs/operations/end-of-day-checklist.md) |
 | 工具／路由／TASKS 一頁 | [TOOLS_DELIVERY_TRACEABILITY.md](docs/operations/TOOLS_DELIVERY_TRACEABILITY.md) |
 | **脈絡鏈（不重貼內文；依序鑽）** | **1** [TOOLS_DELIVERY_TRACEABILITY.md](docs/operations/TOOLS_DELIVERY_TRACEABILITY.md)（**§0** 總索引＋能力表／P1–P7 DoD）→ **2** [WORKLOG.md](WORKLOG.md)（當日 `## yyyy-MM-dd` 敘事與收工證據）→ **3** Phase1 compose：[README.md](../lobster-factory/infra/hetzner-phase1-core/README.md) → **4** 收工機讀：[end-of-day-checklist.md](docs/operations/end-of-day-checklist.md) §0 · `docs/operations/` [OPS_DOCS_INDEX.md](docs/operations/OPS_DOCS_INDEX.md)（`AUTO_TASK_DONE`、`apply-closeout-task-checkmarks` 列） |
-| AO-RESUME 規則 | [30-resume-keyword.mdc](.cursor/rules/30-resume-keyword.mdc) |
-| AO-CLOSE 規則 | [40-shutdown-closeout.mdc](.cursor/rules/40-shutdown-closeout.mdc) |
+| AO-RESUME 規則 | 30-resume-keyword.mdc（Cursor 已於 2026-08-26 退場，檔案已刪除） |
+| AO-CLOSE 規則 | 40-shutdown-closeout.mdc（Cursor 已於 2026-08-26 退場，檔案已刪除） |
 | 今日主線 | [TASKS.md](TASKS.md) |
 | 統整報告（檔） | [integrated-status-LATEST.md](reports/status/integrated-status-LATEST.md) |
 | 統整報告（說明） | [INTEGRATED_STATUS_REPORT.md](docs/overview/INTEGRATED_STATUS_REPORT.md) |
@@ -95,7 +95,7 @@
 | 事件 | 檔案 |
 |:---|:---|
 | 開工（AO-RESUME） | [REMOTE_WORKSTATION_STARTUP.md](docs/overview/REMOTE_WORKSTATION_STARTUP.md) |
-| 收工（AO-CLOSE） | [end-of-day-checklist.md](docs/operations/end-of-day-checklist.md) + [40-shutdown-closeout.mdc](.cursor/rules/40-shutdown-closeout.mdc) |
+| 收工（AO-CLOSE） | [end-of-day-checklist.md](docs/operations/end-of-day-checklist.md) + 40-shutdown-closeout.mdc（Cursor 已於 2026-08-26 退場，檔案已刪除） |
 | 跨系統運作模型 | [ao-lobster-operating-model.md](docs/overview/ao-lobster-operating-model.md) |
 
 原則：其他文件只保留入口一句，不重複貼全套命令。
@@ -236,9 +236,9 @@
 
 | 用途 | 檔案 |
 |:---|:---|
-| Cursor 00 啟動 | [00-session-bootstrap.mdc](.cursor/rules/00-session-bootstrap.mdc) |
-| Cursor 10 記憶 | [10-memory-maintenance.mdc](.cursor/rules/10-memory-maintenance.mdc) |
-| Cursor 20 doc-sync | [20-doc-sync-closeout.mdc](.cursor/rules/20-doc-sync-closeout.mdc) |
+| Cursor 00 啟動 | 00-session-bootstrap.mdc（Cursor 已於 2026-08-26 退場，檔案已刪除） |
+| Cursor 10 記憶 | 10-memory-maintenance.mdc（Cursor 已於 2026-08-26 退場，檔案已刪除） |
+| Cursor 20 doc-sync | 20-doc-sync-closeout.mdc（Cursor 已於 2026-08-26 退場，檔案已刪除） |
 | 龍蝦工廠入口 | [README.md](../lobster-factory/README.md) |
 
 ---

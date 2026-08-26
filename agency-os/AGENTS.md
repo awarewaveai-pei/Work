@@ -212,14 +212,13 @@ Secrets: `scripts/secrets-vault.ps1 -Action get -Name <KEY_NAME>`（輸出 `NAME
 - **Routing 三件套（同一 PR 必須同步）**：`lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` + `lobster-factory/workflow-risk-matrix.json` + `lobster-factory/docs/ROUTING_MATRIX.md`
 - **自動化安全預設**：DB 寫入預設 OFF（`LOBSTER_ENABLE_DB_WRITES=true` 才開）；Manifest 預設 off（`LOBSTER_EXECUTE_MANIFEST_STEPS=true` + `LOBSTER_MANIFEST_EXECUTION_MODE=dry_run|apply`）；自動 remediation 預設 OFF（`AUTO_REMEDIATE_ENABLED=true` + `AUTO_REMEDIATE_SERVICE_WHITELIST=<逗號分隔 compose service>` 兩者都設才生效，空白名單 = 全不匹配；目錄 SSOT：next-admin `lib/repair-center/remediations/`，四段契約 precheck→execute→healthcheck→rollback）
 - **Trigger.dev 憑證（不可互換）**：`tr_pat_*` = CLI deploy（`TRIGGER_DEPLOY_PAT`）；`tr_prod_*` = SDK runtime（`TRIGGER_ACCESS_TOKEN`）
-- Cursor rules 正本：`agency-os/.cursor/rules/`（repo 根 `.cursor/rules/` 是 mirror，不改正本）
 - 監控分工：SG endpoint-alert 打本機端口（避免 hairpin timeout）；EU Uptime Kuma 負責 public reachability。詳見 [`AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md)
 
 ## 語言與輸出
 
 繁體中文；先結論後步驟；操作說明含路徑 + 動作 + 預期結果；指令貼完整可執行版本；每 15 分鐘回報長任務進度。
 **壓縮模式（永久預設）**：本 project 所有回覆採 caveman style（省 ~75% token）。不等使用者說觸發詞，直接生效。去掉 filler / 問候 / 解釋。技術名詞保留原文。僅在**不可逆操作確認**（刪資料 / deploy / reboot）時暫時切回完整說明，說完自動恢復。
-Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回寫 WORKLOG/memory（Cursor: `.cursor/rules/40-shutdown-closeout.mdc`；Claude Code: `.claude/commands/ao-close.md`）。
+Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依 `.claude/commands/ao-close.md` 回寫 WORKLOG/memory。
 
 ## 代理自動工具使用規則（Claude 主動執行）
 
@@ -316,7 +315,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | 改動 `.ts/.tsx` 任何檔案 | 完成前 `npx tsc --noEmit` 必綠（**🔧** `batch-format.js` Stop 時自動跑）；型別錯誤不得宣告完成 |
 | 完成任何 code 改動（`.ps1/.ts/.tsx/.js/.sh/.py`）| 跑 `/verify-recent`（**🔧** verify-gate 三件套硬擋未驗證 commit）|
 | critic 回報 Critical 或 High 問題 | 召喚 `vuln-verifier` 寫 PoC 確認是否真實漏洞 |
-| 改動 governance 文件（`AGENTS.md` / `CLAUDE.md` / hooks / cursor rules）| 改後跑 `/doc-sync`；若同時改了 `.claude/commands/` `.claude/agents/` `.claude/skills/` → 跑 `/sync-check` |
+| 改動 governance 文件（`AGENTS.md` / `CLAUDE.md` / hooks）| 改後跑 `/doc-sync`；若同時改了 `.claude/commands/` `.claude/agents/` `.claude/skills/` → 跑 `/sync-check` |
 | 任何 R0 任務完成後（輸出 [已修改]）| 跑 `/checkpoint` 存 mid-session commit（tree 乾淨時靜默跳過）|
 | 準備 sg-deploy 前 | 自動跑 `/check-drift` + `/verify` + `tsc --noEmit`（有 ts 改動時）|
 | sg-deploy 完成後 | 自動跑 `/playwright smoke` |
@@ -393,7 +392,7 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 
 ## Session 啟動順序（每次都做）
 
-SSOT：[`.claude/commands/ao-resume.md`](../.claude/commands/ao-resume.md)（Claude Code）/ `.cursor/rules/30-resume-keyword.mdc`（Cursor）。  
+SSOT：[`.claude/commands/ao-resume.md`](../.claude/commands/ao-resume.md)。  
 Hook `ao-resume-on-prompt.ps1` 自動觸發 → 讀 `.agency-state/ao-resume-hook-last.json` → AO-RESUME 報告（§0–§8）輸出。兩者不一致時以各自 SSOT 為準。
 
 ## AO-RESUME / AO-CLOSE 快速續接
@@ -406,7 +405,7 @@ Hook `ao-resume-on-prompt.ps1` 自動觸發 → 讀 `.agency-state/ao-resume-hoo
 **判讀 smoke 結果（2026-08-17 起）**：`smoke-LATEST.json` 自帶 `overall` 與 `blind_spots` 兩個欄位，**直接讀，不要自己心算**。`blind_spots` 非空 = 某個關鍵偵測器這輪「什麼都沒量到」（SSH 掛了 / 金鑰不見 / 解析失敗），此時 `overall` 一律 WARN —— 因為「偵測器啞了」不可以長得像「一切正常」，那正是 2026-08-03 事故的形狀。`client_mail` 除了近 7 天失敗數，另查**距上次成功寄信天數**（門檻 `-MailQuietDayLimit`，預設 10）：只數失敗無法分辨「健康」與「已壞但還沒人用到」。門檻**必須低於 14** —— FluentSMTP 的 `log_saved_interval_days=14` 每日清舊日誌，設 14 以上該分支永遠觸發不到。  
 每 30 天自動執行月度五項檢查（warn-only，2026-08-24 訂正：原文寫「三項」但 `ao-resume.ps1` 早就是四項，今天再加第五項）：`monthly-system-review.ps1` / `check-supabase-memory-monthly.ps1` / `check-governance-docs-drift.ps1`（4 份核心治理文件一致性）/ `refresh-cf-origin-ips.ps1` / `check-change-impact-matrix-drift.ps1`（`docs/CHANGE_IMPACT_MATRIX.md` 全部 ~85 條關係的 mtime 漂移，不只 4 份核心文件）。結果寫 `reports/`，Claude 在 §1 回報。
 
-**AO-CLOSE**（關機/收工任何表達）：先補 `WORKLOG.md` AUTO_TASK_DONE + 更新 `CONVERSATION_MEMORY.md`，再跑 `.\scripts\ao-close.ps1`。預設門檻：health-check 100%（未達 100% 代理**自行嘗試自修後重跑**，修不好才列具體失敗項問一題；**禁止**主動提議 `-AllowNonPerfectHealth`）。步驟 SSOT：`docs/operations/end-of-day-checklist.md`；關鍵字行為 SSOT：Cursor → `.cursor/rules/40-shutdown-closeout.mdc`；Claude Code → `.claude/commands/ao-close.md`。
+**AO-CLOSE**（關機/收工任何表達）：先補 `WORKLOG.md` AUTO_TASK_DONE + 更新 `CONVERSATION_MEMORY.md`，再跑 `.\scripts\ao-close.ps1`。預設門檻：health-check 100%（未達 100% 代理**自行嘗試自修後重跑**，修不好才列具體失敗項問一題；**禁止**主動提議 `-AllowNonPerfectHealth`）。步驟 SSOT：`docs/operations/end-of-day-checklist.md`；關鍵字行為 SSOT：`.claude/commands/ao-close.md`。
 
 ## Git + 記憶 + 文件
 
@@ -427,6 +426,12 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 ## First Run
 若有 `BOOTSTRAP.md`，先照檔案完成初始化再開始任務。
 
+> **Cursor 於 2026-08-26 退場**（操作者決定，單機單 IDE）。`.cursor/`、`agency-os/.cursor/`
+> 及三支 cursor 專用腳本已刪除；`ao-resume.ps1` 的 rules 鏡像一致性檢查與
+> `machine-environment-audit.ps1` 的 `.cursor/mcp.json` 檢查一併移除（否則會變成永久
+> 警告——永久警告等於被忽略的偵測器）。歷史 WORKLOG 與 report 中的 Cursor 敘述保留，
+> 它們描述的是當時為真的事。
+
 ## Related Documents (Auto-Synced)
 - `.cursor/rules/00-session-bootstrap.mdc`
 - `.cursor/rules/10-memory-maintenance.mdc`
@@ -445,5 +450,5 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-08-24 19:21:02 UTC_
+_Last synced: 2026-08-26 04:45:21 UTC_
 
