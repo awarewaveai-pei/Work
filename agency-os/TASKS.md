@@ -362,8 +362,14 @@
   - **尚未驗證**：端到端上傳。下次排程 `wpvivid_main_schedule_event` = **2026-08-31 00:08:15**。
   - **刻意不由代理觸發備份**：站台 925 MB（uploads 744M + DB 181M），`wpvivid_task_list` 已 105 KB、`wpvivid_last_msg` 105 KB；在共享主機跑無人監看的多階段任務，**卡住反而可能連 8/31 那次一起卡死**。要提早驗證請由操作者在 UI 按 Backup Now（看得到進度、可中止）。
   - **待觀察的副作用**：Google 若仍被限流，WPvivid 可能仍把整個任務標成 `Failed`，即使 Dropbox 已收到檔案。8/31 後看 `report_addon`：若出現「Dropbox 成功但整體 Failed」，要決定是否移除 Google Drive 以免偵測器長期假紅。
-  - **仍未解**：MainWP UI 顯示的 `Aug 26 07:10 / Manual` 在子站 `wpvivid_backup_list` 裡**不存在**（該表只有 2 筆：`2026-07-27` 與 `2026-08-17`，皆 googledrive、local=no）。需確認當時那個面板選的是哪個站（可能是 `aware-wave.com`）。
+  - **✅ 已解（2026-08-26，操作者提供 Google Drive 檔案列表）**：MainWP 那筆 `Aug 26 07:10 / Manual` 是 **`aware-wave.com`** 的，不是 soulful —— 雲端檔名 `aware-wave.com_wpvivid-f7e4835952c38_2026-08-26-15-10_backup_all.zip`（15:10 TPE ＝ 07:10 UTC）完全對上。子站紀錄沒有它是正確的。
   - **目前實際曝險**：最新可用備份仍是 **2026-08-17**（9 天前），且只在 Google Drive 一處 —— EU 那份已被保留政策刪除（見上一條）。
+  - **✅ 安全網已確認為真（非僅紀錄）**：Google Drive 上 `soulfulexpression.org_wpvivid-02daeea9609b4_2026-08-17-00-10_*` 共 **5 個分片**（137.3 + 197.5 + 197.4 + 182.2 + 84.4 ≈ **798.8 MB**），task id 與 `BACKUP_AUTO_STATUS.json` 的 `last_success.task_id` 完全吻合。7-27 那次同樣 5 分片完整。**所以最新備份是「9 天前但完整」，不是「可疑的單筆紀錄」。**
+  - **🔑 根因更精確（2026-08-26 由檔案大小對照得出）**：`rateLimitExceeded` 打的是 **Queries per minute**，而兩站的體積差一個量級 ——
+    - `aware-wave.com`：55–61 MB、**單檔**、近期 8/8・8/15・8/23・8/26 **四次全成**
+    - `soulfulexpression.org`：~799 MB、**5 分片**、只有 7/27・8/17 成功
+    - 分片上傳的 session start/append/finish 會把 API 呼叫數放大數十倍 → **同一個 Google 帳號下只有 soulful 撞牆**。不是 Google Drive 壞了，是體積在共用配額池裡超標。
+    - **這反向支持換 Dropbox 的判斷**：Dropbox 的 chunked upload 不共用 WPvivid 那個全球 Google 專案配額。
 
 - [ ] **`cf-iprefresh` 偵測器已 error 14 天，而且沒有任何讀者**
   - `🔴 現行` · `2026-08-26 開出` · `可直接做`

@@ -75,6 +75,23 @@ class（把身分編碼進字串再反解）。既然 `wp_sites.organization_id`
 
 ### AUTO_TASK_DONE: Soulful 自動備份加上 Dropbox 第二目的地（含四次自我訂正）
 
+[追記（同日，操作者提供 Google Drive 檔案列表後）]
+**兩個懸案解掉，並得到更精確的根因。**
+
+1. **`Aug 26 07:10 / Manual` 是 `aware-wave.com` 不是 soulful** —— 雲端檔名 `aware-wave.com_wpvivid-f7e4835952c38_2026-08-26-15-10_backup_all.zip`（15:10 TPE ＝ 07:10 UTC）完全對上。子站 `wpvivid_backup_list` 沒有它是**正確的**，先前的「未解」不是資料不一致。
+
+2. **soulful 的安全網確認為真**：Google Drive 上 `soulfulexpression.org_wpvivid-02daeea9609b4_2026-08-17-00-10_*` 共 5 分片（137.3+197.5+197.4+182.2+84.4 ≈ **798.8 MB**），task id 與 `BACKUP_AUTO_STATUS.json` 的 `last_success.task_id` 吻合；7-27 那次同樣 5 分片完整。**風險描述應由「只有一筆可疑紀錄」修正為「9 天前但完整可用」。**
+
+3. **根因更精確 —— 是體積不是服務**：
+   | 站 | 單次大小 | 分片 | 近期成功 |
+   |---|---|---|---|
+   | aware-wave.com | 55–61 MB | 1 | 8/8・8/15・8/23・8/26 全成 |
+   | soulfulexpression.org | ~799 MB | 5 | 僅 7/27・8/17 |
+   `rateLimitExceeded` 限的是 **Queries per minute**；5 分片的 upload session start/append/finish 把 API 呼叫數放大數十倍。**同一個 Google 帳號下只有 soulful 撞牆 → 不是 Google Drive 壞了，是體積在 WPvivid 全球共用專案的配額池裡超標。**
+   這反向支持本輪換 Dropbox 的判斷：Dropbox chunked upload 不共用該專案配額。
+
+- REALTEST_EVIDENCE: tool=操作者提供的 Google Drive 檔案列表（截圖）| 交叉比對 task id `02daeea9609b4` 與 `BACKUP_AUTO_STATUS.json.last_success.task_id` | **一致**；分片數 5、合計 ≈798.8 MB
+
 [任務]
 操作者：「那自動存要去哪裡設？你去幫我處理」。
 
