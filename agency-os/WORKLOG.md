@@ -2,6 +2,47 @@
 
 ## 2026-08-26
 
+### Soulful 搬遷主機（KS-6 缺貨改買 OVH SYS-GAME-2）— 買機 + OS 安裝 + P2 硬化起步 + 全站基礎設施盤點
+
+[任務]
+`2026-08-18-dedicated-host-purchase-timing.md` 決策 C6（立刻買、KS-6 缺貨改次選）進入執行。操作者本人下單 OVH **SYS-GAME-2**（非首選 KS-6——KS-6 缺貨，已查證為決策文件已知風險，非意外）：Ryzen 7 3800X 8c/16t / **64GB DDR4 ECC**（低於決策下限 128GB）/ 2×960GB NVMe soft RAID（低於下限 1TB）/ $72/mo，Gravelines FR。已與操作者對齊：**這台機只承接 Soulful，不預留給 EU/SG 整併**（規格落差下的範圍縮小，非默默接受）。
+
+[依據文件]
+- `agency-os/reports/decisions/2026-08-18-dedicated-host-purchase-timing.md` P1–P8 主計畫
+- `runbooks/KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md` 通用主機層 + 既有服務搬遷坑
+- `runbooks/KS6-BUILDOUT-SEQUENCE.md`（索引，不重複內容）
+- `runbooks/SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md` §8（DOCKER-USER chain 修法，4/20 SG 挖礦事件根治）
+
+[已完成]
+1. **OVH API 全權限 key 建立**（`aw-01`，GET/PUT/PATCH/POST/DELETE 皆 `/*`），寫入 `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md`
+2. **OS 安裝**：透過 OVH API `POST /dedicated/server/{svc}/reinstall`（非文件誤寫的 `/install/start`，實查 API schema 才找到正確 endpoint）安裝 Ubuntu 24.04 LTS，SSH key 直接內建（`sshKey` 欄位，非 `sshKeyName`）
+3. **P2.1 RAID1 驗證**：`md2`（/boot）、`md3`（/）皆 `[UU]`，兩碟健康
+4. **P2.2 NVMe 磨耗檢查**：兩顆 `percentage_used=5%`（遠低於 40% 警戒線）、`media_errors=0`、`unsafe_shutdowns=51`
+5. **全站基礎設施盤點**（操作者要求「有很多網站/自架的東西，看仔細」）：SSH 進 SG+EU 跑 `docker ps -a` + nginx `server_name` 全量 grep + Cloudflare zones/DNS API + GitHub repo API + MainWP 資料庫查詢，三方交叉核對
+6. **修正 `AWAREWAVE_STACK_QUICKREF.md`**（topology SSOT）：SG 原漏 oracle-web + 觀測堆疊 3 容器；EU 原只列 3 服務，漏 Postiz/MainWP/Uptime Kuma/Remotion/Video 5 個服務群（29 容器）；新增 Cloudflare Zones 節
+7. **修正 `TASKS.md`**：EU 整併清單補 `EU⑥b Remotion/Video 服務`（有對外網域 `remotion-svc.aware-wave.com`／`video-svc.aware-wave.com`，先前完全未列，屬真漏項非文件簡化）
+
+[未完成，順序未到]
+- P2.3–P2.10（防火牆 UFW+DOCKER-USER chain 雙層／SSH 硬化／建非 root 帳號／Docker 安裝＋log rotation／sysctl `vm.overcommit_memory`／THP／`fstrim.timer`／rescue mode 實測）
+- P3 備份管線、P4 還原演練 + `NEW-HOST-RECOVERY-RUNBOOK.md`（**P4.4 才要寫，現在還沒到，不是漏了**）
+- P5 起（Chatwoot／可觀測性／soulful 建置）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl` OVH API 簽章請求 `GET /me` | exit=0 | 回帳號真實資料（`nichandle=awarewaveai@gmail.com`, `customerCode=4380-3012-22`）確認 key 全權限生效
+- REALTEST_EVIDENCE: tool=Bash | cmd=OVH API `POST /dedicated/server/{svc}/reinstall` + 輪詢 `/install/status` 至 `task done` | exit=0 | `os` 欄位由 `none_64` 變為 `ubuntu2404-server_64`
+- REALTEST_EVIDENCE: tool=SSH(hetzner-ssh MCP) | cmd=`hostnamectl && lsblk && cat /proc/mdstat && sudo nvme smart-log` | exit=0 | Ubuntu 24.04.4 LTS、RAID1 `[UU]`×2、磨耗 5%
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker ps -a` on SG(10 容器) + EU(29 容器) | exit=0 | 逐一列出並與 nginx server_name + Cloudflare DNS 交叉核對一致
+- REALTEST_EVIDENCE: tool=Bash(curl) | cmd=Cloudflare `GET /zones` + `GET /zones/{id}/dns_records` | exit=0 | 5 zone 確認，3 個新查到的 zone（hope-flow.org/weartheworld.org/wusheng.foundation）零 DNS 記錄
+- REVIEW_WAIVED: DOC_ONLY -- 本輪 repo 內變更僅 `TASKS.md`／`AWAREWAVE_STACK_QUICKREF.md`（Markdown），無 code 邏輯變更；OVH API 操作對象是外部服務非本 repo 程式碼
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`ns3006986\|149.202.64.114\|ks-aw-01` | hits=0（憑證正確地只存在 repo 外的 `AWARE_WAVE_CREDENTIALS.md`，未誤寫進任何 repo 追蹤檔案）；另 grep `EU①-⑥` 系列確認 `AWAREWAVE_STACK_QUICKREF.md` 為拓樸唯一正本，無第二份文件重複記錄舊的 3-服務清單需要同步修正
+
+[剩餘風險]
+- P2 硬化未完成前，這台機器**尚未接上防火牆雙層防護**——目前無服務曝險（OS 剛裝，無 Docker 容器在跑），但下一步裝 Docker 前必須先做 P2.4/4b/4c，順序不可顛倒
+- 規格落差（64GB/960GB vs 決策下限 128GB/1TB）已與操作者對齊為「範圍縮小只放 Soulful」，但**這個範圍縮小尚未寫回決策文件的「切換條件」段**，下次 AO-RESUME 若直接讀決策文件仍會看到 128GB 下限字樣，需要人工判讀目前現況
+
+[rollback]
+OS 安裝：OVH 月租可隨時取消（`P1.7` 已記錄）；重裝可再次呼叫 `reinstall` API，機上目前無資料。文件修正：`git revert` 對應 commit。
+
 ### AUTO_TASK_DONE: 補上佈建的拆除路徑 + 三層對帳偵測器（不變量的另一半）
 
 [任務]
