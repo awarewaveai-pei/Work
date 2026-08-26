@@ -617,7 +617,9 @@ export default function SiteManager() {
   const loadSites = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/content/sites");
+      // 站別管理頁是唯一真的需要看見「已停用」站的畫面（要能重新啟用／刪除它們），
+      // 所以明示 opt-in。其他消費端不帶這個參數 → 只拿得到 active（route.ts GET 的預設）。
+      const res = await fetch("/api/content/sites?includeInactive=1");
       const data = await res.json() as { ok: boolean; sites?: ManagedSite[] };
       if (data.ok && data.sites) setSites(data.sites);
     } finally {

@@ -2,6 +2,85 @@
 
 ## 2026-08-26
 
+### AUTO_TASK_DONE: active 過濾收斂成 route 預設 —— 三輪覆審逼出一條不變量，外加一個 prod 跨租戶寫入
+
+[任務]
+接續前一則（3 個死站停用只關掉一半）。操作者指示把 default-safe 改法做掉一起 deploy。
+
+[已修改]
+- `app/api/content/sites/route.ts`：GET 預設 `.eq("active", true)`，`?includeInactive=1` 才回全部
+- `app/(shell)/tools/content/sites/SiteManager.tsx`：明示 opt-in（站別管理頁本來就要看得到停用站）
+- `app/(shell)/tools/video/ScriptForge.tsx`：刪掉前端那份重複的 `s.active !== false`
+- `lib/content/pick-initial-site.ts`（新）＋ `lib/content/__tests__/pick-initial-site.test.ts`（新，5 測）
+- `app/api/content/sites/__tests__/sites-active-default.test.ts`（新，3 測）
+- `app/(shell)/tools/content/ContentStudio.tsx`：見下
+
+[三輪覆審，3 條 CONFIRMED，全是同一個實作缺陷]
+Codex round 1 抓到：`ContentStudio.tsx:788` 的 `match ? match.id : data.sites[0].id` —— 網址明確
+指定的 `?siteId=` 取不到時**靜默改用第一個客戶**。我的 active 預設改動不是造出這個洞，是把它
+變寬（多一種「取不到」的原因）。而且它對打錯的 UUID、已刪除的站、以及**屬於別的租戶被
+`canAccessOrg` 濾掉的站**行為完全一樣 —— 只擋 inactive 就是修實例不修類。
+
+round 2 又抓到 2 條，指向同一個地方：① effect 讀 `searchParams` 卻綁 `[]`，掛載後 URL 換成另一個
+`?siteId=` 不重算（App Router 同路由換 query 不 remount，`ClientHubTabs.tsx:606` 就有這種連結）
+② 外面包著 `if (data.ok && data.sites?.length)`，「清單被 active／租戶過濾成空」時整段跳過，
+`pickInitialSite` 根本沒被呼叫 —— 純函式處理得對，接線卻沒去問它。
+
+同一 reviewer 對同一段連續兩輪 → 依 AGENTS.md §跨模型 oracle 停下來做不變量分析，不逐點補。
+**不變量：選中的站必須是 (目前的 URL siteId, 目前有哪些站可選) 的函式 —— 任一輸入改變就重算，
+且每個分支都要算。** 我 round-1 的修法只滿足「不得靜默替換」，卻把它實作成「在 fetch callback
+的某一個分支裡算一次」；那兩條 finding 正是這個實作失敗的兩種形狀。所以把決策從載入裡拆出來，
+讓那兩種形狀在結構上回不來。
+
+[自審再抓到的（Codex 已無法使用，這幾條是自己打自己抓的）]
+1. `setWpSites(prev => prev.map(...))`（存客戶預設成功後更新該列）會產生新的陣列 identity →
+   若 `wpSites` 是選站 effect 的依賴，就會重跑並把操作者手動選的站**踢回 URL 指定的那個**。
+   根因是依賴寫成「整份清單」，但決策的輸入只有「URL 要哪個站」＋「有哪些站可選」，站的*內容*
+   不是決策輸入 → 改用 `siteIdsKey`（id 集合指紋）。
+2. 引入「未選定」這個正常狀態後，同檔 10 處 `wpSites.find(...) ?? wpSites[0]` 全部活起來 ——
+   同一條規則抄 10 次正是這個 bug 的形狀。收斂成一個 `useMemo currentSite`（未選定即 undefined）。
+   其中 `saveAsClientDefault()` 原本會把整份表單預設**寫進 `wpSites[0]` 那個客戶的 content_defaults**；
+   現在擋下並顯示「尚未選擇目標客戶」（不用靜默 return，那只是把錯誤換成「按了沒反應」）。
+3. `selectedSiteId` 為空時前端送 `siteId: undefined`，伺服器 `resolveWpSite(req, undefined)` 會挑
+   「第一個可存取的站」。那個後備是給不帶 siteId 的唯讀清單呼叫用的，寫入不可以沾 →
+   `handlePublish`（發文）與 `embed-to-wp`（改寫既有文章）加上「未選定即拒絕」，錯誤訊息會顯示
+   （`:4073` / `:4086` 已有渲染點）。讀取面同理處理 `patterns` 與 `related-posts`（後者回來的內部
+   連結會被直接寫進文章內文，等於把別的客戶的網域埋進文章）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && npx vitest run` | exit=0 | ms=~1900
+  - tsc 0 錯；57 檔 656 測全綠（改動前 56 檔 648 測）
+  - **突變測試（證明測試非空跑）**：① 拿掉 `route.ts` 的 `if (!includeInactive)` → 3 測中 2 測轉紅
+    ② `pickInitialSite` 的「找不到」分支改回 `sites[0]` → 5 測中 2 測轉紅
+    ③ 拿掉 `trim()` → 1 測轉紅。三者還原後全綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=3c/0m/0n
+  - external oracle = Codex CLI（`scripts/codex-oracle.ps1 -Mode review`），artifact
+    `agency-os/reports/oracle/2026-08-26-review-88c83bb1.md`（round 1）與 `...-db716de2.md`（round 2）
+  - verdict=warn 而非 pass：**最終狀態沒有外部覆審**（見 ORACLE_WAIVED），且元件接線層無自動測試
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`api/content/sites\|wpSites\[0\]\|pickInitialSite\|includeInactive` | hits=1 既有跨租戶寫入
+  - 3 個清單消費端全部收斂：ContentStudio（預設）／SiteManager（opt-in）／ScriptForge（預設）；
+    `/api/content/sites/<id>` 系列是單列管理呼叫，不受影響
+  - **hits=1**：`ops/clients/[slug]/page.tsx:87` 用 `ilike("url", '%<hostname>%')` 取客戶的 wp_sites，
+    `ClientHubTabs.tsx:270` 取 `[0]`。EU prod 實測該 ilike 撈到**橫跨 4 個 org 的 4 列**（4 個 org 的
+    site_url hostname 全是 `aware-wave.com`），`[0]` 恆為最早的 AwareWave → 打開任一 staging 客戶的
+    客戶頁看到的是 AwareWave 的設定，按儲存則 PATCH 到 AwareWave 那一列。**這是 commit 439499c7
+    從 `content/sites` 移除的 hostname 猜測機制的第二份抄本。** 不在本次改動範圍，已開 TASKS 待操作者裁示。
+- ORACLE_WAIVED: 操作者於本 session 中途告知 Codex 已無法使用；round 3（覆蓋最終狀態）啟動後被中止，
+  無 artifact。改以寫出來的對抗自審替代，並實際抓到 3 條（上段 1–3 條，皆已修）。**誠實計數**：
+  最終狀態（write guards + siteIdsKey + 讀取面修正）**未經外部模型覆審**。
+- WORKLOG: 本則
+
+[剩餘風險]
+- **接線層無自動測試**：repo 無 jsdom／testing-library，vitest 全域 `environment: "node"`。
+  突變證實：把 ContentStudio 改回舊寫法、完全繞過 `pickInitialSite`，5 個測試照樣全綠。
+  三條 CONFIRMED finding 全發生在接線層 —— 這個缺口有實證代價，已開 TASKS 讓操作者決定要不要引依賴。
+- 上述 `ops/clients` 跨租戶寫入未修（已開 TASKS）。
+- 本次改動**尚未 deploy**，prod 仍是舊行為。
+
+[rollback]
+`git revert <本 commit>` → `sg-deploy`。DB 無改動（前一則的 `active=false` 是獨立的一次，各自可回滾）。
+
+
 ### AUTO_TASK_DONE: 從一封 LLAR 通知查出 EU origin 未鎖 CF + 針對性暴力破解 320 次
 
 [任務]

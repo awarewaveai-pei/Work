@@ -59,18 +59,32 @@ export interface ManagedSite {
   org_slug?: string | null;
 }
 
-// GET /api/content/sites — list all sites (no tokens in response)
+// GET /api/content/sites — list sites (no tokens in response)
+//
+// **預設只回 active 的站**（2026-08-26）。在此之前這條 GET 回傳全部站並把 `active` 當成一個
+// 欄位交出去，由每個消費端自己決定要不要濾 —— 而那條規則只要放在消費端就會分岔，實際上也
+// 分岔了：`ScriptForge` 濾了、`ContentStudio` 沒濾，所以三個已停用的死站仍出現在主要內容
+// 工具的站別下拉選單裡。這和 `resolveWpSite` 收斂 8 個取站點是同一個 class（同一條規則抄在
+// N 個地方）。
+//
+// 修法是把預設翻成 fail-safe：不帶參數 = 只看得到 active，唯一真的需要看見停用站的畫面
+// （`SiteManager`，站別管理頁本身）以 `?includeInactive=1` **明示** opt-in。未來新增的消費端
+// 忘記處理 active 時拿到的是安全的那一邊，而不是危險的那一邊。
 export async function GET(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
 
+  const includeInactive = new URL(req.url).searchParams.get("includeInactive") === "1";
+
   const supabase = getSupabaseWriteClient();
   if (supabase) {
+    let sitesQuery = supabase
+      .from("wp_sites")
+      .select("id, name, url, color, active, note, created_at, token, username, content_defaults, organization_id");
+    if (!includeInactive) sitesQuery = sitesQuery.eq("active", true);
+
     const [sitesResult, orgsResult] = await Promise.all([
-      supabase
-        .from("wp_sites")
-        .select("id, name, url, color, active, note, created_at, token, username, content_defaults, organization_id")
-        .order("created_at"),
+      sitesQuery.order("created_at"),
       supabase
         .from("organizations")
         .select("id, slug")

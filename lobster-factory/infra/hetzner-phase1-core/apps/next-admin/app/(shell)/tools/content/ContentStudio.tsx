@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import type { WpSite } from "@/lib/content/wp-sites";
 import type { ManagedSite } from "@/app/api/content/sites/route";
+import { pickInitialSite } from "@/lib/content/pick-initial-site";
 import type { BrandVoiceProfile } from "@/app/api/content/brand-voice/route";
 import type { RankMathReport } from "@/lib/seo/rankmath-checker";
 import { SeoCheckPanel } from "./SeoCheckPanel";
@@ -508,12 +509,37 @@ function ChipBtn({ label, active, onClick, disabled }: { label: string; active: 
 
 export default function ContentStudio() {
   const searchParams = useSearchParams();
+  // 字串而非 searchParams 物件本身當依賴 —— 物件每次 render 都是新的，會讓下面的
+  // effect 每 render 重跑並蓋掉操作者手動選的站。
+  const paramSiteId = searchParams.get("siteId") ?? "";
 
   const [activeTab, setActiveTab] = useState<Tab>("generate");
 
   // Multi-site (ManagedSite carries contentDefaults; WpSite is the internal server type)
   const [wpSites,       setWpSites]       = useState<ManagedSite[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>("");
+  // 非 null = 網址帶的 ?siteId= 在可用清單裡找不到（停用／已刪除／打錯／別的租戶）。
+  // 一定要顯示出來：吞掉它就等於讓人以為自己在對 A 客戶操作，實際卻在對 B 客戶。
+  const [unresolvedSiteParam, setUnresolvedSiteParam] = useState<string | null>(null);
+  // 區分「還沒載完」與「載完了但一個站都沒有」—— 兩者對 unresolvedSiteParam 的意義相反。
+  const [sitesLoaded, setSitesLoaded] = useState(false);
+
+  /**
+   * 目前真正選定的站。**刻意不回退到 wpSites[0]** —— 這個檔案原本有 10 處寫著
+   *     wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0]
+   * 也就是「沒選定就當作選了第一個客戶」。在 selectedSiteId 永遠非空的舊行為下這幾乎不會
+   * 觸發；但一旦「指定的站取不到 → 不選」成為一個正常狀態（見 pick-initial-site.ts），它們
+   * 就會全部活起來，用**別的客戶**的品牌／SEO 脈絡去生成內容，其中 saveAsClientDefault()
+   * 更會直接把表單預設寫進別的客戶那一列。同一條規則抄 10 次是這個 bug 的形狀，所以收斂成
+   * 一個 derived value：沒選定就是 undefined，呼叫端各自以 ?. / if (!site) 處理。
+   */
+  const currentSite = useMemo(
+    () => wpSites.find(s => s.id === selectedSiteId),
+    [wpSites, selectedSiteId],
+  );
+
+  /** 「有哪些站可選」的穩定指紋 —— 選站決策的第二個輸入（第一個是 URL 的 ?siteId=）。 */
+  const siteIdsKey = useMemo(() => wpSites.map(s => s.id).join("|"), [wpSites]);
 
   // Brand Voice
   const [showBrandVoice,    setShowBrandVoice]    = useState(false);
@@ -778,44 +804,64 @@ export default function ContentStudio() {
   const imgRunRef    = useRef(0);
 
   // ─── Load WP sites ────────────────────────────────────────────────────────
+  // 只負責把清單載進來。**刻意不在這裡決定選哪個站** —— 見下面那個 effect 的說明。
   useEffect(() => {
-    const paramSiteId = searchParams.get("siteId") ?? "";
     fetch("/api/content/sites")
       .then(r => r.json())
       .then((data: { ok: boolean; sites?: ManagedSite[] }) => {
-        if (data.ok && data.sites?.length) {
-          setWpSites(data.sites);
-          const match = paramSiteId && data.sites.find(s => s.id === paramSiteId);
-          setSelectedSiteId(match ? match.id : data.sites[0].id);
-        }
+        if (!data.ok) return;              // 載入失敗 ≠ 清單為空，不可混為一談
+        setWpSites(data.sites ?? []);
+        setSitesLoaded(true);
       })
       .catch(() => {/* silent — single-site env works without this */});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /**
+   * 「選中哪個站」的決定點 —— **只有這裡**。
+   *
+   * 不變量：選中的站必須是 (目前的 URL siteId, 目前可用的站清單) 的**函式**：任一輸入改變就
+   * 重算，而且**每個分支都要算**。這條不變量是被兩次覆審逼出來的，兩次都是同一個實作缺陷的
+   * 不同表現形式：
+   *   ① 原本這段算在 fetch 的 .then() 裡、effect 綁 []，於是「掛載後 URL 才變成另一個
+   *      ?siteId=」不會重算（App Router 同路由換 query 不會 remount，ClientHubTabs.tsx:606
+   *      就有這種連結）。
+   *   ② 原本外面包著 `if (data.ok && data.sites?.length)`，於是「清單被 active／租戶過濾成
+   *      空」時整段被跳過，pickInitialSite 根本沒被呼叫 —— 純函式處理得對，接線卻沒去問它，
+   *      使用者連「你指定的站取不到」都看不到。
+   * 把決定從載入裡拆出來之後，這兩種形狀在結構上都回不來了。
+   */
+  useEffect(() => {
+    if (!sitesLoaded) return;              // 還沒載完就判定「取不到」會是假警報
+    const picked = pickInitialSite(wpSites, paramSiteId);
+    setSelectedSiteId(picked.selectedId);
+    setUnresolvedSiteParam(picked.unresolvedRequest);
+    // wpSites 本身刻意**不**放進依賴：決策的輸入只有「URL 要哪個站」與「有哪些站可選」，
+    // 站的*內容*變了不是決策輸入。saveAsClientDefault() 成功後會 setWpSites(prev.map(...))
+    // 更新該列的 contentDefaults —— 那會產生新的陣列 identity，若它是依賴，這個 effect 就會
+    // 重跑並把操作者手動選的站踢回 URL 指定的那一個。用 id 集合當依賴才是決策的真實輸入。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sitesLoaded, siteIdsKey, paramSiteId]);
 
   // Brand Voice name follows the selected target client (📍 目標客戶) — so the operator never
   // re-types "Soulful Expression". Stops the moment they edit the field manually (bvNameTouched).
   useEffect(() => {
     if (bvNameTouched) return;
-    const site = wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0];
-    if (site?.name) setBvProfileName(site.name);
-  }, [wpSites, selectedSiteId, bvNameTouched]);
+    if (currentSite?.name) setBvProfileName(currentSite.name);
+  }, [currentSite, bvNameTouched]);
 
   // #2 — Brand-voice sample URL follows the selected client's site URL (operator reported it was not
   // auto-filling). We default to the site's /about page (the richest brand-voice source); cleared the
   // moment the operator edits the field manually (bvUrlTouched). Mirrors the name auto-fill above.
   useEffect(() => {
     if (bvUrlTouched) return;
-    const site = wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0];
-    if (site?.url) setBvSampleUrl(`${site.url.replace(/\/$/, "")}/about`);
-  }, [wpSites, selectedSiteId, bvUrlTouched]);
+    if (currentSite?.url) setBvSampleUrl(`${currentSite.url.replace(/\/$/, "")}/about`);
+  }, [currentSite, bvUrlTouched]);
 
   // Media Hub Brand Name follows the selected site — saves operator from re-typing every time.
   useEffect(() => {
     if (brandNameTouched) return;
-    const site = wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0];
-    if (site?.name) setMedia("brandName", site.name.slice(0, 30));
-  }, [wpSites, selectedSiteId, brandNameTouched]);
+    if (currentSite?.name) setMedia("brandName", currentSite.name.slice(0, 30));
+  }, [currentSite, brandNameTouched]);
 
   // ─── Form helpers ──────────────────────────────────────────────────────────
 
@@ -1065,7 +1111,7 @@ export default function ContentStudio() {
   async function handleMarketAnalysis() {
     if (!form.keyword.trim() || marketLoading) return;
     setMarketLoading(true); setMarketError(""); setMarketAnalysis(null); setMarketContext("");
-    const brand = bvProfileName || (wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0])?.name || "";
+    const brand = bvProfileName || currentSite?.name || "";
     try {
       const res  = await fetch("/api/content/market-analysis", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -1082,9 +1128,12 @@ export default function ContentStudio() {
   // ─── #6 Load available Kadence synced patterns for the selected site ───────
 
   const loadPatterns = useCallback(async () => {
+    // 不帶 siteId 時伺服器會挑「第一個可存取的站」，於是沒選定客戶時會抓到**別的客戶**的
+    // patterns 並混進文章。與下面 categories/tags 的既有作法一致：沒選定就不抓。
+    if (!selectedSiteId) { setAvailablePatterns([]); setPatternsNote("尚未選擇目標客戶"); return; }
     setPatternsLoading(true); setPatternsNote("");
     try {
-      const res  = await fetch(`/api/content/patterns${selectedSiteId ? `?siteId=${encodeURIComponent(selectedSiteId)}` : ""}`);
+      const res  = await fetch(`/api/content/patterns?siteId=${encodeURIComponent(selectedSiteId)}`);
       const json = await res.json() as { ok: boolean; patterns?: Array<{ id: number; title: string; slug: string }>; note?: string };
       if (json.ok && json.patterns) {
         setAvailablePatterns(json.patterns);
@@ -1244,12 +1293,14 @@ export default function ContentStudio() {
       // links instead of fabricating fake URLs. Best-effort — failure just falls back to user links.
       let autoInternal: string[] = [];
       try {
-        const rp = await fetch("/api/content/related-posts", {
+        // siteId 省略 → 伺服器挑第一個可存取的站，回來的內部連結會是**別的客戶**的網域，
+        // 而且會被直接寫進文章內文。沒選定客戶時寧可不要自動內部連結。
+        const rp = selectedSiteId ? await fetch("/api/content/related-posts", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ keyword: form.keyword, siteId: selectedSiteId || undefined }),
-        });
-        const rpJson = await rp.json() as { ok: boolean; posts?: Array<{ link: string }> };
-        if (rpJson.ok && rpJson.posts?.length) autoInternal = rpJson.posts.map(p => p.link);
+          body: JSON.stringify({ keyword: form.keyword, siteId: selectedSiteId }),
+        }) : null;
+        const rpJson = rp ? await rp.json() as { ok: boolean; posts?: Array<{ link: string }> } : null;
+        if (rpJson?.ok && rpJson.posts?.length) autoInternal = rpJson.posts.map(p => p.link);
       } catch { /* best-effort: no auto internal links */ }
       const internalLinks = [...new Set([...userInternal, ...autoInternal])].slice(0, 10);
 
@@ -1351,7 +1402,7 @@ export default function ContentStudio() {
       // Derive siteDomain so the checker can distinguish internal vs external links when related-posts
       // returns full absolute URLs (e.g. https://soulfulexpression.org/...). Without this, every
       // absolute internal link was counted as external and the internal-links check always failed.
-      const _seoSite = wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0];
+      const _seoSite = currentSite;
       const _siteDomain = _seoSite?.url ? (() => { try { return new URL(_seoSite.url).hostname; } catch { return undefined; } })() : undefined;
       fetch("/api/content/seo-check", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -1600,8 +1651,8 @@ export default function ContentStudio() {
         body: JSON.stringify({
           prompt, platform: "facebook_link", aspectRatio: "16:9", ...mediaImageParams(),
           titleText: metaData?.seoTitle || form.keyword || "",
-          featuredImageFont: (wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0])?.contentDefaults?.featuredImageFont ?? "sans",
-          featuredImageTitlePosition: (wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0])?.contentDefaults?.featuredImageTitlePosition ?? "bottom",
+          featuredImageFont: currentSite?.contentDefaults?.featuredImageFont ?? "sans",
+          featuredImageTitlePosition: currentSite?.contentDefaults?.featuredImageTitlePosition ?? "bottom",
           _jobId: jobIdRef.current,
         }),
       });
@@ -1631,7 +1682,7 @@ export default function ContentStudio() {
     setSeoChecking(true);
     fetch("/api/content/seo-check", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ markdown: fixedMd, focusKeyword: form.keyword, seoTitle: title, metaDescription: metaDesc, slug: slugHint || slugify(form.keyword), siteDomain: (() => { try { const s = wpSites.find(x => x.id === selectedSiteId) ?? wpSites[0]; return s?.url ? new URL(s.url).hostname : undefined; } catch { return undefined; } })() }),
+      body: JSON.stringify({ markdown: fixedMd, focusKeyword: form.keyword, seoTitle: title, metaDescription: metaDesc, slug: slugHint || slugify(form.keyword), siteDomain: (() => { try { const s = currentSite; return s?.url ? new URL(s.url).hostname : undefined; } catch { return undefined; } })() }),
     })
       .then(r => r.ok ? r.json() as Promise<RankMathReport> : null)
       .then(j => { if (j && myRun === seoRunRef.current) setSeoReport(j); })
@@ -1643,6 +1694,14 @@ export default function ContentStudio() {
 
   async function handlePublish(mode?: "draft" | "publish" | "future") {
     if (!generated.trim()) return;
+    // 沒選定客戶就不准發 —— 送 siteId: undefined 時伺服器會 resolveWpSite(req, undefined)，
+    // 也就是「挑呼叫者有權存取的第一個站」。對 staff 而言那是全域第一列，於是文章會被發到
+    // **另一個客戶**的網站上。這個伺服器端後備是給不帶 siteId 的唯讀清單呼叫用的，寫入動作
+    // 不可以沾。（wpSites 為空時不擋，讓伺服器回報真正的原因。）
+    if (!selectedSiteId && wpSites.length > 0) {
+      setPubStatus("error"); setPubError("尚未選擇目標客戶 — 請先在上方「📍 目標客戶」選定，再發布。");
+      return;
+    }
     const resolvedMode = mode ?? pubMode;
     setPubMode(resolvedMode);
     setPubStatus("publishing"); setPubError(""); setPubResult(null);
@@ -1731,6 +1790,13 @@ export default function ContentStudio() {
             // Save all output URLs so the Postiz social-publish flow can send per-platform formats.
             setVideoOutputUrls(sj.video.outputs as Record<string, string>);
             clearInterval(videoPollRef.current!); videoPollRef.current = null;
+            // 同 handlePublish：embed-to-wp 會**改寫**客戶站上的文章內容，沒選定客戶時
+            // 伺服器端的「第一個可存取的站」後備會讓它改到別人的站去。
+            if (!selectedSiteId && wpSites.length > 0) {
+              setVideoStatus("error");
+              setVideoError("尚未選擇目標客戶 — 影片已產出，但未嵌入任何網站。請選定客戶後重試。");
+              return;
+            }
             setVideoStatus("embedding");
             const embedRes = await fetch("/api/video/embed-to-wp", {
               method: "POST", headers: { "Content-Type": "application/json" },
@@ -2039,8 +2105,10 @@ export default function ContentStudio() {
 
   // ─── Save current form state as client content_defaults ─────────────────
   async function saveAsClientDefault() {
-    const site = wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0];
-    if (!site) return;
+    const site = currentSite;
+    // 沒選定客戶就不能存 —— 舊行為是回退到 wpSites[0]，等於把這份表單預設寫進**別的客戶**
+    // 那一列。改成擋下並說明白；靜默 return 也不行，那只是把錯誤換成「按了沒反應」。
+    if (!site) { setSaveDefaultsMsg("✗ 尚未選擇目標客戶"); return; }
     setSavingDefaults(true);
     setSaveDefaultsMsg(null);
     // Merge: preserve fields not managed by the form (featuredImageFont, featuredImageTitlePosition)
@@ -2327,17 +2395,26 @@ export default function ContentStudio() {
                   <a href="/tools/content/sites" style={{ color: "var(--btn-primary-bg)" }}>前往連接 ↗</a>
                 </span>
               )}
-              {wpSites.length === 1 && (
+              {unresolvedSiteParam && (
+                <span style={{ fontSize: "12px", color: "var(--yellow)" }}>
+                  ⚠ 網址指定的客戶（<code>{unresolvedSiteParam}</code>）不在你可用的清單裡 —
+                  可能已停用、已刪除，或不屬於你。<strong>尚未選擇目標客戶</strong>，請在右側自行選取。
+                </span>
+              )}
+              {wpSites.length === 1 && !unresolvedSiteParam && (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: "8px", fontSize: "13px" }}>
                   <span style={{ width: 10, height: 10, borderRadius: "50%", background: wpSites[0].color, display: "inline-block" }} />
                   <strong style={{ color: "var(--text-primary)" }}>{wpSites[0].name}</strong>
                   <a href={wpSites[0].url} target="_blank" rel="noreferrer" style={{ fontSize: "12px", color: "var(--text-muted)", textDecoration: "none" }}>{wpSites[0].url} ↗</a>
                 </span>
               )}
-              {wpSites.length > 1 && (
+              {/* 指定的站取不到時，即使只有一個站也要給下拉 —— 否則操作者沒有「明確選擇」的手段，
+                  畫面又會退回「看起來已經選好了」的假象。 */}
+              {(wpSites.length > 1 || (unresolvedSiteParam && wpSites.length >= 1)) && (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
-                  <select value={selectedSiteId} onChange={e => setSelectedSiteId(e.target.value)}
+                  <select value={selectedSiteId} onChange={e => { setSelectedSiteId(e.target.value); if (e.target.value) setUnresolvedSiteParam(null); }}
                     className="form-select" style={{ fontSize: "13px", padding: "4px 10px" }}>
+                    {!selectedSiteId && <option value="">— 請選擇目標客戶 —</option>}
                     {wpSites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                   {(() => {
@@ -3285,7 +3362,7 @@ export default function ContentStudio() {
                   onChange={e => { setBvProfileName(e.target.value); setBvNameTouched(true); }}
                   placeholder="例：Soulful Expression" />
                 {!bvNameTouched && wpSites.length > 0 && (
-                  <div className="form-hint">已自動帶入目標客戶「{(wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0])?.name}」，可直接覆寫。</div>
+                  <div className="form-hint">已自動帶入目標客戶「{currentSite?.name}」，可直接覆寫。</div>
                 )}
               </div>
               <div>

@@ -851,7 +851,9 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { 
     setCustomScenes(next);
     SF_CUSTOM_SCENES = next;
   }
-  useEffect(()=>{(async()=>{try{const r=await fetch("/api/content/sites");const j=await r.json();if(j?.ok&&Array.isArray(j.sites))setClients(j.sites.filter((s:any)=>s.active!==false));}catch{/* best-effort：未登入/無客戶 → 下拉為空 */}})();},[]);
+  // active 過濾已移到 route.ts GET 的預設（2026-08-26）；這裡原本自己濾一次，是把同一條
+  // 規則放在消費端的第二份抄本 —— ContentStudio 沒抄到那份，死站就漏出去了。刪掉抄本。
+  useEffect(()=>{(async()=>{try{const r=await fetch("/api/content/sites");const j=await r.json();if(j?.ok&&Array.isArray(j.sites))setClients(j.sites);}catch{/* best-effort：未登入/無客戶 → 下拉為空 */}})();},[]);
   function loadClient(id:string){
     const s=clients.find((c:any)=>c.id===id);if(!s)return;
     const m=s.contentDefaults?.marketing||{};
