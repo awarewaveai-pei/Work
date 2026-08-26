@@ -60,6 +60,10 @@ token 外洩的爆炸半徑放大一級，換來一個沒人要用的呼叫方�
   - 所有引用一致；報告中的 `/root/lobster-phase1/scripts/deprovision-staging.sh` 於本次 sg-deploy
     rsync 後成立（R4：聲稱即驗證，部署前該路徑不存在）
 - ORACLE_WAIVED: 操作者告知 Codex 本 session 不可用，並明示由我自己 review
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin`（把腳本 rsync 到正式路徑）| exit=0 | ms=~200000
+  - `.deployed-commit` 4666333b → **2375ea7e**；healthy 7s；內建 smoke 4/4 OK
+  - **產物層驗證**：`ls -l /root/lobster-phase1/scripts/deprovision-staging.sh` 存在且可執行（13285 bytes），
+    直接以正式路徑跑一次 dry-run 成功 —— 報告裡給操作者的那條指令到這一刻才成立（R4）
 - WORKLOG: 本則
 
 [這個檔踩過的五個坑，寫進 .NOTES 以免後人踩回去]
