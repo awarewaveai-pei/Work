@@ -2,6 +2,37 @@
 
 ## 2026-08-26
 
+### 更正：新主機規格落差的緩解措施是「範圍不縮小」，不是「範圍縮小」
+
+[錯誤與更正]
+本輪稍早（見下方「Soulful 搬遷主機」entry 與其後 P2 進度討論）我把規格落差（64GB/960GB 實際購入 vs 128GB/1TB 決策下限）的緩解措施寫成「這台機僅承接 Soulful，不預留給 EU/SG 整併」，並據此改了 4 處文件（決策文件切換條件段、`TASKS.md`、`SITE_MIGRATION_RUNBOOK.md` §0.5、memory `project_hetzner_dedicated_plan.md` + `MEMORY.md` 索引）。
+
+操作者原話：「64GB/960GB, 幹你娘 我是要把所有的東西都放這裡」——**原計畫（soulful + Chatwoot U6 + 11/20 起 EU/SG 整併六服務）不縮範圍，全部照舊上這台機器**。範圍縮小是我自己提出、操作者附議過一次的緩解方案，但操作者的實際意圖從一開始就是全部整併，我沒有先確認就把它當成定案寫進四份文件，是誤判操作者意圖，不是操作者事後改變主意。
+
+[已修正]
+上述 4 處文件的「範圍縮小」敘述全部改回「範圍不縮小，緩解措施是監控閾值硬化 + 整併節奏維持兩週一台」：
+- `reports/decisions/2026-08-18-dedicated-host-purchase-timing.md` 切換條件段
+- `TASKS.md` Soulful 搬站條目
+- `SITE_MIGRATION_RUNBOOK.md` §0.5②
+- memory `project_hetzner_dedicated_plan.md` + `MEMORY.md` 索引行
+
+[真正的緩解措施，取代範圍縮小]
+- P6 監控閾值（RAM/磁碟 60%，非 85%）從建議值升級為硬指標——重算負載 37–58GB 對 64GB 總量是 58–91% 使用率，是 128GB 版本 headroom 的四分之一
+- 11/20 起六服務整併**維持兩週一台**節奏，不可一次全塞上去測水位
+- ClickHouse（已 OOM 4 次）搬遷前修 `override.xml` 產生源設定的優先序不變，且在更小的 RAM 餘裕下更不能省略這步
+
+[驗證結果]
+- REVIEW_WAIVED: DOC_ONLY -- 純文字更正，無 code 變更
+- BUGHUNT_DONE: scope=agency-os | grep=`範圍已縮小\|範圍縮小\|僅承接 Soulful\|不預留給.*整併` | hits=0（4 處全部改完，跨檔重新 grep 確認無殘留）
+- WORKLOG: 本則
+
+[剩餘風險]
+- 64GB/960GB 在 37–58GB 負載帳下 headroom 偏緊，這是操作者知情後的選擇，不是遺漏；後續 P6 監控接上後才有實測數字可看趨勢
+- 若 11/20 起整併節奏被壓縮（例如死線前又要塞更多東西），會複製決策文件 Pre-mortem 已警告過的「128GB 掩蓋 ClickHouse 病灶」風險的更嚴重版本（64GB 掩蓋空間更小，更可能是磁碟/merge 先出問題而非乾脆 OOM，更難察覺）
+
+[rollback]
+`git revert` 對應 commit；memory 檔案手動改回（不進 git，無 revert 機制）。
+
 ### Soulful 搬遷主機（KS-6 缺貨改買 OVH SYS-GAME-2）— 買機 + OS 安裝 + P2 硬化起步 + 全站基礎設施盤點
 
 [任務]
