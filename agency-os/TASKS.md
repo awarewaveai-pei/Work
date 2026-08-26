@@ -74,18 +74,72 @@
 > 想知道「先做哪些」→ **由上往下讀**：`A 有時鐘` → `B 卡在你` → `C 卡在外部` → `D–G 可直接做` → `H 只記錄`。
 > **不變量**：一個開放責任 = 全檔恰好一個 `- [ ]` 行。`apply-closeout-task-checkmarks.ps1` 與 `verify-archive-tasks-lift.ps1` 兩道閘靠這個唯一性運作 —— **重複行會讓 AO-CLOSE 硬失敗**，所以不要為了「方便看」把同一條複製到別區。
 
+### 條目格式規約
+
+一條待辦 = **一個短標題 + 幾個各講一件事的子項**。不要把整段塞進 `- [ ]` 那一行。
+
+**模板**
+
+```markdown
+- [_] **<短標題：做什麼，一眼看懂>**
+  - `<狀態>` · `<開出/到期日>` · `<卡在誰>`
+  - **一句話**：這是什麼、為什麼要做
+  - **現在到哪**：已完成的部分
+  - **下一步**：具體動作（含指令或路徑）
+  - **完成定義**：可驗證的條件
+  - **卡點**：誰／什麼（沒卡就不寫這行）
+  - **證據**：file:line、commit、文件連結
+```
+
+> 範例的核取方塊寫成 `[_]` 而非 `[ ]`，否則 `print-open-tasks.ps1` 會把這個模板當成一條真待辦 —— 這就是下面規則 1 的實例。
+
+**三條硬規則**
+
+1. **標題必須自足** —— `- [ ]` 那一行要能被子字串命中。`apply-closeout-task-checkmarks.ps1` 與 `verify-archive-tasks-lift.ps1` 都靠它比對，**多重匹配或找不到會讓 AO-CLOSE 硬失敗**。
+2. **一個開放責任只能有一行 `- [ ]`** —— 不要為了好看把同一條複製到別區。
+3. **子項用兩個空白縮排**，一項一件事，長度 2–4 行。
+
+**狀態詞彙**：`🔴 現行` / `🟠 未開始` / `🟡 潛伏` / `🟢 小` / `⚠️ 逾期` / `⛔ 不處理`
+
+> **2026-08-26 拆行紀錄**：49 條長行已機械拆成階層，標題行長度中位數由 494 → 157 字元。
+> 逐字節驗證：**唯一被移除的是破折號分隔符**（`——` × 33、`—` × 4，共 70 字元），零文字／路徑／數字遺失。
+> 標籤詞彙的統一是判斷工作，另開待辦處理（見 E 區）。
+
+
 ### 未完成
 
 #### A. ⏰ 有外部時鐘（死線／到期日）
 
 > 外部時鐘不等人。這一區由上往下就是先後順序。
 
-- [ ] **【⚠️ 逾期 69 天｜原排 2026-06-17｜資安複盤】Defender 嚴重木馬 `Trojan:Win32/PowhidSubExec.B` 來源查清與善後** — **來龍去脈**：2026-06-16 02:33:49 Windows Defender 跳出嚴重威脅，名稱 `Trojan:Win32/PowhidSubExec.B`；02:34:42 Defender 已執行「移除」，`ActionSuccess=True`，`CurrentThreatExecutionStatusID=0`。後續 Codex 已更新 Defender 病毒碼到 `1.453.108.0`，Quick Scan 於 02:59:26 開始、03:13:41 結束；`Get-MpThreat` 顯示 `Trojan:Win32/PowhidSubExec.B` 與 `Trojan:Win32/PShellDlr.HD!MTB` 皆 `IsActive=False`、`DidThreatExecute=False`，目前沒有 active threat。**來源證據**：Defender 的 `Resources/Path` 不是下載檔或 exe，而是一條命令列：`C:\Program Files\Git\bin\bash.exe` 載入 `C:\Users\user1115\.claude\shell-snapshots\snapshot-bash-1781544836335-9sl8s6.sh`，建立 `D:\tmp\realtest-reg.ps1`，再跑 `powershell -NoProfile -ExecutionPolicy Bypass -File "D:/tmp/realtest-reg.ps1"`。`.claude\bash-commands.log` 第 9296/9299 行與 `.claude\projects\D--Work\b0dfd505-590d-4b54-9b3a-52c275a46f87.jsonl` 對上同一事件：entrypoint=`claude-desktop`，session=`b0dfd505-590d-4b54-9b3a-52c275a46f87`，tool=`Bash`，permission_mode=`bypassPermissions`，description=`Syntax-check + run new registrar + verify both tasks hidden + run Daily`。**暫存腳本內容**：`D:\tmp\realtest-reg.ps1` 先 parse `D:\Work\agency-os\automation\REGISTER_SYSTEM_GUARD_TASKS.ps1`，再用 `ExecutionPolicy Bypass` 執行 registrar，查 `AgencyOS-SystemGuard-*` scheduled tasks，最後 `Start-ScheduledTask -TaskName "AgencyOS-SystemGuard-Daily"`。**目前判斷**：這比較像 Claude Desktop 自動化測試命令觸發 Defender 行為偵測，不像外部下載木馬；觸發特徵是「Git Bash + temp ps1 + PowerShell ExecutionPolicy Bypass + scheduled task + hidden launcher + Start-ScheduledTask」。但因為它確實碰到排程任務且 Claude session 是 `bypassPermissions`，明天仍需當正式資安事件善後。**明天處理步驟**：① 刪除暫存檔 `D:\tmp\realtest-reg.ps1`（刪前可保留 hash：`1D57CD353937BEEBEDFE37E40AAB987F14A8C1294FD9901D144F3E7E2D8C873D`，內容已在本 task 摘要）② 審 `D:\Work\agency-os\automation\REGISTER_SYSTEM_GUARD_TASKS.ps1` 與 `scripts\scheduled-task-launcher.ps1`，確認只註冊預期的 Daily guard、沒有 downloader/encoded payload/外連 ③ 查 live scheduled task：`AgencyOS-SystemGuard-Daily` 的 action 應只指向 repo 內 launcher + system-guard，且符合 `WindowStyle Hidden` / `scheduled-task-launcher` 預期；若有 `OnStartup`/`OnLogoff` 殘留或奇怪 action，移除或重註冊 ④ 決定是否調整 Claude hook/policy：`high-risk-bash-warn` 對 `ExecutionPolicy Bypass` + `Register-ScheduledTask` + `Start-ScheduledTask` 應升級為 block/explicit approval，不要只 warn ⑤ 若 Windows Security UI 仍顯示「開始動作」，按一次；若重開機後仍顯示，跑 Defender Offline Scan。**DoD**：暫存檔清掉；scheduled task action 驗證乾淨；Defender `Get-MpThreat` 仍 `IsActive=False`；WORKLOG 記錄本事件結論；必要時補 hook 阻擋規則，避免 AI 工具再次用 bypass 權限直接跑排程任務測試。
+- [ ] **【⚠️ 逾期 69 天｜原排 2026-06-17｜資安複盤】Defender 嚴重木馬 `Trojan:Win32/PowhidSubExec.B` 來源查清與善後**
+  - **來龍去脈**：2026-06-16 02:33:49 Windows Defender 跳出嚴重威脅，名稱 `Trojan:Win32/PowhidSubExec.B`；02:34:42 Defender 已執行「移除」，`ActionSuccess=True`，`CurrentThreatExecutionStatusID=0`。後續 Codex 已更新 Defender 病毒碼到 `1.453.108.0`，Quick Scan 於 02:59:26 開始、03:13:41 結束；`Get-MpThreat` 顯示 `Trojan:Win32/PowhidSubExec.B` 與 `Trojan:Win32/PShellDlr.HD!MTB` 皆 `IsActive=False`、`DidThreatExecute=False`，目前沒有 active threat。
+  - **來源證據**：Defender 的 `Resources/Path` 不是下載檔或 exe，而是一條命令列：`C:\Program Files\Git\bin\bash.exe` 載入 `C:\Users\user1115\.claude\shell-snapshots\snapshot-bash-1781544836335-9sl8s6.sh`，建立 `D:\tmp\realtest-reg.ps1`，再跑 `powershell -NoProfile -ExecutionPolicy Bypass -File "D:/tmp/realtest-reg.ps1"`。`.claude\bash-commands.log` 第 9296/9299 行與 `.claude\projects\D--Work\b0dfd505-590d-4b54-9b3a-52c275a46f87.jsonl` 對上同一事件：entrypoint=`claude-desktop`，session=`b0dfd505-590d-4b54-9b3a-52c275a46f87`，tool=`Bash`，permission_mode=`bypassPermissions`，description=`Syntax-check + run new registrar + verify both tasks hidden + run Daily`。
+  - **暫存腳本內容**：`D:\tmp\realtest-reg.ps1` 先 parse `D:\Work\agency-os\automation\REGISTER_SYSTEM_GUARD_TASKS.ps1`，再用 `ExecutionPolicy Bypass` 執行 registrar，查 `AgencyOS-SystemGuard-*` scheduled tasks，最後 `Start-ScheduledTask -TaskName "AgencyOS-SystemGuard-Daily"`。
+  - **目前判斷**：這比較像 Claude Desktop 自動化測試命令觸發 Defender 行為偵測，不像外部下載木馬；觸發特徵是「Git Bash + temp ps1 + PowerShell ExecutionPolicy Bypass + scheduled task + hidden launcher + Start-ScheduledTask」。但因為它確實碰到排程任務且 Claude session 是 `bypassPermissions`，明天仍需當正式資安事件善後。
+  - **明天處理步驟**：
+    - ① 刪除暫存檔 `D:\tmp\realtest-reg.ps1`（刪前可保留 hash：`1D57CD353937BEEBEDFE37E40AAB987F14A8C1294FD9901D144F3E7E2D8C873D`，內容已在本 task 摘要）
+  - ② 審 `D:\Work\agency-os\automation\REGISTER_SYSTEM_GUARD_TASKS.ps1` 與 `scripts\scheduled-task-launcher.ps1`，確認只註冊預期的 Daily guard、沒有 downloader/encoded payload/外連
+  - ③ 查 live scheduled task：`AgencyOS-SystemGuard-Daily` 的 action 應只指向 repo 內 launcher + system-guard，且符合 `WindowStyle Hidden` / `scheduled-task-launcher` 預期；若有 `OnStartup`/`OnLogoff` 殘留或奇怪 action，移除或重註冊
+  - ④ 決定是否調整 Claude hook/policy：`high-risk-bash-warn` 對 `ExecutionPolicy Bypass` + `Register-ScheduledTask` + `Start-ScheduledTask` 應升級為 block/explicit approval，不要只 warn
+  - ⑤ 若 Windows Security UI 仍顯示「開始動作」，按一次；若重開機後仍顯示，跑 Defender Offline Scan。
+  - **DoD**：暫存檔清掉；scheduled task action 驗證乾淨；Defender `Get-MpThreat` 仍 `IsActive=False`；WORKLOG 記錄本事件結論；必要時補 hook 阻擋規則，避免 AI 工具再次用 bypass 權限直接跑排程任務測試。
   - **明日快速入口**：先處理本機殘留與驗證，不要直接重跑 `D:\tmp\realtest-reg.ps1`；依序確認暫存檔、`AgencyOS-SystemGuard-Daily` action、Defender active state、Claude `high-risk-bash-warn` 是否要升級為 block/approval。
 
-- [ ] **【未開始｜2026-08-25 開｜到期日 2026-08-31】重新啟用 Codex stop-time review gate** — 2026-08-25 05:08 UTC **暫時停用**（`node ~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs setup --disable-review-gate`，走官方開關非改檔；已驗證 `stopReviewGate: True → False`）。**原因不是它報錯，是它跑不起來**：Codex 用量額度用罄，job `task-mt87cnhq-4oqkk0` 回 `You've hit your usage limit ... try again at Aug 31st, 2026 12:41 PM`。認證正常（`ChatGPT login active`、`codex-cli 0.149.1`），純粹是額度。**為何停用而非留著**：閘每次收工都失敗，會訓練出「看到它失敗就略過」的習慣——那正是本日整場事故的核心機制（`Trigger infra config guard` 紅 10 天沒人看）。**額度是本日消耗的**：為第 5 次 ClickHouse 事故跑了四輪對抗式覆審（11 條 finding、10 條為真），是紀律的真實成本。**DoD**：2026-08-31 12:41 之後執行 `setup --enable-review-gate`，並實跑一次確認 `stopReviewGate: True` 且 review 能正常完成 → 打勾。**⚠️ 禁止**：因為「這樣比較順」而讓它保持停用；若 8/31 後額度仍不足，改為評估用量而非延長停用。
+- [ ] **【未開始｜2026-08-25 開｜到期日 2026-08-31】重新啟用 Codex stop-time review gate** — 2026-08-25 05:08 UTC **暫時停用**（`node ~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs setup --disable-review-gate`，走官方開關非改檔；已驗證 `stopReviewGate: True → False`）。
+  - **原因不是它報錯，是它跑不起來**：Codex 用量額度用罄，job `task-mt87cnhq-4oqkk0` 回 `You've hit your usage limit ... try again at Aug 31st, 2026 12:41 PM`。認證正常（`ChatGPT login active`、`codex-cli 0.149.1`），純粹是額度。
+  - **為何停用而非留著**：閘每次收工都失敗，會訓練出「看到它失敗就略過」的習慣
+  - 那正是本日整場事故的核心機制（`Trigger infra config guard` 紅 10 天沒人看）。
+  - **額度是本日消耗的**：為第 5 次 ClickHouse 事故跑了四輪對抗式覆審（11 條 finding、10 條為真），是紀律的真實成本。
+  - **DoD**：2026-08-31 12:41 之後執行 `setup --enable-review-gate`，並實跑一次確認 `stopReviewGate: True` 且 review 能正常完成 → 打勾。
+  - **⚠️ 禁止**：因為「這樣比較順」而讓它保持停用；若 8/31 後額度仍不足，改為評估用量而非延長停用。
 
-- [ ] **⏭️ Soulful 搬站：機器買到後的接手點（硬死線 2026-11-12，買機死線 9/30）** —— DNS/信箱/備份/演練皆已完成，**唯一阻塞是機器還沒買**。**規格已定案（2026-08-17）：128GB ECC / ≥8C16T / ≥1TB NVMe RAID1；首選 OVH KS-6 $59.80，Hetzner auction ≤€65（128G ECC + ≥2TB）則改選 Hetzner；~~觀望截止 8/31~~ **⛔ 該條已於 2026-08-18 被推翻**（見下）** —— 決策正本 [`reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md`](reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md)（取代 DR runbook §0b 機型表）。 **【訂正 2026-08-25】「觀望截止 8/31」已被 [`reports/decisions/2026-08-18-dedicated-host-purchase-timing.md`](reports/decisions/2026-08-18-dedicated-host-purchase-timing.md) 明文取代**（該決策 §「與 2026-08-17 的關係」表列 🔄 取代：決策規則第 1–3 條 + 觀望截止日）。**現行結論＝C6：立刻下單 OVH KS-6、用月租不簽 12 個月，觀望期改由月租的退出權承載，不由日曆餘裕承載**；理由是觀望的「獎品」（2TB 碟 + Robot/RMA，€445–484／3 年）在月租架構下未來 36 個月任一天都能買，不需拿死線餘裕當入場費。同時關閉前一份唯一未驗證項（Backup Agent 免費容量 → 移除依賴，備份一律走既有 R2）。**Pre-mortem 首要風險**：機器買了、soulful 也切了，但 EU/SG 整併從未完成，2028 年仍三台並存。
+- [ ] **⏭️ Soulful 搬站：機器買到後的接手點（硬死線 2026-11-12，買機死線 9/30）**
+  - DNS/信箱/備份/演練皆已完成，**唯一阻塞是機器還沒買**。
+  - **規格已定案（2026-08-17）：128GB ECC / ≥8C16T / ≥1TB NVMe RAID1；首選 OVH KS-6 $59.80，Hetzner auction ≤€65（128G ECC + ≥2TB）則改選 Hetzner；~~觀望截止 8/31~~ **⛔ 該條已於 2026-08-18 被推翻**（見下）**
+  - 決策正本 [`reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md`](reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md)（取代 DR runbook §0b 機型表）。 **【訂正 2026-08-25】「觀望截止 8/31」已被 [`reports/decisions/2026-08-18-dedicated-host-purchase-timing.md`](reports/decisions/2026-08-18-dedicated-host-purchase-timing.md) 明文取代**（該決策 §「與 2026-08-17 的關係」表列 🔄 取代：決策規則第 1–3 條 + 觀望截止日）。
+  - **現行結論＝C6：立刻下單 OVH KS-6、用月租不簽 12 個月，觀望期改由月租的退出權承載，不由日曆餘裕承載**；理由是觀望的「獎品」（2TB 碟 + Robot/RMA，€445–484／3 年）在月租架構下未來 36 個月任一天都能買，不需拿死線餘裕當入場費。同時關閉前一份唯一未驗證項（Backup Agent 免費容量 → 移除依賴，備份一律走既有 R2）。
+  - **Pre-mortem 首要風險**：機器買了、soulful 也切了，但 EU/SG 整併從未完成，2028 年仍三台並存。
   - **操作者說一句話即可接手**：例「機器買好了，IP 是 x.x.x.x」或「soulful 搬站繼續」。不需要重述背景 —— 全部在下列文件裡。
   - **AI 接手第一步**：讀 [`tenants/company-soulful-expression/core/SITE_MIGRATION_RUNBOOK.md`](tenants/company-soulful-expression/core/SITE_MIGRATION_RUNBOOK.md)（步驟/切換/回滾 SSOT），再依序 §0.5 → §3 → §4 → §5 → §6。
   - **已完成、不要重做**：① CF zone 14 筆記錄 + nameserver 已切（2026-08-15）② 信箱 mail-tester **10/10**（SPF/DKIM/DMARC 三項 pass）③ EU 三份備份 769 MB（DB 15M + uploads 632M + code 122M）④ 還原演練 **Drill #1 PASS** ⑤ FluentSMTP 主機名已修（`pop`→`smtp.hostinger.com`）
@@ -93,7 +147,8 @@
   - **切換動作本身**：Cloudflare apex A 記錄 `191.101.230.176` → 新 IP（proxy 維持 🟠）。**回滾 = 改回去**，幾秒生效。屬 High risk，需操作者明示 go-ahead。
   - **操作者待辦（與買機平行）**：~17 個付費外掛的 5–6 組授權續約狀態盤點（清單 `core/SITE_CODE_MANIFEST.md`）。
 
-- [ ] **🔴【硬死線 2026-11-12】Soulful 網站搬離 Hostinger（hosting 不續約，操作者 2026-08-15 決定）** —— **【進行中】** Hostinger `Premium Web Hosting` $215.76/年，**自動續約已關閉**，**2026-11-12 到期**。什麼都不做 = 客戶網站當天下線。
+- [ ] **🔴【硬死線 2026-11-12】Soulful 網站搬離 Hostinger（hosting 不續約，操作者 2026-08-15 決定）**
+  - **【進行中】** Hostinger `Premium Web Hosting` $215.76/年，**自動續約已關閉**，**2026-11-12 到期**。什麼都不做 = 客戶網站當天下線。
   - **三筆訂閱現況**（2026-08-15 帳單截圖確認，推翻先前「$80/年」的假設）：Hosting $215.76 → **2026-11-12**（不續約）／`.ORG` Domain $53.97 → 2028-06-03（付到 2028）／Starter Business Email $76.32 → 2029-06-03（**預付近 3 年，保留**）
   - **信箱不受影響**（2026-08-15 查官方文件三項獨立證據）：① Hostinger 支援文原句「Since emails are stored on a separate infrastructure, they are not included in hosting plan reactivations or file backups」② Business Email 是可獨立購買產品、不需 hosting ③ DNS 管理綁網域不綁 hosting（網域付到 2028）。**故不需開 support ticket**。搬 DNS 到 CF 後三個依賴全部脫鉤
   - **📅 日曆提醒已建立（2026-08-16，`peijingartstudio@gmail.com`）** —— **勿重複建立**：① `2026-09-30` 買二手 Hetzner 機（前 1 天彈窗 + 前 7 天 email）② `2026-10-15` 搬站進度檢查 ③ `2026-11-05` 到期前 7 天最後確認 ④ `2026-11-12` hosting 到期（紅色標記，前 1 天彈窗 + 前 14 天 email）。每則描述內含當下該做什麼、文件路徑、以及「別取消 Hostinger 帳號」警告。**註**：操作者的 AwareWaveAI Google 帳號（`awarewaveai@gmail.com`）未連到 Claude connector，故寫入主日曆
@@ -144,33 +199,72 @@
 
 > 刷卡／登入第三方面板／瀏覽器點測／給截圖。多數每條只要幾分鐘，卻卡住下游。
 
-- [ ] **🔴【資安】2026-08-15 transcript 憑證外洩 — 三項待輪換** —— **【待操作者處理】** 本次 session 有三組憑證因我的疏失進入對話紀錄，若 transcript 會離開本機（雲端記錄／報告存檔）即視為外洩：
+- [ ] **🔴【資安】2026-08-15 transcript 憑證外洩 — 三項待輪換**
+  - **【待操作者處理】** 本次 session 有三組憑證因我的疏失進入對話紀錄，若 transcript 會離開本機（雲端記錄／報告存檔）即視為外洩：
   - `TELEGRAM_BOT_TOKEN`、`PRINTFUL_API_KEY` —— critic subagent 為查證 `mcp/user-env.ps1` 副作用而讀取該檔（round 1）
   - **Google 帳號 `soulfulexpression01@gmail.com` 的密碼** —— 我 grep `AWARE_WAVE_CREDENTIALS.md` 時遮罩規則只涵蓋 `:` `=` `：`，未涵蓋 markdown 表格的 `|` 分隔符
   **根因（同一類、犯了兩次）**：讀含憑證的檔案時，遮罩是「輸出後才套用」而非「不讀取值」。**改善**：日後查證這類檔案改用 `grep -c` / 欄位名列舉 / `Get-VaultSecretFingerprint`，不輸出行內容。
   **DoD**：三項各自輪換並更新 vault 與 `AWARE_WAVE_CREDENTIALS.md`；Telegram token 換發後需重跑 `scripts/configure-telegram-webhook.ps1`。
 
-- [ ] **【人工｜Postiz Task 2 OAuth app 審核】各平台 dev app 提交** — Meta IG+FB（一個 Meta app，App Review，最高價值）/ Reddit / LinkedIn。callback = `https://postiz.aware-wave.com/integrations/social/<slug>`；client_id/secret 加進 EU `/root/postiz/.env`（`<PLATFORM>_CLIENT_ID/SECRET`）+ restart。**X 跳過**（API $100/月）。非 Claude 可做，等各平台審核通過再接線。
+- [ ] **【人工｜Postiz Task 2 OAuth app 審核】各平台 dev app 提交** — Meta IG+FB（一個 Meta app，App Review，最高價值）/ Reddit / LinkedIn。callback = `https://postiz.aware-wave.com/integrations/social/<slug>`；client_id/secret 加進 EU `/root/postiz/.env`（`<PLATFORM>_CLIENT_ID/SECRET`）+ restart。
+  - **X 跳過**（API $100/月）。非 Claude 可做，等各平台審核通過再接線。
 
 - [ ] **【人工｜Postiz 測試草稿清理】** 登入 `https://postiz.aware-wave.com` → Posts → Drafts → 刪 draft ID `cmqo1wijz0005p58ncl1mtssr`（Gate C 測試用，content 含「Delete this draft」）。
 
 - [ ] **【操作者｜Postiz 帳號 → 客戶 Hub 連結】** `app.aware-wave.com/ops/clients/[slug]` → 社群頻道 tab → 點「連結」→ 選 Bluesky integration（soulfulexpression.bsky.social）→ 儲存。完成後 ContentStudio 才能看到 channel selector 顯示帳號。
 
-- [ ] **既有站接手 Day 1（Soulful Expression）** —— **【進行中 2026-05-08】§1.2 ✅ §1.3 DB dump ✅**。§1.2 機讀基線完成（commit `b5cef4c`：WP 6.9.4 / PHP 8.2.30 / MariaDB 11.8.6 / Kadence 1.3.6 / 35 active plugins (16 有更新) / 2 admins / 138MB DB / 風險 Top 3）。§1.3 DB dump 完成（`soulful_db_20260508_160734.sql.gz`，15 MB，SHA256 `849db784…`，本機 + `BACKUP_RESTORE_PROOF.md #1`；restore drill 待 staging 建立後執行）。**仍開放（操作者必做）**：§1.1 帳號層級權限確認（Hostinger panel / DNS panel / WP admin browser login，純 SSH 無法驗證 panel-level access）。Day 2 staging 操作指引已備：`DAY2_STAGING_OPERATOR_GUIDE.md`；Day 3 更新計劃已備：`DAY3_SECURITY_PATCH_PLAN.md`。
+- [ ] **既有站接手 Day 1（Soulful Expression）**
+  - **【進行中 2026-05-08】§1.2 ✅ §1.3 DB dump ✅**。§1.2 機讀基線完成（commit `b5cef4c`：WP 6.9.4 / PHP 8.2.30 / MariaDB 11.8.6 / Kadence 1.3.6 / 35 active plugins (16 有更新) / 2 admins / 138MB DB / 風險 Top 3）。§1.3 DB dump 完成（`soulful_db_20260508_160734.sql.gz`，15 MB，SHA256 `849db784…`，本機 + `BACKUP_RESTORE_PROOF.md #1`；restore drill 待 staging 建立後執行）。
+  - **仍開放（操作者必做）**：§1.1 帳號層級權限確認（Hostinger panel / DNS panel / WP admin browser login，純 SSH 無法驗證 panel-level access）。Day 2 staging 操作指引已備：`DAY2_STAGING_OPERATOR_GUIDE.md`；Day 3 更新計劃已備：`DAY3_SECURITY_PATCH_PLAN.md`。
   - 執行：`docs/operations/PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md` 第 1~2 節
   - 產出：§1.2 ✅ §1.3 DB dump ✅ §1.1 待操作者 §restore drill 待 Day 2
 
-- [ ] **【診斷】Mockup Studio 功能異常 — server-side 已排除（2026-06-16），卡操作者症狀**：操作者回報 mockup 有問題未提供細節（2026-06-13）。MockupStudio.tsx 實走 `/api/tools/studio/generate`（nano-banana-2 + referenceImages）。**本輪已排除（步驟③④完成）**：container `Up healthy` + full docker log **零 error**（generate/mockup/nano-banana 皆無）；Replicate token 實打 `/v1/account`=ok（非 429/402/auth）→ **server-side 健康，最常見因全排除**。**剩下（卡操作者）**：① 操作者給「什麼操作、什麼錯誤畫面、F12 console + network tab」②（拿到後）Claude 依 `file:line` 對症修 `MockupStudio.tsx`/`lib/studio/mockup-prompt.ts`/`app/api/tools/studio/generate/route.ts`。R0 紅線：不憑猜改 code。
+- [ ] **【診斷】Mockup Studio 功能異常 — server-side 已排除（2026-06-16），卡操作者症狀**：操作者回報 mockup 有問題未提供細節（2026-06-13）。MockupStudio.tsx 實走 `/api/tools/studio/generate`（nano-banana-2 + referenceImages）。
+  - **本輪已排除（步驟
+    - ③
+  - ④完成）**：container `Up healthy` + full docker log **零 error**（generate/mockup/nano-banana 皆無）；Replicate token 實打 `/v1/account`=ok（非 429/402/auth）→ **server-side 健康，最常見因全排除**。
+  - **剩下（卡操作者）**：
+    - ① 操作者給「什麼操作、什麼錯誤畫面、F12 console + network tab」
+  - ②（拿到後）Claude 依 `file:line` 對症修 `MockupStudio.tsx`/`lib/studio/mockup-prompt.ts`/`app/api/tools/studio/generate/route.ts`。R0 紅線：不憑猜改 code。
 
-- [ ] **【驗證債】Canvas 編輯器 `/tools/canvas` 整輪瀏覽器實測** — 整個 PS 功能目錄已全部 build+deploy（HEAD 含 `09b81ee4`/`5b73b77d`，tsc 0+build 0+critic 過），但**使用者尚未瀏覽器實測**（Claude 無登入 session 無法測）。主檔 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/canvas/CanvasEditor.tsx`。待驗清單：① **Undo/Redo**（Fabric v7 loadFromJSON Promise + re-applyFilters，最易壞）② **排版 / 橡皮擦→文字**（前幾批修，可能只是瀏覽器快取，先 **Ctrl+Shift+R**）③ **生成填色 / 擴圖**（flux-fill-pro，需 `POD_DESIGNS_ENABLED=true` + operator role + 花費；route `/api/tools/studio/genfill` 已掛載驗 401）④ **群組/解散、Posterize、設計檔 .design.json 存載**（純前端互動）。**下一步**：① 使用者硬重整後逐項點測 ② 壞的給截圖 + 開 console（F12）貼 error ③ Claude 依 `file:line` 定位修。**注意**：lib+route 層已是 inpaint faithful mirror（production-clean），剩風險全在 client handler 的 Fabric 互動。 **【範圍訂正 2026-08-25】部分待驗項已在 2026-06-27 由真機 e2e 覆蓋**（WORKLOG-archive/2026-06.md `feat(canvas): 畫布自動適應一頁…`，`REALTEST_EVIDENCE: tool=mcp__Claude_in_Chrome | 部署版 470e10ba`）：自動適應（1000×2000→顯示 248×495，real 保留全解析度）、**Ctrl+Z undo**、Delete 刪除、工具列進側欄（canvas top 181→86px）皆已實測 PASS。**故本條剩餘待驗＝** ①「Redo」與 `loadFromJSON` 後的 re-applyFilters（undo 已驗、redo 未驗）② 排版／橡皮擦→文字 ③ 生成填色／擴圖（flux-fill-pro，需 flag + operator role + 花費）④ 群組/解散、Posterize、`.design.json` 存載。
+- [ ] **【驗證債】Canvas 編輯器 `/tools/canvas` 整輪瀏覽器實測** — 整個 PS 功能目錄已全部 build+deploy（HEAD 含 `09b81ee4`/`5b73b77d`，tsc 0+build 0+critic 過），但**使用者尚未瀏覽器實測**（Claude 無登入 session 無法測）。主檔 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/canvas/CanvasEditor.tsx`。待驗清單：
+  - ① **Undo/Redo**（Fabric v7 loadFromJSON Promise + re-applyFilters，最易壞）
+  - ② **排版 / 橡皮擦→文字**（前幾批修，可能只是瀏覽器快取，先 **Ctrl+Shift+R**）
+  - ③ **生成填色 / 擴圖**（flux-fill-pro，需 `POD_DESIGNS_ENABLED=true` + operator role + 花費；route `/api/tools/studio/genfill` 已掛載驗 401）
+  - ④ **群組/解散、Posterize、設計檔 .design.json 存載**（純前端互動）。
+  - **下一步**：
+    - ① 使用者硬重整後逐項點測
+  - ② 壞的給截圖 + 開 console（F12）貼 error
+  - ③ Claude 依 `file:line` 定位修。
+  - **注意**：lib+route 層已是 inpaint faithful mirror（production-clean），剩風險全在 client handler 的 Fabric 互動。 **【範圍訂正 2026-08-25】部分待驗項已在 2026-06-27 由真機 e2e 覆蓋**（WORKLOG-archive/2026-06.md `feat(canvas): 畫布自動適應一頁…`，`REALTEST_EVIDENCE: tool=mcp__Claude_in_Chrome | 部署版 470e10ba`）：自動適應（1000×2000→顯示 248×495，real 保留全解析度）、**Ctrl+Z undo**、Delete 刪除、工具列進側欄（canvas top 181→86px）皆已實測 PASS。
+  - **故本條剩餘待驗＝**
+    - ①「Redo」與 `loadFromJSON` 後的 re-applyFilters（undo 已驗、redo 未驗）
+  - ② 排版／橡皮擦→文字
+  - ③ 生成填色／擴圖（flux-fill-pro，需 flag + operator role + 花費）
+  - ④ 群組/解散、Posterize、`.design.json` 存載。
 
-- [ ] **【POD A1 已完工｜剩 e2e + A2】** A1（一鍵 native 建品）後端+UI+hardening 全 live。剩：① **真實 e2e 開賣驗證**（操作者驅動瀏覽器：app.aware-wave.com → 建品 → 🚀一鍵上 Printful → 驗 native store 商品+變體+印刷檔全綁 → 清理測試商品）② **A2 自動轉單 webhook ✅ 已建+已部署 draft-only dormant（2026-06-16，deployed `e336d5da`）**：`app/api/webhooks/woo-order/route.ts` = Woo 付款 → Printful DRAFT（kill-switch `POD_AUTO_FULFILL_ENABLED` 預設 OFF + HMAC 驗簽；333/333 test；critic PASS）。**✅ 2026-06-16 啟用 draft-only LIVE**（SG flag+secret+compose passthrough、soulful 2 webhook、端到端 401/400 實測過；見下方獨立任務行）。**confirm/送印紅線未建**（測試結束+批准才議）。
+- [ ] **【POD A1 已完工｜剩 e2e + A2】** A1（一鍵 native 建品）後端+UI+hardening 全 live。剩：
+  - ① **真實 e2e 開賣驗證**（操作者驅動瀏覽器：app.aware-wave.com → 建品 → 🚀一鍵上 Printful → 驗 native store 商品+變體+印刷檔全綁 → 清理測試商品）
+  - ② **A2 自動轉單 webhook ✅ 已建+已部署 draft-only dormant（2026-06-16，deployed `e336d5da`）**：`app/api/webhooks/woo-order/route.ts` = Woo 付款 → Printful DRAFT（kill-switch `POD_AUTO_FULFILL_ENABLED` 預設 OFF + HMAC 驗簽；333/333 test；critic PASS）。
+  - **✅ 2026-06-16 啟用 draft-only LIVE**（SG flag+secret+compose passthrough、soulful 2 webhook、端到端 401/400 實測過；見下方獨立任務行）。
+  - **confirm/送印紅線未建**（測試結束+批准才議）。
 
-- [ ] **【POD A2 confirm phase — 🔴 金流紅線，測試結束 + 操作者明示批准才做】** A2 draft-only 管線已上 prod dormant。真正「自動扣款 + 送印」需未來明確建 confirm step（目前 code 完全沒有）。**動工前置（同一批做）**：① 改用 Woo webhook topic header（`order.created` vs `order.updated`）判別狀態，並顯式處理 `refunded`/partial-refund-still-processing edge（critic 2026-06-16 Minor）② confirm 必須有獨立 flag（與 draft flag 分離）+ 操作者每筆/批次審核閘，**禁止**裸自動 confirm ③ High-risk：需操作者 go-ahead + 先 draft 模式試單對帳通過。SSOT：`app/api/webhooks/woo-order/route.ts` + `lib/studio/print-provider.ts createDraftOrderOnNative`（⚠ DO NOT add confirm 註解）。
+- [ ] **【POD A2 confirm phase — 🔴 金流紅線，測試結束 + 操作者明示批准才做】** A2 draft-only 管線已上 prod dormant。真正「自動扣款 + 送印」需未來明確建 confirm step（目前 code 完全沒有）。
+  - **動工前置（同一批做）**：
+    - ① 改用 Woo webhook topic header（`order.created` vs `order.updated`）判別狀態，並顯式處理 `refunded`/partial-refund-still-processing edge（critic 2026-06-16 Minor）
+  - ② confirm 必須有獨立 flag（與 draft flag 分離）+ 操作者每筆/批次審核閘，**禁止**裸自動 confirm
+  - ③ High-risk：需操作者 go-ahead + 先 draft 模式試單對帳通過。SSOT：`app/api/webhooks/woo-order/route.ts` + `lib/studio/print-provider.ts createDraftOrderOnNative`（⚠ DO NOT add confirm 註解）。
 
-- [ ] **【未開始｜待使用者明確下指令】會議服務網路版安裝** — 客戶筆電無 NVIDIA GPU（2026-08-20 確認），本機版 CPU 路線慢 20-27 倍不可用。**完整安裝手冊（含動工前三題決策 + 方案比較 + T1-T7 步驟 + DoD）已寫好**：[`lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/NETWORK_VERSION_INSTALL_RUNBOOK.md`](../lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/NETWORK_VERSION_INSTALL_RUNBOOK.md)。**觸發方式**：使用者說「網路版繼續」等義詞，AI 直接讀該檔依序執行，不用重述背景。**動工前必答三題**（該檔已列）：① 客戶是否同意錄音上傳到伺服器（本機版音檔不外流原則會被推翻）② GPU 伺服器方案（推薦先租雲端 GPU instance，如 RunPod/Vast.ai）③ 服務幾個客戶（決定要不要現在就做多租戶隔離）。同日已完成的相關工作：本機版 API 自動處理選項（`lib/settings.py` + `summarize_via_api()` + 網頁設定頁，給客戶「自己貼上」或「填自己 API key」二選一，已驗證上線）。
+- [ ] **【未開始｜待使用者明確下指令】會議服務網路版安裝** — 客戶筆電無 NVIDIA GPU（2026-08-20 確認），本機版 CPU 路線慢 20-27 倍不可用。
+  - **完整安裝手冊（含動工前三題決策 + 方案比較 + T1-T7 步驟 + DoD）已寫好**：[`lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/NETWORK_VERSION_INSTALL_RUNBOOK.md`](../lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/NETWORK_VERSION_INSTALL_RUNBOOK.md)。
+  - **觸發方式**：使用者說「網路版繼續」等義詞，AI 直接讀該檔依序執行，不用重述背景。
+  - **動工前必答三題**（該檔已列）：
+    - ① 客戶是否同意錄音上傳到伺服器（本機版音檔不外流原則會被推翻）
+  - ② GPU 伺服器方案（推薦先租雲端 GPU instance，如 RunPod/Vast.ai）
+  - ③ 服務幾個客戶（決定要不要現在就做多租戶隔離）。同日已完成的相關工作：本機版 API 自動處理選項（`lib/settings.py` + `summarize_via_api()` + 網頁設定頁，給客戶「自己貼上」或「填自己 API key」二選一，已驗證上線）。
 
-- [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤** —— **【未開始】**
+- [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤**
+  - **【未開始】**
   - 📖 **完整步驟讀這個（單一主人）**：[`agency-os/docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md`](docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md) — §0（5 步驗證）+ §5（4 條 Snippets）+ §8（key 上手機 3 方法）
   - 📅 **規劃日期**：2026-05-08
   - 👤 **執行者**：**操作者親自手機操作**，代理無法代執行
@@ -190,33 +284,68 @@
 
 > 不是你不做，是還沒輪到你。**買機一解，這區有三條直接轉可做**。
 
-- [ ] **【已知限制｜2026-08-25 開｜2026-08-31 自動解除】Codex 額度耗盡，跨模型 oracle 路徑不可用** — `codex exec` 直測回 `You've hit your usage limit ... try again at Aug 31st, 2026 12:41 PM`。影響：① AGENTS.md §跨模型 oracle 把 R0 [驗證計畫] 的 Review 動作路由給 Codex —— 該路徑至 8/31 不可用，期間 Review 改走 `critic` subagent ② codex plugin 的 **stop-time review gate 每次收工都會失敗並擋住 session 結束**，且它顯示的錯誤是誤導的（`DEP0190 DeprecationWarning` 只是 stderr 上唯一的文字，真正的額度錯誤在空的 stdout 裡）。若擋住工作流程，用 `/codex:setup` 暫時關掉 stop-time review gate，8/31 後再開。**根因不在本 repo**（vendor plugin + 訂閱額度），不要去改 `~/.claude/plugins/cache/` 底下的 vendor code。⚠️ 額度是本 session 五次 oracle 覆審燒掉的 —— 之後 oracle 用量要節制：prompt 只放 Decision/Constraints/Acceptance（AGENTS.md 已有此規則，本 session 第一次呼叫因塞了整段推理而 timeout），且避免對同一份大 diff 反覆重跑。
+- [ ] **【已知限制｜2026-08-25 開｜2026-08-31 自動解除】Codex 額度耗盡，跨模型 oracle 路徑不可用** — `codex exec` 直測回 `You've hit your usage limit ... try again at Aug 31st, 2026 12:41 PM`。影響：
+  - ① AGENTS.md §跨模型 oracle 把 R0 [驗證計畫] 的 Review 動作路由給 Codex
+  - 該路徑至 8/31 不可用，期間 Review 改走 `critic` subagent
+    - ② codex plugin 的 **stop-time review gate 每次收工都會失敗並擋住 session 結束**，且它顯示的錯誤是誤導的（`DEP0190 DeprecationWarning` 只是 stderr 上唯一的文字，真正的額度錯誤在空的 stdout 裡）。若擋住工作流程，用 `/codex:setup` 暫時關掉 stop-time review gate，8/31 後再開。
+  - **根因不在本 repo**（vendor plugin + 訂閱額度），不要去改 `~/.claude/plugins/cache/` 底下的 vendor code。⚠️ 額度是本 session 五次 oracle 覆審燒掉的
+  - 之後 oracle 用量要節制：prompt 只放 Decision/Constraints/Acceptance（AGENTS.md 已有此規則，本 session 第一次呼叫因塞了整段推理而 timeout），且避免對同一份大 diff 反覆重跑。
 
-- [ ] **【gated｜8月｜等買二手機才繼續建 customer service U6 Chatwoot】** — 軟體層(cs-engine U0–U5 + widget U4)已上 prod 並 live 驗；只剩裝 Chatwoot + 接線（建 `app/api/cs/chatwoot-webhook` 呼叫 `handleInbound`、MockTransport 換 ChatwootTransport）。**買機=操作者刷卡(High risk)，7月出國→8月回來辦**。完整冷啟動步驟序、接線 file:line、8 通道現實全在接手包 → handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md
+- [ ] **【gated｜8月｜等買二手機才繼續建 customer service U6 Chatwoot】** — 軟體層(cs-engine U0–U5 + widget U4)已上 prod 並 live 驗；只剩裝 Chatwoot + 接線（建 `app/api/cs/chatwoot-webhook` 呼叫 `handleInbound`、MockTransport 換 ChatwootTransport）。
+  - **買機=操作者刷卡(High risk)，7月出國→8月回來辦**。完整冷啟動步驟序、接線 file:line、8 通道現實全在接手包 → handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md
 
-- [ ] **【gated｜8月｜EU→Dedicated 搬機 + 整併退雲端】** — **動機**：上 Chatwoot（CS U6）需 ~8GB，EU 8GB(已吃 3G swap)/SG 4GB 都塞不下。**決策**（runbook §0b，2026-06-27）：買**二手 dedicated**（FSN i7-7700/64GB/2×512SSD/~€48.70）當主力，Chatwoot greenfield 先上 → EU 服務照 §5 逐台搬（Supabase/Trigger/n8n/Postiz/MainWP/Uptime）→ 退 SG+EU 兩台雲端。單台+RAID 1+R2 夠用，HA 第二台延後。**搬家/RAID/還原 SSOT**：[`runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`](../runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md)（§0b 決策/§3 RAID/§5 遷移/§7 checklist）。**§7 gate（5 項，現卡）**：❌ 買機（**操作者刷卡，High risk**）❌ auction 機 RAID 1+SMART+mdadm 告警 ❌ Chatwoot greenfield+接線 ✅ 每容器 `mem_limit`（2026-08-15 實測：EU 29 個執行中容器有 **27 個已設限**，僅 `buildx_buildkit_trigger0` / `trigger-registry` 兩個 build 用容器未設；此項實質已完成）❌ 第二異地取代 SG-offsite。**已綠**：備份補漏全補 / `.env` 加密 / 還原演練過(2026-06-26) / R2 真 3-2-1 / 救援鑰 off-machine / DNS 9 record 清單 / §4 端到端驗。**時程**：7月出國→8月回來辦。冷啟動接手包：[`handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md`](handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md)。
+- [ ] **【gated｜8月｜EU→Dedicated 搬機 + 整併退雲端】**
+  - **動機**：上 Chatwoot（CS U6）需 ~8GB，EU 8GB(已吃 3G swap)/SG 4GB 都塞不下。
+  - **決策**（runbook §0b，2026-06-27）：買**二手 dedicated**（FSN i7-7700/64GB/2×512SSD/~€48.70）當主力，Chatwoot greenfield 先上 → EU 服務照 §5 逐台搬（Supabase/Trigger/n8n/Postiz/MainWP/Uptime）→ 退 SG+EU 兩台雲端。單台+RAID 1+R2 夠用，HA 第二台延後。
+  - **搬家/RAID/還原 SSOT**：[`runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`](../runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md)（§0b 決策/§3 RAID/§5 遷移/§7 checklist）。
+  - **§7 gate（5 項，現卡）**：❌ 買機（**操作者刷卡，High risk**）❌ auction 機 RAID 1+SMART+mdadm 告警 ❌ Chatwoot greenfield+接線 ✅ 每容器 `mem_limit`（2026-08-15 實測：EU 29 個執行中容器有 **27 個已設限**，僅 `buildx_buildkit_trigger0` / `trigger-registry` 兩個 build 用容器未設；此項實質已完成）❌ 第二異地取代 SG-offsite。
+  - **已綠**：備份補漏全補 / `.env` 加密 / 還原演練過(2026-06-26) / R2 真 3-2-1 / 救援鑰 off-machine / DNS 9 record 清單 / §4 端到端驗。
+  - **時程**：7月出國→8月回來辦。冷啟動接手包：[`handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md`](handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md)。
 
-- [ ] **蒙古客戶 Cloudways 實際建站**：待客戶刷卡配合 —— **【未開始】** 現場開機 checklist 與 Cloudways 方案已備（`handoffs/2026-07-05-mongolia-client-onsite-checklist.md`；網域在 Namecheap 買，Cloudways 不賣網域）。**阻塞**：需客戶本人刷卡開 Cloudways 帳號。（2026-08-12 從 AO-CLOSE 2026-07-05 封存補回 TASKS）
+- [ ] **蒙古客戶 Cloudways 實際建站**：待客戶刷卡配合
+  - **【未開始】** 現場開機 checklist 與 Cloudways 方案已備（`handoffs/2026-07-05-mongolia-client-onsite-checklist.md`；網域在 Namecheap 買，Cloudways 不賣網域）。
+  - **阻塞**：需客戶本人刷卡開 Cloudways 帳號。（2026-08-12 從 AO-CLOSE 2026-07-05 封存補回 TASKS）
 
-- [ ] **新站建置（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；**Day 2 書面**：canonical staging **提案** `https://staging.scenery-travel.mn/` 已寫入 registry／SITE_PROFILE。**下一步：**選定主機商後 Runbook §2 建置實機 + 客戶訪談補 Discovery。
+- [ ] **新站建置（Scenery Travel Mongolia）**
+  - **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；
+  - **Day 2 書面**：canonical staging **提案** `https://staging.scenery-travel.mn/` 已寫入 registry／SITE_PROFILE。
+  - **下一步：**選定主機商後 Runbook §2 建置實機 + 客戶訪談補 Discovery。
   - 本項目標：完成 M1 啟動（tenant/site/project + 雲端 staging 可用 + Discovery 國際需求補齊）
 
-- [ ] **新站建置 Day 1（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架 + Discovery 骨架完成。**下一步：**與客戶確認素材與頂級網域，選定主機商 → 銜接 **`TASKS`**「Day 2 雲端 staging 實機驗收」。
+- [ ] **新站建置 Day 1（Scenery Travel Mongolia）**
+  - **【進行中】** **進度（2026-05-07）：**tenant 骨架 + Discovery 骨架完成。
+  - **下一步：**與客戶確認素材與頂級網域，選定主機商 → 銜接 **`TASKS`**「Day 2 雲端 staging 實機驗收」。
   - 執行：`docs/operations/PRODUCTION_RUNBOOK_PILOT_B_NEW_SITE_SCENERY_TRAVEL_MONGOLIA.md` 第 1~2 節
   - 產出：新站 staging 啟動條件
 
-- [ ] **Next-Gen 試點 — Day 2 雲端 staging 實機驗收（~~兩案~~ → 僅剩 Scenery）** —— **【未完成｜範圍已縮 2026-08-25】** **DoD：**Scenery：`https://staging.scenery-travel.mn/` 後台可登入 + 關鍵頁可開（Pilot A §2 同等驗收；若網域變更須先更新 registry）。**阻塞：**須選定主機商操作與 DNS／SSL；代理無法代登入第三方面板，且蒙古案本身卡在客戶刷卡開 Cloudways（見該條）。 **⛔ Soulful 半邊已作廢，不要再排**：~~Soulful：`https://staging.soulfulexpression.org/` 後台可登入 + 關鍵頁可開~~ —— 2026-08-16 決議 **abandon staging**，理由是 Hostinger hosting 2026-11-12 到期不續約，不在即將退場的主機上建 staging（WORKLOG 2026-08-16「補上搬站執行手冊 + 清掉 5 份文件的過期 staging 主張」，`ENVIRONMENT_REGISTRY.md` 與 `02_EXECUTION_PLAN.md` Day 2 兩行均已加刪除線並註「⛔ 不再執行」）。Soulful 的等價驗收改由**搬站後在新主機上做**，見「Soulful 網站搬離 Hostinger」條。
+- [ ] **Next-Gen 試點 — Day 2 雲端 staging 實機驗收（~~兩案~~ → 僅剩 Scenery）**
+  - **【未完成｜範圍已縮 2026-08-25】** **DoD：**Scenery：`https://staging.scenery-travel.mn/` 後台可登入 + 關鍵頁可開（Pilot A §2 同等驗收；若網域變更須先更新 registry）。
+  - **阻塞：**須選定主機商操作與 DNS／SSL；代理無法代登入第三方面板，且蒙古案本身卡在客戶刷卡開 Cloudways（見該條）。 **⛔ Soulful 半邊已作廢，不要再排**：~~Soulful：`https://staging.soulfulexpression.org/` 後台可登入 + 關鍵頁可開~~
+  - 2026-08-16 決議 **abandon staging**，理由是 Hostinger hosting 2026-11-12 到期不續約，不在即將退場的主機上建 staging（WORKLOG 2026-08-16「補上搬站執行手冊 + 清掉 5 份文件的過期 staging 主張」，`ENVIRONMENT_REGISTRY.md` 與 `02_EXECUTION_PLAN.md` Day 2 兩行均已加刪除線並註「⛔ 不再執行」）。Soulful 的等價驗收改由**搬站後在新主機上做**，見「Soulful 網站搬離 Hostinger」條。
   - 證據鏈：`core/ENVIRONMENT_REGISTRY.md`（**URL／lifecycle SSOT**）、`SITES_INDEX.md`（須與 registry 對齊）、各案 `02_EXECUTION_PLAN.md` Day 2、`SITE_PROFILE.md`；Runbook §2 對齊框：`PRODUCTION_RUNBOOK_PILOT_*`；藍圖 §6：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`
   - **自動漂移閘道**：`agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`（比對 **`SITES_INDEX`**、含 HTTPS 之 **`sites/*/SITE_PROFILE`**、以及 `projects/*/02_EXECUTION_PLAN.md` 的 staging URL；`scripts/system-health-check.ps1` → **`verify-build-gates`**；PR `.github/workflows/tenant-staging-ssot.yml`）。
 
-- [ ] `tenants/templates/` v2 —— **【未開始】** **進度：**依試點回填後再開；見 Pilot 條目。
+- [ ] `tenants/templates/` v2
+  - **【未開始】** **進度：**依試點回填後再開；見 Pilot 條目。
   - 本項目標：試點 tenant 實填回饋後，再擴欄位與自動檢查（若有）
 
 #### D. ▶️ 可直接做 — 安全與資料正確性
 
 > 已由 critic 驗證屬實、尚未修。優先於任何功能。
 
-- [ ] **【2026-08-25 開出｜類別級重設計】影片歸屬改為持久化 `outName → organization_id` mapping，停止從 object key 反解** — critic（2026-08-25）指出 2026-08-25 那批修正裡的三條 finding（crafted legacy prefix / 大小寫不一致 / ctx 缺欄位 fallback）是**同一類問題的三個實例**：「把租戶身分編碼進一個有損字串、再從字串反解回來」。真正的不變量是「**歸屬在 submit 當下就已知且權威，不該事後從 object key 猜**」。**治本**：out_name 產生時歸屬已知，落一張持久表（`video_jobs` 有 1h TTL 且不存 out_dir，不能用），`reconcile` 改成 join 該表、解不到就 skip。**一次關掉整類**，並可移除 32-bit 前綴命名空間與 public URL 上的租戶指紋。**警告**：逐點修這三個實例會再被打回（critic 明講）。目前三個危險實例已各自修掉，所以這是「改善」不是「救火」。
+- [ ] **`cf-iprefresh` 偵測器已 error 14 天，而且沒有任何讀者**
+  - `🔴 現行` · `2026-08-26 開出` · `可直接做`
+  - **一句話**：守 SG 80/443 只開放給 Cloudflare IP 的 origin lockdown，其狀態檔壞了兩週沒人知道。
+  - **證據**：`agency-os/reports/status/cf-iprefresh-LATEST.json` → `status=error`、`v4_ranges=0`、`v6_ranges=0`、`generated=2026-08-12 17:35:11`，訊息 `[cf-lockdown] ERROR: ipsets not found. Run --apply first.`
+  - **為什麼沒人知道**：grep `cf-iprefresh|refresh-cf-origin` 於 `scripts/system-health-check.ps1`、`scripts/ao-resume.ps1`、`agency-os/AGENTS.md` → **零命中**。這份 artifact 沒有任何消費端，寫了等於沒寫。
+  - **下一步**：先 SSH 進 SG 判斷是「ipset 真的不見了」還是「只是沒跑過 `--apply`」。**屬 High risk，需操作者明示 go-ahead。**
+  - **完成定義**：`status=ok` 且 `v4_ranges>0`；並接上一個讀者（`system-health-check` 或 AO-RESUME §1），否則下次壞掉一樣沒人知道。
+
+- [ ] **【2026-08-25 開出｜類別級重設計】影片歸屬改為持久化 `outName → organization_id` mapping，停止從 object key 反解** — critic（2026-08-25）指出 2026-08-25 那批修正裡的三條 finding（crafted legacy prefix / 大小寫不一致 / ctx 缺欄位 fallback）是
+  - **同一類問題的三個實例**：「把租戶身分編碼進一個有損字串、再從字串反解回來」。真正的不變量是「**歸屬在 submit 當下就已知且權威，不該事後從 object key 猜**」。
+  - **治本**：out_name 產生時歸屬已知，落一張持久表（`video_jobs` 有 1h TTL 且不存 out_dir，不能用），`reconcile` 改成 join 該表、解不到就 skip。
+  - **一次關掉整類**，並可移除 32-bit 前綴命名空間與 public URL 上的租戶指紋。
+  - **警告**：逐點修這三個實例會再被打回（critic 明講）。目前三個危險實例已各自修掉，所以這是「改善」不是「救火」。
 
 - [ ] **【2026-08-25 開出｜critic Minor 7 條｜2026-08-26 部分結案】影片管線租戶邊界收尾** — 原 7 條逐條重驗結果如下（重驗而非沿用）：
   - **✅ ① `/api/video/status` 補租戶閘（2026-08-26 完成）** — **原 finding 的位置是錯的**：它寫「`route.ts:87`（recordVideoAsset）之前應補」，但 `status="done"` 的 job 在更早的 `:79` 就 `return job.video`（該次 render 全部格式的 R2 URL）+ `title`，**根本走不到 :87** —— 照原文補出來會是一道對已完成 job 完全無效的假閘。實際修法：`migration 0060` 給 `video_jobs` 加 `organization_id`（0047 建表時無 owner 欄位），`createJob(orgId)` 在**建立列的當下**寫定，`status/route.ts:77` 在第一個回傳資料的分支之前 assert。**不可**改用 `recordParams.organizationId`：prepare 失敗路徑（`generate/route.ts:142`、`:168`）不寫 recordParams，那種寫法會讓 client 對自己失敗的 render 永久 403、連錯誤訊息都看不到。附帶關掉 `createJob` insert 失敗只 `console.warn` 的消音（會導致之後每次 /status 回 `job_not_found`）。7 個 vitest + **突變測試證明有效**（把閘改回上述兩種錯誤寫法，各有 2 條測試轉紅）。
@@ -226,35 +355,124 @@
   - **⏸ ②③ 刻意不做（不是忘記）** — 2026-08-26 實測 R2：`TOTAL_OBJECTS=11 / TOTAL_DIRS=2 / NEW_ORG_PREFIX=0 / NOORG=0 / LEGACY=2`。所以 reconcile 每 15 分回的是 `checked=2, recorded=0, skippedLegacy=2`，**永遠不變**。此刻接告警＝裝一個永遠在叫的警報器（AGENTS.md 明文最糟樣態）。**正確順序：先處理掉那 2 個 legacy 目錄（確認歸屬後補記或刪除）讓 baseline 歸零，再接告警**。cron 腳本 `/root/lobster-phase1/scripts/reconcile-videos.sh` → `/var/log/reconcile-videos.log` **不在 repo**（drift，一併處理）。
   - **➡️ ⑥ 移出本條** — 見 §2.3.2，屬產品決策非工程 bug。
 
-- [ ] **【2026-08-26 開出｜🔴 跨租戶寫入｜與 `wp_sites` org migration 綁定，不可單獨修】`/api/video/embed-to-wp` 可寫入任一客戶的 WordPress 站** — `app/api/video/embed-to-wp/route.ts:23` 的 `siteId` 直接取自 request body，`:33` 呼叫 `getWpSites()`；`lib/content/wp-sites.ts:55-77` **零 org 過濾**，回傳全部 active 站 + 全部 token，缺 `siteId` 時 fallback `sites[0]`。`:70-79` 用該站 token 對任意 `postId` 送 `POST /wp-json/wp/v2/posts/<id>`（X-HTTP-Method-Override: PUT）覆寫內容。**只有角色閘（`:17-18` canCreateAiImageJob），零租戶閘。****根因＝`wp_sites` 表沒有 `organization_id` 欄位**，與 `MULTI_TENANT_ISOLATION_AUDIT_AND_PLAN.md §2.2` 的 `content/sites` 🔴 同一根，**必須同一批做**（單修 embed-to-wp 無欄位可 assert，等於再造一次 2026-08-26 `video_jobs` 的相同處境）。**現行曝險為零**：EU auth 實測僅 1 個帳號（staff/owner），唯一的 operator 就是站主本人；Phase 5 客戶登入開門那一刻引爆。**驗證來源**：2026-08-26 逐檔實讀 14 條 `/api/video/*`（見 §2.3.1）。
+- [ ] **【2026-08-26 開出｜🔴 跨租戶寫入｜與 `wp_sites` org migration 綁定，不可單獨修】`/api/video/embed-to-wp` 可寫入任一客戶的 WordPress 站** — `app/api/video/embed-to-wp/route.ts:23` 的 `siteId` 直接取自 request body，`:33` 呼叫 `getWpSites()`；`lib/content/wp-sites.ts:55-77` **零 org 過濾**，回傳全部 active 站 + 全部 token，缺 `siteId` 時 fallback `sites[0]`。
+  - `:70-79` 用該站 token 對任意 `postId` 送 `POST /wp-json/wp/v2/posts/<id>`（X-HTTP-Method-Override: PUT）覆寫內容。
+  - **只有角色閘（`:17-18` canCreateAiImageJob），零租戶閘。
+  - ****根因＝`wp_sites` 表沒有 `organization_id` 欄位**，與 `MULTI_TENANT_ISOLATION_AUDIT_AND_PLAN.md §2.2` 的 `content/sites` 🔴 同一根，**必須同一批做**（單修 embed-to-wp 無欄位可 assert，等於再造一次 2026-08-26 `video_jobs` 的相同處境）。
+  - **現行曝險為零**：EU auth 實測僅 1 個帳號（staff/owner），唯一的 operator 就是站主本人；Phase 5 客戶登入開門那一刻引爆。
+  - **驗證來源**：2026-08-26 逐檔實讀 14 條 `/api/video/*`（見 §2.3.1）。
 
-- [ ] **【2026-08-26 開出｜小｜跟著 ②③ 一起做】R2 影片 bucket 的 2 個 legacy 目錄清理** — 2026-08-26 實測 `lobster-videos`：11 物件 / 2 目錄，皆為 2026-08-25 之前的舊格式（無 org 前綴）→ `parseOrgPrefixFromDir` 回 null → reconcile 每輪 `skippedLegacy=2` 且**永遠不會被補記**（fail-closed 是對的，但它讓計數器永遠非零）。**要做的是逐一確認歸屬**（比對 `media_assets` 既有列 / 檔名 / 建立時間）→ 補 `media_assets` 列或刪除物件 → baseline 歸零 → 才有資格接告警。**注意**：另一項實測 `NEW_ORG_PREFIX=0` 代表 2026-08-25 部署 `1d15e867` 之後**prod 未曾生成過任何影片**，該批新程式碼路徑至今未被真實流量執行過。
+- [ ] **【2026-08-26 開出｜小｜跟著
+  - ②
+  - ③ 一起做】R2 影片 bucket 的 2 個 legacy 目錄清理** — 2026-08-26 實測 `lobster-videos`：11 物件 / 2 目錄，皆為 2026-08-25 之前的舊格式（無 org 前綴）→ `parseOrgPrefixFromDir` 回 null → reconcile 每輪 `skippedLegacy=2` 且**永遠不會被補記**（fail-closed 是對的，但它讓計數器永遠非零）。
+  - **要做的是逐一確認歸屬**（比對 `media_assets` 既有列 / 檔名 / 建立時間）→ 補 `media_assets` 列或刪除物件 → baseline 歸零 → 才有資格接告警。
+  - **注意**：另一項實測 `NEW_ORG_PREFIX=0` 代表 2026-08-25 部署 `1d15e867` 之後**prod 未曾生成過任何影片**，該批新程式碼路徑至今未被真實流量執行過。
 
 #### E. ▶️ 可直接做 — 治理與機械閘
 
-- [ ] **【2026-08-26 開出｜🔴 交叉污染｜第 4 個 `git add -A`】AO-CLOSE 的 `git add -A` 會掃走其他 session 進行中的檔案** — **實際發生於 2026-08-26**：另一 session 的 AO-CLOSE 把本 session 6 個未完成檔案（`app/api/video/{generate,render-draft,status}/route.ts`、`lib/content/video/job-store.ts`、`packages/db/{migrations,scripts}/0060_*`）掃進 `2dbe858a`（標題「fix(reports): 報告保留政策」，1247 檔）。**兩層後果**：① 一批資安修改被歸屬到完全不相干的 commit，30 秒故障手冊失效 ② 那 6 個檔案**繞過 verify gate 進 main**（掃走的當下 tsc/vitest 都還沒跑，`159fce87` 剛關上的正是這道門）。**這是同一個 bug class 的第 4 個實例**：`8c3ac617`（每則訊息 auto-checkpoint）、`680db6c6`（第三個自動 commit 呼叫點）、`7251d14d`（checkpoint `-Paths` 改必填、移除 `git add -A`）都已移除，**唯獨 AO-CLOSE 自己那個還在**——而它是最危險的一個，因為它跑在「要 commit 了」的時刻、掃得最廣。**不變量**：任何自動 commit 只能 stage「本 session 明確宣告過的路徑」，不能 stage 工作區的全部內容；單機多 session 是常態不是例外。**修法方向**（需先設計，勿直接改）：AO-CLOSE 改為只 add 本 session 觸碰過的路徑清單（hook 已有 `code-change-tracker.js` 在追蹤修改，可作為來源），或在 `add -A` 前偵測「非本 session 修改的檔案」並中止要求人工裁決。**注意**：不可只加一個警告就了事——`7251d14d` 已示範正確做法是把能力拿掉，不是加提示。
+- [ ] **【2026-08-26 開出｜偵測器說謊｜第三顆】Phase 4 Check 1／Check 2 至少 12 週在回報假綠燈 —— 雲端容器沒有 `gh`** — 2026-08-26 把檢查邏輯換成 `scripts/phase4-checks.py` 後第一次雲端實跑，Check 1／2 回 `SKIP — gh not installed`（`RemoteTrigger get_run_log cse_01BAKre3odz4KUbP1jUDxaFS`，容器內 `python3` 有、`gh` 沒有）。但 `agency-os/reports/repair-center/phase4-2026-06-08.md` 到 `phase4-2026-08-21.md` **連續 12 份全部是 `Check 1: PASS`**（逐檔 grep 確認）。舊 prompt 明文寫 `If gh exit != 0: CHECK1_STATUS = "SKIP"`，所以要嘛容器映像近期拿掉 `gh`，要嘛散文規格被執行成了 PASS —— 兩者結論相同：**那兩項檢查有 12 週沒有真的在量任何東西**。**現況不是退步**：SKIP 是誠實的「我沒量到」，比假 PASS 好；且 SKIP 會進 `整體` 顯示（今天是「⚠️ 1 項需注意, 2 項 SKIP」），不會被當健康。**要決定的是取捨不是 bug**：① 給 routine 配 setup script 裝 `gh`（目前 `No setup script configured`）② 改走 GitHub REST API + token —— 但 routine 刻意無 env vars（與另外三支 routine 同 pattern），加 token 會讓四支分叉 ③ 接受 SKIP，把 auto-repair PR 重複偵測改由本機 `/health` 或 `.ps1` fallback 負責（本機有 `gh`，今天實測 Check 1 正常回 PASS）。**建議③**：這兩項本來就不是時效性檢查，而雲端加 secret 的代價高於收益。
+
+- [ ] **建立 `detector-contract` audit class：偵測器必須申報「這輪量到什麼」**
+  - `🟠 未開始` · `2026-08-26 開出` · `可直接做` · `依 BUG_HUNT_PROTOCOL 9 步`
+  - **一句話**：18 支偵測器各自手寫 verdict，於是「我什麼都沒量到」和「一切正常」在輸出上長得一樣。
+  - **不變量**：每份 `reports/status/*-LATEST.json` 必須帶 `overall` 與 `measured`；`measured=0` 時 `overall` 不得為 PASS；且每份 artifact 必須有至少一個讀者。
+  - **為什麼是這個形式**：「這支能不能分辨沒量到 vs 都好」是語意問題、靜態分析判不出來；「有沒有申報量了什麼」可以完全判定。把不可判定換成可判定，不是放寬標準。
+  - **現況證據**：9 份 artifact 只有 `smoke-LATEST.json` 帶 `blind_spots`；4 份連 verdict 欄位名都不一致（`overall`/`status`/沒有）。不變量本身早在 `scripts/check-smoke-tests.ps1:268-272` 寫過（「A detector that goes quiet must be louder than one that reports nothing wrong」，2026-08-17），只套了一支就沒再推廣。
+  - **實作計畫**：① `scripts/lib/_detector-contract.ps1` 契約定義 ② `scripts/audit-detector-contract.ps1` 掃描器 ③ 接進 `system-health-check.ps1`（Step 9.5 選項 b，操作者零記憶）④ `AUDIT_REGISTRY.md` 新章節 ⑤ `AGENTS.md` 觸發列。
+  - **完成定義**：塞一份 `measured=0/overall=PASS` 的假 artifact 必須 FAIL（證明不是永遠綠）；`smoke-LATEST.json` 必須 PASS（證明不是永遠紅）；現況掃描必須點名 `cf-iprefresh`。
+  - **Phase 2（另計）**：8 支補 `measured` 並改 fail-closed，由上面那道閘逼出來，一次一支。
+
+- [ ] **Phase 4 Check 3 有三套實作，兩套讀已退役欄位**
+  - `🟠 現行` · `2026-08-26 開出` · `⚠️ 平行 session 進行中，我沒有動`
+  - **一句話**：tenant 資料今天換了 schema，但每週真正在跑的那套沒跟著換。
+  - **證據**：tenant 檔已改記錄事實（`restore_drills:` + `restore_drill_interval_days`，見 `agency-os/tenants/company-soulful-expression/core/BACKUP_RESTORE_PROOF.md`）；但 `scripts/phase4-weekly-check.ps1:143` 與 `agency-os/automation/claude-routines/phase4-weekly.md:81-83` 仍解析已退役的 `restore_drill_due_after`。
+  - **後果**：`$drillMatch.Success=false` → 3A **靜默 PASS**。正確版 `scripts/phase4-checks.py:349`（欄位缺失回 WARNING，fail-closed，自帶 selftest）目前 **untracked 且沒有任何呼叫端**。
+  - **最急的一項**：雲端 routine 才是每週產 `phase4-LATEST.md` 的那個。若不更新，**下週五的 Check 3 會靜默通過**。
+  - **邊界**：`phase4-checks.py`／`check-backup-health.ps1`／4 份 tenant 檔都在平行 session 的未提交工作樹裡。AGENTS.md 紅線禁止兩個 agent 同改一檔 —— **本條只記錄，不動手**。
+
+- [ ] **`check-backup-health.ps1` 把「無法證明可還原」當成健康**
+  - `🟡 潛伏` · `2026-08-26 開出` · `⚠️ 平行 session 正在改這支`
+  - **一句話**：備份跑了、也夠新，但驗證結果不明時，它報 PASS。
+  - **證據**：`scripts/check-backup-health.ps1:165-167` —— `verify_result="UNKNOWN"` 刻意不升級，註解寫 `Only FAILED escalates to WARN; UNKNOWN ... does NOT false-alarm`。
+  - **目前未觸發**：`backup-health-LATEST.json` 兩台都是 `verify_result=PASSED`，所以這是**潛伏**不是已發生。
+  - **為什麼仍要修**：11/12 Soulful 搬站期間，備份是唯一的安全網。「有備份但不知道能不能還原」必須看得見。
+  - **完成定義**：`UNKNOWN` 升級為 WARN，且 WARN 理由字面寫出「無法證明可還原」而非只是狀態碼。
+
+- [ ] **統一 TASKS 條目的標籤詞彙**
+  - `🟢 小` · `2026-08-26 開出` · `可直接做`
+  - **一句話**：2026-08-26 已把 49 條長行拆成階層（機器可證零遺失），但標籤本身仍是 ad-hoc。
+  - **證據**：全檔 `**標籤**：` 統計 —— `DoD` 8 次、`注意` 4 次，其餘幾乎都只出現 1 次，甚至整句話被當標籤（例：`原因不是它報錯，是它跑不起來`）。62 條裡有 35 條完全沒有標籤。
+  - **下一步**：照本檔 §條目格式規約的固定槽位（一句話／現在到哪／下一步／完成定義／卡點／證據）逐條歸位。**這是判斷工作，不能機器化**，故與拆行分開做。
+  - **完成定義**：所有開放項的子項標籤都落在規約列出的詞彙表內；新寫入的條目照模板。
+
+- [ ] **【2026-08-26 開出｜🔴 交叉污染｜第 4 個 `git add -A`】AO-CLOSE 的 `git add -A` 會掃走其他 session 進行中的檔案**
+  - **實際發生於 2026-08-26**：另一 session 的 AO-CLOSE 把本 session 6 個未完成檔案（`app/api/video/{generate,render-draft,status}/route.ts`、`lib/content/video/job-store.ts`、`packages/db/{migrations,scripts}/0060_*`）掃進 `2dbe858a`（標題「fix(reports): 報告保留政策」，1247 檔）。
+  - **兩層後果**：
+    - ① 一批資安修改被歸屬到完全不相干的 commit，30 秒故障手冊失效
+  - ② 那 6 個檔案**繞過 verify gate 進 main**（掃走的當下 tsc/vitest 都還沒跑，`159fce87` 剛關上的正是這道門）。
+  - **這是同一個 bug class 的第 4 個實例**：`8c3ac617`（每則訊息 auto-checkpoint）、`680db6c6`（第三個自動 commit 呼叫點）、`7251d14d`（checkpoint `-Paths` 改必填、移除 `git add -A`）都已移除，**唯獨 AO-CLOSE 自己那個還在**
+  - 而它是最危險的一個，因為它跑在「要 commit 了」的時刻、掃得最廣。
+  - **不變量**：任何自動 commit 只能 stage「本 session 明確宣告過的路徑」，不能 stage 工作區的全部內容；單機多 session 是常態不是例外。
+  - **修法方向**（需先設計，勿直接改）：AO-CLOSE 改為只 add 本 session 觸碰過的路徑清單（hook 已有 `code-change-tracker.js` 在追蹤修改，可作為來源），或在 `add -A` 前偵測「非本 session 修改的檔案」並中止要求人工裁決。
+  - **注意**：不可只加一個警告就了事
+  - `7251d14d` 已示範正確做法是把能力拿掉，不是加提示。
 
 
-- [ ] **【2026-08-26 開出｜營運｜搬站前必處理】soulful 週備份近 10 次有 5 次失敗，最新一次就是失敗** — `agency-os/tenants/company-soulful-expression/core/BACKUP_AUTO_STATUS.json`：`last_failure` = **2026-08-24 Failed**（最新一次）；`backup_history_since_last_sync` 近 10 次為 F/S/F/F/S/S/S/F/S/F = **5 敗**。**這不是偵測器問題** —— Phase 4 Check 3 今天已經在正確地叫（3B「距上次成功 9 天」+ 3C「最新一次失敗」），是備份本身壞了。**為何現在才浮出**：2026-08-07 起 Check 3 被一個已知假警報（restore drill overdue）綁在同一行，真訊號連續四週被略過（根因與修法見 WORKLOG 2026-08-26）。**要查什麼**：WPvivid → Google Drive 的 OAuth token / 配額；歷史上 `wpvivid-c9f8ea1a50284`（2026-05-25）是 Drive API 403 rateLimitExceeded 自行恢復，但這次是**間歇性反覆**不是單次。`reason` 欄多半只有 `"Failed,"` 空字串 → 需上 EU MainWP DB 或 WPvivid 端看完整錯誤。**為何是死線項**：hosting 2026-11-12 到期，搬站的還原點就靠這條鏈。
+- [ ] **【2026-08-26 開出｜營運｜搬站前必處理】soulful 週備份近 10 次有 5 次失敗，最新一次就是失敗** — `agency-os/tenants/company-soulful-expression/core/BACKUP_AUTO_STATUS.json`：`last_failure` = **2026-08-24 Failed**（最新一次）；`backup_history_since_last_sync` 近 10 次為 F/S/F/F/S/S/S/F/S/F = **5 敗**。
+  - **這不是偵測器問題**
+  - Phase 4 Check 3 今天已經在正確地叫（3B「距上次成功 9 天」+ 3C「最新一次失敗」），是備份本身壞了。
+  - **為何現在才浮出**：2026-08-07 起 Check 3 被一個已知假警報（restore drill overdue）綁在同一行，真訊號連續四週被略過（根因與修法見 WORKLOG 2026-08-26）。
+  - **要查什麼**：WPvivid → Google Drive 的 OAuth token / 配額；歷史上 `wpvivid-c9f8ea1a50284`（2026-05-25）是 Drive API 403 rateLimitExceeded 自行恢復，但這次是**間歇性反覆**不是單次。`reason` 欄多半只有 `"Failed,"` 空字串 → 需上 EU MainWP DB 或 WPvivid 端看完整錯誤。
+  - **為何是死線項**：hosting 2026-11-12 到期，搬站的還原點就靠這條鏈。
 
-- [ ] **【2026-08-26 開出｜治理｜機械閘誤判】`verify-gate-commit.js` 對 Bash 指令做純文字比對，heredoc 內容含 `git commit` 就被 BLOCK** — 本 session 撰寫 routine prompt（內文本身就含 `git commit -m ...` 這一行指令範例）時，`python3 - <<'EOF'` 的 heredoc **內容**被當成「要執行 git commit」而 exit-2 擋下。閘沒有區分「要執行的指令」與「被當作資料寫入檔案的內容」。**影響**：任何要把 git 指令寫進文件/prompt/runbook 的工作都會被誤擋，代理只能繞路（改用 Write tool 落檔再 splice），繞路本身沒被記錄 → 閘的實際攔截率與帳面不符。**修法方向**：比對前先剝除 heredoc 區塊與引號字串，或只看指令的第一個 token。**不要**用「加白名單」了事 —— 那是逐點消音。SSOT：`mcp/claude-userlevel/hooks/rules/verify-gate-commit.js`。
+- [ ] **【2026-08-26 開出｜治理｜機械閘誤判】`verify-gate-commit.js` 對 Bash 指令做純文字比對，heredoc 內容含 `git commit` 就被 BLOCK** — 本 session 撰寫 routine prompt（內文本身就含 `git commit -m ...` 這一行指令範例）時，`python3 - <<'EOF'` 的 heredoc **內容**被當成「要執行 git commit」而 exit-2 擋下。閘沒有區分「要執行的指令」與「被當作資料寫入檔案的內容」。
+  - **影響**：任何要把 git 指令寫進文件/prompt/runbook 的工作都會被誤擋，代理只能繞路（改用 Write tool 落檔再 splice），繞路本身沒被記錄 → 閘的實際攔截率與帳面不符。
+  - **修法方向**：比對前先剝除 heredoc 區塊與引號字串，或只看指令的第一個 token。
+  - **不要**用「加白名單」了事
+  - 那是逐點消音。SSOT：`mcp/claude-userlevel/hooks/rules/verify-gate-commit.js`。
 
-- [ ] **【2026-08-26 開出｜治理｜來源未定位】某個 session 用廣域 `git add` 一次 commit 1247 檔並 push，把別的 session 未驗證的工作掃進 main** — `2dbe858a`（2026-08-26 14:08，主題是報告保留政策）的檔案清單含 **1247 個檔**，其中包含另一個 session 當時尚未通過 `/verify-recent` 的 `scripts/phase4-checks.py`、4 份 `BACKUP_RESTORE_PROOF.md`，以及一顆 `scripts/__pycache__/*.pyc` 編譯產物。**這正是 `.gitignore:170-176` 註解已記載過的失效樣態**（「auto-checkpoint 的 `git add -A` 把產物 commit 進 SSOT」），而今早 `680db6c6`/`7251d14d`/`c63bdc5c` 才剛移除三個自動 commit 呼叫點 —— 所以來源**不是**那三個，是別的東西。**要查**：哪支腳本／哪個流程仍在做廣域 add（`ao-close.ps1` 的 `git add -A`？`/checkpoint`？還是代理手打？）。**已處置**：`.pyc` 已 `git rm --cached` + `.gitignore` 補 `__pycache__/` `*.py[cod]`。**未處置**：commit message 與內容不符這件事對那幾個檔已無法補救（不 revert —— `2dbe858a` 同時含一個完整合理的功能）。**為何要修**：commit message 是本 repo 的 30 秒故障手冊，1247 檔一鍋端會讓那個性質整批失效。
+- [ ] **【2026-08-26 開出｜治理｜來源未定位】某個 session 用廣域 `git add` 一次 commit 1247 檔並 push，把別的 session 未驗證的工作掃進 main** — `2dbe858a`（2026-08-26 14:08，主題是報告保留政策）的檔案清單含 **1247 個檔**，其中包含另一個 session 當時尚未通過 `/verify-recent` 的 `scripts/phase4-checks.py`、4 份 `BACKUP_RESTORE_PROOF.md`，以及一顆 `scripts/__pycache__/*.pyc` 編譯產物。
+  - **這正是 `.gitignore:170-176` 註解已記載過的失效樣態**（「auto-checkpoint 的 `git add -A` 把產物 commit 進 SSOT」），而今早 `680db6c6`/`7251d14d`/`c63bdc5c` 才剛移除三個自動 commit 呼叫點
+  - 所以來源**不是**那三個，是別的東西。
+  - **要查**：哪支腳本／哪個流程仍在做廣域 add（`ao-close.ps1` 的 `git add -A`？`/checkpoint`？還是代理手打？）。
+  - **已處置**：`.pyc` 已 `git rm --cached` + `.gitignore` 補 `__pycache__/` `*.py[cod]`。
+  - **未處置**：commit message 與內容不符這件事對那幾個檔已無法補救（不 revert
+  - `2dbe858a` 同時含一個完整合理的功能）。
+  - **為何要修**：commit message 是本 repo 的 30 秒故障手冊，1247 檔一鍋端會讓那個性質整批失效。
 
-- [ ] **【2026-08-26 開出｜小｜人體工學，非安全機制】`record-restore-drill` 一鍵記錄還原演練** — 目前記錄一次演練要手寫兩處（frontmatter `restore_drills` + 敘述段落）。**安全性已由對帳掃描保證**（`phase4-checks.py` 的 3A2：敘述有 `| Drill date | ... |` 而 frontmatter 沒有 → WARN 並附可貼上的 YAML），所以這條**只是省事，不是補洞**，優先度低。做的話：一支腳本吃 `--tenant/--date/--result/--note`，同時寫兩處；錨點 `## Restore Drill Record` 找不到就 exit 非 0，不得靜默寫到檔尾。**刻意在 2026-08-26 那批從方案裡砍掉**，理由是範圍膨脹（見 WORKLOG 同日 finding #7）。
+- [ ] **【2026-08-26 開出｜小｜人體工學，非安全機制】`record-restore-drill` 一鍵記錄還原演練** — 目前記錄一次演練要手寫兩處（frontmatter `restore_drills` + 敘述段落）。
+  - **安全性已由對帳掃描保證**（`phase4-checks.py` 的 3A2：敘述有 `| Drill date | ... |` 而 frontmatter 沒有 → WARN 並附可貼上的 YAML），所以這條**只是省事，不是補洞**，優先度低。做的話：一支腳本吃 `--tenant/--date/--result/--note`，同時寫兩處；錨點 `## Restore Drill Record` 找不到就 exit 非 0，不得靜默寫到檔尾。
+  - **刻意在 2026-08-26 那批從方案裡砍掉**，理由是範圍膨脹（見 WORKLOG 同日 finding #7）。
 
 > 多半是「偵測器在說謊」或「閘沒接上」。修它們是為了讓其他事情的驗證可信。
 
 
-- [ ] **【2026-08-25 開出｜小｜文件一致性】Soulful staging「abandon」決策未傳播到 3 份仍在宣告它的文件** — 2026-08-16 已決議不在即將退場的 Hostinger 上建 staging，`ENVIRONMENT_REGISTRY.md` / `02_EXECUTION_PLAN.md` 均已加刪除線，但下列**仍以肯定語氣宣告要建 staging**，冷啟動的代理或操作者照著做就會白工：① `docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md:141`（「Canonical staging URL … https://staging.soulfulexpression.org/」）② `docs/operations/PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md:33,35`（§Day 2「建立 staging 子網域」未標作廢）③ `tenants/company-soulful-expression/projects/2026-011-existing-site-handover-soulful/DAY2_STAGING_OPERATOR_GUIDE.md:14,33`（整份的「目標」就是建那個子網域）。**注意**：2026-08-16 WORKLOG 聲稱「命中 5 份 soulful 文件全部處理」，本輪 grep 證明**未涵蓋這 3 份** —— 屬「聲稱已修但沒修」樣態，故修法要連同**當初那個 grep 的範圍**一起檢討（為何 `staging.soulfulexpression` 掃不到 DAY2 guide）。**DoD**：三份各自加刪除線或 ⛔ 作廢註記並指向搬站主線；`grep -rn "staging\.soulfulexpression" agency-os/ --include=*.md | grep -v "~~"` 僅剩 `SITES_INDEX.md:13` 通用規則說明。
+- [ ] **【2026-08-25 開出｜小｜文件一致性】Soulful staging「abandon」決策未傳播到 3 份仍在宣告它的文件** — 2026-08-16 已決議不在即將退場的 Hostinger 上建 staging，`ENVIRONMENT_REGISTRY.md` / `02_EXECUTION_PLAN.md` 均已加刪除線，但下列**仍以肯定語氣宣告要建 staging**，冷啟動的代理或操作者照著做就會白工：
+  - ① `docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md:141`（「Canonical staging URL … https://staging.soulfulexpression.org/」）
+  - ② `docs/operations/PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md:33,35`（§Day 2「建立 staging 子網域」未標作廢）
+  - ③ `tenants/company-soulful-expression/projects/2026-011-existing-site-handover-soulful/DAY2_STAGING_OPERATOR_GUIDE.md:14,33`（整份的「目標」就是建那個子網域）。
+  - **注意**：2026-08-16 WORKLOG 聲稱「命中 5 份 soulful 文件全部處理」，本輪 grep 證明**未涵蓋這 3 份**
+  - 屬「聲稱已修但沒修」樣態，故修法要連同**當初那個 grep 的範圍**一起檢討（為何 `staging.soulfulexpression` 掃不到 DAY2 guide）。
+  - **DoD**：三份各自加刪除線或 ⛔ 作廢註記並指向搬站主線；`grep -rn "staging\.soulfulexpression" agency-os/ --include=*.md | grep -v "~~"` 僅剩 `SITES_INDEX.md:13` 通用規則說明。
 
-- [ ] **【2026-08-25 開出】`ao-resume-last.txt` 錨點卡在 2026-06-12，AO-CLOSE 視窗計算長期失真** — `agency-os/.agency-state/ao-resume-last.txt` 實測值 `2026-06-12T05:27:33.6508893Z`，距今 2.5 個月未推進；`ao-close-prev.txt`=`2026-08-24T12:13:10Z`、`ao-close-last.txt`=`2026-08-24T12:14:06Z` 兩者只差 56 秒（同日兩次 close 嘗試）。後果：`.claude/commands/ao-close.md` 要求存檔涵蓋「上次 AO-RESUME → 本次 AO-CLOSE」，但依錨點算出的視窗是 6/12→今天，與實際工作區間對不上，**逼得每次收工都要手選「真實區間」繞過**（2026-08-24-2014.md 就是這樣寫的，敘述誠實但錨點沒修）。CONVERSATION_MEMORY 2026-07-02 已記過同一現象，**未修**。**根因待查**：`ao-resume.ps1` 只在「寫出真實 AO-RESUME 存檔」時推進 stamp，而 hook 自動觸發那輪印的是 `AO-RESUME stamp NOT advanced (auto-refresh / non-interactive)` —— 代理事後補寫存檔時沒有回頭推進錨點。**DoD**：確認推進條件、補上代理寫完 archive 後推進 stamp 的路徑（或改由 `verify-aoresume-archive.ps1` 帶動），並讓 AO-CLOSE 視窗不再需要人工手選。（2026-08-25 Codex round-5 覆審抓到，經讀三個錨點檔實測確認）
+- [ ] **【2026-08-25 開出】`ao-resume-last.txt` 錨點卡在 2026-06-12，AO-CLOSE 視窗計算長期失真** — `agency-os/.agency-state/ao-resume-last.txt` 實測值 `2026-06-12T05:27:33.6508893Z`，距今 2.5 個月未推進；`ao-close-prev.txt`=`2026-08-24T12:13:10Z`、`ao-close-last.txt`=`2026-08-24T12:14:06Z` 兩者只差 56 秒（同日兩次 close 嘗試）。
+  - 後果：`.claude/commands/ao-close.md` 要求存檔涵蓋「上次 AO-RESUME → 本次 AO-CLOSE」，但依錨點算出的視窗是 6/12→今天，與實際工作區間對不上，**逼得每次收工都要手選「真實區間」繞過**（2026-08-24-2014.md 就是這樣寫的，敘述誠實但錨點沒修）。CONVERSATION_MEMORY 2026-07-02 已記過同一現象，**未修**。
+  - **根因待查**：`ao-resume.ps1` 只在「寫出真實 AO-RESUME 存檔」時推進 stamp，而 hook 自動觸發那輪印的是 `AO-RESUME stamp NOT advanced (auto-refresh / non-interactive)`
+  - 代理事後補寫存檔時沒有回頭推進錨點。
+  - **DoD**：確認推進條件、補上代理寫完 archive 後推進 stamp 的路徑（或改由 `verify-aoresume-archive.ps1` 帶動），並讓 AO-CLOSE 視窗不再需要人工手選。（2026-08-25 Codex round-5 覆審抓到，經讀三個錨點檔實測確認）
 
-- [ ] **【2026-08-24 開出】CHANGE_IMPACT_MATRIX 漂移偵測腳本首輪 7 個 WARN 待人工確認** — `scripts/check-change-impact-matrix-drift.ps1` 2026-08-24 首次接進月度巡檢（`ao-resume.ps1` monthly check #5），真實跑出 7 對 WARN（全部是 `docs/operations/cursor-enterprise-rules-index.md` / `docs/operations/cursor-mcp-and-plugin-inventory.md` / `../docs/spec/raw/Cursor  Rules for AI/README-部署說明.md` 宣告的 impacted，vs `.cursor/rules/64-architecture-mcp-routing.mdc` / `65-build-standards-data-state.mdc` / `66-skills-observability-protocol.mdc` 三個 `.mdc` 檔案，4 月未更新但主文件近期持續改動，drift 127-141 天）。這是純資訊性快照非 build gate，**待下次月度巡檢時人工判斷**這三個 `.mdc` 是否真的過期需要更新，或只是穩定未變不需動。報告：`agency-os/reports/governance/impact-matrix-drift-LATEST.md`。
+- [ ] **【2026-08-24 開出】CHANGE_IMPACT_MATRIX 漂移偵測腳本首輪 7 個 WARN 待人工確認** — `scripts/check-change-impact-matrix-drift.ps1` 2026-08-24 首次接進月度巡檢（`ao-resume.ps1` monthly check #5），真實跑出 7 對 WARN（全部是 `docs/operations/cursor-enterprise-rules-index.md` / `docs/operations/cursor-mcp-and-plugin-inventory.md` / `../docs/spec/raw/Cursor  Rules for AI/README-部署說明.md` 宣告的 impacted，vs `.cursor/rules/64-architecture-mcp-routing.mdc` / `65-build-standards-data-state.mdc` / `66-skills-observability-protocol.mdc` 三個 `.mdc` 檔案，4 月未更新但主文件近期持續改動，drift 127-141 天）。
+  - 這是純資訊性快照非 build gate，**待下次月度巡檢時人工判斷**這三個 `.mdc` 是否真的過期需要更新，或只是穩定未變不需動。報告：`agency-os/reports/governance/impact-matrix-drift-LATEST.md`。
 
-- [ ] **【2026-08-25 開出｜小】`scripts/rebuild-content-studio-4cards.ps1:185` CP950 parse-break** — `audit-cp950-traps.ps1 -ParseBreakOnly` 持續回報唯一一筆 drift：非 ASCII 無 BOM，在 CP950 下 parse 出 46 個錯誤（等於這支腳本在預設 console 編碼下**根本跑不起來**）。既有問題非新引入，本 session 兩度出現在掃描結果中。**修法**（該檔已列出）：裝飾性字元 ASCII 化，或若 CJK 是資料就加 UTF-8 BOM。掃描 166 支中其餘 165 支皆 clean。
+- [ ] **【2026-08-25 開出｜小】`scripts/rebuild-content-studio-4cards.ps1:185` CP950 parse-break** — `audit-cp950-traps.ps1 -ParseBreakOnly` 持續回報唯一一筆 drift：非 ASCII 無 BOM，在 CP950 下 parse 出 46 個錯誤（等於這支腳本在預設 console 編碼下**根本跑不起來**）。既有問題非新引入，本 session 兩度出現在掃描結果中。
+  - **修法**（該檔已列出）：裝飾性字元 ASCII 化，或若 CJK 是資料就加 UTF-8 BOM。掃描 166 支中其餘 165 支皆 clean。
 
-- [ ] **【2026-08-25 開出｜小｜非阻塞】CP950 backlog 其餘 84 個 site：套用 ao-close 那套分類法** — 2026-08-25 關掉 27 個（`ao-resume.ps1` 17／`lib/git-safe-ops.ps1` 4／`ao-close.ps1` 6），repo-wide drift 111→84。**`ao-close.ps1` 已無未知**：剩餘 17 個逐項列了消費端與判定在 `AUDIT_REGISTRY.md`。**這條要做的是把同一套判準套到其餘檔案**（`check-three-way-sync.ps1` 16、`git-align-main-aoresume-feature.ps1` 9、`git-audit-tracked-remote.ps1` 7 等）。判準：捕獲**值**若流入任何 gate／條件／迴圈／寫入 → 必包；只進 `Out-Host`/`Out-Null` → 可留白但須在 registry 寫明消費端。**教訓（別重蹈）**：原 registry 用「看起來像 ASCII metadata」一句話帶過 23 個 site，藏了一個閘級 bypass 三個月；也別反過來 —— `ao-close.ps1:318` 跟出事的 `:203` 是同一支 `git log %s`，驗證後並非同型。兩個方向都要驗。**觸發**：`powershell -File scripts/audit-cp950-traps.ps1`。
+- [ ] **【2026-08-25 開出｜小｜非阻塞】CP950 backlog 其餘 84 個 site：套用 ao-close 那套分類法** — 2026-08-25 關掉 27 個（`ao-resume.ps1` 17／`lib/git-safe-ops.ps1` 4／`ao-close.ps1` 6），repo-wide drift 111→84。
+  - **`ao-close.ps1` 已無未知**：剩餘 17 個逐項列了消費端與判定在 `AUDIT_REGISTRY.md`。
+  - **這條要做的是把同一套判準套到其餘檔案**（`check-three-way-sync.ps1` 16、`git-align-main-aoresume-feature.ps1` 9、`git-audit-tracked-remote.ps1` 7 等）。判準：捕獲**值**若流入任何 gate／條件／迴圈／寫入 → 必包；只進 `Out-Host`/`Out-Null` → 可留白但須在 registry 寫明消費端。
+  - **教訓（別重蹈）**：原 registry 用「看起來像 ASCII metadata」一句話帶過 23 個 site，藏了一個閘級 bypass 三個月；也別反過來
+  - `ao-close.ps1:318` 跟出事的 `:203` 是同一支 `git log %s`，驗證後並非同型。兩個方向都要驗。
+  - **觸發**：`powershell -File scripts/audit-cp950-traps.ps1`。
 
 - [ ] TASKS [x] 自動歸檔 + 重複行偵測閘（archive-completed-tasks.ps1，**R0 已批方案A**，照 packet 直接動工免重提案）→ handoffs/2026-06-11-1738-tomo-173818.md
 
@@ -264,18 +482,53 @@
 
 > 沒有外部時鐘。看起來最忙，但推遲的代價最小。
 
-- [ ] **【進行中｜Phase 1 ungated 全完成，剩 T10 gated】Cold Outreach Workbench — 冷開發完整鏈** — SSOT：[`agency-os/docs/cold_email/COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md`](docs/cold_email/COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md)（三份草稿已整合並 superseded）；實作排程：[`COLD_OUTREACH_PHASE1_BUILD_PLAN.md`](docs/cold_email/COLD_OUTREACH_PHASE1_BUILD_PLAN.md)（T1–T12 依賴排序）。**已拍板決策**：代操冷信用客戶 Gmail / 名單你幫找 / 訂閱制 / 不用 SES / schema prefix `co_`。**架構對齊**：org-tenant + **service-role RLS + ops-role RBAC**（已驗證現況 §B0.1，runtime 非 Clerk；賣的 per-login 隔離留 Phase 5）；暖層走既有 wp-bridge（+小擴充 FluentCRM contact/tag endpoint，非新建 connector）；暖信走客戶 FluentSMTP 或 Brevo free；self-host Supabase/Trigger.dev/n8n = $0；**Free-Plan Router + 客戶 BYO-key 乘數**為第一級設計（PART H）。**關鍵路徑**：T1 schema → T2 module 殼 → T4 Connector/Router/BYO-key → T5 Inbox → T6 AI scoring → T8 Message gen(Cold Gate) → T9 Review → T10 Gmail draft(⚠High，等 go-ahead)。**DoD**：操作者跑完「Service Profile→Inbox(dedup+suppression)→AI 評分→生冷信→審核→客戶 Gmail 草稿→follow-up」，全程 org-scoped、人工寄、不碰金流。**⚠️ 待補**：免費額度數字（PART H）需上線前以官方頁確認；驗證 workflow 撞 session limit 未跑完，可重置後補跑。 —— **進度（2026-06-23）**：✅ **T1 完成** — migration `0048_co_outreach_core`（12 表 + service-role RLS）已 **apply 到 EU prod Supabase 並驗證**（12 表 RLS 全開 + 12 policy + co_leads FK 正確 + 0 個 enabled-no-policy；`PSQL_EXIT=0`）；db-expert 審 pass（W1 BEGIN/COMMIT + W2 NOTIFY pgrst + N2 已套）。**✅ T2 完成**（`app/outreach/` 9 頁 + nav + canManageOutreach + 資料層；tsc 0）。**✅ T3 完成**（Service Profile CRUD route + 表單；tsc 0 + DB round-trip）。**✅ T4 完成**（Free-Plan Router + Quota Guard 純邏輯 + 15 vitest 全過 + connector metadata CRUD 含密鑰值防呆 + UI；tsc 0 + DB round-trip）。**✅ T5–T12 完成（2026-06-24）**：T5 Inbox（normalize/dedup/suppression+機械評分）、T6 deterministic scoring、T7 Leads+Approve、**密鑰骨幹 migration 0049 Supabase Vault**（`secret_put/get/delete`，已 apply EU prod + round-trip + anon 提權測試）、T8 Message 生成（Cold Gate+vault key+Gemini+lint）、T9 Review（approve，不自動寄）、T11 Follow-ups（Asia/Taipei 日期）、T12 Suppression。全程 tsc 0 + 37 vitest + critic Deep pass（密鑰骨幹 textbook-correct）+ 6 個 EU-prod DB round-trip。**Phase 1 ungated 全完成**。**唯一剩 T10 Gmail per-org OAuth = gated High-risk（另案，會重用 0049 vault）**。ops 待辦：續期 agency `GEMINI_API_KEY`（或靠 BYO client key）；leads/route.ts uuid-into-column 小修（critic pre-existing）。 **【狀態訂正 2026-08-25｜原標【未開始】為過期】實際進度**：T1 schema 已落（`lobster-factory/packages/db/migrations/0048_co_outreach_core.sql`）、T2–T9/T11/T12 已實作 —— `apps/next-admin/lib/outreach/`（`connectors/`、`scoring.ts`、`cold-gate.ts`、`normalize.ts`、`db.ts`、`ai-claude/ai-gemini/ai-openai.ts`）+ 7 條 API route（`app/api/outreach/{leads,inbox,messages,followups,suppression,connectors,service-profiles}`）+ UI `app/(shell)/outreach`。**唯一剩餘＝T10 Gmail per-org OAuth + 建草稿(n8n) + sender daily limit**（⚠️High auth/憑證，gated）。`memory/daily/` 自 2026-07-05 起即持續註記「Phase 1 ungated 全完成」，僅 TASKS 標籤未同步。**附帶待修**：`docs/cold_email/COLD_OUTREACH_PHASE1_BUILD_PLAN.md:5` 檔頭仍寫「狀態：未開始」，同批訂正。
+- [ ] **【進行中｜Phase 1 ungated 全完成，剩 T10 gated】Cold Outreach Workbench — 冷開發完整鏈** — SSOT：[`agency-os/docs/cold_email/COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md`](docs/cold_email/COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md)（三份草稿已整合並 superseded）；實作排程：[`COLD_OUTREACH_PHASE1_BUILD_PLAN.md`](docs/cold_email/COLD_OUTREACH_PHASE1_BUILD_PLAN.md)（T1–T12 依賴排序）。
+  - **已拍板決策**：代操冷信用客戶 Gmail / 名單你幫找 / 訂閱制 / 不用 SES / schema prefix `co_`。
+  - **架構對齊**：org-tenant + **service-role RLS + ops-role RBAC**（已驗證現況 §B0.1，runtime 非 Clerk；賣的 per-login 隔離留 Phase 5）；暖層走既有 wp-bridge（+小擴充 FluentCRM contact/tag endpoint，非新建 connector）；暖信走客戶 FluentSMTP 或 Brevo free；self-host Supabase/Trigger.dev/n8n = $0；**Free-Plan Router + 客戶 BYO-key 乘數**為第一級設計（PART H）。
+  - **關鍵路徑**：T1 schema → T2 module 殼 → T4 Connector/Router/BYO-key → T5 Inbox → T6 AI scoring → T8 Message gen(Cold Gate) → T9 Review → T10 Gmail draft(⚠High，等 go-ahead)。
+  - **DoD**：操作者跑完「Service Profile→Inbox(dedup+suppression)→AI 評分→生冷信→審核→客戶 Gmail 草稿→follow-up」，全程 org-scoped、人工寄、不碰金流。
+  - **⚠️ 待補**：免費額度數字（PART H）需上線前以官方頁確認；驗證 workflow 撞 session limit 未跑完，可重置後補跑。
+  - **進度（2026-06-23）**：✅ **T1 完成** — migration `0048_co_outreach_core`（12 表 + service-role RLS）已 **apply 到 EU prod Supabase 並驗證**（12 表 RLS 全開 + 12 policy + co_leads FK 正確 + 0 個 enabled-no-policy；`PSQL_EXIT=0`）；db-expert 審 pass（W1 BEGIN/COMMIT + W2 NOTIFY pgrst + N2 已套）。
+  - **✅ T2 完成**（`app/outreach/` 9 頁 + nav + canManageOutreach + 資料層；tsc 0）。
+  - **✅ T3 完成**（Service Profile CRUD route + 表單；tsc 0 + DB round-trip）。
+  - **✅ T4 完成**（Free-Plan Router + Quota Guard 純邏輯 + 15 vitest 全過 + connector metadata CRUD 含密鑰值防呆 + UI；tsc 0 + DB round-trip）。
+  - **✅ T5–T12 完成（2026-06-24）**：T5 Inbox（normalize/dedup/suppression+機械評分）、T6 deterministic scoring、T7 Leads+Approve、**密鑰骨幹 migration 0049 Supabase Vault**（`secret_put/get/delete`，已 apply EU prod + round-trip + anon 提權測試）、T8 Message 生成（Cold Gate+vault key+Gemini+lint）、T9 Review（approve，不自動寄）、T11 Follow-ups（Asia/Taipei 日期）、T12 Suppression。全程 tsc 0 + 37 vitest + critic Deep pass（密鑰骨幹 textbook-correct）+ 6 個 EU-prod DB round-trip。
+  - **Phase 1 ungated 全完成**。
+  - **唯一剩 T10 Gmail per-org OAuth = gated High-risk（另案，會重用 0049 vault）**。ops 待辦：續期 agency `GEMINI_API_KEY`（或靠 BYO client key）；leads/route.ts uuid-into-column 小修（critic pre-existing）。 **【狀態訂正 2026-08-25｜原標【未開始】為過期】實際進度**：T1 schema 已落（`lobster-factory/packages/db/migrations/0048_co_outreach_core.sql`）、T2–T9/T11/T12 已實作
+  - `apps/next-admin/lib/outreach/`（`connectors/`、`scoring.ts`、`cold-gate.ts`、`normalize.ts`、`db.ts`、`ai-claude/ai-gemini/ai-openai.ts`）+ 7 條 API route（`app/api/outreach/{leads,inbox,messages,followups,suppression,connectors,service-profiles}`）+ UI `app/(shell)/outreach`。
+  - **唯一剩餘＝T10 Gmail per-org OAuth + 建草稿(n8n) + sender daily limit**（⚠️High auth/憑證，gated）。`memory/daily/` 自 2026-07-05 起即持續註記「Phase 1 ungated 全完成」，僅 TASKS 標籤未同步。
+  - **附帶待修**：`docs/cold_email/COLD_OUTREACH_PHASE1_BUILD_PLAN.md:5` 檔頭仍寫「狀態：未開始」，同批訂正。
 
-- [ ] **【進行中｜軟體先行·U0–U5 + widget U4 完成並 prod live，剩 U6 gated】全自動客服系統** — **執行 SSOT**：[`Customer_service_BUILD_PLAN.md`](docs/Customer_service/Customer_service_BUILD_PLAN.md)（單元 U0–U6/順序/進度/gate）；**設計 SSOT**：[`Customer_service_automation_plan.md`](docs/Customer_service/Customer_service_automation_plan.md)（v2.1）；附錄 `_competitive_research.md`（頂規競品證據）+ `_uiux_design.md`（清新自然 UX + CIS §2.6/2.7）。**建置原則**：軟體先行（U0–U5 現有機器 $0）、硬體後搬（U6 Chatwoot 搬大記憶體）。**進度**：✅ U0 資料地基（migration 0051 **已 apply EU prod**：8表/8RLS/8policy/RPC/pgvector live 驗證）+ ✅ **U1 cs-engine**（`lib/cs/` 13 檔；tsc 0 / vitest 35 / critic 2-High 修訖）+ ✅ **U2 CIS「品牌識別」tab**（client hub tab + cis route；tsc 0 / critic 0C0M）+ ✅ **U3 客服 tab + 頂層「客服」section**（cs-config route + /ops/cs + sidebar；critic 抓到 kill-switch inert→接進 engine 修訖）+ ✅ **U5 eval/護欄 harness**（lib/cs/eval + route + 7 測；critic 抓到 eval 用 lossy 子集→改跑真實 decideAnswerAction）+ 🟡 **U4 headless 清新自然 widget 程式碼完成**（lib/cs-widget 6 檔 + demo 頁；tsc 0/vitest 49/critic XSS-clean+4 Major 修；transport 抽象 Mock/Chatwoot）；⏭ **僅剩 U6 Chatwoot 載體 — gate 在「買二手 dedicated 機」**（決策已定 2026-06-27 runbook §0b：FSN i7-7700/64GB/2×512SSD/~€48.70）→ RAID 1 → Chatwoot greenfield 先上 → 接線（建 `app/api/cs/chatwoot-webhook` 呼叫已存在的 `handleInbound`、MockTransport 換 ChatwootTransport）→ EU 服務照 runbook §5 逐台搬 → 退 SG+EU 雲端。**8 月冷啟動接手包**：[`handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md`](handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md)；搬家 SSOT：[`runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`](../runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md)。**已拍板決策（§0 D1–D12）**：雙軸漸進 L1→L2 × A1→A2（money/身分 code 硬閘永不自動）/ 三維一起建（自用+客戶自用+代操，自家 Account#0 先金絲雀）/ OpenAI embeddings 可插拔 / 商業軌主幹+個人軌隔離 / **獨立 Chatwoot VPS** / Chatwoot 擁有對話 / **自建 Claude+RAG+agentic（非 Captain）** / Pattern A AgentBot + Community 版 / **headless 自建 widget（清新自然）** / **CIS 重用既有 `brandColors`+`BrandVoiceProfile`**。**IA 落點（已驗證 `SidebarNav.tsx`）**：per-client hub `/ops/clients/[slug]` 加「品牌識別(CIS)」tab + 「客服」tab（吃掉散在設定/內容的品牌東西）；跨客戶營運開**頂層 sidebar section「客服」**（仿 Cold Outreach）；客戶自用 Phase 5 重用同元件不重造。**Phase 0 DoD**：① ✅ 機器/區域/成本拍板（改為**買二手 dedicated**，FSN，runbook §0b，2026-06-27）② Anthropic+OpenAI DPA 到位 ③ Phoenix/Langfuse tracing 選址 ④ 域名/備份策略。**⚠️ 租 VPS = High risk，等操作者明示 go-ahead 才執行 provision。** 後續 Phase 1–9（載體+副駕→RAG+eval→唯讀行動→受閘寫入→Meta→LINE→產品化→進階→個人軌）見主計畫 §11。 **【狀態訂正 2026-08-25｜原標「U0 完成」為過期】**WORKLOG-archive/2026-06.md 2026-06-27 `feat(cs)`：「規劃→建置 U0–U5→操作 UI→prod 上線 + live 實測 ✅（U6 Chatwoot 待買機）」。本條標籤停在 U0，實際 U0–U5 + widget U4 均已上 prod 並 live 驗；剩餘全部集中在 U6，見下方獨立 gated 條目。
+- [ ] **【進行中｜軟體先行·U0–U5 + widget U4 完成並 prod live，剩 U6 gated】全自動客服系統**
+  - **執行 SSOT**：[`Customer_service_BUILD_PLAN.md`](docs/Customer_service/Customer_service_BUILD_PLAN.md)（單元 U0–U6/順序/進度/gate）；
+  - **設計 SSOT**：[`Customer_service_automation_plan.md`](docs/Customer_service/Customer_service_automation_plan.md)（v2.1）；附錄 `_competitive_research.md`（頂規競品證據）+ `_uiux_design.md`（清新自然 UX + CIS §2.6/2.7）。
+  - **建置原則**：軟體先行（U0–U5 現有機器 $0）、硬體後搬（U6 Chatwoot 搬大記憶體）。
+  - **進度**：✅ U0 資料地基（migration 0051
+  - **已 apply EU prod**：8表/8RLS/8policy/RPC/pgvector live 驗證）+ ✅ **U1 cs-engine**（`lib/cs/` 13 檔；tsc 0 / vitest 35 / critic 2-High 修訖）+ ✅ **U2 CIS「品牌識別」tab**（client hub tab + cis route；tsc 0 / critic 0C0M）+ ✅ **U3 客服 tab + 頂層「客服」section**（cs-config route + /ops/cs + sidebar；critic 抓到 kill-switch inert→接進 engine 修訖）+ ✅ **U5 eval/護欄 harness**（lib/cs/eval + route + 7 測；critic 抓到 eval 用 lossy 子集→改跑真實 decideAnswerAction）+ 🟡 **U4 headless 清新自然 widget 程式碼完成**（lib/cs-widget 6 檔 + demo 頁；tsc 0/vitest 49/critic XSS-clean+4 Major 修；transport 抽象 Mock/Chatwoot）；⏭ **僅剩 U6 Chatwoot 載體 — gate 在「買二手 dedicated 機」**（決策已定 2026-06-27 runbook §0b：FSN i7-7700/64GB/2×512SSD/~€48.70）→ RAID 1 → Chatwoot greenfield 先上 → 接線（建 `app/api/cs/chatwoot-webhook` 呼叫已存在的 `handleInbound`、MockTransport 換 ChatwootTransport）→ EU 服務照 runbook §5 逐台搬 → 退 SG+EU 雲端。
+  - **8 月冷啟動接手包**：[`handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md`](handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md)；搬家 SSOT：[`runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`](../runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md)。
+  - **已拍板決策（§0 D1–D12）**：雙軸漸進 L1→L2 × A1→A2（money/身分 code 硬閘永不自動）/ 三維一起建（自用+客戶自用+代操，自家 Account#0 先金絲雀）/ OpenAI embeddings 可插拔 / 商業軌主幹+個人軌隔離 / **獨立 Chatwoot VPS** / Chatwoot 擁有對話 / **自建 Claude+RAG+agentic（非 Captain）** / Pattern A AgentBot + Community 版 / **headless 自建 widget（清新自然）** / **CIS 重用既有 `brandColors`+`BrandVoiceProfile`**。
+  - **IA 落點（已驗證 `SidebarNav.tsx`）**：per-client hub `/ops/clients/[slug]` 加「品牌識別(CIS)」tab + 「客服」tab（吃掉散在設定/內容的品牌東西）；跨客戶營運開**頂層 sidebar section「客服」**（仿 Cold Outreach）；客戶自用 Phase 5 重用同元件不重造。
+  - **Phase 0 DoD**：
+    - ① ✅ 機器/區域/成本拍板（改為**買二手 dedicated**，FSN，runbook §0b，2026-06-27）
+  - ② Anthropic+OpenAI DPA 到位
+  - ③ Phoenix/Langfuse tracing 選址
+  - ④ 域名/備份策略。
+  - **⚠️ 租 VPS = High risk，等操作者明示 go-ahead 才執行 provision。
+  - ** 後續 Phase 1–9（載體+副駕→RAG+eval→唯讀行動→受閘寫入→Meta→LINE→產品化→進階→個人軌）見主計畫 §11。 **【狀態訂正 2026-08-25｜原標「U0 完成」為過期】**WORKLOG-archive/2026-06.md 2026-06-27 `feat(cs)`：「規劃→建置 U0–U5→操作 UI→prod 上線 + live 實測 ✅（U6 Chatwoot 待買機）」。本條標籤停在 U0，實際 U0–U5 + widget U4 均已上 prod 並 live 驗；剩餘全部集中在 U6，見下方獨立 gated 條目。
 
-- [ ] **【進行中｜POD 一鍵自動上架】設計圖 → Woo + Printful 多款多色全自動** — 計畫 SSOT = `lobster-factory/docs/PLAN-pod-one-click-auto-publish-design-to-woo-printful.md`（5 階段）。目標：操作者**只做設計圖**、一鍵自動 合成商品圖(白背/2模特/平拍,分長短袖,<100KB) + 建 3 款 Woo 草稿(Gildan 2400 **長袖** id57 / Stanley-Stella STTU169 id456 / Gildan 5000 id438，各 4 色 × S-2XL) + Printful native 建品綁設計稿。**對接用 hex(color_code) 不用顏色名**（同名 Sport Grey 跨款 hex 不同）。**紅線**：止於 WP draft，開賣/扣款人工（守 A2 金流紅線）。**現況**：研究完成（三款 Printful ID + 12 色 hex 已實機查證）、今日選圖器已修（WORKLOG 2026-06-20）。
+- [ ] **【進行中｜POD 一鍵自動上架】設計圖 → Woo + Printful 多款多色全自動** — 計畫 SSOT = `lobster-factory/docs/PLAN-pod-one-click-auto-publish-design-to-woo-printful.md`（5 階段）。目標：操作者**只做設計圖**、一鍵自動 合成商品圖(白背/2模特/平拍,分長短袖,<100KB) + 建 3 款 Woo 草稿(Gildan 2400 **長袖** id57 / Stanley-Stella STTU169 id456 / Gildan 5000 id438，各 4 色 × S-2XL) + Printful native 建品綁設計稿。
+  - **對接用 hex(color_code) 不用顏色名**（同名 Sport Grey 跨款 hex 不同）。
+  - **紅線**：止於 WP draft，開賣/扣款人工（守 A2 金流紅線）。
+  - **現況**：研究完成（三款 Printful ID + 12 色 hex 已實機查證）、今日選圖器已修（WORKLOG 2026-06-20）。
   - **Phase 0** ✅ 上線（c3beb87c）：`pod-catalog-config.ts`（3 款 × 4 色 hex SSOT）— REALTEST Printful v2 API 12/12 colours resolve
   - **Phase 1** ✅ 上線（c3beb87c）：Printful **hex bind**（`getCatalogVariants` v2 雙比對 + `pfcreate` 多款 + `pod-product` 多色 + PublishWizard 選款下拉）— REALTEST hex bind 3 models × 4 hex × 5 sizes = 20/20
   - **Phase 2** ✅ 驗證 + 部署（a383ed73）：`batch-mockup.ts`（4 specs：白背+2模特+裝飾平拍，分長短袖）— vitest 5/5
   - **Phase 3** ✅ 驗證 + 部署（a383ed73）：`runAll` 批次合成串接（`genMockup` generate→存 designs + gallery white-bg=主圖 + all-fail fallback 設計圖原稿 + progress n/4）— critic Low 0c/0M、npm test 426 passed
   - **Phase 4**（剩）：真機端到端 — browser 跑 runAll 真生成驗 pipeline + **AI 圖品質操作者 review**（模特手/臉，plan §7 需人判斷）+ P4 試單（Printful 履約解析正確 variant + 設計稿）
 
-- [ ] **【進行中｜內容引擎積木化】搜尋積木 registry 已 live，剩來源/UI/第二批** — ✅ **已完成並部署（2026-06-16，commit `e336d5da`）**：後端積木註冊骨架 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/content/blocks/registry.ts`（`register/byKind/listAll/geoMatch` + `ContentBlock` 契約，前端 `AB.registerBlock` 後端鏡像）+ 搜尋家族 5 source 自註冊 `lib/content/trending-sources.ts`（google-news/reddit/ptt/perplexity/env-custom-rss）+ 契約 SSOT `lib/content/blocks/README.md`（修好 `public/vector-editor.html:902` 斷裂參照）。`app/api/content/trending/route.ts` 改走 `runTrending()`=`byKind("search")`。驗證：tsc 0 + critic Deep 0C/0M + node registry 語意斷言 + SG compiled bundle 含 `search/perplexity`/`CONTENT_TRENDING_FEEDS` + 容器 `PERPLEXITY_API_KEY` SET(53)=Perplexity 積木啟用。**剩餘未做**：
+- [ ] **【進行中｜內容引擎積木化】搜尋積木 registry 已 live，剩來源/UI/第二批** — ✅ **已完成並部署（2026-06-16，commit `e336d5da`）**：後端積木註冊骨架 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/content/blocks/registry.ts`（`register/byKind/listAll/geoMatch` + `ContentBlock` 契約，前端 `AB.registerBlock` 後端鏡像）+ 搜尋家族 5 source 自註冊 `lib/content/trending-sources.ts`（google-news/reddit/ptt/perplexity/env-custom-rss）+ 契約 SSOT `lib/content/blocks/README.md`（修好 `public/vector-editor.html:902` 斷裂參照）。
+  - `app/api/content/trending/route.ts` 改走 `runTrending()`=`byKind("search")`。驗證：tsc 0 + critic Deep 0C/0M + node registry 語意斷言 + SG compiled bundle 含 `search/perplexity`/`CONTENT_TRENDING_FEEDS` + 容器 `PERPLEXITY_API_KEY` SET(53)=Perplexity 積木啟用。
+  - **剩餘未做**：
   1. **RSS / Inoreader 實際來源未加**：引擎已支援任意 RSS/Atom（`rssSearchBlock` + `CONTENT_TRENDING_FEEDS` env），但**目前 env 空、零 feed 配置**；Inoreader 全 repo+vault=0（`grep -i inoreader` no match；`user-env.ps1` 無 key）。**最快路徑（零碼零部署）**：取使用者 Inoreader 資料夾/標籤**公開 RSS URL** + 其他 RSS URL → 寫進 SG `CONTENT_TRENDING_FEEDS` → 重啟 next-admin。**OAuth 路徑**（folder/tag 同步、已讀狀態）需註冊 app + `INOREADER_APP_ID/KEY` + OAuth flow（目前全空，較大工）。**待使用者給 feed URL 或選 OAuth**。
   2. **來源管理 UI（可增刪 visible）+ 修寫死提示字**：前端提示 `ContentStudio.tsx:1112` 仍寫死「（Google News / Reddit / PTT）」未含 Perplexity/registry → 使用者「看起來跟之前一樣」的根因。做法：加 `type=sources`（後端 `listAll()`）→ 前端**動態列出實際註冊來源** + UI 加/刪 feed（durable=DB `content_sources` table，需 migration 先給 schema）。
   3. **第二批 block 註冊進 registry**（編排器零改、逐批可驗）：✅ `publish/wordpress`（P1）、✅ `article/generate`（P2，原稱 `article/claude`；core=`lib/content/article/generate-core.ts`，route 薄殼共用）、✅ `quality/check`（P3；core=`lib/content/quality/seo-check-core.ts`，route 薄殼共用；16 點 RankMath）；**剩** `video/pipeline`、其他 `quality/*`（抄襲/內鏈/FAQ/Alt/A-B）、`publish/youtube|postiz`。✅ **P4 headless 編排器接線完成**（`lib/content/pipeline.ts` `runContentPipeline()` 串 article→quality→publish→WP draft，逐階段 ok 短路 + article GENERATION marker 後驗；search 為上游 producer 不入迴圈）；44/44 REALTEST、tsc 0、critic PASS。**LIVE 端到端跑（真 token + 真寫客戶 WP draft）另需 go-ahead**。
@@ -285,7 +538,15 @@
 
 - [ ] **wp-bridge 續做 operation：featured image** / update-existing-post / product update+delete（v0.7.0 只做 product CREATE，其餘端點仍待補）。
 
-- [ ] **【POD Studio 自建動工】** plan=`.claude/plans/pod-studio-p2a-p4-execution-PLAN.md`；藍本=`lobster-factory/docs/POD_STUDIO_ROADMAP.md`。✅ ① 擬真合成驗證 PASS（nano-banana-2 白 ~95%/黑鎖色 ~90%，prompt 三鐵則進 plan §0）✅ 先決小修（REPLICATE token 回填 + vault doc drift）✅ ② **P2a 儲存層完成 2026-06-11**（`lib/storage/r2.ts`+route+My Designs 頁，REALTEST 全過，flag OFF **未部署**；deploy 時 SG 設 `POD_DESIGNS_ENABLED=true`+`POD_DESIGNS_DEFAULT_ORG_ID=2bf60452-…`）。✅ ③ P2b 生成器（facade+Studio 頁，fbc1b7b1）✅ ④ P2c 去背（851-labs，RGBA 驗證）✅ Printful 憑證落定（vault ×4；store 18314943 已綁 Woo — P2d 先決解除）。✅ ⑤ Mockup Studio（B9-S 雙模式+鎖色，REALTEST 目視 PASS）✅ ⑥ P2d PrintProvider（Woo 平台改道 sync API；讀路徑實測過）✅ ⑦ 一鍵上架鏈+Publish 頁（upscaler 誠實合約+Ed25519 client；兩輪部署 a4fd0e95 全上線）。**下一步 = link 寫路徑首驗（見【明日優先】packet）→ P3 上架定案（主站 Woo 已可用）→ P4 試單對帳**
+- [ ] **【POD Studio 自建動工】** plan=`.claude/plans/pod-studio-p2a-p4-execution-PLAN.md`；藍本=`lobster-factory/docs/POD_STUDIO_ROADMAP.md`。✅
+  - ① 擬真合成驗證 PASS（nano-banana-2 白 ~95%/黑鎖色 ~90%，prompt 三鐵則進 plan §0）✅ 先決小修（REPLICATE token 回填 + vault doc drift）✅
+  - ② **P2a 儲存層完成 2026-06-11**（`lib/storage/r2.ts`+route+My Designs 頁，REALTEST 全過，flag OFF **未部署**；deploy 時 SG 設 `POD_DESIGNS_ENABLED=true`+`POD_DESIGNS_DEFAULT_ORG_ID=2bf60452-…`）。✅
+  - ③ P2b 生成器（facade+Studio 頁，fbc1b7b1）✅
+  - ④ P2c 去背（851-labs，RGBA 驗證）✅ Printful 憑證落定（vault ×4；store 18314943 已綁 Woo — P2d 先決解除）。✅
+  - ⑤ Mockup Studio（B9-S 雙模式+鎖色，REALTEST 目視 PASS）✅
+  - ⑥ P2d PrintProvider（Woo 平台改道 sync API；讀路徑實測過）✅
+  - ⑦ 一鍵上架鏈+Publish 頁（upscaler 誠實合約+Ed25519 client；兩輪部署 a4fd0e95 全上線）。
+  - **下一步 = link 寫路徑首驗（見【明日優先】packet）→ P3 上架定案（主站 Woo 已可用）→ P4 試單對帳**
 
 - [ ] **【POD 服飾 Phase 1-4 後續｜2026-06-15 已部署 37dfba85】** 服飾 POD 全功能（忠實印刷檔 / Printful 多風格+真人模特 mockup+存圖庫 / 平拍真實 overlay 雙軌 / 台灣本地印刷檔 seam / AI 商品文案 SEO-GEO-AEO-RankMath）已 **live on app.aware-wave.com**（smoke 24 pass）。剩餘未做：
   1. **台灣印刷廠實際規格未確認** — 現用 DTG 業界預設（透明底 PNG/300DPI/4800px）。拿到廠商實際規格（檔案類型/解析度/尺寸/CMYK 與否）後更新 SSOT `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/studio/apparel-print-destinations.ts`。
@@ -331,28 +592,51 @@
 
 #### G. ▶️ 可直接做 — 基礎建設與客戶站
 
-- [ ] **【進行中｜app.aware-wave 一鍵架站總藍圖】MASTER PLAN = `docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`**（5 階段路線圖 SSOT）。✅ Stage 0 建站引擎閉環已驗（run 655197bf completed + curl 200，2026-06-06）。✅ **Stage 1 接通入口完成 2026-06-14**：trigger-build 403 修復（dual-path auth, 8b1d6d86）+ dispatcher kick fallback（TRIGGER_ACCESS_TOKEN, 000f068c）+ dispatch-action-run-schedule 部署（每分鐘 cron）。✅ **Stage 2 n8n 橋接完成 2026-07-03**（workflow `RbrHNu3BUEmpNWeT` active，e2e 驗過；剩 WP 端裝 Fluent Forms+建表單+webhook feed+FluentCRM）。✅ Stage 3 程式+migration 0055 均已套（剩前端報價頁）。🟡 **Stage 4 程式完成、idle 已驗（2026-07-03）**：開閘 = SG .env 三 flag + `HETZNER_STAGING_TOKEN`（vault 現無，需決定專用 token vs 主 token）+ 重啟 next-admin（High/billable，需明示 go-ahead）→ Stage 5 串接監控。
+- [ ] **【進行中｜app.aware-wave 一鍵架站總藍圖】MASTER PLAN = `docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`**（5 階段路線圖 SSOT）。✅ Stage 0 建站引擎閉環已驗（run 655197bf completed + curl 200，2026-06-06）。
+  - ✅ **Stage 1 接通入口完成 2026-06-14**：trigger-build 403 修復（dual-path auth, 8b1d6d86）+ dispatcher kick fallback（TRIGGER_ACCESS_TOKEN, 000f068c）+ dispatch-action-run-schedule 部署（每分鐘 cron）。
+  - ✅ **Stage 2 n8n 橋接完成 2026-07-03**（workflow `RbrHNu3BUEmpNWeT` active，e2e 驗過；剩 WP 端裝 Fluent Forms+建表單+webhook feed+FluentCRM）。✅ Stage 3 程式+migration 0055 均已套（剩前端報價頁）。
+  - 🟡 **Stage 4 程式完成、idle 已驗（2026-07-03）**：開閘 = SG .env 三 flag + `HETZNER_STAGING_TOKEN`（vault 現無，需決定專用 token vs 主 token）+ 重啟 next-admin（High/billable，需明示 go-ahead）→ Stage 5 串接監控。
 
-- [ ] **既有站接手（Soulful Expression Art Therapy）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；**Day 2 書面** staging canonical URL 已入 registry／SITE_PROFILE／`02_EXECUTION_PLAN`。**下一步：**Day 1 Runbook §1.1–1.3（操作者登入）+ **`TASKS`**「Day 2 實機驗收」。 **【下一步訂正 2026-08-25】原「下一步：Day 1 §1.1–1.3 + Day 2 實機驗收」已部分作廢** —— Day 2 staging 於 2026-08-16 決議 **abandon**（hosting 2026-11-12 到期，不在退場主機上建 staging；`ENVIRONMENT_REGISTRY.md` 該列已加刪除線）。**現行主線＝搬站**：見本檔「Soulful 網站搬離 Hostinger」與「機器買到後的接手點」兩條；本條僅剩 Day 1 §1.1 帳號層級權限確認（操作者必做）。
+- [ ] **既有站接手（Soulful Expression Art Therapy）**
+  - **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；**Day 2 書面** staging canonical URL 已入 registry／SITE_PROFILE／`02_EXECUTION_PLAN`。
+  - **下一步：**Day 1 Runbook §1.1–1.3（操作者登入）+ **`TASKS`**「Day 2 實機驗收」。 **【下一步訂正 2026-08-25】原「下一步：Day 1 §1.1–1.3 + Day 2 實機驗收」已部分作廢**
+  - Day 2 staging 於 2026-08-16 決議 **abandon**（hosting 2026-11-12 到期，不在退場主機上建 staging；`ENVIRONMENT_REGISTRY.md` 該列已加刪除線）。
+  - **現行主線＝搬站**：見本檔「Soulful 網站搬離 Hostinger」與「機器買到後的接手點」兩條；本條僅剩 Day 1 §1.1 帳號層級權限確認（操作者必做）。
   - 本項目標：完成 M1 台帳（staging/prod、備份策略、維護窗、baseline 外掛/版本）
 
-- [ ] `lobster-factory` A10-2 商業閉環實跑 —— **【未開始】**
+- [ ] `lobster-factory` A10-2 商業閉環實跑
+  - **【未開始】**
   - 流程：新客戶建立 -> 驗收 -> production 觸發證據鏈
 
-- [ ] **【2026-05-30 開出】endpoint-alert.sh 自動化部署機制** —— **【未開始】** **背景**：`lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh`（SG 公網告警器）**無 repo→SG 自動部署路徑**，靠手動 scp 到 `/usr/local/bin/endpoint-alert.sh`。`sync-hetzner-slack-alert-webhooks.ps1` 只寫 env 不部署腳本本體。30 年風險：SG 重建 / `.bak` 被清 → 腳本回退舊版且無人知。**DoD**：(a) 新 `scripts/sync-hetzner-endpoint-alert-script.ps1`（仿 `sync-hetzner-endpoint-alert-heartbeat.ps1`：base64 ship + backup + `bash -n` verify + sha 比對 + 一輪 `systemctl start` 驗收）；(b) 接入既有 infra sync 流程；(c) repo SSOT sha == SG sha 的 drift 檢查可選接 system-health-check。**參考**：本日 WORKLOG `## 2026-05-30 endpoint-alert.sh debounce`（debounce 部署即走此手動路徑）。
+- [ ] **【2026-05-30 開出】endpoint-alert.sh 自動化部署機制**
+  - **【未開始】**
+  - **背景**：`lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh`（SG 公網告警器）**無 repo→SG 自動部署路徑**，靠手動 scp 到 `/usr/local/bin/endpoint-alert.sh`。`sync-hetzner-slack-alert-webhooks.ps1` 只寫 env 不部署腳本本體。30 年風險：SG 重建 / `.bak` 被清 → 腳本回退舊版且無人知。
+  - **DoD**：(a) 新 `scripts/sync-hetzner-endpoint-alert-script.ps1`（仿 `sync-hetzner-endpoint-alert-heartbeat.ps1`：base64 ship + backup + `bash -n` verify + sha 比對 + 一輪 `systemctl start` 驗收）；(b) 接入既有 infra sync 流程；(c) repo SSOT sha == SG sha 的 drift 檢查可選接 system-health-check。
+  - **參考**：本日 WORKLOG `## 2026-05-30 endpoint-alert.sh debounce`（debounce 部署即走此手動路徑）。
 
-- [ ] **【2026-08-15 開出】SG dockerd/containerd 持續吃 CPU（2 核機器 load 3.2）** —— **【未查】** `top` 顯示 `containerd` 66.7%／`dockerd` 58.3%（生命週期平均），但**所有容器都 <1%**；context switch 約 1.6 萬/秒。vmstat 瞬時 idle 72%、IO wait 0、blocked 0，**無使用者影響**（Kuma 近 1 小時 0 DOWN、服務全 healthy）。**同樣數字在 2026-08-15 07:29 session 開始時就存在**（當時追磁碟問題漏掉），故為長期狀態非新事件。**推測**：有東西在密集輪詢 Docker API（netdata docker collector 或 promtail service discovery 最可能）。**DoD**：找出輪詢來源 → 降低頻率或改用事件訂閱 → 確認 containerd/dockerd CPU 下降。**注意**：SG 只有 2 核，容器執行層自身開銷佔比過高會壓縮實際服務可用資源。
+- [ ] **【2026-08-15 開出】SG dockerd/containerd 持續吃 CPU（2 核機器 load 3.2）**
+  - **【未查】** `top` 顯示 `containerd` 66.7%／`dockerd` 58.3%（生命週期平均），但**所有容器都 <1%**；context switch 約 1.6 萬/秒。vmstat 瞬時 idle 72%、IO wait 0、blocked 0，**無使用者影響**（Kuma 近 1 小時 0 DOWN、服務全 healthy）。
+  - **同樣數字在 2026-08-15 07:29 session 開始時就存在**（當時追磁碟問題漏掉），故為長期狀態非新事件。
+  - **推測**：有東西在密集輪詢 Docker API（netdata docker collector 或 promtail service discovery 最可能）。
+  - **DoD**：找出輪詢來源 → 降低頻率或改用事件訂閱 → 確認 containerd/dockerd CPU 下降。
+  - **注意**：SG 只有 2 核，容器執行層自身開銷佔比過高會壓縮實際服務可用資源。
 （依 [`BUG_HUNT_PROTOCOL.md`](docs/operations/BUG_HUNT_PROTOCOL.md)，2026-05-22 開出）
 
 - [ ] Auto-Repair Post-Phase 4 (M2 per-source HMAC + M4 fingerprint) — Batch 3 已完成（9f862d82）→ handoffs/2026-05-28-1807-batch-3-post-phase.md
 
 - [ ] M2/M4 Phase 1 code 完成；剩 Phase 2 rollout + Phase 3 constraint swap + 3 side item（Phase4Weekly 錯 repo / incidents API 藏 open / 5 webhook 零流量）→ handoffs/2026-06-05-2017-tomo-201752.md
 
-- [ ] **Hetzner dispatcher 上線前 follow-up（啟用 LOBSTER_EXECUTE_* 前必做，現 gated OFF）**：① M10 orphan reaper（claim 後 trigger 前 crash→卡 running 終態；需 claimed_at 時戳+reaper `dispatch-action-run.ts:157-180`）② partial index `create index concurrently idx_ops_action_runs_pending_dispatch on ops_action_runs(started_at) where status='pending'` **【狀態訂正 2026-08-25】② partial index 已存在**，見 `lobster-factory/packages/db/migrations/0037_ops_action_runs_pending_dispatch_index.sql:18`（`create index concurrently if not exists idx_ops_action_runs_pending_dispatch`）→ 本條剩餘只有 ① M10 orphan reaper（`claimed_at` 時戳 + reaper），勿重複建 index。
+- [ ] **Hetzner dispatcher 上線前 follow-up（啟用 LOBSTER_EXECUTE_* 前必做，現 gated OFF）**：
+  - ① M10 orphan reaper（claim 後 trigger 前 crash→卡 running 終態；需 claimed_at 時戳+reaper `dispatch-action-run.ts:157-180`）
+  - ② partial index `create index concurrently idx_ops_action_runs_pending_dispatch on ops_action_runs(started_at) where status='pending'` **【狀態訂正 2026-08-25】
+  - ② partial index 已存在**，見 `lobster-factory/packages/db/migrations/0037_ops_action_runs_pending_dispatch_index.sql:18`（`create index concurrently if not exists idx_ops_action_runs_pending_dispatch`）→ 本條剩餘只有
+  - ① M10 orphan reaper（`claimed_at` 時戳 + reaper），勿重複建 index。
 
 - [ ] **【READY，未做】把 Hetzner 一鍵租機嵌進 app.aware-wave.com 一鍵架站按鈕（Phase 5）** — 程式+真機已驗過，**直接呼叫 `provisionClient()` 勿重寫**。recipe：`lobster-factory/docs/hosting/EMBED_PROVISION_INTO_APP.md`（app 端 `onboarding/trigger-build/route.ts` 頂部已留指標）。等 app 校正完再接。
 
-- [ ] **【計畫完成，未實作】客戶機「開機後全棧部署+維護」層（provider 無關）** — 讓新機/客戶自帶機自動部署成 production 等級（Docker+Grafana/Loki/Netdata/Sentry+快取+swap+備份+限速/WAF/fail2ban）。**料件 90%+ 現成**，缺一個編排器 `provision-stack.sh`（串既有腳本，純 SSH，Vultr/DO/客戶自帶機通用）+ BYO adapter + swap。完整 R0 計畫：`lobster-factory/docs/hosting/SERVER_STACK_DEPLOYMENT_PLAN.md`。**禁止重寫既有 compose/腳本，只編排**。→ handoffs/2026-06-06-1925-postboot-stack-deploy.md
+- [ ] **【計畫完成，未實作】客戶機「開機後全棧部署+維護」層（provider 無關）** — 讓新機/客戶自帶機自動部署成 production 等級（Docker+Grafana/Loki/Netdata/Sentry+快取+swap+備份+限速/WAF/fail2ban）。
+  - **料件 90%+ 現成**，缺一個編排器 `provision-stack.sh`（串既有腳本，純 SSH，Vultr/DO/客戶自帶機通用）+ BYO adapter + swap。完整 R0 計畫：`lobster-factory/docs/hosting/SERVER_STACK_DEPLOYMENT_PLAN.md`。
+  - **禁止重寫既有 compose/腳本，只編排**。→ handoffs/2026-06-06-1925-postboot-stack-deploy.md
 
 - [ ] app.aware-wave onboarding/provisioning IA 重整 — Phase 1 退役 ops-console（已規劃、Q1-Q3 已決、未動 code）+ verify intake 觸發建站 + Phase 2/3 → handoffs/2026-06-05-2028-onboarding-ia-consolidation.md
 
@@ -364,7 +648,8 @@
 > - **Patch 2 (C2)**：(EMaj-1) `B64_BLOB` regex 改 env-flag-gated 或加 prefix anchor + (EMaj-4) `MAX_DEPTH = 64` (非 32)
 > - **Patch 3 (C4)**：(EMaj-3) reframe — primary fix = column allow-list，secondary = default_viewer guard（`canModifyIncidentStatus` 含 viewer 不夠緊）
 
-- [ ] **【🟠 Major M2-M4/M7-M10 + 🟡 Minor m2-m6/m8-m11】** —— **【未開始】** 剩餘 7 Major + 9 Minor — 排 Phase 4 觀察期後（2026-06-19+）
+- [ ] **【🟠 Major M2-M4/M7-M10 + 🟡 Minor m2-m6/m8-m11】**
+  - **【未開始】** 剩餘 7 Major + 9 Minor — 排 Phase 4 觀察期後（2026-06-19+）
 
 - **owner doc 參考**：[`docs/awarewave-auto-repair-plan-v3.2-final.md`](../docs/awarewave-auto-repair-plan-v3.2-final.md) + [`docs/awarewave-repair-center-app-architecture.md`](../docs/awarewave-repair-center-app-architecture.md) + [`docs/BRIEF_AWAREWAVE_REPAIR_CENTER_AI.md`](../docs/BRIEF_AWAREWAVE_REPAIR_CENTER_AI.md)
 - **跨機**：所有檔案 repo 內，git pull 同步；harness 跑在筆電 / 桌機任一台都可
@@ -373,9 +658,19 @@
 
 > **這一區不是待辦。**保留是為了「日後條件變了要看得見」，不是為了有天要做掉。
 
-- [ ] **【已知風險｜操作者已決定不輪換｜2026-08-17】`~/.codex/config.toml` 明文憑證** — 該檔以明文存約 30 組正式憑證（Supabase `service_role`、Hetzner API token、Cloudflare API token、Resend、Slack、Sentry、n8n、Grafana 密碼、Trigger prod token 等）。2026-08-17 稽核 Codex 設定時另被印入 session transcript（transcript 保留期已於 `75512998` 改為 365 天）。**操作者 2026-08-17 明確決定不輪換**，理由：站台新、資料量少。⚠️ 該理由**不涵蓋** Hetzner（可刪伺服器）與 Cloudflare（可改 DNS 指向）——這兩者風險與資料量無關。**未做的補救**：① 輪換 ② 移出明文改用 `mcp/user-env.ps1` 既有的環境變數引用模式。前一次同類事件見 `0961263f`（2026-08-15 三項待輪換，狀態未確認）。重啟此項的時機：任何一把 token 疑似外流、或客戶資料量成長後重新評估。
+- [ ] **【已知風險｜操作者已決定不輪換｜2026-08-17】`~/.codex/config.toml` 明文憑證** — 該檔以明文存約 30 組正式憑證（Supabase `service_role`、Hetzner API token、Cloudflare API token、Resend、Slack、Sentry、n8n、Grafana 密碼、Trigger prod token 等）。2026-08-17 稽核 Codex 設定時另被印入 session transcript（transcript 保留期已於 `75512998` 改為 365 天）。
+  - **操作者 2026-08-17 明確決定不輪換**，理由：站台新、資料量少。⚠️ 該理由**不涵蓋** Hetzner（可刪伺服器）與 Cloudflare（可改 DNS 指向）
+  - 這兩者風險與資料量無關。
+  - **未做的補救**：
+    - ① 輪換
+  - ② 移出明文改用 `mcp/user-env.ps1` 既有的環境變數引用模式。前一次同類事件見 `0961263f`（2026-08-15 三項待輪換，狀態未確認）。重啟此項的時機：任何一把 token 疑似外流、或客戶資料量成長後重新評估。
 
-- [ ] **【已知缺陷｜第三方 plugin，不在本 repo｜2026-08-25 開】`stop-review-gate-hook.mjs` 的失敗訊息會遮住真正原因** — `~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/stop-review-gate-hook.mjs:121` 寫 `String(result.stderr || result.stdout || "")`。子行程的**真正錯誤在 stdout**（`{"status":1,...}` 與 usage-limit 訊息），stderr 只有一句無害的 `DEP0190 DeprecationWarning`（該 plugin 自己用 `shell: true` 傳參造成）。`||` 讓 stderr 優先 → **操作者看到的是雜訊，真正的原因被丟掉**。本次就是靠手動分離兩個串流才查出是額度問題。**這是本日同一個 bug class 的又一變體**：診斷取錯來源，把答案藏起來。**不修的理由**：檔案位於 plugin 快取目錄，更新即被覆蓋，非本 repo 資產。**可做的**：回報上游（openai-codex plugin）。**繞過方式**（若再遇到）：`node <companion> status --all --json` 讀 `latestFinished.summary` 拿真正原因。
+- [ ] **【已知缺陷｜第三方 plugin，不在本 repo｜2026-08-25 開】`stop-review-gate-hook.mjs` 的失敗訊息會遮住真正原因** — `~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/stop-review-gate-hook.mjs:121` 寫 `String(result.stderr || result.stdout || "")`。
+  - 子行程的**真正錯誤在 stdout**（`{"status":1,...}` 與 usage-limit 訊息），stderr 只有一句無害的 `DEP0190 DeprecationWarning`（該 plugin 自己用 `shell: true` 傳參造成）。`||` 讓 stderr 優先 → **操作者看到的是雜訊，真正的原因被丟掉**。本次就是靠手動分離兩個串流才查出是額度問題。
+  - **這是本日同一個 bug class 的又一變體**：診斷取錯來源，把答案藏起來。
+  - **不修的理由**：檔案位於 plugin 快取目錄，更新即被覆蓋，非本 repo 資產。
+  - **可做的**：回報上游（openai-codex plugin）。
+  - **繞過方式**（若再遇到）：`node <companion> status --all --json` 讀 `latestFinished.summary` 拿真正原因。
 
 #### I. 📥 收件匣（`/tomo` 落地區，待分類）
 

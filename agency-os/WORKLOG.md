@@ -2,6 +2,57 @@
 
 ## 2026-08-26
 
+### AUTO_TASK_DONE: TASKS 條目拆行 + 偵測器契約 class 入庫（調查完成，依指示不動工）
+
+[任務]
+操作者兩件事：① 偵測器 class 的調查「先不用[實作]，開 tasks 就好」② 「TASKS 的排版很爛」，並給出 10 條可讀性原則。
+
+[調查結論 —— 只入庫不動工]
+依 AGENTS.md 硬觸發先讀 `BUG_HUNT_PROTOCOL.md`（方法 SSOT）與 `AUDIT_REGISTRY.md`（狀態 SSOT）。**該 class 不在 registry 既有 4 個 class 裡**，屬新 class，觸發等級 Tier 2。
+
+**根本問題不是「幾個偵測器壞了」**，是 18 支各自手寫 verdict、沒有共同契約，於是「我這輪什麼都沒量到」與「一切正常」在輸出上長得一樣。而這個不變量 repo 內**早就寫對過一次** —— `scripts/check-smoke-tests.ps1:268-272`「A detector that goes quiet must be louder than one that reports nothing wrong」（2026-08-17），只套了 `client_mail` 一支，從未推廣。
+
+**決定性證據（非推論）**：`reports/status/*-LATEST.json` 共 9 份，只有 `smoke-LATEST.json` 帶 `blind_spots`；4 份連 verdict 欄位名都不一致（`overall`/`status`/沒有）。
+
+**已確認實例**（皆附 file:line）：
+- `reports/status/cf-iprefresh-LATEST.json` —— `status=error`、`v4_ranges=0`、自 2026-08-12 起 **14 天**；grep `system-health-check.ps1`/`ao-resume.ps1`/`AGENTS.md` **零命中 = 沒有任何讀者**。它守的是 SG 80/443 origin lockdown。
+- `scripts/phase4-weekly-check.ps1:143` + `agency-os/automation/claude-routines/phase4-weekly.md:81-83` —— 仍解析今日已從 tenant 檔退役的 `restore_drill_due_after` → 3A 靜默 PASS。正確版 `scripts/phase4-checks.py:349` 是 fail-closed 且自帶 selftest，但當時 untracked 且無呼叫端。
+- `scripts/check-backup-health.ps1:165-167` —— `verify_result="UNKNOWN"` 刻意不升級（註解明寫 does NOT false-alarm）→「備份存在但無法證明可還原」報 PASS。**目前未觸發**（兩台皆 PASSED），記為潛伏。
+
+**負面對照（證明沒有硬套 pattern）**：`scripts/check-cloudflare-security.ps1:70,80` 預設 `$overall="WARN"`、憑證缺失走 `SKIP`，fail-closed，**不是實例**。
+
+**邊界**：`phase4-checks.py` / `check-backup-health.ps1` / tenant `BACKUP_RESTORE_PROOF.md` 當時都在平行 session 未提交的工作樹裡。AGENTS.md 紅線禁止兩個 agent 同改一檔，故只記錄不修改。
+
+[已修改]
+1. `agency-os/TASKS.md` —— 49 條長行機械拆成階層；11 行圈號列舉再縮一層；清掉 4 個懸空破折號
+2. `agency-os/TASKS.md` —— 新增 `### 條目格式規約`（模板 + 三條硬規則 + 狀態詞彙）
+3. `agency-os/TASKS.md` —— 新增 5 條待辦：D 區 `cf-iprefresh`；E 區 `detector-contract` class、Phase 4 三套實作、`check-backup-health` UNKNOWN、標籤詞彙統一
+
+[為何拆行是機械的、詞彙統一不是]
+量過才決定：62 條裡 **35 條完全沒有粗體標籤切點**，且現有標籤 ad-hoc（`DoD` 8 次、`注意` 4 次，其餘幾乎都只出現 1 次，甚至整句話被當標籤）。**拆行今日做（可機器保證無損），詞彙歸位另開待辦（判斷工作，會改寫語意）** —— 不混在一起，是為了讓「無損」這個保證仍然成立。
+
+[自己踩到的坑]
+寫格式規約時，模板裡的核取方塊範例**被 `print-open-tasks.ps1` 當成真的待辦**（86 → 87）。改成 `[_]` 並把這件事寫成規約規則 1 的實例。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`difflib.SequenceMatcher` 對改前/改後全檔（去空白）逐字元比對 | **被移除的片段只有兩種：`——` × 33、`—` × 4，共 70 字元，全部是破折號分隔符** —— 零文字／路徑／數字／commit hash 遺失
+- REALTEST_EVIDENCE: tool=Bash | cmd=閘子字串存活檢查 | 三個 archive tasks-ref 子字串各仍在**恰好 1 行 `- [ ]`** 中。其中 `EU→Dedicated 搬機` 位於 `【】` 前綴內，故**刻意不把 `【】` 移出標題行**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`print-open-tasks.ps1` | `Total open: 86`（原 81 + 新增 5）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`verify-archive-tasks-lift.ps1` | **RESULT: PASS (exit=0)**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`verify-build-gates.ps1` | **ALL PASSED**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`system-health-check.ps1` | **Score: 100% (312/312)**
+- REALTEST_EVIDENCE: tool=Bash | cmd=可讀性量測 | 標題行長度中位數 **494 → 157** 字元；>350 字元者 32 → 2 條
+- REVIEW_DONE: critic=Quick（讀回 A 區完整渲染 + 機器斷言）| verdict=warn→修正後 pass | findings=0c/2m/0n —— M1 模板範例被當成真待辦（已修）；M2 圈號與所屬標籤同層（已縮排 11 行）。兩者都是**讀回渲染輸出才看到的**
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`restore_drill_due_after|restore_drills|phase4-checks|cf-iprefresh|refresh-cf-origin` | hits=3 真實，全數入庫成待辦（屬平行 session 範圍故未修改）；其餘為 `Backups/` 與歷史 WORKLOG，刻意不動
+
+[剩餘風險]
+- **標籤詞彙仍不一致**（35 條無標籤）。在它做完前本檔仍不完全符合第 10 條原則。
+- **下週五的 Phase 4 Check 3 可能靜默通過**（雲端 routine 未更新）—— 本輪調查裡時間最緊的一項。
+- 拆行依標點與粗體標籤切，少數段落會在語意中途斷開。可讀性淨值為正，但不完美。
+
+[rollback]
+`git revert` 單一 commit。純 markdown，無 code、無 migration、無部署。
+
 ### AUTO_TASK_DONE: /api/video/status 租戶閘 —— 原 finding 指的位置會做出一道假閘
 
 [任務]
@@ -167,8 +218,28 @@ Check 3 連續四週 WARNING：`phase4-2026-08-07.md`（假 drill + 真備份 11
 - **本次處置**：`git rm --cached` 該 `.pyc` + `.gitignore` 補 `__pycache__/` `*.py[cod]`。**不 revert `2dbe858a`** —— 它同時含一個完整且合理的功能（reports 保留政策），revert 的傷害大於收益。
 - **未處置、已列 TASKS**：廣域 `git add` 的來源尚未定位（哪個 session／哪支腳本）。內容本身現已全部驗證通過，但「commit message 是 30 秒故障手冊」這個性質對這幾個檔已經失效。
 
+[部署後實跑驗證 — 2026-08-26 06:27 UTC，`RemoteTrigger run` 提前觸發]
+- REALTEST_EVIDENCE: tool=RemoteTrigger | cmd=run trigger_id=trig_01JyFw78ZkgwQzpyXXaX1F2K (session cse_01BAKre3odz4KUbP1jUDxaFS) | exit=0 | ms=50000
+
+雲端實跑逐項結果（讀 `get_run_log`）：
+1. **唯一未知已解除**：容器 `python3 --version` = **Python 3.11.15**，`scripts/phase4-checks.py --format report --write` **exit code 0**，兩份報告各 925 bytes 寫出，CJK 正確。剩餘風險 #1 關閉。
+2. 報告內容與本機逐字一致（3A PASS/下次到期 2026-11-14、3B/3C WARNING、3D PASS、Check 4 PASS）。
+3. routine 自行 commit + push 成功（`2cf49a2`，`git push origin HEAD:main`）。
+
+[**換成腳本的第一次執行就抓出第三顆說謊的偵測器**]
+新報告：`Check 1 重複修復: SKIP — gh not installed` / `Check 2: SKIP — gh not installed`。
+但歷史報告 **2026-06-08 至 2026-08-21 連續 12 份全部是 `Check 1: PASS`**（逐檔 grep 確認）。
+
+舊 prompt 對這個情況寫得很清楚：`If gh exit != 0: CHECK1_STATUS = "SKIP", CHECK1_DETAIL = "gh exit=<code>"`。
+所以要嘛 ① 容器映像在近期拿掉了 `gh`，要嘛 ② **散文規格被執行成了 PASS，而規格明文要求 SKIP**。
+無論哪一種，結論相同：**Check 1／Check 2 至少 12 週在回報綠燈，而它們依賴的指令在該環境跑不起來**。
+
+這正是本次要根除的那個 class 的第三個實例（前兩個：restore drill 假 WARN、`.ps1` 缺 Check 4），
+而且它**只在換成可測試的腳本之後第一次執行就自己現形** —— 散文規格連「我沒量到」都說不出口。
+已列 TASKS 獨立追蹤（不折進本次：修法要決定是裝 `gh`、改走 REST API + token、還是接受 SKIP，是取捨不是 bug）。
+
 [剩餘風險]
-1. **雲端容器是否有 `python3` 無法離線證實**（本機 3.12.10 ✅、EU 已用 python3 ✅、雲端 ❓）。緩解：prompt STEP 4 把「跑不起來」定義為四項全 SKIP 並寫進報告本體 —— 吵、可見、可回滾。**驗證點：2026-08-28 06:00 UTC 首次開火後讀 `phase4-LATEST.md`**。
+1. ~~雲端容器是否有 `python3`~~ **已解除（2026-08-26 06:28 雲端實跑：Python 3.11.15，exit 0）**。fail-closed 分支仍保留在 prompt STEP 4，未來若映像變更仍會吵而不是靜默。
 2. 3A2 對帳靠敘述裡的表格列格式；若未來有人改寫該列格式，對帳會漏抓（退回今日行為，不會誤放行）。
 3. 機械閘仍驗不到「證據行內容是否誠實」—— 同 AGENTS.md §已知信任邊界，本次不變。
 
