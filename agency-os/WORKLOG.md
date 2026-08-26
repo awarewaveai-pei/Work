@@ -53,6 +53,35 @@
 [rollback]
 `git revert` 單一 commit。純 markdown，無 code、無 migration、無部署。
 
+### 追記（同日）：操作者要求「要分類」+ 兩項調查結論已過期需訂正
+
+[追加已修改]
+1. `agency-os/TASKS.md` —— 子項分類三步（皆機械、皆可驗）：
+   - **A 併回被切斷的散文** 37 行 —— 前一輪拆行時在語意中途切斷的片段，判準是「前一項不以句末標點結尾且本片段不以粗體/程式碼/圈號起頭」
+   - **B 粗體標題補冒號** 13 行 —— `**標題：內文**` → `**標題**：內文`，讓它成為真的標籤而不只是粗體句
+   - **C 同義標籤統一** 24 處 —— `DoD`→`完成定義`(13)、`動作`→`下一步`(5)、`阻塞`→`卡點`(2)、`參考`→`證據`(2)、`來源證據`→`證據`(1)、`待辦`→`下一步`(1)
+
+[為什麼沒有把 165 種標籤全部壓成 6 個槽位]
+長尾標籤多是**好路標**（`為什麼今天才看見`、`不要誤讀`、`同一類問題的三個實例`）。操作者給的原則 #4 明寫「小標題要像路標，**不要太抽象**」，把它們統一成「背景」會同時滿足 #10 卻違反 #4。
+**折衷**：核心槽位（完成定義／下一步／證據／一句話／注意／卡點／風險／根因）統一同義詞，描述性標籤保留。結果：子項 508 → 471，有標籤 228 → 248，核心槽位分佈 `完成定義 20 / 下一步 13 / 證據 12 / 一句話 7 / 注意 6 / 風險 5 / 根因 5 / 卡點 3`。
+剩 169 條無標籤，多為粗體句（本身已是路標，只是不是 `**X**：` 形式）；54 條圈號清單**本來就不該有標籤**（它們是父項底下的列舉）。
+
+[訂正兩項調查結論 —— 平行 session 在本輪期間已修掉一半]
+- **`phase4-weekly-check.ps1:143` 那條不再成立**：grep 該檔 `restore_drill_due_after` 已為 **0**，`scripts/phase4-checks.py` 已進版控，2026-08-26 14:28 雲端實跑回報 `3A 還原演練: PASS — 最近 PASS 2026-08-16，下次到期 2026-11-14`。TASKS 該條已改寫為只剩 `agency-os/automation/claude-routines/phase4-weekly.md`（**仍有 5 處**參照退役欄位）。
+- **偵測器修好之後，立刻照出一件更嚴重的事**（新開待辦，D 區）：`agency-os/tenants/company-soulful-expression/core/BACKUP_AUTO_STATUS.json` 顯示 Soulful 每週備份 **近 8 次失敗 4 次**（`2026-08-24`／`08-10`／`08-03`／`07-06`），`last_success = 2026-08-17T00:15:04Z`（9 天前）。唯一有具體原因的那次是 `WPvivid_Google_Service_Exception`，其餘 `reason` 只有 `"Failed,"`。
+  **這正是本輪調查主張的實證**：偵測器先前被卡在誤報的 3A，3B/3C 從來沒真的量到東西；閘一修好，被藏住的東西就出來了。
+  **不要誤讀**：2026-08-16 還原演練 PASS 用的是 EU 上三份手動備份（769 MB），**不是**這條 WPvivid → Google Drive 管線。
+
+[追加驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`difflib.SequenceMatcher` 對分類前/後全檔逐字元比對 | 被移除/取代的片段**只有**：`-`×37（併回時消掉的項目符號）、`DoD`×13、`動作`×5、`阻塞`×2、`參考`×2、`來源`×1、`待辦`×1 —— **全部是我刻意重命名的標籤詞**，零非預期遺失
+- REALTEST_EVIDENCE: tool=Bash | cmd=`print-open-tasks.ps1` | `Total open: 88`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`verify-archive-tasks-lift.ps1` | **RESULT: PASS (exit=0)**；三個 archive tasks-ref 子字串各仍命中恰好 1 行 `- [ ]`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`verify-build-gates.ps1` | **ALL PASSED**
+- REALTEST_EVIDENCE: tool=Bash | cmd=重複核取行檢查 | **0**（重複會讓 AO-CLOSE 硬失敗）
+
+[本輪的一個治理觀察]
+本 session 對 `agency-os/TASKS.md` 的改動**被平行 session 的大批 commit 掃走**（`0b4057f7` 已含 `條目格式規約`／`cf-iprefresh` 等內容），該 session 自己的 commit 訊息也寫了「被兩次大批 commit 掃走」。內容沒丟，但**證據鏈掛在別人的訊息底下** —— 與今日稍早移除 auto-checkpoint 想解決的是同一個問題的另一種形狀：`git add -A` 式的大批提交會吸走別的 session 正在做的事。值得在下次治理迭代時一併看。
+
 ### AUTO_TASK_DONE: /api/video/status 租戶閘 —— 原 finding 指的位置會做出一道假閘
 
 [任務]
