@@ -1,6 +1,6 @@
 # Backup health report
 
-- Generated: 2026-08-26 18:01:48
+- Generated: 2026-08-26 19:08:59
 - Overall: **PASS**
 
 ## SG (5.223.93.113)
@@ -8,7 +8,7 @@
 - Cron schedule (non-comment lines): SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|0 2 * * * root /root/lobster-phase1/scripts/backup-phase1.sh >> /var/log/lobster-backup.log 2>&1|30 2 * * * root /root/lobster-phase1/scripts/verify-backup.sh >> /var/log/lobster-backup.log 2>&1
 - Retention days (RETENTION_DAYS): 7 (source: static)
 - Backup dir size: 14G
-- Latest backup file time: 2026-08-26 02:32:51
+- Latest backup file time: 2026-08-26 10:26:31
 - Oldest backup file time: 2026-08-19 02:00:01
 - Backup age: 0d
 - Verify result: PASSED (2026-08-26T02:30:21Z)
