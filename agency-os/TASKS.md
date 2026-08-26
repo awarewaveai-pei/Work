@@ -203,7 +203,7 @@
   - **Google 帳號 `soulfulexpression01@gmail.com` 的密碼** —— 我 grep `AWARE_WAVE_CREDENTIALS.md` 時遮罩規則只涵蓋 `:` `=` `：`，未涵蓋 markdown 表格的 `|` 分隔符
   **根因（同一類、犯了兩次）**：讀含憑證的檔案時，遮罩是「輸出後才套用」而非「不讀取值」。**改善**：日後查證這類檔案改用 `grep -c` / 欄位名列舉 / `Get-VaultSecretFingerprint`，不輸出行內容。
   **DoD**：三項各自輪換並更新 vault 與 `AWARE_WAVE_CREDENTIALS.md`；Telegram token 換發後需重跑 `scripts/configure-telegram-webhook.ps1`。
-  - **【2026-08-26 追加，同款疏失再犯一次】** 查 WPvivid 失敗原因時，`SELECT option_value FROM mwp_mainwp_wpvividmeta WHERE site_id=2` 把 `remote` 欄位整段撈出，其中含 **Soulful 站的 Dropbox `access_token` 明文**，已進入本次對話紀錄。**同樣視為外洩，需輪換**（WPvivid → Remote Storage → 重新授權 Dropbox）。
+  - **【2026-08-26 追加，同款疏失再犯一次】** 查 WPvivid 失敗原因時，`SELECT option_value FROM mwp_mainwp_wpvividmeta WHERE site_id=2` 把 `remote` 欄位整段撈出，其中含 **Soulful 站的 Dropbox `access_token` 明文**，已進入本次對話紀錄。**【2026-08-26 訂正：已自行中和，不需輪換】** 當時用 `SUBSTRING(option_value,1,1200)`，而 access_token 長 1948 字元 → 輸出在 access_token 中途截斷，**`refresh_token` 從未被印出**（欄位順序 `…,access_token,expires_in,refresh_token,…`）。且該 access_token 已 95.9 天過期，並於 2026-08-26 的 `check_token()` refresh 中被換掉。**殘留風險：無。** 教訓仍成立。
   - **教訓已具體化**：查這張表時必須指定欄位並排除 `remote` / `remote_addon`，不可 `SELECT option_value` 全撈。這正是本條原本記載的「遮罩是輸出後才套用而非不讀取值」同一個錯。
 
 - [ ] **【人工｜Postiz Task 2 OAuth app 審核】各平台 dev app 提交** — Meta IG+FB（一個 Meta app，App Review，最高價值）/ Reddit / LinkedIn。callback = `https://postiz.aware-wave.com/integrations/social/<slug>`；client_id/secret 加進 EU `/root/postiz/.env`（`<PLATFORM>_CLIENT_ID/SECRET`）+ restart。
@@ -325,6 +325,15 @@
 
 > 已由 critic 驗證屬實、尚未修。優先於任何功能。
 
+- [ ] **【2026-08-26 開出｜🔴 客戶站已破圖｜刪影片會靜默弄破已發布的文章】`video/[id]` DELETE 無引用檢查** — **現行損害（實測）**：Soulful Expression 上線文章 `感恩日記：改變人生的五分鐘習慣`（post id 7393，`https://soulfulexpression.org/insights/general/...`）嵌著 `https://pub-bd79a1c3b4554025bd92a6192b032427.r2.dev/video/感恩日記_改變人生的五分鐘習慣/16x9.mp4`，該物件 **HTTP 404**（陰性對照：仍存在的 `三個習慣_...` 回 200）。客戶頁面上是一個壞掉的影片。
+  - **成因不是 `video/cleanup`**：2026-08-26 實查 SG crontab，`video/cleanup` **根本沒有 cron entry，從未執行過**（等於一段沒接線的程式碼，本身也該處理）。
+  - **真正的類別**：`app/api/video/embed-to-wp/route.ts:60,65` 把**裸 R2 URL** 寫進 WP 文章內容；`app/api/video/[id]/route.ts:52` 的 `deleteVideoObjects()` 是 **LIST 整個 `video/<dir>/` 後全刪**，且**完全不檢查該影片是否正被任何已發布文章引用**。兩者之間沒有任何對帳。⇒ **從畫廊刪任何一支影片，都可能靜默弄破一個或多個客戶的線上頁面，而且不會有任何訊息。**
+  - **不變量**：「刪除一個公開資產」與「該資產被外部內容引用」必須在同一個決策裡。現在是兩個互不知情的系統。
+  - **修法方向**（需設計）：① 刪除前掃已知 wp_sites 的文章內容找該 URL，有命中就擋下並列出文章 ② 或改為「先把文章裡的引用換掉／移除，再刪物件」 ③ 或根本不要寫裸 URL 進文章，改寫成指向本站的 stable redirect，讓刪除可以優雅降級。**⚠️ 別只加一句警告就當修好** —— 這是不可逆操作對外部系統的影響，要嘛擋住要嘛連帶處理。
+  - **另需操作者決定**：那篇 Soulful 文章現在就是壞的。要 ① 重新生成同主題影片並補回 ② 直接把壞掉的影片區塊從文章移除 ③ 先不動。**這是客戶已發布的內容，我不會自行修改。**
+
+- [x] **【✅ 2026-08-26 完成】R2 影片桶清理（操作者指示）** — 刪除 9 個物件：8 個 `remotion/*`（~200MB，從未被任何對帳或清理涵蓋）+ `video/蒙古旅遊___熱情分享型主持人稿/4x5.mp4`（23MB 真孤兒）。**刪前引用檢查**：`media_assets` 0 命中、`content_drafts` 0 列、5 個 wp_sites 逐一搜 `remotion` / `蒙古旅遊` 全部 0 命中（3 個 staging 站已是 404 死站）。刪後剩 2 個物件（`三個習慣_...` 的 16x9 + 9x16，即畫廊裡那唯一一列）。**reconcile 隨即自動轉綠**：`orphanUnattributable=0` → `NOTIFIED state=ok`，告警 baseline 歸零。
+
 - [ ] **【2026-08-26 開出｜小】R2 裡 8 個 `remotion/` 物件（~200MB）從未被任何對帳涵蓋** — `reconcile.ts` 的 `FORMAT_SUFFIX_RE = /^video\/(.+)\/([^/]+)\.mp4$/` 只收 `video/` 前綴，而 remotion-service 寫的是 `remotion/YYYY-MM-DD/<uuid>.mp4`（`apps/remotion-service/src/server.ts:293`）。實測 R2 有 8 個此類物件（2026-06-24 五個、2026-07-02 三個，最大 113MB），**全部不在 media_assets、也不在任何清理排程**（`video/cleanup` 也只刪 media_assets 有列的）。等於一個持續長大且無人看管的儲存桶分區。**先決定要不要留**：remotion 產出目前有無使用者可見的入口？沒有的話直接刪比補對帳便宜。
 
 - [ ] **【2026-08-26 開出｜等一個決定】R2 `video/蒙古旅遊___熱情分享型主持人稿/4x5.mp4` 是真孤兒（23MB）** — 無 media_assets 列、目錄名無 org 前綴（2026-08-25 之前的格式）→ reconcile 一律 fail-closed 不猜擁有者。**告警上線後會持續報 `orphanUnattributable=1` 直到處理掉**（這是正確行為，它確實是孤兒）。選項：① 補記到某個 org（`organizations` 有 `d6d1e845 mongolia-03` 這個測試租戶，名稱吻合但**不可據此推定**）② 直接刪除物件。**需操作者判斷這支影片還要不要**。
@@ -342,17 +351,19 @@
   - **修法方向（治本，非補丁）**：保留清理只能刪**自己產生的**快照 —— 用命名樣式 `[0-9]{8}-[0-9]{6}` 過濾，或改成刪 manifest 記錄過的目錄。**不要只把 clients/ 搬到別處了事**，那只關掉這一個實例，下次任何人往 `/root/backups/` 放東西都會再被刪一次。
   - **完成定義**：① prune 只匹配快照命名 ② 造一個假的非快照目錄跑一次，確認它沒被刪 ③ Soulful 三份備份重建並更新 `BACKUP_RESTORE_PROOF.md` ④ 演練證據改存不會被輪替的位置。
 
-- [ ] **Soulful 備份：5 次失敗全部是 Google Drive API 速率限制（已診斷，修法已在手邊）**
-  - `🔴 現行` · `2026-08-26 診斷完成` · `可直接做`
-  - **一句話**：11/12 要搬的客戶站，每週備份一半在失敗，原因單一而且已經查到。
-  - **根因（實測，非推測）**：`mwp_mainwp_wpvividmeta` site_id=2 的 `report_addon` 共 10 筆 —— **成功 5、失敗 5，5 次失敗全部是同一個原因**：
-    - HTTP `403` / `"reason": "rateLimitExceeded"` / `"status": "PERMISSION_DENIED"`
-    - 訊息原文：`Quota exceeded for quota metric 'Queries' and limit 'Queries per minute' of service 'drive.googleapis.com' for consumer 'project_number:134809148507'`
-    - **storage 滿 = 0 次、認證錯誤 = 0 次**。所以不是空間不足也不是 token 過期，是 WPvivid 共用的那個 Google API 專案被打爆每分鐘查詢配額。
-  - **修法就在原地**：該站 WPvivid **已經設好一個 Dropbox remote**（`wpvivid-remote-soulful-dropbox`，名稱 `SoulfulDBBackup`，路徑 `/soulfulexpression.org/`，token 已存在），但 `remote_selected` 目前指向 Google Drive 那個。**切過去即可完全避開這個共用專案的配額。**
-  - **下一步**：① 在 MainWP → WPvivid 把 soulful 的 remote 改選 Dropbox ② 手動觸發一次備份確認成功 ③ 連跑兩週確認穩定 ④ 再決定要不要保留 Google Drive 當第二目的地。
-  - **完成定義**：連續 2 次週備份 `Succeeded`，且 `BACKUP_AUTO_STATUS.json` 的 `last_failure.reason` 不再是空字串（失敗必須帶得走原因 —— 目前那個欄位只寫 `"Failed,"`，真正的 JSON 在 MainWP DB 裡沒被同步出來）。
-  - **附帶缺口**：`sync-backup-status-from-mainwp.sh` 只搬了 `"Failed,"` 這幾個字，把後面整段 JSON 錯誤訊息丟掉了 —— 所以 repo 這一側看不到原因，我是直接查 DB 才拿到的。這條要一起修。
+- [ ] **Soulful 備份：已加上 Dropbox 第二目的地（待 8/31 排程驗證端到端）**
+  - `🟠 已改設定，待驗證` · `2026-08-26 處理` · `下次驗證點 2026-08-31 00:08 UTC`
+  - **根因（實測）**：`report_addon` 10 筆＝成功 5／失敗 5，**5 次失敗全部是** HTTP `403` / `rateLimitExceeded` / `PERMISSION_DENIED`，來自 `drive.googleapis.com` 的每分鐘查詢配額（consumer `project_number:134809148507` ＝ WPvivid 全球共用的 API 專案，**操作端無旋鈕可調**）。storage 滿 0 次、認證錯誤 0 次。
+  - **「自動存去哪裡」的正確位置**：子站 `wp_options` → `wpvivid_upload_setting` → `remote_selected`（**不是** MainWP 的「Back Up Manually」面板，那個面板自己寫著 `won't affect schedule settings`）。
+  - **已執行（2026-08-26）**：`remote_selected` 由 `["wpvivid-remote-69ff0a63b77ab"]` 改為 `["wpvivid-remote-69ff0a63b77ab","wpvivid-remote-soulful-dropbox"]`（googledrive + dropbox 並存）。
+    - **選擇「加上」而非「換掉」的理由**：Dropbox 若不通，Google 照舊 → **零退步**；上傳路徑是 `class-wpvivid.php:7040` 的 `foreach ($remoteslist["remote_selected"] as $value)`，逐一跑過陣列。
+    - **Dropbox 憑證已實測可用**：`Dropbox_Base::check_token()` 回 `{"result":"success"}`，且 `created` 時戳更新 → refresh_token 成功換到新 access_token（原 token 已 95.9 天）。
+    - **回滾**：原值備份於子站 `/home/u942075013/wpvivid_upload_setting.backup.20260826-072903.txt`（3212 bytes、sha256 `87a5ce01…`、chmod 600）。
+  - **尚未驗證**：端到端上傳。下次排程 `wpvivid_main_schedule_event` = **2026-08-31 00:08:15**。
+  - **刻意不由代理觸發備份**：站台 925 MB（uploads 744M + DB 181M），`wpvivid_task_list` 已 105 KB、`wpvivid_last_msg` 105 KB；在共享主機跑無人監看的多階段任務，**卡住反而可能連 8/31 那次一起卡死**。要提早驗證請由操作者在 UI 按 Backup Now（看得到進度、可中止）。
+  - **待觀察的副作用**：Google 若仍被限流，WPvivid 可能仍把整個任務標成 `Failed`，即使 Dropbox 已收到檔案。8/31 後看 `report_addon`：若出現「Dropbox 成功但整體 Failed」，要決定是否移除 Google Drive 以免偵測器長期假紅。
+  - **仍未解**：MainWP UI 顯示的 `Aug 26 07:10 / Manual` 在子站 `wpvivid_backup_list` 裡**不存在**（該表只有 2 筆：`2026-07-27` 與 `2026-08-17`，皆 googledrive、local=no）。需確認當時那個面板選的是哪個站（可能是 `aware-wave.com`）。
+  - **目前實際曝險**：最新可用備份仍是 **2026-08-17**（9 天前），且只在 Google Drive 一處 —— EU 那份已被保留政策刪除（見上一條）。
 
 - [ ] **`cf-iprefresh` 偵測器已 error 14 天，而且沒有任何讀者**
   - `🔴 現行` · `2026-08-26 開出` · `可直接做`

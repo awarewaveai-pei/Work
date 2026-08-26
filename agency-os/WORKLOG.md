@@ -2,6 +2,47 @@
 
 ## 2026-08-26
 
+### AUTO_TASK_DONE: Soulful 自動備份加上 Dropbox 第二目的地（含四次自我訂正）
+
+[任務]
+操作者：「那自動存要去哪裡設？你去幫我處理」。
+
+[「自動存」的正確位置 —— 不是 MainWP 那個面板]
+子站 `wp_options` → `wpvivid_upload_setting` → `remote_selected`。
+操作者原本在 MainWP 的「Back Up Manually」面板裡改，那個面板**自己寫著** `The settings is only for manual backup, which won't affect schedule settings` —— 改了也修不到每週失敗的 Cron 備份。
+且 MainWP 側 `backup_custom_setting` / `backup_custom_setting_ex` 皆為 **0 bytes**，證實他按 Save 後 per-site override 根本沒寫進去 —— 「儲存後不是」不是操作錯誤。
+
+[已修改：子站 soulfulexpression.org（非 repo）]
+`remote_selected`：`["wpvivid-remote-69ff0a63b77ab"]` → `["wpvivid-remote-69ff0a63b77ab","wpvivid-remote-soulful-dropbox"]`
+- **加上而非換掉**：Dropbox 若不通，Google 照舊 → 零退步。上傳路徑 `class-wpvivid.php:7040` 是 `foreach ($remoteslist['remote_selected'] as $value)`，逐一跑陣列，多目的地是支援的。
+- **回滾**：原值備份於 `/home/u942075013/wpvivid_upload_setting.backup.20260826-072903.txt`（3212 bytes / sha256 `87a5ce01…` / chmod 600）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH+WP-CLI | cmd=`wp eval` 讀 `wpvivid_schedule_setting` | `enable=1, type=wpvivid_weekly, backup.local=0, backup.remote=1` —— 排程本身設定正確，問題只在目的地
+- REALTEST_EVIDENCE: tool=SSH+WP-CLI | cmd=`update_option` + 讀回 | 改後 `remote_selected` 含兩筆，逐一解析出 `googledrive/Update_Backup` 與 `dropbox/SoulfulDBBackup`
+- REALTEST_EVIDENCE: tool=SSH+WP-CLI | cmd=`Dropbox_Base::check_token()`（外掛自己的 refresh 路徑）| 回 `{"result":"success"}` 且 `created` 時戳更新 → **refresh_token 有效，成功換到新 access_token**（原 token 已 95.9 天）
+- REALTEST_EVIDENCE: tool=SSH+WP-CLI | cmd=`wp cron event list` | `wpvivid_main_schedule_event` next run `2026-08-31 00:08:15`，weekly
+- REVIEW_WAIVED: NA -- 遠端設定變更，非 repo 程式碼；每一步皆讀回驗證，且原值已備份可回滾
+
+[本輪四次自我訂正 —— 都是被實測推翻的]
+1. 「PHP warning 污染 JSON 造成 DataTables Ajax error」→ `display_errors` 實際為空（關閉），**假說死**
+2. 「Cloudflare 攔截 admin-ajax」→ 從外部 POST 實測 200 + 合法 JSON、無 `cf-mitigated`，**假說死**
+3. 「43 個 JS 錯誤導致初始化中斷」→ 那 43 個是 DevTools **Issues 面板的無障礙警告**（`<label>` 未綁 form field），與執行無關，**我把問題數讀成錯誤數**
+4. 「今天那份備份存在 Hostinger 磁碟上」→ 子站 `wpvividbackups` 目錄**只有 log、無任何備份檔**；`wpvivid_backup_list` 只有 2 筆（`2026-07-27`、`2026-08-17`）皆 `local=no / remote=googledrive`，**假說死**
+另訂正憑證外洩嚴重度：當時 `SUBSTRING(...,1,1200)` 而 access_token 長 1948 → 輸出在 access_token 中途截斷，**`refresh_token` 從未印出**；該 access_token 已過期並於本輪 refresh 中被換掉 → **殘留風險無**，先前「必須輪換」的判斷過度。
+
+[順帶發現：第四個永遠說 OK 的偵測器]
+`class-wpvivid-dropbox.php:60` 的 `test_connect()` 是空殼：`return array('result' => WPVIVID_SUCCESS);` —— 無條件回成功。與本日 `detector-contract` class 同型（外掛層，非本 repo，不列入該 class 的修復範圍，僅記錄）。
+
+[剩餘風險]
+- **端到端未驗**：下次真實上傳要等 `2026-08-31 00:08:15`。**刻意不由代理觸發** —— 站台 925 MB、`wpvivid_task_list` 已 105 KB，無人監看的多階段任務若卡住，可能連 8/31 那次一併卡死。
+- **目前曝險未消**：最新可用備份仍是 `2026-08-17`（9 天前）且僅存 Google Drive 一處，EU 那份已被保留政策刪除。
+- **可能的假紅**：Google 若仍被限流，WPvivid 可能把整個任務標 `Failed` 即使 Dropbox 已收到。8/31 後需看 `report_addon` 決定是否移除 Google Drive。
+- **未解**：MainWP UI 的 `Aug 26 07:10 / Manual` 在子站紀錄中不存在，需確認該面板當時選的是哪個站。
+
+[rollback]
+子站：`wp option update wpvivid_upload_setting` 還原自上述備份檔即可（JSON 格式已存）。repo 側純文字，`git revert` 單一 commit。
+
 ### AUTO_TASK_DONE: reconcile 的計數器在測錯的東西 + designs 讀路徑對齊 staff 全域語意
 
 [任務]
