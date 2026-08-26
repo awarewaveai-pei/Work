@@ -15,6 +15,11 @@
 set -euo pipefail
 
 ENV_FILE=/root/lobster-phase1/.env
+# Telegram 通道的 SSOT **不在** .env，而在這裡（endpoint-alert 的 systemd unit 也讀同一份，
+# 見 /etc/systemd/system/awarewave-endpoint-alert.service 的 EnvironmentFile 行）。
+# 2026-08-26 實測：.env 裡的 TELEGRAM_* 只存在於 .env.bak* 舊備份，現行值在 /etc/default。
+# 只讀 .env 的新告警會靜靜地永遠不發訊息 —— 這是加新告警最容易踩的第一個坑。
+TELEGRAM_ENV_FILE=/etc/default/awarewave-endpoint-alert.telegram
 STATE_DIR=/root/lobster-phase1/.state
 STATE_FILE="${STATE_DIR}/reconcile-videos-last-alert"
 LOG_FILE=/var/log/reconcile-videos.log
@@ -32,6 +37,8 @@ if [[ ! -r "${ENV_FILE}" ]]; then
   exit 1
 fi
 set -a; . "${ENV_FILE}"; set +a
+# 選用：不存在就走下面的 NOTIFY_SKIPPED 分支（會寫 log，不靜默）。
+[[ -r "${TELEGRAM_ENV_FILE}" ]] && { set -a; . "${TELEGRAM_ENV_FILE}"; set +a; }
 if [[ -z "${OPS_PROXY_SHARED_SECRET:-}" ]]; then
   echo "[${NOW_ISO}] ABORT: OPS_PROXY_SHARED_SECRET 未設定 — 本輪對帳與告警完全沒有執行" >> "${LOG_FILE}"
   exit 1
