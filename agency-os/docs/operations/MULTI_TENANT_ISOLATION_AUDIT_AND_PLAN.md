@@ -58,8 +58,40 @@
 | tools/designs GET/POST | `app/api/tools/designs/route.ts:165,349` | `body.organizationId ?? defaultOrganizationId()`（信任 body）| 🟠 | RLS+OWN |
 | tools/designs DELETE | `tools/designs/route.ts:~288` | DELETE 只憑 `id`，無 org → 可刪別客戶圖 | 🔴 | OWN |
 | tools/presets | `tools/presets/route.ts:50,132,234` | 信任 body/query org + default fallback | 🟠 | RLS+OWN |
-| video/[id] DELETE | `app/api/video/[id]/route.ts:30,52` | fetch org 選填（:30）；實際 delete 只 `.eq("id")`（:52）| 🔴 | OWN |
-| video/history | `video/history/route.ts:53` | org 過濾選填 | 🟠 | RLS |
+
+#### 2.3.1 `/api/video/*` 全量盤點（14 條，2026-08-26 逐檔實讀）
+
+> **為何單獨列一節**：2026-06-29 首版只收了 `video/[id]` 與 `video/history` 兩條，其餘 **12 條從未進過這份清單**。
+> 2026-08-25 的 critic review 因此把 `/api/video/status` 當成新發現 —— inventory 不完整會讓每一輪 reviewer 重新踩同一個洞。
+> 本節以 `grep -c assertOrgAccess/effectiveOrgId/canCreateAiImageJob/x-ops-sync-key` 對 14 個檔逐一機器核對後手寫。
+>
+> **現行曝險前提（2026-08-26 實測）**：EU Supabase auth **僅 1 個帳號**（`user_kind` unset → staff、`ops_role: owner`、無 `org_id`）。
+> 因此下表所有 🟠/🔴 **今天皆不可被利用** —— 它們是 Phase 5（客戶自助登入）開門那一刻才引爆的，與 §0 結論一致。
+
+| Route | 方法 | 角色閘 | 租戶閘 | 評級 | 說明 |
+|---|---|---|---|---|---|
+| `video/generate` | POST | `:37` | `effectiveOrgId :59` → `createJob(orgId) :121` | 🟢 | 2026-08-25 接上 seam；2026-08-26 起租戶身分寫進 `video_jobs.organization_id` |
+| `video/render-draft` | POST | `:42` | `effectiveOrgId :59` → `createJob(orgId) :165` | 🟢 | 同上 |
+| `video/status` | GET | `:46` | `assertOrgAccess :75` | 🟢 | **2026-08-26 補**。閘在 `:79` done 分支（回 `job.video` 全部 R2 URL）**之前**，不是在 `:114` recordVideoAsset 之前 —— 後者對已完成 job 走不到，是假閘 |
+| `video/history` | GET | `:31` | `effectiveOrgId(req, null) :53` → 過濾 `:65-67` | 🟠 | staff 看**全部 org**；`tools/designs/route.ts:355` 對同一批 `media_assets` 卻強制預設 org。兩畫面集合不同（見 §2.3.2） |
+| `video/[id]` | DELETE | `:13-16` | `assertOrgAccess :42`（fetch `:32-37`、delete `:60`）| 🟢 | 刻意**不**預先用 org 過濾查詢（`:21-27` 有完整理由）；閘在 fetch 之後 |
+| `video/embed-to-wp` | POST | `:17-18` | **無** | 🔴 | `siteId` 取自 body `:23`，`getWpSites() :33` 回**全部**站含 token（`lib/content/wp-sites.ts:55-77` 零 org 過濾），缺 `siteId` fallback `sites[0]`；可 PATCH 任一客戶站的任一 postId。**根因＝`wp_sites` 無 `organization_id` 欄位**（同 §2.2 `content/sites` 🔴），必須一起修 |
+| `video/reconcile` | POST | — | `x-ops-sync-key :18-22` | 🟢 | 2026-08-25 補（原本零 auth；`middleware.ts:146` 的 `hasValidSyncKey` 是 exempt 不是 require）。租戶由 R2 key 前綴反解，解不出 fail-closed |
+| `video/cleanup` | POST | — | `x-ops-sync-key :19-23` | 🟢 | cron 專用；`:32-37` 跨全部 org 刪 30 天前影片是**設計如此**（維運清理，非租戶操作）|
+| `video/draft` | POST | `:38` | 不適用 | 🟢 | 只產草稿 scenes + 暫存圖，不寫任何 org-scoped 列 |
+| `video/regenerate-image` | POST | `:29` | 不適用 | 🟢 | 單張重生圖，回 URL，不寫 DB |
+| `video/upload-asset` | POST | `:47` | 不適用 | 🟢 | 寫 `designs/YYYY-MM/<uuid>` 隨機 key，URL 只回給上傳者 |
+| `video/remotion-render` | POST | `:37` | 不適用 | 🟢 | templateId 白名單 `:53` + props URL SSRF 閘 `:75-82` |
+| `video/remotion-status` | GET | `:15` | **無**（無 org 可驗）| 🟠 | 代理 remotion-service `/status/:jobId`；jobId 是該服務的 `uuidv4()`（`apps/remotion-service/src/server.ts:236`），非本 app 的 `video_jobs`，**沒有任何租戶資訊可綁**。要修必須先讓 remotion job 也落一張帶 org 的表 |
+| `video/capabilities` | GET | **無** | 不適用 | ⚪ | 在 middleware matcher 內 → 仍需登入 session；只回 EU video-service 的 feature flags + formats，無租戶資料。任何登入者（含 viewer）可探測 |
+
+#### 2.3.2 待決策：staff 的可見範圍不一致
+
+`video/history:53` 用 `effectiveOrgId(req, null)`（staff 看全部 org）；`tools/designs/route.ts:355-360` 用
+`effectiveOrgId(req, query ?? defaultOrganizationId())` 且 null 直接回 400（staff 只看預設 org）。
+兩者讀**同一張 `media_assets`**。`lib/tenant-guard.ts:6` 定義 staff = 「Full access to all orgs」→
+**`designs` 才是與文件模型衝突的那一邊**。對齊方向是產品決策（改 designs 會讓每天在用的 POD 畫廊突然出現其他 org 的圖），
+**不由工程單方裁決**，記於此避免下一輪 reviewer 當成 bug 重報。
 
 ### 2.4 Ops / Build（執行紀錄、審批、憑證）
 

@@ -68,10 +68,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   // recordParams 在 prepare 失敗時根本不存在（generate/route.ts:142、:168），拿它當依據會讓
   // client 對自己失敗的 render 永久 403，連錯誤訊息都拿不到。所有權必須獨立於 record payload。
   //
-  // organizationId 為 null 的情況：① 本 migration（0060）之前建立的 in-flight 列 —— 受該表
-  // 1h TTL 自限 ② staff 且 POD_DESIGNS_DEFAULT_ORG_ID 未設。兩者 assertOrgAccess 都放行 staff、
+  // organizationId 為 null 的情況：① 本 migration（0060）之前建立的舊列 ② staff 且
+  // POD_DESIGNS_DEFAULT_ORG_ID 未設。①**不會自動隨時間消失** —— 1h TTL 的清理只在
+  // createJob 時順手執行（job-store.ts:106），不是計時器；2026-08-26 實測該表有 14 列殘留，
+  // 因為 2026-08-25 之後 prod 未再生成影片。實務影響為零（舊列只能憑 jobId 定址，而持有該
+  // jobId 的瀏覽器早已離開；staff 一律放行），但別把它當成「一小時後就乾淨了」。
+  // 兩者 assertOrgAccess 都放行 staff、
   // 擋下 client，即 fail-closed。（client 帳號無 org 綁定時 effectiveOrgId 早在建 job 時就拋，
-  // 所以「client 的 job 沒有 org」不可能發生 —— lib/tenant-guard.ts:113-119。）
+  // 所以「client 的 job 沒有 org」不可能發生 —— lib/tenant-guard.ts:114-117。）
   try { assertOrgAccess(req, job.organizationId ?? null); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e) as NextResponse; throw e; }
 

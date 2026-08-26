@@ -2,6 +2,185 @@
 
 ## 2026-08-26
 
+### AUTO_TASK_DONE: /api/video/status 租戶閘 —— 原 finding 指的位置會做出一道假閘
+
+[任務]
+操作者指 `TASKS.md` D 區「影片管線租戶邊界收尾」的 ①：`/api/video/status` 無 `assertOrgAccess`。
+要求不得補丁式處理。7 條 finding 全部重驗（非沿用），另做 14 條 `/api/video/*` 全量掃描。
+
+[根因：不是「忘了加一行」，是 video_jobs 沒有 owner 欄位]
+`0047_video_jobs.sql:17-30` 建表時沒有 `organization_id`。租戶身分只存在 `record_params` jsonb 裡，
+而那包東西**要等 prepare 成功才寫**（`generate/route.ts:148-164`），失敗路徑（`:142`、`:168`）完全不寫。
+所以「這個 job 屬於誰」對**每一支失敗的 render** 都無法回答 —— 沒有東西可以拿來 assert。
+
+[原 finding 自己的 bug（本輪最重要的發現）]
+原文寫「`route.ts:87`（recordVideoAsset）之前應補」。但 `status="done"` 的 job 在更早的 `:79` 就
+`return job.video`（該次 render 全部格式的 R2 URL）+ `title` —— **根本走不到 :87**。照原文補出來會是
+一道對已完成 job 完全無效的假閘，卻會讓 TASKS 被勾掉、讓下一個 reviewer 以為關了。
+（AGENTS.md §補丁判準「消音偵測器」樣態。）
+
+[為何不能改用 recordParams.organizationId 當授權來源]
+prepare 失敗時 recordParams 不存在 → `assertOrgAccess(req, undefined)` 對 client 恆 403 →
+**使用者永遠看不到自己的 render 為什麼失敗**（前端 `VideoStudio.tsx:333` `if (!sj.ok)` 直接收攤，
+只會顯示「查詢生成狀態失敗」）。修一個資安洞換一條 UX 死路 = 補丁。
+
+[不變量]
+job 的擁有者必須在**建立列的當下**寫定，與 payload 是否齊備無關；每一條以 jobId 定址的 route 必須在
+**第一個回傳資料的分支之前**驗證它。
+
+[已修改]
+| 檔案 | 改動 |
+|---|---|
+| `lobster-factory/packages/db/migrations/0060_video_jobs_add_org.sql`（新） | `video_jobs` 加 `organization_id uuid → organizations(id) on delete set null`；`lock_timeout '3s'` + `notify pgrst`（照 0058 慣例）。刻意**不建 index**（全部存取走 PK，唯一掃描是 TTL prune 走 `created_at` 索引）|
+| `lobster-factory/packages/db/scripts/0060_video_jobs_add_org_down.sql`（新） | drop column；註明回滾順序必須先 revert code |
+| `lib/content/video/job-store.ts` | `VideoJob.organizationId`；`rowToJob` 映射；`createJob(organizationId)` 改**必填參數**（編譯期強制每個呼叫端交代租戶）；insert 失敗改 **throw**（原本只 `console.warn` → job 列不存在 → 之後每次 /status 回 `job_not_found`）；`finishJob` 的 patch 型別改 `Omit<Partial<VideoJob>,"organizationId">`，所有權不可變**由型別強制**而非註解 |
+| `app/api/video/generate/route.ts` | `createJob(orgId)` + 失敗回 500 |
+| `app/api/video/render-draft/route.ts` | 同上；註明 EU 已提交時的後盾**只在 orgId 非 null 時成立**（`noorg_` 分支 sweep 一律跳過） |
+| `app/api/video/status/route.ts` | `assertOrgAccess(req, job.organizationId)` 置於 `:75`，在 `:79` done 分支之前 |
+| `lib/content/video/__tests__/video-status-tenant.test.ts`（新） | 7 測，含 naive patch 的回歸測試 |
+| `lib/content/blocks/video-pipeline.ts` | ⑤：`noorg_` 分支是 17 字元不是 20，註解修正 |
+| `agency-os/docs/operations/MULTI_TENANT_ISOLATION_AUDIT_AND_PLAN.md` | ⑦：新增 §2.3.1（14 條 `/api/video/*` 全量盤點）+ §2.3.2（⑥ 決策記錄）；原 `:61,62` 漂移行號訂正 |
+| `agency-os/TASKS.md` | ①⑤⑦ 結案含證據；②③④ 依實測重寫；新開 2 條（embed-to-wp 🔴、R2 legacy 目錄清理）|
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`ssh hetzner-eu docker exec supabase-db psql -U supabase_admin -f /tmp/dryrun_wrap.sql`（BEGIN → \i 0060 → 驗欄位/FK/列數 → ROLLBACK → 再驗欄位已消失）| exit=0 | ms=~2500
+  - 結果：`organization_id | uuid | YES`；FK `video_jobs_organization_id_fkey → organizations`，`confdeltype='n'`（SET NULL）；`existing_rows=14 / non_null_org=0`（無 rewrite）；ROLLBACK 後 `column_should_be_zero=0` → **零持久化已證明**
+  - **該 dry-run 擋下一次會失敗的 apply**：先以 `-U postgres` 跑得到 `ERROR: must be owner of table video_jobs` —— `video_jobs`/`repair_runs`/`ops_incidents` 的 owner 是 `supabase_admin`，只有 `organizations` 是 `postgres`。apply 必須用 `-U supabase_admin`，已寫進 migration 檔頭
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && npx vitest run` | exit=0 | ms=~1900（53 檔 / 629 測全過；較前 52/622 增 1 檔 7 測）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`ssh hetzner-sg docker exec lobster-next-admin node -e "<R2 CF API 唯讀分類>"` | exit=0 | ms=~1800
+  - `TOTAL_OBJECTS=11 / TOTAL_DIRS=2 / NEW_ORG_PREFIX=0 / NOORG=0 / LEGACY=2` → ②③ 的告警若現在接上，永遠是 `checked=2, recorded=0, skippedLegacy=2` 的常數，等於裝一個永遠在叫的警報器 → 刻意不做，理由寫進 TASKS
+  - `NEW_ORG_PREFIX=0` 另證：2026-08-25 部署 `1d15e867` 之後 **prod 未曾生成過任何影片**，該批新程式碼路徑至今未被真實流量執行
+- REALTEST_EVIDENCE: tool=SSH | cmd=`ssh hetzner-sg docker exec lobster-next-admin node -e "<auth admin users 分類統計>"` | exit=0 | ms=~1500
+  - `TOTAL_USERS=1`，`(unset) | owner | no_org => 1` → **本批所有租戶類 finding 現行曝險為零**（只有一個 staff/owner 帳號）。是 Phase 5 客戶登入才引爆的，與 audit doc §0 一致。這也修正了我本 session 前段把 embed-to-wp 講得像現行風險的說法
+- REVIEW_DONE: critic=Deep（**自審**，見 ORACLE_WAIVED）| verdict=pass-with-fixes | findings=0C/0M/4m（全部當場修訖）
+  - S1 `render-draft` 註解過度宣稱「sweep 會補進畫廊」—— 僅 orgId 非 null 時成立，已加限定 + 補述 r2Keys 不會被清
+  - S2 測試常數用了 prod 衍生的 org 前綴 `39ad4149` → 改為明顯虛構的 `aaaaaaaa-…`
+  - S3 所有權不可變原本只靠註解 → 改 `Omit<Partial<VideoJob>,"organizationId">`，編譯器強制
+  - S4（REALTEST 揭露）「受 1h TTL 自限」是過度宣稱：TTL prune 只在 `createJob` 內順手跑（`job-store.ts:106`），不是計時器；實測該表殘留 14 列。註解與 migration 檔頭均已改為實測敘述
+  - **突變測試（證明測試不是裝飾）**：把閘改成 ① `recordParams?.organizationId` → 2 測轉紅 ② 搬到 recordVideoAsset 之前（原 finding 的位置）→ 2 測轉紅（含「403 不得洩漏 title/URL」那條）。還原後 7/7 綠
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`createJob(\|video_jobs\|assertOrgAccess\|0060\|recordParams` | hits=0 斷裂引用
+  - `createJob(` 全 repo 僅 2 個真呼叫點（generate:121 / render-draft:165，皆已改），第 3 個 `lib/tarot/batch-store.ts:32` 是**同名不同模組**，刻意不動
+  - `0060` 無編號衝突（WORKLOG:824 記載前一個 0060 已刪除且「編號回到 0059 結尾，無空號」，migrations 目錄實查 0059 → 0060 連續）
+  - stale claim：`agency-os/.agency-state/open-tasks-snapshot.md`、`reports/status/integrated-status-*.md` 仍寫「無 assertOrgAccess」—— 皆為**自動生成的衍生檔**，下次 ao-resume 重生，不手改；`WORKLOG.md:821` 是當時為真的歷史紀錄，保留
+  - **順帶發現（未修，已記 TASKS）**：`docs/cold_email/COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md:70` 寫「最新為 `0047_video_jobs`」，早在 0048–0059 就過期，非本次造成
+- ORACLE_WAIVED: 操作者本 session 明確告知 Codex 額度已用盡（「codex額度用完了, 你要自己做review」），`codex-oracle.ps1` 無法產出 artifact。改以自審 + **突變測試**替代：突變測試是對「閘是否真的有效」的機器驗證，比 reviewer 的文字判斷更強，兩種錯誤寫法各被 2 條測試抓到（見 REVIEW_DONE）。額度恢復後應補跑 `codex-oracle.ps1 -Mode review` 覆核本批
+
+[事故：另一個 session 的 AO-CLOSE `git add -A` 掃走我進行中的檔案]
+本批工作進行到一半時，另一 session 的 AO-CLOSE 把我 6 個未完成的檔案（`generate/route.ts`、
+`render-draft/route.ts`、`status/route.ts`、`job-store.ts`、`0060` 兩支）掃進 `2dbe858a`
+（標題「fix(reports): 報告保留政策」，1247 檔）。後果：① 我的資安修改被歸屬到一個不相干的 commit
+② 那 6 個檔案是**繞過 verify gate** 進 main 的（當時 tsc/vitest 都還沒跑）。
+**刻意不改寫歷史**（另一 session 可能仍在執行，rebase 會製造更大的問題）；改以本 commit 補齊並在此留證。
+這是本 repo 第 4 個 `git add -A` 造成的交叉污染 —— 前 3 個（`8c3ac617`／`680db6c6`／`7251d14d`）
+都已移除，唯獨 AO-CLOSE 自己那個還在。已開 TASKS 追蹤。
+
+[剩餘風險]
+- migration **尚未 apply**、code **尚未部署**。順序不可顛倒：先 apply（`-U supabase_admin`）→ 驗欄位 + PostgREST 快取 → 再 `sg-deploy`。反向會讓每支影片回 500（大聲失敗，非靜默）
+- 部署後的真實影片生成尚未做（`NEW_ORG_PREFIX=0` 證明該路徑目前無自然流量）。部署後必須**真的生一支影片**才算閉環，curl `/status` 不夠
+- 本批對「今天」的行為改變為零（只有 1 個 staff/owner 帳號，`assertOrgAccess` 對 staff 一律放行）。價值在 Phase 5 開門前把列模型做對，不是即時止血
+- ②③④ 與 `embed-to-wp` 🔴 未修，理由與前置條件已寫入 TASKS
+
+[rollback]
+1. `git revert <本 commit>` → `sg-deploy`（回到今天的行為）
+2. `psql -U supabase_admin -f 0060_video_jobs_add_org_down.sql`（欄位可空，也可留著不 drop，舊 code 對它完全無感）
+3. 順序不可顛倒：先 revert code 再 drop 欄位
+
+
+### AUTO_TASK_DONE: Phase 4 Check 3 假警報 —— 治的是「衍生值當閘的輸入」，不是那個日期
+
+[任務]
+操作者指本對話開頭的 ①：`phase4-LATEST.md`（2026-08-21）掛 `Check 3: WARNING — restore drill overdue (due 2026-08-06)`，但還原演練 Drill #1 已於 2026-08-16 PASS。要求「不得用補丁方式處理」。
+
+[根因：三個方向都沒守，其中第三個是本輪實測才發現的]
+偵測器讀的是 `BACKUP_RESTORE_PROOF.md` frontmatter 的 `restore_drill_due_after` —— 一個**由人手維護的推導值**（drill 日期 + 90 天）。
+
+| 方向 | 後果 | 狀態 |
+|---|---|---|
+| P1 演練做了、沒人回頭改日期 | 假 WARN | 本次事故本體 |
+| P2 日期被推前但沒做演練 | 閘被無聲滿足 | 原設計完全沒防 |
+| **P3 欄位寫壞或被刪** | **整條檢查靜默消失** | **本輪實測發現** |
+
+P3 實測：沙箱把該欄位改成 `NOT-A-DATE` 後重跑 `phase4-weekly-check.ps1`，drill 那條檢查**不是報錯、不是 WARN，是不存在**。機制在 `scripts/phase4-weekly-check.ps1:143-149`（舊版）—— regex 要 `\d{4}-\d{2}-\d{2}`，配不上就整個 `if` 跳過，加上該檔 `:28` 的 `$ErrorActionPreference = "SilentlyContinue"`，連錯誤都不冒出來。推論：`sed -i '/restore_drill_due_after/d'` 可讓還原演練閘永久靜音、git diff 以外零痕跡。
+
+[第二個 bug class：同一份規格寫兩次，而且已經分叉]
+雲端 routine（實際跑的）與 `phase4-weekly-check.ps1`（fallback）各實作一次 Check 3。`grep -c "Check 4" scripts/phase4-weekly-check.ps1` = **0** —— CHECK 4 於 2026-05-23 只加進雲端 prompt，fallback 三個月不知道它存在。所謂「備援」其實是另一顆不同的偵測器。散文規格還有第二個毛病：**只能等每週五開火才知道對不對**。
+
+[告警疲勞的實證鏈]
+Check 3 連續四週 WARNING：`phase4-2026-08-07.md`（假 drill + 真備份 11d）、`phase4-2026-08-14.md`（假 drill + 真備份 18d）、`phase4-2026-08-21.md`（只剩假的）、本日重現。真訊號與已知假訊號被串成同一個字串，四週無人處理 —— 期間備份仍在失敗。
+
+[已修改]
+| 檔案 | 改動 |
+|---|---|
+| `scripts/phase4-checks.py`（新） | **唯一實作**：Check 1/2/3/4，其中 Check 3 含 3A 演練 + 3A2 對帳 + 3B 新鮮度 + 3C 最近結果 + 3D 真相來源。內建 `--selftest`（15 個真實檔案 fixture / 19 條斷言） |
+| `scripts/phase4-weekly-check.ps1` | 由 137 行自有邏輯改為薄殼呼叫同一支；補上缺席三個月的 Check 4；`$ErrorActionPreference` 由 `SilentlyContinue` 改 `Continue`；Telegram 內容改由 checker 的單一輸出提供 |
+| `agency-os/automation/claude-routines/phase4-weekly.md` | 新 prompt **零檢查邏輯**（pull → 跑 script → commit）；舊 prompt 原封保留為 rollback 正本（不轉抄，避免出錯）；Rollback 表補「回滾本次改版」列 |
+| 3 份 tenant + 1 份 template `BACKUP_RESTORE_PROOF.md` | 退役 `restore_drill_due_after`（推導值）與 `last_known_success_utc`/`_task_id`（手抄鏡像，已爛 70 天、零消費端）；改記錄 `restore_drills` 事實 + `restore_drill_interval_days`。**template 原本完全沒有 frontmatter** → 新 tenant 會生下來就掛「status 不明」WARNING |
+| `SITE_MIGRATION_RUNBOOK.md` / `DAY2_STAGING_OPERATOR_GUIDE.md` | 演練程序改為「先寫 frontmatter（閘只讀這裡）再寫敘述」 |
+| `.gitignore` | 補 `__pycache__/` + `*.py[cod]`（見下方治理事件） |
+
+[不變量]
+`drill_overdue(today) = today > (最後一次 PASS drill 日期 + interval)`，且缺鍵／解析失敗／無 PASS／未來日期**一律 WARNING，沒有任何路徑通往靜默 PASS**。要消音必須偽造一筆帶日期與 PASS 的演練 —— 那在 git diff 上是看得見的謊，不再是無聲推一個 deadline。
+
+[P1 的真正關閉方式：對帳，不是換一個要人記得的欄位]
+第一版方案只把「要記得改的欄位」換了個名字，失敗鏈一模一樣。改為：判定只讀 frontmatter（穩），**額外**掃敘述裡結構化的 `| Drill date | YYYY-MM-DD |` 表格列，有 frontmatter 沒有的就 WARN 並附可貼上的 YAML。判定永遠不依賴敘述解析 → parser 脆弱的代價被鎖住（漏抓＝退回今日行為，誤抓＝一句提醒）。刻意只認表格列不認標題，否則「Drill #2 預計 2026-11-01」這種計畫句會被誤報。
+
+[自審找到的 7 條，其中 2 條原本會直接上線]
+1. **P1 假修**（上段已述）
+2. **cp950**：`locale.getpreferredencoding()` 與 `sys.stdout.encoding` 實測皆為 `cp950` → 裸 `open()` 讀 CJK 會壞、`print()` 中文直接 UnicodeEncodeError 使全部 check SKIP。修：全讀 `utf-8-sig`、啟動即 `reconfigure(encoding="utf-8")`、寫檔 `newline="\n"`
+3. **3D 門檻原訂 2 天是錯的**：`scripts/lib/mainwp-backup-merge.py:14-15,83-86` 明寫 JSON「僅在 task_id 改變時改寫」（critic 2026-06-08 anti-churn 決策），故 `synced_at_utc` 是「最後一次變動」不是「最後一次執行」，健康的一週本來就會靜止 7 天。照原設計上線＝在修假警報的過程中親手製造新的假警報。改 9 天
+4. 對帳規則過寬（已收斂為表格列）
+5. selftest 若只測純函式＝單元測試不是實測 → 改為自建真實暫存檔跑完整 `check_tenant()` 路徑
+6. JSON 缺 `last_failure`/`last_success` 會 KeyError 炸掉整支 → 全走 `.get()`，缺鍵 WARN 不 crash
+7. `record-restore-drill.py` 是範圍膨脹 → 砍掉（對帳掃描已是機械保證）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=python3 scripts/phase4-checks.py --selftest | exit=0 | ms=900
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/phase4-weekly-check.ps1 -WorkRoot <sandbox> -SkipTelegram | exit=0 | ms=4200
+- REALTEST_EVIDENCE: tool=Bash | cmd=python3 -m py_compile scripts/phase4-checks.py | exit=0 | ms=300
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell Parser::ParseFile scripts/phase4-weekly-check.ps1 | exit=0 | ms=800
+
+實測明細（皆在 `$TEMP` 沙箱，未動 repo 狀態）：
+1. **修前基線重現**：沙箱跑舊 `.ps1` → `restore drill overdue (due 2026-08-06)` 假 WARN 重現
+2. **P3 fail-open 實證**：欄位改 `NOT-A-DATE` → drill 檢查整條消失（見上方根因）
+3. **selftest 15 fixture / 19 斷言全過**，含 TASKS DoD 要求的「刻意造一筆真逾期仍要 WARN」
+4. **突變測試（證明測試非空跑）**：把 `TRUTH_SOURCE_STALL_DAYS` 改回我自己原本設計錯的 2 → selftest FAIL（抓到「健康的安靜週不得告警」）；把「缺 restore_drills → WARNING」改回靜默放行 → selftest FAIL
+5. **修後真實 repo**：3A `PASS — 最近 PASS 2026-08-16，下次到期 2026-11-14`，假警報消失
+6. **`.ps1` 薄殼端到端**：輸出與 Python 直跑逐字一致且含 Check 4；CJK 在 cp950 主機完成 PowerShell→Python→PowerShell 往返無損
+7. **fail-closed 分支**：checker 不存在時四項全 `SKIP` + 原因寫進報告本體，絕不長得像健康
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/5n
+  **審查者說明**：Codex 額度耗盡至 2026-08-31（見 `7934eb9e`），外部 oracle 不可用；操作者明示「你要自己做review」。故本次為結構化自我對抗覆審，7 條 finding 全部在寫 code 前提出並修訖（清單見上），其中 2 條（cp950、3D 門檻）經實測證實原設計會上線即壞。突變測試用以證明測試套件非空跑 —— 這是自審無法自證時唯一能替代外部視角的機械手段。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,runbooks,lobster-factory | grep=restore_drill_due_after | hits=17
+  **17 個命中全部逐一判定為刻意保留，無一是 live consumer**（不寫 `hits=0` —— 該欄位名確實還在檔案裡，宣告 0 會是假的，`bughunt-oracle.ps1` 也會 HARD FAIL）：
+  `WORKLOG.md` 5（本篇在描述退役）／`phase4-weekly.md` 5（rollback 正本區塊 + Rollback 表）／3 份 tenant 各 1（退役說明註解）／`phase4-checks.py` 1（docstring 記錄病史）／`WORKLOG-archive/2026-05.md` 3（歷史敘述，描述當時為真的事，刻意不動）。
+  **關鍵的那一問另外驗過**：`grep --include=*.ps1 --include=*.py --include=*.sh --include=*.js --include=*.mjs` 全 repo 只命中 `phase4-checks.py:16` 的說明性 docstring → **沒有任何程式還在讀這兩個退役欄位**。
+  `last_known_success` 同法驗證，程式面 0 命中（`sync-backup-status-from-mainwp.sh:87` 只讀 `^status:`，已確認不受影響）。
+- 另跑 `audit-cp950-traps.ps1 -Path scripts/phase4-weekly-check.ps1` → `scanned=1 clean=1 drift=0`
+
+[本輪順帶發現，未折進本次修改]
+1. **soulful 備份正在半數失敗** —— `BACKUP_AUTO_STATUS.json` 近 10 次 **5 次失敗**，最新一次（2026-08-24）就是失敗。這是營運問題不是偵測器問題；修好偵測器只會讓它更大聲。已列 TASKS。
+2. **90 天週期撞死線** —— 最後 PASS 2026-08-16 + 90 = **2026-11-14**，比 hosting 死線 **2026-11-12** 晚兩天，即巡檢閘不會在死線前提醒。刻意不發明第二套排程機制；改為在 PASS 時也印出到期日讓人看得見，並把 Drill #2 綁在 `SITE_MIGRATION_RUNBOOK.md` 的 checklist。
+3. **`hooks/rules/verify-gate-commit.js` 誤判**：Bash 指令的 **heredoc 內容**含 `git commit` 字串就會被當成真的要 commit 而 BLOCK（本輪寫 routine prompt 時撞到）。純文字比對，未區分「要執行的指令」與「當作資料的內容」。已列 TASKS。
+
+[治理事件：另一個 session 的 1247 檔 commit 把本次未驗證的工作掃進 main]
+`2dbe858a`（2026-08-26 14:08，另一 session，主題是報告保留政策）一次 commit **1247 個檔案**並已 push，其中包含本 session 當時尚未通過 `/verify-recent` 的 `scripts/phase4-checks.py`、4 份 `BACKUP_RESTORE_PROOF.md`，以及一顆 **`scripts/__pycache__/phase4-checks.cpython-312.pyc` 編譯產物**。
+- 這正是 `.gitignore` 結尾註解已經描述過的失效（「auto-checkpoint 的 `git add -A` 把產物 commit 進 SSOT」），只是這次來源換成另一個 session。今早 `680db6c6` / `7251d14d` 才剛移除三個自動 commit 呼叫點。
+- **本次處置**：`git rm --cached` 該 `.pyc` + `.gitignore` 補 `__pycache__/` `*.py[cod]`。**不 revert `2dbe858a`** —— 它同時含一個完整且合理的功能（reports 保留政策），revert 的傷害大於收益。
+- **未處置、已列 TASKS**：廣域 `git add` 的來源尚未定位（哪個 session／哪支腳本）。內容本身現已全部驗證通過，但「commit message 是 30 秒故障手冊」這個性質對這幾個檔已經失效。
+
+[剩餘風險]
+1. **雲端容器是否有 `python3` 無法離線證實**（本機 3.12.10 ✅、EU 已用 python3 ✅、雲端 ❓）。緩解：prompt STEP 4 把「跑不起來」定義為四項全 SKIP 並寫進報告本體 —— 吵、可見、可回滾。**驗證點：2026-08-28 06:00 UTC 首次開火後讀 `phase4-LATEST.md`**。
+2. 3A2 對帳靠敘述裡的表格列格式；若未來有人改寫該列格式，對帳會漏抓（退回今日行為，不會誤放行）。
+3. 機械閘仍驗不到「證據行內容是否誠實」—— 同 AGENTS.md §已知信任邊界，本次不變。
+
+[rollback]
+| 情境 | 動作 |
+|---|---|
+| 雲端 checker 跑不起來 | `RemoteTrigger update` 貼回 `phase4-weekly.md` §已退役的 routine prompt ＋ §CHECK 4 的 `5b.` 區塊 |
+| repo 側任何問題 | `git revert <sha>`；`phase4-checks.py` 是新增檔，revert 後零殘留 |
+| 只退 frontmatter | 單檔 `git checkout <old-sha> -- <path>`；EU cron 只讀 `^status:`，不受影響（已驗 `sync-backup-status-from-mainwp.sh:87`） |
+| **禁止的組合** | 新 frontmatter ＋ 舊 prompt —— 舊 prompt 讀 `restore_drill_due_after`，鍵不存在時 3A 會靜默消失（本輪實測）。兩者必須同進同退 |
+
+
 ### AUTO_TASK_DONE: TASKS.md 換分類軸 —— 順手挖出三個「一直在說謊」的解析器與閘
 
 [任務]

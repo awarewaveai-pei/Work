@@ -179,6 +179,8 @@ Hostinger 主機在 2026-11-12 前都還活著，舊站原封不動 —— 這�
 - [ ] **監控**：`scripts/check-smoke-tests.ps1` 的 `client_mail` 檢查用的是 Hostinger 的 SSH 資訊，**主機換了要同步更新**（`HOSTINGER_SOULFUL_SSH_*` 三個環境變數與金鑰路徑）
 - [ ] 更新 `ENVIRONMENT_REGISTRY.md`：Hosting Provider、IP、備份位置
 - [ ] **完整還原演練**（Drill #2）—— 這次要驗到「站能開起來」，Drill #1 因缺程式碼備份只驗到資料層
+  - **演練完成後先做這件事**：在 `core/BACKUP_RESTORE_PROOF.md` **檔頭 frontmatter** 的 `restore_drills` 加一筆 `- date: YYYY-MM-DD` / `result: PASS` —— **Phase 4 巡檢只讀那裡**，敘述寫得再詳細它也看不到。漏了會掛假 WARNING（2026-08-16 Drill #1 就是這樣掛了四週）。敘述照舊寫在 §Restore Drill Record，其中 `| Drill date | YYYY-MM-DD |` 那列請保留原格式，`scripts/phase4-checks.py` 會拿它跟 frontmatter 對帳並在漏登時直接告訴你要補哪一行
+  - **時間點注意**：90 天週期算下來 Drill #2 的機械到期日是 **2026-11-14**，比 hosting 死線 **2026-11-12** 還晚兩天 —— 也就是說**巡檢閘不會在死線前提醒你**。真正綁住這件事的是本行，不是那個閘
 
 ---
 

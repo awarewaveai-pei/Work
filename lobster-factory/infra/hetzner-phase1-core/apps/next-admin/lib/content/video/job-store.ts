@@ -25,7 +25,7 @@ export interface VideoJob {
    * 這是 /api/video/status 租戶閘的唯一依據。
    *
    * 為何不能用 `recordParams.organizationId` 當授權來源：那包東西要等 prepare 成功才寫入
-   * （generate/route.ts:134-150），失敗路徑（:128、:154）完全不寫。拿它當閘 = client 對
+   * （generate/route.ts:148-164），失敗路徑（:142、:168）完全不寫。拿它當閘 = client 對
    * 自己失敗的 render 永遠 403，連錯誤訊息都看不到。所有權與 record payload 是兩件事。
    */
   organizationId?: string;
@@ -126,10 +126,14 @@ export async function updateJobStep(id: string, step: string): Promise<void> {
 /**
  * 背景管線完成/失敗時更新 job（done 帶 video/title；error 帶 error/statusCode）。best-effort。
  *
- * **刻意不映射 `organizationId`**：所有權在 createJob 當下寫定後即不可變。若這裡也能改 owner，
- * 「這個 job 屬於誰」就會有兩個寫入點，租戶閘讀到的答案會取決於時序。缺這一行是設計，不是遺漏。
+ * **所有權不可變，且由型別強制**：`patch` 型別把 `organizationId` 排除在外。所有權在 createJob
+ * 當下寫定；若這裡也能改 owner，「這個 job 屬於誰」就會有兩個寫入點，租戶閘讀到的答案取決於時序。
+ * 用 `Omit<>` 而不是只寫註解 —— 註解擋不住下一個人「順手補上」，編譯器可以。
  */
-export async function finishJob(id: string, patch: Partial<VideoJob>): Promise<void> {
+export async function finishJob(
+  id: string,
+  patch: Omit<Partial<VideoJob>, "organizationId">,
+): Promise<void> {
   const supabase = getSupabaseWriteClient();
   if (!supabase) return;
   const upd: Record<string, unknown> = {};

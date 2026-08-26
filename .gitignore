@@ -173,3 +173,11 @@ agency-os/Backups/
 /$null
 /null
 /nul
+
+# --- Python bytecode (2026-08-26) ---
+# scripts/phase4-checks.py 是本 repo 第一支進版控的 Python。import 它一次就會生出
+# scripts/__pycache__/*.pyc，而 2026-08-26 的一次 1247 檔大批 commit 正好把它掃進 main
+# （同上一段講的失效：廣域 `git add` 把產物寫進 SSOT）。.pyc 是編譯產物、隨版本 churn，
+# 且可能讓人讀到與原始碼不一致的舊 bytecode。
+__pycache__/
+*.py[cod]

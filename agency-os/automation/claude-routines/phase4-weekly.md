@@ -18,6 +18,7 @@
 | **Created** | 2026-05-22T08:47:42Z |
 | **Created via** | `RemoteTrigger` API (in-CLI, no web UI) |
 | **Supersedes** | `scripts/phase4-weekly-check.ps1` (kept as manual fallback only) |
+| **Prompt 內含邏輯** | **無**（2026-08-26 起）。所有檢查在 `scripts/phase4-checks.py`；prompt 只負責 pull → 跑 → commit |
 
 ## Design decisions
 
@@ -33,7 +34,17 @@ Earlier draft of this file included an elaborate Telegram + env var + web UI che
 
 Replaces the broken `/phase4-check` triple-trigger design (CronCreate 7-day expiry / non-existent Windows Task Scheduler / Big5-broken script) discovered to have never run on 2026-05-22. Runs the same 3 health checks (duplicate auto-repair PRs / needs-human-review backlog / BACKUP_RESTORE_PROOF freshness).
 
-## Routine prompt (verbatim, as sent to RemoteTrigger create)
+## 已退役的 routine prompt（2026-05-22 部署 → 2026-08-26 退役）
+
+> **保留原因＝rollback 正本。** 不要刪、不要「順手更新」它。
+> 實際部署過的版本 ＝ **下面這個區塊** ＋ **本檔 §CHECK 4 的 `5b.` 區塊插在 STEP 5 與 STEP 6 之間**
+> （另外 STEP 6/7 與 RULES 各有一處把 `CHECK1/2/3` 讀成 `CHECK1/2/3/4`、多一行 Check 4 報告列、
+> `STEP 3/4/5` 讀成 `STEP 3/4/5/5b`）。要回滾就照這個組法貼回 `RemoteTrigger update`。
+>
+> **為何退役**：這段散文規格是「同一份規格寫兩次」的其中一份，另一份是 `phase4-weekly-check.ps1`。
+> 兩份已經分叉過一次 —— CHECK 4 於 2026-05-23 只加進這裡，`.ps1` 三個月不知道它存在。
+> 而且散文規格**無法在本機驗證**，只能等每週五開火才知道對不對。
+
 
 ```text
 You are AwareWave's Repair Center Phase 4 weekly monitor. Execute the 3 checks below mechanically — no interpretation. The repo awarewaveai-pei/Work is cloned at your working directory.
@@ -154,6 +165,88 @@ RULES:
 - Total runtime budget: 5 minutes — if exceeded, skip step 8 (commit) and exit cleanly
 ```
 
+## Routine prompt（**現行**，2026-08-26 部署）
+
+> **這段刻意不含任何檢查邏輯。** 檢查全部在 `scripts/phase4-checks.py`，本機 fallback
+> `scripts/phase4-weekly-check.ps1` 呼叫同一支。**以後要新增／調整檢查，改那個 `.py` 就好，
+> 不需要再動 `RemoteTrigger update`** —— 那一步是整條流程最容易失敗的環節（2026-05-22 認證事故）。
+>
+> 這樣改的直接理由：`CHECK 4` 曾經只加進 prompt、沒加進 `.ps1`，兩顆偵測器分叉了三個月沒人發現。
+> 規格寫兩份就一定會分叉；散文規格還有第二個毛病 —— **只能等每週五開火才知道對不對**。
+> 現在 `python3 scripts/phase4-checks.py --selftest` 隨時可跑（15 個真實檔案 fixture / 19 條斷言），含「真逾期仍要 WARN」。
+
+```text
+You are AwareWave's Repair Center Phase 4 weekly monitor.
+
+You do NOT evaluate anything yourself. scripts/phase4-checks.py in the repo is the single
+implementation of every check (it is shared with the manual fallback
+scripts/phase4-weekly-check.ps1). Your job is: run it, commit what it wrote, and make any
+failure loud. Do not re-interpret, summarise, or "fix up" its verdicts.
+
+The repo awarewaveai-pei/Work is cloned at your working directory.
+
+STEPS:
+
+1. Run: git pull origin main
+
+2. Compute:
+   date_string = $(TZ=Asia/Taipei date +%Y-%m-%d)
+   timestamp   = $(TZ=Asia/Taipei date '+%Y-%m-%d %H:%M')
+
+3. Run the checker. It writes BOTH report files itself:
+     agency-os/reports/repair-center/phase4-LATEST.md
+     agency-os/reports/repair-center/phase4-${date_string}.md
+
+   python3 scripts/phase4-checks.py --format report --write \
+     --timestamp "${timestamp}" \
+     --trigger "Claude routine AgencyOS-RepairCenterPhase4Weekly" \
+     > /tmp/phase4.out 2> /tmp/phase4.err
+   rc=$?
+
+4. Treat ALL of the following as failure: rc != 0, OR python3 not on PATH, OR
+   scripts/phase4-checks.py missing, OR agency-os/reports/repair-center/phase4-LATEST.md
+   is empty/absent after step 3.
+
+   On failure: do NOT invent a verdict and do NOT leave the previous report in place --
+   a stale report would be read as a fresh healthy run. Set REASON to the first 300
+   characters of /tmp/phase4.err (or "python3 not available" / "phase4-checks.py missing"),
+   write the following to BOTH report paths (UTF-8 without BOM, LF line endings):
+
+   # Repair Center Phase 4 週巡檢
+   - 日期: ${timestamp} TPE
+   - 觸發: Claude routine AgencyOS-RepairCenterPhase4Weekly
+   - Check 1 重複修復: SKIP — REASON
+   - Check 2 needs-human-review PR: SKIP — REASON
+   - Check 3 租戶備份健康: SKIP — REASON
+   - Check 4 VPS auto-reboot SSOT: SKIP — REASON
+   - 整體: ⚠️ 0 項需注意, 4 項 SKIP
+
+   and prefix the STEP 5 commit message with "[claude] PARTIAL: " instead of "[claude] auto: ".
+
+5. Commit and push:
+   OVERALL=$(grep '^- 整體: ' agency-os/reports/repair-center/phase4-LATEST.md | sed 's/^- 整體: //')
+   git add agency-os/reports/repair-center/
+   git commit -m "[claude] auto: Phase 4 週巡檢 ${date_string} — ${OVERALL}"
+   git push origin main
+   If push fails (conflict): run git pull --rebase origin main, then retry push once.
+   If it still fails, exit reporting the error.
+
+RULES:
+- Never edit scripts/phase4-checks.py from this routine. If a verdict looks wrong, that is a
+  bug to surface in the report, not to correct here.
+- Only write inside agency-os/reports/repair-center/
+- Never delete files. Never amend prior commits.
+- Never modify TASKS.md, WORKLOG.md, memory/, or anything outside the report dir.
+- Commit prefix MUST be [claude]
+- Total runtime budget: 5 minutes — if exceeded, skip the commit and exit cleanly.
+```
+
+### 這段 prompt 唯一的執行期依賴：`python3`
+
+雲端容器有沒有 `python3` 無法離線證實（本機 3.12.10 ✅、EU 已用 python3 ✅、雲端 ❓）。
+所以 STEP 4 把「跑不起來」明確定義成四項全 `SKIP` 並寫進報告本體 —— **吵、可見、可回滾**，
+不會靜默長得像健康。首次開火（2026-08-28 06:00 UTC）讀 `phase4-LATEST.md` 即可確認。
+
 ## CLI `RemoteTrigger run` vs scheduled fire — different auth paths (2026-05-22 lesson)
 
 **Symptom**: Immediately after `create`, `RemoteTrigger run` returned `HTTP 400 github_repo_access_denied — re-authorize GitHub in settings`. Re-trying on the **existing** `AgencyOS-DailyBriefing` from the same CLI session returned the same error.
@@ -227,6 +320,7 @@ AO-RESUME / AO-CLOSE surface this WARN automatically. Watchdog uses `[Math]::Flo
 | Delete routine | <https://claude.ai/code/routines> → routine → Delete (no CLI delete supported) |
 | Routine misbehaving (writing wrong files / spamming) | Disable via RemoteTrigger update first; investigate via web UI transcript; commit fixes here; update via RemoteTrigger; re-enable |
 | Revert a bad commit by the routine | `git revert <sha>` then disable routine until prompt fixed |
+| **回滾 2026-08-26 的 prompt 改版** | `RemoteTrigger update` 貼回 §已退役的 routine prompt 那個區塊 ＋ §CHECK 4 的 `5b.` 區塊（組法見該節說明）。**同時**要把 tenant frontmatter 一起 revert —— 舊 prompt 讀 `restore_drill_due_after`，新 frontmatter 沒有那個鍵，兩者混用時 3A 會靜默消失（2026-08-26 實測） |
 
 ## Update flow (if prompt needs change)
 
@@ -235,7 +329,11 @@ AO-RESUME / AO-CLOSE surface this WARN automatically. Watchdog uses `[Math]::Flo
 3. Verify with `RemoteTrigger get trigger_id=trig_01JyFw78ZkgwQzpyXXaX1F2K`
 4. Commit the SSOT update with link to actual API call
 
-## CHECK 4 — VPS auto-reboot SSOT integrity (deployed 2026-05-23 12:04 UTC)
+## CHECK 4 — VPS auto-reboot SSOT integrity（2026-05-23 部署；2026-08-26 起邏輯已移入 `phase4-checks.py`）
+
+> 本節自 2026-08-26 起為**歷史紀錄 ＋ rollback 素材**：下面那段 `5b.` prompt 文字已不在部署中，
+> 檢查本身改由 `scripts/phase4-checks.py` 的 `check_auto_reboot_ssot()` 執行（同一組 3 個路徑）。
+> 設計理由（為何簡化成 `test -f`）仍然成立，保留。
 
 **Status**: 🟢 DEPLOYED — `RemoteTrigger update trigger_id=trig_01JyFw78ZkgwQzpyXXaX1F2K` completed at 2026-05-23T12:04:44Z. First fire with CHECK 4 will be 2026-05-29 06:00 UTC (= 14:00 TPE Friday).
 

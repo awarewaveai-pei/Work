@@ -1,7 +1,9 @@
 ﻿#requires -Version 5.1
 <#
 .SYNOPSIS
-  Repair Center Phase 4 weekly check — 3 checks, ~5 minutes.
+  Repair Center Phase 4 weekly check — 4 checks, ~1 minute.
+  Thin wrapper only: every check lives in scripts/phase4-checks.py, which the cloud
+  routine runs too. Adding a check means editing that .py and nothing else.
   Writes report to agency-os/reports/repair-center/phase4-LATEST.md
   Sends Telegram summary to TELEGRAM_ALLOWED_CHAT_IDS.
 
@@ -15,6 +17,8 @@
   Trigger paths (in order of preference):
     1. Claude routine (primary, always-on, no machine dependency)
     2. Manual fallback: chcp 65001 ; powershell -NoProfile -ExecutionPolicy Bypass -File scripts\phase4-weekly-check.ps1
+  Requires Python 3 on PATH (python3 / python / py). Missing -> all four checks report
+  SKIP with the reason in the report body; it must never look like a clean run.
   File saved with UTF-8 BOM so PowerShell 5.1 parses CJK characters correctly
   regardless of system codepage (Big5 / GBK / Shift-JIS, etc). Do not strip the BOM.
 #>
@@ -24,7 +28,9 @@ param(
 )
 
 Set-StrictMode -Version Latest
-$ErrorActionPreference = "SilentlyContinue"
+# 2026-08-26: was SilentlyContinue. That is precisely how the old Check 3 could skip its
+# whole drill branch on malformed input and still report health (reproduced 2026-08-26).
+$ErrorActionPreference = "Continue"
 
 . (Join-Path $PSScriptRoot '_console-encoding-helpers.ps1')
 
@@ -37,11 +43,10 @@ if (Test-Path $WorkRoot) { $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Pat
 $reportDir = Join-Path $WorkRoot "agency-os\reports\repair-center"
 $null = New-Item -ItemType Directory -Force -Path $reportDir
 
-$now       = Get-Date
-$dateLabel = $now.ToString("yyyy-MM-dd HH:mm")
-$results   = [ordered]@{}
+$now   = Get-Date
+$stamp = $now.ToString("yyyy-MM-dd HH:mm")
 
-Write-Host "== Phase 4 週巡檢 $dateLabel ==" -ForegroundColor Cyan
+Write-Host "== Phase 4 週巡檢 $stamp ==" -ForegroundColor Cyan
 
 # ── 執行單一 checker ───────────────────────────────────────────────────────
 # 2026-08-26：本檔不再自己實作任何檢查。全部邏輯在 scripts/phase4-checks.py，
@@ -52,10 +57,8 @@ Write-Host "== Phase 4 週巡檢 $dateLabel ==" -ForegroundColor Cyan
 # $ErrorActionPreference 從 SilentlyContinue 改為 Continue：舊值正是 Check 3 在
 # 資料寫壞時整段靜默跳過、卻仍宣告健康的成因（2026-08-26 實測重現）。這裡改為
 # 逐一檢查 exit code，任何失敗都必須看得見。
-$ErrorActionPreference = "Continue"
 
 $checker     = Join-Path $WorkRoot "scripts\phase4-checks.py"
-$stamp       = $now.ToString("yyyy-MM-dd HH:mm")
 $dateOnly    = $now.ToString("yyyy-MM-dd")
 $latestPath  = Join-Path $reportDir "phase4-LATEST.md"
 $archivePath = Join-Path $reportDir "phase4-$dateOnly.md"

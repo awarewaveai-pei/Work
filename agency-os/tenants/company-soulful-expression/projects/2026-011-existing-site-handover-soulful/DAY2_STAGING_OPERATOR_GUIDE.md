@@ -133,7 +133,8 @@
    - Backup Location, Last Backup 填入
 
 2. **`core/BACKUP_RESTORE_PROOF.md`**：
-   - Restore Drill Record 填入結果（匯入 = restore drill 通過 ✅）
+   - **先**在檔頭 frontmatter 的 `restore_drills` 加一筆（`- date:` / `result: PASS`）—— Phase 4 巡檢只讀這裡
+   - **再**在 Restore Drill Record 填敘述（匯入 = restore drill 通過 ✅），保留 `| Drill date | YYYY-MM-DD |` 那一列供對帳
 
 3. **`sites/soulfulexpression-org/SITE_PROFILE.md`**：
    - Staging URL lifecycle 更新

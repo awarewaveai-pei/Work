@@ -165,8 +165,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     job = await createJob(orgId);
   } catch (e: unknown) {
     // EU 渲染已於上方 render.run() 提交，這裡失敗＝「算力已花但沒有進度票」。刻意不試圖取消 EU：
-    // 影片仍會落到 R2，且 out_name 已帶 org 前綴 → 對帳 sweep 會把它補進畫廊
-    // （lib/content/video/reconcile.ts:95-98）。回 500 讓失敗可見，不假裝成功。
+    // 影片仍會落到 R2。**後盾只在 orgId 非 null 時成立** —— 那時 out_name 帶 org 前綴
+    // （:147 傳入），對帳 sweep 反解得出擁有者並補記（reconcile.ts:95-98）；orgId 為 null 時
+    // out_name 走 `noorg_` 分支，sweep 一律 fail-closed 跳過，影片會成為永久孤兒。
+    // 另：本輪 r2Keys 也不會被 /status 清理（無 job 可掛），留給既有的 age-based 清理。
+    // 回 500 讓失敗可見，不假裝成功。
     console.error("[video/render-draft] createJob failed (EU render already submitted):", e);
     return NextResponse.json(
       { ok: false, error: "無法建立影片工作（job 儲存失敗）；渲染仍在進行，稍後可於歷史紀錄查看" },
