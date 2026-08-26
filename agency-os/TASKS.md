@@ -203,6 +203,8 @@
   - **Google 帳號 `soulfulexpression01@gmail.com` 的密碼** —— 我 grep `AWARE_WAVE_CREDENTIALS.md` 時遮罩規則只涵蓋 `:` `=` `：`，未涵蓋 markdown 表格的 `|` 分隔符
   **根因（同一類、犯了兩次）**：讀含憑證的檔案時，遮罩是「輸出後才套用」而非「不讀取值」。**改善**：日後查證這類檔案改用 `grep -c` / 欄位名列舉 / `Get-VaultSecretFingerprint`，不輸出行內容。
   **DoD**：三項各自輪換並更新 vault 與 `AWARE_WAVE_CREDENTIALS.md`；Telegram token 換發後需重跑 `scripts/configure-telegram-webhook.ps1`。
+  - **【2026-08-26 追加，同款疏失再犯一次】** 查 WPvivid 失敗原因時，`SELECT option_value FROM mwp_mainwp_wpvividmeta WHERE site_id=2` 把 `remote` 欄位整段撈出，其中含 **Soulful 站的 Dropbox `access_token` 明文**，已進入本次對話紀錄。**同樣視為外洩，需輪換**（WPvivid → Remote Storage → 重新授權 Dropbox）。
+  - **教訓已具體化**：查這張表時必須指定欄位並排除 `remote` / `remote_addon`，不可 `SELECT option_value` 全撈。這正是本條原本記載的「遮罩是輸出後才套用而非不讀取值」同一個錯。
 
 - [ ] **【人工｜Postiz Task 2 OAuth app 審核】各平台 dev app 提交** — Meta IG+FB（一個 Meta app，App Review，最高價值）/ Reddit / LinkedIn。callback = `https://postiz.aware-wave.com/integrations/social/<slug>`；client_id/secret 加進 EU `/root/postiz/.env`（`<PLATFORM>_CLIENT_ID/SECRET`）+ restart。
   - **X 跳過**（API $100/月）。非 Claude 可做，等各平台審核通過再接線。
@@ -323,15 +325,30 @@
 
 > 已由 critic 驗證屬實、尚未修。優先於任何功能。
 
-- [ ] **Soulful 每週備份近 8 次失敗 4 次，已 9 天沒有成功備份**
-  - `🔴 現行` · `2026-08-26 開出` · `可直接做（診斷唯讀）`
-  - **一句話**：11/12 要搬的那個客戶站，它的自動備份管線有一半在失敗，而這件事今天才第一次被看見。
-  - **證據**：`agency-os/tenants/company-soulful-expression/core/BACKUP_AUTO_STATUS.json` —— 失敗 `2026-08-24`／`2026-08-10`／`2026-08-03`／`2026-07-06`，成功 `08-17`／`07-27`／`07-20`／`07-13`。`last_success.iso_utc = 2026-08-17T00:15:04Z`（9 天前）。
-  - **唯一有具體原因的那次**：`2026-07-06` 回 `WPvivid_Google_Service_Exception` → 指向 Google Drive 授權／配額。其餘幾次 `reason` 只有 `"Failed,"`，等於沒有原因。
-  - **為什麼今天才看見**：Phase 4 Check 3 先前被卡在誤報的 3A，2026-08-26 修好後 3B/3C 才第一次真的量到東西。這正是 `detector-contract` 那條要處理的同一類問題。
-  - **不要誤讀**：2026-08-16 還原演練 PASS 用的是 EU 上三份手動備份（769 MB），**不是**這條 WPvivid → Google Drive 管線。兩者是不同東西，演練通過不代表這條管線健康。
-  - **下一步**：① 讀 MainWP DB `mwp_mainwp_wpvividmeta` site_id=2 的完整 `report_addon` 取真實錯誤字串 ② 判斷是 Google Drive token 過期、配額滿、還是站上 WPvivid 執行逾時 ③ 修好後連跑兩週確認連續成功。
-  - **完成定義**：連續 2 次週備份 `Succeeded`，且 `last_failure.reason` 不再是空字串（失敗必須帶得走的原因）。
+- [ ] **🔴 EU 的保留政策把「還原演練證明過的備份」刪掉了**
+  - `🔴 現行` · `2026-08-26 發現` · `可直接做`
+  - **一句話**：2026-08-16 演練 PASS 的那三份 Soulful 備份，被每晚的保留清理當成過期快照 `rm -rf` 掉了。
+  - **實測**：`ssh EU` → `/root/backups/clients/` **不存在**；限定範圍 find 只找到 repo checkout，找不到 `code-20260816*` / `db-20260815*` 任何一份。
+  - **根因（原文）**：`/root/scripts/backup-eu-stack.sh:194-196`
+    - `find "${BACKUP_DIR}" -maxdepth 1 -mindepth 1 -type d -mtime +"${BACKUP_RETAIN_DAYS}" -exec rm -rf {} +`
+    - `BACKUP_DIR=/root/backups`（`:29`）、`BACKUP_RETAIN_DAYS=7`（`:30`）
+    - **它刪的是「任何」超過 7 天的頂層目錄，沒有比對快照命名規則**（`YYYYMMDD-HHMMSS`）。`clients/` 的 mtime 停在 08-16，約 08-24 就被掃掉。`from-sg/` 活下來只因為它每晚有新子目錄、mtime 一直更新。
+  - **後果**：Soulful 目前只剩 Google Drive 那一份（最後成功 `2026-08-17`），而那條管線本身 5/10 失敗（見上一條）。**兩層安全網剩一層，且那一層是壞的那層。**
+  - **文件已與事實不符**：`agency-os/tenants/company-soulful-expression/core/BACKUP_RESTORE_PROOF.md:63,136,172` 仍宣告備份存放在 `204.168.175.41:/root/backups/clients/soulful/`。**這是「文件說謊」的實例，要一起修。**
+  - **修法方向（治本，非補丁）**：保留清理只能刪**自己產生的**快照 —— 用命名樣式 `[0-9]{8}-[0-9]{6}` 過濾，或改成刪 manifest 記錄過的目錄。**不要只把 clients/ 搬到別處了事**，那只關掉這一個實例，下次任何人往 `/root/backups/` 放東西都會再被刪一次。
+  - **完成定義**：① prune 只匹配快照命名 ② 造一個假的非快照目錄跑一次，確認它沒被刪 ③ Soulful 三份備份重建並更新 `BACKUP_RESTORE_PROOF.md` ④ 演練證據改存不會被輪替的位置。
+
+- [ ] **Soulful 備份：5 次失敗全部是 Google Drive API 速率限制（已診斷，修法已在手邊）**
+  - `🔴 現行` · `2026-08-26 診斷完成` · `可直接做`
+  - **一句話**：11/12 要搬的客戶站，每週備份一半在失敗，原因單一而且已經查到。
+  - **根因（實測，非推測）**：`mwp_mainwp_wpvividmeta` site_id=2 的 `report_addon` 共 10 筆 —— **成功 5、失敗 5，5 次失敗全部是同一個原因**：
+    - HTTP `403` / `"reason": "rateLimitExceeded"` / `"status": "PERMISSION_DENIED"`
+    - 訊息原文：`Quota exceeded for quota metric 'Queries' and limit 'Queries per minute' of service 'drive.googleapis.com' for consumer 'project_number:134809148507'`
+    - **storage 滿 = 0 次、認證錯誤 = 0 次**。所以不是空間不足也不是 token 過期，是 WPvivid 共用的那個 Google API 專案被打爆每分鐘查詢配額。
+  - **修法就在原地**：該站 WPvivid **已經設好一個 Dropbox remote**（`wpvivid-remote-soulful-dropbox`，名稱 `SoulfulDBBackup`，路徑 `/soulfulexpression.org/`，token 已存在），但 `remote_selected` 目前指向 Google Drive 那個。**切過去即可完全避開這個共用專案的配額。**
+  - **下一步**：① 在 MainWP → WPvivid 把 soulful 的 remote 改選 Dropbox ② 手動觸發一次備份確認成功 ③ 連跑兩週確認穩定 ④ 再決定要不要保留 Google Drive 當第二目的地。
+  - **完成定義**：連續 2 次週備份 `Succeeded`，且 `BACKUP_AUTO_STATUS.json` 的 `last_failure.reason` 不再是空字串（失敗必須帶得走原因 —— 目前那個欄位只寫 `"Failed,"`，真正的 JSON 在 MainWP DB 裡沒被同步出來）。
+  - **附帶缺口**：`sync-backup-status-from-mainwp.sh` 只搬了 `"Failed,"` 這幾個字，把後面整段 JSON 錯誤訊息丟掉了 —— 所以 repo 這一側看不到原因，我是直接查 DB 才拿到的。這條要一起修。
 
 - [ ] **`cf-iprefresh` 偵測器已 error 14 天，而且沒有任何讀者**
   - `🔴 現行` · `2026-08-26 開出` · `可直接做`
@@ -428,13 +445,25 @@
   - **修法方向**：比對前先剝除 heredoc 區塊與引號字串，或只看指令的第一個 token。
   - **不要**用「加白名單」了事那是逐點消音。SSOT：`mcp/claude-userlevel/hooks/rules/verify-gate-commit.js`。
 
-- [ ] **【2026-08-26 開出｜治理｜來源未定位】某個 session 用廣域 `git add` 一次 commit 1247 檔並 push，把別的 session 未驗證的工作掃進 main** — `2dbe858a`（2026-08-26 14:08，主題是報告保留政策）的檔案清單含 **1247 個檔**，其中包含另一個 session 當時尚未通過 `/verify-recent` 的 `scripts/phase4-checks.py`、4 份 `BACKUP_RESTORE_PROOF.md`，以及一顆 `scripts/__pycache__/*.pyc` 編譯產物。
-  - **這正是 `.gitignore**:**170-176` 註解已記載過的失效樣態**（「auto-checkpoint 的 `git add -A` 把產物 commit 進 SSOT」），而今早 `680db6c6`/`7251d14d`/`c63bdc5c` 才剛移除三個自動 commit 呼叫點所以來源**不是**那三個，是別的東西。
-  - **要查**：哪支腳本／哪個流程仍在做廣域 add（`ao-close.ps1` 的 `git add -A`？`/checkpoint`？還是代理手打？）。
-  - **已處置**：`.pyc` 已 `git rm --cached` + `.gitignore` 補 `__pycache__/` `*.py[cod]`。
-  - **未處置**：commit message 與內容不符這件事對那幾個檔已無法補救（不 revert
-  - `2dbe858a` 同時含一個完整合理的功能）。
-  - **為何要修**：commit message 是本 repo 的 30 秒故障手冊，1247 檔一鍋端會讓那個性質整批失效。
+- [ ] **【2026-08-26 開出｜治理｜✅ 根因已定位 2026-08-26】廣域 `git add -A` 把別的 session 未驗證的工作掃進不相干的 commit**
+  - `🟠 根因已定位，待建閘` · `2026-08-26`
+  - **根因**：**不是腳本、不是 hook —— 是代理自己在 Bash 打的 `git add -A`。**
+  - **直接證據**：`.claude/bash-commands.log:21462`（`05:34:05Z` → `84f6f3ec`）與 `:21611`（`06:08:25Z` → `2dbe858a`，1247 檔）兩行都是 `cd "D:/Work" && git add -A && git commit …`。
+  - **排除法**：全 repo 掃 `git add -A|git add .|git add --all`，主流程只剩 `scripts/ao-close.ps1:652` 一處活的；而那兩顆 commit 的訊息都不是 AO-CLOSE 產生的，故不是它。
+  - **`2dbe858a` 的組成**：1208 D（報告保留政策真的要刪的舊 status 檔，正當）+ 27 M + 8 A + 4 R —— 掃進來的包括 `scripts/__pycache__/*.pyc`、`phase4-checks.py`、4 份 `BACKUP_RESTORE_PROOF.md`、video route 檔、`.claude/sessions`。**內容本身都通過驗證，壞掉的是「commit message = 30 秒故障手冊」這個 R2 保證。**
+  - **該 session 已自我修正**：`06:16` 發現 .pyc 後，之後 4 次 commit 全改具名 add（log `:21685`、`:21691`、`:21723`、`:21747`）。
+  - **機械閘缺口（真正要補的）**：`mcp/claude-userlevel/hooks/rules/` 20 條規則 **grep `git add` 零命中** —— 今早移除三個自動 commit 呼叫點只關掉「腳本自動做」，「代理手動做」這條從來沒被關過。
+  - **完成定義**：新增一條 PreToolUse 規則，Bash 內出現 `git add -A` / `git add .` / `git add --all` 時 BLOCK 並要求改具名路徑；豁免需在命令首行寫明理由（比照 `high-risk-bash-warn.js` 的 `# CONFIRMED-HIGH-RISK:` 形式）。
+
+- [ ] **【2026-08-26 開出｜治理｜具名 add 也擋不住】兩個 session 編輯同一檔案時，`git add -- <file>` 一樣會帶走對方未提交的編輯**
+  - `🟠 未開始` · `2026-08-26` · `與上一條是不同的失效模式，不要合併`
+  - **一句話**：把 `git add -A` 改成具名 add 解決不了這一類 —— git 暫存的是「磁碟上的整個檔案」，不是「你改的那幾行」。
+  - **實例**：`0b4057f7`（`06:31:01Z`，log `:21723`）用的是 **已經具名的** `git add -- agency-os/WORKLOG.md agency-os/TASKS.md`，仍然把另一 session 當時未提交的 `TASKS.md` 編輯（`條目格式規約`、`cf-iprefresh` 等）一起 commit 掉，掛在「Phase 4 改版雲端實跑驗證」這個不相干的訊息下。
+  - **證據**：`git log -S "條目格式規約" -- agency-os/TASKS.md` → `0b4057f7`。
+  - **為什麼上一條的修法擋不住**：具名 add 限制的是「哪些檔案」，這一類的問題是「同一個檔案裡有兩個作者」。
+  - **既有規則不夠**：`agency-os/AGENTS.md` §跨模型 oracle 已有紅線「禁止讓 Claude 與 Codex 同時修改同一份檔案」，但 ① 純文字、無機械強制 ② 只寫 Claude↔Codex，**沒有涵蓋 Claude↔Claude**。
+  - **修法方向（需先設計，勿直接改）**：可能是 commit 前比對 `code-change-tracker.js` 的本 session 觸碰清單與 staged 清單，出現「我沒碰過卻被我 stage」時警告；或在多 session 並行時對共享檔案加 advisory lock。**先確認哪一個真的可行再動手。**
+  - **注意**：這不是 git 用法錯誤，是缺少不變量。上一條是行為錯誤，這一條是架構缺口。
 
 - [ ] **【2026-08-26 開出｜小｜人體工學，非安全機制】`record-restore-drill` 一鍵記錄還原演練** — 目前記錄一次演練要手寫兩處（frontmatter `restore_drills` + 敘述段落）。
   - **安全性已由對帳掃描保證**（`phase4-checks.py` 的 3A2：敘述有 `| Drill date | ... |` 而 frontmatter 沒有 → WARN 並附可貼上的 YAML），所以這條**只是省事，不是補洞**，優先度低。做的話：一支腳本吃 `--tenant/--date/--result/--note`，同時寫兩處；錨點 `## Restore Drill Record` 找不到就 exit 非 0，不得靜默寫到檔尾。

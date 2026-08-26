@@ -2,6 +2,66 @@
 
 ## 2026-08-26
 
+### AUTO_TASK_DONE: 定位「大批 commit 掃走別人工作」的根因 + Soulful 備份兩層同時查證
+
+[任務]
+操作者兩題：① 那件事為什麼會發生、是好是壞 ② Soulful 那條備份。
+
+[① 根因已定位 —— 另一 session 標記為「尚未定位」的那個]
+**不是腳本、不是 hook，是代理自己在 Bash 打的 `git add -A`。**
+- 直接證據：`.claude/bash-commands.log:21462`（`05:34:05Z` → `84f6f3ec`）、`:21611`（`06:08:25Z` → `2dbe858a`，1247 檔），兩行都是 `cd "D:/Work" && git add -A && git commit …`
+- 排除法：全 repo 掃 `git add -A|git add .|git add --all`，主流程只剩 `scripts/ao-close.ps1:652` 一處活的；那兩顆 commit 都不是 AO-CLOSE 產生的
+- `2dbe858a` 組成：1208 D（報告保留政策真的要刪的舊檔，**正當**）+ 27 M + 8 A + 4 R；掃進來的有 `.pyc`、`phase4-checks.py`、4 份 `BACKUP_RESTORE_PROOF.md`、video routes、`.claude/sessions`
+- **該 session 已自我修正**：`06:16` 發現 .pyc 後，之後 4 次 commit 全改具名 add（log `:21685`/`:21691`/`:21723`/`:21747`）
+
+[① 的判斷：一半是錯誤行為，一半不是 —— 而且我先前講錯了一半]
+- **`git add -A` = 錯誤行為**。工作樹是多 session 共用的，廣域 add 等於替別人決定要不要提交。它同時毀掉 R2 的「commit message = 30 秒故障手冊」。
+- **但掃走我 TASKS.md 的那顆不是它**。`0b4057f7`（log `:21723`）用的是 **已經具名的** `git add -- agency-os/WORKLOG.md agency-os/TASKS.md`，仍然帶走我未提交的編輯。**因為 git 暫存的是「磁碟上的整個檔案」，不是「你改的那幾行」。**
+- 所以這是**兩個不同的失效模式**：前者是行為錯誤（可用 hook 擋），後者是架構缺口（具名 add 擋不住，因為問題是「同一個檔案有兩個作者」）。我先前對操作者說「`git add -A` 會吸走別的 session」，對第一種成立，對發生在我身上的那次不成立。
+- **機械閘缺口**：`mcp/claude-userlevel/hooks/rules/` 20 條規則 grep `git add` **零命中**。今早移除三個自動 commit 呼叫點只關掉「腳本自動做」，「代理手動做」從來沒被關過。
+- **既有紅線不夠**：AGENTS.md §跨模型 oracle 有「禁止兩個 agent 同改一檔」，但無機械強制，且只寫 Claude↔Codex，沒涵蓋 Claude↔Claude。
+- 兩條已分別入 TASKS（治理區），**刻意不合併**。
+
+[② Soulful 備份 —— 兩層都查，結果比原本以為的嚴重]
+**先做 VBC**：讀 WORKLOG 2026-08-16「還原演練 PASS + 補上備份缺口」，確認那次是**刻意繞開 Hostinger**、用 EU 手動備份做的，**沒有碰過 WPvivid → Google Drive 這條**。所以不是「沒人管」，是兩層裡壞了一層 —— 結果查下去發現另一層也沒了。
+
+**層 1（WPvivid → Google Drive，每週）**：`mwp_mainwp_wpvividmeta` site_id=2 `report_addon` 10 筆 —— 成功 5、失敗 5，**5 次失敗全部同一個原因**：HTTP `403` / `reason: rateLimitExceeded` / `status: PERMISSION_DENIED`，訊息為 `drive.googleapis.com` 的 `Queries per minute` 配額（consumer `project_number:134809148507`）。**storage 滿 0 次、認證錯誤 0 次。**
+→ **修法就在原地**：該站已設好一個 Dropbox remote（`wpvivid-remote-soulful-dropbox`），只是 `remote_selected` 指著 Google Drive。切過去即可避開共用專案的配額。
+
+**層 2（EU 手動備份）—— 已被刪除**：`/root/backups/clients/` 不存在；限定範圍 find 找不到 `code-20260816*` / `db-20260815*` 任一份。
+根因原文 `/root/scripts/backup-eu-stack.sh:194-196`：`find "${BACKUP_DIR}" -maxdepth 1 -mindepth 1 -type d -mtime +"${BACKUP_RETAIN_DAYS}" -exec rm -rf {} +`，`BACKUP_DIR=/root/backups`（`:29`）、`BACKUP_RETAIN_DAYS=7`（`:30`）。
+**它刪任何超過 7 天的頂層目錄，不比對快照命名**。`clients/` mtime 停在 08-16，約 08-24 被掃掉；`from-sg/` 活著只因為每晚有新子目錄。
+**後果**：Soulful 只剩 Google Drive 一份（最後成功 `2026-08-17`），而那條 5/10 失敗。**兩層剩一層，且剩的是壞的那層。**
+**文件已說謊**：`BACKUP_RESTORE_PROOF.md:63,136,172` 仍宣告備份在 `/root/backups/clients/soulful/`。
+
+[我自己在本輪犯的錯 —— 不隱瞞]
+查失敗原因時用 `SELECT option_value FROM mwp_mainwp_wpvividmeta WHERE site_id=2`，把 `remote` 欄位整段撈出，其中含 **Soulful 站 Dropbox `access_token` 明文**，已進入對話紀錄。**與 TASKS 上那條「2026-08-15 transcript 憑證外洩」是同款疏失，我又犯一次**，已追加進該條的待輪換清單。教訓具體化：查該表必須指定欄位並排除 `remote`/`remote_addon`，不可 `SELECT option_value` 全撈。
+
+[已修改]
+1. `agency-os/TASKS.md` —— 改寫「來源未定位」那條為根因已定位（含 log 行號）；新增「具名 add 也擋不住」獨立條目
+2. `agency-os/TASKS.md` —— 改寫 Soulful 備份條目為完整診斷 + 修法；新增「EU 保留政策刪掉演練備份」🔴 條目
+3. `agency-os/TASKS.md` —— 憑證輪換條目追加 Dropbox token
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`grep -n 'git add' .claude/bash-commands.log` | 命中 `:21462`/`:21611` 兩行 `git add -A`，以及 `:21685`/`:21691`/`:21723`/`:21747` 四行具名 add —— 根因與自我修正時間點皆有原始命令佐證
+- REALTEST_EVIDENCE: tool=Bash | cmd=`git show --name-status 2dbe858a` | 1247 檔 = 1208 D + 27 M + 8 A + 4 R
+- REALTEST_EVIDENCE: tool=Bash | cmd=`git log -S '條目格式規約' -- agency-os/TASKS.md` | → `0b4057f7`（證明具名 add 那顆才是掃走我工作的）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`ls /root/backups/clients/` on EU | **目錄不存在**；`find /root /opt /srv /var/backups -maxdepth 4 -iname '*soulful*'` 只回 repo checkout
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sed -n '188,205p' /root/scripts/backup-eu-stack.sh` | 取得 prune 原文與 `BACKUP_RETAIN_DAYS=7`
+- REALTEST_EVIDENCE: tool=SSH | cmd=MainWP DB 計數查詢（`REPLACE` 長度差法）| `rateLimit=5 / userRateLimit=0 / storageFull=0 / authError=0 / succeeded=5 / failed=5`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`print-open-tasks.ps1` | `Total open: 90`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`verify-archive-tasks-lift.ps1` | **RESULT: PASS (exit=0)**
+- REVIEW_WAIVED: NA -- 本輪為調查 + TASKS 入庫，無程式碼與腳本改動；每項結論都以遠端實測或原始命令紀錄佐證，且含一項推翻我自己先前說法的訂正
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=`git add -A|clients/soulful|BACKUP_RETAIN_DAYS|rateLimitExceeded` | hits=4 —— `ao-close.ps1:652`（唯一活的廣域 add，已有 TASKS 追蹤）、`BACKUP_RESTORE_PROOF.md:63,136,172`（文件與事實不符，已入庫）、`backup-eu-stack.sh:194`（根因）、hooks rules 零命中（閘缺口）
+
+[剩餘風險]
+- **Soulful 目前只有一份 9 天前的備份，且產生它的管線 5/10 失敗。** 這是本輪最需要先處理的事，優先於任何排版或治理工作。
+- 我沒有動 `backup-eu-stack.sh`、`BACKUP_RESTORE_PROOF.md`、WPvivid 設定 —— 前者屬 EU 生產腳本（改動需操作者授權），後兩者需先決定修法。
+- Dropbox token 已外洩待輪換。
+
+[rollback]
+`git revert` 單一 commit（純 TASKS/WORKLOG 文字）。遠端未做任何寫入，全程唯讀查詢。
+
 ### AUTO_TASK_DONE: TASKS 條目拆行 + 偵測器契約 class 入庫（調查完成，依指示不動工）
 
 [任務]
