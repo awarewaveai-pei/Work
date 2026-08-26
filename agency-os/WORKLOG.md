@@ -2,6 +2,57 @@
 
 ## 2026-08-26
 
+### AUTO_TASK_DONE: 從一封 LLAR 通知查出 EU origin 未鎖 CF + 針對性暴力破解 320 次
+
+[任務]
+操作者轉來 2026-08-21 的 LLAR 封鎖通知（12 次失敗／3 次封鎖／來源 `172.69.9.166`／帳號 `awmainwp`）。查證實況。
+
+[結論：通知本身低估了狀況，而且真正的問題不在「有人試密碼」]
+
+**① 來源 IP 是 Cloudflare，不是攻擊者**
+RDAP 查 `172.69.9.166` → `CLOUDFLARENET`（`172.64.0.0`–`172.71.255.255`）。目前 `limit_login_retries` 裡的 `172.71.164.176`、`172.71.164.166` 同樣是 CF。加上通知裡那個，已是三個不同邊緣節點。
+
+**② LLAR 看不到真實 IP —— 封鎖無效，而且會誤傷**
+- `limit_login_client_type` 未設定 → 走預設 `REMOTE_ADDR`
+- host nginx **沒有** `set_real_ip_from` / `real_ip_header`（`grep -rn` on `/etc/nginx/` 零命中）
+- 容器 Apache 有 `remoteip.load`，但 `RemoteIPInternalProxy` 只涵蓋 `10/8`、`172.16/12`、`192.168/16`、`169.254/16` —— **CF 的 `172.64/13` 不在其中**，所以 Apache 停在 CF IP
+→ 攻擊者換一個 CF 邊緣即繞過封鎖；**而封鎖一個 CF 節點會擋掉共用該節點的正常訪客，包含出國中的操作者**（與 memory `feedback_global_traveler` 直接相關）。
+
+**③ 規模：不是零星，是針對性**
+`limit_login_logged`：**98 個不同 IP**。帳號嘗試彙總 —— **`awmainwp` 320 次**、`admin` 1 次、`websitesupport@getpagehub.com` 1 次。`limit_login_lockouts_total = 322`。
+`awmainwp` 經 `wp user list` 確認是**真實 administrator**（`peijingartstudio@gmail.com`，2026-05-09 建立）。**攻擊者知道正確使用者名稱** —— `admin` 只試 1 次就放棄，形狀是「已知目標」而非字典掃描。
+
+**④ 真正的根本問題：EU origin 對全世界開放**
+`ufw status` → `80/tcp ALLOW Anywhere`、`443/tcp ALLOW Anywhere`。access log 實證有非 CF 網段直接命中 origin：`205.210.31.240`、`205.210.31.93`、`198.235.24.227` 打 `/wp-login.php` 皆回 **200**。
+→ **任何人可繞過 Cloudflare 直打 `204.168.175.41:443`，CF 的 WAF／Bot Fight Mode／限流全部形同虛設。**
+
+**⑤ 與今日稍早的發現直接相扣**
+`reports/status/cf-iprefresh-LATEST.json` 自 `2026-08-12` 起 `status=error`、`v4_ranges=0`、訊息 `[cf-lockdown] ERROR: ipsets not found. Run --apply first.`，且 grep 證實**該 artifact 沒有任何讀者**。
+今天早上我把它列為「偵測器沒有讀者」的實例；**現在看到的是它的後果** —— origin lockdown 壞了兩週，期間累積 320 次針對性嘗試，沒有任何機制發出訊號。那封 LLAR 信是唯一漏出來的訊號，而它指向的還是錯的 IP。
+
+[已修改]
+`agency-os/TASKS.md` —— D 區新增 🔴 條目，含三項修法與**執行順序約束**。
+
+[修法與順序（皆 High risk，未執行，等 go-ahead）]
+- **(a) 先做**：host nginx 加 `set_real_ip_from <CF 網段>` + `real_ip_header CF-Connecting-IP`。**修在 proxy 層不是 LLAR 設定** —— 一次修好所有外掛與日誌，不是逐一補丁。
+- **(b) 後做**：UFW 80/443 限縮到 CF 網段。**不是 geo 封鎖**，操作者出國仍走 CF，與 `feedback_global_traveler` 不衝突。
+- **(c)**：`awmainwp` 使用者名稱已外洩，考慮改名或加 2FA。
+- **順序不可顛倒**：先鎖 origin 而 CF 網段清單是空的（現況 `v4_ranges=0`）會直接自鎖。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=curl | cmd=`rdap.arin.net/registry/ip/172.69.9.166` | `CLOUDFLARENET` / `172.64.0.0`–`172.71.255.255`
+- REALTEST_EVIDENCE: tool=SSH+WP-CLI | cmd=`wp user list` on mainwp-web | `awmainwp` = administrator，非偽造帳號
+- REALTEST_EVIDENCE: tool=SSH+WP-CLI | cmd=`wp eval-file` 讀 `limit_login_logged` / `limit_login_retries` | 98 IP、`awmainwp` 320 次、lockouts_total 322、目前 retries 兩個 IP 皆 CF
+- REALTEST_EVIDENCE: tool=SSH | cmd=`grep -rn "set_real_ip_from\|real_ip_header" /etc/nginx/` | **零命中**；容器 `remoteip.conf` 的 InternalProxy 網段不含 `172.64/13`
+- REALTEST_EVIDENCE: tool=SSH | cmd=`ufw status` + `ss -tlnp` | 80/443 `ALLOW Anywhere`、nginx 監聽 `0.0.0.0`
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker logs mainwp-web \| grep wp-login` 排除 CF 網段 | 三筆非 CF 掃描器直打 origin 回 200
+- REVIEW_WAIVED: NA -- 純唯讀調查，未修改任何遠端狀態；每項結論皆有指令與輸出
+
+[剩餘風險]
+- **攻擊仍在進行中**，且目前沒有任何有效阻擋（LLAR 擋錯對象、origin 未鎖）。
+- 未確認密碼強度或是否已有成功登入。**下一步應查 `wp_users` 最後登入時間與是否有非預期的 session／新增使用者**，本輪未做。
+- 未動任何生產設定，維持現狀等待 go-ahead。
+
 ### AUTO_TASK_DONE: Soulful 自動備份修復 —— 分塊 2 MB → 30 MB，三次實測全 Succeeded
 
 [任務]

@@ -325,6 +325,23 @@
 
 > 已由 critic 驗證屬實、尚未修。優先於任何功能。
 
+- [ ] **🔴 EU origin 對全世界開放 80/443，wp-login 正被針對性暴力破解（320 次打真實管理員帳號）**
+  - `🔴 現行｜資安` · `2026-08-26 查證` · `修法屬 High risk，需操作者明示 go-ahead`
+  - **觸發**：LLAR 於 2026-08-21 15:54 寄出封鎖通知（12 次失敗／3 次封鎖，來源 `172.69.9.166`）。查下去發現通知本身**低估了實況**。
+  - **① 攻擊規模（實測）**：`limit_login_logged` 有 **98 個不同 IP**；帳號嘗試彙總 —— **`awmainwp` 320 次**、`admin` 1 次、`websitesupport@getpagehub.com` 1 次。`limit_login_lockouts_total = 322`。
+    - **`awmainwp` 是真實的 administrator 帳號**（`peijingartstudio@gmail.com`，建立於 2026-05-09）。攻擊者**知道正確使用者名稱**，不是亂猜 —— `admin` 只試了 1 次。
+  - **② origin 沒有鎖到 Cloudflare（根本問題）**：EU `ufw status` 顯示 `80/tcp ALLOW Anywhere`、`443/tcp ALLOW Anywhere`。實測 access log 有非 CF 網段直接命中：`205.210.31.240`、`205.210.31.93`、`198.235.24.227` 打 `/wp-login.php` 皆回 **200**。
+    - **後果**：任何人可繞過 Cloudflare 直接打 `204.168.175.41:443`，CF 的 WAF／Bot Fight Mode／限流**全部形同虛設**。
+    - **與今日另一條發現直接相扣**：`reports/status/cf-iprefresh-LATEST.json` 自 `2026-08-12` 起 `status=error`、`v4_ranges=0`、訊息 `[cf-lockdown] ERROR: ipsets not found. Run --apply first.`，而**該檔沒有任何讀者**。origin lockdown 壞了兩週沒人知道 —— 這就是它的後果。
+  - **③ LLAR 看不到真實 IP，封鎖無效且會誤傷**：`limit_login_client_type` 未設定 → 走預設 `REMOTE_ADDR`；host nginx **沒有** `set_real_ip_from`／`real_ip_header`；容器 Apache 的 `RemoteIPInternalProxy` 只涵蓋 `10/8`、`172.16/12`、`192.168/16`，而 CF 是 `172.64/13` **不在其中**。
+    - 所以 LLAR 記錄／封鎖的是 CF 邊緣節點（`172.69.9.166`、`172.71.164.176`、`172.71.164.166`…）。攻擊者換一個邊緣就繞過；**而封鎖一個 CF 節點會連帶擋掉共用該節點的正常訪客 —— 包含出國中的操作者**。
+  - **修法（三項，皆需 go-ahead）**：
+    - **(a) 還原真實 IP（先做，零風險且是其他修法的前提）**：host nginx 加 `set_real_ip_from <CF 網段>` + `real_ip_header CF-Connecting-IP`。**修在 proxy 層而非 LLAR 設定**，一次修好所有外掛與日誌，不是逐一打補丁。
+    - **(b) origin 鎖到 CF 網段**：UFW 80/443 改為只允許 Cloudflare IP。**不是 geo 封鎖**，操作者出國仍走 CF 正常連線（與 `feedback_global_traveler` 不衝突）。需先修好 `refresh-cf-origin-ips.ps1`（見上方 `cf-iprefresh` 待辦），否則網段清單會過期而自鎖。
+    - **(c) 帳號層**：`awmainwp` 使用者名稱已外洩，考慮改名或加 2FA。
+  - **不可先做 (b) 再做 (a)**：先鎖 origin 而 CF 網段清單是空的（目前 `v4_ranges=0`）會直接把自己鎖在外面。
+  - **完成定義**：① nginx 還原後 LLAR 記錄到的是真實 IP（非 `172.6x/17x`）② 從非 CF IP 直打 `204.168.175.41:443` 應被拒 ③ `cf-iprefresh-LATEST.json` 回 `status=ok` 且 `v4_ranges>0` ④ 該 artifact 接上讀者，下次壞掉看得見。
+
 - [ ] **【2026-08-26 開出｜🔴 客戶站已破圖｜刪影片會靜默弄破已發布的文章】`video/[id]` DELETE 無引用檢查** — **現行損害（實測）**：Soulful Expression 上線文章 `感恩日記：改變人生的五分鐘習慣`（post id 7393，`https://soulfulexpression.org/insights/general/...`）嵌著 `https://pub-bd79a1c3b4554025bd92a6192b032427.r2.dev/video/感恩日記_改變人生的五分鐘習慣/16x9.mp4`，該物件 **HTTP 404**（陰性對照：仍存在的 `三個習慣_...` 回 200）。客戶頁面上是一個壞掉的影片。
   - **成因不是 `video/cleanup`**：2026-08-26 實查 SG crontab，`video/cleanup` **根本沒有 cron entry，從未執行過**（等於一段沒接線的程式碼，本身也該處理）。
   - **真正的類別**：`app/api/video/embed-to-wp/route.ts:60,65` 把**裸 R2 URL** 寫進 WP 文章內容；`app/api/video/[id]/route.ts:52` 的 `deleteVideoObjects()` 是 **LIST 整個 `video/<dir>/` 後全刪**，且**完全不檢查該影片是否正被任何已發布文章引用**。兩者之間沒有任何對帳。⇒ **從畫廊刪任何一支影片，都可能靜默弄破一個或多個客戶的線上頁面，而且不會有任何訊息。**
