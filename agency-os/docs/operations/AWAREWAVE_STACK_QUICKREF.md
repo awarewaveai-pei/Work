@@ -3,7 +3,7 @@
 > 所有伺服器、容器、路徑、端口的事實參考。
 > 從 AGENTS.md 移出，避免讓 system prompt 過重。
 > 規則（禁止事項、SOP）仍在 AGENTS.md。
-> Last updated: 2026-06-26
+> Last updated: 2026-08-26（SSH 實查 `docker ps` + nginx `server_name` 全量比對，非文件推測）
 >
 > **📍 本檔 = 機器拓樸唯一正本（topology SSOT）。** 「誰跑在哪台、什麼容器、什麼 port」以此為準。
 > 各 stack 的**部署/設定細節**另有正本（改容器時這幾處要一起改）：
@@ -28,6 +28,12 @@
 | `lobster-node-api` | Node.js API (Express, port 3001) | api.aware-wave.com/api/ → node-api:3001 |
 | `lobster-next-admin` | Next.js 15 Admin (port 3000 內部 / 3002 host) | app.aware-wave.com → next-admin:3000 |
 | `lobster-redis` | Redis 7 (127.0.0.1:6379) | 內部 |
+| `oracle-web` | Next.js（紫微斗數命理 app「Oracle」，`Projects/internal/ziwei-doushu/`）| oracle.aware-wave.com → 127.0.0.1:3010 |
+| `lobster-loki` | Loki 2.9.4（日誌儲存）| 內部 127.0.0.1:3100 |
+| `lobster-grafana-obs` | Grafana 10.4.3 | 內部 127.0.0.1:3009（SSH tunnel 存取，不對外）|
+| `lobster-promtail` | Promtail 2.9.4（日誌收集）| 內部，無對外 port |
+
+> **10 個容器，2026-08-26 `docker ps -a` 實查**（此前表格只列 6 個，漏了 oracle-web + 觀測堆疊三容器）。
 
 **nginx**
 - rate limits: public 30r/s / admin 20r/s / webhook 10r/s / wplogin 5r/m
@@ -50,11 +56,17 @@
 
 ## EU VPS `204.168.175.41` — Services
 
-| 服務 | compose SSOT | VPS 路徑 |
-|-----|-------------|---------|
-| Trigger.dev | `lobster-factory/infra/trigger/docker-compose.yml` | `/root/trigger/` |
-| Supabase | `lobster-factory/infra/supabase/docker-compose.yml` | `/root/supabase/` |
-| n8n | `lobster-factory/infra/n8n/docker-compose.yml` | `/root/n8n/` |
+> **29 個容器分 7 個服務群，2026-08-26 `docker ps -a` + nginx `server_name` + Cloudflare DNS 三方交叉核對**。此前表格只列 3 個服務（Trigger.dev/Supabase/n8n），**Postiz、MainWP、Uptime Kuma、Remotion、Video 五個服務完全沒被記錄**——其中 Remotion/Video 還是有對外網域的真實服務，不是內部輔助容器（見 `agency-os/TASKS.md` EU⑥b）。
+
+| 服務群 | 對外網域 | compose SSOT | VPS 路徑 | 容器 |
+|-----|-----|-------------|---------|------|
+| Supabase | studio.aware-wave.com / supabase.aware-wave.com | `lobster-factory/infra/supabase/docker-compose.yml` | `/root/supabase/` | supabase-db / -pooler / -studio / -kong / -storage / -edge-functions / -meta / -auth / -rest / -imgproxy / `realtime-dev.supabase-realtime`（11）|
+| Trigger.dev | trigger.aware-wave.com | `lobster-factory/infra/trigger/docker-compose.yml` | `/root/trigger/` | trigger-webapp / -clickhouse / -supervisor / -docker-proxy / -electric / -postgres / -redis / -minio / -registry / `buildx_buildkit_trigger0`（10）|
+| n8n | n8n.aware-wave.com | `lobster-factory/infra/n8n/docker-compose.yml` | `/root/n8n/` | n8n（1）|
+| Postiz | postiz.aware-wave.com | — | `/root/postiz/` | postiz / postiz-redis（2）|
+| MainWP | mainwp.aware-wave.com | — | `/root/mainwp/docker-compose.yml` | mainwp-web / mainwp-db（2）|
+| Uptime Kuma | uptime.aware-wave.com | — | — | uptime-kuma（1）|
+| Remotion/Video | remotion-svc.aware-wave.com / video-svc.aware-wave.com | — | — | lobster-remotion-service / lobster-video-service（2）|
 
 - n8n 網路: `supabase_default`；DB: `supabase-db:5432` database `n8n`
 - ClickHouse: `CLICKHOUSE_IMAGE_TAG=25.7.5-debian-12-r0`（**禁升 latest / 降回 24.x**）
@@ -68,6 +80,16 @@
 - Key: `~/.ssh/hetzner_trigger`（SG + EU 兩台共用，password login DISABLED）
 
 ---
+
+## Cloudflare Zones（帳號下全部 5 個，2026-08-26 API 實查）
+
+| Zone | 狀態 | 說明 |
+|---|---|---|
+| aware-wave.com | 使用中 | 13 筆 A/CNAME，全部指向 SG（4）或 EU（9），見上兩節 |
+| soulfulexpression.org | 使用中 | 指向 Hostinger `191.101.230.176`，待搬遷（見 TASKS.md A 區）|
+| hope-flow.org | **零 DNS 記錄** | 保留網域，未建站，不需搬遷 |
+| weartheworld.org | **零 DNS 記錄** | 保留網域，未建站，不需搬遷 |
+| wusheng.foundation | **零 DNS 記錄** | 保留網域（品牌防禦，見 memory `project_content_engine_ssot` WuSheng Healing Module™），未建站，不需搬遷 |
 
 ## Client Tenants
 
