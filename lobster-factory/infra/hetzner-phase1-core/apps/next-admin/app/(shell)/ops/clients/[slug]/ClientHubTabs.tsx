@@ -310,7 +310,10 @@ function ContentTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cfg
   }
 
   async function save() {
-    if (!siteId) return;
+    // 這個客戶沒有 wp_sites 列時，按鈕原本按了完全沒反應。siteId 現在來自 page.tsx 的
+    // organization_id 查詢（不再用 hostname 猜），所以「查不到列」正是那個查詢出錯時會有的
+    // 樣子 —— 靜默 return 會讓它隱形。
+    if (!siteId) { setSaveMsg("此客戶尚未連接 WP 網站（wp_sites 無對應列），無法儲存"); return; }
     setSaving(true);
     setSaveMsg(null);
     try {

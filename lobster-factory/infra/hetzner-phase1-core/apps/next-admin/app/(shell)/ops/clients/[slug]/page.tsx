@@ -57,12 +57,6 @@ export default async function ClientDetailPage({
   const cfg = ((org.metadata as Record<string, unknown>)?.client_config as ClientConfig) ?? {};
   const wp = ((org.metadata as Record<string, unknown>)?.wp_update_latest as WpUpdateLatest) ?? null;
 
-  // ── Hostname for wp_sites URL matching ─────────────────────────────────────
-  let siteHostname: string | null = null;
-  if (cfg.site_url) {
-    try { siteHostname = new URL(cfg.site_url).hostname; } catch { /* ignore */ }
-  }
-
   // ── Parallel fetches ────────────────────────────────────────────────────────
   const [health, runsResult, installRunsResult, integrationsResult, wpSitesResult] = await Promise.all([
     probeHealth(cfg.site_url),
@@ -82,12 +76,18 @@ export default async function ClientDetailPage({
       .from("tenant_integration_bindings")
       .select("provider,status,last_tested_at,last_error")
       .eq("organization_id", org.id),
-    siteHostname
-      ? supabase
-          .from("wp_sites")
-          .select("id,name,url,color,active,content_defaults")
-          .ilike("url", `%${siteHostname}%`)
-      : Promise.resolve({ data: [], error: null }),
+    // 這個客戶的 WP 站 —— 讀權威欄位，**不用 hostname 猜**（migration 0061 加的
+    // organization_id）。原本是 ilike("url", "%<site_url 的 hostname>%")：EU prod 實測
+    // 4 個 org 的 site_url hostname 全是 aware-wave.com（只有 path 不同），那個 ilike 會撈到
+    // 橫跨 4 個 org 的 4 列，而 ClientHubTabs 的 ContentTab 取 wpSites[0]（恆為最早建立的
+    // AwareWave）→ 打開任一 staging 客戶頁看到的是別人的 content_defaults，按儲存還會
+    // PATCH 到別人那一列。這是 commit 439499c7 從 content/sites 移除的同一套 hostname 猜測
+    // 機制的第二份抄本。注意上面每一條並行查詢都早就用 organization_id 了，只有這條在猜。
+    supabase
+      .from("wp_sites")
+      .select("id,name,url,color,active,content_defaults")
+      .eq("organization_id", org.id)
+      .order("created_at"),
   ]);
 
   // ── Resolve action_id → action_key for display/filtering ───────────────────

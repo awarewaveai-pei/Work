@@ -2,6 +2,56 @@
 
 ## 2026-08-26
 
+### AUTO_TASK_DONE: 客戶頁的 hostname 猜測（第二份抄本）+ 佈建從未寫入租戶歸屬
+
+[任務]
+前一則的抓蟲 hits=1。操作者說「你做最完美的決定」，判定折進同一個 deploy：這是**現在就在
+發生**的跨租戶寫入，修法與 439499c7 同構，而且明知有跨租戶寫入卻先部署它隔壁的程式碼是
+最差的組合。
+
+[已修改]
+- `app/(shell)/ops/clients/[slug]/page.tsx`：`ilike("url", '%<hostname>%')` → `.eq("organization_id", org.id)`
+  ＋ `.order("created_at")`（原本無排序，`[0]` 是任意的）；`siteHostname` 推導整段刪除（已無用途）
+- `app/api/internal/hosting/provision-staging/route.ts`：`wireClientToContentTools` 的 insert
+  補上 `organization_id`；2 處過期註解訂正
+- `app/(shell)/ops/clients/[slug]/ClientHubTabs.tsx`：無站時的靜默 `return` 改成會說話
+
+[為什麼這是同一個 class 而不是三件事]
+439499c7 昨天從 `content/sites` 移除「把身分編碼進字串再反解」的 hostname 猜測，但那套機制
+**有第二份抄本**在客戶頁。同一份權威欄位（0061 的 `organization_id`）同時暴露了第三個缺口：
+**佈建程式碼從來沒寫過那個欄位**。0061 只回填了當時既有的 5 列，所以「已存在的站正確、未來
+的站全是 null」—— 一個只會隨時間變壞、且不會有任何錯誤訊息的狀態。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`psql -c "<新舊兩種比對法各自 join 出的列數>"` | exit=0 | ms=~1800
+  - **新（organization_id）**：5 個 org 各自精確 1 列，全部正確
+  - **舊（hostname ilike）**：`e2e-verify-0704` / `test-wp-webhook-co` / `mongolia-03` 各撈到 **4 列**
+    （橫跨 4 個 org）；`awarewave-ops` 撈到 **0 列**（site_url 是 `app.aware-wave.com`，站的 url 是
+    `aware-wave.com`，`%app.aware-wave.com%` 對不到）→ 舊寫法偽陽性與偽陰性同時存在
+  - `\d public.wp_sites` 確認 `organization_id uuid` + FK `ON DELETE SET NULL` + 部分索引
+  - tsc 0；57 檔 656 測全綠
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+  - 自審（Codex 不可用）：確認 `siteHostname` 無其他用途才刪；`cfg.site_url` 仍供 `probeHealth` 使用；
+    `ContentTab` 的 `site?.` 全為選擇性存取，0 列不會炸；`organizationId` 在 `wireClientToContentTools`
+    開頭已擋 falsy，insert 不會寫入 undefined
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`ilike\("url"\|hostname` | hits=1 第二個 insert 缺 org
+  - **無第三份** org↔wp_sites 的 hostname 猜測抄本；其餘 hostname 用法皆無關
+    （postiz SSRF 白名單、trending-sources 正規化、IncidentCard 顯示、api-check 文案）
+  - **hits=1**：`app/api/content/sites/route.ts:176` 的 POST（SiteManager 手動新增站）**同樣沒填
+    `organization_id`` ——因為新增表單沒有「屬於哪個客戶」欄位。修它要動 UI，是獨立的一塊工，已開 TASKS
+- ORACLE_WAIVED: Codex 本 session 已不可用（操作者告知）；改以上述自審 + prod before/after 實測
+- WORKLOG: 本則
+
+[剩餘風險]
+- **刻意的行為改變**：經 `SiteManager` 手動新增、org 為 null 的站，改動後**不會出現在任何客戶頁**。
+  舊的 hostname ilike 有機會「猜對」而讓它顯示在正確的客戶頁上。取捨是「正確但空白」優於
+  「顯示成別的客戶」。目前 prod 5 列的 organization_id 全非 null，故本次部署無實際影響。
+- 上一則的接線層無自動測試缺口不變。
+
+[rollback]
+`git revert <本 commit>` → `sg-deploy`。三處改動皆為查詢／欄位層級，無 schema 變更、無資料遷移。
+
+
 ### AUTO_TASK_DONE: active 過濾收斂成 route 預設 —— 三輪覆審逼出一條不變量，外加一個 prod 跨租戶寫入
 
 [任務]

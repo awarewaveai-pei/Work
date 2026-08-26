@@ -217,9 +217,11 @@ async function seedContentFromSpec(conn: SshClient, wpPath: string, websiteSpecI
 }
 
 // Wire a newly-provisioned client into the content toolchain: create a WP Application Password,
-// register a wp_sites row (so SEO Content / Video can target it), and stamp client_config.site_url
-// on the org (the hostname the content tools match on). Without this the built client is invisible
-// to the content tools (connectivity audit 2026-06-27). Idempotent: skips if wp_sites row exists.
+// register a wp_sites row carrying organization_id (so SEO Content / Video can target it), and
+// stamp client_config.site_url on the org. Without this the built client is invisible to the
+// content tools (connectivity audit 2026-06-27). Idempotent: skips if wp_sites row exists.
+// NOTE: 租戶歸屬走 wp_sites.organization_id，**不再是** client_config.site_url 的 hostname 比對
+// —— 那套猜測在 2026-08-26 (439499c7) 移除，因為所有 staging 站的 hostname 都相同。
 // Best-effort — a wiring failure must NOT fail the provision.
 async function wireClientToContentTools(
   conn: SshClient,
@@ -245,7 +247,12 @@ async function wireClientToContentTools(
     //    so a concurrent/retry race can never leave an orphaned WP credential.
     const { error: insErr } = await supabase
       .from("wp_sites")
-      .insert({ name: siteName, url: cleanUrl, username: "admin", token: "", color: brandColor, active: false });
+      .insert({ name: siteName, url: cleanUrl, username: "admin", token: "", color: brandColor, active: false,
+                // organization_id 是租戶歸屬的**權威欄位**（migration 0061）。0061 回填了當時
+                // 既有的 5 列，但這個 insert 一直沒填它 —— 也就是說在此之前每一個新佈建的站
+                // organization_id 都是 null，而 null 對 client 是 fail-closed（canAccessOrg），
+                // 客戶頁與內容工具都看不到自己的站。這裡有 organizationId（函式開頭已擋 falsy）。
+                organization_id: organizationId });
     if (insErr) {
       return (insErr as { code?: string }).code === "23505"
         ? "wiring skipped: wp_sites row already exists"
@@ -264,8 +271,8 @@ async function wireClientToContentTools(
       return `wiring WARN: app-password not created (code ${apRes.code})`;
     }
 
-    // 3. Activate the row with the real token + stamp client_config.site_url (content tools
-    //    hostname-match on this; spread preserves brandColors and all other client_config keys).
+    // 3. Activate the row with the real token + stamp client_config.site_url (用於健康探測與顯示；
+    //    租戶歸屬看的是 organization_id，不是這個 URL。spread 保留 brandColors 等既有鍵）。
     await supabase.from("wp_sites").update({ token: appPw, active: true }).eq("url", cleanUrl);
     meta.client_config = { ...cc, site_url: cleanUrl };
     await supabase.from("organizations").update({ metadata: meta }).eq("id", organizationId);
