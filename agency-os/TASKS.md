@@ -351,25 +351,32 @@
   - **修法方向（治本，非補丁）**：保留清理只能刪**自己產生的**快照 —— 用命名樣式 `[0-9]{8}-[0-9]{6}` 過濾，或改成刪 manifest 記錄過的目錄。**不要只把 clients/ 搬到別處了事**，那只關掉這一個實例，下次任何人往 `/root/backups/` 放東西都會再被刪一次。
   - **完成定義**：① prune 只匹配快照命名 ② 造一個假的非快照目錄跑一次，確認它沒被刪 ③ Soulful 三份備份重建並更新 `BACKUP_RESTORE_PROOF.md` ④ 演練證據改存不會被輪替的位置。
 
-- [ ] **Soulful 備份：已加上 Dropbox 第二目的地（待 8/31 排程驗證端到端）**
-  - `🟠 已改設定，待驗證` · `2026-08-26 處理` · `下次驗證點 2026-08-31 00:08 UTC`
-  - **根因（實測）**：`report_addon` 10 筆＝成功 5／失敗 5，**5 次失敗全部是** HTTP `403` / `rateLimitExceeded` / `PERMISSION_DENIED`，來自 `drive.googleapis.com` 的每分鐘查詢配額（consumer `project_number:134809148507` ＝ WPvivid 全球共用的 API 專案，**操作端無旋鈕可調**）。storage 滿 0 次、認證錯誤 0 次。
-  - **「自動存去哪裡」的正確位置**：子站 `wp_options` → `wpvivid_upload_setting` → `remote_selected`（**不是** MainWP 的「Back Up Manually」面板，那個面板自己寫著 `won't affect schedule settings`）。
-  - **已執行（2026-08-26）**：`remote_selected` 由 `["wpvivid-remote-69ff0a63b77ab"]` 改為 `["wpvivid-remote-69ff0a63b77ab","wpvivid-remote-soulful-dropbox"]`（googledrive + dropbox 並存）。
-    - **選擇「加上」而非「換掉」的理由**：Dropbox 若不通，Google 照舊 → **零退步**；上傳路徑是 `class-wpvivid.php:7040` 的 `foreach ($remoteslist["remote_selected"] as $value)`，逐一跑過陣列。
-    - **Dropbox 憑證已實測可用**：`Dropbox_Base::check_token()` 回 `{"result":"success"}`，且 `created` 時戳更新 → refresh_token 成功換到新 access_token（原 token 已 95.9 天）。
-    - **回滾**：原值備份於子站 `/home/u942075013/wpvivid_upload_setting.backup.20260826-072903.txt`（3212 bytes、sha256 `87a5ce01…`、chmod 600）。
-  - **尚未驗證**：端到端上傳。下次排程 `wpvivid_main_schedule_event` = **2026-08-31 00:08:15**。
-  - **刻意不由代理觸發備份**：站台 925 MB（uploads 744M + DB 181M），`wpvivid_task_list` 已 105 KB、`wpvivid_last_msg` 105 KB；在共享主機跑無人監看的多階段任務，**卡住反而可能連 8/31 那次一起卡死**。要提早驗證請由操作者在 UI 按 Backup Now（看得到進度、可中止）。
-  - **待觀察的副作用**：Google 若仍被限流，WPvivid 可能仍把整個任務標成 `Failed`，即使 Dropbox 已收到檔案。8/31 後看 `report_addon`：若出現「Dropbox 成功但整體 Failed」，要決定是否移除 Google Drive 以免偵測器長期假紅。
-  - **✅ 已解（2026-08-26，操作者提供 Google Drive 檔案列表）**：MainWP 那筆 `Aug 26 07:10 / Manual` 是 **`aware-wave.com`** 的，不是 soulful —— 雲端檔名 `aware-wave.com_wpvivid-f7e4835952c38_2026-08-26-15-10_backup_all.zip`（15:10 TPE ＝ 07:10 UTC）完全對上。子站紀錄沒有它是正確的。
-  - **目前實際曝險**：最新可用備份仍是 **2026-08-17**（9 天前），且只在 Google Drive 一處 —— EU 那份已被保留政策刪除（見上一條）。
-  - **✅ 安全網已確認為真（非僅紀錄）**：Google Drive 上 `soulfulexpression.org_wpvivid-02daeea9609b4_2026-08-17-00-10_*` 共 **5 個分片**（137.3 + 197.5 + 197.4 + 182.2 + 84.4 ≈ **798.8 MB**），task id 與 `BACKUP_AUTO_STATUS.json` 的 `last_success.task_id` 完全吻合。7-27 那次同樣 5 分片完整。**所以最新備份是「9 天前但完整」，不是「可疑的單筆紀錄」。**
-  - **🔑 根因更精確（2026-08-26 由檔案大小對照得出）**：`rateLimitExceeded` 打的是 **Queries per minute**，而兩站的體積差一個量級 ——
-    - `aware-wave.com`：55–61 MB、**單檔**、近期 8/8・8/15・8/23・8/26 **四次全成**
-    - `soulfulexpression.org`：~799 MB、**5 分片**、只有 7/27・8/17 成功
-    - 分片上傳的 session start/append/finish 會把 API 呼叫數放大數十倍 → **同一個 Google 帳號下只有 soulful 撞牆**。不是 Google Drive 壞了，是體積在共用配額池裡超標。
-    - **這反向支持換 Dropbox 的判斷**：Dropbox 的 chunked upload 不共用 WPvivid 那個全球 Google 專案配額。
+- [x] **【✅ 2026-08-26 修復並實測通過】Soulful 自動備份：Google Drive 分塊由 2 MB 調為 30 MB**
+  - **一句話**：失敗不是 Google Drive 壞了，是 800 MB 用 2 MB 分塊切出約 400 次 API 呼叫，撞爆 WPvivid 全球共用專案的「每分鐘查詢」配額。
+  - **完整根因鏈**：
+    - `report_addon` 10 筆＝成功 5／失敗 5，**5 次失敗全部**是 `403 rateLimitExceeded / PERMISSION_DENIED`（`drive.googleapis.com`，consumer `project_number:134809148507`＝WPvivid 全球共用專案）
+    - `class-wpvivid-google-drive.php:861` 分塊大小預設 `WPVIVID_GOOGLEDRIVE_UPLOAD_SIZE = 1024*1024*2` ＝ **2 MB** → 800 MB 約 **400 次**分塊請求
+    - `:946-953` 有重試 15 次，但**重試之間沒有任何 sleep** → 15 次全落在同一分鐘內，對「每分鐘配額」注定全滅。**所以修法是減少請求數，不是加重試。**
+    - 對照證據：`aware-wave.com` 55–61 MB 單檔，同一個 Google 帳號下 8/8・8/15・8/23・8/26 **四次全成** → 確認是體積問題不是服務問題
+  - **已修改（子站，非 repo）**：`wpvivid-remote-69ff0a63b77ab` 的 `upload_chunk_size` 由「未設定（走 2 MB 預設）」改為 **`31457280`（30 MB，UI 允許上限）**。
+    - **存的是 bytes 不是 MB**：`sanitize_options()`（`:633,651-653`）在存檔時先乘 `1024*1024`，執行期 `:1115` 直接讀、`:861` 直接當 bytes 用。寫錯單位會變成 30 bytes ＝ 2600 萬次請求。
+    - `31457280 ÷ 262144 = 120`，符合 Google resumable upload 要求的 256 KB 整數倍。
+    - **預期效果**：800 MB 的分塊請求由約 400 次降到約 **27 次**（少約 15 倍）。
+  - **實測（三次全 `Succeeded`）**：`07:51` googledrive（2 MB，舊設定）／`08:01` dropbox（測試用）／**`08:12` googledrive（30 MB，新設定）**。`wpvivid_backup_reports` 三筆皆 `{"status":"Succeeded"}`；本地暫存清空正常，無記憶體不足、無逾時、Google 未拒絕該分塊大小。
+  - **重要結構發現（這才是 UI 改不動的原因）**：`remote_selected` 存在**兩個地方**，而 `class-wpvivid-setting.php:388` 會用 `wpvivid_user_history` **覆蓋** `wpvivid_upload_setting`。**只改 `upload_setting` 永遠不生效**。要改必須用 `WPvivid_Setting::update_user_history('remote_selected', ...)`。
+  - **目的地維持 Google Drive**（操作者 2026-08-26 明確指示不用 Dropbox）。兩份設定均已對齊為 `["wpvivid-remote-69ff0a63b77ab"]`。
+  - **我造成的副作用（已處理／需知悉）**：
+    - ⚠️ `max_backup_count=3`，我三次測試把 `2026-08-17` 與 `2026-07-27` 兩份**擠出保留窗**。目前 Google Drive 上是今天的兩份（`07:51`、`08:12`）＋ Dropbox 一份（`08:01`）。**淨結果是備份更新，但歷史深度變淺。**
+    - ✅ 排程被 `wp cron event run` 重新錨定到 `2026-09-02 08:12`（週二下午，有流量時段），**已還原**為原槽位 `2026-08-31 00:08:15 UTC`，recurrence `wpvivid_weekly`。
+    - Dropbox 上多了一份 `08:01` 的備份（測試副產物），可自行刪除。
+  - **下次驗證點**：`2026-08-31 00:08:15 UTC` 的排程執行。要看 `report_addon` 是否 `Succeeded`，以及往後幾週的成功率是否明顯高於先前的 50%。
+
+- [ ] **【2026-08-26 開出｜已知風險｜操作者決定不處理】WPvivid 的 Google Drive refresh_token 曾進入對話紀錄**
+  - `🧊 記錄` · `2026-08-26` · `操作者明確表示不重新授權`
+  - **經過**：診斷時查該遠端設定，`token` 欄位是一個內含 `access_token` 與 `refresh_token` 的 JSON 字串，我的排除清單只擋了頂層同名鍵，未涵蓋巢狀情況，整段被印出。
+  - **範圍**：scope 為 `https://www.googleapis.com/auth/drive.file`，僅涵蓋該 app 自己建立的檔案 —— 即 WPvivid 在該 Drive 上的備份，非整個雲端硬碟。
+  - **操作者裁決（2026-08-26）**：「我沒有要重新授權」→ **不執行撤銷**。若日後改變決定：`https://myaccount.google.com/permissions` 移除 WPvivid 存取權後於外掛內重新授權。
+  - **這是同日第三次同款疏失**（另兩次：Dropbox token、本條）。**已具體化的紀律**：查 `wp_options` / `wpvividmeta` 這類設定表時，**只 `SELECT`／只印明確指名的純量欄位，絕不遍歷陣列或整欄輸出** —— 前兩次的教訓寫成「排除敏感欄位名」，本次證明那個寫法不夠，因為憑證可以巢狀在任意鍵底下。
 
 - [ ] **`cf-iprefresh` 偵測器已 error 14 天，而且沒有任何讀者**
   - `🔴 現行` · `2026-08-26 開出` · `可直接做`
@@ -395,7 +402,8 @@
 
 - [x] **【✅ 2026-08-26 結案｜🔴 跨租戶寫入】`/api/video/embed-to-wp` 等 8 個取站點已收斂到單一 seam** — 實讀後確認不是一條 route 而是一整類：7 條 route 各自抄 `(siteId && sites.find(...)) || sites[0]`，加上 `publishToWordPress`（主要發文核心）共 8 個取站點，全都零租戶檢查；其中 `embed-to-wp`（改寫文章）與 `wp-post` / `publishToWordPress`（發文）會**寫入**客戶站。**修法**：migration `0061` 給 `wp_sites` 加 `organization_id`（5 站 backfill 全部命中，3 個靠站名完全相同、2 個靠 URL 明確對映）；`lib/content/wp-sites.ts` 新增 `resolveWpSite(req, siteId)` 當唯一入口，8 個取站點全部收斂；多站畫面用 `listAccessibleWpSites(req)`。`|| sites[0]` 不砍掉而是縮成「呼叫者有權存取的第一個」（前端有不帶 siteId 的呼叫）。`tenant-guard` 新增非拋出的 `canAccessOrg()` 並讓 `assertOrgAccess` 以它實作 → 規則只有一份。**順帶移除第二套機制**：`content/sites` 原本用 hostname 猜 org_slug，而 3 個 staging 站 hostname 全是 `aware-wave.com` → 一直標錯租戶；改讀權威欄位。**驗證**：0061 先 BEGIN/ROLLBACK 預演（backfill 5/5、零持久化）再 apply；tsc 0 / 55 檔 648 測全過；11 個新測 + 突變測試（把 seam 改回舊行為 → 4 條轉紅）。
 
-- [ ] **【2026-08-26 開出｜小】`wp_sites` 有 3 個死站仍 `active=true`** — `E2E-Verify-0704` / `Test WP Webhook Co` / `MONGOLIA-03` 的 WP REST 實測**全部回 404**（站已不存在），但資料列仍 active，會出現在內容工具的站別下拉選單裡，選到就是一連串連線失敗。它們對應的 org（`9e6e0993` / `37fdf3e3` / `d6d1e845`）也是測試租戶。**處理方式**：確認確實不再需要後 `active=false`（保留稽核痕跡）或整列刪除；連帶決定那 3 個測試 org 要不要一起清。
+- [x] **【✅ 2026-08-26 結案｜小】`wp_sites` 3 個死站已停用（操作者選 `active=false`，保留稽核痕跡）** — `E2E-Verify-0704` / `Test WP Webhook Co` / `MONGOLIA-03` 三列 EU prod `update ... set active=false`（`UPDATE 3`，單一 transaction），剩 `Soulful Expression` + `AwareWave` 兩列 active。**未整列刪**：`wp_sites` 雖無 FK 子表（`pg_constraint` 查 0 列，刪不會 cascade），但停用可逆且下拉選單效果相同。**3 個測試 org 不動**：它們身上的 `ops_action_runs` / `intake_forms` 是 Stage 0 建站引擎跑通過的唯一證據。**順帶抓到分岔**（見下一條）：`/api/content/sites` GET 不濾 active，ScriptForge 自己在前端濾、ContentStudio 沒濾 → 停用只關掉了一半。
+- [ ] **【2026-08-26 開出｜小｜接上一條】`/api/content/sites` 的 active 過濾散在消費端，兩個消費端已分岔** — `route.ts:71` 的 GET 回傳全部站（含 inactive）並把 `active` 當欄位交出去，由消費端各自決定要不要濾：`ScriptForge.tsx:854` 濾了（`s.active !== false`）、`ContentStudio.tsx:783` 沒濾 → 3 個已停用的死站仍列在主要內容工具的下拉選單裡（選到會在 API 層被 `getWpSites()` 的 `.eq("active", true)` 擋成 404，不再是連線 timeout，但選單本身還是髒的）。**不變量**：「inactive 的站不得出現在任何『挑發布目標』的清單」。**修法方向（default-safe，不要把規則抄到第三個消費端）**：`/api/content/sites` GET 預設只回 active，由唯一需要看全部的 `SiteManager` 以 `?includeInactive=1` 明示 opt-in → 未來新增的消費端忘記濾也是安全的。需 sg-deploy。
 - [ ] **【2026-08-26 開出｜小｜跟著
   - ②
   - ③ 一起做】R2 影片 bucket 的 2 個 legacy 目錄清理** — 2026-08-26 實測 `lobster-videos`：11 物件 / 2 目錄，皆為 2026-08-25 之前的舊格式（無 org 前綴）→ `parseOrgPrefixFromDir` 回 null → reconcile 每輪 `skippedLegacy=2` 且**永遠不會被補記**（fail-closed 是對的，但它讓計數器永遠非零）。

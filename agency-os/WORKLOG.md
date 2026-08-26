@@ -2,6 +2,66 @@
 
 ## 2026-08-26
 
+### AUTO_TASK_DONE: 3 個死站停用 —— 順帶抓到 active 過濾散在消費端已分岔
+
+[任務]
+操作者問「刪掉那 3 個死站了嗎」。先查證：沒有，`agency-os/TASKS.md` 該條仍 `[ ]`，EU prod
+`wp_sites` 五列裡 `E2E-Verify-0704` / `Test WP Webhook Co` / `MONGOLIA-03` 三列都還 `active=t`。
+給三個選項後操作者選 `active=false`（保留稽核痕跡）。
+
+[已修改]
+- EU prod `public.wp_sites`：3 列 `active=false`（單一 transaction，`UPDATE 3`）
+- `agency-os/TASKS.md`：原條目結案，並開出新一條記錄下面那個分岔
+- 3 個測試 org **不動**（`e2e-verify-0704-5c1356` / `test-wp-webhook-co-c705c6` / `mongolia-03-6fc1c8`）
+  —— 它們身上的 `ops_action_runs` / `intake_forms` 是 Stage 0 建站引擎跑通過的唯一證據
+
+[為什麼選停用而不是刪]
+`pg_constraint` 查 `wp_sites` 的 FK 子表 = 0 列，所以整列刪不會 cascade 掉任何東西，技術上安全。
+仍選停用：對「從選單消失」這個目的兩者等效，而停用可逆、刪除不可逆。取小的那個。
+
+[改完才發現的分岔 —— 停用只關掉了一半]
+先確認 `active` 不是裝飾欄位：`lib/content/wp-sites.ts:68` 的 `getWpSites()` 有
+`.eq("active", true)`，而它是 `resolveWpSite` / `listAccessibleWpSites` 的唯一資料來源，所以
+發文 / 日曆 / 標籤 / 分類 / related-posts / embed-to-wp 全部立刻生效（選到那 3 個 id 會 404）。
+剩 2 列仍 active，不會誤觸 `data.length > 0` 的 env fallback。
+
+但 `/api/content/sites` GET（`route.ts:71`）**沒有** `.eq("active", true)` —— 它回傳全部站並把
+`active` 當欄位交出去，讓消費端各自決定。兩個消費端已經分岔：
+- `ScriptForge.tsx:854` 濾了（`s.active !== false`）→ 3 站已消失
+- `ContentStudio.tsx:783` 沒濾 → **主要內容工具的下拉選單仍列出那 3 個死站**
+
+這正是 TASKS 原條目描述的症狀，所以那一半沒關掉。不變量是「inactive 的站不得出現在任何
+『挑發布目標』的清單」，而現在這條規則被放在消費端 —— 和昨天剛收斂掉的 8 個取站點是同一
+個 class（同一條規則抄在 N 個地方，遲早分叉；這次已經分叉了）。**沒有就地在 ContentStudio
+補一行 filter**：那會讓抄本從 1 份變 2 份。正確修法是把預設翻成 fail-safe（GET 預設只回
+active，`SiteManager` 以 `?includeInactive=1` 明示 opt-in），已開 TASKS，需 sg-deploy，等操作者
+排程。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec supabase-db psql -U supabase_admin --single-transaction -c "update public.wp_sites set active=false where id in (...) and active=true"` | exit=0 | ms=~1900
+  - 回 `UPDATE 3`；同一連線 select 全表確認 Soulful/AwareWave = t、三個死站 = f
+  - 重放 `getWpSites()` 的確切選擇器 `select ... where active = true order by created_at` → 只剩 2 列
+  - 改前先查 `pg_constraint` 確認 `wp_sites` 無 FK 子表（0 列）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/1m/0n
+  - 整檔讀 `lib/content/wp-sites.ts` 確認 `active` 是真閘不是裝飾欄位
+  - Major = 上面那個 ContentStudio 未過濾的分岔（本次不改 code，已開 TASKS）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`wp_sites` | hits=1 未過濾 active 的消費端
+  - 逐一看 5 個 `.from("wp_sites")` 讀取點：`wp-sites.ts:66` 有濾；`content/sites/route.ts:71` 無濾（刻意，管理用）；
+    `content/sites/[id]/*` 走單筆 id（管理用，不受影響）；`ops/clients/[slug]/page.tsx:87` 是客戶頁顯示（顯示 inactive 正確）；
+    `provision-staging:269` 是新站佈建時設 `active: true`（不受影響）
+  - 前端消費端 2 個，1 個濾 1 個沒濾 → 即上述 finding
+- ORACLE_WAIVED: 本次未改任何 source 檔（只有 DB 資料 + .md）
+- WORKLOG: 本則
+
+[剩餘風險]
+- ContentStudio 下拉仍列 3 個死站（選到 → API 層 404，不會寫錯站，但選單髒）
+- 3 個測試 org 仍在，`/ops/clients` 會列出它們
+
+[rollback]
+`update public.wp_sites set active=true where id in
+('ed979807-84c6-4ad5-ae56-f84db010fc52','217401d7-9a70-4921-9f7b-186624335985','91ba6cd6-93ae-42ea-b325-182ba746a8dd');`
+
+
 ### AUTO_TASK_DONE: WordPress 站的租戶邊界 —— 7 條 route 抄同一段沒有閘的取站邏輯
 
 [任務]
