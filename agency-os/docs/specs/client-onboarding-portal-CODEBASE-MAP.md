@@ -1,8 +1,8 @@
-# Client Onboarding Portal — Codebase Map + Reading List
+﻿# Client Onboarding Portal — Codebase Map + Reading List
 
 > **狀態**：研究完成（2026-05-30），14 段規格**尚未撰寫**。
 > 這份檔的用途：讓任何機器、任何 session 的 Claude「開工就接得回來」，不必重新研究。
-> 對應任務：`TASKS.md` → `### 未完成` → `#### 待釐清 / 明日提醒`（onboarding portal 那兩行）。
+> 對應任務：`TASKS.md` → `### 未完成` → `#### G. ▶️ 可直接做 — 基礎建設與客戶站`（2026-08-26 換軸前為 `#### 待釐清 / 明日提醒`）（onboarding portal 那兩行）。
 
 ---
 

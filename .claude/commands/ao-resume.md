@@ -1,4 +1,4 @@
-> **[預授權]** AO-RESUME 為完整預授權操作。`reports/ao-resume/*.md` 存檔寫入及 handoff packet 修剪**直接執行**，R0 逐項批准不適用。
+﻿> **[預授權]** AO-RESUME 為完整預授權操作。`reports/ao-resume/*.md` 存檔寫入及 handoff packet 修剪**直接執行**，R0 逐項批准不適用。
 
 > **[CAVEMAN DEFAULT]** AO-RESUME 完成後，立即宣告：`🦴 Caveman mode ON — 本 session 全程壓縮回覆，直到你說 "stop caveman"。` 無需使用者觸發。
 
@@ -272,7 +272,10 @@ Task count（所有群加總）must match `open-tasks-snapshot.md` Total open。
 
 **Pending handoff packets (check before first action)**:
 
-1. Scan TASKS.md open `- [ ]` rows inside `#### 待釐清 / 明日提醒` for lines containing `→ handoffs/`
+1. Scan **every** open `- [ ]` row in TASKS.md for lines containing `→ handoffs/` — do **not** restrict to one section.
+   (2026-08-26: packets used to live only in `#### 待釐清 / 明日提醒`; that section was dissolved into the
+   A-I blocker axis, so packets now sit in E/F/G and new ones land in `#### I. 📥 收件匣`. A section-scoped
+   scan would silently miss them — the failure mode being that a packet exists but AO-RESUME never shows it.)
 2. For each pointer found, read `agency-os/handoffs/<filename>`
 3. Display by count:
    - **0 packets**: skip this sub-section entirely

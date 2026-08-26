@@ -1,4 +1,4 @@
-Follow the `/tomo` carry-over protocol.
+﻿Follow the `/tomo` carry-over protocol.
 
 ## Overview
 
@@ -22,12 +22,17 @@ Gather in parallel:
 
 ## Step 2 — Write TASKS.md entry
 
-**Target section**: `#### 待釐清 / 明日提醒` under `### 未完成`.
+**Target section**: `#### I. 📥 收件匣（`/tomo` 落地區，待分類）` under `### 未完成`.
 
-If the section doesn't exist, create it before `#### 雙機環境 / 日常開工`:
+> Renamed 2026-08-26 (was `#### 待釐清 / 明日提醒`). TASKS.md is now sorted by **who is blocking**
+> (A ⏰ deadline / B 🔒 you / C 🔒 external / D-G ▶️ actionable / H 🧊 wont-do), and a fresh /tomo
+> packet does not yet know its blocker. Section I is the deliberate landing zone; triage into A-H
+> happens at the next AO-RESUME or board cleanup. Do NOT invent a new section.
+
+If the section doesn't exist, create it as the LAST `####` under `### 未完成` (after `#### H.`):
 
 ```markdown
-#### 待釐清 / 明日提醒
+#### I. 📥 收件匣（`/tomo` 落地區，待分類）
 > `/tomo` 自動寫入此分類
 
 ```
@@ -63,6 +68,6 @@ Where `<slug>` = first 3 ASCII words from hint, kebab-case. All-CJK hint → `to
 Print:
 
 ```
-✅ /tomo saved to TASKS.md #### 待釐清 / 明日提醒
+✅ /tomo saved to TASKS.md #### I. 📥 收件匣
    AO-RESUME 下次 §8 下一步會顯示此條目。
 ```

@@ -60,14 +60,21 @@ function Get-UncheckedInSection {
         [string]$StartHeader,
         [string]$StopHeaderRegex
     )
+    # 2026-08-26 FIX: this was `-eq $StartHeader` (exact equality). The real headings are
+    # "## Next - <chinese>" / "## Backlog - <chinese>", so equality NEVER matched: the search
+    # loop ran to EOF and the collector below returned empty. Result: sections 1) and 2) of
+    # every integrated-status report had been silently blank. Prefix match is the contract.
     $i = 0
+    $found = $false
     while ($i -lt $Lines.Count) {
-        if ($Lines[$i].Trim() -eq $StartHeader) {
+        if ($Lines[$i].Trim().StartsWith($StartHeader)) {
             $i++
+            $found = $true
             break
         }
         $i++
     }
+    if (-not $found) { return ,@() }
     $items = [System.Collections.Generic.List[string]]::new()
     while ($i -lt $Lines.Count) {
         $line = $Lines[$i]
@@ -168,8 +175,25 @@ $sb = [System.Text.StringBuilder]::new()
 
 if (Test-Path $tasksPath) {
     $tl = Get-Content -LiteralPath $tasksPath -Encoding UTF8
-    $nextOpen = @(Get-UncheckedInSection -Lines $tl -StartHeader "## Next" -StopHeaderRegex '^## Backlog\s*$')
-    $backlogOpen = @(Get-UncheckedInSection -Lines $tl -StartHeader "## Backlog" -StopHeaderRegex '^## Related')
+    # NOTE 2026-08-26: no @( ) around the call. The function already returns `,@($items)`;
+    # wrapping it again produces an array-of-one-array, so Count is always 1 and the whole
+    # list gets stringified onto a single line. This bug was invisible while the function
+    # returned empty (see the exact-equality bug fixed above) -- one bug hid the other.
+    $nextOpen = Get-UncheckedInSection -Lines $tl -StartHeader "## Next" -StopHeaderRegex '^##\s+Backlog'
+    $backlogOpen = Get-UncheckedInSection -Lines $tl -StartHeader "## Backlog" -StopHeaderRegex '^##\s+(Related|歷史封存)'
+
+    # Blind-detector guard (2026-08-26): closing the CLASS, not just the instance above.
+    # If TASKS.md plainly contains open checkboxes but our parse produced none, the parser
+    # and the file have drifted apart again -- say so loudly in the report instead of
+    # rendering an empty section that reads as "nothing is open".
+    $rawOpenCount = @($tl | Where-Object { $_ -match '^\s*-\s+\[\s\]' }).Count
+    if ($rawOpenCount -gt 0 -and ($nextOpen.Count + $backlogOpen.Count) -lt $rawOpenCount) {
+        [void]$sb.AppendLine("> **PARSER MISMATCH** - TASKS.md has $rawOpenCount open ``- [ ]`` line(s) but this report parsed $($nextOpen.Count + $backlogOpen.Count).")
+        [void]$sb.AppendLine("> The section headings in TASKS.md no longer match what ``generate-integrated-status-report.ps1`` looks for.")
+        [void]$sb.AppendLine("> Treat sections 1) and 2) below as UNVERIFIED, not as empty. Fix the parser before trusting this report.")
+        [void]$sb.AppendLine("")
+        Write-Warning "generate-integrated-status-report: PARSER MISMATCH - $rawOpenCount open tasks in TASKS.md, $($nextOpen.Count + $backlogOpen.Count) parsed."
+    }
 
     [void]$sb.AppendLine("## 1) TASKS.md - Next (unchecked)")
     if ($nextOpen.Count -eq 0) {
@@ -193,7 +217,8 @@ if (Test-Path $tasksPath) {
 
 if (Test-Path $lobsterPath) {
     $ll = Get-Content -LiteralPath $lobsterPath -Encoding UTF8
-    $open = @(Get-LobsterOpenBeforeSectionD -Lines $ll)
+    # Same double-wrap class as the two calls above (`,@()` in the function + @( ) here).
+    $open = Get-LobsterOpenBeforeSectionD -Lines $ll
     [void]$sb.AppendLine("## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)")
     if ($open.Count -eq 0) {
         [void]$sb.AppendLine("_none_")

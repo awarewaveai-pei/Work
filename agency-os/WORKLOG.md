@@ -1,5 +1,78 @@
 ﻿# Worklog
 
+## 2026-08-26
+
+### AUTO_TASK_DONE: TASKS.md 換分類軸 —— 順手挖出三個「一直在說謊」的解析器與閘
+
+[任務]
+操作者：「把 `agency-os/TASKS.md` 整理好，要分類和清楚脈絡和處理情形，現在一團糟」。經 R0 方案比較後選 B（換軸 + 撤出已完成 + 修腳本）。
+
+[根因：不是排版難看，是「未完成」區有一半以上不是未完成的]
+| 事實 | 數字 |
+|---|---|
+| 全檔核取項 | 291（open 75 / done 216）|
+| `## Next — 未完成` 區實際裝的 | **167 項，其中 93 項（56%）是 `- [x]`** |
+| 最大子區 `#### 待釐清 / 明日提醒` | **86 項**（31 open + 55 done），佔全部開放項的 41%，主題橫跨 POD／Postiz／wp-bridge／一鍵架站／auto-repair |
+| 檔案自己訂的規則 | 「**勿**在未完成區混放 `- [x]`」—— 已被違反 93 次 |
+
+**不變量（先寫，避免又是補丁式重排）**：一個開放責任 = 全檔恰好一個 `- [ ]` 行；項目的**位置由「誰卡住它 + 有沒有外部時鐘」決定，不由它屬於哪個產品決定**。
+換軸理由：主題軸（Cold Outreach／POD／客戶）回答不了「先做哪些」，每次都要重推導依賴鏈 —— 那正是這份檔案的失效點。
+
+[動檔前先查機器契約（11 支腳本 + 3 個 command 讀它）]
+- `apply-closeout-task-checkmarks.ps1:128` / `verify-archive-tasks-lift.ps1:218`：靠 `- [ ]` 行**唯一性**做子字串比對，**多重匹配 = AO-CLOSE 硬失敗** → 絕不可為了「方便看」做重複的索引區
+- `.claude/commands/ao-close.md:16`：讀 `### 未完成` 底下所有 `- [ ]` → **保留該標題當傘**，A–I 放在 `####` 層
+- `.claude/commands/tomo.md:25,30,66`：寫入 `#### 待釐清 / 明日提醒`
+- `.claude/commands/ao-resume.md:275`：只在該區掃 `→ handoffs/`
+
+[已修改]
+1. `agency-os/TASKS.md` —— 78 條頂層 `- [x]` 撤出未完成區（依結案月份分組移入已完成歷程：2026-08 ×12 / 2026-06 ×38 / 2026-05 ×24 / 日期未標 ×4）；59 條開放項重新歸入 **A ⏰ 有時鐘 / B 🔒 卡在你 / C 🔒 卡在外部 / D–G ▶️ 可直接做 / H 🧊 已知風險（不是待辦）/ I 📥 收件匣**；`## 歷史封存` 從檔案中段移到底部；新增「狀態詞彙」與「舊子區 → 現在在哪」兩張對照表。**開放項文字逐字節未改**，分類靠區段承載。
+   **刻意不動的 15 條**：巢狀 `- [x]` 全部掛在開放項底下（如 Image Output Pipeline 的 `[0-a]`/`[1-b]`），是該項的進度證據不是獨立待辦，搬走就毀掉脈絡。
+2. `scripts/generate-integrated-status-report.ps1` —— **三個 bug**（詳下）+ PARSER MISMATCH 護欄
+3. `scripts/verify-build-gates.ps1:151` —— 反轉一道**過期的契約閘**（詳下）
+4. `scripts/print-open-tasks.ps1:35` —— 分組正則 `^##\s+` → `^#{2,4}\s+`，snapshot 才會鏡射 A–I（原本冷啟動代理看到的是一整坨）
+5. `.claude/commands/tomo.md` —— 寫入點改 `#### I. 📥 收件匣`，並說明為何是刻意的未分類落地區
+6. `.claude/commands/ao-resume.md` —— packet 掃描**不再綁單一區段**：packets 已分散到 E/F/G，區段內掃描會靜默漏掉（原本就是潛在洞，換軸讓它變成現行洞）
+7. `agency-os/docs/specs/client-onboarding-portal-CODEBASE-MAP.md:5` —— R4 抓蟲命中的唯一活檔過期指標
+
+[三個「一直在說謊」的東西 —— 都不是本次改壞的，是本次才照到]
+**① `generate-integrated-status-report.ps1:65` 用完全相等比對**
+`$Lines[$i].Trim() -eq $StartHeader`，傳入 `"## Next"`；實際標題是 `## Next — 未完成（目前正式隊列）`。**永遠不匹配** → 搜尋迴圈跑到 EOF → 回空。實測：`integrated-status-LATEST.md` 的 §1/§2 **長期是空白的**。昨天盤點時我在那個檔看到的待辦來自 §5 內嵌的 daily note，不是 TASKS 解析。
+
+**② 修好①之後才浮出來的第二層：`,@()` + 呼叫端 `@()` 雙重包裝**
+函式 `return ,@($items)`，呼叫端又寫 `@(Get-UncheckedInSection ...)` → 得到「只有一個元素、該元素是 74 筆陣列」的陣列。`.Count` 永遠 = 1，整包被 stringify 成**一行**。`Get-LobsterOpenBeforeSectionD` 呼叫端同款，一併修（關整類，不是關這一個實例）。
+**一個 bug 藏住另一個**：函式永遠回空的期間，雙重包裝完全看不出來。
+
+**③ `verify-build-gates.ps1` 有一道閘在要求「必須存在一個今早剛被刻意刪掉的東西」**
+它斷言 `ao-resume.ps1` 必須含 `-WorkRoot $Root` 的 auto-checkpoint 呼叫。但 `8c3ac617`/`c63bdc5c`/`680db6c6`/`7251d14d` 已把全部自動 commit 呼叫點移除（`ao-resume.ps1:283` 留了墓碑註解），**閘沒跟著更新 → `verify-build-gates` 從今早起必失敗**，而 AO-CLOSE 門檻是 100%。
+**不是打補丁把它刪掉**：有用的契約現在跑反方向 —— 改成斷言 `ao-resume.ps1` **不得**出現任何 `commit-checkpoint.ps1` / `$checkpointScript` 呼叫（先剝除註解行，否則閘會被自己的墓碑註解絆倒）。這樣同時把「日後有人加回來」也堵住。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=無損解析自證（把 TASKS.md 未完成區切成 186 塊再逐字節重組回原文）| `無損重組: True` —— **先證明解析器不會弄丟東西，才准它動檔案**
+- REALTEST_EVIDENCE: tool=Bash | cmd=改前/改後核取行集合比對（`collections.Counter`）| 291 → 291、**逐字節集合相等 True**、**重複行 0**、open 75 / done 216 不變
+- REALTEST_EVIDENCE: tool=Bash | cmd=非核取行差異列舉 | 遺失 16 行、**全部是被拆掉的 16 個 `####` 標題**（0 條散文、0 條項目遺失）；脈絡以「舊子區 → 現在在哪」對照表承接
+- REALTEST_EVIDENCE: tool=Bash | cmd=`print-open-tasks.ps1` | exit=0、`Total open: 75`（改前改後一致）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`generate-integrated-status-report.ps1` 改後重跑 | §1 = **74** 條開放項（改前 0 → 修①後 1 行巨無霸 → 修②後正常）、§2 = 1、§3 = 27、PARSER MISMATCH 未觸發
+- REALTEST_EVIDENCE: tool=Bash | cmd=新閘行為 A/B（`$env:TEMP` 拋棄式 .ps1，ASCII-only 避開 CP950 陷阱）| T1 真呼叫點→**觸發**（matched `$checkpointScript`）／T2 只有墓碑註解→**不觸發**（無假陽性）／T3 現行 `ao-resume.ps1`→PASS。**證明它不是永遠綠的閘**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`verify-build-gates.ps1` | **ALL PASSED**（修前必失敗）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`system-health-check.ps1` | **Score: 100% (312/312)**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`verify-archive-tasks-lift.ps1` | **RESULT: PASS (exit=0)** —— 這道閘正是靠 `- [ ]` 唯一性運作，等於反向驗證了「零重複」
+- REALTEST_EVIDENCE: tool=Bash | cmd=`audit-cp950-traps.ps1 -ParseBreakOnly` | 我改的 3 支 `.ps1` 全 clean；唯一 drift 是既有的 `rebuild-content-studio-4cards.ps1:184`（已是 E 區待辦）
+- REALTEST_EVIDENCE: tool=Bash | cmd=三支 `.ps1` 逐一 `[Parser]::ParseFile` | 全 PARSE OK
+- REVIEW_DONE: critic=Quick（自審 + 機器斷言）| verdict=warn→修正後 pass | findings=0c/2m/0n —— M1：line-range 取代時把 `` 當成 Python 跳脫字元，寫出 `"scriptso-resume.ps1"`（PowerShell 語法仍合法故 parse 過，但路徑錯 → 閘會回「找不到 ao-resume」而非真檢查）；M2：同一次取代只刪到第一個 `}`，舊閘殘留在新閘後面形成雙閘。兩者都是**跑實測才發現，不是讀 diff 發現的** —— 記錄下來因為它示範了「parse OK ≠ 行為正確」。**外部 oracle 不可用**：Codex 額度耗盡至 2026-08-31（見 A 區條目）。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp | grep=`待釐清 / 明日提醒\|### 未完成\|Get-UncheckedInSection\|print-open-tasks` | hits=1 真實需修（`client-onboarding-portal-CODEBASE-MAP.md:5`，已同批修）—— 其餘命中全數人工判讀為**歷史快照刻意不動**：`Backups/claude-userlevel-*/commands-before/`（今日 sync 自動備份 ×14）、`reports/weekly/`、`reports/status/integrated-status-*`、`handoffs/2026-05-28-*`。另確認 `.codex/` 只鏡射 `agents/`+`hooks/`，**無 commands 鏡像**故無跨目錄漂移。
+- ORACLE_WAIVED: Codex 額度耗盡至 2026-08-31 12:41（`codex exec` 直測回 usage-limit，見 TASKS A 區「Codex 額度耗盡，跨模型 oracle 路徑不可用」），跨模型覆審路徑本週不可用。替代證據：本批 `.ps1` 改動全部以**行為 A/B 實測**驗證（新閘 T1 觸發／T2 無假陽性／T3 現況 PASS、`verify-build-gates` 修前必失敗→修後 ALL PASSED、報告 §1 由 0→1 巨無霸→74 條正常），且 TASKS.md 為 DOC 位移並以逐字節集合比對機器證明零遺失零重複。
+
+[剩餘風險]
+- **分類是判斷，不是機器導出的**。59 條的歸屬由我依「誰卡住它」判定；B/C 的界線（「等你下指令」vs「等外部」）最主觀。分類錯不會弄丟東西，但會讓它排在錯的位置 —— 看到不對直接搬，區段之間搬動是安全操作。
+- 條目文字裡的舊 `【未開始】`/`【gated】` 前綴**沒有統一改寫**（那要動 59 條的判斷，風險遠高於收益）。已在檔案裡明寫「**以所在區段為準，兩者衝突時區段贏**」。
+- `#### I. 收件匣` 目前是空的；`/tomo` 下次寫入才會有內容。若之後沒人把它分派到 A–H，它會慢慢長回成新的垃圾桶 —— 這是**流程風險，機器擋不住**。
+- 平行 session 今日同時在動 `scripts/`；本次 commit 具名檔案，未使用 `git add -A`。
+
+[rollback]
+`git revert` 單一 commit 即完整回復。純 markdown 位移 + 3 支 `.ps1` 的小幅修正 + 2 個 command 文件，無 code、無 migration、無部署。
+
+---
+
 ## 2026-08-25
 
 ### AUTO_TASK_DONE: 停用 auto-checkpoint —— 一個存檔按鈕被當成管線零件用了三個月

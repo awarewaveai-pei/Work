@@ -32,7 +32,10 @@ $utf8 = [System.Text.UTF8Encoding]::new($false)
 $lines = @([System.IO.File]::ReadAllLines($tasksPath, $utf8))
 $section = "(prologue — before first ##)"
 $rxOpen = [regex]'^\s*-\s+\[\s+\]\s+'
-$rxHeading = [regex]'^##\s+'
+# 2026-08-26: group by ## AND ###/#### so the snapshot mirrors TASKS.md's A-I blocker
+# sections. Grouping by '##' alone collapsed every open task into one bucket, which is
+# exactly what a cold-start agent reads first.
+$rxHeading = [regex]'^#{2,4}\s+'
 
 $items = New-Object System.Collections.Generic.List[object]
 

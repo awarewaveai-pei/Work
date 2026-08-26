@@ -148,16 +148,27 @@ if (Test-Path -LiteralPath $govScript) {
     }
 }
 
-Write-Host "== AO-RESUME contract: auto-checkpoint must pin WorkRoot ==" -ForegroundColor Cyan
+# 2026-08-26: this guard was INVERTED, because the contract it enforced was deleted.
+# It used to assert that ao-resume.ps1 CONTAINS an auto-checkpoint call pinned with
+# -WorkRoot $Root. On 2026-08-25/26 every automatic commit call site was removed
+# (8c3ac617 / c63bdc5c / 680db6c6 / 7251d14d) because auto-committing the operator dirty
+# tree produced six documented harm classes and zero recovered work. The guard was not
+# updated alongside them, so verify-build-gates has been failing ever since -- a gate
+# demanding the presence of something the codebase deliberately no longer has.
+# The useful contract now runs the other way: nothing in ao-resume.ps1 may silently
+# commit. Asserting the absence also stops the habit from being reintroduced later.
+Write-Host "== AO-RESUME contract: no automatic commit call sites ==" -ForegroundColor Cyan
 $aoResumeScript = Join-Path $WorkRoot "scripts\ao-resume.ps1"
 if (-not (Test-Path -LiteralPath $aoResumeScript)) {
     Write-Error "verify-build-gates: missing ao-resume script at $aoResumeScript"
     exit 1
 }
 $aoResumeRaw = Get-Content -LiteralPath $aoResumeScript -Raw -Encoding UTF8
-$autoCheckpointCallPattern = '(?m)^\s*&\s*powershell\.exe\s+-NoProfile\s+-ExecutionPolicy\s+Bypass\s+-File\s+\$checkpointScript\s+-Message\s+\$checkpointMsg\s+-WorkRoot\s+\$Root(?:\s*\|\s*Out-Host)?\s*$'
-if ($aoResumeRaw -notmatch $autoCheckpointCallPattern) {
-    Write-Error "verify-build-gates: ao-resume auto-checkpoint call must pass -WorkRoot `$Root (contract guard)."
+# Strip comment lines first: the tombstones explaining the removal legitimately mention
+# the old names, and a guard that trips on its own documentation is worse than no guard.
+$aoResumeCode = (($aoResumeRaw -split "`r?`n") | Where-Object { $_ -notmatch '^\s*#' }) -join "`n"
+if ($aoResumeCode -match '(commit-checkpoint\.ps1|\$checkpointScript)') {
+    Write-Error "verify-build-gates: ao-resume.ps1 must not invoke commit-checkpoint. Automatic commits were removed 2026-08-25/26 (see agency-os/WORKLOG.md); found: $($Matches[1])"
     exit 1
 }
 
