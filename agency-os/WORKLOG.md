@@ -38,6 +38,15 @@
   - 另發現 R2 有 **8 個 `remotion/` 物件（~200MB）完全不在 reconcile 的正則涵蓋內**（`^video/...`），是第二類從未被對帳的孤兒 → 已記 TASKS
 - REALTEST_EVIDENCE: tool=Bash | cmd=`bash -n reconcile-videos.sh` + 7 案例狀態機測試（含 `set -euo pipefail`）| exit=0 | ms=~200
   - 案例：緊湊 JSON / 有孤兒 / `ok:false` / 舊版無欄位 / 完全非 JSON / pretty-print / 相似欄位名干擾 —— 全部分類正確且**不會在 errexit 下死掉**
+- REALTEST_EVIDENCE: tool=SSH | cmd=`ssh hetzner-sg bash /root/lobster-phase1/scripts/reconcile-videos.sh` | exit=0 | ms=~14000
+  - **同一份 log 的前後對照**（`/var/log/reconcile-videos.log`）：
+    - `07:00:04`（舊碼）`{"ok":true,"checked":2,"recorded":0,"skippedLegacy":2,"skippedUnresolved":0}`
+    - `07:14:14`（新碼）`{"ok":true,"checked":2,"recorded":0,"alreadyRecorded":1,"orphanUnattributable":1,"unattributableByMissingPrefix":1,"unattributableByUnresolvedPrefix":0,"noPrimary":0,"probeFailed":0,"recordFailed":0}`
+    - 窮盡性成立：0+1+1+0+0+0 = 2 = checked
+  - 告警確實送出：log 下一行 `NOTIFIED state=orphans=1`，狀態檔 `orphans=1|1787728456`
+  - **去重實測**：連跑 3 次，`grep -c NOTIFIED` = **1**（同一狀態 24h 內不重複打擾）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`grep -oE "^[A-Z_]+=" /etc/default/awarewave-endpoint-alert*` | exit=0 | ms=~800
+  - **修掉一個會讓告警靜默失效的坑**：`TELEGRAM_NOTIFY_ENABLED/BOT_TOKEN/ALLOWED_CHAT_IDS` 的現行值在 `/etc/default/awarewave-endpoint-alert.telegram`（endpoint-alert 的 systemd unit 以 EnvironmentFile 讀同一份），`/root/lobster-phase1/.env` 只有 `.env.bak*` 舊備份還留著這些鍵。只 source `.env` 的新告警會恆為 `NOTIFY_SKIPPED` —— 偵測器存在但沒有出口。已改為額外 source 該檔並寫進註解（commit `4735afc1`）
 - REVIEW_DONE: critic=Deep（**自審**，見 ORACLE_WAIVED）| verdict=pass-with-fixes | findings=0C/2M/1m（全部當場修訖）
   - M1 **告警腳本會自己靜默死掉**：`set -euo pipefail` 下欄位缺失時 `grep` 回非零 → 整支腳本當場結束。這是最糟的失敗模式（告警消失但看起來正常）。修：`|| true` + 前置條件顯式檢查（缺 `.env` / 缺密鑰改為寫 log 後 `exit 1`，而非靜默）
   - M2 **JSON 解析押在「輸出永遠緊湊」上**：`"ok": true`（帶空白）會解析失敗 → 永久假警報。修：正則允許 `[[:space:]]*`
