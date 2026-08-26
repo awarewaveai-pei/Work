@@ -2,6 +2,56 @@
 
 ## 2026-08-26
 
+### AUTO_TASK_DONE: Soulful 自動備份修復 —— 分塊 2 MB → 30 MB，三次實測全 Succeeded
+
+[任務]
+操作者：「我是要你修好 soulfulexpression.org 自動備份」。並在過程中明確指示「我沒有要存在 dropbox，存在 google drive」與「我沒有要重新授權，你可以直接處理」。
+
+[完整根因鏈（每一環都有 file:line）]
+1. `report_addon` 10 筆 = 成功 5／失敗 5，**5 次失敗全部**是 `403 rateLimitExceeded / PERMISSION_DENIED`，來自 `drive.googleapis.com` 的 Queries-per-minute 配額，consumer `project_number:134809148507` ＝ **WPvivid 全球共用的 Google API 專案**（操作端無旋鈕）。
+2. `class-wpvivid-google-drive.php:861` 分塊大小預設 `WPVIVID_GOOGLEDRIVE_UPLOAD_SIZE = 1024*1024*2` ＝ **2 MB** → 800 MB 約 **400 次**分塊請求。
+3. `:946-953` 確實有重試 15 次，但 **重試之間沒有任何 sleep** —— 15 次全部落在同一分鐘內。對「每分鐘配額」而言，瞬間重試注定全滅。**所以正解是減少請求數，不是再加重試。**
+4. 對照組確認是體積而非服務：`aware-wave.com` 55–61 MB 單檔，同一個 Google 帳號下 8/8・8/15・8/23・8/26 四次全成。
+
+[已修改（子站 soulfulexpression.org，非 repo）]
+`wpvivid-remote-69ff0a63b77ab` 的 `upload_chunk_size`：未設定（走 2 MB 預設）→ **`31457280`（30 MB，UI 允許上限 1–30）**
+- **單位是 bytes 不是 MB**：`sanitize_options()`（`:633`、`:651-653`）在**存檔時**先乘 `1024*1024`，執行期 `:1115` 直接讀、`:861` 直接當 bytes 用。若誤寫成 `30` 會變成 30 bytes ＝ 2600 萬次請求，比原狀況慘一百倍。**動手前先確認單位，是本次唯一沒有踩下去的坑。**
+- `31457280 ÷ 262144 = 120`，符合 Google resumable upload 要求的 256 KB 整數倍。
+- 預期：800 MB 的分塊請求 400 次 → 約 **27 次**（少約 15 倍）。
+
+[重要結構發現 —— 這才是「UI 按 Save 沒反應」的真因]
+`remote_selected` 存在**兩個 option**，而 `class-wpvivid-setting.php:388` 會用 `wpvivid_user_history` **覆蓋** `wpvivid_upload_setting`：
+```
+$upload_options['remote_selected'] = WPvivid_Setting::get_user_history('remote_selected');
+```
+所以只改 `wpvivid_upload_setting` **永遠不生效**（我第一次就是改錯地方，實測跑出來仍送 Google Drive 才發現）。正解是 `WPvivid_Setting::update_user_history('remote_selected', ...)`。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH+WP-CLI | cmd=`wp cron event run wpvivid_main_schedule_event` ×3 實跑 | **三次 `wpvivid_backup_reports` 皆 `{"status":"Succeeded"}`** —— `07:51` googledrive(2MB 舊設定)／`08:01` dropbox(測試)／**`08:12` googledrive(30MB 新設定)**
+- REALTEST_EVIDENCE: tool=SSH | cmd=`ls wp-content/wpvividbackups` 與 `du -sh` | 每次跑完本地暫存由 800 M 歸零 → 上傳完成後清理正常，**30 MB 分塊未造成記憶體不足／逾時／Google 拒絕**
+- REALTEST_EVIDENCE: tool=SSH+WP-CLI | cmd=`Dropbox_Base::check_token()` | 回 `{"result":"success"}` 且 `created` 更新（過程中為排除「憑證死了」而做，雖最終未採用 Dropbox）
+- REALTEST_EVIDENCE: tool=SSH+WP-CLI | cmd=`wp cron event list` | 還原後 `wpvivid_main_schedule_event` = `2026-08-31 00:08:15`，recurrence `wpvivid_weekly`
+- REVIEW_WAIVED: NA -- 遠端設定變更，非 repo 程式碼；每步皆讀回驗證，且以三次真實備份取代靜態審查
+
+[我造成的副作用 —— 全部主動列出]
+1. **保留窗被我的測試吃掉**：`max_backup_count=3`，三次測試把 `2026-08-17` 與 `2026-07-27` 擠出。**淨結果是備份更新（今天兩份）但歷史深度變淺。**
+2. **排程被重新錨定**：`wp cron event run` 把週期事件從「現在」重排到 `2026-09-02 08:12`（週二下午、有流量時段）。**已還原**為原槽位 `2026-08-31 00:08:15 UTC`。
+3. **Dropbox 多一份 `08:01` 測試備份**（我誤判方向所致），操作者可自行刪除。
+4. **走錯一次方向**：操作者要的是 Google Drive，我先做了「換 Dropbox」。收到指正後立即改回，並確認兩份設定一致。
+
+[憑證：同日第三次同款疏失]
+查該遠端設定時，`token` 欄位是一個**內含 `access_token` 與 `refresh_token` 的 JSON 字串**；我的排除清單只擋頂層同名鍵，未涵蓋巢狀，整段被印出。scope 為 `drive.file`，僅涵蓋該 app 自建檔案（即 WPvivid 的備份），非整個雲端硬碟。
+**操作者裁決：「我沒有要重新授權」→ 不執行撤銷**，已記入 TASKS 的「已知風險」區。
+**紀律修正**：前兩次的教訓寫成「排除敏感欄位名」，本次證明不夠 —— 憑證可巢狀在任意鍵底下。改為：**查設定表時只 SELECT／只印明確指名的純量欄位，絕不遍歷陣列或整欄輸出。**
+
+[剩餘風險]
+- **單次成功不等於修好 50% 的失敗率**。分塊減少 15 倍請求是有機制根據的緩解，但要看 `2026-08-31` 起連續幾週的成功率才算證實。
+- 共用 Google 專案的配額**仍是外部變數**，尖峰時段仍可能被其他 WPvivid 使用者拖累。若 8/31 之後仍失敗，下一步是縮小備份體積（排除 uploads 另行處理）而非再調分塊。
+- 重試無 backoff 是外掛層缺陷，更新即覆蓋，**不修改外掛原始碼**。
+
+[rollback]
+子站：`WPvivid_Setting::update_remote_option('wpvivid-remote-69ff0a63b77ab', ...)` 移除 `upload_chunk_size` 即回到 2 MB 預設。排程如需再調用 `wp_schedule_event`。repo 側純文字，`git revert` 單一 commit。
+
 ### AUTO_TASK_DONE: 3 個死站停用 —— 順帶抓到 active 過濾散在消費端已分岔
 
 [任務]
