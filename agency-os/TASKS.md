@@ -134,7 +134,8 @@
   - **⚠️ 禁止**：因為「這樣比較順」而讓它保持停用；若 8/31 後額度仍不足，改為評估用量而非延長停用。
 
 - [ ] **⏭️ Soulful 搬站：機器買到後的接手點（硬死線 2026-11-12，買機死線 9/30）**
-  - DNS/信箱/備份/演練皆已完成，**唯一阻塞是機器還沒買**。
+  - **【進度更新 2026-08-26】機器已買已裝，阻塞解除，進度轉移到 P2 硬化中途**：KS-6 缺貨（決策文件切換條件已觸發，見 `reports/decisions/2026-08-18-dedicated-host-purchase-timing.md` 切換條件段），實際買 **OVH SYS-GAME-2**（149.202.64.114，8c/16t／**64GB ECC**／**2×960GB RAID1**，規格低於下限，範圍已縮小為僅承接 Soulful，見決策文件同段落）。Ubuntu 24.04 已裝、RAID1 `[UU]` 已驗、NVMe 磨耗 5% 健康。**現況**：P2.1/P2.2 完成，**P2.3–P2.10（防火牆雙層／SSH 硬化／Docker 安裝／sysctl／rescue mode 實測）尚未做**，P3 備份管線／P4 還原演練+`NEW-HOST-RECOVERY-RUNBOOK.md`／P5 起皆未開始。憑證在 `AWARE_WAVE_CREDENTIALS.md`「OVH Dedicated Server」節。
+  - DNS/信箱/備份/演練皆已完成（見下方已完成清單）。
   - **規格已定案（2026-08-17）**：**128GB ECC / ≥8C16T / ≥1TB NVMe RAID1；首選 OVH KS-6 $59.80，Hetzner auction ≤€65（128G ECC + ≥2TB）則改選 Hetzner；~~觀望截止 8/31~~ **⛔ 該條已於 2026-08-18 被推翻**（見下）**決策正本 [`reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md`](reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md)（取代 DR runbook §0b 機型表）。 **【訂正 2026-08-25】「觀望截止 8/31」已被 [`reports/decisions/2026-08-18-dedicated-host-purchase-timing.md`](reports/decisions/2026-08-18-dedicated-host-purchase-timing.md) 明文取代**（該決策 §「與 2026-08-17 的關係」表列 🔄 取代：決策規則第 1–3 條 + 觀望截止日）。
   - **現行結論＝C6**：**立刻下單 OVH KS-6、用月租不簽 12 個月，觀望期改由月租的退出權承載，不由日曆餘裕承載**；理由是觀望的「獎品」（2TB 碟 + Robot/RMA，€445–484／3 年）在月租架構下未來 36 個月任一天都能買，不需拿死線餘裕當入場費。同時關閉前一份唯一未驗證項（Backup Agent 免費容量 → 移除依賴，備份一律走既有 R2）。
   - **Pre-mortem 首要風險**：機器買了、soulful 也切了，但 EU/SG 整併從未完成，2028 年仍三台並存。
