@@ -40,6 +40,12 @@
   - `UPDATE 3` / `UPDATE 1` / `UPDATE 1`，NOTICE：`all wp_sites rows mapped to an organization`
   - PostgREST 讀回驗證：5 站 org 前綴 `2bf60452 / 39ad4149 / 9e6e0993 / 37fdf3e3 / d6d1e845` 全部正確
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && npx vitest run` | exit=0 | ms=~1900（55 檔 / 648 測全過）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin` + 部署後打 prod 內部端點 | exit=0 | ms=~250000
+  - 部署 `439499c7`：容器 healthy 7s、smoke 4/4
+  - `/api/content/sites` → 200，Soulful 的 `org_slug=soulful-expression`（**來自新欄位，不是 hostname 猜測**）
+  - `/api/content/categories?siteId=<soulful>` → 200 並回真實分類 → seam 解析 + 認證在 prod 正常
+  - `/api/content/publish` 帶不存在的 siteId → `400 Site 'does-not-exist' not found` → 發文核心的新解析路徑確實在跑（且**不產生任何內容**）
+  - 部署 bundle 內 `app/api/content/wp-post/route.js` 含租戶閘字串（grep 命中 1）→ 閘在 prod 生效
 - REVIEW_DONE: critic=Deep（**自審**，見 ORACLE_WAIVED）| verdict=pass | findings=0C/0M/0m 新增
   - **突變測試**：把 `resolveWpSite` 改回舊行為（移除 assert + 還原 `sites[0]`）→ **4 條測試轉紅**（含「client 未指定 siteId 時取到的是自己的站而非清單第一個」）。還原後 11/11 綠
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`getWpSites\|sites\[0\]\|hostnameSlugMap\|publishToWordPress` | hits=0 未收斂的取站點
