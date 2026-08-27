@@ -161,6 +161,53 @@ WSL2 內下載大檔會斷流卡死（medium 模型 12 分鐘下載 0 bytes，�
 [rollback]
 `git revert <commit>`。`lib/word.py`、`start_server.sh` 為新增檔可直接刪；`start_server.ps1` 為改寫，revert 後會回到原生 Windows 版本（該版本在此機**確定跑不起來**，僅適用於 SAC 未鎖定的環境）。
 
+### 🔴 訂正：SAC 封鎖是暫時性的，我把它當成永久並據此做了錯誤的架構決定
+
+[根因：沒讀自己維護的文件]
+今天上午 `av` 被 Smart App Control 擋（`ImportError: DLL load failed ... 應用程式控制原則已封鎖此檔案`），我查了 registry 確認 SAC 為完全鎖定狀態、查了 Microsoft 說明確認該狀態無法從 UI 關閉，於是判定「Windows 永久不可用」，把整個工具搬到 WSL2。
+
+**但這個 repo 自己的 README「安裝細節」第 4 條早就寫著**：「Windows Smart App Control：新裝套件的 DLL 首次載入可能被暫時封鎖（信譽評估中），重試一次通常就過。」
+
+當晚實測：同一支套件、同一個 `.pyd`、沒有重裝、沒有改設定 —— `import av` 正常，真實解碼 200 frames 通過，`torch.cuda.is_available()` 為 True，GPU 探針回 `cuda/float16`。SAC 的信譽評估完成後自動放行了。
+
+[代價]
+搬到 WSL2 的直接後果：轉錄從 GPU 7.0x realtime 掉到 CPU 2.1x；**講者分離完全消失**（WSL2 缺 torch），使用者的會議記錄因此只能用語意推定發言歸屬。我還把「WSL2 下載 torch 會斷流」寫進 TASKS 當成已知限制 —— 而那個描述也是錯的（見下）。
+
+[連帶訂正的三個錯誤數據]
+1. torch CUDA wheel **732 MB**，不是我說的 2.5GB
+2. 「WSL2 網路斷流」**不成立**：實測 Windows 端下載同一個 URL 也是 0.56 MB/s，兩邊一樣慢；而且穩定不斷流（連續 100MB 無中斷）。真正會斷流卡死的是 **HuggingFace** 主機（medium 模型 12 分鐘 0 bytes），我把兩個不同主機的問題混為一談
+3. 先前那次 `pip install` 失敗是**我自己設 600 秒逾時**砍掉的，加上背景 nohup 沒存活（這個坑 repo 早有記錄），不是網路不行
+
+[已修改]
+`start_server.ps1` 改為**每次啟動實測**再決定環境，不預設任何一邊：
+  - `python -c "import av, faster_whisper"` 成功 → Windows 原生（GPU，含講者分離）
+  - 失敗 → 自動退到 WSL2（CPU，較慢但能動），並提示 SAC 放行後下次會自動切回
+抽出 `Start-OnWindows` / `Start-OnWsl2` 兩個函式，失敗訊息也依實際走的路徑指向正確的 log。
+
+這個設計關掉的是整類問題：SAC 擋或不擋都不需要人介入，也不會再發生「因為當下被擋就永久改走慢很多的路」。
+
+另補 Windows 端缺的 `python-docx`（今天加 Word 功能時只裝在 WSL2，導致切回 Windows 時 `app.py` import 失敗）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=Windows `import av` + 真實解碼 20260827.m4a 200 frames | exit=0 | 0.00s，確認 SAC 已放行
+- REALTEST_EVIDENCE: tool=Bash | cmd=`pick_device('medium')` GPU 探針 | exit=0 | backend=cuda/float16
+- REALTEST_EVIDENCE: tool=Bash | cmd=`start_server.ps1` 從乾淨狀態啟動 | exit=0 | 自動選 Windows，serving process=python.exe PID 34216（非 wsl），index/word/coach 端點皆 200
+- REALTEST_EVIDENCE: tool=Bash | cmd=**講者分離實跑**（50.4 分鐘音檔，Windows GPU） | exit=0 | 136s = 22.2x realtime，2 位講者（A 52.7% / B 47.3%），304 turns，重疊語音 242s(8.0%)，貼標來源：精確 1578／鄰近推定 15／無法判定 2
+- REALTEST_EVIDENCE: tool=Bash | cmd=Windows/WSL2 下載速度對照（同一 torch wheel URL，100MB 範圍請求）| exit=0 | Windows 0.56 MB/s 穩定不斷流 → 推翻「WSL2 網路特有問題」的說法
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+  - 本輪為啟動器分支邏輯 + 環境訂正，核心行為（偵測、啟動、端點、GPU、講者分離）全部有端到端實測覆蓋，強度高於靜態審查
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`Start-OnWindows\|Start-OnWsl2\|winOk\|python-docx` | hits=6
+  - 皆為本次新增的自我引用；README「WSL2 執行」章節仍正確（現定位為後備路徑而非唯一路徑），已於同一 commit 調整措辭
+- ORACLE_WAIVED: 訂正性改動，關鍵行為有端到端實測（含真實 50 分鐘音檔的講者分離），實測強度高於靜態覆審。
+
+[剩餘風險]
+- SAC 何時會再擋新裝套件**無法預測**，但自動偵測已讓它不需要人介入。
+- WSL2 後備路徑目前仍缺 torch（背景下載中），若在下載完成前 SAC 又擋，後備路徑會沒有講者分離。
+- **方法論教訓**：這次的根因不是技術問題，是「宣告永久失效前沒先查 repo 自己的記錄」。R4 的 VBC 原則（宣告 X 缺失前先查是否已有替代方案／既有說明）本來就涵蓋這個情境，我沒有執行。
+
+[rollback]
+`git revert <commit>`；`start_server.ps1` 可還原成單一路徑版本，但不建議 —— 那會回到「寫死走某一邊」的狀態。
+
 ### meeting-service：文件輸出一律 Word + 版面設定標準化 + 型別正規化關掉整類崩潰
 
 [任務]

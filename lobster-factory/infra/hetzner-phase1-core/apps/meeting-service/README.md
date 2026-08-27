@@ -2,15 +2,23 @@
 
 錄音/影片上傳 → 本機轉錄 → 講者分離 → AI 摘要（預設貼上式，零費用；選填 API 自動處理，見下方）→ PPT + Word + Excel + 報告教練。**全程本機執行，音檔不外流**。
 
-## 🚨 執行環境：WSL2（2026-08-27 起，非選項）
+## 執行環境：Windows 優先，SAC 擋住才退 WSL2（自動判斷）
 
-**Windows 原生已經跑不起來**：Smart App Control（SAC）封鎖 `av` 套件未簽章的 `.pyd`，
-錯誤訊息是 `ImportError: DLL load failed while importing frame: 應用程式控制原則已封鎖此檔案`。
-這台機器的 SAC 是**完全鎖定**狀態（`VerifiedAndReputablePolicyState=1`），Microsoft 官方
-說明該狀態無法從 UI 關閉。**重灌 `av` 無效**——實測全新安裝的檔案照樣被擋，因為擋的是
-簽章不是檔案損毀（`Microsoft-Windows-CodeIntegrity/Operational` event 3077 可證）。
+**預設走 Windows 原生**（GPU：轉錄 7.0x realtime、講者分離 24.4x realtime）。
+`start_server.ps1` 每次啟動會實測 `python -c "import av, faster_whisper"`，
+成功就走 Windows，失敗才自動退到 WSL2（CPU 2.1x，較慢但能動）。
 
-解法是改在 WSL2（Ubuntu）執行，Linux 不受 SAC 管轄。**對操作者的使用方式完全不變**：
+**為什麼需要這個判斷**：Smart App Control（SAC）會封鎖新安裝套件裡未簽章的 `.pyd`
+（`ImportError: DLL load failed ... 應用程式控制原則已封鎖此檔案`），`av` 踩過這個坑。
+**但這個封鎖通常是暫時的**——SAC 先擋、待雲端信譽評估完成後放行（見下方「安裝細節」
+第 4 條）。2026-08-27 當天上午 `av` 被擋、當晚同一支套件同一個檔案就正常了，中間
+沒有重裝也沒有改設定。
+
+⚠️ **歷史教訓**：當天曾因為「查了 registry 確認 SAC 完全鎖定、查了官方說明確認無法
+從 UI 關閉」就判定 Windows 永久不可用，把整套搬到 WSL2 —— 代價是轉錄掉到 CPU 速度、
+講者分離完全消失。宣告任何環境永久失效前，先查本檔既有記錄（R4 VBC）。
+
+**對操作者的使用方式完全不變**（兩條路徑都是同一個網址）：
 
 ```powershell
 # 一樣雙擊桌面捷徑，或直接跑（會自動偵測並啟動 WSL2 內的服務）
@@ -39,9 +47,10 @@ wsl -d Ubuntu -- bash -lc "python3 -m venv ~/mtg-venv && ~/mtg-venv/bin/pip inst
 wsl -d Ubuntu -- bash /mnt/d/Work/.../apps/meeting-service/start_server.sh
 ```
 
-**目前 WSL2 環境缺 `torch`/`pyannote`（講者分離）**，原因同樣是大檔下載斷流。
-其餘功能（轉錄／摘要／PPT／Word／Excel／教練稿）全部正常，只是逐字稿不會有
-A/B/C 講者標籤。要補回講者分離，需在網路狀況良好時裝 `torch` + `pyannote.audio`。
+**WSL2 後備環境目前缺 `torch`/`pyannote`**（背景下載中，732MB @ 約 0.56MB/s）。
+只在 SAC 擋住 Windows 而退到 WSL2 時才會影響到——那種情況下逐字稿不會有 A/B/C
+講者標籤，其餘功能（轉錄／摘要／PPT／Word／Excel／教練稿）全部正常。
+Windows 路徑不受影響，torch/pyannote 早已安裝且 GPU 可用。
 
 ## ⚠️ 為什麼只能本機跑，不部署到 SG/EU
 
