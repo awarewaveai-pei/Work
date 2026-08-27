@@ -23,11 +23,15 @@ RED = "EF4444"
 YELLOW = "F59E0B"
 BODY_BG = "F2F5FB"
 
-HEADER_FONT = Font(name="Microsoft JhengHei", size=11, bold=True, color="FFFFFF")
+# 與 word.py / deck.py 一致（操作者 2026-08-27 指定 Noto Sans TC）。
+# 集中成一個常數，不再散落 7 處字面量——換字型時只有這裡要改。
+FONT_NAME = "Noto Sans TC"
+
+HEADER_FONT = Font(name=FONT_NAME, size=11, bold=True, color="FFFFFF")
 HEADER_FILL = PatternFill("solid", fgColor=ACCENT)
-TITLE_FONT = Font(name="Microsoft JhengHei", size=16, bold=True, color=INK)
-LABEL_FONT = Font(name="Microsoft JhengHei", size=10, bold=True, color=MUTED)
-BODY_FONT = Font(name="Microsoft JhengHei", size=10, color=INK)
+TITLE_FONT = Font(name=FONT_NAME, size=16, bold=True, color=INK)
+LABEL_FONT = Font(name=FONT_NAME, size=10, bold=True, color=MUTED)
+BODY_FONT = Font(name=FONT_NAME, size=10, color=INK)
 WRAP = Alignment(wrap_text=True, vertical="top")
 THIN = Side(style="thin", color=BORDER_C)
 CELL_BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
@@ -106,7 +110,7 @@ def _sheet_summary(wb: Workbook, m: dict):
         ws.cell(row=r, column=1, value="資料來源與限制").font = LABEL_FONT
         r += 1
         ws.cell(row=r, column=1, value=m["_provenance"]).font = Font(
-            name="Microsoft JhengHei", size=9, italic=True, color=MUTED)
+            name=FONT_NAME, size=9, italic=True, color=MUTED)
         ws.cell(row=r, column=1).alignment = WRAP
         ws.merge_cells(start_row=r, start_column=1, end_row=r + 3, end_column=4)
         ws.row_dimensions[r].height = 20
@@ -148,7 +152,7 @@ def _sheet_actions(wb: Workbook, m: dict):
         if pf:
             cell = ws.cell(row=row, column=5)
             cell.fill = pf
-            cell.font = Font(name="Microsoft JhengHei", size=10, bold=True, color="FFFFFF")
+            cell.font = Font(name=FONT_NAME, size=10, bold=True, color="FFFFFF")
             cell.alignment = Alignment(horizontal="center", vertical="center")
         ws.row_dimensions[row].height = 32
 
@@ -189,7 +193,7 @@ def _sheet_open(wb: Workbook, m: dict):
     for risk in m.get("risks", []):
         _data_row(ws, r, ["⚠ 風險", risk], wrap_cols={2})
         cell = ws.cell(row=r, column=1)
-        cell.font = Font(name="Microsoft JhengHei", size=10, bold=True, color=RED)
+        cell.font = Font(name=FONT_NAME, size=10, bold=True, color=RED)
         ws.row_dimensions[r].height = 28
         r += 1
     if r == 2:
@@ -199,6 +203,13 @@ def _sheet_open(wb: Workbook, m: dict):
 
 def build(minutes: dict, out_path: str) -> str:
     wb = Workbook()
+    # 沒被逐格設定字型的儲存格（空白列、未來新增而漏設的格）會落回 openpyxl
+    # 的預設 Calibri，跟其餘內容不一致。改掉活頁簿的 Normal 具名樣式，讓
+    # 「沒特別指定」的預設值本身就是對的，而不是靠每一格都記得設。
+    try:
+        wb._named_styles["Normal"].font = Font(name=FONT_NAME, size=11, color=INK)
+    except (KeyError, AttributeError):
+        pass  # openpyxl 內部結構若改版，不因樣式微調而讓整份報表產不出來
     _sheet_summary(wb, minutes)
     _sheet_decisions(wb, minutes)
     _sheet_actions(wb, minutes)

@@ -1,7 +1,12 @@
-"""把講稿寫進 PPTX 備忘稿欄位，並輸出報告教練 markdown。"""
+"""把講稿寫進 PPTX 備忘稿欄位。
+
+原本這支還負責輸出報告教練 markdown（`write_coach_md()`），2026-08-27 操作者
+決定文件類輸出一律用 Word，該函式已移除，改由 `word.build_coach()` 產出
+`coach.docx`。刪除而非保留是刻意的——兩套渲染同一份資料必然漂移。
+"""
 from pptx import Presentation
 
-WPM_ZH = 240  # 中文口語每分鐘字數，正式簡報建議 220-260
+WPM_ZH = 240  # 中文口語每分鐘字數，正式簡報建議 220-260（word.py 有同值副本）
 
 
 def attach_notes(pptx_path: str, coaching: dict, out_path: str = None):
@@ -36,49 +41,3 @@ def attach_notes(pptx_path: str, coaching: dict, out_path: str = None):
     return out
 
 
-def write_coach_md(coaching: dict, minutes: dict, path: str) -> str:
-    per = coaching.get("per_slide", [])
-    total_s = sum(n.get("seconds", 0) for n in per)
-    lines = []
-    lines.append(f"# 報告教練 — {minutes.get('title','')}\n")
-    lines.append(f"**總時長目標**：{total_s//60} 分 {total_s%60} 秒　|　**頁數**：{len(per)}\n")
-
-    if coaching.get("opening_hook"):
-        lines.append("\n## 開場鉤子\n")
-        lines.append(f"> {coaching['opening_hook']}\n")
-        lines.append("\n開場 30 秒決定聽眾要不要聽下去。先講結論或先講痛點，不要先自我介紹。\n")
-
-    lines.append("\n## 逐頁節奏\n")
-    lines.append("| # | 頁面目標 | 秒數 | 講稿字數 | 語速檢查 |")
-    lines.append("|---|---------|-----|---------|---------|")
-    for i, n in enumerate(per, 1):
-        chars = len(n.get("script", ""))
-        sec = n.get("seconds", 0)
-        need = chars / WPM_ZH * 60
-        flag = "✅" if sec == 0 or abs(need - sec) <= sec * 0.25 else ("⚠ 太趕" if need > sec else "⚠ 太空")
-        lines.append(f"| {i} | {n.get('goal','')[:28]} | {sec} | {chars} | {flag} |")
-
-    if coaching.get("qa"):
-        lines.append("\n## 預期問題與回答\n")
-        for i, q in enumerate(coaching["qa"], 1):
-            lines.append(f"\n**Q{i}. {q.get('q','')}**")
-            lines.append(f"\n{q.get('a','')}\n")
-            if q.get("trap"):
-                lines.append(f"> ⚠ 陷阱：{q['trap']}\n")
-
-    if coaching.get("delivery_tips"):
-        lines.append("\n## 表達提醒\n")
-        for t in coaching["delivery_tips"]:
-            lines.append(f"- {t}")
-
-    if coaching.get("practice"):
-        lines.append("\n## 練習方式\n")
-        for t in coaching["practice"]:
-            lines.append(f"- {t}")
-
-    text = "\n".join(lines) + "\n"
-    # 走 Google Drive 同步的 .md 需 UTF-8 BOM，否則 Big5 系統 CJK 亂碼
-    # （見 minutes_md.py 同一慣例；archive.py 會把這支直接複製進 Drive）
-    with open(path, "w", encoding="utf-8-sig") as f:
-        f.write(text)
-    return path

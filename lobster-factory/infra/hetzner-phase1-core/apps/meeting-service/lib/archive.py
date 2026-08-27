@@ -82,11 +82,10 @@ def sync_to_drive(job_dir: str, minutes: dict, job_id: str) -> dict:
     # 同步結果少一個檔案且不會報錯（下面 os.path.exists 不存在就靜默跳過），
     # 是這個設計的已知代價：容忍缺檔換取「某個階段沒跑到也不會炸」。
     plan = [
-        ("slides.pptx", f"{title}_會議記錄.pptx"),
         ("meeting_record.docx", f"{title}_會議記錄.docx"),
-        ("meeting_notes.md", f"{title}_會議記錄.md"),
+        ("slides.pptx", f"{title}_會議記錄.pptx"),
         ("meeting_record.xlsx", f"{title}_會議記錄.xlsx"),
-        ("coach.md", f"{title}_報告教練.md"),
+        ("coach.docx", f"{title}_報告教練.docx"),
         ("diarized.txt", f"{title}_逐字稿.txt"),
         ("merged.txt", f"{title}_逐字稿.txt"),  # 沒做講者分離時的備援來源
     ]

@@ -176,12 +176,12 @@ const STAGES = [
   ["preflight","檢查檔案"], ["transcribe","轉錄"], ["merge","段落合併"],
   ["hallucination_check","幻覺偵測"], ["diarize","講者分離"], ["preparing_prompt","準備摘要 prompt"],
   ["summarize_via_api","API 自動摘要"], ["awaiting_summary","等待貼上摘要"], ["build_deck","生成 PPT"],
-  ["build_notes","寫入講稿"], ["build_minutes_md","會議記錄"], ["build_excel","生成 Excel"],
+  ["build_notes","寫入講稿"], ["build_excel","生成 Excel"],
   ["build_word","生成 Word"], ["sync_drive","同步 Google Drive"], ["done","完成"],
 ];
 const DOWNLOAD_LABELS = {
-  minutes_md: "會議記錄 (.md)", slides: "PPT (.pptx)", word: "會議記錄 (.docx)",
-  excel: "會議記錄 (.xlsx)", coach: "報告教練 (.md)",
+  word: "會議記錄 (.docx)", slides: "PPT (.pptx)",
+  excel: "會議記錄 (.xlsx)", coach: "報告教練 (.docx)",
   transcript_srt: "字幕檔 (.srt)", diarized_txt: "逐字稿-含講者 (.txt)", merged_txt: "逐字稿 (.txt)",
 };
 
@@ -412,7 +412,7 @@ document.getElementById("submitSummaryBtn").addEventListener("click", async () =
     document.getElementById("summaryCard").style.display = "none";
     document.getElementById("progressCard").style.display = "block";
     // resume_after_summary 是同步跑完才回應——HTTP 200 回來的當下，
-    // build_deck/build_notes/build_minutes_md 全部已完成，直接用真實 status
+    // build_deck/build_notes/build_excel/build_word 全部已完成，直接用真實 status
     // 更新階段列表，不要留在送出當下畫的過場畫面（先前這裡漏更新，卡在
     // "生成PPT" 沒跳到"完成"，看起來像卡住，其實下面下載按鈕早就好了）。
     const s = await (await fetch(`/api/status/${currentJobId}`)).json();

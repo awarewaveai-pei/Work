@@ -18,8 +18,10 @@ GREEN = RGBColor(0x10, 0xB9, 0x81)
 RED = RGBColor(0xEF, 0x44, 0x44)
 YELLOW = RGBColor(0xF5, 0x9E, 0x0B)
 
-FONT_EA = "Microsoft JhengHei"
-FONT_LAT = "Segoe UI"
+# 字型與 word.py / excel.py 一致（操作者 2026-08-27 指定 Noto Sans TC）。
+# 三種交付物看起來要像同一套文件，故字型統一；A4／邊界／行高那些只適用 Word。
+FONT_EA = "Noto Sans TC"
+FONT_LAT = "Noto Sans TC"
 PRIORITY_COLOR = {"high": RED, "medium": YELLOW, "low": GREEN}
 
 

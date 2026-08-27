@@ -20,7 +20,7 @@ import threading
 import time
 import traceback
 
-from lib import archive, deck, diarize, excel, hallucination, keep_awake, merge_segments, minutes_md, speaker_notes, summarize, word
+from lib import archive, deck, diarize, excel, hallucination, keep_awake, merge_segments, speaker_notes, summarize, word
 from lib.transcribe import transcribe, write_srt
 
 
@@ -235,18 +235,18 @@ def _finalize_from_minutes(job_dir: str, minutes: dict, log) -> list:
 
     write_status(job_dir, stage="build_notes")
     speaker_notes.attach_notes(pptx_path, minutes["coaching"])
-    speaker_notes.write_coach_md(minutes["coaching"], minutes, os.path.join(job_dir, "coach.md"))
-
-    write_status(job_dir, stage="build_minutes_md")
-    minutes_md.write(minutes, os.path.join(job_dir, "meeting_notes.md"))
 
     write_status(job_dir, stage="build_excel")
     excel.build(minutes, os.path.join(job_dir, "meeting_record.xlsx"))
     log("[Excel] 五個工作表 -> meeting_record.xlsx")
 
+    # 文件類輸出一律 Word（2026-08-27 操作者決定不再需要 .md）。
+    # 逐字稿仍是 .txt——純文字本來就該是純文字，Word 化只會讓搜尋與 diff 變難。
     write_status(job_dir, stage="build_word")
     word.build(minutes, os.path.join(job_dir, "meeting_record.docx"))
     log("[Word] 會議記錄 -> meeting_record.docx")
+    word.build_coach(minutes["coaching"], minutes, os.path.join(job_dir, "coach.docx"))
+    log("[Word] 報告教練 -> coach.docx")
 
     # 讀失敗不該讓已經產出的 PPT/Word/Excel 全部作廢——同步是選配功能，
     # 讀不到旗標時保守地當作「不同步」（不會誤傳到雲端），繼續走完 done。

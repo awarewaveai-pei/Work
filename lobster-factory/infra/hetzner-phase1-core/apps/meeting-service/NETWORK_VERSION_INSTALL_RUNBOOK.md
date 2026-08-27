@@ -54,7 +54,7 @@
 | 儲存 | `jobs/<job_id>/` 永久留在本機磁碟，無清理機制 | 加保留期限（例如完成後 N 天自動刪除音檔+逐字稿），因為現在音檔在別人的伺服器上，長期留著是額外的資料外洩風險面 |
 | API key | `lib/settings.py` 單一全域 key，存 `.settings.json` | 若多客戶共用一台伺服器，key 要嘛每客戶自己填（沿用現有設計，`GET/POST /api/settings` 加 tenant 維度）、要嘛操作者統一用一把 key 但要有用量上限（避免某個客戶把你的額度用爆） |
 | Google Drive 同步 | `MEETING_DRIVE_BASE` 單一路徑（`lib/archive.py`） | 多租戶情境下要嘛關掉這功能、要嘛每租戶自己的目的地路徑，不能繼續寫死單一路徑 |
-| `lib/` 底下的核心邏輯 | — | **幾乎不用動**——`transcribe.py`/`diarize.py`/`summarize.py`/`deck.py`/`excel.py`/`speaker_notes.py`/`minutes_md.py` 是純函式庫，跟本機/網路無關，原封不動搬過去（README 已預留這個假設，見 `README.md:16`） |
+| `lib/` 底下的核心邏輯 | — | **幾乎不用動**——`transcribe.py`/`diarize.py`/`summarize.py`/`deck.py`/`excel.py`/`speaker_notes.py`/`word.py` 是純函式庫，跟本機/網路無關，原封不動搬過去（README 已預留這個假設，見 `README.md:16`） |
 
 ## 施工步驟（依序，每步都要驗證才進下一步）
 

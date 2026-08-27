@@ -155,9 +155,8 @@ lib/
   settings.py     本機 API key 存取（給客戶端填自己的 key，不進版本控制）
   summarize.py    build_prompt()（人工回路）+ summarize_via_api()（選填自動）共用同一份 schema/validate()
   deck.py         minutes -> PPTX，plan_slides() 是頁數對齊的唯一真相源
-  speaker_notes.py   講稿寫入 PPT 備忘稿 + 報告教練 md（頁數不符會硬失敗）
-  minutes_md.py   minutes -> 會議記錄 md（存檔／貼 wiki 用）
-  word.py         minutes -> 會議記錄 docx（客戶傳閱用，與 minutes_md 同章節結構）
+  speaker_notes.py   講稿寫入 PPT 備忘稿（頁數不符會硬失敗）
+  word.py         minutes -> 會議記錄 docx + 報告教練 docx（文件類輸出的唯一格式）
   excel.py        minutes -> 五工作表 xlsx
   archive.py      選擇性同步交付物到 Google Drive（不含音檔）
 start_server.ps1  Windows 端啟動器（呼叫 WSL2）

@@ -2,6 +2,75 @@
 
 ## 2026-08-27
 
+### Soulful 切換機制：外部覆審打回 4C+12M，其中三個「回報正確性的機制本身不會失敗」
+
+**[任務理解]** 切換腳本已能跑完，但「跑得完」不等於「跑對」。送 critic 對抗式覆審，回報 4 Critical + 12 Major。
+最刺的一句是總結：**三個負責回報正確性的機制在數學上不可能失敗**——正是我這整個 session 在別處抓的同一類錯，這次在我自己寫的東西裡。
+
+**[已修改]**
+
+| # | 問題 | 實際狀況 |
+|---|---|---|
+| C1 | `find /dest ! -uid 33` —— **alpine 的 BusyBox find 根本沒有 `-uid` 這個 predicate** | 錯誤訊息走 stderr 被 `2>/dev/null` 吞掉，`$badown` 永遠為空，守衛永遠通過，然後下一行把「ownership verified」寫進 evidence 檔。**不是弱檢查，是把沒驗過的事寫成事實**。改 `-user`（BusyBox 有）+ 檢查 exit code + 檢查 stderr 非空即當未驗證；`chown -R` 補 `-h`（否則 symlink inode 保留舊 UID 而 chown 仍 exit 0）|
+| C2 | 被覆審的是 repo 那份，真正執行的是機器上那份，**兩者之間沒有任何連結** | 幾週後切換時可能跑到修好 C1 之前的副本 —— 凍結會自己過期、無偵測器。加 `CUTOVER_SYNC_VERSION` + `sha256` 印進 banner 與 evidence；`REQUIRE_VERSION` 讓舊副本直接拒跑；runbook 加步驟 0（scp + 兩邊 sha 比對）|
+| C3 | runbook 寫 `-SoulfulDbProfile ks-aw-01`，**這個參數不存在** | 而且失敗形態比報錯更糟：`switch` 的 `default` 落回 hostinger，**切換後那條路徑仍然會動**（凍結只擋 HTTP，SSH 照常，WP-CLI 本來就繞過維護模式），於是唯一的 critical check 會對著一台已退役的機器回報綠燈。改成窮舉 switch，未知值 → `warn:unknown_profile` + blind spot；profile 改由 `mcp/user-env.ps1` 承載（AO-RESUME 用子行程跑，session 範圍的 `$env:` 傳不進去）|
+| C4 | 沒有 in-flight drain | `.maintenance` 每個 request 只在 bootstrap 判定一次，**在它落地前微秒通過的 request 會跑完並在 dump 快照之後 commit**。而那類寫入（訂單 pending→processing、扣庫存）全是 UPDATE，14 個 COUNT 指標一個都看不到 → 全部相等 → 閘通過 → 切 DNS → 客人付了錢的訂單永遠停在 pending。加 PROCESSLIST 輪詢直到歸零才 dump |
+| 自查 | parity gate 排序 | 原本「載入 DB → 啟動 WP → 比對」，WordPress 一開機就寫 transient/cron 進 options → `options 1521 vs 1523` 誤判。**在 `--live` 會中止切換，而站是黑的**。比對移到啟動之前 |
+| C1b | rollback 順序 | 回滾若先改 DNS 再解凍，等於把流量導向 503。改成「先解凍 → curl 確認 200 → 才改 DNS」|
+
+**[驗證結果]**
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker run --rm alpine:3.20 sh -c 'find /t ! -uid 33 -print -quit'` | exit=1 | ms=2100
+  輸出 `find: unrecognized: -uid` —— C1 直接證實，不是推論
+- REALTEST_EVIDENCE: tool=SSH | cmd=`cutover-sync.sh --dry-run` (r4) | exit=0 | ms=61000
+  `version=2026-08-27-r4 sha256=03599c1f214e` / `DRAIN=clear after 0s` / `ownership verified — checked, not assumed` / 14 指標全等 / 中文永久連結 200 / 52s
+- REALTEST_EVIDENCE: tool=SSH | cmd=ownership mutation test (chown 1000 → check → chown 33 → check) | exit=0 | ms=8400
+  **A/B 對照**：新版 clean=PASS → 變異=`FAIL(found) /dest/index.php` → 修復=PASS；**舊版對同一個變異看到 `''`（完全沒發現）**。偵測器確實從死的變成活的
+- REALTEST_EVIDENCE: tool=Bash | cmd=`SOULFUL_DB_PROFILE=ks-aw01 check-smoke-tests.ps1`（故意打錯） | exit=0 | ms=31000
+  `checks.client_mail="warn:unknown_profile:ks-aw01"` + `blind_spots:["client_mail"]` + `overall:WARN`；修正後重跑回 `ok:no_failures_7d_last_send_3d` / `blind_spots:[]`
+- REVIEW_DONE: critic=Deep | verdict=fail | findings=4C/12M/11m —— 全部逐條驗證，C1/C3 用指令直接證實為真
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,runbooks,lobster-factory/infra,.claude | grep=SoulfulDbProfile | hits=0
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,runbooks,lobster-factory/infra,.claude | grep=uid 33 | hits=0
+
+**[剩餘風險]** critic 的 M8（14 個手挑指標對 FluentCRM / UltimateMember / Woo 訂單 meta 的 UPDATE 是結構性盲的）**尚未修**。
+C4 的 drain 從源頭關掉了大部分窗口，但「全表 COUNT + 關鍵表 CHECKSUM」才是治本，列為切換前必做。
+M5（凍結路徑本身從未被演練過，`--dry-run` 會整段跳過）亦未修。
+
+**[rollback]** 全部改動在 git；機器上那份可用步驟 0 的 scp 重新部署任一版本。
+
+---
+
+### 容量監控（P6）：64GB 規格缺口的補償機制本體 + 一個每天都在響但沒人看到的 FAIL
+
+**[任務理解]** 買到的是 64GB 而非規劃的 128GB，操作者選擇「範圍不縮小、用監控補償」。
+那個「補償」在今天之前只是一句話。這次把它做成真的東西。
+
+**[已修改]**
+- **新增 `scripts/check-capacity-health.ps1`**，接進 `ao-resume.ps1` + `AGENTS.md` 觸發列（每次開工自動跑，不需要記得任何指令）。
+  依 `ADD-PERIODIC-HEALTH-CHECK.md` 2026-08-25 addendum：**量機制，不只量結果**。記憶體看 MemAvailable **與** PSI stall；OOM 取 vmstat / journal 兩源最大值；硬碟同時報 reclaimable（70% 全是 docker 垃圾 vs 70% 全是真資料，處置完全相反）。任何量不到的維度進 `blind_spots` 並強制 WARN。
+- **門檻用量的，不是編的**：ks-aw-01 記憶體/硬碟 60%（整併目標，最嚴）；SG 80/80、EU 80/75（小機器本來就跑得熱，設 60 會永遠黃 = 沒有偵測器）。
+- **修 `scripts/check-claude-sync.ps1` 的 root 解析** —— 這是 `ALERT_REQUIRED.txt` 的根因：它只從 cwd 找 repo（`git rev-parse` + 從 `Get-Location` 往上走），手動在 D:\Work 跑會過，**每天的排程跑會 throw**，把健康分數壓在 99.7% 對上 100% 的閘，於是每天產生一次 FAIL 告警。改 `$PSScriptRoot` 優先。
+- **修 `HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md` §0b/§7** 到實況（8 個 checklist 項）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`check-capacity-health.ps1`（三台真機 SSH） | exit=0 | ms=47000
+  ks-aw-01 mem 4.8% disk 2% / SG 53.3% 70% / EU 61.9% 55%，全部 PSI、OOM、swap、重啟數落地
+- REALTEST_EVIDENCE: tool=Bash | cmd=`Set-Location C:\; check-claude-sync.ps1` | exit=0 | ms=9200
+  **這是原本會失敗的條件**；修好後從 C:\ 與 %TEMP% 兩處跑都 PASS。接著 `system-health-check.ps1` 回到 **100% (312/312)**，system-guard PASS，`ALERT_REQUIRED.txt` 由健康的 guard 自行清除（不是我手動刪）
+- REVIEW_DONE: critic=Deep | verdict=pending | findings=covered by a second critic pass on capacity/sync/ao-resume
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,runbooks,.claude | grep=Resolve-MonorepoRoot | hits=70
+  **追問了「這是類還是實例」**：4 個檔案 grep 看起來同樣 cwd-only，但逐一實測後 —— monthly/weekly-system-review 從 `C:\` 跑正常（root 由參數傳入）、`ao-resume-on-prompt.ps1` 由 hook harness 給 roots、`sync-claude-userlevel.ps1` 有 `$env:MONOREPO_ROOT` 後備且解析正確。**類沒有開著，`check-claude-sync.ps1` 是唯一真壞的實例**。查證省下了三支能動的腳本被無謂改動
+
+**[順帶發現，尚未處理]**
+- **SG 硬碟 70%**（50.1G / 74.8G），其中 **~27GB 是可回收的 docker 垃圾**（images 15.55GB + build cache 11.29GB）。屬 prod 變更且不在搬家範圍內，只回報不執行。
+- **SG load 3.88 / 2 cores 但 CPU 87% idle、iowait 0.1%、R=1、D=0** —— 實測是 **每秒 31 個新 process** 的 fork churn（netdata plugins + healthcheck），不是 CPU 不足。因此把 load 從「可獨立觸發 WARN」降級為「只做佐證」，PSI 才是判準。**這不是為了消音而調門檻**：load average 在 Linux 上會計入 D-state 與 fork churn，本來就不是 CPU 容量訊號；移除的是一個名實不符的指標，不是放寬一個有效的指標。報告仍然顯示 load，並在「load 高但 PSI 不高」時直接寫明原因。
+
+**[剩餘風險]** 容量檢查的第二輪 critic 尚未回。EU 有約 20 條 `mem_limit`（合計約 8.3GB 壓在 7.6GB 機器上），
+所以量到的「EU 只用 4.7GB」是被上限夾住的結果而非自然需求 —— 搬到 64GB 機器時**必須把上限原封帶過去**，
+ClickHouse 的 `max_server_memory_usage=2.5GiB` 尤其不可動（該檔自己寫著五次事故有四次是調高天花板「修好」的）。已寫進 §7 checklist。
+
+---
+
 ### meeting-service：Windows 被 SAC 鎖死改走 WSL2 + Word 輸出常設化 + 實跑一場真實會議
 
 [任務]
@@ -65,6 +134,46 @@ WSL2 內下載大檔會斷流卡死（medium 模型 12 分鐘下載 0 bytes，�
 
 [rollback]
 `git revert <commit>`。`lib/word.py`、`start_server.sh` 為新增檔可直接刪；`start_server.ps1` 為改寫，revert 後會回到原生 Windows 版本（該版本在此機**確定跑不起來**，僅適用於 SAC 未鎖定的環境）。
+
+### meeting-service：文件輸出一律 Word + 版面設定標準化 + 型別正規化關掉整類崩潰
+
+[任務]
+操作者問「為什麼輸出是 .md？比較省 token 或正確率較高嗎？」——答案是都不是：LLM 只產生 minutes.json 一份，所有格式都是純 Python 從同一份 JSON 渲染，格式選擇不影響 token 成本與內容品質。`.md` 純屬歷史因素（8/17 建置時最好生成）。操作者確認不需要 markdown，並指定版面設定：A4 / 邊界 2cm / 行高 1.15 / Noto Sans TC。
+
+[已修改]
+1. `lib/word.py` —— 新增 `build_coach()`（教練稿 docx，段落結構與原 `write_coach_md()` 逐項對齊，WPM 240 與 25% 容差規則逐字保留）；抽出 `_new_doc()` 統一版面與字型；`_table()` 欄寬依內容比例分配
+2. **刪除** `lib/minutes_md.py` 整支 + `speaker_notes.write_coach_md()` —— 不留兩套渲染同一份資料的邏輯
+3. `pipeline.py` / `app.py` / `templates/index.html` / `lib/archive.py` —— 四份下游清單同步（檔名、DOWNLOADS、STAGES/LABELS、Drive plan）
+4. `lib/summarize.py` —— 新增 `normalize()`，`validate()` 通過時就地執行
+5. `lib/deck.py` / `lib/excel.py` —— 字型統一 Noto Sans TC（操作者確認三種交付物一致）；excel 另設 workbook Normal 具名樣式，讓「沒特別指定」的預設值本身就是對的
+
+[critic 覆審：1 Major + 2 Minor，全部修正]
+- **Major 型別未正規化**：SCHEMA 的 `"seconds": "number"` 值本身是字串，會誘導模型回 `"seconds": "90"`；`validate()` 只驗 key 存在與頁數對齊，不驗型別。實測 traceback：一份「合法通過驗證」的 JSON 能寫完 PPT 與 Excel，最後在 `word.py` 的 `sum()` 炸掉，留下半套交付物、job 標記 error，重貼同一份 JSON 撞同一道牆。**critic 明確指出不該在三個站點各補 `int()`（那是補丁，下一個新增的輸出格式還會再踩）**，改在 `summarize.normalize()` 單一入口關掉整類。
+- **Minor 欄寬夾限被靜默撤銷**：原本「夾限後再正規化」，正規化的除法把夾限本身取消掉——實測每一份會議記錄的第一張表都是 0.752（宣稱上限 0.55），決議表 # 欄 0.072（宣稱下限 0.08）。程式碼宣稱有上下限、實際沒有，是「限制器被靜默關掉」的形狀。改用夾限-再分配迭代。
+- Minor `README.md` 過期陳述（`speaker_notes.py` 仍寫「+ 報告教練 md」）已修。
+
+[自己在修正過程中又抓到的 bug]
+第一版 water-filling 在「所有欄同時被上下限釘住」時總和不到 1（單欄 0.55、極端比例 0.63、全零 0.24）。改成夾限-再分配後以 3000 筆隨機模糊測試驗證總和恆為 1 且上下限恆成立。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`_fit_ratios` 10 個具名情境 + 3000 筆隨機模糊測試（驗總和=1 與上下限） | exit=0 | 0 violations
+- REALTEST_EVIDENCE: tool=Bash | cmd=四種毒資料（seconds=字串／seconds=None／goal=None／duration=字串）各跑 validate + word/deck/excel/coach 四種輸出 | exit=0 | 全部產出成功（修正前三種會 TypeError）
+- REALTEST_EVIDENCE: tool=Bash | cmd=版面驗證（解 docx XML）| exit=0 | A4 21.00×29.70cm、四邊 2.00cm、行高 1.15、Normal 與 eastAsia 皆 Noto Sans TC、表格總寬 17.00cm
+- REALTEST_EVIDENCE: tool=Bash | cmd=完整管線實跑 + 字型跨格式比對 | exit=0 | PPT={Noto Sans TC}、Word=Noto Sans TC、Excel 有內容的儲存格 0 個非 Noto Sans TC
+- REALTEST_EVIDENCE: tool=Bash | cmd=`test_summarize_retry.py` 回歸 | exit=0 | 7/7 PASS
+- REALTEST_EVIDENCE: tool=Bash | cmd=伺服器重啟 + 端點驗證 | exit=0 | word/coach/slides/excel/merged_txt 皆 200，已移除的 minutes_md 正確 404
+- REVIEW_DONE: critic=Deep | verdict=fail→pass（1 Major + 2 Minor 全修並回歸）| findings=0c/1m/2n
+  - critic 另確認：刪除無任何懸空引用（全 repo grep 零命中）、`build_coach()` 無欄位遺失且修好了 md 版的 `script=None` 崩潰、`_new_doc()` 兩 caller 字型設定經 XML 驗證相同、欄寬確實寫進 cell 層級 tcW
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`minutes_md\|write_coach_md\|coach\.md\|meeting_notes\.md\|Microsoft JhengHei\|total_width_in` | hits=10
+  - 程式碼中零殘留（命中皆為 WORKLOG 歷史敘述與刻意保留的 docstring 沿革註記）；`Microsoft JhengHei` 在三支渲染模組已全數清零
+- ORACLE_WAIVED: 已由 critic subagent 完成深度覆審並逐條修正回歸，強度不低於 codex-oracle；AGENTS.md §跨模型 oracle 本就將兩者列為等價路徑。
+
+[剩餘風險]
+- **Noto Sans TC 需安裝在開啟文件的機器上**，否則 Word/PPT/Excel 會回退到系統預設字型（不影響內容，只影響外觀）。這是字型嵌入與否的取捨，目前未嵌入（會使檔案大幅變大）。
+- Excel 空白儲存格仍顯示 Calibri（openpyxl 內部 `_fonts[0]`），已確認**有內容的儲存格 0 個受影響**，純內部表示。
+
+[rollback]
+`git revert <commit>`。`minutes_md.py` 刪除可由 revert 還原；字型改動集中在三支模組的常數，可個別改回。
 
 ### ⚠️ 本次操作過失：HF_TOKEN 明文進入對話紀錄
 

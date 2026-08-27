@@ -162,11 +162,11 @@ def log_tail(job_id: str, lines: int = 60):
 
 
 DOWNLOADS = {
-    "minutes_md": ("meeting_notes.md", "text/markdown; charset=utf-8"),
+    # 文件類一律 Word（2026-08-27 起不再產 .md）；逐字稿維持純文字
+    "word": ("meeting_record.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
     "slides": ("slides.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
     "excel": ("meeting_record.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
-    "word": ("meeting_record.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
-    "coach": ("coach.md", "text/markdown; charset=utf-8"),
+    "coach": ("coach.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
     "transcript_srt": ("transcript.srt", "application/x-subrip"),
     "transcript_json": ("transcript.json", "application/json"),
     "diarized_txt": ("diarized.txt", "text/plain; charset=utf-8"),

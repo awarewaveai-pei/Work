@@ -241,8 +241,63 @@ def summarize_via_api(transcript_text: str, audio_duration_sec: float, api_key: 
     raise RuntimeError(f"API 產生的摘要經 {API_CONTENT_RETRIES} 次嘗試仍不符規格：{last_errs}")
 
 
+def normalize(minutes: dict) -> dict:
+    """就地把型別修成下游一致可依賴的形式，回傳同一個 dict。
+
+    **存在理由（不變量）**：`minutes` 通過 validate() 之後，下游所有輸出模組
+    （deck / speaker_notes / excel / word，以及未來任何新格式）都應該能直接
+    對 `coaching.per_slide[*].seconds` 做算術、對 `goal`/`script` 做字串操作，
+    不必各自防禦。
+
+    為什麼需要：SCHEMA 裡 `"seconds": "number"` 的值本身是字串，會誘導模型回
+    `"seconds": "90"`；而 README 明文支援免費層級模型，回字串數字是常態。
+    validate() 原本只檢查 key 存在與頁數對齊，不驗型別，於是一份「合法通過
+    驗證」的 JSON 可以一路寫完 PPT 與 Excel，最後在 word.py 的 sum() 炸掉——
+    留下半套交付物、job 標記 error，而使用者重貼同一份 JSON 會撞同一道牆。
+
+    刻意做成單一入口的正規化而非在各輸出模組補 int()：後者是補丁，下一個
+    新增的輸出格式還會再踩一次（2026-08-27 critic 明確指出這一點）。
+    """
+    def _num(v, default=0):
+        if isinstance(v, bool):  # bool 是 int 的子類，但語義上不是數字
+            return default
+        if isinstance(v, (int, float)):
+            return v
+        try:
+            return int(str(v).strip())
+        except (TypeError, ValueError):
+            try:
+                return float(str(v).strip())
+            except (TypeError, ValueError):
+                return default
+
+    def _str(v, default=""):
+        return v if isinstance(v, str) else (default if v is None else str(v))
+
+    coaching = minutes.get("coaching")
+    if isinstance(coaching, dict):
+        per = coaching.get("per_slide")
+        if isinstance(per, list):
+            for n in per:
+                if not isinstance(n, dict):
+                    continue
+                n["seconds"] = _num(n.get("seconds"), 0)
+                for k in ("goal", "script", "transition", "watch_out"):
+                    n[k] = _str(n.get(k))
+        coaching["opening_hook"] = _str(coaching.get("opening_hook"))
+
+    if isinstance(minutes.get("attendees"), list):
+        minutes["attendees"] = [_str(a) for a in minutes["attendees"]]
+    minutes["title"] = _str(minutes.get("title"), "會議記錄")
+    minutes["date"] = _str(minutes.get("date"))
+    minutes["duration_min"] = _num(minutes.get("duration_min"), 0)
+    return minutes
+
+
 def validate(minutes: dict) -> list:
-    """回傳錯誤訊息清單；空清單代表通過。不丟例外，讓呼叫端決定怎麼回報給使用者。"""
+    """回傳錯誤訊息清單；空清單代表通過。不丟例外，讓呼叫端決定怎麼回報給使用者。
+
+    通過（回傳空清單）時已順帶做完 normalize()，下游可直接依賴型別。"""
     from . import deck
     errs = []
     required = ("title", "tldr", "topics", "_provenance", "coaching")
@@ -251,6 +306,10 @@ def validate(minutes: dict) -> list:
             errs.append(f"缺少必要欄位: {k}")
     if errs:
         return errs
+
+    # 必要欄位齊全後先正規化，再做頁數比對——plan_slides 也讀 minutes，
+    # 讓它看到的是已正規化的值，避免兩邊對同一份資料有不同的型別假設。
+    normalize(minutes)
 
     plan = deck.plan_slides(minutes)
     per_slide = minutes.get("coaching", {}).get("per_slide", [])
