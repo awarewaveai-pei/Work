@@ -75,6 +75,16 @@ $vars = @{
     HOSTINGER_SOULFUL_SSH_PORT   = "65002"
     HOSTINGER_SOULFUL_SSH_USER   = "u942075013"
     # Private key path (machine-local): C:\Users\<you>\.ssh\hostinger_soulful
+    #
+    # Which back end check-smoke-tests.ps1 queries for the soulful mail check.
+    # "hostinger"  = live site on Hostinger shared hosting, via `wp db query`  (pre-cutover)
+    # "ks-aw-01"   = container on 149.202.64.114, via `docker exec soulful-db`  (post-cutover)
+    # Flip this ON CUTOVER DAY. It must live here rather than being a session-scoped
+    # $env: assignment, because AO-RESUME spawns check-smoke-tests.ps1 in a child process
+    # that would never see one. Any value other than the two above is now a LOUD
+    # warn:unknown_profile, not a silent fall back to Hostinger — after cutover the
+    # Hostinger path still returns real-looking rows from the decommissioned host.
+    SOULFUL_DB_PROFILE           = "hostinger"
     UPTIME_KUMA_BASE_URL         = "https://uptime.aware-wave.com"
     UPTIME_KUMA_API_KEY          = ""
     # SSH tunnel required: .\scripts\open-grafana-ssh-tunnel.ps1 -Background

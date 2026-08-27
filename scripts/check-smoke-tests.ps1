@@ -188,12 +188,75 @@ try {
 # delivered through wp_mail — the alert dies with the channel it watches. So the check
 # has to come from outside the site.
 try {
-    $mailHost = $env:HOSTINGER_SOULFUL_SSH_HOST; if (-not $mailHost) { $mailHost = "191.101.230.176" }
-    $mailPort = $env:HOSTINGER_SOULFUL_SSH_PORT; if (-not $mailPort) { $mailPort = "65002" }
-    $mailUser = $env:HOSTINGER_SOULFUL_SSH_USER; if (-not $mailUser) { $mailUser = "u942075013" }
-    $mailKey  = Join-Path $env:USERPROFILE ".ssh\hostinger_soulful"
+    # WHERE the soulful database lives is a profile, not literals scattered through the
+    # command. The 2026-11-12 migration does not merely change an IP: on Hostinger the
+    # site is files on shared hosting reached with `cd <path> && wp db query`, whereas on
+    # ks-aw-01 it is a container reached with `docker exec soulful-db mariadb`. A check
+    # that hard-codes either SHAPE breaks on cutover day and then reports a permanent
+    # warning — and a warning that always fires is a detector nobody reads, which is the
+    # very failure mode this check was written to prevent.
+    #
+    # Cutover therefore flips ONE value (SOULFUL_DB_PROFILE=ks-aw-01) rather than editing
+    # this script under time pressure. Everything below the profile — base64 transport,
+    # row parsing, the no-evidence-is-not-a-skip verdicts — is shared and untouched.
+    $profileName = $env:SOULFUL_DB_PROFILE; if (-not $profileName) { $profileName = "hostinger" }
 
-    if (-not (Test-Path -LiteralPath $mailKey)) {
+    # The SQL is profile-independent: both back ends return a bare tab-separated row.
+    $sql = "SELECT (SELECT COUNT(*) FROM wp_fsmpt_email_logs WHERE status='failed' AND created_at > (UTC_TIMESTAMP() - INTERVAL 7 DAY)) AS failed7d, IFNULL(DATEDIFF(UTC_TIMESTAMP(), (SELECT MAX(created_at) FROM wp_fsmpt_email_logs WHERE status='sent')), -1) AS quiet_days;"
+
+    switch ($profileName) {
+        "ks-aw-01" {
+            $mailHost = $env:SOULFUL_SSH_HOST; if (-not $mailHost) { $mailHost = "149.202.64.114" }
+            $mailPort = $env:SOULFUL_SSH_PORT; if (-not $mailPort) { $mailPort = "58122" }
+            $mailUser = $env:SOULFUL_SSH_USER; if (-not $mailUser) { $mailUser = "ubuntu" }
+            $mailKey  = Join-Path $env:USERPROFILE ".ssh\id_ed25519"
+            # Credentials are read from the host's own env file rather than passed in, so
+            # the DB password never appears in an argument list or in this repo.
+            #
+            # A heredoc, not `sudo bash -c '...'`: the SQL contains single quotes
+            # (status='failed'), which close the wrapper's own quoting and make the remote
+            # shell fail with a syntax error. That first attempt returned ssh_exit1 and was
+            # caught by testing the post-cutover profile TODAY rather than on cutover day.
+            # <<'INNER' is quoted so the outer shell leaves the body alone and the inner
+            # sudo bash expands $SOULFUL_* itself.
+            $nl = "`n"
+            $remoteCmd = "sudo bash -s <<'INNER'" + $nl +
+                         "set -a; . /root/soulful/.env; set +a" + $nl +
+                         "docker exec soulful-db mariadb -N -u root -p" + [char]34 + "`$SOULFUL_DB_ROOT_PASSWORD" + [char]34 +
+                         " " + [char]34 + "`$SOULFUL_DB_NAME" + [char]34 +
+                         " -e " + [char]34 + $sql + [char]34 + $nl +
+                         "INNER"
+        }
+        "hostinger" {
+            $mailHost = $env:HOSTINGER_SOULFUL_SSH_HOST; if (-not $mailHost) { $mailHost = "191.101.230.176" }
+            $mailPort = $env:HOSTINGER_SOULFUL_SSH_PORT; if (-not $mailPort) { $mailPort = "65002" }
+            $mailUser = $env:HOSTINGER_SOULFUL_SSH_USER; if (-not $mailUser) { $mailUser = "u942075013" }
+            $mailKey  = Join-Path $env:USERPROFILE ".ssh\hostinger_soulful"
+            $remoteCmd = "cd domains/soulfulexpression.org/public_html && wp db query " + [char]34 + $sql + [char]34 + " --skip-column-names"
+        }
+        default {
+            # The switch is EXHAUSTIVE on purpose; "hostinger" is named above rather than
+            # being the fallback. Previously any unrecognised value — a typo like
+            # "ks-aw01" or "ks_aw_01", or the variable not reaching a hook-spawned child
+            # process — silently selected Hostinger. That is not a harmless default after
+            # cutover: the freeze blocks HTTP but NOT ssh, and WP-CLI bypasses maintenance
+            # mode entirely, so `wp db query` on the abandoned host keeps returning real
+            # rows from a dead site's mail log. failed7d=0, quiet_days small, verdict
+            # green — the sole critical check reporting healthy while measuring a
+            # decommissioned machine. That is precisely the 2026-08-03 silent-mail failure
+            # this check was built to prevent, re-created by a fallback.
+            $results["client_mail"]    = "warn:unknown_profile:" + $profileName
+            $noEvidence["client_mail"] = $true
+            $mailKey   = $null
+            $remoteCmd = $null
+        }
+    }
+
+    if ($null -eq $remoteCmd) {
+        # Unknown profile: the verdict and the blind-spot flag were already recorded in the
+        # switch's default branch. Nothing to probe, and Test-Path would throw on a $null
+        # LiteralPath rather than degrading, so this must be checked BEFORE the key test.
+    } elseif (-not (Test-Path -LiteralPath $mailKey)) {
         $results["client_mail"]    = "skip:no_ssh_key"
         $noEvidence["client_mail"] = $true
     } elseif (-not (Get-Command Invoke-WithUtf8Console -ErrorAction SilentlyContinue)) {
@@ -211,8 +274,7 @@ try {
         # tried to send through logs zero failed rows and would read as ok. quiet_days
         # (age of the newest successful send) supplies the missing liveness evidence.
         # quiet_days = -1 means the table holds no successful send at all.
-        $sql       = "SELECT (SELECT COUNT(*) FROM wp_fsmpt_email_logs WHERE status='failed' AND created_at > (UTC_TIMESTAMP() - INTERVAL 7 DAY)) AS failed7d, IFNULL(DATEDIFF(UTC_TIMESTAMP(), (SELECT MAX(created_at) FROM wp_fsmpt_email_logs WHERE status='sent')), -1) AS quiet_days;"
-        $remoteCmd = "cd domains/soulfulexpression.org/public_html && wp db query " + [char]34 + $sql + [char]34 + " --skip-column-names"
+        # $sql and $remoteCmd were built by the profile switch above.
         $b64       = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($remoteCmd))
         $sshArgs   = @("-i", $mailKey, "-p", $mailPort, "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
                        "-o", "StrictHostKeyChecking=accept-new", "$mailUser@$mailHost",
