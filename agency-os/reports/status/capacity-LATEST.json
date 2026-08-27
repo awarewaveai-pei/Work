@@ -1,0 +1,154 @@
+{
+    "generatedAt":  "2026-08-27T09:46:03.8292489Z",
+    "overall":  "PASS",
+    "fatal":  false,
+    "fatalReason":  "",
+    "policy":  {
+                   "SG":  {
+                              "MemWarnUsedPct":  80,
+                              "DiskWarnPct":  80,
+                              "DiskFailPct":  90,
+                              "MemFailUsedPct":  92
+                          },
+                   "EU":  {
+                              "MemWarnUsedPct":  80,
+                              "DiskWarnPct":  75,
+                              "DiskFailPct":  88,
+                              "MemFailUsedPct":  92
+                          },
+                   "ks-aw-01":  {
+                                    "MemWarnUsedPct":  60,
+                                    "DiskWarnPct":  60,
+                                    "DiskFailPct":  80,
+                                    "MemFailUsedPct":  85
+                                }
+               },
+    "hosts":  {
+                  "ks-aw-01":  {
+                                   "host":  "149.202.64.114",
+                                   "ok":  true,
+                                   "error":  "",
+                                   "mem_total_kb":  65731400,
+                                   "mem_avail_kb":  61735856,
+                                   "mem_used_kb":  3995544,
+                                   "mem_used_pct":  6.1,
+                                   "swap_used_pct":  0,
+                                   "psi_mem_some":  0,
+                                   "psi_mem_full":  0,
+                                   "psi_io_some":  0,
+                                   "psi_cpu_some":  0,
+                                   "oom_vmstat":  0,
+                                   "oom_journal":  0,
+                                   "disk_total_kb":  919652204,
+                                   "disk_used_kb":  9635892,
+                                   "disk_pct":  2,
+                                   "inode_pct":  1,
+                                   "containers_running":  2,
+                                   "containers_total":  2,
+                                   "containers_unhealthy":  0,
+                                   "restarts":  "",
+                                   "restarts_measured":  true,
+                                   "docker_present":  true,
+                                   "top_mem":  "soulful-db=2.052GiB soulful-wp=553.8MiB",
+                                   "reclaimable":  "Images=370.8MB (19%),Containers=0B (0%),Local Volumes=0B (0%),Build Cache=17.46MB",
+                                   "cpu_cores":  16,
+                                   "load1":  0.03,
+                                   "uptime_days":  0
+                               },
+                  "SG":  {
+                             "host":  "5.223.93.113",
+                             "ok":  true,
+                             "error":  "",
+                             "mem_total_kb":  3905924,
+                             "mem_avail_kb":  1843940,
+                             "mem_used_kb":  2061984,
+                             "mem_used_pct":  52.8,
+                             "swap_used_pct":  21.9,
+                             "psi_mem_some":  0,
+                             "psi_mem_full":  0,
+                             "psi_io_some":  0,
+                             "psi_cpu_some":  25.24,
+                             "oom_vmstat":  0,
+                             "oom_journal":  0,
+                             "disk_total_kb":  78425224,
+                             "disk_used_kb":  52520432,
+                             "disk_pct":  70,
+                             "inode_pct":  15,
+                             "containers_running":  10,
+                             "containers_total":  10,
+                             "containers_unhealthy":  0,
+                             "restarts":  "",
+                             "restarts_measured":  true,
+                             "docker_present":  true,
+                             "top_mem":  "lobster-wordpress=394.2MiB lobster-next-admin=208.1MiB lobster-wordpress-db=84.47MiB lobster-loki=50.75MiB lobster-grafana-obs=46.72MiB oracle-web=45.58MiB",
+                             "reclaimable":  "Images=15.55GB (87%),Containers=0B (0%),Local Volumes=85.15MB (3%),Build Cache=11.29GB",
+                             "cpu_cores":  2,
+                             "load1":  0.46,
+                             "uptime_days":  6
+                         },
+                  "EU":  {
+                             "host":  "204.168.175.41",
+                             "ok":  true,
+                             "error":  "",
+                             "mem_total_kb":  7927600,
+                             "mem_avail_kb":  3046364,
+                             "mem_used_kb":  4881236,
+                             "mem_used_pct":  61.6,
+                             "swap_used_pct":  38.5,
+                             "psi_mem_some":  0,
+                             "psi_mem_full":  0,
+                             "psi_io_some":  0,
+                             "psi_cpu_some":  12.73,
+                             "oom_vmstat":  0,
+                             "oom_journal":  0,
+                             "disk_total_kb":  157197504,
+                             "disk_used_kb":  82782776,
+                             "disk_pct":  55,
+                             "inode_pct":  17,
+                             "containers_running":  29,
+                             "containers_total":  29,
+                             "containers_unhealthy":  0,
+                             "restarts":  "trigger-supervisor(1) supabase-auth(2)",
+                             "restarts_measured":  true,
+                             "docker_present":  true,
+                             "top_mem":  "trigger-webapp=656.8MiB postiz=450.3MiB trigger-clickhouse=419.5MiB supabase-kong=335.4MiB n8n=258.3MiB trigger-minio=226.3MiB",
+                             "reclaimable":  "Images=459.1MB (1%),Containers=0B (0%),Local Volumes=813.2MB (4%),Build Cache=102.5MB",
+                             "cpu_cores":  4,
+                             "load1":  0.79,
+                             "uptime_days":  4
+                         }
+              },
+    "verdicts":  {
+                     "ks-aw-01":  {
+                                      "level":  0,
+                                      "blind":  [
+
+                                                ],
+                                      "reasons":  [
+
+                                                  ]
+                                  },
+                     "SG":  {
+                                "level":  0,
+                                "blind":  [
+
+                                          ],
+                                "reasons":  [
+
+                                            ]
+                            },
+                     "EU":  {
+                                "level":  0,
+                                "blind":  [
+
+                                          ],
+                                "reasons":  [
+
+                                            ]
+                            }
+                 },
+    "blind_spots":  [
+
+                    ],
+    "reportPath":  "agency-os/reports/status/capacity-LATEST.md"
+}

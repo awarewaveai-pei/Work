@@ -636,6 +636,42 @@ if (Test-Path -LiteralPath $ciHealthScript) {
     $global:LASTEXITCODE = 0
 }
 
+# --- Capacity health across ks-aw-01 / SG / EU (warn-only) ---
+# Rationale: ks-aw-01 was bought at 64 GB against a plan that specified 128 GB, and the
+# operator chose to keep the full consolidation scope (soulful + Chatwoot + the EU/SG
+# migration) and compensate with monitoring rather than cut services. This check IS that
+# compensation, so it has to run in a flow that happens anyway -- a slash command nobody
+# remembers to type would leave the spec gap simply unmanaged.
+# Measures outcome AND mechanism per runbooks/ADD-PERIODIC-HEALTH-CHECK.md (2026-08-25
+# addendum): MemAvailable and disk %, but also PSI stall time, OOM counters from two
+# independent sources, swap, and container restarts -- because "percent used" alone is a
+# bad memory detector in both directions. Writes reports/status/capacity-LATEST.md.
+$capacityHealthScript = Join-Path $WorkRoot "scripts\check-capacity-health.ps1"
+if (Test-Path -LiteralPath $capacityHealthScript) {
+    Write-Host ""
+    Write-Host "== AO-RESUME: capacity health snapshot (warn-only) ==" -ForegroundColor Cyan
+    # Freshness is captured BEFORE the run so a crash can be told apart from a verdict.
+    # The child exits 0/1/2 for PASS/WARN/FAIL, but an unhandled StrictMode throw ALSO exits
+    # 1 -- so "one host unreachable" and "the check died and wrote nothing" were previously
+    # the same yellow line. That mattered here more than elsewhere: this check is the agreed
+    # compensating control for a 64 GB box carrying a 128 GB plan, and its stale report reads
+    # green.
+    $capReport = Join-Path $WorkRoot ("agency-os" + [IO.Path]::DirectorySeparatorChar + "reports" + [IO.Path]::DirectorySeparatorChar + "status" + [IO.Path]::DirectorySeparatorChar + "capacity-LATEST.json")
+    $capBefore = if (Test-Path -LiteralPath $capReport) { (Get-Item -LiteralPath $capReport).LastWriteTimeUtc } else { [datetime]::MinValue }
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $capacityHealthScript -WorkRoot $WorkRoot
+    $capExit = $LASTEXITCODE
+    $capAfter = if (Test-Path -LiteralPath $capReport) { (Get-Item -LiteralPath $capReport).LastWriteTimeUtc } else { [datetime]::MinValue }
+    if ($capAfter -le $capBefore) {
+        Write-Host "FAIL: capacity check wrote NO report - the file on disk is STALE and its verdict means nothing." -ForegroundColor Red
+        Write-Host "      Do not report a capacity verdict at AO-RESUME until this is fixed." -ForegroundColor Red
+    } elseif ($capExit -ge 2) {
+        Write-Host "FAIL: capacity check reports a RED condition (see agency-os/reports/status/capacity-LATEST.md)." -ForegroundColor Red
+    } elseif ($capExit -eq 1) {
+        Write-Host "WARN: capacity check reports drift or a blind spot (see agency-os/reports/status/capacity-LATEST.md)." -ForegroundColor Yellow
+    }
+    $global:LASTEXITCODE = 0
+}
+
 # --- Claude routine output freshness (warn-only; surfaces silent routine failure at startup) ---
 # Rationale: a cloud routine whose source drifts / auth lapses / gets disabled stops landing
 # its report — and the operator should learn this at AO-RESUME (when they can act), not only

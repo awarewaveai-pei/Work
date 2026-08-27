@@ -30,7 +30,31 @@
 >
 > ★ **重要脈絡（只讀本 runbook 會漏掉）**：AI 客服的「大腦」—— cs-engine + RAG + 操作 UI（U0–U5）+ headless widget 程式碼（U4）—— **已建好且上 prod 驗證過**（部署在 SG `lobster-next-admin`，讀 EU Supabase 的 cs_* 表；餵知識→pgvector 已 live 驗證 embed_dim=1536）。本搬家的 **Chatwoot = 該系統 U6（最後一塊）= 收件匣那層**。Chatwoot 裝好後的**接線步驟**（建 AgentBot webhook route 呼叫 `lib/cs` 的 `handleInbound`、widget 把 `MockTransport` 換 `ChatwootTransport`）+ 8 月冷啟動完整接手 → **`agency-os/handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md`**（這份是接手第一讀）。
 
-**選定機型** —— 🔴 **本表已於 2026-08-17 被規格上修取代。下單前讀新決策，不要照下表買。**
+**選定機型** —— 🔴 **本表已於 2026-08-17 被規格上修取代；而 2026-08-26 實際買到的又不是上修後的規格。以下兩段都要讀完才不會誤解。**
+
+> ## ⚠️ 已買什麼（2026-08-26，**現況正本**）
+>
+> **OVH SYS-GAME-2 / `149.202.64.114` / 代號 ks-aw-01** —— **64GB ECC，不是上修要求的 128GB**。
+> KS-6 缺貨，操作者當下可買到的是這台。
+>
+> **範圍沒有縮小**：操作者 2026-08-26 明確指示 soulful + Chatwoot(U6) + EU/SG 全整併**全部照舊**上這台，
+> 用監控補償而不是砍服務。（Claude 曾提議縮成 soulful-only，被否決；這是誤判意圖，不是操作者改主意。）
+>
+> **補償機制是實體存在的東西，不是一句話**：`scripts/check-capacity-health.ps1`，每次 AO-RESUME 自動跑，
+> ks-aw-01 的記憶體/硬碟 60% 就 WARN（比 SG/EU 嚴），且同時量 PSI stall、OOM、swap、容器重啟。
+>
+> **2026-08-27 實測，把風險評估往好的方向修正**（但有但書）：
+>
+> | | 實際用量 | 機器 |
+> |---|---|---|
+> | ks-aw-01（目前只有 soulful）| 2.9 GiB | 62.7 GiB |
+> | SG 全部 10 容器 | 2.0 GiB | 3.7 GiB |
+> | EU 全部 29 容器 | 4.7 GiB | 7.6 GiB |
+> | **要搬過去的總和** | **約 9.6 GiB** | **62.7 GiB** |
+>
+> 也就是說 37–58 GB 的負載模型**遠比實際保守**，硬碟更不是問題（877 GiB RAID1，現用 2%）。
+> **但書（重要）**：這些數字是**在小機器上、被 `mem_limit` 夾住**量到的，不是自然需求。
+> 詳見 §7 checklist 的「搬移時把現有記憶體上限原封帶過去」那一項 —— 那一項比這張表重要。
 
 > **新正本**：[`agency-os/reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md`](../agency-os/reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md)
 > **上修後的規格下限**：**128GB ECC / ≥8C16T / ≥1TB NVMe 可 RAID1**。首選 **OVH KS-6**（Epyc 7351p 16C32T / 128GB DDR4 ECC / 2×1TB NVMe soft RAID / **$59.80 月** ≈ €51–54）；Hetzner auction 若出現 128GB ECC + ≥2TB NVMe **≤€65/月** 則改選 Hetzner。**觀望截止 2026-08-31，硬買機死線 2026-09-30。**
@@ -353,23 +377,23 @@ openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -in "$OUT/env.tar.g
 - [x] **演練還原成功一次**（§6 A/C + MainWP/n8n 內容驗證）— 2026-06-26
 - [x] **修 R2 upload WARN**（2026-06-26：`set -a` export 修；實測 10/10 HTTP 200）→ 真 3-2-1 成立
 - [x] 備份失敗會 surface（2026-06-26：`check-backup-health.ps1` 讀 verify 判定，FAILED→AO-RESUME WARN；非 Telegram 而是開工自動報，涵蓋「壞了」+「停了」）
-- [ ] 機型已選（**2026-08-17 上修**：**128GB ECC / ≥8C16T / ≥1TB NVMe RAID1**；首選 OVH KS-6 $59.80）— **待操作者下單**（刷卡非 Claude）。正本 [`2026-08-17-dedicated-host-spec-upgrade.md`](../agency-os/reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md)；§0b 舊表（i7-7700/64GB/€48.70）已作廢
+- [x] **機器已買並上線（2026-08-26）：OVH SYS-GAME-2 `149.202.64.114`（ks-aw-01）** —— **偏離規劃**：KS-6 缺貨，實買為 **64GB（非 128GB）ECC / 894.3G x2 NVMe RAID1**。操作者 2026-08-26 明確指示**範圍不縮小**（soulful + Chatwoot + EU/SG 全整併照舊上這台），改以監控閾值硬化補償 → `scripts/check-capacity-health.ps1`（ks-aw-01 記憶體/硬碟 60% 即 WARN，比 SG/EU 嚴）。規格缺口正本 [`2026-08-17-dedicated-host-spec-upgrade.md`](../agency-os/reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md) §切換條件
 - [ ] **採購時機已定（2026-08-18）：立刻買，選月租，不要 12 個月承諾** —— 不再觀望到 8/31。理由與量化：[`2026-08-18-dedicated-host-purchase-timing.md`](../agency-os/reports/decisions/2026-08-18-dedicated-host-purchase-timing.md)。觀望改由月租退出權承載（隨時可退，非日曆餘裕）；月租跑滿 30 天全綠後再評估轉 12 個月
-- [ ] **下單前逐項確認**（KS-6 路線）：可裝 Ubuntu LTS + 自訂分割 + soft RAID1／rescue mode 可用／刷卡幣別與匯率。**Backup Agent 容量已移除依賴**（改走 R2）
-- [ ] **P2.2** 二手 NVMe 磨耗檢查：`nvme smart-log` 兩顆碟，`percentage_used` > 40% 資料落地前要求換碟
+- [x] ~~下單前逐項確認（KS-6 路線）~~ —— **已由實機取代**：SYS-GAME-2 實裝 Ubuntu 24.04 + soft RAID1（md2/md3 `[2/2] [UU]`）驗證通過。**Backup Agent 容量已移除依賴**（改走 R2）
+- [x] **P2.2** NVMe 磨耗檢查（2026-08-27 實測）：`nvme smart-log` 兩顆碟 **`percentage_used=5%`**，遠低於 40% 換碟線 → 不需換碟
 - [ ] **P2.8** rescue mode 平時實按一次驗證可用（無 IPMI/KVM，這是唯一救援路徑）
 - [ ] **P4.1** Drill #2：從 R2 完整還原到拋棄式機器，計時，目標 < 4 小時
 - [ ] **W4（EU/SG 整併）明確排 2026-11-20 之後**，六個服務各一具名任務，兩週一台 —— 操作者已確認 9–11 月與 2027 Q1 無出國行程，排程無阻礙
-- [ ] 🔴 **P2.4 防火牆用 UFW + DOCKER-USER chain 雙層，不能只設 UFW**（2026-08-18 追加，修正 2026-04-20 SG 挖礦入侵同款漏洞——Docker 寫 iptables `DOCKER` chain，執行順序在 UFW `INPUT` chain 之前，單純 UFW 攔不住）。事故記錄與根治法：[`SECURITY-INCIDENT-CRYPTO-MINER.md`](HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md) / [`SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md`](SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md)
+- [x] 🔴 **P2.4 防火牆 UFW + DOCKER-USER chain 雙層已裝並驗證**（2026-08-27：`ufw` active、`DOCKER-USER` 4 條規則、`docker-user-chain.service` enabled 開機重建）。**裝的過程真的踩到了**：`iptables-persistent` 安裝時**靜默移除了 ufw**（INPUT policy DROP→ACCEPT），只被 P2.8 重開機驗證抓到——而這個衝突 repo 早就記錄在 `SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md:630-633`，當時只 grep 指令沒讀旁邊的說明。原文保留如下（2026-08-18 追加，修正 2026-04-20 SG 挖礦入侵同款漏洞——Docker 寫 iptables `DOCKER` chain，執行順序在 UFW `INPUT` chain 之前，單純 UFW 攔不住）。事故記錄與根治法：[`SECURITY-INCIDENT-CRYPTO-MINER.md`](HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md) / [`SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md`](SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md)
 - [ ] **P2.4b** 所有非對外服務 port（Postgres/Redis/ClickHouse/MinIO/n8n/Chatwoot）一律 compose 層綁 `127.0.0.1:`，不依賴防火牆當唯一防線
 - [ ] **P2.4c** 所有服務預設密碼全部更換為 `openssl rand -hex 32`，存 vault 不進 git（4/20 事件第二根因：Supabase 預設密碼從未改過）
 - [ ] **P2.9** 上線前逐項跑 `SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md` §10 預防性檢查清單（不只裝機當下跑一次，每次新服務上線前都跑）
 - [ ] **P6.10** 每週安全稽核 cron（§8-6 現成腳本）：找 0.0.0.0 綁定的資料庫類 port / 可疑進程 / `/tmp` 新檔案 / `authorized_keys` 異動 → 異常寫 status，AO-RESUME 讀
-- [ ] **P2.5** SSH port 改非標準埠（49152–65535）（2026-08-19 對照 OVH 官方硬化指南補）
-- [ ] **P2.5b** 建非 root 工作帳號，root 僅供緊急救援（OVH 官方硬化指南建議）
-- [ ] **P2.5c** 下單時查 KS-6 是否含 OVHcloud Network Firewall（基礎設施層，封包到主機前擋，[unverified] Kimsufi 線是否開放）
+- [x] **P2.5** SSH port 已改 **58122**（2026-08-27 實測：僅 58122 listening，22 已關）。**坑**：Ubuntu 24.04 用 `ssh.socket`，改 `sshd_config` 的 `Port` 無效，必須改 systemd socket override；採雙埠並行→驗證→再撤 22 的分段做法
+- [x] **P2.5b** 非 root 工作帳號 `ubuntu`（uid 1000）已建，root 僅供緊急救援
+- [ ] **P2.5c** 查 SYS-GAME-2 是否含 OVHcloud Network Firewall（基礎設施層，封包到主機前擋）—— KS-6 路線作廢後**仍未查**，不要因為機型換了就當它不存在
 - [ ] **Chatwoot greenfield 先上**（EU 搬移前；§0b 順序 step 3）→ 接 cs-engine AgentBot webhook + headless widget
-- [ ] **每容器設記憶體上限**（docker-compose `mem_limit`）→ 防一個服務吃爆拖垮全部（EU 現況痛點）
+- [ ] 🔴 **搬移時把現有記憶體上限原封帶過去，不准因為新機大就放寬** —— **本項原文寫「EU 現況痛點、要補設 mem_limit」，2026-08-27 實查後證實前提是錯的**：EU 已有約 20 條 `mem_limit`（supabase 13 / trigger 2 / n8n / postiz 2 / mainwp 2），加總約 8.3GB 上限壓在 7.6GB 機器上。所以量到的「EU 只用 4.7GB」**是被這些上限夾住的結果，不是自然需求**。真正的風險是反過來的：搬到 64GB 機器後把上限放寬，用量就會長到上限為止。<br>**ClickHouse 尤其不可動**：`override.xml` 的 `max_server_memory_usage=2.5GiB` 檔案裡自己寫著「**DO NOT RAISE THIS VALUE。五次事故中有四次是靠調高天花板『修好』的，每次瓶頸只是換位置（RAM→RAM→RAM→CPU）而症狀看起來像新的。上限是預算，塞不下要縮東西不是放大預算**」。搬機時連同這段註解一起帶走。
 - [ ] Chatwoot PG dump + uploads volume 納入 `backup-eu-stack.sh`（Chatwoot 上線後；§0b）
 - [x] §4 災難還原指令補齊並驗證（2026-06-26：取備份/解密/還原 DB/volume 確切指令；端到端 R2→解密實測）；§5 DNS step 補齊（§4/§5 剩 step 隨真機演練定稿）
 - [x] **救援鑰匙 off-machine**（2026-06-26 修 DR gap：`R2_API_TOKEN` 原本只在 EU，已鏡像本機 vault；EU 死也下載得到 R2 備份）

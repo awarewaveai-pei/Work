@@ -53,19 +53,51 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 # ---------- Locate monorepo root ----------
+# $PSScriptRoot is tried FIRST because the script's own location on disk is true no
+# matter what working directory the caller happened to have. The previous order asked
+# `git rev-parse` and then walked up from Get-Location -- both cwd-dependent -- so this
+# check passed when a human ran it from D:\Work and threw "Cannot locate monorepo root"
+# under the DAILY SCHEDULED run, which starts elsewhere. That single failure held the
+# health score at 99.7% against a 100% gate, so system-guard wrote ALERT_REQUIRED.txt
+# every day (observed 2026-08-27 12:02, auto-repair FAIL). A check that only works when
+# someone is standing in the right directory is not a check.
+# TrimEnd('\') on a drive root turns 'D:\' into 'D:', and every later
+# Join-Path then yields a DRIVE-RELATIVE path ('D:.claude') that silently resolves against
+# the process's per-drive current directory. Improbable here (no .git at any drive root)
+# but silent and unbounded if it ever happens, so the trim is bounded instead.
+function Normalize-RootPath {
+    param([string]$Path)
+    if (-not $Path) { return $Path }
+    $t = $Path.TrimEnd([char]92)
+    if ($t.Length -lt 3) { return $Path }   # 'D:' -> keep 'D:\'
+    return $t
+}
+
 function Resolve-MonorepoRoot {
-    try {
-        $r = (& git rev-parse --show-toplevel 2>$null)
-        if ($LASTEXITCODE -eq 0 -and $r) { return ($r -replace '/', '\').TrimEnd('\') }
-    } catch { }
-    $cur = (Get-Location).Path
-    while ($cur -and (Test-Path $cur)) {
-        if (Test-Path (Join-Path $cur '.git')) { return $cur.TrimEnd('\') }
-        $parent = Split-Path -Parent $cur
-        if ($parent -eq $cur) { break }
-        $cur = $parent
+    $candidates = @()
+    if ($PSScriptRoot) {
+        $candidates += (Split-Path -Parent $PSScriptRoot)   # <root>\scripts -> <root>
+        $candidates += $PSScriptRoot
     }
-    throw "Cannot locate monorepo root. Run from inside the repo."
+    $candidates += (Get-Location).Path
+    foreach ($start in $candidates) {
+        if (-not $start) { continue }
+        # -C makes git resolve relative to $start rather than the process cwd.
+        try {
+            $r = (& git -C $start rev-parse --show-toplevel 2>$null)
+            if ($LASTEXITCODE -eq 0 -and $r) { return (Normalize-RootPath ($r -replace '/', '\')) }
+        } catch { }
+        $cur = $start
+        while ($cur -and (Test-Path -LiteralPath $cur)) {
+            if (Test-Path -LiteralPath (Join-Path $cur '.git')) { return (Normalize-RootPath $cur) }
+            $parent = Split-Path -Parent $cur
+            if ($parent -eq $cur) { break }
+            $cur = $parent
+        }
+    }
+    # Name what was actually tried: "run from inside the repo" sent the reader looking at
+    # their shell when the caller was a scheduler they could not see.
+    throw ("Cannot locate monorepo root. Tried: " + ($candidates -join " ; "))
 }
 
 $MonorepoRoot = Resolve-MonorepoRoot
@@ -187,7 +219,15 @@ foreach ($subdir in $claudeSubdirs) {
         }
     }
 
-    if ($missing.Count -gt 0) {
+    if ($tracked.Count -eq 0) {
+        # A vacuous pass: with no tracked files, $missing is empty and the else-branch below
+        # would report "0 tracked file(s) all present on disk" as a PASS -- a green line for a
+        # comparison that never happened. `git ls-files` returning nothing means the detector
+        # produced no evidence (wrong root, git failure, path renamed), not that parity holds.
+        Add-Finding -Severity 'hard' -Check "H3: .claude/$subdir git/disk parity" `
+            -Detail "git ls-files returned NOTHING for $relPath - no evidence was produced, so parity is unverified (not passing)." `
+            -Fix "Check the resolved monorepo root and that $relPath is still tracked: git -C <root> ls-files $relPath"
+    } elseif ($missing.Count -gt 0) {
         $sample = ($missing | Select-Object -First 3) -join ', '
         $more = if ($missing.Count -gt 3) { " (+$($missing.Count - 3) more)" } else { '' }
         Add-Finding -Severity 'hard' -Check "H3: .claude/$subdir git/disk parity" `
