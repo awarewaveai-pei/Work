@@ -47,10 +47,14 @@ wsl -d Ubuntu -- bash -lc "python3 -m venv ~/mtg-venv && ~/mtg-venv/bin/pip inst
 wsl -d Ubuntu -- bash /mnt/d/Work/.../apps/meeting-service/start_server.sh
 ```
 
-**WSL2 後備環境目前缺 `torch`/`pyannote`**（背景下載中，732MB @ 約 0.56MB/s）。
-只在 SAC 擋住 Windows 而退到 WSL2 時才會影響到——那種情況下逐字稿不會有 A/B/C
-講者標籤，其餘功能（轉錄／摘要／PPT／Word／Excel／教練稿）全部正常。
-Windows 路徑不受影響，torch/pyannote 早已安裝且 GPU 可用。
+⚠️ **WSL2 後備環境目前是「未建置」狀態**（2026-08-27 起）。當初為了繞過 SAC 而在
+WSL2 建的 venv 已移除，因為 SAC 封鎖被證實是暫時的、Windows 才是正常路徑，
+留著只是佔 1.4GB。**Ubuntu distro 本身保留**（裡面有操作者 2026-04 自己裝的
+Slack CLI 等，不屬於本工具，勿一併刪除）。
+
+若 SAC 又擋住 Windows，`start_server.ps1` 會試著退到 WSL2 並回報找不到 venv，
+此時依上方「WSL2 環境建立」重建即可（約 5 分鐘，模型不用重下）。多數情況下
+更省事的做法是**等 SAC 信譽評估完成自動放行**（實測當天內就好了）。
 
 ## ⚠️ 為什麼只能本機跑，不部署到 SG/EU
 

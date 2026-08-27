@@ -138,10 +138,10 @@
   - **影響範圍**：該 token 僅用於下載 HuggingFace 模型（含 pyannote gated repo），無付費額度、無寫入權限，風險等級低於前次的 Supabase/Telegram 類憑證，但仍應輪換。
   - **防再發**：日後查證含憑證的環境變數／檔案，一律只列欄位名稱或用 `grep -c` 判存在與否，**不輸出值**；不要依賴輸出後的遮罩。
 
-- [ ] **【後備路徑補強｜非阻塞】meeting-service 的 WSL2 後備環境缺 torch** — 2026-08-27 訂正：原記「講者分離不可用」**已不成立**。當天上午 Windows Smart App Control 暫時封鎖 `av`，我誤判為永久失效而把整套搬到 WSL2；當晚 SAC 信譽評估完成自動放行，Windows 恢復正常（GPU 轉錄 7.0x、講者分離實測 22.2x realtime 可用）。`start_server.ps1` 已改為每次啟動實測後自動選路徑（Windows 優先，被擋才退 WSL2），使用者無須介入。
-  - **剩下的事**：WSL2 後備環境仍缺 `torch`（背景下載中，732MB @ 約 0.56MB/s）。若在補齊前 SAC 又擋，後備路徑會沒有講者分離（轉錄／摘要／文件產出不受影響）。
-  - **DoD**：WSL2 內 `~/mtg-venv/bin/pip install torch torchaudio pyannote.audio==4.0.7` 完成並實跑 `lib/diarize.py` 產出 `diarized.txt`。
-  - **不要再重複的誤判**：SAC 對新裝套件的封鎖是**暫時的**（信譽評估中），該 app 的 README「安裝細節」第 4 條早有記載。宣告任何環境「永久不可用」前先查 repo 既有記錄（R4 VBC）。
+- [x] **【已結案｜2026-08-27】meeting-service 執行環境誤判與 WSL2 清理** — 當天上午 Windows Smart App Control 暫時封鎖 `av`，誤判為永久失效而把整套搬到 WSL2；當晚 SAC 信譽評估完成自動放行，Windows 恢復正常（GPU 轉錄 7.0x、講者分離實測 22.2x realtime）。
+  - **已處置**：`start_server.ps1` 改為每次啟動實測後自動選路徑（Windows 優先，被擋才退 WSL2）；WSL2 內為本工具建的 venv 與 pip 快取已移除（回收 1.4GB 內容量），**Ubuntu distro 本身保留**（含操作者 2026-04 自裝的 Slack CLI，非本工具資產）。
+  - **未完成的小事**：`ext4.vhdx` 仍佔 6.94GB —— 刪檔案不會自動縮小虛擬磁碟，需管理員權限跑 diskpart compact 才回收（指令見當日 WORKLOG）。非阻塞，C: 尚有 237GB。
+  - **不要再重複的誤判**：SAC 對新裝套件的封鎖是**暫時的**（信譽評估中），該 app README「安裝細節」第 4 條早有記載。宣告任何環境「永久不可用」前先查 repo 既有記錄（R4 VBC）。
 
 - [ ] **⏭️ Soulful 搬站：機器買到後的接手點（硬死線 2026-11-12，買機死線 9/30）**
   - **【進度更新 2026-08-27】P2+P3 完成，下一步 P4 還原演練**：KS-6 缺貨（決策文件切換條件已觸發，見 `reports/decisions/2026-08-18-dedicated-host-purchase-timing.md` 切換條件段），實際買 **OVH SYS-GAME-2**（149.202.64.114，8c/16t／**64GB ECC**／**2×960GB RAID1**，規格低於下限）。Ubuntu 24.04 已裝、SSH 非標準埠 58122、UFW+DOCKER-USER 雙層防火牆、fail2ban、Docker 29.7.2、sysctl/THP、fstrim、**rescue mode 實測 PASS**（含中途一次自己造成的防火牆迴歸被抓到並修復）。**P3 備份管線就緒**：`lobster-factory/infra/ks-aw-01-backup/` 備份+驗證腳本、R2 bucket lock（14 天 WORM）、cron 02:15/02:45 UTC、`check-backup-health.ps1` 三台化實測 PASS（詳見 `WORKLOG.md` 2026-08-27 兩則 entry）。**現況**：P2.1–P2.10、P3.1–P3.5 全數完成，**P4 還原演練+`NEW-HOST-RECOVERY-RUNBOOK.md`／P5 Chatwoot 起皆未開始**。憑證在 `AWARE_WAVE_CREDENTIALS.md`「OVH Dedicated Server」節（SSH 指令已更新為 58122 埠）。
