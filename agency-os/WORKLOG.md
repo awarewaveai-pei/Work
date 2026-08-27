@@ -57,7 +57,33 @@ M5（凍結路徑本身從未被演練過，`--dry-run` 會整段跳過）亦未
   ks-aw-01 mem 4.8% disk 2% / SG 53.3% 70% / EU 61.9% 55%，全部 PSI、OOM、swap、重啟數落地
 - REALTEST_EVIDENCE: tool=Bash | cmd=`Set-Location C:\; check-claude-sync.ps1` | exit=0 | ms=9200
   **這是原本會失敗的條件**；修好後從 C:\ 與 %TEMP% 兩處跑都 PASS。接著 `system-health-check.ps1` 回到 **100% (312/312)**，system-guard PASS，`ALERT_REQUIRED.txt` 由健康的 guard 自行清除（不是我手動刪）
-- REVIEW_DONE: critic=Deep | verdict=pending | findings=covered by a second critic pass on capacity/sync/ao-resume
+- REVIEW_DONE: critic=Deep | verdict=fail | findings=1C/5M/6m -- **全部在 degradation path 上**，也就是 2026-08-27 校準時三台都活著、因此一次都沒跑到的那些路徑
+- REALTEST_EVIDENCE: tool=Bash | cmd=degradation test（毒化前次 JSON + 強制一台 unreachable） | exit=0 | ms=52000
+  `report REWRITTEN: True` / `overall: WARN` / `blind_spots: [{host:SG, reason:...}]` / `stale MD replaced: True`
+
+**critic 對容量檢查的 1 Critical，性質與今天其他錯完全同一類 —— 但這次是「偵測器死掉時，昨天的綠燈留在原地」**：
+
+| # | 問題 | 為什麼致命 |
+|---|---|---|
+| C1 | trend 區塊在 `try` **外面**存取 `$ph.Value.disk_used_kb` | 前一輪 unreachable 的主機只被序列化成 `{host, ok, error}`，沒有 `disk_used_kb`。StrictMode 下存取不存在的屬性會 throw → 腳本在 `WriteAllText` **之前**死掉 → **舊的綠色報告留在磁碟上**，而 AGENTS.md 要求代理讀那個檔並在 AO-RESUME §1 報 verdict。更糟的是**會自我延續**：被毒化的 JSON 永遠不會被覆寫，之後每一輪都死在同一行。且偽裝良好——unhandled throw 的 exit code 也是 1，與正常 WARN 無法區分 |
+| M2 | `$oomVals.Count`，而 `Where-Object` 全濾掉時回傳的是 `$null` 不是空陣列 | `$null.Count` 在 StrictMode 下 throw。所以「兩個 OOM 來源都瞎了」那個 blind 分支**是不可達的死碼**，而它想回報的那個狀態反而會殺掉整輪 |
+| M3 | `$HOST_POLICY` 沒有該主機時 throw | 這支腳本存在的理由就是「更多服務要併進 ks-aw-01」，第四台是遲早的事。加一台而忘了加 policy = 補償機制靜默變成 exception |
+| M4 | inode / 容器重啟數量不到時**靜默當 PASS** | 與檔案自己 §BLIND SPOTS 宣稱的契約矛盾。`df -i` 在 btrfs/zfs 印 `-`；`docker inspect` 權限不足回空——兩者都會被讀成「沒問題」 |
+| M5 | 遠端指令無時限 | `ConnectTimeout` 只管握手。主機「接受連線後卡住」——正是本檢查要偵測的狀況——會永遠阻塞，而它跑在 blocking 的 UserPromptSubmit hook 裡（timeout 1200s），操作者當天第一句話會卡最多 20 分鐘 |
+| M6 | AO-RESUME 把 WARN / FAIL / 崩潰印成同一行黃字 | 沒有這條，上面兩個修好之前的失敗**依然看不見** |
+
+**結構性修法（不只補洞）**：報告改成「先建 body → 後組 header → 一定寫出」，render 期間任何 throw 都被捕捉並**寫進報告本身**（大字標明 THIS REPORT IS INCOMPLETE + 強制 FAIL），而不是讓上一份綠色檔案留著。
+AO-RESUME 端額外比對 `capacity-LATEST.json` 的 mtime：沒變新 = 「檢查沒寫出報告，磁碟上那份是舊的」，紅字，與 WARN/FAIL 三者分開。
+
+其餘已修：m7（`$null - $null` 在 PowerShell 等於 `[int]0`，害報告印出 `0G of ?` —— 把沒量到的東西講成量到 0）、
+m8（趨勢投影用 total 當分母，但 df 的百分比是 `used/(used+avail)`，對 SG 高估餘裕 36%）、
+m9（`blindSpots` → `blind_spots` 符合本 repo 慣例，並保留 host 歸屬）、m10（`grep -c || echo 0` 會吐兩行）、
+s1（`[double]::TryParse` 預設用 CurrentCulture，逗號小數地區會把 `1.94` 讀成 194）、
+m11（`TrimEnd('\')` 會把 `D:\` 變成 `D:`，之後所有 Join-Path 變成磁碟相對路徑）、
+m12（`git ls-files` 回空時 H3 報 `0 tracked file(s) all present` = PASS —— 又一個 vacuous pass）。
+
+**修的過程自己又犯一次**：`-replace '/', '\'` 打成 `'\\'`（兩個反斜線），輸出變 `D:\\Work\...`。
+檢查照樣 PASS（Windows 容忍重複分隔符），只有印出來的路徑字串洩漏了它。改完立刻重跑才看到。
 - BUGHUNT_DONE: scope=agency-os,scripts,mcp,runbooks,.claude | grep=Resolve-MonorepoRoot | hits=70
   **追問了「這是類還是實例」**：4 個檔案 grep 看起來同樣 cwd-only，但逐一實測後 —— monthly/weekly-system-review 從 `C:\` 跑正常（root 由參數傳入）、`ao-resume-on-prompt.ps1` 由 hook harness 給 roots、`sync-claude-userlevel.ps1` 有 `$env:MONOREPO_ROOT` 後備且解析正確。**類沒有開著，`check-claude-sync.ps1` 是唯一真壞的實例**。查證省下了三支能動的腳本被無謂改動
 

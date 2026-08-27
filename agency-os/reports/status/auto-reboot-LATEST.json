@@ -1,5 +1,5 @@
 {
-    "generated_utc":  "2026-08-26 11:09:11",
+    "generated_utc":  "2026-08-27 09:45:40",
     "overall_label":  "healthy",
     "overall_user":  "PASS",
     "ssot":  {
@@ -42,8 +42,8 @@
                                 "sha53":  "c07273c3d7aa009ab56fe2ca97c0f8ffd1baa019c2ea1347571beb6aa5cf438d",
                                 "daemon_active":  "active",
                                 "daemon_enabled":  "enabled",
-                                "reboot_pending":  "0",
-                                "reboot_pkgs":  "",
+                                "reboot_pending":  "1",
+                                "reboot_pkgs":  "libssl3",
                                 "kernel":  "5.15.0-190-generic",
                                 "last_reboot":  "Sat Aug 22 20:30 still",
                                 "expect_53":  true
@@ -53,7 +53,7 @@
                                "reasons":  [
 
                                            ],
-                               "pending":  false
+                               "pending":  true
                            }
            }
 }
