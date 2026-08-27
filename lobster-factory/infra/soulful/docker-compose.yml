@@ -1,0 +1,105 @@
+# soulfulexpression.org on ks-aw-01 (OVH SYS-GAME-2, 149.202.64.114)
+#
+# Migration target for the 2026-11-12 Hostinger deadline. Built from the verified
+# backup at /root/soulful-source/<stamp>/ — see BACKUP_RESTORE_PROOF.md.
+#
+# NAMES ARE A CONTRACT, NOT A PREFERENCE:
+#   container `soulful-db`             ← backup-ks-aw-01.sh:93  require_container
+#   volume    `soulful_wordpress_data` ← backup-ks-aw-01.sh:109 require_volume
+# Those two are already deployed and critic-reviewed on this host. Renaming either here
+# makes the nightly backup ERROR and abort BEFORE its R2 upload — taking Chatwoot's
+# backup down with it, since one script covers both. If a rename is ever genuinely
+# needed, change /etc/default/ks-aw-01-backup's SOULFUL_* overrides in the same commit.
+#
+# A bind mount would break the same contract (`docker volume inspect` finds nothing),
+# which is why the WordPress root is a named volume rather than /srv/sites/<slug>/.
+
+x-soulful-logging: &soulful-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  soulful-db:
+    # Pinned to the exact version running live (MariaDB 11.8.8-log, verified 2026-08-27).
+    # Not `11` or `11.8` — a silent minor bump under a site with WooCommerce HPOS tables
+    # is not a risk worth taking during a migration.
+    image: mariadb:11.8.8
+    container_name: soulful-db
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${SOULFUL_DB_NAME:-soulful}
+      MARIADB_USER: ${SOULFUL_DB_USER:-soulful}
+      MARIADB_PASSWORD: ${SOULFUL_DB_PASSWORD:?SOULFUL_DB_PASSWORD not set}
+      MARIADB_ROOT_PASSWORD: ${SOULFUL_DB_ROOT_PASSWORD:?SOULFUL_DB_ROOT_PASSWORD not set}
+      # The live site runs DB_CHARSET='utf8' (NOT utf8mb4) with an empty DB_COLLATE.
+      # Copied verbatim on purpose: "fixing" it to utf8mb4 re-maps existing byte
+      # sequences and corrupts stored content.
+      MARIADB_AUTO_UPGRADE: "1"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max-allowed-packet=256M
+      - --innodb-buffer-pool-size=2G
+    volumes:
+      - soulful_db_data:/var/lib/mysql
+    # No ports: stanza at all — the database is reachable only over the internal
+    # network. Publishing it even on 127.0.0.1 is unnecessary here and every published
+    # DB port is one config slip away from the 2026-04-20 crypto-miner incident.
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks: [soulful-net]
+    deploy:
+      resources:
+        limits:
+          memory: 6G
+    logging: *soulful-logging
+
+  soulful-wp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: soulful-wordpress:local
+    container_name: soulful-wp
+    restart: unless-stopped
+    depends_on:
+      soulful-db:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: soulful-db:3306
+      WORDPRESS_DB_NAME: ${SOULFUL_DB_NAME:-soulful}
+      WORDPRESS_DB_USER: ${SOULFUL_DB_USER:-soulful}
+      WORDPRESS_DB_PASSWORD: ${SOULFUL_DB_PASSWORD:?SOULFUL_DB_PASSWORD not set}
+      WORDPRESS_DB_CHARSET: utf8
+      WORDPRESS_DB_COLLATE: ""
+      WORDPRESS_TABLE_PREFIX: wp_
+    volumes:
+      - soulful_wordpress_data:/var/www/html
+    # Bound to loopback only. nginx (added at the TLS/cutover step) terminates TLS on
+    # the host and proxies here; nothing reaches this port from outside the box.
+    ports:
+      - "127.0.0.1:8081:80"
+    networks: [soulful-net]
+    deploy:
+      resources:
+        limits:
+          # PHP memory_limit is 1536M per process (matching live). Apache prefork can
+          # hold several of those concurrently, so the container ceiling is deliberately
+          # well above a single process rather than equal to it.
+          memory: 4G
+    logging: *soulful-logging
+
+volumes:
+  soulful_wordpress_data:
+    name: soulful_wordpress_data
+  soulful_db_data:
+    name: soulful_db_data
+
+networks:
+  soulful-net:
+    name: soulful-net

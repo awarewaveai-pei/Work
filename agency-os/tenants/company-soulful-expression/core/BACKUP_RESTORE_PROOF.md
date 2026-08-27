@@ -194,6 +194,64 @@ truth_source: agency-os/tenants/company-soulful-expression/core/BACKUP_AUTO_STAT
 
 > ~~三份備份合計 769 MB，全部存放於 **EU VPS**（不在 Hostinger），2026-11-12 hosting 到期不受影響。~~
 >
+## Drill #2 — 2026-08-27 — 從備份重建到「站真的會動」，PASS
+
+> Drill #1（2026-08-16）證明的是「資料還原得出來」。Drill #2 證明的是**「還原後的站與 live 行為一致」** ——
+> 兩者差別在於前者比對數量，後者比對**真實 HTTP 回應**。
+
+**還原目標**：ks-aw-01（149.202.64.114）`/root/soulful/` docker compose stack
+（`soulful-db` = mariadb:11.8.8 精確對齊 live、`soulful-wp` = 自建映像，見
+[`lobster-factory/infra/soulful/`](../../../../lobster-factory/infra/soulful/)）
+
+**還原來源**：`/root/soulful-source/20260827-060707/`（同一份亦在 R2
+`ks-aw-01/soulful-source/20260827-060707/`，已驗證可從 R2 完整重組，SHA256 相符）
+
+### 逐項結果
+
+| 檢查 | 新機 | live 對照 | 判定 |
+|---|---|---|---|
+| 已發布文章數 | 706 | 706 | ✅ |
+| 使用者數 | 3 | 3 | ✅ |
+| 附件數 | 752 | 752 | ✅ |
+| 資料表數 | 288 | 288 | ✅ |
+| WooCommerce 訂單（HPOS）| 0（8 張 `wp_wc_order*` 表在）| 0 | ✅ 站本來就沒訂單 |
+| **DB↔檔案系統互相對照**（全集非抽樣）| 749 refs / 10,894 files / **0 missing** | 750 / 10,923 / 1 missing | ✅ 新機比 live 還乾淨 |
+| 首頁 | HTTP 200，249,954 bytes，title `Soulful Expression \| Healing Through Art`，Kadence 173 命中、WooCommerce 34 命中 | — | ✅ 是真站不是安裝畫面 |
+| `/wp-login.php` | 200，登入表單存在 | — | ✅ |
+| `/shop/` | 200 | — | ✅ |
+| **7 條真實永久連結逐條比對** | 全部 200 | 全部 200 | ✅ 含中文 URL `insights/general/感恩日記改變人生的五分鐘習慣` |
+| PHP 模組載入 | gmp/tidy/xsl/soap/redis/imagick/intl/igbinary/msgpack 全部 `yes` | — | ✅ |
+| PHP 限制 | memory/upload/post 皆 1536M、`max_input_vars=5000`、`max_execution_time=0`、TZ=UTC | 相同 | ✅ |
+| PHP fatal 錯誤 | 0 | — | ✅ |
+
+### 過程中被驗證擋下的三件事（記錄下來，因為它們證明驗證不是空跑）
+
+1. **`tidy` / `xsl` 編譯成功但載入失敗** —— Dockerfile 用 `apt purge --auto-remove` 清開發標頭時，
+   把**執行期**函式庫一起清掉（`libtidy.so.58` / `libexslt.so.0` not found）。只有 runtime `php -m`
+   檢查抓得到，build 本身是「成功」的。已加 build-time 斷言：模組載不進去就讓 build 失敗。
+2. **「27 個附件遺失」是量測錯誤，不是還原錯誤** —— 驗證腳本的 `find` 只找圖片副檔名，
+   DB 裡的 `.zip`/`.txt`/`.xml` 一律被算成遺失。**與 live 對照後才確認**（live 同樣路徑的檔案存在）。
+   改成比對全部檔案類型後為 0 missing。差一點就去追一個不存在的資料遺失。
+3. **中文永久連結 404 是測錯 URL** —— 站的永久連結結構是 `/insights/%category%/%postname%/`，
+   且 `permalink-manager-pro` 另存 466 條自訂 URI，文章根本不在 `/{slug}/`。
+   改用真實 URI 後兩邊皆 200。
+
+### RTO：誠實區分「已測」與「未測」
+
+| 階段 | 實測 | 備註 |
+|---|---|---|
+| 從 R2 下載 767 MB（4 分片）+ 重組 + SHA 驗證 | **~1 分 30 秒** | 已實測（往返驗證那輪）|
+| DB 載入 288 表 | **~4 秒** | 已實測 |
+| 檔案還原進 volume（767 MB 解壓）| **~14 秒** | 已實測 |
+| 容器起動至 healthy | **~45 秒** | 已實測 |
+| **合計（資料已在手、機器已備妥）** | **約 3 分鐘** | |
+| 🔴 **未測**：全新裸機從零建置（裝 OS/Docker/建映像）| — | 本次是在既有已硬化主機上還原。真正的「整機死掉」情境還要加上 P2 全套（實際耗時約半天）+ 映像 build（約 3 分鐘）|
+
+**故可宣稱的 RTO 是「資料層 < 5 分鐘」，不是「整機災難 < 4 小時」** ——
+後者尚未端到端演練過，決策文件 P4.1 的 4 小時目標**只在資料層獲得驗證**。
+
+---
+
 > 🔴 **2026-08-27 訂正：上述 EU 副本已於 2026-08-24 02:32 UTC 被 `backup-eu-stack.sh` 的 retention 誤刪。**
 > 根因：該 retention 用 `find $BACKUP_DIR -maxdepth 1 -type d -mtime +7 -exec rm -rf`，假設該層每個目錄
 > 都是自己建的每日快照；`clients/soulful/` 是長期保存的客戶備份卻放在同一層，mtime 靜止滿 7 天即被掃除。

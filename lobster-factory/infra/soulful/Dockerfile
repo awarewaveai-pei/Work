@@ -1,0 +1,76 @@
+# soulfulexpression.org — WordPress runtime for ks-aw-01
+#
+# Base is pinned to the minor tag because Docker Hub publishes no 6.9.7 patch tag.
+# That is acceptable here for one specific reason: the site's own WP core files come
+# from the migration backup and are pre-populated into the volume BEFORE this service
+# ever starts, so the image's bundled WordPress is never what serves traffic — the
+# image supplies PHP, Apache and the extensions. See
+# tenants/company-soulful-expression/core/LIVE_RUNTIME_BASELINE_20260827.md.
+FROM wordpress:6.9-php8.2-apache
+
+# Already compiled into the base image, verified with `php -m` on 6.9-php8.2-apache
+# (digest sha256:29a3af5d…) — do NOT rebuild these, it only lengthens the build:
+#   bcmath ctype curl dom exif fileinfo filter gd hash iconv imagick intl mbstring
+#   mysqli openssl pdo_sqlite Phar posix sodium sqlite3 zip zlib OPcache
+#
+# Added below = present on the live Hostinger runtime but absent from this base.
+# Each was checked against actual plugin code on the live site rather than copied
+# wholesale from `php -m`:
+#   gmp      — 16 plugin files call gmp_init(); genuinely required
+#   tidy     — 1 plugin file calls tidy_parse()
+#   xsl/soap — 0 current callers, but cheap and part of the live runtime, so kept
+#              rather than discovering a runtime dependency during cutover
+#   redis    — the new host has no LiteSpeed cache; Redis object cache is the
+#              planned replacement (igbinary/msgpack are its serializers)
+#   calendar, ftp, gettext, pcntl, shmop, sysv* — present live, trivial to build
+#
+# On the purge at the end: `apt-get purge --auto-remove <lib>-dev` strips the RUNTIME
+# library too, not just the headers, and the extension then dies at PHP startup with
+# "cannot open shared object file" (libtidy.so.58 / libexslt.so.0). Measured, not
+# theoretical — the first build of this image reported tidy=NO and xsl=NO for exactly
+# that reason, and only a runtime `php -m` check caught it. The runtime halves are
+# reinstalled after the purge, and the build now ASSERTS the extensions load instead
+# of assuming a successful compile means a working extension.
+#
+# Runtime package names are Debian-release specific and were read off this base image
+# (Debian 13.5 "trixie") rather than carried over from memory: it is `libtidy58` here,
+# not the `libtidy5deb1` of bookworm. The assertion below is what turns a wrong name
+# into a failed build instead of a runtime surprise in production.
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        libgmp-dev libtidy-dev libxslt1-dev libzip-dev; \
+    docker-php-ext-install -j"$(nproc)" \
+        gmp tidy xsl soap calendar ftp gettext pcntl shmop \
+        sysvmsg sysvsem sysvshm; \
+    pecl install redis igbinary msgpack; \
+    docker-php-ext-enable redis igbinary msgpack; \
+    apt-get purge -y --auto-remove libgmp-dev libtidy-dev libxslt1-dev; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends libtidy58 libxslt1.1 libgmp10; \
+    find /var/lib/apt/lists -mindepth 1 -delete; \
+    php -m | grep -qx tidy || { echo "FATAL: tidy did not load"; exit 1; }; \
+    php -m | grep -qx xsl  || { echo "FATAL: xsl did not load";  exit 1; }; \
+    php -m | grep -qx gmp  || { echo "FATAL: gmp did not load";  exit 1; }
+
+# DELIBERATELY NOT REPRODUCED, each for a stated reason rather than by omission:
+#
+#   imap    — its build dependency `libc-client-dev` no longer exists in Debian
+#             (the UW-IMAP library is unmaintained and was dropped). Checked the live
+#             site first: no active plugin calls imap_open/imap_search/imap_fetch.
+#             FluentSMTP sends mail over SMTP and does not need it.
+#   xmlrpc  — no plugin calls xmlrpc_encode, WordPress's xmlrpc.php is a standing
+#             brute-force/pingback amplification surface, and the Cloudflare zone
+#             already blocks it. Omitting it is a security improvement, not a gap.
+#   monarxprotect — Hostinger's proprietary scanner. No equivalent exists off-platform
+#             and nothing on the site depends on it.
+
+COPY php-limits.ini /usr/local/etc/php/conf.d/zz-soulful-limits.ini
+
+# mod_rewrite is required for WordPress permalinks. The site's .htaccess also carries
+# LiteSpeed cache directives; Apache ignores them harmlessly because they sit inside
+# <IfModule LiteSpeed> blocks that never match here.
+RUN a2enmod rewrite headers expires
+
+HEALTHCHECK --interval=20s --timeout=5s --start-period=90s --retries=5 \
+  CMD curl -fsS http://127.0.0.1/ >/dev/null || exit 1
