@@ -1,5 +1,49 @@
 ﻿# Worklog
 
+## 2026-08-27
+
+### Soulful 搬遷主機 P2 完整硬化完成 — 過程中自己的指令一度讓防火牆失效，靠 P2.8 重開機驗證抓到並修復
+
+[任務]
+延續 2026-08-26「Soulful 搬遷主機」entry，完成 P2.3–P2.10 全部項目：SSH 硬化、UFW+DOCKER-USER 雙層防火牆、Docker 安裝、fail2ban、sysctl/THP、fstrim、rescue mode 實測。操作者明確要求「完全了解之後再動」，故先讀完 P1-P8 主計畫、KS6 hardening checklist、breach playbook §8/10 才動手（見 2026-08-26 entry）。
+
+[已完成，依序]
+1. **P2.5 SSH 硬化**：非標準埠 58122（先併聽新舊埠驗證通再關舊埠，避免鎖死自己）、`PasswordAuthentication no`／`PermitRootLogin without-password`（cloud-init 已內建，僅驗證）、fail2ban 裝上並綁定新埠的 sshd jail
+2. **P2.5c**：查證 SYS-GAME-2 這條線（Eco/遊戲機系列）**不支援 OVHcloud Network Firewall**（API 404），維持純主機層防護，符合計畫 contingency
+3. **P2.6**：`unattended-upgrades` 已由 cloud-init 內建（security origin 已在允許清單），dry-run 驗證正常
+4. **P2.7**：Docker 29.7.2 + Compose v5.5.0 安裝，`daemon.json` log rotation（10m×3）
+5. **P2.4**：UFW 預設 deny incoming + 允許 58122/80/443；DOCKER-USER chain 補上（4/20 SG 挖礦事件根治法）
+6. **P2.9**：跑 `SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md` §10 清單——防火牆段可查證已過，密碼/port 綁定/mem_limit/監控段要等 P5/P7 實際部署服務才有東西可查（清單本身就是「每次部署新 stack 前跑一次」的性質，非一次性）
+7. **P2.10**：`vm.overcommit_memory=1`（Redis 用）、THP 關閉（systemd oneshot，開機前於 docker.service 之前跑）、`fstrim.timer`（cloud-init 已內建，僅驗證）、`docker system prune` 週排程
+8. **P2.8 rescue mode 實測**：透過 OVH API 設定 `rescueSshKey` → 切 bootId 到 rescue → 重開機 → SSH 進 Debian 12 rescue 系統 → `mount /dev/md3` + `/dev/md2` 成功並確認內容正確（`hostname=ks-aw-01`、`/etc/docker/daemon.json` 在）→ 切回 harddisk boot → 重開機
+
+[真機踩到的坑，已記入 `runbooks/KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md` 通用主機層]
+- Ubuntu 24.04 用 `ssh.socket` systemd socket activation，`sshd_config` 的 `Port` 指令完全不生效（改了看起來成功，實際沒變）
+- `iptables -I`（insert）疊加會讓最後一條規則跑到最前面，DROP 蓋過所有 ACCEPT，空機階段零症狀
+- 主網卡是 `enp1s0f0` 不是範本寫的 `eth0`
+
+[🔴 最重要的發現：P2.8 的重開機驗證抓到我自己造成的防火牆迴歸]
+裝機當下 `iptables-persistent` 是我為了讓 DOCKER-USER chain 規則撐過重開機而裝的套件。裝的當下一切正常：`ufw status` active、規則都在、`netfilter-persistent save` 也成功。**P2.8 為了測 rescue mode 而重開機後，回頭做例行性的「撐過重開機」驗證，才發現 `ufw` 套件已經被 `iptables-persistent` 的依賴解算靜默移除**（`apt history.log` 精確記錄：`Install: iptables-persistent... Remove: ufw`，零警告訊息）。實際後果：`ufw.service` 消失、`ufw-reject-input`/`ufw-after-input` 這兩條真正擋預設流量的鏈變空、`INPUT` chain policy 從 `DROP` 變回 `ACCEPT`——主機層防火牆形同虛設，只是空機階段沒有服務監聽危險 port，外部 TCP 探測看不出差異（filtered 跟「單純沒人聽」幾乎無法區分）。
+
+修法：`apt purge iptables-persistent netfilter-persistent` → 重裝 `ufw` → 重跑完整 ufw 規則 → DOCKER-USER chain 改用獨立 systemd oneshot service（`/usr/local/sbin/apply-docker-user-chain.sh` + `docker-user-chain.service`，`After=docker.service`）不再依賴會跟 ufw 衝突的套件 → **再次重開機驗證**：`INPUT policy DROP` 且已有真實 drop 封包計數（13 packets）、DOCKER-USER 規則順序正確、外部掃描結果不變但這次內部狀態真的支撐得住。
+
+**🔴🔴 更正（寫下修法後、跑 BUGHUNT 時才發現）：這不是新坑，是我沒讀仔細，重複踩了 repo 已經記錄過的錯**。BUGHUNT 對 `runbooks/` 也跑一次（原本只查了 `agency-os/`，範圍不夠）才發現：`SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md:630-633` 有整段標題就叫「UFW 與 iptables-persistent 不相容」，原文「安裝 iptables-persistent 時會自動移除 ufw。選一個用，不要混用」；`HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md:136` 也寫了同一句話。這兩份文件我在 2026-08-26 讀 P2 計畫時都讀過（P2 計畫的「為什麼要加這五項」註腳明確指向這兩份），但當時只 `grep` 特定 iptables 指令片段來確認 DOCKER-USER chain 的寫法，沒有讀到緊鄰的警告文字段落——**這是「grep 抓片段」取代「讀完整節」的直接代價，跟 CLAUDE.md session 衛生規則裡提醒過的「片段讀最常漏開頭全域設定」是同一類錯誤，這次漏的是同一小節裡的警告段落**。教訓不是「iptables-persistent 跟 ufw 不相容」（這件事 repo 早就知道），教訓是**照抄command前，該小節的prose要整段讀，不能只挑commandgrep**。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH(hetzner-ssh MCP) | cmd=兩次完整重開機（rescue 往返一次 + 修復後驗證一次）+ `iptables -L INPUT -v -n` / `ufw status verbose` / `iptables -L DOCKER-USER --line-numbers` / `systemctl is-active` 全項 | exit=0 | 第二次重開機後全數確認：ufw active + INPUT policy DROP（真實 drop 計數）+ DOCKER-USER 順序正確 + fail2ban/docker/fstrim.timer 皆 active + RAID `[UU]`×2 + sysctl/THP 持久化生效
+- REALTEST_EVIDENCE: tool=Bash(python socket) | cmd=外部 TCP connect 掃描 22/58122/80/443/5432/6379/8123/9000/5678/3306/27017 | exit=0 | 修復前後結果表面相同（危險 port 皆 closed/filtered），**證明單純外部掃描無法證明防火牆真的在擋，必須配合重開機後檢查 iptables policy 欄位**——這正是本則發現的核心教訓
+- REALTEST_EVIDENCE: tool=SSH rescue | cmd=`mount /dev/md3 /mnt/main && mount /dev/md2 /mnt/main/boot` 後 `ls`/`cat` 驗內容 | exit=0 | 內容正確，乾淨 umount
+- REVIEW_WAIVED: DOC_ONLY -- 本輪為主機層 shell/systemd 設定與 OVH API 操作，非 repo 內程式碼變更；文件修正（hardening checklist）已直接由本人核對命令輸出撰寫
+- BUGHUNT_DONE: scope=agency-os,runbooks | grep=`iptables-persistent` | hits=5（`agency-os/WORKLOG.md` 本則 1 + `runbooks/KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md` 本輪新增條目 1 + `runbooks/CLOUDFLARE-WAF-SETUP.md` 1 + `runbooks/SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md` 3 + `runbooks/HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md` 1；後三個舊檔本來就正確警告過此衝突，不需修正，只是我第一輪 BUGHUNT 範圍設太窄漏掉）
+
+[剩餘風險]
+- P2 全部完成，P3（備份管線）／P4（還原演練 + `NEW-HOST-RECOVERY-RUNBOOK.md`）／P5（Chatwoot）尚未開始
+- `docker-user-chain.service` 是本次新建的持久化機制，只驗證過一次重開機；比 `iptables-persistent`（成熟套件但這次證實會衝突 ufw）更客製，未來若忘記這個機制存在、又手滑重裝 iptables-persistent，會重演同一個坑——已寫進硬化文件明確警告
+- **流程風險**：今天連續兩次先寫結論、後做 BUGHUNT 才發現範圍不夠（「範圍縮小」誤判是意圖沒先確認，這次是 grep 片段沒讀全文），兩次都是後補修正而非事前擋下。BUGHUNT 的「scope 要含 runbooks」這個具體疏漏本身也該記住：日後只要改動涉及 `runbooks/` 既有教訓的主題，BUGHUNT scope 必須包含 `runbooks`，不能只查 `agency-os`
+
+[rollback]
+防火牆設定：`ufw disable` 可緊急關閉（不建議）；`docker-user-chain.service` 可 `systemctl disable --now` 停用。SSH 埠：`ssh.socket.d/override.conf` 改回含 22 即可恢復雙埠監聽。
+
 ## 2026-08-26
 
 ### 更正：新主機規格落差的緩解措施是「範圍不縮小」，不是「範圍縮小」
