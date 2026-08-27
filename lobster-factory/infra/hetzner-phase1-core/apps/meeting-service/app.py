@@ -1,7 +1,9 @@
 """會議錄音處理 — 本機操作頁面。
 
-僅限本機執行（GPU 依賴）。啟動：
-    python app.py
+僅限本機執行（GPU 依賴）。啟動方式：
+  這台筆電：`.\\start_server.ps1`（實際跑在 WSL2，因為 Windows 的 Smart App
+    Control 封鎖 av 套件的 .pyd —— 見 README「執行環境」與 lib/transcribe.py）
+  其他環境：`python app.py`
 開啟 http://127.0.0.1:8420
 
 不部署到 SG/EU（無 GPU，見 README.md）。
@@ -163,6 +165,7 @@ DOWNLOADS = {
     "minutes_md": ("meeting_notes.md", "text/markdown; charset=utf-8"),
     "slides": ("slides.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
     "excel": ("meeting_record.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+    "word": ("meeting_record.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
     "coach": ("coach.md", "text/markdown; charset=utf-8"),
     "transcript_srt": ("transcript.srt", "application/x-subrip"),
     "transcript_json": ("transcript.json", "application/json"),

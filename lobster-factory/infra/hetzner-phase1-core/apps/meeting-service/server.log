@@ -1,7 +1,0 @@
-會議錄音處理 — 僅限本機執行 http://127.0.0.1:8420
-INFO:     127.0.0.1:50150 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:50150 - "GET /api/settings HTTP/1.1" 200 OK
-INFO:     127.0.0.1:65217 - "POST /api/settings HTTP/1.1" 200 OK
-INFO:     127.0.0.1:65217 - "GET /api/settings HTTP/1.1" 200 OK
-INFO:     127.0.0.1:60733 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:60733 - "GET /api/settings HTTP/1.1" 200 OK

@@ -2,6 +2,76 @@
 
 ## 2026-08-27
 
+### meeting-service：Windows 被 SAC 鎖死改走 WSL2 + Word 輸出常設化 + 實跑一場真實會議
+
+[任務]
+操作者要處理一場 50 分鐘真實會議錄音，但工具在 Windows 已完全跑不動；同時要求「之後也都要做會議記錄的 Word 檔」。
+
+[根因：不是檔案損毀，是簽章]
+`ImportError: DLL load failed while importing frame: 應用程式控制原則已封鎖此檔案`。
+Smart App Control 封鎖 `av` 套件未簽章的 `.pyd`。**重灌 `av` 無效**——全新安裝的檔案照樣被擋（`Microsoft-Windows-CodeIntegrity/Operational` event 3077 明指 `av\video\frame.pyd`）。該機 SAC 為完全鎖定（`VerifiedAndReputablePolicyState=1`），Microsoft 官方說明此狀態無法從 UI 關閉。操作者明確表示不可能重灌 Windows。
+→ 改走 WSL2（Linux 不受 SAC 管轄）。
+
+[關鍵發現：模型不用重新下載]
+WSL2 內下載大檔會斷流卡死（medium 模型 12 分鐘下載 0 bytes，與 2026-08 前次 WSL2 嘗試同款未解症狀）。但 Windows 端 `~/.cache/huggingface` 早有 large-v3（2.9GB）與 medium（1.5GB）——**模型檔是資料不是可執行碼，SAC 不擋**，直接讓 WSL2 讀 `/mnt/c/.../huggingface` 即可，完全繞開下載問題。這是整條路走通的關鍵。
+
+[已修改]
+1. `lib/word.py`（新增）—— minutes -> docx，章節結構與 `minutes_md.render()` 對齊；CJK 需手寫 `<w:rFonts w:eastAsia>`（理由同 `deck.py` set_font）；黃色在白底 Word 對比不足故壓深
+2. `pipeline.py` —— `_finalize_from_minutes()` 加 `build_word` 階段（Word 常設化，非選配）
+3. `app.py` —— `DOWNLOADS` 加 `word`；docstring 更新啟動方式
+4. `templates/index.html` —— `STAGES` 加 `build_word`、`DOWNLOAD_LABELS` 加 word
+5. `lib/archive.py` —— `plan` 補 `.docx`（**首次同步實際少傳一個檔才發現**，見下方教訓）
+6. `lib/transcribe.py` —— `register_cuda_dlls()` 改跨平台：Windows 走 `os.add_dll_directory`（Linux 無此 API，原本會直接 AttributeError），Linux 改用 `ctypes.CDLL(RTLD_GLOBAL)` preload（`LD_LIBRARY_PATH` 由連結器在 process 啟動時讀完，執行中改 `os.environ` 無效）；抽出 `_site_roots()` 處理 venv
+7. `start_server.sh`（新增）+ `start_server.ps1`（改寫）—— 啟動邏輯搬進 .sh，PowerShell 只傳單一無空白路徑
+8. `requirements.txt` 加 `python-docx==1.2.0`；README 大改（新增「執行環境：WSL2」章節 + 新增輸出格式的 checklist）
+
+[過程中修掉的 3 個真 bug（都是實測才現形，非靜態檢查可得）]
+① `start_server.ps1` 判斷發行版用 `$distros -notmatch $DISTRO`——對**陣列**用 `-notmatch` 是「過濾」語意不是布林判斷，只要存在任何其他發行版（本機有 docker-desktop）就非空即 true，誤判成「找不到 Ubuntu」。改先 `-join` 攤平再 `-notlike`。
+② `Start-Process -ArgumentList` 傳含空白的參數不會自動加引號，bash 命令被空白拆碎。**實測隔離確認**：`echo HELLO > /tmp/argtest.log` 只剩 `echo` 被執行（檔案 1 byte）。→ 把啟動邏輯收斂成單一無空白的 `.sh` 路徑，繞開整類問題。
+③ `start_server.ps1` 重寫後 UTF-8 BOM 掉了（含 CJK 的 .ps1 無 BOM 會被 PS 5.1 用 CP950 誤解析）——寫入後自檢才抓到，已補回。
+
+[訂正一筆過期的實測數字（R4）]
+`transcribe.py` / README 原記「CPU int8 0.3x realtime，純 CPU 機器不可用」。本次實測 **2.1x realtime**（large-v3 int8，50.4 分鐘音檔 → 1444 秒），差 7 倍，「不可用」的結論已被推翻。原因未追查（推測舊測法未帶 `cpu_threads`）。**兩筆並存不刪舊值**（無法確認舊環境不會重現），但標明決策以新值為準。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=真實跑完 50.4 分鐘會議錄音（20260827.m4a）全流程：轉錄 1595 segments / 2.1x realtime / 幻覺率 1.3% → 摘要 → PPT 11 頁 + Word + Excel + md + 教練稿 | exit=0 | ms=1444000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`start_server.ps1` 從乾淨狀態啟動（先 pkill）→ 回報啟動成功 → `curl http://127.0.0.1:8420/` | exit=0 http=200 time=27ms
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl /api/download/20260827/{word,excel,slides}` | exit=0 | 三者皆 http=200，word 45339 bytes
+- REALTEST_EVIDENCE: tool=Bash | cmd=`pipeline._finalize_from_minutes()` 實跑（先刪 docx）→ log 出現 `[Word] 會議記錄 -> meeting_record.docx`、stage=done、docx 45339 bytes | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`transcribe.register_cuda_dlls()` + `preflight()` 在 Linux 實跑（驗跨平台修正不再 AttributeError） | exit=0 | 預檢通過音軌 1 條/3026.2s
+- REALTEST_EVIDENCE: tool=Bash | cmd=UI 內容比對 `curl / | grep 'word:'` 與 `grep build_word` | exit=0 | 兩者皆命中
+- REALTEST_EVIDENCE: tool=Bash | cmd=`write_status` 2 writer×200 次併發回歸（即 critic PoC 出 173 次例外的同一情境）| exit=0 | writer exceptions=0, leftover tmp=[], 最終檔案可讀
+- REALTEST_EVIDENCE: tool=Bash | cmd=`test_summarize_retry.py`（7 案：529 重試成功／409 耗盡傳輸額度／401 立即失敗／修正提示只在第 2 次／max_tokens 截斷據實報錯／傳輸抖動不吃內容額度／空 content 明確錯誤）| exit=0 | 7/7 PASS
+- REALTEST_EVIDENCE: tool=Bash | cmd=WSL2 內 `archive.sync_to_drive()` 實跑（掛載 drvfs 後）→ Windows 端列檔驗證 | exit=0 | ok=True, 6 檔全到且大小相符
+- REALTEST_EVIDENCE: tool=Bash | cmd=`keep_awake.prevent_sleep()/allow_sleep()` 在 WSL2 實跑 + 獨立驗證 `SetThreadExecutionState([uint32]2147483649)` 回傳值 | exit=0 | helper 存活(exit=None)且 API 回傳 2147483648（非 0 = 成功）
+- REVIEW_DONE: critic=Deep | verdict=fail→pass（5 Major 全部修正並回歸驗證）| findings=0c/5m/10n
+  - 外部 oracle = `critic` subagent，附真實執行 PoC。**這一輪 critic 抓到的東西是這次改動裡最有價值的部分**——三個「搬到 WSL2 之後靜默失效」的功能，全部是我自己端到端測試沒覆蓋到的：
+    - **M1 `write_status` tmp 檔名碰撞**：`os.getpid()` 對同 process 所有 thread 相同 → 兩個併發寫入共用同一個 tmp 檔，A 的 `os.replace` 消耗後 B 拋 `FileNotFoundError`（我原本只接 `PermissionError`）。critic 以 2 thread×200 次 PoC 重現 173 次未捕捉例外。**我先前的壓力測試只有 1 writer + 1 reader，所以測不到**，而 docstring 卻宣稱併發安全——假保證比沒保證糟。修：tmp 名加 `threading.get_ident()`、改接 `OSError`、docstring 明列保證範圍（不含 read-modify-write 互斥）。
+    - **M2 `max_tokens=8192` 小於本管線自己的實際產出**：實測 minutes.json 為 9,916／10,531／14,115 字元（中文約 1 token/字），**每一場真實會議都會被截斷**；截斷後解析必失敗，重試用同一上限必再失敗，使用者被計費兩次仍退回人工。修：提高到 32000 + 先判 `stop_reason == "max_tokens"` 據實報錯不盲目重試。
+    - **M3 Drive 同步在 WSL2 完全失效**：`/mnt/h` 根本不存在（WSL2 automount 只涵蓋實體磁碟，Google Drive 是虛擬檔案系統）。之所以早先同步成功是因為那次我用的是 **Windows 端 Python**，不是搬進 WSL2 之後的路徑。修：`start_server.sh` 自動 `mount -t drvfs`、`archive.py` 在 WSL 情境給正確指路（原訊息說「磁碟代號變了或帳號登出」完全指錯方向）。**另修 `shutil.copy2` → `copyfile` + best-effort `copystat`**：drvfs 不支援設 metadata，`copystat` 拋 `[Errno 1]` 導致「檔案其實已複製完成卻整批判定失敗」。
+    - **M4 `keep_awake` 變成完全空操作**：`sys.platform != "win32"` 直接 return。這個保護的存在理由是 2026-08-18 真實事故（1 小時轉錄跑到 9% 筆電睡眠、整個 job 遺失且無可回收進度），而它**正好在無人值守時間變長的同時失效**（GPU 7.0x → CPU 2.1x，60 分鐘錄音的無人值守從 ~9 分鐘變成 ~28 分鐘）。修：WSL2 下透過 `powershell.exe` 起常駐 helper 持有 `ES_CONTINUOUS|ES_SYSTEM_REQUIRED`，並加 `is_holding()` 讓「有沒有保護」可被查驗。
+    - **M5 `start_server.sh` 用 `$USER`** 取 Windows 使用者名稱（實際是 WSL 的 `pei`，Windows 是 `user1115`）→ 獨立執行時靜默退回 `~/.cache` 觸發那個會卡死的多 GB 下載。修：改問 `cmd.exe` 要（且必須先 `cd /mnt/c`，cwd 為 Linux 路徑時 cmd.exe 回空值——實測確認）。
+  - 次要 10 條亦全數修正：雙重 sleep 殘留、`sync_drive` 讀取未防護、重試計數器一兼二用（傳輸抖動會吃掉唯一的自我修正機會）、`resp.content` 空清單、失敗訊息指向不存在的 log、PATH 無限增長、`word.py` 隱性順序依賴、`$APPDIR` 寫死路徑等。
+  - **修正過程中我自己又製造並抓到一個同類 bug**：keep-awake helper 第一版把旗標寫成 `0x80000001`，PowerShell 解析成有號 Int32 導致 `SetThreadExecutionState` 呼叫直接拋例外——**helper 照樣活著、`is_holding()` 照樣回 True，但毫無防睡眠效果**，又是一個「看起來有保護實際沒有」。改用 `[uint32]2147483649` 並加 `if($r -eq 0){exit 1}` 守衛，把「API 有沒有成功」變成「process 還在不在」這個可觀測事實。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`keep_awake\|prevent_sleep\|allow_sleep\|API_MAX_RETRIES\|API_MAX_TOKENS\|copy2\|register_cuda_dlls\|write_status\|python app\.py\|start_server` | hits=13
+  - meeting-service 外部**無任何消費者**（命中皆為 WORKLOG 歷史敘述與不相干的 venv site-packages）。`API_MAX_RETRIES` 改名後全 repo 零殘留參照。另抓到並修正 2 處過期主張：README「使用方式」與 `app.py` docstring 都還叫人直接 `python app.py`（該機已不可行）。
+- ORACLE_WAIVED: 本輪已由 `critic` subagent 做完整深度覆審（5 Major + 10 次要，全部附真實執行 PoC 並逐條修正回歸），強度不低於 codex-oracle；AGENTS.md §跨模型 oracle 分工表本就把 Review 動作列為 critic 與 codex 兩條等價路徑。全部修正另有 7/7 回歸測試與端到端實測覆蓋。
+
+[剩餘風險]
+- **WSL2 環境缺 `torch`/`pyannote`，講者分離功能目前不可用**（大檔下載斷流未解）。其餘功能正常，但逐字稿無 A/B/C 標籤，摘要中的發言歸屬變成語意推定——已在 `_provenance` 與 README 誠實標註。網路良好時應補裝。
+- WSL2 大檔下載斷流的**根因仍未查明**（2026-08 前次嘗試也是同款症狀）。目前靠「共用 Windows 模型快取」繞過，但這只對已下載過的模型有效；未來需要新模型或 torch 時會再撞到。
+- `start_server.ps1` 的 WSLENV 轉送在**本機實測通過**，但未在乾淨機器上驗證過（新機需先照 README 建 venv）。
+- SAC 封鎖是**平台層問題不會自己好轉**；若哪天 Windows 端要恢復原生執行，需重新評估而非假設可行。
+
+[rollback]
+`git revert <commit>`。`lib/word.py`、`start_server.sh` 為新增檔可直接刪；`start_server.ps1` 為改寫，revert 後會回到原生 Windows 版本（該版本在此機**確定跑不起來**，僅適用於 SAC 未鎖定的環境）。
+
+### ⚠️ 本次操作過失：HF_TOKEN 明文進入對話紀錄
+
+驗證環境變數轉送時，我對 `/proc/<pid>/environ` 的輸出加了 `sed` 遮罩，但比對條件寫錯未生效，`HF_TOKEN` 完整值直接印進 transcript。
+**這是 repo 已記錄過的同一類錯誤**（見 TASKS.md 2026-08-15 條目：「遮罩是『輸出後才套用』而非『不讀取值』」）——同樣的根因，第三次發生。
+正確做法應是一開始就不要求輸出該欄位值（只列欄位名稱，或用 `grep -c` 確認存在與否）。已列入 TASKS 待輪換。
+
 ### 🔴 事故：soulful 搬站安全網（EU 上 769 MB 三份備份）已於 2026-08-24 被自家 retention 靜默刪除，三支腳本同一 bug，SG 上 8.8 GB 異地備份也在同一爆炸半徑
 
 [怎麼發現的]

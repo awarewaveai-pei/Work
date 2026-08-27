@@ -1,6 +1,47 @@
-# Meeting Service — 會議錄音 → 逐字稿 → 會議記錄 → PPT → 報告教練
+# Meeting Service — 會議錄音 → 逐字稿 → 會議記錄 → PPT / Word / Excel → 報告教練
 
-錄音/影片上傳 → 本機轉錄 → 講者分離 → AI 摘要（預設貼上式，零費用；選填 API 自動處理，見下方）→ PPT + 報告教練。**全程本機執行，音檔不外流**。
+錄音/影片上傳 → 本機轉錄 → 講者分離 → AI 摘要（預設貼上式，零費用；選填 API 自動處理，見下方）→ PPT + Word + Excel + 報告教練。**全程本機執行，音檔不外流**。
+
+## 🚨 執行環境：WSL2（2026-08-27 起，非選項）
+
+**Windows 原生已經跑不起來**：Smart App Control（SAC）封鎖 `av` 套件未簽章的 `.pyd`，
+錯誤訊息是 `ImportError: DLL load failed while importing frame: 應用程式控制原則已封鎖此檔案`。
+這台機器的 SAC 是**完全鎖定**狀態（`VerifiedAndReputablePolicyState=1`），Microsoft 官方
+說明該狀態無法從 UI 關閉。**重灌 `av` 無效**——實測全新安裝的檔案照樣被擋，因為擋的是
+簽章不是檔案損毀（`Microsoft-Windows-CodeIntegrity/Operational` event 3077 可證）。
+
+解法是改在 WSL2（Ubuntu）執行，Linux 不受 SAC 管轄。**對操作者的使用方式完全不變**：
+
+```powershell
+# 一樣雙擊桌面捷徑，或直接跑（會自動偵測並啟動 WSL2 內的服務）
+.\start_server.ps1
+# 一樣開 http://127.0.0.1:8420
+```
+
+WSL2 的 `localhostForwarding` 預設開啟，服務綁在 WSL2 內的 `127.0.0.1:8420`，
+Windows 瀏覽器直連即可（2026-08-27 實測 HTTP 200 / 27ms）。
+
+### WSL2 環境建立（新機或重建時）
+
+```bash
+wsl --install -d Ubuntu          # 若尚未安裝
+wsl -d Ubuntu -- bash -lc "sudo apt-get update && sudo apt-get install -y python3-pip python3-venv"
+wsl -d Ubuntu -- bash -lc "python3 -m venv ~/mtg-venv && ~/mtg-venv/bin/pip install -r /mnt/d/Work/lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/requirements.txt"
+```
+
+**模型不要在 WSL2 內重新下載。** 實測 WSL2 下載數 GB 大檔會斷流卡死（medium 模型
+12 分鐘下載 0 bytes），而 Windows 端 `~/.cache/huggingface` 早已有 large-v3（2.9GB）
+與 medium（1.5GB）。模型檔是**資料不是可執行碼，SAC 不擋**，直接讓 WSL2 讀 Windows
+那份即可 —— `start_server.sh` 已預設把 `HF_HOME` 指過去，不需要手動設定。
+
+也可以在 WSL2 內直接啟動（不經 PowerShell）：
+```bash
+wsl -d Ubuntu -- bash /mnt/d/Work/.../apps/meeting-service/start_server.sh
+```
+
+**目前 WSL2 環境缺 `torch`/`pyannote`（講者分離）**，原因同樣是大檔下載斷流。
+其餘功能（轉錄／摘要／PPT／Word／Excel／教練稿）全部正常，只是逐字稿不會有
+A/B/C 講者標籤。要補回講者分離，需在網路狀況良好時裝 `torch` + `pyannote.audio`。
 
 ## ⚠️ 為什麼只能本機跑，不部署到 SG/EU
 
@@ -10,17 +51,28 @@
 
 | 階段 | GPU（RTX 5060） | CPU |
 |---|---|---|
-| 轉錄 faster-whisper large-v3 | **7.0x realtime**（510s） | 0.3x（**3.6 小時**） |
+| 轉錄 faster-whisper large-v3 | **7.0x realtime**（510s） | 0.3x（**3.6 小時**）※見下方訂正 |
 | 講者分離 pyannote 3.1 | **24.4x realtime**（147s） | 1.03x（58 分鐘） |
 
-CPU 路線差 20-27 倍，不是「慢一點」，是不可用。在有 GPU 的機器（Hetzner dedicated + GPU 卡）到位前，這支服務**刻意不走 `sg-deploy.sh`**，不進 6 項部署 SOP，`app.py` 只 bind `127.0.0.1`。等買了 GPU 機，這裡的 `lib/` 全部可以原封不動搬過去，只是 `app.py` 換成 API + 佇列架構（見下方「未來：多人版」）。
+⚠️ **2026-08-27 訂正**：CPU 轉錄實測為 **2.1x realtime**（WSL2，large-v3 int8，
+50.4 分鐘音檔 → 1444 秒跑完），與上表的 0.3x 差 7 倍。上表數字**過度悲觀**，
+「純 CPU 不可用」的結論已被推翻——50 分鐘會議 24 分鐘跑完是堪用的。原因未追查
+（推測舊測法未帶 `cpu_threads` 或量測方式不同）。兩筆並存不刪舊值（無法確認舊
+環境不會重現），但**決策請以 2.1x 為準**。
+
+GPU 仍快 3 倍以上且講者分離差 20 倍以上，所以有 GPU 時仍應優先用 GPU。在有 GPU 的機器（Hetzner dedicated + GPU 卡）到位前，這支服務**刻意不走 `sg-deploy.sh`**，不進 6 項部署 SOP，`app.py` 只 bind `127.0.0.1`。等買了 GPU 機，這裡的 `lib/` 全部可以原封不動搬過去，只是 `app.py` 換成 API + 佇列架構（見下方「未來：多人版」）。
 
 ## 使用方式
 
+**本機（這台筆電）**：雙擊桌面捷徑，或跑 `.\start_server.ps1`，然後開
+`http://127.0.0.1:8420`。實際執行在 WSL2，原因見上方「執行環境」章節。
+
+**其他機器 / 未來有 GPU 的環境**（SAC 不擋的環境可直接原生跑）：
 ```bash
 cd apps/meeting-service
 pip install -r requirements.txt
-# torch 預設裝 CPU 版，要手動換 CUDA 版（見下方「安裝細節」）
+# torch 預設裝 CPU 版，要手動換 CUDA 版（見下方「安裝細節」）；
+# 不裝 torch/pyannote 也能跑，只是沒有講者分離
 python app.py
 # 開啟 http://127.0.0.1:8420
 ```
@@ -104,10 +156,21 @@ lib/
   summarize.py    build_prompt()（人工回路）+ summarize_via_api()（選填自動）共用同一份 schema/validate()
   deck.py         minutes -> PPTX，plan_slides() 是頁數對齊的唯一真相源
   speaker_notes.py   講稿寫入 PPT 備忘稿 + 報告教練 md（頁數不符會硬失敗）
-  minutes_md.py   minutes -> 會議記錄 md
+  minutes_md.py   minutes -> 會議記錄 md（存檔／貼 wiki 用）
+  word.py         minutes -> 會議記錄 docx（客戶傳閱用，與 minutes_md 同章節結構）
+  excel.py        minutes -> 五工作表 xlsx
+  archive.py      選擇性同步交付物到 Google Drive（不含音檔）
+start_server.ps1  Windows 端啟動器（呼叫 WSL2）
+start_server.sh   WSL2 端實際啟動邏輯
 templates/index.html   單頁：拖拉上傳 + 進度 + 下載
 jobs/<job_id>/    執行期輸出，.gitignore 排除
 ```
+
+**新增輸出格式時要一起改的地方**（2026-08-27 加 Word 時漏掉 `archive.py`，
+同步結果少一個檔且不會報錯）：
+`lib/<new>.py` → `pipeline.py` `_finalize_from_minutes()` → `app.py` `DOWNLOADS` →
+`templates/index.html` 的 `STAGES` + `DOWNLOAD_LABELS` → `lib/archive.py` 的 `plan`
+→ `requirements.txt`。
 
 ## 已知限制（誠實列出，不要粉飾）
 

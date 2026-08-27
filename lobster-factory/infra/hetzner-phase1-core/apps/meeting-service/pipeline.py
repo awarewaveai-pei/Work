@@ -16,10 +16,11 @@
 """
 import json
 import os
+import threading
 import time
 import traceback
 
-from lib import archive, deck, diarize, excel, hallucination, keep_awake, merge_segments, minutes_md, speaker_notes, summarize
+from lib import archive, deck, diarize, excel, hallucination, keep_awake, merge_segments, minutes_md, speaker_notes, summarize, word
 from lib.transcribe import transcribe, write_srt
 
 
@@ -49,10 +50,17 @@ def write_status(job_dir: str, **fields):
     os.replace() 本身在 Windows 上實測會因為讀端短暫持有檔案 handle 丟
     PermissionError（WinError 5，sharing violation）——這是真實測過會發生的
     情況，不是理論風險（2026-08-20 threaded read/write 壓力測試重現，緊湊迴圈
-    下 5 次重試/0.05s 固定間隔仍不夠，改指數退避 20 次上限 ~5 秒才穩定過關）。
+    下 5 次重試/0.05s 固定間隔仍不夠，改指數退避 20 次上限 ~8.6 秒才穩定過關）。
     retry 是唯一務實做法：檔案鎖是別的 process/thread 造成的瞬時狀態，不是
     這裡的邏輯錯誤，等一下通常就通了；實際情境是 1.5s 輪詢，這個預算遠超
-    需要，只有在測試用的緊湊迴圈下才會逼近上限。"""
+    需要，只有在測試用的緊湊迴圈下才會逼近上限。
+
+    併發保證的範圍（不要過度推論）：同一 job_dir 的多執行緒併發寫入是安全的
+    （tmp 檔名含 thread id），讀端不會看到寫一半的內容。但這裡沒有做
+    read-modify-write 的互斥——兩個執行緒同時更新不同欄位時，後寫者的
+    `cur` 快照可能不含前者剛寫入的欄位，造成欄位遺失。目前呼叫端都是
+    「一個 job 一條 thread 依序推進 stage」，不會踩到；若未來有多個執行緒
+    更新同一個 job 的不同欄位，需要改成檔案鎖或單一 writer。"""
     path = _status_path(job_dir)
     cur = {}
     if os.path.exists(path):
@@ -63,7 +71,13 @@ def write_status(job_dir: str, **fields):
             cur = {}
     cur.update(fields)
     cur["updated_at"] = time.time()
-    tmp_path = f"{path}.tmp{os.getpid()}"
+    # tmp 檔名必須含 thread id：os.getpid() 對同 process 的所有執行緒都一樣，
+    # 兩個併發寫入同一個 job_dir 會共用同一個 tmp 檔——A 的 os.replace 消耗掉
+    # 檔案後，B 的 replace 拋 FileNotFoundError（不是 PermissionError，下面的
+    # 重試接不到）。實際觸發路徑：submit_summary 是同步端點，重複送出或多開
+    # 分頁會讓兩個 resume_after_summary 同時跑。2026-08-27 critic 以 2 執行緒
+    # ×200 次寫入 PoC 重現 173 次未捕捉的 FileNotFoundError。
+    tmp_path = f"{path}.tmp{os.getpid()}.{threading.get_ident()}"
     with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(cur, f, ensure_ascii=False, indent=2)
     max_attempts = 20
@@ -71,7 +85,9 @@ def write_status(job_dir: str, **fields):
         try:
             os.replace(tmp_path, path)
             return
-        except PermissionError:
+        except OSError:
+            # PermissionError（Windows sharing violation）是主要目標，但用
+            # OSError 涵蓋整類短暫檔案系統錯誤，避免再出現「這個子類別沒接到」。
             if attempt == max_attempts - 1:
                 try:
                     os.remove(tmp_path)
@@ -79,7 +95,6 @@ def write_status(job_dir: str, **fields):
                     pass
                 raise
             time.sleep(min(0.5, 0.02 * (2 ** attempt)))
-            time.sleep(0.05)
 
 
 def run_pipeline_phase1(job_dir: str, media_path: str, model_name: str = "large-v3",
@@ -229,7 +244,18 @@ def _finalize_from_minutes(job_dir: str, minutes: dict, log) -> list:
     excel.build(minutes, os.path.join(job_dir, "meeting_record.xlsx"))
     log("[Excel] 五個工作表 -> meeting_record.xlsx")
 
-    sync_drive = json.load(open(_status_path(job_dir), encoding="utf-8")).get("sync_drive", False)
+    write_status(job_dir, stage="build_word")
+    word.build(minutes, os.path.join(job_dir, "meeting_record.docx"))
+    log("[Word] 會議記錄 -> meeting_record.docx")
+
+    # 讀失敗不該讓已經產出的 PPT/Word/Excel 全部作廢——同步是選配功能，
+    # 讀不到旗標時保守地當作「不同步」（不會誤傳到雲端），繼續走完 done。
+    try:
+        with open(_status_path(job_dir), encoding="utf-8") as f:
+            sync_drive = json.load(f).get("sync_drive", False)
+    except (OSError, json.JSONDecodeError) as e:
+        log(f"[warn] 讀不到 sync_drive 旗標（{type(e).__name__}），本次不同步 Drive")
+        sync_drive = False
     if sync_drive:
         write_status(job_dir, stage="sync_drive")
         result = archive.sync_to_drive(job_dir, minutes, os.path.basename(job_dir))

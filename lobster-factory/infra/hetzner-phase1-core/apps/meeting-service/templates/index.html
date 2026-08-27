@@ -177,10 +177,11 @@ const STAGES = [
   ["hallucination_check","幻覺偵測"], ["diarize","講者分離"], ["preparing_prompt","準備摘要 prompt"],
   ["summarize_via_api","API 自動摘要"], ["awaiting_summary","等待貼上摘要"], ["build_deck","生成 PPT"],
   ["build_notes","寫入講稿"], ["build_minutes_md","會議記錄"], ["build_excel","生成 Excel"],
-  ["sync_drive","同步 Google Drive"], ["done","完成"],
+  ["build_word","生成 Word"], ["sync_drive","同步 Google Drive"], ["done","完成"],
 ];
 const DOWNLOAD_LABELS = {
-  minutes_md: "會議記錄 (.md)", slides: "PPT (.pptx)", excel: "會議記錄 (.xlsx)", coach: "報告教練 (.md)",
+  minutes_md: "會議記錄 (.md)", slides: "PPT (.pptx)", word: "會議記錄 (.docx)",
+  excel: "會議記錄 (.xlsx)", coach: "報告教練 (.md)",
   transcript_srt: "字幕檔 (.srt)", diarized_txt: "逐字稿-含講者 (.txt)", merged_txt: "逐字稿 (.txt)",
 };
 

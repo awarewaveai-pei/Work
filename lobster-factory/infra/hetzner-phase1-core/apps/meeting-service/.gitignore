@@ -1,6 +1,9 @@
 jobs/*
 !jobs/.gitkeep
 .settings.json
+# 伺服器執行期日誌（原生 Windows 啟動時產生；WSL2 版寫在 /tmp 不在這裡）
+server.log
+server.err.log
 .ecapa/
 *.venv/
 __pycache__/

@@ -21,10 +21,22 @@ import datetime
 import os
 import re
 import shutil
+import sys
 
 DRIVE_BASE = os.environ.get("MEETING_DRIVE_BASE")
 
 _INVALID_FS_CHARS = re.compile(r'[\\/:*?"<>|]')
+
+
+def _is_wsl() -> bool:
+    """WSL 判定：核心版本字串含 microsoft（微軟官方建議的偵測方式）。"""
+    if sys.platform != "linux":
+        return False
+    try:
+        with open("/proc/version", encoding="utf-8", errors="replace") as f:
+            return "microsoft" in f.read().lower()
+    except OSError:
+        return False
 
 
 def _safe_name(s: str, fallback: str) -> str:
@@ -41,6 +53,18 @@ def sync_to_drive(job_dir: str, minutes: dict, job_id: str) -> dict:
         return {"ok": False, "dest": None, "files": [],
                 "error": "未設定環境變數 MEETING_DRIVE_BASE，Google Drive 同步功能未啟用"}
     if not os.path.isdir(DRIVE_BASE):
+        # WSL2 情境要給不同的指路：Google Drive 這類虛擬磁碟不會被 WSL2 自動
+        # automount（只有實體磁碟會），所以 /mnt/h 天生不存在，跟「磁碟代號變了
+        # 或帳號登出」完全無關。給錯的原因會讓人往錯的方向查（2026-08-27 critic
+        # 指出：服務搬進 WSL2 後這個功能實際上已完全失效）。
+        if DRIVE_BASE.startswith("/mnt/") and _is_wsl():
+            drive_letter = DRIVE_BASE.split("/")[2] if len(DRIVE_BASE.split("/")) > 2 else "?"
+            return {"ok": False, "dest": None, "files": [],
+                    "error": f"WSL2 內找不到 {DRIVE_BASE}。Google Drive 這類虛擬磁碟不會被 "
+                             f"WSL2 自動掛載，需手動掛："
+                             f"sudo mkdir -p /mnt/{drive_letter} && "
+                             f"sudo mount -t drvfs {drive_letter.upper()}: /mnt/{drive_letter}"
+                             f"（start_server.sh 會嘗試自動處理，失敗時才會看到這則訊息）"}
         return {"ok": False, "dest": None, "files": [],
                 "error": f"找不到 Google Drive 路徑 {DRIVE_BASE}；"
                          f"檢查掛載是否還在（可能是磁碟代號變了，或該帳號登出了）"}
@@ -54,8 +78,12 @@ def sync_to_drive(job_dir: str, minutes: dict, job_id: str) -> dict:
 
     title = _safe_name(minutes.get("title"), job_id)
     copied = []
+    # 新增產出格式時這份清單要一起改——2026-08-27 加 Word 輸出時漏掉這裡，
+    # 同步結果少一個檔案且不會報錯（下面 os.path.exists 不存在就靜默跳過），
+    # 是這個設計的已知代價：容忍缺檔換取「某個階段沒跑到也不會炸」。
     plan = [
         ("slides.pptx", f"{title}_會議記錄.pptx"),
+        ("meeting_record.docx", f"{title}_會議記錄.docx"),
         ("meeting_notes.md", f"{title}_會議記錄.md"),
         ("meeting_record.xlsx", f"{title}_會議記錄.xlsx"),
         ("coach.md", f"{title}_報告教練.md"),
@@ -71,7 +99,16 @@ def sync_to_drive(job_dir: str, minutes: dict, job_id: str) -> dict:
             continue
         dst = os.path.join(dest_dir, dst_name)
         try:
-            shutil.copy2(src, dst)
+            # 刻意不用 shutil.copy2：它等於 copyfile + copystat，而 WSL2 透過
+            # drvfs 掛載的 Google Drive 虛擬檔案系統不支援設定 metadata，
+            # copystat 會丟 [Errno 1] Operation not permitted —— 檔案內容其實
+            # 已經複製完成，卻整批被判定失敗（2026-08-27 實測）。
+            # 拆開處理：內容複製失敗才是真失敗；metadata 保留是 best-effort。
+            shutil.copyfile(src, dst)
+            try:
+                shutil.copystat(src, dst)
+            except OSError:
+                pass  # drvfs / 網路磁碟不支援，不影響檔案內容正確性
             copied.append(dst_name)
             seen_targets.add(dst_name)
         except OSError as e:

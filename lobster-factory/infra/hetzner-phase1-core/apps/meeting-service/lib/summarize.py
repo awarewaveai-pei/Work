@@ -24,6 +24,7 @@ Schema 與規則沿用 2026-08-17 對 BU5.m4a 手動處理時學到的教訓：
 """
 import json
 import re
+import time
 
 MAX_TRANSCRIPT_CHARS = 60_000  # 貼上到聊天視窗的合理上限，避免單則訊息過長
 
@@ -133,7 +134,21 @@ def parse_pasted_json(text: str) -> dict:
 
 
 MODEL = "claude-sonnet-4-6"
-API_MAX_RETRIES = 2  # 首次 + 1 次修正重試；沒有人在旁邊看，壞了要自己救一次
+
+# 兩種重試**刻意分開計數**，不共用預算：
+#   內容重試 = 模型輸出不合規（解析失敗／驗證不過），要帶著錯誤訊息請它修正。
+#   傳輸重試 = 網路抖動／429／5xx，跟輸出好壞無關，帶錯誤提示反而是雜訊。
+# 合用一個計數器時，一次網路抖動會吃掉唯一的自我修正機會，「壞了要自己救一次」
+# 這個設計意圖就靜默失效了（2026-08-27 critic 指出）。
+API_CONTENT_RETRIES = 2    # 首次 + 1 次帶修正提示的重試
+API_TRANSPORT_RETRIES = 3  # 每次請求各自擁有的傳輸層重試額度
+
+# 這份 schema 的真實產出量（實測 jobs/*/minutes.json）：9,916 / 10,531 / 14,115
+# 字元，內容以中文為主約等於同量級的 token 數。原本設 8192 會讓每一場真實會議
+# 都在輸出中途被截斷 —— 截斷後 parse_pasted_json 的 rfind("}") 會落在內層物件、
+# json.loads 拋 JSONDecodeError，而重試用的是同一個上限，於是必然二次失敗，
+# 使用者被計費兩次仍退回人工貼上。32000 對最長的實測值留約 2 倍餘裕。
+API_MAX_TOKENS = 32000
 
 
 def summarize_via_api(transcript_text: str, audio_duration_sec: float, api_key: str,
@@ -154,47 +169,65 @@ def summarize_via_api(transcript_text: str, audio_duration_sec: float, api_key: 
                           hallucination_stats=hallucination_stats,
                           overlap_sec=overlap_sec, speakers=speakers)
 
+    def _call(user_msg: str):
+        """送一次請求，傳輸層錯誤自行重試（獨立額度）。回傳 resp 或丟 RuntimeError。"""
+        for t in range(1, API_TRANSPORT_RETRIES + 1):
+            try:
+                return client.messages.create(
+                    model=MODEL, max_tokens=API_MAX_TOKENS,
+                    messages=[{"role": "user", "content": user_msg}],
+                )
+            except (anthropic.APIConnectionError, anthropic.RateLimitError,
+                    anthropic.InternalServerError, anthropic.OverloadedError,
+                    anthropic.ConflictError) as e:
+                # 五類都是暫時性的（網路抖動/429/伺服器端 5xx/529 過載/409 鎖衝突，
+                # 對照已安裝 SDK _client.py 的 status code 映射逐一核對過，不是憑
+                # 印象猜）。註：SDK 本身對 408/409/429/5xx 已有一層透明自動重試
+                # （_base_client.py _should_retry），這裡的例外代表那層也已放棄；
+                # 再包一層屬於防禦性的第二道保險，不是重複無意義。
+                log(f"[API 摘要] 傳輸層錯誤 {t}/{API_TRANSPORT_RETRIES}"
+                    f"（{type(e).__name__}）: {e}")
+                if t >= API_TRANSPORT_RETRIES:
+                    raise RuntimeError(
+                        f"API 呼叫連續 {API_TRANSPORT_RETRIES} 次暫時性錯誤：{type(e).__name__}: {e}"
+                    ) from e
+                time.sleep(min(8, 2 ** t))
+            except anthropic.APIStatusError as e:
+                # 4xx（key 無效/請求本身有問題）重試沒有意義，直接放棄。
+                raise RuntimeError(f"API 呼叫失敗（HTTP {e.status_code}）：{e.message}") from e
+            except anthropic.APIError as e:
+                raise RuntimeError(f"API 呼叫失敗：{e}") from e
+
     last_errs = None
-    for attempt in range(1, API_MAX_RETRIES + 1):
-        log(f"[API 摘要] 第 {attempt} 次呼叫 {MODEL} ...")
+    for attempt in range(1, API_CONTENT_RETRIES + 1):
+        log(f"[API 摘要] 第 {attempt}/{API_CONTENT_RETRIES} 次呼叫 {MODEL} ...")
         user_msg = prompt
         if last_errs:
             user_msg += (
                 "\n\n---\n上一次你的輸出有以下問題，請修正後重新輸出完整 JSON：\n"
                 + "\n".join(f"- {e}" for e in last_errs)
             )
-        try:
-            resp = client.messages.create(
-                model=MODEL, max_tokens=8192,
-                messages=[{"role": "user", "content": user_msg}],
-            )
-        except (anthropic.APIConnectionError, anthropic.RateLimitError, anthropic.InternalServerError,
-                anthropic.OverloadedError, anthropic.ConflictError) as e:
-            # 五類都是暫時性的（網路抖動/429/伺服器端 5xx/529 過載/409 鎖衝突，
-            # 對照已安裝 SDK _client.py 的 status code 映射逐一核對過，不是憑
-            # 印象猜），跟輸出內容好壞無關，重試才有意義；不能套用上面
-            # 「上次輸出有問題」的修正提示（沒有輸出可修正）。last_errs 保持
-            # None 讓下一輪的 user_msg 維持原始 prompt，不夾帶不相干的錯誤
-            # 訊息進去問模型。註：SDK 本身對 408/409/429/5xx 已有一層透明
-            # 自動重試（_base_client.py _should_retry），這裡的例外代表那層
-            # 也已經放棄；再包一層屬於防禦性的第二道保險，不是重複無意義。
-            log(f"[API 摘要] 第 {attempt} 次暫時性錯誤（{type(e).__name__}），"
-                f"{'重試' if attempt < API_MAX_RETRIES else '放棄'}: {e}")
-            if attempt >= API_MAX_RETRIES:
-                raise RuntimeError(f"API 呼叫連續 {API_MAX_RETRIES} 次暫時性錯誤：{type(e).__name__}: {e}") from e
-            continue
-        except anthropic.APIStatusError as e:
-            # 4xx（key 無效/請求本身有問題）重試沒有意義，直接放棄。
-            raise RuntimeError(f"API 呼叫失敗（HTTP {e.status_code}）：{e.message}") from e
-        except anthropic.APIError as e:
-            raise RuntimeError(f"API 呼叫失敗：{e}") from e
 
+        resp = _call(user_msg)
+
+        # 截斷要先於解析判斷：被 max_tokens 砍斷的輸出解析必然失敗，但錯誤訊息
+        # 會是「JSON 格式錯」，把使用者與模型都指向錯誤方向。重試也沒用——同樣
+        # 的上限會產生同樣的截斷，只是多付一次錢。直接如實報錯讓它退回人工回路。
+        if getattr(resp, "stop_reason", None) == "max_tokens":
+            raise RuntimeError(
+                f"API 回應超過輸出上限（max_tokens={API_MAX_TOKENS}）被截斷，無法解析。"
+                f"這場會議的摘要比預期長，請改用手動貼上模式，或調高 summarize.API_MAX_TOKENS。"
+            )
+
+        if not resp.content:
+            raise RuntimeError(f"API 回應沒有任何內容（stop_reason={getattr(resp, 'stop_reason', '?')}）")
         text = resp.content[0].text
         try:
             minutes = parse_pasted_json(text)
         except ValueError as e:
             last_errs = [f"回應無法解析為 JSON：{e}"]
-            log(f"[API 摘要] 第 {attempt} 次解析失敗，{'重試' if attempt < API_MAX_RETRIES else '放棄'}")
+            log(f"[API 摘要] 第 {attempt} 次解析失敗，"
+                f"{'重試' if attempt < API_CONTENT_RETRIES else '放棄'}")
             continue
 
         errs = validate(minutes)
@@ -202,9 +235,10 @@ def summarize_via_api(transcript_text: str, audio_duration_sec: float, api_key: 
             log(f"[API 摘要] 第 {attempt} 次通過驗證")
             return minutes
         last_errs = errs
-        log(f"[API 摘要] 第 {attempt} 次驗證失敗：{errs}；{'重試' if attempt < API_MAX_RETRIES else '放棄'}")
+        log(f"[API 摘要] 第 {attempt} 次驗證失敗：{errs}；"
+            f"{'重試' if attempt < API_CONTENT_RETRIES else '放棄'}")
 
-    raise RuntimeError(f"API 產生的摘要經 {API_MAX_RETRIES} 次嘗試仍不符規格：{last_errs}")
+    raise RuntimeError(f"API 產生的摘要經 {API_CONTENT_RETRIES} 次嘗試仍不符規格：{last_errs}")
 
 
 def validate(minutes: dict) -> list:

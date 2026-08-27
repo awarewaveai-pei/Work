@@ -1,10 +1,21 @@
 """本機離線轉錄（faster-whisper）。音檔絕不外流。
 
-2026-08-17 實測（BU5.m4a，60 分鐘，RTX 5060）：
-  - GPU float16：7.0x realtime（510s）
-  - CPU int8：0.3x realtime（3.6 小時）→ 純 CPU 機器不可用
+實測數據（同一台筆電，RTX 5060 / Intel CPU）：
+  - 2026-08-17 Windows GPU float16：7.0x realtime（BU5.m4a 60 分鐘 → 510s）
+  - 2026-08-27 WSL2 CPU int8 large-v3：2.1x realtime（50.4 分鐘 → 1444s）
+
+⚠️ 2026-08-17 曾記錄「CPU int8 0.3x realtime，純 CPU 不可用」，該數字與
+08-27 的實測差 7 倍，已證實過度悲觀（實際 50 分鐘會議 24 分鐘跑完，堪用）。
+原因未追查，推測是當時未帶 cpu_threads 或量測方式不同。保留兩筆並存而非
+刪掉舊值，因為無法確認舊環境不會重現——但決策時請以 2.1x 這筆為準。
+
+**Windows 上本模組可能完全無法載入**：Smart App Control（SAC）會封鎖 `av`
+套件未簽章的 .pyd（`ImportError: DLL load failed ... 應用程式控制原則已封鎖`），
+且該機 SAC 為完全鎖定狀態無法關閉。解法是改在 WSL2 執行（Linux 不受 SAC 管），
+見 README「WSL2 執行」章節。本模組已做跨平台處理，兩邊都能跑。
 """
 import os
+import sys
 import time
 
 ZH_PROMPT = "以下是一場繁體中文會議的錄音，請以臺灣用語的繁體中文輸出逐字稿。"
@@ -12,22 +23,64 @@ ZH_PROMPT = "以下是一場繁體中文會議的錄音，請以臺灣用語的�
 
 def register_cuda_dlls():
     """CUDA 執行庫由 pip wheel 提供（nvidia-cublas-cu12 / nvidia-cudnn-cu12），
-    但不在 PATH 上。Windows 需明確 add_dll_directory 才找得到。"""
+    但不在預設搜尋路徑上，兩個平台要用不同機制掛上去：
+
+    Windows：wheel 把 DLL 放在 nvidia/*/bin，用 os.add_dll_directory 註冊。
+    Linux：wheel 放在 nvidia/*/lib，且 LD_LIBRARY_PATH 由動態連結器在 process
+      啟動時就讀完，執行中改 os.environ 沒有用——所以改用 ctypes 直接 preload
+      .so 檔，載進 process 後 ctranslate2 dlopen 時就能解析到符號。
+      cublas 必須在 cudnn 之前載入（後者相依前者），故先排序再載。
+    """
     import glob
-    import site
     added = []
-    roots = list(site.getsitepackages()) + [site.getusersitepackages()]
+    roots = _site_roots()
+
+    if sys.platform == "win32":
+        for p in roots:
+            for d in glob.glob(os.path.join(p, "nvidia", "*", "bin")):
+                if os.path.isdir(d):
+                    try:
+                        os.add_dll_directory(d)
+                        added.append(d)
+                    except OSError:
+                        pass
+        # 去重再前置：pick_device() 每個 job 都會呼叫一次，無條件前置會讓 PATH
+        # 隨 job 數線性膨脹，長期執行的伺服器會逼近 32,767 字元的環境變數上限。
+        cur_path = os.environ.get("PATH", "")
+        cur_parts = cur_path.split(os.pathsep)
+        new_parts = [d for d in added if d not in cur_parts]
+        if new_parts:
+            os.environ["PATH"] = os.pathsep.join(new_parts) + os.pathsep + cur_path
+        return added
+
+    import ctypes
+    sos = []
     for p in roots:
-        for d in glob.glob(os.path.join(p, "nvidia", "*", "bin")):
-            if os.path.isdir(d):
-                try:
-                    os.add_dll_directory(d)
-                    added.append(d)
-                except OSError:
-                    pass
-    if added:
-        os.environ["PATH"] = os.pathsep.join(added) + os.pathsep + os.environ.get("PATH", "")
+        sos.extend(glob.glob(os.path.join(p, "nvidia", "*", "lib", "*.so*")))
+    # cublas 先於 cudnn；其餘維持字典序，確保每次載入順序一致可重現
+    sos.sort(key=lambda s: (0 if "cublas" in s else 1, s))
+    for so in sos:
+        try:
+            ctypes.CDLL(so, mode=ctypes.RTLD_GLOBAL)
+            added.append(so)
+        except OSError:
+            pass  # 版本不合或相依缺失的個別 .so 跳過，讓 pick_device 的探針去判定
     return added
+
+
+def _site_roots():
+    """site-packages 根目錄。venv 下 getusersitepackages() 可能拋例外或無意義，
+    包起來不讓它中斷整個 CUDA 註冊流程。"""
+    import site
+    roots = list(getattr(site, "getsitepackages", lambda: [])())
+    try:
+        roots.append(site.getusersitepackages())
+    except Exception:
+        pass
+    # venv 的 site-packages 不一定在上面兩者裡，用實際載入路徑補一個
+    import faster_whisper
+    roots.append(os.path.dirname(os.path.dirname(os.path.abspath(faster_whisper.__file__))))
+    return [r for r in dict.fromkeys(roots) if r and os.path.isdir(r)]
 
 
 def pick_device(model_name: str, log=print):
