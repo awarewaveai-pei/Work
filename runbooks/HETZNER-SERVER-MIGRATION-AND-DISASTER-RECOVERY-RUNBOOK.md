@@ -139,6 +139,12 @@
 | 異地 L1 | rsync → **SG VPS** | 每日 | — | **❌ 斷**（SG 退役）|
 | 異地 L2 | **Cloudflare R2**（bucket `lobster-backup`/prefix `eu`）| 每日 | — | ✅ 不受影響 |
 
+> **2026-08-27 新增第三台 prefix**：`lobster-backup/ks-aw-01/<STAMP>/`（OVH SYS-GAME-2）。
+> 該 prefix key 用**時間戳非日期**、且有 14 天 WORM lock，**還原流程與 eu/sg 不同**
+> （不可由日期推導 key，必須先列出 bucket）——見
+> [`lobster-factory/infra/ks-aw-01-backup/README.md`](../lobster-factory/infra/ks-aw-01-backup/README.md)。
+> 下方 §R2 救援腳本的 `objects/eu/$date/$f` 寫法**只適用 eu/sg**。
+
 **所以策略不是「重建」，是兩件補強**：
 1. **補漏覆蓋**（§1 表的 🔴🟡）— 加進 `backup-eu-stack.sh`，含 integrity 驗證 + 一起進 R2。
 2. **SG 退役前補第二異地**取代 L1：選一 →

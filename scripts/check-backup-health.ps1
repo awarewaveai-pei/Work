@@ -1,10 +1,14 @@
-﻿#requires -Version 5.1
+#requires -Version 5.1
 [CmdletBinding()]
 param(
     [string]$SgHost = "5.223.93.113",
     [string]$EuHost = "204.168.175.41",
+    [string]$KsAw01Host = "149.202.64.114",
     [string]$SshUser = "root",
     [string]$PrivateKey = (Join-Path $env:USERPROFILE ".ssh\hetzner_trigger"),
+    [string]$KsAw01SshUser = "ubuntu",
+    [int]$KsAw01SshPort = 58122,
+    [string]$KsAw01PrivateKey = (Join-Path $env:USERPROFILE ".ssh\id_ed25519"),
     [string]$WorkRoot = "",
     [switch]$Json
 )
@@ -29,19 +33,37 @@ function Resolve-Root {
 function Invoke-Ssh {
     param(
         [Parameter(Mandatory = $true)][string]$ServerHost,
-        [Parameter(Mandatory = $true)][string]$Command
+        [Parameter(Mandatory = $true)][string]$Command,
+        [string]$User = $SshUser,
+        [string]$Key = $PrivateKey,
+        [int]$Port = 22
     )
     $sshArgs = @(
         "-o", "BatchMode=yes",
         "-o", "StrictHostKeyChecking=accept-new",
         "-o", "ConnectTimeout=10",
-        "-i", $PrivateKey,
-        ("{0}@{1}" -f $SshUser, $ServerHost),
+        "-p", $Port,
+        "-i", $Key,
+        ("{0}@{1}" -f $User, $ServerHost),
         $Command
     )
     # Force UTF-8 console for SSH stdout — Big5 locale would mojibake any CJK output bytes
     # and can eat newline bytes inside multi-byte sequences. $LASTEXITCODE propagates.
-    $out = Invoke-WithUtf8Console { & ssh @sshArgs 2>&1 }
+    #
+    # $ErrorActionPreference='Continue' inside the scriptblock (child scope, so the
+    # assignment is local) is REQUIRED: under the script-level 'Stop', ANY byte a native
+    # command writes to stderr throws a terminating NativeCommandError regardless of exit
+    # code. ssh writes benign notices to stderr routinely — "Warning: Permanently added
+    # '[host]:port' to the list of known hosts" on first connect (note [host]:port is a
+    # distinct known_hosts entry, so a new port re-triggers it), sudo's first-use lecture,
+    # "sudo: unable to resolve host" on hosts missing their own name in /etc/hosts. Without
+    # this, one such notice aborts the whole script before the report is written, leaving
+    # the PREVIOUS (green) backup-health-LATEST.md in place while AO-RESUME points the
+    # reader at it — a stale-green monitor, the exact failure this check exists to prevent.
+    $out = Invoke-WithUtf8Console {
+        $ErrorActionPreference = 'Continue'
+        & ssh @sshArgs 2>&1
+    }
     return @{
         ExitCode = $LASTEXITCODE
         Output   = (($out | ForEach-Object { [string]$_ }) -join "`n").Trim()
@@ -66,7 +88,11 @@ function Get-HostBackupHealth {
         [Parameter(Mandatory = $true)][string]$CronPath,
         [Parameter(Mandatory = $true)][string]$BackupScriptPath,
         [Parameter(Mandatory = $true)][string]$BackupDir,
-        [Parameter(Mandatory = $true)][string]$VerifyLog
+        [Parameter(Mandatory = $true)][string]$VerifyLog,
+        [string]$User = $SshUser,
+        [string]$Key = $PrivateKey,
+        [int]$Port = 22,
+        [switch]$UseSudo
     )
 
     $parts = @(
@@ -98,8 +124,9 @@ function Get-HostBackupHealth {
     )
     $raw = ($parts -join "; ")
     $b64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($raw))
-    $cmd = "echo $b64 | base64 -d | bash -l"
-    $res = Invoke-Ssh -ServerHost $ServerHost -Command $cmd
+    $bashRunner = if ($UseSudo) { "sudo bash -l" } else { "bash -l" }
+    $cmd = "echo $b64 | base64 -d | $bashRunner"
+    $res = Invoke-Ssh -ServerHost $ServerHost -Command $cmd -User $User -Key $Key -Port $Port
     if ($res.ExitCode -ne 0) {
         return [ordered]@{
             host             = $ServerHost
@@ -141,31 +168,81 @@ $null = New-Item -ItemType Directory -Force -Path $statusDir
 $stamp = Get-Date
 
 $sshOk = [bool](Get-Command ssh.exe -ErrorAction SilentlyContinue)
-$keyOk = Test-Path -LiteralPath $PrivateKey
 
 $sg = $null
 $eu = $null
+$ks = $null
 $fatal = $false
 $fatalReason = ""
+
+# Per-host degradation, NOT a global fatal: one host's missing key or unreachable
+# SSH must never blind the other two. A global fatal here would mean the newest,
+# least-critical host (ks-aw-01, whose default key is the operator's general-purpose
+# id_ed25519 rather than the repo's hetzner_trigger convention) could take down
+# monitoring for the two hosts that actually hold live customer data.
+# NOTE: the splat parameter is deliberately NOT named $Args — that collides with
+# PowerShell's automatic $args (the argument array), and under Set-StrictMode
+# -Version Latest, $Args.ServerHost then throws PropertyNotFoundStrict instead of
+# reading the hashtable. Caught by the missing-key degradation test, which is the
+# only path that exercises it.
+function Invoke-HostCheck {
+    param(
+        [Parameter(Mandatory = $true)][hashtable]$CheckArgs,
+        [Parameter(Mandatory = $true)][string]$KeyPath,
+        [Parameter(Mandatory = $true)][string]$Label
+    )
+    $targetHost = $CheckArgs.ServerHost
+    $unreachable = {
+        param($reason)
+        [ordered]@{
+            host = $targetHost; ok = $false; error = $reason
+            cron_status = "(error)"; cron_lines = "(error)"
+            retention_days = "(error)"; retention_source = "(error)"
+            backup_size = "(error)"; latest_time = "(error)"; oldest_time = "(error)"
+            backup_age_days = "999"; verify_result = "(error)"; verify_time = "(error)"
+        }
+    }
+    if (-not (Test-Path -LiteralPath $KeyPath)) {
+        return & $unreachable "SSH private key not found: $KeyPath"
+    }
+    try {
+        return Get-HostBackupHealth @CheckArgs
+    } catch {
+        return & $unreachable ("check threw: " + $_.Exception.Message)
+    }
+}
 
 if (-not $sshOk) {
     $fatal = $true
     $fatalReason = "ssh.exe not found on PATH"
-} elseif (-not $keyOk) {
-    $fatal = $true
-    $fatalReason = "SSH private key not found: $PrivateKey"
 } else {
-    $sg = Get-HostBackupHealth -ServerHost $SgHost -CronPath "/etc/cron.d/lobster-backup" -BackupScriptPath "/root/lobster-phase1/scripts/backup-phase1.sh" -BackupDir "/root/lobster-phase1/backups" -VerifyLog "/var/log/lobster-backup.log"
-    $eu = Get-HostBackupHealth -ServerHost $EuHost -CronPath "/etc/cron.d/eu-backup" -BackupScriptPath "/root/scripts/backup-eu-stack.sh" -BackupDir "/root/backups" -VerifyLog "/var/log/eu-backup.log"
+    $sg = Invoke-HostCheck -KeyPath $PrivateKey -Label "SG" -CheckArgs @{
+        ServerHost = $SgHost; CronPath = "/etc/cron.d/lobster-backup"
+        BackupScriptPath = "/root/lobster-phase1/scripts/backup-phase1.sh"
+        BackupDir = "/root/lobster-phase1/backups"; VerifyLog = "/var/log/lobster-backup.log"
+    }
+    $eu = Invoke-HostCheck -KeyPath $PrivateKey -Label "EU" -CheckArgs @{
+        ServerHost = $EuHost; CronPath = "/etc/cron.d/eu-backup"
+        BackupScriptPath = "/root/scripts/backup-eu-stack.sh"
+        BackupDir = "/root/backups"; VerifyLog = "/var/log/eu-backup.log"
+    }
+    $ks = Invoke-HostCheck -KeyPath $KsAw01PrivateKey -Label "ks-aw-01" -CheckArgs @{
+        ServerHost = $KsAw01Host; CronPath = "/etc/cron.d/ks-aw-01-backup"
+        BackupScriptPath = "/root/scripts/backup-ks-aw-01.sh"
+        BackupDir = "/root/backups"; VerifyLog = "/var/log/ks-aw-01-backup.log"
+        User = $KsAw01SshUser; Key = $KsAw01PrivateKey; Port = $KsAw01SshPort; UseSudo = $true
+    }
 }
 
 $sgStale = ($sg -ne $null) -and $sg.ok -and ($sg.backup_age_days -match '^\d+$') -and ([int]$sg.backup_age_days -gt 3)
 $euStale = ($eu -ne $null) -and $eu.ok -and ($eu.backup_age_days -match '^\d+$') -and ([int]$eu.backup_age_days -gt 3)
+$ksStale = ($ks -ne $null) -and $ks.ok -and ($ks.backup_age_days -match '^\d+$') -and ([int]$ks.backup_age_days -gt 3)
 # Verify RESULT (integrity), not just freshness: a backup can be fresh-but-broken.
 # Only FAILED escalates to WARN; UNKNOWN (e.g. log rotated / marker not yet present) does NOT false-alarm.
 $sgVerifyFail = ($sg -ne $null) -and $sg.ok -and ($sg.verify_result -eq "FAILED")
 $euVerifyFail = ($eu -ne $null) -and $eu.ok -and ($eu.verify_result -eq "FAILED")
-$overall = if ($fatal) { "ERROR" } elseif (((($sg -ne $null) -and (-not $sg.ok))) -or ((($eu -ne $null) -and (-not $eu.ok)))) { "WARN" } elseif ($sgStale -or $euStale -or $sgVerifyFail -or $euVerifyFail) { "WARN" } else { "PASS" }
+$ksVerifyFail = ($ks -ne $null) -and $ks.ok -and ($ks.verify_result -eq "FAILED")
+$overall = if ($fatal) { "ERROR" } elseif (((($sg -ne $null) -and (-not $sg.ok))) -or ((($eu -ne $null) -and (-not $eu.ok))) -or ((($ks -ne $null) -and (-not $ks.ok)))) { "WARN" } elseif ($sgStale -or $euStale -or $ksStale -or $sgVerifyFail -or $euVerifyFail -or $ksVerifyFail) { "WARN" } else { "PASS" }
 
 $markdown = New-Object System.Text.StringBuilder
 [void]$markdown.AppendLine("# Backup health report")
@@ -182,7 +259,8 @@ if ($fatal) {
 } else {
     foreach ($node in @(
         [ordered]@{ name = "SG"; data = $sg; cron = "/etc/cron.d/lobster-backup" },
-        [ordered]@{ name = "EU"; data = $eu; cron = "/etc/cron.d/eu-backup" }
+        [ordered]@{ name = "EU"; data = $eu; cron = "/etc/cron.d/eu-backup" },
+        [ordered]@{ name = "ks-aw-01"; data = $ks; cron = "/etc/cron.d/ks-aw-01-backup" }
     )) {
         [void]$markdown.AppendLine("## " + $node.name + " (" + $node.data.host + ")")
         if (-not $node.data.ok) {
@@ -225,6 +303,7 @@ $payload = [ordered]@{
     fatalReason = $fatalReason
     sg          = $sg
     eu          = $eu
+    ks_aw_01    = $ks
     reportPath  = "agency-os/reports/status/backup-health-LATEST.md"
 }
 [System.IO.File]::WriteAllText($jsonPath, ($payload | ConvertTo-Json -Depth 6), $utf8NoBom)
@@ -240,7 +319,8 @@ if ($Json) {
     } else {
         foreach ($x in @(
             [ordered]@{ name = "SG"; data = $sg },
-            [ordered]@{ name = "EU"; data = $eu }
+            [ordered]@{ name = "EU"; data = $eu },
+            [ordered]@{ name = "ks-aw-01"; data = $ks }
         )) {
             if ($x.data.ok) {
                 $ageD = $x.data.backup_age_days

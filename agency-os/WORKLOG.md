@@ -2,6 +2,62 @@
 
 ## 2026-08-27
 
+### Soulful 搬遷主機 P3 備份管線就緒 — R2 token IP 限制欄位實測異常（保留但停用），bucket lock 帶出同天覆蓋碰撞並修正
+
+[任務]
+延續 P2（見上一則 entry），完成 P3.1–P3.5：R2 write-only token（實測後改用共用 token）、bucket lock（WORM 14 天）、備份腳本移植、`check-backup-health.ps1` 三台化、cron 排程 + 首跑驗證。操作者中途明確裁定「範圍不縮小」（另有獨立 WORKLOG entry），且指示「不要廢話趕快處理好」，故 P3.1 token 範圍問題排查到一定深度後即務實收斂，不繼續深挖 Cloudflare 平台行為。
+
+[已完成]
+1. **P3.2 R2 bucket lock**：`lobster-backup` bucket 設 14 天 Age-based retention rule（WORM，防刪除/覆蓋），API 設定成功且**真實驗證有效**（見下方異常記錄）
+2. **P3.1 R2 token 建立**：操作者於 Cloudflare dashboard 建 `ks-aw-01-backup-write-only`，選擇 **Admin Read & Write**（帳號全域）。**實測發現 bucket 限定與 IP 限定欄位對 Admin 等級皆不生效**（見下方異常記錄），且該 token 從其自己指定的白名單 IP（149.202.64.114，即 ks-aw-01 本機）呼叫 R2 物件操作固定回 401，從其他任意 IP 卻正常——**邏輯與預期方向相反，非本地可修的設定問題**。**最終決定：新 token 保留在憑證檔（未來若 Cloudflare 修正此行為可再啟用），ks-aw-01 backup 實際使用與 SG/EU 共用的既有 `lobster-backup-r2-token`**（本來就是帳號全域權限，與新 token 實質等效，唯一差異只是無法獨立撤銷）
+3. **P3.3 備份腳本移植**：新建 `lobster-factory/infra/ks-aw-01-backup/{backup-ks-aw-01.sh, verify-backup-ks-aw-01.sh}`，比照 `backup-eu-stack.sh`/`verify-backup-eu.sh` 設計。P5/P7 尚未部署，故 soulful DB/uploads、Chatwoot PG/uploads 四段皆做成「容器/volume 不存在則優雅 SKIP」，manifest.json 心跳檔案永遠寫入，讓 pipeline 現在就能跑且未來服務一上線自動開始收錄
+4. **P3.4 `check-backup-health.ps1` 三台化**：新增 `-KsAw01Host/-KsAw01SshUser/-KsAw01SshPort/-KsAw01PrivateKey` 參數（預設值），`Invoke-Ssh`/`Get-HostBackupHealth` 加 `-Port`/`-Key`/`-User`/`-UseSudo`（ks-aw-01 走 ubuntu+sudo，非 root 直連）；overall 判定、markdown report、console 輸出三處迴圈皆加入第三台。**呼叫端 `ao-resume.ps1:544` 用具名參數 `-WorkRoot`，未受新參數影響**（已 grep 確認）
+5. **P3.5 cron + 首跑驗證**：`/etc/cron.d/ks-aw-01-backup`（02:15 備份 + 02:45 驗證 UTC，錯開 SG 02:00/EU 02:30）；`check-backup-health.ps1` 實跑三台皆 PASS
+
+[🔴 異常記錄：Cloudflare R2 token 的 IP 限制欄位行為與文件/常識相反]
+1. 從本機（42.70.78.220，未在白名單）PUT 物件成功（200，真實寫入，非測試方法誤判——事後用另一把 token 從遠端 ground-truth 確認物件真的存在）
+2. 從新 token 自己指定要允許的 IP（149.202.64.114，ks-aw-01 本機）PUT 同一物件，**固定回 401 Authentication error**
+3. 同時間用共用舊 token（無任何 IP/bucket 限制）從 ks-aw-01 打，正常成功——排除「這個 IP 對 R2 服務整體被擋」的可能性，問題精確定位在新 token 本身的 IP 條件判斷
+4. 操作者確認建立時選擇的是 **Admin Read & Write**（非 Object Read & Write）——bucket 限定欄位對 Admin 等級不生效可以理解（Admin 本來就帳號全域），但 **IP 限制欄位理論上不該連方向都反過來**
+5. 未深入查證 Cloudflare 後端根因（超出本次任務範圍，且操作者已明確要求收斂）；新 token 資訊完整保留在 `AWARE_WAVE_CREDENTIALS.md`，供未來若要重新嘗試或回報 Cloudflare 時使用
+
+[🟡 次要發現：bucket lock 與同天多次執行的 R2 key 碰撞]
+`upload-to-r2.sh`（EU/SG/ks-aw-01 共用）的 R2 key 路徑原設計是 `{prefix}/{DATE}/{filename}`（日期粒度，非時間戳）。P3.2 剛設定的 bucket lock 是 **bucket 全域**（`prefix:""`，涵蓋既有 `eu/`、`sg/` 前綴，非只影響新加的 `ks-aw-01/`），若同一天同一物件路徑被寫入第二次（測試重跑、人工重試），因物件已被鎖住無法覆蓋，上傳會以 HTTP 409 失敗——當天稍早測試時實際撞見。**修法只動 `backup-ks-aw-01.sh` 自己的呼叫參數**（改傳 `${STAMP}`，含時間戳，不是 `${DATE}`），不改動共用的 `upload-to-r2.sh` 本體（避免影響 EU/SG 既有呼叫方式）。**遺留風險**：EU/SG 若未來真的一天內人工重跑 R2 upload 那段，仍會撞見同樣的 409（機率低，正常 cron 一天一次不會觸發），暫不视為本次任務範圍需要修正 EU/SG 既有腳本。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(curl) | cmd=R2 bucket lock PUT + GET config + PUT/DELETE 物件驗證鎖生效（`"success":false` + `"The object is locked by the bucket policy."`）| exit=0 | 鎖確認真實生效，非文件宣稱
+- REALTEST_EVIDENCE: tool=SSH(hetzner-ssh MCP) | cmd=`sudo /root/scripts/backup-ks-aw-01.sh` + `verify-backup-ks-aw-01.sh`（含一次因舊 key 撞鎖的失敗案例 + 修正後的成功案例）| exit=0（修正後）| log 出現 `=== verify-backup-ks-aw-01 PASSED ===` 標準標記
+- REALTEST_EVIDENCE: tool=Bash(curl) | cmd=`GET /r2/buckets/lobster-backup/objects/ks-aw-01/...manifest.json` 用**另一把**帳號 token ground-truth 核對 | exit=0 | R2 上真的有這個物件，不是腳本自稱成功
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`.\scripts\check-backup-health.ps1`（無參數，走全部預設值）| exit=0 | Overall: PASS，三台皆列出且 ks-aw-01 verify=PASSED、retention=7d、age=0d
+- REVIEW_DONE: critic=Deep | verdict=fail→fixed | findings=1c/5m/9n（**初版被打回**，見下方「critic 覆審」段；全部修完後重測通過）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks | grep=`ks-aw-01\|backup-ks-aw-01\|KsAw01\|upload-to-r2` | hits=9+5+2+9（**第一輪只 grep `check-backup-health` 範圍太窄**，critic 指出應 grep 新增符號才發現 `runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md` 與 `BACKUP_RESTORE_PROOF.md` 兩份 R2 prefix 表格仍只列 sg/eu、且 runbook 的還原指令寫死 `objects/eu/$date/$f`（ks-aw-01 的 STAMP key 不可由日期推導，照抄會失敗）——兩份已於同一 commit 修正，memory `reference_backup_system.md` 一併補上）
+- ORACLE_WAIVED: Codex 額度用罄至 2026-08-31（見 A 區「重新啟用 Codex stop-time review gate」待辦）；本輪改用 `critic` subagent 作為外部 oracle，findings 逐條驗證後全數修復，證據見下方 critic 覆審段
+
+[🔴 critic 覆審：初版被打回 1 Critical + 5 Major，全部修復後重測]
+
+**C1（最惡樣態，AGENTS.md 明列的紅線）**：初版備份與驗證腳本**都**用 `docker ps | grep -q` 判斷服務是否存在。兩層從同一個 live state 推導期望值 ⇒「容器改名／崩潰／dockerd 掛掉」與「還沒部署」無法區分，全部 SKIP、`ERRORS=0`、manifest 照寫、R2 照傳、verify 照 PASS、`check-backup-health.ps1` 照報綠——**一個完全空的備份被三層認證為健康，而且會一直這樣**。這正好踩在 11/12 死線的關鍵路徑上，且 compose v2 會把 `soulful` 專案的 `db` 服務命名為 `soulful-db-1` 而非腳本寫死的 `soulful-db`，觸發機率不是理論值。
+**修法（關掉整類，非逐點補丁）**：`EXPECT_SERVICES` 宣告式清單放 `/etc/default/ks-aw-01-backup`，**備份與驗證讀同一份宣告**；宣告了卻找不到 = ERROR 不是 SKIP；驗證腳本**完全不呼叫 docker**（它檢查的是宣告 vs 產出，不是 live state）；備份開頭加 `docker info` 硬失敗，讓 daemon 掛掉永遠不可能長得像「沒部署」；manifest 額外記錄 `expect_services` 供驗證交叉比對，兩邊讀到不同設定即 FAIL。
+**突變測試證明偵測器非空轉**：宣告 `EXPECT_SERVICES=soulful`（實際未部署）→ 備份 exit=1 + 2 個明確 ERROR、驗證 exit=1 + 4 個 FAIL（含從 manifest 讀出的 errors 數）；恢復空宣告 → 兩層回 PASS。
+
+**M1（stale-green 監控）**：`check-backup-health.ps1` 在 `$ErrorActionPreference='Stop'` 下，ssh **只要往 stderr 寫任何一 byte** 就丟 terminating `NativeCommandError`（與 exit code 無關）。新機引入三個新觸發源：首次連線的 `Warning: Permanently added '[host]:port'`（`[host]:port` 是獨立 known_hosts entry，換 port 會重新觸發，本次實際撞到）、sudo 首次使用告誡、`sudo: unable to resolve host`。後果是腳本在寫報告前就中止，**留下前一份綠色的 `backup-health-LATEST.md`**，而 AO-RESUME 還指著那份叫人去看。修法：`$ErrorActionPreference='Continue'` 放進 scriptblock（子作用域，不污染外層）+ 每台 try/catch。
+**M2（一台拖垮三台）**：初版 ks 金鑰缺失走 `elseif ($fatal=$true)` 全域中止，SG/EU 根本不會被查——最新、最不重要的主機可以讓兩台有真實客戶資料的主機監控全滅。且 ks 預設金鑰是操作者通用的 `id_ed25519`（非 repo 慣例的 `hetzner_trigger`），反而更可能不存在。修法：改 per-host 降級為該台 WARN。
+**M3**：驗證腳本 header 宣稱會驗 volume 封存但實際完全沒有——soulful uploads／media（真正要搬的內容）零完整性驗證。修法：補 `tar tzf` 檢查，與 C1 的宣告式清單同源。
+**M4（我引入的迴歸）**：P3.2 我設的 bucket lock 是 **bucket 全域**（`prefix:""`），連既有 `eu/`、`sg/` 一起鎖。它們用 date-only key，一旦部分上傳失敗，重試會 permanently 409（已鎖物件無法覆蓋）達 14 天——與 2026-05 那次 R2 靜默不上傳同型，且更難救。**今天之前它們本來沒有鎖**，等於是我新增的風險。修法：lock 縮回 `prefix: "ks-aw-01/"`，EU/SG 回到原狀；雙向實測（`ks-aw-01/` 內物件刪除被擋、prefix 外物件可刪）。給 EU/SG 同等保護需先改成 STAMP key，是另一個刻意的改動，不做成本次的副作用。
+**M5**：`check-backup-health.ps1` 的 retention fallback 會 `source` 備份腳本本體（＝執行它）。目前靜態 grep 命中所以休眠，但新機這條路徑是 `sudo` 跑的——若哪天有人把 `BACKUP_RETAIN_DAYS` 從腳本移進 `/etc/default/`（腳本 header 本身就這樣建議），每次 AO-RESUME 都會**以 root 跑一次完整備份**（含 `find -exec rm -rf`），而這支腳本文件寫的是「warn-only 唯讀」。已記錄為潛伏風險，未修（屬既有程式碼，非本次改動引入）。
+**Minor（9 條）**：已修 SKIP 訊息寫死 `(P7 not built yet)` 未來會變謊言、`WARN`/`SKIP` 字樣配 `exit 2` 語意矛盾（改 `FATAL`）、cron 缺 `SHELL`/`PATH`（cron.d 預設 PATH 無 `/usr/local/bin`，典型「手動可跑、cron 失敗」）、manifest 移到 abort gate 之前（失敗那次才是最需要記錄的）、`R2_PREFIX` 補 `export` 預設值、補 README（含 `chmod +x` 與還原指令，兩支腳本 commit 為 644）、`upload-to-r2.sh` 收進 repo（異地備份工具原本只存在於它保護的機器上，是循環依賴）。
+
+**修法自身的 bug，被自己的測試抓到**：per-host 降級函式初版把 splat 參數命名為 `$Args`，撞 PowerShell 自動變數 `$args`（參數陣列），StrictMode 下 `$Args.ServerHost` 直接丟 `PropertyNotFoundStrict`。**正常路徑測試完全正常，只有降級路徑會炸**——正是「只測 happy path 會漏掉」的實例。改名 `$CheckArgs`，三處呼叫端同步。
+
+[剩餘風險]
+- ks-aw-01 backup 目前與 SG/EU 共用同一把 R2 token（非原計畫的獨立 write-only token），若該共用 token 外洩，三台機器的備份 bucket 曝險範圍相同——這是務實妥協，非刻意接受的新風險（新 token 本應更安全但實測不可用）
+- **M5 未修**（見上）：`check-backup-health.ps1` retention fallback 的 `source` 執行路徑，目前休眠但新機以 root 跑。屬既有程式碼，本次未動；若日後有人把 `BACKUP_RETAIN_DAYS` 移進 `/etc/default/` 就會引爆
+- **EU/SG 仍用 date-only R2 key 且無 WORM lock**（回到 2026-08-27 之前的原狀）。要給它們同等的防勒索保護，需先改 STAMP key 再加 prefix lock——另開任務，不做成本次副作用
+- **無 flock／in-progress 標記**：verify 排在 backup 後 30 分鐘，目前資料量下綽綽有餘；等 soulful uploads + Chatwoot 上機後若備份超過 30 分鐘，會每天 FAIL → 變成被忽略的永久警告（AGENTS.md 明列的失效模式）。P5/P7 上機時必須重新評估這個間隔
+- P3 全部完成，P4（還原演練 + `NEW-HOST-RECOVERY-RUNBOOK.md`）／P5（Chatwoot）尚未開始
+
+[rollback]
+`check-backup-health.ps1`：`git revert` 對應 commit（所有新參數皆有預設值，revert 不影響既有 SG/EU 呼叫）。R2 bucket lock：目前 `rules:[]` 可清空停用（但會使既有物件立即可刪，需操作者明示同意才做）。cron：`rm /etc/cron.d/ks-aw-01-backup`。
+
 ### Soulful 搬遷主機 P2 完整硬化完成 — 過程中自己的指令一度讓防火牆失效，靠 P2.8 重開機驗證抓到並修復
 
 [任務]

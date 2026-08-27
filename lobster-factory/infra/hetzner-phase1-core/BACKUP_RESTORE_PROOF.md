@@ -26,6 +26,19 @@
 | L3 | 跨洲 VPS 互備（Hetzner 內） | → EU `/root/backups/from-sg/` | → SG `/root/lobster-phase1/backups/from-eu/` |
 | L4 | Cloudflare R2（跨供應商） | → `lobster-backup/sg/<date>/` | → `lobster-backup/eu/<date>/` |
 
+**第三台：ks-aw-01（OVH SYS-GAME-2，`149.202.64.114`，2026-08-27 起）**
+
+| 層 | 機制 | ks-aw-01 |
+|----|------|---------|
+| L2 | 服務 dump + volume 封存 | 02:15 UTC 備份 / 02:45 UTC 驗證（`/etc/cron.d/ks-aw-01-backup`）|
+| L3 | 跨機互備 | ⛔ 尚未建立（P3 只做 R2 單異地；SG/EU 整併完成後再評估）|
+| L4 | Cloudflare R2（跨供應商） | → `lobster-backup/ks-aw-01/<STAMP>/`，**`STAMP` = `YYYYmmdd-HHMMSS`，非日期** |
+
+> ⚠️ **ks-aw-01 的 R2 key 不可由日期推導**（與 sg/eu 不同）。該 prefix 有 14 天 WORM lock
+> （`ks-aw-01-retention-14d`），date-only key 會讓「部分上傳失敗後重試」在鎖定期內永久不可能，
+> 故改用時間戳。**還原前必須先列出 bucket**，見
+> [`infra/ks-aw-01-backup/README.md`](../ks-aw-01-backup/README.md) §Restore。
+
 ### SG VPS 關鍵路徑
 
 | 項目 | 路徑 |
