@@ -32,24 +32,55 @@ expects() {
   esac
 }
 
-# require_gzip <file> <label>
+# "valid archive" is NOT "has content". `: | gzip` produces a 20-byte file that is a
+# perfectly valid gzip and passes both -s and `gunzip -t`; `tar czf -T /dev/null`
+# produces a valid tarball with zero entries. Both states occurred on this host on
+# 2026-08-27: a failed `wp db export` (PHP exec() disabled on the source) wrote a 4 KB
+# gzip of an error backtrace, and the first-generation check called it OK. Every
+# threshold below therefore asserts CONTENT, not format.
+
+# require_gzip <file> <label> <min-bytes> <min-create-table>
 require_gzip() {
-  local f="${TODAY_DIR}/$1"
-  if [[ -f "$f" && -s "$f" ]] && gunzip -t "$f" 2>/dev/null; then
-    ok "$1 ($(du -h "$f" | cut -f1), gzip OK)"
-  else
-    fail "$1 missing/empty/corrupt (${2} declared in EXPECT_SERVICES)"
+  local f="${TODAY_DIR}/$1" label="$2" minb="${3:-1000000}" mintbl="${4:-50}"
+  if [[ ! -f "$f" ]]; then fail "$1 missing (${label} declared in EXPECT_SERVICES)"; return; fi
+  if ! gunzip -t "$f" 2>/dev/null; then fail "$1 corrupt gzip (${label})"; return; fi
+  local bytes tbl trailer
+  bytes=$(stat -c %s "$f")
+  if [[ "$bytes" -lt "$minb" ]]; then
+    fail "$1 only ${bytes}B, below ${minb}B floor — almost certainly an error message, not a dump (${label})"
+    return
   fi
+  tbl=$(zcat "$f" | grep -c "^CREATE TABLE" || true)
+  if [[ "$tbl" -lt "$mintbl" ]]; then
+    fail "$1 has ${tbl} CREATE TABLE, below ${mintbl} (${label})"
+    return
+  fi
+  # mysqldump writes this last; its absence means the dump was cut off mid-stream
+  trailer=$(zcat "$f" | tail -3 | grep -c "Dump completed" || true)
+  if [[ "$trailer" -lt 1 ]]; then
+    fail "$1 has no mysqldump completion trailer — truncated (${label})"
+    return
+  fi
+  ok "$1 ($(du -h "$f" | cut -f1), ${tbl} tables, trailer present)"
 }
 
-# require_tgz <file> <label>
+# require_tgz <file> <label> <min-bytes> <min-entries>
 require_tgz() {
-  local f="${TODAY_DIR}/$1"
-  if [[ -f "$f" && -s "$f" ]] && tar tzf "$f" >/dev/null 2>&1; then
-    ok "$1 ($(du -h "$f" | cut -f1), tar OK)"
-  else
-    fail "$1 missing/empty/corrupt (${2} declared in EXPECT_SERVICES)"
+  local f="${TODAY_DIR}/$1" label="$2" minb="${3:-1000000}" minent="${4:-100}"
+  if [[ ! -f "$f" ]]; then fail "$1 missing (${label} declared in EXPECT_SERVICES)"; return; fi
+  if ! tar tzf "$f" >/dev/null 2>&1; then fail "$1 corrupt archive (${label})"; return; fi
+  local bytes ent
+  bytes=$(stat -c %s "$f")
+  if [[ "$bytes" -lt "$minb" ]]; then
+    fail "$1 only ${bytes}B, below ${minb}B floor (${label})"
+    return
   fi
+  ent=$(tar tzf "$f" | wc -l)
+  if [[ "$ent" -lt "$minent" ]]; then
+    fail "$1 has ${ent} entries, below ${minent} — valid but effectively empty (${label})"
+    return
+  fi
+  ok "$1 ($(du -h "$f" | cut -f1), ${ent} entries)"
 }
 
 log "=== verify-backup-ks-aw-01 START (EXPECT_SERVICES='${EXPECT_SERVICES:-(none)}') ==="
@@ -87,13 +118,13 @@ else
 fi
 
 if expects soulful; then
-  require_gzip "soulful-db.sql.gz" "soulful"
-  require_tgz  "soulful-wordpress.tgz" "soulful"
+  require_gzip "soulful-db.sql.gz" "soulful" 5000000 250
+  require_tgz  "soulful-wordpress.tgz" "soulful" 100000000 10000
 fi
 
 if expects chatwoot; then
-  require_gzip "chatwoot.sql.gz" "chatwoot"
-  require_tgz  "chatwoot-storage.tgz" "chatwoot"
+  require_gzip "chatwoot.sql.gz" "chatwoot" 100000 10
+  require_tgz  "chatwoot-storage.tgz" "chatwoot" 1000 1
 fi
 
 # Encrypted .env bundle — required whenever any target .env exists on the host

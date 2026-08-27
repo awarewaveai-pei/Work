@@ -2,6 +2,181 @@
 
 ## 2026-08-27
 
+### 🔴 事故：soulful 搬站安全網（EU 上 769 MB 三份備份）已於 2026-08-24 被自家 retention 靜默刪除，三支腳本同一 bug，SG 上 8.8 GB 異地備份也在同一爆炸半徑
+
+[怎麼發現的]
+不是靠告警——**是準備跑 P4 還原演練時去拿來源資料才發現不存在**。所有偵測層在事故發生後三天都持續回報 PASS。
+
+[事實]
+`BACKUP_RESTORE_PROOF.md:63/136/172` 記載 soulful 的 DB（15 M）+ uploads（632 M）+ code（122 M）三份備份存於 EU `/root/backups/clients/soulful/`，`TASKS.md` 據此聲稱「安全網已就緒且已驗證」「已完成、不要重做」。**該路徑不存在。**
+
+VBC 全面查證後才下結論（不是只看一個點）：① EU 全碟 `find / -maxdepth 5 -type d -name clients` → 只有 `/root/Work/Projects/clients`（git 目錄，非備份）② 全碟搜尋文件記載的確切檔名 `db-20260815*` / `uploads-20260815*` / `code-20260816*` → 零命中 ③ `/root /srv /opt /home` 底下 >10 M 的 tar.gz → 零命中 ④ R2 `soulful` / `clients` prefix → 空。
+
+[根因]
+`backup-eu-stack.sh` §6 retention：
+```
+find "${BACKUP_DIR}" -maxdepth 1 -mindepth 1 -type d -mtime +7 -exec rm -rf {} +
+```
+它假設 `/root/backups/` 底下**每個目錄都是自己建的每日快照**。`clients/soulful/` 是長期保存的客戶備份，被放在同一層；它的 mtime 在 2026-08-16 最後一次寫入後靜止，7 天後（08-23 屆滿）就進入刪除條件。
+
+log 精確對上：`grep "Retention: deleted" /var/log/eu-backup.log` 顯示每一天都是 `deleted 1`（當日輪替的那個快照），**唯獨 2026-08-24 02:32 UTC 是 `deleted 2`** —— 多的那一個就是 `clients/`。
+
+[為什麼沒有任何一層擋住]
+- `verify-backup-eu.sh` 只驗當日 EU stack 的 4 個檔案（supabase/trigger/mainwp/n8n），**client 備份不在它的檢查清單裡**
+- `check-backup-health.ps1` 只看 BACKUP_DIR 的大小與最新 mtime——每日快照照常產生，數字看起來完全正常
+- 於是三天之間，每次 AO-RESUME 都報 `backup verify=PASSED`
+
+這是 AGENTS.md §已知信任邊界 講的同一件事的實例：**偵測器只量它被寫去量的東西**，沒被列進清單的資料消失時，它不會沉默——它會報綠。
+
+[🔴 更嚴重：同一個 bug 在三支腳本，而且現在就有東西在爆炸半徑內]
+`grep -n "maxdepth 1 -mindepth 1 -type d -mtime"`：
+- `lobster-factory/infra/eu-backup/backup-eu-stack.sh`（肇事者）
+- `lobster-factory/infra/hetzner-phase1-core/scripts/backup-phase1.sh`（SG，同一行）
+- `lobster-factory/infra/ks-aw-01-backup/backup-ks-aw-01.sh`（**我今天新寫的，照抄了這個 bug**）
+
+實查當下各 BACKUP_DIR 底下的非快照目錄：
+- EU `/root/backups/from-sg/` ← SG 的跨機異地備份
+- SG `/root/lobster-phase1/backups/from-eu/` ← EU 的跨機異地備份，**實測 8.8 GB**
+- SG `/root/lobster-phase1/backups/deprovision/`
+
+它們至今沒被刪，**只是因為每日 rsync 讓 mtime 保持新鮮**。也就是說這個 bug 的完整形狀是：**「對方主機連續掛掉一週」→ 隔天自動把對方全部的異地備份刪光** —— 觸發條件與「最需要那份備份」的條件是同一個。
+
+[修法：不變量，不是補丁]
+清理工作只能刪**自己建立的**東西，用自己的命名格式辨識，不是「這個資料夾裡的所有目錄」。三支腳本統一加上快照命名 glob：
+```
+_snap_glob='20[0-9][0-9][01][0-9][0-3][0-9]-[0-2][0-9][0-5][0-9][0-5][0-9]'
+find "${BACKUP_DIR}" -maxdepth 1 -mindepth 1 -type d -name "$_snap_glob" -mtime +N ...
+```
+（三支腳本的 `STAMP` 皆為 `date +%Y%m%d-%H%M%S`，已 grep 確認格式一致）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=隔離目錄突變測試（混合 `20260101-020000`／`clients`／`from-sg`／`from-eu`／`deprovision`／`not-a-snapshot`／畸形 `2026010-02000`，全部 aged 30 天）| exit=0 | 舊邏輯選中全部 8 個；新邏輯只選中 2 個真快照，其餘 6 個（含畸形命名）全部保留
+- REALTEST_EVIDENCE: tool=SSH | cmd=三台部署後 `bash -n` + `md5sum` 與本機逐位元組比對 | exit=0 | EU `d154c578…`／SG `e9e705ac…`／ks-aw-01 `44ce33a4…` 三台皆與 repo 相符；部署前各自留 `.bak-20260827-1403xx`
+- REALTEST_EVIDENCE: tool=SSH | cmd=ks-aw-01 上以 root 實跑 `backup-ks-aw-01.sh` + `verify-backup-ks-aw-01.sh`（修改後）| exit=0 | R2 upload OK、`=== verify-backup-ks-aw-01 PASSED ===`
+- REVIEW_DONE: critic=Deep | verdict=n/a-incident-fix | findings=本則即為 critic 覆審之後、執行 P4 準備時發現的新事故，修法沿用同一份 critic 對「宣告式契約 vs live state 推導」的判準
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks | grep=`maxdepth 1 -mindepth 1 -type d -mtime` | hits=3（三支備份腳本全部命中並全部修復；無第四處）
+- WORKLOG: 本則
+
+[🔴 順帶發現並修復：我自己造成的提權管道]
+ks-aw-01 上 `/root/scripts/backup-ks-aw-01.sh` 與 `verify-backup-ks-aw-01.sh` 是 `ubuntu:ubuntu` 且 **777**——由 root 的 cron 每日執行、卻可被非 root 使用者改寫。成因是我先前用 `sftp_write` 寫到 `/tmp` 再 `sudo mv`（mv 保留原始 owner/mode），不是 `sudo tee`。已改為 `root:root 700`（`.bak` 為 600、`/root/scripts` 目錄 700），並實測：root 仍可正常執行（exit 0），ubuntu 寫入被拒。
+過程中二度踩到同一個 glob 陷阱：`sudo chmod /root/scripts/*.sh` 的 glob 由**非 root 的 shell** 展開，目錄改 700 之後就展不開而靜默失敗——必須 `sudo bash -c "..."` 讓 glob 在 root 內展開。同一個坑今天出現兩次（先前 `sudo rm -rf /root/backups/*` 也是這樣沒清到）。
+
+[資料實際上沒有遺失，但保護層消失了 3 天]
+- ✅ Google Drive 有 **2026-08-26 的 WPvivid 完整備份**（5 分片，約 780 MB）——正是前一天修好 QPM 分塊問題那套跑出來的
+- ✅ 本機 `agency-os/tenants/company-soulful-expression/backups/` 有 2026-05-08 的 DB dump（舊，但在）
+- ✅ **來源網站本身還活著**（Hostinger 未到期）
+- 已從 live 站重新拉取完整 DB + 檔案到 ks-aw-01（見下一則 entry）
+
+[剩餘風險]
+- **WPvivid 多分片 ZIP 需要 WPvivid 才能還原**，不是通用可還原格式；這也是為何重新拉取一份純 DB dump + 檔案 tarball 有意義（P4 演練要證明的是「可用的」還原路徑）
+- retention 修法讓刪除範圍嚴格變小，不會誤刪；但**它不會回頭清理已經被錯誤保留的東西**——若日後有人真的在 BACKUP_DIR 放了該被清的非快照目錄，得手動處理
+- **偵測缺口本身未修**：`verify-backup-eu.sh` 仍然只驗它清單上的檔案。任何未來新增、但沒被加進驗證清單的備份資料，消失時依然會靜默。這正是我今天在 ks-aw-01 用 `EXPECT_SERVICES` 宣告式清單解決的同一類問題——EU/SG 尚未套用同一模式，已列入剩餘工作
+
+[rollback]
+三台皆有 `.bak-20260827-1403xx`；`git revert` 對應 commit 可還原 repo 版本。retention 修法只縮小刪除範圍，回滾反而會重新打開資料遺失風險，不建議。
+
+---
+
+### 安全網重建 + 上傳管線的 413 懸崖（同日續，事故的善後與連帶發現）
+
+[重建 soulful 安全網]
+從 **live 站**重新拉取（來源仍在，Hostinger 未到期），落在 ks-aw-01 `/root/soulful-source/20260827-060707/`：
+- DB **288 表** / 15.8 MB / 204 個 INSERT
+- 檔案 **44,826 個**（uploads 10,894）/ tarball 767 MB
+- SHA256 記錄於同目錄 `SHA256SUMS` + `source-manifest.json`
+
+**未把 Hostinger 私鑰複製到新機**：在 ks-aw-01 上另生 `soulful_pull` 金鑰（私鑰不離開該機），把公鑰加進 Hostinger `authorized_keys` 並加限制 `from="149.202.64.114",no-agent-forwarding,no-port-forwarding,no-X11-forwarding,no-pty`。**搬遷完成後需移除該 key** —— 這正是 `KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md` 「舊帳號/舊 key 沒有一起關掉」那條坑，已列入剩餘工作。
+
+[🔴 我的第一版 DB 備份檢查對垃圾回綠 —— 跟今天在修的是同一類錯]
+第一次拉取用 `wp db export`，Hostinger 停用了 PHP 的 `exec()`，wp-cli 吐出 19 行 Fatal error。我的檢查是 `gzip -t` + `[ -s ]`（非空）——**一個 4 KB 的「錯誤訊息壓縮檔」兩項都通過**，腳本回報 `DB OK`。若沒有順手看檔案大小（4.0K vs 預期 15 MB）就會當成備份成功。
+
+改成**內容驗證**：`CREATE TABLE` 計數 / mysqldump 表頭 / `Dump completed` 結尾 / 檔案下限 / 結構性錯誤字串。
+第二版又被自己的偵測器擋下一次（誤判）：錯誤字串 grep 掃到 INSERT 資料列裡的外掛 serialized 設定 `lw_harbor_catalog_state` —— **那是網站內容不是 dump 錯誤**。修法是只在資料列之外的位置比對（`grep -vE "^\(|^INSERT INTO"` 後再找），不掃內容。
+
+[最終驗證強度：不是「檔案合法」，是「真的還原得出來」]
+拿拋棄式 `mariadb:11` 容器實際載入整份 dump：`db_tables_in_dump=288` == `db_tables_loaded=288`。舊的驗證（`gzip -t` + SHA 兩地一致）只能證明檔案沒壞，證明不了它是一份**有內容且可還原**的 dump。
+
+[🔴 連帶發現：R2 上傳有 413 懸崖，soulful 上機後每日備份必壞]
+把 767 MB tarball 傳 R2 → **HTTP 413 Payload Too Large，0 秒回應**；同一輪 15.8 MB 的 DB 回 200。
+`upload-to-r2.sh`（EU/SG/ks-aw-01 三台共用）對每個檔案做單次 REST PUT。**這不是未來風險**：EU 現有的 `trigger.sql.gz` 在 R2 上已經 204 MB 且隨執行紀錄成長；而 soulful 一旦上 ks-aw-01，每日備份就會產生 767 MB 的 `soulful-wordpress.tgz`，當天就撞牆。
+
+**修法**：`upload-to-r2.sh` 對超過 200 MiB 的檔案自動切片上傳，並額外傳一份 `<file>.parts.json`（記錄片數、總 bytes、原檔 SHA256、以及重組指令），三台一起部署。
+**沒選 S3 multipart 的理由**：multipart 需要 S3 Access Key，這些主機只有 REST bearer token；且 `cat parts > file` 的還原路徑遠比 multipart 單純。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`mysqldump` 經 ks-aw-01 中繼拉取 + 內容驗證 | exit=0 | 15,836,489 bytes、`CREATE TABLE`=288、header=1、`Dump completed` trailer=1、結構性錯誤=0
+- REALTEST_EVIDENCE: tool=SSH+docker | cmd=`zcat dump \| docker exec -i mariadb:11 mariadb` 後查 `information_schema.tables` | exit=0 | **288 表實際載入成功**，證明可還原而不只是檔案合法
+- REALTEST_EVIDENCE: tool=SSH(curl) | cmd=767 MB tarball 單次 REST PUT | exit=0 | **HTTP 413**（同輪 15.8 MB 檔案 HTTP 200）—— 413 懸崖為實測非推測
+- REALTEST_EVIDENCE: tool=SSH | cmd=修改後 `upload-to-r2.sh` 上傳同一個 767 MB tarball | exit=0 | 自動切成 4 片（200/201/201/167 MB）+ `.parts.json`，**全部 HTTP 200**，耗時 1m48s
+- REALTEST_EVIDENCE: tool=SSH | cmd=**完整往返還原測試**——從 R2 抓 `.parts.json` → 依其指示從 R2 下載 4 片 → `cat` 重組 → 比對 | exit=0 | bytes `803982707` 與 SHA256 `999bf99e…` **與原檔完全一致**；`tar tzf` 有效（53,147 entries）；成功解出 `wp-config.php`（3,532 bytes）
+- REALTEST_EVIDENCE: tool=Bash | cmd=三台部署 `upload-to-r2.sh` 後 md5 比對 | exit=0 | EU／SG／ks-aw-01 皆 `38f67d03…`，與 repo 逐位元組相符
+- REVIEW_DONE: critic=Deep | verdict=pending-at-write-time | 覆審已送出（scope：retention 修法 + 切片上傳器的失敗模式，特別是 WORM lock 下部分上傳後的重試路徑）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks | grep=`upload-to-r2\|maxdepth 1 -mindepth 1 -type d -mtime` | hits=3 retention 全修 + upload-to-r2 呼叫端三台一致；`BACKUP_RESTORE_PROOF.md`／`HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`／`TASKS.md` 三份對安全網的過期聲稱已同步訂正
+- ORACLE_WAIVED: Codex 額度用罄至 2026-08-31；改用 critic subagent 作為外部 oracle
+
+[剩餘風險]
+- **切片上傳與 WORM lock 的互動未實測**：`ks-aw-01/` prefix 有 14 天鎖，若某次上傳傳到第 3 片才失敗，重試時前 2 片已鎖住無法覆寫 —— 但因 key 含時間戳，重試會產生**新的一組 key**，理論上不衝突；**尚未實測驗證**，已列入 critic 覆審範圍
+- **Hostinger 上的 `soulful_pull` 公鑰未移除**：搬遷完成後必須清掉（見上）
+- **R2 新 token 的 IP 限制疑似方向相反**：`ks-aw-01-backup-write-only` 從它自己白名單的 IP（149.202.64.114）呼叫 R2 一律 401/403，從其他 IP 卻正常。推測是建立時 IP 過濾選成「is not in」而非「is in」。目前改用共用 token 繞過，**新 token 尚不可用**；操作者可在 Cloudflare 面板花數秒改正
+
+### 🔴 我把含 live 憑證的 `wp-config.php` 上傳到 R2，且被自己設的 WORM lock 鎖住 —— 已完整補救
+
+[怎麼發現的]
+不是自己檢查出來的。平行偵察 agent 讀 `SITE_MIGRATION_RUNBOOK` 與備份腳本後指出：`backup-ks-aw-01.sh:149-168` 之所以對 `.env` 做 AES-256 加密、2026-08-16 那次程式碼備份之所以**刻意排除** `wp-config.php`，正是為了避免這件事——而我今天上傳的 tarball 整包含著它。
+
+[驗證後確認屬實（未照單全收）]
+`tar tzf soulful-files.tar.gz | grep -c "^public_html/wp-config.php$"` → **1**。內含 `DB_PASSWORD` 與 8 組 WordPress 認證鹽（`AUTH_KEY`/`AUTH_SALT`/`SECURE_AUTH_*`/`LOGGED_IN_*`/`NONCE_*`/`COOKIEHASH`/`WP_CACHE_KEY_SALT`）。
+同時排除誤判：另外命中的 `.../Credentials/*.php` 是 WPvivid 內附 AWS SDK 的原始碼檔名，不是憑證。
+
+[為何嚴重、又為何不是燒起來]
+嚴重：R2 token **三台共用、無法單獨撤銷**；`ks-aw-01/` prefix 有我自己設的 14 天 WORM lock —— **我把一個憑證洩漏鎖進了正常情況下 14 天不可修正的狀態**。
+不是燒起來：bucket 私有、token 未外流、`DB_HOST=127.0.0.1` 使該組 DB 帳密無法遠端使用。真正有價值的是認證鹽（可偽造 session，但仍需併同資料庫存取）。
+
+[補救（順序刻意：先讓乾淨副本就位，才動舊的）]
+1. 取出 `wp-config.php` 單獨 AES-256 加密為 `wp-config.php.enc`（沿用 `.env` 同一套 `BACKUP_ENC_KEY`），**實測解密比對回原檔逐位元組相同**
+2. 重建不含它的 `soulful-files-nocfg.tar.gz`：`grep -c wp-config.php` = **0**，項目數 **53,146**（原 53,147，正好少一）
+3. 上傳乾淨版（4 片 + manifest + 加密的 wp-config）→ 全部 HTTP 200
+4. **確認乾淨副本可讀後才**暫時清空 lock rule → 刪 4 個外洩分片 + 過期 metadata → **立即復原 lock rule**
+5. 重傳更正後的 SHA256SUMS 與 manifest（manifest 明載 `wp_config: encrypted-separately`）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`tar tzf … \| grep -c "^public_html/wp-config.php$"` 新舊兩個 tarball | exit=0 | 舊=1、新=**0**；項目數 53147→53146
+- REALTEST_EVIDENCE: tool=SSH | cmd=`openssl enc -d … \| diff -q - <原檔>` | exit=0 | 加密版可完整解回原檔
+- REALTEST_EVIDENCE: tool=Bash(curl) | cmd=lock 清空 → 7 物件 DELETE → lock 復原 → 讀回 rules | exit=0 | 全部 HTTP 200；rules 讀回為 `prefix:"ks-aw-01/"` 14 天，與清除前一致
+- REALTEST_EVIDENCE: tool=Bash(curl) | cmd=最終列出 `ks-aw-01/soulful-source/` | exit=0 | 9 物件 781.8 MB，**含憑證物件剩餘 0**
+
+[同批修掉：我的 verify 腳本有跟今天在修的同一個弱檢查]
+偵察同時指出 `verify-backup-ks-aw-01.sh` 的 `require_gzip` 只做 `-s` + `gunzip -t` —— **`: | gzip` 產生的 20 bytes 檔案兩項都通過**（本機實測確認）。這正是稍早 `wp db export` 失敗寫出 4 KB 錯誤訊息卻被判 OK 的同一個洞：我在 pull 腳本修好了，**卻沒回頭修 verify 腳本**。
+修法：改驗**內容**——大小下限 + `CREATE TABLE` 計數 + `Dump completed` 結尾；tarball 加大小與項目數下限。呼叫端帶各服務實際門檻（soulful DB ≥5 MB/≥250 表、檔案 ≥100 MB/≥10,000 項）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=突變測試——植入 20-byte 合法 gzip 與 45-byte 合法 tarball，宣告 `EXPECT_SERVICES=soulful` 後 verify | exit=1 | **三條 FAIL 全中**（DB 20B 低於下限、tarball 45B 低於下限、EXPECT_SERVICES 不一致交叉比對）；清除後基準回 exit 0
+
+[VBC：另一項指控查證後為誤報]
+覆審提「EU 的 R2 異地可能早已靜默失敗」。實查：`eu/` prefix **619 物件、64 個日期目錄、最新為今日**。我先前以為「最新只到 06-27」是**分頁預設 20 筆 + 依 key 排序**造成的錯覺，非事實。EU 異地正常。
+
+[剩餘風險]
+- **外洩物件曾在 R2 存在約 20 分鐘**（06:16 上傳 → 06:44 刪除）。bucket 私有、token 未外流；若要絕對保守，該站 8 組認證鹽可考慮輪換（會使所有既有登入 session 失效，需挑時間）——**未執行，待操作者決定**
+- 代價來自「先做再想」：拉取腳本沿用 EU 慣例整包打 tarball，沒有先問「這包裡有什麼不該離開主機」。備份腳本本身有加密 `.env` 的機制，但**來源資料的一次性拉取沒有走同一套規範**
+
+### ⚠️ AO-RESUME 的 git-align 在 session 進行中把工作樹 stash 走，差點讓 repo 與生產環境反向分歧
+
+[事件]
+`git stash list` 出現 `stash@{0}: On main: git-align-main-aoresume-feature-20260827-144620`。AO-RESUME hook 在本 session **工作進行中**觸發，git-align 依設計 stash 了髒工作樹，但**沒有完整還原**。結果：五支備份腳本與三份文件的本機修改全部消失，而**三台主機上是新版**。
+
+[為何危險 —— 分歧方向是反的]
+一般的「repo 比生產新」很容易發現。這次是**生產比 repo 新**：若當下直接 commit，repo 會存下舊版，下一次部署就把**已驗證的修正靜默倒退回 413 壞掉的 uploader 與會刪別人備份的 retention**。而且 commit 本身會顯示成功，沒有任何錯誤。
+
+[怎麼發現的]
+不是靠檢查。是編輯 `WORKLOG.md` 時工具回報「File has been modified since read」，順手 grep 才發現 `_snap_glob` 在四支腳本裡全部變成 0。
+
+[修法與驗證]
+`git stash pop` 未能套用（stash 保留）。改用確定性做法：`git show "stash@{0}:<path>"` **逐檔取出**，腳本另以三台主機的 `md5sum` 作為 ground truth 交叉核對。
+- REALTEST_EVIDENCE: tool=Bash+SSH | cmd=逐檔還原後對五支腳本比對 repo 與各自部署主機的 md5 | exit=0 | 五支**全部 repo==host**（`upload-to-r2.sh` `38f67d03…` 三台一致、`backup-eu-stack.sh` `d154c578…`、`backup-phase1.sh` `e9e705ac…`、`backup-ks-aw-01.sh` `44ce33a4…`、`verify-backup-ks-aw-01.sh` `4155ad24…`）
+- REALTEST_EVIDENCE: tool=Bash | cmd=文件標記 grep | exit=0 | WORKLOG 事故條目/TASKS 兩處訂正/BACKUP_RESTORE_PROOF 訂正全部回到位
+
+[剩餘風險]
+- **根因未修**：AO-RESUME hook 仍可能在 session 中途觸發並 stash 工作樹。本次靠人工察覺，下次未必。應評估：hook 在偵測到工作樹有未 commit 的**程式碼**改動時應拒絕 stash 並提示，而非靜默搬走
+- `stash@{0}` 刻意保留未 drop，作為本次事件的證據與備援
+
 ### Soulful 搬遷主機 P3 備份管線就緒 — R2 token IP 限制欄位實測異常（保留但停用），bucket lock 帶出同天覆蓋碰撞並修正
 
 [任務]

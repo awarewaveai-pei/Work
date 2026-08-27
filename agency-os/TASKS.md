@@ -142,7 +142,8 @@
   - **Pre-mortem 首要風險**：機器買了、soulful 也切了，但 EU/SG 整併從未完成，2028 年仍三台並存。
   - **操作者說一句話即可接手**：例「機器買好了，IP 是 x.x.x.x」或「soulful 搬站繼續」。不需要重述背景 —— 全部在下列文件裡。
   - **AI 接手第一步**：讀 [`tenants/company-soulful-expression/core/SITE_MIGRATION_RUNBOOK.md`](tenants/company-soulful-expression/core/SITE_MIGRATION_RUNBOOK.md)（步驟/切換/回滾 SSOT），再依序 §0.5 → §3 → §4 → §5 → §6。
-  - **已完成、不要重做**：① CF zone 14 筆記錄 + nameserver 已切（2026-08-15）② 信箱 mail-tester **10/10**（SPF/DKIM/DMARC 三項 pass）③ EU 三份備份 769 MB（DB 15M + uploads 632M + code 122M）④ 還原演練 **Drill #1 PASS** ⑤ FluentSMTP 主機名已修（`pop`→`smtp.hostinger.com`）
+  - **已完成、不要重做**：① CF zone 14 筆記錄 + nameserver 已切（2026-08-15）② 信箱 mail-tester **10/10**（SPF/DKIM/DMARC 三項 pass）③ ~~EU 三份備份 769 MB~~ **🔴 已於 2026-08-24 被 retention 誤刪，2026-08-27 已從 live 站重拉並改存 ks-aw-01 + R2（見下）** ④ 還原演練 **Drill #1 PASS**（該次演練本身有效，但它驗的那份來源已不存在）⑤ FluentSMTP 主機名已修（`pop`→`smtp.hostinger.com`）
+  - **🔑 2026-08-27 新增待清理**：ks-aw-01 為了拉取站台資料，在 Hostinger `~/.ssh/authorized_keys` 加了一把受限公鑰（`ks-aw-01-soulful-pull`，限 `from="149.202.64.114"`）。**搬遷完成後必須移除**——這正是 `KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md`「舊帳號/舊 key 沒有一起關掉」那條坑
   - **接手時必查的三個陷阱**：① DKIM 實際 selector 是 `hostingermail1`（不是 `-a`/`-b`），Hostinger 舊 zone 沒這筆 → 回滾 DNS 會讓 DKIM 失效 ② `litespeed-cache` 換到非 LiteSpeed 主機會失效，切換當天不要處理，另排 ③ `scripts/check-smoke-tests.ps1` 的 `client_mail` 檢查寫死 Hostinger SSH（`HOSTINGER_SOULFUL_SSH_*`），主機換了要同步改
   - **切換動作本身**：Cloudflare apex A 記錄 `191.101.230.176` → 新 IP（proxy 維持 🟠）。**回滾 = 改回去**，幾秒生效。屬 High risk，需操作者明示 go-ahead。
   - **操作者待辦（與買機平行）**：~17 個付費外掛的 5–6 組授權續約狀態盤點（清單 `core/SITE_CODE_MANIFEST.md`）。
@@ -163,7 +164,11 @@
     - **建議時程**：搬站完成且穩定後再處理。2028 到期，無時間壓力；搬站期間同時動 registrar 會讓可出錯的地方變成兩處
     - **費用**：CF Registrar 零加價（照註冊局成本）。舊記載 `~$9.77` 可能已過時（`.org` 批發價近年調漲），**以下單當下 CF 頁面顯示為準**
   - **DNS 對照表（Cloudflare 實際 14 筆；清點表 13 筆已證實漏掉 `hostingermail-c`）**：[`core/DNS_MIGRATION_RECORD_MAP.md`](tenants/company-soulful-expression/core/DNS_MIGRATION_RECORD_MAP.md) —— 含「AAAA 刻意不建」「哪些 CNAME 不可開 Proxy」「🔴 DKIM 實況：實際簽章 selector 是 `hostingermail1`」「回滾方式（回滾會失去 `hostingermail1`，需先補）」
-  - **安全網已就緒且已驗證**（2026-08-16 更新）：DB（288 表）+ uploads（11,001 檔）+ **程式碼（38,991 檔，含 ~17 個付費外掛）** 三份共 769 MB 存於 EU，SHA-256 兩地一致。**還原演練 2026-08-16 PASS**（EU 拋棄式容器：288 表還原、750 筆附件與磁碟檔案零遺失交叉比對通過）。見 [`core/BACKUP_RESTORE_PROOF.md`](tenants/company-soulful-expression/core/BACKUP_RESTORE_PROOF.md) Drill #1 + Record #3
+  - **🔴 安全網 2026-08-24 曾短暫消失，2026-08-27 已重建（狀態已變，勿照舊描述行動）**
+    - ~~（2026-08-16）三份共 769 MB 存於 EU `/root/backups/clients/soulful/`~~ → **該目錄已被 `backup-eu-stack.sh` 的 retention 於 2026-08-24 02:32 UTC 誤刪**（`find -maxdepth 1 -type d -mtime +7 -exec rm -rf` 把非快照目錄一起掃掉），**三天無人察覺，所有健康檢查照常報 PASS**。根因與不變量修法見 `WORKLOG.md` 2026-08-27 事故條目；三支備份腳本已全部修正
+    - **現行安全網（2026-08-27 建立）**：從 live 站重新拉取，存 ks-aw-01 `/root/soulful-source/20260827-060707/` + R2 `ks-aw-01/soulful-source/20260827-060707/`（14 天 WORM lock）。內容：DB **288 表**（15.8 MB）+ 檔案 **44,826 個**（uploads 10,894，tarball 767 MB），SHA256 已記錄
+    - **驗證強度比舊的高**：不只 `gzip -t`，而是**實際載入拋棄式 MariaDB 容器確認 288 張表真的還原得出來**（`db_tables_in_dump` == `db_tables_loaded` == 288）。舊的驗證只證明檔案是合法 gzip
+    - Drill #1（2026-08-16）的方法仍有效可參考，但**它驗證的那份來源檔案已不存在**：見 [`core/BACKUP_RESTORE_PROOF.md`](tenants/company-soulful-expression/core/BACKUP_RESTORE_PROOF.md) Drill #1 + 該檔 2026-08-27 訂正段
   - **✅ 目標主機已定（2026-08-16）＋規格已定案（2026-08-17）**：搬到**新購的二手 dedicated 機**。原「決定目標主機」阻塞解除，剩下的路徑是「買機 → 建置 → 搬 → 切換」。**注意**：該機預期不只放 soulful，建置時按多站設計
     - **規格下限**：**128GB ECC / ≥8C16T / ≥1TB NVMe 可 RAID1**（2026-08-17 上修，原 64GB 作廢 —— 負載重算後 37–58GB，64GB 僅剩 ~9% headroom 且 ClickHouse 已 OOM 復發 4 次）
     - **首選 OVH KS-6** $59.80/月（Epyc 7351p 16C32T / 128G DDR4 ECC / 2×1TB NVMe soft RAID / Limburg DE）+ $43.20 一次裝機 —— 比原核准的 €48.70 只貴 €3–6/月，換到 RAM 2× + 核數 4×

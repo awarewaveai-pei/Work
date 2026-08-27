@@ -192,7 +192,18 @@ truth_source: agency-os/tenants/company-soulful-expression/core/BACKUP_AUTO_STAT
 
 **傳輸方式**：Hostinger → 本機 → EU 串流（`ssh cat | ssh cat`），不經第三方、不落地暫存於雲端硬碟。
 
-> 三份備份合計 769 MB，全部存放於 **EU VPS**（不在 Hostinger），2026-11-12 hosting 到期不受影響。
+> ~~三份備份合計 769 MB，全部存放於 **EU VPS**（不在 Hostinger），2026-11-12 hosting 到期不受影響。~~
+>
+> 🔴 **2026-08-27 訂正：上述 EU 副本已於 2026-08-24 02:32 UTC 被 `backup-eu-stack.sh` 的 retention 誤刪。**
+> 根因：該 retention 用 `find $BACKUP_DIR -maxdepth 1 -type d -mtime +7 -exec rm -rf`，假設該層每個目錄
+> 都是自己建的每日快照；`clients/soulful/` 是長期保存的客戶備份卻放在同一層，mtime 靜止滿 7 天即被掃除。
+> **三天內沒有任何一層偵測到**（`verify-backup-eu.sh` 的檢查清單不含 client 備份，健康檢查只看快照數量與 mtime）。
+> 完整事故記錄與不變量修法見 `agency-os/WORKLOG.md` 2026-08-27「事故：soulful 搬站安全網…」。
+>
+> **現行安全網（取代上述）**：2026-08-27 從 live 站重新拉取，存於 ks-aw-01 `/root/soulful-source/20260827-060707/`
+> 並上傳 R2 `ks-aw-01/soulful-source/20260827-060707/`（該 prefix 有 14 天 WORM lock）。
+> 這一份與舊的不同之處在於**驗證方式**：不只 `gzip -t`，而是實際載入一個拋棄式 MariaDB 容器，
+> 確認 288 張表真的可還原（`db_tables_in_dump=288` == `db_tables_loaded=288`）。
 
 ## Artefacts
 

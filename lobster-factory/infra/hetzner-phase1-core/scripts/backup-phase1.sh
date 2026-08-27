@@ -154,9 +154,22 @@ fi
 
 # --- 6. Retention cleanup (only after successful local backup) ---
 if [[ "${BACKUP_RETAIN_DAYS}" -gt 0 ]]; then
-  DELETED=$(find "${BACKUP_DIR}" -maxdepth 1 -mindepth 1 -type d -mtime +"${BACKUP_RETAIN_DAYS}" 2>/dev/null | wc -l)
+  # -name '20[0-9][0-9]...' is NOT cosmetic: retention must only ever delete
+  # snapshots THIS script created. Without it, `find -maxdepth 1 -type d` matches
+  # EVERY directory in BACKUP_DIR, including long-lived ones other processes put
+  # there. That is not hypothetical: on 2026-08-24 02:32 UTC this exact line on EU
+  # deleted /root/backups/clients/ -- the entire 769 MB soulfulexpression.org
+  # migration safety net (DB + uploads + code) -- 7 days after its mtime went
+  # static, silently, with every health check still reporting PASS.
+  # Still in the blast radius today: `from-sg/` on EU and `from-eu/` on SG, the
+  # cross-VPS offsite copies. They survive only because daily rsync keeps their
+  # mtime fresh -- meaning "the peer host has been down for a week" would trigger
+  # "delete all of the peer's offsite backups", precisely when they are needed.
+  # Invariant: a cleanup job may only delete what it created.
+  _snap_glob='20[0-9][0-9][01][0-9][0-3][0-9]-[0-2][0-9][0-5][0-9][0-5][0-9]'
+  DELETED=$(find "${BACKUP_DIR}" -maxdepth 1 -mindepth 1 -type d -name "$_snap_glob" -mtime +"${BACKUP_RETAIN_DAYS}" 2>/dev/null | wc -l)
   if [[ "$DELETED" -gt 0 ]]; then
-    find "${BACKUP_DIR}" -maxdepth 1 -mindepth 1 -type d -mtime +"${BACKUP_RETAIN_DAYS}" -exec rm -rf {} + 2>/dev/null || true
+    find "${BACKUP_DIR}" -maxdepth 1 -mindepth 1 -type d -name "$_snap_glob" -mtime +"${BACKUP_RETAIN_DAYS}" -exec rm -rf {} + 2>/dev/null || true
     log "Retention: deleted ${DELETED} backup(s) older than ${BACKUP_RETAIN_DAYS} days"
   else
     log "Retention: nothing to clean (keep ${BACKUP_RETAIN_DAYS} days)"
