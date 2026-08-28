@@ -36,6 +36,8 @@
 2. CF PATCH content 改回 `191.101.230.176`
 3. `SOULFUL_DB_PROFILE` 改回 `hostinger`
 
+- 附記：commit 5079de1e 帶入一筆先前 session staged 未 commit 的刪除 `scripts/repair-user-mcp-json-escapes.ps1`——該檔為 Cursor 專用腳本（2026-04 建，修 Cursor user-level mcp.json 轉義），Cursor 已於 2026-08-26 退場並決策刪除其腳本，此刪除方向正確；現行 repo 無任何 call site（僅歷史 WORKLOG-archive/daily 引用，依政策保留）
+- 切換後 smoke：`check-smoke-tests.ps1` PASS 全項，`mail=ok:last_send_0d`（0 天 = 03:08 測試信 = client_mail 監控已實讀 ks-aw-01 資料庫，profile 切換生效）
 - AUTO_TASK_DONE: soulful-cutover-executed 2026-08-28
 
 
