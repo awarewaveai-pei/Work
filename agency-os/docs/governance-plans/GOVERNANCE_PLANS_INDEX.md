@@ -17,6 +17,7 @@
 | `30y-stability-hardening`（觀測、密鑰、DR、gate） | [`PLAN_30Y_STABILITY_HARDENING.md`](PLAN_30Y_STABILITY_HARDENING.md) |
 | `30-year-rule-consolidation`（規則治理收斂） | [`PLAN_30_YEAR_RULE_CONSOLIDATION.md`](PLAN_30_YEAR_RULE_CONSOLIDATION.md) |
 | `rules-stability-consolidation`（規則整併，與上同軌） | [`PLAN_RULES_STABILITY_CONSOLIDATION.md`](PLAN_RULES_STABILITY_CONSOLIDATION.md)（與上一檔**並列**；執行時擇一為 sprint 主檔或合併 PR 時對齊） |
+| `nextjs_console_30y`（Next.js Internal Ops 控制台執行計畫） | [`PLAN_NEXTJS_CONSOLE_30Y.md`](PLAN_NEXTJS_CONSOLE_30Y.md)（規格正本另在 [`../operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md`](../operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md)；本檔保存執行計畫與 2026-04-25 todo 狀態） |
 
 **邊緣／子網域統管入口**（含 `api` 連結表）：[`../edge-and-domains/EDGE_DOMAINS_INDEX.md`](../edge-and-domains/EDGE_DOMAINS_INDEX.md)
 
