@@ -1,8 +1,14 @@
 # soulfulexpression.org 切換手冊 — Hostinger → ks-aw-01
 
-> **狀態（2026-08-27）**：新機已就緒並通過 Drill #2。**尚未切換。**
-> 切換是 High-risk，需操作者明示 go-ahead —— 本文件的目的是讓那個「明示」之後，
-> 每一步都已經寫好、演練過、且有回滾路徑。
+> **狀態（2026-08-28）**：**切換已完成。** 03:02 UTC rehearse-freeze 通過（200→503→200）、
+> 03:04 `--live` 78 秒完成（288 表一致）、03:08:00 UTC DNS PATCH（191.101.230.176 → 149.202.64.114，
+> proxied=true 維持）、03:08 起流量實測走新機（`x-soulful-cache` header）、03:08:57 強制寄信
+> `sent` row id=97。舊站依設計**維持凍結**（`.maintenance` 留著當回滾路徑）。
+> 本文件其餘段落轉為歷史記錄 + 「切換後」章節的執行依據（觀察期 ≥7 天 → 2026-09-04 起收尾）。
+>
+> **凍結期間的觀測注意（2026-08-28 實測）**：舊站 LiteSpeed 伺服器層快取會讓「快取命中的 GET」
+> 繼續回 200（不進 PHP）；所有寫入（POST 登入 / admin-ajax / 下單）確實 503。
+> 判斷凍結是否仍在，要用帶唯一 query 的探測（cache miss 才進 PHP），不要看快取頁。
 
 ## 一句話
 
@@ -104,7 +110,7 @@ ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114 'sudo /root/soulful/cuto
 #    腳本裝了 SIGHUP handler：ssh 斷線 -> 收到 HUP -> 自動解凍 -> exit 129。
 #    那個行為在「腳本自己失敗」時是對的，但在「你家網路閃一下」時，
 #    它會在你正要切 DNS 的當下把凍結解掉，而你的終端機已經沒了、什麼都看不到。
-ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114   "tmux new -d -s cutover 'sudo REQUIRE_VERSION=2026-08-28-r8 /root/soulful/cutover-sync.sh --live 2>&1 | tee /root/cutover-live.log'"
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114   "tmux new -d -s cutover 'sudo REQUIRE_VERSION=2026-08-28-r10 /root/soulful/cutover-sync.sh --live 2>&1 | tee /root/cutover-live.log'"
 
 # 另開一個連線看進度（斷線也不影響那邊的執行）
 ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114 'tail -f /root/cutover-live.log'

@@ -2,6 +2,43 @@
 
 ## 2026-08-28
 
+### 🎉 Soulful 正式切換完成：Hostinger → ks-aw-01（操作者授權「你幫我」，全程代執行）
+
+**時間線（UTC）**：02:57 首次 rehearse-freeze 被前置檢查安全擋下（301≠200）→ 03:02 r10 彩排通過 200→503→200 → 03:04:14 `--live` 開凍結 → 03:05:28 同步完成 78 秒（288 表 row-count 一致）→ 03:08:00 Cloudflare DNS PATCH（`191.101.230.176`→`149.202.64.114`，proxied=true 維持）→ 03:08:57 新機強制寄信 `sent`。舊站依設計**維持凍結**（`.maintenance` 03:04 寫入，回滾路徑）。
+
+**低流量窗口選擇（數據不是猜）**：CF GraphQL 近 72h 逐小時流量，台灣 10:00–11:00 = 全天最低（平均 239 req/h ≈ 4/min）。彩排+切換同窗完成。
+
+[已修改]
+- `lobster-factory/infra/soulful/cutover-sync.sh` r8→r10：5 個凍結探測點修正（兩個 bug 都是**第一次真跑 rehearse-freeze 抓到的**，這正是該模式存在的理由）
+  1. r9：`http://127.0.0.1`+Host 探測必得 LiteSpeed 301（http→https 轉向發生在 WordPress 之前），`before` 永遠不可能 =200 → 改 `https` + `--resolve`（真 SNI）+`-k`。**若未修，今天 `--live` 會在凍結中途以同樣方式中止。**
+  2. r10：LiteSpeed 伺服器層快取（`x-litespeed-cache: hit`）把快取 GET 直接端出去**不進 PHP**，`.maintenance` 生效中探測仍 200。實測證明凍結不變量本來就成立（POST wp-login / POST admin-ajax 都 503）——錯的是觀測點。修法：探測帶唯一 `?cachebust=$(date +%s%N)` 強制 cache miss。**刻意不用 POST 探測**：失敗登入會餵 LLAR 鎖定計數器。
+- `agency-os/tenants/.../CUTOVER_RUNBOOK.md`：REQUIRE_VERSION pin r10；狀態段改「切換已完成」+ 凍結期間觀測注意（快取 GET 200 是預期，看寫入路徑）
+- `agency-os/TASKS.md`：切換完成記錄 + 切換後收尾 checklist（2026-09-04 起：origin lockdown / 移除 pull key / 解凍舊站 / registrar）
+- 筆電 `SOULFUL_DB_PROFILE=ks-aw-01`（User scope）已設，M4 tripwire 不會誤報
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=cutover-sync.sh --rehearse-freeze (r10) | exit=0 | ms=12000 — 200→503→200 全鏈驗證
+- REALTEST_EVIDENCE: tool=SSH | cmd=cutover-sync.sh --live (tmux, REQUIRE_VERSION=r10) | exit=0 | ms=87000 — 78s 凍結窗口，288 表一致，凍結留置
+- REALTEST_EVIDENCE: tool=curl | cmd=CF DNS PATCH + https://soulfulexpression.org/ ×3 | exit=0 | ms=5000 — `x-soulful-cache: HIT`（該 header 僅新機 nginx 會發 = 流量證實走新機）；/shop/ /wp-login /CJK 文章全 200；帶 WP cookie 與 /cart/ 皆 BYPASS
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp eval wp_mail(...) + wpdb 查 fsmpt_email_logs | exit=0 | ms=8000 — row id=97 status=sent 03:08:57（站外收件：peijingartstudio@gmail.com）
+- REALTEST_EVIDENCE: tool=SSH | cmd=手動 .maintenance + GET(快取/cachebust)/POST 矩陣 | exit=0 | ms=20000 — 快取GET=200、cachebust GET=503、POST login/ajax=503：凍結不變量成立、探測點錯誤定案
+- REVIEW_DONE: critic=Self-adversarial | verdict=pass | findings=0c/0m/2n — Codex 額度盡（feedback_self_review_when_oracle_down 協議）：逐行讀回 r9→r10 diff；兩個 note：①cachebust 依賴 LSCache「未知 query 不共用快取鍵」行為，已實測證實（503）非臆測 ②`-k` 降級 TLS 驗證，僅讀 status code 且對象是 localhost 自連，可接受
+- ORACLE_WAIVED: Codex 訂閱額度已盡（操作者 2026-08-27 告知「codex用完了」），依自審協議以上列 REVIEW_DONE 替代；探測修正的每一步都有指令級實測而非讀碼推斷
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=127.0.0.1/wp-login | hits=0 — 舊探測形式無其他 call site；runbook 內 wp-login 引用（:29）為對外 smoke 迴圈，正確不動
+- 彩排即偵測器的實證：兩個 bug 若靠讀碼審查（三輪 critic + Codex 都沒抓到）永遠不會浮現，只有真跑才炸出來
+
+[剩餘風險]
+- 觀察期（≥7 天）內若新機出事，回滾 = 解凍舊站（指令在 runbook）→ DNS 改回。舊站資料停在 03:04:14，之後新機收的單回滾即失
+- LSCache 快取頁在舊站凍結期間仍對外 200（無害：唯讀舊內容），解凍前訪客若繞過 CF 直連舊 IP 會看到過期頁——CF proxied=true 下正常訪客不會
+
+[rollback]
+1. `ssh -i ~/.ssh/hostinger_soulful -p 65002 u942075013@191.101.230.176 'rm -f .../public_html/.maintenance'`（解凍，先驗 200）
+2. CF PATCH content 改回 `191.101.230.176`
+3. `SOULFUL_DB_PROFILE` 改回 `hostinger`
+
+- AUTO_TASK_DONE: soulful-cutover-executed 2026-08-28
+
+
 ### Soulful 快取層 + 第三輪覆審（4C+11M）：三個 Critical 全部有指令級證實，含一個現在進行式的憑證洩漏
 
 **[任務理解]** 新機比舊機慢的根因是缺頁面快取（LiteSpeed 在舊機 0.0003s 不跑 PHP；新機每請求跑滿 PHP 0.36s，

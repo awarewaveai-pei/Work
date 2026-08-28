@@ -63,7 +63,7 @@ UNFREEZE_ONBOX="ssh -i ${SSHK} -p ${RPORT} ${RHOST} 'rm -f ${RWP}/.maintenance'"
 # before the C1 fix -- freeze silently expiring mid-DNS-flip -- with no detector at all.
 # The version is logged into the banner AND the evidence file, and --require-version makes
 # the runbook able to demand a specific one. Bump this on every behavioural change.
-CUTOVER_SYNC_VERSION="2026-08-28-r8"
+CUTOVER_SYNC_VERSION="2026-08-28-r10"
 # Optional pin: the runbook exports this so a stale deployed copy refuses to run.
 REQUIRE_VERSION="${REQUIRE_VERSION:-}"
 SELF_SHA="$(sha256sum "$0" 2>/dev/null | cut -c1-12)"
@@ -218,18 +218,31 @@ log "=== soulful cutover sync - mode=${MODE} stamp=${STAMP} ==="
 # =========================================================================================
 if [[ "$MODE" == "--rehearse-freeze" ]]; then
   log "--- rehearsing the freeze path (the live site WILL 503 briefly) ---"
-  before=$(rssh "curl -s -o /dev/null -w '%{http_code}' --max-time 15 -H 'Host: soulfulexpression.org' -H 'Cache-Control: no-cache' http://127.0.0.1/wp-login.php" 2>/dev/null | tr -d '[:space:]')
+  # Probe form -- BOTH quirks below were found by the first real --rehearse-freeze runs
+  # (2026-08-28), which is exactly what this mode exists for:
+  #   1. plain http://127.0.0.1 + Host header gets a LiteSpeed 301 to https BEFORE
+  #      WordPress ever runs, so 'before' could never equal 200. https + --resolve gives
+  #      real SNI; -k because the probe only reads the status code and a cert-chain
+  #      hiccup must not abort a cutover.
+  #   2. LiteSpeed's server-level cache (x-litespeed-cache: hit) serves cached GETs
+  #      WITHOUT invoking PHP, so a cached URL kept returning 200 while .maintenance was
+  #      in force. The freeze invariant is about WRITES, and every write is a POST that
+  #      always reaches PHP (verified: POST wp-login / POST admin-ajax both 503 under
+  #      freeze) -- but the probe must still be a request that reaches PHP, so it carries
+  #      a unique cachebust query. A POST probe was rejected: failed login attempts feed
+  #      the LLAR lockout counter on a store we are about to leave frozen.
+  before=$(rssh "curl -sk -o /dev/null -w '%{http_code}' --max-time 15 -H 'Cache-Control: no-cache' --resolve soulfulexpression.org:443:127.0.0.1 https://soulfulexpression.org/wp-login.php?cachebust=$(date +%s%N)" 2>/dev/null | tr -d '[:space:]')
   log "    before: HTTP ${before}"
   [[ "$before" == "200" ]] || fail "live is not serving 200 before the rehearsal (got '${before}') - not touching it"
 
   MAINTENANCE_ON=1
   rssh "printf '<?php \$upgrading = time(); ?>' > ${RWP}/.maintenance"     || fail "could not write .maintenance"
-  during=$(rssh "curl -s -o /dev/null -w '%{http_code}' --max-time 15 -H 'Host: soulfulexpression.org' -H 'Cache-Control: no-cache' http://127.0.0.1/wp-login.php" 2>/dev/null | tr -d '[:space:]')
+  during=$(rssh "curl -sk -o /dev/null -w '%{http_code}' --max-time 15 -H 'Cache-Control: no-cache' --resolve soulfulexpression.org:443:127.0.0.1 https://soulfulexpression.org/wp-login.php?cachebust=$(date +%s%N)" 2>/dev/null | tr -d '[:space:]')
   log "    during: HTTP ${during}"
 
   rssh "rm -f ${RWP}/.maintenance" || fail "COULD NOT UNFREEZE - run by hand NOW from your laptop: ${UNFREEZE_LAPTOP}"
   MAINTENANCE_ON=0
-  after=$(rssh "curl -s -o /dev/null -w '%{http_code}' --max-time 15 -H 'Host: soulfulexpression.org' -H 'Cache-Control: no-cache' http://127.0.0.1/wp-login.php" 2>/dev/null | tr -d '[:space:]')
+  after=$(rssh "curl -sk -o /dev/null -w '%{http_code}' --max-time 15 -H 'Cache-Control: no-cache' --resolve soulfulexpression.org:443:127.0.0.1 https://soulfulexpression.org/wp-login.php?cachebust=$(date +%s%N)" 2>/dev/null | tr -d '[:space:]')
   log "    after : HTTP ${after}"
 
   [[ "$during" == "503" ]] || fail "freeze did NOT take effect (during=${during}). The real cutover would abort here."
@@ -383,7 +396,7 @@ if [[ "$MODE" == "--live" ]]; then
   #     PHP ever running, so a cache hit returns 200 while .maintenance IS in force -> the
   #     script would fail, unfreeze, and abort a cutover that was actually working.
   #     wp-login.php is never cached.
-  fc=$(rssh "curl -s -o /dev/null -w '%{http_code}' --max-time 15 -H 'Host: soulfulexpression.org' -H 'Cache-Control: no-cache' http://127.0.0.1/wp-login.php" 2>/dev/null | tr -d '[:space:]')
+  fc=$(rssh "curl -sk -o /dev/null -w '%{http_code}' --max-time 15 -H 'Cache-Control: no-cache' --resolve soulfulexpression.org:443:127.0.0.1 https://soulfulexpression.org/wp-login.php?cachebust=$(date +%s%N)" 2>/dev/null | tr -d '[:space:]')
   log "    live site now returns: HTTP ${fc}"
   [[ "$fc" == "503" ]] || fail "freeze did not take effect - live returned '${fc}', not 503"
   rssh "cat ${RWP}/.maintenance" 2>/dev/null | sed 's/^/    marker: /' | tee -a "$EVIDENCE"
@@ -839,7 +852,7 @@ log ""
 # An expired or manually-cleared marker here means the operator is about to flip DNS
 # believing writes are stopped when they are not.
 if [[ "$MAINTENANCE_ON" -eq 1 ]]; then
-  fc2=$(rssh "curl -s -o /dev/null -w '%{http_code}' --max-time 15 -H 'Host: soulfulexpression.org' -H 'Cache-Control: no-cache' http://127.0.0.1/wp-login.php" 2>/dev/null | tr -d '[:space:]')
+  fc2=$(rssh "curl -sk -o /dev/null -w '%{http_code}' --max-time 15 -H 'Cache-Control: no-cache' --resolve soulfulexpression.org:443:127.0.0.1 https://soulfulexpression.org/wp-login.php?cachebust=$(date +%s%N)" 2>/dev/null | tr -d '[:space:]')
   if [[ "$fc2" != "503" ]]; then
     log "############################################################"
     log "# !! THE FREEZE IS NOT IN FORCE ANY MORE (live returned '${fc2}', not 503)."
