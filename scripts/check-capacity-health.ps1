@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
     Capacity health across the three hosts (ks-aw-01 / SG / EU).
 
@@ -490,8 +490,11 @@ if (-not (Get-Command ssh.exe -ErrorAction SilentlyContinue)) {
         ServerHost = $KsAw01Host; User = $KsAw01SshUser; Key = $KsAw01PrivateKey
         Port = $KsAw01SshPort; UseSudo = $true
     }
-    $results["SG"] = Invoke-HostCheck -KeyPath $PrivateKey -Label "SG" -CheckArgs @{ ServerHost = $SgHost }
-    $results["EU"] = Invoke-HostCheck -KeyPath $PrivateKey -Label "EU" -CheckArgs @{ ServerHost = $EuHost }
+    # 2026-08-28 consolidation: SG/EU are stopped and pending deletion. Probing them
+    # would be a permanent WARN after deletion - and a permanent warning is an ignored
+    # detector. ks-aw-01 (above) is now the ONLY production machine and carries the
+    # deliberately strict 60% thresholds that compensate for the 64GB spec gap.
+    # (Params $SgHost/$EuHost kept for signature compatibility; deliberately unused.)
 }
 
 $verdicts = [ordered]@{}

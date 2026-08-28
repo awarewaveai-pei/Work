@@ -154,40 +154,14 @@ if [[ $ERRORS -gt 0 ]]; then
   exit 1
 fi
 
-# --- 5. Offsite: rsync to SG VPS ---
-OFFSITE_OK=true
-if [[ -f "${OFFSITE_KEY}" ]]; then
-  log "Syncing to SG VPS (${OFFSITE_HOST}:${OFFSITE_DIR}/${DATE}/)..."
-  if ssh -i "${OFFSITE_KEY}" -o StrictHostKeyChecking=no -o ConnectTimeout=30 \
-    "root@${OFFSITE_HOST}" "mkdir -p ${OFFSITE_DIR}/${DATE}" 2>/dev/null && \
-    rsync -az -e "ssh -i ${OFFSITE_KEY} -o StrictHostKeyChecking=no -o ConnectTimeout=30" \
-    "${OUT}/" "root@${OFFSITE_HOST}:${OFFSITE_DIR}/${DATE}/" 2>&1; then
-    log "  Offsite rsync OK"
-  else
-    log "  ERROR: Offsite rsync failed"
-    OFFSITE_OK=false
-  fi
-else
-  log "  SKIP: no offsite key at ${OFFSITE_KEY}"
-  OFFSITE_OK=false
-fi
-
-# --- 5b. Offsite retention (prune the copies we pushed) ---
-# Root cause 2026-08-12: section 6 below only prunes BACKUP_DIR on THIS host.
-# The copies rsynced to SG were never pruned -> 97 snapshots / 30G -> SG disk 90%.
-# Rule: retention follows the producer. Whoever pushes a copy also prunes it.
-# Only runs after a successful rsync, so a failed push never deletes history.
-OFFSITE_RETAIN_DAYS="${OFFSITE_RETAIN_DAYS:-14}"
-if [[ "$OFFSITE_OK" == "true" && "${OFFSITE_RETAIN_DAYS}" -gt 0 ]]; then
-  OFFSITE_CUTOFF="$(date -u -d "${OFFSITE_RETAIN_DAYS} days ago" +%Y-%m-%d)"
-  if OFFSITE_PRUNED=$(ssh -i "${OFFSITE_KEY}" -o StrictHostKeyChecking=no -o ConnectTimeout=30 \
-      "root@${OFFSITE_HOST}" \
-      "cd '${OFFSITE_DIR}' && ls -1 | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' | awk '\$1 < \"${OFFSITE_CUTOFF}\"' > /tmp/offsite-prune.txt; wc -l < /tmp/offsite-prune.txt; xargs -a /tmp/offsite-prune.txt -r -d '\n' rm -r --" 2>/dev/null); then
-    log "Offsite retention: pruned ${OFFSITE_PRUNED} snapshot(s) older than ${OFFSITE_CUTOFF} on ${OFFSITE_HOST}"
-  else
-    log "  WARN: offsite retention prune failed (non-fatal; all copies intact)"
-  fi
-fi
+# --- 5. (removed 2026-08-28) peer-VPS offsite leg ---
+# The SG rsync leg was deleted outright during the EU/SG consolidation onto
+# ks-aw-01: the peer host is being retired, the leg had been dead-skipping on
+# every run (no key on this box), and its ssh used StrictHostKeyChecking=no --
+# a spoofed peer would have silently received full customer DB dumps (review
+# finding F3, 2026-08-28). If a second machine ever exists again, reintroduce
+# the leg WITH a pinned known_hosts entry, never with host checking disabled.
+OFFSITE_OK=false   # kept only so the summary wording below stays truthful
 
 # --- 6. Retention cleanup ---
 if [[ "${BACKUP_RETAIN_DAYS}" -gt 0 ]]; then
@@ -213,25 +187,41 @@ if [[ "${BACKUP_RETAIN_DAYS}" -gt 0 ]]; then
   fi
 fi
 
-# --- 7. Summary ---
-TOTAL_SIZE=$(du -sh "${OUT}" | cut -f1)
-log "=== Backup complete: ${OUT} (${TOTAL_SIZE}) ==="
-
-if [[ "$OFFSITE_OK" == "false" ]]; then
-  log "WARNING: Local backup OK but offsite failed."
-  exit 2
-fi
-
-# --- 8. Cloudflare R2 upload (cross-provider offsite) ---
+# --- 7. Cloudflare R2 upload (cross-provider offsite) ---
+# 2026-08-28 REORDERED to run BEFORE the exit decision, and promoted to MANDATORY.
+# Old order had `exit 2` (peer-offsite failed) ABOVE this section. On EU that path
+# almost never fired because the SG rsync leg usually succeeded — but after the
+# EU/SG consolidation onto ks-aw-01 the peer leg ALWAYS fails (no peer left), so
+# the old ordering meant R2 never ran and the machine had ZERO offsite copies
+# while reporting only a WARNING. Observed on the first real run on ks-aw-01.
+# Invariant: a snapshot is not safe until at least one OFFSITE copy exists.
+# Single-machine topology => R2 IS the offsite; its failure is a hard failure.
+R2_OK=false
 if [[ -n "${R2_API_TOKEN:-}" ]]; then
   if [[ -x "/root/scripts/upload-to-r2.sh" ]]; then
     log "Uploading to Cloudflare R2..."
     if /root/scripts/upload-to-r2.sh "${OUT}" "${DATE}" 2>&1; then
       log "  R2 upload OK"
+      R2_OK=true
     else
-      log "  WARN: R2 upload failed (non-fatal; cross-VPS offsite still active)"
+      log "  ERROR: R2 upload failed"
     fi
+  else
+    log "  ERROR: /root/scripts/upload-to-r2.sh missing or not executable"
   fi
 else
-  log "  SKIP: R2_API_TOKEN not set"
+  log "  ERROR: R2_API_TOKEN not set - no cross-provider offsite possible"
+fi
+
+# --- 8. Summary + exit policy ---
+TOTAL_SIZE=$(du -sh "${OUT}" | cut -f1)
+log "=== Backup complete: ${OUT} (${TOTAL_SIZE}) ==="
+
+if [[ "$R2_OK" == "false" ]]; then
+  log "FATAL: local snapshot exists but NO R2 offsite copy was made."
+  log "       (peer-VPS leg: OFFSITE_OK=${OFFSITE_OK} - optional since the 2026-08-28 consolidation)"
+  exit 2
+fi
+if [[ "$OFFSITE_OK" == "false" ]]; then
+  log "NOTE: peer-VPS offsite leg skipped/failed (expected post-consolidation; R2 copy is in place)."
 fi

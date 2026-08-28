@@ -1,1 +1,1 @@
-﻿{"v4_ranges":0,"status":"error","message":"refresh exited 1: [cf-lockdown] ERROR: ipsets not found. Run --apply first.\n","generated":"2026-08-12 17:35:11","v6_ranges":0}
+﻿{"v4_ranges":15,"status":"ok","message":"Refresh completed: v4=15 v6=7 (nginx geo map on ks-aw-01)","generated":"2026-08-28 16:44:57","v6_ranges":7}

@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
 .SYNOPSIS
 SSH EU; measure ClickHouse self-telemetry vs application data; write LATEST report.
@@ -81,9 +81,10 @@ crashes on multi-byte chars without BOM. Emoji are produced at output time only.
 #>
 [CmdletBinding()]
 param(
-    [string]$EuHost = "204.168.175.41",
-    [string]$SshUser = "root",
-    [string]$PrivateKey = (Join-Path $env:USERPROFILE ".ssh\hetzner_trigger"),
+    # 2026-08-28 consolidation: trigger-clickhouse now lives on ks-aw-01.
+    [string]$EuHost = "149.202.64.114",
+    [string]$SshUser = "ubuntu",
+    [string]$PrivateKey = (Join-Path $env:USERPROFILE ".ssh\id_ed25519"),
     [string]$Container = "trigger-clickhouse",
     [string]$AppDatabase = "trigger_dev",
     [string]$WorkRoot = "",
@@ -170,6 +171,7 @@ function Invoke-Ssh {
         "-o", "StrictHostKeyChecking=accept-new",
         "-o", "ConnectTimeout=15",
         "-i", $PrivateKey,
+        "-p", "58122",
         ("{0}@{1}" -f $SshUser, $ServerHost),
         $Command
     )
@@ -255,7 +257,7 @@ echo "orphan_dup_count=$(q "SELECT count() FROM system.tables WHERE database='sy
 $remoteScript = $remoteScript.Replace("__APPDB__", $AppDatabase)
 
 $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(($remoteScript -replace "`r`n", "`n")))
-$remoteCmd = "docker exec -e B64=$b64 $Container sh -lc 'echo `$B64 | base64 -d | sh'"
+$remoteCmd = "sudo docker exec -e B64=$b64 $Container sh -lc 'echo `$B64 | base64 -d | sh'"
 
 $root = Resolve-Root -InputRoot $WorkRoot
 $res = Invoke-Ssh -ServerHost $EuHost -Command $remoteCmd

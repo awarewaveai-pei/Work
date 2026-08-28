@@ -73,6 +73,53 @@ Cursor 2026-08-26 退場、`~\.cursor` 2026-08-28 刪除（1.3 GB），但**產�
 [rollback]
 - `git revert <此 commit>` 後跑 `.\scripts\sync-mcp-config.ps1` 即重新產生 `.cursor\mcp.json`；vault 動作舊名一路都沒拿掉，revert 不會讓任何呼叫端斷掉
 
+### 三輪安全/穩定覆審(操作者指示與 Codex 協作)— Round 1 完成:5 findings 全真、全修、全變異驗證
+
+**Round 1 前自查先抓到**:①4 容器無 mem_limit(我搬遷時弄丟 EU 原值)→ 恢復 EU parity(kuma 512m/remotion 1g+2cpu/video 1536m+2cpu)+registry 補 512m,並把三個裸 docker-run 轉為宣告式 compose(`/root/uptime-kuma/`、`/root/render-services/`)②**Trigger 排程任務全掛**:registry 的儲存是匿名 volume(EU 6 個雜湊名 volume 我一個沒拷)→ 補拷 179M;host dockerd 缺 `/etc/hosts registry` 別名 + `insecure-registries`(SIGHUP 熱載,零容器閃斷);**再一層**:task 打自家網域被 CF challenge 403 → 發現 EU IP 在 CF 有 whitelist access rule → 兩個 zone 各補 `149.202.64.114` whitelist。修復後 30 分鐘內 7/7 COMPLETED_SUCCESSFULLY(前一天基線 290/日全成功,故障窗僅限今天 03:53–07:39)③備份腳本 R2 段在 `exit 2` 之後永遠跑不到(EU 時代被 SG offsite 成功掩蓋)→ R2 移前並升為強制。
+
+**Codex Round 1(5 findings,逐條驗真)**:
+- F1 origin 全開(直連 IP + Host header 繞過 CF WAF)→ nginx 層 `geo $realip_remote_addr $cf_edge`(CF v4+v6 段,TCP peer 不可偽造)+ per-vhost snippet;**class 級掃描再抓到兩個漏網**(soulful 與 sg-stack 的 443 block,sed 只插了第一個 server_name)→ 最終 14/14 proxied hostname 直連 403(含 IPv6 實測)、via-CF 全 200、DNS-only 2 個依設計開放
+- F2 verifier 不驗 R2(唯一異地卻無人驗)→ 三條管線 verifier 全部加 R2 REST 實列;變異測試過程本身抓到兩個 bug:defaults 檔覆蓋呼叫者 env(優先序反了,發生兩次:頂部 source + 我第一版修在錯層)、`grep` 零命中在 `set -euo pipefail` 下無聲殺死腳本(FAIL 訊息永遠印不出來)
+- F3 SG offsite 腿 `StrictHostKeyChecking=no`(偽造 peer 可收走全部客戶 DB dump)→ 腿整條移除(peer 已死),註解載明重新引入時必須 pin known_hosts
+- F4 backup-health 在排程器檔缺失時仍 PASS → cron missing ⇒ WARN(變異證明:藏檔 WARN/還原 PASS);同時單機化(三管線全指 ks)
+- F5 = 自查①,已先修
+- **F4 挖出更大的洞**:SG 的 lobster 管線(aware-wave.com WP DB/uploads)根本沒搬,ks 上零備份 → 移植 + offsite 從「rclone SFTP 到 EU(要死)」改為與另兩條管線同構的 REST R2(機上 rclone S3 remote 實測 AccessDenied=死設定);`.env` 的 `RCLONE_REMOTE` 移除、`R2_PREFIX=sg-stack`
+
+**驗證證據行**:
+- REALTEST_EVIDENCE: tool=SSH | cmd=backup-phase1.sh + verify-backup.sh (real) | exit=0/0 | ms=180000 — R2 sg-stack/ 6 objects PASS
+- REALTEST_EVIDENCE: tool=SSH | cmd=backup-eu-stack.sh + verify-backup-eu.sh (real) | exit=0/0 | ms=200000 — R2 eu/ 14 objects PASS;mutation(錯 prefix)可見 FAIL exit 1
+- REALTEST_EVIDENCE: tool=curl | cmd=14 proxied hostnames direct-IP + via-CF + IPv6 | exit=0 | ms=60000 — 直連全 403 / CF 全 200
+- REALTEST_EVIDENCE: tool=Bash | cmd=check-backup-health.ps1 real + mutation(藏 cron 檔) | exit=0 | ms=120000 — PASS→WARN→PASS
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=RCLONE_REMOTE | hits=3(全部為本輪改動檔案的內文/註解,無殘留 call site)
+- REVIEW_DONE: critic=Codex(round1)+class-sweep | verdict=warn→fixed | findings=5c 全修
+
+### 三輪覆審 Round 2（6 findings）+ Round 3（4 findings，3 修 1 過時）——全部閉環，監控工具鏈單機化完成
+
+**Round 2（Codex，逐條驗真後修）**：
+- R2-F1 multipart 盲點：分片上傳中斷時 verifier 數 key 照樣 PASS 但物件不可重組 → 兩支 verifier 改「逐檔對應」：小檔期待確切 key，大檔期待 `.parts.json`（uploader 契約：全部分片成功才寫）。變異：假檔無對應物件 → 可見 FAIL exit 1
+- R2-F2 兩條管線共用 `/root/backups` 互相掩蓋新鮮度（報告中 size/time 兩列完全相同已是鐵證）→ stack 管線分家 `/root/backups-stack`（cron env + health 設定 + 今天誤入的快照搬家）
+- R2-F3 verify=UNKNOWN 永遠 PASS → UNKNOWN + 備份齡 ≥1 天 = WARN
+- R2-F4 soulful 直連 200 → 審查中途已修（443 block 補 guard）；同時 repo 的 nginx conf 同步，消除 repo≠機器漂移
+- R2-F5 `check-cloudflare-security.ps1` 還在 SSH 舊 SG 查 ipset → 改為端到端探測（從 ks 自身直連 origin 帶 proxied SNI，兩個 zone 各一發，403/403 = active）；探測不會像設定檢查那樣臭掉
+- R2-F6 還原文件過時 → `BACKUP_RESTORE_PROOF.md` 整併橫幅 + `.part-*` 重組步驟（`cat name.part-* > name`）
+
+**Round 3（最終確認輪）**：
+- R3-F1/F2 驗證判定未綁定它認證的快照（log 尾的 PASSED 可能說的是舊快照；同日 verifier 死亡有整天盲窗）→ 新規則：最新快照存在 >90 分鐘而最後一行 `Checking:` 未點名它 = WARN。變異：假 2h 舊快照 → WARN，移除 → PASS
+- R3-F3 lockdown 探測 inactive 不影響 Overall → inactive 一律降 WARN（unreachable 仍 warn-only）。變異：拔掉 trigger guard 20 秒 → WARN，還原 → PASS
+- R3-F4（refresh 路徑指舊 SG）= 過時：Codex 審的是改寫前版本；`refresh-cf-origin-ips.ps1` 已重寫為觸發 ks 上的 `refresh-cf-edge-geo.sh`（repo 新增 `lobster-factory/infra/ks-aw-01/`；拒絕縮小得離譜的清單 + nginx -t 失敗自動回滾），實跑 v4=15 v6=7 後直連仍 403／CF 仍 200
+
+**附帶抓到並治本的病（非 Codex 清單）**：
+- supabase-kong memcg OOM 連殺 nginx worker（實時發生 08:40）：根因 = kong 的 nginx worker 數跟 CPU 走，EU 4 vCPU→ks 16 threads = 16 workers 塗滿 768M。修 = `KONG_NGINX_WORKER_PROCESSES=4`（EU parity），**不是調高上限**。repo+機器同步，重建後 4 workers/233M/30%
+- swap 67.5% 陳舊頁（搬遷壓力殘留）→ swapoff/on 沖回（RAM 餘 50G，5 秒）
+- Trigger 任務鏈修復後持續驗證：修復後 30 分鐘 7/7 COMPLETED_SUCCESSFULLY
+
+**監控/工具鏈單機化（全部實跑驗證）**：capacity（單機 + 抓到 swap）/ clickhouse（ks，PASS 1.1x）/ deploy-drift（ks，正確報出真 drift，順手抓到 python 引號吃掉造成的 `bash -c cat` 懸死）/ supabase-memory（ks）/ supabase-tunnel（ks）/ trigger-deploy（ks）/ auto-reboot（誠實的 topology-retired 🟡，ks 無 auto-reboot 屬刻意，決策待操作者）/ ao-resume 標籤 / sg-deploy 指令檔 / sg⁄eu-reboot⁄origin-lockdown 退役橫幅
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=全部修改过的 ps1/sh 各自 real run + 變異對（本條目各段內嵌） | exit=0 | ms=cumulative
+- REVIEW_DONE: critic=Codex(3 rounds) | verdict=pass | findings=15條累計，14 修 1 過時，全部指令級驗證
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=hetzner_trigger | hits=殘存於未改的歷史文件與 runbook（描述當時為真）；活性工具鏈已全數改 id_ed25519/58122/ubuntu
+- ORACLE artifacts: agency-os/reports/oracle/2026-08-28-review-{9f19461b,7030556d}.md + round-1 raw log
+
 ### 🚨 同日下午：SG + EU 全面整併入 ks-aw-01（操作者因帳務指示提前，原排 11/20）
 
 **指示**：「SG和EU 也都要搬到新機 因為(9)/2 就要被扣款43 我不想付」。已向操作者說明 Hetzner 後付制 → 9/2 那筆是 8 月已用量免不掉，能省的是 9 月起；以「儘快搬完驗證後刪機」為目標執行。

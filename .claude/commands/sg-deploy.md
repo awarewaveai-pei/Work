@@ -7,9 +7,10 @@ Default app is `next-admin`. Pass extra args after `/sg-deploy` to override:
 - `/sg-deploy next-admin --skip-pull` — skip the upstream `git pull` step
 
 Use the `hetzner-ssh` MCP server. Connection details:
-- host: `5.223.93.113`
+- host: `149.202.64.114`（**2026-08-28 整併後 SG 棧在 ks-aw-01**）
+- port: `58122`／user: `ubuntu`（遠端指令前加 `sudo`）
 - user: `root`
-- privateKeyPath: `$env:USERPROFILE\.ssh\hetzner_trigger`（Claude 須先展開為絕對路徑，例如 `C:\Users\USER\.ssh\hetzner_trigger`）
+- privateKeyPath: `$env:USERPROFILE\.ssh\id_ed25519`（Claude 須先展開為絕對路徑，例如 `C:\Users\USER\.ssh\hetzner_trigger`）
 
 Steps:
 1. `ssh_connect` to SG with the credentials above (name the connection `sg-prod`).

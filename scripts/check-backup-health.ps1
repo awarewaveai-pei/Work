@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 [CmdletBinding()]
 param(
     [string]$SgHost = "5.223.93.113",
@@ -111,6 +111,13 @@ function Get-HostBackupHealth {
         'if [ -d "$BACKUP_DIR" ]; then backup_size=$(du -sh "$BACKUP_DIR" 2>/dev/null | awk ''{print $1}''); latest_file=$(ls -1t "$BACKUP_DIR" 2>/dev/null | head -n 1 || true); oldest_file=$(ls -1tr "$BACKUP_DIR" 2>/dev/null | head -n 1 || true); if [ -n "$latest_file" ]; then latest_time=$(stat -c ''%y'' "$BACKUP_DIR/$latest_file" | cut -d''.'' -f1); else latest_time="(none)"; fi; if [ -n "$oldest_file" ]; then oldest_time=$(stat -c ''%y'' "$BACKUP_DIR/$oldest_file" | cut -d''.'' -f1); else oldest_time="(none)"; fi; else backup_size="(missing)"; latest_time="(missing)"; oldest_time="(missing)"; fi',
         'backup_age_days="999"; if [ -d "$BACKUP_DIR" ]; then _latest=$(ls -1t "$BACKUP_DIR" 2>/dev/null | head -n 1 || true); if [ -n "$_latest" ]; then _mtime=$(stat -c ''%Y'' "$BACKUP_DIR/$_latest" 2>/dev/null || echo "0"); _now=$(date +%s); backup_age_days=$(( (_now - _mtime) / 86400 )); fi; fi',
         'verify_result="UNKNOWN"; verify_time="(none)"; if [ -f "$VERIFY_LOG" ]; then vline=$(grep -E ''=== verify-backup[a-zA-Z0-9_-]* (PASSED|FAILED)'' "$VERIFY_LOG" 2>/dev/null | tail -n 1 || true); if [ -n "$vline" ]; then if printf ''%s'' "$vline" | grep -q PASSED; then verify_result="PASSED"; else verify_result="FAILED"; fi; verify_time=$(printf ''%s'' "$vline" | grep -oE ''^\[[^]]+\]'' | tr -d ''[]'' || true); if [ -z "$verify_time" ]; then verify_time="(?)"; fi; fi; fi',
+        # R3-F1/F2 (round-3 review): bind the verify verdict to the snapshot it certifies.
+        # A verdict parsed from the log tail may describe an OLDER snapshot than the one
+        # sitting newest in BACKUP_DIR. If the newest snapshot has existed >90 min (the
+        # verifier cadence is 30 min after backup) and the last 'Checking:' line does not
+        # name it, the newest snapshot is UNVERIFIED - same-day, no whole-day blind spot.
+        'unverified_latest="no"; if [ -d "$BACKUP_DIR" ]; then _l=$(ls -1t "$BACKUP_DIR" 2>/dev/null | head -n 1 || true); if [ -n "$_l" ]; then _mt=$(stat -c ''%Y'' "$BACKUP_DIR/$_l" 2>/dev/null || echo 0); _am=$(( ($(date +%s) - _mt) / 60 )); _vt=""; if [ -f "$VERIFY_LOG" ]; then _vt=$(grep -E ''Checking: '' "$VERIFY_LOG" 2>/dev/null | tail -n 1 | sed ''s/.*Checking: //'' | xargs -r basename 2>/dev/null || true); fi; if [ "$_am" -gt 90 ] && [ "$_vt" != "$_l" ]; then unverified_latest="yes"; fi; fi; fi',
+        'echo UNVERIFIED_LATEST=$unverified_latest',
         'echo CRON_STATUS=$cron_status',
         'echo "CRON_LINES=$(printf ''%s'' "$cron_lines" | tr ''\n'' ''|'')"',
         'echo RETENTION_DAYS=$retention_days',
@@ -150,6 +157,7 @@ function Get-HostBackupHealth {
         ok               = $true
         error            = ""
         cron_status      = Parse-ResultLine -Output $res.Output -Key "CRON_STATUS"
+        unverified_latest = Parse-ResultLine -Output $res.Output -Key "UNVERIFIED_LATEST"
         cron_lines       = Parse-ResultLine -Output $res.Output -Key "CRON_LINES"
         retention_days   = Parse-ResultLine -Output $res.Output -Key "RETENTION_DAYS"
         retention_source = Parse-ResultLine -Output $res.Output -Key "RETENTION_SOURCE"
@@ -216,15 +224,21 @@ if (-not $sshOk) {
     $fatal = $true
     $fatalReason = "ssh.exe not found on PATH"
 } else {
-    $sg = Invoke-HostCheck -KeyPath $PrivateKey -Label "SG" -CheckArgs @{
-        ServerHost = $SgHost; CronPath = "/etc/cron.d/lobster-backup"
+    # 2026-08-28 consolidation: all three pipelines live on ks-aw-01 now. The old
+    # SG/EU machines are stopped and pending deletion - probing them would either
+    # false-alarm forever (post-deletion) or false-pass (pre-deletion, stale data).
+    # Labels keep their pipeline identity; only the host moved.
+    $sg = Invoke-HostCheck -KeyPath $KsAw01PrivateKey -Label "lobster (ex-SG)" -CheckArgs @{
+        ServerHost = $KsAw01Host; CronPath = "/etc/cron.d/lobster-backup"
         BackupScriptPath = "/root/lobster-phase1/scripts/backup-phase1.sh"
         BackupDir = "/root/lobster-phase1/backups"; VerifyLog = "/var/log/lobster-backup.log"
+        User = $KsAw01SshUser; Key = $KsAw01PrivateKey; Port = $KsAw01SshPort; UseSudo = $true
     }
-    $eu = Invoke-HostCheck -KeyPath $PrivateKey -Label "EU" -CheckArgs @{
-        ServerHost = $EuHost; CronPath = "/etc/cron.d/eu-backup"
+    $eu = Invoke-HostCheck -KeyPath $KsAw01PrivateKey -Label "stack (ex-EU)" -CheckArgs @{
+        ServerHost = $KsAw01Host; CronPath = "/etc/cron.d/ks-stack-backup"
         BackupScriptPath = "/root/scripts/backup-eu-stack.sh"
-        BackupDir = "/root/backups"; VerifyLog = "/var/log/eu-backup.log"
+        BackupDir = "/root/backups-stack"; VerifyLog = "/var/log/eu-backup.log"  # F2-2: own dir; sharing /root/backups with the soulful pipeline masked either one dying
+        User = $KsAw01SshUser; Key = $KsAw01PrivateKey; Port = $KsAw01SshPort; UseSudo = $true
     }
     $ks = Invoke-HostCheck -KeyPath $KsAw01PrivateKey -Label "ks-aw-01" -CheckArgs @{
         ServerHost = $KsAw01Host; CronPath = "/etc/cron.d/ks-aw-01-backup"
@@ -242,7 +256,25 @@ $ksStale = ($ks -ne $null) -and $ks.ok -and ($ks.backup_age_days -match '^\d+$')
 $sgVerifyFail = ($sg -ne $null) -and $sg.ok -and ($sg.verify_result -eq "FAILED")
 $euVerifyFail = ($eu -ne $null) -and $eu.ok -and ($eu.verify_result -eq "FAILED")
 $ksVerifyFail = ($ks -ne $null) -and $ks.ok -and ($ks.verify_result -eq "FAILED")
-$overall = if ($fatal) { "ERROR" } elseif (((($sg -ne $null) -and (-not $sg.ok))) -or ((($eu -ne $null) -and (-not $eu.ok))) -or ((($ks -ne $null) -and (-not $ks.ok)))) { "WARN" } elseif ($sgStale -or $euStale -or $ksStale -or $sgVerifyFail -or $euVerifyFail -or $ksVerifyFail) { "WARN" } else { "PASS" }
+# Scheduler file missing = the pipeline will never run again, however fresh the
+# last snapshot looks. Review finding F4 (2026-08-28): the report printed
+# "cron => missing" while Overall stayed PASS - a surfaced fact the verdict
+# ignored. A detector that shows a problem but does not change its verdict is
+# an ignored detector.
+# F2-3 (round-2 review): UNKNOWN verify with a day-old (or older) backup means a
+# full cron cycle produced no verdict line - the verifier is dead or its log path
+# is wrong. Fresh-backup UNKNOWN (manual run just happened) stays quiet.
+$sgVerifyDead = ($sg -ne $null) -and $sg.ok -and ($sg.verify_result -eq "UNKNOWN") -and ($sg.backup_age_days -match '^\d+$') -and ([int]$sg.backup_age_days -ge 1)
+$euVerifyDead = ($eu -ne $null) -and $eu.ok -and ($eu.verify_result -eq "UNKNOWN") -and ($eu.backup_age_days -match '^\d+$') -and ([int]$eu.backup_age_days -ge 1)
+$ksVerifyDead = ($ks -ne $null) -and $ks.ok -and ($ks.verify_result -eq "UNKNOWN") -and ($ks.backup_age_days -match '^\d+$') -and ([int]$ks.backup_age_days -ge 1)
+# R3-F1/F2: newest snapshot not named by any verify run within 90 min => WARN.
+$sgUnverified = ($sg -ne $null) -and $sg.ok -and ($sg.unverified_latest -eq "yes")
+$euUnverified = ($eu -ne $null) -and $eu.ok -and ($eu.unverified_latest -eq "yes")
+$ksUnverified = ($ks -ne $null) -and $ks.ok -and ($ks.unverified_latest -eq "yes")
+$sgCronGone = ($sg -ne $null) -and $sg.ok -and ($sg.cron_status -ne "present")
+$euCronGone = ($eu -ne $null) -and $eu.ok -and ($eu.cron_status -ne "present")
+$ksCronGone = ($ks -ne $null) -and $ks.ok -and ($ks.cron_status -ne "present")
+$overall = if ($fatal) { "ERROR" } elseif (((($sg -ne $null) -and (-not $sg.ok))) -or ((($eu -ne $null) -and (-not $eu.ok))) -or ((($ks -ne $null) -and (-not $ks.ok)))) { "WARN" } elseif ($sgStale -or $euStale -or $ksStale -or $sgVerifyFail -or $euVerifyFail -or $ksVerifyFail -or $sgCronGone -or $euCronGone -or $ksCronGone -or $sgVerifyDead -or $euVerifyDead -or $ksVerifyDead -or $sgUnverified -or $euUnverified -or $ksUnverified) { "WARN" } else { "PASS" }
 
 $markdown = New-Object System.Text.StringBuilder
 [void]$markdown.AppendLine("# Backup health report")
@@ -258,8 +290,8 @@ if ($fatal) {
     [void]$markdown.AppendLine("")
 } else {
     foreach ($node in @(
-        [ordered]@{ name = "SG"; data = $sg; cron = "/etc/cron.d/lobster-backup" },
-        [ordered]@{ name = "EU"; data = $eu; cron = "/etc/cron.d/eu-backup" },
+        [ordered]@{ name = "lobster (ex-SG)"; data = $sg; cron = "/etc/cron.d/lobster-backup" },
+        [ordered]@{ name = "stack (ex-EU)"; data = $eu; cron = "/etc/cron.d/ks-stack-backup" },
         [ordered]@{ name = "ks-aw-01"; data = $ks; cron = "/etc/cron.d/ks-aw-01-backup" }
     )) {
         [void]$markdown.AppendLine("## " + $node.name + " (" + $node.data.host + ")")
@@ -318,8 +350,8 @@ if ($Json) {
         Write-Host ("Reason: " + $fatalReason) -ForegroundColor Yellow
     } else {
         foreach ($x in @(
-            [ordered]@{ name = "SG"; data = $sg },
-            [ordered]@{ name = "EU"; data = $eu },
+            [ordered]@{ name = "lobster(ex-SG)"; data = $sg },
+            [ordered]@{ name = "stack(ex-EU)"; data = $eu },
             [ordered]@{ name = "ks-aw-01"; data = $ks }
         )) {
             if ($x.data.ok) {

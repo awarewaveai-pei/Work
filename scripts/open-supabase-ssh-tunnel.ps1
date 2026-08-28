@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Open SSH tunnels to self-hosted Supabase on the EU VPS (postgres + studio).
 
@@ -36,13 +36,13 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrWhiteSpace($SshHost)) {
-    $SshHost = if ($env:SUPABASE_EU_SSH_HOST) { $env:SUPABASE_EU_SSH_HOST } else { "204.168.175.41" }
+    $SshHost = if ($env:SUPABASE_EU_SSH_HOST) { $env:SUPABASE_EU_SSH_HOST } else { "149.202.64.114" }  # 2026-08-28: supabase on ks-aw-01
 }
 if ([string]::IsNullOrWhiteSpace($SshUser)) {
-    $SshUser = if ($env:SUPABASE_EU_SSH_USER) { $env:SUPABASE_EU_SSH_USER } else { "root" }
+    $SshUser = if ($env:SUPABASE_EU_SSH_USER) { $env:SUPABASE_EU_SSH_USER } else { "ubuntu" }
 }
 if ([string]::IsNullOrWhiteSpace($PrivateKeyPath)) {
-    $PrivateKeyPath = if ($env:SUPABASE_EU_SSH_KEY) { $env:SUPABASE_EU_SSH_KEY } else { "$env:USERPROFILE\.ssh\hetzner_trigger" }
+    $PrivateKeyPath = if ($env:SUPABASE_EU_SSH_KEY) { $env:SUPABASE_EU_SSH_KEY } else { "$env:USERPROFILE\.ssh\id_ed25519" }
 }
 
 $tunnels = @(
@@ -73,6 +73,7 @@ try {
 # ServerAlive*: reduce silent drops on long IDE sessions.
 $args = @(
     "-N",
+    "-p", "58122",
     "-o", "ExitOnForwardFailure=yes",
     "-o", "ServerAliveInterval=30",
     "-o", "ServerAliveCountMax=6"

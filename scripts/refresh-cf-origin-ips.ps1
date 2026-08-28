@@ -29,8 +29,11 @@ $v6Ranges = 0
 $message  = ""
 
 try {
-    $sshKey = "$env:USERPROFILE\.ssh\hetzner_trigger"
-    if (-not (Test-Path $sshKey)) { $sshKey = "~/.ssh/hetzner_trigger" }
+    # 2026-08-28 consolidation: the lockdown moved from SG's ipset (iptables) to an
+    # nginx geo map on ks-aw-01. This wrapper now triggers the on-box regenerator
+    # (repo SSOT: lobster-factory/infra/ks-aw-01/refresh-cf-edge-geo.sh), which
+    # refuses implausibly small lists and rolls back on nginx -t failure.
+    $sshKey = "$env:USERPROFILE\.ssh\id_ed25519"
     if (-not (Test-Path $sshKey)) {
         $status = "skip"
         $message = "SSH key not found -- skipped"
@@ -38,39 +41,21 @@ try {
         $outPath = [System.IO.Path]::GetTempFileName()
         $errPath = [System.IO.Path]::GetTempFileName()
         try {
-            # Check if lockdown script exists on SG before running refresh
-            $checkCmd = "test -f /root/cf-origin-lockdown.sh && echo EXISTS || echo MISSING"
-            $checkArgs = @("-i", $sshKey, "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10", "root@5.223.93.113", $checkCmd)
-            $checkProc = Start-Process -FilePath "ssh" -ArgumentList $checkArgs -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outPath -RedirectStandardError $errPath
-            $checkOut  = (Get-Content -LiteralPath $outPath -Raw -ErrorAction SilentlyContinue).Trim()
-            if ($checkOut -notmatch "EXISTS") {
-                $status  = "skip"
-                $message = "cf-origin-lockdown.sh not found on SG -- run /origin-lockdown apply first"
+            $refreshArgs = @("-i", $sshKey, "-p", "58122", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=30", "ubuntu@149.202.64.114", "sudo bash /root/scripts/refresh-cf-edge-geo.sh 2>&1")
+            $proc = Start-Process -FilePath "ssh" -ArgumentList $refreshArgs -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outPath -RedirectStandardError $errPath
+            $out  = (Get-Content -LiteralPath $outPath -Raw -ErrorAction SilentlyContinue)
+            $m = [regex]::Match([string]$out, "cf-edge-geo refreshed: v4=(\d+) v6=(\d+)")
+            if ($proc.ExitCode -eq 0 -and $m.Success) {
+                $v4Ranges = [int]$m.Groups[1].Value
+                $v6Ranges = [int]$m.Groups[2].Value
+                $status  = "ok"
+                $message = "Refresh completed: v4=$v4Ranges v6=$v6Ranges (nginx geo map on ks-aw-01)"
             } else {
-                # Run --refresh
-                $refreshCmd = "bash /root/cf-origin-lockdown.sh --refresh 2>&1"
-                $refreshArgs = @("-i", $sshKey, "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=30", "root@5.223.93.113", $refreshCmd)
-                $proc = Start-Process -FilePath "ssh" -ArgumentList $refreshArgs -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outPath -RedirectStandardError $errPath
-                $out  = (Get-Content -LiteralPath $outPath -Raw -ErrorAction SilentlyContinue)
-                if ($proc.ExitCode -eq 0 -and $out) {
-                    # Parse: "ipset cf-ipv4 populated with N ranges"
-                    $m4 = [regex]::Match($out, "cf-ipv4 populated with (\d+)")
-                    $m6 = [regex]::Match($out, "cf-ipv6 populated with (\d+)")
-                    if ($m4.Success) { $v4Ranges = [int]$m4.Groups[1].Value }
-                    if ($m6.Success) { $v6Ranges = [int]$m6.Groups[1].Value }
-                    $status  = "ok"
-                    $message = "Refresh completed: v4=$v4Ranges v6=$v6Ranges"
-                } elseif ($proc.ExitCode -ne 0) {
-                    $status  = "error"
-                    $message = "refresh exited $($proc.ExitCode): $out"
-                } else {
-                    $status  = "skip"
-                    $message = "No output from refresh script"
-                }
+                $status  = "error"
+                $message = "refresh exited $($proc.ExitCode): $out"
             }
         } finally {
-            Remove-Item -LiteralPath $outPath -Force -ErrorAction SilentlyContinue
-            Remove-Item -LiteralPath $errPath -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $outPath, $errPath -Force -ErrorAction SilentlyContinue
         }
     }
 } catch {

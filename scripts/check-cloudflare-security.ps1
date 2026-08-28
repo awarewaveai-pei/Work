@@ -145,37 +145,34 @@ if (-not $token) {
     }
 }
 
-# 3. Origin lockdown (SSH to SG -- warn-only, never affects $overall PASS/FAIL)
+# 3. Origin lockdown (ks-aw-01, warn-only, never affects $overall PASS/FAIL)
+# 2026-08-28 consolidation retarget (round-2 review F5): SG's ipset/iptables lockdown
+# died with the SG machine. On ks-aw-01 the mechanism is an nginx geo guard
+# (cf-edge-geo.conf + snippets/cf-only.conf). Instead of inspecting config, this
+# probes the INVARIANT end-to-end from the box itself: a direct-to-origin request
+# carrying a proxied Host/SNI must get 403 for BOTH production zones. A probe
+# cannot rot the way a config-inspection can.
 $lockdownStatus = 'unknown'
-$lockdownIpCount = 0
-$lockdownIpv6Count = 0
+$lockdownAw = ''
+$lockdownSf = ''
 try {
-    $sshKey = "$env:USERPROFILE\.ssh\hetzner_trigger"
-    if (-not (Test-Path $sshKey)) { $sshKey = '~/.ssh/hetzner_trigger' }
-    $lockdownOut = & ssh -i $sshKey -o StrictHostKeyChecking=no -o ConnectTimeout=8 -o BatchMode=yes `
-        root@5.223.93.113 `
-        "echo V4=`$(ipset list cf-ipv4 2>/dev/null | awk '/Number of entries/ {print `$NF}'); echo V6=`$(ipset list cf-ipv6 2>/dev/null | awk '/Number of entries/ {print `$NF}'); iptables -C INPUT -p tcp --dport 443 -m set --match-set cf-ipv4 src -j ACCEPT 2>/dev/null && echo V4_RULE=ACTIVE || echo V4_RULE=INACTIVE; ip6tables -C INPUT -p tcp --dport 443 -m set --match-set cf-ipv6 src -j ACCEPT 2>/dev/null && echo V6_RULE=ACTIVE || echo V6_RULE=INACTIVE" `
-        2>$null
-    if ($lockdownOut) {
-        $lockdownLines = @($lockdownOut | Where-Object { $_ -match '\S' })
-        $v4Rule = 'INACTIVE'
-        $v6Rule = 'INACTIVE'
-        foreach ($line in $lockdownLines) {
-            if ($line -match '^V4=(\d+)$') { $lockdownIpCount = [int]$Matches[1] }
-            elseif ($line -match '^V6=(\d+)$') { $lockdownIpv6Count = [int]$Matches[1] }
-            elseif ($line -match '^V4_RULE=(ACTIVE|INACTIVE)$') { $v4Rule = $Matches[1] }
-            elseif ($line -match '^V6_RULE=(ACTIVE|INACTIVE)$') { $v6Rule = $Matches[1] }
-        }
-        $lockdownStatus = if (
-            $lockdownIpCount -gt 0 -and
-            $lockdownIpv6Count -gt 0 -and
-            $v4Rule -eq 'ACTIVE' -and
-            $v6Rule -eq 'ACTIVE'
-        ) { 'active' } else { 'inactive' }
+    $ksKey = "$env:USERPROFILE\.ssh\id_ed25519"
+    $probeCmd = "curl -sk -o /dev/null -m 10 -w 'AW=%{http_code};' --resolve trigger.aware-wave.com:443:149.202.64.114 https://trigger.aware-wave.com/login; curl -sk -o /dev/null -m 10 -w 'SF=%{http_code}' --resolve soulfulexpression.org:443:149.202.64.114 https://soulfulexpression.org/"
+    $lockdownOut = & ssh -i $ksKey -p 58122 -o StrictHostKeyChecking=no -o ConnectTimeout=8 -o BatchMode=yes ubuntu@149.202.64.114 $probeCmd 2>$null
+    if ($lockdownOut -match 'AW=(\d+);SF=(\d+)') {
+        $lockdownAw = $Matches[1]
+        $lockdownSf = $Matches[2]
+        $lockdownStatus = if ($lockdownAw -eq '403' -and $lockdownSf -eq '403') { 'active' } else { 'inactive' }
     }
 } catch {
     $lockdownStatus = 'unreachable'
 }
+
+# R3-F3 (round-3 review): the lockdown check used to be config-inspection and was
+# deliberately warn-only (it could rot). It is now a live end-to-end probe with no
+# false-positive mode: 'inactive' means a direct-origin request REALLY got through.
+# That must degrade the overall verdict. 'unreachable' (ssh hiccup) stays warn-only.
+if ($lockdownStatus -eq 'inactive' -and $overall -eq 'PASS') { $overall = 'WARN' }
 
 $stamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
 $lines = @(
@@ -193,9 +190,9 @@ $lines = @(
     "| xmlrpc.php block rule | $(if ($xmlrpcOk) { 'present' } elseif ($WpLoginProtectedByServerSide) { 'server-side (nginx/LLAR)' } else { 'MISSING' }) |",
     "| Scanner flood rate-limit rule | $rateLimitRuleStatus |",
     "| WP admin rate-limit carve-outs | $rateLimitAdminCarveout |",
-    "| Origin lockdown (SG) | $lockdownStatus$(if ($lockdownStatus -eq 'inactive') { ' warning: direct-origin attacks possible' }) |",
-    "| CF ipset cf-ipv4 entries | $(if ($lockdownIpCount -gt 0) { $lockdownIpCount } else { 'N/A' }) |",
-    "| CF ipset cf-ipv6 entries | $(if ($lockdownIpv6Count -gt 0) { $lockdownIpv6Count } else { 'N/A' }) |"
+    "| Origin lockdown (ks-aw-01 nginx guard) | $lockdownStatus$(if ($lockdownStatus -eq 'inactive') { ' warning: direct-origin attacks possible' }) |",
+    "| Direct-origin probe aware-wave (expect 403) | $(if ($lockdownAw) { $lockdownAw } else { 'N/A' }) |",
+    "| Direct-origin probe soulful (expect 403) | $(if ($lockdownSf) { $lockdownSf } else { 'N/A' }) |"
 )
 if ($WpLoginProtectedByServerSide) {
     $lines += ""
@@ -206,15 +203,12 @@ if ($WpLoginProtectedByServerSide) {
     $lines += "- This check verifies CF posture plus Origin Lockdown; WordPress plugin protection is verified separately (client-status / WP plugin checks)."
 }
 $lines += ""
-$lines += "## Origin Lockdown (SG 5.223.93.113)"
+$lines += "## Origin Lockdown (ks-aw-01 149.202.64.114, since 2026-08-28 consolidation)"
 $lines += "- Status: **$lockdownStatus**"
-$lines += "- CF IPv4 ranges in ipset: $lockdownIpCount"
-$lines += "- CF IPv6 ranges in ipset: $lockdownIpv6Count"
-$lines += '- Architecture: iptables allows only CF IPs on 80/443 -- direct-origin scanners DROP before nginx'
-if ($lockdownStatus -eq 'active') {
-    $lines += '- Maintenance: use /origin-lockdown status or scripts/refresh-cf-origin-ips.ps1; rollback only for emergency recovery.'
-} else {
-    $lines += '- To apply: /origin-lockdown apply (HIGH RISK, go-ahead required)'
+$lines += "- Probe aware-wave direct-origin: $(if ($lockdownAw) { $lockdownAw } else { 'N/A' }) / soulful: $(if ($lockdownSf) { $lockdownSf } else { 'N/A' }) (403 = guarded)"
+$lines += '- Architecture: nginx geo guard (conf.d/cf-edge-geo.conf + snippets/cf-only.conf) returns 403 unless the raw TCP peer is a CF edge or localhost; DNS-only vhosts (remotion-svc/video-svc) deliberately unguarded.'
+if ($lockdownStatus -ne 'active') {
+    $lines += '- INACTIVE/UNKNOWN: re-check /etc/nginx/snippets/cf-only.conf includes per 443 server block; CF CIDR source is soulful-security.conf (refresh-cf-origin-ips.ps1).'
 }
 $lines += '- Runbook: runbooks/CLOUDFLARE-WAF-SETUP.md #Origin-Lockdown-SOP'
 if ($errorMsg) { $lines += ""; $lines += "## Errors"; $lines += "- $errorMsg" }

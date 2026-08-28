@@ -249,6 +249,38 @@ $repoSsot53Rel = "lobster-factory\infra\hetzner-phase1-core\auto-reboot\53awarew
 $ssotSha52 = Get-RepoSsotSha -Root $rootPath -RelPath $repoSsot52Rel
 $ssotSha53 = Get-RepoSsotSha -Root $rootPath -RelPath $repoSsot53Rel
 
+# ============================================================================
+# 2026-08-28 consolidation short-circuit: the machines this checker probed
+# (SG 5.223.93.113 / EU 204.168.175.41) are stopped and pending deletion; the
+# B-Minimal auto-reboot system died with them. ks-aw-01 deliberately has NO
+# auto-reboot yet: a daily reboot of the single consolidated host would be a
+# daily full-stack outage window - that trade-off is the operator's call, not
+# a default to inherit. TASKS.md tracks the decision. Until then this checker
+# reports the topology change honestly instead of red-noise ssh failures.
+$stamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss 'UTC'")
+$rcRoot = Resolve-Root -InputRoot $WorkRoot
+$rcDir = Join-Path $rcRoot "agency-os/reports/status"
+if (-not (Test-Path -LiteralPath $rcDir)) { New-Item -ItemType Directory -Force -Path $rcDir | Out-Null }
+$mdPath = Join-Path $rcDir "auto-reboot-LATEST.md"
+$jsonPath = Join-Path $rcDir "auto-reboot-LATEST.json"
+@(
+    "# VPS auto-reboot health",
+    "",
+    "- Generated: $stamp",
+    "- **Verdict: [YELLOW] topology-retired**",
+    "",
+    "SG/EU were consolidated onto ks-aw-01 on 2026-08-28 and are pending deletion.",
+    "The auto-reboot system existed only on those machines. ks-aw-01 has NO",
+    "auto-reboot **by design pending an operator decision** (daily reboot of the",
+    "single consolidated host = daily full-stack outage window).",
+    "",
+    "AO-RESUME reading this: reboot signals for ks-aw-01 are always manual +",
+    "High-risk go-ahead; there is no 16h auto-window any more."
+) -join "`r`n" | Set-Content -LiteralPath $mdPath -Encoding UTF8
+'{"verdict":"topology-retired","generated":"' + $stamp + '","note":"SG/EU consolidated onto ks-aw-01 2026-08-28; auto-reboot decision pending (TASKS.md)"}' | Set-Content -LiteralPath $jsonPath -Encoding UTF8
+Write-Host "== VPS auto-reboot: [YELLOW] topology-retired (SG/EU consolidated onto ks-aw-01; see TASKS.md) =="
+exit 0
+
 $sg = Get-AutoRebootHealth -ServerHost $SgHost -Is53Expected $false
 $eu = Get-AutoRebootHealth -ServerHost $EuHost -Is53Expected $true
 

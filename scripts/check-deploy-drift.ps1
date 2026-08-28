@@ -48,9 +48,10 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$ServerHost = "5.223.93.113",
-    [string]$ServerUser = "root",
-    [string]$PrivateKey = (Join-Path $env:USERPROFILE ".ssh\hetzner_trigger"),
+    # 2026-08-28 consolidation: the deploy staging (/root/lobster-phase1) now lives on ks-aw-01.
+    [string]$ServerHost = "149.202.64.114",
+    [string]$ServerUser = "ubuntu",
+    [string]$PrivateKey = (Join-Path $env:USERPROFILE ".ssh\id_ed25519"),
     [int]$WarnAt = 1,
     [int]$FailAt = 6,
     [switch]$Strict,
@@ -91,6 +92,7 @@ function Invoke-Ssh {
         "-o", "StrictHostKeyChecking=accept-new",
         "-o", "ConnectTimeout=8",
         "-i", $PrivateKey,
+        "-p", "58122",
         ("{0}@{1}" -f $ServerUser, $ServerHost),
         $Cmd
     )
@@ -167,7 +169,7 @@ try {
 }
 
 # 3. SSH probe deployed commit
-$probe = Invoke-Ssh -Cmd "cat /root/lobster-phase1/.deployed-commit 2>/dev/null || (cd /root/Work && git rev-parse HEAD) 2>/dev/null"
+$probe = Invoke-Ssh -Cmd "sudo bash -c 'cat /root/lobster-phase1/.deployed-commit 2>/dev/null || (cd /root/Work && git rev-parse HEAD) 2>/dev/null'"
 if ($probe.ExitCode -ne 0) {
     $msg = "SSH probe failed (exit $($probe.ExitCode)): $($probe.Output)"
     if ($Strict) { Emit-Result -Status "FAIL" -ExitCode 2 -Message $msg -Data @{ host = $ServerHost } }

@@ -1,8 +1,9 @@
-param(
+﻿param(
     [string]$AgencyOsRoot = "",
-    [string]$SshHost = "204.168.175.41",
-    [string]$SshUser = "root",
-    [string]$PrivateKeyPath = "$env:USERPROFILE\.ssh\hetzner_trigger",
+    # 2026-08-28 consolidation: supabase on ks-aw-01.
+    [string]$SshHost = "149.202.64.114",
+    [string]$SshUser = "ubuntu",
+    [string]$PrivateKeyPath = "$env:USERPROFILE\.ssh\id_ed25519",
     [string]$ContainerName = "supabase-studio",
     [double]$WarnPercent = 85.0,
     [double]$FailPercent = 92.0,
@@ -48,7 +49,7 @@ function Invoke-SshCapture {
     $outPath = [System.IO.Path]::GetTempFileName()
     $errPath = [System.IO.Path]::GetTempFileName()
     try {
-        $sshArgs = @("-o","BatchMode=yes","-o","ConnectTimeout=12","-i",$KeyPath,"$SshUserValue@$SshHostValue",$Command)
+        $sshArgs = @("-o","BatchMode=yes","-o","ConnectTimeout=12","-p","58122","-i",$KeyPath,"$SshUserValue@$SshHostValue",$Command)
         $proc = Start-Process -FilePath "ssh" -ArgumentList $sshArgs -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outPath -RedirectStandardError $errPath
         return [pscustomobject]@{
             ExitCode = $proc.ExitCode
@@ -82,11 +83,11 @@ $rawLimitBytes = ""
 $remoteErr = ""
 
 try {
-    $inspect = Invoke-SshCapture -SshHostValue $SshHost -SshUserValue $SshUser -KeyPath $PrivateKeyPath -Command ("docker inspect --format '{{.HostConfig.Memory}}' " + $ContainerName)
+    $inspect = Invoke-SshCapture -SshHostValue $SshHost -SshUserValue $SshUser -KeyPath $PrivateKeyPath -Command ("sudo docker inspect --format '{{.HostConfig.Memory}}' " + $ContainerName)
     if ($inspect.ExitCode -ne 0) {
         throw ("docker inspect failed: " + $inspect.StdErr.Trim())
     }
-    $stats = Invoke-SshCapture -SshHostValue $SshHost -SshUserValue $SshUser -KeyPath $PrivateKeyPath -Command ("docker stats --no-stream --format '{{.MemUsage}}' " + $ContainerName)
+    $stats = Invoke-SshCapture -SshHostValue $SshHost -SshUserValue $SshUser -KeyPath $PrivateKeyPath -Command ("sudo docker stats --no-stream --format '{{.MemUsage}}' " + $ContainerName)
     if ($stats.ExitCode -ne 0) {
         throw ("docker stats failed: " + $stats.StdErr.Trim())
     }

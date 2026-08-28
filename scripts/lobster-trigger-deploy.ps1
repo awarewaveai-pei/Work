@@ -1,4 +1,4 @@
-#!/usr/bin/env pwsh
+﻿#!/usr/bin/env pwsh
 # One-shot Trigger.dev deploy: reads secrets from vault/VPS, deploys to EU worker.
 #
 # Secret sources:
@@ -14,8 +14,9 @@
 # Usage: .\scripts\lobster-trigger-deploy.ps1
 
 param(
-    [string]$VpsHost = "204.168.175.41",
-    [string]$SshKey  = "$env:USERPROFILE\.ssh\hetzner_trigger",
+    # 2026-08-28 consolidation: trigger stack now on ks-aw-01.
+    [string]$VpsHost = "149.202.64.114",
+    [string]$SshKey  = "$env:USERPROFILE\.ssh\id_ed25519",
     [string]$AoOrgId = "39ad4149-5044-4077-8d9a-b6b916de0e21"
 )
 
@@ -45,7 +46,7 @@ if (-not $env:OPS_INBOX_INGEST_TOKEN) { throw "OPS_INBOX_INGEST_TOKEN not set in
 
 # ── 2. Read SERVICE_ROLE_KEY from VPS ──────────────────────────────────────
 Write-Host "[deploy] Reading SERVICE_ROLE_KEY from VPS..." -ForegroundColor Cyan
-$srk = (& ssh -o StrictHostKeyChecking=no -i $SshKey root@$VpsHost `
+$srk = (& ssh -o StrictHostKeyChecking=no -p 58122 -i $SshKey ubuntu@$VpsHost `
     "grep '^SERVICE_ROLE_KEY=' /root/supabase/.env | cut -d= -f2-" 2>&1).Trim()
 if (-not $srk -or $srk.StartsWith("ssh:") -or $srk.Length -lt 20) {
     throw "Could not read SERVICE_ROLE_KEY from VPS /root/supabase/.env"
@@ -164,14 +165,14 @@ export NODE_OPTIONS='--dns-result-order=ipv4first'
 # ── 4. Write script to VPS temp file (stdin, no TTY needed) ───────────────
 # Convert Windows CRLF to Unix LF so bash doesn't choke on \r.
 Write-Host "[deploy] Uploading deploy script to VPS temp file..." -ForegroundColor Cyan
-($deployBash -replace "`r`n", "`n") | & ssh -o StrictHostKeyChecking=no -i $SshKey root@$VpsHost `
+($deployBash -replace "`r`n", "`n") | & ssh -o StrictHostKeyChecking=no -p 58122 -i $SshKey ubuntu@$VpsHost `
     "tr -d '\r' > /tmp/lobster-deploy.sh && chmod 700 /tmp/lobster-deploy.sh"
 if ($LASTEXITCODE -ne 0) { throw "Failed to upload deploy script to VPS." }
 Write-Host "[deploy] Script uploaded." -ForegroundColor Green
 
 # ── 5. Execute script on VPS (no TTY — trigger deploy works without it) ────
 Write-Host "[deploy] Running deploy on VPS..." -ForegroundColor Cyan
-& ssh -o StrictHostKeyChecking=no -i $SshKey root@$VpsHost `
+& ssh -o StrictHostKeyChecking=no -p 58122 -i $SshKey ubuntu@$VpsHost `
     "bash /tmp/lobster-deploy.sh; EC=`$?; rm -f /tmp/lobster-deploy.sh; exit `$EC"
 $exitCode = $LASTEXITCODE
 

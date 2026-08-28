@@ -1086,9 +1086,9 @@ try {
                     if ($msgText -match 'post_update_reboot|requires reboot|needs reboot|System restart required') {
                         $hitHost = $null
                         if ($msgText -match 'awarewave-eu-hel1|hel1-cpx32|204\.168\.175\.41') {
-                            $hitHost = 'EU (awarewave-eu-hel1-cpx32 / 204.168.175.41)'
+                            $hitHost = 'ks-aw-01 (149.202.64.114; ex-EU services since 2026-08-28)'
                         } elseif ($msgText -match 'wordpress-ubuntu-4gb-sin|sin-1|5\.223\.93\.113') {
-                            $hitHost = 'SG (wordpress-ubuntu-4gb-sin-1 / 5.223.93.113)'
+                            $hitHost = 'ks-aw-01 (149.202.64.114; ex-SG services since 2026-08-28)'
                         }
                         if ($hitHost) {
                             $msgDate = if ($m.PSObject.Properties.Name -contains 'date') { [string]$m.date } else { '?' }

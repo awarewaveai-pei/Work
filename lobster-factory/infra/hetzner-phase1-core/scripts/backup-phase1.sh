@@ -6,7 +6,7 @@
 # Environment (from .env or shell):
 #   BACKUP_DIR           — output root (default: ./backups, absolute recommended for cron)
 #   BACKUP_RETAIN_DAYS   — delete local backups older than N days (default: 7)
-#   RCLONE_REMOTE        — rclone destination (e.g. b2:bucket/lobster-phase1); empty = skip
+#   R2_PREFIX            — R2 key prefix (default sg-stack); token from /etc/default/eu-backup
 #   OFFSITE_RETAIN_DAYS  — purge offsite copies older than N days (default: 14)
 #   WORDPRESS_DB_NAME    — database name (required)
 #   WORDPRESS_DB_ROOT_PASSWORD — root password (required)
@@ -112,44 +112,33 @@ if [[ $ERRORS -gt 0 ]]; then
   exit 1
 fi
 
-# --- 5. Offsite upload (opt-in) ---
-OFFSITE_OK=true
-if [[ -n "${RCLONE_REMOTE}" ]]; then
-  if command -v rclone &>/dev/null; then
-    log "Uploading to offsite: ${RCLONE_REMOTE}/${DATE}/ ..."
-    if rclone copy "${OUT}" "${RCLONE_REMOTE}/${DATE}/" --log-level NOTICE 2>&1; then
-      log "  Offsite upload OK"
-    else
-      log "  ERROR: Offsite upload failed"
-      OFFSITE_OK=false
-    fi
-  else
-    log "  WARN: RCLONE_REMOTE set but rclone not installed — skipping offsite"
-    OFFSITE_OK=false
-  fi
-else
-  log "  SKIP: RCLONE_REMOTE not set — no offsite upload"
+# --- 5. Offsite upload: Cloudflare R2 via REST (MANDATORY, 2026-08-28) ---
+# History: this leg was rclone -> `eu-backup:` (SFTP to the EU peer VPS). The
+# 2026-08-28 consolidation retired both peers onto ks-aw-01, so the peer remote
+# is gone; the machine's rclone S3 remote turned out to be a dead config
+# (AccessDenied on every call - never actually used). The path that IS proven
+# daily on this host is upload-to-r2.sh (REST + bearer token) - the same leg
+# the soulful and stack pipelines use. One uploader, three pipelines.
+# R2 is the ONLY offsite in single-machine topology => failure is a hard failure.
+R2_PREFIX="${R2_PREFIX:-sg-stack}"
+export R2_PREFIX
+if [[ -z "${R2_API_TOKEN:-}" && -r /etc/default/eu-backup ]]; then
+  # machine-local R2 credential file (shared by all three backup pipelines)
+  set -a; source /etc/default/eu-backup; set +a
 fi
-
-# --- 5b. Offsite retention (purge the copies we pushed) ---
-# Root cause 2026-08-12: section 6 below only prunes BACKUP_DIR on THIS host.
-# The copies uploaded to the rclone remote were never purged -> 96 snapshots / 31G on EU.
-# Rule: retention follows the producer. Whoever pushes a copy also prunes it.
-# Only runs after a successful upload, so a failed push never deletes history.
-OFFSITE_RETAIN_DAYS="${OFFSITE_RETAIN_DAYS:-14}"
-if [[ "$OFFSITE_OK" == "true" && -n "${RCLONE_REMOTE}" && "${OFFSITE_RETAIN_DAYS}" -gt 0 ]]; then
-  OFFSITE_CUTOFF="$(date -u -d "${OFFSITE_RETAIN_DAYS} days ago" +%Y-%m-%d)"
-  OFFSITE_PRUNED=0
-  while read -r offsite_dir; do
-    [[ "$offsite_dir" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || continue
-    [[ "$offsite_dir" < "$OFFSITE_CUTOFF" ]] || continue
-    if rclone purge "${RCLONE_REMOTE}/${offsite_dir}" >/dev/null 2>&1; then
-      OFFSITE_PRUNED=$((OFFSITE_PRUNED + 1))
-    else
-      log "  WARN: offsite purge failed for ${offsite_dir} (non-fatal)"
-    fi
-  done < <(rclone lsf --dirs-only "${RCLONE_REMOTE}" 2>/dev/null | sed 's:/$::')
-  log "Offsite retention: purged ${OFFSITE_PRUNED} snapshot(s) older than ${OFFSITE_CUTOFF} from ${RCLONE_REMOTE}"
+OFFSITE_OK=false
+if [[ -z "${R2_API_TOKEN:-}" ]]; then
+  log "  ERROR: R2_API_TOKEN not set - no offsite copy possible"
+elif [[ ! -x /root/scripts/upload-to-r2.sh ]]; then
+  log "  ERROR: /root/scripts/upload-to-r2.sh missing or not executable"
+else
+  log "Uploading to R2: lobster-backup/${R2_PREFIX}/${DATE}/ ..."
+  if /root/scripts/upload-to-r2.sh "${OUT}" "${DATE}" 2>&1; then
+    log "  R2 upload OK"
+    OFFSITE_OK=true
+  else
+    log "  ERROR: R2 upload failed"
+  fi
 fi
 
 # --- 6. Retention cleanup (only after successful local backup) ---
@@ -180,7 +169,7 @@ fi
 TOTAL_SIZE=$(du -sh "${OUT}" | cut -f1)
 log "=== Backup complete: ${OUT} (${TOTAL_SIZE}) ==="
 log "  Local retention: ${BACKUP_RETAIN_DAYS} days"
-[[ -n "${RCLONE_REMOTE}" ]] && log "  Offsite: ${RCLONE_REMOTE}/${DATE}/"
+log "  Offsite: R2 lobster-backup/${R2_PREFIX}/${DATE}/"
 
 if [[ "$OFFSITE_OK" == "false" ]]; then
   log "WARNING: Local backup OK but offsite failed. Data is NOT replicated."

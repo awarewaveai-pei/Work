@@ -1,5 +1,9 @@
 Reboot the SG VPS (`wordpress-ubuntu-4gb-sin-1` / 5.223.93.113) safely with full pre-flight + post-flight checklists.
 
+> **🚨 2026-08-28 拓樸退役**：本指令針對的機器已整併入 ks-aw-01（`149.202.64.114`）並待刪除。
+> 單機拓樸下的 reboot = 全站停機窗口，一律 High-risk 手動 + 明示 go-ahead；auto-reboot 決策見 TASKS.md。
+
+
 Use when:
 - Netdata shows `System requires reboot after package updates` (warning), or
 - `/var/run/reboot-required` exists on SG, or

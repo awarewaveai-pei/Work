@@ -1,5 +1,9 @@
 Reboot the EU VPS (`awarewave-eu-hel1-cpx32` / 204.168.175.41) safely with full pre-flight + post-flight checklists.
 
+> **🚨 2026-08-28 拓樸退役**：本指令針對的機器已整併入 ks-aw-01（`149.202.64.114`）並待刪除。
+> 單機拓樸下的 reboot = 全站停機窗口，一律 High-risk 手動 + 明示 go-ahead；auto-reboot 決策見 TASKS.md。
+
+
 Use when:
 - Netdata shows `System requires reboot after package updates` (warning) on `awarewave-eu-hel1-cpx32`, or
 - `/var/run/reboot-required` exists on EU, or

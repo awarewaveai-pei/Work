@@ -1,5 +1,27 @@
 # Backup and Restore Proof — Hetzner Phase 1 (SG VPS)
 
+> ## 🚨 2026-08-28 整併更新：三條備份管線全部住在 ks-aw-01（`149.202.64.114`，SSH 58122/ubuntu/sudo）
+> SG/EU 機器已退場。**跨機互備（L3）已不存在**——單機拓樸下 R2 是唯一異地，
+> 三支 verifier 都已把「R2 物件實列 + 逐檔對應」設為硬性檢查（缺任一檔即 FAIL）。
+>
+> | 管線 | cron 檔（皆在 ks） | 備份目錄 | 驗證 log | R2 prefix |
+> |------|------------------|---------|---------|-----------|
+> | lobster（原 SG：WP DB/uploads）| `/etc/cron.d/lobster-backup` 02:00/02:30 | `/root/lobster-phase1/backups/` | `/var/log/lobster-backup.log` | `sg-stack/<date>/` |
+> | stack（原 EU：Supabase/Trigger/Kuma/MainWP/n8n/Postiz）| `/etc/cron.d/ks-stack-backup` 02:30/03:00 | `/root/backups-stack/` | `/var/log/eu-backup.log` | `eu/<date>/` |
+> | soulful | `/etc/cron.d/ks-aw-01-backup` 02:15/02:45 | `/root/backups/` | `/var/log/ks-aw-01-backup.log` | `ks-aw-01/<STAMP>/`（WORM，見下）|
+>
+> **🔴 R2 還原必讀：大檔是分片的。** `upload-to-r2.sh` 對 >200MiB 的檔案切成
+> `<name>.part-000`、`<name>.part-001`… 加一個 `<name>.parts.json` 清單
+> （**清單只在所有分片都成功後才寫入** = 完整性證明）。還原時重組：
+> ```bash
+> cat <name>.part-* > <name>        # part 檔名有序，glob 展開即正確順序
+> gunzip -t <name> 或 tar tzf <name>  # 重組後先驗完整性再灌
+> ```
+> 歷史 R2 內容：`sg/`（舊 SG 直傳，2026-08-28 前）與 `eu/` 照舊；`sg-stack/` 自 2026-08-28 起。
+> 下方 SG/EU 區塊描述的是退場前的拓樸，保留當歷史證據；路徑在 ks 上依然同構有效
+> （唯 EU 備份目錄已改 `/root/backups-stack/`、cron 檔改名 `ks-stack-backup`、
+> 跨機 L3 與 `backup_to_sg`/`backup_to_eu` 金鑰全部作廢）。
+
 > Infrastructure-level backup evidence for the Phase 1 compose stack.
 > Per LONG_TERM_OPS.md §4: annual minimum restore drill required.
 
