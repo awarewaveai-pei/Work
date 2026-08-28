@@ -168,7 +168,7 @@ done | grep -E '^[0-9a-f]{64}'
 2. **Origin guard**：14 個 proxied hostname `--resolve host:443:NEW_IP` 直連全部 **403**（含 IPv6 直連抽測）；remotion/video 直連 200
 3. **備份三管線**在新機 real-run + verify PASS + R2 objects 實列 + 變異測試（錯 prefix → 可見 FAIL exit 1）
 4. **Kuma 看板 23/23 綠**（URL 全公開網域，不需改）＋ endpoint-alert heartbeat OK（journal 兩輪零失敗輸出）
-5. **Telegram**：`getWebhookInfo` pending=0 無 last_error；**Trigger**：30 分鐘內 TaskRun 全 COMPLETED_SUCCESSFULLY
+5. **Telegram**：`getWebhookInfo` pending=0 無 last_error；**Trigger**：30 分鐘內 TaskRun 全 COMPLETED_SUCCESSFULLY；**MainWP**：對每個子站強制同步並確認 sync_errors 清空（`docker exec mainwp-web wp --allow-root --path=/var/www/html eval '''...MainWP_Sync::sync_site(...)'''`）——切換窗內的失敗同步會留下 **stale 斷線旗標**，不主動重同步要等隔日 cron 才自癒（2026-08-28 實例：aware-wave.com 紅叉 9 小時，實際一次手動同步即緑）
 6. **§1g IP 清單逐檔改** → `check-{backup,capacity,clickhouse,cloudflare-security,deploy-drift}` 全部實跑 PASS
 7. 機上出站：DNS/HTTPS/NTP（edge firewall 規則 0/1/2 的活體證明）；PTR 反查 = ks-aw-01.aware-wave.com
 
