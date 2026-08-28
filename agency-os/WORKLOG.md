@@ -93,6 +93,24 @@ Cursor 2026-08-26 退場、`~\.cursor` 2026-08-28 刪除（1.3 GB），但**產�
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=RCLONE_REMOTE | hits=3(全部為本輪改動檔案的內文/註解,無殘留 call site)
 - REVIEW_DONE: critic=Codex(round1)+class-sweep | verdict=warn→fixed | findings=5c 全修
 
+### 「處理好所有的事」收尾批：部署管線驗證、LE 帳號統一、PAT→deploy key、R2 生命週期、rDNS 正向記錄
+
+[已修改/已執行]
+- **部署管線實證**：手動觸發 auto-deploy-next-admin.sh（與 11:00 cron 同路徑）→「no app-code drift」正確判定（docs commits 不觸發 rebuild，設計如此）；07:00 UTC 那輪 cron 已在 ks 自動跑過 = 整條自動部署鏈在新機存活
+- **LE 帳號統一**：三張 EU 時代憑證（supabase/remotion/video）的 renewal conf 改指 ks 帳號；`certbot renew --dry-run` 全部模擬續期成功（5/5）
+- **PAT 退場**：`/root/Work` remote 從內嵌 PAT 的 https 改為 GitHub read-only deploy key（id=161572505，`/root/.ssh/work_deploy` + ssh config alias）；實測 git pull 成功拉到最新 commit
+- **R2 生命週期補齊**：`lobster-backup` bucket 原本只有 multipart-abort 規則，備份前綴永不過期 = 無上限累積；新增 eu/ sg-stack/ sg/ ks-aw-01/ 各 30 天過期（30d > 14d WORM lock 不衝突；預估穩態 ~112GB ≈ $1.7/月封頂）
+- **rDNS 正向記錄**：`ks-aw-01.aware-wave.com` A 記錄已建（DNS-only）並外部解析驗證；反向那半等操作者在 OVH console 填
+- **OVH Edge Firewall**：嘗試用操作者 Chrome 代點 → OVH 要求重新登入（舊 manager 網址觸發 action=disconnect，可能連帶登出了既有 session，已告知）；輸入密碼屬絕對禁區故停手，規則表已在 TASKS P2.5c，操作者登入後可由代點或自點
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=certbot renew --dry-run | exit=0 | ms=60000 — 5/5 Congratulations
+- REALTEST_EVIDENCE: tool=SSH | cmd=git pull via deploy key | exit=0 | ms=8000 — 拉到 11f2783e
+- REALTEST_EVIDENCE: tool=curl | cmd=R2 lifecycle PUT + GET 回讀 | exit=0 | ms=3000 — success:true，5 條規則
+- REVIEW_DONE: critic=Self | verdict=pass | findings=0c/0m/1n — note：deploy key 為 read-only，ks 上任何流程不需要 push（auto-deploy 只 pull），權限最小化成立
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=work_deploy | hits=0 — 新路徑無既有 call site 衝突
+- 待操作者：① OVH 登入後設 Edge Firewall + rDNS ② 刪除兩台 Hetzner（不可逆，等明示同意）
+
 ### 三輪覆審 Round 2（6 findings）+ Round 3（4 findings，3 修 1 過時）——全部閉環，監控工具鏈單機化完成
 
 **Round 2（Codex，逐條驗真後修）**：
