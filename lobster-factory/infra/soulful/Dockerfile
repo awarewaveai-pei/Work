@@ -72,10 +72,19 @@ RUN set -eux; \
 # WordPress core updates / plugin operations after cutover assume it exists.
 # Verified at build time rather than trusted: a broken download would otherwise surface
 # the first time someone needs it, which is exactly when they cannot afford to debug it.
+# M5: the phar is verified against the sha512 wp-cli publishes alongside the release,
+# BEFORE it is installed or executed. The previous check ran the downloaded phar and
+# grepped its own version string -- a substituted binary controls what it prints, so
+# that proved "a runnable phar that claims to be 2.12.0", not "the official artifact".
+# This binary runs as root in the container serving a store; liveness is not integrity.
 RUN set -eux; \
-    curl -fsSL -o /usr/local/bin/wp \
+    curl -fsSL -o /tmp/wp.phar \
       https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar; \
-    chmod +x /usr/local/bin/wp; \
+    curl -fsSL -o /tmp/wp.phar.sha512 \
+      https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar.sha512; \
+    echo "$(cat /tmp/wp.phar.sha512)  /tmp/wp.phar" | sha512sum -c -; \
+    install -m 0755 /tmp/wp.phar /usr/local/bin/wp; \
+    rm -f /tmp/wp.phar /tmp/wp.phar.sha512; \
     wp --allow-root --version | grep -q "2.12.0" || { echo "FATAL: wp-cli did not install"; exit 1; }
 
 COPY php-limits.ini /usr/local/etc/php/conf.d/zz-soulful-limits.ini

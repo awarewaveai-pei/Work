@@ -199,7 +199,19 @@ try {
     # Cutover therefore flips ONE value (SOULFUL_DB_PROFILE=ks-aw-01) rather than editing
     # this script under time pressure. Everything below the profile — base64 transport,
     # row parsing, the no-evidence-is-not-a-skip verdicts — is shared and untouched.
-    $profileName = $env:SOULFUL_DB_PROFILE; if (-not $profileName) { $profileName = "hostinger" }
+    # M4: User scope FIRST, matching every other env read in this file (:97-100, :152-155).
+    # This script is spawned by ao-resume.ps1 as a child process, and a session-scoped
+    # $env: set in some other shell never reaches it -- so "unset" here used to silently
+    # mean "hostinger", which after cutover is not a typo but the DEFAULT, quietly
+    # measuring the decommissioned host (freeze blocks HTTP, not SSH; WP-CLI bypasses
+    # maintenance mode). The date tripwire makes "unset after the deadline" land in the
+    # exhaustive switch's default branch -> warn:unknown_profile + blind spot, instead of
+    # a green verdict from a dead machine.
+    $profileName = [Environment]::GetEnvironmentVariable("SOULFUL_DB_PROFILE", "User")
+    if (-not $profileName) { $profileName = $env:SOULFUL_DB_PROFILE }
+    if (-not $profileName) {
+        $profileName = if ((Get-Date) -gt [datetime]"2026-11-12") { "unset_after_hostinger_deadline" } else { "hostinger" }
+    }
 
     # The SQL is profile-independent: both back ends return a bare tab-separated row.
     $sql = "SELECT (SELECT COUNT(*) FROM wp_fsmpt_email_logs WHERE status='failed' AND created_at > (UTC_TIMESTAMP() - INTERVAL 7 DAY)) AS failed7d, IFNULL(DATEDIFF(UTC_TIMESTAMP(), (SELECT MAX(created_at) FROM wp_fsmpt_email_logs WHERE status='sent')), -1) AS quiet_days;"

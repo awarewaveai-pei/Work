@@ -32,9 +32,11 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=request_uri | hits=4（1=HTTP→HTTPS 301 轉址的正確用法（轉址本來就該保留原始字串）；3=解釋為何不可用它做快取判斷的註解；**快取判斷路徑 0 個殘留**）
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=soulful-smoke.cnf | hits=2（皆為修後的 trap 清理路徑）
 
-**[剩餘風險]** M4（profile 讀取只看 process env，AO-RESUME 子行程讀不到 → 建議切換日直接寫入 user-env.ps1 的 User scope）、
-M5（wp-cli phar 無 sha512 驗證）、M9（`add_header` 在 location 內會丟棄繼承 header —— 目前 server 層無 header 故無實害，加固時要記得）尚未修，均不在凍結路徑。
-C4 的過期後行為驗證見本 session 尾（TTL 邊界測試）。
+**[後續同日補完]** M4/M5/M9 亦已修畢並實測：
+- M4：profile 改讀 User scope 優先（與同檔其他 env 讀取一致）+ 死線日期絆線 —— 2026-11-12 後仍未設定會落入 `warn:unknown_profile` 而非假綠。兩側行為皆實測
+- M5：wp-cli phar 下載後先對 wp-cli 官方發佈的 sha512 驗證才安裝（先確認 .sha512 檔為純 hash 格式再套用組合式 checkfile）。真機 rebuild：`/tmp/wp.phar: OK`、容器 healthy、WP-CLI 2.12.0
+- M9：實查 nginx -T —— 全設定僅一個 add_header（X-Soulful-Cache），wp-login 上的安全 header 來自 WordPress 上游透傳、不受繼承規則影響 → 今日零實害；地雷以完整註解寫死在 add_header 旁（含「HSTS 刻意不設」的理由：回滾指向 Hostinger、其憑證 2026-10-25 到期，長 max-age 會把回滾變成瀏覽器硬失敗）。順修 xmlrpc 403+log off → 444 有記錄（回到 scanner-block 的可見性模型），實測 000/連線關閉、站 200
+- C4 TTL 邊界突變測試：停後端 → 60s 內 HIT（TTL 容忍，正常）→ **70s 後 502 EXPIRED**（修前會永遠 HIT 200）→ 恢復後重新驗證。殭屍頁行為證明消除
 
 **[rollback]** nginx: 註解掉 `proxy_cache soulful_cache;` 一行 + reload（runbook 已載明）；腳本: git + scp 任一版本。
 
