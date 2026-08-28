@@ -93,6 +93,22 @@ Cursor 2026-08-26 退場、`~\.cursor` 2026-08-28 刪除（1.3 GB），但**產�
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=RCLONE_REMOTE | hits=3(全部為本輪改動檔案的內文/註解,無殘留 call site)
 - REVIEW_DONE: critic=Codex(round1)+class-sweep | verdict=warn→fixed | findings=5c 全修
 
+### OVH 基礎設施層完工：Edge Network Firewall 上線 + rDNS 配對（P2.5c 從「已查清」升級「已完成」）
+
+**路徑曲折但結局乾淨**：① 操作者帳號在 OVH 世界區（ca.ovhcloud.com），我先導到歐洲區登入頁造成「密碼錯誤」謎題（兩套獨立帳號庫）② IP 頁 UI 的 inline 表單確認鈕 hitbox 對滑鼠座標映射極不友善（每次都點到取消鈕，零 API 呼叫零錯誤提示）③ 最終改用 **Manager 內建 Cloud Shell（`ovhcloud` 官方 CLI，用操作者現有 session）** —— 每步指令級回饋，全程不碰密碼。
+
+[已執行（OVH 側，全部有 CLI 成功訊息截圖紀錄）]
+- `ip firewall add` 註冊 149.202.64.114
+- 8 條規則全建立且全部 state=ok：seq0 permit tcp established / seq1 permit udp src-port 53（DNS 回包，stateless 必需）/ seq2 udp src 123（NTP）/ seq3 icmp / seq4 tcp 58122 / seq5 tcp 80 / seq6 tcp 443 / seq19 deny ipv4
+- `ip firewall enable` → enabled=true state=ok（注：IPv4-only，v6 靠機上 UFW+DOCKER-USER，已就位）
+- `ip reverse set` → ks-aw-01.aware-wave.com（正向 A 早上已建，反向即刻生效）
+- GAME firewall 刻意不設（L7 遊戲協定專用，官方文件對非遊戲流量明說無益）；Anti-DDoS=Automatic 預設即使用
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH+curl | cmd=防火牆啟用後即刻外部全項探測 | exit=0 | ms=60000 — SSH 58122 OK；機上出站 DNS/HTTPS/NTP 全通（規則 0/1/2 實證）；14/14 公開端點狀態碼正確；DNS-only 直連 200；ICMP 通；Trigger 近 30 分鐘 6/6 成功
+- REALTEST_EVIDENCE: tool=nslookup | cmd=PTR 149.202.64.114 | exit=0 | ms=1000 — 回 ks-aw-01.aware-wave.com，正反配對完成
+- 回滿路徑：同一 Cloud Shell 一行 `ovhcloud ip firewall disable 149.202.64.114/32 149.202.64.114`
+
 ### 「處理好所有的事」收尾批：部署管線驗證、LE 帳號統一、PAT→deploy key、R2 生命週期、rDNS 正向記錄
 
 [已修改/已執行]
