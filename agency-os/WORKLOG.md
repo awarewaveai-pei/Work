@@ -33,6 +33,19 @@
 [剩餘風險] OQ-2 未答前 lineage 存疑；全部結論為 Claude 單模型產出，CONVERGENCE_MATRIX 前不得視為 FACT。
 [rollback] `git revert` 本 commit 即可；三母文件內容未動（hash 可驗），`.ai/` 為純新增目錄。
 
+## 2026-08-29
+
+### Netdata Cloud claim 補齊（整併日已登記的待辦，操作者發現 Cloud 上還是舊 Hetzner 兩節點）
+
+**根因**：claim 需操作者帳號的一次性 token，整併日只能列 TASKS 待辦。今日經操作者登入的 Chrome 取得 token 後執行。
+**坑**：Ubuntu 24.04 發行版 netdata 1.43.2 編譯時 `--disable-cloud`，`netdata-claim.sh` 直接拒絕（exit=3）；kickstart 又拒絕覆蓋系統套件。解法：備份 /etc/netdata → purge 發行版 → kickstart --stable-channel 官方庫重裝+claim。官方版預設監聽 0.0.0.0 → netdata.conf [web] bind to = 127.0.0.1 綁回本地。
+**順驗**：Grafana/Loki/Promtail/Slack/Telegram 告警鏈全部實查活著（操作者質疑觸發）：grafana health=200、Loki 15m 內有新 stream、endpoint-alert.timer active 每分鐘觸發。操作者書籤 127.0.0.1:3009 走 SSH tunnel，改指新機即通。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo netdatacli aclk-state (Claimed: Yes, Id ccc95d48) + ss -tlnp grep 19999 (127.0.0.1 only) + Cloud UI 3/3 Live | exit=0 | ms=8000
+- REVIEW_WAIVED: DOC_ONLY -- 本次無 repo code 改動（遠端主機套件更換 + TASKS/WORKLOG 登記）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=netdata-claim | hits=1（TASKS.md 待辦行本次同步更新；scripts 無 netdata 依賴）
+- AUTO_TASK_DONE: Netdata Cloud claim — ks-aw-01 上線 3/3 Live；舊節點保留至刪機
+
 ## 2026-08-28
 
 ### Cursor 退場的真正代價：一個假話語法漏進 Claude 的產出（14 支 MCP 天天失敗而所有 gate 全綠），以及移除它時扯出的四條斷鏈
