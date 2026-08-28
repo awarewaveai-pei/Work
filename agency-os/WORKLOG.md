@@ -35,6 +35,15 @@
 
 ## 2026-08-29
 
+### 換機 runbook 補今日兩個真坑 + 新子網域 cognitive.aware-wave.com 待搬 checklist（操作者要求）
+
+**坑 1**：Ubuntu 發行版 netdata 編譯 `--disable-cloud`，claim 必拒（今日實流）→ 寫進 §1d：purge 發行版→官方 stable kickstart 重裝+claim→綁回 127.0.0.1。
+**坑 2**：新網域上線未補 DMARC → 可被偽造寡信且不主動告警（今日實流）→ 寫進 §1e。
+**新增**：§1e 追加「新子網域上線 checklist」（DNS/nginx guard/TLS/DMARC/硬編 IP 清單/記錄數量同步），首筆适用對象 `cognitive.aware-wave.com`（操作者建造中的 Cognitive Engineering 工具，DNS 延後到 MVP 可 serve 才建——交叉引用另一 session 的決策 SSOT `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_OS_Program_Plan_v1.md:142`，避免兩份文件各說各話）。
+
+- REVIEW_WAIVED: DOC_ONLY -- runbook 文字新增，無 code 改動
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks | grep=cognitive.aware-wave | hits=1（另 session 的 Program Plan已交叉引用，無 stale）
+
 ### CF DNS 頁兩個警告判讀（操作者貼圖質疑）：DMARC 真缺口已補；「IP 外洩」是刻意設計非問題
 
 **警告 1（DMARC 缺）= 真缺口**：aware-wave.com 無 _dmarc 記錄（soulful 早有 p=none）。已經 CF API 新增 `v=DMARC1; p=none; rua=mailto:<operator gmail>; fo=1`（監控模式，零投遞風險；觀察報告幾週後可升 quarantine）。

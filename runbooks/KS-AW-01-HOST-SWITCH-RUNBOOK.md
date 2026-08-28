@@ -206,6 +206,33 @@ done | grep -E '^[0-9a-f]{64}'
 | buildx builder metadata 不在 volume | 換機後首次 trigger deploy 推 registry 失敗 | §1d（2026-08-28 覆審發現 ks 現役就漏，已補） |
 | external docker network 不自建 | n8n/render/SG compose 起不來 | §2.4 |
 | 已接寫後 DNS 直接回切 | 丟失新機已接受的寫入 | §7(b) 反向同步 |
+| Ubuntu 發行版 netdata 編譯 `--disable-cloud` | `netdata-claim.sh` 直接拒絕(exit=3),kickstart 也拒絕覆蓋系統套件管理的安裝 | §1d（2026-08-29 補：換機須 purge 發行版套件→官方 stable kickstart 重裝+claim→`[web] bind to = 127.0.0.1` 綁回本地，見下方新增條目） |
+| 新網域上線未補 DMARC | 該網域可被偽造寄信，且不會主動跳警告直到被人拿去釣魚 | §1e（2026-08-29 補：新增子網域/新 zone 上線 checklist 需含 `_dmarc` TXT） |
+
+### 1d 追加：Netdata Cloud claim（2026-08-29 補）
+
+換機後若要接回 Netdata Cloud 儀表板：**不能**沿用 Ubuntu `apt install netdata`（編譯時 `--disable-cloud`，claim 必拒絕）。正確順序：
+```
+sudo cp -a /etc/netdata /root/netdata-etc-bak-$(date +%Y%m%d)
+sudo apt-get remove --purge -y netdata netdata-core netdata-web netdata-plugins-bash
+wget -qO /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh
+sudo sh /tmp/netdata-kickstart.sh --stable-channel --non-interactive \
+  --claim-token <TOKEN> --claim-rooms <ROOM_ID> --claim-url https://app.netdata.cloud
+```
+官方版預設監聽 `0.0.0.0:19999`，裝完務必在 `/etc/netdata/netdata.conf` 的 `[web]` 段加 `bind to = 127.0.0.1` 再 `systemctl restart netdata`，否則對外暴露監控面板。`sudo netdatacli aclk-state` 應回 `Claimed: Yes`。
+
+### 1e 追加：新子網域上線 checklist（2026-08-29，`cognitive.aware-wave.com` 待搬）
+
+**Cognitive Engineering 工具**（操作者建造中，尚未上線）預定掛 `cognitive.aware-wave.com`，之後換機時比照本節 13 筆 A 記錄流程一併搬遷。**DNS 記錄本身延後到 MVP 可 serve 才建**（決策 SSOT：`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_OS_Program_Plan_v1.md:142`，理由：避免 dangling DNS / subdomain takeover / Kuma 假紅）。新子網域/新服務上線一律走這張表，勿漏：
+
+| 項目 | 動作 |
+|------|------|
+| CF DNS A 記錄 | 加 `cognitive.aware-wave.com` → 新機 IP，預設 proxied🟠（除非有 CF 100s timeout 顧慮，同 remotion-svc/video-svc 案例才設 DNS-only） |
+| nginx vhost | 新建 `sites-available/cognitive.aware-wave.com`，**務必 `include /etc/nginx/snippets/cf-only.conf`**（2026-08-28 坑：漏插 guard = 裸奔） |
+| TLS | certbot 簽新網域證書，走同一帳號（`renewal/` 已統一單一 account，勿另開新帳號） |
+| DMARC | 若此工具會寄信（通知/驗證信等），確認 apex `_dmarc.aware-wave.com` 已存在（**2026-08-29 已補**，見 §8 上表） |
+| §1g 硬編 IP 清單 | 若程式碼寫死 IP 或網域，跑 `git grep` 重新產清單納入換機改動範圍 |
+| §1e 本節 A 記錄計數 | 上線後從 13 筆更新為 14 筆，換機日 1e 表格同步改 |
 
 ---
 
