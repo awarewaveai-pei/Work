@@ -93,6 +93,24 @@ Cursor 2026-08-26 退場、`~\.cursor` 2026-08-28 刪除（1.3 GB），但**產�
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=RCLONE_REMOTE | hits=3(全部為本輪改動檔案的內文/註解,無殘留 call site)
 - REVIEW_DONE: critic=Codex(round1)+class-sweep | verdict=warn→fixed | findings=5c 全修
 
+### 操作者質疑「沒完美處理好」→ 對抗自審：抓到一個躇在 git 歷史兩個月的真洩漏，當場輪換閉環
+
+**密鑰掃描（tracked tree + 全歷史 -S）**：
+- ✅ 真洩漏：`WORKLOG-archive/2026-06.md:1697` 含完整 43 字元 `RENDER_AUTH_TOKEN`（守護對外開放的 DNS-only render 端點——這把 token 就是整道牆），自 6 月起在已推送歷史。
+- ❌ 誤報 1：`ops/tools/page.tsx:39` — Slack webhook 是**刻意截斷的展示字串**（`…（環境變數）`），只含 T/B 識別碼不含密段。
+- ❌ 誤報 2：`2026-05.md:5073` 的 sk-ant 僅 22 字元截斷引用（真鑰 100+）；audit 報告命中 = redactSecrets 測試假資料。
+- ✅ Kuma push token / R2 cfut / n8n⁄mainwp 密碼 / Pexels⁄OpenAI key：**不在** repo 也不在歷史（今日僅曾印到本地終端，`.claude/sessions/` 實查未收錄工具輸出，未進 git）。
+
+**RENDER_AUTH_TOKEN 輪換（自簽密鑰，完整閉環）**：
+- 消費點地圖：ks 全盤 grep 舊值 = 3 檔（render-services 兩 env + lobster-phase1/.env 兩處）；Trigger EnvironmentVariable 表 19 筆無 RENDER → 無其他消費者
+- `openssl rand -hex 24` 新值 → 三檔替換（.bak-rotate-20260828 保留回滾）→ render 兩容器 force-recreate + next-admin 自動 Recreate
+- REALTEST_EVIDENCE: tool=curl | cmd=公網直打 video-svc /render 舊新 token 對照 | exit=0 | ms=15000 — **舊=401（已死）新=400（過驗證只差 body）**，health=200，全容器 healthy
+- `2026-06.md:1697` 已清洗為 `<REDACTED-ROTATED-2026-08-28>`；git 歷史中的舊值已因輪換而死，完整 history-scrub（filter-repo + force push）爆炸半徑大，列為可選後續
+
+**附帶驗證三項（蓋掃前未驗證的盲點）**：Telegram webhook → app.aware-wave.com，pending=0 無錯誤（指令通道活）；11:00 auto-deploy cron 實跑 OK；MainWP 容器內实测可達 soulful 子站 wp-json 200。
+
+**誚實列出仍未驗證/未完成（不裝沒有）**：① lobster/stack 兩條備份管線的 **cron 自動跑**今晚 02:00/02:30 UTC 才第一次（手動實跑已過，health-check 現在會監視）② P2.4c 全面密碼輪換仍開放（多服務連動，需專門 session）③ Netdata Cloud claim 需操作者 token（可選）④ 舊機刪除等明示同意。
+
 ### 操作者書籤掃描揭稿：Kuma 18/27 監控標的死在舊拓樸 + Netdata 代理缺口 + IPv6 白名單盲點
 
 **觸發**：操作者帼出書籤清單問「這些也都搬好了？」。自架 11 項已全搬；但逐項實查抓出三個真缺口：
