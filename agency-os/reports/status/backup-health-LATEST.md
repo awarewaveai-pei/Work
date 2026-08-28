@@ -1,7 +1,7 @@
 # Backup health report
 
-- Generated: 2026-08-28 16:47:11
-- Overall: **PASS**
+- Generated: 2026-08-28 18:29:53
+- Overall: **WARN**
 
 ## lobster (ex-SG) (149.202.64.114)
 - Cron file: /etc/cron.d/lobster-backup => **present**

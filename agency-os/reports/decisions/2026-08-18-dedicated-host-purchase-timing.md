@@ -129,6 +129,10 @@
 
 ### 切換條件（何時應重新評估本決策）
 
+> **2026-08-28 接棒公告**：整併已完成（SG+EU+soulful 全部落地 ks-aw-01），下列「切換窗已關」類條款由
+> [`runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md`](../../../runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md) 接棒：
+> 換機永遠可行，成本已重新定價（~40 分鐘停機分片 + 1 工作日），Go/No-Go 與執行步驟以該 runbook 為準。
+
 - [x] **下單當下 KS-6 無貨** → 不觀望，改 C4（Rise-1）或當下合規最便宜 Hetzner auction 機；本決策的「立刻買」原則不變，只換標的
   - **✅ 2026-08-26 觸發並執行，但實際標的偏離本條寫定的次選路徑**：KS-6 確認無貨；未走 C4（Rise-1）或 Hetzner auction，操作者實際下單 **OVH SYS-GAME-2**（Ryzen 7 3800X 8c/16t / **64GB ECC**（低於 P1.2 規格下限 128GB）/ **2×960GB NVMe soft RAID**（低於下限 1TB）/ $72/mo，Gravelines FR）。「立刻買」原則有守住，但規格下限**沒有**守住。
   - **【2026-08-26 澄清，取代同日稍早的錯誤記錄】操作者明確要求：範圍不縮小，原計畫（soulful + Chatwoot U6 + 2026-11-20 起 EU/SG 整併六服務）照舊全部上這台機器**，不因規格低於下限而砍範圍。同日稍早本文件與周邊文件（TASKS.md／SITE_MIGRATION_RUNBOOK.md／memory）一度被寫成「範圍縮小為僅 Soulful」，已被操作者推翻並全部改回。**實際緩解措施改為監控與節奏，不是砍範圍**：① P6 監控閾值（RAM/磁碟 60%，非 85%）從「保守值」升級為**硬指標**，因為 64GB 對 37–58GB 負載帳只剩 9–42% headroom（128GB 版本的四分之一）② 11/20 起六服務**維持兩週一台**節奏，不可一次全塞上去測水位③ ClickHouse 已 OOM 4 次，這台機更沒有 RAM 掩蓋病灶的餘裕，`override.xml` 產生源設定修復（Pre-mortem 風險 #3）優先序不變。1TB／128GB 天花板問題原樣未解，留待下次換機決策。詳見 `WORKLOG.md` 2026-08-26「Soulful 搬遷主機」entry 及同日後續澄清 entry。

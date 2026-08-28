@@ -371,9 +371,6 @@ powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1
 
 ## Related Documents (Auto-Synced)
 - `../README.md`
-- `.cursor/rules/00-session-bootstrap.mdc`
-- `.cursor/rules/30-resume-keyword.mdc`
-- `.cursor/rules/40-shutdown-closeout.mdc`
 - `AGENTS.md`
 - `docs/operations/end-of-day-checklist.md`
 - `docs/overview/EXECUTION_DASHBOARD.md`
@@ -382,5 +379,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1
 - `RESUME_AFTER_REBOOT.md`
 - `TASKS.md`
 
-_Last synced: 2026-06-16 14:30:02 UTC_
+_Last synced: 2026-08-28 11:57:18 UTC_
 

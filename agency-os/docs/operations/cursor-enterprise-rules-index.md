@@ -63,14 +63,9 @@
 4. **`63`–`66` 同步到 monorepo 根**：已自動化 — `verify-build-gates.ps1` 與 `doc-sync-automation.ps1`（Apply）會呼叫 **`scripts/sync-enterprise-cursor-rules-to-monorepo-root.ps1`**；健檢會對四檔做 SHA256 比對（見 `README-部署說明.md` § Monorepo 根工作區）。
 
 ## Related Documents (Auto-Synced)
-- `../docs/spec/raw/Cursor  Rules for AI/README-部署說明.md`
 - `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`
 - `../lobster-factory/docs/ROUTING_MATRIX.md`
 - `../README.md`
-- `.cursor/rules/63-cursor-core-identity-risk.mdc`
-- `.cursor/rules/64-architecture-mcp-routing.mdc`
-- `.cursor/rules/65-build-standards-data-state.mdc`
-- `.cursor/rules/66-skills-observability-protocol.mdc`
 - `AGENTS.md`
 - `docs/CHANGE_IMPACT_MATRIX.md`
 - `docs/change-impact-map.json`
@@ -80,5 +75,5 @@
 - `docs/operations/security-secrets-policy.md`
 - `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md`
 
-_Last synced: 2026-08-26 04:45:21 UTC_
+_Last synced: 2026-08-28 11:57:18 UTC_
 

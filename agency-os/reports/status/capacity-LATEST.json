@@ -1,5 +1,5 @@
 {
-    "generatedAt":  "2026-08-28T08:40:45.9876609Z",
+    "generatedAt":  "2026-08-28T10:30:29.6116570Z",
     "overall":  "FAIL",
     "fatal":  false,
     "fatalReason":  "",
@@ -29,18 +29,18 @@
                                    "ok":  true,
                                    "error":  "",
                                    "mem_total_kb":  65731400,
-                                   "mem_avail_kb":  53176956,
-                                   "mem_used_kb":  12554444,
-                                   "mem_used_pct":  19.1,
-                                   "swap_used_pct":  11.1,
-                                   "psi_mem_some":  2.28,
-                                   "psi_mem_full":  2.15,
-                                   "psi_io_some":  0.23,
-                                   "psi_cpu_some":  10.63,
+                                   "mem_avail_kb":  53360068,
+                                   "mem_used_kb":  12371332,
+                                   "mem_used_pct":  18.8,
+                                   "swap_used_pct":  0.3,
+                                   "psi_mem_some":  0,
+                                   "psi_mem_full":  0,
+                                   "psi_io_some":  0,
+                                   "psi_cpu_some":  6.44,
                                    "oom_vmstat":  15,
                                    "oom_journal":  15,
                                    "disk_total_kb":  919652204,
-                                   "disk_used_kb":  98062588,
+                                   "disk_used_kb":  98081460,
                                    "disk_pct":  12,
                                    "inode_pct":  5,
                                    "containers_running":  41,
@@ -49,10 +49,10 @@
                                    "restarts":  "",
                                    "restarts_measured":  true,
                                    "docker_present":  true,
-                                   "top_mem":  "soulful-db=2.752GiB postiz=1.18GiB soulful-wp=815.6MiB trigger-webapp=757.4MiB supabase-kong=753.6MiB trigger-clickhouse=457.7MiB",
+                                   "top_mem":  "soulful-db=2.76GiB postiz=1.193GiB soulful-wp=1009MiB trigger-webapp=749.9MiB trigger-clickhouse=398MiB supabase-kong=290.2MiB",
                                    "reclaimable":  "Images=463.6MB (1%),Containers=0B (0%),Local Volumes=12.76GB (56%),Build Cache=57.19MB",
                                    "cpu_cores":  16,
-                                   "load1":  0.56,
+                                   "load1":  0.32,
                                    "uptime_days":  1
                                }
               },
@@ -63,7 +63,6 @@
 
                                                 ],
                                       "reasons":  [
-                                                      "memory stall (PSI full avg60 2.15%) -- tasks are BLOCKED on memory",
                                                       "OOM kills observed: 15 (vmstat=15, journal=15)"
                                                   ]
                                   }

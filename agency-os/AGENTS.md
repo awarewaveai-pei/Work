@@ -388,6 +388,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依 `.claude/command
 | VPS reboot 訊號 + 16h 未處理 | `runbooks/VPS-AUTO-REBOOT-RUNBOOK.md` |
 | 雲端排程報告沒更新 / Telegram 排程警報 / routine source 漂移 / 週報月報 stale | `runbooks/自動排程監控與手機Telegram警報-維護手冊.md` |
 | EU/SG 搬機 / 上 dedicated 主機 / 備份策略 / RAID / 災難還原 / Cloud→Dedicated 遷移 | `runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md` |
+| 換更便宜機器 / KS-6 / KS-7 / 整機轉移 ks-aw-01 / 月租退出權 | `runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md` |
 
 MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 
@@ -434,12 +435,6 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 > 它們描述的是當時為真的事。
 
 ## Related Documents (Auto-Synced)
-- `.cursor/rules/00-session-bootstrap.mdc`
-- `.cursor/rules/10-memory-maintenance.mdc`
-- `.cursor/rules/20-doc-sync-closeout.mdc`
-- `.cursor/rules/30-resume-keyword.mdc`
-- `.cursor/rules/40-shutdown-closeout.mdc`
-- `.cursor/rules/63-cursor-core-identity-risk.mdc`
 - `docs/CHANGE_IMPACT_MATRIX.md`
 - `docs/operations/BUG_HUNT_PROTOCOL.md`
 - `docs/operations/cursor-enterprise-rules-index.md`
@@ -451,5 +446,5 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-08-26 04:45:21 UTC_
+_Last synced: 2026-08-28 11:57:18 UTC_
 

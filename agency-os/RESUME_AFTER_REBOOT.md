@@ -46,5 +46,5 @@
 - `docs/operations/system-guard-and-notification.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-06-16 14:30:02 UTC_
+_Last synced: 2026-08-28 11:57:18 UTC_
 

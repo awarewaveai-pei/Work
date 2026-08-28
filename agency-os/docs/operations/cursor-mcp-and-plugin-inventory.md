@@ -139,7 +139,6 @@ perplexity → 內建 + **work-global** → 雲商 MCP → **龍蝦寫入**只�
 ## Related Documents (Auto-Synced)
 - `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`
 - `../lobster-factory/docs/ROUTING_MATRIX.md`
-- `.cursor/rules/64-architecture-mcp-routing.mdc`
 - `AGENTS.md`
 - `docs/operations/cursor-enterprise-rules-index.md`
 - `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
@@ -147,5 +146,5 @@ perplexity → 內建 + **work-global** → 雲商 MCP → **龍蝦寫入**只�
 - `README.md`
 - `TASKS.md`
 
-_Last synced: 2026-08-26 04:45:21 UTC_
+_Last synced: 2026-08-28 11:57:18 UTC_
 

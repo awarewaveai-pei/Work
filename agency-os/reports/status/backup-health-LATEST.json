@@ -1,6 +1,6 @@
 {
-    "generatedAt":  "2026-08-28T08:47:11.4284248Z",
-    "overall":  "PASS",
+    "generatedAt":  "2026-08-28T10:29:53.6315815Z",
+    "overall":  "WARN",
     "fatal":  false,
     "fatalReason":  "",
     "sg":  {
@@ -8,7 +8,7 @@
                "ok":  true,
                "error":  "",
                "cron_status":  "present",
-               "unverified_latest":  "no",
+               "unverified_latest":  "yes",
                "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|0 2 * * * root /root/lobster-phase1/scripts/backup-phase1.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261|30 2 * * * root /root/lobster-phase1/scripts/verify-backup.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261",
                "retention_days":  "7",
                "retention_source":  "static",
@@ -24,7 +24,7 @@
                "ok":  true,
                "error":  "",
                "cron_status":  "present",
-               "unverified_latest":  "no",
+               "unverified_latest":  "yes",
                "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|30 2 * * * root BACKUP_DIR=/root/backups-stack /root/scripts/backup-eu-stack.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261|0 3 * * * root BACKUP_DIR=/root/backups-stack /root/scripts/verify-backup-eu.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261",
                "retention_days":  "7",
                "retention_source":  "static",

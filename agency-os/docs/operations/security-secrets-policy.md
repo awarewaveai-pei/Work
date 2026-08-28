@@ -53,10 +53,9 @@
 3. 記錄於 `docs/operations/RUNBOOK_INCIDENT_RESPONSE.md` 事件流程
 
 ## Related Documents (Auto-Synced)
-- `.cursor/rules/64-architecture-mcp-routing.mdc`
 - `docs/international/global-compliance-baseline.md`
 - `docs/operations/cursor-enterprise-rules-index.md`
 - `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
 
-_Last synced: 2026-08-26 04:45:21 UTC_
+_Last synced: 2026-08-28 11:57:18 UTC_
 

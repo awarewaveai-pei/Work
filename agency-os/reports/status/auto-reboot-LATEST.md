@@ -1,6 +1,6 @@
 ﻿# VPS auto-reboot health
 
-- Generated: 2026-08-28 09:10:53 UTC
+- Generated: 2026-08-28 10:30:07 UTC
 - **Verdict: [YELLOW] topology-retired**
 
 SG/EU were consolidated onto ks-aw-01 on 2026-08-28 and are pending deletion.

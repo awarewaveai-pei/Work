@@ -1,5 +1,8 @@
 ﻿# EU 自架 Stack — 備份 / RAID / 災難還原 Runbook（上 Dedicated 主機的安全前提）
 
+> **🚨 2026-08-28 拓樸更新**：EU/SG 已整併入 ks-aw-01。本檔的備份/還原/硬化章節仍為正本；**單機時代的換機（例 KS-6/KS-7 更便宜方案）唯一正本** → [`KS-AW-01-HOST-SWITCH-RUNBOOK.md`](KS-AW-01-HOST-SWITCH-RUNBOOK.md)。本檔 §5 描述的 EU/SG 分立拓樸屬歷史。
+
+
 > **這份文件是什麼**：EU VPS（`204.168.175.41`，跑 Supabase + Trigger + n8n + Postiz + MainWP + Uptime Kuma）
 > 若要從 Hetzner **Cloud** 搬到便宜很多的 **Dedicated auction（Serverbörse）** 二手實體機，會失去 Cloud 的「硬體壞自動遷移」。
 > 本 runbook = **讓 dedicated 變安全的前提層**：要備份什麼、備到哪、RAID 怎麼設、硬體壞了怎麼還原、Cloud→Dedicated 怎麼搬。
