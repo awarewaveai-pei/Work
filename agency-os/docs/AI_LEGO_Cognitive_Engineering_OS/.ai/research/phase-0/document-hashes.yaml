@@ -1,0 +1,23 @@
+# AI LEGO OS — Phase 0 document hash snapshot
+# Generated: 2026-08-28 (Asia/Taipei) by Claude via sha256sum (Git Bash, exit 0)
+# Rule (Execution Contract §1): identity = Document ID + Version + Hash; filename is not identity.
+snapshot:
+  date_local: "2026-08-28"
+  tool: sha256sum
+  location: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/"
+documents:
+  - filename: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md
+    sha256: 8e5e67f607477babe60f2a4a354a211a30bd88cb1ece631dd51c5e11b23bac10
+    bytes: 87797
+    lines: 6082
+    mtime_local: "2026-08-28 20:56"
+  - filename: AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md
+    sha256: a47424f96bf6f88023b9870d4112ab1f607e9b424236693572d6a5558d2804a1
+    bytes: 124214
+    lines: 4618
+    mtime_local: "2026-08-28 20:51"
+  - filename: AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md
+    sha256: 2ad2a179944b917fe390119b6340ba9019344d7d15fcc9b77fdda3677937fc1e
+    bytes: 55924
+    lines: 4185
+    mtime_local: "2026-08-28 21:10"

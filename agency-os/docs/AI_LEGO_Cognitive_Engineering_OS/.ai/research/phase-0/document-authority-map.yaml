@@ -1,0 +1,36 @@
+# AI LEGO OS — Phase 0 scoped authority map
+# Sources: Execution Contract §2 (lines 90-137) + Master Plan §0.0.2 (lines 60-83). This file is an index, not a rewrite.
+scoped_authority:
+  - scope: "Product / Domain / Platform Architecture"
+    authoritative_source: Global Master Plan
+  - scope: "Security / Data / Deployment / Global Jurisdiction Architecture"
+    authoritative_source: "Global Master Plan + approved machine policies"
+  - scope: "Cognitive Primitive / Method / Lens / Method Selection"
+    authoritative_source: Method Atlas
+  - scope: "Method-specific Quality Gate"
+    authoritative_source: Method Atlas
+  - scope: "AI execution lifecycle"
+    authoritative_source: Execution Contract
+  - scope: "AI Authority / Tool Use / Change Control"
+    authoritative_source: "Execution Contract + machine policy"
+  - scope: "Exact Schema / Enum / Runtime Contract"
+    authoritative_source: "Approved machine-readable specs"
+  - scope: "Specific accepted architecture choices"
+    authoritative_source: "Accepted ADR"
+  - scope: "Legal validity"
+    authoritative_source: "Official legal source + approved Jurisdiction Pack"
+  - scope: "Current production reality"
+    authoritative_source: "Current-state evidence"
+conflict_resolution_order:   # EC §2.1 lines 113-129; higher wins
+  - "Applicable Binding Law / Regulatory Hard Constraint"
+  - "Approved Security / Privacy / Safety Hard Policy"
+  - "Approved Machine-readable Contract / Schema"
+  - "Accepted ADR"
+  - "Scoped Normative Document"
+  - "Recipe / Runbook"
+  - "Example"
+  - "Ad-hoc Suggestion"
+same_level_conflict: CONFLICT_REQUIRES_HUMAN_REVIEW   # EC line 134; AI must not pick the convenient one
+program_layer:
+  document: AI_LEGO_OS_Program_Plan_v1.md
+  authority: "process only (phases / gates / roles / path mapping); yields to all three mother documents"

@@ -1,0 +1,1288 @@
+# AI LEGO OS — Phase 0 verified findings (all 71 adversarially verified against file:line by doc-scoped verifier agents)
+# CROSS-T-* = cross-document terminology/duplication analyst; CROSS-R-* = reference-integrity/scope analyst; DOC-<doc>-* = single-document reader defects.
+# Verdicts: CONFIRMED (quote+line+claim all hold) | PARTIAL (core claim holds, framing over-reads — see verdict_votes reasons) | LINE_MISMATCH (evidence.line = verifier-corrected line; original_line preserved).
+# severity_source: analyst_assessed (CROSS-*, judged by cross-analysts) | default_not_assessed (DOC-*, reader defects carried no severity; 'medium' is a default, NOT a triage judgement).
+# Phase 0 rule: REGISTERED, not fixed. Conflict/duplication registers for Phase 1 will be derived from this file.
+findings:
+  - id: "CROSS-R-1"
+    type: "broken_reference"
+    severity: "high"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "The Master Plan makes 10 normative references to `AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md`, which does not exist on disk. The actual companion file is `AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md` (correctly referenced at L20 and L91 of the same document). Several of these are hard MUST-resolve targets: L804 requires all Workflow method nodes to resolve from the nonexistent file, L816 embeds it as a required reference in the canonical Workflow IR example, and L635 names it as the authoritative source for all Method definitions. Under the Execution Contract's own Boot Contract (§3.1) and DOCUMENT_RESOLUTION_BLOCKED rule, resolution against these named targets fails. Full list of stale lines: 56, 635, 804, 816, 2131, 2202, 2245, 3472, 3509, 3805."
+    evidence:
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 804
+        quote: "MUST resolve method definition from AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 635
+        quote: "> `AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md` **為 authoritative source。**"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 816
+        quote: "file: AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 20
+        quote: "> `AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md` (the correct, existing filename used in §0.0)"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "Grep confirms exactly 10 v1_2_zhTW references at the listed lines (56, 635, 804, 816, 2131, 2202, 2245, 3472, 3509, 3805); the file does not exist on disk. L804 MUST-resolve rule, L816 Workflow IR pin, and L635 authoritative-source declaration all verified verbatim; EC Boot Contract §3.1 (L172-178) and DOCUMENT_RESOLUTION_BLOCKED (EC L184) exist as claimed."
+  - id: "CROSS-R-2"
+    type: "broken_reference"
+    severity: "high"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 2
+    detail: "The Master Plan's own document-responsibility table (§0.0.1) names the Master Plan itself as `ai_lego_cognitive_engineering_os_global_master_plan_v2_1.md` — a file that does not exist. The actual file is `AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md`. The anchor row of the Scoped Authority mechanism (which decides which document wins conflicts over Product/Architecture/Security/Data/Deployment/Governance) points at a nonexistent document identity; the Execution Contract's Document Registry (L231) uses the correct v1 filename, so the two documents disagree about the Master Plan's canonical identity."
+    evidence:
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 55
+        quote: "| `ai_lego_cognitive_engineering_os_global_master_plan_v2_1.md` | Product / Architecture / Domain / Platform / Security / Data / Global / Deployment / Governance |"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 231
+        quote: "filename: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "MP L55 verbatim names the Master Plan as lowercase v2_1 in the Scoped Authority anchor row; the file does not exist. EC Document Registry L231 uses the correct v1 filename, so the two documents disagree about the Master Plan's canonical identity."
+      - verdict: "CONFIRMED"
+        reason: "Same substance as CROSS-T-2, independently re-verified: MP L55 quote verbatim; file nonexistent on disk; EC L231 uses correct v1 filename. The two documents disagree on the Master Plan's canonical identity."
+  - id: "CROSS-R-3"
+    type: "missing_contract"
+    severity: "high"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 3
+    detail: "The Master Plan's central Capability Contract (§8.3, cognitive.execute_method v1.0.0) types its input as `MethodExecutionRequest` and its output as `TypedMethodResult`, but no schema for either type exists in any of the three documents, and neither appears in any promised schema list: the Master Plan's /specs/cognitive list (L766-771) names only primitive/method/lens/representation/recipe schemas; the Atlas's Appendix A 14-schema list (L4576+) has no request/result schema; the Execution Contract's /specs/execution 13-schema list (L2768+) has method-resolution.schema.yaml but nothing for these two types. The platform's single execution entry point therefore has normatively-required but nowhere-defined I/O types — Typed LEGO pre-execution rejection (MP L752) cannot be implemented against them."
+    evidence:
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 708
+        quote: "type:\n    - MethodExecutionRequest"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 712
+        quote: "- TypedMethodResult"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 4576
+        quote: "Appendix A schema list: primitive/method/lens/representation/recipe/profile/evidence/claim/assumption/decision/reversal/context/availability/manifest — no MethodExecutionRequest or TypedMethodResult"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 2768
+        quote: "/specs/execution/ — 13 *.schema.yaml files; none covers MethodExecutionRequest/TypedMethodResult"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "MethodExecutionRequest (MP L708) and TypedMethodResult (MP L712) are the only occurrences across all three docs (grep). MP /specs/cognitive list L766-771 has five schemas, none matching; Atlas Appendix A's 14 schemas and EC §92's 13 /specs/execution schemas contain no request/result schema; Typed LEGO pre-execution rejection at MP L752 (不合法組合在執行前拒絕) verified."
+      - verdict: "CONFIRMED"
+        reason: "MP L708 MethodExecutionRequest and L712 TypedMethodResult are the ONLY occurrences of these types in all three docs (grep). MP /specs/cognitive list (L766-771) has only primitive/method/lens/representation/recipe; Atlas Appendix A 14-schema list has no request/result schema; EC §92's 13 schemas cover neither. Typed-rejection rule at MP L752 verbatim."
+      - verdict: "CONFIRMED"
+        reason: "MP L708 '- MethodExecutionRequest' and L712 '- TypedMethodResult' exact (grep); these are the ONLY two occurrences of either type across all three documents. MP /specs/cognitive list (L767-772) has only primitive/method/lens/representation/recipe; Atlas Appendix A (L4577-4594) has 14 schemas, none for these types; EC §92 (L2769-2781) has 13 schemas incl. method-resolution but nothing for these I/O types. MP L752 '不合法組合在執行前拒絕。' confirms the pre-execution rejection requirement that has no schema to check against."
+  - id: "CROSS-R-4"
+    type: "contradiction"
+    severity: "high"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 2
+    detail: "Two different mandated status codes for the identical failure condition (Method Atlas unreadable/unloadable while method selection is needed). Master Plan §0.0 mandates: 若 Atlas 無法讀取…狀態必須為 `PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED` (L45-47). Execution Contract §14 mandates: Atlas 無法載入 → `METHOD_RESOLUTION_BLOCKED` (L720-723). No document maps one to the other, and neither identifier appears in the Execution Contract's canonical side-state vocabulary (§10 L565-573: BLOCKED / NEEDS_HUMAN_REVIEW / FAILED / CANCELLED / ROLLED_BACK / COMPENSATED / PARTIAL_SUCCESS). A compliant agent hitting this condition cannot satisfy both mandates simultaneously."
+    evidence:
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 47
+        quote: "`PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED`"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 723
+        quote: "METHOD_RESOLUTION_BLOCKED"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 720
+        quote: "Atlas 無法載入："
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "MP L45-47 (狀態必須為 PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED) and EC L720-723 (Atlas 無法載入 → METHOD_RESOLUTION_BLOCKED) verified at exact lines; EC §10 legal side states L566-572 (BLOCKED/NEEDS_HUMAN_REVIEW/FAILED/CANCELLED/ROLLED_BACK/COMPENSATED/PARTIAL_SUCCESS) contain neither code; no mapping exists in any document."
+      - verdict: "CONFIRMED"
+        reason: "MP L45-47 and EC L720-723 verified verbatim. Neither code appears in EC's side-state vocabulary (L563-573: BLOCKED/NEEDS_HUMAN_REVIEW/FAILED/CANCELLED/ROLLED_BACK/COMPENSATED/PARTIAL_SUCCESS) nor in the other document (grep). Two mandated codes for the same condition."
+  - id: "CROSS-R-5"
+    type: "contradiction"
+    severity: "high"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 3
+    detail: "The mandatory release-gate set differs materially between the Master Plan and the Atlas. Master Plan §158 Global Definition of Done requires 11 PASS items and for high risk adds ONLY `Human Specialist Review PASS` (L5923-5926). Atlas §22.1 Global Gate requires 14 PASS items (adds Evidence PASS, Reasoning PASS, Capacity PASS) and §22.2 High-risk Gate requires SIX additional items (Human Specialist Review, Counterevidence, Red Team, Independent Judge, Reversal Criteria, Recovery/Rollback Rehearsal). A high-risk deliverable that fully satisfies MP §158 fails Atlas §22.2 (no Red Team, no Counterevidence, no Recovery Rehearsal). Execution Contract §68 (L2250-2276) sides with the Atlas's larger set. Both MP and Atlas state their lists as 必須/要求 — they cannot both define 'done'."
+    evidence:
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 5923
+        quote: "高風險另加：Human Specialist Review PASS （唯一的高風險附加項）"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 4185
+        quote: "額外要求：Human Specialist Review PASS / Counterevidence PASS / Red Team PASS / Independent Judge PASS / Reversal Criteria PASS / Recovery / Rollback Rehearsal PASS"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 4167
+        quote: "Functional PASS / Evidence PASS / Reasoning PASS … Capacity PASS …（14 項，MP §158 只有 11 項）"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 2267
+        quote: "High-risk：Human Specialist / Counterevidence / Red Team / Independent Review / Reversal Criteria / Recovery Rehearsal"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "MP §158 L5910-5920 lists 11 PASS items with only Human Specialist Review PASS added for high risk (L5923-5926). Atlas §22.1 L4167-4180 lists 14 (adds Evidence/Reasoning/Capacity) and §22.2 L4185-4193 adds six high-risk items. EC §68 L2250-2275 carries the Atlas's larger sets (softened as 可能包含, but the MP-vs-Atlas 必須/額外要求 contradiction stands independently)."
+      - verdict: "CONFIRMED"
+        reason: "MP §158 (L5903): exactly 11 PASS items, 高風險另加 (L5923) adds only Human Specialist Review PASS. Atlas §22.1: 14 items (adds Evidence/Reasoning/Capacity); §22.2: 6 extra high-risk items. EC §68 carries the Atlas-sized set (with 可能包含 qualifier). A MP-§158-compliant high-risk deliverable indeed lacks Red Team/Counterevidence/Recovery Rehearsal required by Atlas §22.2."
+      - verdict: "CONFIRMED"
+        reason: "MP §158 (L5903) '必須：' 11 PASS items (L5910-5920: no Evidence, Reasoning, or Capacity), then L5923-5926 '高風險另加：' with ONLY 'Human Specialist Review PASS'. Atlas §22.1 (L4167-4180) 14 items adding Evidence/Reasoning/Capacity PASS; §22.2 (L4185 '額外要求：', L4188-4193) SIX additional high-risk items. EC §68 (L2250-2276) carries the Atlas-sized set (prefixed '可能包含', slightly softer, but sides with the larger list). A high-risk deliverable satisfying MP §158 verifiably fails Atlas §22.2 — the contradiction is real."
+  - id: "CROSS-R-6"
+    type: "duplicate_definition"
+    severity: "high"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 3
+    detail: "The Execution Manifest — the mechanism both docs rely on for 30-year replay — is normatively defined with incompatible key sets in four places across the three docs, with no mapping: (1) Master Plan §0.0.3 (L89-95) mandates recording the Atlas as `cognitive_method_atlas: {file, declared_version, content_hash, loaded}`; (2) Execution Contract §64 (L2143-2149) mandates `documents.method_atlas: {version, sha256}` — different key names for the same mandatory record (EC's own prose at L85 uses yet a third pair, `document_version + content_hash`); (3) Master Plan §69 (L2872-2882) defines a flat manifest (EX-991: app_version/workflow_version/capability_version/...) missing the documents/jurisdiction/change sections EC requires; (4) Atlas §16.3 (L3823-3857) defines a `method_execution` record (EX-...) with its own field set. Per Scoped Authority (EC L104, AI 執行生命週期 → Execution Contract), the manifest schema should have exactly one home; today an execution cannot satisfy all four normative shapes."
+    evidence:
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 91
+        quote: "cognitive_method_atlas: file / declared_version: 1.0 / content_hash / loaded: true"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 2147
+        quote: "method_atlas:\n    version: ...\n    sha256: ..."
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 2873
+        quote: "execution_id: EX-991 / app_version: 21.3 / workflow_version: 8.4 …（扁平 schema，無 documents/jurisdiction/change 段）"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 3824
+        quote: "method_execution:\n  execution_id: EX-...\n  method_id: ..."
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "All four incompatible normative shapes verified at exact lines: MP L89-95 cognitive_method_atlas (file/declared_version/content_hash/loaded); EC §64 L2143-2149 documents.method_atlas (version/sha256) with EC L85 prose using a third pair (document_version + content_hash); MP §69 L2873-2882 flat EX-991 manifest; Atlas §16.3 L3823+ method_execution record. EC L104 assigns AI 執行生命週期 to the Execution Contract as claimed."
+      - verdict: "CONFIRMED"
+        reason: "All four shapes verified: MP L90-94 (declared_version/content_hash), EC §64 L2143-2149 (version/sha256) with EC L85 prose using a third pair (document_version + content_hash), MP §69 L2873-2881 flat EX-991, Atlas §16.3 L3823+ method_execution. EC L104 assigns AI 執行生命週期 to EC. No mapping between shapes exists."
+      - verdict: "CONFIRMED"
+        reason: "All four incompatible normative shapes verified: (1) MP L89-93 cognitive_method_atlas{file, declared_version, content_hash, loaded}; (2) EC L2143-2149 documents.method_atlas{version, sha256}, with EC L85 using a third pair 'document_version + content_hash' exact; (3) MP L2870-2882 flat 'Execution Manifest' (EX-991, app_version…) with no documents/jurisdiction section; (4) Atlas §16.3 L3821-3857 method_execution{execution_id: EX-..., method_id...} (L3824 exact). EC L104 'AI 執行生命週期 | Execution Contract' scoped-authority row exact. No mapping among the four."
+  - id: "CROSS-T-1"
+    type: "inconsistent_path"
+    severity: "high"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 2
+    detail: "The mandatory-read Method Atlas is referenced under two different filenames, and the majority name does not exist on disk. Master Plan §0.0 (L20) and its Execution Manifest example (L91) use the real file AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md, but nine other normative sites (L56, 635, 804, 816, 2131, 2202, 2245, 3472, 3509, 3805) — including the Scoped Authority table, the Workflow IR resolution rule, the Phase 0 registration mandate, and the pre-MVP spec list — reference AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md, which does not exist (only the _v1.md files are on disk). The Execution Contract resolves against _v1.md everywhere (L27, 60, 174, 236). Under the Master Plan's own rule (L47), an AI resolving the v1_2_zhTW pin must halt with PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED, and the sample Workflow IR (L816) pins a file that can never load."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 20
+        quote: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 816
+        quote: "file: AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md"
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 236
+        quote: "filename: AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "All 10 v1_2_zhTW sites verified at exactly L56/635/804/816/2131/2202/2245/3472/3509/3805 of the Master Plan (grep); only _v1.md files exist on disk (ls). MP L20/L91 use v1.md; EC resolves v1.md at L27/61/174/236 (detail says L60, actual L61 — immaterial; evidence-array lines 20/816/236 all exact). MP L45-47 mandates PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED when Atlas unreadable. Note: detail says 'nine other sites' but lists 10 — the count error understates the finding."
+      - verdict: "CONFIRMED"
+        reason: "All ten v1_2_zhTW sites verified at exactly L56/635/804/816/2131/2202/2245/3472/3509/3805 in MP (finding says 'nine' but lists ten — miscount only). Only _v1.md files exist on disk (Glob). MP L20/L91 pin _v1.md; EC pins _v1.md at L27/61/174/236 (finding said 60, actual 61 — trivial). MP L45-47 halt rule verified verbatim."
+  - id: "CROSS-T-2"
+    type: "broken_reference"
+    severity: "high"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 2
+    detail: "The Master Plan's document-authority table names the Master Plan itself as ai_lego_cognitive_engineering_os_global_master_plan_v2_1.md — lowercase, version v2_1 — which does not exist on disk and contradicts both the actual filename (AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md) and the Execution Contract's Document Registry entry (L231) and Boot Contract step 1 (L173). The mechanism that decides which document is authoritative points at a nonexistent file, so a compliant Boot Contract resolver either fails or silently resolves a different lineage than the authority table declares."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 55
+        quote: "| `ai_lego_cognitive_engineering_os_global_master_plan_v2_1.md` | Product / Architecture / Domain / Platform / Security / Data / Global / Deployment / Governance |"
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 231
+        quote: "filename: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "MP L55 verbatim names itself `ai_lego_cognitive_engineering_os_global_master_plan_v2_1.md` in the §0.0.1 authority table; no such file exists (only _v1.md on disk). EC Document Registry L231 and Boot Contract step 1 L173 use the correct AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md."
+      - verdict: "CONFIRMED"
+        reason: "MP L55 verbatim names ai_lego_cognitive_engineering_os_global_master_plan_v2_1.md; no such file exists (only _v1.md on disk). EC Document Registry L231 and Boot step 1 L173 use the correct v1 filename. Authority-table anchor row points at a nonexistent identity."
+  - id: "CROSS-T-3"
+    type: "term_conflict"
+    severity: "high"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 2
+    detail: "The machine field risk_tier carries two incompatible enums. The Method Atlas selection_context defines risk_tier: low|medium|high|critical (L1077) and keys Mandatory Gate Injection on `risk_tier = critical` (L3599). The Execution Contract defines the five-level scheme R0–R4 (§8, L379–475) and puts risk_tier into the same task_context record (L374) that its Method Resolution flow feeds into the Atlas's Method Selection Engine. No mapping between {low,medium,high,critical} and {R0..R4} exists in any document, so a compiler cannot decide when Atlas mandatory gates (Red Team, Reversal Criteria, etc.) must be injected — the gate trigger value 'critical' is unexpressible in R0–R4 terms and vice versa."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 1077
+        quote: "risk_tier: low|medium|high|critical"
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 3599
+        quote: "如果 `risk_tier = critical`："
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 374
+        quote: "risk_tier: ..."
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 379
+        quote: "# 8. Risk Tier"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "Atlas L1077 'risk_tier: low|medium|high|critical' and L3599 '如果 `risk_tier = critical`：' exact. EC L374 task_context risk_tier (undeclared value domain, only occurrence in EC) and L379 '# 8. Risk Tier' (R0-R4 at L381-454) exact. Grep confirms no R0-R4 tokens in Atlas/MP and no low|medium|high|critical enum in EC — no mapping exists anywhere."
+      - verdict: "CONFIRMED"
+        reason: "Atlas L1077 'risk_tier: low|medium|high|critical' and L3599 '如果 `risk_tier = critical`：' exact. EC L374 'risk_tier: ...' (task_context, no value domain) and L379 '# 8. Risk Tier' (R0-R4 at L381-475) exact. Grep confirms zero R0-R4 references in the Atlas and zero low/medium/high/critical risk-tier enum in the EC or MP; no mapping anywhere. EC §14 (L705-717) pipes Task Context → Method Atlas → Method Selection Engine, so the gate-trigger incompatibility is real."
+  - id: "CROSS-T-4"
+    type: "duplicate_definition"
+    severity: "high"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 3
+    detail: "The Execution Manifest — the single reproducibility record both documents mandate — is defined with three incompatible schemas across two documents. Master Plan §0.0.3 requires an Atlas pin with keys declared_version + content_hash (L92–93); Master Plan §69 gives a flat pin list (execution_id: EX-991, app_version…, no documents section, L2873); the Execution Contract §64 requires documents.method_atlas with keys version + sha256 (L2147–2150). Same mandatory record, different field names for the same data. Additionally, both the Atlas (Appendix A, L4594) and the Execution Contract (§92, L2780) claim /specs/execution/manifest.schema.yaml as the schema to be split out of THEIR content — the one schema file has two would-be parent documents carrying conflicting shapes, a direct violation of the program's no-dual-maintenance rule."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 92
+        quote: "declared_version: 1.0\n  content_hash: <sha256>"
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 2873
+        quote: "execution_id: EX-991"
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 2147
+        quote: "method_atlas:\n    version: ...\n    sha256: ..."
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 4594
+        quote: "/specs/execution/manifest.schema.yaml"
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 2780
+        quote: "├── manifest.schema.yaml"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "Three incompatible manifest shapes verified: MP §0.0.3 L90-94 (file/declared_version/content_hash/loaded), MP §69 L2873-2882 flat EX-991 pin list with no documents section, EC §64 L2143-2149 documents.method_atlas {version, sha256}. Atlas Appendix A L4594 and EC §92 L2780 both list /specs/execution/manifest.schema.yaml as a spec to be extracted, with conflicting parent shapes."
+      - verdict: "CONFIRMED"
+        reason: "Three shapes verified: MP L90-94 (file/declared_version/content_hash/loaded), MP L2872-2882 flat EX-991 (no documents section), EC L2143-2152 (documents.method_atlas version/sha256). Atlas Appendix A L4594 and EC §92 L2780 both list /specs/execution/manifest.schema.yaml — exact lines confirmed."
+      - verdict: "CONFIRMED"
+        reason: "MP L92-93 'declared_version: 1.0 / content_hash: <sha256>' exact (grep). MP L2873 'execution_id: EX-991' exact — flat pin list with no documents section (L2872-2882). EC L2147-2149 documents.method_atlas {version, sha256} exact. Atlas L4594 and EC L2780 both list /specs/execution/manifest.schema.yaml verbatim (Atlas under '建議拆出的下一批正式規格', EC under its own §92 Machine-readable Execution Specs). Three incompatible key sets for the same mandatory record verified."
+  - id: "CROSS-T-5"
+    type: "inconsistent_id"
+    severity: "high"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 2
+    detail: "Two different mandatory machine status codes exist for the identical condition 'Method Atlas unreadable/unresolvable while the task needs method selection'. Master Plan L47 mandates PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED ('狀態必須為'); Execution Contract L723 mandates METHOD_RESOLUTION_BLOCKED for 'Atlas 無法載入'. Neither doc maps them, and neither code appears in the other doc. A state machine, monitor, or golden test implemented against one document will treat the other's emission as an unknown status."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 47
+        quote: "`PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED`"
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 723
+        quote: "METHOD_RESOLUTION_BLOCKED"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "MP L47 mandates PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED (狀態必須為, L45) for unreadable Atlas; EC L720-723 mandates METHOD_RESOLUTION_BLOCKED for Atlas 無法載入. Grep confirms each code appears in exactly one document; no mapping exists anywhere."
+      - verdict: "CONFIRMED"
+        reason: "MP L47 PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED and EC L723 METHOD_RESOLUTION_BLOCKED (EC L720 'Atlas 無法載入：') exact. Cross-doc grep: neither code appears in the other document; no mapping."
+  - id: "CROSS-T-6"
+    type: "duplicate_definition"
+    severity: "high"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 3
+    detail: "The epistemic label vocabulary — the runtime-enforced trust boundary — is defined three times with two casings and two cardinalities. Atlas L593–605 defines 11 space-separated values (SOURCE FACT … DECISION); Execution Contract §38 (L1476–1487) defines the same 11 values in SNAKE_CASE (SOURCE_FACT, AI_INFERENCE, …); Master Plan §83 (L3384–3391) defines only 6 values. A machine comparing labels cannot match 'SOURCE FACT' to 'SOURCE_FACT', and content labeled with the Master Plan's 6-value set has no defined status for EVIDENCE/ASSUMPTION/HYPOTHESIS/SIMULATED_RESULT/DECISION."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 594
+        quote: "SOURCE FACT"
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 1476
+        quote: "SOURCE_FACT"
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 3385
+        quote: "SOURCE FACT (6-value list, §83)"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "Atlas L594-604 lists 11 space-separated values (SOURCE FACT ... DECISION); EC L1476-1486 lists the same 11 in SNAKE_CASE; MP §83 L3385-3390 lists only 6 values with 禁止混合 at L3393. All three definitions verified verbatim at the claimed locations."
+      - verdict: "CONFIRMED"
+        reason: "Atlas L593-605: 11 space-form values starting SOURCE FACT (L594). EC L1475-1485: same 11 in SNAKE_CASE, SOURCE_FACT at L1476 (grep-pinned). MP §83 L3385-3390: only 6 values, 禁止混合. Three vocabularies, two casings, two cardinalities — all verified."
+      - verdict: "CONFIRMED"
+        reason: "Atlas L593-605: 11 space-form values starting 'SOURCE FACT' at L594 (exact). EC L1475-1487: same 11 values with underscore multi-word forms, 'SOURCE_FACT' at L1476 (exact). MP L3384-3391: only 6 values, 'SOURCE FACT' at L3385 (exact) — EVIDENCE/ASSUMPTION/HYPOTHESIS/SIMULATED RESULT/DECISION absent from MP's list. No mapping or supersession note found in any document."
+  - id: "CROSS-T-9"
+    type: "duplicate_definition"
+    severity: "high"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 2
+    detail: "The Scoped Authority conflict-resolution precedence chain — the rule that arbitrates all other document conflicts — is itself defined twice and has already drifted. Master Plan §0.0.2 (L62–83) gives a 6-level chain whose second level is 'Architecture Constitution / Security / Privacy Hard Policy'; Execution Contract §2.1 (L113–131) gives an 8-level chain whose second level is 'Approved Security / Privacy / Safety Hard Policy' — no Architecture Constitution layer at all, plus Safety, plus extra bottom levels (Example, Ad-hoc Suggestion). When an Architecture Constitution provision conflicts with a machine contract, the two chains produce different winners."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 67
+        quote: "Architecture Constitution / Security / Privacy Hard Policy"
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 116
+        quote: "Approved Security / Privacy / Safety Hard Policy"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "MP §0.0.2 L65-78 gives a 6-level chain with 'Architecture Constitution / Security / Privacy Hard Policy' at L67 (level 2); EC §2.1 L114-130 gives an 8-level chain with 'Approved Security / Privacy / Safety Hard Policy' at L116 — no Architecture Constitution layer, adds Safety plus Example and Ad-hoc Suggestion bottom levels. An ArchConst-vs-machine-contract conflict resolves oppositely under the two chains."
+      - verdict: "CONFIRMED"
+        reason: "MP §0.0.2 (L64-81) is a 6-level chain, level 2 = 'Architecture Constitution / Security / Privacy Hard Policy' (L67). EC §2.1 (L113-131) is an 8-level chain, level 2 = 'Approved Security / Privacy / Safety Hard Policy' (L116), no Architecture Constitution layer, plus Example and Ad-hoc Suggestion bottom levels. Both verified verbatim."
+  - id: "CROSS-R-10"
+    type: "term_conflict"
+    severity: "medium"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 2
+    detail: "Two incompatible risk-tier vocabularies drive gate injection with no mapping between them. The Atlas's Method Selection Engine takes `risk_tier: low|medium|high|critical` (L1077) and its Mandatory Gate Injection triggers on `risk_tier = critical` (L3599); the Execution Contract defines Risk Tiers R0–R4 (§8, L379-476) and puts `risk_tier` into task_context (L374) and task.manifest. The Execution Contract's own Method Resolution flow (L706-717) and Phase 2 method_resolver (L4027) must feed the Atlas selector — but no document says whether R4 = critical, whether R2 maps to medium or high, etc. Gate injection outcomes therefore depend on an undefined conversion."
+    evidence:
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 1077
+        quote: "risk_tier: low|medium|high|critical"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 3599
+        quote: "如果 `risk_tier = critical`："
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 379
+        quote: "# 8. Risk Tier（R0—R4 五級）"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 374
+        quote: "risk_tier: ...（task_context，未宣告值域）"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "Same substance as CROSS-T-3, all four evidence lines exact (Atlas L1077, L3599; EC L379, L374). EC §14 flow (L707-717) feeds the Atlas selector; grep confirms no R-tier↔critical conversion defined in any document."
+      - verdict: "CONFIRMED"
+        reason: "Same substrate as CROSS-T-3, all evidence exact: Atlas L1077 enum, L3599 critical trigger; EC L379 R0-R4 (§8, L381-475), L374 task_context risk_tier with no declared value domain. EC Method Resolution flow L705-717 and Phase 2 method_resolver (path at L4023; the detail text says L4027 — 4 lines off, in-section) must feed the Atlas selector. Grep confirms no R-to-word mapping exists in any of the three documents."
+  - id: "CROSS-R-11"
+    type: "undefined_term"
+    severity: "medium"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 2
+    detail: "The Execution Contract imposes a hard redline on `LOCKED_DECISION` (§57 L1988: 不得由 AI 修改), but no document defines it: it is absent from the Execution Contract's epistemic labels (§38), absent from the Atlas entirely, and the Master Plan defines only 'LOCKED FACT' (§11.3 L975) — a different identifier (space vs underscore) with fact-only semantics and no decision-lock mechanism. Cross-doc verification (grep over all three files) confirms no companion document supplies the definition the Execution Contract's prohibition depends on."
+    evidence:
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 1988
+        quote: "`LOCKED_FACT` / `LOCKED_DECISION`：不得由 AI 修改。"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 975
+        quote: "LOCKED FACT（僅此一種 lock；無 Locked Decision 概念）"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "EC L1988-1990 imposes 不得由 AI 修改 on `LOCKED_DECISION`; grep across all three files shows LOCKED_DECISION appears only there — absent from EC §38's labels, absent from the Atlas entirely; MP §11.3 L970-978 defines only space-form LOCKED FACT with fact-only semantics."
+      - verdict: "CONFIRMED"
+        reason: "EC L1988 verbatim. LOCKED_DECISION appears nowhere else in the three docs (grep); EC §38 label list (L1475-1485) excludes it; MP defines only LOCKED FACT (L975) with fact-only semantics; Atlas has no lock concept. No pointer to a defining document exists near EC §57."
+  - id: "CROSS-R-12"
+    type: "contradiction"
+    severity: "medium"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 2
+    detail: "The identity of the 'Architecture Constitution' — a load-bearing node in the conflict-resolution chain — differs across documents. Execution Contract §152 End State equates it with the Master Plan itself ('Master Plan = Architecture Constitution / Product Direction', L4152-4153). Master Plan §90 instead lists `Architecture-Constitution-v1.md` as item 1 of the separate specs to create BEFORE MVP (L3785), i.e. a distinct, not-yet-existing document. This matters because the Master Plan's own precedence chain (§0.0.2 L67) ranks 'Architecture Constitution / Security / Privacy Hard Policy' ABOVE the scoped-document layer that contains the Master Plan — if EC's equation holds, the Master Plan outranks itself in its own chain; if MP's version holds, the chain's second layer references a document that no doc or path provides."
+    evidence:
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 4152
+        quote: "Master Plan = Architecture Constitution / Product Direction"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 3785
+        quote: "1. `Architecture-Constitution-v1.md`（列為待建立的獨立規格）"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 67
+        quote: "Architecture Constitution / Security / Privacy Hard Policy（位於 Master Plan 所在 scoped 層之上）"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "EC §152 L4152-4153 equates Master Plan with Architecture Constitution; MP §90 L3785 lists Architecture-Constitution-v1.md as item 1 of separate pre-MVP specs; MP L67 ranks Architecture Constitution above the scoped layer containing the Master Plan. The self-outranking / missing-document dilemma follows directly from the verified text."
+      - verdict: "CONFIRMED"
+        reason: "EC L4152-4153 equates Master Plan with Architecture Constitution; MP §90 L3785 lists Architecture-Constitution-v1.md as item 1 of specs to create before MVP (a distinct, nonexistent file); MP L67 ranks Architecture Constitution above the scoped layer containing the Master Plan. All three verified verbatim; the circularity/vacancy dilemma follows."
+  - id: "CROSS-R-13"
+    type: "contradiction"
+    severity: "medium"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 2
+    detail: "The two Scoped Authority models disagree on the document set they govern. Master Plan §0.0.1's 文件職責分離 table (L53-58) and the §0.0.2 diagram (L73-76) recognize only Master Plan + Method Atlas (+ Machine Specs + ADR), assigning 'Governance' to the Master Plan (L55) with no row or branch for an Execution Contract. The Execution Contract's Scoped Authority table (L98-110) adds rows assigning 'AI 執行生命週期' (L104) and 'AI Authority / Tool Use / Change Control' (L105) to itself. A conflict about execution governance therefore resolves to different authoritative documents depending on which table an agent consults — the exact same-scope conflict both docs say must escalate as CONFLICT_REQUIRES_HUMAN_REVIEW, embedded in the conflict-resolution mechanism itself."
+    evidence:
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 55
+        quote: "職責表僅兩份文件 + Machine Specs + ADR；Master Plan 職責含 Governance，無 Execution Contract 列"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 74
+        quote: "│ Architecture / Platform Scope │ Cognitive Method / Tool Scope │（僅兩分支）"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 104
+        quote: "| AI 執行生命週期 | Execution Contract |"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "MP §0.0.1 table (L53-58) has exactly four rows (MP/Atlas/Machine Specs/ADR) with Governance in the MP row and no Execution Contract row; the §0.0.2 diagram (L73-76) has only two scope branches. EC's table adds 'AI 執行生命週期' (L104) and 'AI Authority / Tool Use / Change Control' (L105) to itself. CONFLICT_REQUIRES_HUMAN_REVIEW verified at MP L83 and EC L134."
+      - verdict: "CONFIRMED"
+        reason: "MP §0.0.1 table (L53-58) contains only MP + Atlas + Machine Specs + ADR rows, with Governance under MP (L55); §0.0.2 diagram (L73-76) has exactly two scope branches. EC table adds 'AI 執行生命週期 → Execution Contract' (L104) and 'AI Authority / Tool Use / Change Control' (L105). Execution-governance conflicts resolve differently per table — verified."
+  - id: "CROSS-R-7"
+    type: "scope_violation"
+    severity: "medium"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 3
+    detail: "Atlas §22.1 (Global Gate) and §22.2 (High-risk Gate) normatively define platform-wide, release-level gates, but both Scoped Authority tables grant the Atlas authority only over method-scope gates: Master Plan §0.0.1 gives the Atlas 'Method-specific Gate' (L56) and the Execution Contract's table gives it 'Method-specific Quality Gate' only (L103), while release governance/DoD belongs to the Master Plan (L55 'Governance'; MP §158). §22.3 (Method-specific Gate) is correctly placed; §22.1/§22.2 are full normative PASS checklists — not summaries or references — living outside the Atlas's granted scope, and they have already drifted from the Master Plan's version (see CROSS-R-5)."
+    evidence:
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 4164
+        quote: "## 22.1 Global Gate （14 項平台級 PASS 清單，非 method-specific）"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 103
+        quote: "| Method-specific Quality Gate | Method Atlas |"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 56
+        quote: "Atlas 職責欄僅含 …/ Method-specific Gate / Cognitive Recipe（無 Global/High-risk 平台 gate）"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "Atlas §22.1 (L4164) and §22.2 (L4183) are full normative platform-level PASS checklists, while MP §0.0.1 L56 grants the Atlas only 'Method-specific Gate' and EC L103 only 'Method-specific Quality Gate'; Governance sits in the MP row (L55). §22.3 is the method-specific table. The drift from MP §158 (CROSS-R-5) is real, so the out-of-scope duplication has concrete consequences."
+      - verdict: "CONFIRMED"
+        reason: "Atlas §22.1/22.2 (L4164-4194) are full PASS checklists with no reference to MP. MP L56 grants the Atlas only 'Method-specific Gate' among its scopes; EC L103 grants 'Method-specific Quality Gate' only; MP L55 keeps Governance. §22.3 is the in-scope one. Drift with MP §158 separately confirmed (R-5)."
+      - verdict: "CONFIRMED"
+        reason: "Atlas §22.1 (L4164) and §22.2 (L4183) are full normative platform-level PASS checklists, not references. MP §0.0.1 table L56 grants the Atlas only '...Method Contract / Method-specific Gate / Cognitive Recipe' (exact); EC L103 '| Method-specific Quality Gate | Method Atlas |' exact; MP L55 keeps Governance in the Master Plan row (exact); MP §158 is the MP's own DoD. Drift already demonstrated by CROSS-R-5 (11+1 vs 14+6). Scope violation verified."
+  - id: "CROSS-R-8"
+    type: "scope_violation"
+    severity: "medium"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 3
+    detail: "Atlas §18 'Global Jurisdiction Architecture' (L4023-4085) normatively re-defines platform jurisdiction architecture that the Scoped Authority tables assign to the Master Plan (EC L101: 'Security / Data / Deployment / Global Jurisdiction Architecture → Global Master Plan'): the resolver input list (§18.1, duplicating MP §94's 不得只看 IP rule and jurisdiction_context), the 7-status Capability Availability enum + fail-closed rule (§18.2, duplicating MP §143), and a full Market Admission Gate flowchart (§18.3, duplicating MP §142). The two admission flows have already drifted: the Atlas gate adds a 'Localization / Accessibility PASS' check (L4080) and merges 'Sector / Human Sign-off' into one step, while MP §142 splits 'Sector Pack Complete?' and 'Human Legal Sign-off?' into separate steps and has no accessibility step (L5489-5493). This is exactly the double-maintenance the Master Plan's own §8.5 rule forbids in the opposite direction."
+    evidence:
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 4023
+        quote: "# 18. Global Jurisdiction Architecture"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 101
+        quote: "| Security / Data / Deployment / Global Jurisdiction Architecture | Global Master Plan + approved machine policies |"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 4080
+        quote: "G{Localization / Accessibility PASS?}（MP §142 流程無此步）"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 5491
+        quote: "Sector Pack Complete? ↓ Human Legal Sign-off?（兩步分列；Atlas 版合併為一步）"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "Atlas §18 (L4023) re-defines resolver inputs (§18.1, duplicating MP §94 L3980 不得只看 IP Address), the 7-status enum + fail-closed (§18.2, duplicating MP §143), and a Market Admission Gate (§18.3) — all under EC L101's grant of Global Jurisdiction Architecture to the Master Plan. Drift verified: Atlas L4080 'G{Localization / Accessibility PASS?}' and merged L4082 'Sector / Human Sign-off PASS?' vs MP §142 L5488-5492 which has Localization (no accessibility) and separate Sector Pack / Human Legal Sign-off steps. MP §8.5 (L754) forbids exactly this dual maintenance."
+      - verdict: "CONFIRMED"
+        reason: "Atlas §18 at L4023 verbatim; §18.1 duplicates MP §94's rule (MP L3980 '不得只看 IP Address'); §18.2 7-status enum + fail-closed duplicates MP §143 (L5508, Local-only/Government-only at L5525-5526); §18.3 gate has 'G{Localization / Accessibility PASS?}' at L4080 exact and merged 'Sector / Human Sign-off' step, vs MP §142 separate 'Sector Pack Complete?' (L5491) and 'Human Legal Sign-off?' (L5493) with no accessibility component. EC L101 assigns Global Jurisdiction Architecture to MP."
+      - verdict: "CONFIRMED"
+        reason: "Atlas L4023 '# 18. Global Jurisdiction Architecture' exact; EC L101 assigns 'Global Jurisdiction Architecture' to the Master Plan (exact). Duplications verified: §18.1 repeats MP §94's rule (MP L3980 '不得只看 IP Address') with a resolver input list; §18.2 repeats MP §143's 7-status enum verbatim; §18.3 duplicates MP §142's admission flow with real drift — Atlas L4080 'G{Localization / Accessibility PASS?}' exact (MP flow L5489 has 'Localization Complete?' and NO accessibility step) and Atlas L4082 merges 'Sector / Human Sign-off' while MP splits 'Sector Pack Complete?' (L5491) and 'Human Legal Sign-off?' (L5493). MP §8.5 no-dual-maintenance rule exists at L754."
+  - id: "CROSS-R-9"
+    type: "term_conflict"
+    severity: "medium"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 3
+    detail: "The epistemic label vocabulary — the load-bearing content-integrity enum — differs across all three documents: Master Plan §83 mandates exactly six labels with 禁止混合 (SOURCE FACT / AI INFERENCE / AI SUGGESTION / HUMAN OPINION / CALCULATED RESULT / UNKNOWN, L3385-3391); the Atlas mandates eleven space-form types (adds EVIDENCE / ASSUMPTION / HYPOTHESIS / SIMULATED RESULT / DECISION, L594-604); the Execution Contract lists the same eleven in underscore machine-id form (SOURCE_FACT … DECISION, L1476-1486). No mapping or supersession note exists. Additionally, both the Atlas (L4151 '`UNKNOWN` 不得提升為 `FACT`') and the Execution Contract (L1492 'UNKNOWN → FACT' forbidden) key their promotion redline on a label `FACT` that appears in none of the three enums."
+    evidence:
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 3384
+        quote: "SOURCE FACT / AI INFERENCE / AI SUGGESTION / HUMAN OPINION / CALCULATED RESULT / UNKNOWN … 禁止混合"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 593
+        quote: "11 個 Epistemic Type（含 EVIDENCE/ASSUMPTION/HYPOTHESIS/SIMULATED RESULT/DECISION）"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 1476
+        quote: "SOURCE_FACT … DECISION（底線機器格式）"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 1492
+        quote: "UNKNOWN → FACT（FACT 不在任何一份 enum 中）"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "Three divergent enums verified: MP §83 six labels + 禁止混合 (L3385-3393); Atlas eleven space-form (L594-604); EC eleven underscore-form (L1476-1486). Promotion redlines keyed on `FACT` verified at Atlas L4151 (`UNKNOWN` 不得提升為 `FACT`) and EC L1492 (UNKNOWN → FACT); `FACT` alone appears in none of the three enums (all use SOURCE FACT / SOURCE_FACT)."
+      - verdict: "CONFIRMED"
+        reason: "MP L3385-3390 six labels + 禁止混合; Atlas L593-604 eleven space-form; EC L1475-1485 eleven underscore-form — all verified. No mapping/supersession note found. FACT promotion redline (Atlas L4151, EC L1492) keys on a label absent from every enum (grep-confirmed)."
+      - verdict: "CONFIRMED"
+        reason: "MP L3384-3393: exactly six labels + '禁止混合' (SOURCE FACT at L3385 exact). Atlas L593-605: eleven space-form types (adds EVIDENCE/ASSUMPTION/HYPOTHESIS/SIMULATED RESULT/DECISION). EC L1475-1487: same eleven in underscore form. No mapping/supersession note found. FACT-promotion redline keyed to undefined label verified: Atlas L4151 and EC L1492 exact; full-doc grep shows bare 'FACT' in none of the three enums."
+  - id: "CROSS-T-10"
+    type: "term_conflict"
+    severity: "medium"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 2
+    detail: "'Architecture Constitution' means two different artifacts. Master Plan Phase 0 (L3457–3462) and its §90 spec list treat 'Architecture Constitution v1' as a separate, yet-to-be-written deliverable that sits ABOVE machine contracts in the Master Plan's precedence chain (L67). The Execution Contract's End State (L4153) declares 'Master Plan = Architecture Constitution / Product Direction'. Whether constitution-level authority lives in a fourth document or in the Master Plan itself is undecidable, which directly affects conflict arbitration (see CROSS-T-9)."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 3462
+        quote: "Architecture Constitution v1"
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 4153
+        quote: "= Architecture Constitution / Product Direction"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "MP Phase 0 (L3457-3466) lists 'Architecture Constitution v1' at L3462 as a to-be-created spec, and §90 L3785 lists Architecture-Constitution-v1.md as item 1 of the pre-MVP list, while MP L67 ranks it above the scoped-document layer; EC §152 L4152-4153 instead declares 'Master Plan = Architecture Constitution / Product Direction'. Both readings verified verbatim."
+      - verdict: "CONFIRMED"
+        reason: "MP Phase 0 L3462 'Architecture Constitution v1' listed as a deliverable to create (and §90 L3785 as a separate file), while EC L4152-4153 declares 'Master Plan = Architecture Constitution / Product Direction'. Both exact; the two identities are incompatible."
+  - id: "CROSS-T-11"
+    type: "duplicate_definition"
+    severity: "medium"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 2
+    detail: "The Global Gate and High-risk Gate checklists are enumerated in full in both the Atlas (§22.1/22.2, L4166–4194: 14 + 6 items) and the Execution Contract (§68, L2250–2278: same 14 + 6), with gate-name drift already present: Atlas 'Independent Judge PASS' vs EC 'Independent Review'; Atlas 'Human Specialist Review PASS' vs EC 'Human Specialist'; Atlas 'Recovery / Rollback Rehearsal PASS' vs EC 'Recovery Rehearsal'. EC's gate_result.gate_id (L2285) implies stable gate identifiers, but no shared gate-id registry exists, so the two lists will diverge further under maintenance."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 4191
+        quote: "Independent Judge PASS"
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 2273
+        quote: "Independent Review"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "Atlas §22.1 (14 items) + §22.2 (6 items) at L4166-4194; EC §68 same 14+6 at L2250-2278. Name drift verified verbatim: 'Independent Judge PASS' (L4191) vs 'Independent Review' (L2273), 'Human Specialist Review PASS' vs 'Human Specialist', 'Recovery / Rollback Rehearsal PASS' vs 'Recovery Rehearsal'. gate_result.gate_id actually at L2287 (claimed 2285, trivial). Caveat: EC §68 prefixes its list with 可能包含 ('may include'), slightly softer than the Atlas's list — drift claim still stands."
+      - verdict: "CONFIRMED"
+        reason: "Atlas §22.1 L4166-4181: 14 PASS items; §22.2 L4187-4194: 6 items; 'Independent Judge PASS' at L4191 exact. EC §68 L2250-2265: same 14; L2269-2276: same 6; 'Independent Review' at L2273 exact. All three name drifts verified (Human Specialist Review PASS vs Human Specialist L2270; Recovery / Rollback Rehearsal PASS L4193 vs Recovery Rehearsal L2275). EC gate_result at L2285 with gate_id: security; no shared gate-id registry found in any document."
+  - id: "CROSS-T-12"
+    type: "duplicate_definition"
+    severity: "medium"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 2
+    detail: "The Reversal Criteria machine schema exists in three incompatible shapes across two documents: Atlas language-policy example (L56–59) uses reversal_conditions: [indicator/threshold/action]; Atlas §11.33 (L1990–1995) uses reversal: indicator/condition/action/owner (singular, 'condition' not 'threshold'); Execution Contract §88 (L2692–2697) uses reversal: indicators[]/thresholds[]/owner/action (plural arrays). The promised /specs/decision/reversal.schema.yaml (Atlas Appendix A L4589) has three conflicting source-of-truth candidates."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 56
+        quote: "reversal_conditions:\n  - indicator: ...\n    threshold: ..."
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 1990
+        quote: "reversal:\n  indicator: CAC\n  condition: \"> 300 USD for 3 consecutive months\""
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 2692
+        quote: "reversal:\n  indicators: [...]\n  thresholds: [...]"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "Atlas L56-59 reversal_conditions (indicator/threshold/action), Atlas L1990-1994 reversal singular (indicator/condition/action/owner), EC L2691-2696 reversal plural (indicators[]/thresholds[]/owner/action) — all verified verbatim. reversal.schema.yaml promised at Atlas L4589."
+      - verdict: "CONFIRMED"
+        reason: "Atlas L56-59 'reversal_conditions: - indicator/threshold/action' exact. Atlas §11.33 (heading L1980) L1990-1995 'reversal: indicator: CAC / condition / action / owner' exact — singular, 'condition' not 'threshold'. EC §88 L2692-2697 'reversal: indicators: [...] / thresholds: [...] / owner / action' exact — plural arrays. /specs/decision/reversal.schema.yaml at Atlas L4589 exact. Three incompatible source-of-truth shapes verified (plus two more variants at Atlas 3773/3812 in typed objects, strengthening the claim)."
+  - id: "CROSS-T-13"
+    type: "duplicate_definition"
+    severity: "medium"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 2
+    detail: "The Assumption Registry record (ASM-*) is schematized differently in each document that defines it: Master Plan L1554–1563 uses type/evidence_strength/confidence/validation_method (no owner); Execution Contract L3238–3247 uses evidence[]/validation/owner (no type, no confidence); the Atlas F10 tool row (L570) lists ID/statement/type/evidence/confidence/validation/status/owner. Three field sets for the same registry object; /specs/evidence/assumption.schema.yaml (Atlas Appendix A) has no single authoritative shape to formalize."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 1554
+        quote: "assumption:\n  id: ASM-018 ... evidence_strength: Medium ... validation_method: \"Interview 30 universities\""
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 3238
+        quote: "assumption:\n  id: ASM-... evidence: [...] validation: ... owner: ..."
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "MP §24 L1554-1563: type/evidence_strength/confidence/validation_method, no owner. EC §116 L3238-3247: evidence[]/validation/owner, no type/confidence. Atlas F10 row L570: ID/statement/type/evidence/confidence/validation/status/owner. Three distinct field sets verified; /specs/evidence/assumption.schema.yaml is in Atlas Appendix A with no single authoritative shape."
+      - verdict: "CONFIRMED"
+        reason: "MP §24 L1555-1564: type/evidence_strength/confidence/validation_method, no owner. EC §116 L3239-3247: evidence[]/validation/owner, no type/confidence. Atlas F10 L570: ID/statement/type/evidence/confidence/validation/status/owner. Three incompatible field sets confirmed."
+  - id: "CROSS-T-14"
+    type: "inconsistent_id"
+    severity: "medium"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 2
+    detail: "The SWOT method carries two different machine IDs across documents: Master Plan's Typed LEGO example uses strategy.swot (L745, '<family>.<name>' grammar matching root_cause.fishbone), while the Atlas versions it as method.swot.v1/v2/v3 (L4256–4258, 'method.<name>.v<N>' grammar, no family segment) — and the Atlas's own third grammar method.association.mind_map (L50) matches neither. Since Workflow IR method nodes MUST resolve from the Atlas (Master Plan L802–804), a node written with the Master Plan's strategy.swot cannot resolve in an Atlas registry keyed by method.swot.vN."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 745
+        quote: "execute_method(strategy.swot):"
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 4256
+        quote: "method.swot.v1"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "MP L745 'execute_method(strategy.swot):' (family.name grammar, matching root_cause.fishbone at L742); Atlas L4256-4258 method.swot.v1/v2/v3; Atlas L50 method.association.mind_map — three grammars verified at exact lines. MP L803-804 requires Workflow method nodes to resolve from the Atlas, so strategy.swot has no resolvable key in a method.swot.vN registry."
+      - verdict: "CONFIRMED"
+        reason: "MP L745 'execute_method(strategy.swot):' exact; Atlas L4256-4258 'method.swot.v1/v2/v3' exact; Atlas L50 'method.association.mind_map' exact; Atlas §9 contract itself uses a third form 'root_cause.fishbone' (L989). MP L802-805 mandates Workflow IR method nodes MUST resolve from the Atlas. Grep confirms 'strategy.swot' appears nowhere in the Atlas — the only SWOT machine-IDs there are method.swot.vN, so the resolution mismatch is real."
+  - id: "CROSS-T-15"
+    type: "term_conflict"
+    severity: "medium"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 2
+    detail: "The rigor/mode vocabulary disagrees: Master Plan §84 defines five operating modes — Fast, Professional, Research Grade, Board Grade, Deep Intelligence (L3399–3415) — while the Atlas's machine enum required_rigor: fast|professional|research_grade|board_grade (L1086) has only four values. The Master Plan's 'Deep Intelligence' mode is unexpressible in the selector contract, and no document defines how it maps (e.g., to board_grade plus extra gates)."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 3415
+        quote: "## Deep Intelligence"
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 1086
+        quote: "required_rigor: fast|professional|research_grade|board_grade"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "MP §84 (L3396+) defines five modes ending with '## Deep Intelligence' at exactly L3415; Atlas L1086 'required_rigor: fast|professional|research_grade|board_grade' has four values. Grep confirms Deep Intelligence appears nowhere in the Atlas or EC and no mapping is defined."
+      - verdict: "CONFIRMED"
+        reason: "MP §84 (L3397) defines five modes: Fast L3399, Professional L3403, Research Grade L3407, Board Grade L3411, Deep Intelligence L3415 (exact). Atlas L1086 'required_rigor: fast|professional|research_grade|board_grade' exact — four values. Grep confirms 'Deep Intelligence' appears exactly once across all three documents (MP 3415); no mapping is defined anywhere."
+  - id: "CROSS-T-16"
+    type: "missing_contract"
+    severity: "medium"
+    severity_source: "analyst_assessed"
+    verdict: "PARTIAL"
+    independent_votes: 2
+    detail: "The seam between the Execution Contract's Method Resolution flow and the Atlas's Method Selection Engine has no field mapping. EC §14 (L706–712) pipes 'Task Context' into 'Method Atlas → Method Selection Engine', but EC's task_context (L362–375) lacks most fields the Atlas's selection_context requires (goal_type, problem_type, required_rigor, decision_criticality, evidence_available, uncertainty, time_horizon…). Only risk_tier and jurisdiction_context overlap — and risk_tier's enums conflict (CROSS-T-3). No document defines the transformation, so the central handoff of the whole system is unimplementable without invention."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 362
+        quote: "task_context:\n  task_id ... risk_tier: ..."
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 1070
+        quote: "selection_context:\n  goal_type ... problem_type ... required_rigor ..."
+    verdict_votes:
+      - verdict: "PARTIAL"
+        reason: "Core claim confirmed: EC task_context (L362-374) lacks goal_type/problem_type/required_rigor/decision_criticality/evidence_available/uncertainty/time_horizon that Atlas selection_context (L1070-1087) requires, and no document defines the transformation. But 'only risk_tier and jurisdiction_context overlap' is wrong — reversibility appears in both, and domains/domain nearly match. Understates overlap; missing-mapping conclusion unaffected."
+      - verdict: "PARTIAL"
+        reason: "Core claim confirmed: EC L705-717 flow (Task Context → Method Atlas → Method Selection Engine) exists; EC task_context (L362-375) lacks goal_type, problem_type, required_rigor, decision_criticality, evidence_available, uncertainty, time_horizon, stakeholders, budget etc. that Atlas selection_context (L1071-1088) requires; no transformation is defined anywhere. But 'Only risk_tier and jurisdiction_context overlap' is inaccurate: reversibility appears in both records (EC L373, Atlas L1082), and EC 'domains' nearly matches Atlas 'domain'. The seam gap is real; the overlap enumeration undercounts. (Also selection_context: is L1071, not L1070.)"
+  - id: "CROSS-T-17"
+    type: "missing_contract"
+    severity: "medium"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "MethodExecutionRequest and TypedMethodResult — the input/output types of the core capability contract cognitive.execute_method (Master Plan §8.3) — are used only at Master Plan L708/L712 and defined in none of the three documents. They are absent from the Atlas's Typed Object Model (§16 defines only Idea/Decision/Method Execution), absent from Atlas Appendix A's 14 promised schemas, and absent from the Execution Contract's §92 13-schema list. The Phase 1 core interface has no schema target anywhere in the program."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 708
+        quote: "- MethodExecutionRequest"
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 712
+        quote: "- TypedMethodResult"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "Grep across all three documents: MethodExecutionRequest and TypedMethodResult occur only at MP L708 and L712 (§8.3 capability yaml). Absent from MP's /specs/cognitive list (L766-771, five schemas), Atlas §16 Typed Object Model (16.1 Idea/16.2 Decision/16.3 Method Execution), Atlas Appendix A's 14 schemas, and EC §92's 13-schema list."
+  - id: "CROSS-T-18"
+    type: "undefined_term"
+    severity: "medium"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "'Section Registry' (EC L198) and 'Normative Context Bundle' (EC L204) are load-bearing components of the mandated index-based retrieval pipeline, and normative-context.yaml is a required file of every Task Execution Packet (EC L738), yet no structure or schema for either exists in any of the three documents — EC §92's spec list has no normative-context.schema.yaml or section-registry schema, and the terms never appear in the Master Plan or Atlas."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 198
+        quote: "Section Registry"
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 738
+        quote: "├── normative-context.yaml"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "EC L198 'Section Registry', L204 'Normative Context Bundle', L738 normative-context.yaml all exact. §92's 13-schema list contains no normative-context or section-registry schema. Grep confirms neither term appears in MP or Atlas."
+  - id: "CROSS-T-19"
+    type: "duplicate_definition"
+    severity: "medium"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 2
+    detail: "The deprecation/retirement pipeline is defined in both the Atlas (§24.3, L4278–4288: Notice→Replacement→Compatibility Matrix→Migration Tool→Usage Scan→Archive, 6 steps) and the Execution Contract (§113, L3164–3195: same chain plus a 'Deadline' step before Archive, 7 steps), and both scopes cover Method retirement. The two mandated procedures disagree on whether a Deadline stage exists — classic dual-maintenance drift."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 4280
+        quote: "Deprecation Notice\n→ Replacement\n→ Compatibility Matrix\n→ Migration Tool\n→ Usage Scan\n→ Archive"
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 3189
+        quote: "Deadline\n↓\nArchive"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "Atlas §24.3 (L4275-4285): 6-step chain ending Usage Scan → Archive, scope 'method retirement'. EC §113 (L3163-3192): same chain plus Deadline before Archive (Deadline at L3190; claimed 3189, off by one), scope includes Method. Dual definition with drift confirmed."
+      - verdict: "CONFIRMED"
+        reason: "Atlas §24.3 L4275-4288: 'Deprecation Notice → Replacement → Compatibility Matrix → Migration Tool → Usage Scan → Archive' (6 steps, L4280 exact), scoped '每個 method retirement'. EC §113 L3164-3194: same chain plus 'Deadline' before Archive (L3189 exact, 7 steps), scope list includes '- Method' (L3169). Two normative procedures for the same retirement, disagreeing on the Deadline stage — verified."
+  - id: "CROSS-T-7"
+    type: "undefined_term"
+    severity: "medium"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 2
+    detail: "The most-cited promotion redline is keyed to the status `FACT`, which no vocabulary in any of the three documents defines. Atlas rule 2 (L4151) forbids 'UNKNOWN 不得提升為 FACT' and Execution Contract §38 forbids 'UNKNOWN → FACT' (L1492), but both documents' epistemic enums contain only SOURCE FACT / SOURCE_FACT, never a bare FACT. A validator implementing the redline literally has no target value to check against."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 4151
+        quote: "2. `UNKNOWN` 不得提升為 `FACT`。"
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 1492
+        quote: "UNKNOWN → FACT"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "Atlas L4151 '`UNKNOWN` 不得提升為 `FACT`' and EC L1492 'UNKNOWN → FACT' exact. Grep across all three docs: no enum defines a bare FACT value (only SOURCE FACT/SOURCE_FACT/LOCKED FACT)."
+      - verdict: "CONFIRMED"
+        reason: "Atlas L4151 '2. `UNKNOWN` 不得提升為 `FACT`。' exact; EC L1492 'UNKNOWN → FACT' exact. Full grep of FACT across all three docs finds no bare 'FACT' in any epistemic enum — only SOURCE FACT (Atlas 594, MP 3385), SOURCE_FACT (EC 1476), and unrelated LOCKED_FACT/LOCKED FACT lock statuses (EC 1988, MP 975). The redline's target value is undefined."
+  - id: "CROSS-T-8"
+    type: "inconsistent_id"
+    severity: "medium"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 2
+    detail: "The human-content protection labels disagree across docs: Master Plan defines 'LOCKED FACT' with a space (L975; 'AI MUST NOT CHANGE LOCKED FACTS' L3671) while the Execution Contract's hard prohibition is keyed on `LOCKED_FACT` / `LOCKED_DECISION` in SNAKE_CASE (L1988). `LOCKED_DECISION` is defined in none of the three documents. An enforcement layer matching the Execution Contract's identifiers will not match content labeled per the Master Plan."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 975
+        quote: "LOCKED FACT"
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 1988
+        quote: "`LOCKED_FACT` / `LOCKED_DECISION`：不得由 AI 修改。"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "MP L975 defines space-form LOCKED FACT (§11.3) and L3671 'AI MUST NOT CHANGE LOCKED FACTS.'; EC L1988-1990 keys its prohibition on `LOCKED_FACT` / `LOCKED_DECISION` (quote spans two lines but is verbatim in substance). Grep across all three docs: LOCKED_DECISION appears only in the EC prohibition, defined nowhere."
+      - verdict: "CONFIRMED"
+        reason: "MP L975 LOCKED FACT and L3671 'AI MUST NOT CHANGE LOCKED FACTS.' exact. EC L1988 `LOCKED_FACT` / `LOCKED_DECISION` exact. Grep confirms LOCKED_DECISION appears only at EC L1988 — defined nowhere in any of the three docs."
+  - id: "DOC-execution_contract-1"
+    type: "other"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "A stray unnumbered level-1 heading appears in the middle of §2 (between the intro '採：' at L94 and the authority table at L98). Every other H1 follows the '# N. Title' numbered scheme 0–152; this one breaks the numbering and reads as a table caption promoted to a document-level heading, which corrupts any TOC/section-registry built from H1s."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 96
+        quote: "# Scoped Authority"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "EC L96 '# Scoped Authority' is a genuine unnumbered H1 between the '採：' intro (L94) and the table (L98), inside §2 (L90 '# 2. 三份母規格的 Scoped Authority'). Grep of all '^# ' lines: the only other unnumbered H1s are the document title (L1) and '# Execution Result' at L3335, which sits inside a ```markdown template fence — so the numbered-scheme claim holds for real headings."
+  - id: "DOC-execution_contract-10"
+    type: "ambiguous"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "PARTIAL"
+    independent_votes: 1
+    detail: "The §1.1 filename grammar shows a single choice token from {Global, Architecture, Plan, Contract}, but all three actual canonical filenames combine 'Global' with a multi-word suffix (Global_Master_Plan, Global_Architecture, Global_Execution_Contract) plus extra domain words (Engineering_Os, Method_Atlas). The declared grammar cannot unambiguously parse or regenerate the canonical filenames it governs."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 71
+        quote: "_<Global / Architecture / Plan / Contract>"
+    verdict_votes:
+      - verdict: "PARTIAL"
+        reason: "Quote exact at L71. But 'cannot unambiguously parse' overstates: since the choice token is positionally last before _v<MAJOR>, all three filenames parse deterministically (…Master|Plan, …Global|Architecture, …Execution|Contract). The genuine defect is smaller than claimed: 'Global' is offered as a choice option yet only ever appears mid-domain, and natural units like 'Master_Plan' split awkwardly across the domain/choice boundary."
+  - id: "DOC-execution_contract-11"
+    type: "ambiguous"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "PARTIAL"
+    independent_votes: 1
+    detail: "Path-layout sections are inconsistently qualified: §4, §12/15 (workspace), §72, §77, §95, §147 mark their layouts 建議 (suggested), while §91, §92, §93 and §94 present near-identical path trees with no qualifier at all. It is undecidable which path contracts are binding and which are advisory — significant because §141 ('確切路徑') and Phase 0 (L3995–3997) treat some of the same paths as mandatory deliverables."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 2750
+        quote: "# 91. Policy-as-Code Paths"
+    verdict_votes:
+      - verdict: "PARTIAL"
+        reason: "The binding/advisory inconsistency is real and verified: 建議 marks §4 (L220), §23 (L1005), §72 (L2362), §77 (L2473), §95 (L2825), §147 (L3943), while §91-§94 present trees with no qualifier and §141 says 確切路徑. But the finding misattributes §12/§15: grep shows no 建議 anywhere between L527 and L1005 — §12 says 'Runtime 工作路徑：' and §15 has no qualifier, so those two are in the unqualified camp, not the 建議 camp."
+  - id: "DOC-execution_contract-12"
+    type: "contradiction"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "PARTIAL"
+    independent_votes: 1
+    detail: "The §151 minimum boot instruction orders reading Execution Contract first, then Master Plan, then Method Atlas, while §3.1 Required Document Resolution (L173–175) orders Master Plan (1), Method Atlas (2), Execution Contract (3). Minor, but the two boot sequences prescribe different resolution orders for the same mandatory step."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 4132
+        quote: "1. AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+    verdict_votes:
+      - verdict: "PARTIAL"
+        reason: "Both texts verified exactly: §151 (L4130-4134) orders EC→MP→Atlas; §3.1 (L173-175) orders MP→Atlas→EC. However 'contradiction' over-reads: §3.1 is a locate/resolve checklist within the full Boot Contract while §151 is a minimal bootstrap for externally-constrained AI, and neither attaches normative precedence semantics to its numbering. A presentation inconsistency, not two conflicting mandates."
+  - id: "DOC-execution_contract-2"
+    type: "inconsistent_id"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "The naming rule at L85 mandates recording keys 'document_version + content_hash', but the actual Execution Manifest schema (§64, L2144–2152) and the per-execution record (§4, L257–273) use keys `version` and `sha256`. The prose contract and the machine block name the same two fields differently."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 85
+        quote: "Execution Manifest 永遠記錄 `document_version + content_hash`"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "EC L85 verbatim mandates recording `document_version + content_hash`; §64 manifest (L2143-2152) and §4 per-execution record (normative_documents, L257-273) both use `version` + `sha256`. Same fields, different names, no reconciliation."
+  - id: "DOC-execution_contract-3"
+    type: "inconsistent_id"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "§61 Retry Policy says retry exhaustion yields 'FAILED / NEEDS_REVIEW', but the canonical vocabularies define only NEEDS_HUMAN_REVIEW (§10 side states L567, §70 final statuses L2306). 'NEEDS_REVIEW' is an undeclared status identifier."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 2082
+        quote: "FAILED / NEEDS_REVIEW"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "EC L2082 'FAILED / NEEDS_REVIEW' exact, inside §61 Retry Policy (L2064). Grep: NEEDS_REVIEW appears only there; canonical vocabularies define only NEEDS_HUMAN_REVIEW (§10 L567, §70 final statuses L2306)."
+  - id: "DOC-execution_contract-4"
+    type: "undefined_term"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "§57 imposes a hard prohibition keyed on the labels LOCKED_FACT and LOCKED_DECISION, but neither label is defined anywhere in this document (they are not in the §38 epistemic label list L1475–1487), and no pointer says which companion document defines them."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 1988
+        quote: "`LOCKED_FACT` / `LOCKED_DECISION`：不得由 AI 修改。"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "EC L1988 verbatim. Neither LOCKED_FACT nor LOCKED_DECISION appears in the §38 label list (L1475-1485) or anywhere else in EC (grep), and §57's surrounding text contains no pointer to a defining companion document."
+  - id: "DOC-execution_contract-5"
+    type: "undefined_term"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "'Jurisdiction Pack' (L108) and 'Applicable Pack' (§41 L1562, '法規 pack' §83 L2593) are used normatively (authority table entry; mandatory resolution step; freshness requirement) but the construct is never defined in this document and no schema or path for packs appears in §91/§92."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 108
+        quote: "Official legal source + approved Jurisdiction Pack"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "EC L108 'Official legal source + approved Jurisdiction Pack' exact (only 'Jurisdiction Pack' occurrence in EC); 'Resolve Applicable Pack' at L1561 (claimed 1562, off by one); '法規 pack 有 freshness' at L2593 exact. §91 (8 policy files) and §92 (13 schemas) contain no pack schema or path; no definition of the construct anywhere in EC."
+  - id: "DOC-execution_contract-6"
+    type: "inconsistent_path"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "§23 recommends ADRs at /docs/adr/, but §93 Governance Documentation Paths (L2797) places adr/ under /docs/governance/ instead ('├── adr/' inside /docs/governance/). Two different recommended ADR locations with no reconciliation."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 1008
+        quote: "/docs/adr/ADR-XXXX-<slug>.md"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "EC §23: 建議路徑 (L1005) → /docs/adr/ADR-XXXX-<slug>.md (L1008 exact). EC §93 tree (L2789-2798) places adr/ (L2797 exact) under /docs/governance/. Two recommended locations, no reconciliation text found."
+  - id: "DOC-execution_contract-7"
+    type: "inconsistent_path"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "Phase 4 (§149, L4052–4054) mandates building /platform/ai-execution/audit/, handoff/ AND replay/, but the §95 Execution Runtime Modules inventory (L2828–2842) lists 14 modules ending '├── audit/ └── handoff/' with no replay/ module. The test tree §94 (L2817) does include replay/, so the §95 module list is the odd one out."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 4054
+        quote: "/platform/ai-execution/replay/"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "EC Phase 4 mandates /platform/ai-execution/audit/ handoff/ replay/ at L4052-4054 exact. §95 module inventory (L2827-2842) lists exactly 14 modules ending audit/ handoff/ with no replay/. §94 test tree does include replay/ (L2817). §95 is the odd one out as claimed."
+  - id: "DOC-execution_contract-8"
+    type: "inconsistent_path"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "§141 mandates golden compliance tests at /tests/governance/ai-execution/golden/, but the §94 Test Paths tree (L2805–2819) enumerates 12 subdirectories of /tests/governance/ai-execution/ and golden/ is not among them."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 3805
+        quote: "/tests/governance/ai-execution/golden/"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "EC §141 '確切路徑' → /tests/governance/ai-execution/golden/ at L3805 exact. §94 tree (L2805-2819) enumerates 12 subdirectories (document-resolution through handoff); golden/ is not among them."
+  - id: "DOC-execution_contract-9"
+    type: "missing_contract"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "The document emits many named blocking/escalation signals (DOCUMENT_RESOLUTION_BLOCKED L184, METHOD_RESOLUTION_BLOCKED L723, CURRENT_STATE_DRIFT_DETECTED L635, SCOPE_CHANGE_REQUIRED L804, LEGAL_REVIEW_REQUIRED L1580, BUDGET_REVIEW_REQUIRED L2622, CONFLICT_REQUIRES_HUMAN_REVIEW L134, PREEXISTING_WORKTREE_CHANGES L2503, OFFLINE_SOURCE_STALE L2601) but never defines how any of them maps onto the Execution State Machine's legal side states or final statuses. A machine implementation of the state machine cannot place these signals; no *.schema.yaml in §92 is designated to carry them either."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 565
+        quote: "合法 side states："
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        corrected_line: 563
+        reason: "All nine signal lines grep-verified exactly (L184, 723, 635, 804, 1580, 2622, 134, 2503, 2601). The side-state vocabulary block sits at L563-573 ('合法 side states：' at L563, not the claimed 565) and contains none of these signals; no mapping section exists and no §92 schema is designated for them."
+  - id: "DOC-master_plan-1"
+    type: "inconsistent_path"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "PARTIAL"
+    independent_votes: 1
+    detail: "The mandatory-read Atlas is named `..._v1.md` in §0.0 (L20) and in the mandatory Execution Manifest example (L91), but everywhere else (L56, 635, 804, 816, 2131, 2202, 2245, 3472, 3509, 3805) it is `AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md`. Two different filenames for the single Source of Truth; neither matches a canonical name pattern for the actual companion file."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 20
+        quote: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+    verdict_votes:
+      - verdict: "PARTIAL"
+        reason: "Dual naming confirmed: v1.md at L20/L91, v1_2_zhTW at the ten listed lines, and v1_2_zhTW does not exist on disk. But the closing claim 'neither matches a canonical name pattern for the actual companion file' is wrong — the actual companion file IS AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md, which the L20/L91 references match exactly."
+  - id: "DOC-master_plan-2"
+    type: "stale_reference"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "The document-responsibility table names the Master Plan itself as a lowercase v2_1 file, but this document is `AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md`. Self-reference does not match the canonical filename or version."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 55
+        quote: "`ai_lego_cognitive_engineering_os_global_master_plan_v2_1.md`"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "MP L55 verbatim self-names the document as `ai_lego_cognitive_engineering_os_global_master_plan_v2_1.md` (lowercase, v2_1), while the file on disk is AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md."
+  - id: "DOC-master_plan-3"
+    type: "inconsistent_id"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "§0.0.3's mandatory Execution Manifest example pins Atlas `declared_version: 1.0` (and file `..._v1.md`), while the rest of the document mandates resolution against v1_2_zhTW. Version drift inside the same normative mechanism designed to prevent exactly this."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 92
+        quote: "declared_version: 1.0"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "MP L91-92 pins file: ..._v1.md with declared_version: 1.0 in the mandatory §0.0.3 manifest example, while L635/L804/L816/L3805 etc. mandate resolution/registration against the v1_2_zhTW name — version drift inside the very mechanism (Atlas-pin recording) built to prevent it."
+  - id: "DOC-master_plan-4"
+    type: "contradiction"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "§90 enumerates 22 numbered specification items (L3785–3806) but the closing sentence calls them '20 份規格'. Count mismatch."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 3808
+        quote: "這 20 份規格正確之後，再開始大規模 MVP"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "MP §90 enumerates items numbered 1-22 at L3785-3806, and L3808 verbatim says '這 20 份規格正確之後，再開始大規模 MVP' — a 22-vs-20 count mismatch."
+  - id: "DOC-master_plan-5"
+    type: "other"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "The plane diagram code fence opened at L365 (```text) is never closed before this heading; the next line ```text (L406) carries an info string and therefore cannot close a fence in CommonMark. The Trust Fabric prose and list render inside/outside the wrong fence — broken markdown fencing in the core architecture section."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 404
+        quote: "Cross-cutting Trust Fabric："
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "Verified structure: ```text opens at L365; no closing fence occurs before L404 'Cross-cutting Trust Fabric：'; L406 is another ```text, which per CommonMark cannot close a fence (closing fences may not carry an info string); the only bare ``` is at L416. The Trust Fabric prose and the L406 fence line are swallowed into the L365 code block."
+  - id: "DOC-master_plan-6"
+    type: "missing_contract"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "LINE_MISMATCH"
+    independent_votes: 1
+    detail: "The normative Capability Contract (§8.3) types its input/output as MethodExecutionRequest / TypedMethodResult, but no schema for either type is defined or pointed to anywhere in this document (the /specs/cognitive list at L766-771 names only primitive/method/lens/representation/recipe schemas)."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 708
+        quote: "type:\n    - MethodExecutionRequest"
+        original_line: 709
+    verdict_votes:
+      - verdict: "LINE_MISMATCH"
+        corrected_line: 708
+        reason: "Claim fully verified — MethodExecutionRequest/TypedMethodResult appear only at MP L708/L712, and the /specs/cognitive list (L766-771) names only primitive/method/lens/representation/recipe schemas — but the evidence anchor L709 is the 'output:' line; the quoted 'type:\\n    - MethodExecutionRequest' sits at L707-708."
+  - id: "DOC-master_plan-7"
+    type: "inconsistent_id"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "LINE_MISMATCH"
+    independent_votes: 1
+    detail: "§134 legal-uncertainty states use `CONFLICTING` while §98 conflict-of-laws states use `CONFLICT` (L4204). Two near-identical status identifiers for the same legal-conflict condition, with no mapping between the two enums."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 5268
+        quote: "CONFLICTING"
+        original_line: 5269
+    verdict_votes:
+      - verdict: "LINE_MISMATCH"
+        corrected_line: 5268
+        reason: "Claim verified: §134 (L5258) legal-uncertainty enum uses CONFLICTING and §98 Conflict-of-Laws Engine (L4168) enum uses CONFLICT at L4204, with no mapping (grep shows these are the only two occurrences). But CONFLICTING is at L5268, not the cited L5269."
+  - id: "DOC-master_plan-8"
+    type: "other"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "Stray unnumbered H1 injected inside §15 breaks the numbered-section hierarchy; same pattern at L5116 ('# Compliance Center' inside §129). Any tooling keyed on '# <number>.' section structure will mis-segment these chapters."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 1145
+        quote: "# Stakeholder & Expert Intelligence Plane"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "Stray unnumbered H1 '# Stakeholder & Expert Intelligence Plane' verified at exactly L1145, between §15 (L1141) and §15.1 (L1149); same pattern '# Compliance Center' at exactly L5116 inside §129 (L5112). Both break the '# <number>.' section convention as claimed."
+  - id: "DOC-master_plan-9"
+    type: "ambiguous"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "LINE_MISMATCH"
+    independent_votes: 1
+    detail: "Phase 0 (§85) requires delivering 'Cognitive Method Contract v1', but §90's authoritative 22-file spec list contains no corresponding filename (closest are Capability-Contract-v1.md and the Atlas itself). Deliverable has no canonical file target."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 3465
+        quote: "Cognitive Method Contract v1"
+        original_line: 3466
+    verdict_votes:
+      - verdict: "LINE_MISMATCH"
+        corrected_line: 3465
+        reason: "Claim verified: Phase 0 requires 'Cognitive Method Contract v1' and grep confirms no Cognitive-Method-Contract*.md filename exists in §90's 22-item list (closest are Capability-Contract-v1.md #3 and the Atlas #21). But the quoted text is at L3465, not the cited L3466."
+  - id: "DOC-method_atlas-1"
+    type: "inconsistent_id"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "Method machine-ID 文法三種並存：line 50 範例為 `method.association.mind_map`（method.<family>.<name>），line 989 契約為 `root_cause.fishbone`（<family>.<name>，無 method. 前綴），line 4256 版本化範例為 `method.swot.v1`（method.<name>.v<N>，無 family 段）。同一文件內無單一 ID 文法可依循。"
+    evidence:
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 989
+        quote: "id: root_cause.fishbone"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "Three ID grammars within the Atlas verified at exact lines: L50 'method.association.mind_map' (method.<family>.<name>), L989 'id: root_cause.fishbone' (<family>.<name>, no method. prefix), L4256 'method.swot.v1' (method.<name>.v<N>, no family segment). No single grammar rule reconciling them exists in the document."
+  - id: "DOC-method_atlas-10"
+    type: "ambiguous"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "§17 標題稱「確切工程路徑」並以肯定語氣列出 /specs/*.schema.yaml 等檔案，Appendix A（4574）卻把同一批檔案稱為「建議拆出的下一批正式規格」（即尚未存在）。同批檔案的存在狀態在兩處敘述矛盾。"
+    evidence:
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 3861
+        quote: "# 17. 確切工程路徑"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "L3861 '# 17. 確切工程路徑' exact, and §17 affirmatively lists the /specs/ tree with the same schema files (primitive/method/lens/…/manifest.schema.yaml at L3988-4011). Appendix A at L4574 '# Appendix A — 建議拆出的下一批正式規格' exact, re-listing the identical batch (L4577-4594) as proposed future artifacts. The same files are presented as definite paths in one place and not-yet-existing proposals in the other — contradiction verified."
+  - id: "DOC-method_atlas-11"
+    type: "duplicate_definition"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "PARTIAL"
+    independent_votes: 1
+    detail: "規範性內容在 §8 總表與 §11 詳解間逐字重複，造成雙寫維護點：TOWS 表（530–537 與 1362–1367）、Assumption Mapping 象限（581–589 與 1632–1641）、Power–Interest 象限（497–506 與 1558–1567）、Scenario 象限（686–695 與 1818–1827）、Futures Wheel（699–711 與 1851–1860）、Causal DAG 例（624–630 與 1679–1685）。"
+    evidence:
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 1362
+        quote: "| SO | 如何用優勢放大機會？ | Growth strategy |"
+    verdict_votes:
+      - verdict: "PARTIAL"
+        reason: "Four of six pairs verified as verbatim or near-verbatim: TOWS SO/ST/WO/WT rows identical (L533-536 vs L1364-1367; evidence claimed L1362 — actual L1364, off by 2; header cell differs 核心問題 vs 問題), Assumption Mapping quadrant identical (581-589 vs 1632-1641), Power-Interest identical (497-507 vs 1558-1568), Causal DAG identical (624-630 vs 1679-1685). Scenario differs only in chart title (兩個關鍵不確定性 vs Scenario Planning). But the Futures Wheel pair is NOT 逐字重複: L699-711 is a 3-level wheel (A[AI 成本下降 90%] with a D layer) while L1851-1857 is a shorter 2-level variant with different node text — already drifted. The dual-maintenance claim stands for all pairs, but '逐字重複' overstates two of the six."
+  - id: "DOC-method_atlas-12"
+    type: "ambiguous"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "F19 的 `Stress Test`（851，負載測試）與 F12 的 `Stress Testing`（649，情境壓力測試）是兩個不同方法卻近乎同名，且皆無 machine ID 可區分；快速選工具表（4523「Stress Test」）無法判定指向哪一個。"
+    evidence:
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 851
+        quote: "| Stress Test | 找系統破壞點 | 超過預期負載→觀察 cliff/recovery | 了解安全餘量 |"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "L649 (inside F12 挑戰/紅隊/風險, L636-664) '| Stress Testing | 極端但合理情境 |…' — scenario stress-testing; L851 (inside F19 DevOps/SRE, L843-874) '| Stress Test | 找系統破壞點 | 超過預期負載→…' — load testing; both exact. Neither table row carries a machine ID. L4523 quick-select '…Futures Wheel / Stress Test…' exact and cannot be disambiguated between the two near-同名 methods."
+  - id: "DOC-method_atlas-13"
+    type: "undefined_term"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "§1 準則表「強制設計」欄要求 `Perspective Packs` 與 `Independent Analysis`，兩詞在全文件僅此一處出現，無定義、無目錄項、無契約——被列為強制設計卻不可查。"
+    evidence:
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 84
+        quote: "Perspective Packs、Independent Analysis、Minority Opinion、Red Team"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "L84 exact, in the §1 準則表 under the '強制設計' column (header verified at L82). Case-insensitive full-document grep confirms 'Perspective Pack(s)' and 'Independent Analysis' each occur exactly once — at L84 — with no definition, catalog entry, or contract anywhere in the Atlas despite being listed as mandatory design."
+  - id: "DOC-method_atlas-14"
+    type: "other"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "§30 內把模組定位名稱寫成 level-1 heading，對任何依 heading 解析結構的工具會產生一個幻影頂層章節（夾在 §30 與 Appendix A 之間）。"
+    evidence:
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 4568
+        quote: "# Cognitive Exploration, Deliberation & Decision Engine"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "L4568 '# Cognitive Exploration, Deliberation & Decision Engine' exact — a level-1 markdown heading used as a module-name label inside §30's narrative (§30 heading at L4556, prose '正式模組定位建議：' at L4566), sitting before Appendix A (L4574). Any heading-based parser will see a phantom top-level chapter exactly as claimed."
+  - id: "DOC-method_atlas-2"
+    type: "undefined_term"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "§4 組合式與 §9 正式契約（line 996 `- CAUSE_HYPOTHESIS`）使用了不在 24-primitive kernel（lines 157–182）中的 primitives：CAUSE_HYPOTHESIS、TRANSFORM（188）、CLASSIFY、CONTEXTUALIZE（189）、WEIGHT（191）。kernel 自稱「應盡量長期穩定」卻在同節即被超出。"
+    evidence:
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 187
+        quote: "Fishbone = DECOMPOSE + GROUP + CAUSE_HYPOTHESIS"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "Kernel at L158-181 lists exactly 24 primitives (FRAME…LEARN) and contains CAUSE/GROUP/COMPARE but NOT CAUSE_HYPOTHESIS, TRANSFORM, CLASSIFY, CONTEXTUALIZE, or WEIGHT. Yet L187 'Fishbone = DECOMPOSE + GROUP + CAUSE_HYPOTHESIS', L188 TRANSFORM, L189 CLASSIFY+CONTEXTUALIZE, L191 WEIGHT (all exact), and the §9 formal contract uses '- CAUSE_HYPOTHESIS' at L996 exact. L155 '方法可以消失；Primitive 應盡量長期穩定。' confirms the stability claim being violated in the same document."
+  - id: "DOC-method_atlas-3"
+    type: "inconsistent_id"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "同一個被禁止的因果輸出型別有多個名稱：契約 forbidden_transition 用 `FinalCausalFact`（1020、3564），11.4 用 `RootCauseFact`（1267），22.3 gate 表用 `Root Cause Fact`（4200）；而 §14.1 合法鏈終點又是只出現一次的 `RootCauseAssessment`（3556）。四個名稱皆無 schema 定義。"
+    evidence:
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 1020
+        quote: "- CauseHypothesisSet -> FinalCausalFact"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "All four names verified: FinalCausalFact at L1020 (exact) and L3563 (claimed 3564, off by one); RootCauseFact at L1267 exact; 'Root Cause Fact' at L4200 exact in the 22.3 gate table; RootCauseAssessment at L3555 (claimed 3556, off by one), appearing exactly once as the §14.1 legal-chain endpoint. None of the four appear in §16's typed objects (only Idea/Decision/MethodExecution) or the Appendix A schema list — no schema defines any of them."
+  - id: "DOC-method_atlas-4"
+    type: "undefined_term"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "Method-specific Gate 治理的 `AI Expert Lens`（4204）與 `LLM Arithmetic`（4205）不在任何 F01–F24 目錄、lens 清單或契約中被宣告；其必補驗證 `Trusted Compute`（4205，並於規則 4543「數學與統計必須由 Trusted Compute 執行」再度強制）全文件無定義。gate 引用了不存在於目錄的受治理對象。"
+    evidence:
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 4204
+        quote: "| AI Expert Lens | Real Expert Opinion | Hypothetical label; high-risk requires human expert |"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "L4204 'AI Expert Lens' and L4205 'LLM Arithmetic … Trusted Compute' exact. Full-document grep: 'AI Expert Lens' and 'LLM Arithmetic' each appear exactly once (only in the gate table) — declared in no F01-F24 catalog, lens list, or contract. 'Trusted Compute' appears only at L4205 and L4543 (rule 6, exact), with no definition anywhere in the Atlas. (The EC has a §39 Trusted Compute Contract, but this finding is scoped to the Atlas's internally-dangling gate references, which is accurate.)"
+  - id: "DOC-method_atlas-5"
+    type: "inconsistent_id"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "selection_context 的 problem_type enum 與 §10 Problem Type 路由表（1112–1123）不一致：表中 Incident、Policy、Architecture、Security、DB Migration、Market Entry 不在 enum；enum 的 exploratory、decision、operational 在表中沒有對應列。機器選擇器與人類路由表無法對齊。"
+    evidence:
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 1073
+        quote: "problem_type: diagnostic|exploratory|creative|strategic|causal|decision|operational"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "L1073 enum 'problem_type: diagnostic|exploratory|creative|strategic|causal|decision|operational' exact. §10 routing table at L1112-1123 exact: rows Diagnostic/Creative/Strategy/Causal/Incident/Policy/Architecture/Security/DB Migration/Market Entry. Incident, Policy, Architecture, Security, DB Migration, Market Entry are absent from the enum; enum values exploratory, decision, operational have no table row. Mismatch verified exactly as stated."
+  - id: "DOC-method_atlas-6"
+    type: "other"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "Monte Carlo 有完整詳解（11.29）、Method-specific Gate 條目（4207）、Phase 3 優先項（4364）與 recipe 使用（3321、3531），但不在 §7/§8 任何 F01–F24 方法目錄表中——自稱總覽的目錄未涵蓋一個被 gate 治理的方法。"
+    evidence:
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 1867
+        quote: "## 11.29 蒙地卡羅模擬（Monte Carlo Simulation）"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "L1867 '## 11.29 蒙地卡羅模擬（Monte Carlo Simulation）' exact; gate entry L4207, Phase 3 priority L4364, recipe usages L3321/L3531 all verified. F01-F24 catalog tables span L329-984; grep shows zero Monte Carlo occurrences in that range (nearest are L72 intro prose and L1867) — a gate-governed method absent from the self-described method catalog."
+  - id: "DOC-method_atlas-7"
+    type: "missing_contract"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "§14.1 型別相容性合法性依賴大量 typed objects（ProblemStatement@1003、CauseHypothesisSet@1010、KnowledgeSet、SWOTAnalysis、StrategyOptions、DecisionCandidate、HumanDecision@3569–3577、PerspectiveAssessment@1042、BoardDecisionPack@3335、IdeaSet/ClusterSet/PreliminaryPriority@3241–3244），但 §16 Typed Object Model 只定義 Idea/Decision/MethodExecution 三種，Appendix A 承諾的 schema 也不含這些型別。宣稱可做 static type check 的物件集合沒有型別定義。"
+    evidence:
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 3569
+        quote: "KnowledgeSet\n→ SWOT\n→ SWOTAnalysis"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "Typed objects verified: ProblemStatement L1003, CauseHypothesisSet L1010, PerspectiveAssessment L1042, IdeaSet/ClusterSet/PreliminaryPriority L3243-3245 (claimed 3241-3244, ~2 off), BoardDecisionPack L3335, KnowledgeSet→SWOT→SWOTAnalysis→…→HumanDecision chain L3569-3576 exact. §16 Typed Object Model (L3716) defines only 16.1 Idea, 16.2 Decision, 16.3 Method Execution; Appendix A's 14 schemas include none of these workflow types. The type-compatibility legality regime (§14.1 legal/illegal chains, §9 forbidden_transition) has no type definitions to check against."
+  - id: "DOC-method_atlas-8"
+    type: "inconsistent_id"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "強制規則 #2 使用狀態 `FACT`，但 Epistemic Type 清單（593–605）只有 `SOURCE FACT`，沒有獨立的 `FACT` 型別；規則引用了不存在的狀態值。"
+    evidence:
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 4151
+        quote: "`UNKNOWN` 不得提升為 `FACT`。"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "L4151 '2. `UNKNOWN` 不得提升為 `FACT`。' exact. The Epistemic Type list (L593-605) contains SOURCE FACT (L594) and UNKNOWN (L603) but no standalone FACT — full-document grep confirms bare FACT appears in no Atlas vocabulary. The rule references a nonexistent status value."
+  - id: "DOC-method_atlas-9"
+    type: "undefined_term"
+    severity: "medium"
+    severity_source: "default_not_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 1
+    detail: "Method Contract 的 precondition 引用 ProblemStatement 的 status 欄位與 `validated` 狀態值，但 ProblemStatement 的 status enum（有哪些狀態、如何轉移）在全文件無定義。"
+    evidence:
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 1013
+        quote: "- problem_statement.status == validated"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "L1013 '- problem_statement.status == validated' exact in the §9 Method Contract preconditions. Grep of every ProblemStatement/problem_statement occurrence in the Atlas (1003, 1013, 3242, 3549, 3561) shows no status enum, no state list, and no transition definition anywhere — 'validated' is an undefined status value."
+  - id: "CROSS-R-14"
+    type: "scope_violation"
+    severity: "low"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 2
+    detail: "Atlas §19 'Execution Lifecycle：完整閉環' (L4089-4107) and §21 強制規則 5-6 (L4154-4155: authority gate for publish/deploy/delete/send/irreversible; rollback via Execution Manifest) legislate execution lifecycle, authority, and change control — scopes both Scoped Authority tables assign to the Execution Contract (EC L104-105). The Atlas's lifecycle stages (Input→Validation→Planning→Processing→Quality Check→Human Review→Versioning→Audit→Publish→Monitor→Learn→Rollback) have no defined mapping onto the Execution Contract's mandatory 14-state machine (RECEIVED→CLOSED, L531+, where skipping required states is forbidden), leaving two normative but unreconciled execution lifecycles. Low severity because the Atlas version is coarse-grained and directionally compatible, but it is normative text ('強制規則'), not a summary."
+    evidence:
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 4089
+        quote: "# 19. Execution Lifecycle：完整閉環"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 4154
+        quote: "5. `publish / deploy / delete / send / irreversible` 需要 authority gate。6. Rollback 使用 Execution Manifest。"
+      - file: "D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 105
+        quote: "| AI Authority / Tool Use / Change Control | Execution Contract + machine policy |"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "Atlas §19 at L4089 (12-stage lifecycle flowchart) and §21 強制規則 5-6 at L4154-4155 (authority gate for publish/deploy/delete/send/irreversible; rollback via Execution Manifest) verified verbatim — scopes EC L104-105 assigns to the Execution Contract. No mapping onto EC's 14-state machine (L531-560, 禁止跳過必要 state) exists. Finding's own low-severity qualification is apt."
+      - verdict: "CONFIRMED"
+        reason: "Atlas §19 L4089-4107 lifecycle (Input→Validation→…→Rollback) exact; §21 強制規則 rules 5-6 at L4154-4155 exact ('publish / deploy / delete / send / irreversible 需要 authority gate' / 'Rollback 使用 Execution Manifest'). EC L104-105 assign execution lifecycle and Authority/Change Control to the EC (exact). EC §10 state machine at L531+, 14 states RECEIVED→CLOSED, with L575 '禁止跳過必要 state。' No mapping between the Atlas's 12-stage lifecycle and the EC's 14-state machine exists. Low-severity framing is fair."
+  - id: "CROSS-T-20"
+    type: "duplicate_definition"
+    severity: "low"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 3
+    detail: "Champion/Challenger is defined in all three documents (Master Plan §71 L2914, Atlas §24.2 L4263, Execution Contract §37 L1447) with drifting scope: Master Plan applies it to models only; Atlas to 'Champion Method / Model / Recipe'; Execution Contract to '模型、Method、Prompt、Recipe'. The mechanism is the same, but three copies of the same governance rule with different applicability lists is a dual-maintenance violation."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 2914
+        quote: "# 71. Champion / Challenger"
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 4266
+        quote: "Champion Method / Model / Recipe"
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 1447
+        quote: "# 37. Champion / Challenger — 模型、Method、Prompt、Recipe"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "MP §71 L2914-2930 applies Champion/Challenger to models only ('Champion Model' / '新模型'); Atlas §24.2 L4263-4266 to 'Champion Method / Model / Recipe'; EC §37 L1447-1449 to '模型、Method、Prompt、Recipe'. EC evidence quote condenses heading L1447 + prose L1449 but is accurate in substance; three copies with drifting applicability confirmed."
+      - verdict: "CONFIRMED"
+        reason: "MP L2914 (Champion Model — models only), Atlas L4263/L4266 ('Champion Method / Model / Recipe'), EC L1447 (§37, applies to 模型、Method、Prompt、Recipe per L1449) all verified. Three copies with drifting applicability lists as claimed."
+      - verdict: "CONFIRMED"
+        reason: "MP L2914 '# 71. Champion / Challenger' exact — body covers 'Champion Model' / 新模型 only. Atlas L4263 §24.2 with 'Champion Method / Model / Recipe' at L4266 exact. EC L1447 '# 37. Champion / Challenger' exact with scope '模型、Method、Prompt、Recipe' on L1449 (the finding's quote merges heading + next line, content accurate). Three copies with drifting applicability lists verified."
+  - id: "CROSS-T-21"
+    type: "duplicate_definition"
+    severity: "low"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 2
+    detail: "The 7-value Capability Availability status enum (Allowed / Restricted / Human Review / Local-only / Government-only / Prohibited / Unknown) is defined verbatim in both Master Plan §143 (L5521–5529) and Atlas §18.2 (L4050–4058). Values currently agree, so this is a pure dual-maintenance point; note the Master Plan's own yaml example uses lowercase `status: prohibited` while the enum list is Title Case, leaving the canonical casing unspecified."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 5523
+        quote: "Restricted\nHuman Review\nLocal-only"
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 4050
+        quote: "Allowed\nRestricted\nHuman Review\nLocal-only\nGovernment-only\nProhibited\nUnknown"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "Identical 7-value enum verified in MP §143 (L5522-5528, within claimed range) and Atlas §18.2 (L4051-4057, within claimed range); MP's yaml example at L5516 uses lowercase 'status: prohibited' vs the Title Case list. Atlas evidence anchor L4050 is the fence line, one above 'Allowed' — immaterial."
+      - verdict: "CONFIRMED"
+        reason: "MP §143 L5520-5528: 7 values Allowed/Restricted/Human Review/Local-only/Government-only/Prohibited/Unknown (Restricted L5522-5523 area, exact text); Atlas §18.2 L4050-4058: identical 7 values (Allowed L4051). Values currently agree — pure dual-maintenance point. MP's own yaml at L5515 uses lowercase 'status: prohibited' vs Title Case list, leaving canonical casing unspecified, as claimed."
+  - id: "CROSS-T-22"
+    type: "inconsistent_path"
+    severity: "low"
+    severity_source: "analyst_assessed"
+    verdict: "CONFIRMED"
+    independent_votes: 3
+    detail: "ADR location and template are inconsistently specified across documents. Location: Master Plan §157 (L5884), Atlas Appendix A (L4599–4601), and EC §23 (L1008) all use /docs/adr/, but EC §93 (L2797) instead places adr/ under /docs/governance/. Template: Master Plan §157's ADR format (Context/Decision/Alternatives/Security Impact/Legal Impact/Operational Impact/Migration/Rollback/Expiry) differs from the Atlas §11.37 ADR template (ADR-XXXX with Context/Decision/Alternatives Considered/Migration/Rollback/Validation/Revisit-Reversal Conditions). Two paths and two templates for the same record type."
+    evidence:
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        line: 5884
+        quote: "/docs/adr/"
+      - file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        line: 2797
+        quote: "├── adr/ (under /docs/governance/)"
+      - file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        line: 2082
+        quote: "ADR-XXXX template (§11.37)"
+    verdict_votes:
+      - verdict: "CONFIRMED"
+        reason: "MP L5884, EC L1008, Atlas L4601-4603 use /docs/adr/ while EC §93 L2797 places '├── adr/' under /docs/governance/ (exact). Templates differ: MP §157 L5888-5898 (Context/Decision/Alternatives/Security Impact/Legal Impact/Operational Impact/Migration/Rollback/Expiry) vs Atlas §11.37 L2083-2095 (ADR-XXXX with Alternatives Considered/Compatibility/Validation/Revisit-Reversal Conditions)."
+      - verdict: "CONFIRMED"
+        reason: "MP L5884 /docs/adr/ exact; EC §23 L1008 /docs/adr/ADR-XXXX-<slug>.md exact; EC §93 L2797 places adr/ under /docs/governance/ exact. MP §157 template (Context/Decision/Alternatives/Security/Legal/Operational/Migration/Rollback/Expiry) differs from Atlas §11.37 template L2083-2096 (adds Compatibility/Data Impact/Validation/Revisit-Reversal, drops Legal Impact/Expiry). Atlas /docs/adr/ refs at L4601-4603 (claimed 4599-4601, minor)."
+      - verdict: "CONFIRMED"
+        reason: "Paths: MP L5884 '/docs/adr/' exact; EC §23 L1008 '/docs/adr/ADR-XXXX-<slug>.md' exact; EC §93 L2797 '├── adr/' under /docs/governance/ exact; Atlas Appendix A /docs/adr/ paths at L4601-4603 (claimed 4599-4601, off by 2). Templates: MP §157 (Context/Decision/Alternatives/Security Impact/Legal Impact/Operational Impact/Migration/Rollback/Expiry, L5888-5898) vs Atlas §11.37 '# ADR-XXXX' at L2083 (Context/Decision/Alternatives Considered/Security-Privacy/Data Impact/Operational Impact/Compatibility/Migration/Rollback/Validation/Revisit-Reversal Conditions) — materially different. Two paths and two templates verified."

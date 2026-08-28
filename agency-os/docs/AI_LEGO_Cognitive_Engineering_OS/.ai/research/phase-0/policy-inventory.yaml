@@ -1,0 +1,1092 @@
+# AI LEGO OS — Phase 0 policy / gate / red-line inventory
+# Generated mechanically from full-document reads (workflow wf_7d1cd8d8-038, 3 reader agents, every line of all three mother docs covered).
+# Source doc identity/hashes: see document-hashes.yaml. Line numbers are 1-indexed into the hashed snapshots.
+# Phase 0 rule: this REGISTERS what exists; nothing is fixed here.
+by_document:
+  "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md":
+    policies_gates:
+      - name: "Filename/versioning rule (v-major lineage, SemVer inside, Git-tag history, Document ID+Version+Hash = identity)"
+        line: 76
+        kind: "policy"
+        normative: true
+        summary: "Breaking normative change bumps _v2; history preserved by tag/release/hash, never file overwrite"
+      - name: "Scoped Authority table"
+        line: 96
+        kind: "policy"
+        normative: true
+        summary: "Per-scope authoritative source; forbids last-document-read-wins conflict handling"
+      - name: "Conflict resolution precedence (Law→Hard Policy→Machine Contract→ADR→Scoped Doc→Recipe→Example→Ad-hoc)"
+        line: 113
+        kind: "policy"
+        normative: true
+      - name: "CONFLICT_REQUIRES_HUMAN_REVIEW"
+        line: 134
+        kind: "status_code"
+        normative: true
+        summary: "Same-level same-scope conflicts escalate; AI cannot pick the convenient one"
+      - name: "AI Boot Contract sequence"
+        line: 145
+        kind: "protocol"
+        normative: true
+        summary: "BOOT→Resolve Documents→Verify Versions/Hashes→Resolve Current State→Classify Task→Jurisdiction→Methods→Gates→Rollback→Forward Plan→Execute"
+      - name: "DOCUMENT_RESOLUTION_BLOCKED"
+        line: 184
+        kind: "status_code"
+        normative: true
+        summary: "Emitted when any required spec is missing"
+      - name: "Index-based normative retrieval (no full-book context)"
+        line: 193
+        kind: "policy"
+        normative: true
+        summary: "Full Document→Index→Section Registry→Content Hash→Task-specific Retrieval→Normative Context Bundle; index reusable while hash unchanged"
+      - name: "Per-execution normative_documents record"
+        line: 257
+        kind: "policy"
+        normative: true
+        summary: "Each run stores document_id/version/sha256/loaded_sections"
+      - name: "Execution Invariants (14 hard NO-* rules)"
+        line: 281
+        kind: "redline"
+        normative: true
+        summary: "NO PATCH-FIRST … NO CLAIM OF DONE WHILE A REQUIRED GATE IS NOT PASS"
+      - name: "Minimum Sufficient Coherent Change"
+        line: 323
+        kind: "principle"
+        normative: true
+        summary: "Root cause + bounded context + no scope expansion + tests + migration + observability + rollback; forbids symptom patch, magic constant, no-expiry bypass, catch-all exception, disabling validation/security, swallowing failures"
+      - name: "Task Classification (task_context required)"
+        line: 359
+        kind: "policy"
+        normative: true
+      - name: "Risk Tier R0 — auto-executable read-only"
+        line: 381
+        kind: "policy"
+        normative: true
+      - name: "Risk Tier R1 — Current State + Unit Test + Diff Review"
+        line: 404
+        kind: "gate"
+        normative: true
+      - name: "Risk Tier R2 — adds Integration Test/Compatibility/Rollback/Observability"
+        line: 422
+        kind: "gate"
+        normative: true
+      - name: "Risk Tier R3 — adds Threat Review/Data Review/Rehearsal/Canary/Human Approval/Post-deployment Verification"
+        line: 445
+        kind: "gate"
+        normative: true
+      - name: "Risk Tier R4 — Independent+Specialist Review, Explicit Human Authority, Recovery Drill, Emergency Stop, Rollback/Compensating Plan"
+        line: 467
+        kind: "gate"
+        normative: true
+      - name: "Capability ≠ Authority"
+        line: 483
+        kind: "principle"
+        normative: true
+      - name: "A4 requires human authority; AI cannot treat its own suggestion as approval"
+        line: 525
+        kind: "redline"
+        normative: true
+      - name: "Execution State Machine — no skipping required states"
+        line: 575
+        kind: "protocol"
+        normative: true
+      - name: "Legal side states (BLOCKED/NEEDS_HUMAN_REVIEW/FAILED/CANCELLED/ROLLED_BACK/COMPENSATED/PARTIAL_SUCCESS)"
+        line: 565
+        kind: "status_code"
+        normative: true
+      - name: "Current-state reconstruction first for all nontrivial changes"
+        line: 579
+        kind: "policy"
+        normative: true
+      - name: "Evidence source precedence (Running System Evidence first, Model Inference last)"
+        line: 618
+        kind: "policy"
+        normative: true
+      - name: "CURRENT_STATE_DRIFT_DETECTED"
+        line: 635
+        kind: "status_code"
+        normative: true
+        summary: "Doc-vs-reality conflicts recorded as drift; never assume docs correct"
+      - name: "No secrets in current-state artifacts; /.ai/ is workspace not identity"
+        line: 667
+        kind: "policy"
+        normative: true
+      - name: "Problem Definition Before Solution (Root Cause = UNKNOWN allowed, fabrication not)"
+        line: 673
+        kind: "policy"
+        normative: true
+      - name: "Method Resolution via Method Atlas; intuition is not a Method Registry"
+        line: 700
+        kind: "policy"
+        normative: true
+      - name: "METHOD_RESOLUTION_BLOCKED — high-risk tasks cannot degrade to model free-play"
+        line: 723
+        kind: "status_code"
+        normative: true
+      - name: "Scope Contract (IN/OUT OF SCOPE, NON-GOALS, INVARIANTS, ASSUMPTIONS, UNKNOWNs); no silent scope expansion"
+        line: 790
+        kind: "policy"
+        normative: true
+      - name: "SCOPE_CHANGE_REQUIRED — re-evaluate risk/rollback/tests/authority"
+        line: 804
+        kind: "status_code"
+        normative: true
+      - name: "Change Impact Graph before code change"
+        line: 816
+        kind: "policy"
+        normative: true
+      - name: "Rollback-first Rule — rollback/recovery validated before forward execution"
+        line: 857
+        kind: "redline"
+        normative: true
+      - name: "rollback_possible:false requires compensation_plan + recovery_plan + explicit_authority"
+        line: 912
+        kind: "gate"
+        normative: true
+      - name: "Forward Change Plan only after rollback accepted"
+        line: 929
+        kind: "policy"
+        normative: true
+      - name: "Option Analysis — high-risk change needs Option A + Option B + Status Quo"
+        line: 949
+        kind: "policy"
+        normative: true
+      - name: "ADR Trigger list"
+        line: 989
+        kind: "policy"
+        normative: true
+        summary: "12 conditions (new bounded context, new store, security boundary change, etc.) usually require an ADR at /docs/adr/ADR-XXXX-<slug>.md"
+      - name: "Exception/Workaround Contract — no owner+expiry+test+migration means no merge as architecture exception"
+        line: 1035
+        kind: "gate"
+        normative: true
+      - name: "Code Change Contract (11 rules incl. regression test for bug fixes, no hard-coded secret)"
+        line: 1047
+        kind: "policy"
+        normative: true
+      - name: "API Change Contract — breaking change = NEW VERSION or EXPAND→MIGRATE→DEPRECATE→REMOVE; no silent semantics change at same URL/version"
+        line: 1082
+        kind: "policy"
+        normative: true
+      - name: "Event/Messaging Contract — at-least-once + idempotent consumer + idempotency key + replay-safe + versioned schema; Event ID never reused"
+        line: 1103
+        kind: "policy"
+        normative: true
+      - name: "Database Change Contract — expand-contract standard flow"
+        line: 1133
+        kind: "protocol"
+        normative: true
+      - name: "DB Migration Requirements — 14-item assessment; backfill resumable/idempotent/checkpointed/throttled/observable; no unassessed destructive ALTER"
+        line: 1163
+        kind: "gate"
+        normative: true
+      - name: "Data Integrity Contract — exit code 0 insufficient, data invariant = PASS required"
+        line: 1211
+        kind: "gate"
+        normative: true
+      - name: "Data Deletion Contract — 10-step production deletion flow; soft delete ≠ compliant deletion"
+        line: 1229
+        kind: "protocol"
+        normative: true
+      - name: "Security Change Contract — Threat Review mandatory for authn/authz/secrets/crypto/network/egress/tenant isolation/file parsing/user content/AI tools"
+        line: 1270
+        kind: "gate"
+        normative: true
+      - name: "Secrets Contract — 10 forbidden locations; STOP→REVOKE/ROTATE→INVESTIGATE→RESUME on possible exposure"
+        line: 1290
+        kind: "redline"
+        normative: true
+      - name: "Supply Chain Contract — production deploys only verified artifacts; traceable Source→Commit→Deps→Build→SBOM→Scan→Sign→Registry→Deploy"
+        line: 1330
+        kind: "policy"
+        normative: true
+      - name: "Untrusted Content / Prompt Injection Contract — retrieved text never gains system authority; tool calls decided by Capability+Policy+Authority"
+        line: 1384
+        kind: "redline"
+        normative: true
+      - name: "AI / Model Change Contract — 9 recorded versions + 8 eval dimensions per affected capability"
+        line: 1412
+        kind: "policy"
+        normative: true
+      - name: "Champion/Challenger — challenger may not directly modify official artifacts"
+        line: 1465
+        kind: "protocol"
+        normative: true
+      - name: "AI Output Trust Boundary — 11 epistemic labels; UNKNOWN→FACT promotion forbidden without evidence/compute/human validation"
+        line: 1475
+        kind: "policy"
+        normative: true
+      - name: "Trusted Compute Contract — LLM mental calculation can never be CALCULATED_RESULT"
+        line: 1503
+        kind: "redline"
+        normative: true
+      - name: "Research Integrity Execution — no fabricated citations, DOI primary verification, dataset lineage, reproducible AnalysisRun"
+        line: 1526
+        kind: "policy"
+        normative: true
+      - name: "Jurisdiction Execution — High/Critical with unknown jurisdiction FAILS CLOSED; LLM memory never substitutes official legal sources"
+        line: 1556
+        kind: "policy"
+        normative: true
+      - name: "LEGAL_REVIEW_REQUIRED"
+        line: 1580
+        kind: "status_code"
+        normative: true
+      - name: "Data Residency-aware failover — availability cannot override sovereignty; no arbitrary foreign region fallback"
+        line: 1589
+        kind: "redline"
+        normative: true
+      - name: "Localization Execution — translation ≠ localization; 14-item check"
+        line: 1613
+        kind: "policy"
+        normative: true
+      - name: "Infrastructure Change Contract — IaC first, no manual drift; emergency console change must reconcile to Drift = 0"
+        line: 1642
+        kind: "policy"
+        normative: true
+      - name: "Configuration Contract — no undocumented env var, unknown default, hidden production-only behavior"
+        line: 1670
+        kind: "policy"
+        normative: true
+      - name: "Feature Flag Contract — owner/created_at/expiry/target_scope/default/kill_switch/removal_plan; permanent flag = architecture debt"
+        line: 1693
+        kind: "policy"
+        normative: true
+      - name: "CI Gate — required gate failure means MERGE / RELEASE = BLOCKED"
+        line: 1730
+        kind: "gate"
+        normative: true
+      - name: "Test strategy risk-based; required gates injected by compiler, not rigid pyramid"
+        line: 1738
+        kind: "policy"
+        normative: true
+      - name: "Regression Rule — failing regression test before fix; if not automatable, record reason + manual verification"
+        line: 1764
+        kind: "policy"
+        normative: true
+      - name: "Performance Contract — baseline/target/load profile/compare; no single benchmark"
+        line: 1786
+        kind: "gate"
+        normative: true
+      - name: "SRE Release Contract — SLI/SLO/Error Budget; burn rate breach → PAUSE / ROLLBACK"
+        line: 1819
+        kind: "gate"
+        normative: true
+      - name: "Release Strategy selection by blast radius/statefulness/traffic/reversibility/cost/environment — not always canary"
+        line: 1848
+        kind: "policy"
+        normative: true
+      - name: "Post-deployment Verification — deploy success ≠ task success; 10-item check"
+        line: 1874
+        kind: "gate"
+        normative: true
+      - name: "Observation Window — set by failure latency, not hard-coded"
+        line: 1895
+        kind: "policy"
+        normative: true
+      - name: "Incident Mode — no blind patch; emergency mitigation must be temporary + owner + expiry + follow-up root cause"
+        line: 1914
+        kind: "protocol"
+        normative: true
+      - name: "No-blame Evidence Rule — system/process/control failure, not person, as root-cause endpoint"
+        line: 1966
+        kind: "principle"
+        normative: true
+      - name: "Human Contribution Protection — Original→AI Proposal→Diff→Accept/Reject/Edit; LOCKED_FACT/LOCKED_DECISION untouchable by AI"
+        line: 1976
+        kind: "redline"
+        normative: true
+      - name: "Multi-Agent Coordination — role permission boundaries; concurrent writes locked or serialized"
+        line: 1996
+        kind: "policy"
+        normative: true
+      - name: "Separation of Duties — Generator != Final Approver; second AI is not legal human approval"
+        line: 2018
+        kind: "redline"
+        normative: true
+      - name: "Idempotency/Retry Contract — external side effects (send/charge/publish/create) must prevent double execution"
+        line: 2037
+        kind: "policy"
+        normative: true
+      - name: "Retry Policy — no infinite retry; exhaustion → FAILED / NEEDS_REVIEW"
+        line: 2066
+        kind: "policy"
+        normative: true
+      - name: "Compensation (Saga) for non-transactional side effects; compensation failure needs state"
+        line: 2089
+        kind: "protocol"
+        normative: true
+      - name: "Cancellation Contract — no forced kill leaving unknown persistent state"
+        line: 2111
+        kind: "policy"
+        normative: true
+      - name: "Execution Manifest required per execution"
+        line: 2125
+        kind: "policy"
+        normative: true
+      - name: "Content-addressed Evidence (hash/source/timestamp/producer)"
+        line: 2187
+        kind: "policy"
+        normative: true
+      - name: "Audit Event — who/what/when/where/why/input/decision/policy/result; no secrets in audit"
+        line: 2202
+        kind: "policy"
+        normative: true
+      - name: "Definition of Done Compiler — AI cannot self-declare completion"
+        line: 2222
+        kind: "gate"
+        normative: true
+      - name: "Global Gates + high-risk additions (Human Specialist, Counterevidence, Red Team, Independent Review, Reversal Criteria, Recovery Rehearsal)"
+        line: 2248
+        kind: "gate"
+        normative: true
+      - name: "Gate Result — NOT_APPLICABLE requires rationale"
+        line: 2293
+        kind: "gate"
+        normative: true
+      - name: "Final Status vocabulary (7 values only); '應該好了/看起來沒問題/大概完成' forbidden"
+        line: 2299
+        kind: "status_code"
+        normative: true
+      - name: "Handoff Protocol — 29-item mandatory handoff content"
+        line: 2323
+        kind: "protocol"
+        normative: true
+      - name: "Expected Result mandatory before execution; Expected vs Actual compared after"
+        line: 2380
+        kind: "gate"
+        normative: true
+      - name: "Validation Evidence — 'I ran the tests' is not evidence; command/env/version/timestamp/result/output retained"
+        line: 2414
+        kind: "gate"
+        normative: true
+      - name: "Command Safety classification before execution; destructive/irreversible require authority gate"
+        line: 2433
+        kind: "policy"
+        normative: true
+      - name: "Shell Safety — rm -rf / DROP / TRUNCATE / force push / kubectl delete / terraform destroy need scope preview, exact target, backup, approval, verify"
+        line: 2450
+        kind: "redline"
+        normative: true
+      - name: "Git Discipline — feature/<task-id>-<slug>; commits map to task_id; no direct high-risk edits on production branch"
+        line: 2473
+        kind: "policy"
+        normative: true
+      - name: "PREEXISTING_WORKTREE_CHANGES — never overwrite or reset user work"
+        line: 2503
+        kind: "status_code"
+        normative: true
+      - name: "Generated Files — never hand-edit generated file without changing source of truth"
+        line: 2520
+        kind: "policy"
+        normative: true
+      - name: "Dependency Upgrade Contract — 10-item pre-upgrade analysis; no wholesale unjustified tree bump"
+        line: 2526
+        kind: "policy"
+        normative: true
+      - name: "Vendor Replacement — core domain never depends on provider-specific contract (Port→Adapter)"
+        line: 2547
+        kind: "principle"
+        normative: true
+      - name: "OFFLINE_SOURCE_STALE — offline execution must not pretend freshness"
+        line: 2601
+        kind: "status_code"
+        normative: true
+      - name: "Cost Governance — budget overrun → BUDGET_REVIEW_REQUIRED"
+        line: 2610
+        kind: "policy"
+        normative: true
+      - name: "Quality vs Cost — hard constraints can never be defeated by cost; no fixed cheapest-first routing"
+        line: 2631
+        kind: "policy"
+        normative: true
+      - name: "Long-running Task Checkpoint (checkpoint_id/processed_range/state_hash/resume_token)"
+        line: 2651
+        kind: "policy"
+        normative: true
+      - name: "Provenance of Human Judgment — not just approved=true"
+        line: 2666
+        kind: "policy"
+        normative: true
+      - name: "Reversal Criteria — triggers spawn Decision Review Task"
+        line: 2689
+        kind: "policy"
+        normative: true
+      - name: "Decision Feedback Loop — no retroactive rewriting of original rationale"
+        line: 2709
+        kind: "principle"
+        normative: true
+      - name: "Architecture Fitness Functions — invariants become automated checks"
+        line: 2729
+        kind: "gate"
+        normative: true
+      - name: "Tool Broker mediation — AI never gets unrestricted shell/database/network authority"
+        line: 2849
+        kind: "redline"
+        normative: true
+      - name: "Least Privilege per task type"
+        line: 2881
+        kind: "principle"
+        normative: true
+      - name: "Sandbox for unknown code/plugins/generated scripts"
+        line: 2903
+        kind: "policy"
+        normative: true
+      - name: "Network Egress deny-by-default + allowlist for high-sensitivity projects"
+        line: 2922
+        kind: "policy"
+        normative: true
+      - name: "File Parsing Safety — PDFs/Office/images/archives untrusted; archive bombs, path traversal, macros, decompression limits"
+        line: 2940
+        kind: "policy"
+        normative: true
+      - name: "Data Classification pre-execution; Restricted requires policy-approved routing, redacted logs, sovereign route"
+        line: 2957
+        kind: "policy"
+        normative: true
+      - name: "Logging Contract — structured/correlatable/redacted/bounded/retention-controlled; 8 minimum keys; no sensitive full-payload dump"
+        line: 2976
+        kind: "policy"
+        normative: true
+      - name: "Minimum metrics set (execution_success_rate … replay_success_rate)"
+        line: 3005
+        kind: "policy"
+        normative: true
+      - name: "Traceability — full chain shares trace/IDs"
+        line: 3024
+        kind: "policy"
+        normative: true
+      - name: "Backups/Restore — restore drill evidence before high-risk data change; backup existing ≠ restorable"
+        line: 3043
+        kind: "gate"
+        normative: true
+      - name: "DR Change Awareness questions (RTO/RPO, secondary region, backup readability of new schema)"
+        line: 3057
+        kind: "policy"
+        normative: true
+      - name: "Crypto Agility — algorithm_id/key_version/crypto_policy; root key change is R4"
+        line: 3070
+        kind: "policy"
+        normative: true
+      - name: "Time/Clock — UTC instants, IANA timezones, no local-clock jurisdiction inference"
+        line: 3088
+        kind: "policy"
+        normative: true
+      - name: "Identifier Stability — display name may change; stable ID must never be reused"
+        line: 3099
+        kind: "redline"
+        normative: true
+      - name: "Schema Evolution — optional/backward-compatible first; removal via deprecate→usage scan→migration→contract"
+        line: 3110
+        kind: "policy"
+        normative: true
+      - name: "Archive/Long-term Readability — open formats, no SaaS-proprietary-only artifacts"
+        line: 3129
+        kind: "policy"
+        normative: true
+      - name: "30-year Replacement Drill — periodically prove replaceability (model/provider/storage/backup/replay/export/import/offline)"
+        line: 3145
+        kind: "policy"
+        normative: true
+      - name: "Deprecation Contract — Notice→Replacement→Compatibility Matrix→Migration Tool→Usage Scan→Deadline→Archive; no delete that breaks history replay"
+        line: 3178
+        kind: "protocol"
+        normative: true
+      - name: "Technical Debt Contract — id/reason/impact/risk/owner/review_date/paydown_condition, not scattered TODO"
+        line: 3200
+        kind: "policy"
+        normative: true
+      - name: "Unknowns Registry — AI must not mask unknowns with fluent prose"
+        line: 3218
+        kind: "policy"
+        normative: true
+      - name: "Assumption Registry — unvalidated critical assumption forbids feigned certainty in final status"
+        line: 3236
+        kind: "policy"
+        normative: true
+      - name: "Evidence Quality dimensions — citation count ≠ quality"
+        line: 3255
+        kind: "principle"
+        normative: true
+      - name: "Dissent Preservation — Synthesis Agent must not wash out disagreement"
+        line: 3272
+        kind: "policy"
+        normative: true
+      - name: "No Fake Consensus — 'AI Council Consensus' never labeled 'Expert Consensus' without real-expert evidence"
+        line: 3287
+        kind: "redline"
+        normative: true
+      - name: "Human Specialist Escalation — exact question + evidence bundle + uncertainty, not just 'ask an expert'"
+        line: 3307
+        kind: "policy"
+        normative: true
+      - name: "AI Response Contract — 完整流程 + 確切路徑 + 預期結果 (+ actual result/evidence/rollback/remaining risk when executed)"
+        line: 3399
+        kind: "policy"
+        normative: true
+      - name: "禁止「完成幻覺」 — no '已測試成功/已部署/符合所有法律' without real execution/access/verification; only PLANNED / NOT EXECUTED"
+        line: 3425
+        kind: "redline"
+        normative: true
+      - name: "Preconditions/Postconditions — missing key precondition = BLOCKED, not 先做看看"
+        line: 3455
+        kind: "policy"
+        normative: true
+      - name: "High-risk Two-phase Execution (Phase A Prepare/Preview, Phase B Commit/Release)"
+        line: 3477
+        kind: "protocol"
+        normative: false
+      - name: "Dry-run preferred but dry-run PASS never substitutes real post-verify"
+        line: 3498
+        kind: "principle"
+        normative: true
+      - name: "Resource Ownership — owner/lifecycle/cost center/retention/delete procedure before creating resources"
+        line: 3508
+        kind: "policy"
+        normative: true
+      - name: "Cleanup check before task close (temp resources, flags, debug logging, elevated permissions, temp secrets, migration workers, shadow traffic)"
+        line: 3524
+        kind: "policy"
+        normative: true
+      - name: "Release Closure — CLOSED only with Post Verify PASS + observation window + no critical open issue + rollback window decision recorded"
+        line: 3540
+        kind: "gate"
+        normative: true
+      - name: "Failed Change Closure — no unknown half-state left behind"
+        line: 3562
+        kind: "protocol"
+        normative: true
+      - name: "Emergency Stop / Kill Switch for high-risk runtime capabilities"
+        line: 3582
+        kind: "policy"
+        normative: true
+      - name: "AI Planner Constraint — cannot grant permissions, waive gates, declare legal eligibility, or approve own high-risk execution"
+        line: 3605
+        kind: "redline"
+        normative: true
+      - name: "Verifier Independence — different failure mode than generator; no self-asking 'am I correct?'"
+        line: 3616
+        kind: "principle"
+        normative: true
+      - name: "Reproducibility Tiers — Tier 0 forbidden for critical output; research/critical decisions target Tier 3–4"
+        line: 3663
+        kind: "policy"
+        normative: true
+      - name: "Determinism Reality — never promise bit-for-bit replay of hosted AI"
+        line: 3689
+        kind: "principle"
+        normative: true
+      - name: "Replay Semantics — Exact/Semantic/Historical Re-evaluation must not be conflated"
+        line: 3710
+        kind: "policy"
+        normative: true
+      - name: "Historical Re-evaluation — never overwrite history; keep original decision + snapshot + new re-evaluation"
+        line: 3724
+        kind: "redline"
+        normative: true
+      - name: "Governance Change to This Contract — Proposal→Diff→Impact→Compatibility→Golden Cases→Human Approval→Version→Publish; breaking → _v2"
+        line: 3744
+        kind: "protocol"
+        normative: true
+      - name: "Golden Execution Cases — 15 mandatory fixed test scenarios"
+        line: 3776
+        kind: "gate"
+        normative: true
+      - name: "Contract Compliance Tests at /tests/governance/ai-execution/golden/"
+        line: 3800
+        kind: "gate"
+        normative: true
+      - name: "Preflight Checklist — any required item incomplete = NO EXECUTION"
+        line: 3822
+        kind: "gate"
+        normative: true
+      - name: "Pre-release Checklist (11 items)"
+        line: 3848
+        kind: "gate"
+        normative: true
+      - name: "Post-release Checklist (10 items)"
+        line: 3866
+        kind: "gate"
+        normative: true
+      - name: "Definition of Success — AI cannot quietly push a high-risk error into production without evidence, spec compliance, authority control and rollback"
+        line: 3883
+        kind: "principle"
+        normative: true
+      - name: "完整標準流程 (full standard flow USER TASK→…→MONITOR/LEARN/REVERSE)"
+        line: 3895
+        kind: "protocol"
+        normative: true
+      - name: "AI 最終操作憲法 — 10 BEFORE rules + 10 NO rules + traceable/testable/versioned/reversible/observable/handoff-ready mandate"
+        line: 4073
+        kind: "redline"
+        normative: true
+      - name: "最短啟動指令 for external AI (block rather than guess)"
+        line: 4129
+        kind: "protocol"
+        normative: true
+  "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md":
+    policies_gates:
+      - name: "Mandatory Atlas read-before-planning"
+        line: 18
+        kind: "policy"
+        normative: true
+        summary: "Any method-related AI task MUST FIRST READ the Method Atlas; no inferring method behavior from Master Plan examples (L43)"
+      - name: "PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED"
+        line: 47
+        kind: "status_code"
+        normative: true
+        summary: "Required state when Atlas unreadable/unknown and method selection needed; no guessing from model memory"
+      - name: "Scoped Authority precedence chain"
+        line: 62
+        kind: "protocol"
+        normative: true
+        summary: "Law > Constitution/Security Policy > Machine Contract > ADR > scoped (Master Plan vs Atlas) > Recipe/Runbook"
+      - name: "CONFLICT_REQUIRES_HUMAN_REVIEW"
+        line: 83
+        kind: "status_code"
+        normative: true
+      - name: "Execution Manifest must record Atlas version"
+        line: 87
+        kind: "policy"
+        normative: true
+      - name: "多角度優先"
+        line: 143
+        kind: "principle"
+        normative: true
+      - name: "30 年工程紀律 (everything replaceable, knowledge survives)"
+        line: 169
+        kind: "principle"
+        normative: true
+      - name: "零重工原則"
+        line: 210
+        kind: "principle"
+        normative: true
+        summary: "One source understood at high cost exactly once; no re-upload/re-transcribe"
+      - name: "完整閉環"
+        line: 244
+        kind: "principle"
+        normative: true
+      - name: "最小爆炸半徑"
+        line: 262
+        kind: "principle"
+        normative: true
+      - name: "Local-first, Cloud-enhanced"
+        line: 479
+        kind: "principle"
+        normative: true
+      - name: "No hard-coding Method names into platform business logic"
+        line: 671
+        kind: "redline"
+        normative: true
+      - name: "Typed LEGO pre-execution rejection"
+        line: 752
+        kind: "gate"
+        normative: true
+        summary: "Illegal input/output type combinations rejected before execution"
+      - name: "No duplicate Method maintenance in Master Plan"
+        line: 754
+        kind: "policy"
+        normative: true
+        summary: "Method names here are examples/Recipe intent only; Atlas is authoritative"
+      - name: "Workflow method nodes MUST resolve from Atlas"
+        line: 802
+        kind: "policy"
+        normative: true
+      - name: "AI may not silently overwrite human content"
+        line: 952
+        kind: "redline"
+        normative: true
+        summary: "AI: Suggest/Diff/Comment/Challenge only; human decides Accept/Reject/Edit/Lock/Branch/Merge"
+      - name: "LOCKED FACT immutability"
+        line: 978
+        kind: "redline"
+        normative: true
+      - name: "No AI-detector-pass claims"
+        line: 986
+        kind: "redline"
+        normative: true
+        summary: "May not claim 100% detector pass / guaranteed 0% AI / guaranteed human attribution"
+      - name: "Content origin labels"
+        line: 994
+        kind: "protocol"
+        normative: true
+        summary: "HUMAN ORIGINAL / AI GENERATED / AI SUGGESTED / HUMAN EDITED / HUMAN APPROVED / SOURCE QUOTATION / CALCULATED RESULT"
+      - name: "Hypothetical Local Perspective labeling"
+        line: 1273
+        kind: "policy"
+        normative: true
+        summary: "AI-simulated local views must be labeled; high-risk decisions need real surveys/interviews"
+      - name: "No stereotype-as-fact"
+        line: 1653
+        kind: "redline"
+        normative: true
+      - name: "Correlation may not be auto-described as causation"
+        line: 1809
+        kind: "redline"
+        normative: true
+      - name: "No high-confidence conclusions on bad data quality"
+        line: 1889
+        kind: "gate"
+        normative: true
+      - name: "Statistical Guardrails pre-model checks"
+        line: 1895
+        kind: "gate"
+        normative: true
+      - name: "Red/Blue/Judge mandatory for major artifacts"
+        line: 2330
+        kind: "gate"
+        normative: true
+      - name: "Multi-agent role output labels"
+        line: 2319
+        kind: "protocol"
+        normative: true
+        summary: "Evidence-backed / Model inference / Hypothetical role perspective / Unknown"
+      - name: "Data classification AI routing"
+        line: 2650
+        kind: "policy"
+        normative: true
+        summary: "Restricted→External AI DENY; Confidential→approval; Internal→policy; Public→cloud"
+      - name: "Zero Trust credential redlines"
+        line: 2684
+        kind: "redline"
+        normative: true
+        summary: "No shared password, long-lived API key, hard-coded secret"
+      - name: "Secrets never in Git/Log/plain config"
+        line: 2706
+        kind: "redline"
+        normative: true
+      - name: "Agent ≠ Authority"
+        line: 2762
+        kind: "redline"
+        normative: true
+        summary: "Agents may not directly Delete/Publish/Deploy/Send/Modify Locked Fact"
+      - name: "Production accepts only Signed Artifacts"
+        line: 2790
+        kind: "gate"
+        normative: true
+      - name: "Immutable Deployment — no SSH/manual prod config"
+        line: 2827
+        kind: "redline"
+        normative: true
+      - name: "No Eval, no launch"
+        line: 2888
+        kind: "gate"
+        normative: true
+        summary: "Every capability needs Golden/Regression/Adversarial/Privacy/Safety datasets"
+      - name: "Champion/Challenger promotion criteria"
+        line: 2930
+        kind: "gate"
+        normative: true
+      - name: "Content principle six labels, no mixing"
+        line: 3384
+        kind: "policy"
+        normative: true
+        summary: "SOURCE FACT / AI INFERENCE / AI SUGGESTION / HUMAN OPINION / CALCULATED RESULT / UNKNOWN"
+      - name: "Phase 1 may not re-implement method logic"
+        line: 3515
+        kind: "redline"
+        normative: true
+      - name: "Standard delivery format (12 items)"
+        line: 3580
+        kind: "protocol"
+        normative: true
+      - name: "最終工程憲法"
+        line: 3654
+        kind: "redline"
+        normative: true
+        summary: "AI must not fabricate computation / overwrite human work / remove provenance / change locked facts / publish high-risk without policy approval; humans retain final authority"
+      - name: "Jurisdiction resolution not by IP alone"
+        line: 3980
+        kind: "policy"
+        normative: true
+      - name: "Minimal-attribute jurisdiction context"
+        line: 4002
+        kind: "policy"
+        normative: true
+        summary: "No inferred sensitive personal data; high-risk fields explicitly set by user/org"
+      - name: "No Blog/Vendor page/AI summary as Primary Legal Authority"
+        line: 4085
+        kind: "redline"
+        normative: true
+      - name: "Conflict-of-laws states"
+        line: 4200
+        kind: "status_code"
+        normative: true
+        summary: "RESOLVED / CONSERVATIVE_SAFE_MODE / AMBIGUOUS / CONFLICT / LEGAL_REVIEW_REQUIRED"
+      - name: "AMBIGUOUS/CONFLICT blocks irreversible action"
+        line: 4210
+        kind: "gate"
+        normative: true
+      - name: "Use-case classification ≠ model classification"
+        line: 4469
+        kind: "policy"
+        normative: true
+      - name: "Standards/frameworks may not be mislabeled as law"
+        line: 4498
+        kind: "redline"
+        normative: true
+      - name: "Unknown rights ≠ free use"
+        line: 4651
+        kind: "redline"
+        normative: true
+      - name: "High-risk trade/sanctions BLOCK → Specialist Review"
+        line: 4766
+        kind: "gate"
+        normative: true
+        summary: "Also: may not be decided by generic LLM alone (L4771)"
+      - name: "Labor/employment workflows default high-risk"
+        line: 4849
+        kind: "policy"
+        normative: true
+      - name: "Rollback may not bypass effective law"
+        line: 5048
+        kind: "policy"
+        normative: true
+      - name: "Expired Legal Pack → BLOCK (high-risk workflows)"
+        line: 5081
+        kind: "gate"
+        normative: true
+      - name: "Legal uncertainty first-class states"
+        line: 5264
+        kind: "status_code"
+        normative: true
+        summary: "KNOWN / INTERPRETATION_REQUIRED / AMBIGUOUS / CONFLICTING / STALE / UNKNOWN; low risk→conservative, high risk→human legal review"
+      - name: "No Legal Hallucination Rule"
+        line: 5289
+        kind: "redline"
+        normative: true
+        summary: "AI must not invent law / present guidance as binding / present proposed law as effective / omit jurisdiction+effective date"
+      - name: "LAW ≠ STANDARD ≠ GUIDANCE ≠ CONTRACT ≠ INTERNAL POLICY"
+        line: 5379
+        kind: "principle"
+        normative: true
+      - name: "Global Compliance Regression Gate"
+        line: 5459
+        kind: "gate"
+        normative: true
+        summary: "8 test families must PASS before any release"
+      - name: "Global Deployment Admission Control"
+        line: 5476
+        kind: "gate"
+        normative: true
+        summary: "9-step market enablement checklist; any critical failure → DO NOT ENABLE"
+      - name: "Capability availability statuses"
+        line: 5521
+        kind: "status_code"
+        normative: true
+        summary: "Allowed / Restricted / Human Review / Local-only / Government-only / Prohibited / Unknown"
+      - name: "Market entry decision values"
+        line: 5177
+        kind: "status_code"
+        normative: true
+        summary: "Go / Conditional Go / No-Go; machine form CONDITIONAL_GO at L5203"
+      - name: "Failover may not violate residency/sovereignty"
+        line: 5726
+        kind: "redline"
+        normative: true
+      - name: "No Patch Change Discipline"
+        line: 5864
+        kind: "redline"
+        normative: true
+        summary: "NO JURISDICTION-SPECIFIC BUSINESS LOGIC OUTSIDE VERSIONED PACKS; exceptions need ADR+expiry+owner+test+migration plan"
+      - name: "ADR required for major design decisions"
+        line: 5879
+        kind: "policy"
+        normative: true
+      - name: "Global Definition of Done"
+        line: 5909
+        kind: "gate"
+        normative: true
+        summary: "11 PASS dimensions + Human Specialist Review for high risk"
+      - name: "全球版工程憲法新增條款"
+        line: 6017
+        kind: "redline"
+        normative: true
+        summary: "Jurisdiction-neutral core; no legal claim on model memory alone; Atlas fail-closed for method-dependent high-risk planning (L6055)"
+  "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md":
+    policies_gates:
+      - name: "核心原則 Human-led / Evidence-centered / Model-replaceable / Typed LEGO / Local-first / Global-ready"
+        line: 10
+        kind: "principle"
+        normative: true
+        summary: "文件層級的六項核心原則"
+      - name: "中文優先與必要設定英文保留規範"
+        line: 14
+        kind: "policy"
+        normative: true
+        summary: "使用者可見內容中文；API/Schema/ID/Path/Enum 等一律英文不翻譯"
+      - name: "翻譯不得改變機器面穩定性"
+        line: 64
+        kind: "redline"
+        normative: true
+        summary: "介面語言變更不得改變 API、Schema、ID、Path、Enum、Execution Manifest 或歷史 Workflow 可重播性"
+      - name: "五項工程準則"
+        line: 80
+        kind: "principle"
+        normative: true
+        summary: "多角度優先／30 年工程紀律／零重工／完整閉環／最小爆炸半徑，各附強制設計"
+      - name: "NO JURISDICTION-SPECIFIC BUSINESS LOGIC OUTSIDE VERSIONED JURISDICTION / POLICY PACKS"
+        line: 253
+        kind: "redline"
+        normative: true
+        summary: "管轄差異只能進版本化 packs，不得散落 business logic"
+      - name: "Cognitive preference 優先序"
+        line: 284
+        kind: "policy"
+        normative: true
+        summary: "Explicit user choice > Current task need > Learned preference > Default"
+      - name: "Epistemic Type 必須分離"
+        line: 591
+        kind: "policy"
+        normative: true
+        summary: "SOURCE FACT / EVIDENCE / ASSUMPTION / HYPOTHESIS / AI INFERENCE / AI SUGGESTION / HUMAN OPINION / CALCULATED RESULT / SIMULATED RESULT / UNKNOWN / DECISION 十一類不得混同"
+      - name: "DAG edge 必綁證據"
+        line: 632
+        kind: "policy"
+        normative: true
+        summary: "DAG 是假設模型；每條 edge 應綁 evidence / rationale / confidence"
+      - name: "forbidden_transition: CauseHypothesisSet -> FinalCausalFact"
+        line: 1020
+        kind: "gate"
+        normative: true
+        summary: "Fishbone contract 禁止假設集直升因果事實"
+      - name: "Fishbone 只能產生 CauseHypothesisSet"
+        line: 1267
+        kind: "gate"
+        normative: true
+        summary: "不能直接產生 RootCauseFact（同一規則在 22.3 以 Root Cause Fact 出現）"
+      - name: "View 不複製 Knowledge 本體"
+        line: 1062
+        kind: "redline"
+        normative: true
+        summary: "View 只保存 layout/filters/visible_fields/presentation_preferences"
+      - name: "High Impact × High Uncertainty 必須產生 Validation Plan"
+        line: 1648
+        kind: "gate"
+        normative: true
+        summary: "Assumption Mapping 最重要規則"
+      - name: "最便宜可證偽測試原則"
+        line: 749
+        kind: "principle"
+        normative: true
+        summary: "找最便宜且足以證偽 Critical Assumption 的測試，而非 AI 主觀評分"
+      - name: "Red Team 沒有 final authority"
+        line: 1744
+        kind: "policy"
+        normative: true
+        summary: "只能輸出 challenge artifact"
+      - name: "Pilot 前置 gate"
+        line: 2969
+        kind: "gate"
+        normative: true
+        summary: "Pilot 開始前必須定義 Success / Stop / Rollback criteria"
+      - name: "Market Admission FAIL CLOSED"
+        line: 2477
+        kind: "gate"
+        normative: true
+        summary: "任一 critical unknown → FAIL CLOSED；§18.3 流程任一 No → DO NOT ENABLE"
+      - name: "Expert LEGO Compiler 檢查"
+        line: 2547
+        kind: "gate"
+        normative: true
+        summary: "Type/Precondition/Policy/Jurisdiction check + cost/risk estimate + required gate injection；自由組裝不是自由破壞"
+      - name: "Recipe 不 fork 國家版"
+        line: 3391
+        kind: "policy"
+        normative: true
+        summary: "同一 MarketEntryRecipe 不分日本版/德國版；差異由 versioned packs 注入"
+      - name: "Production Incident 禁止清單"
+        line: 3444
+        kind: "redline"
+        normative: true
+        summary: "未重建 current state 不 patch；incident 中不改多個不相關系統；不只修症狀；無 rollback 不進 production"
+      - name: "Type 相容組裝規則"
+        line: 3544
+        kind: "policy"
+        normative: true
+        summary: "§14.1 合法/非法鏈範例；SWOT 不得直通 AutomaticProductionDeployment"
+      - name: "Mandatory Gate Injection"
+        line: 3588
+        kind: "gate"
+        normative: true
+        summary: "risk_tier=critical 時 compiler 自動插入 Evidence Matrix/Counterevidence/Red Team/Scenario/Human Review/Reversal Criteria 等 block，並顯示不可移除原因"
+      - name: "Block edge 標籤"
+        line: 3627
+        kind: "status_code"
+        normative: true
+        summary: "RECOMMENDED / OPTIONAL / REQUIRED_BY_RISK / REQUIRED_BY_JURISDICTION / REQUIRED_BY_SECTOR / FORBIDDEN"
+      - name: "Capability Availability statuses"
+        line: 4051
+        kind: "status_code"
+        normative: true
+        summary: "Allowed / Restricted / Human Review / Local-only / Government-only / Prohibited / Unknown"
+      - name: "Unknown = Fail Closed"
+        line: 4063
+        kind: "gate"
+        normative: true
+        summary: "high / critical risk 時 jurisdiction Unknown 一律 fail closed"
+      - name: "零重工禁止清單"
+        line: 4126
+        kind: "redline"
+        normative: true
+        summary: "禁止每 Recipe 重新 OCR、每 Method 重讀 PDF、換 View 重生成事實、換 LLM 重建 Knowledge、多 Artifact 各存不一致 facts"
+      - name: "最小爆炸半徑強制規則（9 條）"
+        line: 4148
+        kind: "policy"
+        normative: true
+        summary: "AI idea 預設 DRAFT；UNKNOWN 不升 FACT；failure 不污染 Project Knowledge；高風險先 shadow；publish/deploy/delete/send/irreversible 需 authority gate；rollback 用 Execution Manifest；pack 限 scope；experiment 受限；destructive migration 需 prevalidated recovery"
+      - name: "Global Gate"
+        line: 4164
+        kind: "gate"
+        normative: true
+        summary: "14 項 PASS：Functional/Evidence/Reasoning/Security/Privacy/Data/Jurisdiction/Localization/Accessibility/Observability/Capacity/Rollback/Documentation/Golden Test"
+      - name: "High-risk Gate"
+        line: 4183
+        kind: "gate"
+        normative: true
+        summary: "額外 6 項：Human Specialist Review / Counterevidence / Red Team / Independent Judge / Reversal Criteria / Recovery Rehearsal PASS"
+      - name: "Method-specific Gate"
+        line: 4196
+        kind: "gate"
+        normative: true
+        summary: "10 method 的「禁止直接輸出／必須補的驗證」表（Fishbone、Persona、Scenario、SWOT、AI Expert Lens、LLM Arithmetic、Red Team、Monte Carlo、MCDA、Jurisdiction Inference）"
+      - name: "Test / Eval Strategy"
+        line: 4213
+        kind: "protocol"
+        normative: true
+        summary: "每 Method/Capability 需 8 類 dataset + 18 項必測（type compatibility、provenance、fail-closed、replay、rollback、cost ceiling 等）"
+      - name: "Method 不可就地覆寫"
+        line: 4253
+        kind: "policy"
+        normative: true
+        summary: "以 method.swot.v1/v2/v3 版本化；舊 Workflow 仍能 replay"
+      - name: "Champion / Challenger"
+        line: 4263
+        kind: "protocol"
+        normative: true
+        summary: "Challenger 走 Shadow→Eval→Compare→Promote or Reject"
+      - name: "Deprecation 流程"
+        line: 4275
+        kind: "policy"
+        normative: true
+        summary: "Notice→Replacement→Compatibility Matrix→Migration Tool→Usage Scan→Archive；禁止直接刪除破壞舊 project replay"
+      - name: "預期結果與驗收標準"
+        line: 4405
+        kind: "gate"
+        normative: true
+        summary: "18 項目標×驗收方式表（admission test、replay test、rollback integration test、failure injection、authority test 等）"
+      - name: "方法搭配基本規則（15 條）"
+        line: 4536
+        kind: "principle"
+        normative: true
+        summary: "含 Divergence/Evaluation 分離、Hypothesis/Fact 分離、Trusted Compute 強制、fail-closed、dissent 保存、Rollback 先於 Forward Plan、Workaround 需 owner/expiry/test/migration/ADR、單一模型不得 final authority"
+      - name: "Appendix B 文件維護規則"
+        line: 4608
+        kind: "policy"
+        normative: true
+        summary: "Method ID 不重用；新增 Method 必有 Contract；刪除必有 deprecation/migration；Mermaid 不當 evidence；法規交 Legal Source Registry；新 AI model 不改 object semantics；高風險 workflow 保留 Human final authority"
+      - name: "操作風險處置表（§10 Problem Type 起始推薦/不應預設）"
+        line: 1112
+        kind: "policy"
+        normative: true
+        summary: "10 種 problem type 的起始方法與禁用預設（如 Diagnostic 不預設 SWOT、DB Migration 禁 Big-bang ALTER）"

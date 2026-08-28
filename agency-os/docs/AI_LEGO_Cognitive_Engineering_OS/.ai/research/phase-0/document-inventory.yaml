@@ -1,0 +1,44 @@
+# AI LEGO OS — Phase 0 document inventory
+# Generated: 2026-08-28 by Claude. Defects are REGISTERED, not fixed (Phase 0 rule).
+inventory:
+  - filename: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md
+    document_id_declared: null            # header has no Document ID field
+    document_id_provisional: ai-lego.master-plan
+    version_declared: null                # header has no version field
+    filename_lineage: v1
+    language: zh-TW + machine-facing English
+    scope_declared: "Product / Domain / Architecture / Security / Data / Deployment / Global Jurisdiction / Governance / 30-year engineering"
+    scope_source: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md:14 + :55"
+    defects:
+      - id: DEF-MP-1
+        type: stale_self_reference
+        detail: "§0.0.1 table (line 55) names itself 'ai_lego_cognitive_engineering_os_global_master_plan_v2_1.md' — file does not exist on disk (full-disk search 2026-08-28)"
+      - id: DEF-MP-2
+        type: stale_cross_reference
+        detail: "§0.0.1 table (line 56) references Atlas as 'AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md' — file does not exist on disk"
+      - id: DEF-MP-3
+        type: missing_identity_header
+        detail: "No Document ID / Document Version header; violates Execution Contract §1 identity rule (EC lines 5-7, 86)"
+  - filename: AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md
+    document_id_declared: null
+    document_id_provisional: ai-lego.method-atlas
+    version_declared: "1.0"               # line 6: **版本**：1.0
+    filename_lineage: v1
+    language: zh-TW-first with English terms preserved (own §中文優先 rules)
+    scope_declared: "Brainstorming / Reasoning / Decision methodology + engineering supplement spec"
+    scope_source: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:7"
+    defects:
+      - id: DEF-AT-1
+        type: missing_identity_header
+        detail: "Has 版本 1.0 but no Document ID / canonical filename declaration; version not semver (EC §1 expects e.g. 1.0.0)"
+  - filename: AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md
+    document_id_declared: ai-lego.execution-contract   # line 6
+    version_declared: "1.0.0"                          # line 7
+    filename_lineage: v1                               # line 8 Major Lineage
+    language: zh-TW + machine-facing English
+    scope_declared: "Normative Execution Contract / AI Entry Protocol / Change Governance / Handoff Protocol"
+    scope_source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md:11"
+    defects: []
+notes:
+  - "Only these three files exist on disk for this project; no v2_1 / v1_2_zhTW lineage found anywhere (D:/Work + Downloads searched 2026-08-28)."
+  - "All three untracked in git at snapshot time; baseline commit planned (see open-questions.yaml OQ-5)."

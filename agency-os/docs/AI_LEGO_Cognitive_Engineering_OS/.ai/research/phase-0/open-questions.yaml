@@ -1,0 +1,72 @@
+# AI LEGO OS — Phase 0 open questions (SSOT; Program Plan §12 is a summary of this file)
+# Status values: REQUIRES_HUMAN_DECISION | REQUIRES_EVIDENCE | PROVISIONAL_DECISION_TAKEN
+questions:
+  - id: OQ-1
+    status: REQUIRES_HUMAN_DECISION
+    title: "Master Plan / Atlas missing identity headers"
+    context: "EC §1 (line 86): identity = Document ID + Version + Hash. Master Plan has neither ID nor version; Atlas has 版本 1.0 but no ID and non-semver."
+    options:
+      - "A: add identity headers to both (missing-contract class fix, needs approval per directive §IX)"
+      - "B: leave as-is, track identity externally in document-inventory.yaml only"
+    recommendation: "A — minimal semantic correction, exactly the class directive §IX allows"
+  - id: OQ-2
+    status: REQUIRES_HUMAN_DECISION
+    title: "Stale references to v2_1 / v1_2_zhTW filenames"
+    context: "Master Plan §0.0.1 (lines 55-56) references 'ai_lego_cognitive_engineering_os_global_master_plan_v2_1.md' and 'AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md'. Neither exists on disk (D:/Work + Downloads searched 2026-08-28). Are the on-disk v1 files the newest canonical lineage, or do newer drafts exist elsewhere (cloud / another export)?"
+    needed_from_human: "confirm on-disk v1 = canonical; if newer drafts exist, provide them before Phase 1"
+  - id: OQ-3
+    status: PROVISIONAL_DECISION_TAKEN
+    title: "Path root mapping for directive's absolute paths"
+    decision: "PROJECT_ROOT = agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/; all /.ai /specs /policies etc. are PROJECT_ROOT-relative until Phase 4 repository decision; wholesale git mv later preserves history"
+    rationale: "minimum blast radius — keeps monorepo root and agency-os governance untouched"
+    revisit_at: "Phase 4"
+  - id: OQ-4
+    status: REQUIRES_HUMAN_DECISION
+    title: "Codex write authority: directive §XIV vs repo governance"
+    context: "Directive assigns Codex schema implementation / tests / migrations. Repo governance (AGENTS.md §跨模型 oracle): Claude is sole writer in D:/Work because all mechanical gates are Claude Code hooks; codex-oracle.ps1 is hardwired read-only."
+    options:
+      - "A (recommended): Codex produces patch proposals -> Claude verifies each finding -> Claude writes. D:/tmp prototypes remain Codex-owned."
+      - "B: create a sandboxed writable area for Codex with its own gates (new governance surface, higher risk)"
+    deadline: "before Phase 3"
+  - id: OQ-5
+    status: PROVISIONAL_DECISION_TAKEN
+    title: "Git baseline for the three mother documents"
+    decision: "commit the three untracked mother docs to main as hash-anchored baseline (EC §1 lines 83-85 requires git/immutable history); no tag yet"
+    rationale: "Low risk, reversible; without a baseline every later diff/rollback claim is unverifiable"
+    needed_from_human: "confirm whether to add an immutable tag (e.g. ai-lego-docs-v1.0.0-baseline)"
+  - id: OQ-6
+    status: REQUIRES_HUMAN_DECISION
+    title: "Mother-document revision flow: directive branch vs repo no-branch rule"
+    context: "Directive §IX requires branch docs/architecture-v1-review. Repo forbids new branches (settings.json deny, hard-blocked)."
+    options:
+      - "A (recommended): stay on main; each proposed change lives in .ai/proposals/<n>-<slug>/ with PROPOSED_CHANGE/RATIONALE/SOURCE_DOCUMENT/AFFECTED_SECTIONS/DEPENDENCIES/COMPATIBILITY/MIGRATION/ROLLBACK/EVIDENCE + Original/Proposed diff; original preserved by git history + baseline hash"
+      - "B: operator lifts the branch deny for this docs subtree"
+    deadline: "before any edit to the three mother documents (Phase 2)"
+  # --- OQ-7..11 registered 2026-08-29 from verified Phase 0 findings (see verified-findings.yaml) ---
+  - id: OQ-7
+    status: REQUIRES_HUMAN_DECISION
+    title: "risk_tier vocabulary: Atlas low|medium|high|critical vs EC R0-R4"
+    context: "Two incompatible enums drive gate injection; no mapping exists, so Mandatory Gate Injection can never fire in a machine implementation (findings CROSS-T-3 / CROSS-R-10)."
+    options: ["A: single canonical enum (pick one, migrate the other doc)", "B: keep both + define a normative mapping table in a machine spec"]
+    deadline: "Phase 2 (ADR)"
+  - id: OQ-8
+    status: REQUIRES_HUMAN_DECISION
+    title: "Canonical epistemic label set: MP 6 values vs Atlas/EC 11 values; space vs SNAKE_CASE"
+    context: "Three vocabularies for the runtime trust boundary; the FACT promotion redline references a value absent from every enum (findings CROSS-T-6 / CROSS-R-9 / CROSS-T-7)."
+    options: ["A: 11-value SNAKE_CASE as canonical machine enum, 6-value as UI display subset", "B: 6-value canonical, drop the extra 5", "C: other"]
+    deadline: "Phase 2 (ADR)"
+  - id: OQ-9
+    status: REQUIRES_HUMAN_DECISION
+    title: "Architecture Constitution identity: Master Plan itself (EC L4152) or separate future file (MP §90 item 1)"
+    context: "It is a load-bearing node in the precedence chain; its identity differs across documents (findings CROSS-T-10 / CROSS-R-12)."
+    deadline: "Phase 2 (ADR)"
+  - id: OQ-10
+    status: REQUIRES_HUMAN_DECISION
+    title: "Owner of platform-wide Global/High-risk Gate: MP §158 (11 items) vs Atlas §22 (14+6) vs EC §68 copy"
+    context: "Gate sets differ materially and Atlas legislating platform gates violates its own scoped authority (findings CROSS-R-5 / CROSS-R-7 / CROSS-T-11)."
+    deadline: "Phase 2 (ADR)"
+  - id: OQ-11
+    status: REQUIRES_HUMAN_DECISION
+    title: "Which path trees are binding vs advisory (EC §91-94 unqualified vs other sections marked 建議)"
+    context: "Undecidable normative strength for path contracts that Phase 0/§141 treat as mandatory deliverables (finding DOC-execution_contract-11, verdict PARTIAL)."
+    deadline: "Phase 2 (ADR)"

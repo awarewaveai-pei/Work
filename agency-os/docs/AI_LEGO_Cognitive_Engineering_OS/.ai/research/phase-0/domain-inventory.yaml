@@ -1,0 +1,138 @@
+# AI LEGO OS — Phase 0 domain inventory
+# Generated mechanically from full-document reads (workflow wf_7d1cd8d8-038, 3 reader agents, every line of all three mother docs covered).
+# Source doc identity/hashes: see document-hashes.yaml. Line numbers are 1-indexed into the hashed snapshots.
+# Phase 0 rule: this REGISTERS what exists; nothing is fixed here.
+by_document:
+  "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md":
+    domains:
+      []
+  "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md":
+    domains:
+      - name: "Research Mode"
+        line: 1997
+        summary: "Full research pipeline: topic→question→literature→gap→method→analysis→paper"
+      - name: "Qualitative Research"
+        line: 2033
+        summary: "Interview→transcription→diarization→coding→themes→triangulation"
+      - name: "Quantitative Research"
+        line: 2066
+        summary: "Hypothesis→instrument→data→cleaning→inferential statistics→interpretation"
+      - name: "Business Planning Mode"
+        line: 2125
+        summary: "Source→insight→market/competitor→SWOT/PESTEL/Porter/STP→strategy→proposal (method semantics deferred to Atlas)"
+      - name: "Business Strategy Mode"
+        line: 2175
+        summary: "Multi-factor strategy analysis (market, finance, policy, culture, execution…)"
+      - name: "Learning / Class Notes Mode"
+        line: 2199
+        summary: "Lecture→transcript→segmentation→notes→flashcards→quiz; reusable into other artifacts"
+      - name: "Brainstorming Mode"
+        line: 2240
+        summary: "Human idea→divergence→clustering→challenge→evidence→ranking→decision; tool catalog deferred to Atlas"
+      - name: "canvas (module)"
+        line: 3189
+        summary: "Bounded context under /modules"
+      - name: "knowledge (module)"
+        line: 3190
+        summary: "Bounded context under /modules"
+      - name: "research (module)"
+        line: 3191
+        summary: "Bounded context under /modules"
+      - name: "business (module)"
+        line: 3192
+        summary: "Bounded context under /modules"
+      - name: "learning (module)"
+        line: 3193
+        summary: "Bounded context under /modules"
+      - name: "brainstorm (module)"
+        line: 3194
+        summary: "Bounded context under /modules"
+      - name: "analytics (module)"
+        line: 3195
+        summary: "Bounded context under /modules"
+      - name: "simulation (module)"
+        line: 3196
+        summary: "Bounded context under /modules"
+      - name: "optimization (module)"
+        line: 3197
+        summary: "Bounded context under /modules"
+      - name: "decision (module)"
+        line: 3198
+        summary: "Bounded context under /modules"
+      - name: "stakeholders (module)"
+        line: 3199
+        summary: "Bounded context under /modules"
+      - name: "artifact (module)"
+        line: 3200
+        summary: "Bounded context under /modules"
+      - name: "authorship (module)"
+        line: 3201
+        summary: "Bounded context under /modules"
+      - name: "jurisdiction (module)"
+        line: 3202
+        summary: "Bounded context under /modules"
+      - name: "compliance (module)"
+        line: 3203
+        summary: "Bounded context under /modules"
+      - name: "privacy (module)"
+        line: 3204
+        summary: "Bounded context under /modules"
+      - name: "localization (module)"
+        line: 3205
+        summary: "Bounded context under /modules"
+      - name: "accessibility (module)"
+        line: 3206
+        summary: "Bounded context under /modules"
+      - name: "trade (module)"
+        line: 3207
+        summary: "Bounded context under /modules"
+      - name: "tax (module)"
+        line: 3208
+        summary: "Bounded context under /modules"
+      - name: "legal (module)"
+        line: 3209
+        summary: "Bounded context under /modules"
+      - name: "standards (module)"
+        line: 3210
+        summary: "Bounded context under /modules"
+      - name: "Domain Model core objects"
+        line: 334
+        summary: "Workspace, Project, Source, Evidence, Claim, Knowledge, Artifact, Capability, Workflow, Execution, Policy, Identity, Decision, HumanContribution, Annotation, Idea, Dataset, AnalysisPlan, AnalysisRun, Simulation, Experiment, Outcome"
+  "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md":
+    domains:
+      - name: "architecture"
+        line: 3891
+        summary: "軟體架構 domain pack（對應 F18）"
+      - name: "devops-sre"
+        line: 3892
+        summary: "DevOps / SRE / 可靠性 domain pack（對應 F19）"
+      - name: "security"
+        line: 3893
+        summary: "資安／隱私 domain pack（對應 F20）"
+      - name: "database-data"
+        line: 3894
+        summary: "DB / Data domain pack（對應 F21）"
+      - name: "pm-governance"
+        line: 3895
+        summary: "PM / 交付 / 治理 domain pack（對應 F22）"
+      - name: "research"
+        line: 3896
+        summary: "研究 domain pack"
+      - name: "business"
+        line: 3897
+        summary: "商業策略 domain pack"
+      - name: "policy"
+        line: 3898
+        summary: "公共政策 domain pack"
+      - name: "education"
+        line: 3899
+        summary: "教育 domain pack（僅目錄宣告，無方法內容）"
+      - name: "healthcare"
+        line: 3900
+        summary: "醫療 domain pack（僅目錄宣告，無方法內容）"
+      - name: "finance"
+        line: 3901
+        summary: "金融 domain pack（僅目錄宣告，無方法內容）"
+      - name: "supply-chain"
+        line: 3902
+        summary: "供應鏈 domain pack（僅目錄宣告，無方法內容）"

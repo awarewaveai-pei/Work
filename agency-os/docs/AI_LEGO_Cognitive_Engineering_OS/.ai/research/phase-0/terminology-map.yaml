@@ -1,0 +1,958 @@
+# AI LEGO OS — Phase 0 terminology map
+# Generated mechanically from full-document reads (workflow wf_7d1cd8d8-038, 3 reader agents, every line of all three mother docs covered).
+# Source doc identity/hashes: see document-hashes.yaml. Line numbers are 1-indexed into the hashed snapshots.
+# Phase 0 rule: this REGISTERS what exists; nothing is fixed here.
+by_document:
+  "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md":
+    terminology:
+      - term: "Document ID ai-lego.execution-contract"
+        line: 6
+        defined: true
+        machine_id: "ai-lego.execution-contract"
+        note: "This document's stable identity; filename is explicitly NOT identity (L86)"
+      - term: "Task Execution Packet"
+        line: 38
+        defined: true
+        note: "Directory contract defined at §15 L730"
+      - term: "Scoped Authority"
+        line: 96
+        defined: true
+        note: "Per-scope authoritative-source table replacing last-read-wins"
+      - term: "CONFLICT_REQUIRES_HUMAN_REVIEW"
+        line: 134
+        defined: true
+        machine_id: "CONFLICT_REQUIRES_HUMAN_REVIEW"
+      - term: "AI Boot Contract"
+        line: 141
+        defined: true
+      - term: "DOCUMENT_RESOLUTION_BLOCKED"
+        line: 184
+        defined: true
+        machine_id: "DOCUMENT_RESOLUTION_BLOCKED"
+      - term: "Section Registry"
+        line: 198
+        defined: false
+        note: "Named in the index pipeline; no structure or schema given anywhere in doc"
+      - term: "Normative Context Bundle"
+        line: 204
+        defined: false
+        note: "Named in retrieval pipeline and as normative-context.yaml (L738); no schema defined and absent from /specs/execution/ list"
+      - term: "Document Registry"
+        line: 218
+        defined: true
+        machine_id: "document-registry.yaml"
+      - term: "Execution Invariants"
+        line: 277
+        defined: true
+        note: "14 hard NO-* invariants"
+      - term: "Minimum Sufficient Coherent Change"
+        line: 323
+        defined: true
+        note: "The correct definition of 最小修改"
+      - term: "task_context"
+        line: 362
+        defined: true
+        machine_id: "task_context"
+      - term: "Risk Tier R0"
+        line: 381
+        defined: true
+        machine_id: "R0"
+      - term: "Risk Tier R1"
+        line: 393
+        defined: true
+        machine_id: "R1"
+      - term: "Risk Tier R2"
+        line: 410
+        defined: true
+        machine_id: "R2"
+      - term: "Risk Tier R3"
+        line: 429
+        defined: true
+        machine_id: "R3"
+      - term: "Risk Tier R4"
+        line: 454
+        defined: true
+        machine_id: "R4"
+      - term: "Authority Level A0 — Observe"
+        line: 486
+        defined: true
+        machine_id: "A0"
+      - term: "Authority Level A1 — Local Reversible Edit"
+        line: 495
+        defined: true
+        machine_id: "A1"
+      - term: "Authority Level A2 — Staged Write"
+        line: 499
+        defined: true
+        machine_id: "A2"
+      - term: "Authority Level A3 — Production Reversible Change"
+        line: 503
+        defined: true
+        machine_id: "A3"
+      - term: "Authority Level A4 — Irreversible / External High-impact"
+        line: 515
+        defined: true
+        machine_id: "A4"
+      - term: "Capability ≠ Authority"
+        line: 483
+        defined: true
+      - term: "Execution State Machine"
+        line: 531
+        defined: true
+        note: "14 main states RECEIVED→CLOSED"
+      - term: "RECEIVED / DOCUMENTS_RESOLVED / ... / CLOSED (main states)"
+        line: 533
+        defined: true
+        machine_id: "RECEIVED..CLOSED"
+      - term: "BLOCKED (side state)"
+        line: 566
+        defined: true
+        machine_id: "BLOCKED"
+      - term: "NEEDS_HUMAN_REVIEW"
+        line: 567
+        defined: true
+        machine_id: "NEEDS_HUMAN_REVIEW"
+      - term: "PARTIAL_SUCCESS"
+        line: 572
+        defined: true
+        machine_id: "PARTIAL_SUCCESS"
+      - term: "Current-state Reconstruction"
+        line: 579
+        defined: true
+      - term: "CURRENT_STATE_DRIFT_DETECTED"
+        line: 635
+        defined: true
+        machine_id: "CURRENT_STATE_DRIFT_DETECTED"
+      - term: "Current State Artifact"
+        line: 642
+        defined: true
+        note: "/.ai/tasks/{task_id}/current-state/ file set"
+      - term: "Method Selection Engine"
+        line: 711
+        defined: false
+        note: "Named in Method Resolution flow only; component belongs to Method Atlas doc"
+      - term: "METHOD_RESOLUTION_BLOCKED"
+        line: 723
+        defined: true
+        machine_id: "METHOD_RESOLUTION_BLOCKED"
+      - term: "task.manifest.yaml"
+        line: 753
+        defined: true
+        machine_id: "task.manifest.yaml"
+      - term: "Scope Contract"
+        line: 786
+        defined: true
+      - term: "SCOPE_CHANGE_REQUIRED"
+        line: 804
+        defined: true
+        machine_id: "SCOPE_CHANGE_REQUIRED"
+      - term: "Change Impact Graph"
+        line: 816
+        defined: true
+      - term: "Rollback-first Rule"
+        line: 853
+        defined: true
+      - term: "rollback-plan.yaml"
+        line: 882
+        defined: true
+        machine_id: "rollback-plan.yaml"
+      - term: "change_plan"
+        line: 932
+        defined: true
+        machine_id: "change_plan"
+      - term: "ADR"
+        line: 985
+        defined: true
+        note: "Trigger list given; concept assumed known; path /docs/adr/ADR-XXXX-<slug>.md"
+      - term: "Exception (EXC-)"
+        line: 1019
+        defined: true
+        machine_id: "EXC-..."
+      - term: "EXPAND → MIGRATE → DEPRECATE → REMOVE"
+        line: 1087
+        defined: true
+      - term: "Expand-Contract DB migration flow"
+        line: 1135
+        defined: true
+      - term: "Jurisdiction Pack"
+        line: 108
+        defined: false
+        note: "'approved Jurisdiction Pack' (L108) and 'Applicable Pack' (L1562) used normatively but never defined in this doc"
+      - term: "FAIL CLOSED"
+        line: 1574
+        defined: true
+      - term: "LEGAL_REVIEW_REQUIRED"
+        line: 1580
+        defined: true
+        machine_id: "LEGAL_REVIEW_REQUIRED"
+      - term: "Epistemic label SOURCE_FACT"
+        line: 1476
+        defined: true
+        machine_id: "SOURCE_FACT"
+      - term: "Epistemic label AI_INFERENCE"
+        line: 1480
+        defined: true
+        machine_id: "AI_INFERENCE"
+      - term: "Epistemic label CALCULATED_RESULT"
+        line: 1483
+        defined: true
+        machine_id: "CALCULATED_RESULT"
+      - term: "Epistemic label UNKNOWN"
+        line: 1485
+        defined: true
+        machine_id: "UNKNOWN"
+      - term: "Trusted Compute"
+        line: 1499
+        defined: true
+      - term: "Champion / Challenger"
+        line: 1447
+        defined: true
+      - term: "LOCKED_FACT"
+        line: 1988
+        defined: false
+        machine_id: "LOCKED_FACT"
+        note: "Used normatively (AI must not modify) but never defined in this document"
+      - term: "LOCKED_DECISION"
+        line: 1988
+        defined: false
+        machine_id: "LOCKED_DECISION"
+        note: "Same as LOCKED_FACT — undefined here"
+      - term: "Separation of Duties (Generator != Final Approver)"
+        line: 2014
+        defined: true
+      - term: "NEEDS_REVIEW"
+        line: 2082
+        defined: false
+        machine_id: "NEEDS_REVIEW"
+        note: "Used at retry exhaustion but not in the canonical state/side-state/final-status vocabularies (canonical is NEEDS_HUMAN_REVIEW)"
+      - term: "Execution Manifest"
+        line: 2123
+        defined: true
+        machine_id: "execution (EX-/RUN-/TRACE-)"
+      - term: "Content-addressed Evidence"
+        line: 2185
+        defined: true
+      - term: "Audit Event"
+        line: 2200
+        defined: true
+      - term: "Definition of Done Compiler"
+        line: 2220
+        defined: true
+      - term: "Global Gates"
+        line: 2246
+        defined: true
+      - term: "gate_result"
+        line: 2285
+        defined: true
+        machine_id: "gate_result"
+      - term: "NOT_APPLICABLE"
+        line: 2287
+        defined: true
+        machine_id: "NOT_APPLICABLE"
+        note: "Gate status; requires rationale"
+      - term: "Final Status PASS_WITH_APPROVED_RISK"
+        line: 2303
+        defined: true
+        machine_id: "PASS_WITH_APPROVED_RISK"
+      - term: "Handoff Protocol"
+        line: 2321
+        defined: true
+      - term: "Expected Result"
+        line: 2383
+        defined: true
+        machine_id: "expected_result"
+      - term: "Command Safety classes READ_ONLY..SECRET_SENSITIVE"
+        line: 2436
+        defined: true
+        machine_id: "READ_ONLY|LOCAL_WRITE|REMOTE_WRITE|DESTRUCTIVE|IRREVERSIBLE|SECRET_SENSITIVE"
+      - term: "PREEXISTING_WORKTREE_CHANGES"
+        line: 2503
+        defined: true
+        machine_id: "PREEXISTING_WORKTREE_CHANGES"
+      - term: "OFFLINE_SOURCE_STALE"
+        line: 2601
+        defined: true
+        machine_id: "OFFLINE_SOURCE_STALE"
+      - term: "BUDGET_REVIEW_REQUIRED"
+        line: 2622
+        defined: true
+        machine_id: "BUDGET_REVIEW_REQUIRED"
+      - term: "Reversal Criteria"
+        line: 2687
+        defined: true
+        machine_id: "reversal"
+      - term: "Architecture Fitness Functions"
+        line: 2727
+        defined: true
+      - term: "Tool Broker"
+        line: 2847
+        defined: true
+      - term: "Data Classification Public/Internal/Confidential/Restricted"
+        line: 2960
+        defined: true
+      - term: "Kill Switch"
+        line: 3587
+        defined: true
+        machine_id: "kill_switch"
+      - term: "Unknowns Registry (UNK-)"
+        line: 3216
+        defined: true
+        machine_id: "UNK-..."
+      - term: "Assumption Registry (ASM-)"
+        line: 3234
+        defined: true
+        machine_id: "ASM-..."
+      - term: "AI Council Consensus"
+        line: 3292
+        defined: true
+        note: "Must not be labeled Expert Consensus without real-expert evidence"
+      - term: "Reproducibility Tiers 0–4"
+        line: 3661
+        defined: true
+        machine_id: "Tier 0..Tier 4"
+      - term: "Exact Replay / Semantic Replay / Historical Re-evaluation"
+        line: 3713
+        defined: true
+      - term: "Golden Execution Cases"
+        line: 3774
+        defined: true
+  "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md":
+    terminology:
+      - term: "AI LEGO Cognitive Engineering OS"
+        line: 1
+        defined: true
+        note: "Product formal name; restated at §2.1 L283"
+      - term: "Cognitive Method Atlas (Mandatory Companion Document)"
+        line: 20
+        defined: true
+        note: "Role defined here; content external. Referenced under TWO different filenames (v1 vs v1_2_zhTW)"
+      - term: "PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED"
+        line: 47
+        defined: true
+        machine_id: "PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED"
+        note: "Status when Atlas unreadable/unknown-version and method selection needed"
+      - term: "Scoped Authority"
+        line: 62
+        defined: true
+        note: "Conflict-resolution precedence model between documents"
+      - term: "CONFLICT_REQUIRES_HUMAN_REVIEW"
+        line: 83
+        defined: true
+        machine_id: "CONFLICT_REQUIRES_HUMAN_REVIEW"
+      - term: "Execution Manifest"
+        line: 85
+        defined: true
+        note: "Must record Atlas version (§0.0.3) and full version pins (§69 L2870)"
+      - term: "Plane (multi-plane architecture)"
+        line: 363
+        defined: true
+      - term: "Trust Fabric"
+        line: 404
+        defined: true
+        note: "Cross-cutting; every Capability must pass it before execution"
+      - term: "Local-first, Cloud-enhanced"
+        line: 479
+        defined: true
+      - term: "BYOAI"
+        line: 496
+        defined: true
+      - term: "AI Gateway"
+        line: 577
+        defined: true
+      - term: "Capability"
+        line: 640
+        defined: true
+        note: "What the system can execute; contrast with Method"
+      - term: "Method"
+        line: 644
+        defined: true
+        note: "How to think/analyze/verify; semantics Atlas-authoritative"
+      - term: "method_id"
+        line: 697
+        defined: false
+        machine_id: "method_id"
+        note: "Normatively required input to execute_method; schema external (Atlas / machine specs)"
+      - term: "cognitive.execute_method"
+        line: 703
+        defined: true
+        machine_id: "cognitive.execute_method"
+        note: "Capability contract v1.0.0"
+      - term: "MethodExecutionRequest"
+        line: 709
+        defined: false
+        machine_id: "MethodExecutionRequest"
+        note: "Used as contract input type; no schema declared anywhere in this doc"
+      - term: "TypedMethodResult"
+        line: 713
+        defined: false
+        machine_id: "TypedMethodResult"
+        note: "Used as contract output type; no schema declared in this doc"
+      - term: "Method Contract"
+        line: 697
+        defined: false
+        note: "Normative; defined in Atlas / machine-readable specs, not here"
+      - term: "Method-specific Gate"
+        line: 722
+        defined: false
+        note: "Required by capability contract quality section; semantics external"
+      - term: "Typed LEGO"
+        line: 731
+        defined: true
+        note: "Every capability/method has Input/Output types; illegal combos rejected pre-execution"
+      - term: "Workflow IR"
+        line: 798
+        defined: true
+        note: "Workflow Intermediate Representation; separates capability vs method nodes"
+      - term: "Recipe"
+        line: 794
+        defined: false
+        note: "Used throughout; recipe.schema.yaml pointed to but recipe semantics/catalog external"
+      - term: "Prompt → Plan Compiler"
+        line: 862
+        defined: true
+      - term: "HumanContribution"
+        line: 938
+        defined: true
+        note: "10 subtypes: Opinion…Task"
+      - term: "LOCKED FACT"
+        line: 975
+        defined: true
+        note: "AI may never overwrite"
+      - term: "Compliance Profile"
+        line: 1016
+        defined: true
+        note: "Academic Strict / Corporate / Personal / Research / No External AI / Institution-specific"
+      - term: "Evidence"
+        line: 1048
+        defined: true
+        note: "Core chain SOURCE→EVIDENCE→CLAIM→INFERENCE→ASSUMPTION→DECISION"
+      - term: "Claim"
+        line: 1050
+        defined: true
+      - term: "Provenance"
+        line: 1075
+        defined: true
+        note: "Sentence-level: Sentence→Claim→Evidence→Source→Page/Region/Timestamp"
+      - term: "Knowledge Memory layers"
+        line: 1122
+        defined: true
+        note: "Episodic/Semantic/Project/Personal Preference/Organization/Temporary"
+      - term: "Stakeholder & Expert Intelligence Plane"
+        line: 1145
+        defined: true
+      - term: "Hypothetical Local Perspective"
+        line: 1276
+        defined: true
+        note: "Mandatory label for AI-simulated local views"
+      - term: "Expert Packs"
+        line: 1291
+        defined: true
+      - term: "Role Assembly Engine"
+        line: 1353
+        defined: true
+      - term: "Diversity Coverage Score"
+        line: 1386
+        defined: true
+      - term: "Intelligence Council"
+        line: 1465
+        defined: true
+      - term: "Assumption Registry"
+        line: 1550
+        defined: true
+        note: "ASM-018 example"
+      - term: "AnalysisRun"
+        line: 1911
+        defined: true
+        note: "Reproducible analysis manifest; ANA-92817 example"
+      - term: "Statistical Guardrails"
+        line: 1893
+        defined: true
+      - term: "VisualizationSpec"
+        line: 1992
+        defined: false
+        note: "Named binding requirement only; no schema"
+      - term: "Claim Strength Model"
+        line: 2483
+        defined: true
+      - term: "Quality Gate"
+        line: 2503
+        defined: true
+        note: "Research gates and business gates enumerated"
+      - term: "Event Ledger / Projection"
+        line: 2548
+        defined: true
+        note: "Current State = projection of events; replayable"
+      - term: "Content-addressed storage"
+        line: 2581
+        defined: true
+        note: "/objects/sha256/aa/bb/<hash>"
+      - term: "Portable Artifact URI"
+        line: 2595
+        defined: true
+        machine_id: "artifact://"
+        note: "artifact://project/PRJ001/source/SRC0003"
+      - term: "Repository Contract"
+        line: 2635
+        defined: false
+        note: "Named only; no contract shown"
+      - term: "Data Classification"
+        line: 2643
+        defined: true
+        note: "Public / Internal / Confidential / Restricted with AI routing rules"
+      - term: "Zero Trust"
+        line: 2668
+        defined: true
+      - term: "Policy-as-Code"
+        line: 2714
+        defined: true
+      - term: "Agent Intent (Agent ≠ Authority)"
+        line: 2749
+        defined: true
+      - term: "Champion / Challenger"
+        line: 2914
+        defined: true
+      - term: "Golden Dataset"
+        line: 2893
+        defined: false
+        note: "Required per capability; format unspecified"
+      - term: "Signed Offline License"
+        line: 3014
+        defined: true
+      - term: "Project Package"
+        line: 3030
+        defined: true
+        note: "Cloud↔Local portability bundle"
+      - term: "Architecture Constitution"
+        line: 3462
+        defined: false
+        note: "Referenced normatively (§85, §135) but is a planned Phase-0 deliverable, not yet an existing doc"
+      - term: "GLOBAL INVARIANTS / LOCAL VARIANTS"
+        line: 3836
+        defined: true
+      - term: "Jurisdiction Pack"
+        line: 4100
+        defined: true
+        note: "Versioned pack carrying local law/hierarchy; core of §91 design"
+      - term: "Jurisdiction Resolver / jurisdiction_context"
+        line: 3978
+        defined: true
+      - term: "Legal Source Registry"
+        line: 4036
+        defined: true
+        note: "LAW-… records with official_url, effective dates, checksum"
+      - term: "Authority Hierarchy"
+        line: 4099
+        defined: true
+        note: "Per-jurisdiction-pack legal precedence"
+      - term: "Legal Snapshot"
+        line: 4150
+        defined: true
+        machine_id: "LS-YYYYMMDD-…"
+        note: "Example LS-20260828-EU-01"
+      - term: "CONSERVATIVE_SAFE_MODE"
+        line: 4203
+        defined: true
+        machine_id: "CONSERVATIVE_SAFE_MODE"
+        note: "Conflict-of-laws state"
+      - term: "LEGAL_REVIEW_REQUIRED"
+        line: 4206
+        defined: true
+        machine_id: "LEGAL_REVIEW_REQUIRED"
+      - term: "Obligation / Control"
+        line: 4221
+        defined: true
+        note: "Legal Requirement→Normalized Obligation→Control→Executable Policy→Evidence; OBL-123 example"
+      - term: "ProcessingActivityArtifact"
+        line: 4321
+        defined: false
+        note: "Named only; fields listed above it but no schema"
+      - term: "Transfer Mechanism"
+        line: 4352
+        defined: true
+        note: "Adequacy / SCC / BCR / … abstract mechanisms"
+      - term: "Sovereign Regional Cell"
+        line: 4405
+        defined: true
+      - term: "AI Regulatory Classification Engine"
+        line: 4434
+        defined: true
+        note: "Use-case-level classification, not model-level"
+      - term: "Sector Compliance Pack"
+        line: 4502
+        defined: true
+      - term: "Legal Hold"
+        line: 4725
+        defined: true
+      - term: "Political Compliance Pack"
+        line: 4986
+        defined: true
+      - term: "Law Pack (jurisdiction-pack bundle)"
+        line: 5057
+        defined: true
+        note: "jurisdiction-pack-XX-v123.bundle; signed, versioned"
+      - term: "Freshness Warning"
+        line: 5075
+        defined: true
+      - term: "Legal Freshness SLA"
+        line: 5087
+        defined: true
+      - term: "Market Entry Passport"
+        line: 5188
+        defined: true
+      - term: "Project Passport"
+        line: 5208
+        defined: true
+        note: "All workflows inherit it"
+      - term: "Compliance Decision Artifact"
+        line: 5237
+        defined: true
+      - term: "Legal uncertainty states (KNOWN/INTERPRETATION_REQUIRED/AMBIGUOUS/CONFLICTING/STALE/UNKNOWN)"
+        line: 5264
+        defined: true
+        machine_id: "KNOWN|INTERPRETATION_REQUIRED|AMBIGUOUS|CONFLICTING|STALE|UNKNOWN"
+      - term: "CONDITIONAL_GO"
+        line: 5203
+        defined: true
+        machine_id: "CONDITIONAL_GO"
+        note: "Market entry decision value; prose form Go / Conditional Go / No-Go at L5177"
+      - term: "Eligible Provider Set"
+        line: 5559
+        defined: true
+        note: "Compliance-filtered provider pool before cost/quality optimization"
+      - term: "BYOK / HYOK"
+        line: 5643
+        defined: true
+        note: "Key sovereignty options incl. Customer HSM, Local-only, Region-bound"
+      - term: "Regulatory Impact Graph"
+        line: 5821
+        defined: true
+        note: "Law Change→Obligations→Policies→Capabilities→Workflows→Projects→Artifacts→Customers"
+      - term: "Regulatory Evidence Package"
+        line: 5791
+        defined: true
+      - term: "Global Definition of Done"
+        line: 5903
+        defined: true
+  "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md":
+    terminology:
+      - term: "Cognitive LEGO"
+        line: 74
+        defined: true
+        note: "核心概念：可分類/可搜尋/可組裝/可版本化/可稽核/可回滾的方法積木"
+      - term: "Cognitive Primitive"
+        line: 153
+        defined: true
+        note: "§4 kernel 列 24 個（FRAME…LEARN）；宣稱長期穩定核心"
+      - term: "Method Family"
+        line: 298
+        defined: true
+        note: "F01–F24 於 §7 方法總覽表定義"
+      - term: "Method Contract"
+        line: 987
+        defined: true
+        note: "僅以 root_cause.fishbone 一個 worked example 定義；method.schema.yaml 僅在 Appendix A 承諾"
+      - term: "Lens Contract"
+        line: 1032
+        defined: true
+        note: "以 stakeholder.regulator 範例定義"
+      - term: "Representation Contract"
+        line: 1049
+        defined: true
+        note: "View 只存 layout/filters/visible_fields/presentation_preferences"
+      - term: "Method Selection Engine"
+        line: 1066
+        defined: true
+        machine_id: "method-selector"
+        note: "§10；/compiler/method-selector/ 對應 §17"
+      - term: "selection_context"
+        line: 1071
+        defined: true
+        note: "Selector 輸入 YAML 契約"
+      - term: "problem_type"
+        line: 1073
+        defined: true
+        note: "enum diagnostic|exploratory|creative|strategic|causal|decision|operational；與 §10 路由表值不一致（見 defects）"
+      - term: "risk_tier"
+        line: 1077
+        defined: true
+        note: "enum low|medium|high|critical"
+      - term: "required_rigor"
+        line: 1086
+        defined: true
+        note: "enum fast|professional|research_grade|board_grade"
+      - term: "Cognitive LEGO Graph"
+        line: 98
+        defined: false
+        note: "僅出現在 §2 架構圖節點，未定義結構"
+      - term: "Prompt → Plan Compiler"
+        line: 96
+        defined: false
+        note: "§0 明言承自 Master Plan；本文件未定義"
+      - term: "Workflow IR"
+        line: 76
+        defined: false
+        note: "列於 Global Invariant Core(211) 且承自 Master Plan；本文件無定義"
+      - term: "Workflow Validator"
+        line: 120
+        defined: false
+        note: "§2 圖節點；驗證行為散見 §14 但無 component 定義"
+      - term: "Execution Runtime"
+        line: 122
+        defined: true
+        note: "§17 /runtime/（execution/branch/checkpoint/replay/rollback）"
+      - term: "Quality Gate"
+        line: 4162
+        defined: true
+        note: "分 Global / High-risk / Method-specific 三層"
+      - term: "Global Gate"
+        line: 4164
+        defined: true
+        note: "14 項 PASS 清單"
+      - term: "High-risk Gate"
+        line: 4183
+        defined: true
+        note: "6 項額外 PASS"
+      - term: "Method-specific Gate"
+        line: 4196
+        defined: true
+        note: "10 method 的禁止輸出/必補驗證表"
+      - term: "Epistemic Type"
+        line: 591
+        defined: true
+        note: "11 值：SOURCE FACT…DECISION，必須分離"
+      - term: "SOURCE FACT"
+        line: 594
+        defined: true
+      - term: "AI INFERENCE"
+        line: 598
+        defined: true
+      - term: "UNKNOWN"
+        line: 603
+        defined: true
+        note: "epistemic status；亦用於 capability availability(4057) 與 fail-closed 規則"
+      - term: "DRAFT"
+        line: 4150
+        defined: false
+        note: "「AI-generated idea 預設 DRAFT」— status 值未在任何狀態 schema 中列舉"
+      - term: "FACT"
+        line: 4151
+        defined: false
+        note: "規則用 `FACT`，但 Epistemic Type 清單只有 `SOURCE FACT`（見 defects）"
+      - term: "Assumption Registry"
+        line: 570
+        defined: true
+        note: "F10 工具列；欄位 ID/statement/type/evidence/confidence/validation/status/owner"
+      - term: "Reversal Criteria"
+        line: 1980
+        defined: true
+        machine_id: "reversal"
+        note: "schema 範例於 1989–1994（indicator/condition/action/owner）"
+      - term: "Kill Criteria"
+        line: 805
+        defined: true
+      - term: "KnowledgeSet"
+        line: 149
+        defined: false
+        note: "§3 核心效果與 §14.1 合法鏈使用；無 schema"
+      - term: "Knowledge Object"
+        line: 1052
+        defined: true
+        note: "Representation Contract 樹的根；無正式 schema"
+      - term: "ProblemStatement"
+        line: 1003
+        defined: false
+        note: "typed input；precondition 引用 problem_statement.status==validated 但 status enum 未定義"
+      - term: "CauseHypothesisSet"
+        line: 1010
+        defined: false
+        note: "typed output；無 schema"
+      - term: "FinalCausalFact"
+        line: 1020
+        defined: false
+        note: "forbidden_transition 目標型別；與 RootCauseFact/Root Cause Fact 命名不一致"
+      - term: "RootCauseFact"
+        line: 1267
+        defined: false
+        note: "11.4 重要限制使用；同一概念另名"
+      - term: "RootCauseAssessment"
+        line: 3556
+        defined: false
+        note: "§14.1 合法鏈終點型別；僅此一處出現"
+      - term: "EvidenceSet"
+        line: 1005
+        defined: false
+      - term: "StakeholderSet"
+        line: 1007
+        defined: false
+      - term: "PerspectiveAssessment"
+        line: 1042
+        defined: false
+        note: "Lens output 型別；無 schema"
+      - term: "JurisdictionContext"
+        line: 1040
+        defined: false
+        note: "Lens requires；schema 僅承諾於 /specs/jurisdiction/context.schema.yaml"
+      - term: "forbidden_transition"
+        line: 1019
+        defined: true
+        note: "Method Contract key"
+      - term: "recommended_next"
+        line: 1023
+        defined: true
+        note: "Method Contract key；值為 method IDs"
+      - term: "side_effect_free"
+        line: 1030
+        defined: true
+        note: "rollback contract key"
+      - term: "reversal_conditions"
+        line: 56
+        defined: true
+        note: "machine-facing schema 範例（indicator/threshold/action）"
+      - term: "Recipe"
+        line: 3200
+        defined: true
+        note: "validated reference workflow + typed contracts + optional branches + mandatory gates + jurisdiction rules"
+      - term: "Mandatory Gate Injection"
+        line: 3588
+        defined: true
+      - term: "REQUIRED_BY_RISK"
+        line: 3630
+        defined: true
+        note: "block edge 標籤 enum 之一（RECOMMENDED/OPTIONAL/REQUIRED_BY_RISK/REQUIRED_BY_JURISDICTION/REQUIRED_BY_SECTOR/FORBIDDEN）"
+      - term: "FORBIDDEN"
+        line: 3634
+        defined: true
+        note: "edge 標籤 enum 值"
+      - term: "Idea Object"
+        line: 3718
+        defined: true
+        machine_id: "IDEA-*"
+        note: "§16.1 YAML"
+      - term: "Decision Object"
+        line: 3780
+        defined: true
+        machine_id: "DEC-*"
+        note: "§16.2 YAML"
+      - term: "Method Execution"
+        line: 3821
+        defined: true
+        machine_id: "EX-*"
+        note: "§16.3 YAML（execution_id/method_id/snapshots/rollback_ref）"
+      - term: "Execution Manifest"
+        line: 4155
+        defined: false
+        note: "強制規則#6「Rollback 使用 Execution Manifest」；schema 僅承諾於 /specs/execution/manifest.schema.yaml"
+      - term: "Jurisdiction Pack"
+        line: 216
+        defined: true
+        note: "§5.2 維度清單 + §18 階層"
+      - term: "Jurisdiction Resolver"
+        line: 2430
+        defined: true
+      - term: "Applicable Law Graph"
+        line: 945
+        defined: true
+        note: "F23 工具列"
+      - term: "Market Admission Control"
+        line: 2458
+        defined: true
+        note: "任一 critical unknown → FAIL CLOSED"
+      - term: "Capability Availability"
+        line: 4046
+        defined: true
+        note: "7 個 status：Allowed/Restricted/Human Review/Local-only/Government-only/Prohibited/Unknown"
+      - term: "Fail Closed"
+        line: 4063
+        defined: true
+        note: "Unknown = Fail Closed（high/critical risk）"
+      - term: "Global Invariant Core"
+        line: 198
+        defined: true
+        note: "13 個不變核心（Evidence…Rollback）"
+      - term: "Soft Cognitive Preference"
+        line: 257
+        defined: true
+        note: "soft preference + task adaptation，不永久標籤使用者"
+      - term: "cognitive_preference"
+        line: 262
+        defined: true
+        note: "YAML profile（representation/interaction/thinking/detail/decision）"
+      - term: "Guided Mode"
+        line: 980
+        defined: true
+      - term: "Expert LEGO Mode"
+        line: 981
+        defined: true
+        note: "compiler 仍做 type/precondition/policy/jurisdiction/cost/risk/gate 檢查"
+      - term: "Representation Switching"
+        line: 972
+        defined: true
+        note: "同一 Knowledge 換 View 不重算"
+      - term: "Trusted Compute"
+        line: 4205
+        defined: false
+        note: "Method-specific Gate 與規則 4543 之強制要求；全文件無定義"
+      - term: "AI Expert Lens"
+        line: 4204
+        defined: false
+        note: "Method-specific Gate 治理對象；未在任何 Lens/Method 目錄中宣告"
+      - term: "LLM Arithmetic"
+        line: 4205
+        defined: false
+        note: "Method-specific Gate 治理對象；未宣告為 method"
+      - term: "Independent Judge"
+        line: 643
+        defined: true
+        note: "F12 工具；高風險 gate 必過項"
+      - term: "Minority Opinion"
+        line: 84
+        defined: false
+        note: "準則強制設計與 recipes/decision object 使用；無正式定義"
+      - term: "Perspective Packs"
+        line: 84
+        defined: false
+        note: "§1 強制設計欄提及；全文件僅此一次"
+      - term: "Champion / Challenger"
+        line: 4263
+        defined: true
+        note: "shadow→eval→compare→promote/reject"
+      - term: "Deprecation"
+        line: 4275
+        defined: true
+        note: "notice→replacement→compatibility matrix→migration tool→usage scan→archive"
+      - term: "BoardDecisionPack"
+        line: 3335
+        defined: true
+        note: "僅以輸出樹描述，無 schema"
+      - term: "MarketEntryRecipe"
+        line: 3391
+        defined: true
+        note: "同一 recipe 不 fork 國家版；差異由 versioned packs 注入"
+      - term: "method.association.mind_map"
+        line: 50
+        defined: true
+        machine_id: "method.association.mind_map"
+        note: "machine-facing identifier 範例；ID 文法與 root_cause.fishbone、method.swot.v1 不一致"
+      - term: "root_cause.fishbone"
+        line: 989
+        defined: true
+        machine_id: "root_cause.fishbone"
+        note: "唯一完整 Method Contract 的 id"
+      - term: "stakeholder.regulator"
+        line: 1036
+        defined: true
+        machine_id: "stakeholder.regulator"
+        note: "唯一 Lens Contract 的 id"
+      - term: "method.swot.v1"
+        line: 4256
+        defined: true
+        machine_id: "method.swot.v1"
+        note: "版本化範例（v1/v2/v3）；ID 文法第三種形態"
+      - term: "最小爆炸半徑（Minimum Blast Radius）"
+        line: 4136
+        defined: true
+        note: "Tenant→Workspace→Project→Workflow→Branch→Execution→Capability 隔離階層 + 9 條強制規則"
+      - term: "零重工（Zero Rework）"
+        line: 4111
+        defined: true
+        note: "Normalize Once；同 source 只高成本理解一次"

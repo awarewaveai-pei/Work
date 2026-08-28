@@ -1,5 +1,38 @@
 ﻿# Worklog
 
+## 2026-08-29
+
+### AI LEGO Cognitive Engineering OS — Phase 0 全程完成：Program Plan + 三母文件 identity 鎖定 + 全文 inventory + 71 條對抗式驗證 findings
+
+**起點**：操作者投入三份母規格（`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/`，共 14,885 行）+ 30 節 program directive（要求 Phase 0–5 收斂工程、Claude/Codex 反 anchoring 分工、Phase 2 結束 STOP FOR HUMAN REVIEW）。本批 = Phase 0 完整交付。
+
+**產出**：①`AI_LEGO_OS_Program_Plan_v1.md`（程序正本：階段/gates/角色/路徑映射/status tracker；明文「非第四套架構」，與母文件衝突時讓位）②`.ai/research/phase-0/` 11 項全數完成——SHA-256 鎖定、identity 缺陷登錄、authority map、directive 存檔、五份全文 inventory（640 headings / 246 terms / 42 domains / 168 components / **Atlas 284 methods 全編目** / 251 policies）、`verified-findings.yaml`（71 條）、`PHASE_0_CURRENT_STATE_REPORT.md`。
+
+**方法**：8-agent workflow（`wf_7d1cd8d8-038`）：3 readers 逐行全讀 → 2 cross-analysts（terminology/duplication + reference-integrity/scope）→ 3 doc-scoped 對抗式 verifiers（預設 finding 為錯、逐條 Grep 驗 quote/line/claim）。第一輪 5 agents 撞 session limit，resume 後 cache 續跑（readers 零重付）。
+
+**核心發現**（62 CONFIRMED / 6 PARTIAL / 3 LINE_MISMATCH；13 high）：衝突全在機制層不在理念層。最嚴重一組 = **仲裁機制自身壞掉**：precedence chain 定義兩次已漂移、MP 授權模型沒有 EC 的位置、authority table anchor 指向不存在的 `v2_1`/`v1_2_zhTW` 檔名（MP 有 10 處 MUST-resolve 指向不存在檔 → 忠實實作 Boot Contract 的 agent 第一步就 BLOCKED）。load-bearing enum 三處多套版本（epistemic labels 6/11/11、risk_tier R0-R4 vs critical、status codes）；Execution Manifest（30 年 replay 核心）3–4 套不相容 schema；v1 未寫任何 code 前雙維護機制已漂移 7 組。
+
+**誠實記錄**：workflow 第一版 finding-ID 有碰撞 bug（`DOC-`+檔名前 12 字元，三檔相同），merge 時 verdict 錯接；已從 per-verifier journal（各自範圍內 ID 唯一）重建正確 mapping，register 改用 `DOC-<doc_key>-<n>` 消歧。0 REFUTED 偏順向已在報告 §10 明文標註，Codex cross-review 是下一道防線。**critic 覆審 transform 腳本再抓 3 Major**：①3 筆 LINE_MISMATCH 發佈的是修正前行號（708/5268/3465 才對）——emitter 修正後重產，corrected line 逐筆對照原文命中 ✅ ②35 筆 DOC severity=medium 是預設值非評估——補 `severity_source: default_not_assessed` 標記 ③header「all 71」硬編碼＋無 step-completeness guard——改插值＋斷言（首輪 5 agents 曾 failed，此 guard 堵「漏一整個文件的 verdicts 仍自稱全驗」）。critic 同時對 7 份 YAML 做獨立 round-trip 全等驗證（STRICT EQUAL）、CJK 5084 碼位 byte-exact、無 dup key、無 silent coercion。
+
+**待人類決策**：OQ-1~11（`open-questions.yaml` SSOT）。**OQ-2 最急**（磁碟 v1 是否即 canonical？v2_1/v1_2_zhTW 草稿是否存在他處？）——建議 cross-review 前回答。OQ-7~11 為 Phase 2 ADR 決策點。
+
+**附帶決策（子網域諮詢）**：AI LEGO 未來部署建議獨立一級子網域（`lego.aware-wave.com`），不塞 `app.aware-wave.com`（邊界/身分模型/生命週期三理由）；Phase 0–2 禁建 UI，現在不建 DNS 記錄（dangling DNS 風險），Phase 5 MVP 時再建並寫 ADR。
+
+[已修改]
+- 新增 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_OS_Program_Plan_v1.md`（程序正本）
+- 新增 `.ai/research/phase-0/` 13 檔（document-hashes / document-inventory / document-authority-map / open-questions / source-directive-2026-08-28 / terminology-map / domain-inventory / architecture-inventory / method-inventory / policy-inventory / reader-defects-and-references / verified-findings / PHASE_0_CURRENT_STATE_REPORT）
+- 三母文件首次 commit 進 git 作 hash-anchored baseline（OQ-5 暫案；內容零改動，SHA-256 與 document-hashes.yaml 可驗）
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=sha256sum *.md + node phase0-transform.js/phase0-verified.js + python yaml.safe_load(11 檔) + 6 筆隨機行號抽查對照原文 | exit=0 | ms=~4000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/6n（3 Major 全數當場修復並重產 register；critic 另做 7 檔 YAML round-trip 獨立驗證全 STRICT EQUAL）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=AI_LEGO | hits=42
+- ORACLE_WAIVED: Phase 0 為機械 inventory＋程序文件；Codex 獨立審查依 source directive §V 反 anchoring 協議刻意延後至 cross-review 階段（避免以 Claude 結論污染其對三母文件的獨立分析），屆時以 codex-oracle.ps1 -Mode inspect 無污染執行
+
+[剩餘風險] OQ-2 未答前 lineage 存疑；全部結論為 Claude 單模型產出，CONVERGENCE_MATRIX 前不得視為 FACT。
+[rollback] `git revert` 本 commit 即可；三母文件內容未動（hash 可驗），`.ai/` 為純新增目錄。
+
 ## 2026-08-28
 
 ### Cursor 退場的真正代價：一個假話語法漏進 Claude 的產出（14 支 MCP 天天失敗而所有 gate 全綠），以及移除它時扯出的四條斷鏈

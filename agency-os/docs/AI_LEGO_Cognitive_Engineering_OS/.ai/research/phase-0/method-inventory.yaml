@@ -1,0 +1,1181 @@
+# AI LEGO OS — Phase 0 method inventory
+# Generated mechanically from full-document reads (workflow wf_7d1cd8d8-038, 3 reader agents, every line of all three mother docs covered).
+# Source doc identity/hashes: see document-hashes.yaml. Line numbers are 1-indexed into the hashed snapshots.
+# Phase 0 rule: this REGISTERS what exists; nothing is fixed here.
+by_document:
+  "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md":
+    methods:
+      - name: "Evidence-first Debugging"
+        line: 3633
+        category: "execution protocol (defined by this doc)"
+        has_contract: false
+        note: "Observe→Reproduce→Measure→Hypothesize→Test Hypothesis→Fix; the only method-like procedure this doc defines itself. Cognitive methods it mentions (ATAM, MCDA, Decision Matrix, Pre-mortem, Red Team at L977-981; STRIDE, LINDDUN, Attack Tree, PASTA at L1284) are explicitly delegated to the Method Atlas and are mentions, not definitions — consistent with L47 '本文件…不重新建立 Cognitive Method Catalog'"
+  "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md":
+    methods:
+      - name: "root_cause.fishbone"
+        machine_id: "root_cause.fishbone"
+        line: 742
+        has_contract: false
+        category: "example-only (Atlas-authoritative); typed example ProblemStatement+EvidenceSet?→CauseHypothesisSet"
+      - name: "strategy.swot"
+        machine_id: "strategy.swot"
+        line: 746
+        has_contract: false
+        category: "example-only (Atlas-authoritative); typed example KnowledgeSet→SWOTAnalysis"
+      - name: "research.thematic_analysis"
+        machine_id: "research.thematic_analysis"
+        line: 825
+        has_contract: false
+        category: "example-only, used in Workflow IR sample research.qualitative.v4"
+      - name: "evidence.triangulation"
+        machine_id: "evidence.triangulation"
+        line: 833
+        has_contract: false
+        category: "example-only, used in Workflow IR sample research.qualitative.v4"
+  "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md":
+    methods:
+      - name: "FRAME"
+        line: 158
+        category: "primitive"
+        has_contract: false
+      - name: "QUESTION"
+        line: 159
+        category: "primitive"
+        has_contract: false
+      - name: "EXPAND"
+        line: 160
+        category: "primitive"
+        has_contract: false
+      - name: "ASSOCIATE"
+        line: 161
+        category: "primitive"
+        has_contract: false
+      - name: "DECOMPOSE"
+        line: 162
+        category: "primitive"
+        has_contract: false
+      - name: "GROUP"
+        line: 163
+        category: "primitive"
+        has_contract: false
+      - name: "MAP"
+        line: 164
+        category: "primitive"
+        has_contract: false
+      - name: "COMPARE"
+        line: 165
+        category: "primitive"
+        has_contract: false
+      - name: "RELATE"
+        line: 166
+        category: "primitive"
+        has_contract: false
+      - name: "CAUSE"
+        line: 167
+        category: "primitive"
+        has_contract: false
+      - name: "INFER"
+        line: 168
+        category: "primitive"
+        has_contract: false
+      - name: "CHALLENGE"
+        line: 169
+        category: "primitive"
+        has_contract: false
+      - name: "IMAGINE"
+        line: 170
+        category: "primitive"
+        has_contract: false
+      - name: "FORECAST"
+        line: 171
+        category: "primitive"
+        has_contract: false
+      - name: "ESTIMATE"
+        line: 172
+        category: "primitive"
+        has_contract: false
+      - name: "CALCULATE"
+        line: 173
+        category: "primitive"
+        has_contract: false
+      - name: "SIMULATE"
+        line: 174
+        category: "primitive"
+        has_contract: false
+      - name: "OPTIMIZE"
+        line: 175
+        category: "primitive"
+        has_contract: false
+      - name: "PRIORITIZE"
+        line: 176
+        category: "primitive"
+        has_contract: false
+      - name: "DECIDE"
+        line: 177
+        category: "primitive"
+        has_contract: false
+      - name: "VALIDATE"
+        line: 178
+        category: "primitive"
+        has_contract: false
+      - name: "EXPLAIN"
+        line: 179
+        category: "primitive"
+        has_contract: false
+      - name: "REFLECT"
+        line: 180
+        category: "primitive"
+        has_contract: false
+      - name: "LEARN"
+        line: 181
+        category: "primitive"
+        has_contract: false
+      - name: "Goal Statement"
+        line: 333
+        category: "F01 framing"
+        has_contract: false
+      - name: "SMART"
+        line: 334
+        category: "F01 framing"
+        has_contract: false
+      - name: "OKR"
+        line: 335
+        category: "F01 framing"
+        has_contract: false
+      - name: "North Star Metric"
+        line: 336
+        category: "F01 framing"
+        has_contract: false
+      - name: "Success Criteria"
+        line: 337
+        category: "F01 framing"
+        has_contract: false
+      - name: "Non-goals"
+        line: 338
+        category: "F01 framing"
+        has_contract: false
+      - name: "5W1H"
+        line: 339
+        category: "F01 framing"
+        has_contract: false
+      - name: "Problem Statement"
+        line: 340
+        category: "F01 framing"
+        has_contract: false
+      - name: "How Might We"
+        line: 341
+        category: "F01 framing"
+        has_contract: false
+      - name: "Frame Storming"
+        line: 342
+        category: "F01 framing"
+        has_contract: false
+      - name: "Boundary Critique"
+        line: 343
+        category: "F01 framing"
+        has_contract: false
+      - name: "Issue Tree"
+        line: 362
+        category: "F02 decomposition"
+        has_contract: false
+      - name: "Logic Tree"
+        line: 363
+        category: "F02 decomposition"
+        has_contract: false
+      - name: "MECE"
+        line: 364
+        category: "F02 decomposition"
+        has_contract: false
+      - name: "Problem Tree"
+        line: 365
+        category: "F02 decomposition"
+        has_contract: false
+      - name: "Objective Tree"
+        line: 366
+        category: "F02 decomposition"
+        has_contract: false
+      - name: "Functional Decomposition"
+        line: 367
+        category: "F02 decomposition"
+        has_contract: false
+      - name: "FAST"
+        line: 368
+        category: "F02 decomposition"
+        has_contract: false
+      - name: "Hierarchical Task Analysis"
+        line: 369
+        category: "F02 decomposition"
+        has_contract: false
+      - name: "WBS"
+        line: 370
+        category: "F02 decomposition"
+        has_contract: false
+      - name: "Classic Brainstorming"
+        line: 378
+        category: "F03 ideation"
+        has_contract: false
+      - name: "Brainwriting"
+        line: 379
+        category: "F03 ideation"
+        has_contract: false
+      - name: "6-3-5"
+        line: 380
+        category: "F03 ideation"
+        has_contract: false
+      - name: "Crazy 8s"
+        line: 381
+        category: "F03 ideation"
+        has_contract: false
+      - name: "SCAMPER"
+        line: 382
+        category: "F03 ideation"
+        has_contract: false
+      - name: "Lotus Blossom"
+        line: 383
+        category: "F03 ideation"
+        has_contract: false
+      - name: "Starbursting"
+        line: 384
+        category: "F03 ideation"
+        has_contract: false
+      - name: "Random Stimulus"
+        line: 385
+        category: "F03 ideation"
+        has_contract: false
+      - name: "Forced Connections"
+        line: 386
+        category: "F03 ideation"
+        has_contract: false
+      - name: "Synectics"
+        line: 387
+        category: "F03 ideation"
+        has_contract: false
+      - name: "Mind Map"
+        line: 410
+        category: "F04 association"
+        has_contract: false
+        machine_id: "method.association.mind_map"
+      - name: "Concept Map"
+        line: 411
+        category: "F04 association"
+        has_contract: false
+      - name: "Affinity Diagram"
+        line: 412
+        category: "F04 association"
+        has_contract: false
+      - name: "Morphological Analysis"
+        line: 413
+        category: "F04 association"
+        has_contract: false
+      - name: "Attribute Listing"
+        line: 414
+        category: "F04 association"
+        has_contract: false
+      - name: "Analogy Mapping"
+        line: 415
+        category: "F04 association"
+        has_contract: false
+      - name: "Fishbone / Ishikawa"
+        line: 433
+        category: "F05 root_cause"
+        has_contract: true
+        machine_id: "root_cause.fishbone"
+      - name: "5 Whys"
+        line: 434
+        category: "F05 root_cause"
+        has_contract: false
+        machine_id: "root_cause.five_whys"
+      - name: "Pareto"
+        line: 435
+        category: "F05 root_cause"
+        has_contract: false
+        machine_id: "root_cause.pareto"
+      - name: "Fault Tree"
+        line: 436
+        category: "F05 root_cause"
+        has_contract: false
+      - name: "Event Tree"
+        line: 437
+        category: "F05 root_cause"
+        has_contract: false
+      - name: "Bow-Tie"
+        line: 438
+        category: "F05 root_cause"
+        has_contract: false
+      - name: "Kepner–Tregoe"
+        line: 439
+        category: "F05 root_cause"
+        has_contract: false
+      - name: "Change Analysis"
+        line: 440
+        category: "F05 root_cause"
+        has_contract: false
+      - name: "Barrier Analysis"
+        line: 441
+        category: "F05 root_cause"
+        has_contract: false
+      - name: "JTBD"
+        line: 460
+        category: "F06 human_insight"
+        has_contract: false
+      - name: "Persona"
+        line: 461
+        category: "F06 human_insight"
+        has_contract: false
+      - name: "Empathy Map"
+        line: 462
+        category: "F06 human_insight"
+        has_contract: false
+      - name: "Journey Map"
+        line: 463
+        category: "F06 human_insight"
+        has_contract: false
+      - name: "Service Blueprint"
+        line: 464
+        category: "F06 human_insight"
+        has_contract: false
+      - name: "Contextual Inquiry"
+        line: 465
+        category: "F06 human_insight"
+        has_contract: false
+      - name: "Interview"
+        line: 466
+        category: "F06 human_insight"
+        has_contract: false
+      - name: "Survey"
+        line: 467
+        category: "F06 human_insight"
+        has_contract: false
+      - name: "Focus Group"
+        line: 468
+        category: "F06 human_insight"
+        has_contract: false
+      - name: "Stakeholder Map"
+        line: 486
+        category: "F07 stakeholders"
+        has_contract: false
+      - name: "Power–Interest"
+        line: 487
+        category: "F07 stakeholders"
+        has_contract: false
+      - name: "Salience Model"
+        line: 488
+        category: "F07 stakeholders"
+        has_contract: false
+      - name: "Incentive Mapping"
+        line: 489
+        category: "F07 stakeholders"
+        has_contract: false
+      - name: "RACI"
+        line: 490
+        category: "F07 stakeholders"
+        has_contract: false
+      - name: "BATNA"
+        line: 491
+        category: "F07 stakeholders"
+        has_contract: false
+      - name: "ZOPA"
+        line: 492
+        category: "F07 stakeholders"
+        has_contract: false
+      - name: "Interest-Based Negotiation"
+        line: 493
+        category: "F07 stakeholders"
+        has_contract: false
+      - name: "Game Theory"
+        line: 494
+        category: "F07 stakeholders"
+        has_contract: false
+      - name: "Coalition Mapping"
+        line: 495
+        category: "F07 stakeholders"
+        has_contract: false
+      - name: "PESTEL"
+        line: 514
+        category: "F08 strategy"
+        has_contract: false
+      - name: "STEEPV"
+        line: 515
+        category: "F08 strategy"
+        has_contract: false
+      - name: "3C"
+        line: 516
+        category: "F08 strategy"
+        has_contract: false
+      - name: "SWOT"
+        line: 517
+        category: "F08 strategy"
+        has_contract: false
+        machine_id: "method.swot"
+      - name: "TOWS"
+        line: 518
+        category: "F08 strategy"
+        has_contract: false
+      - name: "Porter Five Forces"
+        line: 519
+        category: "F08 strategy"
+        has_contract: false
+      - name: "VRIO"
+        line: 520
+        category: "F08 strategy"
+        has_contract: false
+      - name: "Value Chain"
+        line: 521
+        category: "F08 strategy"
+        has_contract: false
+      - name: "STP"
+        line: 522
+        category: "F08 strategy"
+        has_contract: false
+      - name: "Ansoff"
+        line: 523
+        category: "F08 strategy"
+        has_contract: false
+      - name: "BCG"
+        line: 524
+        category: "F08 strategy"
+        has_contract: false
+      - name: "Blue Ocean"
+        line: 525
+        category: "F08 strategy"
+        has_contract: false
+      - name: "Business Model Canvas"
+        line: 526
+        category: "F08 strategy"
+        has_contract: false
+      - name: "Value Proposition Canvas"
+        line: 527
+        category: "F08 strategy"
+        has_contract: false
+      - name: "Causal Loop Diagram"
+        line: 544
+        category: "F09 systems"
+        has_contract: false
+      - name: "Stock & Flow"
+        line: 545
+        category: "F09 systems"
+        has_contract: false
+      - name: "Iceberg Model"
+        line: 546
+        category: "F09 systems"
+        has_contract: false
+      - name: "Systems Archetypes"
+        line: 547
+        category: "F09 systems"
+        has_contract: false
+      - name: "Rich Picture"
+        line: 548
+        category: "F09 systems"
+        has_contract: false
+      - name: "Leverage Point Analysis"
+        line: 549
+        category: "F09 systems"
+        has_contract: false
+      - name: "Behavior-over-Time"
+        line: 550
+        category: "F09 systems"
+        has_contract: false
+      - name: "Agent-Based Modeling"
+        line: 551
+        category: "F09 systems"
+        has_contract: false
+      - name: "Assumption Mapping"
+        line: 569
+        category: "F10 epistemic"
+        has_contract: false
+      - name: "Assumption Registry"
+        line: 570
+        category: "F10 epistemic"
+        has_contract: false
+      - name: "Ladder of Inference"
+        line: 571
+        category: "F10 epistemic"
+        has_contract: false
+      - name: "Argument Mapping"
+        line: 572
+        category: "F10 epistemic"
+        has_contract: false
+      - name: "Toulmin Model"
+        line: 573
+        category: "F10 epistemic"
+        has_contract: false
+      - name: "Evidence Matrix"
+        line: 574
+        category: "F10 epistemic"
+        has_contract: false
+      - name: "Evidence Hierarchy"
+        line: 575
+        category: "F10 epistemic"
+        has_contract: false
+      - name: "Bayesian Updating"
+        line: 576
+        category: "F10 epistemic"
+        has_contract: false
+      - name: "Confidence Calibration"
+        line: 577
+        category: "F10 epistemic"
+        has_contract: false
+      - name: "Contradiction Detection"
+        line: 578
+        category: "F10 epistemic"
+        has_contract: false
+      - name: "Causal DAG"
+        line: 613
+        category: "F11 causal"
+        has_contract: false
+        machine_id: "causal.dag"
+      - name: "Counterfactual Reasoning"
+        line: 614
+        category: "F11 causal"
+        has_contract: false
+      - name: "Theory of Change"
+        line: 615
+        category: "F11 causal"
+        has_contract: false
+      - name: "Logic Model"
+        line: 616
+        category: "F11 causal"
+        has_contract: false
+      - name: "Process Tracing"
+        line: 617
+        category: "F11 causal"
+        has_contract: false
+      - name: "RCT"
+        line: 618
+        category: "F11 causal"
+        has_contract: false
+      - name: "Difference-in-Differences"
+        line: 619
+        category: "F11 causal"
+        has_contract: false
+      - name: "Regression Discontinuity"
+        line: 620
+        category: "F11 causal"
+        has_contract: false
+      - name: "Instrumental Variables"
+        line: 621
+        category: "F11 causal"
+        has_contract: false
+      - name: "Synthetic Control"
+        line: 622
+        category: "F11 causal"
+        has_contract: false
+      - name: "Devil's Advocate"
+        line: 640
+        category: "F12 challenge"
+        has_contract: false
+      - name: "Red Team"
+        line: 641
+        category: "F12 challenge"
+        has_contract: false
+      - name: "Blue Team"
+        line: 642
+        category: "F12 challenge"
+        has_contract: false
+      - name: "Independent Judge"
+        line: 643
+        category: "F12 challenge"
+        has_contract: false
+      - name: "Pre-mortem"
+        line: 644
+        category: "F12 challenge"
+        has_contract: false
+      - name: "Counterexample Search"
+        line: 645
+        category: "F12 challenge"
+        has_contract: false
+      - name: "Disconfirming Evidence"
+        line: 646
+        category: "F12 challenge"
+        has_contract: false
+      - name: "FMEA"
+        line: 647
+        category: "F12 challenge"
+        has_contract: false
+      - name: "HAZOP"
+        line: 648
+        category: "F12 challenge"
+        has_contract: false
+      - name: "Stress Testing"
+        line: 649
+        category: "F12 challenge"
+        has_contract: false
+      - name: "Horizon Scanning"
+        line: 669
+        category: "F13 foresight"
+        has_contract: false
+      - name: "Weak Signal Detection"
+        line: 670
+        category: "F13 foresight"
+        has_contract: false
+      - name: "Historical Analogy"
+        line: 671
+        category: "F13 foresight"
+        has_contract: false
+      - name: "Cross-industry Transfer"
+        line: 672
+        category: "F13 foresight"
+        has_contract: false
+      - name: "Cross-country Comparison"
+        line: 673
+        category: "F13 foresight"
+        has_contract: false
+      - name: "Adjacent Discipline Search"
+        line: 674
+        category: "F13 foresight"
+        has_contract: false
+      - name: "Outlier Analysis"
+        line: 675
+        category: "F13 foresight"
+        has_contract: false
+      - name: "Black Swan Exercise"
+        line: 676
+        category: "F13 foresight"
+        has_contract: false
+      - name: "Wild Cards"
+        line: 677
+        category: "F13 foresight"
+        has_contract: false
+      - name: "Scenario Planning"
+        line: 678
+        category: "F13 foresight"
+        has_contract: false
+      - name: "Futures Wheel"
+        line: 679
+        category: "F13 foresight"
+        has_contract: false
+      - name: "Backcasting"
+        line: 680
+        category: "F13 foresight"
+        has_contract: false
+      - name: "Delphi"
+        line: 681
+        category: "F13 foresight"
+        has_contract: false
+      - name: "Cross-impact Analysis"
+        line: 682
+        category: "F13 foresight"
+        has_contract: false
+      - name: "TELOS"
+        line: 719
+        category: "F14 feasibility"
+        has_contract: false
+      - name: "Cost–Benefit Analysis"
+        line: 720
+        category: "F14 feasibility"
+        has_contract: false
+      - name: "Cost–Effectiveness"
+        line: 721
+        category: "F14 feasibility"
+        has_contract: false
+      - name: "TCO"
+        line: 722
+        category: "F14 feasibility"
+        has_contract: false
+      - name: "Unit Economics"
+        line: 723
+        category: "F14 feasibility"
+        has_contract: false
+      - name: "Break-even"
+        line: 724
+        category: "F14 feasibility"
+        has_contract: false
+      - name: "NPV"
+        line: 725
+        category: "F14 feasibility"
+        has_contract: false
+      - name: "IRR"
+        line: 726
+        category: "F14 feasibility"
+        has_contract: false
+      - name: "Real Options"
+        line: 727
+        category: "F14 feasibility"
+        has_contract: false
+      - name: "Prototype"
+        line: 735
+        category: "F15 validation"
+        has_contract: false
+      - name: "MVP"
+        line: 736
+        category: "F15 validation"
+        has_contract: false
+      - name: "Proof of Concept"
+        line: 737
+        category: "F15 validation"
+        has_contract: false
+      - name: "Technical Spike"
+        line: 738
+        category: "F15 validation"
+        has_contract: false
+      - name: "Concierge Test"
+        line: 739
+        category: "F15 validation"
+        has_contract: false
+      - name: "Wizard of Oz"
+        line: 740
+        category: "F15 validation"
+        has_contract: false
+      - name: "Fake Door"
+        line: 741
+        category: "F15 validation"
+        has_contract: false
+      - name: "Smoke Test"
+        line: 742
+        category: "F15 validation"
+        has_contract: false
+      - name: "A/B Test"
+        line: 743
+        category: "F15 validation"
+        has_contract: false
+      - name: "Pilot"
+        line: 744
+        category: "F15 validation"
+        has_contract: false
+      - name: "Benchmark"
+        line: 745
+        category: "F15 validation"
+        has_contract: false
+      - name: "Impact–Effort"
+        line: 757
+        category: "F16 decision"
+        has_contract: false
+      - name: "ICE"
+        line: 758
+        category: "F16 decision"
+        has_contract: false
+      - name: "RICE"
+        line: 759
+        category: "F16 decision"
+        has_contract: false
+      - name: "MoSCoW"
+        line: 760
+        category: "F16 decision"
+        has_contract: false
+      - name: "WSJF"
+        line: 761
+        category: "F16 decision"
+        has_contract: false
+      - name: "Kano"
+        line: 762
+        category: "F16 decision"
+        has_contract: false
+      - name: "Weighted Decision Matrix"
+        line: 763
+        category: "F16 decision"
+        has_contract: false
+      - name: "AHP"
+        line: 764
+        category: "F16 decision"
+        has_contract: false
+      - name: "MCDA"
+        line: 765
+        category: "F16 decision"
+        has_contract: false
+      - name: "TOPSIS"
+        line: 766
+        category: "F16 decision"
+        has_contract: false
+      - name: "Decision Tree"
+        line: 767
+        category: "F16 decision"
+        has_contract: false
+      - name: "Expected Value"
+        line: 768
+        category: "F16 decision"
+        has_contract: false
+      - name: "Pareto Frontier"
+        line: 769
+        category: "F16 decision"
+        has_contract: false
+      - name: "PDCA"
+        line: 798
+        category: "F17 learning"
+        has_contract: false
+      - name: "OODA"
+        line: 799
+        category: "F17 learning"
+        has_contract: false
+      - name: "Build–Measure–Learn"
+        line: 800
+        category: "F17 learning"
+        has_contract: false
+      - name: "After Action Review"
+        line: 801
+        category: "F17 learning"
+        has_contract: false
+      - name: "Post-mortem"
+        line: 802
+        category: "F17 learning"
+        has_contract: false
+      - name: "Decision Journal"
+        line: 803
+        category: "F17 learning"
+        has_contract: false
+      - name: "Reversal Criteria"
+        line: 804
+        category: "F17 learning"
+        has_contract: false
+      - name: "Kill Criteria"
+        line: 805
+        category: "F17 learning"
+        has_contract: false
+      - name: "Prediction Tracking"
+        line: 806
+        category: "F17 learning"
+        has_contract: false
+      - name: "C4 Model"
+        line: 814
+        category: "F18 architecture"
+        has_contract: false
+      - name: "Domain-Driven Design (DDD)"
+        line: 815
+        category: "F18 architecture"
+        has_contract: false
+      - name: "Event Storming"
+        line: 816
+        category: "F18 architecture"
+        has_contract: false
+      - name: "Architecture Decision Record (ADR)"
+        line: 817
+        category: "F18 architecture"
+        has_contract: false
+      - name: "ATAM"
+        line: 818
+        category: "F18 architecture"
+        has_contract: false
+      - name: "Quality Attribute Scenario"
+        line: 819
+        category: "F18 architecture"
+        has_contract: false
+      - name: "Architecture Fitness Functions"
+        line: 820
+        category: "F18 architecture"
+        has_contract: false
+      - name: "Strangler Fig Pattern"
+        line: 821
+        category: "F18 architecture"
+        has_contract: false
+      - name: "Architecture Trade-off Matrix"
+        line: 822
+        category: "F18 architecture"
+        has_contract: false
+      - name: "Dependency Mapping"
+        line: 823
+        category: "F18 architecture"
+        has_contract: false
+      - name: "SLI/SLO/SLA"
+        line: 847
+        category: "F19 devops-sre"
+        has_contract: false
+      - name: "Error Budget"
+        line: 848
+        category: "F19 devops-sre"
+        has_contract: false
+      - name: "Capacity Model"
+        line: 849
+        category: "F19 devops-sre"
+        has_contract: false
+      - name: "Load Test"
+        line: 850
+        category: "F19 devops-sre"
+        has_contract: false
+      - name: "Stress Test"
+        line: 851
+        category: "F19 devops-sre"
+        has_contract: false
+      - name: "Soak Test"
+        line: 852
+        category: "F19 devops-sre"
+        has_contract: false
+      - name: "Canary Deployment"
+        line: 853
+        category: "F19 devops-sre"
+        has_contract: false
+      - name: "Blue–Green Deployment"
+        line: 854
+        category: "F19 devops-sre"
+        has_contract: false
+      - name: "Game Day"
+        line: 855
+        category: "F19 devops-sre"
+        has_contract: false
+      - name: "Chaos Engineering"
+        line: 856
+        category: "F19 devops-sre"
+        has_contract: false
+      - name: "RTO/RPO"
+        line: 857
+        category: "F19 devops-sre"
+        has_contract: false
+      - name: "Runbook / Playbook"
+        line: 858
+        category: "F19 devops-sre"
+        has_contract: false
+      - name: "Release Readiness Review"
+        line: 859
+        category: "F19 devops-sre"
+        has_contract: false
+      - name: "STRIDE"
+        line: 879
+        category: "F20 security"
+        has_contract: false
+      - name: "Attack Tree"
+        line: 880
+        category: "F20 security"
+        has_contract: false
+      - name: "PASTA"
+        line: 881
+        category: "F20 security"
+        has_contract: false
+      - name: "LINDDUN"
+        line: 882
+        category: "F20 security"
+        has_contract: false
+      - name: "DPIA / PIA"
+        line: 883
+        category: "F20 security"
+        has_contract: false
+      - name: "Zero Trust Review"
+        line: 884
+        category: "F20 security"
+        has_contract: false
+      - name: "Secrets Threat Review"
+        line: 885
+        category: "F20 security"
+        has_contract: false
+      - name: "Supply Chain Threat Model"
+        line: 886
+        category: "F20 security"
+        has_contract: false
+      - name: "Abuse Case"
+        line: 887
+        category: "F20 security"
+        has_contract: false
+      - name: "Security Control Mapping"
+        line: 888
+        category: "F20 security"
+        has_contract: false
+      - name: "ERD"
+        line: 896
+        category: "F21 database-data"
+        has_contract: false
+      - name: "Normalization"
+        line: 897
+        category: "F21 database-data"
+        has_contract: false
+      - name: "Data Lineage"
+        line: 898
+        category: "F21 database-data"
+        has_contract: false
+      - name: "Data Contract"
+        line: 899
+        category: "F21 database-data"
+        has_contract: false
+      - name: "Schema Compatibility Analysis"
+        line: 900
+        category: "F21 database-data"
+        has_contract: false
+      - name: "Data Quality Dimensions"
+        line: 901
+        category: "F21 database-data"
+        has_contract: false
+      - name: "Backup/Restore Drill"
+        line: 902
+        category: "F21 database-data"
+        has_contract: false
+      - name: "Retention / Deletion Model"
+        line: 903
+        category: "F21 database-data"
+        has_contract: false
+      - name: "Expand–Contract Migration"
+        line: 904
+        category: "F21 database-data"
+        has_contract: false
+      - name: "Reconciliation"
+        line: 905
+        category: "F21 database-data"
+        has_contract: false
+      - name: "RAID Log"
+        line: 927
+        category: "F22 pm-governance"
+        has_contract: false
+      - name: "Critical Path Method"
+        line: 928
+        category: "F22 pm-governance"
+        has_contract: false
+      - name: "Dependency Graph"
+        line: 929
+        category: "F22 pm-governance"
+        has_contract: false
+      - name: "Stage-Gate"
+        line: 930
+        category: "F22 pm-governance"
+        has_contract: false
+      - name: "Change Risk Matrix"
+        line: 931
+        category: "F22 pm-governance"
+        has_contract: false
+      - name: "Definition of Done"
+        line: 932
+        category: "F22 pm-governance"
+        has_contract: false
+      - name: "Decision Log"
+        line: 933
+        category: "F22 pm-governance"
+        has_contract: false
+      - name: "Outcome Roadmap"
+        line: 934
+        category: "F22 pm-governance"
+        has_contract: false
+      - name: "Risk Register"
+        line: 935
+        category: "F22 pm-governance"
+        has_contract: false
+      - name: "RACI (delivery)"
+        line: 936
+        category: "F22 pm-governance"
+        has_contract: false
+      - name: "Jurisdiction Resolver"
+        line: 944
+        category: "F23 jurisdiction"
+        has_contract: false
+      - name: "Applicable Law Graph"
+        line: 945
+        category: "F23 jurisdiction"
+        has_contract: false
+      - name: "Obligation-to-Control Mapping"
+        line: 946
+        category: "F23 jurisdiction"
+        has_contract: false
+      - name: "Compliance Gap Analysis"
+        line: 947
+        category: "F23 jurisdiction"
+        has_contract: false
+      - name: "Regulatory Horizon Scan"
+        line: 948
+        category: "F23 jurisdiction"
+        has_contract: false
+      - name: "Localization Review"
+        line: 949
+        category: "F23 jurisdiction"
+        has_contract: false
+      - name: "Cultural Context Review"
+        line: 950
+        category: "F23 jurisdiction"
+        has_contract: false
+      - name: "Market Admission Control"
+        line: 951
+        category: "F23 jurisdiction"
+        has_contract: false
+      - name: "Data Residency Assessment"
+        line: 952
+        category: "F23 jurisdiction"
+        has_contract: false
+      - name: "Conflict-of-Law Review"
+        line: 953
+        category: "F23 jurisdiction"
+        has_contract: false
+      - name: "Representation Switching"
+        line: 972
+        category: "F24 representation"
+        has_contract: false
+      - name: "Text / Outline View"
+        line: 973
+        category: "F24 representation"
+        has_contract: false
+      - name: "Table / Matrix View"
+        line: 974
+        category: "F24 representation"
+        has_contract: false
+      - name: "Mind Map View"
+        line: 975
+        category: "F24 representation"
+        has_contract: false
+      - name: "Concept Graph View"
+        line: 976
+        category: "F24 representation"
+        has_contract: false
+      - name: "Timeline View"
+        line: 977
+        category: "F24 representation"
+        has_contract: false
+      - name: "Causal View"
+        line: 978
+        category: "F24 representation"
+        has_contract: false
+      - name: "Audio / Conversational View"
+        line: 979
+        category: "F24 representation"
+        has_contract: false
+      - name: "Guided Mode"
+        line: 980
+        category: "F24 representation"
+        has_contract: false
+      - name: "Expert LEGO Mode"
+        line: 981
+        category: "F24 representation"
+        has_contract: false
+      - name: "Monte Carlo Simulation"
+        line: 1867
+        category: "computation (uncataloged in F01–F24)"
+        has_contract: false
+      - name: "stakeholder.regulator lens"
+        line: 1036
+        category: "lens"
+        has_contract: true
+        machine_id: "stakeholder.regulator"
+      - name: "Simple Brainstorm Recipe"
+        line: 3228
+        category: "recipe"
+        has_contract: false
+      - name: "Professional Brainstorm Recipe"
+        line: 3252
+        category: "recipe"
+        has_contract: false
+      - name: "Research-grade Ideation Recipe"
+        line: 3280
+        category: "recipe"
+        has_contract: false
+      - name: "Board-grade Strategy Recipe"
+        line: 3309
+        category: "recipe"
+        has_contract: false
+      - name: "New Product / Startup Recipe"
+        line: 3350
+        category: "recipe"
+        has_contract: false
+      - name: "Global Market Entry Recipe"
+        line: 3370
+        category: "recipe"
+        has_contract: false
+        machine_id: "MarketEntryRecipe"
+      - name: "Public Policy Recipe"
+        line: 3396
+        category: "recipe"
+        has_contract: false
+      - name: "Production Incident Recipe"
+        line: 3425
+        category: "recipe"
+        has_contract: false
+      - name: "High-risk Architecture Change Recipe"
+        line: 3453
+        category: "recipe"
+        has_contract: false
+      - name: "Database Migration Recipe"
+        line: 3484
+        category: "recipe"
+        has_contract: false
+      - name: "Security Review Recipe"
+        line: 3504
+        category: "recipe"
+        has_contract: false
+      - name: "Decision Under Deep Uncertainty Recipe"
+        line: 3523
+        category: "recipe"
+        has_contract: false
+      - name: "validation.experiment"
+        line: 1027
+        category: "method (referenced only in recommended_next)"
+        has_contract: false
+        machine_id: "validation.experiment"

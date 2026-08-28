@@ -1,0 +1,3155 @@
+# AI LEGO OS — Phase 0 architecture inventory
+# Generated mechanically from full-document reads (workflow wf_7d1cd8d8-038, 3 reader agents, every line of all three mother docs covered).
+# Source doc identity/hashes: see document-hashes.yaml. Line numbers are 1-indexed into the hashed snapshots.
+# Phase 0 rule: this REGISTERS what exists; nothing is fixed here.
+by_document:
+  "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md":
+    structure_headings:
+      - title: "AI LEGO Cognitive Engineering OS"
+        id: "h1-title"
+        line: 1
+      - title: "Global AI Execution Contract, Governance & Handoff Protocol"
+        id: "h2-subtitle"
+        line: 3
+      - title: "0. 文件定位"
+        line: 16
+      - title: "1. Canonical Companion Documents"
+        line: 55
+      - title: "1.1 命名規則"
+        line: 65
+      - title: "2. 三份母規格的 Scoped Authority"
+        line: 90
+      - title: "Scoped Authority (stray unnumbered H1)"
+        line: 96
+      - title: "2.1 衝突解決順序"
+        line: 111
+      - title: "3. AI 開機契約（AI Boot Contract）"
+        line: 141
+      - title: "3.1 Required Document Resolution"
+        line: 169
+      - title: "3.2 不要求每次把全部文件塞進 Context"
+        line: 187
+      - title: "4. Document Registry"
+        line: 218
+      - title: "5. 不可破壞的 Execution Invariants"
+        line: 277
+      - title: "6. 「最小修改」的正確定義"
+        line: 315
+      - title: "7. Task Classification"
+        line: 357
+      - title: "8. Risk Tier"
+        line: 379
+      - title: "R0 — Read-only / Documentation"
+        line: 381
+      - title: "R1 — Localized Reversible"
+        line: 393
+      - title: "R2 — Moderate"
+        line: 410
+      - title: "R3 — High"
+        line: 429
+      - title: "R4 — Critical"
+        line: 454
+      - title: "9. Autonomy / Authority Levels"
+        line: 478
+      - title: "A0 — Observe"
+        line: 486
+      - title: "A1 — Local Reversible Edit"
+        line: 495
+      - title: "A2 — Staged Write"
+        line: 499
+      - title: "A3 — Production Reversible Change"
+        line: 503
+      - title: "A4 — Irreversible / External High-impact"
+        line: 515
+      - title: "10. Execution State Machine"
+        line: 531
+      - title: "11. Current-state Reconstruction"
+        line: 579
+      - title: "11.1 Minimum Current State"
+        line: 589
+      - title: "11.2 Evidence Sources"
+        line: 614
+      - title: "12. Current State Artifact"
+        line: 642
+      - title: "13. Problem Definition Before Solution"
+        line: 673
+      - title: "14. Method Resolution"
+        line: 700
+      - title: "15. Task Execution Packet"
+        line: 730
+      - title: "16. task.manifest.yaml"
+        line: 753
+      - title: "17. Scope Contract"
+        line: 786
+      - title: "18. Change Impact Graph"
+        line: 816
+      - title: "19. Rollback-first Rule"
+        line: 853
+      - title: "20. rollback-plan.yaml"
+        line: 882
+      - title: "21. Forward Change Plan"
+        line: 927
+      - title: "22. Option Analysis"
+        line: 949
+      - title: "23. ADR Trigger"
+        line: 985
+      - title: "24. Exception / Workaround Contract"
+        line: 1013
+      - title: "25. Code Change Contract"
+        line: 1045
+      - title: "26. API Change Contract"
+        line: 1063
+      - title: "27. Event / Messaging Contract"
+        line: 1099
+      - title: "28. Database Change Contract"
+        line: 1129
+      - title: "29. DB Migration Requirements"
+        line: 1161
+      - title: "30. Data Integrity Contract"
+        line: 1198
+      - title: "31. Data Deletion Contract"
+        line: 1225
+      - title: "32. Security Change Contract"
+        line: 1255
+      - title: "33. Secrets Contract"
+        line: 1288
+      - title: "34. Supply Chain Contract"
+        line: 1328
+      - title: "35. Untrusted Content / Prompt Injection Contract"
+        line: 1370
+      - title: "36. AI / Model Change Contract"
+        line: 1412
+      - title: "37. Champion / Challenger"
+        line: 1447
+      - title: "38. AI Output Trust Boundary"
+        line: 1469
+      - title: "39. Trusted Compute Contract"
+        line: 1499
+      - title: "40. Research Integrity Execution"
+        line: 1524
+      - title: "41. Global / Jurisdiction Execution"
+        line: 1539
+      - title: "42. Data Residency-aware Execution"
+        line: 1587
+      - title: "43. Localization / Accessibility Execution"
+        line: 1611
+      - title: "44. Infrastructure Change Contract"
+        line: 1640
+      - title: "45. Configuration Contract"
+        line: 1668
+      - title: "46. Feature Flag Contract"
+        line: 1691
+      - title: "47. CI Gate"
+        line: 1709
+      - title: "48. Test Pyramid 不可僵化"
+        line: 1738
+      - title: "49. Regression Rule"
+        line: 1762
+      - title: "50. Performance Contract"
+        line: 1784
+      - title: "51. SRE Release Contract"
+        line: 1817
+      - title: "52. Release Strategy"
+        line: 1846
+      - title: "53. Post-deployment Verification"
+        line: 1872
+      - title: "54. Observation Window"
+        line: 1893
+      - title: "55. Incident Mode"
+        line: 1912
+      - title: "56. No-blame Evidence Rule"
+        line: 1966
+      - title: "57. Human Contribution Protection"
+        line: 1974
+      - title: "58. Multi-Agent Coordination"
+        line: 1994
+      - title: "59. Separation of Duties"
+        line: 2014
+      - title: "60. Idempotency / Retry Contract"
+        line: 2035
+      - title: "61. Retry Policy"
+        line: 2064
+      - title: "62. Compensation"
+        line: 2087
+      - title: "63. Cancellation Contract"
+        line: 2109
+      - title: "64. Execution Manifest"
+        line: 2123
+      - title: "65. Content-addressed Evidence"
+        line: 2185
+      - title: "66. Audit Event"
+        line: 2200
+      - title: "67. Definition of Done Compiler"
+        line: 2220
+      - title: "68. Global Gates"
+        line: 2246
+      - title: "69. Gate Result"
+        line: 2282
+      - title: "70. Final Status"
+        line: 2297
+      - title: "71. Handoff Protocol"
+        line: 2321
+      - title: "72. Handoff Files"
+        line: 2360
+      - title: "73. Expected Result 必填"
+        line: 2378
+      - title: "74. Validation Evidence"
+        line: 2412
+      - title: "75. Command Safety"
+        line: 2431
+      - title: "76. Shell Safety"
+        line: 2448
+      - title: "77. Git Discipline"
+        line: 2471
+      - title: "78. Repository Dirty State"
+        line: 2492
+      - title: "79. Generated Files"
+        line: 2510
+      - title: "80. Dependency Upgrade Contract"
+        line: 2524
+      - title: "81. Framework / Vendor Replacement"
+        line: 2545
+      - title: "82. Local / Cloud / Hybrid Execution"
+        line: 2563
+      - title: "83. Offline Execution"
+        line: 2588
+      - title: "84. Cost Governance"
+        line: 2608
+      - title: "85. Quality vs Cost"
+        line: 2629
+      - title: "86. Long-running Task Checkpoint"
+        line: 2649
+      - title: "87. Provenance of Human Judgment"
+        line: 2664
+      - title: "88. Reversal Criteria"
+        line: 2687
+      - title: "89. Decision Feedback Loop"
+        line: 2707
+      - title: "90. Architecture Fitness Functions"
+        line: 2727
+      - title: "91. Policy-as-Code Paths"
+        line: 2750
+      - title: "92. Machine-readable Execution Specs"
+        line: 2766
+      - title: "93. Governance Documentation Paths"
+        line: 2787
+      - title: "94. Test Paths"
+        line: 2803
+      - title: "95. Execution Runtime Modules"
+        line: 2823
+      - title: "96. Tool Broker"
+        line: 2847
+      - title: "97. Least Privilege"
+        line: 2879
+      - title: "98. Sandbox"
+        line: 2901
+      - title: "99. Network Egress"
+        line: 2920
+      - title: "100. File Parsing Safety"
+        line: 2938
+      - title: "101. Data Classification"
+        line: 2955
+      - title: "102. Logging Contract"
+        line: 2974
+      - title: "103. Metrics"
+        line: 3003
+      - title: "104. Traceability"
+        line: 3022
+      - title: "105. Backups / Restore"
+        line: 3041
+      - title: "106. DR Change Awareness"
+        line: 3055
+      - title: "107. Crypto Agility"
+        line: 3068
+      - title: "108. Time / Clock"
+        line: 3086
+      - title: "109. Identifier Stability"
+        line: 3097
+      - title: "110. Schema Evolution"
+        line: 3108
+      - title: "111. Archive / Long-term Readability"
+        line: 3127
+      - title: "112. 30-year Replacement Drill"
+        line: 3143
+      - title: "113. Deprecation Contract"
+        line: 3164
+      - title: "114. Technical Debt Contract"
+        line: 3198
+      - title: "115. Unknowns Registry"
+        line: 3216
+      - title: "116. Assumption Registry"
+        line: 3234
+      - title: "117. Evidence Quality"
+        line: 3253
+      - title: "118. Dissent Preservation"
+        line: 3270
+      - title: "119. No Fake Consensus"
+        line: 3285
+      - title: "120. Human Specialist Escalation"
+        line: 3305
+      - title: "121. Execution Result Template"
+        line: 3332
+      - title: "122. AI Response Contract"
+        line: 3397
+      - title: "123. 禁止「完成幻覺」"
+        line: 3425
+      - title: "124. Preconditions / Postconditions"
+        line: 3453
+      - title: "125. High-risk Two-phase Execution"
+        line: 3475
+      - title: "126. Dry-run"
+        line: 3496
+      - title: "127. Resource Ownership"
+        line: 3506
+      - title: "128. Cleanup"
+        line: 3522
+      - title: "129. Release Closure"
+        line: 3538
+      - title: "130. Failed Change Closure"
+        line: 3560
+      - title: "131. Emergency Stop / Kill Switch"
+        line: 3580
+      - title: "132. AI Planner Constraint"
+        line: 3601
+      - title: "133. Verifier Independence"
+        line: 3614
+      - title: "134. Evidence-first Debugging"
+        line: 3633
+      - title: "135. Reproducibility Tiers"
+        line: 3661
+      - title: "Tier 0"
+        line: 3663
+      - title: "Tier 1"
+        line: 3669
+      - title: "Tier 2"
+        line: 3673
+      - title: "Tier 3"
+        line: 3677
+      - title: "Tier 4"
+        line: 3681
+      - title: "136. Determinism Reality"
+        line: 3689
+      - title: "137. Replay Semantics"
+        line: 3708
+      - title: "138. Historical Re-evaluation"
+        line: 3722
+      - title: "139. Governance Change to This Contract"
+        line: 3742
+      - title: "140. Golden Execution Cases"
+        line: 3774
+      - title: "141. Contract Compliance Tests"
+        line: 3800
+      - title: "142. Preflight Checklist"
+        line: 3820
+      - title: "143. Pre-release Checklist"
+        line: 3846
+      - title: "144. Post-release Checklist"
+        line: 3864
+      - title: "145. Definition of Success"
+        line: 3881
+      - title: "146. 完整標準流程"
+        line: 3893
+      - title: "147. 最終 Repository 位置"
+        line: 3941
+      - title: "148. 預期結果"
+        line: 3962
+      - title: "149. 第一階段實作計畫"
+        line: 3988
+      - title: "Phase 0 — Normative Bootstrap"
+        line: 3990
+      - title: "Phase 1 — Current State + Risk Compiler"
+        line: 4004
+      - title: "Phase 2 — Method / Gate Compiler"
+        line: 4018
+      - title: "Phase 3 — Rollback / Authority"
+        line: 4033
+      - title: "Phase 4 — Handoff / Audit / Replay"
+        line: 4047
+      - title: "Phase 5 — Golden Cases / Production Gate"
+        line: 4061
+      - title: "150. AI 最終操作憲法"
+        line: 4071
+      - title: "151. 給任何 AI 的最短啟動指令"
+        line: 4125
+      - title: "152. End State"
+        line: 4147
+    architecture_components:
+      - name: "Document Registry"
+        kind: "registry"
+        line: 218
+        summary: "Registry of the three mother docs at /specs/governance/document-registry.yaml with id/filename/major/required(_for)"
+      - name: "Section Registry"
+        kind: "registry"
+        line: 198
+        summary: "Part of the index pipeline (Full Document→Index→Section Registry→Content Hash→Task-specific Retrieval); no schema given"
+      - name: "Normative Context Bundle"
+        kind: "artifact"
+        line: 204
+        summary: "Task-specific bundle of retrieved normative sections; materialized as normative-context.yaml in the Task Execution Packet"
+      - name: "Execution State Machine"
+        kind: "state machine"
+        line: 531
+        summary: "14 mandatory main states RECEIVED→CLOSED plus 7 legal side states; skipping required states forbidden"
+      - name: "Current State Artifact store"
+        kind: "artifact store"
+        line: 642
+        summary: "/.ai/tasks/{task_id}/current-state/ with 10 named baseline files; /.ai/ is workspace path, not identity"
+      - name: "Method Selection Engine"
+        kind: "engine"
+        line: 711
+        summary: "In Method Resolution flow: Task Context→Method Atlas→Method Selection Engine→Candidate Methods→Mandatory Method Gates→Workflow Plan"
+      - name: "Task Execution Packet"
+        kind: "artifact store"
+        line: 730
+        summary: "/.ai/tasks/{task_id}/ with TASK.md, task.manifest.yaml, normative-context.yaml, current-state/, risk-assessment.yaml, methods.yaml, change-plan.yaml, rollback-plan.yaml, acceptance.yaml, gates.yaml, evidence/, results/, handoff/"
+      - name: "Trusted Compute + Validator"
+        kind: "compute layer"
+        line: 1506
+        summary: "AI plans → Trusted Compute executes → Validator verifies → Result Artifact → AI interprets; LLM mental math can never be CALCULATED_RESULT"
+      - name: "Multi-Agent roles (Planner/Researcher/Implementer/Verifier/Reviewer)"
+        kind: "agent roles"
+        line: 2001
+        summary: "Each role has permission boundary; concurrent writes to same file/migration/prod resource must lock or serialize"
+      - name: "Definition of Done Compiler"
+        kind: "compiler"
+        line: 2220
+        summary: "Required gates compiled from Task Type + Risk Tier + Domain + Data Impact + Jurisdiction + Method + Release Mode; AI cannot self-declare done"
+      - name: "Handoff files store"
+        kind: "artifact store"
+        line: 2364
+        summary: "/.ai/tasks/{task_id}/handoff/ with EXECUTION_RESULT.md, execution-result.yaml, changed-paths.txt, test-results.yaml, gate-results.yaml, rollback-evidence.yaml, known-risks.yaml, evidence-index.yaml"
+      - name: "Port / Adapter seam"
+        kind: "pattern"
+        line: 2551
+        summary: "All vendor integration goes Port→Adapter; business logic referencing provider SDK directly is architecture debt"
+      - name: "Architecture fitness test suite"
+        kind: "test suite"
+        line: 2745
+        summary: "/tests/architecture/ — automated checks of long-term invariants (no provider SDK in domain, no secrets committed, etc.)"
+      - name: "Policy-as-Code store"
+        kind: "policy store"
+        line: 2752
+        summary: "/policies/ai-execution/ with authority, risk-tiers, mandatory-gates, tool-permissions, forbidden-actions, network-egress, exception-policy, release-policy YAMLs"
+      - name: "Machine-readable Execution Specs"
+        kind: "schema store"
+        line: 2768
+        summary: "/specs/execution/ with 13 *.schema.yaml files (task, document-registry, current-state, risk, authority, method-resolution, change-plan, rollback, gate, exception, manifest, result, handoff)"
+      - name: "Governance documentation tree"
+        kind: "docs layout"
+        line: 2789
+        summary: "/docs/governance/ai-execution/ (lifecycle, authority, risk-classification, rollback-first, handoff) plus adr/ and runbooks/"
+      - name: "Governance test suite"
+        kind: "test suite"
+        line: 2805
+        summary: "/tests/governance/ai-execution/ with 12 subdirs incl. state-machine/, gate-injection/, prompt-injection/, replay/"
+      - name: "document_resolver"
+        kind: "runtime module"
+        line: 2829
+        summary: "/platform/ai-execution/document_resolver/"
+      - name: "normative_context"
+        kind: "runtime module"
+        line: 2830
+        summary: "/platform/ai-execution/normative_context/"
+      - name: "current_state"
+        kind: "runtime module"
+        line: 2831
+        summary: "/platform/ai-execution/current_state/"
+      - name: "task_classifier"
+        kind: "runtime module"
+        line: 2832
+        summary: "/platform/ai-execution/task_classifier/"
+      - name: "risk_engine"
+        kind: "runtime module"
+        line: 2833
+        summary: "/platform/ai-execution/risk_engine/"
+      - name: "method_resolver"
+        kind: "runtime module"
+        line: 2834
+        summary: "/platform/ai-execution/method_resolver/ — parses Method Atlas / Method Specs (Phase 2)"
+      - name: "plan_compiler"
+        kind: "runtime module"
+        line: 2835
+        summary: "/platform/ai-execution/plan_compiler/"
+      - name: "authority"
+        kind: "runtime module"
+        line: 2836
+        summary: "/platform/ai-execution/authority/"
+      - name: "tool_broker"
+        kind: "runtime module"
+        line: 2837
+        summary: "/platform/ai-execution/tool_broker/"
+      - name: "execution_runtime"
+        kind: "runtime module"
+        line: 2838
+        summary: "/platform/ai-execution/execution_runtime/"
+      - name: "gate_engine"
+        kind: "runtime module"
+        line: 2839
+        summary: "/platform/ai-execution/gate_engine/"
+      - name: "rollback"
+        kind: "runtime module"
+        line: 2840
+        summary: "/platform/ai-execution/rollback/"
+      - name: "audit"
+        kind: "runtime module"
+        line: 2841
+        summary: "/platform/ai-execution/audit/"
+      - name: "handoff"
+        kind: "runtime module"
+        line: 2842
+        summary: "/platform/ai-execution/handoff/"
+      - name: "replay"
+        kind: "runtime module"
+        line: 4054
+        summary: "/platform/ai-execution/replay/ — mandated in Phase 4 but ABSENT from the §95 Execution Runtime Modules list (see internal_defects)"
+      - name: "Tool Broker"
+        kind: "broker"
+        line: 2847
+        summary: "AI Intent→Tool Broker→Policy→Scope→Authority→Execution→Audit; can restrict command, filesystem path, network domain, DB role, cloud account, namespace, duration"
+      - name: "Sandbox"
+        kind: "isolation layer"
+        line: 2901
+        summary: "Unknown code/plugin/generated script sandboxed with filesystem/network/cpu/memory/time/secret limits"
+      - name: "Network Egress allowlist"
+        kind: "network control"
+        line: 2920
+        summary: "deny by default for high-sensitivity projects; external domains allowlisted"
+      - name: "Golden cases test path"
+        kind: "test suite"
+        line: 3805
+        summary: "/tests/governance/ai-execution/golden/ — verifies state transitions, required documents, gate injection, authority, rollback, final status, handoff"
+      - name: "Repository root layout"
+        kind: "repo layout"
+        line: 3945
+        summary: "Three mother docs at repo root plus specs/, policies/, docs/, methods/, recipes/, tests/, .ai/"
+    machine_readable_blocks:
+      - line: 228
+        kind: "yaml — document registry example"
+        ids:
+          - "documents"
+          - "ai-lego.master-plan"
+          - "ai-lego.method-atlas"
+          - "ai-lego.execution-contract"
+          - "filename"
+          - "major"
+          - "required"
+          - "required_for"
+      - line: 257
+        kind: "yaml — per-execution normative documents record"
+        ids:
+          - "normative_documents"
+          - "document_id"
+          - "version"
+          - "sha256"
+          - "loaded_sections"
+      - line: 361
+        kind: "yaml — task_context classification schema"
+        ids:
+          - "task_context"
+          - "task_id"
+          - "objective"
+          - "requester"
+          - "environment"
+          - "domains"
+          - "affected_modules"
+          - "data_impact"
+          - "external_side_effects"
+          - "jurisdiction_context"
+          - "reversibility"
+          - "user_impact"
+          - "risk_tier"
+      - line: 652
+        kind: "text — current-state artifact file contract"
+        ids:
+          - "system-inventory.yaml"
+          - "dependency-map.yaml"
+          - "affected-paths.txt"
+          - "schema-baseline.yaml"
+          - "api-baseline.yaml"
+          - "deployment-baseline.yaml"
+          - "security-boundary.yaml"
+          - "test-baseline.yaml"
+          - "observability-baseline.yaml"
+          - "unknowns.yaml"
+      - line: 734
+        kind: "text — Task Execution Packet directory contract"
+        ids:
+          - "/.ai/tasks/{task_id}/"
+          - "TASK.md"
+          - "task.manifest.yaml"
+          - "normative-context.yaml"
+          - "current-state/"
+          - "risk-assessment.yaml"
+          - "methods.yaml"
+          - "change-plan.yaml"
+          - "rollback-plan.yaml"
+          - "acceptance.yaml"
+          - "gates.yaml"
+          - "evidence/"
+          - "results/"
+          - "handoff/"
+      - line: 755
+        kind: "yaml — task.manifest.yaml"
+        ids:
+          - "task.id"
+          - "task.objective"
+          - "task.status"
+          - "scope.include"
+          - "scope.exclude"
+          - "environment.target"
+          - "risk.tier"
+          - "authority.max_autonomy"
+          - "normative.master_plan"
+          - "normative.method_atlas"
+          - "normative.execution_contract"
+          - "execution.execution_id"
+          - "execution.trace_id"
+      - line: 884
+        kind: "yaml — rollback-plan.yaml"
+        ids:
+          - "rollback.trigger_conditions"
+          - "rollback.strategy"
+          - "rollback.recovery_point"
+          - "rollback.validation"
+          - "rollback.owner"
+          - "rollback.max_recovery_time"
+      - line: 931
+        kind: "yaml — change_plan"
+        ids:
+          - "change_plan"
+          - "objective"
+          - "root_cause"
+          - "selected_option"
+          - "alternatives_considered"
+          - "files_to_change"
+          - "schema_changes"
+          - "api_changes"
+          - "config_changes"
+          - "deployment_changes"
+          - "tests"
+          - "metrics"
+          - "release_strategy"
+      - line: 1019
+        kind: "yaml — exception contract"
+        ids:
+          - "exception"
+          - "EXC-..."
+          - "reason"
+          - "owner"
+          - "scope"
+          - "risk"
+          - "approved_by"
+          - "created_at"
+          - "expires_at"
+          - "test"
+          - "migration_plan"
+          - "removal_condition"
+          - "adr"
+      - line: 2070
+        kind: "yaml — retry policy"
+        ids:
+          - "retry"
+          - "max_attempts"
+          - "backoff"
+          - "retryable_errors"
+          - "non_retryable_errors"
+          - "fallback"
+      - line: 2127
+        kind: "yaml — Execution Manifest"
+        ids:
+          - "execution"
+          - "EX-..."
+          - "TASK-..."
+          - "RUN-..."
+          - "TRACE-..."
+          - "source.repository"
+          - "source.commit"
+          - "source.dirty_state"
+          - "documents.master_plan"
+          - "documents.method_atlas"
+          - "documents.execution_contract"
+          - "architecture.adr_refs"
+          - "policy.versions"
+          - "jurisdiction.snapshot"
+          - "ai.provider"
+          - "ai.model_profile"
+          - "ai.model_identifier"
+          - "ai.prompt_version"
+          - "ai.tool_schema_version"
+          - "data.schema_version"
+          - "data.dataset_snapshots"
+          - "change.plan_hash"
+          - "change.rollback_plan_hash"
+          - "results.status"
+          - "results.gates"
+      - line: 2284
+        kind: "yaml — gate_result"
+        ids:
+          - "gate_result"
+          - "gate_id"
+          - "status PASS|FAIL|BLOCKED|NOT_APPLICABLE"
+          - "evidence"
+          - "validator"
+          - "timestamp"
+      - line: 2364
+        kind: "text — handoff file contract"
+        ids:
+          - "/.ai/tasks/{task_id}/handoff/"
+          - "EXECUTION_RESULT.md"
+          - "execution-result.yaml"
+          - "changed-paths.txt"
+          - "test-results.yaml"
+          - "gate-results.yaml"
+          - "rollback-evidence.yaml"
+          - "known-risks.yaml"
+          - "evidence-index.yaml"
+      - line: 2388
+        kind: "yaml — expected_result"
+        ids:
+          - "expected_result"
+          - "behavior"
+          - "data"
+          - "performance.p95_latency_ms_max"
+          - "security.authorization_regression"
+          - "rollback.recoverable"
+      - line: 2691
+        kind: "yaml — reversal criteria"
+        ids:
+          - "reversal"
+          - "indicators"
+          - "thresholds"
+          - "owner"
+          - "action: re_review"
+      - line: 2752
+        kind: "text — policy-as-code file contract"
+        ids:
+          - "/policies/ai-execution/"
+          - "authority.yaml"
+          - "risk-tiers.yaml"
+          - "mandatory-gates.yaml"
+          - "tool-permissions.yaml"
+          - "forbidden-actions.yaml"
+          - "network-egress.yaml"
+          - "exception-policy.yaml"
+          - "release-policy.yaml"
+      - line: 2768
+        kind: "text — execution spec schema file contract"
+        ids:
+          - "/specs/execution/"
+          - "task.schema.yaml"
+          - "document-registry.schema.yaml"
+          - "current-state.schema.yaml"
+          - "risk.schema.yaml"
+          - "authority.schema.yaml"
+          - "method-resolution.schema.yaml"
+          - "change-plan.schema.yaml"
+          - "rollback.schema.yaml"
+          - "gate.schema.yaml"
+          - "exception.schema.yaml"
+          - "manifest.schema.yaml"
+          - "result.schema.yaml"
+          - "handoff.schema.yaml"
+      - line: 3220
+        kind: "yaml — unknown registry entry"
+        ids:
+          - "unknown"
+          - "UNK-..."
+          - "statement"
+          - "impact"
+          - "owner"
+          - "resolution_plan"
+          - "status"
+      - line: 3238
+        kind: "yaml — assumption registry entry"
+        ids:
+          - "assumption"
+          - "ASM-..."
+          - "statement"
+          - "evidence"
+          - "impact_if_wrong"
+          - "validation"
+          - "owner"
+          - "status"
+      - line: 3334
+        kind: "markdown — Execution Result template"
+        ids:
+          - "Execution Result"
+          - "Task"
+          - "Final Status"
+          - "Current State"
+          - "Root Cause / Problem Definition"
+          - "Normative Documents"
+          - "Methods"
+          - "Risk / Authority"
+          - "Selected Approach"
+          - "Alternatives Rejected"
+          - "Exact Paths Changed"
+          - "Data / Schema / API Impact"
+          - "Security / Privacy / Jurisdiction Impact"
+          - "Tests & Gates"
+          - "Expected Result"
+          - "Actual Result"
+          - "Rollback"
+          - "Observability"
+          - "Known Risks / Unknowns"
+          - "ADR / Evidence"
+      - line: 3457
+        kind: "yaml — action pre/postconditions"
+        ids:
+          - "action"
+          - "preconditions"
+          - "execute"
+          - "postconditions"
+          - "failure_action"
+  "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md":
+    structure_headings:
+      - id: "title"
+        title: "AI LEGO Cognitive Engineering OS"
+        line: 1
+      - id: "subtitle"
+        title: "30 年級 Human–AI 多專業、多利害關係人、研究、商業、學習與決策作業系統"
+        line: 2
+      - id: "0.0"
+        title: "0.0 AI 必讀文件與規範邊界（Mandatory Companion Document）"
+        line: 10
+      - id: "0.0.1"
+        title: "0.0.1 文件職責分離"
+        line: 51
+      - id: "0.0.2"
+        title: "0.0.2 Scoped Authority / 衝突處理"
+        line: 60
+      - id: "0.0.3"
+        title: "0.0.3 Execution Manifest 必須記錄 Atlas 版本"
+        line: 85
+      - id: "0"
+        title: "0. 文件目的"
+        line: 106
+      - id: "1"
+        title: "1. 最高工程準則"
+        line: 138
+      - id: "1.1"
+        title: "1.1 多角度優先"
+        line: 143
+      - id: "1.2"
+        title: "1.2 30 年工程紀律"
+        line: 169
+      - id: "1.3"
+        title: "1.3 零重工原則"
+        line: 210
+      - id: "1.4"
+        title: "1.4 完整閉環"
+        line: 244
+      - id: "1.5"
+        title: "1.5 最小爆炸半徑"
+        line: 262
+      - id: "2"
+        title: "2. 產品最高定位"
+        line: 279
+      - id: "2.1"
+        title: "2.1 正式名稱"
+        line: 281
+      - id: "2.2"
+        title: "2.2 中文定位"
+        line: 285
+      - id: "2.3"
+        title: "2.3 核心公式"
+        line: 289
+      - id: "2.4"
+        title: "2.4 真正核心"
+        line: 309
+      - id: "3"
+        title: "3. 產品核心物件"
+        line: 330
+      - id: "4"
+        title: "4. 總體架構"
+        line: 361
+      - id: "5"
+        title: "5. 部署模式：Online / Offline / Hybrid"
+        line: 422
+      - id: "5.1"
+        title: "5.1 Cloud"
+        line: 424
+      - id: "5.2"
+        title: "5.2 Local / Offline"
+        line: 435
+      - id: "5.3"
+        title: "5.3 Hybrid"
+        line: 457
+      - id: "5.4"
+        title: "5.4 原則"
+        line: 477
+      - id: "6"
+        title: "6. AI 使用與商業模式"
+        line: 485
+      - id: "6.1"
+        title: "6.1 支援模式"
+        line: 489
+      - id: "6.2"
+        title: "6.2 商業收費拆分"
+        line: 513
+      - id: "6.3"
+        title: "6.3 產品 Edition"
+        line: 525
+      - id: "7"
+        title: "7. AI Gateway"
+        line: 577
+      - id: "8"
+        title: "8. LEGO Capability 架構"
+        line: 630
+      - id: "8.1"
+        title: "8.1 Capability ≠ Method"
+        line: 638
+      - id: "8.2"
+        title: "8.2 Capability 範例"
+        line: 673
+      - id: "8.3"
+        title: "8.3 Capability Contract"
+        line: 699
+      - id: "8.4"
+        title: "8.4 Typed LEGO"
+        line: 731
+      - id: "8.5"
+        title: "8.5 Method 定義禁止在 Master Plan 雙重維護"
+        line: 754
+      - id: "9"
+        title: "9. Workflow IR 與 Recipe Engine"
+        line: 794
+      - id: "10"
+        title: "10. Prompt → Plan Compiler"
+        line: 862
+      - id: "11"
+        title: "11. Multimodal Knowledge Canvas"
+        line: 902
+      - id: "11.1"
+        title: "11.1 Human Contribution"
+        line: 936
+      - id: "11.2"
+        title: "11.2 人類內容不能被 AI 靜默覆蓋"
+        line: 952
+      - id: "11.3"
+        title: "11.3 Locked Fact"
+        line: 971
+      - id: "12"
+        title: "12. Authorship & Integrity Plane"
+        line: 982
+      - id: "12.1"
+        title: "12.1 記錄內容來源"
+        line: 992
+      - id: "12.2"
+        title: "12.2 確切路徑"
+        line: 1004
+      - id: "12.3"
+        title: "12.3 Compliance Profile"
+        line: 1016
+      - id: "13"
+        title: "13. Knowledge 與 Provenance"
+        line: 1039
+      - id: "13.1"
+        title: "13.1 Sentence-level Provenance"
+        line: 1075
+      - id: "13.2"
+        title: "13.2 圖片區域證據"
+        line: 1087
+      - id: "13.3"
+        title: "13.3 Evidence Graph"
+        line: 1099
+      - id: "14"
+        title: "14. Knowledge Memory 分層"
+        line: 1116
+      - id: "15"
+        title: "15. Human–AI 多專家、多利害關係人系統"
+        line: 1141
+      - id: "15-stray-h1"
+        title: "Stakeholder & Expert Intelligence Plane (stray H1 inside §15)"
+        line: 1145
+      - id: "15.1"
+        title: "15.1 角色七維"
+        line: 1149
+      - id: "15.2"
+        title: "15.2 專家層次"
+        line: 1161
+      - id: "16"
+        title: "16. 政府機關角色模型"
+        line: 1197
+      - id: "16.1"
+        title: "16.1 Policy Execution Chain"
+        line: 1232
+      - id: "17"
+        title: "17. Local People / Local Intelligence"
+        line: 1254
+      - id: "18"
+        title: "18. 專家領域 Packs"
+        line: 1291
+      - id: "19"
+        title: "19. Role Assembly Engine"
+        line: 1353
+      - id: "19.1"
+        title: "19.1 Diversity Coverage Score"
+        line: 1386
+      - id: "20"
+        title: "20. 利害關係人 Incentive Model"
+        line: 1404
+      - id: "20.1"
+        title: "20.1 Power / Influence Matrix"
+        line: 1419
+      - id: "21"
+        title: "21. Conflict Engine"
+        line: 1432
+      - id: "22"
+        title: "22. Intelligence Council"
+        line: 1465
+      - id: "23"
+        title: "23. Epistemic & Strategic Reasoning Engine"
+        line: 1502
+      - id: "24"
+        title: "24. Assumption Registry"
+        line: 1550
+      - id: "25"
+        title: "25. 推理類型必須分離"
+        line: 1576
+      - id: "25-deduction"
+        title: "Deduction"
+        line: 1578
+      - id: "25-induction"
+        title: "Induction"
+        line: 1582
+      - id: "25-abduction"
+        title: "Abduction"
+        line: 1586
+      - id: "25-causal"
+        title: "Causal"
+        line: 1590
+      - id: "25-counterfactual"
+        title: "Counterfactual"
+        line: 1594
+      - id: "25-temporal"
+        title: "Temporal"
+        line: 1598
+      - id: "25-second-third"
+        title: "Second / Third Order"
+        line: 1602
+      - id: "26"
+        title: "26. Culture / Geography / Politics / Policy Context"
+        line: 1622
+      - id: "26.1"
+        title: "26.1 Culture"
+        line: 1638
+      - id: "26.2"
+        title: "26.2 Geography"
+        line: 1655
+      - id: "26.3"
+        title: "26.3 Policy"
+        line: 1669
+      - id: "27"
+        title: "27. Data Science Plane"
+        line: 1688
+      - id: "28"
+        title: "28. Data Lab"
+        line: 1710
+      - id: "29"
+        title: "29. 統計能力"
+        line: 1734
+      - id: "29-basic"
+        title: "基礎統計"
+        line: 1738
+      - id: "29-tests"
+        title: "假設檢定"
+        line: 1748
+      - id: "29-regression"
+        title: "Regression"
+        line: 1758
+      - id: "29-timeseries"
+        title: "時間序列"
+        line: 1767
+      - id: "30"
+        title: "30. Machine Learning"
+        line: 1778
+      - id: "31"
+        title: "31. Causal Inference"
+        line: 1796
+      - id: "32"
+        title: "32. Optimization"
+        line: 1813
+      - id: "33"
+        title: "33. Monte Carlo / Scenario Engine"
+        line: 1835
+      - id: "34"
+        title: "34. Experiment Engine"
+        line: 1862
+      - id: "35"
+        title: "35. Data Quality Engine"
+        line: 1875
+      - id: "36"
+        title: "36. Statistical Guardrails"
+        line: 1893
+      - id: "37"
+        title: "37. Reproducible Research"
+        line: 1909
+      - id: "38"
+        title: "38. Visualization Engine"
+        line: 1953
+      - id: "39"
+        title: "39. Research Mode"
+        line: 1997
+      - id: "40"
+        title: "40. Qualitative Research"
+        line: 2033
+      - id: "41"
+        title: "41. Quantitative Research"
+        line: 2066
+      - id: "42"
+        title: "42. Research Integrity Engine"
+        line: 2096
+      - id: "43"
+        title: "43. Business Planning Mode"
+        line: 2125
+      - id: "44"
+        title: "44. Business Strategy Mode"
+        line: 2175
+      - id: "45"
+        title: "45. Learning / Class Notes Mode"
+        line: 2199
+      - id: "46"
+        title: "46. Brainstorming Mode"
+        line: 2240
+      - id: "47"
+        title: "47. Multi-Agent Workshop"
+        line: 2297
+      - id: "48"
+        title: "48. Red Team / Blue Team / Judge"
+        line: 2328
+      - id: "49"
+        title: "49. Devil's Advocate"
+        line: 2357
+      - id: "50"
+        title: "50. Unknown Unknown Discovery"
+        line: 2372
+      - id: "51"
+        title: "51. Second / Third-order Effects"
+        line: 2397
+      - id: "52"
+        title: "52. Temporal Reasoning"
+        line: 2419
+      - id: "53"
+        title: "53. Decision Intelligence"
+        line: 2433
+      - id: "54"
+        title: "54. Decision Reversal Criteria"
+        line: 2462
+      - id: "55"
+        title: "55. Claim Strength Model"
+        line: 2483
+      - id: "56"
+        title: "56. Quality Gate"
+        line: 2503
+      - id: "57"
+        title: "57. Event-native Architecture"
+        line: 2546
+      - id: "58"
+        title: "58. Immutable-first"
+        line: 2570
+      - id: "59"
+        title: "59. Portable Artifact URI"
+        line: 2588
+      - id: "60"
+        title: "60. Data Architecture"
+        line: 2610
+      - id: "61"
+        title: "61. 安全架構"
+        line: 2639
+      - id: "62"
+        title: "62. Zero Trust"
+        line: 2668
+      - id: "63"
+        title: "63. Secret Management"
+        line: 2692
+      - id: "64"
+        title: "64. Policy-as-Code"
+        line: 2714
+      - id: "65"
+        title: "65. Agent ≠ Authority"
+        line: 2744
+      - id: "66"
+        title: "66. Supply Chain Security"
+        line: 2772
+      - id: "67"
+        title: "67. Deployment"
+        line: 2794
+      - id: "68"
+        title: "68. Immutable Deployment"
+        line: 2823
+      - id: "69"
+        title: "69. Rollback"
+        line: 2854
+      - id: "70"
+        title: "70. 測試與 Eval"
+        line: 2886
+      - id: "71"
+        title: "71. Champion / Challenger"
+        line: 2914
+      - id: "72"
+        title: "72. Agent Evaluation"
+        line: 2934
+      - id: "73"
+        title: "73. Observability"
+        line: 2950
+      - id: "74"
+        title: "74. Disaster Recovery"
+        line: 2977
+      - id: "75"
+        title: "75. Offline License"
+        line: 3010
+      - id: "76"
+        title: "76. Cloud ↔ Local 可攜"
+        line: 3026
+      - id: "77"
+        title: "77. UI 工作空間"
+        line: 3051
+      - id: "77-canvas"
+        title: "Canvas"
+        line: 3057
+      - id: "77-knowledge"
+        title: "Knowledge"
+        line: 3061
+      - id: "77-datalab"
+        title: "Data Lab"
+        line: 3065
+      - id: "77-workflowlab"
+        title: "Workflow Lab"
+        line: 3069
+      - id: "77-artifactstudio"
+        title: "Artifact Studio"
+        line: 3073
+      - id: "77-decisionroom"
+        title: "Decision Room"
+        line: 3077
+      - id: "77-intelcouncil"
+        title: "Intelligence Council"
+        line: 3083
+      - id: "78"
+        title: "78. 使用者完整流程"
+        line: 3089
+      - id: "79"
+        title: "79. 專案資料路徑"
+        line: 3141
+      - id: "80"
+        title: "80. 程式碼目錄"
+        line: 3175
+      - id: "81"
+        title: "81. 配置路徑"
+        line: 3301
+      - id: "82"
+        title: "82. Execution Audit"
+        line: 3354
+      - id: "83"
+        title: "83. 最重要的內容原則"
+        line: 3380
+      - id: "84"
+        title: "84. 高階模式"
+        line: 3397
+      - id: "84-fast"
+        title: "Fast"
+        line: 3399
+      - id: "84-professional"
+        title: "Professional"
+        line: 3403
+      - id: "84-research-grade"
+        title: "Research Grade"
+        line: 3407
+      - id: "84-board-grade"
+        title: "Board Grade"
+        line: 3411
+      - id: "84-deep-intel"
+        title: "Deep Intelligence"
+        line: 3415
+      - id: "85"
+        title: "85. MVP 分階段"
+        line: 3455
+      - id: "85-phase0"
+        title: "Phase 0 — Architecture Constitution"
+        line: 3457
+      - id: "85-phase1"
+        title: "Phase 1 — Core Platform"
+        line: 3483
+      - id: "85-phase2"
+        title: "Phase 2 — Research + Data"
+        line: 3519
+      - id: "85-phase3"
+        title: "Phase 3 — Intelligence Council"
+        line: 3534
+      - id: "85-phase4"
+        title: "Phase 4 — Decision Intelligence"
+        line: 3550
+      - id: "85-phase5"
+        title: "Phase 5 — Sovereign / Enterprise"
+        line: 3563
+      - id: "86"
+        title: "86. 每個功能的標準交付格式"
+        line: 3578
+      - id: "87"
+        title: "87. 成功判斷標準"
+        line: 3599
+      - id: "87-reliable"
+        title: "可靠"
+        line: 3603
+      - id: "87-verifiable"
+        title: "可驗證"
+        line: 3608
+      - id: "87-maintainable"
+        title: "可維護"
+        line: 3613
+      - id: "87-portable"
+        title: "可攜"
+        line: 3620
+      - id: "87-secure"
+        title: "安全"
+        line: 3626
+      - id: "87-human-led"
+        title: "人類主導"
+        line: 3631
+      - id: "87-quality"
+        title: "高品質"
+        line: 3637
+      - id: "88"
+        title: "88. 最終工程憲法"
+        line: 3652
+      - id: "89"
+        title: "89. 最終產品願景"
+        line: 3697
+      - id: "90"
+        title: "90. 建議下一步"
+        line: 3781
+      - id: "91"
+        title: "91. 世界各地通用：真正的設計定義"
+        line: 3821
+      - id: "92"
+        title: "92. Global Jurisdiction & Compliance Plane"
+        line: 3878
+      - id: "93"
+        title: "93. Jurisdiction Model：不只國家與州"
+        line: 3934
+      - id: "94"
+        title: "94. Jurisdiction Resolver"
+        line: 3978
+      - id: "95"
+        title: "95. Legal Source Registry"
+        line: 4036
+      - id: "96"
+        title: "96. Legal Authority Hierarchy"
+        line: 4093
+      - id: "97"
+        title: "97. Temporal Law Engine"
+        line: 4130
+      - id: "98"
+        title: "98. Conflict-of-Laws Engine"
+        line: 4168
+      - id: "99"
+        title: "99. Compliance Policy Compiler"
+        line: 4217
+      - id: "100"
+        title: "100. Global Privacy Engine"
+        line: 4259
+      - id: "101"
+        title: "101. Lawful Basis / Consent Registry"
+        line: 4303
+      - id: "102"
+        title: "102. Cross-Border Data Transfer Engine"
+        line: 4328
+      - id: "103"
+        title: "103. Data Residency & Sovereignty"
+        line: 4377
+      - id: "104"
+        title: "104. Sovereign Regional Cell Architecture"
+        line: 4405
+      - id: "105"
+        title: "105. AI Regulatory Classification Engine"
+        line: 4434
+      - id: "106"
+        title: "106. AI Governance"
+        line: 4473
+      - id: "107"
+        title: "107. Sector Compliance Packs"
+        line: 4502
+      - id: "108"
+        title: "108. Education / Children Pack"
+        line: 4543
+      - id: "109"
+        title: "109. Government / Public Sector Pack"
+        line: 4570
+      - id: "110"
+        title: "110. Research Ethics Pack"
+        line: 4596
+      - id: "111"
+        title: "111. Intellectual Property & Content Rights"
+        line: 4617
+      - id: "112"
+        title: "112. Open Source & Software License Governance"
+        line: 4657
+      - id: "113"
+        title: "113. Cybersecurity / Breach / Incident Regulatory Engine"
+        line: 4678
+      - id: "114"
+        title: "114. Records Retention / Legal Hold / eDiscovery"
+        line: 4716
+      - id: "115"
+        title: "115. Trade / Sanctions / Export Control"
+        line: 4744
+      - id: "116"
+        title: "116. Customs / Trade / Supply Chain"
+        line: 4775
+      - id: "117"
+        title: "117. Tax / Payments / Commercial Operations"
+        line: 4792
+      - id: "118"
+        title: "118. Consumer Protection / E-commerce"
+        line: 4815
+      - id: "119"
+        title: "119. Labor / Employment"
+        line: 4836
+      - id: "120"
+        title: "120. Competition / Antitrust / Anti-Bribery"
+        line: 4853
+      - id: "121"
+        title: "121. Accessibility by Design"
+        line: 4869
+      - id: "122"
+        title: "122. Localization Architecture"
+        line: 4891
+      - id: "123"
+        title: "123. Cultural Localization"
+        line: 4934
+      - id: "124"
+        title: "124. Indigenous / Tribal / Customary Context"
+        line: 4956
+      - id: "125"
+        title: "125. Political / Election / Government Influence Controls"
+        line: 4972
+      - id: "126"
+        title: "126. Legal Change Management"
+        line: 5000
+      - id: "127"
+        title: "127. Signed Offline Law Packs"
+        line: 5052
+      - id: "128"
+        title: "128. Legal Freshness SLA"
+        line: 5087
+      - id: "129"
+        title: "129. Compliance Center UI"
+        line: 5112
+      - id: "129-stray-h1"
+        title: "Compliance Center (stray H1 inside §129)"
+        line: 5116
+      - id: "130"
+        title: "130. Global Market Entry Compiler"
+        line: 5136
+      - id: "131"
+        title: "131. Market Entry Passport"
+        line: 5188
+      - id: "132"
+        title: "132. Global Project Passport"
+        line: 5208
+      - id: "133"
+        title: "133. Compliance Decision Artifact"
+        line: 5237
+      - id: "134"
+        title: "134. Legal Uncertainty Is a First-class State"
+        line: 5258
+      - id: "135"
+        title: "135. No Legal Hallucination Rule"
+        line: 5285
+      - id: "136"
+        title: "136. Legal Expert Escalation"
+        line: 5309
+      - id: "137"
+        title: "137. 全球專家議會擴充"
+        line: 5337
+      - id: "138"
+        title: "138. International Standards Crosswalk"
+        line: 5360
+      - id: "139"
+        title: "139. 代表性全球法規來源：系統設計驗證樣本"
+        line: 5386
+      - id: "140"
+        title: "140. 全球測試矩陣"
+        line: 5415
+      - id: "141"
+        title: "141. Global Compliance Regression Gate"
+        line: 5455
+      - id: "142"
+        title: "142. Global Deployment Admission Control"
+        line: 5472
+      - id: "143"
+        title: "143. Capability Availability Matrix"
+        line: 5508
+      - id: "144"
+        title: "144. Compliance-aware AI Router"
+        line: 5533
+      - id: "145"
+        title: "145. Provider & Subprocessor Registry"
+        line: 5566
+      - id: "146"
+        title: "146. Contract & DPA Engine"
+        line: 5588
+      - id: "147"
+        title: "147. Contractual Policy != Law"
+        line: 5607
+      - id: "148"
+        title: "148. Encryption & Key Sovereignty"
+        line: 5637
+      - id: "149"
+        title: "149. Privacy-preserving Computation"
+        line: 5659
+      - id: "150"
+        title: "150. 全球時間、法規與資料快照"
+        line: 5676
+      - id: "151"
+        title: "151. 全球失敗模式與降級"
+        line: 5709
+      - id: "151-legal-pack"
+        title: "Legal Pack 失效"
+        line: 5713
+      - id: "151-cloud-region"
+        title: "Cloud Region 故障"
+        line: 5720
+      - id: "151-ai-provider"
+        title: "AI Provider 故障"
+        line: 5728
+      - id: "151-law-conflict"
+        title: "法規衝突"
+        line: 5734
+      - id: "151-offline-expired"
+        title: "Offline 且 Pack 過期"
+        line: 5741
+      - id: "152"
+        title: "152. 全球可觀測性"
+        line: 5750
+      - id: "153"
+        title: "153. 全球 Audit"
+        line: 5774
+      - id: "154"
+        title: "154. 法規事件與業務事件分離"
+        line: 5796
+      - id: "155"
+        title: "155. Regulatory Impact Graph"
+        line: 5821
+      - id: "156"
+        title: "156. No Patch Change Discipline"
+        line: 5851
+      - id: "157"
+        title: "157. Architecture Decision Records"
+        line: 5879
+      - id: "158"
+        title: "158. Global Definition of Done"
+        line: 5903
+      - id: "159"
+        title: "159. 修正版完整交付路徑"
+        line: 5931
+      - id: "160"
+        title: "160. 修正版預期結果"
+        line: 5979
+      - id: "161"
+        title: "161. 全球版工程憲法新增條款"
+        line: 6015
+      - id: "162"
+        title: "162. 最終全球產品定義"
+        line: 6063
+    architecture_components:
+      - name: "Experience Plane"
+        kind: "plane"
+        line: 367
+        summary: "Chat / Canvas / Studio / Mobile / API / A11y"
+      - name: "Human Collaboration Plane"
+        kind: "plane"
+        line: 371
+      - name: "Stakeholder Intelligence Plane"
+        kind: "plane"
+        line: 373
+      - name: "Global Jurisdiction & Compliance Plane"
+        kind: "plane"
+        line: 376
+        summary: "Formally declared again at §92 L3878"
+      - name: "Decision Plane"
+        kind: "plane"
+        line: 379
+      - name: "Computation Plane"
+        kind: "plane"
+        line: 382
+      - name: "Cognitive Plane"
+        kind: "plane"
+        line: 385
+      - name: "Knowledge Plane"
+        kind: "plane"
+        line: 388
+      - name: "Artifact Plane"
+        kind: "plane"
+        line: 391
+      - name: "Control Plane"
+        kind: "plane"
+        line: 394
+      - name: "Data Plane"
+        kind: "plane"
+        line: 397
+      - name: "Platform Plane"
+        kind: "plane"
+        line: 400
+      - name: "Trust Fabric"
+        kind: "cross-cutting layer"
+        line: 404
+        summary: "Identity+Jurisdiction+Policy+Provenance+Encryption+Audit+Legal Source Version+Data Classification+Human Approval"
+      - name: "AI Gateway"
+        kind: "service"
+        line: 577
+        summary: "Routing/fallback/cost/privacy/quality routing, rate limit, budget, audit; paths /ai/*"
+      - name: "Capability Resolver"
+        kind: "pipeline stage"
+        line: 584
+      - name: "Policy Engine"
+        kind: "engine"
+        line: 586
+        summary: "Also gate of Agent Intent (§65) and retention conflicts (§114)"
+      - name: "Capability Engine (LEGO)"
+        kind: "engine"
+        line: 630
+        summary: "Capability execution contract; Phase 1 deliverable L3491"
+      - name: "/specs/cognitive schemas"
+        kind: "spec store"
+        line: 767
+        summary: "primitive/method/lens/representation/recipe .schema.yaml"
+      - name: "/methods registry-contracts-versions"
+        kind: "registry"
+        line: 774
+      - name: "/compiler method-selector / compatibility / mandatory-gates"
+        kind: "compiler"
+        line: 779
+      - name: "Workflow IR"
+        kind: "intermediate representation"
+        line: 798
+        summary: "capability vs method node types; paths /workflows/{ir,compiler,recipes,validation,runtime}"
+      - name: "Recipe Engine"
+        kind: "engine"
+        line: 794
+      - name: "Prompt → Plan Compiler"
+        kind: "compiler"
+        line: 862
+        summary: "Intent→Goal Spec→Capability Graph→Compilation→Validation→Cost/Risk→Human Approval→Execution"
+      - name: "Multimodal Knowledge Canvas"
+        kind: "module"
+        line: 902
+        summary: "/modules/canvas/{nodes,edges,annotations,attachments,realtime}"
+      - name: "Authorship & Integrity Plane"
+        kind: "plane"
+        line: 982
+        summary: "/authorship/*.json contribution and provenance maps"
+      - name: "Evidence Graph"
+        kind: "store"
+        line: 1099
+        summary: "/modules/knowledge/{sources,evidence,claims,entities,relations,provenance,graph}"
+      - name: "Knowledge Memory layering"
+        kind: "store"
+        line: 1116
+        summary: "6 memory types each with retention/permission/version/expiry/audit"
+      - name: "Stakeholder & Expert Intelligence Plane"
+        kind: "plane"
+        line: 1145
+      - name: "Role Assembly Engine"
+        kind: "engine"
+        line: 1353
+      - name: "Conflict Engine"
+        kind: "engine"
+        line: 1432
+      - name: "Intelligence Council"
+        kind: "engine/workspace"
+        line: 1465
+        summary: "Independent analysis→cross-examination→synthesis with minority opinion preservation"
+      - name: "Epistemic & Strategic Reasoning Engine"
+        kind: "engine"
+        line: 1502
+      - name: "Assumption Registry"
+        kind: "registry"
+        line: 1550
+      - name: "Reasoning modules"
+        kind: "module tree"
+        line: 1608
+        summary: "/reasoning/{deductive,inductive,abductive,causal,counterfactual,temporal,second_order,third_order}"
+      - name: "Context modules"
+        kind: "module tree"
+        line: 1626
+        summary: "/context/{cultural,geographic,political,policy,economic,historical,demographic,environmental}"
+      - name: "Data Science Plane"
+        kind: "plane"
+        line: 1688
+        summary: "AI→Analysis Planner→Trusted Compute Engine→Validation→Result Artifact→AI Interpretation"
+      - name: "Analysis Planner"
+        kind: "pipeline stage"
+        line: 1697
+      - name: "Trusted Compute Engine"
+        kind: "engine"
+        line: 1699
+      - name: "Data Lab"
+        kind: "module/workspace"
+        line: 1710
+        summary: "/modules/analytics/{datasets,cleaning,statistics,ml,causal,timeseries,experiments,visualization}"
+      - name: "Monte Carlo / Scenario Engine"
+        kind: "engine"
+        line: 1835
+        summary: "/modules/simulation/{scenario,monte_carlo,sensitivity,stress_test}"
+      - name: "Experiment Engine"
+        kind: "engine"
+        line: 1862
+      - name: "Data Quality Engine"
+        kind: "engine"
+        line: 1875
+      - name: "Statistical Guardrails"
+        kind: "gate engine"
+        line: 1893
+      - name: "Visualization Engine"
+        kind: "engine"
+        line: 1953
+      - name: "Research Integrity Engine"
+        kind: "engine"
+        line: 2096
+      - name: "Quality Gate tree"
+        kind: "gate store"
+        line: 2507
+        summary: "/quality/{evidence,reasoning,statistics,causal,policy,culture,geography,security,redteam,consistency,uncertainty,authorship}"
+      - name: "Event Ledger (Event-native Architecture)"
+        kind: "store"
+        line: 2546
+      - name: "Content-addressed Object Store"
+        kind: "store"
+        line: 2570
+        summary: "/objects/sha256/aa/bb/<hash>; immutable-first versioning"
+      - name: "Portable Artifact URI"
+        kind: "adapter (logical addressing)"
+        line: 2588
+      - name: "Data Architecture stores"
+        kind: "store set"
+        line: 2610
+        summary: "PostgreSQL / Object Storage / Vector Index / Graph Store / Event Store / Search Index / Time-series, behind Repository Contract"
+      - name: "Policy-as-Code tree"
+        kind: "policy store"
+        line: 2714
+        summary: "/policies/{data,ai,publishing,research,security,enterprise}"
+      - name: "Agent Intent pipeline"
+        kind: "protocol/pipeline"
+        line: 2749
+        summary: "Agent→Intent→Policy Engine→Permission Check→Human Approval/Auto Rule→Execution"
+      - name: "Supply Chain Security pipeline"
+        kind: "pipeline"
+        line: 2772
+        summary: "Signed Commit→CI→SBOM→Dependency Scan→Artifact Signing→Verified Deployment"
+      - name: "Modular Monolith Core + Isolated Workers + Event Bus"
+        kind: "deployment topology"
+        line: 2798
+      - name: "Workers"
+        kind: "worker set"
+        line: 2810
+        summary: "AI / Document / Research / Data / Rendering / Simulation Workers"
+      - name: "Champion / Challenger"
+        kind: "model rollout mechanism"
+        line: 2914
+      - name: "Observability tree"
+        kind: "platform"
+        line: 2954
+        summary: "/platform/observability/{logs,metrics,traces,alerts,dashboards}"
+      - name: "Disaster Recovery topology"
+        kind: "platform"
+        line: 2977
+        summary: "Primary/Secondary Region, Cold Archive, Offline Backup; RPO/RTO targets"
+      - name: "Offline License (Signed)"
+        kind: "licensing mechanism"
+        line: 3010
+      - name: "Project Package"
+        kind: "portability format"
+        line: 3030
+      - name: "Six UI Workspaces (+Intelligence Council, +Compliance Center)"
+        kind: "workspace set"
+        line: 3055
+        summary: "Canvas, Knowledge, Data Lab, Workflow Lab, Artifact Studio, Decision Room; Intelligence Council L3083; Compliance Center L5116"
+      - name: "Code directory layout"
+        kind: "repo layout"
+        line: 3177
+        summary: "/apps /core /modules /compute /ai /reasoning /context /experts /review /data /security /platform /specs"
+      - name: "Config layout"
+        kind: "config layout"
+        line: 3303
+        summary: "/config/{deployment,ai,privacy,compute,licensing,storage,jurisdiction,legal,compliance,localization}"
+      - name: "Execution Audit record"
+        kind: "audit contract"
+        line: 3354
+        summary: "run_id…policy_version, knowledge_snapshot per Capability Run"
+      - name: "Jurisdiction Resolver"
+        kind: "engine"
+        line: 3978
+        summary: "/modules/jurisdiction/{context,resolver,hierarchy,conflicts,temporal,tests}"
+      - name: "Legal Source Registry"
+        kind: "registry"
+        line: 4036
+      - name: "Legal Authority Hierarchy (per Pack)"
+        kind: "configuration"
+        line: 4093
+      - name: "Temporal Law Engine"
+        kind: "engine"
+        line: 4130
+      - name: "Conflict-of-Laws Engine"
+        kind: "engine"
+        line: 4168
+      - name: "Compliance Policy Compiler"
+        kind: "compiler"
+        line: 4217
+        summary: "/modules/compliance/{obligations,controls,compiler,evidence,exceptions}"
+      - name: "Global Privacy Engine"
+        kind: "engine"
+        line: 4259
+        summary: "/modules/privacy/{lawful-basis,consent,rights,requests,identity-verification,deadlines}"
+      - name: "Lawful Basis / Consent Registry"
+        kind: "registry"
+        line: 4303
+      - name: "Cross-Border Data Transfer Engine"
+        kind: "engine"
+        line: 4328
+        summary: "/modules/privacy/transfers/{routes,mechanisms,assessments,localization}"
+      - name: "Residency-aware Deployment Scheduler"
+        kind: "scheduler"
+        line: 4379
+      - name: "Sovereign Regional Cell Architecture"
+        kind: "deployment topology"
+        line: 4405
+        summary: "EU/US/APAC cells with local DB + local KMS; country/gov/air-gapped cells"
+      - name: "AI Regulatory Classification Engine"
+        kind: "engine"
+        line: 4434
+      - name: "Sector Compliance Packs"
+        kind: "pack system"
+        line: 4502
+        summary: "18 sectors; each defines roles, checks, controls, prohibitions, retention, audit"
+      - name: "Cybersecurity / Breach / Incident Regulatory Engine"
+        kind: "engine"
+        line: 4678
+      - name: "Retention / Legal Hold / eDiscovery modules"
+        kind: "module tree"
+        line: 4736
+        summary: "/modules/legal/{retention,legal-hold,ediscovery}"
+      - name: "Localization modules"
+        kind: "module tree"
+        line: 4921
+        summary: "/modules/localization/{locale,language,currency,timezone,calendar,units,address,formatting}"
+      - name: "Legal Change Management pipeline"
+        kind: "pipeline"
+        line: 5000
+        summary: "Fetch→Hash→Diff→Classify→Human Review→Impact→Regression→Shadow→Canary→Activate"
+      - name: "Signed Offline Law Packs"
+        kind: "distribution format"
+        line: 5052
+      - name: "Compliance Center UI"
+        kind: "workspace"
+        line: 5112
+      - name: "Global Market Entry Compiler"
+        kind: "compiler/recipe"
+        line: 5136
+      - name: "Global Project Passport"
+        kind: "contract object"
+        line: 5208
+      - name: "Compliance-aware AI Router"
+        kind: "router"
+        line: 5533
+        summary: "Adds jurisdiction/residency/provider-terms filters producing Eligible Provider Set"
+      - name: "Provider & Subprocessor Registry"
+        kind: "registry"
+        line: 5566
+      - name: "Contract & DPA Engine"
+        kind: "engine"
+        line: 5588
+        summary: "Compiles contract obligations into Policy, layered with law without conflation"
+      - name: "Encryption & Key Sovereignty"
+        kind: "security capability"
+        line: 5637
+      - name: "Snapshot system"
+        kind: "reproducibility mechanism"
+        line: 5676
+        summary: "Knowledge/Legal/Policy/Dataset/Model/Provider-Contract snapshots per artifact"
+      - name: "Compliance Observability"
+        kind: "platform"
+        line: 5769
+        summary: "/platform/observability/compliance/ with 9 compliance metrics"
+      - name: "Regulatory Impact Graph"
+        kind: "graph"
+        line: 5821
+      - name: "ADR store"
+        kind: "doc store"
+        line: 5884
+        summary: "/docs/adr/ with fixed format incl. Expiry / Revisit Date"
+      - name: "Global test matrix"
+        kind: "test tree"
+        line: 5420
+        summary: "/tests/global/ 13 subtrees + 12 mandatory golden cases"
+    machine_readable_blocks:
+      - line: 89
+        kind: "yaml — Execution Manifest atlas reference (mandatory)"
+        ids:
+          - "cognitive_method_atlas"
+          - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+          - "declared_version: 1.0"
+          - "content_hash"
+          - "loaded"
+      - line: 701
+        kind: "yaml — Capability Contract"
+        ids:
+          - "cognitive.execute_method"
+          - "1.0.0"
+          - "MethodExecutionRequest"
+          - "TypedMethodResult"
+          - "method_atlas.loaded"
+          - "method_contract.valid"
+          - "workflow.static_validation"
+          - "policy.validation"
+          - "provenance_required"
+          - "method_specific_gate_required"
+      - line: 810
+        kind: "yaml — Workflow IR example"
+        ids:
+          - "research.qualitative.v4"
+          - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md"
+          - "transcribe"
+          - "research.thematic_analysis"
+          - "literature_search"
+          - "evidence.triangulation"
+          - "artifact.generate_research_paper"
+      - line: 1554
+        kind: "yaml — Assumption Registry record"
+        ids:
+          - "ASM-018"
+          - "evidence_strength"
+          - "impact_if_wrong"
+          - "confidence"
+          - "validation_method"
+          - "status: Unverified"
+      - line: 1913
+        kind: "yaml — AnalysisRun reproducibility manifest"
+        ids:
+          - "ANA-92817"
+          - "DATA-17"
+          - "AP-6"
+          - "CODE-88"
+          - "RESULT-229"
+          - "random_seed"
+      - line: 2872
+        kind: "yaml — Execution Manifest version pins"
+        ids:
+          - "EX-991"
+          - "app_version"
+          - "workflow_version"
+          - "capability_version"
+          - "prompt_version"
+          - "model_profile: reasoning-high-v3"
+          - "schema_version"
+          - "policy_version"
+          - "KS-20290117-1132"
+      - line: 3984
+        kind: "yaml — jurisdiction_context"
+        ids:
+          - "operator_legal_entity"
+          - "establishment_locations"
+          - "target_markets"
+          - "data_subject_locations"
+          - "processing_locations"
+          - "storage_locations"
+          - "model_provider_locations"
+          - "subprocessor_locations"
+          - "governing_law"
+          - "sector"
+          - "data_categories"
+          - "children_involved"
+          - "government_customer"
+      - line: 4024
+        kind: "yaml — jurisdiction_resolution output"
+        ids:
+          - "JUR-001"
+          - "JUR-008"
+          - "JUR-021"
+          - "human_review_required"
+      - line: 4044
+        kind: "yaml — legal_source record"
+        ids:
+          - "LAW-..."
+          - "jurisdiction"
+          - "authority"
+          - "source_type: statute"
+          - "official_url"
+          - "translation_status"
+          - "enacted_at"
+          - "effective_from"
+          - "effective_to"
+          - "status: effective"
+          - "supersedes"
+          - "checksum"
+          - "retrieved_at"
+          - "reviewed_at"
+          - "reviewed_by"
+      - line: 4107
+        kind: "yaml — authority_hierarchy (per Jurisdiction Pack)"
+        ids:
+          - "constitutional"
+          - "supranational"
+          - "national_statute"
+          - "regulation"
+          - "state_or_province"
+          - "local"
+          - "regulator_rule"
+          - "binding_order"
+          - "guidance"
+      - line: 4155
+        kind: "yaml — legal_snapshot"
+        ids:
+          - "LS-20260828-EU-01"
+          - "evaluated_at"
+          - "effective_laws"
+      - line: 4235
+        kind: "yaml — obligation (compliance compiler)"
+        ids:
+          - "OBL-123"
+          - "restrict_external_transfer"
+          - "data_classification: restricted"
+          - "local_processing_only"
+          - "transfer_assessment_required"
+      - line: 4639
+        kind: "yaml — rights metadata (IP/content)"
+        ids:
+          - "owner"
+          - "license"
+          - "permitted_uses"
+          - "ai_processing_allowed: unknown"
+          - "commercial_use"
+          - "attribution_required"
+      - line: 5190
+        kind: "yaml — market_entry_passport"
+        ids:
+          - "market"
+          - "jurisdictions"
+          - "allowed_capabilities"
+          - "restricted_capabilities"
+          - "prohibited_capabilities"
+          - "data_residency"
+          - "required_registrations"
+          - "required_reviews"
+          - "localization"
+          - "major_risks"
+          - "unresolved_questions"
+          - "decision: CONDITIONAL_GO"
+      - line: 5241
+        kind: "yaml — compliance_decision"
+        ids:
+          - "execution_id"
+          - "applicable_rules"
+          - "controls_evaluated"
+          - "result: ALLOW"
+          - "exceptions"
+          - "human_review"
+          - "legal_snapshot"
+      - line: 5512
+        kind: "yaml — capability_availability"
+        ids:
+          - "biometric_identification"
+          - "jurisdiction"
+          - "status: prohibited"
+  "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md":
+    structure_headings:
+      - id: "title"
+        title: "AI LEGO Cognitive Engineering OS"
+        line: 1
+      - id: "subtitle"
+        title: "Global Cognitive Method Atlas & Modular Brainstorming / Reasoning Architecture"
+        line: 4
+      - id: "lang-policy"
+        title: "中文優先與必要設定英文保留規範"
+        line: 14
+      - id: "0"
+        title: "0. 文件目的"
+        line: 68
+      - id: "1"
+        title: "1. 五項工程準則"
+        line: 80
+      - id: "2"
+        title: "2. 總體架構"
+        line: 92
+      - id: "3"
+        title: "3. 八個正交 LEGO 維度"
+        line: 134
+      - id: "4"
+        title: "4. Cognitive Primitive Kernel"
+        line: 153
+      - id: "5"
+        title: "5. Global Core + Local Packs"
+        line: 196
+      - id: "5.1"
+        title: "5.1 Global Invariant Core"
+        line: 198
+      - id: "5.2"
+        title: "5.2 Local / Jurisdiction Packs"
+        line: 216
+      - id: "6"
+        title: "6. 不同人的腦袋：Soft Cognitive Preference"
+        line: 257
+      - id: "7"
+        title: "7. 方法總覽"
+        line: 296
+      - id: "8"
+        title: "8. 方法工具庫：用途、使用方式、效益與搭配"
+        line: 327
+      - id: "F01"
+        title: "F01 — 目標與問題框定（Goal & Problem Framing）"
+        line: 329
+      - id: "F02"
+        title: "F02 — 拆解與結構化（Decomposition & Structuring）"
+        line: 358
+      - id: "F03"
+        title: "F03 — 發散式創意（Divergent Ideation）"
+        line: 374
+      - id: "F04"
+        title: "F04 — 關聯映射與組合（Associative Mapping & Combination）"
+        line: 406
+      - id: "F05"
+        title: "F05 — 根因與失效分析（Root Cause & Failure Analysis）"
+        line: 429
+      - id: "F06"
+        title: "F06 — 人類／顧客洞察（Human / Customer Insight）"
+        line: 456
+      - id: "F07"
+        title: "F07 — 利害關係人／權力／協商（Stakeholder / Power / Negotiation）"
+        line: 482
+      - id: "F08"
+        title: "F08 — 外部環境與策略（Context & Strategy）"
+        line: 510
+      - id: "F09"
+        title: "F09 — 系統思考（Systems Thinking）"
+        line: 540
+      - id: "F10"
+        title: "F10 — 假設／證據／認知品質（Assumption / Evidence / Epistemic Quality）"
+        line: 565
+      - id: "F11"
+        title: "F11 — 因果與研究推理（Causal & Research Reasoning）"
+        line: 609
+      - id: "F12"
+        title: "F12 — 挑戰／紅隊／風險（Challenge / Red Team / Risk）"
+        line: 636
+      - id: "F13"
+        title: "F13 — 未知未知與前瞻（Unknown Unknowns & Foresight）"
+        line: 665
+      - id: "F14"
+        title: "F14 — 可行性與經濟性（Feasibility & Economics）"
+        line: 715
+      - id: "F15"
+        title: "F15 — 實驗與驗證（Experiment & Validation）"
+        line: 731
+      - id: "F16"
+        title: "F16 — 優先排序與決策（Prioritization & Decision）"
+        line: 753
+      - id: "F17"
+        title: "F17 — 學習／監控／反轉（Learning / Monitoring / Reversal）"
+        line: 794
+      - id: "F18"
+        title: "F18 — 軟體架構套件（Software Architecture Pack）"
+        line: 810
+      - id: "F19"
+        title: "F19 — DevOps／SRE／可靠性套件（DevOps / SRE / Reliability Pack）"
+        line: 843
+      - id: "F20"
+        title: "F20 — 資安／隱私套件（Security / Privacy Pack）"
+        line: 875
+      - id: "F21"
+        title: "F21 — 資料庫／資料套件（DB / Data Pack）"
+        line: 892
+      - id: "F22"
+        title: "F22 — 專案管理／交付／治理套件（PM / Delivery / Governance Pack）"
+        line: 923
+      - id: "F23"
+        title: "F23 — 全球管轄／合規／在地化（Global Jurisdiction / Compliance / Localization）"
+        line: 940
+      - id: "F24"
+        title: "F24 — 呈現／認知偏好／協作（Representation / Cognitive Preference / Collaboration）"
+        line: 968
+      - id: "9"
+        title: "9. LEGO Contract：自由組裝，但不能亂接"
+        line: 985
+      - id: "10"
+        title: "10. Method Selection Engine"
+        line: 1066
+      - id: "10-inputs"
+        title: "Selector Inputs"
+        line: 1068
+      - id: "11"
+        title: "11. 核心工具詳細解說與圖解"
+        line: 1127
+      - id: "11.1"
+        title: "11.1 心智圖（Mind Map）"
+        line: 1133
+      - id: "11.2"
+        title: "11.2 概念圖／概念構圖（Concept Map）"
+        line: 1185
+      - id: "11.3"
+        title: "11.3 親和圖／KJ 法（Affinity Diagram）"
+        line: 1215
+      - id: "11.4"
+        title: "11.4 魚骨圖／石川圖／因果圖（Fishbone / Ishikawa Diagram）"
+        line: 1236
+      - id: "11.5"
+        title: "11.5 五個為什麼／五問法（5 Whys）"
+        line: 1271
+      - id: "11.6"
+        title: "11.6 柏拉圖分析／80/20 分析（Pareto Analysis）"
+        line: 1309
+      - id: "11.7"
+        title: "11.7 SWOT 分析（SWOT Analysis）"
+        line: 1333
+      - id: "11.8"
+        title: "11.8 TOWS 矩陣（TOWS Matrix）"
+        line: 1360
+      - id: "11.9"
+        title: "11.9 PESTEL 分析（PESTEL Analysis）"
+        line: 1374
+      - id: "11.10"
+        title: "11.10 SCAMPER 創意法（SCAMPER）"
+        line: 1415
+      - id: "11.11"
+        title: "11.11 形態分析法（Morphological Analysis）"
+        line: 1445
+      - id: "11.12"
+        title: "11.12 待辦工作理論（Jobs To Be Done / JTBD）"
+        line: 1472
+      - id: "11.13"
+        title: "11.13 顧客旅程地圖（Customer Journey Map）"
+        line: 1498
+      - id: "11.14"
+        title: "11.14 利害關係人地圖（Stakeholder Map）"
+        line: 1525
+      - id: "11.15"
+        title: "11.15 權力－關注矩陣（Power–Interest Matrix）"
+        line: 1556
+      - id: "11.16"
+        title: "11.16 談判最佳替代方案（BATNA）"
+        line: 1574
+      - id: "11.17"
+        title: "11.17 可能達成協議區間（ZOPA）"
+        line: 1592
+      - id: "11.18"
+        title: "11.18 因果迴路圖（Causal Loop Diagram）"
+        line: 1608
+      - id: "11.19"
+        title: "11.19 假設矩陣／假設地圖（Assumption Mapping）"
+        line: 1630
+      - id: "11.20"
+        title: "11.20 證據矩陣（Evidence Matrix）"
+        line: 1657
+      - id: "11.21"
+        title: "11.21 因果有向無環圖（Causal DAG）"
+        line: 1674
+      - id: "11.22"
+        title: "11.22 變革理論（Theory of Change）"
+        line: 1698
+      - id: "11.23"
+        title: "11.23 紅隊（Red Team）"
+        line: 1724
+      - id: "11.24"
+        title: "11.24 藍隊（Blue Team）"
+        line: 1748
+      - id: "11.25"
+        title: "11.25 事前驗屍（Pre-mortem）"
+        line: 1764
+      - id: "11.26"
+        title: "11.26 失效模式與效應分析（FMEA）"
+        line: 1784
+      - id: "11.27"
+        title: "11.27 情境規劃（Scenario Planning）"
+        line: 1813
+      - id: "11.28"
+        title: "11.28 未來輪（Futures Wheel）"
+        line: 1846
+      - id: "11.29"
+        title: "11.29 蒙地卡羅模擬（Monte Carlo Simulation）"
+        line: 1867
+      - id: "11.30"
+        title: "11.30 影響－投入矩陣（Impact–Effort Matrix）"
+        line: 1898
+      - id: "11.31"
+        title: "11.31 層級分析法（AHP）"
+        line: 1919
+      - id: "11.32"
+        title: "11.32 多準則決策分析（MCDA）"
+        line: 1951
+      - id: "11.33"
+        title: "11.33 決策反轉條件（Reversal Criteria）"
+        line: 1980
+      - id: "11.34"
+        title: "11.34 C4 架構模型（C4 Model）"
+        line: 2005
+      - id: "11.35"
+        title: "11.35 領域驅動設計（DDD）"
+        line: 2029
+      - id: "11.36"
+        title: "11.36 事件風暴法（Event Storming）"
+        line: 2051
+      - id: "11.37"
+        title: "11.37 架構決策紀錄（ADR）"
+        line: 2075
+      - id: "11.38"
+        title: "11.38 架構權衡分析法（ATAM）"
+        line: 2106
+      - id: "11.39"
+        title: "11.39 SLI / SLO / SLA"
+        line: 2129
+      - id: "11.40"
+        title: "11.40 錯誤預算（Error Budget）"
+        line: 2157
+      - id: "11.41"
+        title: "11.41 金絲雀部署（Canary Deployment）"
+        line: 2170
+      - id: "11.42"
+        title: "11.42 藍綠部署（Blue–Green Deployment）"
+        line: 2197
+      - id: "11.43"
+        title: "11.43 混沌工程（Chaos Engineering）"
+        line: 2216
+      - id: "11.44"
+        title: "11.44 STRIDE 威脅建模（STRIDE）"
+        line: 2234
+      - id: "11.45"
+        title: "11.45 LINDDUN 隱私威脅建模（LINDDUN）"
+        line: 2258
+      - id: "11.46"
+        title: "11.46 資料保護影響評估（DPIA / PIA）"
+        line: 2278
+      - id: "11.47"
+        title: "11.47 實體關係圖（ERD）"
+        line: 2303
+      - id: "11.48"
+        title: "11.48 資料血緣（Data Lineage）"
+        line: 2318
+      - id: "11.49"
+        title: "11.49 資料契約（Data Contract）"
+        line: 2341
+      - id: "11.50"
+        title: "11.50 擴張－收縮遷移模式（Expand–Contract Migration）"
+        line: 2363
+      - id: "11.51"
+        title: "11.51 RAID 專案紀錄表（RAID Log）"
+        line: 2386
+      - id: "11.52"
+        title: "11.52 階段關卡（Stage-Gate）"
+        line: 2412
+      - id: "11.53"
+        title: "11.53 管轄權解析器（Jurisdiction Resolver）"
+        line: 2430
+      - id: "11.54"
+        title: "11.54 市場准入控制（Market Admission Control）"
+        line: 2458
+      - id: "11.55"
+        title: "11.55 多視圖切換（Representation Switching）"
+        line: 2486
+      - id: "11.56"
+        title: "11.56 引導模式（Guided Mode）"
+        line: 2511
+      - id: "11.57"
+        title: "11.57 專家 LEGO 模式（Expert LEGO Mode）"
+        line: 2531
+      - id: "12"
+        title: "12. 其他高頻工具詳細解說"
+        line: 2560
+      - id: "12.1"
+        title: "12.1 六何法（5W1H）"
+        line: 2562
+      - id: "12.2"
+        title: "12.2 問題陳述（Problem Statement）"
+        line: 2572
+      - id: "12.3"
+        title: "12.3 我們可以如何……（How Might We / HMW）"
+        line: 2593
+      - id: "12.4"
+        title: "12.4 SMART 目標法（SMART）"
+        line: 2602
+      - id: "12.5"
+        title: "12.5 目標與關鍵成果（OKR）"
+        line: 2611
+      - id: "12.6"
+        title: "12.6 議題樹（Issue Tree）"
+        line: 2622
+      - id: "12.7"
+        title: "12.7 相互獨立、完全窮盡（MECE）"
+        line: 2640
+      - id: "12.8"
+        title: "12.8 問題樹（Problem Tree）"
+        line: 2651
+      - id: "12.9"
+        title: "12.9 書面腦力激盪（Brainwriting）"
+        line: 2660
+      - id: "12.10"
+        title: "12.10 瘋狂八格法（Crazy 8s）"
+        line: 2668
+      - id: "12.11"
+        title: "12.11 波特五力分析（Porter Five Forces）"
+        line: 2677
+      - id: "12.12"
+        title: "12.12 3C 分析（3C Analysis）"
+        line: 2697
+      - id: "12.13"
+        title: "12.13 VRIO 資源分析（VRIO）"
+        line: 2707
+      - id: "12.14"
+        title: "12.14 市場區隔、目標市場與定位（STP）"
+        line: 2723
+      - id: "12.15"
+        title: "12.15 商業模式圖（Business Model Canvas）"
+        line: 2733
+      - id: "12.16"
+        title: "12.16 服務藍圖（Service Blueprint）"
+        line: 2756
+      - id: "12.17"
+        title: "12.17 深度訪談（Interview）"
+        line: 2777
+      - id: "12.18"
+        title: "12.18 問卷調查（Survey）"
+        line: 2786
+      - id: "12.19"
+        title: "12.19 賽局理論（Game Theory）"
+        line: 2795
+      - id: "12.20"
+        title: "12.20 貝氏更新（Bayesian Updating）"
+        line: 2806
+      - id: "12.21"
+        title: "12.21 魔鬼代言人（Devil's Advocate）"
+        line: 2821
+      - id: "12.22"
+        title: "12.22 地平線掃描（Horizon Scanning）"
+        line: 2829
+      - id: "12.23"
+        title: "12.23 德菲法（Delphi Method）"
+        line: 2839
+      - id: "12.24"
+        title: "12.24 TELOS 可行性分析（TELOS Feasibility）"
+        line: 2849
+      - id: "12.25"
+        title: "12.25 成本效益分析（Cost–Benefit Analysis）"
+        line: 2865
+      - id: "12.26"
+        title: "12.26 總持有成本（TCO）"
+        line: 2875
+      - id: "12.27"
+        title: "12.27 單位經濟模型（Unit Economics）"
+        line: 2900
+      - id: "12.28"
+        title: "12.28 淨現值（NPV）"
+        line: 2920
+      - id: "12.29"
+        title: "12.29 最小可行產品（MVP）"
+        line: 2931
+      - id: "12.30"
+        title: "12.30 A/B 測試（A/B Test）"
+        line: 2942
+      - id: "12.31"
+        title: "12.31 試辦／試點計畫（Pilot）"
+        line: 2963
+      - id: "12.32"
+        title: "12.32 RICE 優先級模型（RICE）"
+        line: 2973
+      - id: "12.33"
+        title: "12.33 加權決策矩陣（Weighted Decision Matrix）"
+        line: 2987
+      - id: "12.34"
+        title: "12.34 戴明循環（PDCA）"
+        line: 3007
+      - id: "12.35"
+        title: "12.35 OODA 循環（OODA Loop）"
+        line: 3020
+      - id: "12.36"
+        title: "12.36 決策日誌（Decision Journal）"
+        line: 3033
+      - id: "12.37"
+        title: "12.37 零信任架構（Zero Trust）"
+        line: 3045
+      - id: "12.38"
+        title: "12.38 攻擊樹（Attack Tree）"
+        line: 3064
+      - id: "12.39"
+        title: "12.39 資料品質維度（Data Quality Dimensions）"
+        line: 3084
+      - id: "12.40"
+        title: "12.40 備份還原演練（Backup / Restore Drill）"
+        line: 3104
+      - id: "12.41"
+        title: "12.41 要徑法（Critical Path Method / CPM）"
+        line: 3121
+      - id: "12.42"
+        title: "12.42 完成定義（Definition of Done / DoD）"
+        line: 3131
+      - id: "12.43"
+        title: "12.43 在地化檢查（Localization Review）"
+        line: 3156
+      - id: "12.44"
+        title: "12.44 文化情境審查（Cultural Context Review）"
+        line: 3181
+      - id: "13"
+        title: "13. Recipe Library：方法像 LEGO 一樣自由搭配"
+        line: 3200
+      - id: "13.1"
+        title: "13.1 Simple Brainstorm Recipe"
+        line: 3228
+      - id: "13.2"
+        title: "13.2 Professional Brainstorm Recipe"
+        line: 3252
+      - id: "13.3"
+        title: "13.3 Research-grade Ideation Recipe"
+        line: 3280
+      - id: "13.4"
+        title: "13.4 Board-grade Strategy Recipe"
+        line: 3309
+      - id: "13.5"
+        title: "13.5 New Product / Startup Recipe"
+        line: 3350
+      - id: "13.6"
+        title: "13.6 Global Market Entry Recipe"
+        line: 3370
+      - id: "13.7"
+        title: "13.7 Public Policy Recipe"
+        line: 3396
+      - id: "13.8"
+        title: "13.8 Production Incident Recipe"
+        line: 3425
+      - id: "13.9"
+        title: "13.9 High-risk Architecture Change Recipe"
+        line: 3453
+      - id: "13.10"
+        title: "13.10 Database Migration Recipe"
+        line: 3484
+      - id: "13.11"
+        title: "13.11 Security Review Recipe"
+        line: 3504
+      - id: "13.12"
+        title: "13.12 Decision Under Deep Uncertainty Recipe"
+        line: 3523
+      - id: "14"
+        title: "14. 自由 LEGO 組裝規則"
+        line: 3542
+      - id: "14.1"
+        title: "14.1 LEGO 可以自由換，但需保持 Type 相容"
+        line: 3544
+      - id: "14.2"
+        title: "14.2 Mandatory Gate Injection"
+        line: 3588
+      - id: "14.3"
+        title: "14.3 Optional / Required / Forbidden"
+        line: 3623
+      - id: "15"
+        title: "15. Representation：不同人的腦袋可以用不同視圖"
+        line: 3638
+      - id: "15.1"
+        title: "15.1 同一 Knowledge，不重新理解"
+        line: 3640
+      - id: "15.2"
+        title: "15.2 典型偏好搭配"
+        line: 3653
+      - id: "16"
+        title: "16. Typed Object Model"
+        line: 3716
+      - id: "16.1"
+        title: "16.1 Idea Object"
+        line: 3718
+      - id: "16.2"
+        title: "16.2 Decision Object"
+        line: 3780
+      - id: "16.3"
+        title: "16.3 Method Execution"
+        line: 3821
+      - id: "17"
+        title: "17. 確切工程路徑"
+        line: 3861
+      - id: "18"
+        title: "18. Global Jurisdiction Architecture"
+        line: 4023
+      - id: "18.1"
+        title: "18.1 Resolver 不能只靠 IP"
+        line: 4025
+      - id: "18.2"
+        title: "18.2 Capability Availability"
+        line: 4046
+      - id: "18.3"
+        title: "18.3 Market Admission Gate"
+        line: 4066
+      - id: "19"
+        title: "19. Execution Lifecycle：完整閉環"
+        line: 4089
+      - id: "20"
+        title: "20. 零重工架構"
+        line: 4111
+      - id: "21"
+        title: "21. 最小爆炸半徑"
+        line: 4136
+      - id: "21-rules"
+        title: "強制規則"
+        line: 4148
+      - id: "22"
+        title: "22. Quality Gates"
+        line: 4162
+      - id: "22.1"
+        title: "22.1 Global Gate"
+        line: 4164
+      - id: "22.2"
+        title: "22.2 High-risk Gate"
+        line: 4183
+      - id: "22.3"
+        title: "22.3 Method-specific Gate"
+        line: 4196
+      - id: "23"
+        title: "23. Test / Eval Strategy"
+        line: 4213
+      - id: "23-items"
+        title: "必測項目"
+        line: 4228
+      - id: "24"
+        title: "24. 30 年演進策略"
+        line: 4251
+      - id: "24.1"
+        title: "24.1 Method 不可就地覆寫"
+        line: 4253
+      - id: "24.2"
+        title: "24.2 Champion / Challenger"
+        line: 4263
+      - id: "24.3"
+        title: "24.3 Deprecation"
+        line: 4275
+      - id: "25"
+        title: "25. 開發優先順序"
+        line: 4292
+      - id: "25-p0"
+        title: "Phase 0 — Constitution / Schema First"
+        line: 4294
+      - id: "25-p1"
+        title: "Phase 1 — Core Cognitive Methods"
+        line: 4314
+      - id: "25-p2"
+        title: "Phase 2 — Evidence / Challenge"
+        line: 4346
+      - id: "25-p3"
+        title: "Phase 3 — Compute / Simulation / Decision"
+        line: 4359
+      - id: "25-p4"
+        title: "Phase 4 — Engineering Domain Packs"
+        line: 4375
+      - id: "25-p5"
+        title: "Phase 5 — Global Packs"
+        line: 4390
+      - id: "26"
+        title: "26. 預期結果與驗收標準"
+        line: 4405
+      - id: "27"
+        title: "27. UI / Product Entry Modes"
+        line: 4430
+      - id: "27-A"
+        title: "Mode A — Goal-first"
+        line: 4432
+      - id: "27-B"
+        title: "Mode B — Guided Thinking"
+        line: 4449
+      - id: "27-C"
+        title: "Mode C — Cognitive Canvas"
+        line: 4455
+      - id: "27-D"
+        title: "Mode D — Expert LEGO Builder"
+        line: 4474
+      - id: "27-E"
+        title: "Mode E — Validated Recipe"
+        line: 4492
+      - id: "28"
+        title: "28. 快速選工具表"
+        line: 4509
+      - id: "29"
+        title: "29. 方法搭配基本規則"
+        line: 4536
+      - id: "30"
+        title: "30. 最終定義"
+        line: 4556
+      - id: "30-engine"
+        title: "Cognitive Exploration, Deliberation & Decision Engine（§30 內的 level-1 heading）"
+        line: 4568
+      - id: "appA"
+        title: "Appendix A — 建議拆出的下一批正式規格"
+        line: 4574
+      - id: "appB"
+        title: "Appendix B — 文件維護規則"
+        line: 4608
+    architecture_components:
+      - name: "Prompt → Plan Compiler"
+        line: 96
+        kind: "compiler"
+        summary: "人類目標→計畫編譯器；§0 明言承自 Master Plan，本文件僅引用"
+      - name: "Method Selection Engine"
+        line: 1066
+        kind: "engine"
+        summary: "依 selection_context 產生候選 workflows，經 compatibility check 與 cost/time/quality 最佳化，人類選擇後進 validation"
+      - name: "Cognitive LEGO Graph"
+        line: 98
+        kind: "graph"
+        summary: "§2 架構圖節點，連接 8 類 LEGO（Primitives/Methods/Lenses/Evidence/Challenge/Computation/Decision/Representation）"
+      - name: "Workflow Validator"
+        line: 120
+        kind: "validator"
+        summary: "Jurisdiction/Sector/Culture Packs 注入後 PASS→Execution Runtime，FAIL→Reject/Require Review"
+      - name: "Execution Runtime"
+        line: 122
+        kind: "runtime"
+        summary: "§17 /runtime/：execution、branch、checkpoint、replay、rollback"
+      - name: "Cognitive Primitive Kernel"
+        line: 153
+        kind: "kernel"
+        summary: "24 個長期穩定 primitives；方法可消失、primitive 穩定"
+      - name: "Global Invariant Core"
+        line: 198
+        kind: "layer"
+        summary: "13 個全球不變核心：Evidence/Claim/Assumption/Inference/Decision/Provenance/Versioning/Audit/Typed Capability/Workflow IR/Human Authority/Reproducibility/Rollback"
+      - name: "Local / Jurisdiction Packs"
+        line: 216
+        kind: "pack layer"
+        summary: "語言/文化/法律/隱私/AI 法規/稅務等 17 維度的版本化 packs；§18 階層 Global→Supranational→Country→State→Local"
+      - name: "Compiler"
+        line: 3951
+        kind: "compiler"
+        summary: "/compiler/：intent、problem-classifier、method-selector、graph、compatibility、optimizer、validator、mandatory-gates"
+      - name: "Methods Registry"
+        line: 3871
+        kind: "registry"
+        summary: "/methods/ 17 個 family 目錄（framing…learning），對應 F01–F17"
+      - name: "Domain Packs"
+        line: 3890
+        kind: "registry"
+        summary: "/domain-packs/ 12 個領域 packs（對應 F18–F22 + research/business/policy/education/healthcare/finance/supply-chain）"
+      - name: "Lenses Registry"
+        line: 3904
+        kind: "registry"
+        summary: "/lenses/：stakeholder、profession、government、local、culture、legal、security、privacy、ethics、accessibility"
+      - name: "Representations Registry"
+        line: 3916
+        kind: "registry"
+        summary: "/representations/：text/outline/table/matrix/mindmap/conceptmap/timeline/causal/graph/canvas/audio"
+      - name: "Evidence Store"
+        line: 3929
+        kind: "store"
+        summary: "/evidence/：retrieval、claims、counterevidence、quality、provenance"
+      - name: "Profiles Store"
+        line: 3936
+        kind: "store"
+        summary: "/profiles/：cognitive、representation、rigor、accessibility"
+      - name: "Recipe Library"
+        line: 3200
+        kind: "library"
+        summary: "§13 十二個 validated reference workflows；§17 /recipes/ generic/research/business/policy/engineering/education/decision"
+      - name: "Evaluation Harness"
+        line: 3968
+        kind: "test harness"
+        summary: "/evaluation/：golden、regression、adversarial、safety、privacy、jurisdiction"
+      - name: "Packs Root"
+        line: 3976
+        kind: "registry"
+        summary: "/packs/：jurisdiction（supranational/country/state-province/local/special）、sector、culture、language、standards"
+      - name: "Specs"
+        line: 3988
+        kind: "schema registry"
+        summary: "/specs/：cognitive、evidence、decision、jurisdiction、execution 的 *.schema.yaml（宣告路徑，內容不在本文件）"
+      - name: "Jurisdiction Resolver"
+        line: 2430
+        kind: "service"
+        summary: "解析多層適用管轄；輸入含 entity/user/data subject/processing/storage/provider/market/sector/governing law 等；不能只靠 IP（§18.1）"
+      - name: "Applicable Law Graph"
+        line: 945
+        kind: "graph"
+        summary: "法規來源與適用條件圖譜：jurisdiction→source→effective date→scope→conflict"
+      - name: "Market Admission Gate"
+        line: 4066
+        kind: "gate"
+        summary: "§18.3 flowchart：Pack Exists→Legal Fresh→Data Region→Provider→Security/Privacy→Localization→Sign-off→ENABLE；任一 No→DO NOT ENABLE"
+      - name: "Capability Availability Matrix"
+        line: 4046
+        kind: "policy matrix"
+        summary: "capability × jurisdiction 的 7 狀態；high/critical 時 Unknown=Fail Closed"
+      - name: "Execution Lifecycle"
+        line: 4089
+        kind: "pipeline"
+        summary: "Input→Validation→Planning→Processing→Quality Check→Human Review→Versioning→Audit→Publish→Monitor→Learn→Rollback/Revise 完整閉環"
+      - name: "Zero-rework Knowledge Pipeline"
+        line: 4113
+        kind: "pipeline"
+        summary: "Raw Source→Normalize Once→Evidence/Claims/Entities→Knowledge Graph→多用途共用（Brainstorm/Research/Strategy/Decision/Presentation/Learning）"
+      - name: "Knowledge Graph"
+        line: 4117
+        kind: "store"
+        summary: "零重工架構的中心知識庫"
+      - name: "Blast-radius Containment Hierarchy"
+        line: 4139
+        kind: "isolation model"
+        summary: "Tenant→Workspace→Project→Workflow→Branch→Execution→Capability"
+      - name: "Typed Object Model"
+        line: 3716
+        kind: "data model"
+        summary: "Idea / Decision / Method Execution 三個 YAML 物件"
+      - name: "Quality Gates"
+        line: 4162
+        kind: "gate"
+        summary: "Global / High-risk / Method-specific 三層"
+      - name: "UI Entry Modes"
+        line: 4430
+        kind: "UI layer"
+        summary: "Mode A Goal-first / B Guided Thinking / C Cognitive Canvas / D Expert LEGO Builder / E Validated Recipe"
+      - name: "Legal Source Registry"
+        line: 4394
+        kind: "registry"
+        summary: "僅在 Phase 5 清單與 Appendix B 點名；本文件無定義"
+      - name: "Causal Inference Engine"
+        line: 1694
+        kind: "engine"
+        summary: "11.21 提及「可連到實驗與 Causal Inference Engine」；僅點名未定義"
+      - name: "Decision Engine"
+        line: 1894
+        kind: "engine"
+        summary: "11.29 提及「支援 Decision Engine」；僅點名未定義"
+      - name: "Conflict Engine"
+        line: 76
+        kind: "engine"
+        summary: "承自 Master Plan 的核心之一；本文件僅列名"
+      - name: "Intelligence Council"
+        line: 76
+        kind: "service"
+        summary: "承自 Master Plan；本文件僅列名"
+      - name: "Stakeholder Intelligence"
+        line: 76
+        kind: "service"
+        summary: "承自 Master Plan；本文件僅列名"
+      - name: "Jurisdiction Hierarchy Graph"
+        line: 238
+        kind: "model"
+        summary: "Global→Supranational→Country→State/Province→County/City；含 SAR、Industry Regulator、Tribal、FTZ、Org governing law"
+    machine_readable_blocks:
+      - line: 45
+        kind: "text example: machine identifier + schema"
+        ids:
+          - "method.association.mind_map"
+          - "reversal_conditions"
+      - line: 157
+        kind: "text enumeration: Cognitive Primitive Kernel"
+        ids:
+          - "FRAME"
+          - "QUESTION"
+          - "EXPAND"
+          - "ASSOCIATE"
+          - "DECOMPOSE"
+          - "GROUP"
+          - "MAP"
+          - "COMPARE"
+          - "RELATE"
+          - "CAUSE"
+          - "INFER"
+          - "CHALLENGE"
+          - "IMAGINE"
+          - "FORECAST"
+          - "ESTIMATE"
+          - "CALCULATE"
+          - "SIMULATE"
+          - "OPTIMIZE"
+          - "PRIORITIZE"
+          - "DECIDE"
+          - "VALIDATE"
+          - "EXPLAIN"
+          - "REFLECT"
+          - "LEARN"
+      - line: 186
+        kind: "text: method→primitive 組合式"
+        ids:
+          - "CAUSE_HYPOTHESIS"
+          - "TRANSFORM"
+          - "CLASSIFY"
+          - "CONTEXTUALIZE"
+          - "WEIGHT"
+      - line: 200
+        kind: "text enumeration: Global Invariant Core"
+        ids:
+          - "Evidence"
+          - "Claim"
+          - "Assumption"
+          - "Inference"
+          - "Decision"
+          - "Provenance"
+          - "Versioning"
+          - "Audit"
+          - "Typed Capability"
+          - "Workflow IR"
+          - "Human Authority"
+          - "Reproducibility"
+          - "Rollback"
+      - line: 218
+        kind: "text enumeration: Local/Jurisdiction Pack 維度"
+        ids:
+          - "Language"
+          - "Culture"
+          - "Law"
+          - "Privacy"
+          - "AI Regulation"
+          - "Tax"
+          - "Trade"
+          - "Employment"
+          - "Consumer Protection"
+          - "Accessibility"
+          - "Currency"
+          - "Units"
+          - "Timezone"
+          - "Government Structure"
+          - "Sector Regulation"
+          - "Official Sources"
+          - "Data Residency"
+      - line: 261
+        kind: "yaml: cognitive_preference profile"
+        ids:
+          - "cognitive_preference"
+          - "representation"
+          - "interaction"
+          - "thinking"
+          - "detail"
+          - "decision"
+      - line: 284
+        kind: "text: preference 優先序"
+        ids:
+          - "Explicit user choice"
+          - "Current task need"
+          - "Learned preference"
+          - "Default"
+      - line: 593
+        kind: "text enumeration: Epistemic Types"
+        ids:
+          - "SOURCE FACT"
+          - "EVIDENCE"
+          - "ASSUMPTION"
+          - "HYPOTHESIS"
+          - "AI INFERENCE"
+          - "AI SUGGESTION"
+          - "HUMAN OPINION"
+          - "CALCULATED RESULT"
+          - "SIMULATED RESULT"
+          - "UNKNOWN"
+          - "DECISION"
+      - line: 987
+        kind: "yaml: Method Contract"
+        ids:
+          - "root_cause.fishbone"
+          - "cognitive_primitives"
+          - "inputs"
+          - "outputs"
+          - "preconditions"
+          - "quality"
+          - "forbidden_transition"
+          - "recommended_next"
+          - "rollback"
+          - "root_cause.pareto"
+          - "root_cause.five_whys"
+          - "causal.dag"
+          - "validation.experiment"
+      - line: 1034
+        kind: "yaml: Lens Contract"
+        ids:
+          - "stakeholder.regulator"
+          - "JurisdictionContext"
+          - "PerspectiveAssessment"
+          - "evidence_backed"
+          - "hypothetical_role_perspective"
+          - "impersonation"
+      - line: 1051
+        kind: "text: Representation Contract view tree"
+        ids:
+          - "Knowledge Object"
+          - "Text View"
+          - "Table View"
+          - "Mind Map View"
+          - "Concept Graph View"
+          - "Timeline View"
+          - "Causal View"
+          - "Audio / Guided View"
+      - line: 1070
+        kind: "yaml: selection_context selector inputs"
+        ids:
+          - "selection_context"
+          - "goal_type"
+          - "problem_type"
+          - "risk_tier"
+          - "required_rigor"
+          - "cognitive_preferences"
+          - "accessibility_needs"
+      - line: 1394
+        kind: "yaml: PESTEL factor schema"
+        ids:
+          - "factor"
+          - "statement"
+          - "geography"
+          - "source"
+          - "source_type"
+          - "effective_from"
+          - "effective_to"
+          - "trend"
+          - "implication"
+          - "confidence"
+      - line: 1989
+        kind: "yaml: reversal 範例"
+        ids:
+          - "reversal"
+          - "indicator"
+          - "condition"
+          - "action"
+          - "owner"
+          - "re_review"
+      - line: 2082
+        kind: "markdown: ADR template"
+        ids:
+          - "ADR-XXXX"
+          - "Context"
+          - "Decision"
+          - "Alternatives Considered"
+          - "Migration"
+          - "Rollback"
+          - "Validation"
+          - "Revisit / Reversal Conditions"
+      - line: 3627
+        kind: "text enumeration: block edge 標籤"
+        ids:
+          - "RECOMMENDED"
+          - "OPTIONAL"
+          - "REQUIRED_BY_RISK"
+          - "REQUIRED_BY_JURISDICTION"
+          - "REQUIRED_BY_SECTOR"
+          - "FORBIDDEN"
+      - line: 3720
+        kind: "yaml: Idea Object schema"
+        ids:
+          - "idea"
+          - "IDEA-..."
+          - "origin"
+          - "assumptions"
+          - "evidence"
+          - "counterevidence"
+          - "feasibility"
+          - "risk"
+          - "effects"
+          - "validation"
+          - "decision"
+          - "provenance"
+      - line: 3782
+        kind: "yaml: Decision Object schema"
+        ids:
+          - "decision"
+          - "DEC-..."
+          - "hard_constraints"
+          - "evidence_snapshot"
+          - "stakeholder_positions"
+          - "minority_opinions"
+          - "human_judgment"
+          - "reversal_conditions"
+          - "monitoring_plan"
+          - "outcome"
+      - line: 3823
+        kind: "yaml: Method Execution record schema"
+        ids:
+          - "method_execution"
+          - "EX-..."
+          - "method_id"
+          - "workflow_id"
+          - "block_id"
+          - "knowledge_snapshot"
+          - "policy_version"
+          - "jurisdiction_snapshot"
+          - "model_profile"
+          - "prompt_version"
+          - "rollback_ref"
+      - line: 3863
+        kind: "text: 工程目錄樹"
+        ids:
+          - "/cognitive/"
+          - "/kernel/"
+          - "/methods/"
+          - "/domain-packs/"
+          - "/lenses/"
+          - "/representations/"
+          - "/evidence/"
+          - "/profiles/"
+          - "/recipes/"
+          - "/compiler/"
+          - "/runtime/"
+          - "/evaluation/"
+          - "/packs/"
+          - "/specs/"
+          - "/docs/"
+      - line: 4050
+        kind: "text enumeration: Capability Availability statuses"
+        ids:
+          - "Allowed"
+          - "Restricted"
+          - "Human Review"
+          - "Local-only"
+          - "Government-only"
+          - "Prohibited"
+          - "Unknown"
+      - line: 4062
+        kind: "text: fail-closed 規則"
+        ids:
+          - "Unknown = Fail Closed"
+      - line: 4166
+        kind: "text checklist: Global Gate"
+        ids:
+          - "Functional PASS"
+          - "Evidence PASS"
+          - "Reasoning PASS"
+          - "Security PASS"
+          - "Privacy PASS"
+          - "Data PASS"
+          - "Jurisdiction PASS"
+          - "Localization PASS"
+          - "Accessibility PASS"
+          - "Observability PASS"
+          - "Capacity PASS"
+          - "Rollback PASS"
+          - "Documentation PASS"
+          - "Golden Test PASS"
+      - line: 4187
+        kind: "text checklist: High-risk Gate"
+        ids:
+          - "Human Specialist Review PASS"
+          - "Counterevidence PASS"
+          - "Red Team PASS"
+          - "Independent Judge PASS"
+          - "Reversal Criteria PASS"
+          - "Recovery / Rollback Rehearsal PASS"
+      - line: 4217
+        kind: "text enumeration: eval datasets"
+        ids:
+          - "Golden Dataset"
+          - "Regression Dataset"
+          - "Adversarial Dataset"
+          - "Privacy Dataset"
+          - "Safety Dataset"
+          - "Jurisdiction Dataset"
+          - "Accessibility Dataset"
+          - "Localization Dataset"
+      - line: 4255
+        kind: "text: method 版本化 IDs"
+        ids:
+          - "method.swot.v1"
+          - "method.swot.v2"
+          - "method.swot.v3"
+      - line: 4576
+        kind: "text: Appendix A spec/doc 路徑清單"
+        ids:
+          - "primitive.schema.yaml"
+          - "method.schema.yaml"
+          - "lens.schema.yaml"
+          - "representation.schema.yaml"
+          - "recipe.schema.yaml"
+          - "profile.schema.yaml"
+          - "evidence.schema.yaml"
+          - "claim.schema.yaml"
+          - "assumption.schema.yaml"
+          - "decision.schema.yaml"
+          - "reversal.schema.yaml"
+          - "context.schema.yaml"
+          - "availability.schema.yaml"
+          - "manifest.schema.yaml"
