@@ -1,5 +1,21 @@
 # AwareWave Stack 快速查詢表
 
+> ## 🚨 2026-08-28 全面整併：SG + EU 已全數搬入 ks-aw-01（`149.202.64.114`）
+> 操作者指示提前整併（原排 11/20）。**現在所有服務都在一台機器上**：
+> - **SSH**：`ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114`（sudo；root 僅緊急）
+> - **13 筆 aware-wave.com DNS + soulfulexpression.org 全部指向 ks-aw-01**
+> - 架構：host nginx 統一終結 TLS（sites-enabled 每域一檔）→ 各服務綁 127.0.0.1 端口。
+>   下表的容器名/內部端口**原樣保留**，僅兩處改動：uptime-kuma 改 bridge 網路綁
+>   `127.0.0.1:3005`（原 host 網路 3001，讓位給 node-api）；lobster-nginx 綁
+>   `127.0.0.1:8083`（host nginx 反代給它，rate limit 靠 default.conf 補了
+>   `set_real_ip_from 127.0.0.1` 維持按真實客戶端計數）
+> - aware-wave.com LE 憑證已在 ks 重簽（SG 上的那張 8/23 已過期無人察覺——CF Flexible 走 80 所以沒炸）
+> - 排程全數移植：endpoint-alert timer、eu-backup cron（`/etc/cron.d/ks-stack-backup`）、
+>   mainwp wp-cron、supabase weekly restart、auto-deploy、watchdog、certbot renew
+> - **舊機 SG `5.223.93.113` / EU `204.168.175.41`：容器已停、排程已靜音（crontab 備份在
+>   `/root/crontab.bak`），保留當回滾路徑，等操作者點頭後刪除退租**
+> - 下方 SG/EU 兩節保留當容器/端口明細參考（內容在 ks 上依然成立），機器歸屬已失效
+
 > 所有伺服器、容器、路徑、端口的事實參考。
 > 從 AGENTS.md 移出，避免讓 system prompt 過重。
 > 規則（禁止事項、SOP）仍在 AGENTS.md。

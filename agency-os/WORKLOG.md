@@ -2,6 +2,34 @@
 
 ## 2026-08-28
 
+### 🚨 同日下午：SG + EU 全面整併入 ks-aw-01（操作者因帳務指示提前，原排 11/20）
+
+**指示**：「SG和EU 也都要搬到新機 因為(9)/2 就要被扣款43 我不想付」。已向操作者說明 Hetzner 後付制 → 9/2 那筆是 8 月已用量免不掉，能省的是 9 月起；以「儘快搬完驗證後刪機」為目標執行。
+
+**時間線（UTC，總計約 50 分鐘，7 個服務群）**：03:23 預拷啟動（36GB）→ 03:30 Kuma → 03:32 MainWP → 03:41 Remotion/Video（docker save/load 原樣帶 image）→ 03:44–03:50 Supabase+n8n+Postiz（共用 supabase-db 故同窗；停機窗 ~6 分鐘）→ 03:53–04:01 Trigger.dev（override.xml 記憶體預算原樣帶）→ 04:06–04:15 SG 整組 → 04:20 憑證重簽 + 排程移植完畢。
+
+[已修改]（機器層為主，repo 內 3 檔）
+- ks-aw-01：/root/{supabase,trigger,n8n,postiz,mainwp,lobster-phase1,scripts,Work}、/opt/oracle、/etc/nginx/sites-available/*（10 vhost + sg-stack）、/etc/nginx/conf.d/rate-limit-zones.conf、/etc/letsencrypt（EU+SG 合併 + aware-wave.com 重簽至 11/26）、systemd endpoint-alert timer、/etc/cron.d/ks-stack-backup、root crontab 11 條
+- `agency-os/docs/operations/AWAREWAVE_STACK_QUICKREF.md`：頂部整併橫幅（拓樸 SSOT 更新）
+- `agency-os/TASKS.md`：整併記錄 + 刪機 gate + 後續清單
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=curl | cmd=15 個公開端點全掃 | exit=0 | ms=30000 — 15/15 回各自正常狀態碼（200/301/307/401）
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker ps + free + uptime on ks | exit=0 | ms=3000 — 41 容器全 Up（多數 healthy）、RAM 11G/62G、load 0.84/16t、碟 11%
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql count workflow_entity on ks supabase-db | exit=0 | ms=2000 — n8n workflows=5 資料完整跟過來
+- REVIEW_DONE: critic=Self-adversarial | verdict=pass | findings=0c/0m/3n — ①mainwp volume 初拷未帶 --numeric-ids（mysql 自行 chown datadir，容器 healthy + 登入頁 200，後續全部改帶）②舊機排程靜音而非刪除，crontab 備份 /root/crontab.bak ③ Work clone remote 內嵌 PAT 沿襲 SG 現狀，已開 TASKS 改 deploy key
+- ORACLE_WAIVED: Codex 額度盡 + 主要為機器層操作（非 repo code），每步有指令級實測
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=204.168.175.41 | hits=多處歷史文件（描述當時為真保留）；活性引用（QUICKREF/TASKS）已更新；監控腳本仍讀三台已列 TASKS 待刪機後改
+- 踩到並修正：①rsync 預設按名稱對映 owner → supabase-db pgsodium key 權限炸（FATAL invalid secret key），改 --numeric-ids 全部重拷 ②EU sites-enabled 是 symlink，staged 後懸空讀到空檔 → 改從 sites-available 取真檔 ③certbot 雙帳號並存需 --account ④kuma host-network 3001 撞 node-api → 改 bridge 3005 ⑤lobster-nginx rate limit 會因新增代理層全部同 bucket → default.conf 補 set_real_ip_from 127.0.0.1 ⑥aware-wave.com 憑證 8/23 已過期（CF Flexible 掩蓋）→ 重簽
+
+[剩餘風險]
+- 舊機保留到操作者點頭刪除；刪除後回滾路徑消失（屆時依賴 ks 備份管線 + R2）
+- ks 備份 cron 今晚 02:30 UTC 首跑，明天必須驗產出（backup-eu-stack.sh 路徑同構應直接可用，但未實跑過）
+- 監控腳本（capacity/smoke）仍讀三台，刪機後會 WARN → 已列 TASKS
+
+[rollback]（刪機前有效）
+- 任一服務群：ks 上 docker compose stop → 對應舊機 docker compose start → CF DNS PATCH 回原 IP
+
 ### 🎉 Soulful 正式切換完成：Hostinger → ks-aw-01（操作者授權「你幫我」，全程代執行）
 
 **時間線（UTC）**：02:57 首次 rehearse-freeze 被前置檢查安全擋下（301≠200）→ 03:02 r10 彩排通過 200→503→200 → 03:04:14 `--live` 開凍結 → 03:05:28 同步完成 78 秒（288 表 row-count 一致）→ 03:08:00 Cloudflare DNS PATCH（`191.101.230.176`→`149.202.64.114`，proxied=true 維持）→ 03:08:57 新機強制寄信 `sent`。舊站依設計**維持凍結**（`.maintenance` 03:04 寫入，回滾路徑）。
