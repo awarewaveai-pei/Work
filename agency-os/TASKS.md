@@ -457,6 +457,16 @@
 
 #### E. ▶️ 可直接做 — 治理與機械閘
 
+- [ ] **MCP 執行期可用性偵測器：讀實際 connected/failed 計數，不再只驗設定檔語法**
+  - `🟠 未開始` · `2026-08-28 開出` · `可直接做`
+  - **一句話**：`check-claude-sync.ps1` 的 H4 只能回答「產生器有沒有吐出 Claude 展不開的語法」；「這 24 支 server 實際上啟不啟得起來」沒有任何人在看。
+  - **不變量**：靜態文字檢查無法回答執行期可用性 —— 那取決於啟動期環境與 Claude Code 自己的 per-server schema。唯一權威來源是 MCP runtime 本身。
+  - **為什麼不併進 H4**：外部 oracle 兩輪各提一次要把「`${NAME}` 執行期未解析」「per-server schema 驗證」加進 H4。再補下去等於在 PowerShell 裡重寫 Claude Code 的 MCP 載入器，它每改一次 schema 就多一個補丁。H4 的範圍已在原始碼註解明文釘死，勿再擴張。
+  - **訊號一直都在，只是沒人讀**：桌面版每次 session 都往 `%LOCALAPPDATA%\Claude\Logs\main.log` 寫 `init_mcp=connected:N/pending:N/failed:N/needs_auth:N`。2026-08-28 之前那行連續數週寫著 `failed:14`，沒有任何流程讀它。
+  - **下一步**：① `scripts/check-mcp-runtime.ps1` 解析 main.log 最近一筆 `init_mcp=` ② 寫 `reports/status/mcp-runtime-LATEST.json`，帶 `overall` + `measured`（沿用 `detector-contract` 不變量，同區另一條待辦）③ 接進 `ao-resume.ps1` 與 `AGENTS.md` §代理自動工具使用規則 §1 系統快照
+  - **完成定義**：塞一份 `failed:14` 的假 log 必須 WARN/FAIL；`failed:0` 必須 PASS；log 讀不到時 `measured=0` 且不得回 PASS
+  - **證據**：`scripts/check-claude-sync.ps1` H4 SCOPE 註解；`agency-os/reports/oracle/2026-08-28-review-2915479a.md` FINDING 1/2；commit 5b446f16 的不變量分析段
+
 - [ ] **【2026-08-26 開出｜偵測器說謊｜第三顆】Phase 4 Check 1／Check 2 至少 12 週在回報假綠燈 —— 雲端容器沒有 `gh`** — 2026-08-26 把檢查邏輯換成 `scripts/phase4-checks.py` 後第一次雲端實跑，Check 1／2 回 `SKIP — gh not installed`（`RemoteTrigger get_run_log cse_01BAKre3odz4KUbP1jUDxaFS`，容器內 `python3` 有、`gh` 沒有）。但 `agency-os/reports/repair-center/phase4-2026-06-08.md` 到 `phase4-2026-08-21.md` **連續 12 份全部是 `Check 1: PASS`**（逐檔 grep 確認）。舊 prompt 明文寫 `If gh exit != 0: CHECK1_STATUS = "SKIP"`，所以要嘛容器映像近期拿掉 `gh`，要嘛散文規格被執行成了 PASS —— 兩者結論相同：**那兩項檢查有 12 週沒有真的在量任何東西**。**現況不是退步**：SKIP 是誠實的「我沒量到」，比假 PASS 好；且 SKIP 會進 `整體` 顯示（今天是「⚠️ 1 項需注意, 2 項 SKIP」），不會被當健康。**要決定的是取捨不是 bug**：① 給 routine 配 setup script 裝 `gh`（目前 `No setup script configured`）② 改走 GitHub REST API + token —— 但 routine 刻意無 env vars（與另外三支 routine 同 pattern），加 token 會讓四支分叉 ③ 接受 SKIP，把 auto-repair PR 重複偵測改由本機 `/health` 或 `.ps1` fallback 負責（本機有 `gh`，今天實測 Check 1 正常回 PASS）。**建議③**：這兩項本來就不是時效性檢查，而雲端加 secret 的代價高於收益。
 
 - [ ] **建立 `detector-contract` audit class：偵測器必須申報「這輪量到什麼」**
