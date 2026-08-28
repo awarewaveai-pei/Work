@@ -93,6 +93,21 @@ Cursor 2026-08-26 退場、`~\.cursor` 2026-08-28 刪除（1.3 GB），但**產�
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=RCLONE_REMOTE | hits=3(全部為本輪改動檔案的內文/註解,無殘留 call site)
 - REVIEW_DONE: critic=Codex(round1)+class-sweep | verdict=warn→fixed | findings=5c 全修
 
+### 操作者書籤掃描揭稿：Kuma 18/27 監控標的死在舊拓樸 + Netdata 代理缺口 + IPv6 白名單盲點
+
+**觸發**：操作者帼出書籤清單問「這些也都搬好了？」。自架 11 項已全搬；但逐項實查抓出三個真缺口：
+
+1. **Uptime Kuma 27 個監控標的有 18 個紅**：URL 寫死舊拓樸（SG IP 直打、EU 時代 host-network 的 127.0.0.1 端口）。依治理文件定位（Kuma 職責 = public reachability）全部改公開網域 URL：11 個改指向 + 3 個加收 401（kong/basic-auth 屬正常未授權態，服務鏈活著的證明）+ 4 個綁死舊機器的停用（Hetzner ping/Netdata 舊機）。DB 先備份 `kuma.db.bak-20260828-monitor-retarget`。結果：**23/23 全綠**。
+2. **CF 白名單 IPv6 盲點（根因珍珠）**：主機自打自家網域被 CF challenge 403（`cf-mitigated: challenge`）——host 層 curl 優先走 IPv6 出站，而早上的白名單只加了 IPv4（容器純 v4 所以 Trigger 沒事，掩蓋了問題）。補 `2001:41d0:d:2572::/64`（target=ip_range，ip6 target 不收 CIDR）兩個 zone → host 自打 200。endpoint-alert 的 heartbeat 403 同根因同時痊癒。
+3. **Netdata 代理沒裝在 ks**（SG/EU 都 active，刪機即全滅）→ apt 官方套件安裝，僅綁 127.0.0.1:19999（安全預設）；Netdata Cloud claim 需操作者的 claim token，列 TASKS 可選項。
+4. 附帶：endpoint-alert 的 WP 本機檢查 `127.0.0.1:8080/` 在 ks 回 404（Host 相依）→ 改 `/wp-json/`（免 Host 回 200，保留打本機端口的反 hairpin 設計）；兩輪 timer 實跑零失敗。
+
+**外部 SaaS 類書籤（不需搬）**：PostHog/Resend/Sentry/Slack/Telegram/ScraperAPI/Apify/Instantly/MillionVerifier/Merchize/Calendarific/Docker Hub/網域註冊商 —— 供應商雲端，與機器無關；DSN/API 都域名制，換 IP 不影響。
+
+- REALTEST_EVIDENCE: tool=SSH+sqlite | cmd=kuma heartbeat 全板查詢 | exit=0 | ms=30000 — 23/23 status=1（含 push 心跳 OK）
+- REALTEST_EVIDENCE: tool=curl | cmd=host 自打 entry-page 前後對照 | exit=0 | ms=20000 — 403(cf-mitigated:challenge) → v6 白名單後 200
+- REALTEST_EVIDENCE: tool=SSH | cmd=netdata install + /api/v1/info | exit=0 | ms=60000 — active，v1.43.2，僅 127.0.0.1
+
 ### OVH 基礎設施層完工：Edge Network Firewall 上線 + rDNS 配對（P2.5c 從「已查清」升級「已完成」）
 
 **路徑曲折但結局乾淨**：① 操作者帳號在 OVH 世界區（ca.ovhcloud.com），我先導到歐洲區登入頁造成「密碼錯誤」謎題（兩套獨立帳號庫）② IP 頁 UI 的 inline 表單確認鈕 hitbox 對滑鼠座標映射極不友善（每次都點到取消鈕，零 API 呼叫零錯誤提示）③ 最終改用 **Manager 內建 Cloud Shell（`ovhcloud` 官方 CLI，用操作者現有 session）** —— 每步指令級回饋，全程不碰密碼。
