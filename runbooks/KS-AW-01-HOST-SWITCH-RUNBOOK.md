@@ -2,7 +2,7 @@
 
 > **建立 2026-08-28**，由當日完成的三機整併（SG+EU+Hostinger → ks-aw-01）實戰驗證中提煉。
 > 本文件是「操作者月租退出權」的執行載體：發現更便宜／更符合規格地板的機器
-> （例：**KS-6 $59.80/mo 128GB ECC 2×1TB**、KS-7、Hetzner auction 合規機）時，
+> （例：**KS-6 $59.80/mo 128GB ECC 2×1TB**（價格為 2026-08 決策文件基準，下單以當日頁面為準）、KS-7、Hetzner auction 合規機）時，
 > 照本文件把 ks-aw-01 整機搬過去。
 >
 > **決策鏈**：[`2026-08-17-dedicated-host-spec-upgrade.md`](../agency-os/reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md)
@@ -78,10 +78,13 @@ done | grep -E '^[0-9a-f]{64}'
 
 ### 1d. 系統層（rsync/重建對象）
 
-- `/etc/nginx/sites-available/`（11 檔，**從 sites-available 拿真檔，sites-enabled 是 symlink** — 整併日坑）＋ `conf.d/{soulful-security,soulful-cache,rate-limit-zones,cf-edge-geo}.conf`＋`snippets/cf-only.conf`
+- `/etc/nginx/sites-available/`（11 檔，**從 sites-available 拿真檔，sites-enabled 是 symlink** — 整併日坑）；拷完**必重建啟用 symlink**（覆審 F3）：`for f in /etc/nginx/sites-available/*; do ln -sf "$f" /etc/nginx/sites-enabled/; done`（default 檔依現況取捨）再 `nginx -t`＋ `conf.d/{soulful-security,soulful-cache,rate-limit-zones,cf-edge-geo}.conf`＋`snippets/cf-only.conf`
 - `/etc/letsencrypt/` 整棵：`archive/ live/ renewal/ accounts/` **加 `options-ssl-nginx.conf` `ssl-dhparams.pem`**（整併日坑：漏這兩檔 nginx -t 直接炸）；renewal conf 的 `account` 已統一單一帳號 ✓
 - `/etc/hosts` 的 `127.0.0.1 registry` 行 + `/etc/docker/daemon.json` 的 `insecure-registries:["registry:5000"]`（整併日坑；改完 `kill -HUP dockerd` 免重啟）
-- root crontab（11 行）＋ `/etc/cron.d/{lobster-backup,ks-stack-backup,ks-aw-01-backup}` ＋ `/etc/default/{eu-backup,awarewave-endpoint-alert*}`（600）＋ systemd `awarewave-endpoint-alert.{service,timer}`
+- **root crontab 不是檔案，不能 rsync**（覆審 F4）：`ssh OLD 'sudo crontab -l' | ssh NEW 'sudo crontab -'`（11 行，需逐行目視確認）
+- `/etc/cron.d/{lobster-backup,ks-stack-backup,ks-aw-01-backup}` ＋ `/etc/default/{eu-backup,**ks-aw-01-backup**,awarewave-endpoint-alert*}`（600；覆審 F2：漏 `ks-aw-01-backup` 則 soulful 管線的 EXPECT_SERVICES/R2/加密設定全沒）
+- systemd `awarewave-endpoint-alert.{service,timer}` 拷入 `/etc/systemd/system/` 後**必跑**（覆審 F5：拷檔不等於註冊）：`systemctl daemon-reload && systemctl enable --now awarewave-endpoint-alert.timer`
+- **Trigger deploy 工具鏈主機層狀態**（覆審 F6，`trigger/README.md` §7a 明寫換機必重做）：`/etc/buildkit/buildkitd.toml`（registry:5000 http+insecure）+ `docker buildx create --name trigger --driver docker-container --driver-opt network=host --config /etc/buildkit/buildkitd.toml --use` + `inspect --bootstrap`（builder metadata 不在任何 volume 裡，2026-08-28 實證：ks 自己就漏了這步，當場補修）
 - `/root/.ssh/`：`soulful_pull`（Hostinger 觀察期內）、`work_deploy`（GitHub deploy key）＋ `config` alias
 
 ### 1e. DNS（Cloudflare，PATCH `content` → NEW_IP；record id 現查 `GET /zones/<zone>/dns_records`）
@@ -91,7 +94,7 @@ done | grep -E '^[0-9a-f]{64}'
 
 ### 1f. Cloudflare / OVH 邊緣層（新機必補，整併日兩個坑都在這）
 
-1. **兩個 zone 各加 IP Access whitelist**：NEW_IP（target=`ip`）**和 NEW_IP 的 IPv6 /64（target=`ip_range`，不是 `ip6`）** —— 整併日坑：只加 v4，主機自打自家網域走 v6 被 CF challenge 403，容器純 v4 掩蓋了問題
+1. **兩個 zone 各加 IP Access whitelist**：NEW_IP（target=`ip`）**和 NEW_IP 的 IPv6 /64（target=`ip_range`，不是 `ip6`；v6 位址新機上 `ip -6 addr show scope global` 取）** —— 整併日坑：只加 v4，主機自打自家網域走 v6 被 CF challenge 403，容器純 v4 掩蓋了問題
 2. **OVH Edge Network Firewall**（若新機仍 OVH；經 Manager **Cloud Shell** `ovhcloud` CLI，UI hitbox 不可靠）：
    ```
    ovhcloud ip firewall add NEW_IP/32 NEW_IP
@@ -105,6 +108,7 @@ done | grep -E '^[0-9a-f]{64}'
    ovhcloud ip firewall rule create NEW_IP/32 NEW_IP --sequence 19 --action deny --protocol ipv4
    # 全部 state=ok 後：
    ovhcloud ip firewall enable NEW_IP/32 NEW_IP
+   # ℹ️ 順序硬約束（自審 M1）：先把 CF 的 `ks-aw-01` A 記錄 PATCH 成 NEW_IP（rDNS 驗證正向配對，沒改先會 fail）
    ovhcloud ip reverse set NEW_IP/32 NEW_IP ks-aw-01.aware-wave.com.
    ```
    帳號在**世界區** `ca.ovhcloud.com`（整併日坑：歐洲區登入頁會回「密碼錯誤」，兩套獨立帳號庫）。GAME firewall 刻意不設。
@@ -125,8 +129,9 @@ done | grep -E '^[0-9a-f]{64}'
 1. Ubuntu 24.04；RAID1 確認 `cat /proc/mdstat` → `[UU]`；`nvme smart-log` 兩碟 `percentage_used <40%`；**rescue mode 實按一次**
 2. SSH 改 58122：**Ubuntu 24.04 是 `ssh.socket`，改 `sshd_config` 無效**——systemd socket override 雙埠並行→驗證→撤 22；建 `ubuntu` 工作帳號
 3. UFW(58122/80/443) + **DOCKER-USER chain + `docker-user-chain.service`**（4/20 挖礦事件根治；`iptables-persistent` 安裝會**靜默移除 ufw**，裝完必查 `ufw status`）
-4. Docker + `/etc/hosts` registry 行 + daemon.json insecure-registries（§1d）
+4. Docker + `/etc/hosts` registry 行 + daemon.json insecure-registries（§1d）；**預建 external 網路**（自審 M20，漏了則 n8n/render/SG compose 直接起不來）：`docker network create lobster-net`（`supabase_default` 由 supabase compose 自建，但需先於 n8n/postiz 起）
 5. fail2ban、sysctl/THP、fstrim、unattended-upgrades
+6. **netdata 代理重裝**（自審 M5，systemd 非 docker，不會隨 volume 走）：`apt-get install -y netdata`（預設僅綁 127.0.0.1:19999，維持）
 
 ## §3 Phase 1 — 零停機預備（D-1～D0）
 
@@ -176,7 +181,9 @@ done | grep -E '^[0-9a-f]{64}'
 
 ## §7 回滾
 
-- **任一群失敗**：新機 `docker compose stop` 該群 → 舊機 `docker compose start` → DNS PATCH 回舊 IP（舊機資料停在該群停機那刻，窗內零寫入 = 零遺失）
+- **兩層回滾（覆審 F1：已開放寫入後直接 DNS 回切 = 丟寫入）**：
+  - **(a) 窗內失敗**（新機驗證沒過、DNS 尚未切或剛切即發現）：新機 stop → 舊機 start → DNS 回——舊機資料停在停機那刻，零遺失
+  - **(b) 已上線接寫後才發現問題**：不可直接 DNS 回切！必須反向重跑同一群的切換程序：停新機該群 → **反向 final rsync（新→舊，--numeric-ids --delete）** → 舊機 start → DNS 回。新機上接受過的寫入藉反向同步帶回，零遺失
 - **邊緣層失敗**（新機被鎖）：OVH console 隨時可 `firewall disable`；CF whitelist 與 DNS 與機器無關
 - **全面中止**：所有 DNS 尚未切的群不受影響；已切的群逐一切回。舊機保留到 §6 才退租 = 全程有家可回。
 
@@ -196,6 +203,9 @@ done | grep -E '^[0-9a-f]{64}'
 | OVH 帳號分區 | 「密碼錯誤」假象 | §1f.2 |
 | 備份 exit 在 R2 之前 | 零異地還只報 WARNING | 已治本於腳本；§5.3 驗證 |
 | limit_req_status 重複 | nginx -t fail | §3.4 |
+| buildx builder metadata 不在 volume | 換機後首次 trigger deploy 推 registry 失敗 | §1d（2026-08-28 覆審發現 ks 現役就漏，已補） |
+| external docker network 不自建 | n8n/render/SG compose 起不來 | §2.4 |
+| 已接寫後 DNS 直接回切 | 丟失新機已接受的寫入 | §7(b) 反向同步 |
 
 ---
 

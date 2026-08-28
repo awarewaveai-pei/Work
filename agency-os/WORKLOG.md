@@ -93,6 +93,17 @@ Cursor 2026-08-26 退場、`~\.cursor` 2026-08-28 刪除（1.3 GB），但**產�
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=RCLONE_REMOTE | hits=3(全部為本輪改動檔案的內文/註解,無殘留 call site)
 - REVIEW_DONE: critic=Codex(round1)+class-sweep | verdict=warn→fixed | findings=5c 全修
 
+### 換機 runbook 雙重覆審（操作者指示 Claude+Codex 各一輪）：11 個缺陷全修，順帶拆掉現役機一顆啦弹
+
+**Codex 6 條（全真）**：F1 已接寫後直接 DNS 回切會丟寫入 → 回滾改兩層（窗內 vs 已上線需反向 rsync）；F2 漏 `/etc/default/ks-aw-01-backup`（實查存在 720B/600）；F3 拷 sites-available 後沒重建 sites-enabled symlink；F4 root crontab 不是檔不能 rsync → 明寫 export/import；F5 systemd unit 拷完沒 daemon-reload+enable；F6 **buildx builder metadata 不在任何 volume** → 換機必重做 `/etc/buildkit/buildkitd.toml` + builder。
+**F6 的額外收穫：現役 ks 自己就漏了這步**（整併只搬了 buildkit 容器 state volume，builder 登記在 EU 的 ~/.docker 沒跟來）——下次 trigger CLI deploy 就會炸。當場依 README §7a 重建，`buildx inspect --bootstrap` running ✓。
+
+**Claude 自審 5 條**（與 Codex 重疊 2）：M20 `lobster-net` 是手建 external 網路（實查無 compose labels），runbook 沒寫建立 → n8n/render/SG compose 直接起不來；M5 netdata 是 systemd 非 docker 不會隨 volume 走；M1 rDNS set 前必先 PATCH ks-aw-01 A 記錄（正向驗證）；M13 v6 取得指令；M17 KS-6 價格加「以當日頁面為準」。
+
+- REVIEW_DONE: critic=Codex+Self 雙輪 | verdict=warn→fixed | findings=11（Codex 6 + 自審 5，重疊 2）全修入 runbook，§8 陷阮表新增 3 列
+- REALTEST_EVIDENCE: tool=SSH | cmd=buildx create+inspect --bootstrap on ks | exit=0 | ms=60000 — builder trigger/trigger0 running
+- ORACLE artifact: agency-os/reports/oracle/2026-08-28-review-bb8f23a1.md
+
 ### 操作者質疑「沒完美處理好」→ 對抗自審：抓到一個躇在 git 歷史兩個月的真洩漏，當場輪換閉環
 
 **密鑰掃描（tracked tree + 全歷史 -S）**：
