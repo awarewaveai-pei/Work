@@ -35,6 +35,15 @@
 
 ## 2026-08-29
 
+### CF DNS 頁兩個警告判讀（操作者貼圖質疑）：DMARC 真缺口已補；「IP 外洩」是刻意設計非問題
+
+**警告 1（DMARC 缺）= 真缺口**：aware-wave.com 無 _dmarc 記錄（soulful 早有 p=none）。已經 CF API 新增 `v=DMARC1; p=none; rua=mailto:<operator gmail>; fo=1`（監控模式，零投遞風險；觀察報告幾週後可升 quarantine）。
+**警告 2（原始 IP 部分外洩）= 刻意設計**：灰雲三筆各有理由 — `ks-aw-01`（rDNS 正向配對 + SSH 入口，必須真 IP）、`remotion-svc`/`video-svc`（長時間 render 會撞 CF proxy 100s timeout，vhost 本來就不掛 cf-only 守衛，靠自己的 token auth，舊拓樸同款設計）。直打 IP 的其餘 vhost 全部 403（cf-only 守衛 9 檔實查），OVH Edge Firewall 只開 58122/80/443，暴面可控。
+
+- REALTEST_EVIDENCE: tool=curl | cmd=CF API POST dns_records (success=True id=f28b0da7) + nslookup TXT _dmarc.aware-wave.com @1.1.1.1 回正確內容 | exit=0 | ms=15000
+- REVIEW_WAIVED: DOC_ONLY -- 無 repo code 改動（DNS 記錄 + WORKLOG）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=_dmarc | hits=0（無其他文件宣稱 DMARC 狀態，無 stale claim）
+
 ### Netdata Cloud claim 補齊（整併日已登記的待辦，操作者發現 Cloud 上還是舊 Hetzner 兩節點）
 
 **根因**：claim 需操作者帳號的一次性 token，整併日只能列 TASKS 待辦。今日經操作者登入的 Chrome 取得 token 後執行。
