@@ -180,7 +180,11 @@ if ($isWindowsHost) {
 $syncScript = Join-Path $MonorepoRoot 'scripts\sync-claude-userlevel.ps1'
 if (Test-Path -LiteralPath $syncScript) {
     try {
-        $verifyCommand = "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new(); & '$syncScript' -Mode verify"
+        # -MonorepoRootOverride is REQUIRED, not decorative: the callee discovers its root from
+        # the CURRENT DIRECTORY, so a run started from System32 or from another checkout verifies
+        # a different repo's SSOT and still exits 0 -- this gate would go green having checked
+        # nothing here. sanitize-user-mcp-config.ps1:152 already pins it; this caller did not.
+        $verifyCommand = "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new(); & '$syncScript' -Mode verify -MonorepoRootOverride '$MonorepoRoot'"
         $verifyOut = & powershell.exe -NoProfile -ExecutionPolicy Bypass -Command $verifyCommand 2>&1
         $verifyExit = $LASTEXITCODE
         if ($verifyExit -eq 0) {
@@ -201,6 +205,62 @@ if (Test-Path -LiteralPath $syncScript) {
     Add-Finding -Severity 'hard' -Check 'H2: sync-claude-userlevel -Mode verify' `
         -Detail "Sync script missing: $syncScript" `
         -Fix 'git pull to restore scripts/sync-claude-userlevel.ps1'
+}
+
+# ---------- H4: repo-root .mcp.json placeholder syntax ----------
+# SCOPE (deliberate, do not widen -- see invariant analysis, WORKLOG 2026-08-28):
+#   This gate owns exactly ONE question: did OUR generator emit a placeholder form that
+#   Claude Code cannot expand? That is a closed, statically-decidable question with a
+#   known-wrong token, and it is the regression that actually happened.
+#   It does NOT and MUST NOT try to answer "will every server actually start" -- that
+#   depends on the launch-time environment and on Claude Code's own per-server schema,
+#   so a static text check can only ever approximate it, and each approximation is one
+#   more thing to keep in sync with an external product. Two oracle rounds proposed
+#   widening it that way (unresolved ${NAME} at runtime; per-server schema validation);
+#   both are real gaps, and both belong to a RUNTIME detector reading the actual
+#   connected/failed counts, not here. See TASKS.md "MCP runtime usability detector".
+
+# Claude Code expands ${NAME}. It passes ${env:NAME} through as a LITERAL string --
+# that form is Cursor / VS Code syntax. Getting it wrong fails SILENTLY: every
+# powershell-launched server receives '${env:MONOREPO_ROOT}\scripts\...' as its -File
+# path, and every http server receives 'Bearer ${env:TOKEN}' as its credential.
+# 14 of 24 servers failed on EVERY launch from at least 2026-08-12 to 2026-08-28 while
+# every gate stayed green, because no gate looked at this file at all. Found by external
+# oracle review, see agency-os/reports/oracle/2026-08-28-inspect-c3ee1ed4.md FINDING 2.
+# Generator: scripts/sync-mcp-config.ps1, Resolve-EnvValue / ClaudeProjectPlaceholder.
+$projectMcpPath = Join-Path $MonorepoRoot '.mcp.json'
+if (-not (Test-Path -LiteralPath $projectMcpPath)) {
+    Add-Finding -Severity 'hard' -Check 'H4: .mcp.json placeholder syntax' `
+        -Detail "Project MCP config missing: $projectMcpPath" `
+        -Fix 'powershell -File scripts\sync-mcp-config.ps1'
+} else {
+    $mcpRaw = Get-Content -LiteralPath $projectMcpPath -Raw
+    # Parse before linting. The invariant is "Claude Code can LOAD this file and every
+    # placeholder in it is one Claude expands" -- a substring check alone reports PASS on a
+    # file that is not valid JSON at all, which fails just as silently (no project MCP servers
+    # load, no error surfaces). Oracle review 2026-08-28-review-2158c99b.md FINDING 2.
+    $mcpParsed = $null
+    $mcpParseError = ''
+    try { $mcpParsed = $mcpRaw | ConvertFrom-Json } catch { $mcpParseError = $_.Exception.Message }
+    if ($null -eq $mcpParsed) {
+        Add-Finding -Severity 'hard' -Check 'H4: .mcp.json placeholder syntax' `
+            -Detail "Not valid JSON, Claude Code loads no project MCP servers: $mcpParseError" `
+            -Fix 'powershell -File scripts\sync-mcp-config.ps1   (regenerates .mcp.json from mcp/registry.template.json)'
+    } elseif ($null -eq $mcpParsed.PSObject.Properties['mcpServers']) {
+        Add-Finding -Severity 'hard' -Check 'H4: .mcp.json placeholder syntax' `
+            -Detail 'Valid JSON but no mcpServers key -- Claude Code loads no project MCP servers' `
+            -Fix 'powershell -File scripts\sync-mcp-config.ps1'
+    } elseif (([regex]::Matches($mcpRaw, '\$\{env:[A-Za-z_][A-Za-z0-9_]*\}')).Count -gt 0) {
+        $cursorStyle = [regex]::Matches($mcpRaw, '\$\{env:[A-Za-z_][A-Za-z0-9_]*\}')
+        $sample = (($cursorStyle | Select-Object -First 3 | ForEach-Object { $_.Value }) -join ', ')
+        $h4Detail = "$($cursorStyle.Count) Cursor-style placeholder(s) of the form " + '${env:NAME}' + " in .mcp.json -- Claude Code does NOT expand that form, so each server gets the literal text as its path or credential. Sample: $sample"
+        Add-Finding -Severity 'hard' -Check 'H4: .mcp.json placeholder syntax' `
+            -Detail $h4Detail `
+            -Fix 'powershell -File scripts\sync-mcp-config.ps1   (if they return, the generator regressed: check Resolve-EnvValue ClaudeProjectPlaceholder in scripts\sync-mcp-config.ps1)'
+    } else {
+        Add-Finding -Severity 'pass' -Check 'H4: .mcp.json placeholder syntax' `
+            -Detail ('no ' + '${env:NAME}' + ' placeholders (Claude Code expands ${NAME} only)')
+    }
 }
 
 # ---------- H3 + S1: git-tracked .claude files exist on disk + extras ----------

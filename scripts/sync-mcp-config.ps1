@@ -170,8 +170,11 @@ function Resolve-EnvValue {
         # Cursor `.cursor/mcp.json`: keep portable `${workspaceFolder}` / `${userHome}`; env must stay `${env:NAME}` per Cursor docs.
         $resolved = $StringValue.Replace('${workspaceRoot}', '${workspaceFolder}').Replace('${workspaceFolder}', '${workspaceFolder}').Replace('${userHome}', '${userHome}')
     } elseif ($Mode -eq "ClaudeProjectPlaceholder") {
-        # Claude Code `.mcp.json`: use `${env:MONOREPO_ROOT}` so Claude resolves it from the environment; env stays `${env:NAME}`.
-        $resolved = $StringValue.Replace('${workspaceRoot}', '${env:MONOREPO_ROOT}').Replace('${workspaceFolder}', '${env:MONOREPO_ROOT}').Replace('${userHome}', '${userHome}')
+        # Claude Code `.mcp.json`: Claude Code expands `${NAME}`, NOT `${env:NAME}` -- the latter is
+        # Cursor / VS Code syntax and is passed through as a LITERAL string. Verified 2026-08-28 by
+        # A/B probe in all three positions (command/args, env block, http headers). Getting this wrong
+        # does not fail loudly: the server just receives '${env:X}' as its path or bearer token.
+        $resolved = $StringValue.Replace('${workspaceRoot}', '${MONOREPO_ROOT}').Replace('${workspaceFolder}', '${MONOREPO_ROOT}').Replace('${userHome}', '${userHome}')
     } else {
         $resolved = $StringValue.Replace('${workspaceRoot}', $WorkspaceRoot).Replace('${workspaceFolder}', $WorkspaceRoot).Replace('${userHome}', $env:USERPROFILE)
     }
@@ -195,7 +198,8 @@ function Resolve-EnvValue {
                     return '${env:' + $name + '}'
                 }
                 "ClaudeProjectPlaceholder" {
-                    return '${env:' + $name + '}'
+                    # NOT '${env:' -- see the ClaudeProjectPlaceholder branch above.
+                    return '${' + $name + '}'
                 }
                 "GeminiPlaceholder" {
                     return '${' + $name + '}'
