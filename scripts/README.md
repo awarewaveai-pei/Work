@@ -59,7 +59,6 @@ All scripts live in this flat directory. Paths are hard-coded as `scripts\<name>
 | `sanitize-user-mcp-config.ps1` | Back up user-level MCP files, then delegate the rewrite to `sync-claude-userlevel.ps1` (the single writer) |
 | `patch-codex-user-mcp-config.ps1` | Patch Codex user MCP config |
 | `patch-cursor-user-mcp-workspace.ps1` | Patch Cursor workspace MCP |
-| `repair-user-mcp-json-escapes.ps1` | Fix malformed JSON escapes in MCP files |
 | `ensure-agent-bootstrap-prompts.ps1` | Generate bootstrap prompt packs for other AI agents |
 | `run-llm-mcp.ps1` | Stdio launcher for LLM MCP servers (Claude/GPT/Gemini/Grok) |
 | `run-filesystem-mcp.ps1` | Stdio launcher for filesystem MCP |
