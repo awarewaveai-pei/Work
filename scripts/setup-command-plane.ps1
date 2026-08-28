@@ -171,7 +171,7 @@ if (-not [string]::IsNullOrWhiteSpace($WorkspaceId)) {
 # 2) Push to Windows user environment so next shell + child processes inherit them.
 Write-Host ""
 Write-Host "Step 2/3: syncing vault -> Windows user environment..." -ForegroundColor Cyan
-& $vault -Action sync-cursor-mcp-user-env
+& $vault -Action sync-mcp-user-env
 
 # Also set in current process so the webhook call below works without restart.
 $env:TELEGRAM_BOT_TOKEN              = $BotToken

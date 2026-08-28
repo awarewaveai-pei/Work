@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("init", "set", "set-prompt", "get", "list", "remove", "run", "import-mcp", "import-user-env", "sync-copilot-mcp-env", "sync-cursor-mcp-user-env")]
+    [ValidateSet("init", "set", "set-prompt", "get", "list", "remove", "run", "import-mcp", "import-user-env", "sync-copilot-mcp-env", "sync-mcp-user-env", "sync-cursor-mcp-user-env")]
     [string]$Action = "list",
     [string]$Name = "",
     [string]$Value = "",

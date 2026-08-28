@@ -146,8 +146,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\sync-mcp-config.ps1
 ```
 MCP sync complete.
   workspace : <WORK_ROOT>\.mcp.json
-  cursor    : <WORK_ROOT>\.cursor\mcp.json
-  claude    : C:\Users\...\mcp.json
+  claude    : not written -- owned by sync-claude-userlevel.ps1, must stay {}
   codex     : C:\Users\...\.codex\config.toml
   copilot   : C:\Users\...\.copilot\mcp-config.json
   gemini    : C:\Users\...\.gemini\settings.json

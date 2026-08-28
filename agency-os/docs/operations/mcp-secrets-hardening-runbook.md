@@ -144,7 +144,7 @@ mcp/user-env.ps1
 
 1. 把該 secret 移進 vault：`.scriptssecrets-vault.ps1 -Action set -Name FOO -Value <value>`
 2. 從本機檔案改用環境變數
-3. 跑 `.scriptssecrets-vault.ps1 -Action sync-cursor-mcp-user-env` 注入到 Windows User env
+3. 跑 `.scriptssecrets-vault.ps1 -Action sync-mcp-user-env` 注入到 Windows User env
 4. **完全結束 Cursor / Claude Code 後重開**（讓新 env 生效）
 5. 再跑 scanner 確認
 

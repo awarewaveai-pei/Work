@@ -12,7 +12,7 @@
 |----|---------|
 | Repo 所有檔案（WORKLOG、TASKS、rules、memory content） | `git pull` ✅ |
 | Claude hooks / settings.json / commands | `sync-claude-userlevel.ps1 -Mode merge`（讀 repo SSOT） ✅ |
-| MCP 設定（.mcp.json / .cursor/mcp.json 等） | `sync-mcp-config.ps1`（讀 registry.template.json） ✅ |
+| MCP 設定（.mcp.json / Codex / Copilot / Gemini） | `sync-mcp-config.ps1`（讀 registry.template.json） ✅ |
 | **MEMORY.md**（Claude Code 讀取的 project memory index） | ❌ 不在 git → AO-CLOSE 自動複製到桌面 |
 
 ---
@@ -72,7 +72,7 @@ WARN: ~/.claude/ drifted from SSOT (mcp/claude-userlevel/).
 
 代表本機 hooks/settings 與 repo SSOT 不同步 → 補跑 `-Mode merge` 即可（normalizer 自動處理 PS 5.1 array bug，不需手動修補）。
 
-`sync-mcp-config.ps1` 不在 ao-resume 自動流程中，需手動跑一次確保 `.mcp.json`、`.cursor/mcp.json` 等來自最新 `mcp/registry.template.json`。
+`sync-mcp-config.ps1` 不在 ao-resume 自動流程中，需手動跑一次確保 `.mcp.json`、`~/.codex/config.toml`、`~/.copilot/mcp-config.json`、`~/.gemini/settings.json` 來自最新 `mcp/registry.template.json`。
 
 ---
 

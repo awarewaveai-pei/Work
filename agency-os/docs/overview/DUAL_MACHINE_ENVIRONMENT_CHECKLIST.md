@@ -37,9 +37,9 @@
 
 - **Shared MCP／AI 結構（固定）**：兩台共用 repo 內 **`mcp/registry.template.json`**、**`scripts/sync-mcp-config.ps1`**、**`CLAUDE.md`**、**`.cursor/rules/67-shared-mcp-governance.mdc`**；各自持有本機 env／vault／user-level config，**不得**直接複製另一台的明文 `~/.cursor/mcp.json`、`~/.claude.json`。
 
-- **筆電全功能接線**：建立 `mcp/user-env.ps1`（依 `mcp/user-env.template.ps1` 補齊全部 env），在 monorepo 根執行 **`scripts/bootstrap-mcp-machine.ps1`**；若筆電曾有舊明文 MCP，再執行 **`scripts/sanitize-user-mcp-config.ps1`** 後重開 Cursor／Claude Code。
+- **筆電全功能接線**：建立 `mcp/user-env.ps1`（依 `mcp/user-env.template.ps1` 補齊全部 env），在 monorepo 根執行 **`scripts/bootstrap-mcp-machine.ps1`**；若筆電曾有舊明文 MCP，再執行 **`scripts/sanitize-user-mcp-config.ps1`** 後重開 Claude Code／Claude Desktop。
 
-- **公司桌機現況**：shared MCP／Claude／Cursor 永久規則與本機明文 MCP 清理已完成；若後續再漂移，優先以 `scripts/sync-mcp-config.ps1`／`scripts/sanitize-user-mcp-config.ps1` 重建，不回頭維護第二套手工設定。
+- **公司桌機現況**：shared MCP／Claude 永久規則與本機明文 MCP 清理已完成；若後續再漂移，優先以 `scripts/sync-mcp-config.ps1`／`scripts/sanitize-user-mcp-config.ps1` 重建，不回頭維護第二套手工設定。（Cursor 已於 2026-08-26 退場；該機亦已於 2026-08-12 退場，本列為歷史狀態。）
 
 - **自託管營運工具（消費端）**：雲上實例（例：**Hetzner 自託管 n8n staging**）為一套部署；**每台開發機**仍須各自具備可觸發／驗證 Webhook 的 **vault 鍵與連通**（見 **`docs/operations/n8n-staging-client-onboarding-e2e.md`**、**`WORKLOG` `## 2026-04-10`**）。後續 Phase 1 其他自託管／邊界工具亦同——**伺服器側**與**本機消費側**不要混成一項「已做完」。
 

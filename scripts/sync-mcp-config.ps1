@@ -7,7 +7,6 @@
   syncs the result into:
 
   - .mcp.json at the repo root
-  - .cursor\mcp.json (Cursor project MCP; same server set as root `.mcp.json`)
   - %USERPROFILE%\.codex\config.toml (managed MCP block only)
   - %USERPROFILE%\.copilot\mcp-config.json
   - %USERPROFILE%\.gemini\settings.json
@@ -158,7 +157,7 @@ function Write-Utf8NoBomFile {
 function Resolve-EnvValue {
     param(
         [string]$StringValue,
-        [ValidateSet("Concrete", "JsonPlaceholder", "ClaudeProjectPlaceholder", "GeminiPlaceholder")]
+        [ValidateSet("Concrete", "ClaudeProjectPlaceholder", "GeminiPlaceholder")]
         [string]$Mode
     )
 
@@ -166,10 +165,7 @@ function Resolve-EnvValue {
         return $null
     }
 
-    if ($Mode -eq "JsonPlaceholder") {
-        # Cursor `.cursor/mcp.json`: keep portable `${workspaceFolder}` / `${userHome}`; env must stay `${env:NAME}` per Cursor docs.
-        $resolved = $StringValue.Replace('${workspaceRoot}', '${workspaceFolder}').Replace('${workspaceFolder}', '${workspaceFolder}').Replace('${userHome}', '${userHome}')
-    } elseif ($Mode -eq "ClaudeProjectPlaceholder") {
+    if ($Mode -eq "ClaudeProjectPlaceholder") {
         # Claude Code `.mcp.json`: Claude Code expands `${NAME}`, NOT `${env:NAME}` -- the latter is
         # Cursor / VS Code syntax and is passed through as a LITERAL string. Verified 2026-08-28 by
         # A/B probe in all three positions (command/args, env block, http headers). Getting this wrong
@@ -193,9 +189,6 @@ function Resolve-EnvValue {
                         return ""
                     }
                     return $value
-                }
-                "JsonPlaceholder" {
-                    return '${env:' + $name + '}'
                 }
                 "ClaudeProjectPlaceholder" {
                     # NOT '${env:' -- see the ClaudeProjectPlaceholder branch above.
@@ -295,37 +288,8 @@ function Test-ResolvedMap {
     return $true
 }
 
-function Convert-ServerToWorkspaceConfig {
-    param([string]$Name, [hashtable]$Server)
-
-    if (-not (Should-IncludeServer -Name $Name -Server $Server -Client "workspace")) {
-        return $null
-    }
-
-    $out = @{}
-    $transport = [string]$Server["transport"]
-    if ($transport -eq "http") {
-        $out["type"] = "http"
-        $out["url"] = Resolve-EnvValue -StringValue ([string]$Server["url"]) -Mode "JsonPlaceholder"
-        if ($Server.ContainsKey("headers")) {
-            $out["headers"] = Resolve-MapValues -Map (ConvertTo-PlainObject $Server["headers"]) -Mode "JsonPlaceholder"
-        }
-    } else {
-        $out["command"] = Resolve-EnvValue -StringValue ([string]$Server["command"]) -Mode "JsonPlaceholder"
-        $args = @()
-        foreach ($arg in $Server["args"]) {
-            $args += ,(Resolve-EnvValue -StringValue ([string]$arg) -Mode "JsonPlaceholder")
-        }
-        $out["args"] = $args
-        if ($Server.ContainsKey("env")) {
-            $out["env"] = Resolve-MapValues -Map (ConvertTo-PlainObject $Server["env"]) -Mode "JsonPlaceholder"
-        }
-    }
-    return $out
-}
-
 function Convert-ServerToClaudeProjectConfig {
-    # Generates Claude Code project `.mcp.json` entries using ${env:MONOREPO_ROOT} for script paths.
+    # Generates Claude Code project `.mcp.json` entries using ${MONOREPO_ROOT} for script paths.
     param([string]$Name, [hashtable]$Server)
 
     if (-not (Should-IncludeServer -Name $Name -Server $Server -Client "workspace")) {
@@ -583,9 +547,9 @@ if (-not $SkipWorkspaceConfig) {
     $workspacePath = Join-Path $WorkspaceRoot ".mcp.json"
     Write-Utf8NoBomFile -Path $workspacePath -Content ($claudeProjectDoc | ConvertTo-Json -Depth 20)
 
-    # Self-consistency: the .mcp.json just written references ${env:MONOREPO_ROOT} for every
-    # powershell-launched server's -File path (see Convert-ServerToClaudeProjectConfig / line ~161).
-    # If that USER env var is unset, Claude Code / Cursor expand it to '' -> broken
+    # Self-consistency: the .mcp.json just written references ${MONOREPO_ROOT} for every
+    # powershell-launched server's -File path (see Convert-ServerToClaudeProjectConfig).
+    # If that USER env var is unset, Claude Code expands it to '' -> broken
     # '\scripts\*.ps1' path -> each MCP server flashes a red "file not found" console window on
     # every host launch (root cause 2026-06-16: laptop had MONOREPO_ROOT unset; desktop had it set).
     # The script that creates the dependency must guarantee it. Idempotent; User scope (no elevation).
@@ -593,26 +557,18 @@ if (-not $SkipWorkspaceConfig) {
     $monoCurrent = [Environment]::GetEnvironmentVariable('MONOREPO_ROOT', 'User')
     if ($monoCurrent -ne $monoValue) {
         [Environment]::SetEnvironmentVariable('MONOREPO_ROOT', $monoValue, 'User')
-        Write-Host "[env] MONOREPO_ROOT (User) set -> $monoValue (was: '$monoCurrent'). Restart the MCP host (Claude Code / Cursor / Claude Desktop) to apply." -ForegroundColor Yellow
+        Write-Host "[env] MONOREPO_ROOT (User) set -> $monoValue (was: '$monoCurrent'). Restart the MCP host (Claude Code / Claude Desktop) to apply." -ForegroundColor Yellow
     } else {
         Write-Host "[env] MONOREPO_ROOT (User) ok = $monoValue" -ForegroundColor Gray
     }
 
-    # .cursor/mcp.json — Cursor project MCP; uses ${workspaceFolder} per Cursor docs
-    $workspaceServers = @{}
-    foreach ($name in ($servers.Keys | Sort-Object)) {
-        $serverConfig = Convert-ServerToWorkspaceConfig -Name $name -Server (ConvertTo-PlainObject $servers[$name])
-        if ($null -ne $serverConfig) {
-            $workspaceServers[$name] = $serverConfig
-        }
-    }
-    $workspaceDoc = @{ mcpServers = $workspaceServers }
-    $cursorMcpDir = Join-Path $WorkspaceRoot ".cursor"
-    if (-not (Test-Path -LiteralPath $cursorMcpDir)) {
-        New-Item -ItemType Directory -Path $cursorMcpDir | Out-Null
-    }
-    $cursorMcpPath = Join-Path $cursorMcpDir "mcp.json"
-    Write-Utf8NoBomFile -Path $cursorMcpPath -Content ($workspaceDoc | ConvertTo-Json -Depth 20)
+    # NOTE (2026-08-28): this block used to also emit .cursor\mcp.json for Cursor, together with
+    # Convert-ServerToWorkspaceConfig and the "JsonPlaceholder" resolve mode. Cursor was retired
+    # 2026-08-26 and ~\.cursor deleted 2026-08-28, so all three are gone. It is not left behind
+    # "in case": a generator with no consumer still rewrites a 20 KB file on every sync, and the
+    # manifest entry that watched it had become a detector that could never go red (its target no
+    # longer exists, and the prune helper reports absent-target as clean). Restore from git history
+    # if another Cursor-family IDE is ever adopted.
 }
 
 # `%USERPROFILE%\.claude\mcp.json` is deliberately NOT written by this script.
@@ -726,7 +682,6 @@ if ($StrictEnv -and $script:MissingVars.Count -gt 0) {
 
 Write-Host "MCP sync complete." -ForegroundColor Green
 Write-Host "  workspace : $(if ($SkipWorkspaceConfig) { 'skipped' } else { Join-Path $WorkspaceRoot '.mcp.json' })" -ForegroundColor Gray
-Write-Host "  cursor    : $(if ($SkipWorkspaceConfig) { 'skipped' } else { Join-Path $WorkspaceRoot '.cursor\mcp.json' })" -ForegroundColor Gray
 Write-Host "  claude    : not written -- owned by sync-claude-userlevel.ps1, must stay {}" -ForegroundColor Gray
 Write-Host "  codex     : $(if ($SkipCodex) { 'skipped' } else { Join-Path $env:USERPROFILE '.codex\config.toml' })" -ForegroundColor Gray
 Write-Host "  copilot   : $(if ($SkipCopilot) { 'skipped' } else { Join-Path $env:USERPROFILE '.copilot\mcp-config.json' })" -ForegroundColor Gray

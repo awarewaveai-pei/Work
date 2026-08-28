@@ -470,6 +470,32 @@
   - **完成定義**：塞一份 `failed:14` 的假 log 必須 WARN/FAIL；`failed:0` 必須 PASS；log 讀不到時 `measured=0` 且不得回 PASS
   - **證據**：`scripts/check-claude-sync.ps1` H4 SCOPE 註解；`agency-os/reports/oracle/2026-08-28-review-2915479a.md` FINDING 1/2；commit 5b446f16 的不變量分析段
 
+- [ ] **`claude_desktop_config.json` 至今無人治理，且正握著 6 把明文 API key**
+  - `🔴 現行` · `2026-08-28 開出` · `等操作者決定`
+  - **一句話**：`%APPDATA%\Claude\claude_desktop_config.json` 被 Claude 與 repo `.mcp.json` 合併載入，但它不在 `mcp/claude-userlevel/manifest.json` 裡、不被 `sanitize-user-mcp-config.ps1` 備份、沒有任何 gate 讀它。
+  - **實測（2026-08-28）**：10 個 server，其中 **8 個與 repo `.mcp.json` 同名**（`airtable` `chatgpt-fast` `chatgpt-latest` `gemini-fast` `gemini-latest` `github` `replicate` `work-global`），**2 個只存在於此**（`perplexity` `wordpress`）。全檔 `${env:}` 與 `${}` 佔位符 **0 個** —— 值全是明文，正規表達式掃出 6 種前綴：`sk-proj-`(164)、`patVgCIuooi8`(82)、`pplx-`(53)、`ghp_`(40)、`r8_`(40)、`AIza`(39)，另有 `REPLICATE_WEBHOOK_SIGNING_KEY` 與 soulful 站的 `JWT_TOKEN`。
+  - **它繼承了角色卻沒繼承治理**：這正是 `~/.cursor/mcp.json` 原本的處境（同樣被合併、同樣持明文），差別只在後者有 `cursor-mcp` 條目管。Cursor 2026-08-26 退場、`~/.cursor` 2026-08-28 刪除後，那條退場了，這個檔卻從來沒被納入。
+  - **機制已經寫好且刻意留著**：`scripts/prune-duplicate-mcp-servers.mjs` 是 `--target/--compare/--collection` 的通用工具，處理的正是「刪掉碰撞的鍵、保留只存在於此的逃生門鍵」這個形狀 —— `replace-json` 會把 `perplexity`/`wordpress` 一起殺掉，所以不能用。**不需要改 code，只需要一條 manifest 條目。**
+  - **下一步**：① 操作者確認 `perplexity` / `wordpress` 是否該進 `mcp/registry.template.json`（進了就連逃生門都不需要）② 決定 8 個碰撞鍵是否 prune ③ 明文 key 併入既有輪換批次一起處理（見同區 2026-08-15 / 2026-08-27 兩條）④ 加 manifest 條目 `claude-desktop-mcp`（`prune-duplicate-json`），並在 `sanitize-user-mcp-config.ps1` 備份清單補上此路徑
+  - **為何沒有直接做**：改寫的是 Claude 正在載入、且持有活憑證的檔案 —— 依 AGENTS.md §操作風險分級屬 Medium 以上，需明示 go-ahead。
+  - **證據**：`scripts/sync-claude-userlevel.ps1` `Sync-Json-PruneDuplicate` 上方註解；`scripts/prune-duplicate-mcp-servers.mjs` header STATUS 段；`agency-os/docs/operations/mcp-add-server-quickstart.md` §明文機密清理 表下引言
+
+- [ ] **`codex-oracle.ps1 -Path` 一用就炸，等於大 repo 沒有可行的 review 路徑**
+  - `🔴 現行` · `2026-08-28 開出` · `可直接做`
+  - **一句話**：`-Path` 帶任何值都回 `Failed to collect diff: 在此物件上找不到屬性 'Count'`（`Set-StrictMode -Version Latest` 下對純量取 `.Count`）。
+  - **為什麼是現行不是小事**：AGENTS.md 把 R0 [驗證計畫] 的 Review 動作指給這支腳本。2026-08-28 實測全樹 review 在 **900s timeout**（packet 133.4KB，被 4 個未追蹤的 `.claude/sessions/*.md` 撐大），而縮小範圍的唯一手段就是 `-Path`。兩條路都不通 = 那一輪只能 waive。
+  - **下一步**：① 把 `-Path` 的收集處包成 `@(...)` ② 加一個 `-Path` 帶單一值的迴歸測試（單值是觸發 StrictMode 的那個 case）③ 順帶評估把未追蹤的 `.claude/sessions/*.md` 排除在 inline 之外——它們對 code review 零價值卻佔了大半 packet
+  - **完成定義**：`-Path @('scripts/x.ps1')` 與 `-Path 'scripts/x.ps1'` 兩種寫法都能跑完並產出 artifact
+  - **證據**：`agency-os/WORKLOG.md` 2026-08-28 本批 `REVIEW_WAIVED` 行；`scripts/codex-oracle.ps1` param `[string[]]$Path`
+
+- [ ] **Cursor 散文殘留：10 份文件仍叫操作者「用 Cursor 開 monorepo 根」**
+  - `🟢 小` · `2026-08-28 開出` · `可直接做`
+  - **一句話**：Cursor 2026-08-26 退場，程式與設定面已清乾淨（見 commit 訊息），但把 Cursor 寫進操作步驟的散文沒清，照著做會找不到東西。
+  - **已在 2026-08-28 清掉的**：只有「我這次改動使其成為假話」的那些 —— `.cursor/mcp.json` 產生器、`cursor-mcp` manifest 條目、`sanitize` 的檔案清單，以及 6 份文件裡對應的句子與表格列。
+  - **還沒清的**：`docs/overview/REMOTE_WORKSTATION_STARTUP.md`（約 20 處，且是開工 SSOT，值得單獨一輪）、`docs/operations/mcp-add-server-quickstart.md` §路徑原則、`docs/operations/n8n-self-hosted-mcp-troubleshooting.md` §Cursor MCP 狀態抖動、`docs/operations/dual-ide-coexistence-strategy.md`、`docs/operations/AWAREWAVE_STACK_QUICKREF.md:134-135`、`docs/operations/claude-code-file-reference.md`、`BOOTSTRAP.md:9`、`docs/operations/AUTO_REPAIR_SYSTEM_V2_LIGHT.md:595,738`
+  - **刻意不碰**：`docs/CHANGE_IMPACT_MATRIX.md` 的 `.cursor/rules/*` 各列 —— 同區已有「CHANGE_IMPACT_MATRIX 漂移偵測腳本首輪 7 個 WARN 待人工確認」在管，兩邊同時改會打架。WORKLOG／memory／governance-plans 的歷史敘述**不改**（它們描述當時為真的事，AGENTS.md 明訂保留）。
+  - **完成定義**：`grep -rnE '[\\/.]cursor[\\/]' --include=*.md` 在 `docs/` 與 `runbooks/` 下只剩歷史敘述與 CHANGE_IMPACT_MATRIX
+
 - [ ] **【2026-08-26 開出｜偵測器說謊｜第三顆】Phase 4 Check 1／Check 2 至少 12 週在回報假綠燈 —— 雲端容器沒有 `gh`** — 2026-08-26 把檢查邏輯換成 `scripts/phase4-checks.py` 後第一次雲端實跑，Check 1／2 回 `SKIP — gh not installed`（`RemoteTrigger get_run_log cse_01BAKre3odz4KUbP1jUDxaFS`，容器內 `python3` 有、`gh` 沒有）。但 `agency-os/reports/repair-center/phase4-2026-06-08.md` 到 `phase4-2026-08-21.md` **連續 12 份全部是 `Check 1: PASS`**（逐檔 grep 確認）。舊 prompt 明文寫 `If gh exit != 0: CHECK1_STATUS = "SKIP"`，所以要嘛容器映像近期拿掉 `gh`，要嘛散文規格被執行成了 PASS —— 兩者結論相同：**那兩項檢查有 12 週沒有真的在量任何東西**。**現況不是退步**：SKIP 是誠實的「我沒量到」，比假 PASS 好；且 SKIP 會進 `整體` 顯示（今天是「⚠️ 1 項需注意, 2 項 SKIP」），不會被當健康。**要決定的是取捨不是 bug**：① 給 routine 配 setup script 裝 `gh`（目前 `No setup script configured`）② 改走 GitHub REST API + token —— 但 routine 刻意無 env vars（與另外三支 routine 同 pattern），加 token 會讓四支分叉 ③ 接受 SKIP，把 auto-repair PR 重複偵測改由本機 `/health` 或 `.ps1` fallback 負責（本機有 `gh`，今天實測 Check 1 正常回 PASS）。**建議③**：這兩項本來就不是時效性檢查，而雲端加 secret 的代價高於收益。
 
 - [ ] **建立 `detector-contract` audit class：偵測器必須申報「這輪量到什麼」**

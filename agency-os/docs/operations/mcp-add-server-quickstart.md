@@ -46,15 +46,15 @@
 4. 關掉 Cursor 再重開
 5. 看到 MCP 能正常使用就完成；若仍失敗，檢查 **`%USERPROFILE%\.cursor\mcp.json`**（或本機 `.cursor/mcp.json`）的 `url/command/args`，並確認沒有舊的 **`D:\Work\...`** 絕對路徑。
 5.1 **遠端 HTTP（`type: http`：Supabase / n8n / posthog / cloudflare 等）紅黃亂跳、或綠但寫 `No tools`**：專案 **`.cursor/mcp.json`** 已用 **`${env:變數名}`**（[Cursor 文件](https://cursor.com/docs/context/mcp) 用系統／使用者環境變數）。**`import-mcp` 只寫入 vault，不會讓 Cursor 讀到** — 在 monorepo 根執行：  
-   `.\scripts\secrets-vault.ps1 -Action sync-cursor-mcp-user-env`  
+   `.\scripts\secrets-vault.ps1 -Action sync-mcp-user-env`  
    會掃描 **`.cursor/mcp.json`** 裡所有 **`${env:…}`**，把 vault 裡同名密鑰寫入 **Windows 使用者環境變數**，再 **完全結束並重開 Cursor**。缺哪個變數，腳本會列出；可用 **`secrets-vault.ps1 -Action set -Name … -Value …`** 補進 vault 後再跑一次 sync。
 5.2 **`SUPABASE_*`／`CLOUDFLARE_*`／`POSTHOG_*`**：若 vault 根本沒有對應鍵名，請依各服後台填入真值 **`set`** 進 vault，勿把明文留在聊天。
 6. **`trigger` 仍紅**：在 monorepo 根執行 `.\scripts\secrets-vault.ps1 -Action list`，清單裡**必須**有 **`TRIGGER_ACCESS_TOKEN`**（Trigger 後台建立的 Personal Access Token，用 `set` 寫入 vault；`import-mcp` 不會憑空生出這一筆）。自託管另需 **`trigger.env.TRIGGER_API_URL`** 與 **`start-trigger-mcp.ps1 -ProjectRef`**／**`TRIGGER_PROJECT_REF`** 正確。
 7. **`copilot` 仍紅**：`https://api.githubcopilot.com/mcp` **不要**多尾階 `/`；Bearer 須符合 [GitHub：設定 Copilot MCP](https://docs.github.com/en/copilot/customizing-copilot/extending-copilot-chat-with-mcp)（常見為 **Copilot 訂閱／權限** 或 **PAT 類型／scope** 不符，一般 `github` MCP 能用的 token 未必能過 Copilot MCP）。建議 **`Authorization`: `Bearer ${env:COPILOT_MCP_BEARER_TOKEN}`**，再執行 **`.\scripts\secrets-vault.ps1 -Action sync-copilot-mcp-env`**（自 vault 的 **`COPILOT_AUTH_BEARER_TOKEN`** 寫入使用者環境變數），**完全結束 Cursor 後重開** 才會載入新的 User env。
 
-## 明文機密清理（Cursor / Claude 舊機）
+## 明文機密清理（舊機）
 
-若機器上已經有舊的 **`%USERPROFILE%\.cursor\mcp.json`**、**`%USERPROFILE%\.claude\mcp.json`** 或 **`%USERPROFILE%\.claude.json`** 並含明文 token，先在 monorepo 根執行：
+若機器上已經有舊的 **`%USERPROFILE%\.claude\mcp.json`** 或 **`%USERPROFILE%\.claude.json`** 並含明文 token，先在 monorepo 根執行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\sanitize-user-mcp-config.ps1
@@ -65,15 +65,18 @@ powershell -ExecutionPolicy Bypass -File .\scripts\sanitize-user-mcp-config.ps1
 1. 先把原檔備份到 `Backups/mcp-sanitize-<timestamp>/`（該目錄已在 `.gitignore`，不會進 git）
 2. 把改寫工作**交給唯一寫入者** `scripts/sync-claude-userlevel.ps1 -Mode merge`
 
-它**自己不改寫任何檔案**。三個檔各自該裝什麼，宣告在 `mcp/claude-userlevel/manifest.json`：
+它**自己不改寫任何檔案**。兩個檔各自該裝什麼，宣告在 `mcp/claude-userlevel/manifest.json`：
 
 | 檔案 | manifest 條目（型別） | 結果 |
 |---|---|---|
 | `~/.claude/mcp.json` | `mcp`（`replace-json`）| 正規化為 `{"mcpServers":{}}` |
-| `~/.cursor/mcp.json` | `cursor-mcp`（`prune-duplicate-json`）| 移除與專案檔**同名**的 server；**保留**不重複的鍵 —— 即上方 §路徑原則 的例外條款（某 MCP 絕不能進 repo 時的逃生門）|
 | `~/.claude.json` | `claude-user-json`（`clear-collections-json`）| 清空 project-scoped `mcpServers` / `enabledMcpjsonServers` / `disabledMcpjsonServers`，讓 repo 根 `.mcp.json` 成為專案真相 |
 
-跑完後請**完全結束** Cursor / Claude Code，再重開。
+跑完後請**完全結束** Claude Code / Claude Desktop，再重開。
+
+> **這張表在 2026-08-28 少了一列，而且不是因為問題消失。** `~/.cursor/mcp.json`（`cursor-mcp` / `prune-duplicate-json`）隨 Cursor 退場移除：目標檔已刪，prune helper 對「目標不存在」回報 `clean`，那條等於一個永遠不會變紅的偵測器。
+>
+> **仍然沒有任何條目管的是 `%APPDATA%\Claude\claude_desktop_config.json`**——它被 Claude 與 repo `.mcp.json` 合併載入，有 8 個與 repo 同名的 server、2 個（`perplexity` / `wordpress`）只存在於該檔，且**目前持有 6 把明文 API key**。它繼承了 `~/.cursor/mcp.json` 原本的角色卻沒有繼承治理。見 `TASKS.md`。
 
 > **2026-08-25 之前這裡是錯的。** 本腳本當時自帶三份寫入邏輯，與本文件上方 §路徑原則 直接牴觸：把兩個 server 寫進規定應為 `{}` 的 `~/.claude/mcp.json`；把 repo `.mcp.json` 整份複製進 user-level Cursor 設定，親手製造 §路徑原則 要求避免的重複；而清 `~/.claude.json` 的實作用了 PowerShell 6 才有的 `-AsHashtable`，在 PS 5.1 上**從未真的執行過**。根因是同一個檔案有多個寫入者、各自帶著沒被交叉檢查的意圖。詳見 `WORKLOG.md` 2026-08-25。
 

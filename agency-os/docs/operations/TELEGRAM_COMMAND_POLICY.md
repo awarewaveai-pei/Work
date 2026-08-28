@@ -71,7 +71,7 @@ Telegram's API does **not** allow programmatic bot creation. The operator must:
    )
    .\scripts\secrets-vault.ps1 -Action set -Name TELEGRAM_ALLOWED_USER_IDS -Value '<your numeric user id>'
    .\scripts\secrets-vault.ps1 -Action set -Name TELEGRAM_ALLOWED_CHAT_IDS -Value '<your numeric user id>'
-   .\scripts\secrets-vault.ps1 -Action sync-cursor-mcp-user-env
+   .\scripts\secrets-vault.ps1 -Action sync-mcp-user-env
    ```
 6. Open a fresh PowerShell session, then:
    ```powershell

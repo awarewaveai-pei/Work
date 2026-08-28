@@ -50,7 +50,7 @@ npm run n8n:mcp-smoke
 ```
 
 需已設定 **`N8N_MCP_URL`**（完整 MCP URL）與 **`N8N_AUTH_BEARER_TOKEN`**（n8n **Connection details** 內 MCP token）。  
-**建議**：用 **`n8n-mcp-smoke.ps1`**，會先嘗試載入 **`mcp/user-env.ps1`**；**`npm run n8n:mcp-smoke`** 僅讀**目前終端機進程**的環境變數（須已在本會話 **`dot-source`** user-env，或由 **`secrets-vault … sync-cursor-mcp-user-env`** 寫入使用者環境後重開終端）。
+**建議**：用 **`n8n-mcp-smoke.ps1`**，會先嘗試載入 **`mcp/user-env.ps1`**；**`npm run n8n:mcp-smoke`** 僅讀**目前終端機進程**的環境變數（須已在本會話 **`dot-source`** user-env，或由 **`secrets-vault … sync-mcp-user-env`** 寫入使用者環境後重開終端）。
 
 腳本會輸出 `INIT_STATUS`／`TOOLS_COUNT`，**exit 3** 表示 HTTP **404** — 請繼續下面「伺服器端」檢查。
 
@@ -104,7 +104,7 @@ npm run n8n:mcp-smoke
 
 1. **`N8N_MCP_URL`**：完整 URL，結尾路徑須為 **`…/mcp-server/http`**（與官方自託管 MCP 文件一致）。  
 2. **`N8N_AUTH_BEARER_TOKEN`**：來自 n8n MCP **Connection details**，勿混用一般 API Key（除非文件指明相容）。  
-3. monorepo 根執行 **`.\scripts\sync-mcp-config.ps1`**，再 **完全重啟 Cursor**，讓 **`${env:…}`** 由使用者環境載入（見 **`mcp-add-server-quickstart.md`** **`sync-cursor-mcp-user-env`**／vault 流程）。
+3. monorepo 根執行 **`.\scripts\sync-mcp-config.ps1`**，再 **完全重啟 Cursor**，讓 **`${env:…}`** 由使用者環境載入（見 **`mcp-add-server-quickstart.md`** **`sync-mcp-user-env`**／vault 流程）。
 
 ---
 

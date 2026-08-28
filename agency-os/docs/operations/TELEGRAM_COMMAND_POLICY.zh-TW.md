@@ -71,7 +71,7 @@ Telegram API **不允許**程式化建立 bot。操作者必須：
    )
    .\scripts\secrets-vault.ps1 -Action set -Name TELEGRAM_ALLOWED_USER_IDS -Value '<your numeric user id>'
    .\scripts\secrets-vault.ps1 -Action set -Name TELEGRAM_ALLOWED_CHAT_IDS -Value '<your numeric user id>'
-   .\scripts\secrets-vault.ps1 -Action sync-cursor-mcp-user-env
+   .\scripts\secrets-vault.ps1 -Action sync-mcp-user-env
    ```
 6. 開一個新的 PowerShell session，接著執行：
    ```powershell

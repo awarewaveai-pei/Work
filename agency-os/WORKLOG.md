@@ -2,6 +2,76 @@
 
 ## 2026-08-28
 
+### Cursor 退場的真正代價：一個假話語法漏進 Claude 的產出（14 支 MCP 天天失敗而所有 gate 全綠），以及移除它時扯出的四條斷鏈
+
+**起點是使用者的一句抱怨**：「桌機版軟體點下去非常久才進入畫面」。查 `%LOCALAPPDATA%\Claude\Logs\main.log` 的 `[CCD start-timing]` 時看到一個沒人在看的欄位：`init_mcp=connected:20/pending:1/failed:14/needs_auth:1`。**14 支失敗，而且從有這行 log 起就一直是 14。**
+
+#### 根因（第一批，commit 5b446f16 / 0a4c48aa）
+
+`scripts/sync-mcp-config.ps1` 的 `ClaudeProjectPlaceholder` 模式吐的是 **Cursor 的語法**：`${env:NAME}`。**Claude Code 展的是 `${NAME}`**，對 `${env:NAME}` 原樣當字串傳下去。三個位置 A/B 實測全部一致：
+
+| 位置 | `${VAR}` | `${env:VAR}` |
+|---|---|---|
+| command / args | `D:\Work\...` ✅ | 字面值 ❌ |
+| env 區塊 | `D:\Work` ✅ | 字面值 ❌ |
+| http headers | `Bearer D:\Work` ✅ | 字面值 ❌ |
+
+**它不會大聲失敗**：server 只是收到一個叫 `${env:MONOREPO_ROOT}` 的路徑或一個叫 `${env:CLOUDFLARE_API_TOKEN}` 的 bearer token。2026-06-16 有人查過這個症狀並誤判為「`MONOREPO_ROOT` 沒設」——那個修法在 Cursor 上有效、在 Claude Code 上從未有效，於是被當成修好了（原註解已就地訂正）。
+
+**沒人發現的原因（Codex FINDING 2，已證實）**：`system-health-check.ps1`、`check-claude-sync.ps1`、`verify-build-gates.ps1` 對 `.mcp.json` 的 grep 命中數全部是 0 —— **沒有任何 gate 讀過那個檔**。補上 `check-claude-sync.ps1` H4，四種突變測試證明它會變紅並一路傳到 health 99.7% + `Critical gate failed`。
+
+**第三輪 oracle 又提兩條 H4 增強，沒有採納**，改做不變量拆分（AGENTS.md 同一 reviewer 連兩輪即強制）：(A)「產生器有沒有吐出展不開的語法」靜態可判定 → H4 的唯一職責，範圍已在原始碼註解釘死；(B)「server 實際啟不啟得起來」只有 runtime 答得出來 → 另開 TASKS。再往 H4 補下去等於在 PowerShell 裡重寫 Claude Code 的 MCP 載入器。
+
+#### 第二批：Cursor 線整批移除，以及移除後才暴露的四條斷鏈
+
+Cursor 2026-08-26 退場、`~\.cursor` 2026-08-28 刪除（1.3 GB），但**產生器與治理條目還活著**。這批把它們一起收掉——重點不在刪檔，在於刪之前先問「誰還接著它」：
+
+| 斷鏈 | 症狀 | 修法 |
+|---|---|---|
+| `secrets-vault.ps1 -Action sync-cursor-mcp-user-env` | 讀 `.cursor\mcp.json`，停產後**必 throw**。它是 `/vault-sync`、`/vault-status`、`setup-command-plane.ps1`、`configure-telegram-webhook.ps1` 的實際執行體 | 改讀 `mcp/registry.template.json`（SSOT，仍用 `${env:NAME}`）；新增 `sync-mcp-user-env`，舊名留 alias |
+| 同上，若改讀 `.mcp.json` | **會靜默同步 0 個** —— 那份檔已改用 `${NAME}`，正則零匹配，而「找到 0 個名字」長得跟「本來就都設好了」一模一樣 | 0 匹配時 throw；並在原始碼寫明為何不能用 `.mcp.json` |
+| manifest `cursor-mcp` 條目 | target `~/.cursor/mcp.json` 已刪，prune helper 對 absent target 回報 `clean` → **永遠不會變紅的偵測器** | 移除條目；helper 與 `Sync-Json-PruneDuplicate` 刻意保留並在原始碼註明 successor |
+| `scan-local-config-for-secrets.ps1` | 掃描清單含已不存在的 `.cursor/mcp.json` | 移除死項；未納入的 `claude_desktop_config.json` 用註解寫明兩個理由，不假裝沒這個洞 |
+
+#### 順手查到的資安發現（本批最重要的一條，未動手）
+
+`%APPDATA%\Claude\claude_desktop_config.json` **被 Claude 與 repo `.mcp.json` 合併載入**（實證：`perplexity` 只存在於該檔、不在 registry、不在任何 plugin，而其工具在本 session 可用），**持有 6 把明文 API key**（`sk-proj-` 164 / `patVgCIuooi8` 82 / `pplx-` 53 / `ghp_` 40 / `r8_` 40 / `AIza` 39，另有 webhook signing key 與 soulful `JWT_TOKEN`），佔位符 0 個。
+
+**它繼承了 `~/.cursor/mcp.json` 的角色卻沒繼承治理**：不在 manifest、不被 sanitize 備份、不被 secret scanner 掃、沒有任何 gate 讀。已開 TASKS，**未自行修改**——那是 Claude 正在載入且持活憑證的檔，依風險分級需明示 go-ahead。
+
+[已修改]
+- `scripts/sync-mcp-config.ps1` — 停產 `.cursor\mcp.json`；刪 `Convert-ServerToWorkspaceConfig` 與 `JsonPlaceholder` 模式；訂正三處已成假話的註解
+- `scripts/secrets-vault.ps1` + `agency-os/scripts/secrets-vault.ps1`（wrapper 的 ValidateSet 也要加，否則新名字過不了驗證）
+- `mcp/claude-userlevel/manifest.json` — 移除 `cursor-mcp`
+- `scripts/sync-claude-userlevel.ps1` / `scripts/prune-duplicate-mcp-servers.mjs` — 保留但加「為何不是死碼」的說明
+- `scripts/sanitize-user-mcp-config.ps1` / `scripts/scan-local-config-for-secrets.ps1` / `scripts/ao-resume.ps1` / `scripts/machine-environment-audit.ps1`
+- 第二輪抓蟲追加：`scripts/posthog-api.ps1`（兩處錯誤訊息叫使用者去讀已不存在的檔）、`scripts/secrets-vault.ps1:290`（copilot 復原指引同病）、`mcp/DESKTOP_MCP_SETUP.md`（範例輸出含 cursor 列）、`scripts/doc-sync-automation.ps1`（移除對已刪 `sync-enterprise-cursor-rules-to-monorepo-root.ps1` 的守衛呼叫）
+- 動作改名連帶：`.claude/commands/vault-{sync,status}.md`、`.claude/agents/repair-agent.md`、`.codex/agents/repair-agent.toml`、`scripts/{setup-command-plane,configure-telegram-webhook,update-client-wp-plugins}.ps1`、`scripts/lib/telegram-notify.ps1`
+- 文件：`mcp/README.md`、`scripts/README.md`、`CROSS_MACHINE_SYNC_RUNBOOK.md`、`REMOTE_WORKSTATION_STARTUP.md`、`mcp-add-server-quickstart.md`、`mcp-secrets-hardening-runbook.md`、`n8n-self-hosted-mcp-troubleshooting.md`、`DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`、`TELEGRAM_COMMAND_POLICY{,.zh-TW}.md`
+- `agency-os/TASKS.md` — 三條（MCP 執行期偵測器 / desktop config 治理 / Cursor 散文殘留）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/sync-mcp-config.ps1（刪 .cursor 後重跑） | exit=0 | ms=12000 — `.mcp.json` sha256 `c913b5b3…0929` 改動前後**逐位元組相同**，`.cursor/` 未被重建
+- REALTEST_EVIDENCE: tool=Bash | cmd=secrets-vault.ps1 -Action sync-mcp-user-env | exit=0 | ms=210000 — registry 57 個名字，**56 個同步成功**，唯一缺的是 vault 沒有的 `XAI_API_KEY`（既有缺口，非本次造成）
+- REALTEST_EVIDENCE: tool=Bash | cmd=agency-os/scripts/secrets-vault.ps1 -Action sync-cursor-mcp-user-env -McpPath <probe> | exit=0 | ms=4000 — **舊名經 wrapper 仍可用**，alias 兩條路徑都通
+- REALTEST_EVIDENCE: tool=Bash | cmd=secrets-vault.ps1 -Action sync-mcp-user-env -McpPath D:/Work/.mcp.json | exit=1 | ms=3000 — **突變測試**：指向零匹配來源時 throw，不回報「同步 0 個」
+- REALTEST_EVIDENCE: tool=Bash | cmd=check-claude-sync.ps1 | exit=0 | ms=25000 — H1/H2/H3×3/H4 全 PASS
+- REALTEST_EVIDENCE: tool=Bash | cmd=verify-build-gates.ps1 | exit=0 | ms=180000 — ALL PASSED，含 `scan-local-config-for-secrets`（baseline mode，4 檔、15 known-suppressed、exit 0）與 `.mcp.json` server list 對 registry 一致性
+- REALTEST_EVIDENCE: tool=Bash | cmd=sync-claude-userlevel.ps1 -Mode verify | exit=0 | ms=20000 — RESULT PASS，輸出中已無 cursor-mcp 段
+- REVIEW_WAIVED: NA -- 外部 oracle 兩次都沒能產出：① 全樹 review 在 900s timeout（packet 133.4KB，被 4 個未追蹤的 session .md 撐大）② 改用 `-Path` 縮小範圍時 `codex-oracle.ps1` 自己噴 `Failed to collect diff: 找不到屬性 'Count'`（Set-StrictMode 對純量取 .Count）。依 AGENTS.md「不再重試同一個失效工具」停手，改做**寫出來的對抗式自審**（見下方 BUGHUNT，那三條 posthog / copilot / DESKTOP_MCP 就是自審抓到的，oracle 從未看過這批 diff）。`-Path` 的 bug 已開 TASKS —— 它是 AGENTS.md 指定的 review 路徑，在這種大小的 repo 裡縮小範圍是唯一可行解，壞掉等於那條路徑名存實亡。
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,.claude,.codex | grep=Convert-ServerToWorkspaceConfig,JsonPlaceholder,sync-cursor-mcp-user-env,.cursor[/\]mcp.json | hits=9 個活性斷鏈，全部在同一 commit 修掉：vault action 來源、`agency-os/scripts/secrets-vault.ps1` wrapper 的 ValidateSet、`ao-resume.ps1` 註解、`machine-environment-audit.ps1` 註解、secret scanner 掃描清單、`posthog-api.ps1` 兩處錯誤復原指引、`secrets-vault.ps1:290` copilot 復原指引、`mcp/DESKTOP_MCP_SETUP.md` 範例輸出、`doc-sync-automation.ps1` 對已刪腳本的 Test-Path 守衛呼叫（永久靜默 no-op）
+  **第一輪抓蟲漏掉後面 4 個，原因是我的 grep 本身壞的**：bash 雙引號裡的 `"cursor\mcp\.json"` 被 shell 吃成 `cursor\mcp\.json`，ERE 再把 `\m` 化簡成 `m` → 實際 pattern 是 `cursormcp.json`，**永遠零命中**。而它回報 `hits=0` 跟「真的沒有」長得一模一樣。改用 `-e '.cursor[/\]mcp.json'`（單引號 + 字元類）後立刻多出 4 個。教訓：宣告 `hits=0` 前先用一個**已知存在**的字串反測 pattern 本身會不會命中
+  殘留的皆為歷史敘述（WORKLOG / memory / governance-plans）與 CHANGE_IMPACT_MATRIX（另有待辦在管）
+
+[剩餘風險]
+- `failed:14 → 2` 是**本機逐支啟動實測**的結果；桌面版本身自 10:26 起未重啟，`main.log` 尚未寫出改後的 `init_mcp=`，要等下次冷啟動才有端到端證據
+- 剩 2 支的錯誤性質已改變（非迴歸）：`cloudflare` 從「token malformed」變成 `Insufficient scope: required user:read account:read`（token 現在被伺服器認得了）、`trigger` 從路徑錯變成 `CONNECT_TIMEOUT 30000ms`（現在真的會啟動）
+- `claude_desktop_config.json` 的 6 把明文 key **尚未輪換**，且 secret scanner 仍掃不到它
+- health 99.7%（311/312），唯一 FAIL 是 `Kuma: AwareWave endpoint-alert (SG) push monitor` = DOWN —— 與本批無關，是同日 12:23 SG 整併進 ks-aw-01 的後果（12:07 前三次 health 皆 100%），屬該批工作的收尾範圍
+
+[rollback]
+- `git revert <此 commit>` 後跑 `.\scripts\sync-mcp-config.ps1` 即重新產生 `.cursor\mcp.json`；vault 動作舊名一路都沒拿掉，revert 不會讓任何呼叫端斷掉
+
 ### 🚨 同日下午：SG + EU 全面整併入 ks-aw-01（操作者因帳務指示提前，原排 11/20）
 
 **指示**：「SG和EU 也都要搬到新機 因為(9)/2 就要被扣款43 我不想付」。已向操作者說明 Hetzner 後付制 → 9/2 那筆是 8 月已用量免不掉，能省的是 9 月起；以「儘快搬完驗證後刪機」為目標執行。

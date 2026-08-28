@@ -8,7 +8,8 @@
   - Git 在 main、建議乾淨、與 origin/main 對齊（可 -FetchOrigin）
   - Node：滿足 lobster engines (>=18)，且建議與 GitHub Actions 相同大版本（目前 22）
   - lobster-factory packages/workflows（及可選 mcp-local-wrappers）已 npm ci
-  - 建議：GitHub CLI 已登入、DPAPI vault、專案 `.cursor/mcp.json`（SSOT）與使用者 `.cursor/mcp.json`（可為空）存在（雙機各做一次）
+  - 建議：GitHub CLI 已登入、DPAPI vault（雙機各做一次）
+    （`.cursor/mcp.json` 兩項檢查已於 2026-08-26 隨 Cursor 退場移除 —— 留著會變成永久警告，等同被忽略的偵測器）
 
 .PARAMETER WorkRoot
   Monorepo 根（預設為本腳本上一層目錄）。

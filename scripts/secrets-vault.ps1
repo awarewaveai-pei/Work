@@ -1,5 +1,5 @@
 ﻿param(
-    [ValidateSet("init", "set", "set-prompt", "get", "list", "remove", "run", "import-mcp", "import-user-env", "sync-copilot-mcp-env", "sync-cursor-mcp-user-env")]
+    [ValidateSet("init", "set", "set-prompt", "get", "list", "remove", "run", "import-mcp", "import-user-env", "sync-copilot-mcp-env", "sync-mcp-user-env", "sync-cursor-mcp-user-env")]
     [string]$Action = "list",
     [string]$Name = "",
     [string]$Value = "",
@@ -219,17 +219,14 @@ Then reload Cursor. See agency-os/docs/operations/mcp-add-server-quickstart.md (
 
     "import-mcp" {
         if ([string]::IsNullOrWhiteSpace($McpPath)) {
+            # Until 2026-08-28 this preferred .cursor\mcp.json then ~\.cursor\mcp.json. Cursor was
+            # retired 2026-08-26 and both are gone, so only the repo-root fallback is left.
+            # Deliberately NOT defaulted to %APPDATA%\Claude\claude_desktop_config.json even though
+            # that is now the one MCP config still holding plaintext values: importing it would
+            # overwrite good vault entries with whatever vintage that file happens to carry.
+            # Point -McpPath at it explicitly when that is what you mean.
             $repoRoot = Split-Path $PSScriptRoot -Parent
-            $pref = Join-Path $repoRoot ".cursor\mcp.json"
-            $userMcp = Join-Path $env:USERPROFILE ".cursor\mcp.json"
-            $fallback = Join-Path $repoRoot "mcp.json"
-            if (Test-Path -LiteralPath $pref) {
-                $McpPath = $pref
-            } elseif (Test-Path -LiteralPath $userMcp) {
-                $McpPath = $userMcp
-            } else {
-                $McpPath = $fallback
-            }
+            $McpPath = Join-Path $repoRoot "mcp.json"
         }
         if (-not (Test-Path -LiteralPath $McpPath)) {
             throw "MCP file not found: $McpPath"
@@ -290,8 +287,9 @@ Then reload Cursor. See agency-os/docs/operations/mcp-add-server-quickstart.md (
         if (-not $store.secrets.Contains($srcName)) {
             throw @"
 Vault missing $srcName. Fix:
-  1) Put a valid GitHub PAT in %USERPROFILE%\.cursor\mcp.json under copilot.headers.Authorization (Bearer ...), OR
-  2) Run: .\scripts\secrets-vault.ps1 -Action import-mcp
+  1) Run: .\scripts\secrets-vault.ps1 -Action set -Name COPILOT_AUTH_BEARER_TOKEN -Value '<GitHub PAT>', OR
+  2) Put it in mcp\user-env.ps1 then run: .\scripts\secrets-vault.ps1 -Action import-user-env
+     (option 1 used to say "%USERPROFILE%\.cursor\mcp.json" -- that file is gone, Cursor retired 2026-08-26)
 Then run this action again. See docs/operations/mcp-add-server-quickstart.md (copilot).
 "@
         }
@@ -333,11 +331,21 @@ Then run this action again. See docs/operations/mcp-add-server-quickstart.md (co
         exit 0
     }
 
-    "sync-cursor-mcp-user-env" {
-        # Cursor resolves HTTP MCP url/headers using ${env:NAME} — secrets only in vault are invisible until synced to User env.
+    { $_ -eq "sync-mcp-user-env" -or $_ -eq "sync-cursor-mcp-user-env" } {
+        # MCP hosts resolve HTTP url/headers from the process environment, so a secret that lives
+        # only in the vault is invisible to them until it is written to Windows User env.
+        #
+        # SOURCE = mcp/registry.template.json, deliberately, and NOT any generated client config:
+        #   - .cursor\mcp.json (the old default) no longer exists -- Cursor retired 2026-08-26, and
+        #     this branch threw "MCP file not found" from the moment that file stopped being generated.
+        #   - .mcp.json is the obvious replacement and would SILENTLY SYNC NOTHING: Claude Code expands
+        #     ${NAME}, not ${env:NAME}, so since 2026-08-28 that file has zero matches for the regex
+        #     below -- and "found no names" reads exactly like "everything was already set".
+        # The registry is the SSOT, keeps ${env:NAME} whatever any client wants, and is a superset (it
+        # also covers servers a given client excludes). Which secrets must reach User env is a property
+        # of the registry, not of one client output format.
         $repoRoot = Split-Path $PSScriptRoot -Parent
-        $pref = Join-Path $repoRoot ".cursor\mcp.json"
-        $target = $pref
+        $target = Join-Path $repoRoot "mcp\registry.template.json"
         if (-not [string]::IsNullOrWhiteSpace($McpPath)) {
             $target = $McpPath
         }
@@ -346,6 +354,11 @@ Then run this action again. See docs/operations/mcp-add-server-quickstart.md (co
         }
         $raw = Get-Content -LiteralPath $target -Raw -Encoding UTF8
         $matches = [regex]::Matches($raw, '\$\{env:([A-Z][A-Z0-9_]*)\}')
+        if ($matches.Count -eq 0) {
+            # "No names found" must never be mistaken for "nothing to do" -- that is how a syncer goes
+            # quiet. If the source stops using the ${env:NAME} form, fail loudly instead of reporting 0.
+            throw "No env placeholders found in: $target -- wrong source file, or its placeholder syntax changed."
+        }
         $names = @($matches | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
         $set = 0
         $missing = New-Object System.Collections.Generic.List[string]
@@ -364,7 +377,7 @@ Then run this action again. See docs/operations/mcp-add-server-quickstart.md (co
             Write-Host ("Vault missing {0} name(s) referenced in {1}: {2}" -f $missing.Count, $target, ($missing -join ", ")) -ForegroundColor Yellow
             Write-Host "Add with: .\scripts\secrets-vault.ps1 -Action set -Name <NAME> -Value '<value>'" -ForegroundColor Yellow
         }
-        Write-Host ("Synced {0} variable(s) to Windows User environment. Fully quit Cursor and reopen." -f $set) -ForegroundColor Cyan
+        Write-Host ("Synced {0} variable(s) to Windows User environment. Fully quit Claude Code / Claude Desktop and reopen." -f $set) -ForegroundColor Cyan
         exit 0
     }
 }

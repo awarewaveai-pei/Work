@@ -4,12 +4,16 @@
  *
  * Companion to scripts/sync-claude-userlevel.ps1 (manifest type `prune-duplicate-json`).
  *
+ * STATUS 2026-08-28: no manifest entry currently dispatches to this helper. It is kept
+ * on purpose -- see the block comment above Sync-Json-PruneDuplicate in
+ * scripts/sync-claude-userlevel.ps1 for why, and TASKS.md for the successor file pair.
+ *
  * Reason this exists:
  *   Cursor loads BOTH the project `.cursor/mcp.json` and the user-level
  *   `%USERPROFILE%\.cursor\mcp.json`. A server named in both launches twice per
  *   window. For OAuth servers behind `mcp-remote` that means two proxies racing
  *   the same token lock -- on 2026-08-25 that produced 36 zombie node processes
- *   and 14 browser popups in two hours.
+ *   and 14 browser popups in two hours. Cursor was retired 2026-08-26.
  *
  *   The policy (agency-os/docs/operations/mcp-add-server-quickstart.md) is NOT
  *   "empty the user file": it is "keep it empty EXCEPT keys that do not collide

@@ -426,14 +426,17 @@ if (-not $SkipOpenTasksList -and (Test-Path -LiteralPath $openTasksScript)) {
 }
 
 # --- MCP config sync (auto-regenerate from SSOT; idempotent, non-blocking) ---
-# Regenerates .mcp.json / .cursor/mcp.json / Codex / Gemini from mcp/registry.template.json.
+# Regenerates .mcp.json / Codex / Copilot / Gemini from mcp/registry.template.json.
+# (.cursor/mcp.json dropped 2026-08-28 -- Cursor retired 2026-08-26.)
 # Ordering note (2026-06-01, SUPERSEDED 2026-08-25): this used to have to run BEFORE
 # sync-claude-userlevel merge, because sync-mcp-config wrote the full server list into
 # .claude/mcp.json (= ~/.claude/mcp.json via junction), undoing the normalization; merge running
 # after was what kept the file at {} before the H2 verify gate. sync-mcp-config no longer writes
 # that file at all (duplicate ownership removed), so this ordering is no longer load-bearing.
 # sync-claude-userlevel.ps1 is now the ONLY writer of every governed user-level config
-# (~/.claude/mcp.json, ~/.cursor/mcp.json, ~/.claude.json), per mcp/claude-userlevel/manifest.json.
+# (~/.claude/mcp.json, ~/.claude.json), per mcp/claude-userlevel/manifest.json. The ~/.cursor/mcp.json
+# entry was removed 2026-08-28 with Cursor; note that %APPDATA%\Claude\claude_desktop_config.json
+# -- which Claude DOES load, merged with the repo .mcp.json -- has never been in the manifest at all.
 # sanitize-user-mcp-config.ps1 backs those files up and delegates here rather than rewriting them,
 # so running it by hand can no longer reintroduce drift.
 $mcpSyncScript = Join-Path $WorkRoot "scripts\sync-mcp-config.ps1"

@@ -307,11 +307,10 @@ function Invoke-Once {
             }
         }
 
-        $monoRoot = Split-Path -Path $Root -Parent
-        $syncEnt = Join-Path $monoRoot "scripts\sync-enterprise-cursor-rules-to-monorepo-root.ps1"
-        if (Test-Path -LiteralPath $syncEnt) {
-            & powershell -NoProfile -ExecutionPolicy Bypass -File $syncEnt -MonorepoRoot $monoRoot -Quiet
-        }
+        # REMOVED 2026-08-28: this used to invoke scripts\sync-enterprise-cursor-rules-to-monorepo-root.ps1
+        # to mirror agency-os/.cursor/rules into the repo root. Cursor was retired 2026-08-26 and
+        # that script plus both rules trees were deleted, so the Test-Path guard had turned the call
+        # into a permanent silent no-op -- a call site that looks like it still does something.
     }
 
     $singleOwnerViolations = @()

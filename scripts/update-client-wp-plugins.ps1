@@ -398,7 +398,7 @@ $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $latestFile -Encodi
 Write-Host "Report  : $rptFile"
 
 # ── Sync report to ops dashboard (non-fatal) ─────────────────────────────────
-# Reads OPS_PROXY_SHARED_SECRET from env (set via secrets-vault.ps1 sync-cursor-mcp-user-env).
+# Reads OPS_PROXY_SHARED_SECRET from env (set via secrets-vault.ps1 sync-mcp-user-env).
 # Server strips backup_path before storing. Failure here does NOT abort the run.
 $syncKey = $env:OPS_PROXY_SHARED_SECRET
 if ($syncKey) {

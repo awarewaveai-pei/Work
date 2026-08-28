@@ -467,12 +467,21 @@ function Resolve-HelperStatus {
   return $status
 }
 
-# ---------- JSON PRUNE-DUPLICATE (user-level Cursor MCP) ----------
-# Governs a file that must NOT simply be replaced. Cursor merges the project
-# .cursor/mcp.json with this user-level file, so a key present in both launches
-# twice; but a key present ONLY here is the documented escape hatch for an MCP
-# that must never enter the repo (mcp-add-server-quickstart.md). So: remove the
-# colliding keys, keep the rest.
+# ---------- JSON PRUNE-DUPLICATE (currently unused by the manifest) ----------
+# NO MANIFEST ENTRY DISPATCHES HERE as of 2026-08-28, and this is deliberately NOT
+# dead code to be swept. Read before deleting.
+#
+# It was built for ~\.cursor\mcp.json: Cursor merged the project .cursor/mcp.json with
+# that user-level file, so a key in both launched twice. Cursor was retired 2026-08-26
+# and its entry removed here 2026-08-28 -- with the target file gone the helper reports
+# absent-target as `clean`, i.e. a detector that could never go red again.
+#
+# The INVARIANT it enforces did not retire with Cursor, only the file pair did:
+# %APPDATA%\Claude\claude_desktop_config.json is merged by Claude the same way, carries
+# 8 names that duplicate the repo .mcp.json, and 2 (perplexity, wordpress) that exist
+# nowhere else -- exactly the "prune the collisions, keep the escape hatch" shape, which
+# a blunt replace-json would destroy. Re-pointing it there is an open TASKS item and needs
+# operator sign-off first, because that file holds live plaintext credentials.
 #
 # The comparison and the write both live in the Node helper, for two reasons:
 # PowerShell 5.1 ConvertTo-Json flattens 1-element arrays into objects, which

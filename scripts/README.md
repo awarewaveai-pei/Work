@@ -56,9 +56,8 @@ All scripts live in this flat directory. Paths are hard-coded as `scripts\<name>
 | `sync-claude-userlevel.ps1` | Sync `mcp/claude-userlevel/` SSOT → `~/.claude/{hooks,settings.json,mcp.json}` (modes: install/merge/verify/dry-run) |
 | `apply-shared-ai-governance.ps1` | One-shot: MCP sync + closeout inbox seed + bootstrap prompts |
 | `verify-shared-ai-governance.ps1` | Verify MCP governance state |
-| `sanitize-user-mcp-config.ps1` | Back up user-level MCP files, then delegate the rewrite to `sync-claude-userlevel.ps1` (the single writer) |
+| `sanitize-user-mcp-config.ps1` | Back up `~/.claude/mcp.json` + `~/.claude.json`, then delegate the rewrite to `sync-claude-userlevel.ps1` (the single writer). Does NOT cover `%APPDATA%\Claude\claude_desktop_config.json`, which is ungoverned and holds plaintext keys -- see TASKS.md |
 | `patch-codex-user-mcp-config.ps1` | Patch Codex user MCP config |
-| `patch-cursor-user-mcp-workspace.ps1` | Patch Cursor workspace MCP |
 | `ensure-agent-bootstrap-prompts.ps1` | Generate bootstrap prompt packs for other AI agents |
 | `run-llm-mcp.ps1` | Stdio launcher for LLM MCP servers (Claude/GPT/Gemini/Grok) |
 | `run-filesystem-mcp.ps1` | Stdio launcher for filesystem MCP |
@@ -183,12 +182,6 @@ All scripts live in this flat directory. Paths are hard-coded as `scripts\<name>
 | `rag_query.ts` | RAG query (TypeScript) |
 | `rag_seed_and_embedding.ts` | RAG seed and embedding (TypeScript) |
 | `setup-rag-env.ps1` | Set up RAG environment |
-
-## Cursor / IDE Tooling
-
-| Script | Purpose |
-|--------|---------|
-| `fix-cursor-ai-sidebars.mjs` | Patch Codex + Claude Code extension package.json to force activity bar placement; run after sidebar icons vanish |
 
 ---
 

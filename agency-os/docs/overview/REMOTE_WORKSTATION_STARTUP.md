@@ -188,7 +188,7 @@ npm run smoke:supabase-tunnel -- --sql
    | 步驟 | 腳本 | 說明 |
    |------|------|------|
    | Claude user-level sync | `sync-claude-userlevel.ps1 -Mode merge` | hooks/settings 對齊，保留 permissions.allow |
-   | MCP 設定 | `sync-mcp-config.ps1` | .mcp.json / .cursor/mcp.json 從 SSOT 重生 |
+   | MCP 設定 | `sync-mcp-config.ps1` | .mcp.json / Codex / Copilot / Gemini 從 SSOT 重生 |
    | 記憶匯入 | `import-cross-machine-memory.ps1` | 若 Desktop 有新的 AO-SYNC 資料夾則自動匯入 MEMORY.md |
 
    **全部為 non-blocking（任一失敗不阻擋 AO-RESUME）、idempotent（重跑無副作用）。**  

@@ -83,10 +83,16 @@ $patterns = @(
 # DEFAULT SCAN PATHS — extend by editing this list, or override via -Path.
 # All paths are relative to $WorkRoot.
 # ============================================================================
+# KNOWN GAP, tracked in TASKS.md ("claude_desktop_config.json 至今無人治理"):
+# %APPDATA%\Claude\claude_desktop_config.json is NOT scanned, and as of 2026-08-28 it holds six
+# plaintext API keys. It is absent for two reasons, neither of them "we think it is safe":
+#   1. Join-Path $WorkRoot $rel below cannot express an absolute path outside the repo.
+#   2. In baseline mode (how verify-build-gates calls this) any unsuppressed WARN exits 2, so
+#      adding it today would hard-block AO-RESUME / AO-CLOSE until those keys are rotated.
+# Wiring it in belongs with that rotation, not before it.
 $defaultPaths = @(
     ".claude/settings.json",
     ".claude/settings.local.json",
-    ".cursor/mcp.json",
     ".mcp.json",
     "mcp/user-env.ps1"
 )

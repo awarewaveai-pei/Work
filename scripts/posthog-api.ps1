@@ -49,7 +49,7 @@ function Get-PostHogApiKey {
 
     $vaultPath = Join-Path $env:LOCALAPPDATA "AgencyOS\secrets\vault.json"
     if (-not (Test-Path -LiteralPath $vaultPath)) {
-        throw "PostHog API key not found in env and vault file is missing: $vaultPath. Set POSTHOG_API_KEY, POSTHOG_AUTH_BEARER_TOKEN, or POSTHOG_PERSONAL_API_KEY; or run: .\scripts\secrets-vault.ps1 -Action import-mcp -McpPath `"$env:USERPROFILE\.cursor\mcp.json`""
+        throw "PostHog API key not found in env and vault file is missing: $vaultPath. Set POSTHOG_API_KEY, POSTHOG_AUTH_BEARER_TOKEN, or POSTHOG_PERSONAL_API_KEY; or run: .\scripts\secrets-vault.ps1 -Action import-user-env  (reads mcp\user-env.ps1)"
     }
 
     $raw = Read-VaultJson -VaultPath $vaultPath
@@ -60,7 +60,7 @@ function Get-PostHogApiKey {
 
     $cipher = Get-PostHogCipherFromSecrets -SecretsRoot $store.secrets
     if (-not $cipher) {
-        throw "PostHog Personal API key not in vault. Expected one of: POSTHOG_API_KEY, POSTHOG_AUTH_BEARER_TOKEN (from import-mcp posthog server), POSTHOG_PERSONAL_API_KEY. Run: .\scripts\secrets-vault.ps1 -Action import-mcp -McpPath `"$env:USERPROFILE\.cursor\mcp.json`""
+        throw "PostHog Personal API key not in vault. Expected one of: POSTHOG_API_KEY, POSTHOG_AUTH_BEARER_TOKEN (from import-mcp posthog server), POSTHOG_PERSONAL_API_KEY. Run: .\scripts\secrets-vault.ps1 -Action import-user-env  (reads mcp\user-env.ps1; ~\.cursor\mcp.json was the old source and no longer exists)"
     }
 
     $secure = ConvertTo-SecureString -String $cipher

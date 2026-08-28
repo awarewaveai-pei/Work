@@ -21,7 +21,7 @@
   It deliberately does NOT dot-source `mcp/user-env.ps1`: that file runs `setx`
   for every key it defines, which persists ~72 User-level environment variables
   machine-wide and can overwrite values that `secrets-vault.ps1
-  -Action sync-cursor-mcp-user-env` just synced from the vault - i.e. it would
+  -Action sync-mcp-user-env` just synced from the vault - i.e. it would
   re-create the very credential-drift class this fix exists to remove.
 
   Guards: a value that still looks masked, or does not match the documented

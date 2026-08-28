@@ -18,7 +18,7 @@
   Pre-requisite — secrets must already be in the vault:
     .\scripts\secrets-vault.ps1 -Action set -Name TELEGRAM_BOT_TOKEN -Value '...'
     .\scripts\secrets-vault.ps1 -Action set -Name TELEGRAM_WEBHOOK_SECRET -Value '<random32>'
-    .\scripts\secrets-vault.ps1 -Action sync-cursor-mcp-user-env  # or run /vault-sync
+    .\scripts\secrets-vault.ps1 -Action sync-mcp-user-env  # or run /vault-sync
 
   Then run:
     .\scripts\configure-telegram-webhook.ps1
@@ -47,7 +47,7 @@ From monorepo root:
   1) Set the secret:
        .\scripts\secrets-vault.ps1 -Action set -Name TELEGRAM_BOT_TOKEN -Value '<paste from BotFather>'
   2) Sync vault to user environment:
-       .\scripts\secrets-vault.ps1 -Action sync-cursor-mcp-user-env
+       .\scripts\secrets-vault.ps1 -Action sync-mcp-user-env
   3) Open a NEW PowerShell session (env vars only refresh on shell start).
   4) Re-run this script.
 "@

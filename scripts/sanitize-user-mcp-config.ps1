@@ -8,9 +8,16 @@
 
     1. Takes uniquely named, timestamped backups of the user-level files that
        historically carried plaintext tokens:
-         %USERPROFILE%\.cursor\mcp.json
          %USERPROFILE%\.claude\mcp.json
          %USERPROFILE%\.claude.json
+
+       %USERPROFILE%\.cursor\mcp.json was on this list until 2026-08-28. Cursor was retired
+       2026-08-26 and the whole ~\.cursor tree deleted 2026-08-28, so backing it up now only
+       produces an empty backup set that reads like a successful sweep.
+
+       NOT on this list, and it should be: %APPDATA%\Claude\claude_desktop_config.json.
+       As of 2026-08-28 that file holds SIX plaintext API keys and is governed by nothing --
+       it inherited the exact role ~\.cursor\mcp.json used to play. See TASKS.md.
 
     2. Delegates the actual rewrite to scripts/sync-claude-userlevel.ps1, which is the
        ONLY writer for all three. What each file must contain is declared in
@@ -79,7 +86,6 @@ $backupDir = Join-Path $BackupRoot ("mcp-sanitize-" + $timestamp)
 
 # The paths are listed here only so they can be backed up. Their required CONTENT is
 # declared in mcp/claude-userlevel/manifest.json -- do not encode expectations here.
-$cursorPath = Join-Path $env:USERPROFILE ".cursor\mcp.json"
 $claudeLegacyPath = Join-Path $env:USERPROFILE ".claude\mcp.json"
 $claudeJsonPath = Join-Path $env:USERPROFILE ".claude.json"
 
@@ -111,7 +117,7 @@ function Backup-FileUnique {
 }
 
 $backups = @()
-foreach ($path in @($cursorPath, $claudeLegacyPath, $claudeJsonPath)) {
+foreach ($path in @($claudeLegacyPath, $claudeJsonPath)) {
     $backupPath = Backup-FileUnique -SourcePath $path -BackupDirectory $backupDir
     if ($null -ne $backupPath) {
         $backups += $backupPath
@@ -163,4 +169,4 @@ if ($syncExit -ne 0) {
 }
 
 Write-Host ""
-Write-Host "Done. Fully exit and reopen Cursor / Claude Code so they reload their config." -ForegroundColor Green
+Write-Host "Done. Fully exit and reopen Claude Code / Claude Desktop so they reload their config." -ForegroundColor Green

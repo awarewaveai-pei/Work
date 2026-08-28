@@ -37,14 +37,6 @@
       "syncMode": "replace",
       "description": "Per CLAUDE.md, ~/.claude/mcp.json must be empty; project-scoped .mcp.json is the SSOT"
     },
-    "cursor-mcp": {
-      "type": "prune-duplicate-json",
-      "compareAgainst": "${MONOREPO_ROOT}\\.cursor\\mcp.json",
-      "target": "${USERPROFILE}\\.cursor\\mcp.json",
-      "collection": "mcpServers",
-      "syncMode": "prune",
-      "description": "Cursor loads the project .cursor/mcp.json AND this user-level file, so a server named in both launches twice per window. Policy per mcp-add-server-quickstart.md: keep this file at {\"mcpServers\":{}} EXCEPT keys that do not collide with the project config -- those are the escape hatch for an MCP that must never enter the repo. Hence prune-duplicate, not replace: replacing would delete that escape hatch, which is why this file went ungoverned for so long."
-    },
     "claude-user-json": {
       "type": "clear-collections-json",
       "target": "${USERPROFILE}\\.claude.json",
