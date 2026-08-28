@@ -1,5 +1,45 @@
 ﻿# Worklog
 
+## 2026-08-28
+
+### Soulful 快取層 + 第三輪覆審（4C+11M）：三個 Critical 全部有指令級證實，含一個現在進行式的憑證洩漏
+
+**[任務理解]** 新機比舊機慢的根因是缺頁面快取（LiteSpeed 在舊機 0.0003s 不跑 PHP；新機每請求跑滿 PHP 0.36s，
+且 CF 對 HTML 回 `DYNAMIC` 不吸收）。補了 Redis object cache + nginx 60s micro-cache 後送第三輪 critic 覆審。
+共用頁面快取在電商站做錯不是變慢，是把 A 的購物車端給 B。
+
+**[已修改]**
+
+| # | 問題 | 證實方式 |
+|---|---|---|
+| C1 | smoke 檢查的 heredoc 被 `docker exec -i` 吃掉尾段 —— **清理行永遠不執行，含 MariaDB root 密碼的 `/tmp/.soulful-smoke.cnf` 每次 AO-RESUME 都留在容器裡** | **實地查獲**：容器內真有該檔（93B, root, 當日 10:58）。這正是 M13 註解宣稱修好的 credential 缺陷，被 transport 重新引入。修法：拿掉不需要的 `-i` + `< /dev/null` + cleanup 改 trap；已清除洩漏檔並重跑證明無殘留 |
+| C2 | cookie 用拒絕清單 —— Set-Cookie 守衛只擋「發 cookie 的那次」，**已持有**個人化 cookie 的訪客渲染出的頁面可被存進共用快取端給陌生人 | 改**允許清單**（無 cookie 或僅分析類才可快取）。突變測試 7 項全過：混合 cookie、前綴、大小寫、`woocommerce_recently_viewed`（舊清單漏掉的）全部 BYPASS |
+| C3 | 規則比對原始 `$request_uri`，但 location 路由與上游都用規範化 `$uri` | **實測洩漏**：`/cart/`→BYPASS 但 `//cart/`→**MISS（進了快取）**。改比對 `$uri` + key 改 `$scheme$host$uri`（同時封掉 `//`×N 撐爆 key 空間的 eviction DoS）。修後 `//cart/`、`///cart/`、`/./cart/`、`/x/../checkout/` 全 BYPASS |
+| C4 | `proxy_cache_use_stale error timeout http_5xx` 無上限 —— 後端死掉時快取**無限期**端 200 給所有監控，而 /checkout/ 是 BYPASS 直接 502：**監控全綠但客人結不了帳** | 改只留 `updating`。突變測試：停掉 soulful-wp，TTL 內仍 HIT（60 秒容忍，正常）；**過期後必須 502 而非繼續 HIT**（見驗證段） |
+| M1 | `docker stop` 失敗會繞過它自己的斷言，標成「本來就沒在跑」，然後在活著的 PHP 底下 DROP 288 張表 | 斷言改無條件執行，不由 stop 的 exit code 決定 |
+| M2 | 我自己的 M6 修法引入新 race：恢復路徑**先啟動 web 層再回滾 DB** = WordPress 對半載入的資料庫寫入 | 改「還原 DB → FLUSHALL → 才啟動 web」；補 `DB_RESTORED` 防雙重還原 |
+| M3 | helper image 的 build 仍在凍結窗口內，而**兩處註解宣稱不是**；build log 導向不存在的檔案 | 移到 pre-flight 0a；log 導向 fail 訊息實際指的檔案 |
+| M6/M10 | `proxy_cache_key` 放 http context 會變成未來所有 vhost（Chatwoot！）的預設 key；cache.conf 無部署路徑說明，缺它 nginx 冷開機拒絕啟動 | key 移入唯一快取的 location；檔頭補部署指令 |
+
+另實查關掉三個 Major：LiteSpeed 排除清單實際為**空**（站主從未設定）、`woocommerce_default_customer_address=base`（非 geolocation）、`.htaccess` 無 Apache 會讀的 mod_expires 區塊 —— 用 wp-cli 查的，不是假設的。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd=容器內查 `/tmp/.soulful-smoke.cnf` | exit=0 | ms=4000 —— C1 查獲實物；修後重跑 smoke 無殘留
+- REALTEST_EVIDENCE: tool=curl | cmd=`//cart/` 等 7 種規範化變體 GET 直打新機 | exit=0 | ms=30000 —— 修前 `//cart/`=MISS（洩漏），修後全 BYPASS
+- REALTEST_EVIDENCE: tool=curl | cmd=cookie 允許清單 7 項突變測試 | exit=0 | ms=25000 —— 全過，含舊拒絕清單漏掉的名字
+- REALTEST_EVIDENCE: tool=SSH | cmd=r7 --dry-run 完整演練 | exit=0 | ms=110000 —— `version=r7 sha=7225835e97e6`、helper build 在凍結前、dry pass 0 deletions、288 表全等
+- REVIEW_DONE: critic=Deep | verdict=fail | findings=4C/11M/10m —— 每條 Critical 以指令證實後才修，非照單全收
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=request_uri | hits=4（1=HTTP→HTTPS 301 轉址的正確用法（轉址本來就該保留原始字串）；3=解釋為何不可用它做快取判斷的註解；**快取判斷路徑 0 個殘留**）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=soulful-smoke.cnf | hits=2（皆為修後的 trap 清理路徑）
+
+**[剩餘風險]** M4（profile 讀取只看 process env，AO-RESUME 子行程讀不到 → 建議切換日直接寫入 user-env.ps1 的 User scope）、
+M5（wp-cli phar 無 sha512 驗證）、M9（`add_header` 在 location 內會丟棄繼承 header —— 目前 server 層無 header 故無實害，加固時要記得）尚未修，均不在凍結路徑。
+C4 的過期後行為驗證見本 session 尾（TTL 邊界測試）。
+
+**[rollback]** nginx: 註解掉 `proxy_cache soulful_cache;` 一行 + reload（runbook 已載明）；腳本: git + scp 任一版本。
+
+---
+
 ## 2026-08-27
 
 ### Soulful 切換機制：外部覆審打回 4C+12M，其中三個「回報正確性的機制本身不會失敗」

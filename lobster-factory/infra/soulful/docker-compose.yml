@@ -60,6 +60,48 @@ services:
           memory: 6G
     logging: *soulful-logging
 
+  soulful-redis:
+    # Object cache backend. Pinned to the exact patch running at pin time (7.4.11,
+    # verified on the host 2026-08-27) for the same reason soulful-db is: a silent minor
+    # bump under a live store is not a risk worth taking during a migration.
+    #
+    # WHY THIS EXISTS: the live Hostinger site is served by LiteSpeed, whose built-in
+    # page cache answers in ~0.3ms WITHOUT invoking PHP. On nginx+Apache that cache is
+    # completely inert (its .htaccess directives sit in <IfModule LiteSpeed> blocks that
+    # never match), so every request here executes PHP end to end. Measured on-box
+    # 2026-08-27: live 0.0003s vs this host 0.36s, and Cloudflare returns
+    # `cf-cache-status: DYNAMIC` for HTML -- i.e. it does NOT absorb the difference.
+    image: redis:7.4.11-alpine
+    container_name: soulful-redis
+    restart: unless-stopped
+    # An object cache is a CACHE: losing it must degrade performance, never correctness.
+    # No persistence is configured on purpose, and allkeys-lru lets it evict rather than
+    # start refusing writes (noeviction would surface as random WordPress failures once
+    # full, which is a far worse failure mode than a cache miss).
+    command:
+      - redis-server
+      - --maxmemory
+      - 512mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+    # No ports: stanza -- reachable only on the internal network, same rule as soulful-db.
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks: [soulful-net]
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    logging: *soulful-logging
+
   soulful-wp:
     build:
       context: .
@@ -69,6 +111,8 @@ services:
     restart: unless-stopped
     depends_on:
       soulful-db:
+        condition: service_healthy
+      soulful-redis:
         condition: service_healthy
     environment:
       WORDPRESS_DB_HOST: soulful-db:3306

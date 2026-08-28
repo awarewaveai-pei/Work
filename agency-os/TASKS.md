@@ -154,7 +154,7 @@
   - **AI 接手第一步**：讀 [`tenants/company-soulful-expression/core/SITE_MIGRATION_RUNBOOK.md`](tenants/company-soulful-expression/core/SITE_MIGRATION_RUNBOOK.md)（步驟/切換/回滾 SSOT），再依序 §0.5 → §3 → §4 → §5 → §6。
   - **已完成、不要重做**：① CF zone 14 筆記錄 + nameserver 已切（2026-08-15）② 信箱 mail-tester **10/10**（SPF/DKIM/DMARC 三項 pass）③ ~~EU 三份備份 769 MB~~ **🔴 已於 2026-08-24 被 retention 誤刪，2026-08-27 已從 live 站重拉並改存 ks-aw-01 + R2（見下）** ④ 還原演練 **Drill #1 PASS**（該次演練本身有效，但它驗的那份來源已不存在）⑤ FluentSMTP 主機名已修（`pop`→`smtp.hostinger.com`）
   - **🔑 2026-08-27 新增待清理**：ks-aw-01 為了拉取站台資料，在 Hostinger `~/.ssh/authorized_keys` 加了一把受限公鑰（`ks-aw-01-soulful-pull`，限 `from="149.202.64.114"`）。**搬遷完成後必須移除**——這正是 `KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md`「舊帳號/舊 key 沒有一起關掉」那條坑
-  - **接手時必查的三個陷阱**：① DKIM 實際 selector 是 `hostingermail1`（不是 `-a`/`-b`），Hostinger 舊 zone 沒這筆 → 回滾 DNS 會讓 DKIM 失效 ② `litespeed-cache` 換到非 LiteSpeed 主機會失效，切換當天不要處理，另排 ③ `scripts/check-smoke-tests.ps1` 的 `client_mail` 檢查寫死 Hostinger SSH（`HOSTINGER_SOULFUL_SSH_*`），主機換了要同步改
+  - **接手時必查的三個陷阱**：① DKIM 實際 selector 是 `hostingermail1`（不是 `-a`/`-b`），Hostinger 舊 zone 沒這筆 → 回滾 DNS 會讓 DKIM 失效 ② ~~`litespeed-cache` 失效，切換當天不要處理，另排~~ → **2026-08-27 更正並已解決**：LiteSpeed 的頁面快取在舊機是「不跑 PHP 就回應」（實測 0.0003s），失效不是「沒作用」而是**每個請求都打滿 PHP**（0.36s），且 CF 對 HTML 回 `DYNAMIC` 不吸收。已補 Redis object cache + nginx 60s micro-cache，實測 0.35s → **0.0034s**，並以計時證明購物車／登入／POST 確實繞過快取（0.7s = 真的跑了 PHP） ③ ~~`client_mail` 寫死 Hostinger SSH~~ → **已 profile 化**：`SOULFUL_DB_PROFILE`（`hostinger`｜`ks-aw-01`）由 `mcp/user-env.ps1` 承載，切換當天改一個值；未知值會 `warn:unknown_profile` + blind spot，不再靜默落回舊機
   - **切換動作本身**：Cloudflare apex A 記錄 `191.101.230.176` → 新 IP（proxy 維持 🟠）。**回滾 = 改回去**，幾秒生效。屬 High risk，需操作者明示 go-ahead。
   - **操作者待辦（與買機平行）**：~17 個付費外掛的 5–6 組授權續約狀態盤點（清單 `core/SITE_CODE_MANIFEST.md`）。
 
@@ -1313,5 +1313,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-08-27 09:08:01 UTC_
+_Last synced: 2026-08-27 15:01:34 UTC_
 

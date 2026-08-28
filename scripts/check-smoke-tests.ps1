@@ -210,21 +210,56 @@ try {
             $mailPort = $env:SOULFUL_SSH_PORT; if (-not $mailPort) { $mailPort = "58122" }
             $mailUser = $env:SOULFUL_SSH_USER; if (-not $mailUser) { $mailUser = "ubuntu" }
             $mailKey  = Join-Path $env:USERPROFILE ".ssh\id_ed25519"
-            # Credentials are read from the host's own env file rather than passed in, so
-            # the DB password never appears in an argument list or in this repo.
+            # Two things this deliberately does NOT do, both of which the first version did
+            # and both of which cutover-sync.sh was already engineered to avoid -- two files
+            # in one change set behaving oppositely is how a rule quietly stops applying:
+            #
+            #  1. NO `. /root/soulful/.env` AS ROOT. Sourcing executes the file, so a value
+            #     containing $(...) or backticks runs as root on ks-aw-01, triggered by a
+            #     routine AO-RESUME. The two keys are read with a plain read loop instead,
+            #     which cannot execute anything.
+            #  2. NO PASSWORD IN ARGV. `-p"$PASS"` is visible to every user on the box via
+            #     `ps aux` for the lifetime of the query. The credential is staged into a
+            #     defaults file INSIDE the container over stdin, exactly as
+            #     cutover-sync.sh setup_db_auth does, and removed afterwards.
             #
             # A heredoc, not `sudo bash -c '...'`: the SQL contains single quotes
             # (status='failed'), which close the wrapper's own quoting and make the remote
             # shell fail with a syntax error. That first attempt returned ssh_exit1 and was
             # caught by testing the post-cutover profile TODAY rather than on cutover day.
-            # <<'INNER' is quoted so the outer shell leaves the body alone and the inner
-            # sudo bash expands $SOULFUL_* itself.
+            # <<'INNER' is quoted so the outer shell leaves the body alone.
             $nl = "`n"
+            $q  = [char]34
             $remoteCmd = "sudo bash -s <<'INNER'" + $nl +
-                         "set -a; . /root/soulful/.env; set +a" + $nl +
-                         "docker exec soulful-db mariadb -N -u root -p" + [char]34 + "`$SOULFUL_DB_ROOT_PASSWORD" + [char]34 +
-                         " " + [char]34 + "`$SOULFUL_DB_NAME" + [char]34 +
-                         " -e " + [char]34 + $sql + [char]34 + $nl +
+                         "set -u" + $nl +
+                         "ENVF=/root/soulful/.env" + $nl +
+                         "[ -r " + $q + "`$ENVF" + $q + " ] || { echo 'env unreadable' >&2; exit 1; }" + $nl +
+                         # read, do not source: no expansion, no command substitution
+                         "DBPASS=`$(sed -n 's/^SOULFUL_DB_ROOT_PASSWORD=//p' " + $q + "`$ENVF" + $q + " | tr -d '
+' | tail -1)" + $nl +
+                         "DBNAME=`$(sed -n 's/^SOULFUL_DB_NAME=//p' " + $q + "`$ENVF" + $q + " | tr -d '
+' | tail -1)" + $nl +
+                         "[ -n " + $q + "`$DBPASS" + $q + " ] || { echo 'no db password' >&2; exit 1; }" + $nl +
+                         "[ -n " + $q + "`$DBNAME" + $q + " ] || DBNAME=soulful" + $nl +
+                         "CNF=/tmp/.soulful-smoke.cnf" + $nl +
+                         # CLEANUP IS A TRAP, NOT A LINE. Ordering-dependent cleanup does not
+                         # survive an early exit, and it did not survive this transport either.
+                         "trap 'docker exec soulful-db sh -c " + $q + "rm -f `$CNF" + $q + " >/dev/null 2>&1 || true' EXIT" + $nl +
+                         "printf '[client]
+user=root
+password=%s
+' " + $q + "`$DBPASS" + $q +
+                           " | docker exec -i soulful-db sh -c 'umask 077; cat > '" + $q + "`$CNF" + $q + $nl +
+                         # NO -i HERE. The inner script's stdin IS the heredoc, and bash reads a
+                         # piped script incrementally, so `docker exec -i` starts a stdin pump and
+                         # SWALLOWS THE REST OF THE SCRIPT. Verified on this host 2026-08-27: the
+                         # cleanup line never ran and /tmp/.soulful-smoke.cnf -- containing the
+                         # MariaDB root password in cleartext -- was left inside soulful-db after
+                         # every run. That is the exact credential-hygiene defect the comment above
+                         # says this block fixed, reintroduced by the transport rather than the
+                         # logic. `< /dev/null` is belt-and-braces for the same class.
+                         "docker exec soulful-db mariadb --defaults-extra-file=" + $q + "`$CNF" + $q +
+                           " -N " + $q + "`$DBNAME" + $q + " -e " + $q + $sql + $q + " < /dev/null" + $nl +
                          "INNER"
         }
         "hostinger" {

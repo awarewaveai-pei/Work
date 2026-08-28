@@ -99,8 +99,20 @@ ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114 'sudo /root/soulful/cuto
 
 # 正式：會凍結 live，並「保持凍結」等你切 DNS
 # REQUIRE_VERSION 讓舊副本直接拒跑，而不是安靜地跑出錯誤結果
-ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114   'sudo REQUIRE_VERSION=2026-08-27-r5 /root/soulful/cutover-sync.sh --live'
+#
+# 🔴 用 tmux，不要直接前景跑。
+#    腳本裝了 SIGHUP handler：ssh 斷線 -> 收到 HUP -> 自動解凍 -> exit 129。
+#    那個行為在「腳本自己失敗」時是對的，但在「你家網路閃一下」時，
+#    它會在你正要切 DNS 的當下把凍結解掉，而你的終端機已經沒了、什麼都看不到。
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114   "tmux new -d -s cutover 'sudo REQUIRE_VERSION=2026-08-27-r7 /root/soulful/cutover-sync.sh --live 2>&1 | tee /root/cutover-live.log'"
+
+# 另開一個連線看進度（斷線也不影響那邊的執行）
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114 'tail -f /root/cutover-live.log'
 ```
+
+> **證據檔在哪**：`/root/soulful-cutover/<STAMP>/evidence.txt`（每次執行一個目錄）。
+> 事後要查「當時 parity 到底是多少」看這個，不要靠記憶。
+> 找最新一次：`ssh … 'sudo ls -1t /root/soulful-cutover | head -1'`
 
 > 腳本開頭會印 `version=… sha256=… host=…`，evidence 檔也留同一行。
 > **對不上就不要往下做。**
@@ -162,6 +174,42 @@ curl -sS -X PATCH   "https://api.cloudflare.com/client/v4/zones/bb1358fe8d3e1d73
 
 ## 切換後立刻驗（前 5 分鐘）
 
+### 寄信路徑（切換後必驗，因為出口 IP 變了而偵測器有 10 天假綠期）
+
+```bash
+# 強制寄一封，並確認資料庫真的多了一列 sent —— 「wp_mail 回 true」不算數，
+# 它只代表交給了 SMTP 層，不代表對方收下。
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114 'sudo bash -s' <<'SH'
+before=$(docker exec soulful-wp wp --allow-root db query   "SELECT COUNT(*) FROM wp_fsmpt_email_logs WHERE status='sent'" --skip-column-names)
+docker exec soulful-wp wp --allow-root eval   'var_dump( wp_mail( "peijingartstudio@gmail.com", "cutover mail test", "sent from ks-aw-01" ) );'
+sleep 5
+after=$(docker exec soulful-wp wp --allow-root db query   "SELECT COUNT(*) FROM wp_fsmpt_email_logs WHERE status='sent'" --skip-column-names)
+echo "sent 列數: $before -> $after   (沒有增加 = 寄信在新機是壞的，不要當作沒事)"
+docker exec soulful-wp wp --allow-root db query   "SELECT status,LEFT(response,120) FROM wp_fsmpt_email_logs ORDER BY id DESC LIMIT 3"
+SH
+```
+
+### 快取層（切換後必驗，因為它是新加的）
+
+```bash
+# 1. 匿名訪客要命中快取
+curl -sSI https://soulfulexpression.org/ | grep -i x-soulful-cache     # 第二次應為 HIT
+
+# 2. 這三個「必須是 BYPASS 或無此 header」—— 任何一個出現 HIT 都是嚴重事故，
+#    代表有人的購物車／帳號頁被存進共用快取並可能端給別人。看到就立刻停用快取：
+#    sudo sed -i 's/^ *proxy_cache soulful_cache;/#&/' /etc/nginx/sites-available/soulfulexpression.org.conf && sudo nginx -t && sudo systemctl reload nginx
+curl -sSI -H 'Cookie: wordpress_logged_in_a=b'      https://soulfulexpression.org/ | grep -i x-soulful-cache
+curl -sSI -H 'Cookie: woocommerce_items_in_cart=1'  https://soulfulexpression.org/ | grep -i x-soulful-cache
+curl -sSI https://soulfulexpression.org/checkout/ | grep -i x-soulful-cache
+
+# 3. 物件快取有在動
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114   'sudo docker exec soulful-redis redis-cli INFO stats | grep keyspace'
+```
+
+> **`cutover-sync.sh` 會在載入 DB 之後、web 層重啟之前自動 `FLUSHALL` Redis。**
+> 那不是保險，是必要的：物件快取裡存的是「被換掉的那個資料庫」的值，不清掉就會端出
+> 已經不存在的價格與庫存，而且沒有任何跡象顯示有問題。
+
 ```bash
 curl -sSI https://soulfulexpression.org/ | head -3          # 期望 200
 curl -sS https://soulfulexpression.org/ | grep -o '<title>[^<]*'   # 期望是真標題不是錯誤頁
@@ -182,31 +230,68 @@ curl -sS https://soulfulexpression.org/ | grep -o '<title>[^<]*'   # 期望是�
 
 **刻意排在切換之後**：現在鎖起來，`--resolve` 的切換前測試就全部做不了。
 
+> 🔴 **順序：先加後刪，而且要先確認清單非空。**
+> 原本的寫法是先 `ufw delete` 再迴圈加回來 —— 若 `curl` 拿不到 CF 清單或 `python3` 不在，
+> 迴圈跑 0 次，結果就是 80/443 對**所有人**關閉,剛切過去的站當場全黑,而且文件裡沒有任何復原步驟。
+> 另外 `ufw delete allow 443/tcp` 只會刪掉「完全以那個形式新增」的規則；
+> 若當初是用 `allow 443` 或 app profile 加的，delete 會靜默無動作，而你會以為已經鎖上了。
+
 ```bash
 ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114
 sudo bash -c '
-  ufw delete allow 80/tcp; ufw delete allow 443/tcp
-  for c in $(curl -s https://api.cloudflare.com/client/v4/ips | python3 -c "
+  set -euo pipefail
+  # 1) 先取得清單，空的就中止 —— 絕不在沒有替代規則的情況下刪掉現有規則
+  CIDRS=$(curl -fsS --max-time 20 https://api.cloudflare.com/client/v4/ips \
+    | python3 -c "
 import json,sys
 d=json.load(sys.stdin)[\"result\"]
-print(\"\n\".join(d[\"ipv4_cidrs\"]+d[\"ipv6_cidrs\"]))"); do
-    ufw allow from $c to any port 443 proto tcp
-    ufw allow from $c to any port 80 proto tcp
+print(\"\n\".join(d[\"ipv4_cidrs\"]+d[\"ipv6_cidrs\"]))")
+  n=$(printf "%s" "$CIDRS" | grep -c . || true)
+  [ "$n" -ge 10 ] || { echo "只拿到 $n 筆 CF CIDR，中止，未更動任何防火牆規則"; exit 1; }
+  echo "取得 $n 筆 CF CIDR"
+
+  # 2) 先「加」
+  for c in $CIDRS; do
+    ufw allow from "$c" to any port 443 proto tcp
+    ufw allow from "$c" to any port 80  proto tcp
+  done
+
+  # 3) 才「刪」，且把各種可能的表述都刪掉（delete 只認完全相同的規則字串）
+  for r in "allow 80/tcp" "allow 443/tcp" "allow 80" "allow 443" "allow http" "allow https"; do
+    ufw --force delete $r 2>/dev/null || true
   done
   ufw status numbered | head -40
 '
+```
+
+```bash
+# 4) 從 Cloudflare 外部驗證真的鎖上了（在你自己的機器跑，不是在 VPS 上）
+curl -sS -o /dev/null -w "直連 origin -> %{http_code}\n" --max-time 15 \
+  --resolve soulfulexpression.org:443:149.202.64.114 https://soulfulexpression.org/ || echo "直連逾時/被拒 = 正確"
+curl -sSI --max-time 15 https://soulfulexpression.org/ | head -1   # 走 CF 必須仍是 200
 ```
 
 > ⚠️ **不要在這裡加操作者自己的 IP 白名單**。操作者長期在不同國家移動
 > （memory `feedback_global_traveler`），寫死 IP 會在出國時把自己擋在外面。
 > SSH 走 58122 是獨立規則，不受此影響。
 
-### 2. 移除 Hostinger 上的拉取金鑰
+### 2. 移除 Hostinger 上的拉取金鑰 —— **不是現在，是觀察期結束後**
+
+> 🔴 **這一節與下方表格曾經互相矛盾，已統一以「觀察期結束後」為準。**
+> 立刻移除會讓 `cutover-sync.sh` 的 pre-flight 連不上舊機，於是**回滾後想重跑同步就跑不動**。
+> 金鑰只是拉取用途、且舊站已凍結，多留七天的風險遠低於失去回滾能力。
 
 ```bash
+# 觀察期（≥7 天）結束、確定不回滾時，連同解除舊站凍結一起做：
 ssh -i ~/.ssh/hostinger_soulful -p 65002 u942075013@191.101.230.176 \
-  "sed -i '/ks-aw-01-soulful-pull/d' ~/.ssh/authorized_keys && grep -c ks-aw-01 ~/.ssh/authorized_keys"
-# 期望輸出 0
+  "sed -i '/ks-aw-01-soulful-pull/d' ~/.ssh/authorized_keys"
+
+# 用「連得上連不上」驗證，不要用 grep 數字驗證：
+#   sed 比對的是金鑰後面的「註解」，別人貼上一把沒有該註解的同一把金鑰就刪不掉，
+#   而 grep -c 仍會印 0 讓你以為成功（grep -c 為 0 時還會 exit 1，&& 串接也會誤導）。
+ssh -i ~/.ssh/soulful_pull -p 65002 -o BatchMode=yes -o ConnectTimeout=10 \
+  u942075013@191.101.230.176 'echo still-in' 2>&1 | tail -1
+# 期望：Permission denied（publickey）＝ 真的移除了
 ```
 
 ---
@@ -215,12 +300,13 @@ ssh -i ~/.ssh/hostinger_soulful -p 65002 u942075013@191.101.230.176 \
 
 | 事項 | 說明 | 何時處理 |
 |---|---|---|
-| **litespeed-cache** | 站上仍啟用，但新機是 nginx，該外掛的快取層完全失效（不會壞，只是沒作用）。`.htaccess` 裡的 LSCACHE 區塊 nginx 不讀 | 切換穩定後另排；替代方案是 Redis object cache（PHP 已內建 redis 模組）|
+| **litespeed-cache** | ~~不會壞，只是沒作用~~ —— **這個判斷是錯的，已於 2026-08-27 更正並修好**。LiteSpeed 的頁面快取在舊機是「不呼叫 PHP 就回應」（實測 0.0003s），在 nginx 上完全失效，於是新機每個請求都跑滿 PHP（0.36s）。而 Cloudflare 對 HTML 回 `cf-cache-status: DYNAMIC` —— **它不吸收這個差距**，使用者是真的會等。<br>**已補上兩層**：Redis object cache（`soulful-redis` 容器 + `object-cache.php` drop-in）＋ nginx 60 秒 micro-cache。實測伺服器端 0.35s → **0.0034s**。<br>先只加 object cache 時只從 0.36s 進步到 0.31s —— 瓶頸是 PHP 執行不是 DB 查詢，所以頁面快取才是關鍵那層 | ✅ 已完成 |
 | **`hostinger` 外掛** | 主機商專屬管理外掛，換機後無意義 | 切換穩定後停用移除 |
 | **MainWP child 連線** | token 綁站台 URL/IP，換機後 Dashboard 可能同步失敗 | 切換後重新確認連線 |
 | **解除舊站凍結** | 舊站切換後刻意維持 503（見 §切換 第 4 步）。移除 `.maintenance` 等於重新打開「寫入落在舊機且無人察覺」這條路 | **觀察期（≥7 天）結束、確定不回滾時**，連同移除拉取金鑰一起做 |
 | **`check-smoke-tests.ps1` 的 `client_mail` 檢查** | 已 profile 化。切換前 `hostinger`（`wp db query`），切換後要改 `ks-aw-01`（`docker exec soulful-db`）。**這不是命令列參數** —— AO-RESUME 是用子行程跑這支腳本，session 範圍的 `$env:` 傳不進去 | **切換同一天**把 `mcp/user-env.ps1` 的 `SOULFUL_DB_PROFILE` 改成 `ks-aw-01`，開新終端機後跑一次 `check-smoke-tests.ps1` 確認 `checks.client_mail` 不是 `warn:unknown_profile:*`。<br>⚠️ **不改的後果不是「壞掉」而是「假綠」**：凍結只擋 HTTP，SSH 照常，且 WP-CLI 本來就繞過維護模式 —— 舊機會繼續回傳看起來正常的郵件記錄，而那是一台已經退役的機器。這正是 2026-08-03 靜默寄信失敗的形狀 |
-| **信箱** | 仍在 Hostinger Business Email（付到 2029），**與 hosting 分離、不受本次切換影響**。DKIM selector 是 `hostingermail1` | 不動 |
+| **信箱（MX / DKIM）** | 仍在 Hostinger Business Email（付到 2029），與 hosting 分離、**收信不受本次切換影響**。DKIM selector `hostingermail1` | 不動 |
+| 🔴 **`wp_mail()` 寄出路徑** | **會受影響，而且偵測器在切換後有一段假綠期。**`wp_fsmpt_email_logs` 是整份複製過來的，所以 `quiet_days` 切換後立刻是個小數字，不論從 OVH 這條線實際上寄不寄得出去 —— 而 `check-smoke-tests.ps1` 要 10 天才會叫。換句話說**站外監控在切換後前 10 天對這件事是瞎的**，而那正是最可能出事的 10 天（出口 IP 變了、SMTP 可能被新機房的防火牆或 Hostinger 端的來源限制擋掉）。<br>2026-08-03 那次靜默失敗跑了 13 天沒人發現，就是這個形狀 | **切換後 5 分鐘內強制寄一封並確認新的 `sent` 列**，見下方指令；不要等偵測器 |
 | **Cloudflare SSL 模式** | 目前 `full`。新 origin 有公開有效 LE 憑證，故 `strict` 對它可行 | 見下 |
 
 ### Cloudflare SSL `full` → `strict` 的取捨（**未決，需操作者判斷**）

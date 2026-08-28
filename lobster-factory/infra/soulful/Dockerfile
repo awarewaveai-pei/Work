@@ -65,6 +65,19 @@ RUN set -eux; \
 #   monarxprotect — Hostinger's proprietary scanner. No equivalent exists off-platform
 #             and nothing on the site depends on it.
 
+# wp-cli, pinned to the version the LIVE host runs (2.12.0, verified 2026-08-27) so
+# maintenance commands behave identically before and after cutover. The official
+# wordpress image does not bundle it; its absence was found by the other session and is
+# not cosmetic -- the maintenance and verification scripts in this repo call `wp`, and
+# WordPress core updates / plugin operations after cutover assume it exists.
+# Verified at build time rather than trusted: a broken download would otherwise surface
+# the first time someone needs it, which is exactly when they cannot afford to debug it.
+RUN set -eux; \
+    curl -fsSL -o /usr/local/bin/wp \
+      https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar; \
+    chmod +x /usr/local/bin/wp; \
+    wp --allow-root --version | grep -q "2.12.0" || { echo "FATAL: wp-cli did not install"; exit 1; }
+
 COPY php-limits.ini /usr/local/etc/php/conf.d/zz-soulful-limits.ini
 
 # mod_rewrite is required for WordPress permalinks. The site's .htaccess also carries

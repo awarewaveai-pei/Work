@@ -52,12 +52,18 @@ SSHK=/root/.ssh/soulful_pull
 RHOST="u942075013@191.101.230.176"
 RPORT=65002
 RWP=/home/u942075013/domains/soulfulexpression.org/public_html
+# M10: every emergency instruction is printed in BOTH forms. SSHK exists only on this
+# box; an operator reading the output on their laptop and pasting it gets "no such
+# identity file" at the exact moment the store is down. The laptop form is printed FIRST
+# because that is where the human actually is.
+UNFREEZE_LAPTOP="ssh -i ~/.ssh/hostinger_soulful -p ${RPORT} ${RHOST} 'rm -f ${RWP}/.maintenance'"
+UNFREEZE_ONBOX="ssh -i ${SSHK} -p ${RPORT} ${RHOST} 'rm -f ${RWP}/.maintenance'"
 # C2: the reviewed script and the RUNNING script are different files on different
 # machines, and nothing linked them. A cutover weeks from now could execute a copy from
 # before the C1 fix -- freeze silently expiring mid-DNS-flip -- with no detector at all.
 # The version is logged into the banner AND the evidence file, and --require-version makes
 # the runbook able to demand a specific one. Bump this on every behavioural change.
-CUTOVER_SYNC_VERSION="2026-08-27-r5"
+CUTOVER_SYNC_VERSION="2026-08-27-r7"
 # Optional pin: the runbook exports this so a stale deployed copy refuses to run.
 REQUIRE_VERSION="${REQUIRE_VERSION:-}"
 SELF_SHA="$(sha256sum "$0" 2>/dev/null | cut -c1-12)"
@@ -102,11 +108,16 @@ ndump(){ docker exec -i soulful-db mariadb-dump --defaults-extra-file="$DBCNF" "
 
 
 restore_service() {
-  # The new host is restored first: it is the side this script actively damaged.
-  if [[ -n "$TARGET_SNAPSHOT" && -f "${TARGET_SNAPSHOT}/db.sql.gz" ]]; then
-    log "--- restoring the NEW host from its pre-freeze snapshot ---"
-    # Re-stage credentials first: this path can run after soulful-db was restarted, which
-    # would have wiped the in-container defaults file.
+  # M2: ORDER MATTERS, and the first version of this had it backwards.
+  # Restoring the DB "while the site is down helps nobody" is true of the SYMPTOM and
+  # wrong about the sequence: starting the web tier first means WordPress boots against a
+  # HALF-LOADED database and immediately writes to it (cron locks, transients, autoloaded
+  # options) while zcat|ndb is still dropping and recreating every table underneath it --
+  # exactly the race step 2 stops the container to avoid, performed by the recovery path.
+  # Correct order: restore DB -> flush the cache keyed to the discarded DB -> start web.
+  if [[ -n "$TARGET_SNAPSHOT" && -f "${TARGET_SNAPSHOT}/db.sql.gz" && "${DB_RESTORED:-0}" -eq 0 ]]; then
+    DB_RESTORED=1        # m4: fail() calls this AND the EXIT trap calls it again
+    log "--- restoring the NEW host database from its pre-freeze snapshot ---"
     setup_db_auth 2>/dev/null || true
     if zcat "${TARGET_SNAPSHOT}/db.sql.gz" | ndb "$SOULFUL_DB_NAME" 2>/dev/null; then
       log "    new host database restored to its pre-run state"
@@ -114,7 +125,35 @@ restore_service() {
       log "    !! new host DB restore FAILED - it is in a partial state."
       log "       recover from: ${TARGET_SNAPSHOT}/db.sql.gz"
     fi
+    # The object cache still holds keys populated from the database that was just
+    # discarded. Serving from it after a rollback is the same defect as serving from it
+    # after a successful load, and the success path already flushes.
+    if docker ps --format '{{.Names}}' | grep -qx soulful-redis; then
+      docker exec soulful-redis redis-cli FLUSHALL >/dev/null 2>&1 \
+        && log "    object cache flushed (it was keyed to the rolled-back database)" \
+        || log "    !! could not flush the object cache after rollback - restart soulful-redis before serving"
+    fi
   fi
+
+  # ALWAYS put the web tier back, and always after the database is settled. Every failure
+  # between step 2 and step 7 used to exit with soulful-wp stopped and never restarted, so
+  # the new host served 502 to everything -- including every "must be green before
+  # cutover" check in the runbook -- and nothing in the output mentioned docker start.
+  if [[ "${WP_STOPPED:-0}" -eq 1 ]]; then
+    log "--- restarting the target web tier (it was stopped by this run) ---"
+    if docker start soulful-wp >/dev/null 2>&1; then
+      WP_STOPPED=0
+      log "    soulful-wp restarted"
+    else
+      log "    !! COULD NOT RESTART soulful-wp - the new host is serving 502. Run BY HAND:"
+      log "       docker start soulful-wp"
+    fi
+  fi
+
+  # NOTE, stated plainly rather than implied: only the DATABASE is rolled back. rsync has
+  # already rewritten FILES in the volume and those are NOT restored, so after a failure
+  # past step 4 the host holds live's file tree with this host's previous database. That
+  # is fine for a dry run (the trees are converged) but is NOT a general rollback.
 
   [[ "$MAINTENANCE_ON" -eq 1 ]] || return 0
   # The manual command is printed BEFORE the attempt. If the attempt hangs or the
@@ -122,7 +161,8 @@ restore_service() {
   # evidence file rather than it being printed only after a call that never returned.
   log "--- restoring live site to service ---"
   log "    if the next lines do not report success, run BY HAND NOW:"
-  log "    ssh -i ${SSHK} -p ${RPORT} ${RHOST} 'rm -f ${RWP}/.maintenance'"
+  log "    FROM YOUR LAPTOP: ${UNFREEZE_LAPTOP}"
+  log "    on this box   : ${UNFREEZE_ONBOX}"
   local i
   for i in 1 2 3; do
     if timeout 30 ssh -i "$SSHK" -p "$RPORT" -o BatchMode=yes -o ConnectTimeout=10 \
@@ -178,7 +218,7 @@ if [[ "$MODE" == "--rehearse-freeze" ]]; then
   during=$(rssh "curl -s -o /dev/null -w '%{http_code}' --max-time 15 -H 'Host: soulfulexpression.org' -H 'Cache-Control: no-cache' http://127.0.0.1/wp-login.php" 2>/dev/null | tr -d '[:space:]')
   log "    during: HTTP ${during}"
 
-  rssh "rm -f ${RWP}/.maintenance" || fail "COULD NOT UNFREEZE - run by hand NOW: ssh -i ${SSHK} -p ${RPORT} ${RHOST} 'rm -f ${RWP}/.maintenance'"
+  rssh "rm -f ${RWP}/.maintenance" || fail "COULD NOT UNFREEZE - run by hand NOW from your laptop: ${UNFREEZE_LAPTOP}"
   MAINTENANCE_ON=0
   after=$(rssh "curl -s -o /dev/null -w '%{http_code}' --max-time 15 -H 'Host: soulfulexpression.org' -H 'Cache-Control: no-cache' http://127.0.0.1/wp-login.php" 2>/dev/null | tr -d '[:space:]')
   log "    after : HTTP ${after}"
@@ -268,6 +308,35 @@ log "    live crontab WP-CLI/cron entries: ${wpcron:-0}"
 
 # M9: snapshot the target BEFORE anything is modified, so the header's promise that a
 # failure leaves both sides where they started is actually true. Costs zero downtime here.
+# M9: every image this run needs is pulled HERE, before anything is frozen. The rsync
+# helper build previously sat AFTER the freeze while a comment claimed the opposite, and
+# alpine:3.20 is a floating minor tag -- a retag invalidates the layer cache and its
+# `apk add` then runs live, so an Alpine mirror blip could fail the build with the store
+# already dark and the reason discarded.
+log "--- 0a. warming container images (pre-freeze, so the freeze has no network dependency) ---"
+if ! docker image inspect alpine:3.20 >/dev/null 2>&1; then
+  docker pull -q alpine:3.20 >/dev/null 2>&1 \
+    || fail "could not pull alpine:3.20 - refusing to start with an unmet image dependency"
+fi
+docker image inspect alpine:3.20 >/dev/null 2>&1 || fail "alpine:3.20 still absent after pull"
+log "    alpine:3.20 present"
+
+# M3: the rsync helper is built HERE, in pre-flight, NOT inside the freeze window. Two
+# comments previously claimed this was already so while the build sat at step 4, after
+# the freeze opens. `apk add` reaches the Alpine CDN, so a mirror blip would have failed
+# the build with the store already dark. Output goes to the log the failure message
+# names; it was previously discarded to /dev/null, pointing the operator at a file that
+# never existed, at the worst possible moment. known_hosts is passed in at run time so
+# the leg with WRITE access to the production volume never accepts arbitrary host keys.
+docker build -q -t soulful-rsync:local -f - "${WORK}" >"${WORK}/helper-build.log" 2>&1 <<'DOCKERFILE'
+FROM alpine:3.20
+RUN apk add --no-cache rsync openssh-client
+DOCKERFILE
+[[ $? -eq 0 ]] || fail "could not build the rsync helper image: $(tail -3 "${WORK}/helper-build.log" 2>/dev/null | tr '\n' ' ')"
+docker image inspect soulful-rsync:local >/dev/null 2>&1 \
+  || fail "soulful-rsync:local absent after a successful build - refusing to enter the freeze"
+log "    soulful-rsync:local built"
+
 log "--- 0b. snapshotting the new host (pre-freeze, zero downtime) ---"
 TARGET_SNAPSHOT="${WORK}/target-snapshot"
 mkdir -p "$TARGET_SNAPSHOT"
@@ -312,7 +381,8 @@ if [[ "$MODE" == "--live" ]]; then
 
   log ""
   log "    >>> THE LIVE SITE IS NOW DARK. To abandon at any point, run:"
-  log "    >>>   ssh -i ${SSHK} -p ${RPORT} ${RHOST} 'rm -f ${RWP}/.maintenance'"
+  log "    >>>   FROM YOUR LAPTOP: ${UNFREEZE_LAPTOP}"
+  log "    >>>   on this box   : ${UNFREEZE_ONBOX}"
   log ""
 else
   log "--- 1. [dry-run] NOT freezing writes; live site keeps serving ---"
@@ -323,7 +393,18 @@ fi
 # executing from exactly those files and querying exactly those tables. DNS has not flipped,
 # so this container is serving nobody and there is no reason to accept the race.
 log "--- 2. stopping the target web tier during the rewrite ---"
-docker stop soulful-wp >/dev/null 2>&1 && log "    soulful-wp stopped" || log "    soulful-wp was not running"
+# M6: the guard is set BEFORE the stop, same pattern as MAINTENANCE_ON. A failure at any
+# later step used to exit with soulful-wp still stopped and no instruction anywhere, so
+# the new host served 502 to everything and the runbook's green checks all failed.
+# M1: assert UNCONDITIONALLY. The first version gated the assertion on the stop's own
+# exit code, so a genuinely FAILED stop (daemon hiccup, container wedged) set WP_STOPPED=0,
+# skipped the check entirely, mislabelled it "was not running", and let the script rsync
+# core files and DROP 288 tables underneath a live PHP process. Pre-flight already proved
+# this container is healthy, so "stop returned non-zero" here means trouble, not absence.
+docker stop soulful-wp >/dev/null 2>&1 || log "    docker stop returned non-zero"
+wp_running=$(docker inspect -f '{{.State.Running}}' soulful-wp 2>/dev/null || echo missing)
+[[ "$wp_running" == "false" || "$wp_running" == "missing" ]]   || fail "soulful-wp is STILL RUNNING after docker stop - refusing to rewrite files and DROP tables under it"
+if [[ "$wp_running" == "false" ]]; then WP_STOPPED=1; log "    soulful-wp stopped"; else WP_STOPPED=0; log "    soulful-wp was not present"; fi
 
 # =========================================================================================
 # 3. FINAL DB DUMP, streamed - never lands on the Hostinger disk.
@@ -420,34 +501,50 @@ docker run --rm -v soulful_wordpress_data:/dest -v "${WORK}":/work alpine:3.20 \
   sh -c 'cp -a /dest/wp-config.php /work/wp-config.keep' \
   || fail "could not preserve the new host's wp-config.php"
 
-# alpine is pinned (compose pins MariaDB to 11.8.8 for the same reason) and the tools are
-# installed at build time rather than inside the freeze window, where an Alpine mirror blip
-# would strand the site dark. known_hosts is passed in so the leg with WRITE access to the
-# production volume is not accepting arbitrary host keys.
-docker build -q -t soulful-rsync:local -f - "${WORK}" >/dev/null 2>&1 <<'DOCKERFILE'
-FROM alpine:3.20
-RUN apk add --no-cache rsync openssh-client
-DOCKERFILE
-[[ $? -eq 0 ]] || fail "could not build the rsync helper image"
 
-docker run --rm \
-  -v soulful_wordpress_data:/dest \
-  -v "${SSHK}":/key:ro \
-  -v /root/.ssh/known_hosts:/known_hosts:ro \
-  -v "${WORK}":/work \
-  soulful-rsync:local \
-  rsync -a --delete --stats --max-delete="${MAX_DELETE}" \
-    --exclude '.maintenance' \
-    --exclude 'wp-config.php' \
-    --exclude 'wp-content/cache/' \
-    --exclude 'wp-content/plugins/*/cache/' \
-    --exclude 'wp-content/uploads/wc-logs/' \
-    --exclude 'wp-content/uploads/cartflows-logs/' \
-    --exclude 'wp-content/uploads/astra-sites/' \
-    --exclude 'wp-content/uploads/ai-builder/' \
-    --exclude 'wp-content/uploads/astra-sites-import-*' \
-    -e "ssh -i /key -p ${RPORT} -o UserKnownHostsFile=/known_hosts -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=20" \
-    "${RHOST}:${RWP}/" /dest/ >"${WORK}/rsync.log" 2>&1
+# M7: the exclude list is defined ONCE as an array and used by BOTH passes below. Two
+# hand-maintained copies of a list like this drift, and a dry pass that excludes less than
+# the real pass reports deletions that would never actually happen (or worse, the reverse).
+RSYNC_EXCL=(
+  --exclude '.maintenance'
+  --exclude 'wp-config.php'
+  --exclude 'wp-content/object-cache.php'
+  --exclude 'wp-content/plugins/redis-cache/'
+  --exclude 'wp-content/cache/'
+  --exclude 'wp-content/plugins/*/cache/'
+  --exclude 'wp-content/uploads/wc-logs/'
+  --exclude 'wp-content/uploads/cartflows-logs/'
+  --exclude 'wp-content/uploads/astra-sites/'
+  --exclude 'wp-content/uploads/ai-builder/'
+  --exclude 'wp-content/uploads/astra-sites-import-*'
+)
+RSYNC_SSH="ssh -i /key -p ${RPORT} -o UserKnownHostsFile=/known_hosts -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=20"
+rsync_run() {
+  docker run --rm \
+    -v soulful_wordpress_data:/dest \
+    -v "${SSHK}":/key:ro \
+    -v /root/.ssh/known_hosts:/known_hosts:ro \
+    -v "${WORK}":/work \
+    soulful-rsync:local \
+    rsync "$@" --delete --stats "${RSYNC_EXCL[@]}" \
+      -e "$RSYNC_SSH" "${RHOST}:${RWP}/" /dest/
+}
+
+# M7: --max-delete stops rsync AT the limit - i.e. AFTER up to MAX_DELETE files are already
+# gone from the production volume - and restore_service rolls back only the database, never
+# files. A dry pass first turns "delete 2000 files, then abort" into "abort before touching
+# anything". It costs about a second on a converged tree.
+rsync_run -n -a >"${WORK}/rsync-dry.log" 2>&1 || true
+PLANNED_DEL=$(sed -n 's/^Number of deleted files: *\([0-9,]*\).*/\1/p' "${WORK}/rsync-dry.log" | tr -d ',' | head -1)
+if [[ -z "${PLANNED_DEL:-}" ]]; then
+  fail "could not read a deletion count from the rsync dry pass - refusing to mirror blind: $(tail -2 "${WORK}/rsync-dry.log" 2>/dev/null | tr '\n' ' ')"
+fi
+log "    dry pass: ${PLANNED_DEL} deletion(s) planned (limit ${MAX_DELETE})"
+if [[ "$PLANNED_DEL" -gt "$MAX_DELETE" ]]; then
+  fail "rsync would delete ${PLANNED_DEL} files, over the ${MAX_DELETE} limit - the source looks wrong. NOTHING was changed."
+fi
+
+rsync_run -a --max-delete="${MAX_DELETE}" >"${WORK}/rsync.log" 2>&1
 RC=$?
 grep -E 'Number of (created|deleted|regular)' "${WORK}/rsync.log" | sed 's/^/    /' | tee -a "$EVIDENCE"
 if [[ $RC -eq 25 ]]; then
@@ -495,6 +592,21 @@ if ! zcat "${WORK}/final-db.sql.gz" | ndb "$SOULFUL_DB_NAME" 2>"${WORK}/load.err
   fail "DB load failed: $(head -2 "${WORK}/load.err" 2>/dev/null)"
 fi
 log "    loaded"
+
+# The object cache holds entries keyed to the database that was here a moment ago, and
+# that database has just been REPLACED wholesale. Serving from it after the swap means
+# handing visitors values that no longer exist in the DB -- stale prices, stale stock,
+# stale options -- with nothing to indicate anything is wrong. Flushed here, after the
+# load and before the web tier restarts, so no request can observe the mixed state.
+if docker ps --format '{{.Names}}' | grep -qx soulful-redis; then
+  if docker exec soulful-redis redis-cli FLUSHALL >/dev/null 2>&1; then
+    log "    object cache flushed (it was keyed to the database just replaced)"
+  else
+    fail "could not flush the object cache - refusing to serve a cache keyed to the old DB"
+  fi
+else
+  log "    no soulful-redis container; no object cache to flush"
+fi
 
 # =========================================================================================
 # 6. PARITY GATE.
@@ -691,7 +803,24 @@ fi
 clear_db_auth
 trap - EXIT INT TERM HUP
 log ""
+# M12: re-measure immediately before asserting. The only 503 check happened at step 1,
+# roughly a minute and six steps ago, and EVERYTHING downstream -- the DNS flip, the
+# verification, the decision not to unfreeze -- rests on the freeze still being in force.
+# An expired or manually-cleared marker here means the operator is about to flip DNS
+# believing writes are stopped when they are not.
 if [[ "$MAINTENANCE_ON" -eq 1 ]]; then
+  fc2=$(rssh "curl -s -o /dev/null -w '%{http_code}' --max-time 15 -H 'Host: soulfulexpression.org' -H 'Cache-Control: no-cache' http://127.0.0.1/wp-login.php" 2>/dev/null | tr -d '[:space:]')
+  if [[ "$fc2" != "503" ]]; then
+    log "############################################################"
+    log "# !! THE FREEZE IS NOT IN FORCE ANY MORE (live returned '${fc2}', not 503)."
+    log "# DO NOT FLIP DNS. Writes may have been accepted since the dump, which means"
+    log "# the two databases may already differ and this run's parity result is stale."
+    log "# Re-run this script from the start once you know why the marker went away."
+    log "############################################################"
+    log "evidence: ${EVIDENCE}"
+    exit 1
+  fi
+  log "    freeze re-confirmed in force (HTTP ${fc2}) immediately before the banner"
   log "############################################################"
   log "# WRITE FREEZE IS OPEN - the live site is returning 503."
   log "# The new host is verified equal to it as of ${STAMP}."
@@ -700,7 +829,8 @@ if [[ "$MAINTENANCE_ON" -eq 1 ]]; then
   log "#   curl -sSI https://soulfulexpression.org/ | head -1"
   log "#"
   log "# To ABANDON instead, put the live site straight back:"
-  log "#   ssh -i ${SSHK} -p ${RPORT} ${RHOST} 'rm -f ${RWP}/.maintenance'"
+  log "#   FROM YOUR LAPTOP: ${UNFREEZE_LAPTOP}"
+  log "#   on this box   : ${UNFREEZE_ONBOX}"
   log "############################################################"
 else
   # The banner used to be an unconditional string, so an aborted-then-continued run printed
