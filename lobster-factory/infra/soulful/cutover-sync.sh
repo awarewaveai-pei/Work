@@ -63,7 +63,7 @@ UNFREEZE_ONBOX="ssh -i ${SSHK} -p ${RPORT} ${RHOST} 'rm -f ${RWP}/.maintenance'"
 # before the C1 fix -- freeze silently expiring mid-DNS-flip -- with no detector at all.
 # The version is logged into the banner AND the evidence file, and --require-version makes
 # the runbook able to demand a specific one. Bump this on every behavioural change.
-CUTOVER_SYNC_VERSION="2026-08-27-r7"
+CUTOVER_SYNC_VERSION="2026-08-28-r8"
 # Optional pin: the runbook exports this so a stale deployed copy refuses to run.
 REQUIRE_VERSION="${REQUIRE_VERSION:-}"
 SELF_SHA="$(sha256sum "$0" 2>/dev/null | cut -c1-12)"
@@ -77,7 +77,16 @@ FREEZE_BUDGET_SEC="${FREEZE_BUDGET_SEC:-480}"
 MAX_DELETE="${MAX_DELETE:-2000}"
 
 SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
-rssh() { timeout 300 ssh -i "$SSHK" -p "$RPORT" "${SSH_OPTS[@]}" "$RHOST" "$@"; }
+# Two helpers, deliberately: `-n` makes ssh re-open /dev/null as its stdin AT STARTUP,
+# which WINS over any shell `< file` redirect -- so a single helper cannot be both safe
+# and able to feed a script. The default (rssh) cannot consume the caller's stdin; a call
+# that genuinely needs to pipe a script in must NAME that fact by using rssh_stdin with
+# an explicit `< file`. Without this split, an rssh inside a heredoc-fed script eats the
+# rest of the script -- observed twice on 2026-08-28: the smoke check's docker exec -i
+# left a root-password file in the container, and a diagnostic heredoc silently lost its
+# last three steps to an inner ssh.
+rssh()       { timeout 300 ssh -n -i "$SSHK" -p "$RPORT" "${SSH_OPTS[@]}" "$RHOST" "$@"; }
+rssh_stdin() { timeout 300 ssh    -i "$SSHK" -p "$RPORT" "${SSH_OPTS[@]}" "$RHOST" "$@"; }
 
 mkdir -p "$WORK"
 : > "$EVIDENCE"
@@ -450,7 +459,7 @@ exit 0
 REMOTE
 if [[ "$MODE" == "--live" ]]; then dmax=60; dgate=1; else dmax=1; dgate=0; fi
 { printf 'DRAIN_MAX=%s\nDRAIN_GATE=%s\n' "$dmax" "$dgate"; cat "${WORK}/remote-drain.sh"; } > "${WORK}/remote-drain-run.sh"
-drain_out=$(rssh 'bash -s' < "${WORK}/remote-drain-run.sh" 2>"${WORK}/drain.err") \
+drain_out=$(rssh_stdin 'bash -s' < "${WORK}/remote-drain-run.sh" 2>"${WORK}/drain.err") \
   || fail "in-flight writer check failed: $(head -1 "${WORK}/drain.err" 2>/dev/null) ${drain_out}"
 log "    ${drain_out}"
 
@@ -468,7 +477,7 @@ mysqldump --defaults-extra-file="$CNF" \
   --single-transaction --quick --default-character-set=utf8mb4 \
   --routines --triggers --events u942075013_hDaEZ
 REMOTE
-rssh 'bash -s' < "${WORK}/remote-dump.sh" 2>"${WORK}/dump.err" | gzip > "${WORK}/final-db.sql.gz"
+rssh_stdin 'bash -s' < "${WORK}/remote-dump.sh" 2>"${WORK}/dump.err" | gzip > "${WORK}/final-db.sql.gz"
 DUMP_RC="${PIPESTATUS[0]}"
 [[ "$DUMP_RC" -eq 0 ]] || fail "remote dump exited ${DUMP_RC}: $(head -2 "${WORK}/dump.err" 2>/dev/null)"
 
@@ -510,6 +519,10 @@ RSYNC_EXCL=(
   --exclude 'wp-config.php'
   --exclude 'wp-content/object-cache.php'
   --exclude 'wp-content/plugins/redis-cache/'
+  # live has no advanced-cache.php TODAY (verified 2026-08-28), but litespeed-cache is
+  # active there and can write one at any moment; wp-config here has WP_CACHE=true, so
+  # a mirrored-in copy WOULD be loaded. Insurance, one line.
+  --exclude 'wp-content/advanced-cache.php'
   --exclude 'wp-content/cache/'
   --exclude 'wp-content/plugins/*/cache/'
   --exclude 'wp-content/uploads/wc-logs/'
@@ -636,7 +649,7 @@ echo "orderitems=$(q 'SELECT COUNT(*) FROM wp_woocommerce_order_items')"
 echo "comments=$(q 'SELECT COUNT(*) FROM wp_comments')"
 echo "scheduler=$(q 'SELECT COUNT(*) FROM wp_actionscheduler_actions')"
 REMOTE
-LIVE=$(rssh 'bash -s' < "${WORK}/remote-counts.sh" 2>"${WORK}/counts.err")
+LIVE=$(rssh_stdin 'bash -s' < "${WORK}/remote-counts.sh" 2>"${WORK}/counts.err")
 [[ -n "$LIVE" ]] || log "    !! live counts came back EMPTY: $(head -2 "${WORK}/counts.err" 2>/dev/null)"
 
 MISMATCH=0
@@ -712,7 +725,7 @@ done
 [ -n "$sql" ] || { echo "no tables found" >&2; exit 1; }
 q "$sql"
 REMOTE
-rssh 'bash -s' < "${WORK}/remote-alltables.sh" 2>"${WORK}/alltables.err"   | sort > "${WORK}/live-alltables.tsv" || true
+rssh_stdin 'bash -s' < "${WORK}/remote-alltables.sh" 2>"${WORK}/alltables.err"   | sort > "${WORK}/live-alltables.tsv" || true
 LIVE_TBL_N=$(wc -l < "${WORK}/live-alltables.tsv")
 
 # Same enumeration on the new host.
@@ -771,6 +784,23 @@ done
 [[ "$(docker inspect -f '{{.State.Health.Status}}' soulful-wp 2>/dev/null)" == "healthy" ]] \
   || fail "soulful-wp did not return to healthy after the reload"
 log "    soulful-wp healthy again"
+
+# 7b. PLUGIN-STATE RECONCILIATION. The DB load replaced wp_options wholesale, and
+# live's active_plugins has litespeed-cache ACTIVE (its cache layer is inert on
+# nginx+Apache but its PHP side still runs, and it wants to own object-cache.php /
+# advanced-cache.php) and redis-cache ABSENT (an "inactive" plugin invites a routine
+# wp-admin cleanup that deletes the directory; the drop-in then survives only because
+# phpredis is compiled in -- one rebuilt image away from a white screen). Reconciled
+# HERE, every run, because every DB load resets it: a one-time manual fix would be
+# silently undone by the next sync. DNS has not flipped, so no visitor sees the window.
+# UPDATEs only -- row counts unchanged, so the parity gate above is not disturbed.
+log "--- 7b. reconciling plugin state (DB load reset it to live's) ---"
+docker exec soulful-wp wp --allow-root plugin deactivate litespeed-cache >/dev/null 2>&1 \
+  && log "    litespeed-cache deactivated (inert cache layer, PHP side was still running)" \
+  || log "    litespeed-cache already inactive or absent"
+docker exec soulful-wp wp --allow-root plugin activate redis-cache >/dev/null 2>&1 \
+  && log "    redis-cache activated (drop-in was already serving; this makes wp-admin agree)" \
+  || fail "could not activate redis-cache - the object cache would show as deletable-inactive"
 
 # =========================================================================================
 # 8. SMOKE - through nginx and TLS, the way a visitor actually arrives.

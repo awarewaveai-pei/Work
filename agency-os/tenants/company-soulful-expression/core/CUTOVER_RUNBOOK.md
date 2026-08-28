@@ -104,7 +104,7 @@ ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114 'sudo /root/soulful/cuto
 #    腳本裝了 SIGHUP handler：ssh 斷線 -> 收到 HUP -> 自動解凍 -> exit 129。
 #    那個行為在「腳本自己失敗」時是對的，但在「你家網路閃一下」時，
 #    它會在你正要切 DNS 的當下把凍結解掉，而你的終端機已經沒了、什麼都看不到。
-ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114   "tmux new -d -s cutover 'sudo REQUIRE_VERSION=2026-08-27-r7 /root/soulful/cutover-sync.sh --live 2>&1 | tee /root/cutover-live.log'"
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114   "tmux new -d -s cutover 'sudo REQUIRE_VERSION=2026-08-28-r8 /root/soulful/cutover-sync.sh --live 2>&1 | tee /root/cutover-live.log'"
 
 # 另開一個連線看進度（斷線也不影響那邊的執行）
 ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114 'tail -f /root/cutover-live.log'

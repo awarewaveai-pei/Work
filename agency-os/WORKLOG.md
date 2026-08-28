@@ -37,6 +37,9 @@
 - M5：wp-cli phar 下載後先對 wp-cli 官方發佈的 sha512 驗證才安裝（先確認 .sha512 檔為純 hash 格式再套用組合式 checkfile）。真機 rebuild：`/tmp/wp.phar: OK`、容器 healthy、WP-CLI 2.12.0
 - M9：實查 nginx -T —— 全設定僅一個 add_header（X-Soulful-Cache），wp-login 上的安全 header 來自 WordPress 上游透傳、不受繼承規則影響 → 今日零實害；地雷以完整註解寫死在 add_header 旁（含「HSTS 刻意不設」的理由：回滾指向 Hostinger、其憑證 2026-10-25 到期，長 max-age 會把回滾變成瀏覽器硬失敗）。順修 xmlrpc 403+log off → 444 有記錄（回到 scanner-block 的可見性模型），實測 000/連線關閉、站 200
 - C4 TTL 邊界突變測試：停後端 → 60s 內 HIT（TTL 容忍，正常）→ **70s 後 502 EXPIRED**（修前會永遠 HIT 200）→ 恢復後重新驗證。殭屍頁行為證明消除
+- **M11 殘項（r8）**：DB 載入會把 active_plugins 重置回 live 的清單（litespeed active / redis-cache 不存在）——一次性手動修會被下一次同步靜默還原，故調解內建為腳本 step 7b（web healthy 後、smoke 前，DNS 未切無訪客窗口；純 UPDATE 不擾動 parity）。r8 演練實跑：`litespeed-cache deactivated` / `redis-cache activated`。另補 `advanced-cache.php` exclude（live 今日無此檔但 litespeed 隨時可能寫出、wp-config 有 WP_CACHE=true 會載入）、清掉 wp-config 死碼 salt（define 先到先贏，我加的第二個永不生效）
+- **rssh 類級修法**：`-n` 會蓋過 shell 的 `< file` 重導（ssh 啟動時自行重開 /dev/null），critic 建議的「全域加 -n」會弄壞四個 bash -s 呼叫點 → 改為兩個具名 helper：`rssh`（帶 -n，預設吃不到 stdin）/`rssh_stdin`（餵腳本時指名使用）。同日兩起 stdin 被吃事故（smoke 的 docker exec -i、診斷 heredoc 的內層 ssh）促成此類級關閉
+- r8 演練 72s 全綠：sha e8d88a5ea141 repo=機器、288 表全等、恢復順序 DB→FLUSHALL→web 實證
 
 **[rollback]** nginx: 註解掉 `proxy_cache soulful_cache;` 一行 + reload（runbook 已載明）；腳本: git + scp 任一版本。
 
