@@ -353,6 +353,13 @@
 
 > 已由 critic 驗證屬實、尚未修。優先於任何功能。
 
+- [ ] **【2026-08-29 開出｜db-expert review 抓到的類別風險】SECURITY DEFINER 函式的 anon/authenticated 洞可能被未來 DROP+CREATE 靜默重開**
+  - `🟡 未開始` · `2026-08-29` · `可直接做`
+  - **背景**：0064 migration（`archive_stale_repair_runs`、`upsert_incident_atomic` 兩函式）已修復 anon/authenticated EXECUTE 殘留（見 WORKLOG 續15）。db-expert review 指出根因是 **DROP FUNCTION + CREATE**（而非 `CREATE OR REPLACE`）會重新觸發 Supabase 的 `ALTER DEFAULT PRIVILEGES`，把 revoke 過的 anon/authenticated 授權**重新加回去**——`upsert_incident_atomic` 過去 3 次改版（0035/0036/0056）中 2 次（0036/0056）就是用這個模式，這正是它會裸奔的根因。
+  - **目前只做了文件化防線**：0064 migration 註解裡警告「未來若再用 DROP+CREATE 改這兩個函式簽名，必須在同一個 migration 重跑 revoke 區塊」——但這是**靠人記得**，不是機械閘。
+  - **建議的治本方向（擇一或組合，未拍板）**：① `check-smoke-tests.ps1` 加一條 proacl 斷言，定期查所有 `prosecdef=true` 的 public 函式，anon/authenticated 出現在非白名單函式上就 WARN ② migration 樣板／checklist 明文要求「改 SECURITY DEFINER 函式簽名前，先讀是否用 CREATE OR REPLACE；用 DROP+CREATE 者必須在同一 migration 內重新 revoke」。
+  - **完成定義**：選定方案並落地（機械閘或至少寫進 migration checklist SOP），下次任何人改 SECURITY DEFINER 函式簽名時會被提醒或自動擋下。
+
 - [ ] **🟠 EU origin 仍未鎖 Cloudflare（步驟 A 已完成，B 待做）**
   - `🟠 部分完成` · `2026-08-26` · `剩餘部分屬 High risk，需 go-ahead`
   - **✅ 步驟 A 已完成並驗證（2026-08-26 10:04 UTC）**：host nginx 新增 `/etc/nginx/conf.d/cloudflare-realip.conf`（22 條 `set_real_ip_from` = CF 官方 15 IPv4 + 7 IPv6，`real_ip_header CF-Connecting-IP`）。

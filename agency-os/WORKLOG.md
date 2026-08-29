@@ -1,5 +1,42 @@
 # Worklog
 
+## 2026-08-29（續15）
+
+### DB 安全稽核：anon/authenticated EXECUTE 洞擴散到 2 個既有 SECURITY DEFINER 函式，migration 0064 修復並已套用 ks-aw-01
+
+**背景**：續12（portal signup）的 critic C1 finding 指出 Supabase 的 `ALTER DEFAULT PRIVILEGES` 會把新 public-schema 函式的 EXECUTE 權限**分開**授予 `anon`/`authenticated`（不是走 PUBLIC），`revoke all ... from public` 單獨跑**不會**移除這兩個授權——0063 從第一版就同時 revoke 兩者。操作者要求：稽核全部既有 SECURITY DEFINER 函式是否有同款漏洞。
+
+**稽核方法**：全 repo grep `security\s+definer`（大小寫不敏感）鎖定 7 個檔案 → 4 個不同函式；SSH ks-aw-01 對每個函式跑 `select proname, proacl from pg_proc where prosecdef = true` 做 live 驗證（非只讀 migration 檔案猜）；grep 全 repo call site 確認呼叫者身分。
+
+**結果**：
+- `archive_stale_repair_runs(int)`（0030/0032 重定義）：proacl 殘留 `anon=X, authenticated=X`——同款漏洞，0030/0032 都只做 `revoke ... from public`。
+- `upsert_incident_atomic(14-arg)`（0035/0036/0056 三次重定義）：**更嚴重**，proacl 連 PUBLIC 本身都還在，三次改版**從未寫過任何 revoke/grant**，全靠 Supabase 預設裸奔——任何持有前端 anon key 者可直接 POST `/rest/v1/rpc/upsert_incident_atomic` 以 `supabase_admin` 身分寫入/竄改 `ops_incidents`，繞過 6 個 webhook route 的簽章驗證。
+- `secret_put/get/delete`（0049）、`portal_complete_signup`（0063）：live 確認乾淨（僅 supabase_admin/postgres/service_role），無需修復。
+- Call site 確認：兩個受影響函式的呼叫者全部是 server-side `getSupabaseWriteClient()`（service-role），無任何 browser/anon-key 呼叫者。
+
+**兩層對外部 oracle 覆審**：
+1. `db-expert` agent review：確認 GRANT/REVOKE on function 只動 `pg_proc` catalog tuple（RowExclusiveLock，非 relation-level lock），live 套用安全不卡併發流量；額外抓到兩點已折入 migration：① proacl grantor 是 `supabase_admin`，用 `postgres` 身分跑 REVOKE 會靜默失敗（exit 0 無效果）——必須 `psql -U supabase_admin` ② `upsert_incident_atomic` 過去用 DROP+CREATE（非 CREATE OR REPLACE）改簽名，未來若再用同模式會重新觸發 Supabase 預設授權、把洞重開。
+2. `codex-oracle.ps1 -Mode review`：1 個 finding（PLAUSIBLE）——pg_cron 排程 `archive-stale-repair-runs` 的執行身分不在 app-code grep 範圍內，若該身分不在保留清單會靜默斷排程。Live 查證：`cron.job.username = supabase_admin`，且 `pg_proc.proowner = supabase_admin`（兩函式皆同）——Postgres owner 對自己擁有的物件永遠繞過 ACL 檢查，migration 只 revoke `public/anon/authenticated`，未動 `supabase_admin`，排程不受影響。verified false-positive，已寫回 migration 註解留審計軌跡。
+
+**套用**：操作者明示同意後，`scp` migration 到 ks-aw-01 → `docker cp` 進 `supabase-db` container → `psql -U supabase_admin -f 0064.sql`，9 個 statement 全數 `REVOKE/GRANT/COMMENT/NOTIFY` 成功、`ON_ERROR_STOP=1` 無錯誤。
+
+[已修改]
+- 新增 `lobster-factory/packages/db/migrations/0064_lockdown_security_definer_anon_grants.sql`：兩函式的完整 revoke/grant + comment 更新，含 apply-as-supabase_admin 警告、DROP+CREATE 類別風險註記、Codex finding 驗證軌跡。
+- 新增 `lobster-factory/packages/db/scripts/0064_lockdown_security_definer_anon_grants_down.sql`：刻意不自動化（db-expert：「能跑的 down script 是顆上膛的槍」），只留註解版 GRANT 供人工手動決定。
+- `agency-os/reports/oracle/2026-08-29-review-831c16d0.md`：Codex review 完整 artifact。
+- `agency-os/reports/agent-dispatch/dispatch-20260829.jsonl`：db-expert dispatch 自動記錄。
+- 已套用至 ks-aw-01 正式 DB（`archive_stale_repair_runs`、`upsert_incident_atomic` 兩函式的 GRANT/REVOKE）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec supabase-db psql -U supabase_admin -d postgres -Atc "select proname,proacl from pg_proc where proname in ('archive_stale_repair_runs','upsert_incident_atomic')"` | 結果：兩函式皆僅剩 `supabase_admin/postgres/service_role`，無 anon、無 authenticated、無 PUBLIC | exit=0
+- REALTEST_EVIDENCE: tool=SSH | cmd=`select has_function_privilege('<role>', '<func_sig>', 'execute')` 對 service_role/anon/authenticated 三角色 × 兩函式共 6 組查詢 | 結果：service_role=t（webhook/cron 不受影響）、anon=f、authenticated=f（洞已關）| exit=0
+- REVIEW_DONE: critic=db-expert（外部 subagent，非自我審查）| verdict=pass（安全套用，call site 確認乾淨，2 點已折入 migration）
+- REVIEW_DONE: critic=codex-oracle.ps1 -Mode review（外部獨立模型）| verdict=1 finding，PLAUSIBLE→live 驗證為 false positive（owner 繞過 ACL）| findings=0c/1m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`archive_stale_repair_runs\|upsert_incident_atomic` | hits=24（6 個既有 migration 定義檔 + 2 個 server-side TS caller + 16 個 doc/worklog 歷史記錄，全部已知路徑，無遺漏 caller）
+
+[剩餘風險] db-expert 指出的類別風險（DROP+CREATE 會重開洞）本次僅寫進 migration 註解警示，**未**加自動化防線（例如 `check-smoke-tests.ps1` 的 proacl 斷言，或 migration 樣板強制帶 revoke 區塊）——若未來 `upsert_incident_atomic` 再次用 DROP+CREATE 改簽名且忘記帶 revoke，洞會靜默重開且無人告警。建議另開 TASKS 項追蹤。
+[rollback] `packages/db/scripts/0064_lockdown_security_definer_anon_grants_down.sql`（文件化、非自動——重新開放 anon/authenticated 執行權在任何情境下都不是我們要的狀態；若真要回滾，檔內有註解版 GRANT 供人工執行）。
+
 ## 2026-08-29（續14）
 
 ### AI LEGO Phase 3 Wave 5 完成 — EC §92 剩餘 13 檔落地 + 首次對整個 Phase 3 產出跑 Codex 結構性覆審，4 個真實跨檔缺陷全數修正
