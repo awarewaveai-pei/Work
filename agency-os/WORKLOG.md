@@ -1,5 +1,36 @@
 # Worklog
 
+## 2026-08-30
+
+### R0 對話決策：codex review 主力工具由 `codex-oracle.ps1` 換成 `/codex:adversarial-review`，附加隱藏依賴檢查 + NO FINDINGS 許可
+
+**觸發**：操作者直接對話討論（非任務起手），比較官方 `/codex:review` 系列指令與自建 `codex-oracle.ps1` 的抓蟲/漏洞審查品質，最終明確裁示：主力換成 `/codex:adversarial-review`，並要求加兩個機制——① 強制查「diff 以外看不到的隱藏依賴」（設定檔 retention/timeout/schema 假設）② 明講 NO FINDINGS 許可（沒找到真的問題就直說，不准灌水）。
+
+**過程**（含一次方向修正，誠實記錄）：中途曾提案改接官方 codex plugin 的私有實作檔 `codex-companion.mjs`，讀完該檔原始碼後自行推翻——那是插件內部未文件化的實作，會隨 marketplace 自動更新跟版本綁死，違反本 repo 30 年穩定紀律；改為只採用其 prompt 文字精華（attack_surface/calibration_rules/grounding_rules，讀自 `~/.claude/plugins/marketplaces/openai-codex/plugins/codex/prompts/adversarial-review.md`）+ 官方公開文件化的 `codex exec --output-schema`/`codex exec review` CLI 旗標（`codex exec --help` 實測確認存在）。另外查到 `~/.codex/config.toml` 的 `model_reasoning_effort=xhigh` 才是「跑很久+耗 token」真根因，曾建議降檔，被操作者糾正——抓蟲抓漏洞用途本來就該用最高推理強度換深度，省的方向應該是輸入量（untracked 檔案排除 lock/vendor/生成檔），不是砍推理深度；已採納訂正。
+
+**最終決策**：`/codex:adversarial-review` 取代 `scripts/codex-oracle.ps1` 成為 AGENTS.md §跨模型 oracle 的唯一入口，每次呼叫固定附帶標準 focus text（隱藏依賴檢查 + NO FINDINGS 許可重申，後者與官方 prompt 內建的 `calibration_rules` 不衝突，屬加保險）。`codex-oracle.ps1` 保留在 repo，降級為官方指令連續失敗 ≥2 次時的備援（`.claude/commands/review.md` 的 critic→codex 三層 fallback 鏈同步更新）。ORACLE gate（`verify-closeout-completeness.ps1`）**不需改動**——`/codex:adversarial-review` 跑完後仍手動把 JSON 結果轉寫成同一種 artifact 格式落地 `agency-os/reports/oracle/`，gate 只認檔案格式不認來源工具。
+
+**VBC 順手抓到的過期任務**：`TASKS.md` 一條 2026-08-28 開出、標 🔴 現行的 `codex-oracle.ps1 -Path` 崩潰 bug，讀現行腳本內容確認 2026-08-29 已由另一 session（commit `eb0530ea1`）修好（`@(...)` 包裹 fix 已在檔案內），checkbox 忘了勾，本輪一併補上。
+
+[已修改]
+- `agency-os/AGENTS.md`：§跨模型 oracle 唯一入口宣告換成 `/codex:adversarial-review` + 標準 focus text（含隱藏依賴檢查、NO FINDINGS 許可重申）
+- `.claude/commands/review.md`：critic 失敗 fallback 鏈補上 `/codex:adversarial-review` 為第一層，`codex-oracle.ps1` 降為第二層
+- `agency-os/docs/operations/TOOL_TRIGGER_MAP.md`：新增 `/codex:adversarial-review` 觸發列，`codex-oracle.ps1 -Mode review` 列標記降級備援
+- `agency-os/TASKS.md`：關閉一條已修復但忘記勾選的過期任務（`codex-oracle.ps1 -Path` 崩潰，VBC 核對後確認）
+- `agency-os/docs/CHANGE_IMPACT_MATRIX.md`、`docs/operations/cursor-enterprise-rules-index.md`、`docs/operations/new-doc-linkage-checklist.md`：`/doc-sync` 自動同步時間戳（無內容變更）
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`codex exec --help` / `codex exec review --help` | exit=0 | 結果=確認 `--output-schema`/`review` 子指令為官方公開旗標，非臆測
+- REALTEST_EVIDENCE: tool=Bash | cmd=`cat ~/.codex/config.toml` | exit=0 | 結果=確認 `model_reasoning_effort=xhigh` 為真實現行設定，找到跑很久/耗 token 的真根因（非猜測）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/doc-sync-automation.ps1 -AutoDetect` | exit=0 | 結果=Single Owner Policy Check PASS，無 broken link
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/check-claude-sync.ps1`（改 `.claude/commands/review.md` 後觸發，發現 H2 settings.json 結構 drift，`-Mode merge` 修復後重跑轉 PASS）| exit=0 | 結果=PASS，HARD/SOFT 皆無 drift
+- REVIEW_DONE: critic=Quick（自我核對：讀 `codex-companion.mjs`/`lib/git.mjs`/`lib/codex.mjs` 原始碼後推翻自己第一版「接私有實作」提案，改採「只抄 prompt 文字+用公開 CLI 旗標」——方案比較記錄在對話中，非事後補理由）| verdict=pass
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=`codex-oracle\.ps1\|唯一入口` | hits=`agency-os/AGENTS.md`（已同步）、`.claude/commands/review.md`（已同步）、`docs/operations/TOOL_TRIGGER_MAP.md`（已同步）、`TASKS.md`（VBC 核對後關閉）；其餘命中皆為歷史 WORKLOG/report/ADR/backup 檔（依既有慣例保留原樣，不回溯改寫歷史紀錄）
+
+[剩餘風險] `/codex:adversarial-review` 的 artifact 落地仍是**手動**步驟（我跑完後手動轉寫成 gate 認的格式），尚未寫成腳本自動化——下次真的用到時若忘記手動轉寫，ORACLE gate 會照樣擋下 commit（這是刻意的機械閘行為，不是 bug）。`codex-oracle.ps1` 大 diff 情境下的 timeout/no-final-message 問題本輪未修（該任務已標記為降級後的備援工具，優先度隨之下降，未來若要修見 TASKS.md 舊條目歷史脈絡）。
+[rollback] 純文件宣告 + fallback 鏈調整，`git revert` 即可完整回退；`codex-oracle.ps1` 腳本本身未刪除/未改動，隨時可切回原本唯一入口設定。
+
 ## 2026-08-29（續31）
 
 ### AI-LEGO Phase 3 收尾第 5 批：`method-resolution.schema.yaml` 補第 18 個欄位 `policy_context`/`regulatory_exposure`，解 P1-GAP-LEGAL-7；順帶抓到並修正第 5 次行號位移復發（MRSP-24 三處引用）

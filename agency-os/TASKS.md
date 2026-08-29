@@ -492,13 +492,10 @@
   - **為何沒有直接做**：改寫的是 Claude 正在載入、且持有活憑證的檔案 —— 依 AGENTS.md §操作風險分級屬 Medium 以上，需明示 go-ahead。
   - **證據**：`scripts/sync-claude-userlevel.ps1` `Sync-Json-PruneDuplicate` 上方註解；`scripts/prune-duplicate-mcp-servers.mjs` header STATUS 段；`agency-os/docs/operations/mcp-add-server-quickstart.md` §明文機密清理 表下引言
 
-- [ ] **`codex-oracle.ps1 -Path` 一用就炸，等於大 repo 沒有可行的 review 路徑**
-  - `🔴 現行` · `2026-08-28 開出` · `可直接做`
-  - **一句話**：`-Path` 帶任何值都回 `Failed to collect diff: 在此物件上找不到屬性 'Count'`（`Set-StrictMode -Version Latest` 下對純量取 `.Count`）。
-  - **為什麼是現行不是小事**：AGENTS.md 把 R0 [驗證計畫] 的 Review 動作指給這支腳本。2026-08-28 實測全樹 review 在 **900s timeout**（packet 133.4KB，被 4 個未追蹤的 `.claude/sessions/*.md` 撐大），而縮小範圍的唯一手段就是 `-Path`。兩條路都不通 = 那一輪只能 waive。
-  - **下一步**：① 把 `-Path` 的收集處包成 `@(...)` ② 加一個 `-Path` 帶單一值的迴歸測試（單值是觸發 StrictMode 的那個 case）③ 順帶評估把未追蹤的 `.claude/sessions/*.md` 排除在 inline 之外——它們對 code review 零價值卻佔了大半 packet
-  - **完成定義**：`-Path @('scripts/x.ps1')` 與 `-Path 'scripts/x.ps1'` 兩種寫法都能跑完並產出 artifact
-  - **證據**：`agency-os/WORKLOG.md` 2026-08-28 本批 `REVIEW_WAIVED` 行；`scripts/codex-oracle.ps1` param `[string[]]$Path`
+- [x] ~~`codex-oracle.ps1 -Path` 一用就炸，等於大 repo 沒有可行的 review 路徑~~
+  - `✅ 已修復（另一 session，2026-08-29，commit eb0530ea1）` · `2026-08-28 開出`
+  - **VBC 核對（2026-08-30）**：本輪讀 `scripts/codex-oracle.ps1` 現行內容確認 `-Path` 收集處已包 `@(...)`（腳本內對應行的行號註解自述「Confirmed via isolated repro + critic cross-check, 2026-08-29」），任務描述的症狀已不存在。checkbox 之前忘了勾，本輪順手核對後補上，非重新修一次。
+  - **2026-08-30 起同時降權**：`/codex:adversarial-review` 已取代 `codex-oracle.ps1` 成為主力 review 工具（見 `AGENTS.md` §跨模型 oracle），此腳本降級為備援，這個舊 bug 的影響範圍本來就縮小了。
 
 - [ ] **Cursor 散文殘留：10 份文件仍叫操作者「用 Cursor 開 monorepo 根」**
   - `🟢 小` · `2026-08-28 開出` · `可直接做`
@@ -1390,5 +1387,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-08-29 02:38:39 UTC_
+_Last synced: 2026-08-29 18:08:46 UTC_
 

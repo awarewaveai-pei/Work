@@ -119,14 +119,21 @@
 
 **為什麼寫入不可委派**：`git-log-injector`、`file-path-router`、`high-risk-bash-warn`、`verify-gate-commit`、`audit-cp950-traps` 全部是 **Claude Code hooks**。Codex 是另一個 process，這些閘對它不存在。它寫的 code 零攔截，到 AO-CLOSE 撞上 `verify-closeout-completeness` 才發現證據鏈缺漏。
 
-**唯一入口**：`scripts/codex-oracle.ps1`（`-Mode inspect|review`）。硬寫死 `-s read-only` 與 `-c mcp_servers={}`，不接受參數覆蓋。
+**唯一入口（2026-08-30 起）**：`/codex:adversarial-review`（官方 codex plugin 指令，取代 `scripts/codex-oracle.ps1`）。每次呼叫**固定附帶**下面這段 focus text，兩件事都要求：① 隱藏依賴檢查（官方 adversarial-review 本身的 attack-surface/calibration/grounding 規則不含這條，非重複）② NO FINDINGS 許可再次明講（官方 prompt 的 `calibration_rules` 已內建「看起來安全就直說沒 finding」，這裡重申一次不衝突，是加保險非畫蛇添足）：
 
-```powershell
-# 規劃前：讓 Codex 讀，回摘要（省 Claude context）
-.\scripts\codex-oracle.ps1 -Mode inspect -Prompt "<具體問題>"
-# 寫完 code 後：對抗式覆審（預設審 working tree，含 untracked 新檔）
-.\scripts\codex-oracle.ps1 -Mode review -Context "<這個改動要解決什麼>"
+> Also verify: does this change depend on something NOT visible in this diff — a config value, retention/timeout setting, schema assumption, cron schedule, or upstream default defined elsewhere in the repo? If it contradicts the change (e.g. makes it silently unreachable / dead code), report that as a finding even if it wasn't otherwise in scope.
+>
+> Reminder: if you cannot support a real finding after checking the above, say so directly and return no findings. Do not invent a weak or speculative finding just to appear useful — that is worse than reporting nothing.
+
 ```
+/codex:adversarial-review --wait "Also verify: does this change depend on something NOT visible in this diff — a config value, retention/timeout setting, schema assumption, cron schedule, or upstream default defined elsewhere in the repo? If it contradicts the change (e.g. makes it silently unreachable / dead code), report that as a finding even if it wasn't otherwise in scope. Reminder: if you cannot support a real finding after checking the above, say so directly and return no findings. Do not invent a weak or speculative finding just to appear useful -- that is worse than reporting nothing."
+```
+
+**推理強度刻意不降**：抓蟲抓漏洞的用途本來就是要花推理成本換深度，`~/.codex/config.toml` 的 `model_reasoning_effort=xhigh` 保留不動；要省的是餵給它的輸入量（untracked 檔案排除 lock 檔/vendor/生成檔、設總量上限），不是砍它想的深度。
+
+**artifact 仍要手動落地**：`/codex:adversarial-review` 本身不會寫 `agency-os/reports/oracle/` —— 跑完後把回傳的 JSON（`verdict`/`summary`/`findings[]`）轉寫成下面 ORACLE gate 認的同一種 artifact 格式（檔名/`files-reviewed`/`deletions-reviewed` 欄位不變），gate 完全不用改。
+
+`scripts/codex-oracle.ps1` 保留在 repo 內但**降級為備援**：官方指令連續失敗（timeout/服務中斷）≥ 2 次時才退回用它（呼叫方式不變，見腳本內 `.EXAMPLE`）。
 
 **機械閘（2026-08-20 起，ORACLE gate）**：上面那條路由表本身**不是自動化** —— 它是文字規則，靠代理自覺。閘補的就是這個缺口：
 
@@ -447,5 +454,5 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-08-28 11:57:18 UTC_
+_Last synced: 2026-08-29 18:08:46 UTC_
 

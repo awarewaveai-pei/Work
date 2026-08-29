@@ -96,8 +96,9 @@
 
 | 工具/環節 | 功能 | 觸發 |
 |-----|------|------|
-| `scripts/codex-oracle.ps1 -Mode inspect` | Codex 唯讀讀 repo，回摘要問答 | 🟢 規劃前想省 Claude context 時；`-Prompt "<具體問題>"` |
-| `scripts/codex-oracle.ps1 -Mode review` | Codex 對抗式覆審 working tree（含 untracked 新檔）| 🟢 R0 [驗證計畫] Review 動作；`/review` 的 critic 連續失敗 ≥2 次時的 fallback（2026-08-24 起）|
+| `/codex:adversarial-review`（2026-08-30 起主力）| Codex 對抗式覆審，固定附帶隱藏依賴 focus text | 🟢 R0 [驗證計畫] Review 動作；`/review` 的 critic 連續失敗 ≥2 次時的第一層 fallback |
+| `scripts/codex-oracle.ps1 -Mode inspect` | Codex 唯讀讀 repo，回摘要問答 | 🟢 規劃前想省 Claude context 時；`-Prompt "<具體問題>"`（inspect 用途不變，仍為主力）|
+| `scripts/codex-oracle.ps1 -Mode review` | Codex 對抗式覆審 working tree（含 untracked 新檔）| 🟡 **降級為備援**：`/codex:adversarial-review` 連續失敗 ≥2 次時的第二層 fallback（2026-08-30 起）|
 | ORACLE gate（`verify-closeout-completeness.ps1` §ORACLE gate）| staged 含 source 檔時強制要求當日 review artifact 存在 | 🔴 Hook（AO-CLOSE 自動強制）；刪除的檔案改用 `path@blob-hash` 內容綁定（2026-08-24），修改的檔案仍用時間戳排序 |
 | `bughunt-oracle.ps1` | 機器驗證 `BUGHUNT_DONE hits=0` 宣告是否為真 | 🔴 Hook（AO-CLOSE commit 時，僅覆蓋 ASCII identifier + code 檔）|
 
