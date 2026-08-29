@@ -1,6 +1,44 @@
 ﻿# Worklog
 
-## 2026-08-29（續3）
+## 2026-08-29（續4）
+
+### 覆審「25 處 X-Forwarded-Proto $scheme 疑似死檔」宣告 — SSH 逐檔實測後推翻：全部是現行 production 設定，非死檔（自我更正今日稍早 BUGHUNT_DONE 誤判）
+
+**任務緣由**：今日稍早 536e8387 commit 的 WORKLOG entry（見下方「2026-08-29」區塊 `api.aware-wave.com / oracle.aware-wave.com` 條）BUGHUNT_DONE 段落宣告：`nginx/system-sites/*.conf` + `nginx/trigger.conf` + `soulful/nginx/soulful-proxy.inc` 共 25 處 `X-Forwarded-Proto $scheme` 命中「未被任何現行 nginx include，不在 ks 或任何主機實際載入」，判定為 2026-06/07 舊架構歷史快照，開獨立任務評估是否該加 `DEPRECATED` 註記或刪除——即本次任務。
+
+**逐檔 SSH 實測結果（`hetzner-sg`=5.223.93.113 wordpress-ubuntu-4gb-sin-1／`hetzner-eu`=204.168.175.41 awarewave-eu-hel1-cpx32）**：
+
+| repo 檔案 | 對應 live 位置 | diff 結果 | 結論 |
+|---|---|---|---|
+| `n8n-aware-wave.conf` | EU `sites-available/n8n.aware-wave.com` | byte-identical | **現行** |
+| `eu-default-site.conf` | EU `sites-available/eu-default-site` | byte-identical | **現行** |
+| `eu-rate-limit-zones.conf` | EU `conf.d/rate-limit-zones.conf` | byte-identical | **現行** |
+| `aware-wave-phase1.conf` | SG `sites-available/aware-wave-phase1`（`aware-wave-phase1` symlink 啟用中） | byte-identical | **現行**（SG WordPress apex host nginx，443 終止 TLS） |
+| `scanner-block.inc` | SG+EU `snippets/scanner-block.inc` | byte-identical（雙機皆裝） | **現行** |
+| `uptime-aware-wave.conf` / `trigger-eu-vps.conf` | EU 對應 sites-available | 僅格式（空行/縮排），內容相同 | **現行** |
+| `mainwp-aware-wave.conf` | EU `sites-available/mainwp.aware-wave.com` | header 文字較舊（repo 版本較新未回填），主體邏輯相同 | **現行**（repo 略領先，文件漂移非死檔） |
+| `lobster-aware-wave-locations.inc` | SG `snippets/lobster-aware-wave-locations.inc`（被 `aware-wave-phase1` include） | 僅 1 空行差異 | **現行** |
+| `ops-proxy-headers.inc` | SG `snippets/ops-proxy-headers.inc`（被 `app` vhost include） | 僅 secret 佔位符 `__OPS_PROXY_SHARED_SECRET__` vs 真值（預期，repo 不放明文） | **現行** |
+| `aware-wave-app-api-subdomains.conf` | SG `sites-available/aware-wave-app-api-subdomains.conf`（**`app` symlink 目前啟用中，`app.aware-wave.com` 生產流量走這支**） | live 版本落後 repo（repo 已加 Repair Center 公開健康檢查端點 `/api/ops/repairs/health`、`scanner-block.inc` include、`/admin` 舊路徑重導向，尚未部署到 SG） | **現行**（repo 領先未部署，非死檔） |
+| `supabase-subdomains.conf` | EU 已拆成兩個獨立檔 `sites-available/supabase.aware-wave.com` + `sites-available/studio.aware-wave.com` | 拆檔後個別內容與 repo 合併檔對應段落一致（rate limit／scanner-block include／proxy_pass 8000/3000／studio auth_basic） | **現行**（部署時被拆檔，內容未變） |
+| `awarewave-endpoint-alert.local.template` | SG `/etc/default/awarewave-endpoint-alert.local` | live 內容比 template 新（多 SG 服務清單／措辭精修） | **現行**（template 落後未回填，非死檔） |
+
+curl 實測 5 個 vhost（`app`/`mainwp`/`n8n`/`trigger`/`uptime`.aware-wave.com）全部回應 200/302/307，非連線失敗——確認不只是「檔案存在」，是真的在服務生產流量。
+
+**真根因（方法論錯誤，非資料錯誤）**：今日稍早的 `grep include` 判斷法對這類檔案從一開始就不適用。這批檔案的部署方式是「`cp` 到 `/etc/nginx/sites-available/` + `ln -sf` 到 `sites-enabled/`」（每個檔案自己的 header 都寫了這段 Install 指令），不是被另一個 nginx 設定用 `include` 指令載入的片段。`grep include` 只抓得到 `.inc` 片段檔的載入路徑（`scanner-block.inc`／`ops-proxy-headers.inc`／`lobster-aware-wave-locations.inc`／`soulful-proxy.inc`），抓不到獨立 vhost 檔的 symlink 啟用——這批 vhost 檔因此被誤判為「未 include = 死檔」。
+
+**拓樸差異才是 `$scheme` 是否為 bug 的關鍵，不是「新舊架構」**：今日修的 wp-admin 無限重導 bug 發生在 SG WordPress apex 的**兩跳**拓樸（host nginx `aware-wave-phase1` 終止 TLS → docker `lobster-nginx`「內部再一跳」→ WordPress；`lobster-nginx` 自己從不碰 TLS 卻用 `$scheme` 判斷，永遠回 http）。本次覆審的這 13 個 system-sites 檔全部是**單跳**拓樸——host nginx 自己 `listen 443 ssl` 用 Certbot 憑證直接終止 TLS，本身就是唯一的代理層，`$scheme` 在這裡如實反映真實協定，寫法正確，不是同一類 bug。`soulful-proxy.inc`（soulfulexpression.org on ks-aw-01）與 `trigger.conf`（自我標示 local/staging-only，非 EU 現行）同理：前者單跳終止 TLS 且已有清楚的 load-bearing 說明註解；後者本來就沒宣稱自己是 production，repo 內查無任何 docker-compose 掛載此路徑，屬「目前無 consumer 但誠實自我標示」的閒置檔，不會誤導人，不需 DEPRECATED、不刪除。
+
+**決策：不加 `DEPRECATED` 註記、不刪除任何檔案**。這批檔案是對應 vhost 的唯一書面 SSOT（供換機/災難復原重建用）；加 `DEPRECATED` 或刪除會製造新的「聲稱與事實不符」問題——比原本的誤判更危險，因為下次真的要換機重建 mainwp/n8n/uptime/trigger/supabase/studio/app 這幾個 vhost 時，會找不到或不敢用正確的來源檔。
+
+**次要發現（開 TASKS，非本次授權範圍，未動手部署）**：`aware-wave-app-api-subdomains.conf`（repo 領先 live，SG 待補部署三項改善）與 `mainwp-aware-wave.conf` / `awarewave-endpoint-alert.local.template`（repo 落後 live，文件待回填）存在雙向 drift，建議另開一輪 repo↔live 同步；本次任務範圍只判定死活，不擅自 deploy 或改動 production 設定。
+
+- REALTEST_EVIDENCE: tool=SSH+curl | cmd=diff repo 13 檔 vs `hetzner-sg`/`hetzner-eu` 對應 `/etc/nginx/{sites-available,sites-enabled,conf.d,snippets}` 實際內容 + curl 5 個 vhost（app/mainwp/n8n/trigger/uptime.aware-wave.com）全部非失敗回應 | exit=0 | ms=45000
+- REVIEW_DONE: critic=Self | verdict=pass | findings=1（今日稍早 536e8387 WORKLOG entry 的 BUGHUNT_DONE 死檔宣告有誤，已在本 entry 明確更正，不竄改原文字，保留歷史記錄原貌）
+- BUGHUNT_DONE: scope=agency-os,lobster-factory,scripts | grep=X-Forwarded-Proto \$scheme|system-sites | hits=30（`system-sites/*.conf` 27 處 + `trigger.conf` 2 處 + `soulful-proxy.inc` 1 處，逐檔核對如上表，全部確認為現行設定的正確寫法，非殘留 bug，不修改任何一處）
+- AUTO_TASK_DONE: system-sites/trigger.conf/soulful-proxy.inc「死檔評估」任務完成——結論為全部現行，不加註記、不刪除；今日稍早死檔誤判已更正
+
+
 
 ### CP950 audit 第三 class：unencoded-raw-read（Get-Content -Raw 缺 -Encoding）永久工具化 + 23 站點修復 + 意外揪出 7b 硬閘從未真正生效
 

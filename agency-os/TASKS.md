@@ -789,6 +789,13 @@
 - **owner doc 參考**：[`docs/awarewave-auto-repair-plan-v3.2-final.md`](../docs/awarewave-auto-repair-plan-v3.2-final.md) + [`docs/awarewave-repair-center-app-architecture.md`](../docs/awarewave-repair-center-app-architecture.md) + [`docs/BRIEF_AWAREWAVE_REPAIR_CENTER_AI.md`](../docs/BRIEF_AWAREWAVE_REPAIR_CENTER_AI.md)
 - **跨機**：所有檔案 repo 內，git pull 同步；harness 跑在筆電 / 桌機任一台都可
 
+- [ ] **【2026-08-29 開出】nginx system-sites repo↔live 雙向 drift 待同步（🟢 小）**
+  - **一句話**：覆審「25 處疑似死檔」時發現 3 個 vhost SSOT 檔的 repo 版本跟現行部署對不上，非危急但該補平。
+  - **現在到哪**：`aware-wave-app-api-subdomains.conf` repo 領先 SG live（缺部署 `/api/ops/repairs/health` 公開端點、`scanner-block.inc` include、`/admin` 舊路徑重導向三項改善）；`mainwp-aware-wave.conf`／`awarewave-endpoint-alert.local.template` repo 落後 live（EU/SG 現場版本文字較新，未回填 repo）。
+  - **下一步**：SG 部署前三項改善（走 `sudo cp` + `nginx -t` + reload，比照檔頭 Install 指令）；EU/SG 兩份文件反向把現場最新內容抄回 repo。
+  - **完成定義**：`diff` repo vs 現場三個檔案皆為 byte-identical 或僅語意無差異的格式差。
+  - **證據**：`agency-os/WORKLOG.md` 2026-08-29（續4）覆審 diff 表。
+
 #### H. 🧊 已知風險（明確不處理，只記錄）
 
 > **這一區不是待辦。**保留是為了「日後條件變了要看得見」，不是為了有天要做掉。
