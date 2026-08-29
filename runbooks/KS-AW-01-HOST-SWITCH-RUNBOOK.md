@@ -86,11 +86,33 @@ done | grep -E '^[0-9a-f]{64}'
 - systemd `awarewave-endpoint-alert.{service,timer}` 拷入 `/etc/systemd/system/` 後**必跑**（覆審 F5：拷檔不等於註冊）：`systemctl daemon-reload && systemctl enable --now awarewave-endpoint-alert.timer`
 - **Trigger deploy 工具鏈主機層狀態**（覆審 F6，`trigger/README.md` §7a 明寫換機必重做）：`/etc/buildkit/buildkitd.toml`（registry:5000 http+insecure）+ `docker buildx create --name trigger --driver docker-container --driver-opt network=host --config /etc/buildkit/buildkitd.toml --use` + `inspect --bootstrap`（builder metadata 不在任何 volume 裡，2026-08-28 實證：ks 自己就漏了這步，當場補修）
 - `/root/.ssh/`：`soulful_pull`（Hostinger 觀察期內）、`work_deploy`（GitHub deploy key）＋ `config` alias
+- **所有 `auth_basic_user_file` 密碼檔**（2026-08-29 坑：`.htpasswd_studio` 漏拷 → Docker 幫你自動建成同名**目錄** → nginx 500）：換機前在來源機跑 `sudo grep -rh auth_basic_user_file /etc/nginx/sites-available/` 產出完整路徑清單，逐一 `stat <path>` 確認型別是 `regular file`；拷到新機後**同樣 `stat` 驗一次**，不能只憑 `ls` 有東西就放行（空目錄在 `ls` 底下看起來也像「有東西」）
+- **Netdata Cloud claim**（2026-08-29 坑：Ubuntu `apt install netdata` 編譯時 `--disable-cloud`，`netdata-claim.sh` 直接拒絕 exit=3，kickstart 也拒絕覆蓋系統套件管理的安裝）。換機後要接回 Netdata Cloud 儀表板，正確順序：
+  ```
+  sudo cp -a /etc/netdata /root/netdata-etc-bak-$(date +%Y%m%d)
+  sudo apt-get remove --purge -y netdata netdata-core netdata-web netdata-plugins-bash
+  wget -qO /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh
+  sudo sh /tmp/netdata-kickstart.sh --stable-channel --non-interactive \
+    --claim-token <TOKEN> --claim-rooms <ROOM_ID> --claim-url https://app.netdata.cloud
+  ```
+  官方版預設監聽 `0.0.0.0:19999`，裝完務必在 `/etc/netdata/netdata.conf` 的 `[web]` 段加 `bind to = 127.0.0.1` 再 `systemctl restart netdata`，否則對外暴露監控面板。`sudo netdatacli aclk-state` 應回 `Claimed: Yes`。
 
 ### 1e. DNS（Cloudflare，PATCH `content` → NEW_IP；record id 現查 `GET /zones/<zone>/dns_records`）
 
 - zone `f21b1919632fee2221647908a94fdcac`（aware-wave.com）：**13 筆 A**（apex/api/app/oracle/mainwp/n8n/postiz/studio/supabase/trigger/uptime = proxied🟠；`remotion-svc`/`video-svc` = **DNS-only⚪ 勿開 proxy**）＋ `ks-aw-01` A（DNS-only，rDNS 配對用 → 同步改）＋ www CNAME 不動
 - zone `bb1358fe8d3e1d73c822bdb31d3cd823`（soulfulexpression.org）：apex A（record `5287ae0edbce87ec8a9fa6152e05e220`，proxied🟠）
+- `_dmarc.aware-wave.com` TXT（`v=DMARC1; p=none; ...`，2026-08-29 補；新網域上線務必比照補一筆，否則可被偽造寄信且不會主動跳警告）
+
+**新子網域/新服務上線 checklist**（2026-08-29 補，首筆對象 `cognitive.aware-wave.com`——操作者建造中的 Cognitive Engineering 工具，**DNS 記錄延後到 MVP 可 serve 才建**，決策 SSOT：`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_OS_Program_Plan_v1.md:142`，理由：避免 dangling DNS / subdomain takeover / Kuma 假紅）：
+
+| 項目 | 動作 |
+|------|------|
+| CF DNS A 記錄 | 加 `<sub>.aware-wave.com` → 新機 IP，預設 proxied🟠（除非有 CF 100s timeout 顧慮，同 remotion-svc/video-svc 案例才設 DNS-only） |
+| nginx vhost | 新建 `sites-available/<sub>.aware-wave.com`，**務必 `include /etc/nginx/snippets/cf-only.conf`**（2026-08-28 坑：漏插 guard = 裸奔） |
+| TLS | certbot 簽新網域證書，走同一帳號（`renewal/` 已統一單一 account，勿另開新帳號） |
+| DMARC | 若此服務會寄信（通知/驗證信等），確認上方 `_dmarc.aware-wave.com` 已存在 |
+| §1g 硬編 IP 清單 | 若程式碼寫死 IP 或網域，跑 `git grep` 重新產清單納入換機改動範圍 |
+| 本節 A 記錄計數 | 上線後從 13 筆更新為 14 筆（含 cognitive 上線後），換機日本節表格同步改 |
 
 ### 1f. Cloudflare / OVH 邊緣層（新機必補，整併日兩個坑都在這）
 
@@ -206,34 +228,9 @@ done | grep -E '^[0-9a-f]{64}'
 | buildx builder metadata 不在 volume | 換機後首次 trigger deploy 推 registry 失敗 | §1d（2026-08-28 覆審發現 ks 現役就漏，已補） |
 | external docker network 不自建 | n8n/render/SG compose 起不來 | §2.4 |
 | 已接寫後 DNS 直接回切 | 丟失新機已接受的寫入 | §7(b) 反向同步 |
-| Ubuntu 發行版 netdata 編譯 `--disable-cloud` | `netdata-claim.sh` 直接拒絕(exit=3),kickstart 也拒絕覆蓋系統套件管理的安裝 | §1d（2026-08-29 補：換機須 purge 發行版套件→官方 stable kickstart 重裝+claim→`[web] bind to = 127.0.0.1` 綁回本地，見下方新增條目） |
+| Ubuntu 發行版 netdata 編譯 `--disable-cloud` | `netdata-claim.sh` 直接拒絕(exit=3),kickstart 也拒絕覆蓋系統套件管理的安裝 | §1d（2026-08-29 補：換機須 purge 發行版套件→官方 stable kickstart 重裝+claim→`[web] bind to = 127.0.0.1` 綁回本地） |
 | 新網域上線未補 DMARC | 該網域可被偽造寄信，且不會主動跳警告直到被人拿去釣魚 | §1e（2026-08-29 補：新增子網域/新 zone 上線 checklist 需含 `_dmarc` TXT） |
 | `.htpasswd` 類檔案漏拷，容器搶先 bind-mount 不存在的 host 路徑 | Docker 自動把該路徑幫你建成**目錄**，host nginx `auth_basic_user_file` 讀到目錄 → `pread() failed (21: Is a directory)` → 500；修完後容器內部仍記著舊掛點型別，`docker restart` 會直接 mount 失敗、容器 Exited，須 `docker compose up -d --force-recreate <service>`（compose service 名可能不等於 container_name，先查 `container_name:` 對應） | §1d（2026-08-29 補：所有 `auth_basic_user_file` 引用的 `.htpasswd*` 路徑，換機前先在來源機 `find / -iname "*.htpasswd*"` 產清單，逐一確認搬過去的是檔案不是目錄；`stat` 型別對照，不能只看 `ls` 有沒有東西） |
-
-### 1d 追加：Netdata Cloud claim（2026-08-29 補）
-
-換機後若要接回 Netdata Cloud 儀表板：**不能**沿用 Ubuntu `apt install netdata`（編譯時 `--disable-cloud`，claim 必拒絕）。正確順序：
-```
-sudo cp -a /etc/netdata /root/netdata-etc-bak-$(date +%Y%m%d)
-sudo apt-get remove --purge -y netdata netdata-core netdata-web netdata-plugins-bash
-wget -qO /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh
-sudo sh /tmp/netdata-kickstart.sh --stable-channel --non-interactive \
-  --claim-token <TOKEN> --claim-rooms <ROOM_ID> --claim-url https://app.netdata.cloud
-```
-官方版預設監聽 `0.0.0.0:19999`，裝完務必在 `/etc/netdata/netdata.conf` 的 `[web]` 段加 `bind to = 127.0.0.1` 再 `systemctl restart netdata`，否則對外暴露監控面板。`sudo netdatacli aclk-state` 應回 `Claimed: Yes`。
-
-### 1e 追加：新子網域上線 checklist（2026-08-29，`cognitive.aware-wave.com` 待搬）
-
-**Cognitive Engineering 工具**（操作者建造中，尚未上線）預定掛 `cognitive.aware-wave.com`，之後換機時比照本節 13 筆 A 記錄流程一併搬遷。**DNS 記錄本身延後到 MVP 可 serve 才建**（決策 SSOT：`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_OS_Program_Plan_v1.md:142`，理由：避免 dangling DNS / subdomain takeover / Kuma 假紅）。新子網域/新服務上線一律走這張表，勿漏：
-
-| 項目 | 動作 |
-|------|------|
-| CF DNS A 記錄 | 加 `cognitive.aware-wave.com` → 新機 IP，預設 proxied🟠（除非有 CF 100s timeout 顧慮，同 remotion-svc/video-svc 案例才設 DNS-only） |
-| nginx vhost | 新建 `sites-available/cognitive.aware-wave.com`，**務必 `include /etc/nginx/snippets/cf-only.conf`**（2026-08-28 坑：漏插 guard = 裸奔） |
-| TLS | certbot 簽新網域證書，走同一帳號（`renewal/` 已統一單一 account，勿另開新帳號） |
-| DMARC | 若此工具會寄信（通知/驗證信等），確認 apex `_dmarc.aware-wave.com` 已存在（**2026-08-29 已補**，見 §8 上表） |
-| §1g 硬編 IP 清單 | 若程式碼寫死 IP 或網域，跑 `git grep` 重新產清單納入換機改動範圍 |
-| §1e 本節 A 記錄計數 | 上線後從 13 筆更新為 14 筆，換機日 1e 表格同步改 |
 
 ---
 

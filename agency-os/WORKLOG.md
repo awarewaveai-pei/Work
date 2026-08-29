@@ -106,6 +106,20 @@
 
 ## 2026-08-29
 
+### studio.aware-wave.com 真的被 CF rate limit 訤鷸（非我測試引發，是真的規則缺口，已修）、supabase.aware-wave.com 登入框再次確認不是帳密
+
+**Rate limit 真根因**：Zone Rate Limiting rule（`b8ffa72d...`，50 req/10s per IP）排除清單只寫了 `app`/`supabase`，漏了 `studio`/`trigger`/`n8n`/`uptime`/`mainwp`/`postiz` 這些內部後台 SPA。操作者正常進 Studio 編輯器（`/project/default/editor`）一頁就會幹發十幾支併發請求，超過 50 門檸即被 CF 封 10 秒。已用 CF API PATCH 同一顆 rule 追加排除名單（oracle.aware-wave.com 屬公開消費者 app，刻意不排除，保留揃膨器防護）。詳細根因+修復隨規則 API 同步寫進 `runbooks/CLOUDFLARE-WAF-SETUP.md` §API維護新小節（不放換機 runbook，這是通用 WAF 完整性問題非機器特定）。
+**supabase.aware-wave.com 登入框**：再次實測確認——Kong 的 401 回應帶 `www-authenticate: Basic realm="service"`，`x-kong-response-latency` 確認請求真的打到 Kong；任何帳密這邊都會 401，因為 Kong 根本不認 Basic Auth，需要的是 `apikey` header（帳號檔 §三進入方式 B）。**這個網址本來就不應該用瀏覽器直接登入**——想要網頁化管理資料庫請用 studio.aware-wave.com（已修好）。
+
+- REALTEST_EVIDENCE: tool=curl | cmd=8 連發 curl 打 studio /project/default/editor 全部 200（修前會觸發 1015）+ CF API PATCH success=True | exit=0 | ms=20000
+- REVIEW_DONE: critic=Self | verdict=pass | findings=0（排除清單新增 6 個 hostname 均為已有其他層保護（basic auth 或站內登入）的內部工具，oracle 公開 app 刻意保留防護）
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks | grep=b8ffa72d | hits=2（WORKLOG 本行+CLOUDFLARE-WAF-SETUP.md 新增段，無 stale 舊排除清單描述）
+
+### runbook 自檢：操作者問「寫盡了嗎？」發現自己犯了 R4「聲稱即驗證」紅線：§8 表格寬「已焦進 §1d/§1e」，實際內容卻放在 §8 之後的「1d 追加/1e 追加」孤立小標題，換機當天照§1d/§1e 順序讀根本看不到。已修正：將 Netdata claim 程序真正媽進 §1d 列表，新子網域 checklist 真正媽進 §1e，刪除重複孤立區塊；同步修正 §8 兩行中已失效的「見下方新增條目」字樣。並逐行交叉核對其餘 15 行§8 寬称→實際章節，全部名實相符。
+
+- REVIEW_DONE: critic=Self | verdict=pass | findings=1（結構性錯誤，已修；非內容錯誤，原文字本身正確，只是位置錯）
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks | grep=1d 追加|1e 追加 | hits=2（均為 WORKLOG 歷史記錄描述當日行為，非活連結，不需修）
+
 ### studio.aware-wave.com 真的 500（操作者實测拓破，我上輪誤判為殊點）+ 修復途中自己打掛 SG 站看短暗 90 秒，已全復原
 
 **真根因**：`/etc/nginx/.htpasswd_studio` 在 ks 上是一個**空目錄**（非檔案）。整併日 rsync 沒拷到這個檔，改成某個容器（`lobster-nginx`）先起來且 bind-mount 了不存在的 host 路徑 → Docker 自動幫你建目錄佔位。host nginx 用 `auth_basic_user_file` 讀到目錄 → `pread() failed (21: Is a directory)` → 500（error.log 實證 crit 級）。**這是真的搬家漏拔，不是上輪判的瞬間抱抖**（上輪進度錯誤判斷已短暗紀錄在此修正）。

@@ -143,6 +143,23 @@ curl -s -o /dev/null -w "/healthz: %{http_code}\n"         https://n8n.aware-wav
 curl -s -o /dev/null -w "/api/ops/summary: %{http_code}\n" https://app.aware-wave.com/api/ops/summary
 ```
 
+### Rate Limit 排除清單缺口（2026-08-29 事故，已修）
+
+**症狀**：操作者正常瀏覽 `studio.aware-wave.com` 的 Studio 編輯器（`/project/default/editor`）被 Cloudflare 回 `Error 1015 You are being rate limited`。稍早 `trigger.aware-wave.com` 儀表板也出現過同款錯誤。
+
+**根因**：Rate Limit Rule（`b8ffa72d...`，50 req/10s per IP）的排除清單只寫了 `app.aware-wave.com` 和 `supabase.aware-wave.com`，2026-07-04 建規則當時 studio/trigger 這些內部管理後台可能還沒各自獨立網域或還沒被納入考慮。這些後台都是 SPA，載入一頁就會併發打十幾支 API/資源請求，單一操作者的正常使用就能觸發「50 req/10s」的門檻——這條規則設計目的是擋公開網站的掃描器灌爆，不該套用在只有操作者一人用、且已有 Basic Auth 或站內登入保護的內部工具上。
+
+**修復**：排除清單追加 `studio.aware-wave.com`、`trigger.aware-wave.com`、`n8n.aware-wave.com`、`uptime.aware-wave.com`、`mainwp.aware-wave.com`、`postiz.aware-wave.com`（`oracle.aware-wave.com` 是公開消費者 app，**刻意不排除**，保留掃描器防護）。已用 PATCH 同一顆 rule 完成，8 連發 curl 打 studio 編輯器全部 200 驗證。
+
+**日後新增內部管理後台子網域時，務必同步檢查這條規則的排除清單**（本次事故的可複製教訓：新子網域 = 新的 SPA = 新的併發請求來源，忘記排除就會在操作者正常使用時無預警鎖 10 秒-timeout 循環）。
+
+```bash
+# 查目前排除清單
+CF_TOKEN=$(grep "CLOUDFLARE_API_TOKEN" mcp/user-env.ps1 | sed 's/.*= "\(.*\)"/\1/')
+curl -s "https://api.cloudflare.com/client/v4/zones/f21b1919632fee2221647908a94fdcac/rulesets/e29e21021ab641b38a4067735a027907" \
+  -H "Authorization: Bearer $CF_TOKEN" | python3 -c "import json,sys; print(json.load(sys.stdin)['result']['rules'][0]['expression'])"
+```
+
 ---
 
 ## §Origin Lockdown SOP（Claude 自動使用）
