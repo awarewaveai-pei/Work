@@ -695,16 +695,28 @@ resolved_selection_context:
         present in selection_context_supplement, computed from
         policy_context's populated fields (the plan does not specify the
         exact derivation algorithm beyond the enum values themselves and
-        the §6.4 forcing rule's consumption of it; see open_questions.OQ-mres-5
-        for that honest gap). MUST be explicit `none` when policy_context is
-        absent entirely -- 2026-08-30 (real /codex-review end-to-end test,
-        MEDIUM finding): this field was originally optional, which let a
-        resolved_selection_context with a populated policy_context still omit
-        regulatory_exposure entirely, silently defeating §6.4's forcing rule
-        for any consumer that only checks for the field's presence rather than
-        re-deriving it. Now in `resolved_selection_context.required` -- every
-        resolved output must state its regulatory exposure, never leave it to
-        an out-of-band convention.
+        the §6.4 forcing rule's consumption of it; see
+        open_questions.OQ-mres-6 for that honest gap -- CORRECTED 2026-08-30,
+        real `/codex-review` HIGH finding: this description previously
+        pointed here at OQ-mres-5, which is a genuinely different, narrower
+        question about whether a future ENGINE correctly applies §6.4's
+        forcing rule once given a value -- it does not cover the more
+        upstream question this note is actually about, which is how that
+        value gets computed in the first place. OQ-mres-6 is the new,
+        correctly-scoped open question for that gap). MUST be explicit `none`
+        when policy_context is absent entirely -- 2026-08-30 (real
+        /codex-review end-to-end test, MEDIUM finding): this field was
+        originally optional, which let a resolved_selection_context with a
+        populated policy_context still omit regulatory_exposure entirely,
+        silently defeating §6.4's forcing rule for any consumer that only
+        checks for the field's presence rather than re-deriving it. Now in
+        `resolved_selection_context.required` -- every resolved output must
+        state its regulatory exposure, never leave it to an out-of-band
+        convention. **This makes OQ-mres-6's gap more consequential, not
+        less**: every producer must now supply a value with no canonical
+        algorithm to compute it correctly, guaranteeing divergent
+        implementations will disagree on borderline cases rather than one
+        of them simply omitting the field.
 
 # ---------------------------------------------------------------------------
 # The output side of EC §14's flow: Candidate Methods, bridging to
@@ -827,7 +839,53 @@ open_questions:
       `required` list, so every resolved output must state an explicit value
       (including `none`). The broader question above (whether the ENGINE
       actually applies the forcing rule correctly given that value) remains
-      open, unchanged.
+      open, unchanged. See the NEW, separate OQ-mres-6 for the even more
+      upstream question this entry does not cover: how the value itself gets
+      computed in the first place.
+  - id: "OQ-mres-6"
+    new_finding: true
+    question: >
+      Real `/codex-review` HIGH finding (2026-08-30, on the ADR-013 batch
+      commit -- flagged via this task's explicit "does this change depend
+      on something not visible in the diff" focus check, not a regression
+      introduced by that diff itself). `regulatory_exposure` is `DERIVED,
+      never hand-set` per GLOBAL_JURISDICTION_PLAN.md §6.2's own comment,
+      and is now REQUIRED on every `resolved_selection_context` (see this
+      field's own description and OQ-mres-5's `partial_resolution`). But
+      neither GLOBAL_JURISDICTION_PLAN.md §6 (read in full again to confirm
+      -- §6.1-6.4 contain no derivation table) nor this schema defines HOW
+      to compute it from `policy_context`'s 11 populated sub-fields. §6.3's
+      mapping table maps each dimension to its DOWNSTREAM EFFECT on method
+      selection, not to a formula or decision table for
+      `regulatory_exposure`'s own value. Concretely: two independent
+      producers can both satisfy this schema while disagreeing on whether
+      the same `policy_context` (e.g. `tax_exposure.present: true` alone,
+      with everything else absent) should resolve to `low` or `moderate` --
+      nothing here or in the source plan says which. Making the field
+      REQUIRED (the 2026-08-30 fix above) closed the "silently omitted"
+      failure mode but did not address this deeper one -- every producer
+      must now supply a value, with no shared algorithm ensuring they agree
+      on what that value should be, which can make §6.4's forcing rule
+      fail open (a regulatory-sensitive request classified as `low` by one
+      implementation and `moderate` by another) in exactly the compliance-
+      sensitive scenario this whole mechanism exists to protect.
+    owner: >
+      operator, or a future Round 3 ADR -- deriving a concrete
+      policy_context -> regulatory_exposure decision table is a genuine
+      legal/policy judgment call (which combinations of tax/trade/AI-
+      regulation/election-cycle signals count as "moderate" vs "high"
+      exposure), not a Phase 3 schema-compilation pick Claude should
+      invent unilaterally -- same class of judgment this project already
+      reserves for the operator elsewhere (e.g. Zero Trust/Supply Chain
+      vendor selection, docs/architecture/ZERO_TRUST_SUPPLY_CHAIN_
+      SELECTION_PLAN.md).
+    blocks: >
+      Nothing in this schema's own structural validity today (the enum and
+      required-ness are both correctly enforced). It DOES mean any current
+      or future implementation's `regulatory_exposure` values are NOT
+      guaranteed consistent across producers until a canonical derivation
+      spec exists -- flagged here so this is a known, disclosed gap rather
+      than an implicit assumption of correctness.
 
 verification:
   method: >

@@ -64,6 +64,8 @@ Phase 3 建置過程中，5 個 schema/policy 檔案的內容是直接轉錄自�
 
 **忠實度查證**：重讀 `GLOBAL_JURISDICTION_PLAN.md` §6.2（L303-322，`policy_context` 11 個子欄位完整範例＋衍生欄位 `regulatory_exposure`）、§6.3（L324-337，MP §26.3 十一項政策分析維度對照表）、§6.4（L339-345，forcing rule）全文。schema 檔案的 `policy_context` 物件（`method-resolution.schema.yaml:542-608`）逐一對應全部 11 個子欄位，巢狀形狀（`budget_context{available,source,cycle}`／`tax_exposure{present,refs}`／`trade_exposure{present,refs}`／`privacy_exposure{present}`／`election_cycle_window{start,end}` 等）逐字相符；`regulatory_exposure` 正確放在 `policy_context` 的同層兄弟欄位（對應來源 L321 的縮排層級，不是巢狀在 `policy_context` 裡面），且正確限定只出現在 resolved 端（`resolved_selection_context`），never 出現在手填輸入端（`selection_context_supplement`），逐字對應來源「DERIVED, never hand-set」的註解。`^LAW-` pattern 是合理、已揭露的推論（沿用來源自己的 `[LAW-...]` 範例語法），非超出範圍的發明。無遺漏、無發明。§6.4 的 forcing rule 誠實地未編碼進 schema（有明確、正確的理由——跨物件行為非同物件形狀約束），而非靜默省略。
 
+**本 ADR 後續一次真實 `/codex-review`（審 ADR-013 本身這批 commit）額外抓到的獨立缺口，非「忠實度」問題**：`regulatory_exposure` 是「DERIVED, never hand-set」，且（因先前一次真實 `/codex-review` 修正）現在是必填欄位——但重讀 `GLOBAL_JURISDICTION_PLAN.md` §6 全文確認：**來源文件自己也沒有給出從 `policy_context` 11 個子欄位推導出 `regulatory_exposure` 值的具體演算法或對照表**，§6.3 的對照表只說明每個維度對「method selection 的下游效果」，不是「如何算出 regulatory_exposure 本身」的公式。這不是本項轉錄不忠實（schema 忠實反映了來源文件同樣缺失這個演算法），而是來源文件自己就沒解決的一個更根本缺口——欄位必填但無法可靠計算，等於保證不同實作在邊界案例上會算出不同答案。這正是本次任務 `/codex-review` focus text 第一段明確要求檢查的「這個改動是否依賴 diff 外看不見的東西」——已誠實記錄為 `method-resolution.schema.yaml` 新增的 `open_questions.OQ-mres-6`，不由本 ADR 或 Claude 自行發明推導演算法（這屬於法規/政策判斷，同 Zero Trust/Supply Chain 選型一樣，是操作者層級的決定，非 Phase 3 schema 編譯可自行拍板的範圍）。
+
 ## Method Used
 
 直接應用既有原則於一個新主題（同 ADR-010 Method Used 段的方法論），此處應用對象是「確認轉錄忠實」而非「從零裁決取捨」。Evidence Triangulation（每個項目的忠實度判斷都交叉核對來源文件原文＋schema 檔案內容＋既有 ADR 覆蓋範圍三方）。R4 聲稱即驗證：兩處獨立缺陷（`repository-contract.schema.yaml` 的計數錯誤、`tenant-isolation-controls.schema.yaml` 的過期交叉引用聲稱）皆透過直接重讀來源檔案驗證後才修正，不是照抄查證報告的結論。
@@ -79,7 +81,7 @@ Phase 3 建置過程中，5 個 schema/policy 檔案的內容是直接轉錄自�
 
 - Positive：5 個此前「已建但無 ADR 稽核軌跡」的檔案現在有正式、可重跑驗證的批准記錄；過程中額外抓到並修正 2 個獨立於「忠實度」問題本身的真實缺陷（計數不一致、過期交叉引用聲稱），沒有因為「只是來查忠實度」就對明顯的其他問題視而不見。
 - Negative：無——這是文件層級的批准與 2 個小型 schema 修正，無 runtime 副作用。
-- 尚未解決的 follow-up（本 ADR 明確不處理，記錄供未來參考）：(i) `repository-contract.schema.yaml` 的 3 份來源規劃文件本身仍待走 ADR-006 `.ai/proposals/` 流程才能實際編輯母文件文字；(ii) P1-DUP-6（MP §98/§134 法律不確定性詞彙衝突）仍待獨立 Round 2 ADR；(iii) `tenant-isolation-controls.schema.yaml` 的 `OQ-TENANTISO-3`（實際 RLS policy SQL/DDL 與測試）是實作階段任務，非本 ADR 範圍。
+- 尚未解決的 follow-up（本 ADR 明確不處理，記錄供未來參考）：(i) `repository-contract.schema.yaml` 的 3 份來源規劃文件本身仍待走 ADR-006 `.ai/proposals/` 流程才能實際編輯母文件文字；(ii) P1-DUP-6（MP §98/§134 法律不確定性詞彙衝突）仍待獨立 Round 2 ADR；(iii) `tenant-isolation-controls.schema.yaml` 的 `OQ-TENANTISO-3`（實際 RLS policy SQL/DDL 與測試）是實作階段任務，非本 ADR 範圍；(iv) **本 ADR 自身這批 commit 事後被真實 `/codex-review` 抓到的新缺口**：`regulatory_exposure` 必填但無任何定義好的 `policy_context → regulatory_exposure` 推導演算法，來源文件 `GLOBAL_JURISDICTION_PLAN.md` §6 自己也沒解決這件事——已記錄為 `method-resolution.schema.yaml` 的 `open_questions.OQ-mres-6`，明確不由本 ADR 或 Claude 自行發明（屬法規/政策判斷，需操作者裁決）。
 
 ## Migration / Rollback
 
@@ -98,7 +100,8 @@ Phase 3 建置過程中，5 個 schema/policy 檔案的內容是直接轉錄自�
 - `docs/architecture/DEVOPS_SRE_PLAN.md`（§4 L138-167、§5 L171-197）
 - `specs/jurisdiction/conflict-of-laws-output.schema.yaml`（`decided_by` L39-47、`open_questions.OQ-CONFLICTOFLAWS-1` L151-158）
 - `docs/architecture/GLOBAL_JURISDICTION_PLAN.md`（§5 L253-294、§6 L297-345）
-- `specs/execution/method-resolution.schema.yaml`（`open_questions.OQ-mres-4` L791-802、`OQ-mres-5` L803-826、`compilation_decisions` L188-235、`policy_context`/`regulatory_exposure` L542-608/690-707）
+- `specs/execution/method-resolution.schema.yaml`（`open_questions.OQ-mres-4`/`OQ-mres-5`/新增 `OQ-mres-6`、`compilation_decisions` L188-235、`policy_context`/`regulatory_exposure` 欄位、`GLOBAL_JURISDICTION_PLAN.md` §6 全文重讀確認無推導演算法）
+- `agency-os/reports/oracle/`（本 ADR 這批 commit 事後的真實 `/codex-review` artifact，抓到 `OQ-mres-6` 這個獨立缺口的原始來源）
 - `policies/privacy/pii-redaction.policy.yaml`（`decided_by` L47-52，§0 排除判定的依據）與 `docs/adr/ADR-007-pii-redaction-vs-pseudonymization-timing.md`（全文 190 行逐條比對）
 - `docs/adr/ADR-010-database-platform-and-table-naming.md`（授權路徑與 Method Used 段的模板參考）
 - `docs/adr/ADR_INDEX.md`（既有 12 份 ADR 的編號/依賴關係記錄慣例）

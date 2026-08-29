@@ -1,5 +1,36 @@
 # Worklog
 
+## 2026-08-30（續9）
+
+### `/codex-review` 真實跑 ADR-013+Phase5 comparison 批次，抓到 1 個真實 HIGH finding（`regulatory_exposure` 無推導演算法），誠實揭露而非發明演算法搪塞
+
+**觸發**：ADR-013 批次含真實 schema 改動（`repository-contract.schema.yaml` 計數修正），依既有慣例跑一次 `/codex-review`（`--base 424287eb3`，涵蓋 ADR-013 與 Phase 5 comparison 兩個 commit）。
+
+**結果**：`verdict: needs-attention`，1 個 HIGH finding，驗真後確認**與本輪 diff 本身無關，但被本輪 focus text 第一段（「這個改動是否依賴 diff 外看不見的東西」）正確揪出**：
+
+- **`method-resolution.schema.yaml:643-707`**：`regulatory_exposure` 現為必填（前一輪 `/codex-review` 修正），且來源文件 `GLOBAL_JURISDICTION_PLAN.md` §6.2 自己註明「DERIVED, never hand-set」——但重讀 §6 全文（§6.1-6.4）確認**來源文件自己也沒給出從 `policy_context` 11 個子欄位推導出這個值的具體演算法或對照表**，§6.3 對照表只講「每個維度對 method selection 的下游效果」，不是「如何算出 regulatory_exposure 本身」的公式。**驗真結論**：這不是本輪 diff 引入的新問題（我的 ADR-013 只改了 `OQ-mres-4` 的文字，未動 `regulatory_exposure` 的 schema 定義或必填狀態），而是一個更早就存在、被「必填」這個修正放大後果的既有缺口——欄位必填但無法可靠計算，保證不同實作在邊界案例（例如只有 `tax_exposure.present: true` 該算 low 還是 moderate？）會算出不同答案。
+
+**判斷（回應「是否要發明演算法補上」）**：不發明。推導 `policy_context → regulatory_exposure` 的具體演算法/對照表是真實的法規/政策判斷（哪些訊號組合算 moderate、哪些算 high），屬於操作者層級的決定，同今天稍早的 Zero Trust/Supply Chain 選型一樣不該由 Claude 自行拍板。已誠實記錄為 `method-resolution.schema.yaml` 新增的 `open_questions.OQ-mres-6`（訂正一併發現的既有交叉引用錯誤：`regulatory_exposure` 欄位描述先前寫「見 OQ-mres-5 這個誠實缺口」，但 `OQ-mres-5` 實際問的是另一個更下游的問題——未來 Method Selection Engine 是否正確套用 §6.4 forcing rule，不是「這個值本身怎麼算」——已訂正指向新的 `OQ-mres-6`）。
+
+[已修改]
+- `specs/execution/method-resolution.schema.yaml`：新增 `open_questions.OQ-mres-6`；`regulatory_exposure` description 訂正交叉引用（OQ-mres-5→OQ-mres-6）；`OQ-mres-5` 補一句指向新問題
+- `docs/adr/ADR-013-batch-ratification-of-proposed-document-transcriptions.md`：Sub-decision 5 補一段記錄此發現；Consequences 補 follow-up (iv)；Evidence 補 oracle artifact 引用
+- `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`：row 95 補此發現摘要
+- 新增 `agency-os/reports/oracle/2026-08-30-review-b7762d27.md`（本次真實覆審 artifact）
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(node) | cmd=`node codex-companion.mjs adversarial-review --background --base 424287eb3 "<兩段標準 focus text>"` | exit=0 | 結果=真實背景執行，verdict=needs-attention，1 個 finding，非模擬
+- REALTEST_EVIDENCE: tool=Bash(grep) | cmd=`git diff 424287eb3..HEAD -- .../method-resolution.schema.yaml` 確認本輪 diff 只改了 `OQ-mres-4` 文字，未動 `regulatory_exposure` schema 本身 | exit=0 | 結果=確認此 finding 是既有缺口被本輪 focus text 揪出，非本輪引入的回歸
+- REALTEST_EVIDENCE: tool=Bash(grep) | cmd=直接重讀 `GLOBAL_JURISDICTION_PLAN.md:297-345`（§6 全文）獨立驗證「無推導演算法」的主張 | exit=0 | 結果=屬實，§6.3 對照表確認只講下游效果非推導公式
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py` + `UniqueKeyLoader` 掃描 | exit=0 | 結果=669 個檢查全過（純新增 open_question，無 schema 約束變更），無重複 key
+- REVIEW_DONE: critic=Deep（外部 oracle，`/codex-review`，審 ADR-013+Phase5 comparison 這批 commit）| verdict=needs-attention → 1 finding 驗真為既有缺口非本輪回歸，判斷不發明演算法、改為誠實揭露新增 open question | findings=0c/1m(HIGH)/0n
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`OQ-mres-5\b` | hits=僅本輪已訂正的引用位置命中，無遺漏懸空引用
+
+[剩餘風險] `OQ-mres-6`（`regulatory_exposure` 無推導演算法）刻意留為未解決——這是操作者層級的法規判斷，不是本次任務可自行裁決的範圍；在演算法補齊前，任何實作對 `regulatory_exposure` 邊界案例的判斷都不保證跨實作一致，已誠實記錄非隱藏。
+
+[rollback] 純新增 open_question + 文件補充說明，`git revert` 可完整回退，無 schema 約束變更、無 runtime 副作用。
+
 ## 2026-08-30（續8）
 
 ### Phase 5 Learning/Research/Business 三選一：第二次 Codex 獨立論證，這次真的成功，與 Claude 論證版收斂一致
