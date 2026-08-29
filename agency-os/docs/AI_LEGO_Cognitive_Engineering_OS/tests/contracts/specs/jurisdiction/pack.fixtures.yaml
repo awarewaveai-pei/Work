@@ -1,0 +1,92 @@
+schema_id: "ai-lego://specs/jurisdiction/pack.schema.yaml"
+target_ref: "#/jurisdiction_pack"
+description: >
+  Exercises the pack_id grammar, freshness.owner_role's const (no pack may
+  exist ownerless), and -- the sharpest case -- a
+  capability_availability_overrides[] bypass attempt setting status to
+  'unknown', which this file's own compilation_decisions explicitly
+  excludes from the authorable subset by hard $ref'ing
+  availability.schema.yaml's 6-value capability_availability_authorable_status
+  (unknown is a computed/fallback state, never directly authorable).
+valid:
+  - name: minimal_draft_pack
+    instance:
+      pack_id: "JPACK-eu-gdpr-v1.0"
+      status: DRAFT
+      scope:
+        jurisdiction_nodes:
+          - { type: Country, id: "DE" }
+      effective_from: "2026-08-29T00:00:00Z"
+      legal_sources: ["LAW-0001"]
+      authority_hierarchy_ref: "authority-hierarchy.eu-gdpr.v1"
+      freshness:
+        owner_role: legal_source_steward
+        sla_class: HIGH
+      data_residency: {}
+  - name: fuller_active_pack_with_overrides_and_disclaimer
+    instance:
+      pack_id: "JPACK-us-federal-v2.1"
+      status: ACTIVE
+      scope:
+        jurisdiction_nodes:
+          - { type: Federal, id: "US" }
+        sector_packs: ["public_administration"]
+        government_pack_ref: null
+      effective_from: "2026-01-01T00:00:00Z"
+      effective_to: null
+      legal_sources: ["LAW-1001", "LAW-1002"]
+      authority_hierarchy_ref: "authority-hierarchy.us-federal.v1"
+      cross_border_transfer:
+        allowed_mechanisms: [Adequacy, SCC]
+      freshness:
+        owner_role: legal_source_steward
+        sla_class: CRITICAL
+        last_checked_at: "2026-08-01T00:00:00Z"
+      data_residency:
+        storage: COUNTRY_ONLY
+        processing: COUNTRY_ONLY
+      capability_availability_overrides:
+        - capability: "biometric_identification"
+          status: prohibited
+          basis_legal_source: "LAW-1001"
+      coverage_disclaimer:
+        text_ref: DISCLAIMER-NOT-EXHAUSTIVE-v1
+        ui_render_required: true
+invalid:
+  - name: pack_id_pattern_violation
+    instance:
+      pack_id: "PACK-eu-gdpr-1.0"
+      status: DRAFT
+      scope: { jurisdiction_nodes: [{ type: Country, id: "DE" }] }
+      effective_from: "2026-08-29T00:00:00Z"
+      legal_sources: ["LAW-0001"]
+      authority_hierarchy_ref: "authority-hierarchy.eu-gdpr.v1"
+      freshness: { owner_role: legal_source_steward, sla_class: HIGH }
+      data_residency: {}
+    reason: "pack_id pattern is ^JPACK-[a-z0-9_-]+-v\\d+\\.\\d+$ ; 'PACK-eu-gdpr-1.0' is missing the required 'JPACK-' prefix and 'v' version marker."
+  - name: freshness_owner_role_const_violation
+    instance:
+      pack_id: "JPACK-eu-gdpr-v1.0"
+      status: DRAFT
+      scope: { jurisdiction_nodes: [{ type: Country, id: "DE" }] }
+      effective_from: "2026-08-29T00:00:00Z"
+      legal_sources: ["LAW-0001"]
+      authority_hierarchy_ref: "authority-hierarchy.eu-gdpr.v1"
+      freshness: { owner_role: "compliance_team", sla_class: HIGH }
+      data_residency: {}
+    reason: "freshness.owner_role is const: legal_source_steward per the plan's 'no pack may exist ownerless' rule -- any other role string, however plausible, is rejected."
+  - name: capability_availability_override_status_unknown_bypass_attempt
+    instance:
+      pack_id: "JPACK-eu-gdpr-v1.0"
+      status: DRAFT
+      scope: { jurisdiction_nodes: [{ type: Country, id: "DE" }] }
+      effective_from: "2026-08-29T00:00:00Z"
+      legal_sources: ["LAW-0001"]
+      authority_hierarchy_ref: "authority-hierarchy.eu-gdpr.v1"
+      freshness: { owner_role: legal_source_steward, sla_class: HIGH }
+      data_residency: {}
+      capability_availability_overrides:
+        - capability: "facial_recognition"
+          status: unknown
+          basis_legal_source: "LAW-0001"
+    reason: "capability_availability_overrides[].status $ref's availability.schema.yaml's capability_availability_authorable_status -- a DELIBERATE 6-value subset that excludes 'unknown' (GLOBAL_JURISDICTION_PLAN.md: 'Unknown is deliberately NOT a settable value here'). Attempting to author 'unknown' directly is exactly the coverage-guard bypass this enum split exists to prevent."

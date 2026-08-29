@@ -1,0 +1,42 @@
+schema_id: "ai-lego://specs/cognitive/profile.schema.yaml"
+target_ref: ""
+description: >
+  Exercises profile.schema.yaml's sole required field `rigor` (a real hard
+  $ref into rigor-level.schema.yaml's 5-value rigor_mode enum), and the
+  `cognitive.representation` per-modality weight vector's 0-1 numeric
+  bounds (Atlas §6 L263-268).
+
+valid:
+  - name: minimal_rigor_only
+    instance:
+      rigor: fast
+  - name: board_grade_profile_with_cognitive_weights
+    instance:
+      profile_id: "PROFILE-board-grade-default"
+      rigor: board_grade
+      cognitive:
+        representation: { visual: 0.3, text: 0.6, table: 0.9, spatial: 0.2, audio: 0.1 }
+        interaction: { guided: 0.7, exploratory: 0.3 }
+        thinking: { divergent: 0.2, analytical: 0.9, narrative: 0.1 }
+        detail: { depth: high }
+        decision: { evidence_preference: high }
+      representation_preference: table
+      accessibility: {}
+
+invalid:
+  - name: missing_required_rigor
+    instance:
+      profile_id: "PROFILE-no-rigor"
+      cognitive:
+        detail: { depth: low }
+    reason: "rigor is this file's sole top-level required field (Atlas's Method Selection Engine flowchart cannot proceed past risk/uncertainty without it) — omitted here entirely."
+  - name: rigor_not_in_5_value_enum
+    instance:
+      rigor: expert_mode
+    reason: "rigor is a real hard $ref into rigor-level.schema.yaml#/rigor_mode, whose enum is exactly [fast, professional, research_grade, board_grade, deep_intelligence]; 'expert_mode' is not a member."
+  - name: cognitive_representation_weight_exceeds_maximum_1
+    instance:
+      rigor: fast
+      cognitive:
+        representation: { visual: 1.5, text: 0.5, table: 0.5, spatial: 0.5, audio: 0.5 }
+    reason: "cognitive.representation.* fields are bounded [0,1] soft-affinity scores (Atlas §6 L263-268); 1.5 violates the maximum: 1 constraint on visual."

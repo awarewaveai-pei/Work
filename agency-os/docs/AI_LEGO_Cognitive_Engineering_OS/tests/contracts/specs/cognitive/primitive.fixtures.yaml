@@ -1,0 +1,40 @@
+schema_id: "ai-lego://specs/cognitive/primitive.schema.yaml"
+target_ref: "#/primitive"
+description: >
+  Exercises primitive.schema.yaml's required fields, the `id` oneOf union
+  across the 24-value CANONICAL_KERNEL enum and the 5-value
+  OBSERVED_EXTENSION enum (disjoint sets, so a legal id matches exactly
+  one branch), the `tier` enum, and the `dimension` const "A" lock.
+
+valid:
+  - name: kernel_primitive_decompose
+    instance:
+      id: "DECOMPOSE"
+      tier: CANONICAL_KERNEL
+      dimension: "A"
+      label: null
+  - name: extended_primitive_cause_hypothesis
+    instance:
+      id: "CAUSE_HYPOTHESIS"
+      tier: OBSERVED_EXTENSION
+      dimension: "A"
+
+invalid:
+  - name: id_not_in_either_kernel_or_extended_enum
+    instance:
+      id: "SYNTHESIZE"
+      tier: CANONICAL_KERNEL
+      dimension: "A"
+    reason: "id must satisfy the oneOf union of kernel_primitive_id (24 values) or extended_primitive_id (5 values) — 'SYNTHESIZE' is in neither enum, so both oneOf branches fail and the union matches zero schemas."
+  - name: dimension_violates_const_A
+    instance:
+      id: "DECOMPOSE"
+      tier: CANONICAL_KERNEL
+      dimension: "C"
+    reason: "dimension is a fixed const \"A\" (LEGO dimension A, Cognitive Operation) — every Cognitive Primitive must carry exactly that value; 'C' (the Lens dimension) fails the const check."
+  - name: tier_not_in_two_value_enum
+    instance:
+      id: "GROUP"
+      tier: EXPERIMENTAL
+      dimension: "A"
+    reason: "tier must be one of CANONICAL_KERNEL or OBSERVED_EXTENSION; 'EXPERIMENTAL' is not a legal tier value."

@@ -1,0 +1,17 @@
+# EC section 94 category: state-machine
+schema_id: "ai-lego://specs/execution/status-codes.schema.yaml"
+target_ref: "#/reference_vocabulary/final_status/schema"
+category: state-machine
+description: >
+  Demonstrates the terminal-state side of the execution state machine: a
+  task's final_status must land on one of the legal end states, not an
+  invented ad hoc string.
+valid:
+  - name: pass
+    instance: "PASS"
+  - name: rolled_back
+    instance: "ROLLED_BACK"
+invalid:
+  - name: made_up_state
+    instance: "MOSTLY_DONE"
+    reason: "final_status must be one of the enumerated legal end states in reference_vocabulary.final_status -- an invented state like MOSTLY_DONE cannot be replayed/audited against a known state machine"

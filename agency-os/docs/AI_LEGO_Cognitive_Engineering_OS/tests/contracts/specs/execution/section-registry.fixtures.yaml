@@ -1,0 +1,73 @@
+schema_id: "ai-lego://specs/execution/section-registry.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the required [document_id, document_version, document_sha256,
+  generated_at, sections] quintet, the deliberately single-value
+  `hash_scope` enum (kept as an explicit enum rather than an implicit
+  assumption so a future second convention can be added without silently
+  reinterpreting existing entries), the sections[] minItems:1 guard (an
+  empty registry cannot back any Normative Context Bundle's
+  loaded_sections[] resolution), and the sha256 hex-pattern case
+  sensitivity.
+
+valid:
+  - name: execution_contract_registry_with_parent_and_child_section
+    instance:
+      document_id: "ai-lego.execution-contract"
+      document_version: "1.0.0"
+      document_sha256: "2ad2a179944b917fe390119b6340ba9019344d7d15fcc9b77fdda3677937fc1e"
+      generated_at: "2026-08-29T12:00:00Z"
+      generator: "index.compile_section_registry"
+      sections:
+        - section_id: "3"
+          parent_section_id: null
+          heading: "3. AI 開機契約（AI Boot Contract）"
+          start_line: 141
+          end_line: 217
+          hash_scope: heading_to_next_heading
+          section_sha256: "b156c1050d8d9ab30798a8c10cdf0a34fb35cdb88829378a3c6c7beea6b38eab"
+        - section_id: "3.2"
+          parent_section_id: "3"
+          heading: "3.2 不要求每次把全部文件塞進 Context"
+          start_line: 187
+          end_line: 217
+          hash_scope: heading_to_next_heading
+          section_sha256: "2560a7db58fe572fa7e16ce7dae364f05dbcac9e6c843c85e9ba87ac503d529e"
+
+invalid:
+  - name: hash_scope_not_in_single_value_enum
+    instance:
+      document_id: "ai-lego.execution-contract"
+      document_version: "1.0.0"
+      document_sha256: "2ad2a179944b917fe390119b6340ba9019344d7d15fcc9b77fdda3677937fc1e"
+      generated_at: "2026-08-29T12:00:00Z"
+      sections:
+        - section_id: "3.2"
+          heading: "3.2 不要求每次把全部文件塞進 Context"
+          start_line: 187
+          end_line: 217
+          hash_scope: "line_range"
+          section_sha256: "2560a7db58fe572fa7e16ce7dae364f05dbcac9e6c843c85e9ba87ac503d529e"
+    reason: "hash_scope is a deliberately single-value enum [heading_to_next_heading] (a future second convention would need an explicit schema amendment, not free-text); 'line_range' is not that one legal value."
+  - name: sections_empty_array
+    instance:
+      document_id: "ai-lego.master-plan"
+      document_version: "1.0.0"
+      document_sha256: "8e5e67f607477babe60f2a4a354a211a30bd88cb1ece631dd51c5e11b23bac10"
+      generated_at: "2026-08-29T12:00:00Z"
+      sections: []
+    reason: "sections has minItems:1 -- an empty registry cannot back any Normative Context Bundle loaded_sections[] resolution against this document_id, defeating the whole file's purpose."
+  - name: document_sha256_uppercase_hex_rejected
+    instance:
+      document_id: "ai-lego.execution-contract"
+      document_version: "1.0.0"
+      document_sha256: "2AD2A179944B917FE390119B6340BA9019344D7D15FCC9B77FDDA3677937FC1E"
+      generated_at: "2026-08-29T12:00:00Z"
+      sections:
+        - section_id: "3.2"
+          heading: "3.2 不要求每次把全部文件塞進 Context"
+          start_line: 187
+          end_line: 217
+          hash_scope: heading_to_next_heading
+          section_sha256: "2560a7db58fe572fa7e16ce7dae364f05dbcac9e6c843c85e9ba87ac503d529e"
+    reason: "document_sha256 is a hard $ref into cas-path.schema.yaml#/definitions/sha256_hash, pattern ^[a-f0-9]{64}$ -- lowercase only. The uppercase-hex form is the same digest textually but fails the case-sensitive pattern."

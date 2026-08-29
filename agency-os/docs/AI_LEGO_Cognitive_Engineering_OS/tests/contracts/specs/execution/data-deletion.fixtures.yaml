@@ -1,0 +1,100 @@
+schema_id: "ai-lego://specs/execution/data-deletion.schema.yaml"
+target_ref: "#/deletion_request"
+description: >
+  Data Deletion Contract instance (EC §31, ADR-002). Exercises the
+  `allOf`/`contains`/`minContains`/`maxContains` coverage-guard block on
+  `steps[]` (must cover exactly the 10 EC §31 canonical step names, each
+  exactly once) -- the same "uniqueItems alone is insufficient" bug class
+  this file's own comment documents as previously found via a PoC (10
+  entries with the same `step` but 10 different `evidence_ref` values would
+  satisfy uniqueItems+minItems:10 while skipping Authorization/Approval/
+  etc.) -- plus `deletion_type` enum membership and `request_id` pattern.
+valid:
+  - name: crypto_shred_full_10_step_coverage
+    instance:
+      request_id: "DEL-2026-000001"
+      deletion_type: "personal_data_crypto_shred"
+      subject_id: "subj-abc123"
+      requested_at: "2026-08-29T10:00:00Z"
+      steps:
+        - { step: "Authorization", status: "passed" }
+        - { step: "Legal Hold Check", status: "passed" }
+        - { step: "Retention Check", status: "passed" }
+        - { step: "Dependency Check", status: "passed", evidence_ref: "dep-scan-001" }
+        - { step: "Dry Run", status: "passed" }
+        - { step: "Count / Scope Preview", status: "passed" }
+        - { step: "Approval", status: "passed", evidence_ref: "approver-jane" }
+        - { step: "Deletion", status: "passed", evidence_ref: "key-destruction-record-77" }
+        - { step: "Verification", status: "passed", evidence_ref: "decrypt-attempt-log-77" }
+        - { step: "Deletion Evidence", status: "passed", evidence_ref: "personal-data-redacted-event-77" }
+  - name: production_row_full_10_step_coverage
+    instance:
+      request_id: "DEL-2026-000002"
+      deletion_type: "production_row"
+      target_refs: ["orders:12345", "orders:12346"]
+      requested_at: "2026-08-29T11:00:00Z"
+      steps:
+        - { step: "Authorization", status: "passed" }
+        - { step: "Legal Hold Check", status: "passed" }
+        - { step: "Retention Check", status: "passed" }
+        - { step: "Dependency Check", status: "passed" }
+        - { step: "Dry Run", status: "passed" }
+        - { step: "Count / Scope Preview", status: "passed" }
+        - { step: "Approval", status: "passed" }
+        - { step: "Deletion", status: "passed" }
+        - { step: "Verification", status: "passed", evidence_ref: "post-delete-count-query-0" }
+        - { step: "Deletion Evidence", status: "passed" }
+invalid:
+  - name: coverage_guard_bypass_repeated_step
+    instance:
+      request_id: "DEL-2026-000003"
+      deletion_type: "production_row"
+      target_refs: ["orders:1"]
+      requested_at: "2026-08-29T12:00:00Z"
+      steps:
+        - { step: "Deletion", status: "passed", evidence_ref: "e1" }
+        - { step: "Deletion", status: "passed", evidence_ref: "e2" }
+        - { step: "Deletion", status: "passed", evidence_ref: "e3" }
+        - { step: "Deletion", status: "passed", evidence_ref: "e4" }
+        - { step: "Deletion", status: "passed", evidence_ref: "e5" }
+        - { step: "Deletion", status: "passed", evidence_ref: "e6" }
+        - { step: "Deletion", status: "passed", evidence_ref: "e7" }
+        - { step: "Deletion", status: "passed", evidence_ref: "e8" }
+        - { step: "Deletion", status: "passed", evidence_ref: "e9" }
+        - { step: "Deletion", status: "passed", evidence_ref: "e10" }
+    reason: "10 whole-object-unique entries (differing only by evidence_ref) all with step:'Deletion' satisfy uniqueItems+minItems:10+maxItems:10 but fail the coverage-guard: maxContains:1 for 'Deletion' (10 occurrences) and minContains:1 for each of the other 9 canonical steps (0 occurrences, including skipping Authorization and Verification entirely) -- the exact bypass this file's own comment documents as previously found via PoC"
+  - name: deletion_type_outside_enum
+    instance:
+      request_id: "DEL-2026-000004"
+      deletion_type: "hard_delete"
+      requested_at: "2026-08-29T13:00:00Z"
+      steps:
+        - { step: "Authorization", status: "passed" }
+        - { step: "Legal Hold Check", status: "passed" }
+        - { step: "Retention Check", status: "passed" }
+        - { step: "Dependency Check", status: "passed" }
+        - { step: "Dry Run", status: "passed" }
+        - { step: "Count / Scope Preview", status: "passed" }
+        - { step: "Approval", status: "passed" }
+        - { step: "Deletion", status: "passed" }
+        - { step: "Verification", status: "passed" }
+        - { step: "Deletion Evidence", status: "passed" }
+    reason: "deletion_type enum is exactly [personal_data_crypto_shred, production_row] (ADR-002 Consequences item 3) -- 'hard_delete' is not a recognized branch"
+  - name: request_id_fails_pattern
+    instance:
+      request_id: "DELETE-2026-000005"
+      deletion_type: "production_row"
+      target_refs: ["orders:1"]
+      requested_at: "2026-08-29T14:00:00Z"
+      steps:
+        - { step: "Authorization", status: "passed" }
+        - { step: "Legal Hold Check", status: "passed" }
+        - { step: "Retention Check", status: "passed" }
+        - { step: "Dependency Check", status: "passed" }
+        - { step: "Dry Run", status: "passed" }
+        - { step: "Count / Scope Preview", status: "passed" }
+        - { step: "Approval", status: "passed" }
+        - { step: "Deletion", status: "passed" }
+        - { step: "Verification", status: "passed" }
+        - { step: "Deletion Evidence", status: "passed" }
+    reason: "request_id must match pattern ^DEL- -- 'DELETE-2026-000005' does not start with the canonical 'DEL-' prefix"

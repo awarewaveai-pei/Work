@@ -1,0 +1,85 @@
+schema_id: "ai-lego://specs/execution/rollback.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the required [plan_id, task_id, targets_validated_before_execution,
+  strategy, reversibility] quintet, the id-prefix patterns, the
+  rollback_capable_layers[].layer 9-value enum (MP §69's target layers), and
+  the reversibility.post_launch if/then conditional -- when
+  post_launch.possible is const false, compensation_plan/recovery_plan/
+  explicit_authority all become required (EC §20 L917-923), a real
+  cross-field JSON Schema conditional, not just a documented `constraints`
+  prose rule.
+
+valid:
+  - name: pre_and_post_launch_both_reversible
+    instance:
+      plan_id: "RB-2026-000010"
+      task_id: "TASK-2026-000010"
+      targets_validated_before_execution: true
+      strategy:
+        code: "previous_signed_artifact"
+        config: "previous_version"
+      reversibility:
+        pre_launch:
+          possible: true
+        post_launch:
+          possible: true
+  - name: post_launch_irreversible_with_full_compensation_trio
+    instance:
+      plan_id: "RB-2026-000011"
+      task_id: "TASK-2026-000011"
+      targets_validated_before_execution: true
+      strategy:
+        database: "forward_compatible_disable"
+      reversibility:
+        pre_launch:
+          possible: true
+          note: "Zero-cost do-over pre-launch."
+        post_launch:
+          possible: false
+          note: "Explicitly NOT safe post-launch, per ADR-003 precedent."
+          compensation_plan: "Issue compensating transaction reversing the tenant merge."
+          recovery_plan: "Restore from last verified backup snapshot."
+          explicit_authority: "operator sign-off, 2026-08-29"
+      rollback_risk: "Low"
+
+invalid:
+  - name: post_launch_false_but_compensation_trio_omitted
+    instance:
+      plan_id: "RB-2026-000012"
+      task_id: "TASK-2026-000012"
+      targets_validated_before_execution: true
+      strategy: {}
+      reversibility:
+        pre_launch:
+          possible: true
+        post_launch:
+          possible: false
+    reason: "reversibility.post_launch has an if/then: when possible == false, [compensation_plan, recovery_plan, explicit_authority] all become required (EC §20 L917-923); all three are omitted here."
+  - name: rollback_capable_layer_not_in_nine_value_enum
+    instance:
+      plan_id: "RB-2026-000013"
+      task_id: "TASK-2026-000013"
+      targets_validated_before_execution: true
+      strategy: {}
+      reversibility:
+        pre_launch:
+          possible: true
+        post_launch:
+          possible: true
+      rollback_capable_layers:
+        - layer: "DATABASE"
+          capable: true
+    reason: "rollback_capable_layers[].layer must be one of MP §69's 9 canonical target layers (APPLICATION/WORKFLOW/PROMPT/MODEL/SCHEMA/POLICY/KNOWLEDGE_SNAPSHOT/ARTIFACT/CONFIGURATION); 'DATABASE' is a plausible-sounding but non-member value."
+  - name: plan_id_missing_rb_prefix
+    instance:
+      plan_id: "ROLLBACK-2026-000014"
+      task_id: "TASK-2026-000014"
+      targets_validated_before_execution: true
+      strategy: {}
+      reversibility:
+        pre_launch:
+          possible: true
+        post_launch:
+          possible: true
+    reason: "plan_id must match pattern ^RB-; 'ROLLBACK-2026-000014' does not start with the required RB- prefix."

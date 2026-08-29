@@ -1,0 +1,82 @@
+schema_id: ai-lego://specs/execution/handoff.schema.yaml
+target_ref: ''
+category: handoff
+description: 'A handoff record -- the artifact produced when one session/agent hands a task to the next (per this repo''s
+  own /tomo command pattern, generalized to the machine-readable execution contract level).
+
+  '
+valid:
+- name: completed_handoff
+  instance:
+    handoff_id: HANDOFF-2026-08-29-001
+    task_id: TASK-2026-08-29-001
+    generated_at: '2026-08-29T12:00:00Z'
+    checklist:
+    - item: task
+      present: true
+    - item: objective
+      present: true
+    - item: current_state
+      present: true
+    - item: problem_root_cause
+      present: true
+    - item: applicable_specifications
+      present: true
+    - item: methods_used
+      present: true
+    - item: risk_tier
+      present: true
+    - item: options_considered
+      present: true
+    - item: selected_approach
+      present: true
+    - item: rejected_alternatives
+      present: true
+    - item: files_changed
+      present: true
+    - item: schemas_changed
+      present: true
+    - item: api_changes
+      present: true
+    - item: data_impact
+      present: true
+    - item: security_privacy_impact
+      present: true
+    - item: jurisdiction_impact
+      present: true
+    - item: compatibility
+      present: true
+    - item: tests
+      present: true
+    - item: expected_results
+      present: true
+    - item: actual_results
+      present: true
+    - item: gate_results
+      present: true
+    - item: known_limitations
+      present: true
+    - item: open_risks
+      present: true
+    - item: rollback
+      present: true
+    - item: observability
+      present: true
+    - item: deployment_release
+      present: true
+    - item: post_verification
+      present: true
+    - item: adr
+      present: true
+    - item: evidence
+      present: true
+    - item: final_status
+      present: true
+invalid:
+- name: empty_checklist_missing_generated_at
+  instance:
+    handoff_id: HANDOFF-2026-08-29-001
+    task_id: TASK-2026-08-29-001
+    checklist: []
+  reason: generated_at is required (handoff.schema.yaml required list) -- a handoff record with no timestamp cannot be ordered
+    against other handoffs for the same task during replay

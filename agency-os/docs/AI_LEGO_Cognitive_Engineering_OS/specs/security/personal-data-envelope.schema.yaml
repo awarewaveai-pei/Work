@@ -108,13 +108,20 @@ decided_by: >
 # Schema body
 # ---------------------------------------------------------------------------
 
+# 2026-08-29 (Wave 8 golden-test runner bughunt): this schema body used to
+# repeat `title:`/`description:` here, duplicating the file's own root-level
+# `title`/`description` keys above (a Draft 2020-12 schema's root object MAY
+# carry `title`/`description` as pure annotations, but a plain YAML loader
+# treats two same-named keys in one mapping as a silent last-write-wins
+# collision -- PyYAML kept THESE values and silently discarded the richer
+# provenance title/description above on every load, in every tool that has
+# read this file this session, until this test suite's UniqueKeyLoader
+# caught it). The one piece of information the body `description` carried
+# that the file header does not -- that encryption is scoped to this one
+# field only, leaving the enclosing event's other fields and its existence/
+# ordering/event_id untouched -- is preserved as this comment instead of a
+# second `description:` key, so the collision cannot recur.
 type: object
-title: PersonalDataEnvelope
-description: >
-  The value of any Event Ledger field classified Confidential or
-  Restricted. Replaces the plaintext value that field would otherwise
-  hold; the enclosing event's other (non-personal-data) fields and the
-  event's own existence, ordering, and `event_id` are entirely unaffected.
 required: [cipher_alg, kek_ref, dek_key_id, dek_wrapped, iv, ciphertext, classification_tag]
 properties:
 

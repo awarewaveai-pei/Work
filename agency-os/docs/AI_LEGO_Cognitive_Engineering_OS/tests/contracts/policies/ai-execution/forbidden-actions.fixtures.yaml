@@ -1,0 +1,200 @@
+schema_id: "ai-lego://policies/ai-execution/forbidden-actions.yaml"
+target_ref: ""
+description: >
+  forbidden-actions.yaml's root $refs `#/forbidden_actions`: a CLOSED
+  5-item array (minItems: 5, maxItems: 5) of `forbidden_action_rule`
+  objects, with `allOf`/`contains`/`minContains: 1`/`maxContains: 1` guards
+  requiring exactly one row per Master Plan §65 verb (DELETE, PUBLISH,
+  DEPLOY, SEND, MODIFY_LOCKED_FACT). Unlike authority.yaml's
+  forbidden_actions_ref guards, `agent_action` here is already a required
+  field of `forbidden_action_rule` (required: [agent_action, condition,
+  action, mediated_path, mother_doc_text]), so no item can omit it -- the
+  MAJ-2-style vacuous-omission bypass is not structurally possible for this
+  file's own contains clauses even though they likewise lack an explicit
+  `required:` inside the contains schema. This fixture instead exercises the
+  exact-one-per-verb (`maxContains: 1`) duplication case, the `const: DENY`
+  verdict, and the `agent_action_id` enum.
+
+valid:
+  - name: real_5_row_transcription
+    instance:
+      - agent_action: DELETE
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: "specs/execution/data-deletion.schema.yaml (soft reference)."
+        mother_doc_text: "Delete"
+      - agent_action: PUBLISH
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: null
+        mother_doc_text: "Publish"
+      - agent_action: DEPLOY
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: "specs/execution/authority.schema.yaml#/levels/A4 (soft cross-reference)."
+        mother_doc_text: "Deploy"
+      - agent_action: SEND
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: "specs/execution/authority.schema.yaml#/levels/A4 (soft cross-reference)."
+        mother_doc_text: "Send"
+      - agent_action: MODIFY_LOCKED_FACT
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: "specs/governance/epistemic-label.schema.yaml#/definitions/locked (hard $ref-grade cross-reference)."
+        mother_doc_text: "Modify Locked Fact"
+
+invalid:
+  - name: missing_modify_locked_fact_row
+    instance:
+      - agent_action: DELETE
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: null
+        mother_doc_text: "Delete"
+      - agent_action: PUBLISH
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: null
+        mother_doc_text: "Publish"
+      - agent_action: DEPLOY
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: null
+        mother_doc_text: "Deploy"
+      - agent_action: SEND
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: null
+        mother_doc_text: "Send"
+    reason: >
+      Only 4 entries -- violates `minItems: 5`/`maxItems: 5` on
+      `forbidden_actions`, AND the MODIFY_LOCKED_FACT `contains`/
+      `minContains: 1` guard finds zero matches. Master Plan §65's list is a
+      closed, exhaustive 5-verb set; dropping one verb is not a smaller
+      valid policy, it is an incomplete one.
+  - name: duplicate_delete_row_bypasses_publish_coverage
+    instance:
+      - agent_action: DELETE
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: null
+        mother_doc_text: "Delete"
+      - agent_action: DELETE
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: null
+        mother_doc_text: "Delete (accidental duplicate)"
+      - agent_action: DEPLOY
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: null
+        mother_doc_text: "Deploy"
+      - agent_action: SEND
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: null
+        mother_doc_text: "Send"
+      - agent_action: MODIFY_LOCKED_FACT
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: null
+        mother_doc_text: "Modify Locked Fact"
+    reason: >
+      Exactly 5 items (satisfies minItems/maxItems), but DELETE appears
+      twice and PUBLISH not at all -- violates `maxContains: 1` for the
+      DELETE guard and `minContains: 1` for the PUBLISH guard
+      simultaneously. Proves the exact-one-per-verb full-coverage treatment
+      (this file's deliberately stricter choice vs. authority.yaml's
+      open-ended `minContains`-only guards) actually rejects a
+      duplicate-verb / missing-verb array, not just an under-sized one.
+  - name: action_verdict_not_deny
+    instance:
+      - agent_action: DELETE
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: REQUIRE_HUMAN_REVIEW
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: null
+        mother_doc_text: "Delete"
+      - agent_action: PUBLISH
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: null
+        mother_doc_text: "Publish"
+      - agent_action: DEPLOY
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: null
+        mother_doc_text: "Deploy"
+      - agent_action: SEND
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: null
+        mother_doc_text: "Send"
+      - agent_action: MODIFY_LOCKED_FACT
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: null
+        mother_doc_text: "Modify Locked Fact"
+    reason: >
+      `forbidden_action_rule.properties.action` is `const: DENY` -- Master
+      Plan §65 states the direct-execution prohibition uniformly, with no
+      row anything other than DENY. The DELETE row sets
+      `action: REQUIRE_HUMAN_REVIEW`, violating that const while every
+      coverage guard (5 distinct verbs, one each) is otherwise satisfied.
+  - name: agent_action_enum_violation
+    instance:
+      - agent_action: DELETE_PERMANENTLY
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: null
+        mother_doc_text: "Delete"
+      - agent_action: PUBLISH
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: null
+        mother_doc_text: "Publish"
+      - agent_action: DEPLOY
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: null
+        mother_doc_text: "Deploy"
+      - agent_action: SEND
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: null
+        mother_doc_text: "Send"
+      - agent_action: MODIFY_LOCKED_FACT
+        condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        action: DENY
+        mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        mechanism_ref: null
+        mother_doc_text: "Modify Locked Fact"
+    reason: >
+      `agent_action: DELETE_PERMANENTLY` is not one of
+      `definitions/agent_action_id`'s closed
+      `enum: [DELETE, PUBLISH, DEPLOY, SEND, MODIFY_LOCKED_FACT]` -- also
+      fails the DELETE `contains`/`minContains: 1` guard, since no row
+      carries the literal value `DELETE`.

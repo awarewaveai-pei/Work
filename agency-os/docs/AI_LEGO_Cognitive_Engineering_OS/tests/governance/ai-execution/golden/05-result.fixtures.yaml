@@ -1,0 +1,28 @@
+# EC section 141 golden scenario, step 5 of 6 -- see golden/README.md
+schema_id: "ai-lego://specs/execution/result.schema.yaml"
+target_ref: ""
+category: golden
+description: >
+  The execution result for TASK-2026-08-29-GOLDEN-001: state transitions
+  (via `status`, a real $ref chain into status-codes.schema.yaml's Final
+  Status vocabulary) and final status together.
+valid:
+  - name: pass_with_gate_and_evidence
+    instance:
+      execution_id: "EX-2026-08-29-GOLDEN-001"
+      task_id: "TASK-2026-08-29-GOLDEN-001"
+      status: "PASS"
+      rationale: "Backup/Restore Validation gate PASSed; additive column deployed; no user-facing impact observed"
+      evaluated_at: "2026-08-29T10:30:00Z"
+      provenance: {epistemic_type: "CALCULATED_RESULT", authorship_state: "HUMAN_APPROVED"}
+      gates: [{gate_id: "backup-restore-validation", status: "PASS"}]
+      rollback_ref: "RB-2026-08-29-GOLDEN-001"
+invalid:
+  - name: status_not_in_final_status_enum
+    instance:
+      execution_id: "EX-2026-08-29-GOLDEN-001"
+      task_id: "TASK-2026-08-29-GOLDEN-001"
+      status: "SUCCESS"
+      evaluated_at: "2026-08-29T10:30:00Z"
+      provenance: {epistemic_type: "CALCULATED_RESULT", authorship_state: "HUMAN_APPROVED"}
+    reason: "status $ref-chains into status-codes.schema.yaml's final_status enum [PASS, PASS_WITH_APPROVED_RISK, BLOCKED, FAILED, NEEDS_HUMAN_REVIEW, ROLLED_BACK, PARTIAL_SUCCESS] -- the common word 'SUCCESS' is not a member, exercising real cross-file $ref resolution through result.schema.yaml into status-codes.schema.yaml, not just a local enum"

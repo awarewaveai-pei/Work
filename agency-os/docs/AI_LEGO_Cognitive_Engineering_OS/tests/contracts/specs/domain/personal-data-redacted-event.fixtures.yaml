@@ -1,0 +1,48 @@
+schema_id: "ai-lego://specs/domain/personal-data-redacted-event.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the fixed event_type const discriminator, the required 5-field
+  set, and redacted_fields[]'s minItems:1 (a redaction event naming zero
+  fields is meaningless per ADR-002 Option C's own role boundary).
+valid:
+  - name: crypto_shred_two_fields_with_provenance
+    instance:
+      event_type: PersonalDataRedacted
+      subject_id: "subject-4f8a2b1c"
+      redacted_fields: ["ClaimCreated.claimant_ssn", "ClaimCreated.claimant_dob"]
+      redacted_at: "2026-08-29T00:00:00Z"
+      authorization_ref: "DEL-3fa85f64-authz"
+      provenance:
+        epistemic_type: SOURCE_FACT
+        authorship_state: AI_GENERATED
+  - name: minimal_no_provenance
+    instance:
+      event_type: PersonalDataRedacted
+      subject_id: "subject-aaaa1111"
+      redacted_fields: ["ClaimCreated.claimant_ssn"]
+      redacted_at: "2026-01-01T00:00:00Z"
+      authorization_ref: "DEL-aaaa1111-authz"
+invalid:
+  - name: wrong_event_type_const
+    instance:
+      event_type: DataDeleted
+      subject_id: "subject-4f8a2b1c"
+      redacted_fields: ["ClaimCreated.claimant_ssn"]
+      redacted_at: "2026-08-29T00:00:00Z"
+      authorization_ref: "DEL-3fa85f64-authz"
+    reason: "event_type is a fixed const: PersonalDataRedacted; any other literal value fails."
+  - name: empty_redacted_fields_array
+    instance:
+      event_type: PersonalDataRedacted
+      subject_id: "subject-4f8a2b1c"
+      redacted_fields: []
+      redacted_at: "2026-08-29T00:00:00Z"
+      authorization_ref: "DEL-3fa85f64-authz"
+    reason: "redacted_fields has minItems:1 -- a redaction event that redacts zero fields is not a valid instance of this event type."
+  - name: missing_subject_id
+    instance:
+      event_type: PersonalDataRedacted
+      redacted_fields: ["ClaimCreated.claimant_ssn"]
+      redacted_at: "2026-08-29T00:00:00Z"
+      authorization_ref: "DEL-3fa85f64-authz"
+    reason: "subject_id is required (it is the correlation key the read-path REDACTED overlay depends on) -- omitting it fails required."

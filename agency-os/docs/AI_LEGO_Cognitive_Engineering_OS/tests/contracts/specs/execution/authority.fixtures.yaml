@@ -1,0 +1,19 @@
+schema_id: "ai-lego://specs/execution/authority.schema.yaml"
+target_ref: ""
+description: >
+  authority.schema.yaml carries a root-level `$ref: "#/authority_level"`, so
+  validating at the document root is equivalent to validating against the
+  bare A0-A4 enum (`{type: string, enum: [A0, A1, A2, A3, A4]}`, EC §9
+  L478-529). Exercises the enum boundary and the type constraint.
+valid:
+  - name: level_a0_observe
+    instance: "A0"
+  - name: level_a4_critical
+    instance: "A4"
+invalid:
+  - name: level_outside_enum
+    instance: "A5"
+    reason: "authority_level enum is exactly [A0, A1, A2, A3, A4] (EC §9 L478-529) -- A5 does not exist in the A0-A4 ladder"
+  - name: wrong_type_integer
+    instance: 2
+    reason: "authority_level must be type: string -- a bare integer (even one that superficially resembles a level number) fails the type constraint"

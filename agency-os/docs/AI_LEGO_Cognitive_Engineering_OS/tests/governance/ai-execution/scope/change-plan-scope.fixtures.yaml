@@ -1,0 +1,62 @@
+# EC section 94 category: scope
+schema_id: "ai-lego://specs/execution/change-plan.schema.yaml"
+target_ref: ""
+category: scope
+description: >
+  A change plan's scope_contract (EC section 17, verbatim 6 categories)
+  records what a change is (and, by implication, is not) allowed to touch
+  -- the mechanical anchor for detecting scope creep mid-task.
+valid:
+  - name: minimal_scoped_change
+    instance:
+      task_id: "TASK-2026-08-29-001"
+      risk_tier: "R1"
+      rollback_plan_ref: "RB-2026-08-29-001"
+      scope_contract:
+        in_scope: ["tests/run_golden_tests.py", "tests/contracts/**"]
+        out_of_scope: ["specs/", "policies/"]
+        non_goals: ["full behavioral/integration test runtime"]
+        invariants: ["no existing schema's normative content changes as a side effect of adding tests"]
+        assumptions: ["jsonschema + referencing libraries are available in the execution environment"]
+        unknowns: ["whether a future runtime engine will reuse this fixture format directly"]
+      objective: "Add golden tests for Wave 1-7 schemas"
+      root_cause: "Wave 8 had no test suite yet"
+      selected_option: "fixture-driven jsonschema conformance suite"
+      alternatives_considered:
+        - {name: "fixture-driven jsonschema conformance suite (selected)", comparison: {complexity: "low", maintainability: "high"}}
+      files_to_change: ["tests/run_golden_tests.py"]
+      release_strategy: "doc-only, no deploy"
+invalid:
+  - name: missing_rollback_plan_ref
+    instance:
+      task_id: "TASK-2026-08-29-001"
+      risk_tier: "R1"
+      scope_contract:
+        in_scope: ["tests/"]
+        out_of_scope: []
+        non_goals: []
+        invariants: []
+        assumptions: []
+        unknowns: []
+      objective: "Add golden tests"
+      root_cause: "Wave 8 had no test suite yet"
+      selected_option: "fixture-driven suite"
+      alternatives_considered:
+        - {name: "only option considered", comparison: {}}
+      files_to_change: []
+      release_strategy: "doc-only"
+    reason: "rollback_plan_ref is required (change-plan.schema.yaml required list) and must match pattern ^RB- -- a change plan with no linked rollback plan cannot satisfy risk-tier.schema.yaml's R1+ required_actions.Rollback"
+  - name: incomplete_scope_contract
+    instance:
+      task_id: "TASK-2026-08-29-001"
+      risk_tier: "R1"
+      rollback_plan_ref: "RB-2026-08-29-001"
+      scope_contract: {in_scope: ["tests/"]}
+      objective: "Add golden tests"
+      root_cause: "Wave 8 had no test suite yet"
+      selected_option: "fixture-driven suite"
+      alternatives_considered:
+        - {name: "only option considered", comparison: {}}
+      files_to_change: []
+      release_strategy: "doc-only"
+    reason: "scope_contract requires all 6 EC section 17 categories (in_scope, out_of_scope, non_goals, invariants, assumptions, unknowns) -- declaring only in_scope silently omits the out_of_scope/non_goals boundary that actually prevents scope creep"

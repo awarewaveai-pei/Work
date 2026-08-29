@@ -1,0 +1,86 @@
+schema_id: "ai-lego://specs/execution/task.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the 12-field required task_context shape (EC L362-374), the
+  three verbatim enums (environment/data_impact/reversibility), and the
+  hard $ref chain on risk_tier into execution/risk-tier.schema.yaml's
+  closed R0-R4 enum.
+
+valid:
+  - name: full_task_context_no_provenance
+    instance:
+      task_id: "TASK-2026-000200"
+      objective: "Backfill missing golden-test fixtures for the execution/ Wave 8 batch."
+      requester: "operator"
+      environment: "dev"
+      domains: ["testing", "execution"]
+      affected_modules: ["tests/contracts/specs/execution/"]
+      data_impact: "none"
+      external_side_effects: []
+      jurisdiction_context: "US"
+      reversibility: "high"
+      user_impact: "None; test fixtures only, no runtime behavior change."
+      risk_tier: "R0"
+  - name: full_task_context_with_optional_provenance
+    instance:
+      task_id: "TASK-2026-000201"
+      objective: "Migrate a production DB column with a forward-compatible rollout."
+      requester: "db-expert"
+      environment: "production"
+      domains: ["database"]
+      affected_modules: ["lobster-factory/infra/hetzner-phase1-core"]
+      data_impact: "migration"
+      external_side_effects: ["customer-facing-downtime-window"]
+      jurisdiction_context: "EU"
+      reversibility: "medium"
+      user_impact: "Brief read-only window during migration."
+      risk_tier: "R3"
+      provenance:
+        epistemic_type: "DECISION"
+        authorship_state: "HUMAN_APPROVED"
+
+invalid:
+  - name: missing_required_user_impact
+    instance:
+      task_id: "TASK-2026-000202"
+      objective: "Task missing one of the 12 required fields."
+      requester: "operator"
+      environment: "local"
+      domains: []
+      affected_modules: []
+      data_impact: "none"
+      external_side_effects: []
+      jurisdiction_context: "US"
+      reversibility: "high"
+      risk_tier: "R0"
+    reason: "task.schema.yaml's required list has 12 entries including user_impact (EC L373); it is omitted here."
+  - name: environment_not_in_four_value_enum
+    instance:
+      task_id: "TASK-2026-000203"
+      objective: "Task with an illegal environment value."
+      requester: "operator"
+      environment: "qa"
+      domains: []
+      affected_modules: []
+      data_impact: "none"
+      external_side_effects: []
+      jurisdiction_context: "US"
+      reversibility: "high"
+      user_impact: "None."
+      risk_tier: "R0"
+    reason: "environment must be one of the verbatim EC L366 enum [local, dev, staging, production]; 'qa' is a plausible but non-member value."
+  - name: risk_tier_out_of_enum_via_ref_chain
+    instance:
+      task_id: "TASK-2026-000204"
+      objective: "Task with an illegal risk_tier value."
+      requester: "operator"
+      environment: "production"
+      domains: []
+      affected_modules: []
+      data_impact: "destructive"
+      external_side_effects: []
+      jurisdiction_context: "US"
+      reversibility: "irreversible"
+      user_impact: "Significant."
+      risk_tier: "R9"
+    reason: "risk_tier is a hard $ref into execution/risk-tier.schema.yaml#/risk_tier, a closed 5-value enum [R0, R1, R2, R3, R4]; 'R9' is out of range."

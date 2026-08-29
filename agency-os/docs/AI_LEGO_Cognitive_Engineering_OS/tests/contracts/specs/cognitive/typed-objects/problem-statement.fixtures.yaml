@@ -1,0 +1,66 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/problem-statement.schema.yaml"
+target_ref: ""
+description: >
+  Exercises ProblemStatement's required fields, the `status` 5-value enum
+  (only 'validated' is literally mandated by Atlas §9's Fishbone
+  precondition, the other 4 are Phase 3 design), the `content` object's
+  required current_state/expected_state/gap trio (Atlas §12.2's suggested
+  format), and the `id` ^PROB- pattern.
+
+valid:
+  - name: validated_problem_statement_ready_for_fishbone
+    instance:
+      id: "PROB-2026-08-29-001"
+      version: "1.0.0"
+      status: validated
+      content:
+        current_state: "Order cancellation rate rose to 8% this month."
+        expected_state: "Order cancellation rate holds at the 2% baseline."
+        gap: "A 6-percentage-point anomalous rise starting three weeks ago."
+        affected_stakeholders: ["Customer Success", "Fulfillment"]
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED }
+      origin_method: "problem_framing.problem_statement"
+  - name: minimal_draft_problem_statement
+    instance:
+      id: "PROB-2026-08-29-002"
+      version: "1.0.0"
+      status: draft
+      content:
+        current_state: "x"
+        expected_state: "y"
+        gap: "z"
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED }
+
+invalid:
+  - name: status_not_in_5_value_enum
+    instance:
+      id: "PROB-2026-08-29-003"
+      version: "1.0.0"
+      status: approved
+      content:
+        current_state: "x"
+        expected_state: "y"
+        gap: "z"
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED }
+    reason: "status must be one of [draft, under_review, validated, rejected, superseded]; 'approved' is not a legal value (validated is the one literal value Atlas §9's Fishbone precondition names)."
+  - name: content_missing_required_gap
+    instance:
+      id: "PROB-2026-08-29-004"
+      version: "1.0.0"
+      status: draft
+      content:
+        current_state: "x"
+        expected_state: "y"
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED }
+    reason: "content requires [current_state, expected_state, gap] (Atlas §12.2's suggested format); gap is entirely absent here."
+  - name: id_missing_PROB_prefix
+    instance:
+      id: "2026-08-29-005"
+      version: "1.0.0"
+      status: draft
+      content:
+        current_state: "x"
+        expected_state: "y"
+        gap: "z"
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED }
+    reason: "id must match pattern ^PROB- (the id-prefix convention shared with Idea/Decision/Method Execution objects); '2026-08-29-005' has no PROB- prefix."

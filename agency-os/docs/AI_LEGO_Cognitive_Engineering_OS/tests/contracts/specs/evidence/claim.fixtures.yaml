@@ -1,0 +1,48 @@
+schema_id: "ai-lego://specs/evidence/claim.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the C-* id pattern, the real $ref to evidence.schema.yaml for
+  supporting_evidence/contradicting_evidence, and provenance's full
+  (unrestricted, since CLAIM is not itself an epistemic_type enum member)
+  11-value epistemic_type enum still being enforced despite being
+  "unrestricted".
+valid:
+  - name: atlas_11_20_worked_example
+    instance:
+      claim_id: "C-01"
+      statement: "外部 AI 教育平台在三個地區的採用率均高於預期"
+      supporting_evidence:
+        - evidence_id: "E-1"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL }
+        - evidence_id: "E-2"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: AI_GENERATED }
+      contradicting_evidence:
+        - evidence_id: "E-8"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL }
+      quality: "High"
+      coverage: "3 regions"
+      confidence: 0.78
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL }
+  - name: minimal_required_only
+    instance:
+      claim_id: "C-42"
+      statement: "A minimal claim statement"
+      provenance: { epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED }
+invalid:
+  - name: claim_id_pattern_violation
+    instance:
+      claim_id: "CLAIM-01"
+      statement: "Some statement"
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL }
+    reason: "claim_id pattern is ^C-[0-9]+$; 'CLAIM-01' does not match."
+  - name: provenance_epistemic_type_not_in_11_value_enum
+    instance:
+      claim_id: "C-02"
+      statement: "Some statement"
+      provenance: { epistemic_type: GUESS, authorship_state: HUMAN_ORIGINAL }
+    reason: "provenance.epistemic_type still must be one of governance/epistemic-label.schema.yaml's 11 enum values even though no single value is const-fixed for Claim -- 'GUESS' is not a member of that enum."
+  - name: missing_statement
+    instance:
+      claim_id: "C-03"
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL }
+    reason: "statement is required [claim_id, statement, provenance] -- a claim record with an id but no assertion text is not a claim."

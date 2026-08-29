@@ -1,0 +1,20 @@
+# EC section 94 category: gate-injection
+schema_id: "ai-lego://specs/execution/gate.schema.yaml"
+target_ref: "#/gate_result"
+category: gate-injection
+description: >
+  A mandatory gate's execution outcome (EC section 69), the record produced
+  when risk-tier.schema.yaml's mandatory_gate_injection_trigger fires
+  (risk_tier IN [R3, R4]).
+valid:
+  - name: pass_with_evidence
+    instance: {gate_id: "security", status: "PASS", evidence: ["threat-review-2026-08-29.md"], validator: "critic-subagent-run-42", timestamp: "2026-08-29T10:05:00Z"}
+  - name: not_applicable_with_rationale
+    instance: {gate_id: "jurisdiction", status: "NOT_APPLICABLE", rationale: "task has no cross-border data movement"}
+invalid:
+  - name: not_applicable_without_rationale
+    instance: {gate_id: "jurisdiction", status: "NOT_APPLICABLE"}
+    reason: "EC section 69 L2293: NOT_APPLICABLE requires a rationale -- gate.schema.yaml's own constraints list enforces this"
+  - name: bad_status_enum
+    instance: {gate_id: "security", status: "SKIPPED"}
+    reason: "status enum is [PASS, FAIL, BLOCKED, NOT_APPLICABLE] -- SKIPPED silently bypasses the gate under a status the schema never sanctions"

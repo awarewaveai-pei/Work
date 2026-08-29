@@ -1,0 +1,17 @@
+# EC section 141 golden scenario, step 2 of 6 -- see golden/README.md
+schema_id: "ai-lego://specs/execution/authority.schema.yaml"
+target_ref: ""
+category: golden
+description: >
+  The authority level bound to TASK-2026-08-29-GOLDEN-001. An R3-tier
+  production DB migration requires explicit Human Approval per
+  risk-tier.schema.yaml tiers.R3.required_actions -- A3 (Reversible Deploy)
+  is the matching authority level, not the higher A4 (Irreversible) tier
+  this task's own `reversibility: high` does not warrant.
+valid:
+  - name: a3_reversible_deploy
+    instance: "A3"
+invalid:
+  - name: out_of_range_level
+    instance: "A9"
+    reason: "authority_level enum is [A0,A1,A2,A3,A4] -- A9 is not a real level; included as the golden scenario's authority-boundary negative case"

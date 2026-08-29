@@ -1,0 +1,26 @@
+schema_id: "ai-lego://specs/execution/status-codes.schema.yaml"
+target_ref: "#/reference_vocabulary/legal_side_states/schema"
+description: >
+  Exercises EC §10's 7-value legal_side_states enum via the `schema` sibling
+  node added alongside the human-citation `values` array (2026-08-29 critic
+  CRITICAL fix -- `values` is a bare YAML array, not $ref-able). The two
+  invalid cases both target the boundary between this enum and its
+  neighbors: 'PASS' is a real value but only in the sibling final_status
+  enum, never a legal side-state; 'NEEDS_REVIEW' is the undeclared EC §61
+  shorthand this file's duplicate_resolutions.needs_review_undeclared
+  explicitly resolves as an ALIAS for NEEDS_HUMAN_REVIEW, not a member of
+  either enum in its own right.
+
+valid:
+  - name: blocked
+    instance: "BLOCKED"
+  - name: compensated
+    instance: "COMPENSATED"
+
+invalid:
+  - name: pass_is_final_status_only_not_a_side_state
+    instance: "PASS"
+    reason: "'PASS' is a member of reference_vocabulary.final_status (EC §70), not of legal_side_states (EC §10) -- a task's terminal success is a Final Status concept, not one of the 7 in-flight/terminal side-states this enum enumerates."
+  - name: needs_review_undeclared_shorthand
+    instance: "NEEDS_REVIEW"
+    reason: "duplicate_resolutions.needs_review_undeclared (DOC-execution_contract-3) resolves EC §61's 'NEEDS_REVIEW' as an informal shorthand for the canonical NEEDS_HUMAN_REVIEW -- the shorthand string itself was never declared in EC §10's list and is not a member of this enum."

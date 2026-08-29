@@ -112,6 +112,29 @@ provenance_record:
       $ref: "#/definitions/authorship_state"
     locked:
       $ref: "#/definitions/locked"
+  # 2026-08-29 (Wave 8 golden-test bughunt): `locked`'s own `constraints:`
+  # list (see #/definitions/locked above) states "LOCKED_FACT legal only
+  # when epistemic_type == SOURCE_FACT" / "LOCKED_DECISION legal only when
+  # epistemic_type == DECISION" as PROSE ONLY -- confirmed empirically
+  # (jsonschema Draft202012Validator, 0 errors) that an instance with
+  # locked: LOCKED_FACT and epistemic_type: AI_INFERENCE validated
+  # successfully before this fix. Scoped at provenance_record's own root
+  # (not nested inside the `locked` property's definition) because the
+  # condition spans two SIBLING properties -- the same mis-scoping this
+  # session's change-plan.schema.yaml fix corrected for
+  # alternatives_considered/risk_tier (an `if` nested inside one sibling
+  # property can only see that property's own value, never its siblings).
+  allOf:
+    - if:
+        properties: { locked: { const: LOCKED_FACT } }
+        required: [locked]
+      then:
+        properties: { epistemic_type: { const: SOURCE_FACT } }
+    - if:
+        properties: { locked: { const: LOCKED_DECISION } }
+        required: [locked]
+      then:
+        properties: { epistemic_type: { const: DECISION } }
   examples:
     - description: "An AI-computed number still awaiting human sign-off"
       value: { epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null }

@@ -1,0 +1,34 @@
+schema_id: "ai-lego://specs/execution/blast-radius-chain.schema.yaml"
+target_ref: "#/chain_instance"
+description: >
+  Per-object blast-radius chain instance (Atlas §21 7-node chain, ADR-003).
+  Exercises `node_type` enum membership, `tenant_id`'s UUID `pattern`, and
+  the `required: [tenant_id, node_type]` constraint.
+valid:
+  - name: tenant_root_node
+    instance:
+      tenant_id: "123e4567-e89b-12d3-a456-426614174000"
+      node_type: "TENANT"
+      node_id: "tenant-aware-wave"
+      parent_node_id: null
+  - name: workflow_node_with_parent
+    instance:
+      tenant_id: "123e4567-e89b-12d3-a456-426614174000"
+      node_type: "WORKFLOW"
+      node_id: "wf-001"
+      parent_node_id: "proj-001"
+invalid:
+  - name: node_type_outside_enum
+    instance:
+      tenant_id: "123e4567-e89b-12d3-a456-426614174000"
+      node_type: "BRANCHX"
+    reason: "node_type must be one of TENANT/WORKSPACE/PROJECT/WORKFLOW/BRANCH/EXECUTION/CAPABILITY (Atlas §21 7-node chain) -- BRANCHX is not a canonical node type"
+  - name: tenant_id_fails_uuid_pattern
+    instance:
+      tenant_id: "not-a-uuid"
+      node_type: "TENANT"
+    reason: "tenant_id must match the UUID pattern ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ (soft cross-reference to domain/tenant.schema.yaml's uuid-typed tenant_id, ADR-003 sub-decision (a))"
+  - name: missing_required_node_type
+    instance:
+      tenant_id: "123e4567-e89b-12d3-a456-426614174000"
+    reason: "node_type is a required field (required: [tenant_id, node_type]) -- omitting it violates the required constraint"

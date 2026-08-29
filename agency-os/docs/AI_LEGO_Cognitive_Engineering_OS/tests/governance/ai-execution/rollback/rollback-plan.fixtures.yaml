@@ -1,0 +1,25 @@
+# EC section 94 category: rollback
+schema_id: "ai-lego://specs/execution/rollback.schema.yaml"
+target_ref: ""
+category: rollback
+description: >
+  A rollback plan record for a task -- required before an R3/R4-tier change
+  may proceed (risk-tier.schema.yaml tiers.R3.required_actions includes
+  "Rollback or Compensating Plan" at R4, "Rollback" at R2+).
+valid:
+  - name: git_revert_sufficient
+    instance:
+      plan_id: "RB-2026-08-29-001"
+      task_id: "TASK-2026-08-29-001"
+      targets_validated_before_execution: true
+      strategy: {kind: "git_revert"}
+      reversibility: {pre_launch: {possible: true}, post_launch: {possible: true}}
+      git_revert_sufficient: true
+invalid:
+  - name: missing_plan_id
+    instance:
+      task_id: "TASK-2026-08-29-001"
+      targets_validated_before_execution: true
+      strategy: {kind: "git_revert"}
+      reversibility: {pre_launch: {possible: true}, post_launch: {possible: true}}
+    reason: "plan_id is required (rollback.schema.yaml required list) and must match pattern ^RB- -- a rollback record with no plan_id cannot be referenced by change-plan.schema.yaml's rollback_plan_ref"

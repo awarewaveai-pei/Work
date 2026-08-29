@@ -1,0 +1,22 @@
+# EC section 94 category: jurisdiction
+schema_id: "ai-lego://specs/jurisdiction/context.schema.yaml"
+target_ref: ""
+category: jurisdiction
+description: >
+  Jurisdiction Context record -- the cross-border/legal-exposure facts a
+  task must declare so the Conflict-of-Laws and availability mechanisms can
+  fire correctly.
+valid:
+  - name: single_jurisdiction_no_minors
+    instance:
+      children_involved: false
+      government_customer: false
+      operator_legal_entity: "AwareWave Inc."
+      governing_law: "Delaware, USA"
+      data_categories: ["operational_metadata"]
+invalid:
+  - name: missing_required_booleans
+    instance:
+      operator_legal_entity: "AwareWave Inc."
+      governing_law: "Delaware, USA"
+    reason: "children_involved and government_customer are both required (context.schema.yaml required list) -- both gate mandatory extra scrutiny (COPPA-class / government-procurement-class rules) and cannot be left implicit"

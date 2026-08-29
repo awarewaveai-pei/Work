@@ -1,0 +1,97 @@
+schema_id: "ai-lego://specs/execution/deprecation-pipeline.schema.yaml"
+target_ref: "#/deprecation_record"
+description: >
+  Deprecation/Retirement Pipeline instance (EC §113, 7-step sequence).
+  Exercises the `allOf`/`contains`/`minContains`/`maxContains` coverage-guard
+  block on `steps[]` (must cover exactly the 7 canonical step names, each
+  exactly once -- the same "uniqueItems alone insufficient" bug class as
+  data-deletion.schema.yaml's steps[], per this file's own comment), the
+  `object_type` enum, and the `id` pattern. Note: this file's two
+  step_gate_mapping blocking conditions (usage_scan_nonzero,
+  deadline_not_reached) are stated only in the top-level `constraints`/
+  `step_gate_mapping` prose blocks, which sit OUTSIDE `deprecation_record`'s
+  own JSON-Schema properties and carry no `if`/`then` enforcement on the
+  instance itself (verified empirically: no if/then/dependentRequired
+  keyword exists anywhere in this file) -- they cannot be exercised as a
+  schema-validation failure without misrepresenting the file's actual
+  behavior, so the "skip a required step" half of the requested coverage is
+  exercised instead via the coverage-guard bypass below, which IS
+  mechanically enforced.
+valid:
+  - name: method_retirement_full_7_step_coverage
+    instance:
+      id: "DEP-2026-000001"
+      object_type: "Method"
+      object_id: "root_cause.fishbone"
+      initiated_at: "2026-08-29T09:00:00Z"
+      steps:
+        - { step: "Notice", status: "passed" }
+        - { step: "Replacement", status: "passed" }
+        - { step: "Compatibility Matrix", status: "passed" }
+        - { step: "Migration Tool", status: "passed" }
+        - { step: "Usage Scan", status: "passed" }
+        - { step: "Deadline", status: "passed" }
+        - { step: "Archive", status: "pending" }
+      step_detail:
+        usage_scan: { live_references_found: 0, reference_locations: [] }
+        deadline: { deadline_at: "2026-09-29T00:00:00Z" }
+  - name: api_retirement_in_progress
+    instance:
+      id: "DEP-2026-000002"
+      object_type: "API"
+      object_id: "GET /v1/legacy-report"
+      initiated_at: "2026-08-01T00:00:00Z"
+      steps:
+        - { step: "Notice", status: "passed" }
+        - { step: "Replacement", status: "passed" }
+        - { step: "Compatibility Matrix", status: "passed" }
+        - { step: "Migration Tool", status: "in_progress" }
+        - { step: "Usage Scan", status: "pending" }
+        - { step: "Deadline", status: "pending" }
+        - { step: "Archive", status: "pending" }
+invalid:
+  - name: coverage_guard_bypass_skips_required_steps
+    instance:
+      id: "DEP-2026-000003"
+      object_type: "Schema"
+      object_id: "legacy.schema.yaml"
+      initiated_at: "2026-08-29T10:00:00Z"
+      steps:
+        - { step: "Notice", status: "passed", evidence_ref: "e1" }
+        - { step: "Notice", status: "passed", evidence_ref: "e2" }
+        - { step: "Notice", status: "passed", evidence_ref: "e3" }
+        - { step: "Notice", status: "passed", evidence_ref: "e4" }
+        - { step: "Notice", status: "passed", evidence_ref: "e5" }
+        - { step: "Notice", status: "passed", evidence_ref: "e6" }
+        - { step: "Notice", status: "passed", evidence_ref: "e7" }
+    reason: "7 whole-object-unique entries (differing only by evidence_ref) all with step:'Notice' satisfy uniqueItems+minItems:7+maxItems:7 but fail the coverage-guard: maxContains:1 for 'Notice' (7 occurrences) and minContains:1 for each of Replacement/Compatibility Matrix/Migration Tool/Usage Scan/Deadline/Archive (0 occurrences each) -- this record skips all 6 remaining required retirement steps including Archive, the exact bypass this file's own comment documents as the same failure mode found in data-deletion.schema.yaml"
+  - name: object_type_outside_enum
+    instance:
+      id: "DEP-2026-000004"
+      object_type: "Database"
+      object_id: "legacy_orders_table"
+      initiated_at: "2026-08-29T11:00:00Z"
+      steps:
+        - { step: "Notice", status: "passed" }
+        - { step: "Replacement", status: "passed" }
+        - { step: "Compatibility Matrix", status: "passed" }
+        - { step: "Migration Tool", status: "passed" }
+        - { step: "Usage Scan", status: "passed" }
+        - { step: "Deadline", status: "passed" }
+        - { step: "Archive", status: "passed" }
+    reason: "object_type enum is exactly [API, Method, Capability, Schema, Policy, Provider, Workflow] (EC §113 L3166-3174, 7 scoped object types) -- 'Database' is not one of the 7"
+  - name: id_fails_pattern
+    instance:
+      id: "DEPRECATION-2026-000005"
+      object_type: "Workflow"
+      object_id: "legacy-onboarding-flow"
+      initiated_at: "2026-08-29T12:00:00Z"
+      steps:
+        - { step: "Notice", status: "passed" }
+        - { step: "Replacement", status: "passed" }
+        - { step: "Compatibility Matrix", status: "passed" }
+        - { step: "Migration Tool", status: "passed" }
+        - { step: "Usage Scan", status: "passed" }
+        - { step: "Deadline", status: "passed" }
+        - { step: "Archive", status: "passed" }
+    reason: "id must match pattern ^DEP- -- 'DEPRECATION-2026-000005' does not start with the canonical 'DEP-' prefix"

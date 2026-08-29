@@ -1,0 +1,86 @@
+schema_id: "ai-lego://policies/ai-execution/release-policy.yaml"
+target_ref: "#/release_gate_requirement"
+description: >
+  release-policy.yaml is PROVISIONAL (status field) -- `release_gate_
+  requirement.scope` is a single-value enum `[TBD_PENDING_ROUND2_ADR]`
+  (the gate range it should ultimately cover is blocked pending Round 2 ADR
+  resolving OQ-10). This fixture validates the object shape that IS
+  decided: the two literal `const` fields (`condition`, `action`), the
+  `const` `gate_rules_source` pointer into mandatory-gates.yaml, the
+  `required_status` array via the $ref'd EC §70 Final Status enum, and
+  deliberately proves `scope` cannot be silently "resolved" to any value
+  other than the one TBD placeholder -- doing so would be exactly the kind
+  of invented, unauthorized resolution this file's own status:
+  PROVISIONAL exists to prevent.
+
+valid:
+  - name: real_worked_example
+    instance:
+      condition: "NOT (every rule in policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules that applies to this task has reached an acceptable Final Status per required_status below)"
+      action: DENY
+      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+      required_status: [PASS, PASS_WITH_APPROVED_RISK]
+      scope: TBD_PENDING_ROUND2_ADR
+  - name: single_status_minimal_array
+    instance:
+      condition: "NOT (every rule in policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules that applies to this task has reached an acceptable Final Status per required_status below)"
+      action: DENY
+      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+      required_status: [PASS]
+      scope: TBD_PENDING_ROUND2_ADR
+
+invalid:
+  - name: action_not_deny
+    instance:
+      condition: "NOT (every rule in policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules that applies to this task has reached an acceptable Final Status per required_status below)"
+      action: ALLOW
+      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+      required_status: [PASS, PASS_WITH_APPROVED_RISK]
+      scope: TBD_PENDING_ROUND2_ADR
+    reason: >
+      `action` is `const: DENY` -- the release_gate_requirement's function
+      is to DENY the STAGED RELEASE transition when `condition` holds
+      (Master Plan §64's first worked-example shape), not REQUIRE_HUMAN_
+      REVIEW or ALLOW. "ALLOW" violates the const.
+  - name: condition_paraphrased_not_verbatim
+    instance:
+      condition: "Deny release unless all mandatory gates passed"
+      action: DENY
+      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+      required_status: [PASS, PASS_WITH_APPROVED_RISK]
+      scope: TBD_PENDING_ROUND2_ADR
+    reason: >
+      `condition` is `const` with the exact predicate string "NOT (every
+      rule in policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_
+      rules that applies to this task has reached an acceptable Final
+      Status per required_status below)" -- a paraphrase, even a faithful
+      one, does not satisfy a `const` (exact string equality) constraint.
+  - name: required_status_invalid_enum_value
+    instance:
+      condition: "NOT (every rule in policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules that applies to this task has reached an acceptable Final Status per required_status below)"
+      action: DENY
+      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+      required_status: [SUCCESS]
+      scope: TBD_PENDING_ROUND2_ADR
+    reason: >
+      `required_status` items $ref
+      `status-codes.schema.yaml#/reference_vocabulary/final_status/schema`,
+      whose enum is [PASS, PASS_WITH_APPROVED_RISK, BLOCKED, FAILED,
+      NEEDS_HUMAN_REVIEW, ROLLED_BACK, PARTIAL_SUCCESS] -- "SUCCESS" is not
+      a member (it is not the EC §70 Final Status vocabulary this file
+      deliberately chose over the narrower per-gate status enum).
+  - name: scope_fabricated_resolved_value
+    instance:
+      condition: "NOT (every rule in policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules that applies to this task has reached an acceptable Final Status per required_status below)"
+      action: DENY
+      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+      required_status: [PASS]
+      scope: GLOBAL_GATE_LIST
+    reason: >
+      `scope` is `enum: [TBD_PENDING_ROUND2_ADR]` -- a single legal value,
+      deliberately, because whether this rule's coverage should extend to
+      the full disputed Global/High-risk Gate list is itself
+      TBD_PENDING_ROUND2_ADR (OQ-RELPOL-2). "GLOBAL_GATE_LIST" would
+      silently assert a resolution to OQ-10 that no Round 2 ADR has made --
+      exactly the fabricated-resolved-value failure mode this PROVISIONAL
+      file's own instructions warn against.

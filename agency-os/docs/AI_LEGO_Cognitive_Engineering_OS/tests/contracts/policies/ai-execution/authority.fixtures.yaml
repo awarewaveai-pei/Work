@@ -1,0 +1,311 @@
+schema_id: "ai-lego://policies/ai-execution/authority.yaml"
+target_ref: ""
+description: >
+  authority.yaml's root validates as `rules_schema` (array of `policy_rule`),
+  guarded by 9 allOf/contains/minContains coverage clauses (one per A0-A4
+  required_authority_level value, one per DELETE/PUBLISH/SEND/DEPLOY
+  forbidden_actions_ref value). The forbidden_actions_ref clauses were fixed
+  this session (MAJ-2) to add `required: [forbidden_actions_ref]` inside each
+  `contains` schema -- without it, a `contains: {properties: {forbidden_
+  actions_ref: {const: X}}}` clause is satisfied VACUOUSLY by any row that
+  simply omits the field (JSON Schema `properties` does not constrain an
+  absent key), so the guard could pass even with zero rows actually carrying
+  X. This fixture's primary adversarial case re-attempts exactly that bypass
+  to prove the `required:` fix actually blocks it. Also covers the
+  `action: {const: ALLOW}` invariant and the local (narrower-than-$ref'd)
+  `forbidden_actions_ref` enum restriction.
+
+valid:
+  - name: minimal_five_row_coverage
+    instance:
+      - id: "AUTHZ-TEST-A0"
+        condition: "Agent action is read, search, analyze, or read-only test."
+        required_authority_level: A0
+        action: ALLOW
+        forbidden_actions_ref: null
+        source: "test fixture"
+      - id: "AUTHZ-TEST-A1"
+        condition: "Agent modifies content in an isolated workspace."
+        required_authority_level: A1
+        action: ALLOW
+        forbidden_actions_ref: DELETE
+        source: "test fixture"
+      - id: "AUTHZ-TEST-A2"
+        condition: "Agent writes to a dev or staging environment."
+        required_authority_level: A2
+        action: ALLOW
+        forbidden_actions_ref: PUBLISH
+        source: "test fixture"
+      - id: "AUTHZ-TEST-A3"
+        condition: "Agent performs a reversible change to production."
+        required_authority_level: A3
+        action: ALLOW
+        forbidden_actions_ref: SEND
+        source: "test fixture"
+      - id: "AUTHZ-TEST-A4"
+        condition: "Agent deletes production data AND granted_authority_level == A4."
+        required_authority_level: A4
+        action: ALLOW
+        forbidden_actions_ref: DEPLOY
+        source: "test fixture"
+  - name: real_10_row_transcription
+    instance:
+      - id: AUTHZ-A0-OBSERVE
+        condition: "Agent action is read, search, analyze, or read-only test."
+        required_authority_level: A0
+        action: ALLOW
+        forbidden_actions_ref: null
+        inferred: false
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L486-494)"
+      - id: AUTHZ-A1-LOCAL-EDIT
+        condition: "Agent modifies content, scoped to an isolated branch or workspace (not shared/staging/production)."
+        required_authority_level: A1
+        action: ALLOW
+        forbidden_actions_ref: null
+        inferred: false
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L495-498)"
+      - id: AUTHZ-A2-STAGED-WRITE
+        condition: "Agent writes to a dev or staging environment."
+        required_authority_level: A2
+        action: ALLOW
+        forbidden_actions_ref: null
+        inferred: false
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L499-502)"
+      - id: AUTHZ-A3-PROD-REVERSIBLE
+        condition: "Agent performs a reversible change to production."
+        required_authority_level: A3
+        action: ALLOW
+        forbidden_actions_ref: null
+        inferred: false
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L503-514)"
+      - id: AUTHZ-A3-DEPLOY-REVERSIBLE
+        condition: "Agent deploys to production WHERE the deploy is reversible AND granted_authority_level == A3."
+        required_authority_level: A3
+        action: ALLOW
+        forbidden_actions_ref: DEPLOY
+        inferred: true
+        source: "Inferred from EC §9's A3/A4 reversible/irreversible distinction (L503-528)."
+      - id: AUTHZ-A4-DELETE
+        condition: "Agent deletes production data AND granted_authority_level == A4."
+        required_authority_level: A4
+        action: ALLOW
+        forbidden_actions_ref: DELETE
+        inferred: false
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L519)"
+      - id: AUTHZ-A4-SEND
+        condition: "Agent sends external communication AND granted_authority_level == A4."
+        required_authority_level: A4
+        action: ALLOW
+        forbidden_actions_ref: SEND
+        inferred: false
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L520)"
+      - id: AUTHZ-A4-PUBLISH
+        condition: "Agent publishes regulated output AND granted_authority_level == A4."
+        required_authority_level: A4
+        action: ALLOW
+        forbidden_actions_ref: PUBLISH
+        inferred: false
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L521)"
+      - id: AUTHZ-A4-CREDENTIAL-ROTATION
+        condition: "Agent revokes or rotates a root credential AND granted_authority_level == A4."
+        required_authority_level: A4
+        action: ALLOW
+        forbidden_actions_ref: null
+        inferred: false
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L522)"
+      - id: AUTHZ-A4-DEPLOY-IRREVERSIBLE
+        condition: "Agent deploys an irreversible migration AND granted_authority_level == A4."
+        required_authority_level: A4
+        action: ALLOW
+        forbidden_actions_ref: DEPLOY
+        inferred: false
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L523)"
+
+invalid:
+  - name: forbidden_actions_ref_coverage_bypass_attempt
+    instance:
+      - id: "AUTHZ-TEST-A0"
+        condition: "Agent deletes production data (described in prose, field never set)."
+        required_authority_level: A0
+        action: ALLOW
+        source: "test fixture"
+      - id: "AUTHZ-TEST-A1"
+        condition: "Agent publishes regulated output (described in prose, field never set)."
+        required_authority_level: A1
+        action: ALLOW
+        source: "test fixture"
+      - id: "AUTHZ-TEST-A2"
+        condition: "Agent sends external communication (described in prose, field never set)."
+        required_authority_level: A2
+        action: ALLOW
+        source: "test fixture"
+      - id: "AUTHZ-TEST-A3"
+        condition: "Agent deploys to production (described in prose, field never set)."
+        required_authority_level: A3
+        action: ALLOW
+        source: "test fixture"
+      - id: "AUTHZ-TEST-A4"
+        condition: "Agent action requiring the highest authority level."
+        required_authority_level: A4
+        action: ALLOW
+        source: "test fixture"
+    reason: >
+      MAJ-2 regression test: this array satisfies the 5 required_authority_level
+      contains guards (A0-A4 each appear once) and every row's `condition`
+      text NARRATES delete/publish/send/deploy in prose, but NOT ONE row
+      actually sets `forbidden_actions_ref` to DELETE/PUBLISH/SEND/DEPLOY (all
+      5 rows omit the field entirely). Before the `required: [forbidden_
+      actions_ref]` fix, `contains: {properties: {forbidden_actions_ref:
+      {const: X}}}` would have been satisfied vacuously by these very
+      field-omitting rows; with the fix, all 4 forbidden_actions_ref
+      minContains guards correctly fail because no row carries the field at
+      all.
+  - name: missing_a2_row_direct_coverage_failure
+    instance:
+      - id: "AUTHZ-TEST-A0"
+        condition: "read-only"
+        required_authority_level: A0
+        action: ALLOW
+        forbidden_actions_ref: null
+        source: "test fixture"
+      - id: "AUTHZ-TEST-A1"
+        condition: "isolated workspace edit"
+        required_authority_level: A1
+        action: ALLOW
+        forbidden_actions_ref: DELETE
+        source: "test fixture"
+      - id: "AUTHZ-TEST-A3"
+        condition: "reversible production change"
+        required_authority_level: A3
+        action: ALLOW
+        forbidden_actions_ref: SEND
+        source: "test fixture"
+      - id: "AUTHZ-TEST-A4"
+        condition: "irreversible deploy"
+        required_authority_level: A4
+        action: ALLOW
+        forbidden_actions_ref: DEPLOY
+        source: "test fixture"
+      - id: "AUTHZ-TEST-A4B"
+        condition: "publish regulated output"
+        required_authority_level: A4
+        action: ALLOW
+        forbidden_actions_ref: PUBLISH
+        source: "test fixture"
+    reason: >
+      No row carries required_authority_level: A2, so rules_schema's
+      `contains: {properties: {required_authority_level: {const: A2}}},
+      minContains: 1` clause finds zero matches -- direct minContains
+      failure on the authority-level coverage guard (distinct from the
+      forbidden_actions_ref guard tested above).
+  - name: action_not_allow
+    instance:
+      - id: AUTHZ-A0-OBSERVE
+        condition: "Agent action is read, search, analyze, or read-only test."
+        required_authority_level: A0
+        action: DENY
+        forbidden_actions_ref: null
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L486-494)"
+      - id: AUTHZ-A1-LOCAL-EDIT
+        condition: "Agent modifies content, scoped to an isolated branch or workspace."
+        required_authority_level: A1
+        action: ALLOW
+        forbidden_actions_ref: null
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L495-498)"
+      - id: AUTHZ-A2-STAGED-WRITE
+        condition: "Agent writes to a dev or staging environment."
+        required_authority_level: A2
+        action: ALLOW
+        forbidden_actions_ref: null
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L499-502)"
+      - id: AUTHZ-A3-PROD-REVERSIBLE
+        condition: "Agent performs a reversible change to production."
+        required_authority_level: A3
+        action: ALLOW
+        forbidden_actions_ref: SEND
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L503-514)"
+      - id: AUTHZ-A4-DELETE
+        condition: "Agent deletes production data AND granted_authority_level == A4."
+        required_authority_level: A4
+        action: ALLOW
+        forbidden_actions_ref: DELETE
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L519)"
+      - id: AUTHZ-A4-PUBLISH
+        condition: "Agent publishes regulated output AND granted_authority_level == A4."
+        required_authority_level: A4
+        action: ALLOW
+        forbidden_actions_ref: PUBLISH
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L521)"
+      - id: AUTHZ-A4-DEPLOY-IRREVERSIBLE
+        condition: "Agent deploys an irreversible migration AND granted_authority_level == A4."
+        required_authority_level: A4
+        action: ALLOW
+        forbidden_actions_ref: DEPLOY
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L523)"
+    reason: >
+      Otherwise-fully-coverage-satisfying array (A0-A4 and DELETE/PUBLISH/
+      SEND/DEPLOY all present) except row AUTHZ-A0-OBSERVE has
+      `action: DENY` instead of the required `const: ALLOW`. This file's
+      whole scope is the ALLOW-once-authorized half of Master Plan §65's
+      Agent≠Authority framing (forbidden-actions.yaml owns the DENY half),
+      so `policy_rule.properties.action` is `const: ALLOW` -- isolates the
+      const violation from the coverage guards, which this instance
+      otherwise satisfies.
+  - name: forbidden_actions_ref_modify_locked_fact_out_of_local_scope
+    instance:
+      - id: AUTHZ-A0-OBSERVE
+        condition: "Agent action is read, search, analyze, or read-only test."
+        required_authority_level: A0
+        action: ALLOW
+        forbidden_actions_ref: null
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L486-494)"
+      - id: AUTHZ-A1-LOCAL-EDIT
+        condition: "Agent modifies content, scoped to an isolated branch or workspace."
+        required_authority_level: A1
+        action: ALLOW
+        forbidden_actions_ref: null
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L495-498)"
+      - id: AUTHZ-A2-STAGED-WRITE
+        condition: "Agent writes to a dev or staging environment."
+        required_authority_level: A2
+        action: ALLOW
+        forbidden_actions_ref: null
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L499-502)"
+      - id: AUTHZ-A3-PROD-REVERSIBLE
+        condition: "Agent performs a reversible change to production."
+        required_authority_level: A3
+        action: ALLOW
+        forbidden_actions_ref: SEND
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L503-514)"
+      - id: AUTHZ-A4-DELETE
+        condition: "Agent deletes production data AND granted_authority_level == A4."
+        required_authority_level: A4
+        action: ALLOW
+        forbidden_actions_ref: DELETE
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L519)"
+      - id: AUTHZ-A4-PUBLISH
+        condition: "Agent publishes regulated output AND granted_authority_level == A4."
+        required_authority_level: A4
+        action: ALLOW
+        forbidden_actions_ref: PUBLISH
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L521)"
+      - id: AUTHZ-A4-MODIFY-LOCKED-FACT
+        condition: "Agent modifies a locked fact AND granted_authority_level == A4."
+        required_authority_level: A4
+        action: ALLOW
+        forbidden_actions_ref: MODIFY_LOCKED_FACT
+        source: "test fixture"
+    reason: >
+      A0-A4 and DELETE/PUBLISH/SEND coverage guards are all satisfied by
+      this array (DEPLOY coverage is incidentally still unmet -- not the
+      constraint under test). The row under test,
+      AUTHZ-A4-MODIFY-LOCKED-FACT, sets
+      `forbidden_actions_ref: MODIFY_LOCKED_FACT`. That field is
+      `oneOf: [null, allOf[$ref forbidden-actions.yaml#/definitions/
+      agent_action_id, enum: [DELETE, PUBLISH, DEPLOY, SEND]]]`.
+      MODIFY_LOCKED_FACT is a legal value of the $ref'd agent_action_id enum
+      (forbidden-actions.yaml's 5th value) but is NOT in this file's local,
+      narrower 4-value enum -- EC §57 gives Modify Locked Fact no ALLOW-able
+      authority-level path at all, so this file deliberately excludes it.
+      This exercises the allOf combination (passes the $ref half, fails the
+      local-enum half), not a plain single-enum violation.

@@ -1,0 +1,203 @@
+schema_id: "ai-lego://policies/ai-execution/risk-tiers.yaml"
+target_ref: ""
+description: >
+  risk-tiers.yaml's root $refs `#/bindings_schema`: a CLOSED 5-item array
+  (minItems/maxItems 5) of `tier_policy_binding` objects, with `allOf`/
+  `contains`/`minContains: 1`/`maxContains: 1` guards requiring exactly one
+  row per R0-R4 `risk_tier` value. `risk_tier` is already a required field
+  of `tier_policy_binding` (required: [id, risk_tier, condition, action,
+  grounding, source]), so no vacuous-omission bypass is structurally
+  possible here (unlike authority.yaml's now-fixed guards). This fixture
+  reproduces the file's own two documented adversarial mutations
+  (duplicate R3 row; missing R4 row) plus the narrower 2-value `action`
+  enum and the `id` pattern.
+
+valid:
+  - name: real_5_row_transcription
+    instance:
+      - id: RISKPOL-R0
+        risk_tier: R0
+        canonical_definition_ref: "ai-lego://specs/execution/risk-tier.schema.yaml#/tiers/R0"
+        condition: "task.risk.tier == R0"
+        action: ALLOW
+        grounding: "required_actions: [] (risk-tier.schema.yaml#/tiers/R0); EC §8 states R0 may execute automatically."
+        additive_content: "NONE beyond the action verdict above."
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §8 (L381-391)"
+      - id: RISKPOL-R1
+        risk_tier: R1
+        canonical_definition_ref: "ai-lego://specs/execution/risk-tier.schema.yaml#/tiers/R1"
+        condition: "task.risk.tier == R1"
+        action: ALLOW
+        grounding: "required_actions (Current State / Unit Test / Diff Review) name no human-approval-type item."
+        additive_content: "NONE beyond the action verdict above."
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §8 (L393-408)"
+      - id: RISKPOL-R2
+        risk_tier: R2
+        canonical_definition_ref: "ai-lego://specs/execution/risk-tier.schema.yaml#/tiers/R2"
+        condition: "task.risk.tier == R2"
+        action: ALLOW
+        grounding: "required_actions (Integration Test / Compatibility / Rollback / Observability) name no human-approval-type item."
+        additive_content: "NONE beyond the action verdict above."
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §8 (L410-427)"
+      - id: RISKPOL-R3
+        risk_tier: R3
+        canonical_definition_ref: "ai-lego://specs/execution/risk-tier.schema.yaml#/tiers/R3"
+        condition: "task.risk.tier == R3"
+        action: REQUIRE_HUMAN_REVIEW
+        grounding: "required_actions literally includes 'Human Approval'."
+        additive_content: "See human_authority_crosswalk.R3 (APPROXIMATE, non-normative)."
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §8 (L429-452)"
+      - id: RISKPOL-R4
+        risk_tier: R4
+        canonical_definition_ref: "ai-lego://specs/execution/risk-tier.schema.yaml#/tiers/R4"
+        condition: "task.risk.tier == R4"
+        action: REQUIRE_HUMAN_REVIEW
+        grounding: "required_actions literally includes 'Explicit Human Authority'."
+        additive_content: "See human_authority_crosswalk.R4 (EXACT_AS_COMPILED, non-normative)."
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §8 (L454-474)"
+
+invalid:
+  - name: duplicate_r3_row_missing_r0
+    instance:
+      - id: RISKPOL-R3-DUP1
+        risk_tier: R3
+        condition: "task.risk.tier == R3"
+        action: REQUIRE_HUMAN_REVIEW
+        grounding: "Human Approval."
+        source: "test fixture"
+      - id: RISKPOL-R3-DUP2
+        risk_tier: R3
+        condition: "task.risk.tier == R3"
+        action: REQUIRE_HUMAN_REVIEW
+        grounding: "accidental duplicate."
+        source: "test fixture"
+      - id: RISKPOL-R1
+        risk_tier: R1
+        condition: "task.risk.tier == R1"
+        action: ALLOW
+        grounding: "no human-approval-type item."
+        source: "test fixture"
+      - id: RISKPOL-R2
+        risk_tier: R2
+        condition: "task.risk.tier == R2"
+        action: ALLOW
+        grounding: "no human-approval-type item."
+        source: "test fixture"
+      - id: RISKPOL-R4
+        risk_tier: R4
+        condition: "task.risk.tier == R4"
+        action: REQUIRE_HUMAN_REVIEW
+        grounding: "Explicit Human Authority."
+        source: "test fixture"
+    reason: >
+      Exactly 5 items (satisfies minItems/maxItems), but R3 appears twice
+      and R0 not at all -- violates `maxContains: 1` for the R3 guard and
+      `minContains: 1` for the R0 guard simultaneously. This is this file's
+      own documented adversarial test (see its `verification` section:
+      "duplicating the R3 row (violating maxContains: 1 / maxItems: 5)").
+  - name: missing_r4_row
+    instance:
+      - id: RISKPOL-R0
+        risk_tier: R0
+        condition: "task.risk.tier == R0"
+        action: ALLOW
+        grounding: "may execute automatically."
+        source: "test fixture"
+      - id: RISKPOL-R1
+        risk_tier: R1
+        condition: "task.risk.tier == R1"
+        action: ALLOW
+        grounding: "no human-approval-type item."
+        source: "test fixture"
+      - id: RISKPOL-R2
+        risk_tier: R2
+        condition: "task.risk.tier == R2"
+        action: ALLOW
+        grounding: "no human-approval-type item."
+        source: "test fixture"
+      - id: RISKPOL-R3
+        risk_tier: R3
+        condition: "task.risk.tier == R3"
+        action: REQUIRE_HUMAN_REVIEW
+        grounding: "Human Approval."
+        source: "test fixture"
+    reason: >
+      Only 4 entries -- violates `minItems: 5`/`maxItems: 5`, AND the R4
+      `contains`/`minContains: 1` guard finds zero matches. This is this
+      file's own documented adversarial test (see its `verification`
+      section: "removing R4 entirely (violating minItems: 5 /
+      minContains: 1)").
+  - name: action_value_outside_narrower_two_value_enum
+    instance:
+      - id: RISKPOL-R0
+        risk_tier: R0
+        condition: "task.risk.tier == R0"
+        action: DENY
+        grounding: "test: attempted DENY verdict."
+        source: "test fixture"
+      - id: RISKPOL-R1
+        risk_tier: R1
+        condition: "task.risk.tier == R1"
+        action: ALLOW
+        grounding: "no human-approval-type item."
+        source: "test fixture"
+      - id: RISKPOL-R2
+        risk_tier: R2
+        condition: "task.risk.tier == R2"
+        action: ALLOW
+        grounding: "no human-approval-type item."
+        source: "test fixture"
+      - id: RISKPOL-R3
+        risk_tier: R3
+        condition: "task.risk.tier == R3"
+        action: REQUIRE_HUMAN_REVIEW
+        grounding: "Human Approval."
+        source: "test fixture"
+      - id: RISKPOL-R4
+        risk_tier: R4
+        condition: "task.risk.tier == R4"
+        action: REQUIRE_HUMAN_REVIEW
+        grounding: "Explicit Human Authority."
+        source: "test fixture"
+    reason: >
+      `tier_policy_binding.properties.action` is
+      `enum: [ALLOW, REQUIRE_HUMAN_REVIEW]` -- narrower than the directory's
+      full 4-value DENY/ALLOW/SCOPE_TO/REQUIRE_HUMAN_REVIEW vocabulary,
+      because this file makes no risk_tier-triggered DENY or SCOPE_TO claim.
+      "DENY" on the R0 row violates this narrower enum even though DENY is
+      a legal `action` value in sibling files like forbidden-actions.yaml.
+  - name: id_pattern_violation
+    instance:
+      - id: "RPOL-R0"
+        risk_tier: R0
+        condition: "task.risk.tier == R0"
+        action: ALLOW
+        grounding: "may execute automatically."
+        source: "test fixture"
+      - id: RISKPOL-R1
+        risk_tier: R1
+        condition: "task.risk.tier == R1"
+        action: ALLOW
+        grounding: "no human-approval-type item."
+        source: "test fixture"
+      - id: RISKPOL-R2
+        risk_tier: R2
+        condition: "task.risk.tier == R2"
+        action: ALLOW
+        grounding: "no human-approval-type item."
+        source: "test fixture"
+      - id: RISKPOL-R3
+        risk_tier: R3
+        condition: "task.risk.tier == R3"
+        action: REQUIRE_HUMAN_REVIEW
+        grounding: "Human Approval."
+        source: "test fixture"
+      - id: RISKPOL-R4
+        risk_tier: R4
+        condition: "task.risk.tier == R4"
+        action: REQUIRE_HUMAN_REVIEW
+        grounding: "Explicit Human Authority."
+        source: "test fixture"
+    reason: >
+      `id` requires `pattern: "^RISKPOL-"` -- "RPOL-R0" does not start with
+      that prefix.

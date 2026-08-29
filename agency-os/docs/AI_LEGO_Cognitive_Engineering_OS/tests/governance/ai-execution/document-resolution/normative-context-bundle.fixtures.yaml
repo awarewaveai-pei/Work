@@ -1,0 +1,38 @@
+# EC section 94 category: document-resolution
+schema_id: "ai-lego://specs/execution/normative-context.schema.yaml"
+target_ref: ""
+category: document-resolution
+description: >
+  EC section 94's own "document-resolution" test category has no dedicated
+  document-registry.schema.yaml to point at yet -- that file is
+  MACHINE_READABLE_SPEC_PLAN.md's own tracked deferral ("依賴尚未建立的
+  Architecture-Constitution-v1.md 這份新母文件，需先走 ADR-006 proposals
+  流程"), not something this Wave can build. The closest already-built,
+  real document-resolution mechanism is normative-context.schema.yaml's
+  Normative Context Bundle -- the record of which document sections were
+  actually loaded and resolved for one task (EC L204's promised type).
+  This golden scenario demonstrates a task successfully resolving its
+  required normative sections before proceeding.
+valid:
+  - name: bundle_with_resolved_sections
+    instance:
+      bundle_id: "NCB-2026-08-29-001"
+      task_id: "TASK-2026-08-29-001"
+      generated_at: "2026-08-29T10:00:00Z"
+      document_index_refs:
+        - document_id: "ai-lego.execution-contract"
+          document_version: "1.0.0"
+          document_sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      loaded_sections:
+        - document_id: "ai-lego.execution-contract"
+          section_id: "section-28"
+          section_sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          heading: "28. Database Change Contract"
+invalid:
+  - name: missing_task_id
+    instance:
+      bundle_id: "NCB-2026-08-29-001"
+      generated_at: "2026-08-29T10:00:00Z"
+      document_index_refs: []
+      loaded_sections: []
+    reason: "task_id is required (normative-context.schema.yaml required list) -- a bundle with no task binding cannot be resolved back to the task that needed it"

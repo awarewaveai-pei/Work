@@ -1,0 +1,71 @@
+schema_id: "ai-lego://specs/cognitive/typed-method-result.schema.yaml"
+target_ref: ""
+description: >
+  Exercises TypedMethodResult's required fields, the `status` field's
+  multi-hop $ref chain (this file -> execution/result.schema.yaml#/properties/status
+  -> execution/status-codes.schema.yaml's 7-value EC §70 Final Status
+  enum), the required top-level `provenance` (epistemic-label's universal
+  content/claim mandate), and the `execution_id` ^EX- pattern.
+
+valid:
+  - name: successful_fishbone_invocation
+    instance:
+      execution_id: "EX-2026-08-29-000042"
+      task_id: "TASK-2026-000001"
+      method_id: "root_cause.fishbone"
+      method_version: "1.0.0"
+      status: PASS
+      evaluated_at: "2026-08-29T15:20:00Z"
+      provenance:
+        epistemic_type: HYPOTHESIS
+        authorship_state: AI_GENERATED
+      quality:
+        provenance_required: true
+        evidence_labeling_required: true
+      outputs:
+        - output_type: "CauseHypothesisSet"
+          value: { id: "CHS-2026-08-29-000007" }
+          hash: "a3f5c1e2b4d6f8a0c2e4b6d8f0a2c4e6b8d0f2a4c6e8b0d2f4a6c8e0b2d4f6a8"
+      rollback_ref: null
+  - name: blocked_invocation_with_zero_outputs
+    instance:
+      execution_id: "EX-2026-08-29-000099"
+      method_id: "strategy.swot"
+      method_version: "1.0.0"
+      status: BLOCKED
+      evaluated_at: "2026-08-29T16:00:00Z"
+      provenance:
+        epistemic_type: UNKNOWN
+        authorship_state: AI_GENERATED
+
+invalid:
+  - name: status_not_in_final_status_vocabulary
+    instance:
+      execution_id: "EX-2026-08-29-000100"
+      method_id: "strategy.swot"
+      method_version: "1.0.0"
+      status: SUCCESS
+      evaluated_at: "2026-08-29T16:05:00Z"
+      provenance:
+        epistemic_type: UNKNOWN
+        authorship_state: AI_GENERATED
+    reason: "status chains through execution/result.schema.yaml#/properties/status into status-codes.schema.yaml's 7-value EC §70 Final Status enum [PASS, PASS_WITH_APPROVED_RISK, BLOCKED, FAILED, NEEDS_HUMAN_REVIEW, ROLLED_BACK, PARTIAL_SUCCESS]; 'SUCCESS' is not one of them."
+  - name: missing_required_top_level_provenance
+    instance:
+      execution_id: "EX-2026-08-29-000101"
+      method_id: "strategy.swot"
+      method_version: "1.0.0"
+      status: PASS
+      evaluated_at: "2026-08-29T16:10:00Z"
+    reason: "provenance is REQUIRED at the top level (a TypedMethodResult is itself a claim under epistemic-label.schema.yaml's universal content/claim mandate) — entirely absent here."
+  - name: execution_id_missing_EX_prefix
+    instance:
+      execution_id: "2026-08-29-000102"
+      method_id: "strategy.swot"
+      method_version: "1.0.0"
+      status: PASS
+      evaluated_at: "2026-08-29T16:15:00Z"
+      provenance:
+        epistemic_type: UNKNOWN
+        authorship_state: AI_GENERATED
+    reason: "execution_id must match pattern ^EX- (Atlas §16.3's join-key convention); '2026-08-29-000102' has no EX- prefix."

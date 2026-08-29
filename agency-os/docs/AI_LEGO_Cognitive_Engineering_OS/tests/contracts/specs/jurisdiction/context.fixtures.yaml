@@ -1,0 +1,46 @@
+schema_id: "ai-lego://specs/jurisdiction/context.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the two deliberately-required-with-no-default "high-risk"
+  boolean fields (children_involved, government_customer -- MP L4006's
+  "must be explicitly set" rule), and the additive
+  tenant_home_jurisdiction_ref field's cross-file oneOf[null, tenant.schema
+  .yaml#/properties/home_jurisdiction] (a string, minLength 1).
+valid:
+  - name: cross_border_eu_education_project
+    instance:
+      operator_legal_entity: "Example EdTech GmbH"
+      establishment_locations: ["DE"]
+      target_markets: ["DE", "FR", "NL"]
+      user_locations: ["DE", "FR", "NL", "BE"]
+      data_subject_locations: ["DE", "FR", "NL", "BE"]
+      processing_locations: ["DE"]
+      storage_locations: ["eu-west"]
+      model_provider_locations: ["US"]
+      subprocessor_locations: ["US", "IE"]
+      governing_law: "DE"
+      sector: "education"
+      data_categories: ["student_records", "usage_telemetry"]
+      children_involved: true
+      government_customer: false
+      tenant_home_jurisdiction_ref: null
+  - name: minimal_only_the_two_required_fields
+    instance:
+      children_involved: false
+      government_customer: true
+invalid:
+  - name: missing_government_customer
+    instance:
+      children_involved: false
+    reason: "government_customer is one of exactly two required fields [children_involved, government_customer] -- MP's own text singles both out as needing an explicit, never-defaulted human/org decision; omitting it fails required."
+  - name: children_involved_wrong_type
+    instance:
+      children_involved: "yes"
+      government_customer: false
+    reason: "children_involved must be type boolean; the string 'yes' fails the type check (and MP L4006 explicitly forbids inferring/defaulting this high-risk field from anything other than an explicit boolean)."
+  - name: tenant_home_jurisdiction_ref_wrong_type
+    instance:
+      children_involved: false
+      government_customer: false
+      tenant_home_jurisdiction_ref: 12345
+    reason: "tenant_home_jurisdiction_ref is oneOf[null, domain/tenant.schema.yaml#/properties/home_jurisdiction (a string, minLength 1)] -- a number matches neither branch, exercising the cross-file $ref for real."

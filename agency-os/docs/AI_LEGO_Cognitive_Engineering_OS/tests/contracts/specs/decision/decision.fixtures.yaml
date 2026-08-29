@@ -1,0 +1,89 @@
+schema_id: "ai-lego://specs/decision/decision.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the DEC- id prefix pattern, human_judgment's own nested
+  required set (only enforced once human_judgment is present at all), and
+  reversal_conditions[] embedding decision/reversal.schema.yaml's oneOf --
+  including a reversal entry that matches NEITHER of that sibling schema's
+  two forms.
+valid:
+  - name: board_grade_decision_full
+    instance:
+      id: "DEC-2026-08-29-001"
+      version: "1.0.0"
+      question: "是否將 EU 客戶全數整併至 ks-aw-01？"
+      options: ["整併至 ks-aw-01", "維持 EU/SG 分機"]
+      criteria: ["月成本", "維運複雜度"]
+      hard_constraints: ["零停機遷移"]
+      evidence_snapshot: { source: "capacity-LATEST.json", summary: "整併後記憶體/硬碟餘裕仍 >40%" }
+      assumptions: ["客戶數量未來 12 個月成長 <20%"]
+      unknowns: ["尖峰負載尚未實測"]
+      risks: ["單機故障即全客戶受影響"]
+      predictions: ["月成本下降約 35%"]
+      analyses: [{ method: "mcda", score_summary: "整併方案最高分" }]
+      simulations: []
+      stakeholder_positions: [{ stakeholder: "操作者", position: "支持整併" }]
+      minority_opinions: []
+      lenses_applied: ["stakeholder.regulator", "profession.devops"]
+      recommendation: "整併至 ks-aw-01"
+      confidence: 0.8
+      human_judgment_pending: false
+      human_judgment:
+        decision_maker: "操作者"
+        decision: "整併至 ks-aw-01"
+        rationale: "MCDA 最高分且 Codex 覆審通過"
+        timestamp: "2026-08-28T00:00:00Z"
+      reversal_conditions:
+        - indicators: ["memory_usage_pct", "disk_usage_pct"]
+          thresholds: ["> 80% for 7 consecutive days", "> 80% for 7 consecutive days"]
+          owner: "操作者"
+          action: re_review
+        - indicator: "container_restart_count"
+          threshold: "> 5 in 24h"
+          action: "escalate to devops-engineer agent"
+      monitoring_plan: "capacity-LATEST.json 每日自動檢查"
+      outcome:
+        status: monitoring
+      provenance: { epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: LOCKED_DECISION }
+  - name: minimal_pending_no_human_judgment_yet
+    instance:
+      id: "DEC-2026-01-01-999"
+      version: "1.0.0"
+      question: "A minimal decision question"
+      options: ["A", "B"]
+      human_judgment_pending: true
+      provenance: { epistemic_type: DECISION, authorship_state: AI_GENERATED }
+invalid:
+  - name: id_missing_dec_prefix
+    instance:
+      id: "DECISION-2026-01-01-001"
+      version: "1.0.0"
+      question: "A decision question"
+      options: ["A"]
+      human_judgment_pending: true
+      provenance: { epistemic_type: DECISION, authorship_state: AI_GENERATED }
+    reason: "id pattern is ^DEC- ; 'DECISION-2026-01-01-001' does not start with the required 'DEC-' prefix."
+  - name: human_judgment_missing_timestamp
+    instance:
+      id: "DEC-2026-01-01-002"
+      version: "1.0.0"
+      question: "A decision question"
+      options: ["A"]
+      human_judgment_pending: false
+      human_judgment:
+        decision_maker: "操作者"
+        decision: "A"
+        rationale: "because"
+      provenance: { epistemic_type: DECISION, authorship_state: HUMAN_APPROVED }
+    reason: "human_judgment, once present, requires all four of [decision_maker, decision, rationale, timestamp] per EC §87's anti-bare-approval rule; timestamp is missing."
+  - name: reversal_condition_matches_neither_oneof_branch
+    instance:
+      id: "DEC-2026-01-01-003"
+      version: "1.0.0"
+      question: "A decision question"
+      options: ["A"]
+      human_judgment_pending: true
+      reversal_conditions:
+        - { note: "no indicator, no indicators, no action -- shapeless" }
+      provenance: { epistemic_type: DECISION, authorship_state: AI_GENERATED }
+    reason: "each reversal_conditions[] entry must validate against decision/reversal.schema.yaml's oneOf (multi_indicator_form requires [indicators,thresholds,action]; single_indicator_form requires [indicator,action] plus condition-or-threshold) -- this entry satisfies neither."

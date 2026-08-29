@@ -1,0 +1,207 @@
+schema_id: "ai-lego://specs/execution/handoff.schema.yaml"
+target_ref: ""
+description: >
+  Structured Handoff Record (EC §71/§72). Exercises the
+  `allOf`/`contains`/`minContains`/`maxContains` coverage-guard block on
+  `checklist[]` (must cover exactly the 30 EC §71 canonical checklist item
+  values, each exactly once -- the same "uniqueItems alone insufficient" bug
+  class this file's own comment documents, matching data-deletion.schema.yaml
+  and deprecation-pipeline.schema.yaml's identical fix), the `final_status`
+  hard $ref chain (handoff -> result.schema.yaml#/properties/status ->
+  status-codes.schema.yaml's final_status enum), and the `handoff_id`/
+  `task_id` patterns.
+valid:
+  - name: full_30_item_checklist_coverage
+    instance:
+      handoff_id: "HANDOFF-2026-000001"
+      task_id: "TASK-2026-000030"
+      execution_id: "EX-2026-000030"
+      generated_at: "2026-08-29T18:00:00Z"
+      generated_by: "claude-code"
+      final_status: "PASS"
+      risk_tier: "R1"
+      checklist:
+        - { item: "task", present: true }
+        - { item: "objective", present: true }
+        - { item: "current_state", present: true }
+        - { item: "problem_root_cause", present: true }
+        - { item: "applicable_specifications", present: true }
+        - { item: "methods_used", present: true }
+        - { item: "risk_tier", present: true }
+        - { item: "options_considered", present: true }
+        - { item: "selected_approach", present: true }
+        - { item: "rejected_alternatives", present: true }
+        - { item: "files_changed", present: true }
+        - { item: "schemas_changed", present: false, note: "no schema files touched by this task" }
+        - { item: "api_changes", present: false, note: "no API surface touched by this task" }
+        - { item: "data_impact", present: true }
+        - { item: "security_privacy_impact", present: true }
+        - { item: "jurisdiction_impact", present: false, note: "single-jurisdiction deployment, not applicable" }
+        - { item: "compatibility", present: true }
+        - { item: "tests", present: true }
+        - { item: "expected_results", present: true }
+        - { item: "actual_results", present: true }
+        - { item: "gate_results", present: true }
+        - { item: "known_limitations", present: true }
+        - { item: "open_risks", present: true }
+        - { item: "rollback", present: true }
+        - { item: "observability", present: true }
+        - { item: "deployment_release", present: true }
+        - { item: "post_verification", present: true }
+        - { item: "adr", present: false, note: "no ADR required for this Low-risk change" }
+        - { item: "evidence", present: true }
+        - { item: "final_status", present: true }
+  - name: with_receiving_authority_ack
+    instance:
+      handoff_id: "HANDOFF-2026-000002"
+      task_id: "TASK-2026-000031"
+      generated_at: "2026-08-29T19:00:00Z"
+      checklist:
+        - { item: "task", present: true }
+        - { item: "objective", present: true }
+        - { item: "current_state", present: true }
+        - { item: "problem_root_cause", present: true }
+        - { item: "applicable_specifications", present: true }
+        - { item: "methods_used", present: true }
+        - { item: "risk_tier", present: true }
+        - { item: "options_considered", present: true }
+        - { item: "selected_approach", present: true }
+        - { item: "rejected_alternatives", present: true }
+        - { item: "files_changed", present: true }
+        - { item: "schemas_changed", present: true }
+        - { item: "api_changes", present: true }
+        - { item: "data_impact", present: true }
+        - { item: "security_privacy_impact", present: true }
+        - { item: "jurisdiction_impact", present: true }
+        - { item: "compatibility", present: true }
+        - { item: "tests", present: true }
+        - { item: "expected_results", present: true }
+        - { item: "actual_results", present: true }
+        - { item: "gate_results", present: true }
+        - { item: "known_limitations", present: true }
+        - { item: "open_risks", present: true }
+        - { item: "rollback", present: true }
+        - { item: "observability", present: true }
+        - { item: "deployment_release", present: true }
+        - { item: "post_verification", present: true }
+        - { item: "adr", present: true }
+        - { item: "evidence", present: true }
+        - { item: "final_status", present: true }
+      receiving_authority:
+        receiver_role: "Tech Lead"
+        authority_level: "A3"
+        acknowledged: true
+        acknowledged_at: "2026-08-29T20:00:00Z"
+invalid:
+  - name: coverage_guard_bypass_skips_29_items
+    instance:
+      handoff_id: "HANDOFF-2026-000003"
+      task_id: "TASK-2026-000032"
+      generated_at: "2026-08-29T21:00:00Z"
+      checklist:
+        - { item: "task", present: true, ref: "r1" }
+        - { item: "task", present: true, ref: "r2" }
+        - { item: "task", present: true, ref: "r3" }
+        - { item: "task", present: true, ref: "r4" }
+        - { item: "task", present: true, ref: "r5" }
+        - { item: "task", present: true, ref: "r6" }
+        - { item: "task", present: true, ref: "r7" }
+        - { item: "task", present: true, ref: "r8" }
+        - { item: "task", present: true, ref: "r9" }
+        - { item: "task", present: true, ref: "r10" }
+        - { item: "task", present: true, ref: "r11" }
+        - { item: "task", present: true, ref: "r12" }
+        - { item: "task", present: true, ref: "r13" }
+        - { item: "task", present: true, ref: "r14" }
+        - { item: "task", present: true, ref: "r15" }
+        - { item: "task", present: true, ref: "r16" }
+        - { item: "task", present: true, ref: "r17" }
+        - { item: "task", present: true, ref: "r18" }
+        - { item: "task", present: true, ref: "r19" }
+        - { item: "task", present: true, ref: "r20" }
+        - { item: "task", present: true, ref: "r21" }
+        - { item: "task", present: true, ref: "r22" }
+        - { item: "task", present: true, ref: "r23" }
+        - { item: "task", present: true, ref: "r24" }
+        - { item: "task", present: true, ref: "r25" }
+        - { item: "task", present: true, ref: "r26" }
+        - { item: "task", present: true, ref: "r27" }
+        - { item: "task", present: true, ref: "r28" }
+        - { item: "task", present: true, ref: "r29" }
+        - { item: "task", present: true, ref: "r30" }
+    reason: "30 whole-object-unique entries (differing only by ref) all with item:'task' satisfy uniqueItems+minItems:30+maxItems:30 but fail the coverage-guard: maxContains:1 for 'task' (30 occurrences) and minContains:1 for each of the other 29 canonical checklist items (0 occurrences each, including skipping 'final_status' and 'evidence' entirely) -- the exact bypass this file's own comment documents as the same failure mode found in data-deletion.schema.yaml and deprecation-pipeline.schema.yaml"
+  - name: final_status_outside_enum
+    instance:
+      handoff_id: "HANDOFF-2026-000004"
+      task_id: "TASK-2026-000033"
+      generated_at: "2026-08-29T22:00:00Z"
+      final_status: "SUCCESS"
+      checklist:
+        - { item: "task", present: true }
+        - { item: "objective", present: true }
+        - { item: "current_state", present: true }
+        - { item: "problem_root_cause", present: true }
+        - { item: "applicable_specifications", present: true }
+        - { item: "methods_used", present: true }
+        - { item: "risk_tier", present: true }
+        - { item: "options_considered", present: true }
+        - { item: "selected_approach", present: true }
+        - { item: "rejected_alternatives", present: true }
+        - { item: "files_changed", present: true }
+        - { item: "schemas_changed", present: true }
+        - { item: "api_changes", present: true }
+        - { item: "data_impact", present: true }
+        - { item: "security_privacy_impact", present: true }
+        - { item: "jurisdiction_impact", present: true }
+        - { item: "compatibility", present: true }
+        - { item: "tests", present: true }
+        - { item: "expected_results", present: true }
+        - { item: "actual_results", present: true }
+        - { item: "gate_results", present: true }
+        - { item: "known_limitations", present: true }
+        - { item: "open_risks", present: true }
+        - { item: "rollback", present: true }
+        - { item: "observability", present: true }
+        - { item: "deployment_release", present: true }
+        - { item: "post_verification", present: true }
+        - { item: "adr", present: true }
+        - { item: "evidence", present: true }
+        - { item: "final_status", present: true }
+    reason: "final_status is a hard $ref chained through result.schema.yaml#/properties/status into status-codes.schema.yaml's final_status enum [PASS, PASS_WITH_APPROVED_RISK, BLOCKED, FAILED, NEEDS_HUMAN_REVIEW, ROLLED_BACK, PARTIAL_SUCCESS] -- 'SUCCESS' is not a member of that vocabulary"
+  - name: handoff_id_fails_pattern
+    instance:
+      handoff_id: "HO-2026-000005"
+      task_id: "TASK-2026-000034"
+      generated_at: "2026-08-29T23:00:00Z"
+      checklist:
+        - { item: "task", present: true }
+        - { item: "objective", present: true }
+        - { item: "current_state", present: true }
+        - { item: "problem_root_cause", present: true }
+        - { item: "applicable_specifications", present: true }
+        - { item: "methods_used", present: true }
+        - { item: "risk_tier", present: true }
+        - { item: "options_considered", present: true }
+        - { item: "selected_approach", present: true }
+        - { item: "rejected_alternatives", present: true }
+        - { item: "files_changed", present: true }
+        - { item: "schemas_changed", present: true }
+        - { item: "api_changes", present: true }
+        - { item: "data_impact", present: true }
+        - { item: "security_privacy_impact", present: true }
+        - { item: "jurisdiction_impact", present: true }
+        - { item: "compatibility", present: true }
+        - { item: "tests", present: true }
+        - { item: "expected_results", present: true }
+        - { item: "actual_results", present: true }
+        - { item: "gate_results", present: true }
+        - { item: "known_limitations", present: true }
+        - { item: "open_risks", present: true }
+        - { item: "rollback", present: true }
+        - { item: "observability", present: true }
+        - { item: "deployment_release", present: true }
+        - { item: "post_verification", present: true }
+        - { item: "adr", present: true }
+        - { item: "evidence", present: true }
+        - { item: "final_status", present: true }
+    reason: "handoff_id must match pattern ^HANDOFF- -- 'HO-2026-000005' does not start with the canonical 'HANDOFF-' prefix"

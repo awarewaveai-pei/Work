@@ -1,0 +1,32 @@
+schema_id: "ai-lego://specs/execution/gate.schema.yaml"
+target_ref: "#/gate_result"
+description: >
+  Gate Execution Result record (EC §69). Exercises `status` enum membership
+  and the `required: [gate_id, status]` constraint. NOTE (honesty, per this
+  task's own quality bar): this file's own text states a constraint
+  "status == NOT_APPLICABLE requires rationale to be present and non-empty"
+  under a `constraints:` prose key on `gate_result`, but that key carries no
+  actual JSON-Schema enforcement -- grepped this file for
+  if/then/else/not/oneOf/allOf/anyOf/dependentRequired/dependentSchemas:
+  zero matches, and empirically confirmed with jsonschema 4.26.0 that
+  `{gate_id: "security", status: "NOT_APPLICABLE"}` (no rationale) validates
+  with zero errors against `gate_result`. This is the same conclusion the
+  pre-existing tests/governance/ai-execution/gate-injection/gate-result.fixtures.yaml
+  fixture (a different Wave's file, out of this batch's scope) already
+  demonstrates as a baseline failure
+  ("::invalid::not_applicable_without_rationale unexpectedly VALID") when
+  `tests/run_golden_tests.py` is run. Rather than repeat that same
+  empirically-false claim here, this fixture's invalid cases exercise the
+  two constraints that ARE mechanically enforced (`status` enum, `required`).
+valid:
+  - name: pass_result
+    instance: { gate_id: "security", status: "PASS" }
+  - name: not_applicable_with_rationale_supplied
+    instance: { gate_id: "security", status: "NOT_APPLICABLE", rationale: "N/A for this task type -- no security-boundary change" }
+invalid:
+  - name: bad_status_enum
+    instance: { gate_id: "security", status: "MAYBE" }
+    reason: "status enum is exactly [PASS, FAIL, BLOCKED, NOT_APPLICABLE] (EC §69 L2287) -- 'MAYBE' is not a legal verdict"
+  - name: missing_required_gate_id
+    instance: { status: "PASS" }
+    reason: "gate_id is in required: [gate_id, status] (EC §69 L2285-2290) -- omitting it violates required"

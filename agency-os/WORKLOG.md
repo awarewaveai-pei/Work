@@ -1,5 +1,53 @@
 # Worklog
 
+## 2026-08-29（續25）
+
+### AI-LEGO Phase 3 Wave 8 全建（tests/ 全目錄，79 檔）+ 5 個並行 subagent 分工撰寫 fixture + 過程中發現並修正 3 個既有 Wave 的真實 bug + codex-oracle 4 次覆審嘗試皆失敗改走突變測試自審
+
+**觸發**：操作者「繼續 而且要搭配 codex review」——延續 Wave 7 完成後的既定序列，Build Order 下一項是 Wave 8（`tests/ 全目錄，對 Wave 1-7 每個 schema 寫 golden test`），並明確要求搭配 Codex 對抗式覆審。
+
+**範圍界定**：先用 python 直接列舉（放棄等 codex-oracle inspect，8 分鐘逾時零輸出）：Wave 1-7 實際落地檔案 = 55 個 SCHEMA 檔（47 specs + 8 policies/ai-execution）+ 3 個 recipe 實例檔 + 2 個 registry 資料檔 = 60 檔，全數皆為 `status: ACTIVE/PROVISIONAL`（已建），無需排除 BLOCKED/SKELETON 項目（那些從未真的建成檔案）。另讀 EC §94（Test Paths，12 個 `tests/governance/ai-execution/` 子目錄）與 §141（Contract Compliance Tests，`golden/` 子目錄，7 項聯合驗證：state transitions/required documents/gate injection/authority/rollback/final status/handoff）確認 `tests/` 目錄結構要求。
+
+**設計**：`tests/run_golden_tests.py`（單一 python runner，沿用本 session 全程使用的 jsonschema Draft202012Validator + referencing.Registry + 自訂 `ai-lego://` retriever 樣式）四種檢查族：① schema conformance（`tests/contracts/**/*.fixtures.yaml`，每個 fixture 指定 `schema_id`+`target_ref`+至少 1 個 valid + 1 個 invalid 案例）② `recipes/validated/*.recipe.yaml` 對 `recipe.schema.yaml` 的實例驗證 ③ `method-inventory.yaml`/`contract-backlog.yaml` 兩份無外部 schema 的自由格式登記表，改驗其自身文件宣稱的結構不變量（289 筆計數、has_contract/contract_status 一致性等）④ 跨檔 `ai-lego://` `$ref` 解析煙霧測試（**改用走訪已解析 YAML 樹找真正的 `$ref` key，非對原始文字 regex 掃描**——第一版用 regex 掃描到 2 個假陽性，命中的是 prose 敘述裡引用 `ai-lego://...` 當範例文字、且被 YAML 折疊純量換行截斷的情況，非真實引用；改用結構化走訪後乾淨）。`target_ref` 對照表（哪些檔案驗根層級、哪些驗具名子節點）由我自己逐檔內省後預先算好寫進 `tests/README.md`，交給 subagent 時不必重新推導，降低出錯率。
+
+**執行**：5 個 general-purpose subagent 平行分工撰寫 58 個 schema conformance fixture（cognitive 13 檔 / execution A 9 檔 / execution B 9 檔含 2 檔各拆 2 個 target / domain+evidence+decision+jurisdiction+security+governance+artifact 16 檔含 1 檔拆 2 個 target / policies 8 檔），每個 agent 被要求先完整讀該 schema 全文再寫 fixture，且必須自己跑 `run_golden_tests.py` 驗證後才回報（非只交檔了事）。governance/ai-execution 的 12 個 EC §94 類別 + `golden/` 6 檔 6 步驟複合情境（一個虛構 R3 DB migration 任務串 task→authority→gate→rollback→result→handoff）由我自己撰寫（判斷屬於需要判斷力而非機械重複的部分）。
+
+**過程中自行抓到並修正的 3 個既有 Wave（非本輪新建）真實 bug**：
+1. `specs/security/personal-data-envelope.schema.yaml`（Wave 2）：schema body 段落重複宣告根層級已有的 `title`/`description` key，PyYAML 預設 loader 靜默吃掉上層 provenance 敘述——本 session 稍早自建的 `UniqueKeyLoader` 抓到。修法：刪除 schema body 段落重複的 `title`，把 `description` 段落裡唯一非重複的資訊（加密範圍僅限該欄位、不影響 event 其餘欄位）轉成註解保留，非簡單刪除損失資訊。
+2. `specs/execution/gate.schema.yaml`（Wave 5）：`gate_result.constraints` 宣稱「NOT_APPLICABLE 需 rationale」但只是純文字列表，非真的 JSON Schema `if`/`then`——**同一個 bug 被 3 個獨立來源各自發現**（我自己寫 governance fixture 時、execution-A subagent 寫 fixture 時、稍早已有另一 session 續24 也踩到但列為 out-of-scope 留給後續）。修法：在 `gate_result` 自己層級（與 `properties`/`constraints` 同層，非誤縮排進某個子屬性）補 `if: {status==NOT_APPLICABLE} then: {required:[rationale], minLength:1}`，補之前/之後各自 4 組正反案例實測確認。
+3. `specs/governance/epistemic-label.schema.yaml`（Wave 1）：`locked` 欄位的 `constraints` 同樣是純文字（「LOCKED_FACT 只在 epistemic_type=SOURCE_FACT 才合法」），由 domain 批次 subagent 發現。修法：在 `provenance_record` 層級（兩個涉及欄位 `locked`/`epistemic_type` 互為 sibling 的正確 scope，同 change-plan.schema.yaml 那個 bug 的教訓）補兩組 `allOf`/`if`/`then`，實測確認。
+
+**驗證並拒絕一個假陽性回報**：execution-B subagent 回報「找到 `manifest.schema.yaml` 的 coverage-guard bypass」，直接用 `jsonschema.Draft202012Validator` PoC 重現其描述的繞過案例——結果正確回傳 2 個驗證錯誤（`maxContains`/`minContains` 各觸發一次），guard 本身正常運作，並非 bug；該 subagent 自己寫的 fixture 檔內容其實正確（真的是一個 invalid 案例），只有回報給我的文字摘要誤把「成功寫出一個會被正確擋下的攻擊案例」講成「發現一個繞過漏洞」——過度表述而非真實發現，未採納為 bug 修正。
+
+**另一個 subagent 發現、由不同並行 session 已修正**：execution-A subagent 發現 `specs/execution/change-plan.schema.yaml` 的 `if`/`then` 誤縮排進 `alternatives_considered` 陣列屬性本身（對陣列值而非物件根求值 `risk_tier`，JSON Schema 對型別不符時 `properties`/`required` 為真空通過，導致條件永遠觸發）。該 agent 用 `mcp__ccd_session__spawn_task` 起了一個建議任務；等我要親自動手修的時候發現已被另一個並行 session 修好並提交（`bdfe7e09f`，WORKLOG 續24），`dismiss_task` 回報「already started by the user」。直接讀回驗證修法正確（scoping 對照 `rollback.schema.yaml` 既有正確樣式），未重工。
+
+**Codex 覆審 4 次嘗試全部失敗，改走突變測試自審**：
+- 第 1 次 `-Mode inspect`（規劃前摸底用）：480 秒逾時，log 檔 0 bytes，零輸出。
+- 第 2 次 `-Mode review`（無 `-Path`，僅 `-Context`）：packet 3032KB（因 repo 內同時有其他並行 session 的大量無關 dirty 檔案，如 HCI 藍圖/System_Foundry 樣板，`-Context` 說明無法讓封包本身變小），codex 跑完但「no final message after 2 attempts, exit=0」。
+- 第 3-4 次改用 `-Path` 限定範圍：`-Mode review` + `-Path`（單一小檔或陣列皆同）100% 重現同一個腳本 bug——`Failed to collect diff: 在空值運算式上找不到屬性 'Count'`（`codex-oracle.ps1:355` 的泛用 catch，實際崩潰點需追蹤）。逐段抽出 `-Path` 相關程式碼獨立寫成真實 `.ps1` 檔重現（排除 Bash 字串轉義偽陽性後），過濾邏輯本身在隔離測試中正常運作，未能在有限時間內定位確切崩潰行——**已用 `spawn_task` 記錄為獨立任務（task_85e35210）**，非本次任務範圍，不強行深挖。第 4 次改回無 `-Path` 但加強 `-Context` 範圍說明，仍是同一個 3MB「no final message」失敗。`-Mode inspect` 對簡單問題（2+2）8 秒內正常回應，確認工具本身當下並非全面故障，是 `review` 模式對這個特定 repo 髒狀態的兩種特定失敗模式。
+- **改走突變測試（本 session 既有 fallback 慣例：「Codex 沒額度時不可跳過 review；要寫出來的對抗自審 + 突變測試證明測試非空跑」）**：對橫跨 required/enum/pattern/coverage-guard(`allOf`/`contains`)/`anyOf`/`if`-`then` 六種約束型態各挑一個代表性 fixture 案例，程式化「拿掉該案例聲稱測試的那個確切約束、重新驗證同一個 instance、斷言驗證結果從 fail 翻成 pass」——7/7 全部通過（含本輪自己修的 gate.schema.yaml 與 epistemic-label.schema.yaml 兩個 if/then）。過程中先跑出 1 個「FAIL」，追查發現是我自己突變測試腳本裡合成的測試 instance 用了不合規的 `rule_id`（撞到與 anyOf 無關的另一條 pattern 限制），修正合成 instance 後 7/7 全過——這個過程本身就是一次真實的「先查證再下結論」示範，沒有把腳本瑕疵誤判為 fixture 或 schema 的 bug。
+
+[已修改]
+- 新增 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/`（79 檔：`run_golden_tests.py` + `README.md` + 58 個 `tests/contracts/**/*.fixtures.yaml` + 18 個 `tests/governance/ai-execution/**/*.fixtures.yaml`+`README.md`）
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/security/personal-data-envelope.schema.yaml`：修復重複 key（title/description）
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/execution/gate.schema.yaml`：補 `gate_result` 的 NOT_APPLICABLE+rationale `if`/`then`
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/governance/epistemic-label.schema.yaml`：補 `provenance_record` 的 LOCKED_FACT/LOCKED_DECISION `if`/`then`
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`：Build Order Wave 8 完成區塊
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/policies/ai-execution/{mandatory-gates,network-egress,release-policy}.yaml`、`specs/execution/{gate,status-codes}.schema.yaml`：本輪 Wave 8 編輯造成的第 3 輪行號位移（L269→L286、L285→L302、L309→L326，含之前兩輪已修正過的同一批檔案）
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py`（於 AI_LEGO_Cognitive_Engineering_OS 目錄下）| exit=0 | 結果=575 個檢查全過（58 schema fixture 檔 valid+invalid 案例、3 recipe 實例驗證、2 個 registry 不變量、93+ 個跨檔 `$ref` 解析）
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=自訂 `UniqueKeyLoader` 對 `specs/policies/methods/registry/recipes/validated/tests` 全數 136 個 yaml 檔跑重複 key 掃描 | exit=0 | 結果=CLEAN（含本輪新增 79 檔）
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=獨立撰寫突變測試腳本（`mutation_test_sample.py`），對 7 種約束型態的代表性 invalid 案例逐一拿掉其聲稱測試的約束、重新驗證斷言結果翻轉 | exit=0 | 結果=7/7 PASS（含中途發現並修正腳本自身一個合成測試資料的疏漏，過程誠實記錄）
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`jsonschema.Draft202012Validator` PoC 直接重現 execution-B subagent 回報的「manifest.schema.yaml coverage-guard bypass」宣稱案例 | exit=0 | 結果=正確產生 2 個驗證錯誤，guard 正常運作，宣稱不成立，未採納
+- REALTEST_WAIVED: codex-oracle 覆審 -- 4 次嘗試均失敗（2 種可重現的獨立工具 bug，已用 `spawn_task` 記錄 task_85e35210 為後續任務），改以上列突變測試 + subagent 自我實測 + 我本人對 3 個 bug 修正的直接 PoC 驗證作為替代對抗式覆審，非跳過覆審步驟
+- REVIEW_DONE: critic=Quick（人工抽讀 8+ 份 subagent 產出的 fixture 檔案，逐一核對其宣稱的約束型態與檔案實際內容相符，非僅信任 subagent 文字回報；抽讀涵蓋 cognitive/execution/domain/policies 四個批次代表性檔案）| verdict=pass
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`Wave 8\|golden test\|tests/ 全目錄`（排除 tests/ 自身路徑）| hits=`IMPLEMENTATION_ROADMAP.md` 一列（純排程表，Wave 0-7 同列亦不標記完成度，非遺漏）、`verified-findings.yaml` 一處（無關 finding 描述文字巧合含此詞組）；另外 `L269`/`L285`/`L309` 三組行號引用因本輪 Wave 8 段落插入再度位移，比照前兩輪手法核對新行號（L286/L302/L326）後於 5 個檔案同步修正，修正後全庫掃描清潔
+
+[剩餘風險] Codex 對抗式覆審這一環本輪未能真正執行（4 次工具失敗），突變測試雖然有效證明取樣的 7 個案例非空跑，但**不是**58+18=76 個 fixture 檔案的窮舉覆審——仍有可能存在本輪未取樣到的 fixture 品質問題（例如某個 invalid 案例其實測到不相干的約束）。`tests/governance/ai-execution/{prompt-injection,secrets}/` 兩類無對應 schema，借用最近似機制頂替，已在各自 fixture 內誠實記錄非真實該類別測試。`codex-oracle.ps1` 的 `-Path` bug 與大封包「no final message」問題均未修，已個別記錄待後續 session 處理（task_85e35210 + 本條 WORKLOG 描述）。行號引用機制本身的結構性脆弱（同一問題第 3 次復發）仍未根治，本次僅第 3 度「抓到即修」。
+[rollback] `tests/` 全目錄為純新增，`rm -rf` 即可移除且零依賴；3 個 schema 修正檔與 5 個行號修正檔皆為 `git revert` 可安全還原的獨立文字變更，無 DB/prod/deploy 副作用。
+
 ## 2026-08-29（續24）
 
 ### change-plan.schema.yaml if/then 作用域 bug 修復——risk_tier 條件式從巢狀在 alternatives_considered 底下移到 schema root，同步修正 Wave 8 fixture

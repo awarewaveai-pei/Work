@@ -1,0 +1,60 @@
+schema_id: "ai-lego://specs/artifact/cas-path.schema.yaml"
+target_ref: "#/definitions/cas_path"
+description: >
+  Exercises tenant_segment's oneOf[tenant-uuid-pattern, const "_global"],
+  the full path string's own independent regex, and
+  global_pool_promotion.content_class's fail-closed enum -- the exact
+  "an enum seeded with only the ADR's named examples, no open-ended
+  third value" guard this file's compilation_decisions installed
+  specifically so a new content_class cannot be smuggled in without
+  amending this schema file itself.
+valid:
+  - name: default_tenant_scoped_object
+    instance:
+      path: "/objects/3fa85f64-5717-4562-b3fc-2c963f66afa6/sha256/a1/92/a19225a6d8e6c4751a850398f7a782f1831c0b81ae7de82b8ee5f53d9ce2cfa4"
+      tenant_segment: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      hash: "a19225a6d8e6c4751a850398f7a782f1831c0b81ae7de82b8ee5f53d9ce2cfa4"
+      shard_1: "a1"
+      shard_2: "92"
+  - name: global_exception_pool_with_promotion_record
+    instance:
+      path: "/objects/_global/sha256/81/a6/81a6f0a07cbde6cc0347e84bb0b56c6dca7128c5e264783e8349d679f09a581c"
+      tenant_segment: "_global"
+      hash: "81a6f0a07cbde6cc0347e84bb0b56c6dca7128c5e264783e8349d679f09a581c"
+      shard_1: "81"
+      shard_2: "a6"
+      global_pool_promotion:
+        content_class: PLATFORM_AUTHORED_TEMPLATE
+        promoted_by: "svc-cas-admin"
+        promoted_at: "2026-08-29T00:00:00Z"
+        authorization_ref: "AUTH-cas-promo-001"
+invalid:
+  - name: tenant_segment_matches_neither_oneof_branch
+    instance:
+      path: "/objects/3fa85f64-5717-4562-b3fc-2c963f66afa6/sha256/a1/92/a19225a6d8e6c4751a850398f7a782f1831c0b81ae7de82b8ee5f53d9ce2cfa4"
+      tenant_segment: "tenant-123"
+      hash: "a19225a6d8e6c4751a850398f7a782f1831c0b81ae7de82b8ee5f53d9ce2cfa4"
+      shard_1: "a1"
+      shard_2: "92"
+    reason: "tenant_segment is oneOf[a real tenant UUID pattern, const '_global'] -- 'tenant-123' matches neither the UUID pattern nor the _global sentinel."
+  - name: path_missing_objects_prefix
+    instance:
+      path: "/object/3fa85f64-5717-4562-b3fc-2c963f66afa6/sha256/a1/92/a19225a6d8e6c4751a850398f7a782f1831c0b81ae7de82b8ee5f53d9ce2cfa4"
+      tenant_segment: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      hash: "a19225a6d8e6c4751a850398f7a782f1831c0b81ae7de82b8ee5f53d9ce2cfa4"
+      shard_1: "a1"
+      shard_2: "92"
+    reason: "path's own pattern requires the literal '/objects/' (plural) prefix; the singular '/object/' fails the regex."
+  - name: content_class_fail_closed_enum_bypass
+    instance:
+      path: "/objects/_global/sha256/81/a6/81a6f0a07cbde6cc0347e84bb0b56c6dca7128c5e264783e8349d679f09a581c"
+      tenant_segment: "_global"
+      hash: "81a6f0a07cbde6cc0347e84bb0b56c6dca7128c5e264783e8349d679f09a581c"
+      shard_1: "81"
+      shard_2: "a6"
+      global_pool_promotion:
+        content_class: CUSTOM_CONTENT
+        promoted_by: "svc-cas-admin"
+        promoted_at: "2026-08-29T00:00:00Z"
+        authorization_ref: "AUTH-cas-promo-002"
+    reason: "content_class enum is fail-closed, seeded only with ADR-003 Option C's two named examples [PLATFORM_AUTHORED_TEMPLATE, PUBLIC_REGULATORY_TEXT] -- 'CUSTOM_CONTENT' is exactly the kind of unreviewed third value the enum (not a free string) exists to reject without a schema amendment."

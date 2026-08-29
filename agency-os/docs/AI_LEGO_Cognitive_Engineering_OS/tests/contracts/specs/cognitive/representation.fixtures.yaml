@@ -1,0 +1,48 @@
+schema_id: "ai-lego://specs/cognitive/representation.schema.yaml"
+target_ref: ""
+description: >
+  Exercises representation.schema.yaml's required fields via this file's
+  own root $ref into #/representation, the 11-value representation_category
+  enum (transcribed from Atlas §17's /cognitive/representations/ taxonomy,
+  deliberately excluding Guided Mode / Expert LEGO Mode per
+  compilation_decisions), and the view_state.visible_fields array-of-string
+  shape.
+
+valid:
+  - name: text_view_with_visible_fields
+    instance:
+      id: "text-view-instance-1"
+      category: text
+      knowledge_ref: "KNOW-2026-08-29-001"
+      state:
+        visible_fields: ["title", "summary"]
+      provenance_consistent: true
+  - name: table_view_with_empty_state
+    instance:
+      id: "table-view-1"
+      category: table
+      knowledge_ref: "KNOW-2026-08-29-002"
+      state: {}
+
+invalid:
+  - name: category_uses_excluded_guided_mode_value
+    instance:
+      id: "guided-mode-instance"
+      category: guided_mode
+      knowledge_ref: "KNOW-003"
+      state: {}
+    reason: "category must be one of the 11 representation_category enum values (text/outline/table/matrix/mindmap/conceptmap/timeline/causal/graph/canvas/audio); 'guided_mode' is an interaction mode explicitly excluded per compilation_decisions, not a View category."
+  - name: missing_required_knowledge_ref
+    instance:
+      id: "orphan-view"
+      category: table
+      state: {}
+    reason: "knowledge_ref is in the top-level required list [id, category, knowledge_ref, state] and is entirely absent — a View with no parent Knowledge Object violates Atlas §9's tree-root model."
+  - name: visible_fields_wrong_type_not_array
+    instance:
+      id: "bad-state-view"
+      category: text
+      knowledge_ref: "KNOW-004"
+      state:
+        visible_fields: "title"
+    reason: "state.visible_fields must be an array of strings (field names); a bare string fails the array type check."

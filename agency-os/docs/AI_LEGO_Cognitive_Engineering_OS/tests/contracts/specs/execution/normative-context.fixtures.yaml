@@ -1,0 +1,82 @@
+schema_id: "ai-lego://specs/execution/normative-context.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the Normative Context Bundle's audit-evidence shape: the
+  minItems:1 guards on document_index_refs[]/loaded_sections[] (an empty
+  loaded_sections[] would defeat EC L214's entire "provable which sections
+  were loaded" purpose), the document_id enum chained through
+  manifest.schema.yaml, and the pinned sha256 pattern on section_sha256.
+
+valid:
+  - name: bundle_spanning_two_mandatory_documents
+    instance:
+      bundle_id: "NCB-2026-08-29-000001"
+      task_id: "TASK-2026-000001"
+      execution_id: null
+      generated_at: "2026-08-29T12:05:00Z"
+      generated_by: "boot.compile_normative_context"
+      document_index_refs:
+        - document_id: "ai-lego.execution-contract"
+          document_version: "1.0.0"
+          document_sha256: "2ad2a179944b917fe390119b6340ba9019344d7d15fcc9b77fdda3677937fc1e"
+        - document_id: "ai-lego.master-plan"
+          document_version: "1.0.0"
+          document_sha256: "8e5e67f607477babe60f2a4a354a211a30bd88cb1ece631dd51c5e11b23bac10"
+      loaded_sections:
+        - document_id: "ai-lego.execution-contract"
+          section_id: "3.2"
+          section_sha256: "2560a7db58fe572fa7e16ce7dae364f05dbcac9e6c843c85e9ba87ac503d529e"
+          heading: "3.2 不要求每次把全部文件塞進 Context"
+          retrieval_reason: "task_context requires confirming the index-reuse rule before compiling this Bundle"
+          loaded_at: "2026-08-29T12:04:50Z"
+        - document_id: "ai-lego.master-plan"
+          section_id: "0.0.3"
+          section_sha256: "e42c77d31ae30908bb0da46ab408683631e82d12c8afb46cb4f0127597e18640"
+          heading: "0.0.3 Execution Manifest 必須記錄 Atlas 版本"
+          retrieval_reason: "task touches Execution Manifest fields governed by this section"
+          loaded_at: "2026-08-29T12:04:55Z"
+      method_execution_ref: null
+      reuse_of: null
+
+invalid:
+  - name: loaded_sections_empty_defeats_audit_purpose
+    instance:
+      bundle_id: "NCB-2026-08-29-000002"
+      task_id: "TASK-2026-000002"
+      generated_at: "2026-08-29T12:10:00Z"
+      document_index_refs:
+        - document_id: "ai-lego.execution-contract"
+          document_version: "1.0.0"
+          document_sha256: "2ad2a179944b917fe390119b6340ba9019344d7d15fcc9b77fdda3677937fc1e"
+      loaded_sections: []
+    reason: "loaded_sections has minItems:1 -- an empty array would make this Bundle unable to prove ANY section was loaded, defeating EC L214's stated audit purpose ('可證明 AI 實際載入哪些規範')."
+  - name: document_index_refs_document_id_not_in_four_value_enum
+    instance:
+      bundle_id: "NCB-2026-08-29-000003"
+      task_id: "TASK-2026-000003"
+      generated_at: "2026-08-29T12:15:00Z"
+      document_index_refs:
+        - document_id: "ai-lego.unknown-document"
+          document_version: "1.0.0"
+          document_sha256: "2ad2a179944b917fe390119b6340ba9019344d7d15fcc9b77fdda3677937fc1e"
+      loaded_sections:
+        - document_id: "ai-lego.execution-contract"
+          section_id: "3.2"
+          section_sha256: "2560a7db58fe572fa7e16ce7dae364f05dbcac9e6c843c85e9ba87ac503d529e"
+          heading: "3.2 不要求每次把全部文件塞進 Context"
+    reason: "document_index_refs[].document_id is a hard $ref chain into manifest.schema.yaml's 4-value document_id enum; 'ai-lego.unknown-document' is not one of the 4 mandatory document ids."
+  - name: section_sha256_malformed_not_64_hex
+    instance:
+      bundle_id: "NCB-2026-08-29-000004"
+      task_id: "TASK-2026-000004"
+      generated_at: "2026-08-29T12:20:00Z"
+      document_index_refs:
+        - document_id: "ai-lego.execution-contract"
+          document_version: "1.0.0"
+          document_sha256: "2ad2a179944b917fe390119b6340ba9019344d7d15fcc9b77fdda3677937fc1e"
+      loaded_sections:
+        - document_id: "ai-lego.execution-contract"
+          section_id: "3.2"
+          section_sha256: "not-a-real-hash"
+          heading: "3.2 不要求每次把全部文件塞進 Context"
+    reason: "loaded_sections[].section_sha256 must match cas-path.schema.yaml#/definitions/sha256_hash's pattern ^[a-f0-9]{64}$; 'not-a-real-hash' is neither 64 characters nor hex."

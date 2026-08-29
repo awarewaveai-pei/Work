@@ -1,0 +1,91 @@
+schema_id: "ai-lego://specs/execution/exception.schema.yaml"
+target_ref: ""
+description: >
+  Exception/Workaround Record (EC §24, 12-field template + status lifecycle).
+  Exercises the required-key-but-nullable-value resolution for `adr`
+  (present as a key, null value legal pre-promotion), the `status` enum, the
+  hard $ref chain into risk-tier.schema.yaml (`risk_tier`) and
+  authority.schema.yaml (`required_authority_level`), and the `id` pattern.
+valid:
+  - name: active_exception_adr_null
+    instance:
+      id: "EXC-2026-000001"
+      reason: "Vendor SDK does not yet support async retries."
+      owner: "platform-team"
+      scope: "billing/invoice-sync module only"
+      risk: "Low -- isolated to one module, covered by existing tests"
+      approved_by: "tech-lead-jane"
+      created_at: "2026-08-29T09:00:00Z"
+      expires_at: "2026-12-31T00:00:00Z"
+      test: "tests/billing/invoice-sync.retry.test.ts"
+      migration_plan: "Switch to vendor SDK v3 once GA, tracked in TASK-2026-000020."
+      removal_condition: "Vendor SDK v3 reaches GA."
+      adr: null
+      status: "active"
+  - name: formalized_exception_with_adr_and_authority
+    instance:
+      id: "EXC-2026-000002"
+      reason: "Direct DB write bypasses the event-sourced core for one legacy table."
+      owner: "data-platform-team"
+      scope: "legacy_orders table"
+      risk: "Medium -- documented architecture invariant exception"
+      risk_tier: "R2"
+      required_authority_level: "A2"
+      approved_by: "architecture-review-board"
+      created_at: "2026-06-01T00:00:00Z"
+      expires_at: "2027-06-01T00:00:00Z"
+      test: "tests/legacy/orders-direct-write.test.ts"
+      migration_plan: "Retire legacy_orders table per DEP-2026-000010."
+      removal_condition: "legacy_orders table is archived."
+      adr: "docs/adr/ADR-099-legacy-orders-direct-write-exception.md"
+      status: "formalized_as_architecture_exception"
+invalid:
+  - name: missing_required_adr_key
+    instance:
+      id: "EXC-2026-000003"
+      reason: "r"
+      owner: "o"
+      scope: "s"
+      risk: "low"
+      approved_by: "a"
+      created_at: "2026-08-29T09:00:00Z"
+      expires_at: "2026-12-31T00:00:00Z"
+      test: "t"
+      migration_plan: "m"
+      removal_condition: "c"
+      status: "active"
+    reason: "adr is a required KEY on every instance (this schema's own required-key/nullable-value resolution of EC §24's '任何 exception 必須有' full 12-field template) even though its VALUE may legally be null -- omitting the key entirely violates required, unlike supplying adr: null"
+  - name: status_outside_enum
+    instance:
+      id: "EXC-2026-000004"
+      reason: "r"
+      owner: "o"
+      scope: "s"
+      risk: "low"
+      approved_by: "a"
+      created_at: "2026-08-29T09:00:00Z"
+      expires_at: "2026-12-31T00:00:00Z"
+      test: "t"
+      migration_plan: "m"
+      removal_condition: "c"
+      adr: null
+      status: "expired"
+    reason: "status enum is exactly [active, formalized_as_architecture_exception, removed] -- 'expired' is not a legal lifecycle value"
+  - name: required_authority_level_outside_enum
+    instance:
+      id: "EXC-2026-000005"
+      reason: "r"
+      owner: "o"
+      scope: "s"
+      risk: "high"
+      risk_tier: "R4"
+      required_authority_level: "A9"
+      approved_by: "a"
+      created_at: "2026-08-29T09:00:00Z"
+      expires_at: "2026-12-31T00:00:00Z"
+      test: "t"
+      migration_plan: "m"
+      removal_condition: "c"
+      adr: null
+      status: "active"
+    reason: "required_authority_level is a hard $ref into authority.schema.yaml#/authority_level (A0-A4 only) -- 'A9' does not exist in that enum"

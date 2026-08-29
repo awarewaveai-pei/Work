@@ -1,0 +1,22 @@
+schema_id: "ai-lego://specs/cognitive/rigor-level.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the 5-value rigor_mode enum (MP §84's 5 named operating modes,
+  SNAKE_CASE canonical form) via this file's own root $ref into
+  #/rigor_mode, including the documented near-match trap between the
+  Title-Case mode names in migration_crosswalk and the canonical
+  snake_case enum values.
+
+valid:
+  - name: fast_mode
+    instance: "fast"
+  - name: deep_intelligence_mode
+    instance: "deep_intelligence"
+
+invalid:
+  - name: title_case_mp_name_not_canonical_value
+    instance: "Board Grade"
+    reason: "migration_crosswalk maps the Title-Case MP §84 name 'Board Grade' to the canonical snake_case value 'board_grade' — the Title-Case prose form itself is not a member of the rigor_mode enum."
+  - name: value_outside_5_value_enum
+    instance: "expert"
+    reason: "'expert' is not one of the 5 canonical rigor_mode enum values [fast, professional, research_grade, board_grade, deep_intelligence]."

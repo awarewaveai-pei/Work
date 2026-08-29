@@ -1,0 +1,133 @@
+schema_id: "ai-lego://specs/execution/current-state.schema.yaml"
+target_ref: ""
+description: >
+  Current-state Reconstruction Record (EC §11). Exercises the
+  `allOf`/`contains`/`minContains`/`maxContains` coverage-guard block on
+  `dimensions[]` (must cover exactly the 20 EC §11.1 canonical dimension
+  names, each exactly once) -- this is the exact "uniqueItems alone is
+  insufficient" bug class this file's own comment documents as already
+  found and fixed once (20 items with the SAME name but different `summary`
+  values are 20 unique whole objects, satisfying uniqueItems+minItems:20
+  while 19 of 20 mandated dimensions never appear).
+valid:
+  - name: full_20_dimension_coverage_no_drift
+    instance:
+      task_id: "TASK-2026-000010"
+      reconstructed_at: "2026-08-29T12:00:00Z"
+      dimensions:
+        - { name: "Repository / Commit", status: "OBSERVED", summary: "main @ abc123" }
+        - { name: "Architecture", status: "OBSERVED", summary: "monolith, 3 modules" }
+        - { name: "Affected Bounded Context", status: "OBSERVED", summary: "billing" }
+        - { name: "Affected Files / Modules", status: "OBSERVED", summary: "billing/invoice.ts" }
+        - { name: "Runtime Dependencies", status: "OBSERVED", summary: "postgres 15" }
+        - { name: "APIs", status: "OBSERVED", summary: "/v1/invoices" }
+        - { name: "Schemas", status: "OBSERVED", summary: "invoice.schema.yaml" }
+        - { name: "Events", status: "NOT_APPLICABLE", summary: "no event bus in this module" }
+        - { name: "Data Flow", status: "OBSERVED", summary: "sync request/response" }
+        - { name: "Security Boundary", status: "OBSERVED", summary: "internal only" }
+        - { name: "Identity / Authorization", status: "OBSERVED", summary: "service-to-service token" }
+        - { name: "Config", status: "OBSERVED", summary: "env vars, no secrets" }
+        - { name: "Infrastructure", status: "OBSERVED", summary: "single VPS" }
+        - { name: "Deployment Topology", status: "OBSERVED", summary: "docker compose" }
+        - { name: "Tests", status: "OBSERVED", summary: "12 unit tests" }
+        - { name: "Observability", status: "UNKNOWN", summary: "" }
+        - { name: "Known Failure", status: "NOT_APPLICABLE", summary: "none logged" }
+        - { name: "Rollback Capability", status: "OBSERVED", summary: "git revert sufficient" }
+        - { name: "Open Migration", status: "NOT_APPLICABLE", summary: "none pending" }
+        - { name: "Known Technical Debt", status: "OBSERVED", summary: "no index on invoice.customer_id" }
+      evidence_log:
+        - { type: "Repository", ref: "abc123" }
+        - { type: "Tests", ref: "ci-run-4821" }
+      drift:
+        detected: false
+  - name: drift_detected_with_side_state
+    instance:
+      task_id: "TASK-2026-000011"
+      reconstructed_at: "2026-08-29T13:00:00Z"
+      dimensions:
+        - { name: "Repository / Commit", status: "OBSERVED" }
+        - { name: "Architecture", status: "OBSERVED" }
+        - { name: "Affected Bounded Context", status: "OBSERVED" }
+        - { name: "Affected Files / Modules", status: "OBSERVED" }
+        - { name: "Runtime Dependencies", status: "OBSERVED" }
+        - { name: "APIs", status: "OBSERVED" }
+        - { name: "Schemas", status: "OBSERVED", drift_detected: true }
+        - { name: "Events", status: "OBSERVED" }
+        - { name: "Data Flow", status: "OBSERVED" }
+        - { name: "Security Boundary", status: "OBSERVED" }
+        - { name: "Identity / Authorization", status: "OBSERVED" }
+        - { name: "Config", status: "OBSERVED" }
+        - { name: "Infrastructure", status: "OBSERVED" }
+        - { name: "Deployment Topology", status: "OBSERVED" }
+        - { name: "Tests", status: "OBSERVED" }
+        - { name: "Observability", status: "OBSERVED" }
+        - { name: "Known Failure", status: "OBSERVED" }
+        - { name: "Rollback Capability", status: "OBSERVED" }
+        - { name: "Open Migration", status: "OBSERVED" }
+        - { name: "Known Technical Debt", status: "OBSERVED" }
+      evidence_log: []
+      drift:
+        detected: true
+        status_code: "CURRENT_STATE_DRIFT_DETECTED"
+        conflicting_dimensions: ["Schemas"]
+        recorded_before_assuming_doc_correct: true
+        side_state: "NEEDS_HUMAN_REVIEW"
+invalid:
+  - name: coverage_guard_bypass_repeated_name
+    instance:
+      task_id: "TASK-2026-000012"
+      reconstructed_at: "2026-08-29T14:00:00Z"
+      dimensions:
+        - { name: "Repository / Commit", status: "OBSERVED", summary: "v1" }
+        - { name: "Repository / Commit", status: "OBSERVED", summary: "v2" }
+        - { name: "Repository / Commit", status: "OBSERVED", summary: "v3" }
+        - { name: "Repository / Commit", status: "OBSERVED", summary: "v4" }
+        - { name: "Repository / Commit", status: "OBSERVED", summary: "v5" }
+        - { name: "Repository / Commit", status: "OBSERVED", summary: "v6" }
+        - { name: "Repository / Commit", status: "OBSERVED", summary: "v7" }
+        - { name: "Repository / Commit", status: "OBSERVED", summary: "v8" }
+        - { name: "Repository / Commit", status: "OBSERVED", summary: "v9" }
+        - { name: "Repository / Commit", status: "OBSERVED", summary: "v10" }
+        - { name: "Repository / Commit", status: "OBSERVED", summary: "v11" }
+        - { name: "Repository / Commit", status: "OBSERVED", summary: "v12" }
+        - { name: "Repository / Commit", status: "OBSERVED", summary: "v13" }
+        - { name: "Repository / Commit", status: "OBSERVED", summary: "v14" }
+        - { name: "Repository / Commit", status: "OBSERVED", summary: "v15" }
+        - { name: "Repository / Commit", status: "OBSERVED", summary: "v16" }
+        - { name: "Repository / Commit", status: "OBSERVED", summary: "v17" }
+        - { name: "Repository / Commit", status: "OBSERVED", summary: "v18" }
+        - { name: "Repository / Commit", status: "OBSERVED", summary: "v19" }
+        - { name: "Repository / Commit", status: "OBSERVED", summary: "v20" }
+      evidence_log: []
+      drift:
+        detected: false
+    reason: "20 whole-object-unique entries (differing only by summary) all named 'Repository / Commit' satisfy uniqueItems+minItems:20+maxItems:20 but the allOf/contains/minContains/maxContains coverage-guard fails twice over: maxContains:1 for 'Repository / Commit' (20 occurrences) and minContains:1 for each of the other 19 canonical names (0 occurrences) -- the exact bypass this file's own comment documents as previously found and closed"
+  - name: dimension_status_outside_enum
+    instance:
+      task_id: "TASK-2026-000013"
+      reconstructed_at: "2026-08-29T15:00:00Z"
+      dimensions:
+        - { name: "Repository / Commit", status: "GUESSED" }
+        - { name: "Architecture", status: "OBSERVED" }
+        - { name: "Affected Bounded Context", status: "OBSERVED" }
+        - { name: "Affected Files / Modules", status: "OBSERVED" }
+        - { name: "Runtime Dependencies", status: "OBSERVED" }
+        - { name: "APIs", status: "OBSERVED" }
+        - { name: "Schemas", status: "OBSERVED" }
+        - { name: "Events", status: "OBSERVED" }
+        - { name: "Data Flow", status: "OBSERVED" }
+        - { name: "Security Boundary", status: "OBSERVED" }
+        - { name: "Identity / Authorization", status: "OBSERVED" }
+        - { name: "Config", status: "OBSERVED" }
+        - { name: "Infrastructure", status: "OBSERVED" }
+        - { name: "Deployment Topology", status: "OBSERVED" }
+        - { name: "Tests", status: "OBSERVED" }
+        - { name: "Observability", status: "OBSERVED" }
+        - { name: "Known Failure", status: "OBSERVED" }
+        - { name: "Rollback Capability", status: "OBSERVED" }
+        - { name: "Open Migration", status: "OBSERVED" }
+        - { name: "Known Technical Debt", status: "OBSERVED" }
+      evidence_log: []
+      drift:
+        detected: false
+    reason: "dimensions[].status enum is exactly [OBSERVED, UNKNOWN, NOT_APPLICABLE] (EC §11 honest-UNKNOWN rule) -- 'GUESSED' is not a legal value, and per EC L688-694 guessing is exactly what this field must not silently do"

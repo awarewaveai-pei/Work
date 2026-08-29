@@ -1,0 +1,37 @@
+# EC section 141 golden scenario, step 1 of 6 -- see golden/README.md
+schema_id: "ai-lego://specs/execution/task.schema.yaml"
+target_ref: ""
+category: golden
+description: >
+  The task context for the golden scenario: an R3-tier DB migration.
+valid:
+  - name: r3_db_migration_task
+    instance:
+      task_id: "TASK-2026-08-29-GOLDEN-001"
+      objective: "Expand orders table with a new nullable column, per db-migration-expand-contract.recipe.yaml"
+      requester: "operator"
+      environment: "production"
+      domains: ["database"]
+      affected_modules: ["orders-service"]
+      data_impact: "migration"
+      external_side_effects: []
+      jurisdiction_context: "single-jurisdiction, no cross-border data movement"
+      reversibility: "high"
+      user_impact: "none expected -- additive schema change"
+      risk_tier: "R3"
+invalid:
+  - name: environment_not_in_enum
+    instance:
+      task_id: "TASK-2026-08-29-GOLDEN-001"
+      objective: "Expand orders table"
+      requester: "operator"
+      environment: "prod"
+      domains: ["database"]
+      affected_modules: ["orders-service"]
+      data_impact: "migration"
+      external_side_effects: []
+      jurisdiction_context: "single-jurisdiction"
+      reversibility: "high"
+      user_impact: "none"
+      risk_tier: "R3"
+    reason: "environment enum is [local, dev, staging, production] -- the common abbreviation 'prod' is not a legal value, exactly the kind of near-miss a machine-readable enum is meant to catch"

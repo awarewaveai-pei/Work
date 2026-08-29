@@ -1,0 +1,27 @@
+# EC section 141 golden scenario, step 3 of 6 -- see golden/README.md
+schema_id: "ai-lego://specs/execution/gate.schema.yaml"
+target_ref: "#/gate_result"
+category: golden
+description: >
+  The gate injected for TASK-2026-08-29-GOLDEN-001 by
+  risk-tier.schema.yaml's mandatory_gate_injection_trigger (fires because
+  risk_tier R3 is IN [R3, R4]) -- a Backup/Restore Validation gate, per
+  db-migration-expand-contract.recipe.yaml's own gate_ref placeholder on
+  that step.
+valid:
+  - name: backup_restore_validation_pass
+    instance:
+      gate_id: "backup-restore-validation"
+      status: "PASS"
+      evidence: ["pg_restore dry-run on staging snapshot 2026-08-29, exit 0"]
+      validator: "sg-deploy.sh pre-migration hook"
+      timestamp: "2026-08-29T10:10:00Z"
+invalid:
+  - name: blocked_without_evidence_array_type
+    instance:
+      gate_id: "backup-restore-validation"
+      status: "PASS"
+      evidence: "pg_restore ok"
+      validator: "sg-deploy.sh"
+      timestamp: "2026-08-29T10:10:00Z"
+    reason: "evidence must be an array (gate_result.evidence type: array per EC section 69 L2288) -- a bare string silently loses the ability to attach more than one evidence item later"

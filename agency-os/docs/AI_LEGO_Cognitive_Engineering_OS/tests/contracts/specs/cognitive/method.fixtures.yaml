@@ -1,0 +1,69 @@
+schema_id: "ai-lego://specs/cognitive/method.schema.yaml"
+target_ref: ""
+description: >
+  Exercises method.schema.yaml's required fields, the ADR-005b bare
+  `<family>.<name>` id pattern (using the file's own documented
+  accept/reject matrix), the version semver pattern, and the
+  `recommended_next[]` items' own id-pattern re-application.
+
+valid:
+  - name: root_cause_fishbone_atlas_worked_example
+    instance:
+      id: "root_cause.fishbone"
+      version: "1.0.0"
+      family: "root_cause"
+      cognitive_primitives: [DECOMPOSE, GROUP, CAUSE_HYPOTHESIS]
+      purpose: [identify_candidate_causes]
+      inputs:
+        required: [ProblemStatement]
+        optional: [EvidenceSet]
+      outputs: [CauseHypothesisSet]
+      quality:
+        provenance_required: true
+        evidence_labeling_required: true
+      recommended_next: [root_cause.pareto, root_cause.five_whys, causal.dag, validation.experiment]
+  - name: minimal_strategy_swot
+    instance:
+      id: "strategy.swot"
+      version: "2.0.0"
+      family: "strategy"
+      cognitive_primitives: [CLASSIFY, COMPARE, CONTEXTUALIZE]
+      purpose: [assess_strategic_position]
+      inputs:
+        required: [KnowledgeSet]
+      outputs: [SWOTAnalysis]
+
+invalid:
+  - name: id_uses_rejected_method_prefix_and_embedded_version
+    instance:
+      id: "method.swot.v1"
+      version: "1.0.0"
+      family: "strategy"
+      cognitive_primitives: [CLASSIFY]
+      purpose: [assess]
+      inputs:
+        required: [KnowledgeSet]
+      outputs: [SWOTAnalysis]
+    reason: "id must match ^[a-z_]+\\.[a-z_]+$ (ADR-005b bare form) — 'method.swot.v1' is the historically-rejected method.<name>.v<N> form documented in this file's own id_grammar_conformance_examples.rejected list (a method. prefix plus an embedded version, two violations at once)."
+  - name: missing_required_cognitive_primitives
+    instance:
+      id: "root_cause.fishbone"
+      version: "1.0.0"
+      family: "root_cause"
+      purpose: [identify_candidate_causes]
+      inputs:
+        required: [ProblemStatement]
+      outputs: [CauseHypothesisSet]
+    reason: "cognitive_primitives is in the top-level required list [id, version, family, cognitive_primitives, purpose, inputs, outputs] and is entirely absent here."
+  - name: recommended_next_entry_fails_id_pattern
+    instance:
+      id: "root_cause.fishbone"
+      version: "1.0.0"
+      family: "root_cause"
+      cognitive_primitives: [DECOMPOSE]
+      purpose: [identify_candidate_causes]
+      inputs:
+        required: [ProblemStatement]
+      outputs: [CauseHypothesisSet]
+      recommended_next: ["RootCausePareto"]
+    reason: "recommended_next[] items must each match the same bare <family>.<name> id pattern as this file's own id field; 'RootCausePareto' has no dot segment and uses PascalCase, failing ^[a-z_]+\\.[a-z_]+$."

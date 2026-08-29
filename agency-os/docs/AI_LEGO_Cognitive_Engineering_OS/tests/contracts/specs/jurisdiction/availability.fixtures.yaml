@@ -1,0 +1,39 @@
+schema_id: "ai-lego://specs/jurisdiction/availability.schema.yaml"
+target_ref: "#/capability_availability"
+description: >
+  Exercises the lowercase-snake_case 7-value status enum (CROSS-T-21's
+  resolved casing) against the required [capability, jurisdiction, status]
+  object -- including that 'unknown' IS legal here (this target uses the
+  full 7-value status, not pack.schema.yaml's 6-value authorable subset
+  that excludes it).
+valid:
+  - name: mp_143_worked_example
+    instance:
+      capability: "biometric_identification"
+      jurisdiction: "eu-west"
+      status: prohibited
+  - name: unknown_is_legal_on_the_full_status_enum
+    instance:
+      capability: "facial_recognition"
+      jurisdiction: "us-federal"
+      status: unknown
+      fail_closed: true
+      basis_legal_source: "LAW-0042"
+invalid:
+  - name: status_wrong_casing
+    instance:
+      capability: "biometric_identification"
+      jurisdiction: "eu-west"
+      status: Prohibited
+    reason: "status enum values are lowercase snake_case only (this file's own CROSS-T-21 casing normalization); Title-Case 'Prohibited' is not a member."
+  - name: missing_jurisdiction
+    instance:
+      capability: "biometric_identification"
+      status: prohibited
+    reason: "jurisdiction is required [capability, jurisdiction, status] -- omitting it fails required."
+  - name: capability_empty_string
+    instance:
+      capability: ""
+      jurisdiction: "eu-west"
+      status: allowed
+    reason: "capability has minLength:1; an empty string is not a legal capability identifier."

@@ -1,0 +1,19 @@
+# EC section 94 category: risk
+schema_id: "ai-lego://specs/execution/risk-tier.schema.yaml"
+target_ref: ""
+category: risk
+description: >
+  R0-R4 canonical risk tier enum (ADR-004a), the single source of truth
+  Atlas's deprecated four-level low/medium/high/critical enum defers to.
+valid:
+  - name: r0
+    instance: "R0"
+  - name: r3
+    instance: "R3"
+invalid:
+  - name: atlas_word_form
+    instance: "critical"
+    reason: "risk_tier is the R0-R4 enum, not Atlas's deprecated low/medium/high/critical word form -- ADR-004a's migration_crosswalk maps 'critical' to R4, it does not make 'critical' itself a legal value here"
+  - name: out_of_range
+    instance: "R5"
+    reason: "enum is [R0,R1,R2,R3,R4] -- R5 does not exist"

@@ -1,0 +1,38 @@
+schema_id: "ai-lego://specs/decision/reversal.schema.yaml"
+target_ref: ""
+description: >
+  Root is a `oneOf` of two named forms (multi_indicator_form / EC §88
+  shape, and single_indicator_form / Atlas §11.33 + ADR-001 real-usage
+  shape). Valid cases cover both branches; invalid cases cover both a
+  value matching NEITHER branch and a value matching BOTH branches
+  simultaneously (neither definition sets additionalProperties:false, so
+  a value carrying both branches' required fields satisfies both schemas
+  at once -- which oneOf itself rejects, since it requires EXACTLY one
+  match).
+valid:
+  - name: multi_indicator_form_ec_88
+    instance:
+      indicators: ["CAC", "adoption_rate"]
+      thresholds: ["> 300 USD for 3 consecutive months", "< 5% after month 2"]
+      owner: growth_lead
+      action: re_review
+  - name: single_indicator_form_adr_001_real_usage
+    instance:
+      indicator: "Architecture-Constitution-v1.md 被證明無法承載 Architecture/Platform-scope 硬政策內容"
+      condition: "Phase 3 machine-readable spec 設計階段，任兩位獨立審查者認定切分不可行"
+      action: "重新review，改採 Option B"
+      owner: "操作者"
+invalid:
+  - name: matches_neither_branch
+    instance:
+      indicator: "CAC"
+      action: re_review
+    reason: "single_indicator_form requires [indicator, action] PLUS anyOf[condition, threshold] -- neither condition nor threshold is present, so this fails single_indicator_form; it also fails multi_indicator_form (missing required indicators/thresholds). Matches zero of the two oneOf branches."
+  - name: matches_both_branches_simultaneously
+    instance:
+      indicators: ["CAC"]
+      thresholds: ["> 300"]
+      action: re_review
+      indicator: "CAC"
+      condition: "> 300"
+    reason: "Neither definition sets additionalProperties:false, so an object carrying multi_indicator_form's required fields (indicators/thresholds/action) AND single_indicator_form's required fields (indicator/action, plus condition satisfying its anyOf) validates against BOTH branches -- oneOf requires exactly one match, so this is invalid for matching two, not zero."

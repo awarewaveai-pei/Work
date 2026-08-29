@@ -1,0 +1,25 @@
+schema_id: "ai-lego://specs/execution/status-codes.schema.yaml"
+target_ref: "#/reference_vocabulary/final_status/schema"
+description: >
+  Exercises EC §70's 7-value final_status enum via the `schema` sibling node
+  (same 2026-08-29 CRITICAL fix as the legal_side_states fixture). The two
+  invalid cases mirror that fixture's boundary logic from the other side:
+  'CANCELLED' is a real legal_side_states value that is NOT one of the 7
+  final_status values (a cancelled-in-flight execution and a terminal
+  Final Status are different axes per this file's own registry), and
+  'NEEDS_REVIEW' is again the undeclared EC §61 shorthand, absent from this
+  enum too.
+
+valid:
+  - name: pass
+    instance: "PASS"
+  - name: needs_human_review
+    instance: "NEEDS_HUMAN_REVIEW"
+
+invalid:
+  - name: cancelled_is_side_state_only_not_final_status
+    instance: "CANCELLED"
+    reason: "'CANCELLED' is a member of reference_vocabulary.legal_side_states (EC §10, 7 values) but is NOT one of EC §70's 7 final_status values (PASS/PASS_WITH_APPROVED_RISK/BLOCKED/FAILED/NEEDS_HUMAN_REVIEW/ROLLED_BACK/PARTIAL_SUCCESS) -- the two vocabularies overlap but are not identical sets."
+  - name: needs_review_undeclared_shorthand
+    instance: "NEEDS_REVIEW"
+    reason: "Same DOC-execution_contract-3 alias as the legal_side_states fixture: EC §61's 'NEEDS_REVIEW' shorthand resolves to the canonical NEEDS_HUMAN_REVIEW but was never itself declared in EC §70's Final Status list either."

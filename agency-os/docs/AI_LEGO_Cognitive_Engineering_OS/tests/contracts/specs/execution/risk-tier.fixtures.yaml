@@ -1,0 +1,22 @@
+schema_id: "ai-lego://specs/execution/risk-tier.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the R0-R4 enum via this file's own root $ref into #/risk_tier
+  (added 2026-08-29 so root-level validation, not just #/risk_tier-scoped
+  validation, actually constrains the value). Covers both the numeric
+  boundary just past the top of the scale and Atlas's deprecated
+  space-form/lowercase vocabulary that ADR-004 superseded.
+
+valid:
+  - name: r0_read_only
+    instance: "R0"
+  - name: r4_critical
+    instance: "R4"
+
+invalid:
+  - name: r5_out_of_range
+    instance: "R5"
+    reason: "risk_tier is a closed 5-value enum [R0, R1, R2, R3, R4]; R5 is one past the top of the scale and was never a legal value in any mother document."
+  - name: atlas_deprecated_lowercase_critical
+    instance: "critical"
+    reason: "'critical' was Method Atlas's own pre-ADR-004 4-value enum term (low/medium/high/critical); ADR-004 deprecates it in favor of this file's R0-R4 scale, and it is not a member of the canonical enum."

@@ -1,0 +1,48 @@
+schema_id: "ai-lego://specs/security/log-redaction-token.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the fixed token_alg const, the classification_tag enum reused
+  verbatim from MP §61/EC §101, and the token value's 64-lowercase-hex
+  pattern (256-bit HMAC-SHA256 digest).
+valid:
+  - name: current_active_key_generation
+    instance:
+      token_alg: "HMAC-SHA256"
+      hmac_key_ref: "hmac-key.tenant-3fa85f64.gen-2"
+      classification_tag: Restricted
+      tenant_scope: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      token: "b7e23ec29af22b0b4e41da31e868d57226121c84a5ffc5e5d3b6c4c8f5f5b7a1"
+      field_name: "customer.email"
+      computed_at: "2026-08-29T00:00:00Z"
+  - name: historical_rotated_key_generation
+    instance:
+      token_alg: "HMAC-SHA256"
+      hmac_key_ref: "hmac-key.tenant-3fa85f64.gen-1"
+      classification_tag: Confidential
+      tenant_scope: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      token: "1c4a5b6c8f5f5b7a1b7e23ec29af22b0b4e41da31e868d57226121c84a5ffc53"
+invalid:
+  - name: token_alg_const_violation
+    instance:
+      token_alg: "SHA256"
+      hmac_key_ref: "hmac-key.tenant-3fa85f64.gen-2"
+      classification_tag: Restricted
+      tenant_scope: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      token: "b7e23ec29af22b0b4e41da31e868d57226121c84a5ffc5e5d3b6c4c8f5f5b7a1"
+    reason: "token_alg is const: 'HMAC-SHA256' -- ADR-007's FMEA finding rules out an unkeyed/unsalted hash like bare SHA256 as dictionary-attack-reversible; any other value is illegal."
+  - name: token_pattern_violation_too_short
+    instance:
+      token_alg: "HMAC-SHA256"
+      hmac_key_ref: "hmac-key.tenant-3fa85f64.gen-2"
+      classification_tag: Restricted
+      tenant_scope: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      token: "ABC123"
+    reason: "token pattern is ^[a-f0-9]{64}$ (a 256-bit lowercase hex digest); 'ABC123' is both the wrong length and uppercase."
+  - name: classification_tag_not_in_enum
+    instance:
+      token_alg: "HMAC-SHA256"
+      hmac_key_ref: "hmac-key.tenant-3fa85f64.gen-2"
+      classification_tag: Secret
+      tenant_scope: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      token: "b7e23ec29af22b0b4e41da31e868d57226121c84a5ffc5e5d3b6c4c8f5f5b7a1"
+    reason: "classification_tag enum is the verbatim MP §61/EC §101 four-value list [Public, Internal, Confidential, Restricted] -- 'Secret' is not a fifth tier this schema invents."

@@ -1,0 +1,65 @@
+schema_id: "ai-lego://specs/security/key-vault-lifecycle.schema.yaml"
+target_ref: "#/definitions/key_record"
+description: >
+  Exercises the required [key_id, key_use, tenant_id, algorithm, status,
+  issued_at] set and the key_use / status enums (ADR-007's lowercase
+  prose 'hmac_signing_key' normalized to SNAKE_CASE uppercase
+  HMAC_SIGNING_KEY, alongside the pre-existing KEK/DEK values).
+valid:
+  - name: dek_record_active
+    instance:
+      key_id: "dek-subject-91ab"
+      key_use: DEK
+      tenant_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      subject_id: "subject-91ab"
+      algorithm: "AES-256-GCM"
+      sovereignty_mode: null
+      wrapped_by_kek_ref: "kek-tenant-7f2c"
+      status: ACTIVE
+      issued_at: "2026-01-01T00:00:00Z"
+      destroyed_at: null
+      rotation_policy: null
+      physical_copies:
+        - { location: "live-vault", is_live: true }
+  - name: kek_record_with_rotation_policy
+    instance:
+      key_id: "kek-tenant-7f2c"
+      key_use: KEK
+      tenant_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      subject_id: null
+      algorithm: "AES-256-KW"
+      sovereignty_mode: BYOK
+      wrapped_by_kek_ref: null
+      status: ACTIVE
+      issued_at: "2025-06-01T00:00:00Z"
+      rotation_policy:
+        rotation_interval: "P90D"
+        last_rotated_at: null
+        rotation_breaks_correlatability: false
+invalid:
+  - name: key_use_not_in_enum
+    instance:
+      key_id: "sig-key-1"
+      key_use: HMAC_KEY
+      tenant_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      algorithm: "HMAC-SHA256"
+      status: ACTIVE
+      issued_at: "2026-01-01T00:00:00Z"
+    reason: "key_use enum is exactly [KEK, DEK, HMAC_SIGNING_KEY] (ADR-007's lowercase 'hmac_signing_key' normalized to SNAKE_CASE uppercase); the abbreviated 'HMAC_KEY' is not a member."
+  - name: missing_tenant_id
+    instance:
+      key_id: "dek-subject-zzzz"
+      key_use: DEK
+      algorithm: "AES-256-GCM"
+      status: ACTIVE
+      issued_at: "2026-01-01T00:00:00Z"
+    reason: "tenant_id is in the required list [key_id, key_use, tenant_id, algorithm, status, issued_at] -- every key belongs to exactly one tenant (ADR-003 Tenant Isolation); omitting it fails required."
+  - name: status_not_in_enum
+    instance:
+      key_id: "dek-subject-yyyy"
+      key_use: DEK
+      tenant_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      algorithm: "AES-256-GCM"
+      status: REVOKED
+      issued_at: "2026-01-01T00:00:00Z"
+    reason: "status enum is [ACTIVE, PENDING_DESTRUCTION, DESTROYED, ROTATED]; 'REVOKED' is not a member of this lifecycle's defined states."

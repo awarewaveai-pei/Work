@@ -1,0 +1,136 @@
+schema_id: "ai-lego://specs/execution/manifest.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the required top-level triad (execution/source/documents), the
+  sha256 hex-pattern on documents[].sha256, and the allOf/contains/
+  minContains/maxContains coverage guard that backstops documents[]'s bare
+  uniqueItems -- 4 objects can be mutually unique (different sha256/version)
+  while still missing one of the 4 mandatory document_id values and
+  duplicating another, exactly the bug class this file's own comments cite
+  as previously found and fixed in data-deletion.schema.yaml's steps[].
+
+valid:
+  - name: all_four_mandatory_documents_present
+    instance:
+      execution:
+        execution_id: "EX-2026-000099"
+      source:
+        repository: "github.com/example/ai-lego"
+        commit: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+      documents:
+        - document_id: "ai-lego.master-plan"
+          file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+          version: "1.0.0"
+          sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          loaded: true
+        - document_id: "ai-lego.method-atlas"
+          file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+          version: "1.0.0"
+          sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          loaded: true
+        - document_id: "ai-lego.execution-contract"
+          file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+          version: "1.0.0"
+          sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          loaded: true
+        - document_id: "ai-lego.architecture-constitution"
+          file: "Architecture-Constitution-v1.md"
+          version: "1.0.0"
+          sha256: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          loaded: true
+
+invalid:
+  - name: coverage_guard_bypass_duplicate_and_missing_document_id
+    instance:
+      execution:
+        execution_id: "EX-2026-000098"
+      source:
+        repository: "github.com/example/ai-lego"
+        commit: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+      documents:
+        - document_id: "ai-lego.master-plan"
+          file: "Master_Plan_v1.md"
+          version: "1.0.0"
+          sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          loaded: true
+        - document_id: "ai-lego.master-plan"
+          file: "Master_Plan_v1.md"
+          version: "1.0.1"
+          sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          loaded: true
+        - document_id: "ai-lego.method-atlas"
+          file: "Method_Atlas_v1.md"
+          version: "1.0.0"
+          sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          loaded: true
+        - document_id: "ai-lego.execution-contract"
+          file: "Execution_Contract_v1.md"
+          version: "1.0.0"
+          sha256: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          loaded: true
+    reason: >
+      All 4 entries are mutually unique whole objects (different sha256/
+      version), so uniqueItems + minItems:4 + maxItems:4 alone are satisfied
+      -- but document_id 'ai-lego.master-plan' appears twice (violates that
+      value's maxContains:1) and 'ai-lego.architecture-constitution' appears
+      zero times (violates that value's minContains:1). This is exactly the
+      uniqueItems-alone-insufficient coverage gap the allOf/contains block
+      exists to close.
+  - name: document_id_not_in_four_value_enum
+    instance:
+      execution:
+        execution_id: "EX-2026-000097"
+      source:
+        repository: "github.com/example/ai-lego"
+        commit: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+      documents:
+        - document_id: "ai-lego.master-plan"
+          file: "Master_Plan_v1.md"
+          version: "1.0.0"
+          sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          loaded: true
+        - document_id: "ai-lego.method-atlas"
+          file: "Method_Atlas_v1.md"
+          version: "1.0.0"
+          sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          loaded: true
+        - document_id: "ai-lego.execution-contract"
+          file: "Execution_Contract_v1.md"
+          version: "1.0.0"
+          sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          loaded: true
+        - document_id: "ai-lego.appendix"
+          file: "Appendix.md"
+          version: "1.0.0"
+          sha256: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          loaded: true
+    reason: "'ai-lego.appendix' is not one of the 4 closed enum values for document_id (master-plan/method-atlas/execution-contract/architecture-constitution)."
+  - name: sha256_not_64_lowercase_hex
+    instance:
+      execution:
+        execution_id: "EX-2026-000096"
+      source:
+        repository: "github.com/example/ai-lego"
+        commit: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+      documents:
+        - document_id: "ai-lego.master-plan"
+          file: "Master_Plan_v1.md"
+          version: "1.0.0"
+          sha256: "not-a-real-sha256-hash"
+          loaded: true
+        - document_id: "ai-lego.method-atlas"
+          file: "Method_Atlas_v1.md"
+          version: "1.0.0"
+          sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          loaded: true
+        - document_id: "ai-lego.execution-contract"
+          file: "Execution_Contract_v1.md"
+          version: "1.0.0"
+          sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          loaded: true
+        - document_id: "ai-lego.architecture-constitution"
+          file: "Architecture-Constitution-v1.md"
+          version: "1.0.0"
+          sha256: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          loaded: true
+    reason: "documents[0].sha256 'not-a-real-sha256-hash' does not match pattern ^[a-f0-9]{64}$."

@@ -1,0 +1,34 @@
+# EC section 94 category: replay
+schema_id: "ai-lego://specs/execution/manifest.schema.yaml"
+target_ref: ""
+category: replay
+description: >
+  The Execution Manifest -- the pinned document/version/hash record that
+  makes 30-year replay possible (a task executed against pinned content can
+  be re-run and produce the same routing decisions even after the mother
+  documents themselves have since changed).
+valid:
+  - name: minimal_pinned_manifest
+    instance:
+      execution: {execution_id: "EX-2026-08-29-001"}
+      source: {repository: "awarewaveai-pei/Work", commit: "74ed425a5"}
+      documents:
+        - {document_id: "ai-lego.master-plan", file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md", version: "1.0.0", sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", loaded: true}
+        - {document_id: "ai-lego.method-atlas", file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md", version: "1.0.0", sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", loaded: true}
+        - {document_id: "ai-lego.execution-contract", file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md", version: "1.0.0", sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", loaded: true}
+        - {document_id: "ai-lego.architecture-constitution", file: "Architecture-Constitution-v1.md", version: "1.0.0", sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", loaded: false}
+invalid:
+  - name: missing_documents
+    instance:
+      execution: {execution_id: "EX-2026-08-29-001"}
+      source: {repository: "awarewaveai-pei/Work", commit: "74ed425a5"}
+    reason: "documents is required (manifest.schema.yaml required list) -- a manifest with no pinned document list cannot be replayed against a known mother-document version later"
+  - name: only_three_of_four_mandatory_documents
+    instance:
+      execution: {execution_id: "EX-2026-08-29-001"}
+      source: {repository: "awarewaveai-pei/Work", commit: "74ed425a5"}
+      documents:
+        - {document_id: "ai-lego.master-plan", file: "x.md", version: "1.0.0", sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", loaded: true}
+        - {document_id: "ai-lego.method-atlas", file: "y.md", version: "1.0.0", sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", loaded: true}
+        - {document_id: "ai-lego.execution-contract", file: "z.md", version: "1.0.0", sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", loaded: true}
+    reason: "documents requires minItems:4 and an allOf/contains block requiring exactly one of each of the 4 mandatory document_id values -- omitting ai-lego.architecture-constitution entirely (only 3 items present) fails both minItems:4 and its own contains/minContains:1 clause"

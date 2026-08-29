@@ -1,0 +1,297 @@
+#!/usr/bin/env python3
+"""
+AI-LEGO Cognitive Engineering OS -- Phase 3 Wave 8 golden test runner.
+
+Resolves MACHINE_READABLE_SPEC_PLAN.md section 3 Build Order: "Wave 8
+tests/ 全目錄（對 Wave 1-7 的每個 schema 寫 golden test）". Runs four
+independent check families against the built (status: ACTIVE/PROVISIONAL)
+Wave 1-7 output:
+
+  1. Schema conformance  -- tests/contracts/**/*.fixtures.yaml drives
+     positive (must validate) and negative (must fail validation) instance
+     checks against every one of the 47 specs/ and policies/ai-execution/
+     files that declare a $schema (see tests/README.md for the fixture
+     contract).
+  2. Recipe instance conformance -- the 3 recipes/validated/*.recipe.yaml
+     files (which are DATA instances, not schemas themselves) validate
+     against specs/cognitive/recipe.schema.yaml.
+  3. Registry invariants -- methods/registry/method-inventory.yaml and
+     contract-backlog.yaml are not governed by an external JSON Schema
+     (they are Phase-0-migrated free-form registries); this file instead
+     checks the specific structural invariants those two files' own
+     headers claim about themselves (counts, has_contract<->contract_status
+     consistency).
+  4. Cross-file $ref resolution smoke test -- every "ai-lego://..." URI
+     found anywhere under specs/, policies/, methods/registry/, and
+     recipes/validated/ resolves to a real file and (if it carries a
+     "#/..." JSON-pointer fragment) a real node within that file.
+
+No mother document, ADR, or existing spec/policy file's normative content
+is modified by this file or by running it. Exit code 0 = all checks
+passed; 1 = at least one failure (each printed with enough context to
+locate the failing fixture/instance).
+"""
+import glob
+import os
+import sys
+import urllib.parse
+
+import yaml
+from jsonschema import Draft202012Validator
+from referencing import Registry, Resource
+from referencing.exceptions import Unresolvable
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+class UniqueKeyLoader(yaml.SafeLoader):
+    """Same duplicate-key guard used throughout this session's ad hoc
+    verification scripts (PyYAML silently lets the last key win otherwise)."""
+
+
+def _construct_mapping(loader, node, deep=False):
+    mapping = {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        if key in mapping:
+            raise ValueError(f"Duplicate key {key!r} at line {key_node.start_mark.line + 1}")
+        mapping[key] = loader.construct_object(value_node, deep=deep)
+    return mapping
+
+
+UniqueKeyLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_mapping)
+
+urllib.parse.uses_relative.append("ai-lego")
+urllib.parse.uses_netloc.append("ai-lego")
+
+_load_cache = {}
+
+
+def load(path):
+    path = os.path.normpath(path)
+    if path in _load_cache:
+        return _load_cache[path]
+    with open(path, encoding="utf-8") as f:
+        data = yaml.load(f, Loader=UniqueKeyLoader)
+    _load_cache[path] = data
+    return data
+
+
+def uri_to_path(uri):
+    parsed = urllib.parse.urlsplit(uri)
+    relpath = (parsed.netloc + parsed.path).lstrip("/")
+    return os.path.join(ROOT, relpath)
+
+
+def retrieve(uri):
+    data = load(uri_to_path(uri))
+    return Resource.from_contents(data)
+
+
+registry = Registry(retrieve=retrieve)
+
+failures = []
+passed = 0
+
+
+def check(cond, msg):
+    global passed
+    if cond:
+        passed += 1
+    else:
+        failures.append(msg)
+
+
+# ---------------------------------------------------------------------------
+# 1. Schema conformance via tests/contracts/**/*.fixtures.yaml
+# ---------------------------------------------------------------------------
+def run_schema_conformance():
+    # Searches all of tests/ (not just tests/contracts/) so the same fixture
+    # mechanism also drives tests/governance/ai-execution/**/golden scenario
+    # fixtures -- one format, two directory purposes (per-schema conformance
+    # vs. EC section 94/141 governance-category illustration).
+    fixture_files = sorted(glob.glob(os.path.join(ROOT, "tests", "**", "*.fixtures.yaml"), recursive=True))
+    check(len(fixture_files) > 0, "no *.fixtures.yaml files found under tests/ -- schema conformance suite is empty")
+    for ff in fixture_files:
+        rel_ff = os.path.relpath(ff, ROOT)
+        try:
+            fx = load(ff)
+        except Exception as e:  # noqa: BLE001 -- report and continue, don't abort the whole suite
+            check(False, f"{rel_ff}: failed to parse -- {e}")
+            continue
+        schema_id = fx.get("schema_id")
+        if not schema_id:
+            check(False, f"{rel_ff}: missing required top-level 'schema_id'")
+            continue
+        target_ref = fx.get("target_ref", "")
+        try:
+            schema_doc = retrieve(schema_id).contents
+        except Exception as e:  # noqa: BLE001
+            check(False, f"{rel_ff}: schema_id {schema_id!r} did not resolve -- {e}")
+            continue
+        reg = registry.with_resource(schema_id, Resource.from_contents(schema_doc))
+        pointer_schema = {"$ref": f"{schema_id}{target_ref}"}
+        try:
+            validator = Draft202012Validator(pointer_schema, registry=reg)
+        except Exception as e:  # noqa: BLE001
+            check(False, f"{rel_ff}: could not build validator for {schema_id}{target_ref} -- {e}")
+            continue
+
+        valid_cases = fx.get("valid", [])
+        invalid_cases = fx.get("invalid", [])
+        check(len(valid_cases) >= 1, f"{rel_ff}: has zero 'valid' cases -- every fixture needs at least one golden instance")
+        check(len(invalid_cases) >= 1, f"{rel_ff}: has zero 'invalid' cases -- every fixture needs at least one adversarial instance")
+
+        for case in valid_cases:
+            name = case.get("name", "<unnamed>")
+            try:
+                errors = list(validator.iter_errors(case["instance"]))
+            except Unresolvable as e:
+                check(False, f"{rel_ff}::valid::{name}: unresolvable $ref during validation -- {e}")
+                continue
+            check(not errors, f"{rel_ff}::valid::{name} unexpectedly INVALID: {[err.message for err in errors]}")
+
+        for case in invalid_cases:
+            name = case.get("name", "<unnamed>")
+            try:
+                errors = list(validator.iter_errors(case["instance"]))
+            except Unresolvable as e:
+                check(False, f"{rel_ff}::invalid::{name}: unresolvable $ref during validation -- {e}")
+                continue
+            check(bool(errors), f"{rel_ff}::invalid::{name} unexpectedly VALID (expected reason: {case.get('reason', '<no reason given>')})")
+
+
+# ---------------------------------------------------------------------------
+# 2. Recipe instance conformance -- recipes/validated/*.recipe.yaml against
+#    specs/cognitive/recipe.schema.yaml
+# ---------------------------------------------------------------------------
+def run_recipe_instance_conformance():
+    recipe_schema_id = "ai-lego://specs/cognitive/recipe.schema.yaml"
+    schema_doc = retrieve(recipe_schema_id).contents
+    reg = registry.with_resource(recipe_schema_id, Resource.from_contents(schema_doc))
+    validator = Draft202012Validator(schema_doc, registry=reg)
+    recipe_files = sorted(glob.glob(os.path.join(ROOT, "recipes", "validated", "*.recipe.yaml")))
+    check(len(recipe_files) == 3, f"expected exactly 3 recipes/validated/*.recipe.yaml files (Wave 7), found {len(recipe_files)}")
+    for p in recipe_files:
+        rel_p = os.path.relpath(p, ROOT)
+        inst = load(p)
+        errors = list(validator.iter_errors(inst))
+        check(not errors, f"recipe instance {rel_p} fails recipe.schema.yaml: {[e.message for e in errors]}")
+        check(inst.get("id") == os.path.basename(p)[: -len(".recipe.yaml")], f"recipe instance {rel_p}: id field does not match filename slug")
+
+
+# ---------------------------------------------------------------------------
+# 3. Registry invariants -- method-inventory.yaml / contract-backlog.yaml
+#    (no external schema governs these; check their own stated claims)
+# ---------------------------------------------------------------------------
+def run_registry_invariants():
+    mi_path = os.path.join(ROOT, "methods", "registry", "method-inventory.yaml")
+    mi = load(mi_path)
+    total = 0
+    bad_consistency = []
+    for doc_name, doc_val in mi.get("by_document", {}).items():
+        for entry in doc_val.get("methods", []):
+            total += 1
+            has_contract = entry.get("has_contract")
+            contract_status = entry.get("contract_status")
+            expected = "complete" if has_contract else "pending"
+            if contract_status != expected:
+                bad_consistency.append((doc_name, entry.get("name"), has_contract, contract_status))
+    check(total == 289, f"method-inventory.yaml: expected 289 total method entries (per its own header claim), found {total}")
+    check(not bad_consistency, f"method-inventory.yaml: {len(bad_consistency)} entries have has_contract/contract_status mismatch: {bad_consistency[:5]}{'...' if len(bad_consistency) > 5 else ''}")
+
+    cb_path = os.path.join(ROOT, "methods", "registry", "contract-backlog.yaml")
+    cb = load(cb_path)
+    tier0 = cb.get("tier_0", [])
+    check(len(tier0) == 4, f"contract-backlog.yaml tier_0: expected 4 entries (per its own header claim -- root_cause.fishbone, stakeholder.regulator, strategy.swot, evidence.triangulation), found {len(tier0)}")
+    tier0_bad = [e["method_id"] for e in tier0 if (e.get("contract_status") == "complete") != bool(e.get("has_contract"))]
+    check(not tier0_bad, f"contract-backlog.yaml tier_0: has_contract/contract_status mismatch for {tier0_bad}")
+
+    tier1 = cb.get("tier_1", {})
+    check(tier1.get("no_method_ids_listed") is True, "contract-backlog.yaml tier_1: expected no_method_ids_listed: true (Tier 1 is an explicit TODO, not populated, per plan section 4)")
+
+    tier2 = cb.get("tier_2", {})
+    explicit_entries = tier2.get("explicit_entries", [])
+    check(len(explicit_entries) >= 1, "contract-backlog.yaml tier_2.explicit_entries: expected at least the ADR-008-mandated finance.financial_assumptions entry, found none")
+    check(
+        any(e.get("method_id") == "finance.financial_assumptions" for e in explicit_entries),
+        "contract-backlog.yaml tier_2.explicit_entries: missing the ADR-008-mandated 'finance.financial_assumptions' entry",
+    )
+
+
+# ---------------------------------------------------------------------------
+# 4. Cross-file ai-lego:// $ref resolution smoke test
+#
+# Walks the PARSED YAML structure (not raw text) looking for dict keys named
+# "$ref" whose value is a real ai-lego:// URI. Deliberately does NOT grep raw
+# file text for anything that merely looks like "ai-lego://..." -- several
+# files in this corpus quote that scheme inside prose/description blocks
+# (e.g. explaining the URI convention itself, or narrating a past bug via a
+# hypothetical urljoin() call) and those prose quotes can be word-wrapped
+# across lines by YAML's folded-scalar (">") style, which a line-based regex
+# mis-truncates into a false "dangling reference". A $ref is only ever a
+# YAML mapping value in this corpus, never prose, so walking the parsed
+# structure for the literal key "$ref" is both simpler and correct where the
+# earlier raw-text-regex version (kept only in this file's own git history)
+# produced 2 false positives on its first run against policies/ai-execution/
+# authority.yaml.
+# ---------------------------------------------------------------------------
+def _walk_refs(node):
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if k == "$ref" and isinstance(v, str) and v.startswith("ai-lego://"):
+                yield v
+            else:
+                yield from _walk_refs(v)
+    elif isinstance(node, list):
+        for item in node:
+            yield from _walk_refs(item)
+
+
+def run_ref_resolution_smoke():
+    roots = ["specs", "policies", "methods/registry", "recipes/validated"]
+    checked = 0
+    for root in roots:
+        for p in glob.glob(os.path.join(ROOT, root, "**", "*.yaml"), recursive=True):
+            rel_p = os.path.relpath(p, ROOT)
+            try:
+                doc = load(p)
+            except Exception as e:  # noqa: BLE001
+                check(False, f"{rel_p}: failed to parse while scanning for $ref -- {e}")
+                continue
+            if not isinstance(doc, dict):
+                continue
+            for m in sorted(set(_walk_refs(doc))):
+                checked += 1
+                base_uri = m.split("#", 1)[0]
+                fragment = m[len(base_uri):]
+                base_path = uri_to_path(base_uri)
+                if not os.path.isfile(base_path):
+                    check(False, f"{rel_p}: dangling $ref {m!r} -- target file does not exist: {os.path.relpath(base_path, ROOT)}")
+                    continue
+                if fragment:
+                    try:
+                        target_doc = load(base_path)
+                        resource = Resource.from_contents(target_doc)
+                        resolver = registry.with_resource(base_uri, resource).resolver()
+                        resolver.lookup(m)
+                    except Exception as e:  # noqa: BLE001
+                        check(False, f"{rel_p}: $ref {m!r} has unresolvable fragment -- {e}")
+                        continue
+                check(True, f"resolved {m}")
+    check(checked > 0, "cross-file $ref smoke test found zero ai-lego:// $ref values to check -- suite is not actually exercising anything")
+
+
+if __name__ == "__main__":
+    run_schema_conformance()
+    run_recipe_instance_conformance()
+    run_registry_invariants()
+    run_ref_resolution_smoke()
+
+    print(f"PASSED: {passed}")
+    if failures:
+        print(f"FAILED: {len(failures)}")
+        for f in failures:
+            print(" -", f)
+        sys.exit(1)
+    print("ALL GOLDEN TESTS PASSED")

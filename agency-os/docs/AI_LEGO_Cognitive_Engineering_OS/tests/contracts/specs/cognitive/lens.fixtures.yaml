@@ -1,0 +1,67 @@
+schema_id: "ai-lego://specs/cognitive/lens.schema.yaml"
+target_ref: "#/lens"
+description: >
+  Exercises lens.schema.yaml's required fields, the `lens_id` bare
+  `<family>.<name>` pattern, the `lens_family` 10-value enum, and the
+  `labels` block's required-and-enumerated evidence_backed /
+  hypothetical_role_perspective / impersonation triple (Atlas L1032-1047's
+  one worked example).
+
+valid:
+  - name: atlas_stakeholder_regulator_worked_example
+    instance:
+      id: "stakeholder.regulator"
+      version: "1.0.0"
+      family: "stakeholder"
+      type: "perspective"
+      requires: ["JurisdictionContext"]
+      output: ["PerspectiveAssessment"]
+      labels:
+        evidence_backed: required
+        hypothetical_role_perspective: allowed
+        impersonation: forbidden
+  - name: minimal_security_lens
+    instance:
+      id: "security.pentester"
+      version: "1.0.0"
+      family: "security"
+      type: "perspective"
+      labels:
+        evidence_backed: allowed
+        hypothetical_role_perspective: allowed
+        impersonation: forbidden
+
+invalid:
+  - name: id_missing_dot_segment
+    instance:
+      id: "stakeholder_regulator"
+      version: "1.0.0"
+      family: "stakeholder"
+      type: "perspective"
+      labels:
+        evidence_backed: required
+        hypothetical_role_perspective: allowed
+        impersonation: forbidden
+    reason: "id must match lens_id pattern ^[a-z_]+\\.[a-z_]+$ (exactly one dot); this value has no dot at all."
+  - name: family_not_in_10_value_enum
+    instance:
+      id: "marketing.persona"
+      version: "1.0.0"
+      family: "marketing"
+      type: "perspective"
+      labels:
+        evidence_backed: required
+        hypothetical_role_perspective: allowed
+        impersonation: forbidden
+    reason: "family must be one of the 10 lens_family enum values (stakeholder/profession/government/local/culture/legal/security/privacy/ethics/accessibility) transcribed from Atlas §17; 'marketing' is not among them."
+  - name: impersonation_label_bad_enum_value
+    instance:
+      id: "stakeholder.regulator"
+      version: "1.0.0"
+      family: "stakeholder"
+      type: "perspective"
+      labels:
+        evidence_backed: required
+        hypothetical_role_perspective: allowed
+        impersonation: sometimes
+    reason: "labels.impersonation must be one of required/allowed/forbidden (lens_label_value enum); 'sometimes' is not a legal value."

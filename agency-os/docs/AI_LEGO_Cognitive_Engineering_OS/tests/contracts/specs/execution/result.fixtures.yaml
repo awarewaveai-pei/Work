@@ -1,0 +1,74 @@
+schema_id: "ai-lego://specs/execution/result.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the required [execution_id, status, evaluated_at, provenance]
+  quartet, the top-level `status` $ref chain into
+  status-codes.schema.yaml#/reference_vocabulary/final_status/schema (7
+  values), the `provenance` $ref chain into
+  epistemic-label.schema.yaml#/provenance_record's own required fields, and
+  gates[].status's DIFFERENT, smaller 4-value enum (PASS/FAIL/BLOCKED/
+  NOT_APPLICABLE) that this file's compilation_decisions explicitly says is
+  never conflated with the top-level status.
+
+valid:
+  - name: pass_with_gate_and_evidence
+    instance:
+      execution_id: "EX-2026-000042"
+      task_id: "TASK-2026-000042"
+      status: "PASS"
+      evaluated_at: "2026-08-29T14:00:00Z"
+      provenance:
+        epistemic_type: "CALCULATED_RESULT"
+        authorship_state: "AI_GENERATED"
+      gates:
+        - gate_id: "Security"
+          status: "PASS"
+          validator: "critic"
+          timestamp: "2026-08-29T13:58:00Z"
+      evidence:
+        - hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          source: "tests/run_golden_tests.py"
+          timestamp: "2026-08-29T13:59:00Z"
+      outputs:
+        - hash: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          path: "tests/contracts/specs/execution/result.fixtures.yaml"
+  - name: rolled_back_with_rollback_ref
+    instance:
+      execution_id: "EX-2026-000043"
+      status: "ROLLED_BACK"
+      evaluated_at: "2026-08-29T15:00:00Z"
+      provenance:
+        epistemic_type: "DECISION"
+        authorship_state: "HUMAN_APPROVED"
+      rollback_ref: "RB-2026-000043"
+
+invalid:
+  - name: status_not_in_final_status_seven_value_enum
+    instance:
+      execution_id: "EX-2026-000044"
+      status: "SUCCESS"
+      evaluated_at: "2026-08-29T16:00:00Z"
+      provenance:
+        epistemic_type: "SOURCE_FACT"
+        authorship_state: "HUMAN_ORIGINAL"
+    reason: "status is a hard $ref into status-codes.schema.yaml#/reference_vocabulary/final_status/schema (PASS/PASS_WITH_APPROVED_RISK/BLOCKED/FAILED/NEEDS_HUMAN_REVIEW/ROLLED_BACK/PARTIAL_SUCCESS); 'SUCCESS' is a colloquial word, not a member."
+  - name: provenance_missing_required_authorship_state
+    instance:
+      execution_id: "EX-2026-000045"
+      status: "PASS"
+      evaluated_at: "2026-08-29T16:10:00Z"
+      provenance:
+        epistemic_type: "SOURCE_FACT"
+    reason: "provenance is a hard $ref into epistemic-label.schema.yaml#/provenance_record, whose own required list is [epistemic_type, authorship_state]; authorship_state is omitted here."
+  - name: gate_status_not_in_its_own_four_value_enum
+    instance:
+      execution_id: "EX-2026-000046"
+      status: "PASS"
+      evaluated_at: "2026-08-29T16:20:00Z"
+      provenance:
+        epistemic_type: "SOURCE_FACT"
+        authorship_state: "HUMAN_ORIGINAL"
+      gates:
+        - gate_id: "Rollback"
+          status: "SKIPPED"
+    reason: "gates[].status uses EC §69's own literal, smaller vocabulary [PASS, FAIL, BLOCKED, NOT_APPLICABLE] -- a different enum from the top-level status field. 'SKIPPED' is not a member of that gate-result enum."

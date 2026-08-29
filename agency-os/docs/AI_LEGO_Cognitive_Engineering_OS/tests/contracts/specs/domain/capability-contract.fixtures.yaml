@@ -1,0 +1,61 @@
+schema_id: "ai-lego://specs/domain/capability-contract.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the bare-vs-dotted `id` pattern, the required [id, version,
+  input, output] set, and the `entitlement.editions_allowed` array's
+  minItems:1-once-present design (the field must be OMITTED, not set to
+  `[]`, to mean "unrestricted" -- an empty array is a deliberately illegal
+  degenerate state per this file's own compilation_decisions).
+valid:
+  - name: mp_worked_example_verbatim
+    instance:
+      id: cognitive.execute_method
+      version: "1.0.0"
+      input:
+        type: [MethodExecutionRequest]
+      output:
+        type: [TypedMethodResult]
+      preconditions:
+        - "method_atlas.loaded == true"
+        - "policy.validation == PASS"
+      quality:
+        provenance_required: true
+        method_specific_gate_required: true
+      security:
+        external_ai: policy_controlled
+      rollback:
+        side_effect_free_preferred: true
+  - name: bare_id_with_entitlement
+    instance:
+      id: transcribe
+      version: "2.3.1"
+      input:
+        type: [AudioVideo]
+      output:
+        type: [Transcript]
+      entitlement:
+        editions_allowed: [professional, enterprise_sovereign]
+        requires_explicit_entitlement_check: true
+invalid:
+  - name: id_three_dot_segments
+    instance:
+      id: "cognitive.execute.method"
+      version: "1.0.0"
+      input: { type: [Foo] }
+      output: { type: [Bar] }
+    reason: "id pattern ^[a-z_]+(\\.[a-z_]+)?$ allows at most ONE dot-separated segment; a 3-segment dotted id is rejected."
+  - name: missing_required_output
+    instance:
+      id: run_statistics
+      version: "1.0.0"
+      input: { type: [Dataset] }
+    reason: "output is in the required list [id, version, input, output]; omitting it fails required."
+  - name: editions_allowed_empty_array_is_illegal
+    instance:
+      id: validate_artifact
+      version: "1.0.0"
+      input: { type: [Foo] }
+      output: { type: [Bar] }
+      entitlement:
+        editions_allowed: []
+    reason: "editions_allowed has minItems:1 by deliberate design (compilation_decisions): '[]' is a disallowed degenerate state distinct from omitting the field entirely, which is how 'unrestricted' must be expressed instead."

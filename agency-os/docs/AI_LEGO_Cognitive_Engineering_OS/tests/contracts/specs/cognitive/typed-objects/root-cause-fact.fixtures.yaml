@@ -1,0 +1,71 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/root-cause-fact.schema.yaml"
+target_ref: ""
+description: >
+  Exercises RootCauseFact's required fields, the `legal_promotion_path`
+  object's own required `validation_methods_applied` (minItems:1 — an
+  empty array would itself be evidence of the forbidden direct
+  CauseHypothesisSet -> RootCauseFact transition per this file's own
+  description) and `evidence_and_causal_validation_pass`, the `status`
+  3-value enum, and the `source_cause_hypothesis_set_ref` ^CHS- pattern.
+
+valid:
+  - name: human_approved_locked_root_cause_fact
+    instance:
+      id: "RCF-2026-08-29-001"
+      version: "1.0.0"
+      status: active
+      statement: "ERP and e-commerce lack real-time inventory event integration."
+      source_cause_hypothesis_set_ref: "CHS-2026-08-29-001"
+      promoted_hypothesis_id: "CHS-2026-08-29-001-H1"
+      legal_promotion_path:
+        validation_methods_applied: ["root_cause.five_whys", "causal.dag"]
+        evidence_and_causal_validation_pass: true
+      provenance: { epistemic_type: SOURCE_FACT, authorship_state: HUMAN_APPROVED, locked: LOCKED_FACT }
+  - name: retracted_root_cause_fact_with_pointer_to_replacement
+    instance:
+      id: "RCF-2026-08-29-002"
+      version: "1.0.0"
+      status: retracted
+      retracted_by: "RCF-2026-08-29-003"
+      retraction_reason: "A second incident revealed the original diagnosis was incomplete."
+      statement: "Original (superseded) root cause statement."
+      source_cause_hypothesis_set_ref: "CHS-2026-08-29-002"
+      legal_promotion_path:
+        validation_methods_applied: ["validation.experiment"]
+        evidence_and_causal_validation_pass: true
+      provenance: { epistemic_type: SOURCE_FACT, authorship_state: HUMAN_APPROVED, locked: LOCKED_FACT }
+
+invalid:
+  - name: validation_methods_applied_empty_array_evidences_forbidden_transition
+    instance:
+      id: "RCF-2026-08-29-004"
+      version: "1.0.0"
+      status: active
+      statement: "Unvalidated shortcut promotion."
+      source_cause_hypothesis_set_ref: "CHS-2026-08-29-004"
+      legal_promotion_path:
+        validation_methods_applied: []
+        evidence_and_causal_validation_pass: true
+      provenance: { epistemic_type: SOURCE_FACT, authorship_state: HUMAN_APPROVED, locked: LOCKED_FACT }
+    reason: "legal_promotion_path.validation_methods_applied has minItems: 1 by this file's own explicit design — an empty array would itself be evidence of the forbidden direct CauseHypothesisSet -> RootCauseFact transition Atlas §9's forbidden_transition rule prohibits."
+  - name: missing_required_legal_promotion_path
+    instance:
+      id: "RCF-2026-08-29-005"
+      version: "1.0.0"
+      status: active
+      statement: "Root cause with no promotion record at all."
+      source_cause_hypothesis_set_ref: "CHS-2026-08-29-005"
+      provenance: { epistemic_type: SOURCE_FACT, authorship_state: HUMAN_APPROVED, locked: LOCKED_FACT }
+    reason: "legal_promotion_path is in the top-level required list [id, version, status, statement, source_cause_hypothesis_set_ref, legal_promotion_path, provenance] and is entirely absent here."
+  - name: status_not_in_3_value_enum
+    instance:
+      id: "RCF-2026-08-29-006"
+      version: "1.0.0"
+      status: closed
+      statement: "x"
+      source_cause_hypothesis_set_ref: "CHS-2026-08-29-006"
+      legal_promotion_path:
+        validation_methods_applied: ["causal.dag"]
+        evidence_and_causal_validation_pass: true
+      provenance: { epistemic_type: SOURCE_FACT, authorship_state: HUMAN_APPROVED, locked: LOCKED_FACT }
+    reason: "status must be one of [active, superseded, retracted]; 'closed' is not a legal value."

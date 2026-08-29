@@ -1,0 +1,42 @@
+schema_id: ai-lego://policies/ai-execution/forbidden-actions.yaml
+target_ref: '#/definitions/forbidden_action_rule'
+category: prompt-injection
+description: 'HONEST GAP, recorded rather than papered over: no dedicated prompt- injection-defense schema
+  exists anywhere in this corpus (grepped specs/policies for "prompt-injection"/"prompt injection" --
+  zero hits outside this test category''s own directory name and EC section 94''s own test-path listing).
+  The closest already-built, real mechanism is policies/ai-execution/forbidden-actions.yaml''s mediated-path
+  enforcement rule: an agent MUST route every action through Policy Engine -> Permission Check -> Human
+  Approval / Auto Rule rather than executing directly -- which is exactly the control that would stop
+  a prompt- injected instruction from producing a direct, unmediated action. This is a substitution, not
+  a real prompt-injection test; see this Wave''s WORKLOG entry and open_questions below for the honest
+  scope statement.
+
+  '
+valid:
+- name: mediated_deny_rule
+  instance:
+    agent_action: DELETE
+    condition: Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check
+      -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760).
+    action: DENY
+    mediated_path: Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule
+      -> Execution
+    mother_doc_text: Agent 不是 Authority
+invalid:
+- name: missing_mediated_path
+  instance:
+    agent_action: DELETE
+    condition: Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check
+      -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760).
+    action: DENY
+    mother_doc_text: Agent 不是 Authority
+  reason: mediated_path is required (forbidden_action_rule required list) -- a DENY rule with no stated
+    mediated path cannot be checked for whether the mediation chain is actually complete
+open_questions:
+- id: OQ-GOLDEN-PROMPT-INJECTION-1
+  question: Should a dedicated prompt-injection-defense schema (e.g. specs/security/untrusted-content-boundary.schema.yaml)
+    be added in a future wave, modeling the instruction-source-boundary concept (data vs. command) directly,
+    rather than only the generic mediated-action-routing rule this fixture borrows?
+  owner: operator or a future Phase 3/4 compilation pass
+  blocks: nothing in this fixture's own validity -- it tests a real, already-built rule, just not one
+    purpose-built for this exact category

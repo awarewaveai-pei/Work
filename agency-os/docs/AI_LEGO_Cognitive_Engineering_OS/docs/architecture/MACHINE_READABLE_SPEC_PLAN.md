@@ -260,8 +260,25 @@ Wave 7 ── ✅ 完成（2026-08-29，3/3）
     TBD_PENDING_ROUND2_ADR placeholder，同 Wave 5/6 的 gate_id 阻塞範圍，
     不阻塞本檔案本身）
           ↓
-Wave 8  tests/ 全目錄（對 Wave 1-7 的每個 schema 寫 golden test）
-        specs/analytics/（低優先，可延後）
+Wave 8 ── ✅ 完成（2026-08-29，55/55 schema + 3/3 recipe instance + 2/2
+  registry + 12/12 EC §94 governance category + golden/）
+  tests/run_golden_tests.py（單一 runner，四種檢查：schema conformance /
+    recipe instance conformance / registry invariants / 跨檔 $ref 解析）
+  tests/contracts/**（58 個 fixture 檔，鏡射 specs/+policies/ai-execution/
+    路徑；method-resolution/status-codes/key-vault-lifecycle 各拆 2 檔）
+  tests/governance/ai-execution/{12 個 EC §94 子目錄}/ + golden/（18 個
+    fixture 檔；prompt-injection/secrets 兩類無對應 schema，誠實記錄為
+    借用最近似機制，非真實該類別測試——見 WORKLOG）
+  過程中發現並修正 3 個真實 bug（非本 Wave 新增，Wave 2/5/6 既有檔）：
+    personal-data-envelope.schema.yaml 根層級 title/description 重複 key
+    （PyYAML 靜默吃掉上層 provenance 內容）、gate.schema.yaml 與
+    epistemic-label.schema.yaml 各有一條「constraints: 純文字未機讀化」
+    （NOT_APPLICABLE 需 rationale、LOCKED_FACT 需 epistemic_type=SOURCE_FACT
+    皆補上真 if/then）；change-plan.schema.yaml 的 if/then 誤縮排進
+    alternatives_considered 陣列本身（對陣列而非物件根做 risk_tier 檢查，
+    JSON Schema 對型別不符時 properties/required 視為真空通過，導致條件永
+    遠觸發）在本 Wave 測試過程中由另一個並行 session 修正，已重新驗證
+  specs/analytics/（低優先，可延後）
 ```
 
 **為什麼 Wave 1 必須最先**：`risk_tier`、`epistemic_type/authorship_state`、`manifest` 三者被 Wave 2 以後**幾乎每一個** schema 引用（tenant 的 encryption_root_key_ref 稽核要記 epistemic label；每個 typed object 要記 provenance；每個 recipe 步驟要掛 risk gate）。先建這三個等於先建全系統的「型別字母表」，避免後續 40+ 個 schema 檔各自發明一套 risk/provenance 欄位又要重新收斂一次——這正是 Phase 0/1 找到的問題的成因，不能在 Phase 3 重演。

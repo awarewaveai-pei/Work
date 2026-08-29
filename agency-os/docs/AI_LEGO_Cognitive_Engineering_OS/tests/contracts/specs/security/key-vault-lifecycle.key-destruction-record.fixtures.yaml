@@ -1,0 +1,76 @@
+schema_id: "ai-lego://specs/security/key-vault-lifecycle.schema.yaml"
+target_ref: "#/definitions/key_destruction_record"
+description: >
+  Exercises the required top-level field set and destruction_scope[]'s
+  minItems:1 -- the closest schema-enforceable proxy for ADR-002's
+  Codex-oracle-driven 'destruction must cover ALL physical copies, not just
+  the live one' invariant (a truly empty destruction_scope can never be a
+  complete destruction of anything).
+valid:
+  - name: full_destruction_two_physical_copies
+    instance:
+      key_id: "dek-subject-91ab"
+      key_use: DEK
+      subject_id: "subject-91ab"
+      destroyed_at: "2026-08-29T00:00:00Z"
+      authorization_ref: "DEL-91ab-authz"
+      destruction_scope:
+        - { copy_location: "live-vault", destroyed: true, destroyed_at: "2026-08-29T00:00:00Z" }
+        - { copy_location: "dr-snapshot-2026-08-15", destroyed: true, destroyed_at: "2026-08-29T00:01:00Z" }
+      verification:
+        attempted_decrypt_refs: ["ClaimCreated#evt-001", "ClaimCreated#evt-002"]
+        all_decrypts_failed: true
+      independent_audit_log_ref: "audit-log.dek-subject-91ab.destroy-1"
+  - name: minimal_single_copy
+    instance:
+      key_id: "dek-subject-zzzz"
+      key_use: DEK
+      subject_id: "subject-zzzz"
+      destroyed_at: "2026-01-01T00:00:00Z"
+      authorization_ref: "DEL-zzzz-authz"
+      destruction_scope:
+        - { copy_location: "live-vault", destroyed: true }
+      verification:
+        attempted_decrypt_refs: []
+        all_decrypts_failed: true
+      independent_audit_log_ref: "audit-log.dek-subject-zzzz.destroy-1"
+invalid:
+  - name: destruction_scope_empty_array
+    instance:
+      key_id: "dek-subject-91ab"
+      key_use: DEK
+      subject_id: "subject-91ab"
+      destroyed_at: "2026-08-29T00:00:00Z"
+      authorization_ref: "DEL-91ab-authz"
+      destruction_scope: []
+      verification:
+        attempted_decrypt_refs: []
+        all_decrypts_failed: true
+      independent_audit_log_ref: "audit-log.dek-subject-91ab.destroy-1"
+    reason: "destruction_scope has minItems:1 -- an empty array can never represent a complete destruction covering at least the live copy, per this file's own compilation_decisions on the Codex-oracle 'all physical copies' correction."
+  - name: missing_independent_audit_log_ref
+    instance:
+      key_id: "dek-subject-91ab"
+      key_use: DEK
+      subject_id: "subject-91ab"
+      destroyed_at: "2026-08-29T00:00:00Z"
+      authorization_ref: "DEL-91ab-authz"
+      destruction_scope:
+        - { copy_location: "live-vault", destroyed: true }
+      verification:
+        attempted_decrypt_refs: []
+        all_decrypts_failed: true
+    reason: "independent_audit_log_ref is required -- per ADR-002 Recommendation, destruction proof MUST survive a Vault-level compromise, which requires an audit trail independent of the Vault itself; omitting the pointer fails required."
+  - name: verification_missing_all_decrypts_failed
+    instance:
+      key_id: "dek-subject-91ab"
+      key_use: DEK
+      subject_id: "subject-91ab"
+      destroyed_at: "2026-08-29T00:00:00Z"
+      authorization_ref: "DEL-91ab-authz"
+      destruction_scope:
+        - { copy_location: "live-vault", destroyed: true }
+      verification:
+        attempted_decrypt_refs: ["ClaimCreated#evt-001"]
+      independent_audit_log_ref: "audit-log.dek-subject-91ab.destroy-1"
+    reason: "verification requires [attempted_decrypt_refs, all_decrypts_failed] -- ADR-002:65's verification test is 'attempt decrypt against all known references, CONFIRM ALL FAIL'; omitting the confirmation boolean fails required."

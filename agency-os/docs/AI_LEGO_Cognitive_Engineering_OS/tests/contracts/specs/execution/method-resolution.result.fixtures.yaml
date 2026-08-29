@@ -1,0 +1,44 @@
+schema_id: "ai-lego://specs/execution/method-resolution.schema.yaml"
+target_ref: "#/method_resolution_result"
+description: >
+  Exercises the method_resolution_result output contract: the required
+  candidate_methods[] (each method_id a real hard $ref chain into
+  cognitive/method.schema.yaml#/properties/id's bare `<family>.<name>`
+  pattern, ADR-005b) and the optional `blocked` object's `status` const
+  METHOD_RESOLUTION_BLOCKED.
+
+valid:
+  - name: two_candidate_methods_with_scores
+    instance:
+      candidate_methods:
+        - method_id: "root_cause.fishbone"
+          score: 0.82
+          rationale: "Matches task_context.domains and risk_tier R1 candidate pool."
+        - method_id: "evidence.triangulation"
+          score: 0.61
+  - name: blocked_atlas_unavailable
+    instance:
+      candidate_methods: []
+      blocked:
+        status: "METHOD_RESOLUTION_BLOCKED"
+        reason: "Method Atlas content hash mismatch; cannot load candidate methods this run."
+
+invalid:
+  - name: method_id_violates_family_dot_name_pattern
+    instance:
+      candidate_methods:
+        - method_id: "RootCauseFishbone"
+    reason: "method_id is a hard $ref into cognitive/method.schema.yaml#/properties/id, pattern ^[a-z_]+\\.[a-z_]+$ (ADR-005b bare family.name grammar); 'RootCauseFishbone' has no dot separator and uses uppercase letters."
+  - name: missing_required_candidate_methods
+    instance:
+      blocked:
+        status: "METHOD_RESOLUTION_BLOCKED"
+        reason: "Atlas unreadable."
+    reason: "method_resolution_result.required is [candidate_methods]; it is omitted here even though a blocked{} object is present."
+  - name: blocked_status_wrong_const
+    instance:
+      candidate_methods: []
+      blocked:
+        status: "ATLAS_UNAVAILABLE"
+        reason: "Wrong status literal used instead of the canonical code."
+    reason: "blocked.status is a const-locked field; the only legal literal is METHOD_RESOLUTION_BLOCKED (soft reference to execution/status-codes.schema.yaml's entry of the same name), not an invented string."

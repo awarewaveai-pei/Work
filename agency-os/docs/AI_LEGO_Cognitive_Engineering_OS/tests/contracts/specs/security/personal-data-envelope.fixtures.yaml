@@ -1,0 +1,57 @@
+schema_id: "ai-lego://specs/security/personal-data-envelope.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the fixed cipher_alg const, the classification_tag enum, and
+  the required dek_key_id field -- the one field this compilation added
+  beyond ADR-002's literal 6-field list, without which the destroy/decrypt
+  mechanism ADR-002 itself describes would have no addressable per-subject
+  key to resolve.
+valid:
+  - name: intact_restricted_field
+    instance:
+      cipher_alg: "AES-256-GCM"
+      kek_ref: "kek-tenant-7f2c"
+      dek_key_id: "dek-subject-91ab"
+      dek_wrapped: "base64:AbCdEf...=="
+      iv: "base64:MTIzNDU2Nzg5MDEy"
+      ciphertext: "base64:XyZ012...=="
+      classification_tag: Restricted
+  - name: confidential_field_different_tenant
+    instance:
+      cipher_alg: "AES-256-GCM"
+      kek_ref: "kek-tenant-abcd"
+      dek_key_id: "dek-subject-zzzz"
+      dek_wrapped: "base64:QqRrSs...=="
+      iv: "base64:OTg3NjU0MzIxMA=="
+      ciphertext: "base64:TtUuVv...=="
+      classification_tag: Confidential
+invalid:
+  - name: cipher_alg_const_violation
+    instance:
+      cipher_alg: "AES-128-CBC"
+      kek_ref: "kek-tenant-7f2c"
+      dek_key_id: "dek-subject-91ab"
+      dek_wrapped: "base64:AbCdEf...=="
+      iv: "base64:MTIzNDU2Nzg5MDEy"
+      ciphertext: "base64:XyZ012...=="
+      classification_tag: Restricted
+    reason: "cipher_alg is const: AES-256-GCM per ADR-002 Recommendation -- any other algorithm is evidence of a non-conforming write path, not a configurable choice."
+  - name: classification_tag_not_in_enum
+    instance:
+      cipher_alg: "AES-256-GCM"
+      kek_ref: "kek-tenant-7f2c"
+      dek_key_id: "dek-subject-91ab"
+      dek_wrapped: "base64:AbCdEf...=="
+      iv: "base64:MTIzNDU2Nzg5MDEy"
+      ciphertext: "base64:XyZ012...=="
+      classification_tag: TopSecret
+    reason: "classification_tag enum is the canonical MP §61/EC §101 four-value list [Public, Internal, Confidential, Restricted]; 'TopSecret' is not a member."
+  - name: missing_dek_key_id
+    instance:
+      cipher_alg: "AES-256-GCM"
+      kek_ref: "kek-tenant-7f2c"
+      dek_wrapped: "base64:AbCdEf...=="
+      iv: "base64:MTIzNDU2Nzg5MDEy"
+      ciphertext: "base64:XyZ012...=="
+      classification_tag: Restricted
+    reason: "dek_key_id is required [cipher_alg, kek_ref, dek_key_id, dek_wrapped, iv, ciphertext, classification_tag] -- without it, decrypt-time lookup and destruction-time verification (ADR-002:65) have no addressable per-subject key to resolve, since one tenant KEK wraps many subjects' DEKs."

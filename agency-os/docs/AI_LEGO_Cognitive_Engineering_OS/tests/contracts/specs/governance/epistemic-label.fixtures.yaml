@@ -1,0 +1,29 @@
+schema_id: "ai-lego://specs/governance/epistemic-label.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the two canonical enums (epistemic_type's 11 values,
+  authorship_state's 6 values) via the root $ref into provenance_record --
+  including the exact bare 'FACT' value ADR-004 explicitly found in no
+  enum (only the full 'SOURCE_FACT' is legal) and the 'CALCULATED_RESULT'
+  duplicate ADR-004 removed from the authorship_state axis specifically.
+  Note: locked's cross-field legality rule (LOCKED_FACT only legal when
+  epistemic_type==SOURCE_FACT) is stated only as prose in this file's
+  `constraints` list, not a real JSON Schema if/then -- it is NOT
+  structurally enforced, so it is deliberately not exercised as an
+  invalid case here (doing so would produce a false claim that the
+  instance fails validation when it would actually pass).
+valid:
+  - name: ai_computed_awaiting_signoff
+    instance: { epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null }
+  - name: human_approved_locked_decision
+    instance: { epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: LOCKED_DECISION }
+invalid:
+  - name: bare_fact_not_in_enum
+    instance: { epistemic_type: FACT, authorship_state: HUMAN_ORIGINAL }
+    reason: "epistemic_type enum has SOURCE_FACT, not bare 'FACT' -- ADR-004's own promotion_redline finding is that both Atlas §21 rule #2 and EC §38's forbidden block referenced a bare FACT value that exists in no enum; this fixture confirms the enum actually rejects it."
+  - name: authorship_state_calculated_result_removed_duplicate
+    instance: { epistemic_type: SOURCE_FACT, authorship_state: CALCULATED_RESULT }
+    reason: "CALCULATED_RESULT was removed from the authorship_state axis by ADR-004 (it was a literal duplicate of an epistemic_type value, Master Plan's own internal self-collision) -- it is illegal as an authorship_state value even though it remains legal as an epistemic_type value."
+  - name: missing_authorship_state
+    instance: { epistemic_type: EVIDENCE }
+    reason: "authorship_state is required [epistemic_type, authorship_state] on provenance_record; omitting it fails required."

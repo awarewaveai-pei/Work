@@ -1,0 +1,207 @@
+schema_id: "ai-lego://policies/ai-execution/exception-policy.yaml"
+target_ref: ""
+description: >
+  exception-policy.yaml's root $refs `#/definitions/exception_policy_bundle`:
+  an object with a closed, exactly-5-row `approval_requirements` array
+  (minItems/maxItems 5, one `allOf`/`contains`/`minContains: 1`/
+  `maxContains: 1` guard per R0-R4 risk_tier value -- `risk_tier` is a
+  required field of `approval_requirement`, so no vacuous-omission bypass is
+  structurally possible here, unlike authority.yaml's now-fixed
+  forbidden_actions_ref guards) plus `expiry_policy`, `forbidden_scopes`,
+  and `self_approval_prohibition`. This fixture reproduces the file's own
+  two documented negative-control mutations (missing R4 row; invalid
+  risk_tier "R9") plus the `required_authority_level_minimum` anyOf and a
+  duplicate/missing-tier coverage bypass.
+
+valid:
+  - name: real_policy_content
+    instance:
+      approval_requirements:
+        - risk_tier: R0
+          required_authority_level_minimum: null
+          binding_basis: "risk-tier.schema.yaml tiers.R0.required_actions == [] -- no minimum established."
+        - risk_tier: R1
+          required_authority_level_minimum: null
+          binding_basis: "risk-tier.schema.yaml tiers.R1.required_actions name no approval/authority item -- no minimum established."
+        - risk_tier: R2
+          required_authority_level_minimum: null
+          binding_basis: "risk-tier.schema.yaml tiers.R2.required_actions name no approval/authority item -- no minimum established."
+        - risk_tier: R3
+          required_authority_level_minimum: A3
+          binding_basis: "risk-tier.schema.yaml tiers.R3.required_actions includes 'Human Approval'; authority.schema.yaml levels.A3.requirements includes authorized_approval."
+        - risk_tier: R4
+          required_authority_level_minimum: A4
+          binding_basis: "risk-tier.schema.yaml tiers.R4.required_actions includes 'Explicit Human Authority'; authority.schema.yaml levels.A4.requirements includes explicit_human_authority."
+      expiry_policy:
+        max_horizon: null
+        status: OPEN_QUESTION
+        rationale: "No mother document, ADR, or register entry supplies a maximum expires_at horizon anywhere in the corpus."
+      forbidden_scopes:
+        categorical_scope_prohibitions_status: NONE_FOUND_IN_CORPUS
+        categorical_scope_prohibitions: []
+        form_prohibitions:
+          - rule: "An exception MUST NOT be used as a substitute for error handling (\"blanket exception\")."
+            source: "EC §25, L1053."
+          - rule: "A temporary bypass or containment MUST NOT be granted without an expiry; an exception MUST NOT be a catch-all."
+            source: "EC §6 L343-353."
+          - rule: "An exception MUST NOT be the mechanism by which a security control is disabled wholesale."
+            source: "EC §6 L351."
+          - rule: "An exception MUST NOT be the mechanism by which validation is disabled wholesale."
+            source: "EC §6 L350."
+      self_approval_prohibition:
+        rule: "The AI MUST NOT treat its own recommendation as the authorized approval / explicit human authority an exception at that tier requires."
+        source: "EC §9 (L527)."
+        applies_to: R3_AND_R4_PER_APPROVAL_REQUIREMENTS
+
+invalid:
+  - name: missing_r4_row
+    instance:
+      approval_requirements:
+        - risk_tier: R0
+          required_authority_level_minimum: null
+          binding_basis: "no minimum established."
+        - risk_tier: R1
+          required_authority_level_minimum: null
+          binding_basis: "no minimum established."
+        - risk_tier: R2
+          required_authority_level_minimum: null
+          binding_basis: "no minimum established."
+        - risk_tier: R3
+          required_authority_level_minimum: A3
+          binding_basis: "Human Approval / authorized_approval."
+      expiry_policy:
+        max_horizon: null
+        status: OPEN_QUESTION
+        rationale: "no horizon stated anywhere."
+      forbidden_scopes:
+        categorical_scope_prohibitions_status: NONE_FOUND_IN_CORPUS
+        categorical_scope_prohibitions: []
+        form_prohibitions:
+          - rule: "An exception MUST NOT be used as a substitute for error handling."
+            source: "EC §25, L1053."
+      self_approval_prohibition:
+        rule: "The AI MUST NOT treat its own recommendation as approval."
+        source: "EC §9 (L527)."
+        applies_to: R3_AND_R4_PER_APPROVAL_REQUIREMENTS
+    reason: >
+      Only 4 approval_requirements rows -- violates `minItems: 5`/
+      `maxItems: 5`, AND the R4 `contains`/`minContains: 1` guard finds zero
+      matches. This is this file's own documented negative-control mutation
+      (see its `verification` section: "an approval_requirements array
+      missing the R4 row").
+  - name: invalid_risk_tier_r9
+    instance:
+      approval_requirements:
+        - risk_tier: R0
+          required_authority_level_minimum: null
+          binding_basis: "no minimum established."
+        - risk_tier: R1
+          required_authority_level_minimum: null
+          binding_basis: "no minimum established."
+        - risk_tier: R9
+          required_authority_level_minimum: null
+          binding_basis: "invalid tier, standing in for R2."
+        - risk_tier: R3
+          required_authority_level_minimum: A3
+          binding_basis: "Human Approval / authorized_approval."
+        - risk_tier: R4
+          required_authority_level_minimum: A4
+          binding_basis: "Explicit Human Authority / explicit_human_authority."
+      expiry_policy:
+        max_horizon: null
+        status: OPEN_QUESTION
+        rationale: "no horizon stated anywhere."
+      forbidden_scopes:
+        categorical_scope_prohibitions_status: NONE_FOUND_IN_CORPUS
+        categorical_scope_prohibitions: []
+        form_prohibitions:
+          - rule: "An exception MUST NOT be used as a substitute for error handling."
+            source: "EC §25, L1053."
+      self_approval_prohibition:
+        rule: "The AI MUST NOT treat its own recommendation as approval."
+        source: "EC §9 (L527)."
+        applies_to: R3_AND_R4_PER_APPROVAL_REQUIREMENTS
+    reason: >
+      `risk_tier: "R9"` is not a member of the $ref'd
+      `risk-tier.schema.yaml#/risk_tier` enum [R0,R1,R2,R3,R4] -- also fails
+      the R2 `contains`/`minContains: 1` guard, since no row carries the
+      literal value R2. This is this file's own documented negative-control
+      mutation (see its `verification` section: "one containing an invalid
+      risk_tier: 'R9'").
+  - name: required_authority_level_minimum_out_of_range
+    instance:
+      approval_requirements:
+        - risk_tier: R0
+          required_authority_level_minimum: null
+          binding_basis: "no minimum established."
+        - risk_tier: R1
+          required_authority_level_minimum: null
+          binding_basis: "no minimum established."
+        - risk_tier: R2
+          required_authority_level_minimum: null
+          binding_basis: "no minimum established."
+        - risk_tier: R3
+          required_authority_level_minimum: A3
+          binding_basis: "Human Approval / authorized_approval."
+        - risk_tier: R4
+          required_authority_level_minimum: A5
+          binding_basis: "attempted ceiling beyond the closed A0-A4 ladder."
+      expiry_policy:
+        max_horizon: null
+        status: OPEN_QUESTION
+        rationale: "no horizon stated anywhere."
+      forbidden_scopes:
+        categorical_scope_prohibitions_status: NONE_FOUND_IN_CORPUS
+        categorical_scope_prohibitions: []
+        form_prohibitions:
+          - rule: "An exception MUST NOT be used as a substitute for error handling."
+            source: "EC §25, L1053."
+      self_approval_prohibition:
+        rule: "The AI MUST NOT treat its own recommendation as approval."
+        source: "EC §9 (L527)."
+        applies_to: R3_AND_R4_PER_APPROVAL_REQUIREMENTS
+    reason: >
+      `required_authority_level_minimum` is
+      `anyOf: [$ref authority.schema.yaml#/authority_level, {type: "null"}]`
+      -- "A5" is neither a member of the closed A0-A4 enum nor null, so it
+      satisfies neither anyOf branch. Distinct from the R9 risk_tier test
+      above: this exercises the authority-level ceiling field, not the
+      risk_tier coverage guard.
+  - name: duplicate_r3_row_and_missing_r1
+    instance:
+      approval_requirements:
+        - risk_tier: R0
+          required_authority_level_minimum: null
+          binding_basis: "no minimum established."
+        - risk_tier: R2
+          required_authority_level_minimum: null
+          binding_basis: "no minimum established."
+        - risk_tier: R3
+          required_authority_level_minimum: A3
+          binding_basis: "Human Approval / authorized_approval."
+        - risk_tier: R3
+          required_authority_level_minimum: A3
+          binding_basis: "accidental duplicate of the R3 row."
+        - risk_tier: R4
+          required_authority_level_minimum: A4
+          binding_basis: "Explicit Human Authority / explicit_human_authority."
+      expiry_policy:
+        max_horizon: null
+        status: OPEN_QUESTION
+        rationale: "no horizon stated anywhere."
+      forbidden_scopes:
+        categorical_scope_prohibitions_status: NONE_FOUND_IN_CORPUS
+        categorical_scope_prohibitions: []
+        form_prohibitions:
+          - rule: "An exception MUST NOT be used as a substitute for error handling."
+            source: "EC §25, L1053."
+      self_approval_prohibition:
+        rule: "The AI MUST NOT treat its own recommendation as approval."
+        source: "EC §9 (L527)."
+        applies_to: R3_AND_R4_PER_APPROVAL_REQUIREMENTS
+    reason: >
+      Exactly 5 items (satisfies minItems/maxItems), but R3 appears twice
+      and R1 not at all -- violates `maxContains: 1` for the R3 guard and
+      `minContains: 1` for the R1 guard simultaneously, proving the
+      exact-one-per-tier coverage guard rejects a duplicate/missing-tier
+      swap, not just an under-sized array.

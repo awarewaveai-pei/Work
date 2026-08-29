@@ -1,0 +1,19 @@
+# EC section 94 category: authority
+schema_id: "ai-lego://specs/execution/authority.schema.yaml"
+target_ref: ""
+category: authority
+description: >
+  A0-A4 Autonomy/Authority Level enum (EC section 9), gating which actions
+  an agent may take without further human sign-off.
+valid:
+  - name: a0
+    instance: "A0"
+  - name: a3
+    instance: "A3"
+invalid:
+  - name: a5_out_of_range
+    instance: "A5"
+    reason: "authority_level enum is [A0,A1,A2,A3,A4] -- A5 does not exist; inventing a level above A4 would silently create an ungoverned authority tier"
+  - name: role_name_not_level
+    instance: "Admin"
+    reason: "authority_level is the A0-A4 enum, not a human role name -- role-to-level mapping is a separate (currently SKELETON_ONLY) field, not interchangeable with the level itself"

@@ -1,0 +1,22 @@
+schema_id: "ai-lego://specs/cognitive/problem-type.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the unified 13-value problem_type enum (Atlas's original 7 plus
+  the 6 values transcribed from routing-table-only rows) via this file's
+  own root $ref into #/problem_type, including the documented near-match
+  trap between the routing table's Title-Case "Strategy" label and the
+  canonical lowercase "strategic" enum value.
+
+valid:
+  - name: original_atlas_enum_value
+    instance: "diagnostic"
+  - name: newly_added_routing_table_value
+    instance: "db_migration"
+
+invalid:
+  - name: table_label_title_case_not_enum_value
+    instance: "Strategy"
+    reason: "The routing table's own label is the noun 'Strategy' (Title Case), but the canonical enum value is the adjective 'strategic' (Atlas L1073 spelling, kept per compilation_decisions) — 'Strategy' itself is not a member of the 13-value enum."
+  - name: value_outside_13_value_enum
+    instance: "financial_planning"
+    reason: "'financial_planning' is not one of the 13 unified problem_type enum values (7 original + 6 newly transcribed from the routing table)."

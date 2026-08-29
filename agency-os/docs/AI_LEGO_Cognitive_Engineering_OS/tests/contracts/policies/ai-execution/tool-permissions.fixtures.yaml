@@ -1,0 +1,105 @@
+schema_id: "ai-lego://policies/ai-execution/tool-permissions.yaml"
+target_ref: ""
+description: >
+  tool-permissions.yaml's root $refs `#/tool_permission_rules`, an array of
+  `tool_permission_rule`. This session added a mechanical `anyOf` guard to
+  `tool_permission_rule` (2026-08-29, critic-flagged Suggestion) requiring
+  at least one of `restrictions` (non-empty array) or `max_authority_level`
+  (non-null) to be present -- a rule with neither restricts nothing and
+  would previously have been a schema-valid no-op enforced only by a
+  prose-only `constraints` comment. This fixture proves the `anyOf` now
+  mechanically rejects that no-op shape (both the all-fields-omitted form
+  and the explicit-empty/explicit-null form), and separately proves each of
+  the two legitimate ways to satisfy it in isolation. Also covers the
+  `restriction_dimension` closed 7(+null)-value enum.
+
+valid:
+  - name: satisfies_via_nonempty_restrictions
+    instance:
+      - rule_id: "TOOLPERM-EC97-1"
+        task_context: "Documentation Task"
+        condition: "task_context = 'Documentation Task' AND target = production DB AND operation = write"
+        action: DENY
+        restrictions:
+          - dimension: db_role
+            constraint_type: DENY
+            value: "production DB write"
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §97 (L2886-2887)"
+        mother_doc_text: "Documentation Task: no production DB write"
+  - name: satisfies_via_max_authority_level_only
+    instance:
+      - rule_id: "TOOLPERM-EC97-4"
+        task_context: "AI Research"
+        condition: "task_context = 'AI Research' AND target = deployment authority"
+        action: DENY
+        restrictions: []
+        max_authority_level: "A2"
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §97 (L2895-2896)"
+        mother_doc_text: "AI Research: no deployment authority"
+
+invalid:
+  - name: anyof_bypass_neither_field_present
+    instance:
+      - rule_id: "TOOLPERM-TEST-NOOP-1"
+        task_context: "Idle Task"
+        condition: "task_context = 'Idle Task'"
+        action: ALLOW
+        source: "test fixture"
+        mother_doc_text: "no restriction of any kind stated"
+    reason: >
+      Neither `restrictions` nor `max_authority_level` is present at all --
+      violates the `anyOf` added this session
+      (`anyOf: [{properties: {restrictions: {minItems: 1}}, required:
+      [restrictions]}, {properties: {max_authority_level: {not: {type:
+      "null"}}}, required: [max_authority_level]}]`). This is the no-op
+      shape the anyOf exists to reject: a rule restricting nothing.
+  - name: anyof_bypass_explicit_empty_and_null
+    instance:
+      - rule_id: "TOOLPERM-TEST-NOOP-2"
+        task_context: "Idle Task"
+        condition: "task_context = 'Idle Task'"
+        action: ALLOW
+        restrictions: []
+        max_authority_level: null
+        source: "test fixture"
+        mother_doc_text: "no restriction of any kind stated, fields explicit"
+    reason: >
+      Same no-op shape as the previous case, but with both fields
+      explicitly present rather than omitted (`restrictions: []`,
+      `max_authority_level: null`) -- proves the `anyOf` rejects the
+      explicit-empty/explicit-null form too, not only bare absence (the
+      first branch's `restrictions: {minItems: 1}` fails on an empty array;
+      the second branch's `max_authority_level: {not: {type: "null"}}`
+      fails on an explicit null).
+  - name: restriction_dimension_invented_eighth_dimension
+    instance:
+      - rule_id: "TOOLPERM-TEST-BAD-DIM"
+        task_context: "Secrets Task"
+        condition: "task_context = 'Secrets Task' AND target = env vars"
+        action: DENY
+        restrictions:
+          - dimension: environment_variable
+            constraint_type: DENY
+            value: "any secret-bearing env var"
+        source: "test fixture"
+        mother_doc_text: "no such EC §96 example exists"
+    reason: >
+      `restriction_dimension` is a closed
+      `enum: [null, command, filesystem_path, network_domain, db_role,
+      cloud_account, namespace, duration]` -- EC §96 names exactly 7
+      restrictable dimensions, verbatim, with no 8th invented.
+      "environment_variable" is not a member.
+  - name: max_authority_level_out_of_range
+    instance:
+      - rule_id: "TOOLPERM-TEST-BAD-AUTH"
+        task_context: "AI Research"
+        condition: "task_context = 'AI Research' AND target = deployment authority"
+        action: DENY
+        max_authority_level: "A5"
+        source: "test fixture"
+        mother_doc_text: "attempted ceiling beyond the closed A0-A4 ladder"
+    reason: >
+      `max_authority_level` is
+      `anyOf: [$ref authority.schema.yaml#/authority_level, {type:
+      "null"}]` -- "A5" is neither a member of the closed A0-A4 enum nor
+      null.

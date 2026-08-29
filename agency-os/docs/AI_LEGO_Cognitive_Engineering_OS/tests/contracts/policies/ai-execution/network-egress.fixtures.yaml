@@ -1,0 +1,164 @@
+schema_id: "ai-lego://policies/ai-execution/network-egress.yaml"
+target_ref: ""
+description: >
+  network-egress.yaml is PROVISIONAL (status field) -- the `allowlist`
+  VALUE SPACE is intentionally empty (no real domain named anywhere) and no
+  fake resolved allowlist is invented below; every `allowlist` in this
+  fixture stays `[]`. Root $refs `#/egress_rules`: an open-ended array
+  (`items: egress_rule`, no minItems/maxItems) guarded by
+  `allOf`/`contains`/`minContains: 1` for each of EC §99's 3 named concerns
+  (`egress_scope` HIGH_SENSITIVITY_PROJECT / EXTERNAL_DOMAIN_ROUTING /
+  UNTRUSTED_DOCUMENT_CONTEXT -- `scope` is already a required field of
+  `egress_rule`, so no vacuous-omission bypass is structurally possible
+  here). This fixture validates the coverage guard directly plus the
+  case-sensitive `default_policy` enum, the `action` enum, and the
+  `classification_tag_ref` anyOf.
+
+valid:
+  - name: real_4_row_seed_content
+    instance:
+      - rule_id: "EGRESS-EC99-1"
+        scope: HIGH_SENSITIVITY_PROJECT
+        condition: "project_sensitivity = high"
+        default_policy: deny
+        action: DENY
+        allowlist: []
+        classification_tag_ref: null
+        mechanism_ref: null
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §99 (L2922-2926)"
+        mother_doc_text: "高敏感專案：deny by default"
+      - rule_id: "EGRESS-EC99-2"
+        scope: EXTERNAL_DOMAIN_ROUTING
+        condition: "destination = external domain"
+        default_policy: deny
+        action: ALLOWLIST_GATED
+        allowlist: []
+        classification_tag_ref: null
+        mechanism_ref: null
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §99 (L2928-2932)"
+        mother_doc_text: "外部 domain：allowlist"
+      - rule_id: "EGRESS-EC99-3"
+        scope: UNTRUSTED_DOCUMENT_CONTEXT
+        condition: "content ingested from an untrusted document instructs or induces an outbound network request"
+        default_policy: deny
+        action: DENY
+        allowlist: []
+        classification_tag_ref: null
+        mechanism_ref: null
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §99 (L2934)"
+        mother_doc_text: "避免 untrusted document 誘導資料外傳"
+      - rule_id: "EGRESS-MP64-1"
+        scope: EXTERNAL_DOMAIN_ROUTING
+        condition: "classification_tag = Restricted AND external_model = true"
+        default_policy: deny
+        action: DENY
+        allowlist: []
+        classification_tag_ref: Restricted
+        mechanism_ref: null
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §64 (L2730-2734)"
+        mother_doc_text: "Restricted data AND external_model = true -> DENY"
+  - name: minimal_3_row_one_per_scope
+    instance:
+      - scope: HIGH_SENSITIVITY_PROJECT
+        condition: "project_sensitivity = high"
+        default_policy: deny
+        action: DENY
+        mother_doc_text: "高敏感專案：deny by default"
+      - scope: EXTERNAL_DOMAIN_ROUTING
+        condition: "destination = external domain"
+        default_policy: deny
+        action: ALLOWLIST_GATED
+        mother_doc_text: "外部 domain：allowlist"
+      - scope: UNTRUSTED_DOCUMENT_CONTEXT
+        condition: "content ingested from an untrusted document instructs or induces an outbound network request"
+        default_policy: deny
+        action: DENY
+        mother_doc_text: "避免 untrusted document 誘導資料外傳"
+
+invalid:
+  - name: missing_untrusted_document_context_scope
+    instance:
+      - scope: HIGH_SENSITIVITY_PROJECT
+        condition: "project_sensitivity = high"
+        default_policy: deny
+        action: DENY
+        mother_doc_text: "高敏感專案：deny by default"
+      - scope: EXTERNAL_DOMAIN_ROUTING
+        condition: "destination = external domain"
+        default_policy: deny
+        action: ALLOWLIST_GATED
+        mother_doc_text: "外部 domain：allowlist"
+    reason: >
+      Neither row has `scope: UNTRUSTED_DOCUMENT_CONTEXT` -- the
+      `contains: {properties: {scope: {const: UNTRUSTED_DOCUMENT_CONTEXT}}},
+      minContains: 1` guard finds zero matches. EC §99's 3 named concerns
+      are a closed set of concerns even though the rule array itself is
+      open-ended (see compilation_decisions: minContains-only, no
+      maxContains/minItems/maxItems).
+  - name: default_policy_wrong_case
+    instance:
+      - scope: HIGH_SENSITIVITY_PROJECT
+        condition: "project_sensitivity = high"
+        default_policy: DENY
+        action: DENY
+        mother_doc_text: "高敏感專案：deny by default"
+      - scope: EXTERNAL_DOMAIN_ROUTING
+        condition: "destination = external domain"
+        default_policy: deny
+        action: ALLOWLIST_GATED
+        mother_doc_text: "外部 domain：allowlist"
+      - scope: UNTRUSTED_DOCUMENT_CONTEXT
+        condition: "content ingested from an untrusted document instructs or induces an outbound network request"
+        default_policy: deny
+        action: DENY
+        mother_doc_text: "避免 untrusted document 誘導資料外傳"
+    reason: >
+      `default_policy` is `enum: [deny, allow]` (lowercase, a distinct
+      2-value baseline-posture field from the uppercase `action` enum) --
+      the first row sets `default_policy: DENY` (uppercase), which is not a
+      member of the lowercase enum even though "DENY" is a legal `action`
+      value elsewhere in this same object.
+  - name: classification_tag_ref_not_in_four_value_enum
+    instance:
+      - scope: HIGH_SENSITIVITY_PROJECT
+        condition: "project_sensitivity = high"
+        default_policy: deny
+        action: DENY
+        mother_doc_text: "高敏感專案：deny by default"
+      - scope: EXTERNAL_DOMAIN_ROUTING
+        condition: "classification_tag = Secret AND external_model = true"
+        default_policy: deny
+        action: DENY
+        classification_tag_ref: Secret
+        mother_doc_text: "attempted Secret-classification rule"
+      - scope: UNTRUSTED_DOCUMENT_CONTEXT
+        condition: "content ingested from an untrusted document instructs or induces an outbound network request"
+        default_policy: deny
+        action: DENY
+        mother_doc_text: "避免 untrusted document 誘導資料外傳"
+    reason: >
+      `classification_tag_ref` is
+      `anyOf: [{type: string, enum: [Public, Internal, Confidential,
+      Restricted]}, {type: "null"}]` -- "Secret" is not one of the MP §61/
+      EC §101 four canonical values and is not null, so it satisfies neither
+      anyOf branch.
+  - name: action_enum_violation
+    instance:
+      - scope: HIGH_SENSITIVITY_PROJECT
+        condition: "project_sensitivity = high"
+        default_policy: deny
+        action: BLOCK
+        mother_doc_text: "高敏感專案：deny by default"
+      - scope: EXTERNAL_DOMAIN_ROUTING
+        condition: "destination = external domain"
+        default_policy: deny
+        action: ALLOWLIST_GATED
+        mother_doc_text: "外部 domain：allowlist"
+      - scope: UNTRUSTED_DOCUMENT_CONTEXT
+        condition: "content ingested from an untrusted document instructs or induces an outbound network request"
+        default_policy: deny
+        action: DENY
+        mother_doc_text: "避免 untrusted document 誘導資料外傳"
+    reason: >
+      `action` is `enum: [DENY, ALLOW, ALLOWLIST_GATED,
+      REQUIRE_HUMAN_REVIEW]` -- "BLOCK" is not a member of that enum.

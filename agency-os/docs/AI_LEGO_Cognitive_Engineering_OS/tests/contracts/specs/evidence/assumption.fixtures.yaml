@@ -1,0 +1,61 @@
+schema_id: "ai-lego://specs/evidence/assumption.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the ASM-* id pattern, the fixed provenance.epistemic_type const
+  (ASSUMPTION), and the cross-file $ref'd authorship_state enum inherited
+  from governance/epistemic-label.schema.yaml.
+valid:
+  - name: full_instance_with_evidence_and_criticality
+    instance:
+      id: "ASM-018"
+      statement: "大學願意採用外部 AI 教育平台"
+      type: "Market Adoption"
+      evidence_strength: "Medium"
+      evidence:
+        - evidence_id: "E-1"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL }
+      impact_if_wrong: "Critical"
+      confidence: 0.62
+      validation: "Interview 30 universities"
+      owner: "growth_lead"
+      status: "Unverified"
+      is_critical_assumption: true
+      provenance:
+        epistemic_type: ASSUMPTION
+        authorship_state: HUMAN_ORIGINAL
+  - name: minimal_required_only
+    instance:
+      id: "ASM-001"
+      statement: "Some minimal assumption statement"
+      status: "Unverified"
+      provenance:
+        epistemic_type: ASSUMPTION
+        authorship_state: AI_GENERATED
+invalid:
+  - name: id_pattern_violation
+    instance:
+      id: "ASSUMPTION-018"
+      statement: "大學願意採用外部 AI 教育平台"
+      status: "Unverified"
+      provenance:
+        epistemic_type: ASSUMPTION
+        authorship_state: HUMAN_ORIGINAL
+    reason: "id pattern is ^ASM-[0-9]+$; 'ASSUMPTION-018' does not match the required ASM- prefix grammar."
+  - name: provenance_epistemic_type_wrong_const
+    instance:
+      id: "ASM-002"
+      statement: "Some statement"
+      status: "Unverified"
+      provenance:
+        epistemic_type: EVIDENCE
+        authorship_state: HUMAN_ORIGINAL
+    reason: "provenance.epistemic_type is fixed const: ASSUMPTION -- every Assumption record's epistemic_type IS that value by construction; EVIDENCE is illegal here."
+  - name: provenance_authorship_state_invalid_enum
+    instance:
+      id: "ASM-003"
+      statement: "Some statement"
+      status: "Unverified"
+      provenance:
+        epistemic_type: ASSUMPTION
+        authorship_state: MACHINE_GENERATED
+    reason: "authorship_state $ref's governance/epistemic-label.schema.yaml's 6-value enum (HUMAN_ORIGINAL/AI_GENERATED/AI_SUGGESTED/HUMAN_EDITED/HUMAN_APPROVED/SOURCE_QUOTATION); 'MACHINE_GENERATED' is not a member -- exercises the cross-file $ref resolving for real."

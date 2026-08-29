@@ -1,0 +1,37 @@
+schema_id: "ai-lego://specs/evidence/evidence.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the E-* id pattern and the fixed provenance.epistemic_type
+  const (EVIDENCE, unlike claim.schema.yaml's unrestricted enum).
+valid:
+  - name: minimal_required_only
+    instance:
+      evidence_id: "E-1"
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL }
+  - name: full_with_quality_assessment_and_hierarchy_tier
+    instance:
+      evidence_id: "E-8"
+      content: "Independent third-party market study, 2026 edition"
+      source: "https://example.org/report-2026"
+      quality_assessment:
+        source_authority: "high"
+        recency: "current year"
+        directness: "direct"
+        independence: "independent third party"
+      hierarchy_tier: "domain-specific: market-research tier 1"
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_EDITED, locked: null }
+invalid:
+  - name: evidence_id_pattern_violation
+    instance:
+      evidence_id: "EVID-1"
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL }
+    reason: "evidence_id pattern is ^E-[0-9]+$; 'EVID-1' does not match the transcribed Atlas 11.20 grammar."
+  - name: provenance_epistemic_type_wrong_const
+    instance:
+      evidence_id: "E-2"
+      provenance: { epistemic_type: SOURCE_FACT, authorship_state: HUMAN_ORIGINAL }
+    reason: "provenance.epistemic_type is fixed const: EVIDENCE (every Evidence record IS that value by construction); SOURCE_FACT is a different, illegal value here."
+  - name: missing_provenance
+    instance:
+      evidence_id: "E-3"
+    reason: "provenance is required [evidence_id, provenance] -- omitting it fails required."

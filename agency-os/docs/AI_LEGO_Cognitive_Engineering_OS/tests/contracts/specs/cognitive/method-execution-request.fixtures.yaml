@@ -1,0 +1,118 @@
+schema_id: "ai-lego://specs/cognitive/method-execution-request.schema.yaml"
+target_ref: ""
+description: >
+  Exercises MethodExecutionRequest's required fields, the full hard-$ref
+  embed of execution/task.schema.yaml at task_context (all 12 of that
+  file's own required fields must be present), the inputs object's
+  minProperties:1 guard, and the typed_input_value wrapper's required
+  `hash` field.
+
+valid:
+  - name: full_fishbone_invocation_with_optional_fields
+    instance:
+      execution_id: "EX-2026-08-29-000042"
+      method_id: "root_cause.fishbone"
+      method_version: "1.0.0"
+      task_context:
+        task_id: "TASK-2026-000001"
+        objective: "Diagnose why order cancellation rate spiked."
+        requester: "human:ops-lead"
+        environment: production
+        domains: ["cognitive"]
+        affected_modules: ["order-service"]
+        data_impact: read
+        external_side_effects: []
+        jurisdiction_context: "US"
+        reversibility: high
+        user_impact: "None — read-only diagnosis."
+        risk_tier: R1
+      workflow_id: null
+      block_id: null
+      inputs:
+        ProblemStatement:
+          hash: "a3f5c1e2b4d6f8a0c2e4b6d8f0a2c4e6b8d0f2a4c6e8b0d2f4a6c8e0b2d4f6a8"
+      requested_at: "2026-08-29T15:00:00Z"
+      provenance:
+        epistemic_type: AI_SUGGESTION
+        authorship_state: AI_GENERATED
+  - name: minimal_required_fields_only
+    instance:
+      method_id: "strategy.swot"
+      task_context:
+        task_id: "TASK-2026-000002"
+        objective: "Assess strategic position for Q4 roadmap."
+        requester: "human:pm"
+        environment: staging
+        domains: ["strategy"]
+        affected_modules: []
+        data_impact: none
+        external_side_effects: []
+        jurisdiction_context: "TW"
+        reversibility: high
+        user_impact: "None."
+        risk_tier: R0
+      inputs:
+        KnowledgeSet:
+          hash: "a3f5c1e2b4d6f8a0c2e4b6d8f0a2c4e6b8d0f2a4c6e8b0d2f4a6c8e0b2d4f6a8"
+      requested_at: "2026-08-29T09:00:00Z"
+
+invalid:
+  - name: inputs_empty_object_violates_minproperties
+    instance:
+      method_id: "root_cause.fishbone"
+      task_context:
+        task_id: "TASK-2026-000003"
+        objective: "x"
+        requester: "human:x"
+        environment: dev
+        domains: []
+        affected_modules: []
+        data_impact: none
+        external_side_effects: []
+        jurisdiction_context: "US"
+        reversibility: high
+        user_impact: "x"
+        risk_tier: R0
+      inputs: {}
+      requested_at: "2026-08-29T09:00:00Z"
+    reason: "inputs has minProperties: 1 — a caller must supply at least one typed-object key; an empty object is rejected."
+  - name: typed_input_value_missing_required_hash
+    instance:
+      method_id: "root_cause.fishbone"
+      task_context:
+        task_id: "TASK-2026-000004"
+        objective: "x"
+        requester: "human:x"
+        environment: dev
+        domains: []
+        affected_modules: []
+        data_impact: none
+        external_side_effects: []
+        jurisdiction_context: "US"
+        reversibility: high
+        user_impact: "x"
+        risk_tier: R0
+      inputs:
+        ProblemStatement: {}
+      requested_at: "2026-08-29T09:00:00Z"
+    reason: "definitions/typed_input_value requires 'hash' — a bare {} value for an inputs key is missing the content-addressed reference."
+  - name: task_context_missing_required_risk_tier
+    instance:
+      method_id: "root_cause.fishbone"
+      task_context:
+        task_id: "TASK-2026-000005"
+        objective: "x"
+        requester: "human:x"
+        environment: dev
+        domains: []
+        affected_modules: []
+        data_impact: none
+        external_side_effects: []
+        jurisdiction_context: "US"
+        reversibility: high
+        user_impact: "x"
+      inputs:
+        ProblemStatement:
+          hash: "a3f5c1e2b4d6f8a0c2e4b6d8f0a2c4e6b8d0f2a4c6e8b0d2f4a6c8e0b2d4f6a8"
+      requested_at: "2026-08-29T09:00:00Z"
+    reason: "task_context is a real hard $ref to the full execution/task.schema.yaml object, which requires risk_tier among its 12 fields — omitting it fails the embedded schema's own required list."

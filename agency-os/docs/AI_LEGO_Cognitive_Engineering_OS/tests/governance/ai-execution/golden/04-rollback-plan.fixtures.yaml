@@ -1,0 +1,30 @@
+# EC section 141 golden scenario, step 4 of 6 -- see golden/README.md
+schema_id: "ai-lego://specs/execution/rollback.schema.yaml"
+target_ref: ""
+category: golden
+description: >
+  The rollback plan for TASK-2026-08-29-GOLDEN-001, matching
+  db-migration-expand-contract.recipe.yaml's "Close Rollback Window" final
+  step -- an additive column expand is git_revert_sufficient (contracting
+  the old schema is a separate, later step per that recipe's 15-step
+  sequence, not yet reached here).
+valid:
+  - name: additive_expand_rollback_plan
+    instance:
+      plan_id: "RB-2026-08-29-GOLDEN-001"
+      task_id: "TASK-2026-08-29-GOLDEN-001"
+      execution_id: "EX-2026-08-29-GOLDEN-001"
+      targets_validated_before_execution: true
+      strategy: {kind: "git_revert", detail: "revert migration commit, column was never read by application code yet"}
+      reversibility: {pre_launch: {possible: true}, post_launch: {possible: true}}
+      git_revert_sufficient: true
+invalid:
+  - name: execution_id_wrong_pattern
+    instance:
+      plan_id: "RB-2026-08-29-GOLDEN-001"
+      task_id: "TASK-2026-08-29-GOLDEN-001"
+      execution_id: "2026-08-29-GOLDEN-001"
+      targets_validated_before_execution: true
+      strategy: {kind: "git_revert"}
+      reversibility: {pre_launch: {possible: true}, post_launch: {possible: true}}
+    reason: "execution_id must match pattern ^EX- (rollback.schema.yaml) -- a bare date-slug string cannot be told apart from a task_id or plan_id by any downstream consumer keying off the prefix"

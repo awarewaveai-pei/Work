@@ -1,0 +1,73 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/cause-hypothesis-set.schema.yaml"
+target_ref: ""
+description: >
+  Exercises CauseHypothesisSet's required fields, the `hypotheses[]`
+  minItems:1 guard, each hypothesis's required `provenance`
+  (epistemic-label.schema.yaml's required epistemic_type+authorship_state,
+  reused rather than a narrow local 3-value enum), the `id` ^CHS- pattern,
+  and the `promotion.validation_methods_applied[]` 4-value enum that gates
+  legal promotion to RootCauseFact.
+
+valid:
+  - name: mid_validation_not_yet_promotable
+    instance:
+      id: "CHS-2026-08-29-001"
+      version: "1.0.0"
+      problem_statement_ref: "PROB-2026-08-29-001"
+      generated_by_method: "root_cause.fishbone"
+      hypotheses:
+        - id: "CHS-2026-08-29-001-H1"
+          statement: "ERP and e-commerce systems are not synchronized in real time."
+          category: "Technology"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED }
+      promotion:
+        validation_methods_applied: []
+        ready_for_promotion: false
+  - name: two_hypotheses_ready_for_promotion
+    instance:
+      id: "CHS-2026-08-29-002"
+      version: "1.0.0"
+      problem_statement_ref: "PROB-2026-08-29-002"
+      hypotheses:
+        - id: "CHS-2026-08-29-002-H1"
+          statement: "Manual confirmation step introduces delay."
+          category: "Process"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_EDITED }
+        - id: "CHS-2026-08-29-002-H2"
+          statement: "Unrelated staffing shortage."
+          category: "People"
+          provenance: { epistemic_type: UNKNOWN, authorship_state: AI_GENERATED }
+      promotion:
+        validation_methods_applied: ["root_cause.five_whys", "causal.dag"]
+        ready_for_promotion: true
+
+invalid:
+  - name: hypotheses_empty_array_violates_minitems
+    instance:
+      id: "CHS-2026-08-29-003"
+      version: "1.0.0"
+      problem_statement_ref: "PROB-2026-08-29-003"
+      hypotheses: []
+    reason: "hypotheses has minItems: 1 (Atlas §11.4 steps 2-4 require at least one candidate cause) — an empty array is rejected."
+  - name: hypothesis_provenance_missing_required_authorship_state
+    instance:
+      id: "CHS-2026-08-29-004"
+      version: "1.0.0"
+      problem_statement_ref: "PROB-2026-08-29-004"
+      hypotheses:
+        - id: "CHS-2026-08-29-004-H1"
+          statement: "Some candidate cause."
+          provenance: { epistemic_type: HYPOTHESIS }
+    reason: "hypotheses[].provenance is a real hard $ref to epistemic-label.schema.yaml#/provenance_record, whose required list is [epistemic_type, authorship_state] — authorship_state is missing here."
+  - name: promotion_validation_method_not_in_4_value_enum
+    instance:
+      id: "CHS-2026-08-29-005"
+      version: "1.0.0"
+      problem_statement_ref: "PROB-2026-08-29-005"
+      hypotheses:
+        - id: "CHS-2026-08-29-005-H1"
+          statement: "Some candidate cause."
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED }
+      promotion:
+        validation_methods_applied: ["root_cause.ishikawa"]
+    reason: "promotion.validation_methods_applied[] items must be one of the 4 recommended_next methods [root_cause.pareto, root_cause.five_whys, causal.dag, validation.experiment]; 'root_cause.ishikawa' is not among them."

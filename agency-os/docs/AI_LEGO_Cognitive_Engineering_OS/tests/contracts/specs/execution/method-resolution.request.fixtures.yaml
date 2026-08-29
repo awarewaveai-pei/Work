@@ -1,0 +1,88 @@
+schema_id: "ai-lego://specs/execution/method-resolution.schema.yaml"
+target_ref: "#/method_resolution_request"
+description: >
+  Exercises the method_resolution_request adapter input contract: the
+  required task_context (a real hard $ref into the whole
+  execution/task.schema.yaml document, itself chaining into
+  execution/risk-tier.schema.yaml#/risk_tier for the risk_tier field) plus
+  the required selection_context_supplement object.
+
+valid:
+  - name: full_task_context_with_empty_supplement
+    instance:
+      task_context:
+        task_id: "TASK-2026-000123"
+        objective: "Wire the Method Resolution adapter's request shape into the boot pipeline."
+        requester: "operator"
+        environment: "production"
+        domains: ["execution", "method-selection"]
+        affected_modules: ["specs/execution/method-resolution.schema.yaml"]
+        data_impact: "none"
+        external_side_effects: []
+        jurisdiction_context: "US"
+        reversibility: "high"
+        user_impact: "No end-user visible change; internal spec compilation only."
+        risk_tier: "R1"
+      selection_context_supplement: {}
+  - name: full_task_context_with_populated_supplement
+    instance:
+      task_context:
+        task_id: "TASK-2026-000124"
+        objective: "Resolve candidate methods for an incident triage task."
+        requester: "incident-responder"
+        environment: "production"
+        domains: ["incident-response"]
+        affected_modules: []
+        data_impact: "read"
+        external_side_effects: ["paging-on-call"]
+        jurisdiction_context: "EU"
+        reversibility: "medium"
+        user_impact: "Delays on-call escalation until candidates resolve."
+        risk_tier: "R2"
+      selection_context_supplement:
+        goal_type: "diagnose"
+        stakeholders: ["on-call-engineer", "incident-commander"]
+        decision_criticality: "high"
+        evidence_available: "partial"
+        data_available: "logs-only"
+        uncertainty: "moderate"
+        time_horizon: "minutes"
+        budget: "unconstrained"
+        time_budget: "15m"
+        cognitive_preferences: ["fast-diagnosis"]
+        accessibility_needs: []
+
+invalid:
+  - name: missing_selection_context_supplement
+    instance:
+      task_context:
+        task_id: "TASK-2026-000125"
+        objective: "Task with no supplement supplied."
+        requester: "operator"
+        environment: "staging"
+        domains: ["execution"]
+        affected_modules: []
+        data_impact: "none"
+        external_side_effects: []
+        jurisdiction_context: "US"
+        reversibility: "high"
+        user_impact: "None."
+        risk_tier: "R0"
+    reason: "method_resolution_request.required lists both task_context and selection_context_supplement; the latter is omitted entirely."
+  - name: task_context_risk_tier_out_of_enum_via_ref_chain
+    instance:
+      task_context:
+        task_id: "TASK-2026-000126"
+        objective: "Task carrying an illegal risk_tier value."
+        requester: "operator"
+        environment: "production"
+        domains: ["execution"]
+        affected_modules: []
+        data_impact: "write"
+        external_side_effects: []
+        jurisdiction_context: "US"
+        reversibility: "low"
+        user_impact: "Some impact."
+        risk_tier: "R5"
+      selection_context_supplement: {}
+    reason: "task_context.risk_tier is a hard $ref chain (method-resolution -> task.schema.yaml -> risk-tier.schema.yaml#/risk_tier); 'R5' is outside the closed 5-value R0-R4 enum, one past the top of the scale."

@@ -1,0 +1,88 @@
+schema_id: ai-lego://specs/execution/handoff.schema.yaml
+target_ref: ''
+category: golden
+description: 'The handoff record closing out TASK-2026-08-29-GOLDEN-001, referencing the execution result and rollback plan
+  produced in the earlier steps of this scenario.
+
+  '
+valid:
+- name: closing_handoff
+  instance:
+    handoff_id: HANDOFF-2026-08-29-GOLDEN-001
+    task_id: TASK-2026-08-29-GOLDEN-001
+    execution_id: EX-2026-08-29-GOLDEN-001
+    generated_at: '2026-08-29T10:35:00Z'
+    generated_by: claude-sonnet-5
+    final_status: PASS
+    risk_tier: R3
+    checklist:
+    - item: task
+      present: true
+    - item: objective
+      present: true
+    - item: current_state
+      present: true
+    - item: problem_root_cause
+      present: true
+    - item: applicable_specifications
+      present: true
+    - item: methods_used
+      present: true
+    - item: risk_tier
+      present: true
+    - item: options_considered
+      present: true
+    - item: selected_approach
+      present: true
+    - item: rejected_alternatives
+      present: true
+    - item: files_changed
+      present: true
+    - item: schemas_changed
+      present: true
+    - item: api_changes
+      present: true
+    - item: data_impact
+      present: true
+    - item: security_privacy_impact
+      present: true
+    - item: jurisdiction_impact
+      present: true
+    - item: compatibility
+      present: true
+    - item: tests
+      present: true
+    - item: expected_results
+      present: true
+    - item: actual_results
+      present: true
+    - item: gate_results
+      present: true
+    - item: known_limitations
+      present: true
+    - item: open_risks
+      present: true
+    - item: rollback
+      present: true
+    - item: observability
+      present: true
+    - item: deployment_release
+      present: true
+    - item: post_verification
+      present: true
+    - item: adr
+      present: true
+    - item: evidence
+      present: true
+    - item: final_status
+      present: true
+invalid:
+- name: execution_id_null_but_referenced_elsewhere
+  instance:
+    handoff_id: HANDOFF-2026-08-29-GOLDEN-001
+    task_id: TASK-2026-08-29-GOLDEN-001
+    execution_id: 12345
+    generated_at: '2026-08-29T10:35:00Z'
+    checklist: []
+  reason: execution_id must be type [string, null] (handoff.schema.yaml) -- a bare integer, even one that looks like an id,
+    is not a legal type here

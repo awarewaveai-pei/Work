@@ -45,7 +45,7 @@ source_of_truth_for:
   - "execution/risk-tier.schema.yaml mandatory_gate_injection_trigger + tiers.R3.gate_injection + tiers.R4.gate_injection — the R3∪R4 condition under which gate_result records are expected to be emitted"
   - ".ai/research/phase-0/open-questions.yaml OQ-10 (L68-72) — the unresolved ownership question this file's gate_id field defers to"
   - ".ai/research/phase-0/verified-findings.yaml CROSS-R-5 (L98-116), CROSS-R-7 (L398-421), CROSS-T-11 (L495-517) — the three-way count/name dispute, independently confirmed 2-3x each"
-  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2 row 102 (L102) and §3 Build Order (L269, corrected 2026-08-29 — self-caught during Wave 6 critic-fix bughunt: originally mis-cited as '§4 (L246)', wrong section [§4 is 'Atlas Method Contract 補齊策略', unrelated] AND wrong line) — this file's tracked status and explicit instruction to build the skeleton now with gate_id left TBD_PENDING_ROUND2"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2 row 102 (L102) and §3 Build Order (L286, corrected 2026-08-29 — self-caught during Wave 6 critic-fix bughunt: originally mis-cited as '§4 (L246)', wrong section [§4 is 'Atlas Method Contract 補齊策略', unrelated] AND wrong line) — this file's tracked status and explicit instruction to build the skeleton now with gate_id left TBD_PENDING_ROUND2"
   - "execution/manifest.schema.yaml results.gates (L303-315) and cognitive/recipe.schema.yaml steps[].gate_ref (L149-165, L333-342) — existing forward dependents already waiting on this file, whose own untyped-string precedent this file follows"
 
 decided_by: >
@@ -54,7 +54,7 @@ decided_by: >
   — verified by grep across docs/adr/ADR-001~010: none rules on the
   Global/High-risk Gate list. MACHINE_READABLE_SPEC_PLAN.md itself
   prescribes exactly what this file may and may not do while that ADR is
-  pending (§3 Build Order, L269 — corrected 2026-08-29, see source_of_truth_for
+  pending (§3 Build Order, L286 — corrected 2026-08-29, see source_of_truth_for
   above for why: "可以先建這兩檔的骨架（欄位結構）、gate_id enum 留
   TBD_PENDING_ROUND2，不阻塞其餘 30+ 個檔案的建置" — "the skeleton/field
   structure of these two files may be built now, with the gate_id enum left
@@ -162,6 +162,19 @@ gate_result:
         rationale"). See `constraints` below.
   constraints:
     - "status == NOT_APPLICABLE requires `rationale` to be present and non-empty (EC §69 L2293)."
+  # 2026-08-29 (Wave 8 golden-test bughunt, independently found by 3
+  # separate test-writing passes this same Wave): the `constraints:` list
+  # above was PROSE ONLY -- confirmed empirically (jsonschema
+  # Draft202012Validator, 0 errors) that {gate_id: "x", status:
+  # NOT_APPLICABLE} with no `rationale` validated successfully before this
+  # fix. `if`/`then` below make the already-documented rule real.
+  if:
+    properties: { status: { const: NOT_APPLICABLE } }
+    required: [status]
+  then:
+    required: [rationale]
+    properties:
+      rationale: { minLength: 1 }
 
 # ---------------------------------------------------------------------------
 # The trigger mechanism gate_result records are expected to be produced by.
@@ -198,7 +211,7 @@ gate_id_registry:
     4th list. Deciding the list is policies/ai-execution/mandatory-gates.yaml's
     job (Wave 6), itself gated on Round 2 ADR per
     MACHINE_READABLE_SPEC_PLAN.md §2.9 (release/ dir) and §3 Build Order
-    (L269, corrected 2026-08-29 — see source_of_truth_for above).
+    (L286, corrected 2026-08-29 — see source_of_truth_for above).
   disputed_candidates:
     - source: "Master Plan §158 Global Definition of Done (L5903-5926)"
       global_gate_count: 11

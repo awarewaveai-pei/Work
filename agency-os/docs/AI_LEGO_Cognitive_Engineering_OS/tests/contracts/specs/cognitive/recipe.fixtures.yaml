@@ -1,0 +1,70 @@
+schema_id: "ai-lego://specs/cognitive/recipe.schema.yaml"
+target_ref: ""
+description: >
+  Exercises recipe.schema.yaml's required fields, the kebab-case `id`
+  pattern, the `steps[]` minItems:1 guard, the MP §9-derived 2-value
+  `steps[].type` enum (deliberately excluding the human-gate/data-input
+  stage labels Atlas §13.x also uses, per this file's own
+  compilation_decisions), and the `steps[].necessity` 6-value enum.
+
+valid:
+  - name: simple_brainstorm_recipe_single_capability_step
+    instance:
+      id: "simple-brainstorm"
+      version: "1.0.0"
+      name: "Simple Brainstorm Recipe"
+      suited_for: ["Cross-functional workshop"]
+      not_for: ["高風險正式決策"]
+      steps:
+        - label: "Problem Framing"
+          type: capability
+          ref: "problem_framing.problem_statement"
+      outputs: ["ProblemStatement"]
+  - name: db_migration_recipe_with_method_step_and_risk_tier
+    instance:
+      id: "db-migration-expand-contract"
+      version: "1.0.0"
+      name: "DB Migration Expand-Contract Recipe"
+      risk_tier: R3
+      mandatory_elements: ["Backup / Restore Validation"]
+      forbidden_actions: ["Big-bang ALTER"]
+      steps:
+        - label: "Schema Baseline"
+          type: capability
+          ref: "schema.baseline_snapshot"
+          necessity: RECOMMENDED
+        - label: "Backfill"
+          type: method
+          method_id: "data.backfill"
+          input: ["schema_baseline"]
+          necessity: REQUIRED_BY_RISK
+          gate_ref: "backup_restore_validation"
+      outputs: ["MigrationPlan"]
+
+invalid:
+  - name: id_not_kebab_case
+    instance:
+      id: "DB_Migration_Expand"
+      version: "1.0.0"
+      name: "Bad Id Recipe"
+      steps:
+        - label: "Step 1"
+          type: capability
+          ref: "x"
+    reason: "id must match ^[a-z][a-z0-9-]*$ (kebab-case slug); 'DB_Migration_Expand' uses uppercase letters and underscores, both disallowed."
+  - name: steps_empty_array_violates_minitems
+    instance:
+      id: "empty-recipe"
+      version: "1.0.0"
+      name: "Empty Recipe"
+      steps: []
+    reason: "steps has minItems: 1 — a Recipe with zero steps has no ordered sequence at all."
+  - name: step_type_uses_excluded_human_gate_value
+    instance:
+      id: "recipe-with-human-gate"
+      version: "1.0.0"
+      name: "Recipe With Human Gate"
+      steps:
+        - label: "Human Decision"
+          type: human_decision
+    reason: "steps[].type stays a 2-value enum [capability, method] per compilation_decisions (Atlas §13.x's human-gate/data-input stage labels were explicitly excluded rather than added as new type values); 'human_decision' is not a legal type."
