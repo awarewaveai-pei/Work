@@ -1,17 +1,19 @@
 schema_id: "ai-lego://policies/ai-execution/release-policy.yaml"
 target_ref: "#/release_gate_requirement"
 description: >
-  release-policy.yaml is PROVISIONAL (status field) -- `release_gate_
-  requirement.scope` is a single-value enum `[TBD_PENDING_ROUND2_ADR]`
-  (the gate range it should ultimately cover is blocked pending Round 2 ADR
-  resolving OQ-10). This fixture validates the object shape that IS
-  decided: the two literal `const` fields (`condition`, `action`), the
-  `const` `gate_rules_source` pointer into mandatory-gates.yaml, the
-  `required_status` array via the $ref'd EC §70 Final Status enum, and
-  deliberately proves `scope` cannot be silently "resolved" to any value
-  other than the one TBD placeholder -- doing so would be exactly the kind
-  of invented, unauthorized resolution this file's own status:
-  PROVISIONAL exists to prevent.
+  release-policy.yaml is `status: ACTIVE` (upgraded 2026-08-30 from
+  `PROVISIONAL` — see file header). `release_gate_requirement.scope` was a
+  single-value enum `[TBD_PENDING_ROUND2_ADR]` until 2026-08-30; it is now
+  RESOLVED by `docs/adr/ADR-011-platform-gate-ownership-and-unification.md`
+  into a structured object with two required fields (`always_required`,
+  `conditionally_required`), each a `const` pointer into
+  `gate.schema.yaml#/gate_catalog/global` and
+  `mandatory-gates.yaml#/mandatory_gate_rules` respectively. This fixture
+  validates both the still-decided literal fields (`condition`, `action`,
+  `gate_rules_source`, `required_status`) and the now-resolved `scope`
+  object shape — this is a BREAKING schema change from the pre-2026-08-30
+  fixture (the old bare-string `scope: TBD_PENDING_ROUND2_ADR` fixtures no
+  longer validate, since `scope` changed type from string to object).
 
 valid:
   - name: real_worked_example
@@ -20,14 +22,18 @@ valid:
       action: DENY
       gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
       required_status: [PASS, PASS_WITH_APPROVED_RISK]
-      scope: TBD_PENDING_ROUND2_ADR
+      scope:
+        always_required: "ai-lego://specs/execution/gate.schema.yaml#/gate_catalog/global"
+        conditionally_required: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
   - name: single_status_minimal_array
     instance:
       condition: "NOT (every rule in policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules that applies to this task has reached an acceptable Final Status per required_status below)"
       action: DENY
       gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
       required_status: [PASS]
-      scope: TBD_PENDING_ROUND2_ADR
+      scope:
+        always_required: "ai-lego://specs/execution/gate.schema.yaml#/gate_catalog/global"
+        conditionally_required: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
 
 invalid:
   - name: action_not_deny
@@ -36,7 +42,9 @@ invalid:
       action: ALLOW
       gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
       required_status: [PASS, PASS_WITH_APPROVED_RISK]
-      scope: TBD_PENDING_ROUND2_ADR
+      scope:
+        always_required: "ai-lego://specs/execution/gate.schema.yaml#/gate_catalog/global"
+        conditionally_required: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
     reason: >
       `action` is `const: DENY` -- the release_gate_requirement's function
       is to DENY the STAGED RELEASE transition when `condition` holds
@@ -48,7 +56,9 @@ invalid:
       action: DENY
       gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
       required_status: [PASS, PASS_WITH_APPROVED_RISK]
-      scope: TBD_PENDING_ROUND2_ADR
+      scope:
+        always_required: "ai-lego://specs/execution/gate.schema.yaml#/gate_catalog/global"
+        conditionally_required: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
     reason: >
       `condition` is `const` with the exact predicate string "NOT (every
       rule in policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_
@@ -61,7 +71,9 @@ invalid:
       action: DENY
       gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
       required_status: [SUCCESS]
-      scope: TBD_PENDING_ROUND2_ADR
+      scope:
+        always_required: "ai-lego://specs/execution/gate.schema.yaml#/gate_catalog/global"
+        conditionally_required: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
     reason: >
       `required_status` items $ref
       `status-codes.schema.yaml#/reference_vocabulary/final_status/schema`,
@@ -69,18 +81,41 @@ invalid:
       NEEDS_HUMAN_REVIEW, ROLLED_BACK, PARTIAL_SUCCESS] -- "SUCCESS" is not
       a member (it is not the EC §70 Final Status vocabulary this file
       deliberately chose over the narrower per-gate status enum).
-  - name: scope_fabricated_resolved_value
+  - name: scope_still_bare_tbd_string_pre_2026-08-30_shape
     instance:
       condition: "NOT (every rule in policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules that applies to this task has reached an acceptable Final Status per required_status below)"
       action: DENY
       gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
       required_status: [PASS]
-      scope: GLOBAL_GATE_LIST
+      scope: TBD_PENDING_ROUND2_ADR
     reason: >
-      `scope` is `enum: [TBD_PENDING_ROUND2_ADR]` -- a single legal value,
-      deliberately, because whether this rule's coverage should extend to
-      the full disputed Global/High-risk Gate list is itself
-      TBD_PENDING_ROUND2_ADR (OQ-RELPOL-2). "GLOBAL_GATE_LIST" would
-      silently assert a resolution to OQ-10 that no Round 2 ADR has made --
-      exactly the fabricated-resolved-value failure mode this PROVISIONAL
-      file's own instructions warn against.
+      RESOLVED 2026-08-30 by ADR-011: `scope` changed type from a
+      single-value string enum to a required object with
+      `always_required`/`conditionally_required` const fields (see
+      `release-policy.yaml#/release_gate_requirement/properties/scope`).
+      A bare string, even the pre-resolution placeholder value itself, now
+      fails on `type` (expected object, got string) before any const check
+      is even reached. This fixture intentionally keeps the pre-2026-08-30
+      shape as a regression check: it proves the schema migration is a real
+      breaking change an old producer's stale output would be caught by,
+      not a silently-widened field that still happens to accept the old
+      shape.
+  - name: scope_object_wrong_always_required_value
+    instance:
+      condition: "NOT (every rule in policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules that applies to this task has reached an acceptable Final Status per required_status below)"
+      action: DENY
+      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+      required_status: [PASS]
+      scope:
+        always_required: "ai-lego://specs/execution/gate.schema.yaml#/gate_catalog/high_risk"
+        conditionally_required: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+    reason: >
+      `always_required` is `const:
+      "ai-lego://specs/execution/gate.schema.yaml#/gate_catalog/global"` --
+      it must point at the always-required Global 14-item set specifically,
+      not the risk-tier-conditional `high_risk` set (which is what
+      `conditionally_required`, via mandatory-gates.yaml, already covers).
+      Swapping them would silently misrepresent the Global tier as
+      conditional and vice versa -- exactly the "which tier is actually
+      unconditional" ambiguity ADR-011's own `gate_catalog.global.
+      description` exists to settle.

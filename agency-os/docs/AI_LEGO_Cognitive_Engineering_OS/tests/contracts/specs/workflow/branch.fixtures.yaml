@@ -1,0 +1,336 @@
+schema_id: "ai-lego://specs/workflow/branch.schema.yaml"
+target_ref: ""
+description: >
+  branch.schema.yaml is `status: ACTIVE`, built 2026-08-30 by
+  docs/adr/ADR-012-branch-merge-state-machine.md — the first file in this
+  ADR series with zero mother-document prior art (ADR-003 confirmed
+  Branch's full behavioral spec is undefined anywhere in the corpus). This
+  fixture exercises all 6 states, the ADR-012 Sub-decision (b) merge
+  authority floor (>= A2), Sub-decision (c)'s conditional R3/R4 gate
+  requirement (both mandatory-gates.yaml rules, referencing ADR-011's
+  resolved gate_catalog ids), and Sub-decision (d)'s conflict-tracking
+  shape. Every instance below was independently validated against the real
+  schema (via the same referencing.Registry + urllib.parse ai-lego-scheme
+  patch this test runner itself uses) before being committed to this file —
+  see WORKLOG for the exact script and PASS/FAIL results per case.
+
+valid:
+  - name: active_minimal
+    instance:
+      tenant_id: "11111111-1111-1111-1111-111111111111"
+      node_type: BRANCH
+      node_id: "wf-node-001"
+      parent_node_id: "workflow-abc"
+      branch_id: "BR-0001"
+      state: ACTIVE
+      risk_tier: R1
+  - name: merge_requested_with_merge_base
+    instance:
+      tenant_id: "11111111-1111-1111-1111-111111111111"
+      node_type: BRANCH
+      node_id: "wf-node-001"
+      parent_node_id: "workflow-abc"
+      branch_id: "BR-0002"
+      state: MERGE_REQUESTED
+      risk_tier: R1
+      merge_base: "wf-commit-42"
+  - name: merged_low_risk_a2_floor
+    instance:
+      tenant_id: "11111111-1111-1111-1111-111111111111"
+      node_type: BRANCH
+      node_id: "wf-node-001"
+      parent_node_id: "workflow-abc"
+      branch_id: "BR-0003"
+      state: MERGED
+      risk_tier: R1
+      merge_base: "wf-commit-42"
+      merge_authorization:
+        authority_level: A2
+        approved_by: alice
+        approved_at: "2026-08-30T00:00:00Z"
+    description_note: >
+      ADR-012 Sub-decision (b): merging requires >= A2 regardless of
+      risk_tier. R1 does NOT additionally require gate_results (only R3/R4
+      does, per Sub-decision c) — this instance proves the A2 floor alone
+      is sufficient at low risk tiers.
+  - name: merged_r3_with_both_mandatory_gates_pass
+    instance:
+      tenant_id: "11111111-1111-1111-1111-111111111111"
+      node_type: BRANCH
+      node_id: "wf-node-001"
+      parent_node_id: "workflow-abc"
+      branch_id: "BR-0004"
+      state: MERGED
+      risk_tier: R3
+      merge_base: "wf-commit-42"
+      merge_authorization:
+        authority_level: A3
+        approved_by: bob
+        approved_at: "2026-08-30T00:00:00Z"
+      gate_results:
+        - gate_id: human_specialist_review
+          status: PASS
+        - gate_id: recovery_rollback_rehearsal
+          status: PASS
+    description_note: >
+      ADR-012 Sub-decision (c): R3/R4 merges additionally require both of
+      mandatory-gates.yaml's current 2 grounded rules (ADR-011's
+      human_specialist_review + recovery_rollback_rehearsal) to PASS.
+      Extra gate_results entries beyond the 2 required are also legal
+      (not exercised here, but the schema does not cap the array).
+  - name: conflict_unresolved
+    instance:
+      tenant_id: "11111111-1111-1111-1111-111111111111"
+      node_type: BRANCH
+      node_id: "wf-node-001"
+      parent_node_id: "workflow-abc"
+      branch_id: "BR-0005"
+      state: CONFLICT
+      risk_tier: R1
+      merge_base: "wf-commit-42"
+      conflict:
+        detected_at: "2026-08-30T00:00:00Z"
+        cause: SIBLING_MERGED
+        resolution_rule_applied: null
+    description_note: >
+      ADR-012 Sub-decision (d): a genuinely unresolved conflict may have
+      resolution_rule_applied: null while state remains CONFLICT.
+  - name: conflict_resolved_re_requesting_merge
+    instance:
+      tenant_id: "11111111-1111-1111-1111-111111111111"
+      node_type: BRANCH
+      node_id: "wf-node-001"
+      parent_node_id: "workflow-abc"
+      branch_id: "BR-0006"
+      state: MERGE_REQUESTED
+      risk_tier: R1
+      merge_base: "wf-commit-99"
+      conflict:
+        detected_at: "2026-08-30T00:00:00Z"
+        cause: PARENT_ADVANCED
+        resolution_rule_applied: "rebased onto wf-commit-99 after manual review"
+        resolved_by: carol
+        resolved_at: "2026-08-30T01:00:00Z"
+    description_note: >
+      Per this file's own `conflict` field description: the conflict object
+      persists as an audit trail even after CONFLICT -> MERGE_REQUESTED
+      (state_transitions row) resolves it, with resolution_rule_applied now
+      populated (same conflict-of-laws-output.schema.yaml pattern reused).
+  - name: abandoned_from_active
+    instance:
+      tenant_id: "11111111-1111-1111-1111-111111111111"
+      node_type: BRANCH
+      node_id: "wf-node-001"
+      parent_node_id: "workflow-abc"
+      branch_id: "BR-0007"
+      state: ABANDONED
+      risk_tier: R1
+      abandoned_at: "2026-08-30T00:00:00Z"
+      abandoned_by: dave
+  - name: rolled_back_after_merge
+    instance:
+      tenant_id: "11111111-1111-1111-1111-111111111111"
+      node_type: BRANCH
+      node_id: "wf-node-001"
+      parent_node_id: "workflow-abc"
+      branch_id: "BR-0008"
+      state: ROLLED_BACK
+      risk_tier: R1
+      merge_base: "wf-commit-42"
+      rollback_plan_ref: "RB-001"
+    description_note: >
+      rollback_plan_ref soft-references rollback.schema.yaml#/plan_id by
+      naming convention (pattern ^RB-), same treatment that file already
+      establishes elsewhere in this suite.
+
+invalid:
+  - name: merge_requested_missing_merge_base
+    instance:
+      tenant_id: "11111111-1111-1111-1111-111111111111"
+      node_type: BRANCH
+      node_id: "wf-node-001"
+      parent_node_id: "workflow-abc"
+      branch_id: "BR-0009"
+      state: MERGE_REQUESTED
+      risk_tier: R1
+    reason: >
+      state IN [MERGE_REQUESTED, CONFLICT, MERGED, ROLLED_BACK] requires
+      merge_base to be non-null (ADR-012 Sub-decision d) — a branch cannot
+      request a merge without a fork point to compare staleness against.
+  - name: merged_missing_gate_results_at_r3
+    instance:
+      tenant_id: "11111111-1111-1111-1111-111111111111"
+      node_type: BRANCH
+      node_id: "wf-node-001"
+      parent_node_id: "workflow-abc"
+      branch_id: "BR-0010"
+      state: MERGED
+      risk_tier: R3
+      merge_base: "wf-commit-42"
+      merge_authorization:
+        authority_level: A2
+        approved_by: alice
+        approved_at: "2026-08-30T00:00:00Z"
+    reason: >
+      state == MERGED AND risk_tier IN [R3, R4] requires gate_results to
+      contain PASS entries for both human_specialist_review and
+      recovery_rollback_rehearsal (ADR-012 Sub-decision c) — this instance
+      has valid merge_authorization but omits gate_results entirely.
+  - name: merged_only_one_of_two_required_gates
+    instance:
+      tenant_id: "11111111-1111-1111-1111-111111111111"
+      node_type: BRANCH
+      node_id: "wf-node-001"
+      parent_node_id: "workflow-abc"
+      branch_id: "BR-0011"
+      state: MERGED
+      risk_tier: R4
+      merge_base: "wf-commit-42"
+      merge_authorization:
+        authority_level: A3
+        approved_by: bob
+        approved_at: "2026-08-30T00:00:00Z"
+      gate_results:
+        - gate_id: human_specialist_review
+          status: PASS
+    reason: >
+      Both `contains`/`minContains: 1` clauses must independently be
+      satisfied — human_specialist_review PASS alone does not also satisfy
+      the separate recovery_rollback_rehearsal requirement.
+  - name: merged_authority_below_a2_floor
+    instance:
+      tenant_id: "11111111-1111-1111-1111-111111111111"
+      node_type: BRANCH
+      node_id: "wf-node-001"
+      parent_node_id: "workflow-abc"
+      branch_id: "BR-0012"
+      state: MERGED
+      risk_tier: R1
+      merge_base: "wf-commit-42"
+      merge_authorization:
+        authority_level: A1
+        approved_by: alice
+        approved_at: "2026-08-30T00:00:00Z"
+    reason: >
+      ADR-012 Sub-decision (b): merging requires at LEAST A2 (Staged
+      Write) — A1 (Local Reversible Edit) is exactly the authority level
+      a Branch already occupies while merely ACTIVE, not sufficient to
+      promote work into the parent Workflow's shared committed history.
+      merge_authorization.authority_level's own enum is narrowed to
+      [A2, A3, A4] specifically to make this unreachable, not just
+      discouraged.
+  - name: merged_missing_merge_authorization_entirely
+    instance:
+      tenant_id: "11111111-1111-1111-1111-111111111111"
+      node_type: BRANCH
+      node_id: "wf-node-001"
+      parent_node_id: "workflow-abc"
+      branch_id: "BR-0013"
+      state: MERGED
+      risk_tier: R1
+      merge_base: "wf-commit-42"
+    reason: >
+      state == MERGED unconditionally requires merge_authorization to be
+      present (ADR-012 Sub-decision b) — a MERGED branch with no record of
+      who authorized it is exactly the "usually did, if someone remembered"
+      failure mode Decision Driver #3 (30-year survivability) exists to
+      close off.
+  - name: conflict_missing_conflict_object
+    instance:
+      tenant_id: "11111111-1111-1111-1111-111111111111"
+      node_type: BRANCH
+      node_id: "wf-node-001"
+      parent_node_id: "workflow-abc"
+      branch_id: "BR-0014"
+      state: CONFLICT
+      risk_tier: R1
+      merge_base: "wf-commit-42"
+    reason: >
+      state == CONFLICT requires the `conflict` object to be present with
+      at least `detected_at` and `cause` populated — a CONFLICT state with
+      no record of when/why is unauditable.
+  - name: conflict_invalid_cause_enum
+    instance:
+      tenant_id: "11111111-1111-1111-1111-111111111111"
+      node_type: BRANCH
+      node_id: "wf-node-001"
+      parent_node_id: "workflow-abc"
+      branch_id: "BR-0015"
+      state: CONFLICT
+      risk_tier: R1
+      merge_base: "wf-commit-42"
+      conflict:
+        detected_at: "2026-08-30T00:00:00Z"
+        cause: "MERGE_FAILED_RANDOMLY"
+    reason: >
+      `conflict.cause` enum is exactly [PARENT_ADVANCED, SIBLING_MERGED,
+      OTHER] (ADR-012 Sub-decision d) — "MERGE_FAILED_RANDOMLY" is not a
+      member; OTHER exists as the honest escape hatch for a genuinely
+      unclassified cause, not an open-ended free-text field.
+  - name: abandoned_missing_actor_and_timestamp
+    instance:
+      tenant_id: "11111111-1111-1111-1111-111111111111"
+      node_type: BRANCH
+      node_id: "wf-node-001"
+      parent_node_id: "workflow-abc"
+      branch_id: "BR-0016"
+      state: ABANDONED
+      risk_tier: R1
+    reason: >
+      state == ABANDONED requires abandoned_at and abandoned_by to both be
+      present — an abandonment with no record of when/by whom is
+      unauditable, same discipline as every other terminal state here.
+  - name: rolled_back_missing_rollback_plan_ref
+    instance:
+      tenant_id: "11111111-1111-1111-1111-111111111111"
+      node_type: BRANCH
+      node_id: "wf-node-001"
+      parent_node_id: "workflow-abc"
+      branch_id: "BR-0017"
+      state: ROLLED_BACK
+      risk_tier: R1
+      merge_base: "wf-commit-42"
+    reason: >
+      state == ROLLED_BACK requires rollback_plan_ref to be present — a
+      rollback with no linked rollback.schema.yaml plan record breaks this
+      file's soft-reference audit trail.
+  - name: invalid_state_enum_value
+    instance:
+      tenant_id: "11111111-1111-1111-1111-111111111111"
+      node_type: BRANCH
+      node_id: "wf-node-001"
+      parent_node_id: "workflow-abc"
+      branch_id: "BR-0018"
+      state: "IN_REVIEW"
+      risk_tier: R1
+    reason: >
+      `state` enum is exactly the 6 ADR-012 Sub-decision (a) values
+      [ACTIVE, MERGE_REQUESTED, CONFLICT, MERGED, ABANDONED, ROLLED_BACK] —
+      "IN_REVIEW" is not a member (deliberately no DRAFT/IN_REVIEW
+      pre-state, see ADR-012 for why).
+  - name: branch_id_missing_prefix
+    instance:
+      tenant_id: "11111111-1111-1111-1111-111111111111"
+      node_type: BRANCH
+      node_id: "wf-node-001"
+      parent_node_id: "workflow-abc"
+      branch_id: "0019"
+      state: ACTIVE
+      risk_tier: R1
+    reason: >
+      `branch_id` requires `pattern: \"^BR-\"` — a bare numeric id without
+      the prefix does not match.
+  - name: node_type_not_branch
+    instance:
+      tenant_id: "11111111-1111-1111-1111-111111111111"
+      node_type: WORKFLOW
+      node_id: "wf-node-001"
+      parent_node_id: "workflow-abc"
+      branch_id: "BR-0020"
+      state: ACTIVE
+      risk_tier: R1
+    reason: >
+      This file's `branch` object fixes the inherited
+      blast-radius-chain.schema.yaml chain_instance.node_type to
+      `const: BRANCH` — a branch record whose node_type claims WORKFLOW is
+      self-contradictory and must be rejected.

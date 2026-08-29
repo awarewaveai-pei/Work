@@ -149,10 +149,13 @@ compilation_decisions:
   - question: >
       `db-migration-expand-contract.recipe.yaml` (MRSP §2.8 L174) is
       explicitly dependent on `execution/gate.schema.yaml` for hooking steps
-      like "Backup / Restore Validation" to a formal gate. But
-      `gate.schema.yaml` itself is `BLOCKED_PENDING_ROUND2_ADR`
+      like "Backup / Restore Validation" to a formal gate. At write time,
+      `gate.schema.yaml` itself was `BLOCKED_PENDING_ROUND2_ADR`
       (MACHINE_READABLE_SPEC_PLAN.md §2.2 L102 — the Global/High-risk Gate
-      list is undecided). How should `steps[].gate_ref` be typed?
+      list was undecided; RESOLVED 2026-08-30 by
+      docs/adr/ADR-011-platform-gate-ownership-and-unification.md — see
+      `gate.schema.yaml#/gate_catalog`). How should `steps[].gate_ref` be
+      typed?
     decision: "Plain `type: string`, no enum, no hard $ref."
     reasoning: >
       Identical precedent already set by `execution/manifest.schema.yaml`'s
@@ -334,12 +337,19 @@ properties:
           type: string
           description: >
             OPTIONAL. Soft reference to a gate id in
-            `execution/gate.schema.yaml`, which is itself
-            `BLOCKED_PENDING_ROUND2_ADR` — kept untyped for that reason
-            (see compilation_decisions above). Grounded in
+            `execution/gate.schema.yaml#/gate_catalog` (RESOLVED 2026-08-30
+            by ADR-011 — see that file; was `BLOCKED_PENDING_ROUND2_ADR` at
+            this field's original write time). Kept untyped (no enum, no
+            hard $ref) even after resolution — see compilation_decisions
+            above for why: Atlas §22.3's Method-specific namespace remains
+            open-ended, so a plain string stays the correct type regardless
+            of OQ-10's resolution. Grounded in
             `db-migration-expand-contract.recipe.yaml`'s stated dependency
             on `execution/gate.schema.yaml` for steps like "Backup / Restore
-            Validation" (MRSP §2.8 L174).
+            Validation" (MRSP §2.8 L174) — that recipe's own gate_ref values
+            now use real catalog ids (recovery_rollback_rehearsal, data,
+            human_specialist_review) instead of the pre-2026-08-30
+            TBD_PENDING_ROUND2_ADR marker.
 
   outputs:
     type: array
@@ -375,8 +385,10 @@ open_questions:
       Branch/Merge) and `/specs/cognitive/recipe.schema.yaml` in DIFFERENT
       top-level directories and its Spec Inventory (§2) currently defines no
       `workflow/workflow-ir.schema.yaml` or `workflow/node.schema.yaml` file
-      at all — only `workflow/branch.schema.yaml` (L145, itself
-      `BLOCKED` pending ADR-003's out-of-scope follow-up). This schema
+      at all — only `workflow/branch.schema.yaml` (L145, `BUILT` 2026-08-30
+      by docs/adr/ADR-012-branch-merge-state-machine.md; that resolution
+      covers Branch's own state machine only, not the broader Recipe-vs-
+      Workflow-IR identity question this open item asks). This schema
       assumes the Recipe-to-Workflow-IR relationship is "compiles to" and
       borrows MP §9's node grammar directly into `steps[]` rather than
       waiting for a not-yet-planned `workflow/*.schema.yaml`, but that

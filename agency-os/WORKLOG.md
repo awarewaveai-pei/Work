@@ -1,5 +1,66 @@
 # Worklog
 
+## 2026-08-30（續4）
+
+### AI-LEGO 剩餘任務兩項純工程判斷收斂：OQ-10（Global/High-risk Gate 三方爭議，ADR-011）+ Branch 完整狀態機（ADR-012）
+
+**觸發**：操作者「繼續！你決定！」全權授權，指名剩餘任務中「純工程判斷、無需操作者選型」的兩項（OQ-10 gate 清單三方命名統一、Branch merge 衝突狀態機從零設計），並要求全程 R0 架構師模式，完成後跑 `/codex-review`。Zero Trust/SBOM 選型（需操作者）與 Phase 5 Codex 三選一比較（需真跑）不在本輪範圍。
+
+#### 一、OQ-10：Master Plan §158 vs Atlas §22 vs EC §68 Global/High-risk Gate 清單三方爭議
+
+**根因**：三份母文件各自宣告平台級 Gate 清單但互相矛盾——MP 11+1 項、Atlas/EC 14+6 項且彼此 3 個 gate 名稱漂移（CROSS-T-11）；且 Atlas §22.1/22.2 立法平台級 Gate 已違反其自身 Scoped Authority（CROSS-R-7，僅獲授權 Method-specific Gate）。既有 `gate.schema.yaml`/`mandatory-gates.yaml`/`release-policy.yaml` 三檔（2026-08-29 建）皆刻意留 `TBD_PENDING_ROUND2_ADR` 佔位，明確點名等這次 ADR 裁決。
+
+**方案**（`docs/adr/ADR-011-platform-gate-ownership-and-unification.md`，ACCEPTED）：
+- **歸屬**：直接重讀 MP 與 EC 各自的 Scoped Authority 表原文（`MP:53-58`、`EC:98-109`）——MP 自身表格已含「Governance」授權，EC 自身表格把「Security/Data/Deployment/Global Jurisdiction Architecture」明文歸給 Master Plan，兩者都指向 MP 才是平台級 Gate 的正確 owner；Atlas 僅 §22.3 Method-specific Gate 在授權範圍內。**這是本次新發現**：CROSS-R-7 原本只點名 Atlas 違規，重讀 EC 自身表格後發現 EC §68 同樣不在自己的授權範圍內，是先前未點出的對稱違規。
+- **內容**：逐項比對確認 MP 11+1 項是 Atlas/EC 14+6 項的嚴格子集（無任何一項衝突），依既有 fail-closed 慣例採聯集，不是「誰贏」。
+- **命名**：3 個 CROSS-T-11 漂移項採 Atlas 版本（因為 MP 唯一的高風險項「Human Specialist Review PASS」與 Atlas 逐字相同，EC 才是漂移的一方；另外 2 項 MP 未提及但 Atlas 的「X PASS」字尾與 MP 自己 11 項的既有慣例一致，EC 反而是不一致的一方）。
+
+**套用**：`gate.schema.yaml` 新增 `gate_catalog`（20 項：14 Global + 6 High-risk + Method-specific 維持開放命名空間）；`mandatory-gates.yaml` 補第 2 條規則 `MGATE-R3-R4-RECOVERY-ROLLBACK`（新 action 值 `REQUIRE_RECOVERY_REHEARSAL`）、`gate_ref` 由 TBD 換成真值；`release-policy.yaml` 的 `release_gate_requirement.scope` 從單一 TBD 字串改為 `{always_required, conditionally_required}` 結構化物件（**此為破壞性 schema 變更**，舊格式 fixture 已改寫並保留一則「舊格式現在應該失敗」的迴歸測試）。下游連動：`db-migration-expand-contract.recipe.yaml` 3 個 `gate_ref` 佔位換成真值（`recovery_rollback_rehearsal`/`data`/`human_specialist_review`，映射依據各步驟原有論證，非重新推導）；`recipe.schema.yaml`/`manifest.schema.yaml`/`risk-tier.schema.yaml` 的過期敘述性引用同步訂正；`open-questions.yaml` OQ-10 標記 `RESOLVED_BY_HUMAN`；`ADR_INDEX.md`/`MACHINE_READABLE_SPEC_PLAN.md`（row 102/183/188、MRSP-1）同步。
+
+#### 二、Branch 完整狀態機（ADR-003 Consequences follow-up (iii)、MRSP-4）
+
+**根因**：ADR-003 只給 Branch 最小定義（「forked isolated execution lineage」），明文把「誰能 Merge / 衝突處理 / 狀態機」列為 out-of-scope follow-up；三份母文件對此**零字提及**（ADR-003 自己的全文 grep 已確認）——這是本 ADR 系列第一份完全沒有母文件先例可轉錄的原創設計。
+
+**方案**（`docs/adr/ADR-012-branch-merge-state-machine.md`，ACCEPTED）：不發明新機制，改為組合本專案已裁決的 5 個既有機制：
+1. **6 狀態機**：ACTIVE（初始）/MERGE_REQUESTED/CONFLICT/MERGED/ABANDONED/ROLLED_BACK（無 DRAFT 前置態——Atlas §21 rule 1 的 DRAFT 預設是給 epistemic content 用的，跨用到 Branch 是無根據的類比）。`ROLLED_BACK` 直接沿用 `rollback.schema.yaml#/result/side_state` 既有列舉值。
+2. **Merge 授權**：`authority.schema.yaml` 的 A1 明文 scope 是「isolated branch or workspace」、A2 是「dev/staging + 需要 gate」——merge 正是從隔離空間晉升到共享空間的同型態轉換，故 merge 至少需要 A2（非猜測數值對應，是直接比對兩個 level 各自的 scope 文字）。
+3. **R3/R4 額外 Gate**：`risk_tier IN [R3, R4]` 時額外要求 `mandatory-gates.yaml` 現有兩條規則皆 PASS（**即時引用**，非重新宣告——`mandatory-gates.yaml` 未來新增第 3 條規則不需要改這份 ADR，但**會**需要改 `branch.schema.yaml` 的 JSON Schema `contains` 區塊，此限制已誠實記錄為 `OQ-BRANCH-1`）。
+4. **衝突處理**：`merge_base`（分支點參照）與目標 Workflow 當前狀態不一致即觸發 CONFLICT（同時涵蓋「parent 前進」與「手足分支搶先 merge」兩種既有子缺口，同一機制）；**一律人工裁決**，不設自動合併演算法（母文件對此零證據，發明演算法違反 fail-closed 紀律）；`resolution_rule_applied` 沿用 `conflict-of-laws-output.schema.yaml` 既有的 CONSERVATIVE_SAFE_MODE 記錄模式。
+
+**套用**：新建 `specs/workflow/branch.schema.yaml`（`status: ACTIVE`），透過 `allOf` 組合 `blast-radius-chain.schema.yaml#/chain_instance`（LEGO 式複用既有 node 形狀，不重複宣告）；`merge_authority_level` 用局部窄化 enum `[A2,A3,A4]` 表達「至少 A2」（JSON Schema 無原生大小比較，沿用 `risk-tier.schema.yaml` 自己 `risk_tier IN [R3,R4]` 的同款寫法）；新建 `tests/contracts/specs/workflow/branch.fixtures.yaml`（8 valid + 11 invalid，涵蓋全部 6 狀態 + 授權下限 + gate 覆蓋率 + 衝突欄位驗證）。連動更新：`blast-radius-chain.schema.yaml` 的 `open_questions.blast-radius-1` 標記已解決；`MACHINE_READABLE_SPEC_PLAN.md`（row 144/145、MRSP-4、ASCII 狀態圖）、`ADR_INDEX.md`、`IMPLEMENTATION_ROADMAP.md`、`recipe.schema.yaml`（OQ-recipe-1 過期引用訂正）同步。
+
+**未觸碰**：`specs/execution/result.schema.yaml` 本次過程中發現另有獨立於 OQ-10 的舊敘述（「gate.schema.yaml 尚不存在」，實際上該檔 2026-08-29 就已建立）——已另開 spawn_task 交給獨立 session 處理（該 session 已在本 WORKLOG 撰寫時同步進行中，工作樹已見其未 commit 的修改，本次刻意不觸碰、不 stage 該檔，避免與並行 session 衝突）。
+
+[已修改]
+- 新增 `docs/adr/ADR-011-platform-gate-ownership-and-unification.md`、`docs/adr/ADR-012-branch-merge-state-machine.md`
+- 新增 `specs/workflow/branch.schema.yaml`、`tests/contracts/specs/workflow/branch.fixtures.yaml`
+- `specs/execution/gate.schema.yaml`：`gate_id_registry`（BLOCKED）→ `gate_catalog`（RESOLVED，20 項）
+- `policies/ai-execution/mandatory-gates.yaml`：`status: PROVISIONAL`→`ACTIVE`，補第 2 條規則，`action` enum 補 `REQUIRE_RECOVERY_REHEARSAL`
+- `policies/ai-execution/release-policy.yaml`：`status: PROVISIONAL`→`ACTIVE`，`release_gate_requirement.scope` 從 enum 字串改為結構化物件（破壞性變更）
+- `policies/ai-execution/network-egress.yaml`：4 處引用 `gate_id_registry` 的歷史性描述訂正指向新名稱
+- `recipes/validated/db-migration-expand-contract.recipe.yaml`：3 個 `gate_ref` TBD 佔位換真值
+- `specs/cognitive/recipe.schema.yaml`：2 處過期 `gate.schema.yaml`/`workflow/branch.schema.yaml` 狀態引用訂正
+- `specs/execution/{risk-tier,manifest,blast-radius-chain}.schema.yaml`：過期 OQ-10/branch 狀態引用訂正
+- `.ai/research/phase-0/open-questions.yaml`：OQ-10 標記 `RESOLVED_BY_HUMAN`
+- `docs/adr/ADR_INDEX.md`：+2 列（ADR-011/012）、依賴關係、誠實聲明計數更新
+- `docs/architecture/{MACHINE_READABLE_SPEC_PLAN,IMPLEMENTATION_ROADMAP}.md`：row 102/144/145/183/188、MRSP-1/4、ASCII 狀態圖同步
+- `tests/contracts/policies/ai-execution/{mandatory-gates,release-policy}.fixtures.yaml`：改寫以符合新 schema 形狀，各補新增規則/破壞性變更的迴歸案例
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=手工建構 jsonschema.Draft202012Validator + referencing.Registry（與 tests/run_golden_tests.py 相同機制）逐一驗證 mandatory-gates.yaml 2 條規則、release-policy.yaml scope 物件 | exit=0 | 結果=全部 PASS
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=針對 branch.schema.yaml 手工驗證 19 個案例（6 狀態各自的 valid/invalid 組合，含授權下限、gate 覆蓋率、衝突欄位）| exit=0 | 結果=19/19 符合預期（PASS/FAIL 皆如設計）
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py`（全部改動套用後）| exit=0 | 結果=666 個檢查全過（較改動前 638 增加 28：branch fixture 19 + mandatory-gates 2 + release-policy 1 + 既有 fixture 微調）
+- REVIEW_DONE: critic=待 `/codex-review`（本次任務指示「做完要 /codex-review」，將於本條 WORKLOG 之後執行，結果另補一條 WORKLOG）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`OQ-10\|TBD_PENDING_ROUND2_ADR\|gate_id_registry\|workflow/branch.schema.yaml\|MRSP-4\|blast-radius-1` | hits=17 個檔案命中，其中 8 個為本輪修改對象、9 個為額外訂正（network-egress.yaml x4、recipe.schema.yaml x2、risk-tier/manifest/blast-radius-chain 各 1）；`AI_LEGO_OS_Program_Plan_v1.md`/`PROPOSED_ARCHITECTURE_CHANGES.md`/`verified-findings.yaml` 命中但確認屬歷史快照或不同追蹤軸（母文件編輯提案 vs 機讀 schema 狀態），依既有慣例不回填
+
+[剩餘風險]
+- `mandatory-gates.yaml` 未來新增第 3 條規則不會被 `branch.schema.yaml` 的靜態 `contains` 區塊自動吸收，需手動同步（已記錄 `OQ-BRANCH-1`，非隱藏缺陷）。
+- `branch.schema.yaml` 只驗證單一時間點快照，不驗證跨快照的狀態轉移合法性（需要獨立 audit-log 機制才能做到，已記錄 `OQ-BRANCH-2`，明確排除在本次範圍）。
+- ADR-011/012 皆為機讀 schema 層級的決策套用，母文件本身（MP §158/Atlas §22/EC §68 prose、Atlas §21 Branch 段落）尚未編輯，需另走 ADR-006 `.ai/proposals/` 流程並經操作者核准才能落地到母文件——與既有全部 12 份 ADR 相同的已知限制，非本輪新增風險。
+- `release-policy.yaml` 的 `scope` 破壞性 schema 變更若有任何外部消費者已經產出舊格式資料（實際上不存在，本專案零 runtime 資料），理論上會需要遷移；因專案仍是 pre-implementation 階段（同 ADR-003/010 的 greenfield 論述），此風險為零成本。
+
+[rollback] 全部為新增/機讀 schema 編輯，`git revert` 可完整回退；`release-policy.yaml` 的破壞性欄位變更若 revert，`mandatory-gates.yaml`/`gate.schema.yaml` 也需一併 revert 以保持一致（三檔同一 commit，天然原子）。無 DB/prod/deploy 副作用。
+
 ## 2026-08-30（續3）
 
 ### `/codex-review` 首次真實端到端測試：跑通，且真的抓到 AI-LEGO corpus 裡 2 個真實邏輯漏洞（已修）+ 1 個腳本自身的計數盲點（已修）

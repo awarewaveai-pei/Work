@@ -350,9 +350,13 @@ properties:
         items: { type: string }
         description: >
           Gate result references. Deliberately untyped here — the
-          Global/High-risk gate list itself is BLOCKED_PENDING_ROUND2_ADR
-          (MRSP-1, gate.schema.yaml, Wave 5); this field only records which
-          gate IDs ran, it does not enumerate the legal set.
+          Global/High-risk gate list (MRSP-1, gate.schema.yaml, Wave 5) was
+          BLOCKED_PENDING_ROUND2_ADR at this field's write time, RESOLVED
+          2026-08-30 by docs/adr/ADR-011-platform-gate-ownership-and-
+          unification.md (see gate.schema.yaml#/gate_catalog). Stays
+          untyped even after resolution: this field only records which
+          gate IDs ran (a plain list of strings), it does not itself
+          enumerate the legal set — that job stays gate_catalog's.
 
   method_execution_log:
     type: array

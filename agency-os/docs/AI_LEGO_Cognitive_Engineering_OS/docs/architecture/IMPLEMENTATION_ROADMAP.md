@@ -46,14 +46,14 @@ Phase 2 完成後的關卡是**directive 明文要求的硬停**，不是本文�
 | Wave 1 | `epistemic-label` / `risk-tier` / `status-codes` / `manifest`（全系統型別字母表） | Wave 0 | ~4 個 schema |
 | Wave 2 ∥ Wave 3 | Wave 2：Tenant/CAS/個資加密（依賴 ADR-002/003）<br>Wave 3：Cognitive Engine 核心（method/primitive/typed-objects，含 Method Selection 兩個全新型別） | Wave 1 | Wave 2 ~8 檔；Wave 3 ~20 檔（含 10 個 typed-object 新設計） |
 | Wave 4 | Evidence/Decision/Jurisdiction | Wave 2+3 | ~8 檔 |
-| Wave 5 | 其餘 execution/ 契約 + `gate.schema.yaml`（骨架，等 Round 2） | Wave 4 | ~10 檔 |
+| Wave 5 | 其餘 execution/ 契約 + `gate.schema.yaml`（骨架，2026-08-30 由 ADR-011 完整裁決） | Wave 4 | ~10 檔 |
 | Wave 6 | policies/ 代碼化（多數需操作者法遵/技術選型決策，非文件收斂） | Wave 5 | 部分 SKELETON_ONLY |
 | Wave 7 | recipes/validated/（DB Migration、Deprecation、Champion/Challenger） | Wave 5 | 3 檔 |
 | Wave 8 | tests/ 全目錄（每個 schema 的 golden test）+ analytics（低優先） | Wave 1-7 | 依 Wave 1-7 檔案數等比例 |
 
 **平行化提示**：Wave 2 與 Wave 3 互不依賴，可同時進行（例如 Claude 做 Wave 2，Codex inspect 模式協助 Wave 3 的方法清點交叉核對，最終寫入仍由 Claude 執行，符合 §跨模型 oracle 分工的讀寫分離原則）。
 
-**已知阻塞（不影響其餘 Wave）**：`gate.schema.yaml`／`release-policy.yaml`／`conflict-of-laws-output.schema.yaml`／`workflow/branch.schema.yaml`／`tenant-isolation-controls.schema.yaml` 五個檔案標記 `BLOCKED_PENDING_ROUND2_ADR`，Phase 3 內先建骨架，內容留 placeholder，不阻塞其餘 ~50 個 schema 檔案的建置。
+**已知阻塞（不影響其餘 Wave，狀態持續更新）**：原標記 `BLOCKED_PENDING_ROUND2_ADR` 五個檔案，Phase 3 內先建骨架、內容留 placeholder，不阻塞其餘 ~50 個 schema 檔案的建置。現況（2026-08-30）：`gate.schema.yaml`／`release-policy.yaml` 已由 **ADR-011** 完整裁決（`mandatory-gates.yaml` 一併升級）；`conflict-of-laws-output.schema.yaml`／`tenant-isolation-controls.schema.yaml` 已於更早的 Phase 3 batch 建成正式內容（見 `MACHINE_READABLE_SPEC_PLAN.md` §2.5/§2.6 對應列）；`workflow/branch.schema.yaml`（Branch 完整狀態機）已於 2026-08-30 由 **ADR-012** 裁決並建成 `status: ACTIVE`——見 `docs/adr/ADR-012-branch-merge-state-machine.md` 與 `MACHINE_READABLE_SPEC_PLAN.md` §2.5 row 145 / §5 MRSP-4。
 
 **Atlas Method Contract 補齊**：不追求 289 個方法一次補齊（`MACHINE_READABLE_SPEC_PLAN.md` §4 已論證原因）。Tier 0（~5-10 個示範方法，Phase 3 立即做）→ Tier 1（15-25 個，數量待 Phase 5 切片方向鎖定後於 Phase 3 末期補齊清單）→ Tier 2（260+ 個，`contract_status: pending`，透過新狀態碼 `PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED` fail-closed，不阻塞 Phase 3 收尾）。
 
@@ -87,7 +87,7 @@ Phase 2 完成後的關卡是**directive 明文要求的硬停**，不是本文�
 |---|---|---|
 | 其餘 7 份 ADR（001/002 已覆審，003/004/005/006/009 未逐份覆審）若日後被 Codex 覆審推翻，Phase 3 已建的 Wave 1 型別需要重新核對 | `ADR_INDEX.md`、`MACHINE_READABLE_SPEC_PLAN.md` MRSP-7 | 已對 001/002 完成覆審並修正；其餘 7 份風險較低（未涉及最高竄改面的治理鏈/個資機制），可於 Phase 3 執行中順帶驗證，不阻塞開工 |
 | Phase 5 切片方向若與 Research Mode 建議不同，`MVP_VERTICAL_SLICE_PLAN.md` 的 28 步 walkthrough 與 Tier 1 Method Contract 清單需重寫 | `MVP_VERTICAL_SLICE_PLAN.md`、§3 Atlas Method Contract 補齊 | 在本文件 §2 類別 D 決議後，若方向改變，重寫成本已知且侷限在單一文件，不影響 Phase 3 Wave 1-2 已完成的型別基礎 |
-| Global/High-risk Gate 清單（CROSS-R-5/7、CROSS-T-11）長期未裁決，會讓 Wave 5-6 兩個檔案永遠卡在骨架狀態 | `MACHINE_READABLE_SPEC_PLAN.md` MRSP-1 | 建議操作者將此列為 Round 2 ADR 第一優先項，避免變成長期未追蹤缺口（同 §已知信任邊界的教訓：偵測到的缺口若無 owner 與期限，會退化成無人管理的技術債） |
+~~Global/High-risk Gate 清單（CROSS-R-5/7、CROSS-T-11）長期未裁決，會讓 Wave 5-6 兩個檔案永遠卡在骨架狀態~~ **已解決（2026-08-30）**：`ADR-011` 裁決 OQ-10（Master Plan 定為唯一 owner、內容聯集、命名統一），`gate.schema.yaml`/`mandatory-gates.yaml`/`release-policy.yaml` 三檔同步升級為 `ACTIVE` | `MACHINE_READABLE_SPEC_PLAN.md` MRSP-1 | 風險已閉環，保留列供歷史稽核 |
 | Atlas 289 方法中 287 個無 contract，Tier 2 清單龐大 | `MACHINE_READABLE_SPEC_PLAN.md` §4 | 用 `contract-backlog.yaml` + fail-closed 狀態碼機制持續可見，不靜默隱藏；每次 Phase 3 之後的 session 若要選用 pending 方法，機制會自然要求補 contract 而非放行 |
 
 ---

@@ -136,15 +136,18 @@ mandatory_gate_injection_trigger:
     description: >
       The exact Global/High-risk Gate list itself (Evidence Matrix, Counterevidence,
       Red Team, Human Specialist Review, Reversal Criteria, and how it reconciles
-      with the conflicting counts in MP §158 / Atlas §22 / EC §68 copy — see OQ-10,
-      still REQUIRES_HUMAN_DECISION, not resolved by ADR-004) is intentionally
-      NOT enumerated here. This schema only defines WHEN the gate mechanism fires
-      (the risk_tier condition), not WHICH gates fire — that is
-      policies/ai-execution/mandatory-gates.yaml's job (Wave 6 — BUILT
-      2026-08-29 with `status: PROVISIONAL`; its own gate_id VALUE SPACE, not
-      the file itself, remains pending a Round 2+ ADR on OQ-10, corrected
-      2026-08-29 critic-flagged Minor). Do not treat this file's silence on the
-      gate list as an oversight; it is a deliberate scope boundary.
+      with the conflicting counts in MP §158 / Atlas §22 / EC §68 copy — OQ-10,
+      RESOLVED 2026-08-30 by docs/adr/ADR-011-platform-gate-ownership-and-
+      unification.md, not by ADR-004) is intentionally NOT enumerated in THIS
+      file — this schema only defines WHEN the gate mechanism fires (the
+      risk_tier condition), not WHICH gates fire. The resolved list itself
+      lives at specs/execution/gate.schema.yaml#/gate_catalog; the mandatory
+      rule set consuming it lives at
+      policies/ai-execution/mandatory-gates.yaml#/grounded_rules (2 rules as
+      of 2026-08-30, `status: ACTIVE`). Do not treat this file's silence on
+      the gate list as an oversight; it is a deliberate scope boundary that
+      remains correct even after OQ-10's resolution — this file's job stays
+      the trigger CONDITION only.
 
 migration_crosswalk:
   description: >

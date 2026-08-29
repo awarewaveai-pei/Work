@@ -66,7 +66,8 @@ questions:
     context: "It is a load-bearing node in the precedence chain; its identity differs across documents (findings CROSS-T-10 / CROSS-R-12)."
     deadline: "Phase 2 (ADR)"
   - id: OQ-10
-    status: REQUIRES_HUMAN_DECISION
+    status: RESOLVED_BY_HUMAN  # 2026-08-30: 操作者明示授權，ADR-011 → ACCEPTED（Master Plan 定為唯一 owner；14 Global + 6 High-risk 聯集內容；3 個 CROSS-T-11 命名採 Atlas 版本）
+    proposed_adr: "docs/adr/ADR-011-platform-gate-ownership-and-unification.md (ACCEPTED 2026-08-30) — Master Plan §158 sole canonical owner (per MP's own + EC's own Scoped Authority tables); content = union of all 3 candidates (14 Global + 6 High-risk); 3 CROSS-T-11 drifted names resolved to Atlas's wording with EC's as deprecated aliases"
     title: "Owner of platform-wide Global/High-risk Gate: MP §158 (11 items) vs Atlas §22 (14+6) vs EC §68 copy"
     context: "Gate sets differ materially and Atlas legislating platform gates violates its own scoped authority (findings CROSS-R-5 / CROSS-R-7 / CROSS-T-11)."
     deadline: "Phase 2 (ADR)"

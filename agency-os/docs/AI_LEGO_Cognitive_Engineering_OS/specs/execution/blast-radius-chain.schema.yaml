@@ -140,11 +140,12 @@ branch_node:
     Atlas §21's `Branch` node, minimally defined. This is the FULL scope of
     what this file specifies about Branch — no state machine, no merge
     authority model, no conflict-handling rules. ADR-003 Consequences item
-    (iii) explicitly names "full Branch state-machine spec at Atlas §21" as
-    follow-up work OUT OF SCOPE for ADR-003 itself, and
-    docs/architecture/MACHINE_READABLE_SPEC_PLAN.md tracks the full spec as
-    `specs/workflow/branch.schema.yaml`, status BLOCKED (MRSP-4) — that file
-    is not built here and this section must not be extended to duplicate it.
+    (iii) explicitly named "full Branch state-machine spec at Atlas §21" as
+    follow-up work OUT OF SCOPE for ADR-003 itself; that follow-up is now
+    BUILT at `specs/workflow/branch.schema.yaml` (status: ACTIVE, MRSP-4
+    resolved 2026-08-30 by docs/adr/ADR-012-branch-merge-state-machine.md)
+    — this section is NOT extended to duplicate it; the full spec lives
+    only there.
   minimal_definition: >
     A Branch is a forked, isolated execution lineage of a Workflow — the
     exact phrase ADR-003 sub-decision (c) uses (L94) and
@@ -212,12 +213,18 @@ mandatory_rules:
 open_questions:
   - id: "blast-radius-1"
     question: >
-      Full Branch state machine — who can Merge, how Branch/Branch and
-      Branch/parent conflicts are resolved, valid state transitions. ADR-003
-      Consequences item (iii) names this explicitly as follow-up work, not
-      decided by ADR-003 itself.
-    owner: "operator, Round 2 ADR — tracked as MRSP-4 / specs/workflow/branch.schema.yaml (BLOCKED) in docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §5"
-    blocks: "nothing in this schema — branch_node above is deliberately minimal and self-declares its own boundary"
+      RESOLVED 2026-08-30 by docs/adr/ADR-012-branch-merge-state-machine.md:
+      full Branch state machine (6 states), merge authority (>= A2, plus
+      R3/R4 mandatory gates per ADR-011's resolved catalog), and conflict
+      handling (merge_base staleness -> CONFLICT, always human-resolved via
+      resolution_rule_applied) are now specified at
+      specs/workflow/branch.schema.yaml (status: ACTIVE). Original question
+      (2026-08-29, preserved): "Full Branch state machine — who can Merge,
+      how Branch/Branch and Branch/parent conflicts are resolved, valid
+      state transitions. ADR-003 Consequences item (iii) names this
+      explicitly as follow-up work, not decided by ADR-003 itself."
+    owner: "closed"
+    blocks: "nothing — resolved; branch_node above remains this file's own deliberately minimal scope, unchanged, per ADR-012's own note that it extends rather than replaces ADR-003's minimal definition"
   - id: "blast-radius-2"
     question: >
       Cardinality of the 5 edges below Tenant→Workspace (Workspace→Project,

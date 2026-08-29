@@ -1,0 +1,463 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/workflow/branch.schema.yaml"
+title: Branch — Full State Machine
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the Branch node's full behavioral
+  spec: states, valid transitions, merge authority, and conflict handling.
+  Resolves MRSP-4 (docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §5,
+  L331) and `specs/execution/blast-radius-chain.schema.yaml`'s
+  `open_questions.blast-radius-1` (L212-220) — both explicitly named this
+  file, at this exact path, as the future home of this content.
+
+  ADR-003 sub-decision (c) established only a MINIMAL Branch definition ("a
+  forked, isolated execution lineage of a Workflow") and explicitly flagged
+  the full spec as out-of-scope follow-up (`ADR-003:94`, Consequences item
+  (iii), `ADR-003:112`) — no mother document (Master Plan, Method Atlas,
+  Execution Contract) contains ANY text on Branch states, merge authority,
+  or conflict handling; this is confirmed by ADR-003's own full-text grep
+  (`ADR-003:19`). This file is therefore an ORIGINAL design — the first in
+  this ADR series with zero mother-document prior art — built by
+  `docs/adr/ADR-012-branch-merge-state-machine.md` (ACCEPTED 2026-08-30) via
+  composition of FIVE already-decided mechanisms rather than invention from
+  scratch: `authority.schema.yaml`'s A0-A4 ladder (merge authority floor),
+  `risk-tier.schema.yaml` + `mandatory-gates.yaml`'s R3∪R4 gate injection
+  (ADR-004/ADR-011, merge gate requirement), `rollback.schema.yaml`'s
+  reversibility model (`ROLLED_BACK` terminal state), and
+  `conflict-of-laws-output.schema.yaml`'s `resolution_rule_applied` pattern
+  (conflict resolution tracking). See ADR-012 for the full reasoning behind
+  each composition — this file is ADR-012's compiled, machine-readable form,
+  not a re-derivation of it.
+
+  This file models ONE Branch's CURRENT snapshot (like `domain/tenant.schema
+  .yaml` models one Tenant row) — `state` is the branch's current position
+  in the state machine below; `state_transitions` (informative, not
+  per-instance-enforced) documents which transitions are legal. See
+  `open_questions.OQ-BRANCH-2` for why transition HISTORY (a full audit log
+  of every state change) is explicitly NOT modeled by this file.
+
+source_of_truth_for:
+  - "docs/adr/ADR-003-tenant-model-and-cas-isolation.md Sub-decision (c) (L87-94) — Branch's minimal definition, which this file extends, not replaces"
+  - "docs/adr/ADR-012-branch-merge-state-machine.md — the full design this file compiles"
+  - "specs/execution/blast-radius-chain.schema.yaml#/branch_node, #/chain_instance — the minimal definition and generic per-node shape this file's `branch` object extends via allOf"
+  - "specs/execution/authority.schema.yaml#/authority_level, #/levels/A1, #/levels/A2 — the merge-authority floor (ADR-012 Sub-decision b)"
+  - "specs/execution/risk-tier.schema.yaml#/mandatory_gate_injection_trigger — the R3∪R4 condition gating whether merge additionally requires gate_results"
+  - "policies/ai-execution/mandatory-gates.yaml#/grounded_rules — the live rule set this file's merge gate requirement references (not re-declares)"
+  - "specs/execution/gate.schema.yaml#/gate_result, #/gate_catalog — the per-gate outcome shape and the resolved (ADR-011) gate id catalog"
+  - "specs/execution/rollback.schema.yaml#/plan_id, #/result/side_state — the soft-reference convention and ROLLED_BACK vocabulary this file's `rollback_plan_ref` and `ROLLED_BACK` state reuse verbatim"
+  - "specs/jurisdiction/conflict-of-laws-output.schema.yaml (CONSERVATIVE_SAFE_MODE's resolution_rule_applied allOf/if/then) — the conflict-resolution-tracking pattern this file's `conflict.resolution_rule_applied` constraint reuses"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §11.2 (L961-969) — Accept/Reject/Edit/Lock/Branch/Merge vocabulary, the only mother-document evidence Branch/Merge is an intentional concept"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §5 MRSP-4 (L331) — this file's tracked build instruction"
+
+decided_by: >
+  docs/adr/ADR-012-branch-merge-state-machine.md (ACCEPTED 2026-08-30). No
+  mother document governs any part of this file's content — see
+  `description` above. This file is the direct machine-readable compilation
+  of that ADR's four sub-decisions; where this file adds a FURTHER
+  schema-level detail the ADR text did not spell out (e.g. the exact JSON
+  Schema mechanics for enforcing "authority_level >= A2"), that detail is
+  recorded in `compilation_decisions` below as a Phase-3-level compilation
+  choice, not a re-opening of the ADR's own decision.
+
+compilation_decisions:
+  - question: >
+      ADR-012 Sub-decision (b) says merging requires "at least A2" — but
+      `authority.schema.yaml#/authority_level` is a plain string enum
+      [A0,A1,A2,A3,A4] with no native ordering JSON Schema can compare
+      numerically. How should ">= A2" actually be enforced?
+    decision: >
+      `merge_authorization.authority_level` uses its own local
+      `enum: [A2, A3, A4]` (a narrowed subset of the full authority_level
+      enum) rather than a `$ref` to the unrestricted 5-value enum.
+    reasoning: >
+      JSON Schema has no native "enum ordering" comparison operator: there
+      is no way to express "any value ranked at or above A2" against a
+      alphabetically/arbitrarily-ordered string enum other than explicitly
+      listing the legal subset. This is the same technique
+      `risk-tier.schema.yaml#/mandatory_gate_injection_trigger` uses for
+      "risk_tier IN [R3, R4]" (an explicit 2-value list, not a ">=R3"
+      comparison) — reusing an already-established pattern in this exact
+      schema suite rather than inventing a new ordering mechanism (e.g. a
+      numeric rank field on authority.schema.yaml, which would be a
+      breaking change to a file this task is not authorized to redesign).
+  - question: >
+      Should `branch` model itself as a flat object (duplicating
+      `blast-radius-chain.schema.yaml#/chain_instance`'s tenant_id/node_type/
+      node_id/parent_node_id fields) or compose with that file via `allOf`?
+    decision: "Compose via allOf — one $ref to chain_instance, plus this file's own branch-specific object."
+    reasoning: >
+      Per the operator's explicit LEGO-composability directive and Decision
+      Driver #4 in ADR-012: a Branch IS a chain_instance (node_type: BRANCH)
+      that additionally has a lifecycle. Duplicating the 4 base fields here
+      would create a second, driftable copy of a shape
+      `blast-radius-chain.schema.yaml` already owns — the same
+      single-source-of-truth discipline this whole schema suite already
+      applies everywhere else (e.g. `gate.schema.yaml` not re-declaring EC
+      §65's evidence shape, `mandatory-gates.yaml` not re-declaring
+      `gate.schema.yaml`'s gate_id type).
+  - question: >
+      `gate.schema.yaml#/gate_result/properties/status` is EC §69's narrow
+      PASS/FAIL/BLOCKED/NOT_APPLICABLE enum — it does NOT include
+      `PASS_WITH_APPROVED_RISK` (that value exists only in EC §70's
+      task-level Final Status vocabulary, per `status-codes.schema.yaml`,
+      and `release-policy.yaml`'s own compilation_decisions explicitly kept
+      the two enums separate). Should a merge's required gate_results accept
+      `PASS_WITH_APPROVED_RISK` as a passing outcome?
+    decision: >
+      No — a merge's `gate_results[].status` must be exactly `PASS` for
+      each required gate id. `PASS_WITH_APPROVED_RISK` is not a legal
+      per-gate value at all (it is not in `gate_result.status`'s own enum),
+      so accepting it here would require importing a value from a
+      DIFFERENT, task-level vocabulary into a per-gate field — the same
+      enum-conflation `release-policy.yaml` already declined for the
+      identical reason.
+    reasoning: >
+      Consistency with the existing, deliberate split between
+      `gate_result.status` (per-gate, EC §69) and `final_status` (per-task,
+      EC §70) that `release-policy.yaml`'s own compilation_decisions
+      established. A future release-level policy MAY still choose to accept
+      a task-level `PASS_WITH_APPROVED_RISK` verdict that tolerates one
+      FAILED gate — but that is a decision for a release/task-level
+      consumer of this Branch record, not something this file should
+      pre-empt by loosening the per-gate enum itself.
+  - question: >
+      Should `branch_id` use a new prefix, and does it collide with any
+      existing pattern in this schema suite?
+    decision: 'pattern: "^BR-"'
+    reasoning: >
+      Checked against this suite's existing prefixes (EX-/TASK-/RUN-/
+      TRACE-/DEL-/EXC-/DEC-/ASM-/C-/E-/RCF-/PROB-/CHS-/NCB-/LAW-/LS-/RB-/
+      DEP-/COL-/OBL-/JPACK-, grepped across specs/ this session) — zero
+      collisions. `BR-` is the natural short form and is not already
+      claimed.
+
+# ---------------------------------------------------------------------------
+# The 6-state machine (ADR-012 Sub-decision a).
+# ---------------------------------------------------------------------------
+definitions:
+
+  branch_state:
+    description: >
+      6 states, no DRAFT pre-state (see ADR-012 Sub-decision a for why).
+      `ACTIVE` is the initial state upon creation via the Branch action
+      (MP §11.2). `MERGED`, `ABANDONED`, `ROLLED_BACK` are the only states
+      with no outgoing transition.
+    type: string
+    enum: [ACTIVE, MERGE_REQUESTED, CONFLICT, MERGED, ABANDONED, ROLLED_BACK]
+
+  merge_authority_level:
+    description: >
+      Narrowed subset of authority.schema.yaml#/authority_level enforcing
+      ADR-012 Sub-decision (b)'s "at least A2" floor — see
+      compilation_decisions above for why a subset enum, not a $ref to the
+      full 5-value one.
+    type: string
+    enum: [A2, A3, A4]
+
+# Root $ref (established pattern in this suite — see gate.schema.yaml,
+# risk-tier.schema.yaml, mandatory-gates.yaml: without a root-level type
+# constraint, a validator pointed at this file's ROOT would accept ANY
+# value).
+$ref: "#/branch"
+
+# ---------------------------------------------------------------------------
+# Informative (non-instance-enforced) transition table — see
+# open_questions.OQ-BRANCH-2 for why per-instance transition HISTORY is not
+# modeled. Mirrors blast-radius-chain.schema.yaml's `chain` const-array
+# documentation style.
+# ---------------------------------------------------------------------------
+state_transitions:
+  description: >
+    Every legal (from, to) pair. A conforming implementation MUST NOT
+    perform any transition not listed here. This is documentation for
+    tooling/implementers — this file does not itself enforce transition
+    LEGALITY across two point-in-time snapshots (see OQ-BRANCH-2).
+  transitions:
+    - { from: null, to: ACTIVE, trigger: "Branch action (MP §11.2) creates the branch" }
+    - { from: ACTIVE, to: MERGE_REQUESTED, trigger: "Merge action (MP §11.2) invoked" }
+    - { from: ACTIVE, to: ABANDONED, trigger: "Branch explicitly discarded without merging" }
+    - { from: MERGE_REQUESTED, to: MERGED, trigger: "merge_authorization + applicable gate_results satisfied, no staleness detected" }
+    - { from: MERGE_REQUESTED, to: CONFLICT, trigger: "merge_base staleness detected against target Workflow's current state" }
+    - { from: MERGE_REQUESTED, to: ACTIVE, trigger: "Merge request withdrawn" }
+    - { from: CONFLICT, to: MERGE_REQUESTED, trigger: "conflict.resolution_rule_applied populated, re-attempt" }
+    - { from: CONFLICT, to: ABANDONED, trigger: "Conflict deemed not worth resolving" }
+    - { from: MERGED, to: ROLLED_BACK, trigger: "Post-merge rollback executed per rollback.schema.yaml" }
+
+# ---------------------------------------------------------------------------
+# The Branch instance schema.
+# ---------------------------------------------------------------------------
+branch:
+  allOf:
+    - $ref: "ai-lego://specs/execution/blast-radius-chain.schema.yaml#/chain_instance"
+    - type: object
+      required: [branch_id, state]
+      properties:
+        node_type:
+          const: BRANCH
+          description: "Fixes the inherited chain_instance.node_type to BRANCH for every instance of this file's own type."
+        branch_id:
+          type: string
+          pattern: "^BR-"
+          description: "This file's own identifier, distinct from chain_instance's generic node_id (which this file's allOf composition also inherits)."
+        state:
+          $ref: "#/definitions/branch_state"
+        risk_tier:
+          $ref: "ai-lego://specs/execution/risk-tier.schema.yaml#/risk_tier"
+          description: >
+            Required — gates whether ADR-012 Sub-decision (c)'s additional
+            merge gate_results requirement applies (risk_tier IN [R3, R4]).
+        merge_base:
+          type: [string, "null"]
+          description: >
+            Opaque reference to the point in the parent Workflow's history
+            this Branch forked from (ADR-012 Sub-decision d). Deliberately
+            untyped/opaque — no mother document or existing schema defines
+            a "Workflow committed-history reference" concept to reuse; kept
+            as a soft, free-text pointer, same treatment
+            `rollback.schema.yaml#/plan_id` gives references to a concept
+            with no existing formal representation. `null` only while
+            `state: ACTIVE` and no merge has ever been attempted.
+        merge_authorization:
+          type: [object, "null"]
+          description: >
+            Populated once a merge succeeds (state: MERGED). `null` before
+            that. See `constraints` below for the exact state-conditional
+            requirement.
+          properties:
+            authority_level:
+              $ref: "#/definitions/merge_authority_level"
+            approved_by:
+              type: string
+              description: "Free-text identifier of the approving actor — same untyped convention as gate.schema.yaml#/gate_result/properties/validator."
+            approved_at:
+              type: string
+              format: date-time
+          required: [authority_level, approved_by, approved_at]
+        gate_results:
+          type: array
+          description: >
+            Per-gate outcomes consulted at merge time. Only required
+            (non-empty, covering both current mandatory-gates.yaml rules)
+            when risk_tier IN [R3, R4] AND state: MERGED — see
+            `constraints` below. Each entry is a real
+            gate.schema.yaml#/gate_result record, not re-declared here.
+          items:
+            $ref: "ai-lego://specs/execution/gate.schema.yaml#/gate_result"
+        conflict:
+          type: [object, "null"]
+          description: >
+            Populated once the branch has EVER entered CONFLICT (persists
+            even after CONFLICT -> MERGE_REQUESTED resolves it, as an audit
+            trail of the most recent conflict episode — this file does not
+            model a full history of multiple conflict episodes, see
+            OQ-BRANCH-2). `null` if the branch has never conflicted.
+          required: [detected_at, cause]
+          properties:
+            detected_at:
+              type: string
+              format: date-time
+            cause:
+              type: string
+              enum: [PARENT_ADVANCED, SIBLING_MERGED, OTHER]
+              description: >
+                ADR-012 Sub-decision (d): both named gap sources
+                (blast-radius-chain.schema.yaml's "two Branches diverge and
+                both attempt Merge" = SIBLING_MERGED here; the parent
+                Workflow advancing independently = PARENT_ADVANCED) collapse
+                onto the same merge_base-staleness check. OTHER is an
+                honest escape hatch, not a 4th mechanism.
+            resolution_rule_applied:
+              type: [string, "null"]
+              description: >
+                REQUIRED non-null once the branch has transitioned back to
+                MERGE_REQUESTED or beyond after this conflict (see
+                `constraints`) — same pattern
+                `conflict-of-laws-output.schema.yaml`'s CONSERVATIVE_SAFE_MODE
+                status already established for this project. `null` while
+                the conflict remains genuinely unresolved (state: CONFLICT
+                still).
+            resolved_by:
+              type: [string, "null"]
+              description: "Free-text actor identifier, same convention as merge_authorization.approved_by."
+            resolved_at:
+              type: [string, "null"]
+              format: date-time
+        rollback_plan_ref:
+          type: [string, "null"]
+          pattern: "^RB-"
+          description: >
+            Soft reference by naming convention (not a hard $ref, matching
+            rollback.schema.yaml's own established pattern for this exact
+            field name elsewhere in this suite) to a
+            rollback.schema.yaml#/plan_id record. REQUIRED non-null once
+            `state: ROLLED_BACK` (see `constraints`).
+        abandoned_at:
+          type: [string, "null"]
+          format: date-time
+        abandoned_by:
+          type: [string, "null"]
+          description: "Free-text actor identifier. REQUIRED non-null once state: ABANDONED (see constraints)."
+
+# ---------------------------------------------------------------------------
+# State-conditional requirements — the machine-checkable form of ADR-012's
+# four sub-decisions. Draft 2020-12 if/then, same technique gate.schema.yaml
+# uses for its NOT_APPLICABLE-requires-rationale rule and
+# conflict-of-laws-output.schema.yaml uses for its per-status requirements.
+# ---------------------------------------------------------------------------
+constraints:
+  - "state IN [MERGE_REQUESTED, CONFLICT, MERGED, ROLLED_BACK] requires merge_base to be non-null (ADR-012 Sub-decision d) — a branch cannot request/attempt/complete a merge without a fork point to compare staleness against."
+  - "state == MERGED requires merge_authorization to be non-null, with merge_authorization.authority_level one of [A2, A3, A4] (ADR-012 Sub-decision b's 'at least A2' floor, enforced via the narrowed enum in #/definitions/merge_authority_level)."
+  - "state == MERGED AND risk_tier IN [R3, R4] additionally requires gate_results to contain an entry with gate_id: human_specialist_review AND status: PASS, and a separate entry with gate_id: recovery_rollback_rehearsal AND status: PASS (ADR-012 Sub-decision c, referencing mandatory-gates.yaml#/grounded_rules — today's 2 rules; a future 3rd rule there is NOT retroactively enforced by this static schema, see OQ-BRANCH-1)."
+  - "state == CONFLICT requires conflict to be non-null with conflict.detected_at and conflict.cause populated; conflict.resolution_rule_applied MAY be null while genuinely unresolved."
+  - "state == ABANDONED requires abandoned_at and abandoned_by to be non-null."
+  - "state == ROLLED_BACK requires rollback_plan_ref to be non-null (state: MERGED is the only legal predecessor per state_transitions, so this also implies merge_authorization was populated at the time of merge)."
+if:
+  properties: { state: { enum: [MERGE_REQUESTED, CONFLICT, MERGED, ROLLED_BACK] } }
+  required: [state]
+then:
+  required: [merge_base]
+  properties:
+    merge_base: { type: string }
+
+# ---------------------------------------------------------------------------
+# Per-state property requirements, composed via allOf/if/then (Draft
+# 2020-12) — one block per state named in `constraints` above.
+# ---------------------------------------------------------------------------
+allOf:
+  - if:
+      properties: { state: { const: MERGED } }
+      required: [state]
+    then:
+      required: [merge_authorization]
+      properties:
+        merge_authorization:
+          type: object
+          required: [authority_level, approved_by, approved_at]
+  - if:
+      allOf:
+        - properties: { state: { const: MERGED } }
+          required: [state]
+        - properties: { risk_tier: { enum: [R3, R4] } }
+          required: [risk_tier]
+    then:
+      required: [gate_results]
+      properties:
+        gate_results:
+          type: array
+          allOf:
+            - contains:
+                type: object
+                required: [gate_id, status]
+                properties:
+                  gate_id: { const: human_specialist_review }
+                  status: { const: PASS }
+              minContains: 1
+            - contains:
+                type: object
+                required: [gate_id, status]
+                properties:
+                  gate_id: { const: recovery_rollback_rehearsal }
+                  status: { const: PASS }
+              minContains: 1
+  - if:
+      properties: { state: { const: CONFLICT } }
+      required: [state]
+    then:
+      required: [conflict]
+      properties:
+        conflict:
+          type: object
+          required: [detected_at, cause]
+  - if:
+      properties: { state: { const: ABANDONED } }
+      required: [state]
+    then:
+      required: [abandoned_at, abandoned_by]
+      properties:
+        abandoned_at: { type: string }
+        abandoned_by: { type: string }
+  - if:
+      properties: { state: { const: ROLLED_BACK } }
+      required: [state]
+    then:
+      required: [rollback_plan_ref]
+      properties:
+        rollback_plan_ref: { type: string }
+
+open_questions:
+  - id: "OQ-BRANCH-1"
+    question: >
+      `constraints`' gate-coverage rule hard-codes today's 2
+      `mandatory-gates.yaml#/grounded_rules` entries (human_specialist_review,
+      recovery_rollback_rehearsal) rather than dynamically reading whatever
+      that file currently contains — a real JSON Schema `contains` clause
+      cannot iterate an external file's array at validation time. If
+      `mandatory-gates.yaml` gains a 3rd grounded rule in the future, this
+      file's `allOf` block will need a matching edit; it will NOT
+      automatically inherit it despite ADR-012 Sub-decision (c)'s stated
+      intent ("referenced live, not re-declared"). Should this be
+      re-architected (e.g. a build-time codegen step that regenerates this
+      block from mandatory-gates.yaml), or is a manual-sync obligation
+      (documented here) acceptable given how rarely that file's rule set is
+      expected to change?
+    owner: "operator or future Phase 4 tooling work"
+    blocks: "nothing today — the 2 current rules are correctly enforced; only a FUTURE 3rd rule would silently not be enforced until this file is manually updated"
+  - id: "OQ-BRANCH-2"
+    question: >
+      This file models a Branch's CURRENT snapshot only — it does not model
+      a transition-history log (every past state change with timestamp and
+      actor), nor does it enforce that state changes only ever follow the
+      legal (from, to) pairs in `state_transitions` (that would require
+      comparing TWO snapshots, which a single-instance JSON Schema document
+      cannot express). A production implementation would need a separate
+      audit-log mechanism (e.g. reusing `execution/manifest.schema.yaml`'s
+      pattern) to actually enforce transition legality over time. Left
+      unmodeled here — out of scope for "define the state machine's legal
+      shape," in scope for "enforce it live."
+    owner: "operator or future Phase 4 implementation work"
+    blocks: "nothing in this schema's own validity — a single point-in-time snapshot is fully specified regardless"
+  - id: "OQ-BRANCH-3"
+    question: >
+      `conflict.cause` distinguishes PARENT_ADVANCED from SIBLING_MERGED,
+      but ADR-012's Consequences (ii) already flags that no mother-document
+      or existing-schema evidence currently DISTINGUISHES their downstream
+      handling — both currently require the identical
+      resolution_rule_applied treatment. Should they eventually diverge
+      (e.g. SIBLING_MERGED might be auto-resolvable by a real
+      three-way-merge algorithm the corpus doesn't yet define, while
+      PARENT_ADVANCED never could be)? Left open, matching ADR-012's own
+      disclosed follow-up.
+    owner: "operator or Round 3 ADR, if real usage ever demands it"
+    blocks: "nothing today — both causes are handled identically and correctly"
+
+verification:
+  method: >
+    Read docs/adr/ADR-003-tenant-model-and-cas-isolation.md in full
+    (Context P1-DUP-3, Sub-decision (c), Consequences). Read
+    specs/execution/blast-radius-chain.schema.yaml in full, including
+    `branch_node`, `chain_instance`, and `open_questions.blast-radius-1`.
+    Read specs/execution/authority.schema.yaml in full (A0-A4 levels,
+    scope descriptions for A1/A2). Read specs/execution/risk-tier.schema.yaml
+    in full (mandatory_gate_injection_trigger). Read
+    policies/ai-execution/mandatory-gates.yaml (same-session, post-ADR-011
+    state, 2 grounded rules) and specs/execution/gate.schema.yaml
+    (same-session, post-ADR-011 gate_catalog) in full. Read
+    specs/execution/rollback.schema.yaml (plan_id, result.side_state) and
+    specs/jurisdiction/conflict-of-laws-output.schema.yaml
+    (CONSERVATIVE_SAFE_MODE's resolution_rule_applied pattern) in full.
+    Grepped specs/ for every existing ID-prefix pattern to confirm `BR-`
+    has zero collisions. Validated a hand-written instance for each of the
+    6 states (see tests/contracts/specs/workflow/branch.fixtures.yaml)
+    against this schema with jsonschema.Draft202012Validator using a
+    registry-backed `ai-lego://` resolver — all pass/fail as expected (see
+    WORKLOG for the exact command and results).
+  note: >
+    No mother document was modified — none exists to modify for this
+    subject. This file is the first in this ADR series built from zero
+    mother-document prior art; every substantive design choice traces to
+    docs/adr/ADR-012-branch-merge-state-machine.md, and every ADR-012
+    decision traces to a specific, already-ACCEPTED decision it composes
+    (see `source_of_truth_for` and ADR-012's own Evidence section) — nothing
+    here was asserted from first principles alone.

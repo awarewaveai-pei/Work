@@ -8,64 +8,82 @@ description: >
   Structural (field-shape) definition of a Gate Execution Result record —
   EC §69 "Gate Result" (L2282-2293): what one gate's execution outcome looks
   like (which gate ran, when, PASS/FAIL/BLOCKED/NOT_APPLICABLE, what
-  evidence backs the verdict, who/what validated it). Per
-  MACHINE_READABLE_SPEC_PLAN.md §2.2 row 102, this file is
-  BLOCKED_PENDING_ROUND2_ADR for ONE field only — `gate_id` — because the
-  Global/High-risk Gate LIST itself is disputed across three mother-document
-  copies with different item counts: Master Plan §158 (L5903-5926) lists 11
-  Global items + 1 high-risk add-on ("Human Specialist Review PASS" only);
-  Method Atlas §22.1/22.2 (L4164-4194) lists 14 Global items + 6 high-risk
-  add-ons; Execution Contract §68 (L2246-2278) copies Atlas's 14+6 counts but
-  with gate-NAME drift ("Independent Review" vs Atlas's "Independent Judge
-  PASS"; "Human Specialist" vs "Human Specialist Review PASS"; "Recovery
-  Rehearsal" vs "Recovery / Rollback Rehearsal PASS"). This is findings
-  CROSS-R-5 / CROSS-R-7 / CROSS-T-11, tracked as open question OQ-10
-  (.ai/research/phase-0/open-questions.yaml L68-72, status
-  REQUIRES_HUMAN_DECISION, deadline "Phase 2 (ADR)").
+  evidence backs the verdict, who/what validated it), PLUS (2026-08-30,
+  ADR-011) the canonical Global/High-risk `gate_id` value catalog itself.
 
-  This file does NOT pick a side in that dispute, does NOT merge/union the
-  three lists, and does NOT invent a 4th list. `gate_id` is typed as a bare,
-  unconstrained string carrying an explicit `TBD_PENDING_ROUND2_ADR` marker
-  rather than an enum — the exact precedent already set, before this file
-  existed, by `execution/manifest.schema.yaml`'s `results.gates` field
+  Until 2026-08-30 this file's `gate_id` field was BLOCKED_PENDING_ROUND2_ADR
+  because the Global/High-risk Gate LIST was disputed across three
+  mother-document copies with different item counts: Master Plan §158
+  (L5903-5926) listed 11 Global items + 1 high-risk add-on ("Human
+  Specialist Review PASS" only); Method Atlas §22.1/22.2 (L4164-4194) listed
+  14 Global items + 6 high-risk add-ons; Execution Contract §68 (L2246-2278)
+  copied Atlas's 14+6 counts but with gate-NAME drift ("Independent Review"
+  vs Atlas's "Independent Judge PASS"; "Human Specialist" vs "Human
+  Specialist Review PASS"; "Recovery Rehearsal" vs "Recovery / Rollback
+  Rehearsal PASS"). This was findings CROSS-R-5 / CROSS-R-7 / CROSS-T-11,
+  tracked as open question OQ-10 (.ai/research/phase-0/open-questions.yaml
+  L68-72).
+
+  **RESOLVED 2026-08-30 by `docs/adr/ADR-011-platform-gate-ownership-and-
+  unification.md`**: Master Plan is the sole canonical owner of the
+  platform-wide Global/High-risk Gate (per both MP's and EC's own
+  self-declared Scoped Authority tables — ADR-011 Sub-decision (a)); its
+  content, once amended via the ADR-006 proposal process, is the verified
+  union of all three candidates — 14 Global + 6 High-risk items, since the
+  smaller candidates are strict subsets, not genuine disagreements
+  (Sub-decision (b)); the 3 CROSS-T-11 name-drifted items adopt Atlas's
+  wording, with EC's 3 names becoming deprecated aliases (Sub-decision (c)).
+  `gate_catalog` below is that resolved 20-item registry. `gate_id` stays
+  `type: string` rather than a closed `enum` because Atlas §22.3's
+  Method-specific Gate namespace (unaffected by ADR-011, still Atlas's own
+  granted scope) is open-ended and grows per-method — a real `gate_id` value
+  for a Global/High-risk gate SHOULD be one of `gate_catalog`'s 20 entries,
+  but this is recorded as a documented catalog (see `gate_catalog`'s own
+  cross-reference), not a hard schema constraint, so a Method-specific
+  gate_id remains valid without needing to be enumerated here too — the
+  precedent `execution/manifest.schema.yaml`'s `results.gates` field
   (L303-315) and `cognitive/recipe.schema.yaml`'s `steps[].gate_ref` field
-  (L149-165, L333-342), both of which left gate references untyped for this
-  identical reason and both of which already cite this file by name as the
-  future home of that decision. Everything else in `gate_result` (status,
+  (L149-165, L333-342) already set (leaving gate references as untyped
+  strings, not requiring a schema-level enum) still applies post-resolution,
+  just with a real catalog to validate against at the tooling/lint layer
+  instead of a TBD placeholder. Everything else in `gate_result` (status,
   evidence, validator, timestamp, the NOT_APPLICABLE-requires-rationale
-  rule) is a direct, low-risk transcription of EC §69 and is fully
-  buildable today.
+  rule) is a direct, low-risk transcription of EC §69 and was already fully
+  buildable before this resolution.
 
 source_of_truth_for:
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §69 Gate Result (L2282-2293) — the gate_result record shape, verbatim"
-  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §68 Global Gates (L2246-2278) — cited for CONTEXT/DISPUTE RECORD only; its 14+6 list is NOT adopted as canonical by this file"
-  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §22.1/§22.2 Global Gate / High-risk Gate (L4164-4194) — cited for CONTEXT/DISPUTE RECORD only; its 14+6 list is NOT adopted as canonical by this file"
-  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §158 Global Definition of Done (L5903-5926) — cited for CONTEXT/DISPUTE RECORD only; its 11+1 list is NOT adopted as canonical by this file"
+  - "docs/adr/ADR-011-platform-gate-ownership-and-unification.md — RESOLVES OQ-10; Sub-decision (a) names Master Plan the sole canonical owner, Sub-decision (b) grounds the 14+6 union, Sub-decision (c) grounds the 20-item gate_id/display_name registry below"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §68 Global Gates (L2246-2278) — one of ADR-011's three reconciled candidate sources, no longer disputed"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §22.1/§22.2 Global Gate / High-risk Gate (L4164-4194) — ADR-011's primary source for the 3 pure-addition items and the winning wording for the 3 CROSS-T-11 drifted names"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §158 Global Definition of Done (L5903-5926) — ADR-011 Sub-decision (a)'s designated SSOT owner; its 11+1 items are the verified subset the 20-item union above extends without contradiction"
   - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §14.2 Mandatory Gate Injection (L3588-3612) — the trigger mechanism this file's records are expected to be produced by, per execution/risk-tier.schema.yaml"
   - "execution/risk-tier.schema.yaml mandatory_gate_injection_trigger + tiers.R3.gate_injection + tiers.R4.gate_injection — the R3∪R4 condition under which gate_result records are expected to be emitted"
-  - ".ai/research/phase-0/open-questions.yaml OQ-10 (L68-72) — the unresolved ownership question this file's gate_id field defers to"
-  - ".ai/research/phase-0/verified-findings.yaml CROSS-R-5 (L98-116), CROSS-R-7 (L398-421), CROSS-T-11 (L495-517) — the three-way count/name dispute, independently confirmed 2-3x each"
-  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2 row 102 (L102) and §3 Build Order (L288, corrected 2026-08-29 — self-caught during Wave 6 critic-fix bughunt: originally mis-cited as '§4 (L246)', wrong section [§4 is 'Atlas Method Contract 補齊策略', unrelated] AND wrong line) — this file's tracked status and explicit instruction to build the skeleton now with gate_id left TBD_PENDING_ROUND2"
-  - "execution/manifest.schema.yaml results.gates (L303-315) and cognitive/recipe.schema.yaml steps[].gate_ref (L149-165, L333-342) — existing forward dependents already waiting on this file, whose own untyped-string precedent this file follows"
+  - ".ai/research/phase-0/open-questions.yaml OQ-10 (L68-72) — RESOLVED by ADR-011, see above"
+  - ".ai/research/phase-0/verified-findings.yaml CROSS-R-5 (L98-116), CROSS-R-7 (L398-421), CROSS-T-11 (L495-517) — the three-way count/name dispute ADR-011 resolves; kept as historical record, not re-litigated here"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2 row 102 (L102) and §3 Build Order (L288) — this file's tracked status, now RESOLVED"
+  - "execution/manifest.schema.yaml results.gates (L303-315) and cognitive/recipe.schema.yaml steps[].gate_ref (L149-165, L333-342) — existing forward dependents already waiting on this file; their untyped-string field shape is unaffected by this resolution (`gate_id` stays `type: string`, now with a real catalog to validate against instead of a TBD marker)"
 
 decided_by: >
-  No ADR governs this file. OQ-10 remains REQUIRES_HUMAN_DECISION with
-  deadline "Phase 2 (ADR)" (.ai/research/phase-0/open-questions.yaml L68-72)
-  — verified by grep across docs/adr/ADR-001~010: none rules on the
-  Global/High-risk Gate list. MACHINE_READABLE_SPEC_PLAN.md itself
-  prescribes exactly what this file may and may not do while that ADR is
-  pending (§3 Build Order, L288 — corrected 2026-08-29, see source_of_truth_for
-  above for why: "可以先建這兩檔的骨架（欄位結構）、gate_id enum 留
-  TBD_PENDING_ROUND2，不阻塞其餘 30+ 個檔案的建置" — "the skeleton/field
-  structure of these two files may be built now, with the gate_id enum left
-  as TBD_PENDING_ROUND2, without blocking the other 30+ files"). This file
-  follows that instruction exactly: the `gate_result` record SHAPE (gate_id,
-  status, evidence, validator, timestamp, rationale) is decided here as a
-  direct, low-risk transcription of EC §69 — the same class of Low-risk
-  compilation MACHINE_READABLE_SPEC_PLAN.md's precedent describes for
-  uncontested single-source structural definitions. The gate_id VALUE SPACE
-  (which strings are legal) is explicitly NOT decided here and awaits Round
-  2 ADR resolution of OQ-10.
+  `docs/adr/ADR-011-platform-gate-ownership-and-unification.md` (ACCEPTED
+  2026-08-30) resolves OQ-10 and governs `gate_catalog` below in full.
+  Before 2026-08-30, no ADR governed this file and OQ-10 was
+  REQUIRES_HUMAN_DECISION — verified at the time by grep across
+  docs/adr/ADR-001~010: none ruled on the Global/High-risk Gate list.
+  MACHINE_READABLE_SPEC_PLAN.md's §3 Build Order (L288) had prescribed
+  exactly what this file could do while that ADR was pending ("可以先建這兩
+  檔的骨架（欄位結構）、gate_id enum 留 TBD_PENDING_ROUND2，不阻塞其餘 30+
+  個檔案的建置") — the `gate_result` record SHAPE (gate_id, status,
+  evidence, validator, timestamp, rationale) was already decided as a
+  direct, low-risk transcription of EC §69 at that time; only the gate_id
+  VALUE SPACE was deferred. ADR-011 is that deferred resolution. Per
+  ADR-011's own scope note, this ADR governs the schema/policy-file
+  content directly (Low-risk machine-readable-spec compilation, the same
+  class every other ADR-001~010-derived schema file in this project
+  already applies) — the mother-document prose edits it recommends (MP §158
+  content amendment, Atlas §22.1/22.2 and EC §68 reduction to pointers)
+  remain separately gated behind the ADR-006 `.ai/proposals/` flow and are
+  NOT performed by this file.
 
 compilation_decisions:
   - question: >
@@ -90,7 +108,9 @@ compilation_decisions:
       kind of quiet scope-creep R0 forbids for a file whose own plan entry
       says not to pick a side. EC §68's own closing line — "Method-specific
       gate 從 Method Atlas 取得" (L2278) — is preserved instead as informational
-      context in `gate_id_registry` below, not modeled as a schema field.
+      context in `gate_catalog.method_specific` below (renamed from this
+      section's original `gate_id_registry` when ADR-011 resolved OQ-10,
+      2026-08-30), not modeled as a schema field.
   - question: >
       `evidence` in EC §69's worked example is a bare `[...]` with no
       element shape given. Should this file define a typed evidence-item
@@ -108,8 +128,8 @@ compilation_decisions:
       as a plausible future improvement rather than decided silently here.
 
 # ---------------------------------------------------------------------------
-# The gate_result record shape (GROUNDED — verbatim from EC §69, NOT
-# blocked). Only the gate_id VALUE SPACE below is blocked, not this shape.
+# The gate_result record shape — GROUNDED, verbatim from EC §69. gate_id's
+# value space is now RESOLVED (ADR-011, 2026-08-30) — see gate_catalog below.
 # ---------------------------------------------------------------------------
 gate_result:
   type: object
@@ -119,19 +139,18 @@ gate_result:
     gate_id:
       type: string
       description: >
-        TBD_PENDING_ROUND2_ADR. Placeholder identifier for the gate that
-        ran. Deliberately NOT constrained to an enum and NOT populated with
-        any of the three disputed candidate lists — see `description`,
-        `decided_by`, and `gate_id_registry` below. Once Round 2 ADR settles
-        OQ-10, this field is expected to gain a strict `enum` (or a $ref to
-        a separate policies/ai-execution/mandatory-gates.yaml registry — see
-        open_questions.OQ-GATE-1) referencing the single winning gate-id
-        list, with the CROSS-T-11 naming drift also resolved to one form.
-        Until then, any real gate_id value emitted by an implementation is
-        provisional.
+        Identifier of the gate that ran. RESOLVED 2026-08-30 by
+        `docs/adr/ADR-011-platform-gate-ownership-and-unification.md`: for a
+        Global or High-risk gate, this SHOULD be one of `gate_catalog`'s 20
+        `id` values below (kept as a documented catalog rather than a hard
+        schema `enum` — see `gate_catalog.note` for why). For a
+        Method-specific gate (Atlas §22.3's own open-ended, per-method
+        namespace, unaffected by ADR-011), this is any value that
+        namespace's own per-method contract defines — still not enumerable
+        here, per `open_questions.OQ-GATE-3` (unresolved by ADR-011).
       examples:
         - "security"
-      x-status: TBD_PENDING_ROUND2_ADR
+      x-status: RESOLVED_2026-08-30_ADR-011
     status:
       type: string
       enum: [PASS, FAIL, BLOCKED, NOT_APPLICABLE]
@@ -192,79 +211,87 @@ trigger_context:
     R3 as well, so R3-tier operations (DB migration, Identity/Authorization
     changes) do not skip the same protections.
   source: "execution/risk-tier.schema.yaml#/mandatory_gate_injection_trigger, #/tiers/R3/gate_injection, #/tiers/R4/gate_injection"
-  produces: "zero or more gate_result records, one per gate that fires — the COUNT and IDENTITY of which gates fire is exactly what gate_id_registry below is blocked on"
+  produces: "zero or more gate_result records, one per gate that fires — the COUNT and IDENTITY of which gates fire is enumerated in gate_catalog below"
 
 # ---------------------------------------------------------------------------
-# BLOCKED — the gate_id VALUE SPACE itself. Recorded here for auditability,
-# not adjudicated. Do not treat any list below as authoritative.
+# RESOLVED 2026-08-30 by ADR-011 — the canonical Global/High-risk gate_id
+# value catalog. Kept as a documented catalog (not folded into `gate_id`'s
+# JSON Schema as a hard `enum`) because Atlas §22.3's Method-specific Gate
+# namespace is separate, open-ended, and grows per-method — a hard enum here
+# would make every future Method-specific gate_id fail validation.
 # ---------------------------------------------------------------------------
-gate_id_registry:
-  status: TBD_PENDING_ROUND2_ADR
-  blocked_by: "OQ-10 (.ai/research/phase-0/open-questions.yaml L68-72); findings CROSS-R-5, CROSS-R-7, CROSS-T-11"
-  this_file_does: >
-    Defines the gate_result RECORD SHAPE only (what a gate outcome looks
-    like once you already have a gate_id). Does not enumerate or adjudicate
-    the legal gate_id values.
-  this_file_does_not: >
-    Does not pick Master Plan, Method Atlas, or Execution Contract's list as
-    canonical. Does not merge/union them into a superset. Does not invent a
-    4th list. Deciding the list is policies/ai-execution/mandatory-gates.yaml's
-    job (Wave 6), itself gated on Round 2 ADR per
-    MACHINE_READABLE_SPEC_PLAN.md §2.9 (release/ dir) and §3 Build Order
-    (L288, corrected 2026-08-29 — see source_of_truth_for above).
-  disputed_candidates:
-    - source: "Master Plan §158 Global Definition of Done (L5903-5926)"
-      global_gate_count: 11
-      high_risk_addon_count: 1
-      high_risk_addon: ["Human Specialist Review PASS"]
-    - source: "Method Atlas §22.1/§22.2 Global Gate / High-risk Gate (L4164-4194)"
-      global_gate_count: 14
-      global_extra_vs_mp: ["Evidence PASS", "Reasoning PASS", "Capacity PASS"]
-      high_risk_addon_count: 6
-      high_risk_addon:
-        - "Human Specialist Review PASS"
-        - "Counterevidence PASS"
-        - "Red Team PASS"
-        - "Independent Judge PASS"
-        - "Reversal Criteria PASS"
-        - "Recovery / Rollback Rehearsal PASS"
-    - source: "Execution Contract §68 Global Gates (L2246-2278)"
-      global_gate_count: 14
-      high_risk_addon_count: 6
-      note: >
-        Same counts as Atlas (both 14+6) but with gate-NAME drift
-        (CROSS-T-11, EC L2270-2275 vs Atlas L4188-4193): "Independent
-        Review" vs Atlas's "Independent Judge PASS"; "Human Specialist" vs
-        "Human Specialist Review PASS"; "Recovery Rehearsal" vs "Recovery /
-        Rollback Rehearsal PASS". EC also prefixes its whole list with
-        "可能包含" ("may include"), softer phrasing than Atlas's/MP's 必須/
-        要求, per CROSS-T-11's own caveat.
-    - source: "Method Atlas §22.3 Method-specific Gate Table"
-      note: >
-        A DIFFERENT, third category ("Method-specific gate 從 Method Atlas
-        取得" — EC §68 L2278) not counted above. Not itself part of the
-        Global/High-risk dispute, but its relationship to gate_id (same
-        namespace? separate registry?) is likewise undecided — see
-        open_questions.OQ-GATE-3.
+gate_catalog:
+  status: RESOLVED_2026-08-30
+  resolved_by: "docs/adr/ADR-011-platform-gate-ownership-and-unification.md"
+  resolves_finding: ["OQ-10", "CROSS-R-5", "CROSS-R-7", "CROSS-T-11"]
+  note: >
+    This is the RECOMMENDED value catalog for `gate_result.gate_id` when the
+    gate is a Global or High-risk gate. It is deliberately a documented list
+    (for tooling/lint to validate against), not a schema-level `enum` on
+    `gate_id` itself — see the block comment above. Master Plan §158 is
+    ADR-011's designated SSOT for this content once the mother document is
+    actually amended via the ADR-006 proposal process; until then, this
+    catalog is this project's own machine-readable record of ADR-011's
+    Recommendation, same status as every other ADR-001~010-derived schema
+    content in this project (ADR ACCEPTED ≠ mother document edited).
+  global:
+    description: "14 items, all mandatory for every deliverable regardless of risk tier."
+    items:
+      - { id: functional, display_name: "Functional PASS" }
+      - { id: evidence, display_name: "Evidence PASS" }
+      - { id: reasoning, display_name: "Reasoning PASS" }
+      - { id: security, display_name: "Security PASS" }
+      - { id: privacy, display_name: "Privacy PASS" }
+      - { id: data, display_name: "Data PASS" }
+      - { id: jurisdiction, display_name: "Jurisdiction PASS" }
+      - { id: localization, display_name: "Localization PASS" }
+      - { id: accessibility, display_name: "Accessibility PASS" }
+      - { id: observability, display_name: "Observability PASS" }
+      - { id: capacity, display_name: "Capacity PASS" }
+      - { id: rollback, display_name: "Rollback PASS" }
+      - { id: documentation, display_name: "Documentation PASS" }
+      - { id: golden_test, display_name: "Golden Test PASS" }
+  high_risk:
+    description: >
+      6 additional items, mandatory on top of `global` when
+      execution/risk-tier.schema.yaml's mandatory_gate_injection_trigger
+      fires (risk_tier IN [R3, R4]).
+    items:
+      - id: human_specialist_review
+        display_name: "Human Specialist Review PASS"
+        deprecated_aliases: ["Human Specialist"]
+      - { id: counterevidence, display_name: "Counterevidence PASS" }
+      - { id: red_team, display_name: "Red Team PASS" }
+      - id: independent_judge
+        display_name: "Independent Judge PASS"
+        deprecated_aliases: ["Independent Review"]
+      - { id: reversal_criteria, display_name: "Reversal Criteria PASS" }
+      - id: recovery_rollback_rehearsal
+        display_name: "Recovery / Rollback Rehearsal PASS"
+        deprecated_aliases: ["Recovery Rehearsal"]
+  method_specific:
+    description: >
+      NOT enumerated here — Atlas §22.3's own open-ended, per-method
+      namespace, unaffected by ADR-011 (Atlas's own Scoped Authority grant
+      already covers Method-specific Gate). See open_questions.OQ-GATE-3 for
+      the still-unresolved question of whether it shares this same flat
+      gate_id string space or needs a namespaced form.
+    owner: "Method Atlas §22.3, per-method contract"
 
 open_questions:
   - id: "OQ-GATE-1"
     question: >
-      Once Round 2 ADR resolves OQ-10 (the gate list and its naming drift),
-      should `gate_result.gate_id` become a strict inline `enum:` in this
-      file, or should it instead stay `type: string` validated against a
-      separately-maintained registry (e.g. a $ref into
-      policies/ai-execution/mandatory-gates.yaml — built Wave 6,
-      2026-08-29, as a skeleton whose own `gate_ref` field carries this
-      identical TBD_PENDING_ROUND2_ADR marker and asks this same question
-      from its side, as that file's own OQ-MGATE-1; its sibling
-      policies/ai-execution/release-policy.yaml#/release_gate_requirement
-      composes with mandatory-gates.yaml's rule set for the same deferred
-      reason, per that file's OQ-RELPOL-2)? This is a schema-design choice,
-      not yet made, independent of what the list's CONTENTS turn out to
-      be.
-    owner: "Phase 3 continuation, after Round 2 ADR lands"
-    blocks: "nothing today — gate_id stays a bare string either way until the ADR lands"
+      RESOLVED 2026-08-30 by ADR-011 (implicitly, via this file's own
+      compilation choice): `gate_result.gate_id` stays `type: string`
+      validated against `gate_catalog` above as a documented list, not a
+      hard schema `enum` — because Atlas §22.3's Method-specific namespace
+      (OQ-GATE-3 below) is open-ended and a closed enum would reject every
+      future Method-specific gate_id. `policies/ai-execution/
+      mandatory-gates.yaml`'s own `gate_ref` field ($ref's this file's
+      `gate_id` node) follows the identical choice — see that file's
+      OQ-MGATE-1, resolved the same way.
+    owner: "closed"
+    blocks: "nothing — resolved"
   - id: "OQ-GATE-2"
     question: >
       Should `gate_result.evidence[]` eventually adopt a typed shape (e.g.
@@ -294,18 +321,20 @@ verification:
     §22.1/§22.2 (L4164-4194) and §14.2 (L3588-3612). Read Master Plan §158
     (L5903-5926). Read .ai/research/phase-0/open-questions.yaml OQ-10
     (L68-72) and .ai/research/phase-0/verified-findings.yaml CROSS-R-5
-    (L98-116), CROSS-R-7 (L398-421), CROSS-T-11 (L495-517) verbatim. Grepped
-    docs/adr/ for any ruling on the gate list (none found across
-    ADR-001~010). Read this project's own existing precedent in
-    execution/manifest.schema.yaml (L303-315) and cognitive/recipe.schema.yaml
-    (L149-165, L333-342) confirming gate_id/gate_ref were already left
-    untyped elsewhere, and that both already name this file as the future
-    resolution point.
+    (L98-116), CROSS-R-7 (L398-421), CROSS-T-11 (L495-517) verbatim. Read
+    docs/adr/ADR-011-platform-gate-ownership-and-unification.md (2026-08-30)
+    in full — the resolution this update applies. Read this project's own
+    existing precedent in execution/manifest.schema.yaml (L303-315) and
+    cognitive/recipe.schema.yaml (L149-165, L333-342) confirming gate_id/
+    gate_ref stay untyped strings elsewhere (unaffected by this resolution).
   note: >
-    No mother document was modified. `gate_id` deliberately carries no enum
-    and no guessed list — MRSP-1/OQ-10 remains open pending Round 2 ADR;
-    this file does not pick a side among the MP (11+1) / Atlas (14+6) / EC
-    (14+6, name-drifted) candidates, nor does it merge them. This file's
-    normative content is limited to the `gate_result` RECORD SHAPE (gate_id,
-    status, evidence, validator, timestamp, rationale-if-NOT_APPLICABLE),
-    which is a direct, low-risk transcription of EC §69.
+    No mother document was modified — ADR-011's Recommendation (MP §158
+    content amendment, Atlas §22.1/22.2 and EC §68 reduction to pointers)
+    remains gated behind the separate ADR-006 `.ai/proposals/` flow. This
+    file's own edit (gate_catalog, resolved gate_id description) is a
+    machine-readable-spec compilation change, the same Low-risk class every
+    other ADR-001~010-derived schema file in this project already applies.
+    `gate_id` stays `type: string` (not a hard enum) for the reason recorded
+    in `gate_catalog`'s own block comment — Atlas §22.3's Method-specific
+    namespace remains open-ended and unresolved (OQ-GATE-3), so a closed
+    enum here would be a regression, not a completion.

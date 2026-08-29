@@ -99,7 +99,7 @@ PROJECT_ROOT/                                  ← D:\Work\agency-os\docs\AI_LEG
 | `authority.schema.yaml` | EC §92 既有承諾，A0-A4 Autonomy/Authority Levels | YAML (JSON Schema) | governance/epistemic-label（locked 欄位需對照誰能改） | P1-GAP-SEC-6（人類角色↔A0-A4 對應，部分） | **BUILT（骨架，2026-08-29）**——A0-A4 本體為 EC §9 真實逐字轉譯；`role_to_authority_mapping` 誠實留空並標 `SKELETON_ONLY`，未捏造範例角色 |
 | `change-plan.schema.yaml` | EC §92 既有承諾 | YAML (JSON Schema) | risk-tier | — | **BUILT（2026-08-29）** |
 | `rollback.schema.yaml` | EC §92 既有承諾 | YAML (JSON Schema) | — | — | **BUILT（2026-08-29）**——從 EC §20 + 本專案 10 份 ADR 自己真實的 Migration/Rollback 段落逆向工程，非抽象發明 |
-| `gate.schema.yaml` | EC §92 既有承諾，`gate_result.gate_id` 需要一份穩定 gate 清單 | YAML (JSON Schema) | risk-tier（R3∪R4 觸發規則） | 部分依 ADR-004a 可用；**Global/High-risk Gate 清單本身（14+6 vs 11+1）尚未裁決** | **BUILT（骨架，2026-08-29）**——`gate_result` 結構本體已建（EC §69），`gate_id` 明確標 `TBD_PENDING_ROUND2_ADR`，未從三方爭議清單任一方猜測 |
+| `gate.schema.yaml` | EC §92 既有承諾，`gate_result.gate_id` 需要一份穩定 gate 清單 | YAML (JSON Schema) | risk-tier（R3∪R4 觸發規則） | 部分依 ADR-004a 可用；Global/High-risk Gate 清單本身（14+6 vs 11+1）**已由 ADR-011（2026-08-30）裁決** | **BUILT（2026-08-29 骨架 → 2026-08-30 完整）**——`gate_result` 結構本體已建（EC §69）；`gate_id` 由 `TBD_PENDING_ROUND2_ADR` 升級為 `gate_catalog`（20 項：14 Global + 6 High-risk，Master Plan 為唯一內容 owner，3 個 CROSS-T-11 命名採 Atlas 版本）；Method-specific（Atlas §22.3）維持開放命名空間不變 |
 | `exception.schema.yaml` | EC §92 既有承諾 | YAML (JSON Schema) | — | — | **BUILT（2026-08-29）**——EC §24 12 欄位範本 + Atlas §29 rule 12 交叉核對 |
 | `result.schema.yaml` | EC §92 既有承諾 | YAML (JSON Schema) | cognitive/typed-method-result.schema.yaml | CROSS-R-3（部分：result.schema.yaml 不等於 TypedMethodResult，見 2.3） | **BUILT（2026-08-29）**——`status` 為真實 $ref 指向 EC §70 vocabulary，非重新宣告 |
 | `handoff.schema.yaml` | EC §92 既有承諾 | YAML (JSON Schema) | authority.schema.yaml | — | **BUILT（2026-08-29）**——EC §71 30 項 MUST 清單 + §72 8 檔 RECOMMENDED 佈局逐字依據 |
@@ -141,8 +141,8 @@ PROJECT_ROOT/                                  ← D:\Work\agency-os\docs\AI_LEG
 |---|---|---|---|---|---|
 | `domain/tenant.schema.yaml` | Domain Model 第 23 物件；`tenant_id/legal_name/status/home_jurisdiction/data_residency_region/encryption_root_key_ref/created_at/deleted_at` | YAML (JSON Schema) | jurisdiction/context.schema.yaml, security/key-vault-lifecycle.schema.yaml | P1-CONFLICT-2, P1-DUP-3, P1-GAP-SEC-7（部分）（ADR-003a） | **BUILT（2026-08-29）** |
 | `artifact/cas-path.schema.yaml` | Tenant-scoped CAS 路徑文法 `/objects/<tenant_id>/sha256/aa/bb/<hash>` + narrow 全域例外池的白名單機制 | YAML (JSON Schema) | domain/tenant.schema.yaml | P1-CONFLICT-2（ADR-003b Option A + C） | **BUILT（2026-08-29）** |
-| `execution/blast-radius-chain.schema.yaml` | Method Atlas §21 七層鏈（含 Branch）定為 canonical，`Tenant→Workspace→Project→Workflow→Branch→Execution→Capability` | YAML (JSON Schema) | domain/tenant.schema.yaml | P1-DUP-3（ADR-003c） | **BUILT（2026-08-29）**——Branch 僅最小定義，完整 state machine 仍 BLOCKED（見下） |
-| `workflow/branch.schema.yaml` **（新增）** | Branch 的完整狀態機（誰能 Merge、衝突處理） | YAML (JSON Schema) | blast-radius-chain.schema.yaml | ADR-003 Consequences 段明列的 follow-up (iii) | **BLOCKED**（ADR-003 明文標記為 out-of-scope follow-up，非本輪 ADR 已裁決範圍；Phase 3 應先只實作最小定義，完整 state machine 排入 Round 2） |
+| `execution/blast-radius-chain.schema.yaml` | Method Atlas §21 七層鏈（含 Branch）定為 canonical，`Tenant→Workspace→Project→Workflow→Branch→Execution→Capability` | YAML (JSON Schema) | domain/tenant.schema.yaml | P1-DUP-3（ADR-003c） | **BUILT（2026-08-29）**——Branch 僅最小定義；完整 state machine 已於 2026-08-30 由 ADR-012 補建於 `workflow/branch.schema.yaml`（見下），本檔自身不重複收錄 |
+| `workflow/branch.schema.yaml` **（新增）** | Branch 的完整狀態機（誰能 Merge、衝突處理） | YAML (JSON Schema) | blast-radius-chain.schema.yaml, authority.schema.yaml, risk-tier.schema.yaml, mandatory-gates.yaml, gate.schema.yaml, rollback.schema.yaml | ADR-003 Consequences 段明列的 follow-up (iii) | **BUILT（2026-08-30，`docs/adr/ADR-012-branch-merge-state-machine.md` 裁決）**——6 狀態機（ACTIVE/MERGE_REQUESTED/CONFLICT/MERGED/ABANDONED/ROLLED_BACK）；merge 授權門檻 >= A2；R3/R4 額外要求 `mandatory-gates.yaml` 兩條規則（引用 ADR-011 `gate_catalog`）皆 PASS；衝突一律由 `merge_base` 過期偵測，只能人工裁決（`resolution_rule_applied`，沿用 conflict-of-laws-output.schema.yaml 既有模式）。全系統零母文件先例，完全由本項目已裁決的 5 個既有機制組合而成，非憑空發明 |
 | `security/personal-data-envelope.schema.yaml` | 個資欄位加密信封格式：`cipher_alg/kek_ref/dek_wrapped/iv/ciphertext/classification_tag` | YAML (JSON Schema) | domain/tenant.schema.yaml（`encryption_root_key_ref`） | P1-CONFLICT-1（ADR-002 Consequences 項 2） | **BUILT（2026-08-29）** |
 | `security/key-vault-lifecycle.schema.yaml` | Per-subject DEK 生命週期：簽發/銷毀/Key Destruction Record | YAML (JSON Schema) | personal-data-envelope.schema.yaml | P1-CONFLICT-1（ADR-002 Consequences 項 1） | **BUILT（2026-08-29）**——已含 Codex 覆審新增的 restore-replay 強制關卡 + 備份副本銷毀範圍檢查 + ADR-007 `HMAC_SIGNING_KEY` 用途 |
 | `security/log-redaction-token.schema.yaml` **（新增，ADR-007 追加，原表遺漏）** | v1 log 去識別化 token 格式：`token_alg/hmac_key_ref/classification_tag/tenant_scope` + `token` 本體，依附 key-vault-lifecycle 的 `HMAC_SIGNING_KEY` | YAML (JSON Schema) | security/key-vault-lifecycle.schema.yaml | P1-CONFLICT-3（ADR-007 規格缺口項 2） | **BUILT（2026-08-29）**——本列為本次補登，ADR-007 早於本表最後一次全面更新，此為文件同步缺口的訂正 |
@@ -180,12 +180,12 @@ PROJECT_ROOT/                                  ← D:\Work\agency-os\docs\AI_LEG
 
 | 目錄 | 涵蓋內容 | 狀態摘要 |
 |---|---|---|
-| `ai-execution/` | EC §91 既有 8 檔清單直接轉譯（authority/risk-tiers/mandatory-gates/tool-permissions/forbidden-actions/network-egress/exception-policy/release-policy），`mandatory-gates.yaml` 需套用 ADR-004a 的 R3∪R4 擴大規則 | **BUILT（2026-08-29，8/8）**——`authority.yaml`/`risk-tiers.yaml`/`tool-permissions.yaml`/`forbidden-actions.yaml`/`exception-policy.yaml` 為 `status: ACTIVE`；`mandatory-gates.yaml`/`network-egress.yaml`/`release-policy.yaml` 為 `status: PROVISIONAL`（各自 blocked 內容見各檔 `blocked_scope`/`allowlist_registry`/`release_gate_requirement.scope`，非整檔阻塞）。Critic 覆審（Wave 6 批次）：0 Critical、6 Major（已修正）、多項 Minor/Suggestion（已修正或記錄於各檔 `open_questions`）|
+| `ai-execution/` | EC §91 既有 8 檔清單直接轉譯（authority/risk-tiers/mandatory-gates/tool-permissions/forbidden-actions/network-egress/exception-policy/release-policy），`mandatory-gates.yaml` 需套用 ADR-004a 的 R3∪R4 擴大規則 | **BUILT（2026-08-29，8/8 → 2026-08-30 三檔升級）**——`authority.yaml`/`risk-tiers.yaml`/`tool-permissions.yaml`/`forbidden-actions.yaml`/`exception-policy.yaml`/`network-egress.yaml` 為 `status: ACTIVE`；`mandatory-gates.yaml`/`release-policy.yaml` 由 `PROVISIONAL` 升級為 **`ACTIVE`（2026-08-30，ADR-011 裁決 OQ-10 後 gate_ref/scope 不再阻塞）**：`mandatory-gates.yaml` 補 `MGATE-R3-R4-RECOVERY-ROLLBACK` 第 2 條規則（`action` enum 新增 `REQUIRE_RECOVERY_REHEARSAL`）；`release-policy.yaml` 的 `release_gate_requirement.scope` 改為 `{always_required: gate_catalog.global, conditionally_required: mandatory-gates.yaml 規則}` 結構化物件。Critic 覆審（Wave 6 批次）：0 Critical、6 Major（已修正）、多項 Minor/Suggestion（已修正或記錄於各檔 `open_questions`）|
 | `security/` | Zero Trust 協定選型（IdP/OIDC/SPIFFE/OPA）、Supply Chain 標準版本（SBOM 格式/簽章機制/SLSA 等級） | SKELETON_ONLY（P1-GAP-SEC-1, P1-GAP-SEC-2 全文空白，需操作者選型，非文件收斂） |
 | `privacy/` | crypto-shred 落地為可執行政策（依附 ADR-002）；PII redaction 現行時效 vs pseudonymization「未來能力」矛盾 | **BUILT（2026-08-29，`pii-redaction.policy.yaml`）**——ADR-007 定案內容（Deterministic Keyed-HMAC Tokenization + MP §149 v1_baseline/future_advanced 分級）已寫入 policy 檔；MP §149/EC §101-102 母文件本身文字仍待 ADR-006 `.ai/proposals/` 流程套用（僅操作者可推進 APPROVED），本 policy 檔為過渡期權威來源 |
 | `jurisdiction/`（此目錄本身，即 `policies/jurisdiction/`，尚未建立） | Legal Source Registry 更新 SLA（週期天數） | SKELETON_ONLY / BLOCKED（P1-GAP-LEGAL-1 需操作者訂週期數字）。Conflict-of-Laws Engine 歸屬已於 §2.6 `specs/jurisdiction/conflict-of-laws-output.schema.yaml` 解決（2026-08-29），非本目錄範圍 |
 | `provider/` | Model Registry 元件、AI Gateway Fallback circuit breaker 規則 | **BUILT（2026-08-29）**——`ai-gateway-fallback.policy.yaml`（P1-GAP-INFRA-5）+ `model-registry.policy.yaml`（P1-GAP-INFRA-6），逐字轉譯 `DEVOPS_SRE_PLAN.md`（Status: PROPOSED）§4/§5 數值門檻，母文件本身尚未經 ADR 批准 |
-| `release/` | Global/High-risk Gate 統一清單 | **BLOCKED_PENDING_ROUND2_ADR**（同 gate.schema.yaml） |
+| `release/` | Global/High-risk Gate 統一清單 | **內容裁決已由 ADR-011（2026-08-30）解除**（見 `specs/execution/gate.schema.yaml#/gate_catalog`）；此目錄本身（`policies/release/`）目前實際內容已建在 `policies/ai-execution/release-policy.yaml`（EC §91 指定路徑），是否需要另建 `policies/release/` 屬既有規劃遺留的目錄命名疑問，非本次 ADR-011 範圍，暫不新建空目錄 |
 
 ### 2.10 `/specs/analytics/`（低優先，Wave 8+）
 
@@ -214,7 +214,7 @@ Wave 2 ── ✅ 核心完成（2026-08-29）           Wave 3 ── ✅ 核�
   specs/domain/personal-data-redacted-        specs/cognitive/{rigor-level ✅,problem-type
     event.schema.yaml ✅                          ── 延後（依賴 method-resolution 循環）}
   specs/execution/data-deletion.schema.yaml ✅ specs/execution/method-resolution.schema.yaml ── 延後
-  workflow/branch.schema.yaml ── BLOCKED      methods/registry/{method-inventory,
+  workflow/branch.schema.yaml ✅（ADR-012）    methods/registry/{method-inventory,
   domain/repository-contract.schema.yaml        contract-backlog}.yaml ✅
     ✅ BUILT（2026-08-29，本輪補齊——原判定 SKELETON_ONLY，
     發現 DATA_ARCHITECTURE_PLAN.md 已有完整設計，直接轉錄）
@@ -235,7 +235,7 @@ Wave 5 ── ✅ 核心完成（2026-08-29）
   specs/execution/{task,current-state,authority,change-plan,rollback,
     exception,result,handoff,method-resolution,deprecation-pipeline}
     .schema.yaml ✅
-  specs/execution/gate.schema.yaml ✅（骨架，gate_id 明確標 TBD_PENDING_ROUND2_ADR）
+  specs/execution/gate.schema.yaml ✅（2026-08-29 骨架 → 2026-08-30 完整，gate_id 由 TBD 升級為 gate_catalog，見 ADR-011）
   specs/execution/document-registry.schema.yaml ── 延後（依賴尚未建立的
     Architecture-Constitution-v1.md 這份新母文件，需先走 ADR-006 proposals 流程）
   specs/cognitive/{problem-type,method-execution-request,
@@ -285,7 +285,7 @@ Wave 8 ── ✅ 完成（2026-08-29，55/55 schema + 3/3 recipe instance + 2/2
 
 **為什麼 Wave 1 必須最先**：`risk_tier`、`epistemic_type/authorship_state`、`manifest` 三者被 Wave 2 以後**幾乎每一個** schema 引用（tenant 的 encryption_root_key_ref 稽核要記 epistemic label；每個 typed object 要記 provenance；每個 recipe 步驟要掛 risk gate）。先建這三個等於先建全系統的「型別字母表」，避免後續 40+ 個 schema 檔各自發明一套 risk/provenance 欄位又要重新收斂一次——這正是 Phase 0/1 找到的問題的成因，不能在 Phase 3 重演。
 
-**為什麼 `gate.schema.yaml` / `release-policy.yaml` 卡住不擋全局**：CROSS-R-5/CROSS-R-7/CROSS-T-11（Global/High-risk Gate 清單本身 11 vs 14+6 items、命名漂移）尚無 ADR 裁決。這不影響 Wave 1-4 的建置（它們不依賴 gate 清單內容），只影響 Wave 5 的 `gate.schema.yaml` 與 Wave 6 的 `release-policy.yaml`——可以先建這兩檔的骨架（欄位結構）、`gate_id` enum 留 `TBD_PENDING_ROUND2`，不阻塞其餘 30+ 個檔案的建置。
+**為什麼 `gate.schema.yaml` / `release-policy.yaml` 曾卡住但不擋全局（2026-08-30 起已解除）**：CROSS-R-5/CROSS-R-7/CROSS-T-11（Global/High-risk Gate 清單本身 11 vs 14+6 items、命名漂移）原無 ADR 裁決，這不影響 Wave 1-4 的建置（它們不依賴 gate 清單內容），只影響 Wave 5 的 `gate.schema.yaml` 與 Wave 6 的 `release-policy.yaml`/`mandatory-gates.yaml`——先建這幾檔的骨架（欄位結構）、`gate_id` enum 留 `TBD_PENDING_ROUND2`，不阻塞其餘 30+ 個檔案的建置。**2026-08-30**：`docs/adr/ADR-011-platform-gate-ownership-and-unification.md` 裁決 OQ-10，三檔的 TBD 佔位已升級為實際值（見 `gate.schema.yaml#/gate_catalog`）。
 
 ---
 
@@ -325,10 +325,10 @@ Wave 8 ── ✅ 完成（2026-08-29，55/55 schema + 3/3 recipe instance + 2/2
 
 | # | 問題 | 阻塞範圍 | 建議處理方式 |
 |---|---|---|---|
-| MRSP-1 | Global/High-risk Gate 清單（CROSS-R-5/CROSS-R-7/CROSS-T-11）尚無 ADR 裁決，`gate.schema.yaml` 與 `release-policy.yaml` 無法定案內容 | Wave 5-6 兩個檔案 | 建議操作者將此列為 Round 2 ADR 的第一項；Phase 3 先建骨架，`gate_id` enum 留 placeholder |
+| MRSP-1 | Global/High-risk Gate 清單（CROSS-R-5/CROSS-R-7/CROSS-T-11）尚無 ADR 裁決，`gate.schema.yaml` 與 `release-policy.yaml` 無法定案內容 | Wave 5-6 兩個檔案 | **已解決（2026-08-30）**：`docs/adr/ADR-011-platform-gate-ownership-and-unification.md` 裁決 OQ-10——Master Plan 依其自身＋EC 自身的 Scoped Authority 表定為唯一 owner；內容為三方聯集（14 Global + 6 High-risk）；3 個 CROSS-T-11 命名採 Atlas 版本。`gate.schema.yaml`（`gate_catalog`）、`mandatory-gates.yaml`（新增 `MGATE-R3-R4-RECOVERY-ROLLBACK` 規則）、`release-policy.yaml`（`release_gate_requirement.scope` 結構化）三檔同批次更新，`status` 由 `PROVISIONAL` 升級為 `ACTIVE` |
 | MRSP-2（2026-08-29 訂正：ADR 已定案，此列原文過期） | ~~P1-CONFLICT-3...P1-CONFLICT-4...尚無 ADR~~ → **P1-CONFLICT-3 已由 ADR-007 定案**（Deterministic Keyed-HMAC Tokenization，已建 `policies/privacy/pii-redaction.policy.yaml`）；**P1-CONFLICT-4 已由 ADR-008 定案**（MP §43 加註現況警語，不現在造 stub） | `policies/privacy/` 已建；MP §43 加註文字仍待 ADR-006 `.ai/proposals/` 流程套用到母文件本身（僅操作者可推進 APPROVED） | 兩個 ADR 裁決本身已完成，剩餘工作是母文件文字套用（治理流程步驟，非未決架構問題） |
 | MRSP-3（2026-08-29 訂正：ADR 已定案，此列原文過期） | ~~P1-DUP-2...P1-DUP-5...尚無 ADR~~ → **兩者已由 ADR-009 定案**（三層命名各自維持正本 + 12×6×22 跨層對照表；Localization 正本 = `/platform/trust-fabric/localization/`） | `docs/architecture/` 敘事文件；`REPOSITORY_ARCHITECTURE.md`（`Status: PROPOSED`，ADR-009 的目錄配置依附此文件，該文件本身尚未 ACCEPTED） | ADR 裁決本身已完成；實際生效還多依賴一層——`REPOSITORY_ARCHITECTURE.md` 自己尚未走完 ACCEPTED 流程（ADR_INDEX.md 決策依賴關係第 23 行已註記此依賴） |
-| MRSP-4 | `workflow/branch.schema.yaml`（Branch 完整 state machine）明列為 ADR-003 的 out-of-scope follow-up | `specs/workflow/` 一檔 | Phase 3 只實作 ADR-003 給的最小定義（forked isolated execution lineage），完整 state machine 排入 Round 2 或 Phase 4 |
+| MRSP-4 | `workflow/branch.schema.yaml`（Branch 完整 state machine）明列為 ADR-003 的 out-of-scope follow-up | `specs/workflow/` 一檔 | **已解決（2026-08-30）**：`docs/adr/ADR-012-branch-merge-state-machine.md` 裁決 6 狀態機 + merge 授權（>= A2）+ R3/R4 gate 要求（引用 ADR-011）+ 衝突一律人工裁決；`specs/workflow/branch.schema.yaml` 已建成 `status: ACTIVE`，19 個 fixture case 全過 |
 | MRSP-5（2026-08-29 訂正：已建成，此列原文過期） | ~~`security/tenant-isolation-controls.schema.yaml`...非本輪已裁決範圍~~ → **已由 `DATA_ARCHITECTURE_PLAN.md` §6 裁決並建成**（shared-schema+RLS 預設、共用元件強制 tenant_id 過濾+RLS/fail-closed） | `specs/security/tenant-isolation-controls.schema.yaml` 已建 | 設計層級已完成；正式 ADR 批准仍待後續（見該檔 `OQ-TENANTISO-1`） |
 | MRSP-6 | Tier 1 Method Contract 清單依賴 Phase 5 MVP 切片選擇，但 Phase 5 `Status: NOT_STARTED` | `methods/contracts/` 15-25 個檔案的具體名單 | 見 §4 建議：Phase 3 末期由 Claude/Codex 各自列候選切片常用方法交集，作為顯式待辦而非本計畫產出的清單 |
 | MRSP-7 | 6 份 Round 1 ADR 全部 `Status: PROPOSED`，尚未經 Codex 獨立驗證，建議至少對 ADR-001/002 安排 Codex oracle 覆審 | 本計畫全部依賴 ADR 內容的項目（幾乎所有 Wave） | **已處理（2026-08-29）**：ADR-001/002 已完成 Codex 覆審並修正；9 份 ADR 全數 ACCEPTED（操作者授權）。ADR-003/005/006/009 仍未逐份覆審，風險相對低 |

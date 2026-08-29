@@ -2,23 +2,26 @@ $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "ai-lego://policies/ai-execution/release-policy.yaml"
 title: Release Policy
 version: "1.0.0"
-status: PROVISIONAL
+status: ACTIVE
 
 description: >
   Policy-as-code binding of the release-readiness rules — Execution
   Contract §91 "Policy-as-Code Paths" (L2750-2762) names this file
-  `/policies/ai-execution/release-policy.yaml` at L2761. Named in
-  MACHINE_READABLE_SPEC_PLAN.md §3 Build Order (L288) alongside
-  `gate.schema.yaml` as blocked on the same undecided Global/High-risk Gate
-  list (CROSS-R-5/CROSS-R-7/CROSS-T-11, OQ-10) — "只影響 Wave 5 的
-  gate.schema.yaml 與 Wave 6 的 release-policy.yaml". Per §2.9's own row for
-  `ai-execution/` (L183 — updated 2026-08-29 to "BUILT（2026-08-29，8/8）"
-  after this Wave's 8/8 files landed; this file's original "READY overall"
-  framing below reflects that row's wording at the time this file was
-  written, and is superseded by, not contradicted by, the row's current
-  text), this file's status was READY overall at write time, with the
-  BLOCKED annotation applying specifically to whichever content would need
-  the disputed gate_id list — not to the entire file.
+  `/policies/ai-execution/release-policy.yaml` at L2761. Originally named
+  (2026-08-29) in MACHINE_READABLE_SPEC_PLAN.md §3 Build Order (L288)
+  alongside `gate.schema.yaml` as blocked on the same undecided
+  Global/High-risk Gate list (CROSS-R-5/CROSS-R-7/CROSS-T-11, OQ-10) —
+  "只影響 Wave 5 的 gate.schema.yaml 與 Wave 6 的 release-policy.yaml".
+
+  **RESOLVED 2026-08-30 by `docs/adr/ADR-011-platform-gate-ownership-and-
+  unification.md`**: `release_gate_requirement.scope` now references
+  `gate.schema.yaml#/gate_catalog` directly (both its always-required
+  `global` items and its risk-tier-conditional `high_risk` items via
+  `mandatory-gates.yaml`), closing `OQ-RELPOL-2` below. Per §2.9's own row
+  for `ai-execution/` (L183, "BUILT（2026-08-29，8/8）"), this file's status
+  was READY overall at write time, with the BLOCKED annotation applying
+  specifically to `scope` — not to the entire file; that one field is now
+  resolved too.
 
   What IS grounded, independent of the disputed list, and built here in
   full: EC §143 Pre-release Checklist (11 items, verbatim, L3846-3860) and
@@ -35,30 +38,22 @@ description: >
   Recovery Drill, Rollback or Compensating Plan, Emergency Stop) — all
   ADR-004-decided.
 
-  What is BLOCKED: the STRUCTURAL rule "release requires mandatory gates to
-  PASS" is buildable (it only needs `gate.schema.yaml`'s `gate_result
-  .status` enum, `status-codes.schema.yaml`'s Final Status enum, and this
-  same Wave's sibling `mandatory-gates.yaml`'s rule shape, all three
-  grounded), but WHICH gate_id values that rule ultimately ranges over is
-  not — same TBD_PENDING_ROUND2_ADR deferral as
-  `mandatory-gates.yaml#/grounded_rules/rules[].gate_ref` and
-  `gate.schema.yaml#/gate_result/properties/gate_id`.
+  What was BLOCKED (2026-08-29): the STRUCTURAL rule "release requires
+  mandatory gates to PASS" was buildable (it only needed
+  `gate.schema.yaml`'s `gate_result.status` enum, `status-codes.schema.yaml`'s
+  Final Status enum, and this same Wave's sibling `mandatory-gates.yaml`'s
+  rule shape, all three grounded), but WHICH gate_id values that rule
+  ultimately ranges over was not. RESOLVED 2026-08-30 — see above.
 
-  This file does not pick a side in the disputed gate-list count, does not
-  merge/union the three candidate lists, and does not invent a 4th list.
-  `status: PROVISIONAL` (not `ACTIVE`) is used per this task's explicit
-  instruction. This is a judgment call worth disclosing honestly: sibling
-  file `network-egress.yaml` (built concurrently in this same Wave; see
-  below) establishes the criterion "`PROVISIONAL` when the blocked content
-  is close to the file's ENTIRE practical payload, `ACTIVE` when only one
-  field of an otherwise-complete shape is blocked" — under that criterion
-  this file is a genuine borderline case, since its MAJORITY content
-  (pre_release_checklist, post_release_checklist, release_sequence,
-  risk_tier_release_requirements) is fully grounded and unblocked, and only
-  `release_gate_requirement`'s gate range is blocked. `PROVISIONAL` is used
-  here per explicit task-brief instruction and because it is the more
-  conservative, more visible choice while MRSP-1 remains open — see
-  `compilation_decisions` for the full disclosure.
+  This file does not pick a side in the mother-document prose itself (that
+  is ADR-011's job and the downstream ADR-006 proposal flow's). `status` is
+  upgraded from `PROVISIONAL` to `ACTIVE` (2026-08-30): sibling file
+  `network-egress.yaml`'s own criterion ("`PROVISIONAL` when the blocked
+  content is close to the file's ENTIRE practical payload, `ACTIVE` when
+  only one field of an otherwise-complete shape is blocked") now points to
+  `ACTIVE`, since the one previously-blocked field (`release_gate_
+  requirement.scope`) is resolved — see `compilation_decisions` for the
+  full disclosure trail.
 
   Directory context (discovered mid-task): at the time of writing,
   `policies/ai-execution/` already contains `tool-permissions.yaml`,
@@ -84,12 +79,15 @@ source_of_truth_for:
   - "execution/status-codes.schema.yaml reference_vocabulary/final_status/schema — the PASS/PASS_WITH_APPROVED_RISK/BLOCKED/FAILED/NEEDS_HUMAN_REVIEW/ROLLED_BACK/PARTIAL_SUCCESS enum (EC §70) this file's `release_gate_requirement.required_status` field reuses"
   - "policies/ai-execution/mandatory-gates.yaml mandatory_gate_rules, grounded_rules — the sibling policy this file's release_gate_requirement composes with, built in the same task under the identical blocking condition"
   - ".ai/research/phase-0/policy-inventory.yaml (L603-610) — phase-0's own catalog entry for the Pre-/Post-release Checklists, confirming their existence and item counts independently of this compilation pass, with no recorded cross-reference to the Global/High-risk Gate entries in the same inventory file"
-  - ".ai/research/phase-0/open-questions.yaml OQ-10 (L68-72) — the unresolved ownership question this file's release_gate_requirement gate range defers to"
+  - "docs/adr/ADR-011-platform-gate-ownership-and-unification.md — RESOLVES OQ-10 and the gate_catalog this file's release_gate_requirement.scope now references"
+  - ".ai/research/phase-0/open-questions.yaml OQ-10 (L68-72) — RESOLVED by ADR-011"
 
 decided_by: >
-  No ADR governs the gate_id VALUE SPACE the release_gate_requirement rule
-  ranges over — identical situation to gate.schema.yaml and
-  mandatory-gates.yaml (see their `decided_by`). The §143/§144 checklists
+  `docs/adr/ADR-011-platform-gate-ownership-and-unification.md` (ACCEPTED
+  2026-08-30) now governs the gate_id VALUE SPACE `release_gate_requirement
+  .scope` ranges over — same resolution as gate.schema.yaml and
+  mandatory-gates.yaml (see their `decided_by`). Before 2026-08-30, no ADR
+  governed it. The §143/§144 checklists
   and §146 sequencing carry no ADR either, because none is needed: they are
   direct, low-risk, single-source verbatim transcriptions with no competing
   mother-document version (grepped EC/Atlas/MP for "Pre-release Checklist" /
@@ -299,11 +297,10 @@ risk_tier_release_requirements:
       - "Rollback or Compensating Plan"
 
 # ---------------------------------------------------------------------------
-# Schema body for the one structural, PARTIALLY BLOCKED rule this file
-# defines. Its SHAPE and its ONE populated gate-coverage source
-# (mandatory-gates.yaml's single rule) are grounded; the full gate_id range
-# it should ultimately cover is TBD_PENDING_ROUND2_ADR, same as
-# mandatory-gates.yaml.
+# Schema body for the one structural rule this file defines. RESOLVED
+# 2026-08-30 by ADR-011 — `scope` now names both the always-required
+# gate_catalog.global set and the risk-tier-conditional mandatory-gates.yaml
+# rule set (2 rules as of 2026-08-30), instead of a TBD placeholder.
 # ---------------------------------------------------------------------------
 
 # Root $ref (established pattern in this suite — see risk-tier.schema.yaml,
@@ -355,23 +352,35 @@ release_gate_requirement:
         NOT_APPLICABLE); see compilation_decisions for why the task-level
         vocabulary is used here instead.
     scope:
-      type: string
-      enum: [TBD_PENDING_ROUND2_ADR]
+      type: object
       description: >
-        Whether this rule's coverage extends to ONLY
-        `policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules`
-        (today: 1 rule) or to the FULL disputed Global/High-risk Gate list
-        once Round 2 ADR resolves OQ-10 is itself undecided — recorded
-        here rather than silently assumed to be "whatever
-        mandatory-gates.yaml happens to contain today".
+        RESOLVED 2026-08-30 by ADR-011 (closes `OQ-RELPOL-2`): this rule's
+        coverage is TWO-PART, not a single flat list — `always_required`
+        (every one of `gate_catalog.global`'s 14 items, unconditional on
+        risk_tier, per that catalog's own `description`) plus
+        `conditionally_required` (whatever
+        `mandatory-gates.yaml#/mandatory_gate_rules` currently enumerates —
+        today 2 rules, both R3/R4-triggered). This two-part shape mirrors
+        `gate_catalog`'s own global/high_risk split rather than flattening
+        it into one undifferentiated set.
+      required: [always_required, conditionally_required]
+      properties:
+        always_required:
+          type: string
+          const: "ai-lego://specs/execution/gate.schema.yaml#/gate_catalog/global"
+        conditionally_required:
+          type: string
+          const: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
   constraints:
-    - "This rule's actual gate coverage is bounded by whatever policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules currently enumerates (today: 1 rule) — it is NOT the full Global/High-risk Gate list, which remains TBD_PENDING_ROUND2_ADR."
+    - "This rule's actual gate coverage is the UNION of gate_catalog.global (always, every release) and whatever policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules currently enumerates for this release's risk_tier (today: 2 rules, both R3/R4-triggered) — RESOLVED 2026-08-30 by ADR-011, see `scope` above."
   examples:
     - condition: "NOT (every rule in policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules that applies to this task has reached an acceptable Final Status per required_status below)"
       action: DENY
       gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
       required_status: [PASS, PASS_WITH_APPROVED_RISK]
-      scope: TBD_PENDING_ROUND2_ADR
+      scope:
+        always_required: "ai-lego://specs/execution/gate.schema.yaml#/gate_catalog/global"
+        conditionally_required: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
 
 open_questions:
   - id: "OQ-RELPOL-1"
@@ -393,14 +402,21 @@ open_questions:
       built as their own verbatim, self-contained lists either way
   - id: "OQ-RELPOL-2"
     question: >
-      Once Round 2 ADR resolves OQ-10, should `release_gate_requirement`'s
-      `scope` become the FULL Global Gate list (all gates, every release)
-      or stay scoped to whatever `mandatory-gates.yaml
-      #/mandatory_gate_rules` enumerates (risk-tier-conditional gates
-      only)? This is the direct release-policy analogue of
-      `mandatory-gates.yaml`'s own OQ-MGATE-1.
-    owner: "Phase 3 continuation, after Round 2 ADR lands (same batch as gate.schema.yaml OQ-GATE-1 and mandatory-gates.yaml OQ-MGATE-1)"
-    blocks: "nothing today — release_gate_requirement.scope stays TBD_PENDING_ROUND2_ADR"
+      RESOLVED 2026-08-30 by ADR-011: `release_gate_requirement.scope` is
+      BOTH, not an either/or — `always_required` (gate_catalog.global's 14
+      items, every release, unconditional) `conditionally_required`
+      (mandatory-gates.yaml's risk-tier-triggered rules, today 2). Original
+      question (2026-08-29, preserved): "Once Round 2 ADR resolves OQ-10,
+      should `release_gate_requirement`'s `scope` become the FULL Global
+      Gate list (all gates, every release) or stay scoped to whatever
+      `mandatory-gates.yaml#/mandatory_gate_rules` enumerates
+      (risk-tier-conditional gates only)?" The answer turned out to be
+      "both, as two distinct fields" rather than a single choice between
+      them — `gate_catalog`'s own global/high_risk split (unconditional vs
+      risk-tier-conditional) made the false dichotomy visible once the
+      catalog existed to consult.
+    owner: "closed"
+    blocks: "nothing — resolved"
 
 verification:
   method: >
@@ -426,15 +442,25 @@ verification:
     `release_gate_requirement` with `jsonschema.Draft202012Validator` using
     a custom `ai-lego://` resolver (registry-backed retrieve function
     mapping each `ai-lego://` URI to its on-disk YAML file) — see WORKLOG
-    for the exact command and PASS result.
+    for the exact command and PASS result (2026-08-29).
+
+    **2026-08-30 update**: Read `docs/adr/ADR-011-platform-gate-ownership-
+    and-unification.md` and the same-day updated `gate.schema.yaml`/
+    `mandatory-gates.yaml` in full. Re-validated the updated
+    `release_gate_requirement.examples[0]` (now a structured `scope`
+    object) against the updated `release_gate_requirement` schema with the
+    same `jsonschema.Draft202012Validator` + `ai-lego://` resolver setup —
+    PASS.
   note: >
-    No mother document was modified. `release_gate_requirement.scope` and
-    the `gate_ref` values it transitively depends on (via
-    mandatory-gates.yaml) deliberately carry no enum and no guessed list;
-    MRSP-1/OQ-10 remains open. This file's normative content —
-    pre_release_checklist (11 items), post_release_checklist (10 items),
-    release_sequence (7-stage release-adjacent segment), and
-    risk_tier_release_requirements — is a direct, low-risk transcription of
-    EC §143/§144/§146 and the already-ADR-004-decided
-    risk-tier.schema.yaml. Only release_gate_requirement's `scope` and the
-    number/identity of gates it will eventually range over remain blocked.
+    No mother document was modified. This file's edit is a
+    machine-readable-spec compilation change applying ADR-011's already-
+    ACCEPTED decision. `release_gate_requirement.scope` now names real
+    values (`gate_catalog#/global`, `mandatory-gates.yaml
+    #/mandatory_gate_rules`) instead of a TBD placeholder. This file's
+    normative content — pre_release_checklist (11 items),
+    post_release_checklist (10 items), release_sequence (7-stage
+    release-adjacent segment), risk_tier_release_requirements, and now
+    `release_gate_requirement.scope` — is either a direct, low-risk
+    transcription of EC §143/§144/§146, already-ADR-004-decided
+    risk-tier.schema.yaml content, or (for `scope`) ADR-011-decided
+    content.

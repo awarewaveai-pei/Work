@@ -36,7 +36,7 @@ source_of_truth_for:
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §29 DB Migration Requirements (L1161-1194) -- Backfill's 5 required properties and the assessment checklist, folded into mandatory_elements below"
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §30 Data Integrity Contract (L1198-1221) -- the 6 required data-change definitions and the 'exit code != proof' rule, folded into mandatory_elements/outputs below"
   - "specs/execution/risk-tier.schema.yaml tiers.R3.examples (lists 'DB migration' verbatim) -- grounds this file's risk_tier: R3"
-  - "specs/execution/gate.schema.yaml -- gate_id value space is BLOCKED_PENDING_ROUND2_ADR; this file's gate_ref placeholders inherit that block, not a new one"
+  - "specs/execution/gate.schema.yaml -- gate_id value space WAS BLOCKED_PENDING_ROUND2_ADR at this file's original write time; this file's gate_ref placeholders inherited that block, not a new one; RESOLVED 2026-08-30 by docs/adr/ADR-011-platform-gate-ownership-and-unification.md -- see gate.schema.yaml#/gate_catalog and this file's own updated compilation_decisions/steps[].gate_ref below, which already carry real catalog ids"
   - "specs/cognitive/recipe.schema.yaml -- the schema this file's body (id/version/name/steps/etc.) is validated against"
   - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.8 row for this file (L175)"
 
@@ -75,14 +75,30 @@ compilation_decisions:
       `Traffic Migration / Switch` (the point where risk-tier R3's
       "Human Approval" required_action would bind, per
       specs/execution/risk-tier.schema.yaml tiers.R3.required_actions).
-      All three use `gate_ref: "TBD_PENDING_ROUND2_ADR"` -- a literal
-      string value, not a real gate id, matching gate.schema.yaml's own
-      `x-status: TBD_PENDING_ROUND2_ADR` marker convention.
+      All three originally used `gate_ref: "TBD_PENDING_ROUND2_ADR"` -- a
+      literal string value, not a real gate id, matching gate.schema.yaml's
+      own `x-status: TBD_PENDING_ROUND2_ADR` marker convention (as it stood
+      before 2026-08-30).
     reasoning: >
       Naming exactly these three (not all 15, not just the one the plan row
       mentions by name) keeps the choice traceable to specific EC/risk-tier
       text rather than either under- or over-claiming gate coverage while
       the underlying gate_id list remains genuinely undecided.
+
+      **RESOLVED 2026-08-30** by `docs/adr/ADR-011-platform-gate-ownership-
+      and-unification.md`: all three placeholders now hold real
+      `gate.schema.yaml#/gate_catalog` ids, chosen from each step's own
+      already-documented rationale above (not re-derived): `Backup /
+      Restore Validation` -> `recovery_rollback_rehearsal` (High-risk;
+      validating a backup/restore IS rehearsing recovery/rollback, the
+      exact concept that catalog item names); `Reconciliation` -> `data`
+      (Global; EC §30's "exit code alone is not proof" rule is precisely a
+      Data-correctness verification); `Traffic Migration / Switch` ->
+      `human_specialist_review` (High-risk; this is literally the point
+      named above as where R3's "Human Approval" required_action binds).
+      No new gate concept was invented — each mapping traces to the SAME
+      textual justification this decision already gave per step, only now
+      pointing at a real catalog id instead of a marker string.
   - question: >
       Should this recipe's steps carry `necessity: REQUIRED_BY_RISK`
       (Atlas §14.3's enum, per recipe.schema.yaml) rather than the schema's
@@ -154,7 +170,7 @@ steps:
     type: capability
     ref: backup_restore_validation
     necessity: REQUIRED_BY_RISK
-    gate_ref: "TBD_PENDING_ROUND2_ADR"
+    gate_ref: "recovery_rollback_rehearsal"
   - label: "Expand"
     type: capability
     ref: expand
@@ -179,7 +195,7 @@ steps:
     type: capability
     ref: reconciliation
     necessity: REQUIRED_BY_RISK
-    gate_ref: "TBD_PENDING_ROUND2_ADR"
+    gate_ref: "data"
   - label: "Dual Read Verification"
     type: capability
     ref: dual_read_verification
@@ -195,7 +211,7 @@ steps:
     type: capability
     ref: traffic_migration_switch
     necessity: REQUIRED_BY_RISK
-    gate_ref: "TBD_PENDING_ROUND2_ADR"
+    gate_ref: "human_specialist_review"
   - label: "Observe"
     type: capability
     ref: observe
@@ -226,12 +242,16 @@ open_questions:
     blocks: "nothing in this file's own validity"
   - id: "OQ-DBMIG-2"
     question: >
-      The three `gate_ref: "TBD_PENDING_ROUND2_ADR"` placeholders will need
-      real gate ids once Round 2 ADR resolves OQ-10 (the Global/High-risk
-      Gate list dispute, see specs/execution/gate.schema.yaml). Left open,
-      not decided here.
-    owner: "operator, via Round 2+ ADR"
-    blocks: "nothing structurally — gate_ref stays an untyped string either way"
+      RESOLVED 2026-08-30 by docs/adr/ADR-011-platform-gate-ownership-and-
+      unification.md: the three `gate_ref` placeholders now hold real
+      `gate.schema.yaml#/gate_catalog` ids (`recovery_rollback_rehearsal`,
+      `data`, `human_specialist_review`) — see the updated
+      compilation_decisions entry above for the per-step mapping rationale.
+      Original question (2026-08-29, preserved): "The three `gate_ref:
+      TBD_PENDING_ROUND2_ADR` placeholders will need real gate ids once
+      Round 2 ADR resolves OQ-10."
+    owner: "closed"
+    blocks: "nothing — resolved"
 
 verification:
   method: >

@@ -1,29 +1,56 @@
 schema_id: "ai-lego://policies/ai-execution/mandatory-gates.yaml"
 target_ref: ""
 description: >
-  mandatory-gates.yaml is PROVISIONAL (status field) -- its `gate_ref` value
-  space is TBD_PENDING_ROUND2_ADR (bare string, no enum) and no fake
-  resolved gate_id list is invented anywhere below. Root $refs
-  `#/mandatory_gate_rules`: an open-ended array (minItems: 1 only, no
-  contains/coverage guard -- unlike the closed-set siblings, more rules are
-  expected once Round 2 ADR resolves OQ-10). This fixture validates the
-  parts of `mandatory_gate_rule` that ARE decided: `rule_id` pattern,
-  `action` enum, the locally-owned closed `gate_concept_id` enum
-  ([HUMAN_REVIEW_CLASS] only -- deliberately not an open taxonomy so this
-  file cannot become an unreviewed second gate registry), and `risk_tier_in`
-  items via the $ref'd risk_tier enum.
+  mandatory-gates.yaml is `status: ACTIVE` (upgraded 2026-08-30 from
+  `PROVISIONAL` -- OQ-10 RESOLVED by
+  docs/adr/ADR-011-platform-gate-ownership-and-unification.md). `gate_ref`
+  remains `type: string` (unchanged shape) but now SHOULD hold a real id from
+  `gate.schema.yaml#/gate_catalog` (e.g. "human_specialist_review",
+  "recovery_rollback_rehearsal") rather than the pre-2026-08-30
+  `TBD_PENDING_ROUND2_ADR` placeholder -- both forms remain schema-valid
+  (no enum constrains `gate_ref`'s literal value), so this fixture file
+  tests both the current real values AND keeps one legacy-placeholder case
+  to confirm the schema did not retroactively reject the old marker. Root
+  $refs `#/mandatory_gate_rules`: an open-ended array (minItems: 1 only, no
+  contains/coverage guard -- 2 grounded rules as of 2026-08-30, more may
+  still be added, e.g. a future Red-Team-class rule per OQ-MGATE-3). This
+  fixture validates the parts of `mandatory_gate_rule` that ARE decided:
+  `rule_id` pattern, `action` enum (5 values as of 2026-08-30, with
+  `REQUIRE_RECOVERY_REHEARSAL` added), the locally-owned closed
+  `gate_concept_id` enum ([HUMAN_REVIEW_CLASS] only -- deliberately not an
+  open taxonomy so this file cannot become an unreviewed second gate
+  registry; note `gate_concept` is OPTIONAL and the new
+  MGATE-R3-R4-RECOVERY-ROLLBACK rule does not use it at all, relying on
+  `action` instead), and `risk_tier_in` items via the $ref'd risk_tier enum.
 
 valid:
-  - name: real_grounded_rule
+  - name: real_grounded_rule_human_review
     instance:
       - rule_id: "MGATE-R3-R4-HUMAN-REVIEW"
         condition: "risk_tier IN ['R3', 'R4']"
         action: REQUIRE_HUMAN_REVIEW
         risk_tier_in: [R3, R4]
-        gate_ref: "TBD_PENDING_ROUND2_ADR"
+        gate_ref: "human_specialist_review"
         gate_concept: HUMAN_REVIEW_CLASS
         source: "execution/risk-tier.schema.yaml tiers.R3.required_actions (Human Approval), tiers.R4.required_actions (Explicit Human Authority)."
         mother_doc_text: null
+  - name: real_grounded_rule_recovery_rollback
+    instance:
+      - rule_id: "MGATE-R3-R4-RECOVERY-ROLLBACK"
+        condition: "risk_tier IN ['R3', 'R4']"
+        action: REQUIRE_RECOVERY_REHEARSAL
+        risk_tier_in: [R3, R4]
+        gate_ref: "recovery_rollback_rehearsal"
+        source: "ADR-011 Sub-decision (b); closes OQ-MGATE-2. Added 2026-08-30 -- proves the new REQUIRE_RECOVERY_REHEARSAL action value and a rule with no gate_concept field at all (optional field genuinely omitted, not merely null) both validate."
+        mother_doc_text: null
+  - name: legacy_tbd_placeholder_gate_ref_still_valid
+    instance:
+      - rule_id: "MGATE-TEST-LEGACY-TBD"
+        condition: "risk_tier IN ['R3', 'R4']"
+        action: REQUIRE_HUMAN_REVIEW
+        risk_tier_in: [R3, R4]
+        gate_ref: "TBD_PENDING_ROUND2_ADR"
+        source: "test fixture -- confirms gate_ref's plain string type was never an enum, so the pre-2026-08-30 placeholder literal remains structurally valid even after ADR-011 (it is simply no longer the RECOMMENDED value)."
   - name: minimal_rule_without_optional_fields
     instance:
       - rule_id: "MGATE-TEST-MINIMAL"
@@ -67,13 +94,15 @@ invalid:
         gate_concept: ROLLBACK_CLASS
         source: "test fixture"
     reason: >
-      `gate_concept` $refs `#/definitions/gate_concept_id`, whose enum is
-      deliberately closed to `[HUMAN_REVIEW_CLASS]` only -- OQ-MGATE-2
-      explicitly declined to add a Rollback/Recovery-class rule this Wave
-      (2-of-3 candidate convergence, weaker than the 3-of-3 basis
-      HUMAN_REVIEW_CLASS used). "ROLLBACK_CLASS" would silently promote that
-      declined rule into the schema's accepted vocabulary, exactly the
-      "unreviewed second gate taxonomy" this closed enum exists to prevent.
+      `gate_concept` $refs `#/definitions/gate_concept_id`, whose enum
+      remains closed to `[HUMAN_REVIEW_CLASS]` only even after ADR-011
+      (2026-08-30) resolved OQ-MGATE-2 and added the
+      MGATE-R3-R4-RECOVERY-ROLLBACK rule -- that new rule deliberately does
+      NOT introduce a `ROLLBACK_CLASS` gate_concept value; it is
+      distinguished instead via its own `action: REQUIRE_RECOVERY_
+      REHEARSAL` value, keeping `gate_concept_id` a narrow, additive-only
+      vocabulary rather than growing into a parallel gate taxonomy.
+      "ROLLBACK_CLASS" is still not a member and still fails.
   - name: missing_required_source_field
     instance:
       - rule_id: "MGATE-TEST-NO-SOURCE"

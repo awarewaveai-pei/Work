@@ -23,7 +23,10 @@ description: >
   invent the one thing EC §99 leaves unstated: which actual domains belong
   on the allowlist. That content requires operator/organizational input no
   mother document, ADR, or research artifact supplies — the same class of
-  gap `gate.schema.yaml`'s `gate_id_registry` and `rigor-level.schema.yaml`'s
+  gap `gate.schema.yaml`'s `gate_id_registry` (renamed `gate_catalog` and
+  resolved 2026-08-30 by ADR-011 — cited here for its historical
+  PROVISIONAL-precedent shape, not its current resolved content) and
+  `rigor-level.schema.yaml`'s
   `required_rigor_mapping.deep_intelligence` already established a
   precedent for in this suite (build the skeleton now, mark the blocked
   value space explicitly, do not guess). Because the allowlist is this
@@ -83,7 +86,10 @@ compilation_decisions:
       Every other file in this suite (46 files checked via grep) uses
       top-level `status: ACTIVE`, including files with a genuinely blocked
       sub-field (`gate.schema.yaml`'s `gate_id_registry.status:
-      TBD_PENDING_ROUND2_ADR`, `authority.schema.yaml`'s
+      TBD_PENDING_ROUND2_ADR` at this task's write time — since renamed to
+      `gate_catalog` and resolved 2026-08-30 by ADR-011; cited as a
+      point-in-time precedent, not current status — and
+      `authority.schema.yaml`'s
       `role_to_authority_mapping.status: SKELETON_ONLY`). This task's
       instructions explicitly direct `status: PROVISIONAL` for this file
       specifically. Should this file instead follow the suite-wide
@@ -366,7 +372,9 @@ seed_content:
 
 # ---------------------------------------------------------------------------
 # BLOCKED — the allowlist VALUE SPACE. Recorded for auditability, not
-# adjudicated. Same treatment style as gate.schema.yaml's gate_id_registry.
+# adjudicated. Same treatment style as gate.schema.yaml's gate_id_registry
+# (that section is now named gate_catalog and resolved, since 2026-08-30's
+# ADR-011 — cited here for its original PROVISIONAL-precedent shape).
 # ---------------------------------------------------------------------------
 allowlist_registry:
   status: PROVISIONAL_PENDING_OPERATOR_SIGNOFF
@@ -441,8 +449,10 @@ verification:
     file's `status: PROVISIONAL` and `allowlist_registry` record. Read
     `specs/security/personal-data-envelope.schema.yaml`'s
     `classification_tag` field and `specs/execution/gate.schema.yaml`'s
-    `gate_id_registry` in full for the PROVISIONAL/TBD_PENDING_ROUND2_ADR
-    precedent this file's `allowlist_registry` follows. Read
+    `gate_id_registry` (at this task's write time — since renamed
+    `gate_catalog` and resolved 2026-08-30 by ADR-011) in full for the
+    PROVISIONAL/TBD_PENDING_ROUND2_ADR precedent this file's
+    `allowlist_registry` follows. Read
     `specs/execution/authority.schema.yaml`'s `role_to_authority_mapping
     .entry_shape` in full for the ILLUSTRATIVE_NON_NORMATIVE placeholder
     convention. Validated the schema body and all 4 `seed_content.rules`
