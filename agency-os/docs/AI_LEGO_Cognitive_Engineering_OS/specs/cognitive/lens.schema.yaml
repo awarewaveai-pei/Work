@@ -200,7 +200,8 @@ related_but_out_of_scope:
       high-risk decisions (minimum lens count + dissent tracking). That is a
       property of a Decision object consuming multiple Lens instances, not a
       field on a single `lens` object — out of scope for this file, belongs
-      to decision.schema.yaml (Atlas Appendix A, not yet built in this wave).
+      to decision.schema.yaml (built Wave 4, 2026-08-29, which closed this
+      exact forward reference via its `lenses_applied` field).
 
 compilation_decisions:
   - question: >

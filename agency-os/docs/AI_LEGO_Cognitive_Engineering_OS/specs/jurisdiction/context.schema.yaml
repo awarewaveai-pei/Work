@@ -1,0 +1,452 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/jurisdiction/context.schema.yaml"
+title: Jurisdiction Context
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `JurisdictionContext` — the named
+  input type Atlas §9's Lens Contract example already requires
+  (`stakeholder.regulator`'s `requires: [JurisdictionContext]`, Atlas
+  L1039-1040, formalized in `specs/cognitive/lens.schema.yaml`) and the value
+  Atlas §10's `selection_context.jurisdiction_context` field points at
+  (Atlas L1075, left as an unspecified `...` placeholder in that block). Atlas
+  Appendix A (L4591) lists `/specs/jurisdiction/context.schema.yaml` as a
+  promised spec but, like `lens.schema.yaml` before it, defines no fields for
+  it anywhere in the document. The ONE fully concrete, machine-consumed
+  instance in any of the three mother documents is Master Plan §94
+  "Jurisdiction Resolver" (L3978-4032)'s `jurisdiction_context` yaml block
+  (14 fields) — this file transcribes that block verbatim as its normative
+  core, the same "reverse-engineer from the one real instance" method
+  `lens.schema.yaml` used for its own single-anchor Appendix A promise.
+
+  Execution Contract §41 "Global / Jurisdiction Execution" (L1539-1584)
+  independently corroborates this object's role without redefining its
+  shape: the mandatory MUST pipeline for any task touching market/law/
+  privacy/AI-regulation/children/government/cross-border-data/trade/tax/
+  employment/consumer/regulated-sector work opens with "Resolve Jurisdiction
+  Context" (L1559) as its first step, before "Resolve Applicable Pack"
+  (L1561, `specs/jurisdiction/pack.schema.yaml`'s subject) — i.e. Applicable
+  Pack resolution CONSUMES a resolved JurisdictionContext, not the reverse.
+  This file is that consumed input; the resolution/output side
+  (`jurisdiction_resolution: {applicable, uncertain, human_review_required}`,
+  MP L4024-4032) and the FAIL-CLOSED gate built on top of it (EC L1570-1575;
+  formalized at design-proposal level in
+  `docs/architecture/GLOBAL_JURISDICTION_PLAN.md` §3) are explicitly NOT
+  this file's scope — see `related_but_out_of_scope` below.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §94 Jurisdiction Resolver (L3978-4032) — the 14-field `jurisdiction_context` yaml block this file transcribes"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §93 Jurisdiction Taxonomy (L3935-3956) — the 17-node taxonomy `jurisdiction_context`'s location-array fields resolve against"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §10 Method Selection Engine, `selection_context.jurisdiction_context` (L1075, within the block L1071-1089)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §18.1 Resolver 不能只靠 IP (L4025-4044) — corroborating dimension list, partially drifted from MP §94's field list; see `compilation_decisions`"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 Lens Contract example, `requires: [JurisdictionContext]` (L1039-1040) — real concrete usage instance, formalized in specs/cognitive/lens.schema.yaml"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md Appendix A (L4591, context.schema.yaml listed as a promised spec)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §41 Global / Jurisdiction Execution (L1539-1584) — 'Resolve Jurisdiction Context' as the pipeline's first mandatory step"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.6 row for context.schema.yaml (L159: 'Atlas Appendix A 既有承諾', dependency domain/tenant.schema.yaml's home_jurisdiction, no assigned finding, READY)"
+  - "docs/adr/ADR-003-tenant-model-and-cas-isolation.md Sub-decision (a) (L53, the home_jurisdiction/Project-Pack decoupling text this file's `tenant_home_jurisdiction_ref` field partially narrows) and Consequences follow-up (iv) (L112)"
+
+decided_by: >
+  No ADR governs this file. Verified by grep across docs/adr/ADR-001~010
+  (2026-08-29): "Jurisdiction Context" / "jurisdiction_context" appears in no
+  ADR; ADR-003 mentions "Jurisdiction Pack" only incidentally (L29, L53, L126)
+  while discussing Tenant's `home_jurisdiction` field, and explicitly defers
+  "formal binding of Jurisdiction Pack scope to Tenant vs. Project" as an
+  unsolved Consequences follow-up (L112, item iv) rather than ruling on it.
+  MACHINE_READABLE_SPEC_PLAN.md §2.6's row for this file (L159) lists it
+  READY with no ADR dependency and no assigned finding — described only as
+  "Atlas Appendix A 既有承諾" (an existing Appendix A promise, filename
+  only), the same posture lens.schema.yaml's row carried. Every field below
+  is therefore a direct Phase 3 compilation choice, following the same
+  "no existing ADR, decide directly, disclose reasoning" pattern
+  status-codes.schema.yaml and lens.schema.yaml both used for their own
+  ADR-free sections.
+
+compilation_decisions:
+  - question: >
+      Atlas §18.1 (L4025-4044) lists 14 jurisdiction-dimension names
+      (Legal Entity, User Location, Data Subject Location, Processing
+      Location, Storage Location, AI Provider Location, Payment Entity,
+      Market, Sector, Contract Governing Law, Government Level, Special
+      Territory, Indigenous/Tribal Jurisdiction, Cross-border Transfer) as a
+      prose text-fence, not a yaml instance. Compared field-by-field against
+      MP §94's 14-field concrete yaml block, most correspond loosely
+      (Legal Entity~operator_legal_entity, User Location~user_locations,
+      Market~target_markets, Contract Governing Law~governing_law, Sector~
+      sector), but four Atlas names have NO field anywhere in MP's block —
+      Payment Entity, Government Level (an enumerated level, distinct from
+      MP's boolean `government_customer`), Special Territory, and Indigenous/
+      Tribal Jurisdiction (both closer to MP §93's taxonomy-NODE list,
+      L3935-3956, than to a `jurisdiction_context` FIELD) — and MP has three
+      fields with no Atlas dimension counterpart at all (subprocessor_locations,
+      data_categories, children_involved). Should this schema silently merge
+      the two lists into one superset, the way `epistemic-label.schema.yaml`
+      merged Atlas's space-form values into EC's SNAKE_CASE list?
+    decision: >
+      No. Only MP §94's 14 fields are transcribed as this object's normative
+      properties. The 4 Atlas-only dimensions are NOT added as new fields.
+    reasoning: >
+      `epistemic-label.schema.yaml`'s merge was safe because ADR-004 first
+      VERIFIED the two lists were the same 11 concepts in two spellings (a
+      pure casing drift). Here, no such verification exists — nothing in any
+      mother document confirms Payment Entity/Government Level/Special
+      Territory/Indigenous-Tribal-Jurisdiction are the SAME concepts as any
+      MP §94 field under a different name, versus being four genuinely
+      additional dimensions MP's own concrete example simply omitted. Adding
+      them here would be inventing schema surface beyond the one concrete
+      anchor this file's design method depends on (the same discipline
+      `lens.schema.yaml` applied: single-instance confidence is disclosed,
+      not silently extended). This drift is not tracked in any existing
+      register (DUPLICATION_REGISTER.yaml, GAP_REGISTER.yaml,
+      verified-findings.yaml — grepped 2026-08-29, no hit for "Payment
+      Entity" or a §94-vs-§18.1 field comparison) — flagged fresh in
+      `open_questions` below, the same "Phase 3 can still surface findings
+      Phase 0/1's sweeps missed" posture DUPLICATION_REGISTER.yaml's P1-DUP-6
+      entry already established for this project.
+  - question: >
+      MP §94's own prose notes (L4004-4006): "只有真正必要的屬性才收集"
+      (only truly necessary attributes should be collected), "不得用推測的
+      敏感個資來判斷" (must not use inferred sensitive personal data), and
+      "高風險欄位必須由使用者／組織明確設定" (high-risk fields must be
+      explicitly set by the user/organization) — naming `children_involved`
+      and `government_customer` by implication as the two "高風險欄位"
+      (they are the only boolean flags in the block; every other field is a
+      location/entity array or string). Should any field be `required`?
+    decision: >
+      `children_involved` and `government_customer` are `required` with no
+      `default`. All 12 other fields are optional.
+    reasoning: >
+      Directly mirrors `domain/tenant.schema.yaml`'s `status` field
+      treatment (no implicit default, Decision Driver #6 fail-closed over
+      fail-open) for the same reason: MP's own text singles these two fields
+      out as needing an EXPLICIT human/org decision, not an inferred or
+      silently-defaulted one — the same class of instruction ADR-004
+      recognized as "語意變更" territory when a machine enum's legal-value
+      handling changes silent defaulting behavior. Making them required
+      (present, no default) forces the caller to make that explicit choice
+      every time a JurisdictionContext is authored, rather than letting a
+      producer omit the key and have downstream logic silently assume
+      `false`. The other 12 fields have no comparable "high-risk, must be
+      explicit" language attached to them in MP's own text, and MP's
+      "collect only what's truly necessary" instruction argues directly
+      against making them required.
+  - question: >
+      MACHINE_READABLE_SPEC_PLAN.md §2.6 (L159) lists this file's dependency
+      as `domain/tenant.schema.yaml`（`home_jurisdiction`）— but ADR-003
+      (L53) frames Tenant.home_jurisdiction and a Project-level operational
+      Jurisdiction Pack reference as DELIBERATELY DECOUPLED concepts
+      ("this decouples 'whose legal entity owns this Tenant' from 'which
+      jurisdiction's rules apply to this piece of work'"), and ADR-003's own
+      Consequences (L112, item iv) leaves "formal binding of Jurisdiction
+      Pack scope to Tenant vs. Project" as an explicitly unsolved follow-up.
+      Given that, what should the dependency edge from this file TO
+      tenant.schema.yaml actually consist of?
+    decision: >
+      Add one optional field, `tenant_home_jurisdiction_ref`, typed as a
+      hard `$ref` to `domain/tenant.schema.yaml#/properties/home_jurisdiction`
+      (both files are same-session, sequentially-authored Wave 4 siblings —
+      `domain/tenant.schema.yaml` is already BUILT on disk by the time this
+      file is written, making this a safe backward reference, unlike
+      `tenant.schema.yaml`'s own forward-looking soft reference TO this
+      file's future existence). The field is documented as a FALLBACK/
+      default only, not an override or an authority claim.
+    reasoning: >
+      This satisfies the dependency the plan lists without overstepping
+      ADR-003's explicit decoupling or silently resolving Consequences
+      item (iv)'s binding question — which this file is not positioned to
+      resolve (that requires an operator/Round-2-ADR decision about
+      Tenant-vs-Project Pack precedence generally, not just this one field).
+      Making the field OPTIONAL, one-directional (Context may consult
+      Tenant's home_jurisdiction; Tenant does not enumerate its Contexts),
+      and named `..._ref` rather than `..._override` keeps this file
+      strictly on the "fallback when nothing more specific is resolved"
+      reading ADR-003's own text supports, while leaving the full
+      Tenant-vs-Project precedence question open (see `open_questions`
+      MRSP-context-2, which explicitly cross-references ADR-003's
+      MRSP-tenant-1 open question rather than duplicating or silently
+      closing it).
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+type: object
+required:
+  - children_involved
+  - government_customer
+properties:
+
+  operator_legal_entity:
+    type: string
+    minLength: 1
+    description: >
+      MP L3986. The legal entity operating/responsible for this Project or
+      Processing Activity. Free-form string — no mother document defines a
+      legal-entity-registry schema this could `$ref` into.
+
+  establishment_locations:
+    type: array
+    items: { type: string }
+    description: "MP L3987. Where the operating entity is legally established."
+
+  target_markets:
+    type: array
+    items: { type: string }
+    description: >
+      MP L3988. Corroborated by Atlas §18.1's "Market" dimension (L4037).
+
+  user_locations:
+    type: array
+    items: { type: string }
+    description: >
+      MP L3989. Corroborated by Atlas §18.1's "User Location" dimension
+      (L4031).
+
+  data_subject_locations:
+    type: array
+    items: { type: string }
+    description: >
+      MP L3990. Corroborated by Atlas §18.1's "Data Subject Location"
+      dimension (L4032). Distinct from `user_locations` — a data subject
+      need not be the platform user (e.g. an end-customer whose data a
+      tenant's user processes).
+
+  processing_locations:
+    type: array
+    items: { type: string }
+    description: >
+      MP L3991. Corroborated by Atlas §18.1's "Processing Location"
+      dimension (L4033).
+
+  storage_locations:
+    type: array
+    items: { type: string }
+    description: >
+      MP L3992. Corroborated by Atlas §18.1's "Storage Location" dimension
+      (L4034). Conceptually related to but not the same field as
+      `domain/tenant.schema.yaml`'s `data_residency_region` (that field is a
+      single pinned Tenant-level CAS storage region; this field is a
+      per-Context array of locations data may actually be stored in,
+      collected for legal jurisdiction resolution, not CAS path routing).
+
+  model_provider_locations:
+    type: array
+    items: { type: string }
+    description: >
+      MP L3993. Corroborated by Atlas §18.1's "AI Provider Location"
+      dimension (L4035).
+
+  subprocessor_locations:
+    type: array
+    items: { type: string }
+    description: >
+      MP L3994. No Atlas §18.1 dimension names this concept separately from
+      "AI Provider Location" — kept as its own field since MP's concrete
+      instance lists it as distinct from `model_provider_locations`.
+
+  governing_law:
+    type: string
+    description: >
+      MP L3995. Corroborated by Atlas §18.1's "Contract Governing Law"
+      dimension (L4039).
+
+  sector:
+    type: string
+    description: >
+      MP L3996 (example value: `education`). Corroborated by Atlas §18.1's
+      "Sector" dimension (L4038). Free-form string, not a closed enum — no
+      mother document defines a concrete sector taxonomy (same reasoning
+      `domain/tenant.schema.yaml` used for `data_residency_region`); MP
+      §107's Sector Compliance Packs are the closest structural anchor but
+      remain a separate, not-yet-built concept.
+
+  data_categories:
+    type: array
+    items: { type: string }
+    description: >
+      MP L3997. No Atlas §18.1 dimension names this separately — broader
+      than `data_subject_locations`, describing what kinds of data are
+      involved (not where).
+
+  children_involved:
+    type: boolean
+    description: >
+      MP L3998. One of MP's own implied "高風險欄位" (high-risk fields,
+      L4006) — see `compilation_decisions` for why this field carries no
+      `default` despite being `required`.
+    constraints:
+      - "MUST be explicitly set by the user/organization (MP L4006: \"高風險欄位必須由使用者／組織明確設定\"), never inferred from other fields or defaulted."
+
+  government_customer:
+    type: boolean
+    description: >
+      MP L3999. The other implied "高風險欄位". `docs/architecture/
+      GLOBAL_JURISDICTION_PLAN.md` §7 (a PROPOSED, not-ACCEPTED, Phase 2
+      Round 2 architecture document) sketches re-deriving this exact field
+      as a computed projection off a richer `government_context.
+      government_level` enum rather than an independently-authored boolean.
+      That proposal is NOT adopted here — it has no ADR and this file's task
+      scope does not extend to re-designing MP §94's field per a PROPOSED
+      document — but is noted for traceability since a future
+      `government-identity` schema may eventually supersede this field's
+      authoring model. See `open_questions` MRSP-context-3.
+    constraints:
+      - "MUST be explicitly set by the user/organization (MP L4006), never inferred or defaulted."
+
+  tenant_home_jurisdiction_ref:
+    oneOf:
+      - type: "null"
+      - $ref: "ai-lego://specs/domain/tenant.schema.yaml#/properties/home_jurisdiction"
+    default: null
+    description: >
+      ADDITIVE field, not present in MP §94's concrete example. Fallback-only
+      reference to the owning Tenant's `home_jurisdiction` (a Jurisdiction
+      Pack identifier) for when this Context does not itself resolve a more
+      specific Pack for the current Project/Processing Activity. Per
+      ADR-003 (L53), this is explicitly NOT an override or an authority
+      claim — a Project's own resolved Applicable Pack (once
+      `pack.schema.yaml`'s resolution machinery runs) always takes
+      precedence when present. Null is legal and means "no Tenant-level
+      fallback recorded for this Context" (e.g. during pre-Tenant
+      procurement evaluation, or for a Context that always independently
+      resolves its own Pack). See `compilation_decisions` for why this is a
+      hard `$ref` rather than the soft/name-only reference
+      `tenant.schema.yaml` itself used when pointing the other direction.
+
+examples:
+  - description: >
+      A cross-border EU education project (mirrors MP §94's own sector
+      example), no Tenant-level fallback recorded.
+    value:
+      operator_legal_entity: "Example EdTech GmbH"
+      establishment_locations: ["DE"]
+      target_markets: ["DE", "FR", "NL"]
+      user_locations: ["DE", "FR", "NL", "BE"]
+      data_subject_locations: ["DE", "FR", "NL", "BE"]
+      processing_locations: ["DE"]
+      storage_locations: ["eu-west"]
+      model_provider_locations: ["US"]
+      subprocessor_locations: ["US", "IE"]
+      governing_law: "DE"
+      sector: "education"
+      data_categories: ["student_records", "usage_telemetry"]
+      children_involved: true
+      government_customer: false
+      tenant_home_jurisdiction_ref: null
+  - description: >
+      A government procurement Project inheriting its Tenant's home
+      jurisdiction as a fallback.
+    value:
+      operator_legal_entity: "Example Regulatory Agency"
+      establishment_locations: ["US"]
+      target_markets: ["US"]
+      user_locations: ["US"]
+      data_subject_locations: ["US"]
+      processing_locations: ["US"]
+      storage_locations: ["us-east"]
+      model_provider_locations: ["US"]
+      subprocessor_locations: []
+      governing_law: "US-Federal"
+      sector: "public_administration"
+      data_categories: ["citizen_records"]
+      children_involved: false
+      government_customer: true
+      tenant_home_jurisdiction_ref: "jurisdiction-pack.us-federal.v1"
+
+# ---------------------------------------------------------------------------
+# Governance context this schema does NOT itself resolve
+# ---------------------------------------------------------------------------
+related_but_out_of_scope:
+  - note: >
+      The RESOLUTION output this Context feeds into
+      (`jurisdiction_resolution: {applicable, uncertain,
+      human_review_required}`, MP L4024-4032) and the 4-stage FAIL-CLOSED
+      gate built on top of it (EC §41 L1570-1575; formalized at
+      design-proposal level in GLOBAL_JURISDICTION_PLAN.md §3's unified
+      pipeline, Stage 0) are a separate concept — a resolver's OUTPUT, not
+      this object's own shape — and are not defined by this file. No Wave 4
+      file is currently assigned that output shape in
+      MACHINE_READABLE_SPEC_PLAN.md §2.6.
+  - note: >
+      Atlas §18.1's 4 dimensions with no MP §94 field counterpart (Payment
+      Entity, Government Level, Special Territory, Indigenous/Tribal
+      Jurisdiction) are not added as fields here — see `compilation_decisions`
+      and `open_questions` MRSP-context-1.
+
+open_questions:
+  - id: "MRSP-context-1"
+    new_finding: true
+    question: >
+      Atlas §18.1 (L4025-4044) and MP §94 (L3978-4032) each independently
+      enumerate jurisdiction-relevant dimensions for the same underlying
+      concept, but the two lists are not identical: 4 Atlas-named dimensions
+      (Payment Entity, Government Level, Special Territory, Indigenous/
+      Tribal Jurisdiction) have no corresponding field in MP's concrete
+      instance, and 3 MP fields (subprocessor_locations, data_categories,
+      children_involved) have no named Atlas §18.1 counterpart. Not present
+      in DUPLICATION_REGISTER.yaml, GAP_REGISTER.yaml, or
+      verified-findings.yaml as of this file (grepped 2026-08-29) — a fresh
+      observation surfaced while compiling this schema, in the same
+      "Phase 3 building schema files can still surface findings Phase 0/1's
+      sweeps missed" position DUPLICATION_REGISTER.yaml's P1-DUP-6 entry
+      already documents for this project. Should a future revision of this
+      schema add the 4 Atlas-only dimensions as additive optional fields
+      once/if a real usage instance justifies each one, or are some of them
+      (Special Territory, Indigenous/Tribal Jurisdiction in particular)
+      better modeled as values WITHIN the location arrays already present
+      (i.e. an `establishment_locations` entry can itself be a
+      Special-Territory-typed node per MP §93's 17-node taxonomy) rather
+      than as separate top-level fields?
+    owner: "operator, non-blocking"
+    blocks: "nothing in this schema; the 14-field shape is usable today"
+  - id: "MRSP-context-2"
+    question: >
+      This file's `tenant_home_jurisdiction_ref` field only records a
+      FALLBACK relationship (Context inherits Tenant's home_jurisdiction
+      when it has no more specific Pack of its own). It does not define
+      precedence rules for when a Context's OWN resolved Applicable Pack
+      (once `pack.schema.yaml`'s resolution runs) conflicts with or differs
+      from the Tenant fallback, nor does it fully resolve ADR-003
+      Consequences item (iv) ("formal binding of Jurisdiction Pack scope to
+      Tenant vs. Project", L112) — it only narrows that question by giving
+      it one concrete field to attach to. Full precedence semantics remain
+      the operator/Round-2-ADR's to decide, per `domain/tenant.schema.yaml`'s
+      own `open_questions.MRSP-tenant-1`, which this entry cross-references
+      rather than duplicates.
+    owner: "operator, via Round 2 ADR (see domain/tenant.schema.yaml MRSP-tenant-1)"
+    blocks: "nothing in this schema; the fallback field is usable today with no precedence guarantee implied"
+  - id: "MRSP-context-3"
+    question: >
+      Should `government_customer` eventually be re-derived as a computed
+      projection off a richer government-identity/government-level concept,
+      per GLOBAL_JURISDICTION_PLAN.md §7's PROPOSED (not ACCEPTED) sketch,
+      rather than remain an independently-authored boolean? That document
+      has no ADR backing it and this file's task scope does not extend to
+      adopting a PROPOSED design — left open for whichever future session
+      formalizes that document's §4/§7 government-identity design, mirroring
+      how this file already declined to adopt its own read of that document
+      for MP §94's other fields.
+    owner: "operator, or whichever future session builds a government-identity schema"
+    blocks: "nothing in this schema"
+
+verification:
+  method: >
+    Read against MP §93 (L3935-3956) and §94 (L3978-4032) full text, Atlas
+    §9 (L985-1047), §10 (L1066-1089), §18.1 (L4022-4044), Appendix A
+    (L4574-4604), EC §41 (L1539-1584), ADR-003 full text (grepped for
+    "Jurisdiction" — 3 incidental hits at L29/L53/L126, none governing this
+    file's fields), `domain/tenant.schema.yaml` full text (for the
+    `home_jurisdiction` field this file soft/hard-references), and
+    `specs/cognitive/lens.schema.yaml` full text (for the
+    `requires: [JurisdictionContext]` real usage instance). Grep-confirmed
+    (2026-08-29) across docs/adr/ADR-001~010: no ADR names "Jurisdiction
+    Context" or rules on this object's field shape.
+  note: >
+    No mother document, ADR, or `docs/architecture/GLOBAL_JURISDICTION_PLAN.md`
+    was modified to produce this file. The 14-field core is a verbatim
+    transcription of MP §94's one concrete yaml instance; the one additive
+    field (`tenant_home_jurisdiction_ref`) and the required/optional split
+    are Phase 3 compilation decisions recorded above, not new mother-document
+    claims. The Atlas §18.1-vs-MP §94 dimension drift was checked
+    name-by-name against both source blocks in this session, not asserted
+    from memory or from either document's own summary of the other.

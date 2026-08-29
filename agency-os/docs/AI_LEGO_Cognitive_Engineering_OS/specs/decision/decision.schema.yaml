@@ -1,0 +1,637 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/decision/decision.schema.yaml"
+title: Decision
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `Decision` — promised by filename
+  only in Atlas Appendix A (L4588: `/specs/decision/decision.schema.yaml`),
+  with zero shape specified there (verified: the surrounding Appendix A text,
+  L4574-4590, is a bare file-tree list with no accompanying field
+  description for any entry). This file grounds the shape in real
+  mother-document usage rather than inventing one from the filename alone.
+
+  Primary grounding — Atlas §16.2 "Decision Object" (L3780-3817) — is the
+  ONLY place in either mother document that sketches Decision as a concrete,
+  machine-facing YAML structure (19 keys: id/version/question/options/
+  criteria/hard_constraints/evidence_snapshot/assumptions/unknowns/analyses/
+  simulations/stakeholder_positions/minority_opinions/recommendation/
+  confidence/human_judgment/reversal_conditions/monitoring_plan/outcome).
+  `.ai/research/phase-0/architecture-inventory.yaml` (L831-835) and
+  `terminology-map.yaml` (L2555-2557) both independently index this as THE
+  "Decision Object" definition, machine_id `DEC-*`.
+
+  Secondary grounding — Atlas §14.1 free-LEGO-assembly legal chains name
+  Decision as the terminal typed object reached after MCDA: `KnowledgeSet ->
+  SWOT -> SWOTAnalysis -> TOWS -> StrategyOptions -> MCDA -> DecisionCandidate
+  -> HumanDecision` (L3568-3577) and, under Mandatory Gate Injection at
+  `risk_tier: critical`, `... -> MCDA -> Human Specialist Review -> Decision
+  -> Reversal Criteria` (L3602-3612). Two name variants appear
+  (`HumanDecision` at L3576, `Decision` at L3610) for what is the same
+  chain-terminal concept — a naming drift, not a shape conflict; this file
+  keeps Atlas Appendix A's own filename-implied canonical name `Decision`
+  and does not separately model `DecisionCandidate` (the pre-human-judgment
+  intermediate the chain shows one step earlier) as its own type, since
+  Atlas gives it no distinct field shape of its own — it is represented here
+  as a `Decision` record whose `human_judgment` field is not yet populated
+  (see `human_judgment` below).
+
+  A NEW, previously-unflagged partial duplicate found during this session's
+  own reading (not one of Wave 4's assigned CROSS-T findings for this file —
+  MACHINE_READABLE_SPEC_PLAN.md §2.4 L135 lists no Finding for
+  `decision.schema.yaml`, unlike its `reversal.schema.yaml` sibling row's
+  CROSS-T-12; same class of gap as `status-codes.schema.yaml`'s
+  OQ-STATUS-3): Master Plan §53 "Decision Intelligence" (L2433-2448)
+  independently sketches its OWN "Decision Object" bullet-tree — Options /
+  Criteria / Evidence / Assumptions / Risks / Predictions / Simulations /
+  Human Judgment / Outcome (9 items) — with no cross-reference to Atlas
+  §16.2 in either direction, and neither `verified-findings.yaml`,
+  `DUPLICATION_REGISTER.yaml`, nor `terminology-map.yaml` cross-references
+  MP §53 against Atlas §16.2 (checked by grep in this session: MP §53 /
+  "Decision Object" together return no hits outside MP itself). Checked
+  field-by-field, not assumed: 7 of MP's 9 items map directly onto an Atlas
+  §16.2 field of matching name or clear synonym (Options->options,
+  Criteria->criteria, Evidence->evidence_snapshot, Assumptions->assumptions,
+  Simulations->simulations, Human Judgment->human_judgment,
+  Outcome->outcome). Two do NOT: `Risks` and `Predictions` name no
+  counterpart anywhere in Atlas §16.2's fuller 19-key sketch. Per this
+  suite's own "union, don't silently drop" precedent
+  (`status-codes.schema.yaml`'s trigger-condition unions,
+  `evidence/assumption.schema.yaml`'s row rationale in
+  MACHINE_READABLE_SPEC_PLAN.md §2.4 L134), this schema adds `risks` and
+  `predictions` as additive optional fields rather than treating MP §53 as
+  fully subsumed by Atlas §16.2's list. Flagged as its own open question
+  below for whether it should be escalated to a tracked CROSS-T finding, not
+  silently folded in without a trace.
+
+  `provenance` (required) is this file's compliance with
+  `governance/epistemic-label.schema.yaml`'s own stated scope ("every
+  content/claim object in the system must carry" a provenance_record) and
+  its `DECISION` epistemic_type / `LOCKED_DECISION` lock value — both of
+  which exist in that file specifically because Master Plan's original §83
+  vocabulary had "no DECISION concept to lock in the first place"
+  (epistemic-label.schema.yaml L86-87). A `Decision` record IS the concrete
+  object that `epistemic_type: DECISION` / `locked: LOCKED_DECISION`
+  describe; carrying `provenance` here is what makes that lock legally
+  checkable (`locked == LOCKED_DECISION` is legal only when
+  `epistemic_type == DECISION`, epistemic-label.schema.yaml L93) rather than
+  a rule with no object to apply it to.
+
+  `reversal_conditions` (optional, array) embeds this suite's sibling file
+  `decision/reversal.schema.yaml`, resolving CROSS-T-12 (see that file for
+  the full duplicate-definition analysis). Named and pluralized to match
+  Atlas §16.2's own literal field (L3812: `reversal_conditions: [...]`) —
+  see `compilation_decisions` for why an array of the sibling schema was
+  chosen over a single embedded `reversal` object.
+
+  `lenses_applied` closes an explicit, real forward-reference found during
+  this session's BUGHUNT grep sweep (not invented speculatively):
+  `specs/cognitive/lens.schema.yaml`'s own `related_but_out_of_scope`
+  section (L196-203) states verbatim that Atlas §29 rule 15 (L4552,
+  "高風險問題不得靠單一模型或單一方法形成 final authority") and §26's
+  "多角度" Quality Gate row (L4419: "高風險 Decision 有多 Lens + Dissent")
+  describe "a MULTI-lens governance requirement for high-risk decisions
+  (minimum lens count + dissent tracking)" that is "a property of a Decision
+  object consuming multiple Lens instances... belongs to
+  decision.schema.yaml (Atlas Appendix A, not yet built in this wave)".
+  This file is that "not yet built" file; `lenses_applied` is the field
+  lens.schema.yaml was written expecting. Atlas §29 rule 5 (L4542, "重大決策
+  至少保存一條 dissent path") and rule 10 (L4547, "重要 Recommendation 必須
+  有 Reversal / Kill Criteria") independently reinforce, respectively, this
+  file's existing `minority_opinions` field and its `reversal_conditions`
+  field — read together, §26/§29 describe one coherent high-risk-decision
+  quality bar this file's fields already mostly satisfy, with
+  `lenses_applied` being the one genuinely missing piece.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §16.2 Decision Object (L3780-3817)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §16.1 Idea Object, decision sub-block (L3769-3774)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §14.1 legal chains (L3566-3577, L3602-3612): DecisionCandidate/HumanDecision/Decision naming"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.32 MCDA (L1951-1978): Human Decision as MCDA's terminal output step"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §53 Decision Intelligence (L2433-2458): risks/predictions additive fields"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §54 Decision Reversal Criteria (L2462-2480)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §87 Provenance of Human Judgment (L2664-2677): human_judgment.timestamp additive field"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §88 Reversal Criteria (L2687-2697), §89 Decision Feedback Loop (L2707-2721): outcome lifecycle grounding"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md Appendix A (L4588): filename promise only"
+  - "specs/governance/epistemic-label.schema.yaml (DECISION epistemic_type L48, LOCKED_DECISION lock L89-93, provenance_record L96-111)"
+  - "specs/decision/reversal.schema.yaml (this file's sibling, embedded in reversal_conditions)"
+  - "specs/cognitive/lens.schema.yaml related_but_out_of_scope (L196-203): explicit forward-reference to this file's `lenses_applied` field"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §26 多角度 Quality Gate row (L4419), §29 rules 5/10/15 (L4542, L4547, L4552)"
+
+decided_by: >
+  No ADR governs this file. Atlas Appendix A promises only the filename;
+  MACHINE_READABLE_SPEC_PLAN.md §2.4 (L135) lists it READY with no assigned
+  CROSS-T finding and a dependency on `governance/epistemic-label` alone.
+  Field shape is a Phase 3 compilation decision: Atlas §16.2 is adopted
+  verbatim as the base (it is the fuller and more concrete of the two
+  independent "Decision Object" sketches found — see description), MP §53's
+  two extra fields (`risks`, `predictions`) are additively merged per the
+  union-not-drop precedent this suite already established, and `provenance`
+  / `reversal_conditions` are added as real cross-file `$ref`s to this
+  session's own sibling files. This is the same class of Low-risk,
+  Phase-3-decidable compilation `typed-objects/problem-statement.schema.yaml`
+  and `typed-objects/root-cause-fact.schema.yaml` used for their own
+  from-scratch field designs — no mother document is edited, no ADR-worthy
+  semantic/cardinality tradeoff is being resolved (contrast
+  `rigor-level.schema.yaml`'s genuinely Medium-risk Part 2).
+
+compilation_decisions:
+  - question: >
+      Master Plan §53 names `Risks` and `Predictions` as Decision Object
+      fields; Atlas §16.2's fuller sketch names neither. Drop them as
+      redundant, or add them?
+    decision: >
+      Added as `risks` (array of string) and `predictions` (array of
+      string), both optional/additive to Atlas §16.2's own list.
+    reasoning: >
+      Verified field-by-field (see top-level description) that these 2 of
+      MP's 9 items have no Atlas §16.2 counterpart — silently dropping them
+      would repeat exactly the class of regression
+      `status-codes.schema.yaml`'s duplicate_resolutions section explicitly
+      warned against ("picking a name is a Low-risk consistency fix, but
+      silently dropping MP's extra trigger sub-cases would be a real
+      regression"). `risks` is additionally reinforced by Atlas §16.1's own
+      Idea Object carrying a `risk` block (security/privacy/safety/
+      regulatory/execution, L3749-3754) — a sibling typed object in the same
+      §16 Typed Object Model already treats risk as a first-class concept
+      worth carrying, even though Atlas's OWN Decision Object omits it.
+      Kept untyped beyond `array of string` (no security/privacy/safety
+      sub-breakdown copied from the Idea Object) because MP §53 gives no
+      such breakdown for Decision specifically, and inventing one here would
+      be presenting a guess as a compiled fact.
+  - question: >
+      EC §87 "Provenance of Human Judgment" (L2664-2677) lists 8 fields that
+      MUST be preserved about a human final decision:
+      decision/actor/timestamp/options/evidence/reason/dissent/
+      reversal_conditions — explicitly contrasted with the anti-pattern of
+      saving only `approved = true` (L2679-2683). Atlas §16.2's
+      `human_judgment` sub-object has only 3
+      (`decision_maker`/`decision`/`rationale`). Reconcile how?
+    decision: >
+      `human_judgment` gains a required `timestamp` field (EC's field,
+      absent from Atlas). EC's `actor` is treated as the same field Atlas
+      already names `decision_maker` (synonym, not added separately). EC's
+      `options`/`evidence` are treated as already satisfied by this file's
+      own top-level `options`/`evidence_snapshot` fields (not duplicated
+      inside `human_judgment`). EC's `dissent` is treated as satisfied by
+      this file's own top-level `minority_opinions` field (Atlas's own
+      name for the same concept — a decision-wide record, not one scoped
+      only to the final human-judgment moment). EC's `reversal_conditions`
+      is likewise satisfied by this file's own top-level field of the
+      identical name — NOT duplicated a second time inside `human_judgment`.
+    reasoning: >
+      EC §87 is a REQUIREMENTS list ("must preserve"), not a competing
+      object shape — every one of its 8 items already has a home somewhere
+      in Atlas §16.2's fuller Decision Object once the two are read
+      together, except `timestamp`, which is a genuine gap (Atlas's
+      `human_judgment` sketch simply omits a when-was-this-decided field).
+      Adding only the one genuinely-missing field, rather than restructuring
+      `human_judgment` to mirror EC's flatter 8-field list, keeps Atlas
+      §16.2's structure (the fuller, more detailed source) as the spine and
+      treats EC §87 as a checklist against it — same reconciliation
+      discipline `root-cause-fact.schema.yaml` used when treating 4 name
+      variants as one concept rather than 4 competing objects.
+  - question: >
+      Should `reversal_conditions` be a single embedded
+      `decision/reversal.schema.yaml` object (matching this file's own task
+      brief, which suggested an optional singular `reversal` field), or an
+      array of them?
+    decision: >
+      Array of `decision/reversal.schema.yaml` $refs, field named
+      `reversal_conditions` (plural).
+    reasoning: >
+      Two independent reasons converge on the same answer. (1) Real-usage
+      grounding: Atlas §16.2's own literal field at this exact position
+      (L3812) is already named `reversal_conditions` and is already an
+      array (`[...]`) — transcribing the mother document's own field name
+      and cardinality verbatim is this suite's established practice
+      (`typed-objects/problem-statement.schema.yaml`'s entire `content`
+      block does the same). (2) Structural necessity:
+      `reversal.schema.yaml`'s own description documents that a SINGLE
+      reversal object (in either of its two forms) cannot losslessly
+      express N independently-actioned criteria, because Execution Contract
+      §88's canonical multi-indicator form has exactly one shared
+      `action`/`owner` for however many indicators it lists. An ARRAY of
+      single-criterion reversal objects closes that gap without inventing
+      any new field on `reversal.schema.yaml` itself — each array entry may
+      carry its own `action`. Both reasons independently point at "array,
+      plural name," so this is not a coin-flip pick between the task
+      brief's suggested field name and the mother document's — the mother
+      document's plural array is simply the more capable and better-attested
+      of the two.
+  - question: >
+      `lens.schema.yaml`'s own `related_but_out_of_scope` section explicitly
+      defers a "minimum lens count + dissent tracking" requirement to this
+      file. Add a field, or leave it to a future revision?
+    decision: >
+      Added now, as `lenses_applied` (array of lens-id strings) — see
+      top-level description for the full citation chain.
+    reasoning: >
+      This is not a speculative addition — it is closing a real, explicit,
+      already-written forward-reference discovered by this file's own
+      required BUGHUNT grep sweep (`decision.schema.yaml` / `reversal.schema.yaml`
+      across the repo), the same discipline that surfaced
+      `status-codes.schema.yaml`'s OQ-STATUS-3. Leaving it unaddressed would
+      mean `lens.schema.yaml` (already ACTIVE) points at a promise this file
+      does not keep, in the same file-creation session where the promise
+      could be kept. `dissent tracking` itself is NOT a second new field —
+      it is already satisfied by this file's pre-existing `minority_opinions`
+      (Atlas §16.2 L3802); only the lens-count half was genuinely missing.
+  - question: >
+      Should `options`/`criteria`/`analyses`/`simulations`/
+      `stakeholder_positions` be given an internal object shape (e.g.
+      `{id, label, score}` for an option), or left unconstrained?
+    decision: "Left unconstrained (`items: {}`, matches anything) for all five."
+    reasoning: >
+      Atlas §16.2 gives every one of these fields as a bare `[...]` /
+      `- ...` ellipsis with zero internal structure — inventing a specific
+      shape here would be presenting a guess as a compiled fact, the exact
+      failure mode this suite's `decided_by` sections repeatedly flag as
+      out of bounds. A richer per-field shape belongs in a future
+      MCDA-specific or recipe-specific schema that actually specifies one,
+      not in this base `Decision` type. Recorded as `OQ-DECISION-2` below
+      rather than silently decided either way.
+
+type: object
+required: [id, version, question, options, human_judgment_pending, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^DEC-"
+    description: >
+      Atlas §16.2 L3784 (`id: DEC-...`). Same id-prefix convention already
+      used by Atlas §16's other typed objects (Idea `IDEA-`, Method
+      Execution `EX-`) and already cited as such by
+      `typed-objects/problem-statement.schema.yaml`.
+
+  version:
+    type: string
+    description: "Atlas §16.2 L3785."
+
+  question:
+    type: string
+    description: "Atlas §16.2 L3787. The decision question being answered."
+
+  options:
+    type: array
+    items: {}
+    description: >
+      Atlas §16.2 L3788 (`options: [...]`). Left unconstrained — see
+      compilation_decisions. Soft-linked in spirit to Atlas §14.1's
+      `StrategyOptions`/`DecisionCandidate` chain-intermediate concepts, no
+      hard $ref (those are not independently schema'd typed objects in this
+      Wave).
+
+  criteria:
+    type: array
+    items: {}
+    description: "Atlas §16.2 L3789 (`criteria: [...]`). Left unconstrained — see compilation_decisions."
+
+  hard_constraints:
+    type: array
+    items: { type: string }
+    description: >
+      Atlas §16.2 L3790. Cross-referenced by §12.33 Weighted Decision Matrix
+      (L3004: "限制：高風險決策要補 hard constraints、scenario 與
+      stakeholder weights") as specifically required at high-risk/board-grade
+      decisions — see `cognitive/rigor-level.schema.yaml`'s `board_grade`
+      mode (Finance/Market/Strategy/Risk/Scenario/Red Team dimensions).
+
+  evidence_snapshot:
+    type: object
+    additionalProperties: true
+    description: >
+      Atlas §16.2 L3792 (`evidence_snapshot: ...`, singular ellipsis, not a
+      list marker — read as one embedded snapshot object, not an array of
+      IDs). Soft reference only (free-form object, no hard `$ref`) to a
+      future `evidence/evidence.schema.yaml` — promised in the same Atlas
+      Appendix A block as this file (L4584) but NOT YET BUILT in this repo
+      (verified via directory listing: `specs/evidence/` does not exist as
+      of this file). Avoiding a forward-Wave dependency on an unbuilt file,
+      same caution `typed-objects/problem-statement.schema.yaml` applied to
+      its own `content.evidence` field.
+
+  assumptions:
+    type: array
+    items: { type: string }
+    description: >
+      Atlas §16.2 L3793. Soft reference (free-text/id list), same
+      not-yet-built-evidence-schema caution as `evidence_snapshot` above
+      (`evidence/assumption.schema.yaml` is also promised, also not yet
+      built).
+
+  unknowns:
+    type: array
+    items: { type: string }
+    description: >
+      Atlas §16.2 L3794. Conceptually ties to
+      `governance/epistemic-label.schema.yaml`'s `epistemic_type: UNKNOWN`
+      value — soft reference by name only, no hard $ref (this field is a
+      list of open questions, not itself a labeled content object).
+
+  risks:
+    type: array
+    items: { type: string }
+    description: >
+      NEW, additive field — Master Plan §53 L2443 (`Risks`), absent from
+      Atlas §16.2's own list. See top-level description and
+      compilation_decisions for the full duplicate-definition analysis and
+      why this is additive rather than invented from nothing.
+
+  predictions:
+    type: array
+    items: { type: string }
+    description: >
+      NEW, additive field — Master Plan §53 L2444 (`Predictions`), absent
+      from Atlas §16.2's own list. Reinforced by Execution Contract §89
+      Decision Feedback Loop (L2709-2721: `Prediction -> Decision ->
+      Execution -> Outcome -> Compare -> Learn`) and Master Plan §53's own
+      adjacent "半年後可回來比較：Prediction vs Reality" (L2450-2456) — both
+      independently name Prediction as something a Decision record should
+      carry forward for later comparison against `outcome.actual_result`
+      below. See top-level description and compilation_decisions.
+
+  analyses:
+    type: array
+    items: {}
+    description: "Atlas §16.2 L3796-3797 (`analyses: [- ...]`). Left unconstrained — see compilation_decisions."
+
+  simulations:
+    type: array
+    items: {}
+    description: "Atlas §16.2 L3798-3799 (`simulations: [- ...]`). Left unconstrained — see compilation_decisions."
+
+  stakeholder_positions:
+    type: array
+    items: {}
+    description: "Atlas §16.2 L3801. Left unconstrained — see compilation_decisions."
+
+  minority_opinions:
+    type: array
+    items: {}
+    description: >
+      Atlas §16.2 L3802. Also satisfies Execution Contract §87's `dissent`
+      preservation requirement (L2675) — see compilation_decisions
+      (human_judgment reconciliation). Reinforced by Atlas §23 Epistemic &
+      Strategic Reasoning Engine output list, which independently names
+      `Minority Opinion` / `Critical Dissent` alongside `Unknowns` /
+      `Assumptions` / `Reversal Conditions` as a converging output set
+      (L1492-1497).
+
+  lenses_applied:
+    type: array
+    items:
+      type: string
+      pattern: "^[a-z_]+\\.[a-z_]+$"
+      description: >
+        Soft reference by id to `cognitive/lens.schema.yaml#/definitions/lens_id`
+        — same
+        `<family>.<name>` grammar that file reuses from ADR-005b's Method ID
+        Grammar (its own compilation_decisions, L206-210). Not a hard $ref
+        (a bare id string, not the full Lens object), since this field only
+        needs to record WHICH lenses were consulted, not re-embed each one's
+        full content.
+    description: >
+      NEW field closing `cognitive/lens.schema.yaml`'s own explicit
+      forward-reference (L196-203) — see top-level description. Atlas §26's
+      Quality Gate (L4419) expects high-risk Decisions to show MULTIPLE
+      entries here (descriptive quality bar, not a JSON-Schema-enforced
+      `minItems` tied to a risk tier this file does not itself carry a field
+      for — no mother document gives this file its own `risk_tier` field to
+      condition on).
+
+  recommendation:
+    type: string
+    description: "Atlas §16.2 L3804."
+
+  confidence:
+    description: >
+      Atlas §16.2 L3805 (`confidence: ...`, ellipsis — no scale defined by
+      any mother document; Idea Object L3762 has an identically-undefined
+      `confidence: ...`). Left untyped (accepts number or string) rather
+      than inventing a 0-1 numeric scale or a qualitative enum neither
+      mother document specifies. See `OQ-DECISION-2`.
+
+  human_judgment_pending:
+    type: boolean
+    default: true
+    description: >
+      NEW DESIGN. Not a literal mother-document field — added so a
+      `Decision` record can legally omit `human_judgment` (Atlas's own
+      `DecisionCandidate` chain-position, L3575: a Decision proposed by MCDA
+      but not yet human-decided) while still being a valid, distinguishable
+      record from one where a human has ruled. Set `false` once
+      `human_judgment` is populated. Required at the top level precisely so
+      a consumer never has to infer "pending vs. decided" from the mere
+      presence/absence of an optional sub-object.
+
+  human_judgment:
+    type: object
+    description: >
+      Atlas §16.2 L3807-3811, enriched per Execution Contract §87's
+      preservation requirement — see compilation_decisions. Optional at the
+      `Decision` level (absent/not-yet-applicable while
+      `human_judgment_pending: true`); once present, all four of its own
+      fields are required — EC §87 L2679-2683 is explicit that a bare
+      `approved = true` boolean is NOT an acceptable substitute for this
+      richer record.
+    required: [decision_maker, decision, rationale, timestamp]
+    properties:
+      decision_maker:
+        type: string
+        description: "Atlas §16.2 L3808. Same concept as EC §87's `actor` (L2670) — synonym, not a second field."
+      decision:
+        type: string
+        description: "Atlas §16.2 L3809. The actual human ruling (e.g. which option was chosen)."
+      rationale:
+        type: string
+        description: "Atlas §16.2 L3810. Same concept as EC §87's `reason` (L2674) — synonym, not a second field."
+      timestamp:
+        type: string
+        format: date-time
+        description: >
+          ADDITIVE field — Execution Contract §87 L2671 (`timestamp`),
+          absent from Atlas §16.2's own `human_judgment` sketch. Added per
+          EC's own explicit anti-pattern warning against under-preserving
+          human judgment provenance (L2679-2683).
+
+  reversal_conditions:
+    type: array
+    items:
+      $ref: "ai-lego://specs/decision/reversal.schema.yaml"
+    description: >
+      Atlas §16.2 L3812 (`reversal_conditions: [...]`). Real cross-file
+      `$ref` to this session's sibling file, one array entry per
+      independently-actioned reversal criterion — see this file's
+      top-level description and compilation_decisions for why this is an
+      array of the sibling schema rather than a single embedded object.
+      Also satisfies Execution Contract §87's `reversal_conditions`
+      preservation requirement (L2676) at the same field, not a second time
+      inside `human_judgment`.
+
+  monitoring_plan:
+    description: >
+      Atlas §16.2 L3813 (`monitoring_plan: ...`, ellipsis — no structure
+      given by any mother document). Left untyped/unconstrained rather than
+      inventing a cadence/metrics shape. See `OQ-DECISION-2`.
+
+  outcome:
+    type: object
+    required: [status]
+    properties:
+      status:
+        type: string
+        enum: [pending, monitoring, confirmed, reversed, superseded]
+        default: pending
+        description: >
+          Atlas §16.2 L3816 literally shows only `status: pending` as an
+          example value — the remaining 4 values are NEW DESIGN, inferred
+          (not transcribed) from the fields Atlas places immediately around
+          `outcome` in its own YAML ordering (`reversal_conditions` and
+          `monitoring_plan` precede it) and from Execution Contract §88's
+          "監控到 trigger: Decision Review Task" (L2699-2703) / §89's
+          Decision Feedback Loop stages (Prediction -> Decision -> Execution
+          -> Outcome -> Compare -> Learn, L2709-2721). This tracks whether
+          the decision's real-world outcome has been observed and compared
+          yet — a separate axis from `human_judgment_pending` (has a human
+          decided at all).
+      status_transitions:
+        description: >
+          Descriptive guidance only, not a hard JSON Schema state-machine
+          constraint — same limitation
+          `typed-objects/problem-statement.schema.yaml` accepted for its own
+          `status_transitions`.
+        legal:
+          - "pending -> monitoring (once monitoring_plan is active)"
+          - "monitoring -> confirmed (outcome matched recommendation/predictions, no reversal indicator triggered)"
+          - "monitoring -> reversed (a reversal_conditions entry's threshold/condition was crossed and its action taken)"
+          - "confirmed -> superseded (a later decision replaces this one even though this one was not reversed)"
+      review_task_ref:
+        type: [string, "null"]
+        default: null
+        description: >
+          NEW DESIGN. Execution Contract §88 L2701-2703: crossing a
+          reversal indicator's threshold triggers a "Decision Review Task".
+          Free-string soft reference, not a hard $ref — no
+          `execution/task.schema.yaml` exists in this repo yet (verified via
+          directory listing), same forward-Wave-dependency caution as
+          `evidence_snapshot` above.
+      actual_result:
+        type: string
+        description: >
+          NEW DESIGN. Grounds Execution Contract §89's "Compare" stage
+          (L2718) and Master Plan §53's "Prediction vs Reality" comparison
+          (L2450-2456) as a recordable field — free text describing what
+          actually happened, to be read alongside this record's own
+          `predictions`/`recommendation` fields above.
+
+  provenance:
+    description: >
+      Required — see top-level description for why a `Decision` record is
+      exactly the object `governance/epistemic-label.schema.yaml`'s
+      `DECISION` epistemic_type / `LOCKED_DECISION` lock value exist to
+      describe. Real cross-file $ref — `governance/` is a Wave 1 file
+      already BUILT, a backward (safe) dependency.
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: >
+      A board-grade decision, MCDA-scored, human-approved and locked, with
+      two independently-actioned reversal criteria and outcome still
+      pending real-world comparison.
+    value:
+      id: "DEC-2026-08-29-001"
+      version: "1.0.0"
+      question: "是否將 EU 客戶全數整併至 ks-aw-01？"
+      options: ["整併至 ks-aw-01", "維持 EU/SG 分機", "改租 dedicated 新機"]
+      criteria: ["月成本", "維運複雜度", "故障隔離度", "遷移風險"]
+      hard_constraints: ["零停機遷移", "ClickHouse 版本鎖定 25.7.x"]
+      evidence_snapshot: { source: "capacity-LATEST.json", summary: "整併後記憶體/硬碟餘裕仍 >40%" }
+      assumptions: ["客戶數量未來 12 個月成長 <20%"]
+      unknowns: ["尖峰負載尚未實測"]
+      risks: ["單機故障即全客戶受影響"]
+      predictions: ["月成本下降約 35%", "維運事件數下降"]
+      analyses: [{ method: "mcda", score_summary: "整併方案最高分" }]
+      simulations: []
+      stakeholder_positions: [{ stakeholder: "操作者", position: "支持整併" }]
+      minority_opinions: []
+      lenses_applied: ["stakeholder.regulator", "profession.devops"]
+      recommendation: "整併至 ks-aw-01"
+      confidence: 0.8
+      human_judgment_pending: false
+      human_judgment:
+        decision_maker: "操作者"
+        decision: "整併至 ks-aw-01"
+        rationale: "MCDA 最高分且 Codex 覆審通過"
+        timestamp: "2026-08-28T00:00:00Z"
+      reversal_conditions:
+        - indicators: ["memory_usage_pct", "disk_usage_pct"]
+          thresholds: ["> 80% for 7 consecutive days", "> 80% for 7 consecutive days"]
+          owner: "操作者"
+          action: re_review
+        - indicator: "container_restart_count"
+          threshold: "> 5 in 24h"
+          action: "escalate to devops-engineer agent"
+      monitoring_plan: "capacity-LATEST.json 每日自動檢查"
+      outcome:
+        status: monitoring
+      provenance: { epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: LOCKED_DECISION }
+
+open_questions:
+  - id: "OQ-DECISION-1"
+    question: >
+      Should the Master Plan §53 vs. Atlas §16.2 "Decision Object" partial
+      duplicate this file surfaces (see top-level description) be escalated
+      to its own tracked entry in `verified-findings.yaml` /
+      `DUPLICATION_REGISTER.yaml` (analogous to `status-codes.schema.yaml`'s
+      OQ-STATUS-3 handling of its own newly-surfaced finding), given it was
+      not one of the findings this file was assigned to resolve? Left open
+      rather than silently fixed without a trace — this file's own additive
+      `risks`/`predictions` fields are a compilation-level fix, not a
+      registry update, and registry updates are outside a single schema
+      file's mandate.
+    owner: "operator / next Phase 3 session doing a GAP_REGISTER/DUPLICATION_REGISTER pass"
+  - id: "OQ-DECISION-2"
+    question: >
+      Several fields (`options`, `criteria`, `analyses`, `simulations`,
+      `stakeholder_positions`, `confidence`, `monitoring_plan`) are left
+      unconstrained because neither mother document specifies their
+      internal shape. Should a future MCDA-specific or recipe-specific
+      schema narrow these (e.g. a typed `Option` object with `id`/`label`/
+      `scores`)? Left open — this file's job is compiling the Decision
+      type's OWN documented shape, not inventing sub-structure no mother
+      document gives.
+    owner: "operator / future cognitive/recipe.schema.yaml or a decision-specific MCDA schema author"
+
+verification:
+  method: >
+    Read against Atlas §16 full (L3716-3860: Idea Object, Decision Object,
+    Method Execution), §14.1 (L3542-3612), §11.32 (L1951-1978), §23
+    (L1490-1502), Appendix A (L4574-4590); Master Plan §53 (L2433-2460) and
+    §54 (L2462-2481) full; Execution Contract §87-89 (L2660-2725) full;
+    `governance/epistemic-label.schema.yaml` full (DECISION/LOCKED_DECISION
+    sections); `.ai/research/phase-0/architecture-inventory.yaml` (L826-839)
+    and `terminology-map.yaml` (L2548-2560, L3030-3046); grep sweep for
+    "Decision Object" across `.ai/research/` (2 files matched, neither
+    cross-references MP §53 against Atlas §16.2, confirming OQ-DECISION-1's
+    novelty); directory listing of `specs/` confirming `evidence/` and
+    `decision/` did not exist before this file (ruling out hard $refs to
+    unbuilt evidence/assumption schemas). Repo-wide grep for
+    `decision.schema.yaml` / `reversal.schema.yaml` across `agency-os/` and
+    `lobster-factory/` (required BUGHUNT step) found one real, load-bearing
+    forward-reference — `specs/cognitive/lens.schema.yaml` L196-203 — closed
+    here via the new `lenses_applied` field (see compilation_decisions); no
+    other file references either new schema, so no other stale claim needed
+    fixing in this same commit.
+  note: >
+    Atlas §16.2's 19 fields are transcribed with their own literal names
+    (snake_cased where already snake_case). `risks`/`predictions` are
+    explicitly flagged NEW/additive (from MP §53, not Atlas). `timestamp`
+    is explicitly flagged additive (from EC §87, not Atlas).
+    `human_judgment_pending`, `outcome.status_transitions`,
+    `outcome.review_task_ref`, and `outcome.actual_result` are explicitly
+    flagged NEW DESIGN with their inference chain stated, not presented as
+    mother-document content. No mother document or ADR was modified to
+    produce this file.

@@ -107,11 +107,14 @@ compilation_decisions:
   - question: >
       `home_jurisdiction: JurisdictionPackRef` and `encryption_root_key_ref:
       KMSKeyRef` are ADR-003's own type names for concepts whose schemas
-      are not yet built: Jurisdiction Pack is `specs/jurisdiction/
-      pack.schema.yaml` (Wave 4, not yet built) and the tenant-level key
-      concept is `specs/security/key-vault-lifecycle.schema.yaml` (Wave 2,
-      being built concurrently by a sibling agent in this same session —
-      per task scope, this file does not wait for or read that sibling).
+      have since been built: Jurisdiction Pack is
+      `specs/jurisdiction/pack.schema.yaml` (built Wave 4, 2026-08-29) and
+      the tenant-level key concept is
+      `specs/security/key-vault-lifecycle.schema.yaml` (built Wave 2,
+      2026-08-29, concurrently with this file — per this file's original
+      task scope it did not wait for or read that sibling at the time). Both
+      soft references above remain intentionally soft (no hard $ref added
+      retroactively), consistent with this file's original design choice.
       The MACHINE_READABLE_SPEC_PLAN.md §2.5 inventory row for this file
       lists both as dependencies.
     decision: >
@@ -209,8 +212,8 @@ properties:
       Project-level piece of work may separately reference for its own
       operational rules — ADR-003: "this decouples 'whose legal entity owns
       this Tenant' from 'which jurisdiction's rules apply to this piece of
-      work'". Future schema home: `specs/jurisdiction/pack.schema.yaml`
-      (Wave 4, not yet built).
+      work'". Schema home: `specs/jurisdiction/pack.schema.yaml`
+      (built Wave 4, 2026-08-29).
 
   data_residency_region:
     type: string

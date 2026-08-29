@@ -164,9 +164,11 @@ properties:
         items: { type: string }
         description: >
           Atlas L2584 'Evidence'. Soft reference only (free-text/id list) to
-          future `evidence/evidence.schema.yaml` (Wave 4, not yet built) —
-          not a hard $ref, to avoid a forward-Wave dependency (same caution
-          `manifest.schema.yaml` applied to `document-registry.schema.yaml`).
+          `evidence/evidence.schema.yaml` (built Wave 4, 2026-08-29) — kept
+          as a soft reference rather than upgraded to a hard $ref, since this
+          file predates that Wave and the dependency direction was
+          deliberately kept loose (same caution `manifest.schema.yaml`
+          applied to `document-registry.schema.yaml`).
       constraints:
         type: array
         items: { type: string }

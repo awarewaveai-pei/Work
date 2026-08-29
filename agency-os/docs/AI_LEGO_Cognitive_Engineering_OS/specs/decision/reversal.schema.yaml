@@ -1,0 +1,332 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/decision/reversal.schema.yaml"
+title: Reversal Criteria
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `reversal` — pre-committed
+  criteria answering "what new information or threshold, reached to what
+  degree, obligates us to re-evaluate or overturn this decision?" Promised
+  by filename only in Atlas Appendix A (L4589:
+  `/specs/decision/reversal.schema.yaml`); this file supplies the shape.
+  Resolves CROSS-T-12 (duplicate_definition, medium severity, CONFIRMED by
+  2 independent votes, `.ai/research/phase-0/verified-findings.yaml` L514-535):
+  three incompatible field-shapes for the identical concept exist across the
+  corpus with no single authoritative one.
+
+  CORRECTION to this file's own task brief (verified by direct grep/Read in
+  this session, not accepted on summary): the brief characterized one shape
+  as "a Master Plan 'language policy' example." That is WRONG. Grepping
+  `AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md` for
+  `reversal_conditions` returns zero matches — the literal
+  `reversal_conditions: [{indicator, threshold, action}]` schema block lives
+  in the METHOD ATLAS's own bilingual-naming-policy section
+  ("中文優先與必要設定英文保留規範", L14-65; the block itself L53-60), not
+  in the Master Plan at all. Master Plan's only two reversal-related
+  sections — §23 Epistemic & Strategic Reasoning Engine (L1497, a bare list
+  heading "Reversal Conditions" with no field shape) and §54 "Decision
+  Reversal Criteria" (L2462-2480, prose: "Current Recommendation +
+  Conditions to Reverse", bullet examples like "CAC > X", no machine schema
+  at all) — are narrative, not one of the three competing machine shapes.
+  `verified-findings.yaml`'s own CROSS-T-12 evidence block (L521-530)
+  already cites the correct file (Atlas) for all three quotes; only this
+  file's task brief mis-summarized it as Master Plan. Corrected attribution
+  of the three real shapes:
+
+    1. Atlas bilingual-policy example (L53-60): `reversal_conditions:` — an
+       ARRAY of `{indicator, threshold, action}` triples, no `owner`. Each
+       array item carries its OWN `action` — the schema does not force one
+       shared action across items.
+    2. Atlas §11.33 決策反轉條件 method definition (L1989-1995): `reversal:`
+       — a SINGLE object `{indicator, condition, action, owner}`. Real
+       instance of this exact shape already in this repo:
+       `docs/adr/ADR-001-scoped-authority-precedence-unification.md`
+       (L146-151, its own Reversal Criteria block, cited per Atlas §11.33's
+       own recommendation).
+    3. Execution Contract §88 Reversal Criteria (L2691-2696): `reversal:` —
+       a SINGLE object with PLURAL parallel arrays
+       `{indicators: [...], thresholds: [...], owner, action}`. ONE shared
+       `owner`/`action` for however many indicators are listed.
+
+  `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` §2.4 (L136) recommends
+  building on shape 3 "因唯一支援多指標場景" (because it is the only one
+  supporting multi-indicator scenarios). VERIFIED, not accepted uncritically
+  (per this file's own task instruction): shape 3 losslessly represents
+  shape 2 as a length-1 array (`indicators: [indicator]`,
+  `thresholds: [condition]`) — confirmed field-by-field, no information
+  lost. Shape 3 does NOT losslessly represent the GENERAL case of shape 1:
+  shape 1's schema literally allows each list item its own `action` (no
+  mother-document text constrains items to share one action), while shape
+  3 has exactly one `action`/`owner` per block — collapsing a
+  heterogeneous-action shape-1 list into one shape-3 block would silently
+  merge distinct actions into one, a real (if so far only theoretical —
+  every actually-cited shape-1 instance uses a single item with one action)
+  lossy edge. This file does NOT paper over that gap by inventing an
+  unrequested `actions: [...]` array onto shape 3 (no mother document ever
+  specifies per-index actions on the plural form). Instead it keeps this
+  file scoped to ONE reversal block and resolves the general
+  multiple-independent-actions case one layer up: `decision.schema.yaml`
+  embeds this file's schema inside an ARRAY field
+  (`reversal_conditions: [...]`) — independently grounded in Atlas §16.2's
+  own literal Decision Object field of that exact plural name (L3812) — so
+  N independently-actioned criteria are N array entries, not N actions
+  wedged into one object. See `decision.schema.yaml`'s
+  `compilation_decisions` for the embedding side of this resolution.
+
+  Field-name reconciliation (a second, smaller duplicate nested inside
+  CROSS-T-12, not previously called out as its own line item): the "trigger
+  value" slot has THREE different literal names across the three shapes —
+  `threshold` (shape 1), `condition` (shape 2), `thresholds` (shape 3).
+  Checked against actual usage, not assumed: shape 2's real instance
+  (ADR-001 L147) puts a full comparison-expression STRING in `condition`
+  ("Phase 3 machine-readable spec 設計階段，任兩位獨立審查者..."), and
+  shape 3's own worked example elsewhere (Atlas §11.33 L1990-1994, reused
+  near-verbatim in `verified-findings.yaml` CROSS-T-12 evidence) uses the
+  same free-text-comparison style ("> 300 USD for 3 consecutive months").
+  No mother document treats `threshold` as strictly-numeric and `condition`
+  as strictly-prose — both hold the identical kind of value. Resolved as one
+  semantic slot, two accepted spellings depending on which form (multi- vs
+  single-indicator) is in use — see `multi_indicator_form.thresholds` and
+  `single_indicator_form` below.
+
+  This file therefore validates as EITHER of two forms (`oneOf`), not one
+  shape force-fitted over the other three — this is the only design under
+  which ADR-001's own real, already-committed Reversal Criteria block
+  (single-indicator form) AND Execution Contract §88's own real worked
+  shape (multi-indicator form) both validate without rewriting either
+  mother document or ADR (neither is modified by this file).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md 中文優先與必要設定英文保留規範 bilingual example (L14-65, block L53-60): reversal_conditions array form"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.33 決策反轉條件／決策翻轉條件 (L1980-2003): reversal singular-object form"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §88 Reversal Criteria (L2687-2697): reversal plural-array-fields form"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §87 Provenance of Human Judgment (L2664-2677): reversal_conditions listed as a field that MUST be preserved, not just approved=true"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §16.2 Decision Object (L3780-3817): decision-level `reversal_conditions` plural field — the real usage this file's embedding-as-array resolution is grounded in"
+  - "docs/adr/ADR-001-scoped-authority-precedence-unification.md (L144-151): real single-indicator-form instance already committed in this repo"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md Appendix A (L4589): filename promise only, no shape"
+  - ".ai/research/phase-0/verified-findings.yaml CROSS-T-12 (L514-535)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.4 (L136): recommends EC's plural-array shape as base"
+
+decided_by: >
+  No ADR governs this file. MACHINE_READABLE_SPEC_PLAN.md §2.4's row for
+  `decision/reversal.schema.yaml` (L136) marks it READY with no ADR
+  dependency ("同上，聯集式合併" — same union-style merge as its sibling row
+  for `evidence/assumption.schema.yaml`, which that same line marks
+  Low-risk because "三形狀是子集關係非互斥取捨，可直接取聯集" — a
+  subset/union relationship, not a mutually-exclusive tradeoff). This file
+  follows that same union method, but a literal field-by-field union (one
+  object with every field from every shape) was rejected in favor of a
+  `oneOf` of two forms, because the plan's own "subset relationship" premise
+  verified TRUE for shape 2 (clean length-1-array subset of shape 3) but
+  NOT fully true for shape 1 in the general case (see description's
+  per-item-action analysis) — a flat union would have silently discarded
+  shape 1's per-item-action expressiveness. Choosing `oneOf` over
+  force-fitting is itself a Low-risk compilation decision (structural
+  choice preserving strictly more information than the alternative, not a
+  new semantic policy), consistent with the Low-risk bar this suite's other
+  naming/shape-consolidation decisions used (e.g.
+  `root-cause-fact.schema.yaml`'s decided_by, `status-codes.schema.yaml`'s
+  duplicate_resolutions).
+
+compilation_decisions:
+  - question: >
+      Force-fit all three shapes into EC §88's plural-array shape alone (as
+      MACHINE_READABLE_SPEC_PLAN.md's row text literally reads), or define
+      two validated forms?
+    decision: >
+      Two forms via `oneOf`: `multi_indicator_form` (canonical EC §88 shape)
+      and `single_indicator_form` (Atlas §11.33 / ADR-001 shape). Each of
+      shape 1's array items also validates as one `single_indicator_form`
+      instance (using its `threshold` field name).
+    reasoning: >
+      A single EC-shaped object cannot hold N independently-actioned
+      criteria (see description). Rather than inventing an unrequested
+      `actions: [...]` parallel array (extending EC's shape beyond what any
+      mother document specifies), this file stays a precise model of the
+      shapes actually on file and pushes multi-block composition to the
+      embedding schema's array field, where it is independently grounded in
+      real usage (Atlas §16.2 L3812). This is the same discipline
+      `rigor-level.schema.yaml`'s Part 1/Part 2 split used: compile what is
+      Low-risk and directly evidenced now, do not silently invent the
+      unevidenced remainder.
+  - question: >
+      Should `condition` (shape 2) and `threshold`/`thresholds` (shapes 1/3)
+      be collapsed into one canonical field name, deprecating the others?
+    decision: >
+      NOT collapsed to one name — both are live, accepted field names,
+      selected by which form (`single_indicator_form` uses `condition` OR
+      `threshold` as an alternate key for the same slot;
+      `multi_indicator_form` uses `thresholds`).
+    reasoning: >
+      Unlike `root-cause-fact.schema.yaml`'s TYPE-name consolidation (where
+      3 of 4 names were confirmed dead — used only in a forbidden-transition
+      example or exactly once — leaving one clear survivor), all three
+      FIELD names here are each the live, real, currently-used spelling in
+      their own citation (ADR-001 uses `condition` verbatim today; EC's own
+      text uses `thresholds` verbatim). Renaming ADR-001's field to match a
+      newly chosen canonical spelling would require editing an ACCEPTED ADR,
+      which is out of this file's scope (ADRs are not modified by Phase 3
+      compilation) and was not asked for. Accepting both spellings costs
+      nothing in expressiveness and avoids that edit.
+
+# ---------------------------------------------------------------------------
+# Schema body — validates as either form
+# ---------------------------------------------------------------------------
+
+oneOf:
+  - $ref: "#/definitions/multi_indicator_form"
+  - $ref: "#/definitions/single_indicator_form"
+
+definitions:
+
+  multi_indicator_form:
+    title: "Multi-indicator form (canonical base — EC §88, L2691-2696)"
+    type: object
+    required: [indicators, thresholds, action]
+    properties:
+      indicators:
+        type: array
+        minItems: 1
+        items: { type: string }
+        description: "EC §88 L2693 `indicators: [...]`."
+      thresholds:
+        type: array
+        minItems: 1
+        items: { type: string }
+        description: >
+          EC §88 L2694 `thresholds: [...]`. Parallel to `indicators` —
+          `thresholds[i]` is the trigger value/expression for
+          `indicators[i]`. Array-length equality between `indicators` and
+          `thresholds` is a documented invariant, not a JSON-Schema-enforced
+          one (2020-12 has no native cross-sibling-array-length keyword) —
+          same class of limitation `typed-objects/problem-statement.schema.yaml`
+          accepted for its own `status_transitions`.
+          A `thresholds[i]` value MAY be a bare comparison (`"> 300"`) or a
+          fuller expression (`"> 300 USD for 3 consecutive months"`) — no
+          mother document distinguishes the two; see this file's top-level
+          description, field-name reconciliation.
+      owner:
+        type: string
+        description: "EC §88 L2695. ONE owner for the whole block — all indicators listed share it."
+      action:
+        type: string
+        default: re_review
+        description: >
+          EC §88 L2696 (`action: re_review` in its own worked form). ONE
+          action for the whole block — see this file's description for why
+          heterogeneous per-indicator actions are modeled as separate
+          reversal objects one layer up, not as a parallel `actions` array
+          here.
+
+  single_indicator_form:
+    title: "Single-indicator form (Atlas §11.33 L1989-1995 / ADR-001 real usage / Atlas bilingual-example array item)"
+    type: object
+    required: [indicator, action]
+    anyOf:
+      - required: [condition]
+      - required: [threshold]
+    properties:
+      indicator:
+        type: string
+        description: "Atlas §11.33 L1991 (`indicator: CAC`); ADR-001 L147; Atlas bilingual example L57."
+      condition:
+        type: string
+        description: >
+          Atlas §11.33 L1992 field name (e.g. `"> 300 USD for 3 consecutive
+          months"`). Same semantic slot as `threshold` below — see this
+          file's top-level description, field-name reconciliation. This is
+          the literal field name ADR-001's own committed Reversal Criteria
+          block uses (L147-148).
+      threshold:
+        type: string
+        description: >
+          Atlas bilingual-policy-example field name (L58) for the identical
+          slot as `condition`. Present when this object represents one item
+          of shape 1's array form.
+      owner:
+        type: string
+        description: >
+          Atlas §11.33 L1994 (`owner: growth_lead`); ADR-001 L150
+          (`owner: "操作者"`). Absent from the bilingual-example array
+          form (L53-60 names no owner field at all) — therefore optional,
+          not required, on this form.
+      action:
+        type: string
+        description: "Atlas §11.33 L1993; ADR-001 L149; Atlas bilingual example L59."
+
+examples:
+  - description: "Multi-indicator form, directly transcribed from EC §88's own worked shape"
+    value:
+      indicators: ["CAC", "adoption_rate"]
+      thresholds: ["> 300 USD for 3 consecutive months", "< 5% after month 2"]
+      owner: growth_lead
+      action: re_review
+  - description: "Single-indicator form — ADR-001's own real, already-committed Reversal Criteria block (L146-151), transcribed verbatim to confirm this schema validates it"
+    value:
+      indicator: "Architecture-Constitution-v1.md 被證明無法承載 Architecture/Platform-scope 硬政策內容（例如發現它與 MP 現有 Governance 職責重疊到無法切分）"
+      condition: "Phase 3 machine-readable spec 設計階段，任兩位獨立審查者（人類或 Codex oracle）認定切分不可行"
+      action: "重新review，改採 Option B 並補一份獨立、極簡的 OQ-9-only 裁決記錄解決身分矛盾"
+      owner: "操作者"
+  - description: "Single-indicator form — one item of Atlas's bilingual-policy array example (L53-60), no owner"
+    value:
+      indicator: "..."
+      threshold: "..."
+      action: re_review
+
+generality_note: >
+  This schema is designed for reuse anywhere in this project a reversal
+  criterion is needed, not only as `decision.schema.yaml`'s sub-object.
+  Verified concretely, not just asserted: (1) ADR-001's own real Reversal
+  Criteria block (`docs/adr/ADR-001-...md` L146-151) validates against
+  `single_indicator_form` above with zero transformation — see the second
+  worked example. (2) Any future `recipes/` reversal-pattern content
+  following Atlas §11.33's or EC §88's documented shapes will likewise
+  validate directly, since both are transcribed here verbatim rather than
+  redesigned. Any schema in this project that carries a decision, a
+  recommendation, or a locked commitment (per
+  `governance/epistemic-label.schema.yaml`'s `locked` axis) may embed this
+  file the same way `decision.schema.yaml` does — as an array item when
+  multiple independently-actioned criteria are possible, or as a single
+  embed when exactly one is guaranteed sufficient for that object's use
+  case.
+
+open_questions:
+  - id: "OQ-REVERSAL-1"
+    question: >
+      Should `multi_indicator_form` grow a future `actions: [...]` parallel
+      array (matching `indicators`/`thresholds`) to let a multi-indicator
+      block express per-indicator actions, fully closing the theoretical
+      gap this file identifies against shape 1's general case? Left open —
+      no mother document specifies this today (verified by grep: EC §88's
+      own text gives exactly one `action`), and every actually-cited shape-1
+      instance uses only one item with one action, so there is no real
+      usage to ground a new field on yet. Adding it now would be
+      `decision.schema.yaml`-style invention ahead of evidence, which this
+      suite's own discipline (see e.g. `problem-statement.schema.yaml`'s
+      `status` enum reasoning) avoids.
+    owner: "operator / next author who finds a real heterogeneous-action multi-indicator usage"
+
+verification:
+  method: >
+    Read against Atlas L14-65 (bilingual policy section, full), Atlas
+    L1978-2003 (§11.33 full), EC L2660-2705 (§87-88 full), Atlas L3780-3817
+    (§16.2 Decision Object, full), Atlas L4574-4590 (Appendix A), ADR-001
+    full text (Reversal Criteria block, L144-151), Master Plan grepped for
+    `reversal_conditions` (zero hits — corrects this file's own task brief,
+    see description) and read in full at §23 (L1490-1498), §54 (L2462-2481).
+    `.ai/research/phase-0/verified-findings.yaml` CROSS-T-12 full entry
+    (L514-535) and `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` §2.4
+    (L128-136).
+  note: >
+    The "EC's plural-array shape losslessly subsumes the other two" claim in
+    MACHINE_READABLE_SPEC_PLAN.md §2.4 (L136) was independently re-derived,
+    not accepted on the plan's word: TRUE for Atlas §11.33's shape (a clean
+    length-1-array embedding, verified field-by-field) and TRUE for every
+    ACTUALLY-CITED instance of the bilingual-example shape (all of which use
+    exactly one item/one action) — but NOT a general structural guarantee
+    against that shape's own schema, which literally permits a per-item
+    `action`. This file resolves the gap with a two-form `oneOf` rather than
+    silently endorsing the plan's stronger claim or silently inventing an
+    unrequested field to force it true. No mother document or ADR was
+    modified to produce this file.

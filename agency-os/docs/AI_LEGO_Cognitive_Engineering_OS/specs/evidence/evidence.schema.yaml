@@ -1,0 +1,219 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/evidence/evidence.schema.yaml"
+title: Evidence Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of an Evidence record. This file is
+  one of the three Atlas Appendix A "existing promises" (L3998, L4584) —
+  Appendix A only ever lists the bare filename, never a field shape. Broad
+  grep across all three mother documents for structural (not prose) uses of
+  "evidence" found NO place that defines an Evidence record's own fields:
+  Atlas only ever shows evidence being REFERENCED BY ID from other
+  structures — Assumption Registry's `evidence: [...]` array (EC §116
+  L3242), §11.20 Evidence Matrix's Supporting/Contradicting columns citing
+  E-1/E-2/E-8 (L1663), and Fishbone's optional `EvidenceSet` input type
+  (Atlas L1005) — never the record's own definition. The only genuinely
+  concrete, multi-line textual grounding available is EC §117 "Evidence
+  Quality" (L3255-3264), an 8-dimension checklist for judging evidence, and
+  Atlas F10's one-line "Evidence Hierarchy" concept (L575). Per this task's
+  explicit instruction, this schema keeps to that thin grounding honestly
+  rather than inventing a rich record shape no line supports — see
+  `open_questions` for the fields that are NEW_DESIGN rather than
+  textually anchored.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md Appendix A directory listing (L3998)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md Appendix A path listing (L4584)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.20 Evidence Matrix worked example (L1657-1669, E-1/E-2/E-8 IDs at L1663)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 tool row 'Evidence Hierarchy' (L575)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md Fishbone method contract, EvidenceSet optional input (L995-1030, EvidenceSet at L1005)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §117 Evidence Quality (L3255-3264)"
+  - "specs/governance/epistemic-label.schema.yaml (EVIDENCE is a first-class epistemic_type enum value, L39)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.4 row (L132)"
+
+decided_by: >
+  No ADR governs this file's field shape. Grepped docs/adr/ADR-001~010 full
+  text for "Assumption Registry"/"Evidence Matrix"/"Evidence Quality":
+  ADR-001 (L132) and ADR-004 (L3, L75) each cite "Evidence Matrix" once, but
+  only as one named item inside Atlas §14.2's Mandatory Gate Injection tool
+  checklist (alongside Red Team/Counterevidence/etc.) — neither ADR rules on,
+  or even discusses, what fields an Evidence record itself carries. Same
+  "no ADR, direct Phase 3 compilation" class as status-codes.schema.yaml,
+  except this file's textual base is thinner than any prior Wave 1-3 file:
+  it is closer to filling a pure Appendix-A-promised gap than to resolving a
+  multi-shape conflict. MACHINE_READABLE_SPEC_PLAN.md §2.4's row for this
+  file lists no Finding ID ("解決的 Finding" = "—"), consistent with that
+  reading.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+type: object
+required: [evidence_id, provenance]
+properties:
+
+  evidence_id:
+    type: string
+    pattern: "^E-[0-9]+$"
+    description: >
+      Atlas §11.20 Evidence Matrix's worked example cites `E-1`, `E-2`, `E-8`
+      as the IDs a Claim's Supporting/Contradicting columns reference
+      (L1663). No document defines the ID grammar formally; this pattern is
+      a direct transcription of the only real examples that exist — same
+      "transcribe the one real example, don't invent grammar" discipline
+      cas-path.schema.yaml and blast-radius-chain.schema.yaml applied to
+      their own ID conventions.
+
+  content:
+    type: string
+    description: >
+      NEW_DESIGN — not a mother-document field name. No line in any of the
+      three mother documents names what an Evidence record's own body of
+      content is called; Atlas and EC only ever show evidence being
+      REFERENCED by ID, never define the record itself. A content field is
+      a structural necessity (a record with only an ID and no content is
+      not evidence), so it is added here as OPTIONAL and explicitly flagged
+      rather than silently presented as textually grounded. See
+      `open_questions.MRSP-evidence-1`.
+
+  source:
+    type: string
+    description: >
+      NEW_DESIGN, same rationale as `content` above. Indirectly implied by
+      EC §117's `source authority` quality dimension (assessing a source's
+      authority presupposes a source field exists to point at), but no
+      mother document names a `source` field directly. Optional, not
+      required. See `open_questions.MRSP-evidence-1`.
+
+  quality_assessment:
+    type: object
+    description: >
+      The best-grounded part of this schema. EC §117 "Evidence Quality"
+      (L3255-3264) lists exactly these 8 dimensions verbatim as what
+      "重要決策需考慮"（important decisions must consider）when judging
+      evidence, closing with "不是「引用很多」就高品質"（citation volume
+      is not quality）. Nested as one object (not 8 top-level fields) so a
+      caller MAY omit the whole assessment for evidence not yet reviewed.
+      Left as free-form strings per dimension — EC gives dimension NAMES,
+      not value scales or enums for any of them.
+    properties:
+      source_authority:
+        type: string
+        description: "EC §117 (L3257) 'source authority'."
+      recency:
+        type: string
+        description: "EC §117 (L3258) 'recency'."
+      directness:
+        type: string
+        description: "EC §117 (L3259) 'directness'."
+      independence:
+        type: string
+        description: "EC §117 (L3260) 'independence'."
+      consistency:
+        type: string
+        description: "EC §117 (L3261) 'consistency'."
+      geography:
+        type: string
+        description: "EC §117 (L3262) 'geography'."
+      sample:
+        type: string
+        description: "EC §117 (L3263) 'sample'."
+      method_quality:
+        type: string
+        description: "EC §117 (L3264) 'method quality'."
+
+  hierarchy_tier:
+    type: [string, number, "null"]
+    default: null
+    description: >
+      Atlas F10 row 'Evidence Hierarchy' (L575): "區分證據強度｜使用方式：
+      domain-specific hierarchy｜效益：避免來源等價化"（distinguish evidence
+      strength via a domain-specific hierarchy; avoid treating all sources
+      as equivalent）. Deliberately left untyped/free-form because the
+      source text itself says "domain-specific" — a single universal enum
+      (e.g. a fixed Weak/Medium/Strong ladder) would contradict the source's
+      own point that the hierarchy varies per domain (a medical evidence
+      hierarchy — RCT > cohort > case report — is not a market-research
+      evidence hierarchy).
+
+  provenance:
+    type: object
+    required: [epistemic_type, authorship_state]
+    description: >
+      EVIDENCE is a first-class value on governance/epistemic-label.schema.yaml's
+      epistemic_type enum (L39) — every Evidence record's epistemic_type IS
+      that value by construction, not a free per-instance choice. Contrast
+      claim.schema.yaml (built same task), where CLAIM is not itself an
+      epistemic_type enum value and the full 11-value enum remains legal.
+    properties:
+      epistemic_type:
+        const: EVIDENCE
+        description: >
+          Fixed per governance/epistemic-label.schema.yaml's enum (L39):
+          EVIDENCE is a literal member of that 11-value list.
+      authorship_state:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/definitions/authorship_state"
+      locked:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/definitions/locked"
+
+# ---------------------------------------------------------------------------
+# Forward dependents (informational — these files depend on this one)
+# ---------------------------------------------------------------------------
+referenced_by:
+  - "specs/evidence/claim.schema.yaml (supporting_evidence/contradicting_evidence arrays, real $ref, built same task)"
+  - "specs/evidence/assumption.schema.yaml (evidence[] array, real $ref, built same task)"
+  - "specs/cognitive/typed-objects/cause-hypothesis-set.schema.yaml (supporting_evidence_refs, L172-179 — currently a SOFT string-only placeholder predating this file; see open_questions.MRSP-evidence-2)"
+  - "specs/cognitive/typed-objects/problem-statement.schema.yaml (similar soft placeholder, L165-169; see open_questions.MRSP-evidence-2)"
+
+# ---------------------------------------------------------------------------
+# Genuinely open questions — NOT decided by this file
+# ---------------------------------------------------------------------------
+open_questions:
+  - id: "MRSP-evidence-1"
+    question: >
+      No mother document names a field for what an Evidence record's own
+      content/body or its source citation is called — `content` and
+      `source` above are NEW_DESIGN, structurally necessary but textually
+      ungrounded. Should a future ADR or `.ai/proposals/` PROPOSAL formalize
+      these, and should `source` be a structured object (e.g. distinct
+      url/document/interview citation sub-types) rather than a free string?
+    owner: "operator"
+    blocks: "nothing in this schema (both fields are optional); flagged per R4 claim-before-verify"
+
+  - id: "MRSP-evidence-2"
+    status: RESOLVED（2026-08-29，同批次收工時修正）
+    question: >
+      `cause-hypothesis-set.schema.yaml` (L177) and `problem-statement.schema.yaml`
+      (L167) — both BUILT in an earlier session of this same Phase 3 effort —
+      each described their evidence-reference field as pointing to "future
+      `evidence/evidence.schema.yaml` (Wave 4, not yet built)", which went
+      stale the moment this file was created.
+    resolution: >
+      Both comments updated by the orchestrating session in the same commit
+      as this file, per this project's R4 cross-file BUGHUNT discipline —
+      still kept as soft (non-$ref) references, per the original design
+      choice both files documented (avoiding a forward-Wave hard dependency).
+      No hard $ref was added; only the staleness of the "not yet built"
+      wording was fixed.
+    owner: "the orchestrating agent's BUGHUNT step (scope=agency-os), or next session touching either file"
+    blocks: "nothing in this schema; both referencing files remain functionally valid (a stale soft-reference comment does not break their schema)"
+
+verification:
+  method: >
+    Read/Grep against Atlas Appendix A (L3998, L4584), Atlas §11.20
+    (L1657-1669), Atlas F10 row (L570-579, this row at L575), Atlas
+    Fishbone method contract (L995-1030), EC §117 (L3255-3264),
+    governance/epistemic-label.schema.yaml, docs/adr/ADR-001~010 full text
+    (grepped for "Evidence Matrix"/"Evidence Quality"/"Assumption Registry":
+    2 incidental non-ruling citations found, see `decided_by`).
+  note: >
+    This file's grounding is genuinely thinner than most Wave 1-3 schemas in
+    this project: the mother documents promise the file (Appendix A) and use
+    "evidence" pervasively as a REFERENCED concept, but never define the
+    record's own shape. `evidence_id` and `quality_assessment` are directly
+    textually grounded; `content`/`source`/`hierarchy_tier` are honestly
+    flagged as NEW_DESIGN or explicitly domain-varying rather than presented
+    as settled mother-document fields. No mother document was modified to
+    produce this file.

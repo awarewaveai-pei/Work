@@ -1,0 +1,176 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/evidence/claim.schema.yaml"
+title: Claim Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of a Claim record. This file is one
+  of the three Atlas Appendix A "existing promises" (L3999, L4585) — Appendix
+  A only ever lists the bare filename, never a field shape. The only
+  concrete, EXAMPLE-BEARING textual grounding for a Claim record anywhere in
+  the three mother documents is §11.20's Evidence Matrix worked example:
+  `Claim ID C-01 | Supporting E-1, E-2 | Contradicting E-8 | Quality High |
+  Coverage 3 regions | Confidence 0.78` (L1663). Atlas F10's Argument Mapping
+  and Toulmin Model rows (L572-573) also use the word "claim" — but as a
+  component of THEIR OWN method technique ("main claim -> support ->
+  objection -> rebuttal -> evidence"; "Claim/Grounds/Warrant/Backing/
+  Qualifier/Rebuttal") describing how a method OPERATES ON a claim during
+  execution, not a persisted Claim record's own field shape. Folding those
+  in here would be inventing structure with no record-level textual basis
+  (no methods/registry/ entry for either technique exists yet — grepped,
+  zero hits), so they are deliberately left out and recorded in
+  `open_questions` instead, per this task's explicit instruction to be
+  honest about thin grounding rather than build a rich schema no line
+  supports.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md Appendix A directory listing (L3999)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md Appendix A path listing (L4585)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.20 Evidence Matrix worked example (L1657-1669, table row at L1663)"
+  - "specs/evidence/evidence.schema.yaml (supporting_evidence/contradicting_evidence real $ref, built same task)"
+  - "specs/governance/epistemic-label.schema.yaml (full epistemic_type enum remains legal for a Claim — see compilation_decisions)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.4 row (L133)"
+
+decided_by: >
+  No ADR governs this file's field shape (same grep sweep as
+  evidence.schema.yaml: docs/adr/ADR-001~010 full text, zero hits for
+  "Claim record"/"Evidence Matrix" ruling on Claim's own fields — the two
+  ADR-001/ADR-004 "Evidence Matrix" citations found are both about the
+  Mandatory Gate Injection tool checklist, not this record). MACHINE_READABLE_SPEC_PLAN.md
+  §2.4's row for this file lists no Finding ID ("解決的 Finding" = "—").
+  This file's dependency on evidence.schema.yaml (both built this task) is a
+  genuine field-level $ref, not a soft forward-Wave placeholder — see
+  `supporting_evidence`/`contradicting_evidence` below.
+
+compilation_decisions:
+  - question: >
+      Should `provenance.epistemic_type` be fixed to a single `const` value,
+      the way evidence.schema.yaml fixes EVIDENCE and assumption.schema.yaml
+      (built same task) fixes ASSUMPTION?
+    decision: "No — left as the full, unrestricted epistemic_type enum ($ref, unmodified)."
+    reasoning: >
+      CLAIM does not appear anywhere in governance/epistemic-label.schema.yaml's
+      11-value epistemic_type enum (SOURCE_FACT, EVIDENCE, ASSUMPTION,
+      HYPOTHESIS, AI_INFERENCE, AI_SUGGESTION, HUMAN_OPINION,
+      CALCULATED_RESULT, SIMULATED_RESULT, UNKNOWN, DECISION) — unlike
+      Evidence and Assumption, each of which literally IS one of those 11
+      values. A Claim is a container for an assertion of ANY of those
+      kinds — a claim can itself be a hypothesis, an AI inference, a human
+      opinion, a calculated result, etc. — so `epistemic_type` describes
+      WHAT KIND of assertion the claim is making, and narrowing it to one
+      const would be structurally wrong, not merely under-specified.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+type: object
+required: [claim_id, statement, provenance]
+properties:
+
+  claim_id:
+    type: string
+    pattern: "^C-[0-9]+$"
+    description: "Atlas §11.20 worked example: 'C-01' (L1663)."
+
+  statement:
+    type: string
+    description: >
+      NEW_DESIGN field name — no mother-document line names the claim's own
+      assertion-text field ("Claim ID" is a table column header in §11.20,
+      not a record schema). Named `statement` for internal consistency with
+      evidence.schema.yaml and assumption.schema.yaml (built same task),
+      whose own `statement` fields are directly grounded (MP §24 L1556, EC
+      §116 L3241). Required: a claim record with an ID but no assertion
+      text is not a claim.
+
+  supporting_evidence:
+    type: array
+    items:
+      $ref: "ai-lego://specs/evidence/evidence.schema.yaml"
+    description: >
+      Atlas §11.20 'Supporting' column, example `E-1, E-2` (L1663). Real
+      $ref to evidence.schema.yaml (built this same task, not a soft
+      forward-Wave placeholder) — since that schema only requires
+      `evidence_id` + `provenance`, a caller MAY supply a minimal
+      `{evidence_id, provenance}` stub as a lightweight reference, or a
+      fully fleshed Evidence record inline.
+
+  contradicting_evidence:
+    type: array
+    items:
+      $ref: "ai-lego://specs/evidence/evidence.schema.yaml"
+    description: "Atlas §11.20 'Contradicting' column, example `E-8` (L1663). Same $ref shape as supporting_evidence above."
+
+  quality:
+    type: string
+    description: >
+      Atlas §11.20 'Quality' column, example 'High' (L1663). No enum is
+      defined anywhere in the mother documents for this column; kept as a
+      free string rather than inventing a scale. See `open_questions.MRSP-claim-2`.
+
+  coverage:
+    type: string
+    description: "Atlas §11.20 'Coverage' column, example '3 regions' (L1663)."
+
+  confidence:
+    type: [number, "null"]
+    minimum: 0
+    maximum: 1
+    default: null
+    description: "Atlas §11.20 'Confidence' column, example 0.78 (L1663)."
+
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+    description: >
+      Unmodified provenance_record — full 11-value epistemic_type enum
+      remains legal for a Claim (see `compilation_decisions` above).
+
+# ---------------------------------------------------------------------------
+# Forward dependents (informational — these files depend on this one)
+# ---------------------------------------------------------------------------
+referenced_by:
+  - "specs/evidence/assumption.schema.yaml (MACHINE_READABLE_SPEC_PLAN.md §2.4 lists assumption.schema.yaml's dependency column as this file — see that file's compilation_decisions for how the two relate: Assumption is treated as narrowing this record's provenance to a fixed epistemic_type, the same pattern evidence.schema.yaml uses)"
+
+# ---------------------------------------------------------------------------
+# Genuinely open questions — NOT decided by this file
+# ---------------------------------------------------------------------------
+open_questions:
+  - id: "MRSP-claim-1"
+    question: >
+      Argument Mapping and Toulmin Model (Atlas F10, L572-573) describe
+      richer claim-argumentation structures (support/objection/rebuttal;
+      Grounds/Warrant/Backing/Qualifier) that this file deliberately does
+      not fold in (see top-level `description`). Should a future
+      `typed-objects/argument-map.schema.yaml` be built as a SEPARATE,
+      richer wrapper around one or more base Claim records for method
+      executions that specifically run Argument Mapping or Toulmin Model,
+      rather than extending this base record? No existing methods/registry/
+      entry for either technique was found (grepped, zero hits), so this is
+      new design territory, not a compilation gap this file must close.
+    owner: "operator / future Wave"
+    blocks: "nothing in this schema"
+
+  - id: "MRSP-claim-2"
+    question: >
+      `quality` and `coverage` are transcribed as free strings straight from
+      Atlas §11.20's own example values ('High', '3 regions') with no
+      enum/unit defined anywhere. Should a future revision constrain
+      `quality` to a fixed scale (e.g. reusing execution/risk-tier.schema.yaml's
+      four-level style), or leave it free-form as domain-specific, the same
+      way evidence.schema.yaml's `hierarchy_tier` was deliberately left open?
+    owner: "operator"
+    blocks: "nothing in this schema"
+
+verification:
+  method: >
+    Read/Grep against Atlas Appendix A (L3999, L4585), Atlas §11.20
+    (L1657-1669, table row at L1663), Atlas F10 rows 572-575,
+    governance/epistemic-label.schema.yaml, docs/adr/ADR-001~010 full text
+    (zero hits ruling on Claim's own field shape), methods/registry/*.yaml
+    (grepped for "toulmin"/"argument_mapping", zero hits).
+  note: >
+    Every field in this schema traces to the single §11.20 worked example
+    row except `statement` (NEW_DESIGN, justified above) and `provenance`
+    (a direct, unmodified $ref). No mother document was modified to produce
+    this file.

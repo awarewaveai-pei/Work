@@ -91,7 +91,7 @@ PROJECT_ROOT/                                  ← D:\Work\agency-os\docs\AI_LEG
 | `risk-tier.schema.yaml` | R0–R4 五級唯一 canonical risk_tier enum，取代 Atlas 四級 | YAML (JSON Schema) | 無 | CROSS-T-3, CROSS-R-10（ADR-004a） | **BUILT（2026-08-29，`specs/execution/risk-tier.schema.yaml`）** |
 | `status-codes.schema.yaml` **（新增）** | 統一收斂全庫所有 blocking/escalation 機讀狀態碼：`PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED`/`METHOD_RESOLUTION_BLOCKED` 合併映射、EC 另外 9 個具名信號（`DOCUMENT_RESOLUTION_BLOCKED`/`CURRENT_STATE_DRIFT_DETECTED`/`SCOPE_CHANGE_REQUIRED`/`LEGAL_REVIEW_REQUIRED`/`BUDGET_REVIEW_REQUIRED`/`CONFLICT_REQUIRES_HUMAN_REVIEW`/`PREEXISTING_WORKTREE_CHANGES`/`OFFLINE_SOURCE_STALE`）與 §10 合法 side states 的映射關係，並新增 §5 提案的 `PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED` | YAML (JSON Schema) | 無 | CROSS-R-4, CROSS-T-5, DOC-execution_contract-9, DOC-execution_contract-3（`NEEDS_REVIEW` 未宣告） | **BUILT（2026-08-29，`specs/execution/status-codes.schema.yaml`；額外發現新衝突 P1-DUP-6，見 DUPLICATION_REGISTER.yaml）** |
 | `manifest.schema.yaml` | Execution Manifest 唯一正本，合併 MP §0.0.3 Atlas pin（file/declared_version/content_hash/loaded）+ EC §64 documents 段（version/sha256）+ MP §69 flat pin list + Atlas §16.3 method_execution record 四種形狀，並補上 ADR-001 建議的 Architecture Constitution 記錄欄位 | YAML (JSON Schema) | governance/epistemic-label（provenance 欄位）、Architecture-Constitution-v1.md（記錄它的 hash） | CROSS-R-6, CROSS-T-4, DOC-execution_contract-2（`document_version+content_hash` vs `version+sha256` 命名不一致） | **BUILT（2026-08-29，`specs/execution/manifest.schema.yaml`；EC L85 prose 與機讀區塊仍不一致，留 open_question 未擅自改母文件）** |
-| `normative-context.schema.yaml` **（新增）** | 定義 `Section Registry`（EC L198）與 `Normative Context Bundle`（EC L204）結構，供 Task Execution Packet 的 `normative-context.yaml` 引用 | YAML (JSON Schema) | manifest.schema.yaml | CROSS-T-18 | READY（母文件僅提名詞，內容需 Phase 3 從零設計，非重複定義修正） |
+| `normative-context.schema.yaml` **（新增）** | 定義 `Section Registry`（EC L198）與 `Normative Context Bundle`（EC L204）結構，供 Task Execution Packet 的 `normative-context.yaml` 引用 | YAML (JSON Schema) | manifest.schema.yaml | CROSS-T-18 | **BUILT（2026-08-29）**——~85% 為 Phase 3 新設計，已誠實標註非母文件既有承諾內容 |
 | `method-resolution.schema.yaml` | Task Context → Method Atlas selection_context 的欄位映射表，補齊 `goal_type/problem_type/required_rigor/decision_criticality/evidence_available/uncertainty/time_horizon` 等 EC task_context 缺失欄位 | YAML (JSON Schema) | risk-tier.schema.yaml, cognitive/method.schema.yaml | CROSS-T-16 | READY |
 | `task.schema.yaml` | EC §92 既有承諾，task_context 完整結構 | YAML (JSON Schema) | risk-tier, governance/epistemic-label | （沿用既有承諾，無單一 finding） | READY |
 | `document-registry.schema.yaml` | EC §92 既有承諾，含三母文件 + Architecture Constitution 的 identity header 登記 | YAML (JSON Schema) | Architecture-Constitution-v1.md | OQ-1（identity header 缺失） | READY |
@@ -103,7 +103,7 @@ PROJECT_ROOT/                                  ← D:\Work\agency-os\docs\AI_LEG
 | `exception.schema.yaml` | EC §92 既有承諾 | YAML (JSON Schema) | — | — | READY |
 | `result.schema.yaml` | EC §92 既有承諾 | YAML (JSON Schema) | cognitive/typed-method-result.schema.yaml | CROSS-R-3（部分：result.schema.yaml 不等於 TypedMethodResult，見 2.3） | READY |
 | `handoff.schema.yaml` | EC §92 既有承諾 | YAML (JSON Schema) | authority.schema.yaml | — | READY |
-| `section-registry.schema.yaml` **（新增，若與 normative-context 分離設計）** | 若評估後 Section Registry 與 Normative Context Bundle 不宜合併為一檔，另立此檔 | YAML (JSON Schema) | normative-context.schema.yaml | CROSS-T-18（同上，二擇一實作細節） | READY |
+| `section-registry.schema.yaml` **（新增，評估後確定分離設計）** | Section Registry 與 Normative Context Bundle 判定為不同生命週期（前者文件層級可跨 execution 重用，後者 per-execution）而分離為兩檔 | YAML (JSON Schema) | normative-context.schema.yaml | CROSS-T-18（同上） | **BUILT（2026-08-29）** |
 | `deprecation-pipeline.schema.yaml` **（新增）** | 統一 Atlas §24.3（6 步）與 EC §113（7 步，多 Deadline）的方法/物件退場流程，採 EC 版（更完整，屬 Low-risk 事實性補全，非需要 ADR 裁決的取捨） | YAML (JSON Schema) | status-codes.schema.yaml | CROSS-T-19 | READY |
 
 ### 2.3 `/specs/cognitive/`（Wave 3 — Method Selection Engine 核心）
@@ -129,11 +129,11 @@ PROJECT_ROOT/                                  ← D:\Work\agency-os\docs\AI_LEG
 
 | 檔名 | 用途 | 格式 | 依賴 | 解決的 Finding | 狀態 |
 |---|---|---|---|---|---|
-| `evidence/evidence.schema.yaml` | Atlas Appendix A 既有承諾 | YAML (JSON Schema) | governance/epistemic-label | — | READY |
-| `evidence/claim.schema.yaml` | Atlas Appendix A 既有承諾 | YAML (JSON Schema) | evidence.schema.yaml | — | READY |
-| `evidence/assumption.schema.yaml` | 合併 MP §24（type/evidence_strength/confidence/validation_method）+ EC §116（evidence[]/validation/owner）+ Atlas F10（ID/statement/type/evidence/confidence/validation/status/owner，欄位最完整）三種形狀，建議採 Atlas F10 版為底 | YAML (JSON Schema) | claim.schema.yaml | CROSS-T-13 | READY（Low-risk 事實性合併：三形狀是子集關係非互斥取捨，可直接取聯集） |
-| `decision/decision.schema.yaml` | Atlas Appendix A 既有承諾 | YAML (JSON Schema) | governance/epistemic-label（DECISION 型別 + LOCKED_DECISION） | — | READY |
-| `decision/reversal.schema.yaml` | 合併 Atlas 語言政策範例（`reversal_conditions: indicator/threshold/action`）+ Atlas §11.33（`reversal: indicator/condition/action/owner`）+ EC §88（`reversal: indicators[]/thresholds[]/owner/action`，複數陣列）三種形狀 | YAML (JSON Schema) | decision.schema.yaml | CROSS-T-12 | READY（同上，聯集式合併：建議採 EC 複數陣列形狀為底，因唯一支援多指標場景） |
+| `evidence/evidence.schema.yaml` | Atlas Appendix A 既有承諾 | YAML (JSON Schema) | governance/epistemic-label | — | **BUILT（2026-08-29）**——母文件對本體形狀證據薄弱，誠實標記 `content`/`source` 為新設計非既有承諾 |
+| `evidence/claim.schema.yaml` | Atlas Appendix A 既有承諾 | YAML (JSON Schema) | evidence.schema.yaml | — | **BUILT（2026-08-29）**——以 Atlas §11.20 Evidence Matrix 實例為主要依據 |
+| `evidence/assumption.schema.yaml` | 合併 MP §24（type/evidence_strength/confidence/validation_method）+ EC §116（evidence[]/validation/owner）+ Atlas F10（ID/statement/type/evidence/confidence/validation/status/owner，欄位最完整）三種形狀，建議採 Atlas F10 版為底 | YAML (JSON Schema) | claim.schema.yaml | CROSS-T-13 | **BUILT（2026-08-29）**——逐欄位核對後發現本列「F10 最完整」的敘述其實不精確：F10 缺 `impact_if_wrong`（MP/EC 皆有），已補回，非機械照抄 |
+| `decision/decision.schema.yaml` | Atlas Appendix A 既有承諾 | YAML (JSON Schema) | governance/epistemic-label（DECISION 型別 + LOCKED_DECISION） | — | **BUILT（2026-08-29）**——以 Atlas §16.2 Decision Object 範例為主，補回 MP §53 額外欄位（risks/predictions） |
+| `decision/reversal.schema.yaml` | 合併 Atlas 語言政策範例（`reversal_conditions: indicator/threshold/action`）+ Atlas §11.33（`reversal: indicator/condition/action/owner`）+ EC §88（`reversal: indicators[]/thresholds[]/owner/action`，複數陣列）三種形狀 | YAML (JSON Schema) | decision.schema.yaml | CROSS-T-12 | **BUILT（2026-08-29）**——EC 陣列形狀不完全能無損吸收 Atlas 雙語政策範例（每項可各自 action），改用 `oneOf` 雙形狀而非強行統一 |
 
 ### 2.5 `/specs/domain/`、`/specs/artifact/`、`/specs/security/`（Wave 2 — Tenant/CAS/個資）
 
@@ -156,9 +156,9 @@ PROJECT_ROOT/                                  ← D:\Work\agency-os\docs\AI_LEG
 
 | 檔名 | 用途 | 格式 | 依賴 | 解決的 Finding | 狀態 |
 |---|---|---|---|---|---|
-| `context.schema.yaml` | Atlas Appendix A 既有承諾 | YAML (JSON Schema) | domain/tenant.schema.yaml（`home_jurisdiction`） | — | READY |
-| `availability.schema.yaml` | Atlas Appendix A 既有承諾，7-status Capability Availability enum | YAML (JSON Schema) | context.schema.yaml | CROSS-T-21（casing 未定案：Title Case enum vs lowercase yaml 範例，Low-risk 直接統一為 lowercase） | READY |
-| `pack.schema.yaml` **（新增）** | 定義 `Jurisdiction Pack`/`Applicable Pack`——EC 用了三次卻從未定義的核心構件 | YAML (JSON Schema) | availability.schema.yaml | DOC-execution_contract-5 | READY（新設計） |
+| `context.schema.yaml` | Atlas Appendix A 既有承諾 | YAML (JSON Schema) | domain/tenant.schema.yaml（`home_jurisdiction`） | — | **BUILT（2026-08-29）** |
+| `availability.schema.yaml` | Atlas Appendix A 既有承諾，7-status Capability Availability enum | YAML (JSON Schema) | context.schema.yaml | CROSS-T-21（casing 未定案：Title Case enum vs lowercase yaml 範例，Low-risk 直接統一為 lowercase） | **BUILT（2026-08-29）**——7 值統一為 lowercase snake_case（`allowed/restricted/human_review/local_only/government_only/prohibited/unknown`） |
+| `pack.schema.yaml` **（新增）** | 定義 `Jurisdiction Pack`/`Applicable Pack`——EC 用了三次卻從未定義的核心構件 | YAML (JSON Schema) | availability.schema.yaml | DOC-execution_contract-5 | **BUILT（2026-08-29）**——formalize `GLOBAL_JURISDICTION_PLAN.md` 既有設計為正式 schema，非重新設計 |
 | `conflict-of-laws-output.schema.yaml` **（新增）** | `/modules/jurisdiction/conflicts/` 路徑與 §98 Conflict-of-Laws Engine 的輸出格式與仲裁規則 | YAML (JSON Schema) | pack.schema.yaml | P1-GAP-LEGAL-4 | **BLOCKED_PENDING_ROUND2_ADR**（兩個機制哪個該贏尚未裁決，非單純缺 schema） |
 
 ### 2.7 `/methods/registry/`（Wave 3，Atlas Method Contract 相關）
@@ -222,10 +222,12 @@ Wave 2 ── ✅ 核心完成（2026-08-29）           Wave 3 ── ✅ 核�
   security/tenant-isolation-controls.schema.yaml
     ── BLOCKED_PENDING_ROUND2_ADR
           ↓                                          ↓
-Wave 4  specs/evidence/{evidence,claim,assumption}.schema.yaml
-        specs/decision/{decision,reversal}.schema.yaml
-        specs/jurisdiction/{context,availability,pack}.schema.yaml
-        specs/execution/{normative-context,section-registry}.schema.yaml
+Wave 4 ── ✅ 完成（2026-08-29）
+  specs/evidence/{evidence,claim,assumption}.schema.yaml ✅
+  specs/decision/{decision,reversal}.schema.yaml ✅
+  specs/jurisdiction/{context,availability,pack}.schema.yaml ✅
+    （jurisdiction/conflict-of-laws-output.schema.yaml 仍 BLOCKED_PENDING_ROUND2_ADR，未建）
+  specs/execution/{normative-context,section-registry}.schema.yaml ✅
           ↓
 Wave 5  specs/execution/ 其餘檔（task/document-registry/current-state/authority/
           change-plan/rollback/exception/result/handoff）

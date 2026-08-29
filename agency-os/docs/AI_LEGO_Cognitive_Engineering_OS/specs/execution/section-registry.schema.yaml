@@ -1,0 +1,434 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/execution/section-registry.schema.yaml"
+title: Section Registry
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the "Section Registry" pipeline
+  node named at Execution Contract §3.2 (L198), one stage in the mandated
+  index-based retrieval pipeline (EC L192-205):
+
+    Full Document -> Index -> Section Registry -> Content Hash ->
+    Task-specific Retrieval -> Normative Context Bundle
+
+  Resolves CROSS-T-18 (verified-findings.yaml, severity medium, verdict
+  CONFIRMED): "Section Registry" (EC L198) and "Normative Context Bundle"
+  (EC L204) are load-bearing components of this pipeline, and
+  `normative-context.yaml` is a required file of every Task Execution
+  Packet (EC §15, L738), yet no mother document defines any structure for
+  either — EC §92's 13-file machine-readable spec list (L2766-2783) has no
+  entry for either concept, and grep confirms neither term appears anywhere
+  in the Master Plan or the Method Atlas.
+
+  NEW DESIGN notice: unlike `manifest.schema.yaml` or
+  `governance/epistemic-label.schema.yaml`, this is not a
+  duplicate-definition compilation of existing mother-document field lists
+  — EC §3.2 only names this pipeline stage and states its PURPOSE (avoid
+  reloading full documents every task; let an index be reused across runs
+  "只要 hash 未變", EC L207; make loading provable, EC L214). It specifies
+  zero fields. Everything below not explicitly cited to a mother-document
+  line is Phase 3 invention required to make that stated pipeline stage
+  implementable — see `compilation_decisions` for the reasoning behind each
+  invented field, and the top-level `verification.note` for an honest
+  grounded-vs-invented ratio.
+
+  Scope of this file: the per-document Section Registry — a catalog of the
+  addressable sections inside ONE mandatory document, each carrying its own
+  content hash. Its sibling `normative-context.schema.yaml` defines the
+  Normative Context Bundle — the per-task record of which registry entries
+  were actually pulled in for one task/execution. See that file's
+  `compilation_decisions` for why the two are separate files rather than
+  one, and this file's own split-rationale entry below for the same
+  decision from this side.
+
+compilation_decisions:
+  - question: >
+      Should Section Registry and Normative Context Bundle be one file
+      (Section Registry folded in as a sub-definition, the task's stated
+      default) or two separate files?
+    decision: "Two files: this file (section-registry.schema.yaml) plus normative-context.schema.yaml."
+    reasoning: >
+      Two concrete, citable structural signals point at a genuine lifecycle
+      split, not just a conceptual one: (1) EC §15's Task Execution Packet
+      directory listing (L730-749) names exactly one relevant file per task,
+      `normative-context.yaml` (L738) — there is no section-registry file
+      inside any single task's packet, meaning the Registry is NOT a
+      per-task artifact; it must live outside the packet, at a scope shared
+      across tasks. (2) EC L207 ("第一次建立 index 後，只要 hash 未變，可
+      重用 index") is explicitly a reuse-across-runs promise — the Registry
+      is a document-scoped cache invalidated only when THAT document's
+      content changes, while a Normative Context Bundle is inherently
+      per-task and gets a fresh instance every time a Task Execution Packet
+      is compiled. Forcing a document's entire section catalog to be
+      re-serialized (and re-hashed, re-timestamped) inside every task's
+      Bundle would defeat EC L207's own reuse purpose. This is the same
+      reasoning family `manifest.schema.yaml` used to justify staying a
+      separate file from `document-registry.schema.yaml` despite both
+      tracking document version/hash (different Wave, different grain,
+      different consumer) — see that file's compilation_decisions, item 3.
+      Per-field cross-referencing keeps the two files coupled without
+      merging them: `normative-context.schema.yaml`'s `loaded_sections[]`
+      pins `(document_id, section_id, section_sha256)` tuples that resolve
+      against entries defined here.
+    scope_note: >
+      MACHINE_READABLE_SPEC_PLAN.md §2.2 row 106 lists this file's
+      dependency as `normative-context.schema.yaml` (build-order framing —
+      normative-context.schema.yaml is the "required" file per the task
+      brief, this one conditional on it). The natural DATA dependency
+      actually runs the other way: a Bundle entry references a specific
+      Section Registry entry, so `normative-context.schema.yaml` is the one
+      with the real structural need to resolve against THIS file's shape,
+      not vice versa. Flagged under `open_questions` rather than silently
+      resolved against the plan's listed arrow — editing that plan file is
+      out of scope for this task's explicit file boundary.
+  - question: >
+      One combined registry object covering all four mandatory documents,
+      or one registry object per document (this file validates a single
+      instance, one per document)?
+    decision: "One Section Registry instance per document; four instances for the four mandatory documents, not one combined file."
+    reasoning: >
+      Mirrors the reasoning the task brief itself raised for per-section
+      hashing (a change to one section should not invalidate registry
+      entries for unrelated sections) one level up: a change to ONE
+      mandatory document (e.g. the Master Plan gets a new section) should
+      not invalidate the cached registry for the other three unrelated
+      documents (Method Atlas, Execution Contract, Architecture
+      Constitution). `manifest.schema.yaml`'s `documents[]` array already
+      tracks each of the four with independent `version`/`sha256` pairs —
+      this file's `document_sha256` freshness gate operates at that same
+      per-document granularity, not a compound one.
+  - question: >
+      What format should `section_id` take? (EC names no convention —
+      grounded instead in how the mother documents actually number their
+      own headings.)
+    decision: >
+      Free-form string, required to equal the exact heading number/token
+      as it literally appears in the source markdown — no single regex
+      pattern is enforced.
+    reasoning: >
+      Grepped all three mother documents' `^#{1,3} ` headings before
+      choosing this. Master Plan and Execution Contract both use
+      dotted-decimal outline numbers of varying depth (`0.0.1`, `0.0.3`,
+      `1.1`, `3.2`, `64`, `92` — EC even uses bare two-digit top-level
+      numbers with no dots at all, e.g. `# 64. task.manifest.yaml`-adjacent
+      sections). The Method Atlas uses the SAME dotted-decimal style for
+      most sections (`5.1`, `5.2`, `11.1`) but ADDITIONALLY uses F-prefixed
+      alphanumeric ids for its §8 method-catalog subsections (`## F01 —
+      目標與問題框定` through `## F24`). A single regex tight enough to be
+      useful would reject one of these two real, currently-in-use
+      conventions. Rather than invent a fourth convention no document uses,
+      `section_id` stays a plain string with the hard requirement that it
+      be grep-able against the literal heading text in the source file —
+      preserving human verifiability over machine strictness.
+  - question: >
+      What exactly does "Content Hash" (EC L200) hash? The pipeline names
+      the node but never specifies scope, boundaries, or algorithm.
+    decision: >
+      `section_sha256` = sha256 of the UTF-8 bytes of the closed line range
+      `[start_line, end_line]` (inclusive), read verbatim from the same
+      document content that produced `document_sha256`. `end_line` is
+      defined as one less than the line number of the next heading whose
+      outline depth is the same as or shallower than this entry's own
+      heading (or end-of-file, if no such heading follows). `hash_scope`
+      records this rule by name (`heading_to_next_heading`) so a future
+      second convention can be added without breaking existing entries.
+    reasoning: >
+      This is the field the task brief explicitly asked to be documented as
+      a genuine design choice (point 2): reusing the whole-document
+      `sha256` convention already established by `manifest.schema.yaml` for
+      `document_sha256`, but adding a PER-SECTION hash so that editing one
+      section does not force every task that already loaded an unrelated
+      section to be treated as stale. The heading-depth rule was chosen
+      over relying on the `---` horizontal-rule separators visible between
+      many EC top-level `# N.` sections, because grep confirms those
+      separators do NOT appear between every heading pair (e.g. no `---`
+      between EC's `## 3.1` and `## 3.2`, and none between the Atlas's
+      `## F0x` subsections) — heading depth is the only boundary rule that
+      generalizes across all three documents' actual structure.
+      `sha256_hash`'s format itself is not reinvented a third time: it
+      reuses `artifact/cas-path.schema.yaml#/definitions/sha256_hash`
+      (Wave 2, already BUILT) via a real hard `$ref` — a safe backward
+      dependency, the same direction `typed-objects/problem-statement.schema.yaml`
+      used referencing `governance/epistemic-label.schema.yaml`.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §3.2 pipeline, reuse rule, and audit-purpose bullets (L187-215)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §15 Task Execution Packet directory listing (L730-749), confirming no per-task section-registry file exists"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §92 Machine-readable Execution Specs list (L2766-2783), confirming the gap"
+decided_by: >
+  No ADR governs this file — CROSS-T-18 is an `undefined_term` finding (a
+  documented gap, not a documented conflict between competing existing
+  designs), so there is nothing for an ADR to arbitrate between. Built per
+  docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2 row for
+  `normative-context.schema.yaml` / `section-registry.schema.yaml` (status:
+  READY, "母文件僅提名詞，內容需 Phase 3 從零設計，非重複定義修正"). All
+  field-level and split/merge choices are Phase 3 compilation decisions
+  recorded above, not a separate ADR — consistent with the precedent
+  `typed-objects/problem-statement.schema.yaml` set for genuinely new,
+  from-scratch type definitions.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+# One instance of this schema = one mandatory document's Section Registry.
+# Suggested (NEW DESIGN, not mother-document-specified) storage location,
+# following the same "建議" framing EC §4 used for document-registry.yaml:
+#   .ai/index/section-registry/<document_id>.yaml   (one file per document_id)
+
+type: object
+required: [document_id, document_version, document_sha256, generated_at, sections]
+properties:
+
+  document_id:
+    $ref: "ai-lego://specs/execution/manifest.schema.yaml#/properties/documents/items/properties/document_id"
+    description: >
+      Real hard $ref (not soft-by-convention) — this is the identical
+      4-value concept at the identical grain as manifest.schema.yaml's
+      `documents[].document_id`, and manifest.schema.yaml is Wave 1
+      (already BUILT), so this Wave 4 file depending on it is a safe
+      backward dependency, not a forward one.
+
+  document_version:
+    type: string
+    description: >
+      Mirrors manifest.schema.yaml `documents[].version` (EC §64/§4 naming,
+      per that file's own compilation_decisions) — the document version
+      this registry snapshot was generated against.
+
+  document_sha256:
+    $ref: "ai-lego://specs/artifact/cas-path.schema.yaml#/definitions/sha256_hash"
+    description: >
+      Whole-document content hash — MUST equal the value a
+      manifest.schema.yaml-conformant Execution Manifest records at
+      `documents[].sha256` for this same `document_id`, at any moment they
+      are compared. This registry is stale (must be regenerated) the
+      instant the live document's sha256 diverges from this value — this
+      field is the literal mechanism behind EC L207's "只要 hash 未變，可
+      重用 index" reuse promise. Cross-file value equality is a
+      caller/runtime responsibility, not something JSON Schema can enforce
+      structurally — the same limitation `manifest.schema.yaml` and
+      `typed-objects/problem-statement.schema.yaml` already accepted for
+      their own cross-field/cross-file constraints (see each file's
+      `compilation_decisions`).
+
+  generated_at:
+    type: string
+    format: date-time
+    description: "When this registry snapshot was (re)built."
+
+  generator:
+    type: string
+    description: >
+      OPTIONAL. Free-text id of the tool/method that compiled this
+      registry, e.g. `index.compile_section_registry`. NEW DESIGN, not
+      required — provenance-of-the-index-itself is useful but not load-
+      bearing for the reuse mechanism above.
+
+  sections:
+    type: array
+    minItems: 1
+    items:
+      $ref: "#/definitions/section_registry_entry"
+
+definitions:
+
+  section_registry_entry:
+    type: object
+    required: [section_id, heading, start_line, end_line, hash_scope, section_sha256]
+    properties:
+
+      section_id:
+        type: string
+        description: >
+          Free-form string, required to equal the literal heading
+          number/token as it appears in the source markdown (e.g. "3.2",
+          "64", "0.0.3", "F01" — see compilation_decisions for why no
+          single pattern is enforced across all three mother documents'
+          real, currently-differing numbering conventions).
+
+      parent_section_id:
+        type: [string, "null"]
+        default: null
+        description: >
+          Outline-parent linkage, e.g. section_id "3.2" MAY carry
+          parent_section_id "3" if a bare "# 3." heading was itself
+          registered as its own entry. NEW DESIGN, OPTIONAL — null when the
+          section is top-level, or when its parent heading was not itself
+          registered as a separate addressable entry (registries are not
+          required to register every outline depth, only the depths a task
+          actually needs to retrieve at). A parent entry's own
+          `[start_line, end_line]` range naturally CONTAINS (overlaps with)
+          every child entry's range — a parent heading's section, by
+          definition, includes the text of its nested subsections. This is
+          expected hierarchical structure, not a data-integrity error; this
+          schema does not forbid overlapping ranges between a parent and
+          its declared children.
+
+      heading:
+        type: string
+        description: >
+          Literal heading text, verbatim from the source markdown,
+          including its own numbering (e.g. "3.2 不要求每次把全部文件塞進
+          Context"). Kept as plain text (not re-parsed into number+title)
+          so this field stays byte-comparable against the source for audit.
+
+      start_line:
+        type: integer
+        minimum: 1
+        description: "1-indexed line number of this section's own heading line."
+
+      end_line:
+        type: integer
+        minimum: 1
+        description: >
+          1-indexed line number of the LAST line included in this section's
+          hashed range — one less than the next heading of the same-or-
+          shallower outline depth, or end-of-file if none follows. See
+          `hash_scope` and compilation_decisions for the full rule.
+
+      hash_scope:
+        type: string
+        enum: [heading_to_next_heading]
+        default: heading_to_next_heading
+        description: >
+          NEW DESIGN convention name for the exact boundary rule applied
+          to compute `section_sha256` (see compilation_decisions). Kept as
+          an explicit enum field, not an implicit assumption, so a future
+          second convention (e.g. a semantic/paragraph-aware splitter) can
+          be introduced later without silently reinterpreting existing
+          entries.
+
+      section_sha256:
+        $ref: "ai-lego://specs/artifact/cas-path.schema.yaml#/definitions/sha256_hash"
+        description: >
+          sha256 of the UTF-8 bytes of lines [start_line, end_line]
+          inclusive, read verbatim from the document whose whole-file hash
+          is `document_sha256` above. Distinct from `document_sha256` by
+          design (task brief point 2): a change to one section must not
+          invalidate registry entries for unrelated sections of the same
+          document.
+
+open_questions:
+  - id: "MRSP-secreg-1"
+    question: >
+      MACHINE_READABLE_SPEC_PLAN.md §2.2 row 106 lists this file's
+      dependency direction as pointing AT `normative-context.schema.yaml`;
+      this file's actual real $refs run the other way in
+      `normative-context.schema.yaml` (a Bundle entry resolves against a
+      Section Registry entry, not the reverse). Left unresolved against the
+      plan text itself — editing that file is outside this task's file
+      boundary (only the two schema files were authorized to be created).
+    owner: "operator, next time MACHINE_READABLE_SPEC_PLAN.md's Wave 4 row is revised"
+    blocks: "nothing in this schema; flagged for completeness per R4 (claim-before-verify)"
+  - id: "MRSP-secreg-2"
+    question: >
+      `section_sha256` is defined over line-range bytes with no stated
+      line-ending normalization (CRLF vs LF). This repo is Windows-hosted
+      (`D:\Work`) but the mother documents may be checked out or read on
+      other platforms across a 30-year horizon; an un-normalized hash would
+      silently disagree across platforms even when the semantic content is
+      identical. Left open rather than guessed — normalization policy
+      (e.g. always hash after `\r\n` -> `\n`) is a real design decision this
+      file should not make unilaterally without a documented convention
+      applied consistently everywhere hashes are computed in this project
+      (including `manifest.schema.yaml`'s whole-document `sha256`, which
+      has the identical unstated gap).
+    owner: "operator / whichever tool first implements `index.compile_section_registry`"
+    blocks: "cross-platform hash reproducibility; does not block schema validity itself"
+
+verification:
+  method: >
+    Read against EC §3.2 (L187-215), §15 (L730-749), §92 (L2766-2783),
+    verified-findings.yaml CROSS-T-18 full entry, `manifest.schema.yaml`
+    full read (for `documents[].document_id`/`sha256` field reuse), and
+    `artifact/cas-path.schema.yaml` full read (for `sha256_hash` reuse).
+    `heading_to_next_heading` boundary rule cross-checked by grepping
+    `^#{1,3} ` across all three mother documents (confirms both the
+    dotted-decimal and F-prefixed numbering conventions cited above, and
+    confirms `---` separators do not appear between every heading pair).
+  worked_example: >
+    The `examples` block below uses REAL, reproducibly-computed sha256
+    values (not placeholders) for EC §3.2 and MP §0.0.3, both against
+    mother-document content as of commit `293e9289f2f6e890557f0c714209cf4e40a75f78`
+    (2026-08-29, the commit that last touched both files at authoring
+    time): `sed -n '187,217p' AI_LEGO_..._Execution_Contract_v1.md | sha256sum`
+    and `sha256sum AI_LEGO_..._Execution_Contract_v1.md` for the EC pair;
+    `sed -n '85,105p' AI_LEGO_..._Master_Plan_v1.md | sha256sum` and
+    `sha256sum AI_LEGO_..._Master_Plan_v1.md` for the MP pair. These values
+    WILL change the next time either mother document's bytes change — they
+    are illustrative of the mechanism, not permanent pins, and inherit the
+    CRLF-normalization open question above (computed on this session's
+    checkout as-is, no normalization applied).
+  note: >
+    No mother document or ADR was modified to produce this file. Ratio
+    honesty (per task instruction): the pipeline node names, their order,
+    and their stated purpose (avoid full-document reloads; reuse while hash
+    unchanged; prove what was loaded) are transcribed verbatim from EC
+    L187-215 — roughly the `description` and the existence of `document_id`/
+    `document_version`/`document_sha256`/`sections` as a concept. Every
+    concrete field name, the `section_id`/`hash_scope`/`section_sha256`
+    field shapes, the split-into-two-files decision, and the
+    one-registry-per-document decision are Phase 3 invention, documented
+    above as such rather than presented as mother-document fact. Roughly:
+    ~15% grounded in cited mother-document text (the pipeline's existence,
+    order, and purpose), ~85% new design necessary to make that pipeline
+    stage implementable — see `compilation_decisions` for the reasoning
+    behind each invented piece.
+
+examples:
+  - description: >
+      Section Registry for the Execution Contract, containing two real
+      entries: EC §3 (the parent heading, "AI Boot Contract") and its child
+      §3.2 (the section that names this very pipeline), demonstrating the
+      `parent_section_id` linkage and the expected overlap between a
+      parent's range and its child's range. Hash values are REAL, computed
+      as described in `verification.worked_example` above — not
+      illustrative placeholders.
+    value:
+      document_id: "ai-lego.execution-contract"
+      document_version: "1.0.0"
+      document_sha256: "2ad2a179944b917fe390119b6340ba9019344d7d15fcc9b77fdda3677937fc1e"
+      generated_at: "2026-08-29T12:00:00Z"
+      generator: "index.compile_section_registry"
+      sections:
+        - section_id: "3"
+          parent_section_id: null
+          heading: "3. AI 開機契約（AI Boot Contract）"
+          start_line: 141
+          end_line: 217
+          hash_scope: heading_to_next_heading
+          section_sha256: "b156c1050d8d9ab30798a8c10cdf0a34fb35cdb88829378a3c6c7beea6b38eab"
+        - section_id: "3.2"
+          parent_section_id: "3"
+          heading: "3.2 不要求每次把全部文件塞進 Context"
+          start_line: 187
+          end_line: 217
+          hash_scope: heading_to_next_heading
+          section_sha256: "2560a7db58fe572fa7e16ce7dae364f05dbcac9e6c843c85e9ba87ac503d529e"
+  - description: >
+      Section Registry for the Master Plan, containing two real entries:
+      §0.0 (the parent heading) and its child §0.0.3 (the section
+      manifest.schema.yaml's own description cites at L85-95). Hash values
+      are REAL, same computation method as above.
+    value:
+      document_id: "ai-lego.master-plan"
+      document_version: "1.0.0"
+      document_sha256: "8e5e67f607477babe60f2a4a354a211a30bd88cb1ece631dd51c5e11b23bac10"
+      generated_at: "2026-08-29T12:00:00Z"
+      generator: "index.compile_section_registry"
+      sections:
+        - section_id: "0.0"
+          parent_section_id: null
+          heading: "0.0 AI 必讀文件與規範邊界（Mandatory Companion Document）"
+          start_line: 10
+          end_line: 105
+          hash_scope: heading_to_next_heading
+          section_sha256: "e3696ee6422f483c6f832b0a5141dd10dd18a057709ecf015c84fa5e40a904d7"
+        - section_id: "0.0.3"
+          parent_section_id: "0.0"
+          heading: "0.0.3 Execution Manifest 必須記錄 Atlas 版本"
+          start_line: 85
+          end_line: 105
+          hash_scope: heading_to_next_heading
+          section_sha256: "e42c77d31ae30908bb0da46ab408683631e82d12c8afb46cb4f0127597e18640"

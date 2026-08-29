@@ -193,9 +193,10 @@ properties:
     description: >
       Per Atlas §9 (L993-996). SOFT reference (not a hard `$ref`) to the
       24-primitive kernel enum `cognitive/primitive.schema.yaml` defines —
-      that file is being built concurrently in this same Wave by a separate
-      agent; see `compilation_decisions` above for why this is intentionally
-      loose-typed rather than `$ref`-bound. Values are expected to be
+      that file was built in this same Wave (2026-08-29, by a separate
+      concurrent agent); see `compilation_decisions` above for why this
+      remains intentionally loose-typed rather than `$ref`-bound even now
+      that the sibling file exists. Values are expected to be
       SCREAMING_SNAKE_CASE primitive names (e.g. `DECOMPOSE`, `GROUP`,
       `CAUSE_HYPOTHESIS`), matching Atlas §9's literal example.
     examples: [[DECOMPOSE, GROUP, CAUSE_HYPOTHESIS]]

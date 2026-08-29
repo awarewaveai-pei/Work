@@ -1,0 +1,528 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/jurisdiction/pack.schema.yaml"
+title: Jurisdiction Pack / Applicable Pack
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of "Jurisdiction Pack" (also called
+  "Applicable Pack" in one Execution Contract context) — a NEW definition,
+  not a duplicate-resolution merge. Resolves DOC-execution_contract-5
+  (verified-findings.yaml, severity medium, CONFIRMED): the Execution
+  Contract uses the term normatively in three separate places — the §2
+  Scoped Authority precedence table ("法律有效性 | Official legal source +
+  approved Jurisdiction Pack", L108), §41 Global/Jurisdiction Execution's
+  mandatory boot pipeline ("Resolve Jurisdiction Context ↓ Resolve
+  Applicable Pack ↓ Check Freshness ↓ Check Capability Availability ↓
+  Compile Controls", L1559-1567), and §83 Offline Execution ("法規 pack 有
+  freshness", L2593) — but the construct is never defined anywhere in EC,
+  and no schema or path for it appears in EC §91 (8 policy files) or §92
+  (13 schemas). Master Plan independently NAMES the same construct as the
+  owner of several other mechanisms (§96 Legal Authority Hierarchy, §100
+  privacy rights, §107 Sector Packs, §127 signed offline bundles, §142
+  admission gate) without ever giving it a schema either.
+
+  This file does NOT design that shape from scratch. `docs/architecture/
+  GLOBAL_JURISDICTION_PLAN.md` §1 ("Jurisdiction Pack Schema", a Phase 2
+  Round 2 PROPOSED architecture deliverable, dated 2026-08-29) already
+  performed that design work — reading MP §96/§100/§107/§127/§142 and EC's
+  three usage sites together and producing a concrete yaml sketch (§1.2,
+  L23-94) plus a Legal Freshness SLA table (§2, L104-137) that closes the
+  exact "no number, no owner, no consequence" gap MP §128 leaves open. Per
+  the task boundary for this file: formalize that PROPOSED sketch into an
+  actual JSON Schema using this suite's established conventions (definitions/
+  properties/enum shape, `capability_availability_status` reuse from this
+  file's sibling `availability.schema.yaml`, required-field discipline) —
+  NOT re-design it. Every structural choice below traces to a specific
+  GLOBAL_JURISDICTION_PLAN.md line; where this file diverges from that
+  plan's literal yaml sketch (e.g. casing), the divergence and its reason
+  are recorded in `compilation_decisions`, not silently applied.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §2 Scoped Authority precedence table (L108, 'Official legal source + approved Jurisdiction Pack')"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §41 Global / Jurisdiction Execution (L1559-1567, 'Resolve Applicable Pack' as the boot pipeline's 2nd of 5 steps)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §83 Offline Execution (L2593, '法規 pack 有 freshness'; L2596, license-permanence requirement anchoring `signature`/`checksum`)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §93 Jurisdiction Taxonomy (L3935-3956, the 17-node `jurisdiction_nodes` value set)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §95 Legal Source Registry (L4036-4089, `legal_source.id` grammar `LAW-...` this file's `legal_sources[]` array references)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §96 Legal Authority Hierarchy (L4093-4118, the `authority_hierarchy` concept this file's `authority_hierarchy_ref` points at)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §102 Cross-Border Data Transfer (L4350-4361, abstract mechanism list for `cross_border_transfer.allowed_mechanisms`)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §103 Data Residency & Sovereignty (L4377-4402, the 5-value residency enum this file's `data_residency.*` fields reuse verbatim)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §128 Legal Source Freshness (L5087-5109, the 'higher cadence for critical / lower for stable' direction with no number — closed by GLOBAL_JURISDICTION_PLAN.md §2)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §139 Coverage Disclaimer (L5386-5411, anchor for `coverage_disclaimer`)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §142 Market Admission Gate ('Pack Exists? / Legal Freshness Valid?' gates, cited by GLOBAL_JURISDICTION_PLAN.md L171)"
+  - ".ai/research/phase-0/verified-findings.yaml DOC-execution_contract-5 (L801-814)"
+  - "docs/architecture/GLOBAL_JURISDICTION_PLAN.md §1 Jurisdiction Pack Schema (L15-101) and §2 Legal Freshness SLA (L104-137) — the PROPOSED design this file formalizes; read-only source per task boundary, not modified"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.6 row for pack.schema.yaml (L161: 'EC 用了三次卻從未定義的核心構件', dependency availability.schema.yaml, READY 新設計)"
+  - "specs/jurisdiction/availability.schema.yaml (this file's declared Wave 4 dependency — `capability_availability_authorable_status` reused for `capability_availability_overrides[].status`)"
+  - "specs/domain/tenant.schema.yaml (`home_jurisdiction` field — the opaque `JurisdictionPackRef` this file gives a concrete shape to; see `compilation_decisions`)"
+
+decided_by: >
+  No ADR governs this file's field shape. GLOBAL_JURISDICTION_PLAN.md itself
+  is PROPOSED, not ACCEPTED — it is a Phase 2 Round 2 architecture document,
+  not an ADR, and its own §0 states plainly: "this document is a design
+  proposal, not a mother-document edit... no concrete repo path is treated
+  as load-bearing here." This file treats that proposal's SCHEMA CONTENT
+  (field names, states, ownership — exactly what §0 says IS load-bearing
+  about it, as distinct from any path it mentions) as a Low-risk Phase 3
+  formalization task, on direct precedent: `execution/data-deletion.schema.yaml`
+  ("BUILT（2026-08-29）") and other Wave files have already compiled
+  architecture-plan-level designs into schemas without waiting for a
+  dedicated ADR when the plan document itself was the designated resolution
+  vehicle for the finding in question (here, DOC-execution_contract-5 is
+  assigned to `pack.schema.yaml` by MACHINE_READABLE_SPEC_PLAN.md §2.6 with
+  no ADR dependency listed, status READY). Verified by grep across
+  docs/adr/ADR-001~010 (2026-08-29): no ADR names "Jurisdiction Pack" as
+  anything other than an incidental prose mention (ADR-003 L29/L53/L126,
+  already noted in `context.schema.yaml`'s own `decided_by`). Where this
+  file's formalization required a choice GLOBAL_JURISDICTION_PLAN.md itself
+  left ambiguous (casing, enum reuse, required-field strictness), that
+  choice is recorded in `compilation_decisions` below as this file's own
+  Phase 3 compilation decision, not attributed to the plan.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+definitions:
+
+  pack_status:
+    description: >
+      Verbatim from GLOBAL_JURISDICTION_PLAN.md §1.2 (L26). Already
+      uppercase SNAKE_CASE in the plan's own sketch — no casing
+      normalization needed here (contrast `availability.schema.yaml`'s
+      `capability_availability_status`, whose source material genuinely
+      disagreed on casing; this enum's one source is already consistent).
+    type: string
+    enum: [DRAFT, ACTIVE, REVIEW_DUE, STALE, DEPRECATED, SUPERSEDED]
+
+  data_residency_value:
+    description: >
+      Verbatim from MP §103 (L4377-4402), reused for all five
+      `data_residency.*` sub-fields per GLOBAL_JURISDICTION_PLAN.md §1.2
+      (L64-68, "mirrors MP §103 fields verbatim"). Uppercase SNAKE_CASE
+      matches MP's own spelling exactly — no normalization needed.
+    type: string
+    enum: [EU_ONLY, COUNTRY_ONLY, ON_PREM_ONLY, DEVICE_ONLY, UNRESTRICTED]
+
+  jurisdiction_node_type:
+    description: >
+      MP §93's 17-node taxonomy (L3935-3956), transcribed verbatim. This is
+      the closed set of NODE TYPES a `scope.jurisdiction_nodes[]` entry may
+      claim — not a concrete jurisdiction identifier (e.g. "which country"),
+      which remains a free-form string per `jurisdiction_node` below.
+    type: string
+    enum:
+      - Supranational
+      - Country
+      - Federal
+      - State_Province
+      - Canton
+      - Prefecture
+      - Territory
+      - Special_Administrative_Region
+      - County
+      - City_Municipality
+      - District
+      - Tribal_Indigenous_Jurisdiction
+      - Free_Trade_Zone
+      - Special_Economic_Zone
+      - Industry_Regulator
+      - Public_Sector_Authority
+      - Contractual_Governing_Law
+
+  jurisdiction_node:
+    description: >
+      One scoped jurisdiction claim: a node TYPE (closed enum, MP §93) plus
+      a free-form concrete identifier (e.g. `{type: Country, id: "DE"}`) —
+      GLOBAL_JURISDICTION_PLAN.md's own sketch leaves `jurisdiction_nodes: [...]`
+      as a literal ellipsis (L31); this file makes the implied
+      type+id shape explicit rather than leaving it a bare untyped array,
+      the same "make the implicit structure explicit" step
+      `lens.schema.yaml` took for its own `family` field.
+    type: object
+    required: [type, id]
+    properties:
+      type:
+        $ref: "#/definitions/jurisdiction_node_type"
+      id:
+        type: string
+        minLength: 1
+        description: "Free-form concrete identifier within the node type (e.g. an ISO country code for `type: Country`). No mother document defines a closed identifier registry per node type."
+
+  legal_source_id:
+    type: string
+    pattern: "^LAW-"
+    description: "MP §95 (L4046) `legal_source.id` grammar, reused by reference here (this file does not redefine legal_source.schema.yaml, which is not yet built)."
+
+# ---------------------------------------------------------------------------
+# The Jurisdiction Pack object itself
+# ---------------------------------------------------------------------------
+
+jurisdiction_pack:
+  description: >
+    Formalization of GLOBAL_JURISDICTION_PLAN.md §1.2's yaml sketch
+    (L23-94). Field grouping and comments mirror the plan's own six
+    sections (scope / temporal validity / legal sources / freshness /
+    residency / capability overrides / disclaimer / offline signature) so a
+    reader can check this schema against that plan section-by-section.
+  type: object
+  required:
+    - pack_id
+    - status
+    - scope
+    - effective_from
+    - legal_sources
+    - authority_hierarchy_ref
+    - freshness
+    - data_residency
+  properties:
+
+    pack_id:
+      type: string
+      pattern: "^JPACK-[a-z0-9_-]+-v\\d+\\.\\d+$"
+      description: >
+        GLOBAL_JURISDICTION_PLAN.md L25: `JPACK-<jurisdiction_id>-v<major>.<minor>`.
+        This file adds the concrete regex (the plan gives a template, not a
+        pattern) — a direct, low-risk formalization of the plan's own
+        illustrated grammar, not a new design choice.
+
+    status:
+      $ref: "#/definitions/pack_status"
+
+    scope:
+      type: object
+      required: [jurisdiction_nodes]
+      description: "GLOBAL_JURISDICTION_PLAN.md L29-37 (適用地區 / scope)."
+      properties:
+        jurisdiction_nodes:
+          type: array
+          minItems: 1
+          items: { $ref: "#/definitions/jurisdiction_node" }
+          description: "L30-35. See `definitions.jurisdiction_node` for why this is typed as {type, id} objects rather than the plan's bare `[...]`."
+        sector_packs:
+          type: array
+          items: { type: string }
+          default: []
+          description: "L36. Soft reference (no `$ref`) to MP §107 Sector Compliance Packs (MP:4502-4527) — not yet a built schema."
+        government_pack_ref:
+          type: ["string", "null"]
+          default: null
+          description: "L37. Soft reference to MP §7's Unified Government Concept, only if applicable."
+
+    effective_from:
+      type: string
+      format: date-time
+      description: "L40."
+    effective_to:
+      type: ["string", "null"]
+      format: date-time
+      default: null
+      description: "L41. Nullable-required-key pattern matching `domain/tenant.schema.yaml`'s `deleted_at` — most packs have no planned expiry."
+    supersedes:
+      type: ["string", "null"]
+      default: null
+      description: "L42. `pack_id` of the prior version this pack replaces."
+    superseded_by:
+      type: ["string", "null"]
+      default: null
+      description: "L43. `pack_id` of the pack that replaced this one, once `status: SUPERSEDED`."
+    legal_snapshot_ref:
+      type: ["string", "null"]
+      default: null
+      pattern: "^LS-"
+      description: "L44. Ties to MP §97 Temporal Law Engine (MP:4130-4165) — soft reference, that schema is not yet built."
+
+    legal_sources:
+      type: array
+      minItems: 1
+      items: { $ref: "#/definitions/legal_source_id" }
+      description: "L47. Composition, not duplication — refs into MP §95 Legal Source Registry, never a copy of source content."
+    authority_hierarchy_ref:
+      type: string
+      minLength: 1
+      description: >
+        L48-49. Soft reference (no `$ref`) to a ranked list following MP
+        §96's `authority_hierarchy` shape (L4108-4118) — packs "MAY NOT
+        invent a bespoke ranking outside this ref" (L49). No dedicated
+        `authority-hierarchy.schema.yaml` exists yet to hard-`$ref` into.
+
+    cross_border_transfer:
+      type: object
+      description: "L70-74."
+      properties:
+        allowed_mechanisms:
+          type: array
+          items:
+            type: string
+            enum: [Adequacy, SCC, BCR, Contractual_Clauses, Consent_Exception, Statutory_Exception, Local_Processing_Only, Other]
+          default: []
+          description: "L71-74, MP §102 (MP:4350-4361) abstract mechanism list, transcribed verbatim (space-to-underscore per this suite's usual casing pass for multi-word enum values)."
+
+    freshness:
+      type: object
+      required: [owner_role, sla_class]
+      description: "L51-60. Closes P1-GAP-LEGAL-1 per GLOBAL_JURISDICTION_PLAN.md §1.3 (L98: 'owner_role is now a required field, not an implied convention; next_check_due is computed, not narrative')."
+      properties:
+        last_checked_at:
+          type: ["string", "null"]
+          format: date-time
+          default: null
+          description: "L53."
+        next_check_due:
+          type: ["string", "null"]
+          format: date-time
+          default: null
+          description: "L54. COMPUTED = last_checked_at + sla_days (see `sla_class` below and `sla_table`) — not independently authored; kept nullable/optional here because it is derived, not input."
+        sla_class:
+          type: string
+          enum: [CRITICAL, HIGH, MEDIUM, LOW]
+          description: "L55. See `sla_table` below for the cadence/grace/degrade numbers GLOBAL_JURISDICTION_PLAN.md §2.2 binds to each value."
+        owner_role:
+          type: string
+          const: legal_source_steward
+          description: >
+            L56. REQUIRED, not optional — GLOBAL_JURISDICTION_PLAN.md L56
+            comment: "no pack may exist ownerless." Modeled as `const`
+            rather than a free string since the plan names exactly one
+            role value and §2.4 (L137) states "a pack without an assigned
+            steward cannot reach ACTIVE status" — i.e. this is a fixed
+            role name, not a placeholder for an arbitrary role string.
+        reviewed_by:
+          type: ["string", "null"]
+          default: null
+          description: "L57."
+        reviewed_at:
+          type: ["string", "null"]
+          format: date-time
+          default: null
+          description: "L58."
+        audit_trail:
+          type: array
+          default: []
+          items:
+            type: object
+            required: [event, actor, at]
+            properties:
+              event: { type: string }
+              actor: { type: string }
+              at: { type: string, format: date-time }
+              note: { type: ["string", "null"], default: null }
+          description: "L59. 'Every state change, reuses EC §66 Audit Event fields (EC:2200-2214)' — soft reference, `execution/` has no dedicated audit-event schema yet to hard-`$ref`."
+
+    data_residency:
+      type: object
+      description: "L63-68. Mirrors MP §103 fields verbatim (GLOBAL_JURISDICTION_PLAN.md L68)."
+      properties:
+        storage: { $ref: "#/definitions/data_residency_value" }
+        processing: { $ref: "#/definitions/data_residency_value" }
+        backup: { $ref: "#/definitions/data_residency_value" }
+        log: { $ref: "#/definitions/data_residency_value" }
+        key_residency: { $ref: "#/definitions/data_residency_value" }
+
+    capability_availability_overrides:
+      type: array
+      default: []
+      description: >
+        L76-82. Closes "no override rule" gap. Each entry's `status` reuses
+        `availability.schema.yaml`'s `capability_availability_authorable_status`
+        (the 6-value subset EXCLUDING `unknown`) by hard `$ref` — both files
+        are same-session, sequentially-authored Wave 4 siblings and
+        `availability.schema.yaml` is already BUILT on disk by the time this
+        file is written, a safe backward reference (same reasoning
+        `context.schema.yaml` used for its own tenant.schema.yaml `$ref`).
+        This directly formalizes GLOBAL_JURISDICTION_PLAN.md's own L79-81
+        note that Unknown "is deliberately NOT a settable value here."
+      items:
+        type: object
+        required: [capability, status, basis_legal_source]
+        properties:
+          capability:
+            type: string
+            minLength: 1
+            description: "L78."
+          status:
+            $ref: "ai-lego://specs/jurisdiction/availability.schema.yaml#/definitions/capability_availability_authorable_status"
+          basis_legal_source:
+            $ref: "#/definitions/legal_source_id"
+            description: "L82: 'every non-default status must cite a source.' Required (not optional) at the schema level to make that prose rule structurally enforced rather than advisory."
+
+    coverage_disclaimer:
+      type: object
+      required: [text_ref, ui_render_required]
+      description: "L84-89. Closes P1-RISK-LEGAL-3 (disclaimer trapped in spec text)."
+      properties:
+        text_ref:
+          type: string
+          const: DISCLAIMER-NOT-EXHAUSTIVE-v1
+          description: "L86. Canonical text, versioned once, ref'd everywhere — modeled as `const` since the plan names one canonical value, not a family of interchangeable disclaimer texts."
+        ui_render_required:
+          type: boolean
+          const: true
+          description: >
+            L87-89. 'Any UI-facing artifact consuming this pack... MUST
+            render this, not merely document it in a spec.' Modeled as
+            `const: true` (not a plain boolean default) because the plan's
+            own language is an unconditional MUST with no legitimate
+            `false` case described anywhere in its text.
+
+    signature:
+      type: ["string", "null"]
+      default: null
+      description: "L92. Ties to MP §127 signed offline bundles (MP:5052-5084)."
+    checksum:
+      type: ["string", "null"]
+      default: null
+      description: "L93."
+
+# ---------------------------------------------------------------------------
+# Legal Freshness SLA table (GLOBAL_JURISDICTION_PLAN.md §2.2, L110-117)
+# ---------------------------------------------------------------------------
+sla_table:
+  description: >
+    Formalizes the plan's markdown table into a structured lookup keyed by
+    `freshness.sla_class`. These are explicitly INTERNAL OPERATING CADENCES,
+    not legal requirements (GLOBAL_JURISDICTION_PLAN.md §0 non-goals, L9;
+    §2.1, L108: "an internal operating policy, not a legal requirement in
+    any jurisdiction... overridable per-pack by a named human reviewer with
+    a recorded reason"). This file transcribes the numbers; it does not
+    re-justify or re-derive them — the plan's own §2.2 rationale (L119) is
+    cited by reference, not repeated here.
+  CRITICAL:
+    review_cadence_days: 30
+    grace_period_days: 15
+    auto_degrade_at_day: 45
+  HIGH:
+    review_cadence_days: 90
+    grace_period_days: 30
+    auto_degrade_at_day: 120
+  MEDIUM:
+    review_cadence_days: 180
+    grace_period_days: 60
+    auto_degrade_at_day: 240
+  LOW:
+    review_cadence_days: 365
+    grace_period_days: 90
+    auto_degrade_at_day: 450
+
+compilation_decisions:
+  - question: >
+      GLOBAL_JURISDICTION_PLAN.md §1.2's own sketch leaves several fields as
+      literal ellipses (`jurisdiction_nodes: [...]`, `authority_hierarchy_ref:
+      ...`, `signature: ...`) — illustrative, not concretely typed, per that
+      document's own §0 disclaimer ("every schema below is a contract...
+      where a path is mentioned it is illustrative"). Does formalizing the
+      plan into an actual JSON Schema mean inventing concrete types for
+      these, or leaving them as untyped placeholders the way the plan itself
+      does?
+    decision: >
+      Give each a concrete JSON Schema type (string/object/array with
+      patterns or nested definitions as appropriate), documented field by
+      field above, while explicitly flagging (in each field's own
+      `description`) which underlying registry/schema it soft-references
+      that is NOT yet built (legal_source.schema.yaml, authority-hierarchy
+      schema, an EC §66 audit-event schema).
+    reasoning: >
+      The task assigned to this file is specifically "formalize that plan's
+      design into an actual JSON Schema, not redesign it" — an untyped
+      ellipsis is not a formalization, it is a re-statement of the plan's
+      own illustrative shorthand. Every concrete type added here is a
+      MECHANICAL typing of a field the plan already named and scoped
+      (e.g. `pack_id`'s regex is the plan's own template with `\d+` in
+      place of `<major>`), not a new field or a new concept — this mirrors
+      how `domain/tenant.schema.yaml` added concrete `type`/`format`/
+      `pattern` choices on top of ADR-003's field-list-only minimal schema
+      without treating that as re-litigating ADR-003.
+  - question: >
+      Should `capability_availability_overrides[].status` reuse this
+      project's freshly-built `availability.schema.yaml` enum, or transcribe
+      GLOBAL_JURISDICTION_PLAN.md's own Title-Case literal text
+      (`Allowed | Restricted | Human Review | Local-only | Government-only |
+      Prohibited`, L79) verbatim?
+    decision: >
+      Reuse `availability.schema.yaml`'s `capability_availability_authorable_status`
+      by hard `$ref`, not the plan's own Title-Case text.
+    reasoning: >
+      GLOBAL_JURISDICTION_PLAN.md's Title-Case spelling here is itself just
+      that document's own PROPOSED-stage transcription of MP §143 / Atlas
+      §18.2's un-normalized casing (the exact CROSS-T-21 drift
+      `availability.schema.yaml` was built to resolve) — the plan predates
+      this file's own casing decision and was not positioned to make it
+      (its own §0 explicitly frames itself as contract-content-only, not a
+      casing-normalization exercise). Silently perpetuating the plan's
+      Title-Case spelling into a NEW schema file, immediately after
+      resolving that exact casing question in this same task's sibling
+      file, would recreate CROSS-T-21 a third time instead of closing it.
+      Reusing the sibling enum by `$ref` also gets the `unknown`-excluded
+      6-value authorable subset for free, rather than re-deriving that
+      constraint a second time.
+  - question: >
+      Should this file's `jurisdiction_pack.scope.jurisdiction_nodes[]`
+      double as (or hard-`$ref`) `context.schema.yaml`'s location-array
+      fields (`establishment_locations`, `user_locations`, etc.), given both
+      files deal with "where does this apply" data?
+    decision: "No — kept as two independent shapes with no cross-`$ref`."
+    reasoning: >
+      They answer different questions at different lifecycle stages.
+      `context.schema.yaml`'s arrays are per-Project/Processing-Activity
+      RAW INPUT signals (MP §94, collected before any resolution happens,
+      "只有真正必要的屬性才收集"). `jurisdiction_pack.scope.jurisdiction_nodes`
+      is the RESOLVED, PACK-AUTHORING-TIME scope a Pack's author declares it
+      covers (MP §93's 17 node TYPES, not raw location strings) — a Pack is
+      authored once per jurisdiction/version and consumed by many Contexts,
+      not built per-Context. Collapsing them would conflate an input
+      collection concern with a governance-authoring concern; no mother
+      document or the plan itself ever treats them as the same object.
+
+open_questions:
+  - id: "MRSP-pack-1"
+    question: >
+      GLOBAL_JURISDICTION_PLAN.md §3 (its unified 4-stage FAIL CLOSED
+      pipeline) and §5 (Conflict-of-Laws Engine interface) both consume a
+      resolved `jurisdiction_pack` but are themselves NOT formalized by this
+      file — `conflict-of-laws-output.schema.yaml` is explicitly
+      BLOCKED_PENDING_ROUND2_ADR (MACHINE_READABLE_SPEC_PLAN.md §2.6 L162,
+      P1-GAP-LEGAL-4: which of MP §98's Conflict-of-Laws Engine and MP
+      §134's separate legal-uncertainty vocabulary should own the relevant
+      output states is undecided). This file's `jurisdiction_pack` object is
+      usable standalone today, but the Stage 0-3 pipeline and the
+      Conflict-of-Laws output schema that would consume/produce alongside
+      it remain future work, gated on that same Round 2 ADR.
+    owner: "operator, via Round 2 ADR (see MACHINE_READABLE_SPEC_PLAN.md §2.6 L162)"
+    blocks: "nothing in this schema; blocks a future conflict-of-laws-output.schema.yaml and the §3 pipeline's own formalization"
+  - id: "MRSP-pack-2"
+    question: >
+      GLOBAL_JURISDICTION_PLAN.md is PROPOSED, not ACCEPTED — no ADR has
+      ratified its §1/§2 design (the SLA cadence numbers, the `pack_id`
+      grammar, the freshness state machine). This file formalizes that
+      PROPOSED content into a schema on the Low-risk-formalization
+      reasoning recorded in `decided_by` above, but if an operator or a
+      future Round 2 ADR review changes the plan's own numbers or field
+      names, this schema (and its `sla_table`) would need a follow-up
+      revision — it is not itself the ratifying act.
+    owner: "operator, via Round 2 ADR review of GLOBAL_JURISDICTION_PLAN.md"
+    blocks: "nothing in this schema's current usability; flags that its content traces to a PROPOSED, not ACCEPTED, source"
+
+verification:
+  method: >
+    Read GLOBAL_JURISDICTION_PLAN.md in full (all 391 lines, §0-§8) before
+    formalizing any field. Cross-checked every field in `jurisdiction_pack`
+    against that document's §1.2 yaml sketch line-by-line (L23-94) and every
+    `sla_table` number against §2.2's table (L112-117) and §2.3's auto-degrade
+    rule (L124-131) — no number invented or altered. Read MP §93 (L3935-3956),
+    §95 (L4036-4089), §96 (L4093-4118), §102 (L4350-4361 area, verified via
+    GLOBAL_JURISDICTION_PLAN.md's own citation), §103 (L4377-4402, verified
+    via `domain/tenant.schema.yaml`'s prior read of the same section), EC §2
+    (L108), §41 (L1539-1584), §83 (L2588-2606). Re-read
+    `availability.schema.yaml` (built earlier in this same task) in full
+    before writing this file's `$ref` into it. Grep-confirmed (2026-08-29)
+    across docs/adr/ADR-001~010: no ADR names "Jurisdiction Pack" as a
+    schema-governing decision.
+  note: >
+    No mother document, ADR, or `docs/architecture/GLOBAL_JURISDICTION_PLAN.md`
+    was modified to produce this file (read-only per task boundary). Every
+    field, enum value, and SLA number traces to a specific
+    GLOBAL_JURISDICTION_PLAN.md line cited inline above; the only NEW
+    content this file adds beyond that plan is JSON Schema typing mechanics
+    (concrete patterns/objects replacing the plan's illustrative ellipses)
+    and the casing/enum-reuse decision recorded in `compilation_decisions`,
+    both disclosed rather than silently blended into "the plan said so."

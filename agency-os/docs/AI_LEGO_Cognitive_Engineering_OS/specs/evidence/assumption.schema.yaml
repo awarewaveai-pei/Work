@@ -1,0 +1,367 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/evidence/assumption.schema.yaml"
+title: Assumption Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the Assumption Registry record
+  (ASM-*). Resolves CROSS-T-13 (verdict CONFIRMED, 2 independent votes,
+  severity medium): the same registry object is schematized three different
+  ways across the mother documents — Master Plan §24 (L1555-1563), Execution
+  Contract §116 (L3238-3247), and Method Atlas F10's tool row (L570). This
+  file is the single source of truth; the mother documents reference it,
+  they do not redefine it.
+
+  The three shapes, transcribed verbatim:
+    1. MP §24 (L1555-1563): id, statement, type, evidence_strength,
+       impact_if_wrong, confidence, validation_method, status (8 fields;
+       no `owner`, no `evidence` array).
+    2. EC §116 (L3239-3246): id, statement, evidence[], impact_if_wrong,
+       validation, owner, status (7 fields; no `type`, no `confidence`,
+       no `evidence_strength`).
+    3. Atlas F10 tool row (L570, "使用方式" column): ID, statement, type,
+       evidence, confidence, validation, status, owner (8 fields; this is
+       a markdown table cell describing the technique, not a machine
+       example, but it is the richest single-source field list of the
+       three).
+
+  MACHINE_READABLE_SPEC_PLAN.md §2.4's row for this file characterizes the
+  three as "子集關係非互斥取捨,可直接取聯集"（a subset relationship, not
+  mutually exclusive tradeoffs — take the union directly）and suggests Atlas
+  F10 as the base. Per this task's explicit instruction to verify that
+  characterization field-by-field rather than transcribe it, this file did
+  so — see `compilation_decisions` below. Finding: the "no incompatible
+  same-name field" half of that claim is CONFIRMED TRUE (no field name
+  carries conflicting types/semantics across the three sources, so a union
+  merge is genuinely Low-risk and needs no ADR-level tradeoff). But the
+  "Atlas F10 as the complete base" half is FALSE as a literal reading:
+  Atlas F10's list is actually MISSING `impact_if_wrong` (present in BOTH
+  MP and EC) and has no field matching MP's `evidence_strength` concept
+  (Atlas's `evidence` is the array-of-evidence-items concept from EC, a
+  different field from MP's qualitative strength rating). Both gaps are
+  filled explicitly below rather than silently dropped — see
+  `compilation_decisions`.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §24 Assumption Registry (L1546-1572, machine block at L1555-1563)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §116 Assumption Registry (L3234-3247, machine block at L3239-3246)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 tool row 'Assumption Registry' (L570)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §23 Epistemic & Strategic Reasoning Engine pipeline (L1503-1531) — Evidence Collection precedes Assumption Registry, grounding the evidence[] dependency direction"
+  - "specs/evidence/claim.schema.yaml (dependency per MACHINE_READABLE_SPEC_PLAN.md §2.4 row L134 — see compilation_decisions for how the two relate)"
+  - "specs/evidence/evidence.schema.yaml (evidence[] real $ref, built same task, per this task's explicit instruction)"
+  - "specs/governance/epistemic-label.schema.yaml (ASSUMPTION is a first-class epistemic_type enum value, L40)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.4 row (L134)"
+  - ".ai/research/phase-0/verified-findings.yaml CROSS-T-13 (L536-554)"
+
+decided_by: >
+  No ADR governs this file (grepped docs/adr/ADR-001~010 full text for
+  "Assumption Registry"/"ASM-": zero hits). MACHINE_READABLE_SPEC_PLAN.md
+  §2.4 explicitly marks this merge "Low-risk 事實性合併...不需要 ADR-level
+  tradeoff decision" and this file's own field-by-field comparison (below)
+  confirms that characterization for the NO-CONFLICT half of the claim —
+  consistent with the "no single ADR governs this file, direct Phase 3
+  compilation" class status-codes.schema.yaml and manifest.schema.yaml's
+  own compilation_decisions established as precedent for genuine multi-shape
+  merges that are additive/renaming rather than adversarial tradeoffs.
+
+compilation_decisions:
+  - question: >
+      Per this task's explicit instruction: verify field-by-field whether
+      MP §24 and EC §116 are truly subsets of Atlas F10 (the proposed base),
+      rather than assuming the plan row's "子集關係" characterization is
+      correct.
+    decision: >
+      VERIFIED FALSE as a literal reading. Field-by-field comparison
+      against Atlas F10's 8 named fields (ID, statement, type, evidence,
+      confidence, validation, status, owner):
+        MP §24's 8 fields -> Atlas F10 home?
+          id -> ID (match) | statement -> statement (match) |
+          type -> type (match) | evidence_strength -> NO HOME (Atlas has
+          `evidence`, a different concept — see next decision) |
+          impact_if_wrong -> NO HOME (absent from Atlas F10's list entirely) |
+          confidence -> confidence (match) |
+          validation_method -> validation (name variant, treated as a match —
+          see next decision) | status -> status (match).
+        EC §116's 7 fields -> Atlas F10 home?
+          id -> ID (match) | statement -> statement (match) |
+          evidence[] -> evidence (match) |
+          impact_if_wrong -> NO HOME (same gap as MP) |
+          validation -> validation (exact match) | owner -> owner (match) |
+          status -> status (match).
+      So EC §116 is 6-of-7 covered by Atlas F10 (only `impact_if_wrong`
+      missing); MP §24 is 5-of-8 covered outright plus 2 name-variant
+      matches, with 2 genuine gaps (`evidence_strength`, `impact_if_wrong`).
+      Neither source is a clean strict subset of Atlas F10 as literally
+      written — Atlas F10 must be ADDITIVELY extended with
+      `impact_if_wrong` and `evidence_strength` to be a true union, not just
+      adopted verbatim as "already the complete shape". This matches
+      MACHINE_READABLE_SPEC_PLAN.md §2.4's own more careful phrasing
+      ("建議採 Atlas F10 版為底,**確認** MP §24 與 EC §116 每個欄位都在其中
+      有位置" — confirm each field has a home, not assert it already does)
+      — the row's own instruction anticipated exactly this check; only the
+      shorthand "子集關係" summary oversimplified the result.
+    reasoning: >
+      Per R4 (claim-before-verify) and this project's own precedent
+      (Phase-1 register previously found wrong about a similar
+      characterization — cited directly in this task's instructions), a
+      merge task must show its work rather than transcribe a prior
+      author's summary. The check above is a real diff of all three field
+      lists, not a re-assertion.
+
+  - question: >
+      Are there any SAME-NAME fields across the three sources with
+      INCOMPATIBLE types or meanings — the kind of conflict that would
+      require an ADR-level tradeoff rather than a Low-risk union?
+    decision: >
+      No. Zero same-name conflicts found. The only near-miss is
+      `validation_method` (MP) vs `validation` (EC, Atlas F10) — different
+      literal names, but MP's example value ("Interview 30 universities",
+      L1562) describes a validation approach/plan, consistent with EC's and
+      Atlas's generic, example-less `validation` field rather than
+      contradicting it. Treated as a naming-variant rename (2-of-3 sources
+      use `validation`), not a field-level conflict — same
+      "pick the more-repeated name, note the rename" reasoning
+      manifest.schema.yaml applied to `version`/`sha256` vs
+      `declared_version`/`content_hash`.
+    reasoning: >
+      This confirms the part of the plan row's claim that genuinely holds:
+      because no field collides on name-with-different-meaning, the merge
+      is Low-risk and does not require Round-2-ADR-style adjudication —
+      only the "Atlas F10 alone is already complete" half needed correcting
+      (previous decision above).
+
+  - question: >
+      `evidence_strength` (MP-only) vs `evidence` (EC + Atlas F10) — are
+      these the same field under different names, like `validation_method`/
+      `validation` above, or two genuinely different fields that both need
+      a home in the union?
+    decision: "Two different fields. Both kept, under their own names."
+    reasoning: >
+      MP's example value is a qualitative rating ("Medium", L1559) —
+      a strength/confidence-in-the-evidence-as-a-whole judgment. EC's
+      `evidence: [...]` (L3242) and Atlas F10's `evidence` are an ARRAY of
+      evidence items (this file's `evidence` field, $ref'd to
+      evidence.schema.yaml per this task's explicit instruction). A rating
+      of how strong the assembled evidence is, and the list of evidence
+      items themselves, are not interchangeable — collapsing them into one
+      field would silently drop MP's rating concept, the same class of
+      error `manifest.schema.yaml`'s compilation_decisions warned against
+      when it kept MP's `file`/`loaded` fields alongside EC's richer shape
+      rather than treating them as already covered.
+
+  - question: >
+      `impact_if_wrong` (MP + EC, both with real example values — "Critical")
+      is completely absent from Atlas F10's field list. Should the union
+      include it, and does anything else in the mother documents ground it
+      further?
+    decision: >
+      Include it as an optional field, plus one small additive convenience
+      field `is_critical_assumption` (NEW_DESIGN, boolean).
+    reasoning: >
+      MP §24's own text, immediately following the assumption example
+      (L1565-1572): "系統自動識別：`CRITICAL ASSUMPTION` 優先驗證。"（the
+      system automatically identifies CRITICAL ASSUMPTION and prioritizes
+      validating it）— this is a real, textually-grounded automatic
+      classification behavior driven by `impact_if_wrong`. Rather than
+      require every consumer to re-derive "is this the critical one" from
+      `impact_if_wrong == "Critical"` string matching, `is_critical_assumption`
+      is added as an explicit, computed convenience boolean — same pattern
+      as `typed-objects/cause-hypothesis-set.schema.yaml`'s
+      `ready_for_promotion` field, itself flagged "NEW DESIGN — not a
+      mother-document field" for an analogous computed-convenience reason.
+
+  - question: >
+      Should this file carry a hard `$ref` to `claim.schema.yaml`, matching
+      MACHINE_READABLE_SPEC_PLAN.md §2.4's dependency column for this file
+      (which names `claim.schema.yaml`, not `evidence.schema.yaml`), given
+      this task's separate explicit instruction that `evidence[]` should
+      `$ref` `evidence.schema.yaml` directly?
+    decision: >
+      Both dependencies are real and coexist: `provenance` narrows
+      claim.schema.yaml's unrestricted epistemic_type enum to a fixed
+      `const: ASSUMPTION` (satisfying the plan's stated claim.schema.yaml
+      dependency structurally — an Assumption IS a Claim whose
+      epistemic_type happens to be pinned), while `evidence[]` separately
+      `$ref`s evidence.schema.yaml directly (satisfying this task's
+      explicit instruction). Neither supersedes the other; they answer
+      different questions (what kind of assertion is this vs. what backs
+      it).
+    reasoning: >
+      Same class of gap as method.schema.yaml's compilation_decisions
+      entry on `risk_tier`: MACHINE_READABLE_SPEC_PLAN.md's dependency
+      column for a file is not always exhaustive (method.schema.yaml's
+      column omitted execution/risk-tier.schema.yaml too). Recording the
+      discrepancy transparently here (R4) rather than silently picking one
+      dependency over the other preserves both the plan's stated
+      relationship and this task's explicit, more specific instruction.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+type: object
+required: [id, statement, status, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^ASM-[0-9]+$"
+    description: "MP §24 (L1556) 'ASM-018'; EC §116 (L3240) 'ASM-...'; Atlas F10 (L570) 'ID'."
+
+  statement:
+    type: string
+    description: >
+      MP §24 (L1557) 大學願意採用外部 AI 教育平台; EC §116 (L3241) `statement: ...`;
+      Atlas F10 (L570) 'statement'. Exact-name match across all three sources.
+
+  type:
+    type: string
+    description: >
+      MP §24 (L1558) example 'Market Adoption'; Atlas F10 (L570) 'type'.
+      ABSENT from EC §116. No enum is defined by any source for this field's
+      value domain (MP's one example is not exhaustive); kept as a free
+      string. Additive-only gap (present in 2 of 3 sources, absent from the
+      third) — not a conflict, per `compilation_decisions`.
+
+  evidence_strength:
+    type: string
+    description: >
+      MP §24 ONLY (L1559), example 'Medium'. NOT present in EC §116 or
+      Atlas F10's field list (`evidence` there is a different, array-typed
+      concept — see `compilation_decisions`). Kept under its own name
+      specifically because this task's verification found Atlas F10 is NOT
+      a complete superset without it — dropping this field would silently
+      regress MP's captured concept, the exact failure mode this task's
+      instructions warned against.
+
+  evidence:
+    type: array
+    items:
+      $ref: "ai-lego://specs/evidence/evidence.schema.yaml"
+    description: >
+      EC §116 (L3242) `evidence: [...]`; Atlas F10 (L570) 'evidence'. Real
+      $ref to evidence.schema.yaml (built this same task), per this task's
+      explicit cross-reference instruction — "real internal consistency,
+      your own $ref". Grounded in dependency direction by MP §23's
+      Epistemic & Strategic Reasoning Engine pipeline (L1503-1531), where
+      "Evidence Collection" is the pipeline step immediately preceding
+      "Assumption Registry".
+
+  impact_if_wrong:
+    type: string
+    description: >
+      MP §24 (L1560) example 'Critical'; EC §116 (L3243) `impact_if_wrong: ...`.
+      ABSENT from Atlas F10's field list entirely — added here per
+      `compilation_decisions` (this file's central verification finding:
+      Atlas F10 alone is not a complete union without this field). See
+      `is_critical_assumption` below for the derived convenience flag this
+      field feeds.
+
+  confidence:
+    type: [number, "null"]
+    minimum: 0
+    maximum: 1
+    default: null
+    description: "MP §24 (L1561) example 0.62; Atlas F10 (L570) 'confidence'. ABSENT from EC §116."
+
+  validation:
+    type: string
+    description: >
+      Canonical name per `compilation_decisions` (matches EC §116 L3244 and
+      Atlas F10 L570 verbatim; absorbs MP §24's `validation_method`
+      (L1562, example 'Interview 30 universities') as a naming variant, not
+      a distinct field — same class of rename manifest.schema.yaml applied
+      to `version`/`sha256`).
+
+  owner:
+    type: string
+    description: "EC §116 (L3245) `owner: ...`; Atlas F10 (L570) 'owner'. ABSENT from MP §24."
+
+  status:
+    type: string
+    description: >
+      MP §24 (L1563) example 'Unverified'; EC §116 (L3246) `status: ...`;
+      Atlas F10 (L570) 'status'. Exact-name match across all three sources
+      (hence required, alongside id/statement). No enum is defined anywhere
+      in the mother documents beyond MP's single 'Unverified' example; kept
+      as a free string rather than inventing a status vocabulary no source
+      supports. See `open_questions.MRSP-assumption-1`.
+
+  is_critical_assumption:
+    type: [boolean, "null"]
+    default: null
+    description: >
+      NEW_DESIGN — not a mother-document field name, but a direct
+      computed-convenience grounding of MP §24's own text immediately
+      following its worked example (L1565-1572): "系統自動識別：
+      `CRITICAL ASSUMPTION` 優先驗證。" See `compilation_decisions` for the
+      full reasoning. Computing this from `impact_if_wrong == "Critical"`
+      (and optionally combined with low `confidence`/`evidence_strength`,
+      per the Assumption Mapping technique's importance-x-uncertainty
+      quadrant referenced in the same Atlas F10 table row group, L571) is
+      left to the consuming engine — this field only records the outcome.
+
+  provenance:
+    type: object
+    required: [epistemic_type, authorship_state]
+    description: >
+      ASSUMPTION is a first-class value on governance/epistemic-label.schema.yaml's
+      epistemic_type enum (L40) — every Assumption record's epistemic_type
+      IS that value by construction, the same pattern evidence.schema.yaml
+      applies for EVIDENCE. Contrast claim.schema.yaml (built same task),
+      where the full 11-value enum remains legal because CLAIM is not
+      itself an enum member.
+    properties:
+      epistemic_type:
+        const: ASSUMPTION
+        description: >
+          Fixed per governance/epistemic-label.schema.yaml's enum (L40):
+          ASSUMPTION is a literal member of that 11-value list.
+      authorship_state:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/definitions/authorship_state"
+      locked:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/definitions/locked"
+
+# ---------------------------------------------------------------------------
+# Genuinely open questions — NOT decided by this file
+# ---------------------------------------------------------------------------
+open_questions:
+  - id: "MRSP-assumption-1"
+    question: >
+      No mother document defines a status enum for Assumption records — only
+      MP's single example value 'Unverified' exists anywhere. Should a
+      future revision define a fixed vocabulary (e.g. Unverified / Validated
+      / Invalidated / Superseded), and if so, on what evidentiary basis
+      (none of the three mother documents supply one today)?
+    owner: "operator"
+    blocks: "nothing in this schema; `status` remains a free string until decided"
+
+  - id: "MRSP-assumption-2"
+    question: >
+      `type`'s value domain (MP's one example: 'Market Adoption') is
+      similarly undefined by any source. Should it eventually reference a
+      controlled vocabulary (Market/Technical/Regulatory/Financial/etc.),
+      or remain free-form the way `evidence.schema.yaml`'s `hierarchy_tier`
+      was deliberately left domain-specific?
+    owner: "operator"
+    blocks: "nothing in this schema"
+
+verification:
+  method: >
+    Read against MP §23-24 (L1503-1572, machine block L1555-1563), EC §116
+    (L3234-3247, machine block L3239-3246), Atlas F10 row (L570),
+    governance/epistemic-label.schema.yaml, docs/adr/ADR-001~010 full text
+    (grepped for "Assumption Registry"/"ASM-": zero hits),
+    .ai/research/phase-0/verified-findings.yaml CROSS-T-13 full entry
+    (L536-554). Every field-by-field comparison in `compilation_decisions`
+    was performed against the mother-document text re-read at its cited
+    line in this session, not transcribed from verified-findings.yaml's
+    summary `detail` field alone.
+  note: >
+    No mother document was modified to produce this file. This is a
+    genuine 3-way merge (like manifest.schema.yaml and status-codes.schema.yaml
+    before it): the union is lossless — every field from all three sources
+    has an explicit home above, either verbatim, as a documented rename, or
+    as an additively-restored gap this task's own verification found
+    (`impact_if_wrong`, `evidence_strength`) that a literal reading of
+    "Atlas F10 as complete base" would otherwise have silently dropped.

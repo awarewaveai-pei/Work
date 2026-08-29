@@ -1,5 +1,56 @@
 # Worklog
 
+## 2026-08-29（續13）
+
+### AI LEGO Phase 3 Wave 4 完成 — Evidence/Decision/Jurisdiction/Normative-Context 10 檔落地，過程中修正計畫文件一處不精確敘述 + 6 處跨檔過期 forward-reference 註解
+
+**背景**：續10 完成 Wave 2-3 核心、續11 補一份 ADR-010 後，操作者說「繼續阿」，依 `MACHINE_READABLE_SPEC_PLAN.md` §3 進入 Wave 4（Evidence 鏈、Decision 鏈、Jurisdiction 鏈、Normative Context）——這四組全數無阻塞依賴（只依賴 Wave 1），可平行處理。4 個 subagent 平行派出。
+
+**產出（10 個新檔，全數 Python `yaml.safe_load` 驗證語法正確）**：`evidence/{evidence,claim,assumption}.schema.yaml`、`decision/{decision,reversal}.schema.yaml`、`jurisdiction/{context,availability,pack}.schema.yaml`（不含仍 `BLOCKED_PENDING_ROUND2_ADR` 的 `conflict-of-laws-output.schema.yaml`，明確跳過）、`execution/{normative-context,section-registry}.schema.yaml`。
+
+**過程中抓到的問題（本輪紀律亮點）**：
+1. **計畫文件本身的敘述不精確**：`assumption.schema.yaml` 的 agent 逐欄位核對三方合併來源後，發現 `MACHINE_READABLE_SPEC_PLAN.md` 原文說「Atlas F10 欄位最完整」其實不夠精確——F10 缺了 MP §24 與 EC §116 都有的 `impact_if_wrong` 欄位，agent 沒有照抄計畫文件的定性，自己補回缺欄，並在 schema 檔案裡誠實記錄這個落差。
+2. **我自己的 briefing 錯誤被 agent 抓到並修正**：我原本告知 decision/reversal 的 agent「MP 語言政策範例」是三種 reversal 形狀之一，agent 實測 grep MP 全文對 `reversal_conditions` 零命中，查證後確認那個範例其實在 **Atlas**（雙語命名政策段落），不是 MP——修正了我的錯誤引用，未沿用。同時也沒有照單全收「EC 複數陣列可無損吸收所有形狀」的既定說法，逐一核對後發現 Atlas 雙語範例允許每個 list item 各自帶 `action`，EC 單一 action/owner 的形狀會有損，改用 `oneOf` 雙形狀而非強行統一。
+3. **6 處跨檔過期 forward-reference 註解**：Wave 3 建置時，`cause-hypothesis-set.schema.yaml`、`problem-statement.schema.yaml`、`lens.schema.yaml`、`method.schema.yaml` 都寫了「見未來的 evidence/decision/primitive schema（Wave 4，尚未建）」這類前向註解；Wave 4 完成後這些注記全部過期。三個不同 agent（evidence、jurisdiction、decision）各自獨立抓到自己負責領域相關的過期註解並誠實回報（不擅自跨檔修改，正確遵守任務邊界），我在收工彙整時統一修正全部 6 處。
+4. **normative-context 誠實比例揭露**：EC 對 Section Registry/Normative Context Bundle 只給了一張 6 節點流程圖、零欄位定義，agent 沒有假裝這是「母文件既有承諾的編譯」，明確標註約 85% 內容是 Phase 3 全新設計，僅 15% 有母文件文字根據，並用真實算出的 sha256（對母文件實際位元組範圍跑 `sha256sum`）驗證所有範例，不是佔位符。
+
+[已修改]
+- 新增 10 個檔案（見上方產出清單）
+- 修正 6 處跨檔過期 forward-reference 註解：`cause-hypothesis-set.schema.yaml:177`、`problem-statement.schema.yaml:167`、`lens.schema.yaml:203`、`method.schema.yaml:194-198`、`tenant.schema.yaml:107-116,213`（3 處）、`evidence.schema.yaml`（MRSP-evidence-2 標記已解決）
+- `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`：10 個 Spec Inventory 表格列狀態改為 `BUILT`；Wave 4 mermaid 區塊標註完成
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 -c "yaml.safe_load(...)"` 對全部 10 個新檔逐一解析（全部 OK）| exit=0
+- REVIEW_DONE: critic=Claude 主 session 讀取全部 4 個 agent 回報並核對其自我驗證方法（json schema 結構驗證、正反範例測試、sha256 真值計算）| verdict=pass | findings=0（除 agent 自行發現並修正的項目外，無殘留問題）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=10 個新檔檔名逐一 + `not yet built`/`尚未建`/`being built concurrently` 全庫掃描 | hits=修正 6 處過期註解（詳見上方），其餘為母文件 Appendix A 承諾清單等預期引用
+- `/verify-recent`（3 個 agent 於 scratchpad 寫入的 JSON Schema 驗證腳本 `validate_schemas.py`/`validate_negative.py`/`validate_ncb_schemas.py` 觸發 verify-gate-commit 機械閘）：語法 `python -m py_compile` 三份皆通過；REALTEST_EVIDENCE: tool=Bash | cmd=實際重跑三支腳本 | exit=0/0/1——第三個區塊（獨立驗證 `epistemic-label.schema.yaml` 的 `provenance_record` 子物件）exit=1，追查後確認是腳本自己抽取子物件驗證時沒帶正確的 `$ref` 解析基準文件（`#/definitions/epistemic_type` 相對於整份文件才存在），**不是** schema 本身的缺陷——另外寫一段用正確 resolver 重新驗證 `provenance_record` 兩個範例，結果皆 OK，確認已委交的 4 個檔案（decision/reversal/section-registry/normative-context）與已提交的 epistemic-label.schema.yaml 皆正確無誤；BUGHUNT_WAIVED: NA -- 三支皆一次性 scratchpad 驗證腳本非 repo 產物
+- ORACLE_WAIVED: 全數為既有母文件承諾的編譯或 Low-risk 合併/設計決策（非新架構取捨），不需要對外部 oracle 覆審
+
+[剩餘風險] `jurisdiction/pack.schema.yaml` 依附 `GLOBAL_JURISDICTION_PLAN.md`（仍 `PROPOSED`，非 ACCEPTED）；`conflict-of-laws-output.schema.yaml` 仍卡在 `BLOCKED_PENDING_ROUND2_ADR`（P1-GAP-LEGAL-4 + P1-DUP-6 兩個機制哪個該贏未裁決）；Wave 5 完成前，`method-execution-request`/`typed-method-result`/`method-resolution`/`problem-type`/`capability-contract` 五個延後檔案仍無法建置。
+[rollback] `git revert` 本次 commit；三母文件全程零改動，新增內容僅限 10 個新檔 + 4 個既有 schema 檔的過期註解訂正 + 計畫文件狀態欄位更新。
+
+## 2026-08-29（續12）
+
+### refactor(next-admin): 抽取 lib/turnstile.ts，消除 intake-browser/portal-signup 重複的 verifyTurnstileToken()
+
+**背景**：`app/api/onboarding/intake-browser/route.ts` 與 `app/portal/api/signup/route.ts` 各自維護一份逐行相同的 `verifyTurnstileToken()`（POST siteverify + 5s timeout + boolean 回傳）。此重複在 2026-07-04 建 `portal/api/signup` 時已知並記錄（見本檔 2026-07-04「Turnstile helper 重複」條，`spawn_task` 開 `task_584a3f20` 追蹤），操作者本次要求正式抽取。
+
+[已修改]
+- 新增 `lib/turnstile.ts`：`export async function verifyTurnstileToken(token, remoteip?)`，內容與原兩份逐行相同（含 `TURNSTILE_SECRET_KEY` 讀取、5s `AbortSignal.timeout`、catch 回傳 false）
+- `app/api/onboarding/intake-browser/route.ts`：刪除內嵌 helper + `TURNSTILE_VERIFY_URL` const，改 `import { verifyTurnstileToken } from "../../../../lib/turnstile"`
+- `app/portal/api/signup/route.ts`：同上，改 `import { verifyTurnstileToken } from "@/lib/turnstile"`；同步訂正檔頭已過時的註解（原寫「duplicated ... see spawned follow-up task」，改為「lives in lib/turnstile.ts and is imported by both routes」）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin）| exit=0 | ms≈30000 — 0 型別錯誤
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npm test`（next-admin）| exit=0 | 57 files / 656 tests 全過（intake-browser、portal/signup 兩路由本身無既有 test file，BUGHUNT 已確認）
+- REVIEW_DONE: critic=Claude 主 session 逐行比對兩份原始 helper（byte-identical）+ 讀回三個改動檔案 | verdict=pass | findings=0
+- BUGHUNT_DONE: scope=agency-os,lobster-factory | grep=verifyTurnstileToken\|TURNSTILE_VERIFY_URL | hits=3（intake-browser/route.ts、portal/api/signup/route.ts 兩處 import + lib/turnstile.ts 定義本身，無殘留內嵌版本）
+- ORACLE_WAIVED: 純函式抽取無行為變動、無 auth/RLS/金流/DB migration 觸碰，比照既有純重構慣例免對抗式覆審
+
+[剩餘風險] 無——env var（`TURNSTILE_SECRET_KEY`）與錯誤處理路徑逐行沿用原邏輯，非新增行為。
+[rollback] `git revert` 本次 commit；純抽取 1 個新檔 + 兩處 import 替換，無 schema/API 介面變動。
+
 ## 2026-08-29（續11）
 
 ### AI LEGO 新增 ADR-010：資料庫主機平台 + Table 命名規範定案
@@ -191,6 +242,35 @@
 - REALTEST_WAIVED: DOC_ONLY -- 自審為文字分析,無程式碼變更
 - REVIEW_DONE: critic=Quick（self-review,非外部 oracle,已誠實標記）| verdict=pass-with-known-gap | findings=1 個既有共用函式缺口（記錄不修,理由已寫入方案文件）
 - BUGHUNT_DONE: scope=lobster-factory | grep=`organizations.status\|user_has_org_membership` 交叉核對 | hits=確認 `0018:25-37` 定義處無 join `organizations` 表,缺口屬實非誤讀
+
+### next-admin portal 頁面全部落地（login/signup/launcher + signup API route + 0063 RPC migration）
+
+操作者「你做最完美的決定！」授權繼續，決定：codex-oracle 失敗先不深追（不在 portal 任務範圍,已記錄待查),continue 建 next-admin 頁面（repo-only,不動生產環境)。
+
+**新增 `0063_portal_complete_signup.sql`**：db-expert Major #5（4 表寫入應為單一交易）的修正——新增 `SECURITY DEFINER` function `portal_complete_signup()`（house pattern同 `0035_upsert_incident_atomic.sql`），把 `organizations`/`profiles`/`organization_memberships`/`organization_product_subscriptions` 四個 insert 包進同一 function body（天然原子）。誠實記錄已知限制（Supabase Auth user 建立走 GoTrue API,不在這個 Postgres transaction 內,route.ts 需先建 auth user 再呼叫此 function,失敗需補償 `deleteUser()`)。`EXECUTE` 明確只給 `service_role`（`REVOKE ALL FROM PUBLIC`）。含對應 down 檔。
+
+**新增 next-admin 頁面**（照抄既有 house pattern,非重新發明）：
+- `app/portal/login/{page,PortalLoginForm}.tsx` — 照抄既有 `app/login/{page,LoginForm}.tsx` 的 `@supabase/ssr` 模式,`next` 參數預設改為 `/launcher`(非 admin 的 `/`)
+- `app/portal/signup/{page,PortalSignupForm}.tsx` — 表單 + 條件式載入 Cloudflare Turnstile widget（`NEXT_PUBLIC_TURNSTILE_SITE_KEY` 有設才渲染）
+- `app/portal/api/signup/route.ts` — 照抄 `app/api/onboarding/intake-browser/route.ts` 的 house pattern（env gate 預設關 + Turnstile + rate limit,細節見下）；service-role 建 auth user（pre-generate `orgId` 解決「app_metadata 需要 org_id 但 org row 建立需要 user id」的雞生蛋問題）→ 呼叫 `portal_complete_signup` RPC → 失敗補償刪除 auth user
+- `app/portal/launcher/page.tsx` — server component,`requireClientOrg()` 讀 header,失敗顯示「需要客戶帳號登入」而非硬 crash；用 service-role client 查 `organization_product_subscriptions`（RLS 為縱深防禦,實際範圍靠已驗證過的 `orgId` 手動 `.eq()`,與既有 22 個消費端點的慣例一致）
+
+**rate limit 設計調整**（跟 intake-browser 的 insert-then-delete 不同）：signup 無法便宜地「先插入再刪除」復原一個已建立的 Auth user,故改成「先數後做」——查 `organizations.metadata->>'source'='portal_signup'` 在時間窗內的筆數,超過門檻直接拒絕,不寫入任何東西。
+
+**`middleware.ts` matcher 擴充**（機械閘 `file-path-router.js` 攔截,已知會 review,照走）：排除清單加 `portal/login`、`portal/signup`、`portal/api/signup` 三個字面值,純字串擴充,不改任何現有邏輯分支;`/portal/launcher` 等其餘路徑刻意不排除,維持受 session gate 保護。
+
+**Turnstile helper 重複**：`verifyTurnstileToken()` 在 `intake-browser/route.ts` 跟新的 `portal/api/signup/route.ts` 各自一份（現況本來就沒抽成 shared lib,不在這次範圍內改既有檔案）。已用 `spawn_task` 開一張獨立 chip 建議未來抽成 `lib/turnstile.ts`（task_584a3f20），非本次任務阻塞項。
+
+**`npx tsc --noEmit`（`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`）：exit 0，無型別錯誤**。
+
+**critic 覆審跑中**（`middleware.ts`/`tenant-guard.ts` 屬 auth path,`file-path-router.js` 機械閘強制要求,已依指示送出,涵蓋全部本輪新增檔案）。
+
+方案文件 §7 新增 §7.1（0063 說明）+ §7.2（nginx 完整可貼文字,含冪等 rewrite 修正版本），標記步驟 1-4 全數完成。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（於 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`）| exit=0 | ms=約 15000
+- REVIEW_DONE: critic=Deep | verdict=（背景執行中,結果待下一條記錄）| findings=（待補）
+- BUGHUNT_DONE: scope=lobster-factory | grep=`portal/login\|portal/signup\|portal/api/signup` 於 `middleware.ts` | hits=2 行（新增註解 1 行 + `matcher` 陣列本身 1 行,確認排除清單只新增這 3 個字面值,未動其餘既有排除項）
 
 ## 2026-08-29（續7）
 

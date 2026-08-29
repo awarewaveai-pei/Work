@@ -1,0 +1,279 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/jurisdiction/availability.schema.yaml"
+title: Capability Availability
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the 7-value Capability Availability
+  status vocabulary — "每個 capability × jurisdiction" (Atlas §18.2 L4048).
+  Atlas Appendix A (L4592) lists `/specs/jurisdiction/availability.schema.yaml`
+  as a promised spec but, like its `context.schema.yaml` sibling, defines no
+  fields for it beyond the bare enum. Resolves CROSS-T-21
+  (verified-findings.yaml, severity low, CONFIRMED by 2 independent votes):
+  the identical 7-value Title-Case enum (Allowed / Restricted / Human Review /
+  Local-only / Government-only / Prohibited / Unknown) is defined verbatim in
+  both Master Plan §143 (L5520-5528) and Atlas §18.2 (L4050-4058) — values
+  agree, so this is a pure dual-maintenance point, not a semantic conflict —
+  but the finding itself flags that the ONLY concrete machine-consumed
+  instance in either document, Master Plan §143's own yaml example
+  (`status: prohibited`, L5516), uses lowercase, "leaving the canonical
+  casing unspecified" against the Title-Case prose list sitting two lines
+  above it.
+
+  Grep-verified in this session (2026-08-29): Atlas §18.2 contains NO yaml or
+  other machine-consumed example anywhere for Capability Availability — only
+  the same plain Title-Case text-fence list MP repeats (L4050-4058) and two
+  bare mentions elsewhere (§21 mandatory-read item 9, L4306; §23 disclosure
+  list, L4396). The single real machine-consumed instance across BOTH mother
+  documents is therefore MP §143's lowercase `status: prohibited`. This file
+  normalizes the canonical enum to lowercase snake_case, following the same
+  "pick the version already wired into a real machine-readable mechanism,
+  not a narrative example" reasoning `execution/status-codes.schema.yaml`
+  used to pick METHOD_RESOLUTION_BLOCKED over
+  PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED — except here the "already wired"
+  version happens to be the LOWERCASE one, not an UPPER_SNAKE one, which
+  itself matches this suite's own precedent for STATUS-shaped fields
+  specifically: `domain/tenant.schema.yaml`'s `status` enum
+  (`active/suspended/offboarding/deleted`) and
+  `specs/cognitive/rigor-level.schema.yaml`'s `rigor_mode` enum
+  (`fast/professional/.../deep_intelligence`) are both plain lowercase
+  snake_case, distinct from this suite's UPPER_SNAKE convention for CODES/
+  LABELS (`governance/epistemic-label.schema.yaml`'s `epistemic_type`,
+  `execution/status-codes.schema.yaml`'s registry names). Capability
+  Availability's `status` field is structurally a status-on-an-object field
+  (MP L5512-5517: `capability_availability: {capability, jurisdiction,
+  status}`), placing it in the lowercase family by the same reasoning, not
+  the UPPER_SNAKE code family.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §143 Capability Availability Matrix (L5508-5529) — the only concrete yaml instance (`status: prohibited`, L5516) in either mother document"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §18.2 Capability Availability (L4046-4064) — the 7-value Title-Case text-fence list, and the High/Critical `Unknown = Fail Closed` rule (L4062-4064)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §18.3 Market Admission Gate (L4066-4085) — mermaid flow consuming a resolved Capability Availability status as one of 6 sequential gate checks"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md Appendix A (L4592, availability.schema.yaml listed as a promised spec)"
+  - ".ai/research/phase-0/verified-findings.yaml CROSS-T-21 (L1246-1264)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.6 row for availability.schema.yaml (L160: casing undecided, 'Low-risk 直接統一為 lowercase', dependency context.schema.yaml, READY)"
+  - "docs/architecture/GLOBAL_JURISDICTION_PLAN.md §1.2 `jurisdiction_pack.capability_availability_overrides[].status` and its `Unknown` non-settable design note (a PROPOSED, not-ACCEPTED document — cited here only as corroborating evidence that this enum needs an authorable/non-authorable split; the enum VALUES and casing themselves are decided by this file independently of that proposal, which itself still writes them in Title Case prose)"
+
+decided_by: >
+  No ADR governs this file. MACHINE_READABLE_SPEC_PLAN.md §2.6's own row for
+  this file (L160) already pre-states the resolution ("Low-risk 直接統一為
+  lowercase") rather than leaving it fully open the way rigor-level.schema.yaml's
+  cardinality question was left — this file's job is to execute that
+  pre-scoped Low-risk casing pick with full reasoning attached (the plan
+  names the target casing family; it does not independently verify, as this
+  file does above, that Atlas contributes no competing concrete instance).
+  Verified by grep across docs/adr/ADR-001~010 (2026-08-29): no ADR mentions
+  "Capability Availability" or rules on this enum's casing.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+definitions:
+
+  capability_availability_status:
+    description: >
+      Canonical 7-value status. Mechanical Title-Case-to-lowercase-snake_case
+      transcription (zero semantic change) of MP §143 / Atlas §18.2's shared
+      list, normalized to the casing MP's own concrete yaml example already
+      uses for its one-word value — multi-word values get the same
+      space-to-underscore treatment `governance/epistemic-label.schema.yaml`
+      used for Atlas's space-form epistemic values, and the same
+      hyphen-to-underscore treatment for the two hyphenated values, so all
+      7 values share one consistent token shape.
+    type: string
+    enum:
+      - allowed
+      - restricted
+      - human_review
+      - local_only
+      - government_only
+      - prohibited
+      - unknown
+
+  capability_availability_authorable_status:
+    description: >
+      The 6-value subset of `capability_availability_status` that may be
+      DIRECTLY AUTHORED (e.g. in a Jurisdiction Pack's override list, per
+      `pack.schema.yaml`'s `capability_availability_overrides[].status`).
+      Excludes `unknown` by design: GLOBAL_JURISDICTION_PLAN.md §1.2's note
+      on this exact point ("'Unknown' is deliberately NOT a settable value
+      here — Unknown is the ABSENCE of an entry in this list, computed by the
+      resolver, never authored") is corroborated structurally by MP §143
+      itself never showing `unknown` as an example value (only `prohibited`
+      is ever shown authored) and by Atlas §18.2's own framing of `Unknown`
+      as a FALLBACK computed state ("Unknown = Fail Closed" for high/critical
+      risk, L4062-4064) rather than a status anyone would deliberately set.
+      This is a genuine constraint this file adds beyond the bare 7-value
+      enum transcription — see `compilation_decisions`.
+    type: string
+    enum:
+      - allowed
+      - restricted
+      - human_review
+      - local_only
+      - government_only
+      - prohibited
+
+capability_availability:
+  description: >
+    A single capability's resolved (or override-authored) availability
+    status for one jurisdiction. Field names transcribed from MP §143's
+    concrete yaml (`capability`, `jurisdiction`, `status`, L5512-5517).
+  type: object
+  required: [capability, jurisdiction, status]
+  properties:
+    capability:
+      type: string
+      minLength: 1
+      description: "MP L5514 example: `biometric_identification`. Free-form capability identifier — no mother document defines a closed Capability Registry this could `$ref` into."
+    jurisdiction:
+      type: string
+      minLength: 1
+      description: >
+        MP L5515 (literal ellipsis in the source, no concrete format given).
+        Soft reference (no `$ref`) to a resolved jurisdiction node — this
+        file does not itself define the jurisdiction-node identifier grammar
+        (MP §93's 17-node taxonomy, L3935-3956, names the node TYPES but no
+        mother document gives node IDs a concrete string format).
+    status:
+      $ref: "#/definitions/capability_availability_status"
+      description: "MP L5516: `status: prohibited` — the field's one concrete example, normalized per this file's casing decision."
+    fail_closed:
+      type: boolean
+      description: >
+        DERIVED, not independently authored. `true` exactly when
+        `status == unknown` AND the consuming task's risk tier is `R3` or
+        `R4` — Atlas §18.2's own rule verbatim in its own prose vocabulary
+        (L4060-4064: "對 high/critical risk：Unknown = Fail Closed"), joined
+        through `execution/risk-tier.schema.yaml`'s ACCEPTED (ADR-004)
+        `migration_crosswalk` (`atlas_high: R3`, `atlas_critical: R4`) rather
+        than left as an unverified assumption that "high/critical" and
+        "R3/R4" are the same thing — CROSS-T-3 (verified-findings.yaml
+        L193-199, CONFIRMED, severity high) found NO document anywhere
+        defines that conversion directly; `risk-tier.schema.yaml`'s
+        crosswalk is the one place it is recorded, and this field reuses
+        that mapping by name rather than re-deriving or restating it here.
+        Included as an explicit field (rather than left implicit) so a
+        consumer does not have to re-derive this join independently. The
+        risk-tier value itself is read from
+        `execution/risk-tier.schema.yaml#/risk_tier`
+        (`[R0, R1, R2, R3, R4]`) — a hard `$ref` is not attached to this
+        boolean field itself (a boolean has no sub-structure to anchor one
+        to); the dependency is documented here in prose instead, the same
+        way `rigor-level.schema.yaml` documents its own
+        `governance/epistemic-label.schema.yaml` dependency as a named
+        soft reference rather than a structural `$ref`.
+    basis_legal_source:
+      type: ["string", "null"]
+      default: null
+      description: >
+        Soft reference (no `$ref`) to a Legal Source Registry entry (MP §95,
+        `LAW-...` id grammar, L4045-4046) justifying a non-default status.
+        ADDITIVE field, not present in MP §143's bare example — added because
+        `pack.schema.yaml`'s formalization of
+        GLOBAL_JURISDICTION_PLAN.md §1.2 requires every authored override to
+        cite a basis (`# every non-default status must cite a source`,
+        GLOBAL_JURISDICTION_PLAN.md L82); kept here rather than duplicated on
+        `pack.schema.yaml` since it is a property of the availability
+        judgment itself, not of the pack that carries it.
+
+compilation_decisions:
+  - question: >
+      Should the canonical enum be normalized to UPPER_SNAKE_CASE (matching
+      `governance/epistemic-label.schema.yaml`'s `epistemic_type` and
+      `execution/status-codes.schema.yaml`'s registry names) or to plain
+      lowercase snake_case (matching `domain/tenant.schema.yaml`'s `status`
+      and `cognitive/rigor-level.schema.yaml`'s `rigor_mode`)?
+    decision: "Plain lowercase snake_case."
+    reasoning: >
+      Two independent lines of evidence converge on the same answer. (1) The
+      ONE concrete machine-consumed instance across both mother documents
+      (MP L5516, `status: prohibited`) is already lowercase — normalizing to
+      UPPER_SNAKE would require inventing a casing MP's own example never
+      uses, the opposite of "pick the version already wired into a real
+      mechanism." (2) Within this suite's own established precedent,
+      UPPER_SNAKE is reserved for CODE/LABEL-shaped enums consumed as
+      discrete signals across the corpus (epistemic_type, status_codes'
+      registry names — both explicitly axis/signal vocabularies), while
+      plain lowercase is this suite's convention for STATUS-shaped fields
+      that live directly on a domain-ish object (Tenant.status, rigor_mode).
+      MP's own field name for this value is literally `status`
+      (L5516), placing it in the second family by direct structural analogy,
+      not the first.
+  - question: >
+      MP's Title-Case values include two hyphenated forms (`Local-only`,
+      `Government-only`) and one space-form (`Human Review`) — should the
+      hyphen be preserved (`local-only`) or normalized to underscore
+      (`local_only`), to match the space-form's underscore treatment?
+    decision: "Normalize both the hyphen and the space to underscore."
+    reasoning: >
+      A mixed convention (`local-only` but `human_review` in the same enum)
+      would be a needless second casing inconsistency introduced by this
+      very file meant to remove one. snake_case with underscore as the sole
+      word-separator is this suite's uniform convention across every other
+      enum in the corpus (rigor_mode, epistemic_type, Tenant.status) — no
+      enum anywhere in this project's Wave 1-4 output mixes hyphens and
+      underscores as separators within the same value set.
+  - question: >
+      Should `unknown` be excluded from the set of values a Jurisdiction
+      Pack override may directly author, per
+      GLOBAL_JURISDICTION_PLAN.md §1.2's explicit note on this point?
+    decision: >
+      Yes — split into two definitions: the full 7-value
+      `capability_availability_status` (used for the RESOLVED/computed
+      status a consumer reads) and the 6-value
+      `capability_availability_authorable_status` (used wherever a human or
+      a Pack author is setting a value directly, e.g.
+      `pack.schema.yaml`'s override list).
+    reasoning: >
+      This is a Low-risk structural formalization, not a new design
+      decision: GLOBAL_JURISDICTION_PLAN.md already states the rule in
+      prose ("Unknown is deliberately NOT a settable value here"), and it is
+      independently corroborated by both mother documents never showing
+      `Unknown`/`unknown` as an AUTHORED example value (only computed/
+      fallback framing throughout). Formalizing it as two enums rather than
+      one plus a runtime "don't do this" comment follows this suite's
+      general preference for machine-checkable constraints over
+      prose-only conventions (the same reasoning `governance/
+      epistemic-label.schema.yaml`'s `promotion_redline` block used to make
+      the UNKNOWN -> SOURCE_FACT direct-transition prohibition
+      structurally visible rather than just narratively stated).
+
+open_questions:
+  - id: "MRSP-availability-1"
+    question: >
+      Neither mother document specifies a concrete identifier grammar for
+      the `jurisdiction` field's value (MP L5515 is a literal `...`) — this
+      file leaves it a free-form string. Should a future revision constrain
+      it to a formal jurisdiction-node ID pattern once MP §93's 17-node
+      taxonomy (L3935-3956) gets its own machine-readable identifier scheme?
+    owner: "operator, non-blocking"
+    blocks: "nothing in this schema; the field is usable today as a free-form string"
+
+verification:
+  method: >
+    Read against MP §143 full text (L5508-5529), Atlas §18.2 (L4046-4064)
+    and §18.3 (L4066-4085) full text, verified-findings.yaml CROSS-T-21
+    (L1246-1264, both verdict_votes), MACHINE_READABLE_SPEC_PLAN.md §2.6 row
+    for this file (L160), GLOBAL_JURISDICTION_PLAN.md §1.2 (L76-82, the
+    `capability_availability_overrides` block and its Unknown note), and
+    `domain/tenant.schema.yaml` / `specs/cognitive/rigor-level.schema.yaml`
+    (re-read to confirm the lowercase-snake-case-for-status-fields precedent
+    claimed above, not asserted from memory). Full-document grep of
+    "Capability Availability" / "capability_availability" across all three
+    mother documents (2026-08-29) confirmed Atlas contains no yaml or other
+    machine-consumed example of this enum anywhere — only the shared
+    Title-Case text-fence list and two bare narrative mentions (§21 L4306,
+    §23 L4396). Grep-confirmed across docs/adr/ADR-001~010: no ADR governs
+    this enum.
+  note: >
+    No mother document or ADR was modified to produce this file. The 7-value
+    enum's MEMBERSHIP is verbatim from MP §143 / Atlas §18.2 (CROSS-T-21
+    already confirmed the two lists agree on values); only the CASING is a
+    Phase 3 compilation decision, recorded above. The
+    `capability_availability_authorable_status` 6-value subset is this
+    file's own structural addition, formalizing a rule
+    GLOBAL_JURISDICTION_PLAN.md already states in prose rather than
+    inventing a new constraint.

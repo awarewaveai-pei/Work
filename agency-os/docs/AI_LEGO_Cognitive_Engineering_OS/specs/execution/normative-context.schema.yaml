@@ -1,0 +1,461 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/execution/normative-context.schema.yaml"
+title: Normative Context Bundle
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the "Normative Context Bundle" —
+  the final artifact of the Execution Contract §3.2 retrieval pipeline (EC
+  L204) and the literal `normative-context.yaml` file every non-trivial
+  Task Execution Packet must contain (EC §15, L738):
+
+    /.ai/tasks/{task_id}/
+    ├── TASK.md
+    ├── task.manifest.yaml
+    ├── normative-context.yaml     <- THIS file's shape
+    ├── ...
+
+  Resolves CROSS-T-18 (verified-findings.yaml, severity medium, verdict
+  CONFIRMED) together with its sibling `section-registry.schema.yaml`: EC
+  L198 "Section Registry" and L204 "Normative Context Bundle" are both
+  load-bearing pipeline nodes with zero field-level definition in any
+  mother document, and `normative-context.yaml` is required by name (L738)
+  yet undefined. This file defines the Bundle; `section-registry.schema.yaml`
+  defines the per-document index a Bundle's entries resolve against — see
+  `compilation_decisions` below for why these are two files, not one.
+
+  NEW DESIGN notice: same situation as `section-registry.schema.yaml` — EC
+  §3.2 only names this pipeline stage and states its PURPOSE:
+
+    "這符合：零重工 / 降低 context cost / 防止截斷 /
+     可證明 AI 實際載入哪些規範"                              (EC L209-214)
+
+  i.e. avoid reloading full documents every task, and make it provable
+  which normative sections an AI actually loaded for a given task. It
+  specifies zero fields. Everything below not explicitly cited to a
+  mother-document line is Phase 3 invention required to make that stated
+  purpose mechanically checkable — see the top-level `verification.note`
+  for an honest grounded-vs-invented ratio.
+
+compilation_decisions:
+  - question: >
+      Should this file fold "Section Registry" in as a sub-definition
+      (the task's stated default), or stay a separate file from
+      `section-registry.schema.yaml`?
+    decision: "Kept separate. See section-registry.schema.yaml's own compilation_decisions for the full split rationale."
+    reasoning: >
+      From THIS file's side, the decisive signal is the same one flagged in
+      the sibling file: the Bundle is inherently PER-TASK — exactly one
+      instance lives at `.ai/tasks/{task_id}/normative-context.yaml` (EC
+      L738, a literal mother-document path), created fresh every time a
+      Task Execution Packet is compiled. The Section Registry it draws
+      entries from is document-scoped and explicitly meant to be REUSED
+      across many tasks "只要 hash 未變" (EC L207). Folding the Registry's
+      full per-document section catalog into every task's Bundle would mean
+      re-serializing (and re-hashing, re-timestamping) that catalog inside
+      every single task, defeating the reuse EC L207 promises. Two files
+      matches the two genuinely different lifecycles/consumers — the same
+      reasoning family `manifest.schema.yaml` used to justify staying
+      separate from `document-registry.schema.yaml` (see that file's
+      compilation_decisions, item 3).
+    scope_note: >
+      MACHINE_READABLE_SPEC_PLAN.md §2.2 row 106 lists `section-registry.schema.yaml`'s
+      dependency as pointing AT this file (build-order framing: this file
+      is the "required" Wave 4 deliverable, `section-registry.schema.yaml`
+      conditional on it). The real DATA dependency below runs the other
+      way — `loaded_sections[]` entries in THIS file structurally resolve
+      against `section_registry_entry` objects defined in the sibling file,
+      so it is `normative-context.schema.yaml` that has the genuine
+      structural need to reference `section-registry.schema.yaml`'s shape.
+      Recorded under `open_questions`, not silently resolved against the
+      plan's listed arrow — editing that plan file is outside this task's
+      explicit file-creation boundary.
+  - question: "What id prefix and identity fields does a Bundle need?"
+    decision: >
+      `bundle_id` with a new `NCB-` prefix; `task_id` reusing
+      `manifest.schema.yaml`'s `execution.task_id` pattern via hard $ref;
+      `execution_id` OPTIONAL/nullable.
+    reasoning: >
+      `NCB-` follows the existing free id-prefix convention already used
+      by Atlas §16's `IDEA-`/`DEC-`/`EX-` and by
+      `typed-objects/problem-statement.schema.yaml`'s `PROB-` — additive,
+      not competing, per that file's own precedent. `task_id` is reused
+      verbatim (not reinvented) because a Bundle's storage path IS keyed by
+      `task_id` per EC L735 (`/.ai/tasks/{task_id}/`) — the identity is
+      already fixed by the mother document, only the internal field name
+      needed picking, and reusing manifest.schema.yaml's existing pattern
+      keeps one canonical `TASK-` convention across the whole spec tree
+      rather than a second one. `execution_id` is nullable because EC's own
+      boot pipeline (§3, L141-167) runs "Task-specific Retrieval" (context
+      compilation) as an earlier stage than "Execute" — a Bundle can
+      legitimately be written before an Execution Manifest's
+      `execution.execution_id` is minted for the run that will consume it.
+      `task_id` is the one identity guaranteed to exist at Bundle-creation
+      time (it is literally the packet's own directory name).
+  - question: >
+      How does a `loaded_sections[]` entry prove WHICH bytes were actually
+      loaded, given the live Section Registry can change after the fact?
+    decision: >
+      Each entry pins `section_sha256` — COPIED from the source
+      `section_registry_entry` at retrieval time, not a live pointer to it.
+    reasoning: >
+      This is the field that makes EC L214's audit claim ("可證明 AI 實際
+      載入哪些規範") mechanically checkable after the fact (task brief
+      point 3). A bare `section_id` reference would only prove WHICH NAMED
+      SECTION was consulted, not WHAT CONTENT it contained at the time —
+      if the underlying document is edited later and the registry
+      regenerated, a `section_id`-only reference would silently point at
+      different bytes than what the AI actually read. Pinning the exact
+      `section_sha256` the AI consumed proves precisely which byte-content
+      was loaded, independent of what the live registry says today —
+      exactly the same content-addressing principle
+      `artifact/cas-path.schema.yaml` already applies to stored objects.
+  - question: >
+      Does "Task-specific Retrieval" (EC L202) need its own field, or is
+      recording WHICH sections were loaded sufficient?
+    decision: >
+      Added `loaded_sections[].retrieval_reason` (free text, OPTIONAL).
+    reasoning: >
+      EC L214's audit purpose is "可證明 AI 實際載入哪些規範" — provable
+      LOADING. A bare list of loaded sections proves THAT they were loaded,
+      but gives the pipeline's own named "Task-specific Retrieval" stage
+      (L202) no actual field to point at recording WHY a given section was
+      selected for this particular task. Without it, nothing distinguishes
+      a well-targeted retrieval from a scattershot one after the fact.
+      Marked OPTIONAL rather than required because not every retrieval path
+      can yet mechanically produce a reason string (e.g. a keyword-match
+      retriever may only have a similarity score, not a rationale) —
+      this field exists so tooling THAT CAN produce a reason has somewhere
+      to record it, not to force one where none exists yet.
+  - question: >
+      Should `document_index_refs[]` be a hard $ref into
+      `manifest.schema.yaml`'s `documents[]` item shape?
+    decision: >
+      No — a lighter, denormalized subset (`document_id`/`document_version`/
+      `document_sha256` only).
+    reasoning: >
+      `manifest.schema.yaml`'s `documents[]` items additionally REQUIRE
+      `file` and `loaded` (per that schema's own `required` array) — fields
+      that describe the EXECUTION's own manifest bookkeeping (which literal
+      filename was pinned, whether THIS run actually loaded it), not "which
+      document version this Bundle's sections were drawn from". Reusing the
+      full item shape would force every Bundle to also answer manifest-
+      specific questions unrelated to context compilation. Instead this
+      field is a soft reference by name-and-format — same technique
+      `artifact/cas-path.schema.yaml` used for its own `tenant_segment`
+      definition when the related shape wasn't a clean subset match (see
+      that file's own description of the choice).
+  - question: >
+      Should a Bundle be scoped to `manifest.schema.yaml`'s top-level
+      `execution.execution_id`, or to one entry of its
+      `method_execution_log[]` (the task brief raised both as options)?
+    decision: >
+      Top-level `execution.execution_id` (via the nullable `execution_id`
+      field above); `method_execution_log[]` scoping is additive/optional
+      via `method_execution_ref`, not the default grain.
+    reasoning: >
+      Atlas §16.3's `method_execution_log[].knowledge_snapshot` (already in
+      `manifest.schema.yaml`) answers a DIFFERENT question — "which Project
+      Knowledge base snapshot did this ONE method invocation consult" — a
+      general knowledge-base pointer, not "which normative mother-document
+      sections govern this task". Tying the Bundle's default grain to the
+      coarser `execution.execution_id` instead of the finer per-method-
+      invocation id avoids conflating those two distinct axes into one
+      field, and matches the Bundle's own per-TASK grain (one Bundle per
+      Task Execution Packet, which may contain a workflow that invokes many
+      methods, each with its own `method_execution_log` entry).
+  - question: "Is `provenance` required, per epistemic-label.schema.yaml's own stated scope (\"every content/claim object\")?"
+    decision: "OPTIONAL, not required."
+    reasoning: >
+      A Bundle is a mechanical retrieval record — WHICH bytes were read for
+      a task — not itself an epistemic claim about the world, unlike
+      `ProblemStatement` or a `Decision` object which
+      `governance/epistemic-label.schema.yaml` clearly intends to cover. It
+      is kept as an optional field for the case an operator manually
+      curates or overrides a Bundle's contents (worth recording
+      `HUMAN_EDITED`/`HUMAN_APPROVED` then), but a Bundle produced by
+      following the mechanical retrieval procedure above is not required to
+      carry a provenance record just to exist.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §3.2 pipeline, reuse rule, and audit-purpose bullets (L187-215)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §15 Task Execution Packet, `normative-context.yaml` (L730-749, file named at L738)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §92 Machine-readable Execution Specs list (L2766-2783), confirming the gap"
+decided_by: >
+  No ADR governs this file — CROSS-T-18 is an `undefined_term` finding (a
+  documented gap, not a documented conflict between competing existing
+  designs), so there is nothing for an ADR to arbitrate between. Built per
+  docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2 row for
+  `normative-context.schema.yaml` (status: READY, "母文件僅提名詞，內容需
+  Phase 3 從零設計，非重複定義修正"). All field-level and split/merge
+  choices are Phase 3 compilation decisions recorded above, not a separate
+  ADR — consistent with the precedent `typed-objects/problem-statement.schema.yaml`
+  set for genuinely new, from-scratch type definitions.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+# One instance of this schema = the `normative-context.yaml` file inside
+# ONE task's Task Execution Packet (EC L738, path verbatim):
+#   /.ai/tasks/{task_id}/normative-context.yaml
+
+type: object
+required: [bundle_id, task_id, generated_at, document_index_refs, loaded_sections]
+properties:
+
+  bundle_id:
+    type: string
+    pattern: "^NCB-"
+    description: "NEW DESIGN prefix — see compilation_decisions."
+
+  task_id:
+    type: string
+    pattern: "^TASK-"
+    description: >
+      Pattern matches `manifest.schema.yaml`'s `execution.task_id` verbatim
+      — the same task-identifier convention, reused rather than reinvented.
+      Not a hard $ref: manifest.schema.yaml's `task_id` is an OPTIONAL
+      field on its `execution{}` block (not in that block's own `required`
+      array), while it is mandatory here — this file's `required` list, not
+      a $ref'd optionality, is the correct place to make that stricter.
+
+  execution_id:
+    type: [string, "null"]
+    default: null
+    pattern: "^EX-"
+    description: >
+      Nullable — see compilation_decisions. When set, matches
+      `manifest.schema.yaml`'s `execution.execution_id` pattern verbatim
+      (the whole-run identity this Bundle was ultimately consumed by, once
+      known).
+
+  generated_at:
+    type: string
+    format: date-time
+    description: "When this Bundle was assembled (the 'Task-specific Retrieval' step, EC L202, completing)."
+
+  generated_by:
+    type: string
+    description: >
+      OPTIONAL. Free-text id of the tool/method that assembled this Bundle,
+      e.g. `boot.compile_normative_context`. NEW DESIGN, not required.
+
+  document_index_refs:
+    type: array
+    minItems: 1
+    description: >
+      Denormalized subset of `manifest.schema.yaml`'s `documents[]` pin —
+      which document versions this Bundle's `loaded_sections[]` were drawn
+      from. See compilation_decisions for why this is a soft reference by
+      name/format rather than a hard $ref into the fuller item shape.
+    items:
+      type: object
+      required: [document_id, document_version, document_sha256]
+      properties:
+        document_id:
+          $ref: "ai-lego://specs/execution/manifest.schema.yaml#/properties/documents/items/properties/document_id"
+          description: >
+            Real hard $ref — identical 4-value concept at the identical
+            grain as manifest.schema.yaml's `documents[].document_id`, and
+            manifest.schema.yaml is Wave 1 (already BUILT), so this Wave 4
+            file depending on it is a safe backward dependency.
+        document_version:
+          type: string
+          description: "Mirrors manifest.schema.yaml documents[].version, per that file's own naming decision."
+        document_sha256:
+          $ref: "ai-lego://specs/artifact/cas-path.schema.yaml#/definitions/sha256_hash"
+          description: >
+            Whole-document hash at the moment this Bundle was assembled —
+            MUST match the `document_sha256` recorded in that document's
+            Section Registry (`section-registry.schema.yaml`) for every
+            `loaded_sections[]` entry citing the same `document_id` below.
+            Cross-file equality is a caller/runtime responsibility (same
+            limitation the sibling file accepted for its own document_sha256).
+
+  loaded_sections:
+    type: array
+    minItems: 1
+    description: >
+      THE Normative Context Bundle payload proper — the actual set of
+      sections an AI loaded for this task, pinned by content hash. Answers
+      EC L214's audit purpose directly.
+    items:
+      $ref: "#/definitions/loaded_section_entry"
+
+  method_execution_ref:
+    type: [string, "null"]
+    default: null
+    pattern: "^EX-"
+    description: >
+      OPTIONAL finer-grained pin to one specific
+      `manifest.schema.yaml` `method_execution_log[].execution_id` entry,
+      for the rarer case a Bundle should be scoped to a single method
+      invocation rather than the whole task-level execution. Additive, not
+      required — see compilation_decisions for why execution-level is the
+      default grain.
+
+  reuse_of:
+    type: [string, "null"]
+    default: null
+    description: >
+      `bundle_id` of a prior Normative Context Bundle this one reuses or
+      extends without full recomputation — supports EC's 零重工 principle
+      across sequential tasks in the same session that share normative
+      context (e.g. a follow-up task in the same incident needing the same
+      Data Deletion Contract section already loaded earlier). NEW DESIGN,
+      OPTIONAL.
+
+  provenance:
+    description: "OPTIONAL — see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+definitions:
+
+  loaded_section_entry:
+    type: object
+    required: [document_id, section_id, section_sha256, heading]
+    properties:
+      document_id:
+        $ref: "ai-lego://specs/execution/manifest.schema.yaml#/properties/documents/items/properties/document_id"
+        description: "Which of the four mandatory documents this loaded section belongs to."
+      section_id:
+        type: string
+        description: >
+          MUST match a `section_registry_entry.section_id` recorded in that
+          `document_id`'s Section Registry (`section-registry.schema.yaml`)
+          at the pinned `section_sha256` below, at the time of retrieval.
+      section_sha256:
+        $ref: "ai-lego://specs/artifact/cas-path.schema.yaml#/definitions/sha256_hash"
+        description: >
+          PINNED at retrieval time (copied from the source
+          `section_registry_entry`, not a live pointer) — see
+          compilation_decisions. Proves exactly which byte-content was
+          loaded, independent of whether the live Section Registry has
+          since changed.
+      heading:
+        type: string
+        description: >
+          Denormalized copy of the registry entry's heading text, kept
+          inline so this Bundle remains self-contained audit evidence even
+          if `section-registry.schema.yaml`'s data file for this document
+          is later regenerated or pruned — the same reasoning
+          `manifest.schema.yaml` gave for keeping its own `file` field
+          inline rather than depending on `document-registry.schema.yaml`
+          existing in the same form at read time.
+      retrieval_reason:
+        type: string
+        description: >
+          OPTIONAL, NEW DESIGN — why this section was pulled in for this
+          task (e.g. "task_context.problem_type == incident requires EC §31
+          Data Deletion Contract"). See compilation_decisions.
+      loaded_at:
+        type: string
+        format: date-time
+        description: "OPTIONAL. Per-entry timestamp, for Bundles assembled incrementally rather than all at once."
+
+open_questions:
+  - id: "MRSP-normctx-1"
+    question: >
+      MACHINE_READABLE_SPEC_PLAN.md §2.2 row 106 lists
+      `section-registry.schema.yaml`'s dependency as pointing AT this file;
+      this file's actual `loaded_sections[]` entries resolve against
+      `section_registry_entry` objects defined in the sibling file, so the
+      real structural dependency runs the other way. Left unresolved
+      against the plan text itself — editing that file is outside this
+      task's file-creation boundary. Identical open item recorded in
+      `section-registry.schema.yaml` from its own side.
+    owner: "operator, next time MACHINE_READABLE_SPEC_PLAN.md's Wave 4 row is revised"
+    blocks: "nothing in this schema; flagged for completeness per R4 (claim-before-verify)"
+  - id: "MRSP-normctx-2"
+    question: >
+      Should `method_execution_ref` eventually become the PRIMARY scoping
+      field (replacing the coarser `execution_id`) once Wave 5's
+      `task.schema.yaml` formalizes exactly when in the boot pipeline a
+      Bundle is compiled relative to method selection? Left open — this
+      file commits to the coarser task/execution grain as the safer default
+      (see compilation_decisions) but does not foreclose a future stricter
+      binding.
+    owner: "operator / Wave 5 execution/task.schema.yaml author"
+  - id: "MRSP-normctx-3"
+    question: >
+      `loaded_sections[].section_sha256` inherits `section-registry.schema.yaml`'s
+      own open question about line-ending normalization (CRLF vs LF) not
+      being specified for the underlying hash computation — a cross-
+      platform reproducibility gap, not a schema-validity gap.
+    owner: "operator / whichever tool first implements `boot.compile_normative_context`"
+    blocks: "cross-platform hash reproducibility; does not block schema validity itself"
+
+verification:
+  method: >
+    Read against EC §3.2 (L187-215), §15 (L730-749), §92 (L2766-2783),
+    verified-findings.yaml CROSS-T-18 full entry, `manifest.schema.yaml`
+    full read (for `documents[].document_id`/`sha256`,
+    `execution.task_id`/`execution_id`, and `method_execution_log[]` field
+    reuse/contrast), `governance/epistemic-label.schema.yaml` full read
+    (for `provenance_record` reuse), and `artifact/cas-path.schema.yaml`
+    full read (for `sha256_hash` reuse). Cross-checked against the sibling
+    `section-registry.schema.yaml` authored in the same session for
+    internal consistency of the `document_id`/`section_id`/`section_sha256`
+    resolution contract between the two files.
+  worked_example: >
+    The `examples` block below reuses the REAL, reproducibly-computed
+    sha256 values from `section-registry.schema.yaml`'s own worked
+    examples (EC §3.2 and MP §0.0.3, both against mother-document content
+    as of commit `293e9289f2f6e890557f0c714209cf4e40a75f78`, 2026-08-29) —
+    demonstrating a single Bundle citing loaded sections from TWO different
+    mandatory documents, which is the normal case for any non-trivial task.
+  note: >
+    No mother document or ADR was modified to produce this file. Ratio
+    honesty (per task instruction): the Bundle's existence, its role as
+    the pipeline's final artifact, its file path (`.ai/tasks/{task_id}/normative-context.yaml`,
+    EC L738 verbatim), and its stated audit purpose (EC L214) are
+    transcribed/cited directly from mother-document text. Every concrete
+    field name, the `bundle_id`/`section_sha256`-pinning/`retrieval_reason`
+    field shapes, the split-into-two-files decision, and the choice of
+    `execution_id` over `method_execution_log[]` as the default scoping
+    grain are Phase 3 invention, documented above as such. Roughly: ~15%
+    grounded in cited mother-document text (the artifact's existence, its
+    file path, and its stated purpose), ~85% new design necessary to make
+    that purpose mechanically checkable — see `compilation_decisions` for
+    the reasoning behind each invented piece. Same ratio order as the
+    sibling `section-registry.schema.yaml`, for the same underlying reason
+    (CROSS-T-18 is a from-scratch design gap, not a duplicate-definition
+    conflict to compile).
+
+examples:
+  - description: >
+      Normative Context Bundle for a hypothetical task that needed to
+      consult both the Execution Contract's §3.2 retrieval-pipeline rule
+      and the Master Plan's §0.0.3 Execution Manifest requirement — showing
+      a Bundle spanning two mandatory documents in one task, the normal
+      case. Hash values are REAL, reused from `section-registry.schema.yaml`'s
+      own worked examples — not illustrative placeholders.
+    value:
+      bundle_id: "NCB-2026-08-29-000001"
+      task_id: "TASK-2026-000001"
+      execution_id: null
+      generated_at: "2026-08-29T12:05:00Z"
+      generated_by: "boot.compile_normative_context"
+      document_index_refs:
+        - document_id: "ai-lego.execution-contract"
+          document_version: "1.0.0"
+          document_sha256: "2ad2a179944b917fe390119b6340ba9019344d7d15fcc9b77fdda3677937fc1e"
+        - document_id: "ai-lego.master-plan"
+          document_version: "1.0.0"
+          document_sha256: "8e5e67f607477babe60f2a4a354a211a30bd88cb1ece631dd51c5e11b23bac10"
+      loaded_sections:
+        - document_id: "ai-lego.execution-contract"
+          section_id: "3.2"
+          section_sha256: "2560a7db58fe572fa7e16ce7dae364f05dbcac9e6c843c85e9ba87ac503d529e"
+          heading: "3.2 不要求每次把全部文件塞進 Context"
+          retrieval_reason: "task_context requires confirming the index-reuse rule before compiling this Bundle"
+          loaded_at: "2026-08-29T12:04:50Z"
+        - document_id: "ai-lego.master-plan"
+          section_id: "0.0.3"
+          section_sha256: "e42c77d31ae30908bb0da46ab408683631e82d12c8afb46cb4f0127597e18640"
+          heading: "0.0.3 Execution Manifest 必須記錄 Atlas 版本"
+          retrieval_reason: "task touches Execution Manifest fields governed by this section"
+          loaded_at: "2026-08-29T12:04:55Z"
+      method_execution_ref: null
+      reuse_of: null
