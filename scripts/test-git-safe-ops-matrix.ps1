@@ -84,7 +84,7 @@ Test-Case "T1: Invoke-SafeGitFetch on real repo (aligned)" {
     Invoke-SafeGitFetch -WorkRoot $WorkRoot -Prune
     $lp = Join-Path $WorkRoot "agency-os\.agency-state\git-network-last.json"
     if (-not (Test-Path $lp)) { throw "ledger not written" }
-    $d = Get-Content $lp -Raw | ConvertFrom-Json
+    $d = Get-Content $lp -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($d.lastOp.op -ne 'fetch') { throw "op wrong: $($d.lastOp.op)" }
     if (-not $d.lastOp.success)   { throw "success=false" }
     "fetch ok, ledger success=true"
@@ -123,7 +123,7 @@ Test-Case "T3: Fetch failure recorded in ledger, throws" {
     try { Invoke-SafeGitFetch -WorkRoot $repoDir -MaxAttempts 1 } catch { $threw = $true }
 
     $lp = Join-Path $repoDir "agency-os\.agency-state\git-network-last.json"
-    $ledgerFail = (Test-Path $lp) -and -not ((Get-Content $lp -Raw | ConvertFrom-Json).lastOp.success)
+    $ledgerFail = (Test-Path $lp) -and -not ((Get-Content $lp -Raw -Encoding UTF8 | ConvertFrom-Json).lastOp.success)
     Remove-Item -Recurse -Force $repoDir -ErrorAction SilentlyContinue
 
     if (-not $threw)      { throw "expected throw on bad remote" }
@@ -149,7 +149,7 @@ Test-Case "T4: Invoke-SafeGitPush happy path" {
     Invoke-SafeGitPush -WorkRoot $repoDir -Branch 'master'
 
     $lp = Join-Path $repoDir "agency-os\.agency-state\git-network-last.json"
-    $d = Get-Content $lp -Raw | ConvertFrom-Json
+    $d = Get-Content $lp -Raw -Encoding UTF8 | ConvertFrom-Json
     Remove-Item -Recurse -Force $repoDir   -ErrorAction SilentlyContinue
     Remove-Item -Recurse -Force $originDir -ErrorAction SilentlyContinue
 
@@ -159,7 +159,7 @@ Test-Case "T4: Invoke-SafeGitPush happy path" {
 }
 
 Test-Case "T5: ao-close.ps1 references lib + both Invoke-Safe* functions" {
-    $content = Get-Content $AoClosePath -Raw
+    $content = Get-Content $AoClosePath -Raw -Encoding UTF8
     if ($content -notmatch 'git-safe-ops\.ps1')    { throw "no lib reference" }
     if ($content -notmatch 'Invoke-SafeGitFetch')  { throw "no Invoke-SafeGitFetch" }
     if ($content -notmatch 'Invoke-SafeGitPush')   { throw "no Invoke-SafeGitPush" }
@@ -167,14 +167,14 @@ Test-Case "T5: ao-close.ps1 references lib + both Invoke-Safe* functions" {
 }
 
 Test-Case "T6: Preflight auto-bypasses -AllowAheadCommits for checkpoint-only ahead" {
-    $content = Get-Content $AoClosePath -Raw
+    $content = Get-Content $AoClosePath -Raw -Encoding UTF8
     if ($content -notmatch 'checkpoint:') { throw "auto-detect pattern missing" }
     if ($content -notmatch 'humanCommits') { throw "humanCommits var missing" }
     "auto-checkpoint-bypass pattern present"
 }
 
 Test-Case "T7: Preflight clear remediation for human-authored ahead commits" {
-    $content = Get-Content $AoClosePath -Raw
+    $content = Get-Content $AoClosePath -Raw -Encoding UTF8
     if ($content -notmatch 'human-authored') { throw "'human-authored' missing" }
     if ($content -notmatch 'AllowAheadCommits') { throw "flag name missing" }
     "clear remediation message present"

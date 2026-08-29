@@ -234,7 +234,7 @@ if (-not (Test-Path -LiteralPath $projectMcpPath)) {
         -Detail "Project MCP config missing: $projectMcpPath" `
         -Fix 'powershell -File scripts\sync-mcp-config.ps1'
 } else {
-    $mcpRaw = Get-Content -LiteralPath $projectMcpPath -Raw
+    $mcpRaw = Get-Content -LiteralPath $projectMcpPath -Raw -Encoding UTF8
     # Parse before linting. The invariant is "Claude Code can LOAD this file and every
     # placeholder in it is one Claude expands" -- a substring check alone reports PASS on a
     # file that is not valid JSON at all, which fails just as silently (no project MCP servers

@@ -86,7 +86,7 @@ function Read-JsonFileOrFail {
         [Parameter(Mandatory = $true)][string]$Label
     )
     try {
-        $raw = Get-Content -LiteralPath $LiteralPath -Raw -ErrorAction Stop
+        $raw = Get-Content -LiteralPath $LiteralPath -Raw -Encoding UTF8 -ErrorAction Stop
         if ([string]::IsNullOrWhiteSpace($raw)) {
             Write-Error "CRITICAL: $Label is empty: $LiteralPath"
             exit 1

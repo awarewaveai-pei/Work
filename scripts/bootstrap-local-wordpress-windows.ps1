@@ -109,7 +109,7 @@ function Ensure-PhpIniForWp {
         Write-Host "Created $ini from php.ini-development" -ForegroundColor Green
     }
     $extDir = Join-Path $phpDir "ext"
-    $c = Get-Content -LiteralPath $ini -Raw
+    $c = Get-Content -LiteralPath $ini -Raw -Encoding UTF8
 
     if ($c -notmatch '(?m)^extension_dir\s*=') {
         $c = $c -replace '(?m)^;extension_dir = "ext"\s*$', "extension_dir = `"$extDir`""
@@ -123,7 +123,14 @@ function Ensure-PhpIniForWp {
     }
     $c = $c -replace '(?m)^memory_limit\s*=\s*128M\s*$', 'memory_limit = 512M'
 
-    Set-Content -LiteralPath $ini -Value $c -NoNewline
+    # Critic review (2026-08-29) M3: the read above is now explicit -Encoding UTF8 (this
+    # session's CP950 fix), but `Set-Content` with no -Encoding writes the system ANSI codepage
+    # (CP950/Big5) on PS 5.1 -- a read/modify/write pair must agree on encoding on both ends, or
+    # the pair becomes lossy in whichever direction is unguarded. Write BOM-less UTF-8 explicitly
+    # (matching the read) rather than `Set-Content -Encoding UTF8`, which BOM-writes on PS 5.1 --
+    # a BOM at the top of php.ini is its own hazard, not something this fix should introduce.
+    $utf8NoBomIni = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($ini, $c, $utf8NoBomIni)
     Write-Host "PHP ini updated for WP-CLI (extension_dir, curl, openssl, mysqli, memory_limit)." -ForegroundColor Green
 }
 

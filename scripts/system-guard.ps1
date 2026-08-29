@@ -208,7 +208,7 @@ $stableStatusOf = {
     $t = ([string]$text).TrimStart([char]0xFEFF)
     (($t -split "`r?`n" | Where-Object { $_ -notmatch '^- (Time|Health|Closeout): ' }) -join "`n").TrimEnd()
 }
-$existingStatus = if (Test-Path -LiteralPath $statusFile) { Get-Content -LiteralPath $statusFile -Raw } else { "" }
+$existingStatus = if (Test-Path -LiteralPath $statusFile) { Get-Content -LiteralPath $statusFile -Raw -Encoding UTF8 } else { "" }
 if ((& $stableStatusOf $existingStatus) -ne (& $stableStatusOf $newStatus)) {
     Set-Content -Path $statusFile -Value $newStatus -Encoding UTF8
 }

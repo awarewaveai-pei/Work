@@ -127,11 +127,90 @@ Tool reports **85 remaining unprotected sites** across these files (was 117; 202
 | `mcp/claude-userlevel/hooks/post-push-trigger-deploy.ps1` | 2 | Low |
 | `scripts/playwright-runner.ps1` | parse-error | 🔴 FIXED 2026-05-30: root cause **WAS** encoding (BOM-less non-ASCII decorative glyphs `╔═╗ ► ✔ ⚠ ✘ → —` mis-decoded by PS5.1 under CP950 → broken string terminator at L340). Fixed by converting all decorative chars to ASCII (`[OK]`/`[!]`/`[X]`/`->`/`--`). Verified: `Parser::ParseFile` OK + smoke 26/0/4 + `audit-cp950-traps` clean. Original "unrelated to encoding" diagnosis was incorrect. |
 | `scripts/generate-customer-delivery-status.ps1` | parse-error (79) | 🔴 TRACKED: same encoding root cause (41 non-ASCII, PARSE FAIL under CP950) but **distinct subclass** — non-ASCII is CJK **data** (department cluster labels e.g. `倉儲/履約`), NOT strippable to ASCII. Fix = add UTF-8 BOM **or** externalize catalog to UTF-8 JSON read with `-Encoding UTF8` (preferred, matches DEPARTMENT_CLUSTER_CATALOG pattern). Not yet fixed — separate task. |
+| `scripts/rebuild-content-studio-4cards.ps1` | parse-error (46) | 🔴 FIXED 2026-08-29: same subclass as `generate-customer-delivery-status.ps1` above — non-ASCII is real CJK **data** (React/JSX UI strings, e.g. `電子報導讀（FluentCRM 草稿）`), not decorative. Fixed by adding a UTF-8 BOM (byte-level prepend, content bytes unchanged, verified valid-UTF-8 before and after). Never previously listed in this registry (only tracked in TASKS.md) — surfaced for real fixing because this was `-ParseBreakOnly`'s first-ever live run (see the `system-health-check.ps1 $root` fix, `unencoded-raw-read` section below): the gate had silently skipped since 2026-05-30 due to an unrelated path-resolution bug, so this known drift was never actually blocking AO-CLOSE until today. Verified: `Parser::ParseFile` OK + `audit-cp950-traps.ps1 -ParseBreakOnly -Quiet` scanned=167 clean=167 drift=0. |
 
 **Hardening strategy** (per AGENTS.md auto-trigger): when any of these scripts gets an `Edit`/`Write`, Claude must:
 1. Run `/audit-encoding --file <path>` on the changed file
 2. If still flagged, wrap the capture in `Invoke-WithUtf8Console { ... }` and add helper dot-source
 3. Mark the entry here as `🔴 FIXED`
+
+---
+
+## CP950 class 3: unencoded-raw-read (2026-08-29)
+
+**Scope**: same 5 default scan roots as class 1/2 above (167 `.ps1` files). Detector added as a
+third function (`Get-UnencodedRawReadFindings`) inside the same tool — same "CP950 encoding-trap
+audit" umbrella, distinct code shape (data-file read, not command capture or script self-parse).
+
+**Method**: AST detection of `Get-Content` CommandAst nodes where `-Raw` is present and
+`-Encoding` is absent (both matched by unambiguous PowerShell parameter-name prefix, not exact
+string). Deliberately scoped to `-Raw`; non-Raw (line-array) `Get-Content` carries the same
+theoretical CP950 fallback-decode risk but is out of scope for this class (see 🟢 CLEAN /
+scope-boundary note below).
+
+**Tool**: [scripts/audit-cp950-traps.ps1](../../../scripts/audit-cp950-traps.ps1) (`Get-UnencodedRawReadFindings`, `-RawReadOnly` gate switch) → invoked via `/audit-encoding` slash command
+
+**Origin trigger**: 2026-08-29 `codex-oracle.ps1:143,406,495` `Get-Content -Raw` without
+`-Encoding` — Windows PowerShell 5.1 on a zh-TW host decoded a BOM-less UTF-8 artifact file
+(written by the external `codex` CLI) using the system ANSI codepage (CP950). CP950's
+unmappable-sequence fallback (`0x3F '?'`) makes the loss of multi-byte CJK sequences
+**irreversible** — no way to recover original bytes from the corrupted string. 29 prior artifacts
+under `agency-os/reports/oracle/` were corrupted this way before discovery; those are not
+recoverable and were left as-is (the corruption is unrecoverable, re-generating history is not
+useful). Fixed same day, commit `fe87cf05`.
+
+### Real-world validation this is a distinct class, not overlap with class 1
+
+`scripts/lib/git-safe-ops.ps1` had **all 4 of its class-1 (capture-trap) sites already hardened**
+(see class 1 FIXED list above). This audit still found 2 **new, independent** unencoded-raw-read
+sites in the exact same file (`:325`, `:332`, inside the `-SelfTest` block) — proof this class
+catches real gaps that class-1 hardening does not touch, not a re-detection of the same bug.
+
+### 🔴 FIXED (23/23 sites found by the initial full scan — 0 backlog left; gate `-RawReadOnly` wired as a hard AO-CLOSE check, same tier as class 2)
+
+All fixed by adding `-Encoding UTF8` (repo convention — verified 100% of ~90 pre-existing
+`-Raw -Encoding` call sites already use this value, no case-by-case judgment needed):
+
+- `scripts/ao-close.ps1:881` — reads back `ao-close-last.txt` before overwriting it (writer uses BOM-less UTF8; content is a `.Trim()`-ed ISO-8601 timestamp, so CP950-decode-safe today, but implicit/fragile — fixed rather than left to that assumption)
+- `scripts/ao-resume.ps1:843` — monthly-checks-last.txt stamp read (same ASCII-timestamp shape as above)
+- `scripts/ao-resume.ps1:993` — ao-resume-last.txt stamp read (same shape)
+- `scripts/bootstrap-local-wordpress-windows.ps1:112` — reads `php.ini` before regex-editing it; a CJK path component (e.g. non-ASCII Windows username) would have corrupted the whole content on read
+- `scripts/check-claude-sync.ps1:237` — reads `.mcp.json` for placeholder-syntax linting; config JSON, real risk if any field ever carries non-ASCII
+- `scripts/check-supabase-memory-monthly.ps1:56,57` (this is `scripts/`, distinct from the like-named `agency-os/scripts/check-supabase-memory-monthly.ps1`, which was already clean) — SSH stdout/stderr capture; remote docker error text could carry non-ASCII
+- `scripts/open-supabase-ssh-tunnel.ps1:107,129` — SSH stderr tail read for diagnostics; remote error text could carry non-ASCII
+- `scripts/ops-network-precheck.ps1:31` — `curl.exe` stderr capture
+- `scripts/phase4-weekly-check.ps1:115` — Python checker stderr capture
+- `scripts/refresh-cf-origin-ips.ps1:46` — SSH stdout capture, parsed by regex for a range count
+- `scripts/system-guard.ps1:211` — reads back a status file this script itself writes via `Set-Content -Encoding UTF8` (PS5.1 always BOM-writes "UTF8", so this read was safe today via BOM round-trip — same "Pattern B safe" logic already coded for class 2's BOM short-circuit) — fixed anyway rather than rely on an implicit round-trip nothing else guards
+- `scripts/test-git-safe-ops-matrix.ps1:87,126,152,162,170,177` — test fixture reads (git-network ledger JSON + `ao-close.ps1` content-grep); this file matches the audit's default scan filter (`test-` prefix, not `.test.ps1` suffix, so not excluded) — fixed for consistency since the fix is harmless and future test fixtures could add CJK content
+- `scripts/verify-build-gates.ps1:118` — reads `.env.example`; effectively ASCII today (env var names) but no guarantee
+- `scripts/verify-shared-ai-governance.ps1:89` — `Read-JsonFileOrFail` reads MCP registry JSON (`.mcp.json` / `mcp/registry.template.json`) for cross-file server-name diffing
+- `scripts/lib/git-safe-ops.ps1:325,332` — reads back the git-network ledger JSON inside `-SelfTest`; see "distinct from class 1" note above
+
+### 🟢 CLEAN (scope boundary, not a finding)
+
+- **Non-`-Raw` `Get-Content` calls** — line-array reads carry the same CP950 fallback-decode risk in principle, but this class is scoped to `-Raw` only, matching the actual 2026-08-29 incident and the task that commissioned this class. Documented here as an explicit boundary (not silently ignored) — candidate for a future Tier-3/4 backlog item if it ever bites in practice. Critic review (2026-08-29, S3) sized this: exactly 1 site currently in scan scope, `scripts/ops-console-bootstrap.ps1:20` — cheap to close if ever prioritized.
+- **`agency-os/scripts/check-supabase-memory-monthly.ps1`** — no `-Raw` reads at all (different file from `scripts/check-supabase-memory-monthly.ps1` above, which is the one with the finding).
+- **Files outside the 5 default scan roots** — critic review (2026-08-29, m5) found 17 tracked `.ps1` files never reach this tool, including `automation/TENANT_AUTOMATION_RUNNER.ps1` and `agency-os/automation/*`. Ran the detector over all 17 explicitly: currently clean (drift=0), so this is a latent blind spot, not a live miss. Candidate: add `automation`, `agency-os\automation`, `.codex\hooks` to `$script:DefaultScanPaths`, or drive scanning off `git ls-files '*.ps1'` instead of a fixed root list.
+- **Splatted parameters and variable-dispatched command names** — critic review (2026-08-29, m6/S1) found `Get-Content -Raw $p @se` (splat carrying `-Encoding`) and `& $cmd -Raw $p` (variable-held command name) both evade detection entirely (0 occurrences in repo today). The splat case for `-Encoding`'s value specifically fails closed via the M1 fix (unverifiable), but a fully-splatted `-Raw` itself is invisible to the detector, same as it always was for class 1. Not fixed — zero real occurrences to justify the added AST complexity right now.
+- **Standalone `agency-os` checkout (no monorepo parent)** — critic review (2026-08-29, m8) noted `system-health-check.ps1:129`'s own comment claims to support this layout, but with 7b/7c now `Add-CriticalFailure`-ing on a missing tool (this session's Codex FINDING 2 fix), that layout would permanently fail both hard gates with no self-heal path, since `audit-cp950-traps.ps1` cannot exist outside a monorepo checkout. Not resolved — needs an operator decision (drop the standalone-layout claim, or give 7b/7c a distinct "no monorepo root at all" branch that doesn't hard-fail), not a code change made unilaterally here.
+
+**Backlog candidate raised by this class (not this class's own scope)**: critic review (2026-08-29, S2) found the WRITE side of this exact bug shape is completely unguarded — `Set-Content`/`Add-Content`/`Out-File` without `-Encoding` also writes CP950/Big5 on this host (measured), and an AST scan of the same 167 files found **10 such sites** (9× `Add-Content` in `mcp/claude-userlevel/hooks/post-push-trigger-deploy.ps1`, plus the site fixed as part of M3 above). This is arguably the larger half of the same invariant ("every file I/O declares its encoding," not just "-Raw reads declare theirs") and is sized enough to be its own Build Playbook class, not a `--raw-read-only` scope creep. Logged in [BUG_HUNT_PROTOCOL.md](BUG_HUNT_PROTOCOL.md) backlog as **CP950 class 4: unencoded-file-write**.
+
+### Statistics
+| Audited | Fixed | Clean | Tracked | Real production breaks pre-audit |
+|---------|-------|-------|---------|----------------------------------|
+| 167 files scanned, 23 sites | 23 | scope boundary only (no false-positive backlog) | 0 | 1 (codex-oracle.ps1, 29 corrupted artifacts) |
+
+**FP-rate note (BUG_HUNT_PROTOCOL Step 7 gate)**: detector found 0 false positives in the sense
+of "flagged something that didn't need `-Encoding UTF8`" — every one of the 23 sites got the fix
+applied, and the fix is a strict improvement with no possible regression (an already-BOM'd or
+already-ASCII file decodes identically whether `-Encoding UTF8` is explicit or not; only a
+BOM-less non-ASCII file's behavior changes, from wrong to right). The three sites noted above as
+"technically safe today" (`ao-close.ps1:881`, `ao-resume.ps1:843`, `ao-resume.ps1:993` via
+guaranteed-ASCII content; `system-guard.ps1:211` via BOM round-trip) are not false positives in
+the sense that matters here — they were still fixed, at zero cost, rather than left depending on
+an implicit assumption nothing else enforces.
 
 ### 🛠 TOOL
 

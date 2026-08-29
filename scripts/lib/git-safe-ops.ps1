@@ -322,14 +322,14 @@ if ($SelfTest) {
         -StartUtc ([DateTime]::UtcNow) -WorkRoot $tmpRoot
     $lp = Join-Path $tmpRoot "agency-os\.agency-state\git-network-last.json"
     Assert-Eq "T1: ledger file exists"      (Test-Path $lp) $true
-    $d = Get-Content $lp -Raw | ConvertFrom-Json
+    $d = Get-Content $lp -Raw -Encoding UTF8 | ConvertFrom-Json
     Assert-Eq "T2: lastOp.op"              $d.lastOp.op      'fetch'
     Assert-Eq "T2: lastOp.success"         $d.lastOp.success  $true
     Assert-Eq "T2: history.Count"          $d.history.Count   1
 
     Write-GitNetworkLedger -Op 'push' -Success $false -Attempts 3 -ExitCode 1 `
         -ErrorText 'auth failure' -StartUtc ([DateTime]::UtcNow) -WorkRoot $tmpRoot
-    $d2 = Get-Content $lp -Raw | ConvertFrom-Json
+    $d2 = Get-Content $lp -Raw -Encoding UTF8 | ConvertFrom-Json
     Assert-Eq "T3: lastOp.op after push"   $d2.lastOp.op      'push'
     Assert-Eq "T3: history.Count after 2"  $d2.history.Count   2
 

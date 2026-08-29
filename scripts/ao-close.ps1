@@ -878,7 +878,7 @@ Repair it first, then re-run:
         if (Test-Path -LiteralPath $closeStampPath) {
             try {
                 $closePrevTmp = "$closePrevPath.tmp"
-                [System.IO.File]::WriteAllText($closePrevTmp, ((Get-Content -Raw -LiteralPath $closeStampPath).Trim() + [Environment]::NewLine), $utf8NoBom2)
+                [System.IO.File]::WriteAllText($closePrevTmp, ((Get-Content -Raw -LiteralPath $closeStampPath -Encoding UTF8).Trim() + [Environment]::NewLine), $utf8NoBom2)
                 Move-Item -LiteralPath $closePrevTmp -Destination $closePrevPath -Force
             } catch {
                 Write-Warning "AO-CLOSE: could not write ao-close-prev.txt (non-fatal): $_"

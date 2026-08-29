@@ -1,4 +1,4 @@
-# rebuild-content-studio-4cards.ps1
+﻿# rebuild-content-studio-4cards.ps1
 # Rebuilds ContentStudio.tsx form area with 4 visual cards (A/B/C/D)
 # Card A: 文章/内容 | Card B: 品牌 | Card C: 分发 | Card D: 发布
 

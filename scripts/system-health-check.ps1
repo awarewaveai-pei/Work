@@ -511,6 +511,13 @@ if (Test-Path $vaultHelper) {
 }
 
 # 7) Deploy drift (informational): SG production vs origin/main.
+# KNOWN GAP (found 2026-08-29 while wiring 7c below, not fixed here -- out of scope for the
+# CP950 raw-read audit task): check-deploy-drift.ps1 lives only under monorepo-root scripts/,
+# never agency-os/scripts/, so this $root-relative Join-Path silently resolves to a path that
+# doesn't exist and the check below always takes the "not present" skip branch. Same shape as
+# the 7b/7c fix just below (see $monoRoot) -- not applied here because this check's
+# correct behavior when actually enabled hasn't been verified in this session. Tracked:
+# TASKS.md "system-health-check.ps1 7)deploy-drift(:520) 與 9)cloudflare 兩個 check 從未真正執行過".
 $driftScript = Join-Path $root "scripts/check-deploy-drift.ps1"
 if (Test-Path $driftScript) {
     try {
@@ -539,7 +546,7 @@ if (Test-Path $driftScript) {
 # generate-customer-delivery-status.ps1, both 2026-05-30). The broader capture-trap audit stays
 # informational/on-demand (large accepted backlog); only this catastrophic class blocks AO-CLOSE.
 # SSOT: scripts/audit-cp950-traps.ps1 -ParseBreakOnly.
-$cp950Gate = Join-Path $root "scripts/audit-cp950-traps.ps1"
+$cp950Gate = Join-Path $monoRoot "scripts/audit-cp950-traps.ps1"
 if (Test-Path $cp950Gate) {
     try {
         & powershell -NoProfile -ExecutionPolicy Bypass -File $cp950Gate -ParseBreakOnly -Quiet 2>&1 | Out-Null
@@ -548,13 +555,47 @@ if (Test-Path $cp950Gate) {
         Add-Check -Name "PowerShell scripts parse under CP950 (no BOM-less non-ASCII parse-breaks)" -Pass $cp950Pass -Detail $(if ($cp950Pass) { "OK (all .ps1 parse on Big5 PS 5.1)" } else { "FAIL: >=1 .ps1 cannot parse under CP950 - run scripts/audit-cp950-traps.ps1 -ParseBreakOnly; fix = ASCII-ify or add UTF-8 BOM" })
         if (-not $cp950Pass) { Add-CriticalFailure -Reason "A repo .ps1 fails to parse under CP950 (cannot run on zh-TW PS 5.1) - see audit-cp950-traps.ps1 -ParseBreakOnly" }
     } catch {
-        Add-Check -Name "PowerShell scripts parse under CP950 (no BOM-less non-ASCII parse-breaks)" -Pass $true -Detail ("Skipped: " + $_.Exception.Message.Substring(0, [Math]::Min(80, $_.Exception.Message.Length)))
+        # Hard gate must fail CLOSED when its own tool crashes -- a silent skip here would give
+        # false confidence that CP950 parse-breaks were checked when they weren't (codex-oracle
+        # review 2026-08-29 FINDING 2).
+        Add-Check -Name "PowerShell scripts parse under CP950 (no BOM-less non-ASCII parse-breaks)" -Pass $false -Detail ("CRASHED (treated as FAIL for a hard gate): " + $_.Exception.Message.Substring(0, [Math]::Min(80, $_.Exception.Message.Length)))
+        Add-CriticalFailure -Reason "audit-cp950-traps.ps1 -ParseBreakOnly crashed instead of returning a verdict - a hard gate cannot silently pass when its own tool is broken"
     }
 } else {
-    Add-Check -Name "PowerShell scripts parse under CP950 (no BOM-less non-ASCII parse-breaks)" -Pass $true -Detail "Skipped: scripts/audit-cp950-traps.ps1 not present"
+    Add-Check -Name "PowerShell scripts parse under CP950 (no BOM-less non-ASCII parse-breaks)" -Pass $false -Detail "MISSING: scripts/audit-cp950-traps.ps1 not found - hard gate cannot verify without its tool"
+    Add-CriticalFailure -Reason "audit-cp950-traps.ps1 not found - the CP950 parse-break hard gate cannot run"
+}
+
+# 7c) CP950 unencoded-raw-read gate (HARD). `Get-Content -Raw` without `-Encoding` silently
+# mis-decodes CJK data files under CP950, and for unmappable byte sequences the loss is
+# IRREVERSIBLE (root cause: codex-oracle.ps1, 2026-08-29, 29 corrupted artifacts, commit
+# fe87cf05). Distinct class from 7b: this is a data-file read, not a script self-parse — the
+# script still runs, it just corrupts what it reads, silently. Sibling gate, same severity
+# tier: both classes started this check at 0 backlog, so both can be hard from day one.
+# SSOT: scripts/audit-cp950-traps.ps1 -RawReadOnly.
+$rawReadGate = Join-Path $monoRoot "scripts/audit-cp950-traps.ps1"
+if (Test-Path $rawReadGate) {
+    try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $rawReadGate -RawReadOnly -Quiet 2>&1 | Out-Null
+        $rawReadExit = $LASTEXITCODE
+        $rawReadPass = ($rawReadExit -eq 0)
+        Add-Check -Name "PowerShell Get-Content -Raw reads specify -Encoding (no CP950 data corruption)" -Pass $rawReadPass -Detail $(if ($rawReadPass) { "OK (all -Raw reads specify -Encoding)" } else { "FAIL: >=1 Get-Content -Raw without -Encoding - run scripts/audit-cp950-traps.ps1 -RawReadOnly; fix = add -Encoding UTF8" })
+        if (-not $rawReadPass) { Add-CriticalFailure -Reason "A repo .ps1 has Get-Content -Raw without -Encoding (CP950 data corruption risk) - see audit-cp950-traps.ps1 -RawReadOnly" }
+    } catch {
+        # Hard gate must fail CLOSED when its own tool crashes -- see 7b's identical fix
+        # (codex-oracle review 2026-08-29 FINDING 2, which flagged both siblings).
+        Add-Check -Name "PowerShell Get-Content -Raw reads specify -Encoding (no CP950 data corruption)" -Pass $false -Detail ("CRASHED (treated as FAIL for a hard gate): " + $_.Exception.Message.Substring(0, [Math]::Min(80, $_.Exception.Message.Length)))
+        Add-CriticalFailure -Reason "audit-cp950-traps.ps1 -RawReadOnly crashed instead of returning a verdict - a hard gate cannot silently pass when its own tool is broken"
+    }
+} else {
+    Add-Check -Name "PowerShell Get-Content -Raw reads specify -Encoding (no CP950 data corruption)" -Pass $false -Detail "MISSING: scripts/audit-cp950-traps.ps1 not found - hard gate cannot verify without its tool"
+    Add-CriticalFailure -Reason "audit-cp950-traps.ps1 not found - the CP950 unencoded-raw-read hard gate cannot run"
 }
 
 # 9) Cloudflare security posture (warn-only informational check).
+# KNOWN GAP (same shape as the 7) deploy-drift note above, found 2026-08-29, not fixed here):
+# check-cloudflare-security.ps1 also lives only under monorepo-root scripts/, so this
+# $root-relative Join-Path also silently resolves to a non-existent path and always skips.
 $cfScript = Join-Path $root "scripts/check-cloudflare-security.ps1"
 if (Test-Path $cfScript) {
     try {

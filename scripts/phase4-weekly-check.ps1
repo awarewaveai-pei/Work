@@ -112,7 +112,7 @@ if (-not $python) {
         $rc = $LASTEXITCODE
         $stderrText = ""
         if (Test-Path -LiteralPath $errFile) {
-            $stderrText = ((Get-Content -LiteralPath $errFile -Raw -ErrorAction SilentlyContinue) + "").Trim()
+            $stderrText = ((Get-Content -LiteralPath $errFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue) + "").Trim()
         }
 
         if ($rc -ne 0) {

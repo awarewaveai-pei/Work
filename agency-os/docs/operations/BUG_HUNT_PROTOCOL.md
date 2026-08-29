@@ -154,7 +154,7 @@ Build Playbook 預設 **Pattern audit** 形：可機械化偵測（CP950 regex�
 
 | Class | Shape | Status | 工具 |
 |-------|-------|--------|------|
-| **CP950 / encoding-trap audit** (2026-05-22) | Pattern | ✅ DEPLOYED | `/audit-encoding`、`scripts/audit-cp950-traps.ps1`、`scripts/_console-encoding-helpers.ps1` |
+| **CP950 / encoding-trap audit** (2026-05-22; class 3 unencoded-raw-read added 2026-08-29) | Pattern | ✅ DEPLOYED | `/audit-encoding`、`scripts/audit-cp950-traps.ps1`（3 classes: capture-trap / parse-break / unencoded-raw-read，各有獨立 gate 開關）、`scripts/_console-encoding-helpers.ps1` |
 | **Cross-machine .md BOM audit** (2026-05-22) | Pattern | ✅ DEPLOYED | `/audit-cross-machine-bom`、`scripts/audit-cross-machine-bom.ps1` |
 | **Cross-machine sync verifier** (2026-05-22) | Pattern | ✅ DEPLOYED | `/sync-check`、`scripts/check-claude-sync.ps1` |
 | **Auto-Repair logic audit** (2026-05-23) | Logic | ✅ DEPLOYED + APPLIED | `/apply-audit`、`scripts/audit-tools/dogfood-auto-repair.ps1`、[`reports/audit/auto-repair-2026-05-23.md`](../../reports/audit/auto-repair-2026-05-23.md)。5 🔴 Critical (C1-C5) 全 FIXED 同日；10 Major + 9 Minor 留下次 iteration |
@@ -168,6 +168,7 @@ Build Playbook 預設 **Pattern audit** 形：可機械化偵測（CP950 regex�
 | 優先 | Class | 觸發理由 | 預期命中 | 工時 |
 |------|-------|---------|---------|------|
 | 🔴 **NEXT** | Date/time local-vs-UTC | AO-CLOSE 跨日邊界已踩過；多腳本同類；單元測試難覆蓋 | 5-10 | 2 hr |
+| 🔴 | CP950 class 4：unencoded-file-write（`Set-Content`/`Add-Content`/`Out-File` 缺 `-Encoding`）| Codex×critic 雙輪覆審發現（2026-08-29，class 3 critic review S2）：write 端與已修的 class 3（unencoded-raw-read）是同一不變量的另一半，且量體更大——同一 167 檔掃描找到 10 處，9 處集中在 `mcp/claude-userlevel/hooks/post-push-trigger-deploy.ps1`（9 個 `Add-Content`）| 10 | 2-3 hr |
 | 🔴 | Empty `catch {}` silent fail | Critic 每輪都抓；1 個爆會藏多時；high latent rate | 30-50 | 3 hr |
 | 🟠 | Atomic file write race | ao-close-last.txt bug 本質；所有 state file 都有此風險 | 10-20 | 2 hr |
 | 🟠 | TypeScript strict null / unknown | next-admin 整 app 沒掃；hot path | 50-100+ | 4 hr |

@@ -115,7 +115,7 @@ if (-not (Test-Path -LiteralPath $phase1EnvExample)) {
     exit 1
 }
 
-$envRaw = Get-Content -LiteralPath $phase1EnvExample -Raw
+$envRaw = Get-Content -LiteralPath $phase1EnvExample -Raw -Encoding UTF8
 $requiredSentryKeys = @(
     "SENTRY_DSN_NODE_API",
     "SENTRY_DSN_TRIGGER_WORKFLOWS",

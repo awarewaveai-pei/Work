@@ -28,7 +28,7 @@ function Test-Http {
     try {
         $statusText = (& curl.exe -L -sS -o NUL -w "%{http_code}" --connect-timeout $TimeoutSec --max-time $TimeoutSec $Url 2>"$env:TEMP\ops-network-precheck-curl.err")
         if (Test-Path "$env:TEMP\ops-network-precheck-curl.err") {
-            $stderrText = (Get-Content "$env:TEMP\ops-network-precheck-curl.err" -Raw).Trim()
+            $stderrText = (Get-Content "$env:TEMP\ops-network-precheck-curl.err" -Raw -Encoding UTF8).Trim()
             Remove-Item "$env:TEMP\ops-network-precheck-curl.err" -Force -ErrorAction SilentlyContinue
         }
     } catch {

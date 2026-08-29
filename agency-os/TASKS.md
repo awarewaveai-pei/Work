@@ -601,8 +601,10 @@
 - [ ] **【2026-08-24 開出】CHANGE_IMPACT_MATRIX 漂移偵測腳本首輪 7 個 WARN 待人工確認** — `scripts/check-change-impact-matrix-drift.ps1` 2026-08-24 首次接進月度巡檢（`ao-resume.ps1` monthly check #5），真實跑出 7 對 WARN（全部是 `docs/operations/cursor-enterprise-rules-index.md` / `docs/operations/cursor-mcp-and-plugin-inventory.md` / `../docs/spec/raw/Cursor  Rules for AI/README-部署說明.md` 宣告的 impacted，vs `.cursor/rules/64-architecture-mcp-routing.mdc` / `65-build-standards-data-state.mdc` / `66-skills-observability-protocol.mdc` 三個 `.mdc` 檔案，4 月未更新但主文件近期持續改動，drift 127-141 天）。
   - 這是純資訊性快照非 build gate，**待下次月度巡檢時人工判斷**這三個 `.mdc` 是否真的過期需要更新，或只是穩定未變不需動。報告：`agency-os/reports/governance/impact-matrix-drift-LATEST.md`。
 
-- [ ] **【2026-08-25 開出｜小】`scripts/rebuild-content-studio-4cards.ps1:185` CP950 parse-break** — `audit-cp950-traps.ps1 -ParseBreakOnly` 持續回報唯一一筆 drift：非 ASCII 無 BOM，在 CP950 下 parse 出 46 個錯誤（等於這支腳本在預設 console 編碼下**根本跑不起來**）。既有問題非新引入，本 session 兩度出現在掃描結果中。
-  - **修法**（該檔已列出）：裝飾性字元 ASCII 化，或若 CJK 是資料就加 UTF-8 BOM。掃描 166 支中其餘 165 支皆 clean。
+- [x] **【2026-08-25 開出｜小】~~`scripts/rebuild-content-studio-4cards.ps1:185` CP950 parse-break~~** — 🔴 FIXED 2026-08-29：加 UTF-8 BOM（內容為真實 CJK UI 文字，非裝飾字元，故走 BOM 而非 ASCII 化）。順手修，起因是同日另一個任務（CP950 audit 第三 class）修好 `system-health-check.ps1` 的 `$root` 解析後，7b 這個「hard gate」從上線以來第一次真正跑起來，立刻抓到這個已知項目。驗證：`Parser::ParseFile` OK + `audit-cp950-traps.ps1 -ParseBreakOnly -Quiet` 與 `-RawReadOnly -Quiet` 均 scanned=167 clean=167 drift=0。
+
+- [ ] **【2026-08-29 開出｜中】`system-health-check.ps1` 7)deploy-drift(:520) 與 9)cloudflare(:~610) 兩個 check 從未真正執行過** — 同一 session 修 CP950 第三 class 時發現：`$root` 恆等於 `agency-os`（`Resolve-WorkspaceRoot` 的 monorepo guardrail），但 `check-deploy-drift.ps1` / `check-cloudflare-security.ps1` 只存在於 monorepo-root `scripts/`，從未存在於 `agency-os/scripts/`，故這兩個 `Join-Path $root "scripts/..."` 恆指向不存在路徑，`Test-Path` 恆 false，兩個 check 永遠走 `Pass=$true "Skipped: ... not present"` 分支——跟 7b（CP950 parse-break）2026-05-30 上線後從未真正跑過是同一款缺陷，本次已修 7b/7c（改用 `$monoRoot`），這兩個刻意未動（不同 check，需各自驗證改用 `$monoRoot` 後的實際輸出是否正確，不能照搬 7b/7c 的 fail-closed 處理，因為這兩個目前是 informational/warn-only 不是 hard gate）。
+  - **完成定義**：把 `Join-Path $root ...` 改成 `Join-Path $monoRoot ...`（比照 7b/7c），跑一次確認 deploy-drift／cloudflare 真的執行且輸出合理，才能判斷要不要也把它們升級成有意義的 gate（目前設計是 informational，維持原設計即可，只是要讓它真的跑）。
 
 - [ ] **【2026-08-25 開出｜小｜非阻塞】CP950 backlog 其餘 84 個 site：套用 ao-close 那套分類法** — 2026-08-25 關掉 27 個（`ao-resume.ps1` 17／`lib/git-safe-ops.ps1` 4／`ao-close.ps1` 6），repo-wide drift 111→84。
   - **`ao-close.ps1` 已無未知**：剩餘 17 個逐項列了消費端與判定在 `AUDIT_REGISTRY.md`。

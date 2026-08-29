@@ -840,7 +840,7 @@ if (-not (Test-Path -LiteralPath $monthlyStamp)) {
     $runMonthly = $true
 } else {
     try {
-        $lastRun = [DateTime]::Parse((Get-Content -LiteralPath $monthlyStamp -Raw).Trim())
+        $lastRun = [DateTime]::Parse((Get-Content -LiteralPath $monthlyStamp -Raw -Encoding UTF8).Trim())
         if (([DateTime]::UtcNow - $lastRun).TotalDays -gt 30) { $runMonthly = $true }
     } catch { $runMonthly = $true }
 }
@@ -990,7 +990,7 @@ $null = New-Item -ItemType Directory -Force -Path $stateDir
 $lastUtc = $null
 if (Test-Path -LiteralPath $stampPath) {
     try {
-        $raw = (Get-Content -LiteralPath $stampPath -Raw).Trim()
+        $raw = (Get-Content -LiteralPath $stampPath -Raw -Encoding UTF8).Trim()
         if ($raw) { $lastUtc = [DateTime]::Parse($raw, $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime() }
     } catch {
         $lastUtc = $null

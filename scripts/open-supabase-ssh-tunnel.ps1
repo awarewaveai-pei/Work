@@ -104,7 +104,7 @@ if ($Background) {
     if ($p.HasExited) {
         $errTail = ""
         if (Test-Path -LiteralPath $stderrFile) {
-            $errTail = (Get-Content -LiteralPath $stderrFile -Raw -ErrorAction SilentlyContinue)
+            $errTail = (Get-Content -LiteralPath $stderrFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue)
         }
         Write-Host "SSH exited early (exit $($p.ExitCode))." -ForegroundColor Red
         if ($errTail -match "administratively prohibited") {
@@ -126,7 +126,7 @@ if ($Background) {
 
     Write-Host "Tunnel probe failed - port 5432 not accepting. Check key, firewall, or whether another process holds the local port." -ForegroundColor Red
     if (Test-Path -LiteralPath $stderrFile) {
-        $errTail = Get-Content -LiteralPath $stderrFile -Raw -ErrorAction SilentlyContinue
+        $errTail = Get-Content -LiteralPath $stderrFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
         if ($errTail) {
             Write-Host "--- ssh stderr (tail) ---" -ForegroundColor DarkGray
             Write-Host $errTail.Substring([Math]::Max(0, $errTail.Length - 2000))

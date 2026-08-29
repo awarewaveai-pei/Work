@@ -53,8 +53,8 @@ function Invoke-SshCapture {
         $proc = Start-Process -FilePath "ssh" -ArgumentList $sshArgs -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outPath -RedirectStandardError $errPath
         return [pscustomobject]@{
             ExitCode = $proc.ExitCode
-            StdOut = (Get-Content -LiteralPath $outPath -Raw -ErrorAction SilentlyContinue)
-            StdErr = (Get-Content -LiteralPath $errPath -Raw -ErrorAction SilentlyContinue)
+            StdOut = (Get-Content -LiteralPath $outPath -Raw -Encoding UTF8 -ErrorAction SilentlyContinue)
+            StdErr = (Get-Content -LiteralPath $errPath -Raw -Encoding UTF8 -ErrorAction SilentlyContinue)
         }
     } finally {
         Remove-Item -LiteralPath $outPath -Force -ErrorAction SilentlyContinue

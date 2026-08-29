@@ -43,7 +43,7 @@ try {
         try {
             $refreshArgs = @("-i", $sshKey, "-p", "58122", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=30", "ubuntu@149.202.64.114", "sudo bash /root/scripts/refresh-cf-edge-geo.sh 2>&1")
             $proc = Start-Process -FilePath "ssh" -ArgumentList $refreshArgs -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outPath -RedirectStandardError $errPath
-            $out  = (Get-Content -LiteralPath $outPath -Raw -ErrorAction SilentlyContinue)
+            $out  = (Get-Content -LiteralPath $outPath -Raw -Encoding UTF8 -ErrorAction SilentlyContinue)
             $m = [regex]::Match([string]$out, "cf-edge-geo refreshed: v4=(\d+) v6=(\d+)")
             if ($proc.ExitCode -eq 0 -and $m.Success) {
                 $v4Ranges = [int]$m.Groups[1].Value

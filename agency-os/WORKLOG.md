@@ -82,6 +82,45 @@ curl 實測 5 個 vhost（`app`/`mainwp`/`n8n`/`trigger`/`uptime`.aware-wave.com
 
 [rollback] `git revert` 本次 commit；`audit-cp950-traps.ps1`/`system-health-check.ps1` 回上一版即恢復舊行為（7b/7c 回到靜默 skip）；23 個 `-Encoding UTF8` 移除即回原狀（fix 本身無副作用，但也無單獨拆分必要）。
 
+**Round 2 — `/verify-recent` 觸發的 critic 覆審（Claude 內建 critic subagent，非 codex）找到 3 Major + 8 Minor + 3 Suggestion，逐一核實並修復 Major 全部 3 條 + Minor 5 條**：
+
+- **M1（Major）**：偵測邏輯只查 `-Encoding` 參數**存在與否**，不查**值**。實測證實 `-Encoding Default`/`-Encoding Oem` 與完全不寫 `-Encoding` 產出逐位元組相同的損毀結果（CP950 fallback），`-Encoding Ascii` 更差（全部非 ASCII 變 `?`）——三者皆被舊版判定 CLEAN。任何人日後想關掉這個閘只需打一個看似合理的參數值。修法：新增 `-Encoding` 值的 allow-list（`utf8`/`utf8bom`/`utf8nobom`，對照本 repo 100% 既有慣例），非字面值（變數/運算式/splat）一律判 `unverifiable`（fail-closed，同 parse-error 邏輯）。
+- **M2（Major）**：`Resolve-RepoRoot` 用 `git rev-parse --show-toplevel`（無 `-C`），解析基準是**呼叫時的 CWD** 不是腳本自身位置。若從 repo 外的 CWD 呼叫（例如 Scheduled Task 預設 CWD=`%SystemRoot%\System32`，`system-guard.ps1` 本身就有 `AGENCYOS_SCHEDULED_QUIET` 這類排程專用邏輯，此情境非空想），`Get-ScanTargets` 回傳空陣列，`drift=0` 但其實**掃了 0 個檔案**，閘照樣回報 CLEAN。實測重現：`CWD=C:\Windows\Temp` 時 `scanned=0 clean=0 drift=0 EXIT=0`。修法：① `Resolve-RepoRoot` 改用 `git -C $script:scriptDir`（錨定腳本自身位置非 CWD），git 失敗時 fallback `Split-Path $script:scriptDir -Parent` ② gate mode（`-ParseBreakOnly`/`-RawReadOnly`）新增斷言：`$scanFiles.Count -eq 0` → exit 2（拒絕在「掃了 0 個檔案」的狀態下宣稱 CLEAN）。
+- **M3（Major）**：本次「純機械式」的 23 個修復點之一 `bootstrap-local-wordpress-windows.ps1:112` 讀端加了 `-Encoding UTF8`，但配對的寫端 `:126 Set-Content -LiteralPath $ini -Value $c -NoNewline` 沒有 `-Encoding`——PS5.1 預設用系統 ANSI（CP950）寫入。造成新的不對稱：讀 UTF8／寫 Big5，且若既有 php.ini 是 Big5（此腳本自己過去每次執行都可能寫出這種檔案），下次讀取會整批 `U+FFFD` 損毀再寫回 `0x3F`——比修復前的行為更糟。**這推翻了本次「加 -Encoding UTF8 永遠是安全改進」的假設，只在沒有配對寫入的站點成立**。修法：`:126` 改用 `[System.IO.File]::WriteAllText($ini, $c, (New-Object System.Text.UTF8Encoding $false))`（BOM-less UTF8，與讀端對稱，且不引入 php.ini 不該有的 BOM）。REALTEST：scratchpad round-trip 測試（CJK 路徑 `C:\Users\張三\ext`）驗證無 BOM + 內容完整 + regex 替換正確。
+- **m1（Minor）**：新變數 `$monorepoRootForGates` 與既有 `$monoRoot`（`system-health-check.ps1:162`，已被 6+ 個既有 check 使用，包含 hard gate `check-claude-sync`）重複定義同一件事。改用既有 `$monoRoot`，刪除重複變數（DRY，也避免兩條路徑未來各自漂移）。
+- **m2（Minor）**：7)/9) 的「已知缺口」註解寫「See TASKS.md」但 `grep` 不到對應項目（懸空引用）。補開 TASKS.md 真實項目，註解改指向具體項目名稱。
+- **m3（Minor）**：新 finding 的錯誤訊息內嵌 `$errors[0].Message`（zh-TW PS5.1 為在地化中文字串），但 console 仍是原始 CP950——工具在它要保護的同一個 host 上，把自己的錯誤訊息印成亂碼。已知但**本輪未修**（需要決定是否對整個報表區塊做 console encoding wrap，影響範圍略大於單純訊息文字，留待下次一併處理，非本次任務核心）。
+- **m4（Minor）**：預設模式（無 gate 開關）下，parse-broken 檔案會同時被 class 1（`parse-error`）與新 class 3（`unencoded-raw-read-unverifiable`）各報一次，造成 `-Json` payload 的 `drift_count` 虛高。**本輪未修**（gate mode 不受影響，只有人讀的預設報表有雜訊，優先度低）。
+- **m5（Minor）**：17 個 tracked `.ps1` 在 5 個預設掃描根之外（`automation/*` 等），工具從未掃到。逐一手動跑過 `-File` 確認目前 0 命中（非現存漏洞，是潛在盲區）。記入 AUDIT_REGISTRY 範圍界線，未擴大掃描根（超出本次任務）。
+- **m6/S1（Minor/Suggestion）**：splat（`Get-Content @sp`）與變數持有指令名（`& $cmd -Raw $p`）兩種形式偵測器完全看不到（現存 0 案例）。記入 AUDIT_REGISTRY 範圍界線，未修（AST 複雜度增加但零真實案例不划算）。
+- **m7（Minor）**：`audit-encoding.md` 宣稱「repo 100% 用 `-Encoding UTF8`，無其他值」——grep 出 3 個**寫入**站點用 `-Encoding ASCII`（`install-autopilot-startup-fallback.ps1:41,47`、`setup-wp-cli-windows.ps1:52`）。修正文件：宣稱範圍限縮為「`-Raw` 讀取」，不含寫入。
+- **m8（Minor）**：`system-health-check.ps1:129` 註解宣稱支援「獨立 agency-os checkout（無 monorepo 上層）」佈局，但 7b/7c 改 `Add-CriticalFailure` 後，該佈局下 `audit-cp950-traps.ps1` 必然不存在，會永久卡死兩個硬閘、無自癒路徑。**本輪未修**（需要操作者決定：拿掉獨立佈局宣稱，或給 7b/7c 一個「沒有 monorepo root」的獨立分支不當硬失敗——是設計取捨非單純程式碼修正）。
+- **S2（Suggestion，記為新 backlog）**：write 端（`Set-Content`/`Add-Content`/`Out-File` 缺 `-Encoding`）完全沒被稽核，且量體比 read 端（class 3）更大——同 167 檔掃出 10 處（9 處集中在 `post-push-trigger-deploy.ps1` 的 `Add-Content`）。這是同一不變量的另一半，已記入 `BUG_HUNT_PROTOCOL.md` backlog 為獨立的「CP950 class 4：unencoded-file-write」候選（非本次順手做，量體夠大該走完整 9 步 Playbook）。
+
+Round 2 額外驗證：`-ParseBreakOnly`/`-RawReadOnly` 全 repo重跑（167 掃描，167 clean，drift=0）、M1 三組 synthetic 測試（Default 觸發／UTF8 通過／變數值 fail-closed）皆通過、M2 CWD-outside-repo 重現後確認修復（`scanned=167` 不再是 0）、M3 round-trip 測試通過、`system-health-check.ps1` 全量再跑一次確認**只剩**並行 session 的 Doc integrity 失敗（7b/7c 均不再出現於 critical failures 清單）。
+
+[Round 2 已修改]
+- `scripts/audit-cp950-traps.ps1` — M1（`-Encoding` 值 allow-list）+ M2（`Resolve-RepoRoot` 改用 `-C $script:scriptDir` + gate mode `scanned=0` 斷言）+ unverifiable fix-pattern 文字修正
+- `scripts/bootstrap-local-wordpress-windows.ps1:126` — M3（Set-Content 改 BOM-less UTF8 明確寫入）
+- `scripts/system-health-check.ps1` — m1（刪 `$monorepoRootForGates`，改用既有 `$monoRoot`）+ m2（7 的註解指向真實 TASKS.md 項目）
+- `.claude/commands/audit-encoding.md` — m7（宣稱範圍修正）
+- `agency-os/docs/operations/AUDIT_REGISTRY.md` — 補 m5/m6/m8/S1/S2/S3 範圍界線 + S2 新 backlog candidate
+- `agency-os/docs/operations/BUG_HUNT_PROTOCOL.md` — backlog 表新增「CP950 class 4」候選
+- `agency-os/TASKS.md` — 新增 7)/9) 真實追蹤項目（m2 修復）
+
+[Round 2 驗證結果]
+- REVIEW_DONE: critic=Deep（Claude 內建 critic subagent，`/verify-recent` 觸發）| verdict=3 Major 全修復 + 5/8 Minor 修復（3 Minor + m8 設計取捨留待決定）| findings=3c(Major)/8m(Minor)/3s(Suggestion) — 全數逐條核實（非照單全收，附實測證據）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`audit-cp950-traps.ps1 -File <synthetic> -RawReadOnly`（3 組：`-Encoding Default`/`-Encoding UTF8`/`-Encoding $var`）| 全部符合預期（flag/clean/unverifiable）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`cd C:\Windows\Temp; powershell -File D:\Work\scripts\audit-cp950-traps.ps1 -RawReadOnly -Quiet`（M2 重現後驗證）| 修復前 `scanned=0 EXIT=0`（假 CLEAN）、修復後 `scanned=167 clean=167 EXIT=0`（真 CLEAN）
+- REALTEST_EVIDENCE: tool=Bash | cmd=scratchpad round-trip test（M3，CJK 路徑 + regex 替換）| BOM=False（正確）、CJK 內容完整、regex 替換正確
+- REALTEST_EVIDENCE: tool=Bash | cmd=`audit-cp950-traps.ps1 -ParseBreakOnly -Quiet` + `-RawReadOnly -Quiet`（Round 2 修復後全 repo 重跑）| 兩者皆 scanned=167 clean=167 drift=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`system-health-check.ps1`（Round 2 後第 4 次全量跑）| score=99.7%（312/313），唯一失敗=並行 session 的 Doc integrity（與本次 CP950 改動無關，7b/7c 均已不在 critical failures 清單）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`monorepoRootForGates`（確認清乾淨，改名後無殘留引用）+ `\$monoRoot.*audit-cp950-traps`（確認新引用點正確）| hits=0 殘留舊名、2 正確新引用（:548,:575）
+
+[Round 2 剩餘風險]
+- m3（console encoding 讓 unverifiable 錯誤訊息在 zh-TW host 顯示亂碼）、m4（預設模式雙重回報同一 parse-broken 檔案）、m8（獨立 agency-os 佈局與新 fail-closed 設計的宣稱衝突）三項留待下次處理，均非阻斷性（m3/m4 只影響人讀報表可讀性，m8 是尚未發生的假設情境且需要操作者做設計取捨）
+- S2 新 backlog（unencoded-file-write class 4）已記錄但未動工，10 個站點目前仍是活的風險（同一不變量的另一半）
+
 ### AI LEGO Phase 2 Architecture Convergence Round 1 — 6 份基礎 ADR 起草，解決全部 2 條硬性矛盾 + 6 個 open question
 
 **背景**：Phase 1 完成後操作者說「繼續」，進入 Phase 2（架構收斂，第一次做真實取捨決策而非純調查）。挑選 6 個最高槓桿問題起草 ADR：治理裁決鏈統一、GDPR 刪除權 vs 事件不可變、Tenant/CAS 矛盾、risk_tier+信任標籤統一、DB Migration Recipe、母文件修改流程+repo 佈局歸屬。全部 6 個 subagent 平行跑，各自用 Method Atlas 中**真實存在**的決策方法（MCDA/ATAM/FMEA/LINDDUN/DPIA，逐一 grep 確認 Atlas 章節後才引用，非憑外部知識代入）。
