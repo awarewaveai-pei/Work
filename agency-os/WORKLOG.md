@@ -1,5 +1,45 @@
 # Worklog
 
+## 2026-08-30（續2）
+
+### `/codex-review` 包裝 command + `write-oracle-artifact.ps1`：critic 抓到 Critical 級恆真式漏洞（刪除審查證明可偽造），重寫為 capture-then-review 兩段式
+
+**觸發**：操作者指出 AGENTS.md 散文規則太肥容易被漏讀/忘記，要求把「跑 `/codex:adversarial-review` + 固定附帶 2 段 focus text」包成一個獨立 command（`/codex-review`），細節寫死在 command 檔案裡而非散文規則。
+
+**第一版設計與其致命缺陷**：建 `.claude/commands/codex-review.md` + `scripts/write-oracle-artifact.ps1`，後者職責是把 `/codex:adversarial-review` 回傳的 JSON 轉寫成 ORACLE gate 認的 artifact 格式（該指令本身不寫檔，gate 認檔案不認來源工具）。第一版把 diff 解析 regex 從 `codex-oracle.ps1` 逐字複製過來，但**在寫檔當下才重新跑一次 `git diff`**——這與「review 當下實際審了什麼」完全脫鉤。
+
+**critic 覆審抓到（Critical + 3 Major，全部在隔離 scratch repo 實測復現，非理論推測）**：
+- 🔴 **C1**：`deletions-reviewed` 的 hash 綁定是恆真式——`-Answer "x"`（一個字元，什麼都沒審）就能產出跟真實審查完全相同的 `path@hash` token，gate 的刪除確認機制被完全繞過。這正是 AGENTS.md §補丁判準點名的「消音偵測器」最惡樣態——8 輪修正才做出的刪除追蹤機制，一次重寫就退回零證據。
+- 🟠 M1：全檔零 exit-code 檢查、零 empty-diff 中止，git 完全失敗 / 乾淨 tree 都照樣寫出「已審」artifact 且 exit 0。
+- 🟠 M2：untracked 檔案零過濾，`.env`/`.jpg`/超大檔全部無條件列進 `files-reviewed`。
+- 🟠 M3：findings 計數對 `codex-oracle.ps1` 自己的 `FINDING N:` 文字格式回傳 0（真實 finding 被宣告成 0），對純 JSON schema 回聲文字回傳 1（真實 0 個 finding 被宣告成 1 個）——這個數字會被直接貼進 WORKLOG。
+- 🟠 M4：`Write-Error; exit N` 在 `$ErrorActionPreference='Stop'` 下 `exit N` 是死碼，所有錯誤路徑實際 exit 0。
+
+**重寫（不變量修正）**：拆成 `-Mode capture`（review 呼叫前先拍一份 diff+已過濾 untracked 快照存檔，port 回 `codex-oracle.ps1` 的全部既有守衛：exit-code 檢查、empty-diff 中止、untracked 過濾清單、auto-commit 偵測警告）+ `-Mode review`（`files-reviewed`/`deletions-reviewed` 只從 `-ReviewedDiff` 指定的**已捕捉檔案**解析，未給則誠實印「NOT CAPTURED」而非重新查詢 git）。Findings 計數改 JSON-first + `FINDING` 文字格式 fallback，兩者都對不上就印 `<unknown>` 而非猜一個數字。`Write-Error` 全換成 `[Console]::Error.WriteLine` + 真正的 `exit N`。
+
+**修正後實測**（5 個情境，皆在隔離 scratch repo，未寫入 `D:\Work` 任何 artifact）：
+1. 手刻一份含假 hash（`deadbeef...`）的捕捉檔，在一個從未有過該檔案的全新 repo 執行 review → artifact 正確印出 `doomed.ps1@deadbeef...`，證明數值來自捕捉檔內容而非即時 git 查詢
+2. 未給 `-ReviewedDiff` → 正確印出 `(NOT CAPTURED)` 警告，不假裝有綁定
+3. 全空 tree 跑 `-Mode capture` → exit 2 "Nothing to review"，未寫檔
+4. `-AnswerFile` 指向不存在路徑 → exit 2（原版此情境 exit 0）
+5. `FINDING 1/2/3` 文字格式（3 個真實 finding）→ 正確印出 `findings=3`（原版此情境印 `findings=0`）
+
+[已修改]
+- 新增 `.claude/commands/codex-review.md`
+- 新增 `scripts/write-oracle-artifact.ps1`（同一 session 內一次 critic 覆審後整份重寫，非增量修補——選擇重寫而非逐點打補丁的理由：C1 影響的是整份 artifact 的信任基礎，M1-M4 全部源自同一個根因「複製 regex 但沒複製守衛」，逐點修等於留下同一漏洞的其他變體）
+- `agency-os/AGENTS.md`：§跨模型 oracle 唯一入口改指向 `/codex-review`，移除重複貼在散文裡的 focus text 全文（回應操作者「文件太肥」的原始訴求）
+- `.claude/commands/review.md`、`agency-os/docs/operations/TOOL_TRIGGER_MAP.md`：fallback 鏈引用同步改成 `/codex-review`
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(powershell) | cmd=`[System.Management.Automation.Language.Parser]::ParseFile` | exit=0 | 結果=PARSE OK
+- REALTEST_EVIDENCE: tool=Bash(powershell) | cmd=`write-oracle-artifact.ps1` 5 個情境（見上）於 3 個隔離 scratch repo | exit=符合各情境預期（0/2/2） | 結果=C1/M1/M2/M3/M4 全數證實修復，非僅讀 code 判斷
+- REVIEW_DONE: critic=Deep（外部 oracle，非自我描述）| verdict=Critical 1 + Major 4，全數已修正並重新實測 | findings=1c/4m/3minor（3 個 Minor 未動：m1 已在重寫中一併補上守衛、m2/m3 是散文措辭建議非功能缺陷，優先度降低留待下次觸碰時處理）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=`write-oracle-artifact\|ReviewedDiff\|-Mode capture\|codex:adversarial-review` | hits=`AGENTS.md`/`.claude/commands/review.md`/`TOOL_TRIGGER_MAP.md`（皆已同步指向新版）；`.claude/sessions/*.md` 為自動生成 session 逐字稿，依既有慣例不回溯改寫
+
+[剩餘風險] Step 1.5（capture）與 Step 2（`/codex:adversarial-review` 自己內部收集 diff）之間有小型競態窗口——兩者非原子操作，中間若有並行 session 寫入 working tree，兩邊看到的 diff 可能有微小落差；`codex-oracle.ps1` 本身也有同類殘留風險，非本輪重寫引入的新問題，誠實記錄而非隱藏。整條 `/codex-review` 流程尚未實跑過一次真正的 `/codex:adversarial-review` 呼叫（會產生真實 OpenAI 端費用/時間，未在本輪浪費測試）——首次真實使用時才是端到端的第一次驗證，若發現問題屆時處理。
+[rollback] 純新增檔案 + 文件宣告調整，`git revert` 即可完整回退；`codex-oracle.ps1`（原本唯一入口）完全未變動，隨時可切回。
+
 ## 2026-08-30
 
 ### R0 對話決策：codex review 主力工具由 `codex-oracle.ps1` 換成 `/codex:adversarial-review`，附加隱藏依賴檢查 + NO FINDINGS 許可
