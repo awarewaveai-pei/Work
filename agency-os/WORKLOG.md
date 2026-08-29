@@ -1,6 +1,47 @@
 # Worklog
 
-## 2026-08-29（續25）
+## 2026-08-29（續26）
+
+### codex-oracle.ps1 `-Mode review -Path` 100% 崩潰修復 —— PowerShell StrictMode scalar/null Count 陷阱（+ critic 抓到我自己 BUGHUNT 誤判一處同類孤例）
+
+**觸發**：續25 session 已重現此 bug 3-4 次並用 `spawn_task`（task_85e35210）記錄為獨立任務，未深挖確切崩潰行。本 session 收到完整重現報告（3 種 `-Path` 值皆 100% 崩潰、隔離測試各段落均正常）延續追查。
+
+**根因**：`scripts/codex-oracle.ps1:234`（修前行號）`$untracked` 的 `-Path` 過濾迴圈內：
+```powershell
+($Path | Where-Object { $f -like ... }).Count -gt 0
+```
+`Set-StrictMode -Version Latest`（L61）下，PowerShell 的合成 `Count`/`Length` ETS 成員在結果不是真陣列時一律被抑制——這不只涵蓋零命中的 `$null`，**單一命中的裸純量同樣沒有這個成員**（`Where-Object` 管線剛好 1 筆結果不會包成陣列）。實測驗證：`'x'.Count`／`(1).Count`／`$null.Count` 在 StrictMode Latest 下皆丟 `PropertyNotFoundStrict`；`$Path` 只有 1 個元素時，即使 `$f` 確實命中該元素，`.Count` 一樣崩潰。也就是說原本以為的「零命中才炸」是低估——單一元素 `-Path`（最常見用法）在 0 命中和 1 命中兩種情況下都會炸，僅 2 命中以上才僥倖不炸。這比初版根因判斷更廣，完整解釋「3 種不同 `-Path` 值皆 100% 重現」（critic 覆審抓到我第一版註解把根因寫窄了，見下）。
+
+**為何續25 的隔離測試沒抓到**：抽出的獨立 `.ps1` 檔沒有一併帶上 `Set-StrictMode -Version Latest`，同一段程式碼在無 StrictMode 下靜默回傳 `$null`/裸值（`$null -gt 0` = `$false`），不會拋錯，看起來「正常」。另外我自己第一次用 Bash heredoc 重現時，heredoc 把 `-replace '\\', '/'` 的雙反斜線吃掉一個變成 `'\'`（無效 regex），一度誤判成另一種崩潰——改用 Write 工具直接寫檔案才避開這個 shell-escaping 假象，與 [[feedback_bash_powershell_forward_slash]] 同一類陷阱的變體（該筆記錄的是路徑分隔符，這次是 regex 特殊字元，同源：Bash 字串跨進 PowerShell 內容不可信）。
+
+**修法**：`@(...)` 包住內層 `Where-Object` 結果，強制任何命中數（0/1/多）都是真陣列而非裸值：
+```powershell
+@($Path | Where-Object { $f -like ... }).Count -gt 0
+```
+
+**Critic 覆審（Standard）抓到 2 個問題，皆已驗證後修正**：
+1. **我自己的 BUGHUNT_DONE 宣告錯誤**——`scripts/fetch-external-signals.ps1:285`（`$okCount = ($allStatuses | Where-Object { $_ -eq "ok" }).Count`）是同一類未保護的孤例，該檔 L33 確有 `Set-StrictMode -Version Latest`。第一輪 grep 有掃到這行但人工分類判斷錯誤（誤判成已保護）。已補 `@()` 包裝 + 真實跑一次驗證（見下）；這是這一類問題目前確認的唯二兩處，非普遍系統性錯誤。
+2. **我的第一版說明註解把機制寫窄了**（只講 `$null`，漏了單一命中裸純量同樣會炸）——已重寫註解與本條 WORKLOG 反映正確、更廣的不變量。
+
+**Critic 另外提出 7 項 pre-existing（非本次改動引入）的 `-Path` 邊界問題**（`$ru.Exit` 未檢查／`-like` 前綴比對比 git pathspec 寬／絕對路徑靜默清空 untracked 集合／`-Path $null` 會炸／空字串元素／`Write-Error`+`exit` 在 Stop 模式下不可達／`-Path` scoped review 無法滿足 ORACLE gate）——不在本次「修復崩潰」範圍內，已用 `spawn_task` 記錄為獨立任務，避免此次修法擴大成大改動。
+
+**額外釐清（報告 §4 的問題）**：`-Mode review` 無 `-Path` 時偶發的「codex produced no final message after 2 attempt(s)」是**不同、無關**的失敗路徑——那是 `codex` 子行程正常結束（`WaitForExit` 回 true）但 `$outFile` 未產生（stream 中斷），觸發重試 1 次後仍失敗（L489 附近）。本次修復驗證時用短 `-TimeoutSec 120` 反而先撞到**另一條**、更早的路徑：硬逾時（`WaitForExit(ms)` 逾時未歸，直接 kill + `Write-Error "codex timed out..."`，L469-473，不重試）。兩者都在 diff 收集完成、真正呼叫 `codex` CLI 之後才會發生，皆與本次修的 `.Count` bug 無關，不在本次範圍內處理。
+
+[已修改]
+- `scripts/codex-oracle.ps1`：L231-238 `-Path` 未追蹤檔過濾迴圈內層 `Where-Object` 結果補 `@()` 包裝；說明註解修正為正確、完整的機制（scalar 亦會炸，非僅 `$null`）
+- `scripts/fetch-external-signals.ps1`：L285（critic 抓到的同類孤例）補 `@()` 包裝 + 說明註解
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(powershell) | cmd=`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-oracle.ps1 -Mode review -Context "test" -Path "agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/README.md" -TimeoutSec 120` | exit=1（`codex timed out after 120s`，非本次修的 bug；診斷收集階段本身無崩潰，正確 inline 1 個 untracked 檔、組出 8.6KB packet 並成功呼叫 `codex` CLI）
+- REALTEST_EVIDENCE: tool=Bash(powershell) | cmd=`powershell -File scripts/fetch-external-signals.ps1 -MaxLookbackHours 2` | exit=0 | 結果：`ops_inbox_commands: ok (0 msg)` / `deploy_events: ok (2 events)` / `Slack: ok`，digest 正常寫出，無崩潰
+- REALTEST_EVIDENCE: tool=Bash(powershell) | cmd=修前/修後對照 repro（Write 工具寫入隔離 `.ps1`，`Set-StrictMode -Version Latest`）| exit=0 | 結果：`'x'.Count`/`(1).Count`/`$null.Count` 修前皆丟 `PropertyNotFoundStrict`（含「確實命中」的單元素 `-Path` 案例）；`@(...).Count` 修後於 0/1/多 命中皆正常回傳
+- REVIEW_DONE: critic=Standard | verdict=warn→fixed | findings=1c/6m/1s（1 個 CRITICAL：我自己 BUGHUNT hits=0 宣告有誤，已修正；6 個 MAJOR/1 個建議為 pre-existing `-Path` 邊界問題，已用 spawn_task 記錄不在本次範圍處理；「`@()` 修法本身正確且足夠」「無 `$_` 遮蔽 bug」「無 CP950 陷阱」「diff 範圍乾淨」四項覆審通過）
+- BUGHUNT_DONE: scope=scripts,agency-os | grep=`\)\.Count`（StrictMode-unsafe Where-Object→.Count pattern，含 critic 覆審修正後的完整分類）| hits=1（`scripts/fetch-external-signals.ps1:285`，已於同一輪修正；其餘既有命中皆已用 `@(...)`/`Measure-Object`/`[regex]::Matches`（恆回傳真物件不受影響）保護）
+
+[剩餘風險] 兩個 `@()` 修法皆為單行邏輯修正、非行為變更（命中數本就決定 true/false，修法只是讓實作在任何命中數下都不拋例外）。Critic 提出的 7 項 `-Path` 邊界問題（pathspec 比對寬鬆/絕對路徑靜默失效等）未修，已記錄追蹤，非此次崩潰修復範圍內的迴歸風險。
+[rollback] `git revert` 該 commit，或手動移除兩處新增的 `@(` / 對應 `)`。
+
+
 
 ### AI-LEGO Phase 3 Wave 8 全建（tests/ 全目錄，79 檔）+ 5 個並行 subagent 分工撰寫 fixture + 過程中發現並修正 3 個既有 Wave 的真實 bug + codex-oracle 4 次覆審嘗試皆失敗改走突變測試自審
 

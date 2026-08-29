@@ -229,9 +229,19 @@ if ($Mode -eq 'review') {
             $ru        = Invoke-Git -GitArgs @('ls-files','--others','--exclude-standard') -Root $root
             $untracked = @($ru.Text -split "`n" | ForEach-Object { "$_".Trim() } | Where-Object { $_ -and $_ -notmatch $selfArtifacts })
             if ($Path.Count -gt 0) {
+                # @() is required around the inner Where-Object. Under Set-StrictMode
+                # -Version Latest (line 61), the synthetic Count/Length ETS member is
+                # suppressed on anything that isn't a REAL array -- that includes both
+                # $null (zero matches) AND a bare scalar (exactly one match, which
+                # PowerShell's pipeline does not wrap). So `.Count` on the unwrapped
+                # result throws PropertyNotFoundStrict for 0-match AND 1-match, i.e. on
+                # nearly every real -Path run (verified: throws even when $f DOES match
+                # $Path, if $Path itself has exactly one element). Only @()-wrapping
+                # guarantees a true array regardless of match count. Confirmed via
+                # isolated repro + critic cross-check, 2026-08-29.
                 $untracked = @($untracked | Where-Object {
                     $f = $_
-                    ($Path | Where-Object { $f -like (($_ -replace '\\', '/').TrimEnd('/') + '*') }).Count -gt 0
+                    @($Path | Where-Object { $f -like (($_ -replace '\\', '/').TrimEnd('/') + '*') }).Count -gt 0
                 })
             }
 

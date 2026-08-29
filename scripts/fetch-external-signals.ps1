@@ -282,7 +282,12 @@ $endIso       = if ($untilUtc) { $untilUtc.ToString("o") } else { $generatedUtc.
 # endpoint_pending is a known-transient state (new endpoint not yet deployed); treat as neutral for aggregate.
 $deployStatusForAggregate = if ($deployStatus -eq "endpoint_pending") { "ok" } else { $deployStatus }
 $allStatuses  = @($tgStatus, $deployStatusForAggregate) + @($slackChannels.Values | ForEach-Object { $_.status })
-$okCount      = ($allStatuses | Where-Object { $_ -eq "ok" }).Count
+# @() wrap is required: under Set-StrictMode -Version Latest (:33), a Where-Object
+# result that isn't a real array (zero matches -> $null, exactly one match -> a bare
+# scalar) has no synthetic .Count member and throws PropertyNotFoundStrict. That is
+# precisely the 0-ok / 1-ok case this line exists to detect (codex-oracle.ps1:234
+# review, 2026-08-29).
+$okCount      = @($allStatuses | Where-Object { $_ -eq "ok" }).Count
 $fetchStatus  = if ($okCount -eq $allStatuses.Count) { "ok" } elseif ($okCount -gt 0) { "partial" } else { "failed" }
 
 $digest = [ordered]@{
