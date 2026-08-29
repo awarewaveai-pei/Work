@@ -1,0 +1,60 @@
+schema_id: "ai-lego://policies/provider/model-registry.policy.yaml"
+target_ref: ""
+description: >
+  Exercises the required field set, the provider/champion_status enums, and
+  the weights_hash sha256-prefixed-hex pattern.
+valid:
+  - name: cloud_api_champion_model
+    instance:
+      model_profile_id: "reasoning-high-v3"
+      provider: anthropic
+      model_identifier: "claude-opus-5-20260815"
+      endpoint: {type: cloud_api, uri: "https://api.anthropic.com/v1", region: ["us-east-1"]}
+      capability_tags: ["reasoning", "tool-use"]
+      cost_profile: {input_per_1k: 0.015, output_per_1k: 0.075}
+      eval_scorecard_ref: "EVAL-2026-08-29-001"
+      champion_status: champion
+      registered_at: "2026-08-15T00:00:00Z"
+      registered_by: "operator"
+  - name: self_hosted_shadow_model_with_weights_hash
+    instance:
+      model_profile_id: "local-shadow-v1"
+      provider: self-hosted
+      model_identifier: "llama-70b-finetune-v1"
+      weights_hash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      capability_tags: ["reasoning"]
+      champion_status: shadow
+      registered_at: "2026-08-20T00:00:00Z"
+      registered_by: "operator"
+invalid:
+  - name: bad_provider_enum
+    instance:
+      model_profile_id: "x"
+      provider: "some-random-vendor"
+      model_identifier: "x"
+      capability_tags: []
+      champion_status: champion
+      registered_at: "2026-08-15T00:00:00Z"
+      registered_by: "operator"
+    reason: "provider enum is exactly [anthropic, openai, google, azure, self-hosted, byo-endpoint] -- 'some-random-vendor' is not a member"
+  - name: bad_champion_status_recipe_step_confused_with_state
+    instance:
+      model_profile_id: "x"
+      provider: anthropic
+      model_identifier: "x"
+      capability_tags: []
+      champion_status: "Promote or Reject"
+      registered_at: "2026-08-15T00:00:00Z"
+      registered_by: "operator"
+    reason: "champion_status enum is [champion, challenger, shadow, retired] -- a recipe STEP name like 'Promote or Reject' is not a legal STATE value, see this file's own compilation_decisions on why the two are kept distinct"
+  - name: weights_hash_missing_sha256_prefix
+    instance:
+      model_profile_id: "x"
+      provider: self-hosted
+      model_identifier: "x"
+      weights_hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      capability_tags: []
+      champion_status: shadow
+      registered_at: "2026-08-15T00:00:00Z"
+      registered_by: "operator"
+    reason: "weights_hash pattern requires the literal 'sha256:' prefix before the 64 hex chars, matching DEVOPS_SRE_PLAN.md L184's own 'sha256:...' example"

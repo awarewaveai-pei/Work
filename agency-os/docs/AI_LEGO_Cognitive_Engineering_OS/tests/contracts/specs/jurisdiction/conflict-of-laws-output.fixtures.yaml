@@ -1,0 +1,109 @@
+schema_id: "ai-lego://specs/jurisdiction/conflict-of-laws-output.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the required field set, the MP §98 status enum, and the
+  allOf/if/then blocks requiring resolution_rule_applied for
+  CONSERVATIVE_SAFE_MODE and human_counsel_ref for the 3 escalation status
+  values.
+valid:
+  - name: resolved_no_conflict
+    instance:
+      id: "COL-2026-08-29-001"
+      evaluated_at: "2026-08-29T00:00:00Z"
+      jurisdiction_resolution_ref: "JR-2026-08-29-001"
+      owning_component: conflict_of_laws_engine
+      input_rules:
+        - jurisdiction: "eu-west"
+          obligation_ref: "OBL-GDPR-17"
+          required_action: "erase_on_request"
+          source: "LAW-0001"
+      scope_test: PASS
+      extraterritorial_test: PASS
+      authority_test: PASS
+      conflicts_detected: []
+      choice_of_law_applied: false
+      status: RESOLVED
+  - name: conservative_safe_mode_with_resolution_rule
+    instance:
+      id: "COL-2026-08-29-002"
+      evaluated_at: "2026-08-29T00:00:00Z"
+      owning_component: conflict_of_laws_engine
+      input_rules:
+        - jurisdiction: "us-federal"
+          obligation_ref: "OBL-CCPA-04"
+          required_action: "retain_for_audit"
+          source: "LAW-0002"
+        - jurisdiction: "eu-west"
+          obligation_ref: "OBL-GDPR-17"
+          required_action: "erase_on_request"
+          source: "LAW-0001"
+      scope_test: PASS
+      extraterritorial_test: PASS
+      authority_test: PASS
+      conflicts_detected:
+        - rule_a: {jurisdiction: "us-federal", obligation_ref: "OBL-CCPA-04"}
+          rule_b: {jurisdiction: "eu-west", obligation_ref: "OBL-GDPR-17"}
+          conflict_type: DIRECT_CONTRADICTION
+      choice_of_law_applied: false
+      status: CONSERVATIVE_SAFE_MODE
+      resolution_rule_applied: "most_restrictive_obligation_wins"
+  - name: legal_review_required_with_human_counsel_ref
+    instance:
+      id: "COL-2026-08-29-003"
+      evaluated_at: "2026-08-29T00:00:00Z"
+      owning_component: conflict_of_laws_engine
+      input_rules:
+        - jurisdiction: "cn"
+          obligation_ref: "OBL-PIPL-09"
+          required_action: "local_data_residency"
+          source: "LAW-0003"
+      scope_test: PASS
+      extraterritorial_test: FAIL
+      authority_test: PASS
+      status: LEGAL_REVIEW_REQUIRED
+      human_counsel_ref: "COUNSEL-CASE-2026-0071"
+invalid:
+  - name: bad_status_enum_value
+    instance:
+      id: "COL-2026-08-29-004"
+      evaluated_at: "2026-08-29T00:00:00Z"
+      owning_component: conflict_of_laws_engine
+      input_rules: []
+      scope_test: PASS
+      extraterritorial_test: PASS
+      authority_test: PASS
+      status: "MAYBE"
+    reason: "status enum is MP §98's own 5 values (RESOLVED/CONSERVATIVE_SAFE_MODE/AMBIGUOUS/CONFLICT/LEGAL_REVIEW_REQUIRED) reused verbatim -- 'MAYBE' is not a member."
+  - name: conservative_safe_mode_missing_resolution_rule
+    instance:
+      id: "COL-2026-08-29-005"
+      evaluated_at: "2026-08-29T00:00:00Z"
+      owning_component: conflict_of_laws_engine
+      input_rules: []
+      scope_test: PASS
+      extraterritorial_test: PASS
+      authority_test: PASS
+      status: CONSERVATIVE_SAFE_MODE
+    reason: "the allOf/if/then block requires resolution_rule_applied (non-null) whenever status = CONSERVATIVE_SAFE_MODE -- omitting it fails, since a fallback decision made with no recorded rule is exactly the silent-decision failure this schema exists to prevent."
+  - name: ambiguous_missing_human_counsel_ref
+    instance:
+      id: "COL-2026-08-29-006"
+      evaluated_at: "2026-08-29T00:00:00Z"
+      owning_component: conflict_of_laws_engine
+      input_rules: []
+      scope_test: PASS
+      extraterritorial_test: FAIL
+      authority_test: PASS
+      status: AMBIGUOUS
+    reason: "the allOf/if/then block requires human_counsel_ref (non-null) whenever status is AMBIGUOUS/CONFLICT/LEGAL_REVIEW_REQUIRED -- omitting it fails, since this is the field that makes escalation to a real human lawyer structurally traceable rather than optional."
+  - name: wrong_owning_component_const
+    instance:
+      id: "COL-2026-08-29-007"
+      evaluated_at: "2026-08-29T00:00:00Z"
+      owning_component: "some_other_service"
+      input_rules: []
+      scope_test: PASS
+      extraterritorial_test: PASS
+      authority_test: PASS
+      status: RESOLVED
+    reason: "owning_component is const 'conflict_of_laws_engine' (GLOBAL_JURISDICTION_PLAN.md §5.2's single logical owner) -- any other value re-opens the ownership ambiguity this file exists to close."

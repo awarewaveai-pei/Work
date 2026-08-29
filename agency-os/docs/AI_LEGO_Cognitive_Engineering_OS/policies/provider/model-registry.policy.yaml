@@ -1,0 +1,139 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://policies/provider/model-registry.policy.yaml"
+title: Model Registry Entry
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Closes P1-GAP-INFRA-6 (severity: medium). EC §64, MP §69, and Atlas all
+  reference a free-text `model_profile` string with no backing registry
+  component -- this file gives it one. Transcribes
+  docs/architecture/DEVOPS_SRE_PLAN.md §5 (Status: PROPOSED, 2026-08-29,
+  explicitly "Closes: P1-GAP-INFRA-6" at that section's own header). Same
+  "transcribed from a not-yet-ADR-ratified design document" provenance
+  class as the sibling policies/provider/ai-gateway-fallback.policy.yaml
+  built alongside this file.
+
+source_of_truth_for:
+  - "docs/architecture/DEVOPS_SRE_PLAN.md §5 Model Registry (L171-197) -- every field below transcribed verbatim from the model_registry_entry worked example"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §37 Champion / Challenger (L1447-1465) -- the champion_status lifecycle this file's field reuses verbatim, per DEVOPS_SRE_PLAN.md L196's own note that this is not a new invention"
+  - "recipes/validated/champion-challenger.recipe.yaml -- the machine-executable promotion recipe this registry entry's champion_status field is the system-of-record target of"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.9 row for policies/provider/ (P1-GAP-INFRA-5/6, SKELETON_ONLY)"
+
+decided_by: >
+  docs/architecture/DEVOPS_SRE_PLAN.md (Status: PROPOSED, 2026-08-29). See
+  specs/domain/repository-contract.schema.yaml's `decided_by` for the full
+  reasoning on treating an evidence-comparable PROPOSED document as
+  authoritative content to transcribe.
+
+compilation_decisions:
+  - question: >
+      DEVOPS_SRE_PLAN.md L196 states champion_status reuses EC §37/MP §71's
+      already-defined lifecycle "for the first time with a concrete
+      system-of-record." Should this file's `champion_status` enum match
+      champion-challenger.recipe.yaml's own step vocabulary
+      (Shadow/Eval/Compare/Promote or Reject), or the plan's own literal
+      4-value enum?
+    decision: "Kept as the plan's own literal 4-value enum (champion, challenger, shadow, retired) -- a model's CURRENT STATE, not a recipe STEP name."
+    reasoning: >
+      These are two different concepts at two different grains: the recipe
+      models the PROCESS (the 4 steps a promotion decision goes through);
+      this registry field models the model's STANDING STATUS at any given
+      moment, which is a state a model occupies BEFORE, DURING, and AFTER
+      that process runs (e.g. a model is "shadow" for the whole duration of
+      the recipe's Shadow step, then becomes "champion" only after a
+      Promote verdict). Conflating the two would misrepresent a state as a
+      step or vice versa.
+
+type: object
+required: [model_profile_id, provider, model_identifier, capability_tags, champion_status, registered_at, registered_by]
+properties:
+  model_profile_id: { type: string, examples: ["reasoning-high-v3"] }
+  provider:
+    type: string
+    enum: [anthropic, openai, google, azure, self-hosted, byo-endpoint]
+  model_identifier:
+    type: string
+    description: "Exact upstream model id/version. Free text -- no closed vocabulary exists across providers to enumerate against."
+  endpoint:
+    type: object
+    properties:
+      type: { type: string, enum: [cloud_api, private_endpoint, local_runtime] }
+      uri: { type: string }
+      region: { type: array, items: { type: string } }
+  weights_hash:
+    type: [string, "null"]
+    pattern: "^sha256:[a-f0-9]{64}$"
+    description: "Only present for local/self-hosted models (DEVOPS_SRE_PLAN.md L184: '僅 local/self-hosted')."
+  license_ref: { type: [string, "null"] }
+  capability_tags:
+    type: array
+    items: { type: string }
+  cost_profile:
+    type: object
+    properties:
+      input_per_1k: { type: number }
+      output_per_1k: { type: number }
+  eval_scorecard_ref:
+    type: [string, "null"]
+    description: "Links to MP §70's 5-dataset Eval results (Golden/Regression/Adversarial/Privacy/Safety Dataset)."
+  champion_status:
+    type: string
+    enum: [champion, challenger, shadow, retired]
+    description: "See compilation_decisions above for why this is a STATE, not a recipe STEP name."
+  security_review_ref: { type: [string, "null"] }
+  deprecation:
+    type: object
+    properties:
+      announced_at: { type: [string, "null"], format: date-time }
+      sunset_at: { type: [string, "null"], format: date-time }
+      replacement_model_profile_id: { type: [string, "null"] }
+  crypto_policy:
+    type: object
+    properties:
+      algorithm_id: { type: string }
+      key_version: { type: string }
+  registered_at: { type: string, format: date-time }
+  registered_by: { type: string }
+
+open_questions:
+  - id: "OQ-MODELREGISTRY-1"
+    question: >
+      Same provenance-class disclosure as sibling
+      policies/provider/ai-gateway-fallback.policy.yaml's OQ-GATEWAYFALLBACK-1
+      -- transcribed from a Status: PROPOSED document, not yet a dedicated
+      ACCEPTED ADR.
+    owner: "operator, or a future session (see specs/domain/repository-contract.schema.yaml OQ-REPOCONTRACT-1 for the batch framing)"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-MODELREGISTRY-2"
+    question: >
+      `deprecation` here (a single model_registry_entry marking itself
+      deprecated) is a DIFFERENT concept from
+      specs/execution/deprecation-pipeline.schema.yaml's 7-step retirement
+      pipeline (which covers API/Method/Capability/Schema/Policy/Provider/
+      Workflow objects generically). Should a Model Registry entry's
+      deprecation eventually be modeled as an instance of that generic
+      pipeline instead of this bespoke 3-field object?
+    owner: "operator, or a future Phase 3/4 compilation pass reconciling the two"
+    blocks: "nothing in this file's own validity -- deprecation-pipeline.schema.yaml's own object_type enum does not currently include a specific 'Model' value, only 'Provider', so this is not an immediate overlap"
+
+verification:
+  method: >
+    Read docs/architecture/DEVOPS_SRE_PLAN.md §5 (L171-197) directly at the
+    cited lines, transcribing the worked model_registry_entry example
+    field-for-field. Cross-checked EC §37 (L1447-1465, already read in full
+    this session for recipes/validated/champion-challenger.recipe.yaml) to
+    confirm champion_status's 4 values are consistent with that section's
+    Champion/Challenger/Shadow concepts (Champion+Challenger explicit,
+    Shadow explicit as the pre-promotion phase, retired is this file's own
+    reasonable addition for a model no longer in active rotation -- not
+    itself named in EC §37, flagged honestly rather than claimed as a
+    literal citation).
+  note: >
+    No mother document was modified. weights_hash/crypto_policy/
+    security_review_ref are transcribed field NAMES from DEVOPS_SRE_PLAN.md
+    L184-192 verbatim; their own internal shapes beyond what the plan
+    literally shows are this file's additive, disclosed compilation
+    choices (e.g. crypto_policy.algorithm_id/key_version as a 2-field
+    object, since the plan gives only `{algorithm_id: ..., key_version:
+    ...}` with no further nesting to transcribe).

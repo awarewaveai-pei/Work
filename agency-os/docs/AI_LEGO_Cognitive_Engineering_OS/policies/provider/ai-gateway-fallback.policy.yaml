@@ -1,0 +1,135 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://policies/provider/ai-gateway-fallback.policy.yaml"
+title: AI Gateway Fallback Circuit Breaker
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Closes P1-GAP-INFRA-5 (severity: high). EC §42 Data Residency-aware
+  Execution and MP §151 全球失敗模式與降級 ("Fallback only within Eligible
+  Provider Set", L5731) both mandate that AI provider fallback never leaves
+  the Eligible Provider Set (jurisdiction/residency/contract-eligible
+  providers only), but neither gives a health-check frequency, failure-rate
+  trip threshold, or an auto-vs-manual failover rule. Transcribes
+  docs/architecture/DEVOPS_SRE_PLAN.md §4 (Status: PROPOSED, 2026-08-29,
+  explicitly "Closes: P1-GAP-INFRA-5" at that section's own header), the
+  same provenance class as specs/domain/repository-contract.schema.yaml and
+  specs/security/tenant-isolation-controls.schema.yaml (see those files'
+  `open_questions.OQ-REPOCONTRACT-1`/`OQ-TENANTISO-1` for the shared
+  "transcribed from a not-yet-ADR-ratified design document" disclosure,
+  identical here).
+
+source_of_truth_for:
+  - "docs/architecture/DEVOPS_SRE_PLAN.md §4 AI Gateway Resilience (Circuit Breaker) (L138-167) -- every field below transcribed verbatim"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §42 Data Residency-aware Execution (L1587-1610) -- cited by DEVOPS_SRE_PLAN.md as one of the two mother-document anchors this policy fills the gap between"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §151 全球失敗模式與降級 (L5709-5749), specifically L5728-5732 'AI Provider 故障 -> Fallback only within Eligible Provider Set' -- the hard constraint this policy's design_principle field is a machine-readable restatement of"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §144 Compliance-aware AI Router (L5533-5565) -- the other mother-document anchor DEVOPS_SRE_PLAN.md cites"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.9 row for policies/provider/ (P1-GAP-INFRA-5/6, SKELETON_ONLY)"
+
+decided_by: >
+  docs/architecture/DEVOPS_SRE_PLAN.md (Status: PROPOSED, 2026-08-29). See
+  specs/domain/repository-contract.schema.yaml's `decided_by` for the full
+  reasoning on why a not-yet-ADR-ratified but evidence-comparable PROPOSED
+  document is treated as authoritative content to transcribe here.
+
+type: object
+required: [health_check, trip_condition, recovery, failover_decision, incident_escalation, design_principle]
+properties:
+
+  health_check:
+    type: object
+    description: "DEVOPS_SRE_PLAN.md L146 verbatim."
+    required: [active_probe_interval_seconds, passive_window_seconds]
+    properties:
+      active_probe_interval_seconds: { type: integer, const: 15 }
+      passive_window_seconds: { type: integer, const: 60 }
+
+  trip_condition:
+    type: object
+    description: "L148 verbatim: Closed -> Open transition."
+    required: [min_samples_in_window, error_rate_threshold_pct, latency_multiplier_of_baseline]
+    properties:
+      min_samples_in_window: { type: integer, const: 20 }
+      error_rate_threshold_pct: { type: integer, const: 20 }
+      latency_multiplier_of_baseline:
+        type: number
+        const: 3
+        description: "p95 latency > 3x rolling baseline."
+      combinator:
+        type: string
+        const: "min_samples_in_window AND (error_rate_threshold_pct OR latency_multiplier_of_baseline)"
+
+  recovery:
+    type: object
+    description: "L150-151 verbatim: Open -> Half-Open -> Closed/Open cycle."
+    required: [open_cooldown_seconds, half_open_canary_requests, half_open_success_threshold_pct, reopen_backoff_seconds]
+    properties:
+      open_cooldown_seconds: { type: integer, const: 30 }
+      half_open_canary_requests: { type: integer, const: 5 }
+      half_open_success_threshold_pct: { type: integer, const: 80 }
+      reopen_backoff_seconds:
+        type: array
+        items: { type: integer }
+        const: [30, 60, 120, 300]
+        description: "L151 verbatim exponential backoff sequence on repeated Half-Open failure."
+
+  failover_decision:
+    type: object
+    description: "L156-161 verbatim auto-vs-manual failover logic."
+    required: [champion_open_with_challenger_available, champion_open_no_challenger_high_risk, champion_open_no_challenger_low_risk]
+    properties:
+      champion_open_with_challenger_available:
+        type: string
+        const: "automatic failover to challenger/backup within the same Eligible Provider Set (jurisdiction/residency/contract already validated)"
+      champion_open_no_challenger_high_risk:
+        type: string
+        const: "BLOCK + alert (applies to R3+ / high-risk Capability)"
+      champion_open_no_challenger_low_risk:
+        type: string
+        const: "enqueue + backoff retry (applies to R0-R2 / low-risk Capability)"
+
+  incident_escalation:
+    type: object
+    description: "L163-164 verbatim automatic incident severity rules."
+    required: [single_provider_open_over_minutes, all_providers_open]
+    properties:
+      single_provider_open_over_minutes:
+        type: object
+        required: [minutes, auto_severity]
+        properties:
+          minutes: { type: integer, const: 5 }
+          auto_severity: { type: string, const: "SEV2" }
+      all_providers_open:
+        type: object
+        required: [auto_severity]
+        properties:
+          auto_severity: { type: string, const: "SEV1" }
+
+  design_principle:
+    type: string
+    const: "circuit breaker MUST NEVER trade availability for leaving the Eligible Provider Set -- directly binds to MP §151 L5731 'Fallback only within Eligible Provider Set', so the breaker itself can never become a backdoor around sovereignty/jurisdiction constraints"
+    description: "L167 verbatim design principle -- this is the one field this whole policy exists to enforce; every other field above is the mechanism, this is the invariant."
+
+open_questions:
+  - id: "OQ-GATEWAYFALLBACK-1"
+    question: >
+      Same provenance-class disclosure as
+      specs/domain/repository-contract.schema.yaml's OQ-REPOCONTRACT-1 --
+      this file transcribes a Status: PROPOSED design document, not a
+      dedicated ACCEPTED ADR.
+    owner: "operator, or a future session (see OQ-REPOCONTRACT-1 for the batch framing)"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read docs/architecture/DEVOPS_SRE_PLAN.md §4 (L138-167) directly at the
+    cited lines. Cross-checked its own EC §42 and MP §144/§151 citations
+    against the actual mother-document line ranges (EC §42 L1587-1610; MP
+    §144 L5533-5565; MP §151 L5709-5749, specifically L5728-5732 for the
+    literal "Fallback only within Eligible Provider Set" quote) rather than
+    trusting the plan document's section-number citation alone. Validated
+    this file's own YAML syntax and duplicate-key-freedom.
+  note: >
+    No mother document was modified. Every numeric threshold (15s/60s/20
+    samples/20%/3x/30s/5 canaries/80%/30-60-120-300s backoff/5min/SEV1-2)
+    is transcribed verbatim from DEVOPS_SRE_PLAN.md §4, none invented here.

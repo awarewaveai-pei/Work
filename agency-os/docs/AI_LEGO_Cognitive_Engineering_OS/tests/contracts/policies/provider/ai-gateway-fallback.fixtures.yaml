@@ -1,0 +1,44 @@
+schema_id: "ai-lego://policies/provider/ai-gateway-fallback.policy.yaml"
+target_ref: ""
+description: >
+  Exercises the const-enforced numeric thresholds transcribed verbatim from
+  DEVOPS_SRE_PLAN.md §4, and the design_principle invariant.
+valid:
+  - name: full_policy_as_designed
+    instance:
+      health_check: {active_probe_interval_seconds: 15, passive_window_seconds: 60}
+      trip_condition: {min_samples_in_window: 20, error_rate_threshold_pct: 20, latency_multiplier_of_baseline: 3, combinator: "min_samples_in_window AND (error_rate_threshold_pct OR latency_multiplier_of_baseline)"}
+      recovery: {open_cooldown_seconds: 30, half_open_canary_requests: 5, half_open_success_threshold_pct: 80, reopen_backoff_seconds: [30, 60, 120, 300]}
+      failover_decision:
+        champion_open_with_challenger_available: "automatic failover to challenger/backup within the same Eligible Provider Set (jurisdiction/residency/contract already validated)"
+        champion_open_no_challenger_high_risk: "BLOCK + alert (applies to R3+ / high-risk Capability)"
+        champion_open_no_challenger_low_risk: "enqueue + backoff retry (applies to R0-R2 / low-risk Capability)"
+      incident_escalation:
+        single_provider_open_over_minutes: {minutes: 5, auto_severity: SEV2}
+        all_providers_open: {auto_severity: SEV1}
+      design_principle: "circuit breaker MUST NEVER trade availability for leaving the Eligible Provider Set -- directly binds to MP §151 L5731 'Fallback only within Eligible Provider Set', so the breaker itself can never become a backdoor around sovereignty/jurisdiction constraints"
+invalid:
+  - name: weakened_trip_threshold
+    instance:
+      health_check: {active_probe_interval_seconds: 15, passive_window_seconds: 60}
+      trip_condition: {min_samples_in_window: 5, error_rate_threshold_pct: 50, latency_multiplier_of_baseline: 3}
+      recovery: {open_cooldown_seconds: 30, half_open_canary_requests: 5, half_open_success_threshold_pct: 80, reopen_backoff_seconds: [30, 60, 120, 300]}
+      failover_decision:
+        champion_open_with_challenger_available: "automatic failover to challenger/backup within the same Eligible Provider Set (jurisdiction/residency/contract already validated)"
+        champion_open_no_challenger_high_risk: "BLOCK + alert (applies to R3+ / high-risk Capability)"
+        champion_open_no_challenger_low_risk: "enqueue + backoff retry (applies to R0-R2 / low-risk Capability)"
+      incident_escalation: {single_provider_open_over_minutes: {minutes: 5, auto_severity: SEV2}, all_providers_open: {auto_severity: SEV1}}
+      design_principle: "circuit breaker MUST NEVER trade availability for leaving the Eligible Provider Set -- directly binds to MP §151 L5731 'Fallback only within Eligible Provider Set', so the breaker itself can never become a backdoor around sovereignty/jurisdiction constraints"
+    reason: "min_samples_in_window is const 20 and error_rate_threshold_pct is const 20 -- silently loosening the trip condition (5 samples, 50% error rate) would make the breaker trip far less readily than DEVOPS_SRE_PLAN.md §4 specifies"
+  - name: fallback_escapes_eligible_provider_set
+    instance:
+      health_check: {active_probe_interval_seconds: 15, passive_window_seconds: 60}
+      trip_condition: {min_samples_in_window: 20, error_rate_threshold_pct: 20, latency_multiplier_of_baseline: 3}
+      recovery: {open_cooldown_seconds: 30, half_open_canary_requests: 5, half_open_success_threshold_pct: 80, reopen_backoff_seconds: [30, 60, 120, 300]}
+      failover_decision:
+        champion_open_with_challenger_available: "automatic failover to challenger/backup within the same Eligible Provider Set (jurisdiction/residency/contract already validated)"
+        champion_open_no_challenger_high_risk: "BLOCK + alert (applies to R3+ / high-risk Capability)"
+        champion_open_no_challenger_low_risk: "enqueue + backoff retry (applies to R0-R2 / low-risk Capability)"
+      incident_escalation: {single_provider_open_over_minutes: {minutes: 5, auto_severity: SEV2}, all_providers_open: {auto_severity: SEV1}}
+      design_principle: "for availability, fall back to any provider regardless of jurisdiction eligibility"
+    reason: "design_principle is const to the MP §151 L5731-binding invariant -- weakening it to allow escaping the Eligible Provider Set is exactly the backdoor the real policy forbids"

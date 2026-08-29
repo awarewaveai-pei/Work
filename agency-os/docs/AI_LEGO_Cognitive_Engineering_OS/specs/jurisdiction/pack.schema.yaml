@@ -476,19 +476,25 @@ compilation_decisions:
 open_questions:
   - id: "MRSP-pack-1"
     question: >
-      GLOBAL_JURISDICTION_PLAN.md §3 (its unified 4-stage FAIL CLOSED
-      pipeline) and §5 (Conflict-of-Laws Engine interface) both consume a
-      resolved `jurisdiction_pack` but are themselves NOT formalized by this
-      file — `conflict-of-laws-output.schema.yaml` is explicitly
-      BLOCKED_PENDING_ROUND2_ADR (MACHINE_READABLE_SPEC_PLAN.md §2.6 L162,
-      P1-GAP-LEGAL-4: which of MP §98's Conflict-of-Laws Engine and MP
-      §134's separate legal-uncertainty vocabulary should own the relevant
-      output states is undecided). This file's `jurisdiction_pack` object is
-      usable standalone today, but the Stage 0-3 pipeline and the
-      Conflict-of-Laws output schema that would consume/produce alongside
-      it remain future work, gated on that same Round 2 ADR.
-    owner: "operator, via Round 2 ADR (see MACHINE_READABLE_SPEC_PLAN.md §2.6 L162)"
-    blocks: "nothing in this schema; blocks a future conflict-of-laws-output.schema.yaml and the §3 pipeline's own formalization"
+      UPDATED (2026-08-29): `conflict-of-laws-output.schema.yaml` is now
+      BUILT (MACHINE_READABLE_SPEC_PLAN.md §2.6) — P1-GAP-LEGAL-4 (which
+      component owns Conflict-of-Laws output state, MP §94's path vs MP
+      §98's named Engine) is resolved via that file's `owning_component:
+      const conflict_of_laws_engine`. What remains genuinely open is a
+      DIFFERENT, narrower question that file explicitly does not decide:
+      P1-DUP-6 — MP §98's own 5-value status enum
+      (RESOLVED/CONSERVATIVE_SAFE_MODE/AMBIGUOUS/CONFLICT/
+      LEGAL_REVIEW_REQUIRED) vs MP §134's separate 6-value legal-uncertainty
+      enum (KNOWN/INTERPRETATION_REQUIRED/AMBIGUOUS/CONFLICTING/STALE/
+      UNKNOWN) share only `AMBIGUOUS` verbatim and have never been
+      reconciled (see specs/execution/status-codes.schema.yaml's own
+      disclosure of this same gap). This file's `jurisdiction_pack` object
+      remains usable standalone regardless of either question's status; the
+      GLOBAL_JURISDICTION_PLAN.md §3 Stage 0-3 pipeline itself is still not
+      separately formalized as its own schema (a genuinely separate, still
+      not-yet-built item, tracked in MACHINE_READABLE_SPEC_PLAN.md §2.6).
+    owner: "operator, via Round 2 ADR, for P1-DUP-6 only (see specs/execution/status-codes.schema.yaml's matching open_questions entry)"
+    blocks: "nothing in this schema; P1-DUP-6 blocks a future reconciliation between MP §98's and MP §134's enums, not this file's own validity"
   - id: "MRSP-pack-2"
     question: >
       GLOBAL_JURISDICTION_PLAN.md is PROPOSED, not ACCEPTED — no ADR has

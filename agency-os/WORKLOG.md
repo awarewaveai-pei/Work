@@ -1,5 +1,41 @@
 # Worklog
 
+## 2026-08-29（續30）
+
+### AI-LEGO Phase 3 收尾第 4 批：補建 policies/provider/（Model Registry + AI Gateway Fallback）與 conflict-of-laws-output.schema.yaml，抓到並修正 P1-GAP-LEGAL-4 與 P1-DUP-6 兩個相似但不同議題的混淆引用
+
+**觸發**：續29 [剩餘風險] 明列 `DEVOPS_SRE_PLAN.md`（P1-GAP-INFRA-5/6）與 `GLOBAL_JURISDICTION_PLAN.md`（P1-GAP-LEGAL-4）已確認有完整既有設計但尚未動手建檔，本輪接續處理。
+
+**執行**：
+1. 讀 `DEVOPS_SRE_PLAN.md` §4（L138-167，AI Gateway Resilience/Circuit Breaker，解 P1-GAP-INFRA-5）+ §5（L171-197，Model Registry，解 P1-GAP-INFRA-6），交叉核對 EC §42（L1587-1610）+ MP §144（L5533-5565）+ MP §151（L5709-5749，逐字確認 L5728-5732「Fallback only within Eligible Provider Set」）。
+2. 建 `policies/provider/ai-gateway-fallback.policy.yaml`：全數常數化轉錄 DEVOPS_SRE_PLAN §4 數值門檻（health_check 15s/60s、trip_condition 20 samples/20%/3x、recovery 30s/5 canary/80%/[30,60,120,300]s backoff、incident_escalation 5min→SEV2/all→SEV1），`design_principle` const 綁死「絕不離開 Eligible Provider Set」不變量。
+3. 建 `policies/provider/model-registry.policy.yaml`：轉錄 §5 的 `model_registry_entry`（provider 6 值 enum、`weights_hash` sha256 前綴格式、`champion_status` 4 值狀態——`compilation_decisions` 明確記錄這是「模型當下狀態」非「recipe 步驟名稱」，兩者不可混淆）。
+4. 讀 `GLOBAL_JURISDICTION_PLAN.md` §5（L253-294，Conflict-of-Laws Engine Interface，解 P1-GAP-LEGAL-4），確認其設計範圍**只決定軟體架構歸屬（哪個元件擁有衝突判定狀態），不判定任何真實法律優先權**——`status` 為 AMBIGUOUS/CONFLICT/LEGAL_REVIEW_REQUIRED 時強制轉交 `human_counsel_ref`，這正是先前評估「需操作者法律責任裁決」疑慮已被設計本身解決的具體證據，故判斷可直接建檔。
+5. 建 `specs/jurisdiction/conflict-of-laws-output.schema.yaml`：`owning_component: const conflict_of_laws_engine` 解歸屬模糊；`status` 逐字沿用 MP §98 五值 enum（未改名，依 `GLOBAL_JURISDICTION_PLAN.md` L286 明文指示）；`allOf`/`if`/`then` 強制 CONSERVATIVE_SAFE_MODE 時 `resolution_rule_applied` 非空、AMBIGUOUS/CONFLICT/LEGAL_REVIEW_REQUIRED 時 `human_counsel_ref` 非空。
+6. 各 3 個新檔皆附 3-5 valid + invalid fixture，含刻意測試「常數門檻被削弱」「fallback 逃出 Eligible Provider Set」「champion_status 與 recipe 步驟名稱混淆」等真實會犯的錯。
+
+**抓蟲發現並修正的跨文件混淆**（BUGHUNT 步驟，非表面 grep 命中）：`specs/jurisdiction/pack.schema.yaml` 的 `MRSP-pack-1` 與 `specs/execution/status-codes.schema.yaml` 既有的 open_question 都把「P1-GAP-LEGAL-4」（歸屬問題，MP §94 路徑 vs MP §98 引擎）與「P1-DUP-6」（MP §98 五值 vs MP §134 六值法律不確定性詞彙衝突，僅共享 AMBIGUOUS 一值，`DUPLICATION_REGISTER.yaml:97-111` 已獨立登記）**兩個不同範圍的議題混為一談**。深讀 `GAP_REGISTER.yaml:438-445` 與 `DUPLICATION_REGISTER.yaml:111`（後者明文「同源但範圍不同...非本條目自行判斷」）確認兩者是有意分開登記的獨立條目後，訂正兩處引用：P1-GAP-LEGAL-4 已解（本輪），P1-DUP-6 仍待獨立 Round 2 ADR（未動）。
+
+[已修改]
+- 新增 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/policies/provider/{ai-gateway-fallback,model-registry}.policy.yaml`
+- 新增 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/jurisdiction/conflict-of-laws-output.schema.yaml`
+- 新增對應 3 份 fixture 檔（`tests/contracts/{policies/provider/,specs/jurisdiction/}`）
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`：§2.6 conflict-of-laws-output 列（BLOCKED_PENDING_ROUND2_ADR → BUILT）、§2.9 jurisdiction/ 列拆分（policies/jurisdiction/ 目錄本身仍未建 vs Engine 歸屬已解）、§2.9 provider/ 列（SKELETON_ONLY → BUILT）
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/jurisdiction/pack.schema.yaml`：`MRSP-pack-1` 訂正，拆分 P1-GAP-LEGAL-4（已解）與 P1-DUP-6（未解）
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/execution/status-codes.schema.yaml`：L439 附近引用訂正，指向正確的 P1-DUP-6 而非已解的 P1-GAP-LEGAL-4
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py`（本輪建檔後）| exit=0 | 結果=619 個檢查全過（較續29 的 607 增加 12，來自 2 個 policy 檔 fixture）
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py`（conflict-of-laws-output.schema.yaml + fixture 建檔後）| exit=0 | 結果=628 個檢查全過（再增加 9）
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py`（3 處跨文件訂正文字之後，重新確認未破壞任何驗證）| exit=0 | 結果=628 個檢查全過，無退步
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`UniqueKeyLoader` 對本輪新增 6 檔 + 修改 2 檔跑重複 key 掃描 | exit=0 | 結果=全數 CLEAN
+- REVIEW_DONE: critic=Quick（自我核對：逐字比對 `GLOBAL_JURISDICTION_PLAN.md` §5.2 L261「本文件不判定最終路徑；只移除『哪個元件決定』這一層模糊」與本檔 `owning_component` 欄位設計，確認範圍邊界宣稱屬實非誇大）| verdict=pass
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`P1-GAP-INFRA-5\|P1-GAP-INFRA-6\|P1-GAP-LEGAL-4\|policies/provider\|conflict-of-laws-output\|conflict_of_laws_engine` | hits=`MACHINE_READABLE_SPEC_PLAN.md`（已同步 3 處）、`specs/jurisdiction/pack.schema.yaml`（已同步，且發現並修正 P1-DUP-6 混淆）、`specs/execution/status-codes.schema.yaml`（已同步，且發現並修正同一混淆）；`GAP_REGISTER.yaml`/`ASSUMPTION_REGISTER.yaml`/`DUPLICATION_REGISTER.yaml` 為唯讀溯源登記表，不隨解決狀態改寫（依本 corpus 既有慣例，登記表記錄「發現當下」，狀態流轉記在消費端 schema 檔案），無遺漏
+
+[剩餘風險] 3 個新檔皆轉錄自未經 ADR 正式批准的 `Status: PROPOSED` 設計文件（`OQ-GATEWAYFALLBACK-1`/`OQ-MODELREGISTRY-1`/`OQ-CONFLICTOFLAWS-1` 誠實記錄），與續29 兩檔同一證據等級，建議合併為同一輪批次追認 ADR。P1-DUP-6（MP §98 vs MP §134 法律不確定性詞彙衝突）仍是真正空白，需要獨立 Round 2 ADR 裁決哪個 enum 權威，非本輪範圍。`GLOBAL_JURISDICTION_PLAN.md` §6 policy_context 欄位（解 P1-GAP-LEGAL-7）、OQ-10 Gate 清單、Zero Trust IdP/SBOM 選型、Branch 完整狀態機四項仍待處理，其中後三項確認全庫真的沒有任何既有設計，需要真正從零起草。
+[rollback] 純新增檔案 + 文件文字訂正，`git revert` 即可完整回退，無 DB/prod/deploy 副作用。
+
 ## 2026-08-29（續29）
 
 ### AI-LEGO Phase 3 收尾第 3 批：發現整層未被查覺的既有設計文件（10 份 PROPOSED 架構文件），補建 repository-contract.schema.yaml + tenant-isolation-controls.schema.yaml，順帶抓到並修正跨文件過期宣稱

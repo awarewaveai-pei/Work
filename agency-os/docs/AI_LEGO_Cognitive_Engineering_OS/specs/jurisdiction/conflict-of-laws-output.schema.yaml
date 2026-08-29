@@ -1,0 +1,164 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/jurisdiction/conflict-of-laws-output.schema.yaml"
+title: Conflict-of-Laws Engine Output
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Closes P1-GAP-LEGAL-4: MP §94 lists `/modules/jurisdiction/conflicts/` as
+  a path (MP:4015) while MP §98 separately defines a "Conflict-of-Laws
+  Engine" (MP:4168-4214) -- the two have never cross-referenced each other,
+  and §98's own step names have no pass/fail criteria or output shape.
+  Transcribes docs/architecture/GLOBAL_JURISDICTION_PLAN.md §5 (Status:
+  PROPOSED, 2026-08-29) -- same provenance class as
+  specs/domain/repository-contract.schema.yaml (see that file's
+  `decided_by` for the shared reasoning).
+
+  IMPORTANT SCOPE BOUNDARY (the reason this file was safe to build without
+  separate legal sign-off, flagged explicitly rather than left implicit):
+  this schema defines a SOFTWARE ARCHITECTURE decision only -- WHICH
+  component owns conflict-resolution state (the Conflict-of-Laws Engine,
+  MP §98; `/modules/jurisdiction/conflicts/` is its storage location, not an
+  independent decision-maker, per GLOBAL_JURISDICTION_PLAN.md §5.2). It does
+  NOT decide any real-world legal precedence question (e.g. "which
+  jurisdiction's law wins" is never hard-coded here). The `status` enum's
+  own design routes genuine ambiguity to `CONSERVATIVE_SAFE_MODE` or
+  `AMBIGUOUS`/`LEGAL_REVIEW_REQUIRED` with a mandatory `human_counsel_ref`
+  -- the schema's job is to make sure the system ESCALATES real conflicts to
+  a human lawyer with a complete, structured record, not to make the legal
+  call itself.
+
+source_of_truth_for:
+  - "docs/architecture/GLOBAL_JURISDICTION_PLAN.md §5 Conflict-of-Laws Engine Interface (L253-294) -- every field below transcribed verbatim from the conflict_of_laws_result worked example"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §98 Conflict-of-Laws Engine (MP:4168-4214) -- the status enum values (RESOLVED/CONSERVATIVE_SAFE_MODE/AMBIGUOUS/CONFLICT/LEGAL_REVIEW_REQUIRED) reused verbatim, never renamed, per GLOBAL_JURISDICTION_PLAN.md's own explicit instruction (L286)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §94 (MP:4015, '/modules/jurisdiction/conflicts/' path reference) -- the ambiguity this file's `owning_component` field resolves"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §99 Compliance Policy Compiler -- source of the obligation_ref convention this file's input_rules[].obligation_ref reuses"
+  - "specs/jurisdiction/pack.schema.yaml -- sibling file this schema's jurisdiction_resolution_ref links to (GLOBAL_JURISDICTION_PLAN.md §3 Stage 0 output)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.6 row for conflict-of-laws-output.schema.yaml (P1-GAP-LEGAL-4, BLOCKED_PENDING_ROUND2_ADR)"
+
+decided_by: >
+  docs/architecture/GLOBAL_JURISDICTION_PLAN.md (Status: PROPOSED,
+  2026-08-29). See specs/domain/repository-contract.schema.yaml's
+  `decided_by` for the shared reasoning on treating this evidence-comparable
+  PROPOSED document as authoritative content to transcribe. This file's
+  narrower scope boundary (architecture, not legal substance) is the
+  specific reason it was judged safe to build directly rather than held for
+  separate operator sign-off the way a genuine legal-precedence rule would
+  be -- see `description` above for the full disclosure.
+
+compilation_decisions:
+  - question: >
+      GLOBAL_JURISDICTION_PLAN.md L261 states the ownership decision only
+      "removes the ambiguity about which component decides" and explicitly
+      defers the final repo PATH to Phase-4-owned repo-layout spec per
+      ADR-006. Should this file assert a concrete file path for
+      `/modules/jurisdiction/conflicts/`?
+    decision: "No path asserted. `owning_component` names the LOGICAL owner (the Conflict-of-Laws Engine, MP §98) as a concept, not a filesystem path."
+    reasoning: >
+      Matches the plan document's own explicit boundary (L261: "本文件不
+      判定最終路徑；只移除『哪個元件決定』這一層模糊") -- asserting a path
+      here would exceed what the source document itself decided.
+
+type: object
+required: [id, evaluated_at, input_rules, scope_test, extraterritorial_test, authority_test, status]
+properties:
+  id: { type: string, pattern: "^COL-" }
+  evaluated_at: { type: string, format: date-time }
+  legal_snapshot_ref: { type: [string, "null"] }
+  jurisdiction_resolution_ref:
+    type: [string, "null"]
+    description: "Links to GLOBAL_JURISDICTION_PLAN.md §3 Stage 0 output (Unified FAIL CLOSED Signal pipeline)."
+  owning_component:
+    type: string
+    const: "conflict_of_laws_engine"
+    description: "GLOBAL_JURISDICTION_PLAN.md §5.2: the single logical owner. '/modules/jurisdiction/conflicts/' is its storage location, not an independent decision-maker."
+  input_rules:
+    type: array
+    items:
+      type: object
+      required: [jurisdiction, obligation_ref, required_action, source]
+      properties:
+        jurisdiction: { type: string }
+        obligation_ref: { type: string, pattern: "^OBL-" }
+        required_action: { type: string }
+        source: { type: string, pattern: "^LAW-" }
+  scope_test: { type: string, enum: [PASS, FAIL] }
+  extraterritorial_test: { type: string, enum: [PASS, FAIL] }
+  authority_test: { type: string, enum: [PASS, FAIL] }
+  conflicts_detected:
+    type: array
+    items:
+      type: object
+      required: [rule_a, rule_b, conflict_type]
+      properties:
+        rule_a: { type: object, properties: { jurisdiction: { type: string }, obligation_ref: { type: string } } }
+        rule_b: { type: object, properties: { jurisdiction: { type: string }, obligation_ref: { type: string } } }
+        conflict_type: { type: string, enum: [DIRECT_CONTRADICTION, SCOPE_OVERLAP, AMBIGUOUS_PRECEDENCE] }
+  choice_of_law_applied: { type: boolean }
+  mandatory_law_override: { type: array, items: { type: string } }
+  status:
+    type: string
+    enum: [RESOLVED, CONSERVATIVE_SAFE_MODE, AMBIGUOUS, CONFLICT, LEGAL_REVIEW_REQUIRED]
+    description: >
+      MP §98's own enum, reused verbatim, never renamed
+      (GLOBAL_JURISDICTION_PLAN.md L286). This is the field that routes
+      genuine legal ambiguity to a human -- see `description` above.
+  resolution_rule_applied:
+    type: [string, "null"]
+    description: "REQUIRED IN SPIRIT whenever status = CONSERVATIVE_SAFE_MODE (see `constraints`)."
+  human_counsel_ref:
+    type: [string, "null"]
+    description: "REQUIRED IN SPIRIT whenever status is AMBIGUOUS/CONFLICT/LEGAL_REVIEW_REQUIRED (see `constraints`) -- this is the field that makes escalation to a real human lawyer structurally traceable, not optional metadata."
+
+allOf:
+  - if:
+      properties: { status: { const: CONSERVATIVE_SAFE_MODE } }
+      required: [status]
+    then:
+      required: [resolution_rule_applied]
+      properties: { resolution_rule_applied: { not: { type: "null" } } }
+  - if:
+      properties: { status: { enum: [AMBIGUOUS, CONFLICT, LEGAL_REVIEW_REQUIRED] } }
+      required: [status]
+    then:
+      required: [human_counsel_ref]
+      properties: { human_counsel_ref: { not: { type: "null" } } }
+
+open_questions:
+  - id: "OQ-CONFLICTOFLAWS-1"
+    question: >
+      Same provenance-class disclosure as
+      specs/domain/repository-contract.schema.yaml's OQ-REPOCONTRACT-1 --
+      transcribed from a Status: PROPOSED document, not yet a dedicated
+      ACCEPTED ADR.
+    owner: "operator, or a future session (see OQ-REPOCONTRACT-1 for the batch framing)"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-CONFLICTOFLAWS-2"
+    question: >
+      This schema's `allOf`/`if`/`then` blocks enforce that
+      `resolution_rule_applied`/`human_counsel_ref` are present (non-null)
+      when their respective status values apply -- but this is a
+      STRUCTURAL completeness check, not a validity check on whether the
+      referenced human counsel record is REAL or the resolution rule is
+      SOUND. Should a future Wave add a cross-reference into an actual
+      human-review-record schema (analogous to how gate.schema.yaml's
+      `validator` field is free-text today)?
+    owner: "operator, or a future Phase 3/4 compilation pass once a human-review-record schema exists to reference"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read docs/architecture/GLOBAL_JURISDICTION_PLAN.md §5 (L253-294)
+    directly at the cited lines. Read MP §98 (MP:4168-4214) directly to
+    confirm the status enum's 5 values are transcribed verbatim, not
+    paraphrased. Ran a PoC with jsonschema.Draft202012Validator confirming
+    the allOf/if/then blocks correctly require resolution_rule_applied for
+    CONSERVATIVE_SAFE_MODE and human_counsel_ref for the 3
+    escalation-requiring status values, and correctly allow RESOLVED with
+    neither present.
+  note: >
+    No mother document was modified. This file makes a software-
+    architecture-only decision (which component owns conflict state) and
+    deliberately does not decide any real legal-precedence question -- see
+    `description` above for the explicit scope boundary that made this safe
+    to build without separate legal sign-off.

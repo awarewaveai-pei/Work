@@ -436,8 +436,13 @@ open_questions:
       analysis of a scope and depth (which enum is authoritative, how §98 and
       §134 relate procedurally) that goes beyond this file's compilation
       mandate and belongs in a DUPLICATION_REGISTER.yaml addendum / Round 2 ADR
-      review, analogous to P1-GAP-LEGAL-4's existing treatment of the
-      Conflict-of-Laws Engine's other unresolved overlap.
+      review — this exact gap is registered as P1-DUP-6 in
+      DUPLICATION_REGISTER.yaml (added 2026-08-29 alongside this file), kept
+      deliberately distinct from P1-GAP-LEGAL-4 (which was a different
+      question — which component OWNS Conflict-of-Laws output state — since
+      resolved 2026-08-29 by
+      specs/jurisdiction/conflict-of-laws-output.schema.yaml; that
+      resolution does not touch this enum-vocabulary question).
 
 verification:
   method: "Read/Grep against all three mother documents and docs/architecture/MACHINE_READABLE_SPEC_PLAN.md; docs/adr/ADR-001~009 grepped for prior rulings on this duplicate (none found except incidental quotation in ADR-008)."
