@@ -1,0 +1,22 @@
+-- DOWN for 0064_lockdown_security_definer_anon_grants.sql.
+--
+-- Intentionally NOT automated. Re-granting anon/authenticated EXECUTE on
+-- archive_stale_repair_runs / upsert_incident_atomic re-opens the exact security
+-- gap this migration closes (db-expert review, 2026-08-29: "a working down-script
+-- is a loaded gun"). Both functions are called exclusively by service-role backend
+-- code (webhook routes, lib/repair-center/service.ts, pg_cron) -- there is no
+-- legitimate caller that 0064 should have broken.
+--
+-- If applying 0064 broke something: that caller is misconfigured and should be
+-- switched to the service-role Supabase client (getSupabaseWriteClient()), not
+-- given anon/authenticated RPC access back. Diagnose the actual caller first.
+--
+-- If you are certain a rollback is required anyway, the inverse GRANTs are:
+--
+--   -- grant execute on function public.archive_stale_repair_runs(int) to anon, authenticated;
+--   -- grant execute on function public.upsert_incident_atomic(
+--   --   text, text, text, text, text, text, text, text, text, jsonb, jsonb, boolean, text, text
+--   -- ) to anon, authenticated;
+--   -- notify pgrst, 'reload schema';
+--
+-- Uncomment and run manually with explicit operator sign-off only.

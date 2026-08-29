@@ -1,0 +1,1 @@
+{"ts":"2026-08-29T08:11:53.850Z","task_id":"dlg-20260829-081153-8731","agent":"db-expert","description":"Review lockdown migration safety","result_snippet":"## DB Expert Report\n\n### 🔴 Blocker — the file under review does not exist\n`lobster-factory/packages/db/migrations/0064_lockdown_security_definer_anon_grants.sql` is **not on disk** in `D:\\Work`, not …"}
