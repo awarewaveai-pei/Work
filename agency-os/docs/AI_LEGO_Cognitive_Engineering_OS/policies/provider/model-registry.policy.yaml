@@ -21,10 +21,15 @@ source_of_truth_for:
   - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.9 row for policies/provider/ (P1-GAP-INFRA-5/6, SKELETON_ONLY)"
 
 decided_by: >
-  docs/architecture/DEVOPS_SRE_PLAN.md (Status: PROPOSED, 2026-08-29). See
-  specs/domain/repository-contract.schema.yaml's `decided_by` for the full
-  reasoning on treating an evidence-comparable PROPOSED document as
-  authoritative content to transcribe.
+  docs/adr/ADR-013-batch-ratification-of-proposed-document-transcriptions.md
+  (ACCEPTED 2026-08-30, Sub-decision 3) formally ratifies this file's
+  transcription of docs/architecture/DEVOPS_SRE_PLAN.md §5 (Status:
+  PROPOSED, 2026-08-29, itself unchanged by ADR-013). Before 2026-08-30, no
+  ADR ratified this document -- see
+  specs/domain/repository-contract.schema.yaml's `decided_by` for the
+  shared reasoning class. ADR-013's evidence-gathering pass independently
+  re-verified this file's field list against §5's worked example
+  field-for-field and found the transcription faithful.
 
 compilation_decisions:
   - question: >
@@ -99,12 +104,14 @@ properties:
 open_questions:
   - id: "OQ-MODELREGISTRY-1"
     question: >
-      Same provenance-class disclosure as sibling
-      policies/provider/ai-gateway-fallback.policy.yaml's OQ-GATEWAYFALLBACK-1
-      -- transcribed from a Status: PROPOSED document, not yet a dedicated
-      ACCEPTED ADR.
-    owner: "operator, or a future session (see specs/domain/repository-contract.schema.yaml OQ-REPOCONTRACT-1 for the batch framing)"
-    blocks: "nothing in this file's own validity"
+      RESOLVED 2026-08-30 by docs/adr/ADR-013-batch-ratification-of-
+      proposed-document-transcriptions.md Sub-decision 3. Original question
+      (preserved): "Same provenance-class disclosure as sibling
+      policies/provider/ai-gateway-fallback.policy.yaml's
+      OQ-GATEWAYFALLBACK-1 -- transcribed from a Status: PROPOSED document,
+      not yet a dedicated ACCEPTED ADR."
+    owner: "closed"
+    blocks: "nothing — resolved"
   - id: "OQ-MODELREGISTRY-2"
     question: >
       `deprecation` here (a single model_registry_entry marking itself

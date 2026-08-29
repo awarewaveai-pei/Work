@@ -27,10 +27,15 @@ source_of_truth_for:
   - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.9 row for policies/provider/ (P1-GAP-INFRA-5/6, SKELETON_ONLY)"
 
 decided_by: >
-  docs/architecture/DEVOPS_SRE_PLAN.md (Status: PROPOSED, 2026-08-29). See
-  specs/domain/repository-contract.schema.yaml's `decided_by` for the full
-  reasoning on why a not-yet-ADR-ratified but evidence-comparable PROPOSED
-  document is treated as authoritative content to transcribe here.
+  docs/adr/ADR-013-batch-ratification-of-proposed-document-transcriptions.md
+  (ACCEPTED 2026-08-30, Sub-decision 3) formally ratifies this file's
+  transcription of docs/architecture/DEVOPS_SRE_PLAN.md §4 (Status:
+  PROPOSED, 2026-08-29, itself unchanged by ADR-013). Before 2026-08-30, no
+  ADR ratified this document -- see
+  specs/domain/repository-contract.schema.yaml's `decided_by` for the
+  shared reasoning class. ADR-013's evidence-gathering pass independently
+  re-verified every numeric constant in this file against §4's source text
+  and found the transcription faithful.
 
 type: object
 required: [health_check, trip_condition, recovery, failover_decision, incident_escalation, design_principle]
@@ -113,12 +118,14 @@ properties:
 open_questions:
   - id: "OQ-GATEWAYFALLBACK-1"
     question: >
-      Same provenance-class disclosure as
-      specs/domain/repository-contract.schema.yaml's OQ-REPOCONTRACT-1 --
-      this file transcribes a Status: PROPOSED design document, not a
-      dedicated ACCEPTED ADR.
-    owner: "operator, or a future session (see OQ-REPOCONTRACT-1 for the batch framing)"
-    blocks: "nothing in this file's own validity"
+      RESOLVED 2026-08-30 by docs/adr/ADR-013-batch-ratification-of-
+      proposed-document-transcriptions.md Sub-decision 3. Original question
+      (preserved): "Same provenance-class disclosure as specs/domain/
+      repository-contract.schema.yaml's OQ-REPOCONTRACT-1 -- this file
+      transcribes a Status: PROPOSED design document, not a dedicated
+      ACCEPTED ADR."
+    owner: "closed"
+    blocks: "nothing — resolved"
 
 verification:
   method: >

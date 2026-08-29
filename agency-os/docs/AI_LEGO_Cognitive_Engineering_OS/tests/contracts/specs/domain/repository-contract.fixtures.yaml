@@ -2,9 +2,13 @@ schema_id: "ai-lego://specs/domain/repository-contract.schema.yaml"
 target_ref: ""
 description: >
   Exercises the required top-level triad (storage_tier/storage_engine_assignment/
-  backup_dr_matrix), the exactly-3-tiers and exactly-8-engines cardinality
-  constraints, and the enum closures on storage_tier.tiers[].tier_id and
-  storage_engine_assignment[].purpose.
+  backup_dr_matrix), the exactly-3-tiers and exactly-9-engines cardinality
+  constraints (CORRECTED 2026-08-30, batch-ADR-013 evidence-gathering pass:
+  schema previously said 8, its own `purpose` enum always had 9 members --
+  this fixture's own `full_mvp_instance_matching_data_architecture_plan` case
+  was itself missing the `queue` entry, the same undercount bug mirrored into
+  the fixture, until now), and the enum closures on storage_tier.tiers[].tier_id
+  and storage_engine_assignment[].purpose.
 valid:
   - name: full_mvp_instance_matching_data_architecture_plan
     instance:
@@ -28,6 +32,7 @@ valid:
         - {purpose: full_text_search_index, mvp_approach: "PostgreSQL tsvector/tsquery + GIN index", extraction_threshold: "corpus > 50 million documents OR p95 search latency > 300ms after tuning OR faceted search/typo-tolerance needed"}
         - {purpose: metrics_timeseries, mvp_approach: "TimescaleDB extension or time-partitioned tables", extraction_threshold: "sustained >50k points/sec or sub-second aggregation over billions of rows"}
         - {purpose: cache, mvp_approach: "Postgres shared_buffers + application memoization", extraction_threshold: "measured cache-hit ratio >80% AND latency SLO still unmet"}
+        - {purpose: queue, mvp_approach: "EC section 27 Outbox table + LISTEN/NOTIFY or background worker polling", extraction_threshold: "dispatch latency SLA violated (e.g. > 5s) OR sustained > 500 jobs/sec OR dead-letter/backoff semantics exceed a Postgres-based queue table"}
       consistency_concurrency_strategy:
         aggregate_optimistic_concurrency: "version = number of applied events; UNIQUE(aggregate_id, sequence) constraint detects concurrent writers, loser retries"
         module_ownership: "exactly one owning module writes an aggregate's events directly; all others dispatch a Command"
@@ -64,7 +69,7 @@ invalid:
         rules: ["a", "b", "c", "d", "e"]
       storage_engine_assignment: []
       backup_dr_matrix: {tier_1_sor: [{storage: "x", rpo: "x", rto: "x", method: "x"}], tier_2_derived: []}
-    reason: "storage_tier.tiers requires exactly 3 entries (Tier 0/1/2) -- only 2 given, and storage_engine_assignment requires exactly 8 entries -- 0 given"
+    reason: "storage_tier.tiers requires exactly 3 entries (Tier 0/1/2) -- only 2 given, and storage_engine_assignment requires exactly 9 entries -- 0 given"
   - name: bad_tier_id_enum
     instance:
       storage_tier:
@@ -82,6 +87,7 @@ invalid:
         - {purpose: full_text_search_index, mvp_approach: "x", extraction_threshold: "x"}
         - {purpose: metrics_timeseries, mvp_approach: "x", extraction_threshold: "x"}
         - {purpose: cache, mvp_approach: "x", extraction_threshold: "x"}
+        - {purpose: queue, mvp_approach: "x", extraction_threshold: "x"}
       consistency_concurrency_strategy:
         aggregate_optimistic_concurrency: "x"
         module_ownership: "x"
@@ -106,6 +112,7 @@ invalid:
         - {purpose: full_text_search_index, mvp_approach: "x", extraction_threshold: "x"}
         - {purpose: metrics_timeseries, mvp_approach: "x", extraction_threshold: "x"}
         - {purpose: cache, mvp_approach: "x", extraction_threshold: "x"}
+        - {purpose: queue, mvp_approach: "x", extraction_threshold: "x"}
       consistency_concurrency_strategy:
         aggregate_optimistic_concurrency: "x"
         module_ownership: "x"

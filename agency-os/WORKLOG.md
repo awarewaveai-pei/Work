@@ -1,5 +1,58 @@
 # Worklog
 
+## 2026-08-30（續7）
+
+### 剩餘任務兩項：ADR-013 批次追認 5 個 PROPOSED 轉錄檔案；Zero Trust/Supply Chain 選型研究文件
+
+**觸發**：接續前幾條（OQ-10/Branch/`/codex-review`）完成後，操作者「繼續」推進原始 4 選項選單中剩餘項目。本輪處理「批次追認 ADR」（純文件治理，無需操作者選型）與「Zero Trust/SBOM 選型調研」（WebSearch 研究可自行做，最終選型仍待操作者）；Phase 5 Codex 三選一獨立比較另跑一輪背景任務，見下一條 WORKLOG。
+
+#### 一、ADR-013：批次追認 5 個轉錄自 PROPOSED 規劃文件的 schema/policy 檔案
+
+原始候選 6 項（pii-redaction/repository-contract/tenant-isolation/provider/conflict-of-laws/policy_context），逐一查證後：
+
+- **`pii-redaction.policy.yaml` 排除**：查證發現已由 ADR-007 完整覆蓋（逐欄位比對 190 行 ADR-007 全文，Sub-decision (a)/(b) 與 policy 檔案逐條對應），非本次批次範圍。
+- **其餘 5 項**：委託 Explore agent 逐一重讀來源 PROPOSED 文件全文（`DATA_ARCHITECTURE_PLAN.md` §1-6、`DEVOPS_SRE_PLAN.md` §4/5、`GLOBAL_JURISDICTION_PLAN.md` §5/6）與對應 schema/policy 檔案逐欄位比對，確認轉錄忠實（無新增、無遺漏），寫成 `docs/adr/ADR-013-batch-ratification-of-proposed-document-transcriptions.md`（ACCEPTED，授權路徑比照 ADR-010——這是「確認轉錄忠實」而非「從零裁決」）。
+
+**過程中發現並修正 2 個獨立於「忠實度」問題本身的真實缺陷**（不因為只是查忠實度就視而不見，同 R4 紀律）：
+1. `repository-contract.schema.yaml` 的 `storage_engine_assignment` 陣列原寫 `minItems/maxItems: 8`，但 `purpose` enum 始終有 9 個值（Cache 與 Queue 是 2 個獨立用途，來源表格的「8a/8b」只是列編號標籤，不是「合併成 1 條」的證據，直接重讀 `DATA_ARCHITECTURE_PLAN.md:29-30` 確認兩者各有獨立 MVP 方案與抽離門檻）。已修正為 9，並比照本套件既有的 `deprecation-pipeline.schema.yaml`（MRSP-16 bug class）手法補上 9 條 `contains`/`minContains`/`maxContains` 完整性防護。**連動發現**：對應 fixture 檔案 `repository-contract.fixtures.yaml` 的 `valid` 案例本身就漏了 `queue`（同一計數錯誤鏡射進測試資料），另 2 個 `invalid` 案例的同一欄位也一併補齊。
+2. `tenant-isolation-controls.schema.yaml` 自己的 description 段落宣稱「`SECURITY_THREAT_MODEL.md` 的 I1/Ds1 兩列尚未交叉引用本檔裁決」——直接重讀該檔確認此宣稱已過期：I1/Ds1 兩列現在都已寫「UPDATED（2026-08-29）」並點名本檔，顯然是同一天稍晚的另一輪編輯已補上，只是本檔自己的 description 文字沒跟上。已訂正措辭，`OQ-TENANTISO-2` 標記 RESOLVED。
+
+**另訂正一處引用錯誤**：任務摘要原引用 `method-resolution.schema.yaml` 的 `open_questions.OQ-mres-5` 作為「policy_context 尚未走 ADR」的依據，查證後發現真正承載此揭露的是 `OQ-mres-4`（`OQ-mres-5` 是範圍更窄的另一問題，關於 §6.4 forcing rule 為何不編碼進 schema）。已在 ADR-013 與 `MACHINE_READABLE_SPEC_PLAN.md` row 95 同步訂正引用。
+
+套用：5 個檔案的 `decided_by` 更新為引用 ADR-013，對應 6 個 open_questions（`OQ-REPOCONTRACT-1`/`OQ-TENANTISO-1`/`OQ-GATEWAYFALLBACK-1`/`OQ-MODELREGISTRY-1`/`OQ-CONFLICTOFLAWS-1`/`OQ-mres-4`）標記 RESOLVED；`ADR_INDEX.md`/`MACHINE_READABLE_SPEC_PLAN.md`（row 95/151/153/162/187、ASCII 進度圖 L231）同步；`SECURITY_THREAT_MODEL.md` I1 列與 `tenant.schema.yaml` 的過期交叉引用一併訂正。**過程中意外抓到一個真實 YAML 語法錯誤**：編輯 `model-registry.policy.yaml` 的 `OQ-MODELREGISTRY-1` 時因編輯順序疏忽產生重複 `blocks:` key（PyYAML 預設靜默取最後一個值，本專案自己的 `UniqueKeyLoader` 會擋下）——用 `UniqueKeyLoader` 逐檔掃描本輪全部修改檔案後發現並立即修正，未流入 commit。
+
+**來源文件本身狀態不變**：`DATA_ARCHITECTURE_PLAN.md`／`DEVOPS_SRE_PLAN.md`／`GLOBAL_JURISDICTION_PLAN.md` 三份規劃文件維持 `Status: PROPOSED`——ADR-013 批准的範圍嚴格限定在「5 個機讀檔案已忠實轉錄」，不是把整份規劃文件升格。
+
+#### 二、Zero Trust / Supply Chain Security 選型研究文件
+
+`GAP_REGISTER.yaml` `P1-GAP-SEC-1`/`P1-GAP-SEC-2`（Zero Trust 與供應鏈安全只有階段流程圖，零協定/標準綁定）明確需要操作者選型，非 Claude 可自行拍板。委託 `web-researcher` agent 做真實 WebSearch 研究（非訓練資料預設值，逐條標註信心水準），涵蓋 IdP/OIDC（WorkOS vs Zitadel/Keycloak vs Auth0/Clerk）、workload identity（SPIFFE/SPIRE vs mTLS）、Policy Decision Point（OPA/Rego vs Cedar）、SBOM 格式（CycloneDX vs SPDX）、簽章機制（Sigstore/cosign vs GPG）、SLSA 等級、漏洞掃描（Trivy vs Grype vs Snyk，含 2026-03 Trivy 供應鏈遭真實入侵事件的查證）。寫成 `docs/architecture/ZERO_TRUST_SUPPLY_CHAIN_SELECTION_PLAN.md`（**Status: PROPOSED，非 ADR，不批准最終選型**——8 項子決策各附推薦值與「可能出錯」風險，明確待操作者裁決後才轉正式 ADR）。
+
+[已修改]
+- 新增 `docs/adr/ADR-013-batch-ratification-of-proposed-document-transcriptions.md`
+- 新增 `docs/architecture/ZERO_TRUST_SUPPLY_CHAIN_SELECTION_PLAN.md`
+- `specs/domain/repository-contract.schema.yaml`：`storage_engine_assignment` minItems/maxItems 8→9 + 補 9 條 contains 完整性防護；`decided_by`/`OQ-REPOCONTRACT-1` 更新引用 ADR-013
+- `tests/contracts/specs/domain/repository-contract.fixtures.yaml`：`valid` 案例補 `queue` 條目，2 個 `invalid` 案例同步補齊
+- `specs/security/tenant-isolation-controls.schema.yaml`：description 過期交叉引用聲稱訂正；`decided_by`/`OQ-TENANTISO-1/2` 更新
+- `policies/provider/ai-gateway-fallback.policy.yaml`、`policies/provider/model-registry.policy.yaml`：`decided_by`/對應 open_question 更新引用 ADR-013（並修正後者一處重複 YAML key）
+- `specs/jurisdiction/conflict-of-laws-output.schema.yaml`：`decided_by`/`OQ-CONFLICTOFLAWS-1` 更新
+- `specs/execution/method-resolution.schema.yaml`：`OQ-mres-4` 更新（訂正先前誤引 `OQ-mres-5`）
+- `docs/adr/ADR_INDEX.md`：+1 列（ADR-013）、依賴關係、誠實聲明計數更新（12→13）
+- `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`：row 95/151/153/162/187、ASCII 進度圖 L231 同步
+- `docs/architecture/SECURITY_THREAT_MODEL.md`：I1 列過期宣稱訂正
+- `specs/domain/tenant.schema.yaml`：過期交叉引用訂正
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py`（從 D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS）| exit=0 | 結果=669 個檢查全過，與修正前數字一致（本輪為忠實度稽核+獨立缺陷修正，非新增功能）
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`UniqueKeyLoader` 對本輪修改的 8 個檔案逐一掃描重複 key | exit=0 | 結果=抓到並修正 `model-registry.policy.yaml` 1 處真實重複 `blocks:` key，其餘 7 檔皆 OK
+- REALTEST_EVIDENCE: tool=Bash(grep) | cmd=直接重讀 `SECURITY_THREAT_MODEL.md:109` 與 `DATA_ARCHITECTURE_PLAN.md:15-31` 獨立驗證 Explore agent 報告的 2 個獨立缺陷主張 | exit=0 | 結果=兩處皆屬實，非 agent 幻覺
+- REVIEW_DONE: critic=Deep（外部 agent，Explore subagent 唯讀重讀 5 個 PROPOSED 來源文件全文 + 5 個 schema/policy 檔案逐欄位比對，非自我描述）| verdict=忠實度確認 + 2 個獨立缺陷發現 | findings=2 個真實缺陷（1 計數不一致 HIGH-ish、1 過期聲稱 Minor）皆已修正，0 個忠實度缺口
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`OQ-REPOCONTRACT-1\|OQ-TENANTISO-1\|OQ-GATEWAYFALLBACK-1\|OQ-MODELREGISTRY-1\|OQ-CONFLICTOFLAWS-1\|OQ-mres-4\|尚未走 ADR 正式批准` | hits=11 個檔案命中，其中 9 個為本輪修改對象、2 個為額外訂正（`SECURITY_THREAT_MODEL.md`、`tenant.schema.yaml`），皆已處理；`PROPOSED_ARCHITECTURE_CHANGES.md`（母文件編輯提案索引，追蹤的是不同軸——母文件文字本身是否已編輯——確認不受本 ADR 影響，依既有慣例不回填）
+
+[剩餘風險] Zero Trust/Supply Chain 選型文件的 8 項推薦皆待操作者實際裁決，目前僅是研究完成、非最終決定；`policies/security/` 目錄仍未建立（正確做法，選型未定案前不該建）。ADR-013 涉及的 5 個檔案尚未排入 Codex `/codex-review` 佇列（ADR_INDEX.md 已誠實記錄為已知待辦，非遺漏）。研究文件裡標記 low-confidence 的宣稱（歐盟 CRA 法條原文、Sigstore 採用數字）若操作者需要正式合規簽核，建議另外直接查證一手來源。
+
+[rollback] 全部為文件新增 + 2 個獨立 schema 缺陷修正，`git revert` 可完整回退；revert 後 `repository-contract.schema.yaml` 的計數缺陷與 `tenant-isolation-controls.schema.yaml` 的過期聲稱會重新出現，需注意。
+
 ## 2026-08-30（續6）
 
 ### `/codex-review` 真實跑 commit `53914155d`（ADR-011/012），抓到 3 個真實 HIGH bug，全數確認並修正

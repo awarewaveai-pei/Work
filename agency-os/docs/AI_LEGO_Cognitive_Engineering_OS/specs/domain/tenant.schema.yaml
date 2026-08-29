@@ -292,10 +292,12 @@ open_questions:
       transcribing docs/architecture/DATA_ARCHITECTURE_PLAN.md §6's design
       (shared-schema + RLS by default, mandatory tenant_id filter + RLS on
       shared Vector Index/Graph Store, fail-closed-to-empty-set fallback).
-      That file's own `open_questions.OQ-TENANTISO-1` honestly notes this
-      traces to a Status: PROPOSED design document, not yet a dedicated
-      ACCEPTED ADR -- see that file for the full provenance disclosure.
-      (iv) remains genuinely open; no file resolves it.
+      That file's design (traced to a Status: PROPOSED source document) is
+      now formally ratified by docs/adr/ADR-013-batch-ratification-of-
+      proposed-document-transcriptions.md (ACCEPTED 2026-08-30, Sub-decision
+      2) -- see that file's `open_questions.OQ-TENANTISO-1` (now RESOLVED)
+      for the full provenance disclosure. (iv) remains genuinely open; no
+      file resolves it.
     owner: "operator, via Round 2 ADR (only for remaining item (iv))"
     blocks: >
       Nothing in this schema's own validity. (i)/(ii) no longer block

@@ -34,20 +34,23 @@ source_of_truth_for:
   - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.5 row for repository-contract.schema.yaml (P1-GAP-ARCH-2, SKELETON_ONLY -- 'system-of-record 策略、跨儲存 reconciliation 機制需要架構設計決策，非 schema 撰寫可獨立解決')"
 
 decided_by: >
-  docs/architecture/DATA_ARCHITECTURE_PLAN.md (Status: PROPOSED, 2026-08-29).
-  No ADR yet ratifies this document as a standalone decision -- unlike the
-  10 already-ACCEPTED ADRs, this plan has not been through that same
-  explicit acceptance step. It is treated here as authoritative content to
-  transcribe (not re-derive) because: (a) its reasoning is evidenced to the
-  same depth as the ACCEPTED ADRs (quantified thresholds, exhaustive
-  terminology-vacuum grep confirmation, explicit non-goal boundaries), (b)
-  it directly answers the plan-doc's own stated blocker ("需要架構設計決策"
-  -- a design decision is exactly what this document supplies), and (c) it
-  composes with, rather than re-litigates, all 3 already-ACCEPTED ADRs it
-  touches (002/003/005). Flagged honestly in `open_questions` below as a
-  file built from a not-yet-ADR-ratified design document, distinct from
-  every prior Wave 1-8 file in this corpus (all of which trace to either a
-  direct mother-document transcription or an ACCEPTED ADR).
+  docs/adr/ADR-013-batch-ratification-of-proposed-document-transcriptions.md
+  (ACCEPTED 2026-08-30) formally ratifies this file's transcription of
+  docs/architecture/DATA_ARCHITECTURE_PLAN.md (Status: PROPOSED, 2026-08-29,
+  itself unchanged by ADR-013 -- see that ADR's own scope note). Before
+  2026-08-30, no ADR ratified this document as a standalone decision --
+  unlike the 10 (now 12) already-ACCEPTED ADRs, this plan had not been
+  through that same explicit acceptance step. It was treated as
+  authoritative content to transcribe (not re-derive) because: (a) its
+  reasoning is evidenced to the same depth as the ACCEPTED ADRs (quantified
+  thresholds, exhaustive terminology-vacuum grep confirmation, explicit
+  non-goal boundaries), (b) it directly answers the plan-doc's own stated
+  blocker ("需要架構設計決策" -- a design decision is exactly what this
+  document supplies), and (c) it composes with, rather than re-litigates,
+  all 3 already-ACCEPTED ADRs it touches (002/003/005). ADR-013's own
+  evidence-gathering pass independently re-verified this transcription
+  field-by-field and found it faithful (see that ADR's Sub-decision 1) --
+  the honest gap this section used to flag is now closed.
 
 compilation_decisions:
   - question: >
@@ -134,13 +137,29 @@ properties:
 
   storage_engine_assignment:
     type: array
-    minItems: 8
-    maxItems: 8
+    minItems: 9
+    maxItems: 9
     description: >
-      DATA_ARCHITECTURE_PLAN.md §1 (L21-31), all 8 rows verbatim (7 MP §60
+      DATA_ARCHITECTURE_PLAN.md §1 (L21-31), all 9 rows verbatim (7 MP §60
       engines + Cache + Queue named by Program Directive §XXII but never
-      declared in MP itself -- 9 conceptual purposes total, but Cache/Queue
-      are numbered 8a/8b in the source as a pair, hence 8 not 9 total rows).
+      declared in MP itself). CORRECTED 2026-08-30 (real /codex-review-style
+      finding during batch-ADR evidence gathering for docs/adr/ADR-013): this
+      field previously read `minItems: 8, maxItems: 8`, justifying the count
+      by treating Cache/Queue's source-table row labels "8a"/"8b" as evidence
+      they share one entry. Direct re-read of DATA_ARCHITECTURE_PLAN.md:29-30
+      confirms this was wrong -- Cache and Queue each have their own
+      independent "MVP 方案" and "抽離門檻" column content (Cache: Postgres
+      `shared_buffers` + app-layer memoization, threshold cache-hit-ratio
+      >80% estimate; Queue: EC §27 Outbox table + LISTEN/NOTIFY, threshold
+      dispatch latency SLA or >500 jobs/sec) -- two genuinely distinct
+      purposes with two genuinely distinct rows, not one row split into a
+      pair. The plan's own closing line (L33, "MVP 階段 8 類需求") is the
+      source of the original miscount: it is the PLAN's own rounding/pairing
+      shorthand for "8 numbered table rows" (1-7 plus the paired 8a/8b
+      label), not a claim that Cache and Queue collapse into one schema
+      entry. `minItems`/`maxItems` now match the 9-value `purpose` enum
+      below, which was never changed and always had 9 members -- the
+      original array-length constraint simply never matched its own enum.
     items:
       type: object
       required: [purpose, mvp_approach, extraction_threshold]
@@ -161,6 +180,40 @@ properties:
         extraction_threshold:
           type: string
           description: "Free-text quantified threshold -- see compilation_decisions above for why this is not a structured expression."
+    # 2026-08-30: same completeness-guard pattern established by
+    # deprecation-pipeline.schema.yaml (MRSP-16 bug class) -- minItems +
+    # implicit uniqueness is not enough, since two entries can share the
+    # same `purpose` while differing in `mvp_approach`/`extraction_threshold`
+    # text, satisfying a plain length check while never actually naming one
+    # of the 9 purposes. Pin presence of each purpose value independently.
+    allOf:
+      - contains: { required: [purpose], properties: { purpose: { const: structured_metadata } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [purpose], properties: { purpose: { const: object_storage } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [purpose], properties: { purpose: { const: semantic_retrieval_vector_index } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [purpose], properties: { purpose: { const: graph_store } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [purpose], properties: { purpose: { const: event_store } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [purpose], properties: { purpose: { const: full_text_search_index } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [purpose], properties: { purpose: { const: metrics_timeseries } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [purpose], properties: { purpose: { const: cache } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [purpose], properties: { purpose: { const: queue } } }
+        minContains: 1
+        maxContains: 1
 
   consistency_concurrency_strategy:
     type: object
@@ -285,17 +338,22 @@ properties:
 open_questions:
   - id: "OQ-REPOCONTRACT-1"
     question: >
-      This file transcribes DATA_ARCHITECTURE_PLAN.md, a Status: PROPOSED
-      design document, not yet promoted through a dedicated ADR the way
-      every other Wave 1-8 file in this corpus traces to either a direct
-      mother-document transcription or an ACCEPTED ADR. Should a thin
-      ratifying ADR be drafted for this design (and for the sibling
-      DEVOPS_SRE_PLAN.md-derived policies/provider/ files, and the
-      GLOBAL_JURISDICTION_PLAN.md-derived jurisdiction files), formalizing
-      the same operator-delegated-architect-authority acceptance the 10
-      existing ADRs already went through?
-    owner: "operator, or a future session drafting a batch ratifying ADR for these already-designed-but-unratified PROPOSED documents"
-    blocks: "nothing in this file's own validity -- the design content itself is sound and evidenced regardless of which governance artifact formally ratifies it"
+      RESOLVED 2026-08-30 by docs/adr/ADR-013-batch-ratification-of-
+      proposed-document-transcriptions.md Sub-decision 1: this file's
+      transcription of DATA_ARCHITECTURE_PLAN.md §1-5 is confirmed
+      faithful (field-by-field re-comparison against the source), and the
+      content is formally ratified. That same evidence-gathering pass also
+      found and fixed a real, independent defect: `storage_engine_
+      assignment` had `minItems: 8, maxItems: 8` while `purpose`'s enum
+      always had 9 members -- see that field's own updated description.
+      Original question (preserved): "This file transcribes
+      DATA_ARCHITECTURE_PLAN.md, a Status: PROPOSED design document, not
+      yet promoted through a dedicated ADR... Should a thin ratifying ADR
+      be drafted for this design (and for the sibling DEVOPS_SRE_PLAN.md-
+      derived policies/provider/ files, and the GLOBAL_JURISDICTION_
+      PLAN.md-derived jurisdiction files)?"
+    owner: "closed"
+    blocks: "nothing — resolved"
   - id: "OQ-REPOCONTRACT-2"
     question: >
       DATA_ARCHITECTURE_PLAN.md §7's closing list names 5 mother-document

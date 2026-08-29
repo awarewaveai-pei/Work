@@ -790,16 +790,20 @@ open_questions:
     blocks: "nothing in this schema directly; downstream of the cited open question"
   - id: "OQ-mres-4"
     question: >
-      `policy_context`/`regulatory_exposure` are transcribed from
-      `docs/architecture/GLOBAL_JURISDICTION_PLAN.md` §6, a `Status:
+      RESOLVED 2026-08-30 by docs/adr/ADR-013-batch-ratification-of-
+      proposed-document-transcriptions.md Sub-decision 5: the
+      `policy_context`/`regulatory_exposure` transcription from
+      `docs/architecture/GLOBAL_JURISDICTION_PLAN.md` §6 is confirmed
+      faithful (all 11 policy_context sub-fields, and regulatory_exposure's
+      correct placement as a resolved-side-only sibling field, both
+      re-verified against §6.2's worked example). Original question
+      (preserved): "`policy_context`/`regulatory_exposure` are transcribed
+      from `docs/architecture/GLOBAL_JURISDICTION_PLAN.md` §6, a `Status:
       PROPOSED` document, not a dedicated ACCEPTED ADR -- same provenance
       class as `specs/domain/repository-contract.schema.yaml`'s
-      OQ-REPOCONTRACT-1 and the other files built from this same document
-      corpus in this Phase 3 run (see that file's `decided_by` for the
-      shared reasoning on why a not-yet-ADR-ratified but evidence-comparable
-      PROPOSED document was treated as authoritative content to transcribe).
-    owner: "operator, or a future session (see OQ-REPOCONTRACT-1 for the batch framing)"
-    blocks: "nothing in this file's own validity"
+      OQ-REPOCONTRACT-1..."
+    owner: "closed"
+    blocks: "nothing — resolved"
   - id: "OQ-mres-5"
     question: >
       §6.4's forcing rule (`regulatory_exposure IN {moderate, high}` forces

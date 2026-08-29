@@ -1,6 +1,6 @@
 # ADR Index — AI LEGO Cognitive Engineering OS
 
-**狀態（2026-08-30 更新）**：全部 12 份 ADR 狀態為 `ACCEPTED`。ADR-001~009 由操作者明示授權 Claude 行使架構師裁決權（2026-08-29 對話，「你決定」）；ADR-010 的授權路徑略有不同，見該 ADR 檔頭——Sub-decision (a) 原則操作者已明示接納，Sub-decision (b) 的完整命名對照表是本次首次形式化產出，操作者尚未逐條過目；ADR-011 同 ADR-001~009 授權模式（2026-08-30 對話，「繼續！你決定！」）。**這不等於三母文件已被編輯**——`ACCEPTED` 代表架構決策本身定案，實際套用仍須依 ADR-006 定義的 `.ai/proposals/<NNN>-<slug>/PROPOSAL.md` 流程逐項產生提案，該流程的 `status: APPROVED` 依 directive §XV 絕對句規定**只能由操作者本人**推進，Claude 永遠不能自我核准母文件編輯本身。兩個欄位（ADR Status / Proposal Status）是兩條獨立規則，見每份 ADR 檔頭的範圍聲明。
+**狀態（2026-08-30 更新）**：全部 13 份 ADR 狀態為 `ACCEPTED`。ADR-001~009 由操作者明示授權 Claude 行使架構師裁決權（2026-08-29 對話，「你決定」）；ADR-010 的授權路徑略有不同，見該 ADR 檔頭——Sub-decision (a) 原則操作者已明示接納，Sub-decision (b) 的完整命名對照表是本次首次形式化產出，操作者尚未逐條過目；ADR-011 同 ADR-001~009 授權模式（2026-08-30 對話，「繼續！你決定！」）。**這不等於三母文件已被編輯**——`ACCEPTED` 代表架構決策本身定案，實際套用仍須依 ADR-006 定義的 `.ai/proposals/<NNN>-<slug>/PROPOSAL.md` 流程逐項產生提案，該流程的 `status: APPROVED` 依 directive §XV 絕對句規定**只能由操作者本人**推進，Claude 永遠不能自我核准母文件編輯本身。兩個欄位（ADR Status / Proposal Status）是兩條獨立規則，見每份 ADR 檔頭的範圍聲明。
 
 | # | 標題 | 解決的 findings | 建議方案（一句話） | Status |
 |---|---|---|---|---|
@@ -16,6 +16,7 @@
 | [ADR-010](ADR-010-database-platform-and-table-naming.md) | DB 主機平台選型 + Table 命名規範 | 操作者提問（非 Phase 1 register 條目）：AI LEGO DB 是否應與 Lobster Factory Supabase 統一 | 獨立 Supabase 專案（同 vendor 不同 instance，不與 Lobster Factory 共用）；23 個 Domain Model 物件依 `REPOSITORY_ARCHITECTURE.md` 既有分組套 7 組前綴命名（`platform_/prov_/control_/trust_/canvas_/core_/data_`） | ACCEPTED（platform-separation 原則為操作者本次對話明示接納；23 物件 table 命名對照表為 Claude 本次首次形式化產出，操作者尚未逐條過目確認，見該 ADR 檔頭範圍聲明） |
 | [ADR-011](ADR-011-platform-gate-ownership-and-unification.md) | 平台 Global/High-risk Gate 歸屬 + 內容聯集 + 命名統一 | OQ-10 / CROSS-R-5 / CROSS-R-7 / CROSS-T-11 | Master Plan 依其自身＋EC 自身的 Scoped Authority 表定為唯一 owner；內容為三方聯集（14 Global + 6 High-risk，驗證為子集/超集關係非真衝突）；3 個 CROSS-T-11 命名採 Atlas 版本，EC 3 個名稱降為 deprecated alias | ACCEPTED |
 | [ADR-012](ADR-012-branch-merge-state-machine.md) | Branch 完整狀態機（誰能 Merge、衝突處理）| ADR-003 Consequences follow-up (iii)、MRSP-4 | 6 狀態機（ACTIVE/MERGE_REQUESTED/CONFLICT/MERGED/ABANDONED/ROLLED_BACK）；merge 授權門檻 >= A2；R3/R4 額外要求 mandatory-gates.yaml 兩條規則皆 PASS（引用 ADR-011）；衝突一律由 merge_base 過期偵測，只能人工裁決。全系統零母文件先例的首份 ADR，由 5 個既有已裁決機制組合而成 | ACCEPTED |
+| [ADR-013](ADR-013-batch-ratification-of-proposed-document-transcriptions.md) | 批次追認 5 個已轉錄自 PROPOSED 規劃文件的 schema/policy 檔案 | OQ-REPOCONTRACT-1、OQ-TENANTISO-1、OQ-GATEWAYFALLBACK-1、OQ-MODELREGISTRY-1、OQ-CONFLICTOFLAWS-1、OQ-mres-4 | 逐檔重讀來源 PROPOSED 文件全文（DATA_ARCHITECTURE_PLAN/DEVOPS_SRE_PLAN/GLOBAL_JURISDICTION_PLAN）+ 逐欄位比對確認轉錄忠實，正式採納為權威內容；來源文件本身仍維持 PROPOSED；過程中額外發現並修正 2 個獨立缺陷（repository-contract 的 8 vs 9 計數不一致、tenant-isolation-controls 的過期交叉引用聲稱）；`pii-redaction.policy.yaml` 查證後排除，已由 ADR-007 完整覆蓋 | ACCEPTED |
 
 ## 決策依賴關係
 
@@ -45,8 +46,8 @@
 - **DUPLICATION_REGISTER.yaml P1-DUP-5 已加註**：Atlas 端引用（「§122 Localization Architecture，行 4918」）經 ADR-009 逐字查證**不可驗證存在**（Atlas 全文僅 4618 行，章節僅到 §30）。MP 端引用不受影響。ADR-009 改用獨立工程理由裁決正本，不依賴此引用。
 - **GAP_REGISTER.yaml:264 已訂正**：`duplication_candidates` 原誤指向 `DUPLICATION_REGISTER.yaml P1-DUP-4`（實際內容為因果推論方法重複，與 PII 無關），已改為正確指向 `CONFLICT_REGISTER.yaml P1-CONFLICT-3`。**修正歸屬（VBC 自我更正）**：ADR-007 起草 agent 僅**發現並記錄**此錯誤（其檔案 Context 段明文「不在此修正」），實際修正是由另一個並行 session 依操作者指示執行（見 `WORKLOG.md` 對應條目）——本文件初版誤將此修正歸給 ADR-007 agent 並指控其「邊界確認聲明與行為不符」，經核對 ADR-007 檔案原文與 git log 後確認此指控不實，ADR-007 agent 的邊界聲明是準確的，已在此更正，避免對正確行事的 agent 留下錯誤的負面記錄。
 
-## 誠實聲明（適用於全部 12 份，ADR-010/011/012 另有補充見其檔頭）
+## 誠實聲明（適用於全部 13 份，ADR-010/011/012/013 另有補充見其檔頭）
 
 - ADR-003/005/006（Round 1）與 ADR-009（Round 2.5）本輪**未**逐份安排 Codex 對抗式覆審——僅 ADR-001/002 因起草 agent 主動標記「架構影響面最大」而優先安排。操作者若要求對其餘 6 份也補一輪覆審，可比照 ADR-001/002 的模式逐份執行。
 - 每份 ADR 的 Evidence 段落引用已由起草 agent 自行 Grep/Read 核對；ADR-009 的過程本身即證明「起草 agent 自我核對」不是萬無一失的防線（它抓到了 Phase 1 register 自己的引用錯誤），但也證明這套「每份 ADR 自帶查證」的設計確實會抓到問題，不是流於形式。
-- 全部 12 份 ADR 標記 `Status: ACCEPTED`，但依上方範圍聲明，任何一份轉為母文件實際編輯前，仍須先產生 `.ai/proposals/` 提案並由操作者推進至 `APPROVED`，Claude 不得自我批准該步驟。ADR-010/011/012 未經 Codex 覆審（ADR-010 為純基礎設施/命名決策，ADR-011 為純治理歸屬/內容聯集決策，ADR-012 為純架構設計決策——三者皆非治理裁決鏈或個資機制核心，但依 AGENTS.md §跨模型 oracle 排程，本次任務結束後會對本 session 全部程式/schema 改動跑一次 `/codex-review`，涵蓋 ADR-011/012 消費者 `gate.schema.yaml`/`mandatory-gates.yaml`/`release-policy.yaml`/`specs/workflow/branch.schema.yaml` 的實際編輯，見 WORKLOG 2026-08-30）。
+- 全部 13 份 ADR 標記 `Status: ACCEPTED`，但依上方範圍聲明，任何一份轉為母文件實際編輯前，仍須先產生 `.ai/proposals/` 提案並由操作者推進至 `APPROVED`，Claude 不得自我批准該步驟。ADR-010/011/012/013 未經 Codex 覆審（ADR-010 為純基礎設施/命名決策，ADR-011 為純治理歸屬/內容聯集決策，ADR-012 為純架構設計決策，ADR-013 為純轉錄忠實度稽核——四者皆非治理裁決鏈或個資機制核心。ADR-011/012 消費者 `gate.schema.yaml`/`mandatory-gates.yaml`/`release-policy.yaml`/`specs/workflow/branch.schema.yaml` 已於 2026-08-30 跑過一次 `/codex-review` 並修正 3 個真實 HIGH finding，見 WORKLOG；ADR-013 涉及的 5 個檔案尚未排入 Codex 覆審佇列，屬已知待辦，非遺漏）。

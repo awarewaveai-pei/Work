@@ -19,22 +19,24 @@ description: >
 
   Transcribes docs/architecture/DATA_ARCHITECTURE_PLAN.md (Status: PROPOSED,
   2026-08-29) §6's resolution of both follow-ups. IMPORTANT RECONCILIATION
-  (found while building this file, not silently smoothed over): SECURITY_
-  THREAT_MODEL.md's own I1/Ds1 rows, written the same day, do NOT reference
-  DATA_ARCHITECTURE_PLAN.md's resolution and instead describe this as fully
-  open ("即使 ADR-003 全案核准，此威脅僅部分解決——RAG 檢索面仍未設計") --
-  this is the same "same-day parallel document, no cross-reference" staleness
-  class this session has already found and fixed multiple times within a
-  single file (Wave 6/7/8's line-citation cascades), here occurring ACROSS
-  two separate PROPOSED planning documents instead. Verified directly: the
-  specific failure mode SECURITY_THREAT_MODEL.md I1/Ds1 describes
-  (misconfigured retrieval scope leaking Tenant B's confidential fragment
-  into Tenant A's query) IS exactly what DATA_ARCHITECTURE_PLAN.md §6's
-  mandatory-RLS-plus-fail-closed design prevents structurally (an engine-
-  enforced RLS policy makes a scope-filter bug return zero rows, not another
-  tenant's rows) -- not just "described as future work." Both documents'
-  own staleness is noted in this file's `open_questions` for a future pass
-  to actually go edit SECURITY_THREAT_MODEL.md's I1/Ds1 rows.
+  (found while building this file, not silently smoothed over -- and
+  CORRECTED 2026-08-30, batch-ADR-013 evidence-gathering pass, since the
+  original staleness this paragraph described has since been fixed): at
+  this file's original write time, SECURITY_THREAT_MODEL.md's own I1/Ds1
+  rows, written the same day, did NOT yet reference DATA_ARCHITECTURE_
+  PLAN.md's resolution and instead described this as fully open ("即使
+  ADR-003 全案核准，此威脅僅部分解決——RAG 檢索面仍未設計") -- the same
+  "same-day parallel document, no cross-reference" staleness class this
+  session has already found and fixed multiple times within a single file
+  (Wave 6/7/8's line-citation cascades), here occurring ACROSS two separate
+  PROPOSED planning documents instead. Verified directly (2026-08-30
+  re-read): SECURITY_THREAT_MODEL.md I1/Ds1 (L109, L130) now both read
+  "**UPDATED（2026-08-29）**" and explicitly cite this file by name -- that
+  edit has ALREADY happened, by the same day, evidently in a later pass
+  than the one that produced this file's own original description text.
+  This description previously pointed a future pass at `open_questions`
+  to go make that edit; that open question (`OQ-TENANTISO-2`) is now
+  RESOLVED, not open -- see below.
 
 source_of_truth_for:
   - "docs/architecture/DATA_ARCHITECTURE_PLAN.md §6 Integration with ADR-002/003/005 (L139-143) -- both follow-up resolutions transcribed verbatim"
@@ -44,12 +46,17 @@ source_of_truth_for:
   - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.5 row for tenant-isolation-controls.schema.yaml (P1-GAP-SEC-7, BLOCKED_PENDING_ROUND2_ADR)"
 
 decided_by: >
-  docs/architecture/DATA_ARCHITECTURE_PLAN.md (Status: PROPOSED, 2026-08-29),
-  same provenance class as specs/domain/repository-contract.schema.yaml --
-  see that file's own `decided_by`/`open_questions.OQ-REPOCONTRACT-1` for the
-  full honesty note on this design being transcribed from a not-yet-ADR-
-  ratified document, and OQ-TENANTISO-1 below for the same note scoped to
-  this file.
+  docs/adr/ADR-013-batch-ratification-of-proposed-document-transcriptions.md
+  (ACCEPTED 2026-08-30, Sub-decision 2) formally ratifies this file's
+  transcription of docs/architecture/DATA_ARCHITECTURE_PLAN.md §6 (Status:
+  PROPOSED, 2026-08-29, itself unchanged by ADR-013). Before 2026-08-30, no
+  ADR ratified this design -- same provenance class as
+  specs/domain/repository-contract.schema.yaml (also ratified by ADR-013,
+  Sub-decision 1). ADR-013's evidence-gathering pass independently
+  confirmed ADR-003 itself explicitly declined to decide the two follow-ups
+  this file closes (ADR-003 Consequences, L112) -- so this is a genuine gap
+  ADR-003 left open, not a duplicate ratification of something ADR-003
+  already covered. See OQ-TENANTISO-1 below, now resolved.
 
 compilation_decisions:
   - question: >
@@ -154,24 +161,34 @@ properties:
 open_questions:
   - id: "OQ-TENANTISO-1"
     question: >
-      Same provenance-class disclosure as
+      RESOLVED 2026-08-30 by docs/adr/ADR-013-batch-ratification-of-
+      proposed-document-transcriptions.md Sub-decision 2: this file's
+      transcription of DATA_ARCHITECTURE_PLAN.md §6 is confirmed faithful,
+      and ADR-003 is confirmed to have explicitly declined to decide this
+      (not a duplicate ratification of an already-covered decision).
+      Original question (preserved): "Same provenance-class disclosure as
       specs/domain/repository-contract.schema.yaml's OQ-REPOCONTRACT-1 --
       this file transcribes a Status: PROPOSED design document, not a
-      dedicated ACCEPTED ADR. Should a thin ratifying ADR be drafted?
-    owner: "operator, or a future session (see OQ-REPOCONTRACT-1 for the batch framing across all DATA_ARCHITECTURE_PLAN.md/GLOBAL_JURISDICTION_PLAN.md/DEVOPS_SRE_PLAN.md-derived files)"
-    blocks: "nothing in this file's own validity"
+      dedicated ACCEPTED ADR. Should a thin ratifying ADR be drafted?"
+    owner: "closed"
+    blocks: "nothing — resolved"
   - id: "OQ-TENANTISO-2"
     question: >
-      This file's own description honestly documents that
-      SECURITY_THREAT_MODEL.md's I1/Ds1 rows are stale (written without
-      awareness of DATA_ARCHITECTURE_PLAN.md §6's resolution). Should
-      SECURITY_THREAT_MODEL.md itself be edited to reflect this file's
-      existence and mark I1/Ds1 as resolved (with a residual-risk note
-      scoped to whatever this file does NOT cover, e.g. the actual RLS
-      POLICY DEFINITIONS/testing, which remain an implementation-phase
-      task this schema does not itself perform)?
-    owner: "operator, or a future session with write scope over docs/architecture/SECURITY_THREAT_MODEL.md"
-    blocks: "nothing in this file's own validity -- flagged for cross-document consistency, not a defect in this file"
+      RESOLVED — verified 2026-08-30 (batch-ADR-013 evidence-gathering
+      pass): SECURITY_THREAT_MODEL.md I1/Ds1 (L109, L130) already read
+      "**UPDATED（2026-08-29）**" and explicitly cite this file by name,
+      with a residual-risk note correctly scoped to what this schema does
+      NOT cover (actual RLS policy SQL/DDL and testing, an implementation-
+      phase task -- see OQ-TENANTISO-3). Original question (preserved):
+      "This file's own description honestly documents that SECURITY_
+      THREAT_MODEL.md's I1/Ds1 rows are stale... Should SECURITY_THREAT_
+      MODEL.md itself be edited to reflect this file's existence and mark
+      I1/Ds1 as resolved?" The edit had already happened by the same day,
+      in a pass later than the one that wrote this file's own description
+      -- this file's description text was simply not updated to notice,
+      until this correction.
+    owner: "closed"
+    blocks: "nothing — resolved"
   - id: "OQ-TENANTISO-3"
     question: >
       This schema defines the ARCHITECTURAL DECISION (RLS-by-default,
