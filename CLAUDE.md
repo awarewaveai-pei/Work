@@ -71,7 +71,7 @@ SSOT：`mcp/registry.template.json`。改動後跑 `scripts/sync-mcp-config.ps1`
 
 ### 伺服器邊界（**不可混用**）
 
-SG `5.223.93.113` / EU `204.168.175.41` — 容器細節見 AGENTS.md §AwareWave Stack。  
+**現況（2026-08-28 起）**：SG + EU 已全數整併到單機 **`ks-aw-01`（`149.202.64.114`，SSH `-p 58122`）**。舊 `5.223.93.113`（SG）/ `204.168.175.41`（EU）容器已全部停止（2026-08-29 實測本機直連皆 502），僅保留當回滾備援，**任何部署/操作都不該再 SSH 過去**。容器細節見 AGENTS.md §AwareWave Stack、拓樸橫幅見 [`AWAREWAVE_STACK_QUICKREF.md`](agency-os/docs/operations/AWAREWAVE_STACK_QUICKREF.md)。  
 ClickHouse 版本鎖定：`25.7.x`，**禁升 latest / 24.x**。
 
 詳細操作規則（Routing 三件套 / 自動化安全預設 / Auto-Repair 紅線 / Trigger.dev 憑證 / 其他 SSOT）見 AGENTS.md §Lobster Factory 操作規則 及 §Auto-Repair 紅線。

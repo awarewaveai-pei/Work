@@ -4,7 +4,10 @@
     Detect deploy drift: how many commits behind production lobster-next-admin (and other apps) are.
 
 .DESCRIPTION
-    Compares the deployed commit on the SG server (5.223.93.113) against local origin/main.
+    Compares the deployed commit on the deploy target (2026-08-28 consolidation: ks-aw-01,
+    149.202.64.114 -- default below is already updated; this description previously said the
+    retired SG box, 5.223.93.113, which stopped serving traffic on migration day) against
+    local origin/main.
     Source of truth on the server is /root/lobster-phase1/.deployed-commit, written by sg-deploy.sh.
     Falls back to /root/Work HEAD if .deployed-commit is missing (legacy mode pre-sg-deploy).
 
@@ -15,13 +18,17 @@
         3  ERROR - SSH/git unreachable; emits warning but does not fail unless -Strict
 
 .PARAMETER ServerHost
-    SG server IP/hostname. Default: 5.223.93.113
+    Deploy target IP/hostname. Default: 149.202.64.114 (ks-aw-01, since 2026-08-28 consolidation)
 
 .PARAMETER ServerUser
-    SSH user. Default: root
+    SSH user. Default: ubuntu (ks-aw-01 uses the `ubuntu` working account, not root; this
+    docstring previously said root, which was already stale before today's edit)
 
 .PARAMETER PrivateKey
-    SSH private key path. Default: $env:USERPROFILE\.ssh\hetzner_trigger
+    SSH private key path. Default: $env:USERPROFILE\.ssh\id_ed25519 (ks-aw-01 deliberately uses
+    the operator's general-purpose key here rather than the repo's hetzner_trigger convention,
+    see check-backup-health.ps1 for the same rationale; this docstring previously said
+    hetzner_trigger, which was already stale before today's edit)
 
 .PARAMETER WarnAt
     Behind count to start warning at. Default: 1 (any drift = warn)
