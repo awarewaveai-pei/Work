@@ -286,7 +286,7 @@ open_questions:
       authority" requirements exist in prose but cannot be mechanically
       checked by any gate or approval-UI consulting this schema.
     owner: "operator"
-    blocks: "Any future policies/ai-execution/authority.yaml (EC §91 path list, L2751) that wants to enforce approver eligibility by role rather than by unchecked human judgment."
+    blocks: "policies/ai-execution/authority.yaml (EC §91 path list, L2754 — corrected 2026-08-29, critic-flagged Minor: L2751 is a blank line, the code-fence opener; BUILT 2026-08-29, no longer a future file) enforcing approver eligibility by role rather than by unchecked human judgment — authority.yaml's own OQ-AUTHPOL-4 records this same dependency from its side."
   - id: "OQ-AUTH-2"
     question: >
       Is there, or should there be, a fixed rule relating `risk_tier`

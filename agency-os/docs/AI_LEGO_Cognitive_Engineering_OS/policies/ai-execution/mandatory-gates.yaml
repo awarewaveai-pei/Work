@@ -1,0 +1,489 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://policies/ai-execution/mandatory-gates.yaml"
+title: Mandatory Gates Policy
+version: "1.0.0"
+status: PROVISIONAL
+
+description: >
+  Policy-as-code binding of WHICH gates are mandatory for WHICH conditions —
+  Execution Contract §91 "Policy-as-Code Paths" (L2750-2762) names this file
+  `/policies/ai-execution/mandatory-gates.yaml` at L2756, one of the 8 files
+  in that directory listing. Built under the EXACT same blocking condition
+  as `specs/execution/gate.schema.yaml` (Wave 5): the Global/High-risk Gate
+  LIST itself (findings CROSS-R-5, CROSS-R-7, CROSS-T-11) has no Round 2 ADR
+  ruling yet — Master Plan §158 (L5903-5926) lists 11 Global + 1 high-risk
+  item, Method Atlas §22.1/22.2 (L4164-4194) lists 14 Global + 6 high-risk
+  items, Execution Contract §68 (L2246-2278) copies Atlas's 14+6 counts but
+  with gate-NAME drift. Tracked as OQ-10
+  (.ai/research/phase-0/open-questions.yaml L68-72, status
+  REQUIRES_HUMAN_DECISION) and as MACHINE_READABLE_SPEC_PLAN.md's MRSP-1
+  (§5 Open Questions, L304).
+
+  Per MRSP §3 Build Order (L264: "只影響 Wave 5 的 gate.schema.yaml 與 Wave 6
+  的 release-policy.yaml") and §2.9's row for `ai-execution/` (L183:
+  "mandatory-gates.yaml 需套用 ADR-004a 的 R3∪R4 擴大規則"), this file's job
+  is narrower than the disputed list: it does NOT enumerate WHICH gate_id
+  values exist (that stays deferred to
+  `specs/execution/gate.schema.yaml#/gate_id_registry`, unresolved), it
+  defines the STRUCTURAL rule shape ("when <condition>, a gate is
+  mandatory") plus the one condition-side rule that IS ADR-004-decided and
+  grounded independently of the disputed list: risk_tier IN [R3, R4]
+  mandates a human-review-class gate.
+
+  This file does NOT pick a side in the disputed gate-list count, does NOT
+  merge/union the three candidate lists, and does NOT invent a 4th list —
+  identical discipline to `gate.schema.yaml`'s own `description`. `status:
+  PROVISIONAL` (not `ACTIVE`) is used deliberately, per this task's explicit
+  instruction and matching the sibling file `network-egress.yaml`'s own
+  disclosed criterion (its `compilation_decisions`, first entry): unlike
+  `gate.schema.yaml` (where only one field of an otherwise-complete,
+  fully-usable record shape is blocked), THIS file's blocked content
+  (which gate_id values exist) is close to its entire practical payload —
+  only one rule is populated below — so `ACTIVE` would overstate how much
+  of this file's job is actually done.
+
+  Directory context (discovered mid-task, not assumed in advance): at the
+  time of writing, `policies/ai-execution/` already contains
+  `tool-permissions.yaml`, `forbidden-actions.yaml`, and
+  `network-egress.yaml` (mtimes 2026-08-29 18:40-18:45, ahead of this
+  file's own write), apparently produced by a concurrent session working
+  through EC §91's same 8-file list; `exception-policy.yaml` was also
+  present in the working tree at write time but was NOT read in full for
+  this file's own shape-alignment pass (corrected 2026-08-29 — critic
+  review, Minor: this paragraph previously named it as a 4th aligned
+  sibling, an internal contradiction with `verification`'s own "read all 3
+  in full" claim). This file aligns its rule shape with the 3
+  concurrently-built, independently-established siblings actually read
+  (`definitions:` block, root `$ref` to a plural array type, literal
+  `condition`/`action` fields per Master Plan §64's Policy-as-Code rule
+  shape, an `<x>_id`-style closed vocabulary for this file's own small
+  concept) rather than inventing a divergent shape — see `verification` for
+  how this was confirmed and `compilation_decisions` for where this file's
+  content necessarily differs from those 3 siblings' fully-grounded cases.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §91 Policy-as-Code Paths (L2750-2762, mandatory-gates.yaml at L2756) — this file's directory placement"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.9 row `ai-execution/` (L183) — 'mandatory-gates.yaml 需套用 ADR-004a 的 R3∪R4 擴大規則'"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §3 Build Order (L264) — explicit instruction that this file's skeleton may be built now with the gate_id enum left TBD_PENDING_ROUND2"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §5 Open Questions MRSP-1 (L304) — the blocking dependency, scoped to 'Wave 5-6 兩個檔案'"
+  - "docs/adr/ADR-004-risk-tier-and-epistemic-label-canonicalization.md Sub-decision (a) (L37-42, L75, L126, L132) — the R3∪R4 gate-injection trigger expansion this file's grounded rule encodes"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §64 Policy-as-Code (L2714-2741) — the condition/action rule-shape style this file's `mandatory_gate_rule.condition`/`action` fields follow, same convention as sibling files `tool-permissions.yaml`/`forbidden-actions.yaml`/`network-egress.yaml`"
+  - "execution/risk-tier.schema.yaml mandatory_gate_injection_trigger, tiers.R3.gate_injection, tiers.R4.gate_injection, tiers.R3.required_actions, tiers.R4.required_actions — the grounded condition-side content"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §14.2 Mandatory Gate Injection (L3588-3612) — the mechanism this policy operationalizes into a machine-checkable rule"
+  - "execution/gate.schema.yaml gate_result/properties/gate_id, gate_id_registry, open_questions.OQ-GATE-1 — the sibling file whose gate_id value space this policy's `gate_ref` field defers to"
+  - ".ai/research/phase-0/open-questions.yaml OQ-10 (L68-72) — the unresolved ownership question"
+  - ".ai/research/phase-0/verified-findings.yaml CROSS-R-5 (L98-116), CROSS-R-7 (L398-421), CROSS-T-11 (L495-517) — the three-way count/name dispute"
+
+decided_by: >
+  No ADR governs the gate_id VALUE SPACE — identical situation to
+  gate.schema.yaml (see that file's `decided_by`); OQ-10 remains
+  REQUIRES_HUMAN_DECISION. ADR-004 Sub-decision (a) DOES govern the trigger
+  CONDITION this file's grounded rule encodes: risk-tier.schema.yaml's
+  `mandatory_gate_injection_trigger` (`risk_tier IN [R3, R4]`, ACCEPTED
+  2026-08-29) is the machine-checkable form of Atlas §14.2's rule, expanded
+  from Atlas's original R4-only ("risk_tier = critical") trigger to R3∪R4 —
+  ADR-004's own text (L126): "Gate Injection 觸發條件從 critical 單一值擴大
+  為 R3 ∪ R4 是語意變更...此為關閉既有保護缺口，非新增未經論證的範圍." This
+  file applies that ADR-004-decided condition directly, exactly as MRSP
+  §2.9 instructs, while leaving `gate_ref` (WHICH gate fires) as
+  TBD_PENDING_ROUND2_ADR — the same Low-risk-condition/Blocked-identifier
+  split gate.schema.yaml already established as this project's precedent.
+
+compilation_decisions:
+  - question: >
+      Given gate_id cannot be enumerated, should this whole file be
+      deferred until Round 2 ADR lands — the way
+      `specs/jurisdiction/conflict-of-laws-output.schema.yaml` was deferred
+      in full (MRSP §2.6 L162, "兩個機制哪個該贏尚未裁決，非單純缺
+      schema")?
+    decision: >
+      No. Build the rule SHAPE and the one grounded condition-side rule
+      now; leave only `gate_ref` blocked per rule, not the whole file.
+    reasoning: >
+      The conflict-of-laws case is disputed at the MECHANISM level (which
+      ENGINE governs is itself undecided) — nothing there is safely
+      buildable without picking a side. Here, by contrast, the trigger
+      CONDITION (`risk_tier IN [R3, R4]`) is already ADR-004-decided and is
+      logically independent of the disputed gate-NAME/COUNT question — MRSP
+      §3 (L264) draws exactly this distinction for `gate.schema.yaml` and
+      `release-policy.yaml`, and this file follows the identical reasoning.
+      Deferring the whole file would silently forfeit ADR-004's own
+      already-accepted decision alongside the genuinely-undecided part,
+      which is a worse outcome than building the shape and marking one
+      field blocked.
+  - question: >
+      All three disputed gate-list candidates independently name SOME
+      human-review-class high-risk gate (Master Plan §158 high_risk_addon:
+      "Human Specialist Review PASS" — its ONLY high-risk item; Method
+      Atlas §22.2: "Human Specialist Review PASS", L4188; Execution
+      Contract §68: "Human Specialist", L2270 — the CROSS-T-11
+      naming-drift item). risk-tier.schema.yaml's own ADR-004-decided
+      `required_actions` separately mandate "Human Approval" (R3) and
+      "Explicit Human Authority" (R4). Should this convergence be encoded
+      as a rule now, using a coarse concept distinct from the disputed
+      `gate_id`, per this task's explicit suggestion?
+    decision: >
+      Yes — add one grounded rule, condition `risk_tier IN [R3, R4]`,
+      action `REQUIRE_HUMAN_REVIEW`, tagged with ONE new coarse
+      `gate_concept: HUMAN_REVIEW_CLASS` value (not a general taxonomy),
+      `gate_ref` left TBD_PENDING_ROUND2_ADR.
+    reasoning: >
+      This is not "inventing a gate list" or picking among the 3 disputed
+      candidates — it records an observation true regardless of which
+      candidate Round 2 ADR eventually picks: every one of the 3 disputed
+      high-risk lists, AND risk-tier.schema.yaml's own independently
+      ADR-004-decided R3/R4 required_actions, separately converge on SOME
+      human-review gate for high-risk tiers. Naming the concept
+      `HUMAN_REVIEW_CLASS` (not any of the 3 candidates' exact strings —
+      "Human Specialist Review PASS" / "Human Specialist" — since
+      CROSS-T-11's naming drift is specifically about THIS item) avoids
+      endorsing one spelling. `action: REQUIRE_HUMAN_REVIEW` is a precise,
+      non-forced fit: it is literally Master Plan §64's own second worked
+      example's verdict ("Financial recommendation AND confidence < 0.8 ->
+      REQUIRE HUMAN REVIEW"), reused here for a different condition, not a
+      stretch mapping the way e.g. forcing "no deployment authority" onto
+      one of EC §96's 7 Tool Broker dimensions would have been (see
+      `tool-permissions.yaml`'s own compilation_decisions, which explicitly
+      declined that stretch and used an additive field instead — the same
+      discipline this file applies via `gate_concept`/`gate_ref` as
+      additive fields alongside `condition`/`action`, not a replacement for
+      them). `gate_concept` is informational metadata on the rule only; it
+      is NOT a substitute for `gate_ref` and is NOT written back onto
+      `gate.schema.yaml`'s `gate_result.gate_id` or any enum there —
+      consistent with that file's own refusal to add a `category`
+      discriminator to `gate_result` (its compilation_decisions, first
+      entry) for the same "don't quietly pre-empt OQ-10" reason.
+  - question: >
+      Should a second rule be added for the Rollback/Recovery-class gate
+      that also appears across the disputed candidates (Atlas/EC high-risk
+      "Recovery / Rollback Rehearsal PASS" / "Recovery Rehearsal";
+      risk-tier.schema.yaml R4 "Recovery Drill" / "Rollback or Compensating
+      Plan")?
+    decision: "Not added — left as an explicit open question (OQ-MGATE-2), not a rule."
+    reasoning: >
+      CORRECTED 2026-08-29 (critic-flagged MAJ-3: the original version of
+      this entry claimed MP §158's Global 11-item list's names were "not
+      transcribed anywhere in this project's existing artifacts" — false;
+      direct read of MP §158 L5910-5920 confirms all 11 names, including
+      "Rollback PASS" at L5918). The corrected picture: all 3 candidates DO
+      name a Rollback-class item — MP §158 "Rollback PASS" (Global tier,
+      L5918), Atlas §22.1 "Rollback PASS" (Global tier, L4178), EC §68
+      "Rollback" (Global tier, L2262). But the ORIGINAL question here was
+      narrower than plain existence: it asked whether a Rollback/Recovery
+      gate should be added as an R3/R4-triggered rule PARALLELING the
+      MGATE-R3-R4-HUMAN-REVIEW rule above — i.e. whether it belongs to the
+      same HIGH-RISK-ADDON convergence class that rule was grounded on, not
+      merely whether the item name exists anywhere. On that narrower
+      question, the 3-way convergence does NOT hold: Atlas §22.2 and EC §68
+      each separately list a HIGH-RISK addon item ("Recovery / Rollback
+      Rehearsal PASS", L4193; "Recovery Rehearsal", L2275) distinct from
+      their own Global "Rollback PASS"/"Rollback" entries — but MP §158's
+      high-risk addon contains ONLY "Human Specialist Review PASS" (L5926,
+      confirmed by direct read: no second high-risk line exists at
+      L5923-5927); MP's Rollback item is Global-tier only, with no
+      high-risk-tier counterpart. So only 2 of 3 candidates (Atlas, EC)
+      converge on a High-risk-tier Rollback/Recovery item — the same
+      convergence bar the human-review rule met (3 of 3) is not met here
+      (2 of 3). Adding an R3/R4-triggered Rollback rule on a 2-of-3 basis
+      would be a materially weaker inference than the human-review rule's
+      justification, not the same class of "true regardless of which
+      candidate wins" observation — so the original "not added, left open"
+      OUTCOME still holds, now for the correct, verified reason (a
+      confirmed 2-of-3 split on the high-risk-tier question, not an
+      unverifiable gap in what MP §158 names). See OQ-MGATE-2 below,
+      likewise corrected.
+  - question: >
+      Sibling files `tool-permissions.yaml`/`forbidden-actions.yaml` each
+      pair their condition/action rule shape with a literal
+      `mother_doc_text` field preserving one verbatim mother-document
+      quote per rule. Should this file's rule carry one too?
+    decision: >
+      `mother_doc_text` is included in the shape as OPTIONAL
+      (`type: [string, "null"]`, default null), left `null` on the one
+      populated rule.
+    reasoning: >
+      Unlike EC §97's 4 examples or Master Plan §65's 5-item list (each a
+      single, self-contained verbatim bullet a sibling file's rule
+      instantiates 1:1), this file's grounded rule synthesizes MULTIPLE
+      independent citations (risk-tier.schema.yaml's two separate
+      required_actions entries, plus 3 disputed-candidate documents' each
+      naming a differently-worded human-review item) — there is no single
+      mother-document sentence this rule is "the transcription of".
+      Forcing one citation into `mother_doc_text` would misrepresent a
+      synthesis as a quotation. The full citation trail is instead carried
+      in `source` (a free-text, multi-citation field), and the field stays
+      in the shape (rather than being dropped) so a FUTURE rule that does
+      instantiate one literal mother-document quote can populate it,
+      keeping this file's shape compatible with its siblings'.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+# Root $ref (established pattern in this suite — see risk-tier.schema.yaml,
+# tool-permissions.yaml, forbidden-actions.yaml: without a root-level type
+# constraint, a validator pointed at this file's ROOT would accept ANY
+# value). This file's root validates as `mandatory_gate_rules` (an array of
+# rule objects) — an open-ended rule set, not a fixed-count one (contrast
+# forbidden-actions.yaml's closed 5-item array).
+$ref: "#/mandatory_gate_rules"
+
+definitions:
+
+  gate_concept_id:
+    description: >
+      A small, LOCALLY-owned vocabulary of coarse gate concepts that are
+      true regardless of how Round 2 ADR resolves OQ-10 (see
+      `compilation_decisions`). Deliberately NOT the same kind of thing as
+      `gate.schema.yaml#/gate_result/properties/gate_id` (the disputed,
+      externally-owned identifier space this file does not enumerate) —
+      this enum only grows when a NEW cross-candidate convergence is
+      independently confirmed, the way `HUMAN_REVIEW_CLASS` was here.
+    type: string
+    enum: [HUMAN_REVIEW_CLASS]
+
+  mandatory_gate_rule:
+    description: >
+      "When <condition>, a gate is mandatory." Structural shape only; only
+      `gate_ref` (per rule) carries the blocked value space — the shape
+      itself and the one populated rule in `grounded_rules` below are not
+      blocked. Field shape aligned with sibling files `tool-permissions
+      .yaml`/`forbidden-actions.yaml`/`network-egress.yaml` (Master Plan
+      §64 condition/action rule style, plus this file's own additive
+      gate-specific fields).
+    type: object
+    required: [rule_id, condition, action, risk_tier_in, gate_ref, source]
+    properties:
+      rule_id:
+        type: string
+        pattern: "^MGATE-"
+      condition:
+        type: string
+        description: >
+          Structured predicate, Master Plan §64 rule-shape style (e.g.
+          "risk_tier IN ['R3', 'R4']"). Free text — no formal predicate
+          grammar is defined anywhere in the mother-document corpus for
+          this purpose, so none is invented here (same choice
+          `tool-permissions.yaml`'s `condition` field made).
+      action:
+        type: string
+        enum: [DENY, ALLOW, SCOPE_TO, REQUIRE_HUMAN_REVIEW]
+        description: >
+          Master Plan §64's own condition-action vocabulary, reused
+          verbatim from sibling file `tool-permissions.yaml` (not
+          re-derived independently) — kept as a full, non-closed enum
+          because, unlike `forbidden-actions.yaml`'s exhaustively-known
+          5-verb set, this file's rule set is expected to grow once Round 2
+          ADR resolves OQ-10, and a future gate rule may need a verdict
+          this one grounded rule does not use.
+      risk_tier_in:
+        type: array
+        minItems: 1
+        items:
+          $ref: "ai-lego://specs/execution/risk-tier.schema.yaml#/risk_tier"
+        description: >
+          Grounded in execution/risk-tier.schema.yaml
+          `mandatory_gate_injection_trigger.condition`
+          ("risk_tier IN [R3, R4]"), itself ADR-004 Sub-decision (a)'s
+          R3∪R4 union of Atlas §14.2's original R4-only trigger. Additive
+          detail alongside the free-text `condition` field above, the same
+          "literal condition/action plus granular fields" convention
+          `tool-permissions.yaml`'s compilation_decisions established.
+      gate_ref:
+        description: >
+          TBD_PENDING_ROUND2_ADR. Reuses (does not re-declare)
+          `gate.schema.yaml`'s `gate_result.gate_id` identifier type — the
+          same untyped-string-with-marker treatment, deferred to the same
+          OQ-10 resolution. The JSON Pointer target is
+          `#/gate_result/properties/gate_id` (gate_id is nested under the
+          `gate_result` object's `properties` in that file, not at its
+          document root) — resolution verified with a Draft202012Validator
+          + `ai-lego://` resolver, see `verification`.
+        $ref: "ai-lego://specs/execution/gate.schema.yaml#/gate_result/properties/gate_id"
+      gate_concept:
+        $ref: "#/definitions/gate_concept_id"
+        description: >
+          OPTIONAL. Populated only where ALL 3 disputed gate-list
+          candidates independently converge (see `compilation_decisions`).
+          NOT a substitute for `gate_ref`.
+      source:
+        type: string
+        description: "Citation(s) grounding this rule's condition side."
+      mother_doc_text:
+        type: [string, "null"]
+        default: null
+        description: >
+          OPTIONAL, unlike sibling files where it is required — see
+          `compilation_decisions` for why this file's grounded rule is a
+          multi-citation synthesis rather than a single verbatim quote.
+    constraints:
+      - "gate_ref MUST NOT be populated with any of the 3 disputed candidate strings recorded in specs/execution/gate.schema.yaml#/gate_id_registry/disputed_candidates until Round 2 ADR resolves OQ-10 — doing so would silently pick a side this file (and gate.schema.yaml) explicitly declines to pick."
+      - "gate_concept, when present, MUST be one of #/definitions/gate_concept_id's enum values — deliberately NOT open-ended, to prevent this file from becoming an unreviewed second gate taxonomy alongside the disputed one."
+
+mandatory_gate_rules:
+  type: array
+  minItems: 1
+  items:
+    $ref: "#/definitions/mandatory_gate_rule"
+  description: >
+    Open-ended rule set — NOT a closed/fixed-count array (contrast
+    `forbidden-actions.yaml`'s `minItems: 5, maxItems: 5` treatment of its
+    exhaustively-known 5-verb set). More rules are expected once Round 2
+    ADR resolves OQ-10.
+
+# ---------------------------------------------------------------------------
+# GROUNDED — the one rule this compilation pass could ground independently
+# of the disputed gate list.
+# ---------------------------------------------------------------------------
+grounded_rules:
+  description: >
+    This file's actual policy content today — the 1 rule
+    `mandatory_gate_rules` above validates. Named separately from the
+    schema-body node (which some validators may point at directly), same
+    convention as sibling files' `worked_examples`/`seed_content`.
+  rules:
+    - rule_id: "MGATE-R3-R4-HUMAN-REVIEW"
+      condition: "risk_tier IN ['R3', 'R4']"
+      action: REQUIRE_HUMAN_REVIEW
+      risk_tier_in: [R3, R4]
+      gate_ref: "TBD_PENDING_ROUND2_ADR"
+      gate_concept: HUMAN_REVIEW_CLASS
+      source: >
+        execution/risk-tier.schema.yaml tiers.R3.required_actions
+        ("Human Approval"), tiers.R4.required_actions ("Explicit Human
+        Authority") — both ADR-004-decided; cross-checked against all 3
+        disputed high-risk gate-list candidates independently naming a
+        human-review-class gate (Master Plan §158 high_risk_addon "Human
+        Specialist Review PASS"; Method Atlas §22.2 "Human Specialist
+        Review PASS", L4188; Execution Contract §68 "Human Specialist",
+        L2270 — CROSS-T-11's naming-drift item).
+      mother_doc_text: null
+
+# ---------------------------------------------------------------------------
+# BLOCKED — everything else the disputed gate list would otherwise let this
+# policy state (e.g. "R3/R4 also requires a Red-Team-class gate", "the
+# Global 14-item list applies at every risk tier"). Recorded for
+# auditability, not adjudicated — identical posture to
+# gate.schema.yaml#/gate_id_registry, which this section defers to rather
+# than duplicates.
+# ---------------------------------------------------------------------------
+blocked_scope:
+  status: TBD_PENDING_ROUND2_ADR
+  blocked_by: "OQ-10 (.ai/research/phase-0/open-questions.yaml L68-72); findings CROSS-R-5, CROSS-R-7, CROSS-T-11"
+  this_file_does: >
+    Defines the mandatory_gate_rule RECORD SHAPE, and decides the ONE
+    condition-side rule (R3/R4 -> human-review-class gate) that is grounded
+    independently of the disputed list. Does not enumerate the full set of
+    gates mandatory at each tier.
+  this_file_does_not: >
+    Does not decide whether the Global 14-item (Atlas/EC) or 11-item (MP)
+    list applies universally; does not decide the High-risk add-on's full
+    membership beyond the human-review-class item; does not pick a
+    gate-name spelling among "Human Specialist" / "Human Specialist Review
+    PASS"; does not merge/union the 3 candidate lists; does not invent a
+    4th list. See `specs/execution/gate.schema.yaml#/gate_id_registry` for
+    the full disputed-candidates record — not duplicated here.
+  defers_to: "specs/execution/gate.schema.yaml#/gate_id_registry (disputed_candidates, full detail)"
+
+open_questions:
+  - id: "OQ-MGATE-1"
+    question: >
+      Once Round 2 ADR resolves OQ-10, should `gate_ref` values be
+      populated as literal strings (this file becomes the registry), or
+      should this file instead `$ref` each rule's `gate_ref` against a
+      strict `enum` defined back in `gate.schema.yaml` once THAT file gains
+      one (see gate.schema.yaml's own OQ-GATE-1, which asks the identical
+      question from the other file's side)? The two open questions must be
+      resolved together — whichever file becomes the enum owner, the other
+      references it, not both independently declaring one.
+    owner: "Phase 3 continuation, after Round 2 ADR lands (same owner as gate.schema.yaml OQ-GATE-1)"
+    blocks: "nothing today — gate_ref stays a bare TBD-marked string either way"
+  - id: "OQ-MGATE-2"
+    question: >
+      CORRECTED 2026-08-29 (critic-flagged MAJ-3 — see compilation_decisions
+      above for the full re-adjudication). MP §158's Global 11-item list IS
+      fully known (L5910-5920, includes "Rollback PASS" at L5918) — the
+      original version of this question wrongly treated it as unverified.
+      With the item names confirmed: should a second rule encode a
+      Rollback/Recovery-class gate for R3/R4, paralleling the
+      human-review-class rule above? Verified NOT on a clean 3-way
+      convergence: Atlas §22.2 ("Recovery / Rollback Rehearsal PASS",
+      L4193) and EC §68 ("Recovery Rehearsal", L2275) each place a
+      Rollback/Recovery item at the HIGH-RISK tier (the same tier the
+      human-review rule's convergence was grounded on); MP §158's high-risk
+      addon contains only "Human Specialist Review PASS" (L5926) — its
+      Rollback item ("Rollback PASS", L5918) sits at the GLOBAL tier only,
+      with no high-risk-tier counterpart. So the convergence is 2-of-3 at
+      the high-risk tier, not 3-of-3. Separately, risk-tier.schema.yaml's
+      own R4.required_actions independently name "Recovery Drill" /
+      "Rollback or Compensating Plan" — that is grounded ADR-004 content
+      already, orthogonal to this Global/High-risk-gate-list question, and
+      does not by itself resolve whether the Atlas/EC high-risk item should
+      also become an R3/R4-triggered `mandatory_gate_rule` here. Left as an
+      open question (not a rule) because a 2-of-3 convergence is a
+      materially weaker basis than the 3-of-3 the human-review rule used,
+      and because whether the Global 14/11-item list (which does include
+      Rollback for all 3 candidates) applies universally at every risk tier
+      remains itself the still-open CROSS-R-5/CROSS-R-7 question this whole
+      file declines to adjudicate (see `blocked_scope`).
+    owner: "operator or Round 2 ADR (resolving whether a 2-of-3 high-risk-tier convergence, or the separately-grounded risk-tier.schema.yaml R4.required_actions text, is sufficient basis for a rule here)"
+    blocks: "nothing today — this file simply omits the rule rather than assert a rule on a convergence weaker than its one existing grounded rule's"
+  - id: "OQ-MGATE-3"
+    question: >
+      Should `action`'s enum eventually gain a value more precise than
+      `REQUIRE_HUMAN_REVIEW` for non-human-review-class mandatory gates
+      (e.g. a Red-Team-class or Rollback-class gate, once OQ-MGATE-2 or
+      Round 2 ADR grounds one)? No such rule exists yet, so no such value
+      is invented here — this is a forward-looking schema-shape question
+      only, mirroring `tool-permissions.yaml`'s own precedent of extending
+      the shared MP §64 enum only when a real, grounded case needed it.
+    owner: "operator or future Phase 3/4 compilation pass"
+    blocks: "nothing — `action` stays the current 4-value enum until a concrete rule needs a 5th value"
+
+verification:
+  method: >
+    Read EC §91 (L2750-2762) and §68-69 (L2246-2293) in full. Read Atlas
+    §14.2-14.3 (L3588-3634) and §22.1/22.2 (L4164-4194). Read Master Plan
+    §158 (L5903-5926) and §64 (L2714-2741) in full — CORRECTED 2026-08-29
+    (critic-flagged MAJ-3): MP §158 gives BOTH the Global 11-item list's
+    full names (L5910-5920: Functional/Security/Privacy/Jurisdiction/
+    Localization/Accessibility/Data/Observability/Rollback/Documentation/
+    Golden Test PASS) AND the high-risk add-on's one item name ("Human
+    Specialist Review PASS", L5926) — the original version of this note
+    wrongly claimed only the high-risk name was known. Re-verified directly
+    against the mother document a second time while fixing this entry (not
+    merely trusting the correction) — see compilation_decisions' OQ-MGATE-2
+    re-adjudication for what this changes and does not change. Read
+    docs/adr/ADR-004-risk-tier-and-epistemic-label-canonicalization.md
+    Sub-decision (a) in full (L37-42, L75, L126, L132). Read
+    execution/risk-tier.schema.yaml and execution/gate.schema.yaml in full
+    (this file's two structural dependencies). Mid-task, discovered
+    `policies/ai-execution/tool-permissions.yaml`,
+    `policies/ai-execution/forbidden-actions.yaml`, and
+    `policies/ai-execution/network-egress.yaml` already existed (built by a
+    concurrent session, per file mtimes 2026-08-29 18:40-18:45, ahead of
+    this file's own write) — read all 3 in full and aligned this file's
+    rule shape (`definitions:` block, root `$ref`, `condition`/`action`
+    fields, `<x>_id` closed-vocabulary pattern,
+    `grounded_rules`-vs-`worked_examples`/`seed_content` populated-content
+    convention) with theirs rather than inventing a divergent shape;
+    confirmed no naming collision by grepping for "mandatory-gates" and
+    "release-policy" across all 4 sibling files (zero hits — no forward
+    reference into either of this task's 2 files exists yet in the
+    concurrently-built siblings). Grepped docs/adr/ for any ruling on the
+    gate list (none found across ADR-001~010, confirming gate.schema.yaml's
+    own verification note still holds). Confirmed the `gate_ref` $ref's
+    JSON Pointer target (`#/gate_result/properties/gate_id`) resolves
+    against gate.schema.yaml's actual document structure. Validated
+    `grounded_rules.rules[0]` against `#/definitions/mandatory_gate_rule`
+    with `jsonschema.Draft202012Validator` using a custom `ai-lego://`
+    resolver (registry-backed retrieve function mapping each `ai-lego://`
+    URI to its on-disk YAML file) — see WORKLOG for the exact command and
+    PASS result.
+  note: >
+    No mother document was modified. `gate_ref` deliberately carries no
+    enum and no guessed value; MRSP-1/OQ-10 remains open. This file's
+    normative content is limited to (1) the `mandatory_gate_rule` RECORD
+    SHAPE, and (2) ONE grounded rule (R3/R4 -> human-review-class gate
+    mandatory), both traceable to ADR-004-decided or verbatim-transcribed
+    text — not to any of the 3 disputed candidate lists.

@@ -1,0 +1,344 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://policies/ai-execution/forbidden-actions.yaml"
+title: Forbidden Agent Actions
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable DEFAULT-DENY policy for the 5 actions a
+  Cognitive Engineering OS Agent may never perform directly, per Master
+  Plan §65 "Agent ≠ Authority" (L2744-2769): "Agent 不可直接：Delete /
+  Publish / Deploy / Send / Modify Locked Fact" — transcribed verbatim
+  below as this file's 5 `forbidden_action_rule` entries. Master Plan §65's
+  own flow diagram (L2748-2760: Agent -> Intent -> Policy Engine ->
+  Permission Check -> Human Approval / Auto Rule -> Execution) makes clear
+  these 5 actions are not absolutely impossible, only never executable
+  DIRECTLY by an Agent — they may still occur through that mediated path.
+  This file models both halves: the constant DENY verdict on direct
+  execution, and the one legitimate mediated route around it.
+
+  EC full-text was grepped case-insensitively for "不可直接" and "MUST NOT"
+  near tool/action topics, per this task's cross-check instruction. Exactly
+  one directly relevant hit was found: EC §57 Human Contribution Protection
+  (L1974-1990), "LOCKED_FACT / LOCKED_DECISION：不得由 AI 修改" ("must not be
+  modified by AI") — this sharpens Master Plan §65's "Modify Locked Fact"
+  item with a concrete existing mechanism
+  (`governance/epistemic-label.schema.yaml`'s `locked` field) rather than
+  adding a 6th forbidden action; it is the same concept under a different
+  section, not a new one. Every other EC hit for those two search strings
+  was a different, unrelated concept (see `compilation_decisions` below for
+  the full list of what was checked and ruled out) — none add a 6th action
+  beyond Master Plan §65's 5.
+
+  Relationship to `tool-permissions.yaml` (its sibling, same directory):
+  `tool-permissions.yaml` is an ALLOW-list / scoping mechanism for the Tool
+  Broker's 7 named resource dimensions (command, filesystem path, network
+  domain, DB role, cloud account, namespace, duration — EC §96). This file
+  is the DEFAULT-DENY complement, operating at a different, higher layer —
+  5 action VERBS (not resource dimensions) that are forbidden to an Agent
+  categorically, regardless of what any `tool-permissions.yaml` rule grants.
+  A tool-permissions.yaml rule that granted, say, unrestricted `command`
+  access to a task class still could not lawfully let that task class
+  directly Delete/Publish/Deploy/Send/Modify Locked Fact — this file's 5
+  entries sit "above" and are never overridden by any tool-permissions.yaml
+  grant. The two files are consumer-independent, not competing or
+  duplicate: neither one's content can substitute for the other's.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §65 Agent ≠ Authority (L2744-2769)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §57 Human Contribution Protection (L1974-1990) — LOCKED_FACT/LOCKED_DECISION not modifiable by AI, the mechanism 'Modify Locked Fact' resolves to"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 Autonomy / Authority Levels (L515-528, A4 examples: 'delete production data', 'send external communication', 'publish regulated output', 'deploy irreversible migration' — closely related grounding for Delete/Send/Publish/Deploy, cross-referenced not merged; see compilation_decisions)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §91 Policy-as-Code Paths (L2750-2762, forbidden-actions.yaml at L2758)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §64 Policy-as-Code (L2714-2741) — condition/action rule-shape style this file's `condition`/`action` fields follow"
+  - "specs/governance/epistemic-label.schema.yaml#/definitions/locked (hard $ref — the mechanism 'Modify Locked Fact' resolves to)"
+  - "specs/execution/authority.schema.yaml#/levels/A4 (soft cross-reference — A4's examples closely parallel 4 of this file's 5 actions)"
+  - ".ai/research/phase-0/policy-inventory.yaml (L758-762: 'Agent ≠ Authority' tagged kind=redline, summary quotes the same 5-verb list verbatim — independent corroboration that this is a hard prohibition, not an illustrative principle, unlike tool-permissions.yaml's Least Privilege examples)"
+decided_by: >
+  No ADR. docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.9 lists
+  `ai-execution/` (EC §91's 8-file list, including forbidden-actions.yaml)
+  as READY. Master Plan §65's 5-item list is uncontested (grep-confirmed:
+  no competing or overlapping list exists in Method Atlas or Execution
+  Contract), so this is Low-risk direct compilation, the same class as
+  risk-tier.schema.yaml's and authority.schema.yaml's verbatim-transcription
+  precedent.
+
+compilation_decisions:
+  - question: >
+      This task's instructions require cross-checking Master Plan §65's
+      list against Execution Contract text for "不可直接" and "MUST NOT"
+      near tool/action topics, to catch any additional or more specific
+      forbidden-action language. What did that search find?
+    decision: >
+      Grepped "不可直接" and "MUST NOT" (case-insensitive) across all three
+      mother documents. Every hit was individually read in context:
+      (1) EC L1053 "不使用 blanket exception 取代錯誤處理" (§25 Code Change
+      Contract) — about exceptions substituting for error handling, already
+      fully covered by `exception.schema.yaml`'s own `constraints`, not an
+      agent-action prohibition. (2) EC L1465 "Challenger 不得直接改正式
+      Artifact" (§37 Champion/Challenger) — scopes a specific
+      Champion/Challenger pattern role, not a general Agent-action
+      prohibition; no cross-reference warranted (out of this file's scope).
+      (3) EC L1990 "不得由 AI 修改" (§57, LOCKED_FACT/LOCKED_DECISION) — this
+      IS Master Plan §65's "Modify Locked Fact" item, restated with a
+      concrete mechanism; folded in above, not a 6th action. (4) EC L2480
+      "高風險不得直接在 production branch 臨時修改" (§77 Git Discipline) —
+      scopes git-branching practice for high-risk changes, a process rule
+      about WHERE changes land, not a categorical action prohibition on an
+      Agent. (5) EC L3103 "Stable ID must not be reused" (§ID grammar
+      context) — an identifier-uniqueness invariant, unrelated to agent
+      actions. (6) EC L3194 "不得直接刪除導致歷史無法 replay" (§113
+      Deprecation Pipeline) — a specific delete-during-migration
+      constraint, already covered by `execution/deprecation-pipeline
+      .schema.yaml`'s own migration steps; a narrower instance of the same
+      general "Delete" concern this file's DELETE entry already covers
+      categorically, not additional scope. None of these six add a 6th
+      forbidden action, and none contradict Master Plan §65's 5-item list.
+  - question: >
+      Should the `action` field identifying WHICH verb is forbidden
+      (Delete/Publish/Deploy/Send/Modify Locked Fact) share a name with the
+      condition-action rule shape's own `action` field (the policy verdict
+      — DENY/REQUIRE_HUMAN_REVIEW/etc, per this Wave's required
+      `{condition, action}` shape)? Both concepts are naturally called
+      "action" in this domain (the action the Agent wants to perform, vs.
+      the policy engine's action/verdict on that attempt) — a genuine name
+      collision, not an oversight to silently pick one.
+    decision: >
+      Use `agent_action` for the identity field (the forbidden verb) and
+      reserve `action` for the policy verdict field, matching this Wave's
+      required condition/action rule shape literally. Documented here so a
+      future reader does not mistake the two similarly-named fields for
+      each other.
+    reasoning: >
+      Naming the verdict field anything other than `action` would deviate
+      from this task's explicit required rule shape
+      (`{condition: ..., action: "DENY|REQUIRE_HUMAN_REVIEW|ALLOW|..."}`).
+      Naming the identity field `action` instead would collide with it.
+      `agent_action` (what the Agent is attempting) vs. `action` (what the
+      policy does about it) is the least-invented resolution available.
+  - question: >
+      Master Plan §65 states its 5-item list as a flat, unqualified bullet
+      list ("Agent 不可直接：" followed directly by 5 items, no "例如"/"for
+      example" framing) — unlike this Wave's sibling tool-permissions.yaml,
+      whose EC §97 source explicitly says "例如" before its 4 examples.
+      Should this file's `forbidden_actions` array be treated as a closed,
+      exhaustive set requiring full-coverage validation (`allOf` +
+      `contains` + `minContains` + `maxContains` per canonical value), per
+      this task's instruction to apply that treatment "if you actually have
+      a closed set"?
+    decision: >
+      Yes. `forbidden_actions` is closed at exactly 5 entries. The schema
+      below applies `allOf` with one `contains`/`minContains: 1`/
+      `maxContains: 1` clause per `agent_action` enum value (DELETE,
+      PUBLISH, DEPLOY, SEND, MODIFY_LOCKED_FACT), plus `minItems: 5` /
+      `maxItems: 5` on the array itself, guaranteeing every one of the 5
+      Master Plan §65 verbs appears in this file exactly once — no fewer,
+      no silent duplicates, no drift.
+    reasoning: >
+      This is the mirror-image judgment call from tool-permissions.yaml's
+      compilation_decisions (which explicitly declined this treatment for
+      its own 4 examples, for the opposite textual reason — "例如" framing
+      there, no such framing here). `.ai/research/phase-0/policy-
+      inventory.yaml` independently corroborates the distinction: it tags
+      "Agent ≠ Authority" `kind: redline` (this file) versus "Least
+      Privilege per task type" `kind: principle` (tool-permissions.yaml) —
+      a redline is exactly the kind of hard, closed, non-negotiable rule
+      set that warrants machine-enforced full-coverage validation; a
+      principle applied per task type is not.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+# Root $ref (established pattern in this suite — see risk-tier.schema.yaml,
+# tool-permissions.yaml: without a root-level type constraint, a validator
+# pointed at this file's ROOT would accept ANY value). Full absolute
+# `ai-lego://` form used throughout this file, not a bare `#/...` fragment.
+# CAVEAT SCOPED 2026-08-29 (critic-flagged Suggestion): the hazard this
+# comment originally described as universal — a bare same-document `#/...`
+# $ref "can silently fail to resolve" — was re-tested directly by critic
+# review and confirmed true ONLY for jsonschema's deprecated `RefResolver`;
+# under `referencing` (jsonschema >= 4.18, the library's current default),
+# bare `#/` fragments resolve correctly even against an `ai-lego://` base.
+# Bare `#/` is in fact this corpus's dominant convention (56 pre-existing
+# instances vs. 67 absolute). This file's own full-absolute-form choice is
+# kept as-is (harmless), but the comment no longer overstates the hazard —
+# it applies specifically to code still using the legacy `RefResolver`. See
+# this file's `verification` section for the original jsonschema run this
+# was caught by.
+$ref: "ai-lego://policies/ai-execution/forbidden-actions.yaml#/forbidden_actions"
+
+definitions:
+
+  agent_action_id:
+    description: >
+      Master Plan §65's 5-item list (L2764-2768), transcribed verbatim,
+      SNAKE_CASE-normalized from its space/Title-Case bullet form
+      (mechanical casing fix, zero semantic change — same technique
+      `governance/epistemic-label.schema.yaml` used for LOCKED_FACT). No
+      6th value is added — see compilation_decisions for the EC cross-check
+      that confirmed this.
+    type: string
+    enum: [DELETE, PUBLISH, DEPLOY, SEND, MODIFY_LOCKED_FACT]
+
+  forbidden_action_rule:
+    description: >
+      One of the 5 Master Plan §65 forbidden-action entries. `agent_action`
+      identifies WHICH verb is forbidden; `action` is the policy verdict on
+      an Agent's attempt to perform it directly (always DENY — see
+      compilation_decisions for the agent_action/action naming split).
+    type: object
+    required: [agent_action, condition, action, mediated_path, mother_doc_text]
+    properties:
+      agent_action:
+        $ref: "ai-lego://policies/ai-execution/forbidden-actions.yaml#/definitions/agent_action_id"
+      condition:
+        type: string
+        const: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+        description: "Constant across all 5 entries — Master Plan §65 states the prohibition uniformly for the whole list, not per-item variation."
+      action:
+        type: string
+        const: DENY
+        description: >
+          Verdict on DIRECT execution only (see `mediated_path` for the one
+          legitimate route around it). Master Plan §64's own condition-
+          action vocabulary, reused here per this Wave's required rule
+          shape.
+      mediated_path:
+        type: string
+        const: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+        description: "Master Plan §65's own flow diagram, verbatim (L2748-2760). The only legitimate route by which one of these 5 actions may ultimately execute."
+      mechanism_ref:
+        type: [string, "null"]
+        default: null
+        description: >
+          Soft cross-reference (by name, this suite's established
+          convention) to an existing schema/mechanism that models this
+          action's authorization pathway, where one exists. Null where no
+          such mechanism exists yet in this repo (honestly left null, not
+          invented).
+      mother_doc_text:
+        type: string
+        description: "The literal Master Plan §65 bullet text this entry transcribes, verbatim."
+    constraints:
+      - "`action` MUST be DENY for every entry — there is no forbidden_action_rule whose direct-execution verdict is anything other than DENY (that would contradict Master Plan §65's own uniform 'Agent 不可直接' framing)."
+
+forbidden_actions:
+  type: array
+  minItems: 5
+  maxItems: 5
+  items:
+    $ref: "ai-lego://policies/ai-execution/forbidden-actions.yaml#/definitions/forbidden_action_rule"
+  allOf:
+    - contains: { properties: { agent_action: { const: DELETE } } }
+      minContains: 1
+      maxContains: 1
+    - contains: { properties: { agent_action: { const: PUBLISH } } }
+      minContains: 1
+      maxContains: 1
+    - contains: { properties: { agent_action: { const: DEPLOY } } }
+      minContains: 1
+      maxContains: 1
+    - contains: { properties: { agent_action: { const: SEND } } }
+      minContains: 1
+      maxContains: 1
+    - contains: { properties: { agent_action: { const: MODIFY_LOCKED_FACT } } }
+      minContains: 1
+      maxContains: 1
+
+# ---------------------------------------------------------------------------
+# The 5 Master Plan §65 entries, instantiated verbatim.
+# ---------------------------------------------------------------------------
+seed_content:
+  description: >
+    This file's actual policy content — the 5 entries `forbidden_actions`
+    above validates. Named separately from the schema-body node above
+    (which some validators may point at directly) so this specific array
+    instance is unambiguously addressable.
+  rules:
+    - agent_action: DELETE
+      condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+      action: DENY
+      mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+      mechanism_ref: >-
+        specs/execution/data-deletion.schema.yaml (soft reference — its
+        Authorization step formalizes the human-approval pathway for the
+        data-deletion subset of this action; this rule's own scope is
+        broader — any direct Delete action, not only data-subject erasure).
+      mother_doc_text: "Delete"
+    - agent_action: PUBLISH
+      condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+      action: DENY
+      mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+      mechanism_ref: null
+      mother_doc_text: "Publish"
+    - agent_action: DEPLOY
+      condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+      action: DENY
+      mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+      mechanism_ref: >-
+        specs/execution/authority.schema.yaml#/levels/A4 (soft cross-
+        reference — A4's worked examples include "deploy irreversible
+        migration", requiring explicit_human_authority; a reversible
+        deploy sits at A3, requiring policy_allow + required_gates_pass +
+        authorized_approval together. Either way, direct Agent execution
+        is never sufficient on its own).
+      mother_doc_text: "Deploy"
+    - agent_action: SEND
+      condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+      action: DENY
+      mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+      mechanism_ref: >-
+        specs/execution/authority.schema.yaml#/levels/A4 (soft cross-
+        reference — A4's worked examples include "send external
+        communication", requiring explicit_human_authority).
+      mother_doc_text: "Send"
+    - agent_action: MODIFY_LOCKED_FACT
+      condition: "Agent attempts to execute this action directly, bypassing Policy Engine -> Permission Check -> Human Approval / Auto Rule (Master Plan §65 flow, L2748-2760)."
+      action: DENY
+      mediated_path: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+      mechanism_ref: >-
+        specs/governance/epistemic-label.schema.yaml#/definitions/locked
+        (hard $ref-grade cross-reference — this action IS that field's
+        `locked != null` constraint: "content with locked != null MUST NOT
+        be modified by AI", EC §57, L1988-1990. The two are the same rule
+        stated in two mother-document sections, not two related rules).
+      mother_doc_text: "Modify Locked Fact"
+
+open_questions:
+  - id: "OQ-FORBID-1"
+    question: >
+      `mechanism_ref` is null for PUBLISH — no existing schema in this repo
+      models a Publish-approval pathway (checked: grepped `specs/` for
+      "publish"; only Champion/Challenger's `Promote / Reject` step, EC §37,
+      is adjacent, and that governs promoting a challenger model/method, not
+      publishing general output). Should a future
+      `execution/publish-authorization.schema.yaml` be built to give this
+      entry the same concrete mechanism the other 4 have?
+    owner: "operator, non-blocking"
+    blocks: "nothing in this file's own validity — `mechanism_ref: null` is a valid, honestly-stated gap, not an error"
+
+verification:
+  method: >
+    Read Master Plan §65 (L2744-2769) in full. Read EC §57 (L1974-1990) in
+    full. Grepped "不可直接" and "MUST NOT" case-insensitively across all
+    three mother documents; every one of the 6 hits (L1053, L1465, L1990,
+    L2480, L3103, L3194) was read in its surrounding section context and
+    individually adjudicated in compilation_decisions above — not assumed
+    irrelevant from the matched line alone. Read EC §9 (L478-529) and
+    `specs/execution/authority.schema.yaml` in full for the A4
+    cross-references. Read `specs/governance/epistemic-label.schema.yaml`'s
+    `locked` field in full for the MODIFY_LOCKED_FACT hard cross-reference.
+    Read `.ai/research/phase-0/policy-inventory.yaml` L758-762 for the
+    independent kind=redline corroboration. Validated the schema body and
+    all 5 `seed_content.rules` entries against `jsonschema.
+    Draft202012Validator` with an `ai-lego://` resolver handler, including
+    the `allOf`/`contains`/`minContains`/`maxContains` full-coverage
+    constraint — see this file's companion validation run in the compiling
+    session's report.
+  note: >
+    No mother document was modified to produce this file. Master Plan §65's
+    5-item list is transcribed verbatim in `mother_doc_text` on each entry;
+    the `agent_action`/`action` naming split, the `mediated_path` field, and
+    every `mechanism_ref` cross-reference are this file's own compilation
+    choices, individually justified above, not themselves mother-document
+    literal text.

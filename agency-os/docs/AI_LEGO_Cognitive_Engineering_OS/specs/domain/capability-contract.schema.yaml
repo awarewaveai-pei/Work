@@ -1,0 +1,929 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/domain/capability-contract.schema.yaml"
+title: Capability Contract
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of a **Capability Contract** — Master
+  Plan §8.3 (L699-729)'s literal, and the corpus's ONLY concrete, worked
+  example of the shape ("Capability = 系統「能執行什麼」", MP §8.1 L638-646,
+  distinguished from Cognitive Method = "問題「應該如何思考」"). MP §8.3's
+  literal `cognitive.execute_method` instance (transcribed verbatim in
+  `worked_example` below) is the sole real YAML instance of this shape
+  anywhere in the three mother documents; MP §8.1/§8.2 (L648-689) and §9's
+  Workflow IR node examples (L819-839) only ever NAME capabilities
+  (`transcribe`, `run_statistics`, `execute_method`, `validate_artifact`,
+  `literature_search`, `artifact.generate_research_paper`, …), they never
+  give a second populated Contract.
+
+  This file was deferred twice before this build: first at Wave 2/3
+  (`docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`, historically at
+  L220-221, "延後（依賴 method-execution-request）"), then again at Wave 5
+  (historically at L241-242, "仍延後（可於下一輪立即建置，依賴的
+  method-execution-request.schema.yaml 已完成）") — NOTE (added 2026-08-29,
+  critic-flagged Minor): both line citations describe the plan document's
+  content BEFORE this same build's own edit to it; the L241-242 text was
+  itself REPLACED, in this same commit, with the "✅ BUILT" line this file's
+  Wave-tracking update produced (see `source_of_truth_for` below for the
+  document's current line for this row) — the citation is a historical
+  record of what blocked this file, not a live pointer into today's
+  document. Both times blocked on `cognitive/method-execution-request.schema.yaml`,
+  which that file's own `input.type` field cites as the literal string
+  `MethodExecutionRequest` this Contract's one worked instance names (MP
+  L708). That dependency is now BUILT (Wave 5, 2026-08-29); this file is the
+  "下一輪" (next round) both plan entries anticipated.
+
+  MACHINE_READABLE_SPEC_PLAN.md §2.5's own row for this file (L152) states
+  its job in one line: "既有 Capability Contract（id/version/input/output/
+  preconditions/quality/security/rollback）+ 補 edition/tier/entitlement
+  欄位" (the existing Capability Contract shape, PLUS adding edition/tier/
+  entitlement fields) — i.e. this file has two genuinely different jobs, not
+  one: (1) formalize MP §8.3's 8-field shape as real JSON Schema (Low-risk,
+  direct transcription — the fields are already named and populated in MP's
+  own text), and (2) close P1-GAP-PROD-1
+  (`.ai/research/phase-1/GAP_REGISTER.yaml` L337-344, severity high, role
+  Product Manager): "Capability Contract schema
+  (id/version/input/output/preconditions/quality/security/rollback) 無
+  edition/tier/entitlement 欄位；Capability Availability Matrix enum 完全是
+  jurisdiction 語境，無 Community/Pro/Enterprise 值" — with named consequence
+  "Community-tier 帳號可以呼叫 Professional-only Capability，無中央 gate
+  攔截，無稽核欄位——靜默 entitlement bypass" (a Community-tier account can
+  call a Professional-only capability with no central gate interception and
+  no audit field — a silent entitlement bypass). Job (2) is genuinely NEW
+  DESIGN (additive fields with no direct mother-document shape to
+  transcribe), not a correction — see `compilation_decisions` for the
+  grounding used and its honest limits.
+
+  Not to be confused with, and deliberately NOT collapsing into,
+  `execution/authority.schema.yaml`'s A0-A4 ladder or EC §96 Tool Broker /
+  §97 Least Privilege: those govern AUTHORIZATION (is an already-technically-
+  possible action PERMITTED for this actor/task right now — "Capability ≠
+  Authority", EC §9 L480-484, `authority.schema.yaml`'s own
+  `capability_vs_authority` block). THIS file governs CAPABILITY — the
+  static, versioned, technical declaration of what an action IS (its typed
+  input/output, its preconditions, its quality/security/rollback posture,
+  and now which product Edition may call it at all) independent of any one
+  task's runtime authorization to invoke it. A capability with an
+  `entitlement` block naming which Editions may call it is still a statement
+  about WHAT MAY BE CALLED BY THAT EDITION IN GENERAL, not WHETHER THIS
+  TASK, RIGHT NOW, IS AUTHORIZED — the same layering EC §96's own pipeline
+  keeps distinct (`AI Intent -> Tool Broker -> Policy -> Scope -> Authority
+  -> Execution -> Audit`, L2851-2865): entitlement is resolved at the
+  `Policy`/`Scope` stage, which is downstream of, and does not replace, that
+  pipeline's own `Authority` stage.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §8.1 Capability ≠ Method (L638-671) — Capability/Method definitions and the two example name lists"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §8.2 Capability 範例 (L673-689) — bare single-segment capability id examples (transcribe, run_statistics, execute_method, validate_artifact, etc. — all present, MVP_VERTICAL_SLICE_PLAN.md L111's four cited names grep-verified real, not fabricated)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §8.3 Capability Contract (L699-729, the ONE concrete worked instance in the whole corpus, transcribed verbatim in `worked_example` below)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §9 Workflow IR (L810-840) — capability node refs `transcribe`/`literature_search` (bare) and `artifact.generate_research_paper` (dotted, a DIFFERENT namespace than §8.3's `cognitive.`) — evidence for this file's `id` pattern accepting both forms"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §6.3 產品 Edition (L525-573) — the 5-value Edition list (Community/Free, Personal Pro, Professional, Local Pro, Enterprise/Sovereign) `entitlement.editions_allowed` below transcribes; `Custom Capability` (L573) grounds `entitlement.custom_capability`"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §7 AI Gateway (L577-593) — the Capability Request -> Capability Resolver -> Policy Engine -> AI Gateway pipeline `entitlement.requires_explicit_entitlement_check` below names as the enforcement point"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §85 MVP 分階段 Phase 0 (L3455-3467, `Capability Contract v1` named at L3463) and §90 建議下一步 (L3781-3819, `Capability-Contract-v1.md` at L3787) and §91 世界各地通用 Global Invariants list (L3841-3853, `Capability Contract` at L3848) — confirm Capability Contract is a named, foundational, cross-cutting spec, not a one-off example"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §96 Tool Broker (L2847-2876) and §97 Least Privilege (L2879-2894) — the AUTHORIZATION-side pipeline this file's `description` explicitly distinguishes itself from, not duplicates"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §113 Deprecation Contract (L3164-3195) — lists Capability as 1 of 7 retireable object types; `execution/deprecation-pipeline.schema.yaml#/deprecation_record/properties/object_id` is the cross-reference point, see `referenced_by`"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 LEGO Contract (L985-1030) — the Method-level sibling shape (`quality`/`rollback`/`preconditions`) this file's own `compilation_decisions` cross-checks field-by-field rather than assumes identical"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §18.2 Capability Availability (L4046-4058) and Master Plan §143 Capability Availability Matrix (L5508-5529) — the ALREADY-BUILT jurisdiction-scoped sibling concept (`jurisdiction/availability.schema.yaml`) this file's `entitlement` block deliberately does not duplicate (jurisdiction-gating vs edition-gating are orthogonal axes on the same capability, see `compilation_decisions`)"
+  - ".ai/research/phase-1/GAP_REGISTER.yaml P1-GAP-PROD-1 (L337-344, severity high) — the exact gap `entitlement` below closes additively"
+  - ".ai/research/phase-1/ASSUMPTION_REGISTER.yaml P1-ASSUM-PROD-1 (L14-18) — the explicit, unresolved assumption underlying P1-GAP-PROD-1, carried into `open_questions` rather than silently resolved"
+  - ".ai/research/cross-review/CONVERGENCE_MATRIX.md L30 (`Edition / packaging 商業內容寫入母規格` — REQUIRES_HUMAN_DECISION, Phase 2 agenda) — corroborates that whether Edition content belongs in a mother spec AT ALL is itself unsettled, independent of this file's narrower technical-gap-closing job"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.5 row 152 (domain/capability-contract.schema.yaml: READY, '新增欄位為 additive，非破壞既有結構') and §3 Build Order Wave 2/3 (L220-221) + Wave 5 (L241-242) deferral history"
+  - "specs/cognitive/method-execution-request.schema.yaml (this file's one real build dependency — see decided_by; also carries the forward reference this file resolves, see referenced_by)"
+  - "specs/cognitive/method.schema.yaml (Method-level `quality`/`rollback`/`id`/`version` fields, cross-checked field-by-field against this file's Capability-level fields of the same name — see compilation_decisions)"
+  - "specs/jurisdiction/availability.schema.yaml (the already-built jurisdiction-scoped Capability Availability sibling; its own compilation_decisions note its `capability` field has 'no closed Capability Registry this could $ref into' — this file's `id` is now a candidate for that, flagged in open_questions, not acted on here)"
+  - "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §4 (L111) — an EARLIER, lower-fidelity planning document that names this file `execution/capability-contract.schema.yaml` (wrong directory) with a one-line scope note; MACHINE_READABLE_SPEC_PLAN.md's actively-maintained §2.5/§3 Wave-tracking entries (domain/, not execution/) supersede it — see compilation_decisions for why domain/ is followed, not L111's execution/"
+
+decided_by: >
+  No ADR governs this file. Grep-confirmed across `docs/adr/ADR-001` through
+  `ADR-010` (2026-08-29): 5 files (`ADR-001`, `ADR-003`, `ADR-007`, `ADR-009`,
+  `ADR-010`) contain the word "capability" incidentally in prose (e.g.
+  discussing blast-radius or naming conventions), and `docs/adr/ADR_INDEX.md`
+  itself has zero hits for "Capability" as a ruling subject — none rules on
+  Capability Contract's shape or on Edition/entitlement gating.
+  MACHINE_READABLE_SPEC_PLAN.md §2.5 row 152 marks this file READY with a
+  single build dependency (`method-execution-request.schema.yaml`, now
+  BUILT) and no ADR dependency, explicitly characterizing the new
+  edition/tier/entitlement fields as "additive，非破壞既有結構" (additive,
+  not breaking the existing structure) rather than a tradeoff needing ADR
+  arbitration — the same class of Low-risk direct compilation this suite's
+  `decided_by` sections use for `task.schema.yaml`/`deprecation-pipeline.schema.yaml`.
+  Every field-shape choice below, including the two genuinely new
+  `entitlement`/`contract_provenance` fields, is a Phase 3 compilation
+  decision recorded in `compilation_decisions`, not a new ADR-level ruling.
+
+compilation_decisions:
+
+  - question: >
+      MP §8.3's literal YAML wraps `id`/`version` inside a `capability: {...}`
+      key (L702-704: `capability: \n  id: cognitive.execute_method \n
+      version: 1.0.0`). Should this schema's root object mirror that nesting,
+      or treat the root object as the Capability Contract instance directly?
+    decision: "Root object IS the Capability Contract instance; no wrapping `capability:` key."
+    reasoning: >
+      Identical reasoning to `execution/task.schema.yaml`'s own compilation
+      decision on the exact same question for EC's `task_context:` key:
+      `manifest.schema.yaml`'s root directly represents one Execution
+      Manifest, `normative-context.schema.yaml`'s root directly represents
+      one Bundle — MP's `capability:` key is the block's introducer in prose
+      YAML, not evidence a schema file needs its own nesting layer around
+      the same data. Wrapping it here would be a new, unmotivated
+      inconsistency with this suite's established convention.
+
+  - question: >
+      What `id` grammar accepts every real Capability identifier the corpus
+      actually uses? §8.1/§8.2 (L651-659, L675-689) give 13 BARE
+      single-segment snake_case names (`transcribe`, `run_statistics`,
+      `execute_method`, `validate_artifact`, …) and §9's Workflow IR node
+      refs (L821, L829) repeat two of them bare (`transcribe`,
+      `literature_search`) — but §8.3's own worked Contract instance uses a
+      DOTTED form, `cognitive.execute_method` (L703), and §9's third node ref
+      uses a DIFFERENT dotted form, `artifact.generate_research_paper`
+      (L839). `cognitive/method.schema.yaml`'s Method `id` pattern
+      (`^[a-z_]+\.[a-z_]+$`, ADR-005b) mandates exactly one dot — should
+      Capability `id` copy that mandatory-dot rule?
+    decision: >
+      `pattern: "^[a-z_]+(\\.[a-z_]+)?$"` — a bare single segment OR exactly
+      one dot-separated namespace segment, both legal.
+    reasoning: >
+      Unlike Method `id` (ADR-005b's mandatory-dot rule was decided against
+      textual evidence showing the dotted form is the ONLY correct one,
+      L989 `root_cause.fishbone`, with two dotless/mis-shaped forms
+      explicitly REJECTED), Capability `id` has REAL textual evidence on
+      BOTH sides: 13 bare examples vs. 2 dotted examples using 2 DIFFERENT
+      namespace prefixes (`cognitive.`, `artifact.`) with no third document
+      anywhere stating a closed namespace list or a rule that bare and
+      dotted forms are mutually exclusive. Forcing either "always bare" or
+      "always dotted" would reject real, cited corpus text on one side or
+      the other — the same "don't fabricate a rule the evidence doesn't
+      support" discipline `method.schema.yaml`'s own `preconditions` field
+      and this file's `security`/`preconditions` fields below apply. A
+      permissive pattern accepting both is the only choice that rejects zero
+      real examples. Left genuinely open (not resolved) whether the dotted
+      form denotes a formal namespace registry — see `open_questions.OQ-cc-1`.
+    scope_note: >
+      Deliberately capped at ONE optional dot (not `+`), since no real
+      example anywhere uses two or more dots for a Capability id — matching
+      this suite's discipline of matching the pattern to cited evidence, not
+      to a hypothetical future need.
+
+  - question: >
+      Should `version` hard-`$ref` `cognitive/method.schema.yaml#/properties/version`,
+      since both use identical semver (`^\d+\.\d+\.\d+$`, MP L704's
+      `version: 1.0.0` matches Atlas §9's Method `version` format exactly)?
+    decision: "No. Independently declare the same semver pattern; do not $ref method.schema.yaml's field."
+    reasoning: >
+      A hard `$ref` asserts SHARED VALUE SPACE, not merely shared FORMAT —
+      the same distinction `method-execution-request.schema.yaml`'s
+      `execution_id` field drew when it reused (not `$ref`'d) `manifest.schema.yaml`'s
+      naming CONVENTION without implying the two `execution_id` occurrences
+      are the same identifier space. A Capability's version sequence
+      (`cognitive.execute_method` moving from 1.0.0 to 1.1.0) and a Method's
+      version sequence (`root_cause.fishbone` moving from 1.0.0 to 1.1.0)
+      are independently incremented — `$ref`-binding them would incorrectly
+      imply one registry governs both. The FORMAT is reused by convention
+      (documented here), not by structural coupling.
+
+  - question: >
+      MP §8.3's `input`/`output` fields are each a wrapper object with a
+      single `type:` key holding a list (`input: \n  type: \n    -
+      MethodExecutionRequest`, L706-708). Should this be flattened to a bare
+      array (`input: [MethodExecutionRequest]`) for simplicity?
+    decision: "Preserve the literal nested `{type: [...]}` shape for both `input` and `output`."
+    reasoning: >
+      Same "literal transcription over invented convenience" discipline
+      `execution/task.schema.yaml` applied to `domains`/`affected_modules`/
+      `external_side_effects` (typed as arrays specifically because EC's own
+      `[...]` bracket syntax signaled it, not because a richer shape seemed
+      more convenient). MP's own literal YAML nests under `type:`; flattening
+      it would silently diverge from the one real worked example this whole
+      file is transcribing, for a simplification MP itself does not make.
+    scope_note: >
+      Each array item remains an opaque typed-object NAME STRING (e.g.
+      `MethodExecutionRequest`, `TypedMethodResult`, or per §8.4's other
+      examples `AudioVideo`/`Transcript`/`Dataset`), SOFT-referencing
+      whichever `cognitive/typed-objects/*.schema.yaml` or
+      `cognitive/*.schema.yaml` file that name resolves to — the same
+      soft-reference treatment `method.schema.yaml`'s own `inputs`/`outputs`
+      fields already use for the identical reason (most named typed-objects
+      do not have their own built schema file yet, MRSP §2.3 row 126).
+
+  - question: >
+      MP §8.3's `preconditions` (`method_atlas.loaded == true`,
+      `method_contract.valid == true`, `workflow.static_validation == PASS`,
+      `policy.validation == PASS`, L714-718) are the same four strings
+      `cognitive/method-execution-request.schema.yaml`'s own
+      `compilation_decisions` treated as EXECUTOR-side system-state checks
+      the CALLER does not supply as request fields. Does this file — which
+      types the CONTRACT DEFINITION, not one invocation request — model them
+      differently?
+    decision: >
+      Yes: here they ARE a real, typed field of the Contract
+      (`type: array, items: {type: string}`, opaque boolean-expression
+      strings) — because THIS object is the thing that DECLARES which
+      preconditions must hold, not a per-call request checked against an
+      already-declared contract.
+    reasoning: >
+      No contradiction with `method-execution-request.schema.yaml`'s own
+      decision: that file was right to exclude preconditions as a
+      CALLER-supplied field on a per-invocation REQUEST (the caller does not
+      get to assert `policy.validation == PASS` about itself). This file
+      operates one level up — it is the CONTRACT that STATES those four
+      conditions must hold before ANY request against it is accepted, the
+      same relationship `cognitive/method.schema.yaml`'s own `preconditions`
+      field (Atlas §9 L1012-1013) has to whichever object eventually invokes
+      that Method. Kept as opaque expression strings, not a structured AST,
+      for the identical "no evidence of a grammar" reasoning
+      `method.schema.yaml`'s own `preconditions` field gave.
+
+  - question: >
+      MP §8.3's `quality` block (`provenance_required: true,
+      method_specific_gate_required: true`, L720-722) shares its first field
+      name (`provenance_required`) with Atlas §9's Method-level `quality`
+      block (`provenance_required`, `evidence_labeling_required`,
+      L1015-1017) — already formalized by `cognitive/method.schema.yaml#/properties/quality`.
+      Should this file hard-`$ref` that existing definition?
+    decision: "No — declare an independent `quality` object with its own two fields (`provenance_required`, `method_specific_gate_required`)."
+    reasoning: >
+      Direct field-by-field comparison (not assumed): the CAPABILITY-level
+      `quality` block's SECOND field is `method_specific_gate_required` (MP
+      L722); the METHOD-level `quality` block's SECOND field is
+      `evidence_labeling_required` (Atlas L1017,
+      `method.schema.yaml#/properties/quality/properties/evidence_labeling_required`).
+      These are genuinely DIFFERENT fields at two different grains in two
+      different mother-document locations that merely happen to share a
+      container name (`quality`) and a first field name
+      (`provenance_required`) — `$ref`-ing method.schema.yaml's definition
+      here would silently graft `evidence_labeling_required` onto a
+      Capability Contract and silently drop `method_specific_gate_required`,
+      neither of which MP §8.3 states. Treated as the SAME class of "look
+      similar, verify before merging" trap this file's `rollback` decision
+      below also hits, and the same discipline `method-execution-request.schema.yaml`'s
+      own bug-hunt pass applied when it cross-checked
+      `typed-method-result.schema.yaml`'s actual `required` list instead of
+      assuming a shape.
+
+  - question: >
+      Same question for `rollback`: MP §8.3 uses `side_effect_free_preferred`
+      (L727-728) while Atlas §9 / `method.schema.yaml#/properties/rollback`
+      uses `side_effect_free` (no `_preferred` suffix, L1028-1029). Merge or
+      keep separate?
+    decision: "Keep separate — this file's `rollback.side_effect_free_preferred` is its own field, not a $ref or rename of method.schema.yaml's `rollback.side_effect_free`."
+    reasoning: >
+      The two mother-document locations use LITERALLY DIFFERENT FIELD NAMES
+      for what is conceptually the same idea (rollback via no side effects)
+      at two different grains (capability vs. method). Silently unifying
+      them under one name would misrepresent one of the two sources as using
+      a name it does not use — exactly the kind of unverified "happens to
+      look the same" merge this suite's R4 discipline forbids. The
+      `_preferred` suffix is also not mere stylistic noise: it reads as a
+      softer claim ("preferred", not "guaranteed") than the Method-level
+      field's bare boolean — worth preserving verbatim rather than
+      normalizing away a real wording difference between the two sources.
+
+  - question: >
+      MP §8.3's `security` block has exactly one concrete example
+      (`external_ai: policy_controlled`, L724-725) and no other mother-
+      document location states a closed set of alternative values. Enum or
+      free string?
+    decision: "Free string (`type: string`), not an enum."
+    reasoning: >
+      Grep-confirmed (2026-08-29): `policy_controlled` and `external_ai`
+      each appear in exactly ONE place across all three mother documents —
+      MP L725 — and nowhere else, including this file's own dependency
+      `method-execution-request.schema.yaml` (whose `description` merely
+      re-quotes the same MP L725 line, not a second independent usage).
+      Inventing an enum (`policy_controlled | ... | ...`) from a single data
+      point would be exactly the "fabricate a rich schema with no textual
+      basis" pattern `method.schema.yaml`'s own `compilation_decisions`
+      explicitly flagged and avoided for its `preconditions` field; the same
+      restraint applies here.
+
+  - question: >
+      Which of the 8 MP §8.3 fields (`id`, `version`, `input`, `output`,
+      `preconditions`, `quality`, `security`, `rollback`) should be
+      JSON-Schema `required`, given MP's one worked example populates all 8?
+    decision: "required: [id, version, input, output] only. preconditions/quality/security/rollback stay optional."
+    reasoning: >
+      Direct precedent from the closest sibling file at an adjacent grain:
+      `cognitive/method.schema.yaml`'s own `required` list
+      (`[id, version, family, cognitive_primitives, purpose, inputs,
+      outputs]`) likewise EXCLUDES `preconditions`/`quality`/`rollback` even
+      though Atlas §9's one worked Method Contract example populates all of
+      them too — that file's own working assumption is "one worked example
+      populating a field is evidence the field is LEGAL, not evidence it is
+      MANDATORY for every future instance." Applying the identical
+      threshold here (rather than a stricter one invented just for this
+      file) keeps the two closest sibling files' required-field philosophy
+      consistent. `id`/`version`/`input`/`output` stay required because they
+      are the irreducible identity+type-signature of ANY capability (MP
+      §8.4's own framing, "每個能力與 Method 都必須具有 Input / Output
+      type", L733) — a contract missing any of these four is not
+      identifiable or type-checkable at all.
+
+  - question: >
+      P1-GAP-PROD-1's own `detail` text (GAP_REGISTER.yaml L341) shorthands
+      the missing values as "Community/Pro/Enterprise" (3 values), but MP
+      §6.3 (L525-573) actually names 5 Editions (Community/Free, Personal
+      Pro, Professional, Local Pro, Enterprise/Sovereign). Which does
+      `entitlement.editions_allowed` enumerate?
+    decision: "The real 5-value MP §6.3 list, not the gap register's 3-value paraphrase."
+    reasoning: >
+      GAP_REGISTER.yaml's own evidence citation for P1-GAP-PROD-1 (L343)
+      points at MP L701, not at §6.3 — its "Community/Pro/Enterprise"
+      wording is the gap-analysis author's own shorthand for "some kind of
+      tiering", not a claim that only 3 values exist. Re-reading §6.3
+      directly (rather than trusting the paraphrase — R4 claim-before-
+      verify) surfaces the real 5-value list, including one (`Local Pro`)
+      that is NOT strictly above/below the others on a single ladder — see
+      the next decision.
+    scope_note: >
+      Values normalized to lowercase snake_case per this suite's established
+      status-field convention (`jurisdiction/availability.schema.yaml`'s
+      identical Title-Case-to-lowercase-snake_case treatment of MP §143's
+      enum is the direct precedent): `community_free`, `personal_pro`,
+      `professional`, `local_pro`, `enterprise_sovereign`.
+
+  - question: >
+      Should `entitlement.editions_allowed` express a single ordinal
+      "minimum Edition" (e.g. "requires at least Professional"), the way a
+      risk_tier or authority_level threshold works?
+    decision: "No — model it as an unordered SET of permitted Editions, not an ordinal minimum."
+    reasoning: >
+      Same discipline `execution/authority.schema.yaml` applied to the
+      risk_tier/authority_level numeral-correspondence question: do not
+      assert an ordering relation the source text does not state. MP §6.3's
+      5 Editions do not form one clean ladder — `Local Pro` (L554-560:
+      perpetual license, offline-capable, no activation-server dependency)
+      is a LICENSING-MODEL axis orthogonal to the subscription tiers
+      (`Personal Pro`/`Professional`), not a rung strictly above or below
+      them; `Enterprise/Sovereign` (L562-573) adds governance/compliance
+      features on top of arbitrary underlying tiers rather than replacing
+      them. Treating the 5 values as a strict total order would invent a
+      relationship MP §6.3 never states. A permitted-set field
+      (`editions_allowed: [professional, enterprise_sovereign]`, for
+      example) makes no ordering claim and is satisfiable by whatever the
+      real product-packaging rule turns out to be once decided.
+
+  - question: >
+      Does adding `entitlement` at all overstep this file's job, given
+      `.ai/research/cross-review/CONVERGENCE_MATRIX.md` L30 flags "Edition /
+      packaging 商業內容寫入母規格" as REQUIRES_HUMAN_DECISION (Phase 2
+      agenda, still open per this session's own re-read) and
+      `ASSUMPTION_REGISTER.yaml` P1-ASSUM-PROD-1 (L14-18) explicitly states
+      "沒有證據顯示作者原意是讓 Capability Contract 攜帶 entitlement 欄位"
+      (no evidence the author intended the Capability Contract to carry
+      entitlement fields)?
+    decision: >
+      Add `entitlement` anyway, but strictly OPTIONAL/additive (not
+      required, not retroactively imposed on MP §8.3's own worked example),
+      and carry both caveats forward verbatim into `open_questions` rather
+      than treat the field as settled.
+    reasoning: >
+      This file's own task instruction and MACHINE_READABLE_SPEC_PLAN.md
+      §2.5 row 152 both explicitly direct adding edition/tier/entitlement
+      fields to close P1-GAP-PROD-1 — that direction is followed. But R4
+      claim-before-verify requires surfacing, not silently overriding, the
+      TWO existing registered doubts about whether this is even the right
+      layer for the concept (P1-ASSUM-PROD-1's authorial-intent doubt, and
+      CONVERGENCE_MATRIX's "should this be in a mother spec at all" doubt).
+      Keeping the field OPTIONAL is the concrete hedge: MP §8.3's own
+      `cognitive.execute_method` worked example, which carries no
+      entitlement field, remains fully VALID against this schema exactly as
+      written — this file does not retroactively invalidate the one real
+      corpus instance to close the gap.
+
+  - question: >
+      Does adding a schema field for entitlement, by itself, CLOSE
+      P1-GAP-PROD-1's named consequence ("靜默 entitlement bypass" — silent
+      entitlement bypass)?
+    decision: >
+      No — stated explicitly rather than implied. The field lets a future
+      Capability Contract instance DECLARE its edition restriction; a
+      SEPARATE, not-yet-built enforcement point (MP §7's Policy Engine
+      stage, L586) must actually READ `entitlement.editions_allowed` /
+      `requires_explicit_entitlement_check` and reject a call from an
+      account whose active Edition is absent from the list. This file types
+      the DECLARATION; it does not implement the GATE.
+    reasoning: >
+      Overclaiming "this file fixes the bypass" would misrepresent a schema
+      addition as a running enforcement mechanism — the same
+      declaration-vs-enforcement distinction `cognitive/method-execution-request.schema.yaml`'s
+      own `constraints` block draws for its cross-record `inputs` legality
+      rule ("deferred to the executor/compiler"). Recorded honestly in
+      `constraints` below and in `open_questions.OQ-cc-2`.
+
+  - question: >
+      Should this file also model jurisdiction-scoped availability
+      (`jurisdiction/availability.schema.yaml`'s already-built
+      `capability_availability` object: `capability`, `jurisdiction`,
+      `status`)?
+    decision: "No — out of scope. Cross-referenced in `referenced_by`/`open_questions`, not duplicated or modified here."
+    reasoning: >
+      P1-GAP-PROD-1's own `detail` text names BOTH gaps in one sentence
+      ("Capability Contract...無 edition/tier/entitlement 欄位；Capability
+      Availability Matrix enum 完全是 jurisdiction 語境，無
+      Community/Pro/Enterprise 值") but they are two ORTHOGONAL axes on the
+      same underlying capability (jurisdiction-gating vs. edition-gating),
+      already served by two SEPARATE, independently-versioned files
+      (`jurisdiction/availability.schema.yaml`, ACTIVE since Wave 4; this
+      file, Wave "next round"). Folding jurisdiction-availability into this
+      file would duplicate an ACTIVE file's job and violate this task's own
+      scope (build ONE deliverable, do not modify unrelated ACTIVE
+      sibling files). `jurisdiction/availability.schema.yaml`'s `capability`
+      field remaining a free string (not yet `$ref`-ing this file's `id`) is
+      flagged as a candidate future tightening in `open_questions.OQ-cc-4`,
+      not acted on.
+
+  - question: >
+      Should this file add a `contract_provenance` field, mirroring
+      `cognitive/method.schema.yaml`'s identical-purpose field?
+    decision: >
+      Yes — OPTIONAL, hard `$ref` to
+      `governance/epistemic-label.schema.yaml#/provenance_record`, same
+      field name and same justification as `method.schema.yaml`'s own.
+    reasoning: >
+      Answers the same genuinely distinct question
+      `method.schema.yaml`'s own `compilation_decisions` identified: "who
+      authored/approved THIS CONTRACT DEFINITION" (was this Capability
+      Contract itself drafted by an AI and still pending human review, or
+      human-authored/approved) — independent of `quality.provenance_required`
+      above, which governs whether the capability's RUNTIME OUTPUTS need
+      provenance labeling. `epistemic-label.schema.yaml` is Wave 1 (already
+      BUILT), a safe backward hard-$ref dependency, matching every other
+      file in this suite that added this exact field for this exact reason.
+
+  - question: >
+      This task's own instructions flag a known array-completeness bug
+      class (an array of objects each carrying a closed-enum "identity"
+      field, where `uniqueItems: true` alone cannot guarantee every
+      canonical value is present) found and fixed 5 times already this
+      session. Does `entitlement.editions_allowed` — an array whose items
+      are drawn from a fixed 5-value closed enum — need the
+      `allOf`+`contains`/`minContains`/`maxContains` treatment those 5 fixes
+      applied?
+    decision: "No — considered and rejected. That pattern does not apply here."
+    reasoning: >
+      The bug class applies when a MANDATORY-COVERAGE guarantee is needed
+      ("every canonical value MUST appear somewhere in this array" — e.g.
+      `current-state.schema.yaml`/`data-deletion.schema.yaml`'s deletion-
+      branch coverage lists). `editions_allowed` is the OPPOSITE shape: a
+      PERMITTED SUBSET (which of the 5 Editions may call this ONE
+      capability). CLARIFIED 2026-08-29 (critic-flagged Minor —
+      `editions_allowed`'s own `minItems: 1` appeared to contradict this
+      paragraph's "0 to 5" phrasing): the effective cardinality range IS 0
+      to 5, but 0 is reached by OMITTING `editions_allowed` entirely (per
+      that field's own description: "Absent `entitlement`, or an absent
+      `editions_allowed` within it, means this capability is NOT
+      edition-restricted"), not by setting it to `[]`. `minItems: 1` is
+      deliberate: once `editions_allowed` IS present, an empty array would
+      be a degenerate "restricted to no Edition at all" state distinct from
+      (and easily confused with) "not restricted" — disallowing it forces a
+      writer who wants "unrestricted" to omit the field rather than write an
+      ambiguous empty one. `uniqueItems: true` is sufficient for the
+      1-to-5 case (it only needs to prevent listing the same Edition twice)
+      because there is no completeness obligation to defeat in the first
+      place. This
+      file's `id` field is also NOT a fixed closed enum this pattern could
+      apply to (an open-ended, extensible capability namespace, per
+      `compilation_decisions` above) — checked and confirmed inapplicable
+      for the same reason.
+
+  - question: >
+      MVP_VERTICAL_SLICE_PLAN.md §4 (L111) names this file
+      `execution/capability-contract.schema.yaml` (a DIFFERENT directory
+      than this task's instructed `specs/domain/capability-contract.schema.yaml`,
+      which MACHINE_READABLE_SPEC_PLAN.md §2.5/§3 also consistently use).
+      Which directory is authoritative?
+    decision: "specs/domain/ — per this task's instruction and MACHINE_READABLE_SPEC_PLAN.md's own consistent placement. MVP_VERTICAL_SLICE_PLAN.md L111 is a stale/lower-fidelity mention, not corrected here."
+    reasoning: >
+      MACHINE_READABLE_SPEC_PLAN.md is the actively-maintained Wave-tracking
+      document this whole Phase 3 build follows (§2.5 table row 152, §3
+      Build Order L220-221/L241-242 both place it under `domain/` across
+      TWO separate deferral records) — MVP_VERTICAL_SLICE_PLAN.md §4 is an
+      earlier, coarser planning document (`/specs/execution/`) that predates
+      the Wave-by-Wave directory scheme and is not itself updated as files
+      land (contrast: it does not mark ANY of its listed files BUILT,
+      unlike MACHINE_READABLE_SPEC_PLAN.md's per-row status tracking).
+      Correcting MVP_VERTICAL_SLICE_PLAN.md L111's directory mismatch is a
+      documentation fix to a DIFFERENT file than this task's one deliverable
+      — out of scope here, not silently ignored; flagged for a future
+      housekeeping pass rather than expanded into this task.
+
+# ---------------------------------------------------------------------------
+# The one real, concrete Capability Contract instance in the whole corpus —
+# MP §8.3 (L701-729), transcribed verbatim and annotated. Doubles as this
+# file's own validation fixture (see `verification`).
+# ---------------------------------------------------------------------------
+worked_example:
+  source: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §8.3 (L701-729)"
+  note: >
+    This is MP's literal text with zero additive fields populated
+    (entitlement/contract_provenance) — exactly as MP itself wrote it, to
+    prove this schema still accepts the one real corpus instance unchanged.
+  value:
+    id: cognitive.execute_method
+    version: "1.0.0"
+    input:
+      type: [MethodExecutionRequest]
+    output:
+      type: [TypedMethodResult]
+    preconditions:
+      - "method_atlas.loaded == true"
+      - "method_contract.valid == true"
+      - "workflow.static_validation == PASS"
+      - "policy.validation == PASS"
+    quality:
+      provenance_required: true
+      method_specific_gate_required: true
+    security:
+      external_ai: policy_controlled
+    rollback:
+      side_effect_free_preferred: true
+
+# ---------------------------------------------------------------------------
+# Schema body — root object IS one Capability Contract instance (see
+# compilation_decisions above for why there is no wrapping key).
+# ---------------------------------------------------------------------------
+
+type: object
+required: [id, version, input, output]
+properties:
+
+  id:
+    type: string
+    pattern: "^[a-z_]+(\\.[a-z_]+)?$"
+    description: >
+      Bare `<name>` (13 real examples, MP §8.1/§8.2 L651-659/L675-689) OR
+      `<namespace>.<name>` (2 real examples with 2 different namespaces,
+      `cognitive.execute_method` MP L703 and `artifact.generate_research_paper`
+      MP L839) — both forms legal, see compilation_decisions. NOT the same
+      pattern as `cognitive/method.schema.yaml#/properties/id` (that field
+      mandates exactly one dot; this field makes the dot optional) — the two
+      id spaces are independent namespaces (Capability vs Method, MP §8.1
+      L638-646) even where their grammars happen to overlap.
+    examples:
+      - transcribe
+      - run_statistics
+      - execute_method
+      - validate_artifact
+      - cognitive.execute_method
+      - artifact.generate_research_paper
+
+  version:
+    type: string
+    pattern: "^\\d+\\.\\d+\\.\\d+$"
+    description: >
+      Semver. Per MP L704 (`version: 1.0.0`). Independent value space from
+      `cognitive/method.schema.yaml#/properties/version` — same format by
+      convention, not by `$ref` — see compilation_decisions.
+    examples: ["1.0.0"]
+
+  input:
+    type: object
+    required: [type]
+    description: "Per MP L706-708. Preserves the literal nested shape — see compilation_decisions."
+    properties:
+      type:
+        type: array
+        minItems: 1
+        items: { type: string }
+        description: >
+          Typed-object name(s) this capability consumes (e.g.
+          `MethodExecutionRequest`, or per MP §8.4's other examples
+          `AudioVideo`, `Document`, `ValidatedStrategyInputs`). SOFT
+          reference to `cognitive/typed-objects/*.schema.yaml` or a sibling
+          `cognitive/*.schema.yaml` file by name — not a hard `$ref`, same
+          reasoning `cognitive/method.schema.yaml#/properties/inputs` uses
+          for its own typed-object name list.
+
+  output:
+    type: object
+    required: [type]
+    description: "Per MP L710-712. Preserves the literal nested shape — see compilation_decisions."
+    properties:
+      type:
+        type: array
+        minItems: 1
+        items: { type: string }
+        description: >
+          Typed-object name(s) this capability produces (e.g.
+          `TypedMethodResult`, or per MP §8.4's other examples `Transcript`,
+          `Dataset`, `StrategyArtifact`). Same soft-reference treatment as
+          `input.type` above.
+
+  preconditions:
+    type: array
+    items: { type: string }
+    default: []
+    description: >
+      OPTIONAL. Per MP L714-718 (4 literal examples transcribed in
+      `worked_example` above). Opaque boolean-expression strings the
+      executor must verify hold before accepting ANY request against this
+      capability — see compilation_decisions for why this differs from
+      `cognitive/method-execution-request.schema.yaml`'s own treatment of
+      the identical 4 strings (that file types a per-invocation REQUEST;
+      this file types the CONTRACT that DECLARES the preconditions).
+      Deliberately left as opaque strings, not a structured expression
+      grammar — same "no evidence of a grammar" restraint
+      `cognitive/method.schema.yaml#/properties/preconditions` applies.
+
+  quality:
+    type: object
+    description: >
+      OPTIONAL. Per MP L720-722. Independently declared, NOT a `$ref` to
+      `cognitive/method.schema.yaml#/properties/quality` — see
+      compilation_decisions for the field-by-field difference
+      (`method_specific_gate_required` here vs.
+      `evidence_labeling_required` there).
+    properties:
+      provenance_required:
+        type: boolean
+        default: false
+        description: >
+          Per MP L721. When true, every typed-object named in `output.type`
+          MUST, at runtime, carry a
+          `governance/epistemic-label.schema.yaml#/provenance_record`. This
+          file does not re-declare that shape; it references the SSOT, same
+          convention `cognitive/method.schema.yaml`'s identically-named
+          field uses.
+      method_specific_gate_required:
+        type: boolean
+        default: false
+        description: >
+          Per MP L722 — specific to `cognitive.execute_method`'s own literal
+          example (a capability that dispatches to a Cognitive Method must
+          additionally pass that Method's own Method-specific Gate, Atlas
+          §14 terminology). No mother document states whether this field is
+          meaningful for non-`execute_method` capabilities; left as a
+          general optional boolean rather than scoped narrowly to one
+          capability id, since MP §8.3 itself states it as a general
+          `quality` sub-field, not as an `execute_method`-only property.
+
+  security:
+    type: object
+    description: "OPTIONAL. Per MP L724-725."
+    properties:
+      external_ai:
+        type: string
+        description: >
+          Free string, NOT an enum — see compilation_decisions.
+          `policy_controlled` is the only value evidenced anywhere in the
+          corpus (MP L725).
+        examples: ["policy_controlled"]
+
+  rollback:
+    type: object
+    description: >
+      OPTIONAL. Per MP L727-728. Independently declared, NOT a `$ref` to
+      `cognitive/method.schema.yaml#/properties/rollback` — see
+      compilation_decisions for the field-NAME difference
+      (`side_effect_free_preferred` here vs. `side_effect_free` there).
+    properties:
+      side_effect_free_preferred:
+        type: boolean
+        description: >
+          Per MP L728. When true, re-running or abandoning an invocation of
+          this capability mid-flow is PREFERRED to require no compensating
+          action (a softer claim than Method-level `side_effect_free`'s bare
+          boolean — see compilation_decisions on why the `_preferred`
+          wording is preserved verbatim, not normalized away).
+
+  entitlement:
+    type: object
+    description: >
+      OPTIONAL, ADDITIVE — NOT present in MP §8.3's literal example. Closes
+      P1-GAP-PROD-1 (GAP_REGISTER.yaml L337-344). See compilation_decisions
+      for the two registered doubts (P1-ASSUM-PROD-1,
+      CONVERGENCE_MATRIX.md L30) this field's optionality is a deliberate
+      hedge against, and `constraints` below for what this field does NOT,
+      by itself, guarantee.
+    properties:
+      editions_allowed:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          enum: [community_free, personal_pro, professional, local_pro, enterprise_sovereign]
+        description: >
+          Which of MP §6.3's 5 product Editions (L527-573) may invoke this
+          capability. An unordered PERMITTED SET, not a strict ordinal
+          minimum — see compilation_decisions on why MP §6.3 does not
+          establish a total order across all 5 (`local_pro` is a
+          licensing-model axis, not a rung above/below
+          `personal_pro`/`professional`). Absent `entitlement`, or an absent
+          `editions_allowed` within it, means this capability is NOT
+          edition-restricted (matches MP §8.3's own worked example, which
+          has no entitlement concept at all) — see `constraints`.
+      requires_explicit_entitlement_check:
+        type: boolean
+        default: false
+        description: >
+          When true, MP §7's AI Gateway pipeline (`Capability Request ->
+          Capability Resolver -> Policy Engine -> AI Gateway`, L581-588)
+          MUST verify the calling tenant/account's active Edition is a
+          member of `editions_allowed` before dispatch. Declares the
+          REQUIREMENT for a gate to exist; does not itself implement one —
+          see compilation_decisions and `constraints`.
+      custom_capability:
+        type: boolean
+        default: false
+        description: >
+          Per MP §6.3 Enterprise/Sovereign's own "Custom Capability" line
+          item (L573). True when this capability is a bespoke,
+          customer-specific addition available only under an
+          Enterprise/Sovereign contract, not part of the standard catalog
+          §8.1/§8.2 name.
+
+  contract_provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+    description: >
+      OPTIONAL. Answers "who authored/approved THIS Capability Contract
+      DEFINITION" — distinct from `quality.provenance_required` above,
+      which governs the capability's runtime OUTPUTS, not the contract
+      document itself. See compilation_decisions; identical field/reasoning
+      to `cognitive/method.schema.yaml#/properties/contract_provenance`.
+
+constraints:
+  description: >
+    Cross-field/cross-record rules this schema's JSON-Schema `properties`
+    block cannot express structurally, recorded as prose per this project's
+    established convention (`execution/result.schema.yaml`'s `constraints`
+    list is the precedent for this technique).
+  rules:
+    - "Populating `entitlement.editions_allowed` on a Capability Contract instance does NOT, by itself, prevent an out-of-Edition caller from invoking it — see compilation_decisions. A separate, not-yet-built policy/gate component (MP §7's Policy Engine stage) must read this field at dispatch time and reject non-conforming calls; this schema types the declaration, not the enforcement."
+    - "If `entitlement.requires_explicit_entitlement_check` is true, `entitlement.editions_allowed` SHOULD also be present and non-empty — a check declared mandatory with nothing to check membership against is not a meaningful constraint. Not enforced structurally (no mother document states this as a hard rule); flagged here as a documented expectation."
+    - "This file's `id` (once a real Capability Registry exists) is the natural hard-$ref target for `jurisdiction/availability.schema.yaml#/capability_availability/properties/capability` (currently a free string, by that file's own admission) and for `execution/deprecation-pipeline.schema.yaml#/deprecation_record/properties/object_id` when `object_type: Capability` (currently opaque for all types except Method). Neither sibling file is modified by this one — see open_questions.OQ-cc-4/OQ-cc-5."
+    - "MP §8.3's preconditions (`method_atlas.loaded == true`, `method_contract.valid == true`, `workflow.static_validation == PASS`, `policy.validation == PASS`) describe SYSTEM-STATE checks an executor verifies before accepting a request against this contract — they are declared here as the contract's own `preconditions` field, but checking them at runtime is an executor responsibility this schema cannot itself perform."
+
+# ---------------------------------------------------------------------------
+# Forward reference this file resolves (informational — the file that named
+# this one before it existed).
+# ---------------------------------------------------------------------------
+referenced_by:
+  - "cognitive/method-execution-request.schema.yaml#/referenced_by — previously read 'domain/capability-contract.schema.yaml (not yet built...)'; this file's construction resolves that forward reference (the stale line itself is corrected in the same commit as this file, per this task's own R4 stale-forward-reference-sweep instruction)."
+  - "execution/deprecation-pipeline.schema.yaml#/reference_sequence/scope (EC §113's 7 retireable object types include Capability) — this file's `id` is what a future `deprecation_record.object_id` would carry when `object_type: Capability`; that file is not modified here (its `object_id` description already generically covers 'most of which have no built schema yet', which remains true for the other 5 non-Method/non-Capability types even after this file lands)."
+  - "jurisdiction/availability.schema.yaml#/capability_availability/properties/capability — that file's own compilation_decisions already state it has 'no closed Capability Registry this could $ref into'; this file is a candidate for that future tightening, not acted on here (out of this task's scope) — see open_questions.OQ-cc-4."
+
+open_questions:
+  - id: "OQ-cc-1"
+    question: >
+      Does the dotted `<namespace>.<name>` form (`cognitive.execute_method`,
+      `artifact.generate_research_paper`) denote a formal, registrable
+      namespace convention distinct from the many bare single-segment
+      capability names, or is it merely an optional, uncodified prefix used
+      inconsistently? No mother document states a namespace registry or a
+      rule for when a capability id must/must not carry one.
+    owner: "operator, via a future ADR or Capability Registry design (mirrors OQ-mer-1's identical open status for Method version resolution)"
+    blocks: "nothing in this schema — the `id` pattern accepts both forms today regardless of the answer"
+  - id: "OQ-cc-2"
+    question: >
+      Is Edition/entitlement gating actually meant to be a first-class
+      Capability Contract concern? Two independent doubts are on record and
+      unresolved: ASSUMPTION_REGISTER.yaml P1-ASSUM-PROD-1 ("no evidence the
+      author intended the Capability Contract to carry entitlement fields")
+      and CONVERGENCE_MATRIX.md L30 ("Edition / packaging 商業內容寫入母規格"
+      — REQUIRES_HUMAN_DECISION, Phase 2 agenda, product-positioning vs.
+      over-specification tradeoff). This file adds `entitlement` per its own
+      direct task instruction and MACHINE_READABLE_SPEC_PLAN.md §2.5 row
+      152, but does not resolve either doubt.
+    owner: "operator, Phase 2 agenda per CONVERGENCE_MATRIX.md"
+    blocks: "whether `entitlement` should ever become REQUIRED, or whether a central enforcement gate gets built against it at all"
+  - id: "OQ-cc-3"
+    question: >
+      Should a real enforcement gate reading `entitlement.editions_allowed`
+      live in MP §7's AI Gateway (Policy Engine stage) or in EC §96's Tool
+      Broker pipeline (`Policy` / `Scope` stage)? Both are named,
+      independently, as places policy-driven restriction happens; no mother
+      document states which owns EDITION-scoped (as opposed to
+      authorization-scoped) restriction specifically.
+    owner: "operator / future Wave 6 policies/ai-execution/ design"
+    blocks: "nothing in this schema — the field is usable/readable by either future implementation"
+  - id: "OQ-cc-4"
+    question: >
+      Should `jurisdiction/availability.schema.yaml#/capability_availability/properties/capability`
+      be upgraded from a free string to a hard `$ref` against THIS file's
+      `id` pattern, now that a real Capability Registry shape exists? That
+      file's own text already flags the absence as a known gap ('no closed
+      Capability Registry this could $ref into').
+    owner: "operator / future Round 2 pass over jurisdiction/availability.schema.yaml (NOT this file — out of this task's scope)"
+    blocks: "nothing in this schema; jurisdiction/availability.schema.yaml remains fully valid unmodified either way"
+  - id: "OQ-cc-5"
+    question: >
+      Same question for `execution/deprecation-pipeline.schema.yaml#/deprecation_record/properties/object_id`
+      when `object_type: Capability` — should it gain a soft or hard
+      reference to this file's `id` pattern specifically (as opposed to its
+      current fully-generic, opaque-string treatment covering all 7 object
+      types)?
+    owner: "operator / future Round 2 pass over deprecation-pipeline.schema.yaml (NOT this file — out of this task's scope)"
+    blocks: "nothing in this schema"
+  - id: "OQ-cc-6"
+    question: >
+      Atlas §23 / MP §70 (both grep-verified, not cited as a source_of_truth
+      above since neither gives a machine-readable shape) state every
+      Method/Capability 需要 Golden/Regression/Adversarial/Privacy/Safety
+      Eval datasets before shipping. Should a future revision of this file
+      add an `eval_datasets` field for Capability-level eval tracking,
+      mirroring the pattern this file already applies for
+      entitlement/contract_provenance?
+    owner: "operator, if Capability-level Eval tracking becomes a machine-readable priority"
+    blocks: "nothing in this schema today — not added here since it was not part of this task's instructed scope (edition/tier/entitlement only) and inventing it unprompted would exceed the additive-fields-instructed boundary"
+
+verification:
+  method: >
+    Read MP §8 in full (L630-793: §8.1 through §8.5, not just §8.3 in
+    isolation) and §6.3 (L525-575), §7 (L577-593), §85 Phase 0 (L3455-3467),
+    §90 (L3781-3819), §91 (L3821-3854), §113-cross-reference via EC (below).
+    Read EC §96 (L2847-2876), §97 (L2879-2894), §113 (L3164-3195 region, via
+    `execution/deprecation-pipeline.schema.yaml`'s own already-verified
+    citation) in full. Read Atlas §9 (L985-1030, via
+    `cognitive/method.schema.yaml`'s full text) and §18.2 (L4046-4058) in
+    full. Read `cognitive/method-execution-request.schema.yaml`,
+    `cognitive/method.schema.yaml`, `execution/task.schema.yaml`,
+    `jurisdiction/availability.schema.yaml`, and
+    `execution/deprecation-pipeline.schema.yaml` full text (all cited
+    above). Read `.ai/research/phase-1/GAP_REGISTER.yaml` P1-GAP-PROD-1
+    (L337-344), `.ai/research/phase-1/ASSUMPTION_REGISTER.yaml` P1-ASSUM-PROD-1
+    (L14-18), `.ai/research/phase-1/PHASE_1_GAP_ANALYSIS_SUMMARY.md` (L27,
+    L36), and `.ai/research/cross-review/CONVERGENCE_MATRIX.md` (L30) in
+    full. Read `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` §2.5 row
+    152 and §3 Build Order (L196-250, both Wave 2/3 and Wave 5 deferral
+    lines) in full. Read `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` §4
+    (L101-123, including the L111 row this task asked to be checked against
+    the mother-doc text rather than trusted) in full.
+
+    Grep sweep (2026-08-29): "Capability" (case-insensitive) across all
+    three mother documents in full (confirmed §8.1-8.5/§6.3/§7/§85/§90/§91
+    as the real anchors; also surfaced §96/§97/§113/§131/§143(MP)/§18.2
+    (Atlas)/§23(Atlas)/§70(MP) as adjacent-but-distinct concepts, each
+    either cited above or explicitly scoped out in compilation_decisions).
+    "tier"/"Tier" (case-insensitive) across MP and EC confirmed zero
+    product/pricing-tier hits outside `risk_tier` and Atlas's unrelated
+    "Reproducibility Tiers" — grounding the compilation_decision that
+    "edition" and "tier" denote the same axis, not two. "policy_controlled"/
+    "external_ai" confirmed exactly 2 corpus hits (MP L725 and this file's
+    dependency's description quoting the same line), not independent
+    evidence for an enum. "capability-contract"/"capability_contract" grepped
+    across the FULL `specs/` and `methods/` tree: exactly one stale forward
+    reference found (`cognitive/method-execution-request.schema.yaml`
+    `referenced_by`, "not yet built..."), corrected in the same commit as
+    this file (see `referenced_by` above and R4 requirement). A second,
+    repo-wide grep (whole `AI_LEGO_Cognitive_Engineering_OS/` tree, not just
+    `specs/`+`methods/`) additionally surfaced `AI_LEGO_OS_Program_Plan_v1.md`
+    L138, which lists this file among a "Wave 2-3" historical status
+    paragraph's deferred items — left uncorrected deliberately, same
+    precedent as `MACHINE_READABLE_SPEC_PLAN.md` L220-221's own preserved
+    Wave 2/3 diagram line: it is a dated historical snapshot of what was
+    true AT THAT WAVE, not a live claim, and that whole Program Plan
+    document's `Status` line (L136) has not been advanced past "Wave 0-3"
+    even for Wave 4/5's own since-completed items — a pre-existing, broader
+    staleness this one-file task does not expand scope to fix.
+    ADR-001 through ADR-010 and `docs/adr/ADR_INDEX.md` grepped for
+    "capability"/"Capability": 5 incidental prose hits, zero ruling hits.
+    `id` pattern accept/reject matrix additionally verified by direct
+    `python -c` regex execution (2026-08-29, mirroring
+    `cognitive/method.schema.yaml`'s own `id_grammar_conformance_examples`
+    methodology): all 6 real corpus values accepted (`transcribe`,
+    `run_statistics`, `execute_method`, `validate_artifact`,
+    `cognitive.execute_method`, `artifact.generate_research_paper`) and 6
+    negative controls rejected (3-segment `a.b.c`, uppercase `Transcribe`,
+    hyphenated `run-statistics`, empty string, trailing-dot `cognitive.`,
+    leading-dot `.execute_method`) — not merely asserted from reading the
+    pattern.
+
+    `python -c "import yaml; yaml.safe_load(...)"` run against this file:
+    parses clean. A `jsonschema` Draft202012Validator run against
+    `worked_example.value` above (MP §8.3's own literal instance,
+    unmodified) validates successfully with zero additive fields present,
+    proving this file does not retroactively invalidate the one real corpus
+    example. A second, fuller instance was also constructed and validated,
+    populating `entitlement`/`contract_provenance` together with every
+    `$ref` (the one same-file root-is-the-object-directly reference, plus
+    the cross-file `governance/epistemic-label.schema.yaml#/provenance_record`
+    hard $ref) resolved for real via a `referencing`-library retrieval
+    function that strips the `ai-lego://` prefix and reads the target file
+    from disk — not merely asserted to resolve.
+  note: >
+    No mother document, ADR, or ACTIVE sibling `specs/` file was modified to
+    produce this file (the one stale forward-reference correction inside
+    `cognitive/method-execution-request.schema.yaml` is the sole exception,
+    landed in the same commit per this task's own R4 instruction).
+    Grounded-vs-designed ratio, following
+    `cognitive/method-execution-request.schema.yaml`'s own disclosure model:
+    roughly 45% grounded, 55% new design. Grounded: `id`/`version`/`input`/
+    `output`/`preconditions`/`quality`/`security`/`rollback` and their exact
+    field names, nesting shapes, and the one worked instance transcribing
+    MP §8.3 L701-729 verbatim (`worked_example`); the `id` pattern's
+    permissive bare-or-dotted grammar (built from 3 separate real corpus
+    citations, not invented); the Edition value list itself (MP §6.3,
+    verbatim 5 values). Designed: the ENTIRE `entitlement` block (no mother
+    document gives it a shape — MACHINE_READABLE_SPEC_PLAN.md only names the
+    gap, not the fields), `contract_provenance` (mirrored from
+    `method.schema.yaml`'s precedent, not independently mother-document-
+    sourced for THIS file), and every `constraints`/`open_questions` entry.
+    This file does not implement Capability Availability (jurisdiction-
+    scoped) — that remains `jurisdiction/availability.schema.yaml`'s job —
+    and does not implement an actual entitlement-enforcement gate — that
+    remains a future Wave 6 `policies/` responsibility this file's
+    `constraints` block explicitly defers to.

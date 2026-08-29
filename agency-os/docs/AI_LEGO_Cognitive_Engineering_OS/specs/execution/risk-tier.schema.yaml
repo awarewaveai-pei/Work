@@ -140,8 +140,10 @@ mandatory_gate_injection_trigger:
       still REQUIRES_HUMAN_DECISION, not resolved by ADR-004) is intentionally
       NOT enumerated here. This schema only defines WHEN the gate mechanism fires
       (the risk_tier condition), not WHICH gates fire — that is
-      policies/ai-execution/mandatory-gates.yaml's job (Wave 6, currently blocked
-      pending a Round 2+ ADR on OQ-10). Do not treat this file's silence on the
+      policies/ai-execution/mandatory-gates.yaml's job (Wave 6 — BUILT
+      2026-08-29 with `status: PROVISIONAL`; its own gate_id VALUE SPACE, not
+      the file itself, remains pending a Round 2+ ADR on OQ-10, corrected
+      2026-08-29 critic-flagged Minor). Do not treat this file's silence on the
       gate list as an oversight; it is a deliberate scope boundary.
 
 migration_crosswalk:

@@ -149,7 +149,7 @@ PROJECT_ROOT/                                  ← D:\Work\agency-os\docs\AI_LEG
 | `domain/personal-data-redacted-event.schema.yaml` | `PersonalDataRedacted { subject_id, redacted_fields[], redacted_at, authorization_ref }` 稽核輔助事件 | YAML (JSON Schema) | key-vault-lifecycle.schema.yaml, governance/epistemic-label | P1-CONFLICT-1（ADR-002 Consequences 項 5） | **BUILT（2026-08-29）** |
 | `execution/data-deletion.schema.yaml` **（新增）** | EC §31 Data Deletion Contract 新增分支：「個資刪除（crypto-shred）」與「一般 production row 刪除」兩種不同 Verification 定義 | YAML (JSON Schema) | key-vault-lifecycle.schema.yaml | P1-CONFLICT-1（ADR-002 Consequences 項 3） | **BUILT（2026-08-29）**——兩分支 Verification 語意不同（negative proof vs positive proof）+ Codex 覆審的兩種 Rollback 情境已納入 |
 | `domain/repository-contract.schema.yaml` **（新增）** | MP §60「應用層透過 Repository Contract」全文僅此一句，補上實際 schema，解決 7 種異質儲存無 system-of-record 的問題 | YAML (JSON Schema) | cas-path.schema.yaml | P1-GAP-ARCH-2 | SKELETON_ONLY（system-of-record 策略、跨儲存 reconciliation 機制需要架構設計決策，非 schema 撰寫可獨立解決） |
-| `domain/capability-contract.schema.yaml` | 既有 Capability Contract（id/version/input/output/preconditions/quality/security/rollback）+ 補 edition/tier/entitlement 欄位 | YAML (JSON Schema) | method-execution-request.schema.yaml | P1-GAP-PROD-1 | READY（新增欄位為 additive，非破壞既有結構） |
+| `domain/capability-contract.schema.yaml` | 既有 Capability Contract（id/version/input/output/preconditions/quality/security/rollback）+ 補 edition/tier/entitlement 欄位 | YAML (JSON Schema) | method-execution-request.schema.yaml | P1-GAP-PROD-1 | **BUILT（2026-08-29）**——MP §8.3 唯一具體實例逐欄位轉譯（`worked_example` 驗證零額外欄位仍合法）；`entitlement`（editions_allowed/requires_explicit_entitlement_check/custom_capability）為 additive 新設計，未解決 P1-ASSUM-PROD-1 與 CONVERGENCE_MATRIX L30 的「該不該寫進母規格」疑慮，誠實留 open_questions；jurisdiction-scoped Capability Availability 不重複（見 jurisdiction/availability.schema.yaml） |
 | `security/tenant-isolation-controls.schema.yaml` **（新增）** | RLS/schema-per-tenant vs shared-schema 決策、tenant-scoped 加密金鑰、跨租戶共用元件（Vector Index/Knowledge Graph）防洩漏機制 | YAML (JSON Schema) | domain/tenant.schema.yaml | P1-GAP-SEC-7（ADR-003 Consequences follow-up (i)(ii)） | **BLOCKED_PENDING_ROUND2_ADR**（ADR-003 只解決存儲層 CAS 部分，relational 資料的 RLS 設計是明列的獨立 follow-up，需要另一輪決策） |
 
 ### 2.6 `/specs/jurisdiction/`（Wave 4）
@@ -180,7 +180,7 @@ PROJECT_ROOT/                                  ← D:\Work\agency-os\docs\AI_LEG
 
 | 目錄 | 涵蓋內容 | 狀態摘要 |
 |---|---|---|
-| `ai-execution/` | EC §91 既有 8 檔清單直接轉譯（authority/risk-tiers/mandatory-gates/tool-permissions/forbidden-actions/network-egress/exception-policy/release-policy），`mandatory-gates.yaml` 需套用 ADR-004a 的 R3∪R4 擴大規則 | READY（`release-policy.yaml` 內容依附 `gate.schema.yaml`，見上方 BLOCKED 註記） |
+| `ai-execution/` | EC §91 既有 8 檔清單直接轉譯（authority/risk-tiers/mandatory-gates/tool-permissions/forbidden-actions/network-egress/exception-policy/release-policy），`mandatory-gates.yaml` 需套用 ADR-004a 的 R3∪R4 擴大規則 | **BUILT（2026-08-29，8/8）**——`authority.yaml`/`risk-tiers.yaml`/`tool-permissions.yaml`/`forbidden-actions.yaml`/`exception-policy.yaml` 為 `status: ACTIVE`；`mandatory-gates.yaml`/`network-egress.yaml`/`release-policy.yaml` 為 `status: PROVISIONAL`（各自 blocked 內容見各檔 `blocked_scope`/`allowlist_registry`/`release_gate_requirement.scope`，非整檔阻塞）。Critic 覆審（Wave 6 批次）：0 Critical、6 Major（已修正）、多項 Minor/Suggestion（已修正或記錄於各檔 `open_questions`）|
 | `security/` | Zero Trust 協定選型（IdP/OIDC/SPIFFE/OPA）、Supply Chain 標準版本（SBOM 格式/簽章機制/SLSA 等級） | SKELETON_ONLY（P1-GAP-SEC-1, P1-GAP-SEC-2 全文空白，需操作者選型，非文件收斂） |
 | `privacy/` | crypto-shred 落地為可執行政策（依附 ADR-002）；PII redaction 現行時效 vs pseudonymization「未來能力」矛盾 | 部分 READY（crypto-shred 段）+ 部分 **BLOCKED_PENDING_ROUND2_ADR**（P1-CONFLICT-3 尚無 ADR） |
 | `jurisdiction/` | Legal Source Registry 更新 SLA（週期天數）、Conflict-of-Laws Engine 歸屬 | SKELETON_ONLY / BLOCKED（P1-GAP-LEGAL-1 需操作者訂週期數字；P1-GAP-LEGAL-4 同 2.6） |
@@ -238,10 +238,20 @@ Wave 5 ── ✅ 核心完成（2026-08-29）
     Architecture-Constitution-v1.md 這份新母文件，需先走 ADR-006 proposals 流程）
   specs/cognitive/{problem-type,method-execution-request,
     typed-method-result}.schema.yaml ✅（原 Wave 3 延後項目，Wave 5 補齊）
-  specs/domain/capability-contract.schema.yaml ── 仍延後（可於下一輪立即建置，
-    依賴的 method-execution-request.schema.yaml 已完成）
+  specs/domain/capability-contract.schema.yaml ✅ BUILT（2026-08-29，本輪
+    補齊——原 Wave 2/3 與 Wave 5 兩度延後項目，依賴的
+    method-execution-request.schema.yaml 已完成後立即建置）
           ↓
-Wave 6  policies/ 全目錄（依附 Wave 1-5 的 schema 做代碼化）
+Wave 6 ── ✅ 完成（2026-08-29，8/8）
+  policies/ai-execution/{authority,risk-tiers,tool-permissions,
+    forbidden-actions,exception-policy}.yaml ✅（status: ACTIVE）
+  policies/ai-execution/{mandatory-gates,network-egress,release-policy}.yaml
+    ✅（status: PROVISIONAL——結構已建，blocked 內容見各檔自身
+    blocked_scope/allowlist_registry/release_gate_requirement.scope，
+    非整檔阻塞）
+    Critic 覆審（獨立於本輪撰寫者）：0 Critical、6 Major（已於同批修正：
+    authority.yaml condition 未含 authority 前提子句 x2、coverage guard
+    可繞過、MP §158 誤讀、3 處「未建」過期宣稱、EC 行號誤引、本表未同步）
           ↓
 Wave 7  recipes/validated/ 全目錄
           ↓

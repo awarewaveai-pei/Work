@@ -1,0 +1,631 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://policies/ai-execution/exception-policy.yaml"
+title: Exception Grant Policy
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable POLICY for WHEN an Exception / Workaround
+  (`specs/execution/exception.schema.yaml`) MAY be granted at all, per
+  Execution Contract §91 "Policy-as-Code Paths" (L2750-2762,
+  `exception-policy.yaml` at L2760) — one of EC §91's own 8-file
+  `/policies/ai-execution/` list. `exception.schema.yaml` (Wave 5) already
+  anticipated this file by name in its own `relationship_to_exception_policy`
+  block, which named exactly the three questions this file must answer: (a)
+  which `risk_tier` requires which `required_authority_level` to approve an
+  exception, (b) the maximum allowable `expires_at` horizon, (c) whether any
+  scope is categorically forbidden from ever having an exception. This file
+  answers all three — (a) directly, by binding two already-ACTIVE schemas'
+  existing fields to each other; (b) and (c) by reporting, with full grep
+  evidence, that no mother document supplies either, and leaving both as
+  explicit `open_questions` rather than inventing values.
+
+  This is a POLICY schema (the rules governing whether an exception may be
+  granted), not a RECORD schema — `exception.schema.yaml` remains the sole
+  definition of what a valid, already-granted exception instance looks like.
+  This file never redefines any of that record's 12 EC §24 fields
+  (`id`/`reason`/`owner`/`scope`/`risk`/`approved_by`/`created_at`/
+  `expires_at`/`test`/`migration_plan`/`removal_condition`/`adr`) or its
+  additive `status` field; it only consumes the record's two OTHER additive
+  fields (`risk_tier`, `required_authority_level`) as VALUE TYPES, via the
+  same two canonical enum files (`execution/risk-tier.schema.yaml`,
+  `execution/authority.schema.yaml`) `exception.schema.yaml` itself already
+  $refs — see `relationship_to_exception_schema` and `compilation_decisions`
+  below for why this counts as reference-by-name, not redefinition.
+
+  Lives at `/policies/ai-execution/exception-policy.yaml` per EC §91; this
+  path is one of EC's own 8-file concrete list, reconciled against Master
+  Plan §64's broader 6-category layout
+  (`/policies/{data,ai,publishing,research,security,enterprise}/`) as an
+  already-decided Phase-3-compilable naming question outside this file's
+  scope to re-litigate — same reconciliation note this Wave's sibling
+  `tool-permissions.yaml` already recorded for the same EC-vs-MP path
+  tension, not repeated in full here.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §6 「最小修改」的正確定義 (L315-354, L343-353 禁止 list: 'temporary bypass 無 expiry' / 'catch-all exception' / '關掉 validation' / '關掉 security control' / '把 failure 吞掉')"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §8 Risk Tier (L379-475) — R0-R4 `required_actions`, the textual basis for `approval_requirements` below (already compiled verbatim into `execution/risk-tier.schema.yaml`, not re-transcribed here)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 Autonomy / Authority Levels (L478-529) — A3 'authorized approval' (L512), A4 'human authority' (L525) + 'AI 不得自行把自己的建議當 approval' (L527), the textual basis for `self_approval_prohibition` below"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §24 Exception / Workaround Contract (L1013-1041) — the record this policy governs the granting of"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §25 Code Change Contract (L1045-1060, L1053 blanket-exception-not-error-handling prohibition)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §46 Feature Flag Contract (L1691-1703) — structurally analogous 'expiry field required, no horizon number given' pattern, cited only as corpus-wide corroboration, NOT itself about exceptions"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §55 Incident Mode (L1912-1962, L1954-1961 emergency-containment 'temporary + owner + expiry + follow-up root cause') — same analogous-pattern caveat as §46"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §91 Policy-as-Code Paths (L2750-2762, `exception-policy.yaml` at L2760)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §108 Time / Clock (L3086-3094) — governs HOW an expiry timestamp is stored (UTC instant), not HOW FAR OUT it may be set; confirms no horizon rule hides here either"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §128 Cleanup (L3520-3534) — same analogous-pattern caveat as §46"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §29 方法搭配基本規則, rule 12 (L4549, 'Workaround / Exception 必須有 owner、expiry、test、migration plan、ADR') — no horizon number given"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §14 Knowledge Memory 分層 (L1116-1138, Expiry field at L1136) — different construct (memory retention, not exception), cited only as further corpus-wide 'expiry field required, no number' corroboration"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §156 No Patch Change Discipline (L5851-5876, L5862-5876 jurisdiction-pack exception: 'ADR + expiry + owner + test + migration plan required') — the SAME 5-field pattern as Atlas rule 12, applied to one specific rule (jurisdiction logic must live in versioned packs); read in full as evidence AGAINST any categorical scope prohibition, since it explicitly ALLOWS an exception here provided the 5 fields exist"
+  - "specs/execution/exception.schema.yaml `relationship_to_exception_policy` (the forward-looking boundary this file fulfills) and its `constraints` array (the record-shape prohibitions this policy's `form_prohibitions` restate at grant-time, not re-invent)"
+  - "specs/execution/risk-tier.schema.yaml (hard $ref, `risk_tier` enum + per-tier `required_actions` — R3's 'Human Approval', R4's 'Explicit Human Authority' are this file's `approval_requirements` evidence)"
+  - "specs/execution/authority.schema.yaml (hard $ref, `authority_level` enum + per-level `requirements` — A3's `authorized_approval`, A4's `explicit_human_authority` are the other half of the same evidence)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.9 row for `ai-execution/` (L183 — quote updated 2026-08-29 after the row's own post-Wave-6 status update: originally 'EC §91 既有 8 檔清單直接轉譯...READY', now 'EC §91 既有 8 檔清單直接轉譯...BUILT（2026-08-29，8/8）') — this file's tracked status: direct compilation, no ADR dependency, unlike the same table's `release-policy.yaml`/`mandatory-gates.yaml`/`network-egress.yaml` PROVISIONAL sub-entries"
+  - "policies/ai-execution/tool-permissions.yaml (this Wave's sibling file, same directory) — structural precedent this file follows: `definitions` + root `$ref` to a bundle/rule-set definition + a separately-named concrete-content key, not a redefinition of any sibling record schema"
+
+decided_by: >
+  No ADR governs this file. `MACHINE_READABLE_SPEC_PLAN.md` §2.9 lists
+  `ai-execution/` (EC §91's 8-file list, including `exception-policy.yaml`)
+  as READY — direct transcription/binding of already-agreed EC/Atlas text,
+  the same Low-risk compilation class `risk-tier.schema.yaml`,
+  `authority.schema.yaml`, and this Wave's sibling `tool-permissions.yaml`
+  already established for this suite. The one genuinely new judgment call
+  this file makes — binding R3/R4's existing `required_actions` text to a
+  specific `required_authority_level_minimum` value for exception-approval
+  purposes — is recorded as a `compilation_decisions` entry below, not
+  treated as ADR-level, because it does not invent a new authority concept;
+  it cross-references two fields both already ACTIVE and already
+  cross-referenced by `exception.schema.yaml` itself (see that file's own
+  `required_authority_level` field description, which already states this
+  expectation in prose — this file makes it a checkable table).
+
+compilation_decisions:
+  - question: >
+      Does risk-tier.schema.yaml's own R3/R4 `required_actions` text
+      ("Human Approval" / "Explicit Human Authority") already answer "which
+      risk_tier requires which required_authority_level to approve an
+      exception", making this file mostly a binding/pointer rather than new
+      invented content — and if so, does binding R3->A3 / R4->A4 here
+      conflict with `authority.schema.yaml`'s own open `OQ-AUTH-2` (whether
+      any general risk_tier-to-authority_level numeral correspondence rule
+      exists for ALL operations, explicitly left unresolved there)?
+    decision: >
+      Yes to the first question; no to the second. `approval_requirements`
+      below binds `risk_tier: R3` to `required_authority_level_minimum: A3`
+      and `risk_tier: R4` to `required_authority_level_minimum: A4`, using
+      each tier's own already-ACTIVE `required_actions` text plus each
+      authority level's own already-ACTIVE `requirements` text — not a new
+      invented rule. `risk_tier: R0/R1/R2` bind to `null` (no minimum
+      established), because none of those tiers' `required_actions` mention
+      approval or authority at all. This is explicitly narrower than, and
+      does NOT resolve, `authority.schema.yaml`'s `OQ-AUTH-2` — that
+      question asks about a GENERAL numeral-correspondence rule for every
+      R0-R4 x A0-A4 pairing across ALL operations; this file only answers
+      the SPECIFIC sub-question "what authority level may approve an
+      EXCEPTION at this risk tier", grounded in text that already exists
+      for exactly two tiers (R3, R4), not inferred from numeral pattern-
+      matching across all five. See `open_questions.OQ-EXCPOL-4` for the
+      explicit non-resolution notice.
+    reasoning: >
+      risk-tier.schema.yaml `tiers.R3.required_actions` includes "Human
+      Approval" verbatim (EC §8 L450); `tiers.R4.required_actions` includes
+      "Explicit Human Authority" verbatim (EC §8 L468-470). authority.schema.yaml
+      `levels.A3.requirements` includes `authorized_approval`, one of three
+      ANDed conditions transcribed from EC §9 L508-512 ("policy allow +
+      required gates pass + authorized approval"); `levels.A4.requirements`
+      includes `explicit_human_authority`, which that file itself compiled
+      from EC §9 L525 ("必須 human authority") + L527 ("AI 不得自行把自己的
+      建議當 approval") — i.e. an authority distinct from the AI's own
+      recommendation, which is exactly what "Explicit" further specifies.
+      R4's pairing is the strongest textual match in the whole corpus for
+      any risk_tier<->authority_level relationship (near-identical phrasing
+      on both sides); R3's is a clear conceptual match (both are the
+      approval-gated tier of their respective ladders) even though the
+      literal strings ("Human Approval" vs "authorized approval") differ
+      slightly. R0's `required_actions` is the empty array `[]`; R1's is
+      [Current State, Unit Test, Diff Review]; R2's is [Integration Test,
+      Compatibility, Rollback, Observability] — none of the three mention
+      approval or authority, so asserting a floor for them would be
+      inventing content no field in the corpus supports, exactly the leap
+      `authority.schema.yaml`'s own OQ-AUTH-2 already declined to make for
+      the general case. Binding only the two tiers with direct textual
+      support, while leaving the other three and the general rule open, is
+      the same "structural reading of already-agreed text, not a new
+      tradeoff" standard `exception.schema.yaml`'s own `decided_by` field
+      sets as this suite's bar for Low-risk direct compilation.
+  - question: >
+      This file's `approval_requirements` rows need a `risk_tier` value and
+      a `required_authority_level_minimum` value. Should these be direct
+      hard $refs to `execution/risk-tier.schema.yaml#/risk_tier` and
+      `execution/authority.schema.yaml#/authority_level` (the two canonical
+      enum files), or should they instead $ref through
+      `execution/exception.schema.yaml#/properties/risk_tier` and
+      `.../properties/required_authority_level` — since
+      `exception.schema.yaml`'s own `relationship_to_exception_policy` block
+      states this future file "should reference this file's
+      `id`/`risk_tier`/`required_authority_level` fields by name, not
+      redefine the record shape"?
+    decision: >
+      Direct hard $ref to the two canonical enum files
+      (`risk-tier.schema.yaml#/risk_tier`,
+      `authority.schema.yaml#/authority_level`), matching how every other
+      schema in this suite — including `exception.schema.yaml` itself —
+      consumes these two enums, rather than adding an extra $ref-through-
+      exception.schema.yaml indirection hop. `id` is not consumed anywhere
+      in this file at all: this policy's rules apply to CLASSES of exception
+      (by `risk_tier`), never to one exception instance by its `id`, so
+      there is no field in this file that could meaningfully reference
+      `exception.schema.yaml`'s `id` pattern.
+    reasoning: >
+      This still satisfies "reference by name, not redefine the record
+      shape" in substance: `risk_tier` and `required_authority_level` are
+      themselves ADDITIVE fields on the exception record (per
+      `exception.schema.yaml`'s own `compilation_decisions`), and that
+      file's own definitions of both fields ALREADY point at these exact
+      same two canonical files (`properties.risk_tier` $refs
+      `risk-tier.schema.yaml#/risk_tier`; `properties.required_authority_level`
+      $refs `authority.schema.yaml#/authority_level`). Referencing the same
+      canonical source `exception.schema.yaml` itself references produces
+      the identical validation result as $ref-ing through
+      `exception.schema.yaml#/properties/*` would, without adding a
+      $ref-to-$ref chain purely for indirection's own sake, and without
+      ever re-typing (`type: string, pattern:...`) a single one of the
+      record's own 12 EC §24 fields anywhere in this file — the actual
+      redefinition this instruction is guarding against.
+  - question: >
+      What is the maximum allowable `expires_at` horizon for a granted
+      exception, and is any scope categorically forbidden from ever having
+      an exception at all (EC §25's "blanket exception" prohibition, cited
+      by `exception.schema.yaml`, is about exceptions substituting for error
+      handling — a FORM constraint, not a SCOPE-categorical one)?
+    decision: >
+      No maximum horizon number is stated anywhere in either mother
+      document, in Atlas rule 12, in any ADR, or in either register
+      (`GAP_REGISTER.yaml`, `open-questions.yaml`) — grep-confirmed (see
+      `verification` below for the exact commands and every hit found).
+      Every construct in the corpus that requires an "expiry"-shaped field —
+      the exception record itself (EC §24 L1028), Atlas rule 12 (L4549), the
+      jurisdiction-pack exception (MP §156 L5872), Feature Flags (EC §46
+      L1698), Incident Mode emergency containment (EC §55 L1959), Cleanup
+      (EC §128 L3534), and Knowledge Memory (MP §14 L1136) — requires that
+      the field EXIST, never states how far out its value may legally be
+      set. `expiry_policy.max_horizon` is therefore left `null` with
+      `status: OPEN_QUESTION`, not populated with an invented number.
+      Similarly, no categorical scope-level prohibition was found (no text
+      anywhere reads "exceptions are never permitted for <scope X>");
+      `forbidden_scopes.categorical_scope_prohibitions_status` is
+      `NONE_FOUND_IN_CORPUS`. What WAS found and IS captured
+      (`forbidden_scopes.form_prohibitions`) is a FORM-level constraint on
+      any exception regardless of scope: EC §25 L1053's blanket-exception-
+      not-error-handling rule, and EC §6 L343-353's bans on "temporary
+      bypass 無 expiry", "catch-all exception", "關掉 validation", and
+      "關掉 security control" — these constrain HOW an exception may be
+      shaped, not WHICH scopes may never have one.
+    reasoning: >
+      Inventing either number would violate this task's explicit
+      instruction and this suite's R4 claim-before-verify discipline (see
+      `AGENTS.md` §R4: "驗前先讀歷史" / claim-before-verify). The corpus-wide
+      absence (every analogous construct has the same gap, not just
+      exceptions) is itself useful signal recorded in `open_questions` —
+      it suggests an operator policy decision genuinely has not been made
+      yet, rather than this file having missed a citation.
+
+# ---------------------------------------------------------------------------
+# This file's relationship to execution/exception.schema.yaml — reciprocal
+# of that file's own `relationship_to_exception_policy` block. That block is
+# being updated (2026-08-29, same commit as this file) to mark itself BUILT;
+# this block is the mirror-image statement recorded on this side.
+# ---------------------------------------------------------------------------
+relationship_to_exception_schema:
+  description: >
+    `execution/exception.schema.yaml` (Wave 5) is the sole definition of
+    what a valid, already-granted exception RECORD looks like — all 12 EC
+    §24 fields plus its own additive `risk_tier` / `required_authority_level`
+    / `status` fields. This file (Wave 6) never redefines any of that
+    shape; it defines only the POLICY that decides whether granting one
+    at a given `risk_tier` is even permitted, and what
+    `required_authority_level` value that grant must carry. A future
+    approval/gate engine consulting both files would read
+    `exception.schema.yaml` to validate an exception record's shape, and
+    read this file's `approval_requirements` to decide whether the
+    specific `risk_tier` + `required_authority_level` combination on that
+    record satisfies policy.
+  not_resolved_by_this_file: >
+    This file states WHAT `required_authority_level` an R3/R4 exception
+    needs (the floor). It does NOT state WHO (which human role/title) may
+    exercise or grant that level — that is `execution/authority.schema.yaml`'s
+    own `role_to_authority_mapping` field, explicitly `status: SKELETON_ONLY`
+    there, tracking GAP_REGISTER.yaml's P1-GAP-SEC-6. This file's
+    `self_approval_prohibition` below states WHO may NOT approve (the AI
+    itself), which is a narrower, already-decided rule (EC §9 L527) distinct
+    from the still-open "which role" question.
+  direction: "exception-policy.yaml (this file, Wave 6) depends on exception.schema.yaml (record shape, Wave 5) — not the reverse. Consumes risk-tier.schema.yaml and authority.schema.yaml directly (see compilation_decisions) for the same reason exception.schema.yaml does: both are the canonical, ACTIVE sources for these two enums."
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+# Root $ref (established pattern in this suite — see risk-tier.schema.yaml,
+# authority.schema.yaml, and this Wave's sibling tool-permissions.yaml:
+# without a root-level type constraint, a validator pointed at this file's
+# bare URI would accept ANY value). This file's root validates as
+# `exception_policy_bundle` — the whole grant-policy payload as one object
+# (approval floor table + expiry stance + scope stance + approval-integrity
+# rule), analogous to tool-permissions.yaml's rule-SET root, not a
+# single-record root like exception.schema.yaml's own `$id` root.
+$ref: "#/definitions/exception_policy_bundle"
+
+definitions:
+
+  approval_requirement:
+    description: >
+      One row binding a `risk_tier` to the minimum
+      `exception.schema.yaml#/properties/required_authority_level` an
+      exception at that tier MUST carry before `approved_by` may authorize
+      it. See `compilation_decisions` above for how each row is derived.
+    type: object
+    required: [risk_tier, required_authority_level_minimum, binding_basis]
+    properties:
+      risk_tier:
+        $ref: "ai-lego://specs/execution/risk-tier.schema.yaml#/risk_tier"
+      required_authority_level_minimum:
+        anyOf:
+          - $ref: "ai-lego://specs/execution/authority.schema.yaml#/authority_level"
+          - type: "null"
+        description: >
+          `null` means "no minimum established by the mother-document
+          corpus at this tier" — NOT "A0" and NOT "no authority needed."
+          `exception.schema.yaml`'s own `approved_by`/`owner` fields remain
+          unconditionally required at every tier regardless of this value
+          (EC §24's 12-field template); this field only governs the
+          ADDITIVE `required_authority_level` ceiling.
+      binding_basis:
+        type: string
+        description: "file:line evidence grounding this row, per R4 claim-before-verify."
+
+  expiry_policy:
+    description: "See compilation_decisions above — no horizon number exists anywhere in the corpus."
+    type: object
+    required: [max_horizon, status, rationale]
+    properties:
+      max_horizon:
+        type: [string, "null"]
+        description: "A future duration value (e.g. 'P90D') once/if an operator or Round 2 ADR sets one. `null` until then."
+      status:
+        type: string
+        enum: [DEFINED, OPEN_QUESTION]
+      rationale:
+        type: string
+
+  forbidden_scopes:
+    description: "See compilation_decisions above — no categorical scope prohibition exists anywhere in the corpus; what exists is FORM-level, captured in form_prohibitions."
+    type: object
+    required: [categorical_scope_prohibitions_status, categorical_scope_prohibitions, form_prohibitions]
+    properties:
+      categorical_scope_prohibitions_status:
+        type: string
+        enum: [NONE_FOUND_IN_CORPUS, DEFINED]
+        description: >
+          Explicit status marker beside the array below, same convention
+          `authority.schema.yaml` uses for its `role_to_authority_mapping`
+          — an empty array alone is ambiguous between "checked, found none"
+          and "not yet checked"; this field forecloses that ambiguity.
+      categorical_scope_prohibitions:
+        type: array
+        items:
+          type: object
+          required: [scope, source]
+          properties:
+            scope: { type: string }
+            source: { type: string }
+      form_prohibitions:
+        type: array
+        items:
+          type: object
+          required: [rule, source]
+          properties:
+            rule: { type: string }
+            source: { type: string }
+
+  self_approval_prohibition:
+    description: >
+      EC §9's load-bearing invariant for the whole A0-A4 ladder, restated
+      here as a grant-time policy rule because it directly constrains who
+      `approved_by` may legitimately name on an R3/R4 exception.
+    type: object
+    required: [rule, source, applies_to]
+    properties:
+      rule: { type: string }
+      source: { type: string }
+      applies_to:
+        type: string
+        enum: [R3_AND_R4_PER_APPROVAL_REQUIREMENTS]
+
+  exception_policy_bundle:
+    description: >
+      The complete WHEN-may-an-exception-be-granted payload. One bundle,
+      not four separate top-level schemas, because all four concerns
+      (approval floor / expiry stance / scope stance / approval-integrity)
+      are sub-answers to the single question EC §91 assigns this one file
+      — matching how this Wave's sibling `tool-permissions.yaml` bundles
+      dimension + max_authority_level + condition/action into one
+      `tool_permission_rule` shape rather than splitting further.
+    type: object
+    required: [approval_requirements, expiry_policy, forbidden_scopes, self_approval_prohibition]
+    properties:
+      approval_requirements:
+        type: array
+        description: >
+          Exactly one row per `execution/risk-tier.schema.yaml#/risk_tier`
+          value (R0-R4) — a closed, complete table, unlike
+          tool-permissions.yaml's illustrative `worked_examples` (see that
+          file's compilation_decisions for why its 4 examples are NOT
+          treated as exhaustive; this table IS, because R0-R4 is itself a
+          closed 5-value enum and every value must have a stated floor,
+          even where that floor is `null`).
+        minItems: 5
+        maxItems: 5
+        items:
+          $ref: "#/definitions/approval_requirement"
+        allOf:
+          - contains: { type: object, required: [risk_tier], properties: { risk_tier: { const: R0 } } }
+            minContains: 1
+            maxContains: 1
+          - contains: { type: object, required: [risk_tier], properties: { risk_tier: { const: R1 } } }
+            minContains: 1
+            maxContains: 1
+          - contains: { type: object, required: [risk_tier], properties: { risk_tier: { const: R2 } } }
+            minContains: 1
+            maxContains: 1
+          - contains: { type: object, required: [risk_tier], properties: { risk_tier: { const: R3 } } }
+            minContains: 1
+            maxContains: 1
+          - contains: { type: object, required: [risk_tier], properties: { risk_tier: { const: R4 } } }
+            minContains: 1
+            maxContains: 1
+      expiry_policy:
+        $ref: "#/definitions/expiry_policy"
+      forbidden_scopes:
+        $ref: "#/definitions/forbidden_scopes"
+      self_approval_prohibition:
+        $ref: "#/definitions/self_approval_prohibition"
+
+# ---------------------------------------------------------------------------
+# The actual policy content — one real exception_policy_bundle instance,
+# validating against the schema above. Unlike tool-permissions.yaml's
+# `worked_examples` (a sample of a larger open set), this bundle is a
+# CLOSED, complete answer to "when may an exception be granted" given
+# exactly what the corpus states today — see compilation_decisions for why
+# `approval_requirements` is exhaustive over R0-R4 while `expiry_policy` and
+# `forbidden_scopes` are honestly left open where the corpus is silent.
+# ---------------------------------------------------------------------------
+policy_content:
+  approval_requirements:
+    - risk_tier: R0
+      required_authority_level_minimum: null
+      binding_basis: >
+        risk-tier.schema.yaml tiers.R0.required_actions == [] (EC §8, R0
+        "May execute automatically") — no approval-related action exists at
+        this tier in the corpus. No minimum established.
+    - risk_tier: R1
+      required_authority_level_minimum: null
+      binding_basis: >
+        risk-tier.schema.yaml tiers.R1.required_actions = [Current State,
+        Unit Test, Diff Review] (EC §8 L404-408) — none reference approval
+        or authority. No minimum established.
+    - risk_tier: R2
+      required_authority_level_minimum: null
+      binding_basis: >
+        risk-tier.schema.yaml tiers.R2.required_actions = [Integration Test,
+        Compatibility, Rollback, Observability] (EC §8 L422-427) — none
+        reference approval or authority. No minimum established; see
+        open_questions.OQ-EXCPOL-3.
+    - risk_tier: R3
+      required_authority_level_minimum: A3
+      binding_basis: >
+        risk-tier.schema.yaml tiers.R3.required_actions includes "Human
+        Approval" verbatim (EC §8 L450). authority.schema.yaml levels.A3
+        .requirements includes "authorized_approval", transcribed from EC §9
+        L508-512 ("policy allow" + "required gates pass" + "authorized
+        approval", all three ANDed per that file's requirements_relation
+        note). See compilation_decisions for why this binding does not
+        resolve authority.schema.yaml's own open OQ-AUTH-2.
+    - risk_tier: R4
+      required_authority_level_minimum: A4
+      binding_basis: >
+        risk-tier.schema.yaml tiers.R4.required_actions includes "Explicit
+        Human Authority" verbatim (EC §8 L468-470). authority.schema.yaml
+        levels.A4.requirements includes "explicit_human_authority",
+        compiled by that file from EC §9 L525 ("必須 human authority") + L527
+        ("AI 不得自行把自己的建議當 approval"). Near-identical phrasing on
+        both sides — the strongest textual match in the corpus for any
+        risk_tier<->authority_level pairing. Same OQ-AUTH-2 non-resolution
+        caveat as R3 above.
+
+  expiry_policy:
+    max_horizon: null
+    status: OPEN_QUESTION
+    rationale: >
+      Grepped "expir" case-insensitively across all three mother documents.
+      Every hit that discusses an expiry-bearing construct — EC §6 L348
+      ("temporary bypass 無 expiry", banned outright); EC §24 L1028
+      (exception.expires_at field NAME only, no value); EC §46 L1691-1703
+      Feature Flag Contract (requires an `expiry` field, states no number);
+      EC §55 L1950-1962 Incident Mode emergency containment ("temporary +
+      owner + expiry + follow-up root cause", no number); EC §108 L3086-3094
+      Time/Clock (governs HOW to store an expiry timestamp — UTC instant —
+      not how far out it may be set); EC §128 L3522-3534 Cleanup checklist
+      (asks whether temp resources/flags/secrets are cleaned up "or have an
+      expiry", no number); Atlas §29 rule 12 L4549 ("owner、expiry、test、
+      migration plan、ADR", no number); MP §14 L1116-1138 Knowledge Memory
+      (an unrelated construct — memory retention, not exception — requires
+      an Expiry field per memory type, no number, cited only as further
+      corpus-wide corroboration); MP §156 L5851-5876 No Patch Change
+      Discipline's jurisdiction-pack exception (same 5-field pattern as
+      Atlas rule 12: "有 ADR / 有 expiry / 有 owner / 有 test / 有 migration
+      plan", no number) — every single one requires the FIELD to exist and
+      none states a maximum HORIZON. CORRECTED 2026-08-29 (critic-flagged
+      Minor): the grep for "expir" case-insensitively actually surfaces 13
+      hits (7 EC/5 MP/1 Atlas, re-verified directly), not all of which are
+      individually named above — the 4 not separately cited are EC L1038
+      ("owner + expiry + test + migration", a near-duplicate of the
+      already-cited EC §25/§6 pattern), MP L5081 ("Expired Legal Pack ->
+      BLOCK") and L5450 ("Expired Offline Pack", both jurisdiction-pack
+      CONSUMPTION triggers — reacting to an expiry having already passed,
+      not stating how far out one may be set), and MP L5898 ("Expiry /
+      Revisit Date", a Definition-of-Done checklist item name with no
+      number). All 4 were read in context; none states a maximum horizon
+      either, so this file's conclusion is unchanged — but the earlier
+      "every hit ... listed individually" framing overstated its own
+      citation completeness. This is a corpus-wide absence, not a
+      gap unique to exceptions, which is itself signal that this is a real,
+      unmade operator decision rather than a missed citation. No number is
+      invented here. See open_questions.OQ-EXCPOL-1.
+
+  forbidden_scopes:
+    categorical_scope_prohibitions_status: NONE_FOUND_IN_CORPUS
+    categorical_scope_prohibitions: []
+    form_prohibitions:
+      - rule: >
+          An exception MUST NOT be used as a substitute for error handling
+          ("blanket exception").
+        source: >
+          EC §25 Code Change Contract, L1053: "不使用 blanket exception 取代
+          錯誤處理" — already encoded as a `constraints` entry on
+          exception.schema.yaml itself; restated here because it is also,
+          textually, a GRANT-time policy rule (this file's job), not only a
+          record-shape constraint.
+      - rule: >
+          A temporary bypass or containment MUST NOT be granted without an
+          expiry; an exception MUST NOT be a catch-all.
+        source: >
+          EC §6 L343-353 "「最小修改」的正確定義" 禁止 list: "temporary
+          bypass 無 expiry" and "catch-all exception" both banned outright.
+      - rule: >
+          An exception MUST NOT be the mechanism by which a security
+          control is disabled wholesale.
+        source: "EC §6 L351: '關掉 security control'."
+      - rule: >
+          An exception MUST NOT be the mechanism by which validation is
+          disabled wholesale.
+        source: "EC §6 L350: '關掉 validation'."
+
+  self_approval_prohibition:
+    rule: >
+      The AI MUST NOT treat its own recommendation as the "authorized
+      approval" (R3) or "explicit human authority" (R4) an exception at
+      that tier requires per `approval_requirements` above. Approval MUST
+      originate from a human distinct from the AI proposing the exception.
+    source: "EC §9 (L527): 'AI 不得自行把自己的建議當 approval.'"
+    applies_to: R3_AND_R4_PER_APPROVAL_REQUIREMENTS
+
+open_questions:
+  - id: "OQ-EXCPOL-1"
+    question: >
+      What is the maximum allowable `expires_at` horizon for a granted
+      exception (e.g. 90 days, one quarter, tied to the next release
+      cycle)? No mother document, ADR, or register entry supplies one — see
+      `policy_content.expiry_policy.rationale` for the full grep evidence.
+    owner: "operator or Round 2 ADR"
+    blocks: "Any future automated 'this exception is overdue for renewal or removal' check beyond exception.schema.yaml's existing 'expires_at has passed while status=active' constraint, which needs no horizon value to enforce."
+  - id: "OQ-EXCPOL-2"
+    question: >
+      Is there, or should there be, any scope categorically forbidden from
+      ever having an exception granted (e.g. RLS policies, auth code,
+      payment flows)? None found in either mother document — see
+      `policy_content.forbidden_scopes` for the full evidence and the
+      distinction from the FORM-level prohibitions that DO exist.
+    owner: "operator or Round 2 ADR"
+    blocks: "nothing in this file's own validity — categorical_scope_prohibitions accepts entries whenever/if this is decided, without a schema change"
+  - id: "OQ-EXCPOL-3"
+    question: >
+      Should R0/R1/R2 exceptions eventually get a stated
+      `required_authority_level_minimum` floor (even a low one, e.g. A1),
+      or is "no minimum" (any `approved_by` value, per exception.schema.yaml's
+      unconditional owner/approved_by requirement) the intended permanent
+      state for these three tiers? Left `null` per compilation_decisions
+      rather than inferred.
+    owner: "operator or Round 2 ADR"
+    blocks: "nothing in this file — the three rows remain schema-valid with null either way"
+  - id: "OQ-EXCPOL-4"
+    question: >
+      Does this file's R3->A3 / R4->A4 binding in `approval_requirements`
+      resolve, or should it be read as resolving, `authority.schema.yaml`'s
+      own `OQ-AUTH-2` (a general risk_tier<->authority_level numeral-
+      correspondence rule for ALL operations)? Explicitly: NO — see
+      `compilation_decisions` above. This file's binding is narrower
+      (exception-approval only, grounded in each tier's own text) and
+      `OQ-AUTH-2` remains open in `authority.schema.yaml` for the general
+      case. Recorded here so a future reader does not mistake this file's
+      narrower binding for a general-case resolution.
+    owner: "N/A — clarification only, not a pending decision"
+    blocks: "nothing; flagged to prevent a future misreading"
+  - id: "OQ-EXCPOL-5"
+    question: >
+      `authority.schema.yaml`'s `role_to_authority_mapping` (P1-GAP-SEC-6 —
+      which human role/title may exercise or grant each A0-A4 level) is
+      `status: SKELETON_ONLY`. This file's `approval_requirements` states
+      WHAT authority level an R3/R4 exception needs but cannot state WHO
+      qualifies to hold it, because that mapping does not exist yet. Not
+      this file's gap to close (see `relationship_to_exception_schema
+      .not_resolved_by_this_file` above) — recorded here for cross-link
+      completeness only.
+    owner: "operator (same answer as authority.schema.yaml's OQ-AUTH-1)"
+    blocks: "Any future approval-UI that wants to check approver eligibility by role rather than by unchecked human judgment — same blocking relationship authority.schema.yaml's OQ-AUTH-1 already records"
+
+verification:
+  method: >
+    Read EC §6 (L315-354), §8 (L379-475), §9 (L478-529), §24 (L1013-1041),
+    §25 (L1045-1060), §46 (L1691-1703), §55 (L1912-1962), §91 (L2750-2762),
+    §108 (L3086-3094), §128 (L3520-3534) in full. Read Atlas §29 (L4536-4554)
+    in full, specifically rule 12 (L4549). Read MP §14 (L1116-1138) and §156
+    (L5851-5876) in full. Grepped "expir" case-insensitively across all
+    three mother documents (7 hits in EC, 5 in MP, 1 in Atlas — 13 total, all
+    13 read in surrounding section context; 9 substantively distinct
+    expiry-bearing constructs cited individually in
+    `policy_content.expiry_policy.rationale`, the remaining 4 confirmed
+    non-additive — near-duplicates or expiry-CONSUMPTION rather than
+    expiry-SETTING text, see that field's own 2026-08-29 correction for the
+    4 line numbers and why each was folded rather than separately cited).
+    Grepped
+    "forbidden|不得.*exception|exception.*不得|no exception|zero exception"
+    (EC) and "forbidden|不得.*例外|例外.*不得" (MP) case-insensitively for any
+    categorical scope prohibition — no hit beyond EC §25 L1053's own
+    blanket-exception (form, not scope) rule and the `forbidden-actions.yaml`
+    path name (a directory sibling file — BUILT in this same Wave 6 batch,
+    critic-flagged 2026-08-29 as a same-commit-race "unbuilt"
+    mischaracterization; the path-name hit was never evidence of scope
+    content regardless of that file's build status). Read
+    `specs/execution/exception.schema.yaml`, `specs/execution/
+    risk-tier.schema.yaml`, `specs/execution/authority.schema.yaml`, and
+    this Wave's sibling `policies/ai-execution/tool-permissions.yaml` in
+    full for house style, $ref conventions, and the exact R3/R4 <->
+    A3/A4 textual evidence this file binds. Confirmed via `find`/`ls` that
+    `policies/` did not exist in git history before this file (untracked
+    working-tree state at compile time also showed a concurrently-authored
+    `tool-permissions.yaml`, used as the freshest same-directory structural
+    precedent). Checked `docs/adr/ADR_INDEX.md` and
+    `.ai/research/phase-1/GAP_REGISTER.yaml` for any ADR or gap entry
+    specific to exception-granting policy (none found beyond P1-GAP-SEC-6,
+    already scoped out in `relationship_to_exception_schema
+    .not_resolved_by_this_file`). Validated `policy_content` against
+    `#/definitions/exception_policy_bundle` with `jsonschema
+    .Draft202012Validator` using a `referencing.Registry` with an
+    `ai-lego://` retrieve handler (resolving into
+    `risk-tier.schema.yaml#/risk_tier` and
+    `authority.schema.yaml#/authority_level`); also ran two negative-control
+    mutations (an `approval_requirements` array missing the R4 row, and one
+    containing an invalid `risk_tier: "R9"`) and confirmed both correctly
+    raise `ValidationError` — see the compiling session's report for the
+    exact commands and output.
+  note: >
+    No mother document was modified to produce this file (aside from the
+    small, surgical update to `exception.schema.yaml`'s own
+    `relationship_to_exception_policy` block, recorded in that file's own
+    change history, marking it as now built). `approval_requirements`' R3/R4
+    rows bind two already-ACTIVE schemas' existing fields together; they are
+    not a new authority model. `expiry_policy.max_horizon` and
+    `forbidden_scopes.categorical_scope_prohibitions` are honestly left
+    open/empty with explicit status markers, per full grep evidence that
+    no mother document, ADR, or register entry supplies either — inventing
+    either would have violated this suite's R4 claim-before-verify
+    discipline.

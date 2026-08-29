@@ -1,0 +1,447 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://policies/ai-execution/risk-tiers.yaml"
+title: Risk Tier Policy Bindings
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Policy-as-code binding of specs/execution/risk-tier.schema.yaml's R0-R4
+  tiers, per Execution Contract §91 "Policy-as-Code Paths" (L2750-2762),
+  which places this file as item 2 of the same 8-file /policies/ai-
+  execution/ list authority.yaml (this file's sibling) is item 1 of — see
+  that file's description for the full EC §91-vs-MP §64 directory-layout
+  resolution, which applies identically here and is not repeated.
+
+  REDUNDANCY CHECK (done before writing a single line of new content, per
+  this task's explicit instruction): specs/execution/risk-tier.schema.yaml
+  already fully specifies, per tier, the label, examples, and
+  `required_actions` list (R0: none; R1: Current State/Unit Test/Diff
+  Review; R2: +Integration Test/Compatibility/Rollback/Observability; R3:
+  +Threat Review/Data Review/Rehearsal/Canary/Human Approval/Post-
+  deployment Verification; R4: Independent Review/Specialist Review/
+  Explicit Human Authority/Recovery Drill/Emergency Stop/Rollback or
+  Compensating Plan) plus a `mandatory_gate_injection_trigger` (condition
+  "risk_tier IN [R3, R4]"). Re-read Method Atlas §14.2 "Mandatory Gate
+  Injection" (L3588-3619) directly to check for a hidden runtime
+  consequence beyond what risk-tier.schema.yaml already states: found none
+  — §14.2's mechanism is a COMPILE-TIME plan injection ("Compiler 可以自動
+  插入 mandatory block" into a workflow), not a runtime status-code
+  consequence, and the concrete gate LIST itself is already, explicitly,
+  deferred by risk-tier.schema.yaml's own text to a Round 2+ ADR on OQ-10
+  (`required_gates_pending_round2_adr`, L135-145). Given this, restating
+  tiers/required_actions/gate_injection here would be pure duplication of
+  a canonical source (this file's own explicit anti-pattern to avoid), and
+  inventing a NEW runtime consequence not stated by any mother document
+  would be fabrication (the opposite anti-pattern this file must also
+  avoid). This file is therefore deliberately THIN: a resolvable pointer
+  into risk-tier.schema.yaml for /policies/ai-execution/-scoped consumers,
+  plus exactly ONE genuinely additive, evidence-grounded thing (below).
+
+  The one additive thing: extracting a single coarse `action` verdict
+  (ALLOW / REQUIRE_HUMAN_REVIEW, this directory's own established
+  vocabulary — see authority.yaml's compilation_decisions for why it is
+  not a $ref into status-codes.schema.yaml) per tier, grounded directly in
+  whether that tier's `required_actions` literally names a human-approval-
+  type item (R3: "Human Approval"; R4: "Explicit Human Authority") — NOT a
+  restatement of the full required_actions checklist, and NOT an assertion
+  that risk_tier maps to a specific authority_level numeral (that stays
+  explicitly open, see `human_authority_crosswalk` and
+  `open_questions.OQ-RISKPOL-1`).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §91 Policy-as-Code Paths (L2750-2762) — this file is item 2 of the 8-file /policies/ai-execution/ list"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §64 Policy-as-Code (L2714-2741) — condition/action rule-shape source; directory layout superseded (see authority.yaml)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §14.2 Mandatory Gate Injection (L3588-3619) — confirms the gate-injection mechanism is compile-time plan insertion, not a runtime status code, grounding this file's decision not to invent one"
+  - "specs/execution/exception.schema.yaml#/required_authority_level (L268-287) — existing informal precedent for this file's `human_authority_crosswalk`, not itself redefined here"
+  - "docs/architecture/TEST_EVAL_STRATEGY.md L194 — prior informal notation 'Explicit Human Authority(A4)', corroborating (not originating) the R4/A4 crosswalk"
+  - ".ai/research/phase-1/GAP_REGISTER.yaml P1-GAP-SEC-3 (L206-214) — the orthogonal identity-verification-strength gap this file's crosswalk does not resolve, cited in open_questions"
+decided_by: >
+  No ADR. This file makes exactly one non-trivial compilation choice (the
+  `action` extraction described above) and explicitly declines to make a
+  second one (a risk_tier -> authority_level numeral correspondence) that
+  a naive reading of the evidence might tempt — recording an OBSERVATION,
+  not a ruling, is consistent with authority.schema.yaml's own decided_by
+  reasoning for why an uncontested verbatim transcription needs no ADR but
+  an inference/correlation claim does. The `action` extraction itself is
+  Low-risk direct compilation (each tier's required_actions list is
+  read, not invented) and needs no ADR either.
+
+compilation_decisions:
+  - question: >
+      Is there any genuinely new POLICY CONSEQUENCE to state for risk_tier
+      detection that risk-tier.schema.yaml's own `required_actions` and
+      `mandatory_gate_injection_trigger` fields do not already fully
+      specify?
+    decision: >
+      No new runtime consequence is invented. See the REDUNDANCY CHECK in
+      this file's description above for the full Atlas §14.2 re-read that
+      confirmed this. The one thing this file DOES add (the `action`
+      verdict extraction) is a coarser, differently-shaped VIEW of
+      already-stated content (required_actions), not a new fact.
+    reasoning: >
+      Per this task's own instruction: check for genuine redundancy before
+      writing, and prefer a thin, honest pointer over fabricated content.
+      risk-tier.schema.yaml's own `required_gates_pending_round2_adr` field
+      already explicitly defers the one piece of content that WOULD be a
+      new runtime consequence (the concrete mandatory-gate list) to a
+      different, still-BLOCKED file (mandatory-gates.yaml) and a Round 2+
+      ADR (OQ-10) — this file does not attempt to lift that block.
+  - question: >
+      Should the `action` field (ALLOW / REQUIRE_HUMAN_REVIEW) be derived
+      from every tier's full `required_actions` list, or from something
+      narrower?
+    decision: >
+      Derived narrowly: ALLOW unless the tier's required_actions list
+      literally names a human-approval-type item ("Human Approval" for
+      R3, "Explicit Human Authority" for R4), in which case
+      REQUIRE_HUMAN_REVIEW. R0/R1/R2's required_actions name no such item
+      (Current State/Unit Test/Diff Review/Integration Test/Compatibility/
+      Rollback/Observability are all self-directed engineering practices,
+      not named human-sign-off steps) — ALLOW for all three, with their
+      full required_actions list unrestated, cited only by pointer.
+    reasoning: >
+      This is a real, grounded extraction (the two phrases are literal
+      EC §8 bullets, not invented), narrow enough not to duplicate the
+      richer required_actions list, and useful enough to be worth this
+      file's existence at all — a policy engine that only needs "should I
+      default-ALLOW or default-REQUIRE_HUMAN_REVIEW this risk tier" does
+      not need to re-parse risk-tier.schema.yaml's full per-tier checklist
+      to get that one bit.
+  - question: >
+      specs/execution/exception.schema.yaml's `required_authority_level`
+      field (L280-283) already says: "When risk_tier is R3 or R4, this
+      SHOULD be populated with the authority level that approved_by's
+      identity must satisfy, per risk-tier.schema.yaml's R3 'Human
+      Approval' / R4 'Explicit Human Authority' required_actions" — an
+      informal R3~A3 / R4~A4 correspondence already assumed by a sibling
+      file, while authority.schema.yaml's own OQ-AUTH-2 explicitly
+      declined to assert any fixed risk_tier -> authority_level numeral
+      rule. Should THIS file resolve that tension one way or the other?
+    decision: >
+      No — record it as a `human_authority_crosswalk` OBSERVATION
+      (textual-evidence-based, explicitly non-normative) and raise the
+      tension itself as `open_questions.OQ-RISKPOL-1` for a future Round 2
+      ADR, rather than silently agreeing with exception.schema.yaml's
+      informal recommendation (which would quietly resolve OQ-AUTH-2 by
+      the back door) or silently ignoring it (which would leave an
+      existing sibling file's already-written assumption unexamined).
+    reasoning: >
+      Grepped GAP_REGISTER.yaml, DUPLICATION_REGISTER.yaml,
+      CONFLICT_REGISTER.yaml, verified-findings.yaml, ASSUMPTION_REGISTER
+      .yaml — none address this specific tension between an informal
+      field-description recommendation and a formally-declared open
+      question. R4's phrase match turns out to be closer than R3's on
+      closer reading (see `human_authority_crosswalk` below for the exact
+      calibration, including that authority.schema.yaml's own
+      `explicit_human_authority` requirement literal is itself an
+      undocumented compiled borrowing from EC §8's R4 bullet, not a
+      literal EC §9 quote) — different confidence per tier is itself
+      worth recording, not collapsing into one blanket answer.
+
+# ---------------------------------------------------------------------------
+# Root $ref (established pattern in this suite — see risk-tier.schema.yaml,
+# authority.yaml, forbidden-actions.yaml, tool-permissions.yaml: without a
+# root-level type constraint, a validator pointed at this file's ROOT would
+# accept ANY value). This file's root validates as `bindings_schema` (an
+# array of binding objects) — a rule-SET shape, matching authority.yaml's
+# and tool-permissions.yaml's root-shape precedent.
+# ---------------------------------------------------------------------------
+$ref: "#/bindings_schema"
+
+tier_policy_binding:
+  description: >
+    One risk-tier policy binding: a pointer to the canonical tier
+    definition (not duplicated) plus this file's one additive `action`
+    verdict.
+  type: object
+  required: [id, risk_tier, condition, action, grounding, source]
+  properties:
+    id:
+      type: string
+      pattern: "^RISKPOL-"
+    risk_tier:
+      $ref: "ai-lego://specs/execution/risk-tier.schema.yaml#/risk_tier"
+    canonical_definition_ref:
+      type: string
+      description: >
+        Citation string only (NOT a schema $ref target — this key holds a
+        pointer for a human/tool to follow, not a type-composition
+        instruction), pointing at risk-tier.schema.yaml's own tier node.
+        This file does not duplicate that node's content.
+    condition:
+      type: string
+      description: "Free-text predicate, Master Plan §64 rule-shape style."
+    action:
+      type: string
+      enum: [ALLOW, REQUIRE_HUMAN_REVIEW]
+      description: >
+        Reuses this /policies/ai-execution/ directory's own established
+        action vocabulary (see authority.yaml's compilation_decisions for
+        the full reasoning on why this vocabulary is used instead of a
+        $ref into status-codes.schema.yaml). Only these 2 of the
+        directory's (now 5, post-Wave-6-merge; see authority.yaml's
+        OQ-AUTHPOL-3 for the full 7-file count including
+        network-egress.yaml's 2 additional divergent values) known values
+        (DENY/ALLOW/SCOPE_TO/REQUIRE_HUMAN_REVIEW) are grounded for this
+        file's 5 rows — this file makes no risk_tier-triggered DENY or
+        SCOPE_TO claim.
+    grounding:
+      type: string
+      description: "Which required_action(s) in risk-tier.schema.yaml this row's action verdict is extracted from, or their explicit absence."
+    additive_content:
+      type: string
+      description: "What, if anything, this file adds beyond risk-tier.schema.yaml for this tier. Most rows: NONE."
+    source:
+      type: string
+    notes:
+      type: string
+
+bindings_schema:
+  description: >
+    The type `bindings` (below) must satisfy. Full R0-R4 coverage enforced
+    via `allOf`+`contains`+`minContains` (uniqueItems alone cannot enforce
+    "every enum value appears"). Exactly 5 rows are expected (one per
+    tier, a genuinely closed set — risk-tier.schema.yaml's own R0-R4 enum
+    is closed, unlike authority.yaml's EC §9 "例" example lists) so
+    `minItems`/`maxItems`/`maxContains` ARE applied here, unlike
+    authority.yaml's deliberately open rule set.
+  type: array
+  minItems: 5
+  maxItems: 5
+  items:
+    $ref: "#/tier_policy_binding"
+  allOf:
+    - contains: {type: object, properties: {risk_tier: {const: R0}}, required: [risk_tier]}
+      minContains: 1
+      maxContains: 1
+    - contains: {type: object, properties: {risk_tier: {const: R1}}, required: [risk_tier]}
+      minContains: 1
+      maxContains: 1
+    - contains: {type: object, properties: {risk_tier: {const: R2}}, required: [risk_tier]}
+      minContains: 1
+      maxContains: 1
+    - contains: {type: object, properties: {risk_tier: {const: R3}}, required: [risk_tier]}
+      minContains: 1
+      maxContains: 1
+    - contains: {type: object, properties: {risk_tier: {const: R4}}, required: [risk_tier]}
+      minContains: 1
+      maxContains: 1
+
+# ---------------------------------------------------------------------------
+# The 5 rows.
+# ---------------------------------------------------------------------------
+bindings:
+  - id: RISKPOL-R0
+    risk_tier: R0
+    canonical_definition_ref: "ai-lego://specs/execution/risk-tier.schema.yaml#/tiers/R0"
+    condition: "task.risk.tier == R0"
+    action: ALLOW
+    grounding: "required_actions: [] (risk-tier.schema.yaml#/tiers/R0); EC §8 states R0 '可自動執行' (may execute automatically)."
+    additive_content: "NONE beyond the action verdict above — see risk-tier.schema.yaml#/tiers/R0 for the full definition."
+    source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §8 (L381-391)"
+
+  - id: RISKPOL-R1
+    risk_tier: R1
+    canonical_definition_ref: "ai-lego://specs/execution/risk-tier.schema.yaml#/tiers/R1"
+    condition: "task.risk.tier == R1"
+    action: ALLOW
+    grounding: "required_actions (Current State / Unit Test / Diff Review, risk-tier.schema.yaml#/tiers/R1) name no human-approval-type item."
+    additive_content: "NONE beyond the action verdict above — see risk-tier.schema.yaml#/tiers/R1 for the full required_actions list; this row does not restate it."
+    source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §8 (L393-408)"
+
+  - id: RISKPOL-R2
+    risk_tier: R2
+    canonical_definition_ref: "ai-lego://specs/execution/risk-tier.schema.yaml#/tiers/R2"
+    condition: "task.risk.tier == R2"
+    action: ALLOW
+    grounding: "required_actions (Integration Test / Compatibility / Rollback / Observability, risk-tier.schema.yaml#/tiers/R2) name no human-approval-type item."
+    additive_content: "NONE beyond the action verdict above — see risk-tier.schema.yaml#/tiers/R2 for the full required_actions list; this row does not restate it."
+    source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §8 (L410-427)"
+
+  - id: RISKPOL-R3
+    risk_tier: R3
+    canonical_definition_ref: "ai-lego://specs/execution/risk-tier.schema.yaml#/tiers/R3"
+    condition: "task.risk.tier == R3"
+    action: REQUIRE_HUMAN_REVIEW
+    grounding: "required_actions (risk-tier.schema.yaml#/tiers/R3) literally includes 'Human Approval'."
+    additive_content: "See human_authority_crosswalk.R3 below (APPROXIMATE, not exact, phrase correspondence to authority_level A3 — not a formally decided numeral rule, see open_questions.OQ-RISKPOL-1)."
+    source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §8 (L429-452, 'Human Approval' at L450)"
+
+  - id: RISKPOL-R4
+    risk_tier: R4
+    canonical_definition_ref: "ai-lego://specs/execution/risk-tier.schema.yaml#/tiers/R4"
+    condition: "task.risk.tier == R4"
+    action: REQUIRE_HUMAN_REVIEW
+    grounding: "required_actions (risk-tier.schema.yaml#/tiers/R4) literally includes 'Explicit Human Authority'."
+    additive_content: "See human_authority_crosswalk.R4 below (a closer, but still not formally decided, phrase correspondence to authority_level A4's `explicit_human_authority` requirement — see open_questions.OQ-RISKPOL-1)."
+    source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §8 (L454-474, 'Explicit Human Authority' at L470)"
+    notes: "Same coarse REQUIRE_HUMAN_REVIEW verdict as R3 — see open_questions.OQ-RISKPOL-2 on whether R4 warrants a distinct, stronger verdict value."
+
+# ---------------------------------------------------------------------------
+# The one additive cross-file observation — NOT a decided rule.
+# ---------------------------------------------------------------------------
+human_authority_crosswalk:
+  description: >
+    NOT a decided risk_tier -> authority_level rule. authority.schema.yaml's
+    OQ-AUTH-2 explicitly declined to assert one from a single EC §16
+    worked example, and this file does not silently resolve it by the back
+    door. This is a textual-evidence OBSERVATION only: two required-action
+    phrases in risk-tier.schema.yaml (drawn from EC §8) closely or exactly
+    match two requirement literals in authority.schema.yaml (drawn from EC
+    §9), and an existing sibling file (exception.schema.yaml) already
+    informally assumes the correspondence in its own field description.
+    Recorded here, in the dedicated EC §91 policy file, so the observation
+    has one auditable home instead of being re-derived ad hoc by every
+    future reader.
+  R3:
+    risk_tier_phrase: {quote: "Human Approval", source: "EC §8 (L450), risk-tier.schema.yaml#/tiers/R3/required_actions"}
+    authority_level_phrase: {quote: "authorized approval", source: "EC §9 (L512), authority.schema.yaml#/levels/A3/requirements (authorized_approval)"}
+    match_type: APPROXIMATE
+    match_note: >
+      Different words ("Human Approval" vs "authorized approval") for what
+      is plausibly the same underlying control, not a literal match. Both
+      phrases DO appear verbatim in their respective EC sections — the
+      approximation is between the two sections, not a transcription
+      error in either compiled schema.
+    existing_precedent: >
+      None found specifically for R3/A3 (grep-confirmed against
+      GAP_REGISTER.yaml, DUPLICATION_REGISTER.yaml, CONFLICT_REGISTER.yaml,
+      verified-findings.yaml, exception.schema.yaml, TEST_EVAL_STRATEGY.md
+      — all are silent on R3/A3 specifically, unlike R4/A4 below).
+  R4:
+    risk_tier_phrase: {quote: "Explicit Human Authority", source: "EC §8 (L470), risk-tier.schema.yaml#/tiers/R4/required_actions"}
+    authority_level_phrase: {quote: "explicit_human_authority", source: "authority.schema.yaml#/levels/A4/requirements"}
+    match_type: EXACT_AS_COMPILED
+    match_note: >
+      The exact match holds between risk-tier.schema.yaml's verbatim EC §8
+      bullet and authority.schema.yaml's own ALREADY-COMPILED requirement
+      literal — it is NOT a match against EC §9's raw prose directly. EC
+      §9's own text for A4 (L525) says only "必須 human authority" ("must
+      have human authority") — it does not contain the word "explicit"
+      anywhere. authority.schema.yaml's `explicit_human_authority` field
+      name (grep-confirmed, specs/execution/authority.schema.yaml:209, no
+      inline citation explaining the extra qualifier) can only be
+      explained as already borrowing EC §8's R4 bullet wording across
+      sections — meaning whichever pass compiled authority.schema.yaml in
+      an earlier Wave had already made this same R4<->A4 connection
+      implicitly, without documenting it. This file makes that borrowing
+      explicit and citable for the first time.
+    existing_precedent:
+      - "specs/execution/exception.schema.yaml (L280-283): 'this SHOULD be populated with the authority level that approved_by's identity must satisfy, per risk-tier.schema.yaml's R3 Human Approval / R4 Explicit Human Authority required_actions'"
+      - "docs/architecture/TEST_EVAL_STRATEGY.md (L194): 'Explicit Human Authority(A4)'"
+
+# ---------------------------------------------------------------------------
+# Explicit non-lift of an existing upstream block.
+# ---------------------------------------------------------------------------
+mandatory_gates_forward_pointer:
+  description: >
+    The concrete mandatory-gate LIST that risk-tier.schema.yaml's
+    `mandatory_gate_injection_trigger` (condition "risk_tier IN [R3, R4]")
+    fires is intentionally NOT enumerated here, matching that file's own
+    stated scope boundary (`required_gates_pending_round2_adr`, L135-145:
+    the exact Global/High-risk Gate list is BLOCKED pending a Round 2+ ADR
+    on OQ-10). This file does not lift that block or restate it as new
+    information.
+  status: BLOCKED_UPSTREAM
+  blocked_by: "risk-tier.schema.yaml open OQ-10 (Round 2+ ADR required)"
+  future_home: >
+    policies/ai-execution/mandatory-gates.yaml (EC §91 item 3). BUILT
+    2026-08-29 in the same Wave 6 batch as this file (this note originally
+    said "not built this Wave" — a same-commit-race snapshot flagged by
+    critic review as MAJ-4; mandatory-gates.yaml itself still carries
+    `status: PROVISIONAL` and defers the actual gate_id list to the same
+    OQ-10/Round-2-ADR block this file already names above — that part of
+    the blocking condition has NOT changed, only mandatory-gates.yaml's
+    own existence).
+
+open_questions:
+  - id: "OQ-RISKPOL-1"
+    question: >
+      exception.schema.yaml's field description already informally
+      recommends populating `required_authority_level` per risk_tier R3/R4
+      using the exact "Human Approval"/"Explicit Human Authority" phrase
+      correspondence this file's `human_authority_crosswalk` records —
+      while authority.schema.yaml's OQ-AUTH-2 explicitly leaves the
+      general risk_tier -> authority_level correspondence open. Should a
+      Round 2 ADR formally adopt the R3~A3 / R4~A4 correspondence (closing
+      OQ-AUTH-2), formally reject it, or leave both files' current
+      hedged/non-committal language as-is indefinitely?
+    owner: "operator or Round 2 ADR"
+    blocks: "nothing in this file's own validity — `human_authority_crosswalk` is explicitly labeled non-normative either way"
+  - id: "OQ-RISKPOL-2"
+    question: >
+      This file's `action` vocabulary has only one REQUIRE_HUMAN_REVIEW
+      value for both R3 ("Human Approval") and R4 ("Explicit Human
+      Authority") even though EC §8's own wording distinguishes them as
+      different phrases at different severities. Should the directory's
+      action vocabulary gain a stronger value (e.g.
+      REQUIRE_EXPLICIT_HUMAN_AUTHORITY) reserved for R4, or is
+      coarse-graining both into REQUIRE_HUMAN_REVIEW intentional given no
+      mother document defines a machine-checkable difference between the
+      two beyond wording?
+    owner: "operator or Round 2 ADR"
+    blocks: "nothing in this file's own validity — RISKPOL-R3 and RISKPOL-R4 remain individually distinguishable via their `grounding`/`risk_tier` fields even while sharing one `action` value"
+  - id: "OQ-RISKPOL-3"
+    question: >
+      .ai/research/phase-1/GAP_REGISTER.yaml P1-GAP-SEC-3 ('Explicit Human
+      Authority 無身分驗證強度要求') notes that neither R3/R4's approval
+      requirement nor A3/A4's states WHO qualifies as a human approver or
+      HOW their identity is verified at approval time (no step-up/MFA
+      requirement, no non-repudiation binding to the specific action).
+      This file's `human_authority_crosswalk` does NOT resolve that gap —
+      even a formally-adopted R3~A3/R4~A4 correspondence would still leave
+      P1-GAP-SEC-3 open. Flagged so a reader does not mistake this file's
+      crosswalk for a security-strength improvement.
+    owner: "operator (same root gap as authority.schema.yaml's OQ-AUTH-1, a different angle)"
+    blocks: "nothing in this file — orthogonal, pre-existing, unresolved gap"
+
+verification:
+  method: >
+    Read specs/execution/risk-tier.schema.yaml in full (already read for
+    this Wave's other file). Read Method Atlas §14.2 (L3585-3619) in full
+    to check for a hidden runtime consequence beyond risk-tier.schema.yaml's
+    own text — found none (compile-time plan injection only). Read EC §8
+    (L379-475) in full for the R0-R4 label/example/required_actions text
+    and exact line numbers. Read specs/execution/exception.schema.yaml
+    L255-289 in full for the existing informal R3/R4 <-> A3/A4 precedent.
+    Grepped "Explicit Human Authority" / "explicit_human_authority" /
+    "authorized_approval" / "Human Approval" across .ai/, docs/, and
+    specs/ — found docs/architecture/TEST_EVAL_STRATEGY.md:194 and
+    .ai/research/phase-1/GAP_REGISTER.yaml:209-214 (P1-GAP-SEC-3) as the
+    only other hits, both read in context. Grepped GAP_REGISTER.yaml,
+    DUPLICATION_REGISTER.yaml, CONFLICT_REGISTER.yaml, verified-
+    findings.yaml, ASSUMPTION_REGISTER.yaml for any prior treatment of the
+    R3/R4<->A3/A4 crosswalk itself — none found beyond the two citations
+    above. Grepped specs/execution/authority.schema.yaml for
+    `explicit_human_authority`/`authorized_approval` to confirm neither
+    field carries an inline citation explaining its exact wording (line
+    209, no comment — grounds the EXACT_AS_COMPILED vs EC-§9-raw-text
+    distinction in `human_authority_crosswalk.R4`). Validated
+    `bindings_schema` and the literal `bindings` array (5 entries) against
+    `jsonschema.Draft202012Validator` with a `RefResolver` using a custom
+    `ai-lego://` retrieval handler, resolving into
+    specs/execution/risk-tier.schema.yaml#/risk_tier; ran an adversarial
+    negative test duplicating the R3 row (violating `maxContains: 1` /
+    `maxItems: 5`) to confirm rejection, and a second test removing R4
+    entirely (violating `minItems: 5` / `minContains: 1`) to confirm
+    rejection. Also validated via this file's OWN `$id` with no fragment
+    (`{"$ref": "ai-lego://policies/ai-execution/risk-tiers.yaml"}`) to
+    prove the root-$ref defense pattern functions for an external
+    consumer. 13 checks total, run together with authority.yaml's
+    verification in one script (both files' cross-file `$ref`s exercised
+    in the same session) — see that file's verification for the
+    resolver-harness bug this run discovered and fixed (Python's
+    `urllib.parse.urljoin` silently drops the base document when
+    resolving a bare `#/...` fragment ref against a custom-scheme base
+    unless the scheme is first registered with `urllib.parse`; a
+    verification-harness issue, not a defect in either YAML file). Ran
+    `python3 -c "import yaml; yaml.safe_load(...)"` against this file —
+    exit 0.
+  note: >
+    No mother document was modified. risk-tier.schema.yaml's own tier
+    definitions are not duplicated here (cited only via
+    `canonical_definition_ref` pointer strings and `source_of_truth_for`).
+    This file's only new content is the `action` verdict extraction (5
+    rows) and the `human_authority_crosswalk` observation (R3/R4) —
+    both individually justified above, both explicitly non-normative
+    where they touch an already-open question elsewhere in this suite.

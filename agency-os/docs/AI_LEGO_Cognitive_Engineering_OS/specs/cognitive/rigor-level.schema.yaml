@@ -256,7 +256,9 @@ required_rigor_mapping:
         both this file and Phase 3 compilation generally — must go through
         the ADR-006 `.ai/proposals/` mother-doc revision flow); every existing
         or future piece of code/policy that pattern-matches the 4-value enum
-        (e.g. a future gate.schema.yaml or mandatory-gates.yaml keyed on
+        (e.g. `gate.schema.yaml`, BUILT Wave 5, or `mandatory-gates.yaml`,
+        BUILT Wave 6 — corrected 2026-08-29, critic-flagged Minor: this note
+        originally described both as future/hypothetical — keyed on
         required_rigor) must be re-audited for 5-value handling — an
         unbounded blast radius this file cannot itself measure.
     option_b_additive_layer_default_above:
@@ -310,11 +312,13 @@ open_questions:
     owner: "operator, via a Round 2 ADR (see decided_by above for why this is not Phase-3-decidable)"
     blocks: >
       Nothing in THIS file — `rigor_mode` is usable today with the
-      PROVISIONAL default in place. It DOES block any future
+      PROVISIONAL default in place. It DOES block
       gate.schema.yaml / mandatory-gates.yaml / method-resolution.schema.yaml
-      work from treating Deep Intelligence's gate requirements as final,
-      since which required_rigor value(s) trigger which gates depends on
-      whether Option A or B is eventually chosen.
+      (all 3 now BUILT — corrected 2026-08-29, critic-flagged Minor: this
+      note originally described them as future/hypothetical) from treating
+      Deep Intelligence's gate requirements as final, since which
+      required_rigor value(s) trigger which gates depends on whether Option
+      A or B is eventually chosen.
     default_in_effect: "Option B (required_rigor_mapping.deep_intelligence above), explicitly marked PROVISIONAL_PENDING_OPERATOR_SIGNOFF, not final."
 
 verification:

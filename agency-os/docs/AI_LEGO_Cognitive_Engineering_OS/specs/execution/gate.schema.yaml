@@ -45,7 +45,7 @@ source_of_truth_for:
   - "execution/risk-tier.schema.yaml mandatory_gate_injection_trigger + tiers.R3.gate_injection + tiers.R4.gate_injection — the R3∪R4 condition under which gate_result records are expected to be emitted"
   - ".ai/research/phase-0/open-questions.yaml OQ-10 (L68-72) — the unresolved ownership question this file's gate_id field defers to"
   - ".ai/research/phase-0/verified-findings.yaml CROSS-R-5 (L98-116), CROSS-R-7 (L398-421), CROSS-T-11 (L495-517) — the three-way count/name dispute, independently confirmed 2-3x each"
-  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2 row 102 (L102) and §4 (L246) — this file's tracked status and explicit instruction to build the skeleton now with gate_id left TBD_PENDING_ROUND2"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2 row 102 (L102) and §3 Build Order (L264, corrected 2026-08-29 — self-caught during Wave 6 critic-fix bughunt: originally mis-cited as '§4 (L246)', wrong section [§4 is 'Atlas Method Contract 補齊策略', unrelated] AND wrong line) — this file's tracked status and explicit instruction to build the skeleton now with gate_id left TBD_PENDING_ROUND2"
   - "execution/manifest.schema.yaml results.gates (L303-315) and cognitive/recipe.schema.yaml steps[].gate_ref (L149-165, L333-342) — existing forward dependents already waiting on this file, whose own untyped-string precedent this file follows"
 
 decided_by: >
@@ -54,7 +54,8 @@ decided_by: >
   — verified by grep across docs/adr/ADR-001~010: none rules on the
   Global/High-risk Gate list. MACHINE_READABLE_SPEC_PLAN.md itself
   prescribes exactly what this file may and may not do while that ADR is
-  pending (§4 L246: "可以先建這兩檔的骨架（欄位結構）、gate_id enum 留
+  pending (§3 Build Order, L264 — corrected 2026-08-29, see source_of_truth_for
+  above for why: "可以先建這兩檔的骨架（欄位結構）、gate_id enum 留
   TBD_PENDING_ROUND2，不阻塞其餘 30+ 個檔案的建置" — "the skeleton/field
   structure of these two files may be built now, with the gate_id enum left
   as TBD_PENDING_ROUND2, without blocking the other 30+ files"). This file
@@ -196,7 +197,8 @@ gate_id_registry:
     canonical. Does not merge/union them into a superset. Does not invent a
     4th list. Deciding the list is policies/ai-execution/mandatory-gates.yaml's
     job (Wave 6), itself gated on Round 2 ADR per
-    MACHINE_READABLE_SPEC_PLAN.md §2.9 (release/ dir) and §4 (L246).
+    MACHINE_READABLE_SPEC_PLAN.md §2.9 (release/ dir) and §3 Build Order
+    (L264, corrected 2026-08-29 — see source_of_truth_for above).
   disputed_candidates:
     - source: "Master Plan §158 Global Definition of Done (L5903-5926)"
       global_gate_count: 11
@@ -239,9 +241,15 @@ open_questions:
       should `gate_result.gate_id` become a strict inline `enum:` in this
       file, or should it instead stay `type: string` validated against a
       separately-maintained registry (e.g. a $ref into
-      policies/ai-execution/mandatory-gates.yaml, once that file exists)?
-      This is a schema-design choice, not yet made, independent of what the
-      list's CONTENTS turn out to be.
+      policies/ai-execution/mandatory-gates.yaml — built Wave 6,
+      2026-08-29, as a skeleton whose own `gate_ref` field carries this
+      identical TBD_PENDING_ROUND2_ADR marker and asks this same question
+      from its side, as that file's own OQ-MGATE-1; its sibling
+      policies/ai-execution/release-policy.yaml#/release_gate_requirement
+      composes with mandatory-gates.yaml's rule set for the same deferred
+      reason, per that file's OQ-RELPOL-2)? This is a schema-design choice,
+      not yet made, independent of what the list's CONTENTS turn out to
+      be.
     owner: "Phase 3 continuation, after Round 2 ADR lands"
     blocks: "nothing today — gate_id stays a bare string either way until the ADR lands"
   - id: "OQ-GATE-2"

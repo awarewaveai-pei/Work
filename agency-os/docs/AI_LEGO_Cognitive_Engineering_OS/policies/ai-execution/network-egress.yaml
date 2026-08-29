@@ -1,0 +1,461 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://policies/ai-execution/network-egress.yaml"
+title: Network Egress Policy
+version: "1.0.0"
+status: PROVISIONAL
+
+description: >
+  Canonical machine-readable STRUCTURE for the Network Egress policy named
+  by Execution Contract §99 (L2920-2934) — a genuinely thin source: three
+  short lines of prose, no worked examples, no field names, and (verified by
+  grep across all three mother documents, every accepted ADR, and every
+  `.ai/research/` artifact) zero real domain names anywhere in the corpus
+  for this purpose. EC §99 states exactly 3 things: (1) for 高敏感專案
+  (high-sensitivity projects), the default posture is `deny by default`;
+  (2) reaching an external domain at all requires an `allowlist` — the
+  named escape-hatch mechanism around the deny-by-default baseline; (3)
+  regardless of the above, avoid untrusted-document-induced data
+  exfiltration ("避免 untrusted document 誘導資料外傳").
+
+  This file builds the RULE SHAPE and the two structural/behavioral rules
+  EC §99 actually decides (deny-by-default; watch for document-induced
+  exfiltration) as real, ACTIVE-grade content. It deliberately does NOT
+  invent the one thing EC §99 leaves unstated: which actual domains belong
+  on the allowlist. That content requires operator/organizational input no
+  mother document, ADR, or research artifact supplies — the same class of
+  gap `gate.schema.yaml`'s `gate_id_registry` and `rigor-level.schema.yaml`'s
+  `required_rigor_mapping.deep_intelligence` already established a
+  precedent for in this suite (build the skeleton now, mark the blocked
+  value space explicitly, do not guess). Because the allowlist is this
+  file's primary practical payload — unlike `gate.schema.yaml`, where only
+  one field (`gate_id`) of a much larger, otherwise-usable record shape is
+  blocked — this file's overall `status` is set to `PROVISIONAL` rather
+  than `ACTIVE`, honestly reflecting that the file cannot yet do its whole
+  job, not only that one sub-field is undecided. See `compilation_decisions`
+  for why this is a deliberate deviation from every other file in this
+  suite (all of which use top-level `status: ACTIVE`, even when a sub-field
+  is `TBD_PENDING_ROUND2_ADR`).
+
+  Also cross-references EC §101 Data Classification (L2955-2972) — "Restricted：
+  external provider routing must be policy-approved" is the same network-
+  egress concern viewed from the data-classification angle — and Master
+  Plan §64's own literal worked example ("Restricted data AND
+  external_model = true -> DENY", L2731-2734), which this file reuses
+  as one grounded worked example that needs no domain name at all (a
+  blanket deny on Restricted-classified data reaching any external model,
+  regardless of which domain).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §99 Network Egress (L2920-2934) — the file's entire structural grounding"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §101 Data Classification (L2955-2972) — Restricted data's external-provider-routing rule, cross-referenced"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §91 Policy-as-Code Paths (L2750-2762, network-egress.yaml at L2759)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §64 Policy-as-Code (L2714-2741) — condition/action rule-shape style, and the literal 'Restricted data AND external_model = true -> DENY' worked example this file reuses"
+  - "specs/security/personal-data-envelope.schema.yaml#/properties/classification_tag (soft cross-reference — the existing canonical instance of the MP §61/EC §101 four-value Public/Internal/Confidential/Restricted vocabulary; no standalone domain/data-classification.schema.yaml exists in this repo, verified by grep, so this file cites that vocabulary by name rather than inventing a second copy of it)"
+  - ".ai/research/phase-0/policy-inventory.yaml (L435-437: 'Network Egress deny-by-default + allowlist for high-sensitivity projects' tagged kind=policy — independent corroboration of EC §99's own framing, no additional content beyond what EC §99 itself states)"
+decided_by: >
+  No ADR. docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.9 lists
+  `ai-execution/` (EC §91's 8-file list, including network-egress.yaml) as
+  READY overall, but that row's READY status describes the EC §91 list's
+  8 files as a GROUP relative to the BLOCKED_PENDING_ROUND2_ADR rows
+  elsewhere in the same table (release/, and gate.schema.yaml's own
+  gate_id) — it does not certify that every one of the 8 files has fully
+  populated, operator-ready content. This file's own allowlist content gap
+  is the same SHAPE of blockage `gate.schema.yaml` (Wave 5) already
+  encountered and resolved by building the skeleton now with the blocked
+  value space explicitly marked (MACHINE_READABLE_SPEC_PLAN.md §3 Build
+  Order, L264 — corrected 2026-08-29, critic-flagged Minor: originally
+  mis-cited as "§4 L246", wrong section AND wrong line even before the
+  capability-contract edit that later shifted this file's other §3/§5
+  citations by +1 line; re-verified directly against the current document:
+  "可以先建這兩檔的骨架...gate_id enum 留 TBD_PENDING_ROUND2，不阻塞其餘
+  30+ 個檔案的建置") — applying that same established precedent here, for
+  the same reason (a genuinely undecided value space must not block the
+  surrounding structural work, but also must not be silently guessed).
+  Unlike gate_id's blockage (which is a NAMING/LIST dispute the corpus
+  already argues about — CROSS-R-5/CROSS-R-7/CROSS-T-11), this file's gap
+  is a pure ABSENCE (no mother document, ADR, or research artifact contains
+  even a candidate domain), which is why `open_questions` below frames it
+  as requiring fresh operator input rather than an ADR adjudicating between
+  competing existing lists.
+
+compilation_decisions:
+  - question: >
+      Every other file in this suite (46 files checked via grep) uses
+      top-level `status: ACTIVE`, including files with a genuinely blocked
+      sub-field (`gate.schema.yaml`'s `gate_id_registry.status:
+      TBD_PENDING_ROUND2_ADR`, `authority.schema.yaml`'s
+      `role_to_authority_mapping.status: SKELETON_ONLY`). This task's
+      instructions explicitly direct `status: PROVISIONAL` for this file
+      specifically. Should this file instead follow the suite-wide
+      ACTIVE-at-top-level convention, with the gap marked only at the
+      `allowlist` field level (matching `gate.schema.yaml`'s precedent
+      exactly)?
+    decision: >
+      Follow this task's explicit instruction: top-level `status:
+      PROVISIONAL`. This is a deliberate, disclosed deviation from the
+      suite's prior unanimous ACTIVE-at-top-level pattern, not an
+      inconsistency introduced by accident.
+    reasoning: >
+      The distinguishing factor from `gate.schema.yaml` is WHERE the
+      blocked content sits relative to the file's purpose.
+      `gate.schema.yaml`'s `gate_result` record shape (gate_id, status,
+      evidence, validator, timestamp, rationale) is fully usable today —
+      only the VALUE SPACE of one identifying field (`gate_id`) is
+      undecided, and a real gate outcome can still be recorded, audited,
+      and reasoned about with a provisional string in that field. This
+      file's situation is structurally worse: a Network Egress policy's
+      entire practical function IS the allowlist — a `network-egress.yaml`
+      with an empty allowlist enforces total deny-by-default for external
+      domains, which may or may not be the operator's intent (it is
+      certainly EC §99-compliant, but likely not deployable as-is for any
+      project that needs ANY external domain reachable). Marking only the
+      `allowlist` field internally (gate.schema.yaml-style) while leaving
+      top-level `status: ACTIVE` would risk a downstream reader treating
+      this file as "ready to enforce" when its central content is empty by
+      design — exactly the failure mode `authority.schema.yaml`'s
+      `role_to_authority_mapping.status: SKELETON_ONLY` field-level marker
+      was built to prevent for an EMPTY ARRAY specifically ("An empty array
+      alone is genuinely ambiguous... could be misread as materially
+      different and dangerous"). Promoting that same honesty to file-level
+      `status` here is the more conservative, more visible choice for a
+      file whose blocked content is not a peripheral field but its reason
+      to exist.
+  - question: >
+      EC §99's three lines (deny-by-default for high-sensitivity projects;
+      allowlist for external domains; avoid untrusted-document-induced
+      exfiltration) could be modeled either as ONE unified layered policy
+      (a single deny-by-default rule, with the allowlist as its escape
+      hatch and the exfiltration warning as an overlay) or as up to 3
+      independently-scoped named rules. Which did this file choose, and
+      why?
+    decision: >
+      Modeled as 3 independently-scoped named rules, distinguished by an
+      `egress_scope` enum with exactly 3 values
+      (HIGH_SENSITIVITY_PROJECT, EXTERNAL_DOMAIN_ROUTING,
+      UNTRUSTED_DOCUMENT_CONTEXT — SNAKE_CASE-normalized from EC §99's own
+      3-part textual structure). Flagged as an interpretive choice, not a
+      certainty, in `open_questions.OQ-EGRESS-2` — a future operator or
+      Round-2 review may prefer the single-layered-policy reading instead.
+    reasoning: >
+      This suite's established convention for a policy/record collection is
+      an array of individually-auditable, separately-versionable rule
+      instances (every sibling file in this Wave — tool-permissions.yaml,
+      forbidden-actions.yaml — follows this shape), rather than one
+      monolithic composite rule. Keeping the 3 scopes as separate rule
+      instances also makes each one independently `contains`-checkable for
+      coverage (see the next decision below) without forcing an artificial
+      choice about layering order EC §99's own 3 short, unordered lines do
+      not actually specify.
+  - question: >
+      EC §99's 3-part structure has no "例如"/"for example" framing (unlike
+      tool-permissions.yaml's EC §97 source) — is `egress_scope` a closed,
+      exhaustive 3-value set requiring the same full-coverage `contains`
+      treatment this Wave's forbidden-actions.yaml applies to its 5-value
+      set?
+    decision: >
+      Partially. Apply `contains`/`minContains: 1` per `egress_scope`
+      value (guaranteeing all 3 named cases are represented at least once)
+      but deliberately do NOT apply `maxContains: 1` or a fixed
+      `minItems`/`maxItems` on the rule array as a whole — unlike
+      forbidden-actions.yaml's 5 mutually-exclusive singleton verbs, a real
+      deployment legitimately needs MULTIPLE rules sharing one
+      `egress_scope` (e.g. many different EXTERNAL_DOMAIN_ROUTING rules,
+      one per tenant or data-classification tier) — that is an expected,
+      healthy pattern here, not a duplicate-detection concern the way a 2nd
+      DELETE entry would be in forbidden-actions.yaml.
+    reasoning: >
+      EC §99's list IS closed as a set of NAMED CONCERNS (no 4th concern is
+      textually present), which is what `minContains: 1` per value
+      guarantees — but it is not closed as a set of RULE INSTANCES, which
+      is what `maxContains: 1` would wrongly imply. Treating this file's
+      array exactly like forbidden-actions.yaml's would misrepresent an
+      open-ended rule set as a fixed 3-item list.
+  - question: >
+      How should `allowlist` avoid ever being mistaken for a real, decided
+      domain list, given this task's explicit instruction not to fabricate
+      one?
+    decision: >
+      Every real rule instance in `seed_content` below carries `allowlist:
+      []` (empty). A separate, explicitly `ILLUSTRATIVE_NON_NORMATIVE`
+      shape example uses the single domain string `example.invalid` — the
+      IANA-reserved "invalid" TLD (RFC 2606), guaranteed to never resolve
+      to any real, registrable service — rather than `example.com` (a real,
+      resolvable domain that could be misread as an implicit
+      recommendation).
+    reasoning: >
+      Matches `authority.schema.yaml`'s `role_to_authority_mapping
+      .entry_shape` precedent (`_status: ILLUSTRATIVE_NON_NORMATIVE`, an
+      explicit `_warning`, empty real `entries: []`) for the same class of
+      gap: a structurally-necessary field with zero legitimate content to
+      populate yet.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+# Root $ref (established pattern in this suite — see risk-tier.schema.yaml,
+# tool-permissions.yaml, forbidden-actions.yaml: without a root-level type
+# constraint, a validator pointed at this file's ROOT would accept ANY
+# value). Full absolute `ai-lego://` form used throughout this file, not a
+# bare `#/...` fragment. CAVEAT SCOPED 2026-08-29 (critic-flagged
+# Suggestion): the original comment here claimed a bare same-document
+# `#/...` $ref "can silently fail to resolve" under any validator once the
+# base scope is a custom scheme. Critic review re-tested this directly and
+# found it true ONLY for jsonschema's deprecated `RefResolver`; under
+# `referencing` (jsonschema >= 4.18, the library's current default), bare
+# `#/` fragments resolve correctly even against an `ai-lego://` base — and
+# bare `#/` is in fact this corpus's dominant convention (56 pre-existing
+# instances vs. 67 absolute, per that review). This file's own choice to
+# write full absolute form throughout is kept as-is (harmless, and matches
+# 3 of its 7 directory siblings), but the comment no longer overstates the
+# hazard as universal — it applies specifically to code still using the
+# legacy `RefResolver`. See this file's `verification` section for the
+# original jsonschema run this was caught by.
+$ref: "ai-lego://policies/ai-execution/network-egress.yaml#/egress_rules"
+
+definitions:
+
+  egress_scope:
+    description: >
+      EC §99's own 3-part structure (L2920-2934), SNAKE_CASE-normalized. No
+      4th value is invented — see compilation_decisions.
+    type: string
+    enum: [HIGH_SENSITIVITY_PROJECT, EXTERNAL_DOMAIN_ROUTING, UNTRUSTED_DOCUMENT_CONTEXT]
+
+  egress_rule:
+    description: >
+      One Network Egress rule instance. `allowlist` is meaningful only for
+      `scope: EXTERNAL_DOMAIN_ROUTING` rules whose `action` is
+      `ALLOWLIST_GATED`; it MUST be `[]` for any other scope/action
+      combination (see `constraints`).
+    type: object
+    required: [scope, condition, default_policy, action, mother_doc_text]
+    properties:
+      rule_id:
+        type: string
+        pattern: "^EGRESS-"
+      scope:
+        $ref: "ai-lego://policies/ai-execution/network-egress.yaml#/definitions/egress_scope"
+      condition:
+        type: string
+        description: "Structured predicate, Master Plan §64 rule-shape style."
+      default_policy:
+        type: string
+        enum: [deny, allow]
+        description: "EC §99's own literal 'deny by default' framing, as a two-value baseline-posture field."
+      action:
+        type: string
+        enum: [DENY, ALLOW, ALLOWLIST_GATED, REQUIRE_HUMAN_REVIEW]
+        description: >
+          Master Plan §64's condition-action vocabulary, extended with
+          `ALLOWLIST_GATED` — necessary because EC §99's own allowlist
+          mechanism is neither a bare ALLOW nor a bare DENY, it is
+          conditional on domain-list membership, a verdict shape MP §64's
+          2 worked examples (both plain DENY / REQUIRE HUMAN REVIEW) never
+          needed to express.
+      allowlist:
+        type: array
+        default: []
+        items:
+          type: string
+          description: "A domain string. See compilation_decisions and open_questions.OQ-EGRESS-1 — deliberately empty in every real rule instance below."
+      classification_tag_ref:
+        anyOf:
+          - type: string
+            enum: [Public, Internal, Confidential, Restricted]
+          - type: "null"
+        default: null
+        description: >
+          ADDITIVE, optional. Soft cross-reference to the MP §61/EC §101
+          four-value classification vocabulary (also the exact enum
+          `specs/security/personal-data-envelope.schema.yaml
+          #/properties/classification_tag` uses) — populated when a rule's
+          condition is scoped to a specific data classification, as in the
+          Master Plan §64 worked example below.
+      mechanism_ref:
+        type: [string, "null"]
+        default: null
+      source:
+        type: string
+      mother_doc_text:
+        type: string
+        description: "The literal EC §99 (or MP §64) text this rule instantiates, verbatim."
+    constraints:
+      - "`allowlist` MUST be `[]` unless `scope == EXTERNAL_DOMAIN_ROUTING AND action == ALLOWLIST_GATED`."
+      - "`default_policy` MUST be `deny` for every rule this file currently defines — EC §99 states no case where an external-facing default of `allow` is sanctioned (see open_questions.OQ-EGRESS-2 for whether a future rule could ever legitimately set it to `allow`)."
+
+egress_rules:
+  type: array
+  items:
+    $ref: "ai-lego://policies/ai-execution/network-egress.yaml#/definitions/egress_rule"
+  allOf:
+    - contains: { properties: { scope: { const: HIGH_SENSITIVITY_PROJECT } } }
+      minContains: 1
+    - contains: { properties: { scope: { const: EXTERNAL_DOMAIN_ROUTING } } }
+      minContains: 1
+    - contains: { properties: { scope: { const: UNTRUSTED_DOCUMENT_CONTEXT } } }
+      minContains: 1
+
+# ---------------------------------------------------------------------------
+# EC §99's 3 named concerns, plus the MP §64 worked example, instantiated.
+# `allowlist` is `[]` in every entry — see compilation_decisions and
+# open_questions.OQ-EGRESS-1. This is this file's entire real content;
+# nothing beyond EC §99 and MP §64's literal text is invented here.
+# ---------------------------------------------------------------------------
+seed_content:
+  description: >
+    4 rule instances validating against `egress_rule` above: one per EC
+    §99 named concern, plus Master Plan §64's own literal worked example
+    (which needs no domain name — a blanket deny on Restricted data
+    reaching any external model).
+  rules:
+    - rule_id: "EGRESS-EC99-1"
+      scope: HIGH_SENSITIVITY_PROJECT
+      condition: "project_sensitivity = high"
+      default_policy: deny
+      action: DENY
+      allowlist: []
+      classification_tag_ref: null
+      mechanism_ref: null
+      source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §99 (L2922-2926)"
+      mother_doc_text: "高敏感專案：deny by default"
+
+    - rule_id: "EGRESS-EC99-2"
+      scope: EXTERNAL_DOMAIN_ROUTING
+      condition: "destination = external domain"
+      default_policy: deny
+      action: ALLOWLIST_GATED
+      allowlist: []
+      classification_tag_ref: null
+      mechanism_ref: null
+      source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §99 (L2928-2932)"
+      mother_doc_text: "外部 domain：allowlist"
+
+    - rule_id: "EGRESS-EC99-3"
+      scope: UNTRUSTED_DOCUMENT_CONTEXT
+      condition: "content ingested from an untrusted document instructs or induces an outbound network request"
+      default_policy: deny
+      action: DENY
+      allowlist: []
+      classification_tag_ref: null
+      mechanism_ref: >-
+        No dedicated schema/mechanism exists yet in this repo for
+        prompt-injection or exfiltration-intent detection specifically —
+        EC §100 File Parsing Safety (L2938-2952) is the thematically
+        closest adjacent section but addresses parser-level safety
+        (archive bombs, path traversal, macros), not egress-triggered-by-
+        untrusted-content specifically. See open_questions.OQ-EGRESS-3.
+      source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §99 (L2934)"
+      mother_doc_text: "避免 untrusted document 誘導資料外傳"
+
+    - rule_id: "EGRESS-MP64-1"
+      scope: EXTERNAL_DOMAIN_ROUTING
+      condition: "classification_tag = Restricted AND external_model = true"
+      default_policy: deny
+      action: DENY
+      allowlist: []
+      classification_tag_ref: Restricted
+      mechanism_ref: >-
+        specs/security/personal-data-envelope.schema.yaml
+        #/properties/classification_tag (soft cross-reference — same
+        Restricted value); EC §101 Data Classification (L2966-2970,
+        "Restricted：external provider routing must be policy-approved")
+        states the identical rule from the data-classification angle.
+      source: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §64 (L2730-2734)"
+      mother_doc_text: "Restricted data AND external_model = true -> DENY"
+
+# ---------------------------------------------------------------------------
+# BLOCKED — the allowlist VALUE SPACE. Recorded for auditability, not
+# adjudicated. Same treatment style as gate.schema.yaml's gate_id_registry.
+# ---------------------------------------------------------------------------
+allowlist_registry:
+  status: PROVISIONAL_PENDING_OPERATOR_SIGNOFF
+  this_file_does: >
+    Defines the `egress_rule` SHAPE, including the `allowlist` field's
+    type (array of domain strings) and the rule under which it is
+    consulted (scope EXTERNAL_DOMAIN_ROUTING, action ALLOWLIST_GATED).
+  this_file_does_not: >
+    Does not name a single real domain anywhere. Does not pick a
+    per-tenant, per-project, or global allowlist scope. Does not assume
+    every deployment shares one allowlist. Populating `allowlist` with
+    real values for a real deployment is an operator decision this file
+    stops short of, deliberately.
+  allowlist_entry_shape:
+    _status: ILLUSTRATIVE_NON_NORMATIVE
+    _warning: >
+      SHAPE EXAMPLE ONLY. `example.invalid` is the IANA-reserved "invalid"
+      TLD (RFC 2606) — chosen specifically because it can never resolve to
+      a real, registrable service, so it cannot be mistaken for an implicit
+      domain recommendation. This value MUST NOT be copied into any real
+      rule's `allowlist` array or enforced as policy.
+    example: "example.invalid"
+
+open_questions:
+  - id: "OQ-EGRESS-1"
+    question: >
+      What actual domains belong on any `EXTERNAL_DOMAIN_ROUTING` rule's
+      `allowlist`, for which environment/tenant/project? Zero grounding
+      exists in the mother documents, any accepted ADR, or any
+      `.ai/research/` artifact (verified by grep). This is the file's
+      central open question.
+    owner: "operator"
+    blocks: >
+      Real enforcement of any EXTERNAL_DOMAIN_ROUTING rule — this file's
+      rule STRUCTURE is usable today (an empty allowlist correctly enforces
+      total deny-by-default per EC §99), but no external domain can be
+      lawfully reached under this policy until an operator supplies real
+      values.
+  - id: "OQ-EGRESS-2"
+    question: >
+      Should EC §99's 3 concerns instead be modeled as one unified layered
+      policy (single deny-by-default rule + allowlist escape hatch +
+      exfiltration overlay) rather than 3 independently-scoped rules (this
+      file's current choice, see compilation_decisions)? Relatedly: is
+      there any legitimate case where `default_policy: allow` is
+      appropriate (e.g. a low-sensitivity project with no Restricted data),
+      or does EC §99's silence on that case mean it should stay
+      structurally disallowed until stated otherwise?
+    owner: "operator or Round 2 review"
+    blocks: "nothing in this file's own validity — both readings produce schema-valid content; this affects only how the rule set composes at enforcement time"
+  - id: "OQ-EGRESS-3"
+    question: >
+      How should `UNTRUSTED_DOCUMENT_CONTEXT` concretely be detected and
+      enforced (e.g. prompt-injection scanning, content-provenance
+      tagging, an outbound-request gate keyed to the epistemic
+      authorship_state of the content that triggered it)? EC §99 states
+      the goal but names no mechanism; EC §100 File Parsing Safety is
+      thematically adjacent but does not address exfiltration-via-
+      untrusted-content either (see `seed_content` rule 3's
+      `mechanism_ref`).
+    owner: "operator, non-blocking — future platform/ai-execution module design"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read EC §99 (L2920-2934) in full — the entirety of this file's
+    structural grounding. Read EC §100 (L2938-2952) and §101 (L2955-2972)
+    in full for adjacency/cross-reference checks. Read MP §64 (L2714-2741)
+    in full. Grepped all three mother documents, `docs/adr/ADR-001~009`,
+    and every file under `.ai/research/` for any real domain name or
+    egress-allowlist candidate: zero hits, confirming the genuine gap this
+    file's `status: PROVISIONAL` and `allowlist_registry` record. Read
+    `specs/security/personal-data-envelope.schema.yaml`'s
+    `classification_tag` field and `specs/execution/gate.schema.yaml`'s
+    `gate_id_registry` in full for the PROVISIONAL/TBD_PENDING_ROUND2_ADR
+    precedent this file's `allowlist_registry` follows. Read
+    `specs/execution/authority.schema.yaml`'s `role_to_authority_mapping
+    .entry_shape` in full for the ILLUSTRATIVE_NON_NORMATIVE placeholder
+    convention. Validated the schema body and all 4 `seed_content.rules`
+    entries, plus the `allowlist_entry_shape` placeholder in isolation,
+    against `jsonschema.Draft202012Validator` with an `ai-lego://` resolver
+    handler — see this file's companion validation run in the compiling
+    session's report.
+  note: >
+    No mother document was modified to produce this file. EC §99's 3-line
+    text and MP §64's one worked example are transcribed verbatim in
+    `mother_doc_text` on each rule; the `egress_scope` 3-value split, the
+    `ALLOWLIST_GATED` action value, and every `mechanism_ref` cross-
+    reference are this file's own compilation choices, individually
+    justified above. No domain name anywhere in this file is real or
+    decided — `example.invalid` is an IANA-reserved non-resolvable
+    placeholder, chosen precisely so it cannot be mistaken for one.

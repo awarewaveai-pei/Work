@@ -147,22 +147,42 @@ compilation_decisions:
       but gives no field for tracking whether one still is).
 
 # ---------------------------------------------------------------------------
-# This file's relationship to the not-yet-built exception-policy.yaml
+# This file's relationship to policies/ai-execution/exception-policy.yaml
+# (built 2026-08-29, Wave 6 — see relationship_to_exception_policy.built_2026-08-29)
 # ---------------------------------------------------------------------------
 relationship_to_exception_policy:
+  status: BUILT
   description: >
-    `policies/ai-execution/exception-policy.yaml` (EC §91, L2760) is named as
-    a sibling Policy-as-Code file but is not part of this Wave's file-creation
-    scope and does not exist in this repo yet. It is expected to define WHEN
-    an exception MAY be granted (e.g. which risk tiers require which
-    authority level to approve, maximum allowable `expires_at` horizon,
-    whether certain scopes are categorically forbidden from having an
-    exception at all). This file defines only the SHAPE of an exception once
-    granted/logged. A future exception-policy.yaml should reference this
-    file's `id`/`risk_tier`/`required_authority_level` fields by name, not
-    redefine the record shape — recorded here so the Wave 6 author has this
-    boundary in writing rather than needing to re-derive it.
-  direction: "exception-policy.yaml (policy, Wave 6) depends on exception.schema.yaml (record shape, this file) — not the reverse."
+    HISTORICAL (describes the state as of this file's original Wave 5
+    authoring): `policies/ai-execution/exception-policy.yaml` (EC §91,
+    L2760) was named as a sibling Policy-as-Code file but was not part of
+    that Wave's file-creation scope and did not exist in this repo yet. It
+    was expected to define WHEN an exception MAY be granted (e.g. which risk
+    tiers require which authority level to approve, maximum allowable
+    `expires_at` horizon, whether certain scopes are categorically forbidden
+    from having an exception at all). This file defines only the SHAPE of an
+    exception once granted/logged. A future exception-policy.yaml was
+    expected to reference this file's `id`/`risk_tier`/`required_authority_level`
+    fields by name, not redefine the record shape — recorded here so the
+    Wave 6 author would have this boundary in writing rather than needing to
+    re-derive it.
+  built_2026-08-29: >
+    `policies/ai-execution/exception-policy.yaml` now exists (Wave 6). It
+    binds `risk_tier` to `required_authority_level` (R3->A3, R4->A4 minimum;
+    R0/R1/R2 -> no minimum established) using each tier's own already-ACTIVE
+    `required_actions` text (risk-tier.schema.yaml's "Human Approval" /
+    "Explicit Human Authority") rather than redefining this file's record
+    shape — matching the expectation recorded above verbatim. It found no
+    mother-document grounding for a maximum `expires_at` horizon or for any
+    categorically forbidden scope, and left both as explicit open questions
+    (`exception-policy.yaml` `open_questions.OQ-EXCPOL-1` /
+    `OQ-EXCPOL-2`) rather than inventing values — see that file for the
+    full evidence trail.
+  direction: >
+    exception-policy.yaml (policy, Wave 6) depends on exception.schema.yaml
+    (record shape, this file) — not the reverse. Confirmed unchanged now
+    that exception-policy.yaml is built: it consumes this file's fields, it
+    does not alter them.
 
 # ---------------------------------------------------------------------------
 # Explicitly OUT OF SCOPE: other, unrelated uses of the word "exception"

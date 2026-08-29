@@ -1,6 +1,38 @@
 # Worklog
 
-## 2026-08-29（續18）
+## 2026-08-29（續19）
+
+### AI LEGO Phase 3 Wave 6 — `domain/capability-contract.schema.yaml` + `policies/ai-execution/` 8 檔全建，critic 獨立覆審 0 Critical/6 Major/多項 Minor 全數修正
+
+**背景**：續16 完成 Wave 1-5 全批 critic 覆審修正後，操作者說「繼續」，依 `MACHINE_READABLE_SPEC_PLAN.md` §3 進入 Wave 6：EC §91「Policy-as-Code Paths」明列的 8 檔 `/policies/ai-execution/` 清單，加上先前兩度延後、依賴鏈已補齊的 `specs/domain/capability-contract.schema.yaml`（MP §8.3 Capability Contract 唯一具體實例）。5 個 subagent 平行派出，先由主 session 裁決 EC §91（具體 8 檔）vs Master Plan §64（籠統 6 類目錄）的目錄結構衝突（採 EC §91 為主，MP §64 的 `/ai/` 類目視為被本子樹滿足），再各自建置。操作者事後問「進度?」，如實回報 5 個背景 agent 執行中，未捏造結果。
+
+**Wave 6 建置結果**：9 個新檔全建——`authority.yaml`（EC §9 A0-A4 綁定 ALLOW 動作，$ref 交叉引用 `forbidden-actions.yaml`）、`risk-tiers.yaml`（R0-R4 綁定粗粒度 ALLOW/REQUIRE_HUMAN_REVIEW 判決）、`tool-permissions.yaml`（EC §96/97 Tool Broker 7 維度限制）、`forbidden-actions.yaml`（MP §65 5 動詞封閉清單 DEFAULT-DENY）、`network-egress.yaml`（EC §99，`status: PROVISIONAL`——真實 gap：全語料庫零 domain allowlist）、`exception-policy.yaml`（風險層級對應核准權限門檻）、`mandatory-gates.yaml`（`status: PROVISIONAL`，骨架 only，gate_id 清單仍卡在 CROSS-R-5/7/T-11 未決）、`release-policy.yaml`（`status: PROVISIONAL`，EC §143/§144 前後上線 checklist 全文轉譯）、`capability-contract.schema.yaml`（MP §8.3 逐欄位轉譯 + 新增 `entitlement` 區塊關閉 P1-GAP-PROD-1）。全數含 `compilation_decisions`/`open_questions`/`verification` 段落，31 個跨檔 `$ref` 用 `jsonschema.RefResolver` + 自訂 `ai-lego://` handler 全數驗證通過。
+
+**Critic 獨立覆審（撰寫者以外的 subagent，非自我審查）發現並全數修正**：
+- **6 個 Major**：① `authority.yaml` 5 個 ALLOW 條件字串未含 authority 前提子句（如「Agent deletes production data → ALLOW」讀起來像無條件允許），對比同目錄 `forbidden-actions.yaml` 的 DENY 條件有內嵌前提——補上 `AND granted_authority_level == A4` 等子句（含未被 critic 點名但同類的 AUTHZ-A3-DEPLOY-REVERSIBLE 一併修，不留半套）② `authority.yaml` 的 `forbidden_actions_ref` coverage guard（4 個 `contains` 區塊）未帶 `required`，PoC 證實可用「5 列全部拿 `forbidden_actions_ref: null`」繞過——補 `required: [forbidden_actions_ref]`，繞過 payload 重測確認拒絕 ③ `mandatory-gates.yaml` 的 `verification.method` 聲稱「已讀 MP §158 全文，只給高風險項目名稱」——直接重讀母文件 L5910-5920 證實**11 個 Global 項目名稱其實全部都在**，包含 Rollback PASS；重新裁決 OQ-MGATE-2（3 候選清單中僅 2/3 在 High-risk 層有 Rollback 類項目，MP 的 Rollback 只在 Global 層，故仍不足以達到與 human-review 規則同等的 3/3 收斂門檻，結論不變但理由訂正）④ 3 處「同批其他檔案未建」過期宣稱（`authority.yaml`/`risk-tiers.yaml`/`exception-policy.yaml` 各一處，都是同 commit 內平行 agent 互相看不到彼此最終狀態的快照競態）⑤ `exception-policy.yaml` 兩處 EC 行號引用錯誤（L61-64/L74-78 實為文件其他無關段落，正確為 L404-408/L422-427）⑥ `MACHINE_READABLE_SPEC_PLAN.md` 的 Wave 6 追蹤未同步（§2.9 row 183 仍寫 READY、Build Order 圖仍寫舊佔位文字）。
+- **多項 Minor**：`release-policy.yaml` EC §146 流程步驟數誤植 20（實數 21）；同檔 compilation_decisions 引用 phase-0 `policy-inventory.yaml` 的 `kind: "gate"` 標籤當作「獨立確認分離」，重讀後發現該標籤與 EC §68 Global Gates 條目共用同一個值，證據其實指向相反方向（已訂正，但本體判決——依 EC §143/144 全文無 §68/69 交叉引用——經 critic 直接對母文件重新推導確認成立，不受影響）；8 處因同 commit 內 `capability-contract.schema.yaml` 編輯導致 MRSP 行號位移 1 行（L254/L294 → L255/L295）；`network-egress.yaml` 一處「§4 L246」引用在位移前就已經錯（§4 是不相關的「Atlas Method Contract 補齊策略」）；`authority.yaml` 的 OQ-AUTHPOL-3 揭露「這個目錄的 action 詞彙分歧」時只點名 2 siblings/4 檔，實際已有 7 檔宣告重疊詞彙且遺漏 `network-egress.yaml` 的 `ALLOWLIST_GATED` 與第二組小寫 `default_policy` enum；`exception-policy.yaml` 聲稱「expir 的 13 個 grep 命中逐一列出」實際只列了 9 個，另 4 個（EC:1038, MP:5081/5450/5898）讀過但未列——獨立重跑 grep 確認總數與內容皆屬實，結論不變（無任何一處給出到期上限數字）。
+
+**修 Minor 時自己新捅的洞（當場抓到自己修）**：① 幫 `tool-permissions.yaml` 加 `anyOf` 機械化「至少一項 restrictions 或 max_authority_level」的散文限制時，手滑在同一個 YAML mapping 裡寫了兩個 `description:` key——PyYAML 預設靜默用後者覆蓋前者，若沒發現就是一個新的靜默 bug；重讀 diff 立刻發現並合併成一個 description ② 用 `sed 's/L255/L264/g; s/L295/L304/g'` 對 4 個檔案批次修正因新增 Wave 6 build-order 區塊（+9 行）導致的行號位移時，`sed` 對子字串（非詞界）比對，把 `network-egress.yaml` 裡完全無關的 `L2955`（EC §101 真實行號）誤配 `L295` 子字串、`L2955-2972` 被腰斬改寫成 `L3045-2972`——用 `grep -oE "L[0-9]{4}"` 全量掃描 4 個檔案找出這個唯一的腐化實例並訂正回 `L2955`，同時也發現另一個 `gate.schema.yaml` 內既有的「§4 L246」是與 network-egress.yaml 同一類但獨立存在的錯誤（不在 critic 這次的檢查範圍，因為 gate.schema.yaml 屬 Wave 5 非本輪撰寫對象），一併訂正並確認全域無第二處殘留。
+
+[已修改]
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/policies/ai-execution/{authority,risk-tiers,mandatory-gates,tool-permissions,forbidden-actions,network-egress,exception-policy,release-policy}.yaml`（新增，8 檔）：見上方逐項修正
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/domain/capability-contract.schema.yaml`（新增）：Minor 訂正（`editions_allowed` cardinality 敘述、MRSP 行號歷史性引用註記）
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/execution/gate.schema.yaml`：3 處「§4 L246」訂正為「§3 Build Order L264」（本輪 bughunt 自行發現，非 critic 報告範圍）
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/execution/{authority,risk-tier}.schema.yaml`、`specs/cognitive/rigor-level.schema.yaml`：3 處「未來檔案」過期引用訂正（`authority.yaml`/`mandatory-gates.yaml`/`gate.schema.yaml` 均已建）
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`：§2.9 row 183 更新為 BUILT（8/8，含各檔 status 明細）；Build Order 圖新增 Wave 6 完成區塊
+- `agency-os/WORKLOG.md`：本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3` jsonschema Draft202012Validator + referencing.Registry 對 9 個 Wave 6 檔案 + capability-contract + 6 個既有依賴檔（authority/risk-tier/status-codes/gate/epistemic-label/method-execution-request）跑 37 個跨檔 $ref 解析 + 8 組真實內容驗證（authority.yaml 10 列 rules、risk-tiers.yaml 5 列 bindings、mandatory-gates.yaml grounded_rules、exception-policy.yaml policy_content、release-policy.yaml example、network-egress.yaml seed_content、tool-permissions.yaml worked_examples）+ 3 組對抗式 PoC（authority.yaml 繞過 payload 正確拒絕、tool-permissions.yaml no-op payload 正確拒絕、兩個正控組正確通過）| exit=0（全數 PASS，0 failures）| ms=約 4000
+- REVIEW_DONE: critic=Standard | verdict=warn（首輪）→pass（修正後）| findings=0 Critical/6 Major/約 10 Minor/3 Suggestion（獨立 subagent 覆審，撰寫者以外）
+- BUGHUNT_DONE: scope=agency-os,specs,policies | grep=`L246`, `L255\b`, `L295\b`, `unbuilt sibling`, `remain unbuilt`, `20 stages`, `duplicate mapping key`(自訂 UniqueKeyLoader 掃描) | hits=0（訂正後重掃全部歸零；過程中該 grep 本身抓到 gate.schema.yaml 3 處未在 critic 報告內的同類錯誤，見上方「自己新捅的洞」段）
+
+[剩餘風險]
+- `mandatory-gates.yaml`/`network-egress.yaml`/`release-policy.yaml` 仍 `status: PROVISIONAL`——非本輪缺陷，是真實卡在 Round 2 ADR（OQ-10 Global/High-risk Gate 清單）與純粹操作者決策缺口（allowlist domain 清單）
+- 1 個 Suggestion 未處理（`policies/ai-execution/` 5 檔 identity 欄位命名不一致：`id`/`rule_id`/optional `rule_id`/無此欄位）——記錄於 critic 報告，屬架構一致性建議非缺陷，留待未來 Wave 或操作者決定是否統一
+
+[rollback]
+`git revert` 本次 commit 即可完整回退 9 個新檔 + 7 個既有檔修正；無 DB/prod 操作，純文件層級變更
 
 ### 治本（非補丁）：host nginx 443 補 `default_server` 安全網，docs/trust.aware-wave.com 正式上線佔位頁，關掉整類「未來子網域忘記建 vhost」的洞
 

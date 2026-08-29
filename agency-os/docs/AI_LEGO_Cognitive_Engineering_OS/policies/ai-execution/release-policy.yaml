@@ -1,0 +1,440 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://policies/ai-execution/release-policy.yaml"
+title: Release Policy
+version: "1.0.0"
+status: PROVISIONAL
+
+description: >
+  Policy-as-code binding of the release-readiness rules — Execution
+  Contract §91 "Policy-as-Code Paths" (L2750-2762) names this file
+  `/policies/ai-execution/release-policy.yaml` at L2761. Named in
+  MACHINE_READABLE_SPEC_PLAN.md §3 Build Order (L264) alongside
+  `gate.schema.yaml` as blocked on the same undecided Global/High-risk Gate
+  list (CROSS-R-5/CROSS-R-7/CROSS-T-11, OQ-10) — "只影響 Wave 5 的
+  gate.schema.yaml 與 Wave 6 的 release-policy.yaml". Per §2.9's own row for
+  `ai-execution/` (L183 — updated 2026-08-29 to "BUILT（2026-08-29，8/8）"
+  after this Wave's 8/8 files landed; this file's original "READY overall"
+  framing below reflects that row's wording at the time this file was
+  written, and is superseded by, not contradicted by, the row's current
+  text), this file's status was READY overall at write time, with the
+  BLOCKED annotation applying specifically to whichever content would need
+  the disputed gate_id list — not to the entire file.
+
+  What IS grounded, independent of the disputed list, and built here in
+  full: EC §143 Pre-release Checklist (11 items, verbatim, L3846-3860) and
+  §144 Post-release Checklist (10 items, verbatim, L3864-3877) — a
+  PLAIN-TEXT checklist that is textually SEPARATE from the EC §68/Atlas §22
+  Global/High-risk Gate enumeration (different item wording, different
+  section, no cross-reference between them found in either section's own
+  text, and not itself named in CROSS-R-5/CROSS-R-7/CROSS-T-11's finding
+  text; see `compilation_decisions` for why this file does not assume they
+  are the same list); EC §146's full standard flow (L3893-3937), for the
+  sequencing constraint around STAGED RELEASE; and
+  execution/risk-tier.schema.yaml's R3/R4 `required_actions` items that are
+  release-specific (Canary/Blue-Green, Post-deployment Verification,
+  Recovery Drill, Rollback or Compensating Plan, Emergency Stop) — all
+  ADR-004-decided.
+
+  What is BLOCKED: the STRUCTURAL rule "release requires mandatory gates to
+  PASS" is buildable (it only needs `gate.schema.yaml`'s `gate_result
+  .status` enum, `status-codes.schema.yaml`'s Final Status enum, and this
+  same Wave's sibling `mandatory-gates.yaml`'s rule shape, all three
+  grounded), but WHICH gate_id values that rule ultimately ranges over is
+  not — same TBD_PENDING_ROUND2_ADR deferral as
+  `mandatory-gates.yaml#/grounded_rules/rules[].gate_ref` and
+  `gate.schema.yaml#/gate_result/properties/gate_id`.
+
+  This file does not pick a side in the disputed gate-list count, does not
+  merge/union the three candidate lists, and does not invent a 4th list.
+  `status: PROVISIONAL` (not `ACTIVE`) is used per this task's explicit
+  instruction. This is a judgment call worth disclosing honestly: sibling
+  file `network-egress.yaml` (built concurrently in this same Wave; see
+  below) establishes the criterion "`PROVISIONAL` when the blocked content
+  is close to the file's ENTIRE practical payload, `ACTIVE` when only one
+  field of an otherwise-complete shape is blocked" — under that criterion
+  this file is a genuine borderline case, since its MAJORITY content
+  (pre_release_checklist, post_release_checklist, release_sequence,
+  risk_tier_release_requirements) is fully grounded and unblocked, and only
+  `release_gate_requirement`'s gate range is blocked. `PROVISIONAL` is used
+  here per explicit task-brief instruction and because it is the more
+  conservative, more visible choice while MRSP-1 remains open — see
+  `compilation_decisions` for the full disclosure.
+
+  Directory context (discovered mid-task): at the time of writing,
+  `policies/ai-execution/` already contains `tool-permissions.yaml`,
+  `forbidden-actions.yaml`, `network-egress.yaml`, and
+  `exception-policy.yaml`, apparently produced by a concurrent session
+  working through EC §91's same 8-file list, plus this Wave's sibling
+  `mandatory-gates.yaml` (built immediately before this file, in the same
+  task). This file's `release_gate_requirement` rule shape aligns with that
+  concurrent convention (`condition`/`action` fields per Master Plan §64)
+  rather than inventing a divergent shape.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §91 Policy-as-Code Paths (L2750-2762, release-policy.yaml at L2761) — this file's directory placement"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §143 Pre-release Checklist (L3846-3860) — verbatim 11-item checklist"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §144 Post-release Checklist (L3864-3877) — verbatim 10-item checklist"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §146 完整標準流程 (L3893-3937) — the STAGED RELEASE / POST-VERIFY / OBSERVATION WINDOW / HANDOFF / CLOSE sequencing this file's `release_sequence` transcribes"
+  - "execution/risk-tier.schema.yaml tiers.R3.required_actions, tiers.R4.required_actions — the release-specific ADR-004-decided actions (Canary/Blue-Green, Post-deployment Verification, Recovery Drill, Rollback or Compensating Plan, Emergency Stop)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §64 Policy-as-Code (L2714-2741) — the condition/action rule-shape style `release_gate_requirement` follows, same convention as sibling files in this Wave"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.9 row `ai-execution/` (L183 — read as 'READY overall' at this file's write time; updated 2026-08-29 to 'BUILT（2026-08-29，8/8）' once this Wave's 8/8 files landed) — the gate-dependent BLOCKED annotation this row records was, and remains, scoped narrowly, not to the entire file"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §3 Build Order (L264) — 'release-policy.yaml' named alongside gate.schema.yaml as skeleton-buildable now"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §5 Open Questions MRSP-1 (L304) — the blocking dependency, scoped to 'Wave 5-6 兩個檔案'"
+  - "execution/gate.schema.yaml gate_result/properties/status — the PASS/FAIL/BLOCKED/NOT_APPLICABLE enum this file cites for context (not directly $ref'd — see compilation_decisions for why the task-level Final Status enum is used instead)"
+  - "execution/status-codes.schema.yaml reference_vocabulary/final_status/schema — the PASS/PASS_WITH_APPROVED_RISK/BLOCKED/FAILED/NEEDS_HUMAN_REVIEW/ROLLED_BACK/PARTIAL_SUCCESS enum (EC §70) this file's `release_gate_requirement.required_status` field reuses"
+  - "policies/ai-execution/mandatory-gates.yaml mandatory_gate_rules, grounded_rules — the sibling policy this file's release_gate_requirement composes with, built in the same task under the identical blocking condition"
+  - ".ai/research/phase-0/policy-inventory.yaml (L603-610) — phase-0's own catalog entry for the Pre-/Post-release Checklists, confirming their existence and item counts independently of this compilation pass, with no recorded cross-reference to the Global/High-risk Gate entries in the same inventory file"
+  - ".ai/research/phase-0/open-questions.yaml OQ-10 (L68-72) — the unresolved ownership question this file's release_gate_requirement gate range defers to"
+
+decided_by: >
+  No ADR governs the gate_id VALUE SPACE the release_gate_requirement rule
+  ranges over — identical situation to gate.schema.yaml and
+  mandatory-gates.yaml (see their `decided_by`). The §143/§144 checklists
+  and §146 sequencing carry no ADR either, because none is needed: they are
+  direct, low-risk, single-source verbatim transcriptions with no competing
+  mother-document version (grepped EC/Atlas/MP for "Pre-release Checklist" /
+  "Post-release Checklist" case-insensitively — each appears exactly once,
+  only in EC §143/§144; no duplicate/conflicting version exists to
+  reconcile). This is the same class of Low-risk direct-transcription
+  compilation gate.schema.yaml's `gate_result` shape and
+  risk-tier.schema.yaml's tier examples/required_actions used.
+
+compilation_decisions:
+  - question: >
+      MACHINE_READABLE_SPEC_PLAN.md §3 (L264) says release-policy.yaml is
+      blocked "同 gate.schema.yaml" (same as gate.schema.yaml) on the
+      disputed Global/High-risk Gate list. But EC §143/§144's Pre-/Post-
+      release Checklist items ("Tests PASS", "Security PASS", "Data PASS",
+      "Rollback ready", "Release strategy ready", etc.) read similarly to
+      some of EC §68's Global Gate names ("Security", "Data", "Rollback").
+      Should this file treat §143/§144 as the SAME list as §68's Global
+      Gates (just release-scoped), and therefore treat the ENTIRE checklist
+      as blocked too, not just the gate_id-referencing part?
+    decision: >
+      No. Treat §143/§144 as a SEPARATE, self-contained checklist — build
+      it in full, verbatim, unblocked. Only the distinct
+      `release_gate_requirement` rule (which explicitly ranges over
+      `gate_id`) is blocked.
+    reasoning: >
+      Textual overlap is not identity. (1) §143/§144's items are plain
+      checklist LINES ("[ ] Security PASS"), not `gate_id` references —
+      they never use the word "gate" or cite §68/§69 anywhere in their own
+      text (verified by reading L3846-3877 directly: no cross-reference to
+      §68/§69 exists there). (2) The item SETS genuinely differ: §143 has
+      11 items including "Change matches plan", "No scope creep", "Human
+      approval where required" — none of which appear in EC §68's 14-item
+      Global Gate list or Atlas §22.1's identical 14; §68's list includes
+      "Localization"/"Accessibility"/"Capacity"/"Documentation"/"Golden
+      Test", none of which appear in §143/§144. Asserting they are the same
+      list (or a subset/superset of each other) would be an unverified
+      inference, not a transcription — exactly what R0 forbids and exactly
+      the class of error `gate.schema.yaml`'s own compilation_decisions
+      warned against (its first entry, refusing to infer a `category`
+      discriminator not actually stated). (3) CORRECTED 2026-08-29
+      (critic-flagged, Minor): the original version of this argument cited
+      Phase 0's own `policy-inventory.yaml` cataloging §143/§144 (L603-610)
+      as separate line items from §68's Global/High-risk Gate entries
+      (L339-341) as "independent confirmation" of a split. Direct re-read
+      shows the opposite: both entries carry the IDENTICAL `kind: "gate"`
+      tag (L341, L605, L609) — phase-0's own taxonomy does NOT distinguish
+      them, which is evidence against treating this as a confirmed split,
+      not confirmation of one. This argument is retracted; it does not
+      change the decision, which rests on arguments (1) and (2) above (no
+      "gate"/§68/§69 cross-reference in either checklist's own text, and
+      genuinely non-overlapping item sets) — both independently re-verified
+      by critic review directly against the mother documents and found
+      sound (see that review's "Verified Clean" section). This distinction
+      is recorded as `OQ-RELPOL-1` below (a genuinely new observation, not
+      a previously-tracked CROSS-*/DOC-* finding) rather than silently
+      assumed.
+  - question: >
+      Given §143/§144 are unblocked, should this file ALSO build the
+      "release requires mandatory gates to PASS" structural rule the
+      plan's §2.9 annotation implies release-policy.yaml needs
+      (gate.schema.yaml-dependent content), or omit it entirely since its
+      gate_id range is blocked?
+    decision: >
+      Build the STRUCTURAL rule (`release_gate_requirement`), with its
+      gate coverage sourced from `policies/ai-execution/mandatory-
+      gates.yaml#/mandatory_gate_rules` (currently exactly 1 rule) rather
+      than a standalone enumeration.
+    reasoning: >
+      Omitting it entirely would under-deliver relative to what MRSP §2.9's
+      own annotation ("release-policy.yaml 內容依附 gate.schema.yaml")
+      implies is the intended coupling; building a second, independent
+      partial gate list here (instead of referencing mandatory-gates.yaml)
+      would duplicate — and risk drifting from — the one already built in
+      this same Wave. Composing the two keeps exactly ONE place
+      (`mandatory-gates.yaml`) as the registry of which gates are mandatory
+      for which condition, with this file only consuming it, matching the
+      "single source of truth, mother documents reference it" discipline
+      `status-codes.schema.yaml`'s own `description` states explicitly.
+  - question: >
+      Should `release_gate_requirement.required_status` cite
+      `gate.schema.yaml#/gate_result/properties/status` (the per-gate
+      PASS/FAIL/BLOCKED/NOT_APPLICABLE enum, EC §69) or
+      `status-codes.schema.yaml#/reference_vocabulary/final_status/schema`
+      (the task-level PASS/PASS_WITH_APPROVED_RISK/BLOCKED/FAILED/
+      NEEDS_HUMAN_REVIEW/ROLLED_BACK/PARTIAL_SUCCESS enum, EC §70)?
+    decision: "final_status (EC §70), not gate_result.status (EC §69)."
+    reasoning: >
+      A release-readiness VERDICT is a judgment about the whole release
+      (has every applicable gate reached an acceptable outcome), which is
+      exactly what EC §70's Final Status vocabulary is for — and it already
+      includes `PASS_WITH_APPROVED_RISK`, a verdict EC §69's narrower
+      per-gate enum has no equivalent of (a gate is PASS/FAIL/BLOCKED/
+      NOT_APPLICABLE; nothing in EC §69 lets one FAILED gate be
+      risk-accepted while the release still proceeds — that concept exists
+      only at the §70 level). Conflating the two enums would either lose
+      `PASS_WITH_APPROVED_RISK` (if using §69's enum) or imply individual
+      gates can independently be "PARTIAL_SUCCESS"/"ROLLED_BACK" (§70
+      values that make sense for a whole task, not a single gate) if using
+      §70's enum at the per-gate level. Keeping them distinct, with this
+      file citing §70's task-level enum for its task-level verdict field,
+      preserves both vocabularies' own scope.
+  - question: >
+      Should `release_gate_requirement` follow this Wave's now-established
+      `condition`/`action` rule shape (Master Plan §64), matching sibling
+      files and this file's own `mandatory-gates.yaml` (built immediately
+      before this file, in the same task)?
+    decision: >
+      Yes — `release_gate_requirement` carries literal `condition` (a
+      release-readiness predicate) and `action` (enum, same 4 values), in
+      ADDITION to its granular `gate_rules_source`/`required_status`/
+      `scope` fields.
+    reasoning: >
+      Consistent with the "condition/action plus granular fields" additive
+      convention `tool-permissions.yaml` established and
+      `mandatory-gates.yaml` (this task's other deliverable) already
+      applied. `action: DENY` is the correct verdict here (not
+      `REQUIRE_HUMAN_REVIEW`, which `mandatory-gates.yaml`'s own rule
+      uses): the release_gate_requirement's function is to DENY the
+      STAGED RELEASE transition (see `release_sequence` below) when its
+      condition is NOT met — a blocking precondition on a workflow
+      transition, which is exactly Master Plan §64's first worked example's
+      shape ("Restricted data AND external_model = true -> DENY"), not its
+      second (REQUIRE HUMAN REVIEW is a distinct verdict already used by
+      the gate this rule composes with, not this rule itself).
+
+# ---------------------------------------------------------------------------
+# GROUNDED — EC §143 Pre-release Checklist, verbatim (L3846-3860).
+# ---------------------------------------------------------------------------
+pre_release_checklist:
+  source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §143 (L3846-3860)"
+  items:
+    - "Change matches plan"
+    - "No scope creep"
+    - "Tests PASS"
+    - "Security PASS"
+    - "Data PASS"
+    - "Compatibility PASS"
+    - "Migration PASS where applicable"
+    - "Observability ready"
+    - "Rollback ready"
+    - "Release strategy ready"
+    - "Human approval where required"
+
+# ---------------------------------------------------------------------------
+# GROUNDED — EC §144 Post-release Checklist, verbatim (L3864-3877).
+# ---------------------------------------------------------------------------
+post_release_checklist:
+  source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §144 (L3864-3877)"
+  items:
+    - "Deployment healthy"
+    - "User-visible behavior correct"
+    - "Data reconciled"
+    - "SLO healthy"
+    - "No security regression"
+    - "No policy violation"
+    - "No jurisdiction violation"
+    - "Observation window satisfied"
+    - "Temporary resources handled"
+    - "Handoff complete"
+
+# ---------------------------------------------------------------------------
+# GROUNDED — EC §146 full standard flow, the segment bracketing release
+# (verbatim node sequence, L3893-3937).
+# ---------------------------------------------------------------------------
+release_sequence:
+  source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §146 完整標準流程 (L3893-3937)"
+  description: >
+    EC §146's full flow has 21 stages (USER/SYSTEM TASK through
+    MONITOR/LEARN/REVERSE WHEN NEEDED, recounted directly against L3896-3936
+    after critic review flagged the original "20" as an off-by-one, 2026-08-29);
+    only the release-adjacent segment is transcribed here — see the source
+    for the complete sequence, not re-duplicated in full.
+  ordered_stages:
+    - "QUALITY GATES"
+    - "HUMAN AUTHORITY IF REQUIRED"
+    - "STAGED RELEASE"
+    - "POST-VERIFY"
+    - "OBSERVATION WINDOW"
+    - "HANDOFF"
+    - "CLOSE"
+  constraints:
+    - "STAGED RELEASE MUST NOT occur before QUALITY GATES and HUMAN AUTHORITY IF REQUIRED (when required) have completed, per §146's linear ordering."
+    - "POST-VERIFY, OBSERVATION WINDOW, and HANDOFF MUST all occur after STAGED RELEASE and before CLOSE, per §146's linear ordering — matches post_release_checklist's 'Observation window satisfied' / 'Handoff complete' items above."
+
+# ---------------------------------------------------------------------------
+# GROUNDED — risk-tier-specific release requirements, ADR-004-decided.
+# ---------------------------------------------------------------------------
+risk_tier_release_requirements:
+  description: >
+    Release-relevant subset of execution/risk-tier.schema.yaml's
+    ADR-004-decided `required_actions`. Not a re-declaration of the full
+    tier definition — see that file for R0-R2's non-release-specific
+    actions.
+  R3:
+    source: "execution/risk-tier.schema.yaml tiers.R3.required_actions"
+    release_relevant_actions:
+      - "Canary / Blue-Green where applicable"
+      - "Human Approval"
+      - "Post-deployment Verification"
+  R4:
+    source: "execution/risk-tier.schema.yaml tiers.R4.required_actions"
+    release_relevant_actions:
+      - "Explicit Human Authority"
+      - "Recovery Drill"
+      - "Emergency Stop"
+      - "Rollback or Compensating Plan"
+
+# ---------------------------------------------------------------------------
+# Schema body for the one structural, PARTIALLY BLOCKED rule this file
+# defines. Its SHAPE and its ONE populated gate-coverage source
+# (mandatory-gates.yaml's single rule) are grounded; the full gate_id range
+# it should ultimately cover is TBD_PENDING_ROUND2_ADR, same as
+# mandatory-gates.yaml.
+# ---------------------------------------------------------------------------
+
+# Root $ref (established pattern in this suite — see risk-tier.schema.yaml,
+# tool-permissions.yaml, forbidden-actions.yaml, mandatory-gates.yaml):
+# without a root-level type constraint, a validator pointed at this file's
+# ROOT would accept ANY value. Unlike those array-shaped siblings, this
+# file's practical payload is genuinely multi-component (two checklists, a
+# sequence, tier requirements, one rule) — matching `gate.schema.yaml`'s own
+# precedent of NOT adding a single root $ref for a multi-component file,
+# since no single fragment here is "the" root concept.
+release_gate_requirement:
+  type: object
+  description: >
+    "STAGED RELEASE (release_sequence above) MAY NOT proceed unless every
+    applicable mandatory gate's outcome is an acceptable Final Status."
+    Structural rule only — ranges over whatever `policies/ai-execution
+    /mandatory-gates.yaml#/mandatory_gate_rules` currently contains (today:
+    1 rule, R3/R4 human-review-class), not a fixed list re-declared here.
+    Field shape aligned with this Wave's `condition`/`action` convention —
+    see `compilation_decisions`.
+  required: [condition, action, gate_rules_source, required_status, scope]
+  properties:
+    condition:
+      type: string
+      const: "NOT (every rule in policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules that applies to this task has reached an acceptable Final Status per required_status below)"
+      description: "Master Plan §64 rule-shape style predicate."
+    action:
+      type: string
+      const: DENY
+      description: >
+        Verdict on the STAGED RELEASE transition when `condition` holds.
+        Master Plan §64's own condition-action vocabulary, same field the
+        sibling files and mandatory-gates.yaml use — see
+        compilation_decisions for why DENY (not REQUIRE_HUMAN_REVIEW) is
+        the correct verdict for this specific rule.
+    gate_rules_source:
+      type: string
+      const: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+      description: "The single source of truth this rule composes with — not duplicated here."
+    required_status:
+      type: array
+      minItems: 1
+      items:
+        $ref: "ai-lego://specs/execution/status-codes.schema.yaml#/reference_vocabulary/final_status/schema"
+      description: >
+        Acceptable per-gate-rule outcomes for release to proceed. Grounded
+        in EC §70 Final Status vocabulary via status-codes.schema.yaml —
+        NOT the narrower gate_result.status enum (PASS/FAIL/BLOCKED/
+        NOT_APPLICABLE); see compilation_decisions for why the task-level
+        vocabulary is used here instead.
+    scope:
+      type: string
+      enum: [TBD_PENDING_ROUND2_ADR]
+      description: >
+        Whether this rule's coverage extends to ONLY
+        `policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules`
+        (today: 1 rule) or to the FULL disputed Global/High-risk Gate list
+        once Round 2 ADR resolves OQ-10 is itself undecided — recorded
+        here rather than silently assumed to be "whatever
+        mandatory-gates.yaml happens to contain today".
+  constraints:
+    - "This rule's actual gate coverage is bounded by whatever policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules currently enumerates (today: 1 rule) — it is NOT the full Global/High-risk Gate list, which remains TBD_PENDING_ROUND2_ADR."
+  examples:
+    - condition: "NOT (every rule in policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules that applies to this task has reached an acceptable Final Status per required_status below)"
+      action: DENY
+      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+      required_status: [PASS, PASS_WITH_APPROVED_RISK]
+      scope: TBD_PENDING_ROUND2_ADR
+
+open_questions:
+  - id: "OQ-RELPOL-1"
+    question: >
+      Are EC §143/§144's Pre-/Post-release Checklist items the SAME concept
+      as EC §68/Atlas §22's Global/High-risk Gate list (just release-scoped
+      and independently worded), a genuinely SEPARATE checklist, or a
+      PARTIAL OVERLAP (e.g. "Security PASS"/"Data PASS" map 1:1 onto §68's
+      "Security"/"Data" Global Gate items, while "Change matches plan"/"No
+      scope creep" do not map onto anything in §68)? This compilation pass
+      found no cross-reference between the two in either section's own
+      text and treated them as separate (see `compilation_decisions`
+      above), but this is this file's own inference from absence of a
+      cross-reference, not a confirmed ADR ruling — and is NOT one of the
+      3 previously-tracked findings (CROSS-R-5/CROSS-R-7/CROSS-T-11).
+    owner: "operator or Round 2 ADR (candidate to fold into the same OQ-10 batch, since resolving the Gate list's identity would also resolve this)"
+    blocks: >
+      nothing today — pre_release_checklist/post_release_checklist are
+      built as their own verbatim, self-contained lists either way
+  - id: "OQ-RELPOL-2"
+    question: >
+      Once Round 2 ADR resolves OQ-10, should `release_gate_requirement`'s
+      `scope` become the FULL Global Gate list (all gates, every release)
+      or stay scoped to whatever `mandatory-gates.yaml
+      #/mandatory_gate_rules` enumerates (risk-tier-conditional gates
+      only)? This is the direct release-policy analogue of
+      `mandatory-gates.yaml`'s own OQ-MGATE-1.
+    owner: "Phase 3 continuation, after Round 2 ADR lands (same batch as gate.schema.yaml OQ-GATE-1 and mandatory-gates.yaml OQ-MGATE-1)"
+    blocks: "nothing today — release_gate_requirement.scope stays TBD_PENDING_ROUND2_ADR"
+
+verification:
+  method: >
+    Read EC §143 (L3846-3860), §144 (L3864-3877), and §146 (L3893-3937) in
+    full at the cited lines — confirmed no cross-reference to §68/§69
+    exists in either checklist's own text. Read
+    execution/risk-tier.schema.yaml tiers.R3/R4.required_actions in full.
+    Read .ai/research/phase-0/policy-inventory.yaml L603-610 confirming
+    phase-0's own independent catalog entry for both checklists, with no
+    recorded cross-reference to the Global/High-risk Gate entries in the
+    same file. Grepped EC/Atlas/MP for "Pre-release Checklist" /
+    "Post-release Checklist" case-insensitively — one hit each, both in EC,
+    confirming no competing mother-document version exists to reconcile.
+    Read `policies/ai-execution/mandatory-gates.yaml` in full (built
+    immediately before this file, in the same task) to confirm
+    `release_gate_requirement` composes with it rather than duplicating its
+    1 rule. Read sibling files `tool-permissions.yaml`, `forbidden-
+    actions.yaml`, and `network-egress.yaml` (built concurrently by a
+    different session during this same task) to align `condition`/`action`
+    field shape and the `PROVISIONAL`-vs-`ACTIVE` status criterion
+    (network-egress.yaml's own compilation_decisions) rather than diverge.
+    Validated `release_gate_requirement.examples[0]` against
+    `release_gate_requirement` with `jsonschema.Draft202012Validator` using
+    a custom `ai-lego://` resolver (registry-backed retrieve function
+    mapping each `ai-lego://` URI to its on-disk YAML file) — see WORKLOG
+    for the exact command and PASS result.
+  note: >
+    No mother document was modified. `release_gate_requirement.scope` and
+    the `gate_ref` values it transitively depends on (via
+    mandatory-gates.yaml) deliberately carry no enum and no guessed list;
+    MRSP-1/OQ-10 remains open. This file's normative content —
+    pre_release_checklist (11 items), post_release_checklist (10 items),
+    release_sequence (7-stage release-adjacent segment), and
+    risk_tier_release_requirements — is a direct, low-risk transcription of
+    EC §143/§144/§146 and the already-ADR-004-decided
+    risk-tier.schema.yaml. Only release_gate_requirement's `scope` and the
+    number/identity of gates it will eventually range over remain blocked.

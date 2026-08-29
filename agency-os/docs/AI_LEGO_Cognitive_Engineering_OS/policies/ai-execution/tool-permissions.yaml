@@ -1,0 +1,396 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://policies/ai-execution/tool-permissions.yaml"
+title: Tool Broker Permission Rules
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable ALLOW-list / scoping policy for the Tool Broker
+  named by Execution Contract §96 (L2847-2877): "AI 不應直接取得 unrestricted
+  shell / database / network authority" — every AI tool invocation is routed
+  AI Intent -> Tool Broker -> Policy -> Scope -> Authority -> Execution ->
+  Audit, and the Tool Broker "可限制" (may restrict) exactly 7 named
+  dimensions: command, filesystem path, network domain, DB role, cloud
+  account, namespace, duration. This file defines the SHAPE of one such
+  restriction rule (which dimension(s) it constrains, to what value, and
+  under what condition) and instantiates EC §97 "Least Privilege"'s 4
+  concrete worked examples (L2883-2897) as real, schema-valid rule
+  instances — transcribed verbatim, not paraphrased.
+
+  Lives at `/policies/ai-execution/tool-permissions.yaml` per EC §91
+  Policy-as-Code Paths (L2753-2761); this path is one of EC's own 8-file
+  concrete list, reconciled against Master Plan §64's broader 6-category
+  layout (`/policies/{data,ai,publishing,research,security,enterprise}/`)
+  as an already-decided Phase-3-compilable naming question outside this
+  file's scope to re-litigate (see EC §91 in this suite's Execution
+  Contract, and Master Plan §64 L2714-2727) — noted here only so a future
+  reader does not mistake the directory choice for an oversight.
+
+  Relationship to `forbidden-actions.yaml` (its sibling, same directory):
+  this file is the ALLOW-list / scoping half of the Tool Broker's policy
+  layer — it defines what a task class MAY do, within named dimensions,
+  and how far. `forbidden-actions.yaml` is the DEFAULT-DENY complement — 5
+  actions (Delete/Publish/Deploy/Send/Modify Locked Fact, Master Plan §65)
+  no Agent may perform directly AT ALL, regardless of any grant this file
+  makes. A rule in this file can only ever narrow what an Agent may do
+  within the 7 Tool Broker dimensions; it cannot re-grant, override, or
+  loosen any of `forbidden-actions.yaml`'s 5 categorical prohibitions. See
+  `forbidden-actions.yaml`'s own description for the mirror-image statement
+  of this same boundary.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §96 Tool Broker (L2847-2877) — flow diagram and the 7 named restriction dimensions"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §97 Least Privilege (L2879-2897) — the 4 worked examples this file instantiates verbatim"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 Autonomy / Authority Levels (L478-529) — cross-referenced for the AI Research worked example, whose restriction target ('deployment authority') does not map onto any of §96's 7 dimensions; see compilation_decisions"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §91 Policy-as-Code Paths (L2750-2762, tool-permissions.yaml at L2757)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §64 Policy-as-Code (L2714-2741) — condition/action rule-shape style this file's `condition`/`action` fields follow"
+  - ".ai/research/phase-0/policy-inventory.yaml (L423-430: 'Tool Broker mediation' tagged kind=redline, 'Least Privilege per task type' tagged kind=principle — independent corroboration that Tool Broker mediation itself is non-negotiable while a given task's least-privilege scoping is a design principle applied per task class, not a closed enumeration)"
+  - "specs/execution/authority.schema.yaml#/authority_level (hard $ref, used by the additive `max_authority_level` field)"
+decided_by: >
+  No ADR. docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.9 lists
+  `ai-execution/` (EC §91's 8-file list, including tool-permissions.yaml)
+  as READY — direct transcription of already-agreed EC text, distinct from
+  the BLOCKED_PENDING_ROUND2_ADR rows in the same table. EC §96's 7
+  dimensions and §97's 4 examples are uncontested (grep-confirmed: no
+  competing Tool Broker dimension list or Least Privilege example set
+  exists in Master Plan or Method Atlas), so this is Low-risk direct
+  compilation, the same class risk-tier.schema.yaml's and
+  authority.schema.yaml's verbatim-transcription precedent already
+  established for this suite.
+
+compilation_decisions:
+  - question: >
+      EC §97 gives exactly 4 worked examples (Documentation Task / DB
+      Analysis / Migration / AI Research). Should these be treated as a
+      closed, exhaustive set — requiring the `allOf`+`contains`+
+      `minContains`+`maxContains` full-coverage guarantee this suite uses
+      elsewhere for genuinely closed enums (e.g. this Wave's sibling
+      forbidden-actions.yaml, whose 5 Master Plan §65 verbs are stated as
+      a complete list) — or are they illustrative?
+    decision: >
+      Illustrative, not closed. No `contains`/`minContains`/`maxContains`
+      treatment is applied to `worked_examples`; `task_context` remains a
+      free-text field, not a closed enum.
+    reasoning: >
+      EC §97's own framing is "Task 只取得必要 capability。例如：" ("a Task
+      only gets the necessary capability. For example:") — "例如" (for
+      example) is explicit non-exhaustiveness language, unlike Master Plan
+      §65's "Agent 不可直接：" followed by a flat, unqualified 5-item bullet
+      list with no "for example" framing. `.ai/research/phase-0/policy-
+      inventory.yaml` corroborates this reading independently: it tags
+      "Tool Broker mediation" (the hard mechanism) `kind: redline` but
+      "Least Privilege per task type" (this file's actual content) `kind:
+      principle` — a principle applied per task type, not a closed
+      registry of the only 4 task types that exist. Treating these 4 as
+      exhaustive would wrongly imply no other task class may ever have a
+      tool-permission rule, which EC never states.
+  - question: >
+      EC §97's 4th example, "AI Research: no deployment authority", uses
+      the word "authority" — but EC §96's 7 restriction dimensions
+      (command / filesystem path / network domain / DB role / cloud
+      account / namespace / duration) contain nothing named "authority" or
+      "deployment". Should this example be force-fit onto one of the 7
+      dimensions (e.g. `command` with value "deploy"), or modeled
+      differently?
+    decision: >
+      Do not force-fit it onto a `restriction_dimension`. Add an ADDITIVE,
+      optional `max_authority_level` field to the `tool_permission_rule`
+      shape (hard $ref to `execution/authority.schema.yaml#/authority_level`),
+      used only when a rule's restriction target is an authority-level
+      ceiling rather than one of the 7 named Tool Broker dimensions. Leave
+      `dimension` null for this one worked example rather than guessing
+      which of the 7 it "really" means.
+    reasoning: >
+      `authority.schema.yaml`'s own A4 level lists "deploy irreversible
+      migration" as a worked example of an A4-only action, and its A3 level
+      ("reversible production change") also names deployment-adjacent
+      production authority. "No deployment authority" reads far more
+      naturally as an authority-level ceiling (this file's `max_authority_
+      level`) than as a resource-dimension scope (this file's `dimension` +
+      `restrictions[]`), since EC §96 itself distinguishes "Scope" from
+      "Authority" as two separate steps in the Tool Broker flow
+      (`...-> Scope -> Authority -> Execution -> ...`). Forcing this example
+      onto `command`/`cloud_account` would require guessing which of those
+      7 EC actually meant, which EC's text does not say — inventing that
+      guess would misrepresent an interpretive choice as a transcription.
+      The exact numeral ceiling this worked example uses below
+      (`max_authority_level: A2`) is itself flagged non-normative/
+      illustrative in the worked example's own `note`, not asserted as an
+      EC-literal value — see `open_questions.OQ-TOOLPERM-1`.
+  - question: >
+      What field names should carry the condition/action rule shape Master
+      Plan §64 (L2728-2740) demonstrates (`condition -> action`, e.g.
+      "Restricted data AND external_model = true -> DENY"), given this
+      file's rules are also naturally described by task_context + dimension
+      + scope value?
+    decision: >
+      Every `tool_permission_rule` carries literal `condition` (string,
+      structured predicate) and `action` (enum) fields matching MP §64's
+      shape, in ADDITION to the more granular `task_context`/`dimension`/
+      `value` fields that carry the same information in EC §96/§97's own
+      vocabulary. `action`'s enum is extended beyond MP §64's own two
+      literal values (DENY, REQUIRE HUMAN REVIEW) to include `ALLOW` and
+      `SCOPE_TO` — `SCOPE_TO` is necessary because 3 of EC §97's 4 examples
+      ("read-only role", "migration role only") are not a binary allow/deny,
+      they narrow a capability to a specific scope, a verdict MP §64's own
+      2 worked examples (drawn from a data-classification context, not a
+      Tool Broker context) never needed to express.
+    reasoning: >
+      Keeping both vocabularies (MP §64's generic condition/action shape
+      and EC §96/97's dimension-specific fields) side by side, rather than
+      picking one, follows this suite's established additive-field
+      convention (e.g. `exception.schema.yaml` keeping EC §24's free-text
+      `risk` alongside the additive canonical `risk_tier` enum) — the two
+      do not compete, the granular fields are how a Tool Broker actually
+      evaluates a rule, and `condition`/`action` are how this file
+      satisfies this Wave's required condition-action rule-shape style.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+# Root $ref (established pattern in this suite — see risk-tier.schema.yaml,
+# rigor-level.schema.yaml, authority.schema.yaml: without a root-level type
+# constraint, a validator pointed at this file's ROOT would accept ANY
+# value). This file's root validates as `tool_permission_rules` (an array of
+# rule objects) — its actual payload as a policy rule-SET, unlike a
+# record-shape sibling such as exception.schema.yaml whose root validates one
+# instance. Uses the full absolute `ai-lego://` form rather than a bare
+# `#/...` fragment. CAVEAT SCOPED 2026-08-29 (critic-flagged Suggestion):
+# the hazard this comment originally described as universal — a bare
+# same-document `#/...` $ref "can silently fail to resolve" during real
+# validator $ref-following — was re-tested directly by critic review and
+# confirmed true ONLY for jsonschema's deprecated `RefResolver`; under
+# `referencing` (jsonschema >= 4.18, the library's current default), bare
+# `#/` fragments resolve correctly even against an `ai-lego://` base. Bare
+# `#/` is in fact this corpus's dominant convention (56 pre-existing
+# instances vs. 67 absolute). This file's own full-absolute-form choice is
+# kept as-is (harmless), but the comment no longer overstates the hazard —
+# it applies specifically to code still using the legacy `RefResolver`. See
+# this file's `verification` section for the original jsonschema run this
+# was caught by.
+$ref: "ai-lego://policies/ai-execution/tool-permissions.yaml#/tool_permission_rules"
+
+definitions:
+
+  restriction_dimension:
+    description: >
+      The 7 dimensions EC §96 (L2867-2875) names as restrictable by the
+      Tool Broker, transcribed verbatim, SNAKE_CASE-normalized from EC's
+      space-form bullet list. No 8th dimension is invented.
+    type: [string, "null"]
+    enum:
+      - null
+      - command
+      - filesystem_path
+      - network_domain
+      - db_role
+      - cloud_account
+      - namespace
+      - duration
+
+  tool_permission_rule:
+    description: >
+      One Tool Broker restriction rule instance, scoped to a class of AI
+      task (`task_context`). A rule MUST constrain at least one of
+      `restrictions` (non-empty) or `max_authority_level` (non-null) — see
+      `constraints` below; a rule with neither would be a no-op. ADDED
+      2026-08-29 (critic-flagged Suggestion): that constraint is now ALSO
+      mechanically enforced via the `anyOf` below, not prose-only — matching
+      this suite's general preference for a real schema check over a
+      prose-only one wherever the rule is expressible (unlike a genuine
+      cross-record rule, this one only needed two branches on one record's
+      own fields).
+    type: object
+    required: [rule_id, task_context, condition, action, mother_doc_text]
+    anyOf:
+      - properties: { restrictions: { minItems: 1 } }
+        required: [restrictions]
+      - properties: { max_authority_level: { not: { type: "null" } } }
+        required: [max_authority_level]
+    properties:
+      rule_id:
+        type: string
+        pattern: "^TOOLPERM-"
+      task_context:
+        type: string
+        description: >
+          Free-text class of AI task this rule scopes (e.g. "Documentation
+          Task"). Not a closed enum — see compilation_decisions above.
+      condition:
+        type: string
+        description: >
+          Structured predicate, Master Plan §64 rule-shape style (e.g.
+          "task_context = 'Documentation Task' AND target = production DB
+          AND operation = write"). Free text — no formal predicate grammar
+          is defined anywhere in the mother-document corpus for this
+          purpose, so none is invented here.
+      action:
+        type: string
+        enum: [DENY, ALLOW, SCOPE_TO, REQUIRE_HUMAN_REVIEW]
+        description: >
+          Master Plan §64's own condition-action vocabulary (DENY /
+          REQUIRE HUMAN REVIEW, transcribed SNAKE_CASE), extended with
+          ALLOW and SCOPE_TO — see compilation_decisions for why SCOPE_TO
+          is required to represent 3 of EC §97's 4 worked examples.
+      restrictions:
+        type: array
+        default: []
+        description: >
+          Zero or more dimension-scoped restrictions. May be empty only
+          when `max_authority_level` is non-null (see `constraints`).
+        items:
+          type: object
+          required: [dimension, constraint_type, value]
+          properties:
+            dimension:
+              $ref: "ai-lego://policies/ai-execution/tool-permissions.yaml#/definitions/restriction_dimension"
+            constraint_type:
+              type: string
+              enum: [ALLOW, DENY, SCOPE_TO]
+            value:
+              type: string
+              description: "The concrete restriction value (a role name, path glob, domain, duration, etc.)."
+      max_authority_level:
+        anyOf:
+          - $ref: "ai-lego://specs/execution/authority.schema.yaml#/authority_level"
+          - type: "null"
+        default: null
+        description: >
+          ADDITIVE, optional. Populated only when the rule's restriction
+          target is an authority-level ceiling rather than one of the 7
+          named Tool Broker dimensions — see compilation_decisions (the
+          AI Research worked example is the one case in this file that
+          uses it).
+      source:
+        type: string
+        description: "EC citation this rule instance transcribes."
+      mother_doc_text:
+        type: string
+        description: >
+          The literal EC §97 example text this rule instantiates, verbatim
+          — preserved so the structured decomposition above never drifts
+          from what EC actually says.
+    constraints:
+      - "At least one of `restrictions` (non-empty) or `max_authority_level` (non-null) MUST be present — a rule with neither restricts nothing."
+
+tool_permission_rules:
+  type: array
+  items:
+    $ref: "ai-lego://policies/ai-execution/tool-permissions.yaml#/definitions/tool_permission_rule"
+
+# ---------------------------------------------------------------------------
+# EC §97's 4 worked examples, instantiated verbatim as real rule instances.
+# ---------------------------------------------------------------------------
+worked_examples:
+  description: >
+    The 4 concrete Least Privilege examples from EC §97 (L2884-2897),
+    transcribed verbatim (`mother_doc_text`) and structurally decomposed
+    into real `tool_permission_rule` objects validating against the schema
+    above. This is the SEED content EC §97 already gives; no scope beyond
+    it is invented (see compilation_decisions for why these 4 are treated
+    as illustrative, not a closed set requiring full-coverage validation).
+  rules:
+    - rule_id: "TOOLPERM-EC97-1"
+      task_context: "Documentation Task"
+      condition: "task_context = 'Documentation Task' AND target = production DB AND operation = write"
+      action: DENY
+      restrictions:
+        - dimension: db_role
+          constraint_type: DENY
+          value: "production DB write"
+      max_authority_level: null
+      source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §97 (L2886-2887)"
+      mother_doc_text: "Documentation Task: no production DB write"
+
+    - rule_id: "TOOLPERM-EC97-2"
+      task_context: "DB Analysis"
+      condition: "task_context = 'DB Analysis' AND target = DB"
+      action: SCOPE_TO
+      restrictions:
+        - dimension: db_role
+          constraint_type: SCOPE_TO
+          value: "read-only role"
+      max_authority_level: null
+      source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §97 (L2889-2890)"
+      mother_doc_text: "DB Analysis: read-only role"
+
+    - rule_id: "TOOLPERM-EC97-3"
+      task_context: "Migration"
+      condition: "task_context = 'Migration' AND target = DB"
+      action: SCOPE_TO
+      restrictions:
+        - dimension: db_role
+          constraint_type: SCOPE_TO
+          value: "migration role only"
+      max_authority_level: null
+      source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §97 (L2892-2893)"
+      mother_doc_text: "Migration: migration role only"
+
+    - rule_id: "TOOLPERM-EC97-4"
+      task_context: "AI Research"
+      condition: "task_context = 'AI Research' AND target = deployment authority"
+      action: DENY
+      restrictions: []
+      max_authority_level: "A2"
+      note: >
+        "No deployment authority" does not name any of EC §96's 7
+        dimensions directly (see compilation_decisions) — modeled here as
+        an authority-level ceiling instead of a dimension restriction.
+        `A2` ("Staged Write" per authority.schema.yaml, permitted actions:
+        "write (dev / staging)") is this file's own illustrative choice of
+        the highest level that still categorically excludes any
+        production/deployment action — A3 ("reversible production change")
+        and A4 ("deploy irreversible migration" is a literal A4 example)
+        both explicitly involve production/deployment authority. This
+        specific numeral is NOT itself stated anywhere in EC — flagged
+        non-normative in `open_questions.OQ-TOOLPERM-1` so it is never
+        mistaken for an EC-literal value.
+      source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §97 (L2895-2896)"
+      mother_doc_text: "AI Research: no deployment authority"
+
+open_questions:
+  - id: "OQ-TOOLPERM-1"
+    question: >
+      The AI Research worked example's `max_authority_level: A2` is this
+      file's own illustrative choice (see the worked example's `note`), not
+      an EC-literal value — EC §97 names no A0-A4 level at all for this
+      example. Should the actual ceiling be A0, A1, or A2, and should
+      "no deployment authority" instead (or additionally) be expressed as a
+      `command`-dimension DENY (e.g. `{dimension: command, constraint_type:
+      DENY, value: "deploy"}`) for defense in depth?
+    owner: "operator, non-blocking"
+    blocks: "nothing in this file's own validity — the worked example is schema-valid either way; this only affects how precisely it models EC's intent"
+  - id: "OQ-TOOLPERM-2"
+    question: >
+      Should `task_context` eventually become a closed enum (e.g. once a
+      real task-classification taxonomy exists elsewhere in this repo),
+      making the illustrative-vs-closed judgment in compilation_decisions
+      obsolete? No such taxonomy exists in the corpus today (grep-confirmed
+      against specs/cognitive/ and specs/execution/task.schema.yaml, which
+      defines task record shape, not a closed task-context vocabulary).
+    owner: "operator, non-blocking"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read EC §96 (L2847-2877) and §97 (L2879-2900) in full. Read EC §9
+    (L478-529, full A0-A4 definitions) and `specs/execution/
+    authority.schema.yaml` in full for the `max_authority_level` cross-
+    reference. Read MP §64 (L2714-2741) in full for the condition/action
+    rule-shape style. Read `.ai/research/phase-0/policy-inventory.yaml`
+    L423-444 for independent kind-tagging corroboration (redline vs
+    principle vs policy) of the illustrative-vs-closed judgment call.
+    Grepped `specs/` and `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`
+    for any existing closed task-classification taxonomy (none found).
+    Validated the schema body and all 4 worked_examples against
+    `jsonschema.Draft202012Validator` with an `ai-lego://` resolver handler
+    (resolving `#/authority_level` in the sibling authority.schema.yaml) —
+    see this file's companion validation run in the compiling session's
+    report.
+  note: >
+    No mother document was modified to produce this file. EC §97's 4
+    worked examples are transcribed verbatim in `mother_doc_text` on each
+    rule; their structural decomposition into `dimension`/`constraint_type`/
+    `value`/`max_authority_level` is this file's own compilation choice,
+    individually justified above, not itself EC-literal text.
