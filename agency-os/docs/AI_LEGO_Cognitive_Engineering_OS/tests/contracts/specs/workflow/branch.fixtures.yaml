@@ -320,6 +320,28 @@ invalid:
     reason: >
       `branch_id` requires `pattern: \"^BR-\"` — a bare numeric id without
       the prefix does not match.
+  - name: merged_r3_gate_bypass_via_missing_risk_tier
+    instance:
+      tenant_id: "11111111-1111-1111-1111-111111111111"
+      node_type: BRANCH
+      node_id: "wf-node-001"
+      parent_node_id: "workflow-abc"
+      branch_id: "BR-0021"
+      state: MERGED
+      merge_base: "wf-commit-42"
+      merge_authorization:
+        authority_level: A2
+        approved_by: alice
+        approved_at: "2026-08-30T00:00:00Z"
+    reason: >
+      Real `/codex-review` HIGH finding (2026-08-30): `risk_tier` is now
+      unconditionally required (see compilation_decisions) precisely
+      because this exact shape — a MERGED instance omitting risk_tier
+      entirely — previously validated successfully despite representing an
+      R3/R4-risk merge with zero gate_results and no way to prove the
+      omission wasn't hiding a bypassed high-risk gate. `risk_tier` missing
+      must fail regardless of what state or merge_authorization otherwise
+      look like.
   - name: node_type_not_branch
     instance:
       tenant_id: "11111111-1111-1111-1111-111111111111"

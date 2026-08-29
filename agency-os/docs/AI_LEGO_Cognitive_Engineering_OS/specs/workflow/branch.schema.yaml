@@ -132,6 +132,33 @@ compilation_decisions:
       DEP-/COL-/OBL-/JPACK-, grepped across specs/ this session) — zero
       collisions. `BR-` is the natural short form and is not already
       claimed.
+  - question: >
+      CORRECTED 2026-08-30, real `/codex-review` HIGH finding on this
+      file's first version (not a synthetic/scratch-repo test — a live
+      review of the actual commit): `branch`'s top-level `required` array
+      originally listed only `[branch_id, state]`, even though `risk_tier`'s
+      own field description already said "Required". Was this description
+      simply aspirational prose, or a real enforcement gap?
+    decision: >
+      A real gap, now fixed: `required` is `[branch_id, state, risk_tier]`.
+    reasoning: >
+      The gate-coverage `if`/`then` block (`allOf[1]`) conditions on
+      `risk_tier IN [R3, R4]` via a nested `if.allOf` entry that itself
+      requires `risk_tier` to be present. When `risk_tier` is absent
+      entirely, that inner `required: [risk_tier]` check fails, making the
+      WHOLE `if` condition false — which means `then` (the gate_results
+      requirement) never fires. A MERGED branch instance omitting
+      `risk_tier` therefore validated successfully with zero
+      merge_authorization scrutiny of its actual risk level and zero
+      gate_results, silently bypassing exactly the R3/R4 human-review and
+      recovery-rehearsal controls ADR-012 Sub-decision (c) exists to
+      enforce — a real, exploitable validation bypass, not a theoretical
+      one. Fixed by moving `risk_tier` into the unconditional top-level
+      `required` array, so it can never be silently omitted regardless of
+      `state`. See `tests/contracts/specs/workflow/branch.fixtures.yaml`'s
+      `merged_r3_gate_bypass_via_missing_risk_tier` invalid fixture, added
+      in the same fix, which reproduces exactly this bypass shape and
+      confirms it now correctly fails.
 
 # ---------------------------------------------------------------------------
 # The 6-state machine (ADR-012 Sub-decision a).
@@ -192,7 +219,7 @@ branch:
   allOf:
     - $ref: "ai-lego://specs/execution/blast-radius-chain.schema.yaml#/chain_instance"
     - type: object
-      required: [branch_id, state]
+      required: [branch_id, state, risk_tier]
       properties:
         node_type:
           const: BRANCH
@@ -206,8 +233,16 @@ branch:
         risk_tier:
           $ref: "ai-lego://specs/execution/risk-tier.schema.yaml#/risk_tier"
           description: >
-            Required — gates whether ADR-012 Sub-decision (c)'s additional
-            merge gate_results requirement applies (risk_tier IN [R3, R4]).
+            Required (in `#/branch/allOf/1/required` below, corrected
+            2026-08-30 — a real `/codex-review` HIGH finding on this file's
+            first version: `required` originally listed only
+            `[branch_id, state]`, so a MERGED instance could omit risk_tier
+            entirely and silently skip the R3/R4 gate_results check below,
+            since that check's own `if` condition itself requires risk_tier
+            present to fire — an absent field made the condition false, not
+            true, defeating the check it was supposed to gate). Gates
+            whether ADR-012 Sub-decision (c)'s additional merge
+            gate_results requirement applies (risk_tier IN [R3, R4]).
         merge_base:
           type: [string, "null"]
           description: >

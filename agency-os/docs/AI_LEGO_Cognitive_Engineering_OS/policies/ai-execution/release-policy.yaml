@@ -213,6 +213,39 @@ compilation_decisions:
       shape ("Restricted data AND external_model = true -> DENY"), not its
       second (REQUIRE HUMAN REVIEW is a distinct verdict already used by
       the gate this rule composes with, not this rule itself).
+  - question: >
+      CORRECTED 2026-08-30, real `/codex-review` HIGH finding on this
+      file's ADR-011-resolved version (a live review of the actual commit,
+      not a synthetic test): `gate_rules_source` and the new `scope.
+      conditionally_required` both pointed at
+      `mandatory-gates.yaml#/mandatory_gate_rules` — but that node is only
+      the ARRAY-SHAPE JSON Schema definition (`type: array, items: $ref,
+      minItems: 1`), not the actual populated rule data. A consumer
+      dereferencing that URI to discover WHICH gates are currently
+      mandatory would get a type definition back, not concrete gate ids —
+      release gating built against that pointer is either dead code or
+      silently depends on out-of-band knowledge of where the real rules
+      live.
+    decision: >
+      Retargeted both fields to
+      `ai-lego://policies/ai-execution/mandatory-gates.yaml#/grounded_rules
+      /rules` — the array that actually holds the 2 live rule objects
+      (`MGATE-R3-R4-HUMAN-REVIEW`, `MGATE-R3-R4-RECOVERY-ROLLBACK`), not
+      their shape definition.
+    reasoning: >
+      `mandatory-gates.yaml` itself already draws exactly this
+      shape-vs-data distinction internally (`mandatory_gate_rules` is the
+      schema fragment `grounded_rules.rules` validates against, per that
+      file's own comment above `grounded_rules`) — this file's original
+      pointer picked the wrong side of a distinction the sibling file had
+      already made explicit. `gate_rules_source`'s pre-existing (2026-08-29)
+      value made the identical mistake and is corrected here in the same
+      pass rather than left as a known-inconsistent sibling field, per R4
+      (fix stale cross-file references found during this task, same
+      commit). Verified by direct read: `grounded_rules.rules` is a plain
+      YAML list of 2 objects with real `rule_id`/`gate_ref` values;
+      `mandatory_gate_rules` has no `rules` key and no rule_id anywhere
+      under it.
 
 # ---------------------------------------------------------------------------
 # GROUNDED — EC §143 Pre-release Checklist, verbatim (L3846-3860).
@@ -338,7 +371,7 @@ release_gate_requirement:
         the correct verdict for this specific rule.
     gate_rules_source:
       type: string
-      const: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+      const: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/grounded_rules/rules"
       description: "The single source of truth this rule composes with — not duplicated here."
     required_status:
       type: array
@@ -359,10 +392,24 @@ release_gate_requirement:
         (every one of `gate_catalog.global`'s 14 items, unconditional on
         risk_tier, per that catalog's own `description`) plus
         `conditionally_required` (whatever
-        `mandatory-gates.yaml#/mandatory_gate_rules` currently enumerates —
+        `mandatory-gates.yaml#/grounded_rules/rules` currently enumerates —
         today 2 rules, both R3/R4-triggered). This two-part shape mirrors
         `gate_catalog`'s own global/high_risk split rather than flattening
         it into one undifferentiated set.
+
+        **`always_required` is a POLICY STATEMENT, not a claim of live
+        enforcement** (flagged by a real `/codex-review` HIGH finding,
+        2026-08-30 — see `open_questions.OQ-RELPOL-3`): the only
+        gate-firing mechanism this project has actually built,
+        `risk-tier.schema.yaml#/mandatory_gate_injection_trigger`, fires
+        exclusively on `risk_tier IN [R3, R4]`. No mechanism anywhere in
+        this schema suite currently PRODUCES `gate_results` for the 14
+        Global items at R0-R2. `always_required` correctly transcribes
+        what MP §158/ADR-011 says SHOULD be true of every release; it does
+        NOT assert that a real implementation today has anywhere to get
+        those gate_results from for a low-risk release. Treat this field
+        as a target for future gate-injection work, not as evidence the
+        gap is already closed.
       required: [always_required, conditionally_required]
       properties:
         always_required:
@@ -370,17 +417,17 @@ release_gate_requirement:
           const: "ai-lego://specs/execution/gate.schema.yaml#/gate_catalog/global"
         conditionally_required:
           type: string
-          const: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+          const: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/grounded_rules/rules"
   constraints:
-    - "This rule's actual gate coverage is the UNION of gate_catalog.global (always, every release) and whatever policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules currently enumerates for this release's risk_tier (today: 2 rules, both R3/R4-triggered) — RESOLVED 2026-08-30 by ADR-011, see `scope` above."
+    - "This rule's actual gate coverage is the UNION of gate_catalog.global (always, every release) and whatever policies/ai-execution/mandatory-gates.yaml#/grounded_rules/rules currently enumerates for this release's risk_tier (today: 2 rules, both R3/R4-triggered) — RESOLVED 2026-08-30 by ADR-011, see `scope` above. See `open_questions.OQ-RELPOL-3` for the honest gap between this UNION claim and what any existing mechanism can actually produce for R0-R2 releases."
   examples:
     - condition: "NOT (every rule in policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules that applies to this task has reached an acceptable Final Status per required_status below)"
       action: DENY
-      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/grounded_rules/rules"
       required_status: [PASS, PASS_WITH_APPROVED_RISK]
       scope:
         always_required: "ai-lego://specs/execution/gate.schema.yaml#/gate_catalog/global"
-        conditionally_required: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+        conditionally_required: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/grounded_rules/rules"
 
 open_questions:
   - id: "OQ-RELPOL-1"
@@ -417,6 +464,38 @@ open_questions:
       catalog existed to consult.
     owner: "closed"
     blocks: "nothing — resolved"
+  - id: "OQ-RELPOL-3"
+    new_finding: true
+    question: >
+      Real `/codex-review` HIGH finding (2026-08-30, verified against this
+      commit, not synthetic): `always_required` asserts all 14
+      `gate_catalog.global` items are mandatory for EVERY release,
+      regardless of risk_tier. But the only gate-firing mechanism this
+      project has actually built —
+      `risk-tier.schema.yaml#/mandatory_gate_injection_trigger` — fires
+      exclusively on `risk_tier IN [R3, R4]` (verified: grepped
+      `specs/execution/` and `policies/ai-execution/` for any second,
+      unconditional or R0-R2-triggered gate-injection mechanism; none
+      exists). This leaves R0-R2 releases in an unenforceable position: no
+      defined mechanism ever produces `gate_results` for the 14 Global
+      items at those tiers, so a real implementation either (a) can never
+      satisfy `always_required` for a low-risk release, or (b) silently
+      skips checking it, defeating the policy's own stated intent. Should a
+      new, risk-tier-independent Global-gate-injection trigger be defined
+      (a genuine new architectural mechanism, arguably its own ADR), or
+      should `always_required`'s scope be narrowed (e.g. to
+      "R1+ releases only", or to "advisory, not schema-enforced" pending
+      that mechanism)?
+    owner: "operator or a future Round 3 ADR — this is a genuine
+      architecture gap, not a Phase 3 compilation pick"
+    blocks: >
+      Nothing in THIS schema's own structural validity (the field shape and
+      its pointer are both correct and testable). It DOES mean
+      `always_required`'s substantive CLAIM (every release actually gets
+      Global-gate coverage) is currently aspirational, not enforced — any
+      consumer treating `release-policy.yaml`'s `status: ACTIVE` as proof
+      this is already closed would be mistaken; see `scope`'s own
+      description for the explicit disclaimer.
 
 verification:
   method: >

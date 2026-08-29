@@ -20,31 +20,31 @@ valid:
     instance:
       condition: "NOT (every rule in policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules that applies to this task has reached an acceptable Final Status per required_status below)"
       action: DENY
-      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/grounded_rules/rules"
       required_status: [PASS, PASS_WITH_APPROVED_RISK]
       scope:
         always_required: "ai-lego://specs/execution/gate.schema.yaml#/gate_catalog/global"
-        conditionally_required: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+        conditionally_required: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/grounded_rules/rules"
   - name: single_status_minimal_array
     instance:
       condition: "NOT (every rule in policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules that applies to this task has reached an acceptable Final Status per required_status below)"
       action: DENY
-      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/grounded_rules/rules"
       required_status: [PASS]
       scope:
         always_required: "ai-lego://specs/execution/gate.schema.yaml#/gate_catalog/global"
-        conditionally_required: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+        conditionally_required: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/grounded_rules/rules"
 
 invalid:
   - name: action_not_deny
     instance:
       condition: "NOT (every rule in policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules that applies to this task has reached an acceptable Final Status per required_status below)"
       action: ALLOW
-      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/grounded_rules/rules"
       required_status: [PASS, PASS_WITH_APPROVED_RISK]
       scope:
         always_required: "ai-lego://specs/execution/gate.schema.yaml#/gate_catalog/global"
-        conditionally_required: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+        conditionally_required: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/grounded_rules/rules"
     reason: >
       `action` is `const: DENY` -- the release_gate_requirement's function
       is to DENY the STAGED RELEASE transition when `condition` holds
@@ -54,11 +54,11 @@ invalid:
     instance:
       condition: "Deny release unless all mandatory gates passed"
       action: DENY
-      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/grounded_rules/rules"
       required_status: [PASS, PASS_WITH_APPROVED_RISK]
       scope:
         always_required: "ai-lego://specs/execution/gate.schema.yaml#/gate_catalog/global"
-        conditionally_required: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+        conditionally_required: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/grounded_rules/rules"
     reason: >
       `condition` is `const` with the exact predicate string "NOT (every
       rule in policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_
@@ -69,11 +69,11 @@ invalid:
     instance:
       condition: "NOT (every rule in policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules that applies to this task has reached an acceptable Final Status per required_status below)"
       action: DENY
-      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/grounded_rules/rules"
       required_status: [SUCCESS]
       scope:
         always_required: "ai-lego://specs/execution/gate.schema.yaml#/gate_catalog/global"
-        conditionally_required: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+        conditionally_required: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/grounded_rules/rules"
     reason: >
       `required_status` items $ref
       `status-codes.schema.yaml#/reference_vocabulary/final_status/schema`,
@@ -85,7 +85,7 @@ invalid:
     instance:
       condition: "NOT (every rule in policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules that applies to this task has reached an acceptable Final Status per required_status below)"
       action: DENY
-      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/grounded_rules/rules"
       required_status: [PASS]
       scope: TBD_PENDING_ROUND2_ADR
     reason: >
@@ -104,11 +104,11 @@ invalid:
     instance:
       condition: "NOT (every rule in policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules that applies to this task has reached an acceptable Final Status per required_status below)"
       action: DENY
-      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+      gate_rules_source: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/grounded_rules/rules"
       required_status: [PASS]
       scope:
         always_required: "ai-lego://specs/execution/gate.schema.yaml#/gate_catalog/high_risk"
-        conditionally_required: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/mandatory_gate_rules"
+        conditionally_required: "ai-lego://policies/ai-execution/mandatory-gates.yaml#/grounded_rules/rules"
     reason: >
       `always_required` is `const:
       "ai-lego://specs/execution/gate.schema.yaml#/gate_catalog/global"` --

@@ -1,5 +1,38 @@
 # Worklog
 
+## 2026-08-30（續6）
+
+### `/codex-review` 真實跑 commit `53914155d`（ADR-011/012），抓到 3 個真實 HIGH bug，全數確認並修正
+
+**觸發**：任務指示「做完要 /codex-review」——`53914155d` 已 push 後，依 `.claude/commands/codex-review.md` 完整流程（Step 1.5 capture-before-review → Step 2 帶兩段標準 focus text 呼叫 `codex-companion.mjs adversarial-review --background --base a62739235`）跑一次真實對抗式覆審，非自我描述。
+
+**結果**：`verdict: needs-attention`，3 個 finding，全部 severity=high，逐條驗真（每條皆先 Grep 確認 `file:line` 真實存在，非照單全收）：
+
+1. **`branch.schema.yaml:195` — 真實 gate bypass 漏洞**：`branch.required` 原只列 `[branch_id, state]`，`risk_tier` 雖在欄位描述寫「Required」但從未真正加進 `required` 陣列。因為 R3/R4 gate 檢查的 `if` 條件本身也要求 `risk_tier` 存在才會觸發，`risk_tier` 完全缺席時該 `if` 為 false，`then`（gate_results 必填）就不會生效——等於一個 MERGED 的 R3/R4 分支可以完全不填 `risk_tier`，靜默繞過人工審查與 recovery rehearsal 兩個控制點。**CONFIRMED，真實可利用**。已修：`required` 補上 `risk_tier`；新增 `merged_r3_gate_bypass_via_missing_risk_tier` invalid fixture 精確重現此繞過形狀。
+2. **`release-policy.yaml:317-383` — 指標指向 schema 形狀而非實際資料**：`gate_rules_source` 與新加的 `scope.conditionally_required` 都指向 `mandatory-gates.yaml#/mandatory_gate_rules`，但那個節點只是陣列的 JSON Schema 形狀定義（`type/items/minItems`），真正的 2 條規則資料在 `grounded_rules.rules`。任何依此指標去查「目前哪些 gate 是必填」的消費者，解引用後只會拿到型別定義，拿不到任何真實 gate id。**CONFIRMED**（`gate_rules_source` 這個錯誤其實是 2026-08-29 就存在的舊 bug，我今天新增的 `scope.conditionally_required` 複製了同一個錯誤指標）。已修：兩個欄位皆改指向 `#/grounded_rules/rules`；`mandatory-gates.yaml` 自己內部本來就已經區分這兩個節點，只是 `release-policy.yaml` 挑錯了那一半。
+3. **`release-policy.yaml:357-373` — `always_required` 沒有對應的產出機制**：新增的 `always_required` 宣稱 14 個 Global gate 對「每一次 release」都必填，不分 risk_tier；但全專案唯一真實存在的 gate 觸發機制（`mandatory_gate_injection_trigger`）只在 `risk_tier IN [R3, R4]` 才會啟動，R0-R2 完全沒有任何機制會產生這 14 個 Global item 的 `gate_results`。**CONFIRMED，這是真實架構缺口**（codex 主動查了「這個改動是否依賴 diff 外看不到的東西」才抓到，屬本次 focus text 第一段明確要求的檢查）。判斷：這不是能靠一行 schema 修正解決的問題——發明一個新的、不分 risk_tier 的 Global gate 觸發機制屬於新架構決策，超出本次授權範圍。已修（誠實揭露而非發明機制）：`scope` description 明確加註「`always_required` 是政策宣告，不是已落地的強制執行證明」；新增 `OQ-RELPOL-3` 記錄此缺口，標記需要操作者或未來 Round 3 ADR 裁決是否要新建機制或縮小 `always_required` 範圍。
+
+**未採納**：finding 3 codex 建議「Define and reference an explicit global-gate emission/recording path」——未直接實作，理由見上（新機制屬獨立架構決策，不應在修 bug 的同一批次裡順手發明）。
+
+[已修改]
+- `specs/workflow/branch.schema.yaml`：`#/branch/allOf/1/required` 補 `risk_tier`；`compilation_decisions` 補一則記錄此真實 bug 與修法
+- `tests/contracts/specs/workflow/branch.fixtures.yaml`：新增 1 個 invalid fixture 精確重現繞過形狀
+- `policies/ai-execution/release-policy.yaml`：`gate_rules_source`/`scope.conditionally_required` 兩處指標由 `#/mandatory_gate_rules` 改為 `#/grounded_rules/rules`（含 example）；`scope` description 補誠實揭露；新增 `OQ-RELPOL-3`；補一則 compilation_decisions 記錄修正
+- `tests/contracts/policies/ai-execution/release-policy.fixtures.yaml`：全部 7 處指標同步改為 `#/grounded_rules/rules`
+- 新增 `agency-os/reports/oracle/2026-08-30-review-08abc22c.md`（本次真實覆審完整 artifact，含 codex 原始回應）
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(node) | cmd=`node codex-companion.mjs adversarial-review --background --base a62739235 "<兩段標準 focus text>"` | exit=0 | 結果=真實背景執行，verdict=needs-attention，3 個 finding，非模擬
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py`（3 個修正全部套用後，從 D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS）| exit=0 | 結果=669 個檢查全過（較修正前 666 增加 3：branch 1 個新 invalid fixture + release-policy 兩處 URI 修正後 cross-file $ref 解析仍全過）
+- REALTEST_EVIDENCE: tool=Bash(grep) | cmd=`grep -n "required: \[branch_id, state\]"` 確認 finding 1 的 file:line 在修正前真實存在 | exit=0 | 結果=`branch.schema.yaml:195` 命中，finding 屬實非幻覺
+- REVIEW_DONE: critic=Deep（外部 oracle，`/codex-review` 本身；本次審的是已 push 的真實 commit `53914155d`，非 scratch 測試）| verdict=needs-attention → 3 個 finding 全數驗真：2 個直接修正（bypass 漏洞 + 錯誤指標）、1 個確認為真實架構缺口並誠實揭露（非發明新機制搪塞）| findings=0c/3m(HIGH，依 codex 自身 severity 標記換算)/0n
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`mandatory_gate_rules\b\|required: \[branch_id, state\]` | hits=僅本次已修改的 2 檔案本身命中（`release-policy.yaml`/`release-policy.fixtures.yaml` 的 `condition` 欄位 prose 仍含 bare-path 形式的 `mandatory_gate_rules` 字樣，非機器解引用的 const 指標，故意保留不動——已於 compilation_decisions 說明），無遺漏命中
+
+[剩餘風險] `OQ-RELPOL-3`（Global gate 對 R0-R2 release 無實際產出機制）刻意留為未解決——這是本次覆審發現的真實架構缺口，不是本次修法遺漏；縮小 `always_required` 範圍或新建觸發機制需要操作者裁決或獨立 Round 3 ADR，非本次授權範圍內可自行決定。`release-policy.yaml`/`mandatory-gates.yaml` 之間仍有 `condition` 欄位的 bare-path prose 字串（非機器指標）與實際 const 指標用詞不完全一致，純敘述性文字，不影響機器驗證正確性。
+
+[rollback] 純 schema 指標修正 + 新增 required 欄位 + fixture + 誠實揭露文字，`git revert` 可完整回退；revert 後 finding 1（gate bypass）與 finding 2（錯誤指標）會重新開放，需注意；finding 3 的揭露文字被 revert 不影響任何機器驗證行為，僅回到「宣稱較樂觀」的措辭。
+
 ## 2026-08-30（續5）
 
 ### `result.schema.yaml` 過期前提修正（「gate.schema.yaml 尚不存在」，實際已於 2026-08-29 建骨架 + 2026-08-30 由 ADR-011 補完整內容）——critic 覆審順帶抓到 1 個真實驗證漏洞（NOT_APPLICABLE 缺 rationale 未強制）
