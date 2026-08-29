@@ -78,7 +78,8 @@ done | grep -E '^[0-9a-f]{64}'
 
 ### 1d. 系統層（rsync/重建對象）
 
-- `/etc/nginx/sites-available/`（11 檔，**從 sites-available 拿真檔，sites-enabled 是 symlink** — 整併日坑）；拷完**必重建啟用 symlink**（覆審 F3）：`for f in /etc/nginx/sites-available/*; do ln -sf "$f" /etc/nginx/sites-enabled/; done`（default 檔依現況取捨）再 `nginx -t`＋ `conf.d/{soulful-security,soulful-cache,rate-limit-zones,cf-edge-geo}.conf`＋`snippets/cf-only.conf`
+- `/etc/nginx/sites-available/`（14 檔，2026-08-29 由 11 檔新增 `docs.aware-wave.com`/`trust.aware-wave.com`/`00-default-placeholder`；**從 sites-available 拿真檔，sites-enabled 是 symlink** — 整併日坑）；拷完**必重建啟用 symlink**（覆審 F3）：`for f in /etc/nginx/sites-available/*; do ln -sf "$f" /etc/nginx/sites-enabled/; done`再 `nginx -t`＋ `conf.d/{soulful-security,soulful-cache,rate-limit-zones,cf-edge-geo}.conf`＋`snippets/cf-only.conf`＋**`snippets/coming-soon.conf`**（2026-08-29 新增，`docs`/`trust`/`00-default-placeholder` 三個 vhost 都 `include` 它，漏拷 = 新機 `nginx -t` 直接炸；repo 鏡像 `system-sites/coming-soon.inc`）。
+  - **「default 檔」用詞澄清（避免與新安全網混淆）**：`sites-available/default`（Debian 內建 stock 檔，未啟用，可依現況取捨略過）≠ **`00-default-placeholder`（2026-08-29 新增，`default_server` 安全網，屬安全邊界一部分，換機必拷不得省略——省略會讓 docs/trust 之外任何未來忘記建 vhost 的子網域重新落回字母序最前的 mainwp，回到 2026-08-29 事故原狀）**
 - `/etc/letsencrypt/` 整棵：`archive/ live/ renewal/ accounts/` **加 `options-ssl-nginx.conf` `ssl-dhparams.pem`**（整併日坑：漏這兩檔 nginx -t 直接炸）；renewal conf 的 `account` 已統一單一帳號 ✓
 - `/etc/hosts` 的 `127.0.0.1 registry` 行 + `/etc/docker/daemon.json` 的 `insecure-registries:["registry:5000"]`（整併日坑；改完 `kill -HUP dockerd` 免重啟）
 - **root crontab 不是檔案，不能 rsync**（覆審 F4）：`ssh OLD 'sudo crontab -l' | ssh NEW 'sudo crontab -'`（11 行，需逐行目視確認）
@@ -106,7 +107,7 @@ done | grep -E '^[0-9a-f]{64}'
 
 ### 1e. DNS（Cloudflare，PATCH `content` → NEW_IP；record id 現查 `GET /zones/<zone>/dns_records`）
 
-- zone `f21b1919632fee2221647908a94fdcac`（aware-wave.com）：**13 筆 A**（apex/api/app/oracle/mainwp/n8n/postiz/studio/supabase/trigger/uptime = proxied🟠；`remotion-svc`/`video-svc` = **DNS-only⚪ 勿開 proxy**）＋ `ks-aw-01` A（DNS-only，rDNS 配對用 → 同步改）＋ www CNAME 不動
+- zone `f21b1919632fee2221647908a94fdcac`（aware-wave.com）：**2026-08-29 CF API 直查實測共 16 筆 A**（apex/api/app/oracle/mainwp/n8n/postiz/studio/supabase/trigger/uptime/**portal/docs/trust**（三筆 2026-08-29 新增）= proxied🟠；`remotion-svc`/`video-svc` = **DNS-only⚪ 勿開 proxy**）＋ `ks-aw-01` A（DNS-only，rDNS 配對用 → 同步改，第 17 筆）＋ www CNAME 不動。**此筆數會隨新子網域上線持續變動，換機當天務必重新 `GET /zones/<zone>/dns_records?type=A` 現查，不要沿用本文任何寫死數字**
 - zone `bb1358fe8d3e1d73c822bdb31d3cd823`（soulfulexpression.org）：apex A（record `5287ae0edbce87ec8a9fa6152e05e220`，proxied🟠）
 - `_dmarc.aware-wave.com` TXT（`v=DMARC1; p=none; ...`，2026-08-29 補；新網域上線務必比照補一筆，否則可被偽造寄信且不會主動跳警告）
 
@@ -119,7 +120,9 @@ done | grep -E '^[0-9a-f]{64}'
 | TLS | certbot 簽新網域證書，走同一帳號（`renewal/` 已統一單一 account，勿另開新帳號） |
 | DMARC | 若此服務會寄信（通知/驗證信等），確認上方 `_dmarc.aware-wave.com` 已存在 |
 | §1g 硬編 IP 清單 | 若程式碼寫死 IP 或網域，跑 `git grep` 重新產清單納入換機改動範圍 |
-| 本節 A 記錄計數 | 上線後從 13 筆更新為 14 筆（含 cognitive 上線後），換機日本節表格同步改 |
+| 本節 A 記錄計數 | 每次新子網域上線後，跑 §1e 開頭那行 `GET .../dns_records?type=A` 現查真實筆數更新本節（**不要手動加減**——2026-08-29 曾因同日疊加 portal/docs/trust 三筆導致「13→14」的預先寫死數字當天就過期，改成永遠現查） |
+| **驗證用內容比對，不只看狀態碼** | `curl` 後檢查 `<title>`/內文，不能只看 HTTP code——2026-08-29 兩次真事故（api/oracle 錯發 WordPress、docs/trust 錯發 MainWP）都回 200，只看狀態碼完全看不出來 |
+| **確認沒有落進隱性 default** | host nginx 若無任何 `default_server`，未掛號的子網域會落進 `sites-enabled/` 字母序最前的檔案（2026-08-29 事故：`mainwp.aware-wave.com` 排最前，docs/trust 誤入其登入頁）。**現況已補安全網**：`system-sites/default-placeholder-aware-wave.conf`（`00-default-placeholder`，`default_server` on both :80/:443，回中性佔位頁）——新子網域即使忘記建 vhost 也不會誤入內部工具，但仍應主動建專屬 vhost，安全網只是最後防線不是正式做法 |
 
 ### 1f. Cloudflare / OVH 邊緣層（新機必補，整併日兩個坑都在這）
 
@@ -245,6 +248,7 @@ done | grep -E '^[0-9a-f]{64}'
 | `.htpasswd` 類檔案漏拷，容器搶先 bind-mount 不存在的 host 路徑 | Docker 自動把該路徑幫你建成**目錄**，host nginx `auth_basic_user_file` 讀到目錄 → `pread() failed (21: Is a directory)` → 500；修完後容器內部仍記著舊掛點型別，`docker restart` 會直接 mount 失敗、容器 Exited，須 `docker compose up -d --force-recreate <service>`（compose service 名可能不等於 container_name，先查 `container_name:` 對應） | §1d（2026-08-29 補：所有 `auth_basic_user_file` 引用的 `.htpasswd*` 路徑，換機前先在來源機 `find / -iname "*.htpasswd*"` 產清單，逐一確認搬過去的是檔案不是目錄；`stat` 型別對照，不能只看 `ls` 有沒有東西） |
 | `api.aware-wave.com`/`oracle.aware-wave.com` 從未接線（既有缺陷，非搬家造成，2026-08-29 才被發現） | 兩個網域無匹配 server block，落到 WordPress 預設區塊，**狀態碼一樣回 200**，光看端點掃描碼看不出來，內容其實整個發錯 | §5 第 1 項（2026-08-29 補：改用內容比對，不只看狀態碼） |
 | `X-Forwarded-Proto` 在 lobster-nginx 兩跳架構下用 `$scheme` 覆寫上一跳的值 | `$scheme` 是這層 nginx 自己監聽器的 scheme（永遠 http），把 host nginx 已正確設的 https 蓋掉，WordPress `is_ssl()` 永遠 false，**wp-admin 無限重導自己** | §1a（現役檔已修用 `$http_x_forwarded_proto`，rsync 帶走即可）+ §5 第 1 項回歸測試（2026-08-29 補：連 3 次 curl 確認不是導回自己） |
+| host nginx（`sg-stack.aware-wave.com`）443 沒有任何 `default_server` | 未掛號的子網域落進 `sites-enabled/` **字母序最前**的檔案而非報錯——2026-08-29 `docs`/`trust.aware-wave.com` DNS 建好後誤入 `mainwp.aware-wave.com` 登入頁（同一種「隱性 default 靜默錯發」bug class，這次在 host 層而非 lobster-nginx docker 層）| **已治本**：新增 `00-default-placeholder`（`default_server` on :80/:443，回中性佔位頁，`include cf-only.conf` 一致防護），關掉「任何未來忘記建 vhost 的子網域」整類洞，不只補 docs/trust 兩個名字。repo 鏡像：`system-sites/default-placeholder-aware-wave.conf` + `docs-aware-wave.conf` + `trust-aware-wave.conf` + `coming-soon.inc`。§1e checklist 已補對應驗收項 |
 
 ---
 

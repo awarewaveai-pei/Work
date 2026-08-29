@@ -813,8 +813,10 @@
   - **完成定義**：EU 兩檔若要同步則 `diff` byte-identical；若決定純存查則此項關閉，不需動作。
   - **證據**：`agency-os/WORKLOG.md` 2026-08-29（續4）覆審 diff 表。
 
-- [ ] **【2026-08-29 開出｜未開始】品牌子網域 DNS 保留：`hci` / `docs` / `trust`** — SSOT：`docs/edge-and-domains/PRODUCT_DOMAIN_IA_PLAN.md` §2–4。⚠️ Medium risk（動 Cloudflare 帳號設定），**需操作者 go-ahead 才建 CNAME**，先只是佔位不掛服務。
-  - `trust` 通常企業客戶簽約才需要，晚點也行；`docs` 可跟產品開發同步長；`hci` 等 HCI-30 真的要上線再開。
+- [x] **【2026-08-29 完成】品牌子網域 DNS 保留：`docs` / `trust`** — SSOT：`docs/edge-and-domains/PRODUCT_DOMAIN_IA_PLAN.md` §2–4。CF A record + 專屬 nginx vhost + cert SAN 全數就位，回中性佔位頁；順帶關掉 host nginx 443 缺 `default_server` 這整類洞（曾讓 docs/trust 誤入內部 MainWP 登入頁），新增安全網 `00-default-placeholder`。實測：CF API 直查 + 8 網域內容比對（loopback+公網雙路徑）+ 隨機亂打子網域驗證安全網。證據：`WORKLOG.md` 2026-08-29（續17/18）。
+  - `hci` 仍未動工（`全新產品，未動工`，等 HCI-30 真的要上線再開，維持原規劃——本項只涵蓋 docs/trust）。
+
+- [ ] **【2026-08-29 開出｜未開始｜Codex FINDING 3】`verify-closeout-completeness.ps1` 的 `REVIEW_DONE:`/`BUGHUNT_DONE:` 只 regex 比對前綴存在，不驗證內容是否真完成** — 本輪自己示範過一次：WORKLOG 曾寫 `REVIEW_DONE: ... 結果=待補（背景執行中）`，格式合法但實質未完成，若當下就 AO-CLOSE 會被機械閘放行。屬既有信任邊界（§已知信任邊界已記載「不驗內容真實」），Codex 覆審重新踩到同一個洞，值得補一條輕量檢查（例如 regex 額外擋 `待補|TBD|pending|背景執行中` 這類字樣出現在證據行本身）。**Medium risk**（動治理機械閘本體，需獨立評估，不可與其他基礎設施改動同批次做）。
 
 - [ ] **【2026-08-29 開出｜未開始】`status.aware-wave.com` = 現有 `uptime.aware-wave.com`（Uptime Kuma）對外開放 view** — 不重建，SSOT：`docs/edge-and-domains/PRODUCT_DOMAIN_IA_PLAN.md` §2。做法二選一：(a) Kuma 內建 public status page 功能開一個 group，另建 CNAME `status`→同一 Kuma；(b) 直接讓 `uptime.aware-wave.com` 兼公開用（需確認現有 dashboard 沒有機敏資訊外露）。
 

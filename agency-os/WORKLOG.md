@@ -1,5 +1,73 @@
 # Worklog
 
+## 2026-08-29（續18）
+
+### 治本（非補丁）：host nginx 443 補 `default_server` 安全網，docs/trust.aware-wave.com 正式上線佔位頁，關掉整類「未來子網域忘記建 vhost」的洞
+
+**操作者授權**：「你決定！」+ 全能工程師身份 + 明確要求不可補丁、要 30 年工程紀律、要 Codex review。承續（續17）發現的 mainwp 隱性 default 曝露。
+
+**不變量分析（AGENTS.md §補丁判準，動手前先答）**：這一類問題的不變量是「任何到達這台 nginx 的 Host，若沒有明確匹配的 server block，行為必須是『安全的中性回應』，不能是『恰好排第一的某個服務』」。今天已經在兩層各撞到一次同款事故（lobster-nginx docker 層的 api/oracle 誤發 WordPress、host nginx 層的 docs/trust 誤發 MainWP），代表現有紀律「每個子網域手動加 server_name」單靠人不會漏——需要機制兜底。**判斷**：只把 docs/trust 兩個名字塞進 allowlist 是補丁（只關掉這次的實例）；補 `default_server` 安全網才是關掉整類（未來任何忘記建 vhost 的子網域都會安全落地，不會誤入任意內部服務）。
+
+**設計（DRY，單一正本）**：
+1. `snippets/coming-soon.conf`（新，共用）— 中性佔位頁 body，`noindex`，未來任何佔位子網域都 include 同一份，不各自複製
+2. `sites-available/docs.aware-wave.com`、`trust.aware-wave.com`（新，各自獨立檔，符合既有「每子網域一檔」慣例）— 各自 `server_name` + `include cf-only.conf`（防護與既有網域一致）+ `include coming-soon.conf`
+3. `sites-available/00-default-placeholder`（新）— `listen 80/443 default_server`，`server_name _`，同樣 `cf-only.conf` + `coming-soon.conf`；這是安全網本體，任何未來忘記建 vhost 的子網域自動落這裡而非誤入內部工具
+
+**執行（AGENTS.md §Auto-Repair 紅線：backup→套用→health check→(fail 才 rollback)）**：
+1. 備份 `/root/nginx-backups/20260829-103623/`（sites-available + sites-enabled + snippets 全量）
+2. 建 4 個檔案 + `ln -sf` 掛號 → `nginx -t`（syntax ok，僅既有 4+1 個 http2 redefined warning，非新增問題，比對前後一致）→ `systemctl reload nginx`
+3. 回歸驗證（loopback + 公網雙路徑，**內容比對非只看狀態碼**——直接呼應 §5 今日教訓）：既有 5 域（www/api/app/oracle/portal）code 不變（301/200/307/307/308）；docs/trust 從「MainWP 登入頁」變成「Aware Wave 中性佔位頁」；隨機亂打的未掛號子網域（`totally-unmapped-junk.aware-wave.com`）安全落進同一中性頁，證明安全網生效
+4. `certbot certonly --cert-name aware-wave.com --account 5a8cc415f9202d41cdf20c29d806150f --nginx --expand -d aware-wave.com -d www.aware-wave.com -d api.aware-wave.com -d app.aware-wave.com -d oracle.aware-wave.com -d portal.aware-wave.com -d docs.aware-wave.com -d trust.aware-wave.com` 成功，SAN 6→8 域（`openssl x509 -text` 核對，含新兩域）
+5. cert 更新後最終全量回歸掃描（8 域，loopback），全部維持預期狀態碼，無回歸
+
+[已修改]
+- ks-aw-01：`/etc/nginx/snippets/coming-soon.conf`（新）、`/etc/nginx/sites-available/{docs,trust}.aware-wave.com`（新）、`/etc/nginx/sites-available/00-default-placeholder`（新）+ 對應 `sites-enabled` symlink；`/etc/letsencrypt/live/aware-wave.com/` cert 更新（SAN 擴充，certbot 自動處理 renewal 排程）
+- repo 鏡像（新檔，即時同步，不同於 sg-stack 等舊檔的「不強制同步」狀態）：`lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/{coming-soon.inc,docs-aware-wave.conf,trust-aware-wave.conf,default-placeholder-aware-wave.conf}`
+- `runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md`：§5 已知坑表新增本次事故 + §1e checklist 新增「內容比對驗收」「default_server 安全網確認」兩項
+- `agency-os/docs/edge-and-domains/PRODUCT_DOMAIN_IA_PLAN.md`：docs/trust 狀態由「純佔位未掛服務」訂正為「已上線佔位頁」
+- `TASKS.md`：品牌子網域項目關閉（`hci` 維持原規劃不動）
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH(ks-aw-01) | cmd=`nginx -t && systemctl reload nginx` | exit=0，`systemctl is-active nginx`=active
+- REALTEST_EVIDENCE: tool=SSH(ks-aw-01) | cmd=8 域 `curl --resolve ...127.0.0.1 -k`（loopback，繞過 CF 直測 origin）| 結果=既有 5 域狀態碼與變更前一致（無回歸）；docs/trust 200 + title 改為「Aware Wave」（非 MainWP）；隨機子網域 200 + 同中性頁（安全網生效）
+- REALTEST_EVIDENCE: tool=Bash | cmd=7 域 `curl https://<host>/`（公網，實際走 CF）| 結果=與 loopback 結果一致，CF 路徑確認生效
+- REALTEST_EVIDENCE: tool=SSH(ks-aw-01) | cmd=`certbot certonly --cert-name aware-wave.com --nginx --expand -d ... ×8` | exit=0，`openssl x509 -text` 核對 SAN 確實 8 域（含 docs/trust）
+- REVIEW_DONE: critic=Deep（`codex-oracle.ps1 -Mode review`，操作者明確要求外部 oracle 覆審，非自我審查，`reports/oracle/2026-08-29-review-96736179.md`）| verdict=pass-with-fixes | findings=4C(4 修)/0M/0m。**4 個發現全部 CONFIRMED 且全部修正**：①換機 §1d 系統檔清單漏列新增的 `snippets/coming-soon.conf`（docs/trust/00-default-placeholder 三個 vhost 都依賴它，漏拷=新機 nginx -t 直接炸）②「default 檔依現況取捨」用詞與新安全網 `00-default-placeholder` 撞名，可能被誤省略而讓 mainwp 洩漏事故重演③本條 WORKLOG 曾用 REVIEW_DONE 前綴寫「待補」，證明 `verify-closeout-completeness.ps1` 只 regex 比對前綴、不驗證內容是否真的完成（已就地修正為本行真實結果；gate 本身的 regex 弱點記錄於下方剩餘風險，非本輪改動範圍）④ `PRODUCT_DOMAIN_IA_PLAN.md` §4／runbook A 記錄筆數（13/14）在 docs/trust 上線後已過期，改為「换機當天現查，不寫死數字」
+- BUGHUNT_DONE: scope=agency-os,lobster-factory,runbooks | grep=`docs\.aware-wave\|trust\.aware-wave\|default_server\|mainwp\.aware-wave\|13 筆\|14 筆` | hits=22（`agency-os/**/*.md` 全庫）——逐一核對：runbook/TASKS/PRODUCT_DOMAIN_IA_PLAN（本次工作檔）均已訂正為現況；其餘 19 筆為 soulful 網域搬遷、`WORKLOG-archive/`、`reports/status/integrated-status-2026081*` 等**歷史快照/其他 zone 的既有記錄**，與本次 aware-wave.com 筆數變動無關，非過期宣稱，不動
+
+[剩餘風險] `hci.aware-wave.com` 尚未動工（維持原規劃，非本輪範圍）；lobster-nginx docker 層 line 286 的 WordPress 隱性 default 是**既有已知風險**（該檔自身已有註解警告），今天沒有一併補 `default_server`——理由是那層動的是現行 production WordPress 服務，超出操作者這輪授權的「docs/trust 上線」範圍，屬最小爆炸半徑判斷，非遺漏；若要治本需另一輪獨立 go-ahead。**新發現待追（Codex FINDING 3 的系統性一面）**：`verify-closeout-completeness.ps1` 對 `REVIEW_DONE:`/`BUGHUNT_DONE:` 只 regex 比對前綴存在，不驗證內容是否真完成——本條 WORKLOG 自己就示範過一次「待補」也能通過格式檢查。修這個屬於動治理機械閘本體，風險與影響面跟今天的 nginx 工作是兩件事，未在本輪一併處理，列入 TASKS.md 待追。
+[rollback] `/root/nginx-backups/20260829-103623/` 全量備份可 `cp -a` 復原三個目錄；或單純 `rm sites-enabled/{docs,trust}.aware-wave.com sites-enabled/00-default-placeholder && nginx -t && systemctl reload nginx` 回到變更前行為（cert SAN 擴充是純增量，不需回滾，多出的 SAN 不影響既有網域）。
+
+## 2026-08-29（續17）
+
+### 使用者誤刪「主機搬家」session（transcript 已清空）；VBC 追查 docs/trust DNS 真實現況，抓到一個未在原計畫範圍內的隱性 default 曝露
+
+**觸發**：操作者回報不小心刪掉正在做 DNS 的 session。查 `list_sessions`（含 archived）未見任何 session 真的消失；`local_4b82b3aa`（「主機搬家」）標題最符合，但 `list_events` 回傳 0 則訊息——transcript 已被清空，但 session 條目本身仍在，行為與「刪除」描述吻合。操作者接著提供 `docs/HCI_AI_LEGO_Blueprint_v1/03_AWARE_WAVE_DOMAIN_AND_SUBDOMAIN_MAP.md` 並說「剛完成 portal，繼續做 docs/trust 的 DNS」。
+
+**VBC（AGENTS.md R4）**：沒有直接照做重跑 CF API，先查現況。`git diff` 發現 `docs/edge-and-domains/PRODUCT_DOMAIN_IA_PLAN.md` 有**未 commit** 的編輯，宣稱「2026-08-29 DNS 已保留（docs/trust，proxied，純佔位）」，但 `TASKS.md`（已 commit）仍寫「未開始」、`WORKLOG.md` 無對應證據行——典型「聲稱寫了但驗證鏈斷在中間」形狀，判斷是被刪掉的那個 session 中斷在這一步。
+
+**實測查證（非採信文件宣稱）**：
+1. Cloudflare API 直查 `zones/{zone}/dns_records?name=docs.aware-wave.com` / `trust.aware-wave.com` → 皆為 1 筆 A record → `149.202.64.114`，proxied=true。**DNS 記錄本身真的存在**，文件宣稱為真。
+2. `curl https://docs.aware-wave.com/` / `trust.aware-wave.com/` → 200，但 `<title>` 皆為 **`AwareWave MainWP`**——不是預期的中性佔位頁。
+
+**根因（SSH `ks-aw-01` 追查，兩層 nginx）**：host nginx `sg-stack.aware-wave.com` 的 443 `server_name` 清單只有 `aware-wave.com www app api oracle portal`，未含 `docs`/`trust`；該 vhost 檔沒有任何 `listen 443 ssl default_server`，`sites-enabled/` 目錄按字母序載入時 **`mainwp.aware-wave.com` 排最前**，變成該 port 的隱性 default——SNI 不匹配的請求全部落進 MainWP 的 server block。與今日稍早（續 4/5）修的 `api`/`oracle` 從未接線是同一種「隱性 default 靜默錯發」bug class，只是這次發生在 host nginx 層而非 `lobster-nginx` docker 層（後者 line 286 甚至已有註解警告過同類風險，只是沒推及 host 層）。**未修**：屬新發現，不在操作者這輪授權範圍（她要的是「繼續 DNS 設定」，DNS 本身已完成），列 Medium risk 待另一輪 go-ahead，已寫回 `TASKS.md` §G。
+
+[已修改]
+- `agency-os/agency-os/TASKS.md`：品牌子網域 DNS 項目狀態訂正為「部分完成」+ 記錄 mainwp 隱性 default 缺口
+- `agency-os/docs/edge-and-domains/PRODUCT_DOMAIN_IA_PLAN.md`：沿用被刪 session 遺留的未 commit 編輯（內容已驗證屬實，予以保留）
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl -sS -o /dev/null -w "%{http_code}" https://docs.aware-wave.com/` 與 `trust.aware-wave.com` | 結果=200/200（非預期內容，非錯誤碼）
+- REALTEST_EVIDENCE: tool=SSH(ks-aw-01) | cmd=`grep server_name /etc/nginx/sites-available/sg-stack.aware-wave.com` + `ls sites-enabled | sort` | 結果=確認 docs/trust 未掛號 + `mainwp.aware-wave.com` 字母序最前
+- REALTEST_EVIDENCE: tool=curl(CF API) | cmd=`GET zones/{zone}/dns_records?name=docs.aware-wave.com`（token 走 vault，未落地明文）| 結果=1 record，A→149.202.64.114，proxied=true（trust 同）
+- REVIEW_DONE: critic=Quick（自我核對：TASKS.md 訂正與 CF API/curl/SSH 三方實測一致，未夾帶未驗證宣稱）
+- BUGHUNT_DONE: scope=agency-os | grep=`docs\.aware-wave\|trust\.aware-wave` | hits=TASKS.md 本條 + PRODUCT_DOMAIN_IA_PLAN.md 既有段落，無其他檔案含過期「未開始」聲稱
+
+[剩餘風險] mainwp 隱性 default 曝露未修（Medium risk，待操作者 go-ahead）；「主機搬家」session transcript 清空原因未查（UI 側操作，非本次可控範圍），已確認不影響任何已落地的檔案/DNS 狀態。
+[rollback] 本輪僅文件訂正，`git revert` 或手動改回即可；DNS/nginx 均未變更。
+
 ## 2026-08-29（續16）
 
 ### AI LEGO Phase 3 — 首次對 Phase 3 產出跑 critic subagent 覆審（此前只跑過 Codex oracle），1 Critical + 6 Major + 8 Minor 全數修正並經第二輪獨立覆審驗真

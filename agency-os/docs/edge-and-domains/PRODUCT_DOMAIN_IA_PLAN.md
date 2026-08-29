@@ -36,8 +36,8 @@
 |---|---|---|---|
 | `hci` | HCI-30（辨人 × 合作評估 × 關係情報 × 風險決策）| 產品使用者 | 全新產品，未動工 |
 | `portal` | 統一登入 / Account / Subscription / Product Launcher | **HCI-30 + Cognitive OS 的外部客戶** | **跟 `app` 不同東西**（見下）——`app` 是內部 admin console（單一 owner + RBAC），`portal` 是外部多租戶客戶帳號/訂閱層，目前完全不存在 |
-| `docs` | 技術文件（`/hci/` `/cognitive/` `/developers/`）| 開發者/使用者 | 新 |
-| `trust` | Security / Privacy / Compliance | 企業客戶/採購 | 新，通常簽約才需要 |
+| `docs` | 技術文件（`/hci/` `/cognitive/` `/developers/`）| 開發者/使用者 | 新。**2026-08-29 已上線佔位**（CF A record proxied + 專屬 nginx vhost + 已補入 cert SAN，回中性「Aware Wave — This page is not yet available」頁；無實際內容/後端，避免被搶註）。過程曾短暫誤入內部 MainWP 登入頁（host nginx 缺 `default_server` 的既有洞），已修並補安全網，見 `WORKLOG.md` 2026-08-29（續17/18）與 `runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md` §1e |
+| `trust` | Security / Privacy / Compliance | 企業客戶/採購 | 新，通常簽約才需要。**2026-08-29 已上線佔位**（同上）|
 | `status` | 服務健康 | 公眾 | 建議直接開放 `uptime.aware-wave.com`（已存在的 Uptime Kuma）對外 view，不必重建 |
 
 ---
@@ -56,6 +56,7 @@
 
 ## 4. 下一步
 
-- [ ] DNS 保留（Cloudflare CNAME placeholder，不含服務）：`hci` / `docs` / `trust` — **Medium risk（動 Cloudflare 帳號設定），需操作者 go-ahead**，見 `TASKS.md` §G
+- [x] `docs` / `trust` DNS + nginx vhost + cert SAN — **2026-08-29 已上線**（見上表 §2、`WORKLOG.md` 續17/18）
+- [ ] `hci` DNS 保留 — 仍未動工，等 HCI-30 真的要上線再開（不含服務），見 `TASKS.md` §G
 - [ ] `portal` 最小版設計/建置 — 見 `TASKS.md` §F
 - [ ] `status` 開放 `uptime.aware-wave.com` 對外 view 或另建 CNAME 指向同一 Uptime Kuma — 見 `TASKS.md` §G
