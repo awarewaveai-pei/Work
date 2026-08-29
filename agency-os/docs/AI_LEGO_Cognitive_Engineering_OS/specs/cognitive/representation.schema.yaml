@@ -1,0 +1,291 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/representation.schema.yaml"
+title: Cognitive Representation / View Contract
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of LEGO dimension H ("Representation"
+  — Atlas §3 L147: "怎麼呈現給不同腦袋？ — Text / Table / Mind Map / Graph /
+  Audio"). Atlas Appendix A (L4580) lists `representation.schema.yaml` as a
+  promised spec but defines no schema fields for it anywhere in the document
+  — unlike Lens, Representation has no single formal "Contract" YAML block;
+  instead the concept is described consistently across five separate
+  sections (§9's Representation Contract sketch, §11.55 Representation
+  Switching, §15's View flowchart, F24's tool table, and §17's engineering
+  path taxonomy) that all agree on the same underlying model: one Knowledge
+  Object rendered through interchangeable, non-duplicating Views. This file
+  reverse-engineers the View object shape from that convergent evidence —
+  this is new design (Phase 3 compilation), not a duplicate-definition
+  merge, per MACHINE_READABLE_SPEC_PLAN.md §2.3's method-execution-request.schema.yaml
+  precedent ("無既有內容可沿用，需要新設計，非重複定義修正").
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §2 總體架構 diagram, R[Representation] node (L108, L118)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §3 八個正交 LEGO 維度, row H (L147)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §6 Soft Cognitive Preference, cognitive_preference.representation weights (L261-268 — related but DISTINCT concept, see compilation_decisions)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 LEGO Contract, Representation Contract sketch + View-state invariant (L1049-1062)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.55 多視圖切換／認知呈現切換 Representation Switching (L2486-2508)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13 Recipe Library, '改 Representation' as a user-editable Recipe action (L3222)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §15 Representation：不同人的腦袋可以用不同視圖 (L3638-3712)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F24 方法工具庫 table (L968-981)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §17 確切工程路徑, /cognitive/representations/ 11-category taxonomy (L3916-3927)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §25 開發優先順序, Phase 0 item 5 'Representation Contract' (L4302)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §26 預期結果與驗收標準, 'View 切換不重算 Knowledge' row (L4410)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §29 方法搭配基本規則, rule 9 (L4546, 'Representation 可換，但 Knowledge 不複製')"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md Appendix A (L4580, representation.schema.yaml listed)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §8.2 Capability 範例, render_representation (L687)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.3 row for representation.schema.yaml (L116, no dependency, no assigned finding)"
+  - ".ai/research/phase-0/method-inventory.yaml L1079-1118 (F24 representation entries, all has_contract: false)"
+
+decided_by: >
+  No ADR governs this file. docs/architecture/MACHINE_READABLE_SPEC_PLAN.md
+  §2.3 row for representation.schema.yaml lists it READY with no ADR
+  dependency and no assigned finding (both columns "—"), described only as
+  "Atlas Appendix A 既有承諾". Verified by grep across docs/adr/ADR-001~009
+  (2026-08-29): zero hits for "representation" in any ADR. Every field below
+  is a direct Phase 3 compilation choice, recorded in `compilation_decisions`,
+  following the same pattern lens.schema.yaml and status-codes.schema.yaml
+  use for their own ADR-free sections.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+definitions:
+
+  representation_category:
+    description: >
+      Transcribed verbatim from Atlas §17's /cognitive/representations/
+      engineering path (L3916-3927) — the only place Atlas enumerates a
+      closed, machine-oriented set of Representation categories. Chosen as
+      canonical over the prose View lists (§9, §11.55, §15, F24) because
+      those four lists are mutually near-identical but not byte-identical
+      (see `compilation_decisions` for the reconciliation), and this is the
+      only one of the five sources structured as a flat enumerable list
+      rather than embedded prose/mermaid nodes.
+    type: string
+    enum:
+      - text
+      - outline
+      - table
+      - matrix
+      - mindmap
+      - conceptmap
+      - timeline
+      - causal
+      - graph
+      - canvas
+      - audio
+
+  view_state:
+    description: >
+      Atlas §9 L1062 verbatim: "View 只保存 `layout / filters /
+      visible_fields / presentation_preferences`，不得複製 Knowledge 本體。"
+      These are the ONLY four fields Atlas names for what a View instance is
+      permitted to persist — this file transcribes them as-is rather than
+      inventing a richer state shape, per the task's explicit instruction not
+      to add fields with no textual anchor.
+    type: object
+    properties:
+      layout: { type: object, description: "Atlas L1062. No further internal structure specified anywhere in the corpus — left as an open object. See open_questions." }
+      filters: { type: object, description: "Atlas L1062. No further internal structure specified anywhere in the corpus — left as an open object. See open_questions." }
+      visible_fields:
+        type: array
+        items: { type: string }
+        description: "Atlas L1062. Typed as a string array (field names) since 'visible_fields' most naturally reads as a list of which Knowledge Object fields this View renders."
+      presentation_preferences: { type: object, description: "Atlas L1062. No further internal structure specified anywhere in the corpus — left as an open object. See open_questions." }
+
+representation:
+  description: >
+    A single Representation (View) instance as a typed object — LEGO
+    dimension H's controlled contract shape. Synthesized from the five
+    convergent sections cited in source_of_truth_for; field provenance is
+    noted per property below since (unlike lens.schema.yaml's single
+    example) no one block gives the full shape at once.
+  type: object
+  required: [id, category, knowledge_ref, state]
+  properties:
+    id:
+      type: string
+      description: >
+        No ID grammar is specified anywhere in Atlas for a Representation
+        instance (unlike Method's ADR-005b-decided `<family>.<name>` or
+        Lens's mirrored version — see lens.schema.yaml). Left as an open
+        string rather than inventing a pattern with zero textual anchor. See
+        `compilation_decisions`.
+    category:
+      $ref: "#/definitions/representation_category"
+    knowledge_ref:
+      type: string
+      description: >
+        Atlas §9 L1052 ('Knowledge Object' as the tree root every View hangs
+        off of) and §15.1's identical mermaid structure (L3644, 'K[Knowledge
+        Object]' as the single parent of every View node). Points at the
+        underlying Knowledge Object this View renders — untyped reference
+        (bare string ID) for the same Wave-ordering reason lens.schema.yaml's
+        `requires`/`output` are bare strings: no dependency on the
+        typed-objects/ subfolder being built in parallel this same wave.
+    state:
+      $ref: "#/definitions/view_state"
+    provenance_consistent:
+      type: boolean
+      default: true
+      description: >
+        Atlas §11.55 L2506 ('Provenance 保持一致') and §26 acceptance row
+        (L4410, view switching must not recompute Knowledge). Boolean flag
+        recording that this View was produced by a pure re-render (no
+        re-ingestion / re-computation of the underlying Knowledge Object) —
+        the mechanical, checkable form of the invariant in rule 9 (L4546).
+
+# ---------------------------------------------------------------------------
+# Non-normative catalog: named Views actually used in Atlas prose, cross-
+# mapped onto the canonical representation_category enum (for traceability
+# only — the enum above, not this table, is what `category` validates
+# against)
+# ---------------------------------------------------------------------------
+known_views:
+  - {name: "Text View", category: text, evidence: [{line: 973, quote: "Text / Outline View"}, {line: 3644, quote: "K --> T[Text View]"}]}
+  - {name: "Outline View", category: outline, evidence: [{line: 973, quote: "Text / Outline View", note: "Prose combines Text+Outline into one row; §17 engineering path splits them into two folders — this file follows the finer split. See compilation_decisions."}]}
+  - {name: "Table View", category: table, evidence: [{line: 974, quote: "Table / Matrix View"}, {line: 3645, quote: "K --> TB[Table View]"}]}
+  - {name: "Matrix View", category: matrix, evidence: [{line: 974, quote: "Table / Matrix View", note: "Same split-row treatment as Text/Outline."}]}
+  - {name: "Mind Map View", category: mindmap, evidence: [{line: 975, quote: "Mind Map View"}, {line: 3646, quote: "K --> MM[Mind Map View]"}]}
+  - {name: "Concept Graph View", category: conceptmap, evidence: [{line: 976, quote: "Concept Graph View"}, {line: 3647, quote: "K --> CG[Concept Graph View]"}]}
+  - {name: "Timeline View", category: timeline, evidence: [{line: 977, quote: "Timeline View"}, {line: 3648, quote: "K --> TL[Timeline View]"}]}
+  - {name: "Causal View", category: causal, evidence: [{line: 978, quote: "Causal View"}, {line: 3649, quote: "K --> CV[Causal View]"}, {line: 2497, quote: "Causal Diagram"}]}
+  - {name: "Audio / Conversational View", category: audio, evidence: [{line: 979, quote: "Audio / Conversational View"}, {line: 3650, quote: "K --> AU[Audio View]"}, {line: 2499, quote: "Audio"}]}
+  - {name: "Canvas", category: canvas, evidence: [{line: 2498, quote: "Canvas", note: "Named only in §11.55's Representation Switching list; no dedicated View row in F24 or §15's mermaid diagram."}]}
+  - {name: "(unnamed bare graph)", category: graph, evidence: [{line: 3925, quote: "/graph/", note: "Category exists only in the §17 engineering-path folder list; no prose View is ever called plain 'Graph View' (Concept Graph is the only graph-family View actually named). Flagged in open_questions."}]}
+
+# ---------------------------------------------------------------------------
+# Adjacent but explicitly out-of-scope: interaction modes named alongside
+# View types in the F24 table, and the separate cognitive-preference concept
+# ---------------------------------------------------------------------------
+related_but_out_of_scope:
+  - note: >
+      F24's tool table (L968-981) lists "Guided Mode" and "Expert LEGO Mode"
+      in the same table as the View rows (Text/Outline, Table/Matrix, Mind
+      Map, Concept Graph, Timeline, Causal, Audio/Conversational). Both are
+      INTERACTION modes (how the user is walked through method selection —
+      §11.56/§11.57 describe them as question-flow / drag-and-drop
+      paradigms, not renderings of a Knowledge Object) rather than
+      Representation/View instances, and neither appears in §9's
+      Representation Contract, §11.55's switching list, §15's mermaid
+      diagram, or §17's /representations/ folder. Excluded from
+      `representation_category` on that basis — a compilation judgment call,
+      see `compilation_decisions`.
+  - note: >
+      Atlas §6 (L261-268) defines a DIFFERENT "representation" concept:
+      `cognitive_preference.representation` — a per-user SOFT WEIGHT vector
+      (visual/text/table/spatial/audio, each 0.0-1.0) describing how strongly
+      a user prefers each modality. This is a preference-scoring input to the
+      Method/View Selection Engine, not a View instance itself, and uses a
+      different, coarser vocabulary (5 modality weights) than this file's
+      11-category `representation_category` enum. It plausibly belongs to
+      profile.schema.yaml (Atlas Appendix A's "rigor/mode profile" file,
+      being built in parallel this wave) rather than here — flagged, not
+      merged in, to avoid colliding with that sibling file's scope.
+
+compilation_decisions:
+  - question: >
+      Four sources give near-identical but non-identical View lists: F24
+      table (10 rows, includes Guided/Expert LEGO Mode), §11.55's switching
+      list (8 items, includes Canvas, excludes Outline/Matrix as separate
+      rows), §15.1's mermaid diagram (7 nodes, no Canvas, no Outline/Matrix
+      split), and §17's engineering path (11 folders, includes Graph as
+      distinct from Conceptmap, includes Outline and Matrix as separate
+      folders). Which is canonical for the `representation_category` enum?
+    decision: "§17's engineering-path taxonomy (11 categories)."
+    reasoning: >
+      It is the only one of the four structured as a flat, machine-oriented
+      enumeration rather than prose/mermaid narrative, and it is a strict
+      superset of the concrete View names used elsewhere once Text/Outline
+      and Table/Matrix are split into their finer-grained folder form — no
+      information from the other three sources is lost, only Guided
+      Mode/Expert LEGO Mode (interaction modes, see
+      related_but_out_of_scope) and the two soft-preference-only concepts
+      are excluded, each with its own disclosed reasoning.
+  - question: >
+      Should `representation.id` follow a `<category>.<name>` grammar
+      parallel to method.schema.yaml's ADR-005b pattern or lens.schema.yaml's
+      mirrored pattern?
+    decision: "No — left as an open, unpatterned string."
+    reasoning: >
+      Unlike Lens (which has one real dotted-ID instance, `stakeholder.
+      regulator`, to anchor the pattern on), Atlas gives ZERO worked examples
+      of an actual Representation/View instance ID anywhere in the corpus —
+      every View reference is a bare category name (Text View, Table View,
+      ...), never an instantiated object with an id field. Inventing an ID
+      grammar here would have no textual anchor at all (weaker evidence than
+      even the primitive/lens judgment calls above), so this file declines to
+      assert one and flags it as open instead.
+  - question: >
+      Should Guided Mode / Expert LEGO Mode be included in
+      `representation_category` since Atlas's own F24 table lists them
+      alongside the View rows?
+    decision: "Excluded."
+    reasoning: >
+      Every OTHER source that discusses Representation/View switching (§9,
+      §11.55, §15, §17) omits both — they only ever co-occur with View rows
+      in the single F24 summary table, whose own heading conflates three
+      different concepts ("Representation / Cognitive Preference /
+      Collaboration", L968) into one table. Treating F24's grouping as
+      authoritative would mean this schema's category enum absorbs two
+      interaction-flow concepts that four other independent sections keep
+      separate — the convergent evidence outweighs the one table's grouping.
+
+open_questions:
+  - id: "MRSP-representation-1"
+    question: >
+      §17's /graph/ folder (L3925) is never matched to a named prose View —
+      only /conceptmap/ maps cleanly to "Concept Graph View". Is /graph/ a
+      distinct, not-yet-named View type (e.g. a generic node-edge view
+      broader than the causal/concept-specific graphs), or a redundant
+      folder that should be merged with /conceptmap/? Left open — no Atlas
+      text disambiguates it either way.
+    owner: "operator, or whichever future session builds /representations/graph/"
+    blocks: "nothing in this schema; `graph` remains a valid enum value regardless of how this resolves"
+  - id: "MRSP-representation-2"
+    question: >
+      `view_state.layout`, `.filters`, and `.presentation_preferences` are
+      left as open (unconstrained) objects because Atlas names them (L1062)
+      but never defines their internal shape anywhere in the corpus. Should a
+      future revision define per-category sub-shapes (e.g. a mindmap
+      layout's expected keys vs. a table layout's), or is a fully generic
+      object the right long-term shape given the same object must serve 11
+      different category kinds?
+    owner: "operator"
+    blocks: "nothing — the fields validate as generic objects today"
+  - id: "MRSP-representation-3"
+    question: >
+      Should `cognitive_preference.representation`'s 5-modality weight vector
+      (Atlas §6 L261-268, see related_but_out_of_scope) be reconciled with
+      this file's 11-category enum — e.g. by defining a mapping from each
+      `representation_category` to the modality weight(s) it satisfies — once
+      profile.schema.yaml (the file most likely to own the preference vector)
+      exists? Left unresolved here since profile.schema.yaml is out of this
+      file's scope and is being built by a parallel agent this same wave.
+    owner: "operator, or whoever builds profile.schema.yaml"
+    blocks: "nothing in this schema"
+
+verification:
+  method: >
+    Read against Atlas §2 (L92-129), §3 (L134-149), §6 (L257-292), §9
+    (L985-1064), §11.55 (L2486-2509), §13 (L3200-3226), §15 (L3638-3712), F24
+    table (L968-984), §17 (L3861-3927), §25 (L4292-4312), §26 (L4405-4427),
+    §29 (L4536-4552), Appendix A (L4574-4604); Master Plan §8.2 (L673-689);
+    MACHINE_READABLE_SPEC_PLAN.md §2.3 (L116); method-inventory.yaml
+    (L1079-1118, all 10 F24-category entries, all has_contract: false); a
+    full-document grep of "[Rr]epresentation" across all three mother
+    documents to confirm no additional structural (non-prose) usage was
+    missed; docs/adr/ADR-001~009 grepped for "representation" (zero hits).
+  note: >
+    No mother document or ADR was modified to produce this file. The
+    `representation_category` enum is a verbatim transcription of Atlas
+    §17's engineering path; the `view_state` field names are a verbatim
+    transcription of Atlas L1062's own field list. Every synthesis choice
+    beyond direct transcription (canonical-source selection among 4
+    near-duplicate View lists, exclusion of Guided/Expert LEGO Mode,
+    leaving `id` unpatterned, the cognitive_preference boundary) is recorded
+    above in `compilation_decisions` / `related_but_out_of_scope` /
+    `open_questions` rather than asserted silently.

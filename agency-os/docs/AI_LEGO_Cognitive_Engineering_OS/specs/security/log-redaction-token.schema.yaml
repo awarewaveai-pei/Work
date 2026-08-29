@@ -1,0 +1,350 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/security/log-redaction-token.schema.yaml"
+title: Log Redaction Token
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the token structure that replaces
+  a PII field's raw value before it is written into a structured log, per
+  ADR-007 Sub-decision (a) Option A (Deterministic Keyed-HMAC Tokenization).
+  Resolves ADR-007's regulatory-timing conflict (EC §102 Logging Contract's
+  v1-effective `redacted`+`correlatable` dual requirement, L2980-2981, vs
+  Master Plan §149 miscategorizing Pseudonymization/Tokenization as a
+  "future capability"): the token defined here is computed as
+  `token = HMAC-SHA256(key, raw_value)` using a tenant-scoped HMAC signing
+  key, so the log stores only `token` — never `raw_value` — while identical
+  raw values for the same subject still hash to identical tokens, satisfying
+  `correlatable` and `redacted` simultaneously rather than trading one off
+  against the other. This file is the single source of truth for the token
+  object's field shape; ADR-007 names the four fields in prose, it does not
+  itself define their types, enums, or the token value's own field — those
+  live here, not in the ADR.
+
+  This schema depends on `specs/security/key-vault-lifecycle.schema.yaml`'s
+  `key_use == HMAC_SIGNING_KEY` key type (built by a parallel Phase 3 agent
+  in this same session, per ADR-007 Sub-decision (a)'s explicit instruction
+  to reuse ADR-002's existing Key Vault rather than stand up a second one).
+  Consistent with `manifest.schema.yaml`'s established forward-reference
+  convention, `hmac_key_ref` below is a soft (non-`$ref`) cross-reference by
+  field-name convention, not a hard schema dependency — this file's own
+  validity does not require that sibling file to exist or to have finished
+  building first.
+
+compilation_decisions:
+  - question: >
+      ADR-007 Consequences item 2 (line 154) names four fields in prose —
+      `token_alg`（固定 HMAC-SHA256）/`hmac_key_ref`/`classification_tag`/
+      `tenant_scope` — but specifies no JSON Schema type, enum, or format
+      for any of them, and does not itself name a field for the token
+      VALUE (the actual HMAC output that gets written into the log in
+      place of the raw value).
+    decision: >
+      `token_alg` is a `const` (single legal value, not an open enum, since
+      ADR-007 fixes it — "固定 HMAC-SHA256" is a fixed-value instruction,
+      not a menu). `hmac_key_ref` is an opaque soft-reference `string`
+      matching `key-vault-lifecycle.schema.yaml`'s `key_record.key_id`
+      type (also plain `string`, not `uuid`). `classification_tag` is a
+      closed `enum` reusing MP §61/EC §101's four-value Data Classification
+      list verbatim (Public/Internal/Confidential/Restricted,
+      Execution_Contract_v1.md:2960-2963), the same classification this
+      whole ADR's PII-field-determination rule (Recommendation point 1)
+      is anchored to — not a new fifth tier. `tenant_scope` is `string`
+      with `format: uuid`, matching `tenant.schema.yaml`'s and
+      `key-vault-lifecycle.schema.yaml`'s existing `tenant_id` type. A
+      required `token` field (pattern `^[a-f0-9]{64}$`, lowercase hex,
+      256-bit output) is added as the fifth required field, reusing this
+      repo's already-established hex-digest convention
+      (`manifest.schema.yaml`'s `documents[].sha256` field uses the
+      identical pattern for the same 256-bit output length).
+    reasoning: >
+      Same technique already used by every sibling Phase 3 schema in this
+      directory: `key-vault-lifecycle.schema.yaml`'s `sovereignty_mode`
+      reuses MP §148's six-value list verbatim rather than inventing new
+      vocabulary; `epistemic-label.schema.yaml` transcribes enum values
+      verbatim from its governing ADR. Fixing `token_alg` as `const`
+      rather than a single-value `enum` more precisely encodes "this is
+      not a choice" than an enum with one legal member would. Adding the
+      `token` value field is not new scope creep beyond ADR-007: a schema
+      literally named "log redaction token" that defined only metadata
+      fields and omitted the token's own value would be unable to
+      represent what ADR-007's Recommendation literally says gets written
+      into the log ("log 中只寫入 token，不寫明文") — the field is an
+      obvious completeness requirement of the ADR's own literal formula,
+      not an independent architecture decision.
+  - question: >
+      The task instructions (and ADR-007's own "唯一風險必須明說" callout,
+      Consequences 負面／代價 paragraph, line 149) require this schema to
+      make historical tokens distinguishable from current ones across an
+      HMAC key rotation boundary, even though ADR-007 itself does not
+      specify a field or mechanism for this at the schema level — it only
+      states the tradeoff exists in prose ("輪替 HMAC 金鑰 = 犧牲跨輪替邊界
+      的可關聯性，換取降低長期金鑰外洩風險").
+    decision: >
+      No separate `key_version`/`key_generation` counter field is added.
+      `hmac_key_ref` itself is the key-generation identifier: per
+      `key-vault-lifecycle.schema.yaml`'s `key_record` model (documented
+      there as "One entry in the Vault, per issued key"), rotating a
+      `key_use == HMAC_SIGNING_KEY` key retires the previous `key_record`
+      to `status: ROTATED` (a distinct terminal value from `ACTIVE`,
+      alongside `PENDING_DESTRUCTION`/`DESTROYED`) rather than mutating an
+      existing key's material under a stable `key_id` — each rotation
+      therefore mints a new `key_id`. Two `log_redaction_token` objects
+      computed under different `hmac_key_ref` values are consequently
+      always distinguishable as belonging to different key generations,
+      and a consumer can resolve `hmac_key_ref` against the Vault's
+      `key_record.status` to learn whether that generation is the current
+      signing key (`ACTIVE`) or a retired one (`ROTATED`) — without this
+      schema needing its own duplicate version counter. See the
+      `constraints` list on the composite object below for the
+      correlatability rule this enables.
+    reasoning: >
+      This is a Low-risk compilation decision, not a new architecture
+      decision, per the task's explicit instruction to document it this
+      way rather than silently omitting rotation-tracking: it reuses a
+      field (`hmac_key_ref`) and a state machine
+      (`key_record.status` incl. `ROTATED`) that already exist in the
+      sibling schema for an unrelated reason (identifying which key
+      produced a value), rather than inventing a second, redundant
+      versioning mechanism. Adding a parallel `key_version` integer would
+      duplicate information `hmac_key_ref` already carries and risk the
+      two falling out of sync (e.g. if a future rotation reused a
+      `key_id`, `key_version` and `hmac_key_ref` could disagree) — the
+      single-field design has no such failure mode because there is only
+      one source of truth. The residual dependency this decision creates
+      — this schema's rotation-tracking claim is only as strong as
+      `key-vault-lifecycle.schema.yaml`'s "new `key_id` per rotation,
+      old record retained as `ROTATED`" assumption actually holding — is
+      flagged explicitly in `open_questions` below rather than hidden,
+      per this task's own instruction not to silently omit the
+      rotation-tracking discussion.
+  - question: >
+      Whether one `log_redaction_token` object represents exactly one
+      redacted field's value (as opposed to a whole log line's worth of
+      redacted fields bundled together), and whether identifying *which*
+      log field a given token replaces is in scope, is not addressed by
+      ADR-007's four-field list.
+    decision: >
+      One `log_redaction_token` object = one redacted field value (matches
+      EC §102's per-field structured logging model, not a per-line
+      bundle). An OPTIONAL `field_name` string and an OPTIONAL
+      `computed_at` timestamp are added, additive to the four ADR-named
+      fields plus `token`.
+    reasoning: >
+      Matches `manifest.schema.yaml`'s established pattern for additive,
+      non-ADR-literal fields that complete a schema's practical usability
+      without expanding its governing decision (`app_version`,
+      `loaded_sections` were added there the same way, each documented
+      individually). `field_name` lets a consumer correlate a token object
+      back to the structured-log key it replaced without requiring a
+      redesign of the general log schema (EC §102's minimum key list,
+      `timestamp/level/service/trace_id/task_id/execution_id/event/
+      status`, is untouched by this file — see ADR-007 Consequences item 6).
+      Both fields are OPTIONAL (not required) precisely because ADR-007
+      does not mandate them; omitting them does not make a token object
+      invalid.
+
+source_of_truth_for:
+  - "docs/adr/ADR-007-pii-redaction-vs-pseudonymization-timing.md Recommendation point 2, line 126 (tokenization mechanism: token = HMAC-SHA256(key, raw_value), tenant-scoped HMAC signing key, log stores only token)"
+  - "docs/adr/ADR-007-pii-redaction-vs-pseudonymization-timing.md Recommendation point 1, line 125 (PII field determination reuses MP §61/EC §101 classification verbatim, no new fifth tier)"
+  - "docs/adr/ADR-007-pii-redaction-vs-pseudonymization-timing.md Consequences 需要新增的規格缺口 item 2, line 154 (this exact file name and its four named fields)"
+  - "docs/adr/ADR-007-pii-redaction-vs-pseudonymization-timing.md Consequences 負面／代價, line 149 (HMAC key rotation breaks cross-rotation-boundary correlatability of historical tokens — documented tradeoff, not hidden)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md:2955-2971 (§101 Data Classification — Public/Internal/Confidential/Restricted enum verbatim, L2960-2963; Restricted's `logs redacted` requirement, L2966-2971)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md:2974-2999 (§102 Logging Contract — `correlatable` L2980 and `redacted` L2981 dual v1-effective requirement this token structure satisfies simultaneously)"
+  - "specs/security/key-vault-lifecycle.schema.yaml definitions.key_use.HMAC_SIGNING_KEY (the key type `hmac_key_ref` resolves to) and key_record.status enum incl. ROTATED (the rotation/correlatability mechanics this schema's key-generation tracking decision depends on)"
+decided_by: >
+  docs/adr/ADR-007-pii-redaction-vs-pseudonymization-timing.md (ACCEPTED
+  2026-08-29) Consequences item 2 (the four named fields, line 154) and
+  Recommendation point 2 (the HMAC-SHA256 tokenization mechanism itself).
+  Field types/enums/patterns, the `token` value field, the key-rotation
+  tracking mechanism, and the `field_name`/`computed_at` additive fields
+  are Phase 3 compilation decisions (see `compilation_decisions` above),
+  not a separate ADR.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+definitions:
+
+  token_alg:
+    description: >
+      The tokenization algorithm. Fixed by ADR-007 Sub-decision (a) — not a
+      configurable choice, per the FMEA finding (ADR-007) that an
+      unkeyed/unsalted hash (e.g. bare `sha256(email)`) is unacceptable
+      (dictionary-attack-reversible for low-entropy PII like email/phone).
+    type: string
+    const: "HMAC-SHA256"
+
+  hmac_key_ref:
+    description: >
+      Soft reference (opaque identifier, no `$ref` — same forward-reference
+      convention as `manifest.schema.yaml`'s `documents[].document_id` and
+      `tenant.schema.yaml`'s `encryption_root_key_ref`) to the `key_id` of
+      a `specs/security/key-vault-lifecycle.schema.yaml` `key_record` whose
+      `key_use == HMAC_SIGNING_KEY`. This is also this schema's
+      key-generation tracking mechanism — see `compilation_decisions`
+      above and the composite object's `constraints` below.
+    type: string
+    minLength: 1
+
+  classification_tag:
+    description: >
+      Which Data Classification tier (MP §61 / EC §101, verbatim, no fifth
+      tier added) the original raw value belonged to. Determines whether a
+      field was required to be tokenized in the first place, per ADR-007
+      Recommendation point 1 ("任何 log 欄位若承載可識別自然人的資料，該欄位
+      所屬物件必須先被標記 Confidential 或 Restricted"). In practice a
+      `log_redaction_token` should only ever carry `Confidential` or
+      `Restricted` — `Public`/`Internal` values are included in the enum
+      for completeness with the source classification list, not because
+      tokenizing a Public/Internal field is expected.
+    type: string
+    enum: [Public, Internal, Confidential, Restricted]
+
+  tenant_scope:
+    description: >
+      Soft reference (opaque identifier, same convention as
+      `hmac_key_ref` above) to `domain/tenant.schema.yaml`'s `tenant_id`.
+      Per ADR-007 Recommendation point 2, tokenization is computed
+      "per-tenant"（每個 tenant 用自己的 HMAC 簽章金鑰）— this field
+      records which tenant's key produced this token, matching the
+      `tenant_id` already required on the `key_record` this token's
+      `hmac_key_ref` resolves to.
+    type: string
+    format: uuid
+
+  log_redaction_token:
+    description: >
+      The complete token object that replaces a single PII field's raw
+      value at the point it is written into a structured log entry, per
+      EC §102. One object per redacted field, not one per log line — see
+      `compilation_decisions` above.
+    type: object
+    required: [token_alg, hmac_key_ref, classification_tag, tenant_scope, token]
+    properties:
+      token_alg:
+        $ref: "#/definitions/token_alg"
+      hmac_key_ref:
+        $ref: "#/definitions/hmac_key_ref"
+      classification_tag:
+        $ref: "#/definitions/classification_tag"
+      tenant_scope:
+        $ref: "#/definitions/tenant_scope"
+      token:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+        description: >
+          The HMAC-SHA256 output — `HMAC-SHA256(key, raw_value)` — as a
+          lowercase hex digest (256 bits = 64 hex characters), reusing this
+          repo's established hex-digest encoding convention
+          (`manifest.schema.yaml`'s `documents[].sha256` uses the identical
+          pattern for the same output length). The raw value that produced
+          this token MUST NOT appear anywhere else in the same log entry —
+          per ADR-007 Recommendation point 2, "log 中只寫入 token，不寫明文".
+      field_name:
+        type: [string, "null"]
+        default: null
+        description: >
+          OPTIONAL. Which structured log field (per EC §102's minimum key
+          list) this token replaces, e.g. "customer.email". Additive field,
+          not named by ADR-007 — see `compilation_decisions` above.
+      computed_at:
+        type: [string, "null"]
+        format: date-time
+        default: null
+        description: "OPTIONAL. When this token was computed. Additive field."
+    constraints:
+      description: >
+        Non-normative narrative constraints (same style as
+        `governance/epistemic-label.schema.yaml`'s `locked.constraints` and
+        `key-vault-lifecycle.schema.yaml`'s `vault_restore_event.constraints`),
+        stated here because they express cross-field/cross-schema invariants
+        plain JSON Schema types cannot express directly.
+      value:
+        - "Two log_redaction_token objects with identical tenant_scope, identical hmac_key_ref, and the same underlying raw_value MUST produce identical token values — this is the `correlatable` guarantee (EC §102 L2980) this schema exists to satisfy without storing raw_value anywhere."
+        - "Two log_redaction_token objects with different hmac_key_ref values MUST NOT be assumed correlatable even for the same underlying raw_value and the same tenant_scope — a hmac_key_ref change most commonly means the tenant's HMAC signing key was rotated (per key-vault-lifecycle.schema.yaml's key_record.status transitioning ACTIVE -> ROTATED), and ADR-007 Consequences documents this as an accepted, intentional tradeoff (loss of cross-rotation-boundary correlatability in exchange for reduced long-term key-exposure risk), not a defect to work around."
+        - "raw_value MUST NOT be persisted, logged, or embedded anywhere alongside a log_redaction_token — the entire point of this object is that the log carries token in place of raw_value, never both (EC L2999's 'no full sensitive-payload dumps' rule applies a fortiori to the raw value a token was computed from)."
+
+examples:
+  - description: "A Restricted email field, tokenized under the tenant's current (ACTIVE) HMAC signing key"
+    value:
+      token_alg: "HMAC-SHA256"
+      hmac_key_ref: "hmac-key.tenant-3fa85f64.gen-2"
+      classification_tag: Restricted
+      tenant_scope: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      token: "b7e23ec29af22b0b4e41da31e868d57226121c84a5ffc5e5d3b6c4c8f5f5b7a1"
+      field_name: "customer.email"
+      computed_at: "2026-08-29T00:00:00Z"
+  - description: >
+      A historical token computed under a since-rotated key (hmac-key
+      .tenant-3fa85f64.gen-1, now status: ROTATED in the Key Vault) — still
+      valid and distinguishable by its hmac_key_ref, but not correlatable
+      against gen-2 tokens for the same subject.
+    value:
+      token_alg: "HMAC-SHA256"
+      hmac_key_ref: "hmac-key.tenant-3fa85f64.gen-1"
+      classification_tag: Confidential
+      tenant_scope: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      token: "1c4a5b6c8f5f5b7a1b7e23ec29af22b0b4e41da31e868d57226121c84a5ffc5"
+      field_name: "customer.phone"
+      computed_at: "2025-11-02T00:00:00Z"
+
+open_questions:
+  - id: "MRSP-log-redaction-1"
+    question: >
+      This schema's key-rotation-tracking compilation decision (see
+      `compilation_decisions` above) assumes
+      `key-vault-lifecycle.schema.yaml`'s rotation model mints a NEW
+      `key_id` per rotation and retires the previous `key_record` to
+      `status: ROTATED` rather than mutating an existing key's material
+      under a stable `key_id`. That schema's `key_record` description
+      ("One entry in the Vault, per issued key") and its inclusion of
+      `ROTATED` as a distinct terminal `status` value alongside
+      `DESTROYED` support this reading, but neither ADR-002 nor ADR-007
+      states the "new key_id per rotation" rule as an explicit sentence —
+      it is inferred, not transcribed verbatim. If a future clarification
+      of `key-vault-lifecycle.schema.yaml` establishes that rotation
+      instead reuses a stable `key_id` with in-place material rotation,
+      this schema's claim that "different hmac_key_ref values mean
+      different key generations" would need re-verification (though the
+      correlatability guarantee itself — same tenant+key+raw_value implies
+      same token — would still hold regardless of which rotation model is
+      correct).
+    owner: "operator, if/when key-vault-lifecycle.schema.yaml's rotation semantics are made explicit in a Round 2 ADR or clarification"
+    blocks: "nothing in this schema's own validity; flagged for completeness per R4 (claim-before-verify)"
+  - id: "MRSP-log-redaction-2"
+    question: >
+      `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` §2.5's inventory
+      table (built before ADR-007 existed) does not list this file — only
+      `personal-data-envelope.schema.yaml` and `key-vault-lifecycle
+      .schema.yaml` appear there, both traced to ADR-002. This file is
+      traced instead to ADR-007 Consequences item 2 (line 154), a later
+      ADR in the same Phase 1 conflict family (P1-CONFLICT-3, adjacent to
+      ADR-002's P1-CONFLICT-1). The inventory table itself is out of scope
+      for this file to edit.
+    owner: "operator, via a small doc-sync addition to MACHINE_READABLE_SPEC_PLAN.md §2.5's table"
+    blocks: "nothing in this schema; flagged for completeness per R4 (claim-before-verify)"
+
+verification:
+  method: >
+    Read against ADR-007 full text (Context, Recommendation, Consequences,
+    Evidence sections), EC §101 (L2955-2971) and §102 (L2974-2999),
+    `specs/governance/epistemic-label.schema.yaml` and
+    `specs/execution/manifest.schema.yaml` (style references per task
+    instruction), and `specs/security/key-vault-lifecycle.schema.yaml`
+    (for the HMAC_SIGNING_KEY key_use and key_record.status.ROTATED this
+    schema's rotation-tracking decision depends on). Grep-confirmed
+    (2026-08-29) `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` does not
+    yet list this file (see open_questions MRSP-log-redaction-2).
+  note: >
+    No mother document or ADR was modified to produce this file. The four
+    field names (token_alg/hmac_key_ref/classification_tag/tenant_scope)
+    and the HMAC-SHA256 mechanism are transcribed verbatim from ADR-007
+    Consequences item 2 and Recommendation point 2; field types/enums/
+    patterns, the `token` value field, the key-rotation tracking mechanism,
+    and the two additive fields (field_name/computed_at) reflect Phase 3
+    compilation decisions, recorded above in `compilation_decisions`, not
+    a new ADR. `personal-data-envelope.schema.yaml` (also depended on by
+    the same ADR-007/ADR-002 family) was not read or waited on to produce
+    this file, per task boundary — it did not exist on disk at write time.

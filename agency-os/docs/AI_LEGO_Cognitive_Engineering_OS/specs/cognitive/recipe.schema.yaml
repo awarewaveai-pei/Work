@@ -1,0 +1,430 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/recipe.schema.yaml"
+title: Recipe
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable schema for a "Recipe" — Atlas §13's "Recipe
+  Library：方法像 LEGO 一樣自由搭配" (L3200-3540, 12 worked examples) and Master
+  Plan §9's "Workflow IR 與 Recipe Engine" (L794-858, the ONE place either
+  mother document gives an actual machine-readable YAML shape for a step
+  sequence). Formalizes Atlas Appendix A's promise to schema-ize this
+  (Appendix A, L4574-4604, `cognitive/recipe.schema.yaml` at L4581) and
+  MACHINE_READABLE_SPEC_PLAN.md §2.3's row for this file (L117: "Atlas
+  Appendix A 既有承諾", depends on `method.schema.yaml`, no finding assigned,
+  `READY`).
+
+  UNLIKE `method.schema.yaml` (which formalizes ONE literal worked schema
+  example, Atlas §9's Fishbone contract, essentially verbatim), this file has
+  no single literal machine-readable "Recipe Contract" example to transcribe.
+  The evidence is instead two DIFFERENT levels of the same idea that no
+  mother document explicitly reconciles with each other — this file makes
+  that reconciliation itself an explicit, honestly-flagged compilation
+  decision rather than silently assuming they are identical:
+
+    (1) Atlas §13's 12 example Recipes — informal, human-readable, ordered
+        `→`-arrow or mermaid-flowchart stage-label sequences (e.g. "Problem
+        Framing → Mind Map → Brainstorm → Affinity Diagram → Impact-Effort",
+        §13.1 L3232-3238), most of which do NOT map 1:1 onto a formal
+        `method.schema.yaml` `id` (many stage labels — "Human Decision",
+        "Jurisdiction Context", "Rollback Window Close" — are conceptual
+        gates/inputs/markers, not method invocations).
+    (2) Master Plan §9's Workflow IR — the only place either mother document
+        gives an actual typed YAML node grammar: `nodes: [{type: capability,
+        ref, input} | {type: method, method_id, input}]` (L819-839).
+
+  This schema adopts (2)'s typed node grammar as the machine-checkable
+  `steps[]` shape (it is the only real evidence for one), while (1) supplies
+  every other Recipe-level field below (`suited_for`, `not_for`,
+  `mandatory_elements`, `forbidden_actions`, `outputs`) — each cited to its
+  specific §13.x source rather than invented. Where the two levels genuinely
+  conflict or leave a gap (see `open_questions`), this file says so instead
+  of fabricating a resolution.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13 Recipe Library, definition (L3200-3226)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.1-§13.12 (L3228-3539, 12 worked Recipe examples)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §14.1 LEGO type-compatibility rules (L3544-3584)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §14.2 Mandatory Gate Injection (L3588-3612)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §14.3 Optional/Required/Forbidden edge labels (L3623-3634)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md Appendix A schema list (L4574-4604, recipe.schema.yaml at L4581)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §9 Workflow IR 與 Recipe Engine (L794-858)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.3 row for recipe.schema.yaml (L117)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.8 /recipes/validated/ inventory (L170-176, three real Recipe instance files this schema must be able to express)"
+decided_by: >
+  No single ADR governs this file (same honesty pattern
+  `execution/status-codes.schema.yaml` uses: `decided_by` states this
+  directly rather than inventing an ADR citation). ADR-005 covers Method ID
+  grammar only (see `open_questions` below for why it is NOT extended to
+  Recipe ids here) and ADR-008 covers a content gap in ONE specific Recipe
+  (Business Planning Mode's Financial Assumptions node) — neither rules on
+  this schema's structure. MACHINE_READABLE_SPEC_PLAN.md §2.3's row for this
+  file (L117) marks it `READY` with a dependency on `method.schema.yaml`
+  only, no ADR. The field-shape choices below are Phase 3 compilation
+  decisions, each cited to its specific source line, following the same
+  "Low-risk naming/structure pick, not a new architecture decision" standard
+  `status-codes.schema.yaml` and `manifest.schema.yaml` already established
+  for this class of call.
+
+compilation_decisions:
+
+  - question: >
+      What is a Recipe's `id` grammar? No mother document states one
+      explicitly for Recipes the way ADR-005b did for Methods.
+    decision: >
+      `id` is a kebab-case slug: `^[a-z][a-z0-9-]*$`. `version` is a
+      SEPARATE field (semver), matching `method.schema.yaml`'s pattern.
+    reasoning: >
+      Two candidate forms exist in the corpus and they conflict:
+      (a) MP §9's literal Workflow example uses a DOTTED, VERSION-EMBEDDED
+      form, `id: research.qualitative.v4` (L812) — the same defect class
+      ADR-005b rejected for Method ids (`method.swot.v1`). (b) The THREE
+      real Recipe instance files MACHINE_READABLE_SPEC_PLAN.md §2.8 already
+      commits to building — `db-migration-expand-contract.recipe.yaml`,
+      `method-deprecation-retirement.recipe.yaml`,
+      `champion-challenger.recipe.yaml` (L174-176) — are all named as flat
+      kebab-case slugs with NO embedded version and NO dot-segmented family
+      form. Three concrete, already-planned filenames outweigh one narrative
+      YAML example, and picking the kebab-case slug additionally keeps this
+      file internally consistent with `method.schema.yaml`'s "id is stable
+      across versions, version is a separate field" discipline (itself
+      grounded in Atlas §24.1's "Method 不可就地覆寫" principle, which
+      Atlas §24.2/EC §37/MP §71 group Recipes into the same
+      Champion/Challenger versioning discipline as Methods — see
+      `open_questions` for why this is an inference, not a literal Recipe-ID
+      statement, and therefore only a Low-risk compilation pick, not treated
+      as if ADR-005b already covered it).
+    scope_note: >
+      This does NOT extend ADR-005b's ruling to Recipe ids (that ADR is
+      scoped to Method ID grammar only, see its title and Recommendation).
+      It is this file's own Low-risk structural pick, flagged in
+      `open_questions` as unresolved-by-ADR so a future Round 2 ADR can
+      override it without this file having falsely claimed ADR cover.
+
+  - question: >
+      MP §9's Workflow IR node grammar has exactly two node `type` values:
+      `capability` and `method` (L820-838). Atlas §13's 12 worked Recipe
+      examples contain many stage labels that are neither — e.g. "Human
+      Decision" (§13.2 L3268, §13.4 L3327, §13.7 L3413), "Jurisdiction
+      Context" (§13.6 L3373-3375), "Rollback Window Close" (§13.10 L3499,
+      §13.8/§13.9's "Rollback Window"). Should `steps[].type` be expanded to
+      cover these?
+    decision: >
+      No. `steps[].type` stays exactly `[capability, method]`, the only two
+      values any mother document actually defines as a machine-checkable
+      node type. Recipe steps that are conceptually a human-authority gate,
+      a data/context input, or a control-flow marker are representable as a
+      `capability`-typed step with a free-text `ref` (e.g. `ref:
+      human_decision`, `ref: rollback_window_close`) — a working
+      approximation, not a semantically distinct type — or simply omitted
+      from `steps[]` and left as descriptive-only content in `outputs`/
+      `mandatory_elements` when they carry no data-flow role.
+    reasoning: >
+      Inventing a 5-or-6-value `type` enum (human_gate, data_input,
+      control_marker, ...) to cover every Atlas §13.x stage label would be
+      exactly the "fabricate a rich schema with no textual basis" this task
+      was told to avoid — no mother document proposes such a taxonomy. The
+      honest position is: the FORMAL node grammar only covers
+      capability/method today; the informal Recipe Library's richer
+      vocabulary of stage labels is a real, acknowledged gap, recorded in
+      `open_questions`, not quietly resolved by invention.
+
+  - question: >
+      Atlas §14.3 (L3623-3634) gives a 6-value edge-label enum (RECOMMENDED,
+      OPTIONAL, REQUIRED_BY_RISK, REQUIRED_BY_JURISDICTION,
+      REQUIRED_BY_SECTOR, FORBIDDEN) for "每個 block edge" in a Recipe. Where
+      does this attach in the schema?
+    decision: "Added verbatim as `steps[].necessity`, default `RECOMMENDED`."
+    reasoning: >
+      Direct match to Atlas §13's own definition of what a Recipe IS
+      ("Validated reference workflow + Typed Contracts + Optional branches +
+      Mandatory risk gates + Jurisdiction rules", L3204-3214) — "Optional
+      branches" = OPTIONAL, "Mandatory risk gates" = REQUIRED_BY_RISK,
+      "Jurisdiction rules" = REQUIRED_BY_JURISDICTION. Default RECOMMENDED
+      because every undecorated `→` arrow across all 12 worked examples
+      represents the plain reference-path case, per §13's own framing of a
+      Recipe as first and foremost a "validated reference workflow".
+
+  - question: >
+      `db-migration-expand-contract.recipe.yaml` (MRSP §2.8 L174) is
+      explicitly dependent on `execution/gate.schema.yaml` for hooking steps
+      like "Backup / Restore Validation" to a formal gate. But
+      `gate.schema.yaml` itself is `BLOCKED_PENDING_ROUND2_ADR`
+      (MACHINE_READABLE_SPEC_PLAN.md §2.2 L102 — the Global/High-risk Gate
+      list is undecided). How should `steps[].gate_ref` be typed?
+    decision: "Plain `type: string`, no enum, no hard $ref."
+    reasoning: >
+      Identical precedent already set by `execution/manifest.schema.yaml`'s
+      `results.gates` field, which left gate references untyped for the
+      same reason ("Global/High-risk gate list itself is
+      BLOCKED_PENDING_ROUND2_ADR... this field only records which gate IDs
+      ran, it does not enumerate the legal set"). Repeating that same
+      constraint here keeps the two files consistent and avoids this schema
+      accidentally pre-empting the still-open Round 2 ADR on the gate list.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+type: object
+required: [id, version, name, steps]
+properties:
+
+  id:
+    type: string
+    pattern: "^[a-z][a-z0-9-]*$"
+    description: >
+      Kebab-case slug, stable across versions. See `compilation_decisions`
+      above for why this form (not MP §9's dotted/versioned
+      `research.qualitative.v4` example) was chosen. Matches the three real
+      planned filenames in MACHINE_READABLE_SPEC_PLAN.md §2.8: the `id`
+      value is expected to equal the filename's slug before the
+      `.recipe.yaml` suffix.
+    examples:
+      - db-migration-expand-contract
+      - method-deprecation-retirement
+      - champion-challenger
+
+  version:
+    type: string
+    pattern: "^\\d+\\.\\d+\\.\\d+$"
+    description: >
+      Semver, separate from `id`. Grounded in Atlas §24.2/EC §37/MP §71
+      grouping Recipes alongside Model/Method/Prompt as things subject to
+      Champion/Challenger promotion — which requires a stable identity
+      across versions, the same discipline `method.schema.yaml` applies
+      (Atlas §24.1). This is an inference by analogy, not a literal
+      Recipe-versioning statement in any mother document; flagged as such
+      here rather than presented as directly cited.
+    examples: ["1.0.0"]
+
+  name:
+    type: string
+    description: >
+      Human-readable title. Every one of Atlas §13's 12 worked examples has
+      one (e.g. "Simple Brainstorm Recipe", §13.1 L3228; "Board-grade
+      Strategy Recipe", §13.4 L3309).
+    examples: ["Simple Brainstorm Recipe"]
+
+  references:
+    type: object
+    description: >
+      Per Master Plan §9's Workflow IR (L813-817, `references.cognitive_method_atlas:
+      {file, required}`). Pins which Atlas version this Recipe's `method_id`
+      steps resolve against, for 30-year replay — same discipline
+      `execution/manifest.schema.yaml`'s `documents[]` already enforces at
+      the execution level; this field pins it at the Recipe-definition
+      level instead.
+    properties:
+      cognitive_method_atlas:
+        type: object
+        required: [file, required]
+        properties:
+          file: { type: string }
+          required: { type: boolean, default: true }
+
+  risk_tier:
+    description: >
+      OPTIONAL. Soft reference to `execution/risk-tier.schema.yaml#/risk_tier`.
+      Grounded in Atlas §14.2 (L3588-3612): the Recipe compiler's behavior
+      (whether Mandatory Gate Injection fires) depends on the risk tier the
+      Recipe — or its invoking task — is running at. This file does not
+      redefine WHICH gates fire at which tier; that remains
+      `execution/risk-tier.schema.yaml`'s `mandatory_gate_injection_trigger`
+      (R3∪R4) and the still-`BLOCKED_PENDING_ROUND2_ADR` gate list itself.
+    type: string
+    enum: [R0, R1, R2, R3, R4]
+
+  suited_for:
+    type: array
+    items: { type: string }
+    description: >
+      Free-text use-case labels. Per Atlas §13.2's "適合" list (L3271-3276:
+      Business proposal / Product roadmap / Operational improvement /
+      Cross-functional workshop) and equivalent blocks across other §13.x
+      entries.
+
+  not_for:
+    type: array
+    items: { type: string }
+    description: >
+      Per Atlas §13.1's "不可用於" (L3247-3248: 高風險正式決策、醫療/法律/
+      安全建議、重大投資 — high-stakes formal decisions, medical/legal/safety
+      advice, major investment).
+
+  mandatory_elements:
+    type: array
+    items: { type: string }
+    description: >
+      Per Atlas §13.3's "強制" (L3299-3306: Provenance, Citation
+      verification, Methodology gate, Statistical guardrails, Research
+      integrity) and §13.7's "高風險時強制" (L3416-3421). Deliberately kept
+      as a free-text list rather than a fixed 2-key object (contrast
+      `method.schema.yaml`'s `quality` block) because the actual mandatory
+      items differ per Recipe across the 12 worked examples — there is no
+      single fixed schema for this across all of them.
+
+  forbidden_actions:
+    type: array
+    items: { type: string }
+    description: >
+      Per Atlas §13.8's "禁止" (L3444-3449: 未重建 current state 就直接
+      patch / incident 中修改多個不相關系統 / 只修症狀不建立 regression
+      test / 沒有 rollback 就進 production).
+
+  steps:
+    type: array
+    minItems: 1
+    description: >
+      The ordered step sequence. Array position IS the sequence order (no
+      mother document evidences a separate numeric order field). Node
+      grammar per Master Plan §9's Workflow IR (L819-839) — the only place
+      either mother document defines a typed, machine-checkable step shape.
+    items:
+      type: object
+      required: [label, type]
+      properties:
+        label:
+          type: string
+          description: >
+            Human-readable stage name. Every step in every one of Atlas
+            §13's 12 worked examples carries one (e.g. "Problem Framing",
+            "Schema Baseline").
+        type:
+          type: string
+          enum: [capability, method]
+          description: >
+            Per MP §9 (L820, L824). See `compilation_decisions` above for
+            why this stays a 2-value enum despite Atlas §13.x containing
+            step labels that fit neither value cleanly.
+        method_id:
+          type: string
+          pattern: "^[a-z_]+\\.[a-z_]+$"
+          description: >
+            REQUIRED when `type: method`. MUST validate against
+            `cognitive/method.schema.yaml`'s `id` pattern (ADR-005b bare
+            form) — per MP §9 L825/833 (`method_id: research.thematic_analysis`
+            / `method_id: evidence.triangulation`, both already bare form).
+        ref:
+          type: string
+          description: >
+            REQUIRED when `type: capability`. Field name kept verbatim from
+            MP §9 (L821, L828, L838: `ref: transcribe` / `ref:
+            literature_search` / `ref: artifact.generate_research_paper`)
+            rather than renamed, to stay maximally transcribed rather than
+            introduce a new name for an already-named field.
+        input:
+          description: >
+            Data-flow reference(s) from a prior step's output or an external
+            source. Per MP §9, this is EITHER a single string (L822:
+            `input: source.video`) OR an array of strings (L834-836:
+            `input: [themes, literature]`) — both forms are real, kept as
+            `oneOf` rather than picking one.
+          oneOf:
+            - type: string
+            - type: array
+              items: { type: string }
+        necessity:
+          type: string
+          enum: [RECOMMENDED, OPTIONAL, REQUIRED_BY_RISK, REQUIRED_BY_JURISDICTION, REQUIRED_BY_SECTOR, FORBIDDEN]
+          default: RECOMMENDED
+          description: "Per Atlas §14.3 (L3627-3634). See compilation_decisions above."
+        gate_ref:
+          type: string
+          description: >
+            OPTIONAL. Soft reference to a gate id in
+            `execution/gate.schema.yaml`, which is itself
+            `BLOCKED_PENDING_ROUND2_ADR` — kept untyped for that reason
+            (see compilation_decisions above). Grounded in
+            `db-migration-expand-contract.recipe.yaml`'s stated dependency
+            on `execution/gate.schema.yaml` for steps like "Backup / Restore
+            Validation" (MRSP §2.8 L174).
+
+  outputs:
+    type: array
+    items: { type: string }
+    description: >
+      Per Atlas §13.1's "預期輸出" (L3240-3245: ProblemStatement, IdeaSet,
+      ClusterSet, PreliminaryPriority). SOFT reference to
+      `cognitive/typed-objects/*.schema.yaml`, same reasoning as
+      `method.schema.yaml`'s `outputs` field. NOTE: §13.4's "輸出" block
+      (L3332-3346) shows a RICHER, nested composite output
+      (`BoardDecisionPack` with 9 named sub-sections) that a flat string
+      list cannot fully express — this schema does not attempt to model
+      that composite shape; it is left to a future
+      `cognitive/typed-objects/board-decision-pack.schema.yaml` (already
+      named as a candidate in MACHINE_READABLE_SPEC_PLAN.md §2.3 L126) to
+      define, and is listed here only as a flat string when referenced from
+      a Recipe.
+
+# ---------------------------------------------------------------------------
+# Genuinely open questions — NOT decided by this file
+# ---------------------------------------------------------------------------
+open_questions:
+  - id: "OQ-recipe-1"
+    question: >
+      Is Atlas §13's "Recipe" (an informal, human-curated library entry with
+      `suited_for`/`not_for`/`mandatory_elements` narrative metadata) the
+      SAME object, at a different abstraction level, as Master Plan §9's
+      "Workflow IR" (a compiled, typed node graph) — or are they two
+      genuinely different objects (a Recipe as source, compiling DOWN INTO a
+      Workflow IR instance) that happen to share vocabulary? No mother
+      document states this explicitly. `MACHINE_READABLE_SPEC_PLAN.md`'s
+      directory layout (§1) puts `/specs/workflow/` (Workflow IR node,
+      Branch/Merge) and `/specs/cognitive/recipe.schema.yaml` in DIFFERENT
+      top-level directories and its Spec Inventory (§2) currently defines no
+      `workflow/workflow-ir.schema.yaml` or `workflow/node.schema.yaml` file
+      at all — only `workflow/branch.schema.yaml` (L145, itself
+      `BLOCKED` pending ADR-003's out-of-scope follow-up). This schema
+      assumes the Recipe-to-Workflow-IR relationship is "compiles to" and
+      borrows MP §9's node grammar directly into `steps[]` rather than
+      waiting for a not-yet-planned `workflow/*.schema.yaml`, but that
+      assumption is this file's own inference, not a mother-document fact.
+    owner: "operator, via a future ADR or a documentation PROPOSAL clarifying MP §9 vs Atlas §13's relationship"
+    blocks: "nothing in this schema; flagged for completeness per R4"
+  - id: "OQ-recipe-2"
+    question: >
+      Recipe `id` grammar (kebab-case slug, this file's own compilation
+      decision) is NOT governed by any ADR, unlike Method `id` grammar
+      (ADR-005b). Should a future ADR formally extend ADR-005b's reasoning
+      to Recipe/Workflow ids, and if so, should MP §9's L812
+      `research.qualitative.v4` example be corrected to match (dropping the
+      embedded version suffix)? See `compilation_decisions` above for the
+      Low-risk pick this file made in the meantime.
+    owner: "operator, via a future Round 2+ ADR"
+    blocks: "nothing in this schema"
+  - id: "OQ-recipe-3"
+    question: >
+      Atlas §13.x's stage labels that are neither a `method` nor a
+      `capability` in MP §9's sense (human-authority gates like "Human
+      Decision"; data/context inputs like "Jurisdiction Context";
+      control-flow markers like "Rollback Window Close") have no formal
+      `steps[].type` value of their own in this schema (see
+      `compilation_decisions` above). Should a future revision add
+      first-class types for these, and if so, what is the complete,
+      non-arbitrary list? Left open rather than guessed.
+    owner: "operator, via a future Round 2+ ADR or Phase 4 revision once more Recipe instances exist to generalize from"
+    blocks: "nothing in this schema"
+
+verification:
+  method: >
+    Read against Atlas §13 (L3200-3540, all 12 worked examples individually
+    read, not summarized from a register), Atlas §14.1-§14.3 (L3542-3634),
+    Atlas Appendix A (L4574-4604), Master Plan §9 (L794-858), ADR-005 full
+    text (confirmed it does NOT rule on Recipe/Workflow ids — grepped
+    ADR-005's title and Recommendation section), ADR-008 full text (confirmed
+    it rules on ONE Recipe's content gap, not this schema's structure),
+    MACHINE_READABLE_SPEC_PLAN.md §2.3 (L109-126) and §2.8 (L170-176),
+    `execution/manifest.schema.yaml` and `execution/status-codes.schema.yaml`
+    (precedent for the untyped-gate-reference and no-ADR `decided_by`
+    patterns reused here).
+  note: >
+    No mother document or ADR was modified to produce this file. Unlike
+    `method.schema.yaml` (which formalizes one literal worked example
+    near-verbatim), this file's `steps[]` grammar is assembled from real but
+    separate evidence (MP §9's node shape) and its remaining fields are each
+    cited to a specific Atlas §13.x source rather than invented wholesale.
+    Every point where the evidence was genuinely thin or the two source
+    levels (Atlas §13 vs MP §9) do not explicitly reconcile is recorded in
+    `open_questions` above rather than silently resolved.

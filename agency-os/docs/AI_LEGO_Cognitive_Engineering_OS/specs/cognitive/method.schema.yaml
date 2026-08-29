@@ -1,0 +1,416 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/method.schema.yaml"
+title: Method Contract
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable schema for the "LEGO Contract" — the Method
+  Contract Atlas §9 gives exactly one worked example of (`root_cause.fishbone`,
+  L987-1030). Formalizes Atlas Appendix A's promise to schema-ize this contract
+  (Appendix A, L4574-4604, `cognitive/method.schema.yaml` at L4578).
+
+  Resolves DOC-method_atlas-1 / ADR-005 Sub-decision (b): three incompatible
+  machine-readable Method ID grammars existed across the mother documents
+  (`method.<family>.<name>`, `<family>.<name>`, `method.<name>.v<N>`) and no
+  single parser could resolve every existing ID. ADR-005b ruled Option B —
+  bare `<family>.<name>`, `version` as a separate field — on the grounds that
+  this is the form already used in the ONE place the grammar was ever written
+  as a real schema definition (Atlas §9 itself, `id: root_cause.fishbone`)
+  and in every Workflow IR / function-call usage in Master Plan (§8.4, §9);
+  the two `method.`-prefixed forms were both narrative/teaching examples that
+  were never used as an actual schema anywhere. This file locks `id`'s JSON
+  Schema `pattern` to that decision and is the single source of truth for the
+  grammar; the mother documents reference it, they do not redefine it.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 LEGO Contract, Method Contract example (L985-1030)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md Appendix A schema list (L4574-4604, method.schema.yaml at L4578)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §Data Contract narrative example (L50, `method.association.mind_map` — WRONG grammar per ADR-005b, rejected by this file's `id` pattern)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §24.1 30-year evolution strategy (L4256-4258, `method.swot.v1`/`v2`/`v3` — WRONG grammar AND missing `family` segment, rejected by this file's `id` pattern)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §8.4 (L742, L745, `execute_method(root_cause.fishbone)` / `execute_method(strategy.swot)` — bare form, confirmed by this file's `id` pattern)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §9 Workflow IR (L825, L833, `method_id: research.thematic_analysis` / `method_id: evidence.triangulation` — bare form, confirmed by this file's `id` pattern)"
+decided_by: "docs/adr/ADR-005-db-migration-recipe-and-method-id-grammar.md (ACCEPTED 2026-08-29), Sub-decision (b), Option B"
+
+compilation_decisions:
+
+  - question: >
+      What exact regular expression enforces ADR-005b's "bare `<family>.<name>`"
+      grammar so that it accepts every real usage and rejects both wrong forms
+      cited in ADR-005's Evidence section?
+    decision: 'id.pattern = "^[a-z_]+\.[a-z_]+$" (exactly one dot, two lowercase/underscore segments, no digits, no extra prefix).'
+    reasoning: >
+      Verified by direct regex execution against all 12 real ID strings
+      touched by ADR-005b's Evidence section (2026-08-29, `python3 -re` test,
+      not merely asserted): the pattern matches all 5 confirmed-correct bare
+      forms (root_cause.fishbone, strategy.swot, evidence.triangulation,
+      research.thematic_analysis, finance.financial_assumptions — the last is
+      a hypothetical bare-form ID for ADR-008's still-nonexistent
+      `Financial Assumptions` method, included to confirm the pattern would
+      accept its future ID once Atlas's finance domain pack is built) and
+      rejects all 4 wrong forms (method.swot.v1, method.swot.v2,
+      method.swot.v3, method.association.mind_map) plus 2 additional negative
+      controls (a bare single segment with no dot at all, and
+      `research.qualitative.v4` — MP:812's Workflow `id`, which embeds a
+      version suffix the same way the rejected Method forms did; see
+      `open_questions` below on why that field is NOT governed by this
+      schema). See `id_grammar_conformance_examples` for the full matrix.
+    scope_note: >
+      This is applying an already-ACCEPTED ADR's literal recommended regex
+      (ADR-005 Recommendation §2: "`id` 欄位 pattern 鎖定 ADR-005b 裁決的
+      bare `<family>.<name>` 文法（`^[a-z_]+\.[a-z_]+$`)"), not a new design
+      choice — MACHINE_READABLE_SPEC_PLAN.md §2.3's row for this file
+      (L114) specifies the identical regex verbatim.
+
+  - question: >
+      Atlas §9's LEGO Contract example carries `quality: {provenance_required,
+      evidence_labeling_required}` as two booleans with no further structure.
+      What shape do they actually mandate, and does the Method Contract itself
+      (as opposed to its runtime outputs) need its own provenance record?
+    decision: >
+      Two separate, non-overlapping additions: (1) `quality.provenance_required`
+      /`evidence_labeling_required` remain the two booleans verbatim from
+      Atlas §9, with an added description pointing at
+      `governance/epistemic-label.schema.yaml#/provenance_record` as the shape
+      those flags require every RUNTIME OUTPUT of this method to carry.
+      (2) A new, separate, OPTIONAL top-level field `contract_provenance`
+      is added, itself typed against the same `provenance_record` shape, but
+      answering a different question: "who authored/approved THIS CONTRACT
+      DEFINITION" (human-written vs AI-drafted-pending-review), independent of
+      what the method's own runtime outputs are later required to carry.
+    reasoning: >
+      MACHINE_READABLE_SPEC_PLAN.md §2.3's row for this file (L114) lists
+      `governance/epistemic-label`'s dependency reason as "method 的
+      has_contract 狀態本身需要 provenance" (the method's own has_contract
+      status needs provenance) — a claim about the CONTRACT's authorship, not
+      about its runtime outputs. That is a genuinely different question from
+      what Atlas §9's `quality` block already answers (whether the method's
+      OUTPUTS need provenance labeling when it runs). Conflating the two into
+      one field would silently drop one of the two cited reasons for the
+      dependency; keeping them separate preserves both without inventing a
+      third, undocumented concept.
+
+  - question: >
+      Should `method.schema.yaml` carry a `risk_tier` field referencing
+      `execution/risk-tier.schema.yaml`? Atlas §9's literal Method Contract
+      example does not include one, and MACHINE_READABLE_SPEC_PLAN.md §2.3's
+      dependency column for this file (L114) lists ONLY
+      `governance/epistemic-label` — it does not list `execution/risk-tier`.
+    decision: >
+      Add `risk_tier` as an OPTIONAL, clearly-flagged ADDITIVE field (soft
+      reference to `execution/risk-tier.schema.yaml#/risk_tier`, not a hard
+      `$ref`, consistent with this schema's Wave-3 position having no build
+      dependency asserted on that file).
+    reasoning: >
+      This field is added on direct instruction for this task, not because
+      MACHINE_READABLE_SPEC_PLAN.md's dependency column already calls for it
+      — that discrepancy is recorded here rather than silently smoothed over
+      (R4: claim-before-verify). The functional grounding that does exist:
+      Atlas §14.2 Mandatory Gate Injection (L3588-3612) fires additional
+      mandatory steps into a Recipe when `risk_tier = critical`
+      (superseded by `execution/risk-tier.schema.yaml`'s R3∪R4 rule per
+      ADR-004a), and `method-resolution.schema.yaml` (MRSP §2.2 L95) is
+      already planned to map Task Context risk_tier onto Atlas
+      `selection_context` for method compatibility checking — a method
+      declaring its own applicable/minimum risk tier is the natural
+      per-method half of that compatibility check. Marked optional and
+      additive so a method contract omitting it is still fully valid against
+      Atlas §9's original example.
+    scope_note: >
+      Flagged honestly in `open_questions` as a field whose home (method vs.
+      purely task/selection-context) is not settled by any mother document —
+      this compilation decision adds the field for forward compatibility with
+      the cited mechanisms, it does not claim the mother documents already
+      require it on the method object itself.
+
+  - question: >
+      `cognitive_primitives` (Atlas §9 example: `[DECOMPOSE, GROUP,
+      CAUSE_HYPOTHESIS]`) is meant to draw from the 24-primitive kernel that
+      `cognitive/primitive.schema.yaml` formalizes — a sibling file being
+      built concurrently by a different agent in this same Wave. Should this
+      field hard-`$ref` that file's enum?
+    decision: "No. Keep `cognitive_primitives` as `type: array, items: {type: string}` with a soft-reference description, not a hard $ref."
+    reasoning: >
+      Same pattern `manifest.schema.yaml` already uses for its
+      `documents[].document_id` field relative to `document-registry.schema.yaml`
+      (a later-Wave file): hard-coupling to a sibling file's enum that is being
+      authored in parallel and has not yet been reviewed/committed would make
+      this file's validity depend on file-write ordering between two
+      concurrently-running agents. A soft reference (string type + descriptive
+      note of intended relationship) lets both files be built independently
+      and reconciled later without a schema-breaking change to either.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+type: object
+required: [id, version, family, cognitive_primitives, purpose, inputs, outputs]
+properties:
+
+  id:
+    type: string
+    pattern: "^[a-z_]+\\.[a-z_]+$"
+    description: >
+      Bare `<family>.<name>` grammar per ADR-005b (Option B). Exactly one
+      dot, two lowercase_with_underscore segments. MUST NOT carry a `method.`
+      prefix (Atlas:50's `method.association.mind_map` is the historical wrong
+      form this rejects) and MUST NOT embed a version suffix in the ID itself
+      (Atlas:4256-4258's `method.swot.v1/v2/v3` is the historical wrong form
+      this rejects — versioning belongs exclusively in the sibling `version`
+      field below). See `id_grammar_conformance_examples` for a verified
+      accept/reject matrix.
+    examples:
+      - root_cause.fishbone
+      - strategy.swot
+      - evidence.triangulation
+      - research.thematic_analysis
+
+  version:
+    type: string
+    pattern: "^\\d+\\.\\d+\\.\\d+$"
+    description: >
+      Semver, independent field per ADR-005b — this is what changes across
+      Atlas §24.1's "Method 不可就地覆寫" (methods are never overwritten
+      in-place) discipline; the `id` above stays constant across versions so
+      old Workflow IR entries can still resolve and replay it.
+    examples: ["1.0.0"]
+
+  family:
+    type: string
+    pattern: "^[a-z_]+$"
+    description: >
+      MUST equal the first dot-segment of `id` (e.g. `id: root_cause.fishbone`
+      implies `family: root_cause`, per Atlas §9's own worked example,
+      L989/991). Kept as an explicit sibling field rather than derived purely
+      by string-splitting `id`, matching Atlas §9's literal shape and making
+      the family queryable without a parser.
+
+  cognitive_primitives:
+    type: array
+    minItems: 1
+    items: { type: string }
+    description: >
+      Per Atlas §9 (L993-996). SOFT reference (not a hard `$ref`) to the
+      24-primitive kernel enum `cognitive/primitive.schema.yaml` defines —
+      that file is being built concurrently in this same Wave by a separate
+      agent; see `compilation_decisions` above for why this is intentionally
+      loose-typed rather than `$ref`-bound. Values are expected to be
+      SCREAMING_SNAKE_CASE primitive names (e.g. `DECOMPOSE`, `GROUP`,
+      `CAUSE_HYPOTHESIS`), matching Atlas §9's literal example.
+    examples: [[DECOMPOSE, GROUP, CAUSE_HYPOTHESIS]]
+
+  purpose:
+    type: array
+    minItems: 1
+    items: { type: string }
+    description: "Per Atlas §9 (L998-999). Free-text snake_case intent labels."
+    examples: [[identify_candidate_causes]]
+
+  inputs:
+    type: object
+    required: [required]
+    description: "Per Atlas §9 (L1001-1007)."
+    properties:
+      required:
+        type: array
+        items: { type: string }
+        description: >
+          Typed-object names this method cannot run without. SOFT reference
+          to `cognitive/typed-objects/*.schema.yaml` (sibling files, e.g.
+          `problem-statement.schema.yaml`) — not a hard `$ref`, same
+          concurrent-build reasoning as `cognitive_primitives` above.
+      optional:
+        type: array
+        items: { type: string }
+        default: []
+
+  outputs:
+    type: array
+    minItems: 1
+    items: { type: string }
+    description: >
+      Per Atlas §9 (L1009-1010). SOFT reference to
+      `cognitive/typed-objects/*.schema.yaml`, same reasoning as `inputs`
+      above. Every output listed here is also the implicit subject of
+      `quality.provenance_required`/`evidence_labeling_required` below when
+      those are true.
+    examples: [[CauseHypothesisSet]]
+
+  preconditions:
+    type: array
+    items: { type: string }
+    description: >
+      Per Atlas §9 (L1012-1013). Free-text boolean expressions over
+      typed-object fields (e.g. a `status` enum value defined by the
+      referenced typed-object's own schema — see
+      `cognitive/typed-objects/problem-statement.schema.yaml`, MRSP §2.3
+      L123). Deliberately left as opaque strings rather than a structured
+      expression grammar: Atlas §9 gives no evidence of one, and inventing an
+      expression AST here would be exactly the "fabricate a rich schema with
+      no textual basis" this task was told to avoid.
+    examples: ["problem_statement.status == validated"]
+
+  quality:
+    type: object
+    description: "Per Atlas §9 (L1015-1017)."
+    properties:
+      provenance_required:
+        type: boolean
+        default: false
+        description: >
+          When true, every object listed in `outputs` above MUST, at
+          runtime, carry a `governance/epistemic-label.schema.yaml#/provenance_record`
+          (i.e. at minimum `epistemic_type` + `authorship_state`). This file
+          does not re-declare that shape; it references the SSOT.
+      evidence_labeling_required:
+        type: boolean
+        default: false
+        description: >
+          When true, every claim inside this method's outputs that
+          originates from `EvidenceSet` input MUST retain an `epistemic_type`
+          of `EVIDENCE` (or better) per
+          `governance/epistemic-label.schema.yaml`, not be silently
+          flattened to an unlabeled fact.
+
+  contract_provenance:
+    description: >
+      OPTIONAL. Answers "who authored/approved THIS method CONTRACT
+      definition" (e.g. was this contract itself AI-drafted and still
+      `contract_status: pending` review, or human-approved) — a distinct
+      question from `quality.provenance_required` above, which governs the
+      method's runtime OUTPUTS, not the contract document itself. See
+      `compilation_decisions` above for why these are kept separate. Same
+      shape as `governance/epistemic-label.schema.yaml#/provenance_record`
+      (soft reference, not a hard `$ref`, for the same Wave-ordering reason
+      cited in `compilation_decisions`).
+    type: object
+    properties:
+      epistemic_type: { type: string }
+      authorship_state: { type: string }
+      locked: { type: [string, "null"] }
+
+  risk_tier:
+    description: >
+      OPTIONAL, ADDITIVE field — NOT present in Atlas §9's literal example
+      and NOT listed in MACHINE_READABLE_SPEC_PLAN.md §2.3's dependency
+      column for this file. See `compilation_decisions` above for the full
+      honesty note on why it is added anyway and what remains unsettled.
+      Soft reference to `execution/risk-tier.schema.yaml#/risk_tier`
+      (values R0-R4).
+    type: string
+    enum: [R0, R1, R2, R3, R4]
+
+  forbidden_transition:
+    type: array
+    items: { type: string }
+    description: >
+      Per Atlas §9 (L1019-1020) and §14.1's worked legal/illegal transition
+      examples (L3544-3584). Free-text `"<TypedObject> -> <TypedObject>"`
+      strings naming a type-incompatible hop this method's output must never
+      feed into directly. SOFT reference to
+      `cognitive/typed-objects/*.schema.yaml` for the named types, same
+      reasoning as `inputs`/`outputs` above.
+    examples: ["CauseHypothesisSet -> FinalCausalFact"]
+
+  recommended_next:
+    type: array
+    items:
+      type: string
+      pattern: "^[a-z_]+\\.[a-z_]+$"
+    description: >
+      Per Atlas §9 (L1022-1026). Each entry MUST itself be a valid bare
+      `<family>.<name>` method `id` per this same file's `id` pattern above
+      (verified: all four of Atlas §9's own literal examples —
+      root_cause.pareto, root_cause.five_whys, causal.dag,
+      validation.experiment — already satisfy this pattern).
+
+  rollback:
+    type: object
+    description: "Per Atlas §9 (L1028-1029)."
+    properties:
+      side_effect_free:
+        type: boolean
+        description: >
+          When true, re-running or abandoning this method mid-flow requires
+          no compensating action. When false, a compensating/rollback
+          procedure is expected to exist but this file does not define its
+          shape — no mother document gives one for the Method Contract level
+          (contrast `recipes/validated/*.recipe.yaml`, where rollback shows
+          up as an explicit pipeline STEP, e.g. "Close Rollback Window", not
+          method-level metadata; see `cognitive/recipe.schema.yaml`).
+
+# ---------------------------------------------------------------------------
+# Verified accept/reject matrix for the `id` pattern (R4: claim-before-verify —
+# executed via `python3 -c` regex test, 2026-08-29, not merely asserted)
+# ---------------------------------------------------------------------------
+id_grammar_conformance_examples:
+  method: "python3 re.match against pattern ^[a-z_]+\\.[a-z_]+$ (2026-08-29, this session)"
+  accepted:
+    - value: "root_cause.fishbone"
+      source: "Atlas §9 L989 (the sole real schema definition)"
+    - value: "strategy.swot"
+      source: "ADR-005b's corrected replacement for Atlas:4256's method.swot.v1"
+    - value: "evidence.triangulation"
+      source: "Master Plan §9 L833"
+    - value: "research.thematic_analysis"
+      source: "Master Plan §9 L825"
+    - value: "finance.financial_assumptions"
+      source: "Hypothetical future ID for ADR-008's still-nonexistent Financial Assumptions method — confirms the pattern is ready for it once written"
+  rejected:
+    - value: "method.swot.v1"
+      reason: "method. prefix (wrong grammar) AND version embedded in id (two violations)"
+      source: "Atlas:4256 — cited in ADR-005 Evidence as WRONG"
+    - value: "method.swot.v2"
+      reason: "same as above"
+      source: "Atlas:4257"
+    - value: "method.swot.v3"
+      reason: "same as above"
+      source: "Atlas:4258"
+    - value: "method.association.mind_map"
+      reason: "method. prefix (wrong grammar)"
+      source: "Atlas:50 — cited in ADR-005 Evidence as WRONG"
+    - value: "root_cause"
+      reason: "missing the .<name> segment entirely (negative control, not a real corpus value)"
+    - value: "research.qualitative.v4"
+      reason: >
+        Version embedded in id, same defect class as method.swot.v1 —
+        included as a negative control because it IS a real corpus value
+        (Master Plan §9 L812), but it is a Workflow id, not a Method id; see
+        open_questions below for why this file does not govern it.
+      source: "Master Plan §9 L812"
+
+open_questions:
+  - id: "OQ-method-1"
+    question: >
+      Master Plan §9's own Workflow IR worked example (L812) uses
+      `id: research.qualitative.v4` for the WORKFLOW's own id — the identical
+      "version embedded in the id string" defect ADR-005b rejected for Method
+      ids. ADR-005's Sub-decision (b) title and Recommendation are both
+      scoped explicitly to "Method ID Grammar" and never mention Workflow or
+      Recipe ids. This file therefore does NOT extend ADR-005b's ruling to
+      `research.qualitative.v4` — doing so would be a new architecture
+      decision this task was not asked to make, and MACHINE_READABLE_SPEC_PLAN.md
+      lists no ADR dependency for workflow/recipe id grammar. Left open for a
+      future Round 2+ ADR or documentation-only correction to MP L812;
+      `cognitive/recipe.schema.yaml`'s own `open_questions` records the
+      parallel tension for Recipe ids specifically.
+    owner: "operator, via a future ADR or a documentation PROPOSAL against MP L812"
+    blocks: "nothing in this schema"
+
+verification:
+  method: >
+    Read against Atlas §9 (L985-1030), Atlas:50, Atlas:4256-4258, Master Plan
+    §8.4 (L742,745) and §9 (L812,825,833), ADR-005 full text (Sub-decision b,
+    Evidence section), MACHINE_READABLE_SPEC_PLAN.md §2.3 row for
+    method.schema.yaml (L114). `id` pattern additionally verified by direct
+    `python3 -c` regex execution against all 12 real/negative-control ID
+    strings this session (see `id_grammar_conformance_examples`) — not
+    asserted from reading the pattern alone.
+  note: >
+    No mother document or ADR was modified to produce this file. The
+    `quality`/`contract_provenance` split, the additive `risk_tier` field,
+    and the soft-reference (non-`$ref`) treatment of `cognitive_primitives`/
+    `inputs`/`outputs`/`forbidden_transition` against concurrently-built
+    sibling files are Phase 3 compilation decisions, recorded above in
+    `compilation_decisions`, not new ADR-level rulings.

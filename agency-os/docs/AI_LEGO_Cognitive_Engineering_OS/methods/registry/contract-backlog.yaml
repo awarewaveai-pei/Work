@@ -1,0 +1,260 @@
+$id: "ai-lego://methods/registry/contract-backlog.yaml"
+title: Atlas Method Contract Backlog
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Per-method tracking table for the Atlas Method Contract backfill strategy
+  defined in docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §4 ("Atlas Method
+  Contract 補齊策略", resolving P1-GAP-AI-7). Of the 289 method/lens/primitive
+  entries catalogued in methods/registry/method-inventory.yaml, only 2 carry a
+  real structured contract today (`has_contract: true` / `contract_status:
+  complete`); the remaining 287 have only narrative fields, which the Method
+  Selection Engine's Compatibility Check cannot mechanically evaluate. §4
+  explicitly rules out backfilling all 289 at once (Phase 5's MVP vertical
+  slice -- Learning/Research/Business -- is still `NOT_STARTED` per Program
+  Plan §9, so a full backfill now would write contracts for methods that may
+  never be exercised, and the work volume alone would exceed the rest of
+  Phase 3's deliverables combined) and instead prescribes 3 tiers. This file
+  is the tracking table for that 3-tier strategy; it does not itself contain
+  any method.schema.yaml contract content.
+
+  This file records ONLY what this task actually verified or was explicitly
+  told not to guess -- it does not fabricate a Tier 1 list or enumerate all
+  284 Tier 2 entries as individual records here. method-inventory.yaml already
+  carries a `contract_status` field per entry (this file's sibling, built in
+  the same task); duplicating all 284 `pending` entries into a second flat
+  list here would be pure restatement with zero new information and would
+  itself become a second source of truth to keep in sync -- the kind of
+  duplication AGENTS.md R0 asks every design to avoid. What Tier 2 actually
+  needs beyond method-inventory.yaml's existing field is the *policy*
+  (fail-closed via a status code) applied when one of those pending methods is
+  selected, which is recorded below as a rule plus one worked example lifted
+  verbatim from the plan itself, not invented here.
+
+source_of_truth_for:
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §4 (L240-266, 3-tier Atlas Method Contract backfill strategy) -- this file IS the tracking table that section calls for"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.7 row 2 (L168, contract-backlog.yaml purpose/dependencies)"
+
+decided_by: >
+  docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §4 (status: READY, no ADR
+  blocks Tier 0/2 population; Tier 1 is explicitly deferred pending a Phase 5
+  decision that is Round-2/operator scope, not this file's). The
+  PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED status code referenced by Tier 2
+  is defined in specs/execution/status-codes.schema.yaml (status:
+  NEW_PROPOSED_2026-08-29, proposed_by MACHINE_READABLE_SPEC_PLAN.md §4, not
+  yet present in any mother document).
+
+# =============================================================================
+# Tier 0 -- Phase 3 immediate (plan estimate: ~5-10 methods)
+# =============================================================================
+# §4 names two groups for Tier 0: (a) the 2 methods that already have
+# has_contract:true, to be rewritten in the new method.schema.yaml format as
+# the template for every future contract; (b) methods Atlas/Master Plan
+# repeatedly cite as teaching examples of "how this is used" -- if even the
+# worked examples lack a real contract, the documents' own demonstrations are
+# unverifiable. §4 names exactly 3 methods in group (b): root_cause.fishbone
+# (already counted in group a), strategy.swot, and evidence.triangulation
+# (Atlas §9/§24.1, Master Plan §8.4 / Workflow IR sample research.qualitative.v4).
+# That gives 4 concrete Tier 0 methods -- within the plan's "~5-10" estimate,
+# not a fixed count of 5-10 to pad out; no 5th-10th method is named anywhere
+# in the plan text, so none is invented here.
+tier_0:
+  - method_id: "root_cause.fishbone"
+    contract_status: complete
+    tier: 0
+    has_contract: true
+    source:
+      - "methods/registry/method-inventory.yaml: Fishbone / Ishikawa (Atlas F05 root_cause, L433) -- the has_contract:true, machine_id-bearing definition"
+      - "methods/registry/method-inventory.yaml: root_cause.fishbone (Master Plan L742, example-only, Atlas-authoritative)"
+    note: >
+      One of the 2 pre-existing has_contract:true methods. §4 Tier 0 group (a):
+      to be rewritten under the new cognitive/method.schema.yaml format as the
+      template other contracts follow. `contract_status: complete` here
+      reflects the PRE-EXISTING simplified-field contract carried over from
+      Phase 0/1, not a new method.schema.yaml-shaped contract written by this
+      task -- no such file was written in this task (see verification below).
+
+  - method_id: "stakeholder.regulator"
+    contract_status: complete
+    tier: 0
+    has_contract: true
+    source:
+      - "methods/registry/method-inventory.yaml: stakeholder.regulator lens (Atlas L1036, category: lens)"
+    note: >
+      The other of the 2 pre-existing has_contract:true methods. §4 Tier 0
+      group (a), same caveat as root_cause.fishbone above: `complete` reflects
+      the pre-existing contract, not a new method.schema.yaml file produced by
+      this task.
+
+  - method_id: "strategy.swot"
+    contract_status: pending
+    tier: 0
+    has_contract: false
+    source:
+      - "methods/registry/method-inventory.yaml: strategy.swot (Master Plan L746, example-only, Atlas-authoritative, typed example KnowledgeSet->SWOTAnalysis)"
+    note: >
+      §4 Tier 0 group (b): teaching example, referenced Atlas §9/§24.1 and
+      Master Plan §8.4. `pending` -- Tier 0 means "priority to write next", not
+      "already written"; only root_cause.fishbone and stakeholder.regulator
+      have real contracts today. NAMING CAVEAT: the Atlas document's own F08
+      strategy catalog entry for "SWOT" (method-inventory.yaml L409, Atlas
+      L517) records `machine_id: "method.swot"`, which predates
+      docs/adr/ADR-005-db-migration-recipe-and-method-id-grammar.md's Option B
+      decision (ACCEPTED 2026-08-29): bare `<family>.<name>` grammar, no
+      `method.` prefix. ADR-005 §"Sub-decision (b)" line 166 explicitly
+      corrects Atlas's own versioned SWOT example (`method.swot.v1/v2/v3` at
+      Atlas L4256-58) to `id: strategy.swot` + a separate `version:` field --
+      the same bare form Master Plan already uses at L746. `strategy.swot` is
+      therefore the correct id for this backlog entry, not `method.swot`; the
+      inconsistent `method.swot` machine_id in method-inventory.yaml's Atlas
+      F08 row is preserved verbatim there (migration, not re-cataloging) and
+      is exactly the kind of drift a real method.schema.yaml contract for this
+      method must resolve when written.
+
+  - method_id: "evidence.triangulation"
+    contract_status: pending
+    tier: 0
+    has_contract: false
+    source:
+      - "methods/registry/method-inventory.yaml: evidence.triangulation (Master Plan L833, example-only, used in Workflow IR sample research.qualitative.v4)"
+    note: >
+      §4 Tier 0 group (b): teaching example. `pending` -- not yet contracted.
+      No competing/older machine_id form was found for this method anywhere in
+      method-inventory.yaml (unlike strategy.swot above), so no naming caveat
+      applies here.
+
+# =============================================================================
+# Tier 1 -- explicit TODO, NOT populated (per §4's own instruction)
+# =============================================================================
+tier_1:
+  status: "TODO_PENDING_PHASE_5_MVP_SLICE_DECISION"
+  estimated_count: "15-25 (plan's estimate, not independently re-derived here)"
+  blocked_on: "AI_LEGO_OS_Program_Plan_v1.md §9 -- Learning/Research/Business MVP vertical slice selection, status NOT_STARTED as of this task"
+  note: >
+    docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §4 explicitly forbids
+    guessing this list before the slice decision: "本計畫若在此時武斷列出
+    15-25 個方法名單，等於越權替 Phase 5 做決定，違反 Phase 0-2 期間禁令"
+    (also tracked as open question MRSP-6 in the same document, §5). The
+    plan's prescribed method once the slice is chosen: Claude and Codex each
+    independently list the methods most likely used by each of the 3
+    candidate slices (per Program Plan §9's own required
+    Method Selection/Workflow steps), take the intersection, and prioritize
+    contracts for the intersection. That comparison has not happened; this
+    file records the TODO rather than inventing a list to fill it.
+  no_method_ids_listed: true
+
+# =============================================================================
+# Tier 2 -- remaining pending methods, policy + one worked example only
+# =============================================================================
+tier_2:
+  policy: >
+    Every method_id in methods/registry/method-inventory.yaml with
+    `contract_status: pending` that is NOT listed under tier_0 or assigned to
+    tier_1 above is Tier 2 by default. Tier 2 methods are not individually
+    enumerated in this file (see file-level description for why: it would
+    duplicate method-inventory.yaml's own contract_status field with zero
+    added information). Cross-reference method-inventory.yaml directly to
+    enumerate the current Tier 2 set.
+  entry_count_at_time_of_writing: 284
+  entry_count_basis: >
+    289 total catalog entries - 2 has_contract:true (Tier 0 complete) - 2 Tier
+    0 pending (strategy.swot, evidence.triangulation, matched by machine_id,
+    counting each of root_cause.fishbone's 2 appearances as excluded) = 284.
+    Independently counted in this task (see verification below); the plan's
+    own text says "260+" as an estimate, not an exact figure -- 284 is not a
+    contradiction of that estimate, just this task's precise count against the
+    now-migrated registry.
+  gating_status_code: "PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED"
+  gating_status_code_source: "specs/execution/status-codes.schema.yaml (status: NEW_PROPOSED_2026-08-29)"
+  gating_behavior: >
+    If the Method Selection Engine is asked to select a method whose
+    contract_status is `pending`, it MUST fail-closed and return
+    PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED rather than silently guessing
+    compatibility from narrative-only fields -- modeled on Master Plan's
+    existing PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED "missing precondition ->
+    stop" pattern (see status-codes.schema.yaml's design_lineage note for that
+    entry).
+  worked_example:
+    # Lifted verbatim from MACHINE_READABLE_SPEC_PLAN.md §4's own record-format
+    # illustration (L263-266) -- an example the plan itself already committed
+    # to text, not a method this task independently selected for Tier 2.
+    method_id: "association.mind_map"
+    contract_status: pending
+    tier: 2
+    note: >
+      As given by the plan's own example block. NAMING CAVEAT (same class as
+      strategy.swot above): method-inventory.yaml's Atlas F04 association row
+      for "Mind Map" (L257, Atlas L410) records `machine_id:
+      "method.association.mind_map"` -- the pre-ADR-005 prefixed form. The
+      plan's own example already uses the ADR-005-correct bare form
+      (`association.mind_map`), which is reproduced here unchanged; the older
+      `method.association.mind_map` form in method-inventory.yaml is left
+      as-is per that file's migration-not-re-cataloging scope.
+  explicit_entries:
+    # These are NOT a re-enumeration of the Tier 2 pool (that stays a policy
+    # pointer, per this file's description). Each entry here was individually
+    # mandated, by exact method_id/contract_status/tier/note, by a prior
+    # ACCEPTED ADR that names THIS file by path -- found via this task's R4
+    # bughunt grep across agency-os/docs/AI_LEGO_Cognitive_Engineering_OS for
+    # "contract-backlog" before writing this file. Omitting it would mean
+    # building this file without honoring a decision already on the books.
+    - method_id: "finance.financial_assumptions"
+      contract_status: pending
+      tier: 2
+      note: "見 ADR-008，P1-CONFLICT-4；Business Planning Mode 非目前選定 MVP 切片"
+      mandated_by: "docs/adr/ADR-008-business-planning-recipe-method-gap.md Migration step 4 (L107), Status: ACCEPTED (2026-08-29)"
+      mandate_verbatim: >
+        "待 Phase 3 建立 methods/registry/contract-backlog.yaml
+        （MACHINE_READABLE_SPEC_PLAN.md §2.7 已規劃但尚未建立）時，補一筆條目：
+        method_id: finance.financial_assumptions, contract_status: pending,
+        tier: 2, note: 見 ADR-008，P1-CONFLICT-4；Business Planning Mode
+        非目前選定 MVP 切片——這一步不阻塞本 ADR 的加註修法，屬於後續銜接，
+        本 ADR 僅記錄建議、不代為建立該檔案。"
+      caveat: >
+        This method_id does not appear anywhere in
+        methods/registry/method-inventory.yaml -- it names a gap (no Atlas
+        finance domain pack exists yet for this method), not a catalogued
+        entry, matching ADR-008's own framing (P1-CONFLICT-4: Master Plan §43's
+        flagship Business Planning Recipe references a method that does not
+        exist in the Atlas). Recorded here exactly as ADR-008 Migration step 4
+        specifies, not cross-checked against method-inventory.yaml because
+        there is nothing there to check against.
+
+# =============================================================================
+# contract_status value note
+# =============================================================================
+# docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.7's own row for this file
+# names a 3-value enum: complete | pending | in_mvp_slice. No entry in this
+# file currently uses `in_mvp_slice` -- that third value describes a Tier 1
+# method that has been selected into the Phase 5 MVP slice (once chosen) but
+# whose contract is still being written, i.e. a state between `pending` and
+# `complete` that only becomes reachable after the Tier 1 TODO above is
+# resolved. Documented here so a future session extending this file uses the
+# plan's own vocabulary rather than inventing a fourth value or overloading
+# `pending`.
+contract_status_enum: [complete, pending, in_mvp_slice]
+
+# ---------------------------------------------------------------------------
+verification:
+  method: >
+    Read docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §4 in full (L240-266)
+    and §2.7 (L163-169); Read docs/adr/ADR-005-db-migration-recipe-and-method-id-grammar.md
+    in full, Grepped for "swot|triangulation|grammar|bare|<family>" to locate
+    the Option B ruling; Read specs/execution/status-codes.schema.yaml's
+    PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED entry (L322-355) in full; ran a
+    python/PyYAML load of the sibling method-inventory.yaml to programmatically
+    cross-check machine_id values and count the Tier 2 pool (284) rather than
+    hand-counting; Grepped agency-os/docs/AI_LEGO_Cognitive_Engineering_OS for
+    "contract-backlog" before writing this file (R4/BUGHUNT scope) and found
+    ADR-008 Migration step 4 mandates one specific Tier 2 entry
+    (finance.financial_assumptions) by exact field values -- added under
+    tier_2.explicit_entries rather than silently omitted.
+  claims_this_file_does_NOT_make:
+    - "That a method.schema.yaml contract file was written for any method in this task -- none was; only this tracking table."
+    - "That Tier 1's method list has been decided -- it has not; see tier_1.status."
+    - "That all 284 Tier 2 methods are listed individually here -- they are not; see tier_2.policy. Only ADR-008's one explicitly-mandated entry is listed under tier_2.explicit_entries."
+    - "That finance.financial_assumptions is a catalogued Atlas method -- it is not (see that entry's own caveat field); it names a gap ADR-008 already decided to track here."
+  note: >
+    No mother document, no ADR, and no file under .ai/research/phase-0/ was
+    modified to produce this file.

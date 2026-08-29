@@ -1,0 +1,327 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/domain/tenant.schema.yaml"
+title: Tenant
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of Tenant — Domain Model object #23,
+  added by ADR-003 Sub-decision (a). Resolves P1-DUP-3 (Tenant was named
+  exactly 3 times across all three mother documents with zero schema:
+  Master Plan L269 "Tenant Isolation", Method Atlas L4140 the mermaid node
+  `T[Tenant]`, Execution Contract L1265 a single bullet under §32's
+  must-Threat-Review list — no cardinality, no fields, anywhere) and
+  P1-CONFLICT-2 (global CAS dedup vs. Tenant Isolation as the outermost
+  blast-radius boundary — this object's `tenant_id` is the field
+  `artifact/cas-path.schema.yaml` consumes to build the tenant-scoped path
+  grammar `/objects/<tenant_id>/sha256/aa/bb/<hash>` that closes that
+  conflict). Also substantially narrows P1-GAP-SEC-7 (Tenant Isolation was a
+  fault-isolation label with no schema, no tenant-scoped encryption key
+  story) — the remaining, ADR-003-Consequences-flagged part of that gap
+  (full RLS / schema-per-tenant design for relational data outside the CAS
+  layer) is explicitly NOT resolved here; see `open_questions` below and
+  `specs/security/tenant-isolation-controls.schema.yaml` (MRSP-5,
+  BLOCKED_PENDING_ROUND2_ADR).
+
+  Master Plan §3 "產品核心物件" (L330-357) currently enumerates exactly 22
+  objects with Tenant absent; this file is the schema that MP §3 needs to
+  reference once a documentation PROPOSAL (ADR-006 process) adds Tenant as
+  the 23rd entry — that mother-document edit is out of scope for this file
+  (Phase 3 compiles ACCEPTED ADRs into specs, it does not edit mother docs).
+
+  Conceptually, per ADR-003: Tenant is the outermost billing/legal/deployment
+  entity (one customer organization, agency, or government body), sitting
+  above Workspace in the blast-radius chain with a strict `Tenant 1:N
+  Workspace` cardinality (a Workspace belongs to exactly one Tenant; no
+  cross-tenant shared Workspace). That cardinality is expressed on the
+  Workspace side (a `tenant_id` foreign key on Workspace, not built yet) —
+  it is not a field on this object, consistent with ADR-003's own minimal
+  schema which does not list a `workspaces[]` array here either.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §3 Domain Model object list (L330-357) — this schema is the fields for the 23rd object the list is missing"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §96 Legal Authority Hierarchy (L4093-4118) — anchor for `home_jurisdiction`"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §103 Data Residency & Sovereignty (L4377-4397) — anchor for `data_residency_region`"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §148 Encryption & Key Sovereignty (L5637-5656) — anchor for the tenant-level root key concept behind `encryption_root_key_ref`"
+  - "docs/adr/ADR-003-tenant-model-and-cas-isolation.md Sub-decision (a) minimal schema (L40-55)"
+decided_by: >
+  docs/adr/ADR-003-tenant-model-and-cas-isolation.md (ACCEPTED 2026-08-29)
+  Sub-decision (a) — the field list itself (`tenant_id/legal_name/status/
+  home_jurisdiction/data_residency_region/encryption_root_key_ref/
+  created_at/deleted_at`) and the `Tenant 1:N Workspace` cardinality are
+  ADR-decided verbatim. Field-level type/format/default choices below are
+  Phase 3 compilation decisions per
+  docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.5 row for
+  domain/tenant.schema.yaml, not a separate ADR (see compilation_decisions).
+
+compilation_decisions:
+  - question: >
+      ADR-003's minimal schema writes `status: enum[active, suspended,
+      offboarding, deleted]   # fail-closed default = active only after
+      explicit provisioning` — the four legal values are explicit, but the
+      comment leaves ambiguous whether `active` should be a JSON Schema
+      `default` for the field.
+    decision: >
+      No `default` is set on `status`. The field is required with no
+      implicit value.
+    reasoning: >
+      Reading the comment against Decision Driver #6 (Fail-closed over
+      fail-open, citing Atlas §21 rule 1's own "AI-generated idea defaults
+      to DRAFT" convention): "active only after explicit provisioning" is a
+      statement about *when* a Tenant record is allowed to exist with
+      `status: active`, not a request for the schema to auto-populate that
+      value. A JSON Schema `default: active` would let any producer omit
+      the field and silently receive an active tenant — exactly the
+      fail-open shape this ADR's own driver rules out. Provisioning is
+      therefore the caller's responsibility to set explicitly; this schema
+      only constrains the legal value set.
+  - question: >
+      ADR-003 writes `data_residency_region: enum[...]` — the ellipsis is
+      literal in the ADR text, not an omission by this compiler. No
+      concrete geographic/region code list exists anywhere across the three
+      ~268KB mother documents (grep-confirmed 2026-08-29): MP §103 "Data
+      Residency & Sovereignty" (L4390-4397) lists `EU-only / Country-only /
+      On-prem-only / Device-only` — verified to be a different sub-concept
+      (the *type* of residency constraint a data class carries) from a
+      concrete storage-region value (e.g. which physical region a given
+      tenant's objects are pinned to, the concept this field actually
+      names per ADR-003 sub-decision (b)'s CAS-path discussion).
+    decision: >
+      `data_residency_region` is typed as a free-form `string` (pattern
+      `^[a-z][a-z0-9-]*$`, lowercase-hyphen slug), not a closed `enum`.
+    reasoning: >
+      Enumerating concrete regions is an infrastructure/deployment decision
+      (which cloud provider, which physical regions the platform actually
+      operates in) that no mother document makes anywhere — inventing a
+      closed list here would be a new architecture decision disguised as a
+      compilation choice, which is out of this file's scope per the task
+      boundary (compile ADR-003, do not decide infrastructure topology).
+      A free-form pattern-constrained string keeps the field consumable by
+      `artifact/cas-path.schema.yaml`'s tenant-scoped path grammar today
+      without blocking on that undecided list, and can be tightened to an
+      enum later as a strictly additive, non-breaking schema change once an
+      operator/engineering decision fixes the actual region set. This
+      mirrors `manifest.schema.yaml`'s handling of `results.gates` (left
+      untyped pending the Global/High-risk Gate list ADR, MRSP-1) — a
+      genuinely undecided value set is left open rather than guessed at.
+  - question: >
+      `home_jurisdiction: JurisdictionPackRef` and `encryption_root_key_ref:
+      KMSKeyRef` are ADR-003's own type names for concepts whose schemas
+      are not yet built: Jurisdiction Pack is `specs/jurisdiction/
+      pack.schema.yaml` (Wave 4, not yet built) and the tenant-level key
+      concept is `specs/security/key-vault-lifecycle.schema.yaml` (Wave 2,
+      being built concurrently by a sibling agent in this same session —
+      per task scope, this file does not wait for or read that sibling).
+      The MACHINE_READABLE_SPEC_PLAN.md §2.5 inventory row for this file
+      lists both as dependencies.
+    decision: >
+      Both fields are typed as opaque `string` identifiers with a
+      descriptive soft reference to the concept and its future schema file
+      by name — no `$ref` to either sibling file.
+    reasoning: >
+      Same pattern `manifest.schema.yaml` already established for
+      `documents[].document_id` cross-referencing `document-registry.
+      schema.yaml` (a Wave 5 file) "by convention... NOT a hard $ref, since
+      manifest.schema.yaml (Wave 1) has no dependency on document-registry.
+      schema.yaml (Wave 5)". Here the direction is the same even though the
+      Wave numbers differ (tenant.schema.yaml is itself Wave 2): a hard
+      $ref to a file that either does not exist yet (jurisdiction/pack) or
+      is being authored in parallel this same session (key-vault-lifecycle)
+      would make this file's own validity depend on load-order and
+      concurrent-write races neither Phase 3 nor JSON Schema tooling should
+      have to arbitrate. `encryption_root_key_ref` additionally anchors
+      conceptually to ADR-002's Key Vault design (per-subject DEK wrapped
+      by a tenant-level KEK, stored independently of the Event Ledger) and
+      MP §148's Encryption & Key Sovereignty key models (Platform-managed/
+      BYOK/HYOK/Customer HSM/Local-only/Region-bound) — this field is the
+      anchor those mechanisms attach to, not a redefinition of them.
+  - question: >
+      ADR-003's minimal schema lists `tenant_id, legal_name, status,
+      home_jurisdiction, data_residency_region, encryption_root_key_ref,
+      created_at, deleted_at` without marking any as optional, but a
+      `deleted_at` that is required-and-always-present makes no sense for a
+      Tenant that has never been deleted.
+    decision: >
+      `created_at` is required; `deleted_at` is `[string, "null"]`,
+      required as a key but nullable, defaulting to `null`.
+    reasoning: >
+      Matches `status` including `deleted` as a legal value — a tenant can
+      reach `status: deleted` while its `deleted_at` timestamp records when
+      that happened, so the key must exist to be meaningfully queryable
+      across the tenant's lifecycle, but its value is legitimately absent
+      (`null`) for the overwhelming majority of tenants that are not
+      deleted. This is the same nullable-required pattern
+      `manifest.schema.yaml` uses for `execution.finished_at`.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+type: object
+required:
+  - tenant_id
+  - legal_name
+  - status
+  - home_jurisdiction
+  - data_residency_region
+  - encryption_root_key_ref
+  - created_at
+  - deleted_at
+properties:
+
+  tenant_id:
+    type: string
+    format: uuid
+    description: >
+      Primary key. Immutable once set (application-layer invariant; JSON
+      Schema cannot itself enforce write-time immutability). This is the
+      exact value `artifact/cas-path.schema.yaml`'s tenant-scoped path
+      grammar (`/objects/<tenant_id>/sha256/aa/bb/<hash>`, ADR-003
+      sub-decision (b) Option A) segments storage by — the field this
+      entire ADR exists to give a schema to.
+
+  legal_name:
+    type: string
+    minLength: 1
+    description: >
+      The tenant's legal entity name (customer organization, agency, or
+      government body). ADR-003 does not specify a format constraint beyond
+      "string"; none is added here.
+
+  status:
+    type: string
+    enum: [active, suspended, offboarding, deleted]
+    description: >
+      Verbatim 4-value enum from ADR-003 Sub-decision (a). No `default` —
+      see compilation_decisions above.
+    constraints:
+      - "MUST NOT be implicitly defaulted to 'active'. A Tenant record MUST NOT be considered provisioned (and by ADR-003's own framing, arguably MUST NOT be persisted at all) until an explicit provisioning step sets this field, per Decision Driver #6 (fail-closed over fail-open)."
+      - "Full state-machine (legal transition order between active/suspended/offboarding/deleted, who may trigger each) is not specified by ADR-003 and is not invented here — out of scope for a Phase 3 schema compilation."
+
+  home_jurisdiction:
+    type: string
+    minLength: 1
+    description: >
+      Soft reference (opaque identifier, no `$ref`) to a Jurisdiction Pack —
+      see compilation_decisions above. Anchors the Legal Authority Hierarchy
+      (MP §96, L4093-4118) for this tenant's legal/compliance home.
+      Deliberately singular and distinct from any Jurisdiction Pack a
+      Project-level piece of work may separately reference for its own
+      operational rules — ADR-003: "this decouples 'whose legal entity owns
+      this Tenant' from 'which jurisdiction's rules apply to this piece of
+      work'". Future schema home: `specs/jurisdiction/pack.schema.yaml`
+      (Wave 4, not yet built).
+
+  data_residency_region:
+    type: string
+    pattern: "^[a-z][a-z0-9-]*$"
+    description: >
+      Physical storage region constraint consumed by ADR-003 sub-decision
+      (b) (Option A: a tenant's objects can be pinned to this value so that
+      one physical blob can never need to satisfy two tenants' conflicting
+      residency requirements). Free-form slug, not a closed enum — see
+      compilation_decisions above for why no concrete region list is fixed
+      here.
+
+  encryption_root_key_ref:
+    type: string
+    minLength: 1
+    description: >
+      Soft reference (opaque identifier, no `$ref`) to this tenant's
+      tenant-level root key — see compilation_decisions above.
+      Workspaces/Projects derive their own keys from this, never from a
+      shared platform key (ADR-003 Sub-decision (a)). Conceptually the
+      tenant-level KEK that ADR-002's per-subject DEK envelope encryption
+      wraps DEKs with, and anchors to MP §148 Encryption & Key Sovereignty
+      (L5637-5656)'s key-sovereignty models. Future schema home:
+      `specs/security/key-vault-lifecycle.schema.yaml` (Wave 2, built by a
+      concurrent sibling agent, not read by or hard-referenced from this
+      file).
+
+  created_at:
+    type: string
+    format: date-time
+    description: "Tenant record creation timestamp."
+
+  deleted_at:
+    type: [string, "null"]
+    format: date-time
+    default: null
+    description: >
+      Null for any tenant not in `status: deleted`. See compilation_decisions
+      above for why this key is required-but-nullable rather than optional.
+
+examples:
+  - description: "A newly provisioned, active tenant"
+    value:
+      tenant_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      legal_name: "Example Regulatory Agency"
+      status: active
+      home_jurisdiction: "jurisdiction-pack.eu-gdpr.v1"
+      data_residency_region: "eu-west"
+      encryption_root_key_ref: "kms.tenant-root.3fa85f64"
+      created_at: "2026-08-29T00:00:00Z"
+      deleted_at: null
+  - description: "An offboarded tenant, not yet deleted"
+    value:
+      tenant_id: "9c858901-8a57-4791-81fe-4c455b099bc9"
+      legal_name: "Former Client Corp"
+      status: offboarding
+      home_jurisdiction: "jurisdiction-pack.us-federal.v1"
+      data_residency_region: "us-east"
+      encryption_root_key_ref: "kms.tenant-root.9c858901"
+      created_at: "2025-01-15T00:00:00Z"
+      deleted_at: null
+
+open_questions:
+  - id: "MRSP-tenant-1"
+    question: >
+      ADR-003 Consequences explicitly lists as unsolved follow-up (not
+      resolved by this file): (i) full RLS/schema-per-tenant vs.
+      shared-schema decision for relational data outside the CAS layer;
+      (ii) how shared components like a cross-workspace Knowledge Graph or
+      Vector Index avoid cross-tenant leakage; (iv) formal binding of
+      Jurisdiction Pack scope to Tenant vs. Project (this file only
+      anchors the Tenant-level `home_jurisdiction`; the Project-level
+      override mechanism ADR-003 alludes to is not specified anywhere).
+    owner: "operator, via Round 2 ADR"
+    blocks: >
+      Nothing in this schema's own validity. Blocks
+      `specs/security/tenant-isolation-controls.schema.yaml`
+      (MACHINE_READABLE_SPEC_PLAN.md MRSP-5,
+      BLOCKED_PENDING_ROUND2_ADR) — that file, not this one, is where (i)
+      and (ii) belong once decided. (iv) has no assigned file yet.
+  - id: "MRSP-tenant-2"
+    question: >
+      No mother document defines a concrete data-residency region code
+      list (see compilation_decisions above) or a Tenant `status`
+      transition state machine. Neither is a hard blocker today (both
+      fields are usable as typed above), but both are candidate
+      Low-to-Medium-risk follow-ups if/when an operator wants to close them
+      with an enum or a state diagram.
+    owner: "operator, non-blocking"
+    blocks: "nothing"
+
+verification:
+  method: >
+    Read against ADR-003 full text (Context, Sub-decision (a)/(b),
+    Consequences, Evidence sections), ADR-002 full text (Key Vault /
+    per-subject DEK design, for `encryption_root_key_ref`'s conceptual
+    anchor only), MP §3 (L330-357), MP §96 (L4093-4118), MP §103
+    (L4377-4397), MP §148 (L5637-5656), and
+    `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` §2.5 row for
+    `domain/tenant.schema.yaml`. Grep-confirmed (2026-08-29) that no mother
+    document defines `KMSKeyRef`, `JurisdictionPackRef`, `Key Vault`, `KEK`,
+    or a concrete geographic region enum anywhere — those are ADR-002/
+    ADR-003's own introduced concepts, not pre-existing mother-document
+    terms this file could transcribe verbatim.
+  note: >
+    No mother document or ADR was modified to produce this file. The 8-field
+    list and `Tenant 1:N Workspace` cardinality are transcribed verbatim
+    from ADR-003 Sub-decision (a); field-level type/format/default/pattern
+    choices reflect Phase 3 compilation decisions, recorded above in
+    `compilation_decisions`, not a new ADR. This file does not read or
+    depend on `specs/security/key-vault-lifecycle.schema.yaml` or
+    `specs/domain/personal-data-redacted-event.schema.yaml`, both being
+    authored concurrently by sibling agents in this same session, per task
+    boundary.

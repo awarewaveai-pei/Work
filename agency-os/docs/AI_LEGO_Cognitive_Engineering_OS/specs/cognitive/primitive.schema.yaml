@@ -1,0 +1,281 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/primitive.schema.yaml"
+title: Cognitive Primitive Kernel
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of LEGO dimension A ("Cognitive
+  Operation" — Atlas §3 L140: "大腦正在做什麼？") and its 24-member stable
+  kernel (Atlas §4 L153-182: "方法可以消失；Primitive 應盡量長期穩定。").
+  Types the kernel AND converges the 5 tokens Atlas itself uses outside that
+  kernel in composition examples and its own formal §9 LEGO Contract
+  (CAUSE_HYPOTHESIS, TRANSFORM, CLASSIFY, CONTEXTUALIZE, WEIGHT) — resolving
+  DOC-method_atlas-2 (kernel claims long-term stability, in the same document
+  section it is exceeded). This file is the single source of truth for the
+  primitive vocabulary; the mother documents reference it, they do not
+  redefine it. Atlas Appendix A (L4577) lists this filename as a promised
+  spec; Atlas defines no schema fields for it anywhere — this file is new
+  design (Phase 3 compilation), not a duplicate-definition merge, per
+  MACHINE_READABLE_SPEC_PLAN.md §2.3's row for method-execution-request.schema.yaml
+  precedent ("無既有內容可沿用，需要新設計，非重複定義修正").
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §3 八個正交 LEGO 維度, row A (L140)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §2 總體架構 diagram, P[Cognitive Primitives] node (L101, L111)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §4 Cognitive Primitive Kernel, 24-value list (L157-182) and stability claim (L155)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §4 composition examples using out-of-kernel tokens (L186-192)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 LEGO Contract, cognitive_primitives field (L993-996, uses CAUSE_HYPOTHESIS)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §17 確切工程路徑, /cognitive/kernel/primitives/ (L3865-3866)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md Appendix A (L4577, primitive.schema.yaml listed)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §7 (L634, 'Cognitive Method 的完整定義...Primitive...以 Atlas 為準')"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.3 row for primitive.schema.yaml (L113)"
+  - ".ai/research/phase-0/method-inventory.yaml L37-131 (all 24 kernel entries, has_contract: false for every one)"
+  - ".ai/research/phase-0/verified-findings.yaml DOC-method_atlas-2 (full entry, CONFIRMED, independent_votes: 1)"
+
+decided_by: >
+  No ADR governs this file. docs/architecture/MACHINE_READABLE_SPEC_PLAN.md
+  §2.3 row for primitive.schema.yaml lists it READY with no ADR dependency
+  (dependency column: "—"), assigned to resolve DOC-method_atlas-2 directly.
+  Verified by grep across docs/adr/ADR-001~009 (2026-08-29): none defines or
+  rules on the 24-primitive kernel or the 5 out-of-kernel tokens — ADR-008 only
+  cites Atlas §25's Phase 0-3 ordering in passing (Atlas:4294-4307) while ruling
+  on an unrelated question (P1-CONFLICT-4, Financial Assumptions gap); it does
+  not touch primitive content. The kernel enum below is a direct verbatim
+  transcription (Low-risk, mechanical) of Atlas L157-182 — no judgment call.
+  How to handle the 5 out-of-kernel tokens IS a judgment call, recorded in
+  `compilation_decisions` below rather than silently resolved, per the same
+  "Low-risk naming pick vs genuinely open design" split ADR-004/ADR-005/
+  status-codes.schema.yaml all use.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+definitions:
+
+  kernel_primitive_id:
+    description: >
+      The 24-member stable kernel, transcribed verbatim from Atlas §4
+      (L157-182). This is LEGO dimension A's ("Cognitive Operation")
+      controlled vocabulary — what method.schema.yaml's `cognitive_primitives`
+      field (Atlas §9 L993-996) validates each array entry against, unioned
+      with `extended_primitive_id` below.
+    type: string
+    tier: CANONICAL_KERNEL
+    enum:
+      - FRAME
+      - QUESTION
+      - EXPAND
+      - ASSOCIATE
+      - DECOMPOSE
+      - GROUP
+      - MAP
+      - COMPARE
+      - RELATE
+      - CAUSE
+      - INFER
+      - CHALLENGE
+      - IMAGINE
+      - FORECAST
+      - ESTIMATE
+      - CALCULATE
+      - SIMULATE
+      - OPTIMIZE
+      - PRIORITIZE
+      - DECIDE
+      - VALIDATE
+      - EXPLAIN
+      - REFLECT
+      - LEARN
+
+  extended_primitive_id:
+    description: >
+      Tokens Atlas itself uses as if they were kernel primitives — in
+      composition examples (§4 L187-191) AND in its own formal §9 LEGO
+      Contract instance (L996, `cognitive_primitives: [DECOMPOSE, GROUP,
+      CAUSE_HYPOTHESIS]`) — but that do not appear in the 24-value kernel at
+      L157-182. Grepped exhaustively against method-inventory.yaml (zero
+      catalog entries for any of the 5 — confirmed genuinely uncataloged, not
+      an omission of this file). Typed here as a DISTINCT tier rather than
+      silently folded into `kernel_primitive_id`, per `compilation_decisions`
+      below: this file makes the vocabulary machine-checkable (resolving the
+      "undefined_term" character of DOC-method_atlas-2) without deciding the
+      separate semantic question of whether they deserve kernel status.
+    type: string
+    tier: OBSERVED_EXTENSION
+    enum:
+      - CAUSE_HYPOTHESIS
+      - TRANSFORM
+      - CLASSIFY
+      - CONTEXTUALIZE
+      - WEIGHT
+    evidence:
+      CAUSE_HYPOTHESIS:
+        - {file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md", line: 187, quote: "Fishbone = DECOMPOSE + GROUP + CAUSE_HYPOTHESIS"}
+        - {file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md", line: 996, quote: "- CAUSE_HYPOTHESIS", context: "§9 formal LEGO Contract instance, method root_cause.fishbone"}
+      TRANSFORM:
+        - {file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md", line: 188, quote: "SCAMPER = EXPAND + ASSOCIATE + TRANSFORM"}
+      CLASSIFY:
+        - {file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md", line: 189, quote: "SWOT = CLASSIFY + COMPARE + CONTEXTUALIZE"}
+      CONTEXTUALIZE:
+        - {file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md", line: 189, quote: "SWOT = CLASSIFY + COMPARE + CONTEXTUALIZE"}
+      WEIGHT:
+        - {file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md", line: 191, quote: "AHP = COMPARE + WEIGHT + PRIORITIZE + DECIDE"}
+
+  primitive_id:
+    description: >
+      The full legal vocabulary for any field (e.g. method.schema.yaml's
+      `cognitive_primitives[]`) that references a Cognitive Primitive by name.
+      Union of the two tiers above — NOT a flattened 29-value enum, so
+      consumers can still distinguish "stable kernel" from "observed but not
+      yet promoted" per-value via `tier`.
+    oneOf:
+      - $ref: "#/definitions/kernel_primitive_id"
+      - $ref: "#/definitions/extended_primitive_id"
+
+primitive:
+  description: >
+    A single Cognitive Primitive as a typed object (for registries/tooling
+    that need more than a bare enum value — e.g. rendering the primitive
+    catalog in a UI, or auditing which tier a given method's primitives fall
+    into).
+  type: object
+  required: [id, tier, dimension]
+  properties:
+    id:
+      $ref: "#/definitions/primitive_id"
+    tier:
+      type: string
+      enum: [CANONICAL_KERNEL, OBSERVED_EXTENSION]
+      description: >
+        Mechanically derivable from which half of the union `id` falls into —
+        carried as an explicit field (not left implicit) so a registry file
+        can be grepped/filtered by tier without re-deriving it from the enum
+        membership every time.
+    dimension:
+      type: string
+      const: "A"
+      description: >
+        Fixed reference to Atlas §3's LEGO dimension A ("Cognitive
+        Operation", L140) — every Cognitive Primitive answers that one
+        question ("大腦正在做什麼？"), unlike Lens (dimension C) or
+        Representation (dimension H), which are separate schemas.
+    label:
+      type: [string, "null"]
+      default: null
+      description: >
+        OPTIONAL free-text human-readable gloss. Atlas defines every kernel
+        value as a bare uppercase token with zero prose description anywhere
+        in the document (verified: no primitive is ever expanded into a
+        sentence-form definition) — this field exists for future tooling
+        that wants one, but is left null by default rather than inventing
+        wording Atlas never wrote. See open_questions.
+
+# ---------------------------------------------------------------------------
+# Non-normative catalog: known compositions using the extended tokens
+# (transcribed verbatim from Atlas §4 L186-192, for traceability only —
+# method.schema.yaml, not this file, is the authority on any given method's
+# actual cognitive_primitives[] array)
+# ---------------------------------------------------------------------------
+known_compositions_using_extended_tokens:
+  - {method: "Fishbone", formula: "DECOMPOSE + GROUP + CAUSE_HYPOTHESIS", line: 187}
+  - {method: "SCAMPER", formula: "EXPAND + ASSOCIATE + TRANSFORM", line: 188}
+  - {method: "SWOT", formula: "CLASSIFY + COMPARE + CONTEXTUALIZE", line: 189}
+  - {method: "Scenario Planning", formula: "IMAGINE + FORECAST + COMPARE + CHALLENGE", line: 190, note: "Uses only kernel tokens — listed for completeness, not an extended-token example."}
+  - {method: "AHP", formula: "COMPARE + WEIGHT + PRIORITIZE + DECIDE", line: 191}
+
+compilation_decisions:
+  - question: >
+      DOC-method_atlas-2 is assigned to this file to resolve. Three options
+      exist for the 5 out-of-kernel tokens (CAUSE_HYPOTHESIS, TRANSFORM,
+      CLASSIFY, CONTEXTUALIZE, WEIGHT): (a) silently expand the kernel to 29
+      members, (b) mark the 5 as erroneous usage pending an Atlas text
+      correction, or (c) type them as a second, explicitly-labeled tier
+      (OBSERVED_EXTENSION) that is validatable but not merged into the
+      24-member CANONICAL_KERNEL.
+    decision: "Option (c)."
+    reasoning: >
+      Option (a) would silently overrule Atlas's own stability claim (L155)
+      by promoting 5 values to permanent-kernel status without an ADR — a
+      semantic architecture decision, not a Phase 3 compilation task (compare
+      manifest.schema.yaml's compilation_decisions, which explicitly limits
+      itself to "naming pick over an already-agreed concept," not new
+      architecture). Option (b) is unsafe to pick unilaterally: one of the 5
+      uses (CAUSE_HYPOTHESIS) appears not just in a passing composition
+      example but in Atlas's own FORMAL §9 LEGO Contract instance (L996) —
+      the exact machine-readable shape method.schema.yaml is being built to
+      validate against in this same wave. Declaring that usage "erroneous"
+      would make Atlas's only fully-worked example non-compliant with this
+      file, which is a worse outcome than acknowledging the gap. Option (c)
+      is the only choice that makes DOC-method_atlas-2's "undefined_term"
+      character go away (every one of the 5 tokens is now a named,
+      enumerable, evidence-cited value) without fabricating a semantic
+      promotion decision this file has no authority to make.
+    scope_note: >
+      This resolves the finding's DOCUMENTATION gap (undefined -> defined
+      with tier + evidence). It deliberately does NOT resolve the separate
+      question of whether the kernel should formally become 29 members —
+      that is left open below, consistent with the task boundary of Phase 3
+      compilation, not new ADR-level design.
+  - question: >
+      Should extended tokens be individually mapped onto kernel primitives as
+      synonyms (e.g. CLASSIFY == GROUP) to avoid growing the vocabulary at
+      all?
+    decision: "No — each of the 5 is kept as its own distinct value, not aliased to an existing kernel member."
+    reasoning: >
+      Read against the kernel list, none of the 5 is a clean rewording of an
+      existing member: GROUP is bottom-up clustering (used ALONGSIDE
+      CAUSE_HYPOTHESIS in the same Fishbone formula, L187 — so they are
+      evidently not synonyms of each other), CLASSIFY is assignment to
+      pre-defined categories (SWOT's four boxes) which is a different
+      operation from bottom-up GROUP; WEIGHT (relative weighting) is used
+      alongside both COMPARE and PRIORITIZE in the same AHP formula (L191),
+      so it cannot be a synonym of either without making that formula
+      redundant; CONTEXTUALIZE and TRANSFORM have no kernel candidate at all.
+      Aliasing any of them would be inventing a mapping Atlas's own examples
+      contradict, which R0 and the task's explicit "no field with no textual
+      anchor" instruction both forbid.
+
+open_questions:
+  - id: "MRSP-primitive-1"
+    question: >
+      Should the 5 OBSERVED_EXTENSION tokens be formally promoted into the
+      kernel (making it 29 members), which — per Atlas's own stability claim
+      (L155) and the 30-year engineering discipline principle (Atlas §1 L85,
+      "Primitive 與 typed object 才是穩定核心") — would plausibly warrant its
+      own ADR before the kernel enum is ever changed again? Left open: this
+      file's compilation mandate is to make the existing vocabulary
+      type-safe, not to expand or freeze it further.
+    owner: "operator, via a Round 2 ADR if kernel expansion is desired"
+    blocks: "nothing in this schema; method.schema.yaml can validate against the full primitive_id union today regardless of how this question resolves"
+  - id: "MRSP-primitive-2"
+    question: >
+      Atlas gives every one of the 24 kernel tokens as a bare uppercase word
+      with no prose definition anywhere in the document (verified by reading
+      §4 in full and grepping each token elsewhere in the Atlas — none is
+      ever expanded into a sentence-form gloss). The `label` field above is
+      therefore left null by default rather than populated with invented
+      wording. Should a future revision commission human-authored glosses for
+      all 29 primitive_id values (kernel + extended), and if so, who owns
+      that content (Atlas maintainers vs. this schema file)?
+    owner: "operator"
+    blocks: "nothing — label is optional and nullable"
+
+verification:
+  method: >
+    Read against Atlas §1 (L80-89), §2 (L92-129), §3 (L134-149), §4
+    (L153-192), §9 (L985-1030), §17 (L3861-3866), Appendix A (L4574-4604);
+    Master Plan §7 (L634); MACHINE_READABLE_SPEC_PLAN.md §2.3 (L113);
+    method-inventory.yaml (L37-131, full 24-entry primitive block, plus a
+    targeted grep for the 5 extended tokens returning zero catalog hits);
+    verified-findings.yaml DOC-method_atlas-2 full entry; docs/adr/ADR-001~009
+    grepped for "primitive" (only ADR-008's incidental Atlas §25 citation
+    found, unrelated to kernel content).
+  note: >
+    No mother document was modified to produce this file. The 24-value kernel
+    enum is a verbatim transcription (zero interpretation). The 5-value
+    extended enum, its OBSERVED_EXTENSION tier, and the decision not to merge
+    it into the kernel are this file's own Phase 3 compilation judgment,
+    recorded above in `compilation_decisions` and `open_questions` rather than
+    asserted silently.

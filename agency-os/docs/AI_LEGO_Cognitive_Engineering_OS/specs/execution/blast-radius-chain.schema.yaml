@@ -1,0 +1,249 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/execution/blast-radius-chain.schema.yaml"
+title: Blast-Radius Isolation Chain
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the 最小爆炸半徑 (minimal blast
+  radius) isolation chain. Resolves P1-DUP-3: Master Plan §1.5 (L268-274)
+  enumerated a 6-layer chain with NO `Branch` node
+  (Tenant → Workspace → Project → Workflow → Execution → Capability), while
+  Method Atlas §21's mermaid diagram (L4138-4146) drew a 7-layer chain WITH
+  `Branch` inserted between Workflow and Execution
+  (Tenant → Workspace → Project → Workflow → Branch → Execution → Capability).
+  `Branch` as a blast-radius node had zero definition anywhere in any of the
+  three mother documents (ADR-003 Context, L19, full-text-grep verified).
+  ADR-003 sub-decision (c) adopts Method Atlas §21's 7-layer chain as
+  canonical and directs Master Plan §1.5 to be updated to match it or point
+  to Atlas §21 as SSOT — that mother-document edit is out of scope for this
+  file (it requires the ADR-006 `.ai/proposals/` process); this schema is the
+  machine-readable compiled form of the ADR's decision, not the edit itself.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §21 最小爆炸半徑 mermaid diagram (L4136-4146) — CANONICAL"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §21 強制規則 1-9 (L4148-4159)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §1.5 最小爆炸半徑, 6-layer chain (L262-275) — SUPERSEDED, missing Branch"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §32 Security Change Contract, sole `tenant isolation` mention (L1255-1268)"
+  - "docs/adr/ADR-003-tenant-model-and-cas-isolation.md Context, P1-DUP-3 (L15-19)"
+  - "docs/adr/ADR-003-tenant-model-and-cas-isolation.md Sub-decision (c), Branch minimal definition (L87-94)"
+  - "docs/adr/ADR-003-tenant-model-and-cas-isolation.md Recommendation item (c) (L104)"
+  - "docs/adr/ADR-003-tenant-model-and-cas-isolation.md Consequences, follow-up item (iii) — full Branch state machine, out of scope (L112)"
+decided_by: "docs/adr/ADR-003-tenant-model-and-cas-isolation.md (ACCEPTED 2026-08-29)"
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+definitions:
+
+  node_type:
+    description: >
+      The 7 canonical node types, in outermost-to-innermost order, transcribed
+      verbatim (short code + full name) from Atlas §21's mermaid diagram:
+      `T[Tenant] --> W[Workspace] --> P[Project] --> WF[Workflow] --> B[Branch]
+      --> EX[Execution] --> C[Capability]`. Order in this enum IS the chain
+      order — do not reorder.
+    type: string
+    enum: [TENANT, WORKSPACE, PROJECT, WORKFLOW, BRANCH, EXECUTION, CAPABILITY]
+
+  node_short_code:
+    description: >
+      Atlas §21's own mermaid short codes, preserved verbatim for
+      cross-referencing the source diagram without re-deriving them.
+    type: string
+    enum: [T, W, P, WF, B, EX, C]
+
+chain:
+  description: >
+    The canonical ordered chain, one entry per node type, transcribed
+    verbatim from Atlas §21 (L4139-4145). This is descriptive metadata about
+    the chain's shape (for tooling/documentation), not a per-instance record
+    — see `chain_instance` below for the per-object form.
+  type: array
+  minItems: 7
+  maxItems: 7
+  items:
+    type: object
+    required: [node_type, short_code, label]
+    properties:
+      node_type: { $ref: "#/definitions/node_type" }
+      short_code: { $ref: "#/definitions/node_short_code" }
+      label: { type: string }
+  const:
+    - { node_type: TENANT, short_code: T, label: Tenant }
+    - { node_type: WORKSPACE, short_code: W, label: Workspace }
+    - { node_type: PROJECT, short_code: P, label: Project }
+    - { node_type: WORKFLOW, short_code: WF, label: Workflow }
+    - { node_type: BRANCH, short_code: B, label: Branch }
+    - { node_type: EXECUTION, short_code: EX, label: Execution }
+    - { node_type: CAPABILITY, short_code: C, label: Capability }
+
+chain_instance:
+  description: >
+    Per-object form: one concrete instance of the chain, e.g. a real
+    Execution's actual ancestry. Each node (after Tenant) records its direct
+    parent, forming a tree per the containment semantics below — not a
+    record of the abstract 7-type chain itself.
+  type: object
+  required: [tenant_id, node_type]
+  properties:
+    tenant_id:
+      type: string
+      description: >
+        Soft reference only: cross-references `domain/tenant.schema.yaml`'s
+        `tenant_id` field (type `uuid`, per ADR-003 sub-decision (a), L44) by
+        NAME, NOT a hard $ref — `domain/tenant.schema.yaml` is a concurrent
+        Wave 2 deliverable and may not exist on disk yet when this file is
+        read, the same forward-reference style manifest.schema.yaml uses for
+        `document-registry.schema.yaml` (Wave 5). Outermost/first field of
+        every chain_instance, per Atlas §21: Tenant is the root of the tree.
+      pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    node_type: { $ref: "#/definitions/node_type" }
+    node_id:
+      type: string
+      description: "Identifier of this specific node instance within its type."
+    parent_node_id:
+      type: [string, "null"]
+      description: >
+        Required non-null for every node_type except TENANT (which is the
+        chain root and has no parent within this chain — a Tenant's own
+        upstream, if any, is out of this schema's scope). MUST reference a
+        node one position to the left in the `chain` order above (e.g. a
+        WORKFLOW's parent_node_id MUST resolve to a PROJECT node, never
+        directly to a WORKSPACE or TENANT — no layer may be skipped).
+
+containment_semantics:
+  description: >
+    Compilation note, not a separate ADR decision: ADR-003 sub-decision (a)
+    explicitly establishes ONLY the Tenant→Workspace edge as `1:N`
+    cardinality ("a Workspace belongs to exactly one Tenant; no cross-tenant
+    shared Workspace", ADR-003 L36), reasoning from the diagram's single
+    directed edge as "already imply[ing] a strict one-parent tree" (L38).
+    ADR-003 does not separately re-assert this reasoning for the other 5
+    edges (Workspace→Project, Project→Workflow, Workflow→Branch,
+    Branch→Execution, Execution→Capability). This file extends the same
+    reasoning to every edge in the chain — each is 1:N, parent-owns-children,
+    single-parent — because (a) the mermaid diagram draws every edge in the
+    same single-directed-arrow style Atlas uses for Tenant→Workspace, and (b)
+    "minimal blast radius" as a design goal (§21's own section title) only
+    holds if containment is strict at every layer: an N:N edge anywhere would
+    let a fault cross into a sibling subtree, defeating the isolation
+    property the whole chain exists to provide. This extension is flagged
+    explicitly, not silently assumed, so a future Round 2 ADR can override
+    any single edge's cardinality without this file's silence being mistaken
+    for a prior decision.
+  rule: "Every edge in `chain` is 1:N (parent-owns-children); no cross-parent sharing at any layer."
+
+branch_node:
+  description: >
+    Atlas §21's `Branch` node, minimally defined. This is the FULL scope of
+    what this file specifies about Branch — no state machine, no merge
+    authority model, no conflict-handling rules. ADR-003 Consequences item
+    (iii) explicitly names "full Branch state-machine spec at Atlas §21" as
+    follow-up work OUT OF SCOPE for ADR-003 itself, and
+    docs/architecture/MACHINE_READABLE_SPEC_PLAN.md tracks the full spec as
+    `specs/workflow/branch.schema.yaml`, status BLOCKED (MRSP-4) — that file
+    is not built here and this section must not be extended to duplicate it.
+  minimal_definition: >
+    A Branch is a forked, isolated execution lineage of a Workflow — the
+    exact phrase ADR-003 sub-decision (c) uses (L94) and
+    MACHINE_READABLE_SPEC_PLAN.md §2.5 repeats verbatim for this file's own
+    inventory row.
+  lifecycle_transcribed_from_adr:
+    created_by: >
+      The existing `Branch` action (Master Plan §11.2, one of six
+      human-decision actions on an AI-suggested Claim/Idea:
+      Accept/Reject/Edit/Lock/Branch/Merge, L961-968).
+    produces: "Its own Executions, isolated from the parent Workflow's committed history."
+    reconciled_by: >
+      The existing `Merge` action, and only that action — a Branch's
+      Executions do not affect the parent Workflow's committed history until
+      an explicit Merge.
+    unmerged_state: >
+      "Unmerged Branch executions do not affect Project Knowledge" (ADR-003
+      L94), consistent with Atlas §21 mandatory rule 3: "一個 Method
+      execution failure 不得污染 Project Knowledge" (L4152) — a failed or
+      abandoned Branch is exactly the case rule 3 exists to contain.
+  explicitly_not_specified_here:
+    - "Who is authorized to Merge a Branch (authority/role model)"
+    - "Conflict handling when two Branches diverge and both attempt Merge"
+    - "Branch state machine (states, valid transitions, terminal states)"
+
+mandatory_rules:
+  description: >
+    Atlas §21's 9 mandatory rules (強制規則), transcribed verbatim
+    (L4150-4158), attached here because they govern behavior AT specific
+    points in this chain. Included for completeness of the chain's
+    semantics, not re-litigated or modified — ADR-003 did not change these
+    rules, only the chain's node count that they operate over.
+  rules:
+    - id: 1
+      text_zh: "AI-generated idea 預設 `DRAFT`。"
+      relates_to_node: null
+    - id: 2
+      text_zh: "`UNKNOWN` 不得提升為 `FACT`。"
+      relates_to_node: null
+      see_also: "specs/governance/epistemic-label.schema.yaml promotion_redline (canonical form: SOURCE_FACT, not bare FACT)"
+    - id: 3
+      text_zh: "一個 Method execution failure 不得污染 Project Knowledge。"
+      relates_to_node: [PROJECT, EXECUTION]
+      see_also: "branch_node.lifecycle_transcribed_from_adr.unmerged_state above"
+    - id: 4
+      text_zh: "高風險新 Method 先 shadow / preview。"
+      relates_to_node: null
+    - id: 5
+      text_zh: "`publish / deploy / delete / send / irreversible` 需要 authority gate。"
+      relates_to_node: null
+    - id: 6
+      text_zh: "Rollback 使用 Execution Manifest。"
+      relates_to_node: [EXECUTION]
+      see_also: "specs/execution/manifest.schema.yaml"
+    - id: 7
+      text_zh: "新 Jurisdiction Pack 只能作用在其 scope。"
+      relates_to_node: null
+    - id: 8
+      text_zh: "Experiment 預設受限於 project / cohort / traffic slice。"
+      relates_to_node: [PROJECT]
+    - id: 9
+      text_zh: "任何 destructive migration 必須有 prevalidated recovery path。"
+      relates_to_node: null
+
+open_questions:
+  - id: "blast-radius-1"
+    question: >
+      Full Branch state machine — who can Merge, how Branch/Branch and
+      Branch/parent conflicts are resolved, valid state transitions. ADR-003
+      Consequences item (iii) names this explicitly as follow-up work, not
+      decided by ADR-003 itself.
+    owner: "operator, Round 2 ADR — tracked as MRSP-4 / specs/workflow/branch.schema.yaml (BLOCKED) in docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §5"
+    blocks: "nothing in this schema — branch_node above is deliberately minimal and self-declares its own boundary"
+  - id: "blast-radius-2"
+    question: >
+      Cardinality of the 5 edges below Tenant→Workspace (Workspace→Project,
+      Project→Workflow, Workflow→Branch, Branch→Execution,
+      Execution→Capability) is this file's own compilation extension
+      (see `containment_semantics` above), not a line ADR-003 itself
+      re-asserts for each edge individually. If a future Round 2 ADR finds a
+      real N:N need at any layer (e.g. a shared Capability reused across
+      Workflows), this file's blanket 1:N rule would need a targeted
+      amendment at that one edge, not a rewrite of the whole chain.
+    owner: "operator, if/when a concrete N:N need surfaces"
+    blocks: "nothing currently — no finding in Phase 0/1 or ADR-003 identified a real N:N case"
+
+verification:
+  method: >
+    Read against Atlas §21 mermaid diagram and mandatory rules (L4136-4159),
+    MP §1.5 (L262-275), MP §11.2 Branch/Merge vocabulary (L955-969), EC §32
+    (L1255-1268), ADR-003 full text (Context P1-DUP-3, Sub-decision (c),
+    Recommendation, Consequences), docs/architecture/MACHINE_READABLE_SPEC_PLAN.md
+    §2.5 row for execution/blast-radius-chain.schema.yaml and §3 Build Order
+    (Wave 2).
+  note: >
+    No mother document or ADR was modified to produce this file. The 7-node
+    chain, its order, both short codes and full names, and the Branch
+    minimal definition are transcribed verbatim from Atlas §21 and ADR-003;
+    the per-edge containment-cardinality extension beyond the one edge
+    ADR-003 explicitly reasons about is flagged as a compilation note in
+    `containment_semantics` and cross-referenced in `open_questions`, not
+    silently presented as ADR-decided.

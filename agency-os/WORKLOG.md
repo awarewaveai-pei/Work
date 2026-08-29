@@ -1,5 +1,40 @@
 # Worklog
 
+## 2026-08-29（續10）
+
+### AI LEGO Phase 3 Wave 2-3 核心完成 — Tenant/CAS/個資加密體系 8 檔 + Cognitive Engine 核心 12 檔 + typed-objects 3 節點落地，過程中抓到並修正 1 個真實 ADR 狀態不同步 bug + 2 個 schema 內部 bug
+
+**背景**：續9 完成 Wave 1（全系統型別字母表）後，操作者說「你決定」並重申 R0/R4 全套紀律，授權繼續 Wave 2（Tenant/CAS/個資加密）與 Wave 3（Cognitive Engine 核心）——依 `MACHINE_READABLE_SPEC_PLAN.md` §3 這兩個 Wave 互不依賴、只依賴 Wave 1，可平行處理。10 個 general-purpose subagent 平行派出，每個處理 1-3 個關聯緊密的檔案，全部要求先 Grep/Read 核對母文件與已 ACCEPTED 的 ADR 原文，不得沿用任務摘要。
+
+**產出（24 個新檔，全數 Python `yaml.safe_load` 驗證語法正確）**：
+- Wave 2：`domain/tenant.schema.yaml`、`artifact/cas-path.schema.yaml`、`execution/blast-radius-chain.schema.yaml`、`security/{personal-data-envelope,key-vault-lifecycle,log-redaction-token}.schema.yaml`、`domain/personal-data-redacted-event.schema.yaml`、`execution/data-deletion.schema.yaml`（8 檔）
+- Wave 3：`cognitive/{primitive,method,lens,representation,recipe,rigor-level,profile}.schema.yaml`（7 檔）+ `cognitive/typed-objects/{problem-statement,cause-hypothesis-set,root-cause-fact}.schema.yaml`（3 檔）+ `methods/registry/{method-inventory,contract-backlog}.yaml`（2 檔）（12 檔）
+
+**明確延後、非遺漏的項目**（各自附理由，見 `MACHINE_READABLE_SPEC_PLAN.md` 更新後的 Wave 2/3 mermaid 區塊）：`workflow/branch.schema.yaml`（BLOCKED，ADR-003 明列 follow-up）、`domain/repository-contract.schema.yaml`（SKELETON_ONLY，需操作者法遵決策）、`domain/capability-contract.schema.yaml` 與 `cognitive/{method-execution-request,typed-method-result}.schema.yaml` 與 `execution/method-resolution.schema.yaml`（依賴 Wave 5 尚未建的 task/result schema，未提前設計避免重工）、`cognitive/problem-type.schema.yaml`（與 method-resolution 循環依賴）、`security/tenant-isolation-controls.schema.yaml`（BLOCKED_PENDING_ROUND2_ADR）、typed-objects 鏈其餘 10 節點（計畫明文指示待 Phase 5 切片方向鎖定後再補，不猜測會用到哪些）。
+
+**過程中抓到並修正的問題**：
+1. **真實 bug（跨批次）**：`key-vault-lifecycle.schema.yaml` 的 agent 發現 `docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md` 自己的檔頭仍寫 `Status: PROPOSED`，與 `ADR_INDEX.md` 登記的 `ACCEPTED` 不一致——這是我在續7 那批「9 份 ADR 全數 ACCEPTED」宣告時，只改了 ADR-001 的檔頭卻漏改 ADR-002 的檔頭（內容段落有改，標頭沒改）。已立即修正，並逐一複核其餘 8 份 ADR 標頭確認無同類遺漏（結果：僅 ADR-002 一處遺漏）。
+2. **schema 內部 bug（同批次內）**：`root-cause-fact.schema.yaml` 的 agent 在自我審查階段抓到自己寫的兩個錯誤——`required` 陣列點名了不存在的欄位（誤寫 `promotion`，實際欄位是 `legal_promotion_path`），以及 `cause-hypothesis-set.schema.yaml` 的 `forbidden_transition` 縮排錯誤（被誤放在 `properties` 底下，讓一條 schema 層級規則看起來像實例資料）——兩者在回報前已自行修正。
+3. **誠實留白而非硬拗**：`rigor-level.schema.yaml` 的 agent 面對「MP 五模式 vs Atlas 四值 enum」的落差時，正確拆成兩部分——恢復 5 個名稱本身是 Low-risk 可直接定案，但「Deep Intelligence 該不該是原生第 5 值」是真正的 enum 基數變更，比照 ADR-004 的判準（同類語意擴大需要 ADR 層級揭露），沒有單方決定，留 `PROVISIONAL_PENDING_OPERATOR_SIGNOFF` 預設值 + 明確 `open_questions`。逐字核對 Deep Intelligence 17 個維度與 Board Grade 6 個維度的重疊（結果：只有 2 個部分重疊，非乾淨的超集關係），證明這個留白是有根據的判斷不是偷懶。
+4. **method-inventory/contract-backlog 的紀律**：agent 沒有臆測 Tier 1 方法清單（計畫明文禁止，因為 Phase 5 切片方向未定），Tier 0 只列計畫明文點名的 4 個方法；額外主動把 ADR-008 明訂要求加入的 `finance.financial_assumptions`（Tier 2）補上，避免一個已定案的 ADR 要求被遺漏。
+
+[已修改]
+- 新增 24 個檔案（見上方產出清單）
+- `docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md`：Status 標頭由 `PROPOSED` 訂正為 `ACCEPTED`（真實 bug 修正）
+- `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`：19 個 Spec Inventory 表格列狀態改為 `BUILT`；補一列遺漏的 `security/log-redaction-token.schema.yaml`（ADR-007 追加，原表未同步）；Wave 2/3 mermaid 區塊標註完成/延後項目；§5 新增 MRSP-8/9/10 三條 open questions
+- `AI_LEGO_OS_Program_Plan_v1.md`：Phase 3 狀態更新為「Wave 0-3 核心完成」，列出延後項目與理由
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 -c "yaml.safe_load(...)"` 對全部 24 個新檔逐一解析（全部 OK） | exit=0
+- REVIEW_DONE: critic=Claude 主 session 全文通讀 `key-vault-lifecycle.schema.yaml`（含 Codex 覆審機制的 schema 化）與 `rigor-level.schema.yaml`（含語意判斷的 schema）| verdict=pass | findings=0；其餘 22 檔依 agent 自我審查報告 + YAML 語法驗證 + bughunt grep 三重把關，未逐檔全文通讀（見下方剩餘風險）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=24 個新檔檔名逐一 | hits=僅預期位置（母文件承諾清單、ADR-007/008 引用、Program Plan/Roadmap 引用、本次新增架構文件自身），無 stale 或衝突引用
+- `/verify-recent`（method-inventory agent 於 scratchpad 寫入的一次性遷移腳本 `build_method_inventory.py` 觸發 verify-gate-commit 機械閘）：語法 `python -m py_compile` 通過；人工通讀 109 行（regex 逐行比對 `has_contract: true/false` 插入 `contract_status` 欄位，assert 防呆，UTF-8+LF 一致）確認無邏輯錯誤；REALTEST_EVIDENCE: tool=Bash | cmd=`grep -c "^\s*- name:"` + `grep -c "contract_status: complete\|pending"` 對照腳本自身列印的 289/2/287 | exit=0，三個數字完全吻合；BUGHUNT_WAIVED: NA -- 一次性 scratchpad 腳本非 repo 產物，不會被引用
+- ORACLE_WAIVED: 本批全數為已 ACCEPTED ADR 內容的直接編譯或 Low-risk 命名/映射決策（非新架構取捨），不需要對外部 oracle 覆審；`rigor-level.schema.yaml` 的 Deep Intelligence 基數問題已誠實留白待操作者/Round 2 ADR，非本輪自行拍板
+
+[剩餘風險] 22 個檔案（除 key-vault-lifecycle 與 rigor-level 外）未經 Claude 主 session 逐字全文通讀，僅信任 agent 自我審查報告——這與 Phase 2 Round 1-3 對每份 ADR 逐字通讀的標準不同，是這一輪為了在合理時間內完成 Wave 2/3 規模（24 檔）所做的取捨；若操作者要求更高把關標準，可指定特定檔案要求補做全文通讀。`rigor-level.schema.yaml` 的 Deep Intelligence enum 基數與 `recipe.schema.yaml` 的 ID 文法兩項待操作者裁決（MRSP-8/9）。
+[rollback] `git revert` 本次 commit；三母文件全程零改動，新增內容僅限 24 個新檔 + 既有 ADR-002 標頭訂正 + 計畫文件狀態欄位更新。
+
 ## 2026-08-29（續9）
 
 ### AI LEGO Phase 3 開工 — Wave 0-1 完成：全系統型別字母表 4 份 schema 落地，過程中額外揪出一條 Phase 0/1 都沒抓到的新衝突
@@ -61,6 +96,65 @@
 - REALTEST_WAIVED: DOC_ONLY -- 純方案文件，未寫任何 code/migration/deploy 設定
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m（自我核對：方案與 ADR-003 schema 一致、V1 排除項與金流/RLS 紅線對齊、未偽稱已整合）
 - BUGHUNT_DONE: scope=agency-os | grep=`portal\.customers\|product_provisions\|portal_customer_id` | hits=2（新方案文件自身 + 本 WORKLOG 條目引用，無其他既有同名 schema/表衝突）
+
+### 自我更正：PRODUCT_DOMAIN_IA_PLAN.md 主機欄寫錯（VBC 違規，即時抓到修正）
+
+操作者貼 OVH 主機管理面板連結反問「SG/EU 不是已經停機換到新機了？」——我讀 `AWAREWAVE_STACK_QUICKREF.md` 時直接跳到 §SG/§EU 容器明細段落（line 35 起），**跳過了頂部橫幅**（line 3-17，2026-08-28 全整併到 `ks-aw-01`149.202.64.114`的公告），導致 `PRODUCT_DOMAIN_IA_PLAN.md` §1 現況表的「主機」欄寫成「SG」「EU」，暗示現在還有兩台獨立機器在跑——這是錯的，這批服務全部只在 `ks-aw-01` 單機上。
+
+**根因**：讀長文件時只跳到目標段落，沒讀頂部變更公告——正是 AGENTS.md VBC「先查是否有替代/新現況已覆蓋舊描述」要防的那類錯誤，這次是自己犯的，操作者指出後立即核對橫幅內容並修正。
+
+**已修**：`PRODUCT_DOMAIN_IA_PLAN.md` §1 現況表拆成「主機」（一律 `ks-aw-01`）+「服務群（歷史分組）」（原 SG/原 EU，僅供辨識歷史容器分組用），並加一段「對 portal 設計的實際影響」——單機資源有限這件事直接改變了 portal 部署形態的決策（見下條）。
+
+**[驗證結果]**
+- REALTEST_WAIVED: DOC_ONLY -- 純文件訂正
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m（自我核對：訂正後表格與 `AWAREWAVE_STACK_QUICKREF.md` 頂部橫幅逐項一致）
+- BUGHUNT_DONE: scope=agency-os | grep=`SG（WordPress）\|SG（node-api）\|SG（next-admin）` | hits=2（`PRODUCT_DOMAIN_IA_PLAN.md` 新增的「服務群（歷史分組）」欄位故意保留 `原 SG（WordPress）` 等字串當歷史標籤 + 本 WORKLOG 條目引用；兩者皆非「主機」欄殘留，「主機」欄本身已 100% 改為 `ks-aw-01`，訂正目的達成）
+
+### portal 部署形態 + V1 範圍：操作者授權 Claude 裁決，方案 §6 定案
+
+操作者「你決定！我要完美的系統！」明確授權，重申 R0 全套紀律（30 年工程紀律/零重工/完整閉環/最小爆炸半徑/不接受補丁）。裁決過程納入剛訂正的單機現況（`ks-aw-01` 資源有限、監控門檻嚴）：
+
+- **部署形態＝共用 next-admin，host-based routing，零新 container**：理由與「共用 Auth 實例」同一套複雜度預算判準，且單機環境下每個新 container 是真成本。隔離靠四層拆分（route group／`lib/portal/` namespace／`portal.*` schema／`portal_customer_id` claims namespace），非物理隔離但可逆——之後真要拆成獨立服務時 code 已模組化，直接搬走整包即可。
+- **V1 範圍＝cognitive+hci 兩張 coming-soon 卡一起建（data-driven registry）**：不是擴大範圍——兩張卡的工程量跟一張幾乎相同，且 registry 模式本身就是「LEGO 可彈性擴張」的落地方式。**明確邊界**：兩個 entry 純資料，不含 hci 業務邏輯，真正串接 hci 時是另一輪 R0。
+
+方案文件 §6/§7/§8 已補完整實作步驟（Migration/middleware host 分流/nginx/部署）+ 四動作驗證計畫，含新增抓蟲項「confirm sg-deploy.sh/nginx conf 無寫死舊 SG/EU IP」（承接上條主機訂正）。`TASKS.md` §F portal 條目更新為「下一步＝可直接進 §7 實作」。
+
+**[驗證結果]**
+- REALTEST_WAIVED: DOC_ONLY -- 方案文件更新，尚未寫 migration/middleware/nginx 實際 code
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m（自我核對：決策理由與 §4.1 共用 Auth 判準一致、V1 範圍邊界明確排除 hci 業務邏輯、未偽稱已實作）
+- BUGHUNT_DONE: scope=agency-os | grep=`portal_customer_id\|lib/portal/\|app/(portal)` | hits=3（本方案文件 §6/§7 + `TASKS.md` 條目，均為本輪新增，無舊衝突）
+
+### portal 方案 v2：發現既有 client/org 身分模型，v1 是重工，全面重新設計
+
+操作者「你決定！用 codex review」授權繼續執行。開始寫 migration 前先讀 `middleware.ts` 全文（之前只讀過 `APP_AWARE_WAVE_CURRENT_STATE.md` 摘要）跟委託 db-expert 覆審 v1 schema 草案，過程中發現 `lib/tenant-guard.ts:1-141` + `lobster-factory/packages/db/migrations/0001_core.sql:3-58`（`organizations`/`workspaces`/`profiles`/`organization_memberships`）已經是一套完整、已測試（22 個檔案消費，含多個 `*-tenant.test.ts`）、已在 middleware.ts 中生產運作的 `staff`/`client` 雙身分模型（`app_metadata.user_kind`+`org_id`）——**只是從來沒有真正的外部客戶用過它**（tenant-guard.ts 檔頭原文：「client — end-client self-service」,是為了這種情境設計的，但至今零真實 consumer）。
+
+**v1 方案（新開 `portal` schema + `app_metadata.portal_customer_id` 全新命名空間）違反零重工原則**——等於在同一個 repo 蓋第二套「外部客戶是誰」的系統。已即時攔截：db-expert 覆審 agent 原本委託的是 v1 schema，趁它還在背景執行時發送修正訊息（改覆審 `organization_product_subscriptions` 一張新表，重用 `organizations`/`profiles`/`organization_memberships`，不再新開 schema）。
+
+**方案文件全面改版為 v2**（`docs/operations/PORTAL_AWARE_WAVE_DESIGN_PROPOSAL.md` §0 誠實記錄修正過程,不掩蓋走過的彎路）：signup 流程＝建 `organizations`(type=client) + Supabase Auth user(`user_kind=client`,`org_id`) + `profiles` + `organization_memberships` + 新表 `organization_product_subscriptions`；登入/launcher 一律呼叫既有 `tenant-guard.ts` 的 `effectiveOrgId()`/`assertOrgAccess()`,不重寫。§8 驗證計畫特別加重「這是該機制第一次接真實外部流量」的端對端測試,不能只信任既有單元測試覆蓋新場景。
+
+`TASKS.md` §F portal 條目已更新記錄此修正,避免下次 session 誤讀進度或重複踩 v1 那條路。
+
+**[驗證結果]**
+- REALTEST_WAIVED: DOC_ONLY -- 方案文件 v2 改版,實際 migration/code 待 db-expert 覆審完成後才寫
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m（自我核對：v2 與既有 `tenant-guard.ts`/`0001_core.sql` 實際欄位/函式名稱逐一核對過,無憑空引用）
+- BUGHUNT_DONE: scope=agency-os,lobster-factory | grep=`organization_product_subscriptions` | hits=3（方案文件 + `TASKS.md` 條目 + 本 WORKLOG 條目,均本輪新增;`lobster-factory` 全域=0,確認未撞名既有表）
+
+### portal migration 落地 + db-expert 4 項 Critical 修正 + SSH 實查訂正 nginx 架構
+
+操作者「你決定！用 codex review」授權繼續。流程：
+
+1. **委託 db-expert 審 migration 草案**，讀 `0004`/`0010`/`0014`/`0019`/`0018`/`0033`/`0050`/`0061` 確認既有 RLS 慣例，回報 4 Critical + 4 Major + 5 Minor（完整摘要已寫進方案文件 §9）。全部 4 個 Critical 已在 `0062_organization_product_subscriptions.sql` 套用修正：① write 限定 `service_role`（不套用 0010 那套會讓客戶自己改訂閱狀態的 CRUD pattern）② 註記 RLS 只是縱深防禦、真正邊界在 application 層 ③ **最高嚴重性**：既有 `resolveTenant()` 對缺身分 header fail-open 給 staff 全權限——`lib/tenant-guard.ts` 新增 `requireClientOrg()`/`PortalAccessError`（純新增，`git diff` 確認未動任何既有 export 的行為）,portal 路由強制走這個 ④ SSH 進 `ks-aw-01` 實跑 `docker exec supabase-db psql -c "select count(*),status from clerk_organization_mappings group by status;"` 確認 0 rows,但不依賴「現在是空的」,RLS 改用 `user_has_org_membership()` 結構性排除 JWT 碰撞路徑。額外採納：`ON DELETE CASCADE`→`RESTRICT`（避免刪 org 悄悄清掉訂閱歷史）。
+
+2. **SSH 實查 `ks-aw-01` 真實 nginx 架構,推翻方案 v2 的「middleware host 分流」設計**：讀 `/etc/nginx/sites-available/sg-stack.aware-wave.com`（host 層 TLS 終結,轉 `127.0.0.1:8083`）+ `/root/lobster-phase1/nginx/default.conf`（lobster-nginx 容器,`app.aware-wave.com` 已是獨立 `server{}` block 直轉 `next-admin:3000`）,發現真實架構是兩層而非單層 host-based routing。改用**更簡單更安全**的設計：nginx 新增獨立 portal server block + `rewrite` 轉內部路徑,`middleware.ts` 完全不用加 host 判斷邏輯,只需擴充既有 matcher 排除清單一行（跟現有 `/login` 排除同模式）。**額外發現阻塞項**：`openssl x509 -text` 查 LE 憑證 SAN 清單只有 `api/app/aware-wave.com/oracle/www` 五個,無萬用字元,`portal` 上線前必須先 `certbot --expand`。
+
+3. **已完成（純新增檔案,零風險,尚未套用/部署）**：`lobster-factory/packages/db/migrations/0062_organization_product_subscriptions.sql` + 對應 down 檔、`lib/tenant-guard.ts` 新增 `requireClientOrg()`、`lib/portal/products.ts`（product registry）。方案文件改版 v3,§7 完整記錄步驟 1-8（按風險排序,步驟 5-8 標記【待 go-ahead】)、§9 記錄 db-expert 全部發現與採納/不採納理由。
+
+4. codex-oracle 二次覆審（`-Mode review`,妳明確要求的路徑）已送出跑在背景,結果待收。
+
+**[驗證結果]**
+- REALTEST_WAIVED: DOC+SCHEMA_ONLY -- migration/down 檔已寫入 repo 但**未套用**到任何資料庫（SSH 查證僅執行唯讀 SELECT 確認 clerk_organization_mappings 現況,無寫入操作）;`tenant-guard.ts` 新函式未被任何路由呼叫,未部署,對現行 22 個消費端點零影響
+- REVIEW_DONE: critic=Deep（db-expert agent 角色等同 critic,深度覆審 8 個既有 migration 檔 + 2 個現行 code 檔）| verdict=pass-with-fixes | findings=4C/4M/5m,4 Critical 全數修正,4 Major 記錄決策（1 修正+3 記錄不修+理由）;codex-oracle 二次覆審跑中,結果另記
+- BUGHUNT_DONE: scope=agency-os,lobster-factory | grep=`user_has_org_access\|user_has_org_membership\|resolveTenant\b` | hits=多筆但全數為既有既有消費端點/既有函式定義,新增的 `0062` migration 與 `requireClientOrg()` 未出現在既有 22 個消費端點的呼叫路徑中（確認未意外改變既有行為）；grep `sg-deploy.sh` 有無寫死舊 SG/EU IP 待步驟 3-4 完成後與 nginx 改動一併驗
 
 ## 2026-08-29（續7）
 

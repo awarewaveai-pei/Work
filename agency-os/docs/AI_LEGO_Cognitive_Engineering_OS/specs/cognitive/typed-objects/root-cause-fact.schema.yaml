@@ -1,0 +1,275 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/root-cause-fact.schema.yaml"
+title: Root Cause Fact
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `RootCauseFact` — the terminal
+  node of the §14.1 type-compatibility chain
+  (`ProblemStatement -> Fishbone -> CauseHypothesisSet -> Evidence Search ->
+  Causal DAG -> Validation -> RootCauseFact`). Resolves DOC-method_atlas-3:
+  the same concept ("the validated, evidence-backed root cause of a
+  problem") is named FOUR different ways across the Atlas, with zero schema
+  for any of them:
+    1. `FinalCausalFact` — §9 LEGO Contract `forbidden_transition` (L1020)
+       and §14.1 illegal-chain example (L3563).
+    2. `RootCauseFact` — §11.4 Fishbone limitation note (L1267:
+       "Fishbone 只能產生 CauseHypothesisSet，不能直接產生 RootCauseFact").
+    3. `RootCauseAssessment` — §14.1 legal-chain endpoint, appearing exactly
+       once (L3555).
+    4. "Root Cause Fact" (space-separated table form) — §22.3 Method-specific
+       Gate table, Fishbone row (L4200: "| Fishbone | Root Cause Fact |
+       Evidence + Causal Validation |").
+  Per docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.3's row for this
+  file, `RootCauseFact` (name #2, L1267) is adopted as canonical and the
+  other three become deprecated aliases (naming pick declared Low-risk,
+  no ADR required — see decided_by). This file is the single source of
+  truth; the mother documents reference it, they do not redefine it.
+
+  Why `RootCauseFact` and not one of the other three: it is the only name of
+  the four that reads as a well-formed instance of the `epistemic_type`
+  vocabulary's own `SOURCE_FACT` concept (a "Fact" that is specifically
+  about a "Root Cause") — `FinalCausalFact` and `RootCauseAssessment` both
+  describe the SAME governed concept under different framings ("final" /
+  "assessment") that add no distinct meaning once `provenance.epistemic_type`
+  already carries the FACT-vs-not distinction (see `provenance` below); "Root
+  Cause Fact" (table form) is a mechanical space/underscore casing variant of
+  name #2 with zero semantic difference, the same class of drift
+  `epistemic-label.schema.yaml` already resolved for `SOURCE FACT` vs
+  `SOURCE_FACT`. This is a mechanical consolidation of one concept, not a
+  choice between competing designs.
+
+  The double lock (why the Atlas's object-level rule and the governance
+  layer's field-level rule are the SAME invariant, not two independent
+  ones): Atlas §9's `forbidden_transition` (`CauseHypothesisSet ->
+  FinalCausalFact`, L1019-1020) and §11.4's plain-language restatement
+  (L1267) are a domain-specific instance of the exact same rule ADR-004b
+  encoded generically in `governance/epistemic-label.schema.yaml`'s
+  `promotion_redline`: "UNKNOWN -> SOURCE_FACT (direct)" is forbidden, and
+  the only legal paths are via Compute-produced EVIDENCE or Human
+  Validation. A CauseHypothesisSet's candidate causes are typically labeled
+  `HYPOTHESIS` or `UNKNOWN` (see `cause-hypothesis-set.schema.yaml`) — so
+  "Fishbone cannot directly produce a RootCauseFact" and "UNKNOWN/HYPOTHESIS
+  cannot be directly promoted to SOURCE_FACT" are the identical guarantee,
+  expressed once at the object-type layer (Atlas, this file's
+  `forbidden_transition`) and once at the field-value layer (governance,
+  `provenance.epistemic_type`'s promotion_redline). This file's `provenance`
+  field is therefore not a bolted-on afterthought — carrying it is what lets
+  a compiler check the SAME rule twice, independently, at two layers.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 forbidden_transition, FinalCausalFact (L1019-1020)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.4 Fishbone limitation note, RootCauseFact (L1267)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §14.1 legal chain endpoint, RootCauseAssessment (L3548-3556)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §14.1 illegal chain example, FinalCausalFact (L3558-3564)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §22.3 Method-specific Gate, Fishbone row, \"Root Cause Fact\" (L4200)"
+decided_by: >
+  No ADR governs this file's naming pick. Per
+  docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.3's row for
+  `typed-objects/root-cause-fact.schema.yaml`: "命名裁決屬 Low-risk，可在
+  Phase 3 內部直接定案，不需要 ADR" (this exact naming-consolidation decision
+  is Low-risk and may be finalized within Phase 3 without an ADR). The
+  `deprecated_aliases` structure below follows the precedent
+  `status-codes.schema.yaml` established for its own
+  `METHOD_RESOLUTION_BLOCKED` / `PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED`
+  consolidation (same file, same mechanism, reused verbatim here). Field
+  content (the `provenance`/`promotion` shape) is a Phase 3 compilation
+  decision recorded in compilation_decisions below, not a separate ADR.
+  ADR-004 (Recommendation section, `promotion_redline`) governs the
+  `provenance` field's own semantics (referenced, not redefined, here).
+
+compilation_decisions:
+  - question: >
+      Should the three deprecated names be modeled as a flat list of
+      strings, or with the richer {name, source, note} object structure
+      `status-codes.schema.yaml` used for its own duplicate resolution?
+    decision: "Reuse status-codes.schema.yaml's {name, source, note} structure verbatim."
+    reasoning: >
+      Consistency with an already-ACTIVE sibling file solving the identical
+      class of problem (N names, 1 concept, pick a canonical). Flattening to
+      bare strings would lose the file:line citation each alias needs for
+      auditability (R4 claim-before-verify) and would force a future reader
+      to re-derive which mother-document section each alias came from.
+  - question: >
+      Should `provenance.epistemic_type` be hard-restricted to exactly
+      `SOURCE_FACT` (since the object is literally named "Fact"), or remain
+      the full 11-value enum?
+    decision: "Full 11-value enum remains legal; SOURCE_FACT is documented as the expected terminal value, not enforced as the only legal one."
+    reasoning: >
+      A RootCauseFact record could transiently exist with a weaker
+      epistemic_type mid-review (e.g. `EVIDENCE` while awaiting the human
+      validation step ADR-004b's promotion_redline requires before
+      `SOURCE_FACT` is reached) — forcing `SOURCE_FACT` as the only legal
+      value would make it impossible to represent that legitimate
+      in-progress state, and would duplicate the promotion_redline's own
+      state machine inside this file's schema instead of deferring to it.
+      This mirrors `cause-hypothesis-set.schema.yaml`'s identical decision
+      not to narrow the shared `provenance_record` $ref.
+  - question: >
+      Should this file define its own `status` lifecycle (active/superseded/
+      retracted), or leave that entirely to the `locked` axis?
+    decision: "Both — status is additive to locked, not a replacement."
+    reasoning: >
+      `locked: LOCKED_FACT` (legal only when `epistemic_type: SOURCE_FACT`,
+      per epistemic-label.schema.yaml's own constraint) answers "can AI
+      still modify this record" — a governance question. It does not answer
+      "is this root cause still believed true" — a domain question a later
+      investigation can overturn (e.g. a second incident reveals the
+      original diagnosis was incomplete). `status: retracted` records that
+      domain fact without requiring the record itself to become mutable
+      again; a retraction is a NEW record referencing the old one via
+      `retracted_by`/`retraction_reason`, not an in-place edit of a locked
+      fact — this preserves the 30-year replay guarantee the Execution
+      Manifest is built around (nothing locked is ever silently changed).
+
+type: object
+required: [id, version, status, statement, source_cause_hypothesis_set_ref, legal_promotion_path, provenance]
+
+canonical_name: RootCauseFact
+
+deprecated_aliases:
+  - name: FinalCausalFact
+    source: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:1020 (§9 forbidden_transition) and :3563 (§14.1 illegal chain example)"
+    note: >
+      Used exclusively as the ILLEGAL target of a forbidden direct transition
+      from CauseHypothesisSet — never used as a legitimate positive
+      reference to the type itself in either citation.
+  - name: RootCauseAssessment
+    source: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:3555 (§14.1 legal chain endpoint)"
+    note: >
+      Appears exactly once in the entire Atlas (verified by grep). Used as
+      the legal endpoint of the SAME chain whose illegal shortcut (7 lines
+      later, L3563) uses FinalCausalFact instead — both names describe the
+      identical chain position, one legal-path framing and one
+      forbidden-path framing of the same destination type.
+  - name: "Root Cause Fact"
+    source: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:4200 (§22.3 Method-specific Gate table, Fishbone row)"
+    note: >
+      Space-separated table form. Mechanical casing/spacing variant of
+      canonical name #2 (RootCauseFact) — same class of drift
+      `epistemic-label.schema.yaml` resolved for `SOURCE FACT`/`SOURCE_FACT`.
+
+properties:
+
+  id:
+    type: string
+    pattern: "^RCF-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as problem-statement.schema.yaml's PROB- prefix."
+
+  version:
+    type: string
+
+  status:
+    type: string
+    enum: [active, superseded, retracted]
+    default: active
+    description: >
+      NEW DESIGN, additive to (not a replacement for) the `locked` axis on
+      `provenance` — see compilation_decisions.
+
+  retracted_by:
+    type: [string, "null"]
+    pattern: "^RCF-"
+    default: null
+    description: "Set only when status == retracted. References the RootCauseFact that supersedes/corrects this one."
+
+  retraction_reason:
+    type: [string, "null"]
+    default: null
+
+  statement:
+    type: string
+    description: "The validated root-cause claim itself, in natural language."
+
+  source_cause_hypothesis_set_ref:
+    type: string
+    pattern: "^CHS-"
+    description: >
+      Which CauseHypothesisSet this fact was promoted from. Real $ref to the
+      sibling type built in this same session — the input side of the
+      promotion rule `cause-hypothesis-set.schema.yaml` declares on its
+      `forbidden_transition`/`promotion` fields.
+    $ref: "ai-lego://specs/cognitive/typed-objects/cause-hypothesis-set.schema.yaml#/properties/id"
+
+  promoted_hypothesis_id:
+    type: string
+    description: >
+      Which specific `hypotheses[].id` within the source set was confirmed
+      as the actual root cause (a CauseHypothesisSet may contain several
+      candidates; only one — or a documented combination — becomes the
+      RootCauseFact).
+
+  legal_promotion_path:
+    description: >
+      Machine-checkable record satisfying Atlas §14.1's required
+      Evidence Search -> Causal DAG -> Validation stage (L3548-3556) and
+      §22.3's "Evidence + Causal Validation" gate requirement (L4200) —
+      the mirror image of `cause-hypothesis-set.schema.yaml`'s
+      `promotion.validation_methods_applied` field.
+    required: [validation_methods_applied, evidence_and_causal_validation_pass]
+    properties:
+      validation_methods_applied:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          enum: ["root_cause.pareto", "root_cause.five_whys", "causal.dag", "validation.experiment"]
+        description: >
+          MUST be non-empty — a RootCauseFact record with an empty array
+          here would itself be evidence of the forbidden direct transition
+          (CauseHypothesisSet -> RootCauseFact skipping validation) that
+          Atlas §9's forbidden_transition rule prohibits.
+      evidence_and_causal_validation_pass:
+        type: boolean
+        description: "Atlas §22.3's named gate requirement for Fishbone (L4200), recorded as a pass/fail flag."
+
+  provenance:
+    description: >
+      Required per this file's own reasoning above (the double-lock
+      argument): a RootCauseFact is exactly the kind of object ADR-004b's
+      `promotion_redline` governs (UNKNOWN/HYPOTHESIS -> SOURCE_FACT direct
+      is forbidden; legal only via Compute-produced EVIDENCE or Human
+      Validation). Real cross-file $ref — `governance/` is a Wave 1 file
+      already BUILT.
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A validated, human-approved root cause fact, locked against further AI edits"
+    value:
+      id: "RCF-2026-08-29-001"
+      version: "1.0.0"
+      status: active
+      statement: "ERP 與電商系統缺乏即時庫存事件整合，導致訂單取消率上升"
+      source_cause_hypothesis_set_ref: "CHS-2026-08-29-001"
+      promoted_hypothesis_id: "CHS-2026-08-29-001-H1"
+      legal_promotion_path:
+        validation_methods_applied: ["root_cause.five_whys", "causal.dag"]
+        evidence_and_causal_validation_pass: true
+      provenance: { epistemic_type: SOURCE_FACT, authorship_state: HUMAN_APPROVED, locked: LOCKED_FACT }
+
+open_questions:
+  - id: "OQ-RCF-1"
+    question: >
+      Should `legal_promotion_path.evidence_and_causal_validation_pass`
+      eventually be replaced by a reference into a formal
+      `execution/gate.schema.yaml` gate-result record (Wave 5, currently
+      BLOCKED_PENDING_ROUND2_ADR per MRSP-1) rather than a bare boolean?
+      Left open — this file uses a boolean now to avoid a forward dependency
+      on a file that cannot yet be built, per the same reasoning
+      `manifest.schema.yaml` used for its own `results.gates` field.
+    owner: "operator / Wave 5 execution/gate.schema.yaml author"
+
+verification:
+  method: >
+    Read against Atlas §9 (L985-1030), §11.4 (L1236-1268), §14.1 (L3542-3564),
+    §22.3 (L4196-4210), verified-findings.yaml DOC-method_atlas-3 full entry
+    (including its verdict_votes correcting the finding's own claimed line
+    numbers 3556/3564 to the verified 3555/3563, both re-confirmed by direct
+    Read in this session), ADR-004 full text (promotion_redline section),
+    status-codes.schema.yaml (deprecated_aliases structural precedent).
+  note: >
+    All four name citations and their exact line numbers were independently
+    re-read at the cited lines in this session (not transcribed from
+    verified-findings.yaml's summary alone). No mother document was modified
+    to produce this file.

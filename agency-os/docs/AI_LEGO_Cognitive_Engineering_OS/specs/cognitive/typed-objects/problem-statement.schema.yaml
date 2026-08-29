@@ -1,0 +1,232 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/problem-statement.schema.yaml"
+title: Problem Statement
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ProblemStatement` — the leaf input
+  type of the §14.1 type-compatibility chain (`ProblemStatement -> Fishbone ->
+  CauseHypothesisSet -> Evidence Search -> Causal DAG -> Validation ->
+  RootCauseFact`). Resolves DOC-method_atlas-9 (the Fishbone Method Contract's
+  precondition `problem_statement.status == validated` references a `status`
+  field whose enum, values, and transitions are undefined anywhere in the
+  Atlas) and supplies the structural fields for DOC-method_atlas-7's broader
+  finding that the §14.1 chain has zero schemas for any of its ~13 nodes. This
+  file is the single source of truth; the mother documents reference it, they
+  do not redefine it.
+
+  Field provenance: Atlas §12.2 "問題陳述／問題定義（Problem Statement）"
+  (L2572-2587) is the only place in any mother document that prescribes a
+  concrete structure for a problem statement's content — a
+  `建議格式` (suggested format) of Current State / Expected State / Gap /
+  Affected Stakeholders / Impact / Evidence / Constraints / Scope-Non-goals.
+  Atlas §8 F01's tool table (L340) independently lists a shorthand of the same
+  fields ("Current→Expected→Gap→Impact→Constraints") for the same named tool
+  ("Problem Statement"), confirming this is one method's real output shape,
+  not two competing designs. This schema adopts §12.2's fuller 8-field list
+  verbatim as `content`, since it strictly a superset of §8's shorthand.
+
+  `status` enum: NEW DESIGN (not transcribed from any mother-document enum —
+  none exists per DOC-method_atlas-9). The only hard constraint from the
+  mother documents is the literal value `validated`, lowercase, required by
+  Atlas §9's Fishbone Method Contract precondition (L1013:
+  `problem_statement.status == validated`). Lowercase form was kept (rather
+  than SNAKE_CASE uppercase, contrast `epistemic_type`) to match this literal
+  citation exactly, following the same "match the mother document's own
+  literal casing when one is cited" precedent CROSS-T-21's row used for
+  `jurisdiction/availability.schema.yaml`. The remaining states (`draft`,
+  `under_review`, `rejected`, `superseded`) are inferred from two patterns
+  that already exist elsewhere in the Atlas and are reused here rather than
+  invented from nothing: (1) §21 mandatory rule #1 (L4150) "AI-generated idea
+  預設 DRAFT" — the same default-to-draft lifecycle opening state a
+  human-collaborative content object should have; (2) the Decision Object's
+  `outcome.status: pending` (§16.2, L3816) and Idea Object's
+  `validation.status` (§16.1, L3767) both model a review/validation gate
+  before a content object is treated as usable input to a downstream method —
+  `under_review` mirrors that gate for ProblemStatement specifically, sitting
+  between `draft` and `validated`.
+
+compilation_decisions:
+  - question: >
+      Should `status` transitions be constrained (e.g. `validated` only
+      reachable from `under_review`), or left as a free enum with no state
+      machine?
+    decision: >
+      Define an explicit `status_transitions` map (below) as descriptive
+      guidance, not a hard JSON Schema state-machine constraint (JSON Schema
+      has no native transition-graph validation; enforcing this is a
+      caller/runtime responsibility, same limitation status-codes.schema.yaml
+      accepted for its own side-state mappings).
+    reasoning: >
+      Per Method Atlas §21 rule #3 ("一個 Method execution failure 不得污染
+      Project Knowledge") and rule #2's promotion-redline pattern, undisciplined
+      status jumps (e.g. `draft` -> `validated` with no review step) would let
+      an ungated ProblemStatement satisfy Fishbone's precondition — defeating
+      the precondition's purpose. Recording the intended transitions here,
+      even though this schema cannot mechanically enforce them, gives
+      `method-resolution.schema.yaml` (Wave 5, `execution/`) and any future
+      validator a documented contract to check against rather than an
+      undocumented convention.
+  - question: >
+      Should `content.scope_non_goals` be a single free-text field or split
+      into `scope` / `non_goals`?
+    decision: "Single field, `scope_non_goals`, matching Atlas §12.2's own combined line."
+    reasoning: >
+      Atlas L2586 lists `Scope / Non-goals` as one line item, not two — this
+      schema transcribes the mother document's own granularity rather than
+      inventing a finer split it never asked for.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.2 Problem Statement suggested format (L2572-2587)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §8 F01 tool table, Problem Statement row (L340)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 LEGO Contract precondition `problem_statement.status == validated` (L1013)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.1 Simple Brainstorm Recipe, ProblemStatement as recipe output (L3242)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §14.1 chain, ProblemStatement as chain origin (L3549, L3561)"
+decided_by: >
+  No ADR governs this file (genuinely new type, zero prior mother-document
+  schema per DOC-method_atlas-7/9). Built per
+  docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.3 row for
+  `typed-objects/problem-statement.schema.yaml` (status: READY, 需新設計).
+  Field content and status-enum design choices are Phase 3 compilation
+  decisions recorded above, not a separate ADR — consistent with the
+  Low-risk-naming precedent MACHINE_READABLE_SPEC_PLAN.md §2.3's
+  `root-cause-fact.schema.yaml` row set for this class of decision.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+type: object
+required: [id, version, status, content, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^PROB-"
+    description: >
+      NEW DESIGN. Prefix follows the existing `IDEA-` / `DEC-` / `EX-` id-prefix
+      convention already used by Atlas §16's other typed objects (Idea, Decision,
+      Method Execution) — additive, not a competing convention.
+
+  version:
+    type: string
+    description: "Revision counter. A ProblemStatement may be re-framed; see status.superseded."
+
+  status:
+    type: string
+    enum: [draft, under_review, validated, rejected, superseded]
+    default: draft
+    description: >
+      See top-level description for full design rationale. `validated` is the
+      ONLY value any mother document actually names (Atlas L1013) — it is the
+      value Fishbone's precondition checks for.
+
+  status_transitions:
+    description: >
+      Descriptive guidance only (see compilation_decisions) — not a hard
+      JSON Schema constraint.
+    legal:
+      - "draft -> under_review"
+      - "under_review -> validated"
+      - "under_review -> rejected"
+      - "under_review -> draft (sent back for rework)"
+      - "validated -> superseded (when a newer revision replaces this one)"
+      - "rejected -> draft (re-framed and resubmitted)"
+    illegal:
+      - "draft -> validated (must pass under_review; skipping it defeats the precondition's purpose, see compilation_decisions)"
+
+  content:
+    type: object
+    description: >
+      Atlas §12.2's 8-field suggested format (L2578-2587), transcribed verbatim
+      as field names (snake_cased).
+    required: [current_state, expected_state, gap]
+    properties:
+      current_state:
+        type: string
+        description: "Atlas L2579 'Current State'."
+      expected_state:
+        type: string
+        description: "Atlas L2580 'Expected State'."
+      gap:
+        type: string
+        description: "Atlas L2581 'Gap'."
+      affected_stakeholders:
+        type: array
+        items: { type: string }
+        description: "Atlas L2582 'Affected Stakeholders'."
+      impact:
+        type: string
+        description: "Atlas L2583 'Impact'."
+      evidence:
+        type: array
+        items: { type: string }
+        description: >
+          Atlas L2584 'Evidence'. Soft reference only (free-text/id list) to
+          future `evidence/evidence.schema.yaml` (Wave 4, not yet built) —
+          not a hard $ref, to avoid a forward-Wave dependency (same caution
+          `manifest.schema.yaml` applied to `document-registry.schema.yaml`).
+      constraints:
+        type: array
+        items: { type: string }
+        description: "Atlas L2585 'Constraints'."
+      scope_non_goals:
+        type: string
+        description: "Atlas L2586 'Scope / Non-goals' (kept as one field, see compilation_decisions)."
+
+  provenance:
+    description: >
+      Every ProblemStatement is a content object under
+      `governance/epistemic-label.schema.yaml`'s own stated scope ("every
+      content/claim object in the system must carry" a provenance_record).
+      Real cross-file $ref, not a soft/prose reference — `governance/` is a
+      Wave 1 file already BUILT, so Wave 3 depending on it is a backward
+      (safe) dependency, unlike manifest.schema.yaml's forward-Wave caution.
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  origin_method:
+    type: string
+    description: >
+      Which method produced this ProblemStatement, e.g. `problem_framing.problem_statement`
+      (Atlas §12.2/§8 F01). Free-form string, not an enum — Atlas §8 F01 lists
+      several equivalent framing tools (5W1H, Problem Statement, Boundary
+      Critique) any of which may legitimately produce this object.
+
+examples:
+  - description: "A validated problem statement ready to feed Fishbone"
+    value:
+      id: "PROB-2026-08-29-001"
+      version: "1.0.0"
+      status: validated
+      content:
+        current_state: "訂單取消率本月上升至 8%"
+        expected_state: "訂單取消率維持在 2% 基準線"
+        gap: "6 個百分點的異常上升，起始於三週前"
+        affected_stakeholders: ["Customer Success", "Fulfillment", "Finance"]
+        impact: "預估月損失 12 萬美元；客訴量上升 40%"
+        evidence: ["order_cancellation_report_2026-08.csv"]
+        constraints: ["不可暫停出貨流程做實驗"]
+        scope_non_goals: "只涵蓋 B2C 通路；B2B 訂單另案處理"
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+      origin_method: "problem_framing.problem_statement"
+
+open_questions:
+  - id: "OQ-PROBSTMT-1"
+    question: >
+      Should `status_transitions` become a machine-enforceable state machine
+      (e.g. expressed in a future `execution/method-resolution.schema.yaml`
+      guard) rather than descriptive-only guidance? Left open — this file's
+      job is defining the type, not the enforcement mechanism.
+    owner: "operator / Wave 5 execution/method-resolution.schema.yaml author"
+
+verification:
+  method: >
+    Read against Atlas §12.2 (L2572-2591), §8 F01 table (L327-344), §9 LEGO
+    Contract (L985-1030), §13.1 (L3228-3250), §14.1 (L3542-3564),
+    verified-findings.yaml DOC-method_atlas-9 full entry.
+  note: >
+    `content` fields transcribed verbatim from Atlas L2578-2587. `status`
+    enum values beyond `validated` are new Phase 3 design, explicitly flagged
+    as such above (not presented as mother-document content). No mother
+    document was modified to produce this file.

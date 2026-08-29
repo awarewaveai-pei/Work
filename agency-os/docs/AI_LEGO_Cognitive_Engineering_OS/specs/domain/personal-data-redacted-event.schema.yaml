@@ -1,0 +1,271 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/domain/personal-data-redacted-event.schema.yaml"
+title: PersonalDataRedacted Event
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the `PersonalDataRedacted` event
+  type introduced by ADR-002 (Option C), Consequences item 5. This is a NEW
+  first-class Event Ledger event type — the 10th entry alongside MP §57's
+  existing 9-item example list (`DocumentUploaded / TranscriptGenerated /
+  TranscriptCorrected / ClaimCreated / ClaimVerified / ClaimRejected /
+  StrategyGenerated / StrategyApproved / ArtifactPublished`, L2546-2566) —
+  and is the event-sourced form of EC §31 Data Deletion Contract's
+  "Deletion Evidence" step (L1248) for the `personal_data_crypto_shred`
+  branch of `execution/data-deletion.schema.yaml`.
+
+  ROLE BOUNDARY (load-bearing, transcribed near-verbatim from ADR-002 Option C
+  section, L75-85 — do not weaken this when consuming this schema):
+  `PersonalDataRedacted` records the FACT that a redaction happened (subject,
+  fields, timestamp, authorization) for the projection/query read-path to act
+  on and for EC §31's audit trail. It is explicitly NOT a standalone deletion
+  mechanism. ADR-002's own FMEA (Option C section) rates "someone with
+  underlying storage access (DB dump / backup / disk) reads the original
+  event's plaintext by bypassing the projection layer" as Severity: High
+  (unacceptable) precisely because emitting this event changes nothing about
+  what bytes physically exist — the original event (e.g. `ClaimCreated`) is
+  kept "完整不動（含個資明文）" (fully intact, plaintext included). ADR-002's
+  own words: "Option C 若單獨採用，等於重新製造 P1-CONFLICT-1 本身，只是換了個
+  名字" (Option C used alone recreates the original conflict under a new
+  name). Its only legitimate role is "A 的稽核輔助層" (an audit-support layer
+  for Option A / crypto-shredding). A consumer that treats the presence of a
+  `PersonalDataRedacted` event, by itself, as proof of compliant deletion is
+  misusing this schema — see `constraints` below.
+
+  READ-PATH BEHAVIOR (ADR-002 Option C, verbatim mechanism): every
+  projection/query read path MUST check, before returning a field, whether a
+  `PersonalDataRedacted` event exists for the same `subject_id` with a
+  `redacted_at` newer than the field's originating event; if so, the read
+  path overlays `REDACTED` instead of returning the stored value. This is a
+  presentation-layer overlay only — see the plaintext-retention warning above
+  for why it is insufficient alone.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §57 Event-native Architecture example event list (L2546-2566) — this schema is the 10th entry the list is missing"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §100 Global Privacy Engine Rights Model (L4259-4278) — anchors the 'Deletion' right (L4268) this event supplies audit evidence for"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §101 Lawful Basis / Consent Registry (L4303-4316) — 'Data Subject' (L4310) is the only mother-document anchor for what `subject_id` identifies; no Domain Model schema exists for it (not one of MP §3's 22 objects, not Tenant #23 either)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §31 Data Deletion Contract (L1225-1251) — 'Deletion Evidence' step (L1248) this event instantiates for the crypto-shred branch"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §66 Audit Event (L2200-2216) — minimum audit fields (who/what/when/where/why) and 'Audit 不記 secret' (L2216, audit records MUST NOT contain secrets) — the reason `redacted_fields[]` holds field identifiers, never redacted content"
+  - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md Option C section (L75-85) — event shape, FMEA table (L79-83), role-boundary reasoning"
+  - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md Consequences item 5 (L130) — the event's addition to MP §57 mandated verbatim"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.5 row for domain/personal-data-redacted-event.schema.yaml (L148) — dependency list (key-vault-lifecycle.schema.yaml, governance/epistemic-label)"
+
+decided_by: >
+  docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md (ACCEPTED
+  2026-08-29), Option C section + Consequences item 5. The field list itself
+  (`subject_id, redacted_fields[], redacted_at, authorization_ref`) and the
+  audit-only role boundary are ADR-decided verbatim. Field-level type/format
+  choices and the additive `provenance` field below are Phase 3 compilation
+  decisions per docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.5 row for
+  this file, not a separate ADR (see compilation_decisions).
+
+compilation_decisions:
+  - question: >
+      ADR-002 names the field `subject_id` but no mother document defines a
+      "Data Subject" domain object with a schema — MP §101 (L4310) names the
+      concept as one of 8 things a Processing Activity must track, and MP §3's
+      Domain Model (L330-357) does not list it among its 22 (soon 23, with
+      Tenant) core objects.
+    decision: >
+      `subject_id` is typed as an opaque `string` identifier with a
+      descriptive soft reference to "Data Subject" (MP §101) — no `$ref`, no
+      enum, no assumed format (not assumed to be a UUID, unlike
+      `tenant.schema.yaml`'s `tenant_id`, since no mother document commits to
+      a concrete identity scheme for a data subject).
+    reasoning: >
+      Same pattern `tenant.schema.yaml` used for `home_jurisdiction` and
+      `encryption_root_key_ref`: when the referenced concept has no schema of
+      its own yet, this file types the field as an opaque identifier rather
+      than inventing the referenced concept's shape, which would be a new
+      architecture decision disguised as a compilation choice. Inventing a
+      "Data Subject" domain schema is out of scope for this file and is
+      flagged in `open_questions` below, not silently decided.
+  - question: >
+      ADR-002 writes `redacted_fields[]` as a bare list with no element shape
+      specified. ADR-002 Consequences item 4 separately notes that MP §57's
+      existing event types (`DocumentUploaded`, `ClaimCreated`, etc.) have
+      "現況零標註" (zero annotation) for which of their fields carry
+      Confidential/Restricted classification (MP §61, L2639-2664) — so no
+      closed vocabulary of "known personal-data field names" exists anywhere
+      to validate this array's elements against.
+    decision: >
+      `redacted_fields[]` is typed as a non-empty array of free-form,
+      non-empty strings. No enum, no fixed `<event_type>.<field_name>` path
+      grammar is imposed.
+    reasoning: >
+      Enumerating a closed field-name vocabulary here would require first
+      closing ADR-002's own Consequences item 4 gap (annotating every mother
+      event type's PII fields) — that is explicitly a separate, not-yet-done
+      piece of follow-up work, not something this compilation file can
+      shortcut by inventing a grammar the ADR never specified. Per EC §66's
+      "Audit 不記 secret" (L2216), each element MUST be a field identifier
+      (e.g. a field name or dotted path), never the redacted value itself —
+      recorded as a `constraints` entry below since it is a real invariant,
+      not left to the array's type alone to convey.
+  - question: >
+      docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.5 (L148) lists this
+      file's dependencies as BOTH `key-vault-lifecycle.schema.yaml` (not yet
+      built, concurrent sibling — the CROSS-REFERENCE this file's task scope
+      names) AND `governance/epistemic-label.schema.yaml` (already built,
+      Wave 1) — but ADR-002's own 4-field list
+      (`subject_id/redacted_fields/redacted_at/authorization_ref`) says
+      nothing about provenance/epistemic labeling.
+    decision: >
+      Add one OPTIONAL additive field, `provenance`, shaped as
+      `governance/epistemic-label.schema.yaml`'s `provenance_record` object
+      (`epistemic_type` + `authorship_state` + optional `locked`) — described
+      by name, not a hard `$ref` (same soft-reference convention
+      `tenant.schema.yaml` and `manifest.schema.yaml` both use for
+      cross-file concepts).
+    reasoning: >
+      The Build Order plan explicitly lists epistemic-label as a real
+      dependency of this file, not an incidental mention, so silently
+      omitting it would leave a plan-declared relationship unaddressed. But
+      ADR-002's literal field list is 4 fields with no mention of provenance,
+      so this cannot be promoted to required without inventing scope the ADR
+      never decided — additive-optional is the same resolution pattern
+      `manifest.schema.yaml` used for `execution.app_version` and
+      `loaded_sections` (fields present in one competing shape but absent
+      from the one adopted as the base). A plausible default for most
+      instances: `epistemic_type: SOURCE_FACT` (the redaction either
+      happened, under a given authorization, or it did not — this is a
+      factual record, not an inference) with `authorship_state` set per
+      whichever actor (human operator or automated worker acting under
+      `authorization_ref`) executed the DEK destruction that this event
+      documents. This file does not hard-code that default; see `provenance`
+      field description.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+type: object
+required: [event_type, subject_id, redacted_fields, redacted_at, authorization_ref]
+properties:
+
+  event_type:
+    type: string
+    const: PersonalDataRedacted
+    description: >
+      Fixed literal event-type discriminator. New 10th entry in MP §57's
+      Event-native Architecture example list (L2546-2566), participating in
+      the same Event Ledger as `DocumentUploaded`, `ClaimCreated`, etc. — per
+      MP §58 Immutable-first (L2570-2586), once emitted this event itself is
+      never overwritten (an incorrect redaction is corrected by emitting a
+      further event, not by mutating this one).
+
+  subject_id:
+    type: string
+    minLength: 1
+    description: >
+      Soft reference (opaque identifier, no `$ref`, no assumed format) to the
+      "Data Subject" concept named in MP §101 Lawful Basis / Consent Registry
+      (L4310) — see compilation_decisions above for why no domain schema
+      exists for this concept yet. This is the correlation key the
+      READ-PATH BEHAVIOR overlay (see top-level description) uses to find
+      which subject's fields, across which original events, must be
+      presented as `REDACTED`.
+
+  redacted_fields:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+    description: >
+      Field identifiers (names or dotted paths) whose content has been
+      rendered permanently unreadable for this subject — NOT the redacted
+      values themselves (EC §66 Audit Event, L2216: "Audit 不記 secret"). See
+      compilation_decisions above for why no closed enum/grammar is imposed.
+
+  redacted_at:
+    type: string
+    format: date-time
+    description: >
+      Timestamp of the underlying redaction action (per Option A: DEK
+      destruction) this event documents. This is the value the READ-PATH
+      BEHAVIOR overlay compares against each original event's own timestamp.
+
+  authorization_ref:
+    type: string
+    minLength: 1
+    description: >
+      Soft reference (opaque identifier, no `$ref`) to the specific
+      Authorization that permitted this redaction — conceptually the same
+      Authorization step instance as `execution/data-deletion.schema.yaml`'s
+      `deletion_request` object (EC §31 first pipeline step, L1230). Not a
+      hard cross-file `$ref`, consistent with this schema suite's convention
+      of resolving such links by shared identifier value rather than
+      structural coupling.
+
+  provenance:
+    type: object
+    description: >
+      OPTIONAL additive field — see compilation_decisions above. Shaped as
+      `governance/epistemic-label.schema.yaml`'s `provenance_record`
+      (`epistemic_type` required enum of 11 values + `authorship_state`
+      required enum of 6 values + optional `locked`). Referenced by name,
+      not `$ref`, per this schema suite's cross-file convention. Absent when
+      a producer does not yet populate provenance; downstream consumers MUST
+      NOT treat its absence as an error.
+
+constraints:
+  - "This event, by itself, MUST NOT be treated as sufficient evidence of compliant deletion. Compliant deletion for the personal_data_crypto_shred branch additionally requires a corresponding Key Destruction Record from security/key-vault-lifecycle.schema.yaml (Option A) for the same subject_id — see the ROLE BOUNDARY paragraph in the top-level description and ADR-002 Option C's own FMEA finding (Severity: High) for why this event alone recreates P1-CONFLICT-1."
+  - "redacted_fields[] elements MUST be field identifiers only, never the redacted content itself (EC §66, L2216: 'Audit 不記 secret')."
+  - "Once emitted, a PersonalDataRedacted event is itself immutable (MP §58 Immutable-first, L2570-2586) — a correction is a new event, not a mutation of this one."
+
+examples:
+  - description: "A crypto-shred redaction recorded for one data subject across two fields"
+    value:
+      event_type: PersonalDataRedacted
+      subject_id: "subject-4f8a2b1c"
+      redacted_fields: ["ClaimCreated.claimant_ssn", "ClaimCreated.claimant_dob"]
+      redacted_at: "2026-08-29T00:00:00Z"
+      authorization_ref: "DEL-3fa85f64-authz"
+      provenance:
+        epistemic_type: SOURCE_FACT
+        authorship_state: AI_GENERATED
+
+open_questions:
+  - id: "MRSP-pdr-1"
+    question: >
+      No mother document defines a "Data Subject" domain object/schema (see
+      compilation_decisions above) — `subject_id` is usable today as an
+      opaque string, but a future Round 2+ ADR could formalize identity
+      resolution (e.g. linking multiple subject_id values known to refer to
+      the same real person across systems). Not a blocker for this schema's
+      own validity.
+    owner: "operator, non-blocking"
+    blocks: "nothing in this schema"
+  - id: "MRSP-pdr-2"
+    question: >
+      ADR-002 Consequences item 4 ("MP §57 event 清單旁需標註哪些既有 event
+      type 含 Confidential/Restricted 分級欄位——現況零標註") remains open.
+      Until that annotation work is done, `redacted_fields[]` has no closed
+      vocabulary to validate against (see compilation_decisions above) — this
+      is a pre-existing gap this file inherits and surfaces, not one it
+      introduces.
+    owner: "operator, via a future documentation PROPOSAL against MP §57 (ADR-006 process)"
+    blocks: "field-name validation tooling for redacted_fields[]; does not block this schema's own structural validity"
+
+verification:
+  method: >
+    Read against ADR-002 full text (Context, Option C section L75-85,
+    Recommendation, Consequences items 4-5, Migration/Rollback), MP §57
+    (L2546-2566), MP §61 (L2639-2664), MP §100 (L4259-4278), MP §101
+    (L4303-4316), EC §31 (L1225-1251), EC §66 (L2200-2216),
+    docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.5 row for this file
+    (L148). Grep-confirmed (2026-08-29) that no mother document defines a
+    "Data Subject" schema, a redacted_fields[] path grammar, or a concrete
+    identifier format for subject_id.
+  note: >
+    No mother document or ADR was modified to produce this file. The 4-field
+    list, the audit-only role boundary, and the read-path overlay mechanism
+    are transcribed verbatim/near-verbatim from ADR-002 Option C; the
+    additive `provenance` field and all type/format choices reflect Phase 3
+    compilation decisions, recorded above, not a new ADR. This file does not
+    read or hard-depend on `specs/security/key-vault-lifecycle.schema.yaml`
+    or `specs/domain/tenant.schema.yaml`, both authored concurrently by
+    sibling agents in this same session — cross-references above are
+    soft/descriptive only.

@@ -1,0 +1,331 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/profile.schema.yaml"
+title: Cognitive / Rigor / Representation Profile
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of "Profile" — Atlas Appendix A's
+  promised `/specs/cognitive/profile.schema.yaml` (L4582, also listed in the
+  repo layout at L3995), the single object that binds together the four
+  dimensions Atlas's OWN repo layout already declares as siblings under
+  `/profiles/` (L3936-3940: `/cognitive/`, `/representation/`, `/rigor/`,
+  `/accessibility/`) but never assembles into one shape anywhere in prose.
+  Grounded directly in real Atlas usage, not invented: §10's
+  `selection_context` (L1066-1089) is the one place all of this data actually
+  flows into the Method Selection Engine, and it carries three of these four
+  dimensions as sibling fields — `required_rigor` (L1086), `cognitive_preferences`
+  (L1087, an unexpanded placeholder `...`), and `accessibility_needs` (L1088,
+  also an unexpanded placeholder) — plus the flowchart's own `Cognitive
+  Preference` node (L1099) sitting between Uncertainty/Reversibility and
+  Candidate Methods. The 4th `/profiles/` dimension, representation, has no
+  field in `selection_context` at all — Atlas leaves it implicit. This file
+  is the composite `Profile` object a caller assembles ONCE and that
+  `selection_context` (or any future caller) then reads its 3 explicit fields
+  from, plus the 4th (representation) that Atlas's directory layout implies
+  but never wired up.
+
+  Per MACHINE_READABLE_SPEC_PLAN.md §2.3 (L118), this file's only declared
+  Wave dependency is `rigor-level.schema.yaml` (built alongside this file in
+  the same session, resolving CROSS-T-15's rigor/mode vocabulary gap) — NOT
+  `representation.schema.yaml`, `lens.schema.yaml`, or `primitive.schema.yaml`,
+  which are concurrent Wave 3 sibling files a different agent in this same
+  session is building. This file does not touch or depend on those siblings'
+  content.
+
+compilation_decisions:
+  - question: >
+      Atlas's `/profiles/` directory (L3936-3940) names 4 sibling dimensions
+      (cognitive, representation, rigor, accessibility) but gives concrete
+      field-level shape to only ONE of them anywhere in prose: §6 "Soft
+      Cognitive Preference" (L257-292). The other three have either a
+      placeholder (`cognitive_preferences: ...`, `accessibility_needs: ...`
+      at selection_context L1087-1088) or nothing at all (representation).
+      Should this file (a) invent concrete shapes for all 4 dimensions to
+      look "complete", or (b) transcribe the one dimension that already has
+      real content and honestly mark the other three by their actual state
+      (a forward reference for representation, a genuine gap for
+      accessibility)?
+    decision: >
+      (b). `cognitive` is transcribed near-verbatim from Atlas §6 (L261-280),
+      including its priority-order rule (L282-292). `representation_preference`
+      is typed loosely with an explicit note that representation.schema.yaml
+      (a concurrent sibling, not a dependency of this file) is its eventual
+      authority. `accessibility` is typed as an open object and marked
+      SKELETON_ONLY, matching the disclosure convention
+      MACHINE_READABLE_SPEC_PLAN.md's own introduction uses for gaps with "no
+      既有內容可收斂" (no existing content to converge from) — this project's
+      §0 explicitly warns against Phase 3 "假裝一次規劃能填滿" (pretending one
+      planning pass can fill every gap).
+    reasoning: >
+      Inventing accessibility fields with zero source would be exactly the
+      "猜測補未知" (guessing to fill the unknown) AGENTS.md R0 forbids
+      outright, and would create a NEW single-source-of-truth problem for a
+      future accessibility.schema.yaml to either match or contradict — the
+      same class of drift this entire Phase 3 effort exists to close, not
+      reopen. Honestly marking the gap costs nothing (the field is still
+      present and usable as a free-form object) and avoids inventing a schema
+      a later file would have to un-invent.
+    scope_note: >
+      This is a Low-risk disclosure choice, not an architecture decision —
+      it decides HOW to represent an already-acknowledged gap (Atlas's own
+      layout names the dimension; nobody has designed it yet), not WHETHER
+      the gap should be closed. Closing it (designing an actual accessibility
+      shape) is out of scope for this file.
+  - question: >
+      Should `rigor` on this object be a hard `$ref` into
+      `rigor-level.schema.yaml#/rigor_mode`, given that file IS this schema's
+      one declared Wave dependency (unlike representation/lens/primitive)?
+    decision: >
+      No — soft reference by name/convention, no `$ref`, consistent with
+      EVERY existing file in this schema suite (verified by grep across
+      specs/execution/, specs/governance/, specs/domain/, specs/artifact/,
+      specs/security/: zero cross-file `$ref` anywhere; manifest.schema.yaml
+      L201-204 and tenant.schema.yaml L120-128 both state this convention
+      explicitly even for their own declared Wave dependencies).
+    reasoning: >
+      Matching an established, unanimous house convention is not a new
+      compilation call — deviating from it (introducing the suite's first
+      cross-file `$ref`) would be the actual new decision, and nothing about
+      this dependency is different enough from tenant.schema.yaml's or
+      manifest.schema.yaml's already-accepted soft-reference cases to justify
+      being the exception.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §6 Soft Cognitive Preference (L257-292)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §10 selection_context (L1066-1089), specifically required_rigor (L1086), cognitive_preferences (L1087), accessibility_needs (L1088), and the flowchart's Cognitive Preference node (L1099)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md repo layout /profiles/ (L3936-3940) and /representations/ (L3916-3927)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md Appendix A (L4574-4604, profile.schema.yaml at L4582)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.3 (L118: profile.schema.yaml row, dependency = rigor-level.schema.yaml only)"
+  - "specs/cognitive/rigor-level.schema.yaml (this session's sibling file; source of the rigor_mode vocabulary referenced here by convention)"
+
+decided_by: >
+  No ADR governs this file — it has no assigned finding ID of its own (it is
+  an Atlas Appendix A structural promise, not a cross-document conflict), and
+  MACHINE_READABLE_SPEC_PLAN.md §2.3 L118 lists it plain READY with no
+  Medium/High-risk caveat (contrast rigor-level.schema.yaml's own L119 row,
+  which does carry one). The choices made here (transcribe §6 verbatim for
+  `cognitive`; soft-reference `rigor` into the sibling schema; honestly gap
+  the two undesigned dimensions rather than inventing shapes for them) are
+  Phase 3 compilation decisions per that plan, not new architecture — see
+  `compilation_decisions` above for the specific reasoning on each.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+type: object
+required: [rigor]
+properties:
+
+  profile_id:
+    type: string
+    description: >
+      Opaque identifier for this profile instance, so a caller (e.g. a stored
+      user preference, or a one-off per-execution override) can be referenced
+      without re-embedding its full contents. Not sourced from any mother
+      document — an obvious completeness field for any reusable object, same
+      class as manifest.schema.yaml's execution_id.
+
+  rigor:
+    type: string
+    description: >
+      Soft reference by name/convention (no `$ref`, per this schema suite's
+      established cross-file convention — see compilation_decisions above) to
+      `rigor-level.schema.yaml`'s `rigor_mode` enum: fast | professional |
+      research_grade | board_grade | deep_intelligence. This is the field that
+      resolves onto `selection_context.required_rigor` (Atlas L1086) — via
+      rigor-level.schema.yaml's own `required_rigor_mapping`, not duplicated
+      here. Required on this object because Atlas's Method Selection Engine
+      flowchart (L1091-1110) cannot proceed past risk/uncertainty without a
+      rigor value; the other 3 dimensions below are all genuinely optional
+      inputs to that same flow (Atlas's own placeholders for them carry no
+      "required" marker, unlike required_rigor's position in a fully-spelled
+      enum).
+
+  cognitive:
+    type: object
+    description: >
+      Transcribed near-verbatim from Atlas §6 "Soft Cognitive Preference"
+      (L261-280) — the only place any mother document gives this axis
+      concrete shape. selection_context.cognitive_preferences (L1087) is an
+      unexpanded placeholder `...`; this schema fills it in from §6 rather
+      than inventing a new shape not grounded in the mother documents.
+    properties:
+      representation:
+        type: object
+        description: "Per-modality soft affinity scores, Atlas §6 L263-268."
+        properties:
+          visual: { type: number, minimum: 0, maximum: 1 }
+          text: { type: number, minimum: 0, maximum: 1 }
+          table: { type: number, minimum: 0, maximum: 1 }
+          spatial: { type: number, minimum: 0, maximum: 1 }
+          audio: { type: number, minimum: 0, maximum: 1 }
+      interaction:
+        type: object
+        description: "Atlas §6 L269-271."
+        properties:
+          guided: { type: number, minimum: 0, maximum: 1 }
+          exploratory: { type: number, minimum: 0, maximum: 1 }
+      thinking:
+        type: object
+        description: "Atlas §6 L272-275."
+        properties:
+          divergent: { type: number, minimum: 0, maximum: 1 }
+          analytical: { type: number, minimum: 0, maximum: 1 }
+          narrative: { type: number, minimum: 0, maximum: 1 }
+      detail:
+        type: object
+        description: "Atlas §6 L276-277."
+        properties:
+          depth: { type: string, enum: [low, medium, high] }
+      decision:
+        type: object
+        description: "Atlas §6 L278-279."
+        properties:
+          evidence_preference: { type: string, enum: [low, medium, high] }
+    resolution_priority_order:
+      description: >
+        Atlas §6 L282-292's precedence rule for when multiple preference
+        sources disagree. Not a data-shape constraint (it governs how a
+        consumer resolves conflicting inputs, not what this object contains)
+        — recorded here verbatim so implementers do not have to re-derive it
+        from prose.
+      order: ["explicit_user_choice", "current_task_need", "learned_preference", "default"]
+
+  representation_preference:
+    type: [string, "null"]
+    default: null
+    description: >
+      Forward reference only, deliberately NOT an enum defined here.
+      representation.schema.yaml (Atlas Appendix A L4580, repo layout L3993)
+      is this field's natural eventual authority, but it is a concurrent
+      Wave 3 sibling file being built by a different agent in this same
+      session, not a declared dependency of this file
+      (MACHINE_READABLE_SPEC_PLAN.md §2.3 L118 names only rigor-level.schema.yaml).
+      Atlas's own `/representations/` directory listing (L3916-3927: text,
+      outline, table, matrix, mindmap, conceptmap, timeline, causal, graph,
+      canvas, audio) is transcribed here in this description for context
+      ONLY — this schema deliberately does NOT re-declare those 11 values as
+      a second enum, to avoid creating exactly the kind of duplicate-
+      definition drift (same list, two owners, destined to diverge) that
+      CROSS-T-15 and this schema suite's other resolved findings exist to
+      eliminate. Once representation.schema.yaml lands, this field should be
+      tightened to reference it by the same soft-reference convention used
+      for `rigor` above.
+
+      Cross-file note (found during this file's own bug-hunt pass, not
+      pre-planned): representation.schema.yaml — built concurrently this same
+      wave — independently flagged its own MRSP-representation-3 open
+      question asking whether Atlas §6's 5-modality weight vector
+      (visual/text/table/spatial/audio, see `cognitive.representation` below)
+      "plausibly belongs to profile.schema.yaml" and left the reconciliation
+      unresolved pending this file's existence. This file confirms that
+      hypothesis (the vector lives in `cognitive.representation` below) but
+      does NOT perform the reconciliation MRSP-representation-3 asks about
+      (mapping each of the 11 `representation_category` values to the
+      modality weight(s) it satisfies) — that mapping is invented
+      correspondence, not sourced from any mother document, so it stays open
+      on both sides. See this file's own `open_questions` (MRSP-profile-3)
+      for the tracked cross-reference.
+
+  accessibility:
+    type: object
+    description: >
+      SKELETON_ONLY (the disclosure state MACHINE_READABLE_SPEC_PLAN.md §0
+      itself uses for gaps with no existing content to converge from — "沒有
+      既有內容可收斂，Phase 3 只能先建骨架/佔位"). Atlas's repo layout names
+      both `/profiles/accessibility/` (L3940) and `/lenses/accessibility/`
+      (L3914), and `selection_context.accessibility_needs` (L1088) is an
+      unexpanded placeholder `...` — no mother document anywhere gives this
+      axis concrete fields the way §6 fully works out `cognitive`. This
+      schema records the gap honestly (an open, permissive object) rather
+      than inventing field names with no source, per AGENTS.md R0's
+      prohibition on "猜測補未知" (guessing to fill the unknown). Designing
+      this axis's real shape is an engineering/accessibility-domain decision
+      for a future wave, not a Phase 3 compilation task.
+    additionalProperties: true
+
+examples:
+  - description: "A board_grade profile with a strongly analytical, table-preferring cognitive stance."
+    value:
+      profile_id: "PROFILE-board-grade-default"
+      rigor: board_grade
+      cognitive:
+        representation: { visual: 0.3, text: 0.6, table: 0.9, spatial: 0.2, audio: 0.1 }
+        interaction: { guided: 0.7, exploratory: 0.3 }
+        thinking: { divergent: 0.2, analytical: 0.9, narrative: 0.1 }
+        detail: { depth: high }
+        decision: { evidence_preference: high }
+      representation_preference: table
+      accessibility: {}
+  - description: "A Deep Intelligence profile — rigor resolves through rigor-level.schema.yaml's PROVISIONAL mapping, not natively here."
+    value:
+      profile_id: "PROFILE-deep-intel-2026-08-29"
+      rigor: deep_intelligence
+      cognitive:
+        thinking: { divergent: 0.7, analytical: 0.8, narrative: 0.4 }
+        decision: { evidence_preference: high }
+      representation_preference: null
+      accessibility: {}
+
+# ---------------------------------------------------------------------------
+# Genuinely open — NOT decided by this file
+# ---------------------------------------------------------------------------
+open_questions:
+  - id: "MRSP-profile-1"
+    question: >
+      `representation_preference` and `accessibility` are both intentionally
+      under-specified: the former is a forward reference to a sibling file
+      this session's other concurrent agent is building, the latter is a
+      genuine design gap no mother document has ever filled. Neither blocks
+      this file's primary job (assembling the `rigor` + `cognitive` dimensions
+      that Atlas §6/§10 already give real shape to), but both should be
+      revisited: representation_preference tightened once
+      representation.schema.yaml exists, and accessibility designed from
+      scratch as separate engineering work.
+    owner: "next Phase 3 wave (representation_preference) / a dedicated accessibility design pass (accessibility) — neither is an operator sign-off item the way rigor-level.schema.yaml's MRSP-rigor-1 is"
+    blocks: "nothing in this file; both fields remain loosely typed until their owning designs exist"
+  - id: "MRSP-profile-2"
+    question: >
+      This file's `rigor` field inherits rigor-level.schema.yaml's own open
+      question (MRSP-rigor-1: whether `deep_intelligence` should become a
+      native Atlas `required_rigor` value or stay an additive layer on
+      `board_grade`). This file does not re-litigate that question — it only
+      notes that whichever way MRSP-rigor-1 resolves, this file's `rigor`
+      field needs no structural change (it is a bare string soft-reference
+      either way), only rigor-level.schema.yaml's own mapping table changes.
+    owner: "inherits rigor-level.schema.yaml's MRSP-rigor-1 owner"
+    blocks: "nothing in this file — recorded so a future reader does not have to re-derive that this file is insulated from that decision"
+  - id: "MRSP-profile-3"
+    question: >
+      Cross-file loop with representation.schema.yaml's own MRSP-representation-3
+      (found during this file's bug-hunt pass, not pre-planned): that file asks
+      whether Atlas §6's 5-modality weight vector should be reconciled with its
+      11-value `representation_category` enum (a mapping from each category to
+      the modality weight(s) it satisfies) now that profile.schema.yaml (this
+      file) exists and confirms ownership of the vector (`cognitive.representation`
+      above). This file does NOT perform that reconciliation — no mother
+      document defines the correspondence, so building one here would be new
+      design invention, not compilation. Both files' open_questions now point
+      at each other; resolving either resolves both.
+    owner: "operator, or whoever next touches either profile.schema.yaml or representation.schema.yaml"
+    blocks: "nothing in this file; representation_preference and cognitive.representation remain two independently-typed fields with no cross-mapping"
+
+verification:
+  method: >
+    Read against Atlas §6 (L257-292) in full, §10 selection_context (L1066-1124,
+    not just the required_rigor/cognitive_preferences/accessibility_needs
+    lines in isolation), the /profiles/ and /representations/ repo-layout
+    blocks (L3916-3927, L3936-3940), Appendix A (L4574-4604),
+    MACHINE_READABLE_SPEC_PLAN.md §2.3 rows for profile.schema.yaml (L118)
+    and rigor-level.schema.yaml (L119). Cross-file $ref convention verified
+    by grep across every existing file in specs/execution/, specs/governance/,
+    specs/domain/, specs/artifact/, specs/security/ (zero hard cross-file
+    $ref found anywhere), not assumed from a single example.
+  note: >
+    No mother document or ADR was modified to produce this file. The
+    `cognitive` object is transcribed near-verbatim from Atlas §6;
+    `representation_preference` and `accessibility` are honestly left
+    under-specified per the gaps documented above and in
+    compilation_decisions, not invented to appear complete.

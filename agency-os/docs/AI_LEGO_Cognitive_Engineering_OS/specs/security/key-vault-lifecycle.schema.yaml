@@ -1,0 +1,557 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/security/key-vault-lifecycle.schema.yaml"
+title: Key Vault Lifecycle
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the independent Key Vault that
+  holds every cryptographic key referenced by
+  `personal-data-envelope.schema.yaml`'s `kek_ref`/`dek_key_id` fields:
+  tenant-level Key-Encryption-Keys (KEK), per-subject Data Encryption Keys
+  (DEK), and — per ADR-007 — tenant-level HMAC signing keys used for
+  deterministic log tokenization. Resolves ADR-002's crypto-shredding
+  Recommendation (Option A): GDPR/CCPA/LGPD "right to erasure" is fulfilled
+  by destroying a subject's DEK record, which makes that subject's
+  Confidential/Restricted event-log content permanently unreadable without
+  altering the (append-only, immutable) Event Ledger itself. Also encodes
+  ADR-002's Codex-oracle-driven revision requiring disaster-recovery
+  restores to replay destruction history before serving any decrypt
+  request, and the operational-incident-vs-architecture-reversal Rollback
+  split from the same revision round. ADR-007 Sub-decision (a) reuses this
+  same Vault for a new key-use type (`HMAC_SIGNING_KEY`) rather than
+  standing up a second Key Vault — this schema is the single Vault both
+  ADRs consume.
+
+  This file is the single source of truth for Key Vault key-record shape,
+  Key Destruction Record shape, and the restore-time replay gate; MP §148
+  and EC §32 point at "an independent Key Vault" without specifying its
+  internal record shapes — those shapes live here, not in the mother
+  documents.
+
+compilation_decisions:
+  - question: >
+      ADR-007's Recommendation point 2 and its Consequences/Migration
+      sections name the new key-use type in prose as lowercase
+      `hmac_signing_key`, "與既有 DEK/KEK 並列" (listed side by side with
+      DEK/KEK) — but DEK and KEK are rendered as uppercase abbreviations
+      throughout both ADRs' prose (e.g. ADR-002 Recommendation; ADR-007
+      Context adjacency table row 2; ADR-007 Consequences).
+    decision: >
+      `key_use` enum uses SNAKE_CASE uppercase for all three values: KEK,
+      DEK, HMAC_SIGNING_KEY.
+    reasoning: >
+      Same mechanical-casing-normalization technique already established by
+      `governance/epistemic-label.schema.yaml` (space-form "LOCKED FACT" ->
+      `LOCKED_FACT`, documented there as "zero semantic change"). Picking
+      one casing convention for an enum that mixes an ADR's literal
+      lowercase identifier with two pre-existing uppercase abbreviations is
+      a naming-consistency pick, not a new architecture decision.
+      ADR-007's exact lowercase prose string is preserved verbatim below in
+      `migration_crosswalk` for traceability.
+  - question: >
+      ADR-002's Codex-oracle revision ("修正 2", Recommendation section)
+      mandates that a Key Vault restored from backup must replay all Key
+      Destruction Records dated after the backup snapshot, and re-destroy
+      those DEKs, before the restored Vault may serve any decrypt request —
+      but states this only as a prose obligation, with no machine-checkable
+      predicate for "may this Vault serve decrypt requests now".
+    decision: >
+      Model Vault serviceability as an explicit gated boolean
+      (`vault_restore_event.decrypt_serviceable`) that MUST default to
+      `false` on any `RESTORED_FROM_BACKUP` transition, and MAY only
+      transition to `true` once `replay_gate.status == COMPLETE` AND
+      `replay_gate.re_destruction_confirmed == true`. See
+      `vault_restore_event` and its `constraints` below.
+    reasoning: >
+      A requirement stated only in prose is not enforceable by tooling.
+      Encoding it as a gated boolean with explicit preconditions is the
+      minimal schema change that makes ADR-002's restore-time obligation
+      machine-checkable, following this repo's established pattern of
+      turning ADR prose obligations into structurally-enforced fields
+      rather than leaving them as comments (see risk-tier.schema.yaml's
+      `required_actions[]`, manifest.schema.yaml's `required_document_ids`).
+  - question: >
+      ADR-002's Codex-oracle revision also identifies (PLAUSIBLE finding)
+      that destroying only the *live* copy of a subject's DEK record is
+      insufficient: if the Key Vault's own disaster-recovery backup still
+      holds the pre-destruction key material and that backup is later
+      restored, the subject's data becomes decryptable again — a "false
+      deletion resurrected" failure mode. ADR-002's own revised invariant
+      (Recommendation, "不變量修正") states destruction "必須涵蓋該金鑰的
+      所有物理副本（live + 備援/災復快照）" (must cover all physical
+      copies of the key — live plus backup/DR snapshots) but does not
+      define a field shape for tracking those copies.
+    decision: >
+      Every `key_record` carries a `physical_copies[]` array (one entry per
+      known physical location holding a copy of the key material — live
+      Vault plus every backup/DR snapshot). Every `key_destruction_record`
+      carries a `destruction_scope[]` array that MUST contain one destroyed
+      entry per `physical_copies[]` entry that existed on the key at
+      destruction time — a destruction record with an incomplete
+      `destruction_scope` (fewer entries than known physical copies) is not
+      a valid, complete destruction under this schema.
+    reasoning: >
+      Directly encodes the corrected invariant from ADR-002's Codex-oracle
+      revision as a structural completeness check rather than leaving
+      "all copies" as an unenforced prose promise — same reasoning style as
+      the restore-gate decision above.
+
+source_of_truth_for:
+  - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md:59-67 (Option A: per-subject DEK, tenant KEK, envelope encryption, EC §31 mapping)"
+  - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md:65 (Verification = attempt decrypt on all known references, confirm all fail)"
+  - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md:103-117 (Codex Oracle 對抗式覆審 — 修正 1 Rollback split, 修正 2 Key Destruction Record Replay on Restore)"
+  - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md:121-131 (Consequences — Key Vault higher-redundancy requirement; backup-copy destruction-sync gap)"
+  - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md:137-140 (Migration/Rollback — operational-incident vs architecture-reversal split, GDPR Art. 12(3) reference)"
+  - "docs/adr/ADR-007-pii-redaction-vs-pseudonymization-timing.md Recommendation point 2 (hmac_signing_key, listed alongside DEK/KEK, explicitly not a second Key Vault)"
+  - "docs/adr/ADR-007-pii-redaction-vs-pseudonymization-timing.md Consequences (HMAC key rotation breaks cross-rotation-boundary correlatability of historical log tokens — documented tradeoff, not hidden)"
+  - "docs/adr/ADR-007-pii-redaction-vs-pseudonymization-timing.md:153 (規格缺口 1: key-vault-lifecycle.schema.yaml 新增 hmac_signing_key 金鑰用途類型與其獨立輪替政策欄位)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md:147 (security/key-vault-lifecycle.schema.yaml, Wave 2, READY)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md:5637-5656 (§148 Encryption & Key Sovereignty — sovereignty modes reused for KEK/tenant scope)"
+  - "docs/architecture/DEVOPS_SRE_PLAN.md:120-134 (§3.2-3.3 — WORM 35-day immutability window; backup-key KMS realm kept separate from the crypto-shredding DEK service)"
+decided_by: >
+  docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md
+  (registered ACCEPTED in docs/adr/ADR_INDEX.md:8; see `open_questions`
+  below re: a stale "Status: PROPOSED" header still present in the ADR-002
+  file itself) and docs/adr/ADR-007-pii-redaction-vs-pseudonymization-timing.md
+  (ACCEPTED, ADR_INDEX.md:13). Field-naming, enum-casing, and state-machine
+  encoding choices within this file are Phase 3 compilation decisions per
+  docs/architecture/MACHINE_READABLE_SPEC_PLAN.md:147, not a separate ADR
+  (see `compilation_decisions` above).
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+definitions:
+
+  key_use:
+    description: >
+      What a key in this Vault is used for. Three values, all consumed from
+      the same Vault per ADR-007's explicit "not a second Key Vault"
+      instruction.
+    type: string
+    enum: [KEK, DEK, HMAC_SIGNING_KEY]
+    meaning:
+      KEK:
+        description: >
+          Key-Encryption-Key. Tenant-level (one per tenant, or per tenant's
+          chosen MP §148 sovereignty mode). Wraps per-subject DEKs
+          (envelope encryption). Never destroyed as part of a subject
+          erasure request — destroying a KEK would erase every subject
+          under that tenant, which is a tenant-offboarding operation, not
+          a per-subject DSAR. Rotatable.
+        cross_reference: >
+          Soft reference (non-$ref, per manifest.schema.yaml's established
+          forward-reference pattern) to
+          `domain/tenant.schema.yaml`'s `encryption_root_key_ref` field
+          (docs/architecture/MACHINE_READABLE_SPEC_PLAN.md:142): a tenant's
+          `encryption_root_key_ref` names the KEK that
+          `personal-data-envelope.schema.yaml`'s `kek_ref` field must
+          resolve to for that tenant's envelopes.
+      DEK:
+        description: >
+          Data Encryption Key. Per-subject (one per data subject whose
+          Confidential/Restricted fields are encrypted). AES-256-GCM per
+          ADR-002 Recommendation. Issued once; destruction (not rotation)
+          is the only defined lifecycle transition after issuance — ADR-002
+          never describes DEK rotation, only DEK destruction as the erasure
+          mechanism.
+      HMAC_SIGNING_KEY:
+        description: >
+          Deterministic keyed-HMAC signing key for log tokenization, per
+          ADR-007 Sub-decision (a) Option A (`token = HMAC-SHA256(key,
+          raw_value)`). Tenant-level, like KEK. Unlike DEK, it is not
+          "destroyed" as an erasure mechanism — its lifecycle event of
+          interest is rotation, which has its own documented tradeoff (see
+          `hmac_signing_key_policy` below), not destruction-on-request.
+
+  key_record:
+    description: >
+      One entry in the Vault, per issued key. Every key type in `key_use`
+      shares this record shape; some fields are conditionally required by
+      `key_use` (encoded in `constraints`, not pure JSON Schema
+      if/then, to keep this readable alongside the sibling
+      hand-authored specs in this directory).
+    type: object
+    required: [key_id, key_use, tenant_id, algorithm, status, issued_at]
+    properties:
+      key_id:
+        type: string
+        description: >
+          Stable identifier for this key record. `personal-data-envelope
+          .schema.yaml`'s `dek_key_id` field cross-references this value
+          (soft reference) for `key_use == DEK` records.
+      key_use:
+        $ref: "#/definitions/key_use"
+      tenant_id:
+        type: string
+        format: uuid
+        description: >
+          Soft cross-reference to `domain/tenant.schema.yaml`'s `tenant_id`
+          (docs/architecture/MACHINE_READABLE_SPEC_PLAN.md:142). Every key
+          in this Vault, including per-subject DEKs, belongs to exactly one
+          tenant (a subject's data lives within one tenant's scope; ADR-003
+          Tenant Isolation is the reason KEKs are tenant-scoped in the
+          first place).
+      subject_id:
+        type: [string, "null"]
+        description: >
+          Required (non-null) when `key_use == DEK` — identifies the data
+          subject this DEK protects. MUST be null for `key_use == KEK` and
+          `key_use == HMAC_SIGNING_KEY` (both are tenant-level, not
+          per-subject).
+      algorithm:
+        type: string
+        description: >
+          "AES-256-GCM" for DEK (per ADR-002 Recommendation, matches
+          `personal-data-envelope.schema.yaml`'s `cipher_alg`); a KEK-class
+          wrapping algorithm for KEK; "HMAC-SHA256" for HMAC_SIGNING_KEY
+          (per ADR-007 Sub-decision (a), matches the FMEA finding that a
+          keyless/unsalted hash is unacceptable — see `hmac_signing_key_policy`).
+      sovereignty_mode:
+        type: [string, "null"]
+        enum:
+          - null
+          - "Platform-managed Keys"
+          - BYOK
+          - HYOK
+          - "Customer HSM"
+          - "Local-only Keys"
+          - "Region-bound Keys"
+        description: >
+          Reuses MP §148's exact six-value list verbatim (no new
+          vocabulary). Applies at KEK/tenant granularity; null for
+          per-subject DEK records (a subject's DEK inherits its tenant's
+          KEK's sovereignty mode, it does not carry its own).
+      wrapped_by_kek_ref:
+        type: [string, "null"]
+        description: >
+          Required (non-null) when `key_use == DEK` — the `key_id` of the
+          KEK record that wraps this DEK (envelope encryption, per ADR-002
+          Recommendation). Null for KEK and HMAC_SIGNING_KEY records
+          (neither is itself wrapped by another Vault-managed key under
+          either ADR).
+      status:
+        type: string
+        enum: [ACTIVE, PENDING_DESTRUCTION, DESTROYED, ROTATED]
+      issued_at: { type: string, format: date-time }
+      destroyed_at: { type: [string, "null"], format: date-time }
+      rotation_policy:
+        type: [object, "null"]
+        description: >
+          Required (non-null) for `key_use in [KEK, HMAC_SIGNING_KEY]`.
+          MUST be null for `key_use == DEK` — DEK has no rotation concept
+          in ADR-002, only issuance and destruction.
+        properties:
+          rotation_interval: { type: string }
+          last_rotated_at: { type: [string, "null"], format: date-time }
+          rotation_breaks_correlatability:
+            type: boolean
+            description: >
+              True only for `key_use == HMAC_SIGNING_KEY` (per ADR-007
+              Consequences: "輪替 HMAC 金鑰 = 犧牲跨輪替邊界的可關聯性，
+              換取降低長期金鑰外洩風險" — rotating the HMAC key sacrifices
+              cross-rotation-boundary correlatability of historical log
+              tokens, in exchange for reduced long-term key-exposure risk).
+              False for `key_use == KEK` — rotating a KEK re-wraps existing
+              DEKs, it does not affect their correlatability with anything.
+      physical_copies:
+        type: array
+        description: >
+          Every known physical location holding a copy of this key's
+          material — the live Vault entry plus every backup/DR snapshot.
+          Required non-empty for any key that has ever been backed up (in
+          practice, all of them, per DEVOPS_SRE_PLAN.md §3.2's WORM backup
+          policy). See `compilation_decisions` above for why this exists:
+          a `key_destruction_record`'s `destruction_scope[]` must account
+          for every entry here, not just the live copy.
+        items:
+          type: object
+          required: [location, is_live]
+          properties:
+            location:
+              type: string
+              description: "e.g. 'live-vault', or a backup snapshot identifier."
+            is_live: { type: boolean }
+            snapshot_taken_at: { type: [string, "null"], format: date-time }
+
+  key_destruction_record:
+    description: >
+      Written on destruction of a `key_record` (in practice, a `key_use ==
+      DEK` record fulfilling a data-subject erasure request — ADR-002 does
+      not describe destroying a KEK or HMAC_SIGNING_KEY by this mechanism,
+      only rotating them, so this record's `key_use` is expected to be DEK
+      in every real instance, though the field stays structurally general).
+      MUST be written to an audit log independent of the Key Vault itself
+      (`independent_audit_log_ref` below) — per ADR-002 Recommendation:
+      "銷毀 DEK 並寫一筆 Key Destruction Record 到獨立稽核日誌" — so that
+      proof a destruction occurred survives even a Key Vault compromise or
+      data-loss event, and so the restore-time replay gate below has a
+      trustworthy source of truth that does not itself depend on the thing
+      being restored.
+    type: object
+    required:
+      - key_id
+      - key_use
+      - subject_id
+      - destroyed_at
+      - authorization_ref
+      - destruction_scope
+      - verification
+      - independent_audit_log_ref
+    properties:
+      key_id: { type: string }
+      key_use: { $ref: "#/definitions/key_use" }
+      subject_id:
+        type: string
+        description: "The data subject whose erasure request this record fulfills."
+      destroyed_at: { type: string, format: date-time }
+      authorization_ref:
+        type: string
+        description: "Per EC §31 Data Deletion Contract's Authorization step."
+      destruction_scope:
+        type: array
+        description: >
+          MUST contain one entry per `physical_copies[]` entry that existed
+          on the `key_record` at the moment of destruction — live copy AND
+          every backup/DR snapshot copy. A record whose `destruction_scope`
+          covers fewer copies than the key's known `physical_copies[]` is
+          an INCOMPLETE destruction under this schema (see
+          `compilation_decisions` above; this is the direct fix for
+          ADR-002's Codex-oracle PLAUSIBLE finding).
+        minItems: 1
+        items:
+          type: object
+          required: [copy_location, destroyed]
+          properties:
+            copy_location: { type: string }
+            destroyed: { type: boolean }
+            destroyed_at: { type: [string, "null"], format: date-time }
+      verification:
+        type: object
+        description: >
+          Per ADR-002:65 EC §31 mapping: "Verification = 對所有已知引用嘗試
+          decrypt，確認全部失敗" (attempt decrypt against every known
+          reference, confirm all fail).
+        required: [attempted_decrypt_refs, all_decrypts_failed]
+        properties:
+          attempted_decrypt_refs:
+            type: array
+            items: { type: string }
+            description: "Event/projection/derived-artifact references checked, per EC §31 Dependency Check."
+          all_decrypts_failed: { type: boolean }
+      independent_audit_log_ref:
+        type: string
+        description: >
+          Pointer to this record's location in the audit log that is
+          independent of the Key Vault (a different store/service, so that
+          the destruction proof outlives a Vault-level incident).
+      on_decrypt_failure_projection_behavior:
+        type: string
+        const: REDACTED
+        description: >
+          Non-normative reminder co-located here for discoverability: per
+          ADR-002 Recommendation, when a projection encounters a field
+          whose DEK has been destroyed, it fills in the `REDACTED` sentinel
+          and continues — it does not throw or halt Replay Workflow (MP
+          §112). This behavior belongs to the projection/read layer, not to
+          this record; it is documented here only because this record is
+          the trigger event for that behavior.
+
+  vault_restore_event:
+    description: >
+      Models ADR-002's Codex-oracle "Key Destruction Record Replay on
+      Restore" mandatory gate (Recommendation, 修正 2): "任何從 Key Vault
+      備份還原（disaster recovery restore）的操作，在還原後的 Vault 被允許
+      服務任何 decrypt 請求之前，必須先重放所有時間戳晚於該備份快照的 Key
+      Destruction Record，對其中每一筆記錄的 DEK 執行等效銷毀，才能將還原
+      後的 Vault 標記為 live" — i.e. every Key Destruction Record whose
+      `destroyed_at` is later than the snapshot being restored from must be
+      replayed (its DEK re-destroyed in the restored Vault) before the
+      restored Vault may serve decrypt requests at all. Per ADR-002:117,
+      this is a mandatory relay for EVERY restore, not optional cleanup —
+      DEVOPS_SRE_PLAN.md:120-124's 35-day WORM immutability window means
+      the risk window this gate closes is at least 35 days long on every
+      single restore.
+    type: object
+    required:
+      - restore_event_id
+      - restored_from_snapshot_at
+      - restore_initiated_at
+      - decrypt_serviceable
+      - replay_gate
+    properties:
+      restore_event_id: { type: string }
+      restored_from_snapshot_at:
+        type: string
+        format: date-time
+        description: "Timestamp of the backup snapshot the Vault was restored from."
+      restore_initiated_at: { type: string, format: date-time }
+      decrypt_serviceable:
+        type: boolean
+        default: false
+        description: >
+          MUST default to `false` immediately on any `RESTORED_FROM_BACKUP`
+          transition. See `constraints` below for the only legal path to
+          `true`.
+      replay_gate:
+        type: object
+        required:
+          - status
+          - destruction_records_to_replay
+          - records_replayed
+          - re_destruction_confirmed
+        properties:
+          status:
+            type: string
+            enum: [PENDING, IN_PROGRESS, COMPLETE, FAILED]
+          destruction_records_to_replay:
+            type: array
+            description: >
+              Every `key_destruction_record` (queried from the independent
+              audit log, NOT from the Vault being restored) whose
+              `destroyed_at > restored_from_snapshot_at`.
+            items:
+              type: string
+              description: "Reference (e.g. audit-log entry id) to a key_destruction_record."
+          records_replayed:
+            type: array
+            items:
+              type: string
+              description: "Subset of destruction_records_to_replay actually re-applied so far."
+          re_destruction_confirmed:
+            type: boolean
+            description: >
+              True only when every entry in `destruction_records_to_replay`
+              has had its DEK re-destroyed in the restored Vault with
+              equivalent effect (verification per `key_destruction_record
+              .verification` re-run against the restored Vault's copy).
+      constraints:
+        description: >
+          Non-normative narrative constraints (same style as
+          `governance/epistemic-label.schema.yaml`'s `constraints` list),
+          stated here because they express a cross-field invariant that
+          plain JSON Schema types cannot express directly.
+        value:
+          - "decrypt_serviceable MUST default to false on any RESTORED_FROM_BACKUP transition."
+          - "decrypt_serviceable MAY transition to true ONLY when replay_gate.status == COMPLETE AND replay_gate.re_destruction_confirmed == true."
+          - "A decrypt request received while decrypt_serviceable == false MUST be rejected with a DECRYPT_BLOCKED_PENDING_REPLAY status — it MUST NOT be silently queued, best-effort served, or served with a subset of the gate incomplete."
+          - "destruction_records_to_replay MUST be sourced from the independent audit log (key_destruction_record.independent_audit_log_ref), never from the Vault instance being restored — the whole point of the independent log is that it survives a Vault-level data-loss event that the restore is recovering from."
+
+  rollback_scenario:
+    description: >
+      Encodes ADR-002's Codex-oracle "修正 1" Rollback split (Recommendation
+      section, replacing an earlier single description that conflated an
+      operational incident with an architecture reversal — the CONFIRMED
+      finding was that the original text would have caused a Key Vault
+      outage to silently become a permanent DSAR refusal, directly
+      contradicting Decision Driver #2).
+    type: string
+    enum: [OPERATIONAL_INCIDENT, ARCHITECTURE_REVERSAL]
+    meaning:
+      OPERATIONAL_INCIDENT:
+        description: >
+          Key Vault is temporarily unavailable (e.g. KMS outage). The
+          architecture decision itself (Option A / crypto-shredding) is NOT
+          being reconsidered.
+        required_behavior:
+          - "New deletion requests MUST NOT be refused. They are queued (received_at recorded) pending service restoration."
+          - "The incident itself MUST be escalated to the highest SEV tier per DEVOPS_SRE_PLAN.md's SEV scheme, because it directly threatens Decision Driver #2 (EC §31's deletion contract must not fail on first real DSAR)."
+          - "Remediation target MUST fall within the applicable regulatory response window (e.g. GDPR Art. 12(3): one month, extendable once)."
+          - "Queued requests MUST be processed immediately on service restoration — they MUST NOT be dropped or permanently rejected because the incident occurred."
+      ARCHITECTURE_REVERSAL:
+        description: >
+          Option A (crypto-shredding) itself is being abandoned in favor of
+          Option B/C or a new approach — a genuine architecture decision
+          reversal, not an operational blip.
+        required_behavior:
+          - "Degrade path: keep existing ciphertext fields unchanged; stop issuing new DEKs."
+          - "New deletion requests are handled by the new mechanism, not refused."
+          - "Old-DEK-destruction and the new mechanism run in parallel (Expand-Contract pattern, same spirit as ADR-005's DB Migration Recipe) until all pre-existing DEKs have been migrated — this is not a one-shot cutover."
+          - "Switching mechanisms requires a new ADR and a Phase 2 convergence pass — it is not a same-day patch."
+    constraints:
+      - "OPERATIONAL_INCIDENT and ARCHITECTURE_REVERSAL are mutually exclusive triggers for a given rollback event and MUST NOT be conflated — this conflation is the exact root cause the Codex-oracle CONFIRMED finding identified in ADR-002's original text."
+
+  hmac_signing_key_policy:
+    description: >
+      Additional detail specific to `key_use == HMAC_SIGNING_KEY`, per
+      ADR-007 Sub-decision (a) and its Consequences section.
+    type: object
+    properties:
+      documented_tradeoff:
+        type: string
+        const: >
+          Rotating the tenant's hmac_signing_key breaks cross-rotation
+          -boundary correlatability of historical log tokens: tokens
+          computed for the same subject before vs. after a rotation will
+          NOT match. This is a known, accepted tradeoff (ADR-007
+          Consequences) traded against reduced long-term key-exposure risk
+          — it is not a defect, and MUST NOT be hidden or omitted from
+          operator-facing rotation-policy documentation.
+      rotation_interval:
+        type: string
+        description: >
+          Independent of any KEK rotation policy — per ADR-007 Consequences:
+          "金鑰生命週期政策需要區分兩種用途各自的輪替頻率" (the two key
+          uses need separately-set rotation frequencies).
+
+migration_crosswalk:
+  description: >
+    For translating ADR prose identifiers into this schema's canonical
+    field values — not a runtime bidirectional conversion table (same
+    caveat style as the epistemic-label and manifest sibling schemas).
+  adr_007_prose_to_canonical:
+    "hmac_signing_key (ADR-007 Recommendation point 2, lowercase prose form)": "HMAC_SIGNING_KEY (key_use enum value, this schema)"
+
+open_questions:
+  - id: "MRSP-key-vault-1"
+    question: >
+      ADR-002's own file header (docs/adr/ADR-002-personal-data-erasure
+      -vs-event-immutability.md:4) still reads "Status: PROPOSED", while
+      docs/adr/ADR_INDEX.md:8 registers it ACCEPTED (with the Codex-oracle
+      revision already folded in) and ADR-007 — an ACCEPTED ADR that
+      explicitly builds on ADR-002 as settled — treats it as decided. This
+      schema follows ADR_INDEX.md (the governance registry of record) per
+      this task's framing that ADR-002 is ACCEPTED, but the header drift in
+      the ADR-002 file itself is a real, observed inconsistency this file
+      did not create and cannot fix (this task's boundary is limited to the
+      two named spec files; editing an ADR's header is out of scope).
+    owner: "operator, via a small doc-sync fix to ADR-002's own header line"
+    blocks: "nothing in this schema; flagged for completeness per R4 (claim-before-verify)"
+  - id: "MRSP-key-vault-2"
+    question: >
+      Neither ADR specifies the exact KMS/HSM-level mechanism by which
+      destroying a Vault-side `key_record` (this schema's abstraction)
+      causes `dek_wrapped` ciphertext already embedded in immutable Event
+      Ledger records (per `personal-data-envelope.schema.yaml`) to become
+      unrecoverable — e.g. whether unwrap is always Vault-API-mediated
+      against a revocable per-key grant, versus some other KMS-specific
+      non-exportability guarantee. ADR-002 states the destruction
+      obligation and its verification test (attempt decrypt, confirm
+      failure) at the architecture level; the specific KMS/HSM
+      implementation technique that satisfies that test is a Phase 4+
+      implementation decision, not fixed by either ADR or this schema.
+    owner: "implementation team, at KMS/HSM product-selection time"
+    blocks: "nothing in this schema; the key_record/key_destruction_record shapes are implementation-agnostic by design"
+  - id: "MRSP-key-vault-3"
+    question: >
+      Whether a `key_use == HMAC_SIGNING_KEY` record is itself additionally
+      wrapped by a KEK (envelope-within-envelope, matching the DEK pattern)
+      or stored under some other Vault-native at-rest protection is not
+      specified by ADR-007 — its Recommendation only says the key is
+      "存放於 ADR-002 已提議的 Key Vault" (stored in the Vault), not how.
+      This schema leaves `wrapped_by_kek_ref` null for HMAC_SIGNING_KEY
+      records rather than guessing.
+    owner: "operator, if/when a Round 2 ADR or implementation spec addresses Vault-internal at-rest protection uniformly"
+    blocks: "nothing; HMAC_SIGNING_KEY records remain valid under this schema either way"
+
+verification:
+  method: "Read against ADR-002 full text, ADR-007 full text, ADR_INDEX.md, MACHINE_READABLE_SPEC_PLAN.md:142-149, MP §148 (L5637-5656), DEVOPS_SRE_PLAN.md §3.2-3.3 (L104-134)."
+  note: >
+    No mother document or ADR was modified to produce this file. All
+    lifecycle semantics (issuance/destruction/replay-on-restore/rollback
+    split/hmac tradeoff) are transcribed from the cited ADR sections;
+    field names, enum casing, and the gated-boolean/array encodings of
+    those semantics reflect Phase 3 compilation decisions, recorded above
+    in `compilation_decisions`, not a new ADR.

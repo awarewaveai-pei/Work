@@ -1,0 +1,330 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/rigor-level.schema.yaml"
+title: Rigor Level / Mode
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the rigor/mode vocabulary used by
+  selection_context.required_rigor (Atlas §10, L1086) and referenced by
+  profile.schema.yaml (this file's sole declared dependent per
+  MACHINE_READABLE_SPEC_PLAN.md §2.3 L118). Resolves CROSS-T-15: Master Plan
+  §84 "高階模式" (L3397-3451) names FIVE operating modes — Fast, Professional,
+  Research Grade, Board Grade, Deep Intelligence — while the Atlas's machine
+  enum `required_rigor: fast|professional|research_grade|board_grade` (L1086)
+  has only FOUR values. Deep Intelligence is unexpressible in the selector
+  contract as it stands, and no mother document defines how the fifth mode
+  maps onto the four-value enum (verified-findings.yaml CROSS-T-15, L574-592,
+  CONFIRMED by 2 independent votes; still unresolved as of this file — it
+  carries no OQ-N number in cross-review/CONVERGENCE_MATRIX.md §3 L41, unlike
+  its sibling findings CROSS-T-3/T-5/T-6 which were adjudicated by ADR-004).
+
+  This file resolves the vocabulary-restoration half of CROSS-T-15 (a Low-risk
+  compilation: MP already declares all 5 names, this file just gives them a
+  canonical machine form) but does NOT unilaterally resolve the
+  enum-cardinality half (whether Atlas's `required_rigor` itself should grow
+  a 5th value, or whether Deep Intelligence should instead be represented as
+  an additive layer on top of `board_grade`). That half is recorded as a
+  PROVISIONAL default plus an explicit `open_questions` entry requiring
+  operator sign-off — see `compilation_decisions` and `open_questions` below
+  for why this line was drawn where it was drawn.
+
+  MACHINE_READABLE_SPEC_PLAN.md §2.3's row for this file (L119) lists its
+  dependency as `governance/epistemic-label` (NOT `execution/risk-tier`,
+  despite this file's own subject matter sitting next to risk in Atlas's
+  flowchart) — grounded in real MP text, not the plan's say-so alone: MP §84
+  names an explicit evidentiary requirement for 2 of the 5 modes (Professional
+  "Evidence + Verification", L3405; Deep Intelligence's "Evidence-grounded"
+  dimension, L3424), and `governance/epistemic-label.schema.yaml` is this
+  suite's existing canonical home for exactly that axis (`epistemic_type`:
+  SOURCE_FACT/EVIDENCE/ASSUMPTION/HYPOTHESIS/.../UNKNOWN). Each mode below
+  therefore carries an `evidence_requirement_source` note (soft reference by
+  name, no `$ref`, per this suite's established convention) instead of
+  inventing per-mode minimum-epistemic_type thresholds MP itself never states
+  — MP names WHICH modes need evidence, not HOW MUCH of which epistemic_type
+  value, so this file records the former honestly and leaves the latter
+  undesignated rather than guessing a number MP doesn't give.
+
+source_of_truth_for:
+  - "specs/governance/epistemic-label.schema.yaml (this file's declared Wave dependency per MACHINE_READABLE_SPEC_PLAN.md §2.3 L119 — the epistemic_type axis MP's Professional/Deep Intelligence evidence requirements point to)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §84 高階模式 (L3397-3451): Fast L3399-3401, Professional L3403-3405, Research Grade L3407-3409, Board Grade L3411-3413, Deep Intelligence L3415-3451"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §10 selection_context.required_rigor (L1086, within the selection_context block L1071-1089)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §84 Cost Governance (L2625: \"High rigor 允許較高成本，但需透明\" — the only EC text that uses the word \"rigor\" at all; EC never enumerates rigor levels itself)"
+  - ".ai/research/phase-0/verified-findings.yaml CROSS-T-15 (L574-592)"
+  - ".ai/research/cross-review/CONVERGENCE_MATRIX.md §3 (L41: CROSS-T-15 listed as a Claude-only finding with no assigned OQ-N, unlike its adjudicated siblings)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.3 (L119: rigor-level.schema.yaml row, READY but flagged \"映射方式需操作者確認，屬 Medium-risk 語意決定，非純技術修正\"; L118: profile.schema.yaml's dependency on this file)"
+
+decided_by: >
+  No ADR governs this file. Unlike risk_tier and epistemic_type/authorship_state
+  (both ADR-004, ACCEPTED 2026-08-29) or Method ID Grammar (ADR-005), CROSS-T-15
+  reached this session with no Round-1 ADR and no OQ-N tracking number — verified
+  by grep across docs/adr/ADR-001~009 (2026-08-29): none mention "Deep
+  Intelligence", "rigor mode", or "required_rigor" cardinality. This file applies
+  the same two-part test status-codes.schema.yaml's decided_by section used
+  (naming/mapping picks over an already-agreed concept are Low-risk and
+  Phase-3-decidable; a real semantic/cardinality change is not) and reaches a
+  SPLIT verdict, not a single one:
+  Part 1 (restoring MP's 5 names into one canonical `rigor_mode` enum, casing
+  them SNAKE_CASE to match Atlas's existing 4 values) is Low-risk — MP already
+  declares all 5 names verbatim (L3399-3415), so this is a completeness/casing
+  compilation, the same class ADR-005's Method ID Grammar and this file's own
+  epistemic-label.schema.yaml sibling (space-to-underscore) treated as
+  Phase-3-decidable.
+  Part 2 (how `deep_intelligence` relates to Atlas's `required_rigor` machine
+  enum — a literal 5th enum value vs. an additive `board_grade` + extra
+  dimensions layer) is NOT decided here, on direct precedent from ADR-004
+  itself: ADR-004's own Sub-decision (a) treated an analogous move — expanding
+  Mandatory Gate Injection's trigger from `critical` alone to `R3 ∪ R4` — as a
+  semantic change serious enough to require a full ADR with an explicit
+  operator-facing disclosure ("此為語意變更非純重命名"，ADR-004 L3, L126),
+  even though it was ultimately decided under Claude's ADR-001-granted
+  architect discretion rather than escalated as a live question. CROSS-T-15's
+  cardinality question is the same shape (a machine-consumed enum's legal
+  value set changes, with downstream consequences for every consumer that
+  pattern-matches `required_rigor`) but, unlike ADR-004's gate-injection
+  expansion, it has never been through the ADR Context/Options/Consequences
+  process at all — MACHINE_READABLE_SPEC_PLAN.md's own author flagged it
+  Medium-risk and unconfirmed (L119) rather than marking it a plain Low-risk
+  READY row the way sibling rows like root-cause-fact.schema.yaml's naming
+  pick were marked (L125: "命名裁決屬 Low-risk，可在 Phase 3 內部直接定案，
+  不需要 ADR"). Deciding it unilaterally here — with no Options/Consequences
+  record and no operator acknowledgment — would repeat exactly the pattern
+  ADR-004 itself demonstrates should NOT happen for this class of change.
+  Per the task boundary for this file, Part 2 is therefore recorded as a
+  PROVISIONAL default (not a final decision) in `open_questions` below.
+
+# ---------------------------------------------------------------------------
+# Part 1 (Low-risk, decided): the restored 5-value canonical vocabulary
+# ---------------------------------------------------------------------------
+
+rigor_mode:
+  type: string
+  description: >
+    Canonical machine form of MP §84's 5 named operating modes. The first 4
+    values are a mechanical SNAKE_CASE transcription of MP's Title-Case names,
+    matching Atlas's existing `required_rigor` spelling exactly (zero semantic
+    change, same class of fix as epistemic-label.schema.yaml's space-to-
+    underscore casing pass). `deep_intelligence` is the 5th value this file
+    adds to restore MP's own already-declared taxonomy — see
+    `required_rigor_mapping` below for how it interacts with Atlas's
+    unmodified 4-value `required_rigor` enum.
+  enum: [fast, professional, research_grade, board_grade, deep_intelligence]
+
+modes:
+  fast:
+    mp_name: "Fast"
+    source: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md:3401"
+    summary: "快速一般回覆 (quick general response)."
+    evidence_requirement_source: >
+      None named by MP. No governance/epistemic-label.schema.yaml
+      cross-reference applies to this mode.
+    atlas_required_rigor_value: fast
+
+  professional:
+    mp_name: "Professional"
+    source: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md:3405"
+    summary: "Evidence + Verification."
+    evidence_requirement_source: >
+      MP names "Evidence" explicitly at this line — the only mode besides
+      deep_intelligence to do so. Soft reference (no $ref) to
+      governance/epistemic-label.schema.yaml's `epistemic_type` axis as the
+      mechanism that would carry this requirement; MP does not itself state a
+      minimum epistemic_type value, so none is invented here.
+    atlas_required_rigor_value: professional
+
+  research_grade:
+    mp_name: "Research Grade"
+    source: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md:3409"
+    summary: "文獻 + 方法 + 統計 + Citation + Reproducibility (literature + method + statistics + citation + reproducibility)."
+    evidence_requirement_source: >
+      MP names "Citation" and "Reproducibility" (not the word "Evidence"
+      itself) at this line — related to but distinct from the
+      epistemic_type axis; recorded as a citation/reproducibility
+      requirement, not folded into evidence_requirement_source's "Evidence"
+      wording above to avoid overstating what this line actually says.
+    atlas_required_rigor_value: research_grade
+
+  board_grade:
+    mp_name: "Board Grade"
+    source: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md:3413"
+    summary: "財務 + 市場 + Strategy + Risk + Scenario + Red Team (finance + market + strategy + risk + scenario + red team)."
+    dimensions: [Finance, Market, Strategy, Risk, Scenario, "Red Team"]
+    evidence_requirement_source: >
+      None of MP's 6 named dimensions at this line is the word "Evidence" —
+      recorded honestly as no explicit evidentiary requirement, distinct from
+      professional and deep_intelligence which do name one.
+    atlas_required_rigor_value: board_grade
+
+  deep_intelligence:
+    mp_name: "Deep Intelligence"
+    source: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md:3417-3450"
+    summary: >
+      A 17-item text-fence list (MP does not prose-summarize it the way it
+      does the other 4 modes): Multi-disciplinary + Multi-stakeholder +
+      Multi-model + Evidence-grounded + Quantitative + Causal + Scenario
+      Simulation + Geopolitical + Cultural + Geographic + Policy + Historical
+      + Local + Government + Execution + Red Team + Human Judgment.
+    dimensions:
+      - Multi-disciplinary
+      - Multi-stakeholder
+      - Multi-model
+      - Evidence-grounded
+      - Quantitative
+      - Causal
+      - Scenario Simulation
+      - Geopolitical
+      - Cultural
+      - Geographic
+      - Policy
+      - Historical
+      - Local
+      - Government
+      - Execution
+      - Red Team
+      - Human Judgment
+    evidence_requirement_source: >
+      MP names "Evidence-grounded" verbatim as dimension #4 (L3424) — the
+      other mode besides professional to name an evidence requirement
+      explicitly. Same soft-reference treatment: points at
+      governance/epistemic-label.schema.yaml's epistemic_type axis as the
+      mechanism, no specific minimum value invented since MP names WHICH
+      modes need evidence, not HOW MUCH.
+    overlap_with_board_grade:
+      description: >
+        Checked token-by-token against board_grade.dimensions above, not
+        assumed. Result is a PARTIAL overlap, not a clean superset — this is
+        the load-bearing fact behind treating Part 2 as genuinely undecided
+        rather than an easy "Deep Intelligence obviously extends Board Grade"
+        call.
+      exact_match: ["Red Team"]
+      near_match: ["Scenario (board_grade) ~ Scenario Simulation (deep_intelligence)"]
+      no_match_in_deep_intelligence_list: [Finance, Market, Strategy, Risk]
+    atlas_required_rigor_value: "NOT NATIVELY REPRESENTABLE — see required_rigor_mapping"
+
+# ---------------------------------------------------------------------------
+# Part 2 (Medium-risk, PROVISIONAL default only — see open_questions)
+# ---------------------------------------------------------------------------
+
+required_rigor_mapping:
+  description: >
+    Maps this file's 5-value `rigor_mode` onto Atlas's UNMODIFIED 4-value
+    `required_rigor` enum (Atlas L1086 is not edited by this file — no mother
+    document is edited by this file). For fast/professional/research_grade/
+    board_grade the mapping is a direct 1:1 identity (already shown in
+    `modes.*.atlas_required_rigor_value` above). deep_intelligence is the one
+    case with no identity mapping available; the value below is a working
+    default so this file is usable now, NOT a final decision — flagged
+    PROVISIONAL and tracked in `open_questions`.
+  deep_intelligence:
+    status: PROVISIONAL_PENDING_OPERATOR_SIGNOFF
+    required_rigor: board_grade
+    additional_dimensions_field: "deep_intelligence_dimensions"
+    additional_dimensions_value_ref: "modes.deep_intelligence.dimensions (this file)"
+    rationale_for_this_default: >
+      Matches the sketch already present in MACHINE_READABLE_SPEC_PLAN.md §2.3
+      (L119: "Deep Intelligence 定義為 board_grade + 額外 gate 組合") rather
+      than inventing a fresh design — this file's default follows that
+      existing lean instead of the alternative (see options_considered)
+      precisely because a plan document's own sketch is weak evidence of
+      intent, not zero evidence, and picking the alternative with equally
+      weak support would be a coin flip dressed as a decision.
+    honesty_caveat: >
+      This default is NOT justified by "Deep Intelligence textually contains
+      Board Grade" — the overlap check above shows only 2 of Board Grade's 6
+      dimensions (Red Team exact, Scenario~Scenario Simulation near) recur in
+      Deep Intelligence's 17-item list; Finance/Market/Strategy/Risk have no
+      token match. The default is a plan-precedent pick, not a proven textual
+      superset relationship — stated plainly so nobody downstream mistakes
+      this field for a verified fact.
+  options_considered:
+    option_a_extend_atlas_enum:
+      name: "Add deep_intelligence as a native 5th value to Atlas's required_rigor enum"
+      for: >
+        Keeps rigor_mode and required_rigor as one vocabulary (no translation
+        layer); every future consumer of required_rigor can express Deep
+        Intelligence directly.
+      against: >
+        Requires editing Atlas L1086 (a mother-document edit, out of scope for
+        both this file and Phase 3 compilation generally — must go through
+        the ADR-006 `.ai/proposals/` mother-doc revision flow); every existing
+        or future piece of code/policy that pattern-matches the 4-value enum
+        (e.g. a future gate.schema.yaml or mandatory-gates.yaml keyed on
+        required_rigor) must be re-audited for 5-value handling — an
+        unbounded blast radius this file cannot itself measure.
+    option_b_additive_layer_default_above:
+      name: "deep_intelligence = board_grade + additional_dimensions (this file's current default)"
+      for: >
+        Zero edits to any mother document or to Atlas's existing enum;
+        every existing required_rigor consumer keeps working unchanged
+        (deep_intelligence tasks are simply board_grade tasks with more
+        required dimensions layered on, not a different enum branch);
+        matches MACHINE_READABLE_SPEC_PLAN.md's own existing sketch (L119).
+      against: >
+        Semantically weaker than Option A if a future consumer needs to
+        distinguish "plain board_grade" from "board_grade escalated to Deep
+        Intelligence" using required_rigor alone — it cannot, without also
+        checking the additive `deep_intelligence_dimensions` field, which is
+        an easy step to forget (the same "silent downgrade" risk class ADR-004
+        Consequences flagged for its own gate-injection expansion).
+
+migration_crosswalk:
+  description: >
+    For translating MP §84's Title-Case prose names into this file's SNAKE_CASE
+    canonical form only — not a runtime bidirectional conversion table (same
+    caveat style as this schema suite's other migration_crosswalk blocks).
+  "Fast": fast
+  "Professional": professional
+  "Research Grade": research_grade
+  "Board Grade": board_grade
+  "Deep Intelligence": deep_intelligence
+
+# ---------------------------------------------------------------------------
+# Genuinely open — NOT decided by this file
+# ---------------------------------------------------------------------------
+open_questions:
+  - id: "MRSP-rigor-1"
+    question: >
+      Should Atlas's `required_rigor` machine enum (L1086) be edited to add
+      `deep_intelligence` as a native 5th value (Option A above), or should
+      Deep Intelligence remain permanently expressed as
+      `required_rigor: board_grade` plus an additive `deep_intelligence_dimensions`
+      layer (Option B, this file's current PROVISIONAL default)? This is a
+      real cardinality/architecture decision affecting every downstream
+      consumer of `required_rigor` — CROSS-T-15 (verified-findings.yaml
+      L574-592) has no ADR and no OQ-N tracking number as of this file
+      (cross-review/CONVERGENCE_MATRIX.md §3 L41), and
+      MACHINE_READABLE_SPEC_PLAN.md §2.3 (L119) explicitly flags it as needing
+      operator confirmation before this mapping can be treated as final. Per
+      this project's own ADR-004 precedent (Context/Options/Consequences
+      required for an analogous enum-range change), this question should be
+      raised as a Round 2 ADR candidate rather than settled by any single
+      Phase 3 spec file.
+    owner: "operator, via a Round 2 ADR (see decided_by above for why this is not Phase-3-decidable)"
+    blocks: >
+      Nothing in THIS file — `rigor_mode` is usable today with the
+      PROVISIONAL default in place. It DOES block any future
+      gate.schema.yaml / mandatory-gates.yaml / method-resolution.schema.yaml
+      work from treating Deep Intelligence's gate requirements as final,
+      since which required_rigor value(s) trigger which gates depends on
+      whether Option A or B is eventually chosen.
+    default_in_effect: "Option B (required_rigor_mapping.deep_intelligence above), explicitly marked PROVISIONAL_PENDING_OPERATOR_SIGNOFF, not final."
+
+verification:
+  method: >
+    Read against MP §84 full text (L3397-3451, all 5 mode definitions
+    transcribed and line-cited individually), Atlas L1066-1089 (full
+    selection_context block, not just L1086 in isolation), EC full-text grep
+    for "rigor" (only hit: L2625), verified-findings.yaml CROSS-T-15 both
+    verdict_votes (L588-592), cross-review/CONVERGENCE_MATRIX.md §3 (L41,
+    confirming no OQ-N assignment), MACHINE_READABLE_SPEC_PLAN.md §2.3 rows
+    for rigor-level.schema.yaml (L119) and profile.schema.yaml (L118), and
+    ADR-004 full text (grepped for its gate-injection semantic-change
+    disclosure as the precedent for this file's Part 1/Part 2 split).
+    docs/adr/ADR-001~009 grepped for "Deep Intelligence" / "required_rigor" /
+    "rigor mode": zero hits, confirming no prior ADR covers this question.
+  note: >
+    No mother document or ADR was modified to produce this file. The
+    overlap_with_board_grade token check above was performed by direct
+    comparison against the dimensions lists in this same file, not asserted
+    from memory. deep_intelligence's Atlas-enum mapping is explicitly
+    PROVISIONAL, not a compilation decision dressed up as one.

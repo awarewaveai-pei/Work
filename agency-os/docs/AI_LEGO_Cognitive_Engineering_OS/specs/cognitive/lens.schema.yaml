@@ -1,0 +1,291 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/lens.schema.yaml"
+title: Cognitive Lens / Perspective Contract
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of LEGO dimension C ("Perspective /
+  Lens" — Atlas §3 L142: "從誰的角度看？ — Customer / Regulator / CTO / Local
+  Resident"). Atlas Appendix A (L4579) lists `lens.schema.yaml` as a promised
+  spec but defines no schema fields for it anywhere in the document — the
+  ONLY fully-worked Lens instance in the entire corpus is Atlas §9's
+  "Lens Contract" example (`stakeholder.regulator`, L1032-1047), corroborated
+  by .ai/research/phase-0/method-inventory.yaml (the single entry anywhere in
+  any of the three mother documents with `category: "lens"` and
+  `has_contract: true`, L1123-1127). This file reverse-engineers the Lens
+  object shape from that one real instance plus the surrounding structural
+  evidence (the 10-family engineering-path taxonomy, the governance labels
+  used elsewhere, and the mandatory-design rules that reference Lens
+  behavior) — this is new design (Phase 3 compilation), not a
+  duplicate-definition merge, per MACHINE_READABLE_SPEC_PLAN.md §2.3's
+  method-execution-request.schema.yaml precedent ("無既有內容可沿用，需要新
+  設計，非重複定義修正"). Confidence is explicitly lower than
+  primitive.schema.yaml's kernel enum (24 verbatim values) precisely because
+  the generalizable field shape rests on a SINGLE concrete example — flagged
+  throughout and in `open_questions`, not smoothed over.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §2 總體架構 diagram, L[Perspectives / Lenses] node (L103, L113)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §3 八個正交 LEGO 維度, row C (L142)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 LEGO Contract, Lens Contract example (L1032-1047, the only fully-worked instance)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §17 確切工程路徑, /cognitive/lenses/ 10-family taxonomy (L3904-3915)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §22.3 Method-specific Gate, 'AI Expert Lens' row (L4204)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §29 方法搭配基本規則, rules 13/14/15 (L4550-4552)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §26 預期結果與驗收標準, '多角度' row (L4419)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md Appendix A (L4579, lens.schema.yaml listed)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §7 (L634, 'Cognitive Method 的完整定義...Lens...以 Atlas 為準')"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.3 row for lens.schema.yaml (L115, no dependency, no assigned finding)"
+  - ".ai/research/phase-0/method-inventory.yaml L1123-1127 (stakeholder.regulator, category: lens, has_contract: true, machine_id: stakeholder.regulator)"
+  - "docs/adr/ADR-005-db-migration-recipe-and-method-id-grammar.md Sub-decision (b) (L117-166, Method ID Grammar — cited for ID-pattern reasoning below, NOT as governing this file)"
+
+decided_by: >
+  No ADR governs this file. docs/architecture/MACHINE_READABLE_SPEC_PLAN.md
+  §2.3 row for lens.schema.yaml lists it READY with no ADR dependency and no
+  assigned finding (both columns "—"), described only as "Atlas Appendix A
+  既有承諾" (an existing Appendix A promise, filename only). Verified by grep
+  across docs/adr/ADR-001~009 (2026-08-29): three files (ADR-002, ADR-003,
+  ADR-008) contain the substring "lens" but each is an incidental prose usage
+  unrelated to a Lens Contract schema decision (confirmed by reading each hit
+  in context — none defines or rules on Lens object shape). Every field below
+  is therefore a direct Phase 3 compilation choice, recorded in
+  `compilation_decisions`, following the same "no existing ADR, decide
+  directly, disclose reasoning" pattern status-codes.schema.yaml used for
+  its own ADR-free sections.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+definitions:
+
+  lens_family:
+    description: >
+      Transcribed verbatim from Atlas §17's /cognitive/lenses/ engineering
+      path (L3904-3915) — the only place Atlas enumerates a closed set of
+      Lens categories. `stakeholder.regulator` (the one real instance) has
+      family "stakeholder", consistent with this list.
+    type: string
+    enum:
+      - stakeholder
+      - profession
+      - government
+      - local
+      - culture
+      - legal
+      - security
+      - privacy
+      - ethics
+      - accessibility
+
+  lens_id:
+    description: >
+      Pattern mirrors method.schema.yaml's ADR-005b-decided bare
+      `<family>.<name>` grammar (`^[a-z_]+\.[a-z_]+$`) — but ADR-005b is
+      explicitly scoped to "Method ID Grammar" (its own title), not Lens IDs;
+      it does not govern this field. The pattern is reused here because the
+      one real Lens instance in the corpus already uses that exact bare
+      dot-form (`stakeholder.regulator`, Atlas L1036), and the family half
+      matches one of the 10 `lens_family` values above one-for-one. This is
+      a structural-consistency compilation decision (same reasoning style as
+      manifest.schema.yaml's field-placement decisions), not a claim that
+      ADR-005b's ruling extends to lenses. See `compilation_decisions`.
+    type: string
+    pattern: "^[a-z_]+\\.[a-z_]+$"
+    examples: ["stakeholder.regulator"]
+
+  lens_label_value:
+    description: >
+      Values transcribed from the one real `labels` block (Atlas L1043-1046)
+      plus the parallel governance language at §22.3 L4204 ("Hypothetical
+      label; high-risk requires human expert") and §29 rules 14 (L4551, "AI
+      role perspective 不等於真人專家或民意") — same underlying invariant,
+      independently worded in two places, treated as corroborating (not
+      duplicate-with-drift) since both name the identical constraint: an AI
+      persona speaking AS a stakeholder must be labeled hypothetical and must
+      not be presented as impersonating a real person or real opinion.
+    type: string
+    enum: [required, allowed, forbidden]
+
+lens:
+  description: >
+    A single Cognitive Lens as a typed object — LEGO dimension C's
+    controlled contract shape. Field-for-field transcription of Atlas §9's
+    Lens Contract example (L1032-1047), which is the schema's only textual
+    anchor; every field below traces to that block unless noted otherwise.
+  type: object
+  required: [id, version, family, type, labels]
+  properties:
+    id:
+      $ref: "#/definitions/lens_id"
+      description: "Atlas L1036: `id: stakeholder.regulator`."
+    version:
+      type: string
+      description: "Atlas L1037: `version: 1.0.0`. Semver-shaped in the one example; no stricter pattern asserted since only one data point exists."
+    family:
+      $ref: "#/definitions/lens_family"
+      description: >
+        ADDITIVE field, not present as a separate key in the Atlas L1032-1047
+        example (the example's `id` already encodes family as its dot-prefix,
+        `stakeholder.regulator` -> family `stakeholder`). Broken out into its
+        own field here for the same reason manifest.schema.yaml keeps
+        `documents[].document_id` alongside a human-readable `file` — so
+        tooling can filter/validate by family without re-parsing `id`.
+    type:
+      type: string
+      description: >
+        Atlas L1038: `type: perspective`. The ONLY value ever observed in the
+        corpus — kept as an open string rather than a single-value enum,
+        since one data point cannot establish a closed vocabulary. See
+        `open_questions` (is `perspective` the only Lens type Atlas
+        envisions, or are there unobserved sibling types such as a
+        jurisdiction-lens or sector-lens `type`?).
+    requires:
+      type: array
+      items: { type: string }
+      description: >
+        Atlas L1039-1040: `requires: [JurisdictionContext]`. Named input
+        type(s) this Lens needs before it can run. Kept as a bare string
+        array (not a $ref into a typed-objects registry) for the same
+        Wave-ordering reason manifest.schema.yaml's `documents[].document_id`
+        avoids a hard dependency on document-registry.schema.yaml: this file
+        (Wave 3) has no listed dependency on the typed-objects/ subfolder
+        being built in parallel this same wave.
+    output:
+      type: array
+      items: { type: string }
+      description: "Atlas L1041-1042: `output: [PerspectiveAssessment]`. Same bare-string-array reasoning as `requires`."
+    labels:
+      type: object
+      description: >
+        Atlas L1043-1046 verbatim: the governance label block every Lens
+        instance must carry. Field names and enum values are the literal
+        three key-value pairs from the one real example, corroborated by
+        §22.3's AI Expert Lens gate row and §29 rule 14 (see
+        `lens_label_value` description above).
+      required: [evidence_backed, hypothetical_role_perspective, impersonation]
+      properties:
+        evidence_backed:
+          $ref: "#/definitions/lens_label_value"
+          description: "Atlas L1044: `evidence_backed: required`. Reinforced by §29 rule 13 (L4550): 'Culture / Local Lens 必須標 evidence；不可把 stereotype 當 fact'."
+        hypothetical_role_perspective:
+          $ref: "#/definitions/lens_label_value"
+          description: "Atlas L1045: `hypothetical_role_perspective: allowed`. Reinforced by §22.3 L4204: 'AI Expert Lens | Real Expert Opinion | Hypothetical label; high-risk requires human expert'."
+        impersonation:
+          $ref: "#/definitions/lens_label_value"
+          description: "Atlas L1046: `impersonation: forbidden`. Reinforced by §29 rule 14 (L4551): 'AI role perspective 不等於真人專家或民意'."
+
+# ---------------------------------------------------------------------------
+# Governance context this schema does NOT itself resolve (cited for
+# traceability; each belongs to a different file/finding, not claimed here)
+# ---------------------------------------------------------------------------
+related_but_out_of_scope:
+  - note: >
+      Atlas §22.3's "AI Expert Lens" and "LLM Arithmetic" gate-table rows
+      (L4204-4205) reference names that appear in NO F01-F24 catalog, lens
+      family list, or contract anywhere in Atlas — this is DOC-method_atlas-4
+      (verified-findings.yaml), assigned to no schema file in
+      MACHINE_READABLE_SPEC_PLAN.md §2.3's finding column (lens.schema.yaml's
+      row lists no assigned finding either). This file does NOT claim to
+      resolve DOC-method_atlas-4 — it only reuses the same rows as
+      corroborating evidence for the `labels` field shape above. Whether
+      "AI Expert Lens" is meant to BE a `lens` instance under this schema (in
+      which case it needs a proper `id` like `profession.ai_expert` and is
+      currently just an ungoverned narrative label) is left to whichever
+      future file is assigned DOC-method_atlas-4.
+  - note: >
+      §29 rule 15 (L4552, "高風險問題不得靠單一模型或單一方法形成 final
+      authority") and §26's "多角度" acceptance row (L4419, "高風險 Decision
+      有多 Lens + Dissent") describe a MULTI-lens governance requirement for
+      high-risk decisions (minimum lens count + dissent tracking). That is a
+      property of a Decision object consuming multiple Lens instances, not a
+      field on a single `lens` object — out of scope for this file, belongs
+      to decision.schema.yaml (Atlas Appendix A, not yet built in this wave).
+
+compilation_decisions:
+  - question: >
+      Should `id` follow method.schema.yaml's ADR-005b bare `<family>.<name>`
+      grammar, given ADR-005b's title and scope explicitly say "Method ID
+      Grammar"?
+    decision: "Reuse the identical pattern (`^[a-z_]+\\.[a-z_]+$`) for lens_id, without claiming ADR-005b governs it."
+    reasoning: >
+      The one real Lens instance in the entire corpus (`stakeholder.regulator`,
+      Atlas L1036) already uses that exact bare dot-form, and its family half
+      (`stakeholder`) is one of the 10 values in the independently-sourced
+      /lenses/ engineering-path taxonomy (§17 L3904-3915) — the same
+      structural parallel ADR-005's own Option B reasoning used for methods
+      (family-prefixed bare IDs, no redundant `method.`/`lens.` type prefix
+      since an outer `type`/category field already carries that information).
+      Picking a DIFFERENT grammar for lens_id with zero corpus evidence for it
+      would be inventing a field with no textual anchor, which the task
+      explicitly forbids. This is a Low-risk structural-consistency pick, not
+      a re-litigation of ADR-005b's scope.
+  - question: >
+      `family` does not appear as a distinct key in the one real Lens Contract
+      example — should this schema add it as a first-class field anyway?
+    decision: "Yes, as an ADDITIVE field derived from the `id` prefix."
+    reasoning: >
+      Same reasoning manifest.schema.yaml used to justify keeping `file`
+      alongside `documents[].document_id`: the information already exists
+      (encoded in `id`'s dot-prefix) but leaving it implicit forces every
+      consumer to re-parse the ID string to filter/group by family. Making it
+      explicit is additive detail, not a new invented concept — the 10-value
+      enum it validates against is itself verbatim from Atlas §17.
+  - question: >
+      Is `type: perspective` a fixed constant, or an open enum with unobserved
+      siblings?
+    decision: "Kept as an open `string`, not a single-value `const`/`enum`."
+    reasoning: >
+      A `const: perspective` would assert Atlas's design intends exactly one
+      Lens type forever, which no evidence supports one way or the other —
+      the /lenses/ folder's 10 families read as sub-categories of a shared
+      perspective-taking concept, not as evidence for or against additional
+      top-level `type` values. Flagged as a genuine open question rather than
+      silently deciding either way.
+
+open_questions:
+  - id: "MRSP-lens-1"
+    question: >
+      This entire schema generalizes from exactly ONE worked example
+      (`stakeholder.regulator`). Every other Lens family (profession,
+      government, local, culture, legal, security, privacy, ethics,
+      accessibility) is named only as a folder in §17's engineering path,
+      with zero contract instances anywhere in any of the three mother
+      documents (confirmed: method-inventory.yaml's only `category: "lens"`
+      entry is this same one). Should Phase 4 (Method Family build-out)
+      produce at least one worked example per family before this schema is
+      considered validated against real usage, rather than just this one
+      family?
+    owner: "operator, or whichever future session builds out /lenses/*/ contracts"
+    blocks: "nothing in this schema; the shape is usable today for the one confirmed family"
+  - id: "MRSP-lens-2"
+    question: >
+      Is "AI Expert Lens" (Atlas §22.3 L4204) meant to be a real `lens`
+      instance under this schema (e.g. `profession.ai_expert`), or is it a
+      narrative-only label describing a FAILURE MODE (an AI impersonating a
+      real expert) rather than a governed Lens type to be instantiated? Left
+      open — see `related_but_out_of_scope` above; resolving it is
+      DOC-method_atlas-4's scope, not this file's.
+    owner: "operator, via whichever file is eventually assigned DOC-method_atlas-4"
+    blocks: "nothing in this schema"
+
+verification:
+  method: >
+    Read against Atlas §2 (L92-129), §3 (L134-149), §9 (L985-1047), §17
+    (L3861-3915), §22.3 (L4196-4210), §26 (L4405-4427), §29 (L4536-4552),
+    Appendix A (L4574-4604); Master Plan §7 (L634); ADR-005 full text
+    (L1-198, confirming its scope is limited to Method ID Grammar);
+    method-inventory.yaml (grepped for `category: "lens"` — exactly one hit,
+    L1123-1127); verified-findings.yaml DOC-method_atlas-4 (read for the
+    `related_but_out_of_scope` boundary, not claimed as resolved here); a
+    full-document grep of "lens"/"Lens"/"LENS" across all three mother
+    documents to confirm no other structural (non-prose) usage was missed.
+  note: >
+    No mother document or ADR was modified to produce this file. Every
+    normative field traces to Atlas L1032-1047 (the one real instance) or to
+    the independently-sourced §17 family taxonomy; every field this file adds
+    beyond that single example (`family` as an explicit key, the `lens_id`
+    pattern choice, `type` left open rather than constant) is recorded in
+    `compilation_decisions` rather than asserted silently, and the
+    single-example confidence limit is disclosed in `open_questions` rather
+    than presented as a fully-validated closed schema.

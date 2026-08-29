@@ -1,0 +1,274 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/security/personal-data-envelope.schema.yaml"
+title: Personal Data Envelope
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the encryption envelope format
+  for any Event Ledger field classified Confidential or Restricted under
+  MP §61/EC §101, per ADR-002's crypto-shredding Recommendation (Option A).
+  Every such field is encrypted with a per-subject Data Encryption Key
+  (DEK, AES-256-GCM) before being written to the (append-only, immutable)
+  Event Ledger; the DEK itself is wrapped by a tenant-level Key-Encryption
+  -Key (KEK) and never appears in plaintext in the Ledger. This is the
+  concrete field-level "envelope" that ADR-002 Consequences item 2 requires
+  EC §27 (Event/Messaging Contract) to define, but which EC §27 itself does
+  not yet specify — this schema fills that gap.
+
+  Fulfilling a data subject's erasure request means destroying that
+  subject's DEK record in `key-vault-lifecycle.schema.yaml` (this file's
+  sibling in the same directory, Wave 2 per
+  docs/architecture/MACHINE_READABLE_SPEC_PLAN.md:146-147) — NOT editing or
+  deleting the envelope instance itself, which remains physically present
+  and untouched in the Event Ledger forever (append-only/`event_id`
+  non-reuse, EC §27, is preserved exactly). After destruction, a
+  projection attempting to decrypt this envelope fails and substitutes the
+  `REDACTED` sentinel per ADR-002 Recommendation, without halting Replay
+  (MP §112).
+
+  This file is the single source of truth for the envelope's field shape;
+  the mother documents reference it (once EC §27 is amended per ADR-002
+  Consequences item 2's Migration process), they do not redefine it.
+
+compilation_decisions:
+  - question: >
+      ADR-002 Consequences item 2 and
+      docs/architecture/MACHINE_READABLE_SPEC_PLAN.md:146 both list the
+      envelope's fields verbatim as `cipher_alg/kek_ref/dek_wrapped/iv/
+      ciphertext/classification_tag` — six fields. Neither source lists a
+      field identifying WHICH subject's DEK was used, yet ADR-002's whole
+      mechanism (Recommendation; "該 data subject 專屬的 DEK") requires
+      resolving from an envelope instance to a specific per-subject
+      `key_record` in the Vault in order for decrypt-time REDACTED
+      substitution, and destruction-time "attempt decrypt against all
+      known references" verification (ADR-002:65), to be possible at all.
+    decision: >
+      Add `dek_key_id` as an ADDITIVE field: a soft cross-reference to
+      `key-vault-lifecycle.schema.yaml`'s `key_record.key_id` for the
+      specific DEK used to produce this envelope's `dek_wrapped`.
+    reasoning: >
+      Same additive-field pattern as manifest.schema.yaml's `app_version`
+      and `workflow_version`/`capability_version`: the six-field list in
+      ADR-002/the spec plan is the MINIMUM the ADR calls out explicitly,
+      not an exhaustive ceiling — without a stable per-envelope key
+      identifier, the Vault-mediated unwrap/lookup ADR-002's mechanism
+      depends on has no addressable target. Kept as a soft reference
+      (non-$ref) rather than a hard $ref for the same reason
+      manifest.schema.yaml gives for its own forward references: this file
+      and key-vault-lifecycle.schema.yaml are same-wave (Wave 2) siblings
+      authored together in this task, so field-name consistency is
+      controlled directly rather than needing schema-level enforcement.
+  - question: >
+      `classification_tag`'s legal values are not restated in ADR-002 —
+      it only says the envelope wraps fields "依 MP §61 分級為
+      Confidential/Restricted 者" (classified Confidential or Restricted
+      per MP §61). MP §61/EC §101 both define a FOUR-value classification
+      vocabulary (Public/Internal/Confidential/Restricted, verified
+      identical in both documents, no drift).
+    decision: >
+      `classification_tag` enum reuses the full four-value MP §61/EC §101
+      vocabulary verbatim (no fifth value invented), but this schema
+      documents as a `constraint` that a legal envelope instance's value
+      MUST be `Confidential` or `Restricted` — `Public`/`Internal` data is
+      never wrapped in this envelope in the first place (it stays
+      plaintext in the Ledger), per ADR-002's explicit scoping.
+    reasoning: >
+      Reusing the single canonical four-value enum (rather than inventing
+      a narrower two-value one just for this file) keeps this schema
+      referentially consistent with the one classification vocabulary used
+      everywhere else in the mother documents, while the `constraint`
+      narrative captures the real, narrower legal range for THIS field
+      without fragmenting the shared vocabulary into per-consumer subsets
+      — the same reasoning epistemic-label.schema.yaml uses for keeping
+      one canonical `epistemic_type` enum rather than letting each ADR
+      define its own local subset.
+
+source_of_truth_for:
+  - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md:59-67 (Option A Recommendation — per-subject DEK/AES-256-GCM, tenant KEK, envelope encryption)"
+  - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md:91-99 (Recommendation, invariant statement: content readability vs event existence as orthogonal axes)"
+  - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md §Consequences item 2 (envelope format: cipher_alg/kek_ref/dek_wrapped/iv/ciphertext/classification_tag)"
+  - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md:61 (REDACTED sentinel on decrypt failure, no Replay interruption, per MP §112)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md:146 (security/personal-data-envelope.schema.yaml, Wave 2, READY, dependency: domain/tenant.schema.yaml's encryption_root_key_ref)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md:2639-2664 (§61 Data Classification: Public/Internal/Confidential/Restricted)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md:2955-2971 (§101 Data Classification, identical four-value list, no drift)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md:2999 (§102, prohibition on full sensitive-payload dumps — informs why raw plaintext must never sit beside the envelope)"
+decided_by: >
+  docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md
+  (registered ACCEPTED in docs/adr/ADR_INDEX.md:8; see
+  `key-vault-lifecycle.schema.yaml`'s `open_questions` entry
+  MRSP-key-vault-1 for a stale "Status: PROPOSED" header still present in
+  the ADR-002 file itself — out of scope to fix from this file). Field
+  additions and enum-reuse choices within this file are Phase 3
+  compilation decisions per
+  docs/architecture/MACHINE_READABLE_SPEC_PLAN.md:146, not a separate ADR
+  (see `compilation_decisions` above).
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+type: object
+title: PersonalDataEnvelope
+description: >
+  The value of any Event Ledger field classified Confidential or
+  Restricted. Replaces the plaintext value that field would otherwise
+  hold; the enclosing event's other (non-personal-data) fields and the
+  event's own existence, ordering, and `event_id` are entirely unaffected.
+required: [cipher_alg, kek_ref, dek_key_id, dek_wrapped, iv, ciphertext, classification_tag]
+properties:
+
+  cipher_alg:
+    type: string
+    const: "AES-256-GCM"
+    description: >
+      Fixed per ADR-002 Recommendation ("以該 data subject 專屬的 DEK
+      （AES-256-GCM）加密"). Not a free-choice field — every envelope
+      instance uses this one algorithm; a different value would itself be
+      evidence of a non-conforming write path.
+
+  kek_ref:
+    type: string
+    description: >
+      Identifies the tenant-level KEK that wraps this envelope's DEK.
+      Soft cross-reference (non-$ref, per manifest.schema.yaml's
+      established forward-reference pattern) to two sibling fields that
+      MUST agree for a given tenant: `domain/tenant.schema.yaml`'s
+      `encryption_root_key_ref` (docs/architecture/MACHINE_READABLE_SPEC_PLAN.md:142)
+      and `key-vault-lifecycle.schema.yaml`'s `key_record.key_id` for the
+      matching `key_use == KEK` record. Enforced at the application layer,
+      not by a schema-level $ref, since this file has no build-order
+      dependency on domain/tenant.schema.yaml beyond the one already noted
+      in MACHINE_READABLE_SPEC_PLAN.md:146 (both are Wave 2).
+
+  dek_key_id:
+    type: string
+    description: >
+      ADDITIVE field (see `compilation_decisions` above) — soft
+      cross-reference to `key-vault-lifecycle.schema.yaml`'s
+      `key_record.key_id` for the `key_use == DEK` record that was used to
+      produce `dek_wrapped`. This is the field a decrypt-time lookup and a
+      destruction-time "attempt decrypt against all known references"
+      verification (ADR-002:65) both key off of; `kek_ref` alone is not
+      sufficient because one tenant KEK wraps many subjects' DEKs.
+
+  dek_wrapped:
+    type: string
+    description: >
+      The subject's DEK, itself encrypted ("wrapped") under the KEK named
+      by `kek_ref` (standard envelope-encryption pattern). Opaque
+      ciphertext to any reader without Vault-mediated access to that KEK.
+      Base64 or equivalent binary-safe encoding; exact encoding is an
+      implementation choice not fixed by ADR-002 or this schema.
+
+  iv:
+    type: string
+    description: >
+      Initialization vector / nonce for the AES-256-GCM `ciphertext` field
+      below. MUST be unique per encryption operation (standard GCM
+      requirement — nonce reuse under the same key breaks GCM's
+      confidentiality and authenticity guarantees); this schema does not
+      itself enforce uniqueness (that is a write-path implementation
+      responsibility), it only requires the field to be present.
+
+  ciphertext:
+    type: string
+    description: >
+      The AES-256-GCM ciphertext of the original personal-data field
+      value, encrypted under the (unwrapped) DEK identified by
+      `dek_key_id` using `iv`. Base64 or equivalent binary-safe encoding.
+
+  classification_tag:
+    type: string
+    enum: [Public, Internal, Confidential, Restricted]
+    description: >
+      Reuses the single canonical MP §61 / EC §101 four-value
+      classification vocabulary verbatim (see `compilation_decisions`
+      above for why the full four-value enum is kept rather than a
+      narrower local one).
+    constraints:
+      - "A legal envelope instance's classification_tag MUST be Confidential or Restricted. Public/Internal fields are never wrapped in this envelope — per ADR-002's explicit scoping ('個資欄位（依 MP §61 分級為 Confidential/Restricted 者）'), they remain plaintext in the Event Ledger."
+
+on_decrypt_failure:
+  description: >
+    Non-normative behavioral note (read-path guidance, not a stored field
+    on the envelope itself) — co-located here for discoverability since it
+    is the direct consequence of a `dek_key_id` lookup finding a destroyed
+    `key_record`. Full definition lives on
+    `key-vault-lifecycle.schema.yaml`'s `key_destruction_record
+    .on_decrypt_failure_projection_behavior`.
+  behavior: >
+    When a projection's decrypt attempt against this envelope fails
+    because the referenced DEK has been destroyed, the projection
+    substitutes the literal sentinel value `REDACTED` for the field and
+    continues processing — it MUST NOT throw, halt, or otherwise interrupt
+    the 30-year Replay Workflow (MP §112). A decrypt failure for any OTHER
+    reason (corrupt ciphertext, wrong IV, KEK unavailable due to an
+    in-progress Vault restore per `key-vault-lifecycle.schema.yaml`'s
+    `vault_restore_event`) is a distinct error condition and MUST NOT be
+    silently mapped to the same REDACTED sentinel — conflating "this
+    subject's data was deliberately erased" with "something is broken"
+    would defeat the Verification step's ability to confirm a destruction
+    actually happened (ADR-002:65).
+
+examples:
+  - description: >
+      A Restricted-classified field (e.g. a claimant's national ID number
+      inside a ClaimCreated event) with an intact, undestroyed DEK.
+    value:
+      cipher_alg: "AES-256-GCM"
+      kek_ref: "kek-tenant-7f2c"
+      dek_key_id: "dek-subject-91ab"
+      dek_wrapped: "base64:AbCdEf...=="
+      iv: "base64:MTIzNDU2Nzg5MDEy"
+      ciphertext: "base64:XyZ012...=="
+      classification_tag: Restricted
+  - description: >
+      The same field's shape is unchanged after the subject's DEK is
+      destroyed (per key-vault-lifecycle.schema.yaml's
+      key_destruction_record) — the envelope itself is never edited; only
+      the read-path's ability to decrypt it changes.
+    value:
+      cipher_alg: "AES-256-GCM"
+      kek_ref: "kek-tenant-7f2c"
+      dek_key_id: "dek-subject-91ab"
+      dek_wrapped: "base64:AbCdEf...=="
+      iv: "base64:MTIzNDU2Nzg5MDEy"
+      ciphertext: "base64:XyZ012...=="
+      classification_tag: Restricted
+    note: "Decrypting this now yields REDACTED, per on_decrypt_failure above — the stored bytes are byte-for-byte identical to before destruction."
+
+open_questions:
+  - id: "MRSP-envelope-1"
+    question: >
+      Neither ADR-002 nor this schema specifies the exact KMS/HSM-level
+      mechanism by which destroying the Vault-side `key_record` named by
+      `dek_key_id` causes THIS envelope's already-immutable `dek_wrapped`/
+      `ciphertext` bytes (permanently embedded in the Event Ledger) to
+      become unrecoverable. See `key-vault-lifecycle.schema.yaml`'s
+      `open_questions` entry MRSP-key-vault-2 for the full statement — it
+      is the same open question, viewed from the envelope side rather than
+      the Vault side.
+    owner: "implementation team, at KMS/HSM product-selection time"
+    blocks: "nothing in this schema; the envelope's field shape is valid regardless of which KMS/HSM technique ultimately satisfies ADR-002's destruction-verification test"
+  - id: "MRSP-envelope-2"
+    question: >
+      EC §27 (Event/Messaging Contract) has not yet been amended to
+      reference this schema — ADR-002 Consequences item 2 calls for that
+      amendment, and ADR-002's own Migration section requires it to go
+      through the ADR-006 `.ai/proposals/` process (operator-approved),
+      not a direct edit. Until that PROPOSAL lands, EC §27 itself is
+      silent on the envelope format this file defines.
+    owner: "operator, via an ADR-006 PROPOSAL against EC §27"
+    blocks: "nothing in this schema; it is usable as the de facto envelope format immediately, the open item is only the mother-document cross-reference"
+
+verification:
+  method: "Read against ADR-002 full text, ADR_INDEX.md, MACHINE_READABLE_SPEC_PLAN.md:142-149, MP §61 (L2639-2664), EC §101-102 (L2955-2999)."
+  note: >
+    No mother document or ADR was modified to produce this file. The six
+    ADR-002/spec-plan-listed fields (cipher_alg/kek_ref/dek_wrapped/iv/
+    ciphertext/classification_tag) are transcribed verbatim; `dek_key_id`
+    is the one additive field beyond that list, justified in
+    `compilation_decisions` above as necessary for the mechanism ADR-002
+    itself describes to be addressable at all — not a new architecture
+    decision.

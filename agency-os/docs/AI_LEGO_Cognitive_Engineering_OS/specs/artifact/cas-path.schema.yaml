@@ -1,0 +1,261 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/artifact/cas-path.schema.yaml"
+title: Tenant-Scoped Content-Addressed Storage Path
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the Content-Addressed Storage (CAS)
+  path grammar. Resolves P1-CONFLICT-2: Master Plan §58 defined a single
+  GLOBAL path grammar (`/objects/sha256/aa/bb/<hash>`, no tenant/project
+  segment) at the same time Master Plan §1.5 declared Tenant Isolation the
+  outermost/most-fundamental blast-radius boundary in the platform — a storage
+  layer that physically merges every tenant's bytes into one namespace cannot
+  simultaneously be the thing whose isolation is the platform's most
+  fundamental security claim. ADR-003 sub-decision (b) adopts Option A
+  (tenant-scoped namespace) as the default rule, with Option C's narrow,
+  explicitly-enumerated global exception pool as the only sanctioned carve-out
+  for content that has no privacy expectation by construction. Option B
+  (global CAS + per-tenant encryption) and Status Quo (no change) were
+  rejected by the ADR; this schema does not model them.
+
+  This file defines the STORAGE-LAYER path grammar only. It is distinct from,
+  and does not replace, the logical `artifact://project/<id>/source/<id>`
+  Portable Artifact URI (Master Plan §59, L2588-2596) — that is a separate,
+  not-yet-built spec file (`specs/artifact/portable-uri.schema.yaml`, not in
+  scope for this task) that may resolve TO a cas-path at read time. The two
+  layers are not in conflict; conflating them was not a finding raised by
+  Phase 0/1 and is not addressed here.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §58 Immutable-first, global path grammar — SUPERSEDED (L2570-2584, literal grammar at L2583)"
+  - "docs/adr/ADR-003-tenant-model-and-cas-isolation.md Context, P1-CONFLICT-2 (L10-13)"
+  - "docs/adr/ADR-003-tenant-model-and-cas-isolation.md Sub-decision (b), Options Considered + tradeoff table (L57-85)"
+  - "docs/adr/ADR-003-tenant-model-and-cas-isolation.md Recommendation item (b) (L100-104)"
+  - "docs/adr/ADR-003-tenant-model-and-cas-isolation.md Migration / Rollback, pre-launch gate (L114-118)"
+decided_by: "docs/adr/ADR-003-tenant-model-and-cas-isolation.md (ACCEPTED 2026-08-29)"
+
+compilation_decisions:
+  - question: >
+      ADR-003 states the tenant-scoped grammar as a literal example,
+      `/objects/<tenant_id>/sha256/aa/bb/<hash>` (Recommendation item (b),
+      quoting Option A's definition at L61), but does not itself formalize
+      (i) the exact derivation rule for the two shard directories `aa`/`bb`,
+      or (ii) a concrete path token for Option C's global exception pool
+      (the ADR only specifies the pool's ADMISSION rule — an explicit,
+      logged, platform-level promotion — not its physical path).
+    decision: >
+      (i) `aa` = hash[0:2], `bb` = hash[2:4] (first 4 hex characters of the
+      sha256 digest, split into two 2-character directories) — the standard
+      CAS fan-out convention the literal `aa`/`bb` placeholders in both the
+      superseded MP §58 grammar and ADR-003's own restatement of it already
+      imply, made explicit here because a schema pattern needs a concrete
+      rule, not a placeholder. (ii) the global exception pool uses the
+      literal sentinel segment `_global` in the position the tenant_id
+      segment normally occupies, e.g. `/objects/_global/sha256/aa/bb/<hash>`.
+      `_global` cannot collide with a real tenant_id because sub-decision (a)
+      types tenant_id as `uuid` (ADR-003 L44) and `_global` is not a valid
+      UUID string.
+    reasoning: >
+      Both are additive concretizations of an already-decided structure, not
+      new architecture decisions — consistent with this task's boundary of
+      compiling an already-ACCEPTED ADR. Reusing the *same* `sha256/aa/bb/<hash>`
+      suffix shape for both the per-tenant and global-pool cases (differing
+      only in the first path segment) keeps exactly one sharding/lookup
+      implementation for both branches, which matters for the 30-year
+      survivability driver ADR-003 names explicitly (Decision Driver 1):
+      two independent sharding schemes would be two things a future engineer
+      could silently let drift apart.
+  - question: >
+      Option C requires "an explicitly-flagged 'safe to dedupe' content
+      class" (ADR-003 L65) gated by "an explicit, logged, platform-level
+      action" (ADR-003 L83), but names only two example classes
+      (platform-authored templates, ingested public regulatory texts) and
+      does not enumerate a closed list or define the promotion record's
+      shape.
+    decision: >
+      `content_class` is a schema enum seeded with the ADR's two named
+      examples plus a fail-closed default: no third value may be added to
+      this enum without amending it here (i.e., adding a new eligible class
+      is itself an explicit, reviewable, logged action against THIS file,
+      mirroring the ADR's own "explicit, logged" requirement one level up).
+      The promotion record (`global_pool_promotion`) requires `promoted_by`,
+      `promoted_at`, and `authorization_ref` — the minimal fields needed to
+      satisfy "explicit, logged, platform-level action" mechanically.
+    reasoning: >
+      Per ADR-003's own fail-closed convention (Decision Driver 6, citing
+      Atlas §21 rule 1: AI-generated idea defaults to DRAFT), an open-ended
+      or free-text content_class would let the classification gate — which
+      the ADR itself calls "a new (narrow, auditable) attack surface"
+      (tradeoff table, Security row) — grow without the same scrutiny that
+      produced the original two examples. WHO is authorized to add a
+      content_class value or execute a promotion (which A0-A4 authority
+      level) is deliberately NOT decided here: that mapping is
+      `execution/authority.schema.yaml`'s job (Wave 5, currently
+      SKELETON_ONLY per MACHINE_READABLE_SPEC_PLAN.md §2.2) — this file only
+      requires that an `authorization_ref` be recorded, not what
+      authorizes it.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+definitions:
+
+  sha256_hash:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+    description: "Lowercase hex sha256 digest of the object's byte content."
+
+  tenant_segment:
+    description: >
+      The path segment occupying the position ADR-003 calls `<tenant_id>`.
+      Soft reference only: cross-references `domain/tenant.schema.yaml`'s
+      `tenant_id` field (type `uuid`, per ADR-003 sub-decision (a), L44) by
+      NAME and FORMAT, NOT a hard $ref — `domain/tenant.schema.yaml` is a
+      concurrent Wave 2 deliverable and may not exist on disk yet when this
+      file is read, the same forward-reference style manifest.schema.yaml
+      uses for `document-registry.schema.yaml` (Wave 5). Exactly one of the
+      two alternatives applies per object: a real tenant's UUID (default,
+      tenant-scoped path), or the literal sentinel `_global` (Option C
+      exception pool only, requires a `global_pool_promotion` record — see
+      below).
+    type: string
+    oneOf:
+      - description: "Default: a real tenant, tenant-scoped storage (Option A)."
+        pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      - description: "Exception: the narrow global-dedup pool (Option C)."
+        const: "_global"
+
+  cas_path:
+    type: object
+    description: >
+      Structured (parsed) form of a CAS path. `path` is the canonical
+      serialized string form; the other fields are its decomposition,
+      present so validators and tooling do not have to re-parse `path`.
+    required: [path, tenant_segment, hash, shard_1, shard_2]
+    properties:
+      path:
+        type: string
+        description: >
+          Canonical serialized path. Default form:
+          `/objects/<tenant_id>/sha256/<shard_1>/<shard_2>/<hash>`.
+          Exception form (content_class-eligible only):
+          `/objects/_global/sha256/<shard_1>/<shard_2>/<hash>`.
+        pattern: "^/objects/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|_global)/sha256/[0-9a-f]{2}/[0-9a-f]{2}/[0-9a-f]{64}$"
+      tenant_segment:
+        $ref: "#/definitions/tenant_segment"
+      hash:
+        $ref: "#/definitions/sha256_hash"
+      shard_1:
+        type: string
+        pattern: "^[0-9a-f]{2}$"
+        description: "hash[0:2], per compilation_decisions above."
+      shard_2:
+        type: string
+        pattern: "^[0-9a-f]{2}$"
+        description: "hash[2:4], per compilation_decisions above."
+      global_pool_promotion:
+        description: >
+          REQUIRED when and only when `tenant_segment == "_global"`. Absent
+          for every ordinary tenant-scoped object. This is the machine
+          record of ADR-003's "explicit, logged, platform-level action"
+          admission requirement for Option C.
+        type: object
+        required: [content_class, promoted_by, promoted_at, authorization_ref]
+        properties:
+          content_class:
+            type: string
+            enum:
+              - PLATFORM_AUTHORED_TEMPLATE
+              - PUBLIC_REGULATORY_TEXT
+            description: >
+              Fail-closed enum. Seeded verbatim from ADR-003 Option C's two
+              named examples ("platform-authored templates, ingested public
+              regulatory texts", L65). No other value is legal without
+              amending this schema file itself — see compilation_decisions.
+          promoted_by:
+            type: string
+            description: "Actor/service identity that executed the promotion."
+          promoted_at:
+            type: string
+            format: date-time
+          authorization_ref:
+            type: string
+            description: >
+              Reference to the platform-level authorization record for this
+              promotion (exact shape owned by execution/authority.schema.yaml,
+              Wave 5 — soft reference only, same rationale as tenant_segment
+              above).
+
+default_scope:
+  description: >
+    Fail-closed default per ADR-003 Decision Driver 6 and the tradeoff
+    table's Security row ("fails closed: a bug returns 404, not another
+    tenant's plaintext"): every object is tenant-scoped unless it carries a
+    `global_pool_promotion` record. There is no default that resolves to the
+    global pool.
+  rule: "tenant_segment == real tenant_id, UNLESS an explicit global_pool_promotion record exists."
+
+dedup_check_scope:
+  description: >
+    Closes the CAS "instant upload" side-channel P1-CONFLICT-2 flagged
+    (ADR-003 Context, L13): a pre-upload hash-existence check MUST be scoped
+    to the requesting tenant's own namespace (`tenant_segment == tenant_id`)
+    by default. A hash-existence check against the `_global` namespace is
+    legitimate ONLY for content already classified/promoted under
+    `global_pool_promotion` — that pool is intentionally public with "no
+    privacy expectation by definition" (ADR-003 tradeoff table, Privacy row),
+    so an existence-check hit there discloses nothing about any tenant.
+  forbidden: "A hash-existence check against another tenant's real tenant_id namespace, under any code path."
+
+deletion_semantics:
+  description: >
+    Per ADR-003 tradeoff table (Correctness row): "deletion is a prefix
+    delete" under tenant-scoped storage. Deleting `/objects/<tenant_id>/`
+    entirely removes that tenant's CAS footprint with zero reads against any
+    other tenant's namespace (including `_global`).
+  pre_launch_gate:
+    description: >
+      Transcribed verbatim from ADR-003 Migration/Rollback (L117): before
+      first production tenant onboarding, verify via real test that (1) two
+      tenants uploading identical content produce two distinct storage paths
+      with no observable latency differential, and (2) a tenant deletion
+      request for a locally-referenced hash completes with zero reads
+      against any other tenant's namespace. This is a pre-launch acceptance
+      test requirement, not optional documentation.
+
+open_questions:
+  - id: "cas-path-1"
+    question: >
+      Which A0-A4 authority level (or role) is permitted to execute a
+      `global_pool_promotion` action, and what does `authorization_ref`
+      concretely point to? ADR-003 requires the action be "explicit, logged,
+      platform-level" but does not name an authorizer.
+    owner: "operator, via execution/authority.schema.yaml (Wave 5, currently SKELETON_ONLY)"
+    blocks: "nothing in this schema — the field is required and typed as an opaque reference string; only its downstream resolution is unresolved"
+  - id: "cas-path-2"
+    question: >
+      ADR-003 Consequences item (ii) flags — as explicit follow-up, not
+      solved by this ADR — how shared cross-workspace components (a
+      Knowledge Graph or Vector Index) avoid cross-tenant leakage when they
+      reference CAS objects. This schema defines the storage path only; it
+      does not define or constrain how any consumer indexes or caches
+      references to these paths.
+    owner: "operator, Round 2 ADR — tracked as MRSP-5 / specs/security/tenant-isolation-controls.schema.yaml (BLOCKED_PENDING_ROUND2_ADR) in docs/architecture/MACHINE_READABLE_SPEC_PLAN.md"
+    blocks: "nothing in this schema; flagged for completeness per R4 (claim-before-verify)"
+
+verification:
+  method: >
+    Read against MP §58 (L2570-2584) and MP §59 (L2588-2596, boundary check
+    only), ADR-003 full text (Context P1-CONFLICT-2, Sub-decision (b) Options
+    Considered + tradeoff table, Recommendation, Consequences, Migration/
+    Rollback), docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.5 row for
+    cas-path.schema.yaml and §3 Build Order (Wave 2).
+  note: >
+    No mother document or ADR was modified to produce this file. The path
+    grammar's tenant-scoped default and the global-pool exception's
+    admission requirement are transcribed from ADR-003 verbatim; the shard
+    derivation rule, the `_global` sentinel token, and the promotion
+    record's exact field list are Phase 3 compilation decisions recorded
+    above, not new architecture decisions.

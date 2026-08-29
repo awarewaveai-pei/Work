@@ -1,0 +1,447 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/execution/data-deletion.schema.yaml"
+title: Data Deletion Contract
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of EC §31 Data Deletion Contract
+  (L1225-1251), extended per ADR-002 Consequences item 3 with the branch this
+  file exists to add: EC §31's single 10-step pipeline
+  (`Authorization → Legal Hold Check → Retention Check → Dependency Check →
+  Dry Run → Count/Scope Preview → Approval → Deletion → Verification →
+  Deletion Evidence`, L1230-1248) is followed by BOTH deletion types, but
+  "個資刪除（crypto-shred）" (personal-data deletion via crypto-shred) and
+  "一般 production row 刪除" (ordinary production row deletion) resolve to
+  two DIFFERENT Verification (and, as ADR-002's Option A section makes
+  concrete, Dependency Check / Deletion / Deletion Evidence) semantics —
+  they are not the same operation wearing different labels. This file also
+  carries the Codex-oracle-revised two-scenario Rollback split from
+  ADR-002's Migration/Rollback section, replacing an earlier single
+  "stop accepting new deletion requests" description that directly
+  contradicted ADR-002's own Decision Driver #2 (EC §31 must not fail the
+  first real DSAR). This file is the single source of truth for how EC §31's
+  steps branch by deletion type; EC §31's own prose remains the source of
+  truth for the 10-step sequence itself (unchanged, cited verbatim below).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §31 Data Deletion Contract (L1225-1251) — the 10-step sequence and 'Soft delete 不等於合規刪除' (L1251), unchanged"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §30 Data Integrity Contract (L1198-1221) — 'Migration 完成不能只看 command exit code = 0. 必須證明 data invariant = PASS' (L1211-1221), the same completion-proof standard this file applies to the production_row branch's Verification step"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §65 Content-addressed Evidence (L2185-2194, hash/source/timestamp/producer) and §66 Audit Event (L2200-2216, who/what/when/where/why/input/decision/policy/result; 'Audit 不記 secret' L2216) — the generic evidence shape the production_row branch's Deletion Evidence step reuses"
+  - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md Context section (L14, EC §31 exact citation) — establishes this file's task boundary"
+  - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md Option A section (L59-67) — the crypto-shred branch's Dependency Check/Deletion/Verification definitions, transcribed verbatim into `branches.personal_data_crypto_shred` below"
+  - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md Consequences item 3 (L128) — the two-branch/two-Verification-definition mandate this file implements"
+  - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md Consequences item 6 (L131) and 'Codex Oracle 對抗式覆審' section (L103-117, 修正 2) — Key Destruction Record Replay on Restore, soft-referenced (not modeled) below"
+  - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md Migration / Rollback section, Codex-revised version (L137-140) — the two-scenario Rollback split transcribed verbatim into `rollback` below"
+  - "docs/architecture/DEVOPS_SRE_PLAN.md §3.2-3.3 (L120-134) — WORM 35-day immutability window and backup-KMS-realm isolation, cross-checked by ADR-002 against the Key Vault restore risk window this file's `rollback.scenarios.operational_key_vault_incident` and the soft-referenced Key Destruction Record Replay step both depend on"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.5 row for execution/data-deletion.schema.yaml (L149) — dependency list (security/key-vault-lifecycle.schema.yaml)"
+
+decided_by: >
+  docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md (ACCEPTED
+  2026-08-29), Consequences item 3 (the two-branch/two-Verification mandate),
+  Option A section (the crypto-shred branch's per-step definitions), and the
+  Codex-revised Migration/Rollback section (the two-scenario split). All
+  branch-specific step semantics and the rollback scenario split are
+  ADR-decided verbatim (near-verbatim where translated from Traditional
+  Chinese prose to schema English, flagged individually below where
+  paraphrase occurs). The 10-step sequence itself is EC §31's own prose,
+  unmodified. Structural choices (array-of-steps vs. dict, instance-schema
+  shape) are Phase 3 compilation decisions per
+  docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.5 row for this file, not
+  a separate ADR (see compilation_decisions).
+
+compilation_decisions:
+  - question: >
+      ADR-002 Consequences item 3 says EC §31 needs "分支" (a branch) with
+      two different Verification definitions, but does not specify whether
+      the branching should be modeled as two independent step sequences, a
+      single sequence with per-step overrides, or a discriminated instance
+      schema.
+    decision: >
+      Model the 10-step sequence ONCE as shared `reference_sequence` (cited
+      verbatim from EC §31), then a `branches` dictionary keyed by
+      `personal_data_crypto_shred` / `production_row` that overrides ONLY the
+      steps ADR-002's own text actually gives different semantics for
+      (Dependency Check, Deletion, Verification, Deletion Evidence) — the
+      remaining six steps (Authorization, Legal Hold Check, Retention Check,
+      Dry Run, Count/Scope Preview, Approval) are left unlisted per branch,
+      meaning EC §31's generic prose definition applies identically to both,
+      since neither ADR-002 nor any mother document gives them a
+      branch-specific meaning.
+    reasoning: >
+      Matches this schema suite's existing pattern of "override only what
+      genuinely differs, inherit the rest" — same shape as
+      `risk-tier.schema.yaml`'s `tiers` dict (each tier only lists its own
+      `required_actions`, not a full restatement of the R0-R4 concept) and
+      `status-codes.schema.yaml`'s per-signal `side_state_mapping`.
+      Duplicating all 10 steps under both branch keys would invite silent
+      drift between two copies of text that ADR-002 never said should differ
+      (Authorization/Legal Hold Check/Retention Check/Dry Run/Count-Scope
+      Preview/Approval) — a documentation-duplication risk this file avoids
+      by construction, not by discipline.
+  - question: >
+      Should `personal_data_crypto_shred` and `production_row` requests share
+      one instance schema (`deletion_request`) with conditionally-required
+      fields, or two separate instance schemas?
+    decision: >
+      One `deletion_request` object with a `deletion_type` discriminator
+      (`personal_data_crypto_shred | production_row`), `subject_id` and
+      `target_refs` both present as optional fields, and a plain-English
+      `constraints` list stating the mutual-exclusivity rule (matching
+      `epistemic-label.schema.yaml`'s `locked.constraints` and
+      `tenant.schema.yaml`'s `status.constraints` style) instead of a
+      JSON-Schema `oneOf`/`if`/`then` conditional block.
+    reasoning: >
+      No existing file in this schema suite (epistemic-label, manifest,
+      tenant, risk-tier, status-codes) uses JSON-Schema conditional
+      (`oneOf`/`if`/`then`) validation for cross-field constraints — all of
+      them state such invariants as a plain-English `constraints` list and
+      leave enforcement to the consuming application. Introducing a new
+      validation-style convention in this file would be inconsistent with
+      the established house style for a Low-risk naming/structure choice,
+      not a case where the stronger mechanism is actually required by
+      ADR-002's text.
+  - question: >
+      ADR-002's Codex-revised Rollback section (L137-140) describes two
+      scenarios in prose (an operational incident and an architectural
+      reversal) but does not specify a machine-readable event/record shape
+      for either.
+    decision: >
+      Model `rollback` as a policy-level definition (two `scenarios` plus a
+      shared `invariant`), not a per-instance record schema — mirroring
+      `risk-tier.schema.yaml`'s `tiers` (policy-level tier definitions, no
+      "risk-tier-assignment-event" instance schema) and
+      `status-codes.schema.yaml`'s `status_codes` registry (policy-level
+      signal catalog, no "status-transition-event" instance schema).
+    reasoning: >
+      ADR-002's own text describes behavioral rules and forbidden/required
+      actions ("MUST NOT stop accepting", "queue them", "escalate as
+      SEV1/SEV2"), not a record format to persist per rollback occurrence —
+      inventing an instance-event schema for something ADR-002 never framed
+      as an event would be scope creep beyond compiling the ADR. The
+      `deletion_request.steps[]` log (below) already carries the
+      per-instance auditable record; `rollback` documents the POLICY those
+      instances must follow when either scenario is active.
+
+# ---------------------------------------------------------------------------
+# EC §31's own 10-step sequence, cited verbatim, unmodified by this file.
+# ---------------------------------------------------------------------------
+reference_sequence:
+  source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §31 (L1229-1248)"
+  steps:
+    - Authorization
+    - Legal Hold Check
+    - Retention Check
+    - Dependency Check
+    - Dry Run
+    - Count / Scope Preview
+    - Approval
+    - Deletion
+    - Verification
+    - Deletion Evidence
+  invariant: "Soft delete 不等於合規刪除 (EC §31, L1251) — applies to BOTH branches below; a status flag flip is never sufficient completion evidence for either."
+
+# ---------------------------------------------------------------------------
+# Branch-specific step overrides. Steps not listed here for a branch use EC
+# §31's generic definition unchanged for that branch (see compilation_decisions).
+# ---------------------------------------------------------------------------
+branches:
+
+  personal_data_crypto_shred:
+    description: >
+      "個資刪除（crypto-shred）" (ADR-002 Consequences item 3). Targets a data
+      subject's per-subject DEK (ADR-002 Option A), NOT individual database
+      rows or event records — the underlying ciphertext/event content is
+      left physically untouched; deletion is a change in that content's
+      readability, not its existence (ADR-002 Recommendation's invariant
+      statement).
+    step_overrides:
+      Dependency Check:
+        definition: >
+          "找出所有引用此 DEK 的 event/projection/derived artifact"
+          (ADR-002 Option A, L65) — find every event, projection, and
+          derived artifact that references the subject's DEK, so
+          Verification below has a complete list to re-check.
+      Deletion:
+        definition: >
+          "銷毀 DEK 並寫一筆 Key Destruction Record 到獨立稽核日誌"
+          (ADR-002 Option A, L65) — destroy the subject's DEK (Key Vault
+          operation; see `security/key-vault-lifecycle.schema.yaml`, soft
+          reference, no `$ref`) and write a Key Destruction Record to an
+          audit log independent of the Event Ledger itself. This step does
+          NOT delete, mutate, or truncate any event, row, or backup — only
+          the key that makes the subject's ciphertext readable.
+      Verification:
+        definition: >
+          "對所有已知引用嘗試 decrypt，確認全部失敗" (ADR-002 Option A, L65)
+          — attempt decryption against every reference found by Dependency
+          Check above and confirm ALL attempts fail. This is a NEGATIVE
+          proof (successful failure to decrypt), fundamentally different
+          from `branches.production_row`'s Verification below (a POSITIVE
+          proof of physical absence) — this is the exact distinction
+          ADR-002 Consequences item 3 mandates EC §31 branch on.
+        caveat: >
+          A Key Vault restored from a backup snapshot taken before this
+          Deletion step can make previously-destroyed DEKs decryptable again
+          unless the Key Destruction Record Replay on Restore step (ADR-002
+          Codex-revised section, L103-117 修正 2; Consequences item 6, L131)
+          has run against that restore first. That replay mechanism is
+          soft-referenced here, not modeled — it belongs to
+          `security/key-vault-lifecycle.schema.yaml`'s restore procedure,
+          out of this file's scope.
+      Deletion Evidence:
+        definition: >
+          A `PersonalDataRedacted` event (see
+          `domain/personal-data-redacted-event.schema.yaml`, soft reference,
+          no `$ref`) recording `subject_id`, `redacted_fields[]`,
+          `redacted_at`, `authorization_ref` — per ADR-002 Option C's framing,
+          this event is EC §31's Deletion Evidence artifact for this branch,
+          NOT a substitute for the Verification step above. The Key
+          Destruction Record from the Deletion step is the second, equally
+          required piece of evidence for this branch (see
+          `personal-data-redacted-event.schema.yaml`'s `constraints`: the
+          event alone is not sufficient proof of compliant deletion).
+
+  production_row:
+    description: >
+      "一般 production row 刪除" (ADR-002 Consequences item 3). Ordinary
+      deletion of database rows / records / entities that are not
+      classified as personal data under MP §61 (Confidential/Restricted),
+      or that are personal data but not handled through the Event
+      Ledger/crypto-shred mechanism at all (e.g. a relational table outside
+      the event-sourced core). EC §31's steps apply in their original,
+      generic sense.
+    step_overrides:
+      Dependency Check:
+        definition: >
+          Generic EC §31 sense: find foreign-key references, cascading
+          relationships, and downstream consumers of the target row(s)
+          before deletion. Not specified further by EC §31's prose beyond
+          the step name itself; no ADR narrows this for the production_row
+          branch.
+      Deletion:
+        definition: >
+          Physical removal of the target row(s)/record(s) from storage — a
+          real `DELETE`-equivalent operation, not a status flag. EC §31
+          (L1251): "Soft delete 不等於合規刪除" applies to this branch in its
+          most literal sense — flipping a `deleted: true` column is
+          explicitly insufficient.
+      Verification:
+        definition: >
+          POSITIVE proof that the target row(s) are physically absent post-
+          deletion (e.g. a count/existence query returns zero), consistent
+          with EC §30 Data Integrity Contract's standard (L1211-1221):
+          "Migration 完成不能只看 command exit code = 0. 必須證明 data
+          invariant = PASS." — an exit code or a "rows affected" count from
+          the delete statement itself is not, by itself, this proof; a
+          separate post-deletion existence check is required. This is a
+          POSITIVE absence check, the mirror image of the crypto-shred
+          branch's NEGATIVE decrypt-failure check above.
+      Deletion Evidence:
+        definition: >
+          Generic EC §65 Content-addressed Evidence shape
+          (`hash / source / timestamp / producer`, L2185-2194) and/or EC §66
+          Audit Event shape (`who/what/when/where/why/input/decision/
+          policy/result`, L2200-2216) — no `PersonalDataRedacted` event is
+          emitted for this branch (that event type is specific to the
+          crypto-shred branch's subject-correlated redaction record).
+
+# ---------------------------------------------------------------------------
+# Instance schema for a single deletion request following the sequence above.
+# ---------------------------------------------------------------------------
+deletion_request:
+  type: object
+  required: [request_id, deletion_type, requested_at, steps]
+  properties:
+    request_id:
+      type: string
+      pattern: "^DEL-"
+    deletion_type:
+      type: string
+      enum: [personal_data_crypto_shred, production_row]
+      description: >
+        Selects which entry of `branches` above governs this request's
+        Dependency Check / Deletion / Verification / Deletion Evidence
+        semantics. Verbatim distinction from ADR-002 Consequences item 3.
+    subject_id:
+      type: [string, "null"]
+      default: null
+      description: >
+        Required (non-null) when `deletion_type: personal_data_crypto_shred`;
+        MUST be null for `production_row`. Same opaque soft-reference concept
+        as `domain/personal-data-redacted-event.schema.yaml`'s `subject_id`
+        — see that file's compilation_decisions for why no closed format is
+        assumed. See `constraints` below for the mutual-exclusivity rule with
+        `target_refs`.
+    target_refs:
+      type: array
+      items: { type: string, minLength: 1 }
+      default: []
+      description: >
+        Required (non-empty) when `deletion_type: production_row` — opaque
+        identifiers of the rows/records/entities targeted. MUST be empty for
+        `personal_data_crypto_shred` (that branch targets a subject's DEK by
+        `subject_id`, not individual rows).
+    requested_at:
+      type: string
+      format: date-time
+    steps:
+      type: array
+      description: >
+        Per-instance execution log, one entry per `reference_sequence.steps`
+        value, in order. Semantics of each entry for
+        `Dependency Check`/`Deletion`/`Verification`/`Deletion Evidence` are
+        resolved via `branches[deletion_type].step_overrides`; all other
+        steps use EC §31's generic, branch-independent meaning.
+      minItems: 10
+      items:
+        type: object
+        required: [step, status]
+        properties:
+          step:
+            type: string
+            enum:
+              - Authorization
+              - Legal Hold Check
+              - Retention Check
+              - Dependency Check
+              - Dry Run
+              - Count / Scope Preview
+              - Approval
+              - Deletion
+              - Verification
+              - Deletion Evidence
+          status:
+            type: string
+            enum: [pending, in_progress, passed, failed, queued]
+            description: >
+              `queued` is only legal while `rollback.scenarios.operational_key_vault_incident`
+              is active for a `personal_data_crypto_shred` request whose
+              `Deletion` step cannot reach the Key Vault — see `rollback`
+              below. It is not a legal value for any step of a
+              `production_row` request.
+          completed_at:
+            type: [string, "null"]
+            format: date-time
+          evidence_ref:
+            type: [string, "null"]
+            description: >
+              Opaque pointer to this step's evidence artifact (e.g. a
+              `PersonalDataRedacted` event id for the crypto-shred branch's
+              Deletion Evidence step, or an EC §65 content-addressed hash for
+              the production_row branch's).
+
+constraints:
+  - "Exactly one of `subject_id` (non-null) or `target_refs` (non-empty) MUST be set, determined by `deletion_type`: personal_data_crypto_shred requires subject_id and forbids target_refs; production_row requires target_refs and forbids subject_id."
+  - "`steps[]` MUST cover all 10 `reference_sequence.steps` values in the documented order; a request MUST NOT skip Verification or Deletion Evidence regardless of branch (EC §31, L1251: soft delete is never sufficient for either branch)."
+  - "A `personal_data_crypto_shred` request's Deletion Evidence step MUST reference both a PersonalDataRedacted event AND a Key Destruction Record (see `branches.personal_data_crypto_shred.step_overrides.Deletion Evidence`) — a single evidence_ref pointing only to the event is incomplete per personal-data-redacted-event.schema.yaml's own constraints."
+
+# ---------------------------------------------------------------------------
+# Rollback: two-scenario split, Codex-oracle-revised (ADR-002 L137-140).
+# Policy-level definition, not a per-instance record — see compilation_decisions.
+# ---------------------------------------------------------------------------
+rollback:
+  description: >
+    Replaces an earlier single-scenario description ("停止受理新刪除請求" /
+    stop accepting new deletion requests) that Codex's adversarial review
+    (CONFIRMED finding, ADR-002 L109) identified as directly contradicting
+    Decision Driver #2 (EC §31's compliance contract must not fail the first
+    real DSAR). Root cause per ADR-002's own diagnosis (L113): the original
+    text conflated an operational incident with an architectural decision
+    reversal — two situations this file now keeps as separate,
+    non-interchangeable scenarios.
+  invariant:
+    statement: >
+      Deletion requests are NEVER stopped or refused for either reason below.
+      Only the MEANS of eventually satisfying them changes: an operational
+      incident delays-and-queues against the SAME (crypto-shred) mechanism;
+      an architectural reversal migrates future requests to a DIFFERENT
+      mechanism via Expand-Contract, without refusing them either.
+    ties_to: "ADR-002 Decision Driver #2 (EC §31 must not fail at the first real DSAR)"
+  scenarios:
+    operational_key_vault_incident:
+      label: "Scenario 1 — operational incident (NOT an architectural decision change)"
+      applies_when: "Key Vault / KMS service is temporarily unavailable — an operational/infrastructure fault, per ADR-002 L139."
+      forbidden: "MUST NOT stop accepting new deletion requests (ADR-002 L139, Codex-revised: '不得停止受理新刪除請求')."
+      required_behavior:
+        - "DSARs continue to be accepted and recorded as normal — the Authorization step still executes even while decrypt/encrypt service is down."
+        - "Requests whose Deletion step cannot complete because the Key Vault is unreachable enter `status: queued` (see `deletion_request.steps[].status`), timestamped as `received_at`."
+        - "The incident itself is escalated to the highest SEV classification available (ADR-002 L139: '事故本身...立即升級為最高優先事故'), specifically because it threatens Decision Driver #2's compliance guarantee — not merely because a service is degraded."
+        - "Remediation target must fall within the applicable regulatory reply window (ADR-002 L139 example: GDPR Art. 12(3), one month, extendable once) — an external legal deadline, not an internally chosen SLA."
+        - "Once the Key Vault recovers, all queued requests are processed immediately. MUST NOT be permanently rejected or silently dropped because the incident occurred (ADR-002 L139: '不得因為事故發生過而永久拒絕或靜默丟棄')."
+    architectural_decision_reversal:
+      label: "Scenario 2 — architectural decision reversal (governance-level, not an incident)"
+      applies_when: "Option A (crypto-shredding) itself is abandoned in favor of Option B, Option C alone, or a new design (ADR-002 L140)."
+      pattern: >
+        Expand-Contract, "比照 ADR-005 DB Migration Recipe 的精神" (ADR-002
+        L140) — a phased transition, NOT an abrupt cutover.
+      required_behavior:
+        - "Downgrade path: keep existing ciphertext fields unchanged, stop issuing new DEKs (ADR-002 L140: '保留既有密文欄位不變，停止簽發新 DEK')."
+        - "New deletion requests are handled by the NEW mechanism — NOT refused or stopped (ADR-002 L140: '新刪除請求改用新方案的機制處理，不是停止受理'), sharing the same never-refuse invariant as Scenario 1 despite the different trigger condition."
+        - "Transition period: both the old DEK-destruction path and the new mechanism run in parallel until all existing DEKs have migrated (the Expand phase); a later Contract phase retires the old mechanism once migration completes."
+        - "Switching to Option B or Option C wholesale requires a fresh ADR and a return to the Phase 2 convergence process (ADR-002 L140: '因三方案動的是不同層，彼此改換需重新走 Phase 2 收斂流程與另一份 ADR，非可事後 patch') — it is explicitly NOT a same-ADR patch."
+      reversibility_note: >
+        This is one of Option A's own Reversibility advantages over Option B
+        (ADR-002 Options Considered table, L56): Option B's deletion
+        (external content erasure) has no equivalent downgrade path once
+        triggered — "一旦刪除外部內容即真正不可逆，無等效降級路徑" (ADR-002
+        L140).
+
+open_questions:
+  - id: "MRSP-dd-1"
+    question: >
+      ADR-002's Codex-revised section (修正 2, L117) mandates a "Key
+      Destruction Record Replay on Restore" step for any Key Vault
+      disaster-recovery restore, as a new required gate on that restore
+      procedure. This file's `branches.personal_data_crypto_shred.
+      step_overrides.Verification.caveat` names it but does not model it —
+      it belongs structurally to `security/key-vault-lifecycle.schema.yaml`
+      (Key Vault's own restore procedure), which is out of this file's scope
+      and being authored concurrently by a sibling agent.
+    owner: "the agent/session building security/key-vault-lifecycle.schema.yaml"
+    blocks: >
+      Nothing in this schema's own validity. Blocks full closure of the
+      Verification caveat above until that file exists and this one can be
+      updated with a soft reference to its concrete restore-gate name.
+  - id: "MRSP-dd-2"
+    question: >
+      Neither EC §31 nor ADR-002 specifies a Dependency Check definition for
+      the `production_row` branch beyond the generic step name — unlike the
+      `personal_data_crypto_shred` branch, where ADR-002 Option A gives an
+      exact definition ("找出所有引用此 DEK 的 event/projection/derived
+      artifact"). This is a pre-existing EC §31 gap this file surfaces
+      (production_row's Dependency Check is only as well-specified as EC §31
+      itself ever made it), not one introduced by this compilation.
+    owner: "operator, non-blocking"
+    blocks: "nothing in this schema's own validity"
+
+verification:
+  method: >
+    Read against ADR-002 full text (Context L14, Option A section L59-67,
+    Option C section L75-85, Recommendation, Consequences items 3/4/5/6,
+    Codex Oracle 對抗式覆審 section L103-117, Migration/Rollback L133-140,
+    Evidence L142-153), EC §30 (L1198-1221), EC §31 (L1225-1251), EC §65
+    (L2185-2194), EC §66 (L2200-2216),
+    docs/architecture/DEVOPS_SRE_PLAN.md §3.2-3.3 (L120-134),
+    docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.5 row for this file
+    (L149). Both scenarios of the Rollback section and both branches'
+    step_overrides were checked word-for-word against the ADR's
+    Codex-revised text (not the earlier, superseded single-scenario
+    description that section itself quotes as the CONFIRMED finding it
+    replaced).
+  note: >
+    No mother document or ADR was modified to produce this file. EC §31's
+    10-step sequence is transcribed verbatim, unmodified. The
+    personal_data_crypto_shred branch's step definitions and the rollback
+    scenario split are transcribed verbatim/near-verbatim from ADR-002;
+    the production_row branch's step definitions extrapolate EC §31's
+    generic, pre-existing prose (no ADR narrows them further, see
+    MRSP-dd-2) rather than inventing new semantics. Instance-schema shape,
+    the `deletion_request.steps[].status` enum, and the choice of
+    plain-English `constraints` over JSON-Schema conditionals reflect Phase
+    3 compilation decisions, recorded above, not a new ADR. This file does
+    not read or hard-depend on `specs/security/key-vault-lifecycle.schema.yaml`
+    or `specs/domain/personal-data-redacted-event.schema.yaml` — both are
+    referenced by name only (soft reference, no `$ref`), the former being
+    authored concurrently by a sibling agent in this same session, the
+    latter authored by this same task alongside this file.
