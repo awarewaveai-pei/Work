@@ -1,6 +1,35 @@
 ﻿# Worklog
 
-## 2026-08-29
+## 2026-08-29（續3）
+
+### AI LEGO Phase 2 Architecture Convergence Round 1 — 6 份基礎 ADR 起草，解決全部 2 條硬性矛盾 + 6 個 open question
+
+**背景**：Phase 1 完成後操作者說「繼續」，進入 Phase 2（架構收斂，第一次做真實取捨決策而非純調查）。挑選 6 個最高槓桿問題起草 ADR：治理裁決鏈統一、GDPR 刪除權 vs 事件不可變、Tenant/CAS 矛盾、risk_tier+信任標籤統一、DB Migration Recipe、母文件修改流程+repo 佈局歸屬。全部 6 個 subagent 平行跑，各自用 Method Atlas 中**真實存在**的決策方法（MCDA/ATAM/FMEA/LINDDUN/DPIA，逐一 grep 確認 Atlas 章節後才引用，非憑外部知識代入）。
+
+**產出**：`docs/adr/ADR-001~006` + `ADR_INDEX.md`，全部標記 `Status: PROPOSED`，未套用到三母文件。`open-questions.yaml` 6 條（OQ-6/7/8/9/11/12）加註對應 ADR（狀態仍為 REQUIRES_HUMAN_DECISION，未擅自標記已解決）。
+
+**關鍵決策建議**：①治理裁決鏈——新建極簡 `Architecture-Constitution-v1.md`（沿用 MP 已預留檔名），同時解決裁決鏈重複定義與 Architecture Constitution 身分自我循環 ②GDPR vs 事件不可變——crypto-shredding（per-subject 加密金鑰，刪除=銷毀金鑰）+ 提出不變量「事件存在性與內容可讀性是正交維度」，並用 EDPB/ICO/CNIL 官方認可依據佐證 ③Tenant/CAS——Tenant 正式列為 Domain Model 第 23 物件，CAS 改 tenant-scoped 命名空間，且證明「全域 CAS + per-tenant 加密」方案在邏輯上無法真正解決問題（CAS 去重本質需要加密前明文比對）④risk_tier/信任標籤——全面收斂到 EC 的 R0-R4（Atlas 自己的四級除 critical 外從未被消費），信任標籤拆兩個正交 enum ⑤DB Migration——用查證過的業界 expand-contract 標準判定 Atlas F21 順序對、§11.50/§13.10 錯、EC 完全漏掉 Dual Write 安全機制（比順序錯更嚴重）⑥修改流程——`.ai/proposals/` 機制取代 branch（repo 硬性禁建），repo 具體路徑移出母規格。
+
+**過程中的紀律亮點**：
+- ADR-001 的 agent 主動誠實揭露：Atlas 對這類高風險治理決策建議的正式方法其實是 Evidence Matrix + Red Team 而非它用的 MCDA，並建議操作者核准前補一輪 Codex 對抗式覆審——沒有把自己的分析包裝成比實際更完整。
+- ADR-004 的 agent 核對過程中抓到一個 briefing 沒發現的新問題：MP §12.1 的 authorship 標籤其實是 7 值不是 4 值，其中 `CALCULATED RESULT` 與 MP 自己 §83 的清單逐字重複——**Master Plan 內部自我碰撞**，比原認知的跨文件漂移更嚴重。
+- ADR-005 的 agent 核對出 DB Migration Recipe 實際是**五處**定義而非任務描述的三處（Atlas 內部就有四份不同序列圖），且發現 EC 完全省略 Dual Write 機制比「順序寫錯」的安全風險更高。
+- ADR-006 的 subagent 輸出觸發 harness 指令注入格式偵測（因逐字引用 `settings.json` 的 deny 規則作證據）；人工核對後確認為誤報（純技術論證非嵌入指令），已用 `sed`/`grep` 對照 settings.json 實際內容驗證引用屬實，寫入 ADR 時加註說明。
+
+[已修改]
+- 新增 `docs/adr/ADR-001~006-*.md` + `docs/adr/ADR_INDEX.md`（7 檔）
+- `open-questions.yaml`：OQ-6/7/8/9/11/12 加註 `proposed_adr` 欄位（狀態不變，仍待人類批准）
+- `AI_LEGO_OS_Program_Plan_v1.md`：Phase 2 → IN_PROGRESS（Round 1 完成，Round 2 未開始，建議操作者先審閱這批 ADR）
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`sed -n` 核對 settings.json 4 條 deny 規則 + python yaml.safe_load(open-questions.yaml, 14 題) + wc -l 確認 7 個 ADR 檔案完整落地 | exit=0
+- REVIEW_WAIVED: DOC_ONLY -- 全批為 ADR 治理文件；每份 ADR 由起草 agent 自行 Grep/Read 核對 file:line；ADR-006 的 settings.json 引用額外人工複核
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=ADR-00[1-6] | hits=0（新建 docs/adr/ 目錄，尚無其他檔案引用，Program Plan 與 open-questions.yaml 的引用已在本次一併寫入，非遺漏）
+- ORACLE_WAIVED: 6 份 ADR 為 Claude 單模型單輪產出，Codex 交叉驗證建議列為操作者批准前的下一步（ADR-001 agent 已主動提議），非本批範圍
+
+[剩餘風險] 全部 6 份 ADR 為 PROPOSED 狀態，任何內容不得視為定案；ADR-004 的 risk_tier gate injection 觸發範圍擴大（critical→R3∪R4）是語意變更非純重命名，需操作者特別留意；Phase 2 Round 2（剩餘 9 份交付物）建立在這些決策之上，建議先批准/調整 Round 1 再繼續，避免 Round 2 重工。
+[rollback] `git revert` 本 commit；三母文件零改動（所有 ADR 皆為 PROPOSED，未套用）。
 
 ### AI LEGO Phase 1 Gap Analysis 完成 — 6 角色群 lens 掃描產 98 條新發現，含 2 條硬性架構矛盾（Event-native vs GDPR 刪除、CAS 去重 vs Tenant Isolation）
 

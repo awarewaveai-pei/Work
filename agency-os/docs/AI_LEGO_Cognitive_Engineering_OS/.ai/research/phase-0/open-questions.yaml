@@ -37,6 +37,7 @@ questions:
     needed_from_human: "confirm whether to add an immutable tag (e.g. ai-lego-docs-v1.0.0-baseline)"
   - id: OQ-6
     status: REQUIRES_HUMAN_DECISION
+    proposed_adr: "docs/adr/ADR-006-mother-doc-revision-flow-and-repo-layout.md (PROPOSED, pending approval)"
     title: "Mother-document revision flow: directive branch vs repo no-branch rule"
     context: "Directive §IX requires branch docs/architecture-v1-review. Repo forbids new branches (settings.json deny, hard-blocked)."
     options:
@@ -46,18 +47,21 @@ questions:
   # --- OQ-7..11 registered 2026-08-29 from verified Phase 0 findings (see verified-findings.yaml) ---
   - id: OQ-7
     status: REQUIRES_HUMAN_DECISION
+    proposed_adr: "docs/adr/ADR-004-risk-tier-and-epistemic-label-canonicalization.md (PROPOSED, pending approval) — recommends Option B variant: full convergence to EC R0-R4, gate injection trigger expanded to R3∪R4"
     title: "risk_tier vocabulary: Atlas low|medium|high|critical vs EC R0-R4"
     context: "Two incompatible enums drive gate injection; no mapping exists, so Mandatory Gate Injection can never fire in a machine implementation (findings CROSS-T-3 / CROSS-R-10)."
     options: ["A: single canonical enum (pick one, migrate the other doc)", "B: keep both + define a normative mapping table in a machine spec"]
     deadline: "Phase 2 (ADR)"
   - id: OQ-8
     status: REQUIRES_HUMAN_DECISION
+    proposed_adr: "docs/adr/ADR-004-risk-tier-and-epistemic-label-canonicalization.md (PROPOSED, pending approval) — recommends two orthogonal enums (epistemic_type 11 values + authorship_state 6 values)"
     title: "Canonical epistemic label set: MP 6 values vs Atlas/EC 11 values; space vs SNAKE_CASE — plus a 4th authorship vocabulary"
     context: "FOUR vocabularies for the runtime trust boundary (updated 2026-08-29 after Codex cross-review, CDX-7): MP §83 6 values, Atlas 11 space-form, EC 11 SNAKE_CASE, and MP §12 authorship labels HUMAN ORIGINAL / AI GENERATED / HUMAN APPROVED / SOURCE QUOTATION (MP L995-1000, grep-verified). The FACT promotion redline references a value absent from every enum (findings CROSS-T-6 / CROSS-R-9 / CROSS-T-7 / CDX-7)."
     options: ["A: 11-value SNAKE_CASE as canonical machine enum, 6-value as UI display subset, authorship labels as a SEPARATE orthogonal enum with a defined mapping", "B: 6-value canonical, drop the extra 5", "C: other"]
     deadline: "Phase 2 (ADR)"
   - id: OQ-9
     status: REQUIRES_HUMAN_DECISION
+    proposed_adr: "docs/adr/ADR-001-scoped-authority-precedence-unification.md (PROPOSED, pending approval) — recommends new Architecture-Constitution-v1.md as standalone 4th document"
     title: "Architecture Constitution identity: Master Plan itself (EC L4152) or separate future file (MP §90 item 1)"
     context: "It is a load-bearing node in the precedence chain; its identity differs across documents (findings CROSS-T-10 / CROSS-R-12)."
     deadline: "Phase 2 (ADR)"
@@ -68,6 +72,7 @@ questions:
     deadline: "Phase 2 (ADR)"
   - id: OQ-11
     status: REQUIRES_HUMAN_DECISION
+    proposed_adr: "docs/adr/ADR-006-mother-doc-revision-flow-and-repo-layout.md (PROPOSED, pending approval) — recommends compromise: mother docs keep narrative-only layering principle, all concrete paths move to a Phase-4-owned repo-layout spec; original OQ-11 A/B framing dissolves rather than being answered"
     title: "Which path trees are binding vs advisory (EC §91-94 unqualified vs other sections marked 建議)"
     context: "Undecidable normative strength for path contracts that Phase 0/§141 treat as mandatory deliverables (finding DOC-execution_contract-11, verdict PARTIAL). Codex cross-review adds a more fundamental option: path-as-architecture should not live in the mother specs at all (30-year migration cost; CODEX_REVIEW PART B)."
     options: ["A: mark each tree binding/advisory in place", "B: all trees advisory until Phase 4 repository ADR", "C (Codex proposal): remove repo-layout from mother specs entirely; paths live only in a machine-readable repo-layout spec owned by Phase 4"]
@@ -75,6 +80,7 @@ questions:
   # --- OQ-12..14 registered 2026-08-29 from Claude x Codex cross-review (see cross-review/CONVERGENCE_MATRIX.md) ---
   - id: OQ-12
     status: REQUIRES_HUMAN_DECISION
+    proposed_adr: "docs/adr/ADR-005-db-migration-recipe-and-method-id-grammar.md (PROPOSED, pending approval) — recommends Option B: bare <family>.<name> form"
     title: "Canonical method ID grammar: method.<family>.<name> vs <family>.<name> vs method.<name>.v<N>"
     context: "Three grammars coexist (Atlas L50 / L989 / L4256; MP L742 / L825 / L833 — findings DOC-method_atlas-1, CROSS-T-14, CDX-4). A registry cannot resolve all IDs under any single grammar."
     options: ["A: method.<family>.<name> with versioning via separate field (not in the ID)", "B: <family>.<name> bare form", "C: other"]

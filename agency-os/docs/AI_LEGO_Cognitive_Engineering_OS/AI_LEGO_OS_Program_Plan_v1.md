@@ -113,7 +113,9 @@ Source directive 中所有根路徑（`/.ai/`、`/specs/`、`/policies/`、`/met
 
 ## 6. Phase 2 — Architecture Convergence
 
-**Status：NOT_STARTED** | Entry：Phase 1 exit gate 通過。
+**Status：IN_PROGRESS（Round 1 — 6 份基礎 ADR 已起草，2026-08-29）** | Entry：Phase 1 exit gate 通過。
+
+**Round 1 產出**：`docs/adr/ADR-001~006`（見 [ADR_INDEX.md](../docs/adr/ADR_INDEX.md)），解決 2 條 CONFLICT（全部）、部分 DUPLICATION、OQ-6/7/8/9/11/12。全部 `Status: PROPOSED`，未套用到三母文件，待操作者批准。**Round 2（剩餘 Phase 2 交付物：Repository Architecture / Security Threat Model / Data Architecture Plan 等）尚未開始**，建議操作者先審閱 Round 1 的 6 份 ADR 再決定是否繼續，因為 Round 2 多份文件會建立在這些決策之上。
 
 - 每個重大問題提 `Option A / B / C / Status Quo`，比較維度：Correctness / Security / Privacy / Maintainability / Extensibility / Operability / Performance / Cost / Complexity / Migration / Reversibility / Vendor Lock-in / 30-year survivability。
 - Method semantics 一律取自 Method Atlas（ATAM / MCDA / Pre-mortem / Red Team / Threat Modeling / Causal Analysis / Decision Matrix）；Atlas 缺該 method 定義時輸出 `PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED`，不得以模型記憶補。
@@ -158,7 +160,7 @@ Source directive 中所有根路徑（`/.ai/`、`/specs/`、`/policies/`、`/met
 | 0 | 文件完整性 + Current State | **COMPLETE**（2026-08-29；71 verified findings） | 11 outputs + 報告 ✅ |
 | CR | Claude/Codex Cross-Review | **COMPLETE**（2026-08-29；9/9 交集 0 DISAGREE，Codex 補 3 組新證據＋3 個新決策點） | 三件套 + 分類矩陣 ✅ |
 | 1 | Gap Analysis | **COMPLETE**（2026-08-29；98 條，含 4 CONFLICT + 5 DUPLICATION） | 6 registers ✅ |
-| 2 | Architecture Convergence | **NEXT** | 15 deliverables + **HUMAN REVIEW** |
+| 2 | Architecture Convergence | **IN_PROGRESS**（Round 1: 6 ADR PROPOSED） | 15 deliverables + **HUMAN REVIEW** |
 | 3 | Machine-readable Foundation | NOT_STARTED | specs/policies/tests 樹 + schema 驗證 |
 | 4 | Repository Architecture | NOT_STARTED | bounded contexts 驗證 + repo 決策 |
 | 5 | MVP Vertical Slice | NOT_STARTED | 全鏈 e2e + replay/rollback 實證 |
