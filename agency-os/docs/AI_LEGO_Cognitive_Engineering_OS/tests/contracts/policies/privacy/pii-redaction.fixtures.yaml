@@ -1,0 +1,65 @@
+schema_id: "ai-lego://policies/privacy/pii-redaction.policy.yaml"
+target_ref: ""
+description: >
+  Exercises the 3-way allOf/if/then cross-field derivation of
+  redaction_required from classification_tag+identifies_natural_person, and
+  the const-enforced HMAC-SHA256/keyed-HMAC mechanism (ADR-007's FMEA
+  finding against bare/unkeyed hashing).
+valid:
+  - name: pii_field_needs_redaction
+    instance:
+      field_name: user_email
+      classification_tag: Restricted
+      identifies_natural_person: true
+      redaction_required: true
+      mechanism: {token_alg: "HMAC-SHA256", requires_keyed_hmac: true, hmac_key_ref: "tenant-acme-hmac-key-1"}
+  - name: non_pii_confidential_field_no_mechanism_needed
+    instance:
+      field_name: trade_secret_flag
+      classification_tag: Confidential
+      identifies_natural_person: false
+      redaction_required: false
+  - name: public_field
+    instance:
+      field_name: service_name
+      classification_tag: Public
+      identifies_natural_person: false
+      redaction_required: false
+invalid:
+  - name: pii_field_missing_mechanism
+    instance:
+      field_name: user_email
+      classification_tag: Restricted
+      identifies_natural_person: true
+      redaction_required: true
+    reason: "mechanism is required when redaction_required is true (allOf/if/then branch 1) -- a PII field flagged for redaction with no stated mechanism cannot be implemented"
+  - name: pii_field_wrongly_marked_not_required
+    instance:
+      field_name: user_email
+      classification_tag: Restricted
+      identifies_natural_person: true
+      redaction_required: false
+    reason: "allOf/if/then branch 2: Confidential/Restricted + identifies_natural_person=true forces redaction_required=true -- this instance contradicts its own classification"
+  - name: non_pii_field_wrongly_marked_required
+    instance:
+      field_name: trade_secret_flag
+      classification_tag: Confidential
+      identifies_natural_person: false
+      redaction_required: true
+    reason: "allOf/if/then branch 3: neither Confidential/Restricted-with-person nor otherwise forces redaction_required=false -- marking a non-PII field as requiring redaction is inconsistent, and required 'mechanism' would also be missing"
+  - name: bare_hash_rejected_by_const
+    instance:
+      field_name: user_email
+      classification_tag: Restricted
+      identifies_natural_person: true
+      redaction_required: true
+      mechanism: {token_alg: "SHA256", requires_keyed_hmac: false, hmac_key_ref: "tenant-acme-hmac-key-1"}
+    reason: "token_alg is const HMAC-SHA256 and requires_keyed_hmac is const true -- ADR-007's FMEA finding: an unkeyed/unsalted hash is dictionary-attack-reversible and must be schema-rejected, not just discouraged in prose"
+  - name: bad_classification_enum
+    instance:
+      field_name: user_email
+      classification_tag: TopSecret
+      identifies_natural_person: true
+      redaction_required: true
+      mechanism: {token_alg: "HMAC-SHA256", requires_keyed_hmac: true, hmac_key_ref: "x"}
+    reason: "classification_tag enum is exactly [Public, Internal, Confidential, Restricted] (MP §61/EC §101 verbatim) -- 'TopSecret' is not a 5th invented value"

@@ -1,5 +1,34 @@
 # Worklog
 
+## 2026-08-29（續27）
+
+### AI-LEGO Phase 3 收尾第 1 批：修正 5 處過期的「尚無 ADR」宣稱 + 建 policies/privacy/pii-redaction.policy.yaml（ADR-007 定案內容落地）
+
+**觸發**：操作者「1-5全部都要做啊！」，要求把 Wave 8 完成後盤點出的所有剩餘項目做完（全能工程師 30 年紀律標準授權）。開工前先派 Explore agent 做完整審計（讀全部 10 份 ADR + 全篇 `MACHINE_READABLE_SPEC_PLAN.md`），避免在過期資訊上重工。
+
+**審計發現**：計畫文件 `MACHINE_READABLE_SPEC_PLAN.md:19` 的「誠實聲明」段（以及依附它的 `:48`/`:185`/`:327`/`:328` 四處標記）宣稱 P1-CONFLICT-3/P1-CONFLICT-4/P1-DUP-2/P1-DUP-5「尚無 ADR」，但這 4 條其實已分別被 `docs/adr/ADR-007`（P1-CONFLICT-3）、`ADR-008`（P1-CONFLICT-4）、`ADR-009`（P1-DUP-2+P1-DUP-5）定案，且全數 `Status: ACCEPTED`（`ADR_INDEX.md`）——計畫文件本身在那批 ADR 寫完後從未回頭同步，是同一種「同一批次多個並行 agent/session 各自快照過期」的 staleness bug class（本 session 已在 Wave 6/7/8 各抓過一次同類問題，這是第 4 次獨立實例，非新 bug 種類）。真正仍卡 Round 2 的項目其實只有 8 項（OQ-10 Gate 清單、tenant RLS 設計、conflict-of-laws 優先權、Repository Contract system-of-record 策略、IdP/SBOM 選型、Legal Source Registry SLA 天數、Model Registry/Fallback 設計、Branch state machine），比原始盤點認為的少很多。
+
+**本輪處理**：
+1. 修正 5 處過期標記（`:19`/`:48`/`:185`/`:327` MRSP-2/`:328` MRSP-3），改為準確反映「ADR 已定案，母文件文字套用還在等 ADR-006 `.ai/proposals/` 流程（僅操作者可推進 APPROVED）」的現況，而非簡單改成「已解決」掩蓋治理流程這一層還沒走完的事實。
+2. 新建 `policies/privacy/pii-redaction.policy.yaml`：把 ADR-007 的 Recommendation（Sub-decision a：Deterministic Keyed-HMAC Tokenization；Sub-decision b：MP §149 拆 `v1_baseline`/`future_advanced`）轉成機讀 policy——沿用既有 `log-redaction-token.schema.yaml`/`key-vault-lifecycle.schema.yaml#/definitions/hmac_signing_key_policy`（兩者 Wave 2 已建，本次未重建），不新造第二套機制。加入 3 段 `allOf`/`if`/`then` 把「`redaction_required` 由 `classification_tag`+`identifies_natural_person` 推導」與「`token_alg`/`requires_keyed_hmac` 必須是 keyed HMAC，不可退化成裸雜湊（ADR-007 自己的 FMEA 發現）」都做成機器可驗證的約束，而非又一次 prose-only 的 `constraints:` 陳述（本 Wave 已抓過兩次「宣稱有約束但沒真的機讀化」的 bug，這次從一開始就做對）。
+3. `mp_149_reclassification`/EC §101-102 的 PII 正式定義兩項母文件文字編輯，因需要走 ADR-006 `.ai/proposals/` 流程（僅操作者可推進 `APPROVED`），本次**不**直接編輯三母文件——policy 檔內的 `mp_149_reclassification` block 作為過渡期權威來源，並在 `open_questions.OQ-PII-2` 誠實記錄此依賴，不假裝流程已走完。
+
+[已修改]
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`：5 處過期「尚無 ADR」標記訂正
+- 新增 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/policies/privacy/pii-redaction.policy.yaml`
+- 新增 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/contracts/policies/privacy/pii-redaction.fixtures.yaml`（3 valid + 5 invalid，涵蓋三段 allOf/if/then 分支與 const 強制）
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=獨立 PoC（7 案例：redaction 正確觸發/缺 mechanism/錯誤標記/裸雜湊被拒等）直接對 `pii-redaction.policy.yaml` 跑 `jsonschema.Draft202012Validator` | exit=0 | 結果=7/7 符合預期後才寫入正式 fixture
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py`（含新 fixture）| exit=0 | 結果=585 個檢查全過（較上輪 575 增加 10 個，對應新 fixture 的 3 valid+5 invalid+其他既有檢查微調）
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`UniqueKeyLoader` 對全 137 個 yaml 檔跑重複 key 掃描 | exit=0 | 結果=CLEAN
+- REVIEW_DONE: critic=Quick（自我核對：`pii-redaction.policy.yaml` 引用的 `log-redaction-token.schema.yaml`/`key-vault-lifecycle.schema.yaml` 欄位名稱與既有檔案實際內容逐一核對後才寫入，非憑空假設）| verdict=pass
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`P1-CONFLICT-3\|P1-CONFLICT-4\|P1-DUP-2\|P1-DUP-5\|pii-redaction` | hits=僅本次新增/修正的 6 處（5 處計畫文件訂正 + 1 處 policy 檔自身），無其他檔案含過期的「尚無 ADR」重複宣稱需要同步修正
+
+[剩餘風險] `mp_149_reclassification` 與 EC §101-102 PII 定義文字仍未實際套用進三母文件（需 `.ai/proposals/` + 操作者 APPROVED，本次刻意不越權執行），`policies/privacy/pii-redaction.policy.yaml` 是過渡期權威來源而非最終狀態。其餘 8 項真正仍卡 Round 2 的項目（OQ-10/RLS/conflict-of-laws/Repository Contract/IdP-SBOM/Legal SLA/Model Registry/Branch state machine）尚未處理，將於後續條目逐一處理。
+[rollback] 純新增檔案 + 文件文字訂正，`git revert` 或刪除新檔即可完整回退，無 DB/prod/deploy 副作用。
+
 ## 2026-08-29（續26）
 
 ### codex-oracle.ps1 `-Mode review -Path` 100% 崩潰修復 —— PowerShell StrictMode scalar/null Count 陷阱（+ critic 抓到我自己 BUGHUNT 誤判一處同類孤例）

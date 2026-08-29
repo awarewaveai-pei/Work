@@ -1,0 +1,286 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://policies/privacy/pii-redaction.policy.yaml"
+title: PII Redaction Policy (v1 log de-identification)
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Fills the gap docs/adr/ADR-007-pii-redaction-vs-pseudonymization-timing.md
+  (ACCEPTED 2026-08-29) was written to close: EC §102's Logging Contract
+  requires every log to be simultaneously `redacted` and `correlatable`
+  (L2980-2981) starting v1, while MP §149 mislabeled the one already-standard
+  technique that satisfies both (Pseudonymization/Tokenization) as an
+  undifferentiated "future capability" alongside genuinely research-grade
+  techniques (Homomorphic Encryption, SMPC). This file is the concrete policy
+  MACHINE_READABLE_SPEC_PLAN.md's `policies/privacy/` row has been pointing
+  at since it was first marked BLOCKED_PENDING_ROUND2_ADR; ADR-007 itself
+  already exists and is ACCEPTED, and the two schema-layer prerequisites it
+  called for (`hmac_signing_key` key-use type in
+  specs/security/key-vault-lifecycle.schema.yaml, and
+  specs/security/log-redaction-token.schema.yaml itself) were already built
+  in an earlier Wave — this file is the missing POLICY layer that actually
+  tells an implementation which fields must go through that mechanism and
+  which techniques are legal to use today versus deferred, closing the loop
+  ADR-007's own "需要新增的規格缺口" item 3 named.
+
+  This file does NOT edit the mother documents. MP §149's reclassification
+  into `v1_baseline`/`future_advanced` (ADR-007 Recommendation point 4) and
+  EC §101/§102's missing formal "PII" definition (ADR-007 Recommendation
+  point 3, "需要在條文中補上 PII 一詞的正式定義") both require the
+  docs/adr/ADR-006-mother-doc-revision-flow-and-repo-layout.md `.ai/proposals/`
+  flow, whose `status: APPROVED` step only the operator may advance — this
+  file's `mp_149_reclassification` block below is the machine-readable
+  policy content that flow will eventually promote into MP §149 itself, kept
+  here as the interim authoritative source in the meantime so the rest of
+  Phase 3 is not blocked waiting on that separate governance step.
+
+source_of_truth_for:
+  - "docs/adr/ADR-007-pii-redaction-vs-pseudonymization-timing.md Recommendation (Sub-decision a: Deterministic Keyed-HMAC Tokenization; Sub-decision b: v1_baseline/future_advanced split) -- this file IS that Recommendation made machine-readable and operational"
+  - "docs/adr/ADR-007-pii-redaction-vs-pseudonymization-timing.md 需要新增的規格缺口 item 3 (policies/privacy/pii-redaction.policy.yaml itself)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §101 Data Classification (L2955-2971) -- the 4-value classification this file's pii_field_policy.classification_tag reuses verbatim, no 5th value invented"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §102 Logging Contract (L2974-2999) -- the redacted+correlatable dual requirement this policy exists to satisfy, and the 8 minimum log keys this file's log_key_pii_status block clears"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §149 Privacy-preserving Computation (L5659-5672) -- the 8-item list this file's mp_149_reclassification block splits, pending the separate mother-doc proposal"
+  - "specs/security/log-redaction-token.schema.yaml -- the token record shape this policy's mandatory mechanism produces"
+  - "specs/security/key-vault-lifecycle.schema.yaml#/definitions/hmac_signing_key_policy -- the key lifecycle this policy's mechanism consumes"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md:48, 185 (policies/privacy/ row -- STALE as of this file's creation: both still read BLOCKED_PENDING_ROUND2_ADR, corrected in the same commit as this file)"
+
+decided_by: >
+  docs/adr/ADR-007-pii-redaction-vs-pseudonymization-timing.md (ACCEPTED,
+  ADR_INDEX.md row 13). Field-shape and naming choices within this file are
+  Phase 3 Low-risk compilation decisions transcribing that ADR's
+  Recommendation verbatim, not a new architecture decision -- the ADR did
+  the actual deciding.
+
+compilation_decisions:
+  - question: >
+      ADR-007 Recommendation point 1 says any log field "所屬物件必須先被
+      標記 Confidential 或 Restricted" before the redaction mechanism
+      applies. Should this file re-derive its own classification enum, or
+      reuse the one 4-value enum already used verbatim across MP §61/EC
+      §101/personal-data-envelope.schema.yaml?
+    decision: "Reuse verbatim: [Public, Internal, Confidential, Restricted]. No 5th value."
+    reasoning: >
+      ADR-007's own Decision Driver 4 explicitly forbids inventing a
+      parallel mechanism ("必須重用既有詞彙與基礎設施...不新建第四套平行
+      機制"). specs/security/personal-data-envelope.schema.yaml already
+      established this exact enum as the project's one classification
+      vocabulary; a second copy here would be exactly the kind of
+      duplicate-definition drift this whole spec suite exists to eliminate.
+  - question: >
+      Should `pii_field_policy` require BOTH `Confidential`/`Restricted`
+      classification AND a separate `identifies_natural_person: true` flag,
+      or is classification alone sufficient to trigger the redaction
+      requirement?
+    decision: >
+      Both fields required together; `redaction_required` is a derived
+      constraint (`true` only when classification is Confidential/Restricted
+      AND identifies_natural_person is true), not implied by classification
+      alone.
+    reasoning: >
+      ADR-007 Recommendation point 1's own wording is "若承載可識別自然人
+      的資料" (IF it carries data identifying a natural person) -- the
+      Confidential/Restricted classification is necessary but the ADR's own
+      text does not claim it is sufficient (e.g. a Confidential business
+      trade-secret field identifies no person and does not need
+      tokenization). Collapsing the two into one flag would silently widen
+      ADR-007's actual scope beyond what it decided.
+  - question: >
+      ADR-007's FMEA finding (Context, "使用不加鹽/不加密鑰的裸雜湊...等於
+      沒有去識別化") is a real, named failure mode. Should this policy
+      merely describe it in prose, or make it a `const`-enforced field so a
+      real implementation cannot silently regress to bare hashing?
+    decision: >
+      `mechanism.token_alg` is `const: "HMAC-SHA256"` (matching
+      log-redaction-token.schema.yaml's own field, which already had no
+      enum/const on `token_alg` -- see open_questions.OQ-PII-1) and
+      `mechanism.requires_keyed_hmac` is `const: true`, both non-optional.
+    reasoning: >
+      A prose-only "must use keyed HMAC, not bare hash" constraint is
+      exactly the kind of unenforced `constraints:` block this session
+      already found and fixed twice this Wave (gate.schema.yaml,
+      epistemic-label.schema.yaml) -- baking the FMEA's conclusion into a
+      real schema-enforced value here, on a freshly-written file, avoids
+      reproducing that same bug class a third time.
+  - question: >
+      Should this file assert the log_key_pii_status verdict is FINAL (no
+      future log key can ever be added without re-running this check), or
+      leave it open for extension?
+    decision: >
+      `log_key_pii_status` documents ONLY the 8 keys EC §102 itself
+      currently names as the minimum log shape; it is explicitly NOT a
+      closed enum of "all legal log keys" and does not forbid additional
+      keys.
+    reasoning: >
+      EC §102 defines a MINIMUM key set, not a maximum -- treating this
+      file's coverage of that minimum as exhaustive would misrepresent EC's
+      own scope. ADR-007's own 規格缺口 item 6 explicitly frames future log
+      keys as an ongoing per-addition check, not a one-time closed list.
+
+# ---------------------------------------------------------------------------
+# Schema body -- one field's PII determination + redaction mechanism record.
+# ---------------------------------------------------------------------------
+type: object
+required: [field_name, classification_tag, identifies_natural_person, redaction_required]
+properties:
+  field_name:
+    type: string
+    description: "Name of the field being classified (e.g. a log schema property name)."
+  classification_tag:
+    type: string
+    enum: [Public, Internal, Confidential, Restricted]
+    description: "MP §61 / EC §101 four-value classification, verbatim -- no 5th value."
+  identifies_natural_person:
+    type: boolean
+    description: >
+      Whether this field's value, alone or combined with other fields
+      routinely co-located with it, can identify a specific natural person.
+      Per ADR-007 Recommendation point 1 -- classification alone is
+      necessary but not sufficient (see compilation_decisions).
+  redaction_required:
+    type: boolean
+    description: >
+      MUST be true if and only if classification_tag is Confidential or
+      Restricted AND identifies_natural_person is true (see `constraints`
+      below for the machine-enforced form of this rule).
+  mechanism:
+    type: object
+    description: >
+      REQUIRED when redaction_required is true (see `constraints` below).
+      The v1 redaction mechanism this field must use before entering any
+      log -- ADR-007 Sub-decision (a), Option A.
+    required: [token_alg, requires_keyed_hmac, hmac_key_ref]
+    properties:
+      token_alg:
+        type: string
+        const: "HMAC-SHA256"
+        description: "Matches log-redaction-token.schema.yaml's token_alg field verbatim."
+      requires_keyed_hmac:
+        type: boolean
+        const: true
+        description: >
+          Machine-enforced form of ADR-007's FMEA finding: an unkeyed/
+          unsalted hash (e.g. bare sha256(email)) is explicitly forbidden --
+          see `forbidden_mechanisms` below.
+      hmac_key_ref:
+        type: string
+        description: >
+          Soft reference to a key-vault-lifecycle.schema.yaml key_record
+          whose key_use is HMAC_SIGNING_KEY -- the tenant-scoped signing key
+          this field's tokens are computed with.
+
+allOf:
+  - if:
+      properties: { redaction_required: { const: true } }
+      required: [redaction_required]
+    then:
+      required: [mechanism]
+  - if:
+      properties:
+        classification_tag: { enum: [Confidential, Restricted] }
+        identifies_natural_person: { const: true }
+      required: [classification_tag, identifies_natural_person]
+    then:
+      properties: { redaction_required: { const: true } }
+  - if:
+      not:
+        anyOf:
+          - properties: { classification_tag: { enum: [Confidential, Restricted] } }
+            required: [classification_tag]
+          - properties: { identifies_natural_person: { const: true } }
+            required: [identifies_natural_person]
+    then:
+      properties: { redaction_required: { const: false } }
+
+forbidden_mechanisms:
+  - "Unkeyed or unsalted hashing (e.g. bare sha256(raw_value), no HMAC key) -- ADR-007 Context FMEA finding: low-entropy PII (email, phone number) is dictionary-attack-reversible, equivalent to no redaction at all. Severity: High, unacceptable."
+  - "Full free-text or large payload dump into any log field -- EC §102 L2999 verbatim prohibition, unaffected by this policy; tokenization does not create an exception to it."
+
+# ---------------------------------------------------------------------------
+# ADR-007 Recommendation point 4 -- MP §149's reclassification. Interim
+# authoritative source until the .ai/proposals/ flow promotes this into the
+# mother document itself (operator-only APPROVED step, ADR-006).
+# ---------------------------------------------------------------------------
+mp_149_reclassification:
+  source: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §149 (L5659-5672), split per ADR-007 Recommendation point 4"
+  not_yet_applied_to_mother_document: true
+  v1_baseline:
+    description: "Must -- available now, already a regulator/industry-recognized baseline security measure (GDPR Art.32), no specialized hardware or research-grade infrastructure required."
+    items: [Pseudonymization, Tokenization]
+  future_advanced:
+    description: "Won't (yet) -- requires individual cost/maintenance/threat-model validation (MP §149 L5672) before being scheduled, per the same criterion this reclassification itself had to pass."
+    items:
+      - "Differential Privacy"
+      - "Secure Enclaves"
+      - "Federated Analysis"
+      - "Federated Learning"
+      - "Secure Multi-party Computation"
+      - "Homomorphic Encryption（只在適用成本與成熟度下）"
+
+# ---------------------------------------------------------------------------
+# EC §102's own minimum log key set (L2974-2999) -- already cleared, not a
+# closed enum of all legal keys (see compilation_decisions).
+# ---------------------------------------------------------------------------
+log_key_pii_status:
+  source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §102 (L2974-2999), minimum 8 keys"
+  cleared_not_pii:
+    - {key: timestamp, reason: "system-generated, not user-identifying"}
+    - {key: level, reason: "fixed enum severity label, not user-identifying"}
+    - {key: service, reason: "system component name, not user-identifying"}
+    - {key: trace_id, reason: "system-generated correlation ID"}
+    - {key: task_id, reason: "system-generated internal ID, per ADR-007 規格缺口 item 6 explicit clearance"}
+    - {key: execution_id, reason: "system-generated internal ID, per ADR-007 規格缺口 item 6 explicit clearance"}
+    - {key: event, reason: "fixed vocabulary event name, not user-identifying"}
+    - {key: status, reason: "fixed enum status value, not user-identifying"}
+  note: >
+    Any log key added beyond these 8 MUST be run through this policy's
+    pii_field_policy determination before shipping -- this list is a
+    starting clearance, not a closed allowlist (ADR-007 規格缺口 item 6).
+
+open_questions:
+  - id: "OQ-PII-1"
+    question: >
+      log-redaction-token.schema.yaml's own token_alg/hmac_key_ref/
+      classification_tag/tenant_scope fields are typed `{}` (fully
+      unconstrained) rather than carrying the same const/enum values this
+      file now asserts. Should that file be tightened to match (e.g.
+      token_alg: const HMAC-SHA256), or is leaving it loose intentional
+      (e.g. to allow a future alg upgrade without a schema change there)?
+      Not decided here -- that file's write scope belongs to whichever Wave
+      built it (Wave 2), not this policy file.
+    owner: "operator or a future Phase 3/4 compilation pass over specs/security/log-redaction-token.schema.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-PII-2"
+    question: >
+      ADR-007 Recommendation points 3 and 4 (PII definition text in EC
+      §101/§102; MP §149 split) both require the ADR-006 `.ai/proposals/`
+      flow to actually reach the mother documents, and that flow's
+      `status: APPROVED` step is operator-only. This file's
+      `mp_149_reclassification` block is offered as the ready-to-promote
+      content for that proposal, but the proposal itself has not been
+      created (`.ai/proposals/` does not exist in this repo yet for ANY
+      ADR, not just this one).
+    owner: "operator, or a future session with explicit scope to draft `.ai/proposals/` entries"
+    blocks: "nothing in this file's own validity -- MP §149's mother-doc text stays unedited either way; this file is deliberately the interim authoritative source"
+
+verification:
+  method: >
+    Read docs/adr/ADR-007-pii-redaction-vs-pseudonymization-timing.md in
+    full (190 lines) before drafting this file. Read
+    specs/security/log-redaction-token.schema.yaml and
+    specs/security/key-vault-lifecycle.schema.yaml#/definitions/
+    hmac_signing_key_policy directly to confirm both prerequisites ADR-007
+    called for already exist and this file's field names/references match
+    their actual current shape (not guessed). Read EC §101 (L2955-2971) and
+    §102 (L2974-2999) directly at the cited lines to confirm the
+    classification enum and the 8 minimum log keys. Grepped
+    MACHINE_READABLE_SPEC_PLAN.md:48,185 to confirm both rows still read
+    BLOCKED_PENDING_ROUND2_ADR before creating this file (corrected in the
+    same commit).
+  note: >
+    No mother document was modified to produce this file. ADR-007's
+    Recommendation is transcribed into machine-readable form; the
+    `allOf`/`if`/`then` cross-field enforcement of "redaction_required
+    derives from classification+identifies_natural_person, not asserted
+    independently" and the `const`-enforced HMAC-SHA256/keyed-HMAC
+    requirement are this file's own additive compilation decisions,
+    individually justified above -- not new ADR-level tradeoffs.

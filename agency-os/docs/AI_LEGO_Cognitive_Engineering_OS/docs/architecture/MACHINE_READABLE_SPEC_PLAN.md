@@ -16,7 +16,7 @@ Phase 0/1 用 71+98 條 findings 證明了同一件事的三種樣態：
 
 六份 ADR（Round 1，全部 `PROPOSED`）已經對其中一部分做出裁決。本文件的工作是把「ADR 裁決」與「Phase 0/1 尚未有 ADR 覆蓋的 missing_contract findings」一起攤開，變成一張可執行的建置清單：**每個檔案的用途、格式、依賴順序、解決哪個 finding**。
 
-**誠實聲明（避免自我隱藏缺口）**：GAP_REGISTER.yaml 51 條中，多數（P1-GAP-SEC-*／P1-GAP-INFRA-*／P1-GAP-PROD-* 等）是「完全空白」而非「重複定義衝突」——這類項目沒有既有內容可收斂，Phase 3 只能先建骨架/佔位 schema，實質內容需要操作者做工程/法遵決策（例如選 SBOM 格式、選 IdP 標準），不是靠讀三母文件就能推導。本計畫將這類項目標記為 `SKELETON_ONLY`，不假裝一次規劃能填滿。另有 4 條 CONFLICT（P1-CONFLICT-1~4）與 5 條 DUPLICATION（P1-DUP-1~5）中，**只有 P1-CONFLICT-1/2 與 P1-DUP-1/3 已有 ADR 裁決**（ADR-002/003/005）；P1-CONFLICT-3（PII redaction vs pseudonymization 時序矛盾）、P1-CONFLICT-4（Business Planning Recipe 引用不存在的方法）、P1-DUP-2（Plane/Module/Workspace 三套分解）、P1-DUP-5（Localization 目錄結構歧異）**尚無 ADR**——本計畫把它們相關的 spec 檔案標記 `BLOCKED_PENDING_ROUND2_ADR`，不越權替 Round 2 做裁決。
+**誠實聲明（避免自我隱藏缺口）**：GAP_REGISTER.yaml 51 條中，多數（P1-GAP-SEC-*／P1-GAP-INFRA-*／P1-GAP-PROD-* 等）是「完全空白」而非「重複定義衝突」——這類項目沒有既有內容可收斂，Phase 3 只能先建骨架/佔位 schema，實質內容需要操作者做工程/法遵決策（例如選 SBOM 格式、選 IdP 標準），不是靠讀三母文件就能推導。本計畫將這類項目標記為 `SKELETON_ONLY`，不假裝一次規劃能填滿。**（2026-08-29 訂正，發現本段已過期——見 R4 抓蟲）**：4 條 CONFLICT（P1-CONFLICT-1~4）與 5 條 DUPLICATION（P1-DUP-1~5）**現已全數有 ADR 裁決**：P1-CONFLICT-1（ADR-002）、P1-CONFLICT-2（ADR-003）、P1-CONFLICT-3（**ADR-007**）、P1-CONFLICT-4（**ADR-008**）、P1-DUP-1（ADR-005）、P1-DUP-3（ADR-003）、P1-DUP-2（**ADR-009**）、P1-DUP-5（**ADR-009**）。本段原文寫「P1-CONFLICT-3/4、P1-DUP-2/5 尚無 ADR」，該陳述已被 ADR-007/008/009（皆 2026-08-29 ACCEPTED，見 `docs/adr/ADR_INDEX.md`）取代但本段落當時未同步更新——**ADR 裁決定案 ≠ 母文件已編輯**，套用仍須走 ADR-006 `.ai/proposals/` 流程，該流程 `status: APPROVED` 僅操作者可推進，故下方 §2.9 `policies/privacy/` 相關列的 `BLOCKED_PENDING_ROUND2_ADR` 標記同步改為「ADR 已定案，母文件套用/policy 檔建置進度」說明。
 
 ---
 
@@ -45,7 +45,7 @@ PROJECT_ROOT/                                  ← D:\Work\agency-os\docs\AI_LEG
 ├── policies/
 │   ├── ai-execution/     ← EC §91 既有 8 檔清單（authority/risk-tiers/mandatory-gates/tool-permissions/forbidden-actions/network-egress/exception-policy/release-policy）
 │   ├── security/         ← 多數 SKELETON_ONLY（P1-GAP-SEC-1/2）
-│   ├── privacy/          ← crypto-shred 落地為政策；PII/pseudonymization 段 BLOCKED_PENDING_ROUND2_ADR
+│   ├── privacy/          ← crypto-shred 落地為政策；PII/pseudonymization 段已由 ADR-007 定案並建成 `pii-redaction.policy.yaml`（2026-08-29）
 │   ├── jurisdiction/      ← Legal Source Registry SLA、Conflict-of-Laws Engine 歸屬（BLOCKED，需 Round 2 決定哪個引擎贏）
 │   ├── provider/         ← Model Registry、AI Gateway Fallback（SKELETON_ONLY）
 │   └── release/          ← Global/High-risk Gate 清單（BLOCKED_PENDING_ROUND2_ADR，見 §4 Wave 5）
@@ -182,7 +182,7 @@ PROJECT_ROOT/                                  ← D:\Work\agency-os\docs\AI_LEG
 |---|---|---|
 | `ai-execution/` | EC §91 既有 8 檔清單直接轉譯（authority/risk-tiers/mandatory-gates/tool-permissions/forbidden-actions/network-egress/exception-policy/release-policy），`mandatory-gates.yaml` 需套用 ADR-004a 的 R3∪R4 擴大規則 | **BUILT（2026-08-29，8/8）**——`authority.yaml`/`risk-tiers.yaml`/`tool-permissions.yaml`/`forbidden-actions.yaml`/`exception-policy.yaml` 為 `status: ACTIVE`；`mandatory-gates.yaml`/`network-egress.yaml`/`release-policy.yaml` 為 `status: PROVISIONAL`（各自 blocked 內容見各檔 `blocked_scope`/`allowlist_registry`/`release_gate_requirement.scope`，非整檔阻塞）。Critic 覆審（Wave 6 批次）：0 Critical、6 Major（已修正）、多項 Minor/Suggestion（已修正或記錄於各檔 `open_questions`）|
 | `security/` | Zero Trust 協定選型（IdP/OIDC/SPIFFE/OPA）、Supply Chain 標準版本（SBOM 格式/簽章機制/SLSA 等級） | SKELETON_ONLY（P1-GAP-SEC-1, P1-GAP-SEC-2 全文空白，需操作者選型，非文件收斂） |
-| `privacy/` | crypto-shred 落地為可執行政策（依附 ADR-002）；PII redaction 現行時效 vs pseudonymization「未來能力」矛盾 | 部分 READY（crypto-shred 段）+ 部分 **BLOCKED_PENDING_ROUND2_ADR**（P1-CONFLICT-3 尚無 ADR） |
+| `privacy/` | crypto-shred 落地為可執行政策（依附 ADR-002）；PII redaction 現行時效 vs pseudonymization「未來能力」矛盾 | **BUILT（2026-08-29，`pii-redaction.policy.yaml`）**——ADR-007 定案內容（Deterministic Keyed-HMAC Tokenization + MP §149 v1_baseline/future_advanced 分級）已寫入 policy 檔；MP §149/EC §101-102 母文件本身文字仍待 ADR-006 `.ai/proposals/` 流程套用（僅操作者可推進 APPROVED），本 policy 檔為過渡期權威來源 |
 | `jurisdiction/` | Legal Source Registry 更新 SLA（週期天數）、Conflict-of-Laws Engine 歸屬 | SKELETON_ONLY / BLOCKED（P1-GAP-LEGAL-1 需操作者訂週期數字；P1-GAP-LEGAL-4 同 2.6） |
 | `provider/` | Model Registry 元件、AI Gateway Fallback circuit breaker 規則 | SKELETON_ONLY（P1-GAP-INFRA-5, P1-GAP-INFRA-6） |
 | `release/` | Global/High-risk Gate 統一清單 | **BLOCKED_PENDING_ROUND2_ADR**（同 gate.schema.yaml） |
@@ -324,8 +324,8 @@ Wave 8 ── ✅ 完成（2026-08-29，55/55 schema + 3/3 recipe instance + 2/2
 | # | 問題 | 阻塞範圍 | 建議處理方式 |
 |---|---|---|---|
 | MRSP-1 | Global/High-risk Gate 清單（CROSS-R-5/CROSS-R-7/CROSS-T-11）尚無 ADR 裁決，`gate.schema.yaml` 與 `release-policy.yaml` 無法定案內容 | Wave 5-6 兩個檔案 | 建議操作者將此列為 Round 2 ADR 的第一項；Phase 3 先建骨架，`gate_id` enum 留 placeholder |
-| MRSP-2 | P1-CONFLICT-3（PII redaction v1 生效 vs pseudonymization「未來能力」）、P1-CONFLICT-4（Business Planning Recipe 引用不存在的 Financial Assumptions 方法）尚無 ADR | `policies/privacy/` 部分內容；MP §43 旗艦 Recipe 是否可信任 | 同上，建議併入 Round 2 ADR batch；P1-CONFLICT-4 額外建議：在 Round 2 ADR 前，MP §43 的 Recipe 範例應加註「僅示意，Financial Assumptions 方法尚待 Atlas finance domain pack 補齊」，避免誤導 |
-| MRSP-3 | P1-DUP-2（Plane/Module/Workspace 三套分解）、P1-DUP-5（Localization 目錄結構歧異）尚無 ADR | `docs/architecture/` 敘事文件；`/config/localization/` vs `/modules/localization/` 路徑歸屬 | 兩者皆屬「路徑/命名對照表缺失」而非邏輯矛盾，風險低於 MRSP-1/2，可視操作者時間排入 Round 2 或標記為 Low-risk 直接由 Phase 3 執行者建對照表解決 |
+| MRSP-2（2026-08-29 訂正：ADR 已定案，此列原文過期） | ~~P1-CONFLICT-3...P1-CONFLICT-4...尚無 ADR~~ → **P1-CONFLICT-3 已由 ADR-007 定案**（Deterministic Keyed-HMAC Tokenization，已建 `policies/privacy/pii-redaction.policy.yaml`）；**P1-CONFLICT-4 已由 ADR-008 定案**（MP §43 加註現況警語，不現在造 stub） | `policies/privacy/` 已建；MP §43 加註文字仍待 ADR-006 `.ai/proposals/` 流程套用到母文件本身（僅操作者可推進 APPROVED） | 兩個 ADR 裁決本身已完成，剩餘工作是母文件文字套用（治理流程步驟，非未決架構問題） |
+| MRSP-3（2026-08-29 訂正：ADR 已定案，此列原文過期） | ~~P1-DUP-2...P1-DUP-5...尚無 ADR~~ → **兩者已由 ADR-009 定案**（三層命名各自維持正本 + 12×6×22 跨層對照表；Localization 正本 = `/platform/trust-fabric/localization/`） | `docs/architecture/` 敘事文件；`REPOSITORY_ARCHITECTURE.md`（`Status: PROPOSED`，ADR-009 的目錄配置依附此文件，該文件本身尚未 ACCEPTED） | ADR 裁決本身已完成；實際生效還多依賴一層——`REPOSITORY_ARCHITECTURE.md` 自己尚未走完 ACCEPTED 流程（ADR_INDEX.md 決策依賴關係第 23 行已註記此依賴） |
 | MRSP-4 | `workflow/branch.schema.yaml`（Branch 完整 state machine）明列為 ADR-003 的 out-of-scope follow-up | `specs/workflow/` 一檔 | Phase 3 只實作 ADR-003 給的最小定義（forked isolated execution lineage），完整 state machine 排入 Round 2 或 Phase 4 |
 | MRSP-5 | `security/tenant-isolation-controls.schema.yaml`（RLS/schema-per-tenant 決策）同樣是 ADR-003 明列的 follow-up，非本輪已裁決範圍 | `specs/security/` 一檔 | 同上，Phase 3 建骨架欄位，不填入未裁決的 RLS 策略選擇 |
 | MRSP-6 | Tier 1 Method Contract 清單依賴 Phase 5 MVP 切片選擇，但 Phase 5 `Status: NOT_STARTED` | `methods/contracts/` 15-25 個檔案的具體名單 | 見 §4 建議：Phase 3 末期由 Claude/Codex 各自列候選切片常用方法交集，作為顯式待辦而非本計畫產出的清單 |
