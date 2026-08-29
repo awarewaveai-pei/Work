@@ -194,6 +194,7 @@ done | grep -E '^[0-9a-f]{64}'
 ## §5 Phase 3 — 驗證（全項，缺一不算完成）
 
 1. **15 端點掃描**（期望碼）：soulful/aware-wave/app.../oracle/uptime/mainwp/n8n healthz/trigger login/remotion/video health＝200；www=301；postiz=307；supabase rest・studio=401
+   - **`sg-deploy.sh` smoke 探針補充驗收**（2026-08-29 補，§8 表格同款教訓）：探針本身不寫死 IP、隨 git pull 自動帶到新機，理論上不用重做——但換機後**建議手動跑一次**確認前提沒被打破：`curl -k --resolve aware-wave.com:443:NEW_IP https://aware-wave.com/` 應 200（`remote_ip` 應等於 `NEW_IP`，證實走本機不是繞出去）；`curl -H "Host: api.aware-wave.com" http://NEW_IP/health` 應 200。兩個都過才代表下一次 `sg-deploy.sh next-admin` 不會被這兩個探針的假陽性打成 auto-rollback
    - **`api.aware-wave.com` 內容比對必做，不能只看狀態碼**（2026-08-29 事故：此網域曾從建立起就未接線，錯發到 WordPress 卻同樣回 200，狀態碼騙不出來）：`curl https://api.aware-wave.com/` 回應須含 `"service":"node-api"` 字樣；`curl https://oracle.aware-wave.com/ | grep -i "<title"` 不可出現 `Aware Wave`（那是 WordPress 的 title，代表又錯發了）
    - **wp-admin 無限重導回歸測試**（2026-08-29 真根因：`lobster-phase1/nginx/default.conf` 的 `X-Forwarded-Proto` 若被改回 `$scheme` 或該檔從 `nginx/system-sites/*.conf` 這類舊架構快照重建，此 bug 會複發）：`for i in 1 2 3; do curl -sk -o /dev/null -w "%{http_code} %{redirect_url}\n" https://aware-wave.com/wp-admin/; done` 三次結果必須是 `302` 導向 `wp-login.php?redirect_to=...`，**不可以是導回 `/wp-admin/` 自己**
 2. **Origin guard**：14 個 proxied hostname `--resolve host:443:NEW_IP` 直連全部 **403**（含 IPv6 直連抽測）；remotion/video 直連 200
@@ -238,6 +239,8 @@ done | grep -E '^[0-9a-f]{64}'
 | external docker network 不自建 | n8n/render/SG compose 起不來 | §2.4 |
 | 已接寫後 DNS 直接回切 | 丟失新機已接受的寫入 | §7(b) 反向同步 |
 | Ubuntu 發行版 netdata 編譯 `--disable-cloud` | `netdata-claim.sh` 直接拒絕(exit=3),kickstart 也拒絕覆蓋系統套件管理的安裝 | §1d（2026-08-29 補：換機須 purge 發行版套件→官方 stable kickstart 重裝+claim→`[web] bind to = 127.0.0.1` 綁回本地） |
+| Node.js 從沒裝在新機 | `sg-deploy.sh` tsc/npm test gate 跑在 host 層不是 container 內,docker save/load 帶不到這個依賴,首次 `sg-deploy.sh next-admin` 直接 `npm: command not found` | §1d（2026-08-29 補，portal.aware-wave.com 首次部署發現）|
+| sg-deploy.sh smoke 探針假設舊拓樸 | `_smoke_check()` 的 wordpress/node-api 探針寫死「裸 Host + `/api/health`」路徑,單租戶 SG 時代成立,整併成多 vhost 後這兩個探針必 404,**每次 next-admin 部署都被無關端點的假陽性打成 auto-rollback**（next-admin 自己健康也一樣回滾）| 已治本於 `sg-deploy.sh`（commit `d9206dee`,改用 `--resolve host:443:127.0.0.1` 本機解析 + 正確 `/health` 路徑,不寫死 IP,新機沿用同一套 nginx 架構會自動生效）；**換機後仍建議跑一次 §5.1 補充驗收**確認沒有前提被打破（例如又新增/移除了 vhost,或 nginx 監聽的 port 改了） |
 | 新網域上線未補 DMARC | 該網域可被偽造寄信，且不會主動跳警告直到被人拿去釣魚 | §1e（2026-08-29 補：新增子網域/新 zone 上線 checklist 需含 `_dmarc` TXT） |
 | `.htpasswd` 類檔案漏拷，容器搶先 bind-mount 不存在的 host 路徑 | Docker 自動把該路徑幫你建成**目錄**，host nginx `auth_basic_user_file` 讀到目錄 → `pread() failed (21: Is a directory)` → 500；修完後容器內部仍記著舊掛點型別，`docker restart` 會直接 mount 失敗、容器 Exited，須 `docker compose up -d --force-recreate <service>`（compose service 名可能不等於 container_name，先查 `container_name:` 對應） | §1d（2026-08-29 補：所有 `auth_basic_user_file` 引用的 `.htpasswd*` 路徑，換機前先在來源機 `find / -iname "*.htpasswd*"` 產清單，逐一確認搬過去的是檔案不是目錄；`stat` 型別對照，不能只看 `ls` 有沒有東西） |
 | `api.aware-wave.com`/`oracle.aware-wave.com` 從未接線（既有缺陷，非搬家造成，2026-08-29 才被發現） | 兩個網域無匹配 server block，落到 WordPress 預設區塊，**狀態碼一樣回 200**，光看端點掃描碼看不出來，內容其實整個發錯 | §5 第 1 項（2026-08-29 補：改用內容比對，不只看狀態碼） |
