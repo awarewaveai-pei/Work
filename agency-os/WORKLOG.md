@@ -1,4 +1,4 @@
-﻿# Worklog
+# Worklog
 
 ## 2026-08-29（續6）
 
@@ -28,6 +28,37 @@
 [剩餘風險] 15 份交付物全數 `Status: PROPOSED`，任何內容不得視為定案；`MVP_VERTICAL_SLICE_PLAN.md` 的 Research Mode 選擇尚未完成 directive 要求的雙模型比較（見 `IMPLEMENTATION_ROADMAP.md` §2 類別 D 誠實揭露）；5 個 schema 檔案（`gate.schema.yaml` 等）與 2 份 policy 檔案卡在 `BLOCKED_PENDING_ROUND2_ADR`，需操作者決定是否併入下一輪 ADR。**Phase 2 exit gate 已達成，依 directive 明文規定進入 STOP FOR HUMAN REVIEW，Phase 3 不得在操作者批准前開始。**
 [rollback] `git revert` 本 commit；三母文件零改動（全部 15 份交付物皆為 PROPOSED，未套用任何內容到 Master Plan / Method Atlas / Execution Contract）。
 
+
+### Agent dispatch log
+- general-purpose: Phase 1 gap analysis — architecture/data lenses
+- general-purpose: Phase 1 gap analysis — infra/ops/MLOps lenses
+- general-purpose: Phase 1 gap analysis — security/privacy/IAM lenses
+- general-purpose: Phase 1 gap analysis — AI/data-science/research lenses
+- general-purpose: Phase 1 gap analysis — product/business/ops lenses
+- general-purpose: Phase 1 gap analysis — legal/global/policy lenses
+- critic: Quick security review of encoding fix
+- general-purpose: Draft ADR — Scoped Authority precedence unification
+- general-purpose: Draft ADR — GDPR deletion vs event immutability
+- general-purpose: Draft ADR — Tenant model and CAS isolation
+- general-purpose: Draft ADR — risk tier and epistemic label vocabularies
+- general-purpose: Draft ADR — DB migration recipe and method ID grammar
+- general-purpose: Draft ADR — mother-doc revision flow and repo layout
+- general-purpose: Draft Machine-Readable Spec Plan
+- general-purpose: Draft Repository Architecture plan
+- general-purpose: Draft Security Threat Model
+- general-purpose: Draft Data Architecture Plan
+- general-purpose: Draft Global Jurisdiction Plan
+- general-purpose: Draft DevOps SRE Plan
+- general-purpose: Draft MVP Vertical Slice Plan
+- general-purpose: Draft Test Eval Strategy
+- general-purpose: Draft Migration Rollback Strategy
+- critic: Critic review of CP950 audit changes -> ## Critic Report
+
+Reviewed: `scripts/audit-cp950-traps.ps1` (full), `scripts/system-health-check.ps1` (all 959 lines), all 14 mechanical-fix scripts, `scripts/rebuild-content-studio-4cards.ps1`, plus …
+- critic: Review deploy-drift docstring edit
+- general-purpose: Draft ADR-007 PII redaction timing conflict
+- general-purpose: Draft ADR-008 Financial Assumptions method gap
+- general-purpose: Draft ADR-009 nomenclature and directory canonicalization
 ## 2026-08-29（續5）
 
 ### 二次更正：「25 處疑似死檔」既非死檔亦非「現行 production」——舊 SG/EU 兩台機容器全滞，本機實測全部 502（操作者要求審查兩檔矛盾後發現）
@@ -312,7 +343,7 @@ Round 2 額外驗證：`-ParseBreakOnly`/`-RawReadOnly` 全 repo重跑（167 掃
 上一筆 api/oracle 接線缺口 + X-Forwarded-Proto bug 修完後沒回頲換機 runbook——因為這兩個是既有架構缺陷非搝家機制本身問題，修完就收工。操作者問「換機時不要讓它再發生」，正確拕出真的漏洞：現役機上的修復隨 rsync 會帶過去沒錯，但**沒人告訴下一個操作者這件事，也沒回歸測試去確認沒被候忘。**已補三處：§1a `/root/lobster-phase1/` 拷貝説明加警告（絕對不可從 `nginx/system-sites/*.conf` 舊快照重建）、§5 驗證第 1 項新增 api/oracle 內容比對 + wp-admin 連發 3 次回歸測試、§8 新增兩行教訓。
 
 - REVIEW_DONE: critic=Self | verdict=pass | findings=0（兩個新增 cross-reference均實際 grep 確認存在，吸取上次「聲稱未驗證」的教訓）
-- BUGHUNT_DONE: scope=agency-os,runbooks | grep=X-Forwarded-Proto|api.aware-wave.com 從未接線 | hits=2（均為今日新增的教訓行本身，無 stale）
+- BUGHUNT_DONE: scope=agency-os,runbooks,scripts | grep=X-Forwarded-Proto|api.aware-wave.com 從未接線 | hits=2（均為今日新增的教訓行本身，無 stale；scripts/ 內 0 命中）
 
 ### api.aware-wave.com / oracle.aware-wave.com 從未接線（既有缺陷，非搝家造成）+ wp-admin 無限重導真根因（X-Forwarded-Proto 兩層 nginx 間被覆寫），兩顆都已修復+全面回歸測試
 
@@ -369,7 +400,7 @@ Round 2 額外驗證：`-ParseBreakOnly`/`-RawReadOnly` 全 repo重跑（167 掃
 
 - REALTEST_EVIDENCE: tool=curl | cmd=CF API POST dns_records (success=True id=f28b0da7) + nslookup TXT _dmarc.aware-wave.com @1.1.1.1 回正確內容 | exit=0 | ms=15000
 - REVIEW_WAIVED: DOC_ONLY -- 無 repo code 改動（DNS 記錄 + WORKLOG）
-- BUGHUNT_DONE: scope=agency-os,scripts | grep=_dmarc | hits=0（無其他文件宣稱 DMARC 狀態，無 stale claim）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=_dmarc | hits=1（`scripts/verify-soulful-cutover.ps1:106` 既有 DNS 檢查邏輯本來就會查 `_dmarc.` 記錄，非本次新增、非 stale claim；當時查漏了這個既有 callsite，已更正計數）
 
 ### Netdata Cloud claim 補齊（整併日已登記的待辦，操作者發現 Cloud 上還是舊 Hetzner 兩節點）
 

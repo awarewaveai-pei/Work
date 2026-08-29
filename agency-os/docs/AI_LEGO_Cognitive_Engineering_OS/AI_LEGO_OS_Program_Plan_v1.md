@@ -115,7 +115,7 @@ Source directive 中所有根路徑（`/.ai/`、`/specs/`、`/policies/`、`/met
 
 **Status：COMPLETE（15/15 交付物，2026-08-29）** | Entry：Phase 1 exit gate 通過。**Exit Gate 已達成，進入 STOP FOR HUMAN REVIEW，操作者批准前不進 Phase 3。**
 
-**Round 1 產出**：`docs/adr/ADR-001~006`（見 [ADR_INDEX.md](../docs/adr/ADR_INDEX.md)），解決 2 條 CONFLICT（全部）、部分 DUPLICATION、OQ-6/7/8/9/11/12。全部 `Status: PROPOSED`，未套用到三母文件，待操作者批准。
+**Round 1 產出**：`docs/adr/ADR-001~006`（見 [ADR_INDEX.md](docs/adr/ADR_INDEX.md)），解決 2 條 CONFLICT（全部）、部分 DUPLICATION、OQ-6/7/8/9/11/12。全部 `Status: PROPOSED`，未套用到三母文件，待操作者批准。
 
 **Round 2 產出**（`docs/architecture/`，全部 `Status: PROPOSED`）：`MACHINE_READABLE_SPEC_PLAN.md`（Phase 3 Wave 0-8 全建置清單）、`REPOSITORY_ARCHITECTURE.md`、`SECURITY_THREAT_MODEL.md`（STRIDE+LINDDUN）、`DATA_ARCHITECTURE_PLAN.md`、`GLOBAL_JURISDICTION_PLAN.md`、`DEVOPS_SRE_PLAN.md`、`MVP_VERTICAL_SLICE_PLAN.md`、`TEST_EVAL_STRATEGY.md`、`MIGRATION_AND_ROLLBACK_STRATEGY.md`。另由 Claude 統籌彙整 `PROPOSED_ARCHITECTURE_CHANGES.md`（6 份 ADR → 23 項具體修改提案 P-001~P-023）與 `IMPLEMENTATION_ROADMAP.md`（總排程，含 §2 誠實揭露：MVP 切片選擇尚未完成 directive 要求的雙模型比較）。
 
