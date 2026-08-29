@@ -53,9 +53,21 @@ source_of_truth_for:
 
 decided_by: >
   No ADR governs this file specifically. `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`
-  §2.2 lists `result.schema.yaml` as READY with no ADR dependency (verified
-  by reading its row, L104) — unlike `gate.schema.yaml`'s row (L102), which
-  is explicitly `BLOCKED_PENDING_ROUND2_ADR`. Field-naming and structural
+  §2.2 listed `result.schema.yaml` as READY with no ADR dependency at
+  compilation time (verified by reading its row, L104); that row now
+  reads **BUILT (2026-08-29)** — corrected here 2026-08-30, same audit
+  pass as the `gate.schema.yaml` correction below — unlike `gate.schema.yaml`'s row (L102), which
+  WAS `BLOCKED_PENDING_ROUND2_ADR` when this file was originally compiled
+  (2026-08-29) and has since been RESOLVED by
+  `docs/adr/ADR-011-platform-gate-ownership-and-unification.md` (ACCEPTED
+  2026-08-30) — `gate.schema.yaml` now exists on disk with a 20-item
+  `gate_catalog`. **Corrected 2026-08-30** (found while working an unrelated
+  task, verified independently in this session): this file's
+  `compilation_decisions` and `open_questions` below were written against
+  the pre-ADR-011 premise that `gate.schema.yaml` did not exist; that
+  premise is now false and every affected passage is annotated in place
+  rather than silently rewritten — see `compilation_decisions`'s second
+  entry and `open_questions.OQ-RESULT-3`. Field-naming and structural
   choices below are Phase 3 compilation decisions, following the same
   "formalize an existing stub without inventing new architecture" mandate
   `manifest.schema.yaml` used for its own compilation_decisions.
@@ -102,11 +114,12 @@ compilation_decisions:
   - question: >
       The task instructions describe all three cross-file grounding points
       (epistemic-label.schema.yaml, gate.schema.yaml, cas-path.schema.yaml)
-      uniformly as "soft-reference". But `gate.schema.yaml` does not exist
-      on disk (confirmed: `specs/execution/` listing has 7 files, no
-      `gate.schema.yaml`; MACHINE_READABLE_SPEC_PLAN.md §2.2 L102 marks it
+      uniformly as "soft-reference". But (AT COMPILATION TIME, 2026-08-29)
+      `gate.schema.yaml` did not exist on disk (confirmed then:
+      `specs/execution/` listing had 7 files, no `gate.schema.yaml`;
+      MACHINE_READABLE_SPEC_PLAN.md §2.2 L102 marked it
       `BLOCKED_PENDING_ROUND2_ADR`), while `epistemic-label.schema.yaml`
-      and `cas-path.schema.yaml` are both already BUILT (confirmed on
+      and `cas-path.schema.yaml` were both already BUILT (confirmed on
       disk). Every other Wave 2+ file in this tree (`evidence.schema.yaml`,
       `decision.schema.yaml`, `claim.schema.yaml`, `section-registry.schema.yaml`,
       `normative-context.schema.yaml`, `cause-hypothesis-set.schema.yaml`)
@@ -123,10 +136,23 @@ compilation_decisions:
       output hash fields (into `cas-path.schema.yaml#/definitions/sha256_hash`)
       — both files already exist, so the established convention calls for
       a real ref, not a soft one. Keep `gates[].gate_id` genuinely untyped
-      (no `$ref`, no `enum`) — `gate.schema.yaml` does not exist yet and
-      its content is blocked on Round 2 ADR (MRSP-1), so there is nothing
-      to hard-`$ref` into; this exactly mirrors `manifest.schema.yaml`'s
-      own established wording for the identical gap.
+      (no `$ref`, no `enum`) — AT THE TIME, `gate.schema.yaml` did not
+      exist and its content was blocked on Round 2 ADR (MRSP-1), so there
+      was nothing to hard-`$ref` into; this exactly mirrored
+      `manifest.schema.yaml`'s own established wording for the identical
+      gap. **Re-verified 2026-08-30, decision UNCHANGED for a different
+      reason**: `gate.schema.yaml` now exists (built 2026-08-29, completed
+      2026-08-30 by ADR-011) and its own `gate_result.gate_id` property is
+      ITSELF still `type: string` with no `enum` — deliberately, per that
+      file's own `gate_catalog.note`, because Atlas §22.3's Method-specific
+      gate namespace is open-ended and a closed enum would reject every
+      future Method-specific `gate_id`. A hard `$ref` from this file's
+      `gate_id` into `gate.schema.yaml`'s `gate_id` property would therefore
+      resolve to another plain `{type: string}` node — syntactically legal
+      but adding no enforcement, only an indirection. Genuinely untyped
+      stays correct; only the REASON changes, from "target doesn't exist"
+      to "target exists and made the identical open-ended choice this file
+      already made independently".
     reasoning: >
       Matching the file's actual build state (not the task prompt's
       informal wording) keeps this schema consistent with every sibling
@@ -136,17 +162,40 @@ compilation_decisions:
       "NOT a hard $ref" jargon this project's own compilation_decisions
       sections use — a distinction worth recording explicitly per R4
       (claim-before-verify), not silently resolved either way.
+
+      **Correction note (2026-08-30, found and fixed in a separate
+      consistency-check session, not the original compilation)**: the
+      question/decision above are preserved as the historical record of
+      what was actually true and decided on 2026-08-29 — not rewritten —
+      because the underlying DECISION (keep `gate_id` untyped) survives
+      re-verification against present reality; only the now-stale premise
+      needed annotating. The one place ADR-011's arrival DOES change
+      something new is `gate_result` as a whole OBJECT SHAPE, not just the
+      `gate_id` field: `gate.schema.yaml` now independently defines its own
+      full `gate_result` record (`#/gate_result`, EC §69 shape) — and its
+      `evidence` property is deliberately left UNTYPED (`items: {}`; that
+      file's own `compilation_decisions` explicitly declined to borrow EC
+      §65's Content-addressed Evidence shape), whereas THIS file's
+      `definitions/gate_result.evidence` below is TYPED
+      (`items: {$ref: "#/definitions/evidence_ref"}`, this file's own
+      Q3 below explains why). Two sibling files now hold two different,
+      undeclared-as-such shapes for the same EC §69 concept. Silently
+      picking one (e.g. by hard-`$ref`-ing this file's `gates[]` into
+      `gate.schema.yaml#/gate_result` and losing the `evidence_ref` typing,
+      or vice versa) would be a NEW design decision this doc-sync pass is
+      not authorized to make unilaterally — recorded instead as
+      `open_questions.OQ-RESULT-4` below, not resolved here.
   - question: >
       EC §69's `gate_result` shape (`gate_id, status, evidence, validator,
       timestamp`) is a CONCRETE, fully-specified record — unlike
-      `gate.schema.yaml`'s blocker, which is specifically about the LEGAL
-      SET of `gate_id` values (EC §68's 14 Global + 6 High-risk names,
-      MRSP-1's "14+6 vs 11+1" undecided count), not about the shape of one
-      gate result entry. `manifest.schema.yaml`'s existing `results.gates`
-      field pre-dates this distinction: it types `gates` as a bare
-      `array of string` (gate ID references only, no status/evidence/
-      validator/timestamp), with a comment that the field is "deliberately
-      untyped ... pending that ADR."
+      `gate.schema.yaml`'s blocker (AT COMPILATION TIME, 2026-08-29), which
+      was specifically about the LEGAL SET of `gate_id` values (EC §68's 14
+      Global + 6 High-risk names, MRSP-1's "14+6 vs 11+1" undecided count),
+      not about the shape of one gate result entry. `manifest.schema.yaml`'s
+      existing `results.gates` field pre-dates this distinction: it types
+      `gates` as a bare `array of string` (gate ID references only, no
+      status/evidence/validator/timestamp), with a comment that the field
+      is "deliberately untyped ... pending that ADR."
     decision: >
       This file's `gates[]` uses the FULL EC §69 `gate_result` object shape
       (`gate_id` untyped string + `status` enum PASS/FAIL/BLOCKED/
@@ -168,6 +217,16 @@ compilation_decisions:
       untouched (task boundary); its simpler `gates: array of string`
       field remains valid but strictly less detailed than this file's —
       flagged as a follow-up in `open_questions.OQ-RESULT-1`.
+
+      **Correction note (2026-08-30)**: the "14+6 vs 11+1 undecided count"
+      premise above is now RESOLVED — ADR-011 (ACCEPTED 2026-08-30) settled
+      the count at 20 (14 Global + 6 High-risk, the verified union — see
+      `gate.schema.yaml#/gate_catalog`). This does not change the decision
+      recorded above (`gates[].gate_id` stays untyped regardless of whether
+      the legal set has 11, 17, or 20 members — see Q2's correction note
+      for why a hard `$ref`/`enum` still isn't warranted even now that the
+      set is known); it only removes the now-stale "undecided" framing of
+      the premise itself.
   - question: >
       EC §121's "Execution Result Template" (L3332-3396) is a much richer,
       19-section MARKDOWN template (Task/Objective/Current State/Root
@@ -251,19 +310,39 @@ definitions:
       gate_id:
         type: string
         description: >
-          Deliberately untyped (no `$ref`, no `enum`) — the Global/
-          High-risk gate list itself is BLOCKED_PENDING_ROUND2_ADR
-          (MRSP-1, `gate.schema.yaml`, Wave 5; MACHINE_READABLE_SPEC_PLAN.md
-          §2.2 L102, "14+6 vs 11+1 尚未裁決"). This field only records
-          which gate ran, using EC §68's example name pool
+          RESOLVED 2026-08-30 by
+          `docs/adr/ADR-011-platform-gate-ownership-and-unification.md`:
+          the Global/High-risk gate list is no longer undecided — it is
+          the 20-item catalog (14 Global + 6 High-risk) now recorded at
+          `gate.schema.yaml#/gate_catalog`. Kept `type: string` here with
+          no `$ref`/`enum` nonetheless (unchanged from the pre-ADR-011
+          draft, but now for a verified rather than assumed reason):
+          `gate.schema.yaml`'s own `gate_result.gate_id` property makes the
+          identical choice — a documented catalog, not a hard schema
+          `enum` — because Atlas §22.3's Method-specific gate namespace is
+          open-ended and a closed enum would reject every future
+          Method-specific `gate_id`; see this file's `compilation_decisions`
+          (Q2's correction note) for the full comparison. This field's
+          ORIGINAL description (kept below for local readability, not
+          deleted) named EC §68's example DISPLAY-NAME pool
           (Functional/Evidence/Reasoning/Security/Privacy/Data/
           Jurisdiction/Localization/Accessibility/Observability/Capacity/
           Rollback/Documentation/Golden Test, plus the High-risk set
           Human Specialist/Counterevidence/Red Team/Independent Review/
-          Reversal Criteria/Recovery Rehearsal) as informal guidance only —
-          it does not enumerate the legal set, exact wording adapted from
-          `manifest.schema.yaml`'s identical comment on its own `gates`
-          field.
+          Reversal Criteria/Recovery Rehearsal) as informal guidance only.
+          **Value-space clarification (2026-08-30, since a reader could
+          otherwise copy one of those display names verbatim into this
+          field)**: those are `gate_catalog[].display_name` strings, NOT
+          this field's actual value space — a real `gate_id` here SHOULD be
+          one of `gate.schema.yaml#/gate_catalog`'s `id` slugs (snake_case,
+          "PASS"-suffix stripped, e.g. `security`, `human_specialist_review`
+          — see ADR-011 Sub-decision (c) for why slugs, not display names,
+          are canonical). Of the display names above, 3 are now deprecated
+          aliases superseded by Atlas's wording (`Independent Review` →
+          `independent_judge`/"Independent Judge PASS"; `Human Specialist`
+          → `human_specialist_review`/"Human Specialist Review PASS";
+          `Recovery Rehearsal` → `recovery_rollback_rehearsal`/"Recovery /
+          Rollback Rehearsal PASS"), per CROSS-T-11's resolution.
       status:
         type: string
         enum: [PASS, FAIL, BLOCKED, NOT_APPLICABLE]
@@ -278,13 +357,23 @@ definitions:
       rationale:
         type: string
         description: >
-          REQUIRED in spirit when status == NOT_APPLICABLE, per EC §69's
-          own text (L2293): "`NOT_APPLICABLE` 必須有 rationale。" Not
-          declared as a JSON Schema conditional `required` (this project's
-          precedent for this class of cross-field rule is a documented
-          `constraints` list, e.g. `epistemic-label.schema.yaml`'s
-          `locked` constraints — see `constraints` below) — kept optional
-          at the property level, enforced via that list instead.
+          REQUIRED when status == NOT_APPLICABLE, per EC §69's own text
+          (L2293): "`NOT_APPLICABLE` 必須有 rationale。" **Fixed 2026-08-30**
+          (critic review, cross-checked against a real jsonschema
+          Draft202012Validator run): this property was previously left
+          optional at the property level with the rule stated only as
+          prose in `constraints` below (no JSON Schema `if`/`then`) — the
+          same PROSE-ONLY gap `gate.schema.yaml`'s `gate_result` had until
+          its own 2026-08-29 Wave 8 golden-test bughunt fix (see that
+          file's `gate_result` block comment, L182-187: "confirmed
+          empirically... {gate_id, status: NOT_APPLICABLE} with no
+          rationale validated successfully before this fix"). A PoC run
+          against THIS file's pre-fix `#/definitions/gate_result`
+          reproduced the identical gap:
+          `{gate_id: "security", status: NOT_APPLICABLE}` (no `rationale`)
+          validated with zero errors. Now enforced structurally below —
+          see the sibling `if`/`then` block, copied from
+          `gate.schema.yaml`'s already-fixed pattern.
       evidence:
         type: array
         items: { $ref: "#/definitions/evidence_ref" }
@@ -295,6 +384,13 @@ definitions:
       timestamp:
         type: string
         format: date-time
+    if:
+      properties: { status: { const: NOT_APPLICABLE } }
+      required: [status]
+    then:
+      required: [rationale]
+      properties:
+        rationale: { minLength: 1 }
 
   artifact_ref:
     description: >
@@ -437,7 +533,7 @@ constraints:
     established convention (e.g. `epistemic-label.schema.yaml`'s `locked`
     constraints) rather than left implicit.
   rules:
-    - "gates[].rationale MUST be present when gates[].status == NOT_APPLICABLE (EC §69 L2293, verbatim)."
+    - "gates[].rationale MUST be present when gates[].status == NOT_APPLICABLE (EC §69 L2293, verbatim). **Fixed 2026-08-30**: this was prose-only (no structural enforcement) until a critic review caught the gap by PoC — `definitions/gate_result` now also carries a real `if`/`then` making this rule machine-enforced, not just documented; this prose line is kept as the human-readable citation, not the sole enforcement mechanism."
     - "rationale (top-level) SHOULD be present whenever status != PASS; if present, MUST NOT be one of EC §70's forbidden vague answers (L2311-2318: 應該好了/看起來沒問題/大概完成)."
     - "rollback_ref SHOULD be non-null when status == ROLLED_BACK (EC §70 L2307); MAY be non-null for other statuses if a partial rollback occurred en route (e.g. PARTIAL_SUCCESS)."
     - "outputs[] and evidence[].hash entries are plain sha256 hashes (cas-path.schema.yaml#/definitions/sha256_hash), not full tenant-scoped cas_path objects — resolving a hash to its storage path is that schema's job, not this file's, matching Atlas §16.3's own hash-only precedent."
@@ -470,6 +566,7 @@ open_questions:
       already assume the shape of), not a compilation detail to slip in
       silently.
   - id: "OQ-RESULT-2"
+    status: "RESOLVED_2026-08-29"
     question: >
       For `status`'s `$ref` (see compilation_decisions) to be resolvable
       by a strict JSON Schema validator rather than only by a human reader
@@ -481,20 +578,92 @@ open_questions:
       mirrors `values`). This file's `$ref` target
       (`#/reference_vocabulary/final_status/values`) would then need
       updating to point at the new `enum` key instead of `values`.
-    owner: "operator / future Phase 3 session"
-    blocks: "nothing in this file today (verification is Read/Grep-based, not ajv-based, across this whole tree — see verification.note)"
-    why_not_done_here: >
-      `status-codes.schema.yaml` is an already-committed Wave 1 sibling
-      file this task is explicitly bounded not to touch.
+    resolution: >
+      RESOLVED 2026-08-29 (critic review CRITICAL finding #1, same fix
+      already noted at this file's own `properties/status` above):
+      `status-codes.schema.yaml` gained the additive `reference_vocabulary.
+      final_status.schema` node (`{type: string, enum: [...]}`,
+      status-codes.schema.yaml L86-95) and this file's `status.$ref` was
+      retargeted from `.../final_status/values` to `.../final_status/
+      schema` the same day. **Correction 2026-08-30**: this open question
+      itself was left claiming the upgrade "would need" doing, contradicting
+      this file's own `properties/status` description two sections above
+      which already documents the fix as done — found and annotated while
+      auditing this file for a different, unrelated stale-premise class
+      (the `gate.schema.yaml` existence question). Closed, not re-opened.
+    owner: "closed"
+    blocks: "nothing — resolved"
   - id: "OQ-RESULT-3"
+    status: "PARTIALLY_RESOLVED_2026-08-30"
     question: >
       Should `gates[].gate_id` eventually become a real `$ref` into
       `gate.schema.yaml` once MRSP-1's Round 2 ADR lands? At that point
       this file's untyped `gate_id: { type: string }` would need
       upgrading, mirroring the exact same upgrade `manifest.schema.yaml`
       itself is waiting on for its own `gates` field.
-    owner: "operator, via Round 2 ADR (MRSP-1) then a follow-up edit to both this file and manifest.schema.yaml"
-    blocks: "nothing today — gate.schema.yaml does not exist yet"
+    resolution_2026-08-30: >
+      MRSP-1's Round 2 ADR landed (`docs/adr/ADR-011-platform-gate-
+      ownership-and-unification.md`, ACCEPTED 2026-08-30) — the blocker
+      this question anticipated is gone, `gate.schema.yaml` exists with a
+      resolved 20-item `gate_catalog`. Re-examined against that reality:
+      the answer is NO, `gate_id` should NOT become a hard `$ref`/`enum`
+      — `gate.schema.yaml`'s own `gate_id` property independently made the
+      same "documented catalog, not schema enum" choice for the same
+      reason (Atlas §22.3 Method-specific open-endedness), so there is
+      nothing stricter to upgrade INTO. This question is closed for the
+      `gate_id` scalar. See `open_questions.OQ-RESULT-4` below for the
+      adjacent, genuinely still-open question this correction surfaced:
+      whether `gates[]`'s ITEM SHAPE (the whole `gate_result` object, not
+      just its `gate_id` field) should become a hard `$ref` into
+      `gate.schema.yaml#/gate_result` instead of staying a local
+      `definitions/gate_result` duplicate.
+    owner: "closed (gate_id scalar) — see OQ-RESULT-4 for the open item shape question"
+    blocks: "nothing — gate.schema.yaml exists; the untyped gate_id choice is unchanged, confirmed correct rather than assumed"
+  - id: "OQ-RESULT-4"
+    question: >
+      Discovered 2026-08-30 while correcting OQ-RESULT-3 above (not part
+      of the original Phase 3 compilation): now that `gate.schema.yaml`
+      exists and defines its own full `gate_result` object
+      (`gate.schema.yaml#/gate_result`, verbatim EC §69 shape), it and this
+      file's local `definitions/gate_result` describe the SAME concept
+      with two DIFFERENT shapes for one field — `evidence`.
+      `gate.schema.yaml#/gate_result/properties/evidence` is deliberately
+      untyped (`items: {}`; that file's own `compilation_decisions`
+      explicitly declined to borrow EC §65's Content-addressed Evidence
+      shape, reasoning that EC §69 never cross-references EC §65). THIS
+      file's `definitions/gate_result/properties/evidence` is TYPED
+      (`items: {$ref: "#/definitions/evidence_ref"}`, EC §65's shape,
+      reused because `evidence_ref` is also this file's OWN top-level
+      `evidence[]` shape and EC §65 is explicitly this file's grounding
+      per `source_of_truth_for`). Neither file is "wrong" against its own
+      stated reasoning — but the two now silently disagree on one field's
+      shape for what both call `gate_result`, and no finding or ADR names
+      this disagreement. Should `gates[]` here become a hard `$ref` into
+      `gate.schema.yaml#/gate_result` (adopting its untyped evidence,
+      losing this file's `evidence_ref` typing), should
+      `gate.schema.yaml#/gate_result/properties/evidence` be upgraded to
+      match this file's typed shape instead, or should the two
+      legitimately stay separate concepts (gate.schema.yaml's `gate_result`
+      = the record shape only; this file's `gates[]` = that shape PLUS
+      execution-level enrichment)?
+
+      Note (2026-08-30, critic review): a SEPARATE gap the same review
+      surfaced while checking this `gate_result` block — the NOT_APPLICABLE
+      -requires-rationale rule was prose-only (no JSON Schema `if`/`then`,
+      unlike `gate.schema.yaml`'s already-fixed enforcement) — is NOT part
+      of this open question. That one had a verified, PoC-confirmed correct
+      answer (structurally enforce it, matching the sibling file) and has
+      been fixed directly in `definitions/gate_result` and `constraints`
+      above, not left open. Only the `evidence` shape question above (which
+      genuinely has no single correct answer without a new design choice)
+      remains open here.
+    owner: "operator / future session — this is a genuine cross-file design
+      choice, not a doc-sync correction, so it is surfaced here rather than
+      picked unilaterally"
+    blocks: "nothing today — both files independently validate against
+      their own fixtures; this is a latent drift risk (the two `gate_result`
+      shapes could diverge further under future maintenance), not a
+      current breakage"
 
 verification:
   method: >
@@ -519,6 +688,21 @@ verification:
     drafting this file's `$ref`s into them, not just before. EC §69's and
     §65's field shapes are transcribed verbatim; the `status` $ref target
     shape caveat, the hard-vs-soft reference split between
-    epistemic-label/cas-path (already built) and gate.schema.yaml (not
-    built), and the gate_result-vs-manifest.gates expansion are Phase 3
-    compilation decisions recorded above, not new architecture decisions.
+    epistemic-label/cas-path (already built) and gate.schema.yaml (AT THE
+    TIME, 2026-08-29, not built), and the gate_result-vs-manifest.gates
+    expansion are Phase 3 compilation decisions recorded above, not new
+    architecture decisions.
+
+    **Correction pass, 2026-08-30**: `gate.schema.yaml` now exists
+    (completed same day by ADR-011); every passage above and in
+    `compilation_decisions`/`open_questions` that asserted otherwise has
+    been re-verified against the current on-disk state and annotated in
+    place (not silently rewritten — see `decided_by` for the summary and
+    `open_questions.OQ-RESULT-3`/`OQ-RESULT-4` for the outcome). Re-read
+    in full for this pass: `specs/execution/gate.schema.yaml` (current,
+    post-ADR-011 content) and
+    `docs/adr/ADR-011-platform-gate-ownership-and-unification.md`.
+    Golden tests (`python3 tests/run_golden_tests.py`) re-run after these
+    edits — prose/description-only changes, no `properties`/`type`/`$ref`
+    structural node touched, so no new dangling-`$ref` or fixture-shape
+    risk introduced.

@@ -1,5 +1,44 @@
 # Worklog
 
+## 2026-08-30（續5）
+
+### `result.schema.yaml` 過期前提修正（「gate.schema.yaml 尚不存在」，實際已於 2026-08-29 建骨架 + 2026-08-30 由 ADR-011 補完整內容）——critic 覆審順帶抓到 1 個真實驗證漏洞（NOT_APPLICABLE 缺 rationale 未強制）
+
+**觸發**：操作者指出 `specs/execution/result.schema.yaml`（約 L57/L104-107/L126/L142/L256/L492-522）反覆宣稱「`gate.schema.yaml` 尚不存在」，用此前提解釋 `gate_id` 為何採軟參照非硬 `$ref`；該前提已於本 repo 另一並行 session（`53914155d` `ADR-011 裁決 OQ-10`）確認過期——`gate.schema.yaml` 2026-08-29 建骨架、2026-08-30 由 ADR-011 補上 `gate_catalog`（14 Global + 6 High-risk = 20 項 canonical id）。該 session 的 WORKLOG（本檔續4 條）明確記錄「刻意不觸碰 result.schema.yaml，避免與並行 session 衝突」，故本任務範圍乾淨、無檔案級衝突。
+
+**根因**：`result.schema.yaml` 於 2026-08-29 Phase 3 撰寫時，`gate.schema.yaml` 確實不存在（compilation_decisions 當時的判斷正確），但 2026-08-30 該檔補完整後，`result.schema.yaml` 本身沒有跟著更新——這是純粹的「上游狀態變了，下游文件沒同步」，不是撰寫當下的錯誤。
+
+**逐一檢查結論（回應操作者 3 個問題）**：
+1. **欄位設計決策是否因前提錯誤而做錯**：檢查後判斷**沒有錯**，但理由需要更新（從「gate.schema.yaml 不存在，無處可 $ref」→「gate.schema.yaml 存在，但它自己的 `gate_id` 也刻意保持 `type: string` 無 `enum`，理由是 Atlas §22.3 Method-specific gate 命名空間開放式，硬 enum 會讓未來的 method-specific gate_id 全部驗證失敗；ref 過去也只會指到另一個同樣未型別化的 string 節點，無實質收斂效果」）——結論不變，論證從「假設」變成「已驗證」。
+2. **`open_questions` 對應項目**：`OQ-RESULT-3`（是否該把 `gate_id` 升級成硬 $ref）標記 `PARTIALLY_RESOLVED_2026-08-30`，`gate_id` 純量部分結案；同時發現並新增 `OQ-RESULT-4`——`gate.schema.yaml#/gate_result` 與本檔 `definitions/gate_result` 現在是兩份平行定義，`evidence` 欄位型別互相衝突（`gate.schema.yaml` 故意不型別化 vs 本檔用 `evidence_ref` 型別化，各有明文理由但互不引用），這是本次審查中**新發現**、且不該由單一 session 片面決定的真設計題，記錄為 open question 而非自行合併。過程中也發現同一 `open_questions` 段裡 `OQ-RESULT-2`（status $ref target 型別化）其實已在 2026-08-29 critic review 修好，但自己還留著「尚待處理」的過期措辭——一併標記 `RESOLVED_2026-08-29` 結案。
+3. **golden test**：`python3 tests/run_golden_tests.py` 全數通過（見下方證據）。
+
+**critic 覆審（真實外部 subagent，非自我描述）抓到的問題**：
+- 🔴 **C1（真實漏洞，已修，PoC 驗證）**：本檔 `constraints.rules[0]` 宣稱「`gates[].rationale` MUST be present when `gates[].status == NOT_APPLICABLE`」，但 `definitions/gate_result` 從未有對應的 JSON Schema `if`/`then` 落實——跟 `gate.schema.yaml` 自己在 2026-08-29 Wave 8 抓蟲修過的同一類 bug 一模一樣（該檔已補 `if`/`then`，本檔沒跟上）。用 `jsonschema.Draft202012Validator` 直接 PoC：`{gate_id:"security", status:"NOT_APPLICABLE"}`（無 rationale）修前 0 errors（違反聲稱的規則）、修後 1 error（`'rationale' is a required property`）。已補相同 `if`/`then` + `result.fixtures.yaml` 新增 1 valid（NOT_APPLICABLE 帶 rationale）+ 1 invalid（NOT_APPLICABLE 缺 rationale）迴歸案例。
+- 🟠 Major：`OQ-RESULT-2` 過期措辭（已修，見上）；`db-migration-expand-contract.recipe.yaml`/`recipe.schema.yaml`/`MACHINE_READABLE_SPEC_PLAN.md` 三檔的連動狀態列有額外過期宣稱——複查後確認多數已被並行 session 的 `53914155d` commit 同步修正，本 session 只需補 `MACHINE_READABLE_SPEC_PLAN.md` L175/L262（db-migration 的 3 個 `gate_ref` 已從 TBD 換成真值，但狀態列文字沒跟上）與 `recipe.schema.yaml` L238（`risk_tier` 欄位描述殘留一處 `still-BLOCKED_PENDING_ROUND2_ADR`，並行 session 只修了另外 2 處）。
+- 🟡 Minor：本檔新寫的 `gate_id` 描述把 `gate_catalog[].id`（snake_case slug，如 `human_specialist_review`）與 `display_name`（如 "Human Specialist Review PASS"）混為一談，可能誤導實作者填入 EC 顯示名（甚至是已降級的 deprecated alias）——已修正並明確區分兩個值空間；`decided_by` 句子前半殘留「§2.2 lists result.schema.yaml as READY」過期措辭（該列現為 BUILT）——一併修正。
+- `gate.schema.yaml` 自身的 `gate_id_registry`→`gate_catalog` 更名 blast radius（`network-egress.yaml` 等）critic 覆審當下抓到懸空引用，但覆審耗時期間（約 7 分鐘）並行 session 已自行修正完畢——複查確認現況已一致，無需本 session 動作（這正是本 repo 多 session 並行運作的預期現象，非誤報）。
+
+**未觸碰 / 刻意不做**：`OQ-RESULT-4`（`gate_result.evidence` 型別衝突）故意不片面合併——`gates[]` 是否該改成硬 `$ref` 進 `gate.schema.yaml#/gate_result`（會靜默丟失 `evidence_ref` 型別化）屬新設計決策，超出本次「文件同步」授權範圍，留待操作者/未來 session 裁決。
+
+[已修改]
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/execution/result.schema.yaml`：6 處「gate.schema.yaml 不存在」過期前提訂正（decided_by / compilation_decisions Q2+Q3 / gate_id description / verification.note）；`OQ-RESULT-2` 結案、`OQ-RESULT-3` 部分結案、新增 `OQ-RESULT-4`；`definitions/gate_result` 補 `if`/`then` NOT_APPLICABLE→rationale 強制（真實漏洞修正）；`gate_id` description 修正 id/display_name 混淆
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/contracts/specs/execution/result.fixtures.yaml`：新增 `gate_not_applicable_with_rationale_supplied`（valid）+ `gate_not_applicable_without_rationale`（invalid）迴歸案例
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`：L175/L262 db-migration `gate_ref` 狀態列訂正（TBD→已解決真值）
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/cognitive/recipe.schema.yaml`：L238 `risk_tier` 描述殘留過期宣稱訂正
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py`（從 `D:/Work/agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`）| exit=0 | 結果=668 個檢查全過（含新增的 2 個 fixture case，過程中因並行 session commit `53914155d`落地，基準數字曾經歷 641→644→666→668 的外部飄移，已逐次確認飄移來源是共用 working tree 的其他檔案而非本次改動，非本次改動造成回歸）
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=手工建構 `jsonschema.Draft202012Validator` + `RefResolver`（跨檔 `$ref` 解析 gate.schema.yaml/status-codes.schema.yaml/epistemic-label.schema.yaml/cas-path.schema.yaml）直接驗證 NOT_APPLICABLE 缺 rationale 案例 | exit=0 | 結果=修前 0 errors（違反聲稱規則）、修後 1 error（`'rationale' is a required property`）；帶 rationale 案例 0 errors（無過度收斂）
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 -c "import yaml; yaml.safe_load(...)"` 逐檔驗證本次改動的 4 個 YAML 檔可正確解析 | exit=0 | 結果=全部 OK，無縮排/多行 scalar 折疊語意跑掉
+- REVIEW_DONE: critic=Deep（真實 subagent 呼叫，非自我描述；獨立重讀 + 自行 PoC 驗證，不信任本 session 的敘述）| verdict=needs-attention → 1 Critical + 2 Major + 5 Minor，全部逐條驗真後：1 Critical 已修（PoC 復現）、1 Major 已修（OQ-RESULT-2）、1 Major 確認已由並行 session commit 吸收（MRSP L175/L262 仍需本 session 補，已修）、3 Minor 已修（id/display_name 混淆、READY→BUILT 措辭、recipe.schema.yaml L238）、1 Minor（gate_id_registry 懸空引用）確認並行 session 覆審期間已自行修正、1 Suggestion（YAML flow scalar 風格）未採納（低優先，cosmetic）| findings=1c(fixed)/2m(1 fixed+1 confirmed-absorbed-by-concurrent-commit)/5n(3 fixed+1 confirmed-resolved+1 not-applied)
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`gate\.schema\.yaml.{0,120}(does not exist\|不存在\|BLOCKED_PENDING_ROUND2_ADR)` | hits=3（`recipe.schema.yaml`已修、`db-migration-expand-contract.recipe.yaml`已修、`WORKLOG.md` 命中為歷史紀錄行非過期宣稱，不需改）；`scripts/` 目錄零命中
+
+[剩餘風險] `OQ-RESULT-4`（`gate_result.evidence` 兩檔型別不一致）刻意留為 open question，不是本次遺漏——是否合併需操作者/未來 session 做設計決策，目前兩份定義各自獨立驗證通過，無立即風險，但未來維護若只改一邊會持續 drift。多 session 並行寫入同一 working tree 導致 golden test 總數在驗證過程中三度飄移（外部因素，已排除為本次改動造成）。
+
+[rollback] 全部為文件/schema 描述訂正 + 新增 `if`/`then` 結構化約束 + 2 個 fixture case，無 breaking schema 變更對既有合法 instance（`if`/`then` 只收緊 NOT_APPLICABLE 且缺 rationale 的非法組合，任何原本合法的 instance 不受影響，已用兩個方向的 PoC 驗證）；`git revert` 可完整回退。
+
 ## 2026-08-30（續4）
 
 ### AI-LEGO 剩餘任務兩項純工程判斷收斂：OQ-10（Global/High-risk Gate 三方爭議，ADR-011）+ Branch 完整狀態機（ADR-012）

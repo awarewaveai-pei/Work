@@ -41,6 +41,18 @@ valid:
         epistemic_type: "DECISION"
         authorship_state: "HUMAN_APPROVED"
       rollback_ref: "RB-2026-000043"
+  - name: gate_not_applicable_with_rationale_supplied
+    instance:
+      execution_id: "EX-2026-000047"
+      status: "PASS"
+      evaluated_at: "2026-08-29T16:30:00Z"
+      provenance:
+        epistemic_type: "SOURCE_FACT"
+        authorship_state: "HUMAN_ORIGINAL"
+      gates:
+        - gate_id: "security"
+          status: "NOT_APPLICABLE"
+          rationale: "N/A for this task type -- no security-boundary change"
 
 invalid:
   - name: status_not_in_final_status_seven_value_enum
@@ -72,3 +84,27 @@ invalid:
         - gate_id: "Rollback"
           status: "SKIPPED"
     reason: "gates[].status uses EC §69's own literal, smaller vocabulary [PASS, FAIL, BLOCKED, NOT_APPLICABLE] -- a different enum from the top-level status field. 'SKIPPED' is not a member of that gate-result enum."
+  - name: gate_not_applicable_without_rationale
+    instance:
+      execution_id: "EX-2026-000048"
+      status: "PASS"
+      evaluated_at: "2026-08-29T16:40:00Z"
+      provenance:
+        epistemic_type: "SOURCE_FACT"
+        authorship_state: "HUMAN_ORIGINAL"
+      gates:
+        - gate_id: "security"
+          status: "NOT_APPLICABLE"
+    reason: >
+      **Added 2026-08-30 (critic review, PoC-confirmed regression test)**:
+      `definitions/gate_result`'s `if`/`then` (status == NOT_APPLICABLE =>
+      required: [rationale], minLength: 1) now rejects this instance.
+      Before the 2026-08-30 fix, `{gate_id: "security", status:
+      NOT_APPLICABLE}` with no `rationale` validated with zero errors
+      against this schema despite `constraints.rules[0]` prose claiming
+      the opposite -- the same prose-only gap
+      `specs/execution/gate.schema.yaml#/gate_result` had until its own
+      2026-08-29 Wave 8 golden-test bughunt fix. This fixture is this
+      file's own regression test for that class of gap, mirroring
+      `tests/contracts/specs/execution/gate.fixtures.yaml`'s equivalent
+      case for the sibling file.
