@@ -61,6 +61,18 @@
 
 ## 2026-08-29
 
+### studio.aware-wave.com 真的 500（操作者實测拓破，我上輪誤判為殊點）+ 修復途中自己打掛 SG 站看短暗 90 秒，已全復原
+
+**真根因**：`/etc/nginx/.htpasswd_studio` 在 ks 上是一個**空目錄**（非檔案）。整併日 rsync 沒拷到這個檔，改成某個容器（`lobster-nginx`）先起來且 bind-mount 了不存在的 host 路徑 → Docker 自動幫你建目錄佔位。host nginx 用 `auth_basic_user_file` 讀到目錄 → `pread() failed (21: Is a directory)` → 500（error.log 實證 crit 級）。**這是真的搬家漏拔，不是上輪判的瞬間抱抖**（上輪進度錯誤判斷已短暗紀錄在此修正）。
+**修復**：`rmdir` 空目錄 → `htpasswd -cb` 重建真密碼檔（帳密同 `AWARE_WAVE_CREDENTIALS.md` 原值 `awarewave`/`AwareWave2026!`）→ `nginx -t` + reload。
+**我自己引發的小事故**：重建後 bind mount source 從目錄變檔案，`lobster-nginx` 容器内部已記住舊挖點類型 → `docker restart` 拒絕（`not a directory` mount error）→ 容器 Exited，SG 站(`api/app/aware-wave.com` apex)90 秒內 502。改用 `docker compose up -d --force-recreate nginx`（service 名是 `nginx`，`container_name: lobster-nginx`）重建容器才真正重新解析 mount type，已全部復原。
+**一併澄清**：`supabase.aware-wave.com`（Kong）的登入框不是 Basic Auth，是 Kong 未帶 apikey 時回 `401 WWW-Authenticate: Basic`。上輪我錯發密碼面板給使用者，時看地址列都會 401（需要的是 apikey header，不是帳號密碼，本來就不應用瀏覽器直接登入）。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl -u 實證 studio 401→307（成功）+ 7 個公開 endpoint 全掃確認无漶伤 | exit=0 | ms=90000
+- REVIEW_DONE: critic=Self | verdict=pass | findings=2（真根因確認為目錄非檔案，非假警報；我引發的短暗已完全復原並五項公開站重新確認）
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks | grep=htpasswd_studio | hits=1（只在 studio vhost，無其他服務依賴這個檔名）
+- AUTO_TASK_DONE: studio.aware-wave.com 500 真正修復（非錯判）；副作用引發的 SG 短暗已復原並驗證
+
 ### 換機 runbook 補今日兩個真坑 + 新子網域 cognitive.aware-wave.com 待搬 checklist（操作者要求）
 
 **坑 1**：Ubuntu 發行版 netdata 編譯 `--disable-cloud`，claim 必拒（今日實流）→ 寫進 §1d：purge 發行版→官方 stable kickstart 重裝+claim→綁回 127.0.0.1。

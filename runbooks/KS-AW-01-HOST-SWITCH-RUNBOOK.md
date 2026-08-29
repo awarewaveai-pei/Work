@@ -208,6 +208,7 @@ done | grep -E '^[0-9a-f]{64}'
 | 已接寫後 DNS 直接回切 | 丟失新機已接受的寫入 | §7(b) 反向同步 |
 | Ubuntu 發行版 netdata 編譯 `--disable-cloud` | `netdata-claim.sh` 直接拒絕(exit=3),kickstart 也拒絕覆蓋系統套件管理的安裝 | §1d（2026-08-29 補：換機須 purge 發行版套件→官方 stable kickstart 重裝+claim→`[web] bind to = 127.0.0.1` 綁回本地，見下方新增條目） |
 | 新網域上線未補 DMARC | 該網域可被偽造寄信，且不會主動跳警告直到被人拿去釣魚 | §1e（2026-08-29 補：新增子網域/新 zone 上線 checklist 需含 `_dmarc` TXT） |
+| `.htpasswd` 類檔案漏拷，容器搶先 bind-mount 不存在的 host 路徑 | Docker 自動把該路徑幫你建成**目錄**，host nginx `auth_basic_user_file` 讀到目錄 → `pread() failed (21: Is a directory)` → 500；修完後容器內部仍記著舊掛點型別，`docker restart` 會直接 mount 失敗、容器 Exited，須 `docker compose up -d --force-recreate <service>`（compose service 名可能不等於 container_name，先查 `container_name:` 對應） | §1d（2026-08-29 補：所有 `auth_basic_user_file` 引用的 `.htpasswd*` 路徑，換機前先在來源機 `find / -iname "*.htpasswd*"` 產清單，逐一確認搬過去的是檔案不是目錄；`stat` 型別對照，不能只看 `ls` 有沒有東西） |
 
 ### 1d 追加：Netdata Cloud claim（2026-08-29 補）
 
