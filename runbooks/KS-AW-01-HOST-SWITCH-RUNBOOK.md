@@ -97,6 +97,13 @@ done | grep -E '^[0-9a-f]{64}'
   ```
   官方版預設監聽 `0.0.0.0:19999`，裝完務必在 `/etc/netdata/netdata.conf` 的 `[web]` 段加 `bind to = 127.0.0.1` 再 `systemctl restart netdata`，否則對外暴露監控面板。`sudo netdatacli aclk-state` 應回 `Claimed: Yes`。
 
+- **Node.js（host 層，非容器內）**：`sg-deploy.sh` 的 tsc typecheck/npm test gate 直接在**新機系統層**跑 `npm --prefix .../next-admin run typecheck`，不是在 container 裡——**docker save/load 帶的是既有 image，不含這個 host 依賴**，換機後第一次跑 `sg-deploy.sh next-admin` 才會撞到（2026-08-29 整併後首次驗證：`ks-aw-01` 從沒裝過 Node，直接 `npm: command not found` 擋下整個部署）。換機時務必主動裝，不要等下次部署才發現：
+  ```bash
+  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+  sudo apt install nodejs -y
+  node -v   # 應為 v20.x，對齊 next-admin Dockerfile 的 node:20-alpine
+  ```
+
 ### 1e. DNS（Cloudflare，PATCH `content` → NEW_IP；record id 現查 `GET /zones/<zone>/dns_records`）
 
 - zone `f21b1919632fee2221647908a94fdcac`（aware-wave.com）：**13 筆 A**（apex/api/app/oracle/mainwp/n8n/postiz/studio/supabase/trigger/uptime = proxied🟠；`remotion-svc`/`video-svc` = **DNS-only⚪ 勿開 proxy**）＋ `ks-aw-01` A（DNS-only，rDNS 配對用 → 同步改）＋ www CNAME 不動
