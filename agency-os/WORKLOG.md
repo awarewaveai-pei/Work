@@ -1,5 +1,41 @@
 # Worklog
 
+## 2026-08-29（續22）
+
+### AI-LEGO Phase 3 Wave 7 全建（`recipes/validated/` 3 檔）+ 自我發現並修正 2 個跨檔行號漂移（延續續19 的同一類 bug）
+
+**觸發**：`/compact` 後操作者說「繼續完成」，延續 AI-LEGO Phase 3 既有多輪授權（本 session 已跑過 Wave 4/5/6，見續16/續19），依 `MACHINE_READABLE_SPEC_PLAN.md` §3 Build Order，Wave 6 完成後下一個未建項目就是 Wave 7 `/recipes/validated/` 全目錄（3 檔）。Low-risk（新增檔案，非 prod/deploy/migration/憑證），依規則優先序表「Low/Medium 直接做，說明假設」直接執行，未逐項等待批准。
+
+**執行**：讀 `docs/adr/ADR-005-db-migration-recipe-and-method-id-grammar.md` 全文（ADR-005a 的 15 步 DB migration 序列裁決）、`specs/execution/deprecation-pipeline.schema.yaml` 全文（412 行，Wave 5 既有 7 步序列）、`specs/execution/gate.schema.yaml` 全文、`specs/cognitive/recipe.schema.yaml` 全文（431 行，此檔已預先命名這 3 個確切檔名與 `id` slug，是 Wave 7 的既有契約）、CROSS-T-20 finding 全文，並直接重讀三份母文件的實際段落（EC §28/29/30/37、MP §70/71、Atlas §24.1-24.3）取得精確行號，不轉抄 ADR/finding 裡的摘要行號。
+
+三檔內容：
+1. `db-migration-expand-contract.recipe.yaml`：轉譯 ADR-005a「最終建議序列」15 步（Schema Baseline→…→Close Rollback Window），`risk_tier: R3`（risk-tier.schema.yaml 逐字列出 DB migration 為 R3 範例）；3 個 `gate_ref` 留 `TBD_PENDING_ROUND2_ADR` placeholder（Backup/Restore Validation、Reconciliation、Traffic Migration/Switch）；EC §29/§30 的評估清單/Backfill 5 性質/Data Integrity Contract 6 項/「exit code≠proof」規則轉譯進 `mandatory_elements`/`outputs`。
+2. `method-deprecation-retirement.recipe.yaml`：把既有 `deprecation-pipeline.schema.yaml` 的 7 步結構定義轉成 `recipe.schema.yaml` 的 node-grammar 可執行版本，不新增任何規範內容；發現並誠實記錄一個形狀不匹配——該檔案的 Usage Scan/Archive 阻塞機制是 `status-codes.schema.yaml` 的 `legal_side_state`，不是 `gate.schema.yaml` 的 `gate_id`，因此刻意不把它塞進語意不符的 `gate_ref` 欄位（compilation_decisions 明文記錄，而非靜默省略）。
+3. `champion-challenger.recipe.yaml`：統一 MP §71（僅 Model）/ Atlas §24.2（Model+Method+Recipe）/ EC §37（Model+Method+Prompt+Recipe，含「Challenger 不得直接改正式 Artifact」EC-only 規則）三方適用範圍分歧，採 EC 版（4 種型別的 superset），4 步 Shadow→Eval→Compare→Promote or Reject；額外核對 MP §71 的「品質、成本、延遲達標才升級」判準是否誤植自鄰近但不同的 §70 Eval 指標清單（直讀兩段確認是各自獨立敘述，非誤引），並將此 MP-only 細節補進 `mandatory_elements`（非捨棄）。
+
+**自我發現的 bug（同續19已記錄過的「行號漂移」bug class 再次發生，非新 bug class）**：更新 `MACHINE_READABLE_SPEC_PLAN.md` §2.8 三列狀態（READY→BUILT）與 Build Order 新增 Wave 7 完成區塊（+5 行）後，主動用 `grep -rhoE` 重新掃描全庫對這份計畫文件的所有行號引用做交叉核對（非等下一個 reviewer 抓到才修），抓到兩處被自己這次編輯連帶弄過期的既有引用：① `policies/ai-execution/{mandatory-gates,network-egress,release-policy}.yaml` + `specs/execution/gate.schema.yaml`（4 檔，續19 才剛修過的 L264 引用）位移為 L269；② `policies/ai-execution/{mandatory-gates,release-policy}.yaml` 引用的 `§5 Open Questions MRSP-1`（原 L304）位移為 L309。順帶抓到一個**與本次編輯無關、更早就存在的獨立漂移**：`specs/execution/status-codes.schema.yaml` 引用 `§4 (L252, PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED)`，實際內容早已在 L285（此檔是 Wave 1 建的，漂移量遠大於本次 Wave 7 造成的 +5，代表這條引用在更早的 Wave 2-6 編輯中就已經過期，本次抓蟲順帶抓到並修正，不擴大成獨立任務去做全庫窮舉式行號驗證——這是本 repo 已明文記載的結構性脆弱（見續19 摘要），本次只修「這次抓到的」，非重新設計行號引用機制）。
+
+[已修改]
+- 新增 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/recipes/validated/db-migration-expand-contract.recipe.yaml`
+- 新增 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/recipes/validated/method-deprecation-retirement.recipe.yaml`
+- 新增 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/recipes/validated/champion-challenger.recipe.yaml`
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`：§2.8 三列 READY→BUILT + Build Order Wave 7 完成區塊
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/policies/ai-execution/mandatory-gates.yaml`：L264→L269、L304→L309（3 處）
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/policies/ai-execution/network-egress.yaml`：L264→L269（1 處）
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/policies/ai-execution/release-policy.yaml`：L264→L269、L304→L309（4 處）
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/execution/gate.schema.yaml`：L264→L269（3 處）
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/execution/status-codes.schema.yaml`：L252→L285（3 處，獨立於本次 Wave 7 編輯的更早漂移）
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=自訂 `UniqueKeyLoader`（重複 key 拋錯）載入 3 個新 recipe 檔 + 5 個修正檔，並用 `jsonschema.Draft202012Validator` + `referencing.Registry`（自訂 `ai-lego://` retriever）將 3 個新 recipe 檔的完整內容對 `specs/cognitive/recipe.schema.yaml` 做真實 schema 驗證 | exit=0 | 結果=8 檔 YAML 語法/重複 key 全過、3 檔 recipe.schema.yaml 驗證全 PASS、steps 數量核對（15/7/4）全符合預期
+- REALTEST_EVIDENCE: tool=Bash(grep) | cmd=`grep -rhoE "MACHINE_READABLE_SPEC_PLAN\.md[^)\"]{0,60}" --include="*.yaml" . \| grep -oE "L[0-9]+" \| sort -u`，對每個 >256 的值逐一用 `grep -n`/`sed -n` 核對計畫文件目標行實際內容 | 結果=修正前 3 組漂移（L264/L304/L252），修正後全庫清單清潔，L2639/L5637 二值經核對為引用其他母文件之無關誤命中
+- REVIEW_DONE: critic=Quick（自我核對：3 個新檔的每條 mandatory_elements/forbidden_actions/compilation_decisions 引用皆對照母文件原文逐字核對行號，非轉抄 ADR/finding 摘要；champion-challenger.recipe.yaml 額外核對 MP §70 vs §71 兩段是否誤植，直讀原文排除）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`db-migration-expand-contract\|champion-challenger\.recipe\|method-deprecation-retirement\.recipe\|recipes/validated` | hits=僅既有正向轉發引用（`recipe.schema.yaml`/`deprecation-pipeline.schema.yaml`/`IMPLEMENTATION_ROADMAP.md`/`REPOSITORY_ARCHITECTURE.md`/`AI_LEGO_OS_Program_Plan_v1.md`），皆為已預期、內容仍準確的正向引用，無需修改；另外 `IMPLEMENTATION_ROADMAP.md` §Wave 7 列屬純排程表（無狀態欄），與 Wave 0-6 其餘列一致不標記完成度，非遺漏
+
+[剩餘風險] `db-migration-expand-contract.recipe.yaml` 的 3 個 `gate_ref` 與 EC §28 母文件本身（仍是未編輯的 11 步舊版 mermaid）都還在等 Round 2 ADR（OQ-10）與 ADR-006 proposals 流程落地，非本次可解決；`method-deprecation-retirement.recipe.yaml` 未指定 `risk_tier`（7 種物件型別風險差異太大，強行指定會誤導，已在檔案自身 open_questions 記錄）；行號引用的結構性脆弱本身仍未解決（每次計畫文件被編輯都可能再次連帶弄過期其他檔案的引用），本次只做「抓到即修」，未建立自動化防線——若未來要根治，需要一個獨立任務把行號引用改成更穩定的錨點機制（例如標題文字比對而非絕對行號），本次未做此設計變更以維持最小爆炸半徑。
+[rollback] 全部為新增檔案 + 純文字行號修正，`git revert` 對應 commit 即可完整還原，無 DB/prod/deploy 副作用。
+
 ## 2026-08-29（續21）
 
 ### HCI30_RESEARCH_REVIEW 補一條 9 個 reviewer 都沒抓到的真洞（DOM-12/HD-00）：Subject 被架構寫死限定個人，Organization 有名無實

@@ -1,0 +1,205 @@
+$id: "ai-lego://recipes/validated/champion-challenger.recipe.yaml"
+title: "Champion / Challenger Promotion (unified applicability scope)"
+status: ACTIVE
+
+description: >
+  Machine-readable instance of the Champion/Challenger promotion mechanism,
+  resolving CROSS-T-20 (.ai/research/phase-0/verified-findings.yaml
+  L1222-1245, CONFIRMED, 3/3 independent votes, severity low): the
+  mechanism is defined three times with drifting applicability scope —
+  Master Plan §71 (L2914-2930) applies it to Models only; Method Atlas
+  §24.2 (L4263-4273) to "Champion Method / Model / Recipe" (3 kinds,
+  omitting Prompt); Execution Contract §37 (L1447-1465) to "模型、Method、
+  Prompt、Recipe" (4 kinds — the only version that includes Prompt).
+
+  MACHINE_READABLE_SPEC_PLAN.md §2.8 row 177 recommends adopting the EC
+  version as SSOT ("建議採 EC 版（最完整）" — most complete). Re-read all
+  three sections directly (not transcribed from the finding alone) to
+  confirm before adopting: the actual 4-node flow sequence
+  (Shadow -> Eval -> Compare -> Promote/Reject) is IDENTICAL across all
+  three documents in substance — only the applicability list and one
+  EC-only rule ("Challenger 不得直接改正式 Artifact", EC §37 L1465) differ.
+  Adopting EC's 4-kind scope therefore loses no MP/Atlas-only applicability
+  (Model and Method/Recipe are both subsets of EC's list) while gaining
+  Prompt coverage neither MP nor Atlas states.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §71 Champion / Challenger (L2914-2930) — Model-only scope, and the quality/cost/latency promotion criterion this file's mandatory_elements draws from (not present in Atlas or EC)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §24.2 Champion / Challenger (L4263-4273) — Method/Model/Recipe scope"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §37 Champion / Challenger (L1447-1465) — Model/Method/Prompt/Recipe scope (adopted as this file's applicability list) and the Challenger-must-not-modify-production-Artifact rule (EC-only)"
+  - ".ai/research/phase-0/verified-findings.yaml CROSS-T-20 (L1222-1245) — the 3/3-confirmed drifting-scope finding this file resolves"
+  - "specs/cognitive/recipe.schema.yaml — the schema this file's body is validated against"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.8 row for this file (L177)"
+
+decided_by: >
+  No dedicated ADR governs this file. MACHINE_READABLE_SPEC_PLAN.md §2.8's
+  row for this file (L177) characterizes the EC-version pick as
+  "Low-risk 聯集式合併" (Low-risk union-style merge) not requiring ADR
+  arbitration — independently re-verified in this session (see
+  `description` above: the 4-node flow sequence is identical across all
+  three sources; only applicability scope differs, and EC's list is a
+  strict superset of MP's and Atlas's) before being built on, per this
+  project's R4 claim-before-verify discipline.
+
+compilation_decisions:
+  - question: >
+      All three documents draw "Champion + Challenger" as the entry
+      point of their flow diagram, immediately before the first real
+      processing step (Shadow). Should this file model "Champion" and
+      "Challenger" as steps[] entries of their own?
+    decision: >
+      No. `steps[]` starts at Shadow. Champion/Challenger are modeled as
+      the recipe's PRECONDITION (the two candidate artifacts being
+      compared), described in `suited_for`, not as processing steps.
+    reasoning: >
+      None of the three documents treats "Champion" or "Challenger" as an
+      action being performed — they are the two inputs the subsequent
+      Shadow/Eval/Compare/Promote-or-Reject sequence operates ON. Modeling
+      them as steps[] entries (which recipe.schema.yaml requires to have a
+      `type: capability|method` and typically a `ref`) would force an
+      artificial action-shape onto what is actually a precondition
+      statement in all three sources.
+  - question: >
+      All three documents draw the final node as a single fork,
+      "Promote or Reject" / "Promote / Reject" — not two separate
+      sequential steps. Should this file split it into two steps
+      ("Promote", "Reject") to make the branch explicit?
+    decision: >
+      No. Modeled as ONE step, `label: "Promote or Reject"`, matching the
+      mother documents' own single-node framing. The binary outcome is
+      left as a real-world execution-time fact about that one step, not a
+      structural branch in steps[] (recipe.schema.yaml's steps[] has no
+      branching/conditional-edge construct to represent this correctly
+      even if attempted).
+    reasoning: >
+      Splitting into two sequential array entries would misrepresent a
+      decision fork as two things that both happen in order, which is not
+      what any of the three sources describes.
+  - question: >
+      Should this file assign `necessity: REQUIRED_BY_RISK` to all steps,
+      matching the pattern used for the other two Wave 7 Recipe files
+      (db-migration-expand-contract, method-deprecation-retirement), both
+      of which carry explicit risk-tier or invariant language in their
+      mother-document sections?
+    decision: >
+      No. Left at the schema default, `RECOMMENDED`, for all 4 steps.
+    reasoning: >
+      Unlike DB Migration (explicitly named an R3 risk-tier example) and
+      Deprecation (governed by an explicit "MUST NOT skip" invariant),
+      none of MP §71/Atlas §24.2/EC §37 states that Champion/Challenger
+      itself is mandatory before every Model/Method/Prompt/Recipe change,
+      or ties it to a risk tier the way Atlas §14.2's Mandatory Gate
+      Injection is explicitly tied to risk_tier IN [R3, R4]. Asserting
+      REQUIRED_BY_RISK here would be an unsupported escalation past what
+      the mother documents actually say; the schema's own RECOMMENDED
+      default is the honest fit.
+  - question: >
+      MP §71 (L2930, immediately following "先 Shadow 執行，不影響使用
+      者") states a concrete promotion gate — "只有品質、成本、延遲達標才
+      升級" (only promote when quality/cost/latency bars are met) — that
+      neither Atlas §24.2 nor EC §37 spells out (both simply say "Eval"
+      without naming metrics). Should this MP-only detail be folded into
+      this file even though the file's applicability SCOPE follows EC, not
+      MP?
+    decision: >
+      Yes — added to `mandatory_elements`, explicitly cited as MP-only
+      detail, not re-attributed to EC or Atlas.
+    reasoning: >
+      Adopting EC's wider applicability LIST does not require discarding
+      genuinely additive detail MP supplies about what the Eval/Compare
+      steps must check — the same "adopt superset, cite others for
+      traceability, don't silently drop real content" principle
+      deprecation-pipeline.schema.yaml applied when merging Atlas §24.3
+      into EC §113. This is one concrete criterion set, not a scope
+      claim, so it does not reopen the applicability-scope decision above.
+
+id: champion-challenger
+version: "1.0.0"
+name: "Champion / Challenger Promotion"
+
+suited_for:
+  - "Model 版本更新前的正式切換流程（MP §71 L2914-2930；Atlas §24.2 L4263-4273；EC §37 L1447-1465，三方一致）"
+  - "Method 版本更新前的正式切換流程（Atlas §24.2 L4263-4273；EC §37 L1447-1465；MP 未涵蓋）"
+  - "Recipe 版本更新前的正式切換流程（Atlas §24.2 L4263-4273；EC §37 L1447-1465；MP 未涵蓋）"
+  - "Prompt 版本更新前的正式切換流程（僅 EC §37 L1447-1465 涵蓋；MP/Atlas 均未提及 Prompt）"
+
+mandatory_elements:
+  - "Shadow 階段不得影響真實使用者（MP §71 L2928 verbatim: '先 Shadow 執行，不影響使用者'）"
+  - "升級（Promote）前，品質、成本、延遲三項須達標（MP §71 L2930 verbatim: '只有品質、成本、延遲達標才升級' — MP-only detail, Atlas/EC 未列出具體指標，見 compilation_decisions）"
+
+forbidden_actions:
+  - "Challenger 直接修改正式 Artifact（EC §37 L1465 verbatim: 'Challenger 不得直接改正式 Artifact' — EC-only 規則，MP/Atlas 均未提及此限制）"
+
+steps:
+  - label: "Shadow"
+    type: capability
+    ref: shadow
+    necessity: RECOMMENDED
+  - label: "Eval"
+    type: capability
+    ref: eval
+    necessity: RECOMMENDED
+    input: shadow
+  - label: "Compare"
+    type: capability
+    ref: compare
+    necessity: RECOMMENDED
+    input: eval
+  - label: "Promote or Reject"
+    type: capability
+    ref: promote_or_reject
+    necessity: RECOMMENDED
+    input: compare
+
+outputs:
+  - "promotion_decision (Promote|Reject verdict, backed by the Eval/Compare step's evidence — no mother document names a formal record shape for this; a reasonable, honestly-flagged inference, not a literal citation)"
+
+open_questions:
+  - id: "OQ-CHCH-1"
+    question: >
+      Should this file eventually assert a risk_tier or necessity escalation
+      once/if a future ADR ties Champion/Challenger to Atlas §14.2's
+      Mandatory Gate Injection mechanism (currently scoped only to
+      risk_tier IN [R3, R4] operations generally, not specifically to
+      promotion events)? Left open — no mother document makes that
+      connection today.
+    owner: "operator, via a future ADR if this connection is later intended"
+    blocks: "nothing in this file's own validity — necessity/risk_tier both have safe schema defaults"
+  - id: "OQ-CHCH-2"
+    question: >
+      No mother document defines a formal shape for the `promotion_decision`
+      output (Promote/Reject record: who decided, which Eval/Compare
+      evidence backed it, timestamp). Should a future
+      cognitive/typed-objects/promotion-decision.schema.yaml be added, the
+      way board-decision-pack.schema.yaml was named as a future candidate
+      for a different Atlas §13.x rich output? Left open, not designed here
+      without textual basis.
+    owner: "operator or a future Phase 3/4 compilation pass"
+    blocks: "nothing in this file's own validity — outputs[] stays a flat string list either way"
+
+verification:
+  method: >
+    Read MP §71 (L2905-2930), Atlas §24.2 (L4256-4275, including the
+    immediately preceding §24.1 for context), and EC §37 (L1443-1465)
+    directly at the cited lines, rather than relying on
+    verified-findings.yaml's CROSS-T-20 quotes alone, to confirm (a) the
+    4-node flow sequence is identical in substance across all three, (b)
+    MP's quality/cost/latency criterion is genuinely MP-§71-only and not a
+    misattributed citation to the separate §70 "測試與 Eval" metrics list
+    immediately preceding it in the same document (checked: §70's list —
+    Accuracy/Grounding/Faithfulness/Consistency/Hallucination/Latency/Cost/
+    Security/Regression — is a DIFFERENT, more general list; §71's own
+    "品質、成本、延遲" line is a separate, shorter statement under the §71
+    heading itself, L2930), and (c) EC's "Challenger 不得直接改正式
+    Artifact" rule has no MP/Atlas counterpart (grepped both documents for
+    "Artifact" near their respective Champion/Challenger sections — no
+    match). Read specs/cognitive/recipe.schema.yaml's schema body to
+    confirm this file's steps[]/necessity shape validates against it.
+  note: >
+    No mother document was modified. The applicability-scope unification
+    (adopt EC's 4-kind superset) and the flow-sequence transcription are
+    direct, low-risk factual completions per MACHINE_READABLE_SPEC_PLAN.md
+    §2.8's own characterization, independently re-verified rather than
+    transcribed as-is. The `promotion_decision` output shape and the
+    RECOMMENDED (not REQUIRED_BY_RISK) necessity pick are Phase 3
+    compilation decisions, individually justified above.

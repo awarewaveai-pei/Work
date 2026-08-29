@@ -172,9 +172,9 @@ PROJECT_ROOT/                                  ← D:\Work\agency-os\docs\AI_LEG
 
 | 檔名 | 用途 | 格式 | 依賴 | 解決的 Finding | 狀態 |
 |---|---|---|---|---|---|
-| `db-migration-expand-contract.recipe.yaml` | ADR-005a 裁決的 15 步序列（Schema Baseline→…→Close Rollback Window），機器可讀版本，人類權威版留在 EC §28 prose | YAML | execution/risk-tier.schema.yaml, execution/gate.schema.yaml（Backup/Restore Validation 等步驟掛 gate） | P1-DUP-1, OQ-12（ADR-005a） | READY（`gate.schema.yaml` 若尚未定案，本檔的 gate 掛鉤欄位先留 placeholder） |
-| `method-deprecation-retirement.recipe.yaml` | 對應 `execution/deprecation-pipeline.schema.yaml` 的機器可執行版本 | YAML | execution/deprecation-pipeline.schema.yaml | CROSS-T-19 | READY |
-| `champion-challenger.recipe.yaml` | 統一 MP §71（僅模型）/ Atlas §24.2（模型+Method+Recipe）/ EC §37（模型+Method+Prompt+Recipe）適用範圍，建議採 EC 版（最完整） | YAML | method.schema.yaml | CROSS-T-20 | READY（Low-risk 聯集式合併） |
+| `db-migration-expand-contract.recipe.yaml` | ADR-005a 裁決的 15 步序列（Schema Baseline→…→Close Rollback Window），機器可讀版本，人類權威版留在 EC §28 prose | YAML | execution/risk-tier.schema.yaml, execution/gate.schema.yaml（Backup/Restore Validation 等步驟掛 gate） | P1-DUP-1, OQ-12（ADR-005a） | **BUILT（2026-08-29）**——15 步全數轉譯自 ADR-005a「最終建議序列」；risk_tier: R3（risk-tier.schema.yaml 逐字列 DB migration 為範例）；3 個 gate_ref 留 `TBD_PENDING_ROUND2_ADR` placeholder（Backup/Restore Validation、Reconciliation、Traffic Migration/Switch） |
+| `method-deprecation-retirement.recipe.yaml` | 對應 `execution/deprecation-pipeline.schema.yaml` 的機器可執行版本 | YAML | execution/deprecation-pipeline.schema.yaml | CROSS-T-19 | **BUILT（2026-08-29）**——7 步逐字轉譯自 deprecation-pipeline.schema.yaml，未新增規範內容；Usage Scan/Archive 的阻塞機制刻意不塞進 `gate_ref`（該欄位語意是 gate.schema.yaml 的 gate id，實際機制是 status-codes.schema.yaml 的 legal_side_state，兩者不同，見檔案自身 compilation_decisions） |
+| `champion-challenger.recipe.yaml` | 統一 MP §71（僅模型）/ Atlas §24.2（模型+Method+Recipe）/ EC §37（模型+Method+Prompt+Recipe）適用範圍，建議採 EC 版（最完整） | YAML | method.schema.yaml | CROSS-T-20 | **BUILT（2026-08-29）**——採 EC 4 種適用範圍（Model/Method/Prompt/Recipe）；4 步 Shadow→Eval→Compare→Promote or Reject；MP 專屬的品質/成本/延遲升級判準已補入 mandatory_elements（非捨棄） |
 
 ### 2.9 `/policies/`（Wave 6 — 政策代碼化，多數需操作者決策內容）
 
@@ -253,7 +253,12 @@ Wave 6 ── ✅ 完成（2026-08-29，8/8）
     authority.yaml condition 未含 authority 前提子句 x2、coverage guard
     可繞過、MP §158 誤讀、3 處「未建」過期宣稱、EC 行號誤引、本表未同步）
           ↓
-Wave 7  recipes/validated/ 全目錄
+Wave 7 ── ✅ 完成（2026-08-29，3/3）
+  recipes/validated/{db-migration-expand-contract,
+    method-deprecation-retirement,champion-challenger}.recipe.yaml ✅
+    （全數 status: ACTIVE；db-migration 的 3 個 gate_ref 仍留
+    TBD_PENDING_ROUND2_ADR placeholder，同 Wave 5/6 的 gate_id 阻塞範圍，
+    不阻塞本檔案本身）
           ↓
 Wave 8  tests/ 全目錄（對 Wave 1-7 的每個 schema 寫 golden test）
         specs/analytics/（低優先，可延後）

@@ -1,0 +1,258 @@
+$id: "ai-lego://recipes/validated/db-migration-expand-contract.recipe.yaml"
+title: "Database Migration — Expand/Contract (ADR-005a 15-step SSOT)"
+status: ACTIVE
+
+description: >
+  Machine-readable instance of the DB Migration Expand/Contract sequence,
+  conforming to specs/cognitive/recipe.schema.yaml. Resolves P1-DUP-1 /
+  OQ-12: three mother documents drew FIVE conflicting sequence diagrams for
+  this procedure (Execution Contract §28, Atlas F21 mermaid, Atlas F21 table
+  row, Atlas §11.50, Atlas §13.10), disagreeing on whether Dual Write happens
+  before or after Backfill — a disagreement with a real data-loss
+  consequence, not a wording preference (see docs/adr/ADR-005-db-migration-
+  recipe-and-method-id-grammar.md Sub-decision (a) for the full five-way
+  comparison and WebSearch-verified industry-standard cross-check).
+
+  ADR-005a (ACCEPTED 2026-08-29) resolved this to a single 15-step sequence,
+  with Execution Contract §28 as the designated SSOT location in prose. Per
+  that ADR's own status line, an ADR decision does NOT itself edit the
+  mother documents — applying it requires the separate ADR-006
+  `.ai/proposals/` flow, which only the operator can advance. EC §28
+  currently STILL shows its original 11-step mermaid (verbatim re-read
+  2026-08-29 to confirm: Baseline -> Backup/Restore Validation ->
+  Compatibility Analysis -> Expand -> Deploy Compatible Code -> Backfill ->
+  Reconciliation -> Traffic Migration -> Observe -> Contract Old Schema ->
+  Close Rollback Window, EC:1129-1157) -- it has NOT yet been edited to
+  match ADR-005a. This file's `steps[]` therefore uses ADR-005a's corrected
+  15-step sequence as the machine-readable SSOT (this is exactly the
+  Wave-7 task per MACHINE_READABLE_SPEC_PLAN.md §2.8 row 175: "機器可讀版
+  本，人類權威版留在 EC §28 prose" -- the human-authoritative prose version
+  staying in EC §28 is explicitly understood to mean the ADR-corrected
+  text, once the ADR-006 proposal lands, not the current unedited mermaid).
+
+source_of_truth_for:
+  - "docs/adr/ADR-005-db-migration-recipe-and-method-id-grammar.md Sub-decision (a), 最終建議序列 (L81-115) -- the 15-step sequence this file's steps[] transcribes"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §28 Database Change Contract (L1129-1157, CURRENT unedited 11-step form, cited for context/delta only)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §29 DB Migration Requirements (L1161-1194) -- Backfill's 5 required properties and the assessment checklist, folded into mandatory_elements below"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §30 Data Integrity Contract (L1198-1221) -- the 6 required data-change definitions and the 'exit code != proof' rule, folded into mandatory_elements/outputs below"
+  - "specs/execution/risk-tier.schema.yaml tiers.R3.examples (lists 'DB migration' verbatim) -- grounds this file's risk_tier: R3"
+  - "specs/execution/gate.schema.yaml -- gate_id value space is BLOCKED_PENDING_ROUND2_ADR; this file's gate_ref placeholders inherit that block, not a new one"
+  - "specs/cognitive/recipe.schema.yaml -- the schema this file's body (id/version/name/steps/etc.) is validated against"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.8 row for this file (L175)"
+
+decided_by: >
+  docs/adr/ADR-005-db-migration-recipe-and-method-id-grammar.md (ACCEPTED
+  2026-08-29) for the step sequence itself. This file's own compilation
+  choices (which steps carry a gate_ref placeholder, how EC §29/§30's
+  checklists map onto mandatory_elements/outputs) are Phase 3 Low-risk
+  structural picks, individually justified below -- ADR-005a does not
+  itself specify gate hookups or field-mapping detail at this granularity.
+
+compilation_decisions:
+  - question: >
+      ADR-005a's 15-step sequence splits the old single "Dual Read/Write"
+      node into two: "Enable Dual Write" (before Backfill) and "Dual Read
+      Verification" (after Reconciliation). Should this file collapse them
+      back into one step for brevity?
+    decision: "No. Kept as two separate steps, exactly as ADR-005a specifies."
+    reasoning: >
+      The ADR's entire Sub-decision (a) argument is that Dual Write and Dual
+      Read are semantically different control points that three mother
+      documents wrongly compressed into one, causing the data-loss-risk
+      ordering error this ADR exists to fix. Re-merging them here would
+      silently reintroduce the exact ambiguity the ADR corrected.
+  - question: >
+      Which steps should carry a `gate_ref` placeholder, given
+      `execution/gate.schema.yaml`'s gate_id value space is itself
+      BLOCKED_PENDING_ROUND2_ADR and MACHINE_READABLE_SPEC_PLAN.md §2.8's
+      row for this file says only "Backup/Restore Validation 等步驟掛
+      gate" (steps LIKE Backup/Restore Validation hook to a gate) --
+      naming one example, not an exhaustive list?
+    decision: >
+      Three placeholders: `Backup / Restore Validation` (named explicitly
+      by the plan row), `Reconciliation` (EC §30's own emphatic rule that
+      command exit code alone is not proof -- a natural gate point), and
+      `Traffic Migration / Switch` (the point where risk-tier R3's
+      "Human Approval" required_action would bind, per
+      specs/execution/risk-tier.schema.yaml tiers.R3.required_actions).
+      All three use `gate_ref: "TBD_PENDING_ROUND2_ADR"` -- a literal
+      string value, not a real gate id, matching gate.schema.yaml's own
+      `x-status: TBD_PENDING_ROUND2_ADR` marker convention.
+    reasoning: >
+      Naming exactly these three (not all 15, not just the one the plan row
+      mentions by name) keeps the choice traceable to specific EC/risk-tier
+      text rather than either under- or over-claiming gate coverage while
+      the underlying gate_id list remains genuinely undecided.
+  - question: >
+      Should this recipe's steps carry `necessity: REQUIRED_BY_RISK`
+      (Atlas §14.3's enum, per recipe.schema.yaml) rather than the schema's
+      default `RECOMMENDED`?
+    decision: "Yes, all 15 steps."
+    reasoning: >
+      EC §28 frames this procedure as the standard ("標準") for a
+      risk_tier: R3 operation (DB migration is a named R3 example in
+      risk-tier.schema.yaml), and ADR-005a's entire argument is that
+      skipping or reordering steps causes real data loss -- these are not
+      optional best-practice suggestions, matching Atlas §14.3's
+      REQUIRED_BY_RISK semantics ("Mandatory risk gates" per Atlas §13's
+      own Recipe definition) rather than the default RECOMMENDED.
+  - question: >
+      EC §28 gives no suited_for/not_for lists the way Atlas §13's Recipe
+      Library entries do (e.g. §13.1's explicit "適合"/"不可用於" blocks).
+      Should this file invent one to match the house style, or leave the
+      fields empty?
+    decision: >
+      Populate `not_for` with a single directly-grounded inference: ad-hoc
+      SQL patches applied without this lifecycle. Leave `suited_for` as a
+      direct restatement of EC §28's own scope statement rather than an
+      invented use-case list.
+    reasoning: >
+      EC §28's opening line -- "DB Migration 是高風險工程，不是 SQL patch"
+      ("DB Migration is high-risk engineering, not a SQL patch") -- is
+      itself an explicit suited-for/not-for contrast in the mother
+      document's own words, not a Phase 3 invention; restating it directly
+      is more honest than fabricating a longer list with no textual basis
+      (the same discipline recipe.schema.yaml's own `compilation_decisions`
+      applied when it declined to invent a richer `steps[].type` taxonomy).
+
+id: db-migration-expand-contract
+version: "1.0.0"
+name: "Database Migration — Expand/Contract (ADR-005a)"
+risk_tier: R3
+
+suited_for:
+  - "任何會改變 production 資料庫 schema 的變更 — EC §28: 'DB Migration 是高風險工程，不是 SQL patch'"
+
+not_for:
+  - "未經過此 15 步序列、當作一次性 SQL patch 直接對 production 執行的 schema 變更（EC §28 L1131 verbatim 對比句）"
+
+mandatory_elements:
+  - "Backfill 必須 resumable / idempotent / checkpointed / throttled / observable（EC §29 L1184-1188 verbatim）"
+  - "Data Integrity Contract 六項至少定義：Preconditions / Business Invariants / Postconditions / Checksums or Counts / Reconciliation Query / Quarantine Policy（EC §30 L1203-1208 verbatim）"
+  - "Migration 完成判準是 data invariant = PASS，不是 command exit code = 0（EC §30 L1211-1220 verbatim）"
+  - "評估清單：Lock Duration / Table Size / Index Build / Replication Lag / Write Amplification / Disk / Backup / PITR / Foreign Keys / Triggers / ORM Compatibility / Long-running Transactions / Rollback / Data Reconciliation（EC §29 L1166-1179 verbatim）"
+
+forbidden_actions:
+  - "未評估直接 destructive ALTER（EC §29 L1190-1194 verbatim: '未評估直接 destructive ALTER'）"
+
+steps:
+  - label: "Schema Baseline"
+    type: capability
+    ref: schema_baseline
+    necessity: REQUIRED_BY_RISK
+  - label: "Data Contract"
+    type: capability
+    ref: data_contract
+    necessity: REQUIRED_BY_RISK
+    # ADR-005a-only addition vs. EC's current unedited 11-step mermaid — see
+    # description above. Not present in EC §28's current text.
+  - label: "Compatibility Analysis"
+    type: capability
+    ref: compatibility_analysis
+    necessity: REQUIRED_BY_RISK
+  - label: "Backup / Restore Validation"
+    type: capability
+    ref: backup_restore_validation
+    necessity: REQUIRED_BY_RISK
+    gate_ref: "TBD_PENDING_ROUND2_ADR"
+  - label: "Expand"
+    type: capability
+    ref: expand
+    necessity: REQUIRED_BY_RISK
+  - label: "Deploy Compatible Code"
+    type: capability
+    ref: deploy_compatible_code
+    necessity: REQUIRED_BY_RISK
+  - label: "Enable Dual Write"
+    type: capability
+    ref: enable_dual_write
+    necessity: REQUIRED_BY_RISK
+    input: schema_baseline
+    # ADR-005a's core correction: MUST start here (before Backfill), not
+    # after — see description and compilation_decisions above. Continues
+    # through Backfill and Reconciliation, until Contract Old Schema.
+  - label: "Backfill"
+    type: capability
+    ref: backfill
+    necessity: REQUIRED_BY_RISK
+  - label: "Reconciliation"
+    type: capability
+    ref: reconciliation
+    necessity: REQUIRED_BY_RISK
+    gate_ref: "TBD_PENDING_ROUND2_ADR"
+  - label: "Dual Read Verification"
+    type: capability
+    ref: dual_read_verification
+    necessity: REQUIRED_BY_RISK
+    # ADR-005a-only addition, split out from the old merged "Dual Read/Write"
+    # node — shadow-reads the new schema and compares against the old
+    # schema's results, not yet serving real traffic.
+  - label: "Canary"
+    type: capability
+    ref: canary
+    necessity: REQUIRED_BY_RISK
+  - label: "Traffic Migration / Switch"
+    type: capability
+    ref: traffic_migration_switch
+    necessity: REQUIRED_BY_RISK
+    gate_ref: "TBD_PENDING_ROUND2_ADR"
+  - label: "Observe"
+    type: capability
+    ref: observe
+    necessity: REQUIRED_BY_RISK
+  - label: "Contract Old Schema"
+    type: capability
+    ref: contract_old_schema
+    necessity: REQUIRED_BY_RISK
+  - label: "Close Rollback Window"
+    type: capability
+    ref: close_rollback_window
+    necessity: REQUIRED_BY_RISK
+
+outputs:
+  - "data_invariant_pass_proof (EC §30 L1211-1220 — a positive proof artifact, NOT a command exit code)"
+
+open_questions:
+  - id: "OQ-DBMIG-1"
+    question: >
+      When ADR-006's `.ai/proposals/` flow actually edits EC §28/Atlas
+      F21/§11.50/§13.10 to match ADR-005a, should this file's
+      source_of_truth_for entry for EC §28 be updated from "CURRENT
+      unedited 11-step form" to cite the new line range directly? Left as a
+      forward pointer rather than a blocking condition — this file's own
+      15-step content does not change either way, only its EC §28 citation
+      would need a line-number refresh.
+    owner: "whoever executes the ADR-006 proposal for ADR-005a"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-DBMIG-2"
+    question: >
+      The three `gate_ref: "TBD_PENDING_ROUND2_ADR"` placeholders will need
+      real gate ids once Round 2 ADR resolves OQ-10 (the Global/High-risk
+      Gate list dispute, see specs/execution/gate.schema.yaml). Left open,
+      not decided here.
+    owner: "operator, via Round 2+ ADR"
+    blocks: "nothing structurally — gate_ref stays an untyped string either way"
+
+verification:
+  method: >
+    Read docs/adr/ADR-005-db-migration-recipe-and-method-id-grammar.md in
+    full, including its Evidence section citing five source locations.
+    Re-read EC §28 (L1129-1157), §29 (L1161-1194), §30 (L1198-1221) directly
+    at the cited lines to confirm the CURRENT (unedited) mother-doc content
+    and extract the mandatory_elements/forbidden_actions/outputs detail.
+    Read specs/execution/risk-tier.schema.yaml tiers.R3.examples to confirm
+    "DB migration" is a verbatim listed example before assigning risk_tier:
+    R3. Read specs/execution/gate.schema.yaml in full to confirm gate_id's
+    current blocked status before choosing the TBD_PENDING_ROUND2_ADR
+    placeholder form. Read specs/cognitive/recipe.schema.yaml's schema body
+    and its own compilation_decisions referencing this exact filename
+    (L150-164) to confirm this file's steps[]/gate_ref shape matches what
+    that schema expects.
+  note: >
+    No mother document or ADR was modified to produce this file. The
+    15-step sequence is transcribed verbatim from ADR-005a's own
+    "最終建議序列" block; EC §29/§30's checklists are transcribed verbatim
+    into mandatory_elements/forbidden_actions/outputs. The three gate_ref
+    placeholders, the REQUIRED_BY_RISK necessity pick, and the not_for
+    inference are Phase 3 additive compilation decisions, each individually
+    justified above — not new ADR-level tradeoffs.

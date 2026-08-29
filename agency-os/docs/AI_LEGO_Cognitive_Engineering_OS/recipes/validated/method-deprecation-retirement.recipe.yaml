@@ -1,0 +1,203 @@
+$id: "ai-lego://recipes/validated/method-deprecation-retirement.recipe.yaml"
+title: "Method / Object Deprecation & Retirement (machine-executable form)"
+status: ACTIVE
+
+description: >
+  Machine-executable Recipe wrapping the 7-step retirement sequence already
+  defined structurally by specs/execution/deprecation-pipeline.schema.yaml
+  (Wave 5, ACTIVE). Resolves MACHINE_READABLE_SPEC_PLAN.md §2.8 row 176:
+  "對應 execution/deprecation-pipeline.schema.yaml 的機器可執行版本" (the
+  machine-EXECUTABLE version corresponding to that schema). This file adds
+  no new normative content of its own — deprecation-pipeline.schema.yaml
+  remains the single source of truth for the step list, the two blocking
+  conditions, and the no-unrecoverable-deletion invariant (CROSS-T-19). This
+  file's only job is to express that same sequence in
+  specs/cognitive/recipe.schema.yaml's node-grammar `steps[]` shape, so it
+  can be invoked/composed the same way the other two Wave 7 Recipe files
+  are.
+
+source_of_truth_for:
+  - "specs/execution/deprecation-pipeline.schema.yaml reference_sequence (the 7-step list this file's steps[] is a direct restatement of, in recipe.schema.yaml's node-grammar shape)"
+  - "specs/execution/deprecation-pipeline.schema.yaml step_gate_mapping (the two blocking conditions this file's compilation_decisions explain how it does NOT force into recipe.schema.yaml's gate_ref field)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §113 Deprecation Contract (L3164-3195) -- cited for context; deprecation-pipeline.schema.yaml is this file's direct dependency, not this EC section itself"
+  - "specs/cognitive/recipe.schema.yaml -- the schema this file's body is validated against"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.8 row for this file (L176)"
+
+decided_by: >
+  No new ADR governs this file. specs/execution/deprecation-pipeline.schema.yaml's
+  own `decided_by` already covers the step-list/scope decision (Low-risk
+  factual completion, independently re-verified in that file, not merely
+  transcribed). This file's own scope is narrower: express that already-
+  decided sequence in recipe.schema.yaml's shape, a Phase 3 Low-risk
+  structural task with no independent tradeoff of its own.
+
+compilation_decisions:
+  - question: >
+      deprecation-pipeline.schema.yaml's `step_gate_mapping` blocks Usage
+      Scan and Archive via a $ref into
+      specs/execution/status-codes.schema.yaml's `reference_vocabulary.legal_side_states`
+      (a generic BLOCKED side-state) — NOT via a gate id in
+      execution/gate.schema.yaml. recipe.schema.yaml's own `steps[].gate_ref`
+      field is explicitly documented as "a gate id in
+      execution/gate.schema.yaml". Should this file set `gate_ref` on the
+      Usage Scan / Archive steps anyway, since they are genuinely blocking?
+    decision: >
+      No. `gate_ref` is left UNSET on both steps. Neither step gets a
+      gate.schema.yaml-style placeholder.
+    reasoning: >
+      Setting `gate_ref` there would misrepresent the actual blocking
+      mechanism — a status-code legal_side_state, a fundamentally different
+      registry than gate.schema.yaml's still-undecided gate_id list (see
+      gate.schema.yaml's own OQ-GATE-3, which raises this exact same
+      shape-mismatch concern from its own side). Silently reusing a
+      differently-shaped field just because it is the only "blocking"-
+      flavored field recipe.schema.yaml happens to expose would create a
+      false equivalence between two genuinely different mechanisms. Instead,
+      both steps carry `necessity: REQUIRED_BY_RISK` (a true statement — they
+      are mandatory per deprecation-pipeline.schema.yaml's own constraints)
+      and this compilation_decision records the real mechanism by name so a
+      reader is pointed at the correct file rather than a mismatched one.
+  - question: >
+      deprecation-pipeline.schema.yaml's `object_type` enum covers 7
+      different kinds of object (API, Method, Capability, Schema, Policy,
+      Provider, Workflow) — but this recipe file's own filename says
+      "method-deprecation-retirement". Should this file's `steps[]` be
+      narrowed to Method-only, matching Atlas §24.3's original (narrower)
+      scope rather than EC §113's adopted superset?
+    decision: >
+      No. The step sequence covers all 7 object types, exactly as
+      deprecation-pipeline.schema.yaml defines it. The filename reflects
+      MACHINE_READABLE_SPEC_PLAN.md §2.8 row 176's own naming choice, not a
+      narrower scope decided by this file.
+    reasoning: >
+      Narrowing the actual steps[] content to Method-only here would
+      silently re-introduce the exact Atlas-§24.3-vs-EC-§113 scope
+      discrepancy that deprecation-pipeline.schema.yaml's own
+      `merge_verification` already resolved in favor of the 7-type
+      superset. This file is a Recipe INSTANCE of that already-decided
+      pipeline, not a second, narrower redefinition of it.
+  - question: >
+      Should this file assign a `risk_tier`, given retirement of a
+      production API or a security Policy plausibly reaches R2 or even R3,
+      while retiring an unused draft Schema plausibly does not?
+    decision: >
+      Leave `risk_tier` unset. Not asserted for any of the 7 object types.
+    reasoning: >
+      Neither EC §113 nor Atlas §24.3 states a risk tier for this
+      procedure, and the correct tier genuinely varies by WHICH of the 7
+      object types is being retired and its own blast radius — asserting a
+      single tier here would either over-claim (if it picked the highest)
+      or silently under-protect (if it picked a lower one), for a fact no
+      mother document actually states. Flagged as open_questions.OQ-DEPREC-1
+      rather than guessed.
+
+id: method-deprecation-retirement
+version: "1.0.0"
+name: "Method / Object Deprecation & Retirement"
+
+suited_for:
+  - "退役任一 API / Method / Capability / Schema / Policy / Provider / Workflow（deprecation-pipeline.schema.yaml reference_sequence.scope，7 種物件型別皆適用，非僅限 Method）"
+
+mandatory_elements:
+  - "steps[] 必須依序涵蓋全部 7 個 canonical step 值，不得跳過 Usage Scan 或 Archive（deprecation-pipeline.schema.yaml constraints，EC §113 L3194 / Atlas §24.3 L4288 verbatim invariant）"
+  - "Archive 完成前 Usage Scan 必須為 0 個存活引用（deprecation-pipeline.schema.yaml step_gate_mapping.usage_scan_nonzero）"
+  - "Archive 完成前 Deadline 必須已過（deprecation-pipeline.schema.yaml step_gate_mapping.deadline_not_reached）"
+
+forbidden_actions:
+  - "直接刪除（非 Archive）任一被退役物件，導致既有 workflow/project 的歷史無法 replay（EC §113 L3194 / Atlas §24.3 L4288 verbatim invariant）"
+
+steps:
+  - label: "Notice"
+    type: capability
+    ref: notice
+    necessity: REQUIRED_BY_RISK
+  - label: "Replacement"
+    type: capability
+    ref: replacement
+    necessity: REQUIRED_BY_RISK
+    input: notice
+  - label: "Compatibility Matrix"
+    type: capability
+    ref: compatibility_matrix
+    necessity: REQUIRED_BY_RISK
+    input: replacement
+  - label: "Migration Tool"
+    type: capability
+    ref: migration_tool
+    necessity: REQUIRED_BY_RISK
+    input: compatibility_matrix
+  - label: "Usage Scan"
+    type: capability
+    ref: usage_scan
+    necessity: REQUIRED_BY_RISK
+    # Blocking mechanism is deprecation-pipeline.schema.yaml's
+    # step_gate_mapping.usage_scan_nonzero (a status-codes.schema.yaml
+    # legal_side_state), deliberately NOT modeled as gate_ref here — see
+    # compilation_decisions above.
+  - label: "Deadline"
+    type: capability
+    ref: deadline
+    necessity: REQUIRED_BY_RISK
+    # EC-only addition vs. Atlas §24.3's original 6-step list — see
+    # deprecation-pipeline.schema.yaml's own merge_verification.
+  - label: "Archive"
+    type: capability
+    ref: archive
+    necessity: REQUIRED_BY_RISK
+    input: [usage_scan, deadline]
+    # Blocking mechanism is deprecation-pipeline.schema.yaml's
+    # step_gate_mapping.deadline_not_reached (a status-codes.schema.yaml
+    # legal_side_state), deliberately NOT modeled as gate_ref here — see
+    # compilation_decisions above.
+
+outputs:
+  - "deprecation_record (conforms to specs/execution/deprecation-pipeline.schema.yaml's deprecation_record shape — one populated instance per retirement)"
+
+open_questions:
+  - id: "OQ-DEPREC-1"
+    question: >
+      Should a risk_tier be assigned per object_type instead of leaving the
+      field entirely unset for this Recipe (e.g. retiring a production API
+      or a security-relevant Policy at R2/R3, retiring an unused draft
+      Schema at R0/R1)? Left open, not decided here — see
+      compilation_decisions above for why a single blanket value was not
+      asserted.
+    owner: "operator or a future Phase 3/4 compilation pass with object-type-specific risk data"
+    blocks: "nothing in this file's own validity — risk_tier is OPTIONAL in recipe.schema.yaml"
+  - id: "OQ-DEPREC-2"
+    question: >
+      deprecation-pipeline.schema.yaml's own OQ-DEP-2 asks whether
+      status-codes.schema.yaml should eventually gain named entries (e.g.
+      `DEPRECATION_USAGE_SCAN_BLOCKED`) for its two blocking conditions. If
+      that happens, should this file's Usage Scan / Archive steps then
+      adopt a (hypothetical, not-yet-existing) typed blocking field instead
+      of the current comment-only disclosure? Left open, tracked alongside
+      that file's own OQ-DEP-2 rather than duplicated as an independent
+      decision here.
+    owner: "whoever resolves deprecation-pipeline.schema.yaml's OQ-DEP-2"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read specs/execution/deprecation-pipeline.schema.yaml in full (all 412
+    lines, including merge_verification, step_gate_mapping, and both open
+    questions) before drafting this file's steps[], to confirm no new
+    normative claim was introduced beyond restating that file's own already-
+    verified content in recipe.schema.yaml's shape. Read
+    specs/cognitive/recipe.schema.yaml's schema body and its own
+    compilation_decisions referencing this exact filename (L150-164, the
+    same gate_ref discussion re-applied here) to confirm the steps[]/
+    gate_ref shape this file uses is consistent with that schema's own
+    stated precedent. Read specs/execution/status-codes.schema.yaml's
+    `reference_vocabulary.legal_side_states` node to confirm the actual
+    mechanism deprecation-pipeline.schema.yaml's step_gate_mapping uses,
+    before deciding NOT to force it into gate_ref.
+  note: >
+    No mother document, ADR, or existing schema file was modified to
+    produce this file. All 7 step names, both invariant statements, and
+    both blocking-condition descriptions are transcribed from
+    specs/execution/deprecation-pipeline.schema.yaml verbatim (already
+    itself independently re-verified against EC §113/Atlas §24.3 in that
+    file's own `merge_verification`); this file adds no new fact, only a
+    shape restatement plus the honestly-disclosed gate_ref mismatch
+    decision above.
