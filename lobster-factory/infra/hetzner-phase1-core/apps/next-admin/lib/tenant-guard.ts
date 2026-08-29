@@ -113,6 +113,45 @@ export function assertOrgAccess(
   }
 }
 
+/** Thrown when a portal.aware-wave.com route is hit by a caller that is not a bound client. */
+export class PortalAccessError extends Error {
+  readonly status = 403;
+  constructor(message = "forbidden: portal access requires a client account bound to an org") {
+    super(message);
+    this.name = "PortalAccessError";
+  }
+}
+
+export function toPortalAccessResponse(e: PortalAccessError): Response {
+  return new Response(JSON.stringify({ ok: false, error: e.message }), {
+    status: 403,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+/**
+ * Fail-CLOSED variant for portal.aware-wave.com routes ONLY. Do not use resolveTenant()
+ * directly on a portal route — its fail-open default below is the deliberate historical
+ * default for the ADMIN CONSOLE, whose only caller class has always been internal staff:
+ * absent x-ops-user-kind → { staff, null } → FULL cross-org access. That default is safe
+ * there and would be a privilege-escalation hole on portal, whose caller class is external
+ * customers — a portal request that slips past the middleware matcher, or that lands on a
+ * PUBLIC_API_PATHS passthrough, must never silently resolve to staff-level access.
+ *
+ * requireClientOrg() never falls back to staff: an absent or non-"client" x-ops-user-kind,
+ * or a missing x-ops-org-id, always throws. Call this at the top of every portal
+ * page/route/API handler; never call resolveTenant() there.
+ */
+export function requireClientOrg(req: Request | { headers: Headers }): { userKind: "client"; orgId: string } {
+  const headers = req.headers;
+  const rawKind = headers.get(HEADER_USER_KIND);
+  const rawOrg = (headers.get(HEADER_ORG_ID) ?? "").trim();
+  if (rawKind !== "client" || !rawOrg) {
+    throw new PortalAccessError();
+  }
+  return { userKind: "client", orgId: rawOrg };
+}
+
 /**
  * Resolve the effective organization_id to use for a query or insert.
  *

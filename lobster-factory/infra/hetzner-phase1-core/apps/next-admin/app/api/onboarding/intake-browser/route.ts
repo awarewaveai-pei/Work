@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseWriteClient } from "../../../../lib/supabase-server";
 import { generateWebsiteSpec } from "../../../../lib/onboarding/spec-generator";
 import { coerceFluentFormPayload } from "../../../../lib/onboarding/coerce-fluent-form";
+import { verifyTurnstileToken } from "../../../../lib/turnstile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,26 +37,6 @@ export const dynamic = "force-dynamic";
 
 const BROWSER_INTAKE_WINDOW_MIN = 10;
 const BROWSER_INTAKE_MAX_PER_WINDOW = 5;
-const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
-
-async function verifyTurnstileToken(token: string, remoteip?: string): Promise<boolean> {
-  const secret = process.env.TURNSTILE_SECRET_KEY;
-  if (!secret) return false;
-  try {
-    const params: Record<string, string> = { secret, response: token };
-    if (remoteip) params.remoteip = remoteip;
-    const res = await fetch(TURNSTILE_VERIFY_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams(params).toString(),
-      signal: AbortSignal.timeout(5000),
-    });
-    const data = (await res.json()) as { success?: boolean };
-    return data.success === true;
-  } catch {
-    return false;
-  }
-}
 
 export async function POST(request: Request) {
   // Gate: TURNSTILE_SECRET_KEY is the production security gate. The form is open iff the secret

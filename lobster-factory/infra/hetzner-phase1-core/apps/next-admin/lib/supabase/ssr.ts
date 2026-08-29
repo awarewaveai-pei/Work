@@ -27,16 +27,34 @@ export function createSupabaseBrowserClient(): SupabaseClient {
   return createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
+export interface RefreshedCookie {
+  name: string;
+  value: string;
+  options?: Parameters<NextResponse["cookies"]["set"]>[2];
+}
+
 /**
- * Middleware-scoped server client. Returns the Supabase client plus the NextResponse that
- * carries any refreshed-session cookies — the caller MUST return (or copy headers from)
- * `response` so rotated tokens persist. Follows the official @supabase/ssr middleware pattern.
+ * Middleware-scoped server client. Returns the Supabase client plus an array the caller must
+ * apply (`response.cookies.set(...)`) onto whatever NextResponse it actually returns, so
+ * rotated session tokens persist. Follows the official @supabase/ssr middleware pattern.
+ *
+ * Critic finding M-1 (2026-08-29, CONFIRMED via repro): this used to return a `response:
+ * NextResponse` object built as `let response = NextResponse.next(...)` and REBOUND inside
+ * `setAll()` when a token rotation happened. Because `setAll()` runs asynchronously (during the
+ * caller's `await supabase.auth.getUser()`) and the caller destructures `response` at call time
+ * -- BEFORE that await -- the caller's binding forever pointed at the original, pre-rotation
+ * object. `setAll`'s reassignment only rebound ssr.ts's OWN local variable, invisible outside
+ * this function. Every rotated cookie was silently dropped; a `get response()` accessor would
+ * have the identical bug (a getter re-evaluated at destructure time, not at read time, has the
+ * same staleness). A plain array has no such indirection: `setAll` pushes into it, the caller
+ * reads it after the same await resolves, and the object identity that matters is the array's,
+ * which never changes.
  */
 export function createSupabaseMiddlewareClient(request: NextRequest): {
   supabase: SupabaseClient;
-  response: NextResponse;
+  refreshedCookies: RefreshedCookie[];
 } {
-  let response = NextResponse.next({ request });
+  const refreshedCookies: RefreshedCookie[] = [];
 
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
@@ -44,14 +62,13 @@ export function createSupabaseMiddlewareClient(request: NextRequest): {
         return request.cookies.getAll();
       },
       setAll(cookiesToSet) {
-        // Mirror onto the request (for any later read in this pass) and onto a fresh response
-        // (so the browser receives rotated cookies).
+        // Mirror onto the request (for any later read in this pass) and record for the caller
+        // to apply onto whichever response it ends up building.
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({ request });
-        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+        refreshedCookies.push(...cookiesToSet);
       },
     },
   });
 
-  return { supabase, response };
+  return { supabase, refreshedCookies };
 }

@@ -369,6 +369,39 @@ critic 對全部 10 個新/改檔案做覆審，**並實際對 `ks-aw-01` 現場
 - REVIEW_DONE: critic=（`verify-recent` 機械閘要求的那輪跑在背景,涵蓋範圍待確認是否已包含這三個最新修正,結果待下一條記錄）
 - BUGHUNT_DONE: scope=lobster-factory | grep=`portal.aware-wave.com.*launcher\|TURNSTILE_SECRET_KEY.*PORTAL_SIGNUP_ENABLED` | hits=確認 `middleware.ts`/`route.ts` 修正後的字串只出現一次（各自的新邏輯位置），無殘留舊版本邏輯分支
 
+### 🚨 真實 incident：`verify-recent` critic 回報時發現 portal 正在生產環境上形成重導迴圈放大器，即時止血 + 治本
+
+`verify-recent` 機械閘要求的第二輪 critic 覆審回報：**DNS/nginx 已上線但 next-admin 尚未部署**，造成 `portal.aware-wave.com` 對外呈現**無限重導迴圈**（舊版 `middleware.ts` 不認得 `/portal/login` 是公開頁，`blockedResponse()` 每一跳多疊一層 `next=` 參數，URL 長度指數成長最終 502），且跟 `app.aware-wave.com` 共用同一個 next-admin container 跟 nginx `limit_req zone=admin`——等於一個未授權的請求放大器，理論上可拿 portal 拖累內部維運後台。**這不是理論風險，critic 用 curl 實測到了。**
+
+**即時止血**（發現後立刻執行，不等其他修正）：SSH 進 `ks-aw-01`，portal server block 最前面插入 `return 503;`。**踩到一個坑**：`nginx -s reload` 沒讓變更生效——`docker inspect` 確認這個 container 對 `default.conf` 是**單檔 bind mount**，`sed -i` 的 atomic-rename 寫法（建暫存檔+rename）不會被 bind mount 反映到 container 內；只有整檔 truncate-write 或 `docker restart` 重新 resolve mount 才會生效。改用 `docker restart lobster-nginx` 後確認生效（container 內 `sed -n` 讀到新內容）。curl 驗證：portal 立刻變乾淨 503（無重導鏈），四個既有網域（app/api/www/oracle）全部 200/301/307 正常，**零回歸**。後續 nginx 檔案編輯全部改用 Python 檔案寫入（truncate-write，不換 inode），不再用 `sed -i`。
+
+**治本**：`middleware.ts` `blockedResponse()` 補 loop invariant——redirect 目標已經是 login-shaped path、或已帶 `next` 參數、或組出的 URL 超過 512 字元，一律不疊加 `next`，導去乾淨 `/login`。這是不變量層修正（回答「這一類問題的不變量是什麼」而非只補這次的路徑組合），未來任何 nginx/routing 不同步都不會再變成放大器。
+
+**同一輪 critic 另外抓到 4 個 Major**：nginx rewrite 負向前瞻沒涵蓋無尾斜線的 `/portal`（+ Next.js 308 normalization 又會把 `/portal/` 退化回 `/portal`），導致網域根目錄變 `/portal/portal` 雙前綴 404——§11 為了修「domain root 404」新增的 `app/portal/page.tsx` 因此從未真正執行過（已修，nginx 跟 `middleware.ts` 的 `isPortalPath()` 邊界統一改成 `portal(?:/|$)`）／M6 補償刪除的 re-check query 吞掉自己的 `error`,「查不到」被當「確定不存在」處理,可能在不確定狀態下刪掉真實帳號並永久佔用 email（已修,查詢失敗一律不刪,回 `signup_state_unknown` + CRITICAL log）／`createUser` 失敗分支完全沒 log（已補）／Codex finding 1 同款問題被獨立確認（同一組修正已覆蓋）。6 個 Minor（2 處 stale 註解、cookie 複製漏一條路徑、`/portal` 邊界鏡像問題、死碼分支、body 讀取順序、salt 沒接進 compose）全部修正，`products.ts` 的 status 型別死碼問題（Suggestion）一併修。
+
+方案文件改版至 v6，§14 完整記錄。`npx tsc --noEmit` exit 0、`npx vitest run` 666/666 全過。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash(SSH) | cmd=`curl portal.aware-wave.com/login` 止血前後對照 | 止血前=307 帶疊加 next（重導鏈）,止血後=503 無鏈 | 迴圈確認消失
+- REALTEST_EVIDENCE: tool=Bash(SSH) | cmd=四個既有網域 curl | 全部 200/301/307（正常值）| 止血動作零回歸
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` + `npx vitest run` | exit=0 / 666 條全過（C-A+4 Major+6 Minor 修正後重跑）
+- REVIEW_DONE: critic=Deep（`ks-aw-01` 實機驗證,非紙上談兵）| verdict=pass-with-fixes | findings=1C(已治本)/4M(全修)/6m(5 修 1 記錄不修)
+- BUGHUNT_DONE: scope=lobster-factory | grep=`isPortalPath\|startsWith\("/portal/"\)` | hits=確認 `isClientOutsidePortal`/`isWrongHostForPortal` 均已改用統一的 `isPortalPath()` 邊界函式,無殘留各自獨立判斷的舊版本
+
+### 第三輪 critic（窄範圍驗證 §14 修正）：抓到「修正本身沒生效」的既有共用檔案 bug
+
+專門驗證上一輪修正的窄範圍 critic pass（非重新整篇覆審,SSH 到 `ks-aw-01` 實查止血現況、自己重跑 tsc/vitest）：C-A 治本邏輯、M-A nginx 邊界、M-B 補償刪除、body 讀取順序、`products.ts` 型別全部驗證通過。但抓到一個真發現：**§14 為「複製 refreshed cookie」寫的修正實際上是空跑**。
+
+根因是 `lib/supabase/ssr.ts`（**既有檔案,這次沒改過,是既有 bug**）：`createSupabaseMiddlewareClient()` 用 `let response = NextResponse.next(...)` 宣告回傳物件,`setAll()` callback 裡重新賦值這個區域變數——但呼叫端在 `setAll()` 觸發之前就已經解構拿到 `response` 了（`const { supabase, response } = ...` 這行執行時,`setAll` 要等後面 `await getUser()` 才會跑）,所以呼叫端拿到的永遠是重新賦值前的舊物件。**等於每次 session token 輪替,刷新過的 cookie 全部被靜默丟棄**——不只是這次新加的路徑,連既有的成功路徑都有同一個洞,只是沒人發現（瀏覽器端 `@supabase/ssr` 自己也會刷新 token,一般情況有備援；server-rendered 的 portal 頁面在 idle 一段時間後沒有這層備援才會真的觸發）。
+
+**已修**：`ssr.ts` 改回傳一個穩定陣列（`push` 而非重新賦值物件,陣列身分永遠不變）,`middleware.ts` 兩個套用點（成功路徑 + `clientForbiddenResponse`）都改用這個陣列。順手修 2 個 Minor（rate-limit salt 的 `??`→`||`、重複 email 判斷改用結構化 `error.code` 而非只靠字串比對），並補上 `lib/__tests__/middleware-portal-guards.test.ts`（22 條,export 出 `isPortalPath`/`blockedResponse` 等純函式讓 C-A 治本邏輯第一次有機械測試覆蓋,含直接重現 incident 路徑的案例）。方案文件 §15 完整記錄，改版至 v7。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run` | exit=0（59 檔 688 條,新增 22 條)
+- REVIEW_DONE: critic=Deep（窄範圍,`ks-aw-01` 實機複驗）| verdict=pass-with-fixes | findings=1M(已修)/3m(全修)
+- BUGHUNT_DONE: scope=lobster-factory | grep=`refreshedCookies\|let response = NextResponse` | hits=確認 `ssr.ts` 不再有 `let response` 重新賦值寫法,`middleware.ts` 兩個套用點都改用陣列,無殘留舊模式
+
 ## 2026-08-29（續7）
 
 ### AI LEGO Phase 2 STOP-FOR-HUMAN-REVIEW：操作者「你決定」授權裁決 — 9 份 ADR 全數 ACCEPTED，Codex 對抗式覆審抓到 2 個真實漏洞並修正，新增 3 份 ADR 補齊全部 4 項待決衝突

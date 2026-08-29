@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createSupabaseMiddlewareClient, isSupabaseAuthConfigured } from "@/lib/supabase/ssr";
+import { createSupabaseMiddlewareClient, isSupabaseAuthConfigured, type RefreshedCookie } from "@/lib/supabase/ssr";
 import { getFreshCachedRole, consumeStaleCachedRole, cacheValidatedRole, type CachedIdentity } from "@/lib/supabase/session-cache";
 import type { OpsRole } from "@/lib/ops-contracts";
 
@@ -121,18 +121,111 @@ function applyIdentityHeaders(headers: Headers, identity: CachedIdentity): void 
   if (identity.orgId) headers.set("x-ops-org-id", identity.orgId);
 }
 
-function blockedResponse(request: NextRequest): NextResponse {
+// Exported (alongside the other pure helpers below) so verify-recent's tests can exercise
+// them directly (critic finding M-4, 2026-08-29): the logic that took portal.aware-wave.com
+// down live was, until this fix, covered by nothing but a comment. Next.js's build only treats
+// `middleware` and `config` as special exports from this file -- extra named exports are inert
+// for routing and exist purely for testability.
+export function isApiPath(pathname: string): boolean {
+  // Critic finding (2026-08-29, minor): the original check only matched "/api/", so
+  // "/portal/api/*" fell through to the HTML redirect branch below and a fetch() caller would
+  // try to JSON-parse a login page. Both API path families get a JSON error here.
+  return pathname.startsWith("/api/") || pathname.startsWith("/portal/api/");
+}
+
+// Critic finding C-A (2026-08-29, Critical, confirmed LIVE): before next-admin had /portal/*
+// routes deployed but nginx already rewrote portal.aware-wave.com traffic to /portal/*, the OLD
+// middleware treated /portal/login as a protected path, redirected here, and this function built
+// `?next=/portal/login`. The browser followed it, nginx rewrote it AGAIN, the old middleware
+// still didn't recognise /portal/login as public, and each hop appended another layer of
+// `next=` -- an amplifying redirect loop that eventually 502'd on URL length, hitting the SAME
+// container that serves app.aware-wave.com. PORTAL_PUBLIC_PATHS below prevents this specific
+// case going forward, but the real fix is at the invariant level: this function must never
+// build a redirect target that can re-enter this same gate carrying MORE state than the request
+// that produced it, regardless of what any routing layer in front of it does or doesn't agree
+// with this code about.
+export function blockedResponse(request: NextRequest): NextResponse {
   const { pathname, search } = request.nextUrl;
-  if (pathname.startsWith("/api/")) {
+  if (isApiPath(pathname)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const loginUrl = new URL("/login", request.url);
-  loginUrl.searchParams.set("next", pathname + search);
+  const alreadyLoginShaped = pathname === "/login" || pathname === "/portal/login";
+  const alreadyCarriesNext = new URLSearchParams(search).has("next");
+  const candidateNext = pathname + search;
+  if (!alreadyLoginShaped && !alreadyCarriesNext && candidateNext.length <= 512) {
+    loginUrl.searchParams.set("next", candidateNext);
+  }
   return NextResponse.redirect(loginUrl);
+}
+
+// Critic finding C2 (2026-08-29, Critical): every consumer of this middleware's identity
+// headers was written when "authenticated" meant "AwareWave employee" — ~120 admin-console
+// routes/pages have no per-route role check because that assumption made one unnecessary.
+// portal.aware-wave.com/signup is the first mechanism that ever hands a valid Supabase session
+// to an outside stranger, which retroactively turns that old assumption into a privilege-
+// escalation hole: a portal customer's session would otherwise sail straight through every
+// /ops/* page and API as an authenticated-but-roleless "viewer". Fixing this at the ~120
+// individual routes is the patch-shaped answer; this is the one choke-point fix instead —
+// a client identity may only reach /portal/* (and /login, matcher-excluded). Applied to BOTH
+// paths this middleware can return success from (the fast cache path and the slow
+// verify-then-cache path) so neither can skip it.
+// Critic finding (2026-08-29, minor, mirrors M-A's nginx-side boundary bug): a bare "/portal"
+// (no trailing slash) is neither "/portal/" nor does startsWith("/portal/") match it, so it
+// would escape this check entirely. Matches isPortalPath below, not a separate definition.
+export function isPortalPath(pathname: string): boolean {
+  return pathname === "/portal" || pathname.startsWith("/portal/");
+}
+
+export function isClientOutsidePortal(pathname: string, userKind: string): boolean {
+  return userKind === "client" && !isPortalPath(pathname);
+}
+
+function clientForbiddenResponse(request: NextRequest, cookiesToCopy: RefreshedCookie[] = []): NextResponse {
+  const { pathname } = request.nextUrl;
+  if (isApiPath(pathname)) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+  // Codex second-opinion finding 2 (2026-08-29, CONFIRMED): building this URL from
+  // `request.url` preserves whatever host the BLOCKED request arrived on (e.g.
+  // app.aware-wave.com, since that is exactly the host this response exists to reject a
+  // client identity from). The follow-up request would then hit isWrongHostForPortal() on
+  // that same wrong host and 404 -- a redirect straight into a dead end. Build an ABSOLUTE
+  // URL on the correct host instead, and use the browser-visible unprefixed path ("/launcher",
+  // not "/portal/launcher") -- nginx's idempotent rewrite adds that prefix transparently, same
+  // as every other browser-facing portal link in this codebase.
+  const forbidden = NextResponse.redirect(new URL("/launcher", "https://portal.aware-wave.com"));
+  // Critic finding (2026-08-29, minor): the success path below applies any rotated session
+  // cookies from Supabase's refresh onto its response; this early return didn't, so a client
+  // identity blocked here right when their token happened to rotate could keep a stale
+  // refresh token and get logged out on their next request. Mirror the same copy here.
+  for (const cookie of cookiesToCopy) forbidden.cookies.set(cookie.name, cookie.value, cookie.options);
+  return forbidden;
+}
+
+// Critic finding C3 (2026-08-29, Critical): Next.js file-based routing is host-agnostic --
+// /portal/* resolves identically regardless of which hostname the request arrived on, and
+// app.aware-wave.com and portal.aware-wave.com are proxied to the SAME next-admin container.
+// Verified live: `curl -X POST https://app.aware-wave.com/portal/api/signup` reached this app
+// (307, only because THIS middleware's matcher predates deployment -- the route itself has no
+// host awareness at all). Deploying the /portal/* code is therefore sufficient to expose portal
+// signup on the admin console's own public domain, independent of whether the "gated" DNS/cert/
+// nginx steps for portal.aware-wave.com (design doc §7 steps 5-7) have happened yet. This check
+// is the single choke point that closes that regardless of nginx config on either host.
+const PORTAL_PUBLIC_PATHS = new Set<string>(["/portal/login", "/portal/signup", "/portal/api/signup"]);
+
+export function isWrongHostForPortal(request: NextRequest): boolean {
+  if (!isPortalPath(request.nextUrl.pathname)) return false;
+  const host = (request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "").toLowerCase();
+  return host !== "portal.aware-wave.com" && !isDevelopment();
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (isWrongHostForPortal(request)) {
+    return new NextResponse(null, { status: 404 });
+  }
 
   // Anti-spoof: strip ALL client-supplied identity headers up-front, before any pass-through
   // decision. No path (public, sync-key, dev, or gated) may carry a spoofed role.
@@ -140,6 +233,15 @@ export async function middleware(request: NextRequest) {
   for (const header of CLAIM_HEADERS) baseHeaders.delete(header);
   baseHeaders.delete(SIMULATED_HEADER);
   const passthrough = () => NextResponse.next({ request: { headers: baseHeaders } });
+
+  // Portal's own pre-auth pages (no session exists yet by definition, same reasoning as the
+  // admin console's own /login exclusion). Handled HERE inside the middleware body — NOT via a
+  // matcher exclusion — specifically so isWrongHostForPortal() above still runs for them. A
+  // matcher exclusion skips this whole function, which would leave these three routes reachable
+  // on ANY host (see C3 note above isWrongHostForPortal) with zero check at all.
+  if (PORTAL_PUBLIC_PATHS.has(pathname)) {
+    return passthrough();
+  }
 
   // Server-to-server: own-Bearer /api/ops endpoints, or a valid x-ops-sync-key automation
   // call. Authorization is enforced by the route's own token check.
@@ -165,15 +267,15 @@ export async function middleware(request: NextRequest) {
   if (sessionKey) {
     const fresh = getFreshCachedRole(sessionKey);
     if (fresh !== null) {
+      if (isClientOutsidePortal(pathname, fresh.userKind)) return clientForbiddenResponse(request);
       applyIdentityHeaders(baseHeaders, fresh);
       return NextResponse.next({ request: { headers: baseHeaders } });
     }
   }
 
-  const { supabase, response } = createSupabaseMiddlewareClient(request);
+  const { supabase, refreshedCookies } = createSupabaseMiddlewareClient(request);
 
   let identity: CachedIdentity | null = null;
-  let refreshedCookies = false;
   try {
     const { data, error } = await supabase.auth.getUser();
     if (!error && data.user) {
@@ -181,7 +283,6 @@ export async function middleware(request: NextRequest) {
       const role = resolveRoleFromUser(meta);
       const { userKind, orgId } = resolveTenantFromMeta(meta);
       identity = { role, userKind, orgId };
-      refreshedCookies = true;
       if (sessionKey) cacheValidatedRole(sessionKey, identity);
     } else if (error && sessionKey && isTransientAuthError(error)) {
       // Auth server unreachable / throttled — don't punish a logged-in user. Trust the last
@@ -198,14 +299,16 @@ export async function middleware(request: NextRequest) {
   if (identity === null) {
     return blockedResponse(request);
   }
+  if (isClientOutsidePortal(pathname, identity.userKind)) {
+    return clientForbiddenResponse(request, refreshedCookies);
+  }
 
   applyIdentityHeaders(baseHeaders, identity);
 
   const finalResponse = NextResponse.next({ request: { headers: baseHeaders } });
-  // Preserve any refreshed-session cookies the Supabase client wrote onto `response`.
-  if (refreshedCookies) {
-    for (const cookie of response.cookies.getAll()) finalResponse.cookies.set(cookie);
-  }
+  // Apply any refreshed-session cookies (see M-1 fix in lib/supabase/ssr.ts for why this is a
+  // plain array, not a captured NextResponse reference).
+  for (const cookie of refreshedCookies) finalResponse.cookies.set(cookie.name, cookie.value, cookie.options);
   return finalResponse;
 }
 
@@ -215,5 +318,11 @@ export const config = {
   // PUBLIC_API_PATHS + the x-ops-sync-key check above exempt the remaining /api/ops/*
   // server-to-server callers.
   // `intake` excluded: the public form at /intake needs no session (auth is in intake-browser API route).
+  // `/portal/*` is DELIBERATELY NOT excluded here (unlike `login`/`intake` above) -- all of it,
+  // including the pre-auth login/signup pages, runs through middleware() so isWrongHostForPortal()
+  // and the PORTAL_PUBLIC_PATHS passthrough inside the function body both execute (see C3 comment
+  // on isWrongHostForPortal for why a matcher-level exclusion would have silently skipped the
+  // host check). `/portal/launcher` etc. reach the normal session gate below and get
+  // x-ops-user-kind/x-ops-org-id for lib/tenant-guard.ts's requireClientOrg().
   matcher: ["/((?!_next/static|_next/image|favicon.ico|login|intake|api/auth|api/webhooks|api/internal|tarot-frames|edge-masks/|vector-editor.html).*)"],
 };

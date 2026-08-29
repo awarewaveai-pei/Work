@@ -15,6 +15,7 @@
 
 | 你要做什麼 | 先開這裡 |
 |:---|:---|
+| **`aware-wave.com` 底下每個子網域是什麼、給誰用、優先序** | [`PRODUCT_DOMAIN_IA_PLAN.md`](PRODUCT_DOMAIN_IA_PLAN.md) |
 | **API 要做什麼、P0～P4、與 Trigger／Supabase／Identity(JWT/OIDC) 邊界** | [`PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md`](PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md) |
 | **Cloudflare DNS、`api`／`app` 表、TLS 驗收 curl** | [`../operations/CLOUDFLARE_HETZNER_PHASE1.md`](../operations/CLOUDFLARE_HETZNER_PHASE1.md) |
 | **系統 Nginx 範本（`api`→3001、`app`→302）** | [`../../../lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/aware-wave-app-api-subdomains.conf`](../../../lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/aware-wave-app-api-subdomains.conf) |
