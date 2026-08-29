@@ -1,5 +1,33 @@
 ﻿# Worklog
 
+## 2026-08-29（續6）
+
+### AI LEGO Phase 2 Architecture Convergence Round 2 完成 — 9 份架構計畫 + 2 份 Claude 統籌彙整文件，15/15 交付物達標，進入 STOP FOR HUMAN REVIEW
+
+**背景**：續4 記錄的 Round 1（6 份 ADR）完成後操作者說「繼續」，進入 Round 2——directive §XXVIII 定義的 15 份 Phase 2 exit gate 交付物中，Round 1 只覆蓋了 `ADR_INDEX.md` 這一項，剩餘 9 份架構計畫 + `PROPOSED_ARCHITECTURE_CHANGES.md` + `IMPLEMENTATION_ROADMAP.md` 共 11 項未做。9 份架構計畫（Machine-Readable Spec Plan / Repository Architecture / Security Threat Model / Data Architecture Plan / Global Jurisdiction Plan / DevOps SRE Plan / MVP Vertical Slice Plan / Test & Eval Strategy / Migration & Rollback Strategy）交給 9 個平行 subagent 各自起草，全部要求先 Grep/Read 核對既有內容再寫，不得憑記憶。最後 2 份（`PROPOSED_ARCHITECTURE_CHANGES.md` 把 6 份 ADR 轉成 23 項具體修改提案 P-001~P-023；`IMPLEMENTATION_ROADMAP.md` 總排程）由 Claude 主 session 親自彙整，不假手 subagent——因為這兩份是「已有材料的整合排序」而非新分析，且 directive 把它們定位為 Claude 的統籌責任。
+
+**產出**（`docs/architecture/`，全部 `Status: PROPOSED`，共 2693 行）：見上方 wc -l 逐檔行數。
+
+**過程中的紀律亮點**：
+- `MACHINE_READABLE_SPEC_PLAN.md` 的 agent 誠實區分三種狀態而非一律宣稱「規劃完成」：`READY`（可直接建置）、`SKELETON_ONLY`（母文件全空白，需操作者法遵/技術選型決策）、`BLOCKED_PENDING_ROUND2_ADR`（P1-CONFLICT-3/4、P1-DUP-2/5 尚無 ADR 裁決，5 個 schema 檔案不得單方面選邊）——並明確論證「Atlas 289 個方法一次補完 contract」不現實，改用三層漸進策略（Tier 0 示範方法／Tier 1 待 Phase 5 切片方向鎖定／Tier 2 fail-closed 標記 pending），避免自我隱藏這個大缺口。
+- `MVP_VERTICAL_SLICE_PLAN.md` 的 agent 核對出我 briefing 裡引用的 `P1-GAP-PROD-9` 是錯的 ID（指向無關的 Trade finding），正確應為 `P1-CONFLICT-4`；同時發現這個錯誤**已經存在於 Phase 1 自己的** `ASSUMPTION_REGISTER.yaml:25`（P1-ASSUM-PROD-3 的 `underlies:` 欄位），代表我的任務摘要繼承了 Phase 1 既有的交叉引用 bug，不是本輪新引入。
+- `MIGRATION_AND_ROLLBACK_STRATEGY.md` 的 agent 核對出我引用的「EC §19 為 DB migration 條款」是錯的——§19 是通用的 Rollback-first Rule，真正的 DB Migration Contract 在 EC §28（與 ADR-005 已建立的位置一致）。
+- Claude 親自撰寫 `IMPLEMENTATION_ROADMAP.md` 時主動揭露一處流程缺口而非淡化：`MVP_VERTICAL_SLICE_PLAN.md` 選定 Research Mode 作為建議，但 Program Plan §9 原始要求是「Claude 與 Codex 各自論證後比較」才能定案，這一步尚未執行——寫入 §2 類別 D 供操作者決定是否要求補做，不是自己直接放行成「已決定」。
+
+[已修改]
+- 新增 `docs/architecture/*.md`（11 檔，含 `PROPOSED_ARCHITECTURE_CHANGES.md` 與 `IMPLEMENTATION_ROADMAP.md`）
+- `AI_LEGO_OS_Program_Plan_v1.md`：Phase 2 狀態列與 §7 狀態表由 `IN_PROGRESS` 改為 `COMPLETE（15/15）`，標註進入 STOP FOR HUMAN REVIEW
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`wc -l docs/architecture/*.md`（確認 11 檔非空，合計 2693 行）+ `git status --short`/`git log --oneline -8`（確認與並行 session 的 nginx 稽核工作無檔案衝突） | exit=0
+- REVIEW_WAIVED: DOC_ONLY -- 全批為架構規劃文件；每份由起草 agent 自行 Grep/Read 核對 file:line；3 處 briefing 錯誤（P1-GAP-PROD-9、EC §19、Atlas 289 方法一次補完）由 agent 自行糾正並記錄，未依賴外部 critic
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=MACHINE_READABLE_SPEC_PLAN\|REPOSITORY_ARCHITECTURE\.md\|SECURITY_THREAT_MODEL\|DATA_ARCHITECTURE_PLAN\|GLOBAL_JURISDICTION_PLAN\|DEVOPS_SRE_PLAN\|MVP_VERTICAL_SLICE_PLAN\|TEST_EVAL_STRATEGY\|MIGRATION_AND_ROLLBACK_STRATEGY\|PROPOSED_ARCHITECTURE_CHANGES\|IMPLEMENTATION_ROADMAP | hits=僅本目錄自身 11 檔 + Program Plan 既有引用，無外部 stale 引用
+- ORACLE_WAIVED: 9+2 份文件為 Claude 單模型單輪產出，`ADR_INDEX.md`（Round 1）已建議操作者對 ADR-001/002 安排 Codex 對抗式覆審；本輪文件全部建立在這 6 份 ADR 之上，建議與 ADR 覆審一併安排，非本批單獨範圍
+
+[剩餘風險] 15 份交付物全數 `Status: PROPOSED`，任何內容不得視為定案；`MVP_VERTICAL_SLICE_PLAN.md` 的 Research Mode 選擇尚未完成 directive 要求的雙模型比較（見 `IMPLEMENTATION_ROADMAP.md` §2 類別 D 誠實揭露）；5 個 schema 檔案（`gate.schema.yaml` 等）與 2 份 policy 檔案卡在 `BLOCKED_PENDING_ROUND2_ADR`，需操作者決定是否併入下一輪 ADR。**Phase 2 exit gate 已達成，依 directive 明文規定進入 STOP FOR HUMAN REVIEW，Phase 3 不得在操作者批准前開始。**
+[rollback] `git revert` 本 commit；三母文件零改動（全部 15 份交付物皆為 PROPOSED，未套用任何內容到 Master Plan / Method Atlas / Execution Contract）。
+
 ## 2026-08-29（續5）
 
 ### 二次更正：「25 處疑似死檔」既非死檔亦非「現行 production」——舊 SG/EU 兩台機容器全滞，本機實測全部 502（操作者要求審查兩檔矛盾後發現）
