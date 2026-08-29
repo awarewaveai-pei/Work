@@ -69,11 +69,15 @@ tier_0:
       - "methods/registry/method-inventory.yaml: root_cause.fishbone (Master Plan L742, example-only, Atlas-authoritative)"
     note: >
       One of the 2 pre-existing has_contract:true methods. §4 Tier 0 group (a):
-      to be rewritten under the new cognitive/method.schema.yaml format as the
-      template other contracts follow. `contract_status: complete` here
-      reflects the PRE-EXISTING simplified-field contract carried over from
-      Phase 0/1, not a new method.schema.yaml-shaped contract written by this
-      task -- no such file was written in this task (see verification below).
+      rewritten under the new cognitive/method.schema.yaml format as the
+      template other contracts follow. **UPDATED (2026-08-29)**: the rewrite
+      this note originally described as not-yet-done is now built --
+      `methods/contracts/root_cause.fishbone.contract.yaml` is a literal
+      transcription of Atlas §9's own worked LEGO Contract example
+      (L987-1030), validated against cognitive/method.schema.yaml with
+      jsonschema (0 errors). `contract_status: complete` continues to be
+      accurate, now for both the pre-existing Phase 0/1 simplified record AND
+      this new full-schema file.
 
   - method_id: "stakeholder.regulator"
     contract_status: complete
@@ -83,46 +87,85 @@ tier_0:
       - "methods/registry/method-inventory.yaml: stakeholder.regulator lens (Atlas L1036, category: lens)"
     note: >
       The other of the 2 pre-existing has_contract:true methods. §4 Tier 0
-      group (a), same caveat as root_cause.fishbone above: `complete` reflects
-      the pre-existing contract, not a new method.schema.yaml file produced by
-      this task.
+      group (a). **UPDATED (2026-08-29)**:
+      `methods/contracts/stakeholder.regulator.contract.yaml` is now built --
+      a literal transcription of Atlas §9's Lens Contract example
+      (L1032-1047), validated against cognitive/lens.schema.yaml#/lens (0
+      errors). This is a Lens (LEGO dimension C), not a Method (dimension A)
+      -- validated against a different schema than the other 3 Tier 0
+      contracts in this same directory.
 
   - method_id: "strategy.swot"
-    contract_status: pending
+    contract_status: complete
     tier: 0
-    has_contract: false
+    has_contract: true
     source:
       - "methods/registry/method-inventory.yaml: strategy.swot (Master Plan L746, example-only, Atlas-authoritative, typed example KnowledgeSet->SWOTAnalysis)"
+      - "methods/contracts/strategy.swot.contract.yaml (built 2026-08-29, this task)"
     note: >
       §4 Tier 0 group (b): teaching example, referenced Atlas §9/§24.1 and
-      Master Plan §8.4. `pending` -- Tier 0 means "priority to write next", not
-      "already written"; only root_cause.fishbone and stakeholder.regulator
-      have real contracts today. NAMING CAVEAT: the Atlas document's own F08
-      strategy catalog entry for "SWOT" (method-inventory.yaml L409, Atlas
-      L517) records `machine_id: "method.swot"`, which predates
+      Master Plan §8.4. **UPDATED (2026-08-29)**: `strategy.swot` -> complete
+      -- `methods/contracts/strategy.swot.contract.yaml` is now built,
+      assembling content from three separate Atlas locations (§11.7 protocol
+      section, §4 primitive-composition formula, §14.1 legal/illegal
+      transition example) since no single worked LEGO Contract block exists
+      for SWOT the way Fishbone/stakeholder.regulator each had one -- see
+      that file's own `open_questions.OQ-SWOT-2` for the honest disclosure of
+      that assembly choice. Validated against cognitive/method.schema.yaml
+      with jsonschema (0 errors). NAMING CAVEAT (unchanged): the Atlas
+      document's own F08 strategy catalog entry for "SWOT"
+      (method-inventory.yaml L409, Atlas L517) records `machine_id:
+      "method.swot"`, which predates
       docs/adr/ADR-005-db-migration-recipe-and-method-id-grammar.md's Option B
       decision (ACCEPTED 2026-08-29): bare `<family>.<name>` grammar, no
-      `method.` prefix. ADR-005 §"Sub-decision (b)" line 166 explicitly
-      corrects Atlas's own versioned SWOT example (`method.swot.v1/v2/v3` at
-      Atlas L4256-58) to `id: strategy.swot` + a separate `version:` field --
-      the same bare form Master Plan already uses at L746. `strategy.swot` is
-      therefore the correct id for this backlog entry, not `method.swot`; the
-      inconsistent `method.swot` machine_id in method-inventory.yaml's Atlas
-      F08 row is preserved verbatim there (migration, not re-cataloging) and
-      is exactly the kind of drift a real method.schema.yaml contract for this
-      method must resolve when written.
+      `method.` prefix. This backlog entry's `strategy.swot` (matching the new
+      contract file's real `id`) is correct per ADR-005b; method-inventory.yaml's
+      Atlas F08 row is deliberately left showing `method.swot` verbatim
+      (migration, not re-cataloging, per that file's own stated policy) --
+      this backlog entry being marked complete does NOT retroactively update
+      that row's `has_contract`/`machine_id` fields, which remain out of this
+      task's scope (see open_questions.OQ-BACKLOG-1 below).
 
   - method_id: "evidence.triangulation"
-    contract_status: pending
+    contract_status: complete
     tier: 0
-    has_contract: false
+    has_contract: true
     source:
       - "methods/registry/method-inventory.yaml: evidence.triangulation (Master Plan L833, example-only, used in Workflow IR sample research.qualitative.v4)"
+      - "methods/contracts/evidence.triangulation.contract.yaml (built 2026-08-29, this task)"
     note: >
-      §4 Tier 0 group (b): teaching example. `pending` -- not yet contracted.
-      No competing/older machine_id form was found for this method anywhere in
-      method-inventory.yaml (unlike strategy.swot above), so no naming caveat
-      applies here.
+      §4 Tier 0 group (b): teaching example. **UPDATED (2026-08-29)**:
+      `evidence.triangulation` -> complete --
+      `methods/contracts/evidence.triangulation.contract.yaml` is now built,
+      but on GENUINELY THIN evidence (exhaustive grep of "triangulat" across
+      all three mother documents returns exactly one structural hit, this
+      same Master Plan §9 Workflow IR node -- no dedicated protocol section
+      or primitive-composition formula exists anywhere in Atlas for this
+      method, unlike strategy.swot). That file's `cognitive_primitives`,
+      `purpose`, and `outputs` fields are Phase 3 compilation INFERENCES,
+      individually flagged inline and in that file's own open_questions
+      rather than presented with the same confidence as directly-cited
+      content -- `contract_status: complete` here means "a real
+      method.schema.yaml-conformant file now exists," not "every field is
+      independently source-verified" the way root_cause.fishbone's is.
+      Validated against cognitive/method.schema.yaml with jsonschema (0
+      errors). No competing/older machine_id form was found for this method
+      anywhere in method-inventory.yaml (unlike strategy.swot above), so no
+      naming caveat applies here.
+
+open_questions:
+  - id: "OQ-BACKLOG-1"
+    question: >
+      Now that all 4 Tier 0 entries are `contract_status: complete` in this
+      file, should method-inventory.yaml's own per-document catalog rows
+      (which independently track has_contract/contract_status per citation
+      context, e.g. root_cause.fishbone's EC L742 row still reads
+      has_contract:false even though this backlog and Atlas's own L433 row
+      both say true) be reconciled into a single consistent has_contract
+      value per method, or is per-document-citation tracking intentionally
+      independent of the method's overall contract status?
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml (this task's scope was building methods/contracts/ and updating THIS backlog file, not re-annotating that registry)"
+    blocks: "nothing in this file's own validity -- this backlog is the authoritative Tier 0/1/2 tracker per MACHINE_READABLE_SPEC_PLAN.md §4, independent of method-inventory.yaml's own per-citation has_contract bookkeeping"
 
 # =============================================================================
 # Tier 1 -- explicit TODO, NOT populated (per §4's own instruction)

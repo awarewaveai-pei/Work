@@ -1,0 +1,96 @@
+$id: "ai-lego://methods/contracts/root_cause.fishbone.contract.yaml"
+title: "Fishbone / Ishikawa Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 0 (group a) of the Atlas Method Contract backfill strategy
+  (docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §4, methods/registry/
+  contract-backlog.yaml tier_0 entry `root_cause.fishbone`). This is a
+  literal, near-verbatim transcription of Atlas §9's own worked LEGO
+  Contract example (L987-1030) into a real instance conforming to
+  specs/cognitive/method.schema.yaml, which was itself formalized directly
+  FROM this example -- there is no interpretive gap here, this file is the
+  one real data point method.schema.yaml's own `id_grammar_conformance_examples`
+  and `source_of_truth_for` already cite by content. Serves as the template
+  every other Tier 0/1/2 contract in this directory follows.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 LEGO Contract, Method Contract example (L987-1030) -- every field below transcribed verbatim"
+  - "methods/registry/contract-backlog.yaml tier_0 entry for root_cause.fishbone (has_contract: true, contract_status: complete, PRE-EXISTING simplified-field contract -- this file is the new method.schema.yaml-shaped rewrite that entry's own note calls for, not a duplicate)"
+  - "methods/registry/method-inventory.yaml Fishbone / Ishikawa entry (Atlas F05 root_cause, L433)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §4 Tier 0 group (a): "已有
+  has_contract:true 的 2 個方法先用新 method.schema.yaml 正式重寫（格式從舊有
+  的簡化欄位升級為完整 schema），作為其餘所有 contract 撰寫的範本". No ADR
+  governs the content itself -- Atlas §9 already gives a complete, unambiguous
+  worked example; this is direct transcription, not a design decision.
+
+id: root_cause.fishbone
+version: "1.0.0"
+family: root_cause
+
+cognitive_primitives: [DECOMPOSE, GROUP, CAUSE_HYPOTHESIS]
+
+purpose:
+  - identify_candidate_causes
+
+inputs:
+  required:
+    - ProblemStatement
+  optional:
+    - EvidenceSet
+    - Dataset
+    - StakeholderSet
+
+outputs:
+  - CauseHypothesisSet
+
+preconditions:
+  - "problem_statement.status == validated"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+
+forbidden_transition:
+  - "CauseHypothesisSet -> FinalCausalFact"
+
+recommended_next:
+  - root_cause.pareto
+  - root_cause.five_whys
+  - causal.dag
+  - validation.experiment
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - id: "OQ-FISHBONE-1"
+    question: >
+      `recommended_next` names 4 methods (root_cause.pareto,
+      root_cause.five_whys, causal.dag, validation.experiment), none of
+      which have their own methods/contracts/ file yet (all remain
+      `contract_status: pending` in method-inventory.yaml). This file does
+      not require them to exist -- `recommended_next` is advisory metadata,
+      not a hard $ref -- but a Method Selection Engine resolving this
+      contract's suggestions today would hit 4 unresolvable ids.
+    owner: "whoever backfills Tier 1/2 contracts next"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas §9 (L985-1030) directly at the cited lines and transcribed
+    every field verbatim -- no field in this file was invented or inferred.
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator (required fields present, id pattern
+    ^[a-z_]+\.[a-z_]+$ satisfied, version semver, all array fields non-empty
+    per schema minItems).
+  note: >
+    No mother document was modified. This file adds zero content beyond
+    Atlas §9's own literal example -- it is a format upgrade (simplified
+    Phase-0 fields -> full method.schema.yaml shape), per
+    contract-backlog.yaml's own tier_0 note distinguishing "pre-existing
+    simplified-field contract" from "new method.schema.yaml-shaped contract
+    written by this task."

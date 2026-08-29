@@ -3,18 +3,23 @@
 AI-LEGO Cognitive Engineering OS -- Phase 3 Wave 8 golden test runner.
 
 Resolves MACHINE_READABLE_SPEC_PLAN.md section 3 Build Order: "Wave 8
-tests/ 全目錄（對 Wave 1-7 的每個 schema 寫 golden test）". Runs four
+tests/ 全目錄（對 Wave 1-7 的每個 schema 寫 golden test）". Runs five
 independent check families against the built (status: ACTIVE/PROVISIONAL)
-Wave 1-7 output:
+Wave 1-7+ output:
 
   1. Schema conformance  -- tests/contracts/**/*.fixtures.yaml drives
      positive (must validate) and negative (must fail validation) instance
-     checks against every one of the 47 specs/ and policies/ai-execution/
-     files that declare a $schema (see tests/README.md for the fixture
-     contract).
+     checks against every specs/ and policies/ai-execution/ (and, as of the
+     Tier 0 method-contract backfill, policies/privacy/) file that declares
+     a $schema (see tests/README.md for the fixture contract).
   2. Recipe instance conformance -- the 3 recipes/validated/*.recipe.yaml
      files (which are DATA instances, not schemas themselves) validate
      against specs/cognitive/recipe.schema.yaml.
+  2b. Method/Lens contract instance conformance -- methods/contracts/*.contract.yaml
+      (Tier 0 method/lens contract backfill, docs/architecture/
+      MACHINE_READABLE_SPEC_PLAN.md section 4) validate against
+      specs/cognitive/method.schema.yaml or specs/cognitive/lens.schema.yaml#/lens,
+      dispatched by which schema-specific required key is present.
   3. Registry invariants -- methods/registry/method-inventory.yaml and
      contract-backlog.yaml are not governed by an external JSON Schema
      (they are Phase-0-migrated free-form registries); this file instead
@@ -22,9 +27,9 @@ Wave 1-7 output:
      headers claim about themselves (counts, has_contract<->contract_status
      consistency).
   4. Cross-file $ref resolution smoke test -- every "ai-lego://..." URI
-     found anywhere under specs/, policies/, methods/registry/, and
-     recipes/validated/ resolves to a real file and (if it carries a
-     "#/..." JSON-pointer fragment) a real node within that file.
+     found anywhere under specs/, policies/, methods/, and recipes/validated/
+     resolves to a real file and (if it carries a "#/..." JSON-pointer
+     fragment) a real node within that file.
 
 No mother document, ADR, or existing spec/policy file's normative content
 is modified by this file or by running it. Exit code 0 = all checks
@@ -181,6 +186,42 @@ def run_recipe_instance_conformance():
 
 
 # ---------------------------------------------------------------------------
+# 2b. Method/Lens contract instance conformance -- methods/contracts/*.yaml
+#     against either method.schema.yaml or lens.schema.yaml#/lens. Dispatched
+#     by which schema-specific required key is present (cognitive_primitives
+#     is method-only per method.schema.yaml's own required list; labels is
+#     lens-only per lens.schema.yaml#/lens's required list) rather than by
+#     filename pattern, so this does not silently miss a future contract
+#     whose filename doesn't follow today's naming convention.
+# ---------------------------------------------------------------------------
+def run_method_contract_conformance():
+    method_schema_id = "ai-lego://specs/cognitive/method.schema.yaml"
+    method_schema = retrieve(method_schema_id).contents
+    reg_m = registry.with_resource(method_schema_id, Resource.from_contents(method_schema))
+    method_validator = Draft202012Validator(method_schema, registry=reg_m)
+
+    lens_schema_id = "ai-lego://specs/cognitive/lens.schema.yaml"
+    lens_schema = retrieve(lens_schema_id).contents
+    reg_l = registry.with_resource(lens_schema_id, Resource.from_contents(lens_schema))
+    lens_validator = Draft202012Validator({"$ref": f"{lens_schema_id}#/lens"}, registry=reg_l)
+
+    contract_files = sorted(glob.glob(os.path.join(ROOT, "methods", "contracts", "*.contract.yaml")))
+    check(len(contract_files) >= 4, f"expected at least 4 methods/contracts/*.contract.yaml files (Tier 0), found {len(contract_files)}")
+    for p in contract_files:
+        rel_p = os.path.relpath(p, ROOT)
+        inst = load(p)
+        if "cognitive_primitives" in inst:
+            errors = list(method_validator.iter_errors(inst))
+            check(not errors, f"method contract {rel_p} fails method.schema.yaml: {[e.message for e in errors]}")
+        elif "labels" in inst:
+            errors = list(lens_validator.iter_errors(inst))
+            check(not errors, f"lens contract {rel_p} fails lens.schema.yaml#/lens: {[e.message for e in errors]}")
+        else:
+            check(False, f"{rel_p}: neither 'cognitive_primitives' (method) nor 'labels' (lens) present -- cannot determine which schema to validate against")
+        check(inst.get("id") == os.path.basename(p)[: -len(".contract.yaml")], f"contract {rel_p}: id field does not match filename slug")
+
+
+# ---------------------------------------------------------------------------
 # 3. Registry invariants -- method-inventory.yaml / contract-backlog.yaml
 #    (no external schema governs these; check their own stated claims)
 # ---------------------------------------------------------------------------
@@ -249,7 +290,7 @@ def _walk_refs(node):
 
 
 def run_ref_resolution_smoke():
-    roots = ["specs", "policies", "methods/registry", "recipes/validated"]
+    roots = ["specs", "policies", "methods", "recipes/validated"]
     checked = 0
     for root in roots:
         for p in glob.glob(os.path.join(ROOT, root, "**", "*.yaml"), recursive=True):
@@ -285,6 +326,7 @@ def run_ref_resolution_smoke():
 if __name__ == "__main__":
     run_schema_conformance()
     run_recipe_instance_conformance()
+    run_method_contract_conformance()
     run_registry_invariants()
     run_ref_resolution_smoke()
 

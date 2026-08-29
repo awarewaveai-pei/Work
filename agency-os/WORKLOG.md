@@ -1,5 +1,40 @@
 # Worklog
 
+## 2026-08-29（續28）
+
+### AI-LEGO Phase 3 收尾第 2 批：補建 Tier 0 全部 4 份 method/lens contract 檔（methods/contracts/ 目錄從無到有）
+
+**觸發**：延續續27，操作者「1-5全部都要做」盤點出的第①項——`methods/contracts/` 目錄根本不存在，Tier 0 四個方法（`contract-backlog.yaml` 已追蹤但從未真的寫檔）。
+
+**執行**：讀 `specs/cognitive/method.schema.yaml`（Wave 3）與 `specs/cognitive/lens.schema.yaml` 確認確切必填欄位，逐一回頭讀 Atlas/MP 原文找真實依據，證據品質三個等級誠實區分：
+1. `root_cause.fishbone`：Atlas §9 L987-1030 完整 LEGO Contract 範例，逐字轉錄，零推論。
+2. `stakeholder.regulator`：Atlas §9 L1032-1047 完整 Lens Contract 範例，逐字轉錄——這是 `lens.schema.yaml` 而非 `method.schema.yaml` 實例（LEGO 維度 C「視角」非維度 A「認知操作」）。
+3. `strategy.swot`：Atlas 全文查無單一完整 LEGO Contract 區塊，改組裝三處分散證據——§11.7 完整協定段落（用途/5 步驟/常見誤用）、§4「SWOT = CLASSIFY + COMPARE + CONTEXTUALIZE」（`cognitive_primitives` 逐字引用，非推論）、§14.1 合法/非法型別轉換範例（`forbidden_transition`/inputs/outputs 依據）。組裝本身在 `open_questions.OQ-SWOT-2` 誠實記錄為一個判斷（非母文件本來就寫成一體）。
+4. `evidence.triangulation`：全文 grep「triangulat」僅 1 個結構性命中（MP §9 L833 Workflow IR 節點），Atlas 完全沒有專屬協定段落或 primitive 組合公式——本檔案是 4 份中證據基礎最薄弱的一份，`cognitive_primitives`/`purpose`/`outputs` 三欄位皆標記為「INFERRED」並在 `open_questions` 逐一揭露，不假裝與其他 3 份同等紮實。
+
+**過程中自行抓到並修正的真實 bug**：4 份新檔案全數在 house-style header 區塊重複寫了 `version:` key（header 慣例的 provenance version 與 schema 本身要求的 `version` 欄位撞名）——同一 session 稍早才在 Wave 8 抓過 `personal-data-envelope.schema.yaml` 的 title/description 重複 key 同一 bug class，這次一開始就沒抓到（4 個新檔全中），靠自己主動跑的重複 key 掃描（而非等外部 reviewer）抓到並修正；順帶確認 Wave 7 的 3 份 `recipes/validated/*.recipe.yaml` 沒有同款問題（當時的 header 慣例本來就沒放 `version:`，倖免非巧合）。
+
+**registry 同步**：`methods/registry/contract-backlog.yaml` 的 4 個 Tier 0 條目更新為 `contract_status: complete`／`has_contract: true` 並補充新檔案路徑；過程中一次 Edit 操作意外造成 `stakeholder.regulator` 條目重複兩次，同一輪自查抓到並刪除多餘的一份（舊版未更新的那份）。`methods/registry/method-inventory.yaml` 本身**刻意不動**——該檔案自身宣告是「migration，非重新編目」，且 `strategy.swot`/Atlas F08 列還刻意保留 ADR-005 前的舊 `machine_id: method.swot` 供追溯，牽動它需要單獨處理命名调和，非本次任務範圍，已用 `OQ-BACKLOG-1` 誠實記錄此邊界。
+
+**Wave 8 golden test 擴充**：`tests/run_golden_tests.py` 新增第 5 種檢查族「Method/Lens contract instance conformance」——依 instance 是否含 `cognitive_primitives`（method-only 必填鍵）或 `labels`（lens-only 必填鍵）自動分派驗證目標 schema，不靠檔名猜測。
+
+[已修改]
+- 新增 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/contracts/`（4 檔：`root_cause.fishbone.contract.yaml`/`stakeholder.regulator.contract.yaml`/`strategy.swot.contract.yaml`/`evidence.triangulation.contract.yaml`）
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/registry/contract-backlog.yaml`：4 個 Tier 0 條目更新為 complete，新增 `OQ-BACKLOG-1`
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/run_golden_tests.py`：新增 `run_method_contract_conformance()` 檢查族
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`：`contract-backlog.yaml` 列補充 Tier 0 實際建檔狀態
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`jsonschema.Draft202012Validator` 對 4 份 contract 檔逐一驗證（3 份對 `method.schema.yaml`、1 份對 `lens.schema.yaml#/lens`）| exit=0 | 結果=4/4 zero errors
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`UniqueKeyLoader` 對全 142 個 yaml 檔跑重複 key 掃描（含本輪新增）| exit=0 | 結果=CLEAN（過程中抓到並修正 4 處自製的重複 `version` key）
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py`（含新的 method/lens contract conformance 檢查族）| exit=0 | 結果=594 個檢查全過
+- REVIEW_DONE: critic=Quick（自我核對：`strategy.swot`/`evidence.triangulation` 兩份「組裝式」contract 逐一核對每個引用的 Atlas/MP 行號實際內容是否與描述相符，非憑印象轉述；`evidence.triangulation` 的 3 個 INFERRED 欄位逐一確認確實在 `open_questions` 有對應揭露，未被靜默當成已證實內容）| verdict=pass
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`methods/contracts\|Tier 0`（排除 methods/ 自身路徑）| hits=`MACHINE_READABLE_SPEC_PLAN.md` 兩處，皆非過期宣稱（一處已同步更新，一處是 §4 策略敘述文字不受影響）；其餘命中集中在 `.ai/research/phase-0/*` 唯讀研究檔與其他規劃文件的既有引用，無需同步
+
+[剩餘風險] `strategy.swot`/`evidence.triangulation` 兩份 contract 分別標記了組裝方式（OQ-SWOT-2）與推論內容（OQ-TRIANGULATION-1/2/3）尚待未來查證或補強；`methods/registry/method-inventory.yaml` 本身的 has_contract 欄位未與本輪同步（刻意留給有該檔寫入權限的未來 session，見 OQ-BACKLOG-1）。Tier 1（15-25 個方法）與 Tier 2（260+ 方法）仍待 Phase 5 MVP 切片決定後才能定案名單，非本次範圍。
+[rollback] 純新增檔案 + `contract-backlog.yaml`/`run_golden_tests.py`/plan 文件文字更新，`git revert` 即可完整回退，無 DB/prod/deploy 副作用。
+
 ## 2026-08-29（續27）
 
 ### AI-LEGO Phase 3 收尾第 1 批：修正 5 處過期的「尚無 ADR」宣稱 + 建 policies/privacy/pii-redaction.policy.yaml（ADR-007 定案內容落地）

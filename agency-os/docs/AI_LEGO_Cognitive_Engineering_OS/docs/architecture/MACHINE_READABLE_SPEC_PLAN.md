@@ -166,7 +166,7 @@ PROJECT_ROOT/                                  ← D:\Work\agency-os\docs\AI_LEG
 | 檔名 | 用途 | 格式 | 依賴 | 解決的 Finding | 狀態 |
 |---|---|---|---|---|---|
 | `method-inventory.yaml` | 沿用 Phase 0 既有 289 條目編目（284 個正式 Atlas Method + lens/primitive 條目），升級為 Phase 3 正式 registry（非重新編目） | YAML | cognitive/method.schema.yaml | P1-GAP-AI-7（部分：清點已完成，schema 化未完成） | **BUILT（2026-08-29）**——289 條全數遷移，`has_contract:true` 獨立複核仍為 2 筆 |
-| `contract-backlog.yaml` **（新增）** | 逐方法 `contract_status: complete\|pending\|in_mvp_slice` 追蹤表，見 §4 完整策略 | YAML | method-inventory.yaml, execution/status-codes.schema.yaml | P1-GAP-AI-7 | **BUILT（2026-08-29）**——Tier 0 僅列 4 個計畫明文點名的方法（非臆測 5-10 個清單）；Tier 1 依計畫指示留白待 Phase 5 切片定案；額外補上 ADR-008 明訂要求的 `finance.financial_assumptions` Tier 2 項目 |
+| `contract-backlog.yaml` **（新增）** | 逐方法 `contract_status: complete\|pending\|in_mvp_slice` 追蹤表，見 §4 完整策略 | YAML | method-inventory.yaml, execution/status-codes.schema.yaml | P1-GAP-AI-7 | **BUILT（2026-08-29）**——Tier 0 僅列 4 個計畫明文點名的方法（非臆測 5-10 個清單）；Tier 1 依計畫指示留白待 Phase 5 切片定案；額外補上 ADR-008 明訂要求的 `finance.financial_assumptions` Tier 2 項目。**Tier 0 四份實際 contract 檔案已於同日補建**（`methods/contracts/{root_cause.fishbone,stakeholder.regulator,strategy.swot,evidence.triangulation}.contract.yaml`，皆通過 jsonschema 驗證），本表追蹤與實際檔案首次同步一致 |
 
 ### 2.8 `/recipes/validated/`（Wave 7）
 

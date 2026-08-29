@@ -1,0 +1,130 @@
+$id: "ai-lego://methods/contracts/strategy.swot.contract.yaml"
+title: "SWOT Analysis Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 0 (group b) of the Atlas Method Contract backfill strategy
+  (docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §4: "Atlas 與 Master Plan
+  全文反覆拿來當『這是怎麼用的』範例的方法" -- SWOT is named explicitly at
+  Atlas §9/§24.1 and Master Plan §8.4 as a recurring teaching example, so if
+  even the worked examples lack a real contract, the documents' own
+  demonstrations are unverifiable). Unlike root_cause.fishbone (a single
+  complete LEGO Contract block) and stakeholder.regulator (a single complete
+  Lens Contract block), Atlas gives SWOT's real content spread across THREE
+  separate locations that this file assembles rather than transcribes from
+  one place: §11.7's full protocol section (usage/benefits/common misuse),
+  §4's primitive composition formula, and §14.1's typed legal transition
+  example. None of the three individually gives a complete LEGO Contract --
+  this file is the first place all three are combined into one.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.7 SWOT Analysis (L1333-1357) -- purpose, usage steps 1-5, and the 4 common-misuse warnings this file's `preconditions`/`forbidden_transition` ground"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §4 (L189, 'SWOT = CLASSIFY + COMPARE + CONTEXTUALIZE') -- the literal primitive composition this file's cognitive_primitives transcribes, not inferred"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §14.1 LEGO type-compatibility legal/illegal examples (L3560-3584) -- 'KnowledgeSet -> SWOT -> SWOTAnalysis -> TOWS -> ...' (legal chain, grounds inputs/outputs) and 'SWOT -> AutomaticProductionDeployment' (illegal, grounds forbidden_transition)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §8.4 (L746, `execute_method(strategy.swot)`, bare-form example confirming ADR-005b's id grammar)"
+  - "methods/registry/contract-backlog.yaml tier_0 entry for strategy.swot (contract_status: pending -> complete as of this file; NAMING CAVEAT resolved: method-inventory.yaml's Atlas F08 catalog row still carries the pre-ADR-005 machine_id 'method.swot', preserved there verbatim as a migration artifact per that file's own note -- this contract's real id is the ADR-005b-corrected 'strategy.swot', matching Master Plan L746 and this backlog entry's own key)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+  - "specs/cognitive/primitive.schema.yaml#/definitions/extended_primitive_id -- CLASSIFY/CONTEXTUALIZE are OBSERVED_EXTENSION tier (not CANONICAL_KERNEL), both already catalogued there with this exact Atlas L189 citation as evidence"
+
+decided_by: >
+  docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §4 Tier 0 group (b). No ADR
+  governs the content. ADR-005b (Method ID Grammar) governs only the `id`
+  field's form (bare strategy.swot, not the historical method.swot.v1/v2/v3
+  Atlas §24.1 examples this contract's id pattern rejects), not this file's
+  substantive fields.
+
+id: strategy.swot
+version: "1.0.0"
+family: strategy
+
+cognitive_primitives: [CLASSIFY, COMPARE, CONTEXTUALIZE]
+
+purpose:
+  - assess_internal_external_situation
+
+inputs:
+  required:
+    - KnowledgeSet
+
+outputs:
+  - SWOTAnalysis
+
+preconditions:
+  - "evidence_available == true"
+  # Atlas §11.7 usage step 1 (L1340, verbatim): "先取得證據，不要直接腦補"
+  # (get evidence first, do not guess from thin air) -- this file's
+  # preconditions field is the machine-checkable form of that instruction.
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+  # Grounded in §11.7's own common-misuse warning (L1356, verbatim):
+  # "沒有 Evidence 就寫『品牌強』『市場大』" (writing "strong brand"/"large
+  # market" without evidence) -- the exact failure mode
+  # evidence_labeling_required exists to prevent.
+
+forbidden_transition:
+  - "SWOTAnalysis -> AutomaticProductionDeployment"
+  # Atlas §14.1 L3579-3584 verbatim illegal example, generalized from its
+  # literal "SWOT -> AutomaticProductionDeployment" node names to this
+  # file's own output type name (SWOTAnalysis) per the same convention
+  # root_cause.fishbone.contract.yaml's forbidden_transition already uses
+  # (CauseHypothesisSet, not the bare method name "Fishbone").
+
+recommended_next:
+  - strategy.tows
+  # Atlas §11.7 L1344 verbatim: "SWOT 完成後進 TOWS" (after SWOT, proceed to
+  # TOWS). NOTE: "strategy.tows" is this file's own inferred id for TOWS
+  # under ADR-005b's bare <family>.<name> grammar -- TOWS has NO existing
+  # machine-readable id anywhere in the corpus (method-inventory.yaml has no
+  # TOWS entry at all) and no contract file exists yet. Flagged in
+  # open_questions rather than silently treated as an already-real id.
+
+rollback:
+  side_effect_free: true
+  # No mother document states this explicitly for SWOT specifically. Grounded
+  # by analogy: SWOT (like Fishbone) is a pure analysis/knowledge-object
+  # production method with no described side effect on external systems in
+  # any of the three mother documents -- same class of low-risk inference
+  # method.schema.yaml's own `rollback.side_effect_free` field description
+  # anticipates for methods with no stated rollback procedure.
+
+open_questions:
+  - id: "OQ-SWOT-1"
+    question: >
+      `recommended_next` names `strategy.tows`, but TOWS has no catalogued
+      machine-readable id anywhere in method-inventory.yaml's 289 entries and
+      no methods/contracts/ file. Should a Tier 1/2 pass add a real
+      `strategy.tows` contract (Atlas §11.8, L1360-1370, gives TOWS its own
+      full protocol section with the SO/ST/WO/WT matrix -- real content
+      exists, just not yet a machine-readable id or contract)?
+    owner: "whoever backfills Tier 1/2 contracts next"
+    blocks: "nothing in this file's own validity -- recommended_next is advisory metadata, not a hard $ref"
+  - id: "OQ-SWOT-2"
+    question: >
+      This contract's substantive content (purpose, preconditions, quality
+      flags) is assembled from three separate Atlas locations (§11.7, §4,
+      §14.1) rather than transcribed from one worked LEGO Contract block, the
+      way root_cause.fishbone and stakeholder.regulator both were. Is this
+      assembly faithful, or does treating three independently-written
+      sections as one coherent contract risk introducing a contract shape
+      Atlas itself never actually intended as a unit?
+    owner: "operator, or a future review pass specifically checking assembled (non-single-source) Tier 0/1 contracts"
+    blocks: "nothing in this file's own validity -- each individual field is directly cited, only the ASSEMBLY itself is flagged as a compilation choice"
+
+verification:
+  method: >
+    Read Atlas §11.7 (L1333-1357), §4 (L185-192, the primitive composition
+    formulas), §14.1 (L3544-3584, the legal/illegal transition examples),
+    and Master Plan §8.4 (L742-748) directly at the cited lines. Cross-checked
+    `CLASSIFY`/`CONTEXTUALIZE` against specs/cognitive/primitive.schema.yaml's
+    own `extended_primitive_id` definition to confirm both are already
+    catalogued there with the identical Atlas L189 citation (not a
+    newly-invented primitive pairing). Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Every substantive field traces to a
+    specific Atlas/MP line, individually cited above; the one genuinely
+    inferred value (`recommended_next: strategy.tows`, an id that does not
+    yet exist as a real contract) is disclosed in `open_questions` rather
+    than presented as already-real.

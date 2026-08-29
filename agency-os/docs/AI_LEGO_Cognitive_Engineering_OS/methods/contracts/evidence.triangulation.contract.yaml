@@ -1,0 +1,142 @@
+$id: "ai-lego://methods/contracts/evidence.triangulation.contract.yaml"
+title: "Evidence Triangulation Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 0 (group b) of the Atlas Method Contract backfill strategy
+  (docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §4: named alongside
+  strategy.swot as a teaching-example method referenced in Master Plan §8.4/
+  §9's Workflow IR sample research.qualitative.v4). HONESTLY WEAKER EVIDENCE
+  BASE than the other 3 Tier 0 contracts in this directory: exhaustive grep
+  of "triangulat" across all three mother documents returns exactly ONE
+  structural hit -- Master Plan §9's Workflow IR node (L833,
+  `method_id: evidence.triangulation`) -- and ZERO protocol sections,
+  primitive-composition formulas, or dedicated worked examples anywhere in
+  Atlas (unlike strategy.swot, which has a full §11.7 protocol section even
+  though it lacked a single combined LEGO Contract block). This file
+  therefore has genuinely less textual grounding than its Tier 0 siblings,
+  and says so field-by-field below rather than presenting inferred content
+  with the same confidence as directly-cited content.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §9 Workflow IR (L825-836) -- the ONE real structural evidence: a workflow node naming evidence.triangulation with input: [themes, literature], sandwiched between a research.thematic_analysis method node (producing 'output.transcript' -> implicitly 'themes') and a literature_search capability node (producing 'research.question' results -> implicitly 'literature')"
+  - "methods/registry/contract-backlog.yaml tier_0 entry for evidence.triangulation (contract_status: pending -> complete as of this file; note: 'No competing/older machine_id form was found for this method anywhere in method-inventory.yaml, so no naming caveat applies here' -- unlike strategy.swot's method.swot caveat)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §4 Tier 0 group (b). No ADR
+  governs the content. Given the thin evidence base (see description above),
+  several fields below are Phase 3 compilation INFERENCES rather than direct
+  transcriptions -- each one flagged individually rather than presented as
+  equally grounded to the MP:825-836 citation.
+
+id: evidence.triangulation
+version: "1.0.0"
+family: evidence
+
+cognitive_primitives: [COMPARE, VALIDATE]
+# INFERRED, not cited anywhere in either mother document as a composition
+# formula for this specific method (contrast strategy.swot's directly-cited
+# "SWOT = CLASSIFY + COMPARE + CONTEXTUALIZE", Atlas L189). Chosen from the
+# 24-value CANONICAL_KERNEL enum (specs/cognitive/primitive.schema.yaml)
+# because "triangulation" -- cross-referencing multiple independent sources
+# to confirm or refute a conclusion -- is definitionally a COMPARE operation
+# whose purpose is to VALIDATE, the two kernel primitives whose own
+# definitions (as bare tokens, Atlas gives no prose gloss for any of them)
+# most directly name what the method's own name describes. See open_questions.
+
+purpose:
+  - cross_validate_findings_across_independent_sources
+# INFERRED from the method's own name ("triangulation" is a standard
+# qualitative-research term for using multiple independent data sources/
+# methods to corroborate a finding) and from its Workflow IR position
+# (consuming BOTH thematic-analysis output AND a separate literature-search
+# result before the workflow proceeds to paper generation) -- not itself a
+# literal Atlas/MP phrase.
+
+inputs:
+  required:
+    - themes
+    - literature
+# LITERAL from MP:834-836 (`input: [themes, literature]`), kept as the exact
+# two lowercase words MP itself uses rather than invented PascalCase typed-
+# object names (e.g. "ThemeSet"/"LiteratureCorpus") that would overstate how
+# well-typed this input actually is in the source material -- MP itself
+# never gives these two strings a formal type definition anywhere.
+
+outputs:
+  - TriangulatedFindingSet
+# INFERRED. MP:825-840's Workflow IR never names this node's output
+# directly (the workflow's next node, artifact.generate_research_paper,
+# carries no explicit `input:` key at all, L838-840) -- there is no
+# literal output type name anywhere in the corpus for this method. This
+# name is a Phase 3 compilation choice (PascalCase typed-object naming
+# convention consistent with every other output name in this directory,
+# e.g. CauseHypothesisSet, SWOTAnalysis, PerspectiveAssessment) rather
+# than a transcription. See open_questions.
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+# INFERRED by analogy to root_cause.fishbone's identical flags (both
+# methods take EvidenceSet-adjacent inputs and produce a claim that must be
+# traceable to its sources) -- not itself stated for this specific method
+# anywhere in either mother document.
+
+rollback:
+  side_effect_free: true
+# INFERRED, same class of low-risk default as strategy.swot.contract.yaml's
+# identical field -- a pure analysis method with no described external side
+# effect in either mother document.
+
+open_questions:
+  - id: "OQ-TRIANGULATION-1"
+    question: >
+      cognitive_primitives [COMPARE, VALIDATE] is this file's own inference,
+      not a cited Atlas composition formula (contrast strategy.swot's
+      directly-cited "CLASSIFY + COMPARE + CONTEXTUALIZE"). Should a future
+      pass over Atlas (if a §11.x-style protocol section for triangulation
+      is ever added) supersede this inference with real cited content?
+    owner: "operator, or whoever adds a dedicated Atlas protocol section for evidence.triangulation, if one is ever written"
+    blocks: "nothing in this file's own validity -- method.schema.yaml only requires cognitive_primitives be non-empty and member of the known vocabulary, both satisfied"
+  - id: "OQ-TRIANGULATION-2"
+    question: >
+      `outputs: [TriangulatedFindingSet]` is an invented type name with no
+      corresponding cognitive/typed-objects/ schema file and no literal
+      mother-document citation. Should a
+      cognitive/typed-objects/triangulated-finding-set.schema.yaml be added
+      in a future Wave to make this a real, checkable typed object, the way
+      problem-statement.schema.yaml/cause-hypothesis-set.schema.yaml/
+      root-cause-fact.schema.yaml already exist for root_cause.fishbone's
+      own output chain?
+    owner: "operator, via a future Phase 3/4 typed-objects compilation pass"
+    blocks: "nothing in this file's own validity -- method.schema.yaml's outputs field is a soft-reference bare string array, not a hard $ref"
+  - id: "OQ-TRIANGULATION-3"
+    question: >
+      `inputs.required: [themes, literature]` are kept as MP's own lowercase
+      words rather than promoted to PascalCase typed-object names, unlike
+      this same file's `outputs` field. Is this inconsistency (literal-
+      lowercase inputs vs. invented-PascalCase output) itself a problem, or
+      is it the more honest choice precisely because it marks which half of
+      the contract is cited vs. inferred?
+    owner: "operator, or a future review pass on contract-writing conventions for thin-evidence Tier 0/1/2 methods"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Master Plan §9 (L794-842) in full, including the surrounding
+    workflow node context (L819-840), directly at the cited lines. Grepped
+    "triangulat"/"Triangulat"/"TRIANGULAT" exhaustively across all three
+    mother documents (2 total hits: this MP:833 citation, and an unrelated
+    Atlas:670 "triangulate" usage inside a completely different Weak Signal
+    Detection tool-table row, L670, not this method) to confirm no other
+    structural evidence exists anywhere in the corpus before writing this
+    file. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Unlike the other 3 Tier 0 contracts in
+    this directory, most substantive fields here are Phase 3 compilation
+    INFERENCES rather than direct transcriptions -- each is individually
+    flagged inline and in open_questions rather than presented with false
+    confidence. This is the honest form of R4 (claim-before-verify) applied
+    to a genuinely thin-evidence method, not a shortcut around it.

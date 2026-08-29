@@ -1,0 +1,54 @@
+$id: "ai-lego://methods/contracts/stakeholder.regulator.contract.yaml"
+title: "Stakeholder / Regulator Lens Contract"
+status: ACTIVE
+
+description: >
+  Tier 0 (group a) of the Atlas Method Contract backfill strategy
+  (docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §4, methods/registry/
+  contract-backlog.yaml tier_0 entry `stakeholder.regulator`). This is a
+  literal transcription of Atlas §9's Lens Contract example (L1032-1047) --
+  the ONE real Lens instance anywhere in the corpus, and the exact evidence
+  specs/cognitive/lens.schema.yaml (Wave 3) reverse-engineered its whole
+  shape from. This file validates against `lens.schema.yaml#/lens`, not
+  `method.schema.yaml` -- a Lens (LEGO dimension C, "Perspective") is a
+  structurally different object than a Method (dimension A), even though
+  both happen to share Tier 0 backlog status.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 LEGO Contract, Lens Contract example (L1032-1047) -- every field below transcribed verbatim"
+  - "methods/registry/contract-backlog.yaml tier_0 entry for stakeholder.regulator (has_contract: true, contract_status: complete, category: lens)"
+  - "methods/registry/method-inventory.yaml stakeholder.regulator lens entry (Atlas L1036, category: lens)"
+  - "specs/cognitive/lens.schema.yaml#/lens -- the schema this file's body is validated against"
+
+decided_by: >
+  docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §4 Tier 0 group (a). No ADR
+  governs the content -- Atlas §9 gives the one complete worked example
+  lens.schema.yaml was itself built from; this is direct transcription.
+
+id: stakeholder.regulator
+version: "1.0.0"
+family: stakeholder
+type: perspective
+requires:
+  - JurisdictionContext
+output:
+  - PerspectiveAssessment
+labels:
+  evidence_backed: required
+  hypothetical_role_perspective: allowed
+  impersonation: forbidden
+
+verification:
+  method: >
+    Read Atlas §9 (L1032-1047) directly at the cited lines and transcribed
+    every field verbatim -- no field invented or inferred. Validated against
+    specs/cognitive/lens.schema.yaml#/lens with jsonschema.Draft202012Validator
+    (required [id, version, family, type, labels] present, id pattern
+    ^[a-z_]+\.[a-z_]+$ satisfied, family is a member of the 10-value
+    lens_family enum, all three labels are members of the 3-value
+    lens_label_value enum).
+  note: >
+    No mother document was modified. This file adds zero content beyond
+    Atlas §9's own literal example. `family: stakeholder` is derived from
+    the `id` prefix per lens.schema.yaml's own field convention, not a new
+    fact -- it was already implicit in the id Atlas itself wrote.
