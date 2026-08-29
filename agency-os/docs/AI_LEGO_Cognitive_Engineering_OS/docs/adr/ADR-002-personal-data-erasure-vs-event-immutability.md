@@ -1,7 +1,7 @@
 # ADR-002: Personal-Data Erasure under Event-Native Immutable Architecture
 （事件溯源不可變架構下的個資刪除機制）
 
-Status: PROPOSED
+Status: ACCEPTED（2026-08-29，操作者明示授權 Claude 行使架構師裁決權，見 ADR-001 同款範圍聲明：ADR 決策定案 ≠ 母文件已編輯，套用仍須走 ADR-006 `.ai/proposals/` 流程，該流程 APPROVED 僅操作者可推進）。Codex 對抗式覆審 NEEDS-REVISION 已修正（見下方段落）。
 Date: 2026-08-29
 
 ## Context

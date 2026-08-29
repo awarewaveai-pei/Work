@@ -1,5 +1,30 @@
 # Worklog
 
+## 2026-08-29（續11）
+
+### AI LEGO 新增 ADR-010：資料庫主機平台 + Table 命名規範定案
+
+**背景**：操作者在 Wave 2/3 建置過程中問「資料庫是否統一管理是最好的?」（指 AI LEGO 是否該跟 Lobster Factory 現有 Supabase instance 共用）。當場回答：不建議統一——ADR-003 才定案 Tenant Isolation 是系統最外層安全邊界，共用 instance 會讓 Lobster Factory 變成邊界外的特權超級租戶。操作者「接納建議」並加碼要求「table 命名要有邏輯，相同類似的可以擺在一起」。當時承諾等 Wave 2/3 告一段落後正式寫成 ADR，不只是口頭講講——本條記錄兌現。
+
+**產出**：`docs/adr/ADR-010-database-platform-and-table-naming.md`，兩個子決策：
+- **(a) 主機平台**：獨立 Supabase project（同 vendor 不同 instance），比較矩陣直接沿用 ADR-003 的 Tenant Isolation 論證延伸到「跟不相干的內部工具共用基礎設施」這個新邊界情境，而非重跑一次 ATAM。
+- **(b) Table 命名**：7 組前綴（`platform_/prov_/control_/trust_/canvas_/core_/data_`），完全從 `REPOSITORY_ARCHITECTURE.md` 既有的 Bounded Context Analysis 標註讀出，不是發明新分類——23 個 Domain Model 物件（22 個 MP 原生 + ADR-003 新增的 Tenant）逐一附 `REPOSITORY_ARCHITECTURE.md` 行號引用，23/23 全數有據可查，無一猜測。額外做了 Postgres 識別字長度（63 bytes，最長 26 bytes）與保留字碰撞檢查（零碰撞，`identities`/`policies` 兩個非保留字鄰近詞已加註但因恆帶前綴不構成實際風險）。
+
+**誠實揭露（本 ADR 的授權路徑與 ADR-001~009 不同）**：Sub-decision (a) 的原則操作者已在對話中明示接納；但 Sub-decision (b) 的完整 23 物件命名對照表是本次首次形式化產出，操作者尚未逐條過目——ADR 檔頭與 `ADR_INDEX.md` 都明確標註這個差異，不假裝操作者已經看過每一列。
+
+[已修改]
+- 新增 `docs/adr/ADR-010-database-platform-and-table-naming.md`（Status: ACCEPTED，範圍聲明見上）
+- `docs/adr/ADR_INDEX.md`：新增 ADR-010 表格列 + 依賴關係段落一條；「全部 9 份」相關的 3 處統計文字訂正為「全部 10 份」（ADR-010 未經 Codex 覆審，已註記）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`grep -rln "Supabase"` 對 `docs/architecture/` 與三母文件確認零命中（佐證這是全新決策領域，非重複定義）；`grep -rln "ADR-010"` 確認僅 2 處預期引用 | exit=0/1（grep 無命中回傳 1，符合預期）
+- REVIEW_DONE: critic=Claude 主 session 全文通讀 ADR-010（146 行）| verdict=pass | findings=0——比較矩陣每個維度都直接引用 ADR-003/009 既有論證或 `REPOSITORY_ARCHITECTURE.md`/`DATA_ARCHITECTURE_PLAN.md` 行號，未見「大概/可能」等未經佐證措辭
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=ADR-010 | hits=2（僅 ADR-010 自身與 ADR_INDEX.md 引用，無 stale 引用）
+- ORACLE_WAIVED: 基礎設施/命名決策，非治理鏈或個資機制，不需要 Codex 對抗式覆審（比照 ADR-003/005/006/009 同等風險層級的既有慣例）
+
+[剩餘風險] Sub-decision (b) 的 23 列命名對照表操作者尚未逐條確認，僅接受了「要有邏輯、同類分組」的原則要求——若操作者對特定命名有異議，屬於 Low-risk 可事後调整（ADR 本身已註明 pre-launch 可用 `ALTER TABLE ... RENAME TO` 零成本重命名）。ADR-010 依附的 `REPOSITORY_ARCHITECTURE.md` 本身仍是 `PROPOSED`，尚未 ACCEPTED。
+[rollback] `git revert` 本次 commit；純新增 1 個 ADR 檔 + `ADR_INDEX.md` 加一列的最小編輯，三母文件與其餘既有檔案零改動。
+
 ## 2026-08-29（續10）
 
 ### AI LEGO Phase 3 Wave 2-3 核心完成 — Tenant/CAS/個資加密體系 8 檔 + Cognitive Engine 核心 12 檔 + typed-objects 3 節點落地，過程中抓到並修正 1 個真實 ADR 狀態不同步 bug + 2 個 schema 內部 bug
@@ -155,6 +180,17 @@
 - REALTEST_WAIVED: DOC+SCHEMA_ONLY -- migration/down 檔已寫入 repo 但**未套用**到任何資料庫（SSH 查證僅執行唯讀 SELECT 確認 clerk_organization_mappings 現況,無寫入操作）;`tenant-guard.ts` 新函式未被任何路由呼叫,未部署,對現行 22 個消費端點零影響
 - REVIEW_DONE: critic=Deep（db-expert agent 角色等同 critic,深度覆審 8 個既有 migration 檔 + 2 個現行 code 檔）| verdict=pass-with-fixes | findings=4C/4M/5m,4 Critical 全數修正,4 Major 記錄決策（1 修正+3 記錄不修+理由）;codex-oracle 二次覆審跑中,結果另記
 - BUGHUNT_DONE: scope=agency-os,lobster-factory | grep=`user_has_org_access\|user_has_org_membership\|resolveTenant\b` | hits=多筆但全數為既有既有消費端點/既有函式定義,新增的 `0062` migration 與 `requireClientOrg()` 未出現在既有 22 個消費端點的呼叫路徑中（確認未意外改變既有行為）；grep `sg-deploy.sh` 有無寫死舊 SG/EU IP 待步驟 3-4 完成後與 nginx 改動一併驗
+
+### codex-oracle 二次覆審連續失敗，改誠實自審，額外抓到 1 個既有共用函式缺口
+
+`codex-oracle.ps1 -Mode review`（操作者明確要求的路徑）連續 2 次失敗：`codex produced no final message after 2 attempt(s) (exit=0)`，raw log 空檔（0 bytes），非本次指令參數錯誤——codex CLI 本體本輪異常，未深入 debug（不在本任務範圍）。不重試同一個失效工具，改走 Claude 自己的對抗式自審（`feedback_self_review_when_oracle_down` memory 既定規則），並在方案文件 §10 明確標記「這不是獨立第二意見」，誠實記錄可信度較低。
+
+自審抓到 db-expert 沒提到的一項：`user_has_org_membership()`（`0018:25-37`，既有共用函式）只檢查 `organization_memberships.status='active'`，**從未 join `organizations.status`**——一個已停權的客戶組織,若其 `organization_memberships` 沒同步清掉,成員仍可通過本表的 RLS。**這不是本次 migration 引入的新洞**（既有函式,理論上影響所有既有呼叫端），**故意不修**（改動共用 infra 函式超出這次「只新增不改既有合約」的邊界），記錄為已知缺口 + 未來停權 SOP 待補（停權組織須同時清 `organization_memberships.status`）。
+
+**[驗證結果]**
+- REALTEST_WAIVED: DOC_ONLY -- 自審為文字分析,無程式碼變更
+- REVIEW_DONE: critic=Quick（self-review,非外部 oracle,已誠實標記）| verdict=pass-with-known-gap | findings=1 個既有共用函式缺口（記錄不修,理由已寫入方案文件）
+- BUGHUNT_DONE: scope=lobster-factory | grep=`organizations.status\|user_has_org_membership` 交叉核對 | hits=確認 `0018:25-37` 定義處無 join `organizations` 表,缺口屬實非誤讀
 
 ## 2026-08-29（續7）
 

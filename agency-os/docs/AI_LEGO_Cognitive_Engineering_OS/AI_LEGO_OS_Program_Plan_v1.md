@@ -133,7 +133,9 @@ Source directive 中所有根路徑（`/.ai/`、`/specs/`、`/policies/`、`/met
 
 ## 7. Phase 3 — Machine-readable Foundation
 
-**Status：IN_PROGRESS（Wave 0-1 COMPLETE，2026-08-29）** | Entry：Phase 2 human review 通過，操作者「繼續」授權開工。
+**Status：IN_PROGRESS（Wave 0-3 核心完成，2026-08-29）** | Entry：Phase 2 human review 通過，操作者「繼續」+「你決定」授權開工。
+
+**Wave 2-3（核心部分完成）**：24 個新 schema/registry 檔落地（Tenant/CAS/Blast-Radius/個資加密體系 8 檔 + Cognitive Engine 核心 12 檔 + typed-objects 3 節點 + methods registry 2 檔）。明確延後項目（非遺漏，各自附理由）：`workflow/branch.schema.yaml`（BLOCKED，ADR-003 follow-up）、`domain/repository-contract.schema.yaml`（SKELETON_ONLY，待操作者法遵決策）、`domain/capability-contract.schema.yaml`／`cognitive/{method-execution-request,typed-method-result}.schema.yaml`／`execution/method-resolution.schema.yaml`（依賴 Wave 5 尚未建的 task/result schema）、`cognitive/problem-type.schema.yaml`（循環依賴 method-resolution）、`security/tenant-isolation-controls.schema.yaml`（BLOCKED_PENDING_ROUND2_ADR）、typed-objects 鏈其餘 10 個節點（依計畫指示待 Phase 5 切片方向鎖定再補）。過程中修正 1 個真實 bug（ADR-002 檔頭仍寫 PROPOSED 與 ADR_INDEX 登記的 ACCEPTED 不一致）、新增 2 個 open_questions（MRSP-8/9，見 `MACHINE_READABLE_SPEC_PLAN.md` §5）。
 
 建 `PROJECT_ROOT` 下 `/specs/{domain,cognitive,evidence,artifact,workflow,execution,decision,jurisdiction,security,analytics}/`、`/policies/{ai-execution,security,privacy,jurisdiction,provider,release}/`、`/methods/{contracts,registry}/`、`/recipes/validated/`、`/docs/{architecture,adr,runbooks}/`、`/tests/{architecture,contracts,governance}/`。Markdown = human-readable authority；YAML / JSON Schema = machine-executable contract。依 `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` §3 Wave 0-8 建置序執行。
 
