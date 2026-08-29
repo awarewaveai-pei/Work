@@ -2,6 +2,48 @@
 
 ## 2026-08-29（續3）
 
+### CP950 audit 第三 class：unencoded-raw-read（Get-Content -Raw 缺 -Encoding）永久工具化 + 23 站點修復 + 意外揪出 7b 硬閘從未真正生效
+
+**背景**：接續坑 1（`codex-oracle.ps1` CP950 encoding bug，見下方「修 codex-oracle.ps1」條）——那次是一次性手工修復；操作者要求依 `agency-os/docs/operations/BUG_HUNT_PROTOCOL.md` 9 步 Build Playbook 把這個 bug class 永久工具化，並要求「順手修 23 站點」+「codex review」。
+
+**產出**：
+1. `scripts/audit-cp950-traps.ps1` 新增第三偵測 function `Get-UnencodedRawReadFindings`（AST：`Get-Content` 含 `-Raw` 缺 `-Encoding`，含 alias `gc`/`cat`/`type` 與 module-qualified 形式）+ `-RawReadOnly` gate 開關（比照既有 `-ParseBreakOnly`，互斥）
+2. 全 repo 5 個預設掃描根（167 檔）掃出 23 個站點，逐檔讀上下文後全部加 `-Encoding UTF8` 修復，回歸 `-RawReadOnly -Quiet` 確認 0 backlog
+3. `scripts/system-health-check.ps1` 接入新硬閘（7c），**過程中發現既有 7b（CP950 parse-break，2026-05-30 上線）因 `Resolve-WorkspaceRoot` 的「monorepo guardrail」邏輯，`$root` 恆等於 `D:\Work\agency-os`（agency-os/scripts/system-health-check.ps1 這個 thin wrapper 只要存在就觸發重導向，無論從哪個入口呼叫），導致 `$cp950Gate = Join-Path $root "scripts/audit-cp950-traps.ps1"` 恆指向不存在的 `agency-os\scripts\audit-cp950-traps.ps1`，7b 從上線至今從未真正跑過（一直靜默走 Test-Path=false 的 skip 分支，Pass=$true）**。同款問題也影響 7)deploy-drift(:515) 與 9)cloudflare(:581)（同樣 `Join-Path $root` 指向只存在於monorepo-root scripts/ 的檔案）。修法：新增 `$monorepoRootForGates`（比照既有「1a2) agency-os health entrypoint」檢查已用的同一套 disambiguation 邏輯），只套用在 7b/7c（本次任務直接相關 + 修法已驗證正確）；7/9 兩處刻意只加註解標記已知缺口，不動（不同 check、需各自獨立驗證正確行為，超出本次範圍）
+4. 三份文件更新：`.claude/commands/audit-encoding.md`、`agency-os/docs/operations/AUDIT_REGISTRY.md`（新章節，23 站點逐條記錄+FP-rate 說明）、`BUG_HUNT_PROTOCOL.md`（已執行 class 表註記第三 pattern）
+5. Codex-oracle review（`-Mode review`）：3 findings 全 CONFIRMED，逐一修復：
+   - FINDING 1：`-RawReadOnly` gate mode 下 parse-break class 被跳過，若某檔案同時有語法錯誤+真實 unencoded-raw-read，會被 class 3 的「parse error → 靜默回空」邏輯放過（fail-open）。修法：改為回傳 `unencoded-raw-read-unverifiable` finding，fail-closed
+   - FINDING 2：7b/7c 在 audit-cp950-traps.ps1 遺失或 crash 時走 `Pass=$true` skip 分支——對「硬閘」而言這是靜默放行。修法：兩處 catch/else 分支改 `Add-CriticalFailure`
+   - FINDING 3：偵測邏輯只認字面 `Get-Content`，漏掉內建 alias（`gc`/`cat`/`type`）與 module-qualified 形式。修法：擴大比對集合。三個 fix 均以 synthetic 檔案 true-positive 驗證通過
+
+**意外發現的第三方問題（非本次引入，已排除）**：修復完成後跑 `system-health-check.ps1` 額外冒出 `Doc integrity failed: lobster-factory/scripts/validate-doc-integrity.mjs`（broken_link: `AI_LEGO_OS_Program_Plan_v1.md -> ../docs/adr/ADR_INDEX.md`）。查證：`git log -1` 該檔最後 commit `57f9f3f7`（2026-08-29 09:04，AI LEGO Phase 1 Gap Analysis，同日稍早的另一條 WORKLOG 條目）+ `git status` 顯示該檔**現正 dirty**（AI LEGO Phase 2 Round 1 session 進行中）——確認是同 repo 並行 session 對 AI-LEGO 文件的未完成編輯所致，與本次 CP950 改動無關，未觸碰。
+
+**未修（留給操作者決定）**：本次修復讓 7b 從「靜默永遠 skip」變成「真正會擋」，因而立刻抓到一個既有已知項目：`scripts/rebuild-content-studio-4cards.ps1:184`（TASKS.md 2026-08-25 已開，標記「小」，non-ASCII CJK UI 文字無 BOM，parse under CP950 46 errors）——同時讓 7b 與新 7c（因該檔 unverifiable）雙雙 FAIL。這是真實、正確、非本次引入的既有 bug；本次刻意不修（與 `generate-customer-delivery-status.ps1` 同一 subclass，該檔在 AUDIT_REGISTRY 已被記錄為「需要決定 BOM vs 外部化 JSON，另開任務」，未在原批准範圍內）。
+
+[已修改]
+- `scripts/audit-cp950-traps.ps1` — 新增 `Get-UnencodedRawReadFindings` + `-RawReadOnly` 開關 + fix-pattern 輸出 + docstring
+- `scripts/ao-close.ps1:881`、`scripts/ao-resume.ps1:843,993`、`scripts/bootstrap-local-wordpress-windows.ps1:112`、`scripts/check-claude-sync.ps1:237`、`scripts/check-supabase-memory-monthly.ps1:56,57`、`scripts/open-supabase-ssh-tunnel.ps1:107,129`、`scripts/ops-network-precheck.ps1:31`、`scripts/phase4-weekly-check.ps1:115`、`scripts/refresh-cf-origin-ips.ps1:46`、`scripts/system-guard.ps1:211`、`scripts/test-git-safe-ops-matrix.ps1:87,126,152,162,170,177`、`scripts/verify-build-gates.ps1:118`、`scripts/verify-shared-ai-governance.ps1:89`、`scripts/lib/git-safe-ops.ps1:325,332` — 23 站點加 `-Encoding UTF8`
+- `scripts/system-health-check.ps1` — 新增 7c 硬閘 + `$monorepoRootForGates` 修正 7b/7c 的 root 解析 + 7b/7c fail-closed 化 + 7/9 已知缺口註解
+- `.claude/commands/audit-encoding.md`、`agency-os/docs/operations/AUDIT_REGISTRY.md`、`agency-os/docs/operations/BUG_HUNT_PROTOCOL.md` — 文件同步
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts/audit-cp950-traps.ps1 -RawReadOnly -Quiet`（修復前後對照）| 修復前 exit=1 drift=23（與獨立 AST scratchpad script 交叉核對數字一致）、修復後 exit=0 drift=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts/audit-cp950-traps.ps1 -File scripts/codex-oracle.ps1 -RawReadOnly` | exit=0（已知修復過的檔案驗證不誤報）
+- REALTEST_EVIDENCE: tool=Bash | cmd=synthetic true-positive/negative（scratchpad 假檔：裸 -Raw 觸發→補 -Encoding UTF8 消失、gc alias 觸發、語法錯誤檔觸發 unverifiable）| 4 組全部符合預期
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts/lib/git-safe-ops.ps1 -SelfTest` | exit=0 | 12/12 pass（覆蓋 :325,:332 兩個修復點）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts/test-git-safe-ops-matrix.ps1` | exit=0 | 8/8 pass（覆蓋 :87,126,152,162,170,177 六個修復點）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts/system-health-check.ps1`（全量跑，含新 7c）| ms=~240000 | 修復 root 解析前 7b/7c 均靜默 skip（100%/99.7% 假綠燈）；修復後正確反映真實狀態（99%，3 failures：7b+7c 為同一既有已知項目 rebuild-content-studio-4cards.ps1、Doc integrity 為並行 session 未完成編輯，均非本次引入）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File <parse-check.ps1>`（PowerShell Parser AST）| 所有 16 個改動檔案 PARSE OK
+- REVIEW_DONE: critic=Deep（Codex CLI, `codex-oracle.ps1 -Mode review`, artifact `agency-os/reports/oracle/2026-08-29-review-380e4f06.md`）| verdict=3 findings all CONFIRMED, all fixed | findings=3c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`Get-Content.*-Raw`（全 repo，非僅 5 個預設掃描根）+ `RawReadOnly`/`monorepoRootForGates`（call site 一致性）| hits=0（全 repo grep 剩餘 3 個命中皆為 audit-cp950-traps.ps1 自身的文件字串，非真實呼叫點；RawReadOnly/monorepoRootForGates 呼叫端與文件全數同步，無 stale 引用）
+
+[剩餘風險]
+- `scripts/rebuild-content-studio-4cards.ps1:184`（既有、TASKS.md 已追蹤）目前會讓 7b/7c 雙雙 FAIL，AO-CLOSE 100% 門檻會被擋——操作者需決定是否本次一併修（BOM，小工），或先用已核准的既有流程處理
+- `scripts/check-deploy-drift.ps1`(7) 與 `scripts/check-cloudflare-security.ps1`(9) 有同款 root 解析缺口，僅加註解標記，未修——這兩個目前呈現狀態未變（原本就 silently skip，行為不變，不是新增風險，但也還沒被本次修正）
+- Doc integrity 失敗（AI-LEGO broken link）屬並行 session 進行中的編輯，預期該 session commit 完成後自行消失，非本次需處理
+
+[rollback] `git revert` 本次 commit；`audit-cp950-traps.ps1`/`system-health-check.ps1` 回上一版即恢復舊行為（7b/7c 回到靜默 skip）；23 個 `-Encoding UTF8` 移除即回原狀（fix 本身無副作用，但也無單獨拆分必要）。
+
 ### AI LEGO Phase 2 Architecture Convergence Round 1 — 6 份基礎 ADR 起草，解決全部 2 條硬性矛盾 + 6 個 open question
 
 **背景**：Phase 1 完成後操作者說「繼續」，進入 Phase 2（架構收斂，第一次做真實取捨決策而非純調查）。挑選 6 個最高槓桿問題起草 ADR：治理裁決鏈統一、GDPR 刪除權 vs 事件不可變、Tenant/CAS 矛盾、risk_tier+信任標籤統一、DB Migration Recipe、母文件修改流程+repo 佈局歸屬。全部 6 個 subagent 平行跑，各自用 Method Atlas 中**真實存在**的決策方法（MCDA/ATAM/FMEA/LINDDUN/DPIA，逐一 grep 確認 Atlas 章節後才引用，非憑外部知識代入）。
@@ -134,6 +176,19 @@
 [rollback] `git revert` 本 commit 即可；三母文件內容未動（hash 可驗），`.ai/` 為純新增目錄。
 
 ## 2026-08-29
+
+### api.aware-wave.com / oracle.aware-wave.com 從未接線（既有缺陷，非搝家造成）+ wp-admin 無限重導真根因（X-Forwarded-Proto 兩層 nginx 間被覆寫），兩顆都已修復+全面回歸測試
+
+**发現緣由**：操作者報告 api.aware-wave.com 和 aware-wave.com 首頁長得一樣、wp-admin 進不去。
+
+**坑 1：api/oracle 子網域從來沒接線**。`lobster-nginx`（`default.conf`）只有 `aware-wave.com/www`（WordPress）和 `app.aware-wave.com`（Next.js）兩個 server block，**`api.aware-wave.com` 和 `oracle.aware-wave.com` 從未寫過對應 server block**（repo git log 確認自 2026-06 初建就沒有，不是今日搝家引發）。沒匹配 server_name 的請求改到第一個 server block（WordPress）均還活，還回到 200，看起來像正常，實際上靶進錯語服務（並因 Host header 不對造成 WordPress 內部連結全部錯亂）。`node-api`（3001）與 `oracle-web`（`lobster-net` 內 3000）容器均健康只是沒接。已新增兩個專屬 server block（mirror `app.aware-wave.com` 寫法，CF-only guard + 安全標頭全保留）。
+**坑 2（真根因，影響最大）：X-Forwarded-Proto 在兩層 nginx 間被覆寫**。Host nginx（`sg-stack.aware-wave.com`，終止 TLS）正確固定設 `X-Forwarded-Proto: https`，但下一跳 `lobster-nginx`（內部只聽 80 埠，從不接觸 TLS）自己的 13 個 location 均寫 `proxy_set_header X-Forwarded-Proto $scheme;`——`$scheme` 是**這個 nginx 自己監聽器的 scheme**，永遠是 `http`，把上一跳已經正確的 `https` 覆寫掉。WordPress `wp-config.php` 的 `HTTP_X_FORWARDED_PROTO` 偵測式因此永遠失效，`is_ssl()` 永遠回 false，wp-admin 自己要強制轉 HTTPS却發現自己“已經”在 HTTPS 上（實則內部看到 http），無限重導自己。curl 實測 5 連發 `/wp-admin/` 回同一個 URL 302 確認；寫 PHP debug script直接印 `$_SERVER['HTTP_X_FORWARDED_PROTO']` 確認實際收到 `'http'`。
+**修復**：13 處 `X-Forwarded-Proto $scheme` 全改 `X-Forwarded-Proto $http_x_forwarded_proto`（傳遞上一跳已設好的值，不自己重新判斷），檔首加注釋解釋原理避免日後新增 location 重蹤。修復後 debug script 確認收到 `'https'`，wp-admin 正確導向 `wp-login.php?redirect_to=...`，瀏覽器實測登入頁正常顯示。
+**可能影響範圍**：這個 bug 自 SG 原生部署就存在（git log 確認非今日引入），可能一直靠 MainWP（非瀏覽器登入流程，走 XML-RPC/REST，不受影響）掩蓋，直到操作者今日真的試瀏覽器登入才被發現。
+
+- REALTEST_EVIDENCE: tool=curl+Bash+Chrome | cmd=12 個公開端點完整回歸掃描全正常 + PHP debug script 兩次實測確認 header 們正/修後值 + 瀏覽器真實進入 wp-login 頁面截圖確認 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Self | verdict=pass | findings=1（新增的 api/oracle block 一開始寫成 `$scheme` 會繼承同款 bug，已在 replace_all 中一併修正，未漏網）
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,lobster-factory | grep=X-Forwarded-Proto \$scheme | hits=25（**初次宣告 hits=0 是錯的，已自糾**：`lobster-phase1/nginx/default.conf` 13 處全改完 0 殘留；但 `nginx/system-sites/*.conf` + `nginx/trigger.conf` + `soulful/nginx/soulful-proxy.inc` 共 25 處命中——逐一確認這些是 2026-06/07 舊架構的歷史快照檔，**未被任何現行 nginx include，不在 ks 或任何主機實際載入**（`grep include` 全機無匹配；`aware-wave-app-api-subdomains.conf` 甚至是單跳式舊架構，被後來 `sg-stack.aware-wave.com`+`lobster-nginx` 兩跳分割設計取代），故非活性風險；但這類「長得像現行設定卻是死檔」本身就是本次事故的同一種坑，已開獨立任務評估是否該刪除或加註記 DEPRECATED，不在本次 commit 範圍內處理）
 
 ### studio.aware-wave.com 真的被 CF rate limit 訤鷸（非我測試引發，是真的規則缺口，已修）、supabase.aware-wave.com 登入框再次確認不是帳密
 
