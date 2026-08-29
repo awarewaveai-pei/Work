@@ -1,0 +1,533 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-method-result.schema.yaml"
+title: Typed Method Result
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `TypedMethodResult` — the OUTPUT
+  type of the Master Plan's core Capability Contract `cognitive.execute_method`
+  (MP §8.3, L701-729): `output: { type: [TypedMethodResult] }` (L710-712,
+  verbatim). This is a **全庫首次定義**（first-ever definition in the corpus）
+  per `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` §2.3 row for this file
+  (L122: "同上契約的輸出型別" — "the output type of the same contract [as
+  method-execution-request.schema.yaml]" — dependency `execution/result.schema.yaml`,
+  status `READY（同上）`, i.e. identical treatment to row L121's
+  method-execution-request.schema.yaml: "無既有內容可沿用，需從 MP §8.3 呼叫語境
+  反推欄位，屬新設計非修正" — no existing content to build from; fields must be
+  reverse-engineered from the MP §8.3 calling context; this is new design, not
+  a correction of an existing shape).
+
+  Fully resolves CROSS-R-3, CROSS-T-17, and DOC-master_plan-6 — all three
+  findings independently identify the SAME gap (`TypedMethodResult` named at
+  MP L712, defined in none of the three mother documents, absent from every
+  promised schema list: MP `/specs/cognitive` L766-771, Atlas Appendix A
+  L4576+, EC §92 L2768+). `execution/result.schema.yaml` (built earlier this
+  session) already PARTIALLY resolves CROSS-R-3 and explicitly named this file
+  as the one that would close it in full (see that file's own top-level
+  `description` and its `referenced_by` entry: "cognitive/typed-method-result.schema.yaml
+  (not yet built ...) — the future per-method-invocation output type that
+  will actually resolve CROSS-R-3 in full"). This file is that completion.
+  DOC-master_plan-6's verdict is `LINE_MISMATCH` (its evidence anchor L709 —
+  the `output:` line — was corrected to L708-712, the actual `type:` block);
+  the underlying claim (no schema exists for this type) was independently
+  reconfirmed CONFIRMED by all 3 CROSS-R-3 votes and CROSS-T-17's 1 vote.
+
+  Scope split from `execution/result.schema.yaml` (per that file's own
+  citation of this split): `result.schema.yaml` is the GENERIC envelope for
+  one whole Execution's final outcome (an `EX-*` run, which may invoke many
+  methods across a workflow). THIS file is the per-METHOD-INVOCATION-specific
+  counterpart — the actual typed `output` of ONE `cognitive.execute_method`
+  call, at the same grain as Atlas §16.3's `method_execution` record
+  (L3821-3857) and `execution/manifest.schema.yaml`'s `method_execution_log[]`
+  array that already embeds it. It does not re-embed fields
+  `method_execution_log[]` already fully types (timing/cost/snapshots/
+  workflow linkage) — only the fields that array leaves untyped or absent
+  (a real typed `outputs[]` payload instead of a bare hash array; an overall
+  per-invocation `status`; a denormalized `quality` echo) — see
+  `compilation_decisions` for the line-by-line boundary.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §8.3 Capability Contract (L701-729, `output: type: [TypedMethodResult]` at L710-712)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §8.4 Typed LEGO (L731-752, `execute_method(root_cause.fishbone): ProblemStatement + EvidenceSet? -> CauseHypothesisSet` worked example, L742-743 — confirms a method invocation's output is ONE typed object matching the invoked method's own `outputs[]`)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 LEGO Contract (L985-1030, `outputs`/`quality.provenance_required`/`quality.evidence_labeling_required`/`rollback.side_effect_free` fields — the SAME source cited by `cognitive/method.schema.yaml` for the identical fields, cross-checked for consistency, see compilation_decisions)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §16.3 Method Execution (L3821-3857, `execution_id`/`method_id`/`outputs.hashes`/`rollback_ref` — the per-invocation grain this file shares; already embedded untyped in manifest.schema.yaml's method_execution_log[], see compilation_decisions for the non-duplication boundary)"
+  - "specs/execution/result.schema.yaml properties/status (real hard $ref target for this file's own `status` — reused, not redeclared, per the task's explicit instruction to reference that file's vocabulary rather than status-codes.schema.yaml directly)"
+  - "specs/execution/result.schema.yaml definitions/evidence_ref (real hard $ref target for this file's optional `evidence[]`)"
+  - "specs/execution/manifest.schema.yaml properties/method_execution_log (the existing, untyped-output sibling record this file supplies the missing typed counterpart for)"
+  - "specs/cognitive/method.schema.yaml properties/id, properties/version, properties/outputs, properties/quality (real hard $refs — method.schema.yaml was built earlier this session and is not a forward/concurrent dependency)"
+  - ".ai/research/phase-0/verified-findings.yaml CROSS-R-3 (L49-75), CROSS-T-17 (L612-628), DOC-master_plan-6 (L942-957)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.3, row for typed-method-result.schema.yaml (L122)"
+
+decided_by: >
+  No ADR governs this file. `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`
+  §2.3 row L122 marks it READY with a single file dependency
+  (`execution/result.schema.yaml`) and no ADR — the same class of "genuinely
+  new, from-scratch type definition, Low-risk to compile directly" precedent
+  `typed-objects/problem-statement.schema.yaml` and
+  `typed-objects/cause-hypothesis-set.schema.yaml` already established in
+  Wave 3 for first-ever-definition files. All field-level shape choices below
+  are Phase 3 compilation decisions reverse-engineered from MP §8.3's calling
+  context plus Atlas §9/§16.3's structural precedents, not a separate ADR
+  ruling.
+
+compilation_decisions:
+
+  - question: >
+      The task instructions require `status` to be "a real $ref" to
+      `result.schema.yaml`'s status vocabulary specifically — not a fresh
+      $ref straight into `status-codes.schema.yaml#/reference_vocabulary/final_status`
+      (which `result.schema.yaml` itself already targets), and not a
+      redeclared enum. Is reusing EC §70's Final Status vocabulary (7 values:
+      PASS / PASS_WITH_APPROVED_RISK / BLOCKED / FAILED / NEEDS_HUMAN_REVIEW /
+      ROLLED_BACK / PARTIAL_SUCCESS) even the RIGHT vocabulary for a single
+      METHOD INVOCATION's outcome, given EC §70 only ever states it for a
+      whole Execution, and Atlas §16.3's own `method_execution.validation:
+      {status, score}` field is a textually DIFFERENT concept (output-quality
+      validation, not overall disposition) already embedded untyped in
+      `manifest.schema.yaml`?
+    decision: >
+      `status: { $ref: "ai-lego://specs/execution/result.schema.yaml#/properties/status" }`
+      — a one-hop reference into `result.schema.yaml`'s own `status` property
+      (which itself $refs into `status-codes.schema.yaml`), exactly as
+      instructed. Kept textually distinct from Atlas §16.3's `validation.status`:
+      that field (already in `manifest.schema.yaml`'s
+      `method_execution_log[].validation`) answers "did this invocation's
+      OUTPUT pass its own quality check", a narrower, method-specific
+      question `quality.method_specific_gate_required` (MP §8.3 L722) points
+      at; THIS file's `status` answers the broader "how did this ONE
+      invocation, as a whole, conclude" question — the same shape of
+      question `result.schema.yaml`'s `status` answers at the whole-execution
+      grain, one level up. This file does not attempt to reconcile the two,
+      it only avoids conflating them (same discipline `result.schema.yaml`
+      itself used to keep its own top-level `status` distinct from
+      `gates[].status`).
+    reasoning: >
+      The task's explicit framing ("it should reference result.schema.yaml's
+      status vocabulary (real hard $ref) but add the specific outputs
+      payload") is read as an instruction about WHICH FILE to chain through,
+      not a claim that EC §70 already states this vocabulary applies at the
+      method-invocation grain — that extension is this file's own compilation
+      decision, honestly flagged as such in `open_questions.OQ-TMR-1` rather
+      than presented as already-settled mother-document fact.
+
+  - question: >
+      What shape does `outputs[]` need, given MP §8.4's worked example shows
+      a method invocation produces exactly the typed object(s) named in the
+      invoked Method Contract's own `outputs[]` field (`method.schema.yaml`
+      types that field as `array of string` — typed-object NAMES, soft-
+      referenced to `cognitive/typed-objects/*.schema.yaml`, e.g.
+      `[CauseHypothesisSet]`), but most named output types across the corpus
+      (SWOTAnalysis, StrategyArtifact, ...) have no built typed-object schema
+      yet (only 3 exist on disk: problem-statement, cause-hypothesis-set,
+      root-cause-fact)?
+    decision: >
+      `outputs[]` items are a generic wrapper — `output_type` (string, SOFT
+      reference to `cognitive/typed-objects/*.schema.yaml` by name, MUST
+      correspond to one entry in the invoking method's own `outputs[]`, same
+      soft-reference discipline `method.schema.yaml` already uses for that
+      field) + `value` (untyped `{}` — the actual instantiated object; its
+      real shape is governed by whichever `typed-objects/<name>.schema.yaml`
+      exists for `output_type`, when one exists) + optional `hash` (REAL hard
+      $ref to `cas-path.schema.yaml#/definitions/sha256_hash`, content-
+      addressing the `value` payload, matching Atlas §16.3's own
+      `outputs.hashes` precedent already embedded in `manifest.schema.yaml`)
+      + optional per-output `provenance` (REAL hard $ref to
+      `epistemic-label.schema.yaml#/provenance_record`).
+    reasoning: >
+      A `oneOf` discriminated union across all possible output typed-objects
+      is not buildable today without fabricating schemas for types that do
+      not exist on disk (SWOTAnalysis etc.) — that would be new architecture
+      invented by this file, forbidden by R0's 補丁判準 and the "不接受可能是"
+      standard. The generic wrapper is the same technique `method.schema.yaml`
+      itself already accepted for its own `outputs`/`inputs.required`/
+      `forbidden_transition` fields (soft-reference by name, not a closed
+      union) — extending that established pattern one level down to the
+      actual VALUE, not just the type NAME, is a direct, non-inventive
+      compilation of the same gap. `hash`/`provenance` are optional, not
+      required, because not every method's `quality.provenance_required` is
+      true (see next decision) and not every output needs content-addressing
+      to be a valid result.
+
+  - question: >
+      Atlas §9's LEGO Contract example (the SAME literal source
+      `method.schema.yaml` cites for its own `quality.provenance_required`/
+      `evidence_labeling_required` fields) is the Method CONTRACT's
+      declaration of what its outputs will need. Does the Method RESULT need
+      its own copy of these two flags, or can a consumer always re-resolve
+      the invoked Method Contract to check them?
+    decision: >
+      Add `quality: { provenance_required: boolean, evidence_labeling_required: boolean }`
+      to this file too — a DENORMALIZED ECHO of the invoked method's own
+      `quality` block, not a new, independently-decided value. Same field
+      names, same two booleans, same Atlas §9 citation as
+      `method.schema.yaml`'s block.
+    reasoning: >
+      `manifest.schema.yaml` already accepted this exact pattern (echoing
+      `ai.prompt_version`/`ai.model_profile` again at
+      `method_execution_log[].prompt_version`/`.model_profile`, per that
+      file's own `migration_crosswalk` comments) for the identical reason:
+      a consumer inspecting ONE result record should not have to re-resolve
+      a separate Method Contract file just to know whether THIS invocation's
+      outputs were required to carry provenance/evidence labeling. Kept as
+      an exact-name echo (not renamed) specifically so the cross-file
+      consistency the task instructions ask for ("cross-check consistency
+      [with method.schema.yaml]") is verifiable by a straight string
+      comparison, not a semantic mapping exercise. Enforced via `constraints`
+      below (not a JSON Schema conditional): `outputs[].provenance` is
+      expected present when `quality.provenance_required == true`.
+
+  - question: >
+      Should this file re-embed Atlas §16.3's other `method_execution`
+      fields (`workflow_id`, `block_id`, `started_at`, `completed_at`,
+      `latency`, `cost`, `knowledge_snapshot`, `evidence_snapshot`,
+      `policy_version`, `jurisdiction_snapshot`, `model_profile`,
+      `prompt_version`, `compute_runtime`, `human_review`) since this file
+      operates at the IDENTICAL per-invocation grain those fields already
+      describe?
+    decision: >
+      No. `manifest.schema.yaml`'s `method_execution_log[]` array ALREADY
+      fully types every one of those fields at this exact grain (confirmed
+      by reading that file's `properties/method_execution_log/items/properties`
+      in full, L317-388). Re-embedding them here would be a pure duplicate
+      with zero new information — this file's `execution_id` (verbatim-reused
+      Atlas §16.3 field name and `^EX-` value, same join-key convention
+      `manifest.schema.yaml` itself already established for the identical
+      grain) is the JOIN KEY back to that richer record, not a competing
+      copy of it.
+    reasoning: >
+      Per R0's zero-rework principle: this file's entire reason to exist is
+      the ONE thing `manifest.schema.yaml`'s existing `method_execution_log[]`
+      leaves untyped (`outputs.hashes: array of string`, no type information,
+      exactly CROSS-R-3's complaint) or entirely absent (an overall
+      per-invocation `status`; a `quality` echo). Everything else already has
+      a canonical home; duplicating it here would create two schemas a future
+      editor could silently let drift apart, the same class of risk
+      `result.schema.yaml`'s own `open_questions.OQ-RESULT-1` already flags
+      for its relationship to `manifest.schema.yaml`'s `results{}` stub.
+
+  - question: >
+      Is a top-level `provenance` field required (universal, per
+      `epistemic-label.schema.yaml`'s own stated "every content/claim object"
+      scope) or optional (per-output only, inside each `outputs[]` item)?
+    decision: >
+      REQUIRED at the top level (mirrors `result.schema.yaml`'s own
+      unconditional requirement for the identical reason), in ADDITION to
+      the optional PER-OUTPUT `provenance` inside `outputs[]` items — the two
+      answer different questions. Top-level `provenance` says who/what is
+      asserting "this invocation concluded with THIS status" (an epistemic
+      claim about the result object itself). Per-output `provenance` says
+      who/what is asserting "THIS specific output value is
+      evidence-backed/hypothesis/etc." (a claim about one output's content,
+      only meaningful when `quality.provenance_required` singles that output
+      out).
+    reasoning: >
+      A `TypedMethodResult` is itself exactly the class of object
+      `epistemic-label.schema.yaml`'s universal mandate targets (a claim: "
+      this method invocation is done, and its disposition is X") — the same
+      reasoning `result.schema.yaml` already applied to make ITS `provenance`
+      required. Making it optional here while `result.schema.yaml` requires
+      it at the coarser grain would be an unexplained asymmetry between two
+      files answering structurally the same kind of question at two grains.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+definitions:
+
+  typed_output:
+    description: >
+      One output value this method invocation produced, wrapping the actual
+      typed-object instance named by the invoking Method Contract's own
+      `outputs[]` list (`cognitive/method.schema.yaml#/properties/outputs`).
+      See compilation_decisions above for why this remains a generic wrapper
+      rather than a closed `oneOf` union across typed-objects/*.schema.yaml.
+    type: object
+    required: [output_type, value]
+    properties:
+      output_type:
+        type: string
+        description: >
+          SOFT reference to `cognitive/typed-objects/*.schema.yaml` by name
+          (e.g. `CauseHypothesisSet`) — MUST equal one entry of the invoking
+          method's own `outputs[]` array. Not a hard `$ref`/enum: most named
+          output types across the corpus have no built typed-object schema
+          yet (only `ProblemStatement`, `CauseHypothesisSet`, `RootCauseFact`
+          exist on disk as of this Wave), and `method.schema.yaml` itself
+          keeps its own `outputs[]` field soft-typed for the identical
+          reason.
+        examples: ["CauseHypothesisSet"]
+      value:
+        description: >
+          The actual instantiated object. Untyped (`{}`) here — its real
+          shape is governed by whichever `cognitive/typed-objects/<output_type>.schema.yaml`
+          exists. When no such schema exists yet (the common case today),
+          this remains an opaque, implementation-defined object; this file
+          does not fabricate a shape for it.
+        type: object
+      hash:
+        $ref: "ai-lego://specs/artifact/cas-path.schema.yaml#/definitions/sha256_hash"
+        description: >
+          OPTIONAL. Content-addresses `value`, matching Atlas §16.3's own
+          `outputs.hashes` precedent (already embedded, untyped, in
+          `manifest.schema.yaml`'s `method_execution_log[].outputs.hashes`).
+          Real hard $ref: cas-path.schema.yaml already exists on disk.
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+        description: >
+          OPTIONAL per-output provenance. Expected present when this file's
+          top-level `quality.provenance_required == true` (see `constraints`
+          below) — real hard $ref: epistemic-label.schema.yaml already
+          exists on disk.
+
+type: object
+required: [execution_id, method_id, method_version, status, evaluated_at, provenance]
+properties:
+
+  execution_id:
+    type: string
+    pattern: "^EX-"
+    description: >
+      JOIN KEY back to `manifest.schema.yaml`'s
+      `method_execution_log[].execution_id` for the SAME method invocation —
+      same field name and same `EX-` value, reused verbatim (not reinvented),
+      per Atlas §16.3's own literal field name at this exact grain. NOT the
+      same value as `result.schema.yaml`'s top-level `execution_id` (the
+      WHOLE-run id) unless this is the only method invocation in a
+      single-method execution — same finer-grain-vs-coarser-grain
+      relationship `manifest.schema.yaml` itself already documented between
+      its own `execution.execution_id` and `method_execution_log[].execution_id`
+      fields (see that file's comment, L330-341).
+
+  task_id:
+    type: string
+    pattern: "^TASK-"
+    description: "OPTIONAL. Soft reference by convention to manifest.schema.yaml's execution.task_id, for direct filtering without dereferencing execution_id first."
+
+  method_id:
+    $ref: "ai-lego://specs/cognitive/method.schema.yaml#/properties/id"
+    description: >
+      Real hard $ref: method.schema.yaml already exists on disk (built
+      earlier this session, not a concurrent-Wave dependency). Reuses that
+      file's `id` grammar (ADR-005b bare `<family>.<name>`) rather than
+      re-declaring the pattern here.
+
+  method_version:
+    $ref: "ai-lego://specs/cognitive/method.schema.yaml#/properties/version"
+    description: "Real hard $ref, same reasoning as method_id above — which VERSION of that method contract produced this result."
+
+  status:
+    $ref: "ai-lego://specs/execution/result.schema.yaml#/properties/status"
+    description: >
+      Real hard $ref into result.schema.yaml's own `status` property (which
+      itself $refs into status-codes.schema.yaml's EC §70 Final Status
+      vocabulary) — per the task's explicit instruction to reference that
+      file's vocabulary rather than re-deriving a fresh path to
+      status-codes.schema.yaml or redeclaring the enum. See
+      compilation_decisions and `open_questions.OQ-TMR-1` for the honest
+      caveat that EC §70 itself only ever states this vocabulary for a whole
+      Execution, not explicitly for one method invocation.
+
+  evaluated_at:
+    type: string
+    format: date-time
+    description: "When this invocation's status was determined. Mirrors result.schema.yaml's evaluated_at at the coarser grain."
+
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+    description: >
+      Real hard $ref: epistemic-label.schema.yaml already exists on disk.
+      REQUIRED — see compilation_decisions for why this file does not treat
+      itself as exempt from epistemic-label's universal "every content/claim
+      object" mandate, the same reasoning result.schema.yaml already applied
+      at the whole-execution grain.
+
+  quality:
+    type: object
+    description: >
+      Denormalized echo of the invoking method's own Atlas §9 `quality`
+      block (`cognitive/method.schema.yaml#/properties/quality`) — same two
+      booleans, same source citation, kept as an inline copy rather than a
+      $ref so a consumer reading one TypedMethodResult does not need to
+      re-resolve the Method Contract to know what was required of THIS
+      invocation's outputs. See compilation_decisions.
+    properties:
+      provenance_required:
+        type: boolean
+        default: false
+        description: "Echoed from the invoking method.schema.yaml#/properties/quality/properties/provenance_required."
+      evidence_labeling_required:
+        type: boolean
+        default: false
+        description: "Echoed from the invoking method.schema.yaml#/properties/quality/properties/evidence_labeling_required."
+
+  outputs:
+    type: array
+    items: { $ref: "#/definitions/typed_output" }
+    description: >
+      The typed result payload proper — this is the field CROSS-R-3/
+      CROSS-T-17/DOC-master_plan-6 all complained had nowhere to live. No
+      `minItems`: a FAILED/BLOCKED invocation may legitimately produce zero
+      outputs (see `constraints` below for the expected non-empty case).
+
+  evidence:
+    type: array
+    items: { $ref: "ai-lego://specs/execution/result.schema.yaml#/definitions/evidence_ref" }
+    description: >
+      OPTIONAL. Real hard $ref into result.schema.yaml's evidence_ref shape
+      (EC §65 content-addressed evidence, reused not redeclared) — why this
+      invocation's status/outputs are what they are, at the per-invocation
+      grain, distinct from result.schema.yaml's own whole-execution
+      evidence[].
+
+  rollback_ref:
+    type: [string, "null"]
+    default: null
+    description: >
+      OPTIONAL. Atlas §16.3's own `method_execution.rollback_ref` field
+      (L3857), already embedded verbatim in manifest.schema.yaml's
+      `method_execution_log[].rollback_ref` — repeated here as a convenience
+      join, soft reference by convention to `rollback.schema.yaml#/properties/plan_id`
+      (`^RB-` pattern), matching that file's own established soft-reference
+      convention for the identical field.
+
+constraints:
+  description: >
+    Cross-field rules this schema's JSON-Schema `properties` block cannot
+    express structurally, recorded as prose per this project's established
+    convention (e.g. epistemic-label.schema.yaml's `locked` constraints,
+    result.schema.yaml's own `constraints` block).
+  rules:
+    - "outputs[].provenance SHOULD be present on every entry when quality.provenance_required == true (Atlas §9 L1016 / method.schema.yaml#/properties/quality/properties/provenance_required, echoed above)."
+    - "outputs[] SHOULD be non-empty when status resolves to one of PASS / PASS_WITH_APPROVED_RISK / PARTIAL_SUCCESS (a successful-in-some-degree invocation is expected to have produced at least the outputs its Method Contract declares); MAY be empty for BLOCKED / FAILED."
+    - "outputs[].output_type MUST equal one entry of the invoking method's own outputs[] array (cognitive/method.schema.yaml#/properties/outputs) — this file does not mechanically enforce that cross-file match, it documents the expectation (same limitation class this project's other cross-file $ref-by-convention fields already accept, e.g. section-registry.schema.yaml's document_sha256 cross-check)."
+
+open_questions:
+  - id: "OQ-TMR-1"
+    question: >
+      EC §70's Final Status vocabulary (reused here via result.schema.yaml)
+      is textually stated only for a whole Execution (EC §70, L2297-2318).
+      This file extends its use one grain finer, to a single method
+      invocation. No mother document explicitly confirms or denies that
+      extension is intended — it is this file's own compilation choice,
+      made because MP §8.3 requires `cognitive.execute_method` to return
+      SOME typed disposition and no narrower vocabulary exists anywhere in
+      the corpus for exactly this grain (Atlas §16.3's `validation.status`
+      answers a different, narrower question — see compilation_decisions).
+    owner: "operator / future Round 2 ADR"
+    blocks: "nothing in this schema — the $ref target (result.schema.yaml's own status property) remains valid regardless of how this question resolves"
+  - id: "OQ-TMR-2"
+    question: >
+      Should `manifest.schema.yaml`'s `method_execution_log[].outputs.hashes`
+      (currently a bare array of strings) eventually become a real $ref into
+      this file's `outputs[]` shape, so a single method invocation's result
+      is recorded in exactly one canonical place instead of two overlapping
+      ones (a typed TypedMethodResult here, and a parallel untyped hash list
+      there)? Same class of follow-up as result.schema.yaml's own
+      `open_questions.OQ-RESULT-1` for its relationship to
+      `manifest.schema.yaml`'s `results{}` stub.
+    owner: "operator / future Phase 3 session"
+    blocks: "nothing in this file — the upgrade is entirely inside manifest.schema.yaml, an already-committed Wave 1 file out of this task's boundary"
+  - id: "OQ-TMR-3"
+    question: >
+      Should `output_type` eventually become a real `$ref` into a closed
+      enum once every named output type across the corpus (SWOTAnalysis,
+      StrategyArtifact, ...) has a built `typed-objects/*.schema.yaml`? Left
+      open — today only 3 of the many named output types have schemas.
+    owner: "operator, incrementally as typed-objects/*.schema.yaml files are built"
+    blocks: "nothing today — output_type stays a soft-referenced string either way"
+  - id: "OQ-TMR-4"
+    question: >
+      `cognitive/method-execution-request.schema.yaml` (this file's INPUT-side
+      sibling under the same `cognitive.execute_method` Capability Contract,
+      built earlier in this same Wave) left its own request-level
+      `provenance` field OPTIONAL and explicitly deferred the question of
+      whether that should change to `open_questions.OQ-mer-4`: "once
+      `cognitive/typed-method-result.schema.yaml` ... settles how the OUTPUT
+      side actually satisfies [MP §8.3's unconditional `quality.provenance_required:
+      true`] mandate, should this REQUEST-side field be revisited?" This file
+      settles the output side by making top-level `provenance` REQUIRED
+      unconditionally (see compilation_decisions) — but does not itself
+      reach back to answer OQ-mer-4's conditional-required proposal for the
+      REQUEST side (e.g. requiring request-side provenance only when the
+      target method's `risk_tier` is R3/R4). Editing
+      `method-execution-request.schema.yaml` is outside this task's
+      file-creation boundary (create exactly 2 new files); this entry
+      exists so OQ-mer-4 is not left dangling without a pointer to where its
+      precondition was in fact resolved.
+    owner: "operator / future Phase 3 session revisiting method-execution-request.schema.yaml"
+    blocks: "nothing in this schema — the answer lives entirely inside method-execution-request.schema.yaml, an already-committed-this-Wave sibling file out of this task's boundary"
+
+# ---------------------------------------------------------------------------
+# Worked example (illustrative — `value` is a non-exhaustive subset of a real
+# CauseHypothesisSet instance, marked as such; not claimed to be a byte-exact
+# fixture against typed-objects/cause-hypothesis-set.schema.yaml)
+# ---------------------------------------------------------------------------
+examples:
+  - description: >
+      A successful `execute_method(root_cause.fishbone)` invocation (MP §8.4
+      L742-743 worked example) producing one CauseHypothesisSet.
+    value:
+      execution_id: "EX-2026-08-29-000042"
+      task_id: "TASK-2026-000001"
+      method_id: "root_cause.fishbone"
+      method_version: "1.0.0"
+      status: "PASS"
+      evaluated_at: "2026-08-29T15:20:00Z"
+      provenance:
+        epistemic_type: "HYPOTHESIS"
+        authorship_state: "AI_DRAFTED"
+      quality:
+        provenance_required: true
+        evidence_labeling_required: true
+      outputs:
+        - output_type: "CauseHypothesisSet"
+          value:
+            id: "CHS-2026-08-29-000007"
+            version: "1.0.0"
+            problem_statement_ref: "PROB-2026-08-29-000003"
+            note: "ILLUSTRATIVE SUBSET ONLY — not a full, schema-validated CauseHypothesisSet instance."
+          hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b85"
+      rollback_ref: null
+
+verification:
+  method: >
+    Read MP §8.3 (L701-729) and §8.4 (L731-752) in full; Atlas §9 (L985-1030)
+    and §16.3 (L3821-3857) in full; `.ai/research/phase-0/verified-findings.yaml`
+    CROSS-R-3 (L49-75), CROSS-T-17 (L612-628), DOC-master_plan-6 (L942-957)
+    full entries; `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` §2.3 row
+    for this file (L122) and its sibling row L121
+    (method-execution-request.schema.yaml, same READY/new-design treatment);
+    `specs/execution/result.schema.yaml` read in full (status $ref target,
+    evidence_ref definition, top-level required/provenance precedent);
+    `specs/execution/manifest.schema.yaml`'s `method_execution_log[]` block
+    read in full (L317-388, the non-duplication boundary); `specs/cognitive/method.schema.yaml`
+    read in full (id/version/outputs/quality real hard $ref targets);
+    `specs/execution/status-codes.schema.yaml`'s `reference_vocabulary.final_status`
+    (L76-78, the ultimate vocabulary this file's status $ref chain resolves
+    to); `specs/artifact/cas-path.schema.yaml` and
+    `specs/governance/epistemic-label.schema.yaml` read in full before writing
+    any $ref into them; `git log --oneline -15` against this project directory
+    (no prior commit touches typed-method-result.schema.yaml, confirmed no
+    rework).
+  note: >
+    No mother document, ADR, or sibling spec file was modified to produce
+    this file. Ratio honesty (per house convention, e.g.
+    normative-context.schema.yaml's own disclosure): the field's EXISTENCE
+    (MP L708-712), its role as `cognitive.execute_method`'s output type, and
+    the CONCEPTS this file types (`outputs`/`quality`/`rollback_ref` all
+    textually anchored in Atlas §9/§16.3; `status` anchored via
+    result.schema.yaml's own already-established $ref chain) are cited
+    directly from mother-document text — a materially higher grounded
+    fraction than a from-scratch gap like CROSS-T-18, because Atlas §9 gives
+    an actual worked YAML contract to reverse-engineer the sibling shape
+    from, not a purpose-only prose sentence. What IS new design: the exact
+    `typed_output` wrapper (output_type/value/hash/provenance), the decision
+    to chain `status` through result.schema.yaml rather than
+    status-codes.schema.yaml directly, the `quality` echo mechanism, and the
+    scope boundary excluding Atlas §16.3 fields `manifest.schema.yaml`
+    already owns. Roughly: ~35% grounded (which concepts belong on this
+    type, and their exact source citations) / ~65% new design (the concrete
+    JSON shape connecting them) — see `compilation_decisions` for the
+    reasoning behind each invented piece.

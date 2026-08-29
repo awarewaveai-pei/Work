@@ -1,0 +1,290 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/execution/gate.schema.yaml"
+title: Gate Result
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Structural (field-shape) definition of a Gate Execution Result record —
+  EC §69 "Gate Result" (L2282-2293): what one gate's execution outcome looks
+  like (which gate ran, when, PASS/FAIL/BLOCKED/NOT_APPLICABLE, what
+  evidence backs the verdict, who/what validated it). Per
+  MACHINE_READABLE_SPEC_PLAN.md §2.2 row 102, this file is
+  BLOCKED_PENDING_ROUND2_ADR for ONE field only — `gate_id` — because the
+  Global/High-risk Gate LIST itself is disputed across three mother-document
+  copies with different item counts: Master Plan §158 (L5903-5926) lists 11
+  Global items + 1 high-risk add-on ("Human Specialist Review PASS" only);
+  Method Atlas §22.1/22.2 (L4164-4194) lists 14 Global items + 6 high-risk
+  add-ons; Execution Contract §68 (L2246-2278) copies Atlas's 14+6 counts but
+  with gate-NAME drift ("Independent Review" vs Atlas's "Independent Judge
+  PASS"; "Human Specialist" vs "Human Specialist Review PASS"; "Recovery
+  Rehearsal" vs "Recovery / Rollback Rehearsal PASS"). This is findings
+  CROSS-R-5 / CROSS-R-7 / CROSS-T-11, tracked as open question OQ-10
+  (.ai/research/phase-0/open-questions.yaml L68-72, status
+  REQUIRES_HUMAN_DECISION, deadline "Phase 2 (ADR)").
+
+  This file does NOT pick a side in that dispute, does NOT merge/union the
+  three lists, and does NOT invent a 4th list. `gate_id` is typed as a bare,
+  unconstrained string carrying an explicit `TBD_PENDING_ROUND2_ADR` marker
+  rather than an enum — the exact precedent already set, before this file
+  existed, by `execution/manifest.schema.yaml`'s `results.gates` field
+  (L303-315) and `cognitive/recipe.schema.yaml`'s `steps[].gate_ref` field
+  (L149-165, L333-342), both of which left gate references untyped for this
+  identical reason and both of which already cite this file by name as the
+  future home of that decision. Everything else in `gate_result` (status,
+  evidence, validator, timestamp, the NOT_APPLICABLE-requires-rationale
+  rule) is a direct, low-risk transcription of EC §69 and is fully
+  buildable today.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §69 Gate Result (L2282-2293) — the gate_result record shape, verbatim"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §68 Global Gates (L2246-2278) — cited for CONTEXT/DISPUTE RECORD only; its 14+6 list is NOT adopted as canonical by this file"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §22.1/§22.2 Global Gate / High-risk Gate (L4164-4194) — cited for CONTEXT/DISPUTE RECORD only; its 14+6 list is NOT adopted as canonical by this file"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §158 Global Definition of Done (L5903-5926) — cited for CONTEXT/DISPUTE RECORD only; its 11+1 list is NOT adopted as canonical by this file"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §14.2 Mandatory Gate Injection (L3588-3612) — the trigger mechanism this file's records are expected to be produced by, per execution/risk-tier.schema.yaml"
+  - "execution/risk-tier.schema.yaml mandatory_gate_injection_trigger + tiers.R3.gate_injection + tiers.R4.gate_injection — the R3∪R4 condition under which gate_result records are expected to be emitted"
+  - ".ai/research/phase-0/open-questions.yaml OQ-10 (L68-72) — the unresolved ownership question this file's gate_id field defers to"
+  - ".ai/research/phase-0/verified-findings.yaml CROSS-R-5 (L98-116), CROSS-R-7 (L398-421), CROSS-T-11 (L495-517) — the three-way count/name dispute, independently confirmed 2-3x each"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2 row 102 (L102) and §4 (L246) — this file's tracked status and explicit instruction to build the skeleton now with gate_id left TBD_PENDING_ROUND2"
+  - "execution/manifest.schema.yaml results.gates (L303-315) and cognitive/recipe.schema.yaml steps[].gate_ref (L149-165, L333-342) — existing forward dependents already waiting on this file, whose own untyped-string precedent this file follows"
+
+decided_by: >
+  No ADR governs this file. OQ-10 remains REQUIRES_HUMAN_DECISION with
+  deadline "Phase 2 (ADR)" (.ai/research/phase-0/open-questions.yaml L68-72)
+  — verified by grep across docs/adr/ADR-001~010: none rules on the
+  Global/High-risk Gate list. MACHINE_READABLE_SPEC_PLAN.md itself
+  prescribes exactly what this file may and may not do while that ADR is
+  pending (§4 L246: "可以先建這兩檔的骨架（欄位結構）、gate_id enum 留
+  TBD_PENDING_ROUND2，不阻塞其餘 30+ 個檔案的建置" — "the skeleton/field
+  structure of these two files may be built now, with the gate_id enum left
+  as TBD_PENDING_ROUND2, without blocking the other 30+ files"). This file
+  follows that instruction exactly: the `gate_result` record SHAPE (gate_id,
+  status, evidence, validator, timestamp, rationale) is decided here as a
+  direct, low-risk transcription of EC §69 — the same class of Low-risk
+  compilation MACHINE_READABLE_SPEC_PLAN.md's precedent describes for
+  uncontested single-source structural definitions. The gate_id VALUE SPACE
+  (which strings are legal) is explicitly NOT decided here and awaits Round
+  2 ADR resolution of OQ-10.
+
+compilation_decisions:
+  - question: >
+      Given `gate_id` cannot be enumerated yet, should this file instead
+      model a coarser discriminator now — e.g. a `category` field
+      distinguishing "global" vs "high-risk-addon" vs "method-specific" gate
+      results — since EC §68 and Atlas §22 both preserve that three-way
+      split even though their item lists disagree?
+    decision: >
+      Do not add a category discriminator. Keep `gate_result` flat, matching
+      EC §69's own worked example exactly (gate_id/status/evidence/
+      validator/timestamp only — no category key).
+    reasoning: >
+      Even the CATEGORY BOUNDARY itself is part of the unresolved dispute,
+      not just the item lists within each category: MP §158 (L5903-5926)
+      only distinguishes "全部" (all 11) vs "高風險另加" (+1), while Atlas
+      §22.1 vs §22.2 vs §22.3 draws a three-way line (Global / High-risk /
+      Method-specific) that EC §68 mirrors but MP does not. Adding a
+      `category` enum now would silently pre-empt part of OQ-10's answer
+      (whether the future canonical list even keeps a two-way or three-way
+      split) under the guise of "just a structural field" — exactly the
+      kind of quiet scope-creep R0 forbids for a file whose own plan entry
+      says not to pick a side. EC §68's own closing line — "Method-specific
+      gate 從 Method Atlas 取得" (L2278) — is preserved instead as informational
+      context in `gate_id_registry` below, not modeled as a schema field.
+  - question: >
+      `evidence` in EC §69's worked example is a bare `[...]` with no
+      element shape given. Should this file define a typed evidence-item
+      object (mirroring how EC §65 Content-addressed Evidence, L2185-2194,
+      defines hash/source/timestamp/producer for a different evidence
+      concept) rather than leaving it fully untyped?
+    decision: "Leave `evidence` untyped (`items: {}`) — do not borrow EC §65's shape."
+    reasoning: >
+      EC §69 does not cross-reference §65, and nothing in either section
+      states that a gate's evidence array uses the Content-addressed
+      Evidence shape — that would be an inference by analogy, not a
+      transcription, and this file's job per the plan is narrowly "build the
+      record shape EC §69 actually gives", not "design a fuller evidence
+      contract EC never specified". Flagged in `open_questions` (OQ-GATE-2)
+      as a plausible future improvement rather than decided silently here.
+
+# ---------------------------------------------------------------------------
+# The gate_result record shape (GROUNDED — verbatim from EC §69, NOT
+# blocked). Only the gate_id VALUE SPACE below is blocked, not this shape.
+# ---------------------------------------------------------------------------
+gate_result:
+  type: object
+  description: "One gate's execution outcome. Field set verbatim from EC §69 (L2285-2290)."
+  required: [gate_id, status]
+  properties:
+    gate_id:
+      type: string
+      description: >
+        TBD_PENDING_ROUND2_ADR. Placeholder identifier for the gate that
+        ran. Deliberately NOT constrained to an enum and NOT populated with
+        any of the three disputed candidate lists — see `description`,
+        `decided_by`, and `gate_id_registry` below. Once Round 2 ADR settles
+        OQ-10, this field is expected to gain a strict `enum` (or a $ref to
+        a separate policies/ai-execution/mandatory-gates.yaml registry — see
+        open_questions.OQ-GATE-1) referencing the single winning gate-id
+        list, with the CROSS-T-11 naming drift also resolved to one form.
+        Until then, any real gate_id value emitted by an implementation is
+        provisional.
+      examples:
+        - "security"
+      x-status: TBD_PENDING_ROUND2_ADR
+    status:
+      type: string
+      enum: [PASS, FAIL, BLOCKED, NOT_APPLICABLE]
+      description: "Verbatim EC §69 enum (L2287)."
+    evidence:
+      type: array
+      items: {}
+      description: >
+        Verbatim EC §69 `evidence: [...]` field (L2288). Left untyped —
+        EC §69 gives no further structure for an evidence item at this
+        location. See compilation_decisions above for why EC §65's
+        Content-addressed Evidence shape was NOT borrowed here.
+    validator:
+      type: string
+      description: >
+        Verbatim EC §69 `validator: ...` field (L2289). Free-text identifier
+        of who or what validated the gate (human reviewer id, CI job id,
+        automated checker name). No further typing given by EC.
+    timestamp:
+      type: string
+      format: date-time
+      description: "Verbatim EC §69 `timestamp: ...` field (L2290)."
+    rationale:
+      type: string
+      description: >
+        REQUIRED when status == NOT_APPLICABLE (EC §69 L2293:
+        "NOT_APPLICABLE 必須有 rationale" — "NOT_APPLICABLE must carry a
+        rationale"). See `constraints` below.
+  constraints:
+    - "status == NOT_APPLICABLE requires `rationale` to be present and non-empty (EC §69 L2293)."
+
+# ---------------------------------------------------------------------------
+# The trigger mechanism gate_result records are expected to be produced by.
+# This file only supplies the RECORD SHAPE the trigger fires into — it does
+# not itself define or count which/how many gates fire (see registry below).
+# ---------------------------------------------------------------------------
+trigger_context:
+  description: >
+    A gate_result record is expected whenever
+    execution/risk-tier.schema.yaml's `mandatory_gate_injection_trigger`
+    fires (condition: `risk_tier IN [R3, R4]`, per ADR-004 — R3's
+    `gate_injection.triggers_mandatory_gates` and R4's identical flag). Per
+    ADR-004's own reasoning (risk-tier.schema.yaml tiers.R3.gate_injection.
+    description), this UNIONS Atlas §14.2's originally R4-only trigger onto
+    R3 as well, so R3-tier operations (DB migration, Identity/Authorization
+    changes) do not skip the same protections.
+  source: "execution/risk-tier.schema.yaml#/mandatory_gate_injection_trigger, #/tiers/R3/gate_injection, #/tiers/R4/gate_injection"
+  produces: "zero or more gate_result records, one per gate that fires — the COUNT and IDENTITY of which gates fire is exactly what gate_id_registry below is blocked on"
+
+# ---------------------------------------------------------------------------
+# BLOCKED — the gate_id VALUE SPACE itself. Recorded here for auditability,
+# not adjudicated. Do not treat any list below as authoritative.
+# ---------------------------------------------------------------------------
+gate_id_registry:
+  status: TBD_PENDING_ROUND2_ADR
+  blocked_by: "OQ-10 (.ai/research/phase-0/open-questions.yaml L68-72); findings CROSS-R-5, CROSS-R-7, CROSS-T-11"
+  this_file_does: >
+    Defines the gate_result RECORD SHAPE only (what a gate outcome looks
+    like once you already have a gate_id). Does not enumerate or adjudicate
+    the legal gate_id values.
+  this_file_does_not: >
+    Does not pick Master Plan, Method Atlas, or Execution Contract's list as
+    canonical. Does not merge/union them into a superset. Does not invent a
+    4th list. Deciding the list is policies/ai-execution/mandatory-gates.yaml's
+    job (Wave 6), itself gated on Round 2 ADR per
+    MACHINE_READABLE_SPEC_PLAN.md §2.9 (release/ dir) and §4 (L246).
+  disputed_candidates:
+    - source: "Master Plan §158 Global Definition of Done (L5903-5926)"
+      global_gate_count: 11
+      high_risk_addon_count: 1
+      high_risk_addon: ["Human Specialist Review PASS"]
+    - source: "Method Atlas §22.1/§22.2 Global Gate / High-risk Gate (L4164-4194)"
+      global_gate_count: 14
+      global_extra_vs_mp: ["Evidence PASS", "Reasoning PASS", "Capacity PASS"]
+      high_risk_addon_count: 6
+      high_risk_addon:
+        - "Human Specialist Review PASS"
+        - "Counterevidence PASS"
+        - "Red Team PASS"
+        - "Independent Judge PASS"
+        - "Reversal Criteria PASS"
+        - "Recovery / Rollback Rehearsal PASS"
+    - source: "Execution Contract §68 Global Gates (L2246-2278)"
+      global_gate_count: 14
+      high_risk_addon_count: 6
+      note: >
+        Same counts as Atlas (both 14+6) but with gate-NAME drift
+        (CROSS-T-11, EC L2270-2275 vs Atlas L4188-4193): "Independent
+        Review" vs Atlas's "Independent Judge PASS"; "Human Specialist" vs
+        "Human Specialist Review PASS"; "Recovery Rehearsal" vs "Recovery /
+        Rollback Rehearsal PASS". EC also prefixes its whole list with
+        "可能包含" ("may include"), softer phrasing than Atlas's/MP's 必須/
+        要求, per CROSS-T-11's own caveat.
+    - source: "Method Atlas §22.3 Method-specific Gate Table"
+      note: >
+        A DIFFERENT, third category ("Method-specific gate 從 Method Atlas
+        取得" — EC §68 L2278) not counted above. Not itself part of the
+        Global/High-risk dispute, but its relationship to gate_id (same
+        namespace? separate registry?) is likewise undecided — see
+        open_questions.OQ-GATE-3.
+
+open_questions:
+  - id: "OQ-GATE-1"
+    question: >
+      Once Round 2 ADR resolves OQ-10 (the gate list and its naming drift),
+      should `gate_result.gate_id` become a strict inline `enum:` in this
+      file, or should it instead stay `type: string` validated against a
+      separately-maintained registry (e.g. a $ref into
+      policies/ai-execution/mandatory-gates.yaml, once that file exists)?
+      This is a schema-design choice, not yet made, independent of what the
+      list's CONTENTS turn out to be.
+    owner: "Phase 3 continuation, after Round 2 ADR lands"
+    blocks: "nothing today — gate_id stays a bare string either way until the ADR lands"
+  - id: "OQ-GATE-2"
+    question: >
+      Should `gate_result.evidence[]` eventually adopt a typed shape (e.g.
+      matching EC §65 Content-addressed Evidence's hash/source/timestamp/
+      producer fields, L2185-2194) for consistency with how other execution
+      records represent evidence, or is a fully free-form array intentional
+      here? See compilation_decisions above — left open, not decided, since
+      EC §69 itself gives no such structure.
+    owner: "operator or future Phase 3/4 compilation pass"
+    blocks: "nothing — `evidence: []` validates any array today"
+  - id: "OQ-GATE-3"
+    question: >
+      EC §68's closing line (L2278: "Method-specific gate 從 Method Atlas
+      取得") names a THIRD gate category distinct from Global/High-risk, but
+      neither EC nor Atlas states whether a method-specific gate's execution
+      outcome uses this SAME `gate_result` shape, or a separate one Method
+      Atlas defines for itself. This file assumes (but does not confirm) the
+      same shape applies by default, since EC §69 is presented as the sole
+      Gate Result definition in the corpus and no alternate shape exists
+      anywhere to point to instead.
+    owner: "operator or Round 2 ADR (may be resolved alongside OQ-10 since both concern the same §68/§22 gate taxonomy)"
+    blocks: "nothing structurally — if a different shape is later required for method-specific gates, it would be a new sibling schema, not a breaking change to this one"
+
+verification:
+  method: >
+    Read EC §68-69 (L2246-2293) in full at the cited lines. Read Atlas
+    §22.1/§22.2 (L4164-4194) and §14.2 (L3588-3612). Read Master Plan §158
+    (L5903-5926). Read .ai/research/phase-0/open-questions.yaml OQ-10
+    (L68-72) and .ai/research/phase-0/verified-findings.yaml CROSS-R-5
+    (L98-116), CROSS-R-7 (L398-421), CROSS-T-11 (L495-517) verbatim. Grepped
+    docs/adr/ for any ruling on the gate list (none found across
+    ADR-001~010). Read this project's own existing precedent in
+    execution/manifest.schema.yaml (L303-315) and cognitive/recipe.schema.yaml
+    (L149-165, L333-342) confirming gate_id/gate_ref were already left
+    untyped elsewhere, and that both already name this file as the future
+    resolution point.
+  note: >
+    No mother document was modified. `gate_id` deliberately carries no enum
+    and no guessed list — MRSP-1/OQ-10 remains open pending Round 2 ADR;
+    this file does not pick a side among the MP (11+1) / Atlas (14+6) / EC
+    (14+6, name-drifted) candidates, nor does it merge them. This file's
+    normative content is limited to the `gate_result` RECORD SHAPE (gate_id,
+    status, evidence, validator, timestamp, rationale-if-NOT_APPLICABLE),
+    which is a direct, low-risk transcription of EC §69.

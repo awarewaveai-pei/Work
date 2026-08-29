@@ -275,21 +275,25 @@ properties:
           flattened to an unlabeled fact.
 
   contract_provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
     description: >
       OPTIONAL. Answers "who authored/approved THIS method CONTRACT
       definition" (e.g. was this contract itself AI-drafted and still
       `contract_status: pending` review, or human-approved) — a distinct
       question from `quality.provenance_required` above, which governs the
       method's runtime OUTPUTS, not the contract document itself. See
-      `compilation_decisions` above for why these are kept separate. Same
-      shape as `governance/epistemic-label.schema.yaml#/provenance_record`
-      (soft reference, not a hard `$ref`, for the same Wave-ordering reason
-      cited in `compilation_decisions`).
-    type: object
-    properties:
-      epistemic_type: { type: string }
-      authorship_state: { type: string }
-      locked: { type: [string, "null"] }
+      `compilation_decisions` above for why these are kept separate.
+      **Real hard $ref (2026-08-29, Codex cross-cutting review CONFIRMED
+      finding #3)**: the original version claimed this field was "typed
+      against" `epistemic-label.schema.yaml#/provenance_record` but actually
+      implemented `epistemic_type`/`authorship_state`/`locked` as three
+      unconstrained `{type: string}` fields with no enum — meaning
+      `{epistemic_type: "FACT", authorship_state: "BOT"}` (neither a real
+      enum value) would have passed validation, defeating the entire point
+      of referencing the canonical enum. `epistemic-label.schema.yaml` was
+      already built in Wave 1, well before this file — there was never a
+      real Wave-ordering reason for the soft reference here, unlike the
+      genuine forward-reference cases elsewhere in this suite.
 
   risk_tier:
     description: >

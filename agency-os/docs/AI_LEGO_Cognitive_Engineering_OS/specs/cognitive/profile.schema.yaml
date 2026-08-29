@@ -77,19 +77,25 @@ compilation_decisions:
       `rigor-level.schema.yaml#/rigor_mode`, given that file IS this schema's
       one declared Wave dependency (unlike representation/lens/primitive)?
     decision: >
+      **CORRECTED 2026-08-29 (Codex cross-cutting review, CONFIRMED finding #2)**:
+      YES — real hard `$ref` to `rigor-level.schema.yaml#/rigor_mode`. The
+      original decision below was based on a false premise: it claimed "zero
+      cross-file $ref anywhere in this suite" as of this file's authoring, but
+      `specs/execution/task.schema.yaml` (built the same Wave, by a different
+      concurrent agent) already uses a real hard `$ref` to
+      `risk-tier.schema.yaml#/risk_tier` for the exact same reason (a declared,
+      already-built Wave dependency). The "unanimous house convention" the
+      original reasoning relied on did not actually hold at the moment this
+      file was written — it just hadn't been checked against every sibling
+      file written in the same batch. Fixed to a real `$ref` below.
+    original_decision_superseded: >
       No — soft reference by name/convention, no `$ref`, consistent with
       EVERY existing file in this schema suite (verified by grep across
       specs/execution/, specs/governance/, specs/domain/, specs/artifact/,
       specs/security/: zero cross-file `$ref` anywhere; manifest.schema.yaml
       L201-204 and tenant.schema.yaml L120-128 both state this convention
-      explicitly even for their own declared Wave dependencies).
-    reasoning: >
-      Matching an established, unanimous house convention is not a new
-      compilation call — deviating from it (introducing the suite's first
-      cross-file `$ref`) would be the actual new decision, and nothing about
-      this dependency is different enough from tenant.schema.yaml's or
-      manifest.schema.yaml's already-accepted soft-reference cases to justify
-      being the exception.
+      explicitly even for their own declared Wave dependencies). [This claim
+      was false — see correction above.]
 
 source_of_truth_for:
   - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §6 Soft Cognitive Preference (L257-292)"
@@ -128,10 +134,9 @@ properties:
       class as manifest.schema.yaml's execution_id.
 
   rigor:
-    type: string
+    $ref: "ai-lego://specs/cognitive/rigor-level.schema.yaml#/rigor_mode"
     description: >
-      Soft reference by name/convention (no `$ref`, per this schema suite's
-      established cross-file convention — see compilation_decisions above) to
+      **Real hard $ref (2026-08-29, Codex cross-cutting review fix)** to
       `rigor-level.schema.yaml`'s `rigor_mode` enum: fast | professional |
       research_grade | board_grade | deep_intelligence. This is the field that
       resolves onto `selection_context.required_rigor` (Atlas L1086) — via

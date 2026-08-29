@@ -1,0 +1,483 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/execution/rollback.schema.yaml"
+title: Rollback / Recovery Plan
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the `rollback-plan.yaml` record —
+  Execution Contract §19 "Rollback-first Rule" (L853-880) and §20's literal
+  `rollback-plan.yaml` example (L882-923). §19's rule is the reason this
+  file's fields are validated BEFORE a change-plan.schema.yaml record may
+  exist at all (see change-plan.schema.yaml's `rollback_plan_ref`,
+  itself citing this same precondition): "對 persistent state / production
+  / external side effect：Rollback / Recovery Plan MUST BE VALIDATED BEFORE
+  FORWARD EXECUTION" (L855-861).
+
+  Beyond EC §19/§20's literal block, this file reconciles a SECOND,
+  orthogonal enumeration Master Plan §69 "Rollback" (L2854-2868) gives —
+  9 TARGET LAYERS that "必須同時可回滾" (must simultaneously be
+  rollback-capable: Application/Workflow/Prompt/Model/Schema/Policy/
+  Knowledge Snapshot/Artifact/Configuration). EC §19's 10 items
+  (Code Rollback/Config Rollback/Feature Disable/Schema Compatibility
+  Rollback/Data Restore/Compensating Transaction/External Compensation/
+  Traffic Shift/Model Rollback/Policy Rollback, L867-878) are STRATEGY
+  CLASSES (how a rollback is technically executed); MP's 9 items are
+  TARGET LAYERS (what must be rollback-capable at all). These are not
+  duplicates — EC mixes technique nouns (Feature Disable, Traffic Shift)
+  that don't map 1:1 onto MP's architecture-layer nouns (Prompt, Knowledge
+  Snapshot) — so both are kept, cross-referenced, not merged.
+
+  Per this task's explicit instruction, the fields beyond EC §19/§20's
+  literal shape are reverse-engineered from the REAL "## Migration /
+  Rollback" sections this project's own 10 ADRs (ADR-001 through ADR-010)
+  already wrote — the same method already used for
+  cognitive/primitive.schema.yaml and cognitive/lens.schema.yaml in Wave 3.
+  All 10 ADRs use the identical heading "## Migration / Rollback" (grep-
+  confirmed); 5 were read in full for this file (ADR-001, ADR-002, ADR-003,
+  ADR-005, ADR-010) and the remaining 5 (ADR-004, ADR-006, ADR-007,
+  ADR-008, ADR-009) were also read in full and found to repeat the SAME
+  pattern already saturated by the first 5 (pure doc/governance change ->
+  git-tracked baseline -> `git revert` -> Low risk, zero runtime side
+  effects) rather than introduce a new shape. Two real patterns recur
+  across these 10 real sections that EC §20's flat single-strategy block
+  cannot express, and are added here as clearly-marked ADDITIVE fields:
+  (1) a git-revert fast path for the pure-documentation case, which is
+  empirically the MAJORITY case (7 of 10 ADRs: 001/004/005/006/007/008/009);
+  (2) a pre-launch/post-launch reversibility asymmetry ("zero-cost do-over"
+  before real data/tenants exist vs. "explicitly NOT safe post-launch"
+  after), found in all 3 ADRs whose decision touches persistent
+  architecture (ADR-002, ADR-003, ADR-010). A third pattern, ADR-002's
+  scenario split (a transient operational incident vs. the architecture
+  decision itself being reversed needing genuinely different response
+  procedures), is also added as an additive `scenarios[]` array.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §10 Execution State Machine, legal side-states (L563-573)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §19 Rollback-first Rule (L853-880)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §20 rollback-plan.yaml (L882-923)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §92 Machine-readable Execution Specs list (L2766-2783, rollback.schema.yaml at L2777)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §69 Rollback, 9 target layers (L2854-2868)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.37 Architecture Decision Record template, '## Rollback' heading precedent (L2075-2096)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.8 Production Incident Recipe, 禁止 list ('沒有 rollback 就進 production', L3444-3449)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.9 High-risk Architecture Change Recipe, Rollback Window (L3453-3472)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.10 Database Migration Recipe, Rollback Window Close + Expand->Contract sequence (L3484-3500)"
+  - "docs/adr/ADR-001-scoped-authority-precedence-unification.md '## Migration / Rollback' (L178-187, git-revert fast path, zero risk)"
+  - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md '## Migration / Rollback' (L133-141, two-scenario split + Expand-Contract parallel run)"
+  - "docs/adr/ADR-003-tenant-model-and-cas-isolation.md '## Migration / Rollback' (L114-118, pre-launch/post-launch asymmetry, 'NOT safe post-launch')"
+  - "docs/adr/ADR-005-db-migration-recipe-and-method-id-grammar.md '## Migration / Rollback' (L174-182, git revert, Low risk, ordered steps)"
+  - "docs/adr/ADR-010-database-platform-and-table-naming.md '## Migration / Rollback' (L126-130, zero-cost pre-launch do-over vs. not-safe post-launch, citing ADR-003 precedent explicitly)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2 row for rollback.schema.yaml (READY, no dependency, no finding)"
+
+decided_by: >
+  No ADR governs the SHAPE of this file — docs/architecture/
+  MACHINE_READABLE_SPEC_PLAN.md §2.2 row for rollback.schema.yaml lists it
+  READY with dependency "—" and resolved finding "—". Unlike a
+  finding-driven file, this file's additive substance (scenarios[],
+  reversibility.pre_launch/post_launch, git_revert_sufficient,
+  parallel_run, rollback_window) is not invented for this task — it is a
+  direct field-level transcription of a pattern independently and
+  consistently reproduced across all 10 of this project's own existing
+  ADRs' "## Migration / Rollback" sections, cross-checked against EC
+  §19/§20's own literal machine block. No single one of the 10 ADRs is
+  "the decider" here; the recurring pattern across all of them is the
+  evidence, per this task's explicit grounding instruction.
+
+compilation_decisions:
+  - question: >
+      EC §19 (L865-878) lists 10 STRATEGY CLASSES; MP §69 (L2856-2868)
+      lists 9 TARGET LAYERS. Are these the same list under two names, or
+      genuinely different axes?
+    decision: >
+      Genuinely different, orthogonal axes — both kept as separate fields
+      (`strategy` for EC's 10 classes, `rollback_capable_layers` for MP's
+      9 layers), not merged into one enum.
+    reasoning: >
+      A direct term-by-term comparison shows no clean 1:1 mapping: EC's
+      "Feature Disable" and "Traffic Shift" are techniques that can apply
+      to almost any of MP's 9 layers (e.g. disabling a Workflow feature
+      flag vs. disabling a Model feature flag are the same EC-strategy
+      applied to two different MP-layers); conversely MP's "Prompt" and
+      "Knowledge Snapshot" layers have no EC-strategy-class name of their
+      own. Collapsing them would either lose MP's layer-completeness
+      checklist or lose EC's own strategy vocabulary — the same
+      "verified genuinely different sub-concept, not a duplicate to
+      merge away" judgment call `manifest.schema.yaml` documents for its
+      own `documents[]` vs. `method_execution_log[]` split.
+  - question: >
+      EC §20's `rollback_possible` is a single boolean (L912, "若不可
+      rollback：rollback_possible: false"). Real ADR usage (ADR-002 L140,
+      ADR-003 L118, ADR-010 L130) consistently shows the SAME decision can
+      be safely reversible before real data/tenants exist and NOT safely
+      reversible after — a single boolean cannot express that asymmetry.
+    decision: >
+      Split into `reversibility.pre_launch.possible` and
+      `reversibility.post_launch.possible`, each an independent boolean;
+      EC's literal `compensation_plan`/`recovery_plan`/`explicit_authority`
+      trio (L917-923) is nested under `post_launch` (the harder, more
+      consequential case, and the one all 3 real examples describe).
+    reasoning: >
+      This is the single most load-bearing real-usage finding across the
+      3 architecture-decision ADRs read for this file: ADR-003 L118
+      ("collapsing to pure Option A is... safe. The reverse direction...
+      is explicitly NOT safe post-launch"), ADR-010 L130 ("Reversing
+      Sub-decision (a) after tenants exist... is explicitly not safe
+      post-launch... Reversing before launch is a zero-cost do-over"), and
+      ADR-002 L140 (a symmetric "before vs. after cutover" framing for its
+      own DEK-rotation degrade path). A schema modeled only on EC §20's
+      flat shape would silently lose exactly the distinction that makes
+      these 3 real Rollback sections non-trivial — the entire point of
+      "ground it in real ADR usage" per this task's instruction.
+  - question: >
+      7 of the 10 real ADRs read for this file (ADR-001, 004, 005, 006,
+      007, 008, 009) describe the SAME simple case: a pure documentation/
+      governance change, a git-tracked baseline, `git revert` on the
+      relevant commit, explicitly "風險等級 Low（純文件變更，無 runtime
+      副作用）" (ADR-005 L182, near-identical wording in ADR-009). EC
+      §20's full apparatus (trigger_conditions/strategy/recovery_point/
+      validation/owner/max_recovery_time) is genuine overkill for this
+      case.
+    decision: >
+      Added an ADDITIVE fast-path pair, `git_revert_sufficient` (boolean)
+      and `commit_refs[]`, alongside (not replacing) EC §20's full fields,
+      plus a qualitative `rollback_risk` enum (Low/Medium/High) matching
+      the exact words these ADRs use.
+    reasoning: >
+      This is empirically the MAJORITY real case in this project's own
+      history (7/10 ADRs), not an edge case — a schema that forces every
+      rollback plan through the full trigger_conditions/recovery_point/
+      validation apparatus EC §20 describes for persistent-state/
+      production/external-side-effect changes (L855-857) would misfit
+      most of what this project has actually needed a Rollback section
+      for so far. Kept additive (not required) because EC §19's own scope
+      (L855-857) is explicit that the full rule applies to "persistent
+      state / production / external side effect" changes specifically —
+      pure documentation changes are outside that scope by EC's own words,
+      which is exactly why the ADRs needed a lighter real path.
+  - question: >
+      Should `rollback_risk`'s Low/Medium/High vocabulary be unified with
+      `risk-tier.schema.yaml`'s R0-R4 enum (already ACCEPTED via ADR-004)?
+    decision: "No — kept as a separate, deliberately non-unified field."
+    reasoning: >
+      Real usage (ADR-001 L187, ADR-005 L182) never writes R0-R4 for this
+      concept; it is always the plain 3-word form, always describing
+      rollback-specific risk (how risky is UNDOING this), not the R0-R4
+      tier's execution-risk framing (how risky is DOING this in the first
+      place). Silently mapping "Low" onto, say, R1 would assert an
+      equivalence no ADR ever states and that the two vocabularies'
+      different subjects (undo-risk vs. do-risk) do not obviously support.
+      Left as a genuinely open question rather than decided, since
+      reconciling them (if warranted at all) is a Round 2 ADR-scale call,
+      not a Phase 3 compilation pick — see `open_questions`.
+  - question: >
+      ADR-002 (L137-140) needed two genuinely different rollback
+      procedures under one decision — a transient operational incident
+      (Key Vault outage: queue new requests, do NOT stop accepting them)
+      vs. the architecture decision itself being reversed (a parallel-run
+      degrade path, "比照 Expand-Contract 模式"). EC §20's shape assumes
+      one strategy per plan.
+    decision: >
+      Added an ADDITIVE, optional `scenarios[]` array — each entry its own
+      name/trigger/action/degradation_path — layered on top of (not
+      replacing) the flat `strategy`/`trigger_conditions` fields that
+      remain the default, EC-§20-literal shape for the common
+      single-scenario case.
+    reasoning: >
+      Only 1 of the 10 real ADRs needed this (ADR-002), so it is kept
+      optional/additive rather than promoted to the file's required
+      shape — but real usage proves the need is real, not hypothetical,
+      so the field exists rather than forcing ADR-002's Rollback section
+      to be flattened into a shape that would lose its actual distinction
+      (an operational-incident response has a HARD "must not stop
+      accepting requests" constraint that a single generic
+      degradation-path field would obscure).
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+type: object
+required: [plan_id, task_id, targets_validated_before_execution, strategy, reversibility]
+
+properties:
+
+  plan_id:
+    type: string
+    pattern: "^RB-"
+    description: "Referenced by change-plan.schema.yaml's rollback_plan_ref, by naming convention (soft reference, not a hard $ref — see that file's own compilation_decisions)."
+
+  task_id:
+    type: string
+    pattern: "^TASK-"
+    description: "Soft reference by convention to manifest.schema.yaml's execution.task_id."
+
+  execution_id:
+    type: string
+    pattern: "^EX-"
+
+  targets_validated_before_execution:
+    type: boolean
+    description: >
+      EC §19 (L857-861): "Rollback / Recovery Plan MUST BE VALIDATED
+      BEFORE FORWARD EXECUTION." MUST be true before the paired
+      change-plan.schema.yaml record (whose `rollback_plan_ref` points
+      here) is permitted to execute — the mechanical form of EC §21's
+      precondition (L929).
+
+  rollback_capable_layers:
+    type: array
+    description: >
+      MP §69 (L2856-2868): 9 layers that "必須同時可回滾" (must
+      simultaneously be rollback-capable), verbatim. Orthogonal to
+      `strategy` below — see compilation_decisions.
+    items:
+      type: object
+      required: [layer, capable]
+      properties:
+        layer:
+          type: string
+          enum:
+            - APPLICATION
+            - WORKFLOW
+            - PROMPT
+            - MODEL
+            - SCHEMA
+            - POLICY
+            - KNOWLEDGE_SNAPSHOT
+            - ARTIFACT
+            - CONFIGURATION
+        capable:
+          type: boolean
+        note:
+          type: string
+
+  strategy:
+    type: object
+    description: "EC §20 strategy{} block (L890-895), verbatim 5 sub-fields."
+    properties:
+      code: { type: string, description: "EC example value: previous_signed_artifact (L891)." }
+      config: { type: string, description: "EC example value: previous_version (L892)." }
+      database: { type: string, description: "EC example value: forward_compatible_disable (L893)." }
+      traffic: { type: string, description: "EC example value: shift_back (L894)." }
+      external_side_effects: { type: string, description: "EC example value: compensate (L895)." }
+    rollback_classes_reference:
+      description: >
+        Non-normative citation list of EC §19's 10 strategy-class names
+        (L867-878), for tooling/documentation cross-check against the
+        free-text values above — not a constraint on them, since EC gives
+        no enum, only example values, for the `strategy` sub-fields.
+      value:
+        - "Code Rollback"
+        - "Config Rollback"
+        - "Feature Disable"
+        - "Schema Compatibility Rollback"
+        - "Data Restore"
+        - "Compensating Transaction"
+        - "External Compensation"
+        - "Traffic Shift"
+        - "Model Rollback"
+        - "Policy Rollback"
+
+  trigger_conditions:
+    type: array
+    items: { type: string }
+    description: "EC §20 trigger_conditions[] (L886-888), e.g. 'error_rate > ...', 'data_reconciliation_fail == true'."
+
+  recovery_point:
+    type: object
+    description: "EC §20 recovery_point{} block (L897-899)."
+    properties:
+      backup_id: { type: string }
+      snapshot_id: { type: string }
+
+  validation:
+    type: object
+    description: "EC §20 validation{} block (L901-903)."
+    required: [tested]
+    properties:
+      tested: { type: boolean }
+      environment: { type: string }
+
+  owner:
+    type: string
+    description: "EC §20 owner field (L905)."
+
+  max_recovery_time:
+    type: string
+    description: >
+      EC §20 max_recovery_time field (L906). Format left unconstrained —
+      EC gives no concrete example value for this field, only the field
+      name itself.
+
+  reversibility:
+    type: object
+    description: >
+      ADDITIVE split beyond EC §20's flat rollback_possible boolean
+      (L909-923) — see compilation_decisions for the real-ADR grounding
+      (ADR-002/003/010).
+    required: [pre_launch, post_launch]
+    properties:
+      pre_launch:
+        type: object
+        required: [possible]
+        properties:
+          possible:
+            type: boolean
+            default: true
+          note:
+            type: string
+            description: "e.g. ADR-010 L130: 'Reversing before launch is a zero-cost do-over (drop the project, provision differently)'."
+      post_launch:
+        type: object
+        required: [possible]
+        properties:
+          possible:
+            type: boolean
+          note:
+            type: string
+            description: "e.g. ADR-003 L118 / ADR-010 L130: 'explicitly NOT safe post-launch'."
+          compensation_plan:
+            type: [string, "null"]
+            description: "EC §20 L917-920: required when post_launch.possible is false."
+          recovery_plan:
+            type: [string, "null"]
+            description: "EC §20 L917-920."
+          explicit_authority:
+            type: [string, "null"]
+            description: "EC §20 L921-923."
+        if:
+          properties: { possible: { const: false } }
+          required: [possible]
+        then:
+          required: [compensation_plan, recovery_plan, explicit_authority]
+
+  scenarios:
+    type: array
+    description: >
+      ADDITIVE, optional. Sourced from ADR-002's real two-scenario
+      Rollback split (L137-140) — see compilation_decisions. Most plans
+      need exactly one implicit scenario, already expressed via the flat
+      `strategy`/`trigger_conditions` fields above; this array is for the
+      rarer case (empirically 1/10 ADRs) where a decision needs more than
+      one genuinely distinct rollback procedure.
+    items:
+      type: object
+      required: [name, trigger, action]
+      properties:
+        name:
+          type: string
+          description: "e.g. ADR-002's '情境 1：Key Vault 暫時性事故' vs. '情境 2：架構決策本身被推翻'."
+        trigger: { type: string }
+        action: { type: string }
+        degradation_path:
+          type: string
+          description: >
+            e.g. ADR-002 L140: 'keep existing ciphertext fields, stop
+            issuing new DEKs' while new requests route through the new
+            mechanism during a transition period.
+
+  parallel_run:
+    type: object
+    description: >
+      Expand-Contract pattern. Sourced from ADR-002's explicit "比照
+      Expand-Contract 模式（同 ADR-005 DB Migration Recipe 的精神）"
+      (L140) and Atlas §13.10's Database Migration Recipe
+      (Expand -> ... -> Contract -> Rollback Window Close, L3486-3499).
+    properties:
+      applicable:
+        type: boolean
+        default: false
+      description:
+        type: string
+
+  rollback_window:
+    type: object
+    description: >
+      Atlas §13.9 (L3453-3472) and §13.10 (L3484-3500) "Rollback Window" /
+      "Rollback Window Close" lifecycle marker: the period after a forward
+      change during which rollback remains a live option, before being
+      formally closed out.
+    properties:
+      opens_at: { type: string, format: date-time }
+      closes_at: { type: [string, "null"], format: date-time }
+      close_condition: { type: string }
+
+  git_revert_sufficient:
+    type: boolean
+    default: false
+    description: >
+      ADDITIVE fast path for the empirically majority real case (7 of 10
+      ADRs read for this file: ADR-001/004/005/006/007/008/009) — a pure
+      documentation/governance change with a git-tracked baseline and zero
+      runtime side effects. See compilation_decisions.
+
+  commit_refs:
+    type: array
+    items: { type: string }
+    description: "git commit hash(es) the git_revert_sufficient fast path would target, per ADR-005 L182's 'git revert 對應 commit'."
+
+  rollback_risk:
+    type: string
+    enum: [Low, Medium, High]
+    description: >
+      Qualitative label, verbatim vocabulary from ADR-001 L187 / ADR-005
+      L182 ('風險等級 Low'). Deliberately NOT the R0-R4 risk_tier enum —
+      see compilation_decisions and open_questions.
+
+  result:
+    type: object
+    description: "Terminal outcome, mapped onto EC §10's legal side-states."
+    properties:
+      side_state:
+        type: string
+        enum: [ROLLED_BACK, COMPENSATED, PARTIAL_SUCCESS]
+        description: >
+          Soft reference by name to EC §10 (L563-573) / status-codes.
+          schema.yaml's reference_vocabulary.legal_side_states — no
+          $ref-able definitions node exists at either location for these
+          bare string values (a plain array of literals, not a schema
+          fragment), same limitation documented elsewhere in this
+          directory for soft-by-name references.
+      completed_at:
+        type: string
+        format: date-time
+
+# ---------------------------------------------------------------------------
+open_questions:
+  - id: "OQ-RB-1"
+    question: >
+      Should `rollback_risk` (Low/Medium/High) eventually be formally
+      unified with `risk_tier` (R0-R4)? Both are real, currently-used
+      vocabularies for adjacent-but-different concepts (undo-risk vs.
+      do-risk) — see compilation_decisions for why they were kept separate
+      here rather than merged.
+    owner: "operator, or a future Round 2 ADR"
+    blocks: "nothing in this schema"
+  - id: "OQ-RB-2"
+    question: >
+      `scenarios[]` is optional/additive today because only 1 of 10 real
+      ADRs needed it. Should it become the mandatory shape (replacing the
+      flat `strategy`/`trigger_conditions` fields entirely, with a
+      single-scenario array as the trivial case) once more real ADRs
+      accumulate real usage? Left open rather than pre-emptively
+      restructuring around a sample size of 1.
+    owner: "operator, future schema revision"
+    blocks: "nothing in this schema"
+
+verification:
+  method: >
+    Read against EC §10 (L531-573), §19 (L853-880), §20 (L882-923), §92
+    (L2766-2783); MP §69 (L2854-2882); Atlas §11.37 (L2075-2096), §13.8
+    (L3425-3451), §13.9 (L3453-3472), §13.10 (L3484-3500); full text of
+    all 10 ADRs' "## Migration / Rollback" sections read and grep-line-
+    verified (ADR-001 L178-187, ADR-002 L133-141, ADR-003 L114-118,
+    ADR-004 L128-ff, ADR-005 L174-182, ADR-006 L163-ff, ADR-007 L160-ff,
+    ADR-008 L101-ff, ADR-009 L189-ff, ADR-010 L126-130) — every quoted
+    line above re-confirmed via grep -n in this session, not transcribed
+    from memory or from a summary.
+  note: >
+    Every ADDITIVE field beyond EC §20's literal block (scenarios[],
+    reversibility.pre_launch/post_launch, git_revert_sufficient,
+    commit_refs, rollback_risk, parallel_run, rollback_window) is traced
+    above to a specific real ADR or Atlas recipe passage — none was
+    invented in the abstract. No mother document or ADR was modified to
+    produce this file.

@@ -1,0 +1,597 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/execution/handoff.schema.yaml"
+title: Structured Handoff Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `handoff.schema.yaml` — the 13th
+  and last file EC §92's "Machine-readable Execution Specs" list promises
+  (L2766-2783, `handoff.schema.yaml` named at L2782). No CROSS-*/DOC-*
+  finding number is attached to this gap (see `decided_by` and
+  `open_questions.OQ-HANDOFF-1` for the honest grep-confirmed absence) —
+  unlike `normative-context.schema.yaml`'s CROSS-T-18, this file's "named but
+  never shaped" status was apparently never independently caught as a
+  numbered finding by Phase 0/1 analysts, even though it is the identical
+  class of gap every other §92 file with no listed finding (`current-state`,
+  `rollback`, `exception`, row L98/L101/L103) also carries.
+
+  Unlike `normative-context.schema.yaml` (whose only grounding was a single
+  purpose-stating sentence, EC §3.2 L209-214), EC gives this concept REAL,
+  concrete textual shape in three places:
+
+    §71 "Handoff Protocol" (L2321-2356): "任何完成的工程 task 必須交付"
+    (any completed engineering task MUST deliver) a literal 30-item list —
+    Task / Objective / Current State / Problem / Root Cause / Applicable
+    Specifications / Methods Used / Risk Tier / Options Considered /
+    Selected Approach / Rejected Alternatives / Files Changed / Schemas
+    Changed / API Changes / Data Impact / Security / Privacy Impact /
+    Jurisdiction Impact / Compatibility / Tests / Expected Results / Actual
+    Results / Gate Results / Known Limitations / Open Risks / Rollback /
+    Observability / Deployment / Release / Post-verification / ADR /
+    Evidence / Final Status (L2326-2355, transcribed verbatim into this
+    file's `checklist_item` enum below).
+
+    §72 "Handoff Files" (L2360-2374): "建議" (recommended, NOT "must" — a
+    textually weaker mandate than §71's, preserved as such below) a literal
+    8-file layout at `/.ai/tasks/{task_id}/handoff/`: EXECUTION_RESULT.md,
+    execution-result.yaml, changed-paths.txt, test-results.yaml,
+    gate-results.yaml, rollback-evidence.yaml, known-risks.yaml,
+    evidence-index.yaml.
+
+  Additional confirming context (not new obligations, cross-checked for
+  consistency): §15 Task Execution Packet (L730-749) lists `handoff/` as a
+  SIBLING directory of `results/`, NOT the same directory — confirming this
+  file is a genuinely separate concept from `execution/result.schema.yaml`
+  (which formalizes what lives in `results/`), not a redundant re-typing of
+  it. §148's summary table (L3984): "可交接 | Structured Handoff 固定格式"
+  ("handoff-able | Structured Handoff fixed format") — the explicit
+  fixed-format mandate this file makes mechanically checkable. §149 Phase 4
+  (L4047-4055) builds `/platform/ai-execution/handoff/` as a real runtime
+  module, the same weight Phase 3 gives `/platform/ai-execution/authority/`
+  (which `authority.schema.yaml` grounds) — this is a load-bearing pipeline
+  stage, not a documentation convention. §150's closing motto (L4173-4174):
+  "Handoff = Auditable Result." §143/§144 Pre-/Post-release Checklists
+  (L3846-3877) place "[ ] Human approval where required" and "[ ] Handoff
+  complete" as adjacent gate items around the same acceptance boundary — the
+  textual anchor for this file's `receiving_authority` block (see
+  `compilation_decisions`).
+
+  Scope split from `execution/result.schema.yaml`: that file formalizes what
+  lives in `results/` (the mechanical outcome record — EC §64/65/69/70's
+  status/gates/evidence/outputs). THIS file formalizes what lives in
+  `handoff/` — the DELIVERABLE BUNDLE assembled FROM that outcome (plus
+  tests/changed-paths/rollback-evidence/known-risks) for whoever/whatever
+  receives the completed task next (a human reviewer, the next AI session,
+  an audit/replay pipeline): a content-addressed INDEX over the §72 files
+  plus the §71 checklist as structured completeness flags. It does not
+  re-type §121's narrative Execution Result Template (already
+  `result.schema.yaml`'s `summary` field's job, by that file's own explicit
+  compilation decision) and does not re-declare gate/evidence/status shapes
+  already owned by `gate.schema.yaml`/`result.schema.yaml`.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §15 Task Execution Packet (L730-749, `handoff/` as sibling of `results/`)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §71 Handoff Protocol (L2321-2356, the 30-item MUST-deliver checklist, verbatim)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §72 Handoff Files (L2360-2374, the 8-file RECOMMENDED layout, verbatim)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §92 Machine-readable Execution Specs (L2766-2783, handoff.schema.yaml named at L2782)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §143-144 Pre-/Post-release Checklists (L3846-3877, human-approval/handoff-complete adjacency — grounding for receiving_authority)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §148 Expected Results table (L3984, '可交接 | Structured Handoff 固定格式')"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §149 Phase 4 — Handoff / Audit / Replay (L4047-4059, /platform/ai-execution/handoff/ as a real runtime module)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §150 (L4160-4181, 'Handoff = Auditable Result')"
+  - "specs/execution/authority.schema.yaml properties/authority_level (real hard $ref — MACHINE_READABLE_SPEC_PLAN.md's OWN declared dependency for this file)"
+  - "specs/execution/result.schema.yaml properties/status (real hard $ref, same one-hop chaining convention cognitive/typed-method-result.schema.yaml uses)"
+  - "specs/artifact/cas-path.schema.yaml definitions/sha256_hash (real hard $ref, content-addressing files[])"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2, row for handoff.schema.yaml (L105: dependency = authority.schema.yaml, no finding number, status READY)"
+
+decided_by: >
+  No ADR governs this file. `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`
+  §2.2 row L105 lists it READY with exactly one dependency
+  (`authority.schema.yaml`) and no CROSS-*/DOC-* finding — verified by
+  grepping "handoff" (case-insensitive) across
+  `.ai/research/phase-0/verified-findings.yaml` (4 hits, none targeting this
+  gap — see `open_questions.OQ-HANDOFF-1`) and
+  `.ai/research/phase-1/GAP_REGISTER.yaml` (0 hits). Field-level shape below
+  is a direct Phase 3 compilation from EC §71/§72's own literal content —
+  the same "formalize an existing, textually concrete promise" mandate
+  `manifest.schema.yaml` used, not a from-scratch invention exercise like
+  `normative-context.schema.yaml` faced (EC gives enumerable content here,
+  not a purpose-only sentence).
+
+  The `receiving_authority` block's link to `authority.schema.yaml` is this
+  file's OWN inference from the plan's dependency arrow plus EC §9's
+  approval-distinctness rule (L527: "AI 不得自行把自己的建議當 approval") —
+  NOT a literal EC §71/§72 requirement (grep-confirmed: no "A0"-"A4" or
+  "authority" term appears inside §71's or §72's own cited line ranges).
+  Flagged honestly in `compilation_decisions` and `open_questions.OQ-HANDOFF-2`
+  rather than presented as already-settled mother-document fact.
+
+compilation_decisions:
+
+  - question: >
+      EC §72 names 8 concrete files, three of which (execution-result.yaml,
+      gate-results.yaml, evidence-index.yaml) map onto content this project
+      already has real schemas for (`result.schema.yaml`, `gate.schema.yaml`'s
+      `gate_result`, `result.schema.yaml`'s `evidence_ref`). Should this
+      file re-embed those shapes inline, or reference them?
+    decision: >
+      `files[]` is a content-addressed INDEX only — `kind` (enum of the 8
+      literal §72 filenames, plus `OTHER` for extensibility) + `path` +
+      `hash` (REAL hard $ref to `cas-path.schema.yaml#/definitions/sha256_hash`).
+      It does not re-embed `result.schema.yaml`/`gate.schema.yaml`/evidence
+      shapes inline; a consumer wanting typed content dereferences the
+      hash/path and validates the file against the corresponding schema
+      directly (documented per-kind in `file_kind_content_shape` below, a
+      docs-only hint, not a nested $ref — the FILE is a separate on-disk
+      artifact, not an inline object).
+    reasoning: >
+      Same "index, don't duplicate" principle `section-registry.schema.yaml`
+      and `normative-context.schema.yaml` already established for the
+      Section Registry <-> Normative Context Bundle split — re-embedding
+      full `result.schema.yaml`/`gate.schema.yaml` object graphs inline here
+      would create two places a future editor could let the same execution's
+      result/gate data drift apart. `files[]` has NO `minItems` and is not
+      in `required`: EC §72's own header says "建議" (recommended), a
+      textually weaker mandate than §71's "必須交付" (MUST deliver) for the
+      checklist below — this file preserves that distinction rather than
+      silently promoting §72 to the same mandatory strength as §71.
+
+  - question: >
+      EC §71's 30 items (Root Cause, Selected Approach, Rejected
+      Alternatives, Options Considered, ...) are narrative content with no
+      structured shape given anywhere in the corpus — the same situation
+      `result.schema.yaml` already faced for EC §121's 19-section Execution
+      Result Template, where it explicitly declined to machine-type
+      narrative sections with "no existing structured counterpart"
+      (`result.schema.yaml`'s own compilation_decisions on §121 scope).
+      Should this file invent 30 structured narrative fields to hold that
+      content?
+    decision: >
+      No. `checklist[]` is a COMPLETENESS LEDGER, not a content store: each
+      entry is `{item (enum of the 30 §71 labels), present (boolean),
+      note (optional string), ref (optional string — a pointer, e.g. a
+      files[] kind or a free-text location) }`. The actual narrative CONTENT
+      for each item lives in the files EC §72 already names (chiefly
+      EXECUTION_RESULT.md, per §121's template) or in `result.schema.yaml`'s
+      own `summary` field — this file only records WHETHER each of the 30
+      required items was furnished and WHERE, not the prose itself.
+    reasoning: >
+      Directly follows `result.schema.yaml`'s own established discipline
+      (cited above) and R0's "不接受可能是" / 補丁判準 standard: inventing 30
+      narrative field shapes with zero textual basis for their internal
+      structure would be new architecture design this task was not asked to
+      make. A completeness ledger is exactly what EC §150's own motto asks
+      for ("Handoff = Auditable Result" — auditable COMPLETENESS, not
+      re-hosted prose) and is the only part of §71's 30-item list that is
+      actually mechanically checkable without guessing structure.
+      `checklist` IS required with all 30 canonical items present (mirroring
+      §71's "必須交付" strength) — a `present: false` entry MUST carry a
+      non-empty `note` (see `constraints`), the identical NOT_APPLICABLE+
+      rationale pattern EC §69 / `gate.schema.yaml` already established for
+      declared-not-applicable gate results, reused here for the analogous
+      "declared not applicable" case on a Handoff Protocol item.
+
+  - question: >
+      MACHINE_READABLE_SPEC_PLAN.md's own row for this file names
+      `authority.schema.yaml` as its ONE dependency, but neither EC §71 nor
+      §72's literal text mentions authority/approval. What field connects
+      the two files, and how much of that connection is genuine grounding
+      versus this session's own inference?
+    decision: >
+      Add an OPTIONAL `receiving_authority` block:
+      `{ receiver_role (free string — NOT $ref'd/enum'd against
+      authority.schema.yaml's own `role_to_authority_mapping`, since that
+      registry is SKELETON_ONLY/empty by that file's own honest disclosure),
+      authority_level (REAL hard $ref to
+      `authority.schema.yaml#/authority_level` — the A0-A4 enum values
+      themselves ARE grounded/non-skeleton per that file's own description),
+      acknowledged (boolean), acknowledged_at (date-time, nullable) }`.
+    reasoning: >
+      The most textually-defensible reading of the plan's dependency arrow:
+      EC §9's A0-A4 ladder's load-bearing invariant is that an approval must
+      come from a human authority DISTINCT from the AI that proposed the
+      action (L527) — a Handoff is precisely the artifact through which that
+      distinct authority is expected to review and accept a completed task
+      (§143/§144's adjacent "[ ] Human approval where required" / "[ ]
+      Handoff complete" checklist items). Recording who accepted a handoff
+      and at what authority ceiling closes that audit loop. This is
+      presented explicitly as ONE PLAUSIBLE inference from the plan's
+      dependency arrow, not as if §71/§72 already specified an authority
+      field — a different reading (e.g. "authority_level already computed
+      earlier in the task, simply carried through for audit" rather than
+      "who received/accepted the handoff") is equally consistent with the
+      same one-line dependency arrow and is recorded, not silently
+      foreclosed, in `open_questions.OQ-HANDOFF-2`. Kept OPTIONAL (not
+      required) for the same honesty reason `method.schema.yaml`'s own
+      additive `risk_tier` field was kept optional: this task adds it
+      without the mother documents themselves demanding it.
+
+  - question: >
+      What identity/join-key fields does a Handoff record need?
+    decision: >
+      `handoff_id` (NEW prefix `HANDOFF-`, following this project's existing
+      free id-prefix convention — Atlas `IDEA-`/`DEC-`/`EX-`,
+      typed-objects `PROB-`, `normative-context.schema.yaml`'s own `NCB-` —
+      additive, not competing); `task_id` (REQUIRED, soft reference by
+      convention to `manifest.schema.yaml`'s `execution.task_id`, mandatory
+      here because EC §72's own literal path
+      `/.ai/tasks/{task_id}/handoff/` fixes `task_id` as the storage key —
+      same reasoning `normative-context.schema.yaml` gave for its own
+      mandatory `task_id`); `execution_id` (nullable, `^EX-` pattern, join
+      to `result.schema.yaml`/`manifest.schema.yaml` for the same run).
+    reasoning: >
+      Reuses existing conventions rather than inventing new ones, per this
+      project's own "don't reinvent an id scheme that already exists"
+      discipline (explicit in every sibling file's own compilation_decisions
+      on identity fields).
+
+  - question: >
+      Does this file need its own `provenance` field (per
+      `epistemic-label.schema.yaml`'s "every content/claim object" mandate)?
+    decision: "OPTIONAL, not required."
+    reasoning: >
+      Same reasoning `normative-context.schema.yaml` already gave for its
+      own optional `provenance`: a Handoff record is fundamentally a
+      delivery/index WRAPPER around content that is ALREADY provenanced
+      elsewhere — the authoritative "this execution's disposition is X"
+      claim lives in `result.schema.yaml` (required there), and this file's
+      `final_status` field below is a $ref-chained POINTER to that same
+      claim, not a new one. Requiring a second, independent provenance
+      record here for what is structurally the same underlying claim would
+      be an unexplained duplication, not new information. Kept available
+      for the case an operator manually curates or overrides a Handoff
+      bundle's contents (same escape hatch `normative-context.schema.yaml`
+      documented for its own optional `provenance`).
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+# One instance of this schema = the (recommended) manifest/index describing
+# the contents of ONE `/.ai/tasks/{task_id}/handoff/` directory (EC §72).
+
+definitions:
+
+  handoff_file:
+    type: object
+    required: [kind, path, hash]
+    description: >
+      One indexed file inside the `handoff/` directory. Content-addressed
+      pointer only — see compilation_decisions for why this does not
+      re-embed the referenced file's own typed shape inline.
+    properties:
+      kind:
+        type: string
+        enum:
+          - EXECUTION_RESULT_MD
+          - EXECUTION_RESULT_YAML
+          - CHANGED_PATHS_TXT
+          - TEST_RESULTS_YAML
+          - GATE_RESULTS_YAML
+          - ROLLBACK_EVIDENCE_YAML
+          - KNOWN_RISKS_YAML
+          - EVIDENCE_INDEX_YAML
+          - OTHER
+        description: >
+          The 8 literal EC §72 filenames (L2366-2373), SCREAMING_SNAKE_CASE'd,
+          plus `OTHER` for files a real implementation adds beyond EC's
+          8-item suggestion. See `file_kind_content_shape` below for which
+          kinds already have a real sibling schema to validate against.
+      path:
+        type: string
+        description: "Repository- or packet-relative path, e.g. `.ai/tasks/TASK-2026-000001/handoff/execution-result.yaml`."
+      hash:
+        $ref: "ai-lego://specs/artifact/cas-path.schema.yaml#/definitions/sha256_hash"
+        description: "Real hard $ref: cas-path.schema.yaml already exists on disk."
+      description:
+        type: string
+
+  checklist_entry:
+    type: object
+    required: [item, present]
+    description: >
+      One line of EC §71's Handoff Protocol (L2326-2355), transcribed
+      verbatim into `item`'s enum below — a completeness flag, not a
+      content field. See compilation_decisions.
+    properties:
+      item:
+        type: string
+        enum:
+          - task
+          - objective
+          - current_state
+          - problem_root_cause
+          - applicable_specifications
+          - methods_used
+          - risk_tier
+          - options_considered
+          - selected_approach
+          - rejected_alternatives
+          - files_changed
+          - schemas_changed
+          - api_changes
+          - data_impact
+          - security_privacy_impact
+          - jurisdiction_impact
+          - compatibility
+          - tests
+          - expected_results
+          - actual_results
+          - gate_results
+          - known_limitations
+          - open_risks
+          - rollback
+          - observability
+          - deployment_release
+          - post_verification
+          - adr
+          - evidence
+          - final_status
+        description: >
+          Snake_case transcription of EC §71's 30 literal lines
+          (L2326-2355), in the same order. "Problem / Root Cause",
+          "Security / Privacy Impact", "Deployment / Release" each collapse
+          EC's own slash-joined single line into one snake_case value;
+          "ADR" and "Evidence" are kept as TWO separate values because EC
+          §71 lists them on two separate lines (L2353-2354), unlike the
+          three slash-joined lines above.
+      present:
+        type: boolean
+        description: "Whether this Handoff Protocol item was actually furnished for this task."
+      note:
+        type: string
+        description: >
+          REQUIRED IN SPIRIT when present == false (see `constraints`) —
+          same NOT_APPLICABLE+rationale pattern EC §69/`gate.schema.yaml`
+          already established, applied here to a declared-not-applicable
+          checklist item.
+      ref:
+        type: string
+        description: >
+          OPTIONAL pointer to where this item is satisfied — e.g. a
+          `files[].kind` value, a `section-registry.schema.yaml` section_id,
+          or free text.
+
+type: object
+required: [handoff_id, task_id, generated_at, checklist]
+properties:
+
+  handoff_id:
+    type: string
+    pattern: "^HANDOFF-"
+    description: "NEW id prefix, additive to this project's existing free-prefix convention (IDEA-/DEC-/EX-/PROB-/NCB-). See compilation_decisions."
+
+  task_id:
+    type: string
+    pattern: "^TASK-"
+    description: >
+      REQUIRED — EC §72's own literal path
+      `/.ai/tasks/{task_id}/handoff/` (L2365) fixes task_id as this
+      artifact's storage key. Soft reference by convention to
+      manifest.schema.yaml's execution.task_id, same pattern reused
+      verbatim, not a hard $ref (see manifest.schema.yaml's own
+      task_id field for why: it is OPTIONAL there, mandatory here).
+
+  execution_id:
+    type: [string, "null"]
+    default: null
+    pattern: "^EX-"
+    description: "OPTIONAL join key to result.schema.yaml/manifest.schema.yaml's execution.execution_id for the same run, once minted."
+
+  generated_at:
+    type: string
+    format: date-time
+    description: "When this Handoff record was assembled."
+
+  generated_by:
+    type: string
+    description: "OPTIONAL free-text id of the tool/agent/human that assembled this Handoff."
+
+  final_status:
+    $ref: "ai-lego://specs/execution/result.schema.yaml#/properties/status"
+    description: >
+      OPTIONAL convenience pointer, real hard $ref into result.schema.yaml's
+      own status property (same one-hop chaining convention
+      cognitive/typed-method-result.schema.yaml uses) — lets a receiver read
+      the disposition directly off the Handoff record without first opening
+      `files[]`'s EXECUTION_RESULT.md/execution-result.yaml. Satisfies EC
+      §71's literal "Final Status" checklist item (the `final_status` value
+      of `checklist[].item` above) as a real typed field rather than a bare
+      completeness flag, since this ONE item already has a concrete,
+      already-built target to $ref.
+
+  risk_tier:
+    $ref: "ai-lego://specs/execution/risk-tier.schema.yaml#/risk_tier"
+    description: >
+      OPTIONAL, ADDITIVE — real hard $ref (risk-tier.schema.yaml is a plain
+      JSON-Schema-shaped node, `{type, enum}`, directly $ref-resolvable,
+      unlike status-codes.schema.yaml's citation-shaped final_status node).
+      Same convenience-pointer reasoning as `final_status` above, satisfying
+      EC §71's "Risk Tier" checklist item with a real typed value.
+
+  files:
+    type: array
+    items: { $ref: "#/definitions/handoff_file" }
+    description: >
+      EC §72's 8-file layout (RECOMMENDED, "建議" — see compilation_decisions
+      for why this is NOT `required`/`minItems`, unlike `checklist` below).
+
+  checklist:
+    type: array
+    minItems: 30
+    items: { $ref: "#/definitions/checklist_entry" }
+    description: >
+      EC §71's 30-item Handoff Protocol (MANDATORY, "必須交付"). MUST contain
+      exactly one entry per `checklist_entry.item` enum value — see
+      `constraints`.
+
+  receiving_authority:
+    type: object
+    description: >
+      OPTIONAL — NEW DESIGN, not literal EC §71/§72 text. See
+      compilation_decisions and open_questions.OQ-HANDOFF-2 for the full
+      honesty disclosure on this field's grounding.
+    properties:
+      receiver_role:
+        type: string
+        description: >
+          Free text — NOT validated against authority.schema.yaml's
+          role_to_authority_mapping (that registry's entries[] is
+          SKELETON_ONLY/empty by that file's own disclosure; populating a
+          closed enum here would misrepresent an undecided operator question
+          as settled, the same failure mode authority.schema.yaml itself
+          refused to commit).
+      authority_level:
+        $ref: "ai-lego://specs/execution/authority.schema.yaml#/authority_level"
+        description: >
+          Real hard $ref — MACHINE_READABLE_SPEC_PLAN.md's own declared
+          dependency for this file. The A0-A4 enum values themselves are
+          grounded/non-skeleton (EC §9, L478-529); only the human-role
+          mapping is skeleton.
+      acknowledged:
+        type: boolean
+        default: false
+      acknowledged_at:
+        type: [string, "null"]
+        format: date-time
+        default: null
+
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+    description: "OPTIONAL — see compilation_decisions."
+
+# ---------------------------------------------------------------------------
+# Docs-only hint (NOT a schema $ref — each of these is a separate on-disk
+# file, not an inline object): which files[] kinds already have a real
+# sibling schema to validate their own content against.
+# ---------------------------------------------------------------------------
+file_kind_content_shape:
+  EXECUTION_RESULT_YAML: "ai-lego://specs/execution/result.schema.yaml (whole file)"
+  GATE_RESULTS_YAML: "ai-lego://specs/execution/gate.schema.yaml#/gate_result (array of)"
+  EVIDENCE_INDEX_YAML: "ai-lego://specs/execution/result.schema.yaml#/definitions/evidence_ref (array of)"
+  EXECUTION_RESULT_MD: "Free-form Markdown, expected to follow EC §121's Execution Result Template (L3332-3396) — result.schema.yaml's own `summary` field is the machine-typed sibling of this same content."
+  CHANGED_PATHS_TXT: "Plain text, one path per line — no schema, per EC §72's own literal `.txt` extension."
+  TEST_RESULTS_YAML: "No sibling schema exists yet in this corpus — untyped."
+  ROLLBACK_EVIDENCE_YAML: "No dedicated schema; expected to reference ai-lego://specs/execution/rollback.schema.yaml#/properties/plan_id (soft, by convention, matching that file's own established pattern for this field)."
+  KNOWN_RISKS_YAML: "No sibling schema exists yet in this corpus — untyped."
+
+constraints:
+  description: >
+    Cross-field rules this schema's JSON-Schema `properties` block cannot
+    express structurally, recorded as prose per this project's established
+    convention (e.g. epistemic-label.schema.yaml's `locked` constraints,
+    result.schema.yaml's/typed-method-result.schema.yaml's own `constraints`
+    blocks).
+  rules:
+    - "checklist[] MUST contain exactly one entry per checklist_entry.item enum value (all 30) — EC §71's own '必須交付' (MUST deliver) is unconditional, unlike EC §68/69's risk-tiered gate requirements."
+    - "checklist[].note MUST be present and non-empty when checklist[].present == false (mirrors EC §69's NOT_APPLICABLE+rationale requirement, gate.schema.yaml's identical constraint, applied here to the analogous declared-not-applicable Handoff Protocol item)."
+    - "files[] has no minItems and is not in required — EC §72's own header is '建議' (recommended), a textually weaker mandate than §71's; this file does not silently upgrade it to mandatory."
+    - "When receiving_authority is present, authority_level SHOULD reflect the ceiling the AI itself determined this task's completed change required (EC §9's A3/A4 'authorized approval'/'explicit human authority' requirements) — this file does not mechanically verify that the recorded acknowledgement actually originated from a human distinct from the AI (EC §9 L527's own load-bearing rule); see open_questions.OQ-HANDOFF-4."
+
+open_questions:
+  - id: "OQ-HANDOFF-1"
+    question: >
+      Grepping "handoff" (case-insensitive) across
+      `.ai/research/phase-0/verified-findings.yaml` returns 4 hits: CROSS-T-16
+      (uses "handoff" colloquially for the UNRELATED Method-Resolution ->
+      Method-Selection-Engine data-flow seam, already resolved by
+      `method-resolution.schema.yaml` per the plan — not this file's
+      concept), and 3 incidental hits inside DOC-execution_contract-8's
+      discussion of the §95 module inventory missing a `replay/` directory
+      (where "handoff/" appears only as one of 14 listed module names in
+      that unrelated drift finding). None of the 4 target the "named at §92,
+      shaped nowhere" gap this file actually addresses.
+      `.ai/research/phase-1/GAP_REGISTER.yaml` returns 0 hits. This gap
+      appears to have gone uncaught by Phase 0/1 analysts as its own
+      numbered finding, unlike the structurally identical
+      `normative-context.yaml`/`Section Registry` gap (CROSS-T-18).
+    owner: "operator — informational, not a blocker"
+    blocks: "nothing in this schema; recorded per R4 (claim-before-verify) so this file is not silently presented as if it resolves a finding it does not"
+  - id: "OQ-HANDOFF-2"
+    question: >
+      Is `receiving_authority`'s link to `authority.schema.yaml` the
+      operator's INTENDED reading of MACHINE_READABLE_SPEC_PLAN.md's
+      dependency arrow, or was a different connection meant — e.g.
+      "authority_level already computed earlier in the task (at
+      change-plan/preflight time), simply carried through to the handoff
+      record for audit" rather than "who received/accepted the handoff and
+      at what level"? Both readings are equally consistent with one
+      undisambiguated dependency arrow and no further plan text. This file
+      commits to the "receiving party" reading (see compilation_decisions)
+      because it is the one EC §143/§144's adjacent checklist items
+      textually support, but does not foreclose the alternative.
+    owner: "operator / future Round 2 ADR"
+    blocks: "nothing in this schema today — receiving_authority is OPTIONAL either way"
+  - id: "OQ-HANDOFF-3"
+    question: >
+      Should EC §72's 8 named files (or a subset — `changed-paths.txt`,
+      `known-risks.yaml`, `test-results.yaml`) eventually get their OWN
+      dedicated schemas rather than being generic `files[]` index entries
+      with no sibling shape (see `file_kind_content_shape` above — 3 of 8
+      kinds currently have no sibling schema at all)? Same class of
+      follow-up as `result.schema.yaml`'s `open_questions.OQ-RESULT-1` and
+      `typed-method-result.schema.yaml`'s `OQ-TMR-2`.
+    owner: "operator / future Phase 3+ session"
+    blocks: "nothing today — those 3 kinds stay opaque content-addressed blobs either way"
+  - id: "OQ-HANDOFF-4"
+    question: >
+      `checklist[].present` and `receiving_authority.acknowledged` are both
+      self-reported booleans — nothing in this file (or any mother document)
+      mechanically verifies that a `present: true`/`acknowledged: true`
+      claim corresponds to real, non-vacuous content, or that an
+      acknowledgement genuinely originated from a human distinct from the
+      proposing AI (EC §9 L527). Same class of limitation this project's own
+      `verify-closeout-completeness` gate already documents as a known,
+      accepted trust boundary (evidence-line format is checked, content
+      truth is not) — flagged, not solved, since solving it is an
+      implementation/tooling problem, not a schema-shape problem.
+    owner: "operator / whichever tool first implements handoff assembly + acceptance"
+    blocks: "nothing in this schema's validity; blocks mechanical enforcement of EC §9 L527's approval-distinctness rule until addressed"
+
+verification:
+  method: >
+    Read EC §15 (L730-749), §71 (L2321-2356), §72 (L2360-2374), §92
+    (L2766-2783), §143-144 (L3846-3877), §148 (L3962-3984), §149 Phase 3-4
+    (L4033-4059), §150 (L4160-4181) in full at the cited lines; grepped
+    "handoff"/"hand-off"/"hand off" (case-insensitive) across all three
+    mother documents (EC only — MP and Atlas return zero hits, confirmed);
+    grepped "handoff" across `.ai/research/phase-0/verified-findings.yaml`
+    (4 hits, none targeting this gap — see OQ-HANDOFF-1) and
+    `.ai/research/phase-1/GAP_REGISTER.yaml` (0 hits);
+    `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` §2.2 row for this file
+    (L105); `specs/execution/authority.schema.yaml` read in full (A0-A4 enum
+    real/non-skeleton vs. role_to_authority_mapping SKELETON_ONLY —
+    grounding for why only `authority_level`, not `receiver_role`, gets a
+    hard $ref); `specs/execution/result.schema.yaml` read in full (status
+    $ref target, evidence_ref definition, `summary` field precedent for why
+    this file does not re-type EC §121 narrative content);
+    `specs/execution/gate.schema.yaml` and `specs/execution/rollback.schema.yaml`
+    read for their identity fields (`plan_id` `^RB-` pattern) and
+    `gate_result` shape, used in `file_kind_content_shape`'s docs-only hints;
+    `specs/execution/manifest.schema.yaml`'s `architecture.adr_refs` (untyped
+    `array of string`) read as precedent for keeping this file's own
+    `adr`/`evidence` checklist items as bare completeness flags rather than
+    typed sub-objects; `specs/artifact/cas-path.schema.yaml` and
+    `specs/execution/risk-tier.schema.yaml` read in full before writing
+    hard $refs into them; `git log --oneline -15` against this project
+    directory (no prior commit touches handoff.schema.yaml, confirmed no
+    rework).
+  note: >
+    No mother document, ADR, or sibling spec file was modified to produce
+    this file. Ratio honesty (per house convention): EC §71's 30-item
+    checklist vocabulary, EC §72's 8-file kind enum, this file's existence,
+    and its storage path are all TRANSCRIBED VERBATIM from mother-document
+    text — a materially higher grounded fraction than a from-scratch gap
+    like `normative-context.schema.yaml`'s CROSS-T-18 (a purpose-only
+    sentence), because EC gives concrete, enumerable content here. What IS
+    new design, with zero direct textual mandate: the `files[]`
+    content-addressed wrapper shape, the `checklist[]` boolean-ledger
+    pattern (a deliberate choice modeled on `result.schema.yaml`'s own
+    established precedent for not machine-typing narrative content, not an
+    arbitrary invention), and the entire `receiving_authority` block (whose
+    only grounding is the plan's dependency arrow plus an inference from EC
+    §9's separate approval-distinctness rule — see OQ-HANDOFF-2). Roughly:
+    ~55% grounded (the 30-item checklist vocabulary + 8-file kind enum + the
+    artifact's existence, storage path, and MUST/RECOMMENDED strength
+    distinction, all verbatim-cited) / ~45% new design (the JSON wrapper
+    shapes connecting them, and the authority-linking field, honestly
+    flagged as inference rather than transcription).

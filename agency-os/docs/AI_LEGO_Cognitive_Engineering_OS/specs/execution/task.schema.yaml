@@ -1,0 +1,330 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/execution/task.schema.yaml"
+title: Task Context
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable schema for `task_context` — the object every
+  Execution Contract task must build first, per EC §7 "Task Classification"
+  (L357-375, literal block at L362-374): "每個 task 先建立：task_context: ...".
+  Formalizes the EC §92 Machine-readable Execution Specs promise
+  (L2766-2783, `task.schema.yaml` named at L2770) that this session's own
+  MACHINE_READABLE_SPEC_PLAN.md §2.2 row 96 marks READY with "沿用既有承諾，
+  task_context 完整結構".
+
+  Jointly resolves CROSS-T-16 (verified-findings.yaml L593-611, verdict
+  PARTIAL, 2 independent votes) together with the sibling
+  `method-resolution.schema.yaml`: CROSS-T-16's core claim is that EC's
+  `task_context` (L362-374) lacks most of the fields Atlas's
+  `selection_context` (L1071-1088) requires for Method Selection, and no
+  document defines the transformation. THIS file's job is narrower and
+  prior: give EC's own already-named 12-field `task_context` block a real,
+  typed shape for the first time (it is currently twelve bare `...`
+  placeholders). `method-resolution.schema.yaml` then does the actual
+  gap-filling/mapping work CROSS-T-16 is really about, consuming this file
+  as its `task_context` input. Grep confirmed the literal string
+  `task_context` appears in exactly one place across all three mother
+  documents — EC L362 — MP and Atlas never use the term at all (MP has zero
+  hits; Atlas's closest concept is `selection_context`, a different name for
+  a related-but-distinct object).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §7 Task Classification, task_context block (L357-375, fields at L362-374)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §92 Machine-readable Execution Specs list (L2766-2783, task.schema.yaml at L2770)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §8 Risk Tier (L379-475) — cross-referenced via execution/risk-tier.schema.yaml, not re-copied"
+  - "specs/execution/risk-tier.schema.yaml (this file's hard $ref target for risk_tier)"
+  - "specs/governance/epistemic-label.schema.yaml (this file's hard $ref target for the additive provenance field, per MACHINE_READABLE_SPEC_PLAN.md §2.2 row 96's dependency column)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2 row 96 (task.schema.yaml: 'EC §92 既有承諾，task_context 完整結構'; dependency column: 'risk-tier, governance/epistemic-label')"
+  - ".ai/research/phase-0/verified-findings.yaml CROSS-T-16 (L593-611)"
+
+decided_by: >
+  No dedicated ADR governs this file. MACHINE_READABLE_SPEC_PLAN.md §2.2 row
+  96 lists it READY with no ADR dependency (it "沿用既有承諾" — formalizes an
+  already-named EC block, it does not arbitrate between competing mother-
+  document designs the way risk-tier.schema.yaml's ADR-004a or
+  method.schema.yaml's ADR-005b did). The 12 literal fields below are a
+  Low-risk direct transcription of EC L362-374, the same class of move
+  status-codes.schema.yaml's `decided_by` section documents for naming/
+  mapping picks over an already-agreed concept. The two fields that go
+  beyond pure transcription (`risk_tier` upgraded to a hard $ref,
+  `provenance` added) are each justified individually in
+  `compilation_decisions` below rather than silently folded into the
+  "just transcription" claim — per this project's R4 claim-before-verify
+  discipline.
+
+compilation_decisions:
+
+  - question: >
+      Should the schema body wrap the 12 fields inside a nested
+      `task_context: {...}` property (matching EC's own YAML key literally),
+      or represent them as this file's own root object?
+    decision: "Root object IS the task_context instance; no wrapping key."
+    reasoning: >
+      Matches the established convention in this suite's other object-shaped
+      files: `manifest.schema.yaml`'s root directly represents one Execution
+      Manifest instance (no `manifest: {...}` wrapper), and
+      `normative-context.schema.yaml`'s root directly represents one Bundle
+      instance (no `normative_context: {...}` wrapper). EC's `task_context:`
+      is simply the YAML key introducing the block in prose, not evidence
+      that a schema file needs its own nesting layer around the same data —
+      treating it as a wrapper key would be inconsistent with both existing
+      Wave 1/4 sibling files for no functional benefit.
+
+  - question: >
+      EC L374's literal field is `risk_tier: ...` — an untyped placeholder,
+      same as MP/Atlas's other risk_tier occurrences before ADR-004a
+      resolved them. Should this file re-declare its own enum, soft-reference
+      `execution/risk-tier.schema.yaml`, or hard-`$ref` it?
+    decision: "Hard $ref to execution/risk-tier.schema.yaml#/risk_tier."
+    reasoning: >
+      Contrast with `cognitive/method.schema.yaml`'s own `risk_tier` field,
+      which deliberately stayed a SOFT reference (enum re-declared inline)
+      because that file's Wave-3 build had no asserted dependency on
+      `execution/risk-tier.schema.yaml` in MACHINE_READABLE_SPEC_PLAN.md's
+      dependency column. THIS file's row (§2.2 row 96) explicitly lists
+      `risk-tier` as a real dependency, both files were built in the same
+      Phase 3 session, and `risk-tier.schema.yaml` is Wave 1 (already BUILT)
+      — a safe backward dependency, the same reasoning
+      `normative-context.schema.yaml` used to justify its own hard $refs
+      into the (also Wave 1) `manifest.schema.yaml`. Task-instruction
+      also explicitly directs this file to use "a real hard $ref, not a
+      soft reference" here, consistent with the project's stated pattern of
+      upgrading soft references to hard $refs once the target file exists.
+    scope_note: >
+      This is a typing/enum-source decision over a field EC already names
+      (L374) — not a new architecture decision. It replaces an untyped `...`
+      placeholder with a concrete value set; it does not change what
+      `risk_tier` means.
+
+  - question: >
+      EC's literal field names for `domains`, `affected_modules`, and
+      `external_side_effects` are grammatically plural, but the field bodies
+      are each just `[...]` — an untyped placeholder that happens to use
+      list-bracket notation in EC's own YAML (L367-370). What JSON Schema
+      type do they get?
+    decision: "type: array, items: {type: string} for all three."
+    reasoning: >
+      EC's own literal source already writes them with `[...]` bracket
+      syntax (not bare `...`), unlike the other 8 scalar-looking fields —
+      this is a real textual signal, not an invented one. Items are typed as
+      bare strings (not a richer object) because EC gives no further
+      structure for any of the three lists; inventing per-item object shapes
+      here would be exactly the "fabricate a rich schema with no textual
+      basis" pattern `cognitive/method.schema.yaml`'s own
+      `compilation_decisions` explicitly flagged and avoided for its
+      `preconditions` field.
+
+  - question: >
+      Should `task_context` carry a provenance record, and if so why —
+      MACHINE_READABLE_SPEC_PLAN.md §2.2 row 96's dependency column lists
+      `governance/epistemic-label` but the row's one-line description gives
+      no reasoning for it, unlike risk-tier's dependency which is
+      self-evident from the shared field name.
+    decision: >
+      Add OPTIONAL top-level `provenance`, typed against
+      `governance/epistemic-label.schema.yaml#/provenance_record` (hard
+      $ref — same Wave-1-backward-dependency reasoning as the risk_tier
+      decision above).
+    reasoning: >
+      Same honesty move `cognitive/method.schema.yaml` made for its own
+      `contract_provenance` field when MACHINE_READABLE_SPEC_PLAN.md's
+      dependency column named a target without spelling out why: the
+      functional grounding supplied here is that `execution/risk-tier.schema.yaml`'s
+      own R3/R4 tiers list `Human Approval` / `Explicit Human Authority`
+      among their `required_actions` — meaning a task_context's `risk_tier`
+      value is sometimes an AI's own self-classification pending human
+      sign-off, sometimes a human-confirmed classification, and the two are
+      not the same fact. `provenance.authorship_state` (e.g. `AI_SUGGESTED`
+      vs `HUMAN_APPROVED`) is the existing canonical mechanism this suite
+      already has for recording exactly that distinction on any
+      content/claim object; task_context's own risk classification is such
+      an object. Kept OPTIONAL (not required) because EC's literal L362-374
+      block does not itself demand it — this is a wholly additive field,
+      flagged as such rather than presented as part of the "existing
+      promise" transcription.
+
+  - question: >
+      What identifier pattern does `task_id` use?
+    decision: 'pattern: "^TASK-"'
+    reasoning: >
+      Not reinvented — reuses the identical convention already established
+      by `manifest.schema.yaml`'s `execution.task_id` and
+      `normative-context.schema.yaml`'s `task_id` (both `^TASK-`), and
+      matches EC's own literal example at L363 (`task_id: TASK-...`)
+      verbatim. Keeps exactly one `TASK-` identifier convention across the
+      whole spec tree rather than a second, incompatible one.
+
+# ---------------------------------------------------------------------------
+# Schema body — root object IS one task_context instance (see
+# compilation_decisions above for why there is no wrapping key)
+# ---------------------------------------------------------------------------
+
+type: object
+required:
+  - task_id
+  - objective
+  - requester
+  - environment
+  - domains
+  - affected_modules
+  - data_impact
+  - external_side_effects
+  - jurisdiction_context
+  - reversibility
+  - user_impact
+  - risk_tier
+properties:
+
+  task_id:
+    type: string
+    pattern: "^TASK-"
+    description: "Per EC L363. Same TASK- convention as manifest.schema.yaml and normative-context.schema.yaml."
+
+  objective:
+    type: string
+    description: "Per EC L364. Free-text statement of what the task is for."
+
+  requester:
+    type: string
+    description: "Per EC L365. Free-text identity of who requested the task (human or system)."
+
+  environment:
+    type: string
+    enum: [local, dev, staging, production]
+    description: "Per EC L366, verbatim 4-value enum."
+
+  domains:
+    type: array
+    items: { type: string }
+    description: >
+      Per EC L367 (`[...]` bracket syntax — see compilation_decisions for
+      why this is typed as an array). NEAR_MATCH counterpart of Atlas
+      selection_context.domain (singular) — see
+      method-resolution.schema.yaml's field_mapping for the full
+      cardinality-mismatch treatment; not resolved here.
+
+  affected_modules:
+    type: array
+    items: { type: string }
+    description: "Per EC L368 (`[...]` bracket syntax). No Atlas selection_context equivalent — task-lifecycle metadata only."
+
+  data_impact:
+    type: string
+    enum: [none, read, write, migration, destructive]
+    description: >
+      Per EC L369, verbatim 5-value enum. No Atlas selection_context
+      equivalent. NOTE: values like `migration`/`destructive` visually
+      correlate with execution/risk-tier.schema.yaml's R2/R3 examples
+      ("data write logic", "DB migration") but EC defines no formal
+      cross-field validation rule tying data_impact to risk_tier — none is
+      invented or enforced here; see open_questions.
+
+  external_side_effects:
+    type: array
+    items: { type: string }
+    description: "Per EC L370 (`[...]` bracket syntax). No Atlas selection_context equivalent."
+
+  jurisdiction_context:
+    type: string
+    description: >
+      Per EC L371. DIRECT_MATCH with Atlas selection_context.jurisdiction_context
+      (identical field name both sides, per CROSS-T-16's verdict_votes
+      correction) — see method-resolution.schema.yaml's field_mapping.
+
+  reversibility:
+    type: string
+    enum: [high, medium, low, irreversible]
+    description: >
+      Per EC L372, verbatim 4-value enum. DIRECT_MATCH with Atlas
+      selection_context.reversibility (L1082, identical field name, but
+      Atlas gives no enum of its own) — this file's concrete enum is the one
+      method-resolution.schema.yaml reuses via hard $ref, same "adopt the
+      side with real values" precedent execution/risk-tier.schema.yaml set
+      for its own field.
+
+  user_impact:
+    type: string
+    description: >
+      Per EC L373. No Atlas selection_context equivalent. Considered and
+      rejected as a near-match for selection_context.stakeholders during
+      this file's compilation — user_impact is a free-text impact
+      description, stakeholders is a list of parties; different questions,
+      not merged. See method-resolution.schema.yaml's field_mapping.
+
+  risk_tier:
+    $ref: "ai-lego://specs/execution/risk-tier.schema.yaml#/risk_tier"
+    description: >
+      Per EC L374. Real hard $ref — see compilation_decisions above. DIRECT_MATCH
+      with Atlas selection_context.risk_tier (L1077), which is itself
+      deprecated in favor of this same canonical source per ADR-004a.
+
+  provenance:
+    description: >
+      OPTIONAL, ADDITIVE — not in EC's literal L362-374 block. See
+      compilation_decisions above for the full justification (ties to
+      execution/risk-tier.schema.yaml's R3/R4 Human Approval requirement).
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+# ---------------------------------------------------------------------------
+# Forward dependents (informational — built by a different file, same session)
+# ---------------------------------------------------------------------------
+referenced_by:
+  - "execution/method-resolution.schema.yaml (same Wave 5 session; consumes this file's fields as its task_context input side of the mapping table — see that file's field_mapping)"
+
+open_questions:
+  - id: "OQ-task-1"
+    question: >
+      EC's literal block gives no partial-completeness model — this file
+      currently requires all 12 fields. Should a draft/in-progress
+      task_context (e.g. captured before `risk_tier` classification has
+      happened yet) be legal, with a narrower required set? Left as
+      all-required per literal transcription of EC L362-374; flagged for
+      operator/Round 2 ADR if a draft lifecycle state is later needed.
+    owner: "operator, if a draft task_context state becomes necessary"
+    blocks: "nothing in this schema"
+  - id: "OQ-task-2"
+    question: >
+      The `domains` (plural array) vs. Atlas selection_context.domain
+      (singular, untyped) cardinality mismatch is NOT resolved in this file
+      — it is fully treated in method-resolution.schema.yaml's
+      field_mapping, which owns the task_context-to-selection_context
+      adaptation. Recorded here only as a pointer so a reader of this file
+      alone is not left assuming the mismatch was overlooked.
+    owner: "see execution/method-resolution.schema.yaml"
+    blocks: "nothing in this schema"
+  - id: "OQ-task-3"
+    question: >
+      `data_impact`'s values visually correlate with
+      execution/risk-tier.schema.yaml's R2/R3 example lists (see the field
+      description above) but no mother document states a formal
+      cross-field rule (e.g. "data_impact: migration implies risk_tier >= R3").
+      Not enforced here. Should such a validation rule exist, it would need
+      an explicit ADR or a documented compilation decision of its own — this
+      file does not invent one.
+    owner: "operator, if cross-field validation is later desired"
+    blocks: "nothing in this schema"
+
+verification:
+  method: >
+    Read against EC §7 (L357-375, all 12 fields individually cited above),
+    EC §92 (L2766-2783, confirming task.schema.yaml is a promised file at
+    L2770), EC §8 (L379-475, cross-checked against the already-built
+    execution/risk-tier.schema.yaml rather than re-read as a fresh source),
+    execution/risk-tier.schema.yaml full text (for the risk_tier $ref
+    target and R3/R4 required_actions cited in the provenance
+    justification), governance/epistemic-label.schema.yaml full text (for
+    the provenance_record $ref target), MACHINE_READABLE_SPEC_PLAN.md §2.2
+    row 96 full text, and verified-findings.yaml CROSS-T-16 full entry
+    (L593-611, both verdict_votes). Grep confirmed "task_context" appears
+    exactly once across all three mother documents (EC L362) — MP and Atlas
+    were also grepped directly, zero hits in either.
+  note: >
+    No mother document was modified to produce this file. The 12 field
+    names, their EC line numbers, and the 3 verbatim enums
+    (environment/data_impact/reversibility) are a direct transcription of
+    EC L362-374. `risk_tier`'s upgrade from placeholder to hard $ref and the
+    wholly-additive `provenance` field are the only two points that go
+    beyond pure transcription; both are individually justified in
+    `compilation_decisions` above, not silently folded into the
+    "existing promise" framing.

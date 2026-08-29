@@ -1,0 +1,372 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/execution/exception.schema.yaml"
+title: Exception / Workaround Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of a single EXCEPTION RECORD — one
+  instance of a logged, time-boxed engineering workaround/deviation, per
+  Execution Contract §24 "Exception / Workaround Contract" (L1013-1041).
+  Named in EC §92's Machine-readable Execution Specs list (L2766-2783,
+  `exception.schema.yaml` at L2779) with no field-level shape given there —
+  §24 itself (not §92) is where the shape actually lives, and this file is
+  its schema.
+
+  This is a RECORD schema (the shape of one granted/logged exception), not a
+  POLICY schema. `policies/ai-execution/exception-policy.yaml` (EC §91
+  Policy-as-Code Paths, L2760 — a sibling file, not yet built, Wave 6) will
+  define the RULES for when an exception may be granted at all; this file
+  defines what a valid instance of an already-granted exception looks like.
+  The two are consumer/producer, not competing definitions of the same
+  concept — see `relationship_to_exception_policy` below.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §23 ADR Trigger (L985-1003, 'Exception to Architecture Invariant' at L1002)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §24 Exception / Workaround Contract (L1013-1041)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §25 Code Change Contract (L1045-1060, L1053 'blanket exception' prohibition)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §91 Policy-as-Code Paths (L2750-2762, `exception-policy.yaml` at L2760)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §92 Machine-readable Execution Specs (L2766-2783, `exception.schema.yaml` at L2779)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §29 方法搭配基本規則, rule 12 (L4549, 'Workaround / Exception 必須有 owner、expiry、test、migration plan、ADR')"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2 row for exception.schema.yaml (L103, 'EC §92 既有承諾', no ADR dependency listed)"
+  - "specs/execution/risk-tier.schema.yaml (hard $ref, `risk_tier` enum + R3/R4 `required_actions` used to justify `required_authority_level` below)"
+
+decided_by: >
+  No single ADR governs this file (MACHINE_READABLE_SPEC_PLAN.md §2.2 row for
+  exception.schema.yaml lists no ADR dependency, matching status-codes.schema.yaml's
+  and manifest.schema.yaml's precedent for Low-risk direct compilation). Field
+  shape is EC §24's own literal YAML template (L1019-1032), transcribed
+  verbatim as this schema's core property set; the promotion-gate semantics,
+  the `adr` field's required-key-but-nullable-value resolution, and the three
+  additive fields (`risk_tier`, `required_authority_level`, `status`) are
+  Phase 3 compilation decisions recorded below, not new ADR-level tradeoffs —
+  each is additive to an already-agreed concept, not a competing design.
+
+compilation_decisions:
+  - question: >
+      EC §24 states "任何 exception 必須有：" (ANY exception must have) the
+      full 12-field YAML block (id/reason/owner/scope/risk/approved_by/
+      created_at/expires_at/test/migration_plan/removal_condition/adr,
+      L1019-1032), then immediately adds a second rule: "沒有：owner + expiry
+      + test + migration ... 不得合併為正式 architecture exception。"
+      (L1035-1041). Read literally, the second sentence presupposes a record
+      COULD lack fields (owner/expires_at/test/migration_plan) the first
+      sentence just said every exception must have — an apparent tension.
+      Compounding this, Atlas §29 rule 12 (L4549) restates the floor as FIVE
+      fields (owner, expiry, test, migration plan, ADR) — including ADR,
+      which EC's own promotion-gate sentence does not name as part of that
+      specific 4-field callout.
+    decision: >
+      Resolve using JSON Schema's own required-vs-nullable distinction rather
+      than picking one document's wording over the other: ALL 12 fields from
+      EC's YAML block are required KEYS on every instance (satisfying "任何
+      exception 必須有" literally — see the `required` array below, which
+      includes `adr`), but `adr`'s VALUE is typed `[string, "null"]` and is
+      legally null until the exception reaches
+      `status: formalized_as_architecture_exception` (see `constraints`
+      below). This lets a record exist with every key present per EC's first
+      sentence, while the four fields EC's second sentence specifically
+      re-emphasizes (owner, expires_at, test, migration_plan) are the ones
+      whose VALUES must be genuinely populated before promotion — EC never
+      actually says those four may be absent from an ordinary exception
+      either; its second sentence reads more naturally as a guardrail against
+      submitting an under-specified entry as a permanent architecture
+      exception than as licensing a structurally different lighter record
+      shape (no mother document anywhere defines what such a lighter shape
+      would look like field-by-field, so inventing one here would not be
+      compiling an existing definition). Atlas rule 12's inclusion of ADR in
+      its 5-field floor is compatible with this reading: ADR is likewise a
+      required KEY under this resolution, just one whose value legitimately
+      starts null.
+    scope_note: >
+      This is a structural (required-key vs. required-value) reading of
+      already-agreed text, not a new tradeoff between competing designs —
+      consistent with the Low-risk direct-compilation precedent this file's
+      `decided_by` cites.
+  - question: >
+      EC §24's literal template has no `risk_tier` (R0-R4) field, only a
+      free-text `risk: ...` string. Should this schema add the canonical
+      enum, and if so, does anything in the corpus justify tying it to
+      `approved_by`'s sufficiency?
+    decision: >
+      Add `risk_tier` as an ADDITIVE optional field (hard $ref to
+      `risk-tier.schema.yaml#/risk_tier`), kept alongside — not replacing —
+      EC's free-text `risk` field (same additive-not-competing pattern
+      `manifest.schema.yaml` used for `app_version` alongside `source.commit`).
+      Additionally add `required_authority_level` as an ADDITIVE optional
+      field, a SOFT reference BY NAME (not a hard $ref) to
+      `authority.schema.yaml`'s A0-A4 concept — that file does not exist yet
+      in this repo (`specs/execution/` currently has 7 files, `authority.schema.yaml`
+      is SKELETON_ONLY per MACHINE_READABLE_SPEC_PLAN.md's row for it and may
+      be authored concurrently by a sibling agent in this same Wave), so no
+      hard `$ref` can be resolved reliably; this follows the same
+      "NAME, NOT a hard $ref" convention `blast-radius-chain.schema.yaml:96`
+      already established in this schema suite for a forward dependency on an
+      in-flight sibling file.
+    reasoning: >
+      `risk-tier.schema.yaml`'s own R3/R4 tier definitions already list
+      "Human Approval" (R3) and "Explicit Human Authority" (R4) as
+      `required_actions` (risk-tier.schema.yaml lines ~85 and ~109) — i.e.
+      the mother-document corpus already ties higher risk to a stronger
+      approval requirement in general. `approved_by` alone (a bare string) is
+      structurally unable to express or check that requirement for a specific
+      exception instance. Tagging the exception with its own `risk_tier` and
+      the resulting `required_authority_level` makes that already-established
+      rule checkable per-instance without inventing new policy — it is a
+      cross-reference between two already-ACTIVE/in-flight schemas' existing
+      concepts, not a new authority model.
+  - question: >
+      EC §24's template has no lifecycle/status field — an exception record
+      as literally specified is a static document, but EC L1015 itself states
+      "Workaround 不是永久設計" (a workaround is not a permanent design),
+      which implies a lifecycle (active → resolved-or-formalized) that a
+      purely static record cannot represent.
+    decision: >
+      Add `status` as an ADDITIVE required field, enum
+      `[active, formalized_as_architecture_exception, removed]`, default
+      `active`. `formalized_as_architecture_exception` names the promotion
+      target EC §24 L1041 refers to as "正式 architecture exception" — traced
+      to EC §23's ADR Trigger list (L985-1003), whose final entry
+      (L1002) is literally "Exception to Architecture Invariant". This closes
+      the loop textually: an exception that becomes permanent architecture
+      policy is exactly the L1002 ADR-Trigger condition, which is why the
+      `adr` field exists on this record at all and why it must be non-null at
+      that point (see `constraints`).
+    reasoning: >
+      Matches this schema suite's established pattern of adding a `status`
+      enum to any record whose mother-document text implies a lifecycle but
+      does not spell out states (`manifest.schema.yaml`'s `results.status`,
+      `data-deletion.schema.yaml`'s `steps[].status`) — same technique,
+      applied here to close a real gap (§24 says workarounds are temporary
+      but gives no field for tracking whether one still is).
+
+# ---------------------------------------------------------------------------
+# This file's relationship to the not-yet-built exception-policy.yaml
+# ---------------------------------------------------------------------------
+relationship_to_exception_policy:
+  description: >
+    `policies/ai-execution/exception-policy.yaml` (EC §91, L2760) is named as
+    a sibling Policy-as-Code file but is not part of this Wave's file-creation
+    scope and does not exist in this repo yet. It is expected to define WHEN
+    an exception MAY be granted (e.g. which risk tiers require which
+    authority level to approve, maximum allowable `expires_at` horizon,
+    whether certain scopes are categorically forbidden from having an
+    exception at all). This file defines only the SHAPE of an exception once
+    granted/logged. A future exception-policy.yaml should reference this
+    file's `id`/`risk_tier`/`required_authority_level` fields by name, not
+    redefine the record shape — recorded here so the Wave 6 author has this
+    boundary in writing rather than needing to re-derive it.
+  direction: "exception-policy.yaml (policy, Wave 6) depends on exception.schema.yaml (record shape, this file) — not the reverse."
+
+# ---------------------------------------------------------------------------
+# Explicitly OUT OF SCOPE: other, unrelated uses of the word "exception"
+# found by grepping all three mother documents case-insensitively. Recorded
+# so a future reader does not assume this file was supposed to cover them.
+# ---------------------------------------------------------------------------
+out_of_scope:
+  description: >
+    Grep for "exception" (case-insensitive) across all three mother documents
+    surfaced four additional, unrelated concepts. None are modeled by this
+    file.
+  excluded:
+    - concept: "Consent Exception / Statutory Exception"
+      source: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §102 Cross-Border Data Transfer Engine (L4328-4361, quotes at L4357-4358)"
+      reason: >
+        Named legal transfer mechanisms for cross-border personal data (GDPR-
+        style consent/statutory exceptions to a transfer restriction) — a
+        jurisdiction/legal-basis concept, not an engineering workaround.
+    - concept: "/modules/compliance/exceptions/ directory"
+      source: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §99 Compliance Policy Compiler (L4217-4258, path at L4254)"
+      reason: >
+        A compliance-module folder path listed alongside obligations/controls/
+        compiler/evidence — no field-level shape is given anywhere for its
+        contents, and its sibling `evidence`/`controls` folders correspond to
+        entirely different schemas outside this task's scope.
+    - concept: "compliance_decision.exceptions[] field"
+      source: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §133 Compliance Decision Artifact (L5237-5250, field at L5247)"
+      reason: >
+        A per-execution list of exception references applied within ONE
+        compliance/legal-controls decision — a usage-site list, not the
+        exception record's own defining schema. A future compliance_decision
+        instance MAY populate that list with this schema's `id` values; this
+        file does not model compliance_decision itself (out of Wave scope).
+    - concept: "Retention / Deletion Model method's 'exception' pipeline step"
+      source: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md Data/DB methods table (L903: 'data class→purpose→retention→deletion→exception→proof')"
+      reason: >
+        A legal-hold-style deletion exception (data excluded from a deletion
+        run because of a hold) — already covered by
+        `execution/data-deletion.schema.yaml`'s `Legal Hold Check` step
+        (built earlier this Wave). A different lifecycle from an architecture
+        workaround; not merged into this file.
+  verified_non_applicable:
+    - concept: "ADR-001's Scoped Authority conflict-resolution chain outcome"
+      checked: >
+        Read `docs/adr/ADR-001-scoped-authority-precedence-unification.md` in
+        full, plus EC §2 (L131-137, `CONFLICT_REQUIRES_HUMAN_REVIEW`) and MP
+        §0.0.2 (L81-83) which it cites. The chain's only machine-readable
+        outcome for an unresolved same-level conflict is escalation to
+        `CONFLICT_REQUIRES_HUMAN_REVIEW` (already a
+        `status-codes.schema.yaml` entry) — it does not grant, define, or
+        produce an "exception" record of any kind, and ADR-001's own text
+        never uses the word "exception" to describe that outcome. The two
+        mechanisms are unrelated: one escalates an unresolved conflict for
+        human judgment; this file logs an already-accepted, time-boxed,
+        owned deviation. No cross-reference between this file and ADR-001 was
+        warranted.
+
+# ---------------------------------------------------------------------------
+# Schema body — the exception record instance.
+# ---------------------------------------------------------------------------
+type: object
+required:
+  - id
+  - reason
+  - owner
+  - scope
+  - risk
+  - approved_by
+  - created_at
+  - expires_at
+  - test
+  - migration_plan
+  - removal_condition
+  - adr
+  - status
+properties:
+  id:
+    type: string
+    pattern: "^EXC-"
+    description: "EC §24 L1021 literal example ('id: EXC-...'). Canonical prefix, verbatim from the mother document (unlike this schema's other invented prefixes elsewhere in the suite, e.g. DEL-/DEP-, which had no mother-document example to transcribe)."
+  reason:
+    type: string
+    description: "EC §24 L1022. Why the workaround/deviation exists."
+  owner:
+    type: string
+    description: "EC §24 L1023. The accountable person/role for this exception's lifecycle — distinct from `approved_by` (who authorized it)."
+  scope:
+    type: string
+    description: "EC §24 L1024. Free-text boundary of what this exception covers (system/module/code path/data domain)."
+  risk:
+    type: string
+    description: "EC §24 L1025. Free-text risk description, verbatim field. See `risk_tier` below for the ADDITIVE canonical enum form."
+  risk_tier:
+    $ref: "ai-lego://specs/execution/risk-tier.schema.yaml#/risk_tier"
+    description: >
+      ADDITIVE, optional — not in EC §24's literal template. See
+      compilation_decisions above. Recommended for any exception whose `risk`
+      free-text implies R2 or higher, so `required_authority_level` below can
+      be derived.
+  approved_by:
+    type: string
+    description: "EC §24 L1026. Identity of whoever authorized this exception."
+  required_authority_level:
+    type: [string, "null"]
+    default: null
+    description: >
+      ADDITIVE, optional — SOFT reference by name only (no `$ref`) to
+      `authority.schema.yaml`'s A0-A4 Autonomy/Authority Levels (EC §92,
+      not yet built in this repo — see compilation_decisions above for why
+      this cannot be a hard $ref). When `risk_tier` is R3 or R4, this SHOULD
+      be populated with the authority level that `approved_by`'s identity
+      must satisfy, per risk-tier.schema.yaml's R3 "Human Approval" / R4
+      "Explicit Human Authority" required_actions. Left as a free-form string
+      rather than an enum because this file cannot yet see
+      authority.schema.yaml's exact level identifiers.
+  created_at:
+    type: string
+    format: date-time
+    description: "EC §24 L1027."
+  expires_at:
+    type: string
+    format: date-time
+    description: "EC §24 L1028. See `constraints` below for the overdue-exception rule."
+  test:
+    type: string
+    description: >
+      EC §24 L1029. Opaque reference to the regression/containment test that
+      proves this exception's boundary (a test id, or a file:line pointer) —
+      same opaque-pointer convention as `data-deletion.schema.yaml`'s
+      `steps[].evidence_ref`.
+  migration_plan:
+    type: string
+    description: "EC §24 L1030. How this workaround will eventually be retired."
+  removal_condition:
+    type: string
+    description: "EC §24 L1031. The condition under which this exception should be removed."
+  adr:
+    type: [string, "null"]
+    default: null
+    description: >
+      EC §24 L1032. Reference to the ADR governing this exception, using EC's
+      own suggested path convention (§23, L1005-1009:
+      `/docs/adr/ADR-XXXX-<slug>.md`). Required KEY (see `required` above and
+      compilation_decisions for the required-key/nullable-value resolution),
+      but the VALUE is legally null until `status` becomes
+      `formalized_as_architecture_exception` — see `constraints`.
+  status:
+    type: string
+    enum: [active, formalized_as_architecture_exception, removed]
+    default: active
+    description: >
+      ADDITIVE lifecycle field — see compilation_decisions above.
+      `formalized_as_architecture_exception` is the "正式 architecture
+      exception" EC §24 L1041 names, traced to EC §23 L1002's
+      "Exception to Architecture Invariant" ADR-Trigger condition.
+
+constraints:
+  - "`adr` MUST be non-null when `status` = `formalized_as_architecture_exception` (EC §23 L1002, 'Exception to Architecture Invariant' is itself an ADR-Trigger condition — promotion requires the ADR that grounds it)."
+  - "`owner`, `expires_at`, `test`, and `migration_plan` MUST all be genuinely populated (non-empty) before `status` may become `formalized_as_architecture_exception` (EC §24 L1035-1041, the 4-field promotion gate)."
+  - "A record whose `expires_at` has passed while `status` remains `active` violates EC §24's 'Workaround 不是永久設計' invariant (L1015) — consuming systems MUST treat this as requiring escalation (e.g. surfacing `status-codes.schema.yaml`'s `NEEDS_HUMAN_REVIEW`), not silent continuation."
+  - "MUST NOT be used as a substitute for error handling (EC §25 Code Change Contract, L1053: '不使用 blanket exception 取代錯誤處理') — this schema records a bounded, owned, time-boxed deviation, not a general-purpose escape hatch."
+
+open_questions:
+  - id: "OQ-EXC-1"
+    question: >
+      Neither EC §24 nor Atlas §29 specifies what "merged into a formal
+      architecture exception" concretely produces beyond the exception no
+      longer being treated as temporary — is this record itself the
+      permanent artifact once `status`/`adr` are set, or does formalization
+      additionally copy its content into some other permanent registry (e.g.
+      a future Architecture-Constitution-v1.md exceptions section, per
+      ADR-001's establishment of that document)? Left open — non-blocking for
+      this file's own validity; flagged for whoever next extends
+      Architecture-Constitution-v1.md's content per ADR-001 Consequences.
+    owner: "operator, non-blocking"
+    blocks: "nothing in this schema's own validity"
+  - id: "OQ-EXC-2"
+    question: >
+      Should `risk_tier` be promoted from optional to required, given that
+      `required_authority_level`'s only textual justification (risk-tier.schema.yaml's
+      R3/R4 required_actions) is unusable without it? Left optional per
+      minimal-invasiveness relative to EC §24's literal 12-field template,
+      which names neither field — a future Round 2 review MAY tighten this.
+    owner: "operator, non-blocking"
+    blocks: "nothing in this schema's own validity"
+
+verification:
+  method: >
+    Read EC §23 (L985-1003), §24 (L1013-1041), §25 (L1045-1060), §91
+    (L2750-2762), §92 (L2766-2783) in full. Read Atlas §29 (L4536-4554) in
+    full, specifically rule 12 (L4549). Grepped "exception" and "workaround"
+    case-insensitively across all three mother documents; every hit
+    (MP L4254/L4357-4358/L5247, Atlas L903/L4549, EC L349/L1002/L1013/L1017/
+    L1020/L1041/L1053) was read in its surrounding section context, not just
+    the matched line. Read `docs/adr/ADR-001-scoped-authority-precedence-unification.md`
+    in full to check whether its Scoped Authority conflict-resolution chain
+    produces an "exception" outcome (it does not — see
+    `out_of_scope.verified_non_applicable`). Read
+    `specs/execution/risk-tier.schema.yaml` and
+    `specs/execution/data-deletion.schema.yaml` in full to confirm the
+    `risk_tier` $ref target and to confirm no overlap with the Retention/
+    Deletion Model method's "exception" step (data-deletion.schema.yaml
+    already owns that via its Legal Hold Check step). Confirmed via
+    `ls specs/execution/` that `authority.schema.yaml` does not exist in this
+    repo yet, justifying the soft (name-only) reference to it.
+  note: >
+    No mother document or ADR was modified to produce this file. EC §24's
+    12-field YAML template is transcribed verbatim as this schema's core
+    property set. `risk_tier`, `required_authority_level`, and `status` are
+    Phase 3 additive compilation decisions, individually justified above —
+    not new ADR-level tradeoffs. The four out-of-scope "exception" concepts
+    and the ADR-001 non-applicability check were verified by direct reading,
+    not assumed from the plan's or this task's characterization.

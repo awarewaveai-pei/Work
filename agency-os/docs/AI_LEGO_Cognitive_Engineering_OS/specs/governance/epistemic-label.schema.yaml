@@ -24,6 +24,14 @@ source_of_truth_for:
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §57 (L1988-1990)"
 decided_by: "docs/adr/ADR-004-risk-tier-and-epistemic-label-canonicalization.md (ACCEPTED 2026-08-29)"
 
+# Root $ref (2026-08-29, Codex cross-cutting review CONFIRMED finding #1):
+# without this, a validator pointed at this file's ROOT (not `#/provenance_record`)
+# has no type constraint and would accept any value. `provenance_record` is the
+# composite type every real consumer in this project already references
+# explicitly via `#/provenance_record` — this makes root-level validation agree
+# with that existing convention instead of silently accepting anything.
+$ref: "#/provenance_record"
+
 definitions:
 
   epistemic_type:

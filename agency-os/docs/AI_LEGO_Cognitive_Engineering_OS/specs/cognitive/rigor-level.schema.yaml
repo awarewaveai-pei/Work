@@ -97,6 +97,14 @@ decided_by: >
 # Part 1 (Low-risk, decided): the restored 5-value canonical vocabulary
 # ---------------------------------------------------------------------------
 
+# Root $ref (2026-08-29, Codex cross-cutting review CONFIRMED finding #1):
+# without this, a validator pointed at this file's ROOT (not `#/rigor_mode`)
+# has no type constraint and would accept any value. `rigor_mode` is the
+# type every real consumer in this project already references explicitly via
+# `#/rigor_mode` — this makes root-level validation agree with that existing
+# convention instead of silently accepting anything.
+$ref: "#/rigor_mode"
+
 rigor_mode:
   type: string
   description: >

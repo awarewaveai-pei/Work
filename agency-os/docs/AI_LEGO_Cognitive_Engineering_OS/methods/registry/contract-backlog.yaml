@@ -149,22 +149,43 @@ tier_1:
 # =============================================================================
 tier_2:
   policy: >
+    **CORRECTED 2026-08-29 (Codex cross-cutting review, CONFIRMED finding #4)**:
+    the Tier 2 set is the UNION of two disjoint sources, not method-inventory.yaml
+    alone: (a) every method_id in methods/registry/method-inventory.yaml with
+    `contract_status: pending` that is NOT listed under tier_0 or assigned to
+    tier_1 above, PLUS (b) every entry under `explicit_entries` below. The two
+    sources are disjoint by construction: `explicit_entries` exists precisely
+    for ADR-mandated methods (like `finance.financial_assumptions`) that do
+    NOT appear in method-inventory.yaml at all (verified by grep: zero hits),
+    because Atlas never catalogued them (no domain-pack content exists yet).
+    A compiler that reads ONLY the method-inventory.yaml rule and ignores
+    `explicit_entries` would silently drop the ADR-008-mandated Finance gap —
+    this is the exact failure mode the original wording (below, superseded)
+    did not rule out. Both sources MUST be read together to get the true
+    Tier 2 set; method-inventory.yaml is still not re-enumerated verbatim
+    here (that would duplicate its own contract_status field), but
+    `explicit_entries` below is never optional or supplementary-only.
+  original_policy_superseded: >
     Every method_id in methods/registry/method-inventory.yaml with
     `contract_status: pending` that is NOT listed under tier_0 or assigned to
     tier_1 above is Tier 2 by default. Tier 2 methods are not individually
     enumerated in this file (see file-level description for why: it would
     duplicate method-inventory.yaml's own contract_status field with zero
     added information). Cross-reference method-inventory.yaml directly to
-    enumerate the current Tier 2 set.
-  entry_count_at_time_of_writing: 284
+    enumerate the current Tier 2 set. [This omitted `explicit_entries` from
+    the stated rule — see correction above.]
+  entry_count_at_time_of_writing: 285
   entry_count_basis: >
-    289 total catalog entries - 2 has_contract:true (Tier 0 complete) - 2 Tier
-    0 pending (strategy.swot, evidence.triangulation, matched by machine_id,
-    counting each of root_cause.fishbone's 2 appearances as excluded) = 284.
-    Independently counted in this task (see verification below); the plan's
-    own text says "260+" as an estimate, not an exact figure -- 284 is not a
-    contradiction of that estimate, just this task's precise count against the
-    now-migrated registry.
+    284 from method-inventory.yaml (289 total catalog entries - 2
+    has_contract:true (Tier 0 complete) - 2 Tier 0 pending (strategy.swot,
+    evidence.triangulation, matched by machine_id, counting each of
+    root_cause.fishbone's 2 appearances as excluded) = 284) PLUS 1 from
+    `explicit_entries` below (finance.financial_assumptions, which does NOT
+    appear in method-inventory.yaml — verified by grep, zero hits — so it is
+    additive, not already counted in the 284) = **285 total**. The plan's own
+    text says "260+" as an estimate, not an exact figure — 285 is not a
+    contradiction of that estimate, just this task's precise count against
+    the now-migrated registry plus the one ADR-mandated addition.
   gating_status_code: "PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED"
   gating_status_code_source: "specs/execution/status-codes.schema.yaml (status: NEW_PROPOSED_2026-08-29)"
   gating_behavior: >

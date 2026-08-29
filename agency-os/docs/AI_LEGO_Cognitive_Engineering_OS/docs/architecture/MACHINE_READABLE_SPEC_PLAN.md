@@ -92,19 +92,19 @@ PROJECT_ROOT/                                  ← D:\Work\agency-os\docs\AI_LEG
 | `status-codes.schema.yaml` **（新增）** | 統一收斂全庫所有 blocking/escalation 機讀狀態碼：`PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED`/`METHOD_RESOLUTION_BLOCKED` 合併映射、EC 另外 9 個具名信號（`DOCUMENT_RESOLUTION_BLOCKED`/`CURRENT_STATE_DRIFT_DETECTED`/`SCOPE_CHANGE_REQUIRED`/`LEGAL_REVIEW_REQUIRED`/`BUDGET_REVIEW_REQUIRED`/`CONFLICT_REQUIRES_HUMAN_REVIEW`/`PREEXISTING_WORKTREE_CHANGES`/`OFFLINE_SOURCE_STALE`）與 §10 合法 side states 的映射關係，並新增 §5 提案的 `PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED` | YAML (JSON Schema) | 無 | CROSS-R-4, CROSS-T-5, DOC-execution_contract-9, DOC-execution_contract-3（`NEEDS_REVIEW` 未宣告） | **BUILT（2026-08-29，`specs/execution/status-codes.schema.yaml`；額外發現新衝突 P1-DUP-6，見 DUPLICATION_REGISTER.yaml）** |
 | `manifest.schema.yaml` | Execution Manifest 唯一正本，合併 MP §0.0.3 Atlas pin（file/declared_version/content_hash/loaded）+ EC §64 documents 段（version/sha256）+ MP §69 flat pin list + Atlas §16.3 method_execution record 四種形狀，並補上 ADR-001 建議的 Architecture Constitution 記錄欄位 | YAML (JSON Schema) | governance/epistemic-label（provenance 欄位）、Architecture-Constitution-v1.md（記錄它的 hash） | CROSS-R-6, CROSS-T-4, DOC-execution_contract-2（`document_version+content_hash` vs `version+sha256` 命名不一致） | **BUILT（2026-08-29，`specs/execution/manifest.schema.yaml`；EC L85 prose 與機讀區塊仍不一致，留 open_question 未擅自改母文件）** |
 | `normative-context.schema.yaml` **（新增）** | 定義 `Section Registry`（EC L198）與 `Normative Context Bundle`（EC L204）結構，供 Task Execution Packet 的 `normative-context.yaml` 引用 | YAML (JSON Schema) | manifest.schema.yaml | CROSS-T-18 | **BUILT（2026-08-29）**——~85% 為 Phase 3 新設計，已誠實標註非母文件既有承諾內容 |
-| `method-resolution.schema.yaml` | Task Context → Method Atlas selection_context 的欄位映射表，補齊 `goal_type/problem_type/required_rigor/decision_criticality/evidence_available/uncertainty/time_horizon` 等 EC task_context 缺失欄位 | YAML (JSON Schema) | risk-tier.schema.yaml, cognitive/method.schema.yaml | CROSS-T-16 | READY |
-| `task.schema.yaml` | EC §92 既有承諾，task_context 完整結構 | YAML (JSON Schema) | risk-tier, governance/epistemic-label | （沿用既有承諾，無單一 finding） | READY |
+| `method-resolution.schema.yaml` | Task Context → Method Atlas selection_context 的欄位映射表，補齊 `goal_type/problem_type/required_rigor/decision_criticality/evidence_available/uncertainty/time_horizon` 等 EC task_context 缺失欄位 | YAML (JSON Schema) | risk-tier.schema.yaml, cognitive/method.schema.yaml | CROSS-T-16 | **BUILT（2026-08-29）**——17 個 selection_context 欄位對 12 個 task_context 欄位逐一映射，13 個標記 SUPPLEMENT_REQUIRED |
+| `task.schema.yaml` | EC §92 既有承諾，task_context 完整結構 | YAML (JSON Schema) | risk-tier, governance/epistemic-label | （沿用既有承諾，無單一 finding） | **BUILT（2026-08-29）**——EC §7 12 欄位逐字轉譯，risk_tier 升級為真實 $ref |
 | `document-registry.schema.yaml` | EC §92 既有承諾，含三母文件 + Architecture Constitution 的 identity header 登記 | YAML (JSON Schema) | Architecture-Constitution-v1.md | OQ-1（identity header 缺失） | READY |
-| `current-state.schema.yaml` | EC §92 既有承諾 | YAML (JSON Schema) | — | — | READY |
-| `authority.schema.yaml` | EC §92 既有承諾，A0-A4 Autonomy/Authority Levels | YAML (JSON Schema) | governance/epistemic-label（locked 欄位需對照誰能改） | P1-GAP-SEC-6（人類角色↔A0-A4 對應，部分） | SKELETON_ONLY（人類職稱↔授權等級對應表全文空白，需操作者定義） |
-| `change-plan.schema.yaml` | EC §92 既有承諾 | YAML (JSON Schema) | risk-tier | — | READY |
-| `rollback.schema.yaml` | EC §92 既有承諾 | YAML (JSON Schema) | — | — | READY |
-| `gate.schema.yaml` | EC §92 既有承諾，`gate_result.gate_id` 需要一份穩定 gate 清單 | YAML (JSON Schema) | risk-tier（R3∪R4 觸發規則） | 部分依 ADR-004a 可用；**Global/High-risk Gate 清單本身（14+6 vs 11+1）尚未裁決** | **BLOCKED_PENDING_ROUND2_ADR**（CROSS-R-5, CROSS-R-7, CROSS-T-11） |
-| `exception.schema.yaml` | EC §92 既有承諾 | YAML (JSON Schema) | — | — | READY |
-| `result.schema.yaml` | EC §92 既有承諾 | YAML (JSON Schema) | cognitive/typed-method-result.schema.yaml | CROSS-R-3（部分：result.schema.yaml 不等於 TypedMethodResult，見 2.3） | READY |
-| `handoff.schema.yaml` | EC §92 既有承諾 | YAML (JSON Schema) | authority.schema.yaml | — | READY |
+| `current-state.schema.yaml` | EC §92 既有承諾 | YAML (JSON Schema) | — | — | **BUILT（2026-08-29）**——EC §11.1 20 項檢查清單 + §11.2 證據優先序 |
+| `authority.schema.yaml` | EC §92 既有承諾，A0-A4 Autonomy/Authority Levels | YAML (JSON Schema) | governance/epistemic-label（locked 欄位需對照誰能改） | P1-GAP-SEC-6（人類角色↔A0-A4 對應，部分） | **BUILT（骨架，2026-08-29）**——A0-A4 本體為 EC §9 真實逐字轉譯；`role_to_authority_mapping` 誠實留空並標 `SKELETON_ONLY`，未捏造範例角色 |
+| `change-plan.schema.yaml` | EC §92 既有承諾 | YAML (JSON Schema) | risk-tier | — | **BUILT（2026-08-29）** |
+| `rollback.schema.yaml` | EC §92 既有承諾 | YAML (JSON Schema) | — | — | **BUILT（2026-08-29）**——從 EC §20 + 本專案 10 份 ADR 自己真實的 Migration/Rollback 段落逆向工程，非抽象發明 |
+| `gate.schema.yaml` | EC §92 既有承諾，`gate_result.gate_id` 需要一份穩定 gate 清單 | YAML (JSON Schema) | risk-tier（R3∪R4 觸發規則） | 部分依 ADR-004a 可用；**Global/High-risk Gate 清單本身（14+6 vs 11+1）尚未裁決** | **BUILT（骨架，2026-08-29）**——`gate_result` 結構本體已建（EC §69），`gate_id` 明確標 `TBD_PENDING_ROUND2_ADR`，未從三方爭議清單任一方猜測 |
+| `exception.schema.yaml` | EC §92 既有承諾 | YAML (JSON Schema) | — | — | **BUILT（2026-08-29）**——EC §24 12 欄位範本 + Atlas §29 rule 12 交叉核對 |
+| `result.schema.yaml` | EC §92 既有承諾 | YAML (JSON Schema) | cognitive/typed-method-result.schema.yaml | CROSS-R-3（部分：result.schema.yaml 不等於 TypedMethodResult，見 2.3） | **BUILT（2026-08-29）**——`status` 為真實 $ref 指向 EC §70 vocabulary，非重新宣告 |
+| `handoff.schema.yaml` | EC §92 既有承諾 | YAML (JSON Schema) | authority.schema.yaml | — | **BUILT（2026-08-29）**——EC §71 30 項 MUST 清單 + §72 8 檔 RECOMMENDED 佈局逐字依據 |
 | `section-registry.schema.yaml` **（新增，評估後確定分離設計）** | Section Registry 與 Normative Context Bundle 判定為不同生命週期（前者文件層級可跨 execution 重用，後者 per-execution）而分離為兩檔 | YAML (JSON Schema) | normative-context.schema.yaml | CROSS-T-18（同上） | **BUILT（2026-08-29）** |
-| `deprecation-pipeline.schema.yaml` **（新增）** | 統一 Atlas §24.3（6 步）與 EC §113（7 步，多 Deadline）的方法/物件退場流程，採 EC 版（更完整，屬 Low-risk 事實性補全，非需要 ADR 裁決的取捨） | YAML (JSON Schema) | status-codes.schema.yaml | CROSS-T-19 | READY |
+| `deprecation-pipeline.schema.yaml` **（新增）** | 統一 Atlas §24.3（6 步）與 EC §113（7 步，多 Deadline）的方法/物件退場流程，採 EC 版（更完整，屬 Low-risk 事實性補全，非需要 ADR 裁決的取捨） | YAML (JSON Schema) | status-codes.schema.yaml | CROSS-T-19 | **BUILT（2026-08-29）**——逐欄位核對後確認「EC 完全涵蓋 Atlas」的假設成立，非照抄計畫文件定性 |
 
 ### 2.3 `/specs/cognitive/`（Wave 3 — Method Selection Engine 核心）
 
@@ -117,9 +117,9 @@ PROJECT_ROOT/                                  ← D:\Work\agency-os\docs\AI_LEG
 | `recipe.schema.yaml` | Atlas Appendix A 既有承諾 | YAML (JSON Schema) | method.schema.yaml | — | **BUILT（2026-08-29）**——採 MP §9 Workflow IR 2 值 node-type 文法，Recipe ID 文法留 open_question |
 | `profile.schema.yaml` | Atlas Appendix A 既有承諾（rigor/mode profile） | YAML (JSON Schema) | rigor-level.schema.yaml | — | **BUILT（2026-08-29）**——僅 cognitive 維度有真實依據，其餘留骨架 |
 | `rigor-level.schema.yaml` **（新增）** | 補回 MP §84 五模式（Fast/Professional/Research Grade/Board Grade/**Deep Intelligence**）與 Atlas `required_rigor` 四值 enum 的映射，Deep Intelligence 定義為 board_grade + 額外 gate 組合 | YAML (JSON Schema) | governance/epistemic-label | CROSS-T-15 | **BUILT（2026-08-29）**——名稱恢復（Low-risk）已定案；enum 基數該不該擴為 5 值留 `open_questions` 待操作者/Round 2 ADR（比照 ADR-004 判準，未擅自決定） |
-| `problem-type.schema.yaml` **（新增）** | 統一 `selection_context.problem_type` enum 與 §10 Problem Type 路由表——把 Incident/Policy/Architecture/Security/DB Migration/Market Entry 補進 enum，exploratory/decision/operational 補上路由表對應列 | YAML (JSON Schema) | method-resolution.schema.yaml | DOC-method_atlas-5 | READY |
-| `method-execution-request.schema.yaml` **（新增，全庫首次定義）** | `cognitive.execute_method` Capability Contract 的輸入型別；全三份文件目前僅 MP L708 提名、零定義 | YAML (JSON Schema) | method.schema.yaml, execution/task.schema.yaml | CROSS-R-3, CROSS-T-17, DOC-master_plan-6 | READY（無既有內容可沿用，需從 MP §8.3 呼叫語境反推欄位，屬新設計非修正） |
-| `typed-method-result.schema.yaml` **（新增，全庫首次定義）** | 同上契約的輸出型別 | YAML (JSON Schema) | execution/result.schema.yaml | CROSS-R-3, CROSS-T-17, DOC-master_plan-6 | READY（同上） |
+| `problem-type.schema.yaml` **（新增）** | 統一 `selection_context.problem_type` enum 與 §10 Problem Type 路由表——把 Incident/Policy/Architecture/Security/DB Migration/Market Entry 補進 enum，exploratory/decision/operational 補上路由表對應列 | YAML (JSON Schema) | method-resolution.schema.yaml | DOC-method_atlas-5 | **BUILT（2026-08-29）**——13 值 enum，10 個路由對應有據，3 個（exploratory/decision/operational）誠實留白非母文件承諾 |
+| `method-execution-request.schema.yaml` **（新增，全庫首次定義）** | `cognitive.execute_method` Capability Contract 的輸入型別；全三份文件目前僅 MP L708 提名、零定義 | YAML (JSON Schema) | method.schema.yaml, execution/task.schema.yaml | CROSS-R-3, CROSS-T-17, DOC-master_plan-6 | **BUILT（2026-08-29）**——~15% 有據/~85% 新設計，比例誠實揭露 |
+| `typed-method-result.schema.yaml` **（新增，全庫首次定義）** | 同上契約的輸出型別 | YAML (JSON Schema) | execution/result.schema.yaml | CROSS-R-3, CROSS-T-17, DOC-master_plan-6 | **BUILT（2026-08-29）**——~35% 有據/~65% 新設計，CROSS-R-3 至此完整解決 |
 | `typed-objects/problem-statement.schema.yaml` **（新增）** | 含 `status` enum（引用處要求 `validated` 狀態值，但全文從未定義完整 enum） | YAML (JSON Schema) | — | DOC-method_atlas-9, DOC-method_atlas-7 | **BUILT（2026-08-29）** |
 | `typed-objects/cause-hypothesis-set.schema.yaml` **（新增）** | §14.1 型別鏈節點 | YAML (JSON Schema) | root-cause-fact（見下） | DOC-method_atlas-7 | **BUILT（2026-08-29）**——真實 `$ref` 串接 problem-statement → cause-hypothesis-set → root-cause-fact |
 | `typed-objects/root-cause-fact.schema.yaml` **（新增）** | 統一 `FinalCausalFact`/`RootCauseFact`/`Root Cause Fact`/`RootCauseAssessment` 四個名稱為單一型別 + 單一 canonical name（建議採 `RootCauseFact`，其餘三個列為 deprecated alias） | YAML (JSON Schema) | governance/epistemic-label（此型別的提升規則直接對應 FACT 紅線） | DOC-method_atlas-3 | **BUILT（2026-08-29）**——4 個名稱引用逐一核對行號正確；建置過程抓到並修正 2 個真實 schema bug（required 欄位打錯、forbidden_transition 縮排錯誤） |
@@ -229,9 +229,17 @@ Wave 4 ── ✅ 完成（2026-08-29）
     （jurisdiction/conflict-of-laws-output.schema.yaml 仍 BLOCKED_PENDING_ROUND2_ADR，未建）
   specs/execution/{normative-context,section-registry}.schema.yaml ✅
           ↓
-Wave 5  specs/execution/ 其餘檔（task/document-registry/current-state/authority/
-          change-plan/rollback/exception/result/handoff）
-        specs/execution/gate.schema.yaml            ← BLOCKED，先建骨架等 Round 2
+Wave 5 ── ✅ 核心完成（2026-08-29）
+  specs/execution/{task,current-state,authority,change-plan,rollback,
+    exception,result,handoff,method-resolution,deprecation-pipeline}
+    .schema.yaml ✅
+  specs/execution/gate.schema.yaml ✅（骨架，gate_id 明確標 TBD_PENDING_ROUND2_ADR）
+  specs/execution/document-registry.schema.yaml ── 延後（依賴尚未建立的
+    Architecture-Constitution-v1.md 這份新母文件，需先走 ADR-006 proposals 流程）
+  specs/cognitive/{problem-type,method-execution-request,
+    typed-method-result}.schema.yaml ✅（原 Wave 3 延後項目，Wave 5 補齊）
+  specs/domain/capability-contract.schema.yaml ── 仍延後（可於下一輪立即建置，
+    依賴的 method-execution-request.schema.yaml 已完成）
           ↓
 Wave 6  policies/ 全目錄（依附 Wave 1-5 的 schema 做代碼化）
           ↓
@@ -293,6 +301,11 @@ Wave 8  tests/ 全目錄（對 Wave 1-7 的每個 schema 寫 golden test）
 | MRSP-8（2026-08-29 新增） | `rigor-level.schema.yaml` 的 `deep_intelligence` 該不該是 Atlas `required_rigor` 的原生第 5 值，或永遠只能是 `board_grade` + 附加維度層——這是真正的 enum 基數變更，比照 ADR-004 判準不應由 Phase 3 單方定案 | `specs/cognitive/rigor-level.schema.yaml`、未來任何依 `required_rigor` 觸發的 gate/policy 檔案 | 該 schema 已內建 `PROVISIONAL_PENDING_OPERATOR_SIGNOFF` 預設值（採 board_grade+附加層，與本計畫 §2.3 原始草稿方向一致）並在 `open_questions` 明確標註未定案；建議操作者決定是否併入 Round 2 ADR |
 | MRSP-9（2026-08-29 新增） | `recipe.schema.yaml` 的 `id` 文法用 kebab-case slug，與 MP:812 既有的版本內嵌點號形式不一致，目前無 ADR 裁決 Recipe ID 文法（與 ADR-005b 已裁決的 Method ID 文法是兩件事） | `specs/cognitive/recipe.schema.yaml`、未來 `recipes/validated/` 目錄下的實際檔名 | 低風險，可與 MRSP-3（DUP-2/DUP-5 命名收斂）併入同一輪處理，或操作者另行裁決 |
 | MRSP-10（2026-08-29 新增） | `key-vault-lifecycle.schema.yaml` 發現 ADR-002 檔案自身標頭仍寫 `Status: PROPOSED`，與 `ADR_INDEX.md` 登記的 `ACCEPTED` 不一致 | 無（純文件同步問題） | **已修正（2026-08-29）**：ADR-002 標頭已同步更新為 `ACCEPTED`，見 WORKLOG 對應條目 |
+| MRSP-11（2026-08-29，Codex 覆審）| 4 個檔案（risk-tier/epistemic-label/rigor-level/representation）的實際內容放在具名子欄位下，檔案根本身不驗證任何東西——直接對檔案根做驗證的工具會誤放行任意值 | 上述 4 檔 | **已修正（2026-08-29）**：4 檔根層級各加一行 `$ref` 指向對應的主要型別（`#/risk_tier`、`#/provenance_record`、`#/rigor_mode`、`#/representation`），已用 jsonschema 實測確認根層級驗證正確拒絕非法值 |
+| MRSP-12（2026-08-29，Codex 覆審）| `profile.schema.yaml` 的 `rigor` 欄位用鬆散字串而非真正 `$ref`，其 `compilation_decisions` 聲稱「全套件零跨檔 $ref」其實不實——同一批次的 `task.schema.yaml` 已有真正的 $ref 先例 | `specs/cognitive/profile.schema.yaml` | **已修正（2026-08-29）**：`rigor` 改為真正 `$ref` 指向 `rigor-level.schema.yaml#/rigor_mode`，已實測確認 `"board-grad"` 這類錯字現在會被正確拒絕 |
+| MRSP-13（2026-08-29，Codex 覆審）| `method.schema.yaml` 的 `contract_provenance` 聲稱「型別化為 provenance_record」，實際卻是三個無約束字串——`epistemic_type: FACT`（非真實值）、`authorship_state: BOT`（非真實值）這類資料會通過驗證 | `specs/cognitive/method.schema.yaml` | **已修正（2026-08-29）**：改為真正 `$ref` 指向 `epistemic-label.schema.yaml#/provenance_record`（epistemic-label.schema.yaml 早在 Wave 1 就已建好，原本用軟參照沒有正當理由），已實測確認非法值現在會被拒絕 |
+| MRSP-14（2026-08-29，Codex 覆審）| `contract-backlog.yaml` 的 Tier 2 定義自相矛盾：`policy` 段只說「從 method-inventory.yaml 衍生」，但 `explicit_entries` 又加了一筆 `finance.financial_assumptions`（該方法根本不在 method-inventory.yaml 裡）——依字面規則走的 compiler 會漏掉 ADR-008 要求的項目 | `methods/registry/contract-backlog.yaml` | **已修正（2026-08-29）**：`policy` 改為明確說明 Tier 2 = method-inventory.yaml 待完成項（284）∪ explicit_entries（1）之聯集，總數訂正為 285 |
+| MRSP-15（2026-08-29，我方在驗證 MRSP-12 修正時獨立發現）| 自訂 URI scheme `ai-lego://` 不在 Python `urllib.parse` 的已知 scheme 清單中，導致相對路徑形式的 `$ref`（如 `"rigor-level.schema.yaml#/rigor_mode"`）無法正確解析——`urljoin` 會原樣回傳相對字串，不會拼接成完整 URI | 任何未來新增的跨檔 `$ref` | 全庫掃描確認：現有 40+ 個檔案的真正跨檔 `$ref` 全數已正確使用完整 `ai-lego://specs/...` 絕對形式（`task.schema.yaml` 是最早示範此形式的檔案），無其他檔案受影響；本次修正 MRSP-12 時一度誤用相對形式，已改正。**新規則（供未來建置遵循）**：跨檔 `$ref` 一律使用完整 `ai-lego://specs/<path>#/<key>` 形式，禁止相對檔名形式 |
 
 ---
 

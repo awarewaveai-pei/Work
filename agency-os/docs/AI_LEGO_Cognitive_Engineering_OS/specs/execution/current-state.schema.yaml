@@ -1,0 +1,439 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/execution/current-state.schema.yaml"
+title: Current-State Reconstruction Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the "Current-state Reconstruction"
+  record — Execution Contract §11 (L579-638), which the Contract itself calls
+  "這是所有非 trivial 變更最重要的第一步" (the single most important first
+  step for any non-trivial change). Before any forward change, the record
+  below must be able to answer EC's literal prompt (L586): "現在系統到底是
+  什麼狀態？" ("what state is the system actually in right now?").
+
+  This schema formalizes THREE things EC §11 defines but never gives a
+  field-level shape to: (1) WHAT must be observed — the 20-item Minimum
+  Current State checklist (§11.1, L589-612); (2) WHEN and against WHICH
+  evidence it was observed — the 11-item Evidence Sources priority order
+  (§11.2, L614-630); (3) the drift condition this whole exercise exists to
+  catch — CURRENT_STATE_DRIFT_DETECTED, fired when "文件與 reality 衝突"
+  (L632, documentation conflicts with observed reality), with the explicit
+  rule "不可假裝文件一定正確" (L638, MUST NOT assume the document is
+  correct). `status-codes.schema.yaml` already resolved this code's mapping
+  onto the §10 side-state vocabulary (NEEDS_HUMAN_REVIEW) — this file is the
+  schema that produces the record whose comparison is what triggers that
+  code, closing the loop status-codes.schema.yaml left open.
+
+  Scope boundary (see compilation_decisions #1): this file models the
+  CONCEPTUAL per-run record — the 20 dimensions plus their evidence and
+  drift status — not the 10 individual physical filenames EC §12
+  (L642-663) lists under the `/.ai/tasks/{task_id}/current-state/` runtime
+  directory (system-inventory.yaml, dependency-map.yaml, etc.). None of
+  those 10 filenames appear in EC §92's 13-file `/specs/execution/` list
+  (L2766-2783), so defining 10 additional schemas for them is out of scope
+  for a file that list DOES name. `artifact_index` below tracks which of
+  those 10 files were produced for a given reconstruction, by name only —
+  a manifest-of-manifests, the same pattern `manifest.schema.yaml`'s
+  `documents[]` uses to track pinned files by name+hash without redefining
+  their internal shape.
+
+  This file is also a documented consumer relationship: EC §13 Problem
+  Definition Before Solution (L673-696) lists "Current State" as its
+  literal first field — every problem-definition record's Current State
+  field is expected to be (or point to) an instance of this schema.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §11 Current-state Reconstruction (L579-638)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §11.1 Minimum Current State (L589-612)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §11.2 Evidence Sources + CURRENT_STATE_DRIFT_DETECTED (L614-638)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §12 Current State Artifact (L642-670)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §13 Problem Definition Before Solution, 'Current State' first field (L673-696)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §92 Machine-readable Execution Specs list (L2766-2783, current-state.schema.yaml at L2772)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.8 Production Incident Recipe, 禁止 list (L3444-3449, '未重建 current state 就直接 patch' at L3446)"
+  - "specs/execution/status-codes.schema.yaml CURRENT_STATE_DRIFT_DETECTED entry (its own L211-224), which cites EC §11 L635 and resolves DOC-execution_contract-9's side-state mapping (NEEDS_HUMAN_REVIEW) for this exact condition"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2 row for current-state.schema.yaml (READY, no dependency, no finding)"
+
+decided_by: >
+  No ADR governs this file. docs/architecture/MACHINE_READABLE_SPEC_PLAN.md
+  §2.2 row for current-state.schema.yaml lists it READY with dependency "—"
+  and resolved finding "—" — this file is a direct compilation of EC §11's
+  already-written prose and lists (the 20-item checklist, the 11-item
+  evidence-priority order, the drift trigger condition), not a Phase 0/1
+  finding resolution or a new architecture decision requiring ADR review.
+  Field naming and structural choices (dimensions[] as an array with an
+  enum, evidence_priority as descriptive const vs. evidence_log as
+  per-instance) are Phase 3 compilation decisions, recorded below.
+
+compilation_decisions:
+  - question: >
+      Should this file also define the 10 individual artifact filenames EC
+      §12 (L646-663) lists under `/.ai/tasks/{task_id}/current-state/`
+      (system-inventory.yaml, dependency-map.yaml, affected-paths.txt,
+      schema-baseline.yaml, api-baseline.yaml, deployment-baseline.yaml,
+      security-boundary.yaml, test-baseline.yaml, observability-baseline.yaml,
+      unknowns.yaml)?
+    decision: >
+      No — track them by name only, via `artifact_index[]`, without
+      redefining their internal shape.
+    reasoning: >
+      None of the 10 filenames appear in EC §92's 13-file
+      `/specs/execution/` list (L2766-2783), which is the list this task
+      was scoped against. Defining 10 more schema files is a much larger,
+      separately-scoped undertaking than "formalize the current-state
+      record" and was not requested. `manifest.schema.yaml` faced the
+      identical shape of problem for `document-registry.schema.yaml` (a
+      Wave 5 file not yet built when manifest.schema.yaml, a Wave 1 file,
+      was written) and resolved it the same way: track the referenced
+      thing by name/identity, not by re-deriving its full shape inline.
+  - question: >
+      EC §11.1's 20 items are written as bare English/slash-form phrases
+      ("Repository / Commit", "Affected Bounded Context", ...), not
+      SNAKE_CASE identifiers like this project's other enums (e.g.
+      risk-tier.schema.yaml's R0-R4, or status-codes.schema.yaml's
+      SCREAMING_SNAKE_CASE codes).
+    decision: "Keep the 20 enum values verbatim, exactly as EC L592-611 writes them."
+    reasoning: >
+      Renaming them to SNAKE_CASE would be a cosmetic normalization with no
+      forcing finding behind it (unlike, say, ADR-004's risk_tier
+      canonicalization, which resolved a genuine two-vocabulary conflict).
+      The task instruction was to ground this schema in §11's real content;
+      inventing a naming convention EC never uses risks looking like a
+      second, competing vocabulary the next reader has to reconcile against
+      the mother document's own text. Verbatim transcription avoids that.
+  - question: >
+      How should the record capture "compared against which document
+      version" (the task's explicit third question), given EC §11 itself
+      never names a field for this?
+    decision: >
+      Added `compared_against[]`, each entry a hard `$ref` into
+      `manifest.schema.yaml`'s `documents[].document_id` enum plus its
+      `version`/`sha256` pair.
+    reasoning: >
+      EC §11.2's evidence-source priority list includes "Documentation"
+      (L627) and "Approved ADR" (L626) as legitimate evidence — reading
+      those against a *specific* document identity/version is exactly what
+      "compared against which document version" means, and
+      `manifest.schema.yaml` already defines the canonical
+      document_id/version/sha256 triple for the four mandatory mother
+      documents. Reusing it (real hard $ref, not a soft reference) avoids
+      inventing a second, incompatible document-identity shape — the same
+      reuse pattern `normative-context.schema.yaml` and
+      `section-registry.schema.yaml` already established for this exact
+      $ref target.
+  - question: >
+      EC §11.2 gives ONE ordered priority list (Running System Evidence
+      first, Model Inference last, L619-629). Should that ordering be
+      enforced mechanically on every reconstruction's evidence log?
+    decision: >
+      Recorded as descriptive metadata (`evidence_priority`, a `const`
+      array) separate from the per-instance `evidence_log[]`, ordering NOT
+      mechanically validated.
+    reasoning: >
+      Same split `blast-radius-chain.schema.yaml` already uses for its own
+      `chain` (descriptive, `const`) vs. `chain_instance` (per-instance) —
+      a directly precedented pattern in this same directory. Mechanically
+      enforcing "log entries must appear in priority order" would require
+      inventing a comparison rule EC never states (it says evidence sources
+      are prioritized when choosing WHICH source to trust on conflict, not
+      that a reconstruction must exhaustively consult them in strict
+      sequence) — left open rather than silently decided, see
+      `open_questions`.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+type: object
+required: [task_id, reconstructed_at, dimensions, evidence_log, drift]
+properties:
+
+  task_id:
+    type: string
+    pattern: "^TASK-"
+    description: "Soft reference by convention to manifest.schema.yaml's execution.task_id — no hard $ref, same reasoning manifest.schema.yaml itself uses for forward-only references."
+
+  execution_id:
+    type: string
+    pattern: "^EX-"
+
+  reconstructed_at:
+    type: string
+    format: date-time
+
+  reconstructed_by:
+    type: string
+    description: "Actor performing the reconstruction. EC §11 addresses 'AI' throughout ('AI 必須先回答', L583), but a human may also perform or verify one."
+
+  artifact_path:
+    type: string
+    description: >
+      Physical location per EC §12 (L644-648): /.ai/tasks/{task_id}/current-state/.
+      Non-normative — EC L667 is explicit that "/.ai/ 是 workspace path，
+      不是永久 identity" (a workspace path, not a permanent identity);
+      `task_id`/`execution_id` above are the permanent identity per EC L668.
+
+  compared_against:
+    type: array
+    description: >
+      Which document version(s) this reconstruction's Documentation /
+      Approved ADR evidence (EC §11.2, L626-627) was read against —
+      directly what makes CURRENT_STATE_DRIFT_DETECTED (below) checkable:
+      a drift is precisely a conflict between one of these pinned versions
+      and an `OBSERVED`-status dimension.
+    minItems: 1
+    items:
+      type: object
+      required: [document_id, version, sha256]
+      properties:
+        document_id:
+          $ref: "ai-lego://specs/execution/manifest.schema.yaml#/properties/documents/items/properties/document_id"
+        version:
+          $ref: "ai-lego://specs/execution/manifest.schema.yaml#/properties/documents/items/properties/version"
+        sha256:
+          $ref: "ai-lego://specs/execution/manifest.schema.yaml#/properties/documents/items/properties/sha256"
+
+  dimensions:
+    type: array
+    description: >
+      One entry per EC §11.1 Minimum Current State item (L592-611),
+      transcribed verbatim. See compilation_decisions for why these are
+      NOT renamed to SNAKE_CASE.
+    minItems: 20
+    items:
+      type: object
+      required: [name, status]
+      properties:
+        name:
+          type: string
+          enum:
+            - "Repository / Commit"
+            - "Architecture"
+            - "Affected Bounded Context"
+            - "Affected Files / Modules"
+            - "Runtime Dependencies"
+            - "APIs"
+            - "Schemas"
+            - "Events"
+            - "Data Flow"
+            - "Security Boundary"
+            - "Identity / Authorization"
+            - "Config"
+            - "Infrastructure"
+            - "Deployment Topology"
+            - "Tests"
+            - "Observability"
+            - "Known Failure"
+            - "Rollback Capability"
+            - "Open Migration"
+            - "Known Technical Debt"
+        status:
+          type: string
+          enum: [OBSERVED, UNKNOWN, NOT_APPLICABLE]
+          description: >
+            OBSERVED = evidence-backed value recorded in `summary`. UNKNOWN
+            is a legitimate, honest value (same spirit as EC L688-694's
+            "Root Cause = UNKNOWN 而不是亂填" for problem definitions —
+            not fabricating a value beats guessing one).
+        summary:
+          type: string
+        evidence_ref:
+          type: array
+          items: { type: string }
+          description: "Indexes/keys into evidence_log[] below supporting this dimension's observed value."
+        drift_detected:
+          type: boolean
+          default: false
+          description: "True if this specific dimension is the one where documentation and observed reality disagree."
+    required_dimension_names:
+      description: >
+        Every record MUST contain exactly one entry per value below.
+        Non-normative sibling of the `enum` above, for tooling that wants a
+        completeness check without re-deriving it from the enum (same
+        pattern as manifest.schema.yaml's `required_document_ids`).
+      value:
+        - "Repository / Commit"
+        - "Architecture"
+        - "Affected Bounded Context"
+        - "Affected Files / Modules"
+        - "Runtime Dependencies"
+        - "APIs"
+        - "Schemas"
+        - "Events"
+        - "Data Flow"
+        - "Security Boundary"
+        - "Identity / Authorization"
+        - "Config"
+        - "Infrastructure"
+        - "Deployment Topology"
+        - "Tests"
+        - "Observability"
+        - "Known Failure"
+        - "Rollback Capability"
+        - "Open Migration"
+        - "Known Technical Debt"
+
+  evidence_priority:
+    description: >
+      Descriptive metadata: the ordered priority EC §11.2 (L618-629)
+      assigns to evidence sources when choosing which to trust. NOT a
+      per-instance record — see `evidence_log` below for that. Order in
+      this array IS the priority order (index 0 = highest); do not reorder.
+    type: array
+    const:
+      - "Running System Evidence"
+      - "Repository"
+      - "Tests"
+      - "Schemas"
+      - "Deployment Manifests"
+      - "Infra-as-Code"
+      - "Logs / Metrics / Traces"
+      - "Approved ADR"
+      - "Documentation"
+      - "Human Statement"
+      - "Model Inference"
+
+  evidence_log:
+    type: array
+    description: >
+      Per-instance evidence actually consulted for this reconstruction.
+      `type` values are drawn from the same 11-item vocabulary as
+      `evidence_priority`. This schema does NOT mechanically enforce that
+      entries appear in priority order — see open_questions.
+    items:
+      type: object
+      required: [type, ref]
+      properties:
+        type:
+          type: string
+          enum:
+            - "Running System Evidence"
+            - "Repository"
+            - "Tests"
+            - "Schemas"
+            - "Deployment Manifests"
+            - "Infra-as-Code"
+            - "Logs / Metrics / Traces"
+            - "Approved ADR"
+            - "Documentation"
+            - "Human Statement"
+            - "Model Inference"
+        ref:
+          type: string
+          description: "Commit hash / file path / log query / ADR filename / human statement id, etc., depending on type."
+        consulted_at:
+          type: string
+          format: date-time
+
+  drift:
+    type: object
+    description: >
+      Formalizes EC §11.2's drift condition (L632-638): "文件與 reality
+      衝突時：CURRENT_STATE_DRIFT_DETECTED。需先記錄 drift，不可假裝文件
+      一定正確。"
+    required: [detected]
+    properties:
+      detected:
+        type: boolean
+      status_code:
+        type: string
+        const: "CURRENT_STATE_DRIFT_DETECTED"
+        description: >
+          Soft reference by name to status-codes.schema.yaml's
+          CURRENT_STATE_DRIFT_DETECTED entry. No hard $ref target exists
+          there: status_codes[] is an array of documentation records (each
+          with a `name` string field), not a JSON Schema definitions node
+          with a re-usable enum/type fragment — the same limitation
+          blast-radius-chain.schema.yaml already documented for its own
+          soft-by-name tenant_id reference.
+      conflicting_dimensions:
+        type: array
+        items: { type: string }
+        description: "Which dimensions[].name entries triggered the drift."
+      recorded_before_assuming_doc_correct:
+        type: boolean
+        description: >
+          Mechanical checkbox for EC L638's MUST NOT rule ("不可假裝文件
+          一定正確"). MUST be true whenever detected=true, recorded BEFORE
+          any decision about which source (doc vs. observed reality) wins.
+      side_state:
+        type: string
+        const: "NEEDS_HUMAN_REVIEW"
+        description: >
+          Per status-codes.schema.yaml's side_state_mapping for
+          CURRENT_STATE_DRIFT_DETECTED (mapping_basis: PROPOSED_BY_THIS_FILE):
+          deciding which source is authoritative requires human judgment,
+          it is not mechanically resolvable.
+
+  artifact_index:
+    type: array
+    description: >
+      Manifest-of-manifests for EC §12's 10 sub-artifact filenames
+      (L646-663). Records which were produced for this reconstruction
+      without redefining their internal shape — see compilation_decisions.
+    items:
+      type: object
+      required: [filename, produced]
+      properties:
+        filename:
+          type: string
+          enum:
+            - "system-inventory.yaml"
+            - "dependency-map.yaml"
+            - "affected-paths.txt"
+            - "schema-baseline.yaml"
+            - "api-baseline.yaml"
+            - "deployment-baseline.yaml"
+            - "security-boundary.yaml"
+            - "test-baseline.yaml"
+            - "observability-baseline.yaml"
+            - "unknowns.yaml"
+        produced:
+          type: boolean
+        note:
+          type: string
+
+  consumed_by:
+    type: array
+    description: >
+      Downstream consumers of this record. EC §13 Problem Definition
+      Before Solution (L673-686) lists "Current State" as its literal
+      first field — a problem-definition record's Current State field is
+      expected to be, or point to, an instance of this schema.
+    items: { type: string }
+    default: ["problem_definition.current_state"]
+
+# ---------------------------------------------------------------------------
+open_questions:
+  - id: "OQ-CS-1"
+    question: >
+      Should `evidence_log[]` ordering be mechanically validated against
+      `evidence_priority` (e.g. reject a log that consults "Model
+      Inference" while ignoring available "Repository" evidence for the
+      same dimension)? EC §11.2 states the priority order but does not
+      specify an enforcement rule — left open per compilation_decisions
+      rather than inventing one.
+    owner: "operator, or a future Round 2 ADR"
+    blocks: "nothing in this schema; flagged for completeness per R4 (claim-before-verify)"
+  - id: "OQ-CS-2"
+    question: >
+      Should the 10 filenames in `artifact_index` eventually get their own
+      field-level schemas (a Wave beyond this task)? Not requested by EC
+      §92's 13-file list; noted so the gap is visible rather than silent.
+    owner: "operator, future Wave planning"
+    blocks: "nothing in this schema"
+
+verification:
+  method: >
+    Read against EC §11 (L579-638), §11.1 (L589-612), §11.2 (L614-638),
+    §12 (L642-670), §13 (L673-696), §92 (L2766-2783); Atlas §13.8 (L3425-3451,
+    the '未重建 current state 就直接 patch' prohibition); full text of
+    status-codes.schema.yaml's CURRENT_STATE_DRIFT_DETECTED entry
+    (its own L211-224) and manifest.schema.yaml's documents[] shape
+    (its own L185-253), both re-read in this session to confirm the $ref
+    targets and side_state value cited above are accurate.
+  note: >
+    All 20 dimension names, all 11 evidence-source types, and all 10
+    artifact filenames are transcribed verbatim from EC. No mother document
+    was modified to produce this file. `compared_against[]`'s document_id/
+    version/sha256 shape is a real hard $ref into manifest.schema.yaml, not
+    a re-derivation.

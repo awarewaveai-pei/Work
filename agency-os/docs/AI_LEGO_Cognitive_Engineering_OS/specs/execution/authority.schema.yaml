@@ -1,0 +1,323 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/execution/authority.schema.yaml"
+title: Autonomy / Authority Levels
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the A0-A4 Autonomy/Authority Level
+  enum. Execution Contract §9 "Autonomy / Authority Levels" (L478-529) is the
+  ONLY place either mother document defines this enum — grep-confirmed
+  against Master Plan and Method Atlas, neither of which mentions A0-A4 at
+  all (the only other hit anywhere in the corpus is Atlas L3073-3074, where
+  "A1"/"A2" are unrelated Mermaid diagram node ids for "Phishing"/"Credential
+  Stuffing", not this enum). EC §16's `task.manifest.yaml` stub (L771-772)
+  already assumes this enum exists, via a sibling `authority.max_autonomy`
+  field next to `risk.tier` — this file is that missing definition.
+
+  Per MACHINE_READABLE_SPEC_PLAN.md §2.2 row 99, this file is only PARTIALLY
+  buildable from the mother documents: the five A0-A4 levels themselves
+  (capabilities, scope, requirements) are fully grounded in EC §9 and are
+  built below as real, normative content — NOT skeleton. The genuinely
+  missing half is finding P1-GAP-SEC-6
+  (.ai/research/phase-1/GAP_REGISTER.yaml L231-238): no mother document maps
+  any HUMAN organizational role/title (e.g. "Tech Lead", "Security Officer")
+  to which A0-A4 level that role may exercise or grant approval for — EC's
+  Least Privilege language (§97, L2879-2900) only ever constrains the AI
+  agent, never a human approver. `role_to_authority_mapping` below is that
+  missing piece, and is honestly left as an empty, operator-owned
+  placeholder rather than populated with invented roles — inventing
+  plausible-sounding titles here would misrepresent an undecided operator
+  question as settled fact, exactly the failure mode R0's 補丁判準
+  (patch-criterion) and R4 (claim-before-verify) both forbid.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 Autonomy / Authority Levels (L478-529) — full A0-A4 definitions, verbatim"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §16 task.manifest.yaml (L771-772, `authority.max_autonomy: A2`) — confirms the enum's consuming field"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §97 Least Privilege (L2879-2900) — scopes Least Privilege to the AI Task only; evidence P1-GAP-SEC-6 cites for why no human-role mapping exists"
+  - ".ai/research/phase-1/GAP_REGISTER.yaml P1-GAP-SEC-6 (L231-238) — the exact gap this file's `role_to_authority_mapping` field is scoped to, not silently resolved"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2 row 99 (L99) — this file's tracked status: 'SKELETON_ONLY（人類職稱↔授權等級對應表全文空白，需操作者定義）'"
+  - "specs/artifact/cas-path.schema.yaml compilation_decisions (L85-97) and open_questions.cas-path-1 (L228-236) — an existing forward dependent already waiting on this file's role↔authority mapping for its own `global_pool_promotion` authorization question"
+
+decided_by: >
+  No ADR governs the A0-A4 enum itself. It is a direct, low-risk verbatim
+  transcription of EC §9 — the sole definition in the corpus, with no
+  competing or conflicting version in Master Plan or Method Atlas (unlike
+  risk-tier.schema.yaml's ADR-004 situation, where Atlas and EC gave
+  DIFFERENT enums that needed reconciling). Transcribing an uncontested,
+  single-source enum is the same class of Low-risk compilation
+  MACHINE_READABLE_SPEC_PLAN.md's own precedent describes for
+  typed-objects/root-cause-fact.schema.yaml naming decisions ("命名裁決屬
+  Low-risk，可在 Phase 3 內部直接定案，不需要 ADR").
+
+  `role_to_authority_mapping`, by contrast, is explicitly NOT decided by
+  this file, this session, or any existing ADR. It requires the operator to
+  supply real organizational roles and their authority ceilings — a
+  business/organizational fact no mother document, ADR, or Phase 0-2
+  research artifact contains (grep-confirmed: GAP_REGISTER.yaml records the
+  gap; no ADR_INDEX.md entry addresses it; .ai/research/phase-0/open-
+  questions.yaml does not carry it either, since it was catalogued as a GAP,
+  not an OQ). Per MACHINE_READABLE_SPEC_PLAN.md's own instruction for this
+  file ("SKELETON_ONLY...需操作者定義"), this file builds the empty, typed
+  CONTAINER for that future answer and stops there.
+
+compilation_decisions:
+  - question: >
+      EC §9's motto "Capability ≠ Authority" (L480-484) separates WHAT an AI
+      is technically capable of from WHAT it is permitted to do. Should this
+      file also state a fixed mapping from `risk_tier` (R0-R4,
+      execution/risk-tier.schema.yaml) to a REQUIRED minimum
+      `authority_level` (e.g. "an R3 operation requires at least A3")? Both
+      enums appear as sibling fields in EC §16's `task.manifest.yaml`
+      example, using the SAME numeral in that one worked example
+      (`risk.tier: R2` / `authority.max_autonomy: A2`, L769-772) — which
+      could be read as implying a 1:1 numeral correspondence.
+    decision: >
+      Do not state a fixed risk_tier -> authority_level mapping. Record the
+      relationship as a cross-reference only (`task_binding` below), and
+      surface the numeral-correspondence question explicitly in
+      `open_questions` rather than either asserting or denying it.
+    reasoning: >
+      The single worked example in EC §16 uses matching numerals (2 and 2)
+      but EC §9 nowhere states a rule like "authority_level numeral MUST be
+      >= risk_tier numeral" — the two enums are introduced independently
+      (§8 for risk_tier, §9 for authority_level) and EC's own framing
+      ("Capability ≠ Authority") argues for treating them as orthogonal by
+      design, not derivable from one another. Asserting a numeral-parity
+      rule from a single example would be exactly the kind of unsupported
+      "happens to line up this once" leap R0's 補丁判準 warns against for
+      code changes; the same discipline applies to schema compilation.
+  - question: >
+      Should `role_to_authority_mapping`'s empty state be represented as a
+      bare `[]` (this project's usual convention for "no items yet") or
+      does the gap need a more visible marker so a downstream consumer
+      doesn't mistake "empty array" for "this role list is complete and no
+      role may act above A0"?
+    decision: >
+      Both: keep `entries: []` (so the field stays validly typed and
+      iterable by tooling) AND add an explicit `status: SKELETON_ONLY`
+      sibling key plus a non-empty `gap_description` inside the same
+      `role_to_authority_mapping` object, so a consumer reading the object
+      (not just the array) cannot miss that this is an intentional gap, not
+      a completed empty policy.
+    reasoning: >
+      An empty array alone is genuinely ambiguous. For
+      `execution/manifest.schema.yaml`'s `results.gates: []`, empty
+      plausibly means "no gates ran yet for this execution" — a normal
+      runtime state. Here, empty could instead be misread as "no role may
+      exercise or grant ANY authority level", a materially different and
+      dangerous claim (arguably fail-closed-safe, but not what SKELETON_ONLY
+      means — it means "undefined", not "defined as nobody"). The explicit
+      `status` field forecloses that misreading.
+
+# ---------------------------------------------------------------------------
+# EC §9's own framing, transcribed verbatim (L480-484) — governs how the two
+# blocks below (`authority_level` enum and `role_to_authority_mapping`)
+# relate to `execution/risk-tier.schema.yaml`'s risk_tier enum.
+# ---------------------------------------------------------------------------
+capability_vs_authority:
+  quote: "Capability ≠ Authority"
+  source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L480-484)"
+  meaning: >
+    An actor (AI or human) may be technically CAPABLE of an action (e.g.
+    holding shell/DB/network access per §96 Tool Broker) without being
+    AUTHORIZED to use it. This enum governs authorization, not capability.
+
+# ---------------------------------------------------------------------------
+# The A0-A4 enum (GROUNDED — verbatim from EC §9, NOT skeleton)
+# ---------------------------------------------------------------------------
+authority_level:
+  type: string
+  enum: [A0, A1, A2, A3, A4]
+
+levels:
+  A0:
+    label: "Observe"
+    source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L486-494)"
+    permitted_actions:
+      - read
+      - search
+      - analyze
+      - "test (read-only)"
+    scope: null
+    requirements: []
+    note: >
+      EC §9 does not itself state whether A0 actions may run automatically
+      without a gate — unlike execution/risk-tier.schema.yaml's R0 tier,
+      which explicitly says "May execute automatically"
+      (risk-tier.schema.yaml tiers.R0.autonomy). authority_level and
+      risk_tier are separate enums (see `capability_vs_authority` above);
+      this file does not assume A0 inherits R0's automatic-execution
+      property just because both are the lowest rung of their respective
+      enums — that would be the same un-evidenced numeral/rank
+      correspondence flagged in `compilation_decisions` above. Left
+      unstated rather than guessed.
+
+  A1:
+    label: "Local Reversible Edit"
+    source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L495-498)"
+    permitted_actions:
+      - "modify (isolated branch / workspace only)"
+    scope: "isolated branch or workspace"
+    requirements: []
+
+  A2:
+    label: "Staged Write"
+    source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L499-502)"
+    permitted_actions:
+      - "write (dev / staging)"
+    scope: "dev / staging"
+    requirements:
+      - gate
+
+  A3:
+    label: "Production Reversible Change"
+    source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L503-514)"
+    permitted_actions:
+      - "reversible production change"
+    scope: production
+    requirements:
+      - policy_allow
+      - required_gates_pass
+      - authorized_approval
+    requirements_relation: >
+      All three required together (EC §9 renders this as a "+" chain,
+      L508-512: `policy allow` + `required gates pass` + `authorized
+      approval`) — not any-of.
+
+  A4:
+    label: "Irreversible / External High-impact"
+    source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L515-528)"
+    examples:
+      - "delete production data"
+      - "send external communication"
+      - "publish regulated output"
+      - "revoke/rotate root credential"
+      - "deploy irreversible migration"
+    requirements:
+      - explicit_human_authority
+    critical_rule:
+      quote: "AI 不得自行把自己的建議當 approval。"
+      translation: "AI MUST NOT treat its own recommendation as approval."
+      source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 (L527)"
+      enforcement_note: >
+        This is the load-bearing invariant of the whole A0-A4 ladder: an
+        approval must originate from a human authority distinct from the AI
+        that proposed the action. `role_to_authority_mapping` below is
+        exactly the missing registry of WHICH human roles qualify as that
+        distinct authority — its absence does not weaken this rule; it means
+        the rule currently has no mechanical way to be checked (see
+        open_questions.OQ-AUTH-1).
+
+# ---------------------------------------------------------------------------
+# Cross-reference to the sibling field this enum is consumed by
+# ---------------------------------------------------------------------------
+task_binding:
+  field: "task.manifest.yaml#/authority/max_autonomy"
+  source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §16 (L771-772)"
+  sibling_field: "task.manifest.yaml#/risk/tier (execution/risk-tier.schema.yaml#/risk_tier)"
+  relationship: >
+    See `compilation_decisions` above — no fixed risk_tier -> authority_level
+    mapping is asserted by this file.
+
+# ---------------------------------------------------------------------------
+# MISSING HALF (P1-GAP-SEC-6) — SKELETON_ONLY, operator-owned.
+# ---------------------------------------------------------------------------
+role_to_authority_mapping:
+  status: SKELETON_ONLY
+  resolves_finding_partially: ["P1-GAP-SEC-6"]
+  gap_description: >
+    GAP_REGISTER.yaml P1-GAP-SEC-6 (L234-238, verbatim): "沒有定義哪些人類
+    職稱/角色有資格核准 R3/R4，也沒有說明人類使用者組織角色如何對應到 A0-A4
+    Autonomy/Authority Levels。" (No definition of which human titles/roles
+    are qualified to approve R3/R4, and no explanation of how a human user's
+    organizational role maps to the A0-A4 Autonomy/Authority Levels.)
+    Consequence per the same finding: "落地時「誰能點下核准鈕」完全靠部署
+    團隊自訂，規格無法稽核「違反」" (At implementation time, "who may click
+    approve" is entirely up to the deploying team's own invention — the spec
+    cannot audit a "violation" because it never set an approver-qualification
+    threshold).
+  this_field_is_not: >
+    NOT a list of real organizational roles. NOT a decision about who is
+    authorized to approve anything. Populating it with plausible titles
+    (e.g. asserting "CEO: A4" as if settled) would misrepresent an operator
+    decision as fact — exactly what this task's instructions forbid.
+  entries: []
+  entry_shape:
+    _status: ILLUSTRATIVE_NON_NORMATIVE
+    _warning: >
+      The object below is a SHAPE EXAMPLE ONLY. It is not a real role, not
+      a decided mapping, and MUST NOT be copied into `entries` or enforced
+      as policy. It exists solely so a future author knows what fields an
+      `entries[]` row is expected to carry once the operator supplies real
+      roles.
+    role: "<placeholder — e.g. 'Tech Lead' — NOT a real, decided role>"
+    may_exercise_up_to:
+      description: "Highest authority_level this role may personally perform."
+      enum: [A0, A1, A2, A3, A4]
+    may_grant_up_to:
+      description: >
+        Highest authority_level this role may APPROVE for another actor
+        (human or AI) under EC §9 A3/A4's "authorized approval" / "explicit
+        human authority" requirements. May legitimately differ from
+        may_exercise_up_to (an approver need not be the executor).
+      enum: [A0, A1, A2, A3, A4]
+    notes: "<free text — non-normative placeholder>"
+
+open_questions:
+  - id: "OQ-AUTH-1"
+    question: >
+      What is the real, complete list of organizational roles/titles in
+      scope, and for each, what is its `may_exercise_up_to` and
+      `may_grant_up_to` A0-A4 ceiling? This is P1-GAP-SEC-6 itself — a
+      business/organizational fact, not a technical compilation question.
+      Until answered, EC §9 A3/A4's "authorized approval" / "explicit human
+      authority" requirements exist in prose but cannot be mechanically
+      checked by any gate or approval-UI consulting this schema.
+    owner: "operator"
+    blocks: "Any future policies/ai-execution/authority.yaml (EC §91 path list, L2751) that wants to enforce approver eligibility by role rather than by unchecked human judgment."
+  - id: "OQ-AUTH-2"
+    question: >
+      Is there, or should there be, a fixed rule relating `risk_tier`
+      (execution/risk-tier.schema.yaml) to a MINIMUM required
+      `authority_level` (e.g. "R3 or R4 requires at least A3")? See
+      `compilation_decisions` above — the single EC §16 worked example uses
+      matching numerals (R2/A2) but no rule is stated. Left open rather than
+      inferred from one example.
+    owner: "operator or Round 2 ADR"
+    blocks: "nothing in this schema — authority_level and risk_tier remain independently valid fields either way"
+  - id: "OQ-AUTH-3"
+    question: >
+      specs/governance/epistemic-label.schema.yaml's `locked` field (L81-94)
+      states content with `locked != null` "MUST NOT be modified by AI"
+      (EC §57), implying only a human may unlock/modify a LOCKED_FACT or
+      LOCKED_DECISION — but neither that file nor EC §57 names WHICH human
+      role qualifies. MACHINE_READABLE_SPEC_PLAN.md's own row for this file
+      (§2.2 L99) lists `governance/epistemic-label` as a dependency
+      specifically for this reason ("locked 欄位需對照誰能改"). This is the
+      same unresolved question as OQ-AUTH-1 wearing a different hat (locked-
+      content unlock authority vs R3/R4 approval authority), not a second,
+      separate gap — flagged here explicitly since the plan names this exact
+      cross-file expectation.
+    owner: "operator (the same answer as OQ-AUTH-1 likely resolves both)"
+    blocks: "specs/governance/epistemic-label.schema.yaml gains no enforcement mechanism for its `locked` constraint until this is answered"
+
+verification:
+  method: >
+    Read EC §9 (L478-529) in full at the cited lines; grepped "A0"/"A1"/
+    "A2"/"A3"/"A4" across all three mother documents (only EC §9 headers and
+    EC L772 matched; Atlas L3073-3074 confirmed as an unrelated Mermaid
+    diagram id, not this enum). Read GAP_REGISTER.yaml P1-GAP-SEC-6
+    (L231-238) verbatim. Read specs/artifact/cas-path.schema.yaml's existing
+    forward references to this file (L85-97, L228-236) to confirm this
+    file's eventual shape is already assumed compatible with a role-ceiling
+    design. Read specs/governance/epistemic-label.schema.yaml's `locked`
+    field (L81-94) for OQ-AUTH-3.
+  note: >
+    No mother document was modified. The A0-A4 enum and per-level structure
+    (`levels.A0`-`levels.A4`) are verbatim/near-verbatim transcriptions of
+    EC §9 and are NOT skeleton. `role_to_authority_mapping` is the file's
+    only genuinely skeleton content, confined to that one field and clearly
+    marked as such (`status: SKELETON_ONLY`, empty `entries: []`, an
+    explicitly non-normative `entry_shape` example) — no example role is
+    presented as a real, decided mapping anywhere in this file.

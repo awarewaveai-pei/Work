@@ -23,6 +23,18 @@ source_of_truth_for:
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §8 Risk Tier (L379-475)"
 decided_by: "docs/adr/ADR-004-risk-tier-and-epistemic-label-canonicalization.md (ACCEPTED 2026-08-29)"
 
+# Root $ref (2026-08-29, Codex cross-cutting review CONFIRMED finding #1):
+# this file's title/description/etc. are annotation keywords, so without a
+# root-level type constraint, a validator pointed at this file's ROOT (not
+# `#/risk_tier`) would accept ANY value, including an invalid one like "R5" —
+# every real consumer in this project already references `#/risk_tier`
+# explicitly, but a naive/unaware tool would not. This $ref makes the file's
+# root itself validate as `risk_tier` (Draft 2020-12 permits $ref alongside
+# sibling keywords), so both root-level and `#/risk_tier`-scoped validation
+# now agree. Applies the same fix to the 3 other files this review flagged
+# with the identical pattern (epistemic-label, rigor-level, representation).
+$ref: "#/risk_tier"
+
 risk_tier:
   type: string
   enum: [R0, R1, R2, R3, R4]

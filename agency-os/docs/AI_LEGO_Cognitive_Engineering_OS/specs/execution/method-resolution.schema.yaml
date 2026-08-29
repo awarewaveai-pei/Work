@@ -1,0 +1,612 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/execution/method-resolution.schema.yaml"
+title: Method Resolution — Task Context to Selection Context Adapter
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the field-mapping/adapter layer
+  between `execution/task.schema.yaml`'s `task_context` and
+  `AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md`'s
+  `selection_context` (Atlas §10 Selector Inputs, L1071-1088) — the seam
+  named by EC §14 "Method Resolution" (L700-728): "Task Context ↓ Method
+  Atlas ↓ Method Selection Engine ↓ Candidate Methods ↓ Mandatory Method
+  Gates ↓ Workflow Plan". Formalizes the EC §92 promise
+  (`method-resolution.schema.yaml` at L2775) per
+  MACHINE_READABLE_SPEC_PLAN.md §2.2 row 95.
+
+  Resolves CROSS-T-16 (verified-findings.yaml L593-611, verdict PARTIAL, 2
+  independent votes) directly: "The seam between the Execution Contract's
+  Method Resolution flow and the Atlas's Method Selection Engine has no
+  field mapping ... Only risk_tier and jurisdiction_context overlap — and
+  risk_tier's enums conflict (CROSS-T-3). No document defines the
+  transformation, so the central handoff of the whole system is
+  unimplementable without invention." Both verdict_votes additionally
+  corrected the "only two fields overlap" claim: `reversibility` also
+  appears in both records, and `domains`/`domain` nearly match — this file
+  verifies and encodes that correction directly (see `field_mapping` below,
+  which independently re-derives the overlap by comparing every one of
+  task.schema.yaml's 12 fields against every one of Atlas's 17
+  selection_context fields, not by trusting the finding's summary alone).
+
+  NEW DESIGN notice: Atlas's `selection_context` block gives concrete
+  shape to only 4 of its 17 fields (`problem_type`'s 7-value enum,
+  `risk_tier`'s already-deprecated 4-value enum, `required_rigor`'s
+  4-value enum, and `stakeholders`' array-bracket `[...]` syntax — verified
+  by direct re-read of L1071-1088, not assumed; `cognitive_preferences` and
+  `accessibility_needs` LOOK like they might share that bracket syntax on a
+  first skim but do not — see field_mapping below for the correction). The
+  remaining 13 fields are bare `...` placeholders with zero type signal
+  beyond their name. Per this suite's own
+  discipline (`cognitive/method.schema.yaml`'s `compilation_decisions`
+  explicitly rejected inventing a rich `preconditions` expression grammar
+  Atlas gives no evidence of), every placeholder field below is typed with
+  the loosest structurally-honest shape a plain reading of its name
+  supports (string, or array-of-string when the name is plural) — not a
+  semantically rich type this file cannot justify from any mother-document
+  text. See `verification.note` for the grounded-vs-invented ratio.
+
+compilation_decisions:
+
+  - question: >
+      What is the actual shape of the "field mapping" MACHINE_READABLE_SPEC_PLAN.md
+      §2.2 row 95 says this file must supply?
+    decision: >
+      A `field_mapping` array with one entry per Atlas selection_context
+      field (17 entries) PLUS a reverse `task_context_only_fields` list (the
+      8 task.schema.yaml fields with no selection_context counterpart at
+      all) — so the mapping is verifiably exhaustive in both directions, not
+      just a list of the fields that happen to line up easily.
+    reasoning: >
+      CROSS-T-16's own verdict_votes disagreed with each other about how
+      much overlap exists (the first vote said "only risk_tier and
+      jurisdiction_context", the second corrected it to include
+      reversibility and domains/domain) — the safest way to not repeat that
+      undercount is to enumerate every field on both sides explicitly and
+      classify each one, rather than asserting a summary count.
+
+  - question: >
+      Four mapping types recur across the 17 Atlas fields. What are they and
+      what does each imply for an implementation?
+    decision: >
+      `DIRECT_MATCH` (identical concept, reuse task.schema.yaml's field via
+      hard $ref, no transform), `NEAR_MATCH_CARDINALITY_MISMATCH` (same
+      concept, incompatible shape — requires an explicit widening/narrowing
+      rule, recorded per-field), `SUPPLEMENT_REQUIRED` (no task_context
+      field exists at all — this file must define a NEW field, honestly
+      flagged), `SUPPLEMENT_REQUIRED_VIA_EXISTING_SCHEMA` (no task_context
+      field exists, but a sibling schema already canonicalizes the exact
+      axis — reuse it via hard $ref instead of inventing a parallel one).
+    reasoning: >
+      Collapsing these into a binary "mapped / unmapped" would lose the
+      distinction CROSS-T-16's own text draws between a genuine overlap
+      (risk_tier, jurisdiction_context, reversibility), a near-miss that
+      still needs a decision (domain cardinality), and a true gap that needs
+      new design (goal_type, decision_criticality, etc.) — three materially
+      different obligations for an implementer, not one.
+
+  - question: >
+      Atlas L1073's `problem_type` enum (7 values) is the one non-placeholder
+      field this file must carry that has no existing sibling schema.
+      MACHINE_READABLE_SPEC_PLAN.md §2.3 row 120 names a FUTURE
+      `cognitive/problem-type.schema.yaml` meant to own this exact enum plus
+      a §10 routing table — should this file wait for it, or inline the
+      enum now?
+    decision: >
+      Inline Atlas's 7-value enum verbatim now (`SUPPLEMENT_REQUIRED`, not
+      `..._VIA_EXISTING_SCHEMA`); flagged in `open_questions` as a forward
+      migration point once `problem-type.schema.yaml` exists.
+    reasoning: >
+      `problem-type.schema.yaml` does not exist yet — MACHINE_READABLE_SPEC_PLAN.md's
+      own dependency graph (§3, L120: dependency = `method-resolution.schema.yaml`)
+      makes it DOWNSTREAM of this file, not upstream, so a hard $ref to it
+      here would be circular/forward and unresolvable. Atlas already gives a
+      concrete 7-value enum with real text (L1073) — the honest move is to
+      use that real value set now (not degrade it to a bare string the way
+      the true zero-signal placeholders are handled) while flagging that a
+      future file will supersede it, the same forward-compatibility pattern
+      `cognitive/method.schema.yaml` used for its `cognitive_primitives`
+      field pending `cognitive/primitive.schema.yaml`.
+
+  - question: >
+      Atlas L1086's `required_rigor` (4-value enum) already has a dedicated
+      canonical sibling, `cognitive/rigor-level.schema.yaml` (built this same
+      Phase 3 run, resolving CROSS-T-15's related 5-vs-4-value mismatch).
+      MACHINE_READABLE_SPEC_PLAN.md §2.2 row 95's own dependency column for
+      THIS file lists only `risk-tier.schema.yaml, cognitive/method.schema.yaml`
+      — `rigor-level.schema.yaml` is not named. Reuse it anyway?
+    decision: >
+      Yes — `SUPPLEMENT_REQUIRED_VIA_EXISTING_SCHEMA`, hard $ref to
+      `cognitive/rigor-level.schema.yaml#/rigor_mode` for the supplement
+      INPUT, translated down to Atlas's native 4-value `required_rigor` for
+      the resolved OUTPUT via that same file's own `required_rigor_mapping`.
+    reasoning: >
+      Same honesty move `cognitive/method.schema.yaml` made when it added a
+      `risk_tier` field the plan's dependency column for THAT file didn't
+      list either: the task instruction for this file explicitly points at
+      `rigor-level.schema.yaml` as "how it already handles required_rigor as
+      part of this same selection_context", and inventing a second,
+      parallel 4-or-5-value rigor enum here — duplicating a real, already-
+      ACCEPTED-precedent sibling file just because one plan row's dependency
+      column is incomplete — would recreate exactly the kind of duplicate-
+      vocabulary problem ADR-004/CROSS-T-15 exist to close. The discrepancy
+      with the plan's dependency column is recorded here rather than
+      silently reconciled either way, per R4.
+    scope_note: >
+      Reusing `rigor-level.schema.yaml`'s existing PROVISIONAL
+      `deep_intelligence` → `board_grade` default (that file's own Part 2,
+      still `PROVISIONAL_PENDING_OPERATOR_SIGNOFF`) means this file's own
+      `required_rigor` resolution inherits that same provisional status —
+      not re-litigated here, see that file's `open_questions.MRSP-rigor-1`.
+
+  - question: >
+      Atlas L1074 writes `domain: ...` (singular); task.schema.yaml's
+      `domains` (per EC L367) is a plural array. Which cardinality wins in
+      the resolved `selection_context.domain` output field?
+    decision: >
+      The resolved field is an ARRAY (`domain: array of string`), widening
+      Atlas's apparent singular to match task_context's plural rather than
+      narrowing task_context's array down to one value.
+    reasoning: >
+      Same "widen rather than silently drop data" precedent
+      `manifest.schema.yaml` used when it broadened MP §69's single flat
+      pin-list into EC's richer array shape (see that file's
+      `compilation_decisions`, item 3) — a real task can legitimately span
+      multiple domains, and Atlas's `...` placeholder gives no evidence it
+      deliberately intended a single-domain constraint (unlike
+      `required_rigor`'s or `problem_type`'s enums, which ARE concrete
+      evidence of intent). Narrowing to one value would silently discard
+      information task_context already collects; widening does not.
+    scope_note: >
+      This changes Atlas's OWN selection_context shape (a resolved-output
+      concern), not task.schema.yaml — task.schema.yaml's `domains` field is
+      untouched by this decision.
+
+  - question: >
+      Is `task_context.user_impact` a plausible source for
+      `selection_context.stakeholders`, given both concern "who is
+      affected"?
+    decision: "No — kept as two independent SUPPLEMENT/TASK_CONTEXT_ONLY fields, not merged or derived."
+    reasoning: >
+      `user_impact` (EC L373) is a free-text impact description; `stakeholders`
+      (Atlas L1076) is a list of parties. Answering "how are users affected"
+      does not answer "who are the stakeholders" — conflating them would
+      silently invent a derivation rule neither mother document states. Same
+      class of explicit-rejection discipline `cognitive/method.schema.yaml`
+      applied when distinguishing `quality.provenance_required` (runtime
+      output provenance) from `contract_provenance` (contract-authorship
+      provenance) rather than merging two adjacent-looking concepts.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §10 Selector Inputs, selection_context block (L1066-1089, all 17 fields individually cited below)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §14 Method Resolution (L700-728, flow + METHOD_RESOLUTION_BLOCKED)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §92 Machine-readable Execution Specs list (L2766-2783, method-resolution.schema.yaml at L2775)"
+  - "specs/execution/task.schema.yaml (this file's task_context input side, same Wave 5 session)"
+  - "specs/execution/risk-tier.schema.yaml (hard $ref target for risk_tier)"
+  - "specs/cognitive/rigor-level.schema.yaml (hard $ref target for required_rigor — see compilation_decisions for the plan-dependency-column discrepancy this introduces)"
+  - "specs/cognitive/method.schema.yaml (hard $ref target for candidate_methods[].method_id, the id pattern this file's output bridges into)"
+  - "specs/execution/status-codes.schema.yaml (soft reference for METHOD_RESOLUTION_BLOCKED, the failure signal for this file's own flow)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2 row 95 (method-resolution.schema.yaml, dependency column: risk-tier, cognitive/method)"
+  - ".ai/research/phase-0/verified-findings.yaml CROSS-T-16 (L593-611, both verdict_votes)"
+
+decided_by: >
+  No ADR governs this file — CROSS-T-16 is a `missing_contract` finding (an
+  undefined seam, not a documented conflict between two competing existing
+  designs), so there is nothing for an ADR to arbitrate between, the same
+  situation `normative-context.schema.yaml`'s `decided_by` documents for
+  CROSS-T-18. All field-mapping classifications, the `problem_type`
+  inlining-now decision, the `required_rigor`/`rigor-level.schema.yaml` reuse
+  (despite the plan's incomplete dependency column), and the domain
+  cardinality widening are Phase 3 compilation decisions recorded above, not
+  a separate ADR-level ruling.
+
+# ---------------------------------------------------------------------------
+# The field mapping proper — one entry per Atlas selection_context field
+# (L1072-1088, 17 fields, in source order)
+# ---------------------------------------------------------------------------
+
+field_mapping:
+
+  - selection_context_field: goal_type
+    task_context_field: null
+    mapping_type: SUPPLEMENT_REQUIRED
+    note: >
+      Atlas L1072, bare placeholder. `task_context.objective` (EC L364, free
+      text) MAY plausibly inform a derived goal_type, but EC/Atlas define no
+      derivation rule or algorithm — until one exists, goal_type must be
+      supplied explicitly via `selection_context_supplement`, not
+      auto-derived from objective text.
+
+  - selection_context_field: problem_type
+    task_context_field: null
+    mapping_type: SUPPLEMENT_REQUIRED
+    note: >
+      Atlas L1073, concrete 7-value enum (diagnostic, exploratory, creative,
+      strategic, causal, decision, operational) — inlined verbatim below.
+      See compilation_decisions for why this is not yet a hard $ref to the
+      not-yet-built `cognitive/problem-type.schema.yaml`.
+
+  - selection_context_field: domain
+    task_context_field: domains
+    mapping_type: NEAR_MATCH_CARDINALITY_MISMATCH
+    note: >
+      Atlas L1074 singular vs. task_context.domains (EC L367) plural array.
+      Resolved by widening: `resolved_selection_context.domain` below is
+      typed as an array. See compilation_decisions for the widen-not-narrow
+      reasoning.
+
+  - selection_context_field: jurisdiction_context
+    task_context_field: jurisdiction_context
+    mapping_type: DIRECT_MATCH
+    note: "Atlas L1075, identical field name to task_context (EC L371). No transform; hard $ref reuse."
+
+  - selection_context_field: stakeholders
+    task_context_field: null
+    mapping_type: SUPPLEMENT_REQUIRED
+    note: >
+      Atlas L1076, array placeholder. Explicitly compared against and
+      rejected as a match for task_context.user_impact — see
+      compilation_decisions.
+
+  - selection_context_field: risk_tier
+    task_context_field: risk_tier
+    mapping_type: DIRECT_MATCH
+    note: >
+      Atlas L1077, identical field name to task_context (EC L374). Both
+      sides already point at the same canonical source
+      (`execution/risk-tier.schema.yaml`) per ADR-004a — this mapping needs
+      no translation, only a single shared hard $ref.
+
+  - selection_context_field: decision_criticality
+    task_context_field: null
+    mapping_type: SUPPLEMENT_REQUIRED
+    note: >
+      Atlas L1078, bare placeholder. Structurally resembles risk_tier's own
+      R0-R4 scale, but no mother document states that resemblance is
+      intentional — NOT mapped onto risk-tier.schema.yaml here; kept as an
+      independent free-text field. See open_questions.
+
+  - selection_context_field: evidence_available
+    task_context_field: null
+    mapping_type: SUPPLEMENT_REQUIRED
+    note: "Atlas L1079, bare placeholder. One of the 7 fields the task instruction names explicitly as a CROSS-T-16 gap."
+
+  - selection_context_field: data_available
+    task_context_field: null
+    mapping_type: SUPPLEMENT_REQUIRED
+    note: >
+      Atlas L1080, bare placeholder. Confirmed missing by direct
+      field-by-field comparison during this file's compilation — not one of
+      the 7 fields the task instruction named explicitly, but genuinely
+      absent from task_context all the same.
+
+  - selection_context_field: uncertainty
+    task_context_field: null
+    mapping_type: SUPPLEMENT_REQUIRED
+    note: "Atlas L1081, bare placeholder. One of the 7 fields the task instruction names explicitly as a CROSS-T-16 gap."
+
+  - selection_context_field: reversibility
+    task_context_field: reversibility
+    mapping_type: DIRECT_MATCH
+    note: >
+      Atlas L1082, identical field name to task_context (EC L372). Atlas
+      gives no enum of its own; task_context's concrete 4-value enum
+      (high/medium/low/irreversible) is reused via hard $ref — same
+      "adopt the side with real values" precedent execution/risk-tier.schema.yaml
+      set for its own field.
+
+  - selection_context_field: time_horizon
+    task_context_field: null
+    mapping_type: SUPPLEMENT_REQUIRED
+    note: "Atlas L1083, bare placeholder. One of the 7 fields the task instruction names explicitly as a CROSS-T-16 gap."
+
+  - selection_context_field: budget
+    task_context_field: null
+    mapping_type: SUPPLEMENT_REQUIRED
+    note: >
+      Atlas L1084, bare placeholder. Confirmed missing by direct comparison;
+      not one of the 7 explicitly-named fields but genuinely absent.
+
+  - selection_context_field: time_budget
+    task_context_field: null
+    mapping_type: SUPPLEMENT_REQUIRED
+    note: >
+      Atlas L1085, bare placeholder. Confirmed missing by direct comparison;
+      not one of the 7 explicitly-named fields but genuinely absent.
+
+  - selection_context_field: required_rigor
+    task_context_field: null
+    mapping_type: SUPPLEMENT_REQUIRED_VIA_EXISTING_SCHEMA
+    note: >
+      Atlas L1086, concrete 4-value enum, already canonicalized (and
+      extended to 5 values) by `cognitive/rigor-level.schema.yaml`. One of
+      the 7 fields the task instruction names explicitly. See
+      compilation_decisions for the reuse-despite-incomplete-plan-column
+      reasoning.
+
+  - selection_context_field: cognitive_preferences
+    task_context_field: null
+    mapping_type: SUPPLEMENT_REQUIRED
+    note: >
+      Atlas L1087, bare `...` placeholder (NOT bracket syntax — verified by
+      direct re-read; unlike stakeholders at L1076, which does use `[...]`).
+      Typed as an array below on the plural field-name signal alone, per
+      this file's top-level description's naming rule. Confirmed missing
+      from task_context by direct comparison; not one of the 7
+      explicitly-named fields but genuinely absent.
+
+  - selection_context_field: accessibility_needs
+    task_context_field: null
+    mapping_type: SUPPLEMENT_REQUIRED
+    note: >
+      Atlas L1088, bare `...` placeholder (NOT bracket syntax — same
+      correction as cognitive_preferences above). Typed as an array below on
+      the plural field-name signal alone. Confirmed missing from
+      task_context by direct comparison; not one of the 7 explicitly-named
+      fields but genuinely absent.
+
+# ---------------------------------------------------------------------------
+# Reverse direction — task_context fields with NO selection_context
+# counterpart at all, so the mapping above is verifiably exhaustive in both
+# directions (see compilation_decisions, item 1)
+# ---------------------------------------------------------------------------
+task_context_only_fields:
+  - field: task_id
+    note: "Task identity, not a method-selection input."
+  - field: objective
+    note: "See goal_type's field_mapping entry above for the considered-but-rejected derivation path."
+  - field: requester
+    note: "Task-lifecycle metadata, not a method-selection input."
+  - field: environment
+    note: "Deployment/execution environment, not a method-selection input."
+  - field: affected_modules
+    note: "Task-lifecycle metadata, not a method-selection input."
+  - field: data_impact
+    note: "Task-lifecycle metadata, not a method-selection input. See task.schema.yaml's own open_questions for its risk_tier correlation caveat."
+  - field: external_side_effects
+    note: "Task-lifecycle metadata, not a method-selection input."
+  - field: user_impact
+    note: "See stakeholders' field_mapping entry above for the considered-but-rejected match."
+
+# ---------------------------------------------------------------------------
+# The supplement — NEW fields (per field_mapping's SUPPLEMENT_REQUIRED*
+# entries) that must be provided in addition to task_context to fully
+# populate selection_context. This is the literal "補齊...等 EC task_context
+# 缺失欄位" MACHINE_READABLE_SPEC_PLAN.md §2.2 row 95 calls for.
+# ---------------------------------------------------------------------------
+
+selection_context_supplement:
+  type: object
+  description: >
+    Every field here corresponds to a SUPPLEMENT_REQUIRED* entry in
+    field_mapping above. None of these fields exist anywhere in
+    task.schema.yaml — see verification.note for the honest
+    grounded-vs-invented ratio behind their types.
+  properties:
+    goal_type:
+      type: string
+      description: "NEW DESIGN. Atlas L1072 gives zero shape signal beyond the name."
+    problem_type:
+      type: string
+      enum: [diagnostic, exploratory, creative, strategic, causal, decision, operational]
+      description: "Atlas L1073 verbatim 7-value enum. See compilation_decisions for the not-yet-a-$ref note."
+    stakeholders:
+      type: array
+      items: { type: string }
+      description: "NEW DESIGN. Atlas L1076 gives array-bracket syntax only; item shape invented as bare strings."
+    decision_criticality:
+      type: string
+      description: "NEW DESIGN. Atlas L1078 gives zero shape signal beyond the name. See open_questions on the risk_tier-scale resemblance."
+    evidence_available:
+      type: string
+      description: "NEW DESIGN. Atlas L1079 gives zero shape signal beyond the name — kept as free text rather than an invented boolean/enum."
+    data_available:
+      type: string
+      description: "NEW DESIGN. Atlas L1080 gives zero shape signal beyond the name — kept as free text rather than an invented boolean/enum."
+    uncertainty:
+      type: string
+      description: "NEW DESIGN. Atlas L1081 gives zero shape signal beyond the name."
+    time_horizon:
+      type: string
+      description: "NEW DESIGN. Atlas L1083 gives zero shape signal beyond the name."
+    budget:
+      type: string
+      description: "NEW DESIGN. Atlas L1084 gives zero shape signal beyond the name — kept as free text rather than an invented currency/number type with no stated unit."
+    time_budget:
+      type: string
+      description: "NEW DESIGN. Atlas L1085 gives zero shape signal beyond the name — kept as free text rather than an invented duration type with no stated unit."
+    required_rigor:
+      $ref: "ai-lego://specs/cognitive/rigor-level.schema.yaml#/rigor_mode"
+      description: >
+        Real hard $ref, 5-value canonical input. Translated down to Atlas's
+        native 4-value `required_rigor` for `resolved_selection_context`
+        below via rigor-level.schema.yaml's own `required_rigor_mapping`
+        (inherits that file's PROVISIONAL deep_intelligence default).
+    cognitive_preferences:
+      type: array
+      items: { type: string }
+      description: "NEW DESIGN. Atlas L1087 is a bare `...` placeholder (no bracket syntax); array type invented from the plural field name alone, item shape invented as bare strings."
+    accessibility_needs:
+      type: array
+      items: { type: string }
+      description: "NEW DESIGN. Atlas L1088 is a bare `...` placeholder (no bracket syntax); array type invented from the plural field name alone, item shape invented as bare strings."
+
+# ---------------------------------------------------------------------------
+# The actual adapter input contract: task_context + supplement together
+# ---------------------------------------------------------------------------
+
+method_resolution_request:
+  type: object
+  required: [task_context, selection_context_supplement]
+  description: >
+    What an implementation of EC §14's "Task Context ↓ Method Atlas" step
+    must assemble before Method Selection can run.
+  properties:
+    task_context:
+      $ref: "ai-lego://specs/execution/task.schema.yaml"
+      description: "Real hard $ref — this file's declared Wave 5 sibling, same session."
+    selection_context_supplement:
+      $ref: "#/selection_context_supplement"
+
+# ---------------------------------------------------------------------------
+# The resolved output: the actual selection_context object handed to
+# Atlas's Method Selection Engine, built by applying field_mapping to a
+# method_resolution_request
+# ---------------------------------------------------------------------------
+
+resolved_selection_context:
+  type: object
+  description: >
+    Mirrors Atlas L1071-1088's field set exactly (17 fields, same order),
+    with each field now typed per field_mapping's classification above.
+  required:
+    - goal_type
+    - problem_type
+    - domain
+    - jurisdiction_context
+    - risk_tier
+    - reversibility
+    - required_rigor
+  properties:
+    goal_type: { type: string, description: "From selection_context_supplement.goal_type (SUPPLEMENT_REQUIRED)." }
+    problem_type: { type: string, enum: [diagnostic, exploratory, creative, strategic, causal, decision, operational], description: "From selection_context_supplement.problem_type (SUPPLEMENT_REQUIRED)." }
+    domain:
+      type: array
+      items: { type: string }
+      description: "From task_context.domains, WIDENED to array — see compilation_decisions (domain cardinality)."
+    jurisdiction_context:
+      $ref: "ai-lego://specs/execution/task.schema.yaml#/properties/jurisdiction_context"
+      description: "Direct copy from task_context.jurisdiction_context (DIRECT_MATCH)."
+    stakeholders: { type: array, items: { type: string }, description: "From selection_context_supplement.stakeholders (SUPPLEMENT_REQUIRED)." }
+    risk_tier:
+      $ref: "ai-lego://specs/execution/risk-tier.schema.yaml#/risk_tier"
+      description: "Direct copy from task_context.risk_tier (DIRECT_MATCH, shared canonical source)."
+    decision_criticality: { type: string, description: "From selection_context_supplement.decision_criticality (SUPPLEMENT_REQUIRED)." }
+    evidence_available: { type: string, description: "From selection_context_supplement.evidence_available (SUPPLEMENT_REQUIRED)." }
+    data_available: { type: string, description: "From selection_context_supplement.data_available (SUPPLEMENT_REQUIRED)." }
+    uncertainty: { type: string, description: "From selection_context_supplement.uncertainty (SUPPLEMENT_REQUIRED)." }
+    reversibility:
+      $ref: "ai-lego://specs/execution/task.schema.yaml#/properties/reversibility"
+      description: "Direct copy from task_context.reversibility (DIRECT_MATCH, EC's concrete enum wins over Atlas's placeholder)."
+    time_horizon: { type: string, description: "From selection_context_supplement.time_horizon (SUPPLEMENT_REQUIRED)." }
+    budget: { type: string, description: "From selection_context_supplement.budget (SUPPLEMENT_REQUIRED)." }
+    time_budget: { type: string, description: "From selection_context_supplement.time_budget (SUPPLEMENT_REQUIRED)." }
+    required_rigor:
+      type: string
+      enum: [fast, professional, research_grade, board_grade]
+      description: >
+        Atlas's own native 4-value enum (L1086) — the translated-down form
+        of selection_context_supplement.required_rigor (5-value rigor_mode),
+        via cognitive/rigor-level.schema.yaml's required_rigor_mapping.
+        Inherits that file's PROVISIONAL deep_intelligence->board_grade
+        default.
+    cognitive_preferences: { type: array, items: { type: string }, description: "From selection_context_supplement.cognitive_preferences (SUPPLEMENT_REQUIRED)." }
+    accessibility_needs: { type: array, items: { type: string }, description: "From selection_context_supplement.accessibility_needs (SUPPLEMENT_REQUIRED)." }
+
+# ---------------------------------------------------------------------------
+# The output side of EC §14's flow: Candidate Methods, bridging to
+# cognitive/method.schema.yaml, plus the failure signal
+# ---------------------------------------------------------------------------
+
+method_resolution_result:
+  type: object
+  required: [candidate_methods]
+  description: "Per EC §14's flow: selection_context ↓ Candidate Methods ↓ Mandatory Method Gates ↓ Workflow Plan (L711-717). This file stops at Candidate Methods; gate/workflow shapes are gate.schema.yaml's and cognitive/recipe.schema.yaml's own concerns."
+  properties:
+    candidate_methods:
+      type: array
+      items:
+        type: object
+        required: [method_id]
+        properties:
+          method_id:
+            $ref: "ai-lego://specs/cognitive/method.schema.yaml#/properties/id"
+            description: >
+              Real hard $ref to method.schema.yaml's own `id` pattern
+              (bare `<family>.<name>`, ADR-005b) — method.schema.yaml is
+              Wave 3 (already BUILT), a safe backward dependency.
+          score: { type: [number, "null"], description: "NEW DESIGN. No mother document defines a scoring mechanism; optional, untyped beyond number." }
+          rationale: { type: string, description: "NEW DESIGN. Free text." }
+    blocked:
+      type: [object, "null"]
+      default: null
+      description: >
+        Set instead of a populated candidate_methods list when Method Atlas
+        cannot be loaded. Soft reference (not a hard $ref — status-codes.schema.yaml
+        entries are not individually anchored) to
+        execution/status-codes.schema.yaml's `METHOD_RESOLUTION_BLOCKED`
+        entry, per EC §14 L720-724 verbatim ("Atlas 無法載入：
+        METHOD_RESOLUTION_BLOCKED").
+      properties:
+        status: { type: string, const: "METHOD_RESOLUTION_BLOCKED" }
+        reason: { type: string }
+
+open_questions:
+  - id: "OQ-mres-1"
+    question: >
+      `decision_criticality` (selection_context_supplement) structurally
+      resembles execution/risk-tier.schema.yaml's R0-R4 scale, but no mother
+      document states they are the same axis, and mapping them would be a
+      real semantic decision (does "criticality" always track "risk"? — not
+      obviously, e.g. a high-criticality but fully reversible decision).
+      Kept as an independent free-text field rather than unified with
+      risk_tier. Left open for a future ADR if unification is ever desired.
+    owner: "operator, via a future ADR"
+    blocks: "nothing in this schema"
+  - id: "OQ-mres-2"
+    question: >
+      `problem_type`'s enum is currently inlined verbatim from Atlas L1073
+      rather than $ref'd to `cognitive/problem-type.schema.yaml`, which does
+      not exist yet (MACHINE_READABLE_SPEC_PLAN.md §2.3 row 120 lists it
+      READY, depending on THIS file). Once that file is built, this file's
+      `problem_type` fields (in both `selection_context_supplement` and
+      `resolved_selection_context`) should migrate from an inline enum to a
+      hard $ref, mirroring the soft->hard upgrade pattern already applied
+      elsewhere in this suite. Not done here because the target does not
+      exist yet.
+    owner: "operator / whichever session next builds cognitive/problem-type.schema.yaml"
+    blocks: "nothing in this schema; tracked so the future migration is not forgotten"
+  - id: "OQ-mres-3"
+    question: >
+      This file's `required_rigor` reuse of `cognitive/rigor-level.schema.yaml`
+      inherits that file's own still-open `MRSP-rigor-1` question (whether
+      `deep_intelligence` should become a native 5th Atlas enum value rather
+      than a `board_grade` + additive-dimensions default). Not re-litigated
+      here — resolving it belongs to rigor-level.schema.yaml's own
+      open_questions, but any change there will change what
+      `resolved_selection_context.required_rigor` can express.
+    owner: "see cognitive/rigor-level.schema.yaml open_questions.MRSP-rigor-1"
+    blocks: "nothing in this schema directly; downstream of the cited open question"
+
+verification:
+  method: >
+    Read against Atlas §10 full Selector Inputs block (L1066-1104, including
+    the mermaid flow, not just the selection_context YAML in isolation), EC
+    §14 full text (L700-728), EC §92 (L2766-2783), execution/task.schema.yaml
+    full text (built earlier in this same session), execution/risk-tier.schema.yaml
+    full text, cognitive/rigor-level.schema.yaml full text (for
+    required_rigor reuse and its PROVISIONAL default), cognitive/method.schema.yaml
+    full text (for the id pattern $ref), execution/status-codes.schema.yaml
+    full text (for the METHOD_RESOLUTION_BLOCKED entry), manifest.schema.yaml
+    full text (for the widen-not-narrow precedent cited in domain
+    cardinality), MACHINE_READABLE_SPEC_PLAN.md §2.2 row 95 and §2.3 row 120,
+    and verified-findings.yaml CROSS-T-16 full entry (L593-611, both
+    verdict_votes independently re-checked against a fresh field-by-field
+    comparison rather than trusted at face value — see field_mapping and
+    task_context_only_fields above, which together cover all 12
+    task.schema.yaml fields x all 17 Atlas selection_context fields).
+  note: >
+    No mother document was modified to produce this file. Grounded-vs-
+    invented ratio: `problem_type`'s enum (7 values) and `required_rigor`'s
+    axis (via rigor-level.schema.yaml reuse) are directly grounded in
+    mother-document text; the DIRECT_MATCH/NEAR_MATCH classifications for
+    jurisdiction_context/risk_tier/reversibility/domain are verified by
+    direct field-name comparison against both source blocks. The remaining
+    11 supplement fields (goal_type, stakeholders, decision_criticality,
+    evidence_available, data_available, uncertainty, time_horizon, budget,
+    time_budget, cognitive_preferences, accessibility_needs) have no shape
+    signal beyond their bare Atlas placeholder names — their `string`/
+    `array of string` types are Phase 3 invention, honestly typed at the
+    loosest structurally-defensible level rather than guessed at a richer
+    one, per this suite's established discipline against fabricating schema
+    detail with no textual basis.

@@ -52,6 +52,14 @@ decided_by: >
 # Schema body
 # ---------------------------------------------------------------------------
 
+# Root $ref (2026-08-29, Codex cross-cutting review CONFIRMED finding #1):
+# without this, a validator pointed at this file's ROOT (not `#/representation`)
+# has no type constraint and would accept any value. `representation` is the
+# composite type every real consumer in this project already references
+# explicitly via `#/representation` — this makes root-level validation agree
+# with that existing convention instead of silently accepting anything.
+$ref: "#/representation"
+
 definitions:
 
   representation_category:

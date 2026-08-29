@@ -1,0 +1,404 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/problem-type.schema.yaml"
+title: Problem Type
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable unification of two Atlas §10 artifacts that
+  name the same underlying concept but do not agree with each other:
+
+    (1) `selection_context.problem_type`'s 7-value machine enum (Atlas L1073):
+        `diagnostic|exploratory|creative|strategic|causal|decision|operational`.
+    (2) The "Problem Type 路由表" (Atlas L1112-1123, a 10-row Markdown table
+        pairing a Problem Type label with a `起始推薦` (recommended starting
+        chain) and a `不應預設` (should-not-default) column): Diagnostic,
+        Creative, Strategy, Causal, Incident, Policy, Architecture, Security,
+        DB Migration, Market Entry.
+
+  Resolves DOC-method_atlas-5 (verified-findings.yaml L1130-1143, severity
+  medium, verdict CONFIRMED, 1 independent vote): "selection_context 的
+  problem_type enum 與 §10 Problem Type 路由表（1112-1123）不一致：表中
+  Incident、Policy、Architecture、Security、DB Migration、Market Entry 不在
+  enum；enum 的 exploratory、decision、operational 在表中沒有對應列。機器選擇器
+  與人類路由表無法對齊。" Per
+  `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` §2.3 row 120 (READY):
+  "統一 selection_context.problem_type enum 與 §10 Problem Type 路由表——把
+  Incident/Policy/Architecture/Security/DB Migration/Market Entry 補進
+  enum，exploratory/decision/operational 補上路由表對應列。"
+
+  This is a genuine TWO-WAY reconciliation, verified directly against Atlas
+  L1073 and L1112-1123 (not trusted from the finding's summary alone, per
+  this suite's established due-diligence standard —
+  `method-resolution.schema.yaml`'s own `description` states the identical
+  discipline for its field-by-field comparison):
+
+    - 4 values overlap between the two sides, but NOT all as exact string
+      matches: Diagnostic~diagnostic, Creative~creative, Causal~causal are
+      exact case-fold matches; Strategy~strategic is a NEAR match (same
+      concept, different word form — noun "Strategy" in the table vs.
+      adjective "strategic" in the enum). See `compilation_decisions` for
+      how this near-match is handled (not silently conflated).
+    - 6 table rows have no enum value at all: Incident, Policy, Architecture,
+      Security, DB Migration, Market Entry.
+    - 3 enum values have no table row at all: exploratory, decision,
+      operational.
+
+  Only the FIRST gap (6 missing enum values) has textual content to compile
+  from — the table already states each row's `起始推薦`/`不應預設`, verbatim,
+  transcribed below. The SECOND gap (3 missing table rows) has ZERO
+  mother-document text describing what exploratory/decision/operational's
+  recommended-start or should-not-default content should be — Atlas simply
+  never wrote those rows. Per this project's `AGENTS.md` 補丁判準 ("猜測補
+  未知" is forbidden) and the identical honesty move `method.schema.yaml`
+  made for its own `preconditions` field, this file does NOT invent plausible
+  -sounding recommendations for those 3 rows. They are added to the unified
+  `problem_type` enum (closing DOC-method_atlas-5's enum-completeness half)
+  but recorded as `routing_table_gaps` with no content, not silently given
+  fabricated `recommended_start`/`should_not_default` values.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §10 Selector Inputs, selection_context.problem_type (L1073)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §10 Problem Type 路由表 (L1112-1123, all 10 rows individually cited below)"
+  - ".ai/research/phase-0/verified-findings.yaml DOC-method_atlas-5 (L1130-1143)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.3 row 120 (problem-type.schema.yaml: READY, dependency column lists method-resolution.schema.yaml)"
+  - "specs/execution/method-resolution.schema.yaml (same Wave 5 session; its `open_questions.OQ-mres-2` already anticipates this file and flags the forward-migration point — see this file's own `open_questions` for the mirrored note)"
+
+decided_by: >
+  No ADR governs this file. DOC-method_atlas-5 is an `inconsistent_id`
+  finding between one machine enum and one human-facing routing table inside
+  the SAME mother document (Atlas), not a conflict between two competing
+  ADR-worthy architectural designs — the same class of gap
+  `method-resolution.schema.yaml`'s and `rigor-level.schema.yaml`'s
+  `decided_by` sections both apply the "naming/mapping completeness pick
+  over an already-agreed concept is Phase-3-decidable" test to. Applying
+  that same test here: closing the 6-missing-enum-value half is Low-risk
+  (the table already states the content verbatim; this is transcription,
+  not invention — the same class of move `rigor-level.schema.yaml`'s Part 1
+  restored MP §84's 5 mode names). Closing the 3-missing-table-row half
+  would NOT be Phase-3-decidable if this file invented content for it (that
+  would be a real design decision about what Atlas recommends for
+  exploratory/decision/operational problems, with no textual basis to
+  compile from) — so this file does not attempt it, and leaves it in
+  `open_questions` instead, the same line `rigor-level.schema.yaml` drew
+  between its Low-risk Part 1 and PROVISIONAL Part 2.
+
+compilation_decisions:
+
+  - question: >
+      The 4 overlapping concepts are not spelled identically on both sides
+      (Diagnostic/diagnostic, Creative/creative, Strategy/strategic,
+      Causal/causal — the last pair being a genuine word-form difference,
+      not just casing). Which spelling wins as the canonical `problem_type`
+      enum value?
+    decision: >
+      Keep Atlas's EXISTING machine enum spelling (`diagnostic`, `creative`,
+      `strategic`, `causal`) as the canonical value in all 4 cases. The
+      table's own Title-Case label (`Diagnostic`, `Creative`, `Strategy`,
+      `Causal`) is preserved verbatim in `routing_table.<value>.label` so
+      neither spelling is silently discarded.
+    reasoning: >
+      Atlas L1073's enum is the side already wired into a machine consumer
+      in this same session — `method-resolution.schema.yaml`'s
+      `selection_context_supplement.problem_type` and
+      `resolved_selection_context.problem_type` both inline this exact
+      7-value enum today (see that file's field_mapping, problem_type
+      entry). Changing the canonical spelling to the table's noun form
+      ("strategy" instead of "strategic") would break that already-written
+      consumer for zero benefit — this file's job is to UNIFY the two
+      sides, not to re-litigate which one was "more correct." Same
+      "adopt the side already wired to a real consumer" precedent
+      `task.schema.yaml` used when choosing `execution/risk-tier.schema.yaml`
+      over a redeclared enum for its own `risk_tier` field.
+    scope_note: >
+      This does not silently equate "Strategy" and "strategic" as if they
+      were always interchangeable prose — `migration_crosswalk` below
+      records the mapping explicitly so a reader tracing Atlas's table back
+      to this enum can see exactly which label maps to which canonical
+      value, the same transparency `rigor-level.schema.yaml`'s own
+      `migration_crosswalk` provides for MP §84's Title-Case mode names.
+
+  - question: >
+      What snake_case spelling do the 6 newly-added enum values (Incident,
+      Policy, Architecture, Security, DB Migration, Market Entry) get, given
+      Atlas's original 7-value enum has no multi-word precedent to follow
+      (every existing value is a single lowercase word)?
+    decision: >
+      `incident`, `policy`, `architecture`, `security`, `db_migration`,
+      `market_entry` — lowercase, underscore-separated for the two
+      multi-word labels.
+    reasoning: >
+      Matches this project's established snake_case convention for every
+      other machine-consumed identifier in `specs/` (e.g.
+      `research_grade`/`board_grade` in `rigor-level.schema.yaml`,
+      `root_cause`/`fishbone` segments in `method.schema.yaml`'s `id`
+      pattern) — a mechanical casing transcription, not a new naming
+      scheme invented for this file alone. Single-word labels
+      (Incident/Policy/Architecture/Security) need only lowercasing; the two
+      multi-word labels get an underscore, the same treatment
+      `rigor-level.schema.yaml` gave "Research Grade" -> `research_grade`
+      and "Board Grade" -> `board_grade`.
+
+  - question: >
+      For the 6 newly-added values, the table already states concrete
+      `起始推薦`/`不應預設` content (Atlas L1118-1123). Should this file
+      transcribe it, paraphrase it, or translate the Chinese cells to
+      English?
+    decision: >
+      Transcribe verbatim (including the mixed English-arrow-chain /
+      Chinese-phrase style Atlas itself uses, e.g. `不應預設: "單一 ROI"` for
+      Policy) — no paraphrase, no translation.
+    reasoning: >
+      Same "transcription, not invention" standard this whole file rests
+      on for the enum-completeness half — altering the wording during
+      transcription would introduce exactly the kind of silent drift
+      R4 (claim-before-verify) exists to prevent. A future reader diffing
+      this file against Atlas L1112-1123 should see byte-for-byte matching
+      cell content, not a Phase-3 paraphrase.
+
+  - question: >
+      `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` §2.3 row 120 lists
+      this file's dependency as `method-resolution.schema.yaml` — i.e., the
+      plan's own arrow says THIS file depends on THAT one. But
+      `method-resolution.schema.yaml` (built earlier this same session)
+      already inlines Atlas's 7-value `problem_type` enum directly (its
+      `open_questions.OQ-mres-2` states plainly: "`problem-type.schema.yaml`,
+      which does not exist yet... Once that file is built, this file's
+      `problem_type` fields... should migrate from an inline enum to a hard
+      $ref"). That is the OPPOSITE data-dependency direction from what the
+      plan's column states. Should this file $ref back into
+      `method-resolution.schema.yaml` to honor the plan's literal arrow?
+    decision: >
+      No. This file defines `problem_type` standalone, with zero `$ref`
+      into `method-resolution.schema.yaml`. The real dependency runs THIS
+      file -> consumed BY `method-resolution.schema.yaml`, matching that
+      file's own stated expectation in `OQ-mres-2`. Recorded as a mirrored
+      `open_questions` entry here rather than silently honored or silently
+      overridden.
+    reasoning: >
+      `$ref`-ing into `method-resolution.schema.yaml` to satisfy the plan's
+      literal dependency arrow would be circular the moment
+      `method-resolution.schema.yaml` is later upgraded to `$ref` back into
+      THIS file per its own `OQ-mres-2` — a real cycle, not just an
+      awkward-looking one. `normative-context.schema.yaml` recorded an
+      identical reversed-arrow discrepancy against
+      `section-registry.schema.yaml` in its own `open_questions`
+      (`MRSP-normctx-1`) rather than either blindly following the plan's
+      column or silently correcting the plan file itself (editing
+      `MACHINE_READABLE_SPEC_PLAN.md` is outside both files' creation
+      boundary) — this file follows that exact precedent.
+
+# ---------------------------------------------------------------------------
+# The unified enum — 13 values: Atlas's original 7 (unchanged spelling,
+# see compilation_decisions) + 6 transcribed from routing-table-only rows.
+# ---------------------------------------------------------------------------
+
+problem_type:
+  type: string
+  description: >
+    Canonical machine form of `selection_context.problem_type`. Supersedes
+    Atlas L1073's 7-value enum by ADDING the 6 values that existed only as
+    routing-table rows (see `routing_table` below for their transcribed
+    content). Does NOT remove or rename any of Atlas's original 7 values —
+    `exploratory`, `decision`, `operational` remain valid even though they
+    have no routing-table row (see `routing_table_gaps`).
+  enum:
+    - diagnostic
+    - exploratory
+    - creative
+    - strategic
+    - causal
+    - decision
+    - operational
+    - incident
+    - policy
+    - architecture
+    - security
+    - db_migration
+    - market_entry
+
+# ---------------------------------------------------------------------------
+# The routing table proper — 10 real, grounded entries (4 original overlap
+# values + the 6 newly-enum'd values). Every recommended_start/
+# should_not_default cell is a VERBATIM transcription of Atlas L1112-1123.
+# ---------------------------------------------------------------------------
+
+routing_table:
+
+  diagnostic:
+    label: "Diagnostic"
+    recommended_start: "Baseline→Data→Fishbone/Pareto→Causal Validation"
+    should_not_default: "SWOT"
+    source: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:1114"
+
+  creative:
+    label: "Creative"
+    recommended_start: "HMW→Divergence→Clustering→Prototype"
+    should_not_default: "5 Whys"
+    source: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:1115"
+
+  strategic:
+    label: "Strategy"
+    note: >
+      Table label is the noun "Strategy"; canonical enum value is the
+      adjective "strategic" (Atlas L1073) — a NEAR match, not an exact
+      string match. See `compilation_decisions` and `migration_crosswalk`.
+    recommended_start: "Context→Stakeholder→3C/Porter→Scenario→Decision"
+    should_not_default: "單純 Mind Map"
+    source: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:1116"
+
+  causal:
+    label: "Causal"
+    recommended_start: "DAG→Data Quality→Identification→Compute→Sensitivity"
+    should_not_default: "Brainstorm 結論"
+    source: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:1117"
+
+  incident:
+    label: "Incident"
+    note: "NEW enum value — Atlas L1073 did not previously include this. Content transcribed verbatim from the table row that already existed."
+    recommended_start: "Timeline→Change Analysis→Fault/Fishbone→Barrier→CAPA"
+    should_not_default: "Persona"
+    source: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:1118"
+
+  policy:
+    label: "Policy"
+    note: "NEW enum value — see incident's note above; same treatment."
+    recommended_start: "Stakeholder→Jurisdiction→Evidence→Theory of Change→Scenario"
+    should_not_default: "單一 ROI"
+    source: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:1119"
+
+  architecture:
+    label: "Architecture"
+    note: "NEW enum value — see incident's note above; same treatment."
+    recommended_start: "C4/DDD→Quality Attributes→Options→ATAM→ADR→Rehearsal"
+    should_not_default: "Patch-first"
+    source: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:1120"
+
+  security:
+    label: "Security"
+    note: "NEW enum value — see incident's note above; same treatment."
+    recommended_start: "Assets/DFD→STRIDE/LINDDUN→Attack Tree→Controls→Test"
+    should_not_default: "Checklist only"
+    source: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:1121"
+
+  db_migration:
+    label: "DB Migration"
+    note: "NEW enum value — see incident's note above; same treatment."
+    recommended_start: "Data Contract→Compatibility→Expand/Contract→Backfill→Restore/Rollback"
+    should_not_default: "Big-bang ALTER"
+    source: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:1122"
+
+  market_entry:
+    label: "Market Entry"
+    note: "NEW enum value — see incident's note above; same treatment."
+    recommended_start: "Jurisdiction→PESTEL→Customer→Porter→Unit Economics→Admission Gate"
+    should_not_default: "Country name only"
+    source: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:1123"
+
+# ---------------------------------------------------------------------------
+# The honest residue — 3 enum values with NO routing-table row and NO
+# mother-document text to compile one from. NOT populated with invented
+# content. See compilation_decisions and open_questions.
+# ---------------------------------------------------------------------------
+
+routing_table_gaps:
+  - problem_type: exploratory
+    status: "NO_ROUTING_TABLE_ROW_IN_ATLAS"
+    note: >
+      Atlas L1073 declares this enum value but §10's routing table
+      (L1112-1123) has no corresponding row. No `recommended_start` or
+      `should_not_default` content exists anywhere in the mother documents
+      for this problem type. Not fabricated here.
+  - problem_type: decision
+    status: "NO_ROUTING_TABLE_ROW_IN_ATLAS"
+    note: "Same gap as exploratory above — see that entry's note."
+  - problem_type: operational
+    status: "NO_ROUTING_TABLE_ROW_IN_ATLAS"
+    note: "Same gap as exploratory above — see that entry's note."
+
+migration_crosswalk:
+  description: >
+    For translating Atlas §10's routing-table row labels into this file's
+    canonical `problem_type` enum values only — not a runtime bidirectional
+    conversion table (same caveat style as `rigor-level.schema.yaml`'s own
+    `migration_crosswalk`).
+  "Diagnostic": diagnostic
+  "Creative": creative
+  "Strategy": strategic
+  "Causal": causal
+  "Incident": incident
+  "Policy": policy
+  "Architecture": architecture
+  "Security": security
+  "DB Migration": db_migration
+  "Market Entry": market_entry
+
+# ---------------------------------------------------------------------------
+# Forward dependents (informational — these files depend on this one; not
+# built by this file)
+# ---------------------------------------------------------------------------
+referenced_by:
+  - "specs/execution/method-resolution.schema.yaml (same Wave 5 session, built earlier) — its own `open_questions.OQ-mres-2` already names this exact migration: once this file exists, that file's `selection_context_supplement.problem_type` and `resolved_selection_context.problem_type` should upgrade from an inline 7-value enum to a hard $ref into this file's `problem_type` anchor (now 13 values). NOT done here — editing `method-resolution.schema.yaml` is outside this file's creation boundary; tracked in this file's own `open_questions` below as the mirrored note."
+
+open_questions:
+  - id: "OQ-ptype-1"
+    question: >
+      `routing_table_gaps` (exploratory, decision, operational) have no
+      `recommended_start`/`should_not_default` content anywhere in Atlas.
+      Should Atlas §10's table eventually gain 3 new rows for these, and if
+      so, who decides the content (a Method Atlas domain-expert judgment
+      call, not a schema-compilation task)?
+    owner: "operator / a future Method Atlas revision (Atlas §10 table edit, out of scope for this schema file)"
+    blocks: "nothing in this schema — `problem_type` is fully usable today with 3 acknowledged content gaps, not 3 silent ones"
+  - id: "OQ-ptype-2"
+    question: >
+      Mirrors `method-resolution.schema.yaml`'s `open_questions.OQ-mres-2`
+      from this file's own side: `MACHINE_READABLE_SPEC_PLAN.md` §2.3 row
+      120 lists this file's dependency as `method-resolution.schema.yaml`,
+      but the real data dependency runs the other way (that file should
+      eventually `$ref` INTO this one, not vice versa — see
+      `compilation_decisions` above). Not resolved against the plan text
+      itself; editing that file is outside this task's file-creation
+      boundary.
+    owner: "operator, next time MACHINE_READABLE_SPEC_PLAN.md's §2.3 row 120 is revised"
+    blocks: "nothing in this schema; flagged for completeness per R4 (claim-before-verify)"
+  - id: "OQ-ptype-3"
+    question: >
+      `strategic` (enum) vs. "Strategy" (table label) is a real word-form
+      mismatch this file resolves by keeping the enum's existing spelling
+      canonical (see `compilation_decisions`), not by correcting Atlas's
+      table wording. Should a future documentation-only PROPOSAL retitle
+      the table row "Strategic" for consistency, or should the enum instead
+      be renamed to the noun form? Left open — either edit touches a mother
+      document, out of scope for this schema-compilation task.
+    owner: "operator, via a documentation PROPOSAL against Atlas L1116 or a future ADR"
+    blocks: "nothing in this schema"
+
+verification:
+  method: >
+    Read against Atlas §10 full Selector Inputs + Problem Type routing
+    table block (L1066-1124, not just the two cited sub-ranges in
+    isolation), verified-findings.yaml DOC-method_atlas-5 full entry
+    (L1130-1143, including its `verdict_votes` reasoning),
+    `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` §2.3 row 120 full
+    text, and `specs/execution/method-resolution.schema.yaml` full text
+    (for the reversed-dependency-arrow cross-check and its `OQ-mres-2`
+    citation). Every one of the 10 `routing_table` entries' `label`/
+    `recommended_start`/`should_not_default` values was copied directly
+    from the corresponding Atlas L1112-1123 table row during drafting, then
+    re-diffed against the source table a second time before this file was
+    finalized — not typed from memory of the finding's summary.
+  note: >
+    No mother document, ADR, or sibling `specs/` file was modified to
+    produce this file. Grounded-vs-invented ratio: roughly 90% grounded —
+    all 13 enum values, all 10 `routing_table` entries' full content
+    (label + recommended_start + should_not_default, verbatim from Atlas),
+    and the acknowledged (not fabricated) existence of the 3
+    `routing_table_gaps` are all directly traceable to Atlas L1073/L1112-
+    1123 or to DOC-method_atlas-5's own text. The remaining ~10% is Phase 3
+    compilation: the snake_case spelling picked for the 6 newly-added enum
+    values (`db_migration`, `market_entry`, etc. — a casing convention, not
+    new content) and the decision to keep the enum's existing
+    `diagnostic`/`creative`/`strategic`/`causal` spellings as canonical
+    over the table's own labels (a Low-risk naming pick, not a semantic
+    change — see `compilation_decisions`).

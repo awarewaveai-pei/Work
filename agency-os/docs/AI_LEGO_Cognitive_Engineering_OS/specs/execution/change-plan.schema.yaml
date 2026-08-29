@@ -1,0 +1,423 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/execution/change-plan.schema.yaml"
+title: Forward Change Plan
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the `change_plan:` record —
+  Execution Contract §21 "Forward Change Plan" (L927-946), whose own opening
+  line is the load-bearing ordering rule this schema exists to make
+  mechanically checkable: "只有 Rollback / Recovery 可接受後才產生"
+  (a Forward Change Plan may only be produced AFTER a Rollback/Recovery plan
+  has been accepted). EC §21's literal `change_plan:` yaml block
+  (objective/root_cause/selected_option/alternatives_considered/
+  files_to_change/schema_changes/api_changes/config_changes/
+  deployment_changes/tests/metrics/release_strategy) is this schema's
+  primary structural source, promoted from untyped `...`/`[...]`
+  placeholders to typed fields.
+
+  Four other EC sections this task identified as load-bearing for a real
+  Change Plan are folded in as required or advisory sub-structures, each
+  cited to its own line range: §17 Scope Contract (L786-814, the
+  IN SCOPE/OUT OF SCOPE/NON-GOALS/INVARIANTS/ASSUMPTIONS/UNKNOWNs categories
+  every task must declare, plus the SCOPE_CHANGE_REQUIRED escalation already
+  resolved by status-codes.schema.yaml); §18 Change Impact Graph
+  (L816-850, the Requested Change -> ... -> Artifacts dependency chain a
+  plan should walk before committing to files_to_change); §22 Option
+  Analysis (L949-982, the Option A/B/Status-Quo comparison across 11 named
+  dimensions, and the rule that high-risk changes "不得只提出一個方案");
+  §23 ADR Trigger (L985-1009, the 13 conditions that usually require an
+  ADR). `risk_tier` is a required field with a real hard $ref into
+  `risk-tier.schema.yaml`, per this file's declared dependency in
+  MACHINE_READABLE_SPEC_PLAN.md §2.2's row (the only one of these three
+  new files with a declared dependency).
+
+  Explicit non-source note: this project's OWN AGENTS.md defines an
+  operator-facing 7-block review pattern (任務理解/現況分析/風險清單/
+  方案比較/建議方案/實作計畫/驗證計畫) that is structurally similar to
+  what follows below. That document is NOT one of this project's 3 mother
+  documents (Master Plan / Method Atlas / Execution Contract) and was
+  explicitly excluded as a grounding source for this task. Every field
+  below traces to EC §17/§18/§21/§22/§23 (and risk-tier.schema.yaml) —
+  the resemblance to AGENTS.md's pattern is convergent (both encode the
+  same "understand scope, compare real options, plan rollback before
+  forward action" discipline), not derivative.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §16 task.manifest.yaml, risk.tier field precedent (L768-770)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §17 Scope Contract (L786-814)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §18 Change Impact Graph (L816-850)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §19 Rollback-first Rule, ordering precondition only (L853-861)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §21 Forward Change Plan, canonical change_plan: yaml block (L927-946)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §22 Option Analysis (L949-982)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §23 ADR Trigger (L985-1009)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §92 Machine-readable Execution Specs list (L2766-2783, change-plan.schema.yaml at L2776)"
+  - "specs/execution/risk-tier.schema.yaml (dependency, hard $ref for risk_tier)"
+  - "specs/execution/status-codes.schema.yaml SCOPE_CHANGE_REQUIRED entry (its own L226-236), which cites EC §17 L804 and resolves the side-state mapping (NEEDS_HUMAN_REVIEW) for scope expansion"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2 row for change-plan.schema.yaml (READY, dependency: risk-tier)"
+
+decided_by: >
+  No ADR governs this file. docs/architecture/MACHINE_READABLE_SPEC_PLAN.md
+  §2.2 row for change-plan.schema.yaml lists it READY with dependency
+  "risk-tier" and resolved finding "—" — this file is a direct compilation
+  of EC §17/§18/§21/§22/§23's already-written prose and yaml examples, not
+  a Phase 0/1 finding resolution or a new architecture decision. The
+  risk-tier dependency itself traces to ADR-004 (risk-tier.schema.yaml's own
+  decided_by), consumed here by reference, not re-litigated.
+
+compilation_decisions:
+  - question: >
+      EC §17's Scope Contract categories are written as bare uppercase
+      words (IN SCOPE, OUT OF SCOPE, NON-GOALS, INVARIANTS, ASSUMPTIONS,
+      UNKNOWNs, L790-796) — not valid YAML object keys as-is (spaces,
+      mixed case).
+    decision: >
+      snake_case the 6 keys (in_scope, out_of_scope, non_goals, invariants,
+      assumptions, unknowns) inside a required `scope_contract` object;
+      values are string arrays.
+    reasoning: >
+      Mechanical key-legality transform only, same class of change
+      manifest.schema.yaml's field-naming decisions describe as "a naming
+      pick over an already-agreed concept" — EC's own literal example
+      blocks elsewhere in the corpus (e.g. §16's `risk: tier:`) already use
+      lowercase snake_case for machine fields; the ALL-CAPS forms in §17
+      are prose section headers, not a machine block EC itself ever
+      renders as YAML.
+  - question: >
+      EC §22 (L951) states "高風險變更不得只提出一個方案" (high-risk
+      changes must not present only one option) but gives no mechanical
+      trigger for what counts as "high-risk" in this context, nor a
+      concrete minimum count.
+    decision: >
+      Added a conditional (`if`/`then`) on `risk_tier`: when risk_tier is
+      R2, R3, or R4, `alternatives_considered` must contain at least 3
+      entries and at least one entry with `is_status_quo: true`.
+    reasoning: >
+      risk-tier.schema.yaml (ADR-004) already defines R2 as the first tier
+      whose examples include "multi-module change" / "public API" /
+      "workflow behavior" — a reasonable, already-ACCEPTED reading of
+      EC §22's undefined "high-risk" threshold, reusing an existing
+      canonical enum rather than inventing a second, competing risk
+      vocabulary for this one field. The minimum-3 count and the
+      status-quo requirement both come directly from EC §22 L955-959's own
+      literal minimum example ("至少：Option A / Option B /
+      Status Quo / No-change").
+  - question: >
+      Should EC §18's Change Impact Graph (a 10-node dependency chain) get
+      its own separate schema file, the way blast-radius-chain.schema.yaml
+      exists as a standalone file for Atlas §21's tenant-containment chain?
+    decision: >
+      No — embedded as an optional `impact_graph[]` field inside this file,
+      not a separate file.
+    reasoning: >
+      §18's chain is not named anywhere in EC §92's 13-file list
+      (L2766-2783) the way `blast-radius-chain.schema.yaml` corresponds to
+      a real ADR-003 sub-decision (c) needing its own file. §18 sits
+      textually between §17 (Scope Contract) and §19 (Rollback-first Rule)
+      as a single analysis step feeding directly into the Forward Change
+      Plan produced at §21 — modeling it as this file's own optional
+      pre-plan field keeps the promised 13-file boundary intact while still
+      making the chain mechanically checkable, per the same "don't invent
+      an unpromised file" discipline manifest.schema.yaml and
+      current-state.schema.yaml both apply to their own out-of-scope
+      adjacent concepts.
+  - question: >
+      EC §21's literal opening line makes Rollback/Recovery acceptance a
+      PRECONDITION of a Forward Change Plan's existence
+      ("只有 Rollback / Recovery 可接受後才產生"). How should that
+      ordering be represented mechanically, given rollback.schema.yaml is
+      a sibling file built in this same task?
+    decision: >
+      Required `rollback_plan_ref` field, a string matching `^RB-`,
+      referencing `rollback.schema.yaml`'s `plan_id` by naming convention
+      (soft reference, not a hard $ref).
+    reasoning: >
+      A hard $ref would need to point at a specific identity-bearing node
+      inside rollback.schema.yaml; that file defines `plan_id` as a plain
+      pattern-matched string field, not an enum/definitions node a $ref
+      could usefully pull double duty on (same limitation already
+      documented for other soft-by-convention references in this
+      directory, e.g. blast-radius-chain.schema.yaml's tenant_id). The
+      pattern prefix (`^RB-`) is this file's own compilation choice,
+      chosen to be visually distinct from `^TASK-`/`^EX-`/`^RUN-`/`^TRACE-`
+      already established by manifest.schema.yaml.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+type: object
+required:
+  - task_id
+  - risk_tier
+  - rollback_plan_ref
+  - scope_contract
+  - objective
+  - root_cause
+  - selected_option
+  - alternatives_considered
+  - files_to_change
+  - release_strategy
+
+properties:
+
+  task_id:
+    type: string
+    pattern: "^TASK-"
+    description: "Soft reference by convention to manifest.schema.yaml's execution.task_id."
+
+  execution_id:
+    type: string
+    pattern: "^EX-"
+
+  risk_tier:
+    $ref: "ai-lego://specs/execution/risk-tier.schema.yaml#/risk_tier"
+    description: "Real hard $ref — the declared dependency in MACHINE_READABLE_SPEC_PLAN.md §2.2's row for this file. See EC §16's task.manifest.yaml risk.tier precedent (L768-770)."
+
+  rollback_plan_ref:
+    type: string
+    pattern: "^RB-"
+    description: >
+      MUST reference an already-produced, already-validated rollback plan
+      per EC §19 (L857-861, validated BEFORE forward execution) and §21's
+      literal precondition (L929, "只有 Rollback / Recovery 可接受後才
+      產生"). Soft reference by naming convention to
+      rollback.schema.yaml's `plan_id` — see compilation_decisions.
+
+  scope_contract:
+    type: object
+    description: "EC §17 Scope Contract (L786-797), verbatim 6 categories, snake_cased for YAML key legality — see compilation_decisions."
+    required: [in_scope, out_of_scope, non_goals, invariants, assumptions, unknowns]
+    properties:
+      in_scope: { type: array, items: { type: string } }
+      out_of_scope: { type: array, items: { type: string } }
+      non_goals: { type: array, items: { type: string } }
+      invariants: { type: array, items: { type: string } }
+      assumptions: { type: array, items: { type: string } }
+      unknowns: { type: array, items: { type: string } }
+
+  scope_change:
+    type: object
+    description: >
+      EC §17 L799-812: mid-execution scope expansion handling. "禁止在
+      執行途中偷偷擴 scope" (silently expanding scope is forbidden) — any
+      expansion must go through this explicit re-evaluation record.
+    properties:
+      required:
+        type: boolean
+        default: false
+      status_code:
+        type: string
+        const: "SCOPE_CHANGE_REQUIRED"
+        description: >
+          Soft reference by name to status-codes.schema.yaml's
+          SCOPE_CHANGE_REQUIRED entry (side_state_mapping:
+          NEEDS_HUMAN_REVIEW) — no $ref-able definitions node exists there,
+          same limitation documented in current-state.schema.yaml's drift
+          field.
+      reevaluated:
+        type: object
+        description: "EC L807-812's 4 mandatory re-evaluation items, all required true before an expanded scope may proceed."
+        properties:
+          risk: { type: boolean }
+          rollback: { type: boolean }
+          tests: { type: boolean }
+          authority: { type: boolean }
+
+  impact_graph:
+    type: array
+    description: >
+      EC §18 Change Impact Graph (L818-842), optional pre-plan chain
+      analysis: found hidden dependencies, compatibility risk, blast
+      radius, avoid missed downstream consumers (L844-849). See
+      compilation_decisions for why this is embedded here rather than a
+      separate file.
+    items:
+      type: object
+      required: [node_type]
+      properties:
+        node_type:
+          type: string
+          enum:
+            - REQUESTED_CHANGE
+            - DOMAIN_OBJECTS
+            - MODULES
+            - APIS
+            - SCHEMAS
+            - EVENTS
+            - DATA
+            - SECURITY
+            - INFRA
+            - CONSUMERS
+            - ARTIFACTS
+        findings:
+          type: string
+
+  objective:
+    type: string
+    description: "EC §21 change_plan.objective (L933)."
+
+  root_cause:
+    type: string
+    description: >
+      EC §21 change_plan.root_cause (L934). If not yet determined, the
+      literal string "UNKNOWN" is required rather than a guess — same rule
+      EC §13 (L688-694) states for problem definitions ("Root Cause =
+      UNKNOWN 而不是亂填").
+
+  selected_option:
+    type: string
+    description: "EC §21 change_plan.selected_option (L935)."
+
+  alternatives_considered:
+    type: array
+    description: >
+      EC §21 change_plan.alternatives_considered (L936) and EC §22 Option
+      Analysis (L949-982): minimum Option A / Option B / Status Quo
+      (L955-959), each compared across 11 named dimensions.
+    minItems: 1
+    items:
+      $ref: "#/definitions/option"
+    if:
+      properties:
+        risk_tier: { enum: [R2, R3, R4] }
+      required: [risk_tier]
+    then:
+      minItems: 3
+      contains:
+        properties:
+          is_status_quo: { const: true }
+        required: [is_status_quo]
+
+  files_to_change:
+    type: array
+    items: { type: string }
+    description: "EC §21 change_plan.files_to_change (L937)."
+
+  schema_changes:
+    type: array
+    items: { type: string }
+    description: "EC §21 change_plan.schema_changes (L938)."
+
+  api_changes:
+    type: array
+    items: { type: string }
+    description: "EC §21 change_plan.api_changes (L939)."
+
+  config_changes:
+    type: array
+    items: { type: string }
+    description: "EC §21 change_plan.config_changes (L940)."
+
+  deployment_changes:
+    type: array
+    items: { type: string }
+    description: "EC §21 change_plan.deployment_changes (L941)."
+
+  tests:
+    type: array
+    items: { type: string }
+    description: "EC §21 change_plan.tests (L942)."
+
+  metrics:
+    type: array
+    items: { type: string }
+    description: "EC §21 change_plan.metrics (L943)."
+
+  release_strategy:
+    type: string
+    description: "EC §21 change_plan.release_strategy (L944)."
+
+  adr:
+    type: object
+    description: "EC §23 ADR Trigger (L985-1009), advisory checklist — not every change triggers an ADR."
+    properties:
+      trigger_conditions_met:
+        type: array
+        items:
+          type: string
+          enum:
+            - "New Bounded Context"
+            - "New Persistent Store"
+            - "New External Provider"
+            - "Public API Semantics Change"
+            - "Security Boundary Change"
+            - "Data Ownership Change"
+            - "Event Contract Change"
+            - "Deployment Strategy Change"
+            - "Encryption / Key Strategy"
+            - "Jurisdiction Architecture Change"
+            - "Major Workflow Engine Change"
+            - "Nontrivial Vendor Lock-in"
+            - "Exception to Architecture Invariant"
+      adr_ref:
+        type: string
+        pattern: "^docs/adr/ADR-[0-9]+-.*\\.md$"
+        description: "EC §23's suggested path form (L1007-1009): /docs/adr/ADR-XXXX-<slug>.md."
+
+# ---------------------------------------------------------------------------
+definitions:
+  option:
+    type: object
+    required: [name, comparison]
+    properties:
+      name:
+        type: string
+      is_status_quo:
+        type: boolean
+        default: false
+        description: "EC §22 L957-958's 'Status Quo / No-change' option."
+      comparison:
+        type: object
+        description: "EC §22 L961-973, 11 comparison dimensions verbatim, snake_cased."
+        properties:
+          correctness: { type: string }
+          security: { type: string }
+          maintainability: { type: string }
+          complexity: { type: string }
+          migration: { type: string }
+          lock_in: { type: string }
+          cost: { type: string }
+          latency: { type: string }
+          operability: { type: string }
+          reversibility: { type: string }
+          long_term_debt: { type: string }
+      analysis_method:
+        type: string
+        description: "EC §22 L975-981: Method Atlas decides which of these to use for this comparison."
+        enum: [ATAM, MCDA, DECISION_MATRIX, PRE_MORTEM, RED_TEAM]
+
+# ---------------------------------------------------------------------------
+open_questions:
+  - id: "OQ-CP-1"
+    question: >
+      EC §22's 11 comparison dimensions are given as bare free-text fields
+      here (each a plain string). Should they instead be a richer
+      {score, rationale} pair, or a fixed rating scale, for machine
+      comparison across options? EC gives no concrete typing for these
+      fields anywhere in either its prose or its one Weighted Decision
+      Matrix example (cross-referenced in Atlas §12.33) — left open rather
+      than inventing a scoring scale EC never specifies.
+    owner: "operator, or a future Round 2 ADR"
+    blocks: "nothing in this schema"
+  - id: "OQ-CP-2"
+    question: >
+      Should `impact_graph[]`'s node findings be typed per node (e.g. a
+      DATA node listing specific schema names, a CONSUMERS node listing
+      specific service names) rather than one free-text `findings` field?
+      Kept minimal here since EC §18 only names the 10 chain steps
+      (L820-841) and their PURPOSE (L844-849), not a per-node field shape.
+    owner: "operator, future Wave planning"
+    blocks: "nothing in this schema"
+
+verification:
+  method: >
+    Read against EC §16 (L753-782), §17 (L786-814), §18 (L816-850), §19
+    (L853-861), §21 (L927-946), §22 (L949-982), §23 (L985-1009), §92
+    (L2766-2783); risk-tier.schema.yaml full text (its own risk_tier
+    top-level enum, re-read to confirm the $ref target path); status-codes.
+    schema.yaml's SCOPE_CHANGE_REQUIRED entry (its own L226-236).
+  note: >
+    Every field traces to a specific EC line range cited above; the
+    risk_tier field is a real hard $ref, not a re-derivation. No mother
+    document, ADR, or sibling schema was modified to produce this file.

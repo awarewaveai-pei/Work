@@ -1,5 +1,38 @@
 # Worklog
 
+## 2026-08-29（續14）
+
+### AI LEGO Phase 3 Wave 5 完成 — EC §92 剩餘 13 檔落地 + 首次對整個 Phase 3 產出跑 Codex 結構性覆審，4 個真實跨檔缺陷全數修正
+
+**背景**：續13 完成 Wave 4 後，操作者說「繼續阿」，進入 Wave 5（EC §92 承諾的 13 個 execution/ 檔案剩餘部分）。操作者中途問「有做 codex review 嗎？」——誠實回答：Phase 3 整批（Wave 1-4，當時約 34 檔）都還沒跑過 Codex，過去都用「Low-risk 編譯」豁免對外部 oracle 覆審。重新評估後認為單檔層級的豁免邏輯沒錯，但累積到 30+ 個彼此互相 `$ref` 的檔案後，個別 agent 各自看不到的系統性問題（命名不一致、循環依賴、跨檔矛盾）不會被任何單一檔案的自我審查抓到——這正是外部 oracle 的價值所在，於是主動補跑一輪。
+
+**執行方式**：Wave 5 依真實依賴關係分兩批：Batch 5A（5 個 subagent，10 個無內部依賴的檔案：method-resolution+task、current-state+change-plan+rollback、exception+deprecation-pipeline、result、authority+gate 骨架）、Batch 5B（2 個 subagent，4 個依賴 5A 產出的檔案：problem-type+method-execution-request、typed-method-result+handoff）。與 Batch 5A 平行，另跑一輪 `codex-oracle.ps1 -Mode inspect`，要求 Codex 獨立通讀整個 `specs/`+`methods/` 目錄（約 34-48 個檔案），檢查單一檔案審查看不到的跨檔問題。
+
+**Codex 結構性覆審結果（4 條 CONFIRMED，全數為真實缺陷，非假警報）**：
+1. `risk-tier.schema.yaml`／`epistemic-label.schema.yaml`／`rigor-level.schema.yaml`／`representation.schema.yaml` 四個檔案的實際型別定義都放在具名子欄位下（如 `risk_tier:`、`provenance_record:`），檔案「根」本身沒有型別約束——直接對檔案根驗證的工具會誤放行任意值（例如驗 `risk-tier.schema.yaml` 根層級，`"R5"` 這種不存在的值會通過）。
+2. `profile.schema.yaml` 的 `rigor` 欄位用鬆散字串而非真正 `$ref`，其 `compilation_decisions` 聲稱「全套件零跨檔 $ref」其實不實——同一 Wave 的 `task.schema.yaml` 已有真正 $ref 先例，前者的判斷依據本身就是錯的。
+3. `method.schema.yaml` 的 `contract_provenance` 聲稱「型別化為 provenance_record」，實際卻是三個無約束字串——`{epistemic_type: FACT, authorship_state: BOT}` 這種非法值目前會通過驗證。
+4. `contract-backlog.yaml` 的 Tier 2 定義自相矛盾：`policy` 段只講「從 method-inventory.yaml 衍生」，但 `explicit_entries` 又加了不在該檔案裡的 `finance.financial_assumptions`——依字面規則走的 compiler 會漏掉 ADR-008 要求的項目。
+
+**修正過程中我方自己另外抓到一個問題（MRSP-15）**：修正第 2 條時，我第一次把 `rigor` 改成 `$ref: "rigor-level.schema.yaml#/rigor_mode"`（相對路徑形式），實測發現無法解析——追查後發現 Python `urllib.parse` 根本不認得自訂的 `ai-lego://` scheme，相對路徑拼接會直接失效（`urljoin` 原樣回傳，不會拼成完整 URI）。全庫掃描確認：所有既有的真正跨檔 `$ref` 早就正確使用完整 `ai-lego://specs/...` 絕對形式（`task.schema.yaml` 是最早示範這個形式的檔案）——只有我這次的修正一度用錯格式，已改正。訂為新規則：跨檔 `$ref` 一律用完整絕對形式。
+
+**全部 4 條 CONFIRMED 發現皆已修正並用 jsonschema 實測驗證**（非只改文字說已修，逐條跑過「壞值應該被拒絕、好值應該通過」的正反測試）。
+
+[已修改]
+- 新增 14 個檔案：`execution/{method-resolution,task,current-state,change-plan,rollback,exception,deprecation-pipeline,result,authority,gate}.schema.yaml`、`cognitive/{problem-type,method-execution-request,typed-method-result}.schema.yaml`、`execution/handoff.schema.yaml`
+- 修正 7 個既有檔案：`execution/risk-tier.schema.yaml`、`governance/epistemic-label.schema.yaml`、`cognitive/{rigor-level,representation,method,profile}.schema.yaml`、`methods/registry/contract-backlog.yaml`（各自新增根 `$ref` 或修正欄位型別，詳見上方 4 條 Codex 發現）
+- `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`：13 個 Spec Inventory 表格列狀態改為 `BUILT`；Wave 5 mermaid 區塊標註完成/延後項目；§5 新增 MRSP-11~15 五條記錄
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 -c "yaml.safe_load(...)"` 對全部 48 個 specs/methods 檔案逐一解析（全部 OK）；對 4 條 Codex CONFIRMED 發現逐一用 jsonschema（`Draft202012Validator` + `RefResolver`）跑正反測試（壞值拒絕、好值通過），全數符合預期 | exit=0
+- REVIEW_DONE: critic=`codex-oracle.ps1 -Mode inspect`（外部獨立模型，非自我審查）| verdict=4 CONFIRMED，全數已修正 | 完整 artifact：`agency-os/reports/oracle/2026-08-29-inspect-f8ec719d.md`
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=Wave 5 新增 13 個檔名逐一 | hits=僅預期位置（母文件承諾清單、既有計畫文件引用、WORKLOG 歷史紀錄），無 stale 或衝突引用
+- ORACLE_WAIVED: 本條驗證本身即為對外部 oracle 的呼叫與結果整合；Wave 5 新增的 14 個檔案內容為既有母文件承諾的編譯（非新架構取捨），不需要對這些新檔另跑一輪覆審
+
+[剩餘風險] `execution/document-registry.schema.yaml` 明確延後（依賴尚未建立的 Architecture-Constitution-v1.md，需先走 ADR-006 proposals 流程，非本輪 Phase 3 範圍）；`domain/capability-contract.schema.yaml` 依賴已完成但尚未建置（下一輪可立即補）；Codex 覆審只抓了 4 條，不代表整個 Phase 3 產出零缺陷——覆審本身受限於單次 inspect 的深度，建議未來每完成一個 Wave 都比照本次做法補跑一輪，累積問題才不會在最後一次性爆發。
+[rollback] `git revert` 本次 commit；三母文件全程零改動，新增內容僅限 14 個新檔 + 7 個既有檔案的欄位修正 + 計畫文件狀態欄位更新。
+
 ## 2026-08-29（續13）
 
 ### AI LEGO Phase 3 Wave 4 完成 — Evidence/Decision/Jurisdiction/Normative-Context 10 檔落地，過程中修正計畫文件一處不精確敘述 + 6 處跨檔過期 forward-reference 註解
@@ -269,8 +302,72 @@
 
 **[驗證結果]**
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（於 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`）| exit=0 | ms=約 15000
-- REVIEW_DONE: critic=Deep | verdict=（背景執行中,結果待下一條記錄）| findings=（待補）
-- BUGHUNT_DONE: scope=lobster-factory | grep=`portal/login\|portal/signup\|portal/api/signup` 於 `middleware.ts` | hits=2 行（新增註解 1 行 + `matcher` 陣列本身 1 行,確認排除清單只新增這 3 個字面值,未動其餘既有排除項）
+- REVIEW_DONE: critic=Deep | verdict=pass-with-fixes（見下條完整記錄）| findings=3C/8M/8m/6s
+- BUGHUNT_DONE: scope=lobster-factory | grep=`portal/login\|portal/signup\|portal/api/signup` 於 `middleware.ts` | hits=2 行（新增註解 1 行 + `matcher` 陣列本身 1 行,確認排除清單只新增這 3 個字面值,未動其餘既有排除項；本輪後續 critic 修正已把這 3 條路徑從 matcher 移進函式內判斷,見下條）
+
+### critic 全文覆審完成：3 Critical + 8 Major + 8 Minor + 6 Suggestion，逐項修正
+
+critic 對全部 10 個新/改檔案做覆審，**並實際對 `ks-aw-01` 現場資料庫/API 下唯讀查證指令**（非紙上談兵）：`select proacl from pg_proc`（驗證 revoke 是否真的擋住 anon/authenticated）、`curl -X POST https://app.aware-wave.com/portal/api/signup`（驗證 host 隔離是否存在）、`curl` PostgREST filter 語法驗證。裁定 Overall risk: High，原始狀態不可套 migration/deploy。
+
+**3 個 Critical，全部修正**：
+1. **`revoke all ... from public` 在 Supabase 上不夠**——`anon`/`authenticated` 是另一組獨立預設 grant，critic 拿既有 `0030` 實測 `proacl` 證實舊 pattern 也漏了這個。不補的話任何持有瀏覽器 bundle 裡 `anon` key 的人可以直接 `POST /rest/v1/rpc/portal_complete_signup`，用 `supabase_admin` 身分繞過 Turnstile/rate limit/env gate/route.ts 全部防線寫入四表。**修**：`0063` 補 `revoke all ... from anon, authenticated`，down 檔加 post-apply `proacl` 驗證指令。
+2. **portal signup 核發的帳號可以讀寫內部 ops console**——`middleware.ts` 對「已登入無 `ops_role`」的預設是 `viewer`（非拒絕），全站 ~120 條 `/ops/*` 路由沒有任何一條查 `user_kind`。這個假設在 portal 出現前一直成立，portal signup 是第一個打破它的機制。**修**：`middleware.ts` 加單一 choke point `isClientOutsidePortal()`，client 身分打非 `/portal/*` 一律 403/redirect，套在快取與慢速兩個 return 路徑，不做逐一稽核 120 條路由那種補丁式修法。
+3. **`PORTAL_SIGNUP_ENABLED` 從未在正式環境被讀取**（只在 dev-bypass 分支裡），真正的開關其實是跟 `/intake` 共用的 `TURNSTILE_SECRET_KEY`；且 critic 實測 `curl -X POST https://app.aware-wave.com/portal/api/signup` 打得通（Next.js file-based routing 天生不分 host）——**光部署程式碼，不等 DNS/憑證/nginx 任何一步，就會在 `app.aware-wave.com` 開放公開註冊**。**修**：①`PORTAL_SIGNUP_ENABLED` 改獨立、任何環境都必查，`docker-compose.yml` 補 env passthrough ②`middleware.ts` 加 `isWrongHostForPortal()` 強制 `/portal/*` 只認 `Host===portal.aware-wave.com`，**且把 portal 三個公開頁從 matcher 排除清單移進函式內部 `Set.has()` 判斷**（原本用 matcher 排除會讓這幾條路由完全跳過整個 middleware 函式，host 檢查形同虛設）。
+
+**8 個 Major，7 修正 + 1 accepted residual（誠實記錄）**：matcher 邊界鬆散（隨 C3 架構改動一併解決）／nginx naive rewrite 會把 `/_next/static/*` 也加前綴導致兩個表單永遠 hydrate 不了（rewrite 排除清單加 `_next/`/`favicon.ico`）／launcher 用 service-role client 讀資料導致 `0062` 的 RLS 從未真正執行（改用既有 `lib/supabase/route-client.ts` 的 user-scoped client，RLS 變成真邊界非裝飾）／rate limit 全域計數可被單一攻擊者鎖死全球客戶（改 per-caller salted hash 計數，殘留 TOCTOU race 記錄為 accepted：攻擊者現在只能鎖死自己且每次要過 Turnstile）／409 讓匿名呼叫者可枚舉內部員工 email（改一律回同款 202）／補償刪除邏輯沒考慮「RPC 其實成功但 network timeout 誤報」會誤刪真實帳號且永久卡住該 email（刪除前先查 org row 是否存在）／`email_confirm:true` 已知限制維持但嚴重性因 C2 修正降級／`requireClientOrg()` 零測試覆蓋（新增 `lib/__tests__/tenant-guard.test.ts` 10 條 table-driven tests）。
+
+**8 個 Minor，6 修正 + 2 記錄不修**：`blockedResponse` 對 `/portal/api/*` 誤判非 API 路徑回 307（fetch 呼叫端會把登入頁 HTML 當 JSON 解析,已修）／launcher 吞掉 `error` 導致 DB 掛掉時誤顯示全部「即將推出」（已修，明確處理並顯示錯誤）／`portal.aware-wave.com/` 404（新增 `app/portal/page.tsx` redirect）／輸入無長度上限、email 驗證太鬆（加上限+regex）／`0063` `search_path` 跟房規不一致（改 `public, pg_temp`）／rate limit 查詢缺索引（新增 partial index，順便把「事後 UPDATE 標記」改成 RPC 內原子寫入，一併解決潛在的更新失敗漏標記問題）／拒絕頁回 200 應該 403（App Router page component 不易控制狀態碼，記錄不修）／方案文件 §10 誤寫 `organizations.status` 合法值含不存在的 `offboarding`（已訂正對照 `0001_core.sql:8`）。
+
+**6 個 Suggestion，2 修正 + 4 記錄不修**：`product_key` 打錯字靜默轉預設值（改明確白名單 422）／Turnstile 兩處重複（`spawn_task` 已完成抽成 `lib/turnstile.ts`，本次直接受益）／Turnstile hostname 檢查、`lib/tenant-guard.ts` 既有函式的死判斷（僅清理本次新增那份,既有 `resolveTenant`/`effectiveOrgId` 不動）、`membership_type` 無 CHECK、既有 `0030`/`0032`/`upsert_incident_atomic` 同款 C1 漏洞（後三項不在本次邊界內，最後一項另開 `spawn_task task_43279c03` 追蹤，需獨立稽核+操作者 go-ahead）。
+
+方案文件改版至 v4，§11 完整記錄全部發現與處置。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | ms=約 15000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run` | exit=0 | ms=約 2080（58 檔 666 條全過，含新增 10 條）
+- REVIEW_DONE: critic=Deep | verdict=pass-with-fixes（全部 Critical/多數 Major/Minor 已修，殘留項目均已文件化並附理由）| findings=3C(3 修)/8M(7 修 1 accepted)/8m(6 修 2 不修)/6s(2 修 4 不修)
+- BUGHUNT_DONE: scope=lobster-factory | grep=`isClientOutsidePortal\|isWrongHostForPortal\|PORTAL_PUBLIC_PATHS` | hits=3 檔（`middleware.ts` 實際定義+呼叫；`route.ts`/`tenant-guard.test.ts` 各 1 處純文字註解交叉引用，非重複定義）——確認三個新函式/常數僅 `middleware.ts` 一處定義，未被其他既有檔案意外重複定義或命名衝突
+
+### 操作者「Go + Codex review」授權 → DNS/憑證/nginx/migration 全部在 `ks-aw-01` 完成，Codex 抓到一個三輪覆審都漏掉的真 bug
+
+**Cloudflare**：CF API 建立 `portal.aware-wave.com` A record（照抄 `app.aware-wave.com` 現況：149.202.64.114，proxied）。
+
+**`ks-aw-01` 憑證/nginx**（backup 先行，符合 AGENTS.md nginx 修改紀律）：
+1. backup host nginx vhost + lobster-nginx `default.conf`（timestamp 存檔）
+2. 發現 certbot 用 `authenticator=nginx`（非 webroot）——先誤用 `--webroot` 導致 challenge 404，改正後**先手動把 `portal.aware-wave.com` 加進 host nginx `server_name`（兩處 :80/:443）→ `nginx -t` → reload → 確認四個既有網域（app/api/www/oracle）皆無回歸 → 才跑 `certbot --expand`**（順序很重要：nginx plugin 需要先有對應 server block 才能找到 challenge 掛載點）
+3. `certbot certonly --cert-name aware-wave.com --account 5a8cc415f9202d41cdf20c29d806150f --nginx --expand -d ... -d portal.aware-wave.com` 成功，SAN 六域驗證（`openssl x509 -text` 核對）
+4. lobster-nginx `default.conf` 新增獨立 `server{server_name portal.aware-wave.com}` block（含冪等 rewrite，方案 §7.2 原文照貼）→ `docker exec lobster-nginx nginx -t` → reload → curl 驗證 app/api/www/oracle 四個既有網域皆正常 + portal 新網域有回應（nginx 層通，實際功能待部署程式碼）
+
+**Migration 套用**（sftp 傳檔 → `docker exec -i supabase-db psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1`）：`0062` 先、`0063` 後，均 `COMMIT`/成功結尾無錯誤。**C1 修正即時實測**：套用後立刻查 `select proacl from pg_proc where proname='portal_complete_signup'` → 只剩 `supabase_admin/postgres/service_role`，**無 `anon`/`authenticated`**，Critical 修正在正式庫上確認生效。
+
+**Codex 第二意見抓到一個三輪覆審（db-expert/自審/critic）都沒抓到的真 bug**：`org_product_subs_external_tenant_uniq` 索引沒排除 `canceled` 狀態，導致「客戶取消訂閱後想重新啟用同一個 product tenant」這個正常流程會撞唯一索引失敗（舊 canceled row 永遠佔著那個 `external_tenant_id`）。**已修**：migration 檔案 + **正式庫同步修正**（`drop index` + `create index` 加 `and status <> 'canceled'`，套用時資料表 0 rows，零資料風險，已用 `pg_indexes.indexdef` 驗證正式庫定義與修正後檔案一致）。方案文件 §12 完整記錄。Codex 另外兩個發現：finding 1 跟 §10 自審重複（已知不修）、finding 3 大部分已被 §11 M3（launcher 改用 user-scoped client）覆蓋，殘留記錄不修。
+
+**git commit 被 `verify-recent` 機械閘擋下**（高風險 auth 檔案強制要求，`--ack` 不適用）：正在跑第二輪 critic 覆審（針對 fix 後的最終版本,非重工——第一輪 critic 審的是 fix 前版本,這輪驗證 fix 本身有沒有帶新 bug）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash(SSH) | cmd=`select proacl from pg_proc where proname='portal_complete_signup'` | exit=0 | 結果=只剩 service_role,C1 修正正式庫實測通過
+- REALTEST_EVIDENCE: tool=curl（經 SSH）| cmd=四個既有網域 app/api/www/oracle 全部 200/301/307（皆正常值,非 502/500）| 確認 nginx 改動零回歸
+- REALTEST_EVIDENCE: tool=Bash(SSH) | cmd=`pg_indexes.indexdef` 核對 `org_product_subs_external_tenant_uniq` | 結果=與修正後 migration 檔案定義逐字相符
+- REVIEW_DONE: critic=Deep（跑中,結果待下一條記錄）+ codex-oracle 第二意見已完成（`reports/oracle/2026-08-29-review-a3747059.md`,3 findings,1 個真 bug 已修）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`PORTAL_SIGNUP_ENABLED\|organization_product_subscriptions\|portal_complete_signup` | hits=scripts=0（無既有腳本引用,確認不需同步更新）,agency-os=7 檔（本次新增文件+WORKLOG/TASKS 自身引用+oracle 存檔,無過期舊聲稱）
+
+### Codex 第三輪覆審（帶完整 §11 修正上下文）：3 個發現全部 CONFIRMED，全部修正
+
+`codex-oracle.ps1` 第二個背景任務（帶 `isClientOutsidePortal`/`isWrongHostForPortal` 完整上下文的那輪）跑完，耗時 ~13 分鐘，`reports/oracle/2026-08-29-review-fe335c00.md`。**三個發現都是真的**：
+
+1. **`PORTAL_SIGNUP_ENABLED=true` 但忘記設 `TURNSTILE_SECRET_KEY` 時 captcha 完全被跳過**——兩個 env var 原本互相獨立，操作者只開前者就等於開了一個零機器人防護的帳號建立端點。**已修**：兩者改成聯合閘門。
+2. **C2 跟 C3 各自沒問題，串起來是死路**——client 身分被擋在非 portal 路徑時，redirect 目標用 `request.url` 組出來，保留了原本（錯的）host，導致下一個請求又被 host 檢查擋掉，變成 404 死路。**已修**：redirect 改用絕對網址 `https://portal.aware-wave.com/launcher`。
+3. **§11 M5 的枚舉防護修過頭**——原本把「email 已註冊」跟「任何其他 `createUser` 失敗（服務金鑰設錯、GoTrue 掛掉）」全部當成「成功」回傳，真正的系統故障會被誤判成註冊成功且永遠查不出來。**已修**：只對「看起來是重複 email」這個真正需要防枚舉的情境才回傳無區別回應，其他失敗一律回傳真實 500 + log。
+
+三個發現的共同特徵：**都是「兩個各自看起來對的修正,組合起來才會出問題」**——跟第二輪覆審抓到的 index 問題（那是「單一修正本身沒考慮到的情境」）是不同的錯誤類型，這正是外部第二意見的價值所在,同一個人反覆檢查自己的東西容易對這種組合型問題視而不見。
+
+`npx tsc --noEmit` exit 0、`npx vitest run` 666/666 全過（三次修正後重跑）。方案文件 §13 完整記錄。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run` | exit=0（58 檔 666 條）
+- REVIEW_DONE: critic=（`verify-recent` 機械閘要求的那輪跑在背景,涵蓋範圍待確認是否已包含這三個最新修正,結果待下一條記錄）
+- BUGHUNT_DONE: scope=lobster-factory | grep=`portal.aware-wave.com.*launcher\|TURNSTILE_SECRET_KEY.*PORTAL_SIGNUP_ENABLED` | hits=確認 `middleware.ts`/`route.ts` 修正後的字串只出現一次（各自的新邏輯位置），無殘留舊版本邏輯分支
 
 ## 2026-08-29（續7）
 

@@ -1,0 +1,369 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/execution/deprecation-pipeline.schema.yaml"
+title: Deprecation / Retirement Pipeline
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the retirement/deprecation flow
+  for any API, Method, Capability, Schema, Policy, Provider, or Workflow.
+  Resolves CROSS-T-19 (`.ai/research/phase-0/verified-findings.yaml`
+  L646-664, CONFIRMED, severity medium): the pipeline is defined TWICE — once
+  in Method Atlas §24.3 (L4275-4288, 6 steps, scope "method retirement" only)
+  and once in the Execution Contract §113 (L3164-3195, 7 steps, scope 7
+  object types) — and the two mandated procedures disagree on whether a
+  Deadline stage exists.
+
+  MACHINE_READABLE_SPEC_PLAN.md's row for this file (§2.2, L107) recommends
+  "採 EC 版（更完整，屬 Low-risk 事實性補全，非需要 ADR 裁決的取捨）" (adopt
+  the EC version — more complete, a Low-risk factual completion, not a
+  tradeoff requiring ADR arbitration) without spelling out why step-by-step.
+  Per AGENTS.md R4 (claim-before-verify — this session already found one
+  prior Wave's own plan-row characterization did not hold up on direct
+  re-reading), both sections were re-read in full and compared
+  position-by-position rather than that characterization being transcribed
+  as-is. See `merge_verification` below: the claim HOLDS — EC §113 is a
+  strict superset of Atlas §24.3 on both dimensions checked (steps AND
+  scope), so adopting it wholesale loses zero Atlas-only content. This file
+  is the single source of truth for the retirement pipeline; the mother
+  documents reference it, they do not redefine it.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §24.3 Deprecation (L4275-4288)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §113 Deprecation Contract (L3164-3195)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2 row for deprecation-pipeline.schema.yaml (L107)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2 row for method-deprecation-retirement.recipe.yaml (L176, downstream consumer of this file)"
+  - ".ai/research/phase-0/verified-findings.yaml CROSS-T-19 (L646-664)"
+  - "specs/execution/status-codes.schema.yaml (dependency per MACHINE_READABLE_SPEC_PLAN.md L107 and status-codes.schema.yaml's own `referenced_by` list; hard $ref into `reference_vocabulary.legal_side_states` below)"
+
+decided_by: >
+  No single ADR governs this file. MACHINE_READABLE_SPEC_PLAN.md §2.2's row
+  for deprecation-pipeline.schema.yaml explicitly characterizes this as
+  Low-risk factual completion not requiring ADR arbitration — verified
+  independently in this session (see `merge_verification`), not merely
+  transcribed. This matches the precedent `status-codes.schema.yaml` and
+  `manifest.schema.yaml` set for Low-risk direct compilation without a
+  dedicated ADR. The step-naming pick (EC's "Notice" over Atlas's
+  "Deprecation Notice") and the decision not to invent a new named status
+  code in `status-codes.schema.yaml` are Phase 3 compilation decisions,
+  recorded below.
+
+# ---------------------------------------------------------------------------
+# Field-by-field re-verification of the plan's "採 EC 版（更完整）" claim.
+# ---------------------------------------------------------------------------
+merge_verification:
+  description: >
+    Both sections were read in full and their step lists compared position
+    by position, per AGENTS.md R4 (claim-before-verify) and this session's
+    "same reviewer flags an issue twice -> do the invariant analysis first"
+    discipline applied proactively here (checking the plan's own claim
+    before building on it, not after a reviewer flagged it).
+  atlas_24_3:
+    source: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §24.3 (L4275-4288)"
+    scope: "每個 method retirement (L4277) — Method only, one object type."
+    steps: [Deprecation Notice, Replacement, Compatibility Matrix, Migration Tool, Usage Scan, Archive]
+    invariant: "禁止直接刪除造成舊 project 無法重播 (L4288)"
+  ec_113:
+    source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §113 (L3164-3195)"
+    scope: "API, Method, Capability, Schema, Policy, Provider, Workflow (L3166-3174) — 7 object types, Method included."
+    steps: [Notice, Replacement, Compatibility Matrix, Migration Tool, Usage Scan, Deadline, Archive]
+    invariant: "不得直接刪除導致歷史無法 replay (L3194)"
+  position_by_position:
+    - {position: 1, atlas_step: "Deprecation Notice", ec_step: "Notice", verdict: "SAME_STEP_TERSER_WORDING"}
+    - {position: 2, atlas_step: "Replacement", ec_step: "Replacement", verdict: "IDENTICAL"}
+    - {position: 3, atlas_step: "Compatibility Matrix", ec_step: "Compatibility Matrix", verdict: "IDENTICAL"}
+    - {position: 4, atlas_step: "Migration Tool", ec_step: "Migration Tool", verdict: "IDENTICAL"}
+    - {position: 5, atlas_step: "Usage Scan", ec_step: "Usage Scan", verdict: "IDENTICAL"}
+    - {position: 6, atlas_step: null, ec_step: "Deadline", verdict: "EC_ONLY_ADDITION"}
+    - {position: "6 (Atlas) / 7 (EC)", atlas_step: "Archive", ec_step: "Archive", verdict: "IDENTICAL"}
+  no_further_elaboration_found: >
+    Grepped both documents for every individual step name ("Deprecation
+    Notice", "Compatibility Matrix", "Migration Tool", "Usage Scan",
+    "Deadline", "Archive") — each appears ONLY at the cited §24.3/§113
+    location in its own document (Atlas's "Archive" match count includes one
+    unrelated hit, MP-not-Atlas L2940 "PDF / Office / Image / Archive 等視為
+    untrusted", a data-classification note, not a deprecation-pipeline
+    reference — excluded). Neither document elaborates any step with
+    additional required sub-fields elsewhere, so "adopt EC's step list" does
+    not silently drop richer detail attached to an Atlas-only step name
+    anywhere else in the corpus.
+  verdict: >
+    CONFIRMED, not overstated, on two independent dimensions: (1) STEPS — EC
+    §113's 7 steps are Atlas §24.3's 6 steps in identical order with exactly
+    one additional step (Deadline) inserted before Archive; (2) SCOPE — EC
+    §113's 7 object types are a strict superset of Atlas §24.3's 1 object
+    type (Method is literally one of the 7). Both closing invariants state
+    the same concept in different words (historical replay vs. old-project
+    replay — MP-style vs. EC-style phrasing, not a substantive difference).
+    Adopting EC §113 wholesale therefore loses zero Atlas-only content on
+    either dimension — a genuine Low-risk factual completion, matching the
+    plan's characterization. Unlike the assumption.schema.yaml case this
+    session flagged as an example of an imprecise plan-row characterization,
+    this row's claim holds up unmodified under independent re-verification.
+
+compilation_decisions:
+  - question: >
+      Given EC §113 is confirmed a strict superset of Atlas §24.3, should
+      this file model two branches (one per document) the way
+      `data-deletion.schema.yaml` modeled `personal_data_crypto_shred` vs.
+      `production_row`, or a single unified sequence?
+    decision: >
+      Single unified sequence (EC §113's 7-step list), with Atlas §24.3
+      retained only as historical/traceability evidence in
+      `merge_verification` above, not as a live alternate branch.
+    reasoning: >
+      `data-deletion.schema.yaml` branched because ADR-002 gave each branch
+      GENUINELY DIFFERENT step semantics (a negative decrypt-failure proof
+      vs. a positive absence proof for the same step name). Here, by
+      contrast, `merge_verification` establishes there is no genuine
+      semantic fork: Atlas's 6 steps are not a different way of doing
+      retirement, they are literally a prefix-and-suffix subsequence of EC's
+      7 steps with identical meaning at every shared position. Branching
+      would misrepresent a subset relationship as a design choice.
+  - question: >
+      Should "Notice" (EC) and "Deprecation Notice" (Atlas) be modeled as two
+      alternate names for the same step, or does the terser EC wording risk
+      losing meaning?
+    decision: >
+      Treat as the same step; canonical name = "Notice" (EC's wording),
+      "Deprecation Notice" recorded as a `also_known_as` alias.
+    reasoning: >
+      Same "pick the version already wired into the real machine-readable
+      mechanism being unified, not the narrative example" reasoning
+      `status-codes.schema.yaml` used for METHOD_RESOLUTION_BLOCKED — since
+      this file adopts EC §113 as its base sequence, its own naming for
+      position 1 is the natural canonical choice, and `no_further_elaboration_found`
+      above confirms no content is attached to "Deprecation Notice" that
+      "Notice" would lose.
+  - question: >
+      status-codes.schema.yaml's own `referenced_by` section
+      (L362) already names this file as a dependent, implying deprecation
+      states should map onto that file's status-code vocabulary. Should this
+      file introduce NEW named status codes (e.g. a
+      `DEPRECATION_USAGE_SCAN_BLOCKED`), matching the pattern
+      `status-codes.schema.yaml` itself used when it added
+      `PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED`?
+    decision: >
+      No — this file maps its two genuinely blocking conditions
+      (`usage_scan_nonzero`, `deadline_not_reached`, see
+      `step_gate_mapping` below) onto the EXISTING generic
+      `reference_vocabulary.legal_side_states` enum via a hard $ref, and does
+      NOT add new named entries to `status_codes` inside
+      `status-codes.schema.yaml` itself.
+    reasoning: >
+      This task's authorized file-creation boundary is exactly two new
+      files (this one and `exception.schema.yaml`) with an explicit
+      instruction not to modify any other file. Adding a new named status
+      code is a `status-codes.schema.yaml` edit, which is out of scope here
+      regardless of whether it would otherwise be a good idea — flagged as
+      `open_questions.OQ-DEP-2` below for a future session that has that
+      file in its write scope, rather than silently worked around by, e.g.,
+      inventing a same-shaped-but-differently-named registry inside this
+      file (which would create exactly the kind of duplicate-registry drift
+      `status-codes.schema.yaml` itself was built to eliminate).
+  - question: >
+      EC §113 names a "Deadline" step but does not define its machine
+      representation (a date? a policy-derived offset from Notice?).
+    decision: >
+      Model it as a required `deadline_at` timestamp on that step's entry in
+      `steps[]` (see instance schema below), set no earlier than
+      `Notice`'s own timestamp.
+    reasoning: >
+      Minimal-invasiveness completion of an unambiguous gap (a "Deadline"
+      step is meaningless without a point in time), consistent with this
+      schema suite's pattern of adding the smallest structurally-necessary
+      field when a mother-document step name presupposes data neither
+      document made explicit (e.g. `manifest.schema.yaml`'s `loaded` boolean
+      for MP's implicit "was this actually loaded" concept).
+
+# ---------------------------------------------------------------------------
+# The canonical 7-step sequence (EC §113), cited verbatim in step naming.
+# ---------------------------------------------------------------------------
+reference_sequence:
+  source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §113 (L3164-3195)"
+  scope:
+    description: "EC §113 L3166-3174 — any of these 7 object types being retired follows this sequence."
+    values: [API, Method, Capability, Schema, Policy, Provider, Workflow]
+  steps:
+    - name: Notice
+      also_known_as: "Deprecation Notice (Atlas §24.3 L4280 — same step, see compilation_decisions)"
+    - name: Replacement
+    - name: Compatibility Matrix
+    - name: Migration Tool
+    - name: Usage Scan
+    - name: Deadline
+      note: "EC-only addition (see merge_verification) — Atlas §24.3 has no equivalent step; see step_detail.deadline below for the ADDITIVE `deadline_at` field this file attaches to it."
+    - name: Archive
+  invariant: >
+    "不得直接刪除導致歷史無法 replay" (EC §113 L3194) / "禁止直接刪除造成舊
+    project 無法重播" (Atlas §24.3 L4288) — same concept, both documents
+    agree verbatim in substance. The Archive step MUST NOT be an
+    unrecoverable deletion; historical replay of any workflow/project that
+    referenced the retired object must remain possible after Archive.
+
+# ---------------------------------------------------------------------------
+# Instance schema for one object's retirement, following the sequence above.
+# ---------------------------------------------------------------------------
+deprecation_record:
+  type: object
+  required: [id, object_type, object_id, initiated_at, steps]
+  properties:
+    id:
+      type: string
+      pattern: "^DEP-"
+      description: >
+        No mother document gives a literal ID-prefix example for a
+        deprecation record (unlike `exception.schema.yaml`'s EC-literal
+        `EXC-` prefix) — `DEP-` is a Phase 3 naming compilation decision,
+        checked against this schema suite's existing prefixes
+        (`EX-/TASK-/RUN-/TRACE-/DEL-/EXC-/DEC-/ASM-/C-/E-/RCF-/PROB-/CHS-/
+        NCB-/LAW-/LS-`) to confirm no collision.
+    object_type:
+      type: string
+      enum: [API, Method, Capability, Schema, Policy, Provider, Workflow]
+      description: "Selects which of EC §113's 7 scoped object types is being retired (L3168-3174)."
+    object_id:
+      type: string
+      description: >
+        Opaque identifier of the object being retired. SOFT reference by
+        name only when `object_type: Method` — e.g. `cognitive/method.schema.yaml`'s
+        `id` field (Wave 3, a different Wave than this file) — no hard `$ref`,
+        since this file must remain valid for all 7 object types, most of
+        which have no built schema yet to reference.
+    initiated_at:
+      type: string
+      format: date-time
+      description: "When the Notice step (position 1) was issued."
+    steps:
+      type: array
+      description: >
+        Per-instance execution log, one entry per `reference_sequence.steps`
+        value, in order — same pattern as `data-deletion.schema.yaml`'s
+        `deletion_request.steps[]`.
+      minItems: 7
+      items:
+        type: object
+        required: [step, status]
+        properties:
+          step:
+            type: string
+            enum: [Notice, Replacement, Compatibility Matrix, Migration Tool, Usage Scan, Deadline, Archive]
+          status:
+            type: string
+            enum: [pending, in_progress, passed, failed]
+          completed_at:
+            type: [string, "null"]
+            format: date-time
+          evidence_ref:
+            type: [string, "null"]
+            description: "Opaque pointer to this step's evidence artifact — same convention as data-deletion.schema.yaml's steps[].evidence_ref."
+    step_detail:
+      type: object
+      description: >
+        Additive per-step structured detail for the two steps whose mother-
+        document name presupposes data neither document made explicit (see
+        compilation_decisions). Not present for the other five steps, which
+        carry no detail beyond their `steps[]` entry.
+      properties:
+        usage_scan:
+          type: object
+          description: "Detail for the Usage Scan step (position 5)."
+          properties:
+            live_references_found:
+              type: integer
+              minimum: 0
+            reference_locations:
+              type: array
+              items: { type: string }
+        deadline:
+          type: object
+          description: "Detail for the Deadline step (position 6, EC-only — see reference_sequence.steps note)."
+          properties:
+            deadline_at:
+              type: string
+              format: date-time
+              description: "MUST NOT be earlier than initiated_at (the Notice step's timestamp)."
+
+constraints:
+  - "`steps[]` MUST cover all 7 `reference_sequence.steps` values in the documented order; a record MUST NOT skip Usage Scan or Archive regardless of object_type (EC §113 L3194 / Atlas §24.3 L4288: the no-unrecoverable-deletion invariant applies uniformly)."
+  - "The Archive step's `status` MUST NOT be `passed` while `step_detail.usage_scan.live_references_found` is greater than zero — see `step_gate_mapping.usage_scan_nonzero` below."
+  - "The Archive step's `status` MUST NOT be `passed` before `step_detail.deadline.deadline_at` has passed — see `step_gate_mapping.deadline_not_reached` below."
+  - "`step_detail.deadline.deadline_at` MUST NOT be earlier than `initiated_at`."
+
+# ---------------------------------------------------------------------------
+# Mapping this file's own blocking conditions onto status-codes.schema.yaml's
+# EXISTING generic side-state vocabulary. Does NOT add new named status codes
+# to that file — see compilation_decisions above.
+# ---------------------------------------------------------------------------
+step_gate_mapping:
+  usage_scan_nonzero:
+    condition: "Usage Scan (step 5) finds one or more live references to the object being retired (step_detail.usage_scan.live_references_found > 0)."
+    legal_side_state:
+      $ref: "ai-lego://specs/execution/status-codes.schema.yaml#/reference_vocabulary/legal_side_states/values"
+      value: BLOCKED
+      rationale: >
+        Same fail-closed, mechanical-prerequisite character as
+        status-codes.schema.yaml's `PREEXISTING_WORKTREE_CHANGES` and
+        `DOCUMENT_RESOLUTION_BLOCKED` entries — a hard precondition check,
+        not a human-judgment review gate.
+  deadline_not_reached:
+    condition: "Archive (step 7) is attempted before step_detail.deadline.deadline_at has passed."
+    legal_side_state:
+      $ref: "ai-lego://specs/execution/status-codes.schema.yaml#/reference_vocabulary/legal_side_states/values"
+      value: BLOCKED
+      rationale: "A scheduled precondition, not a review gate — same mechanical character as usage_scan_nonzero above."
+
+open_questions:
+  - id: "OQ-DEP-1"
+    question: >
+      Neither EC §113 nor Atlas §24.3 specifies what happens if Usage Scan
+      finds live references that CANNOT be migrated before the Deadline
+      (e.g. an external, unresponsive consumer) — is Deadline extended, is
+      Archive forced anyway with a logged exception (see
+      `exception.schema.yaml`, built alongside this file in the same Wave —
+      a genuinely plausible use of that schema: a deprecation blocked past
+      its deadline could itself become an EXC- record with its own owner/
+      expiry/migration_plan), or does the object remain permanently
+      un-archivable? Left open — this file only defines the pipeline and its
+      two mechanical gates, not an escalation policy for a stuck retirement.
+    owner: "operator, non-blocking"
+    blocks: "nothing in this schema's own validity"
+  - id: "OQ-DEP-2"
+    question: >
+      Should `status-codes.schema.yaml` eventually gain new named entries
+      (e.g. `DEPRECATION_USAGE_SCAN_BLOCKED`, `DEPRECATION_DEADLINE_BLOCKED`)
+      for the two conditions in `step_gate_mapping` above, matching the
+      naming pattern it used for `PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED`?
+      Left open and NOT decided here — out of this task's authorized
+      file-creation boundary (only `exception.schema.yaml` and this file).
+    owner: "a future session with write scope over status-codes.schema.yaml"
+    blocks: "nothing in this schema's own validity; both gates already resolve to a legal side-state via the generic vocabulary in the meantime"
+
+verification:
+  method: >
+    Read Atlas §24.3 (L4275-4290) and EC §113 (L3164-3196) in full, plus
+    surrounding context (Atlas §24.1-24.2, L4251-4274; EC §111-112 and §114,
+    L3127-3210) to confirm no adjacent section carries additional
+    step-specific detail. Read `.ai/research/phase-0/verified-findings.yaml`
+    CROSS-T-19 (L646-664) in full, including both independent verdict votes.
+    Read `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`'s rows for both
+    `deprecation-pipeline.schema.yaml` (L107) and
+    `method-deprecation-retirement.recipe.yaml` (L176). Read
+    `specs/execution/status-codes.schema.yaml` in full to identify its
+    `reference_vocabulary.legal_side_states` target and its own
+    `referenced_by` entry naming this file. Grepped both mother documents for
+    every individual step name to confirm no step carries elaboration outside
+    its §24.3/§113 location (see `merge_verification.no_further_elaboration_found`).
+    Confirmed via `ls specs/execution/` that no existing file uses the `DEP-`
+    ID prefix before adopting it here.
+  note: >
+    No mother document or ADR was modified to produce this file. Atlas
+    §24.3's and EC §113's step lists and both invariant statements are
+    transcribed verbatim; the position-by-position comparison in
+    `merge_verification` is this session's own independent re-derivation of
+    MACHINE_READABLE_SPEC_PLAN.md's claim, not a transcription of that
+    document's one-line justification. `deadline_at`, `step_detail`, the
+    `DEP-` ID prefix, and the `step_gate_mapping` onto
+    status-codes.schema.yaml's existing vocabulary are Phase 3 additive
+    compilation decisions, individually justified above — not new ADR-level
+    tradeoffs, and no new entries were added to any other file.

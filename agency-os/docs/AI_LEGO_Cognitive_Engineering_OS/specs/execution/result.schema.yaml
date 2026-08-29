@@ -1,0 +1,518 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/execution/result.schema.yaml"
+title: Execution Result
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the Execution Result — the
+  standalone record of how one whole Execution (an `EX-*` run) ended: its
+  Final Status (EC §70), which Global/High-risk gates ran and how (EC §69),
+  the evidence bundle behind that determination (EC §65), and any artifacts
+  it produced. EC §92 promises this file (`result.schema.yaml`, L2766-2781,
+  the file itself named at L2781) but never gives it field-level shape there
+  — §92 is only a directory listing. This file supplies that shape by
+  compiling EC §64's `results{status, gates}` sub-block (L2178-2181, the
+  in-manifest stub this file formalizes and expands), EC §69's `gate_result`
+  record (L2282-2293), and EC §65's content-addressed evidence record
+  (L2185-2196), while reusing (not redeclaring) EC §70's Final Status
+  vocabulary via `status-codes.schema.yaml`.
+
+  Resolves `.ai/research/phase-0/verified-findings.yaml` CROSS-R-3
+  PARTIALLY, per `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` §2.2's
+  own row for this file (L104: "CROSS-R-3（部分：result.schema.yaml 不等於
+  TypedMethodResult，見 2.3）"). CROSS-R-3's full finding is that the Master
+  Plan's `cognitive.execute_method` Capability Contract (MP §8.3, L708/712)
+  types its output as `TypedMethodResult` but no schema anywhere defines
+  it. This file does NOT define `TypedMethodResult` and does not claim to:
+  it is the GENERIC envelope for one whole Execution's final outcome (an
+  `EX-*` run, which may invoke many methods across a workflow — see
+  `manifest.schema.yaml`'s `method_execution_log[]`), not the typed
+  input/output contract for one `cognitive.execute_method` invocation. The
+  future `cognitive/typed-method-result.schema.yaml`
+  (MACHINE_READABLE_SPEC_PLAN.md §2.3 row, L122) is the file that will
+  actually close CROSS-R-3, and that row already names this file
+  (`execution/result.schema.yaml`) as its own dependency — see
+  `referenced_by` below. This file is the single source of truth for the
+  whole-execution result shape; the mother documents and
+  `manifest.schema.yaml` reference it, they do not redefine it.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §64 Execution Manifest, results{} sub-block (L2178-2181)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §65 Content-addressed Evidence (L2185-2196)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §68 Global Gates (L2246-2280, gate_id name pool — not enumerated as an enum here, see compilation_decisions)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §69 Gate Result (L2282-2293)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §70 Final Status (L2297-2318, vocabulary reused via $ref, not redeclared)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §92 Machine-readable Execution Specs (L2766-2781, result.schema.yaml named at L2781)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §121 Execution Result Template (L3332-3396, human-readable narrative sibling — see compilation_decisions on scope)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §16.3 Method Execution, outputs.hashes field (L3821-3857, precedent for this file's `outputs[]` shape at the whole-execution grain)"
+  - "specs/execution/manifest.schema.yaml properties/results (the stub sub-block this file formalizes/expands) and properties/execution/execution_id (the join key)"
+  - "specs/execution/status-codes.schema.yaml reference_vocabulary/final_status (the reused, not redeclared, enum)"
+  - ".ai/research/phase-0/verified-findings.yaml CROSS-R-3 (L49-75)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2, row for result.schema.yaml (L104)"
+
+decided_by: >
+  No ADR governs this file specifically. `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`
+  §2.2 lists `result.schema.yaml` as READY with no ADR dependency (verified
+  by reading its row, L104) — unlike `gate.schema.yaml`'s row (L102), which
+  is explicitly `BLOCKED_PENDING_ROUND2_ADR`. Field-naming and structural
+  choices below are Phase 3 compilation decisions, following the same
+  "formalize an existing stub without inventing new architecture" mandate
+  `manifest.schema.yaml` used for its own compilation_decisions.
+
+compilation_decisions:
+  - question: >
+      The task requires the top-level `status` field to be "a real $ref"
+      to EC §70's Final Status vocabulary, not a re-declared enum. That
+      vocabulary already lives in `status-codes.schema.yaml` as
+      `reference_vocabulary.final_status`, but reading that file shows its
+      node is shaped `{source: <string>, values: [<7 literals>]}` — a
+      citation/documentation shape, NOT a JSON-Schema-shaped fragment
+      (`{type: string, enum: [...]}`). Every other real cross-file `$ref`
+      in this project's specs/ (e.g. `section-registry.schema.yaml`'s ref
+      into `manifest.schema.yaml#/properties/documents/items/properties/document_id`,
+      or `decision.schema.yaml`'s ref into
+      `epistemic-label.schema.yaml#/provenance_record`) resolves to a node
+      that itself has a `type` key — a strict JSON Schema validator could
+      dereference it directly. `reference_vocabulary/final_status` has no
+      `type` key at that path, only `source` and `values`.
+    decision: >
+      `status: { $ref: "ai-lego://specs/execution/status-codes.schema.yaml#/reference_vocabulary/final_status/values" }`
+      — point at the exact array of 7 literals, reproducing zero characters
+      of the enum locally (satisfying "not a re-declaration" precisely),
+      rather than fabricating a parallel `type: string, enum: [...]` block
+      inside a `definitions:` section of THIS file (which would itself be a
+      re-declaration by another name, and would drift the moment
+      status-codes.schema.yaml's 7 values change).
+    reasoning: >
+      This project's existing verification method throughout specs/ is
+      "Read/Grep against mother documents" (see every sibling file's
+      `verification.method`), not "run an ajv validator" — no file in this
+      tree has been demonstrated to pass literal JSON Schema $ref
+      resolution end-to-end. Given that, pointing at the precise, unique,
+      byte-identical location of the 7-value list is the correct
+      house-style choice: it is auditable by a human reader (open the
+      target file, find the exact key path, see the 7 values) even though
+      it would need one additional step (wrapping `values` in a `type` key)
+      before an automated JSON Schema tool could dereference it as a
+      strict schema. That gap is status-codes.schema.yaml's shape, not this
+      file's — and this file's task boundary is to create ONE new file,
+      not edit that sibling. Flagged as `open_questions.OQ-RESULT-2` rather
+      than silently worked around.
+  - question: >
+      The task instructions describe all three cross-file grounding points
+      (epistemic-label.schema.yaml, gate.schema.yaml, cas-path.schema.yaml)
+      uniformly as "soft-reference". But `gate.schema.yaml` does not exist
+      on disk (confirmed: `specs/execution/` listing has 7 files, no
+      `gate.schema.yaml`; MACHINE_READABLE_SPEC_PLAN.md §2.2 L102 marks it
+      `BLOCKED_PENDING_ROUND2_ADR`), while `epistemic-label.schema.yaml`
+      and `cas-path.schema.yaml` are both already BUILT (confirmed on
+      disk). Every other Wave 2+ file in this tree (`evidence.schema.yaml`,
+      `decision.schema.yaml`, `claim.schema.yaml`, `section-registry.schema.yaml`,
+      `normative-context.schema.yaml`, `cause-hypothesis-set.schema.yaml`)
+      uses a REAL hard `$ref` into already-built files, reserving the
+      documented "soft reference by name/convention only, NOT a hard $ref"
+      pattern specifically for files that do not yet exist or would create
+      a forward Wave dependency (e.g. `manifest.schema.yaml`'s
+      `document_id` vs. `document-registry.schema.yaml`, or
+      `cas-path.schema.yaml`'s own `tenant_segment` vs.
+      `domain/tenant.schema.yaml` at the time it was written).
+    decision: >
+      Use a REAL hard `$ref` for `provenance` (into
+      `epistemic-label.schema.yaml#/provenance_record`) and for evidence/
+      output hash fields (into `cas-path.schema.yaml#/definitions/sha256_hash`)
+      — both files already exist, so the established convention calls for
+      a real ref, not a soft one. Keep `gates[].gate_id` genuinely untyped
+      (no `$ref`, no `enum`) — `gate.schema.yaml` does not exist yet and
+      its content is blocked on Round 2 ADR (MRSP-1), so there is nothing
+      to hard-`$ref` into; this exactly mirrors `manifest.schema.yaml`'s
+      own established wording for the identical gap.
+    reasoning: >
+      Matching the file's actual build state (not the task prompt's
+      informal wording) keeps this schema consistent with every sibling
+      file already on disk, and avoids two different meanings of
+      "soft-reference" coexisting silently in the same file. The task's
+      wording is read as "tie into / ground in", not as the stricter
+      "NOT a hard $ref" jargon this project's own compilation_decisions
+      sections use — a distinction worth recording explicitly per R4
+      (claim-before-verify), not silently resolved either way.
+  - question: >
+      EC §69's `gate_result` shape (`gate_id, status, evidence, validator,
+      timestamp`) is a CONCRETE, fully-specified record — unlike
+      `gate.schema.yaml`'s blocker, which is specifically about the LEGAL
+      SET of `gate_id` values (EC §68's 14 Global + 6 High-risk names,
+      MRSP-1's "14+6 vs 11+1" undecided count), not about the shape of one
+      gate result entry. `manifest.schema.yaml`'s existing `results.gates`
+      field pre-dates this distinction: it types `gates` as a bare
+      `array of string` (gate ID references only, no status/evidence/
+      validator/timestamp), with a comment that the field is "deliberately
+      untyped ... pending that ADR."
+    decision: >
+      This file's `gates[]` uses the FULL EC §69 `gate_result` object shape
+      (`gate_id` untyped string + `status` enum PASS/FAIL/BLOCKED/
+      NOT_APPLICABLE, drawn directly from EC §69's own literal text, which
+      is NOT blocked + `evidence[]` + `validator` + `timestamp`), not
+      `manifest.schema.yaml`'s simplified string-array form. Only the
+      `gate_id` VALUE SPACE remains untyped/opaque, using the identical
+      rationale `manifest.schema.yaml` already recorded for that one field
+      — everything else about a gate result is safe to type today because
+      EC §69 already specifies it and no finding disputes it.
+    reasoning: >
+      Directly fulfills the task's framing: "formalize and EXPAND" the
+      manifest sub-block into the full standalone type. Reusing
+      `manifest.schema.yaml`'s bare-string shape here would under-deliver
+      on "full" while offering no benefit — EC §69's richer shape carries
+      real information (pass/fail per gate, who validated it, when, on
+      what evidence) that 30-year replay explicitly needs and that no
+      finding or ADR blocks. `manifest.schema.yaml` itself is left
+      untouched (task boundary); its simpler `gates: array of string`
+      field remains valid but strictly less detailed than this file's —
+      flagged as a follow-up in `open_questions.OQ-RESULT-1`.
+  - question: >
+      EC §121's "Execution Result Template" (L3332-3396) is a much richer,
+      19-section MARKDOWN template (Task/Objective/Current State/Root
+      Cause/Normative Documents/Methods/Risk-Authority/Selected Approach/
+      Alternatives Rejected/Exact Paths Changed/Data-Schema-API Impact/
+      Security-Privacy-Jurisdiction Impact/Tests & Gates/Expected Result/
+      Actual Result/Rollback/Observability/Known Risks-Unknowns/ADR-Evidence)
+      for a HUMAN-facing handoff write-up, not obviously a promise of a
+      13-file `/specs/execution/` machine schema. Should this file
+      machine-type all 19 sections?
+    decision: >
+      No. This file grounds only the fields §121 implies AND that map onto
+      concrete, already-specified machine records elsewhere (Final Status
+      -> `status`; "Rollback" -> `rollback_ref`; "Exact Paths Changed" /
+      Atlas §16.3 `outputs.hashes` -> `outputs[]`; "Tests & Gates" -> EC
+      §69's `gates[]`). It does NOT attempt to machine-type narrative
+      sections with no existing structured counterpart anywhere in the
+      corpus (Root Cause, Alternatives Rejected, Selected Approach,
+      Observability, etc.) — doing so would be new architecture design
+      invented by this file, not a compilation of an existing promise, and
+      is out of scope for a single-file Phase 3 task. `summary` is kept as
+      one free-text field for whatever narrative content an implementation
+      wants to carry, rather than inventing 15 more structured fields with
+      no source-of-truth citation.
+    reasoning: >
+      Per R0's "不接受可能是" standard: every REQUIRED/typed field in this
+      file must trace to a concrete citation. §121's narrative sections
+      have no machine shape anywhere in the three mother documents to
+      compile from — typing them would be guessing, which R0 and
+      `AGENTS.md`'s 補丁判準 both forbid ("未讀現有邏輯即重寫 / 猜測補未知").
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+definitions:
+
+  evidence_ref:
+    description: >
+      One content-addressed evidence item, per EC §65 (L2185-2196) verbatim:
+      "重要 evidence：hash / source / timestamp / producer... 避免「同名檔案
+      內容已變」造成歷史失真" (guards against same-filename-different-content
+      history corruption). Used both by this file's top-level `evidence[]`
+      (why the whole execution's status was determined) and by
+      `gate_result.evidence[]` (EC §69's own `evidence: [...]` field on one
+      gate) — EC never distinguishes two evidence shapes, so this file does
+      not invent one either.
+    type: object
+    required: [hash, timestamp]
+    properties:
+      hash:
+        $ref: "ai-lego://specs/artifact/cas-path.schema.yaml#/definitions/sha256_hash"
+        description: "Real hard $ref: cas-path.schema.yaml already exists on disk."
+      source:
+        type: string
+        description: "EC §65 `source` field, verbatim — where this evidence came from."
+      timestamp:
+        type: string
+        format: date-time
+      producer:
+        type: string
+        description: >
+          EC §65 `producer` field, verbatim. Kept as a plain string (actor/
+          service identity) per EC's own literal 4-field list — NOT
+          expanded into a full `provenance_record` here, since EC §65 names
+          exactly one field for this and gives it no further structure; the
+          richer `provenance_record` shape is reserved for this file's own
+          top-level `provenance` field (see below), which answers a
+          different question (what kind of claim is this whole result,
+          and who authorized it) than "who/what produced one evidence
+          item".
+
+  gate_result:
+    description: >
+      One gate's outcome, per EC §69 Gate Result (L2282-2293) verbatim
+      shape. See compilation_decisions above for why `gate_id` stays
+      untyped while every other field is fully typed.
+    type: object
+    required: [gate_id, status]
+    properties:
+      gate_id:
+        type: string
+        description: >
+          Deliberately untyped (no `$ref`, no `enum`) — the Global/
+          High-risk gate list itself is BLOCKED_PENDING_ROUND2_ADR
+          (MRSP-1, `gate.schema.yaml`, Wave 5; MACHINE_READABLE_SPEC_PLAN.md
+          §2.2 L102, "14+6 vs 11+1 尚未裁決"). This field only records
+          which gate ran, using EC §68's example name pool
+          (Functional/Evidence/Reasoning/Security/Privacy/Data/
+          Jurisdiction/Localization/Accessibility/Observability/Capacity/
+          Rollback/Documentation/Golden Test, plus the High-risk set
+          Human Specialist/Counterevidence/Red Team/Independent Review/
+          Reversal Criteria/Recovery Rehearsal) as informal guidance only —
+          it does not enumerate the legal set, exact wording adapted from
+          `manifest.schema.yaml`'s identical comment on its own `gates`
+          field.
+      status:
+        type: string
+        enum: [PASS, FAIL, BLOCKED, NOT_APPLICABLE]
+        description: >
+          EC §69's own literal vocabulary (L2287: "PASS|FAIL|BLOCKED|
+          NOT_APPLICABLE") — a DIFFERENT, smaller enum than this file's
+          top-level `status` (EC §70 Final Status, 7 values). EC never
+          conflates the two: one gate's pass/fail is not the whole
+          execution's final disposition. Declared inline (not $ref'd) as
+          it has no separate promised schema file of its own, unlike §70's
+          vocabulary which `status-codes.schema.yaml` already owns.
+      rationale:
+        type: string
+        description: >
+          REQUIRED in spirit when status == NOT_APPLICABLE, per EC §69's
+          own text (L2293): "`NOT_APPLICABLE` 必須有 rationale。" Not
+          declared as a JSON Schema conditional `required` (this project's
+          precedent for this class of cross-field rule is a documented
+          `constraints` list, e.g. `epistemic-label.schema.yaml`'s
+          `locked` constraints — see `constraints` below) — kept optional
+          at the property level, enforced via that list instead.
+      evidence:
+        type: array
+        items: { $ref: "#/definitions/evidence_ref" }
+        description: "EC §69's own `evidence: [...]` field on one gate result."
+      validator:
+        type: string
+        description: "EC §69 `validator` field, verbatim — who/what ran this gate."
+      timestamp:
+        type: string
+        format: date-time
+
+  artifact_ref:
+    description: >
+      One output/artifact the execution produced or changed. Grounded in
+      Atlas §16.3's `outputs.hashes` field (L3821-3857, already embedded at
+      the per-method-invocation grain in `manifest.schema.yaml`'s
+      `method_execution_log[].outputs.hashes`, a bare array of strings) and
+      EC §121's "Exact Paths Changed" template section (L3332-3396) — this
+      file needs the same concept at the whole-EXECUTION grain, one level
+      up from a single method invocation. Kept to a hash reference plus an
+      optional human-readable label, matching Atlas §16.3's own
+      hash-only precedent rather than inventing a richer shape with no
+      source-of-truth citation.
+    type: object
+    required: [hash]
+    properties:
+      hash:
+        $ref: "ai-lego://specs/artifact/cas-path.schema.yaml#/definitions/sha256_hash"
+        description: "Real hard $ref: cas-path.schema.yaml already exists on disk."
+      path:
+        type: string
+        description: >
+          OPTIONAL human-readable label for the artifact (e.g. a
+          repository-relative file path), additive detail Atlas §16.3
+          leaves implicit in its bare hash array.
+      description:
+        type: string
+
+type: object
+required: [execution_id, status, evaluated_at, provenance]
+properties:
+
+  execution_id:
+    type: string
+    pattern: "^EX-"
+    description: >
+      Join key back to the owning Execution. Same value and same pattern
+      as `manifest.schema.yaml`'s `properties/execution/properties/execution_id`
+      for the same run — this file and manifest.schema.yaml are two
+      per-execution artifacts describing one `EX-*` run from two angles
+      (manifest = what was pinned/consumed going in; result = what
+      happened coming out). Not a hard `$ref` (this is a plain pattern
+      string, not a schema-object reference) — the regex is reused
+      verbatim rather than duplicated by accident.
+
+  task_id: { type: string, pattern: "^TASK-" }
+  run_id: { type: string, pattern: "^RUN-" }
+  trace_id: { type: string, pattern: "^TRACE-" }
+
+  status:
+    $ref: "ai-lego://specs/execution/status-codes.schema.yaml#/reference_vocabulary/final_status/values"
+    description: >
+      Real $ref into EC §70's Final Status vocabulary as already registered
+      by `status-codes.schema.yaml` — NOT redeclared here. See
+      compilation_decisions above for the exact target-shape caveat and
+      `open_questions.OQ-RESULT-2` for the follow-up that would make this
+      ref strictly validator-resolvable.
+
+  rationale:
+    type: string
+    description: >
+      Human-readable justification for `status`, expected whenever
+      `status` is not `PASS` (documented in `constraints` below, not a hard
+      JSON Schema `required`). MUST NOT be one of EC §70's explicitly
+      forbidden vague answers (L2311-2318: "應該好了 / 看起來沒問題 /
+      大概完成").
+
+  evaluated_at:
+    type: string
+    format: date-time
+    description: "When this final status was determined."
+
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+    description: >
+      Real hard $ref: epistemic-label.schema.yaml already exists on disk.
+      Required per that file's own stated universal mandate ("the minimal
+      provenance object every content/claim object must carry") — an
+      Execution Result is itself a claim ("this execution's final status
+      is X"), so it is in scope for that mandate like any other
+      content/claim object in the system.
+
+  gates:
+    type: array
+    items: { $ref: "#/definitions/gate_result" }
+    description: >
+      Full EC §69 gate_result records for every gate that ran on this
+      execution. Expands `manifest.schema.yaml`'s simplified
+      `results.gates: array of string` stub — see compilation_decisions
+      and `open_questions.OQ-RESULT-1`. No `minItems`: which gates (if
+      any) are required is compiled by EC §67's Definition of Done
+      Compiler from Task Type + Risk Tier + Domain + ... , not by this
+      file (e.g. an R0 read-only task may legitimately run zero gates,
+      per `risk-tier.schema.yaml`'s R0 tier: `required_actions: []`).
+
+  evidence:
+    type: array
+    items: { $ref: "#/definitions/evidence_ref" }
+    description: >
+      Execution-level evidence bundle supporting `status` as a whole,
+      distinct from any single gate's own `gates[].evidence[]`. Same EC
+      §65 shape reused, not redeclared, at both grains.
+
+  outputs:
+    type: array
+    items: { $ref: "#/definitions/artifact_ref" }
+    description: >
+      Artifacts this execution produced or changed, at the whole-execution
+      grain. See `artifact_ref` above for grounding.
+
+  rollback_ref:
+    type: [string, "null"]
+    description: >
+      Populated when `status == ROLLED_BACK` (or when a rollback occurred
+      as part of reaching another status). Whole-execution counterpart of
+      Atlas §16.3's per-method-invocation `rollback_ref`, already embedded
+      in `manifest.schema.yaml`'s `method_execution_log[].rollback_ref`;
+      also answers EC §121's template "## Rollback" section at the
+      whole-execution grain. Nullable: absent/null when no rollback
+      occurred.
+
+  summary:
+    type: string
+    description: >
+      Free-text narrative, e.g. a filled EC §121 Execution Result Template
+      instance or any subset of it. Deliberately unstructured — see
+      compilation_decisions on why §121's 19 narrative sections are not
+      individually machine-typed by this file.
+
+constraints:
+  description: >
+    Cross-field rules this schema's JSON-Schema `properties` block above
+    cannot express structurally, recorded as prose per this project's
+    established convention (e.g. `epistemic-label.schema.yaml`'s `locked`
+    constraints) rather than left implicit.
+  rules:
+    - "gates[].rationale MUST be present when gates[].status == NOT_APPLICABLE (EC §69 L2293, verbatim)."
+    - "rationale (top-level) SHOULD be present whenever status != PASS; if present, MUST NOT be one of EC §70's forbidden vague answers (L2311-2318: 應該好了/看起來沒問題/大概完成)."
+    - "rollback_ref SHOULD be non-null when status == ROLLED_BACK (EC §70 L2307); MAY be non-null for other statuses if a partial rollback occurred en route (e.g. PARTIAL_SUCCESS)."
+    - "outputs[] and evidence[].hash entries are plain sha256 hashes (cas-path.schema.yaml#/definitions/sha256_hash), not full tenant-scoped cas_path objects — resolving a hash to its storage path is that schema's job, not this file's, matching Atlas §16.3's own hash-only precedent."
+
+# ---------------------------------------------------------------------------
+# Forward dependents (informational — these files depend on this one; not
+# built by this file)
+# ---------------------------------------------------------------------------
+referenced_by:
+  - "manifest.schema.yaml's `properties/results` sub-block is the stub this file formalizes/expands (see open_questions.OQ-RESULT-1 for the un-actioned upgrade)."
+  - "cognitive/typed-method-result.schema.yaml (not yet built; MACHINE_READABLE_SPEC_PLAN.md §2.3 row, L122, lists 'execution/result.schema.yaml' as its own dependency) — the future per-method-invocation output type that will actually resolve CROSS-R-3 in full. This file's top-level description explains the scope split between the two."
+
+open_questions:
+  - id: "OQ-RESULT-1"
+    question: >
+      `manifest.schema.yaml`'s `properties/results/properties/status` is
+      currently typed as a bare `{ type: string }`, and `properties/results/properties/gates`
+      as a bare `{ type: array, items: { type: string } }`. Both could now
+      become real `$ref`s into this file (`status` -> this file's own
+      `properties/status` target, i.e. the same status-codes.schema.yaml
+      final_status values; `gates` -> `#/definitions/gate_result`) so the
+      two files stop being able to drift apart on the same concept.
+    owner: "operator / future Phase 3 session"
+    blocks: "nothing in this file — the upgrade is entirely inside manifest.schema.yaml"
+    why_not_done_here: >
+      Task boundary for this session is to create exactly one new file;
+      `manifest.schema.yaml` is an already-committed Wave 1 file explicitly
+      marked read-only for this task. Editing it is a separate, reviewable
+      change (a real schema shape change to a file other consumers may
+      already assume the shape of), not a compilation detail to slip in
+      silently.
+  - id: "OQ-RESULT-2"
+    question: >
+      For `status`'s `$ref` (see compilation_decisions) to be resolvable
+      by a strict JSON Schema validator rather than only by a human reader
+      following the pointer, `status-codes.schema.yaml`'s
+      `reference_vocabulary.final_status` node would need an additive
+      `type: string` key alongside its existing `source`/`values` keys
+      (non-breaking — `values` stays as the human-citation array; a
+      validator would instead dereference a sibling `enum` key that
+      mirrors `values`). This file's `$ref` target
+      (`#/reference_vocabulary/final_status/values`) would then need
+      updating to point at the new `enum` key instead of `values`.
+    owner: "operator / future Phase 3 session"
+    blocks: "nothing in this file today (verification is Read/Grep-based, not ajv-based, across this whole tree — see verification.note)"
+    why_not_done_here: >
+      `status-codes.schema.yaml` is an already-committed Wave 1 sibling
+      file this task is explicitly bounded not to touch.
+  - id: "OQ-RESULT-3"
+    question: >
+      Should `gates[].gate_id` eventually become a real `$ref` into
+      `gate.schema.yaml` once MRSP-1's Round 2 ADR lands? At that point
+      this file's untyped `gate_id: { type: string }` would need
+      upgrading, mirroring the exact same upgrade `manifest.schema.yaml`
+      itself is waiting on for its own `gates` field.
+    owner: "operator, via Round 2 ADR (MRSP-1) then a follow-up edit to both this file and manifest.schema.yaml"
+    blocks: "nothing today — gate.schema.yaml does not exist yet"
+
+verification:
+  method: >
+    Read against EC §64 (L2123-2181), §65 (L2185-2196), §68 (L2246-2280),
+    §69 (L2282-2293), §70 (L2297-2318), §92 (L2766-2782), §121
+    (L3332-3396); Atlas §16.3 (L3821-3857); MP §8.3 (L708-712, CROSS-R-3
+    context only, not redefined here); `.ai/research/phase-0/verified-findings.yaml`
+    CROSS-R-3 full entry (L49-75); `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`
+    §2.2 rows for `result.schema.yaml` (L104) and `gate.schema.yaml` (L102),
+    §2.3 row for `typed-method-result.schema.yaml` (L122); the on-disk
+    contents of `specs/execution/manifest.schema.yaml`,
+    `specs/execution/status-codes.schema.yaml`,
+    `specs/governance/epistemic-label.schema.yaml`, and
+    `specs/artifact/cas-path.schema.yaml` (all Read in full, not
+    grep-excerpted, before writing any `$ref` into them); `git log
+    --oneline -15` against this project directory (no prior commit
+    touches `result.schema.yaml`, confirmed no rework).
+  note: >
+    No mother document, ADR, or sibling `specs/execution/` file was
+    modified to produce this file — confirmed by re-reading
+    `manifest.schema.yaml` and `status-codes.schema.yaml` in full after
+    drafting this file's `$ref`s into them, not just before. EC §69's and
+    §65's field shapes are transcribed verbatim; the `status` $ref target
+    shape caveat, the hard-vs-soft reference split between
+    epistemic-label/cas-path (already built) and gate.schema.yaml (not
+    built), and the gate_result-vs-manifest.gates expansion are Phase 3
+    compilation decisions recorded above, not new architecture decisions.

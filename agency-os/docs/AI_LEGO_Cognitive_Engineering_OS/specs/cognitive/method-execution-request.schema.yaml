@@ -1,0 +1,574 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/method-execution-request.schema.yaml"
+title: Method Execution Request
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `MethodExecutionRequest` — the
+  input type of the Master Plan's central Capability Contract,
+  `cognitive.execute_method` (MP §8.3, L701-729). MP names this type at
+  L708 (`input: type: - MethodExecutionRequest`) and nowhere else defines
+  it: no schema for it exists in any of the three mother documents, and it
+  appears in none of their promised-schema lists (MP `/specs/cognitive/`
+  L766-772; Atlas Appendix A's 14 schemas, L4574-4604; EC §92's 13
+  `/specs/execution/` schemas, L2766-2783).
+
+  Resolves CROSS-R-3 (verified-findings.yaml L49-75, severity high,
+  verdict CONFIRMED, 3 independent votes), CROSS-T-17
+  (verified-findings.yaml L612-628, severity medium, verdict CONFIRMED,
+  1 independent vote), and DOC-master_plan-6 (verified-findings.yaml
+  L942-957, verdict LINE_MISMATCH — content confirmed, evidence anchor
+  off by one line): "The Master Plan's central Capability Contract (§8.3,
+  cognitive.execute_method v1.0.0) types its input as `MethodExecutionRequest`
+  and its output as `TypedMethodResult`, but no schema for either type
+  exists in any of the three documents... The platform's single execution
+  entry point therefore has normatively-required but nowhere-defined I/O
+  types — Typed LEGO pre-execution rejection (MP L752) cannot be
+  implemented against them." (CROSS-R-3 detail, verbatim.)
+
+  Per `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` §2.3 row 121
+  (READY): "`cognitive.execute_method` Capability Contract 的輸入型別；全三
+  份文件目前僅 MP L708 提名、零定義... 無既有內容可沿用，需從 MP §8.3 呼叫語境
+  反推欄位，屬新設計非修正" (no existing content to reuse — fields must be
+  reverse-engineered from MP §8.3's calling context; this is new design,
+  not a correction). This file is that from-scratch design. It defines
+  ONLY the input type; the paired output type, `TypedMethodResult`, is
+  `cognitive/typed-method-result.schema.yaml` (MRSP §2.3 row 122) — this
+  file's own bug-hunt pass discovered it ALREADY EXISTS on disk (built
+  earlier this same session, concurrently with this file, not by an
+  earlier Wave), correcting this file's initial assumption that it was
+  still pending. See `referenced_by` for the confirmed-built citation and
+  `compilation_decisions` for the field-shape cross-check this discovery
+  triggered (`execution_id`/`method_id`/`method_version`/`provenance`
+  required-vs-optional treatment, checked against that file's actual
+  `required` list rather than left as a hypothetical). The input/output
+  scope split itself matches the one `execution/result.schema.yaml`
+  already drew for the same finding from its own side ("This file does
+  NOT define `TypedMethodResult`... the GENERIC envelope for one whole
+  Execution's final outcome... not the typed input/output contract for
+  one `cognitive.execute_method` invocation").
+
+  MP §8.3's literal Capability Contract (L701-729) and §8.4's Typed LEGO
+  worked examples (L731-752) together give the only concrete calling-
+  context evidence for this type's shape:
+
+    capability:
+      id: cognitive.execute_method
+      version: 1.0.0
+    input:
+      type:
+        - MethodExecutionRequest
+    output:
+      type:
+        - TypedMethodResult
+    preconditions:
+      - method_atlas.loaded == true
+      - method_contract.valid == true
+      - workflow.static_validation == PASS
+      - policy.validation == PASS
+    quality:
+      provenance_required: true
+      method_specific_gate_required: true
+    security:
+      external_ai: policy_controlled
+    rollback:
+      side_effect_free_preferred: true
+
+    execute_method(root_cause.fishbone):
+    ProblemStatement + EvidenceSet? → CauseHypothesisSet
+
+    execute_method(strategy.swot):
+    KnowledgeSet → SWOTAnalysis
+
+  From this, three things are certain about what a caller must supply:
+  (1) WHICH method to run (`root_cause.fishbone`, a bare `method.schema.yaml`
+  `id`); (2) the typed input payload that specific method's own
+  `method.schema.yaml` `inputs.required`/`inputs.optional` declares (e.g.
+  `ProblemStatement` required, `EvidenceSet` optional, for
+  `root_cause.fishbone`); (3) that the call happens inside a task ("每個
+  task 先建立 task_context", EC L357-375) whose context governs which
+  Method Resolution candidates were even considered
+  (`execution/method-resolution.schema.yaml`, same Wave 5 session).
+  Everything else below this point — field names, id/timestamp
+  conventions, the content-addressed input-payload shape — is Phase 3
+  invention needed to turn that calling-context evidence into an actual
+  JSON Schema, not a second mother-document promise being compiled. See
+  `verification.note` for the honest grounded-vs-designed ratio.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §8.3 Capability Contract (L701-729, full literal YAML transcribed above)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §8.4 Typed LEGO (L731-752, worked execute_method() call signatures)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §16.3 Method Execution record (L3821-3857, precedent for the per-invocation field vocabulary — execution_id, method_id, workflow_id, block_id, inputs.hashes — already embedded in manifest.schema.yaml's method_execution_log[])"
+  - "specs/cognitive/method.schema.yaml (hard $ref target for method_id/method_version; also the source of the inputs.required/inputs.optional shape this request's payload must satisfy)"
+  - "specs/execution/task.schema.yaml (hard $ref target for task_context, this session's own sibling file)"
+  - "specs/execution/manifest.schema.yaml properties/method_execution_log (the post-execution record shape this pre-execution request eventually becomes one entry of — execution_id/workflow_id/block_id reused verbatim from there, not reinvented)"
+  - "specs/execution/result.schema.yaml (its own description's explicit scope split against TypedMethodResult — the identical split this file draws on the input side)"
+  - "specs/artifact/cas-path.schema.yaml#/definitions/sha256_hash (hard $ref target for content-addressed input values)"
+  - ".ai/research/phase-0/verified-findings.yaml CROSS-R-3 (L49-75), CROSS-T-17 (L612-628), DOC-master_plan-6 (L942-957)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.3 row 121 (method-execution-request.schema.yaml: READY, 'new design not correction')"
+
+decided_by: >
+  No ADR governs this file. Confirmed by grep across `docs/adr/ADR-001`
+  through `ADR-010`: none mention `MethodExecutionRequest` or
+  `cognitive.execute_method`'s input shape (ADR-005 cites MP §8.4's
+  `execute_method(root_cause.fishbone)` call ONLY as evidence for the
+  Method `id` grammar question, not as a ruling on the request object
+  itself). `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` §2.3 row 121
+  marks this file READY with no ADR dependency, explicitly describing it
+  as new design reverse-engineered from calling context rather than a
+  conflict between two existing designs for an ADR to arbitrate. Every
+  field-shape choice below is a Phase 3 compilation decision, recorded in
+  `compilation_decisions`.
+
+compilation_decisions:
+
+  - question: >
+      Should this request embed the FULL `task_context` object (a real
+      hard `$ref` to `execution/task.schema.yaml`, all 12 required fields)
+      or just a lightweight `task_id` string, given a single workflow may
+      invoke many methods and a full embed repeats the same task data at
+      every invocation?
+    decision: >
+      Full embed — `task_context` is a required, real hard `$ref` to
+      `ai-lego://specs/execution/task.schema.yaml` (the whole object, not
+      one field of it).
+    reasoning: >
+      Directly instructed for this file (unlike `execution/result.schema.yaml`,
+      which deliberately kept only a lightweight `task_id` pattern string
+      at the whole-EXECUTION grain — a different file, a different
+      grain). `execution/method-resolution.schema.yaml`, built earlier
+      this same Wave 5 session, already embeds the identical full object
+      at its own `method_resolution_request.task_context` field for the
+      same reason: a `MethodExecutionRequest` is meant to be independently
+      replayable 30 years from now without depending on a separate
+      task-context record still existing, unmodified, at read time — the
+      same "pin the content, don't rely on a live pointer" principle
+      `normative-context.schema.yaml` applied to its own
+      `loaded_sections[].section_sha256`. The repetition cost across a
+      many-method workflow is a real, accepted tradeoff, not an oversight
+      — see `open_questions.OQ-mer-3` for a possible future lighter-weight
+      alternative, not adopted here without evidence it is needed.
+    scope_note: >
+      This is the SECOND file in this Wave to embed
+      `execution/task.schema.yaml` in full via the identical field name
+      `task_context` — consistent with, not a new pattern independent of,
+      `method-resolution.schema.yaml`'s own choice.
+
+  - question: >
+      MP §8.4's calling examples show only `execute_method(method_id): <typed
+      input> -> <typed output>` — no execution identifier, no timestamp, no
+      task linkage at all in the informal arrow notation. Does the actual
+      JSON representation need an identifier of its own, and if so, what
+      convention?
+    decision: >
+      OPTIONAL, nullable `execution_id` (pattern `^EX-`, default `null`) —
+      reusing, not reinventing, `manifest.schema.yaml`'s
+      `method_execution_log[].execution_id` convention (Atlas §16.3's own
+      per-method-invocation `EX-` id, a DIFFERENT value from the top-level
+      `execution.execution_id`, per that file's own field description).
+    reasoning: >
+      MP §8.4's arrow notation is informal shorthand that also omits
+      `task_context`, `requested_at`, and the input payload's actual
+      shape — its silence on an identifier is not evidence that one
+      should not exist, only that the shorthand does not need to show
+      every field. An identifier is needed for idempotency/tracing/audit
+      (the same reasons `manifest.schema.yaml`'s `method_execution_log[]`
+      entries carry one) and for closing the loop: once this request is
+      executed, the resulting `method_execution_log[]` entry SHOULD reuse
+      the same `execution_id` if the caller pre-assigned one, so a request
+      and its eventual log entry are the same record viewed from two
+      sides of execution, not two independently-keyed objects. Nullable
+      because — same reasoning `normative-context.schema.yaml` gave for
+      its own nullable `execution_id` — a request MAY be constructed
+      before an id is minted for the run that will consume it, with the
+      executor minting one at dispatch time instead.
+
+  - question: >
+      MP §8.3's `preconditions` block (`method_atlas.loaded == true`,
+      `method_contract.valid == true`, `workflow.static_validation == PASS`,
+      `policy.validation == PASS`) is part of the Capability Contract's own
+      static declaration. Does `MethodExecutionRequest` need fields for
+      these?
+    decision: "No caller-supplied fields for MP §8.3's preconditions block."
+    reasoning: >
+      These four conditions describe checks the EXECUTOR must verify
+      about the SYSTEM STATE (is the Atlas loaded, is the target method's
+      contract valid, did static/policy validation already pass) before
+      running ANY request against `cognitive.execute_method` — they are
+      not data the caller supplies about this particular invocation, the
+      same distinction `execution/result.schema.yaml`'s own
+      compilation_decisions drew between "fields this file can honestly
+      type" and "narrative sections with no machine shape to compile."
+      Recorded here as a `constraints`-block note (informational) rather
+      than modeled as schema fields, matching this project's convention
+      for cross-cutting rules a `properties` block cannot structurally
+      express (`execution/result.schema.yaml`'s own `constraints` list is
+      the precedent for this technique).
+
+  - question: >
+      MP §8.4's worked examples show each method's typed input signature
+      differently — `ProblemStatement + EvidenceSet?` for
+      `root_cause.fishbone`, plain `KnowledgeSet` for `strategy.swot` — and
+      `method.schema.yaml`'s own `inputs.required`/`inputs.optional` fields
+      are themselves just arrays of typed-object NAME STRINGS (a
+      deliberately loose, non-`$ref`'d shape per that file's own
+      `compilation_decisions`, since most `cognitive/typed-objects/*.schema.yaml`
+      files do not exist yet — MRSP §2.3 row 126 lists 10 of them still
+      READY, not BUILT). Given that, what shape does THIS file's actual
+      input payload take?
+    decision: >
+      An `inputs` object, keyed by typed-object name (matching whichever
+      names the target method's own `method.schema.yaml`
+      `inputs.required`/`inputs.optional` declares), where each value is a
+      content-addressed reference: `{ hash: <sha256, real hard $ref to
+      cas-path.schema.yaml>, inline_value: <OPTIONAL raw echo> }` — NOT a
+      raw embedded object of whatever shape the named typed-object happens
+      to have.
+    reasoning: >
+      This is the one place in the whole design where real, independent
+      textual evidence converges from THREE different already-built
+      files rather than one: (1) `method.schema.yaml`'s `inputs.required`/
+      `inputs.optional` give the legal KEY SET per method (typed-object
+      names); (2) Atlas §16.3's `method_execution.inputs.hashes`
+      (L3821-3857), already embedded verbatim in `manifest.schema.yaml`'s
+      `method_execution_log[].inputs.hashes`, is direct textual precedent
+      that this corpus already represents a method invocation's inputs as
+      CONTENT-ADDRESSED HASHES, not embedded objects — the post-execution
+      LOG record and this pre-execution REQUEST describing the same
+      invocation should share that representation, not diverge on it; (3)
+      `cas-path.schema.yaml#/definitions/sha256_hash` supplies the VALUE
+      type, already used identically by `execution/result.schema.yaml`'s
+      `evidence_ref`/`artifact_ref`. Choosing raw embedded objects instead
+      would have been a genuinely invented shape with zero precedent
+      anywhere in this corpus; choosing hash references is the one design
+      that is actually GROUNDED, not merely plausible. `inline_value` is
+      kept OPTIONAL for the pragmatic case a caller has not yet written
+      the input object to CAS — same "hash is authoritative, inline copy
+      is a convenience" split `execution/result.schema.yaml`'s
+      `artifact_ref` already uses for its own `hash`/`path` pair.
+    scope_note: >
+      Whether a SPECIFIC key in `inputs` is legal for a SPECIFIC
+      `method_id` (i.e., does it appear in that method's own
+      `inputs.required` ∪ `inputs.optional`) is a cross-record check this
+      file cannot express as a JSON Schema structural constraint — it
+      depends on which `method_id` was supplied, the same class of
+      "opaque, deferred to a runtime/compiler check" limitation
+      `method.schema.yaml`'s own `preconditions` field already accepts for
+      an analogous reason. Recorded in `constraints` below, not silently
+      assumed solvable.
+
+  - question: >
+      MP §8.3's `quality.provenance_required: true` is stated unconditionally
+      at the Capability Contract level (every `cognitive.execute_method`
+      call). Does that mean `provenance` should be a REQUIRED field on this
+      request, rather than optional?
+    decision: >
+      OPTIONAL — same additive, non-required treatment
+      `execution/task.schema.yaml` gave its own `provenance` field.
+    reasoning: >
+      MP §8.3's `quality.provenance_required` governs the OUTPUT side —
+      it mandates that whatever `TypedMethodResult` comes back must carry
+      provenance (the same distinction `method.schema.yaml`'s
+      `compilation_decisions` drew between `quality.provenance_required`
+      governing a method's RUNTIME OUTPUTS versus `contract_provenance`
+      governing the CONTRACT DEFINITION itself — two different questions
+      that must not be conflated). It says nothing about whether the
+      REQUEST that triggers a call must itself carry a provenance record.
+      Kept optional here for the same reason `task.schema.yaml` kept its
+      own additive `provenance` field optional: not every request
+      construction path can yet mechanically produce an
+      `authorship_state` value, and forcing it as `required` would make
+      this schema stricter than any mother-document text demands.
+
+      CROSS-CHECKED, not left as a hypothetical, against
+      `cognitive/typed-method-result.schema.yaml` (discovered during this
+      file's bug-hunt pass to already exist — see top-level `description`):
+      that file's top-level `provenance` (the whole result's own claim of
+      "what happened") IS required, on grounds that a Result is itself a
+      claim about the world and therefore falls under
+      `epistemic-label.schema.yaml`'s universal "every content/claim
+      object" mandate — the identical reasoning `execution/result.schema.yaml`
+      already used for its own required top-level `provenance`. A
+      `MethodExecutionRequest`, by contrast, is a DIRECTIVE ("run this
+      method with these inputs"), not an assertion about the world — the
+      same category `task.schema.yaml`'s own task_context sits in, which
+      is exactly why THAT file also kept `provenance` optional/additive
+      rather than required. Two real sibling precedents point in opposite
+      directions (task.schema.yaml optional vs. result.schema.yaml/
+      typed-method-result.schema.yaml required) precisely BECAUSE they
+      answer different questions ("what is this instruction" vs. "what is
+      this claim") — this file's `MethodExecutionRequest` sits on the
+      instruction/directive side of that split, alongside task_context,
+      not the claim/outcome side. This is now a settled cross-check, not
+      a forward-looking question — no `open_questions` entry is carried
+      for it (see `open_questions` below for what remains genuinely open).
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+definitions:
+
+  typed_input_value:
+    type: object
+    required: [hash]
+    description: >
+      One content-addressed input value inside `inputs` below. See
+      `compilation_decisions` for the three-file grounding behind this
+      shape (method.schema.yaml key set + Atlas §16.3 inputs.hashes
+      precedent + cas-path.schema.yaml value type).
+    properties:
+      hash:
+        $ref: "ai-lego://specs/artifact/cas-path.schema.yaml#/definitions/sha256_hash"
+        description: >
+          Real hard $ref: cas-path.schema.yaml already exists on disk.
+          Authoritative — this is WHAT the target method's
+          `inputs.required`/`inputs.optional` typed-object value actually
+          is, addressed by content, not by a mutable pointer.
+      inline_value:
+        description: >
+          OPTIONAL raw echo of the object this hash addresses, for the
+          pragmatic case a caller has not yet written it to CAS, or for
+          human/debug readability. The hash remains authoritative; this
+          is a convenience copy only — same split
+          `execution/result.schema.yaml`'s `artifact_ref.hash`/`.path`
+          pair already uses. Untyped (`{}` — any JSON value) because the
+          actual shape is whichever `cognitive/typed-objects/*.schema.yaml`
+          the containing key names, and most of those files do not exist
+          yet (MRSP §2.3 row 126).
+
+type: object
+required: [method_id, task_context, inputs, requested_at]
+properties:
+
+  execution_id:
+    type: [string, "null"]
+    default: null
+    pattern: "^EX-"
+    description: >
+      OPTIONAL, nullable. Reuses `manifest.schema.yaml`'s
+      `method_execution_log[].execution_id` convention (Atlas §16.3) — see
+      `compilation_decisions`. When set by the caller, the executor SHOULD
+      reuse this exact value as the resulting `method_execution_log[]`
+      entry's own `execution_id` once the invocation completes, so a
+      request and its log entry are traceable as the same record.
+
+  method_id:
+    $ref: "ai-lego://specs/cognitive/method.schema.yaml#/properties/id"
+    description: >
+      REQUIRED. Real hard $ref to `method.schema.yaml`'s own `id` pattern
+      (bare `<family>.<name>`, ADR-005b) — `method.schema.yaml` is Wave 3
+      (already BUILT), a safe backward dependency, same precedent
+      `method-resolution.schema.yaml`'s `candidate_methods[].method_id`
+      already set. Answers "WHICH method to run" — MP §8.4's
+      `execute_method(root_cause.fishbone)` / `execute_method(strategy.swot)`.
+
+  method_version:
+    $ref: "ai-lego://specs/cognitive/method.schema.yaml#/properties/version"
+    description: >
+      OPTIONAL. Real hard $ref to `method.schema.yaml`'s own `version`
+      field (semver). MP §8.4's arrow-notation examples never show a
+      version — pinning one is Phase 3 invention for 30-year replay (Atlas
+      §24.1 "Method 不可就地覆寫" means the version that ran matters for
+      reproducing a past result). When omitted, resolution to a specific
+      version (e.g. "latest ACTIVE") is an executor responsibility this
+      file does not specify — see `open_questions.OQ-mer-1`.
+
+  task_context:
+    $ref: "ai-lego://specs/execution/task.schema.yaml"
+    description: >
+      REQUIRED. Real hard $ref to the full task_context object (this
+      session's own sibling file) — see `compilation_decisions` for the
+      full-embed-over-lightweight-id-reference reasoning. Answers "what
+      task/context triggered it."
+
+  workflow_id:
+    type: [string, "null"]
+    default: null
+    description: >
+      OPTIONAL. Reused verbatim from Atlas §16.3 / `manifest.schema.yaml`'s
+      `method_execution_log[].workflow_id` — which Recipe/Workflow
+      instance (if any) this invocation is one step of, per
+      `cognitive/recipe.schema.yaml`'s `steps[]` node grammar (a
+      `type: method` step names a `method_id`; this field lets the
+      resulting request carry back a pointer to which workflow run
+      dispatched it). Null for a directly-invoked, workflow-less call.
+
+  block_id:
+    type: [string, "null"]
+    default: null
+    description: >
+      OPTIONAL. Reused verbatim from Atlas §16.3 / `manifest.schema.yaml`'s
+      `method_execution_log[].block_id` — which specific step inside
+      `workflow_id` this invocation corresponds to. Null when `workflow_id`
+      is null.
+
+  inputs:
+    type: object
+    minProperties: 1
+    additionalProperties:
+      $ref: "#/definitions/typed_input_value"
+    description: >
+      REQUIRED. Keyed by typed-object name, matching whichever names the
+      target `method_id`'s own `method.schema.yaml` `inputs.required`/
+      `inputs.optional` declares (e.g. for `root_cause.fishbone`:
+      `ProblemStatement` required, `EvidenceSet` optional — MP §8.4's
+      `ProblemStatement + EvidenceSet? → CauseHypothesisSet`). See
+      `compilation_decisions` for the content-addressed value shape and
+      `constraints` below for the cross-record legality rule this file
+      cannot express structurally.
+
+  requested_at:
+    type: string
+    format: date-time
+    description: >
+      REQUIRED. When this request was constructed. Matches the
+      `generated_at`/`started_at` timestamp convention already used by
+      `normative-context.schema.yaml` and `manifest.schema.yaml`'s own
+      `method_execution_log[].started_at`.
+
+  provenance:
+    description: >
+      OPTIONAL. See `compilation_decisions` — answers "who/what
+      constructed this request" (e.g. `AI_SUGGESTED` pending human
+      approval before an R3/R4-tier method actually runs, per
+      `execution/risk-tier.schema.yaml`'s Human Approval requirement),
+      distinct from `quality.provenance_required` on the Capability
+      Contract itself, which governs the OUTPUT (`TypedMethodResult`),
+      not this request.
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+constraints:
+  description: >
+    Cross-field/cross-record rules this schema's JSON-Schema `properties`
+    block cannot express structurally, recorded as prose per this
+    project's established convention (`execution/result.schema.yaml`'s own
+    `constraints` list is the precedent for this technique).
+  rules:
+    - "Every typed-object name in the target method_id's own method.schema.yaml inputs.required list MUST have a corresponding key present in this request's inputs object. This is a cross-record check (depends on which method_id was supplied) that no single JSON Schema file in this tree can express structurally without duplicating every method's own inputs.required list inline — deferred to the executor/compiler, per MP §8.4's own '不合法組合在執行前拒絕' (illegal combinations rejected before execution) and Atlas §14.1's Static + Policy Validation step."
+    - "Any inputs key NOT present in the target method_id's inputs.required ∪ inputs.optional set is not a legal input for that method — same cross-record limitation as above, same deferred enforcement point."
+    - "MP §8.3's preconditions (method_atlas.loaded == true, method_contract.valid == true, workflow.static_validation == PASS, policy.validation == PASS) are executor-side gates checked against a dispatched request before it runs — not caller-supplied fields on this object. See compilation_decisions."
+    - "When workflow_id is non-null, block_id SHOULD also be non-null (a workflow step without a step identity is not a meaningful correlation target) — not enforced structurally, since MP/Atlas give no explicit rule requiring it."
+
+# ---------------------------------------------------------------------------
+# Forward dependents (informational — these files depend on this one; not
+# built by this file)
+# ---------------------------------------------------------------------------
+referenced_by:
+  - "cognitive/typed-method-result.schema.yaml — CONFIRMED ALREADY BUILT (discovered during this file's own bug-hunt pass, not by an earlier Wave; built concurrently this same session). MACHINE_READABLE_SPEC_PLAN.md §2.3 row 122 lists 'execution/result.schema.yaml' as ITS plan-column dependency, not this file — but it is this request's paired OUTPUT type for the same cognitive.execute_method Capability Contract, MP §8.3, and jointly closes CROSS-R-3/CROSS-T-17/DOC-master_plan-6 alongside this file. Its actual on-disk `required: [execution_id, method_id, method_version, status, evaluated_at, provenance]` was read and cross-checked against this file's own required-field choices (see compilation_decisions) rather than assumed: `method_id` required on both sides (consistent); `execution_id`/`method_version` required on the RESULT (post-hoc, always knowable once execution happened) but optional/nullable on this REQUEST (pre-dispatch, may not yet be minted/pinned) — a deliberate temporal asymmetry, not an inconsistency; `provenance` required on the RESULT (a claim-about-outcome, per epistemic-label.schema.yaml's universal mandate) but optional on this REQUEST (a directive, the same category task.schema.yaml's own provenance field sits in) — see compilation_decisions for the full reasoning."
+  - "domain/capability-contract.schema.yaml (not yet built as of this file's own bug-hunt pass, confirmed absent from specs/domain/; MACHINE_READABLE_SPEC_PLAN.md §2.6 row 152 explicitly lists THIS file as its own dependency — the generalized Capability Contract shape that cognitive.execute_method's own MP §8.3 declaration is one instance of)"
+
+open_questions:
+  - id: "OQ-mer-1"
+    question: >
+      When `method_version` is omitted, how does an executor resolve which
+      concrete version of `method_id` actually runs ("latest ACTIVE",
+      pinned by a Recipe's own `references.cognitive_method_atlas`, or
+      something else)? No mother document defines a method version
+      registry or resolution algorithm — `method.schema.yaml`'s
+      `open_questions.OQ-method-1` already flags an adjacent gap
+      (Workflow/Recipe id versioning) without resolving it either.
+    owner: "operator, via a future ADR or a Method Registry design (not yet scoped)"
+    blocks: "nothing in this schema — method_version is usable today when the caller supplies it; omission is a real but separately-tracked resolution gap"
+  - id: "OQ-mer-2"
+    question: >
+      The cross-record `inputs` legality rule (`constraints` above) cannot
+      be checked by this file alone — it requires looking up the target
+      `method_id`'s own `method.schema.yaml` `inputs.required`/
+      `inputs.optional` at validation time. Should a future
+      `compiler/method-selector/` or `compiler/compatibility/` tool (both
+      named as directories-only in MP §8.5, L774-783, with no file-level
+      shape defined anywhere) be the place this check actually runs?
+    owner: "operator / whichever session first builds MP §8.5's compiler/compatibility/ tooling"
+    blocks: "nothing in this schema; the check remains a documented, deferred obligation (constraints above), not silently assumed automatic"
+  - id: "OQ-mer-3"
+    question: >
+      `task_context` is currently always a full embedded object (see
+      `compilation_decisions`), which repeats identical task data across
+      every method invocation in a many-step workflow. Should a future
+      revision allow a lighter `oneOf` alternative — a pinned
+      `{task_id, task_context_sha256}` reference, mirroring
+      `normative-context.schema.yaml`'s own `document_index_refs` pattern
+      — for high-invocation-count workflows? Not adopted here without
+      evidence any real workflow's volume makes the repetition cost a
+      practical problem; the task instruction for this file also asked
+      specifically for "a real hard $ref," which the full-embed form
+      satisfies most directly.
+    owner: "operator / future Phase 3 session, if a real high-fan-out workflow surfaces this as a practical cost"
+    blocks: "nothing in this schema today"
+  - id: "OQ-mer-4"
+    question: >
+      The general optional-vs-required question for `provenance` is now
+      SETTLED by cross-checking `cognitive/typed-method-result.schema.yaml`
+      (see `compilation_decisions` and `referenced_by`) — not left open. A
+      narrower sub-question remains genuinely open: should `provenance`
+      become CONDITIONALLY required on this request when the target
+      `method_id`'s own `method.schema.yaml` `risk_tier` is R3/R4,
+      mirroring `execution/risk-tier.schema.yaml`'s Human Approval
+      requirement for those tiers? No mother document states such a rule,
+      and neither `method.schema.yaml` nor `typed-method-result.schema.yaml`
+      models a risk-tier-conditional provenance requirement either —
+      inventing one here would be fabrication with no textual basis, the
+      same class of invention this file otherwise avoids throughout.
+    owner: "operator, via a future ADR or Round 2+ Method Registry design, if R3/R4-gated methods are later found to need it"
+    blocks: "nothing in this schema"
+
+verification:
+  method: >
+    Read against MP §8 full text (L640-789: §8.1 Method vocabulary through
+    §8.5 Method-definition-ownership rule, not just §8.3/§8.4 in
+    isolation), Atlas §16.3 full text (L3821-3857), `specs/cognitive/method.schema.yaml`
+    full text (for `id`/`version`/`inputs` anchors), `specs/execution/task.schema.yaml`
+    full text (this session's own sibling, for the `task_context` $ref
+    target and its exact 12 field names), `specs/execution/manifest.schema.yaml`
+    full text (for `method_execution_log[]`'s established
+    execution_id/workflow_id/block_id/inputs.hashes vocabulary this file
+    reuses rather than reinvents), `specs/execution/result.schema.yaml`
+    full text (for its own explicit TypedMethodResult scope-split
+    precedent and its `evidence_ref`/`artifact_ref` hash-plus-inline-copy
+    pattern), `specs/artifact/cas-path.schema.yaml` full text (for the
+    `sha256_hash` $ref target), `specs/governance/epistemic-label.schema.yaml`
+    full text (for the `provenance_record` $ref target),
+    `.ai/research/phase-0/verified-findings.yaml` CROSS-R-3 (L49-75, all 3
+    verdict_votes), CROSS-T-17 (L612-628), and DOC-master_plan-6
+    (L942-957) full entries, and `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`
+    §2.3 row 121 full text. Grep confirmed across `docs/adr/ADR-001` through
+    `ADR-010`: zero hits for "MethodExecutionRequest" or
+    "cognitive.execute_method" as a ruling target (ADR-005's one hit on
+    the underlying `execute_method()` call is evidence for the Method `id`
+    grammar question only, not a ruling on this request type). A dedicated
+    bug-hunt pass (`grep -rn "method-execution-request.schema.yaml"` across
+    `agency-os/`) was run AFTER drafting this file's body and BEFORE
+    finalizing it, per this project's R0 four-action verification
+    discipline — it surfaced a real staleness bug in this file's own
+    initial draft (this file's `description`/`referenced_by` originally
+    assumed `cognitive/typed-method-result.schema.yaml` was "not yet
+    built," matching the plan row's literal wording, but the file was
+    found to already exist on disk, built concurrently this same
+    session). That file was then read in full and its `required` list
+    cross-checked field-by-field against this file's own choices (see
+    `compilation_decisions` and `referenced_by`) before this file was
+    finalized, rather than leaving the stale assumption uncorrected.
+  note: >
+    No mother document, ADR, or sibling `specs/` file was modified to
+    produce this file. Grounded-vs-designed ratio, following
+    `normative-context.schema.yaml`'s disclosure model: roughly 15%
+    grounded, 85% new design. Grounded: the type's NAME
+    (`MethodExecutionRequest`), its role as `cognitive.execute_method`'s
+    input (MP L708), the Capability Contract's full literal YAML (MP
+    L701-729, transcribed verbatim in this file's `description`), and the
+    two worked calling-signature examples (MP L742/745) establishing that
+    a method_id plus a typed input payload are the irreducible minimum any
+    shape must carry. Everything else — every concrete field name
+    (`execution_id`, `task_context`, `workflow_id`, `block_id`, `inputs`,
+    `requested_at`, `provenance`), the content-addressed
+    hash-plus-inline-value shape for `inputs` (assembled from three
+    separate already-built sibling files' precedents, not from any single
+    mother-document statement about THIS type), the full-task_context-embed
+    decision, and every `constraints`/`open_questions` entry — is Phase 3
+    invention, individually justified in `compilation_decisions` above
+    rather than presented as if MP or Atlas already specified it. This
+    file does not, and does not attempt to, define `TypedMethodResult` —
+    that remains `cognitive/typed-method-result.schema.yaml`'s job (see
+    `referenced_by`).
