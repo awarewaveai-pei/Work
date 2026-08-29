@@ -101,7 +101,7 @@ Source directive 中所有根路徑（`/.ai/`、`/specs/`、`/policies/`、`/met
 
 ## 5. Phase 1 — 三文件 Gap Analysis
 
-**Status：NOT_STARTED** | Entry：Phase 0 exit gate 通過。
+**Status：NEXT** | Entry：Phase 0 exit gate ✅ + Cross-Review 三件套 ✅（2026-08-29）。種子材料：verified-findings.yaml + CONVERGENCE_MATRIX.md。
 
 方法：角色 lens（System/Software/Domain/Data Architect、DB、DevOps、SRE、Security、Privacy、IAM、Network、Cloud、Local/Offline、MLOps、AI、Data Science、Statistics、Research Methodology、PM、Program、UX、Accessibility、Legal/Compliance、Globalization、Government、Education、Business、Finance、Trade、Policy、Operations、Support/IR、Long-term Maintainer）× failure modes（correctness / availability / durability / security / privacy / data loss / 各類 lock-in / schema・API・workflow・legal・model evolution / operational complexity / cost / latency / offline / cross-border / backup・restore・migration failure / supply-chain / prompt injection / data poisoning / hallucination / human error / agent overreach / observability gap / knowledge inconsistency / documentation drift）。完整清單正本在 source directive §VI；執行策略 = 分批 lens sweep，每批 findings 併入 registers，每條附 `file:line`。
 
@@ -139,6 +139,8 @@ Source directive 中所有根路徑（`/.ai/`、`/specs/`、`/policies/`、`/met
 
 **Status：NOT_STARTED**。一條垂直切片證明全鏈：Source → Ingest → Normalize → Knowledge → Human Contribution → Method Selection → Workflow → AI/Compute → Evidence → Artifact → Human Review → Version → Audit → Replay/Rollback。Learning / Research / Business 三選一——選「最能驗證 architecture」而非功能最多，Claude 與 Codex 各自論證後比較。
 
+**已定決策（操作者 2026-08-29）**：部署主機名 = **`cognitive.aware-wave.com`**（獨立一級子網域，不放 app.aware-wave.com；CF Universal cert 涵蓋一級）。**DNS 記錄延後至本 Phase 有 MVP 可 serve 時才建**（避免 dangling DNS / subdomain takeover / Kuma 假紅），屆時寫入 deployment ADR。
+
 ---
 
 ## 10. 最高工程原則（索引，不重抄）
@@ -154,7 +156,7 @@ Source directive 中所有根路徑（`/.ai/`、`/specs/`、`/policies/`、`/met
 | Phase | 內容 | Status | Gate |
 |---|---|---|---|
 | 0 | 文件完整性 + Current State | **COMPLETE**（2026-08-29；71 verified findings） | 11 outputs + 報告 ✅ |
-| CR | Claude/Codex Cross-Review | **NEXT**（建議先等 OQ-2 回答） | 三件套 + 分類矩陣 |
+| CR | Claude/Codex Cross-Review | **COMPLETE**（2026-08-29；9/9 交集 0 DISAGREE，Codex 補 3 組新證據＋3 個新決策點） | 三件套 + 分類矩陣 ✅ |
 | 1 | Gap Analysis | NOT_STARTED | 6 registers |
 | 2 | Architecture Convergence | NOT_STARTED | 15 deliverables + **HUMAN REVIEW** |
 | 3 | Machine-readable Foundation | NOT_STARTED | specs/policies/tests 樹 + schema 驗證 |

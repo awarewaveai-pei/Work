@@ -10,7 +10,8 @@ questions:
       - "B: leave as-is, track identity externally in document-inventory.yaml only"
     recommendation: "A — minimal semantic correction, exactly the class directive §IX allows"
   - id: OQ-2
-    status: REQUIRES_HUMAN_DECISION
+    status: RESOLVED_BY_HUMAN
+    resolved: "2026-08-29 操作者裁決：磁碟上的 v1 就是最新 canonical。v2_1 / v1_2_zhTW 引用確定為 stale reference，Phase 2 依 §IX 修正協議清理（findings CROSS-T-1/T-2/R-1/R-2, CDX-1）。"
     title: "Stale references to v2_1 / v1_2_zhTW filenames"
     context: "Master Plan §0.0.1 (lines 55-56) references 'ai_lego_cognitive_engineering_os_global_master_plan_v2_1.md' and 'AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md'. Neither exists on disk (D:/Work + Downloads searched 2026-08-28). Are the on-disk v1 files the newest canonical lineage, or do newer drafts exist elsewhere (cloud / another export)?"
     needed_from_human: "confirm on-disk v1 = canonical; if newer drafts exist, provide them before Phase 1"
@@ -51,9 +52,9 @@ questions:
     deadline: "Phase 2 (ADR)"
   - id: OQ-8
     status: REQUIRES_HUMAN_DECISION
-    title: "Canonical epistemic label set: MP 6 values vs Atlas/EC 11 values; space vs SNAKE_CASE"
-    context: "Three vocabularies for the runtime trust boundary; the FACT promotion redline references a value absent from every enum (findings CROSS-T-6 / CROSS-R-9 / CROSS-T-7)."
-    options: ["A: 11-value SNAKE_CASE as canonical machine enum, 6-value as UI display subset", "B: 6-value canonical, drop the extra 5", "C: other"]
+    title: "Canonical epistemic label set: MP 6 values vs Atlas/EC 11 values; space vs SNAKE_CASE — plus a 4th authorship vocabulary"
+    context: "FOUR vocabularies for the runtime trust boundary (updated 2026-08-29 after Codex cross-review, CDX-7): MP §83 6 values, Atlas 11 space-form, EC 11 SNAKE_CASE, and MP §12 authorship labels HUMAN ORIGINAL / AI GENERATED / HUMAN APPROVED / SOURCE QUOTATION (MP L995-1000, grep-verified). The FACT promotion redline references a value absent from every enum (findings CROSS-T-6 / CROSS-R-9 / CROSS-T-7 / CDX-7)."
+    options: ["A: 11-value SNAKE_CASE as canonical machine enum, 6-value as UI display subset, authorship labels as a SEPARATE orthogonal enum with a defined mapping", "B: 6-value canonical, drop the extra 5", "C: other"]
     deadline: "Phase 2 (ADR)"
   - id: OQ-9
     status: REQUIRES_HUMAN_DECISION
@@ -68,5 +69,25 @@ questions:
   - id: OQ-11
     status: REQUIRES_HUMAN_DECISION
     title: "Which path trees are binding vs advisory (EC §91-94 unqualified vs other sections marked 建議)"
-    context: "Undecidable normative strength for path contracts that Phase 0/§141 treat as mandatory deliverables (finding DOC-execution_contract-11, verdict PARTIAL)."
+    context: "Undecidable normative strength for path contracts that Phase 0/§141 treat as mandatory deliverables (finding DOC-execution_contract-11, verdict PARTIAL). Codex cross-review adds a more fundamental option: path-as-architecture should not live in the mother specs at all (30-year migration cost; CODEX_REVIEW PART B)."
+    options: ["A: mark each tree binding/advisory in place", "B: all trees advisory until Phase 4 repository ADR", "C (Codex proposal): remove repo-layout from mother specs entirely; paths live only in a machine-readable repo-layout spec owned by Phase 4"]
+    deadline: "Phase 2 (ADR)"
+  # --- OQ-12..14 registered 2026-08-29 from Claude x Codex cross-review (see cross-review/CONVERGENCE_MATRIX.md) ---
+  - id: OQ-12
+    status: REQUIRES_HUMAN_DECISION
+    title: "Canonical method ID grammar: method.<family>.<name> vs <family>.<name> vs method.<name>.v<N>"
+    context: "Three grammars coexist (Atlas L50 / L989 / L4256; MP L742 / L825 / L833 — findings DOC-method_atlas-1, CROSS-T-14, CDX-4). A registry cannot resolve all IDs under any single grammar."
+    options: ["A: method.<family>.<name> with versioning via separate field (not in the ID)", "B: <family>.<name> bare form", "C: other"]
+    deadline: "Phase 2 (ADR)"
+  - id: OQ-13
+    status: REQUIRES_HUMAN_DECISION
+    title: "Status-code taxonomy: are semantic blocking codes top-level statuses or reasons under BLOCKED?"
+    context: "PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED / DOCUMENT_RESOLUTION_BLOCKED / METHOD_RESOLUTION_BLOCKED etc. (9 codes) are mandated but none maps into the EC state machine's legal side states (findings CROSS-T-5, CROSS-R-4, DOC-execution_contract-9, CDX-6, Codex PART C-5)."
+    options: ["A: state machine keeps small closed enum (BLOCKED/...) + reason_code field carries the semantic codes", "B: expand the state enum to include every semantic code", "C: other"]
+    deadline: "Phase 2 (ADR)"
+  - id: OQ-14
+    status: REQUIRES_HUMAN_DECISION
+    title: "Normative-strength marking for mother-doc content (norm vs example vs vision)"
+    context: "MP mixes narrative vision, examples, and MUST-rules with no way to tell them apart — root cause of examples-masquerading-as-requirements (MP L43 forbids treating its snippets as method truth, yet L742-746 reads as a contract; Codex PART C-7; Claude PART C candidate; edition/packaging content MP L527-562 same question)."
+    options: ["A: introduce explicit markers (NORMATIVE / EXAMPLE / VISION) per section during Phase 2 revision", "B: move all normative content to machine specs, mother docs become narrative-only", "C: other"]
     deadline: "Phase 2 (ADR)"

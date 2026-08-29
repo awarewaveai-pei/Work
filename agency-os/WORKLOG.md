@@ -2,6 +2,32 @@
 
 ## 2026-08-29
 
+### AI LEGO Cross-Review 完成 — Claude×Codex 雙盲互驗 9/9 交集零分歧，Codex 補抓第 4 套信任詞彙；附兩個坑（oracle artifact CP950 損毀、跨 session 未 commit 編輯被還原）
+
+**流程（directive §V 反 anchoring 全程合規）**：①操作者裁決 OQ-2（磁碟 v1 = canonical）+ 子網域定名 `cognitive.aware-wave.com` ②`CLAUDE_REVIEW.md` 先寫檔（未餵 Codex）③`codex-oracle.ps1 -Mode inspect` 無污染 prompt（只給三文件路徑＋中性問題集，明令禁讀 `.ai/`/Program Plan/WORKLOG；Codex 自我聲明未讀他方分析），21.3 分鐘產 9 findings ④逐條 Grep 驗真後寫 `CODEX_REVIEW.md`＋`CONVERGENCE_MATRIX.md`。
+
+**收斂結果**：Codex 9 條 = 7 AGREE + 2 PARTIAL_AGREEMENT，**0 DISAGREE**。兩個獨立模型在「缺陷在機制層、理念層健全、契約層第一優先」完全收斂。**Codex 抓到 Claude 漏的**：MP §12 authorship 標籤（`HUMAN ORIGINAL/AI GENERATED/HUMAN APPROVED/SOURCE QUOTATION`，MP L995-1000 驗真）= 信任邊界詞彙實為 **4 套**非 3 套；另補 2 個 method ID grammar 站點（MP L825/L833）與 path-as-architecture 30 年遷移成本批判。新增 OQ-12（ID grammar）/OQ-13（status taxonomy）/OQ-14（normative-strength 標記），OQ-8/OQ-11 擴充。Claude 獨有 ~50 條維持 CLAUDE_ONLY_VERIFIED 不升格 consensus。
+
+**坑 1（oracle artifact CP950 損毀）**：codex-oracle.ps1 的 artifact 捕獲把 CJK 輸出 double-encode（UTF-8 被當 CP950 解再存），`2026-08-29-inspect-518679ce.md` 正文 mojibake，round-trip 還原仍有 ~4% U+FFFD 永久損失（損失在捕獲當下）。machine-facing 內容全 ASCII 完好，CODEX_REVIEW.md 以規範化轉錄保存＋fidelity 聲明。**已開 spawn_task chip（task_51a5ab62）修 wrapper**。另：Codex 對 EC 的行號有系統性 −28 偏移（MP/Atlas 精確）——已逐條校準標註。
+
+**坑 2（跨 session 編輯被還原）**：上一輪對 open-questions.yaml（OQ-2 RESOLVED）與 Program Plan（子網域決策）的未 commit 編輯，在 session 中斷重續後被還原回 committed 狀態（untracked 的 CLAUDE_REVIEW.md 倖存 → 樣態符合有東西對 tracked 檔跑了 checkout/reset）。已重補。教訓：**決策記錄落檔後應盡快 commit，不留過夜工作樹**。
+
+[已修改]
+- 新增 `.ai/research/cross-review/` 三件套：`CLAUDE_REVIEW.md` / `CODEX_REVIEW.md` / `CONVERGENCE_MATRIX.md`
+- `open-questions.yaml`：OQ-2 → RESOLVED_BY_HUMAN；OQ-8/OQ-11 擴充（第 4 套詞彙、path option C）；新增 OQ-12/13/14（共 14 條）
+- `AI_LEGO_OS_Program_Plan_v1.md`：CR → COMPLETE、Phase 1 → NEXT、Phase 5 記入 `cognitive.aware-wave.com` 決策
+- 新增 `agency-os/reports/oracle/2026-08-29-inspect-518679ce.md`（codex raw artifact，進 git 不刪）
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=codex-oracle.ps1 -Mode inspect（elapsed 1280s, answer 11460B）+ python 逐行驗證 Codex 引用 19 處 file:line + yaml safe_load（14 questions） | exit=0 | ms=~1285000
+- REVIEW_WAIVED: DOC_ONLY -- 本批全為 md/yaml 治理記錄；Codex 9 findings 每條經 Grep 驗真（MP/Atlas 行號全命中，EC 偏移已校準標註）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=v1_2_zhTW | hits=55/14檔（10 處在 MP 母文件本身=已登錄的 defect；43 處在 registers/報告/WORKLOG=對該 defect 的記錄；2 處在 .agency-state 自動摘錄；scripts 0 hits，無 callsites 需修）
+- ORACLE_WAIVED: 本批核心產出即 Codex oracle 互驗結果本身（artifact 2026-08-29-inspect-518679ce.md 進 git）；yaml/md 為其治理記錄，無另行 review 對象
+
+[剩餘風險] oracle artifact 編碼 bug 未修（chip 待操作者點擊）；AI consensus ≠ expert consensus——Phase 2 修正案仍需逐案人類批准。
+[rollback] `git revert` 本 commit；三母文件仍零改動。
+
 ### AI LEGO Cognitive Engineering OS — Phase 0 全程完成：Program Plan + 三母文件 identity 鎖定 + 全文 inventory + 71 條對抗式驗證 findings
 
 **起點**：操作者投入三份母規格（`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/`，共 14,885 行）+ 30 節 program directive（要求 Phase 0–5 收斂工程、Claude/Codex 反 anchoring 分工、Phase 2 結束 STOP FOR HUMAN REVIEW）。本批 = Phase 0 完整交付。
