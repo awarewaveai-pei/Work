@@ -106,7 +106,7 @@ Asset Inventory → Data Flow Diagram → Trust Boundaries → STRIDE → LINDDU
 | T3 | Tampering | Method Atlas / 母文件（A6） | 若 Recipe/Method 定義本身可被竄改，下游 AI agent 會在自以為遵循 SSOT 的情況下執行錯誤流程 | **新發現**（過 Asset A6 才浮現） | Medium | Execution Manifest 已要求記錄 Atlas content_hash——偵測機制存在 | 偵測≠預防；誰有權修改母文件的授權模型未文件化 |
 | R1 | Repudiation | 人類 Approval provenance（A7, TB-2） | 與 S2 同一根因 | P1-GAP-SEC-3 / P1-RISK-SEC-1 | High | EC§87 結構設計良好 | 結構完整不等於身分驗證完整 |
 | R2 | Repudiation | 「第二個 AI」獨立驗證 | EC 明文「第二個 AI 不是法律意義的人類 approval」（L2031） | 無對應 GAP（既有良好設計） | Low | 已妥善防護 | 建議 `approval.actor_type` 明確區分 human/automated 的機讀 enum |
-| I1 | Information Disclosure | 共用 Vector Index / Knowledge Graph（TB-5） | 多租戶 RAG 檢索範圍設定錯誤，Tenant A 問題可能檢索到 Tenant B 機密片段 | P1-GAP-SEC-7 / P1-RISK-SEC-3 | High | ADR-003（PROPOSED）僅解 CAS 儲存層 tenant-scoped 命名空間 | **即使 ADR-003 全案核准，此威脅僅部分解決**——RAG 檢索面仍未設計 |
+| I1 | Information Disclosure | 共用 Vector Index / Knowledge Graph（TB-5） | 多租戶 RAG 檢索範圍設定錯誤，Tenant A 問題可能檢索到 Tenant B 機密片段 | P1-GAP-SEC-7 / P1-RISK-SEC-3 | High | **UPDATED（2026-08-29）**：`docs/architecture/DATA_ARCHITECTURE_PLAN.md` §6（同日撰寫但本表當時未交叉引用，屬過期宣稱）已裁決：mandatory tenant_id filter + Row-Level Security（引擎層強制），未來若換不支援原生 RLS 的專用向量產品則強制 per-tenant collection/namespace，漏寫過濾條件回傳空集合而非另一租戶明文——已建成 `specs/security/tenant-isolation-controls.schema.yaml` | 設計已定案並機讀化，但實際 RLS policy SQL/DDL 與跑分測試仍是實作階段任務（見該檔 `open_questions.OQ-TENANTISO-3`）；決策本身尚未走 ADR 正式批准（見該檔 `OQ-TENANTISO-1`） |
 | I2 | Information Disclosure / 交叉 Detectability（Dt1） | CAS dedup timing side-channel（A3） | "Instant upload" 洩漏「其他租戶已持有相同內容」事實 | ADR-003 Context（同源 SEC-7） | Medium | ADR-003 Option A（tenant-scoped namespace）結構性消除 | 若改採 Option C 窄化全域例外池，殘留風險移至該分類機制本身是否洩漏租戶參與事實 |
 | I3 | Information Disclosure | AI Gateway 分級路由（A11, TB-6） | 路由規則依賴資料被正確標記分級；標記機制、遺漏標記時 fail-open/fail-closed 皆未定義 | **新發現** | Medium-High | 無 | 建議比照 SEC-8 手法，Phase 3 明文：未標記資料一律視為 Restricted（fail-closed） |
 | D1 | Denial of Service | Key Vault（A2, TB-7，ADR-002 新元件） | 「若 Key Vault 資料遺失，等同全體使用者個資一次性被 crypto-shred」（ADR-002 自我揭露） | ADR-002 Consequences | High | ADR-002 已標記須納入 §112 30-year Replacement Drill 測項——尚未寫入 EC | 備援設計未定案前維持 High |
@@ -127,7 +127,7 @@ Asset Inventory → Data Flow Diagram → Trust Boundaries → STRIDE → LINDDU
 | Id1 | Identifiability | Event Ledger 個資欄位（A1），ADR-002 crypto-shred 後 | ADR-002 自陳：「Identifiability 維度未完全歸零——event type、timestamp 等未加密 metadata 仍可能洩漏『此 subject 曾經存在過』的事實」 | ADR-002 Option A 段落 | Medium | ADR-002 明確列為 Phase 2 DPIA 待辦 | Medium，已有追蹤機制 |
 | Nr1 | Non-repudiation（隱私意義：無法否認） | Provenance of Human Judgment（A7） | EC§87 要求永久保存 decision/actor/reason/dissent —— 對 STRIDE Repudiation 是優點，但對人類 Approver 本人是隱私成本 | **新發現** | Low-Medium | 無討論 | 需 Phase 3 釐清：Approver 本人能否對自己的紀錄行使 Rights Model 的 Access/Deletion 權利 |
 | Dt1 | Detectability | CAS dedup timing side-channel（A3） | 同 STRIDE I2 | ADR-003 Context | Medium | ADR-003 Option A 結構性消除 | 同 I2 |
-| Ds1 | Disclosure | 共用 Vector Index / Knowledge Graph（A4, TB-5） | 同 STRIDE I1，但 LINDDUN 視角聚焦「資料主體的個資」而非泛指機密資訊 | P1-GAP-SEC-7 / P1-RISK-SEC-3 | High | 同 I1，ADR-003 僅部分解 | High，同 I1 |
+| Ds1 | Disclosure | 共用 Vector Index / Knowledge Graph（A4, TB-5） | 同 STRIDE I1，但 LINDDUN 視角聚焦「資料主體的個資」而非泛指機密資訊 | P1-GAP-SEC-7 / P1-RISK-SEC-3 | High | 同 I1，**UPDATED（2026-08-29）**：見 I1 列，`tenant-isolation-controls.schema.yaml` 已建 | 同 I1（設計已定案機讀化，實作與正式 ADR 批准仍待後續） |
 | Uw1 | Unawareness | Semantic Memory / Organization Knowledge（A4） | 注入內容一旦固化進記憶，任何資料主體的檔案被此「知識」豐富化，本人完全不知情該資訊源自攻擊者而非驗證事實 | P1-GAP-SEC-4 / P1-RISK-SEC-2 | Medium-High | 同 T2 | 同 T2 |
 | Uw2 | Unawareness | Global Privacy Engine Rights Model（A10） | Jurisdiction Pack 缺失/不完整時，提出刪除請求的資料主體無法知道自己的請求被當「最嚴格處理」還是「不處理」 | P1-GAP-SEC-8 | Medium-High | 無 | High，待寫入 fail-closed 預設 |
 | Nc1 | Non-compliance | 同上（A10） | 缺 fail-closed 預設本身即是合規缺口 | P1-GAP-SEC-8 | High | ADR-002 解決「刪除機制本身」，**但不解決「何時該觸發刪除」** | High，ADR-002 必要但不充分 |
@@ -142,7 +142,7 @@ Asset Inventory → Data Flow Diagram → Trust Boundaries → STRIDE → LINDDU
 | 順序 | 威脅 | 理由 |
 |---|---|---|
 | 1 | E1 RBAC/ABAC 角色模型 + E2 命名消歧義 | **阻斷性**：沒有角色/權限模型，Phase 3 schema 無從設計起 |
-| 2 | I1/Ds1 relational data RLS 決策 + Vector Index/Knowledge Graph tenant-scoping | ADR-003 明文列為自己的未解 follow-up |
+| 2 | I1/Ds1 relational data RLS 決策 + Vector Index/Knowledge Graph tenant-scoping | ADR-003 明文列為自己的未解 follow-up。**UPDATED（2026-08-29）**：設計層級已透過 `specs/security/tenant-isolation-controls.schema.yaml` 定案並機讀化——本項「Phase 3 machine-readable spec 定稿前解決」的字面要求已達成；正式 ADR 批准與實際 RLS policy 落地仍是後續步驟，非本優先序清單原本要求的範圍 |
 | 3 | S1 Zero Trust 協定綁定（選定 IdP/OIDC + workload identity 標準） | Phase 3 任何 auth flow 編碼前必須先有協定可依循 |
 | 4 | S2/R1 人類核准驗證強度 + action-binding 簽章 | EC§87 的 provenance record 在此之前只是「看起來完整」 |
 | 5 | D1 Key Vault 備援設計 | ADR-002 核准當下必須同時附上，不可「先上線後補」 |

@@ -17,9 +17,9 @@ description: >
   with gate-NAME drift. Tracked as OQ-10
   (.ai/research/phase-0/open-questions.yaml L68-72, status
   REQUIRES_HUMAN_DECISION) and as MACHINE_READABLE_SPEC_PLAN.md's MRSP-1
-  (§5 Open Questions, L326).
+  (§5 Open Questions, L328).
 
-  Per MRSP §3 Build Order (L286: "只影響 Wave 5 的 gate.schema.yaml 與 Wave 6
+  Per MRSP §3 Build Order (L288: "只影響 Wave 5 的 gate.schema.yaml 與 Wave 6
   的 release-policy.yaml") and §2.9's row for `ai-execution/` (L183:
   "mandatory-gates.yaml 需套用 ADR-004a 的 R3∪R4 擴大規則"), this file's job
   is narrower than the disputed list: it does NOT enumerate WHICH gate_id
@@ -64,8 +64,8 @@ description: >
 source_of_truth_for:
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §91 Policy-as-Code Paths (L2750-2762, mandatory-gates.yaml at L2756) — this file's directory placement"
   - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.9 row `ai-execution/` (L183) — 'mandatory-gates.yaml 需套用 ADR-004a 的 R3∪R4 擴大規則'"
-  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §3 Build Order (L286) — explicit instruction that this file's skeleton may be built now with the gate_id enum left TBD_PENDING_ROUND2"
-  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §5 Open Questions MRSP-1 (L326) — the blocking dependency, scoped to 'Wave 5-6 兩個檔案'"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §3 Build Order (L288) — explicit instruction that this file's skeleton may be built now with the gate_id enum left TBD_PENDING_ROUND2"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §5 Open Questions MRSP-1 (L328) — the blocking dependency, scoped to 'Wave 5-6 兩個檔案'"
   - "docs/adr/ADR-004-risk-tier-and-epistemic-label-canonicalization.md Sub-decision (a) (L37-42, L75, L126, L132) — the R3∪R4 gate-injection trigger expansion this file's grounded rule encodes"
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §64 Policy-as-Code (L2714-2741) — the condition/action rule-shape style this file's `mandatory_gate_rule.condition`/`action` fields follow, same convention as sibling files `tool-permissions.yaml`/`forbidden-actions.yaml`/`network-egress.yaml`"
   - "execution/risk-tier.schema.yaml mandatory_gate_injection_trigger, tiers.R3.gate_injection, tiers.R4.gate_injection, tiers.R3.required_actions, tiers.R4.required_actions — the grounded condition-side content"
@@ -105,7 +105,7 @@ compilation_decisions:
       buildable without picking a side. Here, by contrast, the trigger
       CONDITION (`risk_tier IN [R3, R4]`) is already ADR-004-decided and is
       logically independent of the disputed gate-NAME/COUNT question — MRSP
-      §3 (L286) draws exactly this distinction for `gate.schema.yaml` and
+      §3 (L288) draws exactly this distinction for `gate.schema.yaml` and
       `release-policy.yaml`, and this file follows the identical reasoning.
       Deferring the whole file would silently forfeit ADR-004's own
       already-accepted decision alongside the genuinely-undecided part,

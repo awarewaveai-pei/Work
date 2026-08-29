@@ -1,0 +1,329 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/domain/repository-contract.schema.yaml"
+title: Repository Contract
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Fills P1-GAP-ARCH-2 (and, additively, P1-GAP-ARCH-3/4/5/7/9): MP §60
+  (L2610-2635) declares 7 storage engines and one sentence -- "應用層透過
+  Repository Contract，不直接依賴資料庫" (the application layer goes
+  through a Repository Contract, never depending on the database directly)
+  -- with no schema, no system-of-record rule, and no cross-store
+  consistency mechanism anywhere in any mother document. This file
+  transcribes docs/architecture/DATA_ARCHITECTURE_PLAN.md (Status: PROPOSED,
+  2026-08-29) sections 1-5 -- a complete, independently-evidenced design
+  that was already sitting unbuilt when this session audited
+  MACHINE_READABLE_SPEC_PLAN.md's BLOCKED/SKELETON_ONLY markers for genuine
+  Round-2-ADR gaps versus already-designed-but-unbuilt content. Per that
+  plan's own closing section ("本計畫產生、但故意不在此次修改三母文件的規格
+  缺口"), the plan deliberately did not edit MP/EC itself (that requires the
+  ADR-006 `.ai/proposals/` flow) -- this schema is the machine-readable
+  layer that plan's own §2 Non-Goals framing anticipated, built directly
+  from its content rather than waiting on the mother-document edit.
+
+source_of_truth_for:
+  - "docs/architecture/DATA_ARCHITECTURE_PLAN.md §1 Storage Engine Necessity Analysis (L17-33) -- storage_engine_assignment below, transcribed verbatim including all quantified extraction thresholds"
+  - "docs/architecture/DATA_ARCHITECTURE_PLAN.md §2 System-of-Record Assignment (L37-60, explicitly 'closes P1-GAP-ARCH-2' at L53) -- the storage_tier enum and its 5 rules"
+  - "docs/architecture/DATA_ARCHITECTURE_PLAN.md §3 Consistency & Concurrency Strategy (L64-72, 'closes P1-GAP-ARCH-4') -- consistency_concurrency_strategy below"
+  - "docs/architecture/DATA_ARCHITECTURE_PLAN.md §4 Backup & DR Matrix (L76-98, 'closes P1-GAP-ARCH-3' and its own Reconciliation Job sub-section) -- backup_dr_matrix and reconciliation_job below"
+  - "docs/architecture/DATA_ARCHITECTURE_PLAN.md §5 Provenance Chain Unification (L102-128, 'closes P1-GAP-ARCH-7') -- provenance_chain_bridge below"
+  - "docs/architecture/DATA_ARCHITECTURE_PLAN.md §6 Integration with ADR-002/003/005 (L132-147) -- cited for context on how this file's content composes with those 3 ADRs; the ADR-003 RLS follow-up itself is NOT this file's scope, see specs/security/tenant-isolation-controls.schema.yaml"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §60 Data Architecture (L2610-2635) -- the one-sentence Repository Contract promise this file fulfills"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §57 Event-native Architecture (L2546-2566) -- 'Current State = Events 的 Projection', the pre-existing claim this file's storage_tier rules build on rather than replace"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.5 row for repository-contract.schema.yaml (P1-GAP-ARCH-2, SKELETON_ONLY -- 'system-of-record 策略、跨儲存 reconciliation 機制需要架構設計決策，非 schema 撰寫可獨立解決')"
+
+decided_by: >
+  docs/architecture/DATA_ARCHITECTURE_PLAN.md (Status: PROPOSED, 2026-08-29).
+  No ADR yet ratifies this document as a standalone decision -- unlike the
+  10 already-ACCEPTED ADRs, this plan has not been through that same
+  explicit acceptance step. It is treated here as authoritative content to
+  transcribe (not re-derive) because: (a) its reasoning is evidenced to the
+  same depth as the ACCEPTED ADRs (quantified thresholds, exhaustive
+  terminology-vacuum grep confirmation, explicit non-goal boundaries), (b)
+  it directly answers the plan-doc's own stated blocker ("需要架構設計決策"
+  -- a design decision is exactly what this document supplies), and (c) it
+  composes with, rather than re-litigates, all 3 already-ACCEPTED ADRs it
+  touches (002/003/005). Flagged honestly in `open_questions` below as a
+  file built from a not-yet-ADR-ratified design document, distinct from
+  every prior Wave 1-8 file in this corpus (all of which trace to either a
+  direct mother-document transcription or an ACCEPTED ADR).
+
+compilation_decisions:
+  - question: >
+      DATA_ARCHITECTURE_PLAN.md's content spans narrative migration-path
+      guidance (§7, Phase A/B/C rollout sequencing) alongside genuinely
+      structural rules (tier assignment, consistency mechanisms, DR
+      matrix). Should this file schema-ize the migration-path narrative
+      too?
+    decision: >
+      No. Only §1-5's structural content is schema-ized below.
+      §6 (ADR integration) and §7 (Migration Path) are cited in
+      source_of_truth_for for traceability but not modeled as schema
+      fields -- they are process/sequencing guidance, not a data shape any
+      instance would ever validate against.
+    reasoning: >
+      Same "structural content becomes schema fields, narrative content
+      stays narrative" boundary this whole corpus already applies (e.g.
+      recipes/validated/*.recipe.yaml model step SEQUENCES as data, but a
+      recipe's own prose "why use this" framing stays in `description`
+      fields, not new schema keys).
+  - question: >
+      §1's "8 storage engine assignment" rows are each a narrative
+      recommendation + a narrative quantified threshold (e.g. "vector count
+      > 20 million OR p99 query latency > 300ms after tuning"). Should the
+      threshold be parsed into a structured comparison expression, or kept
+      as a descriptive string?
+    decision: "Kept as a free-text `extraction_threshold` string per engine, not a structured expression."
+    reasoning: >
+      Same reasoning method.schema.yaml's own `preconditions` field used
+      for boolean expressions: the source document gives no evidence of a
+      structured expression grammar, and several thresholds are compound
+      ("OR"/"AND" across 2-3 conditions of different types -- a duration, a
+      percentage, a qualitative product-capability gap) that would need a
+      genuinely new expression AST to formalize faithfully. Inventing one
+      here would be exactly the "fabricate a rich schema with no textual
+      basis" this project's R0 forbids.
+
+type: object
+required: [storage_tier, storage_engine_assignment, consistency_concurrency_strategy, backup_dr_matrix]
+properties:
+
+  storage_tier:
+    type: object
+    description: >
+      DATA_ARCHITECTURE_PLAN.md §2 (L41-51). The System-of-Record hierarchy
+      every domain object's data ultimately maps onto -- Tier 0 is the only
+      true source of truth; Tiers 1-2 are always reconstructable from it.
+    required: [tiers, rules]
+    properties:
+      tiers:
+        type: array
+        minItems: 3
+        maxItems: 3
+        items:
+          type: object
+          required: [tier_id, name, consistency_level, storage]
+          properties:
+            tier_id:
+              type: string
+              enum: [TIER_0_ULTIMATE_SOR, TIER_1_STRONG_CONSISTENCY, TIER_2_EVENTUAL_DERIVED]
+            name: { type: string }
+            consistency_level:
+              type: string
+              enum: [strong_linearizable, eventual]
+            storage: { type: string }
+            staleness_slo:
+              type: [string, "null"]
+              description: "Only meaningful for TIER_2 -- L56: 'p99 staleness < 60s' (advisory SLO, not a hard schema constraint)."
+      rules:
+        type: array
+        minItems: 5
+        maxItems: 5
+        items: { type: string }
+        description: >
+          The 5 verbatim rules at L54-58: (1) a projection is never
+          authoritative, loss is determined solely by the events table; (2)
+          Tier0->Tier1 consistency is free (same-transaction); (3)
+          Tier1->Tier2 is eventual, p99 staleness < 60s advisory SLO,
+          reusing MP §73 Retrieval Quality monitoring; (4) Object Storage
+          (CAS) has no consistency dispute, only a write-before-reference
+          ordering requirement; (5) a stale Tier 2 read is a latency/UX
+          issue, never a correctness issue, provided any Decision/audit
+          action reconciles against Tier 1/0.
+
+  storage_engine_assignment:
+    type: array
+    minItems: 8
+    maxItems: 8
+    description: >
+      DATA_ARCHITECTURE_PLAN.md §1 (L21-31), all 8 rows verbatim (7 MP §60
+      engines + Cache + Queue named by Program Directive §XXII but never
+      declared in MP itself -- 9 conceptual purposes total, but Cache/Queue
+      are numbered 8a/8b in the source as a pair, hence 8 not 9 total rows).
+    items:
+      type: object
+      required: [purpose, mvp_approach, extraction_threshold]
+      properties:
+        purpose:
+          type: string
+          enum:
+            - structured_metadata
+            - object_storage
+            - semantic_retrieval_vector_index
+            - graph_store
+            - event_store
+            - full_text_search_index
+            - metrics_timeseries
+            - cache
+            - queue
+        mvp_approach: { type: string }
+        extraction_threshold:
+          type: string
+          description: "Free-text quantified threshold -- see compilation_decisions above for why this is not a structured expression."
+
+  consistency_concurrency_strategy:
+    type: object
+    description: "DATA_ARCHITECTURE_PLAN.md §3 (L64-72, closes P1-GAP-ARCH-4)."
+    required: [aggregate_optimistic_concurrency, module_ownership, cross_step_lock, cross_tenant_scope]
+    properties:
+      aggregate_optimistic_concurrency:
+        type: string
+        description: >
+          L68 verbatim mechanism: version = number of applied events;
+          concurrent writers race on the (aggregate_id, sequence) UNIQUE
+          constraint; loser re-reads and retries. Not a new invention --
+          the plan itself cites this as the standard EventStoreDB/Marten
+          pattern.
+      module_ownership:
+        type: string
+        description: >
+          L69: exactly one owning module may write an aggregate's events
+          directly; all others dispatch a Command. Reduces concurrency from
+          N-writers-vs-M-tables to N-writers-vs-1-serialized-path.
+      cross_step_lock:
+        type: string
+        const: "pg_advisory_xact_lock(hashtext(execution_id))"
+        description: "L70 verbatim: Postgres advisory lock for long-running cross-step Execution lifecycles, cheaper than an external coordination service (Zookeeper/etcd class)."
+      cross_tenant_scope:
+        type: string
+        description: >
+          L71: per ADR-003, a Workspace belongs to exactly one Tenant and
+          one region -- no scenario requires a cross-tenant transaction,
+          which is the precondition this whole strategy depends on, not an
+          incidental benefit.
+
+  backup_dr_matrix:
+    type: object
+    description: "DATA_ARCHITECTURE_PLAN.md §4 (L76-98, closes P1-GAP-ARCH-3: 'from 2/7 storage engines covered to all')."
+    required: [tier_1_sor, tier_2_derived]
+    properties:
+      tier_1_sor:
+        type: array
+        minItems: 3
+        items:
+          type: object
+          required: [storage, rpo, rto, method]
+          properties:
+            storage: { type: string }
+            rpo: { type: string }
+            rto: { type: string }
+            method: { type: string }
+        description: >
+          L82-86 verbatim 3 rows: Postgres primary (RPO<5min/RTO<2h,
+          reusing MP §74's existing numbers), Object Storage
+          (RPO<24h/RTO<2h, existing numbers), Key Vault/KMS (RPO<1min/
+          RTO<15min -- NEW, stricter than Postgres itself, because ADR-002
+          self-identifies Key Vault loss as a MORE severe single point of
+          failure than the crypto-shredding problem it was built to solve).
+      tier_2_derived:
+        type: array
+        description: "L90-96, only instantiated once a Tier 2 store is actually extracted per storage_engine_assignment's thresholds -- see reconciliation_job below for the recovery discipline shared by all of them."
+        items:
+          type: object
+          required: [storage, rpo, rto_basis, method]
+          properties:
+            storage: { type: string }
+            rpo: { type: string }
+            rto_basis:
+              type: string
+              description: "A formula ('= replay time from events table'), not a fixed number -- L92-96 deliberately gives a formula because RTO depends on corpus size and AI-provider throughput, not a constant."
+            method: { type: string }
+
+  reconciliation_job:
+    type: object
+    description: >
+      L98 verbatim: ONE generic job applies to every Tier 2 store (not one
+      bespoke recovery procedure per store), reusing ADR-005's own
+      Reconciliation semantics (counts/checksums/business invariants) from
+      the DB Migration Recipe rather than inventing a second Reconciliation
+      concept.
+    properties:
+      reused_from:
+        type: string
+        const: "recipes/validated/db-migration-expand-contract.recipe.yaml Reconciliation step"
+      trigger: { type: string, const: "any DR event that touches a Tier 2 store, after Tier 1 has recovered and been verified" }
+      procedure: { type: string }
+
+  provenance_chain_bridge:
+    type: object
+    description: >
+      DATA_ARCHITECTURE_PLAN.md §5 (L102-128, closes P1-GAP-ARCH-7): MP §13's
+      narrative/strategic provenance chain (SOURCE->EVIDENCE->CLAIM->
+      INFERENCE->ASSUMPTION->DECISION) and MP §37's quantitative
+      reproducibility chain (Paper Sentence->Result->AnalysisRun->Code->
+      Dataset->Original Source) never cross-reference each other. This file
+      does NOT merge them (L109: "不合併...兩者服務目的本質不同") -- it adds
+      an explicit bridging event.
+    properties:
+      bridge_event:
+        type: object
+        description: "L112-118 verbatim event shape, ResultPromotedToEvidence."
+        required: [result_id, analysis_run_id, evidence_id, promoted_by, promoted_at, promotion_rationale]
+        properties:
+          result_id: { type: string, description: "Anchors the §37 chain (RESULT-* per that chain's own id convention)." }
+          analysis_run_id: { type: string, description: "Anchors the §37 chain (ANA-* per that chain's own id convention)." }
+          evidence_id: { type: string, description: "Anchors a NEW node in the §13.3 Evidence Graph (E-* per specs/evidence/evidence.schema.yaml's own evidence_id pattern)." }
+          promoted_by: { type: string }
+          promoted_at: { type: string, format: date-time }
+          promotion_rationale: { type: string }
+      bidirectional_integrity:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items: { type: string }
+        description: >
+          L124-126 verbatim, the two directions of integrity propagation:
+          (1) Source/Dataset/AnalysisRun quarantined -> dependent
+          Evidence/Claim marked provenance_integrity: at_risk, notify prior
+          HumanContribution consumers; (2) an Evidence produced via this
+          bridge is quarantined -> the source AnalysisRun/Dataset marked
+          evidence_integrity: at_risk. Reuses existing Decision/
+          HumanContribution objects for notification -- no new notification
+          subsystem invented.
+
+open_questions:
+  - id: "OQ-REPOCONTRACT-1"
+    question: >
+      This file transcribes DATA_ARCHITECTURE_PLAN.md, a Status: PROPOSED
+      design document, not yet promoted through a dedicated ADR the way
+      every other Wave 1-8 file in this corpus traces to either a direct
+      mother-document transcription or an ACCEPTED ADR. Should a thin
+      ratifying ADR be drafted for this design (and for the sibling
+      DEVOPS_SRE_PLAN.md-derived policies/provider/ files, and the
+      GLOBAL_JURISDICTION_PLAN.md-derived jurisdiction files), formalizing
+      the same operator-delegated-architect-authority acceptance the 10
+      existing ADRs already went through?
+    owner: "operator, or a future session drafting a batch ratifying ADR for these already-designed-but-unratified PROPOSED documents"
+    blocks: "nothing in this file's own validity -- the design content itself is sound and evidenced regardless of which governance artifact formally ratifies it"
+  - id: "OQ-REPOCONTRACT-2"
+    question: >
+      DATA_ARCHITECTURE_PLAN.md §7's closing list names 5 mother-document
+      edits this plan deliberately did not make (MP §60 needs a
+      System-of-Record section; EC §28 needs a storage-engine-extraction
+      Database Change subtype; MP §74 needs the full DR matrix; MP §13/§37
+      need the bridging event; ADR-002 needs a Tier-2-cleanup Addendum).
+      None of these 5 edits have happened -- this schema file is the
+      machine-readable layer, but the mother documents themselves and
+      ADR-002 remain textually silent on this content. Should these 5 edits
+      be drafted as `.ai/proposals/` entries now?
+    owner: "operator, via the ADR-006 `.ai/proposals/` flow"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read docs/architecture/DATA_ARCHITECTURE_PLAN.md in full (181 lines)
+    before drafting. Cross-checked its own Evidence section's mother-doc
+    citations (MP §60 L2610-2635, §57 L2546-2566, §61 L2639-2664, §74
+    L2977-3006, §13 L1039-1114, §37 L1909-1949; EC §27 L1099-1127, §28
+    L1135-1157) directly rather than trusting the plan document's citations
+    alone. Confirmed via grep that ADR-002/003/005 (all cited in the plan's
+    §6) are genuinely ACCEPTED per docs/adr/ADR_INDEX.md. Validated this
+    file's own YAML syntax and duplicate-key-freedom with the same
+    UniqueKeyLoader used throughout this session.
+  note: >
+    No mother document was modified. This file is a direct transcription of
+    an existing, evidenced, not-yet-ADR-ratified design document -- flagged
+    honestly in `decided_by` and `open_questions.OQ-REPOCONTRACT-1` as a
+    different provenance class than every other file in this corpus, rather
+    than silently presented as equivalent to an ACCEPTED-ADR-backed file.

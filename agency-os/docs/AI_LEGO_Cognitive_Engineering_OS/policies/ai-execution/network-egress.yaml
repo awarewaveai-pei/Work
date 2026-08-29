@@ -63,7 +63,7 @@ decided_by: >
   is the same SHAPE of blockage `gate.schema.yaml` (Wave 5) already
   encountered and resolved by building the skeleton now with the blocked
   value space explicitly marked (MACHINE_READABLE_SPEC_PLAN.md §3 Build
-  Order, L286 — corrected 2026-08-29, critic-flagged Minor: originally
+  Order, L288 — corrected 2026-08-29, critic-flagged Minor: originally
   mis-cited as "§4 L246", wrong section AND wrong line even before the
   capability-contract edit that later shifted this file's other §3/§5
   citations by +1 line; re-verified directly against the current document:

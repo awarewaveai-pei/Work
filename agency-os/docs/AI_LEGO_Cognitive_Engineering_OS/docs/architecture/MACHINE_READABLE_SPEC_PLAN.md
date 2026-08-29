@@ -148,9 +148,9 @@ PROJECT_ROOT/                                  ← D:\Work\agency-os\docs\AI_LEG
 | `security/log-redaction-token.schema.yaml` **（新增，ADR-007 追加，原表遺漏）** | v1 log 去識別化 token 格式：`token_alg/hmac_key_ref/classification_tag/tenant_scope` + `token` 本體，依附 key-vault-lifecycle 的 `HMAC_SIGNING_KEY` | YAML (JSON Schema) | security/key-vault-lifecycle.schema.yaml | P1-CONFLICT-3（ADR-007 規格缺口項 2） | **BUILT（2026-08-29）**——本列為本次補登，ADR-007 早於本表最後一次全面更新，此為文件同步缺口的訂正 |
 | `domain/personal-data-redacted-event.schema.yaml` | `PersonalDataRedacted { subject_id, redacted_fields[], redacted_at, authorization_ref }` 稽核輔助事件 | YAML (JSON Schema) | key-vault-lifecycle.schema.yaml, governance/epistemic-label | P1-CONFLICT-1（ADR-002 Consequences 項 5） | **BUILT（2026-08-29）** |
 | `execution/data-deletion.schema.yaml` **（新增）** | EC §31 Data Deletion Contract 新增分支：「個資刪除（crypto-shred）」與「一般 production row 刪除」兩種不同 Verification 定義 | YAML (JSON Schema) | key-vault-lifecycle.schema.yaml | P1-CONFLICT-1（ADR-002 Consequences 項 3） | **BUILT（2026-08-29）**——兩分支 Verification 語意不同（negative proof vs positive proof）+ Codex 覆審的兩種 Rollback 情境已納入 |
-| `domain/repository-contract.schema.yaml` **（新增）** | MP §60「應用層透過 Repository Contract」全文僅此一句，補上實際 schema，解決 7 種異質儲存無 system-of-record 的問題 | YAML (JSON Schema) | cas-path.schema.yaml | P1-GAP-ARCH-2 | SKELETON_ONLY（system-of-record 策略、跨儲存 reconciliation 機制需要架構設計決策，非 schema 撰寫可獨立解決） |
+| `domain/repository-contract.schema.yaml` **（新增）** | MP §60「應用層透過 Repository Contract」全文僅此一句，補上實際 schema，解決 7 種異質儲存無 system-of-record 的問題 | YAML (JSON Schema) | cas-path.schema.yaml | P1-GAP-ARCH-2 | **BUILT（2026-08-29）**——原判定 SKELETON_ONLY 需要架構設計決策；發現 `docs/architecture/DATA_ARCHITECTURE_PLAN.md`（Status: PROPOSED）已對此做出完整、有憑有據的設計（§1-5），直接轉錄建成，額外解決 P1-GAP-ARCH-3/4/5/7/9。尚未走 ADR 正式批准（見該檔 `open_questions.OQ-REPOCONTRACT-1`） |
 | `domain/capability-contract.schema.yaml` | 既有 Capability Contract（id/version/input/output/preconditions/quality/security/rollback）+ 補 edition/tier/entitlement 欄位 | YAML (JSON Schema) | method-execution-request.schema.yaml | P1-GAP-PROD-1 | **BUILT（2026-08-29）**——MP §8.3 唯一具體實例逐欄位轉譯（`worked_example` 驗證零額外欄位仍合法）；`entitlement`（editions_allowed/requires_explicit_entitlement_check/custom_capability）為 additive 新設計，未解決 P1-ASSUM-PROD-1 與 CONVERGENCE_MATRIX L30 的「該不該寫進母規格」疑慮，誠實留 open_questions；jurisdiction-scoped Capability Availability 不重複（見 jurisdiction/availability.schema.yaml） |
-| `security/tenant-isolation-controls.schema.yaml` **（新增）** | RLS/schema-per-tenant vs shared-schema 決策、tenant-scoped 加密金鑰、跨租戶共用元件（Vector Index/Knowledge Graph）防洩漏機制 | YAML (JSON Schema) | domain/tenant.schema.yaml | P1-GAP-SEC-7（ADR-003 Consequences follow-up (i)(ii)） | **BLOCKED_PENDING_ROUND2_ADR**（ADR-003 只解決存儲層 CAS 部分，relational 資料的 RLS 設計是明列的獨立 follow-up，需要另一輪決策） |
+| `security/tenant-isolation-controls.schema.yaml` **（新增）** | RLS/schema-per-tenant vs shared-schema 決策、tenant-scoped 加密金鑰、跨租戶共用元件（Vector Index/Knowledge Graph）防洩漏機制 | YAML (JSON Schema) | domain/tenant.schema.yaml | P1-GAP-SEC-7（ADR-003 Consequences follow-up (i)(ii)） | **BUILT（2026-08-29）**——原判定需要另一輪 ADR；發現 `DATA_ARCHITECTURE_PLAN.md` §6 已裁決（shared-schema+RLS 預設、schema-per-tenant 窄範圍例外、共用元件強制 tenant_id 過濾+RLS/fail-closed），同步修正 `SECURITY_THREAT_MODEL.md` I1/Ds1 兩處過期宣稱（該檔未交叉引用此設計）。尚未走 ADR 正式批准 |
 
 ### 2.6 `/specs/jurisdiction/`（Wave 4）
 
@@ -216,11 +216,13 @@ Wave 2 ── ✅ 核心完成（2026-08-29）           Wave 3 ── ✅ 核�
   specs/execution/data-deletion.schema.yaml ✅ specs/execution/method-resolution.schema.yaml ── 延後
   workflow/branch.schema.yaml ── BLOCKED      methods/registry/{method-inventory,
   domain/repository-contract.schema.yaml        contract-backlog}.yaml ✅
-    ── 延後（SKELETON_ONLY，需操作者法遵決策）
+    ✅ BUILT（2026-08-29，本輪補齊——原判定 SKELETON_ONLY，
+    發現 DATA_ARCHITECTURE_PLAN.md 已有完整設計，直接轉錄）
   domain/capability-contract.schema.yaml
     ── 延後（依賴 method-execution-request）
   security/tenant-isolation-controls.schema.yaml
-    ── BLOCKED_PENDING_ROUND2_ADR
+    ✅ BUILT（2026-08-29，本輪補齊——原判定 BLOCKED_PENDING_ROUND2_ADR，
+    發現 DATA_ARCHITECTURE_PLAN.md §6 已裁決，直接轉錄）
           ↓                                          ↓
 Wave 4 ── ✅ 完成（2026-08-29）
   specs/evidence/{evidence,claim,assumption}.schema.yaml ✅
@@ -327,7 +329,7 @@ Wave 8 ── ✅ 完成（2026-08-29，55/55 schema + 3/3 recipe instance + 2/2
 | MRSP-2（2026-08-29 訂正：ADR 已定案，此列原文過期） | ~~P1-CONFLICT-3...P1-CONFLICT-4...尚無 ADR~~ → **P1-CONFLICT-3 已由 ADR-007 定案**（Deterministic Keyed-HMAC Tokenization，已建 `policies/privacy/pii-redaction.policy.yaml`）；**P1-CONFLICT-4 已由 ADR-008 定案**（MP §43 加註現況警語，不現在造 stub） | `policies/privacy/` 已建；MP §43 加註文字仍待 ADR-006 `.ai/proposals/` 流程套用到母文件本身（僅操作者可推進 APPROVED） | 兩個 ADR 裁決本身已完成，剩餘工作是母文件文字套用（治理流程步驟，非未決架構問題） |
 | MRSP-3（2026-08-29 訂正：ADR 已定案，此列原文過期） | ~~P1-DUP-2...P1-DUP-5...尚無 ADR~~ → **兩者已由 ADR-009 定案**（三層命名各自維持正本 + 12×6×22 跨層對照表；Localization 正本 = `/platform/trust-fabric/localization/`） | `docs/architecture/` 敘事文件；`REPOSITORY_ARCHITECTURE.md`（`Status: PROPOSED`，ADR-009 的目錄配置依附此文件，該文件本身尚未 ACCEPTED） | ADR 裁決本身已完成；實際生效還多依賴一層——`REPOSITORY_ARCHITECTURE.md` 自己尚未走完 ACCEPTED 流程（ADR_INDEX.md 決策依賴關係第 23 行已註記此依賴） |
 | MRSP-4 | `workflow/branch.schema.yaml`（Branch 完整 state machine）明列為 ADR-003 的 out-of-scope follow-up | `specs/workflow/` 一檔 | Phase 3 只實作 ADR-003 給的最小定義（forked isolated execution lineage），完整 state machine 排入 Round 2 或 Phase 4 |
-| MRSP-5 | `security/tenant-isolation-controls.schema.yaml`（RLS/schema-per-tenant 決策）同樣是 ADR-003 明列的 follow-up，非本輪已裁決範圍 | `specs/security/` 一檔 | 同上，Phase 3 建骨架欄位，不填入未裁決的 RLS 策略選擇 |
+| MRSP-5（2026-08-29 訂正：已建成，此列原文過期） | ~~`security/tenant-isolation-controls.schema.yaml`...非本輪已裁決範圍~~ → **已由 `DATA_ARCHITECTURE_PLAN.md` §6 裁決並建成**（shared-schema+RLS 預設、共用元件強制 tenant_id 過濾+RLS/fail-closed） | `specs/security/tenant-isolation-controls.schema.yaml` 已建 | 設計層級已完成；正式 ADR 批准仍待後續（見該檔 `OQ-TENANTISO-1`） |
 | MRSP-6 | Tier 1 Method Contract 清單依賴 Phase 5 MVP 切片選擇，但 Phase 5 `Status: NOT_STARTED` | `methods/contracts/` 15-25 個檔案的具體名單 | 見 §4 建議：Phase 3 末期由 Claude/Codex 各自列候選切片常用方法交集，作為顯式待辦而非本計畫產出的清單 |
 | MRSP-7 | 6 份 Round 1 ADR 全部 `Status: PROPOSED`，尚未經 Codex 獨立驗證，建議至少對 ADR-001/002 安排 Codex oracle 覆審 | 本計畫全部依賴 ADR 內容的項目（幾乎所有 Wave） | **已處理（2026-08-29）**：ADR-001/002 已完成 Codex 覆審並修正；9 份 ADR 全數 ACCEPTED（操作者授權）。ADR-003/005/006/009 仍未逐份覆審，風險相對低 |
 | MRSP-8（2026-08-29 新增） | `rigor-level.schema.yaml` 的 `deep_intelligence` 該不該是 Atlas `required_rigor` 的原生第 5 值，或永遠只能是 `board_grade` + 附加維度層——這是真正的 enum 基數變更，比照 ADR-004 判準不應由 Phase 3 單方定案 | `specs/cognitive/rigor-level.schema.yaml`、未來任何依 `required_rigor` 觸發的 gate/policy 檔案 | 該 schema 已內建 `PROVISIONAL_PENDING_OPERATOR_SIGNOFF` 預設值（採 board_grade+附加層，與本計畫 §2.3 原始草稿方向一致）並在 `open_questions` 明確標註未定案；建議操作者決定是否併入 Round 2 ADR |

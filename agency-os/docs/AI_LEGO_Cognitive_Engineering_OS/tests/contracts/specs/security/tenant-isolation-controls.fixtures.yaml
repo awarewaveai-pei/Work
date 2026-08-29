@@ -1,0 +1,76 @@
+schema_id: "ai-lego://specs/security/tenant-isolation-controls.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the const-enforced default isolation model, the exactly-2-item
+  shared_component_controls array (vector_index + graph_store), and the
+  const-enforced fail-closed fallback and CAS path convention.
+valid:
+  - name: standard_shared_schema_rls_deployment
+    instance:
+      default_isolation_model: shared_schema_with_rls
+      shared_component_controls:
+        - component: vector_index
+          rls_capable_control: "mandatory tenant_id filter + Row-Level Security policy on the pgvector table"
+          fallback_if_rls_unavailable: "mandatory per-tenant collection/namespace; a missing filter returns an empty set, never another tenant's plaintext"
+        - component: graph_store
+          rls_capable_control: "mandatory tenant_id filter + Row-Level Security policy on the adjacency table"
+          fallback_if_rls_unavailable: "mandatory per-tenant collection/namespace; a missing filter returns an empty set, never another tenant's plaintext"
+      object_storage_path_reuse:
+        path_convention: "/objects/<tenant_id>/sha256/aa/bb/<hash>"
+        source_adr: "docs/adr/ADR-003-tenant-model-and-cas-isolation.md"
+      enforcement_from: day_1
+  - name: with_narrow_per_tenant_exception
+    instance:
+      default_isolation_model: shared_schema_with_rls
+      schema_per_tenant_exception:
+        tenant_id: "tenant-eu-sovereign-customer-1"
+        trigger_reason: "contractual data-sovereignty requirement for a dedicated schema"
+        approved_by: "operator"
+      shared_component_controls:
+        - component: vector_index
+          rls_capable_control: "mandatory tenant_id filter + RLS"
+          fallback_if_rls_unavailable: "mandatory per-tenant collection/namespace; a missing filter returns an empty set, never another tenant's plaintext"
+        - component: graph_store
+          rls_capable_control: "mandatory tenant_id filter + RLS"
+          fallback_if_rls_unavailable: "mandatory per-tenant collection/namespace; a missing filter returns an empty set, never another tenant's plaintext"
+      object_storage_path_reuse:
+        path_convention: "/objects/<tenant_id>/sha256/aa/bb/<hash>"
+        source_adr: "docs/adr/ADR-003-tenant-model-and-cas-isolation.md"
+      enforcement_from: day_1
+invalid:
+  - name: wrong_default_isolation_model
+    instance:
+      default_isolation_model: schema_per_tenant
+      shared_component_controls:
+        - component: vector_index
+          rls_capable_control: "x"
+          fallback_if_rls_unavailable: "mandatory per-tenant collection/namespace; a missing filter returns an empty set, never another tenant's plaintext"
+        - component: graph_store
+          rls_capable_control: "x"
+          fallback_if_rls_unavailable: "mandatory per-tenant collection/namespace; a missing filter returns an empty set, never another tenant's plaintext"
+      object_storage_path_reuse: {path_convention: "/objects/<tenant_id>/sha256/aa/bb/<hash>", source_adr: "docs/adr/ADR-003-tenant-model-and-cas-isolation.md"}
+      enforcement_from: day_1
+    reason: "default_isolation_model is const 'shared_schema_with_rls' -- DATA_ARCHITECTURE_PLAN.md L141's whole point is that schema-per-tenant is a narrow exception, not the platform default"
+  - name: only_one_shared_component_listed
+    instance:
+      default_isolation_model: shared_schema_with_rls
+      shared_component_controls:
+        - component: vector_index
+          rls_capable_control: "x"
+          fallback_if_rls_unavailable: "mandatory per-tenant collection/namespace; a missing filter returns an empty set, never another tenant's plaintext"
+      object_storage_path_reuse: {path_convention: "/objects/<tenant_id>/sha256/aa/bb/<hash>", source_adr: "docs/adr/ADR-003-tenant-model-and-cas-isolation.md"}
+      enforcement_from: day_1
+    reason: "shared_component_controls requires exactly 2 entries (vector_index AND graph_store, both named explicitly at DATA_ARCHITECTURE_PLAN.md L142) -- listing only vector_index silently drops the graph_store leakage control"
+  - name: weakened_fallback_not_fail_closed
+    instance:
+      default_isolation_model: shared_schema_with_rls
+      shared_component_controls:
+        - component: vector_index
+          rls_capable_control: "x"
+          fallback_if_rls_unavailable: "log a warning and continue with the unscoped query"
+        - component: graph_store
+          rls_capable_control: "x"
+          fallback_if_rls_unavailable: "mandatory per-tenant collection/namespace; a missing filter returns an empty set, never another tenant's plaintext"
+      object_storage_path_reuse: {path_convention: "/objects/<tenant_id>/sha256/aa/bb/<hash>", source_adr: "docs/adr/ADR-003-tenant-model-and-cas-isolation.md"}
+      enforcement_from: day_1
+    reason: "fallback_if_rls_unavailable is const to the fail-closed empty-set behavior -- 'log a warning and continue unscoped' is exactly the fail-open failure mode SECURITY_THREAT_MODEL.md I1/Ds1 warns about"

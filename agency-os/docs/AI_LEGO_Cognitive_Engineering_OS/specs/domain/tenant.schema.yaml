@@ -287,13 +287,20 @@ open_questions:
       Jurisdiction Pack scope to Tenant vs. Project (this file only
       anchors the Tenant-level `home_jurisdiction`; the Project-level
       override mechanism ADR-003 alludes to is not specified anywhere).
-    owner: "operator, via Round 2 ADR"
+      **UPDATED (2026-08-29)**: (i) and (ii) are now resolved --
+      `specs/security/tenant-isolation-controls.schema.yaml` is built,
+      transcribing docs/architecture/DATA_ARCHITECTURE_PLAN.md §6's design
+      (shared-schema + RLS by default, mandatory tenant_id filter + RLS on
+      shared Vector Index/Graph Store, fail-closed-to-empty-set fallback).
+      That file's own `open_questions.OQ-TENANTISO-1` honestly notes this
+      traces to a Status: PROPOSED design document, not yet a dedicated
+      ACCEPTED ADR -- see that file for the full provenance disclosure.
+      (iv) remains genuinely open; no file resolves it.
+    owner: "operator, via Round 2 ADR (only for remaining item (iv))"
     blocks: >
-      Nothing in this schema's own validity. Blocks
-      `specs/security/tenant-isolation-controls.schema.yaml`
-      (MACHINE_READABLE_SPEC_PLAN.md MRSP-5,
-      BLOCKED_PENDING_ROUND2_ADR) — that file, not this one, is where (i)
-      and (ii) belong once decided. (iv) has no assigned file yet.
+      Nothing in this schema's own validity. (i)/(ii) no longer block
+      `specs/security/tenant-isolation-controls.schema.yaml` -- that file is
+      now BUILT (see UPDATED note above). (iv) still has no assigned file.
   - id: "MRSP-tenant-2"
     question: >
       No mother document defines a concrete data-residency region code

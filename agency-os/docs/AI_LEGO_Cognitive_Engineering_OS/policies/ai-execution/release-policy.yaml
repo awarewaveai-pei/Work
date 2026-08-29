@@ -8,7 +8,7 @@ description: >
   Policy-as-code binding of the release-readiness rules — Execution
   Contract §91 "Policy-as-Code Paths" (L2750-2762) names this file
   `/policies/ai-execution/release-policy.yaml` at L2761. Named in
-  MACHINE_READABLE_SPEC_PLAN.md §3 Build Order (L286) alongside
+  MACHINE_READABLE_SPEC_PLAN.md §3 Build Order (L288) alongside
   `gate.schema.yaml` as blocked on the same undecided Global/High-risk Gate
   list (CROSS-R-5/CROSS-R-7/CROSS-T-11, OQ-10) — "只影響 Wave 5 的
   gate.schema.yaml 與 Wave 6 的 release-policy.yaml". Per §2.9's own row for
@@ -78,8 +78,8 @@ source_of_truth_for:
   - "execution/risk-tier.schema.yaml tiers.R3.required_actions, tiers.R4.required_actions — the release-specific ADR-004-decided actions (Canary/Blue-Green, Post-deployment Verification, Recovery Drill, Rollback or Compensating Plan, Emergency Stop)"
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §64 Policy-as-Code (L2714-2741) — the condition/action rule-shape style `release_gate_requirement` follows, same convention as sibling files in this Wave"
   - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.9 row `ai-execution/` (L183 — read as 'READY overall' at this file's write time; updated 2026-08-29 to 'BUILT（2026-08-29，8/8）' once this Wave's 8/8 files landed) — the gate-dependent BLOCKED annotation this row records was, and remains, scoped narrowly, not to the entire file"
-  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §3 Build Order (L286) — 'release-policy.yaml' named alongside gate.schema.yaml as skeleton-buildable now"
-  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §5 Open Questions MRSP-1 (L326) — the blocking dependency, scoped to 'Wave 5-6 兩個檔案'"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §3 Build Order (L288) — 'release-policy.yaml' named alongside gate.schema.yaml as skeleton-buildable now"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §5 Open Questions MRSP-1 (L328) — the blocking dependency, scoped to 'Wave 5-6 兩個檔案'"
   - "execution/gate.schema.yaml gate_result/properties/status — the PASS/FAIL/BLOCKED/NOT_APPLICABLE enum this file cites for context (not directly $ref'd — see compilation_decisions for why the task-level Final Status enum is used instead)"
   - "execution/status-codes.schema.yaml reference_vocabulary/final_status/schema — the PASS/PASS_WITH_APPROVED_RISK/BLOCKED/FAILED/NEEDS_HUMAN_REVIEW/ROLLED_BACK/PARTIAL_SUCCESS enum (EC §70) this file's `release_gate_requirement.required_status` field reuses"
   - "policies/ai-execution/mandatory-gates.yaml mandatory_gate_rules, grounded_rules — the sibling policy this file's release_gate_requirement composes with, built in the same task under the identical blocking condition"
@@ -101,7 +101,7 @@ decided_by: >
 
 compilation_decisions:
   - question: >
-      MACHINE_READABLE_SPEC_PLAN.md §3 (L286) says release-policy.yaml is
+      MACHINE_READABLE_SPEC_PLAN.md §3 (L288) says release-policy.yaml is
       blocked "同 gate.schema.yaml" (same as gate.schema.yaml) on the
       disputed Global/High-risk Gate list. But EC §143/§144's Pre-/Post-
       release Checklist items ("Tests PASS", "Security PASS", "Data PASS",

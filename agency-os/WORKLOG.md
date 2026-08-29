@@ -1,5 +1,42 @@
 # Worklog
 
+## 2026-08-29（續29）
+
+### AI-LEGO Phase 3 收尾第 3 批：發現整層未被查覺的既有設計文件（10 份 PROPOSED 架構文件），補建 repository-contract.schema.yaml + tenant-isolation-controls.schema.yaml，順帶抓到並修正跨文件過期宣稱
+
+**觸發**：續27 的 ADR 覆蓋審計完成後，準備替 P1-GAP-LEGAL-1（Legal Source Registry SLA 天數）起草全新 ADR 時，查 `jurisdiction/pack.schema.yaml` 才發現該檔**已經有一份完整的 4 級 SLA table**（CRITICAL/HIGH/MEDIUM/LOW = 30/90/180/365 天），來源是 `docs/architecture/GLOBAL_JURISDICTION_PLAN.md`（`Status: PROPOSED`，非 ADR）。這揭露一整層我先前審計完全沒查到的既有設計：`docs/architecture/` 下還有 10 份同樣 `Status: PROPOSED` 的架構文件（`DATA_ARCHITECTURE_PLAN.md`/`DEVOPS_SRE_PLAN.md`/`GLOBAL_JURISDICTION_PLAN.md`/`MIGRATION_AND_ROLLBACK_STRATEGY.md`/`MVP_VERTICAL_SLICE_PLAN.md`/`PROPOSED_ARCHITECTURE_CHANGES.md`/`REPOSITORY_ARCHITECTURE.md`/`SECURITY_THREAT_MODEL.md`/`TEST_EVAL_STRATEGY.md`），先前的 ADR-only 審計完全沒有檢查這批文件是否也解決了我列的「真正卡關」清單。這是「VBC——先查有沒有替代方案再下結論」的又一次真實案例，只是這次不是查 WORKLOG，是查一整類非 ADR 的既有設計產出。
+
+**第二輪審計**（Explore agent，讀完全部 9 份新文件 + 對照原本 7 項「真正卡關」清單）：確認 2 項已被完整、有憑有據地解決（`DATA_ARCHITECTURE_PLAN.md` §2-5 解 Repository Contract system-of-record；§6 解 tenant RLS 兩個 follow-up）；另發現一個真實的跨文件矛盾——`SECURITY_THREAT_MODEL.md` 的 I1/Ds1 兩列仍當作完全未解，因為它與 `DATA_ARCHITECTURE_PLAN.md` 同一天寫成但彼此未交叉引用；其餘 4 項（OQ-10 Gate 清單、Zero Trust IdP/SBOM 選型、Branch 完整狀態機、Model Registry/AI Gateway Fallback）在這批文件中**有 1 項也被解決**（Model Registry/Fallback 見 `DEVOPS_SRE_PLAN.md` §4-5，本輪未及處理，下一輪繼續）、3 項確認仍是真正空白。Phase 5 MVP 切片決定也在 `MVP_VERTICAL_SLICE_PLAN.md` 找到 Claude 論證版已完整存在（選 Research Mode），只是 Program Plan §9 要求的「Codex 獨立論證後比較」那一半從未真正跑過。
+
+**本輪處理**：
+1. 建 `specs/domain/repository-contract.schema.yaml`：轉錄 `DATA_ARCHITECTURE_PLAN.md` §1-5（storage_tier 三層 SoR 規則、8 種儲存引擎量化抽離門檻、並發策略、跨儲存 DR matrix、Provenance chain 橋接事件），額外解決 P1-GAP-ARCH-3/4/5/7/9（非只有原本鎖定的 P1-GAP-ARCH-2）。
+2. 建 `specs/security/tenant-isolation-controls.schema.yaml`：轉錄 `DATA_ARCHITECTURE_PLAN.md` §6（shared-schema+RLS 為預設、schema-per-tenant 窄範圍例外、共用 Vector Index/Graph Store 強制 tenant_id 過濾+RLS/fail-closed fallback），直接關閉 ADR-003 Consequences 明列的兩個 follow-up。
+3. **抓到並修正跨文件矛盾**：`SECURITY_THREAT_MODEL.md` I1/Ds1 兩列 + Prioritized Threat List 第 2 項，全部更新為反映 `DATA_ARCHITECTURE_PLAN.md` §6 已有的設計，同時誠實標註「設計已定案但正式 ADR 批准與實作落地仍待後續」，不誇大成完全解決。
+4. `specs/domain/tenant.schema.yaml` 的 `MRSP-tenant-1` open_question 更新（(i)(ii) 已解，(iv) Jurisdiction Pack 綁定仍開）。
+5. 兩個新檔案的 `decided_by`/`open_questions` 皆誠實標註「轉錄自 `Status: PROPOSED` 設計文件，非走完 ADR 正式批准的內容」，與本 corpus 其餘檔案（皆溯源到 ACCEPTED ADR 或母文件逐字轉錄）的證據等級明確區分，不假裝同等紮實。
+
+**第 4 輪行號位移**（同一 bug class 第 4 次復發）：Build Order 區塊再次因本輪編輯位移（+2 行），`L286→288`/`L302→304`/`L326→328` 三組共 13 處引用同步修正。
+
+[已修改]
+- 新增 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/domain/repository-contract.schema.yaml`
+- 新增 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/security/tenant-isolation-controls.schema.yaml`
+- 新增對應 2 份 fixture 檔（`tests/contracts/specs/{domain,security}/`）
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs/architecture/SECURITY_THREAT_MODEL.md`：I1/Ds1/優先序清單第 2 項訂正
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/domain/tenant.schema.yaml`：`MRSP-tenant-1` 更新
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`：2 個檔案狀態列 + Build Order 區塊 + MRSP-5 訂正 + 第 4 輪行號位移修正
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/policies/ai-execution/{mandatory-gates,network-egress,release-policy}.yaml`、`specs/execution/{gate,status-codes}.schema.yaml`：行號位移同步
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`jsonschema.Draft202012Validator` 對 2 份新 schema 各自的 fixture（valid+invalid 案例）驗證 | exit=0 | 結果=全數符合預期
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py` | exit=0 | 結果=607 個檢查全過
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`UniqueKeyLoader` 對全 146 個 yaml 檔跑重複 key 掃描 | exit=0 | 結果=CLEAN
+- REVIEW_DONE: critic=Quick（自我核對：`SECURITY_THREAT_MODEL.md` I1/Ds1 的具體威脅描述——「多租戶 RAG 檢索範圍設定錯誤洩漏機密片段」——與 `DATA_ARCHITECTURE_PLAN.md` §6 的 RLS+fail-closed 設計逐字比對，確認真的是同一個威脅被解決，非表面相似）| verdict=pass
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`repository-contract.schema.yaml\|tenant-isolation-controls.schema.yaml`（排除新檔自身）| hits=`MACHINE_READABLE_SPEC_PLAN.md`（已同步）、`tenant.schema.yaml`（已同步）、`SECURITY_THREAT_MODEL.md`（已同步），無其餘遺漏
+
+[剩餘風險] 兩個新檔皆轉錄自未經 ADR 正式批准的 `Status: PROPOSED` 設計文件（`OQ-REPOCONTRACT-1`/`OQ-TENANTISO-1` 誠實記錄），與本 corpus 其餘檔案的證據等級不同，建議之後補一輪批次追認 ADR。`DEVOPS_SRE_PLAN.md`（Model Registry/AI Gateway Fallback，解 P1-GAP-INFRA-5/6）與 `GLOBAL_JURISDICTION_PLAN.md`（Conflict-of-Laws/policy_context，解 P1-GAP-LEGAL-4/7）已確認有完整設計但本輪尚未動手建檔，下一輪繼續。OQ-10 Gate 清單、Zero Trust IdP/SBOM 選型、Branch 完整狀態機三項確認全庫真的沒有任何既有設計，需要真正從零起草。
+[rollback] 純新增檔案 + 文件文字訂正，`git revert` 即可完整回退，無 DB/prod/deploy 副作用。
+
 ## 2026-08-29（續28）
 
 ### AI-LEGO Phase 3 收尾第 2 批：補建 Tier 0 全部 4 份 method/lens contract 檔（methods/contracts/ 目錄從無到有）

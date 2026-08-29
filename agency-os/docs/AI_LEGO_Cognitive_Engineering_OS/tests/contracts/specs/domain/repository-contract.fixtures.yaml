@@ -1,0 +1,115 @@
+schema_id: "ai-lego://specs/domain/repository-contract.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the required top-level triad (storage_tier/storage_engine_assignment/
+  backup_dr_matrix), the exactly-3-tiers and exactly-8-engines cardinality
+  constraints, and the enum closures on storage_tier.tiers[].tier_id and
+  storage_engine_assignment[].purpose.
+valid:
+  - name: full_mvp_instance_matching_data_architecture_plan
+    instance:
+      storage_tier:
+        tiers:
+          - {tier_id: TIER_0_ULTIMATE_SOR, name: "Postgres events table", consistency_level: strong_linearizable, storage: "PostgreSQL append-only events table", staleness_slo: null}
+          - {tier_id: TIER_1_STRONG_CONSISTENCY, name: "Relational current-state projections", consistency_level: strong_linearizable, storage: "PostgreSQL relational tables", staleness_slo: null}
+          - {tier_id: TIER_2_EVENTUAL_DERIVED, name: "Derived projections", consistency_level: eventual, storage: "pgvector / tsvector / graph adjacency / TimescaleDB", staleness_slo: "p99 < 60s"}
+        rules:
+          - "A projection is never authoritative; loss is determined solely by the events table."
+          - "Tier0->Tier1 consistency is free (same Postgres transaction)."
+          - "Tier1->Tier2 consistency is eventual, p99 staleness SLO < 60s."
+          - "Object Storage has no consistency dispute, only write-before-reference ordering."
+          - "A stale Tier 2 read is a latency/UX issue, never a correctness issue."
+      storage_engine_assignment:
+        - {purpose: structured_metadata, mvp_approach: "PostgreSQL primary", extraction_threshold: "no extraction needed -- this IS the SoR"}
+        - {purpose: object_storage, mvp_approach: "S3-compatible object storage", extraction_threshold: "total capacity > single-digit TB or edge-cache latency SLO needed"}
+        - {purpose: semantic_retrieval_vector_index, mvp_approach: "pgvector extension, HNSW index", extraction_threshold: "vector count > 20 million OR p99 query latency > 300ms after tuning OR sustained CPU > 30%"}
+        - {purpose: graph_store, mvp_approach: "relational adjacency table + WITH RECURSIVE or Apache AGE", extraction_threshold: ">20% of production queries need >3-hop traversal with p95 SLA violation after tuning, or graph algorithms are a core product feature"}
+        - {purpose: event_store, mvp_approach: "PostgreSQL append-only events table", extraction_threshold: "sustained >2000 events/sec OR >5 independent consumer groups needing replay windows"}
+        - {purpose: full_text_search_index, mvp_approach: "PostgreSQL tsvector/tsquery + GIN index", extraction_threshold: "corpus > 50 million documents OR p95 search latency > 300ms after tuning OR faceted search/typo-tolerance needed"}
+        - {purpose: metrics_timeseries, mvp_approach: "TimescaleDB extension or time-partitioned tables", extraction_threshold: "sustained >50k points/sec or sub-second aggregation over billions of rows"}
+        - {purpose: cache, mvp_approach: "Postgres shared_buffers + application memoization", extraction_threshold: "measured cache-hit ratio >80% AND latency SLO still unmet"}
+      consistency_concurrency_strategy:
+        aggregate_optimistic_concurrency: "version = number of applied events; UNIQUE(aggregate_id, sequence) constraint detects concurrent writers, loser retries"
+        module_ownership: "exactly one owning module writes an aggregate's events directly; all others dispatch a Command"
+        cross_step_lock: "pg_advisory_xact_lock(hashtext(execution_id))"
+        cross_tenant_scope: "per ADR-003 a Workspace belongs to exactly one Tenant/region, so no cross-tenant transaction scenario exists"
+      backup_dr_matrix:
+        tier_1_sor:
+          - {storage: "Postgres primary", rpo: "< 5 min", rto: "< 2h", method: "continuous WAL archiving (PITR) + daily base backup + cross-region replica"}
+          - {storage: "Object Storage (CAS blobs)", rpo: "< 24h", rto: "< 2h", method: "versioned bucket + cross-region replication"}
+          - {storage: "Key Vault / KMS", rpo: "< 1 min", rto: "< 15 min", method: "HSM multi-region replication + offline escrow copy"}
+        tier_2_derived: []
+      reconciliation_job:
+        reused_from: "recipes/validated/db-migration-expand-contract.recipe.yaml Reconciliation step"
+        trigger: "any DR event that touches a Tier 2 store, after Tier 1 has recovered and been verified"
+        procedure: "restore from most recent Tier 2 snapshot then replay events since that snapshot, or discard and fully replay; finish with a counts/checksum consistency check against the same time window in Tier 1"
+      provenance_chain_bridge:
+        bridge_event:
+          result_id: "RESULT-229"
+          analysis_run_id: "ANA-92817"
+          evidence_id: "E-1001"
+          promoted_by: "researcher-jdoe"
+          promoted_at: "2026-08-29T10:00:00Z"
+          promotion_rationale: "quantitative result independently corroborates the qualitative theme"
+        bidirectional_integrity:
+          - "Source/Dataset/AnalysisRun quarantined -> dependent Evidence/Claim marked provenance_integrity: at_risk"
+          - "Evidence produced via this bridge quarantined -> source AnalysisRun/Dataset marked evidence_integrity: at_risk"
+invalid:
+  - name: wrong_tier_count
+    instance:
+      storage_tier:
+        tiers:
+          - {tier_id: TIER_0_ULTIMATE_SOR, name: "x", consistency_level: strong_linearizable, storage: "x"}
+          - {tier_id: TIER_1_STRONG_CONSISTENCY, name: "x", consistency_level: strong_linearizable, storage: "x"}
+        rules: ["a", "b", "c", "d", "e"]
+      storage_engine_assignment: []
+      backup_dr_matrix: {tier_1_sor: [{storage: "x", rpo: "x", rto: "x", method: "x"}], tier_2_derived: []}
+    reason: "storage_tier.tiers requires exactly 3 entries (Tier 0/1/2) -- only 2 given, and storage_engine_assignment requires exactly 8 entries -- 0 given"
+  - name: bad_tier_id_enum
+    instance:
+      storage_tier:
+        tiers:
+          - {tier_id: TIER_3_MADE_UP, name: "x", consistency_level: strong_linearizable, storage: "x"}
+          - {tier_id: TIER_1_STRONG_CONSISTENCY, name: "x", consistency_level: strong_linearizable, storage: "x"}
+          - {tier_id: TIER_2_EVENTUAL_DERIVED, name: "x", consistency_level: eventual, storage: "x"}
+        rules: ["a", "b", "c", "d", "e"]
+      storage_engine_assignment:
+        - {purpose: structured_metadata, mvp_approach: "x", extraction_threshold: "x"}
+        - {purpose: object_storage, mvp_approach: "x", extraction_threshold: "x"}
+        - {purpose: semantic_retrieval_vector_index, mvp_approach: "x", extraction_threshold: "x"}
+        - {purpose: graph_store, mvp_approach: "x", extraction_threshold: "x"}
+        - {purpose: event_store, mvp_approach: "x", extraction_threshold: "x"}
+        - {purpose: full_text_search_index, mvp_approach: "x", extraction_threshold: "x"}
+        - {purpose: metrics_timeseries, mvp_approach: "x", extraction_threshold: "x"}
+        - {purpose: cache, mvp_approach: "x", extraction_threshold: "x"}
+      consistency_concurrency_strategy:
+        aggregate_optimistic_concurrency: "x"
+        module_ownership: "x"
+        cross_step_lock: "pg_advisory_xact_lock(hashtext(execution_id))"
+        cross_tenant_scope: "x"
+      backup_dr_matrix: {tier_1_sor: [{storage: "x", rpo: "x", rto: "x", method: "x"}], tier_2_derived: []}
+    reason: "storage_tier.tiers[].tier_id enum is exactly [TIER_0_ULTIMATE_SOR, TIER_1_STRONG_CONSISTENCY, TIER_2_EVENTUAL_DERIVED] -- 'TIER_3_MADE_UP' is not a member"
+  - name: cross_step_lock_not_the_mandated_mechanism
+    instance:
+      storage_tier:
+        tiers:
+          - {tier_id: TIER_0_ULTIMATE_SOR, name: "x", consistency_level: strong_linearizable, storage: "x"}
+          - {tier_id: TIER_1_STRONG_CONSISTENCY, name: "x", consistency_level: strong_linearizable, storage: "x"}
+          - {tier_id: TIER_2_EVENTUAL_DERIVED, name: "x", consistency_level: eventual, storage: "x"}
+        rules: ["a", "b", "c", "d", "e"]
+      storage_engine_assignment:
+        - {purpose: structured_metadata, mvp_approach: "x", extraction_threshold: "x"}
+        - {purpose: object_storage, mvp_approach: "x", extraction_threshold: "x"}
+        - {purpose: semantic_retrieval_vector_index, mvp_approach: "x", extraction_threshold: "x"}
+        - {purpose: graph_store, mvp_approach: "x", extraction_threshold: "x"}
+        - {purpose: event_store, mvp_approach: "x", extraction_threshold: "x"}
+        - {purpose: full_text_search_index, mvp_approach: "x", extraction_threshold: "x"}
+        - {purpose: metrics_timeseries, mvp_approach: "x", extraction_threshold: "x"}
+        - {purpose: cache, mvp_approach: "x", extraction_threshold: "x"}
+      consistency_concurrency_strategy:
+        aggregate_optimistic_concurrency: "x"
+        module_ownership: "x"
+        cross_step_lock: "a Zookeeper distributed lock"
+        cross_tenant_scope: "x"
+      backup_dr_matrix: {tier_1_sor: [{storage: "x", rpo: "x", rto: "x", method: "x"}], tier_2_derived: []}
+    reason: "cross_step_lock is const 'pg_advisory_xact_lock(hashtext(execution_id))' -- the plan's whole point (L70) is that this is cheaper than an external coordination service; substituting one defeats the documented rationale"

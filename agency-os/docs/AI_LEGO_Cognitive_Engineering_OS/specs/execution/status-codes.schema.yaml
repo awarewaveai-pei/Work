@@ -37,7 +37,7 @@ source_of_truth_for:
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §78 (L2492-2508, PREEXISTING_WORKTREE_CHANGES)"
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §83 (L2588-2606, OFFLINE_SOURCE_STALE)"
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §84 (L2608-2627, BUDGET_REVIEW_REQUIRED)"
-  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §4 (L302, PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED — new proposal)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §4 (L304, PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED — new proposal)"
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §0.0.2 (L83, CONFLICT_REQUIRES_HUMAN_REVIEW — second, matching appearance)"
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §98 (L4198-4206, LEGAL_REVIEW_REQUIRED — second appearance, embedded in a 5-value enum)"
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §134 (L5258-5271, INTERPRETATION_REQUIRED — new finding, see open_questions.OQ-STATUS-3)"
@@ -351,11 +351,11 @@ status_codes:
       Fail-closed: return this status code and require a human or a follow-up
       session to write the method's contract before continuing, rather than
       silently guessing compatibility from the method's narrative-only fields
-      (MACHINE_READABLE_SPEC_PLAN.md L302: "而不是靜默用敘事型欄位瞎猜相容性").
+      (MACHINE_READABLE_SPEC_PLAN.md L304: "而不是靜默用敘事型欄位瞎猜相容性").
     design_lineage: >
       Explicitly modeled on Master Plan's own PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED
       pattern — "same class of 'missing precondition -> stop' invariant"
-      (MACHINE_READABLE_SPEC_PLAN.md L302: "沿用 Master Plan 自己已有的
+      (MACHINE_READABLE_SPEC_PLAN.md L304: "沿用 Master Plan 自己已有的
       PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED 模式（同一類「缺前提就停」的不變量），
       不是發明新機制"). NOTE: this inherited "PLANNING_BLOCKED_" prefix now sits
       in a different naming family than this file's canonical

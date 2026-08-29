@@ -1,0 +1,207 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/security/tenant-isolation-controls.schema.yaml"
+title: Tenant Isolation Controls
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Resolves the two ADR-003 Consequences follow-ups that ADR-003 itself
+  explicitly declined to decide (ADR-003 Consequences, "related, not
+  separately re-litigated here"): (i) full RLS vs. schema-per-tenant vs.
+  shared-schema for RELATIONAL data (ADR-003 only decided the CAS/object-
+  storage layer's tenant-scoped namespace); (ii) how shared components like
+  a Vector Index or Knowledge Graph avoid cross-tenant leakage. Also
+  resolves the highest-severity open item on
+  docs/architecture/SECURITY_THREAT_MODEL.md's own Prioritized Threat List
+  (I1/Ds1, "共用 Vector Index / Knowledge Graph...Tenant A 問題可能檢索到
+  Tenant B 機密片段", explicitly named "必須在 Phase 3 machine-readable spec
+  定稿前解決").
+
+  Transcribes docs/architecture/DATA_ARCHITECTURE_PLAN.md (Status: PROPOSED,
+  2026-08-29) §6's resolution of both follow-ups. IMPORTANT RECONCILIATION
+  (found while building this file, not silently smoothed over): SECURITY_
+  THREAT_MODEL.md's own I1/Ds1 rows, written the same day, do NOT reference
+  DATA_ARCHITECTURE_PLAN.md's resolution and instead describe this as fully
+  open ("即使 ADR-003 全案核准，此威脅僅部分解決——RAG 檢索面仍未設計") --
+  this is the same "same-day parallel document, no cross-reference" staleness
+  class this session has already found and fixed multiple times within a
+  single file (Wave 6/7/8's line-citation cascades), here occurring ACROSS
+  two separate PROPOSED planning documents instead. Verified directly: the
+  specific failure mode SECURITY_THREAT_MODEL.md I1/Ds1 describes
+  (misconfigured retrieval scope leaking Tenant B's confidential fragment
+  into Tenant A's query) IS exactly what DATA_ARCHITECTURE_PLAN.md §6's
+  mandatory-RLS-plus-fail-closed design prevents structurally (an engine-
+  enforced RLS policy makes a scope-filter bug return zero rows, not another
+  tenant's rows) -- not just "described as future work." Both documents'
+  own staleness is noted in this file's `open_questions` for a future pass
+  to actually go edit SECURITY_THREAT_MODEL.md's I1/Ds1 rows.
+
+source_of_truth_for:
+  - "docs/architecture/DATA_ARCHITECTURE_PLAN.md §6 Integration with ADR-002/003/005 (L139-143) -- both follow-up resolutions transcribed verbatim"
+  - "docs/adr/ADR-003-tenant-model-and-cas-isolation.md Consequences (the two named-but-not-resolved follow-ups this file closes) and Recommendation (L103, Option A default + Option C narrow exception -- the object_storage_path_reuse field below reuses this verbatim, does not re-decide it)"
+  - "docs/architecture/SECURITY_THREAT_MODEL.md I1/Ds1 rows (L109, L130) and Prioritized Threat List item 2 (L145) -- the threat this file closes, and the staleness this file's description honestly reconciles"
+  - "specs/domain/tenant.schema.yaml open_questions.MRSP-tenant-1 -- the exact same two follow-ups, named as blocking this file's own creation"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.5 row for tenant-isolation-controls.schema.yaml (P1-GAP-SEC-7, BLOCKED_PENDING_ROUND2_ADR)"
+
+decided_by: >
+  docs/architecture/DATA_ARCHITECTURE_PLAN.md (Status: PROPOSED, 2026-08-29),
+  same provenance class as specs/domain/repository-contract.schema.yaml --
+  see that file's own `decided_by`/`open_questions.OQ-REPOCONTRACT-1` for the
+  full honesty note on this design being transcribed from a not-yet-ADR-
+  ratified document, and OQ-TENANTISO-1 below for the same note scoped to
+  this file.
+
+compilation_decisions:
+  - question: >
+      Should schema-per-tenant/database-per-tenant be modeled as a globally
+      available alternative isolation_model value, or as a narrow per-
+      tenant exception?
+    decision: >
+      Modeled as `schema_per_tenant_exception`, a per-tenant OVERRIDE
+      record (requiring tenant_id + trigger_reason + approved_by), not a
+      platform-wide alternative to the default.
+    reasoning: >
+      DATA_ARCHITECTURE_PLAN.md L141 is explicit: "決策範圍是該租戶，不是
+      全平台，完全比照 ADR-003 CAS Option C 的『窄範圍例外』模式" (the
+      decision scope is THAT tenant, not the whole platform, exactly
+      mirroring ADR-003 CAS Option C's narrow-exception pattern). Modeling
+      it as a peer enum value alongside the default would misrepresent a
+      per-tenant carve-out as a platform-level architectural choice.
+
+type: object
+required: [default_isolation_model, shared_component_controls, object_storage_path_reuse, enforcement_from]
+properties:
+
+  default_isolation_model:
+    type: string
+    const: "shared_schema_with_rls"
+    description: >
+      DATA_ARCHITECTURE_PLAN.md L141 Recommendation, 3 reasons given: (a)
+      Program Directive §XXII avoids premature distributed architecture;
+      (b) Row-Level Security is Postgres-engine-enforced and fail-closed,
+      matching ADR-003's own "fail-closed over fail-open" decision driver;
+      (c) schema-per-tenant is reserved for the narrow per-tenant exception
+      below, mirroring ADR-003 CAS Option C.
+
+  schema_per_tenant_exception:
+    type: object
+    description: >
+      OPTIONAL per-tenant override record. Its mere presence in a schema
+      instance does not change the platform default -- see
+      compilation_decisions above.
+    required: [tenant_id, trigger_reason, approved_by]
+    properties:
+      tenant_id: { type: string }
+      trigger_reason:
+        type: string
+        description: "e.g. contractual or data-sovereignty requirement for a dedicated schema/database, per DATA_ARCHITECTURE_PLAN.md §7 Phase C."
+      approved_by: { type: string }
+
+  shared_component_controls:
+    type: array
+    minItems: 2
+    maxItems: 2
+    description: >
+      DATA_ARCHITECTURE_PLAN.md L142 verbatim, the two named shared
+      components this file's whole reason for existing is to close leakage
+      on -- directly answers SECURITY_THREAT_MODEL.md I1/Ds1.
+    items:
+      type: object
+      required: [component, rls_capable_control, fallback_if_rls_unavailable]
+      properties:
+        component:
+          type: string
+          enum: [vector_index, graph_store]
+        rls_capable_control:
+          type: string
+          description: >
+            L142: mandatory tenant_id filter on every query, enforced by
+            the SAME table's Row-Level Security policy -- a missing/buggy
+            application-layer filter is still caught by the engine.
+        fallback_if_rls_unavailable:
+          type: string
+          const: "mandatory per-tenant collection/namespace; a missing filter returns an empty set, never another tenant's plaintext"
+          description: >
+            L142: for a future specialized product that does not support
+            native RLS (e.g. a dedicated vector database), the fail-closed
+            equivalent is a MANDATORY per-tenant collection/namespace, so a
+            missing scope filter fails to an empty result rather than
+            cross-tenant disclosure.
+
+  object_storage_path_reuse:
+    type: object
+    description: >
+      L143: this file does NOT re-decide object storage isolation --
+      it reuses ADR-003's own Recommendation verbatim.
+    properties:
+      path_convention:
+        type: string
+        const: "/objects/<tenant_id>/sha256/aa/bb/<hash>"
+      source_adr:
+        type: string
+        const: "docs/adr/ADR-003-tenant-model-and-cas-isolation.md"
+
+  enforcement_from:
+    type: string
+    const: "day_1"
+    description: >
+      DATA_ARCHITECTURE_PLAN.md §7 Phase A (L153): "RLS 從第一天就開" (RLS
+      is enabled from day one) -- the plan explicitly reuses ADR-003's own
+      argument that this is "the cheapest correction point in the system's
+      30-year life," applied here to storage-engine/isolation selection
+      rather than to the CAS decision ADR-003 itself made that argument for.
+
+open_questions:
+  - id: "OQ-TENANTISO-1"
+    question: >
+      Same provenance-class disclosure as
+      specs/domain/repository-contract.schema.yaml's OQ-REPOCONTRACT-1 --
+      this file transcribes a Status: PROPOSED design document, not a
+      dedicated ACCEPTED ADR. Should a thin ratifying ADR be drafted?
+    owner: "operator, or a future session (see OQ-REPOCONTRACT-1 for the batch framing across all DATA_ARCHITECTURE_PLAN.md/GLOBAL_JURISDICTION_PLAN.md/DEVOPS_SRE_PLAN.md-derived files)"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-TENANTISO-2"
+    question: >
+      This file's own description honestly documents that
+      SECURITY_THREAT_MODEL.md's I1/Ds1 rows are stale (written without
+      awareness of DATA_ARCHITECTURE_PLAN.md §6's resolution). Should
+      SECURITY_THREAT_MODEL.md itself be edited to reflect this file's
+      existence and mark I1/Ds1 as resolved (with a residual-risk note
+      scoped to whatever this file does NOT cover, e.g. the actual RLS
+      POLICY DEFINITIONS/testing, which remain an implementation-phase
+      task this schema does not itself perform)?
+    owner: "operator, or a future session with write scope over docs/architecture/SECURITY_THREAT_MODEL.md"
+    blocks: "nothing in this file's own validity -- flagged for cross-document consistency, not a defect in this file"
+  - id: "OQ-TENANTISO-3"
+    question: >
+      This schema defines the ARCHITECTURAL DECISION (RLS-by-default,
+      fail-closed fallback) but not the actual RLS POLICY SQL/DDL, nor a
+      test suite proving a given deployment actually enforces it. Should a
+      future Wave add a golden test category specifically for "attempt a
+      cross-tenant query, confirm empty result" at the implementation
+      layer (outside this spec-suite's current scope, which is schema
+      definitions, not a running database)?
+    owner: "operator, or whichever future phase builds the actual runtime/implementation layer this Phase 3 spec suite describes"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read docs/architecture/DATA_ARCHITECTURE_PLAN.md §6 (L132-147) and
+    docs/adr/ADR-003-tenant-model-and-cas-isolation.md's Recommendation and
+    Consequences sections directly at the cited lines. Read
+    docs/architecture/SECURITY_THREAT_MODEL.md's I1/Ds1 rows (L109, L130)
+    and Prioritized Threat List item 2 (L145) directly to confirm the exact
+    threat description before asserting this file resolves it, rather than
+    assuming from a summary. Verified the reconciliation claim (that
+    DATA_ARCHITECTURE_PLAN's design genuinely addresses SECURITY_THREAT_
+    MODEL's specific concern, not just a superficially similar one) by
+    comparing the two documents' literal wording side by side. Read
+    specs/domain/tenant.schema.yaml's own open_questions.MRSP-tenant-1 to
+    confirm it names this exact file as its blocked destination.
+  note: >
+    No mother document was modified. This file is a direct transcription
+    of an existing, evidenced, not-yet-ADR-ratified design document (see
+    `decided_by`). The cross-document staleness reconciliation
+    (SECURITY_THREAT_MODEL.md not knowing about DATA_ARCHITECTURE_PLAN.md's
+    resolution) is disclosed rather than silently resolved by picking one
+    side without comment.
