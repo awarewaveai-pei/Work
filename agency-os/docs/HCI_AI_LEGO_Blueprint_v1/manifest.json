@@ -1,0 +1,43 @@
+{
+  "package": "AwareWave_HCI_AI_LEGO_Blueprint",
+  "version": "0.5.0",
+  "status": "clean-current-source-of-truth",
+  "verified_as_of": "2026-08-29",
+  "parent_brand": "Aware Wave",
+  "products": [
+    "HCI-30",
+    "AI LEGO Cognitive Engineering OS"
+  ],
+  "current_infrastructure": {
+    "provider": "OVHcloud",
+    "type": "Dedicated Server",
+    "server": "ns3006986.ip-149-202-64.eu"
+  },
+  "historical_infrastructure_in_active_docs": false,
+  "documents": [
+    "00_README.md",
+    "01_SYSTEM_CONSTITUTION.md",
+    "02_PRODUCT_BOUNDARIES.md",
+    "03_AWARE_WAVE_DOMAIN_AND_SUBDOMAIN_MAP.md",
+    "04_HCI30_PRODUCT_SPEC.md",
+    "05_HCI30_INTELLIGENCE_METHODS.md",
+    "06_HCI30_PUBLIC_INTELLIGENCE.md",
+    "07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md",
+    "08_HCI30_COMMERCIAL_EDITION_ARCHITECTURE.md",
+    "09_AI_LEGO_COGNITIVE_OS_BOUNDARY.md",
+    "10_HCI_AI_LEGO_INTEGRATION_CONTRACT.md",
+    "11_SECURITY_PRIVACY_GOVERNANCE.md",
+    "12_DEPLOYMENT_API_AND_MULTI_TENANCY.md",
+    "13_TESTING_REPLAY_ROLLBACK_AND_SRE.md",
+    "14_ROADMAP_AND_DEFINITION_OF_DONE.md",
+    "15_BRAND_AND_GO_TO_MARKET_PRINCIPLES.md",
+    "16_OPEN_DECISIONS_AND_NEXT_ARTIFACTS.md",
+    "17_REPOSITORY_LAYOUT_AND_PATHS.md",
+    "18_LEGO_CONTRACT_AND_COMPONENT_TAXONOMY.md",
+    "19_HCI_UI_REPORTING_AND_EXPLAINABILITY.md",
+    "20_VERIFIED_SUBDOMAIN_INVENTORY_AND_BRAND_IA.md",
+    "21_HCI_TOP_TIER_GAP_ANALYSIS.md",
+    "22_HCI_TOP_TIER_IMPLEMENTATION_MASTER_PLAN.md",
+    "23_CURRENT_INFRASTRUCTURE_SOURCE_OF_TRUTH.md"
+  ]
+}

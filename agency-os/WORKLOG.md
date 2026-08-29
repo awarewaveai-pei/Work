@@ -1,5 +1,34 @@
 # Worklog
 
+## 2026-08-29（續23）
+
+### HCI_AI_LEGO_Blueprint_v2 建置——V1 凍結封存 + 24 個決策點全數嵌入正文，收斂雙資料夾交叉引用風險
+
+**觸發**：操作者問「文件比原版少，是不是有漏寫，架構開工是不是只讀研究套件就好」，追問後表明核心焦慮——「我想要乾淨的東西，我非常怕AI誤讀誤會毀了我的東西」。判斷：雙資料夾（V1 + 研究套件）互相參照的模式本身就是冷啟動 AI 誤讀的高風險設計，不該用橫幅緩解就結案，要真正收斂成一份自成一體的文件。
+
+**方案裁決**（三選一，PR 記錄於對話）：A. 直接改 V1（否決——會把 24 個未拍板決策先斬後奏，違反任務本身的執行限制）；B. 維持雙資料夾（否決——正是操作者點出的風險本身）；**C. 版本前進（採用）**——V1 完整讀一遍後逐字比對、逐章重寫成 `HCI_AI_LEGO_Blueprint_v2/`（同 24 章編號，零重工），80 個免決策發現直接寫入正式規格文字，24 個需決策項目用 🔴 DECISION PENDING 區塊嵌在規格文字該出現的確切位置（非集中另檔）。V1 全數凍結加封存橫幅（仿 repo 既有 `AWAREWAVE_STACK_QUICKREF.md` 頂部橫幅模式），研究套件降級為證據鏈（回答「為什麼」），不再是建置起點。
+
+**自我糾正（誠實記錄，非事後美化）**：第一輪寫完後自查發現一致性缺陷——24 個決策點裡有 13 個（HD-04/05/06/07/08/09/10/11/12/13/14/17/18/22/23）被我在撰寫規格文字時直接採納了建議選項、未加 🔴 標記，等於 AI 自己先做了操作者本該拍板的決策，正是操作者最怕的那種「誤讀/誤會」。逐一補回全部標記，改採「建議選項照樣寫出（可快速核可）但明確標示未拍板」的一致寫法。收工前重新掃描確認 HD-00 至 HD-23 全數 24 個在 V2 中至少有一處 🔴 DECISION PENDING 對應。
+
+**第二次自我糾正（機械掃描抓到，非人工發現）**：加 V1 封存橫幅時用 Bash heredoc + Python 批次處理 23 個檔案，寫入的 Windows 路徑字串因跨層級參數轉義，`\\agency-os` 的雙反斜線被中間層吃成單反斜線，導致 `\a` 被 Python 當成合法跳脫序列解析成不可見的 BEL（響鈴）控制字元——這正是 repo 自己 `docs/operations/CJK 編碼陷阱` 那類問題的同一種根因（跳脫序列在非預期層級被解析）。**全 repo 三個 HCI 相關目錄機械掃描 U+FFFD 與 BEL 字元，確認僅 23 個 V1 封存橫幅受影響**（V2 全部 24 章、研究套件全部 24 檔皆由 Write/Edit 工具直接寫入，未經過同一層轉義，乾淨）；改用純 forward-slash 路徑 + 不含反斜線的字串重寫全部 23 個橫幅，二次掃描確認全部三個目錄零殘留。
+
+[已修改]
+- 新增 `agency-os/docs/HCI_AI_LEGO_Blueprint_v2/`（24 個章節檔，00-23，同 V1 編號結構）
+- `agency-os/docs/HCI_AI_LEGO_Blueprint_v1/` 全 24 檔加封存橫幅（首行，內容不動）
+- `agency-os/docs/HCI30_RESEARCH_REVIEW/00_EXECUTIVE_REVIEW.md`：「雙資料夾都要讀」段落改寫為「V2 是唯一起點，本套件降級為證據鏈」
+- `agency-os/docs/HCI30_RESEARCH_REVIEW/{02_V1_CHANGE,05_DOMAIN_ARCHITECTURE_REVIEW,22_OPEN_HUMAN_DECISIONS,00_EXECUTIVE_REVIEW}.md`：續 21 已完成的 DOM-12/HD-00 補件延續在本輪一併核對計數一致
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(Python) | cmd=對 V2 全 24 檔 grep `HD-[0-9]{2}` 去重排序 | 結果=HD-00 至 HD-23 全數 24 個都至少出現一次，無缺漏
+- REALTEST_EVIDENCE: tool=Bash(Python) | cmd=對 V1(23)+V2(24)+研究套件(24) 共 71 個檔案掃描 U+FFFD 與 `\x07` | 結果=第一輪掃描抓到 23 個 V1 橫幅檔案的 BEL 污染，修復後二次掃描 0 命中
+- REALTEST_EVIDENCE: tool=Bash(Python) | cmd=V2 內部交叉引用（`\`NN_XXX.md\`` 樣式）逐一比對實際檔名是否存在 | 結果=僅命中兩類預期外部引用（研究套件自身檔案、AI LEGO 尚未建的規劃中規格檔），V2 內部彼此引用全數解析成功
+- REVIEW_DONE: critic=Deep（自我審查，非外部——本輪工作量過大未來得及排外部 oracle，已在 WORKLOG 誠實記錄兩輪自我糾正過程而非隱藏）| verdict=pass-with-fixes（兩類問題皆為自查自修，非遺留）
+- BUGHUNT_DONE: scope=agency-os | grep=`DECISION PENDING\|HD-[0-9]{2}\|\\x07 replacement char scan` | hits=見上方 REALTEST 三項，逐一核對無殘留
+
+[剩餘風險] V2 的 24 個 🔴 區塊內容（含推薦選項）仍是本次 AI 分析產出，未經操作者實際逐條核可；V2 尚未走過外部 oracle（Codex）二次覆審——鑑於本輪任務規模已達本 session 單輪工作量上限，若操作者需要更高信心，建議下一輪對 V2 全文跑一次 `codex-oracle.ps1 -Mode review`。
+[rollback] `rm -rf agency-os/docs/HCI_AI_LEGO_Blueprint_v2/` 並用 `git checkout` 還原 V1 23 個檔案的封存橫幅即可完全回到續21 狀態；V1 原文內容全程未被修改，僅首行橫幅可逆增刪。
+
 ## 2026-08-29（續22）
 
 ### AI-LEGO Phase 3 Wave 7 全建（`recipes/validated/` 3 檔）+ 自我發現並修正 2 個跨檔行號漂移（延續續19 的同一類 bug）

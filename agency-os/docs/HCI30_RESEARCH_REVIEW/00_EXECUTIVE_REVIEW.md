@@ -10,18 +10,16 @@ Nine independent reviewers (Domain Architecture, Database, Security/Privacy, SRE
 
 **This is a research and design package, not an implementation.** Per the mission's execution limits: no production code was modified, no database was touched, nothing was deployed. `D:\Work\agency-os\systems\` and `shared\` (the eventual HCI/AI LEGO implementation trees) were confirmed by multiple reviewers, independently, to not exist yet — every finding below is cheap to act on now and would be expensive after real code and real customer data exist.
 
-## This package is a critique layered on top of V1 — it is NOT a standalone replacement for it
+## UPDATE 2026-08-29: a clean, self-contained V2 now exists — start there
 
-**This is the single most important thing to understand before using this package to start building.** `HCI_AI_LEGO_Blueprint_v1\` (`D:\Work\agency-os\docs\HCI_AI_LEGO_Blueprint_v1\`) contains the actual base specification — entity field lists, the full intelligence-methods catalog, the System Constitution's invariants, the API/deployment contract, the UI/explainability spec. This package (`HCI30_RESEARCH_REVIEW\`) does **not** reproduce that content. Every reviewer read all 24 V1 documents in full, but what they wrote down was "here's what's right / wrong / missing / should change," not a copy of V1's actual specification text. A KEEP finding (e.g. `01_V1_KEEP.md` DOM-11) means "this part of V1 is correct and should not be touched" — the content it's referring to still lives *only* in V1; it was deliberately not duplicated here, for the same reason `05_DOMAIN_ARCHITECTURE_REVIEW.md` DOM-02 flags duplicating the same concept under the same name in two places as a structural failure mode. Copying V1's content into a second document would have been that exact mistake, made by this package about itself.
+**This section originally said "read both V1 and this package together" — that guidance is superseded.** Maintaining two separate documents that had to be cross-referenced for every chapter was a real confusion risk (an operator using this system correctly flagged it), so the findings in this package have since been folded directly into a new, single, self-contained specification: **`D:\Work\agency-os\docs\HCI_AI_LEGO_Blueprint_v2\00_README.md`.**
 
-**Practically, when you start building: read both directories, not just this one.**
+V2 is not a summary and not a diff — it is the actual specification text, with:
+- All 80 findings that didn't require operator judgment (KEEP confirmations, CHANGE fixes, ADD entities, REMOVE items) written directly into the spec prose, in place, in context.
+- All 24 findings that do require operator judgment (`22_OPEN_HUMAN_DECISIONS.md`) embedded as explicit, impossible-to-miss 🔴 **DECISION PENDING** blocks at the exact point in the spec where that content belongs — not deferred to a separate file, and never silently resolved on the operator's behalf.
+- The original `HCI_AI_LEGO_Blueprint_v1\` frozen, unmodified, and banner-marked as superseded, kept only as historical record.
 
-1. Read the relevant V1 chapter(s) for the base specification (entities, fields, invariants, method definitions, API contract — whatever you're implementing).
-2. Check `20_V1_TO_V2_CHANGESET.md` for what changes on top of that chapter (edits, new entities, new gates).
-3. If the changeset item is flagged `HUMAN`, resolve it via `22_OPEN_HUMAN_DECISIONS.md` before implementing — the recommendation there is a proposal, not a ratified decision.
-4. Follow `21_V2_IMPLEMENTATION_ORDER.md` for sequencing.
-
-Reading `HCI30_RESEARCH_REVIEW\` alone would tell you everything that's wrong with V1 and nothing about what V1 actually specifies — you'd know *what* to change without knowing *what you're changing it from*. Reading `HCI_AI_LEGO_Blueprint_v1\` alone would give you the base spec without the 104 findings (24 of them requiring an explicit decision) this review surfaced. You need both, together, for every chapter you touch.
+**This package (`HCI30_RESEARCH_REVIEW\`) is now the audit trail, not the thing you build from.** It answers "why does V2 say that" with full `file:line` evidence and the independent reasoning behind every decision — read it when you want to understand a rationale or second-guess a recommendation, not as a starting point for implementation. To build: read `HCI_AI_LEGO_Blueprint_v2\` alone, resolve any 🔴 blocks you encounter via that same file's cited `HD-XX` entry in `22_OPEN_HUMAN_DECISIONS.md`, and follow `21_V2_IMPLEMENTATION_ORDER.md` for sequencing.
 
 ---
 
