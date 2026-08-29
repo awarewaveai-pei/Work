@@ -258,11 +258,47 @@ done
 #    Drill mode (AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=false) preserves the legacy
 #    "non-fatal warn" behavior for scheduled drills where degradation is intentional.
 #    Endpoints confirmed reachable from localhost 2026-05-21.
+#    ⚠ 2026-08-29 fix: the wordpress + node-api probes below were last verified against the OLD
+#    single-tenant SG box, which no longer exists -- SG+EU were fully consolidated onto ks-aw-01
+#    on 2026-08-28 (agency-os/docs/operations/AWAREWAVE_STACK_QUICKREF.md banner), and that box
+#    hosts many vhosts (mainwp/n8n/postiz/oracle/soulfulexpression/sg-stack/...). A bare
+#    `http://127.0.0.1/` with no Host header no longer resolves to WordPress -- it hits nginx's
+#    default vhost and 404s -- and node-api's real health path is `/health`, not `/api/health`
+#    (the api.aware-wave.com vhost passes the path through unchanged, no prefix strip). This
+#    caused a FALSE-POSITIVE smoke failure on every next-admin deploy since the consolidation,
+#    auto-rolling back healthy deploys because of two UNRELATED, already-broken probes --
+#    confirmed live 2026-08-29 during the portal.aware-wave.com deploy (next-admin's own two
+#    probes passed; these two didn't). The wordpress probe went through two more revisions after
+#    that (see _smoke_check's resolve_host param below for why -- a `-L` follow-redirect version
+#    leaked the probe out to public DNS/Cloudflare, which a critic pass caught before merge).
+#    Final verified form: `curl -k --resolve aware-wave.com:443:127.0.0.1
+#    https://aware-wave.com/` -> 200, remote_ip=127.0.0.1 (stays on-box; apex not www, so no
+#    extra www->apex redirect hop); `curl -H "Host: api.aware-wave.com"
+#    http://127.0.0.1/health` -> 200.
 _smoke_errors=0
 _smoke_check() {
-  local label="$1" url="$2"
+  local label="$1" url="$2" host_header="${3:-}" resolve_host="${4:-}"
   local http
-  http=$(curl -sf --max-time 5 -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || echo "000")
+  local -a curl_args=(-s --max-time 5 -o /dev/null -w "%{http_code}")
+  if [[ -n "$resolve_host" ]]; then
+    # Critic finding (2026-08-29, Major): an earlier version of this probe used `-L` to follow
+    # WordPress's forced http->https redirect. Following it means curl re-resolves the hostname
+    # via PUBLIC DNS and can land on Cloudflare's edge, satisfying this probe even if the LOCAL
+    # nginx->WordPress path on THIS box is dead -- injecting an external dependency (DNS/CF
+    # availability) into a gate that auto-rolls back production, on the exact false-positive
+    # axis this whole fix exists to close. `--resolve host:443:127.0.0.1` forces the hostname to
+    # resolve to this box while keeping Host/SNI correct, so it tests the real vhost+TLS path
+    # end-to-end without ever leaving localhost. Same pattern already used at
+    # lobster-factory/infra/soulful/cutover-sync.sh:234. `-k` skips cert verification (fine here
+    # -- this box IS the origin; only reachability/routing is being tested, not cert validity).
+    curl_args+=(-k --resolve "${resolve_host}:443:127.0.0.1")
+  elif [[ -n "$host_header" ]]; then
+    curl_args+=(-H "Host: $host_header")
+  fi
+  # Critic finding (2026-08-29, minor): `$(curl ...) || echo "000"` CONCATENATES -- curl without
+  # -f already prints its -w code before exiting non-zero on a transport failure, so the old form
+  # could log a misleading "404000"/"000000". Assign first, fall back on failure, never append.
+  http=$(curl "${curl_args[@]}" "$url" 2>/dev/null) || http="000"
   if [[ "$http" =~ ^2 ]]; then log "  smoke OK: $label -> $http"
   else log "  SMOKE_WARN: $label -> $http"; _smoke_errors=$((_smoke_errors + 1)); fi
 }
@@ -274,11 +310,8 @@ log "--- HTTP smoke check ---"
 # /api/ops/summary (exempt server-to-server endpoint) covers API liveness.
 _smoke_check "next-admin /login"           "http://127.0.0.1:3002/login"
 _smoke_check "next-admin /api/ops/summary" "http://127.0.0.1:3002/api/ops/summary"
-_smoke_check "nginx/wordpress"             "http://127.0.0.1/"
-_na_http=$(curl -sf --max-time 5 -o /dev/null -w "%{http_code}" \
-  -H "Host: api.aware-wave.com" "http://127.0.0.1/api/health" 2>/dev/null || echo "000")
-if [[ "$_na_http" =~ ^2 ]]; then log "  smoke OK: node-api health -> $_na_http"
-else log "  SMOKE_WARN: node-api health -> $_na_http"; _smoke_errors=$((_smoke_errors + 1)); fi
+_smoke_check "nginx/wordpress"             "https://aware-wave.com/" "" "aware-wave.com"
+_smoke_check "node-api health"             "http://127.0.0.1/health" "api.aware-wave.com"
 
 if [[ "$_smoke_errors" -gt 0 ]]; then
   log "SMOKE_WARN: $_smoke_errors endpoint(s) returned non-2xx -- service may be partially degraded"

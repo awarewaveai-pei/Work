@@ -17,9 +17,11 @@
 | 一鍵回滾 | `./scripts/rollback-phase1.sh restore <service> [snapshot-tag]` |
 | 清理舊快照 | `./scripts/rollback-phase1.sh clean <service> [days]`（預設 30 天） |
 | n8n 版本回滾 | `./scripts/rollback-phase1.sh n8n-pin <old-semver>` |
-| 部署後驗收 | `docker compose ps && curl -sf http://127.0.0.1:3002/login && curl -sf http://127.0.0.1:3002/api/ops/summary && curl -sf http://127.0.0.1/ && curl -sf -H "Host: api.aware-wave.com" http://127.0.0.1/api/health` |
+| 部署後驗收 | `docker compose ps && curl -sf http://127.0.0.1:3002/login && curl -sf http://127.0.0.1:3002/api/ops/summary && curl -sfk --resolve aware-wave.com:443:127.0.0.1 https://aware-wave.com/ && curl -sf -H "Host: api.aware-wave.com" http://127.0.0.1/health` |
 
 > **⚠️ Supabase-Auth cutover（2026-06-05）後**：next-admin 首頁 `/` 與所有 `/ops/*` 已被 middleware gate，未帶 session 的 `curl http://127.0.0.1:3002/` 會回 **302→/login**（健康但非 2xx）。故 `sg-deploy.sh` Step 7 smoke 與本驗收指令已改探測 **`/login`**（公開頁，回 200）+ `/api/ops/summary`（豁免端點）作為 liveness。完整登入流驗證需帶 Supabase session cookie（見 §auth-smoke）。
+>
+> **⚠️ `ks-aw-01` 整併後訂正（2026-08-29）**：wordpress／node-api 這兩探針原本寫「confirmed reachable 2026-05-21」，是舊單租戶 SG 機器的行為——2026-08-28 SG+EU 整併到 `ks-aw-01` 後該機同時掛 mainwp/n8n/postiz/oracle/soulfulexpression/sg-stack 等多個 vhost，裸 `curl http://127.0.0.1/`（無 Host header）不再落到 WordPress，會打中 nginx 預設 vhost 回 404；`api.aware-wave.com` 這邊 node-api 真正的健康路徑是 `/health`（不是 `/api/health`，該 vhost 不剝前綴）。**這個 stale 探針造成每一次 next-admin 部署都被這兩個無關端點的假陽性觸發自動 rollback**（2026-08-29 portal.aware-wave.com 部署時發現：next-admin 自己的兩個探針都過，是這兩個才炸）。`sg-deploy.sh` Step 7 與本表指令已同步訂正。**wordpress 探針走過兩輪修正**：第一輪改用裸 curl 帶 Host + `-L` 跟隨 WordPress 強制的 http→https 轉址，但 critic 覆審抓到 `-L` 會讓 curl 重新查公開 DNS、可能落到 Cloudflare edge——等於健康探針繞出機器之外，若本機 nginx→WordPress 這條路徑真的死了，Cloudflare 快取或別的節點仍可能回 200，讓這個「防自動 rollback 誤判」的閘門本身出現同一類假陽性。**第二輪改用 `--resolve <host>:443:127.0.0.1`**（`lobster-factory/infra/soulful/cutover-sync.sh:234` 既有慣例）強制在本機解析，探測真正的 vhost+TLS 路徑但不離開這台機器；改探 apex `aware-wave.com`（非 `www.`）避免多一層 www→apex 轉址。
 
 ---
 

@@ -402,6 +402,36 @@ critic 對全部 10 個新/改檔案做覆審，**並實際對 `ks-aw-01` 現場
 - REVIEW_DONE: critic=Deep（窄範圍,`ks-aw-01` 實機複驗）| verdict=pass-with-fixes | findings=1M(已修)/3m(全修)
 - BUGHUNT_DONE: scope=lobster-factory | grep=`refreshedCookies\|let response = NextResponse` | hits=確認 `ssr.ts` 不再有 `let response` 重新賦值寫法,`middleware.ts` 兩個套用點都改用陣列,無殘留舊模式
 
+### commit + push + 首次部署嘗試：auto-rollback 正確攔下，順藤挖出 sg-deploy.sh 兩個探針自整併後失準
+
+**commit + push**（`83277d80`，25 檔）順利完成（verify-recent tracker 清除後）。SSH 到 `ks-aw-01` 跑 `sg-deploy.sh next-admin` 第一次失敗：**`npm: command not found`**——整併到 `ks-aw-01` 後 Node.js 從未裝上（`dpkg -l`/`find` 全域搜尋確認,不是 PATH 問題）。已修：`nodesource setup_20.x` + `apt install nodejs`（對齊 next-admin Dockerfile 的 `node:20-alpine`），裝出 Node 20.20.2。
+
+重跑部署：git pull（撿到剛推的 commit）→ npm install → tsc typecheck 過 → npm test 過 → docker build 成功（~114s）→ container 啟動、**next-admin 自己的兩個 smoke 探針都過**（`/login`→200、`/api/ops/summary`→200）→ 但**另外兩個探針**（`nginx/wordpress`、`node-api health`）回傳非 2xx → **AUTO-ROLLBACK 正確觸發**，新 code 被自動還原回部署前的 commit。
+
+**追根因**：手動 SSH 重現這兩個探針的確切請求——`curl http://127.0.0.1/`（裸,無 Host header）404；`curl -H "Host: api.aware-wave.com" http://127.0.0.1/api/health` 也 404。兩者都是 sg-deploy.sh 註解裡寫的「confirmed reachable 2026-05-21」的舊探針，**日期早於 2026-08-28 的 SG+EU 整併**——舊 SG 是單租戶機器，裸 Host 請求自然落到 WordPress；整併後 `ks-aw-01` 同時掛 mainwp/n8n/postiz/oracle/soulfulexpression/sg-stack 等多個 vhost，裸請求落到 nginx 預設 vhost 回 404；node-api 的真實健康路徑是 `/health` 不是 `/api/health`（`api.aware-wave.com` vhost 不剝路徑前綴）。手動補正確 Host header + 路徑後兩者皆 200/301（跟隨重導後 200）——**證實這兩個探針從整併那天起，就會讓每一次 next-admin 部署被兩個無關端點的假陽性打成自動 rollback**，不是這次 portal 改動造成的。
+
+**已修**（獨立 commit，非 portal 範圍）：`sg-deploy.sh` `_smoke_check()` 加可選 Host header + follow-redirect 參數；wordpress 探針帶 `Host: www.aware-wave.com` + `-L`（裸 curl 略過外層 TLS 終結層會被 WP 強制 http→https 轉址，跟隨後 200）；node-api 探針路徑改 `/health`。觸發 `auto-repair-guard` 機械閘（sg-deploy Step 7 屬 Auto-Repair 紅線路徑）：讀 `auto-repair-2026-05-23.md`（確認 C1=rollback 機制本身，2026-05-23 已修好且與本次改動的探針輸入無關，`dogfood-auto-repair.ps1 -Mode HealthOnly` 10/10 pass）→ 更新 `DEPLOY_ROLLBACK_RUNBOOK.md` 同步訂正手動驗收指令。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash(SSH) | cmd=手動重現舊探針（裸 curl / `/api/health`）| 結果=兩者皆 404,證實假陽性根因
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash -n sg-deploy.sh` | exit=0
+- REVIEW_DONE: critic=Quick（窄範圍,聚焦 `_smoke_check()` bash 正確性）| verdict=pass-with-fixes | findings=1M(已修)/1m(已修)/1s(記錄不修)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`127\.0\.0\.1/api/health` | hits=修正前 5 檔,已全部訂正（`sg-deploy.sh`/`README.md`/`SAME_VPS_STAGING_RUNBOOK.md`×2/`DEPLOY_ROLLBACK_RUNBOOK.md`）；修正後重跑僅剩 `DEPLOY_ROLLBACK_RUNBOOK.md`+`WORKLOG.md` 自身的歷史說明文字命中,非殘留 stale claim
+
+### critic 窄範圍覆審抓到：`-L` 跟隨重導會讓探針離開機器，改回本機解析
+
+上一條的 `_smoke_check()` 修正版本用 `-L` 讓 wordpress 探針跟隨 WordPress 強制的 http→https 轉址。**critic 抓到這個修法本身有問題**：`-L` 會讓 curl 對轉址目標重新查**公開 DNS**，可能落到 Cloudflare edge 而非本機——如果本機 nginx→WordPress 這條路徑真的死了，Cloudflare 快取或其他節點仍可能回 200，讓這個「防止自動 rollback 誤判」的健康閘門，自己也踩進同一類假陽性（外部依賴混進一個會觸發正式環境自動 rollback 的閘門）。
+
+**已修**：改用 `--resolve <host>:443:127.0.0.1` 強制在本機解析（`lobster-factory/infra/soulful/cutover-sync.sh:234` 既有慣例，非新發明），探測真正的 vhost+TLS 路徑但保證不離開這台機器；順便改探 apex `aware-wave.com`（非 `www.`）避免多一層 www→apex 轉址雜訊。手動 SSH 驗證：`remote_ip=127.0.0.1`（證實沒有離開本機）+ `200`。另修 critic 抓到的一個 Minor（`$(curl...) || echo "000"` 在 transport 失敗時會變成字串串接出 `000000` 這種誤導性 log，改成 assignment-then-fallback 不串接）。critic 也順手點出 `safe-infra-patch.sh` 有同款 `-f`+`||echo` 串接問題（非本次範圍，記錄不修）。
+
+`README.md`/`DEPLOY_ROLLBACK_RUNBOOK.md` 同步訂正到最終版本（`--resolve` 而非 `-L`）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash(SSH) | cmd=`curl -k --resolve aware-wave.com:443:127.0.0.1 https://aware-wave.com/` | 結果=200,`remote_ip=127.0.0.1`（證實未離開本機）
+- REALTEST_EVIDENCE: tool=Bash(SSH) | cmd=`curl -H "Host: api.aware-wave.com" http://127.0.0.1/health` | 結果=200
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash -n sg-deploy.sh` | exit=0
+- BUGHUNT_DONE: scope=lobster-factory | grep=`www.aware-wave.com.*-L\|"follow"` | hits=0（`-L`/`follow` 版本已完全替換為 `--resolve`,無殘留）
+
 ## 2026-08-29（續7）
 
 ### AI LEGO Phase 2 STOP-FOR-HUMAN-REVIEW：操作者「你決定」授權裁決 — 9 份 ADR 全數 ACCEPTED，Codex 對抗式覆審抓到 2 個真實漏洞並修正，新增 3 份 ADR 補齊全部 4 項待決衝突

@@ -62,10 +62,14 @@ docker compose --env-file .env up -d next-admin
 
 ```bash
 docker compose ps
-curl -sf http://127.0.0.1/health
-curl -sf http://127.0.0.1/api/health
-curl -sf http://127.0.0.1/
-curl -sf http://127.0.0.1:3001/health   # SSH 本機除錯
+# ⚠ 2026-08-28 起 SG+EU 已整併到 ks-aw-01，該機同時掛多個 vhost，裸 Host（無 -H）的請求
+# 不再落到這個 stack，必須帶正確 Host header；node-api 健康路徑是 /health 不是 /api/health
+# （api.aware-wave.com vhost 不剝路徑前綴）。詳見 DEPLOY_ROLLBACK_RUNBOOK.md 2026-08-29 訂正。
+curl -sf -H "Host: api.aware-wave.com" http://127.0.0.1/health
+# --resolve 強制本機解析（不用 -L 跟隨 http->https 轉址——那會讓 curl 重新查公開 DNS，
+# 可能落到 Cloudflare edge 而非本機，見 DEPLOY_ROLLBACK_RUNBOOK.md 2026-08-29 訂正）
+curl -sfk --resolve aware-wave.com:443:127.0.0.1 https://aware-wave.com/
+curl -sf http://127.0.0.1:3001/health   # SSH 本機除錯（直打 container port，無 Host 問題）
 ```
 
 **Sentry（next-admin，可選）**：部署並設定 DSN 後，可對外公開 URL 呼叫 **`GET /admin/api/sentry-test`**（實作：[apps/next-admin/app/api/sentry-test/route.ts](apps/next-admin/app/api/sentry-test/route.ts)），於 Sentry 專案確認收到測試事件。
