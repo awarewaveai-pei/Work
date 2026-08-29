@@ -185,8 +185,59 @@ compilation_decisions:
       output provenance) from `contract_provenance` (contract-authorship
       provenance) rather than merging two adjacent-looking concepts.
 
+  - question: >
+      P1-GAP-LEGAL-7 (GAP_REGISTER.yaml L446-453): MP §26.3 (MP:1669-1685)
+      lists 11 policy-analysis dimensions (Current Regulation, Proposed
+      Regulation, Budget, Industrial Policy, Tax/Trade, Education Policy,
+      Privacy, AI Regulation, Election Cycle, International Relations) but
+      Atlas's own `selection_context` (the 17 fields this file otherwise
+      mirrors exactly) has no policy field at all — two tasks with identical
+      risk_tier/jurisdiction_context but wildly different regulatory
+      exposure would resolve to the identical candidate method set. Does
+      closing this gap belong in this file?
+    decision: >
+      Yes — add `policy_context` (2026-08-29) as an 18th field, sourced
+      verbatim from `docs/architecture/GLOBAL_JURISDICTION_PLAN.md` §6
+      (Status: PROPOSED, 2026-08-29), PLUS its derived companion
+      `regulatory_exposure`. This is a DELIBERATE, disclosed departure from
+      this file's own stated design ("mirrors Atlas L1071-1088's field set
+      exactly, 17 fields") — see the honesty note in
+      `resolved_selection_context.description` and `open_questions.OQ-mres-4`
+      below. `policy_context`'s 11 sub-fields are typed exactly per §6.2's
+      worked YAML example, not re-invented; `regulatory_exposure` is a
+      derived enum (`none|low|moderate|high`), explicitly marked as
+      "DERIVED, never hand-set" per §6.2's own comment, so it is NOT added
+      to `selection_context_supplement` (hand-supplied inputs only) — only
+      to `resolved_selection_context` (the resolved output).
+    reasoning: >
+      This is the same "seam that would otherwise silently produce wrong
+      answers" class of gap CROSS-T-16 (the reason this whole file exists)
+      already addresses for risk_tier/jurisdiction_context/reversibility —
+      P1-GAP-LEGAL-7's own consequence text ("兩個 risk_tier 與
+      jurisdiction_context 相同但監理曝險截然不同的決策，會被 Method
+      Selection Engine 選出完全相同的方法組合") describes exactly the same
+      failure mode this file's whole reason for existing is to close. Fixing
+      it anywhere other than this exact adapter file (e.g. only in
+      GLOBAL_JURISDICTION_PLAN.md prose) would leave the machine-readable
+      seam broken even though the human-readable design already exists.
+    scope_note: >
+      §6.4's "forcing rule" (`regulatory_exposure IN {moderate, high}` forces
+      the Policy method chain's Jurisdiction step into the candidate set
+      REGARDLESS of classified problem_type) is a SELECTION-ALGORITHM
+      behavior over in `method_resolution_result.candidate_methods` — a
+      genuinely different object, populated by an actual selection process
+      this schema does not simulate. It is documented here
+      (`open_questions.OQ-mres-5`) rather than encoded as an `allOf`/`if`/
+      `then` constraint, because JSON Schema validates the SHAPE of a given
+      instance; it cannot assert "some OTHER field in a document this
+      schema doesn't describe must contain a specific candidate" — that is
+      the Method Selection Engine's own runtime behavior to implement
+      correctly, not a static structural constraint this file can enforce.
+
 source_of_truth_for:
   - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §10 Selector Inputs, selection_context block (L1066-1089, all 17 fields individually cited below)"
+  - "docs/architecture/GLOBAL_JURISDICTION_PLAN.md §6 Policy-to-Method-Selection Mapping (L297-345) -- source of policy_context/regulatory_exposure, verbatim field shapes from §6.2's worked example (L303-322)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §26.3 (MP:1669-1685) -- the 11 policy-analysis dimensions policy_context's sub-fields map to, per GLOBAL_JURISDICTION_PLAN.md §6.3's mapping table"
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §14 Method Resolution (L700-728, flow + METHOD_RESOLUTION_BLOCKED)"
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §92 Machine-readable Execution Specs list (L2766-2783, method-resolution.schema.yaml at L2775)"
   - "specs/execution/task.schema.yaml (this file's task_context input side, same Wave 5 session)"
@@ -210,7 +261,11 @@ decided_by: >
 
 # ---------------------------------------------------------------------------
 # The field mapping proper — one entry per Atlas selection_context field
-# (L1072-1088, 17 fields, in source order)
+# (L1072-1088, 17 fields, in source order), PLUS one final 18th entry
+# (policy_context, 2026-08-29) that is NOT one of Atlas's original 17 --
+# see compilation_decisions' P1-GAP-LEGAL-7 entry for why it lives here
+# anyway, and mapping_type NEW_FIELD_NOT_IN_ATLAS_17 below for how it is
+# honestly distinguished from the 17 genuine Atlas-sourced entries.
 # ---------------------------------------------------------------------------
 
 field_mapping:
@@ -362,6 +417,20 @@ field_mapping:
       task_context by direct comparison; not one of the 7 explicitly-named
       fields but genuinely absent.
 
+  - selection_context_field: policy_context
+    task_context_field: null
+    mapping_type: NEW_FIELD_NOT_IN_ATLAS_17
+    note: >
+      2026-08-29, closes P1-GAP-LEGAL-7. Not one of Atlas's 17
+      selection_context fields at all (Atlas L1066-1089 has no policy field)
+      — added per GLOBAL_JURISDICTION_PLAN.md §6.2 (Status: PROPOSED). See
+      compilation_decisions above for the full disclosure of why this
+      deviates from "one entry per Atlas field". Its companion derived
+      field, `regulatory_exposure`, appears only in `resolved_selection_context`
+      (never in `selection_context_supplement` — it is computed, not
+      hand-supplied, per §6.2's own "DERIVED, never hand-set" comment) and
+      so has no field_mapping entry of its own here.
+
 # ---------------------------------------------------------------------------
 # Reverse direction — task_context fields with NO selection_context
 # counterpart at all, so the mapping above is verifiably exhaustive in both
@@ -455,6 +524,88 @@ selection_context_supplement:
       type: array
       items: { type: string }
       description: "NEW DESIGN. Atlas L1088 is a bare `...` placeholder (no bracket syntax); array type invented from the plural field name alone, item shape invented as bare strings."
+    policy_context:
+      $ref: "#/policy_context"
+      description: >
+        NOT one of Atlas's original 17 selection_context fields — added
+        2026-08-29 per GLOBAL_JURISDICTION_PLAN.md §6 (Status: PROPOSED),
+        closing P1-GAP-LEGAL-7. See compilation_decisions above. Optional:
+        absence means no policy-analysis signal was supplied, which
+        `regulatory_exposure`'s derivation (resolved_selection_context)
+        treats as `none`.
+
+# ---------------------------------------------------------------------------
+# policy_context's own shape -- verbatim from GLOBAL_JURISDICTION_PLAN.md
+# §6.2's worked YAML example (L303-322), field-for-field
+# ---------------------------------------------------------------------------
+
+policy_context:
+  type: object
+  description: >
+    GLOBAL_JURISDICTION_PLAN.md §6.2, all 11 fields transcribed verbatim.
+    §6.3's mapping table (L324-337) documents which MP §26.3 policy-analysis
+    dimension each field answers and what selection effect it has -- that
+    mapping is documentation of INTENT, not a structural constraint this
+    schema enforces (see compilation_decisions scope_note on the forcing
+    rule for why).
+  properties:
+    current_regulation_refs:
+      type: array
+      items: { type: string, pattern: "^LAW-" }
+      description: "§6.3: feeds Stage 0 jurisdiction resolution; forces the Policy problem-type's Jurisdiction step into the candidate set."
+    proposed_regulation_refs:
+      type: array
+      items: { type: string, pattern: "^LAW-" }
+      description: "§6.3: forces Scenario Planning to model pre/post-enactment branches."
+    budget_context:
+      type: object
+      properties:
+        available: { type: [number, "null"] }
+        source: { type: [string, "null"] }
+        cycle: { type: [string, "null"] }
+      description: "§6.3: adjusts MCDA / cost-benefit criteria weighting."
+    industrial_policy_tags:
+      type: array
+      items: { type: string }
+      description: "§6.3: routes to the matching MP §107 Sector Compliance Pack."
+    tax_exposure:
+      type: object
+      required: [present]
+      properties:
+        present: { type: boolean }
+        refs: { type: array, items: { type: string } }
+      description: "§6.3: feeds Cross-Border/Trade module inputs (Tax half)."
+    trade_exposure:
+      type: object
+      required: [present]
+      properties:
+        present: { type: boolean }
+        refs: { type: array, items: { type: string } }
+      description: "§6.3: feeds Cross-Border/Trade module inputs (Trade half)."
+    sector_policy_refs:
+      type: array
+      items: { type: string }
+      description: "§6.3: routes to applicable §107/§108 sector pack (generalizes the 'Education Policy' dimension to any sector)."
+    privacy_exposure:
+      type: object
+      required: [present]
+      properties:
+        present: { type: boolean }
+      description: "§6.3: cross-checked against jurisdiction_context."
+    ai_regulation_exposure:
+      type: array
+      items: { type: string, pattern: "^LAW-" }
+      description: "§6.3: runs MP §105 Classification upstream of Method Selection."
+    election_cycle_window:
+      type: object
+      properties:
+        start: { type: [string, "null"], format: date }
+        end: { type: [string, "null"], format: date }
+      description: "§6.3: raises decision_criticality; mandates Scenario Planning."
+    geopolitical_refs:
+      type: array
+      items: { type: string }
+      description: "§6.3: feeds Cross-Border Data Transfer Engine + Compliance-aware AI Router."
 
 # ---------------------------------------------------------------------------
 # The actual adapter input contract: task_context + supplement together
@@ -482,8 +633,13 @@ method_resolution_request:
 resolved_selection_context:
   type: object
   description: >
-    Mirrors Atlas L1071-1088's field set exactly (17 fields, same order),
-    with each field now typed per field_mapping's classification above.
+    Mirrors Atlas L1071-1088's 17 original fields exactly, same order, each
+    typed per field_mapping's classification above -- PLUS two 2026-08-29
+    additions NOT part of Atlas's original 17: `policy_context` (hand-
+    supplied, closes P1-GAP-LEGAL-7) and its derived companion
+    `regulatory_exposure`. See compilation_decisions' P1-GAP-LEGAL-7 entry
+    for the full disclosure of this departure from the original "exactly 17"
+    design.
   required:
     - goal_type
     - problem_type
@@ -527,6 +683,20 @@ resolved_selection_context:
         default.
     cognitive_preferences: { type: array, items: { type: string }, description: "From selection_context_supplement.cognitive_preferences (SUPPLEMENT_REQUIRED)." }
     accessibility_needs: { type: array, items: { type: string }, description: "From selection_context_supplement.accessibility_needs (SUPPLEMENT_REQUIRED)." }
+    policy_context:
+      $ref: "#/policy_context"
+      description: "From selection_context_supplement.policy_context (optional, NEW_FIELD_NOT_IN_ATLAS_17). Absent when the task has no policy-analysis signal."
+    regulatory_exposure:
+      type: string
+      enum: [none, low, moderate, high]
+      description: >
+        GLOBAL_JURISDICTION_PLAN.md §6.2: "DERIVED, never hand-set" -- never
+        present in selection_context_supplement, computed from
+        policy_context's populated fields (the plan does not specify the
+        exact derivation algorithm beyond the enum values themselves and
+        the §6.4 forcing rule's consumption of it; see open_questions.OQ-mres-5
+        for that honest gap). Defaults to `none` when policy_context is
+        absent entirely.
 
 # ---------------------------------------------------------------------------
 # The output side of EC §14's flow: Candidate Methods, bridging to
@@ -610,6 +780,32 @@ open_questions:
       `resolved_selection_context.required_rigor` can express.
     owner: "see cognitive/rigor-level.schema.yaml open_questions.MRSP-rigor-1"
     blocks: "nothing in this schema directly; downstream of the cited open question"
+  - id: "OQ-mres-4"
+    question: >
+      `policy_context`/`regulatory_exposure` are transcribed from
+      `docs/architecture/GLOBAL_JURISDICTION_PLAN.md` §6, a `Status:
+      PROPOSED` document, not a dedicated ACCEPTED ADR -- same provenance
+      class as `specs/domain/repository-contract.schema.yaml`'s
+      OQ-REPOCONTRACT-1 and the other files built from this same document
+      corpus in this Phase 3 run (see that file's `decided_by` for the
+      shared reasoning on why a not-yet-ADR-ratified but evidence-comparable
+      PROPOSED document was treated as authoritative content to transcribe).
+    owner: "operator, or a future session (see OQ-REPOCONTRACT-1 for the batch framing)"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-mres-5"
+    question: >
+      §6.4's forcing rule (`regulatory_exposure IN {moderate, high}` forces
+      the Policy method chain's Jurisdiction step into
+      `method_resolution_result.candidate_methods` regardless of classified
+      `problem_type`) is documented in this file's `policy_context`
+      description and compilation_decisions, but not encoded as a
+      schema-level constraint -- see compilation_decisions' scope_note for
+      why (it is a cross-object selection-algorithm behavior, not a
+      same-object shape constraint JSON Schema can express). Should a future
+      Wave add a conformance TEST (not a schema constraint) that exercises
+      an actual Method Selection Engine implementation against this rule?
+    owner: "operator, or a future Phase 4/5 implementation session once a Method Selection Engine exists to test"
+    blocks: "nothing in this file's own validity -- this is a test-coverage gap in a not-yet-built consumer, not a schema defect"
 
 verification:
   method: >
@@ -628,6 +824,11 @@ verification:
     comparison rather than trusted at face value — see field_mapping and
     task_context_only_fields above, which together cover all 12
     task.schema.yaml fields x all 17 Atlas selection_context fields).
+    2026-08-29 addition: read docs/architecture/GLOBAL_JURISDICTION_PLAN.md
+    §6 (L297-345) directly at the cited lines, transcribing §6.2's worked
+    policy_context YAML example field-for-field; cross-checked P1-GAP-LEGAL-7
+    in GAP_REGISTER.yaml (L446-453) to confirm the gap this addition closes
+    matches the plan document's own stated purpose.
   note: >
     No mother document was modified to produce this file. Grounded-vs-
     invented ratio: `problem_type`'s enum (Atlas's original 7 values,

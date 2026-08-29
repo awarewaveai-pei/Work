@@ -1,5 +1,35 @@
 # Worklog
 
+## 2026-08-29（續31）
+
+### AI-LEGO Phase 3 收尾第 5 批：`method-resolution.schema.yaml` 補第 18 個欄位 `policy_context`/`regulatory_exposure`，解 P1-GAP-LEGAL-7；順帶抓到並修正第 5 次行號位移復發（MRSP-24 三處引用）
+
+**觸發**：續30 [剩餘風險] 明列 `GLOBAL_JURISDICTION_PLAN.md` §6 policy_context 欄位（解 P1-GAP-LEGAL-7）已確認有完整既有設計但尚未動手建檔。
+
+**執行**：
+1. 直接重讀 `GLOBAL_JURISDICTION_PLAN.md` §6（L297-345）確認 §6.2 worked YAML example 逐字內容（11 個 policy_context 子欄位 + `regulatory_exposure: none|low|moderate|high` DERIVED 衍生欄位）與 §6.4 forcing rule，交叉核對 `GAP_REGISTER.yaml:446-453`（P1-GAP-LEGAL-7 原始登記文字）確認欄位設計確實對應該缺口的具體 consequence（「兩個 risk_tier 與 jurisdiction_context 相同但監理曝險截然不同的決策，會被 Method Selection Engine 選出完全相同的方法組合」）。
+2. 在 `specs/execution/method-resolution.schema.yaml` 補建：`policy_context` 獨立物件定義（11 子欄位逐字轉錄自 §6.2）、`field_mapping` 新增第 18 筆條目（新 `mapping_type: NEW_FIELD_NOT_IN_ATLAS_17`，誠實標記非 Atlas 原生 17 欄位）、`selection_context_supplement.policy_context`（手動供應輸入）、`resolved_selection_context.policy_context`/`.regulatory_exposure`（後者為衍生輸出，依 §6.2「DERIVED, never hand-set」故不進 supplement）。
+3. 誠實揭露本檔自身既有設計承諾（`resolved_selection_context.description` 原文「Mirrors Atlas L1071-1088's field set exactly, 17 fields」）被本次追加打破，於 `compilation_decisions` 新增專門條目說明為何是刻意、揭露的偏離而非疏漏；§6.4 forcing rule 記錄於 `open_questions.OQ-mres-5`，不硬編為 schema 約束——因其效果作用在 `method_resolution_result.candidate_methods`（另一個由真實選擇演算法產出的物件），JSON Schema 無法對「另一個欄位必須包含特定候選」下結構性斷言。
+4. 新增 fixture `tests/contracts/specs/execution/method-resolution.policy-context.fixtures.yaml`（2 valid + 3 invalid，含 `tax_exposure` 半填 state、`current_regulation_refs` 前綴格式等真實會犯錯誤）。
+
+**抓蟲發現並修正**（第 5 次行號位移復發，同一 bug class）：本輪對 `method-resolution.schema.yaml` 的插入使 `MACHINE_READABLE_SPEC_PLAN.md` MRSP-24 既有列的三處行號引用全部失準（`:230`→`:285`、`:95-114`→`:88-117`、`:600`→`:833-837`），逐一核對現況後訂正，並在訂正文字中註明「原引 `:XXX`」保留稽核軌跡。
+
+[已修改]
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/execution/method-resolution.schema.yaml`：新增 `policy_context` 物件定義、`field_mapping` 第 18 筆、`selection_context_supplement`/`resolved_selection_context` 欄位、`compilation_decisions`/`open_questions`（OQ-mres-4/OQ-mres-5）/`verification` 更新
+- 新增 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/contracts/specs/execution/method-resolution.policy-context.fixtures.yaml`
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`：row 95 狀態列更新 + MRSP-24 三處行號位移修正
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py`（schema 追加後，fixture 建立前）| exit=0 | 結果=628 個檢查全過，無退步（確認純新增未破壞既有 17 欄位映射）
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py`（fixture 建立後）| exit=0 | 結果=635 個檢查全過
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`UniqueKeyLoader` 對修改/新增檔跑重複 key 掃描 | exit=0 | 結果=CLEAN
+- REVIEW_DONE: critic=Quick（自我核對：`jurisdiction_context`/`reversibility`/`risk_tier`/`problem_type` 等既有欄位的實際 enum 值，逐一對照 `task.schema.yaml`/`risk-tier.schema.yaml`/`problem-type.schema.yaml` 原始定義後才寫入 fixture——初稿誤用 `jurisdiction_context: {home_jurisdiction: ...}`（實際是純字串）與 `reversibility: fully_reversible`（實際 enum 是 high/medium/low/irreversible），跑測試前先讀源頭訂正，非事後除錯）| verdict=pass
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`P1-GAP-LEGAL-7\|policy_context\|regulatory_exposure` | hits=僅本輪新增/修改檔案本身出現，`GAP_REGISTER.yaml`/`GLOBAL_JURISDICTION_PLAN.md` 為唯讀溯源文件不需同步；額外對 `MACHINE_READABLE_SPEC_PLAN.md` 既有 MRSP-24 列做行號位移專項核對（見上），三處全部訂正
+
+[剩餘風險] 本檔新增內容與續29/續30 同一證據等級——轉錄自未經 ADR 批准的 `Status: PROPOSED` 文件（`OQ-mres-4` 誠實記錄），建議合併同一輪批次追認 ADR。§6.4 forcing rule 目前僅為文件化行為，尚無 Method Selection Engine 實作可供測試（`OQ-mres-5`），非本檔範圍。OQ-10 Gate 清單、Zero Trust IdP/SBOM 選型、Branch 完整狀態機三項仍待從零起草；Phase 5 MVP 切片 Codex 三方獨立比較仍未真正執行。
+[rollback] 純新增欄位 + 文件文字訂正，`git revert` 即可完整回退，無 DB/prod/deploy 副作用。
+
 ## 2026-08-29（續30）
 
 ### AI-LEGO Phase 3 收尾第 4 批：補建 policies/provider/（Model Registry + AI Gateway Fallback）與 conflict-of-laws-output.schema.yaml，抓到並修正 P1-GAP-LEGAL-4 與 P1-DUP-6 兩個相似但不同議題的混淆引用
