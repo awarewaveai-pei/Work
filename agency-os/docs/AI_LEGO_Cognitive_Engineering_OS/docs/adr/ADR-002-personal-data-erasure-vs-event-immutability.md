@@ -100,11 +100,27 @@ Correctness/Security/Privacy 等維度目前皆為 **N/A**，因為問題不是�
 
 理由排序：A 是唯一同時滿足「監理機關認可的不可逆刪除」與「event 結構/replay 完全不動」兩個約束的選項；B 打破 event schema 不可變假設且與既有 CAS 去重衝突糾纏；C 單獨採用等於重造原始衝突。
 
+## Codex Oracle 對抗式覆審（2026-08-29，已完成，見下方修正）
+
+依 Method Used 段落的一般覆審慣例（同 ADR-001），操作者授權後已對本 ADR 跑一輪 `codex-oracle.ps1 -Mode inspect`（獨立於 Claude 分析，未餵入本 ADR 結論），完整 artifact：`agency-os/reports/oracle/2026-08-29-inspect-d80a93e4.md`。
+
+**判定：NEEDS-REVISION（1 條 CONFIRMED + 1 條 PLAUSIBLE，皆已於本次修訂納入）**
+
+> **CONFIRMED**：ADR 自己把「EC §31 的刪除契約不能在第一個真實 DSAR 時失效」列成硬 driver（Decision Driver #2），但原始 Rollback 段明寫「停止受理新刪除請求」。情境：上線後若因 KMS/Key Vault 事故走 rollback，下一個 DSAR 會被設計性拒絕，直接回到本 ADR 要消除的錯誤行為。
+>
+> **PLAUSIBLE**：Option A 把刪除定義為銷毀 subject DEK 記錄，驗證只要求已知引用解密失敗；同文又要求 Key Vault 做更高規格備援，但沒定義備份中的 DEK 如何同步刪除。情境：live DEK 已刪、驗證通過，之後從刪除前的 Key Vault 備份做災復，歷史事件再次可解密，變成假刪除。
+
+**根因判斷**：兩條發現同源——原始版本把「ADR 層級的架構決策回滾」（放棄整套 Option A，改採其他方案）與「營運層級的事故應變」（Key Vault 一時不可用）混為一談，導致「停止受理新刪除請求」這句話被誤放進一個實際上會在生產事故時觸發的路徑。第二條發現進一步指出，「刪除」的定義本身只涵蓋 live Key Vault，沒有涵蓋「Key Vault 自己的備援副本」這個必然存在的第二份拷貝。**不變量修正**：DEK 的銷毀承諾必須涵蓋該金鑰的**所有物理副本**（live + 備援/災復快照），而非只有 live 那一份；且「金鑰服務暫時不可用」與「架構決策被推翻」必須是兩條分開處理、互不觸發彼此的路徑。
+
+**修正 1 — Rollback 段重寫（拆分兩種情境）**：見下方新版 Migration / Rollback。
+
+**修正 2 — 新增「Key Destruction Record Replay on Restore」強制步驟**：任何從 Key Vault 備份還原（disaster recovery restore）的操作，在還原後的 Vault 被允許服務任何 decrypt 請求之前，**必須**先重放所有時間戳晚於該備份快照的 Key Destruction Record，對其中每一筆記錄的 DEK 執行等效銷毀，才能將還原後的 Vault 標記為 live。此步驟為新的規格缺口第 6 項，見下方 Consequences。**與既有 WORM 35 天窗口的交互**（`docs/architecture/DEVOPS_SRE_PLAN.md` §3.2，L120-126）：因備份本身在 35 天 immutability window 內不可手動刪改，「備份含已銷毀 DEK」這個風險視窗至少與 WORM 窗口等長——這進一步確認此步驟不能是選配的清理作業，必須是還原流程的強制關卡，否則整個 WORM 保護期都是潛在的假刪除視窗。
+
 ## Consequences
 
 **正面**：GDPR/CCPA/LGPD 等 Jurisdiction Pack 的 Deletion 權利有明確技術落地；§112 Replay Workflow、§64 Execution Manifest、30-year survivability 承諾維持成立；重用既有 §61 分級 + §148 金鑰主權詞彙，未新增第四套平行機制。
 
-**負面／代價**：新建 Key Vault/KMS 整合服務 = 新元件 = 新攻擊面，需過 EC §32 Security Change Contract 的 Threat Review；每個含個資欄位的 event 在 projection rebuild 時都要呼叫金鑰服務解密——金鑰服務可用性變成 replay 的新單點依賴；**Key Vault 本身需要比 Event Ledger 更高規格的備援**：若 Key Vault 資料遺失，等同全體使用者個資一次性被 crypto-shred，是比原始問題更劇烈的新單點故障，必須明確納入 §112 30-year Replacement Drill 測項。
+**負面／代價**：新建 Key Vault/KMS 整合服務 = 新元件 = 新攻擊面，需過 EC §32 Security Change Contract 的 Threat Review；每個含個資欄位的 event 在 projection rebuild 時都要呼叫金鑰服務解密——金鑰服務可用性變成 replay 的新單點依賴；**Key Vault 本身需要比 Event Ledger 更高規格的備援**：若 Key Vault 資料遺失，等同全體使用者個資一次性被 crypto-shred，是比原始問題更劇烈的新單點故障，必須明確納入 §112 30-year Replacement Drill 測項。**（Codex 覆審後新增）** Key Vault 備援副本本身若未與 live 端同步銷毀紀錄，會製造「災復還原後假刪除復活」的新風險，見上方修正 2。
 
 **需要新增的規格缺口**：
 1. MP §148 之下新增「Per-Subject DEK 生命週期」小節。
@@ -112,12 +128,16 @@ Correctness/Security/Privacy 等維度目前皆為 **N/A**，因為問題不是�
 3. EC §31 需新增分支：「個資刪除（crypto-shred）」與「一般 production row 刪除」是兩種不同的 Verification 定義。
 4. MP §57 event 清單旁需標註哪些既有 event type（`DocumentUploaded`/`ClaimCreated` 等）含 Confidential/Restricted 分級欄位——現況零標註。
 5. 新增 `PersonalDataRedacted` 事件到 §57 清單（僅稽核輔助角色）。
+6. **（Codex 覆審後新增）** EC §105 Backups/Restore（`DEVOPS_SRE_PLAN.md` §3.2 已標記無演練週期）需新增「Key Vault 還原前必須重放 Key Destruction Record」的強制關卡，作為 Key Vault 專屬的 restore-time 檢查，區別於一般 Event Ledger 的還原流程。
 
 ## Migration / Rollback
 
 **Migration**：專案現階段無 production 事件資料，此刻採用是遷移成本趨近於零的最佳時機；拖到 Phase 3 實作後才決定，成本隨事件量增加，且任何在那之前因 GDPR 壓力被迫破壞不可變性刪除的 event 永久無法回溯修正。
 
-**Rollback**：若日後放棄 crypto-shred，降級路徑是「保留既有密文欄位不變，停止簽發新 DEK / 停止受理新刪除請求」——不破壞任何既有 event 或 replay 能力。這是 A 優於 B 的另一項 Reversibility 理由：B 一旦刪除外部內容即真正不可逆，無等效降級路徑。若要整體改採 B 或 C，因三方案動的是不同層，彼此改換需重新走 Phase 2 收斂流程與另一份 ADR，非可事後 patch。
+**Rollback（Codex 覆審後修正版，拆分兩種情境，取代原始單一描述）**：
+
+- **情境 1：Key Vault 暫時性事故（營運層級，非架構決策改變）**——**不得**停止受理新刪除請求。DSAR 必須照常受理並記錄，若加密/解密服務當下不可用，新的刪除請求進入待處理佇列（記錄 `received_at`），事故本身依 `DEVOPS_SRE_PLAN.md` 的 SEV 分級立即升級為最高優先事故（因為它直接威脅 Decision Driver #2 的硬性合規承諾），修復目標時間須落在監理機關允許的回覆窗口內（如 GDPR Art. 12(3) 一個月，可延長一次）；佇列中的請求在服務恢復後立即處理，不得因為事故發生過而永久拒絕或靜默丟棄。
+- **情境 2：架構決策本身被推翻（放棄整套 Option A，改採 B/C 或全新方案）**——降級路徑是「保留既有密文欄位不變，停止簽發新 DEK」，但**新刪除請求改用新方案的機制處理，不是停止受理**；過渡期間兩套機制（舊 DEK 銷毀 + 新機制）並行，直到所有既有 DEK 都遷移完畢，比照 Expand-Contract 模式（同 ADR-005 DB Migration Recipe 的精神），非一次性切換。這是 A 優於 B 的另一項 Reversibility 理由：B 一旦刪除外部內容即真正不可逆，無等效降級路徑。若要整體改採 B 或 C，因三方案動的是不同層，彼此改換需重新走 Phase 2 收斂流程與另一份 ADR，非可事後 patch。
 
 ## Evidence
 
@@ -127,5 +147,7 @@ Correctness/Security/Privacy 等維度目前皆為 **N/A**，因為問題不是�
 - `.ai/research/phase-1/CONFLICT_REGISTER.yaml` L9-22（P1-CONFLICT-1 原始登錄）
 - Grep 全文確認缺席：`PII`/`data subject`/`crypto-shred`/`tombstone`/`redaction` 在 MP+EC 零命中；`GDPR` 僅作為 Jurisdiction Pack 示範清單出現（MP L4261, L5392-5406），未掛鉤任何技術機制
 - 外部查證（WebSearch，2026-08-29）：Crypto-shredding 業界模式與法規認可（EDPB Guidelines 5/2019、UK ICO、法國 CNIL）；Event sourcing 領域經典模式命名（Forgettable Payloads / Crypto-Shredding，Mathias Verraes）；GDPR in event-driven architecture 綜合討論
+- `docs/architecture/DEVOPS_SRE_PLAN.md` L120-126（§3.2 WORM 35 天 immutability window，與 Key Vault 備份還原風險視窗交互）
+- `agency-os/reports/oracle/2026-08-29-inspect-d80a93e4.md`：Codex 對抗式覆審 artifact（NEEDS-REVISION：Rollback 矛盾 CONFIRMED + 備份 DEK 同步缺口 PLAUSIBLE，已於本次修訂納入）
 
 **邊界確認**：本次任務全程僅執行 Read/Grep/Bash（唯讀）與 WebSearch，未對三母文件做任何修改。

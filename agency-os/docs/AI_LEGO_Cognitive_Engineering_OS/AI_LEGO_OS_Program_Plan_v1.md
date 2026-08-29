@@ -113,11 +113,13 @@ Source directive 中所有根路徑（`/.ai/`、`/specs/`、`/policies/`、`/met
 
 ## 6. Phase 2 — Architecture Convergence
 
-**Status：COMPLETE（15/15 交付物，2026-08-29）** | Entry：Phase 1 exit gate 通過。**Exit Gate 已達成，進入 STOP FOR HUMAN REVIEW，操作者批准前不進 Phase 3。**
+**Status：COMPLETE（15/15 交付物，2026-08-29）→ STOP-FOR-HUMAN-REVIEW 已完成操作者審閱與裁決（2026-08-29 續）** | Entry：Phase 1 exit gate 通過。
 
-**Round 1 產出**：`docs/adr/ADR-001~006`（見 [ADR_INDEX.md](docs/adr/ADR_INDEX.md)），解決 2 條 CONFLICT（全部）、部分 DUPLICATION、OQ-6/7/8/9/11/12。全部 `Status: PROPOSED`，未套用到三母文件，待操作者批准。
+**Round 1 產出**：`docs/adr/ADR-001~006`（見 [ADR_INDEX.md](docs/adr/ADR_INDEX.md)），解決 2 條 CONFLICT（全部）、部分 DUPLICATION、OQ-6/7/8/9/11/12。
 
-**Round 2 產出**（`docs/architecture/`，全部 `Status: PROPOSED`）：`MACHINE_READABLE_SPEC_PLAN.md`（Phase 3 Wave 0-8 全建置清單）、`REPOSITORY_ARCHITECTURE.md`、`SECURITY_THREAT_MODEL.md`（STRIDE+LINDDUN）、`DATA_ARCHITECTURE_PLAN.md`、`GLOBAL_JURISDICTION_PLAN.md`、`DEVOPS_SRE_PLAN.md`、`MVP_VERTICAL_SLICE_PLAN.md`、`TEST_EVAL_STRATEGY.md`、`MIGRATION_AND_ROLLBACK_STRATEGY.md`。另由 Claude 統籌彙整 `PROPOSED_ARCHITECTURE_CHANGES.md`（6 份 ADR → 23 項具體修改提案 P-001~P-023）與 `IMPLEMENTATION_ROADMAP.md`（總排程，含 §2 誠實揭露：MVP 切片選擇尚未完成 directive 要求的雙模型比較）。
+**Round 2 產出**（`docs/architecture/`）：`MACHINE_READABLE_SPEC_PLAN.md`（Phase 3 Wave 0-8 全建置清單）、`REPOSITORY_ARCHITECTURE.md`、`SECURITY_THREAT_MODEL.md`（STRIDE+LINDDUN）、`DATA_ARCHITECTURE_PLAN.md`、`GLOBAL_JURISDICTION_PLAN.md`、`DEVOPS_SRE_PLAN.md`、`MVP_VERTICAL_SLICE_PLAN.md`、`TEST_EVAL_STRATEGY.md`、`MIGRATION_AND_ROLLBACK_STRATEGY.md`、`PROPOSED_ARCHITECTURE_CHANGES.md`（6 份 ADR → 23 項具體修改提案 P-001~P-023）、`IMPLEMENTATION_ROADMAP.md`（總排程）。
+
+**Round 3 — 操作者授權裁決（2026-08-29 續）**：操作者對 STOP-FOR-HUMAN-REVIEW 的 4 類待決事項明示「你決定」，授權 Claude 行使架構師裁決權。處理結果：① **全部 9 份 ADR（含新增 ADR-007/008/009）裁決為 `ACCEPTED`**（ADR-004 的 risk_tier 觸發範圍擴大 critical→R3∪R4 已明確認可）——**範圍澄清：ACCEPTED 為 ADR 決策定案，非母文件已編輯**，實際套用仍須依 ADR-006 的 `.ai/proposals/` 流程逐案由操作者推進 `APPROVED`；② 對 ADR-001/002（影響面最大）跑 Codex 對抗式覆審，兩份皆 `NEEDS-REVISION`（ADR-001：新 SSOT 未登記進 EC 必讀文件集合；ADR-002：Rollback 段自相矛盾 + 備份 DEK 同步缺口），**均已修正納入 ADR 正文**；③ P1-CONFLICT-3/4、P1-DUP-2/5 四項 Round 2 待裁決衝突全數新增 ADR 裁決（ADR-007/008/009）；④ Phase 5 MVP 切片方向補做一輪 Codex 獨立分析，**但誠實記錄：未真正完成 directive 要求的「三選一雙模型比較」**，Codex 回應形式是找執行缺口而非做選擇，此缺口見 `IMPLEMENTATION_ROADMAP.md` §2 類別 D。過程中額外訂正 2 條 Phase 1 register 引用錯誤。詳見 `docs/adr/ADR_INDEX.md` 與 2026-08-29 WORKLOG。
 
 - 每個重大問題提 `Option A / B / C / Status Quo`，比較維度：Correctness / Security / Privacy / Maintainability / Extensibility / Operability / Performance / Cost / Complexity / Migration / Reversibility / Vendor Lock-in / 30-year survivability。
 - Method semantics 一律取自 Method Atlas（ATAM / MCDA / Pre-mortem / Red Team / Threat Modeling / Causal Analysis / Decision Matrix）；Atlas 缺該 method 定義時輸出 `PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED`，不得以模型記憶補。
@@ -125,7 +127,7 @@ Source directive 中所有根路徑（`/.ai/`、`/specs/`、`/policies/`、`/met
 - **母文件修改協議**（directive §IX）：每項修改先產 `PROPOSED_CHANGE / RATIONALE / SOURCE_DOCUMENT / AFFECTED_SECTIONS / DEPENDENCIES / COMPATIBILITY / MIGRATION / ROLLBACK / EVIDENCE`，保留 Original / Proposed / Reason，僅接受 semantic correction / missing contract / boundary clarification / duplication removal / feasibility / testability / versionability——禁止文風美化。⚠️ directive 要求 branch `docs/architecture-v1-review`，但本 repo **禁建 branch**（settings deny 硬擋）→ 替代提案見 **OQ-6**，等人類裁決後才動母文件。
 - 三文件分工不變：敘事 authority 留 Markdown；machine-readable 逐步移至 `/specs/`、`/policies/`、`/methods/`、`/recipes/`。
 
-**Exit Gate = STOP FOR HUMAN REVIEW**：交付 directive §XXVIII 的 15 份文件（CURRENT_STATE_REPORT / THREE_DOCUMENT_GAP_ANALYSIS / CLAUDE_CODEX_CONVERGENCE_MATRIX / PROPOSED_ARCHITECTURE_CHANGES / ADR_INDEX / MACHINE_READABLE_SPEC_PLAN / REPOSITORY_ARCHITECTURE / MVP_VERTICAL_SLICE_PLAN / SECURITY_THREAT_MODEL / DATA_ARCHITECTURE_PLAN / GLOBAL_JURISDICTION_PLAN / DEVOPS_SRE_PLAN / TEST_EVAL_STRATEGY / MIGRATION_AND_ROLLBACK_STRATEGY / IMPLEMENTATION_ROADMAP），**操作者批准前不進 Phase 3**。
+**Exit Gate = STOP FOR HUMAN REVIEW**：交付 directive §XXVIII 的 15 份文件（CURRENT_STATE_REPORT / THREE_DOCUMENT_GAP_ANALYSIS / CLAUDE_CODEX_CONVERGENCE_MATRIX / PROPOSED_ARCHITECTURE_CHANGES / ADR_INDEX / MACHINE_READABLE_SPEC_PLAN / REPOSITORY_ARCHITECTURE / MVP_VERTICAL_SLICE_PLAN / SECURITY_THREAT_MODEL / DATA_ARCHITECTURE_PLAN / GLOBAL_JURISDICTION_PLAN / DEVOPS_SRE_PLAN / TEST_EVAL_STRATEGY / MIGRATION_AND_ROLLBACK_STRATEGY / IMPLEMENTATION_ROADMAP）+ 3 份新增 ADR（007/008/009）。**操作者已審閱並就 4 類待決事項明示裁決授權（見 Round 3）；Phase 3 開工仍待操作者對本輪最終結果的明確 go-ahead**（尤其類別 D 的 MVP 切片雙模型比較尚未真正閉環，不應被本輪處理默默蓋過）。
 
 ---
 
@@ -162,7 +164,7 @@ Source directive 中所有根路徑（`/.ai/`、`/specs/`、`/policies/`、`/met
 | 0 | 文件完整性 + Current State | **COMPLETE**（2026-08-29；71 verified findings） | 11 outputs + 報告 ✅ |
 | CR | Claude/Codex Cross-Review | **COMPLETE**（2026-08-29；9/9 交集 0 DISAGREE，Codex 補 3 組新證據＋3 個新決策點） | 三件套 + 分類矩陣 ✅ |
 | 1 | Gap Analysis | **COMPLETE**（2026-08-29；98 條，含 4 CONFLICT + 5 DUPLICATION） | 6 registers ✅ |
-| 2 | Architecture Convergence | **COMPLETE**（2026-08-29；15/15 deliverables，全部 `Status: PROPOSED`） | 15 deliverables ✅ → **等待 HUMAN REVIEW** |
+| 2 | Architecture Convergence | **COMPLETE**（2026-08-29；15/15 deliverables + 3 新增 ADR；9 份 ADR 全數 `ACCEPTED`） | 15 deliverables ✅ → HUMAN REVIEW 已審閱裁決 → **等待 Phase 3 明確 go-ahead** |
 | 3 | Machine-readable Foundation | NOT_STARTED | specs/policies/tests 樹 + schema 驗證 |
 | 4 | Repository Architecture | NOT_STARTED | bounded contexts 驗證 + repo 決策 |
 | 5 | MVP Vertical Slice | NOT_STARTED | 全鏈 e2e + replay/rollback 實證 |

@@ -1,6 +1,6 @@
 # ADR-004: risk_tier 與 epistemic/provenance label 收斂為 Schema-Anchored 正交 Enum
 
-Status: PROPOSED
+Status: ACCEPTED（2026-08-29，操作者明示授權 Claude 行使架構師裁決權，見 ADR-001 同款範圍聲明：ADR 決策定案 ≠ 母文件已編輯）。**含 Gate Injection 觸發範圍擴大（critical→R3∪R4）之明確認可**：本 ADR 自己已誠實標註此為語意變更非純重命名（見 Consequences 段）；裁決理由——Atlas §14.2 的 Mandatory Gate Injection 清單（Evidence Matrix/Counterevidence/Red Team/Human Specialist Review/Reversal Criteria）語意上對應 EC R3+R4 的聯集，只映射到 R4 會讓 DB Migration、Identity/Authorization 變更等 R3 級操作漏掉本該有的保護；Phase 0 稽核確認無任何實作依賴舊空格式列舉值，遷移成本低。此為**關閉既有保護缺口**，非新增未經論證的範圍。
 Date: 2026-08-29
 
 ## Context

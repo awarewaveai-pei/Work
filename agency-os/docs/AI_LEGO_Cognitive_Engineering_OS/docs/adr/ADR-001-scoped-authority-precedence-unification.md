@@ -1,8 +1,10 @@
 # ADR-001: 統一三母規格的 Scoped Authority 衝突裁決鏈與 Architecture Constitution 身分
 
-Status: PROPOSED
+Status: ACCEPTED（2026-08-29，操作者明示授權 Claude 行使架構師裁決權；Codex 對抗式覆審 NEEDS-REVISION 已修正）
 Date: 2026-08-29
-Deciders: Claude (draft) — 待操作者於 Phase 2 STOP-FOR-HUMAN-REVIEW gate 批准
+Deciders: Claude（裁決）；操作者（明示授權範圍：STOP-FOR-HUMAN-REVIEW gate 之 4 項待決事項，2026-08-29 對話）
+
+**此 Status 的精確範圍（避免誤讀為母文件已修改）**：`ACCEPTED` 代表本 ADR 的**架構決策本身**（選 Option A、其修正版內容）已定案，不再是待討論的選項。這**不等於**三份母文件已被編輯——實際套用仍須依 ADR-006 定義的 `.ai/proposals/<NNN>-<slug>/PROPOSAL.md` 流程逐項產生提案，該流程的 `status: APPROVED` 依規定**只能由操作者本人**推進（directive §XV 絕對句，Claude 永遠不能自我核准母文件編輯本身），與本欄位的 ADR 決策狀態是兩個獨立欄位、兩條不同規則。
 
 ## Context
 
@@ -148,24 +150,39 @@ reversal:
   owner: "操作者"
 ```
 
+## Codex Oracle 對抗式覆審（2026-08-29，已完成，見下方修正）
+
+依 Method Used 末段誠實聲明的建議，操作者授權後已對本 ADR 跑一輪 `codex-oracle.ps1 -Mode inspect`（獨立於 Claude 分析，未餵入本 ADR 結論），完整 artifact：`agency-os/reports/oracle/2026-08-29-inspect-d80a93e4.md`。
+
+**判定：NEEDS-REVISION（CONFIRMED，已於本次修訂納入，見下方 Option A 修正版與 Migration 新增步驟）**
+
+> Option A 把 `Architecture-Constitution-v1.md` 設成唯一 SSOT，並要把 MP/EC 改成指標行而不再重複定義內容；但 EC 的必讀文件解析與 document registry 仍只要求三份母文件與 accepted ADR（`AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md:173`「找到 Master Plan」、`:174`「找到 Method Atlas」、`:229-252` Document Registry 範例僅 3 個 entry），沒有把這個新 SSOT 納入必載入/必追蹤集合。情境：母文件已降成指標行，但 `Architecture-Constitution-v1.md` 缺失或過期；照 EC §3.1 實作的 agent 仍可通過「7 步 Required Document Resolution」檢查（因為該清單本身沒有第 8 步指名這份新檔），卻沒載入唯一有效的裁決鏈，形成靜默繞過——新 SSOT 建好了，但強制載入它的機制沒有同步更新，等於治本方案自己留了一個逃生門。
+
+**根因判斷**：這不是 Option A 本身選錯，是 Option A 原始描述遺漏了一個必要的配套修改——新建 SSOT 檔案與「強制系統實際載入它」是兩件事，前者做了不代表後者自動發生。**不變量修正**（依 AGENTS.md 補丁判準）：任何新增的必讀規範性文件，必須同時登記進 EC §3.1 Required Document Resolution 清單與 §4 Document Registry，否則「建立單一 SSOT」這個模式本身不完整——這一條同樣適用於未來 OQ-7/OQ-8/OQ-10 若採用同一手法時的配套要求，已補進下方 Migration。
+
+**修正後的 Option A（新增第 4 點）**：
+4. **EC §3.1 Required Document Resolution 新增第 8 步**：「找到 `Architecture-Constitution-v1.md`」，缺失時同樣觸發 `DOCUMENT_RESOLUTION_BLOCKED`（沿用既有機制，不新增狀態碼）；**EC §4 Document Registry 範例新增第 4 個 entry**：`id: ai-lego.architecture-constitution, filename: Architecture-Constitution-v1.md, major: 1, required: true`——與 MP/EC 同等級「一律必讀」，不掛在 `required_for` 條件清單下（因為它是裁決鏈本身，任何 scope 的衝突都可能需要它，不能限定情境）。
+
 ## Consequences
 
-**採納 Option A 後解決的既有 findings**：CROSS-T-9（裁決鏈重複定義）、CROSS-R-12 / OQ-9（Architecture Constitution 身分矛盾）、CROSS-R-13（Scoped Authority 授權表範圍不對齊）三條全數 CLOSED，`open-questions.yaml` OQ-9 可標記 `RESOLVED`（附本 ADR 編號）。
+**採納 Option A（含 Codex 覆審後修正版）解決的既有 findings**：CROSS-T-9（裁決鏈重複定義）、CROSS-R-12 / OQ-9（Architecture Constitution 身分矛盾）、CROSS-R-13（Scoped Authority 授權表範圍不對齊）三條全數 CLOSED，`open-questions.yaml` OQ-9 可標記 `RESOLVED`（附本 ADR 編號）。
 
 **產生的新工作**：
-1. 依 `AI_LEGO_OS_Program_Plan_v1.md` §6 母文件修改協議，對 MP（2 處：§0.0.2、§90 item 1）與 EC（2 處：§2、§2.1）的每一處修改各產一份 `PROPOSED_CHANGE / RATIONALE / SOURCE_DOCUMENT / AFFECTED_SECTIONS / DEPENDENCIES / COMPATIBILITY / MIGRATION / ROLLBACK / EVIDENCE` 套件——本 ADR 不代替該協議，只是其上游決策依據。
+1. 依 `AI_LEGO_OS_Program_Plan_v1.md` §6 母文件修改協議，對 MP（2 處：§0.0.2、§90 item 1）與 EC（3 處：§2、§2.1、**新增 §3.1+§4**）的每一處修改各產一份 `PROPOSED_CHANGE / RATIONALE / SOURCE_DOCUMENT / AFFECTED_SECTIONS / DEPENDENCIES / COMPATIBILITY / MIGRATION / ROLLBACK / EVIDENCE` 套件——本 ADR 不代替該協議，只是其上游決策依據。
 2. 新建 `Architecture-Constitution-v1.md`，內容三塊已在 Option A 描述中列出。
-3. 建議（非本 ADR 強制）：仿照 MP §0.0.3 Execution Manifest 記錄 Atlas 版本的模式，未來 Execution Manifest schema 也應記錄 Architecture Constitution 的 `file / declared_version / content_hash / loaded`。
-4. 建議把 OQ-7（risk_tier 詞彙）、OQ-8（epistemic label 詞彙）、OQ-10（platform gate 集合）列為「同類問題」，Phase 2 後續 ADR 可直接複用本 ADR 的 SSOT-抽取手法，不需重新設計。
-5. 建議操作者在正式核准前，對本 ADR 的 Option A 建議跑一輪外部 oracle（Codex）Red Team 覆審，補齊 Atlas §28 對高風險決策要求的對抗式驗證環節（見 Method Used 末段誠實聲明）。
+3. **（Codex 覆審後新增，非原始建議）** EC §3.1 第 8 步 + §4 Document Registry 第 4 個 entry，確保新 SSOT 被納入強制載入集合，不是只被新建卻沒人被要求讀。
+4. 建議（非本 ADR 強制）：仿照 MP §0.0.3 Execution Manifest 記錄 Atlas 版本的模式，未來 Execution Manifest schema 也應記錄 Architecture Constitution 的 `file / declared_version / content_hash / loaded`。
+5. 建議把 OQ-7（risk_tier 詞彙）、OQ-8（epistemic label 詞彙）、OQ-10（platform gate 集合）列為「同類問題」，Phase 2 後續 ADR 可直接複用本 ADR 的 SSOT-抽取手法**，且必須連帶複製本次修正的第 3 點（登記進 §3.1/§4），不能只抽取 SSOT 卻漏掉強制載入配套**。
+6. Codex 對抗式覆審已完成（見上方新增段落），非本 ADR 待辦——已根據其 CONFIRMED 發現修正 Option A 內容,不再是懸而未決的建議。
 
 ## Migration / Rollback
 
-**若採納 Option A**：
+**若採納 Option A（含 Codex 覆審後修正版）**：
 1. 新建 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/Architecture-Constitution-v1.md`（路徑待操作者確認，建議與三母文件同層）。
-2. MP §0.0.2（L60-84）與 §90 item 1（L3785 一行）改為指標行；EC §2 / §2.1（L90-137）改為指標行。四處編輯各走母文件修改協議套件。
-3. 因 repo 禁建 branch（settings deny），四處編輯直接在 `main` 完成，比照 CLAUDE.md「Git 分支」規則。
-4. `open-questions.yaml` OQ-9 標記 `RESOLVED`，加註本 ADR 檔名。
+2. MP §0.0.2（L60-84）與 §90 item 1（L3785 一行）改為指標行；EC §2 / §2.1（L90-137）改為指標行。
+3. **（Codex 覆審後新增）** EC §3.1（L169-185）Required Document Resolution 清單新增第 8 步；EC §4（L218-253）Document Registry 範例新增 `ai-lego.architecture-constitution` entry，`required: true`。
+4. 因 repo 禁建 branch（settings deny），全部編輯直接在 `main` 完成，比照 CLAUDE.md「Git 分支」規則。
+5. `open-questions.yaml` OQ-9 標記 `RESOLVED`，加註本 ADR 檔名。
 
 **Rollback**：純文件變更，`git revert` 對應 commit 即可完全還原；因 Phase 3 尚未開始、無程式碼消費此內容，回滾零風險、零下游影響。
 
@@ -178,3 +195,5 @@ reversal:
 - `.ai/research/phase-0/open-questions.yaml`：OQ-9（L59-63）
 - `AI_LEGO_OS_Program_Plan_v1.md`：L110（Phase 1 exit gate）、L114-124（Phase 2 比較維度定義、母文件修改協議、STOP FOR HUMAN REVIEW gate）
 - Repo-wide grep 確認：Phase 3 `Status: NOT_STARTED`，無任何 `.ts/.js/.py/.yaml/.json` 程式碼消費此裁決鏈
+- EC `AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md`：L169-185（§3.1 Required Document Resolution 七步清單）、L218-253（§4 Document Registry 三筆範例，Codex 指出缺第 4 筆）
+- `agency-os/reports/oracle/2026-08-29-inspect-d80a93e4.md`：Codex 對抗式覆審 artifact（NEEDS-REVISION，已於本次修訂納入）

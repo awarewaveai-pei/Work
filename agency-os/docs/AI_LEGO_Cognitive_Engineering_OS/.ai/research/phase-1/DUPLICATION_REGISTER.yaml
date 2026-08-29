@@ -7,6 +7,7 @@
 # Phase 1 rule: REGISTERED, not fixed.
 duplications:
   - id: P1-DUP-1
+    resolved_by: "docs/adr/ADR-005-db-migration-recipe-and-method-id-grammar.md (ACCEPTED 2026-08-29)"
     severity: high
     origin: P1-GAP-ARCH-1 (architecture_data cluster, promoted)
     title: "DB Migration Recipe 三套互不相同的步驟序列，Atlas 甚至自己內部就矛盾"
@@ -26,6 +27,7 @@ duplications:
     drift: "Atlas 自己的 F21 與 §13.10 對「Dual Read/Write 該在 Backfill 前還是後」自相矛盾（前者在前、後者在後）；EC 版本完全沒有 Dual Read/Write 這個節點。三套步驟數也不同（11/11/13）。"
     consequence: "實作者三選一，選錯順序（例如 backfill 完才開始雙寫）會造成 backfill 期間寫入的新資料遺失——真實的 migration failure，不是文字潔癖。"
   - id: P1-DUP-2
+    resolved_by: "docs/adr/ADR-009-nomenclature-and-directory-canonicalization.md (ACCEPTED 2026-08-29) Sub-decision (a)"
     severity: medium
     origin: P1-GAP-ARCH-11 (architecture_data cluster, promoted)
     title: "同一系統被 Plane / Module / Workspace 三套互不對應的分解方式描述，無對照表"
@@ -45,6 +47,7 @@ duplications:
     drift: "具體命名不一致例證：§27 稱「Data Science Plane」，§28/§77 稱「Data Lab」，程式碼目錄稱「/modules/analytics」——三個名字指同一概念，三份文件都沒有一句話說明這是同一件事。"
     consequence: "讀者/實作者要靠自己拼湊 Plane↔Module↔Workspace 的對應關係；名稱漂移在未來重構時容易被誤判為三個不同的東西而重複建設。"
   - id: P1-DUP-3
+    resolved_by: "docs/adr/ADR-003-tenant-model-and-cas-isolation.md (ACCEPTED 2026-08-29)"
     severity: high
     origin: P1-GAP-ARCH-12 (architecture_data cluster, promoted)
     title: "Tenant Isolation blast-radius 鏈在 MP 與 Atlas 節點數不同，Atlas 多一個 MP 從未提過的「Branch」層級"
@@ -75,15 +78,17 @@ duplications:
     drift: "MP §43 之後每章都有 Method Resolution Rule 導讀防止敘事列表被誤用為完整方法定義，唯獨 §27-42 整個 Data Science block 沒被納入這個保護機制（Method Resolution Rule 全文件只在 MP:2127 出現一次，緊接在 §42 之後）。"
     consequence: "實作者或 AI 只讀 MP 就會用「DAG/DiD/IV/RD/Synthetic Control」等名詞直接建功能，完全繞過 Atlas F11 規定的 assumption/sensitivity 附加規則；未來 Atlas F11 修改因果方法規格，MP §31 不會同步更新也不會被標記過期。"
   - id: P1-DUP-5
+    resolved_by: "docs/adr/ADR-009-nomenclature-and-directory-canonicalization.md (ACCEPTED 2026-08-29) Sub-decision (b)"
     severity: medium
     origin: legal_global_policy GAP-5 (promoted)
     title: "Localization 模組在 MP 與 Atlas 用不相容的目錄/檔案結構各自定義一次"
+    correction_2026-08-29: "ADR-009 逐字查證發現本條目的 Atlas 端引用（§122、行 4918）不可驗證存在——Atlas 全文僅 4618 行，章節僅到 §30，物理上不存在 §122 或行 4918。根因判定為 Phase 1 產出時行號/章節號推測失準（ADR_INDEX.md 已誠實揭露本輪未逐條由第二人複核）。下方 definitions 的 Atlas 條目原樣保留供稽核，但其內容不應被當作 Atlas 真實定義引用；ADR-009 改用獨立工程理由（Correctness/Maintainability/與 REPOSITORY_ARCHITECTURE.md 一致性）裁決正本為 /platform/trust-fabric/localization/，不依賴此不可驗證的引用。MP 端引用（§81）已獨立核對屬實，不受影響。詳見 docs/adr/ADR-009-nomenclature-and-directory-canonicalization.md Sub-decision (b)。"
     definitions:
       - source: "MP §81 Global Config Paths"
         file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md
         line: 3344
         form: "/config/localization/{locale.yaml, currencies.yaml, timezones.yaml, units.yaml, accessibility.yaml}（5 個扁平檔案）"
-      - source: "Atlas §122 Localization Architecture"
+      - source: "Atlas §122 Localization Architecture（⚠️ 2026-08-29 查證：不可驗證存在，見上方 correction 欄位，原樣保留僅供稽核追溯）"
         file: AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md
         line: 4918
         form: "/modules/localization/{locale, language, currency, timezone, calendar, units, address, formatting}/（8 個子目錄，無檔案）"

@@ -1,6 +1,6 @@
 # ADR-006: Mother-Document Revision Flow and Repository-Layout Ownership
 
-Status: PROPOSED
+Status: ACCEPTED（2026-08-29，操作者明示授權 Claude 行使架構師裁決權，見 ADR-001 同款範圍聲明）。本 ADR 定義的 `.ai/proposals/` 流程與其 `status: DRAFT→HUMAN_REVIEW→APPROVED` 硬性規則（Claude 永遠不能自我推進至 APPROVED）**本身不受此 ACCEPTED 影響、繼續原樣生效**——本 ADR 被接受，代表「採用這套流程」的架構決策定案，不代表流程本身的守門規則被放寬。
 Date: 2026-08-29
 Related: OQ-6, OQ-11 (`.ai/research/phase-0/open-questions.yaml`), Program Plan §6, source directive §IX/§X/§XII/§XV
 

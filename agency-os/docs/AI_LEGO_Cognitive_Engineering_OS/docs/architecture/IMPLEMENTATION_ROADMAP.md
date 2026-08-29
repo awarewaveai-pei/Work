@@ -5,7 +5,7 @@ Author: Claude（統籌彙整全部 Phase 0-2 產出，未新增未經其他文�
 
 ## 0. 定位
 
-本文件是 Phase 2 exit gate 第 15 項（最終）交付物，把已產出的 14 份文件（3 份 Phase 0/1/CrossReview 摘要 + 6 份 ADR + 9 份 Round 2 架構計畫，含本文件自己彙整的 `PROPOSED_ARCHITECTURE_CHANGES.md`）串成一條總時間軸。**本文件不做新決策，只做排序**——所有時程都是既有文件已標註的依賴關係的直接推導，任何時間單位（週/月）皆為 Claude 估計，非承諾。
+本文件是 Phase 2 exit gate 第 15 項（最終）交付物，把已產出的 17 份文件（3 份 Phase 0/1/CrossReview 摘要 + 9 份 ADR（含本輪新增 ADR-007/008/009）+ 9 份 Round 2 架構計畫，含本文件自己彙整的 `PROPOSED_ARCHITECTURE_CHANGES.md`）串成一條總時間軸。**本文件不做新決策，只做排序**——所有時程都是既有文件已標註的依賴關係的直接推導，任何時間單位（週/月）皆為 Claude 估計，非承諾。
 
 ---
 
@@ -23,16 +23,18 @@ Phase 2 完成後的關卡是**directive 明文要求的硬停**，不是本文�
 
 ---
 
-## 2. STOP-FOR-HUMAN-REVIEW：操作者需要決定的 4 類事項
+## 2. STOP-FOR-HUMAN-REVIEW：4 類事項處理結果（2026-08-29 更新，操作者已明示授權 Claude 裁決）
 
-| 類別 | 具體項目 | 對應文件 |
+操作者於 2026-08-29 對話中明示「你決定」，將以下 4 類事項的裁決權授予 Claude（架構師身分）。以下記錄實際處理結果，取代原始「待決」版本：
+
+| 類別 | 原始待決事項 | 處理結果 |
 |---|---|---|
-| **A. 是否批准 6 份 ADR** | 可整批、可分批、可部分駁回；ADR-004 的 P-014（risk_tier 觸發範圍語意擴大）建議獨立審閱 | `docs/adr/ADR-001~006*.md`、`PROPOSED_ARCHITECTURE_CHANGES.md` §3 |
-| **B. 是否要求 Codex 對特定 ADR 做對抗式覆審** | ADR-001（治理裁決鏈）與 ADR-002（個資刪除 vs 事件不可變）是 6 份中影響面最大者；`ADR_INDEX.md` 已誠實揭露這兩份尚未經 Codex 驗證 | `docs/adr/ADR_INDEX.md` |
-| **C. 4 項 Round 2 待裁決衝突如何排程** | P1-CONFLICT-3/4、P1-DUP-2/5——是否併入下一輪 ADR，或視為低風險直接授權 Phase 3 執行者裁決 | `MACHINE_READABLE_SPEC_PLAN.md` §5 開放問題 MRSP-1~5 |
-| **D. Phase 5 MVP 切片方向** | Program Plan §9 明定 Learning/Research/Business 三選一「尚未決定」；`MVP_VERTICAL_SLICE_PLAN.md` 已選定 Research Mode 作為**建議**，但這是 Claude 單方分析，未經 directive 要求的「Claude 與 Codex 各自論證後比較」 | `MVP_VERTICAL_SLICE_PLAN.md`、`AI_LEGO_OS_Program_Plan_v1.md` §9 |
+| **A. 是否批准 9 份 ADR** | 6 份 Round 1 ADR 可整批/分批/部分駁回；ADR-004 的 risk_tier 觸發範圍語意擴大建議獨立審閱 | **全部 9 份（含新增 ADR-007/008/009）已裁決為 ACCEPTED**。ADR-004 的 R3∪R4 擴大已明確認可（理由：關閉既有保護缺口，非新增未論證範圍，見 `docs/adr/ADR_INDEX.md`）。**範圍澄清**：ACCEPTED 是 ADR 決策本身定案，非母文件已編輯——實際套用仍須依 ADR-006 的 `.ai/proposals/` 流程逐案由操作者推進至 `APPROVED`。 |
+| **B. 是否要求 Codex 對特定 ADR 做對抗式覆審** | ADR-001/002 影響面最大，建議優先覆審 | **已執行**。兩份皆得到 `NEEDS-REVISION`（ADR-001：新 SSOT 未登記進 EC 必讀集合；ADR-002：Rollback 段自相矛盾 + 備份 DEK 同步缺口），**均已修正並納入 ADR 正文**。完整 artifact：`agency-os/reports/oracle/2026-08-29-inspect-d80a93e4.md`。其餘 7 份本輪未逐份覆審，見 `docs/adr/ADR_INDEX.md` 誠實聲明。 |
+| **C. 4 項 Round 2 待裁決衝突如何排程** | P1-CONFLICT-3/4、P1-DUP-2/5 | **已裁決，新增 ADR-007（PII/pseudonymization 時序）、ADR-008（Financial Assumptions 方法缺口）、ADR-009（Plane/Workspace/Module 命名 + Localization 目錄，合併處理）**。過程中額外訂正 2 條 Phase 1 register 的引用錯誤（`ASSUMPTION_REGISTER.yaml:25` 錯誤 ID；`DUPLICATION_REGISTER.yaml` P1-DUP-5 的 Atlas 端引用不可驗證存在）。 |
+| **D. Phase 5 MVP 切片方向** | Program Plan §9 要求 Claude 與 Codex 各自論證後比較，`MVP_VERTICAL_SLICE_PLAN.md` 原僅有 Claude 單方分析 | **部分執行，未完全閉環**——已跑一輪 Codex 獨立分析（`agency-os/reports/oracle/2026-08-29-inspect-de5cc96f.md`），但 Codex 回應的形式是「找 5 個執行就緒缺口」而非「在 Learning/Research/Business 三者間做出獨立選擇並與 Claude 比較」。Codex 從未明確評估 Learning Mode，也未直接對比 Research vs Business。**誠實結論：directive §9 要求的雙模型比較尚未真正完成**，Research Mode 目前仍是 Claude 單方選擇，只是額外多了「Codex 未發現與其矛盾的執行缺口」這個弱一級的佐證。若操作者要求嚴格閉環，需要用更明確要求「三選一定案」的 prompt 重跑一次 Codex inspect，而非本輪這種開放式 gap-finding 提問方式。 |
 
-**誠實聲明**：類別 D 是本次 Phase 2 產出中唯一一處可能被誤讀為「已經決定」的項目——`MVP_VERTICAL_SLICE_PLAN.md` 選了 Research Mode 並寫出完整 28 步 walkthrough，但 Program Plan §9 的原始要求是雙模型比較後才選，尚未執行。操作者若要求嚴格遵守原始 directive，這一步在 Phase 3 開始前需要補做 Codex 側的獨立論證。
+**本輪的一處自我更正（VBC 案例）**：初版曾誤指控 ADR-007 起草 agent「邊界確認聲明與實際行為不符」（誤以為它修改了 `GAP_REGISTER.yaml` 卻聲稱沒有）。經核對 ADR-007 檔案原文（明文「此為 GAP_REGISTER.yaml 自身的索引錯誤...不在此修正」）與 `git log`/`WORKLOG.md` 後確認：該處修正實際由另一個並行 session 依操作者指示完成，ADR-007 agent 的邊界聲明本身是準確的。此指控已於 `docs/adr/ADR_INDEX.md` 更正——先讀 WORKLOG 再下結論（VBC 原則）在此被自己的初版違反了一次，記錄下來作為提醒。
 
 ---
 
@@ -83,7 +85,7 @@ Phase 2 完成後的關卡是**directive 明文要求的硬停**，不是本文�
 
 | 風險 | 來源文件 | 監控方式 |
 |---|---|---|
-| 6 份 ADR 若被 Codex 覆審推翻，Phase 3 已建的 Wave 1 型別需要重新核對 | `ADR_INDEX.md`、`MACHINE_READABLE_SPEC_PLAN.md` MRSP-7 | Phase 3 開工前完成 Codex 覆審（本文件 §2 類別 B），而非邊做邊改 |
+| 其餘 7 份 ADR（001/002 已覆審，003/004/005/006/009 未逐份覆審）若日後被 Codex 覆審推翻，Phase 3 已建的 Wave 1 型別需要重新核對 | `ADR_INDEX.md`、`MACHINE_READABLE_SPEC_PLAN.md` MRSP-7 | 已對 001/002 完成覆審並修正；其餘 7 份風險較低（未涉及最高竄改面的治理鏈/個資機制），可於 Phase 3 執行中順帶驗證，不阻塞開工 |
 | Phase 5 切片方向若與 Research Mode 建議不同，`MVP_VERTICAL_SLICE_PLAN.md` 的 28 步 walkthrough 與 Tier 1 Method Contract 清單需重寫 | `MVP_VERTICAL_SLICE_PLAN.md`、§3 Atlas Method Contract 補齊 | 在本文件 §2 類別 D 決議後，若方向改變，重寫成本已知且侷限在單一文件，不影響 Phase 3 Wave 1-2 已完成的型別基礎 |
 | Global/High-risk Gate 清單（CROSS-R-5/7、CROSS-T-11）長期未裁決，會讓 Wave 5-6 兩個檔案永遠卡在骨架狀態 | `MACHINE_READABLE_SPEC_PLAN.md` MRSP-1 | 建議操作者將此列為 Round 2 ADR 第一優先項，避免變成長期未追蹤缺口（同 §已知信任邊界的教訓：偵測到的缺口若無 owner 與期限，會退化成無人管理的技術債） |
 | Atlas 289 方法中 287 個無 contract，Tier 2 清單龐大 | `MACHINE_READABLE_SPEC_PLAN.md` §4 | 用 `contract-backlog.yaml` + fail-closed 狀態碼機制持續可見，不靜默隱藏；每次 Phase 3 之後的 session 若要選用 pending 方法，機制會自然要求補 contract 而非放行 |
@@ -112,7 +114,7 @@ Phase 2 完成後的關卡是**directive 明文要求的硬停**，不是本文�
 2. Phase 1 五份 Register + `PHASE_1_GAP_ANALYSIS_SUMMARY.md`（`.ai/research/phase-1/`）
 3. `CONVERGENCE_MATRIX.md`（`.ai/research/cross-review/`）
 4. `PROPOSED_ARCHITECTURE_CHANGES.md`
-5. `docs/adr/ADR_INDEX.md` + 6 份 ADR
+5. `docs/adr/ADR_INDEX.md` + 9 份 ADR（含本輪新增 ADR-007/008/009，全部 `Status: ACCEPTED`）
 6. `MACHINE_READABLE_SPEC_PLAN.md`
 7. `REPOSITORY_ARCHITECTURE.md`
 8. `MVP_VERTICAL_SLICE_PLAN.md`

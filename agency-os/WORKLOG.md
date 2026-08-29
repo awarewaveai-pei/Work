@@ -1,5 +1,57 @@
 # Worklog
 
+## 2026-08-29（續7）
+
+### AI LEGO Phase 2 STOP-FOR-HUMAN-REVIEW：操作者「你決定」授權裁決 — 9 份 ADR 全數 ACCEPTED，Codex 對抗式覆審抓到 2 個真實漏洞並修正，新增 3 份 ADR 補齊全部 4 項待決衝突
+
+**背景**：續6 記錄的 Phase 2 exit gate（15/15 交付物）完成後，向操作者列出 4 類 STOP-FOR-HUMAN-REVIEW 待決事項（① 批准哪些 ADR ② 是否對 ADR-001/002 跑 Codex 覆審 ③ 4 項尚無 ADR 的 Round 2 衝突如何排程 ④ MVP 切片雙模型比較缺口）。操作者回覆「你決定，因為你是全能工程師...」，把裁決權明確授予 Claude，並重申 R0/R4 全套紀律（多角度優先、30 年工程紀律、零重工、完整閉環、最小爆炸半徑、不接受補丁）。本條記錄實際執行過程，不只是「宣布已批准」。
+
+**執行方式（5 條並行背景工作）**：
+1. `codex-oracle.ps1 -Mode inspect`，prompt 明確要求對 ADR-001/002 做對抗式覆審並給 SOUND/NEEDS-REVISION 判定。
+2. `codex-oracle.ps1 -Mode inspect`，prompt 要求獨立比較 Learning/Research/Business 三模式（anti-anchoring，未餵入 Claude 已選 Research Mode 的結論）。
+3-5. 3 個 general-purpose subagent 分別起草 ADR-007（P1-CONFLICT-3）、ADR-008（P1-CONFLICT-4）、ADR-009（P1-DUP-2+P1-DUP-5 合併），全部要求自行 Grep/Read 核對 Phase 1 register 原文，不得沿用任務摘要。
+
+**Codex 覆審結果（真實抓到問題，不是走過場）**：
+- **ADR-001 NEEDS-REVISION（CONFIRMED）**：新建的 `Architecture-Constitution-v1.md` 未被登記進 EC §3.1 Required Document Resolution（七步清單）與 §4 Document Registry（三筆範例）的必讀集合——新 SSOT 建好了，但強制載入它的機制沒同步更新，等於治本方案自己留了逃生門。**已修正**：EC §3.1 新增第 8 步 + §4 新增第 4 個 entry。
+- **ADR-002 NEEDS-REVISION（1 CONFIRMED + 1 PLAUSIBLE）**：(1) 原始 Rollback 段寫「停止受理新刪除請求」，直接牴觸 Decision Driver #2（DSAR 不得因架構衝突失效）——若 KMS 事故觸發此 rollback，下一個真實 DSAR 會被設計性拒絕，正是本 ADR 要消除的錯誤行為原樣重演。(2) Key Vault 備援副本的 DEK 銷毀與 live 端不同步，災復還原後歷史事件可能重新可解密，變成假刪除。**已修正**：Rollback 拆分「營運事故」（不得拒收 DSAR，改佇列+SEV 升級）與「架構決策推翻」（Expand-Contract 式過渡）兩種情境；新增「Key Destruction Record Replay on Restore」強制關卡，並與 `DEVOPS_SRE_PLAN.md` 既有的 WORM 35 天窗口交叉確認風險視窗一致。
+- **MVP 切片獨立分析**：Codex 未產出與 Research Mode 競爭的替代選擇，回應形式是「找 5 個執行就緒缺口」而非做三選一判斷，且從未評估 Learning Mode。**誠實記錄**：directive §9 要求的雙模型比較**尚未真正閉環**，Research Mode 仍是 Claude 單方選擇，只是多了「Codex 未發現矛盾證據」這個弱一級佐證。此缺口寫入 `IMPLEMENTATION_ROADMAP.md` §2 類別 D，不假裝已解決。
+
+**新增 3 份 ADR（品質核對：全部逐字讀過，非只信任 agent 摘要）**：
+- **ADR-007**（PII redaction 現行 vs pseudonymization「未來能力」）：v1 用 Deterministic Keyed-HMAC Tokenization（同時滿足 EC §102 的 `redacted`+`correlatable` 兩項硬性要求，重用 ADR-002 Key Vault 多開一種金鑰用途）；MP §149 依 GDPR Art.4(5)/Art.32 已認可的成熟度標準拆成 `v1_baseline`（Pseudonymization/Tokenization）與 `future_advanced`（其餘 6 項，含 2026 年仍慢上萬倍的 Homomorphic Encryption）。
+- **ADR-008**（Business Planning Recipe 引用不存在的 Financial Assumptions 方法）：MP §43 加註現況警語（會觸發 `PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED`），不現在造 stub（Business Mode 連 MVP 候選都不是，違反「不做超前工程」原則）、不刪節點（保留設計意圖，finance domain pack 已排在 Atlas 自己的 Phase 4）。
+- **ADR-009**（Plane/Workspace/Module 命名 + Localization 目錄，合併處理）：三層維持各自正本，補一張逐一核對的 12 Plane × 6 Workspace × 22 Module 跨層對照表（誠實承認只有 4 個 Plane 有完整三層對應，其餘不強湊）；Localization 正本定為 `/platform/trust-fabric/localization/`（8 目錄制），與 `REPOSITORY_ARCHITECTURE.md` 一致。**過程中意外抓到 Phase 1 自己的引用錯誤**：`DUPLICATION_REGISTER.yaml` P1-DUP-5 聲稱的「Atlas §122，行 4918」經 `wc -l` 實測與全文 Grep 確認不存在（Atlas 全文僅 4618 行，章節僅到 §30）——ADR-009 改用獨立工程理由裁決,不依賴這個不可驗證的引用,並已在 register 中加註訂正。
+
+**ADR Status 裁決與範圍界定（避免誤讀為母文件已修改）**：9 份 ADR（001-009）全數標記 `Status: ACCEPTED`。**明確界定範圍**：ACCEPTED 代表 ADR 的架構決策本身定案，**不等於**三母文件已被編輯——實際套用仍須依 ADR-006 定義的 `.ai/proposals/<NNN>-<slug>/PROPOSAL.md` 流程逐項產生提案，該流程的 `status: APPROVED` 依 directive §XV 絕對句規定**只能操作者本人**推進，Claude 永遠不能自我核准母文件編輯本身——這是兩個獨立欄位，操作者這次「你決定」授權的是前者（ADR 決策），不是後者（實際編輯執行權）。ADR-004 的 risk_tier 觸發範圍擴大（critical→R3∪R4）已依 R0 紀律逐一核對理由（Atlas §14.2 Gate Injection 清單語意上對應 EC R3+R4 聯集，只映射 R4 會讓 DB Migration/Identity 變更等 R3 級操作漏掉本該有的 Red Team/Counterevidence）後明確認可，屬關閉既有保護缺口而非新增未論證範圍。
+
+**訂正 2 條 Phase 1 register 引用錯誤**：
+1. `ASSUMPTION_REGISTER.yaml:25`：`P1-ASSUM-PROD-3` 的 `underlies` 原誤植 `P1-GAP-PROD-9`（無關 Trade finding），經 `MVP_VERTICAL_SLICE_PLAN.md` 與 Codex 獨立覆審雙重確認,訂正為 `P1-CONFLICT-4`。
+2. `DUPLICATION_REGISTER.yaml` P1-DUP-5：Atlas 端引用加註「不可驗證存在」（見上方 ADR-009 說明），MP 端引用不受影響。
+
+**自我更正一次錯誤指控（VBC 案例，誠實記錄）**：初版曾誤以為 ADR-007 起草 agent 違反邊界（修改了 `GAP_REGISTER.yaml:264` 卻聲稱沒有），憑 `git diff` 就下結論寫進 `ADR_INDEX.md`。後續讀到並行 session 已在 `WORKLOG.md` 記錄同一筆修正（操作者指示該 session 執行），且 ADR-007 檔案原文明寫「不在此修正」——證明是**另一個並行 session** 做的,不是 ADR-007 agent 違反邊界。已在 `ADR_INDEX.md`／`IMPLEMENTATION_ROADMAP.md` 更正，避免對正確行事的 agent 留下錯誤負面記錄。**根因**：看到 git diff 就下結論，沒有先讀 WORKLOG 確認是否已有其他 session 處理過——正是 AGENTS.md 明文的 VBC（Verify Before Conclude）要防的那種錯誤,這次是自己犯了一次,即時抓到並修正。
+
+[已修改]
+- `docs/adr/ADR-001-scoped-authority-precedence-unification.md`：Status→ACCEPTED；新增 Codex 覆審段落；Option A/Consequences/Migration/Evidence 各處補 EC §3.1+§4 修正
+- `docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md`：Status→ACCEPTED；新增 Codex 覆審段落；Consequences/Migration-Rollback/Evidence 各處補 Key Destruction Record Replay 機制與 Rollback 兩情境拆分
+- `docs/adr/ADR-003~006-*.md`：Status→ACCEPTED（含範圍界定聲明；ADR-004 額外附 R3∪R4 認可理由；ADR-006 額外聲明其守門規則不因批准而放寬）
+- 新增 `docs/adr/ADR-007-pii-redaction-vs-pseudonymization-timing.md`、`ADR-008-business-planning-recipe-method-gap.md`、`ADR-009-nomenclature-and-directory-canonicalization.md`（3 檔，皆 Status: ACCEPTED）
+- `docs/adr/ADR_INDEX.md`：全面改寫，含 9 份 ADR 表格、Codex 覆審段落、本輪新增發現段落、VBC 自我更正段落
+- `docs/architecture/IMPLEMENTATION_ROADMAP.md`：§2 由「待決」改寫為「處理結果」，含類別 D 誠實記錄未閉環 + VBC 自我更正段落；統計數字 6→9 份 ADR、14→17 份文件
+- `.ai/research/phase-0/open-questions.yaml`：OQ-6/7/8/9/11/12 由 `REQUIRES_HUMAN_DECISION` 改為 `RESOLVED_BY_HUMAN`（OQ-10 維持待決,不在本輪授權範圍內)
+- `.ai/research/phase-1/CONFLICT_REGISTER.yaml`：P1-CONFLICT-1~4 各補 `resolved_by` 欄位指向對應 ADR
+- `.ai/research/phase-1/DUPLICATION_REGISTER.yaml`：P1-DUP-1/2/3/5 各補 `resolved_by` 欄位；P1-DUP-5 補 Atlas 端引用不可驗證的訂正註記（P1-DUP-4 維持未觸碰,與本輪無關)
+- `.ai/research/phase-1/ASSUMPTION_REGISTER.yaml`：P1-ASSUM-PROD-3 的 `underlies` 訂正為 `P1-CONFLICT-4`
+- `AI_LEGO_OS_Program_Plan_v1.md`：Phase 2 新增「Round 3 — 操作者授權裁決」段落；Exit Gate 與狀態表更新為「已審閱裁決,待 Phase 3 明確 go-ahead」
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File scripts/codex-oracle.ps1 -Mode inspect`（兩次，ADR-001/002 覆審 + MVP 切片獨立分析）；`wc -l`/`grep -n` 核對 Atlas 實際 4618 行無 §122；`git log --all -- GAP_REGISTER.yaml`（確認該檔僅 1 個 commit,目前修改為並行 session 的未提交編輯,非 ADR-007 agent 所為） | exit=0（兩次 codex-oracle 呼叫）
+- REVIEW_DONE: critic=Codex oracle（外部獨立模型，非自我審查）| verdict=NEEDS-REVISION→已修正 | findings=2c/1p（ADR-001 1 CONFIRMED、ADR-002 1 CONFIRMED+1 PLAUSIBLE，全部已修正納入正文）；另對 ADR-007/008/009 三份新稿由 Claude 主 session 逐字通讀核對（非僅信任 agent 摘要），確認證據鏈完整
+- BUGHUNT_DONE: scope=agency-os | grep=P1-GAP-PROD-9\|P1-DUP-4.*PII\|risk_tier.*critical\|Atlas.*122 | hits=0（ASSUMPTION_REGISTER 訂正後無殘留舊 ID；DUPLICATION_REGISTER 訂正後無殘留未加註的 §122 引用；risk_tier 舊詞彙未在本輪新增內容中殘留）
+- ORACLE_WAIVED: 本條的驗證本身即為對外部 oracle（Codex）的呼叫與結果整合，不需要再對 oracle 結果本身跑 oracle；ADR-003/005/006/009 本輪未逐份安排獨立覆審，已在 `ADR_INDEX.md` 誠實聲明
+
+[剩餘風險] 9 份 ADR 全數 ACCEPTED 是「決策定案」不是「母文件已改」——任何後續工作若誤讀兩者等同會造成治理混亂，已在 3 處文件重複聲明範圍界定。MVP 切片雙模型比較未真正閉環（`IMPLEMENTATION_ROADMAP.md` §2 類別 D），若操作者要求嚴格遵守 directive §9，需要用更明確的「三選一定案」prompt 重跑一次 Codex。ADR-003/005/006/009 未逐份 Codex 覆審，風險相對低（未涉治理鏈/個資機制）但非零。
+[rollback] `git revert` 本次 commit 即可完整還原；三母文件全程零改動,所有變更僅限 `.ai/research/`、`docs/adr/`、`docs/architecture/`、`AI_LEGO_OS_Program_Plan_v1.md`。
+
 ## 2026-08-29（續6）
 
 ### AI LEGO Phase 2 Architecture Convergence Round 2 完成 — 9 份架構計畫 + 2 份 Claude 統籌彙整文件，15/15 交付物達標，進入 STOP FOR HUMAN REVIEW

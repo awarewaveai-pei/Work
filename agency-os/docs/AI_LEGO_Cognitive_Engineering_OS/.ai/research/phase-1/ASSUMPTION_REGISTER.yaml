@@ -23,7 +23,7 @@ assumptions:
     if_false: "這是合理的設計意圖，但目前 Jurisdiction Model（§93-94）與 Legal Source Registry（§95）都沒有把「accessibility 標準版本」列為 Pack 屬性——這個假設目前沒有落地點。"
   - id: P1-ASSUM-PROD-3
     cluster: product_business_ops
-    underlies: P1-GAP-PROD-9
+    underlies: P1-CONFLICT-4  # 訂正 2026-08-29（ADR-008）：原誤植 P1-GAP-PROD-9（該 ID 實際指向無關的 Trade finding）。經 MVP_VERTICAL_SLICE_PLAN.md 與 Codex 獨立覆審（agency-os/reports/oracle/2026-08-29-inspect-de5cc96f.md #5）雙重確認，真正對應的是 CONFLICT_REGISTER.yaml 的 P1-CONFLICT-4（Business Planning Recipe 引用不存在的 Financial Assumptions 方法）。
     assumption: "空的 finance domain pack 會在 Phase 5 MVP Vertical Slice 之前被補上方法內容。"
     if_false: "Program Plan §9 明確標示 Learning/Research/Business 三選一「待 Claude 與 Codex 各自論證」尚未定案——若最終選 Business 作為 MVP slice，這個空 pack 會變成 MVP 執行中途才被發現的硬性阻塞，而非現在（gap analysis 階段、成本最低時）就被標記。"
   - id: P1-ASSUM-LEGAL-1

@@ -7,6 +7,7 @@
 # Phase 1 rule: REGISTERED, not fixed.
 conflicts:
   - id: P1-CONFLICT-1
+    resolved_by: "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md (ACCEPTED 2026-08-29)"
     severity: high
     origin: P1-GAP-ARCH-6 (architecture_data cluster, promoted)
     title: "Event-native 不可變架構（可 Replay 任意歷史狀態）與 GDPR 類刪除權要求結構性衝突"
@@ -21,6 +22,7 @@ conflicts:
     why_incompatible: "事件日誌本質不可變、不可單點刪除（刪一筆事件會讓所有下游 projection 從那個時間點起與原始計算結果不一致），但「合規刪除」要求真正移除個資內容。全文搜尋 crypto-shred / event redaction / tombstone / GDPR+event 同段皆缺席——事件溯源系統慣用的補救手段（crypto-shredding、只存 ID 不存內容、redaction event）完全未被提及。"
     consequence: "ClaimCreated 這類事件若含使用者上傳文件的個資，用戶合規刪除請求與系統不可變性原則直接互斥，且無 conflict_resolution_order 之外的具體調和規則——這不是缺一個機制，是兩條寫死的規則彼此矛盾。"
   - id: P1-CONFLICT-2
+    resolved_by: "docs/adr/ADR-003-tenant-model-and-cas-isolation.md (ACCEPTED 2026-08-29)"
     severity: high
     origin: P1-GAP-ARCH-8 (architecture_data cluster, promoted)
     title: "全域 Content-Addressed 去重與 Tenant Isolation 為最外層爆炸半徑防線互相矛盾"
@@ -35,6 +37,7 @@ conflicts:
     why_incompatible: "全域 CAS 去重代表兩個不同租戶上傳同一份檔案時只存一份 blob。刪除一個租戶的 Source 若對應到共享 hash，物理刪除前必須先掃全平台其他租戶的引用，但 Data Deletion Contract 的 Dependency Check 步驟未列此檢查。已知的 CAS 跨租戶側通道問題（觀察上傳是否「秒存」可推斷別的租戶是否持有同一檔案）完全未被提及。"
     consequence: "與文件自己宣稱的「Tenant Isolation 是第一層、最基本的爆炸半徑防線」直接矛盾——儲存層設計（全域去重）與隔離層宣稱（tenant 最外層邊界）在架構層次上互斥，除非額外引入 tenant-scoped 加密或棄用全域去重。"
   - id: P1-CONFLICT-3
+    resolved_by: "docs/adr/ADR-007-pii-redaction-vs-pseudonymization-timing.md (ACCEPTED 2026-08-29)"
     severity: high
     origin: security_privacy_iam GAP-9 (promoted from GAP_REGISTER duplication_candidates note)
     title: "v1 即生效的 PII redaction 政策，唯一命名的去識別化能力卻被自稱「未來能力」"
@@ -49,6 +52,7 @@ conflicts:
     why_incompatible: "「PII」一詞全部三份母規格完全零出現；redact 要求今天生效，但唯一被命名的去識別化技術（Pseudonymization）被自己歸類為「明年才有」。政策的時效與能力的時效直接矛盾——現在要做的事，規格自己說能力還不存在。"
     consequence: "稽核時會發現「規則要求今天做的事，規格自己說能力明年才有」——這不是缺少偵測機制的 gap，是文件對同一件事給出了兩個互斥的時間軸承諾。"
   - id: P1-CONFLICT-4
+    resolved_by: "docs/adr/ADR-008-business-planning-recipe-method-gap.md (ACCEPTED 2026-08-29) — 加註現況警語，不新造 stub，底層 finance domain pack 缺口仍未關閉，見該 ADR Recommendation 段誠實聲明"
     severity: medium
     origin: product_business_ops GAP-8 (promoted)
     title: "Business Planning Recipe 引用的方法在 Atlas 對應 domain pack 中不存在，違反文件自己的方法解析紅線，理論上現在就該觸發 BLOCKED"
