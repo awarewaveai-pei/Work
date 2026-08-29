@@ -733,7 +733,9 @@
   - **重用既有機制而非重工**：發現 `lib/tenant-guard.ts` + `0001_core.sql`（`organizations`/`profiles`/`organization_memberships`）已是完整、已測試、已上線但從未被外部真人使用過的 client/staff 雙身分模型，portal 只新增 1 張 `organization_product_subscriptions` 表，不建平行系統。詳見方案 §0/§2/§4.1。
   - **六輪覆審全過**（db-expert/自審/critic×3/Codex×3），含一次真實 production incident（nginx 已上線但 app 未部署造成重導迴圈放大器,跟 `app.aware-wave.com` 共用 container）**即時止血+治本**，過程中順帶修好 `sg-deploy.sh` 兩個因 2026-08-28 SG+EU 整併而過期失準的 smoke 探針（獨立 commit `d9206dee`）。
   - **2026-08-29 commit `83277d80`+`d9206dee` 已 push+部署,`sg-deploy.sh` 4/4 smoke 通過無 rollback**。端對端驗證：`/login`/`/launcher`/`/api/signup`/靜態資源/既有四網域全部符合預期,零回歸。
-  - **V1 範圍界定（刻意,非未完成）**：`PORTAL_SIGNUP_ENABLED` 留空,身分層已上線但**真實註冊尚未開放**。開放需另一輪 go-ahead（設此 env var + `TURNSTILE_SECRET_KEY`）——**新開任務項，不算這條的欠款**。
+  - **V1 範圍界定（刻意,非未完成）**：`PORTAL_SIGNUP_ENABLED` 留空,身分層已上線但**真實註冊尚未開放**。`TURNSTILE_SECRET_KEY`/`NEXT_PUBLIC_TURNSTILE_SITE_KEY` 其實已經在 `.env` 裡（沿用 `/intake` 那組,已確認有值+已烤進當前 build）,唯一還沒設的只有 `PORTAL_SIGNUP_ENABLED=true` 本身。
+  - **【2026-08-29 操作者決定：先不開】** 操作者問「portal 密碼可以做什麼」，釐清後發現：portal 帳號是給**未來 HCI-30/Cognitive OS 外部付費客戶**用的,不是給操作者自己用（操作者本來就有 `app.aware-wave.com` owner 權限,兩者身分/用途完全不同）。**現在開公開註冊除了測水管通不通,對操作者沒有任何實際用途**——Cognitive OS 後端還在 Phase 2 規劃、HCI-30 未動工,登入進去 launcher 只會看到兩張「即將推出」卡片。**操作者選擇先不開,只在 TASKS 記提醒**。
+  - **重新開放的觸發條件（任一成立再考慮）**：① Cognitive OS 或 HCI-30 任一產品有真實 provisioning API 可接（launcher 卡片有東西可以真的開通）② 操作者明確想做一次端對端 signup 水管測試（非開放給真實客戶,測完可考慮關掉或留著）。**觸發前不要主動再問或自己打開**。
 
 #### G. ▶️ 可直接做 — 基礎建設與客戶站
 
