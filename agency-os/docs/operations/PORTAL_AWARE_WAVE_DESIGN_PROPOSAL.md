@@ -1,6 +1,6 @@
-# portal.aware-wave.com 設計方案（v7，六輪覆審完成，待 commit+部署）
+# portal.aware-wave.com 設計方案（v8，V1 已上線）
 
-> **狀態**：DNS/憑證/nginx 已在 `ks-aw-01` 上線（migration `0062`+`0063` 已套用，portal 暫時 `return 503` 止血中）。**過程中發生一次真實 incident**（C-A：nginx 已上線但 app 未部署造成的重導迴圈放大器，已即時止血 + 已治本，見 §14）。db-expert（§9）/自審（§10）/critic 第一輪（§11）/Codex 三輪意見（§12-§13）/critic 第二輪（§14）/critic 第三輪窄範圍驗證（§15，抓到 §14 一項修正實際無效並修正）**六輪覆審全部跑完並修正**。`npx tsc --noEmit` exit 0、`npx vitest run` 59 檔 688 條全過。**下一步**：commit（清 `verify-recent` 機械閘）→ push → `sg-deploy.sh next-admin` → 部署健康後拿掉 nginx 的 `return 503` 止血 → 端對端 smoke test。
+> **狀態：✅ 已部署，portal.aware-wave.com 對外運作中**（2026-08-29）。commit `83277d80`（portal 本體）+ `d9206dee`（sg-deploy.sh 探針修正）已 push + 部署，`sg-deploy.sh` 4/4 smoke 通過無 rollback。nginx 止血用的 `return 503` 已移除，端對端驗證：`/login` 200、`/` 正確導向 launcher（無迴圈）、`/launcher` 無 session 正確擋 307、`/api/signup` 正確回 503（`PORTAL_SIGNUP_ENABLED` 故意留空,V1 只開身分層不開真實註冊）、靜態資源 200（hydration 正常）、app/api/www/oracle 四個既有網域零回歸。過程中兩個真實 incident 都已止血+治本（§14 nginx-vs-app 部署順序造成的重導放大器；部署時發現的 sg-deploy.sh 探針因整併後過期造成假陽性 rollback，另見 `d9206dee` commit + WORKLOG）。db-expert/自審/critic×3/Codex×3 六輪覆審全部修正。`npx tsc --noEmit` exit 0、`npx vitest run` 59 檔 688 條全過。**下一步（V1 範圍外，需另一輪 go-ahead）**：設 `PORTAL_SIGNUP_ENABLED`+`TURNSTILE_SECRET_KEY` 開放真實註冊。
 > **一句話**：portal = HCI-30 + Cognitive OS 的外部客戶登入/帳號/訂閱/launcher 層，跟 `app.aware-wave.com`（內部維運後台）分離——但**重用**既有的 `organizations`/`profiles`/tenant-guard 機制，不建平行系統。
 
 ---
@@ -397,3 +397,25 @@ server_name aware-wave.com www.aware-wave.com api.aware-wave.com app.aware-wave.
 
 - `npx tsc --noEmit`：exit 0
 - `npx vitest run`：**59 檔、688 條全過**（新增 22 條）
+
+## 16. 部署（2026-08-29，成功，含兩個部署期間發現並修正的問題）
+
+`git commit 83277d80` + push → `ks-aw-01` 跑 `sg-deploy.sh next-admin`：
+
+1. **第一次嘗試失敗**：`npm: command not found`。SSH 查證 `ks-aw-01` 自 2026-08-28 SG+EU 整併後**從未裝過 Node.js**（`dpkg`/`find` 全域搜尋確認）。裝 Node 20.20.2（對齊 `next-admin` Dockerfile 的 `node:20-alpine`）。
+2. **第二次嘗試**：git pull → npm install → tsc typecheck 過 → npm test 過 → docker build 成功（~114s）→ container 啟動、**next-admin 自己的兩個 smoke 探針都過**，但另外兩個（wordpress／node-api health）非 2xx，**auto-rollback 正確觸發**，新 code 被自動還原。追根因：這兩個探針是整併前（2026-05-21）驗證的，整併後 `ks-aw-01` 同時掛多個 vhost，裸 Host 請求不再落到 WordPress、node-api 真實路徑是 `/health` 非 `/api/health`——**假陽性，不是 portal 程式碼的問題**。修好 `sg-deploy.sh`（獨立 commit `d9206dee`，過程中 critic 又抓到「用 `-L` 跟隨轉址會讓探針經公開 DNS 落到 Cloudflare」的新問題，改用 `--resolve` 強制本機解析）。
+3. **第三次嘗試（`--skip-pull` 因鎖檔卡了一次,清掉 stale lock 後）：成功**。4/4 smoke 通過，`deployed commit: d9206dee`，無 rollback。
+
+**移除止血 + 端對端驗證**（拿掉 nginx 的 `return 503`,`docker restart lobster-nginx` 生效)：
+
+| 檢查 | 結果 |
+|---|---|
+| `portal.aware-wave.com/login` | 200 |
+| `portal.aware-wave.com/`（跟隨重導） | 200，2 次重導，**無迴圈** |
+| `portal.aware-wave.com/launcher`（無 session） | 307（正確擋下）|
+| `portal.aware-wave.com/api/signup` POST | 503（`PORTAL_SIGNUP_ENABLED` 故意留空，V1 範圍界定生效）|
+| 真實靜態資源（`_next/static/chunks/*.js`） | 200（M2 hydration 修正確認有效）|
+| `app.aware-wave.com`／`api.aware-wave.com`／`www.aware-wave.com`／`oracle.aware-wave.com` | 200/200/301/307，**零回歸** |
+| `lobster-next-admin` container logs | 無 error/CRITICAL |
+
+**V1 範圍界定，這裡再次確認成立**：portal 身分層（login/launcher/host 隔離/C2 選擇性阻擋）已經真實上線；`PORTAL_SIGNUP_ENABLED` 刻意留空，所以**現在還沒有任何人能真的註冊**——這是設計好的，不是漏做。要開放真實註冊需要另一輪操作者 go-ahead（設定 env var + Turnstile 金鑰）。

@@ -729,12 +729,11 @@
   - **Phase 3 WooCommerce**：商品 publish + Claude 文案 + 定價/尺寸表（taiwanmerch.co 模式）。
   - **證據**：WORKLOG 2026-06-05/06 tarot entries；MEGA 截圖(操作者提供)。
 
-- [ ] **【2026-08-29 開出｜方案待批准，未實作】`portal.aware-wave.com` 最小版** — 統一登入 / Account / Subscription / Product Launcher，服務 HCI-30 + Cognitive OS 的**外部客戶**（跟 `app.aware-wave.com` 不同：`app` 是內部 admin console 單一 owner + RBAC，`portal` 是外部多租戶帳號/訂閱層，現在完全不存在）。方案 SSOT：[`docs/operations/PORTAL_AWARE_WAVE_DESIGN_PROPOSAL.md`](docs/operations/PORTAL_AWARE_WAVE_DESIGN_PROPOSAL.md)；IA 對照：`docs/edge-and-domains/PRODUCT_DOMAIN_IA_PLAN.md` §3。
-  - **關鍵依賴（改變範圍）**：`ADR-003`（2026-08-29）已定義 Cognitive OS 的 `Tenant` domain object，但 Cognitive OS 仍是 Phase 2 規劃、無 code、無 provisioning API 可接。portal V1 因此只做「身分+訂閱狀態」，不假裝已能真的開通產品。
-  - **2026-08-29 操作者授權 Claude 裁決**：①部署形態=共用 next-admin host-based routing（零新 container，`ks-aw-01` 單機資源有限）②V1=cognitive+hci 兩張 coming-soon 卡一起建（data-driven registry，非硬編，兩者皆無業務邏輯）。理由見方案 §6。
-  - **【重大修正 v2】繼續讀 code 發現 `lib/tenant-guard.ts` + `0001_core.sql`（`organizations`/`profiles`/`organization_memberships`）已是一套完整、已測試、已上線但從未被外部真人使用過的 client/staff 雙身分模型**。v1 方案（新開 `portal` schema + 新 claims 命名空間）是重工，已作廢改為重用既有機制，只新增 1 張 `organization_product_subscriptions` 表。詳見方案 §0/§2/§4.1。
-  - **現況（2026-08-29，方案 v6）**：db-expert/自審/critic 第一輪/Codex 三輪/critic 第二輪**五輪覆審**。**🚨 過程中發生真實 incident**：DNS/nginx 上線但 app 未部署，造成 `portal.aware-wave.com` 重導迴圈放大器（跟 `app.aware-wave.com` 共用 container），critic 實測抓到——**已即時止血**（nginx `return 503`，SSH 進 `ks-aw-01` 處理，過程中發現這個 container 對 `default.conf` 是單檔 bind mount，`sed -i` 不會生效必須 `docker restart`）**+ 已治本**（`blockedResponse()` 補 loop invariant）。另修 4 Major（nginx rewrite 邊界漏 `/portal` 無尾斜線、補償刪除吞錯誤可能誤刪真帳號、`createUser` 失敗無 log、Codex finding 重複確認）+ 6 Minor。Migration `0062`+`0063` 已套用（含索引修正）。`npx tsc --noEmit`/`vitest` 全綠。**現況**：portal 網域暫時 503 止血中（安全狀態，等部署後解除）；第三輪 critic 窄範圍覆審（只驗證最新這批修正）跑中；`verify-recent` 機械閘尚未清除，commit 尚未完成。**下一步**：窄範圍 critic 過 → 清 tracker → commit + push → `sg-deploy.sh next-admin` → 健康後拿掉 nginx 503 → 端對端 smoke test。
-  - **為何優先**：兩個產品做完沒有它也開不了帳號、收不了費，是 bottleneck，不是外殼。
+- [x] **【2026-08-29 開出並上線】`portal.aware-wave.com` V1（身分層）✅ 已部署** — 統一登入 / Account / Subscription / Product Launcher，服務 HCI-30 + Cognitive OS 的**外部客戶**（跟 `app.aware-wave.com` 不同：`app` 是內部 admin console 單一 owner + RBAC，`portal` 是外部多租戶帳號/訂閱層）。方案 SSOT：[`docs/operations/PORTAL_AWARE_WAVE_DESIGN_PROPOSAL.md`](docs/operations/PORTAL_AWARE_WAVE_DESIGN_PROPOSAL.md)（v8,§16 完整部署記錄）；IA 對照：`docs/edge-and-domains/PRODUCT_DOMAIN_IA_PLAN.md` §3。
+  - **重用既有機制而非重工**：發現 `lib/tenant-guard.ts` + `0001_core.sql`（`organizations`/`profiles`/`organization_memberships`）已是完整、已測試、已上線但從未被外部真人使用過的 client/staff 雙身分模型，portal 只新增 1 張 `organization_product_subscriptions` 表，不建平行系統。詳見方案 §0/§2/§4.1。
+  - **六輪覆審全過**（db-expert/自審/critic×3/Codex×3），含一次真實 production incident（nginx 已上線但 app 未部署造成重導迴圈放大器,跟 `app.aware-wave.com` 共用 container）**即時止血+治本**，過程中順帶修好 `sg-deploy.sh` 兩個因 2026-08-28 SG+EU 整併而過期失準的 smoke 探針（獨立 commit `d9206dee`）。
+  - **2026-08-29 commit `83277d80`+`d9206dee` 已 push+部署,`sg-deploy.sh` 4/4 smoke 通過無 rollback**。端對端驗證：`/login`/`/launcher`/`/api/signup`/靜態資源/既有四網域全部符合預期,零回歸。
+  - **V1 範圍界定（刻意,非未完成）**：`PORTAL_SIGNUP_ENABLED` 留空,身分層已上線但**真實註冊尚未開放**。開放需另一輪 go-ahead（設此 env var + `TURNSTILE_SECRET_KEY`）——**新開任務項，不算這條的欠款**。
 
 #### G. ▶️ 可直接做 — 基礎建設與客戶站
 

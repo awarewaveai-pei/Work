@@ -432,6 +432,21 @@ critic 對全部 10 個新/改檔案做覆審，**並實際對 `ks-aw-01` 現場
 - REALTEST_EVIDENCE: tool=Bash | cmd=`bash -n sg-deploy.sh` | exit=0
 - BUGHUNT_DONE: scope=lobster-factory | grep=`www.aware-wave.com.*-L\|"follow"` | hits=0（`-L`/`follow` 版本已完全替換為 `--resolve`,無殘留）
 
+### 🎉 commit + push + 第三次部署成功：portal.aware-wave.com 正式上線（身分層，signup 仍故意關閉）
+
+commit `d9206dee`（sg-deploy.sh 修正）push 後，SSH 回 `ks-aw-01` 第三次跑 `sg-deploy.sh next-admin`——中間撞到一個 stale lock（`/tmp/sg-deploy.lock` 指向已不存在的 PID，`kill -0` 檢查那個瞬間可能跟前一次 detached 進程收尾重疊），重跑後**4/4 smoke 全過，無 rollback**：`next-admin /login`→200、`/api/ops/summary`→200、`nginx/wordpress`（新 `--resolve` 探針）→200、`node-api health`→200。`deployed commit: d9206dee`。
+
+**移除 nginx 止血**（`return 503` 那行,`docker restart lobster-nginx` 生效同前面踩過的 bind-mount 坑）後端對端驗證：`portal.aware-wave.com/login`→200；`/`→跟隨重導 200，**2 次重導無迴圈**（C-A 治本邏輯生產環境首次真實驗證）；`/launcher` 無 session→307 正確擋下；`/api/signup` POST→503（`PORTAL_SIGNUP_ENABLED` 故意留空，V1 範圍界定在生產環境成立）；真實靜態資源 `_next/static/chunks/*.js`→200（M2 hydration 修正確認有效）；`app`/`api`/`www`/`oracle` 四個既有網域 200/200/301/307**零回歸**；container logs 無 error/CRITICAL。
+
+**這輪 close-out**：portal 身分層（登入/註冊頁面/host 隔離/C2 客戶帳號阻擋內部後台）**已真實上線**；signup 本身還沒開放（刻意，需另一輪 go-ahead 設 `PORTAL_SIGNUP_ENABLED`+`TURNSTILE_SECRET_KEY`）。方案文件改版至 v8（§16 完整部署記錄），標記狀態為「✅ 已部署」。SSH 連線已關閉。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash(SSH) | cmd=`sg-deploy.sh next-admin`（第三次）| 結果=4/4 smoke pass,`deployed commit: d9206dee`,無 rollback
+- REALTEST_EVIDENCE: tool=curl（經 SSH,公開網域）| cmd=portal login/launcher/signup/root/靜態資源 5 項 + 既有 4 網域回歸檢查 | 結果=全數符合預期（200/307/503/200-無迴圈/零回歸）
+- REALTEST_EVIDENCE: tool=Bash(SSH) | cmd=`docker logs lobster-next-admin --since 5m \| grep -i error` | 結果=無輸出,確認無錯誤
+- REVIEW_DONE: 六輪覆審（db-expert/自審/critic×3/Codex×3）全部完成並修正，本輪部署過程新增的 2 個基礎設施問題（Node.js 缺失、smoke 探針過期）均已根因排除並文件化
+- BUGHUNT_DONE: scope=agency-os | grep=`待部署\|尚未部署\|未部署` 於方案文件+TASKS.md | hits=3（均為 §9/§11/§14 的歷史記錄段落,描述的是「當時」為真的狀態,非當前狀態聲稱；文件頂部狀態列+新增 §16 已正確標記「✅ 已部署」，TASKS.md 同步更新，未發現需訂正的過期聲稱）
+
 ## 2026-08-29（續7）
 
 ### AI LEGO Phase 2 STOP-FOR-HUMAN-REVIEW：操作者「你決定」授權裁決 — 9 份 ADR 全數 ACCEPTED，Codex 對抗式覆審抓到 2 個真實漏洞並修正，新增 3 份 ADR 補齊全部 4 項待決衝突
