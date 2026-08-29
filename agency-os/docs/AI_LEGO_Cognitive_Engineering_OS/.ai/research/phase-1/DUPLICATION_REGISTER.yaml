@@ -94,6 +94,22 @@ duplications:
         form: "/modules/localization/{locale, language, currency, timezone, calendar, units, address, formatting}/（8 個子目錄，無檔案）"
     drift: "根路徑不同(config vs modules)、項目數不同(5 vs 8)、粒度不同(檔案 vs 目錄)；language/calendar/address/formatting 只在 Atlas 出現，accessibility 只在 MP 出現。"
     consequence: "與 Execution Manifest（Phase 0 CROSS-T-4/CROSS-R-6）同一種雙重維護樣態，只是發生在 localization 模組；兩個依不同文件實作的團隊會蓋出不相容的目錄結構，且兩版都沒定義翻譯字串缺失時的 fallback 語言。額外發現：Atlas 開頭的「中文優先」聲明段落尾端夾帶一條真正的產品級強制規則（切換介面語言不得破壞歷史 Workflow 可重播性，Atlas:62-64），但該規則從未在真正的 Localization 章節（§122）被複述或連結——容易被誤判為純文件撰寫慣例而被忽略。"
+  - id: P1-DUP-6
+    origin: "Phase 3 discovery (2026-08-29, status-codes.schema.yaml compilation) — NOT part of the original Phase 1 six-cluster sweep; added retroactively to this register so it has a durable home instead of living only inside a schema file's open_questions block. Not caught by Phase 0's terminology-map.yaml (which recorded both enums' existence at L184-187/552-560/609-612 without flagging the conflict) or by any Phase 1 cluster."
+    severity: medium
+    title: "Master Plan 定義兩套不相容的法律不確定性狀態詞彙，分別在 §98 與 §134，僅共享 AMBIGUOUS 一值"
+    definitions:
+      - source: "MP §98 Conflict-of-Laws Engine"
+        file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md
+        line: 4198
+        form: "5 值輸出 enum：RESOLVED / CONSERVATIVE_SAFE_MODE / AMBIGUOUS / CONFLICT / LEGAL_REVIEW_REQUIRED"
+      - source: "MP §134「Legal Uncertainty Is a First-class State」"
+        file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md
+        line: 5262
+        form: "6 值輸出 enum：KNOWN / INTERPRETATION_REQUIRED / AMBIGUOUS / CONFLICTING / STALE / UNKNOWN"
+    drift: "僅逐字共享 AMBIGUOUS 一值；CONFLICT vs CONFLICTING 疑似同一概念的大小寫/詞形漂移；兩章節從未互相引用；不清楚 §134 詞彙是否該在 §98 Conflict-of-Laws Engine 窄化判斷之前先評估，或兩者是各自獨立、競爭同一個「這個法律答案有多確定」問題的設計。"
+    consequence: "與 P1-GAP-LEGAL-4（Conflict-of-Laws Engine 另一項未解重疊）同源但範圍不同——本條目只涉及狀態詞彙本身的雙重定義，不涉及引擎歸屬。哪個 enum 才是權威、兩者程序上如何銜接，需要獨立的裁決（Round 2 ADR 或操作者決定），非本條目自行判斷。"
 notes:
   - "P1-DUP-1（DB Migration）與 P1-DUP-3（Tenant chain）風險最高：前者是可執行 runbook 級別的矛盾，直接影響 migration 是否會遺失資料；後者是 Tenant 概念本身從未進入 Domain Model 卻被當作安全邊界錨點使用。"
   - "所有 5 條建議 Phase 2 統一裁決 SSOT 位置（例如：DB Migration Recipe 唯一正本應該是 Atlas F21 還是 EC §19，兩者擇一或合併），而非逐一微調三份文件裡的既有版本。"
+  - "P1-DUP-6（2026-08-29 新增）：Phase 3 building schema files can still surface findings Phase 0/1's sweeps missed — this register is not a closed ledger just because Phase 1 formally exited.尚無 ADR 裁決，狀態同 OQ-10（platform gate 三套集合），留待下一輪。"

@@ -1,0 +1,433 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/execution/status-codes.schema.yaml"
+title: Blocking / Escalation Status Codes
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical registry of every named blocking/escalation machine-readable status
+  code scattered across the three mother documents, plus their mapping onto the
+  Execution Contract §10 Execution State Machine's 7 legal side states and §70
+  Final Status vocabulary. Resolves: (1) CROSS-R-4 / CROSS-T-5 — Master Plan and
+  Execution Contract each mandate a DIFFERENT status code
+  (PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED vs METHOD_RESOLUTION_BLOCKED) for the
+  IDENTICAL failure condition (Method Atlas unreadable/unloadable while method
+  selection is needed) — this file resolves it as a genuine duplicate, not two
+  distinct signals; (2) DOC-execution_contract-9 — the Execution Contract emits
+  9 named blocking/escalation signals but never maps any of them onto its own
+  §10 side-state vocabulary, and no §92 schema was designated to carry them —
+  this file is that designated schema and supplies the missing mapping;
+  (3) DOC-execution_contract-3 — `NEEDS_REVIEW` (EC §61 L2082) is used as if it
+  were a status value but is not declared in any enum; this file resolves it as
+  an informal shorthand for the canonical NEEDS_HUMAN_REVIEW, not a 10th signal.
+  This file is the single source of truth; the mother documents reference it,
+  they do not redefine these codes.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §0.0 (L45-49, PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED — deprecated alias)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §3.1 (L169-185, DOCUMENT_RESOLUTION_BLOCKED)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §2 (L131-137, CONFLICT_REQUIRES_HUMAN_REVIEW)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §10 (L531-577, Execution State Machine + 7 legal side states)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §11 (L579-638, CURRENT_STATE_DRIFT_DETECTED)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §14 (L700-728, METHOD_RESOLUTION_BLOCKED — canonical)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §17 (L786-814, SCOPE_CHANGE_REQUIRED)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §41 (L1539-1584, LEGAL_REVIEW_REQUIRED)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §61 (L2064-2085, NEEDS_REVIEW — undeclared, resolved as alias)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §70 (L2297-2318, Final Status vocabulary)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §78 (L2492-2508, PREEXISTING_WORKTREE_CHANGES)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §83 (L2588-2606, OFFLINE_SOURCE_STALE)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §84 (L2608-2627, BUDGET_REVIEW_REQUIRED)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §4 (L252, PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED — new proposal)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §0.0.2 (L83, CONFLICT_REQUIRES_HUMAN_REVIEW — second, matching appearance)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §98 (L4198-4206, LEGAL_REVIEW_REQUIRED — second appearance, embedded in a 5-value enum)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §134 (L5258-5271, INTERPRETATION_REQUIRED — new finding, see open_questions.OQ-STATUS-3)"
+
+decided_by: >
+  No single ADR governs this file. docs/architecture/MACHINE_READABLE_SPEC_PLAN.md
+  §2.2 row for status-codes.schema.yaml lists it READY with no ADR dependency
+  (contrast risk-tier.schema.yaml's row, which cites ADR-004a). Verified by grep
+  across docs/adr/ADR-001~009 (2026-08-29): none rules on the
+  METHOD_RESOLUTION_BLOCKED / PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED duplicate.
+  docs/adr/ADR-008-business-planning-recipe-method-gap.md quotes
+  PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED verbatim (its L12/26/73/85) while ruling
+  on P1-CONFLICT-4 (the Financial Assumptions gap), but that citation only quotes
+  Master Plan's mandate as it stood at the time — ADR-008 does not address, and
+  was not asked to address, which of the two duplicate codes should be canonical.
+  This file makes that determination directly, following the same Low-risk
+  "pick the version already wired into a real machine-readable mechanism, not a
+  narrative example" reasoning ADR-005 used for its Method ID Grammar
+  sub-decision, and consistent with the precedent MACHINE_READABLE_SPEC_PLAN.md
+  §2.3's row for typed-objects/root-cause-fact.schema.yaml set for this class of
+  decision ("命名裁決屬 Low-risk，可在 Phase 3 內部直接定案，不需要 ADR").
+  The mapping of each named signal onto the §10 side-state vocabulary (the
+  DOC-execution_contract-9 fix) is likewise a direct compilation, not an ADR
+  matter — per-signal rationale is recorded below so it is auditable, and
+  genuinely open design questions are separated into `open_questions`, not
+  silently decided.
+
+# ---------------------------------------------------------------------------
+# Reference vocabulary (NOT redefined here — cited verbatim from EC §10/§70;
+# this file's only job is mapping named signals onto these existing values).
+# ---------------------------------------------------------------------------
+reference_vocabulary:
+  legal_side_states:
+    source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §10 (L563-573)"
+    values: [BLOCKED, NEEDS_HUMAN_REVIEW, FAILED, CANCELLED, ROLLED_BACK, COMPENSATED, PARTIAL_SUCCESS]
+  final_status:
+    source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §70 (L2299-2309)"
+    values: [PASS, PASS_WITH_APPROVED_RISK, BLOCKED, FAILED, NEEDS_HUMAN_REVIEW, ROLLED_BACK, PARTIAL_SUCCESS]
+
+# ---------------------------------------------------------------------------
+# Duplicate resolution: METHOD_RESOLUTION_BLOCKED vs
+# PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED (CROSS-R-4 / CROSS-T-5)
+# ---------------------------------------------------------------------------
+duplicate_resolutions:
+  method_atlas_unavailable:
+    finding: "CROSS-R-4, CROSS-T-5"
+    problem: >
+      Two different mandatory codes exist for the same failure condition
+      (Method Atlas unreadable/unloadable while a task needs Cognitive Method
+      Selection). Master Plan §0.0 (L45-47): "若 Atlas 無法讀取、版本未知、
+      內容不完整，且任務需要 Cognitive Method Selection，狀態必須為：
+      `PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED`". Execution Contract §14
+      (L720-723): "Atlas 無法載入：`METHOD_RESOLUTION_BLOCKED`". Neither
+      document maps one to the other; neither code appears in EC §10's legal
+      side-state vocabulary (verified by grep — both are unmapped orphans
+      equally, so "which one is already canonical" cannot be decided by that
+      test alone).
+    options_considered:
+      option_a_keep_mp_name:
+        name: "PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED"
+        for: >
+          Broader trigger condition (3 sub-cases: unreadable / version unknown /
+          content incomplete, vs EC's terser "無法載入"). Already used as the
+          working reference term in the ACCEPTED ADR-008 when discussing the
+          Financial Assumptions gap (P1-CONFLICT-4).
+        against: >
+          Lives in MP §0.0, a prose mandatory-read notice — not wired to any
+          formal state machine. MP defines no execution state machine of its
+          own anywhere in the document.
+      option_b_keep_ec_name:
+        name: "METHOD_RESOLUTION_BLOCKED"
+        for: >
+          EC §10's own Execution State Machine names a state `METHODS_RESOLVED`
+          (L542) as the success outcome of the exact boot-flow step
+          ("Select Applicable Methods", §3 L158) that EC §14 "Method Resolution"
+          implements. METHOD_RESOLUTION_BLOCKED is the failure counterpart of
+          that named state — tight structural coupling to the one formal state
+          machine that exists in the corpus. It also matches EC's own sibling
+          naming family in the same Boot Contract flow: DOCUMENT_RESOLUTION_BLOCKED
+          (§3.1, fires one boot step earlier) uses the identical
+          "<Domain>_RESOLUTION_BLOCKED" pattern.
+        against: >
+          Narrower trigger wording ("無法載入" alone) if read literally —
+          addressed below by adopting the union of both documents' trigger
+          conditions rather than EC's wording verbatim.
+      status_quo:
+        note: "Not scored — this is the CONFIRMED-broken condition being fixed."
+    decision: >
+      Canonical name = METHOD_RESOLUTION_BLOCKED (Option B), on structural
+      grounds: it is the only one of the two names actually wired into EC §10's
+      formal Execution State Machine (paired with the METHODS_RESOLVED state)
+      and it is consistent with its immediate sibling DOCUMENT_RESOLUTION_BLOCKED.
+      The trigger CONDITION recorded below is the union of both documents'
+      wording (MP's 3 sub-cases + EC's "cannot load"), not EC's narrower prose
+      taken in isolation — picking a name is a Low-risk consistency fix, but
+      silently dropping MP's 2 extra trigger sub-cases would be a real
+      regression, which this file does not do.
+      PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED becomes a deprecated alias: any
+      code/doc currently emitting or matching on it should treat it as
+      synonymous with METHOD_RESOLUTION_BLOCKED.
+  needs_review_undeclared:
+    finding: "DOC-execution_contract-3"
+    problem: >
+      EC §61 Retry Policy (L2079-2082): "Retry exhaustion：`FAILED / NEEDS_REVIEW`".
+      `NEEDS_REVIEW` is not declared in EC §10's side-state list (L563-573) or
+      §70's Final Status list (L2299-2309) — both only define `NEEDS_HUMAN_REVIEW`.
+    decision: >
+      `NEEDS_REVIEW` is not a 10th status code. It is resolved as an informal
+      shorthand for the canonical `NEEDS_HUMAN_REVIEW` (already declared in both
+      §10 and §70) — a wording slip, not a genuinely distinct signal (§61 gives
+      it no distinct trigger condition, no distinct required action, and no
+      distinct machine handling from NEEDS_HUMAN_REVIEW). EC L2082 should read
+      "FAILED / NEEDS_HUMAN_REVIEW" when the mother document is next revised
+      through the ADR-006 `.ai/proposals/` flow; until then, any implementation
+      encountering the literal string NEEDS_REVIEW in EC prose MUST treat it as
+      NEEDS_HUMAN_REVIEW.
+
+# ---------------------------------------------------------------------------
+# The unified registry
+# ---------------------------------------------------------------------------
+status_codes:
+
+  - name: METHOD_RESOLUTION_BLOCKED
+    status: EXISTING_CONSOLIDATED
+    canonical: true
+    deprecated_aliases:
+      - name: PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md:47"
+        note: "See duplicate_resolutions.method_atlas_unavailable for full reasoning."
+    resolves_finding: ["CROSS-R-4", "CROSS-T-5"]
+    appears_in:
+      - {file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md", section: "§14 Method Resolution", line: 723, quote: "METHOD_RESOLUTION_BLOCKED"}
+      - {file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md", section: "§0.0", line: 47, quote: "PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED (deprecated alias)"}
+    trigger: >
+      Union of both sources: Method Atlas cannot be read, its version is
+      unknown, or its content is incomplete (MP §0.0 L45), OR Atlas fails to
+      load (EC §14 L720) — in either case while the current task requires
+      Cognitive Method Selection.
+    required_action: >
+      MUST NOT self-supplement, guess, or substitute model memory for Atlas
+      (MP L49: "不得自行補齊、猜測或以模型記憶取代 Atlas"). High-risk tasks
+      MUST NOT degrade into unconstrained model improvisation
+      (EC L726: "高風險任務不得降級成「模型自由發揮」"). Halt at the
+      "Select Applicable Methods" boot step (EC §3 L158) until Atlas is
+      restored/resolved.
+    side_state_mapping:
+      value: BLOCKED
+      mapping_basis: PROPOSED_BY_THIS_FILE
+      rationale: >
+        Hard mechanical prerequisite failure with an explicit no-workaround
+        rule — not a human-judgment review gate, so BLOCKED (not
+        NEEDS_HUMAN_REVIEW) fits best. Same family as DOCUMENT_RESOLUTION_BLOCKED,
+        one boot step earlier in the same flow.
+
+  - name: DOCUMENT_RESOLUTION_BLOCKED
+    status: EXISTING_CONSOLIDATED
+    resolves_finding: ["DOC-execution_contract-9"]
+    appears_in:
+      - {file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md", section: "§3.1 Required Document Resolution", line: 184, quote: "DOCUMENT_RESOLUTION_BLOCKED"}
+    trigger: >
+      Any of the 7 boot-mandatory items (§3.1 L172-179) cannot be found:
+      Master Plan, Method Atlas, this Execution Contract itself,
+      machine-readable specs, applicable policies, accepted ADR, or current
+      code/schema/infra/deployment evidence.
+    required_action: "Halt before proceeding past the 'Resolve Documents' boot-flow step (§3 L148)."
+    side_state_mapping:
+      value: BLOCKED
+      mapping_basis: PROPOSED_BY_THIS_FILE
+      rationale: "Earliest boot-flow prerequisite check; mechanical, not a review gate."
+
+  - name: CURRENT_STATE_DRIFT_DETECTED
+    status: EXISTING_CONSOLIDATED
+    resolves_finding: ["DOC-execution_contract-9"]
+    appears_in:
+      - {file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md", section: "§11 Current-state Reconstruction", line: 635, quote: "CURRENT_STATE_DRIFT_DETECTED"}
+    trigger: "Documentation conflicts with observed reality (EC L632: \"文件與 reality 衝突時\")."
+    required_action: "Record the drift first; MUST NOT assume the document is correct (EC L638: \"不可假裝文件一定正確\")."
+    side_state_mapping:
+      value: NEEDS_HUMAN_REVIEW
+      mapping_basis: PROPOSED_BY_THIS_FILE
+      rationale: >
+        Deciding which source (doc vs. observed reality) is authoritative is
+        not mechanically resolvable — it requires human judgment, unlike the
+        boot-time prerequisite-missing signals above.
+
+  - name: SCOPE_CHANGE_REQUIRED
+    status: EXISTING_CONSOLIDATED
+    resolves_finding: ["DOC-execution_contract-9"]
+    appears_in:
+      - {file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md", section: "§17 Scope Contract", line: 804, quote: "SCOPE_CHANGE_REQUIRED"}
+    trigger: "A need to expand scope beyond the original ASSUMPTIONS/UNKNOWNs is discovered mid-execution (EC L799-803)."
+    required_action: "Re-evaluate risk, rollback, tests, and authority before proceeding (EC L807-812). MUST NOT silently expand scope (EC L799: \"禁止在執行途中偷偷擴 scope\")."
+    side_state_mapping:
+      value: NEEDS_HUMAN_REVIEW
+      mapping_basis: PROPOSED_BY_THIS_FILE
+      rationale: "A re-authorization checkpoint, not a hard failure — inherently requires a human/authority decision to proceed."
+
+  - name: LEGAL_REVIEW_REQUIRED
+    status: EXISTING_CONSOLIDATED
+    resolves_finding: ["DOC-execution_contract-9"]
+    appears_in:
+      - {file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md", section: "§41 Global / Jurisdiction Execution", line: 1580, quote: "LEGAL_REVIEW_REQUIRED"}
+      - {file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md", section: "§98 Conflict-of-Laws Engine", line: 4205, quote: "LEGAL_REVIEW_REQUIRED (one leaf value of a 5-value output enum: RESOLVED/CONSERVATIVE_SAFE_MODE/AMBIGUOUS/CONFLICT/LEGAL_REVIEW_REQUIRED)"}
+    trigger: "Legal uncertainty (EC L1577: \"法律不確定\") in jurisdiction-aware execution, after Compile Controls (L1567). MP §98's Conflict-of-Laws Engine also emits this exact string as one possible Resolution-step outcome (MP L4193-4205)."
+    required_action: "MUST NOT let LLM memory substitute for an official legal source (EC L1583: \"不得讓 LLM 記憶代替官方法源\")."
+    side_state_mapping:
+      value: NEEDS_HUMAN_REVIEW
+      mapping_basis: PROPOSED_BY_THIS_FILE
+      rationale: "Named literally as a review requirement; legal sign-off is a human-authority action."
+
+  - name: BUDGET_REVIEW_REQUIRED
+    status: EXISTING_CONSOLIDATED
+    resolves_finding: ["DOC-execution_contract-9"]
+    appears_in:
+      - {file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md", section: "§84 Cost Governance", line: 2622, quote: "BUDGET_REVIEW_REQUIRED"}
+    trigger: "cost_budget / token_budget / compute_budget / time_budget (EC L2612-2617) is exceeded."
+    required_action: "High rigor tasks may spend more but must remain transparent about it (EC L2625: \"High rigor 允許較高成本，但需透明\")."
+    side_state_mapping:
+      value: NEEDS_HUMAN_REVIEW
+      mapping_basis: PROPOSED_BY_THIS_FILE
+      rationale: "A cost overage is not necessarily a failure of the work itself; it is an authorization checkpoint."
+
+  - name: CONFLICT_REQUIRES_HUMAN_REVIEW
+    status: EXISTING_CONSOLIDATED
+    resolves_finding: ["DOC-execution_contract-9"]
+    appears_in:
+      - {file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md", section: "§2 三份母規格的 Scoped Authority", line: 134, quote: "CONFLICT_REQUIRES_HUMAN_REVIEW"}
+      - {file: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md", section: "§0.0.2 Scoped Authority", line: 83, quote: "CONFLICT_REQUIRES_HUMAN_REVIEW"}
+    trigger: "Two same-level specs conflict within the same scope (EC L131: \"若兩份同層級規格在同一 scope 互相衝突\"; MP L81 identical condition: \"若跨 Scope 仍無法消解\"). Verbatim match in both documents — not a duplicate-with-drift like the Method Atlas case, a genuine shared code."
+    required_action: "AI MUST NOT unilaterally pick whichever is most convenient for itself (EC L137: \"不得由 AI 自行選擇對自己最方便的一條\")."
+    side_state_mapping:
+      value: NEEDS_HUMAN_REVIEW
+      mapping_basis: PROPOSED_BY_THIS_FILE
+      rationale: "Name is a literal, unambiguous match to the side-state value."
+
+  - name: PREEXISTING_WORKTREE_CHANGES
+    status: EXISTING_CONSOLIDATED
+    resolves_finding: ["DOC-execution_contract-9"]
+    appears_in:
+      - {file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md", section: "§78 Repository Dirty State", line: 2503, quote: "PREEXISTING_WORKTREE_CHANGES"}
+    trigger: "`git status` (EC L2497) shows modifications that do not belong to the current task."
+    required_action: "MUST NOT overwrite or reset the user's work (EC L2506: \"不得覆蓋或 reset 使用者工作\")."
+    side_state_mapping:
+      value: BLOCKED
+      mapping_basis: PROPOSED_BY_THIS_FILE
+      rationale: "A hard pre-condition safety stop before any write action, analogous to the boot-time resolution blocks, not a judgment call."
+
+  - name: OFFLINE_SOURCE_STALE
+    status: EXISTING_CONSOLIDATED
+    resolves_finding: ["DOC-execution_contract-9"]
+    appears_in:
+      - {file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md", section: "§83 Offline Execution", line: 2601, quote: "OFFLINE_SOURCE_STALE"}
+    trigger: "The task needs the latest external information (EC L2598: \"若需要最新外部資訊\") but the environment is offline/air-gapped."
+    required_action: "MUST NOT pretend the information is current (EC L2604: \"不得假裝最新\")."
+    side_state_mapping:
+      value: NEEDS_HUMAN_REVIEW
+      mapping_basis: PROPOSED_BY_THIS_FILE
+      rationale: >
+        Unlike the hard prerequisite-missing signals, this can plausibly be
+        resolved either by waiting for connectivity or by a human accepting
+        staleness with disclosure — a decision point, not an unconditional halt.
+
+  - name: NEEDS_HUMAN_REVIEW
+    status: EXISTING_CONSOLIDATED
+    canonical: true
+    deprecated_aliases:
+      - name: NEEDS_REVIEW
+        source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md:2082"
+        note: "See duplicate_resolutions.needs_review_undeclared for full reasoning."
+    resolves_finding: ["DOC-execution_contract-3"]
+    appears_in:
+      - {file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md", section: "§10 legal side states", line: 567, quote: "NEEDS_HUMAN_REVIEW"}
+      - {file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md", section: "§70 Final Status", line: 2306, quote: "NEEDS_HUMAN_REVIEW"}
+      - {file: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md", section: "§61 Retry Policy", line: 2082, quote: "FAILED / NEEDS_REVIEW (undeclared shorthand, resolved as this value)"}
+    trigger: "Already a first-class §10/§70 value; §61 Retry Policy additionally triggers it on retry exhaustion (alongside FAILED)."
+    required_action: "Already normative in §10/§70; no new action defined by this file."
+    side_state_mapping:
+      value: NEEDS_HUMAN_REVIEW
+      mapping_basis: VERBATIM_FROM_MOTHER_DOC
+      rationale: "Already a native §10/§70 value — listed here only to anchor the NEEDS_REVIEW alias resolution."
+
+  - name: PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED
+    status: "NEW_PROPOSED_2026-08-29"
+    resolves_finding: ["P1-GAP-AI-7"]
+    appears_in:
+      - {file: "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md", section: "§4 Atlas Method Contract 補齊策略, Tier 2", line: 252, quote: "PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED"}
+    proposed_by: "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §4 (not present in any mother document — introduced for Phase 3's Atlas Method Contract backfill strategy)"
+    trigger: >
+      The Method Selection Engine is asked to select a method whose
+      `contract_status` in the future methods/registry/contract-backlog.yaml is
+      `pending` (i.e. one of the ~260+ Tier-2 methods that has not yet had a
+      formal method.schema.yaml contract written).
+    required_action: >
+      Fail-closed: return this status code and require a human or a follow-up
+      session to write the method's contract before continuing, rather than
+      silently guessing compatibility from the method's narrative-only fields
+      (MACHINE_READABLE_SPEC_PLAN.md L252: "而不是靜默用敘事型欄位瞎猜相容性").
+    design_lineage: >
+      Explicitly modeled on Master Plan's own PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED
+      pattern — "same class of 'missing precondition -> stop' invariant"
+      (MACHINE_READABLE_SPEC_PLAN.md L252: "沿用 Master Plan 自己已有的
+      PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED 模式（同一類「缺前提就停」的不變量），
+      不是發明新機制"). NOTE: this inherited "PLANNING_BLOCKED_" prefix now sits
+      in a different naming family than this file's canonical
+      METHOD_RESOLUTION_BLOCKED (see duplicate_resolutions above, which
+      deprecates the PLANNING_BLOCKED_ prefix for that specific code on
+      structural grounds). Flagged in open_questions below rather than
+      silently renamed — this file introduces the code exactly as specified
+      by the plan; renaming a NEW_PROPOSED code is a separate decision from
+      consolidating two pre-existing duplicates.
+    side_state_mapping:
+      value: BLOCKED
+      mapping_basis: PROPOSED_BY_THIS_FILE
+      rationale: "Same fail-closed, no-workaround character as METHOD_RESOLUTION_BLOCKED — mechanical prerequisite failure, not a review gate."
+    depends_on: "methods/registry/contract-backlog.yaml (contract_status field), cognitive/method.schema.yaml"
+
+# ---------------------------------------------------------------------------
+# Forward dependents (informational — these files depend on this one; not
+# built by this file)
+# ---------------------------------------------------------------------------
+referenced_by:
+  - "execution/deprecation-pipeline.schema.yaml (MACHINE_READABLE_SPEC_PLAN.md §2.2 row, depends on this file)"
+  - "methods/registry/contract-backlog.yaml (MACHINE_READABLE_SPEC_PLAN.md §2.7 row, depends on this file for PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED)"
+
+# ---------------------------------------------------------------------------
+# Genuinely open questions — NOT decided by this file
+# ---------------------------------------------------------------------------
+open_questions:
+  - id: "OQ-STATUS-1"
+    question: >
+      Should any of the 9 EC signals mapped here to NEEDS_HUMAN_REVIEW or
+      BLOCKED (a many-to-one collapse onto 7 generic side-states) instead
+      become first-class named side-states in their own right in a future EC
+      revision, so downstream monitors/tests can distinguish e.g. a legal-review
+      pause from a budget-review pause without inspecting a separate signal
+      field? This is a genuine granularity trade-off (precision vs. state-machine
+      surface area), not a factual compilation question — left for Round 2 ADR
+      or operator decision, not decided here.
+  - id: "OQ-STATUS-2"
+    question: >
+      PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED (NEW_PROPOSED) uses the
+      "PLANNING_BLOCKED_" naming family (MP-style), while this file just
+      deprecated that same prefix on METHOD_RESOLUTION_BLOCKED in favor of
+      EC's "<Domain>_RESOLUTION_BLOCKED"/"<Domain>_BLOCKED" family for
+      structural consistency with the §10 state machine. Should the new code
+      be renamed to something like METHOD_CONTRACT_RESOLUTION_BLOCKED for
+      naming-family consistency before it is ever emitted by real code? Left
+      open rather than decided, since MACHINE_READABLE_SPEC_PLAN.md §4
+      specified the exact string PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED and
+      renaming it is outside this file's compilation mandate.
+  - id: "OQ-STATUS-3"
+    new_finding: true
+    question: >
+      NOT one of the 4 findings this file was assigned to resolve — surfaced
+      during this session's broader grep sweep (`_BLOCKED`/`_REQUIRED`/
+      `_REVIEW`/`_DETECTED` across all 3 mother documents) and not present in
+      any Phase 0/1 register as of this writing (checked: verified-findings.yaml,
+      GAP_REGISTER.yaml P1-GAP-LEGAL-1/3/4/7, DUPLICATION_REGISTER.yaml,
+      CONFLICT_REGISTER.yaml — none cover it; Phase 0's terminology-map.yaml
+      L184-187/552-560/609-612 and policy-inventory.yaml L231/815/853 recorded
+      both enums' existence but did not flag them as conflicting with each
+      other). Master Plan defines TWO different, non-matching legal-uncertainty
+      status vocabularies in two different sections: §98 Conflict-of-Laws
+      Engine (L4198-4206) outputs one of
+      `RESOLVED / CONSERVATIVE_SAFE_MODE / AMBIGUOUS / CONFLICT / LEGAL_REVIEW_REQUIRED`
+      (5 values), while §134 "Legal Uncertainty Is a First-class State"
+      (L5262-5271) outputs one of
+      `KNOWN / INTERPRETATION_REQUIRED / AMBIGUOUS / CONFLICTING / STALE / UNKNOWN`
+      (6 values). They share only `AMBIGUOUS` verbatim; `CONFLICT` vs
+      `CONFLICTING` is a casing/form drift on what looks like the same concept;
+      neither document cross-references the other section; and it is unclear
+      whether §134's vocabulary is meant to be evaluated BEFORE §98 narrows
+      down to the Conflict-of-Laws Engine specifically, or whether the two are
+      independent, competing designs for the same "how certain is this legal
+      answer" question. This file's registry above only captures the one leaf
+      value (`LEGAL_REVIEW_REQUIRED`) that happens to be shared verbatim
+      between MP §98 and EC §41 — it does NOT attempt to reconcile the two
+      enclosing MP enums against each other, since that is a duplication
+      analysis of a scope and depth (which enum is authoritative, how §98 and
+      §134 relate procedurally) that goes beyond this file's compilation
+      mandate and belongs in a DUPLICATION_REGISTER.yaml addendum / Round 2 ADR
+      review, analogous to P1-GAP-LEGAL-4's existing treatment of the
+      Conflict-of-Laws Engine's other unresolved overlap.
+
+verification:
+  method: "Read/Grep against all three mother documents and docs/architecture/MACHINE_READABLE_SPEC_PLAN.md; docs/adr/ADR-001~009 grepped for prior rulings on this duplicate (none found except incidental quotation in ADR-008)."
+  note: >
+    Every trigger/required_action quote above was re-read at its cited line in
+    this session (not transcribed from verified-findings.yaml summaries alone).
+    Side-state mappings are this file's own proposed resolution of the gap
+    DOC-execution_contract-9 identified (mother documents supply none); each
+    carries a one-line rationale so the mapping is auditable rather than
+    asserted. No mother document was modified to produce this file.

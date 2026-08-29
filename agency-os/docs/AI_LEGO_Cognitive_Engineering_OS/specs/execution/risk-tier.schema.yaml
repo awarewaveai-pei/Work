@@ -1,0 +1,148 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/execution/risk-tier.schema.yaml"
+title: Risk Tier
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the R0-R4 risk tier enum. Resolves
+  ADR-004 Sub-decision (a): Method Atlas defined its own low|medium|high|critical
+  four-level enum (Atlas L1077) but never gave it concrete standards or an action
+  checklist, and grep confirmed only "critical" was ever consumed downstream
+  (in the Mandatory Gate Injection trigger, Atlas §14.2 L3599) — low/medium/high
+  were unexpanded placeholders. Execution Contract §8 (L379-475) is the only
+  definition in either document with concrete per-tier examples and required
+  actions, so it is adopted as the sole canonical source. Atlas's four-level enum
+  is deprecated; the mother documents reference this schema instead of redefining
+  values.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md selection_context.risk_tier (L1077)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §14.2 Mandatory Gate Injection (L3588-3612)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md task_context.risk_tier (L374)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §8 Risk Tier (L379-475)"
+decided_by: "docs/adr/ADR-004-risk-tier-and-epistemic-label-canonicalization.md (ACCEPTED 2026-08-29)"
+
+risk_tier:
+  type: string
+  enum: [R0, R1, R2, R3, R4]
+
+tiers:
+  R0:
+    label: "Read-only / Documentation"
+    autonomy: "May execute automatically"
+    examples:
+      - search
+      - explain
+      - read code
+      - produce architecture diagram
+      - non-normative draft
+    required_actions: []
+
+  R1:
+    label: "Localized Reversible"
+    examples:
+      - isolated code fix
+      - unit test
+      - non-production config
+      - local refactor
+    required_actions:
+      - Current State
+      - Unit Test
+      - Diff Review
+
+  R2:
+    label: "Moderate"
+    examples:
+      - multi-module change
+      - public API
+      - workflow behavior
+      - background jobs
+      - data write logic
+    required_actions:
+      - Integration Test
+      - Compatibility
+      - Rollback
+      - Observability
+
+  R3:
+    label: "High"
+    examples:
+      - production
+      - DB migration
+      - security boundary
+      - identity / authorization
+      - privacy
+      - AI routing
+      - legal / jurisdiction
+      - financial or regulated workflow
+      - large data backfill
+    required_actions:
+      - Threat Review
+      - Data Review
+      - Rehearsal
+      - Canary / Blue-Green where applicable
+      - Human Approval
+      - Post-deployment Verification
+    gate_injection:
+      description: >
+        Per ADR-004, Method Atlas §14.2's Mandatory Gate Injection list
+        (Evidence Matrix / Counterevidence / Red Team / Human Specialist Review /
+        Reversal Criteria) semantically corresponds to the UNION of EC R3+R4
+        requirements — mapping only to R4 would let R3-tier operations (DB
+        migration, Identity/Authorization changes) skip protections Atlas's own
+        design intent calls for. This is a closed protection gap, not new scope.
+      triggers_mandatory_gates: true
+
+  R4:
+    label: "Critical"
+    examples:
+      - destructive data operation
+      - cryptographic root/key change
+      - account privilege model
+      - cross-region sovereignty change
+      - irreversible external action
+      - safety-critical / regulated critical decision
+    required_actions:
+      - Independent Review
+      - Specialist Review
+      - Explicit Human Authority
+      - Recovery Drill
+      - Emergency Stop
+      - Rollback or Compensating Plan
+    gate_injection:
+      triggers_mandatory_gates: true
+
+mandatory_gate_injection_trigger:
+  description: >
+    Machine-checkable form of Atlas §14.2's rule. Semantic change from Atlas's
+    original "risk_tier = critical" (single value): now R3 UNION R4, per ADR-004's
+    explicit operator-acknowledged expansion. Phase 0 audit found no implementation
+    depended on the old space-form enum values, so migration cost was assessed low.
+  condition: "risk_tier IN [R3, R4]"
+  required_gates_pending_round2_adr:
+    description: >
+      The exact Global/High-risk Gate list itself (Evidence Matrix, Counterevidence,
+      Red Team, Human Specialist Review, Reversal Criteria, and how it reconciles
+      with the conflicting counts in MP §158 / Atlas §22 / EC §68 copy — see OQ-10,
+      still REQUIRES_HUMAN_DECISION, not resolved by ADR-004) is intentionally
+      NOT enumerated here. This schema only defines WHEN the gate mechanism fires
+      (the risk_tier condition), not WHICH gates fire — that is
+      policies/ai-execution/mandatory-gates.yaml's job (Wave 6, currently blocked
+      pending a Round 2+ ADR on OQ-10). Do not treat this file's silence on the
+      gate list as an oversight; it is a deliberate scope boundary.
+
+migration_crosswalk:
+  description: >
+    For translating historical narrative text or external system values only —
+    not a runtime bidirectional conversion table. R0/R1 split for "low" reflects
+    that Atlas's low-risk examples span both EC's fully-automatic R0 and
+    reversible-but-tracked R1 cases; there is no lossless 1:1 mapping.
+  atlas_low: ["R0", "R1"]
+  atlas_medium: "R2"
+  atlas_high: "R3"
+  atlas_critical: "R4"
+
+verification:
+  method: "Read/Grep against EC §8 (L379-475) and Atlas L1077/L3588-3612, ADR-004 full text"
+  note: "Tier examples and required actions transcribed verbatim from EC §8. No mother document was modified to produce this file."

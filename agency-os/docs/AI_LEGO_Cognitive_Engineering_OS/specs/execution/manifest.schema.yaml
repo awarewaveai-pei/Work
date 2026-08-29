@@ -1,0 +1,431 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/execution/manifest.schema.yaml"
+title: Execution Manifest
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the Execution Manifest — the record
+  every Execution must persist for 30-year replay (per which Method Atlas
+  semantics, which document versions, and which method invocations produced a
+  given result). Resolves CROSS-R-6 / CROSS-T-4 (the same mandatory record
+  defined four incompatible ways across the mother documents) and
+  DOC-execution_contract-2 (the Execution Contract's own naming rule
+  disagreeing with its own machine example). This file is the single source
+  of truth; the mother documents reference it, they do not redefine it.
+
+  The four shapes and how each is resolved:
+  1. Master Plan §0.0.3 (L85-95) `cognitive_method_atlas: {file,
+     declared_version, content_hash, loaded}` — a single-document pin, Atlas
+     only. Superseded by this schema's `documents[]` array (one entry per
+     mandatory document, Atlas included).
+  2. Execution Contract §64 (L2123-2181) full `Execution Manifest` block —
+     the richest and most-consumed shape (its `documents` sub-section is
+     itself echoed a second time, with the same field names, by EC §4's
+     per-execution `normative_documents` record at L257-273). Adopted as the
+     top-level structure of this schema almost verbatim; only its inline
+     `documents` dict (keyed by document name) is replaced with an array per
+     the compilation decision below.
+  3. Master Plan §69 (L2870-2882) flat pin list (`execution_id, app_version,
+     workflow_version, capability_version, prompt_version, model_profile,
+     schema_version, policy_version, knowledge_snapshot`) — no documents/
+     jurisdiction/change sections at all. Superseded; see
+     `migration_crosswalk` below for where each field now lives. Reading the
+     nine fields against EC §64 and Atlas §16.3 shows this list conflates two
+     different granularities: `execution_id` is genuinely per-execution (EC
+     §64's `execution.execution_id`), but `knowledge_snapshot`,
+     `model_profile`, and `prompt_version` are per-method-invocation
+     properties that Atlas §16.3 later correctly separated into its own
+     record — this list predates that separation, it is not a competing
+     design.
+  4. Method Atlas §16.3 (L3821-3857) `method_execution` record — verified to
+     be a genuinely different sub-concept, not a duplicate of the
+     document-tracking record: it tracks one method invocation (execution_id,
+     method_id, method_version, workflow_id, inputs/outputs hashes,
+     validation, human_review, cost, rollback_ref) nested inside a
+     higher-level execution that may invoke many methods across a workflow.
+     Embedded here as the repeatable `method_execution_log[]`, not merged
+     into `documents[]`.
+
+  Per ADR-001 Consequences item 4, `documents[]` also carries a fourth
+  mandatory entry for `Architecture-Constitution-v1.md` (the 4th mandatory
+  document established by ADR-001), tracked with the same shape as MP/Atlas/EC.
+
+compilation_decisions:
+  - question: >
+      Three incompatible field-name pairs exist for "document version" +
+      "document content hash": MP §0.0.3 (L92-93) uses `declared_version` +
+      `content_hash`; EC §64 (L2144-2152) and EC §4's per-execution echo
+      (L259-271) both use `version` + `sha256`; EC's own prose naming rule
+      (L85) promises a THIRD pair, `document_version` + `content_hash`, that
+      no machine block anywhere actually implements (this is exactly
+      DOC-execution_contract-2's finding).
+    decision: "version + sha256 (Execution Contract's naming) wins."
+    reasoning: >
+      Same reasoning style as ADR-004's risk_tier sub-decision: pick whichever
+      name has real, repeated, concrete consumption over one that is a
+      one-off or unimplemented placeholder. `version`/`sha256` is used
+      identically in TWO separate real machine blocks inside EC itself (§64's
+      inline `documents` dict, 3 entries, AND §4's `normative_documents`
+      per-execution array, 3 more entries) — six real occurrences. MP's
+      `declared_version`/`content_hash` is used exactly once, for exactly one
+      document (the Atlas). EC's own prose-promised `document_version` name
+      (L85) is used in zero machine blocks anywhere — it is the unimplemented
+      placeholder in this comparison, not a contender. `sha256` is also more
+      precise than the generic `content_hash` (states the algorithm plainly,
+      matching what both of EC's real blocks already write).
+    scope_note: >
+      This is a naming pick over an already-agreed concept (all three mother
+      documents agree a document pin needs SOME version + hash pair), not a
+      new architecture decision — consistent with the task boundary of
+      compiling already-ACCEPTED ADRs, not making new ones. EC's own prose
+      at L85 should eventually be corrected to say `version + sha256` to
+      match its own machine blocks and this schema; that is a mother-document
+      edit out of scope for this file (tracked implicitly by
+      DOC-execution_contract-2 remaining open in the findings ledger until a
+      documentation PROPOSAL is filed per ADR-006's process).
+  - question: >
+      MP's shape additionally carries `file` (the pinned filename) and
+      `loaded` (boolean, was this document actually loaded this run) — two
+      fields EC's `documents`/`normative_documents` shapes omit (EC relies on
+      the dict key / `document_id` cross-referencing a separate
+      document-registry for the filename, and uses a richer `loaded_sections`
+      array instead of a boolean flag).
+    decision: >
+      Keep `file` and `loaded` as required fields on every `documents[]`
+      entry, additive to the version+sha256 pair chosen above. Keep EC's
+      richer `loaded_sections` too, as an OPTIONAL supplement to `loaded`.
+    reasoning: >
+      These are not competing names for the same field (unlike
+      version/sha256 above) — MP simply carries information EC's shape left
+      implicit. Per the Build Order (MACHINE_READABLE_SPEC_PLAN.md §3),
+      manifest.schema.yaml is a Wave 1 file with no listed dependency on
+      document-registry.schema.yaml (Wave 5) — so this schema must be able to
+      identify which physical file was pinned without resolving a
+      later-built registry. Keeping `file` inline preserves MP's
+      30-year-replay intent ("Atlas 升級不會偷偷改變舊 Workflow", MP L100)
+      without introducing a forward Wave dependency. `loaded` (boolean) is
+      the simplest form satisfying ADR-001 Consequences item 4's literal
+      request; `loaded_sections` is additive detail for partial-load cases,
+      not a replacement.
+  - question: >
+      MP §69's flat pin list uses a `documents`-less, single dict-per-run
+      shape; EC §64 nests documents under a `documents:` dict keyed by
+      document name (`documents.master_plan`, `documents.method_atlas`,
+      `documents.execution_contract`). Neither matches the array shape this
+      schema needs to add a 4th (Architecture Constitution) entry cleanly.
+    decision: "documents is an array of objects, one per tracked document."
+    reasoning: >
+      Directed by task scope (manifest needs "a documents array tracking
+      each of the 4 mandatory documents"). Also matches EC §4's own
+      `normative_documents` array shape (L257-273) more closely than EC §64's
+      dict shape does — EC already has both an array form and a dict form of
+      the same data and they disagree with each other on structure, not just
+      on field names; picking the array form additionally keeps this schema
+      self-consistent with `document-registry.schema.yaml`'s array-of-entries
+      shape (Wave 5, EC §4 L228-253) without creating a hard dependency on it.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §0.0.3 cognitive_method_atlas pin (L85-95)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §69 Execution Manifest flat pin list (L2870-2882)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md naming rule (L85)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §4 Document Registry + per-execution normative_documents (L218-273)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §64 Execution Manifest (L2123-2181)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §92 Machine-readable Execution Specs list (L2766-2783, manifest.schema.yaml at L2780)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §16.3 Method Execution (L3821-3857)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md Appendix A schema list (L4574-4604, manifest.schema.yaml at L4594)"
+decided_by: >
+  docs/adr/ADR-001-scoped-authority-precedence-unification.md (ACCEPTED
+  2026-08-29) Consequences item 4 (architecture_constitution tracking
+  requirement, line 174); field-naming and structural choices within this
+  file are Phase 3 compilation decisions per
+  docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2 row for
+  manifest.schema.yaml, not a separate ADR (see compilation_decisions above).
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+type: object
+required: [execution, source, documents]
+properties:
+
+  execution:
+    type: object
+    description: "Per-run identity. EC §64 execution{} block, verbatim."
+    required: [execution_id]
+    properties:
+      execution_id: { type: string, pattern: "^EX-" }
+      task_id: { type: string, pattern: "^TASK-" }
+      run_id: { type: string, pattern: "^RUN-" }
+      trace_id: { type: string, pattern: "^TRACE-" }
+      actor: { type: string }
+      started_at: { type: string, format: date-time }
+      finished_at: { type: [string, "null"], format: date-time }
+      environment: { type: string }
+      app_version:
+        type: string
+        description: >
+          ADDITIVE field, not present in EC §64. Preserves MP §69's
+          `app_version` concept (the deployed platform build), which EC's
+          richer `source.commit`/`source.repository` pair does not replace
+          1:1 — a git commit pins exact code, `app_version` is a
+          human-readable release label for the same build. See
+          migration_crosswalk.
+
+  source:
+    type: object
+    description: "EC §64 source{} block, verbatim."
+    required: [repository, commit]
+    properties:
+      repository: { type: string }
+      commit: { type: string }
+      dirty_state: { type: boolean, default: false }
+
+  documents:
+    type: array
+    description: >
+      One entry per mandatory document. Exactly four `document_id` values
+      are mandatory in every manifest (see `required_document_ids` below);
+      additional entries (e.g. a future 5th mandatory document) MAY be
+      appended without a schema change, per the extensibility reasoning in
+      compilation_decisions.
+    minItems: 4
+    items:
+      type: object
+      required: [document_id, file, version, sha256, loaded]
+      properties:
+        document_id:
+          type: string
+          description: >
+            Cross-references `document-registry.schema.yaml`'s `id` field by
+            convention (both use the `ai-lego.<slug>` form) — NOT a hard
+            $ref, since manifest.schema.yaml (Wave 1) has no dependency on
+            document-registry.schema.yaml (Wave 5).
+          enum:
+            - "ai-lego.master-plan"
+            - "ai-lego.method-atlas"
+            - "ai-lego.execution-contract"
+            - "ai-lego.architecture-constitution"
+        file:
+          type: string
+          description: >
+            Pinned filename, per MP §0.0.3's `file` field. Required for
+            self-contained resolution without needing document-registry.yaml
+            to exist in the same form 30 years from now.
+        version:
+          type: string
+          description: >
+            Canonical name per compilation_decisions above (EC §64/§4's
+            `version`, not MP's `declared_version`).
+        sha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+          description: >
+            Canonical name per compilation_decisions above (EC §64/§4's
+            `sha256`, not MP's `content_hash` or EC's own unimplemented
+            prose name `document_version`... `content_hash` pairing).
+        loaded:
+          type: boolean
+          description: >
+            Per MP §0.0.3's `loaded` field. MUST be false (not omitted) if
+            resolution failed — a missing document entry is itself a
+            DOCUMENT_RESOLUTION_BLOCKED condition per EC §3.1, this field
+            records the case where the entry exists but the content could
+            not be loaded this run.
+        loaded_sections:
+          type: array
+          items: { type: string }
+          description: >
+            OPTIONAL supplement to `loaded`, per EC §4's `loaded_sections`
+            (L262/267/272). A non-empty array implies `loaded: true` for a
+            partial load; this field is additive detail, not a replacement
+            for the required boolean.
+    required_document_ids:
+      description: >
+        Every manifest MUST contain exactly one entry per value below.
+        Non-normative sibling of `enum` above for tooling that wants a
+        completeness check without re-deriving it from the enum.
+      value:
+        - "ai-lego.master-plan"
+        - "ai-lego.method-atlas"
+        - "ai-lego.execution-contract"
+        - "ai-lego.architecture-constitution"
+
+  architecture:
+    type: object
+    description: "EC §64 architecture{} block, verbatim."
+    properties:
+      adr_refs:
+        type: array
+        items: { type: string }
+
+  policy:
+    type: object
+    description: "EC §64 policy{} block, verbatim."
+    properties:
+      versions:
+        type: array
+        items: { type: string }
+
+  jurisdiction:
+    type: object
+    description: "EC §64 jurisdiction{} block, verbatim."
+    properties:
+      snapshot: { type: string }
+
+  ai:
+    type: object
+    description: "EC §64 ai{} block, verbatim."
+    properties:
+      provider: { type: string }
+      model_profile: { type: string }
+      model_identifier: { type: string }
+      prompt_version: { type: string }
+      tool_schema_version: { type: string }
+
+  data:
+    type: object
+    description: "EC §64 data{} block, verbatim."
+    properties:
+      schema_version: { type: string }
+      dataset_snapshots:
+        type: array
+        items: { type: string }
+
+  change:
+    type: object
+    description: "EC §64 change{} block, verbatim."
+    properties:
+      plan_hash: { type: string }
+      rollback_plan_hash: { type: string }
+
+  results:
+    type: object
+    description: "EC §64 results{} block, verbatim."
+    properties:
+      status: { type: string }
+      gates:
+        type: array
+        items: { type: string }
+        description: >
+          Gate result references. Deliberately untyped here — the
+          Global/High-risk gate list itself is BLOCKED_PENDING_ROUND2_ADR
+          (MRSP-1, gate.schema.yaml, Wave 5); this field only records which
+          gate IDs ran, it does not enumerate the legal set.
+
+  method_execution_log:
+    type: array
+    description: >
+      Atlas §16.3 method_execution record, embedded and repeated: zero or
+      more entries, one per method invocation that occurred during this
+      execution (a workflow may invoke many methods; each gets one entry
+      here). Confirmed a genuinely separate sub-concept from `documents[]`
+      during Phase 3 compilation — NOT a duplicate to be merged away. See
+      top-level `description` point 4.
+    items:
+      type: object
+      required: [execution_id, method_id]
+      properties:
+        execution_id:
+          type: string
+          pattern: "^EX-"
+          description: >
+            Atlas's own field name. NOTE: this is the method-invocation's own
+            id, a different value from the top-level `execution.execution_id`
+            above (an execution can contain many method_execution entries,
+            each with its own id) — Atlas §16.3 reuses the `EX-` prefix at a
+            finer grain, this schema preserves that verbatim rather than
+            inventing a new prefix, since no finding flagged it as a
+            collision (the two ids live in different array/object positions
+            and are never compared for equality by any mother document).
+        method_id: { type: string }
+        method_version: { type: string }
+        workflow_id: { type: string }
+        block_id: { type: string }
+        workflow_version:
+          type: string
+          description: >
+            ADDITIVE field, not in Atlas §16.3's original list. Homes MP
+            §69's orphaned `workflow_version` concept: Atlas has `workflow_id`
+            here but no version for it, and no other mother-document location
+            carries workflow versioning at all. Placed alongside `workflow_id`
+            because that is where its only sibling field already lives — a
+            field-placement compilation decision, not a new architecture
+            decision. See migration_crosswalk.
+        capability_version:
+          type: string
+          description: >
+            ADDITIVE field, homes MP §69's orphaned `capability_version`
+            concept for the same reason as `workflow_version` above — a
+            method invocation is the closest existing granularity to "which
+            Capability Contract version ran". See migration_crosswalk.
+        inputs:
+          type: object
+          properties:
+            hashes: { type: array, items: { type: string } }
+        outputs:
+          type: object
+          properties:
+            hashes: { type: array, items: { type: string } }
+        knowledge_snapshot: { type: string }
+        evidence_snapshot: { type: string }
+        policy_version: { type: string }
+        jurisdiction_snapshot: { type: string }
+        model_profile: { type: string }
+        prompt_version: { type: string }
+        compute_runtime: { type: string }
+        validation:
+          type: object
+          properties:
+            status: { type: string }
+            score: { type: [number, "null"] }
+        human_review: { type: [string, "null"] }
+        started_at: { type: string, format: date-time }
+        completed_at: { type: [string, "null"], format: date-time }
+        latency: { type: [number, "null"] }
+        cost: { type: [number, "null"] }
+        rollback_ref: { type: [string, "null"] }
+
+migration_crosswalk:
+  description: >
+    For translating MP §69's superseded flat pin list into this schema's
+    field homes — not a runtime bidirectional conversion table (same caveat
+    style as the risk-tier and epistemic-label sibling schemas).
+  mp_69_field_to_canonical_home:
+    execution_id: "execution.execution_id (direct match, same concept)"
+    app_version: "execution.app_version (additive field, see schema comment — EC's source.commit/repository is the more precise replacement, app_version kept as a human-readable label)"
+    workflow_version: "method_execution_log[].workflow_version (additive; MP flattened a per-method-invocation field into a per-execution list, Atlas §16.3 already carries the sibling workflow_id at this granularity)"
+    capability_version: "method_execution_log[].capability_version (additive, same reasoning as workflow_version)"
+    prompt_version: "ai.prompt_version (direct match) — also echoed per-invocation at method_execution_log[].prompt_version (direct match to Atlas §16.3)"
+    model_profile: "ai.model_profile (direct match) — also echoed per-invocation at method_execution_log[].model_profile (direct match to Atlas §16.3)"
+    schema_version: "data.schema_version (direct match)"
+    policy_version: "policy.versions[] (direct match, MP's singular becomes EC's plural to support multiple concurrent policies)"
+    knowledge_snapshot: "method_execution_log[].knowledge_snapshot (direct match to Atlas §16.3 — this is a per-method-invocation concept, not a per-execution one; MP §69 predates Atlas §16.3's separation)"
+
+open_questions:
+  - id: "MRSP-manifest-1"
+    question: >
+      EC's own prose naming rule (L85, "document_version + content_hash")
+      does not match EC's own machine blocks (§64, §4: "version" + "sha256").
+      This schema resolves the SCHEMA-level inconsistency by picking the
+      machine-block naming, but the EC prose text itself remains
+      uncorrected — that is a mother-document edit requiring the
+      PROPOSAL.md process (ADR-006), out of scope for a Phase 3 spec file.
+    owner: "operator, via a documentation PROPOSAL against EC L85"
+    blocks: "nothing in this schema; flagged for completeness per R4 (claim-before-verify)"
+
+verification:
+  method: >
+    Read against MP §0.0.3 (L85-95), MP §69 (L2870-2882), EC L85, EC §4
+    (L218-273), EC §64 (L2123-2181), EC §92 (L2766-2783), Atlas §16.3
+    (L3821-3857), Atlas Appendix A (L4574-4604), ADR-001 full text (Context,
+    Recommendation, Consequences item 4 at line 174), verified-findings.yaml
+    CROSS-R-6 / CROSS-T-4 / DOC-execution_contract-2 full entries.
+  note: >
+    No mother document or ADR was modified to produce this file. All four
+    competing shapes and the ADR-001 Architecture Constitution requirement
+    are transcribed verbatim from the cited lines; only field names
+    (documents[].version/sha256/file/loaded) and container shape
+    (documents[] as array) reflect a Phase 3 compilation decision, recorded
+    above in `compilation_decisions`, not a new ADR.

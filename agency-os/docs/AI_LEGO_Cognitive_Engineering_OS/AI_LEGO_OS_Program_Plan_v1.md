@@ -133,9 +133,11 @@ Source directive 中所有根路徑（`/.ai/`、`/specs/`、`/policies/`、`/met
 
 ## 7. Phase 3 — Machine-readable Foundation
 
-**Status：NOT_STARTED** | Entry：Phase 2 human review 通過。
+**Status：IN_PROGRESS（Wave 0-1 COMPLETE，2026-08-29）** | Entry：Phase 2 human review 通過，操作者「繼續」授權開工。
 
-建 `PROJECT_ROOT` 下 `/specs/{domain,cognitive,evidence,artifact,workflow,execution,decision,jurisdiction,security,analytics}/`、`/policies/{ai-execution,security,privacy,jurisdiction,provider,release}/`、`/methods/{contracts,registry}/`、`/recipes/validated/`、`/docs/{architecture,adr,runbooks}/`、`/tests/{architecture,contracts,governance}/`。Markdown = human-readable authority；YAML / JSON Schema = machine-executable contract。
+建 `PROJECT_ROOT` 下 `/specs/{domain,cognitive,evidence,artifact,workflow,execution,decision,jurisdiction,security,analytics}/`、`/policies/{ai-execution,security,privacy,jurisdiction,provider,release}/`、`/methods/{contracts,registry}/`、`/recipes/validated/`、`/docs/{architecture,adr,runbooks}/`、`/tests/{architecture,contracts,governance}/`。Markdown = human-readable authority；YAML / JSON Schema = machine-executable contract。依 `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` §3 Wave 0-8 建置序執行。
+
+**Wave 0**：9 份 ADR 全數 ACCEPTED（見 Phase 2 Round 3）。**Wave 1（全系統型別字母表，已完成）**：`specs/governance/epistemic-label.schema.yaml`、`specs/execution/{risk-tier,status-codes,manifest}.schema.yaml` 共 4 檔，全數 YAML 語法驗證通過，逐檔附完整 `source_of_truth_for` file:line 引用與 `verification` 段。過程中 `status-codes.schema.yaml` 額外發現一條 Phase 0/1 皆未捕捉的新衝突（MP §98 vs §134 兩套不相容的法律不確定性狀態詞彙），已登記為 `DUPLICATION_REGISTER.yaml` P1-DUP-6（尚無 ADR 裁決，留待下一輪）。
 
 ## 8. Phase 4 — Repository Architecture
 
@@ -165,7 +167,7 @@ Source directive 中所有根路徑（`/.ai/`、`/specs/`、`/policies/`、`/met
 | CR | Claude/Codex Cross-Review | **COMPLETE**（2026-08-29；9/9 交集 0 DISAGREE，Codex 補 3 組新證據＋3 個新決策點） | 三件套 + 分類矩陣 ✅ |
 | 1 | Gap Analysis | **COMPLETE**（2026-08-29；98 條，含 4 CONFLICT + 5 DUPLICATION） | 6 registers ✅ |
 | 2 | Architecture Convergence | **COMPLETE**（2026-08-29；15/15 deliverables + 3 新增 ADR；9 份 ADR 全數 `ACCEPTED`） | 15 deliverables ✅ → HUMAN REVIEW 已審閱裁決 → **等待 Phase 3 明確 go-ahead** |
-| 3 | Machine-readable Foundation | NOT_STARTED | specs/policies/tests 樹 + schema 驗證 |
+| 3 | Machine-readable Foundation | **IN_PROGRESS**（Wave 0-1 ✅，2026-08-29；4/約 50+ schema 已建） | specs/policies/tests 樹 + schema 驗證 |
 | 4 | Repository Architecture | NOT_STARTED | bounded contexts 驗證 + repo 決策 |
 | 5 | MVP Vertical Slice | NOT_STARTED | 全鏈 e2e + replay/rollback 實證 |
 

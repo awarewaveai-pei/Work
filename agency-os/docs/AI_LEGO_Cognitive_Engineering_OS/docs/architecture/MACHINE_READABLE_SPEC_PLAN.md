@@ -82,15 +82,15 @@ PROJECT_ROOT/                                  ← D:\Work\agency-os\docs\AI_LEG
 
 | 檔名 | 用途 | 格式 | 依賴 | 解決的 Finding | 狀態 |
 |---|---|---|---|---|---|
-| `epistemic-label.schema.yaml` | 定義 `epistemic_type`（11 值 SNAKE_CASE）+ `authorship_state`（6 值）+ `locked`（LOCKED_FACT/LOCKED_DECISION）三個正交欄位，組成每個內容物件的最小 provenance record | YAML (JSON Schema) | 無（Wave 0 之後最先建） | CROSS-T-6, CROSS-R-9, CROSS-R-11, CROSS-T-7, CROSS-T-8, CDX-7, OQ-7, OQ-8（ADR-004b 全套裁決） | READY |
+| `epistemic-label.schema.yaml` | 定義 `epistemic_type`（11 值 SNAKE_CASE）+ `authorship_state`（6 值）+ `locked`（LOCKED_FACT/LOCKED_DECISION）三個正交欄位，組成每個內容物件的最小 provenance record | YAML (JSON Schema) | 無（Wave 0 之後最先建） | CROSS-T-6, CROSS-R-9, CROSS-R-11, CROSS-T-7, CROSS-T-8, CDX-7, OQ-7, OQ-8（ADR-004b 全套裁決） | **BUILT（2026-08-29，`specs/governance/epistemic-label.schema.yaml`）** |
 
 ### 2.2 `/specs/execution/`（Wave 1 其餘 + EC §92 既有 13 檔 + 新增缺口）
 
 | 檔名 | 用途 | 格式 | 依賴 | 解決的 Finding | 狀態 |
 |---|---|---|---|---|---|
-| `risk-tier.schema.yaml` | R0–R4 五級唯一 canonical risk_tier enum，取代 Atlas 四級 | YAML (JSON Schema) | 無 | CROSS-T-3, CROSS-R-10（ADR-004a） | READY |
-| `status-codes.schema.yaml` **（新增）** | 統一收斂全庫所有 blocking/escalation 機讀狀態碼：`PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED`/`METHOD_RESOLUTION_BLOCKED` 合併映射、EC 另外 9 個具名信號（`DOCUMENT_RESOLUTION_BLOCKED`/`CURRENT_STATE_DRIFT_DETECTED`/`SCOPE_CHANGE_REQUIRED`/`LEGAL_REVIEW_REQUIRED`/`BUDGET_REVIEW_REQUIRED`/`CONFLICT_REQUIRES_HUMAN_REVIEW`/`PREEXISTING_WORKTREE_CHANGES`/`OFFLINE_SOURCE_STALE`）與 §10 合法 side states 的映射關係，並新增 §5 提案的 `PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED` | YAML (JSON Schema) | 無 | CROSS-R-4, CROSS-T-5, DOC-execution_contract-9, DOC-execution_contract-3（`NEEDS_REVIEW` 未宣告） | READY |
-| `manifest.schema.yaml` | Execution Manifest 唯一正本，合併 MP §0.0.3 Atlas pin（file/declared_version/content_hash/loaded）+ EC §64 documents 段（version/sha256）+ MP §69 flat pin list + Atlas §16.3 method_execution record 四種形狀，並補上 ADR-001 建議的 Architecture Constitution 記錄欄位 | YAML (JSON Schema) | governance/epistemic-label（provenance 欄位）、Architecture-Constitution-v1.md（記錄它的 hash） | CROSS-R-6, CROSS-T-4, DOC-execution_contract-2（`document_version+content_hash` vs `version+sha256` 命名不一致） | READY |
+| `risk-tier.schema.yaml` | R0–R4 五級唯一 canonical risk_tier enum，取代 Atlas 四級 | YAML (JSON Schema) | 無 | CROSS-T-3, CROSS-R-10（ADR-004a） | **BUILT（2026-08-29，`specs/execution/risk-tier.schema.yaml`）** |
+| `status-codes.schema.yaml` **（新增）** | 統一收斂全庫所有 blocking/escalation 機讀狀態碼：`PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED`/`METHOD_RESOLUTION_BLOCKED` 合併映射、EC 另外 9 個具名信號（`DOCUMENT_RESOLUTION_BLOCKED`/`CURRENT_STATE_DRIFT_DETECTED`/`SCOPE_CHANGE_REQUIRED`/`LEGAL_REVIEW_REQUIRED`/`BUDGET_REVIEW_REQUIRED`/`CONFLICT_REQUIRES_HUMAN_REVIEW`/`PREEXISTING_WORKTREE_CHANGES`/`OFFLINE_SOURCE_STALE`）與 §10 合法 side states 的映射關係，並新增 §5 提案的 `PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED` | YAML (JSON Schema) | 無 | CROSS-R-4, CROSS-T-5, DOC-execution_contract-9, DOC-execution_contract-3（`NEEDS_REVIEW` 未宣告） | **BUILT（2026-08-29，`specs/execution/status-codes.schema.yaml`；額外發現新衝突 P1-DUP-6，見 DUPLICATION_REGISTER.yaml）** |
+| `manifest.schema.yaml` | Execution Manifest 唯一正本，合併 MP §0.0.3 Atlas pin（file/declared_version/content_hash/loaded）+ EC §64 documents 段（version/sha256）+ MP §69 flat pin list + Atlas §16.3 method_execution record 四種形狀，並補上 ADR-001 建議的 Architecture Constitution 記錄欄位 | YAML (JSON Schema) | governance/epistemic-label（provenance 欄位）、Architecture-Constitution-v1.md（記錄它的 hash） | CROSS-R-6, CROSS-T-4, DOC-execution_contract-2（`document_version+content_hash` vs `version+sha256` 命名不一致） | **BUILT（2026-08-29，`specs/execution/manifest.schema.yaml`；EC L85 prose 與機讀區塊仍不一致，留 open_question 未擅自改母文件）** |
 | `normative-context.schema.yaml` **（新增）** | 定義 `Section Registry`（EC L198）與 `Normative Context Bundle`（EC L204）結構，供 Task Execution Packet 的 `normative-context.yaml` 引用 | YAML (JSON Schema) | manifest.schema.yaml | CROSS-T-18 | READY（母文件僅提名詞，內容需 Phase 3 從零設計，非重複定義修正） |
 | `method-resolution.schema.yaml` | Task Context → Method Atlas selection_context 的欄位映射表，補齊 `goal_type/problem_type/required_rigor/decision_criticality/evidence_available/uncertainty/time_horizon` 等 EC task_context 缺失欄位 | YAML (JSON Schema) | risk-tier.schema.yaml, cognitive/method.schema.yaml | CROSS-T-16 | READY |
 | `task.schema.yaml` | EC §92 既有承諾，task_context 完整結構 | YAML (JSON Schema) | risk-tier, governance/epistemic-label | （沿用既有承諾，無單一 finding） | READY |
@@ -197,10 +197,10 @@ PROJECT_ROOT/                                  ← D:\Work\agency-os\docs\AI_LEG
 Wave 之間的依賴關係，不是任意排序：
 
 ```
-Wave 0  操作者批准 ADR-001/004/005/006（治理與詞彙前提）
+Wave 0  操作者批准 ADR-001/004/005/006（治理與詞彙前提）── ✅ COMPLETE（2026-08-29，9 份 ADR 全數 ACCEPTED）
           ↓
-Wave 1  specs/governance/epistemic-label.schema.yaml
-        specs/execution/{risk-tier, status-codes, manifest}.schema.yaml
+Wave 1  specs/governance/epistemic-label.schema.yaml            ── ✅ BUILT
+        specs/execution/{risk-tier, status-codes, manifest}.schema.yaml ── ✅ BUILT（全數 2026-08-29）
           ↓（Wave 2 與 Wave 3 可平行）
 Wave 2                                    Wave 3
   specs/domain/tenant.schema.yaml           specs/cognitive/{primitive,method,lens,

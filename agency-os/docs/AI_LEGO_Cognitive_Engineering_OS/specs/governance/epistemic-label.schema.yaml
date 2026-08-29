@@ -1,0 +1,138 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/governance/epistemic-label.schema.yaml"
+title: Epistemic Label / Provenance Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the two orthogonal provenance axes every
+  content/claim object in the system must carry, plus the third orthogonal lock axis.
+  Resolves ADR-004 Sub-decision (b): four incompatible vocabularies existed across
+  Master Plan §83 (6 values), Method Atlas Epistemic Type (11 space-form values),
+  Execution Contract §38 (11 SNAKE_CASE values), and Master Plan §12.1 authorship
+  labels (7 values, one of which — CALCULATED RESULT — was a literal duplicate of
+  an §83 value used for a different axis). This file is the single source of truth;
+  the mother documents reference it, they do not redefine it.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §83 (epistemic labels)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §12.1 (authorship labels)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §11.3 (Locked Fact)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md Epistemic Type (L591-605)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §21 mandatory rule #2 (L4148-4151)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §38 (L1469-1495)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §57 (L1988-1990)"
+decided_by: "docs/adr/ADR-004-risk-tier-and-epistemic-label-canonicalization.md (ACCEPTED 2026-08-29)"
+
+definitions:
+
+  epistemic_type:
+    description: >
+      Answers "what kind of epistemic claim is this content?" — mutually exclusive,
+      exactly one value per content object. SNAKE_CASE canonical form, taking
+      Execution Contract §38 as the base (Atlas's space-form values map 1:1 by
+      replacing spaces with underscores — zero semantic change). Master Plan §83's
+      6-value list was verified to be a strict subset of this 11-value list.
+    type: string
+    enum:
+      - SOURCE_FACT
+      - EVIDENCE
+      - ASSUMPTION
+      - HYPOTHESIS
+      - AI_INFERENCE
+      - AI_SUGGESTION
+      - HUMAN_OPINION
+      - CALCULATED_RESULT
+      - SIMULATED_RESULT
+      - UNKNOWN
+      - DECISION
+    promotion_redline:
+      description: >
+        Fixes ADR-004's finding that both Atlas §21 rule #2 and EC §38's forbidden
+        block referenced a bare "FACT" value that exists in no enum. The only
+        legal literal string is SOURCE_FACT, and UNKNOWN may never be promoted to
+        it directly.
+      forbidden_transition: "UNKNOWN -> SOURCE_FACT (direct)"
+      legal_paths:
+        - "UNKNOWN -> (via Compute producing evidence) -> EVIDENCE"
+        - "UNKNOWN -> (via Human Validation) -> SOURCE_FACT"
+      each_legal_path_must_record:
+        - authorship_state
+        - execution_manifest_entry
+
+  authorship_state:
+    description: >
+      Answers "who produced or last touched this content?" — orthogonal to
+      epistemic_type (a fact and an inference can each be human-originated or
+      AI-generated). Based on Master Plan §12.1's 7-value list with CALCULATED_RESULT
+      removed: that value was a literal duplicate of an epistemic_type value
+      mistakenly reused on the authorship axis (Master Plan's own internal
+      self-collision, not just cross-document drift). ADR-004 verified the
+      remaining 6 values answer a genuinely different question than epistemic_type.
+    type: string
+    enum:
+      - HUMAN_ORIGINAL
+      - AI_GENERATED
+      - AI_SUGGESTED
+      - HUMAN_EDITED
+      - HUMAN_APPROVED
+      - SOURCE_QUOTATION
+
+  locked:
+    description: >
+      Third orthogonal axis. Unifies EC §57's SNAKE_CASE LOCKED_FACT/LOCKED_DECISION
+      with Master Plan §11.3's space-form "LOCKED FACT" (mechanical casing fix,
+      zero semantic change) and defines LOCKED_DECISION for the first time (Master
+      Plan's own 6-value §83 vocabulary had no DECISION concept to lock in the
+      first place — this was a completeness gap in that list, not an omission).
+    type: [string, "null"]
+    enum: [null, LOCKED_FACT, LOCKED_DECISION]
+    default: null
+    constraints:
+      - "locked == LOCKED_FACT is legal only when epistemic_type == SOURCE_FACT"
+      - "locked == LOCKED_DECISION is legal only when epistemic_type == DECISION"
+      - "content with locked != null MUST NOT be modified by AI (EC §57)"
+
+provenance_record:
+  description: The minimal provenance object every content/claim object must carry.
+  type: object
+  required: [epistemic_type, authorship_state]
+  properties:
+    epistemic_type:
+      $ref: "#/definitions/epistemic_type"
+    authorship_state:
+      $ref: "#/definitions/authorship_state"
+    locked:
+      $ref: "#/definitions/locked"
+  examples:
+    - description: "An AI-computed number still awaiting human sign-off"
+      value: { epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null }
+    - description: "A human-approved locked decision"
+      value: { epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: LOCKED_DECISION }
+
+migration_crosswalk:
+  description: >
+    For translating historical narrative text or external system values only —
+    not a runtime bidirectional conversion table.
+  master_plan_83_to_canonical:
+    "SOURCE FACT": SOURCE_FACT
+    "AI INFERENCE": AI_INFERENCE
+    "AI SUGGESTION": AI_SUGGESTION
+    "HUMAN OPINION": HUMAN_OPINION
+    "CALCULATED RESULT": CALCULATED_RESULT
+    "UNKNOWN": UNKNOWN
+  master_plan_12_1_to_canonical:
+    "HUMAN ORIGINAL": HUMAN_ORIGINAL
+    "AI GENERATED": AI_GENERATED
+    "AI SUGGESTED": AI_SUGGESTED
+    "HUMAN EDITED": HUMAN_EDITED
+    "HUMAN APPROVED": HUMAN_APPROVED
+    "SOURCE QUOTATION": SOURCE_QUOTATION
+    "CALCULATED RESULT": "REMOVED — was a duplicate of the epistemic_type value, not a real 7th authorship value"
+
+verification:
+  method: "Read/Grep against mother documents, ADR-004 full text"
+  note: >
+    Enum values transcribed verbatim from ADR-004 Recommendation section
+    (which itself cites exact line numbers in all three mother documents).
+    No mother document was modified to produce this file.

@@ -1,5 +1,67 @@
 # Worklog
 
+## 2026-08-29（續9）
+
+### AI LEGO Phase 3 開工 — Wave 0-1 完成：全系統型別字母表 4 份 schema 落地，過程中額外揪出一條 Phase 0/1 都沒抓到的新衝突
+
+**背景**：續7 記錄操作者授權裁決後，操作者說「繼續」，視為對 Phase 3 開工的明確 go-ahead（我先前明確告知「Phase 3 開工還需要你明確的 go-ahead」）。依 `MACHINE_READABLE_SPEC_PLAN.md` §3 Build Order，Wave 0（操作者批准 ADR-001/004/005/006）已在續7完成；本條記錄 Wave 1（全系統型別字母表：`risk_tier`、`epistemic_type/authorship_state`、`manifest` 三者被 Wave 2 以後幾乎每個 schema 引用，必須最先建）。
+
+**執行方式**：`epistemic-label.schema.yaml`（ADR-004 已完整定案 11+6 值，我直接寫）與 `risk-tier.schema.yaml`（EC §8 R0-R4 內容已完整，直接轉譯）由我自己撰寫，因為內容已在 ADR 定案、無需額外分析；`status-codes.schema.yaml`（要合併 EC 全文散落的 9+ 個具名狀態碼）與 `manifest.schema.yaml`（要合併 4 種互不相容的 Execution Manifest 形狀）交給 2 個 general-purpose subagent 平行處理，因為這兩份需要大量 grep 核對母文件原文，不是單純轉譯。全部要求先 Read/Grep 核對再寫，不得憑 `MACHINE_READABLE_SPEC_PLAN.md` 的摘要文字直接下手。
+
+**紀律亮點**：
+- `manifest.schema.yaml` 的 agent 面對 3 個命名衝突（`version+sha256` vs `declared_version+content_hash` vs EC 自己 prose 承諾卻零實作的 `document_version+content_hash`）時，用「挑哪個有真實、重複消費證據」的 ADR-004 式論證選出 `version+sha256`，並誠實把 EC 自己 prose 與機讀區塊不一致這件事留在 `open_questions` 裡，**沒有擅自去改 EC 原文**——正確辨識出「挑欄位名字」是 Phase 3 編譯層級的小決定，「改母文件措辭」則需要走 ADR-006 的 `.ai/proposals/` 流程。
+- `status-codes.schema.yaml` 的 agent 發現 `METHOD_RESOLUTION_BLOCKED`（EC）與 `PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED`（MP）確實是同一件事的兩個名字（非表面相似），用「哪個名字真的掛在 EC §10 正式 state machine 上」的結構性論證選出前者為正本，同時把兩份文件的觸發條件取聯集而非只採用較窄的 EC 版本，避免修名字時不小心弄丟 MP 多出的兩個觸發子情境。
+- 同一個 agent 在對全文做 `_BLOCKED`/`_REQUIRED`/`_REVIEW`/`_DETECTED` 廣義 grep 掃描時，**意外發現一條 Phase 0（71 findings）與 Phase 1（98 條）都沒抓到的新衝突**：Master Plan §98（Conflict-of-Laws Engine，5 值 enum）與 §134（「Legal Uncertainty Is a First-class State」，6 值 enum）定義了兩套幾乎不重疊的法律不確定性狀態詞彙，僅共享 `AMBIGUOUS` 一值。該 agent 正確地沒有自己動手裁決哪個該贏，而是記在檔案的 `open_questions` 段，我再把它正式登記進 `DUPLICATION_REGISTER.yaml`（新增 P1-DUP-6）——**Phase 1 正式 exit 不代表這份 register 是封存文件**，Phase 3 建 schema 這種細粒度工作反而更容易挖出前期粗篩漏掉的東西。
+
+[已修改]
+- 新增 `specs/governance/epistemic-label.schema.yaml`、`specs/execution/{risk-tier,status-codes,manifest}.schema.yaml`（4 檔，全數 Python `yaml.safe_load` 驗證語法正確）
+- `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`：對應 4 個 Spec Inventory 表格列的狀態欄由 `READY` 改為 `BUILT（2026-08-29）`；Build Order 的 Wave 0/1 mermaid 區塊加註完成勾選
+- `.ai/research/phase-1/DUPLICATION_REGISTER.yaml`：新增 `P1-DUP-6`（MP §98 vs §134 法律不確定性狀態詞彙衝突），並在 `notes` 補一句提醒 register 非封存文件
+- `AI_LEGO_OS_Program_Plan_v1.md`：Phase 3 狀態由 `NOT_STARTED` 改為 `IN_PROGRESS（Wave 0-1 COMPLETE）`
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 -c "yaml.safe_load(...)"` 對 4 個新檔逐一解析（全部 OK，無語法錯誤） | exit=0
+- REVIEW_DONE: critic=Claude 主 session 逐字通讀全部 4 份新檔（非僅信任 agent 摘要）| verdict=pass | findings=0（唯一需要跟進的是 agent 自己誠實標記的 open_questions，非缺陷）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=epistemic-label\.schema\.yaml\|risk-tier\.schema\.yaml\|status-codes\.schema\.yaml\|manifest\.schema\.yaml | hits=15（全部為既有母文件承諾清單/Phase 0 inventory/本輪新增架構文件的預期引用，無 stale 或衝突引用）
+- ORACLE_WAIVED: Wave 1 四份 schema 為既有已 ACCEPTED ADR 內容的直接編譯（epistemic-label/risk-tier）或 Low-risk 命名/合併決策（status-codes/manifest，非新架構取捨），不需要對外部 oracle 覆審；新發現的 P1-DUP-6 尚未裁決，留待對應 ADR 起草時再排 Codex 覆審
+
+[剩餘風險] P1-DUP-6（MP §98 vs §134）尚無 ADR 裁決，`status-codes.schema.yaml` 的 `LEGAL_REVIEW_REQUIRED` 條目只處理了兩份 enum 共享的那一個葉值，未處理兩個外層 enum 本身該如何協調；`manifest.schema.yaml` 的 open_questions 記錄 EC 自身 prose（L85）與機讀區塊命名不一致，需要一份獨立的 `.ai/proposals/` 文件修正提案（非本輪範圍）。
+[rollback] `git revert` 本次 commit；三母文件全程零改動，新增內容僅限 4 個新 schema 檔 + 既有 register/計畫文件的狀態欄位更新。
+
+## 2026-08-29（續8）
+
+### aware-wave.com 品牌子網域 IA 對齊（GPT 提案 vs 現況核對）+ 落地成 SSOT
+
+**背景**：操作者貼出 GPT 建議的 `aware-wave.com` 子網域架構圖（www/hci/cognitive/portal/api/docs/trust/status），問「跟現有 app.aware-wave.com 是不同東西嗎」+「想架構起來，ADHD 沒做會忘、不想累積」。
+
+**現況核對**：讀 `AWAREWAVE_STACK_QUICKREF.md`（2026-08-26 實查）發現 GPT 圖遺漏大量現況——`app.aware-wave.com` 已上線（非「預計」），且 EU/SG 另有 9 個內部維運子網域（n8n/trigger/studio+supabase/postiz/mainwp/uptime/oracle/remotion-svc/video-svc）圖上完全沒畫。
+
+**釐清 portal vs app**：讀 `APP_AWARE_WAVE_CURRENT_STATE.md` 確認 `app.aware-wave.com` = Lobster Factory **內部維運後台**（單一 owner + RBAC，Supabase Auth `app_metadata.ops_role`），服務對象是 AwareWave 自己人；GPT 提案的 `portal` = HCI-30 + Cognitive OS **外部客戶**的帳號/訂閱/launcher 層，服務對象、帳號模型都不同，兩者該並存，不是重複建設。
+
+**落地（Low risk，doc-only，直接做不等批准）**：
+1. 新建 [`docs/edge-and-domains/PRODUCT_DOMAIN_IA_PLAN.md`](docs/edge-and-domains/PRODUCT_DOMAIN_IA_PLAN.md) — 現況表（§1）+ 提案新增表（§2）+ 優先序定案（§3：portal 最小版優先，因為它是 bottleneck，其餘外殼晚點補不影響收入）+ 下一步（§4）。
+2. `EDGE_DOMAINS_INDEX.md` 快速導覽表加一列指向新文件。
+3. `TASKS.md`：§F 產品線加「`portal.aware-wave.com` 最小版」；§G 基礎建設加「`hci`/`docs`/`trust` DNS 保留（Medium risk，待 go-ahead）」+「`status` = 現有 `uptime.aware-wave.com` 對外開放 view，不重建」。
+
+**未做（明確標記，避免下次誤讀為已完成）**：DNS 實際建立、`portal` 實際開發——這輪只做文件+待辦入庫，Cloudflare 帳號設定屬 Medium risk 需操作者另行 go-ahead。
+
+**[驗證結果]**
+- REALTEST_WAIVED: DOC_ONLY -- 純文件新增 + TASKS/INDEX 掛連結，無 code/服務行為變動
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m（自我核對：md 連結相對路徑正確、表格語法正確、與現況文件無矛盾）
+- BUGHUNT_DONE: scope=agency-os | grep=`portal\.aware-wave\|hci\.aware-wave\|trust\.aware-wave\|status\.aware-wave` | hits=1（新文件自身，無重複/衝突舊聲稱）
+
+### portal.aware-wave.com R0 設計方案（Medium risk，方案先行不動 code）
+
+操作者追問「所以現在要做了嗎」→ 依 AGENTS.md 風險分級（auth/核心邏輯=Medium，先說計畫同意再做），先產出 R0 七段方案而非直接寫 code。過程中讀到 `ADR-003-tenant-model-and-cas-isolation.md`（同日剛 ACCEPTED）已定義 Cognitive OS 的 `Tenant` domain object（schema 含 data_residency_region/encryption_root_key_ref），這改變了 portal 的設計——**portal 不該自建平行的租戶概念**，且 Cognitive OS 目前 Phase 2 無 code、無 provisioning API，portal V1 因此收斂成「身分+訂閱狀態」，明確排除「假裝已能開通產品」。
+
+新文件：[`docs/operations/PORTAL_AWARE_WAVE_DESIGN_PROPOSAL.md`](docs/operations/PORTAL_AWARE_WAVE_DESIGN_PROPOSAL.md) — 現況依賴/風險清單/方案比較（共用 vs 獨立 Auth 實例，建議共用現有 Supabase Auth）/V1 範圍界定（含明確 non-goals：Stripe、真實 provisioning、HCI-30、獨立 Auth 實例）/schema 草案/2 題待操作者決定（部署形態、V1 範圍）。`TASKS.md` §F portal 條目已更新指向本方案，標記「方案待批准，未實作」。
+
+**[驗證結果]**
+- REALTEST_WAIVED: DOC_ONLY -- 純方案文件，未寫任何 code/migration/deploy 設定
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m（自我核對：方案與 ADR-003 schema 一致、V1 排除項與金流/RLS 紅線對齊、未偽稱已整合）
+- BUGHUNT_DONE: scope=agency-os | grep=`portal\.customers\|product_provisions\|portal_customer_id` | hits=2（新方案文件自身 + 本 WORKLOG 條目引用，無其他既有同名 schema/表衝突）
+
 ## 2026-08-29（續7）
 
 ### AI LEGO Phase 2 STOP-FOR-HUMAN-REVIEW：操作者「你決定」授權裁決 — 9 份 ADR 全數 ACCEPTED，Codex 對抗式覆審抓到 2 個真實漏洞並修正，新增 3 份 ADR 補齊全部 4 項待決衝突
