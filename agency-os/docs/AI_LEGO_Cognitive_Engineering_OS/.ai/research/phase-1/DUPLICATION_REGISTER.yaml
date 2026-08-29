@@ -1,0 +1,94 @@
+# AI LEGO OS — Phase 1 Duplication Register
+# Items promoted from raw GAP findings because they describe the SAME concept defined multiple times
+# across (or even within) the mother docs, with drift already present. Complements Phase 0's
+# duplicate_definition findings (Execution Manifest, Reversal Criteria, Assumption Registry, etc.)
+# by covering role-lens discoveries not caught in the full-document read pass.
+# Claude-only, single-pass — not yet Codex cross-verified.
+# Phase 1 rule: REGISTERED, not fixed.
+duplications:
+  - id: P1-DUP-1
+    severity: high
+    origin: P1-GAP-ARCH-1 (architecture_data cluster, promoted)
+    title: "DB Migration Recipe 三套互不相同的步驟序列，Atlas 甚至自己內部就矛盾"
+    definitions:
+      - source: "Execution Contract §19 (Database Change Contract)"
+        file: AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md
+        line: 1135
+        sequence: "Baseline↓Backup/Restore Validation↓Compatibility Analysis↓Expand↓Deploy Compatible Code↓Backfill↓Reconciliation↓Traffic Migration↓Observe↓Contract Old Schema↓Close Rollback Window（11 步，無 Dual Read/Write 節點）"
+      - source: "Method Atlas F21 (DB/Data Pack)"
+        file: AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md
+        line: 907
+        sequence: "Schema Baseline→Data Contract→Compatibility Analysis→Backup+Restore Test→Expand→Dual Read/Write→Backfill→Reconciliation→Canary→Contract→Rollback Window Close（11 節點，Dual R/W 在 Backfill 之前）"
+      - source: "Method Atlas §13.10"
+        file: AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md
+        line: 3487
+        sequence: "Schema Baseline→Data Contract→Compatibility Analysis→Backup+Restore Drill→Expand→Compatible App→Backfill→Reconciliation→Dual Read/Write→Canary→Switch→Contract→Rollback Window Close（13 節點，Dual R/W 在 Backfill 之後）"
+    drift: "Atlas 自己的 F21 與 §13.10 對「Dual Read/Write 該在 Backfill 前還是後」自相矛盾（前者在前、後者在後）；EC 版本完全沒有 Dual Read/Write 這個節點。三套步驟數也不同（11/11/13）。"
+    consequence: "實作者三選一，選錯順序（例如 backfill 完才開始雙寫）會造成 backfill 期間寫入的新資料遺失——真實的 migration failure，不是文字潔癖。"
+  - id: P1-DUP-2
+    severity: medium
+    origin: P1-GAP-ARCH-11 (architecture_data cluster, promoted)
+    title: "同一系統被 Plane / Module / Workspace 三套互不對應的分解方式描述，無對照表"
+    definitions:
+      - source: "§4 總體架構"
+        file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md
+        line: 363
+        form: "9-10 個 Plane：KNOWLEDGE PLANE / COMPUTATION PLANE / DECISION PLANE ..."
+      - source: "§77 UI 工作空間"
+        file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md
+        line: 3051
+        form: "6 個 Workspace：Canvas/Knowledge/Data Lab/Workflow Lab/Artifact Studio/Decision Room"
+      - source: "§80 目錄結構"
+        file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md
+        line: 3188
+        form: "20 個 /modules 目錄"
+    drift: "具體命名不一致例證：§27 稱「Data Science Plane」，§28/§77 稱「Data Lab」，程式碼目錄稱「/modules/analytics」——三個名字指同一概念，三份文件都沒有一句話說明這是同一件事。"
+    consequence: "讀者/實作者要靠自己拼湊 Plane↔Module↔Workspace 的對應關係；名稱漂移在未來重構時容易被誤判為三個不同的東西而重複建設。"
+  - id: P1-DUP-3
+    severity: high
+    origin: P1-GAP-ARCH-12 (architecture_data cluster, promoted)
+    title: "Tenant Isolation blast-radius 鏈在 MP 與 Atlas 節點數不同，Atlas 多一個 MP 從未提過的「Branch」層級"
+    definitions:
+      - source: "MP §1.5 最小爆炸半徑"
+        file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md
+        line: 268
+        chain: "Tenant Isolation→Workspace Isolation→Project Isolation→Workflow Isolation→Execution Isolation→Capability Isolation（6 層，無 Branch）"
+      - source: "Atlas §21 最小爆炸半徑 mermaid 圖"
+        file: AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md
+        line: 4138
+        chain: "Tenant→Workspace→Project→Workflow→Branch→Execution→Capability（7 層，多了 Branch）"
+    drift: "「Tenant」這個從未被 Domain Model 定義過的概念（全三文件合計僅出現 3 次），被兩份文件各自拿來當系統最外層安全邊界的錨點，且兩份文件對這條鏈本身的節點都對不齊。"
+    consequence: "實作時無法知道 Tenant 的資料表長什麼樣、Tenant:Workspace 是 1:N 還是 N:N，也無法知道「Branch」（Atlas 專有）在系統裡實際對應什麼資源。"
+  - id: P1-DUP-4
+    severity: medium
+    origin: ai_datascience_research GAP-1 (promoted)
+    title: "因果推論方法在 MP 敘事列表與 Atlas F11 結構化目錄中重複定義，零互相引用"
+    definitions:
+      - source: "MP §31 Causal Inference"
+        file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md
+        line: 1796
+        form: "列 DAG/Propensity Score/Matching/DiD/IV/RD/Synthetic Control/Causal Impact，無導讀、無 assumption/sensitivity 規則"
+      - source: "Atlas F11 因果表"
+        file: AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md
+        line: 613
+        form: "同一組方法重新定義，含 variables→edges→confounders/mediators/colliders 完整規格，且要求每條 edge 綁 evidence/rationale/confidence"
+    drift: "MP §43 之後每章都有 Method Resolution Rule 導讀防止敘事列表被誤用為完整方法定義，唯獨 §27-42 整個 Data Science block 沒被納入這個保護機制（Method Resolution Rule 全文件只在 MP:2127 出現一次，緊接在 §42 之後）。"
+    consequence: "實作者或 AI 只讀 MP 就會用「DAG/DiD/IV/RD/Synthetic Control」等名詞直接建功能，完全繞過 Atlas F11 規定的 assumption/sensitivity 附加規則；未來 Atlas F11 修改因果方法規格，MP §31 不會同步更新也不會被標記過期。"
+  - id: P1-DUP-5
+    severity: medium
+    origin: legal_global_policy GAP-5 (promoted)
+    title: "Localization 模組在 MP 與 Atlas 用不相容的目錄/檔案結構各自定義一次"
+    definitions:
+      - source: "MP §81 Global Config Paths"
+        file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md
+        line: 3344
+        form: "/config/localization/{locale.yaml, currencies.yaml, timezones.yaml, units.yaml, accessibility.yaml}（5 個扁平檔案）"
+      - source: "Atlas §122 Localization Architecture"
+        file: AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md
+        line: 4918
+        form: "/modules/localization/{locale, language, currency, timezone, calendar, units, address, formatting}/（8 個子目錄，無檔案）"
+    drift: "根路徑不同(config vs modules)、項目數不同(5 vs 8)、粒度不同(檔案 vs 目錄)；language/calendar/address/formatting 只在 Atlas 出現，accessibility 只在 MP 出現。"
+    consequence: "與 Execution Manifest（Phase 0 CROSS-T-4/CROSS-R-6）同一種雙重維護樣態，只是發生在 localization 模組；兩個依不同文件實作的團隊會蓋出不相容的目錄結構，且兩版都沒定義翻譯字串缺失時的 fallback 語言。額外發現：Atlas 開頭的「中文優先」聲明段落尾端夾帶一條真正的產品級強制規則（切換介面語言不得破壞歷史 Workflow 可重播性，Atlas:62-64），但該規則從未在真正的 Localization 章節（§122）被複述或連結——容易被誤判為純文件撰寫慣例而被忽略。"
+notes:
+  - "P1-DUP-1（DB Migration）與 P1-DUP-3（Tenant chain）風險最高：前者是可執行 runbook 級別的矛盾，直接影響 migration 是否會遺失資料；後者是 Tenant 概念本身從未進入 Domain Model 卻被當作安全邊界錨點使用。"
+  - "所有 5 條建議 Phase 2 統一裁決 SSOT 位置（例如：DB Migration Recipe 唯一正本應該是 Atlas F21 還是 EC §19，兩者擇一或合併），而非逐一微調三份文件裡的既有版本。"

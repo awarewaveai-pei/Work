@@ -1,0 +1,53 @@
+# AI LEGO OS — Phase 1 Assumption Register
+# Implicit assumptions the mother docs make (or that Claude made while interpreting them) that are
+# NOT stated as explicit requirements but underpin how a GAP/RISK finding was scoped. If an
+# assumption turns out false, the severity of the finding it underlies should be re-evaluated.
+# Claude-only, single-pass — not yet Codex cross-verified.
+# Phase 1 rule: REGISTERED, not fixed.
+assumptions:
+  - id: P1-ASSUM-ARCH-1
+    cluster: architecture_data
+    underlies: [P1-GAP-ARCH-2, P1-GAP-ARCH-3, P1-GAP-ARCH-5]
+    assumption: "6 個具名 Worker（AI/Document/Research/Data/Rendering/Simulation Worker）各自獨立、可用 Event Bus 溝通，且每個 Worker 內部自行處理它要碰的那幾種 Data Architecture 儲存（Postgres/Graph/Vector/...）之間的一致性。"
+    if_false: "若某個 Worker（例如 Data Worker）需要同時寫 Postgres + Graph Store + Vector Index 才能完成一次事件的落地，跨儲存一致性問題就會被藏在一個宣稱獨立、可獨立擴展的 Worker 內部，而不是被架構層意識到——不會讓問題消失，只會讓它更難被發現。"
+    evidence: "MP:2794-2819 只列出 Worker 名稱與「初期不要拆成微服務」，未說明 Worker 與 §60 七種儲存的映射關係；三文件皆無對應段落。"
+  - id: P1-ASSUM-PROD-1
+    cluster: product_business_ops
+    underlies: P1-GAP-PROD-1
+    assumption: "Edition（§6.3）是產品行銷構念，下游工程會「之後想辦法」實作 gating——沒有證據顯示作者原意是讓 Capability Contract 攜帶 entitlement 欄位。"
+    if_false: "若 Edition gating 原意就是要成為 Capability Contract 的一級關注點，P1-GAP-PROD-1 從「缺一個欄位」升級為「缺一整層架構」。"
+  - id: P1-ASSUM-PROD-2
+    cluster: product_business_ops
+    underlies: P1-GAP-PROD-4
+    assumption: "§121「Accessibility Standard / 法律依 Jurisdiction Pack 套用」假設未來會定義的 Jurisdiction Pack schema 將攜帶依管轄權而異的 WCAG conformance level 欄位。"
+    if_false: "這是合理的設計意圖，但目前 Jurisdiction Model（§93-94）與 Legal Source Registry（§95）都沒有把「accessibility 標準版本」列為 Pack 屬性——這個假設目前沒有落地點。"
+  - id: P1-ASSUM-PROD-3
+    cluster: product_business_ops
+    underlies: P1-GAP-PROD-9
+    assumption: "空的 finance domain pack 會在 Phase 5 MVP Vertical Slice 之前被補上方法內容。"
+    if_false: "Program Plan §9 明確標示 Learning/Research/Business 三選一「待 Claude 與 Codex 各自論證」尚未定案——若最終選 Business 作為 MVP slice，這個空 pack 會變成 MVP 執行中途才被發現的硬性阻塞，而非現在（gap analysis 階段、成本最低時）就被標記。"
+  - id: P1-ASSUM-LEGAL-1
+    cluster: legal_global_policy
+    underlies: P1-GAP-LEGAL-4
+    assumption: "MP §0.0.2/Atlas 開頭的「中文優先與必要設定英文保留規範」段落標題位置（置於 §0 之前、緊接封面）代表作者確實把它定位為「文件如何撰寫」的說明，而非產品規格章節。"
+    if_false: "若作者原意是把該段落裡的 replay-safety 規則（Atlas:62-64，「翻譯或介面語言變更不得改變 API/Schema/ID/Path/Enum/Execution Manifest 或歷史 Workflow 的可重播性」）刻意放在這個位置以強調「連文件慣例都不能破壞可重播性」，則相關 GAP 的嚴重度應下修為 low（純粹是難找而非真的沒規定）。"
+  - id: P1-ASSUM-SEC-1
+    cluster: security_privacy_iam
+    underlies: P1-GAP-SEC-7
+    assumption: "本系統的「Tenant」語意等同一般 SaaS 多租戶（不同付費客戶/組織），依據是 MP 把 Tenant 放在 Workspace/Project/Workflow 同一巢狀階層最外層，且產品明確有 Enterprise/Sovereign 多客戶野心（Sovereign Regional Cell 提到 EU/US/APAC 三個 Cell）。"
+    if_false: "若「Tenant」實際上只用於單一客戶內部的邏輯分區（非跨客戶共用基礎設施），P1-GAP-SEC-7 的嚴重度會顯著下降。"
+  - id: P1-ASSUM-SEC-2
+    cluster: security_privacy_iam
+    underlies: [P1-GAP-SEC-8, P1-GAP-ARCH-9]
+    assumption: "本次審查引用的「Jurisdiction Pack」與 Phase 0 verified-findings 已標記為未定義的同一個 artifact（本次任務已排除重報這一點本身）。"
+    if_false: "若 Phase 0 之後其實已有 Jurisdiction Pack schema 定案而本次審查未看到，相關 GAP 需重新定調為「schema 存在但缺 PII/fail-closed 欄位」而非「完全未定義」。"
+  - id: P1-ASSUM-INFRA-1
+    cluster: infra_ops_mlops
+    underlies: P1-GAP-INFRA-2
+    assumption: "系統假設 Enterprise/Sovereign 客戶簽下的「SLA」承諾，會在正式簽約前由後續（Phase 2 以後）工程工作補上實際 SLI/SLO 數字與 Error Budget 政策——三份母規格本身沒有排入任何要求「SLA 數字必須在銷售前定案」的 gate，屬隱性假設而非明文規則。"
+    if_false: "若銷售流程不等工程補數字就簽約（常見的 B2B SaaS 現實），P1-GAP-INFRA-2 的風險會提前發生在合約簽署階段而非工程階段。"
+  - id: P1-ASSUM-ARCH-2
+    cluster: architecture_data
+    underlies: [P1-GAP-ARCH-2, P1-GAP-ARCH-3, P1-GAP-ARCH-5]
+    assumption: "Repository Contract（MP:2635，唯一出現處）背後的 7 種儲存引擎是每個部署都必須全部具備的強制清單，而非可依規模裁剪的可插拔清單。"
+    if_false: "如果 Graph Store / Vector Index 在小型部署可以整個不存在，很多跨儲存一致性問題自然不會發生——P1-GAP-ARCH-2/3/5 的優先順序會需要重新排序。"

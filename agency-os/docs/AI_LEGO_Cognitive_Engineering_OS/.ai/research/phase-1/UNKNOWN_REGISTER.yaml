@@ -1,0 +1,58 @@
+# AI LEGO OS — Phase 1 Unknown Register
+# Questions that cannot be resolved from the three mother docs alone. Distinct from open-questions.yaml
+# (Phase 0's decision-tracking SSOT for things the OPERATOR must decide) — these are facts/intents the
+# documents themselves don't reveal, some of which may resolve once the operator answers a related
+# open-question, others which need the original author's clarification or a Phase 2 ADR to settle.
+# Claude-only, single-pass — not yet Codex cross-verified.
+# Phase 1 rule: REGISTERED, not fixed.
+unknowns:
+  - id: P1-UNK-ARCH-1
+    cluster: architecture_data
+    relates_to: [P1-GAP-ARCH-2, P1-GAP-ARCH-3, P1-GAP-ARCH-5, P1-ASSUM-ARCH-2]
+    question: "Repository Contract 背後的 7 種儲存引擎，究竟是每個部署都必須全部具備的強制清單，還是可依規模裁剪的可插拔清單？"
+    why_undecidable: "MP §60 用條列方式呈現，語氣像規格而非菜單；但也沒有一句話說「以下皆為必要」或「可依需求選配」。"
+  - id: P1-UNK-ARCH-2
+    cluster: architecture_data
+    relates_to: [P1-CONFLICT-2, P1-DUP-3]
+    question: "Workspace（Domain Model 物件+隔離層級）與從未定義的 Tenant 是否為 1:N 關係，或系統其實假設 1 Tenant = 1 Workspace？"
+    why_undecidable: "Tenant 全文只出現 3 次且無 schema；若 1 Tenant : 1 Workspace，跨租戶 CAS 去重問題退化成跨 Workspace（風險仍在但合規影響較小）；若 1 Tenant : N Workspace，問題原樣成立且更嚴重。三文件都沒給出足以判斷的線索。"
+  - id: P1-UNK-INFRA-1
+    cluster: infra_ops_mlops
+    relates_to: null
+    question: "Modular Monolith Core + Isolated Workers + Event Bus（§67）究竟是每個 Sovereign Regional Cell（EU/US/APAC）各自獨立部署一整套，還是全球共用一套控制平面、僅資料依地區分區？"
+    why_undecidable: "這直接決定 Disaster Recovery 的 Primary/Secondary Region 定義對象是「單一 Cell」還是「全球控制平面」，以及「Cloud Region 故障→Failover only to legally eligible region」的 failover 對象是換到同 Cell 內的另一 Region，還是完全不同的 Cell——找不到任一段落交代這兩個架構之間的對應關係。"
+  - id: P1-UNK-AI-1
+    cluster: ai_datascience_research
+    relates_to: P1-GAP-AI-2
+    question: "Trusted Compute Engine / Analysis Planner / Validator 具體要不要是一個新建的驗證子系統，還是單純呼叫既有 Python/R/SQL 並原樣回傳計算值？"
+    why_undecidable: "三份文件都沒有回答這個架構問題，該 GAP 的嚴重度會因這個答案而在「補一份 schema」到「設計整個新子系統」之間大幅浮動。"
+  - id: P1-UNK-AI-2
+    cluster: ai_datascience_research
+    relates_to: P1-GAP-AI-5
+    question: "EC §68 Global Gates 清單中的「Data」gate 類別，是否就是 MP §35 Data Quality Engine 的執行落地？"
+    why_undecidable: "沒有任何交叉引用可以證實或否證。若是，Data Quality Engine 目前零門檻值等於這個 gate 完全無法判定 PASS/FAIL；若不是，Data Quality Engine 目前沒有任何執行層 gate 可以掛載。"
+  - id: P1-UNK-SEC-1
+    cluster: security_privacy_iam
+    relates_to: null
+    question: "AI_LEGO_OS_Program_Plan_v1.md（不在本次三份母規格審查範圍內）是否已經補上或取代了 security/privacy/IAM 段落的相關內容？"
+    why_undecidable: "依任務邊界，執行本次審查的 agent 未讀 Program Plan，無法確認是否已 close 掉任一缺口——本檔已知答案：Program Plan 是程序文件不涉及此類內容，此 UNKNOWN 可視為已由 Claude 事後確認為 N/A，保留記錄供稽核軌跡完整性。"
+  - id: P1-UNK-SEC-2
+    cluster: security_privacy_iam
+    relates_to: P1-GAP-SEC-8
+    question: "「Jurisdiction Pack」被引用超過 15 次作為 DPIA 觸發、Rights 請求期限、Retention 衝突、出口管制檢查的裁決依據，這個 schema 本身是否屬於未來 Phase 的既定交付範圍（刻意延後定義，屬合理架構分層），還是三份母規格本應在 Phase 0/1 就把它的最小可行 schema 定義出來？"
+    why_undecidable: "這決定相關 GAP 該標記為「文件缺口」還是「符合預期的分階段延後」，無法從三份母規格本身判斷，需要 Program Plan 或操作者確認交付順序（建議併入 Phase 2 議程，與 OQ 系列一併裁決）。"
+  - id: P1-UNK-PROD-1
+    cluster: product_business_ops
+    relates_to: P1-GAP-PROD-1
+    question: "§143 Capability Availability Matrix enum（Allowed/Restricted/Human Review/Local-only/Government-only/Prohibited/Unknown）是否意圖同時承載 Edition-tier 語意（例如 Local-only 順帶意指 Local Pro edition 專屬），還是預期會有一個完全獨立的 Edition↔Capability 矩陣？"
+    why_undecidable: "corpus 從未消歧義，因此無法判斷 P1-GAP-PROD-1 需要一個全新機制，還是一個既有機制的文件化重用。"
+  - id: P1-UNK-PROD-2
+    cluster: product_business_ops
+    relates_to: null
+    question: "Local Pro edition 明確宣傳「不依賴啟用伺服器長期存活」，這與 Compliance-aware AI Router（暗示需定期連線更新 Jurisdiction/Legal Pack）之間的新鮮度 vs 永久性取捨如何解決？"
+    why_undecidable: "Signed Offline Law Packs（§127）存在，但若 Local Pro 安裝斷網運行數年——其行銷語言暗示這是被支援的——它的 Compliance Center 是否會靜默地在過期法規上運行，三文件從未解決這個 tradeoff。"
+  - id: P1-UNK-PROD-3
+    cluster: product_business_ops
+    relates_to: P1-GAP-PROD-11
+    question: "Enterprise/Sovereign Edition 底下唯一的「SLA」條列項目，是意圖成為真正的合約承諾（此時應歸屬 Contract & DPA Engine / Contractual Policy != Law 章節管轄），還是純粹的行銷層級語言？"
+    why_undecidable: "文件自己的詞彙紀律（LAW ≠ STANDARD ≠ GUIDANCE ≠ CONTRACT ≠ INTERNAL POLICY）意味著這正是系統應該防止的那種模糊性，但平台自己的 Edition 表格對自身也犯了同樣的模糊。"

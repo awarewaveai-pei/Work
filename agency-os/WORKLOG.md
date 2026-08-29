@@ -2,6 +2,32 @@
 
 ## 2026-08-29
 
+### AI LEGO Phase 1 Gap Analysis 完成 — 6 角色群 lens 掃描產 98 條新發現，含 2 條硬性架構矛盾（Event-native vs GDPR 刪除、CAS 去重 vs Tenant Isolation）
+
+**背景**：Cross-Review 完成後操作者說「繼續」，依 Program Plan §5 啟動 Phase 1——33 個角色 × 30 個 failure mode 掃描三母文件。
+
+**方法**：6 個 general-purpose subagent 平行跑（architecture/data、infra/ops/MLOps、security/privacy/IAM、AI/data-science/research、product/business/ops、legal/global/policy），涵蓋全部 33 角色。每個 agent 先讀 Phase 0 索引 yaml 定位行號，再精讀對應段落，並比對 71 條 verified-findings 排除重複，只回報新發現。
+
+**產出**：98 條唯一 ID（GAP 51 / CONFLICT 4 / DUPLICATION 5 / RISK 19 / ASSUMPTION 9 / UNKNOWN 10），寫入 `.ai/research/phase-1/` 六份 registers + `PHASE_1_GAP_ANALYSIS_SUMMARY.md`。
+
+**核心發現**：①契約真空是最大共病——5 個角色群獨立發現同一根因（Trusted Compute 全文件零 schema、Capability Contract 無 edition 欄位、Repository Contract 無 schema、289 個方法僅 2 個有機讀 contract）②**2 條硬性架構矛盾**首次被登錄為 CONFLICT（而非普通 gap）：Event-native 不可變+可任意 replay 的架構與 GDPR 刪除權要求結構性衝突（無 crypto-shredding/redaction event 機制）；全域 content-addressed 去重（路徑無 tenant_id）與「Tenant Isolation 為最外層爆炸半徑防線」宣稱直接矛盾 ③Tenant 概念全三文件合計僅出現個位數次、從未進入 Domain Model，卻同時被 Security 群（存取邊界）與 Architecture 群（blast-radius 錨點，MP/Atlas 節點數還互相矛盾）當作最關鍵安全假設的地基 ④30 年延續性機制對「供應商/技術消失」有完整演練（30-year Replacement Drill），對「理解系統的人消失」完全空白 ⑤human_error 與 cost_explosion 是跨 4 個不同角色群最常命中的 failure mode，屬架構性缺口非單一角色盲點。
+
+**紀律執行**：初版 GAP_REGISTER 把部分 RISK 項目同時內嵌在 cluster 底下又寫入獨立 RISK_REGISTER，構成「同一規則多處維護」（違反 AGENTS.md 零重工原則）——自查發現 14 個 ID 重複後，改為 GAP_REGISTER 只留 `risks_ref` 指標指向 RISK_REGISTER，重驗後 98 條 ID 全唯一。另抽查 9 條關鍵引用對照原文行號，全數命中（誤差 ≤6 行，屬 heading/fence 起始行正常錨定範圍）。
+
+[已修改]
+- 新增 `.ai/research/phase-1/` 7 檔：GAP/CONFLICT/DUPLICATION/RISK/ASSUMPTION/UNKNOWN_REGISTER.yaml + PHASE_1_GAP_ANALYSIS_SUMMARY.md
+- `AI_LEGO_OS_Program_Plan_v1.md`：Phase 1 → COMPLETE，Phase 2 → NEXT，status tracker 更新
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=python yaml.safe_load(6 registers) + 遞迴 ID 唯一性檢查 + 9 處 file:line 逐一對照原文抽查 | exit=0 | ms=~3000
+- REVIEW_WAIVED: DOC_ONLY -- 全批 md/yaml 治理記錄；自查發現並修正 14 個 ID 重複（見上「紀律執行」段），修正後零重複
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=P1-GAP\|P1-CONFLICT\|P1-DUP | hits=0（本批為新建目錄，尚無其他檔案引用這些 ID，屬正常——commit 後才會被後續 Phase 2 引用）
+- ORACLE_WAIVED: 本批為 Claude 單模型 Phase 1 gap analysis，Codex 交叉驗證依 Program Plan §4 排入 Phase 2 前置步驟（尤其 4 條 CONFLICT），非本批範圍
+
+[剩餘風險] 98 條為單輪 Claude 產出未經對抗式驗證；6 個角色群平行執行彼此看不到對方發現，5 大主題屬獨立收斂但尚未做去重後的第二輪深挖（例如 Tenant 概念可能值得 Phase 2 開獨立 ADR 而非分散在多條 GAP）。
+[rollback] `git revert` 本 commit；三母文件與既有 Phase 0/Cross-Review 產出零改動。
+
 ### 修 codex-oracle.ps1 CP950 encoding bug（坑 1 收尾）— Get-Content -Raw 缺 -Encoding UTF8 導致 CJK artifact 不可逆損毀
 
 **根因**：`scripts/codex-oracle.ps1:495` `$answer = (Get-Content -LiteralPath $outFile -Raw)` 缺 `-Encoding UTF8`。`$outFile` 是 codex CLI `-o` 寫出的 BOM-less UTF-8 檔，Windows PowerShell 5.1 在本機 Big5/CP950 locale 下對無 BOM 檔預設用系統 ANSI codepage 解碼，把 UTF-8 multi-byte CJK 序列誤讀，部分序列在 CP950 沒有對應字元變成不可逆遺失（CP950 decode 對不可映射序列吐 `?` (0x3F)，證實於下方 critic 附測）。同檔 `:143`（`$PromptFile` 讀取）同一 bug class；`:406`（`$diffFile` 讀取）目前安全（自己寫的檔有 BOM）但風格與全 repo 其餘 60+ 處 `Get-Content -Raw` 呼叫不一致。三處補齊 `-Encoding UTF8`，與 `:252` 既有的正確寫法一致。

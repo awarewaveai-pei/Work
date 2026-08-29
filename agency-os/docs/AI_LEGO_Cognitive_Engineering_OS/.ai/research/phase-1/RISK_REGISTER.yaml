@@ -1,0 +1,121 @@
+# AI LEGO OS — Phase 1 Risk Register
+# Consolidates all failure-mode-tagged risk items from the 6 role-cluster agents. Each risk ties to
+# one of the 30 failure modes in the Program Plan §5 taxonomy and (where applicable) references the
+# GAP/CONFLICT/DUPLICATION item it extends. Items already embedded as "consequence" fields inside
+# GAP_REGISTER entries are not repeated here unless the cluster agent explicitly separated them as
+# a standalone RISK with a named failure_mode.
+# Claude-only, single-pass — not yet Codex cross-verified.
+# Phase 1 rule: REGISTERED, not fixed.
+risks:
+  - id: P1-RISK-SEC-1
+    failure_mode: human error
+    cluster: security_privacy_iam
+    extends: P1-GAP-SEC-3
+    detail: "攻擊者釣魚取得授權核准者 session 後，對 R4 破壞性操作按下核准，Audit Event 記錄的是「合法核准者身分」，稽核事後無法區分真人決策與帳號劫持。"
+  - id: P1-RISK-SEC-2
+    failure_mode: prompt injection
+    cluster: security_privacy_iam
+    extends: P1-GAP-SEC-4
+    detail: "Untrusted Content Contract 未定義 untrusted 標籤能否隨資料流傳遞進 Knowledge Memory，惡意文件一次性注入的指令可能被固化進 Semantic Memory/Organization Knowledge，之後所有讀取該記憶的任務會把注入內容當作已驗證的內部知識而非 untrusted data。"
+  - id: P1-RISK-SEC-3
+    failure_mode: data loss
+    cluster: security_privacy_iam
+    extends: P1-GAP-SEC-7
+    detail: "Tenant Isolation 僅是故障隔離概念，共用的 Vector Index/Evidence Graph 沒有強制 tenant 分區保證，多租戶部署下的 RAG 檢索範圍設定錯誤可造成跨租戶機密資料外洩，觸發規格自身定義的違約通報義務，但預防機制本身不存在。"
+  - id: P1-RISK-SEC-4
+    failure_mode: supply-chain compromise
+    cluster: security_privacy_iam
+    extends: P1-GAP-SEC-2
+    detail: "Supply Chain Security 從未與 Encryption & Key Sovereignty 交叉引用，不清楚哪一種 KMS 模式保護 artifact 簽章私鑰本身；簽章金鑰若無輪替週期與 HSM 強制要求，CI 簽章私鑰一旦外洩，攻擊者可發布通過所有既定關卡的「Verified Deployment」惡意產物。"
+  - id: P1-RISK-INFRA-1
+    failure_mode: cost explosion
+    cluster: infra_ops_mlops
+    extends: null
+    detail: "Champion/Challenger Shadow 執行 + Eval「每次變更」重跑五套資料集，但 Cost Governance 的 budget 欄位無 shadow/eval 專屬預算或倍數係數——隨 Capability 數量成長(150+項)，疊加成本可能不受控線性甚至超線性成長。"
+  - id: P1-RISK-AI-1
+    failure_mode: hallucination
+    cluster: ai_datascience_research
+    extends: P1-GAP-AI-2
+    detail: "P1-GAP-AI-2 + P1-GAP-AI-3 疊加：AI interprets 步驟與上游 Result Artifact 之間無 checksum/引用綁定，也無可執行的 Statistical Gate 攔截。AI 在論文/報告 prose 中複述數字時可以打錯或竄改，系統設計上沒有任何一層會發現。"
+  - id: P1-RISK-AI-2
+    failure_mode: correctness
+    cluster: ai_datascience_research
+    extends: P1-GAP-AI-4
+    detail: "零顯著性詞彙+Sequential Testing 無 stopping rule 使 p-hacking 在架構層面無防護，全靠操作者個人紀律，30 年跨 session 交接時不會有文件提醒後繼者這件事。"
+  - id: P1-RISK-AI-3
+    failure_mode: knowledge inconsistency
+    cluster: ai_datascience_research
+    extends: P1-DUP-4
+    detail: "因果方法雙重定義（MP §31 vs Atlas F11）沒有版本綁定；未來若 Atlas F11 修改某個因果方法的假設要求，MP §31 的名稱清單不會過期也不會被標記需要複查，兩份文件會在無人察覺下漸行漸遠。"
+  - id: P1-RISK-AI-4
+    failure_mode: agent overreach
+    cluster: ai_datascience_research
+    extends: [P1-GAP-AI-5, P1-GAP-AI-7]
+    detail: "資料品質「嚴重異常」未定義、方法無選擇器標籤——都把本該由架構限制的判斷權下放給 AI 自由裁量，AI 自己決定資料品質是否嚴重異常到該壓低信心、自己從敘事文字猜測某方法是否適合當前 problem_type，違反「AI 只 Plan/Explain，不得捏造」的精神。"
+  - id: P1-RISK-AI-5
+    failure_mode: AI model evolution / model lock-in
+    cluster: ai_datascience_research
+    extends: P1-GAP-AI-8
+    detail: "模型版本追蹤缺失，意味著系統換底層 ML 演算法/模型供應商時，沒有機制知道哪些歷史 Result 依賴舊模型、需要重跑或標記為 stale——30 年設計壽命下這會累積成無法追溯的技術債，且與 Reproducible Research 自我宣稱的目標直接衝突。"
+  - id: P1-RISK-PROD-1
+    failure_mode: cost explosion
+    cluster: product_business_ops
+    extends: P1-GAP-PROD-7
+    detail: "Local/Enterprise AI 租戶 hit AI Gateway Fallback 時，Cloud Model 花費無重新歸屬機制——Fallback 可能靜默把近零邊際成本帳號轉成全額 Cloud 支出，無租戶級別警示（Budget 機制是 task-scoped 非 tenant-scoped）。"
+  - id: P1-RISK-PROD-2
+    failure_mode: operational complexity
+    cluster: product_business_ops
+    extends: P1-GAP-PROD-2
+    detail: "7 個獨立規格的 UI 工作空間 × jurisdiction-aware 合規 gate，每個工作空間團隊必須獨立重新實作相同的合規 UI 元件（lens indicator/gate-blocked banner/locked-fact icon/jurisdiction badge）——放大文件自己紅線禁止的「silent policy bypass」的攻擊面。"
+  - id: P1-RISK-PROD-3
+    failure_mode: documentation drift / workflow evolution
+    cluster: product_business_ops
+    extends: P1-GAP-PROD-10
+    detail: "Learning Mode Recipe 自由持續擴張（Brainstorming 已展示過這個模式），但 Education Pack 的學術誠信條文無版本化連結——若加入自動評分功能會進一步偏離合規清單，除非現在就加入 Method-specific Gate。"
+  - id: P1-RISK-PROD-4
+    failure_mode: human error
+    cluster: product_business_ops
+    extends: P1-GAP-PROD-11
+    detail: "無定義的客戶支援升級路徑，意味著處理影響付費客戶的 production incident 時無腳本化溝通 SOP——單一操作者運營下這是事故壓力中的單點人為錯誤，且與文件對 AI 高風險內容的謹慎程度形成對比（AI 輸出有管制，人類操作者的即興客戶溝通卻沒有）。"
+  - id: P1-RISK-LEGAL-1
+    failure_mode: legal evolution
+    cluster: legal_global_policy
+    extends: P1-GAP-LEGAL-1
+    detail: "Temporal Law Engine 定義 8 個法律生命週期狀態，但沒有說明誰/什麼機制在 effective_from 日期到達時觸發狀態轉換——是排程、人工審核、還是靠 Legal Freshness SLA 順便觸發？三者從未互相引用。真實情境：EU AI Act 分階段生效，若轉換全靠人工且無排程保障，系統會在真正生效日之後仍用舊分類作決策。"
+  - id: P1-RISK-LEGAL-2
+    failure_mode: cross-border restrictions
+    cluster: legal_global_policy
+    extends: null
+    detail: "EC 明文禁止 failover 到「任意境外區域」，強調 Availability 不能超越 sovereignty；但 MP 的部署模式選擇邏輯完全不知道這條規則存在——一個資料落地受限的政府租戶，主要區域故障時沒有任何欄位會攔下「切到境外雲端」這個選項。"
+  - id: P1-RISK-LEGAL-3
+    failure_mode: correctness
+    cluster: legal_global_policy
+    extends: null
+    detail: "MP §139 明確自我聲明所列法規清單「非全球完整清單」，這是好的自我約束；但真正面向使用者的產出 artifact（Compliance Center UI、Market Entry Passport）的 schema 裡都沒有這條免責聲明的必填欄位——聲明只活在規格文件裡，沒有落到任何 UI-facing schema，使用者看到清單不會被提醒它可能不完整。"
+  - id: P1-RISK-LEGAL-4
+    failure_mode: documentation drift
+    cluster: legal_global_policy
+    extends: P1-GAP-LEGAL-3
+    detail: "「Government」概念在三個獨立位置各自定義一次（government_customer 布林欄位、Project Passport 的 Government 欄位、Government-only capability 狀態值），彼此零交叉引用——任一處被重新命名都無機制讓其他兩處同步更新或至少產生警訊。"
+  - id: P1-RISK-LEGAL-5
+    failure_mode: human error
+    cluster: legal_global_policy
+    extends: P1-GAP-LEGAL-3
+    detail: "高風險欄位（government_customer、children_involved 等）要求使用者/組織明確設定，但本身無稽核軌跡要求、無定期覆核機制——身分曖昧的組織一次性勾錯後，不會有任何機制促使重新確認，錯誤宣告會無限期沿用。"
+summary:
+  total: 19
+  by_failure_mode:
+    cost_explosion: 3
+    human_error: 4
+    hallucination: 1
+    correctness: 2
+    prompt_injection: 1
+    data_loss: 1
+    supply_chain_compromise: 1
+    knowledge_inconsistency: 1
+    agent_overreach: 1
+    ai_model_evolution_or_lock_in: 1
+    operational_complexity: 1
+    documentation_drift_or_workflow_evolution: 2
+    legal_evolution: 1
+  note: "human_error 與 cost_explosion 是本輪掃描中最常被獨立命中的 failure mode（各跨 3-4 個不同角色群），值得 Phase 2 優先處理——顯示這兩類風險不是單一角色的專屬盲點，而是架構性缺口。"

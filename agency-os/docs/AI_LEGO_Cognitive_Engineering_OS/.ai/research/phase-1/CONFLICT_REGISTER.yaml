@@ -1,0 +1,67 @@
+# AI LEGO OS — Phase 1 Conflict Register
+# Items promoted from raw GAP findings (see role-cluster agent transcripts) because they describe
+# two normative requirements that CANNOT BOTH BE TRUE AS WRITTEN, not mere absence of a mechanism.
+# Distinct from Phase 0's CROSS-T/CROSS-R conflicts (which were about enum/schema/authority drift
+# between the three documents). These are architectural/policy self-contradictions found via
+# role-lens sweep. Claude-only, single-pass — not yet Codex cross-verified.
+# Phase 1 rule: REGISTERED, not fixed.
+conflicts:
+  - id: P1-CONFLICT-1
+    severity: high
+    origin: P1-GAP-ARCH-6 (architecture_data cluster, promoted)
+    title: "Event-native 不可變架構（可 Replay 任意歷史狀態）與 GDPR 類刪除權要求結構性衝突"
+    statement_a:
+      claim: "核心狀態用 Event Ledger 而非 CRUD；Current State = Events 的 Projection；可以 Replay 到任意歷史狀態。"
+      file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md
+      line: 2546
+    statement_b:
+      claim: "Soft delete 不等於合規刪除。（Data Deletion Contract：Authorization→Legal Hold→...→Deletion→Verification）"
+      file: AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md
+      line: 1225
+    why_incompatible: "事件日誌本質不可變、不可單點刪除（刪一筆事件會讓所有下游 projection 從那個時間點起與原始計算結果不一致），但「合規刪除」要求真正移除個資內容。全文搜尋 crypto-shred / event redaction / tombstone / GDPR+event 同段皆缺席——事件溯源系統慣用的補救手段（crypto-shredding、只存 ID 不存內容、redaction event）完全未被提及。"
+    consequence: "ClaimCreated 這類事件若含使用者上傳文件的個資，用戶合規刪除請求與系統不可變性原則直接互斥，且無 conflict_resolution_order 之外的具體調和規則——這不是缺一個機制，是兩條寫死的規則彼此矛盾。"
+  - id: P1-CONFLICT-2
+    severity: high
+    origin: P1-GAP-ARCH-8 (architecture_data cluster, promoted)
+    title: "全域 Content-Addressed 去重與 Tenant Isolation 為最外層爆炸半徑防線互相矛盾"
+    statement_a:
+      claim: "所有檔案 Content-addressed：/objects/sha256/aa/bb/<hash>（路徑中無 tenant_id / project_id，代表跨租戶共用同一份 blob 儲存）"
+      file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md
+      line: 2580
+    statement_b:
+      claim: "Tenant Isolation → Workspace Isolation → Project Isolation → ...（Tenant 是最外層、最基本的隔離層級）"
+      file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md
+      line: 268
+    why_incompatible: "全域 CAS 去重代表兩個不同租戶上傳同一份檔案時只存一份 blob。刪除一個租戶的 Source 若對應到共享 hash，物理刪除前必須先掃全平台其他租戶的引用，但 Data Deletion Contract 的 Dependency Check 步驟未列此檢查。已知的 CAS 跨租戶側通道問題（觀察上傳是否「秒存」可推斷別的租戶是否持有同一檔案）完全未被提及。"
+    consequence: "與文件自己宣稱的「Tenant Isolation 是第一層、最基本的爆炸半徑防線」直接矛盾——儲存層設計（全域去重）與隔離層宣稱（tenant 最外層邊界）在架構層次上互斥，除非額外引入 tenant-scoped 加密或棄用全域去重。"
+  - id: P1-CONFLICT-3
+    severity: high
+    origin: security_privacy_iam GAP-9 (promoted from GAP_REGISTER duplication_candidates note)
+    title: "v1 即生效的 PII redaction 政策，唯一命名的去識別化能力卻被自稱「未來能力」"
+    statement_a:
+      claim: "logs redacted / 禁止敏感 payload 全量 dump（Logging Contract，v1 即生效的硬性政策）"
+      file: AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md
+      line: 2966
+    statement_b:
+      claim: "未來高階能力可支援：Pseudonymization...（與 Homomorphic Encryption / Federated Learning 並列，明文歸類為未來能力）"
+      file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md
+      line: 5659
+    why_incompatible: "「PII」一詞全部三份母規格完全零出現；redact 要求今天生效，但唯一被命名的去識別化技術（Pseudonymization）被自己歸類為「明年才有」。政策的時效與能力的時效直接矛盾——現在要做的事，規格自己說能力還不存在。"
+    consequence: "稽核時會發現「規則要求今天做的事，規格自己說能力明年才有」——這不是缺少偵測機制的 gap，是文件對同一件事給出了兩個互斥的時間軸承諾。"
+  - id: P1-CONFLICT-4
+    severity: medium
+    origin: product_business_ops GAP-8 (promoted)
+    title: "Business Planning Recipe 引用的方法在 Atlas 對應 domain pack 中不存在，違反文件自己的方法解析紅線，理論上現在就該觸發 BLOCKED"
+    statement_a:
+      claim: "Business Planning Mode Recipe：... → Business Model → Strategy → Financial Assumptions → Scenario → Risk → KPI ..."
+      file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md
+      line: 2137
+    statement_b:
+      claim: "Method 定義禁止在 Master Plan 雙重維護——methods 必須從 Atlas 解析，不得從 Master Plan 敘事即興。若 Atlas 無法讀取/該方法無法解析 → PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED"
+      file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md
+      line: 45
+    why_incompatible: "MP §43 的旗艦 Recipe 命名了「Financial Assumptions」這個方法階段，但 Method Atlas 的 finance domain pack 經確認僅有目錄宣告、無方法內容（見 domain-inventory.yaml 對 Atlas L3901 的註記）。按文件自己的規則，這應該在今天就觸發 PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED，但文件正常敘述這條 Recipe 彷彿它可執行。"
+    consequence: "這只能在 gap analysis 階段被發現而非留到 Phase 5 MVP 執行時才發現——文件自我違反了自己制定的核心紅線之一（method 不得從 Master Plan 敘事即興），且從未被文件自己標記出來。"
+notes:
+  - "所有 4 條均為架構/政策層級的硬性矛盾（兩條規則不可能同時被滿足），需要 Phase 2 ADR 明確二選一或設計調和機制，不是單純補一個缺失的 schema 可以解決。"
+  - "P1-CONFLICT-1/2/3/4 均由單一 lens agent 發現，尚未經 Codex 獨立驗證——Phase 2 收斂前建議至少對 P1-CONFLICT-1（GDPR vs immutable events）與 P1-CONFLICT-2（CAS dedup vs tenant isolation）安排一輪 codex-oracle 交叉驗證，因其架構影響面最大。"

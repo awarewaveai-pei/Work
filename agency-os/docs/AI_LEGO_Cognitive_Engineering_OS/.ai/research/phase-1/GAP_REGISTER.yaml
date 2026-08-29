@@ -1,0 +1,454 @@
+# AI LEGO OS — Phase 1 Gap Register
+# Produced by 6 role-cluster lens agents (architecture/data, infra/ops/MLOps, security/privacy/IAM,
+# AI/data-science/research, product/business/ops, legal/global/policy) sweeping the 3 mother specs
+# against the full role x failure-mode matrix (Program Plan §5). Each agent cross-checked against
+# verified-findings.yaml (71 Phase 0 items) and the cross-review artifacts before reporting — these
+# are Claude-only, single-pass findings (NOT yet Codex-verified; unlike Phase 0's dual-verified set).
+# 5 items originally reported as GAP were promoted to CONFLICT_REGISTER.yaml or DUPLICATION_REGISTER.yaml
+# (cross-referenced below by their original cluster id) because they describe contradictory or
+# duplicated normative content rather than pure absence.
+# Phase 1 rule: REGISTERED, not fixed.
+clusters:
+  architecture_data:
+    roles: [System Architect, Software Architect, Domain Architect, Data Architect, Database Engineer]
+    gaps:
+      - id: P1-GAP-ARCH-2
+        severity: high
+        role: Database Engineer / Data Architect
+        title: "7 種異質儲存引擎宣告但無 system-of-record 或跨儲存一致性機制"
+        detail: |
+          MP §60 宣告 PostgreSQL/Object Storage/Vector Index/Graph Store/Event Store/Search Index/Time-series 七種儲存，
+          僅一句「應用層透過 Repository Contract，不直接依賴資料庫」。Repository Contract 全文僅此一次出現，無 schema。
+          全文搜尋 system of record / eventual consistency / distributed transaction / saga(跨儲存語境) / polyglot 皆缺席。
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 2610, quote: "PostgreSQL→Structured Metadata / Object Storage / Vector Index / Graph Store / Event Store / Search Index / Time-series"}
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 2635, quote: "應用層透過 Repository Contract，不直接依賴資料庫。"}
+        consequence: "同一 Claim 物件同時活在 Postgres row + Graph Store node，沒有 authoritative 來源、寫入順序或和解機制；並發更新跨三個儲存系統無法原子化，會產生跨儲存資料不一致而無人偵測。"
+      - id: P1-GAP-ARCH-3
+        severity: high
+        role: Database Engineer
+        title: "Disaster Recovery 只給 2/7 個儲存系統的 RPO/RTO"
+        detail: "§74 只覆蓋 PostgreSQL(Core metadata, RPO<5min) 與 Object Storage(Artifacts, RPO<24h)；Vector Index/Graph Store/Event Store/Search Index/Time-series 全數缺席，且 DR 流程無跨儲存 Reconciliation 步驟。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 2995, quote: "Core metadata: RPO < 5 min / Artifacts: RPO < 24h / Recovery: RTO < 2h"}
+        consequence: "災難復原後 Postgres 還原到事故前 5 分鐘，但 Graph Store 無對應 RPO 保證，可能還原到不同時間點——出現 Postgres Claim row 指向 Graph Store 不存在或版本不同的節點，且無偵測機制。"
+      - id: P1-GAP-ARCH-4
+        severity: medium
+        role: Database Engineer
+        title: "並發寫入控制只有一句宣告，無隔離等級或跨儲存機制"
+        detail: "「同一檔案/migration/production resource 的 concurrent write 必須 lock 或序列化」——無 isolation level/optimistic lock/pessimistic lock/serializable/race condition 相關定義。配合 P1-GAP-ARCH-2 的 7-store 架構，跨儲存序列化機制完全空白。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md, line: 2010, quote: "同一檔案 / migration / production resource 的 concurrent write 必須 lock 或序列化。"}
+        consequence: "兩個 Agent 併發改同一 Claim（跨 Postgres+Graph+Vector）該怎麼序列化沒有機制描述，實作者無從選擇分散式鎖/DB鎖/樂觀版本控制。"
+      - id: P1-GAP-ARCH-5
+        severity: medium
+        role: Database Engineer
+        title: "Vector Index schema evolution（換 embedding model）無遷移程序"
+        detail: "Embedding Version 只是 AI/Model Change Contract 要記錄的欄位，非可執行的 backfill/dual-index/cutover 程序。EC §28 的 Lock Duration/Foreign Keys 等評估項目對向量重建完全不適用。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md, line: 1425, quote: "Embedding Version"}
+        consequence: "換 embedding model 是常見營運事件，但無對應遷移契約——這類遷移目前無契約可循。"
+      - id: P1-GAP-ARCH-7
+        severity: medium
+        role: Data Architect
+        title: "Knowledge/Evidence Graph 溯源鏈與 Data Lab/Reproducible Research 溯源鏈互不相交"
+        detail: |
+          §13 溯源鏈：SOURCE→EVIDENCE→CLAIM→INFERENCE→ASSUMPTION→DECISION；
+          §37 Reproducible Research 溯源鏈：Paper Sentence→Result→AnalysisRun→Code→Dataset→Original Source（Dataset 直接連回 Source，跳過 Evidence/Claim）。
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 1046, quote: "SOURCE↓EVIDENCE↓CLAIM↓INFERENCE↓ASSUMPTION↓DECISION"}
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 1942, quote: "Paper Sentence→Result→AnalysisRun→Code→Dataset→Original Source"}
+        consequence: "Evidence 被標記 quarantine 或撤回時，不會自動使依賴同一 Source 的 Dataset/AnalysisRun 失效——「Evidence 已有問題但論文用的 Dataset 不知道」的知識不一致。"
+      - id: P1-GAP-ARCH-9
+        severity: medium
+        role: Data Architect
+        title: "Retention/Deletion 衝突（多種 Hold 類型）無預設優先順序"
+        detail: "Legal Hold/Regulatory Hold/Research Hold/Contractual Hold/User Deletion Request 衝突時只交給「Policy Engine 決定，並產生理由」——同等重要（甚至更高風險）的場景卻沒有像 document-authority-map 的 8 層 conflict_resolution_order 那樣的預設順序。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 4718, quote: "資料不能只用固定「30 天刪除」。...衝突時 Policy Engine 決定，並產生理由。"}
+        consequence: "User Deletion Request 撞上 Research Hold 時，實作者可能依「方便」判斷——文件明文提醒過這個陷阱（不得選對自己方便的一條），但這條原則沒有延伸到資料刪除場景。"
+      - id: P1-GAP-ARCH-10
+        severity: high
+        role: Domain Architect
+        title: "20 個 /modules 目錄無對應到 22 個 Domain Model 物件的擁有權/依賴方向/context map"
+        detail: "全文搜尋 owns/depends on/dependency graph/shared kernel/anti-corruption/context map/circular 皆 0 命中。範例矛盾：Simulation 獨立擁有頂層 /modules/simulation/，但 Experiment 被埋在三層深的 /modules/analytics/experiments/，定位邏輯不一致無說明。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 3188, quote: "/modules/canvas, knowledge, research, business, learning, brainstorm, analytics..."}
+        consequence: "沒有 bounded context 契約，任兩個模組都可能宣稱擁有同一個 Domain 物件的寫入權（如 Decision 出現在多處），造成多模組並發寫入同一實體卻無仲裁規則——與 P1-GAP-ARCH-2/4 的並發問題同根。"
+      - id: P1-GAP-ARCH-13
+        severity: medium
+        role: System Architect / Software Architect
+        title: "「避免過早拆微服務」無量化門檻"
+        detail: "「真正需要時再抽離 Service」——全文搜尋 extract service/split service/scale threshold/team size/traffic threshold/Conway 皆 0 命中，無客觀信號可判斷。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 2794, quote: "初期不要一開始拆成上百 Microservices。... 真正需要時再抽離 Service。"}
+        consequence: "任何工程師都能引用同一句話合理化「現在就該拆」或「永遠不用拆」，判準等於不存在。"
+    risks_ref: "此 cluster 無獨立 RISK 項目（consequence 已內嵌於各 gap）"
+  infra_ops_mlops:
+    roles: [DevOps Engineer, SRE, Cloud Architect, Local/Offline Architect, Network Engineer, MLOps Engineer]
+    gaps:
+      - id: P1-GAP-INFRA-1
+        severity: high
+        role: DevOps/SRE
+        title: "Incident Mode 無 on-call/paging/escalation policy 或嚴重度分級"
+        detail: "§55 定義完整生命週期 state machine（Declare→Contain→Freeze Evidence→...），但無 SEV1-3 等分級、無誰有權 Declare 的定義。全庫搜尋 on-call/pager/PagerDuty/incident commander/SEVx/war room/status page 皆 0 命中。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md, line: 1912, quote: "# 55. Incident Mode ... Declare ↓ Contain ↓ Freeze Evidence ..."}
+        consequence: "高風險 incident 可能無人接手，卡在流程第一步。"
+      - id: P1-GAP-INFRA-2
+        severity: medium
+        role: DevOps/SRE
+        title: "SLA 是販售項目但全文無量化 SLI/SLO/SLA 數字"
+        detail: "MP 把 SLA 列為 Enterprise/Sovereign edition 販售項目，唯一數字化的 RTO/RPO 明確標示為「範例」。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 571, quote: "SLA"}
+        consequence: "業務對 Enterprise 客戶簽約承諾 SLA，工程端沒有對應的可驗證數字基線。"
+      - id: P1-GAP-INFRA-3
+        severity: medium
+        role: SRE
+        title: "備份還原演練無固定週期"
+        detail: "只要求「高風險 data change 前」才需 restore drill evidence；唯一「定期」測試（30-year Replacement Drill）未給出具體週期。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md, line: 3041, quote: "高風險 data change 前：restore drill evidence"}
+        consequence: "若長期沒觸發高風險變更，備份可能數月至數年未被實測還原過——「有備份沒驗證能不能救」的典型失效模式。"
+      - id: P1-GAP-INFRA-4
+        severity: medium
+        role: SRE / Durability
+        title: "無 WORM/immutable backup/anti-ransomware 保護要求"
+        detail: "系統對「原始域資料」有強烈 Immutable-first 原則，但備份本身的存取權限、保留鎖定、與正式環境寫入權限的隔離未被要求。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 2570, quote: "# 58. Immutable-first ... 所有檔案 Content-addressed"}
+        consequence: "被入侵的高權限帳號理論上可同時刪除主要 store 與其備份，DR 計畫失去保護力。"
+      - id: P1-GAP-INFRA-5
+        severity: high
+        role: MLOps Engineer
+        title: "AI Gateway Fallback 無 circuit breaker/健康檢查頻率/failover 觸發條件"
+        detail: "宣稱「單一供應商故障不會癱瘓整個系統」但無 circuit breaker/health check/熔斷機制定義；Method Atlas 本身也無 Circuit Breaker 條目。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 622, quote: "單一供應商故障不會癱瘓整個系統"}
+        consequence: "「Fallback」只是敘事性目標，實際 provider outage 發生時系統行為不可預測。"
+      - id: P1-GAP-INFRA-6
+        severity: medium
+        role: MLOps Engineer
+        title: "model_profile 字串無 Model Registry 元件"
+        detail: "AI/Model Change Contract 要求記錄 Provider/Model Identifier/Model Profile 等欄位，但無地方定義這個字串解析到哪個 provider/endpoint/weights hash/棄用日期。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md, line: 2165, quote: "model_profile: ..."}
+        consequence: "Champion/Challenger 升級或 rollback 時，model_profile 字串無法被獨立查證——Replay 與 30-year Replacement Drill 都因缺 registry 難以精確執行。"
+      - id: P1-GAP-INFRA-7
+        severity: high
+        role: Local/Offline Architect
+        title: "Local 離線硬體需求無下限規格"
+        detail: "§5.2 要求 Local LLM/Embedding/RAG/ML 必須支援完全離線，但「GPU」一詞三份文件合計僅出現一次，無 VRAM/RAM/磁碟空間/CPU-only 推論延遲下限。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 435, quote: "必須支援完全離線：Local LLM ... ML"}
+        consequence: "買 Local Pro 或 Air-gapped Enterprise 版的客戶拿到「必須離線可用」的能力清單，卻沒人告訴他們跑得動需要什麼硬體。"
+      - id: P1-GAP-INFRA-8
+        severity: high
+        role: Local/Offline Architect / Supply-chain
+        title: "Air-gapped 環境下 Local Model 更新無簽章/驗證/來源證明機制"
+        detail: "系統對法規內容有 Signed Offline Law Packs、對授權有 Signed Offline License，但對 Local Model 更新完全沒有對應機制。§83 Offline Execution 只說「local model 可替換」，無簽章/checksum/provenance 字樣。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md, line: 2588, quote: "Offline：... local model 可替換。"}
+        consequence: "Air-gapped 客戶更新本地模型時，AI 模型是整個系統中唯一沒有簽章驗證要求的可執行內容。"
+      - id: P1-GAP-INFRA-9
+        severity: medium
+        role: Local/Offline Architect
+        title: "Cloud↔Local 可攜無雙向合併/衝突解決策略"
+        detail: "§76 只定義單向搬遷（Cloud→Export→Local 或反向），沒有處理「離線編輯期間雲端版本也被改動」的合併/衝突解決（CRDT、last-write-wins 皆未提及），儘管系統明確支援多裝置協作。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 3026, quote: "Cloud → Export → Local / Local → Encrypted Package → Cloud"}
+        consequence: "使用者離線工作後重新連網，若雲端同時被其他協作者變更，系統行為未定義——可能靜默覆蓋，違反「人類內容不能被 AI 靜默覆蓋」精神。"
+      - id: P1-GAP-INFRA-10
+        severity: high
+        role: Cloud Architect
+        title: "Capability Availability Matrix 只涵蓋法律管轄權，未涵蓋部署模式(Cloud/Local/Hybrid)可用性"
+        detail: "唯一的 capability 可用性矩陣範圍限定 capability × jurisdiction；MP 其餘 150+ 個編號能力完全沒有對應的 offline 可用性判定（完全可用/降級/不可用）。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 5508, quote: "capability_availability: ... jurisdiction: ... status: prohibited"}
+        consequence: "產品定位聲稱三種部署模式並存，但沒有系統化方式回答「這個功能離線時是完全可用/降級/不可用」，功能對等承諾沒有可驗證規格支撐。"
+      - id: P1-GAP-INFRA-11
+        severity: medium
+        role: Cloud Architect
+        title: "無 auto-scaling/capacity planning/load balancing 策略"
+        detail: "Queue Lag 被列為受監控指標，但無任何機制消費這個指標觸發擴縮容。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 2794, quote: "Modular Monolith Core + Isolated Workers + Event Bus"}
+        consequence: "可觀測性存在但沒有形成閉環，流量尖峰時只能靠人工介入。"
+      - id: P1-GAP-INFRA-12
+        severity: high
+        role: Network Engineer
+        title: "傳輸層安全機制全文件零提及"
+        detail: "近千行的 Global Jurisdiction & Compliance Plane 鉅細靡遺處理跨境資料傳輸法律機制，但 TLS/mTLS/VPN/Private Link/VPC/IPsec/WireGuard 全庫零命中；Sovereign Regional Cell 畫出 EU/US/APAC 三個 Cell 卻無網路層隔離機制說明。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 4405, quote: "EU Cell US Cell APAC Cell / Local DB Local DB Local DB / Local KMS Local KMS Local KMS"}
+        consequence: "資料落地政策講得極細，但沒有網路層規格保證政策在物理/邏輯網路上真的被強制執行——稽核時無法回答「資料真的沒有經過非法域網段」。"
+    risks_ref: "見 RISK_REGISTER.yaml P1-RISK-INFRA-1（cost explosion, MLOps Engineer）"
+  security_privacy_iam:
+    roles: [Security Architect, Privacy Engineer, IAM Engineer]
+    gaps:
+      - id: P1-GAP-SEC-1
+        severity: high
+        role: Security Architect
+        title: "Zero Trust 只有階段名稱流程圖，無協定/標準綁定"
+        detail: "無 IdP/OIDC provider、無 workload identity 標準(SPIFFE/mTLS)、無 Policy Decision Point 引擎名稱(OPA/Rego/Cedar)。整節只有紅線(禁止項)，無正向機制定義。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 2668, quote: "Identity ↓ Workload Identity ↓ Mutual Authentication ↓ Short-lived Credentials ↓ Policy Decision ↓ Resource Access"}
+        consequence: "實作團隊各自選 IdP/token 格式，30 年後不同 cell 用不同身分協定，跨 cell 身分聯邦時無共同標準可比對。"
+      - id: P1-GAP-SEC-2
+        severity: high
+        role: Security Architect
+        title: "Supply Chain Security 無具體標準版本"
+        detail: "SBOM 格式(SPDX/CycloneDX)、簽章機制(Sigstore/cosign/GPG)、SLSA provenance 等級、漏洞掃描門檻全部未定義。全文搜尋 SLSA/cosign/sigstore/SPDX/CycloneDX/CVSS/CVE 皆 0 命中。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 2772, quote: "Source ↓ Signed Commit ↓ CI ↓ SBOM ↓ Dependency Scan ↓ Artifact Signing ↓ Verified Deployment"}
+        consequence: "「Verified Deployment」在合規稽核時無可驗證標準對照——SolarWinds 級供應鏈事件事後最常見的稽核缺口類型。"
+      - id: P1-GAP-SEC-3
+        severity: high
+        role: IAM Engineer / Security Architect
+        title: "Explicit Human Authority 無身分驗證強度要求"
+        detail: "R3/R4 核准要求「誰算 human」沒有驗證機制——無核准當下的 step-up/MFA 要求，無核准與具體 action hash 綁定的簽章(non-repudiation)。EC:2031 只排除了「AI 冒充人」一種情境，沒堵住帳號被盜/session 被劫持的情境。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md, line: 470, quote: "R4 Explicit Human Authority"}
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md, line: 2031, quote: "第二個 AI 不是法律意義的人類 approval"}
+        consequence: "攻擊者釣魚取得授權核准者 session 後可對破壞性操作按下核准，Audit Event 記錄「合法核准者身分」，稽核事後無法區分真人決策與帳號劫持。"
+      - id: P1-GAP-SEC-4
+        severity: medium
+        role: Security Architect
+        title: "Untrusted Content Contract 缺具體 sanitization 機制"
+        detail: "無 untrusted span delimiter/tagging 方案、無防禦「工具鏈式間接注入」、無說明 untrusted 標籤能否在寫入 Knowledge Memory 後存活。File Parsing Safety 只列風險類別，無 parser allowlist 或 fail-open/fail-closed 說明。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md, line: 1370, quote: "Policy/System Instructions ≠ Retrieved Source Data"}
+        consequence: "惡意 PDF 首次觸發的注入指令若成功寫入 Semantic Memory，之後任何任務讀取會把它當內部已驗證知識而非 UNTRUSTED DATA。"
+      - id: P1-GAP-SEC-5
+        severity: high
+        role: IAM Engineer
+        title: "RBAC/ABAC 只出現在定價 SKU 條列，零角色模型/權限 schema"
+        detail: "全文 RBAC/ABAC 僅出現 2 次且都是 Enterprise/Sovereign 定價層/roadmap 條列項目，零與任何 gate/risk tier 綁定。「角色」一詞在 MP §15-19 被大量使用但是「多專家認知模擬人格」概念，與存取控制 role 完全無關，兩者從未消歧義。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 567, quote: "RBAC / ABAC"}
+        consequence: "工程團隊面對同一個「Role」名詞會撞名，可能誤把認知模擬角色表當權限角色表複用，稽核時無法分辨 log 裡的 role 欄位指哪一種。"
+      - id: P1-GAP-SEC-6
+        severity: medium
+        role: IAM Engineer
+        title: "Least Privilege 只作用於 AI Agent，無對應人類使用者權限模型"
+        detail: "沒有定義哪些人類職稱/角色有資格核准 R3/R4，也沒有說明人類使用者組織角色如何對應到 A0-A4 Autonomy/Authority Levels。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md, line: 2879, quote: "Documentation Task: no production DB write"}
+        consequence: "落地時「誰能點下核准鈕」完全靠部署團隊自訂，規格無法稽核「違反」，因為從未規定核准者資格門檻。"
+      - id: P1-GAP-SEC-7
+        severity: high
+        role: IAM Engineer / Security Architect
+        title: "Tenant Isolation 全文只是故障隔離概念，非資料存取安全邊界"
+        detail: "無 RLS、無 schema-per-tenant vs shared-schema+tenant_id 設計選擇、無 tenant-scoped 加密金鑰，也無說明跨租戶共用元件(Vector Index/Knowledge Graph)如何防止跨租戶外洩。全文搜尋 RLS/multi-tenant/schema-per-tenant/noisy neighbor 皆 0 命中。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 266, quote: "Tenant Isolation → Workspace Isolation → Project Isolation → ..."}
+        consequence: "多租戶部署下 RAG 檢索範圍設定錯誤，Tenant A 的問題可能檢索到 Tenant B 的機密文件片段——規格教你怎麼通報洩漏，卻沒教你怎麼防洩漏。"
+      - id: P1-GAP-SEC-8
+        severity: medium-high
+        role: Privacy Engineer
+        title: "Global Privacy Engine Rights Model 缺 workflow 狀態機與 fail-closed 預設"
+        detail: "適用條件/法定期限/例外/保留義務全部委派給未定義的 Jurisdiction Pack；當 Pack 缺失或不完整時，沒有明文 fail-closed 預設行為（不像 Capability Availability Matrix 有此設計）。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 4259, quote: "每個 Jurisdiction Pack 決定：有哪些 Rights / 適用條件 / 法定期限 / 例外 / ..."}
+        consequence: "新市場/新法規剛生效等常見情境下，刪除請求規格沒有規定「無規則就當最嚴格處理」或「無規則就不處理」——不作為視同違規的具體監理裁罰缺口。"
+      - id: P1-GAP-SEC-9
+        severity: medium
+        role: Privacy Engineer
+        title: "Knowledge Memory 保留期限未依資料分級或含個資與否差異化"
+        detail: "6 種記憶類型（含明顯含個資的 Personal Preference 與多半非個資的 Organization Knowledge）用同一句抽象要求帶過，也未說明 Rights Model 的 Deletion/Consent Withdrawal 如何觸達並清除這 6 種記憶庫。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 1116, quote: "§14 Knowledge Memory 分層"}
+        consequence: "使用者對 Personal Preference 記憶提出刪除權請求，沒有規格保證該筆資料真的從底層儲存清除（假刪除/soft-delete 未真正清除底層向量副本的風險）。"
+    duplication_candidates:
+      - "見 DUPLICATION_REGISTER.yaml P1-DUP-4（PII redaction 政策 vs pseudonymization「未來能力」時序矛盾，原編號 Security-GAP-9，已升級為 CONFLICT）"
+  ai_datascience_research:
+    roles: [AI Engineer, Data Scientist, Statistician, Research Methodologist]
+    gaps:
+      - id: P1-GAP-AI-2
+        severity: high
+        role: Statistician / AI Engineer
+        title: "Trusted Compute 全文件零 schema，AI 竄改數字無任何 gate 攔截"
+        detail: "「Trusted Compute」出現 3 次，全是同一張 5 格流程圖複誦；Result Artifact 無 schema；EC 14-state 執行機無 COMPUTE/STATISTICAL 對應 state；Global Gates enum 無 Compute/Numerical/Statistical 類別。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 1690, quote: "AI↓Analysis Planner↓Trusted Compute Engine↓Validation↓Result Artifact↓AI Interpretation"}
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md, line: 1508, quote: "Validator verifies"}
+        consequence: "「AI 只 Plan/Explain/Interpret，不得捏造 calculation」這條紅線沒有任何機器可稽核的落地點——AI 在最後一步把數字寫錯或竄改，系統無任何 gate 會攔截。"
+      - id: P1-GAP-AI-3
+        severity: high
+        role: Statistician / Research Methodologist
+        title: "研究論文 Quality Gate 名稱與 EC 執行引擎的 Global Gates enum 完全不重疊"
+        detail: "MP §56 定義 Research Integrity Gate/Citation Gate/Statistical Gate/Methodology Gate/Authorship Gate，每個名稱僅出現一次、零 PASS/FAIL 條件，EC §68 Global Gates 清單完全不含這 5 個名字。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 2523, quote: "研究論文：Research Integrity Gate / Citation Gate / Statistical Gate / Methodology Gate / Authorship Gate"}
+        consequence: "研究論文流程在執行層沒有對應 gate_id 可以掛，唯一命名的機制是一份從未被執行引擎讀取的名單。"
+      - id: P1-GAP-AI-4
+        severity: medium
+        role: Statistician
+        title: "零出現 p-value/significance level/multiple comparison 具體方法"
+        detail: "三份文件搜尋 p-value/significance level/alpha/Type I error/Type II error/FDR 全部 0 命中；Multiple Comparison Correction 未指名具體方法；Sequential Testing 無 alpha-spending/stopping rule 要求。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 1756, quote: "Multiple Comparison Correction"}
+        consequence: "系統宣稱支援假設檢定與多重比較校正，但沒有定義「什麼叫顯著」、用什麼校正法；Sequential Testing 若無 alpha-spending 保護，AI 可在達到想要結果時偷看提前停止實驗——典型 p-hacking 路徑，架構上完全無防護。"
+      - id: P1-GAP-AI-5
+        severity: medium
+        role: Data Scientist
+        title: "Data Quality Engine / Statistical Guardrails 純名稱清單，零數值門檻"
+        detail: "「不得在資料品質嚴重異常時直接得出高信心結論」未定義「嚴重異常」；EC/Atlas 兩檔搜尋 outlier/missing value/sample size/data quality/statistical guardrail 全部 0 命中。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 1875, quote: "不得在資料品質嚴重異常時直接得出高信心結論"}
+        consequence: "不同實作者/AI 各自決定什麼叫「嚴重異常」，同一份資料在不同時間分析會得到不同信心結論而無法追溯原因——違反 §37 Reproducible Research 自己的可重現性承諾。"
+      - id: P1-GAP-AI-6
+        severity: medium
+        role: Data Scientist
+        title: "Feature engineering 全文件零出現，三條 provenance 鏈互不相通"
+        detail: "feature engineering/feature store/derived feature 三檔零命中；§13 Knowledge、§13.1 Sentence-level、§37 AnalysisRun 三條 provenance 鏈沒有說明統計 Result 如何變成 Evidence Graph 的 CLAIM/EVIDENCE 節點。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 1943, quote: "Paper Sentence→Result→AnalysisRun→Code→Dataset→Original Source"}
+        consequence: "特徵工程產生的衍生欄位沒有 lineage 物件記錄來源公式；ML/統計結果無法正式進入 Evidence Graph，Data Science Plane 產出的知識與系統其餘部分在資料結構上斷開。"
+      - id: P1-GAP-AI-7
+        severity: high
+        role: AI Engineer
+        title: "Atlas 289 個方法中僅 2 個標記 has_contract:true，Method Selection Engine 缺可機讀屬性"
+        detail: "Selector 需要每個候選方法帶 problem_type/required_rigor 才能做 Compatibility Check，但機械統計顯示 289 個方法僅 2 個有結構化 contract，其餘全用敘事型欄位。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md, line: 1066, quote: "selection_context ... problem_type / required_rigor"}
+        consequence: "Method Selection Engine 的 Compatibility Check/Cost-Time-Quality Optimization 在機制上無法執行，「該選哪個方法」的判斷全丟給 AI 主觀猜測，Method Atlas 存在的結構化選型目的落空。"
+      - id: P1-GAP-AI-8
+        severity: medium
+        role: Data Scientist / AI Engineer
+        title: "AnalysisRun schema 無 model 版本欄位，無 model registry/drift 處理流程"
+        detail: "§37 AnalysisRun 有 dataset{version,hash}/code{version}/random_seed 等欄位但無 model 相關 key；全文搜尋 model registry/model versioning/champion-challenger(ML語境)/concept drift/retrain 皆 0 命中。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 1909, quote: "§37 AnalysisRun schema"}
+        consequence: "ML 模型分析無法被可重現性機制涵蓋——事後無法回答「這個歷史 Result 是哪個模型版本產生的」；Drift Detection 偵測到 drift 後無定義的下一步。"
+      - id: P1-GAP-AI-9
+        severity: medium
+        role: Research Methodologist
+        title: "質性研究編碼方法論兩邊都沒有定義"
+        detail: "Atlas 全文搜尋 diarization/transcription/grounded theory/content analysis 皆 0 命中；MP §40 的 Coding/Theme Analysis 僅為流程框名稱，無編碼方案(open/axial/selective coding)、無 inter-rater reliability 門檻或 saturation 判準。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 2033, quote: "§40 Qualitative Research"}
+        consequence: "研究誠信機制對質性研究這一半完全空白——Coding 步驟做得好不好無法被任何 gate 檢驗。"
+    risks_ref: "見 RISK_REGISTER.yaml P1-RISK-AI-1/2/3/4/5"
+  product_business_ops:
+    roles: [Product Manager, Program Manager, UX Architect, Accessibility Specialist, Business, Finance, Trade, Education, Operations, Support/Incident Response, Long-term Maintainer]
+    gaps:
+      - id: P1-GAP-PROD-1
+        severity: high
+        role: Product Manager
+        title: "Edition tiers 與 Capability Contract 之間零綁定機制"
+        detail: "Capability Contract schema (id/version/input/output/preconditions/quality/security/rollback) 無 edition/tier/entitlement 欄位；Capability Availability Matrix enum 完全是 jurisdiction 語境，無 Community/Pro/Enterprise 值。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 701, quote: "Capability Contract: id/version/input/output/preconditions/quality/security/rollback"}
+        consequence: "Community-tier 帳號可以呼叫 Professional-only Capability，無中央 gate 攔截，無稽核欄位——靜默 entitlement bypass。"
+      - id: P1-GAP-PROD-2
+        severity: medium
+        role: UX Architect
+        title: "7 個 UI 工作空間各只有一行定義，無共用 design system"
+        detail: "全文搜尋 design system/component library/interaction pattern/navigation model/design token 皆 0 命中。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 3057, quote: "Canvas / 想法、圖片、Brainstorm."}
+        consequence: "每個工作空間獨立建置，合規 UI 元件（lens indicator/gate-blocked banner/locked-fact icon/jurisdiction badge）會被 7 次不一致地重新實作。"
+      - id: P1-GAP-PROD-3
+        severity: low
+        role: UX Architect / Accessibility Specialist
+        title: "Mobile 只被提及一次，無響應式規格或觸控互動模型"
+        detail: "Mobile 作為架構圖同層級 Surface 出現且有 /apps/mobile 目錄，但無任何響應式規格、無說明哪些資料密集工作空間(Data Lab/Canvas)是否在 mobile 範圍內。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 368, quote: "Chat / Canvas / Studio / Mobile / API / A11y"}
+        consequence: "團隊要嘛靜默放棄 mobile（違背宣告的 surface），要嘛把資料密集工作空間硬塞進小螢幕但無規格仲裁範圍或驗收標準。"
+      - id: P1-GAP-PROD-4
+        severity: high
+        role: Accessibility Specialist
+        title: "Accessibility PASS 是強制 gate 但零可量測驗收標準"
+        detail: "WCAG 是唯一被引用的可測標準且僅出現一次、未標版本/等級，位於非強制的「可支援 standards」清單中，未與強制 gate 或功能需求段落交叉引用。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 5909, quote: "Accessibility PASS"}
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 5372, quote: "WCAG"}
+        consequence: "「Accessibility PASS」是無可測門檻的勾選框——release 可以在不符合任何 conformance level 的情況下打勾通過。這正是這個特定 gate 被設計來防止的 examples-masquerading-as-requirements 樣態，發生在唯一為需要它的使用者存在的 gate 上。"
+      - id: P1-GAP-PROD-5
+        severity: medium
+        role: Program Manager / Long-term Maintainer
+        title: "22 份 pre-MVP 規格清單無依賴圖/owner/驗收標準"
+        detail: "純序號列表，無 depends_on/blocks/owner 語言。Item 21 自我引用一個已確認磁碟上不存在的檔名(v1_2_zhTW)——22 份「MVP 前必須完成」的規格裡，有一份本身就是未解決的 identity defect。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 3785, quote: "1. Architecture-Constitution-v1.md ... 22. Document-Authority-and-Scoped-Precedence-v1.md"}
+        consequence: "單一操作者團隊面對扁平無序清單，可能執行順序造成重工（例如先做 Capability-Contract 才做 Domain-Model，capability I/O 型別基於之後會變的 domain 物件）。"
+      - id: P1-GAP-PROD-6
+        severity: high
+        role: Long-term Maintainer
+        title: "30 年延續性機制只涵蓋技術/供應商/session，從未涵蓋「理解系統的人」"
+        detail: "「即使 model/cloud/provider/database/vendor 消失系統仍必須有用」——人/團隊從未被提及。30-year Replacement Drill 涵蓋 Replace Model/Provider/Storage/Restore Backup/Replay Workflow 等，無「replace maintainer」或「新工程師僅靠文件獨立上手」演練。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 3690, quote: "THE SYSTEM MUST REMAIN USEFUL EVEN IF A MODEL, CLOUD, PROVIDER, DATABASE OR VENDOR DISAPPEARS."}
+        consequence: "一份 15,000+ 行、有非平凡 Scoped-Authority 衝突裁決層級的規格，目前全部運作理解集中在一個人身上——這正是 30 年框架為基礎設施消除的單點故障，對「人」完全敞開。"
+      - id: P1-GAP-PROD-7
+        severity: high
+        role: Business / Finance
+        title: "成本追蹤機制皆為 task-scoped，無租戶/組織識別碼，與計費從未對帳"
+        detail: "AI Gateway Cost Routing/Token Budget、Cost Governance 的四種 budget、Metrics 的 cost_per_execution 全部無 tenant_id/org_id。「billing」全文僅出現一次，作為 kill-switch 候選項目，零計量管線或利潤模型定義。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md, line: 2610, quote: "cost_budget / token_budget / compute_budget / time_budget"}
+        consequence: "Bundled-AI/BYOAI/Local-AI 租戶共用同一套成本指標無歸屬邊界，平台無法偵測（更遑論計費）失控用量——具體的成本爆炸向量。"
+      - id: P1-GAP-PROD-9
+        severity: medium
+        role: Trade
+        title: "貿易/出口管制章節只有通用術語，無任何具名法規"
+        detail: "§115 用 Sanctions/Export Restriction/Dual-use Risk/「BLOCK→Specialist Review」等通用詞，全文搜尋 EAR/ITAR/Wassenaar/OFAC/BIS 皆 0 命中——對照 §139 隱私章節有具名法規(GDPR/CCPA/LGPD)與官方來源。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 4744, quote: "§115 Trade/Sanctions/Export Control"}
+        consequence: "「BLOCK→Specialist Review」無機器可判定的觸發條件——這個領域的實作錯誤承擔的是刑事責任而非糟糕 UX。"
+      - id: P1-GAP-PROD-10
+        severity: medium
+        role: Education
+        title: "學習模式的考題產出功能與學術誠信要求從未交叉引用"
+        detail: "§45 產出流程含 Exam Questions，§108 Education/Children Pack 列「學術誠信」為必要考量，但兩者從未互相指向、無任何 Method-specific Gate 銜接。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 2205, quote: "Lecture Video → Transcription → ... → Flashcards → Quiz → Exam Questions"}
+        consequence: "同一管線同時產出個人學習輔助與可能用於評分的內容，合規條文只存在於散文中，從未接入它本該治理的那條 workflow。"
+      - id: P1-GAP-PROD-11
+        severity: high
+        role: Operations / Support / Incident Response
+        title: "零客戶端支援基礎設施定義，儘管 SLA 是明確銷售項目"
+        detail: "無 help desk/ticketing/回應時間承諾/status page；Incident Mode 純內部工程 runbook 無客戶通知步驟；Human Specialist Escalation 是工作產出品質問題升級，非使用者回報的服務中斷。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md, line: 1912, quote: "§55 Incident Mode ... Post-mortem"}
+        consequence: "Enterprise 客戶被賣了一個無 uptime 目標/回應層級/升級聯絡人的 SLA——若日後起草真實合約，內部沒有 source of truth 可據以起草。"
+    risks_ref: "見 RISK_REGISTER.yaml P1-RISK-PROD-1/2/3/4"
+  legal_global_policy:
+    roles: [Legal/Compliance Architecture, Globalization/Localization, Government/Public Sector, Policy]
+    gaps:
+      - id: P1-GAP-LEGAL-1
+        severity: high
+        role: Legal/Compliance Architecture
+        title: "Legal Source Registry 更新機制無量化 SLA、無負責角色、無逾期自動降級規則"
+        detail: "§128 只有分類敘述(「Critical AI/Privacy Law: 較高頻率」)，無天數/週期數字；§95 legal_source schema 有 reviewed_at/reviewed_by 欄位但全文件無任何指派這兩欄位的流程或角色。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 5087, quote: "Critical AI/Privacy Law: 較高監控頻率 / Stable civil-law: 較低頻率"}
+        consequence: "legal_source.status 標為 effective 但 Next Check 早已過期時，無機制自動轉成 STALE 狀態——Compliance Decision Artifact 會持續引用實際已過期的 legal_snapshot 卻自認合規。"
+      - id: P1-GAP-LEGAL-3
+        severity: high
+        role: Government/Public Sector
+        title: "Government-only capability 存取控制無驗證機制，僅靠自我宣告"
+        detail: "唯一可能的身分訊號是自我宣告欄位 government_customer(布林值，MP 明文「必須由使用者/組織明確設定」= 無第三方驗證)，且該欄位從未與 Government-only 狀態值交叉引用。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 3999, quote: "government_customer: false"}
+        consequence: "限定政府機關使用的 capability，理論上只要付費升級方案並自行勾選一個布林欄位即可解鎖，規格從未要求超出自我宣告的驗證強度。"
+      - id: P1-GAP-LEGAL-4
+        severity: medium
+        role: Legal/Compliance Architecture
+        title: "跨法域規則衝突有兩個可能對應機制，彼此從未互相引用，且都缺輸出 schema"
+        detail: "/modules/jurisdiction/conflicts/ 路徑與 §98 Conflict-of-Laws Engine 從未互相加註連結；Engine 定義了測試步驟名稱但每步無判定標準或輸出格式。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 4168, quote: "§98 Conflict-of-Laws Engine"}
+        consequence: "當多個法域對同一 capability 給出矛盾判定時，沒有 schema 規定呼叫哪個引擎、輸出什麼格式、誰的判斷贏——不同實作團隊會做出彼此都「符合規格」但互相矛盾的解法。"
+      - id: P1-GAP-LEGAL-7
+        severity: medium
+        role: Policy
+        title: "政策分析維度（§26.3）與 Method Selection Engine selection_context 之間無欄位對應"
+        detail: "§26.3 列 11 項政策分析維度(Current Regulation/Proposed Regulation/Budget/...)，但 selection_context 只有 jurisdiction_context 與 risk_tier，無 policy_context/regulatory_exposure 或任何對應欄位。"
+        evidence:
+          - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 1669, quote: "§26.3 政策分析 11 項維度"}
+        consequence: "兩個 risk_tier 與 jurisdiction_context 相同但監理曝險截然不同的決策，會被 Method Selection Engine 選出完全相同的方法組合，因為選擇器根本看不到政策訊號。"
+    risks_ref: "見 RISK_REGISTER.yaml P1-RISK-LEGAL-1/2/3/4/5"

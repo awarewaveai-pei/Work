@@ -101,13 +101,13 @@ Source directive 中所有根路徑（`/.ai/`、`/specs/`、`/policies/`、`/met
 
 ## 5. Phase 1 — 三文件 Gap Analysis
 
-**Status：NEXT** | Entry：Phase 0 exit gate ✅ + Cross-Review 三件套 ✅（2026-08-29）。種子材料：verified-findings.yaml + CONVERGENCE_MATRIX.md。
+**Status：COMPLETE（2026-08-29）** | Entry：Phase 0 exit gate ✅ + Cross-Review 三件套 ✅（2026-08-29）。種子材料：verified-findings.yaml + CONVERGENCE_MATRIX.md。
 
-方法：角色 lens（System/Software/Domain/Data Architect、DB、DevOps、SRE、Security、Privacy、IAM、Network、Cloud、Local/Offline、MLOps、AI、Data Science、Statistics、Research Methodology、PM、Program、UX、Accessibility、Legal/Compliance、Globalization、Government、Education、Business、Finance、Trade、Policy、Operations、Support/IR、Long-term Maintainer）× failure modes（correctness / availability / durability / security / privacy / data loss / 各類 lock-in / schema・API・workflow・legal・model evolution / operational complexity / cost / latency / offline / cross-border / backup・restore・migration failure / supply-chain / prompt injection / data poisoning / hallucination / human error / agent overreach / observability gap / knowledge inconsistency / documentation drift）。完整清單正本在 source directive §VI；執行策略 = 分批 lens sweep，每批 findings 併入 registers，每條附 `file:line`。
+方法：6 個角色群 lens agent 平行掃描，涵蓋 Program Plan 本節列出的全部 33 個角色 × 30 個 failure modes（完整清單正本在 source directive §VI），每組比對 Phase 0 71 條 findings 排除重複，只回報新發現，每條附 `file:line`。
 
-輸出（`PROJECT_ROOT/.ai/research/phase-1/`）：`GAP_REGISTER.yaml`、`CONFLICT_REGISTER.yaml`、`DUPLICATION_REGISTER.yaml`、`RISK_REGISTER.yaml`、`ASSUMPTION_REGISTER.yaml`、`UNKNOWN_REGISTER.yaml`。
+輸出（`PROJECT_ROOT/.ai/research/phase-1/`）：`GAP_REGISTER.yaml`(51)、`CONFLICT_REGISTER.yaml`(4)、`DUPLICATION_REGISTER.yaml`(5)、`RISK_REGISTER.yaml`(19)、`ASSUMPTION_REGISTER.yaml`(9)、`UNKNOWN_REGISTER.yaml`(10)——合計 98 條，ID 全唯一，9 條抽查引用行號全命中。`PHASE_1_GAP_ANALYSIS_SUMMARY.md` 為總覽入口。
 
-**Exit Gate**：六 registers 完成 + cross-review 三件套完成。
+**Exit Gate**：六 registers 完成 + cross-review 三件套完成 → **已通過（2026-08-29）**。**限制**：Claude 單模型單輪產出，尚未 Codex 交叉驗證；4 條 CONFLICT 建議 Phase 2 前補驗證。
 
 ---
 
@@ -157,8 +157,8 @@ Source directive 中所有根路徑（`/.ai/`、`/specs/`、`/policies/`、`/met
 |---|---|---|---|
 | 0 | 文件完整性 + Current State | **COMPLETE**（2026-08-29；71 verified findings） | 11 outputs + 報告 ✅ |
 | CR | Claude/Codex Cross-Review | **COMPLETE**（2026-08-29；9/9 交集 0 DISAGREE，Codex 補 3 組新證據＋3 個新決策點） | 三件套 + 分類矩陣 ✅ |
-| 1 | Gap Analysis | NOT_STARTED | 6 registers |
-| 2 | Architecture Convergence | NOT_STARTED | 15 deliverables + **HUMAN REVIEW** |
+| 1 | Gap Analysis | **COMPLETE**（2026-08-29；98 條，含 4 CONFLICT + 5 DUPLICATION） | 6 registers ✅ |
+| 2 | Architecture Convergence | **NEXT** | 15 deliverables + **HUMAN REVIEW** |
 | 3 | Machine-readable Foundation | NOT_STARTED | specs/policies/tests 樹 + schema 驗證 |
 | 4 | Repository Architecture | NOT_STARTED | bounded contexts 驗證 + repo 決策 |
 | 5 | MVP Vertical Slice | NOT_STARTED | 全鏈 e2e + replay/rollback 實證 |
