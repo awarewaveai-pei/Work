@@ -2,6 +2,25 @@
 
 ## 2026-08-29
 
+### 修 codex-oracle.ps1 CP950 encoding bug（坑 1 收尾）— Get-Content -Raw 缺 -Encoding UTF8 導致 CJK artifact 不可逆損毀
+
+**根因**：`scripts/codex-oracle.ps1:495` `$answer = (Get-Content -LiteralPath $outFile -Raw)` 缺 `-Encoding UTF8`。`$outFile` 是 codex CLI `-o` 寫出的 BOM-less UTF-8 檔，Windows PowerShell 5.1 在本機 Big5/CP950 locale 下對無 BOM 檔預設用系統 ANSI codepage 解碼，把 UTF-8 multi-byte CJK 序列誤讀，部分序列在 CP950 沒有對應字元變成不可逆遺失（CP950 decode 對不可映射序列吐 `?` (0x3F)，證實於下方 critic 附測）。同檔 `:143`（`$PromptFile` 讀取）同一 bug class；`:406`（`$diffFile` 讀取）目前安全（自己寫的檔有 BOM）但風格與全 repo 其餘 60+ 處 `Get-Content -Raw` 呼叫不一致。三處補齊 `-Encoding UTF8`，與 `:252` 既有的正確寫法一致。
+
+**範圍確認**：grep `scripts/` 與 `agency-os/` 全部 `Get-Content -Raw`，除本次三處外無其他遺漏站點。另發現既有 `audit-cp950-traps.ps1` 機械閘完全不覆蓋這個 class（只查外部指令 stdout capture + .ps1 自身解析失敗兩類）——已 spawn_task chip（task_b55cfcdf）另開新 audit class 建置任務，不塞進本次範圍。
+
+**已知殘留**：`agency-os/reports/oracle/` 下 29 個修復前產生的 artifact（含坑 1 提到的 `2026-08-29-inspect-518679ce.md`，463 個 PUA 字元）內容已不可逆損毀，僅影響人類可讀 prose；machine-facing 欄位（`- files-reviewed:`、`- deletions-reviewed:`、檔名日期/kind）全 ASCII 未受影響，ORACLE gate 判讀不受影響。**不要嘗試重新產生這些舊檔**——資料已在讀取當下遺失，重跑只會產生新 artifact 不會修復舊的。
+
+[已修改]
+- `scripts/codex-oracle.ps1:143,406,495` 各加 `-Encoding UTF8`
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/codex-oracle.ps1 -Mode inspect -Prompt "用繁體中文回答：..." 產生 `2026-08-29-inspect-f7c37815.md` + python 逐字元 codepoint 檢查（`0x8cc7 0x6599 0x5eab...` = 正確「資料庫索引…」，non-PUA/non-U+FFFD）| exit=0 | ms=~23400
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/1m/1n（Minor：`:143` 對 ANSI-encoded prompt file 的邊緣情境方向反轉，non-blocking，UTF-8 仍是正確的 repo-wide invariant；Suggestion：29 個舊 artifact 不可逆損毀已列入本條記錄）。critic 另在同機實測 5 組 encoding case 佐證：BOM-less UTF-8 讀取修復前後 codepoint 對照（`30364,31048,...`→`28204,35430,...`）、`:406` 確認無 stray U+FEFF 洩漏進 diff fence、UTF-16 prompt file 仍靠 BOM 偵測正常讀取、production artifact `pua=463`→`pua=0` 前後對照
+- BUGHUNT_DONE: scope=scripts,agency-os | grep=`Get-Content.*-Raw`（缺 -Encoding UTF8）| hits=0
+
+[剩餘風險] `:143` 若未來遇到真的 ANSI 編碼（非 UTF-8）prompt file 會產生 U+FFFD 而非舊行為的正確解碼——critic 判定 non-blocking，因 UTF-8 才是本 repo 一致的正確假設；29 個舊 corrupted artifact 無法復原。
+[rollback] `git revert` 本 commit，`:143,406,495` 退回原狀（重新引入本次修的 bug）。
+
 ### AI LEGO Cross-Review 完成 — Claude×Codex 雙盲互驗 9/9 交集零分歧，Codex 補抓第 4 套信任詞彙；附兩個坑（oracle artifact CP950 損毀、跨 session 未 commit 編輯被還原）
 
 **流程（directive §V 反 anchoring 全程合規）**：①操作者裁決 OQ-2（磁碟 v1 = canonical）+ 子網域定名 `cognitive.aware-wave.com` ②`CLAUDE_REVIEW.md` 先寫檔（未餵 Codex）③`codex-oracle.ps1 -Mode inspect` 無污染 prompt（只給三文件路徑＋中性問題集，明令禁讀 `.ai/`/Program Plan/WORKLOG；Codex 自我聲明未讀他方分析），21.3 分鐘產 9 findings ④逐條 Grep 驗真後寫 `CODEX_REVIEW.md`＋`CONVERGENCE_MATRIX.md`。

@@ -140,7 +140,7 @@ if ($PromptFile) {
         Write-Error "PromptFile not found: $PromptFile"
         exit 2
     }
-    $Prompt = Get-Content -LiteralPath $PromptFile -Raw
+    $Prompt = Get-Content -LiteralPath $PromptFile -Raw -Encoding UTF8
 }
 
 # Rule 4 is the one that matters most: without an explicit licence to return nothing,
@@ -403,7 +403,7 @@ if ($Mode -eq 'review') {
     [void]$sb.AppendLine('# DIFF UNDER REVIEW')
     [void]$sb.AppendLine()
     [void]$sb.AppendLine('```diff')
-    [void]$sb.AppendLine((Get-Content -LiteralPath $diffFile -Raw))
+    [void]$sb.AppendLine((Get-Content -LiteralPath $diffFile -Raw -Encoding UTF8))
     [void]$sb.AppendLine('```')
 }
 else {
@@ -492,7 +492,7 @@ if (-not (Test-Path -LiteralPath $outFile)) {
     exit 3
 }
 
-$answer = (Get-Content -LiteralPath $outFile -Raw)
+$answer = (Get-Content -LiteralPath $outFile -Raw -Encoding UTF8)
 Write-Host ""
 Write-Host $answer
 Write-Host ""
