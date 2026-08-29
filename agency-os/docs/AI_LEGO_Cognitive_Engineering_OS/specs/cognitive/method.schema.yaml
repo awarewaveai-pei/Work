@@ -250,7 +250,11 @@ properties:
       expression grammar: Atlas §9 gives no evidence of one, and inventing an
       expression AST here would be exactly the "fabricate a rich schema with
       no textual basis" this task was told to avoid.
-    examples: ["problem_statement.status == validated"]
+    examples: [["problem_statement.status == validated"]]
+    # 2026-08-29 (critic review MAJOR finding #7): `preconditions` is
+    # `type: array`, so each `examples[]` entry must itself be an array
+    # (one example VALUE of the whole field) — the previous bare-string
+    # form was an example of a single element, not of the field.
 
   quality:
     type: object
@@ -316,7 +320,11 @@ properties:
       feed into directly. SOFT reference to
       `cognitive/typed-objects/*.schema.yaml` for the named types, same
       reasoning as `inputs`/`outputs` above.
-    examples: ["CauseHypothesisSet -> FinalCausalFact"]
+    examples: [["CauseHypothesisSet -> FinalCausalFact"]]
+    # 2026-08-29 (critic review MAJOR finding #7): same fix as
+    # `preconditions.examples` above — `forbidden_transition` is
+    # `type: array`, so the example must be an array-of-strings, not a
+    # bare string.
 
   recommended_next:
     type: array

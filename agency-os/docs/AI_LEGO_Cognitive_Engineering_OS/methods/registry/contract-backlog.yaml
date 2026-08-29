@@ -149,12 +149,18 @@ tier_1:
 # =============================================================================
 tier_2:
   policy: >
-    **CORRECTED 2026-08-29 (Codex cross-cutting review, CONFIRMED finding #4)**:
+    **CORRECTED 2026-08-29 (Codex cross-cutting review, CONFIRMED finding #4;
+    field name corrected again same day, critic review MAJOR finding #4)**:
     the Tier 2 set is the UNION of two disjoint sources, not method-inventory.yaml
-    alone: (a) every method_id in methods/registry/method-inventory.yaml with
-    `contract_status: pending` that is NOT listed under tier_0 or assigned to
-    tier_1 above, PLUS (b) every entry under `explicit_entries` below. The two
-    sources are disjoint by construction: `explicit_entries` exists precisely
+    alone: (a) every entry in methods/registry/method-inventory.yaml keyed by
+    its `name` field (NOT `method_id` — that field does not exist anywhere in
+    method-inventory.yaml; its 289 entries are keyed by `name`, with only 13
+    additionally carrying a `machine_id`) with `contract_status: pending` that
+    is NOT listed under tier_0 or assigned to tier_1 above, PLUS (b) every
+    entry under `explicit_entries` below (which DOES use `method_id`, matching
+    tier_0's own field name — the two registries intentionally use different
+    join-key field names, `name` vs `method_id`, see the standalone note
+    below). The two sources are disjoint by construction: `explicit_entries` exists precisely
     for ADR-mandated methods (like `finance.financial_assumptions`) that do
     NOT appear in method-inventory.yaml at all (verified by grep: zero hits),
     because Atlas never catalogued them (no domain-pack content exists yet).
@@ -174,6 +180,17 @@ tier_2:
     added information). Cross-reference method-inventory.yaml directly to
     enumerate the current Tier 2 set. [This omitted `explicit_entries` from
     the stated rule — see correction above.]
+  join_key_note: >
+    method-inventory.yaml's 289 entries are keyed by `name` (always present)
+    and optionally `machine_id` (only 13 entries carry it — where `name`
+    itself isn't already a clean bare `<family>.<name>` identifier). This
+    file's `tier_0`/`explicit_entries` blocks use `method_id` as their own
+    key field, matching ADR-005's grammar directly. A compiler implementing
+    "Tier 2 = method-inventory.yaml pending entries" MUST join on
+    method-inventory.yaml's `name` field, not on a `method_id` field that
+    does not exist there — this was a real bug (critic review MAJOR
+    finding #4, 2026-08-29) that would have silently produced an EMPTY Tier 2
+    set if implemented literally as first (mis-)written.
   entry_count_at_time_of_writing: 285
   entry_count_basis: >
     284 from method-inventory.yaml (289 total catalog entries - 2

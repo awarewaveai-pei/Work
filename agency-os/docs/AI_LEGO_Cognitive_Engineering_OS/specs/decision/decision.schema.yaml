@@ -305,22 +305,38 @@ properties:
     description: >
       Atlas §16.2 L3792 (`evidence_snapshot: ...`, singular ellipsis, not a
       list marker — read as one embedded snapshot object, not an array of
-      IDs). Soft reference only (free-form object, no hard `$ref`) to a
-      future `evidence/evidence.schema.yaml` — promised in the same Atlas
-      Appendix A block as this file (L4584) but NOT YET BUILT in this repo
-      (verified via directory listing: `specs/evidence/` does not exist as
-      of this file). Avoiding a forward-Wave dependency on an unbuilt file,
-      same caution `typed-objects/problem-statement.schema.yaml` applied to
-      its own `content.evidence` field.
+      IDs). Soft reference only (free-form object, no hard `$ref`).
+      2026-08-29 (critic review MINOR finding #9): re-checked now that
+      `specs/evidence/evidence.schema.yaml` exists (it did not when this
+      file was first compiled) — NOT upgraded to a hard $ref, because the
+      shapes are a genuine mismatch, not just an unbuilt-dependency gap:
+      `evidence.schema.yaml` requires `evidence_id` + `provenance` (a
+      single governed Evidence record, id-referenced from elsewhere), while
+      this field's own example below (`{source, summary}`) is an ad-hoc
+      point-in-time SUMMARY of whatever evidence informed the decision, not
+      one Evidence record — hard-reffing would reject that example and
+      every instance shaped like it. Left as free-form pending a real
+      textual basis for what a "snapshot" (as opposed to a single record)
+      should contain.
 
   assumptions:
     type: array
     items: { type: string }
     description: >
-      Atlas §16.2 L3793. Soft reference (free-text/id list), same
-      not-yet-built-evidence-schema caution as `evidence_snapshot` above
-      (`evidence/assumption.schema.yaml` is also promised, also not yet
-      built).
+      Atlas §16.2 L3793. Soft reference (free-text/id list). 2026-08-29
+      (critic review MINOR finding #9): re-checked now that
+      `specs/evidence/assumption.schema.yaml` exists (it did not when this
+      file was first compiled) — NOT upgraded to a hard $ref, because
+      `assumption.schema.yaml` requires `id` + `statement` + `status` +
+      `provenance` (a full ASM-* Assumption Registry record with its own
+      lifecycle), while this field's own example below is a bare free-text
+      sentence ("客戶數量未來 12 個月成長 <20%") — hard-reffing would reject
+      that example. If a future revision wants each entry to be a formal
+      registry reference, the field should hold an `ASM-*` id STRING (soft
+      reference by pattern, not an embedded full object) rather than the
+      whole record inline — left as an open question below rather than
+      done here, since neither Atlas L3793 nor this file's own example
+      commits to that direction.
 
   unknowns:
     type: array
@@ -510,14 +526,22 @@ properties:
           - "confirmed -> superseded (a later decision replaces this one even though this one was not reversed)"
       review_task_ref:
         type: [string, "null"]
+        pattern: "^TASK-"
         default: null
         description: >
           NEW DESIGN. Execution Contract §88 L2701-2703: crossing a
           reversal indicator's threshold triggers a "Decision Review Task".
-          Free-string soft reference, not a hard $ref — no
-          `execution/task.schema.yaml` exists in this repo yet (verified via
-          directory listing), same forward-Wave-dependency caution as
-          `evidence_snapshot` above.
+          2026-08-29 (critic review MAJOR finding #9 follow-up, corrected by
+          an independent critic pass): the original description claimed
+          `execution/task.schema.yaml` did not exist in this repo, which was
+          already false — that file exists and is hard-$ref'd elsewhere in
+          this suite (e.g. `execution/method-resolution.schema.yaml`'s
+          `task_id` field). This is NOT a hard $ref to that file's full
+          object shape, though, because a Decision Review Task is a task
+          INSTANCE identified by id, not an embedded task-context object —
+          so the honest tightening is the same `^TASK-` id pattern
+          `task.schema.yaml`'s own `task_id` field uses, not a `$ref` to the
+          whole schema.
       actual_result:
         type: string
         description: >
@@ -604,6 +628,21 @@ open_questions:
       type's OWN documented shape, not inventing sub-structure no mother
       document gives.
     owner: "operator / future cognitive/recipe.schema.yaml or a decision-specific MCDA schema author"
+  - id: "OQ-DECISION-3"
+    question: >
+      2026-08-29 (critic review MINOR finding #9): now that
+      `specs/evidence/evidence.schema.yaml` and
+      `specs/evidence/assumption.schema.yaml` exist, should
+      `evidence_snapshot`/`assumptions` be tightened from fully free-form
+      to at least a soft-reference pattern (e.g. `assumptions[]` entries
+      constrained to `^ASM-` id strings pointing at Assumption Registry
+      records, rather than accepting arbitrary free text)? See those
+      fields' own descriptions above for why a full hard $ref to either
+      target schema was investigated and rejected (real shape mismatch,
+      not just an unbuilt-dependency gap) — this question is about a
+      lighter-weight ID-pattern tightening, not a hard $ref.
+    owner: "operator / next session revisiting this file, non-blocking"
+    blocks: "nothing in this schema's own validity"
 
 verification:
   method: >
@@ -617,8 +656,19 @@ verification:
     "Decision Object" across `.ai/research/` (2 files matched, neither
     cross-references MP §53 against Atlas §16.2, confirming OQ-DECISION-1's
     novelty); directory listing of `specs/` confirming `evidence/` and
-    `decision/` did not exist before this file (ruling out hard $refs to
-    unbuilt evidence/assumption schemas). Repo-wide grep for
+    `decision/` did not exist before this file, ruling out hard $refs to
+    `evidence.schema.yaml`/`assumption.schema.yaml` AT THE TIME OF ORIGINAL
+    COMPILATION. 2026-08-29 (critic review MINOR finding #9, re-verified by
+    an independent critic pass): `specs/evidence/` now exists; re-checked
+    whether `evidence_snapshot`/`assumptions` should upgrade to a hard $ref
+    and found a genuine shape mismatch instead (not just an unbuilt-file
+    gap) — `evidence.schema.yaml` requires `evidence_id`+`provenance`,
+    `assumption.schema.yaml` requires `id`+`statement`+`status`+
+    `provenance`, neither of which this file's own existing example values
+    (`{source, summary}` and a bare sentence) satisfy; see those two
+    fields' own descriptions and `open_questions.OQ-DECISION-3` for the
+    full reasoning and the lighter-weight `^ASM-` id-pattern alternative
+    considered instead. Repo-wide grep for
     `decision.schema.yaml` / `reversal.schema.yaml` across `agency-os/` and
     `lobster-factory/` (required BUGHUNT step) found one real, load-bearing
     forward-reference — `specs/cognitive/lens.schema.yaml` L196-203 — closed

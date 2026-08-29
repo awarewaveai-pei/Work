@@ -345,13 +345,19 @@ properties:
   trace_id: { type: string, pattern: "^TRACE-" }
 
   status:
-    $ref: "ai-lego://specs/execution/status-codes.schema.yaml#/reference_vocabulary/final_status/values"
+    $ref: "ai-lego://specs/execution/status-codes.schema.yaml#/reference_vocabulary/final_status/schema"
     description: >
       Real $ref into EC §70's Final Status vocabulary as already registered
-      by `status-codes.schema.yaml` — NOT redeclared here. See
-      compilation_decisions above for the exact target-shape caveat and
-      `open_questions.OQ-RESULT-2` for the follow-up that would make this
-      ref strictly validator-resolvable.
+      by `status-codes.schema.yaml`'s `reference_vocabulary.final_status.schema`
+      node — NOT redeclared here. **Fixed 2026-08-29 (critic review CRITICAL
+      finding #1)**: this previously pointed at `.../final_status/values`,
+      which is a bare YAML array, not a schema object — `$ref` to a
+      non-schema node crashes any real JSON Schema validator. Retargeted to
+      the new `/schema` sibling node added to `status-codes.schema.yaml` for
+      exactly this purpose; the original `open_questions.OQ-RESULT-2`
+      follow-up below (which anticipated needing exactly this kind of
+      additive, non-breaking key) is now resolved by this fix, not merely
+      proposed.
 
   rationale:
     type: string

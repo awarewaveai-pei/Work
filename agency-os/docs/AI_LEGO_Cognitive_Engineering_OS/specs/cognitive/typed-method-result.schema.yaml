@@ -477,7 +477,7 @@ examples:
       evaluated_at: "2026-08-29T15:20:00Z"
       provenance:
         epistemic_type: "HYPOTHESIS"
-        authorship_state: "AI_DRAFTED"
+        authorship_state: "AI_GENERATED"
       quality:
         provenance_required: true
         evidence_labeling_required: true
@@ -488,7 +488,7 @@ examples:
             version: "1.0.0"
             problem_statement_ref: "PROB-2026-08-29-000003"
             note: "ILLUSTRATIVE SUBSET ONLY — not a full, schema-validated CauseHypothesisSet instance."
-          hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b85"
+          hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b850"
       rollback_ref: null
 
 verification:

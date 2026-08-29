@@ -294,6 +294,36 @@ deletion_request:
         resolved via `branches[deletion_type].step_overrides`; all other
         steps use EC §31's generic, branch-independent meaning.
       minItems: 10
+      maxItems: 10
+      uniqueItems: true
+      # 2026-08-29 (critic review MAJOR finding #5), corrected same day.
+      # First attempt used `prefixItems` referencing an
+      # `#/definitions/deletion_step_entry` node that was never actually
+      # defined (unresolvable $ref, same bug class as Critical finding #1
+      # elsewhere in this review) — reverted. Second attempt used
+      # `uniqueItems: true` alone, but a follow-up PoC found that
+      # insufficient too: each item also carries free-form `status`/
+      # `completed_at`/`evidence_ref` fields, so e.g. 10 entries with
+      # `step: Deletion` and 10 different `evidence_ref` values are still
+      # 10 unique WHOLE objects — satisfying uniqueItems+minItems:10 while
+      # Authorization/Legal Hold Check/Approval never appear, yet the
+      # record would validate as a compliant DSAR deletion (the exact
+      # failure mode this finding exists to close). uniqueItems is kept as
+      # a cheap backstop against literal full-duplicate rows; the real
+      # guarantee is the `allOf`/`contains`/`minContains`/`maxContains`
+      # block below, which pins presence of each of the 10 canonical `step`
+      # values independently of what any other field contains (Draft
+      # 2020-12 keywords, matches this file's declared $schema — verified
+      # against a synthetic evasion case with jsonschema 4.26.0 before
+      # being applied here). Does NOT pin array order — EC §31's ordering
+      # requirement is stated in `constraints` below and left as a
+      # documentation-level MUST, not a schema-level one; no available
+      # Draft 2020-12 keyword enforces "exact order, no gaps, only from a
+      # fixed set" as robustly as contains/minContains/maxContains enforces
+      # "exact coverage", and duplicating the item schema 10 times inline
+      # to pin order via `prefixItems` (avoiding $ref entirely this time)
+      # was judged higher risk than benefit for a field EC §31 itself only
+      # narrates as sequential, not as machine-checked.
       items:
         type: object
         required: [step, status]
@@ -330,6 +360,37 @@ deletion_request:
               `PersonalDataRedacted` event id for the crypto-shred branch's
               Deletion Evidence step, or an EC §65 content-addressed hash for
               the production_row branch's).
+      allOf:
+        - contains: { required: [step], properties: { step: { const: "Authorization" } } }
+          minContains: 1
+          maxContains: 1
+        - contains: { required: [step], properties: { step: { const: "Legal Hold Check" } } }
+          minContains: 1
+          maxContains: 1
+        - contains: { required: [step], properties: { step: { const: "Retention Check" } } }
+          minContains: 1
+          maxContains: 1
+        - contains: { required: [step], properties: { step: { const: "Dependency Check" } } }
+          minContains: 1
+          maxContains: 1
+        - contains: { required: [step], properties: { step: { const: "Dry Run" } } }
+          minContains: 1
+          maxContains: 1
+        - contains: { required: [step], properties: { step: { const: "Count / Scope Preview" } } }
+          minContains: 1
+          maxContains: 1
+        - contains: { required: [step], properties: { step: { const: "Approval" } } }
+          minContains: 1
+          maxContains: 1
+        - contains: { required: [step], properties: { step: { const: "Deletion" } } }
+          minContains: 1
+          maxContains: 1
+        - contains: { required: [step], properties: { step: { const: "Verification" } } }
+          minContains: 1
+          maxContains: 1
+        - contains: { required: [step], properties: { step: { const: "Deletion Evidence" } } }
+          minContains: 1
+          maxContains: 1
 
 constraints:
   - "Exactly one of `subject_id` (non-null) or `target_refs` (non-empty) MUST be set, determined by `deletion_type`: personal_data_crypto_shred requires subject_id and forbids target_refs; production_row requires target_refs and forbids subject_id."
@@ -372,7 +433,17 @@ rollback:
     architectural_decision_reversal:
       label: "Scenario 2 — architectural decision reversal (governance-level, not an incident)"
       applies_when: "Option A (crypto-shredding) itself is abandoned in favor of Option B, Option C alone, or a new design (ADR-002 L140)."
-      pattern: >
+      # 2026-08-29 (critic review MINOR finding #11, corrected by an
+      # independent critic pass): renamed from `pattern` — this is a
+      # narrative field describing a MIGRATION SHAPE, not a JSON Schema
+      # `pattern` regex keyword; the shared name was never functionally
+      # ambiguous here (this block is documentation, never used as a `$ref`
+      # validation target) but risked misreading by a future editor
+      # scanning for schema keywords. (Moved this note into a comment,
+      # 2026-08-29: an earlier pass had put it inside the field's own VALUE,
+      # which polluted the actual ADR-derived content below with review
+      # meta-commentary.)
+      transition_pattern: >
         Expand-Contract, "比照 ADR-005 DB Migration Recipe 的精神" (ADR-002
         L140) — a phased transition, NOT an abrupt cutover.
       required_behavior:

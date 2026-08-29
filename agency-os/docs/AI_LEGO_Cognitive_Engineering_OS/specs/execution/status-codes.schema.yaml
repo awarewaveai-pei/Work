@@ -73,9 +73,26 @@ reference_vocabulary:
   legal_side_states:
     source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §10 (L563-573)"
     values: [BLOCKED, NEEDS_HUMAN_REVIEW, FAILED, CANCELLED, ROLLED_BACK, COMPENSATED, PARTIAL_SUCCESS]
+    # schema (2026-08-29, critic review CRITICAL finding #1 fix): consumers
+    # were $ref-ing `#/reference_vocabulary/legal_side_states/values`, which
+    # is a bare YAML array, not a schema object -- $ref to a non-schema node
+    # crashes any real JSON Schema validator (AttributeError on the
+    # implementation side). This `schema` sibling is the actual referenceable
+    # type; `values` above stays as the human-readable citation list, now
+    # duplicated once (by value, not by meaning) into a real schema node.
+    schema:
+      type: string
+      enum: [BLOCKED, NEEDS_HUMAN_REVIEW, FAILED, CANCELLED, ROLLED_BACK, COMPENSATED, PARTIAL_SUCCESS]
   final_status:
     source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §70 (L2299-2309)"
     values: [PASS, PASS_WITH_APPROVED_RISK, BLOCKED, FAILED, NEEDS_HUMAN_REVIEW, ROLLED_BACK, PARTIAL_SUCCESS]
+    # schema (2026-08-29, critic review CRITICAL finding #1 fix): same reason
+    # as legal_side_states.schema above -- this is the real referenceable
+    # type; result.schema.yaml, typed-method-result.schema.yaml, and
+    # handoff.schema.yaml all $ref this exact node.
+    schema:
+      type: string
+      enum: [PASS, PASS_WITH_APPROVED_RISK, BLOCKED, FAILED, NEEDS_HUMAN_REVIEW, ROLLED_BACK, PARTIAL_SUCCESS]
 
 # ---------------------------------------------------------------------------
 # Duplicate resolution: METHOD_RESOLUTION_BLOCKED vs

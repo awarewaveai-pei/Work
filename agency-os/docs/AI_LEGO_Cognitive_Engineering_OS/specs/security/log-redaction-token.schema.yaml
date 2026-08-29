@@ -161,6 +161,16 @@ decided_by: >
   are Phase 3 compilation decisions (see `compilation_decisions` above),
   not a separate ADR.
 
+# Root $ref (2026-08-29, critic review MAJOR finding #2, same class as
+# Codex cross-cutting review CONFIRMED finding #1 — see risk-tier.schema.yaml's
+# identical comment for the full reasoning): this file's title/description/
+# etc. are annotation keywords, so without a root-level type constraint, a
+# validator pointed at this file's ROOT (not `#/definitions/log_redaction_token`)
+# would accept ANY value. This $ref makes the file's root itself validate as
+# `log_redaction_token`, so both root-level and definitions-scoped validation
+# now agree.
+$ref: "#/definitions/log_redaction_token"
+
 # ---------------------------------------------------------------------------
 # Schema body
 # ---------------------------------------------------------------------------
@@ -286,7 +296,7 @@ examples:
       hmac_key_ref: "hmac-key.tenant-3fa85f64.gen-1"
       classification_tag: Confidential
       tenant_scope: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
-      token: "1c4a5b6c8f5f5b7a1b7e23ec29af22b0b4e41da31e868d57226121c84a5ffc5"
+      token: "1c4a5b6c8f5f5b7a1b7e23ec29af22b0b4e41da31e868d57226121c84a5ffc53"
       field_name: "customer.phone"
       computed_at: "2025-11-02T00:00:00Z"
 

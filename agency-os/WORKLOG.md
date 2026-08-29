@@ -1,5 +1,42 @@
 # Worklog
 
+## 2026-08-29（續16）
+
+### AI LEGO Phase 3 — 首次對 Phase 3 產出跑 critic subagent 覆審（此前只跑過 Codex oracle），1 Critical + 6 Major + 8 Minor 全數修正並經第二輪獨立覆審驗真
+
+**背景**：操作者連續兩問直接戳中驗證缺口——「有做 codex review 嗎？」（誠實回答：Wave 5 前 34 檔從未跑過）與「你有 code review 嗎？」（誠實回答：從未對本 Phase 3 任何產出跑過 `critic` subagent，`/verify-recent` 需要 critic 時我用自我審查頂替，是真實的流程偏離）。兩次揭露都導致真實嚴重缺陷被抓到——這正是 AGENTS.md §跨模型 oracle 說的「同一模型審自己，盲點與產出同源」。當場對全部 48 檔跑第一次 critic 覆審。
+
+**第一輪 critic 覆審結果（1 Critical + 6 Major + 8 Minor）**：Critical 為 `status-codes.schema.yaml` 的 `values:` 是裸陣列而非可 `$ref` 目標，導致依賴它的多個檔案（`result.schema.yaml`／`deprecation-pipeline.schema.yaml`）的 `$ref` 全部懸空失效；Major 涵蓋 `uniqueItems` 缺失（5 檔）、`problem_type` 舊 7 值 enum 未跟進升級、`log-redaction-token.schema.yaml` 缺根 $ref、範例資料錯誤（enum 值不存在／hash 少一位）、`examples:` 格式錯誤；Minor 涵蓋兩處軟參照該升級為硬 $ref、命名撞字、`additionalProperties` 建議等。
+
+**修正過程中的關鍵教訓（本身即證明「單輪覆審不夠」）**：
+1. `data-deletion.schema.yaml` 的 `uniqueItems: true` 第一次修正嘗試用 `prefixItems` 想同時鎖定順序，但參照了一個從未定義的 `#/definitions/deletion_step_entry`（懸空 $ref）——自己抓到後退回改用 `uniqueItems: true` 較保守寫法。
+2. 驗證 `uniqueItems: true`（含上述退回後的版本）時，自己寫 PoC 發現**這個修法本身仍不足**：每個 item 除了 identity 欄位（`step`/`name`/`document_id`/`item`）外還帶自由文字欄位（`summary`/`evidence_ref`/`note`/`sha256`），只要那些欄位不同，N 個「identity 相同」的條目仍是 N 個「整體不同」物件，可通過 `uniqueItems`——等於完全沒堵住 critic 原本要堵的洞。改用 `allOf` + 每個 canonical 值一組 `contains`/`minContains: 1`/`maxContains: 1`（Draft 2020-12），對全部 5 個受影響檔案（含 current-state.schema.yaml 這個先前已錯誤宣稱修好的檔案）重新套用並用 jsonschema 4.26.0 對「同 identity 換其他欄位」規避案例逐一實測確認正確拒絕。
+3. `decision.schema.yaml` 的 `evidence_snapshot`/`assumptions` 原本規劃「比照升級為硬 $ref」，但實際查證 `evidence.schema.yaml`（要求 `evidence_id`+`provenance`）與 `assumption.schema.yaml`（要求 `id`+`statement`+`status`+`provenance`）的必填欄位後，發現與本檔既有範例（`{source, summary}` 與一句裸字串）形狀真的不合——改為誠實訂正過期說明文字並記錄 `OQ-DECISION-3`，未強行套用會讓既有範例失敗驗證的 $ref。
+
+**第一輪修正完成後，主動再跑第二次獨立 critic 覆審**（覆審對象縮小為本輪實際修改的 11 個檔案，不信任自己剛寫的敘述，要求逐檔重新機器驗證）：0 Critical，但抓到 **3 個 Major**，全數屬同一類——**schema 本體已修正，但檔案裡解釋設計理由的散文（`compilation_decisions`/`description`/`verification`）還停留在修正前、以現在式聲稱依賴目標「尚不存在」**，其中 `exception.schema.yaml` 最嚴重的一處落在該檔自己的 `verification.method` 段落（等於驗證證據本身作偽證）；另有 `method-resolution.schema.yaml` 的 `mapping_type` 欄位值本身錯誤（不只是散文過期）。3 個 Major + 3 個連帶 Minor（`manifest.schema.yaml` 的「無 schema 變更可擴充」聲稱經 PoC 證實為假、`data-deletion.schema.yaml` 的欄位值混入審查註解、`problem-type.schema.yaml`/`authority.schema.yaml` 同屬 MRSP-11/18 那類「檔案根無型別約束」但建成較晚未同步套用）全數修正。另採納 1 個 Suggestion：71 個 `contains` 區塊補 `required: [<identity欄位>]`，消除「靠 sibling items.required 間接保證」的非局部脆弱性。
+
+[已修改]
+- `specs/execution/{current-state,data-deletion,deprecation-pipeline,manifest,handoff}.schema.yaml`：`uniqueItems` 修法訂正為 `allOf`/`contains`/`minContains`/`maxContains`（含 71 個 `contains` 區塊補 `required`）
+- `specs/execution/method-resolution.schema.yaml`：`problem_type` 兩處改真正 $ref；`mapping_type` 值訂正；`OQ-mres-2` 標記 RESOLVED 並清理過期 owner/blocks；`compilation_decisions`/`verification.note` 改過去式
+- `specs/security/log-redaction-token.schema.yaml`：補根層級 $ref；範例 token 補至 64 位
+- `specs/cognitive/typed-method-result.schema.yaml`：範例 `authorship_state`/`hash` 修正為合法值
+- `specs/cognitive/method.schema.yaml`：兩處 `examples:` 改陣列包裹
+- `specs/execution/exception.schema.yaml`：`required_authority_level` 改硬 $ref；三處過期「不存在」聲稱（含 `verification.method`）改過去式；`source_of_truth_for` 補項
+- `specs/decision/decision.schema.yaml`：`evidence_snapshot`/`assumptions` 說明訂正（刻意不改 $ref，見上）；`review_task_ref` 改 `^TASK-` pattern；`verification.method` 同步；新增 `OQ-DECISION-3`
+- `specs/execution/manifest.schema.yaml`：補 `maxItems: 4`；訂正兩處「無 schema 變更可擴充」假聲稱
+- `specs/cognitive/problem-type.schema.yaml`、`specs/execution/authority.schema.yaml`：補根層級 $ref
+- `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`：§5 新增 MRSP-16~25
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 -c "yaml.safe_load(...)"` 對全部 48 個 specs/methods 檔案逐一解析（全部 OK）；對每一條 Major/Minor 修正逐一用 jsonschema（`Draft202012Validator` + `RefResolver`，自訂 `ai-lego://` handler）跑正反測試，含專門針對「uniqueItems 規避」「懸空 $ref」「根層級驗證」的對抗式 PoC，全數符合預期 | exit=0
+- REVIEW_DONE: critic=`critic` subagent（外部獨立 Claude session，非自我審查）跑兩輪——第一輪對全部 48 檔（1 Critical/6 Major/8 Minor）、第二輪對本次修改的 11 個檔案做獨立機器再驗證（0 Critical/3 Major/3 Minor/1 Suggestion）| verdict=全數修正完畢
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`AI_DRAFTED`／`items_original_generic_schema_moved_to_definitions`／舊 63 位 hash 值／`does not exist`類過期聲稱／`mapping_type: SUPPLEMENT_REQUIRED$`（problem_type 專用行）／`without a schema change` | hits=0（除刻意保留於過去式說明文字內的歷史引用外，無殘留 stale 引用）
+- ORACLE_WAIVED: 本條驗證本身即為兩輪 critic subagent 覆審的完整記錄，未另跑 codex-oracle.ps1（critic 與 codex-oracle 屬 AGENTS.md §跨模型 oracle 分工表定義的同一件事的兩條路徑，critic 這次可用無需切換）
+
+[剩餘風險] MINOR #14（security/ 與 data-deletion 物件加 `additionalProperties: false`）與 s10（`data-deletion.schema.yaml` 的 `MRSP-dd-1` owner/blocks 過期）刻意延後未修，已在計畫文件明確記錄非遺漏；兩輪 critic 覆審皆為單次深度，不代表零殘留缺陷——建議未來每個 Wave 收工前都比照本次做法補跑，避免問題累積到最後一次性爆發（與續14 Codex 覆審的剩餘風險段呼應）。
+[rollback] `git revert` 本次 commit；三母文件全程零改動，全部修改侷限於既有 schema 檔案的欄位/散文修正 + 計畫文件狀態更新，無新檔案、無刪除。
+
 ## 2026-08-29（續15）
 
 ### DB 安全稽核：anon/authenticated EXECUTE 洞擴散到 2 個既有 SECURITY DEFINER 函式，migration 0064 修復並已套用 ks-aw-01

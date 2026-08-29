@@ -418,7 +418,111 @@ properties:
   checklist:
     type: array
     minItems: 30
+    maxItems: 30
+    uniqueItems: true
+    # 2026-08-29 (critic review MAJOR finding #5). uniqueItems alone is
+    # insufficient: each entry also carries free-form `note`/`ref` fields,
+    # so 30 entries with the SAME `item` but 30 different `ref` values
+    # would be 30 unique WHOLE objects, satisfying uniqueItems+minItems:30
+    # while most of the 30 mandated checklist items never appear (same
+    # failure mode found in data-deletion.schema.yaml's `steps[]`, same fix
+    # applied). uniqueItems is kept as a cheap backstop; the real guarantee
+    # is the `allOf`/`contains`/`minContains`/`maxContains` block below,
+    # pinning presence of each of the 30 canonical `item` values
+    # independently of any other field (Draft 2020-12 keywords, matches
+    # this file's declared $schema).
     items: { $ref: "#/definitions/checklist_entry" }
+    allOf:
+      - contains: { required: [item], properties: { item: { const: "task" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "objective" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "current_state" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "problem_root_cause" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "applicable_specifications" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "methods_used" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "risk_tier" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "options_considered" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "selected_approach" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "rejected_alternatives" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "files_changed" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "schemas_changed" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "api_changes" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "data_impact" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "security_privacy_impact" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "jurisdiction_impact" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "compatibility" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "tests" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "expected_results" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "actual_results" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "gate_results" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "known_limitations" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "open_risks" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "rollback" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "observability" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "deployment_release" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "post_verification" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "adr" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "evidence" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [item], properties: { item: { const: "final_status" } } }
+        minContains: 1
+        maxContains: 1
     description: >
       EC §71's 30-item Handoff Protocol (MANDATORY, "必須交付"). MUST contain
       exactly one entry per `checklist_entry.item` enum value — see

@@ -30,6 +30,7 @@ source_of_truth_for:
   - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §29 方法搭配基本規則, rule 12 (L4549, 'Workaround / Exception 必須有 owner、expiry、test、migration plan、ADR')"
   - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2 row for exception.schema.yaml (L103, 'EC §92 既有承諾', no ADR dependency listed)"
   - "specs/execution/risk-tier.schema.yaml (hard $ref, `risk_tier` enum + R3/R4 `required_actions` used to justify `required_authority_level` below)"
+  - "specs/execution/authority.schema.yaml#/authority_level (hard $ref as of 2026-08-29 critic review MINOR finding #8, superseding the original soft-by-name reference — see compilation_decisions above)"
 
 decided_by: >
   No single ADR governs this file (MACHINE_READABLE_SPEC_PLAN.md §2.2 row for
@@ -94,15 +95,20 @@ compilation_decisions:
       EC's free-text `risk` field (same additive-not-competing pattern
       `manifest.schema.yaml` used for `app_version` alongside `source.commit`).
       Additionally add `required_authority_level` as an ADDITIVE optional
-      field, a SOFT reference BY NAME (not a hard $ref) to
-      `authority.schema.yaml`'s A0-A4 concept — that file does not exist yet
-      in this repo (`specs/execution/` currently has 7 files, `authority.schema.yaml`
-      is SKELETON_ONLY per MACHINE_READABLE_SPEC_PLAN.md's row for it and may
-      be authored concurrently by a sibling agent in this same Wave), so no
-      hard `$ref` can be resolved reliably; this follows the same
+      field. ORIGINALLY (at the time this decision was first written) a SOFT
+      reference BY NAME (not a hard $ref) to `authority.schema.yaml`'s A0-A4
+      concept — that file did not exist yet in this repo at the time
+      (`specs/execution/` had 7 files, `authority.schema.yaml` was
+      SKELETON_ONLY per MACHINE_READABLE_SPEC_PLAN.md's row for it and was
+      being authored concurrently by a sibling agent in this same Wave), so
+      no hard `$ref` could be resolved reliably then; this followed the same
       "NAME, NOT a hard $ref" convention `blast-radius-chain.schema.yaml:96`
       already established in this schema suite for a forward dependency on an
-      in-flight sibling file.
+      in-flight sibling file. UPGRADED 2026-08-29 (critic review MINOR
+      finding #8) to a real hard $ref now that `authority.schema.yaml` is
+      built and its `authority_level` node is grounded — see the field's own
+      `properties.required_authority_level` definition below for the current
+      shape.
     reasoning: >
       `risk-tier.schema.yaml`'s own R3/R4 tier definitions already list
       "Human Approval" (R3) and "Explicit Human Authority" (R4) as
@@ -260,18 +266,25 @@ properties:
     type: string
     description: "EC §24 L1026. Identity of whoever authorized this exception."
   required_authority_level:
-    type: [string, "null"]
+    anyOf:
+      - $ref: "ai-lego://specs/execution/authority.schema.yaml#/authority_level"
+      - type: "null"
     default: null
     description: >
-      ADDITIVE, optional — SOFT reference by name only (no `$ref`) to
-      `authority.schema.yaml`'s A0-A4 Autonomy/Authority Levels (EC §92,
-      not yet built in this repo — see compilation_decisions above for why
-      this cannot be a hard $ref). When `risk_tier` is R3 or R4, this SHOULD
-      be populated with the authority level that `approved_by`'s identity
-      must satisfy, per risk-tier.schema.yaml's R3 "Human Approval" / R4
-      "Explicit Human Authority" required_actions. Left as a free-form string
-      rather than an enum because this file cannot yet see
-      authority.schema.yaml's exact level identifiers.
+      ADDITIVE, optional. 2026-08-29 (critic review MINOR finding #8):
+      upgraded from a SOFT reference by name (no `$ref`) to a real hard
+      $ref now that `authority.schema.yaml` exists and its `authority_level`
+      node (A0-A4, a plain `{type, enum}` shape) is grounded/non-skeleton —
+      the original soft reference was written when that file did not yet
+      exist in this repo (see compilation_decisions above for the original
+      "cannot be a hard $ref yet" reasoning). When `risk_tier` is R3 or R4,
+      this SHOULD be populated with the authority level that `approved_by`'s
+      identity must satisfy, per risk-tier.schema.yaml's R3 "Human Approval"
+      / R4 "Explicit Human Authority" required_actions. Was a free-form
+      string rather than an enum ONLY because, at the time this field was
+      first written, this file could not yet see authority.schema.yaml's
+      exact level identifiers (that file did not exist) — no longer true,
+      see the $ref above.
   created_at:
     type: string
     format: date-time
@@ -359,9 +372,14 @@ verification:
     `specs/execution/data-deletion.schema.yaml` in full to confirm the
     `risk_tier` $ref target and to confirm no overlap with the Retention/
     Deletion Model method's "exception" step (data-deletion.schema.yaml
-    already owns that via its Legal Hold Check step). Confirmed via
-    `ls specs/execution/` that `authority.schema.yaml` does not exist in this
-    repo yet, justifying the soft (name-only) reference to it.
+    already owns that via its Legal Hold Check step). Originally confirmed
+    via `ls specs/execution/` that `authority.schema.yaml` did not exist in
+    this repo yet, justifying the then-soft (name-only) reference to it.
+    2026-08-29 (critic review MINOR finding #8, re-verified by an
+    independent critic pass after this fix): `authority.schema.yaml` now
+    exists and `required_authority_level` was upgraded to a real hard $ref
+    to its `authority_level` node (A0-A4) — confirmed resolvable and
+    correctly rejecting `A9`/`A5` via jsonschema.
   note: >
     No mother document or ADR was modified to produce this file. EC §24's
     12-field YAML template is transcribed verbatim as this schema's core

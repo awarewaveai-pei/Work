@@ -199,6 +199,21 @@ properties:
       transcribed verbatim. See compilation_decisions for why these are
       NOT renamed to SNAKE_CASE.
     minItems: 20
+    maxItems: 20
+    uniqueItems: true
+    # 2026-08-29 (critic review MAJOR finding #5), corrected same day after
+    # a PoC found `uniqueItems: true` ALONE insufficient: since each item
+    # also carries a free-form `summary` string, 20 entries with the SAME
+    # `name` but 20 different `summary` values are still 20 unique WHOLE
+    # objects, satisfying uniqueItems+minItems:20 while 19 of the 20
+    # mandated dimensions never appear. uniqueItems is kept as a cheap
+    # backstop against literal full-duplicate rows, but the real guarantee
+    # is the `allOf`/`contains`/`minContains`/`maxContains` block below,
+    # which pins presence of each of the 20 canonical `name` values
+    # independently of what any other field contains (Draft 2020-12
+    # keywords, matches this file's declared $schema — verified against a
+    # synthetic evasion case with jsonschema 4.26.0 before being applied
+    # here).
     items:
       type: object
       required: [name, status]
@@ -244,6 +259,67 @@ properties:
           type: boolean
           default: false
           description: "True if this specific dimension is the one where documentation and observed reality disagree."
+    allOf:
+      - contains: { required: [name], properties: { name: { const: "Repository / Commit" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [name], properties: { name: { const: "Architecture" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [name], properties: { name: { const: "Affected Bounded Context" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [name], properties: { name: { const: "Affected Files / Modules" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [name], properties: { name: { const: "Runtime Dependencies" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [name], properties: { name: { const: "APIs" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [name], properties: { name: { const: "Schemas" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [name], properties: { name: { const: "Events" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [name], properties: { name: { const: "Data Flow" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [name], properties: { name: { const: "Security Boundary" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [name], properties: { name: { const: "Identity / Authorization" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [name], properties: { name: { const: "Config" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [name], properties: { name: { const: "Infrastructure" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [name], properties: { name: { const: "Deployment Topology" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [name], properties: { name: { const: "Tests" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [name], properties: { name: { const: "Observability" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [name], properties: { name: { const: "Known Failure" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [name], properties: { name: { const: "Rollback Capability" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [name], properties: { name: { const: "Open Migration" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [name], properties: { name: { const: "Known Technical Debt" } } }
+        minContains: 1
+        maxContains: 1
     required_dimension_names:
       description: >
         Every record MUST contain exactly one entry per value below.

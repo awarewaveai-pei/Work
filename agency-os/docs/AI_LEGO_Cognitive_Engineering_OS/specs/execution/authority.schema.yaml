@@ -123,6 +123,17 @@ capability_vs_authority:
     holding shell/DB/network access per §96 Tool Broker) without being
     AUTHORIZED to use it. This enum governs authorization, not capability.
 
+# Root $ref (2026-08-29, critic review MINOR finding #6): this file's
+# title/description/etc. are annotation keywords, so without a root-level
+# type constraint, a validator pointed at this file's ROOT (not
+# `#/authority_level`) would accept ANY value, including an invalid one.
+# `exception.schema.yaml` already references `#/authority_level` explicitly,
+# but a naive/unaware tool pointed at the file root would not. Fourth
+# instance of the same class fixed one-file-at-a-time (after MRSP-11's 4
+# files, MRSP-18's log-redaction-token.schema.yaml, and this same finding's
+# fix to problem-type.schema.yaml above).
+$ref: "#/authority_level"
+
 # ---------------------------------------------------------------------------
 # The A0-A4 enum (GROUNDED — verbatim from EC §9, NOT skeleton)
 # ---------------------------------------------------------------------------

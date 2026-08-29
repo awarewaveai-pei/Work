@@ -241,6 +241,20 @@ deprecation_record:
         value, in order — same pattern as `data-deletion.schema.yaml`'s
         `deletion_request.steps[]`.
       minItems: 7
+      maxItems: 7
+      uniqueItems: true
+      # 2026-08-29 (critic review MAJOR finding #5). uniqueItems alone would
+      # be insufficient here too — each item also carries a free-form
+      # `evidence_ref` string, so 7 entries with the SAME `step` but 7
+      # different `evidence_ref` values would be 7 unique WHOLE objects,
+      # satisfying uniqueItems+minItems:7 while most of the 7 canonical
+      # steps never appear (same failure mode found in
+      # data-deletion.schema.yaml's `steps[]`, same fix applied: see that
+      # file's identical comment for the full PoC). uniqueItems is kept as
+      # a cheap backstop; the real guarantee is the `allOf`/`contains`/
+      # `minContains`/`maxContains` block below, pinning presence of each
+      # of the 7 canonical `step` values independently of any other field
+      # (Draft 2020-12 keywords, matches this file's declared $schema).
       items:
         type: object
         required: [step, status]
@@ -257,6 +271,28 @@ deprecation_record:
           evidence_ref:
             type: [string, "null"]
             description: "Opaque pointer to this step's evidence artifact — same convention as data-deletion.schema.yaml's steps[].evidence_ref."
+      allOf:
+        - contains: { required: [step], properties: { step: { const: "Notice" } } }
+          minContains: 1
+          maxContains: 1
+        - contains: { required: [step], properties: { step: { const: "Replacement" } } }
+          minContains: 1
+          maxContains: 1
+        - contains: { required: [step], properties: { step: { const: "Compatibility Matrix" } } }
+          minContains: 1
+          maxContains: 1
+        - contains: { required: [step], properties: { step: { const: "Migration Tool" } } }
+          minContains: 1
+          maxContains: 1
+        - contains: { required: [step], properties: { step: { const: "Usage Scan" } } }
+          minContains: 1
+          maxContains: 1
+        - contains: { required: [step], properties: { step: { const: "Deadline" } } }
+          minContains: 1
+          maxContains: 1
+        - contains: { required: [step], properties: { step: { const: "Archive" } } }
+          minContains: 1
+          maxContains: 1
     step_detail:
       type: object
       description: >
@@ -299,7 +335,10 @@ step_gate_mapping:
   usage_scan_nonzero:
     condition: "Usage Scan (step 5) finds one or more live references to the object being retired (step_detail.usage_scan.live_references_found > 0)."
     legal_side_state:
-      $ref: "ai-lego://specs/execution/status-codes.schema.yaml#/reference_vocabulary/legal_side_states/values"
+      $ref: "ai-lego://specs/execution/status-codes.schema.yaml#/reference_vocabulary/legal_side_states/schema"
+      # Retargeted 2026-08-29 (critic review CRITICAL finding #1): the old
+      # `/values` path is a bare array, not a schema object — $ref to it
+      # crashes any real validator. `/schema` is the new referenceable node.
       value: BLOCKED
       rationale: >
         Same fail-closed, mechanical-prerequisite character as
@@ -309,7 +348,10 @@ step_gate_mapping:
   deadline_not_reached:
     condition: "Archive (step 7) is attempted before step_detail.deadline.deadline_at has passed."
     legal_side_state:
-      $ref: "ai-lego://specs/execution/status-codes.schema.yaml#/reference_vocabulary/legal_side_states/values"
+      $ref: "ai-lego://specs/execution/status-codes.schema.yaml#/reference_vocabulary/legal_side_states/schema"
+      # Retargeted 2026-08-29 (critic review CRITICAL finding #1): the old
+      # `/values` path is a bare array, not a schema object — $ref to it
+      # crashes any real validator. `/schema` is the new referenceable node.
       value: BLOCKED
       rationale: "A scheduled precondition, not a review gate — same mechanical character as usage_scan_nonzero above."
 

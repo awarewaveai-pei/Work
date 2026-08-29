@@ -186,11 +186,38 @@ properties:
     type: array
     description: >
       One entry per mandatory document. Exactly four `document_id` values
-      are mandatory in every manifest (see `required_document_ids` below);
-      additional entries (e.g. a future 5th mandatory document) MAY be
-      appended without a schema change, per the extensibility reasoning in
-      compilation_decisions.
+      are mandatory in every manifest (see `required_document_ids` below).
+      2026-08-29 (critic review MINOR finding #4, corrected by an
+      independent critic pass): this previously claimed a future 5th
+      mandatory document "MAY be appended without a schema change" — false,
+      and the cited "extensibility reasoning in compilation_decisions" does
+      not exist (grepped: no compilation_decisions entry discusses
+      extensibility). A 5th entry is already impossible today regardless of
+      `maxItems`, because `document_id` (below) is a CLOSED 4-value enum —
+      a 5th entry could only repeat one of the 4 existing ids (rejected by
+      each value's `maxContains: 1` in `allOf` below) or carry an
+      unrecognized id (rejected by the enum itself). Adding a real 5th
+      mandatory document requires three coordinated edits regardless of
+      this field's own cardinality keywords: a new `document_id` enum
+      value, a new `contains`/`minContains`/`maxContains` block below, and
+      (now) a `maxItems` bump.
     minItems: 4
+    maxItems: 4
+    uniqueItems: true
+    # 2026-08-29 (critic review MAJOR finding #5). uniqueItems alone is
+    # insufficient: each item also carries free-form `file`/`version`/
+    # `sha256` fields, so 4 entries with the SAME `document_id` but 4
+    # different `sha256` values would be 4 unique WHOLE objects, satisfying
+    # uniqueItems+minItems:4 while 3 of the 4 mandatory documents never
+    # appear (same failure mode found in data-deletion.schema.yaml's
+    # `steps[]`, same fix applied). uniqueItems is kept as a cheap backstop;
+    # the real guarantee is the `allOf`/`contains`/`minContains`/
+    # `maxContains` block below, pinning presence of each of the 4 canonical
+    # `document_id` values independently of any other field (Draft 2020-12
+    # keywords, matches this file's declared $schema). `maxItems: 4` above
+    # is added for honesty/consistency with the other 4 files this finding
+    # touched — see this field's own `description` for why it changes
+    # nothing (the enum already made a 5th distinct entry impossible).
     items:
       type: object
       required: [document_id, file, version, sha256, loaded]
@@ -241,6 +268,19 @@ properties:
             (L262/267/272). A non-empty array implies `loaded: true` for a
             partial load; this field is additive detail, not a replacement
             for the required boolean.
+    allOf:
+      - contains: { required: [document_id], properties: { document_id: { const: "ai-lego.master-plan" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [document_id], properties: { document_id: { const: "ai-lego.method-atlas" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [document_id], properties: { document_id: { const: "ai-lego.execution-contract" } } }
+        minContains: 1
+        maxContains: 1
+      - contains: { required: [document_id], properties: { document_id: { const: "ai-lego.architecture-constitution" } } }
+        minContains: 1
+        maxContains: 1
     required_document_ids:
       description: >
         Every manifest MUST contain exactly one entry per value below.

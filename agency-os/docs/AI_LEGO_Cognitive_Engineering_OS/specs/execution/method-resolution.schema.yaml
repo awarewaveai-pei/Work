@@ -93,20 +93,28 @@ compilation_decisions:
       a §10 routing table — should this file wait for it, or inline the
       enum now?
     decision: >
-      Inline Atlas's 7-value enum verbatim now (`SUPPLEMENT_REQUIRED`, not
+      AT THE TIME (this file's original Wave 5A compilation): inline Atlas's
+      7-value enum verbatim (`SUPPLEMENT_REQUIRED`, not
       `..._VIA_EXISTING_SCHEMA`); flagged in `open_questions` as a forward
-      migration point once `problem-type.schema.yaml` exists.
+      migration point once `problem-type.schema.yaml` exists. SUPERSEDED
+      2026-08-29 (critic review MAJOR finding #6): that file now exists,
+      `problem_type` is a real hard $ref, and `field_mapping`'s
+      `mapping_type` was corrected to `SUPPLEMENT_REQUIRED_VIA_EXISTING_SCHEMA`
+      to match — see `open_questions.OQ-mres-2` for the resolution record.
     reasoning: >
-      `problem-type.schema.yaml` does not exist yet — MACHINE_READABLE_SPEC_PLAN.md's
-      own dependency graph (§3, L120: dependency = `method-resolution.schema.yaml`)
-      makes it DOWNSTREAM of this file, not upstream, so a hard $ref to it
-      here would be circular/forward and unresolvable. Atlas already gives a
-      concrete 7-value enum with real text (L1073) — the honest move is to
-      use that real value set now (not degrade it to a bare string the way
-      the true zero-signal placeholders are handled) while flagging that a
-      future file will supersede it, the same forward-compatibility pattern
+      HISTORICAL, describing why the ORIGINAL inline-now choice was made —
+      `problem-type.schema.yaml` did not exist yet at that time.
+      MACHINE_READABLE_SPEC_PLAN.md's own dependency graph (§3, L120:
+      dependency = `method-resolution.schema.yaml`) made it appear DOWNSTREAM
+      of this file, not upstream, so a hard $ref to it then would have been
+      circular/forward and unresolvable. Atlas already gave a concrete
+      7-value enum with real text (L1073) — the honest move was to use that
+      real value set (not degrade it to a bare string the way the true
+      zero-signal placeholders are handled) while flagging that a future
+      file would supersede it, the same forward-compatibility pattern
       `cognitive/method.schema.yaml` used for its `cognitive_primitives`
-      field pending `cognitive/primitive.schema.yaml`.
+      field pending `cognitive/primitive.schema.yaml`. That future file now
+      exists — see `decision` above for the actual current state.
 
   - question: >
       Atlas L1086's `required_rigor` (4-value enum) already has a dedicated
@@ -219,12 +227,21 @@ field_mapping:
 
   - selection_context_field: problem_type
     task_context_field: null
-    mapping_type: SUPPLEMENT_REQUIRED
+    mapping_type: SUPPLEMENT_REQUIRED_VIA_EXISTING_SCHEMA
+    # 2026-08-29 (critic review MAJOR finding #6, corrected by an independent
+    # critic pass after the initial fix): was SUPPLEMENT_REQUIRED when this
+    # field was an inline enum with no sibling schema to reuse. Now that
+    # problem_type is a real hard $ref to cognitive/problem-type.schema.yaml,
+    # this is exactly the case compilation_decisions above (L74-79) defines
+    # SUPPLEMENT_REQUIRED_VIA_EXISTING_SCHEMA for — matches `required_rigor`'s
+    # identical situation below.
     note: >
       Atlas L1073, concrete 7-value enum (diagnostic, exploratory, creative,
-      strategic, causal, decision, operational) — inlined verbatim below.
-      See compilation_decisions for why this is not yet a hard $ref to the
-      not-yet-built `cognitive/problem-type.schema.yaml`.
+      strategic, causal, decision, operational). Originally inlined verbatim
+      below (see compilation_decisions for why, at the time
+      `cognitive/problem-type.schema.yaml` did not exist yet); upgraded
+      2026-08-29 to a hard $ref to that file now that it exists — see
+      open_questions.OQ-mres-2 (resolved).
 
   - selection_context_field: domain
     task_context_field: domains
@@ -387,9 +404,17 @@ selection_context_supplement:
       type: string
       description: "NEW DESIGN. Atlas L1072 gives zero shape signal beyond the name."
     problem_type:
-      type: string
-      enum: [diagnostic, exploratory, creative, strategic, causal, decision, operational]
-      description: "Atlas L1073 verbatim 7-value enum. See compilation_decisions for the not-yet-a-$ref note."
+      $ref: "ai-lego://specs/cognitive/problem-type.schema.yaml#/problem_type"
+      description: >
+        2026-08-29 (critic review MAJOR finding #6): upgraded from Atlas
+        L1073's inline 7-value enum to a real hard $ref now that
+        cognitive/problem-type.schema.yaml exists (it did not when this
+        file was first compiled — see open_questions.OQ-mres-2, resolved).
+        The target's 13-value enum is a strict superset (adds
+        incident/policy/architecture/security/db_migration/market_entry;
+        keeps all 7 original values, unchanged spelling) — this widens
+        what validates here, it does not narrow or rename anything a
+        caller may already depend on.
     stakeholders:
       type: array
       items: { type: string }
@@ -469,7 +494,7 @@ resolved_selection_context:
     - required_rigor
   properties:
     goal_type: { type: string, description: "From selection_context_supplement.goal_type (SUPPLEMENT_REQUIRED)." }
-    problem_type: { type: string, enum: [diagnostic, exploratory, creative, strategic, causal, decision, operational], description: "From selection_context_supplement.problem_type (SUPPLEMENT_REQUIRED)." }
+    problem_type: { $ref: "ai-lego://specs/cognitive/problem-type.schema.yaml#/problem_type", description: "From selection_context_supplement.problem_type (SUPPLEMENT_REQUIRED). 2026-08-29: upgraded to hard $ref (critic review MAJOR finding #6) — see selection_context_supplement.problem_type's description for the full migration note." }
     domain:
       type: array
       items: { type: string }
@@ -554,6 +579,7 @@ open_questions:
     owner: "operator, via a future ADR"
     blocks: "nothing in this schema"
   - id: "OQ-mres-2"
+    status: RESOLVED
     question: >
       `problem_type`'s enum is currently inlined verbatim from Atlas L1073
       rather than $ref'd to `cognitive/problem-type.schema.yaml`, which does
@@ -564,8 +590,15 @@ open_questions:
       hard $ref, mirroring the soft->hard upgrade pattern already applied
       elsewhere in this suite. Not done here because the target does not
       exist yet.
-    owner: "operator / whichever session next builds cognitive/problem-type.schema.yaml"
-    blocks: "nothing in this schema; tracked so the future migration is not forgotten"
+    resolution: >
+      2026-08-29 (critic review MAJOR finding #6): `cognitive/problem-type.schema.yaml`
+      was built in a later Wave 5B session; both `problem_type` fields in
+      this file now use a real hard $ref to it (`#/problem_type`, a
+      13-value superset of the original 7). See this file's own
+      compilation_decisions for the original inline-now reasoning, still
+      accurate as a historical record of why it was inlined at the time.
+    owner: "N/A — resolved 2026-08-29, no further action needed"
+    blocks: "nothing; the migration this question tracked is complete"
   - id: "OQ-mres-3"
     question: >
       This file's `required_rigor` reuse of `cognitive/rigor-level.schema.yaml`
@@ -597,9 +630,13 @@ verification:
     task.schema.yaml fields x all 17 Atlas selection_context fields).
   note: >
     No mother document was modified to produce this file. Grounded-vs-
-    invented ratio: `problem_type`'s enum (7 values) and `required_rigor`'s
-    axis (via rigor-level.schema.yaml reuse) are directly grounded in
-    mother-document text; the DIRECT_MATCH/NEAR_MATCH classifications for
+    invented ratio: `problem_type`'s enum (Atlas's original 7 values,
+    directly grounded in mother-document text; now surfaced via a hard $ref
+    to `cognitive/problem-type.schema.yaml`'s 13-value superset as of
+    2026-08-29 — the 6 added values are that file's own grounding, not
+    invented here) and `required_rigor`'s axis (via rigor-level.schema.yaml
+    reuse) are directly grounded in mother-document text; the
+    DIRECT_MATCH/NEAR_MATCH classifications for
     jurisdiction_context/risk_tier/reversibility/domain are verified by
     direct field-name comparison against both source blocks. The remaining
     11 supplement fields (goal_type, stakeholders, decision_criticality,
