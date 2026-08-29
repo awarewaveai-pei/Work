@@ -18,7 +18,7 @@
 
 **意外發現的第三方問題（非本次引入，已排除）**：修復完成後跑 `system-health-check.ps1` 額外冒出 `Doc integrity failed: lobster-factory/scripts/validate-doc-integrity.mjs`（broken_link: `AI_LEGO_OS_Program_Plan_v1.md -> ../docs/adr/ADR_INDEX.md`）。查證：`git log -1` 該檔最後 commit `57f9f3f7`（2026-08-29 09:04，AI LEGO Phase 1 Gap Analysis，同日稍早的另一條 WORKLOG 條目）+ `git status` 顯示該檔**現正 dirty**（AI LEGO Phase 2 Round 1 session 進行中）——確認是同 repo 並行 session 對 AI-LEGO 文件的未完成編輯所致，與本次 CP950 改動無關，未觸碰。
 
-**未修（留給操作者決定）**：本次修復讓 7b 從「靜默永遠 skip」變成「真正會擋」，因而立刻抓到一個既有已知項目：`scripts/rebuild-content-studio-4cards.ps1:184`（TASKS.md 2026-08-25 已開，標記「小」，non-ASCII CJK UI 文字無 BOM，parse under CP950 46 errors）——同時讓 7b 與新 7c（因該檔 unverifiable）雙雙 FAIL。這是真實、正確、非本次引入的既有 bug；本次刻意不修（與 `generate-customer-delivery-status.ps1` 同一 subclass，該檔在 AUDIT_REGISTRY 已被記錄為「需要決定 BOM vs 外部化 JSON，另開任務」，未在原批准範圍內）。
+**順手一併修掉的既有項目（操作者當場核准）**：本次修復讓 7b 從「靜默永遠 skip」變成「真正會擋」，因而立刻抓到一個既有已知項目：`scripts/rebuild-content-studio-4cards.ps1:184`（TASKS.md 2026-08-25 已開，標記「小」，non-ASCII CJK UI 文字無 BOM，parse under CP950 46 errors，同時讓 7b 與新 7c 雙雙 FAIL）。操作者當場選擇「順手修掉」——加 UTF-8 BOM（byte-level prepend，內容 bytes 不變，前後皆驗證 valid UTF-8），與 `generate-customer-delivery-status.ps1` 同一 subclass（該檔仍未修，維持另開任務狀態不變）。TASKS.md 該項目改標記 done，AUDIT_REGISTRY 補新增一行（此前從未進入該登記冊，只在 TASKS.md 追蹤）。
 
 [已修改]
 - `scripts/audit-cp950-traps.ps1` — 新增 `Get-UnencodedRawReadFindings` + `-RawReadOnly` 開關 + fix-pattern 輸出 + docstring
@@ -32,15 +32,15 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=synthetic true-positive/negative（scratchpad 假檔：裸 -Raw 觸發→補 -Encoding UTF8 消失、gc alias 觸發、語法錯誤檔觸發 unverifiable）| 4 組全部符合預期
 - REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts/lib/git-safe-ops.ps1 -SelfTest` | exit=0 | 12/12 pass（覆蓋 :325,:332 兩個修復點）
 - REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts/test-git-safe-ops-matrix.ps1` | exit=0 | 8/8 pass（覆蓋 :87,126,152,162,170,177 六個修復點）
-- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts/system-health-check.ps1`（全量跑，含新 7c）| ms=~240000 | 修復 root 解析前 7b/7c 均靜默 skip（100%/99.7% 假綠燈）；修復後正確反映真實狀態（99%，3 failures：7b+7c 為同一既有已知項目 rebuild-content-studio-4cards.ps1、Doc integrity 為並行 session 未完成編輯，均非本次引入）
-- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File <parse-check.ps1>`（PowerShell Parser AST）| 所有 16 個改動檔案 PARSE OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts/system-health-check.ps1`（全量跑 3 次，含新 7c，逐步修復後重跑）| ms=~240000/次 | 第 1 次（root 解析未修）100% 假綠燈；第 2 次（root 解析已修，BOM 未加）99%，3 failures（7b+7c 為 rebuild-content-studio-4cards.ps1、Doc integrity 為並行 session）；第 3 次（BOM 已加）7b/7c 兩閘各自獨立確認 clean（`-ParseBreakOnly -Quiet` 與 `-RawReadOnly -Quiet` 均 scanned=167 clean=167 drift=0）——Doc integrity 那項屬並行 session 範疇不重跑整支 926 行 script 去追它
+- REALTEST_EVIDENCE: tool=Bash | cmd=Python `open(path,'rb')` 位元組級檢查（`rebuild-content-studio-4cards.ps1` BOM 修復）| 修復前 3 bytes=`# r`（無 BOM）、修復前後皆 `data.decode('utf-8')` 成功（valid UTF-8）、修復後 3 bytes=`EF BB BF`（BOM 正確加上，內容 bytes 完全不變，非重新編碼）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File <parse-check.ps1>`（PowerShell Parser AST）| 所有 17 個改動檔案（含 rebuild-content-studio-4cards.ps1）PARSE OK
 - REVIEW_DONE: critic=Deep（Codex CLI, `codex-oracle.ps1 -Mode review`, artifact `agency-os/reports/oracle/2026-08-29-review-380e4f06.md`）| verdict=3 findings all CONFIRMED, all fixed | findings=3c/0m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`Get-Content.*-Raw`（全 repo，非僅 5 個預設掃描根）+ `RawReadOnly`/`monorepoRootForGates`（call site 一致性）| hits=0（全 repo grep 剩餘 3 個命中皆為 audit-cp950-traps.ps1 自身的文件字串，非真實呼叫點；RawReadOnly/monorepoRootForGates 呼叫端與文件全數同步，無 stale 引用）
 
 [剩餘風險]
-- `scripts/rebuild-content-studio-4cards.ps1:184`（既有、TASKS.md 已追蹤）目前會讓 7b/7c 雙雙 FAIL，AO-CLOSE 100% 門檻會被擋——操作者需決定是否本次一併修（BOM，小工），或先用已核准的既有流程處理
-- `scripts/check-deploy-drift.ps1`(7) 與 `scripts/check-cloudflare-security.ps1`(9) 有同款 root 解析缺口，僅加註解標記，未修——這兩個目前呈現狀態未變（原本就 silently skip，行為不變，不是新增風險，但也還沒被本次修正）
-- Doc integrity 失敗（AI-LEGO broken link）屬並行 session 進行中的編輯，預期該 session commit 完成後自行消失，非本次需處理
+- `scripts/check-deploy-drift.ps1`(7) 與 `scripts/check-cloudflare-security.ps1`(9) 有同款 root 解析缺口，僅加註解標記，未修——這兩個目前呈現狀態未變（原本就 silently skip，行為不變，不是新增風險，但也還沒被本次修正）；`scripts/generate-customer-delivery-status.ps1` 仍是既有 CP950 parse-break TRACKED 項目（同一 subclass，未修，維持原狀）
+- Doc integrity 失敗（AI-LEGO broken link）屬並行 session 進行中的編輯，預期該 session commit 完成後自行消失，非本次需處理——但目前若跑 `system-health-check.ps1` 完整版，score 仍非 100%（3 checks 中的 1 個），與本次 CP950 改動無關，AO-CLOSE 若在該並行 session 完成前觸發會被這個無關項目擋住
 
 [rollback] `git revert` 本次 commit；`audit-cp950-traps.ps1`/`system-health-check.ps1` 回上一版即恢復舊行為（7b/7c 回到靜默 skip）；23 個 `-Encoding UTF8` 移除即回原狀（fix 本身無副作用，但也無單獨拆分必要）。
 
@@ -176,6 +176,13 @@
 [rollback] `git revert` 本 commit 即可；三母文件內容未動（hash 可驗），`.ai/` 為純新增目錄。
 
 ## 2026-08-29
+
+### 換機 runbook 補今日 nginx 兩顆修復（操作者追問「有寫進去嗎」發現漏補）
+
+上一筆 api/oracle 接線缺口 + X-Forwarded-Proto bug 修完後沒回頲換機 runbook——因為這兩個是既有架構缺陷非搝家機制本身問題，修完就收工。操作者問「換機時不要讓它再發生」，正確拕出真的漏洞：現役機上的修復隨 rsync 會帶過去沒錯，但**沒人告訴下一個操作者這件事，也沒回歸測試去確認沒被候忘。**已補三處：§1a `/root/lobster-phase1/` 拷貝説明加警告（絕對不可從 `nginx/system-sites/*.conf` 舊快照重建）、§5 驗證第 1 項新增 api/oracle 內容比對 + wp-admin 連發 3 次回歸測試、§8 新增兩行教訓。
+
+- REVIEW_DONE: critic=Self | verdict=pass | findings=0（兩個新增 cross-reference均實際 grep 確認存在，吸取上次「聲稱未驗證」的教訓）
+- BUGHUNT_DONE: scope=agency-os,runbooks | grep=X-Forwarded-Proto|api.aware-wave.com 從未接線 | hits=2（均為今日新增的教訓行本身，無 stale）
 
 ### api.aware-wave.com / oracle.aware-wave.com 從未接線（既有缺陷，非搝家造成）+ wp-admin 無限重導真根因（X-Forwarded-Proto 兩層 nginx 間被覆寫），兩顆都已修復+全面回歸測試
 

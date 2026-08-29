@@ -57,7 +57,7 @@
 | MainWP | `/root/mainwp/` | `mainwp_mainwp_db` `mainwp_mainwp_files` |
 | Uptime Kuma | `/root/uptime-kuma/`（compose 化 2026-08-28）| `uptime-kuma` |
 | Render 雙服務 | `/root/render-services/`（compose + 兩個 `.env`，600）| 無（無狀態，產出上 R2）|
-| SG 棧(nginx/WP/api/admin/redis/觀測) | `/root/lobster-phase1/`（**exclude `backups/`**；`.env` 是機器設定 SSOT）| `lobster-phase1_{wordpress_data,wordpress_db_data,redis_data,loki_data,grafana_obs_data}` |
+| SG 棧(nginx/WP/api/admin/redis/觀測) | `/root/lobster-phase1/`（**exclude `backups/`**；`.env` 是機器設定 SSOT；**`nginx/default.conf` 只能整份直接 rsync 現役機的活檔，絕不可從 repo `lobster-factory/.../nginx/system-sites/*.conf` 這類 2026-06/07 舊架構快照重建**——那批檔案 `X-Forwarded-Proto` 用的是已知有 bug 的 `$scheme` 寫法，2026-08-29 wp-admin 無限重導事故根源，現役檔已修好用 `$http_x_forwarded_proto`，直接 rsync 才會帶到修復） | `lobster-phase1_{wordpress_data,wordpress_db_data,redis_data,loki_data,grafana_obs_data}` |
 | Oracle | `/opt/oracle/Projects/internal/ziwei-doushu/` | 無 |
 | soulful | `/root/soulful/` | soulful 三容器之 volumes（`docker volume ls | grep soulful` 現查）|
 | 工具/備份腳本 | `/root/scripts/` `/root/Work/`（git clone，deploy key）`/root/backups*`（可不搬，R2 為準）| — |
@@ -187,6 +187,8 @@ done | grep -E '^[0-9a-f]{64}'
 ## §5 Phase 3 — 驗證（全項，缺一不算完成）
 
 1. **15 端點掃描**（期望碼）：soulful/aware-wave/app.../oracle/uptime/mainwp/n8n healthz/trigger login/remotion/video health＝200；www=301；postiz=307；supabase rest・studio=401
+   - **`api.aware-wave.com` 內容比對必做，不能只看狀態碼**（2026-08-29 事故：此網域曾從建立起就未接線，錯發到 WordPress 卻同樣回 200，狀態碼騙不出來）：`curl https://api.aware-wave.com/` 回應須含 `"service":"node-api"` 字樣；`curl https://oracle.aware-wave.com/ | grep -i "<title"` 不可出現 `Aware Wave`（那是 WordPress 的 title，代表又錯發了）
+   - **wp-admin 無限重導回歸測試**（2026-08-29 真根因：`lobster-phase1/nginx/default.conf` 的 `X-Forwarded-Proto` 若被改回 `$scheme` 或該檔從 `nginx/system-sites/*.conf` 這類舊架構快照重建，此 bug 會複發）：`for i in 1 2 3; do curl -sk -o /dev/null -w "%{http_code} %{redirect_url}\n" https://aware-wave.com/wp-admin/; done` 三次結果必須是 `302` 導向 `wp-login.php?redirect_to=...`，**不可以是導回 `/wp-admin/` 自己**
 2. **Origin guard**：14 個 proxied hostname `--resolve host:443:NEW_IP` 直連全部 **403**（含 IPv6 直連抽測）；remotion/video 直連 200
 3. **備份三管線**在新機 real-run + verify PASS + R2 objects 實列 + 變異測試（錯 prefix → 可見 FAIL exit 1）
 4. **Kuma 看板 23/23 綠**（URL 全公開網域，不需改）＋ endpoint-alert heartbeat OK（journal 兩輪零失敗輸出）
@@ -231,6 +233,8 @@ done | grep -E '^[0-9a-f]{64}'
 | Ubuntu 發行版 netdata 編譯 `--disable-cloud` | `netdata-claim.sh` 直接拒絕(exit=3),kickstart 也拒絕覆蓋系統套件管理的安裝 | §1d（2026-08-29 補：換機須 purge 發行版套件→官方 stable kickstart 重裝+claim→`[web] bind to = 127.0.0.1` 綁回本地） |
 | 新網域上線未補 DMARC | 該網域可被偽造寄信，且不會主動跳警告直到被人拿去釣魚 | §1e（2026-08-29 補：新增子網域/新 zone 上線 checklist 需含 `_dmarc` TXT） |
 | `.htpasswd` 類檔案漏拷，容器搶先 bind-mount 不存在的 host 路徑 | Docker 自動把該路徑幫你建成**目錄**，host nginx `auth_basic_user_file` 讀到目錄 → `pread() failed (21: Is a directory)` → 500；修完後容器內部仍記著舊掛點型別，`docker restart` 會直接 mount 失敗、容器 Exited，須 `docker compose up -d --force-recreate <service>`（compose service 名可能不等於 container_name，先查 `container_name:` 對應） | §1d（2026-08-29 補：所有 `auth_basic_user_file` 引用的 `.htpasswd*` 路徑，換機前先在來源機 `find / -iname "*.htpasswd*"` 產清單，逐一確認搬過去的是檔案不是目錄；`stat` 型別對照，不能只看 `ls` 有沒有東西） |
+| `api.aware-wave.com`/`oracle.aware-wave.com` 從未接線（既有缺陷，非搬家造成，2026-08-29 才被發現） | 兩個網域無匹配 server block，落到 WordPress 預設區塊，**狀態碼一樣回 200**，光看端點掃描碼看不出來，內容其實整個發錯 | §5 第 1 項（2026-08-29 補：改用內容比對，不只看狀態碼） |
+| `X-Forwarded-Proto` 在 lobster-nginx 兩跳架構下用 `$scheme` 覆寫上一跳的值 | `$scheme` 是這層 nginx 自己監聽器的 scheme（永遠 http），把 host nginx 已正確設的 https 蓋掉，WordPress `is_ssl()` 永遠 false，**wp-admin 無限重導自己** | §1a（現役檔已修用 `$http_x_forwarded_proto`，rsync 帶走即可）+ §5 第 1 項回歸測試（2026-08-29 補：連 3 次 curl 確認不是導回自己） |
 
 ---
 
