@@ -1,5 +1,35 @@
 # Worklog
 
+## 2026-08-30（續8）
+
+### Phase 5 Learning/Research/Business 三選一：第二次 Codex 獨立論證，這次真的成功，與 Claude 論證版收斂一致
+
+**觸發**：原始 4 選項選單最後一項——`ADR_INDEX.md` 誠實記錄過一次失敗的 Codex 獨立論證嘗試（2026-08-29：Codex 只回「5 個執行就緒缺口」，未真正在三選一之間做出獨立選擇，不構成 Program Plan §9「Claude 與 Codex 各自論證後比較」的要求）。本輪重新設計嘗試補齊。
+
+**方法**：重寫 prompt，三個關鍵修正對應上次失敗的三個根因：(1) 明確禁止 Codex 讀取 `MVP_VERTICAL_SLICE_PLAN.md` §2（Claude 已寫的結論），避免定錨效應；(2) 要求 Codex 自行探索三母文件、Method Atlas §13 worked recipe 範例、Phase 0/1 registers 找證據，不餵它 Claude 已篩好的引用；(3) 明確要求「不准迴避單一明確選擇」，禁止只回報缺口清單。用 `codex-oracle.ps1 -Mode inspect`（背景執行，約 16 分鐘）跑一次真實呼叫。
+
+**結果**：這次成功。Codex 產出完整三選一評估：逐一列出 Learning/Research/Business 各自會/不會觸及哪些既有機制、各自現況卡在哪個缺口，給出明確 pick（Research）+ close-second（Business）+ 明確的翻盤條件。與 Claude 論證版（`MVP_VERTICAL_SLICE_PLAN.md` §1-2，MCDA+Weighted Decision Matrix 評分表）**獨立收斂於同一個選擇**——排除 Business 的理由（`P1-CONFLICT-4`，finance domain pack 空殼）與排除 Learning 的理由（驗證強度不足）兩方完全一致，且互不知道對方結論。Codex 額外貢獻一個 Claude 未引用的新發現：`P1-GAP-PROD-10`（Learning pipeline 未串接 academic-integrity 控制）。兩方對「Business 若條件改變會翻盤」都有共識，但標註的觸發條件互補（Claude：複雜度加權提高→翻向 Learning；Codex：財務缺口補齊或決策準則改成優先驗證 BLOCKED 機制→翻向 Business）。
+
+寫成 `docs/architecture/PHASE_5_MODE_SELECTION_CODEX_COMPARISON.md`（Status: PROPOSED——**這不是批准 Phase 5 啟動**，`MVP_VERTICAL_SLICE_PLAN.md` 自己的邊界聲明仍要求 Phase 3/4 完成+操作者 Phase 2 STOP-FOR-HUMAN-REVIEW 批准，本文件只完成「雙方論證都存在可比較」這個 Program Plan §9 的前置要求）。
+
+[已修改]
+- 新增 `docs/architecture/PHASE_5_MODE_SELECTION_CODEX_COMPARISON.md`
+- `docs/adr/ADR_INDEX.md`：Codex 對抗式覆審段落補上 2026-08-30 第二次成功嘗試記錄，保留原始失敗記錄供稽核軌跡
+- `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md`：§0 引言更新指向新比較文件
+- `docs/architecture/IMPLEMENTATION_ROADMAP.md`：§2 類別 D 狀態更新為「已閉環」，保留原始誠實記錄
+- 新增 `agency-os/reports/oracle/2026-08-30-inspect-5ed95209.md`（本次真實獨立論證的完整 artifact）
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(powershell) | cmd=`codex-oracle.ps1 -Mode inspect -PromptFile <獨立論證 prompt> -TimeoutSec 1500`（背景執行）| exit=0 | 結果=真實 16 分鐘執行（ms=989053），產出完整三選一評估，非模擬
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py`（本輪純文件變更，無 schema 修改）| exit=0 | 結果=669 個檢查全過，數字不變（預期，本輪無 schema/fixture 改動）
+- REVIEW_DONE: critic=Deep（外部 oracle，`codex-oracle.ps1 -Mode inspect`——這是本次任務刻意設計的「獨立第二意見」而非審查，比對方式是逐項核對 Codex 引用的 file:line 是否與 Claude 論證版一致或互補，非自我描述）| verdict=獨立收斂一致 | findings=0 個矛盾，1 個 Codex 獨有新發現（P1-GAP-PROD-10）已記錄
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`Codex 從未明確評估 Learning Mode\|未產出與 Research Mode 競爭` | hits=3 個檔案命中，皆為本輪已處理對象（`ADR_INDEX.md`/`IMPLEMENTATION_ROADMAP.md` 保留原始記錄並加註已閉環、新比較文件本身引用原始揭露文字），無遺漏
+
+[剩餘風險] 本文件是決策支援文件非批准文件——Phase 5 實際啟動仍完全取決於操作者的 Phase 2 STOP-FOR-HUMAN-REVIEW 批准與 Phase 3/4 完成進度，本次任務不代為推進那個閘門。Codex 指出的「決策準則若改成優先驗證 BLOCKED 機制」這個岔路本身的解讀權屬於操作者，本文件僅如實記錄未代為裁決。
+
+[rollback] 純文件新增，`git revert` 可完整回退，無 schema/fixture/runtime 變更。
+
 ## 2026-08-30（續7）
 
 ### 剩餘任務兩項：ADR-013 批次追認 5 個 PROPOSED 轉錄檔案；Zero Trust/Supply Chain 選型研究文件

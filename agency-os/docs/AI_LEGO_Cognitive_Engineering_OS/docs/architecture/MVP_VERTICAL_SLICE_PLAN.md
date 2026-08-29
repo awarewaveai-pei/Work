@@ -2,7 +2,7 @@
 Status: PROPOSED
 Date: 2026-08-29
 
-> Program Plan `AI_LEGO_OS_Program_Plan_v1.md` §9: Phase 5 exit gate = 一條垂直切片證明全鏈 `Source → Ingest → Normalize → Knowledge → Human Contribution → Method Selection → Workflow → AI/Compute → Evidence → Artifact → Human Review → Version → Audit → Replay/Rollback`。本文件是 Phase 2 交付物之一（Claude 論證版；Codex 論證版另出，兩者比較後由操作者裁決）。
+> Program Plan `AI_LEGO_OS_Program_Plan_v1.md` §9: Phase 5 exit gate = 一條垂直切片證明全鏈 `Source → Ingest → Normalize → Knowledge → Human Contribution → Method Selection → Workflow → AI/Compute → Evidence → Artifact → Human Review → Version → Audit → Replay/Rollback`。本文件是 Phase 2 交付物之一（Claude 論證版）。**Codex 論證版與雙方比較已完成**：`docs/architecture/PHASE_5_MODE_SELECTION_CODEX_COMPARISON.md`（2026-08-30）——Codex 獨立收斂於同一個選擇（Research），directive §9 要求已滿足，最終啟動仍待操作者 Phase 2 STOP-FOR-HUMAN-REVIEW 批准。
 >
 > **範疇邊界**：本文件為規劃文件，不修改三母文件，不寫 production code，不建 UI/DB schema（Program Plan §10 Phase 0-2 禁令）。實際執行本切片須待 Phase 3、Phase 4 完成、且本文件本身通過操作者 Phase 2 STOP-FOR-HUMAN-REVIEW 批准之後。
 

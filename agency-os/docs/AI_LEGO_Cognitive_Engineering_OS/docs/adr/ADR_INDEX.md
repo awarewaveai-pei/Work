@@ -38,7 +38,9 @@
 
 完整 artifact：`agency-os/reports/oracle/2026-08-29-inspect-d80a93e4.md`。ADR-003~009 本輪未逐份跑 Codex 覆審（見下方誠實聲明）。
 
-另跑一輪 Codex 獨立分析 Phase 5 MVP 切片選擇（`agency-os/reports/oracle/2026-08-29-inspect-de5cc96f.md`）——**未產出與 Research Mode 競爭的替代選擇**，改以「找 5 個 CONFIRMED 執行就緒缺口」的形式回應，其中 3 項（Gate 契約不可機讀、Method Selection 不可執行、Jurisdiction Pack 未定義）已在 `MACHINE_READABLE_SPEC_PLAN.md` 標記 `BLOCKED_PENDING_ROUND2_ADR`/`SKELETON_ONLY`，非本次新發現；1 項（Business Mode 自我阻塞）與 ADR-008 結論一致；1 項（P1-ASSUM-PROD-3 錯誤 ID）已於本輪修正（見下方）。**誠實記錄**：這不構成 directive §9 要求的「Claude 與 Codex 各自對三選一做出獨立選擇後比較」——Codex 從未明確評估 Learning Mode，也未對 Research vs Business 給出直接對比判斷，僅重新確認了已知的執行缺口與 Business Mode 的不可行性。詳見 `IMPLEMENTATION_ROADMAP.md` §2 類別 D 的完整揭露，此缺口尚未閉環。
+另跑一輪 Codex 獨立分析 Phase 5 MVP 切片選擇（`agency-os/reports/oracle/2026-08-29-inspect-de5cc96f.md`）——**未產出與 Research Mode 競爭的替代選擇**，改以「找 5 個 CONFIRMED 執行就緒缺口」的形式回應，其中 3 項（Gate 契約不可機讀、Method Selection 不可執行、Jurisdiction Pack 未定義）已在 `MACHINE_READABLE_SPEC_PLAN.md` 標記 `BLOCKED_PENDING_ROUND2_ADR`/`SKELETON_ONLY`，非本次新發現；1 項（Business Mode 自我阻塞）與 ADR-008 結論一致；1 項（P1-ASSUM-PROD-3 錯誤 ID）已於本輪修正（見下方）。**誠實記錄（原文保留，此缺口已於 2026-08-30 閉環，見下）**：這不構成 directive §9 要求的「Claude 與 Codex 各自對三選一做出獨立選擇後比較」——Codex 從未明確評估 Learning Mode，也未對 Research vs Business 給出直接對比判斷，僅重新確認了已知的執行缺口與 Business Mode 的不可行性。詳見 `IMPLEMENTATION_ROADMAP.md` §2 類別 D 的完整揭露。
+
+**2026-08-30 第二次嘗試，成功閉環**：重新設計 prompt——明確要求 Codex 自行探索三母文件/Atlas §13 recipe/Phase 0-1 registers 找證據、刻意不讓它看到 Claude 已寫好的 `MVP_VERTICAL_SLICE_PLAN.md` §2 結論（避免定錨）、強制要求給出單一明確 pick。這次成功產出真正獨立的三選一評估，見 `docs/architecture/PHASE_5_MODE_SELECTION_CODEX_COMPARISON.md`（artifact：`agency-os/reports/oracle/2026-08-30-inspect-5ed95209.md`）。結果：Codex 獨立選擇 **Research**，與 Claude 論證版一致收斂；排除 Business 的理由（`P1-CONFLICT-4`）與排除 Learning 的理由（驗證強度不足）皆與 Claude 論證版一致，且 Codex 額外貢獻一個 Claude 未引用的新發現（`P1-GAP-PROD-10`，Learning pipeline 未串接 academic-integrity 控制）。至此，directive §9「Claude 與 Codex 各自論證後比較」的要求已完整滿足。
 
 ## 本輪新增發現（2026-08-29，ADR-007/008/009 起草過程中）
 
