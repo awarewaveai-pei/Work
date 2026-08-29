@@ -791,11 +791,11 @@
 - **owner doc 參考**：[`docs/awarewave-auto-repair-plan-v3.2-final.md`](../docs/awarewave-auto-repair-plan-v3.2-final.md) + [`docs/awarewave-repair-center-app-architecture.md`](../docs/awarewave-repair-center-app-architecture.md) + [`docs/BRIEF_AWAREWAVE_REPAIR_CENTER_AI.md`](../docs/BRIEF_AWAREWAVE_REPAIR_CENTER_AI.md)
 - **跨機**：所有檔案 repo 內，git pull 同步；harness 跑在筆電 / 桌機任一台都可
 
-- [ ] **【2026-08-29 開出】nginx system-sites repo↔live 雙向 drift 待同步（🟢 小）**
-  - **一句話**：覆審「25 處疑似死檔」時發現 3 個 vhost SSOT 檔的 repo 版本跟現行部署對不上，非危急但該補平。
-  - **現在到哪**：`aware-wave-app-api-subdomains.conf` repo 領先 SG live（缺部署 `/api/ops/repairs/health` 公開端點、`scanner-block.inc` include、`/admin` 舊路徑重導向三項改善）；`mainwp-aware-wave.conf`／`awarewave-endpoint-alert.local.template` repo 落後 live（EU/SG 現場版本文字較新，未回填 repo）。
-  - **下一步**：SG 部署前三項改善（走 `sudo cp` + `nginx -t` + reload，比照檔頭 Install 指令）；EU/SG 兩份文件反向把現場最新內容抄回 repo。
-  - **完成定義**：`diff` repo vs 現場三個檔案皆為 byte-identical 或僅語意無差異的格式差。
+- [ ] **【2026-08-29 開出，同日更正】nginx system-sites 三檔 drift（🟢 小，SG 那半已作廢，只剩 EU 兩檔待抄）**
+  - **一句話**：覆審「25 處疑似死檔」時發現 3 個 vhost SSOT 檔的 repo 版本跟現行部署對不上；當時誤判 SG 是「現行 production」，已於 WORKLOG 2026-08-29（續5）更正——**SG（5.223.93.113）容器全滅、host nginx 本機實測 502，是搬家後的廢棄機，不是現行服務**。
+  - **現在到哪**：~~`aware-wave-app-api-subdomains.conf` repo 領先 SG live，缺部署三項改善~~ → **作廢，不部署**（SG 已停用，任何改善應直接做在 ks-aw-01 現役的 `lobster-phase1/nginx/default.conf`，該檔今日已因 X-Forwarded-Proto bug 大改過）；`mainwp-aware-wave.conf`／`awarewave-endpoint-alert.local.template` repo 落後 **EU** live 這半仍成立（EU 204.168.175.41 同樣容器全滅但 repo↔live 文字 drift 本身跟死活無關，純粹是歷史快照該不該回填的問題）。
+  - **下一步**：SG 那三項改善**不執行**；EU 兩份文件視保存價值決定要不要把現場最新文字抄回 repo（純文件動作，無風險），或直接標註「反映 2026-08-28 遷移前最後狀態」存查即可，不強制同步。
+  - **完成定義**：EU 兩檔若要同步則 `diff` byte-identical；若決定純存查則此項關閉，不需動作。
   - **證據**：`agency-os/WORKLOG.md` 2026-08-29（續4）覆審 diff 表。
 
 #### H. 🧊 已知風險（明確不處理，只記錄）

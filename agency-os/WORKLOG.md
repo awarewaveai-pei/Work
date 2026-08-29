@@ -1,5 +1,30 @@
 ﻿# Worklog
 
+## 2026-08-29（續5）
+
+### 二次更正：「25 處疑似死檔」既非死檔亦非「現行 production」——舊 SG/EU 兩台機容器全滞，本機實測全部 502（操作者要求審查兩檔矛盾後發現）
+
+**背景**：上一筆 entry（「續4」）推翻今日稽早的「25 處死檔」判斷，但宰稱 `aware-wave-app-api-subdomains.conf`「`app` symlink 目前啟用中，`app.aware-wave.com` 生產流量走這支」、curl 實測 5 個 vhost 回 200/302/307。操作者指示去確認什麼才是對的，逐項独立實測後發現此説法錯誤。
+
+**實測證據**：
+1. DNS 權威查詢確認 `app.aware-wave.com` 解析到 Cloudflare 邊緣 IP（104.21.82.27 等），CF 後方今日稽早已經用 API 查過確認 origin = `149.202.64.114`（ks-aw-01，非舊 SG）。
+2. SSH 進舊 SG（5.223.93.113）`docker ps -a`：`lobster-nginx`/`lobster-next-admin`/全部容器盡數 **Exited 22 小時前**（與搬家時間點呑合）。host-level systemd nginx 服務本身確實 active（這是對方看到的那個），但它 proxy_pass 的後端容器已死。在**該機本機**用 `curl -H "Host: app.aware-wave.com" https://127.0.0.1/` 直接測，回的是 **502**，不是 200/307。
+3. 同法測舊 EU（204.168.175.41）六個 vhost（mainwp/n8n/uptime/trigger/supabase/studio）：`docker ps -a` 小十項容器全部 Exited；本機 curl 實測結果 mainwp/n8n/uptime/trigger/supabase **全部 502**，studio 回 401（因為 auth_basic 在 nginx 層就拖住，還沒碰到後端就先拒，不代表它真的能服務）。
+
+**結論**：舊 SG/EU 兩台機的 host nginx 服務進程確實還在跑，但後端容器全部停止，**對外來說完全無法服務，不可能有任何真實使用者流量走這兩台機**。上一筆 entry 說的「curl 回 200/302/307」很可能是拿公開網域（`https://app.aware-wave.com/` 等）去 curl，DNS 早就指向 ks-aw-01，測到的其實是**新機的回應**，誤把功勞算到舊機檔案頭上。
+
+**两次判斷各錯一半，合起來才是完整真相**：
+- 我稽早的 `grep include` 方法論確實錯（這類檔案用 `cp`+`ln -sf` 部署，本來就抓不到），不應該季定為「死檔」。
+- 但上一筆 entry 把它定調為「現行 production」、「生產流量走這支」**也錯**——這些檔案对應的是**已停止服務的舊機**，不是現行 production。
+- 正確定位：這批檔案是**搬家前 SG/EU 架構的歷史 SSOT 快照**（對災難復原/回溯舊架構有參考價值），**非現役服務也非死檔**。現役 production 全部在 ks-aw-01，中採於 `lobster-phase1/nginx/default.conf`（今日已修 X-Forwarded-Proto bug 那檔）+ ks-aw-01 自己的 `/etc/nginx/sites-available/*`（我今日直接 SSH 進 ks 逐檔確認過）。
+
+**不改變上一筆的最終決策**：仍然不加 DEPRECATED、不刪檔——但理由要改成「這是搬家前架構歷史快照，非現行服務，保留供日後查證/災復參考」，不能写成「現行 production、生產流量走這支」，否則日後有人拿這些檔案去判斷現存流量，會被誤導。
+
+- REALTEST_EVIDENCE: tool=SSH+curl | cmd=舊 SG `docker ps -a`（全部 Exited）+ 本機 `curl -H Host:app.aware-wave.com https://127.0.0.1/` 回 502；舊 EU 同法，6 vhost 5 個 502+1 個 401 | exit=0 | ms=20000
+- REVIEW_DONE: critic=Self | verdict=pass | findings=1（上一筆 entry 的「現行 production/生產流量」措辭不實，本 entry 修正，不竱改原文字）
+- BUGHUNT_DONE: scope=agency-os,runbooks | grep=生產流量走這支 | hits=1（參照上方校正，未再有別處引用同樣說法）
+- AUTO_TASK_DONE: 交叉驗證兩次 nginx 死活判斷，最終定論：system-sites 檔案=搬家前歷史快照，不是死檔也不是現行 production，不加註不刪
+
 ## 2026-08-29（續4）
 
 ### 覆審「25 處 X-Forwarded-Proto $scheme 疑似死檔」宣告 — SSH 逐檔實測後推翻：全部是現行 production 設定，非死檔（自我更正今日稍早 BUGHUNT_DONE 誤判）
