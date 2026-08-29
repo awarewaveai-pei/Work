@@ -1,0 +1,176 @@
+schema_id: "ai-lego://specs/execution/change-plan.schema.yaml"
+target_ref: ""
+description: >
+  Forward Change Plan record (EC §17/§18/§21/§22/§23). Exercises the
+  root-level `if`/`then` conditional on `risk_tier` -> `alternatives_considered`
+  (EC §22 L951 "高風險變更不得只提出一個方案" -- only R2/R3/R4 changes
+  require 3+ alternatives including a status-quo entry), the hard $ref
+  chain into risk-tier.schema.yaml's R0-R4 enum, and top-level `required`
+  coverage.
+
+  The `if`/`then` block was previously nested INSIDE
+  `properties.alternatives_considered` (a sibling of that property's own
+  `type: array`/`minItems`/`items`), which per JSON Schema semantics made
+  `if.properties.risk_tier` evaluate against the VALUE OF
+  `alternatives_considered` itself (an array, where `properties`/`required`
+  are vacuously satisfied) rather than the sibling `risk_tier` field on the
+  parent object -- so `then` fired unconditionally on every change-plan
+  regardless of risk_tier. Fixed by moving `if`/`then` to schema root
+  (sibling of the root `type`/`required`/`properties`), matching the
+  same-level pattern rollback.schema.yaml's `post_launch` block already
+  used correctly (L347-351). `valid::r0_single_alternative_allowed` and
+  `invalid::r3_single_alternative_fails` below directly exercise the
+  now-conditional behavior in both directions.
+valid:
+  - name: r0_three_alternatives_with_status_quo
+    instance:
+      task_id: "TASK-2026-000001"
+      risk_tier: "R0"
+      rollback_plan_ref: "RB-001"
+      scope_contract:
+        in_scope: ["read-only documentation change"]
+        out_of_scope: []
+        non_goals: []
+        invariants: []
+        assumptions: []
+        unknowns: []
+      objective: "Document the current retry policy."
+      root_cause: "UNKNOWN"
+      selected_option: "Option A"
+      alternatives_considered:
+        - { name: "Option A", comparison: {} }
+        - { name: "Option B", comparison: {} }
+        - { name: "Status Quo", is_status_quo: true, comparison: {} }
+      files_to_change: ["docs/retry-policy.md"]
+      release_strategy: "Merge directly, no staged rollout needed for docs."
+  - name: r3_three_alternatives_with_status_quo
+    instance:
+      task_id: "TASK-2026-000002"
+      risk_tier: "R3"
+      rollback_plan_ref: "RB-002"
+      scope_contract:
+        in_scope: ["identity/authorization boundary change"]
+        out_of_scope: ["billing"]
+        non_goals: ["no new provider integration"]
+        invariants: ["existing sessions remain valid"]
+        assumptions: ["auth service is available during rollout"]
+        unknowns: []
+      objective: "Rotate the root signing key."
+      root_cause: "Key nearing scheduled expiry."
+      selected_option: "Option B"
+      alternatives_considered:
+        - name: "Option A"
+          comparison: { security: "higher", cost: "higher" }
+        - name: "Option B"
+          comparison: { security: "adequate", cost: "lower" }
+        - name: "Status Quo"
+          is_status_quo: true
+          comparison: { security: "degrading over time" }
+      files_to_change: ["infra/key-vault.yaml"]
+      release_strategy: "Canary rollout with rollback via RB-002."
+  - name: r0_single_alternative_allowed
+    instance:
+      task_id: "TASK-2026-000003"
+      risk_tier: "R0"
+      rollback_plan_ref: "RB-003"
+      scope_contract:
+        in_scope: ["x"]
+        out_of_scope: []
+        non_goals: []
+        invariants: []
+        assumptions: []
+        unknowns: []
+      objective: "o"
+      root_cause: "r"
+      selected_option: "Option A"
+      alternatives_considered:
+        - { name: "Option A", comparison: {} }
+      files_to_change: []
+      release_strategy: "s"
+    note: "risk_tier:R0 is outside the if-clause's [R2, R3, R4] trigger, so the then-clause's minItems:3 + is_status_quo:true requirement does not apply -- a single alternative is valid, proving the conditional gate is correctly scoped to the root object (see schema fix note above)."
+invalid:
+  - name: r3_single_alternative_fails
+    instance:
+      task_id: "TASK-2026-000007"
+      risk_tier: "R3"
+      rollback_plan_ref: "RB-007"
+      scope_contract:
+        in_scope: ["x"]
+        out_of_scope: []
+        non_goals: []
+        invariants: []
+        assumptions: []
+        unknowns: []
+      objective: "o"
+      root_cause: "r"
+      selected_option: "Option A"
+      alternatives_considered:
+        - { name: "Option A", comparison: {} }
+      files_to_change: []
+      release_strategy: "s"
+    reason: "risk_tier:R3 is inside the if-clause's [R2, R3, R4] trigger, so the then-clause requires alternatives_considered to have minItems:3 and contain an is_status_quo:true entry -- a single alternative fails minItems:3, proving the conditional gate is actually enforced at high risk tiers (EC §22 L951 '高風險變更不得只提出一個方案')"
+  - name: three_alternatives_missing_status_quo
+    instance:
+      task_id: "TASK-2026-000004"
+      risk_tier: "R3"
+      rollback_plan_ref: "RB-004"
+      scope_contract:
+        in_scope: ["x"]
+        out_of_scope: []
+        non_goals: []
+        invariants: []
+        assumptions: []
+        unknowns: []
+      objective: "o"
+      root_cause: "r"
+      selected_option: "Option A"
+      alternatives_considered:
+        - { name: "Option A", comparison: {} }
+        - { name: "Option B", comparison: {} }
+        - { name: "Option C", comparison: {} }
+      files_to_change: []
+      release_strategy: "s"
+    reason: "3 items satisfies minItems:3 but none carries is_status_quo:true, so the then-clause's contains requirement fails regardless of risk_tier"
+  - name: risk_tier_outside_enum
+    instance:
+      task_id: "TASK-2026-000005"
+      risk_tier: "R9"
+      rollback_plan_ref: "RB-005"
+      scope_contract:
+        in_scope: []
+        out_of_scope: []
+        non_goals: []
+        invariants: []
+        assumptions: []
+        unknowns: []
+      objective: "o"
+      root_cause: "r"
+      selected_option: "s"
+      alternatives_considered:
+        - { name: "Option A", comparison: {} }
+        - { name: "Option B", comparison: {} }
+        - { name: "Status Quo", is_status_quo: true, comparison: {} }
+      files_to_change: []
+      release_strategy: "s"
+    reason: "risk_tier is a hard $ref to risk-tier.schema.yaml#/risk_tier, whose enum is exactly R0-R4 -- R9 does not exist"
+  - name: missing_required_root_cause
+    instance:
+      task_id: "TASK-2026-000006"
+      risk_tier: "R0"
+      rollback_plan_ref: "RB-006"
+      scope_contract:
+        in_scope: []
+        out_of_scope: []
+        non_goals: []
+        invariants: []
+        assumptions: []
+        unknowns: []
+      objective: "o"
+      selected_option: "s"
+      alternatives_considered:
+        - { name: "Option A", comparison: {} }
+        - { name: "Option B", comparison: {} }
+        - { name: "Status Quo", is_status_quo: true, comparison: {} }
+      files_to_change: []
+      release_strategy: "s"
+    reason: "root_cause is in the top-level required array (EC §21 change_plan.root_cause) -- omitting it violates required"

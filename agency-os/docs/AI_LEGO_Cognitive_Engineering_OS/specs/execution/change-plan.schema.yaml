@@ -278,16 +278,6 @@ properties:
     minItems: 1
     items:
       $ref: "#/definitions/option"
-    if:
-      properties:
-        risk_tier: { enum: [R2, R3, R4] }
-      required: [risk_tier]
-    then:
-      minItems: 3
-      contains:
-        properties:
-          is_status_quo: { const: true }
-        required: [is_status_quo]
 
   files_to_change:
     type: array
@@ -354,6 +344,26 @@ properties:
         type: string
         pattern: "^docs/adr/ADR-[0-9]+-.*\\.md$"
         description: "EC §23's suggested path form (L1007-1009): /docs/adr/ADR-XXXX-<slug>.md."
+
+if:
+  properties:
+    risk_tier: { enum: [R2, R3, R4] }
+  required: [risk_tier]
+then:
+  properties:
+    alternatives_considered:
+      minItems: 3
+      contains:
+        properties:
+          is_status_quo: { const: true }
+        required: [is_status_quo]
+  description: >
+    EC §22 (L951) "高風險變更不得只提出一個方案" — scoped at schema root
+    so `if.properties.risk_tier` and `then.properties.alternatives_considered`
+    both evaluate against the root change-plan object's own sibling fields,
+    not against the value of alternatives_considered itself. See
+    rollback.schema.yaml's post_launch if/then (L347-351) for the
+    same-level pattern this was fixed to match.
 
 # ---------------------------------------------------------------------------
 definitions:

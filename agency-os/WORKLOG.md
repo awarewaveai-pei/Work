@@ -1,5 +1,30 @@
 # Worklog
 
+## 2026-08-29（續24）
+
+### change-plan.schema.yaml if/then 作用域 bug 修復——risk_tier 條件式從巢狀在 alternatives_considered 底下移到 schema root，同步修正 Wave 8 fixture
+
+**觸發**：操作者提供已完成分析的 bug report（含 file:line、JSON Schema 語意論證、jsonschema 4.26.0 實測結果），指出 `alternatives_considered` 底下的 if/then 巢狀錯誤導致 `then` 無條件觸發於所有 `risk_tier`。
+
+**根因**：if/then 被放在 `properties.alternatives_considered` 自己的 schema 內（`type`/`minItems`/`items` 的 sibling），導致 `if.properties.risk_tier` 是對 `alternatives_considered` 的值（一個陣列）求值，而非對外層物件的 `risk_tier` 欄位求值。JSON Schema 語意下 `properties`/`required` 對非物件實例是「vacuously true」，故 `if` 永遠為真，`then`（`minItems:3` + `contains is_status_quo:true`）對所有 change-plan 無條件生效，與 `compilation_decisions` 記載的「僅 R2/R3/R4 需要」意圖（EC §22 L951「高風險變更不得只提出一個方案」）不符。
+
+**修法**：對照同一 specs/execution/ 目錄內另一處已正確 scoping 的 `rollback.schema.yaml` `post_launch` 區塊（L347-351：if/then 是該物件自己 `type`/`required`/`properties` 的 sibling），把 if/then 從 `alternatives_considered` 底下移到 schema root（root 的 `type`/`required`/`properties` 的 sibling），`then.properties.alternatives_considered` 帶 `minItems:3` + `contains` 約束。
+
+**Fixture 同步修正**：`tests/contracts/specs/execution/change-plan.fixtures.yaml` 在 Wave 8 撰寫時已誠實記錄此 bug（檔頭註解 + `invalid::single_alternative_fails_even_at_r0` 案例證明 bug 效應），本次連同 3 項一起改：① 檔頭註解從「回報 bug、未修」改為「已修，說明修法與對照樣式」；② `single_alternative_fails_even_at_r0` 從 invalid 改名 `r0_single_alternative_allowed` 移到 valid（證明 R0 不再被錯誤要求 3 個方案）；③ 新增 `invalid::r3_single_alternative_fails`（R3 + 單一方案應失敗，證明條件式在高風險確實生效，雙向驗證修法正確）。
+
+[已修改]
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/execution/change-plan.schema.yaml`：if/then 從 `alternatives_considered` 內部移到 schema root（原 L281-290 刪除，新增於 L348-366，含指向 rollback.schema.yaml 對照樣式的說明）
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/contracts/specs/execution/change-plan.fixtures.yaml`：檔頭 bug 說明改為修復說明；1 案例改名並從 invalid 移到 valid；新增 1 個 invalid 案例
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/run_golden_tests.py`（於 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/` 目錄下執行，jsonschema 4.26.0 Draft202012Validator，與 bug report 引用版本一致）| exit=0（修復+fixture 更新後）| ms=約每次執行 <5000ms。三段對照：① 原始（bug）schema：572 PASS / 2 FAIL（`gate-result.fixtures.yaml` 既有無關失敗 + `change-plan-scope.fixtures.yaml::minimal_scoped_change` 因同一 bug 誤判失敗，此為 bug 波及的第二份 fixture，非本次新增認知）；② 修復 schema、更新 fixture 前：572 PASS / 2 FAIL（`single_alternative_fails_even_at_r0` 從預期 invalid 變成 unexpectedly VALID，直接證明 bug 已修；`gate-result` 仍為既有無關失敗）；③ 更新 fixture 後：574 PASS / 1 FAIL（僅剩 `gate-result` 既有無關失敗，非本次改動範圍）。三種狀態各重跑兩次確認結果穩定可重現（其中一次孤立出現的 rollback-plan/handoff 額外失敗判定為 Windows worktree 檔案寫入時序造成的單次偶發，非本次改動引起——重跑不可再現）
+- REVIEW_DONE: critic=Quick（自我審查——讀回 `change-plan.schema.yaml` L272-366 與 fixture 全檔，確認 if/then 縮排層級與 `rollback.schema.yaml` L347-351 對齊、fixture 案例的 valid/invalid 標記與 risk_tier 邏輯一致）| verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os | grep=`^\s*if:\s*$`（`AI_LEGO_Cognitive_Engineering_OS/specs` 全目錄）+ `change-plan\.schema\.yaml`（全 `agency-os`）+ `single_alternative_fails_even_at_r0\|BUG FOUND WHILE WRITING THIS FIXTURE`（全 `agency-os`）| hits=`if:` 僅 2 處（本檔修復後的 root 版 + `rollback.schema.yaml` 既有正確版，無第三處同類 bug）；`change-plan.schema.yaml` 檔名命中 9 檔（fixture/schema 本身 + `MACHINE_READABLE_SPEC_PLAN.md` + EC 原文 + `architecture-inventory.yaml` + 1 份 oracle report + rollback-plan/change-plan-scope 兩份 governance fixture，均為既存依賴/命名引用，非 stale bug 宣稱，未見需同步修正的過期陳述）；bug 描述字串 0 命中於 WORKLOG.md/TASKS.md（此 bug 從未被記錄過，故無 stale claim 需清）
+
+[剩餘風險] `gate-result.fixtures.yaml::invalid::not_applicable_without_rationale` 為既有、與本次改動無關的獨立失敗（EC §69 NOT_APPLICABLE 需 rationale，`gate.schema.yaml` 未強制），本次未修（out of scope），留待後續任務處理。
+[rollback] `git checkout -- agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/execution/change-plan.schema.yaml agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/contracts/specs/execution/change-plan.fixtures.yaml` 即可完全回到 bug 存在但已誠實記錄的 Wave 8 狀態。
+
 ## 2026-08-29（續23）
 
 ### HCI_AI_LEGO_Blueprint_v2 建置——V1 凍結封存 + 24 個決策點全數嵌入正文，收斂雙資料夾交叉引用風險
