@@ -1,5 +1,55 @@
 # Worklog
 
+## 2026-08-29（續21）
+
+### HCI30_RESEARCH_REVIEW 補一條 9 個 reviewer 都沒抓到的真洞（DOM-12/HD-00）：Subject 被架構寫死限定個人，Organization 有名無實
+
+**觸發**：操作者讀完續20 產出的 22 份文件後回饋一個問題——「使用者是什麼角色設定(這個人或公司或集團) 他想跟這個人或公司或集團(本來只針對個人) 達成什麼關係」。不是照單全收，先查證：`grep person_id agency-os/docs/HCI_AI_LEGO_Blueprint_v1/07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md` 全檔僅 1 處命中（Evidence 欄位表），且全檔無 `organization_id`/`subject_id`/`subject_type`；`02_PRODUCT_BOUNDARIES.md:17`「Who is this person?」、`04_HCI30_PRODUCT_SPEC.md:5`「understanding people...」全篇個人框架；但 `Organization` 確實列在 `02:33`/`07:11` core entity 清單裡——**有名無實，Evidence/Assessment/TrustDomain 全綁 person_id，Organization 只是 Person 的僱主附屬節點**。9 個獨立 reviewer（含跑過全文的 Domain reviewer A）都沒抓到，根因判斷：V1 文件本身從頭到尾就是個人框架，9 個 reviewer 雖然彼此獨立，但都獨立地被同一份源文件的框架帶偏——「reviewer 間獨立」不等於「不受源文件本身框架影響」，這是本次覆審方法論本身的一個真實局限，如實記入 00 執行摘要。
+
+**處置**：不是聊天回答完就算，比照套件既有證據標準正式補入——`05_DOMAIN_ARCHITECTURE_REVIEW.md` 新增 `DOM-12`（disposition=CHANGE，三個 Alternative，推薦 Alternative C：Wave-1 ERD 現在就把 `subject_type`/`subject_id` 欄位設計成可擴充的 stub，不強制現在就做 Organization 評估功能，成本接近零；等真實資料存在後才做是昂貴 retrofit，同套件 `17_TECH_DEBT_PREVENTION.md` 一貫的原則）、`02_V1_CHANGE.md` 計數 41→42、`22_OPEN_HUMAN_DECISIONS.md` 新增 `HD-00`（24 個決策點）、`00_EXECUTIVE_REVIEW.md` 計數同步（104 findings，8 條 headline finding）+ 明確標註此條為操作者事後發現、非原始 9-reviewer pass 產出，不冒充一開始就在裡面。
+
+[已修改]
+- `agency-os/docs/HCI30_RESEARCH_REVIEW/05_DOMAIN_ARCHITECTURE_REVIEW.md`：新增 DOM-12（含 provenance note）
+- `agency-os/docs/HCI30_RESEARCH_REVIEW/02_V1_CHANGE.md`：CHANGE 表新增 DOM-12 一列，計數 41→42
+- `agency-os/docs/HCI30_RESEARCH_REVIEW/22_OPEN_HUMAN_DECISIONS.md`：新增 HD-00，計數 23→24
+- `agency-os/docs/HCI30_RESEARCH_REVIEW/00_EXECUTIVE_REVIEW.md`：findings 計數 103→104，補第 8 條 headline finding + 說明本次覆審方法論局限
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(Grep) | cmd=`grep -n person_id 07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md` | 結果=僅 1 處命中（07:85），確認 Evidence schema 無 organization_id/subject_id
+- REALTEST_EVIDENCE: tool=Read | cmd=直讀 `02_PRODUCT_BOUNDARIES.md`/`04_HCI30_PRODUCT_SPEC.md`/`08_HCI30_COMMERCIAL_EDITION_ARCHITECTURE.md` 確認個人框架用語與 edition tier 只描述帳號規模非關係角色 | 結果=符合操作者觀察
+- REVIEW_DONE: critic=Quick（自我核對：DOM-12 沿用與其餘 103 個發現相同的 15 欄位固定格式，未走捷徑；provenance note 誠實標註非原始 9-reviewer 產出）
+- BUGHUNT_DONE: scope=agency-os | grep=`DOM-12\|HD-00` | hits=僅本次新增的三處（05/02/22），無殘留舊計數（103/23/41）未同步——已逐一核對三個計數點全部更新一致
+
+[剩餘風險] DOM-12 是單一操作者觀察 + Claude 事後查證，未經過原始 9-reviewer 的獨立交叉驗證流程；其 Alternative 選項與 Confidence=High 判斷僅出自本次查證，建議操作者裁決 HD-00 時將此列為「未經多方交叉驗證的新發現」看待，權重可與其餘走完整流程的發現略作區隔。
+[rollback] 純文件新增，`git revert` 或手動刪除四處新增區塊即可，無其他依賴。
+
+## 2026-08-29（續20）
+
+### HCI-30 × AI LEGO V1 藍圖獨立多代理研究與交叉驗證（研究階段，未動 production code）— `agency-os/docs/HCI30_RESEARCH_REVIEW/`
+
+**觸發**：操作者明確要求切換角色（Principal Systems Architect + Security/Database/DevOps/AI Systems/Product Architect + Technical PM + Independent Reviewer），對 `HCI_AI_LEGO_Blueprint_v1`（24 檔）跑獨立多代理重新研究 + 交叉驗證，明文禁止「Claude 同意/Codex 同意/V1 已經寫了」當正確性判準，要求 8 個獨立 Reviewer（A-H）+ 22 份固定格式輸出文件。命名澄清：操作者中途改「V5」為「V1」，全程以 V1 稱呼現行架構。
+
+**執行**：`Workflow` 跑 9 個獨立 Reviewer（A-H + 新增 I=Regulatory/Standards，用 WebSearch 查 NIST/OWASP/ISO/GDPR/EU AI Act 現行版本附來源+日期）零交叉可見性平行分析，各自 Glob+Read 全部 24 檔 + 跨查實際 repo（AI LEGO 真實 specs/*.yaml、`portal.aware-wave.com` 真實 migration/commit）。第一輪 Reviewer H（Red Team）API 連線中斷失敗，`resumeFromRunId` 重跑成功（其餘 8 個從快取秒回，未重工）。Convergence 階段再跑 3 個獨立 agent：交叉驗證矩陣（明確禁止「N 個 reviewer 同意=CONSENSUS」，要求 synthesis agent 自己重新推導）、HCI vs AI LEGO 獨立性裁決（六項判準重新推導，非採信 V1 原文）、紅隊交叉檢查（H 的 16 個攻擊場景是否真的被 B/C/D 的 KEEP 建議擋住）。
+
+**紅隊交叉檢查 agent 第一次產出可疑**：`redteam-crosscheck` 燒了 129K tokens、4 次工具呼叫，但最終 `StructuredOutput` 吐出的是明顯 placeholder（`{"red_team_scenario":"test",...}`）而非真實分析——判定為 agent 混亂退化輸出，非系統錯誤，不接受，改用獨立 `Agent` 呼叫帶完整真實資料重跑（避免命中同一份壞 workflow 快取），此輪產出 136K tokens 的完整真實交叉分析，結論：**H 的 16 個攻擊場景,一個都沒被 B/C/D 的 KEEP 建議擋住**（安全審查者 C 的 KEEP 清單本身是空的，本身即是信號）。
+
+**產出**：103 個發現（7 KEEP / 41 CHANGE / 2 REMOVE / 45 ADD / 8 DEFER），23 個去重後的 `requires_human_decision` 決策點。獨立性裁決結果 `PARTIAL_SHARED_PLATFORM`（非 V1 原文的純 Independent Peer Products，也非合併——5/6 判準支持獨立，data ownership 判準不支持，建議抽出小型共用 Foundation kernel，明確排除「Shared God Platform」反模式）。頭條發現：三個不相容的 Tenant 定義同時存在（含今日稍早本 session 才建的 `portal.aware-wave.com` 真實 `organizations` table，commit `83277d80`）、RLS「where appropriate」非強制、被研究第三人（非租戶）無任何權利通道、身份誤配對無修正/回溯機制、單機 DR 從未演練。22 個文件全數寫入 `agency-os/docs/HCI30_RESEARCH_REVIEW/`（00 執行摘要 + 01-04 KEEP/CHANGE/REMOVE/MISSING 彙整 + 05-12 各 Reviewer 專屬檔 + 13 三方案比較矩陣 + 14 交叉驗證矩陣 + 15/16 風險/假設登記 + 17/18 技術債防範/30年替換分析 + 19-21 V2 提案架構/changeset/實作順序 + 22 待人類決策清單），另加 1 份規範外補充文件（Regulatory/Standards 研究，因屬有價值的一手研究予以保留）。
+
+[已修改]
+- 新增 `agency-os/docs/HCI30_RESEARCH_REVIEW/` 全目錄（23 個 .md 檔，00-22 編號 + 1 份補充檔），純新增，未改動任何既有檔案
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(Python) | cmd=掃描全目錄檔案間 markdown 內文引用的檔名是否都存在 | 結果=僅命中對 V1 原始藍圖目錄（不同資料夾）的正常跨目錄引用與一處刻意保留的 V6→V2 更名說明文字，package 內部彼此引用全數解析成功，無斷鏈
+- REALTEST_EVIDENCE: tool=Bash(Python) | cmd=掃描全目錄是否含 U+FFFD replacement character（CP950/編碼損毀慣見症狀，見 AGENTS.md 跨機編碼紀律） | 結果=0 命中，含中文字元（紫微/八字等）的檔案人工核對字元完整
+- REALTEST_EVIDENCE: tool=Workflow | cmd=12-agent 平行研究 workflow（9 reviewer + 3 convergence）+ 1 次 resume（H 失敗重跑）+ 1 次獨立 Agent 呼叫（redteam-crosscheck 重跑）| 結果=全部完成，`agents_error=0`，總計約 2.8M subagent tokens
+- REVIEW_DONE: critic=Quick（自我核對：103 個 change_items 逐一來源可追溯至對應 reviewer JSON 原始輸出，00-22 每份文件的核心宣稱均可回溯到至少一位 reviewer 的具體 file:line 證據，非憑空生成）| verdict=pass
+- BUGHUNT_DONE: scope=agency-os | grep=`HCI30_RESEARCH_REVIEW\|V6_IMPLEMENTATION_ORDER` | hits=僅本目錄自身檔案與 21 檔內對 V6 更名的說明性引用，無其他既有文件對本次新增目錄有過期指涉需要同步
+
+[剩餘風險] 這是**研究/規劃產出**，非已驗證的程式碼變更——103 個發現的證據鏈可追溯，但 Reviewer 本身的判斷（尤其 High confidence 標記）仍是 AI 產出，操作者最終仍需人工判斷 22 份文件、逐條核對後才能授權任何 V2 落地；本輪嚴格遵守任務指示未觸碰 production code/DB/deploy。與同日並行的 AI LEGO Phase 3 Wave 6 session（續19，`d431899e`）無衝突——兩者是互補關係（本次研究引用 AI LEGO 既有 specs 作為證據，未修改該目錄任何檔案）。
+[rollback] `rm -rf agency-os/docs/HCI30_RESEARCH_REVIEW/`；純新增目錄，無其他檔案依賴它，零回歸風險。
+
 ## 2026-08-29（續19）
 
 ### AI LEGO Phase 3 Wave 6 — `domain/capability-contract.schema.yaml` + `policies/ai-execution/` 8 檔全建，critic 獨立覆審 0 Critical/6 Major/多項 Minor 全數修正

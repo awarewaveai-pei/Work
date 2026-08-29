@@ -1,12 +1,18 @@
 # 22 Open Human Decisions
 
-> 41 individual `requires_human_decision=true` findings across the 9 independent reviews, consolidated into 23 distinct decisions (many reviewers independently flagged the same underlying question). These are not analysis gaps — more research will not resolve them. Each is a genuine value trade-off, legal-risk-tolerance call, or product-direction choice that only the operator can make. Full reasoning and evidence for each lives in the numbered review file cited; this page is the decision-ready index.
+> 42 individual `requires_human_decision=true` findings across the 9 independent reviews plus one operator-raised post-package addition, consolidated into 24 distinct decisions (many reviewers independently flagged the same underlying question). These are not analysis gaps — more research will not resolve them. Each is a genuine value trade-off, legal-risk-tolerance call, or product-direction choice that only the operator can make. Full reasoning and evidence for each lives in the numbered review file cited; this page is the decision-ready index.
 >
 > **Not a to-do list in priority order by default** — Section A are the ones with the highest cost-of-delay (see `17_TECH_DEBT_PREVENTION.md` §A for why); Section B can wait for a natural trigger point without penalty.
 
 ---
 
 ## Section A — Decide before Wave 1 domain-model / schema freeze (cheap now, expensive after real data exists)
+
+### HD-00 — Is HCI-30 ever meant to assess Organizations/Groups as the Subject, not just individual Persons — and does the Requester's own party-type (individual / corporate team / group) need to shape which Trust Domains apply?
+**Question**: `Organization` is declared as a core domain entity (02:33, 07:11) but the Evidence schema is hard-coded to `person_id` (07:78-100, verified sole occurrence) with no `organization_id`/`subject_type`, and the product's own mission language ("Who is this person?", "understanding people...") is entirely person-framed. Separately, nothing pairs the Requester's own role in the relationship (an individual evaluating a co-founder vs. a corporate procurement team evaluating a vendor organization) with which analysis dimensions should apply — doc 08's edition tiers describe account size, not relationship role.
+**Why human**: This is a real product-scope decision (does HCI-30 ever do company-vs-company or group-vs-group due diligence, not just person-vetting), not an engineering detail — engineering can build any of the three options below, but only the operator can decide which future the product is for.
+**Options**: (A) scope permanently to individual-Person subjects only, correct the entity list to demote `Organization` to attribute-only. (B) generalize now — polymorphic `subject_type: PERSON | ORGANIZATION` + `subject_id`, plus a `requester_context` role field on the Case/Engagement aggregate (HD-10). (C) **recommended** — keep Person-only functionality for V1, but design the `subject_type`/`subject_id` column shape into the Wave-1 ERD now as a forward-compatible stub (nullable, defaults to `PERSON`), so the decision to actually build organization-assessment can be made later without a costly retrofit.
+**Source**: Operator-raised 2026-08-29, verified and formalized as DOM-12 · `05_DOMAIN_ARCHITECTURE_REVIEW.md` DOM-12 · not part of the original 9-reviewer independent pass — added out-of-band with the same evidentiary bar, not backfilled to look pre-existing.
 
 ### HD-01 — Reconcile the three incompatible "Tenant" definitions
 **Question**: Does AI LEGO's ACCEPTED ADR-003 Tenant (3-level, no Organization) become the one platform-wide Tenant, does the already-shipped `portal.aware-wave.com` `organizations` table become it, or do they stay deliberately separate?

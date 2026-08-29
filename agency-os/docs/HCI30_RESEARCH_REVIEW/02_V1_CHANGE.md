@@ -1,13 +1,16 @@
 # 02 V1 CHANGE
 
-> 41 items where V1 has the right general idea but the current specification, sequencing, or vocabulary needs to change before Wave 1 implementation -- plus 8 items the reviewers explicitly recommend **deferring** (folded into this file rather than a separate one, since "defer, with a named reason and trigger" is itself a considered change to how V1 currently treats these items, which mostly leaves them unaddressed rather than explicitly deferred). Every CHANGE item is grounded in a specific `file:line` citation in its source review file -- this table is the index, not the full reasoning.
+> 42 items where V1 has the right general idea but the current specification, sequencing, or vocabulary needs to change before Wave 1 implementation -- plus 8 items the reviewers explicitly recommend **deferring** (folded into this file rather than a separate one, since "defer, with a named reason and trigger" is itself a considered change to how V1 currently treats these items, which mostly leaves them unaddressed rather than explicitly deferred). Every CHANGE item is grounded in a specific `file:line` citation in its source review file -- this table is the index, not the full reasoning.
+>
+> **DOM-12 added 2026-08-29 post-package**, raised by the operator after reviewing the package (not part of the original 9-reviewer pass), verified against the source blueprint before being added -- see `05_DOMAIN_ARCHITECTURE_REVIEW.md` for the provenance note and full reasoning.
 
 ---
 
-## CHANGE (41)
+## CHANGE (42)
 
 | ID | Title | Why | Source | Confidence |
 |---|---|---|---|---|
+| DOM-12 | HCI's entire product framing and Evidence schema assume the assessed Subject is always an individual Person; Organization is declared as an entity but has no first-class Evidence/Assessment/TrustDomain support, and the Requester's own party-type is not modeled as a dimension that shapes the analysis | Same "cheap now, expensive after Wave 1 data exists" pattern as the rest of this package, on a dimension none of the 9 original reviewers checked because V1's own person-first framing primed every independent reader toward the same blind spot. | A (05_DOMAIN_ARCHITECTURE_REVIEW.md) | High HUMAN |
 | DOM-01 | Tenant/Workspace hierarchy conflicts with AI LEGO's already-ADR-accepted Tenant model | Both are candidate readings of the current blueprint and neither is wrong on its own terms -- but building against both simultaneously is impossible, and this is exactly the kind o | A (05_DOMAIN_ARCHITECTURE_REVIEW.md) | High HUMAN |
 | DOM-02 | HCI 'Evidence'/'Claim' and AI LEGO 'Evidence'/'Claim' are same-named, differently-shaped, differently-owned record types with no disambiguation rule | This is exactly the failure mode doc 01's 'Definition of architecture failure' warns against one layer down from where it is written -- a same-named-but-different-shaped dependency | A (05_DOMAIN_ARCHITECTURE_REVIEW.md) | High  |
 | DOM-03 | HCI's Fact/Observation/Interpretation/Hypothesis epistemic ladder duplicates AI LEGO's already-built, ADR-governed epistemic-status primitive, and two of its four levels have no table | HCI's own core invariant (Invariant 1) is currently backed by half-built plumbing (2 of 4 levels have tables), while a stricter, already-governed version of the same primitive sits | A (05_DOMAIN_ARCHITECTURE_REVIEW.md) | Medium  |
