@@ -261,7 +261,7 @@ clusters:
           - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 1116, quote: "§14 Knowledge Memory 分層"}
         consequence: "使用者對 Personal Preference 記憶提出刪除權請求，沒有規格保證該筆資料真的從底層儲存清除（假刪除/soft-delete 未真正清除底層向量副本的風險）。"
     duplication_candidates:
-      - "見 DUPLICATION_REGISTER.yaml P1-DUP-4（PII redaction 政策 vs pseudonymization「未來能力」時序矛盾，原編號 Security-GAP-9，已升級為 CONFLICT）"
+      - "見 CONFLICT_REGISTER.yaml P1-CONFLICT-3（PII redaction 政策 vs pseudonymization「未來能力」時序矛盾，原編號 Security-GAP-9，已升級為 CONFLICT；ADR-007 已提出裁決，Status: PROPOSED）"
   ai_datascience_research:
     roles: [AI Engineer, Data Scientist, Statistician, Research Methodologist]
     gaps:

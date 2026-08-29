@@ -28,6 +28,20 @@
 [剩餘風險] 15 份交付物全數 `Status: PROPOSED`，任何內容不得視為定案；`MVP_VERTICAL_SLICE_PLAN.md` 的 Research Mode 選擇尚未完成 directive 要求的雙模型比較（見 `IMPLEMENTATION_ROADMAP.md` §2 類別 D 誠實揭露）；5 個 schema 檔案（`gate.schema.yaml` 等）與 2 份 policy 檔案卡在 `BLOCKED_PENDING_ROUND2_ADR`，需操作者決定是否併入下一輪 ADR。**Phase 2 exit gate 已達成，依 directive 明文規定進入 STOP FOR HUMAN REVIEW，Phase 3 不得在操作者批准前開始。**
 [rollback] `git revert` 本 commit；三母文件零改動（全部 15 份交付物皆為 PROPOSED，未套用任何內容到 Master Plan / Method Atlas / Execution Contract）。
 
+### GAP_REGISTER.yaml P1-GAP-SEC-9 duplication_candidates 錯誤交叉引用修正
+
+**背景**：操作者指出 `GAP_REGISTER.yaml:264` 的 `duplication_candidates` 註記寫「見 DUPLICATION_REGISTER.yaml P1-DUP-4」，但 `DUPLICATION_REGISTER.yaml:62-76` 的 P1-DUP-4 實際內容是因果推論方法在 MP 敘事列表與 Atlas F11 重複定義，與 PII 無關；註記真正想指的時序矛盾其實已正確登記在 `CONFLICT_REGISTER.yaml:37-50` 的 P1-CONFLICT-3，且已由 `docs/adr/ADR-007-pii-redaction-vs-pseudonymization-timing.md`（Status: PROPOSED）裁決。Read 三檔逐字核對行號後確認操作者描述無誤——ADR-007:181-182 本身也已記錄這個錯誤引用是既有 finding，本次只是把 GAP_REGISTER 的原始錯字改掉。
+
+[已修改]
+- `GAP_REGISTER.yaml:264`：`duplication_candidates` 註記由「見 DUPLICATION_REGISTER.yaml P1-DUP-4」改為「見 CONFLICT_REGISTER.yaml P1-CONFLICT-3」，並附註 ADR-007 已裁決（Status: PROPOSED）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Read | cmd=Read GAP_REGISTER.yaml:245-274 + DUPLICATION_REGISTER.yaml:55-95 + CONFLICT_REGISTER.yaml:30-59 + ADR-007:1-15,60-184（逐字核對三份 register 的 id/title/line 是否對得上操作者描述） | exit=0
+- REVIEW_WAIVED: DOC_ONLY -- `.yaml` 非 code 檔（不在 AGENTS.md 觸發 critic 之 `.ps1/.ts/.tsx/.js/.jsx/.mjs/.sh/.py` 清單），僅單行交叉引用文字修正；已 Read 回改後行確認字串正確、格式與同檔其餘 duplication_candidates 條目一致
+- BUGHUNT_DONE: scope=agency-os | grep=`P1-DUP-4`（跨 `.ai/research/phase-1/` 全目錄）+ `Security-GAP-9` + `P1-GAP-SEC-9`（跨 `agency-os` 全目錄） | hits=3 file matches，逐一核對：RISK_REGISTER.yaml:48 的 P1-DUP-4 引用內容正確（因果推論風險，非本錯誤）不動；ADR-007:181-182 是已記錄本錯誤的既有 finding 不需修；SECURITY_THREAT_MODEL.md:126,134 的 P1-GAP-SEC-9 是獨立正確引用（Linkability/Non-compliance 威脅列表）不動；本次改動範圍僅 GAP_REGISTER.yaml:264 一處
+
+[剩餘風險] 無；純文件交叉引用修正，未影響任何 PROPOSED 決策內容或 ADR-007 本身狀態
+[rollback] `git revert` 本 commit（單一行變更）
 
 ### Agent dispatch log
 - general-purpose: Phase 1 gap analysis — architecture/data lenses
