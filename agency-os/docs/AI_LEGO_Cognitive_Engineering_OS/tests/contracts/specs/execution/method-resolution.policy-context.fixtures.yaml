@@ -3,7 +3,9 @@ target_ref: "#/resolved_selection_context"
 description: >
   Exercises the 2026-08-29 policy_context/regulatory_exposure addition
   (P1-GAP-LEGAL-7, GLOBAL_JURISDICTION_PLAN.md §6) on top of
-  resolved_selection_context's 7 required original-17 fields.
+  resolved_selection_context's 7 required original-17 fields, and (2026-08-30,
+  real /codex-review end-to-end test, MEDIUM finding) regulatory_exposure's
+  move from optional to required.
 valid:
   - name: no_policy_signal_defaults_absent
     instance:
@@ -14,6 +16,7 @@ valid:
       risk_tier: R1
       reversibility: high
       required_rigor: professional
+      regulatory_exposure: none
   - name: high_regulatory_exposure_with_full_policy_context
     instance:
       goal_type: "assess_ai_regulation_compliance"
@@ -48,6 +51,16 @@ invalid:
       required_rigor: professional
       regulatory_exposure: "very_high"
     reason: "regulatory_exposure enum is exactly [none, low, moderate, high] per GLOBAL_JURISDICTION_PLAN.md §6.2 -- 'very_high' is not a member."
+  - name: missing_regulatory_exposure
+    instance:
+      goal_type: "x"
+      problem_type: strategic
+      domain: ["x"]
+      jurisdiction_context: "us-federal"
+      risk_tier: R1
+      reversibility: high
+      required_rigor: professional
+    reason: "2026-08-30 (real /codex-review end-to-end test, MEDIUM finding): regulatory_exposure is now required on every resolved_selection_context -- omitting it silently defeated §6.4's forcing rule for any consumer that only checks field presence rather than re-deriving the value itself."
   - name: tax_exposure_missing_required_present
     instance:
       goal_type: "x"
@@ -57,6 +70,7 @@ invalid:
       risk_tier: R1
       reversibility: high
       required_rigor: professional
+      regulatory_exposure: none
       policy_context:
         tax_exposure: {refs: ["LAW-0001"]}
     reason: "policy_context.tax_exposure requires 'present' (boolean) -- an exposure object with only refs and no present flag is exactly the kind of ambiguous half-populated state {present: bool, refs: [...]} in §6.2's own worked example exists to prevent."
@@ -69,6 +83,7 @@ invalid:
       risk_tier: R1
       reversibility: high
       required_rigor: professional
+      regulatory_exposure: none
       policy_context:
         current_regulation_refs: ["EU-AI-ACT-01"]
     reason: "current_regulation_refs items require the 'LAW-' prefix pattern (matching this corpus's established LAW-* legal-source-reference convention, e.g. ai-gateway-fallback.policy.yaml's obligation_ref) -- a bare id without the prefix is not a legal reference."

@@ -648,6 +648,7 @@ resolved_selection_context:
     - risk_tier
     - reversibility
     - required_rigor
+    - regulatory_exposure
   properties:
     goal_type: { type: string, description: "From selection_context_supplement.goal_type (SUPPLEMENT_REQUIRED)." }
     problem_type: { $ref: "ai-lego://specs/cognitive/problem-type.schema.yaml#/problem_type", description: "From selection_context_supplement.problem_type (SUPPLEMENT_REQUIRED). 2026-08-29: upgraded to hard $ref (critic review MAJOR finding #6) — see selection_context_supplement.problem_type's description for the full migration note." }
@@ -695,8 +696,15 @@ resolved_selection_context:
         policy_context's populated fields (the plan does not specify the
         exact derivation algorithm beyond the enum values themselves and
         the §6.4 forcing rule's consumption of it; see open_questions.OQ-mres-5
-        for that honest gap). Defaults to `none` when policy_context is
-        absent entirely.
+        for that honest gap). MUST be explicit `none` when policy_context is
+        absent entirely -- 2026-08-30 (real /codex-review end-to-end test,
+        MEDIUM finding): this field was originally optional, which let a
+        resolved_selection_context with a populated policy_context still omit
+        regulatory_exposure entirely, silently defeating §6.4's forcing rule
+        for any consumer that only checks for the field's presence rather than
+        re-deriving it. Now in `resolved_selection_context.required` -- every
+        resolved output must state its regulatory exposure, never leave it to
+        an out-of-band convention.
 
 # ---------------------------------------------------------------------------
 # The output side of EC §14's flow: Candidate Methods, bridging to
@@ -806,6 +814,16 @@ open_questions:
       an actual Method Selection Engine implementation against this rule?
     owner: "operator, or a future Phase 4/5 implementation session once a Method Selection Engine exists to test"
     blocks: "nothing in this file's own validity -- this is a test-coverage gap in a not-yet-built consumer, not a schema defect"
+    partial_resolution: >
+      2026-08-30 (real /codex-review end-to-end test, MEDIUM finding): the
+      narrower half of this question -- "can a resolved output silently omit
+      regulatory_exposure and thereby skip the forcing rule by omission,
+      independent of whether the rule itself is schema-enforced" -- is now
+      closed: `regulatory_exposure` moved into `resolved_selection_context`'s
+      `required` list, so every resolved output must state an explicit value
+      (including `none`). The broader question above (whether the ENGINE
+      actually applies the forcing rule correctly given that value) remains
+      open, unchanged.
 
 verification:
   method: >

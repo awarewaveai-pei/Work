@@ -266,13 +266,22 @@ if ($Mode -eq 'review') {
     }
 }
 
-# ---- findings count: JSON-first, FINDING-text fallback, never guess --------
+# ---- findings count: JSON-first, then two known text-render fallbacks, never
+# guess -----------------------------------------------------------------------
 # Critic M3: a bare regex count of the substring `"severity":` returns 0 for
 # codex-oracle.ps1's own `FINDING N:` text format (real findings, wrong count)
 # and 1 for a JSON schema echoed in prose with no real findings (wrong count
-# the other way) -- and the docstring itself says the answer may be either
-# shape. Try structured parsing first; only fall back to the text-format regex;
-# print a placeholder rather than a wrong number if neither shape matches.
+# the other way). Try structured parsing first; only fall back to known
+# text-render shapes; print a placeholder rather than a wrong number if none
+# match.
+#
+# Third shape added 2026-08-30 after a REAL end-to-end run against
+# /codex:adversarial-review: its --wait foreground output is neither raw JSON
+# nor codex-oracle.ps1's `FINDING N:` format -- it is a rendered markdown
+# report with a `Findings:` section and `- [severity] ...` bullets per finding
+# (verified from a live run, not assumed from reading codex-companion.mjs's
+# source -- the source suggested raw JSON via `outputSchema`, but the actual
+# printed output is rendered markdown, confirming the two can differ).
 $findingsCountStr = '<unknown>'
 try {
     $parsed = $Answer | ConvertFrom-Json -ErrorAction Stop
@@ -281,8 +290,11 @@ try {
     }
 } catch {
     $textMatches = [regex]::Matches($Answer, '(?m)^\s*FINDING\s+\d+')
+    $bulletMatches = [regex]::Matches($Answer, '(?mi)^-\s*\[(?:critical|high|medium|low)\]\s')
     if ($textMatches.Count -gt 0 -or $Answer -match '(?m)^\s*(NO FINDINGS|TOTAL:\s*0\b)') {
         $findingsCountStr = [string]$textMatches.Count
+    } elseif ($bulletMatches.Count -gt 0 -or $Answer -match '(?im)^verdict:\s*approve\b') {
+        $findingsCountStr = [string]$bulletMatches.Count
     }
 }
 

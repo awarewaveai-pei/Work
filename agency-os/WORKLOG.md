@@ -1,5 +1,51 @@
 # Worklog
 
+## 2026-08-30（續3）
+
+### `/codex-review` 首次真實端到端測試：跑通，且真的抓到 AI-LEGO corpus 裡 2 個真實邏輯漏洞（已修）+ 1 個腳本自身的計數盲點（已修）
+
+**觸發**：操作者質疑「你有確定這樣真的可行了?」，要求拿 Cognitive Engineering OS 規劃裡「可能有問題」的東西做真實測試，而非只信任 scratch repo 的合成測試。
+
+**測試目標選定**：重讀自己這個 session 稍早建的 `specs/jurisdiction/conflict-of-laws-output.schema.yaml`，確認一個真實懷疑成立——`conflicts_detected` 陣列與 `status` 欄位之間沒有任何交互約束，schema-valid instance 可以同時宣告真實衝突又聲稱 `RESOLVED`。
+
+**執行**（真實呼叫，非模擬）：
+1. `write-oracle-artifact.ps1 -Mode capture -DiffRef "1d7f0e617..HEAD"` 捕捉真實 4-commit 分支 diff（135KB）
+2. 真的執行 `node .../codex-companion.mjs adversarial-review --wait --base 1d7f0e617 "<兩段標準 focus text + 額外指定去查 conflicts_detected/status 一致性>"`——實測跑了約 5 分鐘（xhigh 推理強度 + 135KB diff 屬預期），過程可見真實工具呼叫（`copilot/search_commits`、`copilot/get_commit`、`work-global/read_multiple_files` 等）
+3. 拿到真實回應：`verdict: needs-attention`，2 個 finding
+
+**codex 真的抓到的 2 個真實 bug**：
+- 🟠 **HIGH**：`conflict-of-laws-output.schema.yaml:62-124` 沒有任何規則把 `conflicts_detected` 關聯回 `status`——一個 `DIRECT_CONTRADICTION` 條目可以跟 `status: RESOLVED` 共存，或 `status: CONFLICT` 可以完全沒有 `conflicts_detected` 佐證。與 `GLOBAL_JURISDICTION_PLAN.md` §5.4「`status` 是 Stage-3 唯一 fail-closed 信號」矛盾——下游只讀 `status` 的消費者會把真實法律衝突當成已解決。
+- 🟡 **MEDIUM**：`method-resolution.schema.yaml:643-699` 的 `regulatory_exposure` 原為選填，一個已填 `policy_context` 的 resolved output 仍可完全省略 `regulatory_exposure`，靜默繞過 §6.4 forcing rule（隱藏依賴——不在 diff 範圍內，是 `GLOBAL_JURISDICTION_PLAN.md` §6.4 那條規則本身的依賴，codex 主動查到）。
+
+**修正**：
+1. `conflict-of-laws-output.schema.yaml` 新增 3 條 `allOf`/`if`/`then`：`status: RESOLVED` ⇒ `conflicts_detected` 必空；`conflicts_detected` 非空 ⇒ `status` 不得為 RESOLVED；`status: CONFLICT` ⇒ `conflicts_detected` 至少 1 筆。補 2 個 invalid fixture 精確重現 codex 描述的兩種矛盾狀態。
+2. `method-resolution.schema.yaml` 的 `regulatory_exposure` 移入 `resolved_selection_context.required`（連 `none` 都要顯式寫）。補 1 個 invalid fixture（省略即失敗）+ 修正既有 3 個 fixture 補上這個新必填欄位。`OQ-mres-5` 補 `partial_resolution` 記錄半題已解。
+
+**順帶抓到並修正 `write-oracle-artifact.ps1` 自己的一個真實盲點**：這次測試才發現 `/codex:adversarial-review` 真實輸出**不是** raw JSON（雖然原始碼看起來會用 `outputSchema` 強制 JSON），而是渲染過的 markdown 報告（`Findings:` + `- [severity] ...` bullet），我的 findings 計數邏輯對這個真實格式完全沒對到、回傳 `<unknown>`。已補第三種 fallback pattern（`- [severity]` bullet 計數），用這次真實拿到的 codex 回應直接迴歸測試，確認 `findings=2` 正確算出，且不影響原有 JSON/FINDING-text 兩條路徑（各自重跑迴歸確認）。
+
+**結論（回應「你有確定嗎」）**：確定了。不是零件測試，是整條 `/codex-review` 流程真的跑了一次，真的花了真實 xhigh 成本，真的找到 2 個此 session 自己寫進去的真實 bug，而且過程本身又逼出第 3 個 bug（計數邏輯）。三個都已修正並各自迴歸測試過。
+
+[已修改]
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/jurisdiction/conflict-of-laws-output.schema.yaml`：新增 3 條 allOf 約束
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/contracts/specs/jurisdiction/conflict-of-laws-output.fixtures.yaml`：新增 2 個 invalid fixture
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/execution/method-resolution.schema.yaml`：`regulatory_exposure` 改為 required，`OQ-mres-5` 補 partial_resolution
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/contracts/specs/execution/method-resolution.policy-context.fixtures.yaml`：新增 1 個 invalid fixture + 修正 3 個既有 fixture 補必填欄位
+- `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`：row 95/162 狀態列補真實測試發現、MRSP-24 第 3 次行號位移修正
+- `scripts/write-oracle-artifact.ps1`：findings 計數補第三種 markdown bullet fallback（用真實 codex 回應驗證）
+- 新增 `agency-os/reports/oracle/2026-08-30-partialreview-1b40777b.md`（本次真實端到端測試的完整 artifact，`/codex-review` 機制上線後第一份真實證據）
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(node) | cmd=`node codex-companion.mjs adversarial-review --wait --base 1d7f0e617 "..."` | exit=0 | 結果=真實 5 分鐘執行，verdict=needs-attention，2 個 finding，非模擬
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py`（3 個修正全部套用後）| exit=0 | 結果=638 個檢查全過（較之前 635 增加 3，對應新增的 3 個 invalid fixture）
+- REALTEST_EVIDENCE: tool=Bash(powershell) | cmd=`write-oracle-artifact.ps1` 用真實 codex 回應 + 既有 JSON/FINDING-text 合成回應各自重跑 | exit=0 | 結果=三種 answer 格式（真實 markdown bullet=2、JSON=1、FINDING-text=3）全數正確計數，無交叉迴歸
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`UniqueKeyLoader` 對 4 個修改/新增 yaml 檔跑重複 key 掃描 | exit=0 | 結果=CLEAN
+- REVIEW_DONE: critic=Deep（外部 oracle：本輪用的正是 `/codex-review` 本身，非自我描述——這是本檔案第一次真正拿真實外部模型審自己這個 session 寫的 schema，不是 scratch repo 合成測試）| verdict=needs-attention → 2 個 finding 全部驗證屬實並修正 | findings=0c/1m(HIGH)/1n(MEDIUM，依 codex 自身 severity 標記換算)
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`conflicts_detected\|regulatory_exposure` | hits=僅 `GAP_REGISTER.yaml`（唯讀溯源登記表，散文提及不需同步），其餘命中皆為本輪已修改檔案本身，無遺漏
+
+[剩餘風險] `conflict-of-laws-output.schema.yaml` 的新約束只驗證了 `RESOLVED`/`CONFLICT` 兩個 status 值與 `conflicts_detected` 的關係，`AMBIGUOUS`/`LEGAL_REVIEW_REQUIRED`/`CONSERVATIVE_SAFE_MODE` 三值刻意不強制要求 `conflicts_detected` 非空（這些狀態可能源於非衝突類的模糊性，如純粹的解釋不確定性），這個設計選擇未來若證明過寬，需要再收斂。`write-oracle-artifact.ps1` 的 findings 計數現在有 3 種 fallback，仍可能遇到第 4 種未見過的 answer 格式而回傳 `<unknown>`——這是誠實的殘留限制，非隱藏。Step 1.5 capture 與 Step 2 codex 自己收集 diff 之間的競態窗口（續2 已記錄）仍未解決，非本輪範圍。
+[rollback] 純新增 schema 約束 + fixture + 文件狀態列，`git revert` 即可完整回退，無 DB/prod/deploy 副作用；已修正的兩個真實 bug 若 revert 會重新開放，需注意。
+
 ## 2026-08-30（續2）
 
 ### `/codex-review` 包裝 command + `write-oracle-artifact.ps1`：critic 抓到 Critical 級恆真式漏洞（刪除審查證明可偽造），重寫為 capture-then-review 兩段式

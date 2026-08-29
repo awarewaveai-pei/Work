@@ -123,6 +123,29 @@ allOf:
     then:
       required: [human_counsel_ref]
       properties: { human_counsel_ref: { not: { type: "null" } } }
+  # 2026-08-30 (real /codex-review end-to-end test, HIGH finding): without
+  # these two rules, `conflicts_detected` and `status` could contradict each
+  # other in a schema-valid instance -- e.g. a real DIRECT_CONTRADICTION
+  # entry present while status: RESOLVED, or status: CONFLICT with zero
+  # conflicts_detected evidence. GLOBAL_JURISDICTION_PLAN.md §5.4 makes
+  # `status` the sole Stage-3 fail-closed signal, so a downstream consumer
+  # reading only `status` could silently treat a real conflict as resolved.
+  - if:
+      properties: { status: { const: RESOLVED } }
+      required: [status]
+    then:
+      properties: { conflicts_detected: { maxItems: 0 } }
+  - if:
+      properties: { conflicts_detected: { minItems: 1 } }
+      required: [conflicts_detected]
+    then:
+      properties: { status: { enum: [CONSERVATIVE_SAFE_MODE, AMBIGUOUS, CONFLICT, LEGAL_REVIEW_REQUIRED] } }
+  - if:
+      properties: { status: { const: CONFLICT } }
+      required: [status]
+    then:
+      required: [conflicts_detected]
+      properties: { conflicts_detected: { minItems: 1 } }
 
 open_questions:
   - id: "OQ-CONFLICTOFLAWS-1"

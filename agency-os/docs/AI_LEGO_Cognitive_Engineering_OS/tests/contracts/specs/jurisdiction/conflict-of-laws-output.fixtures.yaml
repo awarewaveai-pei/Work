@@ -1,10 +1,12 @@
 schema_id: "ai-lego://specs/jurisdiction/conflict-of-laws-output.schema.yaml"
 target_ref: ""
 description: >
-  Exercises the required field set, the MP §98 status enum, and the
-  allOf/if/then blocks requiring resolution_rule_applied for
-  CONSERVATIVE_SAFE_MODE and human_counsel_ref for the 3 escalation status
-  values.
+  Exercises the required field set, the MP §98 status enum, the allOf/if/then
+  blocks requiring resolution_rule_applied for CONSERVATIVE_SAFE_MODE and
+  human_counsel_ref for the 3 escalation status values, and (2026-08-30, real
+  /codex-review end-to-end test, HIGH finding) the reciprocal constraint
+  between conflicts_detected and status that prevents RESOLVED from coexisting
+  with real conflict evidence.
 valid:
   - name: resolved_no_conflict
     instance:
@@ -107,3 +109,30 @@ invalid:
       authority_test: PASS
       status: RESOLVED
     reason: "owning_component is const 'conflict_of_laws_engine' (GLOBAL_JURISDICTION_PLAN.md §5.2's single logical owner) -- any other value re-opens the ownership ambiguity this file exists to close."
+  - name: resolved_with_real_conflict_detected
+    instance:
+      id: "COL-2026-08-30-008"
+      evaluated_at: "2026-08-30T00:00:00Z"
+      owning_component: conflict_of_laws_engine
+      input_rules: []
+      scope_test: PASS
+      extraterritorial_test: PASS
+      authority_test: PASS
+      conflicts_detected:
+        - rule_a: {jurisdiction: "us-federal", obligation_ref: "OBL-CCPA-04"}
+          rule_b: {jurisdiction: "eu-west", obligation_ref: "OBL-GDPR-17"}
+          conflict_type: DIRECT_CONTRADICTION
+      status: RESOLVED
+    reason: "the 2026-08-30 allOf/if/then block requires conflicts_detected to be empty when status = RESOLVED -- this is exactly the real /codex-review finding: a schema without this rule let a DIRECT_CONTRADICTION coexist with RESOLVED, letting a downstream consumer that only reads `status` silently treat a real conflict as resolved."
+  - name: conflict_status_with_no_conflict_evidence
+    instance:
+      id: "COL-2026-08-30-009"
+      evaluated_at: "2026-08-30T00:00:00Z"
+      owning_component: conflict_of_laws_engine
+      input_rules: []
+      scope_test: PASS
+      extraterritorial_test: PASS
+      authority_test: PASS
+      status: CONFLICT
+      human_counsel_ref: "COUNSEL-CASE-2026-0072"
+    reason: "the 2026-08-30 allOf/if/then block requires conflicts_detected to have at least 1 entry when status = CONFLICT -- declaring CONFLICT with zero supporting evidence was the other half of the same real /codex-review finding."
