@@ -1,17 +1,17 @@
 ---
 proposal_id: "041"
 slug: "method-atlas-identity-header"
-status: DRAFT
+status: APPLIED
 target_document: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
 target_baseline_hash: "a47424f96bf6f88023b9870d4112ab1f607e9b424236693572d6a5558d2804a1"
 affected_line_ranges: ["L1-L10"]
 related_open_questions: ["OQ-1"]
 change_class: "missing_contract"
 authored_by: "Codex"
-approved_by: null
-approved_at: null
-approval_note: null
-applied_commit: null
+approved_by: "操作者"
+approved_at: "2026-08-30"
+approval_note: "核准"
+applied_commit: "f3466264"
 ---
 
 ## PROPOSED_CHANGE

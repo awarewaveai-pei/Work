@@ -1,17 +1,17 @@
 ---
 proposal_id: "040"
 slug: "master-plan-identity-header"
-status: DRAFT
+status: APPLIED
 target_document: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
 target_baseline_hash: "8e5e67f607477babe60f2a4a354a211a30bd88cb1ece631dd51c5e11b23bac10"
 affected_line_ranges: ["L1-L6"]
 related_open_questions: ["OQ-1"]
 change_class: "missing_contract"
 authored_by: "Codex"
-approved_by: null
-approved_at: null
-approval_note: null
-applied_commit: null
+approved_by: "操作者"
+approved_at: "2026-08-30"
+approval_note: "核准"
+applied_commit: "51743215"
 ---
 
 ## PROPOSED_CHANGE
