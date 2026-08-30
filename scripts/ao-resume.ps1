@@ -1118,7 +1118,12 @@ try {
         Write-Host "==================================================================" -ForegroundColor Red
         foreach ($key in $rebootByHost.Keys) {
             $h = $rebootByHost[$key]
-            $slug = if ($h.host -like 'EU*') { 'eu-reboot' } else { 'sg-reboot' }
+            # 2026-08-30: SG and EU are the same physical box (ks-aw-01) since the
+            # 2026-08-28 consolidation, and the old per-box slugs pointed their SSH
+            # Connection: at IPs deleted 2026-08-30 -- /codex-review caught that this
+            # would send Claude to run a command that fails outright. One slug now,
+            # regardless of which legacy label matched the alert text.
+            $slug = 'ks-aw-01-reboot'
             Write-Host ("  host    : {0}" -f $h.host) -ForegroundColor Yellow
             Write-Host ("  signal  : {0} @ {1}" -f $h.source, $h.date) -ForegroundColor Yellow
             Write-Host ("  action  : run /{0} (auto-runs pre-flight read-only; wait for go-ahead to reboot)" -f $slug) -ForegroundColor Cyan

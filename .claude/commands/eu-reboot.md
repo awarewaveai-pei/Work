@@ -1,7 +1,8 @@
-Reboot the EU VPS (`awarewave-eu-hel1-cpx32` / 204.168.175.41) safely with full pre-flight + post-flight checklists.
+**⚠️ SUPERSEDED — use `/ks-aw-01-reboot` instead.** EU (`awarewave-eu-hel1-cpx32` / 204.168.175.41) was integrated into ks-aw-01 on 2026-08-28 and deleted at Hetzner console on 2026-08-30. The `Connection:` details below point at a host that no longer exists — running this command as written will fail outright. Everything this file used to check (container health, endpoints, ClickHouse lock, backup freshness) is folded into `/ks-aw-01-reboot`'s pre/post-flight lists, plus what SG/Postiz/Soulful need since they're on the same box now.
 
-> **🚨 2026-08-28 拓樸退役**：本指令針對的機器已整併入 ks-aw-01（`149.202.64.114`）並待刪除。
-> 單機拓樸下的 reboot = 全站停機窗口，一律 High-risk 手動 + 明示 go-ahead；auto-reboot 決策見 TASKS.md。
+Rest of this file kept only as historical reference for the pre-consolidation per-box procedure; do not execute it.
+
+---
 
 
 Use when:

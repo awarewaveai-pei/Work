@@ -1,0 +1,24 @@
+# SSOT in repo: lobster-factory/infra/hetzner-phase1-core/auto-reboot/ks-aw-01-boot-notify.service
+# Deploy target: /etc/systemd/system/ks-aw-01-boot-notify.service on ks-aw-01
+# Enable: systemctl enable ks-aw-01-boot-notify.service
+#
+# Fires ks-aw-01-boot-health-notify.sh on every boot -- automatic (unattended-upgrades)
+# or manual (/ks-aw-01-reboot) -- so a bad reboot is never silent. Runs after Docker
+# is up so `docker ps` inside the script is meaningful; the script itself adds a
+# further sleep for containers to actually finish starting.
+
+[Unit]
+Description=ks-aw-01 post-boot health check + Telegram notify
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ks-aw-01-boot-health-notify.sh
+# Best-effort observability tool -- a failure here must never be treated as a boot
+# failure by systemd or retried in a loop.
+RemainAfterExit=no
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,51 @@
 # Worklog
 
+## 2026-08-30（續21）
+
+### 「做最完美的安排」：ks-aw-01 auto-reboot 復活 + boot 健康通知 + `/sg-reboot`+`/eu-reboot` 合併 + Let's Encrypt 孤兒帳號清理，全部真機驗證
+
+**觸發**：操作者對 auto-reboot 追問「裝了有什麼壞處」後，明確授權「auto-reboot、Let's Encrypt 帳號整併、寫進換機 runbook，你做最完美的安排」，並重申全域「不可補丁、要治本」的架構師指令。
+
+**關鍵訂正（回答她原本的問題）**：apt 原生 `Unattended-Upgrade::Automatic-Reboot "true"` 機制**本來就是條件式的**——只在 unattended-upgrades 真的裝了需要重開機的套件（留下 `/var/run/reboot-required`）才會在指定時間重開，不是「不管有沒有補丁每天都重開」。TASKS.md／`check-vps-auto-reboot-health.ps1` 舊註解把它講成「每日全站停機窗口」是過度誇大的錯誤框架，這次一併訂正。真正因單機化而新增的風險只有一個：舊雙機時代一台 reboot 壞了另一台還在撐，沒人需要盯著；單機現在一次沒回來就是全站掛，而且沒人在看。
+
+**做了什麼（全部先讀現況、真機驗證每一步，沒有用猜的）**：
+
+1. **重新啟用 auto-reboot**：新建 `lobster-factory/infra/hetzner-phase1-core/auto-reboot/ks-aw-01-auto-reboot.conf`（沿用 2026-05-23 B-Minimal 設計的 apt 機制本身，只改敘述與單機拓樸——不需要 53 錯位檔了，一台機器一個時間）。部署到 `/etc/apt/apt.conf.d/52awarewave-auto-reboot`，`apt-config dump` 實測確認三個鍵值生效。
+2. **新增單機拓樸特有的補強——boot 健康通知**：`ks-aw-01-boot-health-notify.sh` + `ks-aw-01-boot-notify.service`（systemd oneshot，每次開機不管自動或手動都跑）。腳本重用既有 `awarewave-endpoint-alert.telegram` 的 Telegram 憑證（沒建新 bot、沒建新 secret），開機 90 秒後探測 10 個服務端點 + docker 容器健康狀態，結果一律送 Telegram，正常/異常都送——這是回答操作者「會不會壞掉而不知」的直接答案。**真機測試 2 次**：第一次發現我犯的錯——以為 Telegram 憑證在 `awarewave-endpoint-alert`（Slack 為主的檔案）裡，實際上有專門的 `awarewave-endpoint-alert.telegram` drop-in 檔（`TELEGRAM_NOTIFY_ENABLED`/`TELEGRAM_BOT_TOKEN`/`TELEGRAM_ALLOWED_CHAT_IDS`），第一次真跑時腳本正確偵測到憑證缺失並降級寫 syslog（沒有靜默失敗），修正 sourcing 路徑後第二次真跑成功送出 Telegram 訊息（操作者應該收到一則「[ks-aw-01] Boot OK」）。
+3. **`/sg-reboot` + `/eu-reboot` 合併為 `/ks-aw-01-reboot`**：`/codex-review` 上一輪抓到的 finding——這兩支指令的 SSH `Connection:` 還寫死已刪除的舊 IP，且各自的 pre/post-flight checklist 只覆蓋各自舊拓樸的 container/endpoint，合併現在同一台機器上的 SG+EU+Postiz+Soulful 全部服務為聯集清單，Rollback 段落誠實承認 Hetzner Console 的舊寫法不適用於 OVH（沒有編造沒查證的 OVH rescue 步驟，明講這是待補的缺口）。`scripts/ao-resume.ps1:1119-1126` 的 reboot 告警 slug 邏輯改成常數 `ks-aw-01-reboot`，不再算 `sg-reboot`/`eu-reboot`。舊兩支指令改成失效說明+導向新指令。
+4. **`check-vps-auto-reboot-health.ps1` 從假象改回真探測**：原本因舊機刪除短路成固定回報 `topology-retired`（續15 只訂正了文字，沒有復活探測邏輯）。這次整段重寫：複用既有的 `Get-AutoRebootHealth`/`Compute-Verdict` 函式（先前是永遠不執行的死碼），改指單機 ks-aw-01，`Invoke-Ssh` 加上 Port/User/Key 參數支援 ks-aw-01 的 58122/ubuntu/id_ed25519。**真機測試抓到一個真的部署疏失**：第一次跑回報 🟡 drift（SHA256 mismatch）——因為我用 sftp_write 傳檔案到伺服器時漏帶了完整註解內容，跟 repo 版本 hash 對不上；用 `sha256sum` 兩邊比對抓到，重新用 repo 檔案原文覆蓋後兩邊 hash 完全一致，重跑回報 🟢 healthy。這個「drift 偵測抓到自己的部署錯誤」正是這支腳本存在的理由，值得記錄。
+5. **Let's Encrypt 孤兒帳號清理**：查證後發現「雙帳號問題」比想像中溫和——5 張有效憑證的 renewal `.conf` 早就全部指向同一帳號（`5a8cc415...`），另一個帳號（`82fe9cdb...`，Apr 25 建立）是沒人清掉的孤兒目錄，`grep -rl` 全 `/etc/letsencrypt/` 確認零引用。備份到 `/root/letsencrypt-orphan-account-backup-20260830/` 後刪除，`certbot renew --dry-run` 對全部 5 張證書（含跨 8 個網域的 `aware-wave.com` 群組）模擬續期，全部 `success`。
+6. **坑寫進換機 runbook**：`KS-AW-01-HOST-SWITCH-RUNBOOK.md` §8 教訓總表新增兩列（LE 孤兒帳號、reboot 指令沒隨拓樸合併），照表格既有格式（坑/症狀/已焊進哪一節），供下次真的換機（KS-6/KS-7 有貨）時不要重踩。
+
+**旁支修正**：`scripts/phase4-checks.py` 的 `AUTO_REBOOT_SSOT` 檔案存在清單補上新 SSOT 檔案路徑，舊兩個路徑保留檢查（歷史參考不刪，清單誠實）。
+
+[已修改]
+- `lobster-factory/infra/hetzner-phase1-core/auto-reboot/ks-aw-01-auto-reboot.conf`（新增）、`ks-aw-01-boot-health-notify.sh`（新增）、`ks-aw-01-boot-notify.service`（新增）
+- `.claude/commands/ks-aw-01-reboot.md`（新增，合併版）、`sg-reboot.md`／`eu-reboot.md`（改為失效說明）
+- `scripts/ao-resume.ps1`：reboot escalation slug 改常數
+- `scripts/check-vps-auto-reboot-health.ps1`：整段重寫為單機探測（複用既有函式，非重造）
+- `scripts/phase4-checks.py`：`AUTO_REBOOT_SSOT` 清單補新檔案
+- `runbooks/VPS-AUTO-REBOOT-RUNBOOK.md`：頂部加單機復活橫幅，指向新 SSOT/新指令/新增的 boot-notify
+- `runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md`：§8 新增 2 列教訓
+- `agency-os/TASKS.md`：auto-reboot 決策項、LE 帳號項標記完成並訂正描述
+- ks-aw-01 實機：`/etc/apt/apt.conf.d/52awarewave-auto-reboot`（部署+驗證 hash 對齊）、`/usr/local/bin/ks-aw-01-boot-health-notify.sh`、`/etc/systemd/system/ks-aw-01-boot-notify.service`（enabled）、Let's Encrypt 孤兒帳號目錄移除（備份保留）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`apt-config dump \| grep Automatic-Reboot` | exit=0 | 結果=三鍵值全部確認生效
+- REALTEST_EVIDENCE: tool=SSH | cmd=`systemctl start ks-aw-01-boot-notify.service` 真跑兩次 | exit=0（兩次皆 SUCCESS）| 結果=第一次抓到 Telegram 憑證來源錯誤並降級記 syslog（非靜默失敗），修正後第二次成功送出 Telegram 訊息，健康檢查 10 項全過
+- REALTEST_EVIDENCE: tool=Bash(powershell) | cmd=`.\scripts\check-vps-auto-reboot-health.ps1` 真跑兩次 | exit=0 | 結果=第一次抓到部署檔案 hash 不一致（🟡 drift，真發現非誤報），修正部署內容後第二次 🟢 healthy
+- REALTEST_EVIDENCE: tool=SSH | cmd=`certbot renew --dry-run`（背景執行避免逾時，輪詢完成）| exit=0 | 結果=5 張憑證（跨 8+1+2+7+1=19 個網域）全部 `success`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`grep -rl 82fe9cdb... /etc/letsencrypt/` | exit=1(無命中) | 結果=確認孤兒帳號零引用才刪除
+- REVIEW_DONE: critic=Quick（自查）| verdict=pass | findings=0c/0m/0n——逐一讀回新建的 4 個檔案 + 3 個修改的既有腳本，確認邏輯與既有 pattern（`Get-AutoRebootHealth`/`endpoint-alert.sh` telegram 慣例）一致
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,runbooks | grep=`sg-reboot\|eu-reboot` in `*.ps1` | hits=0（`ao-resume.ps1` 是唯一曾經命中的檔案，已修）；grep=`53awarewave-stagger-eu` | hits=2，皆為刻意保留（`check-vps-auto-reboot-health.ps1` 内部函式的通用 SHA53 蒐集邏輯，未被單機路徑觸發；`phase4-checks.py` 存在性檢查已補新檔案一併查）
+
+[剩餘風險]
+- `ks-aw-01-reboot.md` 的 Rollback 段落誠實承認 OVH rescue 步驟未寫全，真遇到壞開機仍需臨場摸索 OVH Manager，不是照抄就能做的程序
+- ClickHouse/MinIO 密碼是否為出廠預設仍未核對（P2.4c 殘留，續19 已記錄）
+- boot-health-notify 的 90 秒等待是估計值，未在真實 reboot 情境（而非手動 systemctl start）驗證是否足夠讓全部 ~45 容器穩定——下次真的自動觸發 reboot 時要看第一手結果
+
+[rollback] apt conf：`rm /etc/apt/apt.conf.d/52awarewave-auto-reboot`；boot-notify：`systemctl disable ks-aw-01-boot-notify.service`；LE：備份在 `/root/letsencrypt-orphan-account-backup-20260830/`，還原用 `cp -r` 放回原路徑；repo 端全部 `git revert`
+
 ## 2026-08-30（續20）
 
 ### `/codex-review` 對 AI-LEGO 巨批（39 proposal + 9 schema）真實執行後撞牆——Codex 額度耗盡（非程式問題），改真實自我對抗覆審，誠實記錄 `ORACLE_WAIVED`

@@ -80,7 +80,12 @@ DEFAULT_DRILL_INTERVAL_DAYS = 90
 
 REPORT_DIR_REL = os.path.join("agency-os", "reports", "repair-center")
 
+# 2026-08-30: ks-aw-01-auto-reboot.conf is the live single-host SSOT (deployed to
+# the same /etc/apt/apt.conf.d/52awarewave-auto-reboot path on ks-aw-01). The two
+# pre-consolidation files below are kept as historical reference, not deleted, so
+# this list still checks both -- neither going missing should go unnoticed.
 AUTO_REBOOT_SSOT = [
+    "lobster-factory/infra/hetzner-phase1-core/auto-reboot/ks-aw-01-auto-reboot.conf",
     "lobster-factory/infra/hetzner-phase1-core/auto-reboot/52awarewave-auto-reboot.conf",
     "lobster-factory/infra/hetzner-phase1-core/auto-reboot/53awarewave-stagger-eu.conf",
     "runbooks/VPS-AUTO-REBOOT-RUNBOOK.md",

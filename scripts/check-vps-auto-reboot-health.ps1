@@ -38,6 +38,13 @@ param(
     [string]$EuHost = "204.168.175.41",
     [string]$SshUser = "root",
     [string]$PrivateKey = (Join-Path $env:USERPROFILE ".ssh\hetzner_trigger"),
+    # ks-aw-01 (2026-08-28 consolidation target; only production host since 2026-08-30
+    # deletion of the SG/EU boxes above). $SgHost/$EuHost/$SshUser/$PrivateKey kept for
+    # call-site signature compatibility -- never actually probed any more.
+    [string]$KsAw01Host = "149.202.64.114",
+    [string]$KsAw01SshUser = "ubuntu",
+    [int]$KsAw01SshPort = 58122,
+    [string]$KsAw01PrivateKey = (Join-Path $env:USERPROFILE ".ssh\id_ed25519"),
     [string]$WorkRoot = "",
     [switch]$Json
 )
@@ -66,13 +73,20 @@ function Resolve-Root {
 }
 
 function Invoke-Ssh {
-    param([string]$ServerHost, [string]$Command)
+    param(
+        [string]$ServerHost,
+        [string]$Command,
+        [string]$User = $SshUser,
+        [string]$Key = $PrivateKey,
+        [int]$Port = 22
+    )
     $sshArgs = @(
         "-o", "BatchMode=yes",
         "-o", "StrictHostKeyChecking=accept-new",
         "-o", "ConnectTimeout=10",
-        "-i", $PrivateKey,
-        ("{0}@{1}" -f $SshUser, $ServerHost),
+        "-p", $Port,
+        "-i", $Key,
+        ("{0}@{1}" -f $User, $ServerHost),
         $Command
     )
     $out = Invoke-WithUtf8Console { & ssh @sshArgs 2>&1 }
@@ -106,7 +120,13 @@ function Get-RepoSsotSha {
 }
 
 function Get-AutoRebootHealth {
-    param([string]$ServerHost, [bool]$Is53Expected)
+    param(
+        [string]$ServerHost,
+        [bool]$Is53Expected,
+        [string]$User = $SshUser,
+        [string]$Key = $PrivateKey,
+        [int]$Port = 22
+    )
 
     $parts = @(
         'set -eu',
@@ -136,7 +156,7 @@ function Get-AutoRebootHealth {
     $raw = ($parts -join "; ")
     $b64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($raw))
     $cmd = "echo $b64 | base64 -d | bash -l"
-    $res = Invoke-Ssh -ServerHost $ServerHost -Command $cmd
+    $res = Invoke-Ssh -ServerHost $ServerHost -Command $cmd -User $User -Key $Key -Port $Port
 
     if ($res.ExitCode -ne 0) {
         return [ordered]@{
@@ -243,56 +263,19 @@ function Sha-Cell {
 }
 
 # Main
+# 2026-08-30: re-pointed at the single consolidated host ks-aw-01. SG/EU (5.223.93.113 /
+# 204.168.175.41) were merged into it 2026-08-28 and deleted at Hetzner console
+# 2026-08-30; there is no second host and no 53-stagger conf any more -- one host,
+# one Automatic-Reboot-Time. Reuses Get-AutoRebootHealth/Compute-Verdict verbatim
+# (previously dead code behind a hard exit 0) with Is53Expected always $false.
 $rootPath = Resolve-Root -InputRoot $WorkRoot
-$repoSsot52Rel = "lobster-factory\infra\hetzner-phase1-core\auto-reboot\52awarewave-auto-reboot.conf"
-$repoSsot53Rel = "lobster-factory\infra\hetzner-phase1-core\auto-reboot\53awarewave-stagger-eu.conf"
+$repoSsot52Rel = "lobster-factory\infra\hetzner-phase1-core\auto-reboot\ks-aw-01-auto-reboot.conf"
 $ssotSha52 = Get-RepoSsotSha -Root $rootPath -RelPath $repoSsot52Rel
-$ssotSha53 = Get-RepoSsotSha -Root $rootPath -RelPath $repoSsot53Rel
 
-# ============================================================================
-# 2026-08-28 consolidation, 2026-08-30 deletion short-circuit: the machines this
-# checker probed (SG 5.223.93.113 / EU 204.168.175.41) were deleted at Hetzner
-# console; the B-Minimal auto-reboot system died with them. ks-aw-01 deliberately
-# has NO auto-reboot yet: a daily reboot of the single consolidated host would be a
-# daily full-stack outage window - that trade-off is the operator's call, not
-# a default to inherit. TASKS.md tracks the decision. Until then this checker
-# reports the topology change honestly instead of red-noise ssh failures
-# (SSH to $SgHost/$EuHost below would now fail outright - hosts no longer exist).
-$stamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss 'UTC'")
-$rcRoot = Resolve-Root -InputRoot $WorkRoot
-$rcDir = Join-Path $rcRoot "agency-os/reports/status"
-if (-not (Test-Path -LiteralPath $rcDir)) { New-Item -ItemType Directory -Force -Path $rcDir | Out-Null }
-$mdPath = Join-Path $rcDir "auto-reboot-LATEST.md"
-$jsonPath = Join-Path $rcDir "auto-reboot-LATEST.json"
-@(
-    "# VPS auto-reboot health",
-    "",
-    "- Generated: $stamp",
-    "- **Verdict: [YELLOW] topology-retired**",
-    "",
-    "SG/EU were consolidated onto ks-aw-01 on 2026-08-28 and deleted 2026-08-30.",
-    "The auto-reboot system existed only on those machines. ks-aw-01 has NO",
-    "auto-reboot **by design pending an operator decision** (daily reboot of the",
-    "single consolidated host = daily full-stack outage window).",
-    "",
-    "AO-RESUME reading this: reboot signals for ks-aw-01 are always manual +",
-    "High-risk go-ahead; there is no 16h auto-window any more."
-) -join "`r`n" | Set-Content -LiteralPath $mdPath -Encoding UTF8
-'{"verdict":"topology-retired","generated":"' + $stamp + '","note":"SG/EU consolidated onto ks-aw-01 2026-08-28, deleted 2026-08-30; auto-reboot decision pending (TASKS.md)"}' | Set-Content -LiteralPath $jsonPath -Encoding UTF8
-Write-Host "== VPS auto-reboot: [YELLOW] topology-retired (SG/EU consolidated onto ks-aw-01; see TASKS.md) =="
-exit 0
+$ks = Get-AutoRebootHealth -ServerHost $KsAw01Host -Is53Expected $false -User $KsAw01SshUser -Key $KsAw01PrivateKey -Port $KsAw01SshPort
+$ksVerdict = Compute-Verdict -Snapshot $ks -SsotSha52 $ssotSha52 -SsotSha53 ""
 
-$sg = Get-AutoRebootHealth -ServerHost $SgHost -Is53Expected $false
-$eu = Get-AutoRebootHealth -ServerHost $EuHost -Is53Expected $true
-
-$sgVerdict = Compute-Verdict -Snapshot $sg -SsotSha52 $ssotSha52 -SsotSha53 $ssotSha53
-$euVerdict = Compute-Verdict -Snapshot $eu -SsotSha52 $ssotSha52 -SsotSha53 $ssotSha53
-
-$worstLabel = "healthy"
-foreach ($v in @($sgVerdict, $euVerdict)) {
-    if ($v.label -eq "broken") { $worstLabel = "broken" }
-    elseif ($v.label -eq "drift" -and $worstLabel -ne "broken") { $worstLabel = "drift" }
-}
+$worstLabel = $ksVerdict.label
 $worstUserLabel = switch ($worstLabel) {
     "healthy" { "PASS" }
     "drift"   { "WARN" }
@@ -310,9 +293,8 @@ $jsonObj = [ordered]@{
     generated_utc = $genUtc
     overall_label = $worstLabel
     overall_user  = $worstUserLabel
-    ssot = [ordered]@{ sha52 = $ssotSha52; sha53 = $ssotSha53 }
-    sg = [ordered]@{ snapshot = $sg; verdict = [ordered]@{ label = $sgVerdict.label; reasons = $sgVerdict.reasons; pending = $sgVerdict.pending } }
-    eu = [ordered]@{ snapshot = $eu; verdict = [ordered]@{ label = $euVerdict.label; reasons = $euVerdict.reasons; pending = $euVerdict.pending } }
+    ssot = [ordered]@{ sha52 = $ssotSha52 }
+    ks_aw_01 = [ordered]@{ snapshot = $ks; verdict = [ordered]@{ label = $ksVerdict.label; reasons = $ksVerdict.reasons; pending = $ksVerdict.pending } }
 }
 $jsonPath = Join-Path $reportDir "auto-reboot-LATEST.json"
 $jsonText = ($jsonObj | ConvertTo-Json -Depth 8)
@@ -326,71 +308,41 @@ $md = New-Object System.Text.StringBuilder
 [void]$md.AppendLine("- **Overall: $worstIcon $worstUserLabel**")
 [void]$md.AppendLine("- SSOT: ``lobster-factory/infra/hetzner-phase1-core/auto-reboot/``")
 [void]$md.AppendLine("- Runbook: ``runbooks/VPS-AUTO-REBOOT-RUNBOOK.md``")
+[void]$md.AppendLine("- Boot-outcome notification (separate from this drift check): `` ks-aw-01-boot-health-notify.sh`` fires via Telegram on every boot, automatic or manual.")
 [void]$md.AppendLine("")
-[void]$md.AppendLine("## Per-host status")
+[void]$md.AppendLine("## Host status")
 [void]$md.AppendLine("")
-[void]$md.AppendLine("| VPS | Verdict | Auto-Reboot | Time | SSOT 52 | SSOT 53 | daemon | pending | kernel |")
-[void]$md.AppendLine("|-----|---------|-------------|------|---------|---------|--------|---------|--------|")
-
-$pairs = @(
-    @{ name = "SG ($SgHost)"; snap = $sg; verdict = $sgVerdict },
-    @{ name = "EU ($EuHost)"; snap = $eu; verdict = $euVerdict }
-)
-foreach ($p in $pairs) {
-    $snap = $p.snap
-    $v = $p.verdict
-    $icon = Icon-For-Label $v.label
-    if (-not $snap.ok) {
-        [void]$md.AppendLine("| $($p.name) | $icon $($v.label) | - | - | - | - | - | - | - |")
-        continue
-    }
-    $sha52Cell = Sha-Cell -HostSha $snap.sha52 -RepoSha $ssotSha52
-    if (-not $snap.expect_53) {
-        $sha53Cell = if ($snap.sha53) { "unexpected" } else { "n/a" }
-    } else {
-        $sha53Cell = Sha-Cell -HostSha $snap.sha53 -RepoSha $ssotSha53
-    }
-    $pendingCell = if ($v.pending) { "$ICON_WARN yes" } else { "no" }
-    $daemonCell = "$($snap.daemon_active)/$($snap.daemon_enabled)"
-    [void]$md.AppendLine("| $($p.name) | $icon $($v.label) | $($snap.ar_on) | $($snap.ar_time) | $sha52Cell | $sha53Cell | $daemonCell | $pendingCell | $($snap.kernel) |")
+[void]$md.AppendLine("| VPS | Verdict | Auto-Reboot | Time | SSOT 52 | daemon | pending | kernel |")
+[void]$md.AppendLine("|-----|---------|-------------|------|---------|--------|---------|--------|")
+if (-not $ks.ok) {
+    [void]$md.AppendLine("| ks-aw-01 ($KsAw01Host) | $worstIcon $($ksVerdict.label) | - | - | - | - | - | - |")
+} else {
+    $sha52Cell = Sha-Cell -HostSha $ks.sha52 -RepoSha $ssotSha52
+    $pendingCell = if ($ksVerdict.pending) { "$ICON_WARN yes" } else { "no" }
+    $daemonCell = "$($ks.daemon_active)/$($ks.daemon_enabled)"
+    [void]$md.AppendLine("| ks-aw-01 ($KsAw01Host) | $worstIcon $($ksVerdict.label) | $($ks.ar_on) | $($ks.ar_time) | $sha52Cell | $daemonCell | $pendingCell | $($ks.kernel) |")
 }
 
 [void]$md.AppendLine("")
-$anyReasons = ($sgVerdict.reasons.Count -gt 0) -or ($euVerdict.reasons.Count -gt 0)
-if ($anyReasons) {
+if ($ksVerdict.reasons.Count -gt 0) {
     [void]$md.AppendLine("## Reasons")
     [void]$md.AppendLine("")
-    foreach ($p in $pairs) {
-        if ($p.verdict.reasons.Count -gt 0) {
-            $picon = Icon-For-Label $p.verdict.label
-            [void]$md.AppendLine("**$($p.name)** ($picon $($p.verdict.label)):")
-            foreach ($r in $p.verdict.reasons) {
-                [void]$md.AppendLine("- $r")
-            }
-            [void]$md.AppendLine("")
-        }
-    }
+    foreach ($r in $ksVerdict.reasons) { [void]$md.AppendLine("- $r") }
+    [void]$md.AppendLine("")
 }
 
-$anyPending = $sgVerdict.pending -or $euVerdict.pending
-if ($anyPending) {
+if ($ksVerdict.pending) {
     [void]$md.AppendLine("## Pending reboot (informational)")
     [void]$md.AppendLine("")
-    if ($sgVerdict.pending) {
-        [void]$md.AppendLine("- SG: ``/var/run/reboot-required`` present. Packages: ``$($sg.reboot_pkgs)``. Auto-reboot window: next **20:00 UTC** (= 04:00 TPE).")
-    }
-    if ($euVerdict.pending) {
-        [void]$md.AppendLine("- EU: ``/var/run/reboot-required`` present. Packages: ``$($eu.reboot_pkgs)``. Auto-reboot window: next **20:30 UTC** (= 04:30 TPE).")
-    }
+    [void]$md.AppendLine("- ks-aw-01: ``/var/run/reboot-required`` present. Packages: ``$($ks.reboot_pkgs)``. Auto-reboot window: next **20:00 UTC** (= 04:00 TPE).")
     [void]$md.AppendLine("")
-    [void]$md.AppendLine("Action: none - let OS handle. If marker persists > 16h, AGENTS.md trigger rule escalates to manual ``/sg-reboot`` or ``/eu-reboot``.")
+    [void]$md.AppendLine("Action: none - let OS handle; ``ks-aw-01-boot-health-notify.sh`` will report the outcome via Telegram once it fires. If marker persists > 16h, AGENTS.md trigger rule escalates to manual ``/ks-aw-01-reboot``.")
     [void]$md.AppendLine("")
 }
 
 [void]$md.AppendLine("## Last reboot")
 [void]$md.AppendLine("")
-[void]$md.AppendLine("- SG: $($sg.last_reboot)")
-[void]$md.AppendLine("- EU: $($eu.last_reboot)")
+[void]$md.AppendLine("- ks-aw-01: $($ks.last_reboot)")
 [void]$md.AppendLine("")
 [void]$md.AppendLine("---")
 [void]$md.AppendLine("")
@@ -410,12 +362,9 @@ if ($Json) {
         default   { "White" }
     }
     Write-Host "== VPS auto-reboot health: $worstIcon $worstUserLabel ==" -ForegroundColor $color
-    $sgIcon = Icon-For-Label $sgVerdict.label
-    $euIcon = Icon-For-Label $euVerdict.label
-    Write-Host "  SG: $sgIcon $($sgVerdict.label)" -NoNewline
-    if ($sgVerdict.pending) { Write-Host " (reboot pending, auto-fire @ 20:00 UTC)" -ForegroundColor Yellow } else { Write-Host "" }
-    Write-Host "  EU: $euIcon $($euVerdict.label)" -NoNewline
-    if ($euVerdict.pending) { Write-Host " (reboot pending, auto-fire @ 20:30 UTC)" -ForegroundColor Yellow } else { Write-Host "" }
+    $ksIcon = Icon-For-Label $ksVerdict.label
+    Write-Host "  ks-aw-01: $ksIcon $($ksVerdict.label)" -NoNewline
+    if ($ksVerdict.pending) { Write-Host " (reboot pending, auto-fire @ 20:00 UTC)" -ForegroundColor Yellow } else { Write-Host "" }
     Write-Host "  Report: agency-os/reports/status/auto-reboot-LATEST.md"
 }
 

@@ -1,9 +1,16 @@
 # Runbook: VPS 套件升級自動 Reboot (B-Minimal)
 
-> **Established**: 2026-05-23
-> **SSOT for apt config**: `lobster-factory/infra/hetzner-phase1-core/auto-reboot/52awarewave-auto-reboot.conf`
-> **Applies to**: SG VPS (`5.223.93.113`) + EU VPS (`204.168.175.41`)
-> **Replaces (default behavior, NOT runbook)**: 手動 `/sg-reboot` / `/eu-reboot` 仍保留作為 emergency / forced override 路徑
+> **🚨 2026-08-30 單機復活**：SG+EU 已於 2026-08-28 整併進 ks-aw-01，舊兩台已刪除退租；本文件下方大部分內容（雙機、53 stagger、`/sg-reboot`/`/eu-reboot`）描述的是**歷史拓樸**，機制本身**已在 ks-aw-01 重新啟用**（同一套 apt 原生機制，非重寫）。現況：
+> - **SSOT** 改為 `lobster-factory/infra/hetzner-phase1-core/auto-reboot/ks-aw-01-auto-reboot.conf`（部署到同樣的 `/etc/apt/apt.conf.d/52awarewave-auto-reboot` 路徑，內容邏輯不變，只改敘述與時間——單機不需要 53 錯位檔）
+> - **新增一塊 B-Minimal 原版沒有的東西**：`ks-aw-01-boot-health-notify.sh` + `ks-aw-01-boot-notify.service`（同目錄），**每次開機**（自動或手動）都跑健康檢查並用 Telegram 回報結果。這是單機拓樸特有的風險補強——雙機時代一台壞了另一台還在，沒人需要盯著 reboot 發生；單機現在一次 reboot 壞了就是全站掛，2026-08-30 操作者直接問「會不會壞掉而不知」，這塊就是答案。
+> - **手動 reboot 指令**改為 `.claude/commands/ks-aw-01-reboot.md`（合併原 `/sg-reboot` + `/eu-reboot` 的 checklist 為聯集），`scripts/ao-resume.ps1` 的告警 escalation 已同步改指這支
+> - `scripts/check-vps-auto-reboot-health.ps1` 已改回真的探測 ks-aw-01（先前因舊機刪除而短路成 `topology-retired` 假象，2026-08-30 隨本次啟用一併訂正，SHA256/daemon/pending 全部實測 🟢）
+> - **這不是「daily reboot = daily 全站停機」**：apt 的 `Automatic-Reboot "true"` 只在真的有補丁在等重開機時才觸發（見下方機制圖），沒補丁的日子什麼都不會發生——這件事下方全文一直是對的，只是 TASKS.md 曾經把它誤講成「每天固定停機」，2026-08-30 已訂正
+>
+> **Established**: 2026-05-23（原始雙機設計，機制沿用至今）
+> **SSOT for apt config（歷史，雙機時代）**: `lobster-factory/infra/hetzner-phase1-core/auto-reboot/52awarewave-auto-reboot.conf`
+> **Applies to（歷史，雙機時代）**: SG VPS (`5.223.93.113`) + EU VPS (`204.168.175.41`)
+> **Replaces（歷史）**: 手動 `/sg-reboot` / `/eu-reboot`，現由 `/ks-aw-01-reboot` 取代
 
 ---
 
