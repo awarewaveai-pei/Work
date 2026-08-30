@@ -4134,37 +4134,9 @@ Branch 是 Workflow 的一條分叉、隔離的執行血系（forked, isolated e
 
 # 22. Quality Gates
 
-## 22.1 Global Gate
+## 22.1 Global Gate / 22.2 High-risk Gate
 
-```text
-Functional PASS
-Evidence PASS
-Reasoning PASS
-Security PASS
-Privacy PASS
-Data PASS
-Jurisdiction PASS
-Localization PASS
-Accessibility PASS
-Observability PASS
-Capacity PASS
-Rollback PASS
-Documentation PASS
-Golden Test PASS
-```
-
-## 22.2 High-risk Gate
-
-額外要求：
-
-```text
-Human Specialist Review PASS
-Counterevidence PASS
-Red Team PASS
-Independent Judge PASS
-Reversal Criteria PASS
-Recovery / Rollback Rehearsal PASS
-```
+Global/High-risk Gate 清單的唯一正本見 Master Plan §158 — SSOT（see Master Plan §158 — SSOT），禁止在本文件重複列舉。本文件僅保留 §22.3 Method-specific Gate（per-method 契約，屬 Atlas 自身已獲授權的範圍，見 MP §0.0.1 Scoped Authority 表）。
 
 ## 22.3 Method-specific Gate
 
