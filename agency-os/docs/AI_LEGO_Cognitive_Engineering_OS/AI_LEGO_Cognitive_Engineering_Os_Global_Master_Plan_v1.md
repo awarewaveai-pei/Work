@@ -3372,14 +3372,14 @@ knowledge_snapshot
 
 # 83. 最重要的內容原則
 
-AI 產出必須區分：
+AI 產出必須區分（canonical enum 定義見 `specs/governance/epistemic-label.schema.yaml#/definitions/epistemic_type`，本清單為其嚴格子集，ADR-004 Sub-decision b）：
 
 ```text
-SOURCE FACT
-AI INFERENCE
-AI SUGGESTION
-HUMAN OPINION
-CALCULATED RESULT
+SOURCE_FACT
+AI_INFERENCE
+AI_SUGGESTION
+HUMAN_OPINION
+CALCULATED_RESULT
 UNKNOWN
 ```
 
