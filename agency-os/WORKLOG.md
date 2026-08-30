@@ -1,5 +1,47 @@
 # Worklog
 
+## 2026-08-30（續19）
+
+### P2.4c 硬化：ks-aw-01 上 4 個無密碼 Redis，補上 3 個（lobster/postiz/soulful），trigger-redis 查證後刻意不動
+
+**觸發**：操作者核對 TASKS.md「P2.4c 密碼輪換」待辦時明確授權「要，並存入 AWARE_WAVE_CREDENTIALS.md」。範圍先經 SSH 實查縮小——P2.4b（port 只綁 127.0.0.1）已達成免做；P2.4c 實際缺口只是 4 個 Redis container 沒設 `requirepass`（`redis-cli ping` 免驗證就回 `PONG`），不是要輪換 `AWARE_WAVE_CREDENTIALS.md` 全部 30+ 項憑證。
+
+**逐一處理（每個都：生密碼 → 改 compose command 加 `--requirepass` → 改消費端連線字串 → 改 healthcheck 加 `-a` → 重建容器 → 驗證 NOAUTH/PONG/consumer 健康 → 才進下一個）**：
+
+1. **`postiz-redis`**：`.env` 加 `REDIS_PASSWORD`，compose command 與 postiz 的 `REDIS_URL` 同步改。無既有 healthcheck 不用改。驗證：unauth ping→`NOAUTH`，auth ping→`PONG`，postiz container healthy，log 無 redis 錯誤，HTTP 307（正常導向 /auth）。
+2. **`lobster-redis`**：同做法，另外**修正 healthcheck**（`redis-cli ping` 沒帶 `-a` 的話，設完密碼後 healthcheck 會因 NOAUTH 一直失敗，container 變 unhealthy，`node-api` 的 `depends_on: condition: service_healthy` 永遠等不到，服務就啟動不了——這是這次操作真正的坑，不是設密碼本身）。驗證：`lobster-redis`/`lobster-node-api` 皆 healthy，`/health`=200，`/api/ops/summary`=200（真實 production 端點）。
+3. **`soulful-redis`**：WordPress 走 Redis Object Cache 外掛，設定不在 compose 也不在 repo，是 wp-config.php 裡的 PHP 常數（`WP_REDIS_HOST` 等），檔案本身活在 Docker named volume `soulful_wordpress_data`（非 repo 檔案）——SSH 進容器讀出常數位置後，在 `WP_REDIS_HOST` 定義後面插入 `WP_REDIS_PASSWORD` 常數，值與 compose 的 `REDIS_PASSWORD` 一致；同步修 healthcheck。編輯前備份 `wp-config.php.bak-20260830`。驗證：`wp redis status --allow-root` 回 `Status: Connected`、`Ping: 1`，站台 smoke 200/301 正常。
+4. **`trigger-redis`：刻意不動**——`webapp` 服務用 `REDIS_HOST`/`REDIS_PORT`（不是 URL 格式），且該 compose 還有 `supervisor`/`docker-proxy` 服務，不確定是否也直接碰 Redis 佇列；trigger.dev 官方支援的密碼環境變數名稱未確認（可能不是 `REDIS_PASSWORD`）。貿然設 `requirepass` 有弄壞自架排程系統（給多個工作流用）的風險，不猜，列為待查後續。
+
+**同步更新 repo SSOT**（避免「線上改了、git 沒改」的 drift——這正是本 repo `check-deploy-drift.ps1` 整套機制想防的事）：
+- `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`：redis command + healthcheck + node-api REDIS_URL，改用 `${REDIS_PASSWORD}` 佔位符（**不含實際密碼值**，密碼只在 server `.env` 與 `AWARE_WAVE_CREDENTIALS.md`）
+- `lobster-factory/infra/postiz/docker-compose.yml`：同上
+- `lobster-factory/infra/soulful/docker-compose.yml`：同上（compose 層；wp-config.php 那份因為活在 volume 不受 git 管，只能在 server 上維護，已記錄在憑證檔供下次重建時對照）
+- `lobster-factory/infra/hetzner-phase1-core/.env.example`：新增 `REDIS_PASSWORD` 說明（原本連 `REDIS_HOST_PORT` 都沒寫進範本，這是既有缺口，這次只補自己引入的這項，沒有順手把舊缺口一起補，範圍控制）
+- `runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md` §7：P2.4b 勾選完成，P2.4c 更新為部分完成 + 誠實列出 ClickHouse/MinIO 密碼尚未逐一核對
+
+[已修改]
+- `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`、`lobster-factory/infra/postiz/docker-compose.yml`、`lobster-factory/infra/soulful/docker-compose.yml`：redis 服務 `--requirepass` + healthcheck `-a` + 消費端連線字串（皆用 `${REDIS_PASSWORD}` 佔位符）
+- `lobster-factory/infra/hetzner-phase1-core/.env.example`：新增 `REDIS_PASSWORD` 條目
+- `runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`：§7 checklist P2.4b/4c 狀態更新
+- ks-aw-01 實機（不在 git）：`/root/lobster-phase1/.env`、`/root/postiz/.env`、`/root/soulful/.env` 各加 `REDIS_PASSWORD`；`/root/lobster-phase1/docker-compose.yml`、`/root/postiz/docker-compose.yml`、`/root/soulful/docker-compose.yml` 同步 repo 改法；`/var/lib/docker/volumes/soulful_wordpress_data/_data/wp-config.php` 加 `WP_REDIS_PASSWORD`；4 個容器全部先備份原檔（`.bak-20260830`）才動手
+- `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md`：新增 §32 記錄 3 個密碼實際值 + trigger-redis 未處理原因 + 給下次同類操作的坑（healthcheck 要一起改）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH(hetzner-ssh MCP) | cmd=`docker exec <redis> redis-cli ping`（無密碼，預期並確認 NOAUTH）+ `redis-cli -a <pw> --no-auth-warning ping`（預期並確認 PONG），3 個 Redis 皆執行 | exit=0 | 結果=3/3 通過
+- REALTEST_EVIDENCE: tool=SSH | cmd=`curl 127.0.0.1:3001/health` + `curl -H "Host: app.aware-wave.com" 127.0.0.1/api/ops/summary` | exit=0 | 結果=200/200（node-api 真實服務未受影響）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec soulful-wp wp redis status --allow-root` | exit=0 | 結果=Status: Connected, Ping: 1
+- REALTEST_EVIDENCE: tool=SSH | cmd=`curl -H "Host: soulfulexpression.org" 127.0.0.1/` | exit=0 | 結果=301（正常 http→https 導向，非錯誤）
+- REVIEW_DONE: critic=Quick（自查）| verdict=pass | findings=0c/0m/0n——逐一讀回 3 份 repo compose 檔確認與 server 端結構一致（僅密碼值不同，佔位符 vs 實值符合預期）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`redis://redis:6379\|redis://postiz-redis:6379\|test: \[\"CMD\", \"redis-cli\", \"ping\"\]` | hits=2，逐一核對非漏改：① `agency-os/WORKLOG.md`——本條記錄自己引用舊字串當文件說明，非程式碼 ② `lobster-factory/infra/hetzner-phase1-core/docker-compose.recommended-ai-native.yml:138`——讀開頭確認是「單台 Hetzner 結構建議」參考文件（自述「本檔不放任何真實密鑰」，container 命名 `aos-*` 與實際 production `lobster-*` 不同），非目前部署的 compose，不在本次修改範圍；`lobster-factory/infra/trigger/docker-compose.yml:59` 的 trigger-redis healthcheck 沒被 pattern 排除但屬於本次刻意不動的第 4 項，不算漏改
+
+[剩餘風險]
+- `trigger-redis` 仍無密碼，是本次刻意保留的已知缺口，非遺漏
+- ClickHouse/MinIO 是否為出廠預設密碼未核對，只查了 port 綁定（P2.4c 仍非 100% 完成）
+- `wp-config.php` 裡的密碼常數活在 Docker volume，不受 git/repo 版控保護，唯一備份是 `AWARE_WAVE_CREDENTIALS.md` 跟 server 上的 `.bak-20260830`——若這台機器整個重建且沒讀憑證檔，這個常數會遺失（但不影響網站运作，只會退回無密碼快取而非網站掛掉）
+
+[rollback] 每個服務都有 `.bak-20260830` 原始檔（compose/env/wp-config.php），復原 = 覆蓋回去 + `docker compose up -d` 重建對應容器；repo 端 `git revert` 即可
+
 ## 2026-08-30（續18）
 
 ### 續16 的 commit 被並行 session 意外併入其 commit（15814d1be）；`/verify-recent` critic 抓到 run_golden_tests.py 5 個真實靜默失效點，全數修正

@@ -88,9 +88,11 @@ services:
       - ""
       - --appendonly
       - "no"
+      - --requirepass
+      - ${REDIS_PASSWORD}
     # No ports: stanza -- reachable only on the internal network, same rule as soulful-db.
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--no-auth-warning", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5

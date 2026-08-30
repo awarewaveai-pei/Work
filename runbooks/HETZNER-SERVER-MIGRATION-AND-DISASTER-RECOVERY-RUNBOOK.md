@@ -388,8 +388,8 @@ openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -in "$OUT/env.tar.g
 - [ ] **P4.1** Drill #2：從 R2 完整還原到拋棄式機器，計時，目標 < 4 小時
 - [ ] **W4（EU/SG 整併）明確排 2026-11-20 之後**，六個服務各一具名任務，兩週一台 —— 操作者已確認 9–11 月與 2027 Q1 無出國行程，排程無阻礙
 - [x] 🔴 **P2.4 防火牆 UFW + DOCKER-USER chain 雙層已裝並驗證**（2026-08-27：`ufw` active、`DOCKER-USER` 4 條規則、`docker-user-chain.service` enabled 開機重建）。**裝的過程真的踩到了**：`iptables-persistent` 安裝時**靜默移除了 ufw**（INPUT policy DROP→ACCEPT），只被 P2.8 重開機驗證抓到——而這個衝突 repo 早就記錄在 `SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md:630-633`，當時只 grep 指令沒讀旁邊的說明。原文保留如下（2026-08-18 追加，修正 2026-04-20 SG 挖礦入侵同款漏洞——Docker 寫 iptables `DOCKER` chain，執行順序在 UFW `INPUT` chain 之前，單純 UFW 攔不住）。事故記錄與根治法：[`SECURITY-INCIDENT-CRYPTO-MINER.md`](HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md) / [`SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md`](SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md)
-- [ ] **P2.4b** 所有非對外服務 port（Postgres/Redis/ClickHouse/MinIO/n8n/Chatwoot）一律 compose 層綁 `127.0.0.1:`，不依賴防火牆當唯一防線
-- [ ] **P2.4c** 所有服務預設密碼全部更換為 `openssl rand -hex 32`，存 vault 不進 git（4/20 事件第二根因：Supabase 預設密碼從未改過）
+- [x] **P2.4b** 所有非對外服務 port（Postgres/Redis/ClickHouse/MinIO/n8n/Chatwoot）一律 compose 層綁 `127.0.0.1:`，不依賴防火牆當唯一防線——2026-08-30 `ss -tlnp` 全機掃描確認，對外只有 80/443/58122，其餘全綁 `127.0.0.1`
+- [ ] **P2.4c** 所有服務預設密碼全部更換為 `openssl rand -hex 32`，存 vault 不進 git（4/20 事件第二根因：Supabase 預設密碼從未改過）——2026-08-30 查證：4 個 Redis container 無密碼，已補 3 個（`lobster-redis`/`postiz-redis`/`soulful-redis`，值存 `AWARE_WAVE_CREDENTIALS.md` §32），**`trigger-redis` 未補**（trigger.dev webapp 用 `REDIS_HOST`/`REDIS_PORT` 而非 URL 格式，且 supervisor/docker-proxy 可能也碰佇列，需先查官方文件的密碼環境變數名稱再動，避免弄壞自架排程系統）。ClickHouse/MinIO 的密碼是否為出廠預設**尚未逐一核對**，只查了 port 綁定
 - [ ] **P2.9** 上線前逐項跑 `SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md` §10 預防性檢查清單（不只裝機當下跑一次，每次新服務上線前都跑）
 - [ ] **P6.10** 每週安全稽核 cron（§8-6 現成腳本）：找 0.0.0.0 綁定的資料庫類 port / 可疑進程 / `/tmp` 新檔案 / `authorized_keys` 異動 → 異常寫 status，AO-RESUME 讀
 - [x] **P2.5** SSH port 已改 **58122**（2026-08-27 實測：僅 58122 listening，22 已關）。**坑**：Ubuntu 24.04 用 `ssh.socket`，改 `sshd_config` 的 `Port` 無效，必須改 systemd socket override；採雙埠並行→驗證→再撤 22 的分段做法

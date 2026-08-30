@@ -20,7 +20,7 @@ services:
         max-file: "3"
     mem_limit: 128m
     cpus: "0.25"
-    command: redis-server --save "" --appendonly no
+    command: redis-server --save "" --appendonly no --requirepass ${REDIS_PASSWORD}
     networks:
       - postiz_internal
 
@@ -39,7 +39,7 @@ services:
       - '127.0.0.1:4007:5000'
     environment:
       - DATABASE_URL=postgresql://postiz:${POSTIZ_DB_PASSWORD}@supabase-db:5432/postiz
-      - REDIS_URL=redis://postiz-redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@postiz-redis:6379
       - JWT_SECRET=${POSTIZ_JWT_SECRET}
       - FRONTEND_URL=https://postiz.aware-wave.com
       - NEXT_PUBLIC_BACKEND_URL=https://postiz.aware-wave.com/api
