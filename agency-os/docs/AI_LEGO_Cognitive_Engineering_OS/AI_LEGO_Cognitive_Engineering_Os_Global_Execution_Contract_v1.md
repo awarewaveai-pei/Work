@@ -206,6 +206,11 @@ documents:
     filename: AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md
     major: 1
     required: true
+
+  - id: ai-lego.architecture-constitution
+    filename: Architecture-Constitution-v1.md
+    major: 1
+    required: true
 ```
 
 每次執行保存：
