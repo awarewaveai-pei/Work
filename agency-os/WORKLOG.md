@@ -1,6 +1,32 @@
 # Worklog
 
-## 2026-08-30（續26）
+## 2026-08-30（續27）
+
+### Codex 額度用完中斷，Claude 驗真其半成品後落地：ADR-019 reason_code 完整實作 + ADR-017 兩份 proposal 草稿
+
+**觸發**：操作者「codex 額度用完了 你看他做完了嗎?」——查 git 狀態，Codex 沒做完整份 §9 任務就沒額度了，但已完成部分是完整、可用的（不是半殘檔）。
+
+**發現**：3 個檔案（`result.schema.yaml`/`status-codes.schema.yaml`/`result.fixtures.yaml`）已 `git add` 到共用 index 但未 commit；`.ai/proposals/040-`/`041-` 兩個新資料夾完全 untracked。逐一驗真：`emittable_reason_codes` 的 9 個值逐一對照 `status_codes[]` 真實登記表（Python yaml parse 直接列舉，非肉眼掃）確認精確相符，正確排除 `NEEDS_HUMAN_REVIEW`（side state）與 `PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED`（NEW_PROPOSED 未來碼，且該 fixture 專門測試這個排除）；proposal 040/041 的 Original diff 區塊逐字對照現況 MP/Atlas 開頭確認相符；EC §4 registry 的 `ai-lego.master-plan`/`ai-lego.method-atlas` 兩個 ID 存在確認無誤；兩份 proposal 皆正確停在 `status: DRAFT`，未自我 APPROVED。跑 `python tests/run_golden_tests.py`：851/851（原 839，Codex 新增 12 個 fixture 全過）。
+
+**判定**：Codex 交出的部分品質完整、無需修補，直接落地。§9 尚未做完的部分（等操作者核准 040/041 才能真正套用進母文件）留在 DRAFT，不代辦。
+
+[已修改]
+- `specs/execution/result.schema.yaml`（新增 `reason_code` 欄位 + allOf 限制 + constraints 規則）
+- `specs/execution/status-codes.schema.yaml`（新增 `emittable_reason_codes` 9 值登記）
+- `tests/contracts/specs/execution/result.fixtures.yaml`（+12 fixtures）
+- `.ai/proposals/040-master-plan-identity-header/PROPOSAL.md`（新增，DRAFT）
+- `.ai/proposals/041-method-atlas-identity-header/PROPOSAL.md`（新增，DRAFT）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` | exit=0 | ms=N/A（851/851）
+- REVIEW_DONE: critic=Deep（Claude 本人逐條核對 Codex 產出，非外部 oracle——AGENTS.md §Subagent 交接協議範疇）| verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os | grep=`reason_code`/`OQ-13` 跨 execution-state-machine.schema.yaml 等相鄰檔案核對無遺漏引用 | hits=0（Codex 已在檔案內自行說明為何不放 state-machine，非遺漏）
+
+[剩餘風險]
+- proposal 040/041 仍是 DRAFT，需操作者核准才能推進 HUMAN_REVIEW→APPROVED 並套用進母文件
+- Codex 額度何時恢復未知，§9 若還有其他子項未做完（本輪只查到這 5 個檔案，未見其他半成品）留待下次確認
+
+
 
 ### 操作者核准 ADR-017~020（OQ-1/4/13/14），跑 codex-review 驗證核准一致性
 
