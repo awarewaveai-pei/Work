@@ -100,7 +100,7 @@ Date: 2026-08-29
 
 ## 4. Required Phase-3 Specs
 
-**`/specs/domain/`**：`tenant.schema.yaml`（ADR-003）、`knowledge-canvas.schema.yaml`、`artifact-uri.schema.yaml`
+**`/specs/domain/`**：`tenant.schema.yaml`（ADR-003）、`knowledge-canvas.schema.yaml`；Portable Artifact URI 實際路徑為 `/specs/artifact/portable-uri.schema.yaml`（非本行原寫的 `domain/artifact-uri.schema.yaml`，該檔已於本 session 稍早 relocate，此行未同步更新——2026-08-31 由 Codex Phase 5 原型 HANDBACK.md 發現，Claude 核對屬實後訂正）
 
 **`/specs/cognitive/`**：`method.schema.yaml` 下新增 `research.qualitative_coding`（open/axial/selective coding + inter-rater reliability 門檻 + saturation 判準，解 `P1-GAP-AI-9`）、`evidence.triangulation`；`recipe.schema.yaml` 具體實例 `research.qualitative.v1`
 
@@ -108,7 +108,7 @@ Date: 2026-08-29
 
 **`/specs/workflow/`**：`workflow-ir.schema.yaml`（MP §9）
 
-**`/specs/execution/`**：`risk-tier.schema.yaml`（ADR-004）、`execution-manifest.schema.yaml`（MP §69 + ADR-001 Architecture Constitution 欄位）、`execution-state-machine.schema.yaml`（EC §10，含 `BLOCKED`／`PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED`——**已建成 2026-08-30**，`PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED` 依 status-codes.schema.yaml 既有裁決作為 METHOD_RESOLUTION_BLOCKED 的 deprecated alias 處理，非另立新碼）、`capability-contract.schema.yaml`（含 `transcribe/run_statistics/execute_method/validate_artifact`）、`audit.schema.yaml`（MP §82——**已建成 2026-08-30**，同時收斂 EC §66 Audit Event 的 who/what/when/where/why 決策敘事型形狀，見該檔 `compilation_decisions`）、`rollback-plan.schema.yaml`、`event-ledger.schema.yaml`（依 ADR-002 擴充加密 envelope 欄位）、`personal-data-redacted-event.schema.yaml`（ADR-002 Option C）
+**`/specs/execution/`**：`risk-tier.schema.yaml`（ADR-004）、`manifest.schema.yaml`（非本行原寫的 `execution-manifest.schema.yaml`；MP §69 + ADR-001 Architecture Constitution 欄位）、`execution-state-machine.schema.yaml`（EC §10，含 `BLOCKED`／`PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED`——**已建成 2026-08-30**，`PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED` 依 status-codes.schema.yaml 既有裁決作為 METHOD_RESOLUTION_BLOCKED 的 deprecated alias 處理，非另立新碼）、`audit.schema.yaml`（MP §82——**已建成 2026-08-30**，同時收斂 EC §66 Audit Event 的 who/what/when/where/why 決策敘事型形狀，見該檔 `compilation_decisions`）、`rollback.schema.yaml`（非本行原寫的 `rollback-plan.schema.yaml`）、`event-ledger.schema.yaml`（依 ADR-002 擴充加密 envelope 欄位）。**`capability-contract.schema.yaml`（含 `transcribe/run_statistics/execute_method/validate_artifact`）與 `personal-data-redacted-event.schema.yaml`（ADR-002 Option C）實際位於 `/specs/domain/`，非本節**（2026-08-31 由 Codex Phase 5 原型 HANDBACK.md 發現 4 處路徑漂移，Claude 逐一 `find`/`ls` 核對屬實後訂正）
 
 **`/specs/governance/`**：`epistemic-label.schema.yaml`（ADR-004）
 
