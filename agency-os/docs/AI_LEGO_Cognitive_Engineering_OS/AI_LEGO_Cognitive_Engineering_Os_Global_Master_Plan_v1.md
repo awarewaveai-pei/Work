@@ -390,6 +390,12 @@ Identity
 
 任何 Capability 在執行前都必須先通過 Trust Fabric。
 
+**Plane / Workspace / Module 三層關係**（ADR-009 Sub-decision (a)，2026-08-29 ACCEPTED）：本文件用三個不同抽象層描述同一套系統，三者不是同義詞，不可互相取代：
+
+- **Plane**（本節 §4 為唯一正本，內容不需要改）＝架構／信任邊界宣告層，變動頻率最低，不隨 UI 文案或程式碼重構變動。
+- **Workspace**（§77 為唯一正本）＝ Experience Plane 內部對「人類可見功能」的二次分解，是 Plane 的子集（只有 6 個 Plane 有對應 Workspace），不是與 Plane 平行的另一套系統分解。
+- **Module**（§80 為 v1 歷史快照；`docs/architecture/REPOSITORY_ARCHITECTURE.md` 的 Proposed Directory Tree 為程式碼層現行目標正本，該文件已於 2026-08-30 由操作者核准 ACCEPTED）＝程式碼 bounded-context 層，變動頻率最高。
+
 ---
 
 # 5. 部署模式：Online / Offline / Hybrid
