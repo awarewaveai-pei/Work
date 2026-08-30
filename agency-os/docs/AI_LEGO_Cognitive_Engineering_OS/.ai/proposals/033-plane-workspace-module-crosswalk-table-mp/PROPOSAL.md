@@ -1,7 +1,7 @@
 ---
 proposal_id: "033"
 slug: "plane-workspace-module-crosswalk-table-mp"
-status: DRAFT
+status: HUMAN_REVIEW
 target_document: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
 target_baseline_hash: "8e5e67f607477babe60f2a4a354a211a30bd88cb1ece631dd51c5e11b23bac10"
 affected_line_ranges: ["L419-420", "L3085-3086", "L3297-3299"]

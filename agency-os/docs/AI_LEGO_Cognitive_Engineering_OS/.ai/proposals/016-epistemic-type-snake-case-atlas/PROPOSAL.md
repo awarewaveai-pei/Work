@@ -1,7 +1,7 @@
 ---
 proposal_id: "016"
 slug: "epistemic-type-snake-case-atlas"
-status: DRAFT
+status: HUMAN_REVIEW
 target_document: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
 target_baseline_hash: "a47424f96bf6f88023b9870d4112ab1f607e9b424236693572d6a5558d2804a1"
 affected_line_ranges: ["L591-605"]
