@@ -4,6 +4,7 @@
 > **何時用**：出國、在外、半夜不想開電腦、急需控制系統時
 > **owner doc**：本檔
 > **其它技術文件**（架構／policy／schema）：見 §10 Related
+> **🚨 2026-08-30**：下文「Termius 連 EU server」`204.168.175.41` 已失效（主機刪除退租）。緊急時改連 **ks-aw-01**：Hostname `149.202.64.114` / Port `58122` / Username `ubuntu` / key `id_ed25519`。
 
 ---
 

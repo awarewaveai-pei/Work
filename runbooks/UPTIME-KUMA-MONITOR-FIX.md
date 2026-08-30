@@ -1,5 +1,7 @@
 ﻿# Uptime Kuma Monitor Fix
 
+> **🚨 2026-08-30**：下文「SSH 進 EU VPS」`204.168.175.41` 已失效（主機刪除退租）。改連 ks-aw-01：`ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114`。Kuma 容器現跑在同一台機器上。
+
 **症狀**：Telegram `/health` 顯示 CRITICAL / open incidents，但服務容器本身 healthy。  
 **根因**：Monitor URL 或 headers 設定錯誤，導致 Kuma 收到 403/404/timeout。
 

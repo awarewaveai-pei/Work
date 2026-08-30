@@ -1,6 +1,8 @@
 ﻿#requires -Version 5.1
 <#
-    Capacity health across the three hosts (ks-aw-01 / SG / EU).
+    Capacity health for ks-aw-01 (SG/EU were consolidated into it 2026-08-28 and
+    deleted at Hetzner console 2026-08-30; $SgHost/$EuHost params are kept only for
+    call-site compatibility and are never probed).
 
     WHY THIS EXISTS
     ---------------
@@ -490,10 +492,11 @@ if (-not (Get-Command ssh.exe -ErrorAction SilentlyContinue)) {
         ServerHost = $KsAw01Host; User = $KsAw01SshUser; Key = $KsAw01PrivateKey
         Port = $KsAw01SshPort; UseSudo = $true
     }
-    # 2026-08-28 consolidation: SG/EU are stopped and pending deletion. Probing them
-    # would be a permanent WARN after deletion - and a permanent warning is an ignored
-    # detector. ks-aw-01 (above) is now the ONLY production machine and carries the
-    # deliberately strict 60% thresholds that compensate for the 64GB spec gap.
+    # 2026-08-28 consolidation, 2026-08-30 deletion: SG/EU were stopped, then the
+    # machines themselves were deleted at Hetzner console. Probing them would be a
+    # permanent WARN (SSH to a host that no longer exists) - and a permanent warning
+    # is an ignored detector. ks-aw-01 (above) is now the ONLY production machine and
+    # carries the deliberately strict 60% thresholds that compensate for the 64GB spec gap.
     # (Params $SgHost/$EuHost kept for signature compatibility; deliberately unused.)
 }
 

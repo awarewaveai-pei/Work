@@ -1,5 +1,7 @@
 # Scanner Attack Response Runbook
 
+> **🚨 2026-08-30: host IP retired.** Every `ssh ... root@5.223.93.113` below fails outright — that machine was deleted at Hetzner console 2026-08-28/30. Connect to **ks-aw-01** instead: `ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114`. Origin-lockdown mitigation also moved: see `runbooks/CLOUDFLARE-WAF-SETUP.md` §Origin Lockdown SOP banner (OVH Edge Network Firewall replaces the old iptables script on ks-aw-01).
+
 **Symptom**: Netdata `infra-alerts` — `bad_request %` spike (> 30%), `successful %` drops, multiple recovery/trigger cycles. Slack #infra-alerts flooding.
 
 **Root cause category**: Automated credential-harvesting scanner hitting server directly (/.env, /.aws, /phpinfo, etc.)

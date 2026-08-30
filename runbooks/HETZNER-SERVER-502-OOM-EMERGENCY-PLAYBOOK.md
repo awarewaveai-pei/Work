@@ -1,10 +1,12 @@
 ﻿# Hetzner Server 502 / OOM 緊急處理手冊
 
-> **適用範圍**：此手冊針對 **EU Trigger stack**（IP `204.168.175.41`，`trigger.aware-wave.com`）。  
+> **🚨 2026-08-30：IP 已失效**——本頁所有 `ssh ... 204.168.175.41` / `ssh ... 5.223.93.113` 指令要改連 **ks-aw-01**：`ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114`。SG+EU 已於 2026-08-28 整併到這台機器，兩台舊機已刪除退租，SSH 過去會直接連線失敗。EU Trigger stack 路徑仍是 `/root/lobster-phase1/trigger/`（或依現行部署路徑），SG phase1 stack 路徑仍是 `/root/lobster-phase1/`——兩條 docker compose 路徑現在都在同一台機器上，用路徑分辨是哪個服務，不再用 IP 分辨是哪台機器。
+
+> **適用範圍（歷史，機器已整併）**：此手冊針對 **EU Trigger stack**（IP `204.168.175.41`，`trigger.aware-wave.com`）。  
 > SG phase1 stack（IP `5.223.93.113`，`aware-wave.com` / `app.aware-wave.com`）的 docker compose 路徑為 `/root/lobster-phase1/`，其餘步驟相同。
 
-**伺服器：** EU Trigger — IP `204.168.175.41`（`trigger.aware-wave.com`）  
-**SG 補充：** `wordpress-ubuntu-4gb-sin-1` — IP `5.223.93.113`（`aware-wave.com`）
+**伺服器（現況）：** ks-aw-01 — IP `149.202.64.114`，SSH port `58122`（trigger.aware-wave.com + aware-wave.com 同機）  
+**伺服器（歷史，已刪除）：** EU Trigger `204.168.175.41` / SG `wordpress-ubuntu-4gb-sin-1` `5.223.93.113`
 
 ---
 

@@ -1,5 +1,36 @@
 # Worklog
 
+## 2026-08-30（續15）
+
+### 操作者要求「處理好」舊 SG/EU 刪機後續三項，逐項查證後發現一項已提前做好、聚焦真正缺口（emergency runbook 死指令）
+
+**觸發**：續14 完成治理文件同步後，操作者直接說「你去處理好」，授權處理列出的三項後續：① Netdata Cloud 舊節點移除 ② `check-capacity-health.ps1` 等監控腳本三台→單機 ③ `sg-deploy.sh`/`DEPLOY_ROLLBACK_RUNBOOK.md` 改指 ks-aw-01。
+
+**查證結果（VBC，先讀現況再動手）**：
+- **②實際上不成立**——讀完 `check-capacity-health.ps1`、`check-backup-health.ps1`、`check-vps-auto-reboot-health.ps1`、`check-deploy-drift.ps1` 全文，四支腳本在 2026-08-28 整併當天就已經改成只探 `ks-aw-01`：`$SgHost`/`$EuHost` 參數只為呼叫端簽章相容保留，程式碼從未真的拿去 SSH（`check-vps-auto-reboot-health.ps1` 甚至在無條件 `exit 0` 之前就短路掉，後面 140 行探 SG/EU 的邏輯是已確認的死碼但從不執行）。原先「刪機後會變永久 WARN」的擔憂不成立——只是三支腳本的註解仍寫著英文的「stopped and pending deletion」，現在該訂正為「deleted」。
+- **③範圍比預期大**——`sg-deploy.sh`/`lobster-trigger-deploy.ps1` 本身不含硬編 IP（在被呼叫的機器上原地跑，不需要知道自己的 IP），真正的缺口在**文件層**：`DEPLOY_ROLLBACK_RUNBOOK.md` 兩處活指令（SSH 到 SG 一行、Trigger.dev Server 說明）還寫死舊 IP。往外 grep 同一 pattern（`ssh/scp/root@` + 舊 IP）發現這其實是一個更大的類別：**7 份 emergency/incident-response runbook**（502/OOM、scanner attack、security breach、Trigger deploy BFM、Uptime Kuma fix、Postiz ops、Supabase self-hosted）+ 3 份維運文件（TASKS 已在續14 處理、Telegram cheat sheet、wordpress_mainwp_plan 歷史規劃文件）+ 1 份 EU 備份腳本 README 全部還寫著會在真實事件中直接連線失敗的 `ssh ... root@5.223.93.113` / `root@204.168.175.41`。這比原先設想的「改幾支部署腳本」嚴重——這些是**當機/入侵/scanner 攻擊當下要照著做的文件**，SSH 失敗會在事件應變的黃金時間浪費掉。
+- **①（Netdata Cloud 舊節點移除）查無安全的自動化路徑**——`api.netdata.cloud` 沒有公開文件化的刪除節點 REST API（互動文件本身需操作者登入才看得到），對一個有效 token 的外部 SaaS 猜 DELETE endpoint 屬於不可回頭的破壞性操作，不貿然做。改為查官方文件（`learn.netdata.cloud/docs/netdata-cloud/remove-agent`）取得準確 UI 步驟寫進 TASKS.md，操作者自己 30 秒可完成。
+
+[已修改]
+- `scripts/check-capacity-health.ps1` / `check-backup-health.ps1` / `check-vps-auto-reboot-health.ps1`：註解「stopped and pending deletion」→「deleted」反映現況；`check-capacity-health.ps1` docstring 訂正「three hosts」為現況說明（純註解，零邏輯改動）
+- `agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md`：SG SSH 指令行 + Trigger.dev Server 說明行，改指 ks-aw-01
+- `runbooks/CLOUDFLARE-WAF-SETUP.md`：§Origin Lockdown SOP 整段加失效橫幅，指向 OVH Edge Network Firewall 替代機制 + 回滾指令
+- `.claude/commands/origin-lockdown.md`：橫幅「並待刪除」→「已刪除」+ 指向新機制
+- `runbooks/HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md`、`runbooks/SCANNER-ATTACK-RESPONSE-RUNBOOK.md`、`runbooks/SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md`、`runbooks/TRIGGER-DEPLOY-CLOUDFLARE-BFM.md`、`runbooks/UPTIME-KUMA-MONITOR-FIX.md`、`runbooks/POSTIZ-OPS-RUNBOOK.md`、`agency-os/docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md`、`agency-os/docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md`、`docs/wordpress_mainwp_plan.md`、`lobster-factory/infra/eu-backup/README.md`：頂部或該步驟前加失效橫幅，指向 ks-aw-01（`149.202.64.114`，SSH `-p 58122 ubuntu@`），原範例指令保留當歷史參考不刪除
+- `agency-os/TASKS.md`：§整併後續清單①②標記查證結果與完成狀態；Netdata Cloud 項補上具體 UI 移除步驟 + 官方文件連結
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 純文件/註解訂正，腳本部分只改註解字串，未動任何判斷邏輯或探測目標
+- REVIEW_DONE: critic=Quick（自查）| verdict=pass | findings=0c/0m/0n —— 逐一讀回四支腳本確認短路邏輯與註解一致；讀回全部 12 份文件確認橫幅措辭正確、未誤刪原有歷史範例指令
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,docs,.claude | grep=`ssh.*5\.223\.93\.113\|ssh.*204\.168\.175\.41\|root@5\.223\.93\.113\|root@204\.168\.175\.41` | hits=26 檔案命中，其中 12 份本次已加失效橫幅、1 份（DEPLOY_ROLLBACK_RUNBOOK.md）本次直接訂正指令本身、1 份（HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md）已有既存橫幅免動、其餘 12 份為歷史記錄類（WORKLOG-archive/reports/handoffs/daily memory），依慣例不改寫歷史
+
+[剩餘風險]
+- `lobster-factory/infra/eu-backup/README.md` 與 `lobster-factory/infra/ks-aw-01-backup/` 兩套備份腳本的實際取代關係本次**未核實**，只加了警示橫幅，未斷言後者已完全取代前者——下次真的要改機或重新部署備份時需先比對兩邊再動作
+- Netdata Cloud 舊兩節點移除仍是操作者手動動作，未自動化（安全考量：不對未驗證的 DELETE API 下手）
+- 未窮盡全庫搜尋——本次 grep scope 已涵蓋五大目錄，但不保證零遺漏；若之後又在某份文件撞到舊 IP 死指令，屬同一類已知問題，直接補橫幅即可，不需要重新調查根因
+
+[rollback] 全部是文件用字新增/訂正 + 腳本註解文字，`git revert` 即可；無任何執行邏輯變動
+
 ## 2026-08-30（續14）
 
 ### 操作者告知：舊 SG `5.223.93.113` / EU `204.168.175.41` 兩台 Hetzner 主機已於 console 刪除退租

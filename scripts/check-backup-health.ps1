@@ -224,9 +224,9 @@ if (-not $sshOk) {
     $fatal = $true
     $fatalReason = "ssh.exe not found on PATH"
 } else {
-    # 2026-08-28 consolidation: all three pipelines live on ks-aw-01 now. The old
-    # SG/EU machines are stopped and pending deletion - probing them would either
-    # false-alarm forever (post-deletion) or false-pass (pre-deletion, stale data).
+    # 2026-08-28 consolidation, 2026-08-30 deletion: all three pipelines live on
+    # ks-aw-01 now. The old SG/EU machines were deleted at Hetzner console -
+    # probing them would false-alarm forever (SSH to a host that no longer exists).
     # Labels keep their pipeline identity; only the host moved.
     $sg = Invoke-HostCheck -KeyPath $KsAw01PrivateKey -Label "lobster (ex-SG)" -CheckArgs @{
         ServerHost = $KsAw01Host; CronPath = "/etc/cron.d/lobster-backup"

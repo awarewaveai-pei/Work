@@ -1,6 +1,6 @@
 Manage Cloudflare origin lockdown on SG VPS — restricts port 80/443 to CF IP ranges only.
 
-> **🚨 2026-08-28 拓樸退役**：本指令針對的機器已整併入 ks-aw-01（`149.202.64.114`）並待刪除。
+> **🚨 2026-08-30 已失效**：本指令針對的機器（SG `5.223.93.113`）已整併入 ks-aw-01（`149.202.64.114`）並於 Hetzner console 刪除退租——下方 SSH 指令會直接連線失敗。ks-aw-01 改用 **OVH Edge Network Firewall** 達成同一目的（已啟用，見 `runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md` 或 `TASKS.md` P2.5c），非本指令的 iptables/ipset script。
 > 單機拓樸下的 reboot = 全站停機窗口，一律 High-risk 手動 + 明示 go-ahead；auto-reboot 決策見 TASKS.md。
 
 

@@ -3,7 +3,7 @@
 > 📍 機器拓樸（誰跑哪台）唯一正本：[`AWAREWAVE_STACK_QUICKREF.md`](AWAREWAVE_STACK_QUICKREF.md)。本檔 = Supabase（EU）部署/設定正本；改容器時兩邊一起改。
 
 > Owner: `awarewaveai`  
-> **Supabase stack (EU)**: `204.168.175.41` (Hetzner Helsinki; SG host `5.223.93.113` no longer carries `/root/supabase` compose — lobster-phase1 only).  
+> **Supabase stack (EU) — 2026-08-30 update**: now on **ks-aw-01** (`149.202.64.114`, SSH `-p 58122`, `ubuntu@`). The old EU host `204.168.175.41` and SG host `5.223.93.113` were both deleted at Hetzner console 2026-08-28/30 — every `ssh ... 204.168.175.41` below fails outright; connect to ks-aw-01 instead.  
 > Secrets policy: live tokens and passwords stay in vault or machine-local env only; do not commit them into repo-tracked files.
 
 ---

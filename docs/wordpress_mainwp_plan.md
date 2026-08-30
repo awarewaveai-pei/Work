@@ -1142,6 +1142,8 @@ TTL: Auto
 
 **Step 2 — DNS 傳播後 SSH 至 EU，執行 certbot expand：**
 
+> 🚨 2026-08-30：`204.168.175.41` 已刪除退租（歷史規劃文件，此步驟若尚未執行過，改連 ks-aw-01 `149.202.64.114`，SSH `-p 58122 ubuntu@`）。
+
 ```bash
 ssh root@204.168.175.41
 certbot --expand \

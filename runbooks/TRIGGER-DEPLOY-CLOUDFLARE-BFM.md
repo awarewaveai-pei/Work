@@ -1,5 +1,7 @@
 # Runbook: Trigger.dev Deploy — Cloudflare Bot Fight Mode Bypass
 
+> **🚨 2026-08-30**：下文 `ssh ... 204.168.175.41` 已失效（EU 主機刪除退租）。改連 ks-aw-01：`ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114`。
+
 ## 症狀（Symptoms）
 
 Deploy 在 `=== Deploy (trigger v4) ===` 之後卡住或失敗，log 出現下列任一訊息：

@@ -2,6 +2,7 @@
 
 > 📍 機器拓樸正本見 [`AWAREWAVE_STACK_QUICKREF.md`](../../../agency-os/docs/operations/AWAREWAVE_STACK_QUICKREF.md)。
 > 完整備份/RAID/還原/遷移策略見 [`runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`](../../../runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md)。
+> **🚨 2026-08-30**：舊 EU 主機 `204.168.175.41` 已刪除退租，下文部署指令會失敗。cron 排程本身已隨整併移植到 ks-aw-01（`/etc/cron.d/ks-stack-backup`，見 QUICKREF 頂部橫幅）；`lobster-factory/infra/ks-aw-01-backup/` 是否已完全取代這兩支腳本尚未核實，改機/重新部署前先比對兩邊再動作，不要假設本檔仍是現行部署正本。
 
 EU VPS（`204.168.175.41`）每日備份的兩個腳本。本目錄為 **repo 版控正本**；實機部署在 EU `/root/scripts/`。
 

@@ -4,7 +4,7 @@
 > **SSOT**: `agency-os/docs/operations/POSTIZ_SOCIAL_PUBLISHING_PLAN.md`
 > **Content engine SSOT**: `docs/wp-kadence-ai-seo-geo-content-engine.md §49`
 > **Postiz UI**: `https://postiz.aware-wave.com` (admin: `awarewaveai@gmail.com`)
-> **Infra**: EU VPS `204.168.175.41`，port `127.0.0.1:4007`，public `https://postiz.aware-wave.com`
+> **Infra（2026-08-30 更新）**: ks-aw-01 `149.202.64.114`（SSH `-p 58122`，`ubuntu@`）；port `127.0.0.1:4007`，public `https://postiz.aware-wave.com`。舊 EU VPS `204.168.175.41` 已刪除退租，下文所有 `ssh ... 204.168.175.41` 指令改連 ks-aw-01。
 > **API key**: SG `/root/lobster-phase1/.env` → `POSTIZ_API_KEY`（64 chars），vault `POSTIZ_API_KEY`
 
 ---
