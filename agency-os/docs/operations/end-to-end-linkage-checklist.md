@@ -1,4 +1,4 @@
-﻿# End-to-End Linkage Checklist
+# End-to-End Linkage Checklist
 
 ## Objective
 - Ensure strategy, operations, delivery, automation, and compliance stay fully linked.
@@ -40,6 +40,7 @@
 
 ## Related Documents (Auto-Synced)
 - `docs/architecture/multi-platform-delivery-architecture.md`
+- `docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md`
 - `docs/operations/new-doc-linkage-checklist.md`
 - `docs/operations/system-operation-sop.md`
 - `README.md`
@@ -47,5 +48,5 @@
 - `scripts/system-guard.ps1`
 - `scripts/system-health-check.ps1`
 
-_Last synced: 2026-08-28 11:57:18 UTC_
+_Last synced: 2026-08-30 18:41:55 UTC_
 

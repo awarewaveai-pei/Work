@@ -49,6 +49,7 @@
 | 規則版本與強制判定 | [rules-version-and-enforcement.md](rules-version-and-enforcement.md) |
 | 新文件連動 Checklist | [new-doc-linkage-checklist.md](new-doc-linkage-checklist.md) |
 | 端到端連動 Checklist | [end-to-end-linkage-checklist.md](end-to-end-linkage-checklist.md) |
+| 治理系統建置 SOP（分層、提案／ADR、覆審、VBC、phase gate） | [GOVERNED_SYSTEM_BUILD_SOP.md](GOVERNED_SYSTEM_BUILD_SOP.md) |
 | Single-owner 登記 | [single-owner-registry.json](single-owner-registry.json) |
 
 ### 基礎建設（Hetzner／Supabase／CI／DB）

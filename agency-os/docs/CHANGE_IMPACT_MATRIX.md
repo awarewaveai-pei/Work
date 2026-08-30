@@ -1,4 +1,4 @@
-﻿# Change Impact Matrix
+# Change Impact Matrix
 
 ## 使用方式
 - 修改任一主文件時，必須同步檢查對應關聯文件
@@ -85,6 +85,8 @@
 | `../lobster-factory/docs/ONE_CLICK_BUILD_SYSTEM.md` | `../lobster-factory/docs/LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM_v1.3.md` §41, `../lobster-factory/docs/ARCHITECTURE_CANONICAL_MAP.md`, `docs/overview/ao-lobster-operating-model.md`, `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md` §0, `docs/CHANGE_IMPACT_MATRIX.md` |
 
 | `docs/operations/BUG_HUNT_PROTOCOL.md` | `AGENTS.md`, `docs/operations/AUDIT_REGISTRY.md` |
+
+| `docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md` | `docs/operations/new-doc-linkage-checklist.md`, `docs/operations/end-to-end-linkage-checklist.md`, `docs/architecture/decisions/ADR_INDEX.md` |
 
 ## 最小同步清單（每次改版）
 - [ ] `README.md` 路徑與入口已更新

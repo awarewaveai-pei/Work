@@ -58,3 +58,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-adr-index.ps1
 
 - `docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`
 - `docs/releases/upgrade-path.md`
+
+## Related Documents (Auto-Synced)
+- `docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md`
+
+_Last synced: 2026-08-30 18:41:55 UTC_

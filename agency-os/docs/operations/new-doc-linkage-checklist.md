@@ -1,4 +1,4 @@
-﻿# 新文件連動檢查清單（小白版）
+# 新文件連動檢查清單（小白版）
 
 ## 預設：不要新增檔案（抗增殖）
 
@@ -81,9 +81,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\doc-sync-automation.ps1 -Chan
 - `docs/DOCS_INDEX.md`
 - `docs/operations/cursor-enterprise-rules-index.md`
 - `docs/operations/end-to-end-linkage-checklist.md`
+- `docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md`
 - `scripts/doc-sync-automation.ps1`
 - `scripts/register-new-governance-doc.ps1`
 - `scripts/system-health-check.ps1`
 
-_Last synced: 2026-08-29 18:08:46 UTC_
+_Last synced: 2026-08-30 18:41:55 UTC_
 

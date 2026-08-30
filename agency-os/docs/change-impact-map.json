@@ -432,6 +432,14 @@
         "AGENTS.md",
         "docs/operations/AUDIT_REGISTRY.md"
       ]
+    },
+    {
+      "source": "docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md",
+      "targets": [
+        "docs/operations/new-doc-linkage-checklist.md",
+        "docs/operations/end-to-end-linkage-checklist.md",
+        "docs/architecture/decisions/ADR_INDEX.md"
+      ]
     }
   ]
 }

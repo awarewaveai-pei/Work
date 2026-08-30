@@ -1,5 +1,34 @@
 # Worklog
 
+## 2026-08-31
+
+### Governed System Build SOP：以實讀的 AI-LEGO 證據萃取可重用治理建置流程
+
+**觸發**：操作者要求完整讀取 `CODEX_HANDOFF_UNIVERSAL_SYSTEM_SOP_2026-08-30.md`，再逐一讀取其 §2 指定來源，產出一份不依賴 AI-LEGO 專有名詞、但每段均可回溯真實 WORKLOG／ADR／schema 的通用 SOP。
+
+**處理**：實讀交接文件、`AGENTS.md`、現存的 2026-08-30 WORKLOG 區塊、ADR index 與 ADR-001/006/011/014/017/018、`codex-review` command、machine-readable spec plan，以及兩份含 `source_of_truth_for`／`decided_by` 的實際 schema/policy。新 SOP 僅提煉有實證的模式：三層文件階層、proposal/approval separation、ADR、capture-before-review、全文與全庫 stale-claim 掃描、VBC、寫入邊界與 phase gate。現行 WORKLOG 未找到續1、續23–29，故未把它們假定為已讀或用作證據。
+
+[已修改]
+- `agency-os/docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md`（新增）：10 個必要章節；每個實質段落均附來源；未納入無法對應真實事件或來源檔的建議。
+- `agency-os/docs/DOCS_INDEX.md`、`docs/operations/OPS_DOCS_INDEX.md`：加入可發現入口；`docs/change-impact-map.json` 與 `docs/CHANGE_IMPACT_MATRIX.md`：登錄此 SOP 的三個實際連動對象（新文件連動、端到端連動、ADR index）。
+- `docs/architecture/decisions/ADR_INDEX.md`、`docs/operations/end-to-end-linkage-checklist.md`、`docs/operations/new-doc-linkage-checklist.md`：由 `doc-sync-automation` 自動寫入 Related Documents metadata。
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 新增 Markdown 參考文件，無 runtime、schema、部署或資料變更。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 完整讀回成品；14/14 引用來源路徑存在；10/10 必要章節存在；24 個實證標記覆蓋所有非 metadata 的非標題內容段落；無 code fence；impact map JSON 可解析。
+- DOC_LINKAGE_DONE: `register-new-governance-doc.ps1 -DryRun` 的預期 rule 與 matrix row 已確認，再正式執行；`doc-sync-automation.ps1 -ChangedFiles @('docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md')` 成功更新目標 SOP 與 3 個關聯文件 metadata，並產生 `reports/closeout/closeout-20260831-024155.md`。
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`Governed System Build SOP|GOVERNED_SYSTEM_BUILD_SOP.md` | post-sync hits=12，均為本次 SOP、交接指定路徑、入口、影響地圖或自動 metadata；`scripts/` 零命中，無未預期 consumer。
+- `scripts/audit-cross-machine-bom.ps1 -WorkRoot D:\Work` 已實跑但在檢查 Google Drive secrets vault 時被本機權限拒絕而中止；此 script 明定 repo 內 Markdown 不在其 scope。目標檔前三個 bytes 為 `35,32,71`（`# G`），符合 repo Markdown 無 BOM 慣例。
+- `system-health-check.ps1` 已實跑，得到 99.4%（308/310）；Critical Gate 因既有 AO-CLOSE archive 有 1 筆未回填至 `TASKS.md` 而 FAIL。這不是本次新建 SOP、3 個 map target 或其檔案存在性所致，未越權修改既有待辦。
+
+[剩餘風險]
+- 現行 `WORKLOG.md` 沒有 `2026-08-30（續1）` 與 `續23–29` 區塊；成品沒有宣稱使用這些缺失紀錄，若日後它們恢復，可再檢查是否提供需要補入的新模式。
+- `register-new-governance-doc.ps1` 的 agency-os wrapper 在完成寫入後讀取未設定的 `$LASTEXITCODE` 而額外報錯；已由輸出與後續 JSON／matrix 檢查確認登錄確實完成，未在本次文件任務中改動該腳本。
+- health 的 archive-lift Critical Gate 仍為 FAIL，且 vault 健康檢查列出 13 個缺失鍵；兩項均為本次範圍外的既有治理狀態。
+
+[rollback]
+- `git revert <本次 commit>` 即可移除 SOP、入口、影響地圖與本條工作紀錄；自動產生的報告／state 不納入此 commit。
+
 ## 2026-08-30（續30）
 
 ### Phase 3 Machine-readable Foundation 正式收尾：document-registry.schema.yaml 建成 + 10 個 typed-objects 誠實 DEFERRED
@@ -8369,7 +8398,6 @@ _Last synced: 2026-08-24 19:21:02 UTC_
 - BUGHUNT_DONE: searched `D:\Work`, `%USERPROFILE%\.codex`, `%APPDATA%\Codex`, and `%LOCALAPPDATA%\Codex` for Canva configuration references; actionable sources were Codex global/plugin state rather than a second workspace MCP configuration.
 
 **Rollback**: reinstall Canva in Codex only when it is needed; a fresh explicit OAuth authorization will then be required.
-
 
 
 
