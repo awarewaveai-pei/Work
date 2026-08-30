@@ -1,6 +1,25 @@
 # Worklog
 
-## 2026-08-30（續24）
+## 2026-08-30（續25）
+
+### Codex 完成 4 個 ADR 草案（OQ-1/4/13/14），Claude 逐條驗真後 push
+
+**觸發**：操作者交接給 Codex 的任務（`.ai/CODEX_HANDOFF_2026-08-30.md` §7）完成，操作者說「codex 已完成 你檢驗」。
+
+**驗證過程**：`git log`/`git show a96a1dd12` 確認 Codex 直接 commit 到本機 repo（ahead of origin 1 個 commit，未 push）。逐份讀 4 個新檔（ADR-017 mother-document identity headers / ADR-018 Codex write authority / ADR-019 status-code taxonomy / ADR-020 normative-strength marking），對每份的 Evidence 段引用逐條 grep/Read 核對真實存在（EC L78-86、MP L1-6/14-20/43-49、Atlas L1-10、AGENTS.md L105-122、status-codes.schema.yaml L7-24、execution-state-machine.schema.yaml L55-64 全數核對相符）。確認 4 份全數正確標記 `Status: PROPOSED — awaiting operator go-ahead`（無自我 ACCEPTED，遵守 handoff 文件的硬性交代）；`open-questions.yaml` 的 OQ-1/4/13/14 正確保持未動（尚未變更為 RESOLVED，因為還沒被核准）；`ADR_INDEX.md` 更新範圍精確（只加 4 列 + 更新頂部狀態句，未動其餘 16 份既有紀錄）；`ADR-017~020.md` 檔名無編號衝突。839/839 golden test 全過。判定：Codex 這次交付品質與 Claude 自己起草的水準一致，無需修正，直接 push（commit `a96a1dd12`）。
+
+[已修改]
+- 無新增修改（本輪任務是驗證 Codex 產出，非 Claude 自己寫入）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py`（Codex commit 套用後）| exit=0 | ms=N/A（839/839）
+- REVIEW_DONE: critic=Deep（Claude 本人逐條核對，非外部 oracle——這是驗證「另一個 agent 的產出」而非「自己剛寫的 code」，屬 AGENTS.md §Subagent 交接協議範疇）| verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os | grep=ADR-017/018/019/020 檔名 + 引用行號逐條核對 | hits=0（無編號衝突、無失真引用）
+
+[剩餘風險]
+- 4 份 ADR 仍是 PROPOSED，需操作者本人明示核准才能轉 ACCEPTED；核准後才會有對應的 `.ai/proposals/` 母文件編輯提案（若這些決策需要落地到母文件文字本身）
+
+
 
 ### AI-LEGO mega-batch 真正 /codex-review 補跑（額度恢復後），4 個真實 finding 全數驗真修正
 
