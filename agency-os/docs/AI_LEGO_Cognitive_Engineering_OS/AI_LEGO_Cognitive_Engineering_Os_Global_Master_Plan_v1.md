@@ -2571,11 +2571,19 @@ Version 2
 Version 3
 ```
 
-所有檔案 Content-addressed。
+所有檔案 Content-addressed，且依 Tenant 隔離命名空間，預設規則為 tenant-scoped（ADR-003 Sub-decision (b) Option A，解 P1-CONFLICT-2）：
 
 ```text
-/objects/sha256/aa/bb/<hash>
+/objects/<tenant_id>/sha256/aa/bb/<hash>
 ```
+
+僅限明確標記且經 explicit / logged / platform-level 核准的內容類別（例：platform-authored templates、ingested public regulatory texts）可落入窄範圍全域去重例外池，以固定 sentinel `_global` 取代 `<tenant_id>`：
+
+```text
+/objects/_global/sha256/aa/bb/<hash>
+```
+
+完整 path grammar 與驗證規則（含 shard 推導、`global_pool_promotion` 記錄欄位）見 `specs/artifact/cas-path.schema.yaml`。
 
 ---
 
