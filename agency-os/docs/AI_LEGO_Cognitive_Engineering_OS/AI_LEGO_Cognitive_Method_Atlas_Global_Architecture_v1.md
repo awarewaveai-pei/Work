@@ -3,7 +3,8 @@
 
 ## Global Cognitive Method Atlas & Modular Brainstorming / Reasoning Architecture
 
-**版本**：1.0  
+**Document ID**: `ai-lego.method-atlas`  
+**Version**: `1.0.0`  
 **定位**：AI LEGO Cognitive Engineering OS 的 Brainstorming / Reasoning / Decision 方法論與工程化補充規格  
 **適用範圍**：全球、跨產業、跨文化、跨政府層級、研究、商業、工程、DevOps、資安、DB/Data、PM、政策、教育與個人學習  
 **設計期限**：30 年以上  
