@@ -2089,6 +2089,22 @@ Execution Plan
 Proposal
 ```
 
+> **現況限制（P1-CONFLICT-4 / ADR-008，登記日 2026-08-29）**
+>
+> 上列 Recipe 中的 `Financial Assumptions` 節點，其對應的 Atlas Finance Domain Pack
+>（`AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md` `/domain-packs/finance/`，
+> 目前實際行號請以該檔案即時內容為準，本提案登記時為 L3901，套用時已因該檔案其他
+> 母文件修訂而位移）目前僅有目錄宣告，無任何方法內容。依本節 §Method Resolution
+> Rule（本文件 L45-49）之規則，今日若實際驅動本 Recipe 執行到此節點，Method
+> Selection Engine 必須回傳：
+>
+> `PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED`
+>
+> 節點名稱予以保留（非文件寫錯；Atlas §25 開發優先順序 Phase 4 列有 Business 大類，
+> Finance 是否併入該大類或另立獨立 Phase 尚未在 §25 逐字點名，屬於未來排序細節，
+> 不影響本 callout 的核心結論：domain pack 補齊前，本 Recipe 不具備端到端可執行性）。
+> 詳見 ADR-008。
+
 ---
 
 # 44. Business Strategy Mode
