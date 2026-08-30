@@ -477,6 +477,7 @@ clusters:
         evidence:
           - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 5087, quote: "Critical AI/Privacy Law: 較高監控頻率 / Stable civil-law: 較低頻率"}
         consequence: "legal_source.status 標為 effective 但 Next Check 早已過期時，無機制自動轉成 STALE 狀態——Compliance Decision Artifact 會持續引用實際已過期的 legal_snapshot 卻自認合規。"
+        resolution: "2026-08-30 操作者核准 docs/architecture/GLOBAL_JURISDICTION_PLAN.md §2（Legal Freshness SLA）：CRITICAL/HIGH/MEDIUM/LOW 四級週期 30/90/180/365 天 + 15/30/60/90 天寬限期 + 自動降級規則。落地為 policies/jurisdiction/legal-freshness-sla.policy.yaml（ACTIVE）。"
       - id: P1-GAP-LEGAL-3
         severity: high
         role: Government/Public Sector

@@ -1,0 +1,195 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://policies/jurisdiction/legal-freshness-sla.policy.yaml"
+title: Legal Source / Jurisdiction Pack Freshness SLA Policy
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Closes P1-GAP-LEGAL-1 (.ai/research/phase-1/GAP_REGISTER.yaml L472-479):
+  Master Plan §128 (L5082-5105) states only a direction — "Critical
+  AI/Privacy Law: 較高監控頻率 / Stable civil-law: 較低頻率" — with no
+  cadence number, no owner, and no consequence for missing the review
+  window. `specs/jurisdiction/pack.schema.yaml`'s `freshness.sla_class`
+  field (CRITICAL/HIGH/MEDIUM/LOW) already exists and already points here
+  for "the cadence/grace/degrade numbers" (that file's own L279 comment).
+  This file supplies those numbers as the ACTIVE, enforceable operational
+  policy — not a redefinition of the schema shape, which stays owned by
+  pack.schema.yaml.
+
+  **These numbers are an internal operating policy, not a legal
+  requirement in any jurisdiction.** They are the system's default risk
+  posture only — overridable per-pack by a named human reviewer
+  (`freshness.owner_role: legal_source_steward`) with a recorded reason
+  in `freshness.audit_trail`. No claim is made here about what any real
+  law actually requires; this policy governs how often THIS SYSTEM
+  re-checks its own cached understanding of a legal source, nothing more.
+
+  Scope note: this file covers ONLY §2 (Legal Freshness SLA) of
+  `docs/architecture/GLOBAL_JURISDICTION_PLAN.md`, operator-approved
+  2026-08-30. That plan's §1 (Jurisdiction Pack Schema) and §3 (Unified
+  FAIL CLOSED Signal) remain `PROPOSED` and are NOT implemented by this
+  file — do not treat their content as decided by this policy's existence.
+
+source_of_truth_for:
+  - "docs/architecture/GLOBAL_JURISDICTION_PLAN.md §2.2 SLA table (operator-approved 2026-08-30) — this file IS that table made machine-readable and enforceable"
+  - "docs/architecture/GLOBAL_JURISDICTION_PLAN.md §2.3 Auto-degrade rule — the REVIEW_DUE/STALE state transition and its cascading effects (legal_uncertainty_state forced STALE, Human Review Queue entry)"
+  - "docs/architecture/GLOBAL_JURISDICTION_PLAN.md §2.4 Ownership and escalation — the mandatory legal_source_steward role and the no-steward-no-ACTIVE rule"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §128 Legal Freshness SLA (L5082-5105) — the original direction-only statement this policy supplies real numbers for"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §134 (L5258-5271) — the six-value legal_uncertainty_state enum this policy's auto-degrade rule sets STALE on, verbatim reuse not redefinition"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §129 (L5130) — the Compliance Center Human Review Queue this policy's degrade trigger pushes to"
+  - "specs/jurisdiction/pack.schema.yaml#/properties/freshness — the field shape (sla_class enum, next_check_due, owner_role, reviewed_by/reviewed_at, audit_trail) this policy supplies operating values for, without redefining"
+  - ".ai/research/phase-1/GAP_REGISTER.yaml P1-GAP-LEGAL-1 (L472-479) — the gap this file closes"
+
+decided_by: >
+  docs/architecture/GLOBAL_JURISDICTION_PLAN.md §2 (operator-approved
+  2026-08-30 in chat, after the operator was shown the plan's own
+  pre-existing 4-tier table rather than a simpler 3-tier alternative
+  Claude had proposed before checking whether this gap already had a
+  design on file — see WORKLOG 2026-08-30 for that correction). The
+  4-tier CRITICAL/HIGH/MEDIUM/LOW split and every cadence/grace/degrade
+  number below are transcribed verbatim from that plan's §2.2/§2.3, not
+  a fresh Phase 3 compilation decision.
+
+# ---------------------------------------------------------------------------
+# Schema body — validates one sla_class row of the operating table.
+# ---------------------------------------------------------------------------
+type: object
+required: [sla_table, auto_degrade_rule, ownership]
+properties:
+
+  sla_table:
+    type: array
+    description: >
+      The four sla_class rows, verbatim from GLOBAL_JURISDICTION_PLAN.md
+      §2.2. `review_cadence_days` is the point at which freshness.status
+      moves from ACTIVE to REVIEW_DUE (soft, WARN only); adding
+      `grace_period_days` gives the point at which it moves to STALE
+      (hard gate, see auto_degrade_rule below).
+    minItems: 4
+    maxItems: 4
+    items:
+      type: object
+      required: [sla_class, applies_to_examples, review_cadence_days, grace_period_days, stale_at_day]
+      properties:
+        sla_class:
+          type: string
+          enum: [CRITICAL, HIGH, MEDIUM, LOW]
+          description: "Matches specs/jurisdiction/pack.schema.yaml#/properties/freshness/properties/sla_class verbatim -- same enum, not a second copy that could drift."
+        applies_to_examples:
+          type: string
+          description: "Non-exhaustive illustrative scope per GLOBAL_JURISDICTION_PLAN.md §2.2 -- NOT a closed classification rule. A human legal_source_steward still decides which class a given source belongs to; this field only documents the design intent."
+        review_cadence_days:
+          type: integer
+          minimum: 1
+          description: "Days after last_checked_at before freshness.status = REVIEW_DUE."
+        grace_period_days:
+          type: integer
+          minimum: 0
+          description: "Additional days after review_cadence_days before freshness.status escalates to STALE."
+        stale_at_day:
+          type: integer
+          minimum: 1
+          description: "review_cadence_days + grace_period_days, restated as a single number for direct comparison against days-since-last-check. MUST equal that sum (see constraints below)."
+    default:
+      - sla_class: CRITICAL
+        applies_to_examples: "AI regulation with staged/phased effective dates; biometric, children, health, or government-classified data; any capability currently Government-only or Prohibited"
+        review_cadence_days: 30
+        grace_period_days: 15
+        stale_at_day: 45
+      - sla_class: HIGH
+        applies_to_examples: "Binding general privacy statutes; sector-specific binding regulation (finance, healthcare, education)"
+        review_cadence_days: 90
+        grace_period_days: 30
+        stale_at_day: 120
+      - sla_class: MEDIUM
+        applies_to_examples: "Administrative rules and regulator guidance under active revision, non-binding but load-bearing for Control Mapping"
+        review_cadence_days: 180
+        grace_period_days: 60
+        stale_at_day: 240
+      - sla_class: LOW
+        applies_to_examples: "Constitutional provisions, settled civil-law definitions, stable contractual-governing-law baselines"
+        review_cadence_days: 365
+        grace_period_days: 90
+        stale_at_day: 450
+
+  auto_degrade_rule:
+    type: object
+    description: >
+      The trigger P1-RISK-LEGAL-1 found missing: MP §134 already defines
+      STALE as one of six legal_uncertainty_state values but never says
+      what sets it. This is that trigger, verbatim from
+      GLOBAL_JURISDICTION_PLAN.md §2.3.
+    required: [on_cadence_elapsed, on_grace_elapsed]
+    properties:
+      on_cadence_elapsed:
+        type: object
+        description: "At last_checked_at + review_cadence_days, with no reviewed_at refresh."
+        properties:
+          freshness_status: { const: REVIEW_DUE }
+          severity: { const: "soft; WARN only" }
+      on_grace_elapsed:
+        type: object
+        description: "At last_checked_at + review_cadence_days + grace_period_days (== stale_at_day), with no reviewed_at refresh."
+        properties:
+          freshness_status: { const: STALE }
+          severity: { const: "hard gate" }
+          cascading_effects:
+            type: array
+            items: { type: string }
+            default:
+              - "Every legal_uncertainty_state value (Master Plan §134, L5258-5271) sourced from this pack is force-set to STALE."
+              - "An entry is pushed to Compliance Center's Human Review Queue (Master Plan §129, L5130)."
+
+  ownership:
+    type: object
+    description: "Verbatim from GLOBAL_JURISDICTION_PLAN.md §2.4."
+    required: [owner_role, no_steward_no_active]
+    properties:
+      owner_role:
+        type: string
+        const: legal_source_steward
+        description: "Matches specs/jurisdiction/pack.schema.yaml#/properties/freshness/properties/owner_role's const value -- mandatory per pack, not optional."
+      no_steward_no_active:
+        type: boolean
+        const: true
+        description: "A Jurisdiction Pack without an assigned legal_source_steward cannot reach ACTIVE status."
+
+constraints:
+  description: >
+    Cross-field rules this schema's `properties` block above cannot
+    express structurally.
+  rules:
+    - "Each sla_table row's stale_at_day MUST equal review_cadence_days + grace_period_days -- this is a restated derived value for readability, not an independently-set number."
+    - "sla_table MUST contain exactly one row per CRITICAL/HIGH/MEDIUM/LOW value -- no fifth tier, no missing tier."
+    - "This policy governs internal review cadence only. It MUST NOT be read, cited, or represented as a legal compliance deadline, statutory filing deadline, or legal opinion of any kind (see top-of-file description)."
+
+open_questions:
+  - id: "OQ-JURFRESH-1"
+    question: >
+      GLOBAL_JURISDICTION_PLAN.md §1 (Jurisdiction Pack Schema) and §3
+      (Unified FAIL CLOSED Signal) remain PROPOSED. Once those are
+      reviewed and approved, does this file need a companion
+      `conflict-of-laws` or `fail-closed-gate` policy sibling, or does
+      their content stay schema-only (in pack.schema.yaml and
+      specs/jurisdiction/conflict-of-laws-output.schema.yaml, the latter
+      already ACTIVE per §2.6, resolved 2026-08-29)?
+    owner: "operator, non-blocking for this file's own validity"
+    blocks: "nothing in this file -- purely a scope question for future work"
+
+verification:
+  method: >
+    Read GLOBAL_JURISDICTION_PLAN.md §2.1-§2.4 (L104-137) in full. Read
+    specs/jurisdiction/pack.schema.yaml's `freshness` block (L261-310) in
+    full to confirm this file's field values match that schema's expected
+    shape (sla_class enum, owner_role const) without redefining it. Read
+    MP §128 (L5082-5105), §129 (L5130 area), §134 (L5258-5271) directly to
+    confirm the cited line ranges and quoted text. Read GAP_REGISTER.yaml
+    P1-GAP-LEGAL-1 (L472-479) verbatim.
+  note: >
+    No mother document was modified. The 4-tier table and its numbers are
+    a verbatim transcription of an already-designed, now operator-approved
+    plan (GLOBAL_JURISDICTION_PLAN.md §2, approved 2026-08-30) — not a
+    fresh invention. That plan's own §0 explicitly frames every number
+    here as "internal operating policy, not a legal requirement in any
+    jurisdiction," a framing this file's description block repeats
+    verbatim rather than softening or dropping.

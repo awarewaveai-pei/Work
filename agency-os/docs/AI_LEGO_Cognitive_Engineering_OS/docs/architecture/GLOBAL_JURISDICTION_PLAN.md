@@ -1,5 +1,5 @@
 # GLOBAL_JURISDICTION_PLAN
-Status: PROPOSED
+Status: §2（Legal Freshness SLA）於 2026-08-30 由操作者於對話中明示核准（「要」）；§1/§3 以下章節仍為 PROPOSED，尚未逐條核准
 Date: 2026-08-29
 
 ## 0. Scope, Method, and Non-Goals
