@@ -70,7 +70,7 @@ const ROUTE_CATEGORIES = [
     ],
     label: 'N8N WORKFLOW path detected',
     actions: [
-      'Spawn `n8n-engineer` agent — EU self-hosted n8n at 204.168.175.41',
+      'Spawn `n8n-engineer` agent — self-hosted n8n on ks-aw-01 (149.202.64.114; was EU 204.168.175.41 before 2026-08-28 consolidation)',
     ],
   },
   {

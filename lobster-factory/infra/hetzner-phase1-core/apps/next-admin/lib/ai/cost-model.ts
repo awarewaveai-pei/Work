@@ -141,14 +141,18 @@ export interface InfraCost {
 }
 
 export const INFRA_MONTHLY: InfraCost[] = [
-  // Hetzner real = console PRICE field (screenshots 2026-06-17), account's locked-in rate (NOT the
-  // API /v1/pricing list price of $30.99/$41.99 — that's the current catalog, higher than billed).
-  { key: "hetzner-sg", label: "Hetzner SG VPS (5.223.93.113, CPX22 2c/4GB, sin)", usdPerMonth: 18.49, estimate: false, note: "真實 $18.49/月 (Hetzner console PRICE；含新加坡加價)" },
-  { key: "hetzner-eu", label: "Hetzner EU VPS (204.168.175.41, CPX32 4c/8GB, hel1)", usdPerMonth: 16.49, estimate: false, note: "真實 $16.49/月 (Hetzner console PRICE)；Supabase/n8n/Postiz/Trigger 全自託管於此" },
+  // 2026-08-28 consolidation: the two Hetzner Cloud VPS below (SG 5.223.93.113 / EU
+  // 204.168.175.41) were merged into one OVH dedicated box and deleted at Hetzner console
+  // 2026-08-30 -- kept here commented out as a historical price reference, not billed any more.
+  // { key: "hetzner-sg", label: "Hetzner SG VPS (5.223.93.113, CPX22 2c/4GB, sin)", usdPerMonth: 18.49, estimate: false, note: "真實 $18.49/月 (Hetzner console PRICE；含新加坡加價)" },
+  // { key: "hetzner-eu", label: "Hetzner EU VPS (204.168.175.41, CPX32 4c/8GB, hel1)", usdPerMonth: 16.49, estimate: false, note: "真實 $16.49/月 (Hetzner console PRICE)；Supabase/n8n/Postiz/Trigger 全自託管於此" },
+  { key: "ovh-ks-aw-01", label: "OVH SYS-GAME-2 (149.202.64.114, Ryzen 7 3800X 8c/16t / 64GB ECC / 2x960GB NVMe RAID1, Gravelines FR)", usdPerMonth: 72, estimate: false, note: "真實 $72/月 (決策文件 reports/decisions/2026-08-18-dedicated-host-purchase-timing.md)；取代上面兩台 Hetzner Cloud VPS，2026-08-28 全部服務(soulful+Chatwoot+SG 10 容器+EU 29 容器)整併於此" },
   { key: "cloudflare", label: "Cloudflare (DNS/WAF/R2)", usdPerMonth: 0, estimate: false, note: "真實: 2 zones (aware-wave.com / weartheworld.org) 皆 Free plan $0，CF API；R2 在免費額度內(10GB)，量大再加" },
   // aware-wave.com + weartheworld.org = Cloudflare Registrar (at-cost: .com/.org ~$10.44/yr each,
-  // CF doesn't mark up). soulfulexpression.org = Hostinger (.org), migrating to Hetzner Oct 2026.
+  // CF doesn't mark up). soulfulexpression.org migrated Hostinger -> ks-aw-01 (OVH) 2026-08-28,
+  // ahead of the originally-planned Oct 2026 date; Hostinger kept frozen as rollback through the
+  // observation window, not billed for new usage after cutover.
   // CF Registrar API needs #account.registrar scope (token 403'd); read exact in CF dash.
-  { key: "domains", label: "網域續約攤提 (aware-wave + weartheworld @CF; soulful @Hostinger→Hetzner 10月)", usdPerMonth: 2.9, estimate: true, note: "2 CF 網域 at-cost ~$10.44/年×2=$20.88(可信)；soulful Hostinger .org ~$14/年估算(10月搬遷，過渡)" },
+  { key: "domains", label: "網域續約攤提 (aware-wave + weartheworld @CF; soulful @Hostinger，已於 8/28 切至 ks-aw-01)", usdPerMonth: 2.9, estimate: true, note: "2 CF 網域 at-cost ~$10.44/年×2=$20.88(可信)；soulful 舊 Hostinger 主機凍結當回滾，觀察期滿解約，估算沿用 ~$14/年直到正式退租" },
   { key: "saas-other", label: "其他 SaaS (Sentry/PostHog 等，若付費)", usdPerMonth: 0, estimate: true, note: "推測免費額度；有付費方案再加" },
 ];
