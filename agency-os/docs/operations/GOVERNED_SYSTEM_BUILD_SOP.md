@@ -57,13 +57,53 @@ VBC 的最低步驟是：讀原始主張與其追蹤紀錄、查詢實際現況�
 
 一個合格 gate 的順序是：先提供互相獨立的分析與其證據，再讓人看見收斂或分歧，取得可歸因的決定，最後把其批准範圍與未解除事項寫回 ADR／計畫。這能避免把「人已同意研究方向」錯解為「人已同意所有下游實作」。**實證出處：** `ADR-014` L9-20、L50-69；`ADR_INDEX.md` L52 的第二次獨立論證閉環記錄。
 
-## 10. 第一週最小啟動清單
+## 10. 每項任務先過最小規劃閘，並按責任選來源
 
-第 1 天：建立一份系統敘事正本（目的、邊界、權責與長期不變量）、ADR index、open-questions register，以及母文件修訂用的 proposal template。先讓每一個未決事項和每一次後續修改都有可追蹤的位置；不必先做一整套 schema。**實證出處：** `ADR-006` L63-118 提供可最小化採用的提案結構；`ADR_INDEX.md` L28-39 展示決策依賴關係需要集中追蹤。
+非瑣碎任務在碰檔案前，先說清七件事：真正問題、已讀的現況與近期歷史、風險、至少兩個真實選項、建議、具體步驟、驗證計畫。這不是只給 ADR 用的儀式；它把「看起來要改一行」和真正根因分開，並用近期 commit 避免與正在進行的工作重複。Low-risk 可簡短交代並直接做；Medium／High-risk 則把七項明列並等待確認。**實證出處：** `agency-os/AGENTS.md`〈R0：架構師模式〉的開工七段與 `git log` 要求；`WORKLOG.md`〈2026-07-03 provision hairpin 修復〉的 `[風險清單]`、`[方案比較]`、`[建議方案]`、`[實作計畫]` 實例。
+
+來源不是越多越好：先讀本倉庫的操作規則、任務現況、相關歷史紀錄與決策正本，再用文件目錄導向該任務的架構、部署、稽核或交付 owner；目錄只負責找到正本，不可取代正本。將要修改、驗證或據以作結論的檔案要全文讀；只查名稱或做大範圍模式搜尋，才用片段搜尋或委派。文件新增／跨層交付／程式與基礎設施等情境，再各自載入相應的連動、驗證或稽核來源，而非一律塞滿 context。**實證出處：** `agency-os/AGENTS.md`〈Session 衛生〉的「要負責即整檔讀」判準；`docs/operations/OPS_DOCS_INDEX.md`〈依類別〉的目錄導向角色；`new-doc-linkage-checklist.md`〈什麼時候用這份〉與 `end-to-end-linkage-checklist.md`〈Objective〉的適用邊界。
+
+就本 operations 文件集，AI 要依任務型態路由：每次以 `OPS_DOCS_INDEX.md` 找到 owner 文件後讀 owner 正本；新增或大改治理文件時讀 `new-doc-linkage-checklist.md`，處理入口、impact map、連動與 health；策略、操作、交付、自動化或合規同時受影響時讀 `end-to-end-linkage-checklist.md`，逐項確認鏈路與 closeout evidence；只有 code-quality／bug-class audit、真實 incident 或既有 audit tool 報 drift 時，才讀 `BUG_HUNT_PROTOCOL.md` 決定怎麼與何時 hunt，並讀 `AUDIT_REGISTRY.md` 確認已查過、待處理與可重用的 audit class。平常的文件或功能計畫不必把後兩份 audit 文件當成通用前置讀物。**實證出處：** `OPS_DOCS_INDEX.md` 將各文件列為不同操作入口；`new-doc-linkage-checklist.md`〈什麼時候用這份〉與收斂驗證步驟；`end-to-end-linkage-checklist.md` Objective 與 A/F linkage；`BUG_HUNT_PROTOCOL.md` L3-6、L29-60、L235-245；`AUDIT_REGISTRY.md` L3-23 的 read-first、狀態與新增紀錄規則。
+
+規劃輸出要列出「本任務實際讀過的來源」及未讀條件文件的理由，讓下一個 AI 能重放來源選擇，而不是誤以為所有 checklist 都已套用。這是把 R0 的現況／歷史分析與本 SOP 的逐段可追溯性落成可檢查 artifact 的直接推論。**實證出處：** `agency-os/AGENTS.md`〈R0：架構師模式〉的現況分析與 `git log` 要求；`CODEX_HANDOFF_UNIVERSAL_SYSTEM_SOP_2026-08-30.md` §5 的逐節可追溯性要求。
+
+## 11. 驗證是四個獨立動作，不是「看起來沒問題」
+
+每次工作邏輯改動都要留下四種彼此不能替代的證據：實際執行或觀察新行為、讀回產物的 review、跨檔搜尋矛盾或副作用、以及寫入有日期的工作紀錄。讀過程式或說「測試應會通過」不是實測；只有文件或查詢型任務才可明說為何豁免實測，而不能把豁免偽裝成通過。**實證出處：** `agency-os/AGENTS.md`〈R0〉的 `[驗證計畫]` 四動作與 `REALTEST_WAIVED` 規則；`agency-os/AGENTS.md`〈R4：聲稱即驗證〉的四動作落實檢核。
+
+把四項結果寫成能被後人核對的 artifact，而不是一段自我評價。真實紀錄中，對 schema 的 golden test 與對抗驗證、對覆審 finding 的逐條核對、以及跨文件 stale-claim 搜尋各自記錄，才讓「已完成」可被重放與質疑。**實證出處：** `WORKLOG.md`〈2026-08-30（續30）〉的 `REALTEST_EVIDENCE`／`REVIEW_DONE`／`BUGHUNT_DONE` 三項證據；`WORKLOG.md`〈2026-08-30（續22）〉以 SSH、PowerShell 與憑證 dry-run 實測並另記 review／bug hunt 的紀錄。
+
+## 12. 同一缺陷類別再出現時，先找不變量，不要補第三個洞
+
+第一次修正可針對被證實的實例；同一 reviewer 第二次指出同類問題後，下一次修正前必須先回答：這個問題類別被違反的完整不變量是什麼，這次設計關掉的是整類還是單一實例？若只能關單一實例，要明說其限制並取得人類同意，不能用「範圍很小」掩蓋它仍是補丁。**實證出處：** `agency-os/AGENTS.md`〈補丁判準〉與〈同一 reviewer 對同一段程式碼連續回報 2 次〉的強制規則；同段記載 2026-08-24 deletion tracking 被連續打回八輪的根因。
+
+不變量分析也要界定真實範圍：找出同類模式的全部候選，逐一確認哪些真受影響、哪些只是表面相似，才可說「已全數處理」或「此為有界孤例」。這避免反過來把單一 finding 擴張成未證實的全系統重寫。**實證出處：** `WORKLOG.md`〈2026-08-29（續26）〉對 StrictMode 下 `Where-Object` 的 `.Count` 問題做 0／1／多命中驗證，並以同類搜尋確認僅兩處真實實例；`agency-os/AGENTS.md`〈R4：聲稱即驗證〉要求「清單完整」須以 Glob/Grep 對照。
+
+## 13. 讓流程重量隨風險增加，並按固定優先序解衝突
+
+把工作先分成可逆且低爆炸半徑、涉及核心邏輯／新依賴／auth 的中度風險，以及 production、不可逆資料、身分權限、憑證或金流等 High-STOP。低風險可直接做並說明假設；中風險先提計畫；高風險停止並等明確 go-ahead。這避免把每個 typo 都變成昂貴審議，也避免把不可回復操作當一般修正。**實證出處：** `agency-os/AGENTS.md`〈操作風險分級〉表；此為一手操作政策，無須捏造 WORKLOG 軼事。
+
+規則看似衝突時，不臨時挑對自己方便的一條：已明列的預授權流程優先於風險分級，風險分級再優先於一般的逐項批准預設。將這個順序寫清楚，AI 才能區分「可直接完成已授權收尾」與「必須為高風險決定停下來」。**實證出處：** `agency-os/AGENTS.md`〈規則優先序（衝突裁決）〉的「預授權 > 風險分級 > R0 逐項批准」。
+
+## 14. 交接給其他 agent／工具時，brief 要可驗證，回傳也要重驗
+
+給另一個 agent、模型或工具的 brief 必須包含五項：有位置證據的問題、已知事實、已排除原因、預期輸出形狀，以及不可觸碰的邊界。缺其中一項會讓對方自行猜測範圍或驗收標準；高品質交接不是把大量背景原封不動轉送，而是留下足以獨立查證的決策與約束。**實證出處：** `agency-os/AGENTS.md`〈Subagent 交接協議〉的五項強制 briefing 要素；`agency-os/AGENTS.md`〈跨模型 oracle〉明定給外部 reviewer 的輸入只放 Decision／Constraints／Files／Acceptance。
+
+收到回傳後仍要核對 cited `file:line` 是否存在、建議是否符合相鄰慣例，並要求任何「可能」或「大概」補上證據；自信的措辭不是驗證。實際交接紀錄中，接手者先自行重跑測試並 spot-check 回傳的路徑缺口後，才決定後續工作，沒有把 handback 當成真相。**實證出處：** `agency-os/AGENTS.md`〈Subagent 交接協議〉的回傳驗證要求；`D:\tmp\ai-lego-phase5-prototype\CLAUDE_NEXT_TASKS.md` 開頭段落記錄獨立重跑 8 項測試與 spot-check 一個 gap claim。
+
+## 15. 把 session 與 context 當成有限、會複利的資源
+
+一個連貫任務使用一個工作 session；結案時把狀態放入工作紀錄、任務板與長期記憶，而不是留在聊天裡。這讓後續接手者從版本庫重新取得事實，也防止早期多餘內容在每一輪對話反覆佔用 context。**實證出處：** `agency-os/AGENTS.md`〈Session 衛生〉的「一個任務一個 session」與 durable closeout 規則。
+
+節省 context 不等於片段化理解：準備修改或驗證的檔案必須全文讀，大片日誌或跨二十份以上檔案才先過濾或委派。真實事故曾因只讀 `check-smoke-tests.ps1` 的局部而漏掉檔頭的 `$ErrorActionPreference`，也曾因三次裸跑 CLI 各帶入約 120KB 輸出而永久增加約 366KB session 成本。**實證出處：** `agency-os/AGENTS.md`〈Session 衛生〉的讀取矩陣與 `check-smoke-tests.ps1`／120KB 兩個具名案例。
+
+## 16. 第一週最小啟動清單
+
+第 1 天：建立一份系統敘事正本（目的、邊界、權責與長期不變量）、ADR index、open-questions register，以及母文件修訂用的 proposal template；同日採用本 SOP §10 的任務規劃閘與 §13 的風險分級。先讓每一個未決事項和每一次後續修改都有可追蹤的位置；不必先做一整套 schema。**實證出處：** `ADR-006` L63-118 提供可最小化採用的提案結構；`ADR_INDEX.md` L28-39 展示決策依賴關係需要集中追蹤；`agency-os/AGENTS.md`〈R0〉與〈操作風險分級〉。
 
 第 2 至 3 天：只為已被選定的第一條垂直切片或既有消費端建立機讀契約；每個契約附來源、決策與編譯選擇。對尚無使用證據的物件，登錄為 deferred 並寫下重新檢查條件，避免「規格越多越完整」的錯覺。**實證出處：** `MACHINE_READABLE_SPEC_PLAN.md` L80 對 `READY`／`BLOCKED_PENDING_ROUND2_ADR`／`SKELETON_ONLY` 的區分；`WORKLOG.md`〈2026-08-30（續30）〉對 10 個未被 Research 切片使用的 typed objects 作出 DEFERRED 決定。
 
-第 4 至 5 天：對第一個跨文件決策建立 ADR；對第一個權威文件編輯建立 proposal，但不要自行批准；捕捉 diff 後做一次獨立覆審並將 artifact 連同結果落庫。完成後以「同檔全文＋全庫 claim 搜尋」檢查 stale state，再更新工作紀錄。**實證出處：** `ADR-006` L107-118；`.claude/commands/codex-review.md` L15-55；`WORKLOG.md`〈2026-08-30（續30）〉的 stale-claim 修正與 artifact 驗證記錄。
+第 4 至 5 天：對第一個跨文件決策建立 ADR；對第一個權威文件編輯建立 proposal，但不要自行批准；捕捉 diff 後做一次獨立覆審並將 artifact 連同結果落庫。首次有 committed contract change 時，同時執行 §11 的實測、review、跨檔抓蟲與工作紀錄四項驗證；完成後以「同檔全文＋全庫 claim 搜尋」檢查 stale state。**實證出處：** `ADR-006` L107-118；`.claude/commands/codex-review.md` L15-55；`WORKLOG.md`〈2026-08-30（續30）〉的 stale-claim 修正與 artifact 驗證記錄；`agency-os/AGENTS.md`〈R0〉的四動作驗證計畫。
 
 ## Evidence boundary
 
@@ -74,4 +114,4 @@ VBC 的最低步驟是：讀原始主張與其追蹤紀錄、查詢實際現況�
 - `docs/operations/end-to-end-linkage-checklist.md`
 - `docs/operations/new-doc-linkage-checklist.md`
 
-_Last synced: 2026-08-30 18:41:55 UTC_
+_Last synced: 2026-08-30 19:16:58 UTC_

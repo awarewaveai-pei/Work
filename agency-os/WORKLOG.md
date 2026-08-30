@@ -1,5 +1,32 @@
 # Worklog
 
+## 2026-08-31（續3）
+
+### Governed System Build SOP 補齊任務規劃、文件來源路由與交接規則
+
+**觸發**：操作者確認是否只要閱讀 `GOVERNED_SYSTEM_BUILD_SOP.md`，AI 就能依其中指引開始規劃與動工，並要求把 operations 文件集的正確使用方式一併寫入，而不是只在對話中說明。
+
+**根因**：既有 SOP 雖涵蓋分層文件、proposal／ADR、覆審、VBC、寫入邊界與 phase gate，但缺少可直接執行的「每項任務如何規劃、按情境讀哪些文件、如何驗證／交接／控制 context」指令。新提交的 `CODEX_HANDOFF_SOP_ADDENDUM_2026-08-31.md` 已逐條界定需補入的六個治理主題；本次依其指定來源全文核對後才寫入。
+
+[已修改]
+- `agency-os/docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md`：新增 §10–§15，原「第一週最小啟動清單」改為 §16。§10 明定七段規劃閘與文件路由：`OPS_DOCS_INDEX` 只作導航、new-doc／end-to-end checklist 依情境使用、`BUG_HUNT_PROTOCOL` 與 `AUDIT_REGISTRY` 只在 audit／incident／drift 時載入；並要求計畫列出實際讀過來源及未讀條件文件的理由。
+- `agency-os/docs/architecture/decisions/ADR_INDEX.md`、`docs/operations/end-to-end-linkage-checklist.md`、`docs/operations/new-doc-linkage-checklist.md`：`doc-sync-automation.ps1` 更新 Related Documents metadata。
+- `agency-os/WORKLOG.md`：本條，記錄原因、範圍與驗證；未變更既有 §§1–9 的治理內容。
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 僅改 Markdown 治理文件與其 metadata，無 runtime、schema、部署或資料變更。
+- REVIEW_DONE: critic=Quick（讀回 SOP §10–§16；逐一核對 R0 七段、四動作驗證、不變量、風險分級、五要素 handoff、session 衛生及兩個 WORKLOG 實例均有真實出處；檢查全部新增實質段落均附 `實證出處`）| verdict=pass | findings=0c/0m/0n。
+- DOC_LINKAGE_DONE: `doc-sync-automation.ps1 -ChangedFiles @('docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md')` 成功；目標與 ADR index、new-doc、end-to-end checklist metadata 均更新，closeout=`reports/closeout/closeout-20260831-031659.md`。
+- FORMAT_DONE: 目標檔 UTF-8 無 BOM（開頭 bytes `35,32,71`）、章節連續為 §10–§16、`git diff --check` 無 whitespace error；同步腳本帶入的兩個 EOF blank lines 已移除。
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`GOVERNED_SYSTEM_BUILD_SOP|Governed System Build SOP|每項任務先過最小規劃閘` | hits=25（SOP、兩份 handoff、WORKLOG、入口／impact map／自動連動 metadata）；`scripts/` 命中=0，沒有未預期的程式 consumer 或仍指向舊 §10 的引用。
+
+[剩餘風險]
+- §14 的「回傳後獨立驗證」實例引用 `D:\tmp\ai-lego-phase5-prototype\CLAUDE_NEXT_TASKS.md`；它只是本機歷史 handoff 證據，不是執行本 SOP 的相依檔。若日後該暫存路徑清除，原則仍可由 `AGENTS.md` 的交接協議驗證。
+- 此工作區已有大量其他人未提交的修改／刪除；本次只會 stage 本條列出的 SOP、三個 doc-sync metadata 檔與 WORKLOG，絕不混入。
+
+[rollback]
+- `git revert <本次 commit>` 還原 SOP 新增的六節、三份 metadata 與本條 WORKLOG；自動產生的 closeout report 不納入 commit。
+
 ## 2026-08-31（續2）
 
 ### ALERT_REQUIRED.txt 查明：非新事故，是 2026-08-24 舊 archive 引用一個已完成任務的過期 tag，已修正並確認 100% 健康
@@ -8474,9 +8501,6 @@ _Last synced: 2026-08-24 19:21:02 UTC_
 **Operator action**: restart Codex desktop once to terminate the already-loaded workspace MCP process. The next launch cannot load Canva from the managed MCP configs.
 
 **Rollback**: change `servers.canva.enabled` back to true, run the same sync command, restart the target host, then explicitly complete Canva OAuth.
-
-
-
 
 
 
