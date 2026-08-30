@@ -1,7 +1,7 @@
 ---
 proposal_id: "011"
 slug: "cas-path-tenant-scoped-mp"
-status: APPROVED
+status: APPLIED
 target_document: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
 target_baseline_hash: "8e5e67f607477babe60f2a4a354a211a30bd88cb1ece631dd51c5e11b23bac10"
 affected_line_ranges: ["L2570-2584"]
@@ -11,7 +11,7 @@ authored_by: "Claude"
 approved_by: "操作者"
 approved_at: "2026-08-30"
 approval_note: "39 個都核准"
-applied_commit: null
+applied_commit: "e0e4d6ff5"
 ---
 
 ## PROPOSED_CHANGE

@@ -1,7 +1,7 @@
 ---
 proposal_id: "027"
 slug: "repo-layout-pointer-mp"
-status: APPROVED
+status: APPLIED
 target_document: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
 target_baseline_hash: "8e5e67f607477babe60f2a4a354a211a30bd88cb1ece631dd51c5e11b23bac10"
 affected_line_ranges: ["L610-620", "L764-783", "L842-851", "L1004-1014"]
@@ -11,7 +11,7 @@ authored_by: "Claude"
 approved_by: "操作者"
 approved_at: "2026-08-30"
 approval_note: "39 個都核准"
-applied_commit: null
+applied_commit: "5b3c9cf99"
 ---
 
 ## PROPOSED_CHANGE

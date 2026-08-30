@@ -1,7 +1,7 @@
 ---
 proposal_id: "024"
 slug: "db-migration-atlas-pointer-batch"
-status: APPROVED
+status: APPLIED
 target_document: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
 target_baseline_hash: "a47424f96bf6f88023b9870d4112ab1f607e9b424236693572d6a5558d2804a1"
 affected_line_ranges: ["L900", "L907-919", "L2367-2376", "L3486-3500"]
@@ -11,7 +11,7 @@ authored_by: "Claude"
 approved_by: "操作者"
 approved_at: "2026-08-30"
 approval_note: "39 個都核准"
-applied_commit: null
+applied_commit: "2e82136a2"
 ---
 
 ## PROPOSED_CHANGE
