@@ -1,5 +1,62 @@
 # Worklog
 
+## 2026-08-30（續17）
+
+### `/codex-review` 覆審續14-16 的 SG/EU 刪機文件同步（commit 67019283d/ddb7366ae/737800f38），抓到 3 個真 high finding：banner-only 不夠，emergency runbook 本文仍指向已刪除主機
+
+**觸發**：操作者要求「用 codex-review 做 review」，審前三次 commit（治理文件同步 + emergency runbook 加失效橫幅）。
+
+**Codex 結論**：`needs-attention`，3 個 [high] finding，逐條驗真：
+
+1. **`check-vps-auto-reboot-health.ps1` 短路後，`ao-resume.ps1`/`VPS-AUTO-REBOOT-RUNBOOK.md`/`/sg-reboot`/`/eu-reboot` 整條 escalation 鏈沒跟著改**——屬實但 codex 有一處細節錯誤（誠實記錄）：codex 說「`system-health-check.ps1` still runs this checker」，grep `system-health-check.ps1` 全文找不到 `reboot` 字樣，這句不成立，真正呼叫者是 `ao-resume.ps1`（已用 grep 確認 `check-vps-auto-reboot-health.ps1` join-path 呼叫）。**但核心指控成立且比 codex 講得更嚴重**：`ao-resume.ps1:1088-1091` 已經把 reboot 訊號的「host 顯示名稱」正確改指 ks-aw-01，但 `:1121` 的 `$slug` 判斷式沒跟著改，仍然算出 `eu-reboot`/`sg-reboot` 並印出「run /eu-reboot」——而 `.claude/commands/sg-reboot.md:13` / `eu-reboot.md:13` 的 `Connection: host:` 仍寫死 `5.223.93.113`/`204.168.175.41`。這代表若 ks-aw-01 真的有 pending reboot 且觸發此路徑，Claude 會被指示執行一個會直接連線失敗的指令——這是**Claude 自己可能真的執行**的指令，不只是給人看的文件，風險高於純文件類 finding。
+2. **`UPTIME-KUMA-MONITOR-FIX.md` 本文仍教人把 monitor 指回死 IP**——屬實，比續15自評的更嚴重。續15只在檔案頂加了失效橫幅，但 `:41/:55/:79/:80` 的 curl 探測與**寫入 Kuma DB 的 SQL UPDATE 語句**都還是 `http://5.223.93.113/...`——這不是「讀了會誤導」，是「照做會把 production 監控寫壞」，橫幅擋不住複製貼上 SQL 的操作者。
+3. **`HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md` rescue mode 段落整段是 Hetzner API，ks-aw-01 是 OVH**——查證後比 codex 講得更嚴重：不只是 IP 寫死（`5.223.93.113`）跟 server ID 寫死（`125887340`），是**整個 API 供應商都不對**——`api.hetzner.cloud/v1/servers/...` 對 OVH 機器沒有意義，這段文字提供的不是「過期指令」而是「完全無效、需要重新研究 OVH 對應流程」的空白，橫幅無法補這個缺口。
+
+[已修改]
+- `agency-os/reports/oracle/2026-08-30-review-eaa1d410.md`：`write-oracle-artifact.ps1 -Mode review` 落地本次 ORACLE gate artifact，`-ReviewedDiff` 綁定 `f20e6b298..HEAD` 的 capture diff
+- `agency-os/WORKLOG.md`：本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(node) | cmd=`codex-companion.mjs adversarial-review --background --base f20e6b298 "<兩段強制 focus text>"` | exit=0 | 結果=真實跑，非模擬，3 個 finding
+- REVIEW_DONE: critic=Deep（外部 oracle，`/codex-review`）| verdict=needs-attention | findings=0c/3m(HIGH，逐條驗真屬實)/0n；其中 finding 1 的引用細節（system-health-check.ps1）經 grep 證實為誤，已在上方誠實記錄，不影響核心指控成立
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,runbooks | grep=`sg-reboot\|eu-reboot\|5\.223\.93\.113\|204\.168\.175\.41` in `scripts/ao-resume.ps1`,`.claude/commands/sg-reboot.md`,`.claude/commands/eu-reboot.md`,`runbooks/VPS-AUTO-REBOOT-RUNBOOK.md` | hits=confirmed（ao-resume.ps1:1121 slug 邏輯未更新、兩份 reboot command 的 Connection host 仍為舊 IP、VPS-AUTO-REBOOT-RUNBOOK.md 全文以 SG/EU 為現行拓樸描述無任何退役橫幅）
+
+[剩餘風險]
+- 3 個 finding 尚未修正，本條僅記錄驗真結果——修正方案待與操作者對齊後執行（reboot escalation 鏈需要設計決策，不是機械字串替換；502/OOM playbook 的 OVH rescue 流程需要新研究，非既有文件可抄）
+
+[rollback] 本條僅新增 WORKLOG 記錄與 oracle artifact，無其他變動
+
+## 2026-08-30（續16）
+
+### 「全都都要處理，沒處理完不能停」：ADR-006 proposal 流程啟用（39 個提案）+ Phase 5 前置規格全數建成 + 全域文件同步——三個 commit 的總覽
+
+**觸發**：操作者對「計畫還有那些未完成」的回報明確要求「全都都要處理」，並重申全能架構師身份 + 30 年工程紀律 + 強制 `/codex-review`。範圍涵蓋先前回報的 4 大類缺口：(1) 16 份 ADR 全數「決定但未套用」（`.ai/proposals/` 從未建立）；(2) Phase 5 垂直切片前置規格大量缺失；(3) 4 項需操作者決策的懸案；(4) 2 處文件過期。
+
+**分派策略**：先用 3 個唯讀 Explore agent 精確萃取（Architecture Constitution 的確切內容依據、Phase 5 缺失規格的確切清單與母文件引用、ADR-006 proposal 格式與每份 ADR 需編輯的確切母文件段落），拿到精確依據後才開始寫入——不靠摘要記憶硬做。接著平行派出 9 個 agent 各自負責 1 份 ADR 的全部 proposal（依 ADR-006 自己「每個編輯點一個 proposal」的既有先例，非「每份 ADR 一個」），另平行派出 8 個 agent 各自建置獨立的 Phase 5 前置 schema/policy/contract。全程唯有 Claude（本 session 及其 subagent）寫入 `D:\Work`，符合「跨模型 oracle 分工」的結構性限制。
+
+**第一類成果：`.ai/proposals/` 從零建到 39 筆**（見下方 commit 記錄）。**第二類成果：Phase 5 前置規格從「15 項缺失」盤點後實際建成 9 項全新檔案**。**第三類：4 項需操作者決策的懸案已在對話中明確回報，其中 IdP 一項操作者已當場拍板（見續12/續13）；其餘（`role_to_authority_mapping`、OQ-1/4/13/14、`network-egress` allowlist）已回報但性質上不可能由 Claude 代為決定，繼續保持開放並在對應檔案的 `open_questions` 中誠實記錄，不假裝解決。**第四類**：文件同步修正（見本條 [已修改]）。
+
+**全程品質把關**：每個 agent 被要求先讀母文件原文再寫，不可轉述任務摘要；發現任何一手依據與任務摘要不符時必須回報而非照抄——多個 agent 確實抓到並回報了真實的引用錯誤/路徑錯誤（例：ADR-004 proposal 017 的 slug 與實際內容不符、`artifact-uri.schema.yaml` 誤建路徑、proposal 009 的確切 EC 章節需自行查證補齊）。整合階段（本人執行，非委派）：39 個 proposal 的 YAML frontmatter 全數程式化驗證（status/change_class/hash/防重複 id）、code fence 平衡驗證（3 版本迭代找出正確的 CommonMark 巢狀邏輯，前兩版驗證腳本本身有 bug，第三版才正確——過程記錄於本 session 對話，不隱藏自己工具的錯誤）；全部新舊 YAML 檔案重複 key 掃描；跨檔案路徑衝突發現並修正（`artifact-uri.schema.yaml` 誤建於 `specs/domain/`，經比對兩個獨立既有引用後改置於 `specs/artifact/portable-uri.schema.yaml`，並修正 3 處連動 `$ref`）。
+
+[已修改]（總覽，實際分 3 個 commit 落地）
+- 新增 `Architecture-Constitution-v1.md` + `.ai/proposals/`（39 筆，`001`-`039`，全數 `status: DRAFT`）
+- 新增 9 個 Phase 5 前置 schema/policy 檔案（knowledge-canvas/portable-uri/evidence-graph/sentence-provenance/workflow-ir/execution-state-machine/audit/event-ledger/trusted-compute-gate）+ `data-deletion.policy.yaml` + `methods/contracts/research.qualitative_coding.contract.yaml` + `capabilities/contracts/run_statistics.capability.yaml` + `recipes/validated/research-qualitative-v1.recipe.yaml`，含全數對應 fixture
+- 修正 `specs/artifact/cas-path.schema.yaml`、`specs/evidence/evidence-graph.schema.yaml`、`specs/domain/knowledge-canvas.schema.yaml`、`specs/cognitive/recipe.schema.yaml`、`specs/evidence/{evidence,claim}.schema.yaml`、`methods/registry/{method-inventory,contract-backlog}.yaml`、`tests/{README.md,run_golden_tests.py}` 的交叉引用/註冊
+- 修正 `.ai/research/phase-1/GAP_REGISTER.yaml`（P1-GAP-AI-2/3/9 標記解決）、`AI_LEGO_OS_Program_Plan_v1.md`（Program Status Tracker 全面更新，含實際檔案計數 74 個 schema/policy）、`docs/adr/ADR-001-scoped-authority-precedence-unification.md`（Architecture Constitution 已建成註記）、`docs/adr/ADR-008-business-planning-recipe-method-gap.md`（proposal 031 已建註記）、`policies/privacy/pii-redaction.policy.yaml`（OQ-PII-2 過期宣稱訂正）、`docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`（新增 §2.11 Phase 5 前置規格追蹤）
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py` | exit=0 | 結果=835/835 全過（687→835，淨增 148 個檢查）
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=自訂程式化驗證 39 個 proposal 的 YAML frontmatter（status/change_class/hash/id 唯一性）+ 正確版 CommonMark fence 巢狀檢查 | exit=0 | 結果=39/39 全數通過，0 個真實錯誤（前兩版檢查腳本本身有 bug，已識別並用第三版修正，非隱瞞）
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`UniqueKeyLoader` 對全部新增/修改 YAML 檔案掃描 | exit=0 | 結果=29 個 schema/policy/registry 檔案 + 39 個 proposal frontmatter 全數 OK，無重複 key
+- REALTEST_EVIDENCE: tool=Bash(sha256sum) | cmd=重算三份母文件 hash 比對 `.ai/research/phase-0/document-hashes.yaml` | exit=0 | 結果=完全一致，確認全程未修改任何母文件本體（僅 proposal 記錄擬議編輯，未套用）
+- REVIEW_DONE: 見本 WORKLOG 下一條（`/codex-review` 對本批次的真實覆審結果）
+- BUGHUNT_DONE: scope=agency-os | grep=`specs/domain/artifact-uri\|proposals.{0,20}不存在\|P1-GAP-AI-[239]\b` | hits=發現並修正 3 類真實過期宣稱（`knowledge-canvas.schema.yaml` 的 live `$ref` 路徑錯誤、`pii-redaction.policy.yaml`/`ADR-008.md` 的「proposals 不存在」過期宣稱、GAP_REGISTER.yaml 三個已解決但未標記的 gap）
+
+[剩餘風險] 39 個 proposal 全數 `status: DRAFT`，尚無一筆 `APPROVED`——母文件（Master Plan/Execution Contract/Method Atlas）本身一個字都還沒被編輯，這是 ADR-006 設計本身要求的結果非疏漏。`REPOSITORY_ARCHITECTURE.md` 仍 `Status: PROPOSED`，多個 proposal 依賴其定案，已在各自 DEPENDENCIES 段落誠實揭露。`role_to_authority_mapping`/`network-egress` allowlist/OQ-1/OQ-4/OQ-13/OQ-14 五項仍待操作者決策，本次任務未強行代為裁決。
+
+[rollback] 三個 commit 各自可獨立 `git revert`；`.ai/proposals/` 純新增目錄，回退零風險；新增 schema/policy 檔案回退後 Phase 5 前置缺口會重新出現，需注意連動的 `GAP_REGISTER.yaml`/`MACHINE_READABLE_SPEC_PLAN.md` 記錄也需一併考慮。
+
 ## 2026-08-30（續15）
 
 ### 操作者要求「處理好」舊 SG/EU 刪機後續三項，逐項查證後發現一項已提前做好、聚焦真正缺口（emergency runbook 死指令）
