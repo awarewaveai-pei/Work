@@ -396,6 +396,8 @@ Identity
 - **Workspace**（§77 為唯一正本）＝ Experience Plane 內部對「人類可見功能」的二次分解，是 Plane 的子集（只有 6 個 Plane 有對應 Workspace），不是與 Plane 平行的另一套系統分解。
 - **Module**（§80 為 v1 歷史快照；`docs/architecture/REPOSITORY_ARCHITECTURE.md` 的 Proposed Directory Tree 為程式碼層現行目標正本，該文件已於 2026-08-30 由操作者核准 ACCEPTED）＝程式碼 bounded-context 層，變動頻率最高。
 
+跨層命名對照見 §80.1。
+
 ---
 
 # 5. 部署模式：Online / Offline / Hybrid
@@ -3045,6 +3047,8 @@ LEGO 組裝。
 
 多專家、多政府、多地方辯論。
 
+跨層命名對照見 §80.1。
+
 ---
 
 # 78. 使用者完整流程
@@ -3256,6 +3260,27 @@ Outcome Feedback
     /authorship
     /stakeholders
 ```
+
+## 80.1 Plane / Workspace / Module 跨層命名對照
+
+（ADR-009 Sub-decision (a) 核心產出，逐一核對非猜測）
+
+| Plane（§4） | Workspace（§77） | Module — §80 原始清單 | Module 現況（`REPOSITORY_ARCHITECTURE.md` 驗證後） | 對應程度 |
+|---|---|---|---|---|
+| EXPERIENCE PLANE | 無單一對應（Workspace 全體都是 Experience Plane 內部細分） | 無 | `/apps`（非 `/modules`） | 容器關係，非同層對應 |
+| HUMAN COLLABORATION PLANE | Canvas | canvas, brainstorm | 兩者保留為 vertical | 完整三層對應 |
+| STAKEHOLDER INTELLIGENCE PLANE | Intelligence Council（非正式六大之一） | stakeholders | 保留為 vertical | 對應，但 Workspace 端本身非正式項目 |
+| GLOBAL JURISDICTION & COMPLIANCE PLANE | 無對應 Workspace | jurisdiction, compliance, privacy, localization, accessibility, trade, tax, legal, standards（9 項） | 全部移出 `/modules`，改列 `/platform/trust-fabric/*`——強制關卡，非使用者可選功能 | 無 Workspace；Module 定位本身被 RA 推翻 |
+| DECISION PLANE | Decision Room | decision, optimization | decision 應移除併入 `/core/domain/decision`；optimization 拆為業務包裝與求解器兩處 | Workspace 對應；Module 端已知需修正 |
+| COMPUTATION PLANE（§27 又稱「Data Science Plane」，非 §4 正式名） | Data Lab（§28 亦稱 Data Lab） | analytics, simulation | 合併為 `/modules/data-science/*` | 完整對應，但六站點四種拼法 |
+| COGNITIVE PLANE | 無對應 Workspace | 無 | 屬於 `/cognitive/*` 頂層命名空間，不在 `/modules` 下 | 無 Workspace 亦無 Module |
+| KNOWLEDGE PLANE | Knowledge | knowledge | 保留為 engine，schema 移至 `/core/domain/knowledge` | 完整三層對應 |
+| ARTIFACT PLANE | Artifact Studio | artifact, authorship | artifact 應移除併入 `/core/domain/artifact`；authorship 保留 | Workspace 對應；Module 端部分已知需修正 |
+| CONTROL PLANE | Workflow Lab（僅覆蓋「LEGO 組裝」，Policy/Identity/Version/Consent 無對應） | 無 | Workflow/Policy/Identity 為 Shared Kernel（`/core/domain/*`）；Workflow engine 在 `/platform/workflow` | 僅部分 Workspace 對應，無 Module |
+| DATA PLANE | 無對應 Workspace | 無 | 對應頂層 `/data` | 無 Workspace 亦無 Module |
+| PLATFORM PLANE | 無對應 Workspace | 無 | 對應頂層 `/platform`、`/security` | 無 Workspace 亦無 Module |
+
+**誠實結論**：12 個 Plane 裡，只有 4 個（Human Collaboration / Stakeholder Intelligence / Computation / Knowledge）有真正撐到程式碼層都還存在的完整三層對應；其餘 8 個要嘛從一開始就沒有 Workspace（因為使用者不該直接操作），要嘛 Module 端已經被 `REPOSITORY_ARCHITECTURE.md` 驗證後判定應該搬家或消失（併入 kernel/platform）。
 
 ---
 
