@@ -128,10 +128,11 @@ AI MUST：
 1. 找到 `AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md`。
 2. 找到 `AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md`。
 3. 讀取本 Execution Contract。
-4. 找到 machine-readable specs。
-5. 找到 applicable policies。
-6. 找到 accepted ADR。
-7. 找到目前程式碼、schema、infra 與 deployment evidence。
+4. 找到 `Architecture-Constitution-v1.md`。
+5. 找到 machine-readable specs。
+6. 找到 applicable policies。
+7. 找到 accepted ADR。
+8. 找到目前程式碼、schema、infra 與 deployment evidence。
 
 任一必要規格缺失：
 
