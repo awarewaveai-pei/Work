@@ -964,15 +964,7 @@ AI 永遠不得覆蓋。
 
 ## 12.1 記錄內容來源
 
-```text
-HUMAN ORIGINAL
-AI GENERATED
-AI SUGGESTED
-HUMAN EDITED
-HUMAN APPROVED
-SOURCE QUOTATION
-CALCULATED RESULT
-```
+`authorship_state` 唯一正本見 `specs/governance/epistemic-label.schema.yaml#/definitions/authorship_state`（6 值：HUMAN_ORIGINAL / AI_GENERATED / AI_SUGGESTED / HUMAN_EDITED / HUMAN_APPROVED / SOURCE_QUOTATION）。原第 7 值 `CALCULATED RESULT` 已移除——經 ADR-004 確認為誤植自 §83 epistemic_type 的重複字串，非真實的第 7 種 authorship 概念。
 
 ## 12.2 確切路徑
 
