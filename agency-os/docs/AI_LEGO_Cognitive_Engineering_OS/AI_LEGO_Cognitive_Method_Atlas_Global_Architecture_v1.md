@@ -4226,9 +4226,17 @@ Localization Dataset
 ## 24.1 Method 不可就地覆寫
 
 ```text
-method.swot.v1
-method.swot.v2
-method.swot.v3
+id: strategy.swot
+family: strategy
+version: 1.0.0
+
+id: strategy.swot
+family: strategy
+version: 2.0.0
+
+id: strategy.swot
+family: strategy
+version: 3.0.0
 ```
 
 舊 Workflow 仍能 replay。
