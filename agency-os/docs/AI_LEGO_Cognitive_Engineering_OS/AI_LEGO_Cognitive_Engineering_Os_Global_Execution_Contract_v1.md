@@ -87,54 +87,9 @@ _v<MAJOR>
 
 ---
 
-# 2. 三份母規格的 Scoped Authority
+# 2. Scoped Authority
 
-禁止用「最後讀到的文件永遠優先」處理衝突。
-
-採：
-
-# Scoped Authority
-
-| Scope | Authoritative Source |
-|---|---|
-| Product / Domain / Platform Architecture | Global Master Plan |
-| Security / Data / Deployment / Global Jurisdiction Architecture | Global Master Plan + approved machine policies |
-| Cognitive Primitive / Method / Lens / Method Selection | Method Atlas |
-| Method-specific Quality Gate | Method Atlas |
-| AI 執行生命週期 | Execution Contract |
-| AI Authority / Tool Use / Change Control | Execution Contract + machine policy |
-| Exact Schema / Enum / Runtime Contract | Approved machine-readable specs |
-| 特定已批准架構選擇 | Accepted ADR |
-| 法律有效性 | Official legal source + approved Jurisdiction Pack |
-| 當前 Production Reality | Current-state evidence |
-
-## 2.1 衝突解決順序
-
-```text
-Applicable Binding Law / Regulatory Hard Constraint
-        ↓
-Approved Security / Privacy / Safety Hard Policy
-        ↓
-Approved Machine-readable Contract / Schema
-        ↓
-Accepted ADR
-        ↓
-Scoped Normative Document
-        ↓
-Recipe / Runbook
-        ↓
-Example
-        ↓
-Ad-hoc Suggestion
-```
-
-若兩份同層級規格在同一 scope 互相衝突：
-
-```text
-CONFLICT_REQUIRES_HUMAN_REVIEW
-```
-
-不得由 AI 自行選擇對自己最方便的一條。
+Scoped Authority 裁決鏈與文件職責/授權表的唯一正本見 `Architecture-Constitution-v1.md` §1、§2，禁止在本文件重複定義。「法律有效性」「當前 Production Reality」兩項不屬於文件職責範圍，維持原則：法律有效性依 Official legal source + approved Jurisdiction Pack；當前 Production Reality 依 Current-state evidence 判斷，兩者不變。
 
 ---
 
