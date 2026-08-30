@@ -8,7 +8,8 @@ description: >
   epistemic-label.schema.yaml#/provenance_record's own required fields, and
   gates[].status's DIFFERENT, smaller 4-value enum (PASS/FAIL/BLOCKED/
   NOT_APPLICABLE) that this file's compilation_decisions explicitly says is
-  never conflated with the top-level status.
+  never conflated with the top-level status. ADR-019 reason_code cases cover
+  every currently-emittable named signal, not an unexecuted shorthand.
 
 valid:
   - name: pass_with_gate_and_evidence
@@ -53,6 +54,24 @@ valid:
         - gate_id: "security"
           status: "NOT_APPLICABLE"
           rationale: "N/A for this task type -- no security-boundary change"
+  - name: method_resolution_blocked_reason
+    instance: {execution_id: "EX-2026-000049", status: "BLOCKED", evaluated_at: "2026-08-30T10:00:00Z", provenance: {epistemic_type: "SOURCE_FACT", authorship_state: "HUMAN_ORIGINAL"}, reason_code: "METHOD_RESOLUTION_BLOCKED"}
+  - name: document_resolution_blocked_reason
+    instance: {execution_id: "EX-2026-000050", status: "BLOCKED", evaluated_at: "2026-08-30T10:01:00Z", provenance: {epistemic_type: "SOURCE_FACT", authorship_state: "HUMAN_ORIGINAL"}, reason_code: "DOCUMENT_RESOLUTION_BLOCKED"}
+  - name: current_state_drift_reason
+    instance: {execution_id: "EX-2026-000051", status: "NEEDS_HUMAN_REVIEW", evaluated_at: "2026-08-30T10:02:00Z", provenance: {epistemic_type: "SOURCE_FACT", authorship_state: "HUMAN_ORIGINAL"}, reason_code: "CURRENT_STATE_DRIFT_DETECTED"}
+  - name: scope_change_reason
+    instance: {execution_id: "EX-2026-000052", status: "NEEDS_HUMAN_REVIEW", evaluated_at: "2026-08-30T10:03:00Z", provenance: {epistemic_type: "SOURCE_FACT", authorship_state: "HUMAN_ORIGINAL"}, reason_code: "SCOPE_CHANGE_REQUIRED"}
+  - name: legal_review_reason
+    instance: {execution_id: "EX-2026-000053", status: "NEEDS_HUMAN_REVIEW", evaluated_at: "2026-08-30T10:04:00Z", provenance: {epistemic_type: "SOURCE_FACT", authorship_state: "HUMAN_ORIGINAL"}, reason_code: "LEGAL_REVIEW_REQUIRED"}
+  - name: budget_review_reason
+    instance: {execution_id: "EX-2026-000054", status: "NEEDS_HUMAN_REVIEW", evaluated_at: "2026-08-30T10:05:00Z", provenance: {epistemic_type: "SOURCE_FACT", authorship_state: "HUMAN_ORIGINAL"}, reason_code: "BUDGET_REVIEW_REQUIRED"}
+  - name: conflict_review_reason
+    instance: {execution_id: "EX-2026-000055", status: "NEEDS_HUMAN_REVIEW", evaluated_at: "2026-08-30T10:06:00Z", provenance: {epistemic_type: "SOURCE_FACT", authorship_state: "HUMAN_ORIGINAL"}, reason_code: "CONFLICT_REQUIRES_HUMAN_REVIEW"}
+  - name: preexisting_worktree_changes_reason
+    instance: {execution_id: "EX-2026-000056", status: "BLOCKED", evaluated_at: "2026-08-30T10:07:00Z", provenance: {epistemic_type: "SOURCE_FACT", authorship_state: "HUMAN_ORIGINAL"}, reason_code: "PREEXISTING_WORKTREE_CHANGES"}
+  - name: offline_source_stale_reason
+    instance: {execution_id: "EX-2026-000057", status: "NEEDS_HUMAN_REVIEW", evaluated_at: "2026-08-30T10:08:00Z", provenance: {epistemic_type: "SOURCE_FACT", authorship_state: "HUMAN_ORIGINAL"}, reason_code: "OFFLINE_SOURCE_STALE"}
 
 invalid:
   - name: status_not_in_final_status_seven_value_enum
@@ -108,3 +127,9 @@ invalid:
       file's own regression test for that class of gap, mirroring
       `tests/contracts/specs/execution/gate.fixtures.yaml`'s equivalent
       case for the sibling file.
+  - name: future_only_reason_code_is_not_emittable
+    instance: {execution_id: "EX-2026-000058", status: "BLOCKED", evaluated_at: "2026-08-30T10:09:00Z", provenance: {epistemic_type: "SOURCE_FACT", authorship_state: "HUMAN_ORIGINAL"}, reason_code: "PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED"}
+    reason: "The NEW_PROPOSED future code is excluded from the nine currently-emittable reason codes."
+  - name: reason_code_rejected_for_pass
+    instance: {execution_id: "EX-2026-000059", status: "PASS", evaluated_at: "2026-08-30T10:10:00Z", provenance: {epistemic_type: "SOURCE_FACT", authorship_state: "HUMAN_ORIGINAL"}, reason_code: "DOCUMENT_RESOLUTION_BLOCKED"}
+    reason: "reason_code is only compatible with BLOCKED or NEEDS_HUMAN_REVIEW final status."

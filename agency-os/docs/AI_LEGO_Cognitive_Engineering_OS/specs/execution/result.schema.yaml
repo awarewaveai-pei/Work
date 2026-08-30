@@ -7,9 +7,10 @@ status: ACTIVE
 description: >
   Canonical machine-readable definition of the Execution Result — the
   standalone record of how one whole Execution (an `EX-*` run) ended: its
-  Final Status (EC §70), which Global/High-risk gates ran and how (EC §69),
-  the evidence bundle behind that determination (EC §65), and any artifacts
-  it produced. EC §92 promises this file (`result.schema.yaml`, L2766-2781,
+  Final Status (EC §70), its optional canonical reason_code when that outcome
+  is BLOCKED or NEEDS_HUMAN_REVIEW (ADR-019), which Global/High-risk gates ran
+  and how (EC §69), the evidence bundle behind that determination (EC §65),
+  and any artifacts it produced. EC §92 promises this file (`result.schema.yaml`, L2766-2781,
   the file itself named at L2781) but never gives it field-level shape there
   — §92 is only a directory listing. This file supplies that shape by
   compiling EC §64's `results{status, gates}` sub-block (L2178-2181, the
@@ -29,9 +30,9 @@ description: >
   `EX-*` run, which may invoke many methods across a workflow — see
   `manifest.schema.yaml`'s `method_execution_log[]`), not the typed
   input/output contract for one `cognitive.execute_method` invocation. The
-  future `cognitive/typed-method-result.schema.yaml`
-  (MACHINE_READABLE_SPEC_PLAN.md §2.3 row, L122) is the file that will
-  actually close CROSS-R-3, and that row already names this file
+  `cognitive/typed-method-result.schema.yaml`
+  (MACHINE_READABLE_SPEC_PLAN.md §2.3 row, L122) is the file that closes
+  CROSS-R-3, and that row already names this file
   (`execution/result.schema.yaml`) as its own dependency — see
   `referenced_by` below. This file is the single source of truth for the
   whole-execution result shape; the mother documents and
@@ -258,6 +259,14 @@ compilation_decisions:
       compile from — typing them would be guessing, which R0 and
       `AGENTS.md`'s 補丁判準 both forbid ("未讀現有邏輯即重寫 / 猜測補未知").
 
+# ADR-019 placement decision (2026-08-30): reason_code belongs to this
+# whole-execution result, which owns the EC §70 final status. The state
+# machine's optional trigger_signal remains transition-local evidence; a
+# second synonymous field there would create two sources of truth. The
+# vocabulary is hard-$ref'd from status-codes.schema.yaml, whose registry is
+# the sole owner of named signals. The field is schema-optional for historical
+# records, while new BLOCKED/NEEDS_HUMAN_REVIEW producers must emit it.
+
 # ---------------------------------------------------------------------------
 # Schema body
 # ---------------------------------------------------------------------------
@@ -455,6 +464,14 @@ properties:
       additive, non-breaking key) is now resolved by this fix, not merely
       proposed.
 
+  reason_code:
+    $ref: "ai-lego://specs/execution/status-codes.schema.yaml#/reference_vocabulary/emittable_reason_codes/schema"
+    description: >
+      OPTIONAL canonical cause for a BLOCKED or NEEDS_HUMAN_REVIEW final
+      status. New producers must emit it for those outcomes; historical
+      records remain valid without it. The hard $ref permits only the nine
+      currently-emittable named signals in status-codes.schema.yaml.
+
   rationale:
     type: string
     description: >
@@ -526,6 +543,16 @@ properties:
       compilation_decisions on why §121's 19 narrative sections are not
       individually machine-typed by this file.
 
+allOf:
+  # Historical records can omit reason_code. A present reason is valid only
+  # for the two escalated final states, preventing a PASS-with-block-reason.
+  - if:
+      required: [reason_code]
+    then:
+      properties:
+        status:
+          enum: [BLOCKED, NEEDS_HUMAN_REVIEW]
+
 constraints:
   description: >
     Cross-field rules this schema's JSON-Schema `properties` block above
@@ -535,6 +562,7 @@ constraints:
   rules:
     - "gates[].rationale MUST be present when gates[].status == NOT_APPLICABLE (EC §69 L2293, verbatim). **Fixed 2026-08-30**: this was prose-only (no structural enforcement) until a critic review caught the gap by PoC — `definitions/gate_result` now also carries a real `if`/`then` making this rule machine-enforced, not just documented; this prose line is kept as the human-readable citation, not the sole enforcement mechanism."
     - "rationale (top-level) SHOULD be present whenever status != PASS; if present, MUST NOT be one of EC §70's forbidden vague answers (L2311-2318: 應該好了/看起來沒問題/大概完成)."
+    - "Newly emitted BLOCKED or NEEDS_HUMAN_REVIEW results MUST carry reason_code. The additive schema keeps historical records without it valid; if reason_code is present, status MUST be BLOCKED or NEEDS_HUMAN_REVIEW."
     - "rollback_ref SHOULD be non-null when status == ROLLED_BACK (EC §70 L2307); MAY be non-null for other statuses if a partial rollback occurred en route (e.g. PARTIAL_SUCCESS)."
     - "outputs[] and evidence[].hash entries are plain sha256 hashes (cas-path.schema.yaml#/definitions/sha256_hash), not full tenant-scoped cas_path objects — resolving a hash to its storage path is that schema's job, not this file's, matching Atlas §16.3's own hash-only precedent."
 
@@ -544,7 +572,7 @@ constraints:
 # ---------------------------------------------------------------------------
 referenced_by:
   - "manifest.schema.yaml's `properties/results` sub-block is the stub this file formalizes/expands (see open_questions.OQ-RESULT-1 for the un-actioned upgrade)."
-  - "cognitive/typed-method-result.schema.yaml (not yet built; MACHINE_READABLE_SPEC_PLAN.md §2.3 row, L122, lists 'execution/result.schema.yaml' as its own dependency) — the future per-method-invocation output type that will actually resolve CROSS-R-3 in full. This file's top-level description explains the scope split between the two."
+  - "cognitive/typed-method-result.schema.yaml (built; MACHINE_READABLE_SPEC_PLAN.md §2.3 row, L122, lists 'execution/result.schema.yaml' as its dependency) — the per-method-invocation output type that resolves CROSS-R-3 in full. This file's top-level description explains the scope split between the two."
 
 open_questions:
   - id: "OQ-RESULT-1"

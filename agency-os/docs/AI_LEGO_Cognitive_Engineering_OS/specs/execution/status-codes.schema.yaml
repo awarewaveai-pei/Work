@@ -66,8 +66,9 @@ decided_by: >
   silently decided.
 
 # ---------------------------------------------------------------------------
-# Reference vocabulary (NOT redefined here — cited verbatim from EC §10/§70;
-# this file's only job is mapping named signals onto these existing values).
+# Reference vocabulary: legal side/final states remain cited verbatim from
+# EC §10/§70. This file maps named signals onto them and exposes the derived,
+# referenceable active reason-code vocabulary for result consumers.
 # ---------------------------------------------------------------------------
 reference_vocabulary:
   legal_side_states:
@@ -93,6 +94,15 @@ reference_vocabulary:
     schema:
       type: string
       enum: [PASS, PASS_WITH_APPROVED_RISK, BLOCKED, FAILED, NEEDS_HUMAN_REVIEW, ROLLED_BACK, PARTIAL_SUCCESS]
+  emittable_reason_codes:
+    source: "status_codes[] entries with status: EXISTING_CONSOLIDATED, excluding NEEDS_HUMAN_REVIEW because it is a legal side state rather than a named signal"
+    values: [METHOD_RESOLUTION_BLOCKED, DOCUMENT_RESOLUTION_BLOCKED, CURRENT_STATE_DRIFT_DETECTED, SCOPE_CHANGE_REQUIRED, LEGAL_REVIEW_REQUIRED, BUDGET_REVIEW_REQUIRED, CONFLICT_REQUIRES_HUMAN_REVIEW, PREEXISTING_WORKTREE_CHANGES, OFFLINE_SOURCE_STALE]
+    # Referenceable vocabulary for execution/result.schema.yaml reason_code.
+    # NEW_PROPOSED PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED is not emitted;
+    # NEEDS_HUMAN_REVIEW is the side state, not a named cause.
+    schema:
+      type: string
+      enum: [METHOD_RESOLUTION_BLOCKED, DOCUMENT_RESOLUTION_BLOCKED, CURRENT_STATE_DRIFT_DETECTED, SCOPE_CHANGE_REQUIRED, LEGAL_REVIEW_REQUIRED, BUDGET_REVIEW_REQUIRED, CONFLICT_REQUIRES_HUMAN_REVIEW, PREEXISTING_WORKTREE_CHANGES, OFFLINE_SOURCE_STALE]
 
 # ---------------------------------------------------------------------------
 # Duplicate resolution: METHOD_RESOLUTION_BLOCKED vs
