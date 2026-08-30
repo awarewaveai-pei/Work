@@ -2221,37 +2221,7 @@ Release Mode
 
 # 68. Global Gates
 
-可能包含：
-
-```text
-Functional
-Evidence
-Reasoning
-Security
-Privacy
-Data
-Jurisdiction
-Localization
-Accessibility
-Observability
-Capacity
-Rollback
-Documentation
-Golden Test
-```
-
-High-risk：
-
-```text
-Human Specialist
-Counterevidence
-Red Team
-Independent Review
-Reversal Criteria
-Recovery Rehearsal
-```
-
-Method-specific gate 從 Method Atlas 取得。
+Global/High-risk Gate 清單的唯一正本見 Master Plan §158 — SSOT（see Master Plan §158 — SSOT），禁止在本文件重複列舉或另立命名。Method-specific gate 從 Method Atlas §22.3 取得，維持不變。
 
 ---
 
