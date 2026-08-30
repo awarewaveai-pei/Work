@@ -2538,11 +2538,23 @@ ClaimRejected
 StrategyGenerated
 StrategyApproved
 ArtifactPublished
+PersonalDataRedacted
 ```
 
 Current State = Events 的 Projection。
 
 可以 Replay 到任意歷史狀態。
+
+## 57.1 個資分級標註（Confidential/Restricted Event Types）
+
+依 §61 資料分級，下列既有 event type 含 Confidential/Restricted 分級欄位，寫入前必須套用 Execution Contract §27.1 Encrypted Field Envelope：
+
+```text
+DocumentUploaded  — 可能含身分文件等 Restricted 欄位
+ClaimCreated      — 可能含理賠人個資（如身分證號）等 Confidential/Restricted 欄位
+```
+
+`PersonalDataRedacted` 為稽核輔助角色事件（機器可讀正本：`specs/domain/personal-data-redacted-event.schema.yaml`），記錄「何時、依哪個 Authorization、對哪個 subject 的哪些欄位執行了 crypto-shred」。此事件本身不是刪除機制——原始事件（如 `ClaimCreated`）在 crypto-shred 後仍完整保留（含密文，見 Execution Contract §27.1），僅供 projection read path 疊加 `REDACTED` 呈現與稽核之用（對應 Execution Contract §31.1 Deletion Evidence 步驟）。單獨依賴此事件存在本身，不構成合規刪除的充分證明。
 
 ---
 
