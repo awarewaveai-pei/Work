@@ -173,11 +173,7 @@ Normative Context Bundle
 
 # 4. Document Registry
 
-建議：
-
-```text
-/specs/governance/document-registry.yaml
-```
+建議：Document Registry 檔案的實際路徑由 repo-layout spec 決定，見 `docs/architecture/REPOSITORY_ARCHITECTURE.md`（Phase-4-owned repo-layout spec；過渡期草稿落點 `.ai/research/phase-2/repo-layout-draft.yaml`，標記 `status: DRAFT_PENDING_PHASE_4`）。
 
 範例：
 
@@ -602,11 +598,7 @@ CURRENT_STATE_DRIFT_DETECTED
 
 # 12. Current State Artifact
 
-Runtime 工作路徑：
-
-```text
-/.ai/tasks/{task_id}/current-state/
-```
+Runtime 工作路徑：Current State Artifact 的實際存放位置由 repo-layout spec 決定，見 `docs/architecture/REPOSITORY_ARCHITECTURE.md`。此路徑始終是 workspace path，非永久 identity（見下方「注意」段落，永久 identity 一律使用 `task_id / execution_id / artifact_id / hash`）。
 
 內容：
 
@@ -690,24 +682,7 @@ METHOD_RESOLUTION_BLOCKED
 
 # 15. Task Execution Packet
 
-每個非 trivial task 編譯：
-
-```text
-/.ai/tasks/{task_id}/
-├── TASK.md
-├── task.manifest.yaml
-├── normative-context.yaml
-├── current-state/
-├── risk-assessment.yaml
-├── methods.yaml
-├── change-plan.yaml
-├── rollback-plan.yaml
-├── acceptance.yaml
-├── gates.yaml
-├── evidence/
-├── results/
-└── handoff/
-```
+每個非 trivial task 編譯出一份 Task Execution Packet，須包含以下內容類別：任務定義、任務清單（manifest）、規範性上下文、current-state 快照、風險評估、方法選用紀錄、變更計畫、rollback 計畫、驗收標準、gate 定義、evidence、執行結果、handoff。確切檔名與目錄樹形狀由 repo-layout spec 決定，見 `docs/architecture/REPOSITORY_ARCHITECTURE.md`（過渡期草稿 `.ai/research/phase-2/repo-layout-draft.yaml`，`status: DRAFT_PENDING_PHASE_4`）。
 
 ---
 
@@ -963,11 +938,7 @@ Nontrivial Vendor Lock-in
 Exception to Architecture Invariant
 ```
 
-建議路徑：
-
-```text
-/docs/adr/ADR-XXXX-<slug>.md
-```
+建議路徑：ADR 檔案的存放慣例與命名規則由 repo-layout spec 決定，見 `docs/architecture/REPOSITORY_ARCHITECTURE.md`。
 
 ---
 
@@ -2364,19 +2335,7 @@ Final Status
 
 # 72. Handoff Files
 
-建議：
-
-```text
-/.ai/tasks/{task_id}/handoff/
-├── EXECUTION_RESULT.md
-├── execution-result.yaml
-├── changed-paths.txt
-├── test-results.yaml
-├── gate-results.yaml
-├── rollback-evidence.yaml
-├── known-risks.yaml
-└── evidence-index.yaml
-```
+建議：Handoff 須包含以下內容類別：執行結果說明、結構化執行結果、變更路徑清單、測試結果、gate 結果、rollback 證據、已知風險、evidence 索引。確切檔名與目錄樹形狀由 repo-layout spec 決定，見 `docs/architecture/REPOSITORY_ARCHITECTURE.md`。
 
 ---
 
@@ -2744,108 +2703,37 @@ All migrations have rollback metadata
 All high-risk capabilities require gate
 ```
 
-路徑：
-
-```text
-/tests/architecture/
-```
+路徑：Architecture Fitness Function 測試的落點由 repo-layout spec 決定，見 `docs/architecture/REPOSITORY_ARCHITECTURE.md`。
 
 ---
 
 # 91. Policy-as-Code Paths
 
-```text
-/policies/ai-execution/
-├── authority.yaml
-├── risk-tiers.yaml
-├── mandatory-gates.yaml
-├── tool-permissions.yaml
-├── forbidden-actions.yaml
-├── network-egress.yaml
-├── exception-policy.yaml
-└── release-policy.yaml
-```
+Policy-as-Code（authority、risk-tiers、mandatory-gates、tool-permissions、forbidden-actions、network-egress、exception-policy、release-policy 等 8 類策略）須各自為機讀、版本化、可獨立於程式碼演進的檔案。實際目錄由 repo-layout spec 決定，見 `docs/architecture/REPOSITORY_ARCHITECTURE.md`。
 
 ---
 
 # 92. Machine-readable Execution Specs
 
-```text
-/specs/execution/
-├── task.schema.yaml
-├── document-registry.schema.yaml
-├── current-state.schema.yaml
-├── risk.schema.yaml
-├── authority.schema.yaml
-├── method-resolution.schema.yaml
-├── change-plan.schema.yaml
-├── rollback.schema.yaml
-├── gate.schema.yaml
-├── exception.schema.yaml
-├── manifest.schema.yaml
-├── result.schema.yaml
-└── handoff.schema.yaml
-```
+Execution 生命週期涉及的機讀 schema（task、document-registry、current-state、risk、authority、method-resolution、change-plan、rollback、gate、exception、manifest、result、handoff 等 13 類契約）須各自版本化為獨立 schema。實際目錄由 repo-layout spec 決定，見 `docs/architecture/REPOSITORY_ARCHITECTURE.md`。
 
 ---
 
 # 93. Governance Documentation Paths
 
-```text
-/docs/governance/
-├── ai-execution/
-│   ├── lifecycle.md
-│   ├── authority.md
-│   ├── risk-classification.md
-│   ├── rollback-first.md
-│   └── handoff.md
-├── adr/
-└── runbooks/
-```
+AI 執行治理文件（lifecycle、authority、risk-classification、rollback-first、handoff 等說明文件，含 ADR 與 runbook）須人類可讀且與機讀 spec 一一對應。實際目錄由 repo-layout spec 決定，見 `docs/architecture/REPOSITORY_ARCHITECTURE.md`。
 
 ---
 
 # 94. Test Paths
 
-```text
-/tests/governance/ai-execution/
-├── document-resolution/
-├── state-machine/
-├── authority/
-├── risk/
-├── gate-injection/
-├── rollback/
-├── scope/
-├── prompt-injection/
-├── secrets/
-├── jurisdiction/
-├── replay/
-└── handoff/
-```
+AI 執行治理的每個面向（document-resolution、state-machine、authority、risk、gate-injection、rollback、scope、prompt-injection、secrets、jurisdiction、replay、handoff 等 12 類）須有對應的自動化測試覆蓋。實際目錄由 repo-layout spec 決定，見 `docs/architecture/REPOSITORY_ARCHITECTURE.md`。
 
 ---
 
 # 95. Execution Runtime Modules
 
-建議：
-
-```text
-/platform/ai-execution/
-├── document_resolver/
-├── normative_context/
-├── current_state/
-├── task_classifier/
-├── risk_engine/
-├── method_resolver/
-├── plan_compiler/
-├── authority/
-├── tool_broker/
-├── execution_runtime/
-├── gate_engine/
-├── rollback/
-├── audit/
-└── handoff/
-```
+建議：Execution Runtime 依生命週期切分為獨立模組（document 解析、normative context、current state、task 分類、risk engine、method resolver、plan compiler、authority、tool broker、execution runtime、gate engine、rollback、audit、handoff 等 14 個模組），彼此邊界清楚、可獨立替換。實際目錄由 repo-layout spec 決定，見 `docs/architecture/REPOSITORY_ARCHITECTURE.md`（Phase-4-owned repo-layout spec；過渡期草稿 `.ai/research/phase-2/repo-layout-draft.yaml`，`status: DRAFT_PENDING_PHASE_4`）。
 
 ---
 
@@ -4012,13 +3900,7 @@ MONITOR / LEARN / REVERSE WHEN NEEDED
 
 ## Phase 0 — Normative Bootstrap
 
-建立：
-
-```text
-/specs/governance/document-registry.yaml
-/specs/execution/*.schema.yaml
-/policies/ai-execution/*.yaml
-```
+建立：Document Registry、Execution Specs schema、Policy-as-Code 檔案（機讀規範的最小集合）。實際目錄由 repo-layout spec 決定，見 `docs/architecture/REPOSITORY_ARCHITECTURE.md`。
 
 預期結果：
 
@@ -4026,13 +3908,7 @@ AI 能 machine-read 規範，而不是只靠 prompt 記憶。
 
 ## Phase 1 — Current State + Risk Compiler
 
-建立：
-
-```text
-/platform/ai-execution/current_state/
-/platform/ai-execution/task_classifier/
-/platform/ai-execution/risk_engine/
-```
+建立：Current State 重建、Task 分類、Risk Engine 三個 runtime 模組。實際目錄由 repo-layout spec 決定，見 `docs/architecture/REPOSITORY_ARCHITECTURE.md`。
 
 預期結果：
 
@@ -4040,12 +3916,7 @@ AI 不再 patch-first。
 
 ## Phase 2 — Method / Gate Compiler
 
-建立：
-
-```text
-/platform/ai-execution/method_resolver/
-/platform/ai-execution/gate_engine/
-```
+建立：Method Resolver、Gate Engine 兩個 runtime 模組。實際目錄由 repo-layout spec 決定，見 `docs/architecture/REPOSITORY_ARCHITECTURE.md`。
 
 直接解析 Method Atlas / Method Specs。
 
@@ -4055,13 +3926,7 @@ AI 不再 patch-first。
 
 ## Phase 3 — Rollback / Authority
 
-建立：
-
-```text
-/platform/ai-execution/rollback/
-/platform/ai-execution/authority/
-/platform/ai-execution/tool_broker/
-```
+建立：Rollback、Authority、Tool Broker 三個 runtime 模組。實際目錄由 repo-layout spec 決定，見 `docs/architecture/REPOSITORY_ARCHITECTURE.md`。
 
 預期結果：
 
@@ -4069,13 +3934,7 @@ AI 不再 patch-first。
 
 ## Phase 4 — Handoff / Audit / Replay
 
-建立：
-
-```text
-/platform/ai-execution/audit/
-/platform/ai-execution/handoff/
-/platform/ai-execution/replay/
-```
+建立：Audit、Handoff、Replay 三個 runtime 模組。實際目錄由 repo-layout spec 決定，見 `docs/architecture/REPOSITORY_ARCHITECTURE.md`（Phase-4-owned repo-layout spec；過渡期草稿 `.ai/research/phase-2/repo-layout-draft.yaml`，`status: DRAFT_PENDING_PHASE_4`）。
 
 預期結果：
 
