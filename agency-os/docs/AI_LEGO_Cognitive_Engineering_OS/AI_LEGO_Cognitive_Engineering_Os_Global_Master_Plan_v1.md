@@ -580,17 +580,7 @@ AI Gateway 負責：
 - Audit
 - Observability
 
-確切路徑：
-
-```text
-/ai/
-    /gateway/
-    /providers/
-    /models/
-    /routing/
-    /budgets/
-    /evaluation/
-```
+AI Gateway 的實作子模組（Provider Abstraction、Model Routing、Budget、Evaluation 等，見上方職責清單）的實際目錄切分方式由 repo-layout spec 決定，本文件不鎖定路徑字串。目錄結構見 `docs/architecture/REPOSITORY_ARCHITECTURE.md`（Phase-4-owned repo-layout spec；過渡期草稿落點 `.ai/research/phase-2/repo-layout-draft.yaml`，標記 `status: DRAFT_PENDING_PHASE_4`）。
 
 預期結果：
 
@@ -734,26 +724,7 @@ ValidatedStrategyInputs → StrategyArtifact
 - AI 必須到 Atlas 讀取該 Method 的 Contract、限制、輸入、輸出與 Quality Gate。
 - 未來新增 Method 原則上只更新 Atlas / machine-readable method specs，不修改平台 Domain Kernel。
 
-確切路徑：
-
-```text
-/specs/cognitive/
-    primitive.schema.yaml
-    method.schema.yaml
-    lens.schema.yaml
-    representation.schema.yaml
-    recipe.schema.yaml
-
-/methods/
-    registry/
-    contracts/
-    versions/
-
-/compiler/
-    method-selector/
-    compatibility/
-    mandatory-gates/
-```
+Method 的機讀規格（primitive/method/lens/representation/recipe schema）、registry/contracts/versions 的版本化登記、以及 method-selector/compatibility/mandatory-gates 的編譯邏輯，三者的實際目錄佈局由 repo-layout spec 決定，見 `docs/architecture/REPOSITORY_ARCHITECTURE.md`（過渡期草稿 `.ai/research/phase-2/repo-layout-draft.yaml`，`status: DRAFT_PENDING_PHASE_4`）。
 
 預期結果：
 
@@ -812,16 +783,7 @@ nodes:
     ref: artifact.generate_research_paper
 ```
 
-確切路徑：
-
-```text
-/workflows/
-    /ir/
-    /compiler/
-    /recipes/
-    /validation/
-    /runtime/
-```
+Workflow Intermediate Representation、Compiler、Recipe、Validation、Runtime 五個子系統彼此邊界清楚、可獨立替換（見上方「UI 可換 / Workflow Engine 可換 / AI 模型可換」預期結果），實際目錄佈局由 repo-layout spec 決定，見 `docs/architecture/REPOSITORY_ARCHITECTURE.md`。
 
 預期結果：
 
@@ -966,17 +928,9 @@ AI 永遠不得覆蓋。
 
 `authorship_state` 唯一正本見 `specs/governance/epistemic-label.schema.yaml#/definitions/authorship_state`（6 值：HUMAN_ORIGINAL / AI_GENERATED / AI_SUGGESTED / HUMAN_EDITED / HUMAN_APPROVED / SOURCE_QUOTATION）。原第 7 值 `CALCULATED RESULT` 已移除——經 ADR-004 確認為誤植自 §83 epistemic_type 的重複字串，非真實的第 7 種 authorship 概念。
 
-## 12.2 確切路徑
+## 12.2 追蹤檔案分類
 
-```text
-/authorship/
-    contribution-map.json
-    human-edits.json
-    ai-assistance.json
-    source-provenance.json
-    citation-validation.json
-    version-history.json
-```
+Authorship & Integrity Plane 須維護六類追蹤資料：貢獻地圖（contribution map）、人工編輯紀錄、AI 輔助紀錄、來源溯源、引用驗證、版本歷史。實際檔案佈局由 repo-layout spec 決定，見 `docs/architecture/REPOSITORY_ARCHITECTURE.md`（過渡期草稿 `.ai/research/phase-2/repo-layout-draft.yaml`，`status: DRAFT_PENDING_PHASE_4`）。
 
 ## 12.3 Compliance Profile
 
