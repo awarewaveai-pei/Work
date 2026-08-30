@@ -2,7 +2,7 @@ $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "ai-lego://policies/ai-execution/network-egress.yaml"
 title: Network Egress Policy
 version: "1.0.0"
-status: PROVISIONAL
+status: PARTIALLY_DEFINED  # 2026-08-30: allowlist 主體已由操作者提供並填入 seed_content.rules 的 EGRESS-EC99-2；OQ-EGRESS-2/3 仍待決，見 open_questions
 
 description: >
   Canonical machine-readable STRUCTURE for the Network Egress policy named
@@ -331,9 +331,53 @@ seed_content:
       condition: "destination = external domain"
       default_policy: deny
       action: ALLOWLIST_GATED
-      allowlist: []
+      allowlist:
+        # 2026-08-30 操作者於對話中提供：① aware-wave.com DNS zone 全文匯出
+        # ② wusheng.foundation/hope-flow.org/weartheworld.org/chi.aware-wave.com
+        # 手動補充。單人公司（見 authority.schema.yaml role_to_authority_mapping
+        # 2026-08-30 決議），目前無多租戶區隔需求，此為 global default scope。
+        # 第一方網域（AwareWave 自有／代管）：
+        - "aware-wave.com"
+        - "www.aware-wave.com"
+        - "api.aware-wave.com"
+        - "app.aware-wave.com"
+        - "cognitive.aware-wave.com"
+        - "chi.aware-wave.com"
+        - "docs.aware-wave.com"
+        - "ks-aw-01.aware-wave.com"
+        - "mainwp.aware-wave.com"
+        - "n8n.aware-wave.com"
+        - "oracle.aware-wave.com"
+        - "portal.aware-wave.com"
+        - "postiz.aware-wave.com"
+        - "remotion-svc.aware-wave.com"
+        - "studio.aware-wave.com"
+        - "supabase.aware-wave.com"
+        - "trigger.aware-wave.com"
+        - "trust.aware-wave.com"
+        - "uptime.aware-wave.com"
+        - "video-svc.aware-wave.com"
+        # 客戶/專案網域（操作者代管的獨立品牌站）：
+        - "wusheng.foundation"
+        - "hope-flow.org"
+        - "weartheworld.org"
+        # 既有已知第三方整合（AGENTS.md 已記載的實際串接，非本次新猜測）：
+        - "github.com"
+        - "api.anthropic.com"
+        - "api.openai.com"
+        - "chatgpt.com"
+        - "resend.com"
+        - "api.resend.com"
+        - "amazonses.com"
+        - "api.cloudflare.com"
       classification_tag_ref: null
-      mechanism_ref: null
+      mechanism_ref: >-
+        2026-08-30 操作者提供第一方網域清單（DNS zone 全文 + 口頭補充 4 個），
+        解除 OQ-EGRESS-1 主要阻塞。第三方整合網域取自 AGENTS.md 既有記載的
+        真實串接（非新猜測）。**未完成**：per-tenant/per-project 細分
+        （OQ-EGRESS-1 原問的另一半）——目前 HCI/Cognitive OS 尚無真實外部
+        customer tenant，暫以 global default 處理；有真實多租戶客戶時需
+        重新檢視是否要拆分。
       source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §99 (L2928-2932)"
       mother_doc_text: "外部 domain：allowlist"
 
@@ -377,17 +421,19 @@ seed_content:
 # ADR-011 — cited here for its original PROVISIONAL-precedent shape).
 # ---------------------------------------------------------------------------
 allowlist_registry:
-  status: PROVISIONAL_PENDING_OPERATOR_SIGNOFF
+  status: OPERATOR_SIGNED_OFF  # 2026-08-30, see EGRESS-EC99-2.mechanism_ref for source
   this_file_does: >
     Defines the `egress_rule` SHAPE, including the `allowlist` field's
     type (array of domain strings) and the rule under which it is
     consulted (scope EXTERNAL_DOMAIN_ROUTING, action ALLOWLIST_GATED).
+    2026-08-30: `EGRESS-EC99-2.allowlist` now carries the operator's real
+    global-default domain list (first-party + known third-party
+    integrations) — no longer a bare empty structural example.
   this_file_does_not: >
-    Does not name a single real domain anywhere. Does not pick a
-    per-tenant, per-project, or global allowlist scope. Does not assume
-    every deployment shares one allowlist. Populating `allowlist` with
-    real values for a real deployment is an operator decision this file
-    stops short of, deliberately.
+    Does not yet pick a PER-TENANT or PER-PROJECT allowlist scope — only a
+    single global-default list (see EGRESS-EC99-2.mechanism_ref). That finer
+    split remains open until a real external customer tenant exists (HCI /
+    Cognitive OS are pre-launch as of 2026-08-30).
   allowlist_entry_shape:
     _status: ILLUSTRATIVE_NON_NORMATIVE
     _warning: >
@@ -400,19 +446,26 @@ allowlist_registry:
 
 open_questions:
   - id: "OQ-EGRESS-1"
+    status: PARTIALLY_RESOLVED_BY_HUMAN
     question: >
       What actual domains belong on any `EXTERNAL_DOMAIN_ROUTING` rule's
       `allowlist`, for which environment/tenant/project? Zero grounding
       exists in the mother documents, any accepted ADR, or any
       `.ai/research/` artifact (verified by grep). This is the file's
       central open question.
+    resolution: >
+      2026-08-30 操作者於對話中提供 aware-wave.com 完整 DNS zone 匯出 +
+      4 個補充網域，回答了「哪些網域」的部分。「per-tenant/per-project」
+      的部分仍未答——目前以 global default 處理（見
+      EGRESS-EC99-2.mechanism_ref），因為尚無真實外部 customer tenant。
     owner: "operator"
     blocks: >
       Real enforcement of any EXTERNAL_DOMAIN_ROUTING rule — this file's
       rule STRUCTURE is usable today (an empty allowlist correctly enforces
       total deny-by-default per EC §99), but no external domain can be
       lawfully reached under this policy until an operator supplies real
-      values.
+      values. **RESOLVED for the global-default case** — remains open only
+      for the future per-tenant/per-project split.
   - id: "OQ-EGRESS-2"
     question: >
       Should EC §99's 3 concerns instead be modeled as one unified layered

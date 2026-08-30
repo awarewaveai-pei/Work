@@ -1,10 +1,10 @@
 # REPOSITORY_ARCHITECTURE
-Status: PROPOSED
+Status: ACCEPTED（2026-08-30，操作者於對話中明示核准："我核准了"）
 Date: 2026-08-29
 
 > 依 `source-directive-2026-08-28.md` §XII 產出（Phase 4 交付物清單第 7 項）。本文件遵守該指令「不要因為原文件寫了某個 path 就盲目照抄，先驗證 bounded contexts」與 ADR-006 §(b) 折衷方案的過渡處置——三母文件現有的具體路徑（§80 程式碼目錄、Atlas §17 確切工程路徑、EC §95 Execution Runtime Modules 等）一律視為**草稿訊號**，本文件逐一驗證後才決定保留、合併、搬移或推翻，不是逐字轉抄。
 >
-> 唯讀邊界確認：本次任務全程僅 Read/Grep，未建立任何目錄或檔案，未修改三母文件。若操作者核准，下一步是把本文件內容落地為 `.ai/research/phase-2/repo-layout-draft.yaml`（ADR-006 已預留的落點），而非直接建立實體目錄——Phase 4 才是這份 spec 的正式擁有者。
+> 唯讀邊界確認：本次任務全程僅 Read/Grep，未建立任何目錄或檔案，未修改三母文件。**已完成**：核准後已把本文件內容落地為 `.ai/research/phase-2/repo-layout-draft.yaml`（ADR-006 已預留的落點，status: DRAFT_PENDING_PHASE_4）——採指標式落地（頂層目錄摘要 + 指回本文件），不重複 350 行完整內容，避免與本文件產生第二份正本。Phase 4 才是這份 spec 的正式擁有者，屆時重新驗證後推進為 ACCEPTED。
 
 ---
 

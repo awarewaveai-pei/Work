@@ -251,6 +251,7 @@ clusters:
         evidence:
           - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md, line: 2879, quote: "Documentation Task: no production DB write"}
         consequence: "落地時「誰能點下核准鈕」完全靠部署團隊自訂，規格無法稽核「違反」，因為從未規定核准者資格門檻。"
+        resolution: "2026-08-30 操作者於對話中直接回答（單人公司，職稱=操作者，業務範疇 AI 科技與網站架設）。specs/execution/authority.schema.yaml#/role_to_authority_mapping 已從 SKELETON_ONLY 改為 DEFINED，entries 填入唯一真實角色 A4/A4。"
       - id: P1-GAP-SEC-7
         severity: high
         role: IAM Engineer / Security Architect

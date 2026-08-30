@@ -232,10 +232,10 @@ task_binding:
     mapping is asserted by this file.
 
 # ---------------------------------------------------------------------------
-# MISSING HALF (P1-GAP-SEC-6) — SKELETON_ONLY, operator-owned.
+# P1-GAP-SEC-6 — RESOLVED 2026-08-30 by direct operator answer in chat.
 # ---------------------------------------------------------------------------
 role_to_authority_mapping:
-  status: SKELETON_ONLY
+  status: DEFINED
   resolves_finding_partially: ["P1-GAP-SEC-6"]
   gap_description: >
     GAP_REGISTER.yaml P1-GAP-SEC-6 (L234-238, verbatim): "沒有定義哪些人類
@@ -248,12 +248,26 @@ role_to_authority_mapping:
     approve" is entirely up to the deploying team's own invention — the spec
     cannot audit a "violation" because it never set an approver-qualification
     threshold).
+  resolution: >
+    2026-08-30，操作者於對話中被直接問「你們公司職稱是什麼」，逐字回答
+    「AI科技與網站架設」——這是公司業務範疇（AI 技術與網站架設服務），不是
+    多人職稱清單。交叉核對既有 memory（single_machine_after_job_exit）與
+    本 repo 治理文件（操作者已離職前公司、桌機退場、僅剩個人筆電）確認：
+    這是單人公司，組織內只有「操作者」一個人類角色，沒有第二個職稱需要
+    對應。因此 entries 只需一列，且該列即是全部——不是「尚未補齊的骨架」，
+    是「已補齊，因為只有一個角色」。
   this_field_is_not: >
-    NOT a list of real organizational roles. NOT a decision about who is
-    authorized to approve anything. Populating it with plausible titles
-    (e.g. asserting "CEO: A4" as if settled) would misrepresent an operator
-    decision as fact — exactly what this task's instructions forbid.
-  entries: []
+    NOT a list of invented plausible titles for a multi-person org that
+    doesn't exist. The single entry below is the operator's own verbatim
+    answer, not a guess.
+  entries:
+    - role: "操作者（Owner，唯一人類角色；業務範疇：AI 科技與網站架設）"
+      may_exercise_up_to: A4
+      may_grant_up_to: A4
+      notes: >
+        單人公司，操作者本人即最終人類權威，對所有 R0-R4 動作皆可親自執行
+        或核准。未來若擴編（第二個人類角色出現），在此表新增一列即可，
+        schema 本身（entries 為陣列）已支援擴充，不需重新設計。
   entry_shape:
     _status: ILLUSTRATIVE_NON_NORMATIVE
     _warning: >

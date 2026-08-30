@@ -1,0 +1,55 @@
+# Phase-4-pending landing point for concrete repo-layout paths, per ADR-006
+# Sub-decision (b) (折衷方案): mother docs keep the narrative-only layering
+# principle; concrete paths live here until Phase 4 formally takes ownership.
+#
+# 2026-08-30: operator approved docs/architecture/REPOSITORY_ARCHITECTURE.md
+# in chat ("我核准了") -- promoted PROPOSED -> ACCEPTED (see that file's own
+# header for the approval note). This draft is the mechanical landing step
+# ADR-006 pre-reserved for that approval; it does NOT duplicate the full
+# 350-line bounded-context analysis (would violate this project's own
+# anti-duplication discipline -- see ADR-006's rejection of Status Quo for
+# exactly this reason: "改一個目錄名 = 改憲法級文件"). It points at the
+# approved source instead.
+
+status: DRAFT_PENDING_PHASE_4
+
+source_document:
+  path: "docs/architecture/REPOSITORY_ARCHITECTURE.md"
+  status: "ACCEPTED (2026-08-30, operator go-ahead in chat: \"我核准了\")"
+  contains: >
+    Full Bounded Context Analysis (23 Domain Model objects x Shared-Kernel
+    test x Engine-complexity test), the complete Proposed Directory Tree
+    (/apps, /core, /modules, /platform, /workers), Worker Placement,
+    Microservice Extraction Threshold, and Rationale for Rejected
+    Alternatives. This file is the single content owner; do not fork a
+    second copy here.
+
+top_level_tree_summary:
+  # Mechanical extraction of ONLY the top-level roots (L87-292 of the
+  # source document has the full nested detail per root) -- enough for a
+  # consumer to know the roots exist without re-deriving them by re-reading
+  # the whole source file every time.
+  - "/apps            — Experience Plane (web/desktop/mobile/api), zero business logic"
+  - "/core/domain     — Shared Kernel, 23 Domain Model objects' schema/invariant of record"
+  - "/core/application — use-case orchestration layer"
+  - "/core/contracts  — Ports all /modules and /platform/workers must implement"
+  - "/modules         — Bounded Contexts (canvas/knowledge/research/business/learning/brainstorm/stakeholders/data-science/...)"
+  - "/platform        — cross-cutting engines (workflow compiler/IR, gates, policy, identity)"
+  - "/workers         — async execution surface"
+
+phase_4_scope: >
+  Phase 4 is the formal owner of this spec (per REPOSITORY_ARCHITECTURE.md's
+  own header). Phase 4's job: re-validate each path above against actual
+  bounded-context boundaries at implementation time (this draft is a
+  carried-forward signal, not a re-litigated conclusion), then promote this
+  file's status from DRAFT_PENDING_PHASE_4 to ACCEPTED and become the
+  canonical machine-readable repo-layout spec that
+  `.ai/proposals/027-repo-layout-pointer-mp` and
+  `.ai/proposals/028-repo-layout-pointer-ec` (both HUMAN_REVIEW as of
+  2026-08-30) point the mother documents at.
+
+open_questions:
+  - id: "OQ-REPOLAYOUT-1"
+    question: "Does the nested detail under each top-level root (full class/engine assignment for all 23 objects) need duplicating into this file, or does Phase 4 read REPOSITORY_ARCHITECTURE.md directly?"
+    owner: "Phase 4"
+    recommendation: "Read directly — this file's job is to exist as the pre-reserved landing point ADR-006 named, not to fork content. Revisit only if Phase 4 tooling requires single-file machine parsing."
