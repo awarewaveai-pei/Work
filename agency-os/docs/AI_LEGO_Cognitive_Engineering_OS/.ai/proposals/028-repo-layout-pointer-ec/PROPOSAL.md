@@ -1,16 +1,16 @@
 ---
 proposal_id: "028"
 slug: "repo-layout-pointer-ec"
-status: HUMAN_REVIEW
+status: APPROVED
 target_document: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
 target_baseline_hash: "2ad2a179944b917fe390119b6340ba9019344d7d15fcc9b77fdda3677937fc1e"
 affected_line_ranges: ["L220-224", "L644-648", "L732-749", "L1005-1009", "L2362-2374", "L2742-2843", "L3988-4059"]
 related_open_questions: ["OQ-11"]
 change_class: "boundary clarification"
 authored_by: "Claude"
-approved_by: null
-approved_at: null
-approval_note: null
+approved_by: "操作者"
+approved_at: "2026-08-30"
+approval_note: "39 個都核准"
 applied_commit: null
 ---
 

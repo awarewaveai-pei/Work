@@ -1,16 +1,16 @@
 ---
 proposal_id: "025"
 slug: "method-id-grammar-fix-atlas-l50"
-status: HUMAN_REVIEW
+status: APPROVED
 target_document: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
 target_baseline_hash: "a47424f96bf6f88023b9870d4112ab1f607e9b424236693572d6a5558d2804a1"
 affected_line_ranges: ["L50"]
 related_open_questions: ["OQ-12"]
 change_class: "semantic correction"
 authored_by: "Claude"
-approved_by: null
-approved_at: null
-approval_note: null
+approved_by: "操作者"
+approved_at: "2026-08-30"
+approval_note: "39 個都核准"
 applied_commit: null
 ---
 
