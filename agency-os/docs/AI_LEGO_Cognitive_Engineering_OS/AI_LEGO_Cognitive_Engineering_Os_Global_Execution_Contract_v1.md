@@ -1227,6 +1227,26 @@ Deletion Evidence
 
 Soft delete 不等於合規刪除。
 
+## 31.1 個資刪除（Crypto-shred）vs 一般 Production Row 刪除
+
+上述十步驟流程對兩種刪除類型皆適用，但「個資刪除（crypto-shred）」與「一般 production row 刪除」在 Dependency Check / Deletion / Verification / Deletion Evidence 四步驟上定義不同（完整分支定義：`specs/execution/data-deletion.schema.yaml`）：
+
+```text
+個資刪除（personal_data_crypto_shred）— 目標是 subject 的 DEK，不是資料列本身
+  Dependency Check   — 找出所有引用此 DEK 的 event / projection / derived artifact
+  Deletion           — 銷毀 DEK 並寫一筆 Key Destruction Record 到獨立稽核日誌；不刪除、不修改任何 event
+  Verification       — 對所有已知引用嘗試 decrypt，確認全部失敗（反面證明）
+  Deletion Evidence  — PersonalDataRedacted 事件（見 Master Plan §57.1）+ Key Destruction Record 兩者皆備，缺一不可
+
+一般 production row 刪除（production_row）
+  Dependency Check   — 一般 foreign-key / cascading 依賴檢查
+  Deletion           — 實體刪除該筆 row／record（非 status flag，Soft delete 不算數）
+  Verification       — 事後查詢確認該筆 row 已physical不存在（正面證明，與 crypto-shred 分支互為鏡像）
+  Deletion Evidence  — §65 Content-addressed Evidence 或 §66 Audit Event
+```
+
+其餘六步驟（Authorization / Legal Hold Check / Retention Check / Dry Run / Count-Scope Preview / Approval）兩種類型共用本節既有定義，不重複分支。
+
 ---
 
 # 32. Security Change Contract
