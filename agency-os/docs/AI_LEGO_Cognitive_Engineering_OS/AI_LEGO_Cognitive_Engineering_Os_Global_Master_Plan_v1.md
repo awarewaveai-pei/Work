@@ -945,7 +945,7 @@ AI 只能：
 人可指定：
 
 ```text
-LOCKED FACT
+LOCKED_FACT
 ```
 
 AI 永遠不得覆蓋。
